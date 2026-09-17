@@ -6,10 +6,12 @@ import { authSql } from '@/db/authClient';
 import { sql } from '@/db/client';
 import { DEFAULT_SITE_FOOTER, type SiteFooter } from '@/lib/site-content';
 import {
+  DEFAULT_SITE_LAYOUT,
   DEFAULT_SITE_SETTINGS,
   DEFAULT_SITE_THEME,
   SETTING_KEYS,
   parseSiteSettings,
+  type SiteLayout,
   type SiteSettings,
   type SiteTheme,
 } from '@/lib/site-settings';
@@ -76,6 +78,21 @@ export async function getSiteTheme(): Promise<SiteTheme> {
     return (await getSiteSettings()).frontendTheme;
   } catch {
     return DEFAULT_SITE_THEME;
+  }
+}
+
+/**
+ * The layout preset alone, for the root layout.
+ *
+ * Same swallow-everything shape as `getSiteTheme`: the setting controls page
+ * composition, not correctness, so a dead pool must not turn into a second,
+ * more confusing failure on top of whatever `getSiteSettings` already hit.
+ */
+export async function getSiteLayout(): Promise<SiteLayout> {
+  try {
+    return (await getSiteSettings()).frontendLayout;
+  } catch {
+    return DEFAULT_SITE_LAYOUT;
   }
 }
 

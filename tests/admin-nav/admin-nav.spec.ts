@@ -34,6 +34,7 @@ const ROUTES = [
   '/admin/query-builder',
   '/admin/player-links',
   '/admin/data-editor',
+  '/admin/brownlow',
   '/admin/db-health',
   '/admin/app-health',
   '/admin/nl-search',

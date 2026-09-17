@@ -4,7 +4,7 @@ import { getApexContent } from '@/db/queries/site-content';
 import { getSiteTotals } from '@/db/queries/overview';
 import { getSiteSettingsForAdmin } from '@/db/queries/site-settings';
 import { renderApexPage } from '@/lib/apex-html';
-import { requireSuperAdmin } from '@/lib/auth/session';
+import { requireCapability } from '@/lib/auth/session';
 import { APEX_METRICS, type ApexTotals } from '@/lib/site-content';
 
 export const dynamic = 'force-dynamic';
@@ -23,7 +23,7 @@ export const dynamic = 'force-dynamic';
  * browser tab would answer a different and much less useful question.
  */
 export async function GET() {
-  await requireSuperAdmin();
+  await requireCapability('site.content');
 
   const [content, settings, totals] = await Promise.all([
     getApexContent(),

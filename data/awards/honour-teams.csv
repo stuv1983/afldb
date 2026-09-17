@@ -1,0 +1,114 @@
+source_key,team_name,player,position,role,club,sort_order,player_id,link_status,note,source_citation
+honourteam:afl-vfl-team-of-the-century:1,AFL/VFL Team of the Century,Bernie Smith,Back,,"Geelong, West Adelaide",0,2175,unique,,wikipedia
+honourteam:afl-vfl-team-of-the-century:2,AFL/VFL Team of the Century,John Nicholls,Back,,Carlton,0,3422,unique,,wikipedia
+honourteam:afl-vfl-team-of-the-century:3,AFL/VFL Team of the Century,Stephen Silvagni,Back,,Carlton,0,136,unique,,wikipedia
+honourteam:afl-vfl-team-of-the-century:4,AFL/VFL Team of the Century,Bruce Doull,Half back,,Carlton,1,1680,unique,,wikipedia
+honourteam:afl-vfl-team-of-the-century:5,AFL/VFL Team of the Century,Kevin Murray,Half back,,"Fitzroy, East Perth",1,2018,unique,,wikipedia
+honourteam:afl-vfl-team-of-the-century:6,AFL/VFL Team of the Century,Ted Whitten,Half back,Captain,Footscray,1,2268,resolved,"Ted Whitten (1951-1970, 321g); Ted Whitten (1974-1982, 144g)",wikipedia
+honourteam:afl-vfl-team-of-the-century:7,AFL/VFL Team of the Century,Francis Bourke,Centre,,Richmond,2,1539,unique,,wikipedia
+honourteam:afl-vfl-team-of-the-century:8,AFL/VFL Team of the Century,Ian Stewart,Centre,,"Hobart, St Kilda, Richmond",2,2193,unique,,wikipedia
+honourteam:afl-vfl-team-of-the-century:9,AFL/VFL Team of the Century,Keith Greig,Centre,,North Melbourne,2,1765,unique,,wikipedia
+honourteam:afl-vfl-team-of-the-century:10,AFL/VFL Team of the Century,Alex Jesaulenko,Half forward,,"Carlton, St Kilda",3,1844,unique,,wikipedia
+honourteam:afl-vfl-team-of-the-century:11,AFL/VFL Team of the Century,Dick Reynolds,Half forward,,Essendon,3,3578,unique,,wikipedia
+honourteam:afl-vfl-team-of-the-century:12,AFL/VFL Team of the Century,Royce Hart,Half forward,,Richmond,3,2367,unique,,wikipedia
+honourteam:afl-vfl-team-of-the-century:13,AFL/VFL Team of the Century,Haydn Bunton Sr.,Forward,,"Fitzroy, Subiaco, Port Adelaide",4,1466,unique,,wikipedia
+honourteam:afl-vfl-team-of-the-century:14,AFL/VFL Team of the Century,John Coleman,Forward,,Essendon,4,1614,unique,,wikipedia
+honourteam:afl-vfl-team-of-the-century:15,AFL/VFL Team of the Century,Leigh Matthews,Forward,,Hawthorn,4,1949,unique,,wikipedia
+honourteam:afl-vfl-team-of-the-century:16,AFL/VFL Team of the Century,Bob Skilton,Follower,,South Melbourne,5,3702,unique,,wikipedia
+honourteam:afl-vfl-team-of-the-century:17,AFL/VFL Team of the Century,Graham 'Polly' Farmer,Follower,,"Geelong, East Perth, West Perth",5,2861,unique,,wikipedia
+honourteam:afl-vfl-team-of-the-century:18,AFL/VFL Team of the Century,Ron Barassi,Follower,,"Melbourne, Carlton",5,,ambiguous,"Ron Barassi (1936-1940, 58g); Ron Barassi (1953-1969, 254g)",wikipedia
+honourteam:afl-vfl-team-of-the-century:19,AFL/VFL Team of the Century,Gary Ablett Sr.,Interchange,,"Hawthorn, Geelong",6,567,resolved,'Sr.' → Gary Ablett (1982-1996),wikipedia
+honourteam:afl-vfl-team-of-the-century:20,AFL/VFL Team of the Century,Greg Williams,Interchange,,"Geelong, Sydney, Carlton",6,142,unique,,wikipedia
+honourteam:afl-vfl-team-of-the-century:21,AFL/VFL Team of the Century,Jack Dyer,Interchange,,Richmond,6,2820,resolved,chosen over 1 other(s) on games played,wikipedia
+honourteam:afl-vfl-team-of-the-century:22,AFL/VFL Team of the Century,Norm Smith,Coach,,"Melbourne, Fitzroy, South Melbourne",8,3711,unique,,wikipedia
+honourteam:greek-team-of-the-century:1,Greek Team of the Century,Ang Christou,Back,,,0,138,unique,,wikipedia
+honourteam:greek-team-of-the-century:2,Greek Team of the Century,George Lakes,Back,,,0,3188,unique,,wikipedia
+honourteam:greek-team-of-the-century:3,Greek Team of the Century,Angelo Lekkas,Half back,,,1,655,unique,,wikipedia
+honourteam:greek-team-of-the-century:4,Greek Team of the Century,Russell Morris,Half back,,,1,1188,unique,,wikipedia
+honourteam:greek-team-of-the-century:5,Greek Team of the Century,Vasil Varlamos,Half back,,,1,9948,unique,,wikipedia
+honourteam:greek-team-of-the-century:6,Greek Team of the Century,Andrew Demetriou,Centre,,,2,1668,unique,,wikipedia
+honourteam:greek-team-of-the-century:7,Greek Team of the Century,Anthony Koutoufides,Centre,,,2,144,unique,,wikipedia
+honourteam:greek-team-of-the-century:8,Greek Team of the Century,Athas Hrysoulakis,Half forward,,,3,11376,unique,,wikipedia
+honourteam:greek-team-of-the-century:9,Greek Team of the Century,Daniel Metropolis,Half forward,,,3,550,unique,,wikipedia
+honourteam:greek-team-of-the-century:10,Greek Team of the Century,Jason Traianidis,Forward,,,4,949,unique,,wikipedia
+honourteam:greek-team-of-the-century:11,Greek Team of the Century,Peter Daicos,Forward,Vice-captain,,4,1253,unique,,wikipedia
+honourteam:greek-team-of-the-century:12,Greek Team of the Century,Spiro Kourkoumelis,Forward,,,4,1905,unique,,wikipedia
+honourteam:greek-team-of-the-century:13,Greek Team of the Century,John Georgiou,Follower,,,5,943,unique,,wikipedia
+honourteam:greek-team-of-the-century:14,Greek Team of the Century,Lou Richards,Follower,Captain,,5,3582,unique,,wikipedia
+honourteam:greek-team-of-the-century:15,Greek Team of the Century,Steve Malaxos,Follower,,,5,,unmatched,no player with this name,wikipedia
+honourteam:greek-team-of-the-century:16,Greek Team of the Century,Chris Pavlou,Interchange,,,6,3512,unique,,wikipedia
+honourteam:greek-team-of-the-century:17,Greek Team of the Century,Luke Beveridge,Interchange,,,6,427,unique,,wikipedia
+honourteam:greek-team-of-the-century:18,Greek Team of the Century,Peter Kanis,Interchange,,,6,9357,unique,,wikipedia
+honourteam:greek-team-of-the-century:19,Greek Team of the Century,Zeno Tzatzaris,Interchange,,,6,1384,unique,,wikipedia
+honourteam:greek-team-of-the-century:20,Greek Team of the Century,Ron Richards,Coach,,,8,9034,resolved,chosen over 1 other(s) on games played,wikipedia
+honourteam:indigenous-team-of-the-century:1,Indigenous Team of the Century,Bill Dempsey,Back,,West Perth,0,,unmatched,no player with this name,wikipedia
+honourteam:indigenous-team-of-the-century:2,Indigenous Team of the Century,Chris Johnson,Back,,"Fitzroy, Brisbane",0,385,unique,,wikipedia
+honourteam:indigenous-team-of-the-century:3,Indigenous Team of the Century,Darryl White,Back,,Brisbane,0,114,unique,,wikipedia
+honourteam:indigenous-team-of-the-century:4,Indigenous Team of the Century,Adam Goodes,Half back,,Sydney,1,1012,unique,,wikipedia
+honourteam:indigenous-team-of-the-century:5,Indigenous Team of the Century,Gavin Wanganeen,Half back,,"Essendon, Port Adelaide",1,303,unique,,wikipedia
+honourteam:indigenous-team-of-the-century:6,Indigenous Team of the Century,Norm McDonald,Half back,,Essendon,1,3301,unique,,wikipedia
+honourteam:indigenous-team-of-the-century:7,Indigenous Team of the Century,Maurice Rioli,Centre,,"South Fremantle, Richmond",2,,ambiguous,"Maurice Rioli (1982-1987, 118g); Maurice Rioli (2021-2026, 58g)",wikipedia
+honourteam:indigenous-team-of-the-century:8,Indigenous Team of the Century,Michael Long,Centre,,"Essendon, West Torrens",2,313,unique,,wikipedia
+honourteam:indigenous-team-of-the-century:9,Indigenous Team of the Century,Peter Matera,Centre,,"South Fremantle, West Coast",2,1040,unique,,wikipedia
+honourteam:indigenous-team-of-the-century:10,Indigenous Team of the Century,Nicky Winmar,Half forward,,"South Fremantle, St Kilda, Western Bulldogs",3,461,unique,,wikipedia
+honourteam:indigenous-team-of-the-century:11,Indigenous Team of the Century,Stephen Michael,Half forward,,South Fremantle,3,,unmatched,no player with this name,wikipedia
+honourteam:indigenous-team-of-the-century:12,Indigenous Team of the Century,Syd Jackson,Half forward,,"East Perth, Carlton",3,2370,unique,,wikipedia
+honourteam:indigenous-team-of-the-century:13,Indigenous Team of the Century,Chris Lewis,Forward,,"Claremont, West Coast",4,1039,unique,,wikipedia
+honourteam:indigenous-team-of-the-century:14,Indigenous Team of the Century,Jim Krakouer,Forward,,"Claremont, North Melbourne, St Kilda",4,1389,unique,,wikipedia
+honourteam:indigenous-team-of-the-century:15,Indigenous Team of the Century,Michael O'Loughlin,Forward,,"Sydney, Central Districts",4,1000,unique,,wikipedia
+honourteam:indigenous-team-of-the-century:16,Indigenous Team of the Century,Andrew McLeod,Follower,,"Adelaide, Port Adelaide",5,30,unique,,wikipedia
+honourteam:indigenous-team-of-the-century:17,Indigenous Team of the Century,Graham 'Polly' Farmer,Follower,Captain,"East Perth, Geelong, West Perth",5,2861,unique,,wikipedia
+honourteam:indigenous-team-of-the-century:18,Indigenous Team of the Century,Byron Pickett,Interchange,,"North Melbourne, Port Adelaide, Melbourne",6,791,unique,,wikipedia
+honourteam:indigenous-team-of-the-century:19,Indigenous Team of the Century,David Kantilla,Interchange,,South Adelaide,6,,unmatched,no player with this name,wikipedia
+honourteam:indigenous-team-of-the-century:20,Indigenous Team of the Century,Michael Graham,Interchange,,Sturt,6,,unmatched,no player with this name,wikipedia
+honourteam:indigenous-team-of-the-century:21,Indigenous Team of the Century,Michael McLean,Interchange,,"Footscray, Brisbane",6,99,unique,,wikipedia
+honourteam:indigenous-team-of-the-century:22,Indigenous Team of the Century,Peter Burgoyne,Interchange,,Port Adelaide,6,824,unique,,wikipedia
+honourteam:indigenous-team-of-the-century:23,Indigenous Team of the Century,Ted Kilmurray,Interchange,,East Perth,6,,unmatched,no player with this name,wikipedia
+honourteam:indigenous-team-of-the-century:24,Indigenous Team of the Century,Barry Cable,Coach,,former coach of North Melbourne,8,2327,unique,,wikipedia
+honourteam:italian-team-of-the-century:1,Italian Team of the Century,Frank Curcio,Back,,,0,2745,unique,,wikipedia
+honourteam:italian-team-of-the-century:2,Italian Team of the Century,Len Incigneri,Back,,,0,5043,unique,,wikipedia
+honourteam:italian-team-of-the-century:3,Italian Team of the Century,Stephen Silvagni,Back,,,0,136,unique,,wikipedia
+honourteam:italian-team-of-the-century:4,Italian Team of the Century,Alec Epis,Half back,,,1,2844,unique,,wikipedia
+honourteam:italian-team-of-the-century:5,Italian Team of the Century,Anthony Koutoufides,Half back,,,1,144,unique,,wikipedia
+honourteam:italian-team-of-the-century:6,Italian Team of the Century,John Kennedy Jr,Half back,,,1,1351,resolved,'Jr' → John Kennedy (1979-1991),wikipedia
+honourteam:italian-team-of-the-century:7,Italian Team of the Century,Ian Stewart,Centre,,,2,2193,unique,,wikipedia
+honourteam:italian-team-of-the-century:8,Italian Team of the Century,Peter Matera,Centre,,,2,1040,unique,,wikipedia
+honourteam:italian-team-of-the-century:9,Italian Team of the Century,Robert DiPierdomenico,Centre,,,2,1350,unique,,wikipedia
+honourteam:italian-team-of-the-century:10,Italian Team of the Century,Alan Martello,Half forward,,,3,1944,unique,,wikipedia
+honourteam:italian-team-of-the-century:11,Italian Team of the Century,Mark Mercuri,Half forward,,,3,310,unique,,wikipedia
+honourteam:italian-team-of-the-century:12,Italian Team of the Century,Peter Riccardi,Half forward,,,3,560,unique,,wikipedia
+honourteam:italian-team-of-the-century:13,Italian Team of the Century,Brendan Fevola,Forward,,,4,196,unique,,wikipedia
+honourteam:italian-team-of-the-century:14,Italian Team of the Century,Phillip Matera,Forward,,,4,1052,unique,,wikipedia
+honourteam:italian-team-of-the-century:15,Italian Team of the Century,Saverio Rocca,Forward,,,4,228,unique,,wikipedia
+honourteam:italian-team-of-the-century:16,Italian Team of the Century,Mark Ricciuto,Follower,Captain,,5,4,unique,,wikipedia
+honourteam:italian-team-of-the-century:17,Italian Team of the Century,Peter Pianto,Follower,,,5,2075,unique,,wikipedia
+honourteam:italian-team-of-the-century:18,Italian Team of the Century,Steve Alessio,Follower,,,5,,unmatched,no player with this name,wikipedia
+honourteam:italian-team-of-the-century:19,Italian Team of the Century,Joe Misiti,Interchange,,,6,316,unique,,wikipedia
+honourteam:italian-team-of-the-century:20,Italian Team of the Century,Scott Camporeale,Interchange,,,6,143,unique,,wikipedia
+honourteam:italian-team-of-the-century:21,Italian Team of the Century,Sergio Silvagni,Interchange,,,6,3696,unique,,wikipedia
+honourteam:italian-team-of-the-century:22,Italian Team of the Century,Tony Liberatore,Interchange,,,6,426,unique,,wikipedia
+honourteam:italian-team-of-the-century:23,Italian Team of the Century,"Ron Barassi, Jr",Coach,,,8,2521,resolved,'Jr' → Ron Barassi (1953-1969),wikipedia
+honourteam:queensland-team-of-the-20th-century:1,Queensland Team of the 20th Century,Dick Verdon,Back,,,0,,unmatched,no player with this name,wikipedia
+honourteam:queensland-team-of-the-20th-century:2,Queensland Team of the 20th Century,Marcus Ashcroft,Back,,,0,110,unique,,wikipedia
+honourteam:queensland-team-of-the-20th-century:3,Queensland Team of the 20th Century,Wayne Stewart,Back,,,0,,unmatched,no player with this name,wikipedia
+honourteam:queensland-team-of-the-20th-century:4,Queensland Team of the 20th Century,Don Smith,Half back,,,1,,unmatched,no player with this name,wikipedia
+honourteam:queensland-team-of-the-20th-century:5,Queensland Team of the 20th Century,Gavin Crosisca,Half back,,,1,212,unique,,wikipedia
+honourteam:queensland-team-of-the-20th-century:6,Queensland Team of the 20th Century,Zane Taylor,Half back,,,1,11068,unique,,wikipedia
+honourteam:queensland-team-of-the-20th-century:7,Queensland Team of the 20th Century,Des Hughes,Centre,,,2,,unmatched,no player with this name,wikipedia
+honourteam:queensland-team-of-the-20th-century:8,Queensland Team of the 20th Century,Doug Pittard,Centre,,,2,,unmatched,no player with this name,wikipedia
+honourteam:queensland-team-of-the-20th-century:9,Queensland Team of the 20th Century,Scott McIvor,Centre,,,2,108,unique,,wikipedia
+honourteam:queensland-team-of-the-20th-century:10,Queensland Team of the 20th Century,Barry Clarke,Half forward,,,3,,unmatched,no player with this name,wikipedia
+honourteam:queensland-team-of-the-20th-century:11,Queensland Team of the 20th Century,Dick Parton,Half forward,,,3,,unmatched,no player with this name,wikipedia
+honourteam:queensland-team-of-the-20th-century:12,Queensland Team of the 20th Century,John Stackpoole,Half forward,,,3,,unmatched,no player with this name,wikipedia
+honourteam:queensland-team-of-the-20th-century:13,Queensland Team of the 20th Century,Jason Dunstall,Forward,Vice-captain,,4,632,unique,,wikipedia
+honourteam:queensland-team-of-the-20th-century:14,Queensland Team of the 20th Century,Owen Backwell,Forward,,,4,,unmatched,no player with this name,wikipedia
+honourteam:queensland-team-of-the-20th-century:15,Queensland Team of the 20th Century,Ray Hughson,Forward,,,4,,unmatched,no player with this name,wikipedia
+honourteam:queensland-team-of-the-20th-century:16,Queensland Team of the 20th Century,Jason Akermanis,Follower,,,5,119,unique,,wikipedia
+honourteam:queensland-team-of-the-20th-century:17,Queensland Team of the 20th Century,Ken Grimley,Follower,,,5,9725,unique,,wikipedia
+honourteam:queensland-team-of-the-20th-century:18,Queensland Team of the 20th Century,Michael Voss,Follower,Captain,,5,102,unique,,wikipedia
+honourteam:queensland-team-of-the-20th-century:19,Queensland Team of the 20th Century,Alex McGill,Interchange,,,6,,unmatched,no player with this name,wikipedia
+honourteam:queensland-team-of-the-20th-century:20,Queensland Team of the 20th Century,Clem Ryan,Interchange,,,6,,unmatched,no player with this name,wikipedia
+honourteam:queensland-team-of-the-20th-century:21,Queensland Team of the 20th Century,Gordon Phelan,Interchange,,,6,,unmatched,no player with this name,wikipedia
+honourteam:queensland-team-of-the-20th-century:22,Queensland Team of the 20th Century,Keith Leach,Interchange,,,6,,unmatched,no player with this name,wikipedia
+honourteam:queensland-team-of-the-20th-century:23,Queensland Team of the 20th Century,Mal Michael,Interchange,,,6,255,unique,,wikipedia
+honourteam:queensland-team-of-the-20th-century:24,Queensland Team of the 20th Century,Noel McGuinness,Interchange,,,6,,unmatched,no player with this name,wikipedia

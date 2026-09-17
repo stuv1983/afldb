@@ -11,7 +11,7 @@ server over SSH:
   npm run db:migrate
   npm run build
   sudo systemctl restart afldb
-  curl /api/health
+  poll /api/health until its JSON health contract is ready
 
 The script is designed to be run from a Windows workstation:
 
@@ -32,6 +32,10 @@ param(
   [string] $ServiceName = 'afldb',
   [string] $HealthUrl = 'http://127.0.0.1:3100/api/health',
   [string] $RemoteRef = '',
+  [ValidateRange(1, 600)]
+  [int] $ReadinessTimeoutSeconds = 120,
+  [ValidateRange(1, 30)]
+  [int] $ReadinessIntervalSeconds = 2,
   [switch] $SkipInstall,
   [switch] $SkipMigrate,
   [switch] $SkipBuild,
@@ -85,6 +89,15 @@ Assert-Command ssh
 if ($Issue107Gate -and ($SkipInstall -or $SkipBuild -or $SkipRestart -or $SkipHealth)) {
   throw '-Issue107Gate requires install, build, restart and health checks; do not combine it with their skip switches.'
 }
+if ($ReadinessIntervalSeconds -gt $ReadinessTimeoutSeconds) {
+  throw '-ReadinessIntervalSeconds cannot exceed -ReadinessTimeoutSeconds.'
+}
+
+$remoteHelperPath = Join-Path $PSScriptRoot 'sync-dev-remote.sh'
+if (-not (Test-Path -LiteralPath $remoteHelperPath -PathType Leaf)) {
+  throw "Remote deployment helper was not found: $remoteHelperPath"
+}
+$remoteHelper = [IO.File]::ReadAllText($remoteHelperPath) -replace "`r`n", "`n"
 
 $quotedProjectDir = Escape-BashSingleQuoted $ProjectDir
 $quotedServiceName = Escape-BashSingleQuoted $ServiceName
@@ -94,6 +107,7 @@ $quotedRemoteRef = if ($RemoteRef.Trim()) { Escape-BashSingleQuoted $RemoteRef.T
 $remoteCommands = [System.Collections.Generic.List[string]]::new()
 Add-RemoteCommand $remoteCommands 'set -Eeuo pipefail'
 Add-RemoteCommand $remoteCommands 'trap ''code=$?; echo "[deploy] FAILED line ${LINENO}: ${BASH_COMMAND}" >&2; exit $code'' ERR'
+Add-RemoteCommand $remoteCommands $remoteHelper
 Add-RemoteStep $remoteCommands 'enter project directory' "cd $quotedProjectDir"
 # These must be single-quoted PowerShell strings. A double-quoted string would
 # expand $(...) on the *workstation*, so the deployment would report the local
@@ -113,9 +127,8 @@ Add-RemoteStep $remoteCommands 'enforce Next.js Node floor' "node -e `"const [ma
 Add-RemoteStep $remoteCommands 'show npm version' 'echo "[deploy] npm: $(npm --version)"'
 Add-RemoteStep $remoteCommands 'show current revision' 'echo "[deploy] before: $(git rev-parse --short HEAD) $(git branch --show-current)"'
 
-if (-not $AllowDirtyServer) {
-  Add-RemoteStep $remoteCommands 'check server working tree' 'test -z "$(git status --porcelain)" || { echo "[deploy] server working tree is dirty; use -AllowDirtyServer to deploy anyway" >&2; git status --short; exit 20; }'
-}
+$allowDirtyArgument = if ($AllowDirtyServer) { '1' } else { '0' }
+Add-RemoteStep $remoteCommands 'classify server working tree' "afldb_classify_worktree $allowDirtyArgument"
 
 if (-not $NoPrune) {
   Add-RemoteStep $remoteCommands 'fetch Git refs with prune' 'git fetch --prune'
@@ -163,26 +176,30 @@ else
     sleep 1
     AFLDB_NEW_PID="$(systemctl show --property MainPID --value __SERVICE__)"
     if [ "$(systemctl is-active __SERVICE__)" = active ] && [ "$AFLDB_NEW_PID" -gt 0 ] && [ "$AFLDB_NEW_PID" != "$AFLDB_OLD_PID" ]; then break; fi
+    afldb_service_state __SERVICE__
+    if [ "$AFLDB_SERVICE_ACTIVE" = failed ] || { [ "$AFLDB_SERVICE_ACTIVE" = inactive ] && [ "$AFLDB_SERVICE_SUB" = dead ]; }; then
+      afldb_readiness_diagnostics __SERVICE__ __HEALTH_URL__ 0 "service failed before systemd respawn completed"
+      exit 25
+    fi
   done
   test "$AFLDB_NEW_PID" -gt 0 && test "$AFLDB_NEW_PID" != "$AFLDB_OLD_PID" || { echo "[deploy] systemd did not respawn the service" >&2; exit 25; }
   echo "[deploy] systemd respawned the service: $AFLDB_OLD_PID -> $AFLDB_NEW_PID"
 fi
 '@
-  Add-RemoteStep $remoteCommands 'restart systemd service' ($restartCommand -replace '__SERVICE__', $quotedServiceName)
-  Add-RemoteStep $remoteCommands 'show systemd service status' "systemctl --no-pager --lines=20 status $quotedServiceName"
+  $restartCommand = $restartCommand -replace '__SERVICE__', $quotedServiceName
+  $restartCommand = $restartCommand -replace '__HEALTH_URL__', $quotedHealthUrl
+  Add-RemoteStep $remoteCommands 'restart systemd service' $restartCommand
+  Add-RemoteStep $remoteCommands 'show systemd service status' "systemctl --no-pager --lines=20 status $quotedServiceName || true"
   if ($Issue107Gate) {
     Add-RemoteStep $remoteCommands 'verify development worker and pool controls' "AFLDB_MAIN_PID=`"`$(systemctl show --property MainPID --value $quotedServiceName)`"; test `"`$AFLDB_MAIN_PID`" -gt 0; AFLDB_RUNTIME_CONTROLS=`"`$(tr '\0' '\n' < /proc/`$AFLDB_MAIN_PID/environ | grep -E '^(AFLDB_WORKERS|AFLDB_POOL_MAX)=' | sort)`"; echo `"`$AFLDB_RUNTIME_CONTROLS`"; echo `"`$AFLDB_RUNTIME_CONTROLS`" | grep -qx 'AFLDB_POOL_MAX=10'; echo `"`$AFLDB_RUNTIME_CONTROLS`" | grep -qx 'AFLDB_WORKERS=4'"
   }
 }
 
 if (-not $SkipHealth) {
-  Add-RemoteStep $remoteCommands 'check health endpoint' "curl --fail --silent --show-error $quotedHealthUrl"
-  Add-RemoteCommand $remoteCommands 'echo'
-
-  if ($Issue107Gate) {
-    $liveBuildCommand = 'AFLDB_LIVE_BUILD_ID="$(curl --fail --silent --show-error --dump-header - --output /dev/null ' + $quotedHealthUrl + ' | tr -d ''\r'' | sed -n ''s/^x-afldb-build: //Ip'' | tail -n 1)"; test -n "$AFLDB_LIVE_BUILD_ID" || { echo ''[deploy] x-afldb-build response header is missing'' >&2; exit 21; }; test "$AFLDB_LIVE_BUILD_ID" = "$AFLDB_BUILT_BUILD_ID" || { echo "[deploy] build mismatch: built=$AFLDB_BUILT_BUILD_ID live=$AFLDB_LIVE_BUILD_ID" >&2; exit 22; }; echo "[deploy] live BUILD_ID: $AFLDB_LIVE_BUILD_ID"'
-    Add-RemoteStep $remoteCommands 'prove live standalone build identity' $liveBuildCommand
-  }
+  $expectedBuildArgument = if ($Issue107Gate) { '"$AFLDB_BUILT_BUILD_ID"' } else { "''" }
+  $readinessCommand = 'afldb_wait_for_readiness ' + $quotedServiceName + ' ' + $quotedHealthUrl + ' ' +
+    $ReadinessTimeoutSeconds + ' ' + $ReadinessIntervalSeconds + ' ' + $expectedBuildArgument
+  Add-RemoteStep $remoteCommands 'wait for healthy service readiness' $readinessCommand
 }
 
 # PowerShell writes a UTF-8 BOM into a native command's stdin pipe, so piping
@@ -202,6 +219,7 @@ Write-Host "Deploy target: $SshTarget"
 Write-Host "Project dir:   $ProjectDir"
 Write-Host "Service:       $ServiceName"
 Write-Host "Health URL:    $HealthUrl"
+Write-Host "Readiness:     $ReadinessTimeoutSeconds s timeout / $ReadinessIntervalSeconds s interval"
 Write-Host "ISSUE-107 gate: $(if ($Issue107Gate) { 'on' } else { 'off' })"
 if ($RemoteRef.Trim()) {
   Write-Host "Remote ref:    $($RemoteRef.Trim())"

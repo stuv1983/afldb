@@ -43,6 +43,11 @@ export default defineConfig({
   webServer: process.env.AFLDB_E2E_BASE_URL ? undefined : {
     command: 'node .next/standalone/server.js',
     url: 'http://127.0.0.1:3100/api/health',
+    env: {
+      ...process.env,
+      HOSTNAME: '127.0.0.1',
+      PORT: '3100',
+    },
     reuseExistingServer: false,
     timeout: 60_000,
     stdout: 'ignore',

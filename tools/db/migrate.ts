@@ -3,6 +3,8 @@
  *
  *   npm run db:migrate            apply pending migrations to afldb_dev
  *   npm run db:migrate:test       apply pending migrations to afldb_test
+ *   npm run db:migrate:code-test  apply pending migrations to code_test_db (the disposable
+ *                                 full-rebuild rehearsal target, AFLDB-ISSUE-146)
  *   npm run db:status             show applied / pending without changing anything
  *
  * Migrations are plain .sql files in src/db/migrations, applied in filename
@@ -24,6 +26,12 @@ import {
   matchesStoredChecksum,
   type MigrationChecksumRepresentations,
 } from './migration-checksum';
+import {
+  collectMigrationSources,
+  compareMigrationSets,
+  findMigrationConflicts,
+  readWorkingTreeMigrations,
+} from './migration-safety';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = join(__dirname, '..', '..');
@@ -56,6 +64,7 @@ function loadEnv(): void {
 loadEnv();
 
 const statusOnly = process.argv.includes('--status');
+const allowBranchLocal = process.argv.includes('--allow-branch-local');
 
 /**
  * Every target is named explicitly.
@@ -69,10 +78,18 @@ const statusOnly = process.argv.includes('--status');
 const TARGETS = {
   dev: 'AFLDB_OWNER_DATABASE_URL',
   test: 'AFLDB_TEST_DATABASE_URL',
+  'code-test': 'AFLDB_CODE_TEST_DATABASE_URL',
   prod: 'AFLDB_PROD_DATABASE_URL',
 } as const;
 
 type Target = keyof typeof TARGETS;
+
+/**
+ * Targets that are wiped and rebuilt from nothing by tools/db/rebuild-test.ts, so an
+ * unmerged migration applied to them can never orphan a shared ledger. `code-test` is the
+ * AFLDB-ISSUE-146 rehearsal database and has its OWN variable — it never borrows `test`'s.
+ */
+const DISPOSABLE_TARGETS: readonly Target[] = ['test', 'code-test'];
 
 /**
  * `--target <name>` exists so the package scripts do not have to set the target
@@ -122,6 +139,11 @@ const target = requested as Target;
 const variable = TARGETS[target];
 const connectionString = process.env[variable];
 
+if (allowBranchLocal && target !== 'dev') {
+  console.error('ERROR: --allow-branch-local is accepted for DEV only. It can never relax production or test migrations.');
+  process.exit(1);
+}
+
 if (!connectionString) {
   console.error(`ERROR: ${variable} is not set (target '${target}').`);
   process.exit(1);
@@ -154,6 +176,64 @@ function loadMigrations(): Migration[] {
       return { name, sql, reps: computeChecksumRepresentations(sql) };
     });
 }
+
+/**
+ * Refuse filename collisions before opening a database, and refuse a branch-local migration
+ * on a shared non-test database unless the DEV operator explicitly acknowledges it. The test
+ * database remains the safe place to exercise an unmerged migration.
+ */
+function checkMigrationSafety(): void {
+  const current = {
+    label: 'current checkout',
+    migrations: readWorkingTreeMigrations(MIGRATIONS_DIR),
+  };
+  const localProblems = findMigrationConflicts([current]);
+  if (localProblems.length > 0) {
+    console.error('ERROR: migration filename collision in this checkout:');
+    for (const problem of localProblems) console.error(`  - ${problem.message}`);
+    process.exit(1);
+  }
+
+  // Status is read-only and the disposable targets are rebuilt from nothing: none of them
+  // can create the orphaned shared-database ledger state this guard exists to prevent.
+  if (statusOnly || DISPOSABLE_TARGETS.includes(target)) return;
+
+  let inventory: ReturnType<typeof collectMigrationSources>;
+  try {
+    inventory = collectMigrationSources(PROJECT_ROOT);
+  } catch (error) {
+    console.error('ERROR: could not prove migration safety across refs/worktrees:');
+    console.error(`  ${error instanceof Error ? error.message : error}`);
+    console.error('Run npm run preflight and resolve the Git inventory failure before migrating a shared database.');
+    process.exit(1);
+  }
+
+  const collisions = findMigrationConflicts(inventory.sources);
+  if (collisions.length > 0) {
+    console.error('ERROR: migration collision across relevant refs/worktrees:');
+    for (const problem of collisions) console.error(`  - ${problem.message}`);
+    console.error('Reserve a unique migration number/name before touching a shared database.');
+    process.exit(1);
+  }
+
+  const baseProblems = compareMigrationSets(inventory.current, inventory.base, true);
+  const stale = baseProblems.filter((problem) => problem.code !== 'branch-local-migration');
+  const branchLocal = baseProblems.filter((problem) => problem.code === 'branch-local-migration');
+  if (stale.length > 0 || (branchLocal.length > 0 && !allowBranchLocal)) {
+    console.error(`ERROR: migration set is not safe to apply to target '${target}':`);
+    for (const problem of [...stale, ...branchLocal]) console.error(`  - ${problem.message}`);
+    if (branchLocal.length > 0 && target === 'dev') {
+      console.error('Exercise it on afldb_test first. DEV requires the conscious --allow-branch-local acknowledgement.');
+    }
+    process.exit(1);
+  }
+  if (branchLocal.length > 0) {
+    console.warn('WARNING: applying explicitly acknowledged branch-local migration(s) to DEV:');
+    for (const problem of branchLocal) console.warn(`  - ${problem.message}`);
+  }
+}
+
+checkMigrationSafety();
 
 async function main() {
   const sql = postgres(connectionString!, { max: 1, onnotice: () => {} });

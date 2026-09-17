@@ -17,7 +17,7 @@ type SqlFragment = ReturnType<typeof sql>;
  * uniformly instead of repeating the CASE per metric.
  */
 const SIDES = sql`
-  SELECT m.id AS match_id, m.season, m.round_type, m.round_number, m.is_final,
+  SELECT m.id AS match_id, m.season, m.round_type, m.round_number, m.is_finals_series,
          m.match_date, m.venue_id, m.attendance, m.winner_club_id,
          m.winner_club_id AS final_winner_club_id,
          m.home_club_id AS club_id, m.away_club_id AS opponent_id,
@@ -27,7 +27,7 @@ const SIDES = sql`
     LEFT JOIN match_period_scores hq ON hq.match_id = m.id AND hq.club_id = m.home_club_id AND hq.period = 3
     LEFT JOIN match_period_scores aq ON aq.match_id = m.id AND aq.club_id = m.away_club_id AND aq.period = 3
   UNION ALL
-  SELECT m.id, m.season, m.round_type, m.round_number, m.is_final,
+  SELECT m.id, m.season, m.round_type, m.round_number, m.is_finals_series,
          m.match_date, m.venue_id, m.attendance, m.winner_club_id,
          m.winner_club_id,
          m.away_club_id, m.home_club_id,
@@ -71,7 +71,7 @@ function metricValueExpr(metric: string): SqlFragment {
 /** 'finals' is a synthetic "any final" reading; every other NlMatchType is a literal round_type enum member, the same bound-and-cast pattern player-game.ts's matchTypeSql and search.ts's own round_type lookup already use. */
 function matchTypeSql(matchType: NlMatchType | undefined): SqlFragment {
   if (!matchType) return sql`TRUE`;
-  if (matchType === 'finals') return sql`t.is_final`;
+  if (matchType === 'finals') return sql`t.is_finals_series`;
   return sql`t.round_type = ${matchType}::round_type`;
 }
 
@@ -122,10 +122,24 @@ export async function answerTeamMatch(plan: NlQueryPlan, limit: number): Promise
   const value = metricValueExpr(plan.metric!);
   const direction = plan.agg.kind === 'min' ? sql.unsafe('ASC') : sql.unsafe('DESC');
   const n = rankCutoff(plan.agg);
+  // attendance/total_score are identical for both SIDES rows of a match,
+  // so with no clubFor/clubAgainst scope to justify a per-side row, both
+  // rows would tie and rank() would return the same match twice
+  // (AFLDB-ISSUE-192). Restrict to the home-perspective row so the match
+  // is ranked once; side-scoped and side-dependent (margin/team score)
+  // queries are unaffected. scope.matchup is deliberately excluded here:
+  // it's a physical-match filter (either club can be on either side), not
+  // a directional perspective -- validatePlan rejects matchup combined
+  // with clubFor/clubAgainst (plan.ts), so it never masks a genuine side
+  // scope, and a matchup-scoped symmetric metric must still canonicalise
+  // to one row per match (AFLDB-ISSUE-194).
+  const isSymmetricMetric = plan.metric === 'attendance' || plan.metric === 'total_score';
+  const hasSideScope = Boolean(plan.scope.clubFor || plan.scope.clubAgainst);
   const where = foldAnd([
     ...scopeClauses(plan.scope),
     plan.resultFilter === 'won' ? sql`t.final_winner_club_id = t.club_id` : sql`TRUE`,
     plan.metric ? sql`${value} IS NOT NULL` : sql`TRUE`,
+    isSymmetricMetric && !hasSideScope ? sql`t.club_id = m.home_club_id` : sql`TRUE`,
   ]);
   
   let periodCte = sql``;
@@ -160,7 +174,7 @@ export async function answerTeamMatch(plan: NlQueryPlan, limit: number): Promise
          GROUP BY match_id, club_id
       ),
       period_sides AS (
-        SELECT s.match_id, s.season, s.round_type, s.round_number, s.is_final,
+        SELECT s.match_id, s.season, s.round_type, s.round_number, s.is_finals_series,
                s.match_date, s.venue_id, s.attendance, s.final_winner_club_id,
                CASE WHEN ${forPoints} > ${againstPoints} THEN s.club_id
                     WHEN ${forPoints} < ${againstPoints} THEN s.opponent_id
@@ -193,7 +207,7 @@ export async function answerTeamMatch(plan: NlQueryPlan, limit: number): Promise
          GROUP BY match_id, club_id
       ),
       checkpoint_sides AS (
-        SELECT s.match_id, s.season, s.round_type, s.round_number, s.is_final,
+        SELECT s.match_id, s.season, s.round_type, s.round_number, s.is_finals_series,
                s.match_date, s.venue_id, s.attendance, s.final_winner_club_id,
                CASE WHEN ${forPoints} > ${againstPoints} THEN s.club_id
                     WHEN ${forPoints} < ${againstPoints} THEN s.opponent_id
@@ -248,9 +262,13 @@ const COMPARE_SQL = {
 async function answerTeamAggregate(plan: NlQueryPlan, limit: number): Promise<NlAnswerPayload> {
   const having = plan.havingClause!;
   const clauses = scopeClauses(plan.scope);
+  // 'games' is deliberately un-predicated: every match already inside
+  // the scope counts, so no result clause is added. Written as an
+  // exhaustive if/else rather than a trailing `else` for draws, which
+  // would silently have swallowed any metric added later.
   if (having.metric === 'wins') clauses.push(sql`t.winner_club_id = t.club_id`);
   else if (having.metric === 'losses') clauses.push(sql`t.winner_club_id IS NOT NULL AND t.winner_club_id <> t.club_id`);
-  else clauses.push(sql`t.winner_club_id IS NULL`);
+  else if (having.metric === 'draws') clauses.push(sql`t.winner_club_id IS NULL`);
 
   if (plan.matchFilter) {
     const filterValue = metricValueExpr(plan.matchFilter.metric);
@@ -288,9 +306,13 @@ export async function answerTeamAggregateDrilldown(
 ): Promise<{ rows: NlTeamMatchRow[]; total: number }> {
   const having = plan.havingClause!;
   const clauses = scopeClauses(plan.scope);
+  // 'games' is deliberately un-predicated: every match already inside
+  // the scope counts, so no result clause is added. Written as an
+  // exhaustive if/else rather than a trailing `else` for draws, which
+  // would silently have swallowed any metric added later.
   if (having.metric === 'wins') clauses.push(sql`t.winner_club_id = t.club_id`);
   else if (having.metric === 'losses') clauses.push(sql`t.winner_club_id IS NOT NULL AND t.winner_club_id <> t.club_id`);
-  else clauses.push(sql`t.winner_club_id IS NULL`);
+  else if (having.metric === 'draws') clauses.push(sql`t.winner_club_id IS NULL`);
 
   if (plan.matchFilter) {
     const filterValue = metricValueExpr(plan.matchFilter.metric);

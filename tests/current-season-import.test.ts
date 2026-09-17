@@ -1,9 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { basename, join, resolve } from 'node:path';
 
 import { fetchKaliCurrentMatches, fetchSquiggleCurrentMatches } from '@/lib/external-afl/current-matches';
+import {
+  assessSourceCompleteness,
+  renderSourceCompleteness,
+} from '@/lib/acquisition/source-completeness';
 import {
   analyseCurrentSeasonCorroboration,
   parseCurrentSeasonSources,
@@ -36,6 +42,7 @@ function readSource(path: string): string {
 const tool = readSource('tools/current-season/update-current-season.ts');
 const importer = readSource('src/lib/external-afl/current-season-import.ts');
 const adminAction = readSource('src/app/admin/current-season/actions.ts');
+const adminControls = readSource('src/app/admin/current-season/CurrentSeasonControls.tsx');
 const adminPage = readSource('src/app/admin/current-season/page.tsx');
 const adminNav = readSource('src/app/admin/nav-model.ts');
 const migration = readSource('src/db/migrations/063_external_current_match_sources.sql');
@@ -67,12 +74,11 @@ describe('current-season external source import contracts', () => {
     expect(tool).not.toContain('window.');
   });
 
-  it('stages external payloads before updating local matches', () => {
+  it('stages external payloads without mutating canonical matches', () => {
     expect(migration).toContain('CREATE TABLE staging.external_current_matches');
     expect(migration).toContain('raw_payload        jsonb        NOT NULL');
     expect(importer).toContain('INSERT INTO staging.external_current_matches');
-    expect(importer.indexOf('INSERT INTO staging.external_current_matches'))
-      .toBeLessThan(importer.indexOf('UPDATE matches'));
+    expect(importer).not.toMatch(/\b(?:INSERT INTO|UPDATE|DELETE FROM) matches\b/);
   });
 
   it('writes immutable observation history before refreshing the legacy projection', () => {
@@ -113,9 +119,12 @@ describe('current-season external source import contracts', () => {
     expect(importer).not.toMatch(/DELETE FROM staging\.(source_records|source_record_versions|source_payloads)/);
   });
 
-  it('only applies final-score updates when explicitly requested', () => {
-    expect(tool).toContain("argv.includes('--update-matches')");
-    expect(importer).toContain('if (updateMatches) {');
+  it('explicitly refuses the retired --update-matches flag (AFLDB-ISSUE-122)', () => {
+    expect(tool).toContain("if (argv.includes('--update-matches'))");
+    expect(tool).toContain('--update-matches is deprecated by AFLDB-ISSUE-122');
+    expect(tool).toContain('cannot write canonical matches');
+    expect(tool).not.toContain("updateMatches: argv.includes('--update-matches')");
+    expect(importer).not.toContain('updateMatches');
   });
 
   it('accounts for AFLDB counting Opening Round as round 1 from 2024 onward', () => {
@@ -140,25 +149,63 @@ describe('current-season external source import contracts', () => {
     expect(importer).toContain("status: 'incomplete_source_family'");
   });
 
-  it('records source and import-batch provenance on local score updates', () => {
-    expect(importer).toContain('source_id = ${sourceId}');
-    expect(importer).toContain('source_record_id = ${match.externalGameId}');
-    expect(importer).toContain('import_batch_id = ${batchId}');
+  it('retains source and import-batch provenance in observation and staging writes', () => {
+    expect(importer).toContain('persistSourceObservation(\n        tx, matchObservation(sourceId, match), batchId, observedAt,');
+    expect(importer).toContain('INSERT INTO staging.external_current_matches');
+    expect(importer).toContain('${sourceId}, ${match.externalGameId}');
   });
 
   it('exposes the refresh only through a super-admin server action', () => {
     expect(adminAction).toContain("'use server'");
-    expect(adminAction).toContain('requireSuperAdmin()');
+    // acquisition.currentSeason is super-admin-only (AFLDB-ISSUE-158); the
+    // capability's role list is held by tests/auth.test.ts.
+    expect(adminAction).toContain("requireCapability('acquisition.currentSeason')");
     expect(adminAction).toContain('runCurrentSeasonRefresh');
-    expect(adminPage).toContain('requireSuperAdmin()');
+    expect(adminPage).toContain("requireCapability('acquisition.currentSeason')");
     expect(adminNav).toContain("href: '/admin/current-season'");
   });
 
-  it('keeps the admin auto path server-side and non-destructive by default', () => {
-    expect(adminAction).toContain("mode === 'auto'");
-    expect(adminAction).toContain("? ['kali'] as const");
-    expect(adminAction).toContain("const updateMatches = mode !== 'auto'");
-    expect(adminPage).toContain('Existing final scores are left alone');
+  it('keeps the admin path server-side and staging/diagnostic only', () => {
+    // AFLDB-ISSUE-128 supersedes the old assertions here. The admin action
+    // used to carry `mode === 'auto'` mapping to `['kali'] as const` — the
+    // legacy automatic Kali writer's shape. There is no automatic mode on
+    // this surface any more: automatic current-season ingestion is the AFL
+    // Tables settle chain, and a `mode=auto` post is REFUSED rather than
+    // reinterpreted, so a stale client cannot resurrect it by name.
+    expect(adminAction).not.toContain("mode === 'auto'");
+    expect(adminAction).not.toContain("['kali'] as const");
+    expect(adminAction).toContain("if (mode !== 'manual')");
+    expect(adminAction).toContain('Unknown current-season fallback mode');
+    expect(adminAction).not.toContain('updateMatches');
+    expect(adminControls).not.toContain('updateMatches');
+    expect(adminControls).not.toContain('Overwrite existing resolved final scores');
+    expect(adminPage).toContain('deprecated fallback sources');
+    expect(adminPage).toContain('no canonical-write authority');
+  });
+
+  it('names AFL Tables/fitzRoy as the primary current-season source in the admin UI', () => {
+    // AFLDB-ISSUE-128 Stage 4. The observed defect was a page that said
+    // "Auto update uses Kali AFL Stats". The page must now state provider
+    // precedence, and must not offer AFL Tables in the fallback source list —
+    // AFL Tables is not acquired through that code path, and adding it there
+    // would be a second ingestion implementation.
+    expect(adminPage).toContain('AFL Tables, acquired via fitzRoy, is the primary');
+    expect(adminPage).not.toContain('Auto update uses Kali');
+    expect(adminControls).not.toContain('Auto update from API');
+    expect(adminControls).not.toContain('Refresh Kali fallback staging');
+    expect(adminControls).toContain('There is deliberately no automatic option here');
+    for (const value of ['"squiggle"', '"kali"', '"all"']) {
+      expect(adminControls).toContain(`<option value=${value}`);
+    }
+    expect(adminControls).not.toContain('value="afltables"');
+    expect(adminControls).not.toContain('value="fitzroy"');
+  });
+
+  it('has no default fallback source: Kali is never what "unspecified" means', () => {
+    // The last place in the codebase asserting Kali as the default provider.
+    expect(() => parseCurrentSeasonSources('')).toThrow(/no default/);
+    expect(() => parseCurrentSeasonSources('   ')).toThrow(/AFL Tables is the primary/);
+    expect(parseCurrentSeasonSources('kali')).toEqual(['kali']);
   });
 
   it('adds provenance columns to matches in a forward-only migration', () => {
@@ -432,27 +479,28 @@ describe('Placeholder and Dry-Run Resolution Logic', () => {
   });
 });
 
-describe('Update logic genuine-change and disagreements', () => {
-  it('No-op canonical update: skips update if scores match identically', () => {
-    expect(importer).toContain('const scoreChanged = current.homeScore !== agreedHomeScore');
-    expect(importer).toContain('if (!scoreChanged && !componentsChanged) {\n          continue;\n        }');
+describe('Retired canonical writer and retained diagnostic corroboration', () => {
+  it('keeps legacy canonical insert and update counters structurally zero', () => {
+    expect(importer).toContain('canonicalRowsInserted: 0;');
+    expect(importer).toContain('canonicalRowsUpdated: 0;');
+    expect(importer).toContain('canonicalRowsUpdated: 0,');
   });
 
-  it('Genuine score correction: updates canonical if score changes', () => {
-    expect(importer).toContain('if (!scoreChanged && !componentsChanged) {\n          continue;\n        }');
-    expect(importer).toContain('UPDATE matches');
-    expect(importer).toContain('home_score = ${agreedHomeScore}');
+  it('contains no canonical matches mutation or replacement writer', () => {
+    expect(importer).not.toMatch(/\b(?:INSERT INTO|UPDATE|DELETE FROM) matches\b/);
+    expect(importer).not.toContain('refreshSeasonMetadata(');
   });
 
-  it('deduplicates candidate processing to one canonical match operation', () => {
-    expect(importer).toContain('const updatesByLocalMatchId = new Map<number, MatchCandidate[]>();');
-    expect(importer).toContain('appendCandidate(updatesByLocalMatchId, localMatchId');
-    expect(importer).toContain('for (const [localMatchId, candidates] of updatesByLocalMatchId.entries())');
+  it('deduplicates diagnostic candidate analysis at canonical match identity grain', () => {
+    expect(importer).toContain('const candidateSets = new Map<string, MatchCandidate[]>();');
+    expect(importer).toContain('appendCandidate(candidateSets, `resolved:${observation.localMatchId}`');
+    expect(importer).toContain('for (const [key, candidates] of candidateSets)');
   });
 
-  it('does not update when independent groups disagree', () => {
-    expect(importer).toContain('if (corroboration.disagreeingGroups.length > 0) {\n          continue;\n        }');
+  it('retains independent-source disagreement diagnostics without a write path', () => {
+    expect(importer).toContain('const hasIndependentDisagreement = corroboration.disagreeingGroups.length > 0;');
     expect(importer).toContain('sourceDisagreements: canonicalPlan.sourceDisagreements');
+    expect(importer).not.toContain('if (updateMatches)');
   });
 
   it('Orientation reversal: correctly aligns home/away before comparison', () => {
@@ -461,9 +509,13 @@ describe('Update logic genuine-change and disagreements', () => {
     expect(importer).toContain('awayScore: sameOrientation ? match.awayScore : match.homeScore');
   });
 
-  it('Null score components: does not silently overwrite known canonical components', () => {
-    expect(importer).toContain('agreedHomeGoals = agreedHomeGoals ?? current.homeGoals;');
-    expect(importer).toContain('agreedAwayBehinds = agreedAwayBehinds ?? current.awayBehinds;');
+  it('retains partial score components as corroboration evidence', () => {
+    const partial = currentSeasonObservation('squiggle_api', 'match', 'partial');
+    partial.values.homeGoals = null;
+    partial.values.awayBehinds = null;
+    const complete = currentSeasonObservation('kali_afl_stats', 'match', 'complete');
+
+    expect(analyseCurrentSeasonCorroboration([partial, complete]).values).toEqual(complete.values);
   });
 
   it('independent-source disagreement blocks unsafe missing-match work', () => {
@@ -645,8 +697,9 @@ describe('AFLDB-ISSUE-097 current-season independence-group corroboration', () =
     expect(result.independentlyCorroborated).toBe(false);
     expect(result.values).toBeNull();
     expect(importer).toContain(
-      'if (corroboration.sameGroupConflictGroups.length > 0) {\n          continue;\n        }',
+      'const hasSameGroupConflict = corroboration.sameGroupConflictGroups.length > 0;',
     );
+    expect(importer).toContain('if (hasIndependentDisagreement || hasSameGroupConflict) rejectedOrConflicted += 1;');
     expect(importer).not.toContain('INSERT INTO matches');
   });
 });
@@ -1474,6 +1527,7 @@ import {
   type IdentityResolution,
   type ReconcileInput,
   type ReconciliationOutcome,
+  type TargetOwnership,
 } from '@/lib/acquisition/reconciliation';
 
 const reconciliationSource = readSource('src/lib/acquisition/reconciliation.ts');
@@ -1823,6 +1877,49 @@ describe('S3 reconciliation — refusals fail closed', () => {
     expect(drift.proposal.corroboration).toMatchObject({
       disagreeingGroups: [], sameGroupConflicts: ['kali_afl_stats'],
     });
+  });
+
+  it('lets an ADVISORY family through a disagreement, keeping every piece of evidence', () => {
+    /*
+     * AFLDB-ISSUE-122 §10 (stage S4), approved decision 5. Squiggle and Kali
+     * are being retired and must never be able to veto the source replacing
+     * them, nor become a prerequisite for it. The two AFL Tables families
+     * therefore declare `corroboration_policy: "advisory"`.
+     *
+     * `advisory` withdraws the VETO and nothing else. Everything the blocking
+     * case above records is still recorded here, on the candidate.
+     */
+    expect(afltablesMatch.corroborationPolicy).toBe('advisory');
+    expect(squiggleMatch.corroborationPolicy).toBe('blocking');
+
+    const authority = authoritySpy('clear');
+    const proceeded = candidateOf(reconcile(reconcileInput({
+      contract: afltablesMatch,
+      identity: { ...RESOLVED_TARGET, ownership: { state: 'owned', sourceKey: 'afltables' } },
+      corroboration: [{ contract: kaliMatch, values: { away_score: 71 } }],
+      manualAuthority: authority.provider,
+    })));
+    expect(proceeded.verb).toBe('corrected');
+    // The report still travels, so the settle caller still opens and
+    // deduplicates the source_disagreement data_issue from it.
+    expect(proceeded.proposal.corroboration)
+      .toMatchObject({ ownGroup: 'afltables', disagreeingGroups: ['kali'] });
+    // And the veto being gone does not skip the gate AFTER it: human
+    // authority is still asked, and is still the strongest word.
+    expect(authority.asked).toHaveLength(1);
+    expect(refusalOf(reconcile(reconcileInput({
+      contract: afltablesMatch,
+      identity: { ...RESOLVED_TARGET, ownership: { state: 'owned', sourceKey: 'afltables' } },
+      corroboration: [{ contract: kaliMatch, values: { away_score: 71 } }],
+      manualAuthority: UNAVAILABLE_MANUAL_AUTHORITY,
+    }))).verb).toBe('manual_authority_conflict');
+
+    // Nor does it weaken any gate BEFORE it: ownership still refuses first.
+    expect(refusalOf(reconcile(reconcileInput({
+      contract: afltablesMatch,
+      identity: { ...RESOLVED_TARGET, ownership: { state: 'owned', sourceKey: 'sports_data_lab' } },
+      corroboration: [{ contract: kaliMatch, values: { away_score: 71 } }],
+    }))).verb).toBe('foreign_owned_collision');
   });
 
   it('never lets provider agreement substitute for human authority', () => {
@@ -2554,8 +2651,14 @@ describe('S4 promotion decisions — append-only, and never an accept', () => {
  * projection rules. Every fixture is a literal and every call is pure — no
  * snapshot on disk, no database, no clock.
  */
+import { CANONICAL_TARGET_TABLES } from '@/lib/acquisition/canonical-apply';
 import {
   agreementRestored,
+  autoApplyOwnership,
+  canonicalApplyIssueKey,
+  CANONICAL_APPLY_ISSUE_TYPE,
+  MATCH_TARGET_TABLES,
+  PLAYER_MATCH_TARGET_TABLES,
   contractFamilyOf,
   disagreementConflicts,
   disagreementSeverity,
@@ -2580,7 +2683,6 @@ import {
   PLAYER_MATCH_STAT_COLUMNS,
   SETTLE_ISSUE_OWNER,
   SETTLE_ISSUE_TYPE,
-  TARGETS_WITHOUT_SOURCE_ID,
   type SettleTargetTable,
 } from '@/lib/acquisition/settle-afltables';
 
@@ -2886,17 +2988,104 @@ describe('AFLDB-ISSUE-099 settle — presence and projection are separate facts 
 });
 
 describe('AFLDB-ISSUE-099 settle — ownership, data_issues identity and corroboration', () => {
-  it('supplies indeterminate ownership for a target that carries no source_id column', () => {
-    expect(TARGETS_WITHOUT_SOURCE_ID).toEqual(['match_period_scores', 'brownlow_round_votes']);
-    for (const target of TARGETS_WITHOUT_SOURCE_ID) {
-      // Never 'unowned': a table with no provenance column has not DECLARED an
-      // absence of ownership, it cannot answer. Indeterminate fails closed.
-      expect(ownershipForTarget(target, null)).toEqual({ state: 'indeterminate' });
-      expect(ownershipForTarget(target, 'afltables')).toEqual({ state: 'indeterminate' });
-    }
-    expect(ownershipForTarget('matches', null)).toEqual({ state: 'unowned' });
-    expect(ownershipForTarget('matches', 'squiggle_api'))
+  it('reads ownership uniformly now that every target carries source_id (S3)', () => {
+    // ISSUE-122 S3: migration 083 gave match_period_scores and
+    // brownlow_round_votes the provenance quartet, so the blanket
+    // TARGETS_WITHOUT_SOURCE_ID indeterminacy is gone and the reading is one
+    // rule for all four targets. NULL is a DECLARED absence of ownership,
+    // which the GENERIC gate still admits (see autoApplyOwnership below for
+    // the automatic path, which does not).
+    expect(ownershipForTarget(null)).toEqual({ state: 'unowned' });
+    expect(ownershipForTarget('afltables')).toEqual({ state: 'owned', sourceKey: 'afltables' });
+    expect(ownershipForTarget('squiggle_api'))
       .toEqual({ state: 'owned', sourceKey: 'squiggle_api' });
+  });
+
+  describe('E3 — the automatic-path ownership predicate (§5.1, §7.2)', () => {
+    const resolved = (ownership: TargetOwnership) => ({
+      status: 'resolved' as const,
+      entity: 'matches',
+      targetKey: { match_key: MATCH_RECORD },
+      ownership,
+    });
+
+    it('treats an absent canonical row as insertable: an INSERT adopts nothing', () => {
+      expect(autoApplyOwnership({
+        status: 'new_target', entity: 'matches', targetKey: { match_key: MATCH_RECORD },
+      }, 'afltables')).toEqual({ verdict: 'insertable' });
+    });
+
+    it('treats an afltables-owned row as updateable', () => {
+      expect(autoApplyOwnership(resolved({ state: 'owned', sourceKey: 'afltables' }), 'afltables'))
+        .toEqual({ verdict: 'updateable' });
+    });
+
+    it('refuses a row owned by another source', () => {
+      expect(autoApplyOwnership(
+        resolved({ state: 'owned', sourceKey: 'squiggle_api' }), 'afltables',
+      )).toEqual({ verdict: 'refused', detail: 'foreign_source_owner' });
+    });
+
+    it('refuses source_id IS NULL, which the generic gate admits', () => {
+      // The whole point of E3. applyDataEdit does not re-stamp
+      // matches.source_id for the score group, and afldb_import cannot
+      // read data_edits, so NULL means "provenance unknown", never "free
+      // to adopt". (Pre-AFLDB-ISSUE-184, createMatch() also left every row
+      // NULL; since 184 it stamps manual_admin_edit instead -- see the
+      // 'manual_admin_edit-owned row' case below -- but NULL still occurs
+      // for rows created before 184 shipped, and for any other writer that
+      // leaves it unset.)
+      expect(autoApplyOwnership(resolved({ state: 'unowned' }), 'afltables'))
+        .toEqual({ verdict: 'refused', detail: 'ownership_indeterminate' });
+      // Proven divergent from the generic gate on the same input.
+      expect(evaluateTargetOwnership({ state: 'unowned' }, 'afltables').verdict).toBe('ok');
+    });
+
+    it('AFLDB-ISSUE-184: treats an admin-created (manual_admin_edit-owned) row as foreign-owned, on both the automatic and the generic gate', () => {
+      // Since 184, createMatch() stamps source_id = manual_admin_edit
+      // instead of leaving it NULL, which moves an admin-created match out
+      // of 'unowned' (adoptable by a human reviewer through the promotion
+      // queue -- see the previous test's divergence) into 'owned' by a
+      // source no automated importer promotes as. Unlike NULL, this is
+      // refused on BOTH gates, not just the automatic one -- the concrete
+      // protection the investigation's ownership-gate finding predicted.
+      expect(autoApplyOwnership(
+        resolved({ state: 'owned', sourceKey: 'manual_admin_edit' }), 'afltables',
+      )).toEqual({ verdict: 'refused', detail: 'foreign_source_owner' });
+      expect(evaluateTargetOwnership({ state: 'owned', sourceKey: 'manual_admin_edit' }, 'afltables'))
+        .toEqual({ verdict: 'foreign_owned_collision', detail: 'foreign_source_owner' });
+    });
+
+    it('AFLDB-ISSUE-185: treats a match_results-promoted (sports_data_lab-owned) row as foreign-owned, on both the automatic and the generic gate', () => {
+      // Since 185, matchResults.promoteRow() stamps source_id on a newly
+      // created row instead of leaving it NULL, moving a promoted match out
+      // of 'unowned' into 'owned' by 'sports_data_lab' -- the same key
+      // src/lib/ingest/pipeline.ts already resolves for every admin-upload
+      // dataset (044_schema_integrity.sql:287-289). The generic gate already
+      // proved this collision from the S3 refusal side (see 'refuses a
+      // foreign-owned target and an owner it cannot read' above); this pins
+      // the automatic-path predicate too, mirroring the manual_admin_edit
+      // case immediately above it.
+      expect(autoApplyOwnership(
+        resolved({ state: 'owned', sourceKey: 'sports_data_lab' }), 'afltables',
+      )).toEqual({ verdict: 'refused', detail: 'foreign_source_owner' });
+      expect(evaluateTargetOwnership({ state: 'owned', sourceKey: 'sports_data_lab' }, 'afltables'))
+        .toEqual({ verdict: 'foreign_owned_collision', detail: 'foreign_source_owner' });
+    });
+
+    it('refuses an unreadable owner and an unresolved identity', () => {
+      expect(autoApplyOwnership(resolved({ state: 'indeterminate' }), 'afltables'))
+        .toEqual({ verdict: 'refused', detail: 'ownership_indeterminate' });
+      expect(autoApplyOwnership(
+        { status: 'unresolved', reason: 'no canonical match exists for this match_key yet' },
+        'afltables',
+      )).toEqual({ verdict: 'refused', detail: 'ownership_indeterminate' });
+    });
+
+    it('refuses to answer without the source it is applying for', () => {
+      expect(() => autoApplyOwnership(resolved({ state: 'unowned' }), ''))
+        .toThrow(/name the source/);
+    });
   });
 
   it('derives one stable data_issues key per source, family, record and target', () => {
@@ -3441,10 +3630,20 @@ describe('import-batch ids are opaque identifiers at the driver boundary', () =>
   });
 
   it('decodes the id at each INSERT rather than trusting the declaration', () => {
+    // Handle-agnostic (AFLDB-ISSUE-185 operator verification, 2026-09-15):
+    // src/lib/ingest/pipeline.ts legitimately runs its INSERT INTO
+    // import_batches inside a `tx.savepoint(async (sp) => ...)` and so binds
+    // the row through `sp`, not `tx` -- every other source in
+    // BATCH_ID_SOURCES happens to use `tx`, but nothing about the invariant
+    // being proved (RETURNING id typed as the driver's decimal text, never
+    // narrowed) depends on which identifier names the transaction/savepoint
+    // handle. `\w+` accepts either, and any other legitimate handle name,
+    // while still requiring the exact `{ id: string }[]` type parameter --
+    // `{ id: number }[]` or an untyped call still fail to match.
     for (const [name, source] of BATCH_ID_SOURCES) {
       if (!source.includes('INSERT INTO import_batches')) continue;
       expect(source, `${name} must type RETURNING id as the driver's text`)
-        .toContain('const [batch] = await tx<{ id: string }[]>`');
+        .toMatch(/const \[batch\] = await \w+<\{ id: string \}\[\]>`/);
       expect(source, `${name} must decode the id at the boundary`)
         .toContain('asImportBatchId(batch.id)');
     }
@@ -3461,5 +3660,1168 @@ describe('import-batch ids are opaque identifiers at the driver boundary', () =>
       expect(source, `${name} must not parse a batch id as an integer`)
         .not.toMatch(/parseInt\((batch\.id|batchId|runBatchId)/);
     }
+  });
+});
+
+
+/*
+ * AFLDB-ISSUE-122 S2 — the manual-authority provider, DB-free.
+ *
+ * The §17 home for "registry + reconciliation, DB-free" also owns this: the
+ * whole verdict truth table is pure once the snapshot is in hand, and the two
+ * contracts §8 leans on (migration 073's CHECK, and the editor spec's entity
+ * set) are pinned here as literals so a silent widening fails a test rather
+ * than silently converting a proof into an assumption.
+ */
+import {
+  checkAdmittedEntities,
+  editorEntityKeys,
+  editorExposesNoUnrepresentableEntity,
+  overrideScopeProvenFrom,
+  manualAuthorityVerdict,
+  matchFieldGroupsFor,
+  matchGroupKeys,
+  refusingProvider,
+  MANUAL_ATTENDANCE_SOURCE_KEY,
+  OVERRIDE_ENTITY_TYPES,
+  UNREPRESENTABLE_OVERRIDE_ENTITIES,
+  type ManualAuthoritySnapshot,
+} from '@/lib/acquisition/manual-authority';
+
+const overridesMigration = readSource('src/db/migrations/073_data_overrides.sql');
+const coachAdminMigration = readSource('src/db/migrations/095_coach_admin_overrides.sql');
+const seasonListMigration = readSource('src/db/migrations/096_season_list_members.sql');
+const fixtureMigration = readSource('src/db/migrations/097_fixtures.sql');
+const leadershipMigration = readSource('src/db/migrations/098_club_leadership.sql');
+const honoursMigration = readSource('src/db/migrations/101_awards_honours_lifecycle.sql');
+const specialRecordsMigration = readSource(
+  'src/db/migrations/102_special_records_lifecycle.sql',
+);
+
+/** A `pg_get_constraintdef()` string of the shape PostgreSQL actually prints. */
+function entityTypeCheck(...entities: readonly string[]): string {
+  const array = entities.map((entity) => `'${entity}'::text`).join(', ');
+  return `CHECK ((entity_type = ANY (ARRAY[${array}])))`;
+}
+
+/** The CHECK as migration 073 left it — the pre-095 database. */
+const CHECK_BEFORE_095 = entityTypeCheck('players', 'matches', 'draft_picks');
+/** The CHECK as migration 095 leaves it — the post-095 database. */
+const CHECK_AFTER_095 = entityTypeCheck(
+  'players', 'matches', 'draft_picks', 'coaches', 'match_coaches',
+);
+/** The CHECK as migration 096 leaves it — the post-096 database (AFLDB-ISSUE-161). */
+const CHECK_AFTER_096 = entityTypeCheck(
+  'players', 'matches', 'draft_picks', 'coaches', 'match_coaches', 'season_list_members',
+);
+/** The CHECK as migration 097 leaves it — the post-097 database (AFLDB-ISSUE-162). */
+const CHECK_AFTER_097 = entityTypeCheck(
+  'players', 'matches', 'draft_picks', 'coaches', 'match_coaches', 'season_list_members',
+  'fixtures',
+);
+/** The CHECK as migration 098 leaves it — the post-098 database (AFLDB-ISSUE-163). */
+const CHECK_AFTER_098 = entityTypeCheck(
+  'players', 'matches', 'draft_picks', 'coaches', 'match_coaches', 'season_list_members',
+  'fixtures', 'club_leadership',
+);
+/** The CHECK as migration 101 leaves it — the post-101 database (AFLDB-ISSUE-165). */
+const CHECK_AFTER_101 = entityTypeCheck(
+  'players', 'matches', 'draft_picks', 'coaches', 'match_coaches', 'season_list_members',
+  'fixtures', 'club_leadership', 'award_winners', 'hall_of_fame', 'honour_team_members',
+);
+/** The CHECK as migration 102 leaves it — the post-102 database (AFLDB-ISSUE-167). */
+const CHECK_AFTER_102 = entityTypeCheck(
+  'players', 'matches', 'draft_picks', 'coaches', 'match_coaches', 'season_list_members',
+  'fixtures', 'club_leadership', 'award_winners', 'hall_of_fame', 'honour_team_members',
+  'player_achievements', 'after_siren_kicks',
+);
+
+function authoritySnapshot(over: Partial<ManualAuthoritySnapshot> = {}): ManualAuthoritySnapshot {
+  return {
+    overrideScopeProven: true,
+    matchOverrides: new Map(),
+    manualAttendanceMatches: new Set(),
+    ...over,
+  };
+}
+
+function matchQuery(fields: readonly string[], matchKey = '2026|1|CARL|COLL') {
+  return { entity: 'matches', targetKey: { match_key: matchKey }, fields };
+}
+
+describe('AFLDB-ISSUE-122 §8 — the pinned contracts the provider stands on', () => {
+  it('pins the entity_type CHECK as the migrations actually leave it', () => {
+    // 073 is never edited; 095 widens it forward, retaining every literal.
+    expect(overridesMigration).toContain(
+      "entity_type     text   NOT NULL CHECK (entity_type IN ('players', 'matches', 'draft_picks'))",
+    );
+    expect(coachAdminMigration).toMatch(
+      /ADD CONSTRAINT data_overrides_entity_type_check CHECK \(entity_type IN \(\s*'players',\s*'matches',\s*'draft_picks',\s*'coaches',\s*'match_coaches'\s*\)\)/,
+    );
+    // 096 widens it forward again, retaining every literal 095 left (ISSUE-161 §5).
+    expect(seasonListMigration).toMatch(
+      /ADD CONSTRAINT data_overrides_entity_type_check CHECK \(entity_type IN \(\s*'players',\s*'matches',\s*'draft_picks',\s*'coaches',\s*'match_coaches',\s*'season_list_members'\s*\)\)/,
+    );
+    // 097 widens it forward again, retaining every literal 096 left
+    // (AFLDB-ISSUE-162 §26). `fixtures` is a SCHEDULED match, not a settle
+    // target — the settle writes `matches` and never reads or writes
+    // `fixtures` — so admitting it changes no answer below.
+    expect(fixtureMigration).toMatch(
+      /ADD CONSTRAINT data_overrides_entity_type_check CHECK \(entity_type IN \(\s*'players',\s*'matches',\s*'draft_picks',\s*'coaches',\s*'match_coaches',\s*'season_list_members',\s*'fixtures'\s*\)\)/,
+    );
+    // 098 widens it forward again, retaining every literal 097 left
+    // (AFLDB-ISSUE-163 §22). `club_leadership` is a captain or vice-captain
+    // appointment, not a settle target — nothing in the nightly settle reads or
+    // writes it — so admitting it changes no answer below.
+    expect(leadershipMigration).toMatch(
+      /ADD CONSTRAINT data_overrides_entity_type_check CHECK \(entity_type IN \(\s*'players',\s*'matches',\s*'draft_picks',\s*'coaches',\s*'match_coaches',\s*'season_list_members',\s*'fixtures',\s*'club_leadership'\s*\)\)/,
+    );
+    // 101 widens it forward once more, retaining every literal 098 left
+    // (AFLDB-ISSUE-165 §8). An award result, a Hall of Fame induction and an
+    // honour-team selection are none of them settle targets — the nightly
+    // settle writes matches and statistics and reads none of these three — so
+    // admitting them changes no answer below either.
+    expect(honoursMigration).toMatch(
+      /ADD CONSTRAINT data_overrides_entity_type_check CHECK \(entity_type IN \(\s*'players',\s*'matches',\s*'draft_picks',\s*'coaches',\s*'match_coaches',\s*'season_list_members',\s*'fixtures',\s*'club_leadership',\s*'award_winners',\s*'hall_of_fame',\s*'honour_team_members'\s*\)\)/,
+    );
+    // AFLDB-ISSUE-167 §6.3. Migration 102 admits the two curated special-record
+    // families. Neither is a settle target — the nightly settle writes matches
+    // and statistics and touches neither a first-kick achievement nor an
+    // after-siren event — so admitting both changes no answer below either.
+    expect(specialRecordsMigration).toMatch(
+      /ADD CONSTRAINT data_overrides_entity_type_check CHECK \(entity_type IN \(\s*'players',\s*'matches',\s*'draft_picks',\s*'coaches',\s*'match_coaches',\s*'season_list_members',\s*'fixtures',\s*'club_leadership',\s*'award_winners',\s*'hall_of_fame',\s*'honour_team_members',\s*'player_achievements',\s*'after_siren_kicks'\s*\)\)/,
+    );
+    // And the three unrepresentable settle targets are still absent from all four.
+    for (const settleTarget of [
+      'match_period_scores', 'player_match_stats', 'brownlow_round_votes',
+    ]) {
+      for (const migration of [fixtureMigration, leadershipMigration, honoursMigration,
+        specialRecordsMigration]) {
+        const widening = migration.slice(
+          migration.indexOf('ADD CONSTRAINT data_overrides_entity_type_check'),
+        );
+        expect(widening.slice(0, widening.indexOf('));')), settleTarget)
+          .not.toContain(settleTarget);
+      }
+    }
+    // The documented inventory names the same entities the database now admits.
+    // As a SET: the inventory is written in the order §3.1/§16.1 states it, and
+    // `checkAdmittedEntities()` returns ASCII order ('match_coaches' sorts before
+    // 'matches'). Nothing compares the two as sequences, and under D-1 nothing
+    // may — an order-sensitive comparison is an exact-set proof wearing a
+    // different hat, and it would re-create the deploy window §3.1 removed.
+    expect([...OVERRIDE_ENTITY_TYPES])
+      .toEqual(['coaches', 'draft_picks', 'fixtures', 'matches', 'match_coaches', 'players',
+        'season_list_members', 'club_leadership',
+        'award_winners', 'hall_of_fame', 'honour_team_members',
+        'player_achievements', 'after_siren_kicks']);
+    expect([...OVERRIDE_ENTITY_TYPES].sort())
+      .toEqual(checkAdmittedEntities([CHECK_AFTER_102]));
+    // And the order-independence D-1 requires, stated as a fact rather than a
+    // hope: the settle's answer is identical against the pre-096 and pre-097
+    // constraints, so each migration and its code may deploy in either order.
+    expect(overrideScopeProvenFrom([CHECK_AFTER_095])).toBe(
+      overrideScopeProvenFrom([CHECK_AFTER_096]));
+    expect(overrideScopeProvenFrom([CHECK_AFTER_096])).toBe(
+      overrideScopeProvenFrom([CHECK_AFTER_097]));
+    expect(overrideScopeProvenFrom([CHECK_AFTER_097])).toBe(
+      overrideScopeProvenFrom([CHECK_AFTER_098]));
+    expect(overrideScopeProvenFrom([CHECK_AFTER_098])).toBe(
+      overrideScopeProvenFrom([CHECK_AFTER_101]));
+    expect(overrideScopeProvenFrom([CHECK_AFTER_101])).toBe(
+      overrideScopeProvenFrom([CHECK_AFTER_102]));
+    // ...but it is documentation, NOT the proof. AFLDB-ISSUE-159 §3.1 / D-1: an
+    // exact-set proof has no safe deploy order in either direction, so the proof
+    // itself must not consult this list at all.
+    const moduleCode = readSource('src/lib/acquisition/manual-authority.ts');
+    const proof = moduleCode.slice(moduleCode.indexOf('export function overrideScopeProvenFrom'));
+    expect(proof.length).toBeGreaterThan(0);
+    expect(proof.slice(0, proof.indexOf('\n}'))).not.toContain('OVERRIDE_ENTITY_TYPES');
+  });
+
+  it('keeps every settle target out of the editor, and needs nothing more of it', () => {
+    expect(editorExposesNoUnrepresentableEntity()).toBe(true);
+    for (const entity of UNREPRESENTABLE_OVERRIDE_ENTITIES) {
+      expect(editorEntityKeys()).not.toContain(entity);
+    }
+    // The editor is a SUBSET of what the CHECK admits, not equal to it: 'coaches'
+    // and 'match_coaches' are admitted overrides with their own admin route and
+    // deliberately no spec.ts entry (AFLDB-ISSUE-159 §16.2).
+    const admitted = new Set(checkAdmittedEntities([CHECK_AFTER_095])!);
+    for (const entity of editorEntityKeys()) expect(admitted.has(entity)).toBe(true);
+    expect(editorEntityKeys()).not.toContain('coaches');
+    expect(editorEntityKeys()).not.toContain('match_coaches');
+  });
+
+  it('proves the scope in BOTH deploy orders — the widening is never a silent settle change', () => {
+    // AFLDB-ISSUE-159 D-1. This is the whole point of the rewrite: there must be
+    // no window, in either sequence, where the proof is lost and the nightly
+    // settle quietly drops from apply to propose-only.
+    //
+    // migration-before-code: the database is already widened, the running code is
+    // the old deployment.
+    expect(overrideScopeProvenFrom([CHECK_AFTER_095])).toBe(true);
+    // code-before-migration: this code is deployed, the database is still 073.
+    expect(overrideScopeProvenFrom([CHECK_BEFORE_095])).toBe(true);
+    // And an intermediate state, if the two literals ever landed in two migrations.
+    expect(overrideScopeProvenFrom([
+      entityTypeCheck('players', 'matches', 'draft_picks', 'coaches'),
+    ])).toBe(true);
+  });
+
+  it('never lets migration 095 itself admit a settle target', () => {
+    // The live-CHECK cases are above; this is the source-side half of the same
+    // guarantee, so a future edit to the migration cannot quietly make the
+    // database admit what the proof then has to refuse.
+    for (const entity of UNREPRESENTABLE_OVERRIDE_ENTITIES) {
+      expect(coachAdminMigration, entity).not.toContain(`'${entity}'`);
+      // Narrow but wrong refuses too: admitting one is fatal on its own, whatever
+      // else the CHECK does or does not carry.
+      expect(overrideScopeProvenFrom([entityTypeCheck('players', entity)]), entity).toBe(false);
+    }
+  });
+
+  it('refuses when the editor exposes an entity the CHECK does not admit', () => {
+    // Condition 4, editor ⊆ CHECK: the two authority contracts disagreeing about
+    // what an override is, is ambiguity — not absence.
+    const missingAnEditorEntity = entityTypeCheck(
+      ...editorEntityKeys().slice(1), 'coaches', 'match_coaches',
+    );
+    expect(overrideScopeProvenFrom([missingAnEditorEntity])).toBe(false);
+    // A CHECK that admits nothing the editor exposes refuses for the same reason.
+    expect(overrideScopeProvenFrom([entityTypeCheck('coaches', 'match_coaches')])).toBe(false);
+  });
+
+  it('keeps the three settle-critical targets apply-capable under the widened CHECK', () => {
+    // The consequence the gate actually cares about (S-1): with the post-095
+    // database, these three still answer 'clear', which is what lets the nightly
+    // settle APPLY them rather than merely propose.
+    const snapshot = authoritySnapshot({
+      overrideScopeProven: overrideScopeProvenFrom([CHECK_AFTER_095]),
+    });
+    for (const entity of UNREPRESENTABLE_OVERRIDE_ENTITIES) {
+      expect(manualAuthorityVerdict(snapshot, {
+        entity, targetKey: { match_id: 1 }, fields: ['goals'],
+      }), entity).toBe('clear');
+    }
+  });
+
+  it('pins the five matches field groups §8 maps proposals onto', () => {
+    expect(matchGroupKeys())
+      .toEqual(['attendance', 'match_event', 'match_time', 'notes', 'score']);
+  });
+
+  it('reads a live CHECK definition: a safe widening is accepted, everything else refuses', () => {
+    // AFLDB-ISSUE-159 §3.1 / D-1. This test previously required the live CHECK to
+    // equal a pinned list exactly, which made a WIDENING a refusal — and that is
+    // precisely the coupling D-1 removed, because it leaves no safe deploy order
+    // in either direction and the failure mode is the nightly settle silently
+    // dropping from apply to propose-only. Every OTHER refusal it asserted is
+    // kept below, unchanged in effect.
+    const admitted = "CHECK ((entity_type = ANY (ARRAY['players'::text, "
+      + "'matches'::text, 'draft_picks'::text])))";
+
+    // Both deploy orders. Pre-095 (this code, un-migrated database) and post-095
+    // (migrated database, any code) both prove the scope.
+    expect(overrideScopeProvenFrom([admitted])).toBe(true);
+    expect(overrideScopeProvenFrom([
+      admitted.replace("'draft_picks'::text", "'draft_picks'::text, 'coaches'::text, 'match_coaches'::text"),
+    ])).toBe(true);
+
+    // Widened to admit a settle target: the unrepresentability proof is gone.
+    // This is the one widening that must still refuse, and it refuses because it
+    // makes the proposition FALSE — not because the literal set changed.
+    for (const entity of UNREPRESENTABLE_OVERRIDE_ENTITIES) {
+      expect(overrideScopeProvenFrom([
+        admitted.replace("'draft_picks'::text", `'draft_picks'::text, '${entity}'::text`),
+      ]), entity).toBe(false);
+    }
+
+    // Narrowed past an editor entity: the two authority contracts now disagree
+    // about what an override is, and a disagreement refuses (condition 4).
+    expect(overrideScopeProvenFrom([
+      "CHECK ((entity_type = ANY (ARRAY['players'::text, 'matches'::text])))",
+    ])).toBe(false);
+
+    // Absent, unreadable, ambiguous, or carrying no literal — every one refuses,
+    // and `checkAdmittedEntities()` reports why by returning null rather than a set.
+    for (const definitions of [
+      [] as string[],
+      ['CHECK ((is_active IS NOT NULL))'],
+      [admitted, admitted],
+      ['CHECK ((entity_type IS NOT NULL))'],
+    ]) {
+      expect(checkAdmittedEntities(definitions)).toBeNull();
+      expect(overrideScopeProvenFrom(definitions)).toBe(false);
+    }
+  });
+
+  it('maps only fields the editor actually exposes onto a field group', () => {
+    expect([...matchFieldGroupsFor(['attendance'])]).toEqual(['attendance']);
+    expect([...matchFieldGroupsFor(['home_goals'])]).toEqual(['score']);
+    expect([...matchFieldGroupsFor(['away_behinds', 'match_time'])].sort())
+      .toEqual(['match_time', 'score']);
+    // Source-owned columns no human can edit map to nothing at all.
+    expect([...matchFieldGroupsFor([
+      'round_code', 'venue_id', 'venue_raw', 'margin', 'result',
+      'attendance_status', 'attendance_source_id',
+    ])]).toEqual([]);
+  });
+});
+
+describe('AFLDB-ISSUE-122 §8 — the manual-authority truth table', () => {
+  it('is clear for a matches proposal no active override covers', () => {
+    expect(manualAuthorityVerdict(authoritySnapshot(), matchQuery(['home_goals']))).toBe('clear');
+  });
+
+  it('conflicts when a changed field falls inside an active override group', () => {
+    const state = authoritySnapshot({
+      matchOverrides: new Map([['2026|1|CARL|COLL', new Set(['score'])]]),
+    });
+    expect(manualAuthorityVerdict(state, matchQuery(['home_goals']))).toBe('conflict');
+    expect(manualAuthorityVerdict(state, matchQuery(['away_behinds', 'margin'])))
+      .toBe('conflict');
+    // A different group on the same match is untouched by that decision.
+    expect(manualAuthorityVerdict(state, matchQuery(['match_time']))).toBe('clear');
+    // And a different match entirely carries no decision at all.
+    expect(manualAuthorityVerdict(state, matchQuery(['home_goals'], '2026|1|GEEL|HAW')))
+      .toBe('clear');
+  });
+
+  it('conflicts on attendance already cited to the manual admin source', () => {
+    const state = authoritySnapshot({ manualAttendanceMatches: new Set(['2026|1|CARL|COLL']) });
+    expect(manualAuthorityVerdict(state, matchQuery(['attendance']))).toBe('conflict');
+    // Only the attendance field. Nothing else in the proposal is implicated.
+    expect(manualAuthorityVerdict(state, matchQuery(['home_goals']))).toBe('clear');
+    expect(MANUAL_ATTENDANCE_SOURCE_KEY).toBe('manual_admin_edit');
+  });
+
+  it('is indeterminate when an active override names an unmappable group', () => {
+    const state = authoritySnapshot({
+      matchOverrides: new Map([['2026|1|CARL|COLL', new Set(['retired_group'])]]),
+    });
+    expect(manualAuthorityVerdict(state, matchQuery(['home_goals']))).toBe('indeterminate');
+  });
+
+  it('is indeterminate for an unusable question', () => {
+    expect(manualAuthorityVerdict(authoritySnapshot(), matchQuery([]))).toBe('indeterminate');
+    expect(manualAuthorityVerdict(authoritySnapshot(), {
+      entity: 'matches', targetKey: {}, fields: ['home_goals'],
+    })).toBe('indeterminate');
+    expect(manualAuthorityVerdict(authoritySnapshot(), {
+      entity: 'matches', targetKey: { match_key: 42 }, fields: ['home_goals'],
+    })).toBe('indeterminate');
+    expect(manualAuthorityVerdict(authoritySnapshot(), {
+      entity: 'players', targetKey: { match_key: 'x' }, fields: ['home_goals'],
+    })).toBe('indeterminate');
+  });
+
+  it('answers clear for the three unrepresentable targets only while proven', () => {
+    for (const entity of UNREPRESENTABLE_OVERRIDE_ENTITIES) {
+      expect(manualAuthorityVerdict(authoritySnapshot(), {
+        entity, targetKey: { match_id: 7 }, fields: ['goals'],
+      })).toBe('clear');
+      expect(manualAuthorityVerdict(authoritySnapshot({ overrideScopeProven: false }), {
+        entity, targetKey: { match_id: 7 }, fields: ['goals'],
+      })).toBe('indeterminate');
+    }
+  });
+
+  it('refuses everything when the authority state could not be read', () => {
+    const provider = refusingProvider();
+    expect(provider(matchQuery(['home_goals']))).toBe('indeterminate');
+    expect(provider({ entity: 'player_match_stats', targetKey: {}, fields: ['goals'] }))
+      .toBe('indeterminate');
+  });
+});
+
+describe('AFLDB-ISSUE-122 §8 — data_edits is not the authority source', () => {
+  const providerSource = readSource('src/lib/acquisition/manual-authority.ts');
+
+  it('reads data_overrides and never data_edits', () => {
+    expect(providerSource).toContain('FROM data_overrides');
+    expect(providerSource).not.toMatch(/FROM data_edits\b/);
+    expect(providerSource).not.toMatch(/JOIN data_edits\b/);
+  });
+
+  it('is wired into the settle CLI in place of the stub', () => {
+    const cli = readSource('tools/current-season/settle-afltables.ts');
+    expect(cli).toContain('manualAuthorityLoader: (tx) => loadManualAuthority(tx, bundle.season)');
+    const settle = readSource('src/lib/acquisition/settle-afltables.ts');
+    expect(settle).toContain('manualAuthority: await options.manualAuthorityLoader(tx)');
+  });
+});
+
+/* ================================================================== *
+ * AFLDB-ISSUE-122 S5 — the applier's DB-free contracts
+ * ================================================================== */
+
+/**
+ * The facts about `canonical-apply.ts` that must not drift and that need no
+ * database to check.
+ *
+ * The behavioural proofs — every gate, both savepoint boundaries, the ledger,
+ * the retry and the failure isolation — are in
+ * `tests/integration/settle-afltables.test.ts` against real PostgreSQL,
+ * because a canonical mutation is not a thing that can be proved in the
+ * abstract.
+ */
+describe('AFLDB-ISSUE-122 S5 — the canonical applier contract', () => {
+  const applier = readSource('src/lib/acquisition/canonical-apply.ts');
+  /**
+   * The module with its prose removed.
+   *
+   * The header and the per-writer comments NAME the things these assertions
+   * prove absent — `createMatch()`, `promotion_decisions` — so scanning the
+   * raw file would match its own documentation and pass or fail for the wrong
+   * reason. These assertions are about the code.
+   */
+  const applierCode = applier
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+
+  it('writes exactly the four targets the settle pass and migration 083 name', () => {
+    // `canonical-apply.ts` declares this union itself, so the dependency runs
+    // one way only: the settle pass imports the applier, never the reverse.
+    // That is only safe while the two agree, so they are pinned to each other
+    // here rather than left to a comment.
+    expect([...CANONICAL_TARGET_TABLES].sort()).toEqual(
+      [...MATCH_TARGET_TABLES, ...PLAYER_MATCH_TARGET_TABLES].sort(),
+    );
+    const ddl = readSource('src/db/migrations/083_canonical_auto_apply.sql');
+    for (const target of CANONICAL_TARGET_TABLES) {
+      expect(ddl).toContain(`'${target}'`);
+    }
+  });
+
+  it('keeps the apply-failure issue_type DISTINCT from the disagreement one '
+    + '(§9.2, AFLDB-ISSUE-104)', () => {
+    // Migration 076's dedup index is (issue_type, issue_key) over open rows,
+    // so two writers with different issue_types can never contend for the
+    // same entry. That is ISSUE-104's binding precondition, satisfied without
+    // a migration — and it lapses silently if these ever converge.
+    expect(CANONICAL_APPLY_ISSUE_TYPE).toBe('canonical_apply_failed');
+    expect(CANONICAL_APPLY_ISSUE_TYPE).not.toBe(SETTLE_ISSUE_TYPE);
+
+    expect(canonicalApplyIssueKey('afltables.match', 'rec-1', 'matches'))
+      .toBe('afltables|apply|match|rec-1|matches');
+    // The contract family, never the dotted wire name, and never colliding
+    // with the disagreement key for the same record and target.
+    expect(canonicalApplyIssueKey('afltables.match', 'rec-1', 'matches'))
+      .not.toBe(settleIssueKey('afltables.match', 'rec-1', 'matches'));
+    expect(() => canonicalApplyIssueKey('afltables.match', '', 'matches'))
+      .toThrow(/external record id/);
+  });
+
+  it('reuses no writer that could render match_key, and creates no identity', () => {
+    // §7.1: three incompatible `match_key` renderings exist in this
+    // repository, and a wrong one inserts a duplicate fixture instead of
+    // conflicting. The applier calls none of them and uses the bundle
+    // projection's key verbatim.
+    expect(applierCode).not.toMatch(/createMatch\s*\(/);
+    // §9.4 and the standing rule: no source creates an identity.
+    for (const table of ['players', 'clubs', 'venues', 'venue_aliases', 'external_identities']) {
+      expect(applierCode).not.toMatch(new RegExp(`INSERT\\s+INTO\\s+${table}\\b`, 'i'));
+    }
+  });
+
+  it('writes neither review ledger: the queue and the decisions stay human', () => {
+    // §5.2 / SC8. A successful automatic application creates no candidate and
+    // fabricates no admin decision, so the applier names neither table in any
+    // statement at all — the mentions left in the file are prose saying so.
+    expect(applierCode).not.toMatch(/promotion_(candidates|decisions)/);
+    // The one machine ledger it does write, in the same savepoint as the
+    // mutation it describes.
+    expect(applierCode).toMatch(/INSERT\s+INTO\s+canonical_applications/);
+  });
+
+  it('bounds the driver savepoint chain after both successful and failed units', () => {
+    // postgres.js creates one private `sN` savepoint for tx.savepoint(), but
+    // does not release it after a successful callback. The earlier public
+    // anchor lets the applier release that complete chain without depending
+    // on the driver's private name. The integration suite proves the success
+    // and failure semantics against PostgreSQL; this pins the transaction-
+    // control shape so one live subtransaction cannot accumulate per unit.
+    const anchor = 'afldb_canonical_apply_unit';
+    const create = `tx\`SAVEPOINT ${anchor}\``;
+    const rollback = `tx\`ROLLBACK TO SAVEPOINT ${anchor}\``;
+    const release = `tx\`RELEASE SAVEPOINT ${anchor}\``;
+
+    expect(applierCode.split(create)).toHaveLength(2);
+    expect(applierCode.split(rollback)).toHaveLength(2);
+    expect(applierCode.split(release)).toHaveLength(3);
+    expect(applierCode.indexOf(create)).toBeLessThan(applierCode.indexOf('tx.savepoint('));
+    expect(applierCode.indexOf(rollback)).toBeGreaterThan(applierCode.indexOf('tx.savepoint('));
+  });
+
+  it('touches only the four canonical fact tables and the ledger', () => {
+    const written = [...applierCode.matchAll(/(?:INSERT\s+INTO|UPDATE)\s+([a-z_]+)/g)]
+      .map((match) => match[1]);
+    expect([...new Set(written)].sort()).toEqual([
+      'brownlow_round_votes', 'canonical_applications', 'match_period_scores',
+      'matches', 'player_match_stats',
+    ]);
+  });
+});
+
+/* ================================================================== *
+ * AFLDB-ISSUE-122 S6 — run integration, the DB-free contracts
+ * ================================================================== */
+
+import { parseSettleArgs } from '../tools/current-season/settle-afltables';
+import {
+  automaticProposal,
+  DERIVED_OWNED_FIELDS,
+} from '@/lib/acquisition/settle-afltables';
+import {
+  classifyCandidate,
+  isMatchFamilyTarget,
+  playerNameOf,
+  renderSettleExceptionReport,
+  splitRejectionReason,
+  type SettleExceptionReport,
+} from '@/lib/acquisition/settle-report';
+
+/**
+ * The S6 facts that need no database: the CLI's flag contract, the pure
+ * exception classification behind the §9.3 report, and the source-shape pins
+ * that keep the derived recompute wired the way §13 requires. The end-to-end
+ * proof — dry-run, apply, identical apply, retry, report — is the nested S6
+ * suite in `tests/integration/settle-afltables.test.ts` against PostgreSQL.
+ */
+describe('AFLDB-ISSUE-122 S6 — the operational path contract', () => {
+  const settle = readSource('src/lib/acquisition/settle-afltables.ts');
+  const cli = readSource('tools/current-season/settle-afltables.ts');
+  const cliCode = cli
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+
+  describe('the CLI flag contract', () => {
+    it('keeps the automatic path explicit: off unless --auto-apply is given', () => {
+      expect(parseSettleArgs(['--label', 'snap', '--dry-run'])).toEqual({
+        label: 'snap', apply: false, autoApply: false, report: false,
+        requireCompleteSource: false,
+      });
+      expect(parseSettleArgs(['--label', 'snap', '--apply']).autoApply).toBe(false);
+      expect(parseSettleArgs(['--label', 'snap', '--apply', '--auto-apply'])).toEqual({
+        label: 'snap', apply: true, autoApply: true, report: false,
+        requireCompleteSource: false,
+      });
+      // The preview: the whole automatic path, rolled back.
+      expect(parseSettleArgs(['--label', 'snap', '--dry-run', '--auto-apply'])).toEqual({
+        label: 'snap', apply: false, autoApply: true, report: false,
+        requireCompleteSource: false,
+      });
+      expect(parseSettleArgs(['--label', 'snap', '--report']).report).toBe(true);
+      // AFLDB-ISSUE-128: opt-in, and off unless asked for, exactly like --auto-apply.
+      expect(parseSettleArgs(
+        ['--label', 'snap', '--apply', '--auto-apply', '--require-complete-source'],
+      ).requireCompleteSource).toBe(true);
+    });
+
+    it('refuses what it cannot honour rather than guessing', () => {
+      expect(() => parseSettleArgs(['--apply'])).toThrow(/--label <snapshot> is required/);
+      expect(() => parseSettleArgs(['--label', 'snap', '--apply', '--dry-run']))
+        .toThrow(/mutually exclusive/);
+      // A mistyped flag would otherwise run the review-first path and look
+      // like an automatic run that wrote nothing.
+      expect(() => parseSettleArgs(['--label', 'snap', '--apply', '--auto-aply']))
+        .toThrow(/Unknown flag '--auto-aply'/);
+    });
+
+    it('has no force flag and no bypass, and is reachable as npm run settle:afltables', () => {
+      expect(cliCode).not.toMatch(/--force|--bypass|--skip|--override/);
+      // The switch decides whether the automatic path RUNS; E2 is handed the
+      // same list the bundle was validated against and re-evaluated at the write.
+      expect(cliCode).toMatch(/autoApply:\s*args\.autoApply/);
+      expect(cliCode).toMatch(/inProgressSeasons,/);
+      const scripts = (JSON.parse(readFileSync('package.json', 'utf8')) as {
+        scripts: Record<string, string>;
+      }).scripts;
+      expect(scripts['settle:afltables']).toBe('tsx tools/current-season/settle-afltables.ts');
+    });
+  });
+
+  describe('the derived recompute wiring (§13)', () => {
+    it('treats career_game_no as derived-owned on the automatic path, and nothing else', () => {
+      // Two writers for one column would retry the write every night over
+      // identical source data (SC3): the recompute renumbers what the
+      // applier wrote. So the automatic path neither writes nor compares it.
+      expect(DERIVED_OWNED_FIELDS).toEqual({ player_match_stats: ['career_game_no'] });
+      const proposal = { career_game_no: 12, kicks: 5, club_id: 3 };
+      expect(automaticProposal('player_match_stats', proposal))
+        .toEqual({ kicks: 5, club_id: 3 });
+      // Every other target's proposal passes through untouched, by identity.
+      for (const target of ['matches', 'match_period_scores', 'brownlow_round_votes'] as const) {
+        expect(automaticProposal(target, proposal)).toBe(proposal);
+      }
+      // And the derived helper is what fills the column in the same transaction.
+      expect(readSource('src/db/queries/player-derived.ts')).toMatch(/SET career_game_no = /);
+    });
+
+    it('reuses the four player-derived helpers, in the admin order, once, gated on a write',
+      () => {
+        const gate = 'if (counters.canonicalRowsInserted + counters.canonicalRowsUpdated > 0)';
+        const start = settle.indexOf(gate);
+        expect(start).toBeGreaterThan(0);
+        const block = settle.slice(start, settle.indexOf('\n      }', start));
+        const order = [
+          'recomputeSeasonMetadata(tx, bundle.season)',
+          'recomputeClubSeasons(tx, bundle.season)',
+          'recomputePlayerDerivedStats(tx, playerIds, bundle.season)',
+          'recomputeSeasonBrownlowStatus(tx, bundle.season)',
+        ];
+        let cursor = 0;
+        for (const call of order) {
+          const at = block.indexOf(call, cursor);
+          expect(at, call).toBeGreaterThan(-1);
+          cursor = at;
+        }
+        // Exactly one call site each: once per run, never per record. (The
+        // prose names them more often; only an `await` is a call.)
+        for (const call of order) {
+          const name = `await ${call.split('(')[0]}(`;
+          expect(settle.split(name).length - 1, name).toBe(1);
+        }
+        expect(settle).toContain("from '../../db/queries/player-derived'");
+        // Nothing replaces the helpers: no derived table is written directly.
+        for (const table of [
+          'club_seasons', 'player_clubs', 'player_season_stats', 'player_career_stats',
+          'player_club_season_stats',
+        ]) {
+          expect(settle).not.toMatch(
+            new RegExp(`(INSERT\\s+INTO|UPDATE|DELETE\\s+FROM)\\s+${table}\\b`),
+          );
+        }
+      });
+  });
+
+  describe('the §9.3 exception classification', () => {
+    it('calls a pending candidate moot only once its record applied at or after its version',
+      () => {
+        expect(classifyCandidate(1, null)).toBe('active');
+        expect(classifyCandidate(1, 1)).toBe('moot'); // the §9.3 retry: same version
+        expect(classifyCandidate(1, 2)).toBe('moot'); // superseded by a later apply
+        expect(classifyCandidate(2, 1)).toBe('active'); // the apply predates the exception
+      });
+
+    it("reads the settle's rejection reason back into target and reason", () => {
+      expect(splitRejectionReason('player_match_stats: no external identity for url'))
+        .toEqual({ targetTable: 'player_match_stats', reason: 'no external identity for url' });
+      expect(splitRejectionReason('free text'))
+        .toEqual({ targetTable: 'unknown', reason: 'free text' });
+      expect(isMatchFamilyTarget('matches')).toBe(true);
+      expect(isMatchFamilyTarget('match_period_scores')).toBe(true);
+      expect(isMatchFamilyTarget('player_match_stats')).toBe(false);
+      expect(isMatchFamilyTarget('brownlow_round_votes')).toBe(false);
+    });
+
+    it('takes the display name from display columns only, never as an identity', () => {
+      expect(playerNameOf({ player_name: 'A B', first_name: 'X', surname: 'Y' })).toBe('A B');
+      expect(playerNameOf({ first_name: 'X', surname: 'Y' })).toBe('X Y');
+      expect(playerNameOf({ surname: 'Y' })).toBe('Y');
+      expect(playerNameOf({ url: 'players/x.html' })).toBeNull();
+    });
+
+    it('renders active exceptions apart from moot candidates, with the §9.3 context', () => {
+      const report: SettleExceptionReport = {
+        sourceKey: 'afltables',
+        season: 2026,
+        latestBatch: {
+          batchId: '42' as never, completedAt: '2026-09-02', recordsRead: 3, recordsRejected: 1,
+        },
+        unresolvedRecords: [{
+          sourceKey: 'afltables', family: 'player_match_stats', externalRecordId: 'p@k',
+          sourceVersionSeq: 1, matchKey: 'k', season: 2026, roundCode: '1',
+          playerName: 'New Debutant', profileUrl: 'players/N/New_Debutant.html',
+          clubRaw: 'Carlton', targetTable: 'player_match_stats',
+          reason: 'no external identity', canonicalMatchApplied: true, canonicalMatchId: 7,
+        }],
+        candidates: {
+          active: [{
+            candidateId: '1', family: 'match', externalRecordId: 'k', sourceVersionSeq: 2,
+            verb: 'corrected', targetTable: 'matches', targetId: 7, createdAt: 't',
+            latestAppliedVersionSeq: 1, status: 'active',
+          }],
+          moot: [{
+            candidateId: '2', family: 'player_match_stats', externalRecordId: 'q@k',
+            sourceVersionSeq: 1, verb: 'unresolved_identity', targetTable: 'player_match_stats',
+            targetId: null, createdAt: 't', latestAppliedVersionSeq: 1, status: 'moot',
+          }],
+        },
+        applyFailures: [],
+        disagreements: [],
+        findingsTruncated: false,
+      };
+      const text = renderSettleExceptionReport(report).join('\n');
+      expect(text).toContain('ACTIVE — requires attention (2)');
+      expect(text).toContain(
+        "player_match_stats 'p@k' v1 -> player_match_stats: no external identity",
+      );
+      expect(text).toContain(
+        'player New Debutant · profile players/N/New_Debutant.html · club Carlton'
+        + ' · season 2026 · round 1',
+      );
+      expect(text).toContain('match k: canonical (matches.id 7)');
+      expect(text).toContain("#1 match 'k' v2 -> matches (corrected), last applied v1");
+      expect(text).toContain('MOOT — pending candidates whose record has since applied (1)');
+      expect(text).toContain(
+        "#2 player_match_stats 'q@k' v1 -> player_match_stats (unresolved_identity), applied v1",
+      );
+      // A record whose match has NOT landed says so in as many words.
+      const notLanded = renderSettleExceptionReport({
+        ...report,
+        unresolvedRecords: [{
+          ...report.unresolvedRecords[0], canonicalMatchApplied: false, canonicalMatchId: null,
+        }],
+      }).join('\n');
+      expect(notLanded).toContain('match k: NOT canonical');
+    });
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * AFLDB-ISSUE-128 — the source-completeness verdict
+ * ------------------------------------------------------------------ */
+
+describe('AFLDB-ISSUE-128 — source completeness', () => {
+  /** The counter shape a healthy in-season run stamps. */
+  const clean = {
+    snapshotMatches: 207,
+    snapshotPlayerMatchRows: 9522,
+    snapshotRejections: 0,
+    snapshotUnkeyedRejections: 0,
+    absenceSweepSkipped: 0,
+  };
+
+  describe('the verdict', () => {
+    it('reads a fully represented snapshot as complete', () => {
+      const verdict = assessSourceCompleteness(clean);
+      expect(verdict.status).toBe('complete');
+      expect(verdict.reasons).toEqual([]);
+      expect(verdict.enumeratedRecords).toBe(9729);
+      expect(verdict.headline).toContain('Source complete');
+    });
+
+    it('reads an EMPTY scope as complete, not as an alarm', () => {
+      // The guard must be source evidence, never a calendar. Byes, the gap
+      // before finals and five months of off-season all acquire nothing, and
+      // a defence that cried wolf through all of them would be turned off.
+      const verdict = assessSourceCompleteness({
+        ...clean, snapshotMatches: 0, snapshotPlayerMatchRows: 0,
+      });
+      expect(verdict.status).toBe('complete');
+      expect(verdict.headline).toContain('supplied no rows');
+    });
+
+    it('reads the measured 2026-09-03 production shape as incomplete', () => {
+      // The real numbers: 209 matches and 9,614 player rows acquired live
+      // from AFL Tables, 207 and 9,522 emitted, 94 rows with no representable
+      // identity, both scopes unsweepable.
+      const verdict = assessSourceCompleteness({
+        ...clean, snapshotUnkeyedRejections: 94, absenceSweepSkipped: 2,
+      });
+      expect(verdict.status).toBe('incomplete');
+      expect(verdict.unrepresentableRows).toBe(94);
+      expect(verdict.scopesNotSwept).toBe(2);
+      expect(verdict.reasons.map((r) => r.code))
+        .toEqual(['unrepresentable_rows', 'scopes_not_swept']);
+      expect(verdict.headline).toContain('Source INCOMPLETE');
+      expect(verdict.headline).toContain('must not be read as a complete import');
+    });
+
+    it('treats an unprojected record as incomplete in its own right', () => {
+      const verdict = assessSourceCompleteness({ ...clean, snapshotRejections: 1 });
+      expect(verdict.status).toBe('incomplete');
+      expect(verdict.reasons.map((r) => r.code)).toEqual(['rejected_records']);
+    });
+
+    it('reports a run with no counters as unknown, never as complete', () => {
+      // A run that ended before its counter stamp proves nothing about the
+      // source. Saying "complete" there is exactly the false reassurance this
+      // module exists to remove.
+      for (const missing of [null, undefined]) {
+        const verdict = assessSourceCompleteness(missing);
+        expect(verdict.status).toBe('unknown');
+        expect(verdict.reasons.map((r) => r.code)).toEqual(['no_counters']);
+        expect(verdict.headline).toContain('UNKNOWN');
+      }
+    });
+
+    it('does not escalate a malformed counter into an alarm nobody can act on', () => {
+      const verdict = assessSourceCompleteness({
+        ...clean, snapshotUnkeyedRejections: Number.NaN, absenceSweepSkipped: -3,
+      });
+      expect(verdict.status).toBe('complete');
+      expect(verdict.unrepresentableRows).toBe(0);
+      expect(verdict.scopesNotSwept).toBe(0);
+    });
+
+    it('renders every reason it found, and says what to do only when incomplete', () => {
+      const bad = renderSourceCompleteness(assessSourceCompleteness({
+        ...clean, snapshotUnkeyedRejections: 94, absenceSweepSkipped: 2,
+      })).join('\n');
+      expect(bad).toContain('Source completeness: INCOMPLETE');
+      expect(bad).toContain('unrepresentable_rows');
+      expect(bad).toContain('scopes_not_swept');
+      expect(bad).toContain('not a source outage');
+
+      const good = renderSourceCompleteness(assessSourceCompleteness(clean)).join('\n');
+      expect(good).toContain('Source completeness: COMPLETE');
+      expect(good).not.toContain('Investigate');
+    });
+  });
+
+  describe('the settle CLI gate', () => {
+    const cli = readSource('tools/current-season/settle-afltables.ts');
+    const shell = readSource('deploy/afldb-settle-afltables.sh');
+
+    it('evaluates the verdict on every run, dry or applied', () => {
+      expect(cli).toContain('assessSourceCompleteness(result.counters)');
+      expect(cli).toContain('renderSourceCompleteness(sourceCompleteness)');
+    });
+
+    it('decides the exit code AFTER the run returns, so no data is lost', () => {
+      // The whole point: an incomplete source must cost the run its claim to
+      // success, never cost AFLDB the records it CAN represent. The gate is in
+      // main(), after runSettleCli() has returned and its transaction has
+      // committed, and it sets an exit code rather than throwing.
+      const main = cli.slice(cli.indexOf('async function main('));
+      expect(main).toContain('const outcome = await runSettleCli(');
+      expect(main).toContain('outcome.args.requireCompleteSource');
+      expect(main).toContain('process.exitCode = 1');
+      // Nothing in the gate may skip, roll back or re-run the settle.
+      expect(main).not.toMatch(/rollback|--force|skip/i);
+    });
+
+    it('fails an unknown verdict too: "not shown" is not "shown to be fine"', () => {
+      const main = cli.slice(cli.indexOf('async function main('));
+      expect(main).toContain("outcome.sourceCompleteness.status === 'complete'");
+    });
+
+    it('the scheduled unit asks for the gate', () => {
+      // Without this the nightly timer would keep reporting success for a
+      // pass that dropped rows, which is the defect ISSUE-128 owns.
+      expect(shell).toContain('--require-complete-source');
+      expect(shell).toContain('--apply --auto-apply --require-complete-source');
+    });
+
+    it('prints the complete operator monitoring contract before the long chain', () => {
+      const monitoringCall = shell.indexOf('\nprint_monitoring_block\n');
+      const acquisition = shell.indexOf('"$RSCRIPT" tools/rebuild/fitzroy/acquire_core.R');
+      expect(monitoringCall).toBeGreaterThan(-1);
+      expect(acquisition).toBeGreaterThan(monitoringCall);
+      expect(shell).toContain('[monitor] launcher PID: $$');
+      expect(shell).toContain('ps -o pid,ppid,etime,%cpu,%mem,stat,cmd');
+      expect(shell).toContain('psql "$AFLDB_IMPORT_DATABASE_URL"');
+      expect(shell).toContain('usename=current_user');
+      expect(shell).toContain('journalctl -u afldb-settle-afltables -f');
+      expect(shell).toContain('no child/log/database-statement change for 10 minutes');
+      expect(shell).toContain('AFLDB_SETTLE_SUCCESS label=$label');
+      expect(shell).toContain('AFLDB_SETTLE_FAILURE label=$label exit=$status');
+      expect(shell).not.toContain('echo "$AFLDB_IMPORT_DATABASE_URL"');
+    });
+  });
+});
+
+/* ------------------------------------------------------------------
+ * AFLDB-ISSUE-130 — the R runtime declaration
+ *
+ * The settle unit failed on a host where every required R package was
+ * installed, because the packages sat in a library that R under systemd never
+ * searches, and nothing tracked said so. These assertions hold the shape of the
+ * fix: ONE sourced fragment resolves R for the unit and for a deploy-time
+ * preflight; the optional AFLDB_R_LIBS is additive and must exist; the preflight
+ * validates what the unit will see and reads the fitzRoy pin from the contract;
+ * the unit file gains no host path and loses no hardening; and the mechanism is
+ * documented, so it cannot ship as tribal knowledge.
+ * ------------------------------------------------------------------ */
+
+describe('AFLDB-ISSUE-130 — the R runtime declaration', () => {
+  // The one resolution line both scripts must share, and the one sourcing form.
+  const ROOT_LINE = 'PROJECT_ROOT=${AFLDB_PROJECT_ROOT:-$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)}';
+  const SOURCE_LINE = '. "$PROJECT_ROOT/deploy/afldb-r-env.sh"';
+  const settle = readSource('deploy/afldb-settle-afltables.sh');
+  const fragment = readSource('deploy/afldb-r-env.sh');
+  const preflight = readSource('deploy/afldb-r-preflight.sh');
+  const unit = readSource('deploy/afldb-settle-afltables.service');
+  const deploymentDoc = readSource('docs/deployment.md');
+  const contract = JSON.parse(readSource('tools/rebuild/fitzroy/fitzroy-contract.json')) as {
+    pinned_version: string;
+  };
+
+  describe('the settle script', () => {
+    it('sources the shared fragment before it invokes Rscript, and resolves RSCRIPT nowhere else', () => {
+      const sourced = settle.indexOf(SOURCE_LINE);
+      const invoked = settle.indexOf('"$RSCRIPT" tools/rebuild/fitzroy/acquire_core.R');
+      expect(sourced).toBeGreaterThan(-1);
+      expect(invoked).toBeGreaterThan(sourced);
+      // The fragment is the single place the interpreter is resolved: a second
+      // definition here would let the unit and the preflight drift apart.
+      expect(settle).not.toMatch(/^RSCRIPT=/m);
+      // It is sourced after `cd "$PROJECT_ROOT"`, and through PROJECT_ROOT.
+      expect(settle.indexOf('cd "$PROJECT_ROOT"')).toBeLessThan(sourced);
+    });
+
+    it('resolves PROJECT_ROOT from its own location, exactly as the preflight does (Stage 3 defect)', () => {
+      // Stage 3 on streamanator: the unit was pointed at a worktree checkout
+      // and died with `.: cannot open deploy/afldb-r-env.sh` because this
+      // script defaulted PROJECT_ROOT to the literal canonical path and cd'd
+      // there, away from the copy actually being run. The default must be
+      // derived from $0, so the fragment sourced is the one beside the script.
+      expect(settle).toContain(ROOT_LINE);
+      expect(preflight).toContain(ROOT_LINE);
+      // The override survives, first, as the only way to name another root.
+      expect(settle).toMatch(/^PROJECT_ROOT=\$\{AFLDB_PROJECT_ROOT:-/m);
+      // And the canonical path is no longer a fallback anywhere in the script:
+      // a wrong checkout must fail loudly, never quietly run production's copy.
+      expect(settle).not.toMatch(/^PROJECT_ROOT=.*\/home\/arm\/projects\/afldb/m);
+      expect(settle).not.toContain('PROJECT_ROOT:-/home/');
+      // Both scripts source the fragment through the resolved root, never a
+      // bare relative path that depends on where the shell happens to be.
+      expect(settle).toContain(SOURCE_LINE);
+      expect(preflight).toContain(SOURCE_LINE);
+      expect(settle).not.toContain('. deploy/afldb-r-env.sh');
+      expect(preflight).not.toContain('. deploy/afldb-r-env.sh');
+    });
+
+    it('keeps the three-step chain, its flags, its label and its cleanup trap unchanged', () => {
+      expect(settle).toContain('--acquire --in-season --label "$label" --from "$season" --to "$season"');
+      expect(settle).toContain('--require-in-season');
+      expect(settle).toContain('--on-record-error reject');
+      expect(settle).toContain('--apply --auto-apply --require-complete-source');
+      expect(settle).toContain('label="settle-${season}-$(date +%Y-%m-%d-%H%M)"');
+      expect(settle).toContain('trap cleanup_partial EXIT');
+      expect(settle).toContain('set -eu');
+    });
+  });
+
+  /* The Stage 3 defect, executed rather than grepped. The settle script is
+   * copied VERBATIM into a temporary checkout with its own copy of the fragment
+   * (the real one, plus one sentinel line that prints the directory it was
+   * sourced in), an empty in-progress register, and a stub "python" that
+   * answers the season question with AMBIGUOUS:0. That drives the real script
+   * through root resolution, the fragment and the season gate, then out at
+   * the out-of-season `exit 0` — before any label, network or PostgreSQL.
+   * The process runs with its working directory somewhere ELSE, so a
+   * dependency on the caller's cwd would fail here too. Requires a POSIX sh
+   * (Linux always; Windows through Git Bash); skipped, loudly, without one. */
+  describe('the settle script, executed from a temporary alternate checkout', () => {
+    const haveSh = spawnSync('sh', ['-c', 'exit 0']).status === 0;
+    const scratch: string[] = [];
+    const posix = (p: string) => p.replace(/\\/g, '/');
+
+    function makeCheckout(tag: string): string {
+      const root = mkdtempSync(join(tmpdir(), `afldb-issue-130-${tag}-`));
+      scratch.push(root);
+      mkdirSync(join(root, 'deploy'));
+      mkdirSync(join(root, 'data', 'reference'), { recursive: true });
+      writeFileSync(join(root, 'deploy', 'afldb-settle-afltables.sh'), settle);
+      writeFileSync(
+        join(root, 'deploy', 'afldb-r-env.sh'),
+        `${fragment}\necho "AFLDB_TEST_FRAGMENT_ROOT=$PWD"\n`,
+      );
+      writeFileSync(join(root, 'data', 'reference', 'seasons.json'), '{"in_progress_seasons":[]}\n');
+      const python = join(root, 'fake-python');
+      writeFileSync(python, '#!/bin/sh\ncat >/dev/null\necho AMBIGUOUS:0\n');
+      chmodSync(python, 0o755);
+      return root;
+    }
+
+    function runSettle(root: string, env: Record<string, string> = {}) {
+      const script = posix(join(root, 'deploy', 'afldb-settle-afltables.sh'));
+      const inherited = { ...process.env };
+      delete inherited.AFLDB_PROJECT_ROOT;
+      delete inherited.AFLDB_R_LIBS;
+      return spawnSync('sh', [script], {
+        cwd: tmpdir(), // deliberately NOT the checkout
+        encoding: 'utf8',
+        env: { ...inherited, AFLDB_PYTHON: posix(join(root, 'fake-python')), ...env },
+      });
+    }
+
+    afterEach(() => {
+      for (const root of scratch.splice(0)) rmSync(root, { recursive: true, force: true });
+    });
+
+    it.skipIf(!haveSh)('sources the fragment beside ITSELF, not one under /home/arm/projects/afldb', () => {
+      const root = makeCheckout('alt');
+      const run = runSettle(root);
+      expect(run.stderr).toBe('');
+      expect(run.status).toBe(0);
+      // The sentinel names the directory the fragment ran in: this checkout.
+      // (Git Bash reports C:/x as /c/x, so match on the unique leaf name.)
+      expect(run.stdout).toMatch(/^AFLDB_TEST_FRAGMENT_ROOT=.*$/m);
+      expect(run.stdout).toContain(`/${basename(root)}\n`);
+      expect(run.stdout).not.toContain('/home/arm/projects/afldb');
+      // It got as far as the season gate and stopped there, cleanly.
+      expect(run.stdout).toContain('nothing to settle');
+    });
+
+    it.skipIf(!haveSh)('runs the real fragment it found: a missing AFLDB_R_LIBS is refused before anything else', () => {
+      const root = makeCheckout('libs');
+      const run = runSettle(root, { AFLDB_R_LIBS: posix(join(root, 'no-such-library')) });
+      expect(run.status).toBe(1);
+      expect(run.stderr).toContain('AFLDB_R_LIBS is set to');
+      expect(run.stderr).toContain('does not exist');
+      expect(run.stdout).not.toContain('nothing to settle');
+      expect(run.stdout).not.toContain('AFLDB in-season settle');
+    });
+
+    it.skipIf(!haveSh)('still honours AFLDB_PROJECT_ROOT as an explicit override of its own location', () => {
+      const here = makeCheckout('here');
+      const other = makeCheckout('other');
+      const run = runSettle(here, { AFLDB_PROJECT_ROOT: posix(other) });
+      expect(run.stderr).toBe('');
+      expect(run.status).toBe(0);
+      expect(run.stdout).toContain(`/${basename(other)}\n`);
+      expect(run.stdout).not.toContain(`/${basename(here)}\n`);
+    });
+
+    it.skipIf(!haveSh)('fails loudly, not silently, when the resolved root is not a checkout', () => {
+      const root = makeCheckout('broken');
+      rmSync(join(root, 'deploy', 'afldb-r-env.sh'));
+      const run = runSettle(root);
+      expect(run.status).not.toBe(0);
+      expect(run.stderr).toContain('afldb-r-env.sh');
+      expect(run.stdout).not.toContain('nothing to settle');
+    });
+
+    it('is not silently skipped on the supported runtime', () => {
+      // Linux is the runtime that matters; there, `sh` must exist.
+      if (process.platform === 'linux') expect(haveSh).toBe(true);
+    });
+  });
+
+  describe('deploy/afldb-r-env.sh', () => {
+    it('resolves RSCRIPT with the same override convention as the other interpreters', () => {
+      expect(fragment).toContain('RSCRIPT=${AFLDB_RSCRIPT:-/usr/bin/Rscript}');
+    });
+
+    it('prepends AFLDB_R_LIBS to R_LIBS additively, never R_LIBS_SITE or R_LIBS_USER', () => {
+      // Additive: the apt-installed site library must stay visible.
+      expect(fragment).toContain('R_LIBS="$AFLDB_R_LIBS${R_LIBS:+:$R_LIBS}"');
+      expect(fragment).toContain('export R_LIBS');
+      // R_LIBS_SITE replaces the site entries; R_LIBS_USER names THE user
+      // library. Neither may be assigned or exported here.
+      expect(fragment).not.toMatch(/^\s*(export\s+)?R_LIBS_SITE=/m);
+      expect(fragment).not.toMatch(/^\s*(export\s+)?R_LIBS_USER=/m);
+    });
+
+    it('is a no-op beyond RSCRIPT when AFLDB_R_LIBS is unset, and set -u safe', () => {
+      expect(fragment).toContain('if [ -n "${AFLDB_R_LIBS:-}" ]; then');
+    });
+
+    it('refuses a configured directory that does not exist, because R would drop it silently', () => {
+      expect(fragment).toContain('if [ ! -d "$AFLDB_R_LIBS" ]; then');
+      expect(fragment).toContain('exit 1');
+      expect(fragment).toContain('silently drop');
+    });
+
+    it('carries no host-specific library path and installs nothing', () => {
+      expect(fragment).not.toContain('/home/');
+      expect(fragment).not.toContain('install.packages');
+      // The only absolute path is the canonical library, named as documentation.
+      expect(fragment).toContain('/usr/local/lib/R/site-library');
+    });
+  });
+
+  describe('deploy/afldb-r-preflight.sh', () => {
+    it('exercises the same resolution the unit does', () => {
+      expect(preflight).toContain(SOURCE_LINE);
+      expect(preflight).toContain('set -eu');
+      expect(preflight).toContain('"$RSCRIPT" -');
+    });
+
+    it('validates every fact the settle chain depends on and prints the evidence', () => {
+      for (const pkg of ['jsonlite', 'digest', 'fitzRoy']) {
+        expect(preflight).toContain(`"${pkg}"`);
+      }
+      expect(preflight).toContain('requireNamespace(pkg, quietly = TRUE)');
+      expect(preflight).toContain('.libPaths()');
+      expect(preflight).toContain('R.version.string');
+      // Rscript itself must resolve before R is asked anything.
+      expect(preflight).toContain('Rscript does not resolve');
+    });
+
+    it('proves a configured AFLDB_R_LIBS is really on the effective .libPaths()', () => {
+      expect(preflight).toContain('AFLDB_R_PREFLIGHT_LIBS="${AFLDB_R_LIBS:-}"');
+      expect(preflight).toContain('is NOT on the effective .libPaths()');
+    });
+
+    it('reads the fitzRoy pin from the contract rather than duplicating it', () => {
+      expect(preflight).toContain('tools/rebuild/fitzroy/fitzroy-contract.json');
+      expect(preflight).toContain('$pinned_version');
+      expect(preflight).toContain('identical(installed, pinned)');
+      // The pinned value itself must not appear anywhere in the script: the
+      // contract is the single authority, exactly as for acquire_core.R.
+      expect(contract.pinned_version).toMatch(/^\d+\.\d+\.\d+$/);
+      expect(preflight).not.toContain(contract.pinned_version);
+      expect(preflight).not.toMatch(/\d+\.\d+\.\d+/);
+    });
+
+    it('fails closed with a non-zero exit, and never installs', () => {
+      expect(preflight).toContain('quit(save = "no", status = 1)');
+      expect(preflight).toContain('R PREFLIGHT: FAILED');
+      expect(preflight).toContain('R PREFLIGHT: OK');
+      expect(preflight).not.toContain('install.packages');
+      expect(preflight).not.toContain('/home/');
+    });
+
+    it('warns about the interactive-shell startup file the supported path must not depend on', () => {
+      expect(preflight).toContain('~/.Renviron');
+      expect(preflight).toContain('WARNING');
+    });
+  });
+
+  describe('deploy/afldb-settle-afltables.service', () => {
+    it('declares no Environment= of its own, so no host path can hide in the tracked unit', () => {
+      // The library is declared through .env (EnvironmentFile=) and the sourced
+      // fragment, never as a tracked, host-specific Environment= line — R would
+      // silently drop the path on any host where it does not exist, and the
+      // unit would LOOK as though it declared the dependency while doing nothing.
+      expect(unit).not.toMatch(/^Environment=/m);
+      expect(unit).toContain('EnvironmentFile=/home/arm/projects/afldb/.env');
+      expect(unit).toContain('ExecStart=/bin/sh /home/arm/projects/afldb/deploy/afldb-settle-afltables.sh');
+    });
+
+    it('keeps its hardening, timeout and credential boundary intact', () => {
+      for (const line of [
+        'NoNewPrivileges=true',
+        'PrivateTmp=true',
+        'ProtectSystem=strict',
+        'ProtectHome=read-only',
+        'RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX',
+        'SystemCallFilter=@system-service',
+        'TimeoutStartSec=3600',
+        'Type=oneshot',
+      ]) {
+        expect(unit).toContain(line);
+      }
+      expect(unit).toMatch(/^UnsetEnvironment=.*AFLDB_OWNER_DATABASE_URL/m);
+      expect(unit).not.toMatch(/^UnsetEnvironment=.*AFLDB_IMPORT_DATABASE_URL/m);
+    });
+  });
+
+  describe('docs/deployment.md', () => {
+    it('names the canonical library, the optional override, and the preflight', () => {
+      expect(deploymentDoc).toContain('/usr/local/lib/R/site-library');
+      expect(deploymentDoc).toContain('AFLDB_R_LIBS');
+      expect(deploymentDoc).toContain('sh deploy/afldb-r-preflight.sh');
+      expect(deploymentDoc).toContain('R PREFLIGHT: OK');
+    });
+
+    it('distinguishes the interactive-shell check from the service-equivalent one', () => {
+      expect(deploymentDoc).toContain('systemd-run');
+      expect(deploymentDoc).toContain('-p EnvironmentFile=/home/arm/projects/afldb/.env');
+      expect(deploymentDoc).toContain('-p ProtectHome=read-only');
+      expect(deploymentDoc).toContain('systemctl show afldb-settle-afltables.service -p Environment');
+    });
+
+    it('rules out the untracked substitutes and records the drop-in removal', () => {
+      expect(deploymentDoc).toContain('r-library.conf');
+      expect(deploymentDoc).toContain('~/.Renviron');
+      expect(deploymentDoc).toContain('daemon-reload');
+    });
   });
 });

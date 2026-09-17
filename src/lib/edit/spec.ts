@@ -161,6 +161,13 @@ export const EDITABLE_ENTITIES: Record<string, EditEntity> = {
       draft_age: { key: 'draft_age', label: 'Draft age', kind: 'integer', nullable: true, min: 14, max: 50 },
       pick_note: { key: 'pick_note', label: 'Pick note', kind: 'text', nullable: true, maxLength: 500 },
       detail: { key: 'detail', label: 'Detail / biography', kind: 'text', nullable: true, maxLength: 2000 },
+      // AFLDB-ISSUE-160 §6.1. The two source facts most often wrong, and the
+      // two the generic editor never exposed. The club is carried as a SLUG,
+      // never a club id: the id a browser posts is meaningless the moment a
+      // promotion renumbers it, and the era-correct identity has to be
+      // resolved against draft_year server-side anyway (J-6/J-7).
+      pick_number: { key: 'pick_number', label: 'Pick number', kind: 'integer', nullable: true, min: 1, max: 200 },
+      club_slug: { key: 'club_slug', label: 'Club', kind: 'text', nullable: false, maxLength: 60 },
     },
     groups: {
       player_info: {
@@ -177,6 +184,13 @@ export const EDITABLE_ENTITIES: Record<string, EditEntity> = {
         key: 'notes', label: 'Notes and details',
         fields: ['pick_note', 'detail'],
         help: 'Biographical notes and selection conditions.',
+      },
+      selection_facts: {
+        key: 'selection_facts', label: 'Pick number and club',
+        fields: ['pick_number', 'club_slug'],
+        help: 'The selection itself. The club must be the historical identity active in the '
+          + 'draft year, and the pick number must not already be held by another selection '
+          + 'in the same draft and kind.',
       },
     },
   },

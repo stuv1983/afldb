@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  BROWNLOW_MATCH_SHEET_REFUSAL,
   autoDisposalsFromComponents,
   deriveDisposals,
   validateMatchSheetPayload,
@@ -46,7 +47,6 @@ describe('match-sheet write validation', () => {
 
   it.each([
     [{ players: [{ playerId: 1, clubId: 2, goals: -1 }] }, 'invalid goals'],
-    [{ players: [{ playerId: 1, clubId: 2, brownlowVotes: 4 }] }, 'invalid brownlowVotes'],
     [{ players: [{ playerId: 1, clubId: 2 }, { playerId: 1, clubId: 3 }] }, 'appears more than once'],
     [{ players: [{ playerId: 1, clubId: 2 }], removedPlayerIds: [1] }, 'cannot be both active and removed'],
     [{ players: [{ playerId: 1, clubId: 2, kicks: 4, handballs: 3, disposals: 8 }] }, 'do not equal'],
@@ -74,33 +74,46 @@ describe('match-sheet write validation', () => {
     expect(autoDisposalsFromComponents('', '')).toBe('');
   });
 
-  it('accepts exactly one 3-2-1 Brownlow allocation or an entirely blank allocation', () => {
-    expect(validateMatchSheetPayload({
-      players: [
-        { playerId: 1, clubId: 10, brownlowVotes: 3 },
-        { playerId: 2, clubId: 10, brownlowVotes: 2 },
-        { playerId: 3, clubId: 20, brownlowVotes: 1 },
-        { playerId: 4, clubId: 20, brownlowVotes: 0 },
-      ],
-    }).ok).toBe(true);
+  // AFLDB-ISSUE-155 §27.15: the match sheet is no longer a Brownlow writer.
+  // The previously accepted 3/2/1 allocation is now the primary refusal case.
+  it.each([
+    ['a complete 3-2-1 allocation', [
+      { playerId: 1, clubId: 10, brownlowVotes: 3 },
+      { playerId: 2, clubId: 10, brownlowVotes: 2 },
+      { playerId: 3, clubId: 20, brownlowVotes: 1 },
+      { playerId: 4, clubId: 20, brownlowVotes: 0 },
+    ]],
+    ['an explicit zero on its own', [{ playerId: 1, clubId: 10, brownlowVotes: 0 }]],
+    ['a single 3-vote row', [{ playerId: 1, clubId: 10, brownlowVotes: 3 }]],
+    ['a value outside the historical range', [{ playerId: 1, clubId: 10, brownlowVotes: 4 }]],
+    ['a partial allocation', [
+      { playerId: 1, clubId: 10, brownlowVotes: 3 },
+      { playerId: 2, clubId: 20, brownlowVotes: 2 },
+    ]],
+  ])('refuses any Brownlow value from the match sheet: %s', (_label, players) => {
+    const result = validateMatchSheetPayload({ players });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toBe(BROWNLOW_MATCH_SHEET_REFUSAL);
+  });
+
+  it('names Brownlow administration in the refusal so the editor can redirect', () => {
+    expect(BROWNLOW_MATCH_SHEET_REFUSAL).toContain('/admin/brownlow');
+  });
+
+  it('still accepts a sheet that carries no Brownlow value at all', () => {
     expect(validateMatchSheetPayload({
       players: [{ playerId: 1, clubId: 10 }, { playerId: 2, clubId: 20 }],
     }).ok).toBe(true);
+    expect(validateMatchSheetPayload({
+      players: [{ playerId: 1, clubId: 10, brownlowVotes: null }],
+    }).ok).toBe(true);
   });
 
-  it.each([
-    [[3, 3, 2, 1]],
-    [[3, 2]],
-    [[0, 0, 0]],
-  ])('rejects an invalid published Brownlow distribution: %j', (votes) => {
+  it('normalises the mirror to null so the writer never carries a vote through', () => {
     const result = validateMatchSheetPayload({
-      players: votes.map((brownlowVotes, index) => ({
-        playerId: index + 1,
-        clubId: index % 2 === 0 ? 10 : 20,
-        brownlowVotes,
-      })),
+      players: [{ playerId: 1, clubId: 10, goals: 2 }],
     });
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toContain('exactly one player with 3 votes');
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.players[0].brownlowVotes).toBeNull();
   });
 });

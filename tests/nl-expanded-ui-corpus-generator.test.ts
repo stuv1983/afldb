@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 describe('expanded NL UI corpus generator', () => {
   it('does not create doubled metric plurals', async () => {
-    const { buildExpandedUiCorpusRows, pluralMetric } = await import('../tmp-generate-expanded-ui-corpus.mjs');
+    const { buildExpandedUiCorpusRows, pluralMetric } = await import('../tools/nl/generate-expanded-ui-corpus.mjs');
 
     expect(pluralMetric('goal')).toBe('goals');
     expect(pluralMetric('goals')).toBe('goals');
@@ -16,7 +16,7 @@ describe('expanded NL UI corpus generator', () => {
   });
 
   it('keeps debut-season wording as an unsupported boundary oracle', async () => {
-    const { buildExpandedUiCorpusRows } = await import('../tmp-generate-expanded-ui-corpus.mjs');
+    const { buildExpandedUiCorpusRows } = await import('../tools/nl/generate-expanded-ui-corpus.mjs');
 
     const rows = buildExpandedUiCorpusRows();
     const debutSeasonRows = rows.slice(1).filter((row: string[]) => row[2].includes('in debut season'));

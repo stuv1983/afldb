@@ -4,7 +4,7 @@ import { sql } from '@/db/client';
 import { RECORD_CATEGORIES } from '@/db/queries/records';
 import { indexingEnabled } from '@/lib/indexing';
 import { siteUrl } from '@/lib/seo';
-import { honourTeamSlug } from '@/lib/slugs';
+import { coachSlug, honourTeamSlug } from '@/lib/slugs';
 
 const baseUrl = siteUrl();
 
@@ -64,10 +64,20 @@ export default async function sitemap({
 
   // Segment 0: static routes plus the small reference collections.
   if (id === 0) {
-    const [clubs, seasons, venues] = await Promise.all([
+    const [clubs, seasons, venues, coaches] = await Promise.all([
       sql<{ slug: string }[]>`SELECT slug FROM clubs ORDER BY slug`,
       sql<{ year: number }[]>`SELECT year FROM seasons ORDER BY year`,
       sql<{ slug: string }[]>`SELECT slug FROM venues ORDER BY slug`,
+      // EVERY coach, player-linked or not (AFLDB-ISSUE-170 Stage 1E).
+      // /coaches/[slug] no longer redirects a player-linked coach to their
+      // player page: the coach page is a real, self-canonical document
+      // presenting the coaching career, and the player page presents the
+      // playing career. Both deserve to be crawled; publishing only one of
+      // them would leave ~368 real pages undiscoverable. (Supersedes the
+      // coach-only scope AFLDB-ISSUE-118 §W.4 set.)
+      sql<{ id: number; displayName: string }[]>`
+        SELECT id, display_name AS "displayName" FROM coaches
+      `,
     ]);
 
     return [
@@ -80,8 +90,14 @@ export default async function sitemap({
       { url: `${baseUrl}/awards`, changeFrequency: 'weekly', priority: 0.8 },
       { url: `${baseUrl}/draft`, changeFrequency: 'weekly', priority: 0.7 },
       { url: `${baseUrl}/venues`, changeFrequency: 'monthly', priority: 0.7 },
+      { url: `${baseUrl}/coaches`, changeFrequency: 'monthly', priority: 0.6 },
       { url: `${baseUrl}/match-search`, changeFrequency: 'monthly', priority: 0.8 },
       { url: `${baseUrl}/players/compare`, changeFrequency: 'monthly', priority: 0.5 },
+      // The BASE comparison surface only. A pair, a season, a match filter
+      // and a page are view state on one document, not separate documents:
+      // enumerating pairs would publish 210 near-identical URLs whose
+      // canonical is this one anyway. AFLDB-ISSUE-144.
+      { url: `${baseUrl}/clubs/compare`, changeFrequency: 'monthly', priority: 0.5 },
       { url: `${baseUrl}/about`, changeFrequency: 'yearly', priority: 0.3 },
       ...clubs.map((c) => ({
         url: `${baseUrl}/clubs/${c.slug}`,
@@ -97,6 +113,11 @@ export default async function sitemap({
         url: `${baseUrl}/venues/${v.slug}`,
         changeFrequency: 'monthly' as const,
         priority: 0.5,
+      })),
+      ...coaches.map((c) => ({
+        url: `${baseUrl}/coaches/${coachSlug(c.displayName)}-${c.id}`,
+        changeFrequency: 'monthly' as const,
+        priority: 0.4,
       })),
     ];
   }
@@ -114,15 +135,21 @@ export default async function sitemap({
         SELECT DISTINCT season FROM brownlow_season_votes ORDER BY season
       `,
       sql<{ slug: string }[]>`SELECT slug FROM awards ORDER BY slug`,
+      // `status = 'active'` on both (AFLDB-ISSUE-165 §4.5): these enumerate
+      // URLs, and /awards/[slug]/[season] and /honour-teams/[slug] render
+      // from `getAwardSeason` / `getHonourTeam`, which now return nothing at
+      // all for a season or a team whose every row is void. Emitting such a
+      // URL would advertise an empty page to a crawler.
       sql<{ slug: string; season: number }[]>`
         SELECT DISTINCT a.slug, w.season
           FROM award_winners w
           JOIN awards a ON a.id = w.award_id
-         WHERE w.season IS NOT NULL
+         WHERE w.season IS NOT NULL AND w.status = 'active'
          ORDER BY a.slug, w.season
       `,
       sql<{ teamName: string }[]>`
         SELECT DISTINCT team_name AS "teamName" FROM honour_team_members
+         WHERE status = 'active'
          ORDER BY team_name
       `,
     ]);

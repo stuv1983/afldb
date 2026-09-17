@@ -61,6 +61,12 @@ const ctx: NlParseContext = {
   clubs,
   venues: [{ id: 30, slug: 'mcg', name: 'MCG', names: ['mcg', 'melbourne cricket ground'] }],
   resolvePlayer: async (name) => players[name] ?? [],
+  // AFLDB-ISSUE-197: reuses the same fixture, keyed by the mention's joined
+  // tokens -- the "ablett" bare-surname entry below is exactly what the
+  // real resolvePlayerFamily would return for this fixture's two-Ablett
+  // family, now that the family branch reads from it instead of filtering
+  // resolvePlayer's own result.
+  resolvePlayerFamily: async (tokens) => players[tokens.join(' ')] ?? [],
 };
 
 async function plan(question: string) {
@@ -109,6 +115,40 @@ describe('AFLDB-ISSUE-094 semantic mappings', () => {
     expect(p.scope.matchup?.clubA.slug).toBe('richmond');
     expect(p.scope.matchup?.clubB.slug).toBe('carlton');
     expect(validatePlan(p)).not.toHaveProperty('error');
+  });
+
+  // AFLDB-ISSUE-209: the 173-row exploratory defect family is generated
+  // from exactly one template -- "Which of A and B has more wins head to
+  // head [temporal]" (tools/nl/generate-exploratory-corpus.mjs:362-371,
+  // head_to_head template index 2) -- so the fix is scoped to "has/have
+  // (more|the most) wins head to head", not a general "more wins" rewrite.
+  // "has the most wins head to head" is not in the generated corpus but is
+  // a same-anchor natural equivalent the issue's product semantics ask for
+  // explicitly. Club pairs are varied (not just Richmond/Carlton) to prove
+  // the fix is a structural pattern, not tied to one club pair.
+  //
+  // Two wordings from the issue's illustrative examples were tried and
+  // dropped from this matrix after the RED run: "has more wins between A
+  // and B" and "has more wins against the other" both fall into
+  // extractClubSeasonMetric's "most wins" club_season ranking cue
+  // (parser.ts:2700-2709) and decline there, never reaching
+  // extractHeadToHeadCue's family list at all -- a different mechanism,
+  // out of scope for this issue's minimal fix. See AFLDB-ISSUE-209.md.
+  it.each([
+    ['Which of Richmond and Carlton has more wins head to head', 'richmond', 'carlton'],
+    ['Which of Richmond and Carlton has more wins head to head in 2023', 'richmond', 'carlton'],
+    ['Which club has more wins head to head, Carlton or Richmond', 'carlton', 'richmond'],
+    ['Who has more wins head to head, Carlton or Geelong', 'carlton', 'geelong'],
+    ['Which of Richmond and Carlton has the most wins head to head', 'richmond', 'carlton'],
+    ['Who has won more, Carlton or Richmond?', 'carlton', 'richmond'],
+    ['Which team has won more head to head, Carlton or Richmond?', 'carlton', 'richmond'],
+  ] as const)('AFLDB-ISSUE-209: maps %s to compare_wins (%s v %s)', async (question, clubA, clubB) => {
+    const p = await plan(question);
+    expect(p.grain).toBe('head_to_head');
+    expect(p.headToHead).toEqual({ kind: 'compare_wins' });
+    expect(validatePlan(p)).not.toHaveProperty('error');
+    const slugs = [p.scope.matchup?.clubA.slug, p.scope.matchup?.clubB.slug].sort();
+    expect(slugs).toEqual([clubA, clubB].sort());
   });
 
   it.each([
@@ -247,6 +287,60 @@ describe('AFLDB-ISSUE-094 semantic mappings', () => {
     }
   });
 
+  /**
+   * AFLDB-ISSUE-152 Phase G. The rule directly above is grain-independent
+   * and family-independent, and this is the regression that proves it
+   * rather than assuming it: the Phase G P3 sweep marked one row failing,
+   * `did gary ablett kick a goal with his first kick`, expected `plan`
+   * and observed `absent`. That was the ambiguity rule doing its job in a
+   * family the rule predates, not a first-kick-goal defect -- the panel is
+   * absent because `answerNlQuestion` returns null for every
+   * `status: 'none'`, so a decline and a missing answer are the same
+   * rendered page.
+   *
+   * Measured in afldb_test on 2026-09-09: players 4700 and 4701 BOTH have
+   * display_name "Gary Ablett" AND slug "gary-ablett", each carrying the
+   * bare "Gary Ablett" as a `source_string` alias and its own generational
+   * `alternate` alias ("Gary Ablett Snr" / "Gary Ablett Jnr"). The real
+   * resolver returns them 10.9 points apart (1135.7 / 1124.8) -- nowhere
+   * near the 200-point gap rule -- so the bare mention is two people by
+   * construction, and the suffix is the ONLY thing that separates them.
+   *
+   * No first-kick-goal resolver exists or should: the shared player
+   * resolution above is the whole contract, and these four sentences are
+   * asserted here, next to it, rather than in the family's own suite.
+   */
+  describe('AFLDB-ISSUE-152 first-kick-goal named-player resolution', () => {
+    it('declines the unsuffixed name, which names two players', async () => {
+      const parsed = await parseNlQuestion('did gary ablett kick a goal with his first kick', ctx);
+      expect(parsed.status).toBe('none');
+      if (parsed.status !== 'none') return;
+      expect(parsed.reason).toBe('ambiguous');
+      expect(parsed.report.confidence).toBeCloseTo(0.7);
+      // The decline is the ambiguity, not an unparsed question: the
+      // first-kick-goal phrase itself was understood and consumed, so
+      // nothing is left over for the vocabulary miner to chase.
+      expect(parsed.report.unsupportedTerms).toEqual([]);
+      expect(parsed.report.components?.tokenRatio).toBe(1);
+      expect(parsed.report.components?.playerCertainty).toBeCloseTo(0.7);
+    });
+
+    it.each([
+      ['did gary ablett jr kick a goal with his first kick', 101],
+      ['did gary ablett jnr kick a goal with his first kick', 101],
+      ['did gary ablett sr kick a goal with his first kick', 102],
+      ['did gary ablett snr kick a goal with his first kick', 102],
+    ] as const)('plans the suffixed name against one identity: %s', async (question, playerId) => {
+      const p = await plan(question);
+      expect(p.grain).toBe('player_career');
+      expect(p.player?.id).toBe(playerId);
+      // The suffix justified the identity through the matched alias only;
+      // the canonical ref never carries it.
+      expect(p.player?.name).toBe('Gary Ablett');
+      expect(p.careerPredicates).toEqual([{ builder: 'first_kick_goal_player', params: {} }]);
+    });
+  });
+
   it('keeps surname-candidate ranking behavior', async () => {
     const p = await plan('Ablett most goals');
     expect(p.scope.playerIdIn).toEqual([101, 102]);
@@ -331,6 +425,59 @@ describe('AFLDB-ISSUE-094 semantic mappings', () => {
       // represent the whole question, so it must NOT validate: a plan that
       // kept both conditions at career grain would silently discard the
       // explicit "in a game" and answer career goals instead.
+      expect(p.grain).toBe('player_career');
+      expect(p.careerConditions).toEqual([
+        { kind: 'column', column: 'premierships', op: 'eq', value: 0 },
+      ]);
+      expect(p.metricCondition).toEqual({ op: 'lte', value: 4 });
+      expect(validatePlan(p)).toHaveProperty('error');
+    });
+  });
+
+  describe('AFLDB-ISSUE-187: a METRIC_WORDS threshold must not strand a career condition', () => {
+    it.each([
+      'players with 40 disposals in a game and no premierships',
+      'players with more than 30 disposals and 5 goals in a game',
+      'players with 300 games and more than 30 disposals in a game',
+      'richmond players with 40 disposals in a game and 200 games',
+    ])('declines instead of silently dropping the career condition: %s', async (question) => {
+      const parsed = await parseNlQuestion(question, ctx);
+      expect(parsed.status).toBe('none');
+      if (parsed.status === 'none') expect(parsed.reason).toBe('unrecognised');
+    });
+
+    it('still plans a single-clause non-career threshold with no career condition present', async () => {
+      const p = await plan('players with more than 30 disposals in a game');
+      expect(p).toMatchObject({
+        grain: 'player_game', mode: 'single', metric: 'disposals',
+        metricCondition: { op: 'gt', value: 30 },
+        careerConditions: [],
+      });
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('still plans a sole career condition alone at career grain', async () => {
+      const p = await plan('players with no premierships');
+      expect(p).toMatchObject({
+        grain: 'player_career',
+        careerConditions: [{ kind: 'column', column: 'premierships', op: 'eq', value: 0 }],
+      });
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('still converts a sole career-vocabulary threshold onto a named season', async () => {
+      const p = await plan('players with more than 2 goals in 1989');
+      expect(p).toMatchObject({
+        grain: 'player_season', metric: 'goals',
+        scope: { seasonMin: 1989, seasonMax: 1989 },
+        metricCondition: { op: 'gt', value: 2 },
+        careerConditions: [],
+      });
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('still fails the existing mixed game/career condition closed via validatePlan', async () => {
+      const p = await plan('players with no more than 4 goals in a game and no premierships');
       expect(p.grain).toBe('player_career');
       expect(p.careerConditions).toEqual([
         { kind: 'column', column: 'premierships', op: 'eq', value: 0 },
@@ -725,6 +872,154 @@ describe('AFLDB-ISSUE-094 semantic mappings', () => {
       expect(validatePlan(p)).toEqual({
         error: 'A statistic threshold lists every qualifying result rather than ranking one.',
       });
+    });
+  });
+
+  describe('AFLDB-ISSUE-110 closeout: a career predicate must OWN the scope it keeps', () => {
+    // Findings A and B of the independent adjudication. A career
+    // predicate used to exempt a plan from BOTH career-grain scope
+    // backstops merely by existing, but a builder consumes only its own
+    // parameters: grand_finals_played_min has no season and no club, so
+    // the range and the club reached no SQL at all while the plan
+    // description still displayed them.
+    const SEASON_ERROR = 'A career question cannot be restricted to a season range.';
+    const CLUB_ERROR = 'This kind of career question cannot be limited to one club.';
+
+    it('refuses a season range no predicate consumes instead of counting whole careers', async () => {
+      const p = await plan('players with at least 3 grand finals since 2000');
+      expect(p.grain).toBe('player_career');
+      expect(p.careerPredicates).toEqual([
+        { builder: 'grand_finals_played_min', params: { times: '3' } },
+      ]);
+      // The period genuinely survived parsing: this is the backstop
+      // refusing a plan whose executor would ignore it, not a decline
+      // for want of understanding "since 2000".
+      expect(p.scope.seasonMin).toBe(2000);
+      expect(validatePlan(p)).toEqual({ error: SEASON_ERROR });
+    });
+
+    it('refuses a club no predicate consumes instead of listing every club', async () => {
+      const p = await plan('Carlton players who debuted since 2000');
+      expect(p.grain).toBe('player_career');
+      expect(p.careerPredicates).toEqual([
+        { builder: 'debuted_between', params: { from: '2000', to: '2100' } },
+      ]);
+      // debuted_between owns the SEASON range; nothing owns the club,
+      // and the career compiler dropped it entirely once any predicate
+      // was present -- so this answered for every club while the Games
+      // column stayed club-scoped and read 0 for the extra players.
+      expect(p.scope.clubFor?.slug).toBe('carlton');
+      expect(validatePlan(p)).toEqual({ error: CLUB_ERROR });
+    });
+
+    it('refuses a club beside a club-blind predicate with no season range in play', async () => {
+      const p = await plan('Carlton players who played in at least 3 grand finals');
+      expect(p.grain).toBe('player_career');
+      expect(p.careerPredicates).toEqual([
+        { builder: 'grand_finals_played_min', params: { times: '3' } },
+      ]);
+      expect(p.scope.clubFor?.slug).toBe('carlton');
+      expect(p.scope.seasonMin).toBeUndefined();
+      expect(validatePlan(p)).toEqual({ error: CLUB_ERROR });
+    });
+
+    it('keeps a debut window valid: debuted_between owns the range', async () => {
+      const p = await plan('players who debuted in the 1990s');
+      expect(p).toMatchObject({
+        grain: 'player_career',
+        careerPredicates: [{ builder: 'debuted_between', params: { from: '1990', to: '1999' } }],
+        scope: { seasonMin: 1990, seasonMax: 1999 },
+      });
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('keeps a club-and-season achievement valid: both fields are builder parameters', async () => {
+      const p = await plan('players who kicked a goal with their first kick for Carlton in the 1940s');
+      expect(p.grain).toBe('player_career');
+      expect(p.careerPredicates).toEqual([
+        { builder: 'first_kick_goal_for_club', params: { club: '2' } },
+        { builder: 'first_kick_goal_between', params: { from: '1940', to: '1949' } },
+      ]);
+      expect(p.scope.clubFor?.slug).toBe('carlton');
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('keeps the unscoped predicate question valid', async () => {
+      const p = await plan('players with at least 3 grand finals');
+      expect(p).toMatchObject({
+        grain: 'player_career',
+        careerPredicates: [{ builder: 'grand_finals_played_min', params: { times: '3' } }],
+        scope: {},
+      });
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+  });
+
+  describe('AFLDB-ISSUE-110 D: grouped "games" thresholds', () => {
+    // The whole user_grouped_thresholds "N games against <club>" family
+    // was unanswerable while its wins/losses siblings answered: "games"
+    // was not a grouped result metric, so the question fell through to a
+    // player_career games column still carrying opponent scope, and the
+    // career backstop refused it. games is the un-predicated member of
+    // the same organization-level family.
+    it.each([
+      ['more than', 'gt'],
+      ['at least', 'gte'],
+      ['at most', 'lte'],
+    ] as const)('maps grouped "%s 2 games against Richmond"', async (words, op) => {
+      const p = await plan(`teams with ${words} 2 games against Richmond`);
+      expect(p.grain).toBe('team_match');
+      expect(p.metric).toBeNull();
+      expect(p.agg).toEqual({ kind: 'list' });
+      expect(p.havingClause).toEqual({ metric: 'games', op, value: 2 });
+      expect(p.careerConditions).toEqual([]);
+      expect(p.scope.clubAgainst?.slug).toBe('richmond');
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it.each([
+      ['wins', 'gt', 'more than'],
+      ['wins', 'gte', 'at least'],
+      ['wins', 'lte', 'at most'],
+      ['losses', 'gt', 'more than'],
+      ['losses', 'gte', 'at least'],
+      ['losses', 'lte', 'at most'],
+    ] as const)('leaves grouped %s (%s) untouched', async (metric, op, words) => {
+      const p = await plan(`teams with ${words} 2 ${metric} against Richmond`);
+      expect(p.grain).toBe('team_match');
+      expect(p.havingClause).toEqual({ metric, op, value: 2 });
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('a club subject is what admits the word: a player subject keeps the career column', async () => {
+      // "games" names a career column over the SAME vocabulary. Without
+      // the subject gate this question would silently become a grouped
+      // club count -- a different question with a different answer.
+      const p = await plan('players with more than 200 games');
+      expect(p.grain).toBe('player_career');
+      expect(p.havingClause).toBeUndefined();
+      expect(p.careerConditions).toEqual([
+        { kind: 'column', column: 'games', op: 'gt', value: 200 },
+      ]);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('a result word still governs when both are present', async () => {
+      const p = await plan('teams with more than 2 wins in games against Carlton');
+      expect(p.havingClause).toEqual({ metric: 'wins', op: 'gt', value: 2 });
+    });
+
+    it('a margin filter cannot attach to a games count', () => {
+      // win_margin/loss_margin must count the result they filter; games
+      // counts every match, so the combination fails closed.
+      const raw = {
+        v: 1 as const, grain: 'team_match' as const, metric: null, agg: { kind: 'list' as const },
+        scope: {}, careerConditions: [], careerPredicates: [], clubSeasonConditions: [],
+        havingClause: { metric: 'games' as const, op: 'gt' as const, value: 2 },
+        matchFilter: { metric: 'win_margin' as const, op: 'gt' as const, value: 50 },
+        tiePolicy: 'all' as const, limit: 100,
+      };
+      expect(validatePlan(raw)).toHaveProperty('error');
     });
   });
 

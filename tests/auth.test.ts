@@ -1,10 +1,14 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { readdirSync, readFileSync } from 'node:fs';
+import { basename, join, relative, sep } from 'node:path';
 
-// The audit suite at the foot of this file exercises the real
-// src/lib/auth/session.ts, which binds the auth pool and reads request
-// headers. Both are replaced here so the writer can be observed without
-// a database and without a Next.js request scope; nothing else in this
-// file touches either module.
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// The audit suite at the foot of this file, and the requireCapability
+// suite (AFLDB-ISSUE-158), exercise the real src/lib/auth/session.ts, which
+// binds the auth pool, reads request headers and redirects through
+// next/navigation. All three are replaced here so the writer and the guard
+// can be observed without a database and without a Next.js request scope;
+// nothing else in this file touches those modules.
 type CapturedQuery = { strings: string[]; values: unknown[] };
 
 /**
@@ -18,9 +22,36 @@ const jsonParameter = vi.hoisted(() => (
 ));
 
 const poolQueries = vi.hoisted(() => [] as CapturedQuery[]);
+/**
+ * The auth_sessions JOIN auth_users row getAdminUser() should find, if any.
+ * Left null, every statement returns no rows, as it always did.
+ */
+const sessionRow = vi.hoisted(() => ({
+  row: null as null | {
+    id: number; email: string; role: 'contributor' | 'admin' | 'super_admin';
+    canManageAdmins: boolean; mustChangePassword: boolean;
+  },
+}));
+/**
+ * The admin_invites row loadLiveInvite() (src/app/admin/invite/[token]/
+ * actions.ts) should find, if any -- AFLDB-ISSUE-186 Phase A's
+ * confirmEnrolment/beginEnrolment contributor-invite-refusal tests below.
+ */
+const inviteRow = vi.hoisted(() => ({
+  row: null as null | {
+    id: number; email: string; role: 'contributor' | 'admin' | 'super_admin';
+    canManageAdmins: boolean; pendingTotpSecret: string | null;
+  },
+}));
 vi.mock('@/db/authClient', () => {
   const sql = (strings: TemplateStringsArray, ...values: unknown[]) => {
     poolQueries.push({ strings: [...strings], values });
+    if (sessionRow.row && strings.join('').includes('FROM auth_sessions s')) {
+      return Promise.resolve([sessionRow.row]);
+    }
+    if (inviteRow.row && strings.join('').includes('FROM admin_invites')) {
+      return Promise.resolve([inviteRow.row]);
+    }
     return Promise.resolve([]);
   };
   sql.json = jsonParameter;
@@ -31,6 +62,8 @@ const requestHeaders = vi.hoisted(() => ({
   forwardedFor: null as string | null,
   outsideRequestScope: false,
 }));
+/** The signed admin cookie a test wants getAdminUser() to read, if any. */
+const requestCookie = vi.hoisted(() => ({ admin: null as string | null }));
 vi.mock('next/headers', () => ({
   headers: async () => {
     // What next/headers actually does outside a request scope, which is
@@ -38,12 +71,36 @@ vi.mock('next/headers', () => ({
     if (requestHeaders.outsideRequestScope) throw new Error('called outside a request scope');
     return { get: (name: string) => (name === 'x-forwarded-for' ? requestHeaders.forwardedFor : null) };
   },
-  cookies: async () => ({ get: () => undefined, delete: () => undefined }),
+  cookies: async () => ({
+    get: () => (requestCookie.admin === null ? undefined : { value: requestCookie.admin }),
+    delete: () => undefined,
+  }),
+}));
+// What Next's redirect() does: throw. The message carries the target so a
+// test can tell /admin/upload from /admin from /admin/login.
+vi.mock('next/navigation', () => ({
+  redirect: (to: string): never => { throw new Error(`NEXT_REDIRECT ${to}`); },
 }));
 
 import type postgres from 'postgres';
 
-import { audit, auditInTransaction } from '@/lib/auth/session';
+import { createInvite } from '@/app/admin/admins/invite-actions';
+import { beginEnrolment, confirmEnrolment } from '@/app/admin/invite/[token]/actions';
+import { adminNavFor, isCurrentAdminPath, type AdminNavViewer } from '@/app/admin/nav-model';
+import {
+  LIFECYCLE_ACTIONS,
+  LIFECYCLE_AUDIT_ACTION,
+  canActOnLifecycle,
+  isActive,
+  isViableSuperAdmin,
+  lifecycleEligibility,
+  lifecycleMessage,
+  lifecycleTransition,
+  normaliseLifecycleReason,
+  type LifecycleAccountState,
+} from '@/lib/auth/admin-lifecycle';
+import { hasCapability, type Capability, type CapabilityViewer } from '@/lib/auth/capabilities';
+import { audit, auditInTransaction, getAdminUser, requireCapability } from '@/lib/auth/session';
 import {
   MIN_PASSWORD_LENGTH,
   generateTemporaryPassword,
@@ -245,6 +302,732 @@ describe('CSV parsing', () => {
 });
 
 /**
+ * The Admin Centre capability policy (AFLDB-ISSUE-155 Phase A):
+ * src/lib/auth/capabilities.ts, and the nav grouping in
+ * src/app/admin/nav-model.ts that is built from it. Both are pure and
+ * request-scope-free, like the other modules tested above.
+ */
+describe('capability policy', () => {
+  const viewer = (role: CapabilityViewer['role'], canManageAdmins = false): CapabilityViewer => (
+    { role, canManageAdmins }
+  );
+
+  const SUPER_ADMIN_ONLY: Capability[] = [
+    'data.playerLinks', 'data.dataEditor', 'acquisition.currentSeason',
+    'site.content', 'site.settings', 'operations.queryBuilder',
+    'operations.dbHealth', 'operations.appHealth', 'operations.nlTelemetry',
+    'people.admins.lifecycle', 'data.brownlow.finalise',
+  ];
+
+  it('opens legacy intake to every staff role, including a contributor', () => {
+    for (const role of ['contributor', 'admin', 'super_admin'] as const) {
+      expect(hasCapability(viewer(role), 'acquisition.legacyIntake')).toBe(true);
+    }
+  });
+
+  it('reserves the super-admin-only capabilities from a contributor and a plain admin', () => {
+    for (const capability of SUPER_ADMIN_ONLY) {
+      expect(hasCapability(viewer('contributor'), capability)).toBe(false);
+      expect(hasCapability(viewer('admin'), capability)).toBe(false);
+      expect(hasCapability(viewer('super_admin'), capability)).toBe(true);
+    }
+  });
+
+  it('opens beta access and the admin list to any admin, but not a contributor', () => {
+    for (const capability of ['people.betaAccess', 'people.admins.read'] as const) {
+      expect(hasCapability(viewer('contributor'), capability)).toBe(false);
+      expect(hasCapability(viewer('admin'), capability)).toBe(true);
+      expect(hasCapability(viewer('super_admin'), capability)).toBe(true);
+    }
+  });
+
+  it('never delegates admin management to a contributor, flag or no flag (AFLDB-ISSUE-158)', () => {
+    // requireAdminManager() bounced a contributor at requireAdmin() before
+    // it ever read can_manage_admins. Now that the capability is the guard
+    // for invites and temporary passwords it must draw the same line, or
+    // the migration would have loosened it.
+    expect(hasCapability(viewer('contributor', false), 'people.admins.manage')).toBe(false);
+    expect(hasCapability(viewer('contributor', true), 'people.admins.manage')).toBe(false);
+  });
+
+  it('delegates admin management to a plain admin only when can_manage_admins is set', () => {
+    // Mirrors hasAdminManagementAccess() in session.ts exactly: this is the
+    // one capability a role list alone cannot express.
+    expect(hasCapability(viewer('admin', false), 'people.admins.manage')).toBe(false);
+    expect(hasCapability(viewer('admin', true), 'people.admins.manage')).toBe(true);
+    expect(hasCapability(viewer('super_admin', false), 'people.admins.manage')).toBe(true);
+  });
+
+  it('does not let the admin-management delegation reach the account lifecycle', () => {
+    // The whole point of the Phase B split: can_manage_admins keeps its
+    // invite and password-reset reach and gains no promote, demote,
+    // deactivate or reactivate power (§26.3). If this ever passes for a
+    // delegated admin, the delegation has become a second super admin.
+    expect(hasCapability(viewer('admin', true), 'people.admins.lifecycle')).toBe(false);
+    expect(hasCapability(viewer('admin', true), 'people.admins.manage')).toBe(true);
+    expect(hasCapability(viewer('super_admin', false), 'people.admins.lifecycle')).toBe(true);
+  });
+
+  it('splits Brownlow drafting from finalisation (§27.8)', () => {
+    // Decision 1 of §25, adopted as Option A: an Admin may read and draft --
+    // work that reaches no public query -- but only a Super Admin may
+    // finalise, correct, void or publish, which is the moment a vote becomes
+    // a public statistical fact.
+    for (const capability of ['data.brownlow.read', 'data.brownlow.draft'] as const) {
+      expect(hasCapability(viewer('contributor'), capability)).toBe(false);
+      expect(hasCapability(viewer('admin'), capability)).toBe(true);
+      expect(hasCapability(viewer('super_admin'), capability)).toBe(true);
+    }
+    expect(hasCapability(viewer('admin'), 'data.brownlow.finalise')).toBe(false);
+    expect(hasCapability(viewer('super_admin'), 'data.brownlow.finalise')).toBe(true);
+  });
+
+  it('does not let the admin-management delegation reach Brownlow finalisation', () => {
+    // can_manage_admins is a people delegation; it must not become a data one.
+    expect(hasCapability(viewer('admin', true), 'data.brownlow.finalise')).toBe(false);
+    expect(hasCapability(viewer('admin', true), 'data.brownlow.draft')).toBe(true);
+  });
+
+  it('opens special-record reading to any admin and never to a contributor (AFLDB-ISSUE-167 D-4)', () => {
+    // D-4 (2026-09-13): data.specialRecords.read is ADMIN_AND_UP because the
+    // underlying facts are already public -- /records/first-kick-goal and
+    // /records/after-the-siren are public pages -- and operations.audit.read
+    // already gives an Admin the full data_edits trail. Reading a special
+    // record's provenance, lifecycle state and void reason widens no boundary
+    // that exists today.
+    expect(hasCapability(viewer('contributor'), 'data.specialRecords.read')).toBe(false);
+    expect(hasCapability(viewer('contributor', true), 'data.specialRecords.read')).toBe(false);
+    expect(hasCapability(viewer('admin'), 'data.specialRecords.read')).toBe(true);
+    expect(hasCapability(viewer('super_admin'), 'data.specialRecords.read')).toBe(true);
+  });
+
+  it('keeps every special-record WRITE to a super admin (AFLDB-ISSUE-167 D-4, Stage 6)', () => {
+    // D-4's second half, declared at Stage 6 beside its first guarded mutation
+    // (§9.1). Create, correct, suppress, reinstate and replace are ALL writes
+    // under this one capability -- there is deliberately no separate
+    // `.suppress`, because both halves would be SUPER_ADMIN_ONLY and splitting
+    // them would separate nothing.
+    //
+    // The final role matrix D-4 approved, entire:
+    //     Contributor  read no   edit no
+    //     Admin        read yes  edit no
+    //     Super Admin  read yes  edit yes
+    expect(DECLARED_CAPABILITIES).toContain('data.specialRecords.edit');
+    expect(hasCapability(viewer('contributor'), 'data.specialRecords.edit')).toBe(false);
+    expect(hasCapability(viewer('contributor', true), 'data.specialRecords.edit')).toBe(false);
+    expect(hasCapability(viewer('admin'), 'data.specialRecords.edit')).toBe(false);
+    // can_manage_admins delegates people.admins.manage and nothing else: an
+    // Admin carrying it is still an Admin here.
+    expect(hasCapability(viewer('admin', true), 'data.specialRecords.edit')).toBe(false);
+    expect(hasCapability(viewer('super_admin'), 'data.specialRecords.edit')).toBe(true);
+  });
+
+  it('guards every special-record Server Action and the revalidate route with .edit', () => {
+    // Nav and button hiding are furniture. The boundary is the server-side
+    // call, and a direct POST by an Admin or a Contributor reaches this line
+    // either way -- so the assertion is about the ACTION source, not the page.
+    const actions = boundary('src/app/admin/records/actions.ts');
+    expect(actions, 'the Stage 6 special-record Server Actions module').toBeDefined();
+    const enforced = enforcedCapabilities(actions!.source);
+    expect(enforced.length).toBeGreaterThanOrEqual(10);
+    expect([...new Set(enforced)]).toEqual(['data.specialRecords.edit']);
+
+    // Every exported action, not merely the first one found.
+    const exported = topLevelAsyncFunctions(actions!.source).filter((fn) => fn.exported);
+    expect(exported.length).toBeGreaterThanOrEqual(10);
+    for (const fn of exported) {
+      expect(firstGuard(fn, new Map(topLevelAsyncFunctions(actions!.source).map((f) => [f.name, f]))),
+        `${fn.name} must assert the capability before it awaits anything else`)
+        .toBe('requireCapability');
+    }
+
+    // The bounded revalidation route finishes a mutation, so only a viewer who
+    // could have made one may reach it (the ISSUE-165 §5.6 precedent).
+    const route = boundary('src/app/admin/records/revalidate/route.ts');
+    expect(route, 'the Stage 6 bounded revalidation route').toBeDefined();
+    expect(enforcedCapabilities(route!.source)).toEqual(['data.specialRecords.edit']);
+  });
+
+  it('never calls revalidatePath() inside a special-record Server Action (R-7)', () => {
+    // revalidatePath() inside a Server Action hangs the Next 15.5 client
+    // (AFLDB-ISSUE-156 §7 R-7). The action returns the paths; the browser posts
+    // them to the allowlisted route AFTER the action has resolved.
+    const actions = boundary('src/app/admin/records/actions.ts');
+    expect(actions).toBeDefined();
+    // A CALL, not a mention: the module's own header explains the rule in
+    // prose, and prose must not be what this test is reading.
+    expect(actions!.source).not.toMatch(/\brevalidatePath\s*\(/);
+    expect(actions!.source).not.toContain('next/cache');
+
+    // The one place the call is allowed: the capability-gated allowlisted route.
+    const route = boundary('src/app/admin/records/revalidate/route.ts');
+    expect(route!.source).toContain('applyRevalidateRequest');
+  });
+
+  it('opens the audit trail to any admin and never to a contributor (AFLDB-ISSUE-157)', () => {
+    // ISSUE-156 §2: read-only inspection of auth_audit_log and data_edits is
+    // Admin-and-up. A contributor reaches one route (upload) and this is not
+    // it; nothing about the viewer is delegated by can_manage_admins either
+    // way, because the plain role list already includes every admin.
+    expect(hasCapability(viewer('contributor'), 'operations.audit.read')).toBe(false);
+    expect(hasCapability(viewer('contributor', true), 'operations.audit.read')).toBe(false);
+    expect(hasCapability(viewer('admin'), 'operations.audit.read')).toBe(true);
+    expect(hasCapability(viewer('super_admin'), 'operations.audit.read')).toBe(true);
+  });
+});
+
+/**
+ * The account lifecycle policy (AFLDB-ISSUE-155 Phase B §26.5, §26.6,
+ * §26.10): src/lib/auth/admin-lifecycle.ts, the one module the controls,
+ * the transaction and these tests all read the rules from.
+ */
+describe('admin lifecycle policy', () => {
+  const account = (over: Partial<LifecycleAccountState> = {}): LifecycleAccountState => ({
+    id: 1,
+    role: 'super_admin',
+    disabledAt: null,
+    hasPassword: true,
+    hasTotp: true,
+    canManageAdmins: false,
+    ...over,
+  });
+
+  const superAdmin = account({ id: 1 });
+  const otherSuperAdmin = account({ id: 2 });
+  const plainAdmin = account({ id: 3, role: 'admin' });
+  const contributor = account({ id: 4, role: 'contributor' });
+
+  describe('viability', () => {
+    it('counts an enabled, fully enrolled super admin, temporary password or not', () => {
+      expect(isViableSuperAdmin(otherSuperAdmin)).toBe(true);
+      // must_change_password is not part of the predicate on purpose: the
+      // holder can sign in and replace it, so the site is not stranded.
+      expect(isViableSuperAdmin(account({ id: 5 }))).toBe(true);
+    });
+
+    it('never counts a disabled, half-enrolled or lower-ranked account', () => {
+      expect(isViableSuperAdmin(account({ disabledAt: new Date('2026-09-01') }))).toBe(false);
+      expect(isViableSuperAdmin(account({ hasPassword: false }))).toBe(false);
+      expect(isViableSuperAdmin(account({ hasTotp: false }))).toBe(false);
+      expect(isViableSuperAdmin(plainAdmin)).toBe(false);
+      expect(isViableSuperAdmin(contributor)).toBe(false);
+    });
+
+    it('reads disabled_at as the active flag, exactly as getAdminUser does', () => {
+      expect(isActive(account())).toBe(true);
+      expect(isActive(account({ disabledAt: '2026-09-01T00:00:00.000Z' }))).toBe(false);
+    });
+  });
+
+  describe('who may act', () => {
+    it('admits only an enabled super admin', () => {
+      expect(canActOnLifecycle(superAdmin)).toBe(true);
+      expect(canActOnLifecycle(plainAdmin)).toBe(false);
+      expect(canActOnLifecycle(account({ role: 'admin', canManageAdmins: true }))).toBe(false);
+      expect(canActOnLifecycle(contributor)).toBe(false);
+      expect(canActOnLifecycle(account({ disabledAt: new Date() }))).toBe(false);
+    });
+
+    it('refuses every action to a non-super-admin actor', () => {
+      const eligibility = lifecycleEligibility(plainAdmin, otherSuperAdmin, 5);
+      for (const action of ['promote', 'demote', 'deactivate', 'reactivate'] as const) {
+        expect(eligibility[action]).toEqual({ allowed: false, reason: 'forbidden' });
+      }
+    });
+
+    it('agrees with the capability table about who holds the lifecycle', () => {
+      // Two statements of one rule; a test rather than a comment, because
+      // the guard is requireSuperAdmin() and the table must not drift into
+      // describing something looser.
+      for (const viewer of [superAdmin, plainAdmin, contributor,
+        account({ id: 6, role: 'admin', canManageAdmins: true })]) {
+        expect(canActOnLifecycle(viewer)).toBe(
+          hasCapability(
+            { role: viewer.role, canManageAdmins: viewer.canManageAdmins },
+            'people.admins.lifecycle',
+          ) && isActive(viewer),
+        );
+      }
+    });
+  });
+
+  describe('promotion', () => {
+    it('offers promotion for an active plain admin only', () => {
+      expect(lifecycleEligibility(superAdmin, plainAdmin, 1).promote).toEqual({ allowed: true });
+      expect(lifecycleEligibility(superAdmin, otherSuperAdmin, 1).promote)
+        .toEqual({ allowed: false, reason: 'invalid_state' });
+      expect(lifecycleEligibility(superAdmin, contributor, 1).promote)
+        .toEqual({ allowed: false, reason: 'invalid_state' });
+      expect(lifecycleEligibility(superAdmin, account({ id: 7, role: 'admin', disabledAt: new Date() }), 1).promote)
+        .toEqual({ allowed: false, reason: 'invalid_state' });
+    });
+
+    it('leaves can_manage_admins alone and lands on super_admin', () => {
+      expect(lifecycleTransition('promote', account({ role: 'admin', canManageAdmins: true })))
+        .toEqual({ role: 'super_admin', active: true, canManageAdmins: true });
+    });
+  });
+
+  describe('demotion', () => {
+    it('needs another viable super admin to remain', () => {
+      expect(lifecycleEligibility(superAdmin, otherSuperAdmin, 1).demote)
+        .toEqual({ allowed: true });
+      expect(lifecycleEligibility(superAdmin, otherSuperAdmin, 0).demote)
+        .toEqual({ allowed: false, reason: 'last_super_admin' });
+    });
+
+    it('refuses your own account before it counts anything', () => {
+      // Fail-safe (§26.6): "I demoted myself and the other super admin is
+      // on leave" must not be a recovery incident, and the count cannot
+      // protect against it while two super admins exist.
+      expect(lifecycleEligibility(superAdmin, superAdmin, 3).demote)
+        .toEqual({ allowed: false, reason: 'self' });
+    });
+
+    it('clears the admin-management delegation on the way down', () => {
+      expect(lifecycleTransition('demote', account({ canManageAdmins: true })))
+        .toEqual({ role: 'admin', active: true, canManageAdmins: false });
+    });
+  });
+
+  describe('deactivation', () => {
+    it('refuses your own account', () => {
+      expect(lifecycleEligibility(superAdmin, superAdmin, 3).deactivate)
+        .toEqual({ allowed: false, reason: 'self' });
+    });
+
+    it('applies the invariant to a super admin target and to no one else', () => {
+      expect(lifecycleEligibility(superAdmin, otherSuperAdmin, 0).deactivate)
+        .toEqual({ allowed: false, reason: 'last_super_admin' });
+      expect(lifecycleEligibility(superAdmin, otherSuperAdmin, 1).deactivate)
+        .toEqual({ allowed: true });
+      // A plain admin or contributor is never the last super admin,
+      // whatever the count says.
+      expect(lifecycleEligibility(superAdmin, plainAdmin, 0).deactivate).toEqual({ allowed: true });
+      expect(lifecycleEligibility(superAdmin, contributor, 0).deactivate)
+        .toEqual({ allowed: true });
+    });
+
+    it('protects a super admin who has lost their own credentials too', () => {
+      // The predicate asks what is LEFT, not what is being removed: a
+      // half-enrolled super admin is not viable, but deactivating them
+      // still cannot be the mutation that empties the set.
+      const unenrolled = account({ id: 8, hasTotp: false });
+      expect(lifecycleEligibility(superAdmin, unenrolled, 0).deactivate)
+        .toEqual({ allowed: false, reason: 'last_super_admin' });
+    });
+
+    it('keeps the role and the flag, and only ends the account', () => {
+      expect(lifecycleTransition('deactivate', account({ canManageAdmins: true })))
+        .toEqual({ role: 'super_admin', active: false, canManageAdmins: true });
+    });
+  });
+
+  describe('reactivation', () => {
+    const disabled = account({ id: 9, role: 'admin', disabledAt: new Date('2026-09-01') });
+
+    it('is offered for a deactivated account and refused for a live one', () => {
+      expect(lifecycleEligibility(superAdmin, disabled, 1).reactivate).toEqual({ allowed: true });
+      expect(lifecycleEligibility(superAdmin, plainAdmin, 1).reactivate)
+        .toEqual({ allowed: false, reason: 'invalid_state' });
+    });
+
+    it('restores the account as it was, and nothing else', () => {
+      expect(lifecycleTransition('reactivate', disabled))
+        .toEqual({ role: 'admin', active: true, canManageAdmins: false });
+    });
+
+    it('offers no other action while the account is deactivated', () => {
+      const eligibility = lifecycleEligibility(superAdmin, disabled, 1);
+      expect(eligibility.promote).toEqual({ allowed: false, reason: 'invalid_state' });
+      expect(eligibility.deactivate).toEqual({ allowed: false, reason: 'invalid_state' });
+    });
+  });
+
+  describe('wording and input', () => {
+    it('names one audit action per mutation', () => {
+      expect(LIFECYCLE_AUDIT_ACTION).toEqual({
+        promote: 'admin.promoted',
+        demote: 'admin.demoted',
+        deactivate: 'admin.deactivated',
+        reactivate: 'admin.reactivated',
+      });
+    });
+
+    it('says the account is the last one by name, and never leaks an id', () => {
+      expect(lifecycleMessage('last_super_admin', { email: 'boss@example.test' }))
+        .toContain('boss@example.test');
+      expect(lifecycleMessage('stale')).toMatch(/Reload/);
+      expect(lifecycleMessage('self')).toMatch(/your own account/);
+    });
+
+    it('requires a short, trimmed deactivation reason', () => {
+      expect(normaliseLifecycleReason('  left the project  ')).toBe('left the project');
+      expect(normaliseLifecycleReason('  a ')).toBeNull();
+      expect(normaliseLifecycleReason('x'.repeat(201))).toBeNull();
+      expect(normaliseLifecycleReason(undefined)).toBeNull();
+    });
+  });
+
+  // AFLDB-ISSUE-186 Phase A, test E (corrected 2026-09-15 on operator
+  // review: the original version of this test asserted no lifecycleTransition
+  // result could ever be role: 'contributor', for every starting role
+  // INCLUDING 'contributor' itself -- but 'deactivate'/'reactivate' are
+  // role-PRESERVING actions by design (lifecycleTransition returns
+  // `role: target.role` for both), and Phase A deliberately keeps an
+  // existing contributor row exactly that role for historical
+  // compatibility. contributor -> contributor under either action is not a
+  // transition ONTO contributor, it is the same, unchanged, retired role
+  // being carried forward -- the previous assertion conflated "the output
+  // contains role: 'contributor'" with "this action ASSIGNED
+  // role: 'contributor'", which is a different, false claim for those two
+  // actions. The actual invariant, proven below in three parts: (1) no
+  // action ever MINTS role='contributor' for an account that did not
+  // already have it; (2) the two actions with a fixed, explicit
+  // destination ('promote' -> super_admin, 'demote' -> admin) never land on
+  // contributor, regardless of the starting role passed in; (3) the two
+  // role-preserving actions ('deactivate'/'reactivate') are exactly that --
+  // preserving, not assigning -- for every starting role, contributor
+  // included.
+  it('never assigns the retired contributor role to an account that did not already have it', () => {
+    for (const action of LIFECYCLE_ACTIONS) {
+      for (const role of ['admin', 'super_admin'] as const) {
+        expect(lifecycleTransition(action, account({ role })).role).not.toBe('contributor');
+      }
+    }
+  });
+
+  it('promote and demote always land on a fixed, non-contributor role, regardless of the starting role', () => {
+    for (const role of ['contributor', 'admin', 'super_admin'] as const) {
+      expect(lifecycleTransition('promote', account({ role })).role).toBe('super_admin');
+      expect(lifecycleTransition('demote', account({ role })).role).toBe('admin');
+    }
+  });
+
+  it('deactivate and reactivate preserve an existing contributor role rather than assigning it', () => {
+    for (const role of ['contributor', 'admin', 'super_admin'] as const) {
+      expect(lifecycleTransition('deactivate', account({ role })).role).toBe(role);
+      expect(lifecycleTransition('reactivate', account({ role })).role).toBe(role);
+    }
+  });
+
+  // Requirement 3: reactivation (disabled_at -> NULL, `active: true`) does
+  // not, and must not, restore a contributor's ability to sign in. The
+  // authentication boundary this depends on -- getAdminUser()/adminLogin()
+  // excluding role='contributor' outright, independent of disabled_at -- is
+  // proven directly against the real functions in the "getAdminUser rejects
+  // ..." and "the interactive login predicate ..." describe blocks below,
+  // and against a real row/session pair in
+  // tests/integration/admin-lifecycle.test.ts. What this test adds is the
+  // missing link between the two: that reactivating an existing contributor
+  // really does produce the `active: true` (disabled_at NULL) state those
+  // other tests assume, not some other state a disabled_at check might
+  // still catch.
+  it('reactivating an existing contributor clears disabled_at but leaves the role -- and the ban -- in place', () => {
+    const reactivated = lifecycleTransition(
+      'reactivate',
+      account({ role: 'contributor', disabledAt: new Date('2026-09-01') }),
+    );
+    expect(reactivated).toEqual({ role: 'contributor', active: true, canManageAdmins: false });
+    // active: true is exactly the disabled_at IS NULL state getAdminUser()/
+    // adminLogin() are proven to reject by ROLE ALONE elsewhere in this
+    // file -- reactivation cannot be a backdoor around the role exclusion,
+    // because nothing about the role exclusion reads disabled_at at all.
+  });
+});
+
+/**
+ * The source-contract half of "a deactivated account cannot continue"
+ * (§26.15). The database half is tests/integration/admin-lifecycle.test.ts;
+ * what is proven here is that the per-request lookup still carries both
+ * predicates, since everything else in Phase B rests on them.
+ */
+describe('getAdminUser rejects a disabled account and a revoked session', () => {
+  it('asks for both, on every request', async () => {
+    process.env.AFLDB_SESSION_SECRET = 'x'.repeat(48);
+    requestCookie.admin = await signClaim(
+      { v: 1, kind: 'admin', sub: '5:opaque-token', exp: Math.floor(Date.now() / 1000) + 60, epoch: 1 },
+      process.env.AFLDB_SESSION_SECRET,
+    );
+    poolQueries.length = 0;
+
+    await getAdminUser();
+
+    const statement = poolQueries.at(-1)!.strings.join('?');
+    expect(statement).toContain('u.disabled_at IS NULL');
+    expect(statement).toContain('s.revoked_at IS NULL');
+    expect(statement).toContain('s.expires_at > now()');
+    requestCookie.admin = null;
+  });
+
+  // AFLDB-ISSUE-186 Phase A, test A: the authoritative session lookup no
+  // longer admits 'contributor' at all, independent of disabled_at -- an
+  // existing contributor row with a live, unexpired, unrevoked session
+  // (disabled_at still NULL, exactly as retirement leaves it) still gets
+  // getAdminUser() === null on its very next request.
+  it('never admits the retired contributor role, disabled_at or not (AFLDB-ISSUE-186)', async () => {
+    process.env.AFLDB_SESSION_SECRET = 'x'.repeat(48);
+    requestCookie.admin = await signClaim(
+      { v: 1, kind: 'admin', sub: '4:opaque-token', exp: Math.floor(Date.now() / 1000) + 60, epoch: 1 },
+      process.env.AFLDB_SESSION_SECRET,
+    );
+    // The fake pool only special-cases the auth_sessions JOIN when
+    // sessionRow.row is set AND the query text matches -- setting it here
+    // would prove nothing, because the real getAdminUser() SQL is what
+    // decides whether a contributor row is even eligible to be returned.
+    // Left explicitly null (rather than relying on it never having been
+    // set yet) and asserting the statement text is the correct proof:
+    // this query, as written, can never select role='contributor'.
+    sessionRow.row = null;
+    poolQueries.length = 0;
+    const result = await getAdminUser();
+
+    expect(result).toBeNull();
+    const statement = poolQueries.at(-1)!.strings.join('?');
+    expect(statement).toContain("u.role IN ('admin', 'super_admin')");
+    expect(statement).not.toContain('contributor');
+    requestCookie.admin = null;
+  });
+});
+
+// AFLDB-ISSUE-186 Phase A, tests C/D: the invite-creation and invite-
+// acceptance boundaries both refuse the retired contributor role, not
+// merely the UI that used to offer it.
+describe('the retired contributor role cannot be granted through an invite (AFLDB-ISSUE-186)', () => {
+  afterEach(() => {
+    sessionRow.row = null;
+    inviteRow.row = null;
+    poolQueries.length = 0;
+  });
+
+  it('createInvite refuses a request for role=contributor at the server, not just in the UI', async () => {
+    process.env.AFLDB_SESSION_SECRET = 'x'.repeat(48);
+    sessionRow.row = {
+      id: 1, email: 'boss@example.test', role: 'super_admin',
+      canManageAdmins: false, mustChangePassword: false,
+    };
+    requestCookie.admin = await signClaim(
+      { v: 1, kind: 'admin', sub: '1:opaque-token', exp: Math.floor(Date.now() / 1000) + 60, epoch: 1 },
+      process.env.AFLDB_SESSION_SECRET,
+    );
+
+    const form = new FormData();
+    form.set('email', 'new-contributor@example.test');
+    form.set('role', 'contributor');
+
+    const result = await createInvite({}, form);
+
+    expect(result.error).toMatch(/retired/i);
+    expect(result.inviteLink).toBeUndefined();
+    // Refused, and refused loudly: an admin.invite_refused row, not a
+    // silent no-op and not a downgraded 'admin' invite (ROLE_RANK would
+    // make that a privilege ESCALATION over what was actually asked for).
+    const insertedInvite = poolQueries.find((q) => q.strings.join('').includes('INSERT INTO admin_invites'));
+    expect(insertedInvite).toBeUndefined();
+    const audited = poolQueries.find((q) => q.strings.join('').includes('INSERT INTO auth_audit_log'));
+    expect(audited?.values).toContain('admin.invite_refused');
+    requestCookie.admin = null;
+  });
+
+  it('beginEnrolment refuses to redeem an invite already issued with role=contributor', async () => {
+    inviteRow.row = {
+      id: 9, email: 'stale-invite@example.test', role: 'contributor',
+      canManageAdmins: false, pendingTotpSecret: null,
+    };
+    const form = new FormData();
+    form.set('token', 'irrelevant-token');
+    form.set('password', 'a perfectly fine password');
+    form.set('confirmPassword', 'a perfectly fine password');
+
+    const result = await beginEnrolment({ step: 'password' }, form);
+
+    expect(result.error).toMatch(/retired/i);
+    expect(result.step).toBe('password');
+    // Refused before staging any credential: no UPDATE against the
+    // invite's pending_password_hash/pending_totp_secret columns.
+    const staged = poolQueries.find((q) => q.strings.join('').includes('pending_password_hash'));
+    expect(staged).toBeUndefined();
+  });
+
+  it('confirmEnrolment refuses the same stale invite at its own step too', async () => {
+    inviteRow.row = {
+      id: 9, email: 'stale-invite@example.test', role: 'contributor',
+      canManageAdmins: false, pendingTotpSecret: 'JBSWY3DPEHPK3PXP',
+    };
+    const form = new FormData();
+    form.set('token', 'irrelevant-token');
+    form.set('totp', '123456');
+
+    const result = await confirmEnrolment({ step: 'confirm' }, form);
+
+    expect(result.error).toMatch(/retired/i);
+    expect(result.step).toBe('password');
+    // Never reached the transaction that would create/overwrite the
+    // auth_users row -- proven by there being no INSERT for it, rather
+    // than by mocking the raw `postgres` package this module opens its
+    // own connection with.
+    const insertedUser = poolQueries.find((q) => q.strings.join('').includes('INSERT INTO auth_users'));
+    expect(insertedUser).toBeUndefined();
+  });
+});
+
+// AFLDB-ISSUE-186 Phase A: a source-contract check, the same convention as
+// the ROUTE_GUARD/EQUIVALENT_ROLE_GUARD tables further down this file, for
+// the one query this suite cannot otherwise reach without a real database
+// and a real password/TOTP pair -- adminLogin() itself. REPO/readSource are
+// declared further down the file but are in scope here: module-level
+// `const`s are available to every it() closure by the time tests run.
+describe('the interactive login predicate excludes the retired contributor role (AFLDB-ISSUE-186)', () => {
+  it('src/app/admin/login/actions.ts no longer admits role=contributor', () => {
+    const source = readSource(join(REPO, 'src', 'app', 'admin', 'login', 'actions.ts'));
+    expect(source).toContain("role IN ('admin', 'super_admin')");
+    // The word itself legitimately appears in this file's own explanatory
+    // comment (and did before this issue, in the predicate it replaced) --
+    // the actual contract is the SQL clause, not the absence of the word.
+    expect(source).not.toMatch(/role IN \([^)]*'contributor'[^)]*\)/);
+  });
+});
+
+// AFLDB-ISSUE-186 Phase A, test C: the UI-level half of "no new contributor
+// invite" -- createInvite()'s own refusal (tested above) is the actual
+// boundary; this proves the form does not even offer the choice.
+describe('the admin invite form no longer offers the retired contributor role (AFLDB-ISSUE-186)', () => {
+  it('src/app/admin/admins/InviteManager.tsx has no Contributor <option>', () => {
+    const source = readSource(join(ADMIN_ROOT, 'admins', 'InviteManager.tsx'));
+    expect(source).not.toMatch(/<option value="contributor">/);
+    // The account/history surfaces that must keep LABELLING an existing
+    // contributor row are untouched -- this checks the invite FORM only.
+    expect(source).toContain('<option value="admin">Admin</option>');
+  });
+});
+
+describe('adminNavFor', () => {
+  const idsFor = (v: AdminNavViewer) => adminNavFor(v).map((g) => g.id);
+  const hrefsFor = (v: AdminNavViewer) => adminNavFor(v).flatMap((g) => g.links.map((l) => l.href));
+
+  it('gives a contributor exactly the upload form and their own password, nothing else', () => {
+    const groups = adminNavFor({ role: 'contributor', canManageAdmins: false });
+    expect(groups.map((g) => g.links.map((l) => l.href))).toEqual([
+      ['/admin/upload'],
+      ['/admin/password'],
+    ]);
+  });
+
+  it('never lists the grid solver: it left the admin area when audience became a setting', () => {
+    for (const role of ['admin', 'super_admin'] as const) {
+      const hrefs = hrefsFor({ role, canManageAdmins: false });
+      expect(hrefs).not.toContain('/grid-solver');
+      expect(hrefs).not.toContain('/admin/grid-solver');
+    }
+  });
+
+  it('omits a group entirely for a viewer with no capability it contains, rather than showing it empty', () => {
+    // A plain admin holds no capability in Site, so that group is absent. The
+    // Data group holds Brownlow (AFLDB-ISSUE-155 Phase C2: an Admin may read
+    // and draft Brownlow votes, §27.8), Coaches (AFLDB-ISSUE-159 Stage 2:
+    // data.coaches.read is ADMIN_AND_UP, §8.1), Draft administration
+    // (AFLDB-ISSUE-160 D-6: data.draft.read is ADMIN_AND_UP too) and Season
+    // lists (AFLDB-ISSUE-161 §16: data.seasonLists.read is ADMIN_AND_UP too)
+    // -- an Admin reaches all four but none of their mutating capabilities.
+    // Operations appears from AFLDB-ISSUE-157 and holds exactly the audit
+    // trail: every other Operations link is still super-admin-only. Fixtures
+    // (AFLDB-ISSUE-162 §23: data.fixtures.read is ADMIN_AND_UP too) joins the
+    // same four, and Awards & honours (AFLDB-ISSUE-165 §7: data.awards.read is
+    // ADMIN_AND_UP too) joins the same five.
+    const groups = adminNavFor({ role: 'admin', canManageAdmins: false });
+    expect(groups.map((g) => g.id)).toEqual([
+      'overview', 'data', 'acquisition', 'people', 'operations', 'account',
+    ]);
+    expect(groups.find((g) => g.id === 'data')?.links.map((l) => l.href)).toEqual(['/admin/brownlow', '/admin/coaches', '/admin/draft', '/admin/season-lists', '/admin/fixtures', '/admin/awards', '/admin/records']);
+    expect(groups.find((g) => g.id === 'operations')?.links.map((l) => l.href)).toEqual(['/admin/audit']);
+  });
+
+  it('lists the audit trail last in Operations for a super admin, and never for a contributor (AFLDB-ISSUE-157)', () => {
+    // Gated on operations.audit.read, the capability the route's
+    // requireCapability guard enforces; the link is furniture, the guard is
+    // the boundary.
+    const operations = adminNavFor({ role: 'super_admin', canManageAdmins: false })
+      .find((g) => g.id === 'operations');
+    expect(operations?.links.at(-1)).toMatchObject({ href: '/admin/audit', label: 'Audit trail' });
+    expect(hrefsFor({ role: 'admin', canManageAdmins: false })).toContain('/admin/audit');
+    expect(hrefsFor({ role: 'contributor', canManageAdmins: false })).not.toContain('/admin/audit');
+  });
+
+  it('gives a super admin every group, in the runbook\'s section order', () => {
+    expect(idsFor({ role: 'super_admin', canManageAdmins: false })).toEqual([
+      'overview', 'data', 'acquisition', 'people', 'site', 'operations', 'account',
+    ]);
+  });
+
+  it('shows the Brownlow link to every staff role above contributor, and never to a contributor', () => {
+    // Gated on data.brownlow.read (ADMIN_AND_UP), the same capability the
+    // route's requireCapability guard enforces.
+    expect(hrefsFor({ role: 'admin', canManageAdmins: false })).toContain('/admin/brownlow');
+    expect(hrefsFor({ role: 'super_admin', canManageAdmins: false })).toContain('/admin/brownlow');
+    expect(hrefsFor({ role: 'contributor', canManageAdmins: false })).not.toContain('/admin/brownlow');
+  });
+
+  it('keeps the Data group in section order: data editor, Brownlow, player links, coaches, draft, season lists, fixtures, awards, special records', () => {
+    const data = adminNavFor({ role: 'super_admin', canManageAdmins: false }).find((g) => g.id === 'data');
+    expect(data?.links.map((l) => l.href)).toEqual([
+      '/admin/data-editor', '/admin/brownlow', '/admin/player-links', '/admin/coaches', '/admin/draft', '/admin/season-lists', '/admin/fixtures', '/admin/awards', '/admin/records',
+    ]);
+  });
+
+  it('shows Special records to an admin and never to a contributor (AFLDB-ISSUE-167 §9)', () => {
+    // ONE Data entry for both families, not two: /admin/records carries the
+    // domain cards, and first-kick goal and after-the-siren are subroutes
+    // (§10.1). Gated on data.specialRecords.read, the same capability all
+    // five routes enforce on arrival -- the link is furniture, the guard is
+    // the boundary.
+    expect(hrefsFor({ role: 'admin', canManageAdmins: false })).toContain('/admin/records');
+    expect(hrefsFor({ role: 'super_admin', canManageAdmins: false })).toContain('/admin/records');
+    expect(hrefsFor({ role: 'contributor', canManageAdmins: false })).not.toContain('/admin/records');
+    const hrefs = hrefsFor({ role: 'super_admin', canManageAdmins: false });
+    for (const family of ['/admin/records/first-kick-goal', '/admin/records/after-the-siren']) {
+      expect(hrefs, 'the two families are subroutes, never their own nav entries').not.toContain(family);
+    }
+  });
+
+  it('shows Awards & honours to an admin and never to a contributor (AFLDB-ISSUE-165 §5.2)', () => {
+    // data.awards.read is ADMIN_AND_UP, the same capability /admin/awards
+    // enforces on arrival. An Admin browses; only a Super Admin can mutate,
+    // and that is enforced per action, not by hiding the link.
+    expect(hrefsFor({ role: 'admin', canManageAdmins: false })).toContain('/admin/awards');
+    expect(hrefsFor({ role: 'super_admin', canManageAdmins: false })).toContain('/admin/awards');
+    expect(hrefsFor({ role: 'contributor', canManageAdmins: false })).not.toContain('/admin/awards');
+  });
+
+  it('groups current-season acquisition with legacy file intake', () => {
+    const groups = adminNavFor({ role: 'super_admin', canManageAdmins: false });
+    const acquisition = groups.find((g) => g.id === 'acquisition');
+    expect(acquisition?.links.map((l) => l.href)).toEqual(['/admin/current-season', '/admin/upload']);
+  });
+
+  it('always keeps the account group last, for every non-contributor role', () => {
+    for (const role of ['admin', 'super_admin'] as const) {
+      const groups = adminNavFor({ role, canManageAdmins: false });
+      expect(groups.at(-1)).toMatchObject({ id: 'account', links: [{ href: '/admin/password' }] });
+    }
+  });
+});
+
+describe('isCurrentAdminPath', () => {
+  it('matches an exact link only at its own pathname, never a nested one', () => {
+    const link = { href: '/admin', label: 'Dashboard', exact: true };
+    expect(isCurrentAdminPath('/admin', link)).toBe(true);
+    expect(isCurrentAdminPath('/admin/upload', link)).toBe(false);
+  });
+
+  it('matches a non-exact link at its own path and any path nested under it', () => {
+    const link = { href: '/admin/player-links', label: 'Player links' };
+    expect(isCurrentAdminPath('/admin/player-links', link)).toBe(true);
+    expect(isCurrentAdminPath('/admin/player-links/123', link)).toBe(true);
+    expect(isCurrentAdminPath('/admin/data-editor', link)).toBe(false);
+  });
+});
+
+/**
  * The canonical auth_audit_log writer, in both its forms (AFLDB-ISSUE-119 §8/§9).
  *
  * `audit()` writes on the auth pool and commits on its own connection.
@@ -382,5 +1165,489 @@ describe('auth_audit_log writer', () => {
     await expect(
       auditInTransaction(tx, 'nl_search.telemetry_cleared', { deletedLogRows: 412 }, admin),
     ).rejects.toThrow('audit unavailable');
+  });
+});
+
+/*
+ * ---------------------------------------------------------------------------
+ * Capability enforcement source contract (AFLDB-ISSUE-158, ISSUE-156 P2).
+ *
+ * The capability table in src/lib/auth/capabilities.ts is only authoritative
+ * while every admin boundary actually consults it. These tests read the
+ * source under src/app/admin and fail on drift: a capability declared but
+ * enforced nowhere, an admin page / route handler / Server Action that does
+ * something before its guard or has no guard, a role guard kept somewhere
+ * policy did not name, or a capability that admits a viewer the role guard
+ * it replaced would have turned away.
+ * ---------------------------------------------------------------------------
+ */
+
+const REPO = process.cwd();
+const ADMIN_ROOT = join(REPO, 'src', 'app', 'admin');
+
+/** A repo-relative, forward-slash path, whatever the host's separator. */
+const repoPath = (file: string): string => relative(REPO, file).split(sep).join('/');
+
+/** Sources are read as LF whatever the checkout's line endings are. */
+const readSource = (file: string): string => readFileSync(file, 'utf8').replace(/\r\n/g, '\n');
+
+function walk(dir: string): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const full = join(dir, entry.name);
+    return entry.isDirectory() ? walk(full) : [full];
+  });
+}
+
+/** The `Capability` union, read from the file that declares it. */
+function declaredCapabilities(): string[] {
+  const source = readSource(join(REPO, 'src', 'lib', 'auth', 'capabilities.ts'));
+  const union = source.match(/export type Capability =([\s\S]*?);/);
+  if (!union) throw new Error('export type Capability not found in capabilities.ts');
+  return [...union[1].matchAll(/'([A-Za-z]+(?:\.[A-Za-z]+)+)'/g)].map((m) => m[1]);
+}
+
+const DECLARED_CAPABILITIES = declaredCapabilities();
+
+type BoundaryKind = 'page' | 'route' | 'action';
+type Boundary = { path: string; kind: BoundaryKind; source: string };
+
+/**
+ * Every server boundary under src/app/admin: each page.tsx, each route.ts
+ * and each module whose first statement is 'use server'. Components,
+ * layouts, loading states and pure models are not boundaries.
+ */
+function adminBoundaries(): Boundary[] {
+  const USE_SERVER = /^(?:\s|\/\/[^\n]*\n|\/\*[\s\S]*?\*\/)*'use server';/;
+  return walk(ADMIN_ROOT).flatMap((file): Boundary[] => {
+    const name = basename(file);
+    if (!/\.tsx?$/.test(name)) return [];
+    const source = readSource(file);
+    const path = repoPath(file);
+    if (name === 'page.tsx') return [{ path, kind: 'page', source }];
+    if (name === 'route.ts') return [{ path, kind: 'route', source }];
+    if (USE_SERVER.test(source)) return [{ path, kind: 'action', source }];
+    return [];
+  });
+}
+
+const BOUNDARIES = adminBoundaries();
+const boundary = (path: string): Boundary | undefined => BOUNDARIES.find((b) => b.path === path);
+
+const CAPABILITY_GUARD = 'requireCapability';
+const ROLE_GUARDS = ['requireAdmin', 'requireSuperAdmin', 'requireUploader', 'requireAdminManager', 'requireSignedIn'] as const;
+type RoleGuard = (typeof ROLE_GUARDS)[number];
+const ROLE_GUARD_CALL = /\bawait\s+(requireAdmin|requireSuperAdmin|requireUploader|requireAdminManager|requireSignedIn)\(/g;
+
+/**
+ * Where a role guard is still the boundary, and why. Anything not listed
+ * here must be guarded by requireCapability() alone; anything listed here
+ * must still call exactly the guards named. Both directions are asserted,
+ * so this list can neither grow nor go stale quietly.
+ */
+const RETAINED_ROLE_GUARDS: Record<string, { guards: RoleGuard[]; because: string }> = {
+  'src/app/admin/page.tsx': {
+    guards: ['requireAdmin'],
+    because: 'the dashboard is every admin\'s landing page; no capability names it',
+  },
+  'src/app/admin/submissions/[id]/actions.ts': {
+    guards: ['requireAdmin', 'requireSuperAdmin'],
+    because: 'submission validation (admin) and approval/promotion (super admin) have no capability; '
+      + 'acquisition.legacyIntake is ALL_STAFF and would be weaker',
+  },
+  'src/app/admin/admins/lifecycle-actions.ts': {
+    guards: ['requireSuperAdmin'],
+    because: 'ISSUE-156 §11 P2 keeps the explicit super-admin boundary and asserts '
+      + 'people.admins.lifecycle beside it, not instead of it',
+  },
+  'src/app/admin/password/page.tsx': {
+    guards: ['requireSignedIn'],
+    because: 'the one page an account holding a temporary password may reach',
+  },
+  'src/app/admin/password/actions.ts': {
+    guards: ['requireSignedIn'],
+    because: 'changeOwnPassword: the action behind that page, same reason',
+  },
+};
+
+/**
+ * Boundaries that run before a staff session exists or that touch nothing:
+ * exempt from the guard-first rule, and asserted to stay guard-free so a
+ * stale entry here is noticed.
+ */
+const PRE_AUTH_BOUNDARIES: Record<string, string> = {
+  'src/app/admin/login/page.tsx': 'the sign-in form',
+  'src/app/admin/login/actions.ts': 'adminLogin creates the session every guard checks',
+  'src/app/admin/invite/[token]/page.tsx': 'enrolment by invite token, before an account exists',
+  'src/app/admin/invite/[token]/actions.ts': 'beginEnrolment / confirmEnrolment, token-authenticated',
+  'src/app/admin/logout-action.ts': 'ends the session; reads it only to name the audit row',
+  'src/app/admin/grid-solver/page.tsx': 'a permanent redirect to /grid-solver that reads nothing',
+};
+
+type TopLevelFn = { name: string; exported: boolean; chunk: string };
+
+/**
+ * Every top-level `async function` in a module, exported or not, with the
+ * text from its declaration to the first line that is exactly `}` -- its
+ * closing brace in formatted source (a props type closing with `}: {` or
+ * `}) {` is not). An under-read chunk can only fail the test, never pass
+ * it, because the guard has to be the first thing the chunk awaits.
+ */
+function topLevelAsyncFunctions(source: string): TopLevelFn[] {
+  return [...source.matchAll(/^(export\s+)?(?:default\s+)?async\s+function\s+(\w+)/gm)].map((m) => {
+    const rest = source.slice(m.index ?? 0);
+    const close = rest.search(/\n\}[ \t]*(?:\n|$)/);
+    return { name: m[2], exported: Boolean(m[1]), chunk: close === -1 ? rest : rest.slice(0, close) };
+  });
+}
+
+/**
+ * The guard a function reaches before it awaits anything else, or null.
+ * Un-awaited calls to anything but a local async function (Number(),
+ * formData.get(), parsers) are allowed ahead of it; awaiting Next's async
+ * `params` / `searchParams` props is allowed; an un-awaited or awaited call
+ * into a local async function is followed, so `return runX(...)` wrappers
+ * are judged by what runX does first.
+ */
+function firstGuard(fn: TopLevelFn, locals: Map<string, TopLevelFn>, depth = 0): string | null {
+  if (depth > 3) return null;
+  const body = fn.chunk.slice(fn.chunk.indexOf('(') + 1);
+  const steps = /\bawait\s+([A-Za-z_$][\w$.]*)\s*(\()?|(?<![.\w$])([A-Za-z_$][\w$]*)\s*\(/g;
+  for (const step of body.matchAll(steps)) {
+    if (step[1] !== undefined) {
+      const target = step[1];
+      const isCall = step[2] === '(';
+      if (isCall && (target === CAPABILITY_GUARD || (ROLE_GUARDS as readonly string[]).includes(target))) return target;
+      if (isCall && locals.has(target)) return firstGuard(locals.get(target)!, locals, depth + 1);
+      if (!isCall && /^(params|searchParams|props\.\w+)$/.test(target)) continue;
+      return null;
+    }
+    const callee = step[3];
+    if (locals.has(callee) && callee !== fn.name) return firstGuard(locals.get(callee)!, locals, depth + 1);
+  }
+  return null;
+}
+
+/**
+ * The capability literals named by every awaited requireCapability() call
+ * in a source. Awaited, so a comment that mentions the call cannot stand in
+ * for the code that makes it.
+ */
+function enforcedCapabilities(source: string): string[] {
+  // A capability name is dotted (`group.name[.verb]`); the un-dotted
+  // literal in a ternary's condition (`action === 'saveDraft' ? … : …`) is
+  // not one.
+  return [...source.matchAll(/\bawait\s+requireCapability\(\s*([\s\S]*?)\)/g)]
+    .flatMap((call) => [...call[1].matchAll(/'([A-Za-z]+(?:\.[A-Za-z]+)+)'/g)].map((m) => m[1]));
+}
+
+describe('capability enforcement contract (AFLDB-ISSUE-158)', () => {
+  it('finds the admin boundaries it is about to check', () => {
+    // A walker that silently found nothing would make every rule below
+    // vacuous, so the shape of the area is pinned first.
+    expect(BOUNDARIES.length).toBeGreaterThanOrEqual(40);
+    expect(BOUNDARIES.filter((b) => b.kind === 'page').length).toBeGreaterThanOrEqual(20);
+    expect(BOUNDARIES.filter((b) => b.kind === 'route').length).toBeGreaterThanOrEqual(4);
+    expect(BOUNDARIES.filter((b) => b.kind === 'action').length).toBeGreaterThanOrEqual(15);
+    expect(DECLARED_CAPABILITIES.length).toBeGreaterThanOrEqual(18);
+  });
+
+  it('enforces every declared capability at a real page, route or action boundary', () => {
+    const enforced = new Set(BOUNDARIES.flatMap((b) => enforcedCapabilities(b.source)));
+    const unenforced = DECLARED_CAPABILITIES.filter((capability) => !enforced.has(capability));
+    expect(unenforced, 'declared in capabilities.ts but no boundary calls requireCapability() with it').toEqual([]);
+    const undeclared = [...enforced].filter((capability) => !DECLARED_CAPABILITIES.includes(capability));
+    expect(undeclared, 'named by requireCapability() but absent from the Capability union').toEqual([]);
+  });
+
+  it('guards every admin page, route handler and Server Action before it awaits anything else', () => {
+    const failures: string[] = [];
+    for (const b of BOUNDARIES) {
+      if (b.path in PRE_AUTH_BOUNDARIES) continue;
+      const allowed = new Set<string>([CAPABILITY_GUARD, ...(RETAINED_ROLE_GUARDS[b.path]?.guards ?? [])]);
+      const fns = topLevelAsyncFunctions(b.source);
+      const locals = new Map(fns.map((fn) => [fn.name, fn]));
+      const entryPoints = fns.filter((fn) => fn.exported);
+      if (entryPoints.length === 0) failures.push(`${b.path}: no exported async function found`);
+      for (const fn of entryPoints) {
+        const guard = firstGuard(fn, locals);
+        if (guard === null) failures.push(`${b.path}: ${fn.name} awaits something before any guard, or has none`);
+        else if (!allowed.has(guard)) failures.push(`${b.path}: ${fn.name} is guarded by ${guard}(), which policy does not retain there`);
+      }
+    }
+    expect(failures).toEqual([]);
+  });
+
+  it('keeps a role guard only where policy names it, and every guard policy names', () => {
+    const strays: string[] = [];
+    for (const b of BOUNDARIES) {
+      const used = [...new Set([...b.source.matchAll(ROLE_GUARD_CALL)].map((m) => m[1]))].sort();
+      const retained = RETAINED_ROLE_GUARDS[b.path];
+      if (retained === undefined) {
+        if (used.length > 0) strays.push(`${b.path}: ${used.join(', ')} not retained by policy`);
+        continue;
+      }
+      const expected = [...retained.guards].sort();
+      if (used.join() !== expected.join()) {
+        strays.push(`${b.path}: calls [${used.join(', ')}], policy retains [${expected.join(', ')}] because ${retained.because}`);
+      }
+    }
+    expect(strays).toEqual([]);
+    for (const path of Object.keys(RETAINED_ROLE_GUARDS)) {
+      expect(boundary(path), `${path} is listed as retaining a role guard but is not an admin boundary`).toBeDefined();
+    }
+  });
+
+  it('lists the pre-auth surfaces exactly, and none of them has grown a guard', () => {
+    for (const [path, why] of Object.entries(PRE_AUTH_BOUNDARIES)) {
+      const b = boundary(path);
+      expect(b, `${path} (${why}) is listed as pre-auth but is not an admin boundary`).toBeDefined();
+      expect(enforcedCapabilities(b!.source), `${path} now calls requireCapability(); drop it from the pre-auth list`).toEqual([]);
+      expect([...b!.source.matchAll(ROLE_GUARD_CALL)].map((m) => m[1]),
+        `${path} now calls a role guard; drop it from the pre-auth list`).toEqual([]);
+    }
+  });
+
+  it('asserts people.admins.lifecycle beside requireSuperAdmin(), never instead of it', () => {
+    const b = boundary('src/app/admin/admins/lifecycle-actions.ts');
+    expect(b).toBeDefined();
+    // The role guard first, then the capability, with nothing but comments
+    // between them: ISSUE-156 §11 P2's worked example.
+    expect(b!.source).toMatch(
+      /await requireSuperAdmin\(\);\n(?:[ \t]*\/\/[^\n]*\n)*[ \t]*await requireCapability\('people\.admins\.lifecycle'\);/,
+    );
+  });
+
+  it('leaves the shared account-list actions on the door every admin may open', () => {
+    // revokeSession decides who-may-revoke-whom per target; the door is the
+    // list every admin may read, exactly the boundary requireAdmin() drew.
+    expect(boundary('src/app/admin/admins/actions.ts')?.source).toContain("requireCapability('people.admins.read')");
+  });
+
+  it('enforces the capabilities the sidebar shows, so a hidden link is never the only gate', () => {
+    // Every capability nav-model.ts gates a link on is enforced by the
+    // route the link points at; the walker's coverage of every boundary is
+    // what makes the sidebar furniture rather than a gate.
+    const navModel = readSource(join(ADMIN_ROOT, 'nav-model.ts'));
+    const linked = [...navModel.matchAll(/href: '([^']+)'[^\n]*capability: '([A-Za-z.]+)'/g)];
+    expect(linked.length).toBeGreaterThanOrEqual(14);
+    for (const [, href, capability] of linked) {
+      const page = boundary(`src/app${href}/page.tsx`);
+      expect(page, `${href} is linked in the nav but has no page.tsx`).toBeDefined();
+      expect(enforcedCapabilities(page!.source), `${href} does not enforce ${capability}`).toContain(capability);
+    }
+  });
+});
+
+/**
+ * The role guard each capability stands for. Read as: "requireCapability(X)
+ * admits exactly the viewers <guard>() admitted". Typed as a Record so a new
+ * capability fails the typecheck until it is placed; checked below so no
+ * capability is looser OR tighter than the guard the routes used to call.
+ */
+const EQUIVALENT_ROLE_GUARD: Record<Capability, 'requireUploader' | 'requireAdmin' | 'requireSuperAdmin' | 'requireAdminManager'> = {
+  'data.playerLinks': 'requireSuperAdmin',
+  'data.dataEditor': 'requireSuperAdmin',
+  'data.brownlow.read': 'requireAdmin',
+  'data.brownlow.draft': 'requireAdmin',
+  'data.brownlow.finalise': 'requireSuperAdmin',
+  'data.coaches.read': 'requireAdmin',
+  'data.coaches.edit': 'requireSuperAdmin',
+  'data.draft.read': 'requireAdmin',
+  'data.draft.edit': 'requireSuperAdmin',
+  'data.seasonLists.read': 'requireAdmin',
+  'data.seasonLists.edit': 'requireSuperAdmin',
+  'data.fixtures.read': 'requireAdmin',
+  'data.fixtures.edit': 'requireSuperAdmin',
+  // AFLDB-ISSUE-165 §7. The three creators this domain takes over from
+  // /admin/data-editor were data.dataEditor, itself requireSuperAdmin, so the
+  // edit half narrows the surface without widening the population.
+  'data.awards.read': 'requireAdmin',
+  'data.awards.edit': 'requireSuperAdmin',
+  // AFLDB-ISSUE-167 D-4. Reading a curated special record widens nothing: the
+  // facts are already public pages. Correcting, suppressing, reinstating,
+  // replacing or creating one becomes a public fact immediately with no draft
+  // stage, so the edit half is a super admin's -- the same reasoning as
+  // data.awards.edit / data.coaches.edit / data.draft.edit.
+  'data.specialRecords.read': 'requireAdmin',
+  'data.specialRecords.edit': 'requireSuperAdmin',
+  'acquisition.legacyIntake': 'requireUploader',
+  'acquisition.currentSeason': 'requireSuperAdmin',
+  'people.betaAccess': 'requireAdmin',
+  'people.admins.read': 'requireAdmin',
+  'people.admins.manage': 'requireAdminManager',
+  'people.admins.lifecycle': 'requireSuperAdmin',
+  'site.content': 'requireSuperAdmin',
+  'site.settings': 'requireSuperAdmin',
+  'operations.queryBuilder': 'requireSuperAdmin',
+  'operations.dbHealth': 'requireSuperAdmin',
+  'operations.appHealth': 'requireSuperAdmin',
+  'operations.nlTelemetry': 'requireSuperAdmin',
+  'operations.audit.read': 'requireAdmin',
+};
+
+/** What each role guard in session.ts admits, restated from its source. */
+function roleGuardAdmits(guard: (typeof EQUIVALENT_ROLE_GUARD)[Capability], viewer: CapabilityViewer): boolean {
+  switch (guard) {
+    case 'requireUploader': return true;
+    case 'requireAdmin': return viewer.role !== 'contributor';
+    case 'requireSuperAdmin': return viewer.role === 'super_admin';
+    case 'requireAdminManager':
+      return viewer.role !== 'contributor' && (viewer.role === 'super_admin' || viewer.canManageAdmins);
+  }
+}
+
+const ROLES: CapabilityViewer['role'][] = ['contributor', 'admin', 'super_admin'];
+const EVERY_VIEWER: CapabilityViewer[] = ROLES.flatMap((role) => [
+  { role, canManageAdmins: false },
+  { role, canManageAdmins: true },
+]);
+
+describe('capabilities are exactly as strict as the role guards they replaced (AFLDB-ISSUE-158)', () => {
+  it('places every declared capability', () => {
+    expect(Object.keys(EQUIVALENT_ROLE_GUARD).sort()).toEqual([...DECLARED_CAPABILITIES].sort());
+  });
+
+  it.each(Object.entries(EQUIVALENT_ROLE_GUARD))('%s admits the same viewers as %s()', (capability, guard) => {
+    for (const viewer of EVERY_VIEWER) {
+      expect(
+        hasCapability(viewer, capability as Capability),
+        `${capability} for ${viewer.role}${viewer.canManageAdmins ? '+can_manage_admins' : ''}`,
+      ).toBe(roleGuardAdmits(guard, viewer));
+    }
+  });
+});
+
+/**
+ * The guard itself, end to end and without a database: the signed cookie is
+ * read, the session row is looked up, the temporary-password rule runs, and
+ * the capability table decides -- with the redirect targets the role guards
+ * used, so no route that moved from requireAdmin() / requireSuperAdmin() /
+ * requireUploader() / requireAdminManager() sends anyone somewhere new.
+ */
+describe('requireCapability against the real guard (AFLDB-ISSUE-158)', () => {
+  const signedIn = async (
+    role: CapabilityViewer['role'],
+    canManageAdmins = false,
+    mustChangePassword = false,
+  ) => {
+    process.env.AFLDB_SESSION_SECRET = 'x'.repeat(48);
+    requestCookie.admin = await signClaim(
+      { v: 1, kind: 'admin', sub: '5:opaque-token', exp: Math.floor(Date.now() / 1000) + 60, epoch: 1 },
+      process.env.AFLDB_SESSION_SECRET,
+    );
+    sessionRow.row = { id: 5, email: `${role}@afldb.test`, role, canManageAdmins, mustChangePassword };
+  };
+
+  afterEach(() => {
+    requestCookie.admin = null;
+    sessionRow.row = null;
+  });
+
+  it.each(DECLARED_CAPABILITIES)('%s: admits the viewers the table names and bounces the rest where the role guards did', async (capability) => {
+    for (const viewer of EVERY_VIEWER) {
+      await signedIn(viewer.role, viewer.canManageAdmins);
+      const label = `${capability} for ${viewer.role}${viewer.canManageAdmins ? '+can_manage_admins' : ''}`;
+      if (hasCapability(viewer, capability as Capability)) {
+        await expect(requireCapability(capability as Capability), label).resolves.toMatchObject({ id: 5, role: viewer.role });
+      } else if (viewer.role === 'contributor') {
+        // requireAdmin()'s bounce: the one route a contributor may reach.
+        await expect(requireCapability(capability as Capability), label).rejects.toThrow(/^NEXT_REDIRECT \/admin\/upload$/);
+      } else {
+        // requireSuperAdmin()'s and requireAdminManager()'s bounce: the dashboard.
+        await expect(requireCapability(capability as Capability), label).rejects.toThrow(/^NEXT_REDIRECT \/admin$/);
+      }
+    }
+  });
+
+  it('sends an anonymous caller to the login form, whatever the capability', async () => {
+    requestCookie.admin = null;
+    sessionRow.row = null;
+    await expect(requireCapability('acquisition.legacyIntake')).rejects.toThrow(/^NEXT_REDIRECT \/admin\/login$/);
+  });
+
+  it('sends an outstanding temporary password to the change-password page before any capability is consulted', async () => {
+    // The widest capability there is, held by a super admin: still bounced,
+    // because requireUploader()'s rule runs first exactly as it did under
+    // every role guard.
+    await signedIn('super_admin', false, true);
+    await expect(requireCapability('acquisition.legacyIntake')).rejects.toThrow(/^NEXT_REDIRECT \/admin\/password$/);
+  });
+
+  it('turns a delegated contributor away from admin management at the guard, not only in the table', async () => {
+    await signedIn('contributor', true);
+    await expect(requireCapability('people.admins.manage')).rejects.toThrow(/^NEXT_REDIRECT \/admin\/upload$/);
+  });
+});
+
+/**
+ * ---------------------------------------------------------------------------
+ * Denial must reach the HTTP layer (AFLDB-ISSUE-166).
+ *
+ * Every guard above denies with `redirect()`, and Next can only turn that
+ * into a 307 + Location while the response status is still unsent. A
+ * route-level `loading.tsx` is a Suspense boundary: React commits the shell
+ * -- status line included -- as soon as the fallback is available, which is
+ * BEFORE the page component, and therefore before its guard, has run. The
+ * redirect then arrives too late to be a status code, and Next degrades it
+ * to `<meta id="__next-page-redirect" http-equiv="refresh" content="1;url=…">`
+ * inside a 200 OK body (next/dist/server/app-render/make-get-server-inserted-html.js).
+ *
+ * A browser obeys that tag, so navigation still denies -- one second later.
+ * `fetch()`, curl, a crawler or a monitor obeys nothing and records a denied
+ * admin route as a success. Measured on DEV build 77c03e9: a plain admin
+ * GETting /admin/settings received 200 with `.admin-main` = "Loading…".
+ *
+ * No data escaped, and the contract above is why: every boundary guards
+ * before it awaits anything else, so the denial path issues no privileged
+ * query. That makes this a denial-signalling defect rather than a bypass --
+ * but it also removes the framework's status-code safety net, leaving that
+ * hand-kept ordering as the only thing between a denial and a disclosure.
+ *
+ * So the rule is structural: nothing may open a Suspense boundary above an
+ * admin guard. Keep pending UI below the guard (an explicit <Suspense>
+ * inside a page, after its guard) or on the client (`useLinkStatus`).
+ * ---------------------------------------------------------------------------
+ */
+describe('denial reaches the HTTP layer (AFLDB-ISSUE-166)', () => {
+  it('opens no route-level loading boundary at or above any guarded admin page', () => {
+    const boundaries = walk(ADMIN_ROOT)
+      .filter((file) => basename(file) === 'loading.tsx')
+      .map(repoPath);
+    expect(
+      boundaries,
+      'a loading.tsx under src/app/admin commits the 200 shell before the page guard runs, '
+      + 'so every redirect() denial beneath it degrades to a meta-refresh inside a 200 body. '
+      + 'Put the pending UI below the guard (<Suspense> inside the page) or on the client.',
+    ).toEqual([]);
+
+    // The same boundary one segment up would cover /admin just as well.
+    const ancestors = readdirSync(join(REPO, 'src', 'app'), { withFileTypes: true })
+      .filter((entry) => entry.isFile() && entry.name === 'loading.tsx')
+      .map((entry) => `src/app/${entry.name}`);
+    expect(ancestors, 'src/app/loading.tsx sits above /admin and has the same effect').toEqual([]);
+  });
+
+  it('wraps no admin layout\'s children in a Suspense boundary', () => {
+    // Deleting loading.tsx and re-adding the identical boundary by hand in
+    // the layout would restore the defect without restoring the filename.
+    const layouts = walk(ADMIN_ROOT).filter((file) => basename(file) === 'layout.tsx');
+    expect(layouts.length, 'the admin layout that draws the chrome').toBeGreaterThanOrEqual(1);
+    for (const file of layouts) {
+      const source = readSource(file);
+      expect(
+        /<(?:React\.)?Suspense[\s>]/.test(source),
+        `${repoPath(file)} opens a Suspense boundary around the page tree; `
+        + 'that is the loading.tsx defect under another name',
+      ).toBe(false);
+    }
+  });
+
+  it('still expects the guards themselves to deny by redirect, which only 307s from the shell', () => {
+    // If a guard ever stops redirecting, the rule above stops being the
+    // thing that matters and this suite should be revisited rather than
+    // quietly kept.
+    const session = readSource(join(REPO, 'src', 'lib', 'auth', 'session.ts'));
+    expect(session).toContain("redirect('/admin/login')");
+    expect(session).toMatch(/requireCapability[\s\S]*?redirect\(admin\.role === 'contributor' \? '\/admin\/upload' : '\/admin'\)/);
   });
 });

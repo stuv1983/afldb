@@ -148,7 +148,9 @@ Prefer the issue entry, `<ISSUE-ID>.md`, and current relevant code.
 
 # 5. Bounded Issue Workflow — Fable Only
 
-For a normal bounded bug/feature, use Fable Medium:
+For a normal bounded bug/feature, use Fable Medium. Before step 1, run
+`npm run preflight -- --mode implementation --issue NNN` from the repository root and
+resolve every `FAIL` (especially main/dirty/base/migration-collision failures):
 
 1. read relevant issue/index context;
 2. locate/reproduce the defect using native inspection;
@@ -164,6 +166,42 @@ For a normal bounded bug/feature, use Fable Medium:
 Escalate to a fresh Opus session only for genuine ambiguity, architecture, data-integrity risk, production safety, or unresolved root cause.
 
 Do not escalate merely because a test failed.
+
+## Standard issue lifecycle
+
+The operator updates the primary `main` checkout first. From that clean checkout, create one new
+worktree at the exact fetched `origin/main` SHA:
+
+```bash
+npm run worktree:bootstrap -- --issue NNN --branch codex/issue-NNN
+```
+
+Use `claude/issue-NNN` or another reviewed branch name as appropriate. The bootstrap fetches
+`origin/main`, requires local `main` to equal it, refuses an existing branch, directory or worktree,
+and never deletes or silently reuses anything. `--copy-handoff AFLDB-ISSUE-NNN.md` may copy only an
+explicitly named same-issue Markdown handoff; main must otherwise be clean, and no other untracked
+file is copied or ignored.
+
+The normal lifecycle is:
+
+```text
+1. update main
+2. worktree:bootstrap
+3. enter the issue worktree
+4. preflight -- --mode implementation --issue NNN
+5. implement and validate
+6. operator reviews and commits the local change
+7. merge:ready -- --issue NNN
+8. operator pushes and merges
+9. deploy through deploy/sync-dev.ps1
+10. smoke and close/synchronise the issue records
+```
+
+`npm run preflight -- --mode implementation` blocks main and requires a linked worktree.
+`--mode merge` allows only the primary main checkout; `--mode read-only` allows inspection on main
+and reports dirt as a warning. `npm run merge:ready` is read-only and ends in `READY` or `BLOCKED`
+with the branch relationship, dirt/staging/untracked paths, main freshness, migration collisions,
+declared scope, recorded validation and explicit hard blockers.
 
 ---
 
@@ -296,6 +334,12 @@ Authoritative durable record of problem, evidence, investigation, root cause, fi
 
 Approved complex cross-session plan/runbook. Use when a detailed handoff is genuinely needed, not for every trivial issue.
 
+Keep detailed execution evidence and stage handoffs here (or in the exact `issues.md` issue section
+when no separate runbook exists). A later handoff should reference earlier stages instead of copying
+their evidence. Use this compact order: status/objective; implementation/files; operator lifecycle;
+focused behavior; exact validation commands/results; safety; deviations/blockers; remaining limits;
+exact next action; recommended next model/effort.
+
 ## `CHANGELOG.md`
 
 Meaningful retained changes to AFLDB, not investigation narrative.
@@ -322,6 +366,19 @@ Do not copy the complete previous conversation.
 
 If `<ISSUE-ID>.md` already contains the information, reference it instead.
 
+For machine-readable merge scope/status, a runbook may include one optional JSON comment. Keep it a
+summary; the surrounding runbook remains the detailed evidence:
+
+```markdown
+<!-- afldb-merge-readiness
+{"status":"ready","hardBlockers":[],"expectedFiles":["src/example.ts","tests/example.test.ts","issues/open/AFLDB-ISSUE-NNN.md","CHANGELOG.md"],"validation":["npm test -- tests/example.test.ts — PASS: 12/12","npm run typecheck — PASS"]}
+-->
+```
+
+Allowed statuses are `ready`, `in-progress` and `blocked`. `hardBlockers`, `expectedFiles` and
+`validation` are string arrays. Without this block, `merge:ready` still checks Git/main/migrations
+but warns that scope, issue status and test evidence require operator review.
+
 ---
 
 # 13. Git Workflow
@@ -332,6 +389,10 @@ Git is performed by the user.
 2. User runs desired Git inspection.
 3. User returns diff/output only if Claude review is wanted.
 4. User commits/pushes when satisfied.
+
+Immediately before that review, run `npm run merge:ready -- --issue NNN` from the issue worktree.
+Run `npm run preflight -- --mode merge` from clean main before the operator merge. Neither command
+fetches or merges; remote freshness still begins with the operator's explicit main update.
 
 Do not keep Claude sessions open solely for Git housekeeping.
 

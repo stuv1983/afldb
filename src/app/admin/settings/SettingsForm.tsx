@@ -6,9 +6,11 @@ import { AdminSection } from '@/app/admin/AdminSection';
 import { EarlyAccessSettings } from '@/app/admin/settings/EarlyAccessSettings';
 import { SearchPlaceholderSettings } from '@/app/admin/settings/SearchPlaceholderSettings';
 import { saveSiteSettings, type SettingsState } from '@/app/admin/settings/actions';
+import type { HomeRecordOptionGroup } from '@/lib/home-records';
 import {
   AFLW_LEADER_CATEGORIES,
   GRID_AUDIENCES,
+  SITE_LAYOUTS,
   SITE_THEMES,
   homeSection,
   type HomeLayout,
@@ -28,12 +30,12 @@ import {
  */
 export function SettingsForm({
   settings,
-  recordOptions,
+  recordGroups,
   smtpConfigured,
 }: {
   settings: SiteSettings;
-  /** Career record categories, labelled server-side from RECORD_CATEGORIES. */
-  recordOptions: { value: string; label: string }[];
+  /** Curated record choices, grouped server-side from the typed catalogue. */
+  recordGroups: HomeRecordOptionGroup[];
   /** Whether AFLDB_SMTP_* is set, so the form can say why sending is off. */
   smtpConfigured: boolean;
 }) {
@@ -82,7 +84,9 @@ export function SettingsForm({
 
       <AdminSection id="settings-appearance" title="Appearance">
         <p className="section-note">
-          Select the visual theme for the public frontend. This changes the design and layout of public pages while preserving identical application behaviour and features.
+          Select the visual theme for the public frontend: colours, typography and page density.
+          This does not change the site&apos;s navigation or page structure — see Layout below for
+          that — and preserves identical application behaviour and features either way.
         </p>
         <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}>
           {SITE_THEMES.map((theme) => (
@@ -99,6 +103,34 @@ export function SettingsForm({
               </div>
               <span className="muted" style={{ display: 'block', marginLeft: '1.45rem', fontSize: '0.85rem' }}>
                 {theme.help}
+              </span>
+            </label>
+          ))}
+        </div>
+      </AdminSection>
+
+      <AdminSection id="settings-layout" title="Layout">
+        <p className="section-note">
+          Select the overall page and navigation structure for the public frontend. This is
+          independent of the Appearance theme above — any theme can be combined with any layout —
+          and preserves identical routes, data, search behaviour, permissions and feature
+          availability either way.
+        </p>
+        <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}>
+          {SITE_LAYOUTS.map((layoutOption) => (
+            <label key={layoutOption.value} style={{ display: 'block', margin: '0 0 0.8rem', cursor: 'pointer' }}>
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <input
+                  type="radio"
+                  name="frontendLayout"
+                  value={layoutOption.value}
+                  defaultChecked={settings.frontendLayout === layoutOption.value}
+                  style={{ marginRight: '0.45rem' }}
+                />
+                <strong style={{ fontWeight: 500 }}>{layoutOption.label}</strong>
+              </div>
+              <span className="muted" style={{ display: 'block', marginLeft: '1.45rem', fontSize: '0.85rem' }}>
+                {layoutOption.help}
               </span>
             </label>
           ))}
@@ -183,8 +215,12 @@ export function SettingsForm({
           <div>
             <label htmlFor="homeRecord">Record of the week (AFL)</label>
             <select id="homeRecord" name="homeRecord" defaultValue={settings.homeRecord}>
-              {recordOptions.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
+              {recordGroups.map((group) => (
+                <optgroup key={group.id} label={group.label}>
+                  {group.options.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </div>

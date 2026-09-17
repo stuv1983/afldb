@@ -26,7 +26,7 @@ function metricColumn(metric: string): string {
  */
 function matchTypeSql(matchType: NlMatchType | undefined): SqlFragment {
   if (!matchType) return sql`TRUE`;
-  if (matchType === 'finals') return sql`m.is_final`;
+  if (matchType === 'finals') return sql`m.is_finals_series`;
   return sql`m.round_type = ${matchType}::round_type`;
 }
 

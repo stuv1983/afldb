@@ -4,7 +4,7 @@ import { QueryBuilderForm } from '@/app/admin/query-builder/QueryBuilderForm';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { Pagination } from '@/components/Pagination';
 import { runQueryBuilder, type QueryBuilderResult } from '@/db/queries/query-builder';
-import { requireSuperAdmin } from '@/lib/auth/session';
+import { requireCapability } from '@/lib/auth/session';
 import { QB_LIMITS, QUERYABLE_TABLES, emptyState, parseQueryState } from '@/search/query-builder-spec';
 
 export const dynamic = 'force-dynamic';
@@ -19,15 +19,17 @@ export const metadata: Metadata = {
  * from the shared admin nav (AdminLayout deliberately does no auth
  * checks; see its own comment), only from the dashboard when the signed-
  * in admin is a super admin. "Hidden" means unlinked for a plain admin,
- * never security-by-obscurity: this page enforces requireSuperAdmin()
- * itself regardless of how it was reached.
+ * never security-by-obscurity: this page enforces
+ * requireCapability('operations.queryBuilder') -- super-admin-only, the
+ * boundary requireSuperAdmin() drew before AFLDB-ISSUE-158 -- itself
+ * regardless of how it was reached.
  */
 export default async function QueryBuilderPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  await requireSuperAdmin();
+  await requireCapability('operations.queryBuilder');
 
   const params = await searchParams;
   const raw = params.q;

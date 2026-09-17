@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator } from '@playwright/test';
 
 /**
  * Core user journeys, run against the production build.
@@ -248,23 +248,69 @@ test('match search shows every active club filter', async ({ page }) => {
   await expect(note).toContainText('Carlton');
 });
 
-test('match search is reachable from the primary navigation', async ({ page, isMobile }) => {
-  test.skip(isMobile, 'the masthead nav is hidden on a phone');
+/**
+ * Reaches a primary destination the way a reader on this device would:
+ * from the masthead on a wide screen, and from the phone bar's "More"
+ * sheet — which carries the full PRIMARY_NAV — on a narrow one. Neither
+ * device is allowed to have a destination the other cannot reach
+ * (AFLDB-ISSUE-147).
+ */
+async function reachPrimary(
+  page: import('@playwright/test').Page,
+  isMobile: boolean | undefined,
+  name: string,
+) {
+  if (isMobile) {
+    await page.getByRole('button', { name: 'More' }).click();
+    await page.getByRole('dialog', { name: 'All sections' })
+      .getByRole('link', { name, exact: true }).click();
+  } else {
+    await page.getByRole('navigation', { name: 'Primary' })
+      .getByRole('link', { name, exact: true }).click();
+  }
+}
 
+test('match search is no longer in primary navigation, but is reachable from the home browse grid (AFLDB-ISSUE-172)', async ({ page, isMobile }) => {
   await page.goto('/');
-  await page.getByRole('navigation', { name: 'Primary' })
-    .getByRole('link', { name: 'Match Search' }).click();
+
+  if (isMobile) {
+    await page.getByRole('button', { name: 'More' }).click();
+    const sheet = page.getByRole('dialog', { name: 'All sections' });
+    await expect(sheet.getByRole('link', { name: 'Match Search', exact: true })).toHaveCount(0);
+    await page.keyboard.press('Escape');
+  } else {
+    await expect(
+      page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Match Search', exact: true }),
+    ).toHaveCount(0);
+  }
+
+  // The route and its home-page "Browse the record" tile are unchanged.
+  const browseGrid = page.getByRole('navigation', { name: 'Browse' });
+  await browseGrid.scrollIntoViewIfNeeded();
+  const matchSearchTile = browseGrid.locator('a[href="/match-search"]');
+  await expect(matchSearchTile).toBeVisible();
+  await matchSearchTile.click();
   await expect(page).toHaveURL(/\/match-search/);
+});
+
+test('venues is reachable from the primary navigation', async ({ page, isMobile }) => {
+  await page.goto('/');
+  await reachPrimary(page, isMobile, 'Venues');
+  await expect(page).toHaveURL(/\/venues/);
+});
+
+test('clubs is reachable from the primary navigation', async ({ page, isMobile }) => {
+  // The AFLDB-ISSUE-147 regression: Clubs had no path in the phone nav.
+  await page.goto('/');
+  await reachPrimary(page, isMobile, 'Clubs');
+  await expect(page).toHaveURL(/\/clubs$/);
 });
 
 test('the AFLW landing is reachable from site navigation', async ({ page, isMobile }) => {
   // Start on a static route so this UI-only check does not depend on the database.
   await page.goto('/not-a-real-page');
 
-  const navigation = page.getByRole('navigation', {
-    name: isMobile ? 'Sections' : 'Primary',
-  });
-  await navigation.getByRole('link', { name: 'AFLW' }).click();
+  await reachPrimary(page, isMobile, 'AFLW');
 
   await expect(page).toHaveURL(/\/aflw$/);
   await expect(
@@ -362,4 +408,438 @@ test('statistical tables stay usable on mobile', async ({ page, isMobile }) => {
     () => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
   );
   expect(overflow).toBe(true);
+});
+
+/**
+ * AFLDB-ISSUE-144 Stage 9 — /clubs/compare in a browser (all-time only
+ * since the Club Rivalry Explorer follow-up, FR-1 — season removed).
+ *
+ * Stages 1-8 proved the queries, the route state and the rendered markup;
+ * what none of them could prove is that a reader arrives at the surface at
+ * all, that the collapsed sections open, that a shareable URL survives a
+ * real navigation, and that a bad parameter is an explanation rather than a
+ * 500. The pair (Adelaide, Brisbane Lions) is the runbook witness.
+ */
+
+test('clubs → compare clubs', async ({ page }) => {
+  await page.goto('/clubs');
+  await page.getByRole('link', { name: /Compare clubs/ }).click();
+
+  await expect(page).toHaveURL(/\/clubs\/compare$/);
+  await expect(page.getByRole('heading', { name: 'Compare clubs', level: 1 })).toBeVisible();
+  // Nothing is chosen for the reader, and no comparison is rendered.
+  await expect(page.getByLabel('First club')).toHaveValue('');
+  await expect(page.getByLabel('Second club')).toHaveValue('');
+  await expect(page.getByRole('heading', { name: 'Head-to-head' })).toHaveCount(0);
+});
+
+test('a club page seeds a comparison with that club', async ({ page }) => {
+  await page.goto('/clubs/adelaide');
+  await page.getByRole('link', { name: /Compare with another club/ }).click();
+
+  await expect(page).toHaveURL(/\/clubs\/compare\?club1=adelaide/);
+  await expect(page.getByLabel('First club')).toHaveValue('adelaide');
+  await expect(page.getByLabel('Second club')).toHaveValue('');
+});
+
+test('a rivalry renders every section of the comparison', async ({ page }) => {
+  await page.goto('/clubs/compare?club1=adelaide&club2=brisbane-lions');
+
+  await expect(
+    page.getByRole('heading', { name: 'Adelaide v Brisbane Lions', level: 1 }),
+  ).toBeVisible();
+
+  // Section titles are visible on load whether or not the section is
+  // collapsed (Club Rivalry Explorer follow-up, FR-3): a collapsed
+  // section's title lives in its <summary>, which a closed <details>
+  // never hides. "By decade" and "Period records" are subsections of the
+  // always-expanded Rivalry records, so they need no disclosure opened.
+  const headingsVisibleOnLoad: (string | RegExp)[] = [
+    'Head-to-head',
+    'Rivalry records',
+    'By decade',
+    'Period records',
+    'Venues',
+    'Players',
+    'Brownlow',
+    'Match history',
+  ];
+  for (const heading of headingsVisibleOnLoad) {
+    await expect(
+      page.getByRole('heading', { name: heading, exact: true }).first(),
+      String(heading),
+    ).toBeVisible();
+  }
+
+  // The approved section order (Club Rivalry Explorer follow-up, FR-3) is
+  // Header → Hero → Era explorer → Rivalry records → Venues → Players →
+  // Brownlow → Match history. Every top-level section renders its name as
+  // an <h2> (the hero's is "Head-to-head"; the era explorer is a <nav>,
+  // not a heading), so the document's own <h2> order is the direct proof
+  // of layout, independent of which disclosures happen to be open.
+  const h2Order = await page.evaluate(
+    () => Array.from(document.querySelectorAll('h2')).map((h) => h.textContent?.trim()),
+  );
+  expect(h2Order).toEqual([
+    'Head-to-head',
+    'Rivalry records',
+    'Venues',
+    'Players',
+    'Brownlow',
+    'Match history',
+  ]);
+
+  // Players is one collapsed disclosure (FR-3): its subsections are
+  // hidden until it is opened, exactly like Match history's table below.
+  // Scoped by id, not `details.filter({ has: heading })`: Players is the
+  // only top-level disclosure with nested disclosures of its own ("Every
+  // connected player", "Average leaderboards"), and the fresh full FR-4
+  // acceptance run showed that filter matching the outer Players
+  // `<details>` on its "Players" heading also matched both of those
+  // nested `<details>` elements, so `players.locator('summary')` resolved
+  // to three elements instead of one. `#players` (the id
+  // `ClubComparisonPlayers` gives its own `CollapsiblePanel`) plus the
+  // direct-child `> summary` combinator names the outer disclosure and
+  // only its own summary, excluding the nested disclosures entirely.
+  const players = page.locator('#players');
+  await players.locator('> summary').click();
+  for (const heading of ['Player rivalry leaders', 'Connected players', 'Player averages in this rivalry']) {
+    await expect(players.getByRole('heading', { name: heading }), heading).toBeVisible();
+  }
+
+  // A collapsed section opens without client state: it is <details>
+  // (Club Rivalry Explorer follow-up, FR-3 — Match history is itself the
+  // one collapsed disclosure now, not a nested "Every meeting" table).
+  const history = page.locator('details').filter({
+    has: page.getByRole('heading', { name: 'Match history', exact: true }),
+  });
+  await history.locator('summary').click();
+  await expect(history.getByRole('table').first()).toBeVisible();
+});
+
+test('reversing the pair in the URL reverses the presentation, not the canonical', async ({ page }) => {
+  // AFLDB-ISSUE-172 removed the "Swap the order of the two clubs" control
+  // (presentation-only, no data-semantics value); this now covers the same
+  // reversed-pair/canonical-URL property via a direct navigation instead of
+  // a click on that control.
+  await page.goto('/clubs/compare?club1=brisbane-lions&club2=adelaide');
+  await expect(
+    page.getByRole('heading', { name: 'Brisbane Lions v Adelaide', level: 1 }),
+  ).toBeVisible();
+
+  const canonical = await page.locator('link[rel="canonical"]').first().getAttribute('href');
+  expect(new URL(canonical!).search).toBe('?club1=adelaide&club2=brisbane-lions');
+
+  await page.goto('/clubs/compare?club1=adelaide&club2=brisbane-lions');
+  await expect(
+    page.getByRole('heading', { name: 'Adelaide v Brisbane Lions', level: 1 }),
+  ).toBeVisible();
+
+  await expect(page).toHaveTitle('Adelaide vs Brisbane Lions — Club Comparison | AFLDB');
+  const ogTitleReversed = await page.locator('meta[property="og:title"]').first().getAttribute('content');
+  expect(ogTitleReversed).toBe('Adelaide vs Brisbane Lions — Club Comparison | AFLDB');
+  const canonicalReversed = await page.locator('link[rel="canonical"]').first().getAttribute('href');
+  // The pair is alphabetically ordered either way round.
+  expect(new URL(canonicalReversed!).search).toBe('?club1=adelaide&club2=brisbane-lions');
+});
+
+test('the match filter and the history page are shareable state', async ({ page }) => {
+  await page.goto('/clubs/compare?club1=carlton&club2=collingwood&matchType=finals');
+  await expect(page.getByLabel('Match type')).toHaveValue('finals');
+
+  await page.goto('/clubs/compare?club1=carlton&club2=collingwood');
+  const history = page.locator('details').filter({
+    has: page.getByRole('heading', { name: 'Match history', exact: true }),
+  });
+  await history.locator('summary').click();
+  await history.getByRole('link', { name: 'Next →' }).click();
+
+  await expect(page).toHaveURL(/page=2/);
+  await expect(page).toHaveURL(/club1=carlton&club2=collingwood/);
+  await expect(page.getByText(/Page 2 of/).first()).toBeVisible();
+});
+
+/**
+ * AFLDB-ISSUE-144 Club Rivalry Explorer follow-up, FR-4 — mobile/desktop
+ * layout and URL behaviour acceptance. FR-2 built the era explorer and
+ * query-layer era filtering but deliberately deferred a browser pass on it
+ * to this stage (its own exit note); FR-3 then reordered the page around
+ * it. This is that deferred pass, against the finished FR-3 layout.
+ */
+test('the era explorer narrows rivalry records and match history, resets pagination, and is shareable', async ({ page }) => {
+  // Carlton/Collingwood long-history decade witness recorded in the
+  // runbook: the 1990s alone carries 19 of the pair's 268 all-time meetings
+  // (`1990:19(13/6/0)`), so era=1990 is a real, populated chip for this pair.
+  await page.goto('/clubs/compare?club1=carlton&club2=collingwood&page=2');
+
+  const eraNav = page.getByRole('navigation', { name: /era/i });
+  await expect(eraNav.getByRole('link', { name: 'All time', exact: true }))
+    .toHaveAttribute('aria-current', 'true');
+
+  // Choosing an era is a new population: it drops the page the reader was
+  // on, exactly as changing the match-type filter already does.
+  await eraNav.getByRole('link', { name: /^1990s/ }).click();
+  await expect(page).toHaveURL(/era=1990/);
+  await expect(page).not.toHaveURL(/page=/);
+  await expect(eraNav.getByRole('link', { name: /^1990s/ }))
+    .toHaveAttribute('aria-current', 'true');
+
+  // Rivalry records (always expanded) reflects the chosen era in its own
+  // caption, and states plainly that streaks stay all-time regardless.
+  const rivalryRecords = page.locator('section').filter({
+    has: page.getByRole('heading', { name: 'Rivalry records', exact: true }),
+  });
+  await expect(rivalryRecords.locator('table caption').first()).toContainText('1990s');
+  await expect(rivalryRecords).toContainText('Streaks are always all-time');
+
+  // Venues stays all-time and says so once an era is chosen, even though
+  // its own data never changes.
+  const venues = page.locator('details').filter({
+    has: page.getByRole('heading', { name: 'Venues', exact: true }),
+  });
+  await venues.locator('summary').click();
+  await expect(venues).toContainText('Venue records are always all-time');
+
+  // Match history (collapsed) reflects the same era in its own caption.
+  const history = page.locator('details').filter({
+    has: page.getByRole('heading', { name: 'Match history', exact: true }),
+  });
+  await history.locator('summary').click();
+  await expect(history.locator('table caption').first()).toContainText('1990s');
+
+  // Title, og:title and canonical after this client-side <Link> navigation
+  // used to race: Next's default prefetching of the OTHER links on this
+  // page (Swap, Reset) left their resolved <head> in the router's client
+  // cache, and this era-only navigation could surface one of THOSE instead
+  // of its own (AFLDB-ISSUE-144 follow-up defect). Fixed by `prefetch=false`
+  // on every link on this route (ClubComparisonControls.tsx /
+  // ClubComparisonEraExplorer.tsx), so asserting it here is now safe and is
+  // the dedicated proof that an era-only transition — club1/club2 unchanged
+  // — does not disturb metadata that never depended on era in the first
+  // place. The ordered-pair-alone canonical CONTRACT (era, matchType and
+  // page all dropped) remains `tests/e2e/seo.spec.ts`'s "a club comparison
+  // canonicalises to its ordered pair alone", via a full `page.goto`.
+  await expect(page).toHaveTitle('Carlton vs Collingwood — Club Comparison | AFLDB');
+  const ogTitleAtEra = await page.locator('meta[property="og:title"]').first().getAttribute('content');
+  expect(ogTitleAtEra).toBe('Carlton vs Collingwood — Club Comparison | AFLDB');
+  const canonicalAtEra = await page.locator('link[rel="canonical"]').first().getAttribute('href');
+  expect(new URL(canonicalAtEra!).search).toBe('?club1=carlton&club2=collingwood');
+
+  // Choosing "All time" again clears the era from the URL and the chips.
+  await eraNav.getByRole('link', { name: 'All time', exact: true }).click();
+  await expect(page).not.toHaveURL(/era=/);
+});
+
+test('era and match type combine, and both are shareable together', async ({ page }) => {
+  await page.goto('/clubs/compare?club1=carlton&club2=collingwood&era=1990&matchType=finals');
+
+  const eraNav = page.getByRole('navigation', { name: /era/i });
+  await expect(eraNav.getByRole('link', { name: /^1990s/ }))
+    .toHaveAttribute('aria-current', 'true');
+
+  const history = page.locator('details').filter({
+    has: page.getByRole('heading', { name: 'Match history', exact: true }),
+  });
+  await history.locator('summary').click();
+  await expect(page.getByLabel('Match type')).toHaveValue('finals');
+  // The section-note states both filters regardless of how many meetings
+  // the combination narrows to (Carlton/Collingwood's 1990s finals count is
+  // not a value this stage independently verified), so it is the safe
+  // assertion here rather than a table caption that may not render.
+  await expect(history).toContainText('1990s');
+  await expect(history).toContainText('Finals:');
+
+  // A fresh navigation to the exact URL a reader would have shared lands on
+  // the same state — the round-trip this test exists to prove.
+  await page.goto('/clubs/compare?club1=carlton&club2=collingwood&era=1990&matchType=finals');
+  await expect(eraNav.getByRole('link', { name: /^1990s/ }))
+    .toHaveAttribute('aria-current', 'true');
+});
+
+test('every invalid comparison state answers 200 with an explanation', async ({ page }) => {
+  const cases: [string, RegExp][] = [
+    ['club1=not-a-club&club2=adelaide', /could not be found/],
+    ['club1=adelaide&club2=adelaide', /Choose two different clubs/],
+    ['club1=footscray&club2=western-bulldogs', /could not be found|different clubs/],
+    ['club1=adelaide&club2=carlton&matchType=nonsense', /Adelaide v Carlton/],
+    ['club1=adelaide&club2=carlton&page=99999', /Adelaide v Carlton/],
+    ['club1=adelaide&club2=carlton&era=1700', /Adelaide v Carlton/],
+  ];
+
+  for (const [query, expected] of cases) {
+    const response = await page.goto('/clubs/compare?' + query);
+    expect(response?.status(), query).toBe(200);
+    await expect(page.locator('body'), query).toContainText(expected);
+    // One h1 on every state, and never Next's error page.
+    await expect(page.locator('h1'), query).toHaveCount(1);
+  }
+});
+
+test('the comparison stays inside the viewport on mobile', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'mobile-only check');
+
+  await page.goto('/clubs/compare?club1=adelaide&club2=brisbane-lions');
+  // Wide tables scroll inside .table-wrap; the document must not.
+  const contained = await page.evaluate(
+    () => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
+  );
+  expect(contained).toBe(true);
+
+  // The same holds at the narrowest supported width with EVERY disclosure
+  // open, which is how the Stage 9 defect was found: a grid column holding
+  // a `.table-wrap` took its minimum width from the table inside it, so the
+  // track — and with it the page — grew instead of the table scrolling.
+  await page.setViewportSize({ width: 360, height: 900 });
+  await page.evaluate(() => {
+    for (const disclosure of document.querySelectorAll('details')) disclosure.open = true;
+  });
+  // Club Rivalry Explorer follow-up, FR-3: "Club Brownlow history" is a
+  // plain subsection now, not its own <details> — Brownlow itself is the
+  // one collapsed disclosure that contains it.
+  await expect(
+    page.locator('details').filter({
+      has: page.getByRole('heading', { name: 'Brownlow', exact: true }),
+    }).getByRole('table').first(),
+  ).toBeVisible();
+  const stillContained = await page.evaluate(
+    () => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
+  );
+  expect(stillContained).toBe(true);
+});
+
+test('the comparison controls are labelled and keyboard-operable', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'keyboard traversal is a pointer-free check');
+
+  await page.goto('/clubs/compare?club1=adelaide&club2=brisbane-lions');
+
+  // Every control is reachable by its label, which is the association.
+  for (const label of ['First club', 'Second club']) {
+    await expect(page.getByLabel(label), label).toBeVisible();
+  }
+
+  // Match type (Club Rivalry Explorer follow-up, FR-3) is local to Match
+  // History, which is collapsed by default — its label only resolves to a
+  // visible control once that section is opened.
+  const matchHistory = page.locator('details').filter({
+    has: page.getByRole('heading', { name: 'Match history', exact: true }),
+  });
+  await matchHistory.locator('summary').click();
+  await expect(page.getByLabel('Match type')).toBeVisible();
+
+  await page.getByLabel('First club').focus();
+  const reached: string[] = [];
+  for (let i = 0; i < 8; i += 1) {
+    await page.keyboard.press('Tab');
+    reached.push(await page.evaluate(() => {
+      const active = document.activeElement as HTMLElement | null;
+      if (!active) return '';
+      return (active.getAttribute('aria-label') ?? active.textContent ?? '').trim();
+    }));
+  }
+  // The keyboard reaches Reset from the first selector without being
+  // trapped on the way.
+  expect(reached.join(' | ')).toContain('Reset');
+
+  // Focus is visible rather than suppressed.
+  const focusStyle = await page.evaluate(() => {
+    const active = document.activeElement as HTMLElement | null;
+    if (!active) return '';
+    const style = getComputedStyle(active);
+    return style.outlineStyle + ':' + style.outlineWidth + ':' + style.boxShadow;
+  });
+  expect(focusStyle).not.toBe('');
+  expect(focusStyle).not.toBe('none:0px:none');
+});
+
+/**
+ * AFLDB-ISSUE-170 Stage 1E — route context decides presentation.
+ *
+ * Mick Malthouse both played and coached, which is exactly the case the
+ * acceptance defect was found on: entering through Coaches used to deliver
+ * his PLAYER profile, because /coaches/[slug] permanently redirected a
+ * player-linked coach to /players. The two routes now present two different
+ * careers for one person, and this walks both of them in one pass.
+ */
+test('coaches → a coach who also played → coach profile, then his playing career', async ({ page }) => {
+  await page.goto('/coaches');
+  await expect(page.getByRole('heading', { name: 'Coaches', level: 1 })).toBeVisible();
+
+  const malthouse = page.getByRole('link', { name: 'Mick Malthouse', exact: true });
+  await expect(malthouse).toBeVisible();
+  // The index itself must point at the coach page: a /players href here
+  // would reinstate the defect without needing a redirect to do it.
+  await expect(malthouse).toHaveAttribute('href', /^\/coaches\/mick-malthouse-\d+$/);
+  await malthouse.click();
+
+  // No redirect: the URL that was linked is the URL that renders.
+  await expect(page).toHaveURL(/\/coaches\/mick-malthouse-\d+$/);
+  await expect(page.getByRole('heading', { name: 'Mick Malthouse', level: 1 })).toBeVisible();
+
+  // Coaching is the primary content, visible without scrolling past a
+  // playing career to reach it.
+  await expect(page.getByText('W–L–D', { exact: true }).first()).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Coaching record' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'History against club' })).toBeVisible();
+
+  // The primary compare action belongs to the career being presented.
+  const compareCoach = page.getByRole('link', { name: /Compare with another coach/ });
+  await expect(compareCoach).toBeVisible();
+  await expect(compareCoach).toHaveAttribute('href', /^\/coaches\/compare\?a=\d+$/);
+  await expect(page.getByRole('link', { name: /Compare with another player/ })).toHaveCount(0);
+
+  // The other presentation of the same person is one link away, not a redirect.
+  await page.getByRole('link', { name: /View playing career/ }).click();
+  await expect(page).toHaveURL(/\/players\/mick-malthouse-\d+$/);
+  await expect(page.getByRole('heading', { name: 'Mick Malthouse', level: 1 })).toBeVisible();
+
+  // The player route stays player-centric, with its own primary compare action.
+  const comparePlayer = page.getByRole('link', { name: /Compare with another player/ });
+  await expect(comparePlayer).toBeVisible();
+  await expect(comparePlayer).toHaveAttribute('href', /^\/players\/compare\?a=\d+$/);
+  await expect(page.getByRole('link', { name: /Compare with another coach/ })).toHaveCount(0);
+});
+
+test('the Coaches table expands to fill the viewport, keeps its sort, and restores focus on close (AFLDB-ISSUE-172)', async ({ page }) => {
+  // Compares individual cell values rather than a row's serialized text:
+  // innerText() inserts layout-driven whitespace between <td>s that
+  // toHaveText()'s normalization does not reproduce, which is a mismatch
+  // between text-extraction methods, not a real behavioural difference —
+  // the thing actually under test is "does the same row/state survive
+  // expanding", not whitespace serialization.
+  async function rowCells(row: Locator) {
+    return (await row.locator('td').allTextContents()).map((cell) => cell.trim());
+  }
+
+  await page.goto('/coaches');
+  const table = page.locator('#coaches');
+  await expect(table.getByRole('heading', { name: 'Coaches' })).toBeVisible();
+
+  // Sort by name before expanding, so the same in-memory SortableTable
+  // state can be checked to have survived the toggle below.
+  await table.getByRole('button', { name: 'Name' }).click();
+  const cellsBefore = await rowCells(table.getByRole('row').nth(1));
+
+  const toggle = table.getByRole('button', { name: 'Expand table' });
+  await toggle.click();
+
+  const dialog = page.getByRole('dialog', { name: 'Coaches' });
+  await expect(dialog).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Close expanded view' })).toBeVisible();
+
+  // Same table, same state: sort survived because nothing unmounted.
+  expect(await rowCells(dialog.getByRole('row').nth(1))).toEqual(cellsBefore);
+
+  // The page behind the expanded view cannot be scrolled.
+  const bodyOverflow = await page.evaluate(() => document.body.style.overflow);
+  expect(bodyOverflow).toBe('hidden');
+
+  // Escape closes and returns focus to the trigger, which is the same
+  // control now labelled "Expand table" again.
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'Coaches' })).toBeHidden();
+  await expect(table.getByRole('button', { name: 'Expand table' })).toBeFocused();
+  expect(await page.evaluate(() => document.body.style.overflow)).not.toBe('hidden');
+
+  // The sort is still applied after collapsing back too.
+  expect(await rowCells(table.getByRole('row').nth(1))).toEqual(cellsBefore);
 });

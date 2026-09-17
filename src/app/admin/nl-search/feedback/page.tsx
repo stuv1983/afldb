@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { getNlFeedbackSummary, listNlFeedback } from '@/db/queries/nl-search-log';
-import { requireSuperAdmin } from '@/lib/auth/session';
+import { requireCapability } from '@/lib/auth/session';
 import { formatNumber, NOT_RECORDED } from '@/lib/format';
 import { firstValue } from '@/lib/params';
 
@@ -26,7 +26,7 @@ const LIMIT = 200;
 export default async function NlFeedbackPage(
   { searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> },
 ) {
-  await requireSuperAdmin();
+  await requireCapability('operations.nlTelemetry');
   const params = await searchParams;
   const filter = firstValue(params.verdict);
   const verdict = filter === 'correct' || filter === 'incorrect' ? filter : undefined;

@@ -554,10 +554,19 @@ export function reconcile(input: ReconcileInput): ReconciliationOutcome {
     }
   }
 
-  // 7. Corroboration. Disagreement between independence groups blocks;
-  //    agreement is recorded and authorises nothing.
+  // 7. Corroboration. Agreement is recorded and authorises nothing.
+  //    Disagreement between independence groups blocks — UNLESS this family
+  //    declares `corroboration_policy: "advisory"` (AFLDB-ISSUE-122 §10).
+  //
+  //    Under `advisory` the report is still computed and still travels on the
+  //    outcome, so `disagreeing_groups` is recorded on the ledger row and the
+  //    `source_disagreement` data_issue is still opened and deduplicated by
+  //    the settle caller, which reads the report and not this verb. Only the
+  //    VETO is withdrawn: a source being retired must not be able to refuse a
+  //    proposal from the source that replaces it, and its agreement is never a
+  //    prerequisite. An undeclared family is `blocking`, so nothing else moves.
   const corroboration = classifyCorroboration(contract, input.proposedValues, input.corroboration ?? []);
-  if (corroboration.disagreeingGroups.length > 0) {
+  if (corroboration.disagreeingGroups.length > 0 && contract.corroborationPolicy === 'blocking') {
     return {
       kind: 'refusal', verb: 'source_disagreement', detail: 'independent_sources_disagree',
       requeue: false, observation, corroboration, note: null,

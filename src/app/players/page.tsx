@@ -39,7 +39,7 @@ export const dynamic = 'force-dynamic';
  * The combinatorial space behind this page is unbounded — any pair of bounds
  * on any of a dozen career fields — but the DISCOVERABLE space is not: the
  * filters are a GET form rather than a grid of links, so a crawler only ever
- * finds the five example searches, the seven sort links and the pager.
+ * finds the seven sort links and the pager.
  */
 export async function generateMetadata({
   searchParams,
@@ -58,37 +58,6 @@ export async function generateMetadata({
   });
 }
 
-
-/**
- * Searches worth starting from, shown only on an unfiltered index.
- *
- * These came across from Advanced Player Search when the two pages merged:
- * the filter panel answers the same questions the standalone form did, but a
- * panel of empty min/max pairs does not suggest what to ask it. Every link is
- * a plain URL against this page's own parameters.
- */
-const EXAMPLE_SEARCHES: { href: string; label: string }[] = [
-  {
-    href: '/players?games_min=200&goals_min=100&finals_min=15',
-    label: '200+ games, 100+ goals and 15+ finals',
-  },
-  {
-    href: '/players?debut_min=1960&debut_max=1969&clubs_min=2&clubs_max=2',
-    label: 'Debuted in the 1960s and played for exactly two clubs',
-  },
-  {
-    href: '/players?games_min=200&games_max=249&finals_min=16',
-    label: '200–249 games with 16 or more finals',
-  },
-  {
-    href: '/players?goals_min=50&goals_max=199&brownlow_votes_max=0',
-    label: '50–199 career goals and no Brownlow votes',
-  },
-  {
-    href: '/players?premierships_min=4&sort=premierships',
-    label: 'Four or more premierships',
-  },
-];
 
 export default async function PlayersPage({
   searchParams,
@@ -267,19 +236,6 @@ export default async function PlayersPage({
           </>
         )}
       </CollapsibleTable>
-
-      {values.active === 0 && (
-        <section className="section">
-          <h2>Example searches</h2>
-          <ul className="ruled-list">
-            {EXAMPLE_SEARCHES.map((example) => (
-              <li key={example.href}>
-                <Link href={example.href}>{example.label}</Link>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
     </>
   );
 }

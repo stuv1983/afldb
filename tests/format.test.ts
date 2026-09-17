@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   NOT_RECORDED,
+  coachProfilePath,
   formatHallOfFameClub,
   formatRound,
   formatRoundShort,
@@ -83,6 +84,15 @@ describe('formatRound', () => {
   it('names a final from its type', () => {
     expect(formatRound('grand_final', null)).toBe('Grand Final');
     expect(formatRoundShort('grand_final', null)).toBe('GF');
+  });
+
+  // AFLDB-ISSUE-129. Every AFL call site passes NO fallback — only AFLW carries a
+  // round_code to fall back to — so without a map entry these would render as the
+  // bare identifier "wildcard_final", including as a season-page heading and its
+  // anchor id. The no-fallback call shape is the point of this test.
+  it('names a Wildcard Final with no fallback available', () => {
+    expect(formatRound('wildcard_final', null)).toBe('Wildcard Final');
+    expect(formatRoundShort('wildcard_final', null)).toBe('WF');
   });
 
   // A round type this map has never seen, or a home-and-away row with no
@@ -299,5 +309,29 @@ describe('shouldShowUnmatched', () => {
         clubName: null,
       }),
     ).toBe(true);
+  });
+});
+
+describe('coachProfilePath', () => {
+  // AFLDB-ISSUE-170 Stage 1E reversed this helper's old rule. It used to send
+  // a player-linked coach to /players because /coaches/[slug]-id permanently
+  // redirected them there; that redirect is gone, and a name picked out of a
+  // COACHING surface must now reach the coaching profile.
+  it('sends a player-linked coach to their own coach page, not to /players', () => {
+    const href = coachProfilePath({ slug: 'damien-hardwick', coachId: 17 });
+    expect(href).toBe('/coaches/damien-hardwick-17');
+    expect(href).not.toContain('/players');
+  });
+
+  it('sends a coach-only person to the coach route, never to /players', () => {
+    const href = coachProfilePath({ slug: 'cliff-rankin', coachId: 152 });
+    expect(href).toBe('/coaches/cliff-rankin-152');
+    expect(href).not.toContain('/players');
+  });
+
+  it('is the coach id that identifies the page, not the player id', () => {
+    // The two identifier spaces are different tables; a coach page keyed by a
+    // player id would silently address the wrong coach.
+    expect(coachProfilePath({ slug: 'mick-malthouse', coachId: 3 })).toBe('/coaches/mick-malthouse-3');
   });
 });

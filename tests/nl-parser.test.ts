@@ -9,8 +9,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { parseNlQuestion, type NlParseContext, type NlPlayerCandidate } from '@/search/nl/parser';
-import { NL_CONFIDENCE, NL_METRICS, validatePlan, type NlParse, type NlQueryPlan } from '@/search/nl/plan';
-import type { NlClubDirectoryEntry, NlVenueDirectoryEntry } from '@/search/nl/entities';
+import { describePlan, NL_CONFIDENCE, NL_LIMITS, NL_METRICS, validatePlan, type NlParse, type NlQueryPlan } from '@/search/nl/plan';
+import type { NlClubDirectoryEntry, NlCoachDirectoryEntry, NlVenueDirectoryEntry } from '@/search/nl/entities';
 
 const CLUBS: NlClubDirectoryEntry[] = [
   { organizationId: 1, slug: 'richmond', name: 'Richmond', names: ['richmond', 'tigers'] },
@@ -19,23 +19,105 @@ const CLUBS: NlClubDirectoryEntry[] = [
   { organizationId: 4, slug: 'geelong', name: 'Geelong', names: ['geelong', 'cats'] },
   { organizationId: 5, slug: 'adelaide', name: 'Adelaide', names: ['adelaide', 'crows'] },
   { organizationId: 6, slug: 'port-adelaide', name: 'Port Adelaide', names: ['port adelaide', 'power'] },
+  // AFLDB-ISSUE-202: mirrors the real merged directory (clubs + CLUB_NICKNAMES),
+  // which carries 'gws' and 'giants' as independent one-word nicknames plus
+  // the combined 'gws giants' alias added for this issue.
+  { organizationId: 7, slug: 'gws', name: 'Greater Western Sydney', names: ['greater western sydney', 'gws', 'giants', 'gws giants'] },
+  // AFLDB-ISSUE-213: three overlapping-name pairs, where the shorter name
+  // occurs as a whole word embedded inside the longer one ("melbourne"
+  // inside "north melbourne", "adelaide" inside "port adelaide", "sydney"
+  // inside "greater western sydney").
+  { organizationId: 8, slug: 'melbourne', name: 'Melbourne', names: ['melbourne', 'demons', 'dees'] },
+  { organizationId: 9, slug: 'north-melbourne', name: 'North Melbourne', names: ['north melbourne', 'kangaroos', 'roos'] },
+  { organizationId: 10, slug: 'sydney', name: 'Sydney', names: ['sydney', 'swans'] },
+  // AFLDB-ISSUE-213: no name-overlap regression pair for the "v" separator.
+  { organizationId: 11, slug: 'essendon', name: 'Essendon', names: ['essendon', 'bombers'] },
+  { organizationId: 12, slug: 'hawthorn', name: 'Hawthorn', names: ['hawthorn', 'hawks'] },
+  // AFLDB-ISSUE-217: player_game_scope_collision/3 fixtures.
+  { organizationId: 13, slug: 'brisbane-lions', name: 'Brisbane Lions', names: ['brisbane lions', 'lions'] },
 ];
 
 const VENUES: NlVenueDirectoryEntry[] = [
   { id: 1, slug: 'mcg', name: 'Melbourne Cricket Ground', names: ['mcg', 'melbourne cricket ground', 'the g'] },
   { id: 2, slug: 'docklands', name: 'Docklands Stadium', names: ['docklands', 'marvel', 'etihad'] },
+  // AFLDB-ISSUE-213: the venue named in the confirmed defect's exact wording.
+  { id: 3, slug: 'adelaide-oval', name: 'Adelaide Oval', names: ['adelaide oval'] },
+  // AFLDB-ISSUE-217: player_game_scope_collision/3 fixtures.
+  { id: 4, slug: 'gabba', name: 'Gabba', names: ['gabba', 'the gabba'] },
+  { id: 5, slug: 'optus-stadium', name: 'Optus Stadium', names: ['optus stadium'] },
+];
+
+/**
+ * A stand-in for buildCoachDirectory's 386 rows, including the two
+ * measured surname collisions that must NOT resolve: Albert Pannam and
+ * Charlie Pannam both coached Richmond, and Len Smith and Norm Smith both
+ * coached, so neither surname is an alias here -- exactly as the real
+ * directory builder leaves them out.
+ */
+const COACHES: NlCoachDirectoryEntry[] = [
+  { id: 17, slug: 'damien-hardwick', name: 'Damien Hardwick', playerId: 900, playerSlug: 'damien-hardwick', names: ['damien hardwick', 'hardwick'] },
+  { id: 1, slug: 'mick-malthouse', name: 'Mick Malthouse', playerId: 9635, playerSlug: 'mick-malthouse', names: ['mick malthouse', 'malthouse'] },
+  { id: 152, slug: 'cliff-rankin', name: 'Cliff Rankin', playerId: null, playerSlug: null, names: ['cliff rankin', 'rankin'] },
+  { id: 160, slug: 'albert-pannam', name: 'Albert Pannam', playerId: 700, playerSlug: 'albert-pannam', names: ['albert pannam'] },
+  { id: 266, slug: 'charlie-pannam', name: 'Charlie Pannam', playerId: 701, playerSlug: 'charlie-pannam', names: ['charlie pannam'] },
 ];
 
 const PLAYERS: Record<string, NlPlayerCandidate[]> = {
   'dustin martin': [{ ref: { id: 100, slug: 'dustin-martin', name: 'Dustin Martin' }, score: 1000 }],
-  'gary ablett': [{ ref: { id: 101, slug: 'gary-ablett', name: 'Gary Ablett' }, score: 1000 }],
+  // TWO candidates, because afldb_test holds two: players 4700 and 4701
+  // share the display name "Gary Ablett" AND the slug "gary-ablett", and
+  // the real resolver returns them 10.9 points apart. The single-candidate
+  // stand-in this replaces made an unsuffixed "gary ablett" look uniquely
+  // resolvable to anyone writing a test against it -- which is how the
+  // Phase G corpus came to expect a plan for a question the engine has
+  // declined by design since AFLDB-ISSUE-110. The contract itself is
+  // asserted in tests/nl-semantic-mapping.test.ts.
+  'gary ablett': [
+    { ref: { id: 101, slug: 'gary-ablett', name: 'Gary Ablett' }, score: 1000, matchedName: 'Gary Ablett' },
+    { ref: { id: 102, slug: 'gary-ablett', name: 'Gary Ablett' }, score: 990, matchedName: 'Gary Ablett' },
+  ],
+  // AFLDB-ISSUE-152 Phase C: the measured joint holder of "most goals
+  // after the siren" (2, tied with Gary Rohan).
+  'barry hall': [{ ref: { id: 1001, slug: 'barry-hall', name: 'Barry Hall' }, score: 1000 }],
+  // AFLDB-ISSUE-152 Phase D witnesses, with afldb_test's own ids: Brent
+  // Harvey is both a brother (relationship 358, Shane Harvey) and a
+  // father-son father (relationship 112, Cooper Harvey), so one name
+  // exercises every per-player reading.
+  'brent harvey': [{ ref: { id: 2164, slug: 'brent-harvey', name: 'Brent Harvey' }, score: 1000 }],
+  'cooper harvey': [{ ref: { id: 3048, slug: 'cooper-harvey', name: 'Cooper Harvey' }, score: 1000 }],
+  'phil krakouer': [{ ref: { id: 10500, slug: 'phil-krakouer', name: 'Phil Krakouer' }, score: 1000 }],
+  // The surname that is also a relationship word. "Most goals by Ben
+  // Cousins" must stay a goals question: PLAYER_NICKNAMES maps "cousins"
+  // to him, and a bare cousin gate would have declined it as a family
+  // question AFLDB cannot answer.
+  'ben cousins': [{ ref: { id: 1500, slug: 'ben-cousins', name: 'Ben Cousins' }, score: 1000 }],
+  // AFLDB-ISSUE-217: player_game_single "haul"/"peak single-game"/"which
+  // match saw...collect" wrapper-phrasing fixtures.
+  'chris judd': [{ ref: { id: 2001, slug: 'chris-judd', name: 'Chris Judd' }, score: 1000 }],
+  'lance franklin': [{ ref: { id: 2002, slug: 'lance-franklin', name: 'Lance Franklin' }, score: 1000 }],
+  'nat fyfe': [{ ref: { id: 2003, slug: 'nat-fyfe', name: 'Nat Fyfe' }, score: 1000 }],
+  'patrick dangerfield': [{ ref: { id: 2004, slug: 'patrick-dangerfield', name: 'Patrick Dangerfield' }, score: 1000 }],
+  'shane crawford': [{ ref: { id: 2005, slug: 'shane-crawford', name: 'Shane Crawford' }, score: 1000 }],
+  'jason akermanis': [{ ref: { id: 2006, slug: 'jason-akermanis', name: 'Jason Akermanis' }, score: 1000 }],
 };
 
 function fakeResolvePlayer(name: string): Promise<NlPlayerCandidate[]> {
   return Promise.resolve(PLAYERS[name.toLowerCase()] ?? []);
 }
 
-const ctx: NlParseContext = { clubs: CLUBS, venues: VENUES, resolvePlayer: fakeResolvePlayer };
+// AFLDB-ISSUE-197: no case in this file's existing PLAYERS map resolves
+// below PLAYER_ACCEPT_SCORE with 2+ candidates, so the shared fake never
+// needs a non-empty family; the dedicated family-resolver behaviour (2-12
+// ranks, >12 declines, defence-in-depth filtering) is exercised below with
+// its own per-test fakes, next to the production resolver's contract.
+function fakeResolvePlayerFamily(): Promise<NlPlayerCandidate[]> {
+  return Promise.resolve([]);
+}
+
+const ctx: NlParseContext = {
+  clubs: CLUBS, venues: VENUES, coaches: COACHES,
+  resolvePlayer: fakeResolvePlayer, resolvePlayerFamily: fakeResolvePlayerFamily,
+};
 
 async function parse(question: string): Promise<NlParse> {
   return parseNlQuestion(question, ctx);
@@ -103,6 +185,162 @@ describe('2. team queries', () => {
     expect(p.scope.venue?.name).toBe('Melbourne Cricket Ground');
     expect(p.scope.clubFor).toBeUndefined();
   });
+
+  // AFLDB-ISSUE-202: "GWS Giants" is assembled in the corpus from two
+  // independently-aliased single words ('gws', 'giants'), so extractClubs's
+  // two-slot-per-question span matcher spent one slot on 'giants' (correctly
+  // resolving clubAgainst) while leaving 'gws' unclaimed -- and 128 stress
+  // rows declined unsupported_term on that leftover token even though the
+  // club identity had already resolved. The fix is a combined 'gws giants'
+  // alias in CLUB_NICKNAMES that findLongestMatch selects as one span.
+  it('adelaide biggest win against gws giants -> clubAgainst resolves and no leftover "gws"', async () => {
+    const result = await parse('Adelaide biggest win against GWS Giants');
+    expect(result.status).toBe('plan');
+    if (result.status !== 'plan') return;
+    const p = result.plan;
+    expect(p.grain).toBe('team_match');
+    expect(p.metric).toBe('win_margin');
+    expect(p.scope.clubFor?.name).toBe('Adelaide');
+    expect(p.scope.clubAgainst?.name).toBe('Greater Western Sydney');
+    expect(result.report.unsupportedTerms).not.toContain('gws');
+    expect(result.report.unsupportedTerms).toEqual([]);
+  });
+
+  it('adelaide biggest win versus gws giants -> same identity behaviour', async () => {
+    const p = await plan('Adelaide biggest win versus GWS Giants');
+    expect(p.scope.clubFor?.name).toBe('Adelaide');
+    expect(p.scope.clubAgainst?.name).toBe('Greater Western Sydney');
+  });
+
+  it('adelaide biggest win over gws giants -> same identity behaviour', async () => {
+    const p = await plan('Adelaide biggest win over GWS Giants');
+    expect(p.scope.clubFor?.name).toBe('Adelaide');
+    expect(p.scope.clubAgainst?.name).toBe('Greater Western Sydney');
+  });
+
+  it('adelaide worst loss to gws giants -> same identity behaviour', async () => {
+    const p = await plan('Adelaide worst loss to GWS Giants');
+    expect(p.grain).toBe('team_match');
+    expect(p.metric).toBe('loss_margin');
+    expect(p.scope.clubFor?.name).toBe('Adelaide');
+    expect(p.scope.clubAgainst?.name).toBe('Greater Western Sydney');
+  });
+
+  it('adelaide highest score against gws giants -> score metric intact, identity fully consumed', async () => {
+    const p = await plan('Adelaide highest score against GWS Giants');
+    expect(p.grain).toBe('team_match');
+    expect(p.metric).toBe('team_score');
+    expect(p.agg).toEqual({ kind: 'max' });
+    expect(p.scope.clubFor?.name).toBe('Adelaide');
+    expect(p.scope.clubAgainst?.name).toBe('Greater Western Sydney');
+  });
+
+  it('adelaide biggest win against gws giants since 2000 -> season bound preserved, identity fully consumed', async () => {
+    const p = await plan('Adelaide biggest win against GWS Giants since 2000');
+    expect(p.scope.clubFor?.name).toBe('Adelaide');
+    expect(p.scope.clubAgainst?.name).toBe('Greater Western Sydney');
+    expect(p.scope.seasonMin).toBe(2000);
+  });
+
+  it('bare "GWS" alone still resolves (unchanged single-word alias)', async () => {
+    const p = await plan('Adelaide biggest win against GWS');
+    expect(p.scope.clubAgainst?.name).toBe('Greater Western Sydney');
+  });
+
+  it('bare "Giants" alone still resolves (unchanged single-word alias)', async () => {
+    const p = await plan('Adelaide biggest win against Giants');
+    expect(p.scope.clubAgainst?.name).toBe('Greater Western Sydney');
+  });
+
+  it('negative: "gws" adjacent to a genuinely unsupported word still declines unsupported_term -- proves this is not a blanket ignore of "gws"', async () => {
+    const result = await parse('Adelaide biggest win against GWS reserves');
+    expect(result.status).toBe('none');
+    expect(result.report.unsupportedTerms).toContain('reserves');
+  });
+});
+
+// AFLDB-ISSUE-205: extractScoreCheckpoint's '3QT' entry used to consume
+// "three quarter time" before extractTeamMetric (step 11) ever saw it,
+// leaving the orphaned word "comeback" as an unsupported_term leftover --
+// even though q3_deficit_overcome (team-match.ts) already implements
+// exactly this metric end-to-end. The fix withholds that consumption only
+// when "comeback(s)" immediately follows; genuine score-checkpoint
+// questions ("leading at three quarter time") are unaffected.
+describe('2a. AFLDB-ISSUE-205: three-quarter-time comeback vs score-checkpoint collision', () => {
+  it('adelaide biggest three quarter time comeback -> q3_deficit_overcome, not a decline', async () => {
+    const p = await plan('Adelaide biggest three quarter time comeback');
+    expect(p.grain).toBe('team_match');
+    expect(p.metric).toBe('q3_deficit_overcome');
+    expect(p.agg).toEqual({ kind: 'max' });
+    expect(p.scope.clubFor?.name).toBe('Adelaide');
+  });
+
+  it('adelaide biggest three quarter time comeback since 2000 -> season bound preserved', async () => {
+    const p = await plan('Adelaide biggest three quarter time comeback since 2000');
+    expect(p.grain).toBe('team_match');
+    expect(p.metric).toBe('q3_deficit_overcome');
+    expect(p.scope.clubFor?.name).toBe('Adelaide');
+    expect(p.scope.seasonMin).toBe(2000);
+  });
+
+  it('who has the biggest three quarter time comeback for adelaide -> same metric, trailing club phrasing', async () => {
+    const p = await plan('who has the biggest three quarter time comeback for Adelaide');
+    expect(p.grain).toBe('team_match');
+    expect(p.metric).toBe('q3_deficit_overcome');
+    expect(p.scope.clubFor?.name).toBe('Adelaide');
+  });
+
+  it('adelaide three quarter time comeback -> metric still resolves with no explicit superlative word', async () => {
+    const p = await plan('Adelaide three quarter time comeback');
+    expect(p.grain).toBe('team_match');
+    expect(p.metric).toBe('q3_deficit_overcome');
+  });
+
+  it('adelaide 3qt comeback -> short form, was never affected by the checkpoint collision (no "time" word to collide with)', async () => {
+    const p = await plan('Adelaide 3qt comeback');
+    expect(p.grain).toBe('team_match');
+    expect(p.metric).toBe('q3_deficit_overcome');
+  });
+
+  it('negative: "adelaide score at three quarter time" keeps the genuine checkpoint reading, not q3_deficit_overcome', async () => {
+    const p = await plan('Adelaide score at three quarter time');
+    expect(p.scoreCheckpoint).toBe('3QT');
+    expect(p.metric).toBe('team_score');
+    expect(p.scope.clubFor?.name).toBe('Adelaide');
+  });
+
+  it('negative: "who was leading at three quarter time" never reads as q3_deficit_overcome regardless of how it otherwise resolves', async () => {
+    const result = await parse('who was leading at three quarter time');
+    const metric = result.status === 'plan' ? result.plan.metric : undefined;
+    expect(metric).not.toBe('q3_deficit_overcome');
+  });
+
+  // Operator-validation follow-up: the first 3QT-only guard left the
+  // generic 'QT' entry free to match the nested substring "quarter time"
+  // inside "three quarter time comeback", stripping it and leaving "three
+  // comeback" -- still two orphaned tokens instead of the intact phrase.
+  // 'QT' now also refuses a checkpoint word directly preceded by
+  // "three "/"three-"; these two controls prove that refusal is narrow and
+  // does not disturb a genuine, standalone Q1 checkpoint.
+  it('negative: "adelaide score at quarter time" keeps the genuine Q1 checkpoint reading, unaffected by the "three "-exclusion guard', async () => {
+    const p = await plan('Adelaide score at quarter time');
+    expect(p.scoreCheckpoint).toBe('QT');
+    expect(p.metric).toBe('team_score');
+    expect(p.scope.clubFor?.name).toBe('Adelaide');
+  });
+
+  it('negative: "who was leading at quarter time" never reads as a comeback metric, and the Q1 checkpoint still resolves where a metric word is present', async () => {
+    const result = await parse('who was leading at quarter time');
+    const metric = result.status === 'plan' ? result.plan.metric : undefined;
+    expect(metric).not.toBe('q3_deficit_overcome');
+    expect(metric).not.toBe('q1_deficit_overcome');
+  });
+
+  it('negative: "adelaide largest comeback from quarter time" (Q1, not Q3) still declines unsupported_term -- no q1_deficit_overcome metric exists, and AFLDB-ISSUE-205 does not add one', async () => {
+    const result = await parse('Adelaide largest comeback from quarter time');
+    expect(result.status).toBe('none');
+    expect(result.report.unsupportedTerms.join(' ')).toContain('comeback');
+  });
 });
 
 describe('3. venue queries', () => {
@@ -160,6 +398,77 @@ describe('4. career filters', () => {
 
     p = await plan('2 drawn matches');
     expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'draws', op: 'gte', value: 2 });
+  });
+
+  // AFLDB-ISSUE-203: "zero" had no NUMBER_WORDS entry, so "zero goals"
+  // left the word unclaimed -- it declined unsupported_term instead of
+  // binding goals = 0.
+  it('AFLDB-ISSUE-203: players with 200 games and zero goals', async () => {
+    const result = await parse('players with 200 games and zero goals');
+    expect(result.status).toBe('plan');
+    const p = (result as Extract<NlParse, { status: 'plan' }>).plan;
+    expect(p.grain).toBe('player_career');
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'games', op: 'gte', value: 200 });
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'goals', op: 'eq', value: 0 });
+    expect(result.report.unsupportedTerms).not.toContain('zero');
+    expect(result.report.unsupportedTerms).toEqual([]);
+  });
+
+  it('AFLDB-ISSUE-203: single-condition control -- a bare "zero goals" clause still binds eq 0', async () => {
+    const p = await plan('players with zero goals');
+    expect(p.grain).toBe('player_career');
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'goals', op: 'eq', value: 0 });
+  });
+
+  // The digit form reaches the identical default-op branch as the word
+  // form (NUMBER_WORDS is only consulted when no digit was found), so
+  // without the comparator-default fix this would have bound 'gte' 0 --
+  // trivially true for every player -- rather than declining, which is
+  // why this case was unproven before AFLDB-ISSUE-203 (no corpus row used
+  // digit "0").
+  it('AFLDB-ISSUE-203: digit "0" reaches the same eq-default fix as the word "zero"', async () => {
+    const p = await plan('players with 200 games and 0 goals');
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'games', op: 'gte', value: 200 });
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'goals', op: 'eq', value: 0 });
+  });
+
+  it('AFLDB-ISSUE-203: a positive number word keeps its existing gte default -- zero is the only value whose default op changes', async () => {
+    const p = await plan('players with 200 games and two clubs');
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'games', op: 'gte', value: 200 });
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'clubs_played', op: 'gte', value: 2 });
+  });
+
+  it('AFLDB-ISSUE-203: an explicit comparator on zero wins over the eq default', async () => {
+    let p = await plan('players with 200 games and exactly zero goals');
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'goals', op: 'eq', value: 0 });
+
+    p = await plan('players with 200 games and at least zero goals');
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'goals', op: 'gte', value: 0 });
+
+    p = await plan('players with 200 games and more than zero goals');
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'goals', op: 'gt', value: 0 });
+  });
+
+  it('AFLDB-ISSUE-203: existing negative-trigger zero forms are unaffected', async () => {
+    let p = await plan('players with 200 games and no premiership');
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'premierships', op: 'eq', value: 0 });
+
+    p = await plan('most games without kicking a goal');
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'goals', op: 'eq', value: 0 });
+  });
+
+  it('AFLDB-ISSUE-203: a bound zero does not get dropped through a truthiness check', async () => {
+    const p = await plan('players with 200 games and zero goals');
+    const goalsCondition = p.careerConditions.find(c => c.kind === 'column' && c.column === 'goals');
+    expect(goalsCondition).toBeDefined();
+    expect(goalsCondition?.value).toBe(0);
+  });
+
+  it('AFLDB-ISSUE-203: a genuinely unsupported word next to "zero" still declines unsupported_term, and not on "zero"', async () => {
+    const result = await parse('players with zero goals and flibbertigibbet');
+    expect(result.status).toBe('none');
+    expect(result.report.unsupportedTerms).toContain('flibbertigibbet');
+    expect(result.report.unsupportedTerms).not.toContain('zero');
   });
 });
 
@@ -230,6 +539,25 @@ describe('6. finals', () => {
     expect(p.player?.name).toBe('Dustin Martin');
   });
 
+  // AFLDB-ISSUE-129 §8.4 item 8. "wildcard final" contains the word "final", so
+  // it has to beat the bare /\bfinals?\b/ rule or it is silently read as a
+  // generic finals question. It is its own match type, not a finals synonym.
+  it('reads a wildcard final as its own match type, not as generic finals', async () => {
+    for (const q of [
+      'dusty top 5 disposal games in the wildcard final',
+      'dusty top 5 disposal games in wildcard finals',
+      'dusty top 5 disposal games in the wildcard round',
+    ]) {
+      const p = await plan(q);
+      expect(p.scope.matchType, q).toBe('wildcard_final');
+    }
+  });
+
+  it('leaves the generic finals reading unchanged', async () => {
+    const p = await plan('dusty top 5 disposal games in finals');
+    expect(p.scope.matchType).toBe('finals');
+  });
+
   it('most finals played without winning a premiership', async () => {
     const p = await plan('most finals played without winning a premiership');
     expect(p.grain).toBe('player_career');
@@ -274,6 +602,101 @@ describe('7. career-boundary queries', () => {
     const p = await plan('players whose last game was a grand final');
     expect(p.grain).toBe('player_career');
     expect(p.boundary).toEqual({ event: 'last_game', where: 'grand_final' });
+  });
+
+  // AFLDB-ISSUE-191: bare "first" in finals wording is not a debut cue --
+  // "the first goal" names a metric event, not a career boundary. A metric
+  // consumed alongside a genuine boundary reading must refuse rather than
+  // silently drop the metric and answer plain boundary membership.
+  it('"who kicked the first goal in a grand final" does not elect a boundary plan', async () => {
+    const result = await parse('who kicked the first goal in a grand final');
+    if (result.status === 'plan') {
+      expect(result.plan.boundary).toBeUndefined();
+    } else {
+      expect(result.reason).toBe('ambiguous');
+    }
+  });
+
+  // "highest first quarter score in a grand final" -- extractPeriodSplit
+  // must consume the intact "first quarter" phrase before extractBoundary
+  // ever sees a bare "first" to misread as a debut event.
+  it('"highest first quarter score in a grand final" plans as a period-split team_match', async () => {
+    const p = await plan('highest first quarter score in a grand final');
+    expect(p.grain).toBe('team_match');
+    expect(p.periodSplit).toBe('Q1');
+    expect(p.scope.matchType).toBe('grand_final');
+    expect(p.boundary).toBeUndefined();
+  });
+
+  // Genuine boundary questions must remain supported after the tightening.
+  it('"players who debuted in a grand final" still reads as a boundary', async () => {
+    const p = await plan('players who debuted in a grand final');
+    expect(p.grain).toBe('player_career');
+    expect(p.boundary).toEqual({ event: 'debut', where: 'grand_final' });
+  });
+
+  // AFLDB-ISSUE-201: a season range beside a boundary is parsed exactly
+  // like it is everywhere else (extractSeasons runs well before
+  // extractBoundary and strips its own tokens first) -- the parser was
+  // never the defective stage; validatePlan/player-career.ts were. These
+  // prove the plan shape both fields need to reach that fix.
+  describe('AFLDB-ISSUE-201: boundary plus a season range', () => {
+    it('"in" YEAR names one exact debut season', async () => {
+      const p = await plan('players whose first game was a grand final in 1897');
+      expect(p.grain).toBe('player_career');
+      expect(p.boundary).toEqual({ event: 'debut', where: 'grand_final' });
+      expect(p.scope.seasonMin).toBe(1897);
+      expect(p.scope.seasonMax).toBe(1897);
+    });
+
+    it('"since" YEAR is a lower bound only', async () => {
+      const p = await plan('players whose first game was a grand final since 2000');
+      expect(p.grain).toBe('player_career');
+      expect(p.boundary).toEqual({ event: 'debut', where: 'grand_final' });
+      expect(p.scope.seasonMin).toBe(2000);
+      expect(p.scope.seasonMax).toBeUndefined();
+    });
+
+    it('"before" YEAR is an upper bound of year - 1, the existing convention', async () => {
+      const p = await plan('players whose first game was a grand final before 1950');
+      expect(p.grain).toBe('player_career');
+      expect(p.boundary).toEqual({ event: 'debut', where: 'grand_final' });
+      expect(p.scope.seasonMin).toBeUndefined();
+      expect(p.scope.seasonMax).toBe(1949);
+    });
+
+    it('last_game takes the same three date forms', async () => {
+      const exact = await plan('players whose last game was a grand final in 1997');
+      expect(exact.boundary).toEqual({ event: 'last_game', where: 'grand_final' });
+      expect(exact.scope.seasonMin).toBe(1997);
+      expect(exact.scope.seasonMax).toBe(1997);
+
+      const since = await plan('players whose last game was a grand final since 2000');
+      expect(since.boundary).toEqual({ event: 'last_game', where: 'grand_final' });
+      expect(since.scope.seasonMin).toBe(2000);
+      expect(since.scope.seasonMax).toBeUndefined();
+    });
+
+    // Bare "final"/"finals" (MATCH_TYPE_WORDS' 'finals' entry) is a
+    // distinct, independently-accepted boundary target from "grand
+    // final" -- both must carry the season range, not just the Grand
+    // Final wording.
+    it('the plain "final" boundary target also carries the season range', async () => {
+      const p = await plan('players whose first game was a final since 2000');
+      expect(p.grain).toBe('player_career');
+      expect(p.boundary).toEqual({ event: 'debut', where: 'final' });
+      expect(p.scope.seasonMin).toBe(2000);
+    });
+
+    // The exception is boundary-only: an ordinary career aggregate must
+    // still lose nothing here (extractSeasons/validatePlan are unchanged
+    // for non-boundary plans) -- the negative case itself is exercised in
+    // nl-semantic-mapping.test.ts against validatePlan.
+    it('a plain career aggregate in the same season range carries no boundary', async () => {
+      const p = await plan('most career goals since 2000');
+      expect(p.boundary).toBeUndefined();
+      expect(p.scope.seasonMin).toBe(2000);
+    });
   });
 });
 
@@ -408,6 +831,344 @@ describe('11. player-season queries', () => {
     expect(p.scope.seasonMin).toBe(2017);
     expect(p.scope.seasonMax).toBe(2017);
   });
+
+  // AFLDB-ISSUE-216: player_season_leaderboard/0 ("posted the highest season
+  // tally of <metric>") and /3 ("the best seasonal <metric> total") are two
+  // English phrasings of the already-supported "most <metric> by a <club>
+  // player in <year(s)>" construction above, phrased around their own answer
+  // shape (a single season's tally) instead of "in <year>" filler. Neither
+  // wrapper word ("posted"/"season"/"tally"/"seasonal") was ever consumed by
+  // any extractor, so both declined unsupported_term. /3 additionally hit a
+  // second, independent defect: its own "total" is the same bare word
+  // AGGREGATE_TOTAL_WORDS reads everywhere else as a scoped-running-total cue
+  // ("dusty total goals against Carlton"), which misrouted grain election to
+  // player_game/sum instead of player_season -- fixed by
+  // playerSeasonLeaderboardCue overriding aggregateTotal only when the
+  // player-season leaderboard construction is positively identified.
+  describe('AFLDB-ISSUE-216: "posted...season tally..." / "...seasonal...total" leaderboard phrasing', () => {
+    it('which player posted the highest season tally of handballs for Collingwood during the 2010s -> player_season, max, decade range preserved', async () => {
+      const p = await plan('which player posted the highest season tally of handballs for Collingwood during the 2010s');
+      expect(p.grain).toBe('player_season');
+      expect(p.metric).toBe('handballs');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.scope.clubFor?.name).toBe('Collingwood');
+      expect(p.scope.seasonMin).toBe(2010);
+      expect(p.scope.seasonMax).toBe(2019);
+      expect(p.player).toBeUndefined();
+    });
+
+    it('which player posted the highest season tally of kicks for Richmond after 1999 -> player_season, exclusive lower bound', async () => {
+      const p = await plan('which player posted the highest season tally of kicks for Richmond after 1999');
+      expect(p.grain).toBe('player_season');
+      expect(p.metric).toBe('kicks');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.scope.clubFor?.name).toBe('Richmond');
+      expect(p.scope.seasonMin).toBe(2000);
+      expect(p.scope.seasonMax).toBeUndefined();
+    });
+
+    it('which player posted the highest season tally of goal assists for Geelong in 2017 -> player_season, exact year', async () => {
+      const p = await plan('which player posted the highest season tally of goal assists for Geelong in 2017');
+      expect(p.grain).toBe('player_season');
+      expect(p.metric).toBe('goal_assists');
+      expect(p.scope.clubFor?.name).toBe('Geelong');
+      expect(p.scope.seasonMin).toBe(2017);
+      expect(p.scope.seasonMax).toBe(2017);
+    });
+
+    it('find the Port Adelaide player with the best seasonal goal assists total after 1999 -> player_season, NOT player_game/sum', async () => {
+      const p = await plan('find the Port Adelaide player with the best seasonal goal assists total after 1999');
+      expect(p.grain).toBe('player_season');
+      expect(p.metric).toBe('goal_assists');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.scope.clubFor?.name).toBe('Port Adelaide');
+      expect(p.scope.seasonMin).toBe(2000);
+      expect(p.scope.seasonMax).toBeUndefined();
+      expect(p.player).toBeUndefined();
+    });
+
+    it('find the Geelong player with the best seasonal kicks total before 2019 -> player_season, inclusive upper bound', async () => {
+      const p = await plan('find the Geelong player with the best seasonal kicks total before 2019');
+      expect(p.grain).toBe('player_season');
+      expect(p.metric).toBe('kicks');
+      expect(p.scope.clubFor?.name).toBe('Geelong');
+      expect(p.scope.seasonMax).toBe(2018);
+    });
+
+    it('find the Sydney player with the best seasonal handballs total in 2017 -> player_season, exact year', async () => {
+      const p = await plan('find the Sydney player with the best seasonal handballs total in 2017');
+      expect(p.grain).toBe('player_season');
+      expect(p.metric).toBe('handballs');
+      expect(p.scope.clubFor?.name).toBe('Sydney');
+      expect(p.scope.seasonMin).toBe(2017);
+      expect(p.scope.seasonMax).toBe(2017);
+    });
+
+    it('regression: "most goals by a richmond player in 2017" (already-supported wording) is unchanged by the new cues', async () => {
+      const p = await plan('most goals by a richmond player in 2017');
+      expect(p.grain).toBe('player_season');
+      expect(p.metric).toBe('goals');
+      expect(p.scope.clubFor?.name).toBe('Richmond');
+      expect(p.scope.seasonMin).toBe(2017);
+      expect(p.scope.seasonMax).toBe(2017);
+    });
+
+    it('regression: "dusty total goals against Carlton" (named player, scoped running total) is unchanged -- player_game/sum, not player_season', async () => {
+      const p = await plan('dusty total goals against carlton');
+      expect(p.grain).toBe('player_game');
+      expect(p.mode).toBe('sum');
+    });
+
+    it('regression: bare "seasonal" with no player metric word still declines (richmond seasonal vibes)', async () => {
+      const result = await parse('richmond seasonal vibes');
+      expect(result.status).not.toBe('plan');
+    });
+
+    it('regression: bare "tally" with no "season" still declines as an unsupported term', async () => {
+      const result = await parse('most tally of goals for richmond in 2017');
+      expect(result.status).not.toBe('plan');
+      expect(result.report.unsupportedTerms).toContain('tally');
+    });
+
+    it('regression: bare "posted" alone (no season-tally/seasonal construction) does not become a universal request wrapper', async () => {
+      const result = await parse('richmond posted a big score against carlton');
+      expect(result.status).not.toBe('plan');
+      expect(result.report.unsupportedTerms).toContain('posted big');
+    });
+
+    it('regression: "total" is still not globally consumed away from its meaning -- club_season "seasonal" cue from ISSUE-214 is unchanged', async () => {
+      const p = await plan("north melbourne's highest seasonal losses");
+      expect(p.grain).toBe('club_season');
+      expect(p.metric).toBe('losses');
+    });
+
+    it('regression: career leaderboard wording stays career-grained, not misread as a season leaderboard', async () => {
+      const p = await plan('who has the most career goals');
+      expect(p.grain).toBe('player_career');
+      expect(p.metric).toBe('goals');
+    });
+
+    it('regression: single-game leaderboard wording stays game-grained, not misread as a season leaderboard', async () => {
+      const p = await plan('most disposals in a final');
+      expect(p.grain).toBe('player_game');
+      expect(p.mode).toBe('single');
+    });
+  });
+});
+
+// AFLDB-ISSUE-217. player_game_single/0 ("...biggest <metric> haul in one
+// match..."), /4 ("...peak single-game <metric>...") and /3 ("which match
+// saw <player> collect the most <metric>...") share one root mechanism, not
+// three: grain/mode election was already correct in every case (a named
+// player's per-game stat already defaults to player_game/single -- see "1.
+// player-specific queries" above), but "haul"/"peak"/"single-game"/"match"/
+// "saw"/"collect" had no vocabulary entry, so they survived in `text` when
+// candidatePlayerSpan ran and were swept into the player-name candidate
+// alongside the real name (candidatePlayerSpan takes the first four
+// remaining non-stopword alpha tokens with no notion of "stop at a
+// non-name word"). The polluted multi-word span ("dustin martin haul",
+// "lance franklin peak single-game", "match saw patrick dangerfield") then
+// failed player resolution outright, and the exact polluted span is what
+// the reader saw as the unsupported term -- not a leftover-name-only
+// failure. player_game_scope_collision/3 ("single-match <metric> record
+// for...") shares the identical mechanism: bare "single-match" was the
+// unconsumed word, and it sat immediately before the player name in every
+// row, so it always polluted the span the same way. Fixed with one
+// generic single-game-cue extension (IN_ONE_GAME now also matches the bare
+// "single-game"/"single-match" adjective, not only "in ... game/match")
+// plus three narrow, gated wrapper-word consumers (WHICH_MATCH_SAW_RE,
+// PLAYER_GAME_SINGLE_HAUL_RE, PLAYER_GAME_SINGLE_PEAK_RE) -- no player,
+// club, venue or corpus ID special-cased.
+describe('AFLDB-ISSUE-217: player_game_single "haul" / "peak single-game" / "which match saw...collect" wrapper phrasing', () => {
+  describe('player_game_single/0: "...biggest <metric> haul in one match..."', () => {
+    it("what was Dustin Martin's biggest Brownlow votes haul in one match during the 2010s", async () => {
+      const p = await plan("what was Dustin Martin's biggest Brownlow votes haul in one match during the 2010s");
+      expect(p.grain).toBe('player_game');
+      expect(p.mode).toBe('single');
+      expect(p.metric).toBe('brownlow_votes');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.player?.name).toBe('Dustin Martin');
+      expect(p.scope.seasonMin).toBe(2010);
+      expect(p.scope.seasonMax).toBe(2019);
+    });
+
+    it("what was Chris Judd's biggest goals haul in one match in 2009", async () => {
+      const p = await plan("what was Chris Judd's biggest goals haul in one match in 2009");
+      expect(p.grain).toBe('player_game');
+      expect(p.mode).toBe('single');
+      expect(p.metric).toBe('goals');
+      expect(p.player?.name).toBe('Chris Judd');
+      expect(p.scope.seasonMin).toBe(2009);
+      expect(p.scope.seasonMax).toBe(2009);
+    });
+
+    it("what was Patrick Dangerfield's biggest marks haul in one match since 2000", async () => {
+      const p = await plan("what was Patrick Dangerfield's biggest marks haul in one match since 2000");
+      expect(p.grain).toBe('player_game');
+      expect(p.mode).toBe('single');
+      expect(p.metric).toBe('marks');
+      expect(p.player?.name).toBe('Patrick Dangerfield');
+      expect(p.scope.seasonMin).toBe(2000);
+      expect(p.scope.seasonMax).toBeUndefined();
+    });
+  });
+
+  describe('player_game_single/4: "find <player>\'s peak single-game <metric>..."', () => {
+    it("find Lance Franklin's peak single-game clearances in 2017", async () => {
+      const p = await plan("find Lance Franklin's peak single-game clearances in 2017");
+      expect(p.grain).toBe('player_game');
+      expect(p.mode).toBe('single');
+      expect(p.metric).toBe('clearances');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.player?.name).toBe('Lance Franklin');
+      expect(p.scope.seasonMin).toBe(2017);
+      expect(p.scope.seasonMax).toBe(2017);
+    });
+
+    it("find Nat Fyfe's peak single-game inside 50s in 2009", async () => {
+      const p = await plan("find Nat Fyfe's peak single-game inside 50s in 2009");
+      expect(p.grain).toBe('player_game');
+      expect(p.mode).toBe('single');
+      expect(p.metric).toBe('inside_50s');
+      expect(p.player?.name).toBe('Nat Fyfe');
+      expect(p.scope.seasonMin).toBe(2009);
+      expect(p.scope.seasonMax).toBe(2009);
+    });
+
+    it("find Dustin Martin's peak single-game kicks since 2000", async () => {
+      const p = await plan("find Dustin Martin's peak single-game kicks since 2000");
+      expect(p.grain).toBe('player_game');
+      expect(p.mode).toBe('single');
+      expect(p.metric).toBe('kicks');
+      expect(p.player?.name).toBe('Dustin Martin');
+      expect(p.scope.seasonMin).toBe(2000);
+      expect(p.scope.seasonMax).toBeUndefined();
+    });
+  });
+
+  describe('player_game_single/3: "which match saw <player> collect the most <metric>..."', () => {
+    it('which match saw Patrick Dangerfield collect the most goal assists since 2000', async () => {
+      const p = await plan('which match saw Patrick Dangerfield collect the most goal assists since 2000');
+      expect(p.grain).toBe('player_game');
+      expect(p.mode).toBe('single');
+      expect(p.metric).toBe('goal_assists');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.player?.name).toBe('Patrick Dangerfield');
+      expect(p.scope.seasonMin).toBe(2000);
+      expect(p.scope.seasonMax).toBeUndefined();
+    });
+
+    it('which match saw Patrick Dangerfield collect the most kicks in 2017', async () => {
+      const p = await plan('which match saw Patrick Dangerfield collect the most kicks in 2017');
+      expect(p.grain).toBe('player_game');
+      expect(p.mode).toBe('single');
+      expect(p.metric).toBe('kicks');
+      expect(p.player?.name).toBe('Patrick Dangerfield');
+      expect(p.scope.seasonMin).toBe(2017);
+      expect(p.scope.seasonMax).toBe(2017);
+    });
+
+    it('which match saw Chris Judd collect the most handballs during the 2010s', async () => {
+      const p = await plan('which match saw Chris Judd collect the most handballs during the 2010s');
+      expect(p.grain).toBe('player_game');
+      expect(p.mode).toBe('single');
+      expect(p.metric).toBe('handballs');
+      expect(p.player?.name).toBe('Chris Judd');
+      expect(p.scope.seasonMin).toBe(2010);
+      expect(p.scope.seasonMax).toBe(2019);
+    });
+  });
+
+  // Optional adjacent cluster: player_game_scope_collision/3 ("find the
+  // single-match <metric> record for <player> against <club> at
+  // <venue>..."). Proven (see the block comment above) to share the exact
+  // same candidatePlayerSpan-pollution mechanism as /4 above -- bare
+  // "single-match" was the unconsumed word in every failing row, and it
+  // always sat immediately before the player name -- so it is included
+  // here, fixed by the same IN_ONE_GAME extension, not a separate change.
+  describe('player_game_scope_collision/3: "find the single-match <metric> record for <player> against <club> at <venue>..."', () => {
+    it('find the single-match disposals record for Shane Crawford against Brisbane Lions at Gabba in 2009', async () => {
+      const p = await plan('find the single-match disposals record for Shane Crawford against Brisbane Lions at Gabba in 2009');
+      expect(p.grain).toBe('player_game');
+      expect(p.mode).toBe('single');
+      expect(p.metric).toBe('disposals');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.player?.name).toBe('Shane Crawford');
+      expect(p.scope.clubAgainst?.name).toBe('Brisbane Lions');
+      expect(p.scope.venue?.name).toBe('Gabba');
+      expect(p.scope.seasonMin).toBe(2009);
+      expect(p.scope.seasonMax).toBe(2009);
+    });
+
+    it('find the single-match marks record for Jason Akermanis against Port Adelaide at Optus Stadium since 2000', async () => {
+      const p = await plan('find the single-match marks record for Jason Akermanis against Port Adelaide at Optus Stadium since 2000');
+      expect(p.grain).toBe('player_game');
+      expect(p.mode).toBe('single');
+      expect(p.metric).toBe('marks');
+      expect(p.player?.name).toBe('Jason Akermanis');
+      expect(p.scope.clubAgainst?.name).toBe('Port Adelaide');
+      expect(p.scope.venue?.name).toBe('Optus Stadium');
+      expect(p.scope.seasonMin).toBe(2000);
+      expect(p.scope.seasonMax).toBeUndefined();
+    });
+  });
+
+  describe('regression controls', () => {
+    it('existing single-game wording ("dusty most disposals") is unchanged', async () => {
+      const p = await plan('dusty most disposals');
+      expect(p.grain).toBe('player_game');
+      expect(p.mode).toBe('single');
+      expect(p.metric).toBe('disposals');
+    });
+
+    it('"haul" in unrelated text (no single-game cue) still declines', async () => {
+      const result = await parse("Dustin Martin's biggest goals haul this year");
+      expect(result.status).not.toBe('plan');
+    });
+
+    it('"peak" in unrelated text (no single-game cue) still declines', async () => {
+      const result = await parse('Dustin Martin peak fitness this season');
+      expect(result.status).not.toBe('plan');
+    });
+
+    it('bare "single-game" with no supported player/stat construction still declines', async () => {
+      const result = await parse('single-game trivia');
+      expect(result.status).not.toBe('plan');
+    });
+
+    it('"record" is not globally ignored -- a bare "record" with no metric/player still declines', async () => {
+      const result = await parse('what is the record');
+      expect(result.status).not.toBe('plan');
+    });
+
+    it('"collect" outside the "which match saw...collect" construction still declines', async () => {
+      const result = await parse('Dustin Martin collect stamps as a hobby');
+      expect(result.status).not.toBe('plan');
+    });
+
+    it('named-player scoped totals still remain player_game/sum, not single', async () => {
+      const p = await plan('dusty total goals against carlton');
+      expect(p.grain).toBe('player_game');
+      expect(p.mode).toBe('sum');
+    });
+
+    it('career record questions remain player_career', async () => {
+      const p = await plan('who has the most career goals');
+      expect(p.grain).toBe('player_career');
+      expect(p.metric).toBe('goals');
+    });
+
+    it('player-season leaderboard wording (AFLDB-ISSUE-216) remains player_season', async () => {
+      const p = await plan('which player posted the highest season tally of handballs for Collingwood during the 2010s');
+      expect(p.grain).toBe('player_season');
+      expect(p.metric).toBe('handballs');
+    });
+
+    it('club/team match records are not hijacked by the new player-game cues', async () => {
+      const p = await plan('richmond biggest win in a final');
+      expect(p.grain).toBe('team_match');
+    });
+  });
 });
 
 describe('13. club_season queries', () => {
@@ -462,6 +1223,579 @@ describe('13. club_season queries', () => {
     const p = await plan('most goals against carlton by a richmond player');
     expect(p.grain).not.toBe('club_season');
   });
+
+  // AFLDB-ISSUE-214: "what season had the highest/lowest <metric>" and
+  // "<club>'s highest/lowest seasonal <metric>" are the same club_season
+  // ranking construction as the already-supported "<club>'s highest/lowest
+  // <metric> in a season" -- naming the season as the answer's subject
+  // instead of "in a season" filler. Both used to decline with
+  // unsupported_term: season / unsupported_term: seasonal because neither
+  // word was ever consumed by any extractor.
+  describe('AFLDB-ISSUE-214: "what season had..." / "...seasonal..." rank phrasing', () => {
+    it('for Richmond, what season had the lowest wins during the 2010s -> club_season, min, decade range preserved', async () => {
+      const p = await plan('for Richmond, what season had the lowest wins during the 2010s');
+      expect(p.grain).toBe('club_season');
+      expect(p.metric).toBe('wins');
+      expect(p.agg).toEqual({ kind: 'min' });
+      expect(p.scope.clubFor?.name).toBe('Richmond');
+      expect(p.scope.seasonMin).toBe(2010);
+      expect(p.scope.seasonMax).toBe(2019);
+    });
+
+    it('for Swans, what season had the highest losses -> club_season, max, no explicit year required', async () => {
+      const p = await plan('for Swans, what season had the highest losses');
+      expect(p.grain).toBe('club_season');
+      expect(p.metric).toBe('losses');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.scope.clubFor?.name).toBe('Sydney');
+    });
+
+    it('for Carlton, what season had the highest losses in 2017 -> club_season, explicit year preserved', async () => {
+      const p = await plan('for Carlton, what season had the highest losses in 2017');
+      expect(p.grain).toBe('club_season');
+      expect(p.metric).toBe('losses');
+      expect(p.scope.clubFor?.name).toBe('Carlton');
+      expect(p.scope.seasonMin).toBe(2017);
+      expect(p.scope.seasonMax).toBe(2017);
+    });
+
+    it("north melbourne's highest seasonal losses -> club_season, max, no explicit year required", async () => {
+      const p = await plan("north melbourne's highest seasonal losses");
+      expect(p.grain).toBe('club_season');
+      expect(p.metric).toBe('losses');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.scope.clubFor?.name).toBe('North Melbourne');
+    });
+
+    it("sydney's highest seasonal draws in 2017 -> club_season, draws stays a distinct metric, year preserved", async () => {
+      const p = await plan("sydney's highest seasonal draws in 2017");
+      expect(p.grain).toBe('club_season');
+      expect(p.metric).toBe('draws');
+      expect(p.scope.clubFor?.name).toBe('Sydney');
+      expect(p.scope.seasonMin).toBe(2017);
+      expect(p.scope.seasonMax).toBe(2017);
+    });
+
+    it("greater western sydney's highest seasonal losses in 2023 -> club_season, year preserved", async () => {
+      const p = await plan("greater western sydney's highest seasonal losses in 2023");
+      expect(p.grain).toBe('club_season');
+      expect(p.metric).toBe('losses');
+      expect(p.scope.clubFor?.name).toBe('Greater Western Sydney');
+      expect(p.scope.seasonMin).toBe(2023);
+      expect(p.scope.seasonMax).toBe(2023);
+    });
+
+    it('regression: "teams with the most wins in a season" is unchanged by the new cues', async () => {
+      const p = await plan('teams with the most wins in a season');
+      expect(p.grain).toBe('club_season');
+      expect(p.metric).toBe('wins');
+      expect(p.agg).toEqual({ kind: 'max' });
+    });
+
+    it('regression: "which club had the most losses in 2017" is unchanged by the new cues', async () => {
+      const p = await plan('which club had the most losses in 2017');
+      expect(p.grain).toBe('club_season');
+      expect(p.metric).toBe('losses');
+      expect(p.scope.seasonMin).toBe(2017);
+      expect(p.scope.seasonMax).toBe(2017);
+    });
+
+    it('regression: "which team has the most wins" (no season wording) still declines -- bare "season"/"seasonal" was not made globally ignorable', async () => {
+      const result = await parse('which team has the most wins');
+      expect(result.status).not.toBe('plan');
+      expect(result.report.notes.join(' ')).toMatch(/ranked one season at a time/);
+    });
+
+    it('regression: a genuinely unsupported term next to "seasonal" still declines (the word is only read this way alongside a club-season metric)', async () => {
+      const result = await parse('richmond seasonal vibes');
+      expect(result.status).not.toBe('plan');
+    });
+  });
+});
+
+describe('regression: extractHavingClause requires a club/team subject (AFLDB-ISSUE-188)', () => {
+  // Every grouped-result word (draws/wins/losses/lose/lost/win/won) used to
+  // be admitted with no subject gate at all -- only `games` was gated on a
+  // leading club/team subject (AFLDB-ISSUE-110). A player-subject question
+  // naming "won"/"win"/"wins" was misread as a grouped team_match having
+  // clause: the number was stripped by the having extractor, so a
+  // following career stat word ("premierships", "brownlow medals") was
+  // left with no number and silently dropped, and the question answered a
+  // club-count question ("18 clubs qualify") instead of a player list.
+  it('players who have won 3 premierships -> a player_career condition, not a having clause', async () => {
+    const p = await plan('players who have won 3 premierships');
+    expect(p.grain).toBe('player_career');
+    expect(p.havingClause).toBeUndefined();
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'premierships', op: 'gte', value: 3 });
+  });
+
+  it('players who won 2 brownlow medals -> a player_career condition, not a having clause', async () => {
+    const p = await plan('players who won 2 brownlow medals');
+    expect(p.grain).toBe('player_career');
+    expect(p.havingClause).toBeUndefined();
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'brownlow_medals', op: 'gte', value: 2 });
+  });
+
+  it('players with more than 100 wins -> no having clause', async () => {
+    const p = await plan('players with more than 100 wins');
+    expect(p.havingClause).toBeUndefined();
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'wins', op: 'gt', value: 100 });
+  });
+
+  it('richmond players who have won 3 premierships -> a club-scoped player condition, not a club having clause', async () => {
+    const p = await plan('richmond players who have won 3 premierships');
+    expect(p.grain).not.toBe('team_match');
+    expect(p.havingClause).toBeUndefined();
+  });
+
+  // AFLDB-ISSUE-193: "premierships" governs the number here, not match
+  // wins -- AFLDB has no club-lineage premiership-count grain, so this
+  // must decline by name rather than silently answer a club match-win
+  // threshold under a career-only noun.
+  it('clubs that have won more than 10 premierships -> declines, not a club having clause on match wins', async () => {
+    const result = await parse('clubs that have won more than 10 premierships');
+    expect(result.status).not.toBe('plan');
+    expect(result.report.notes.join(' ')).toMatch(/does not total a club's premierships/);
+  });
+
+  it('teams that have won 5 flags -> declines, not a club having clause on match wins', async () => {
+    const result = await parse('teams that have won 5 flags');
+    expect(result.status).not.toBe('plan');
+    expect(result.report.notes.join(' ')).toMatch(/does not total a club's premierships/);
+  });
+
+  it('teams with more than 2 wins against Richmond -> unchanged club-subject grouped having clause', async () => {
+    const p = await plan('teams with more than 2 wins against Richmond');
+    expect(p.grain).toBe('team_match');
+    expect(p.havingClause).toEqual({ metric: 'wins', op: 'gt', value: 2 });
+  });
+
+  it('teams to lose 5 times by more than 100 points -> unchanged club-subject grouped having clause', async () => {
+    const p = await plan('teams to lose 5 times by more than 100 points');
+    expect(p.grain).toBe('team_match');
+    expect(p.havingClause).toEqual({ metric: 'losses', op: 'gte', value: 5 });
+    // AFLDB-ISSUE-207: this exact row is the shape ISSUE-206's exploratory
+    // scorer missed -- it only checked grain/metric, never matchFilter's
+    // own operator, so a "more than" leaking across from here into the
+    // wins/losses threshold (or vice versa) went undetected. Asserted
+    // explicitly below so this suite can no longer pass with a silently
+    // swapped comparator.
+    expect(p.matchFilter).toEqual({ metric: 'loss_margin', op: 'gt', value: 100 });
+  });
+});
+
+// AFLDB-ISSUE-207: extractHavingClause's operator search used to scan a
+// fixed +-20-character window around the wins/losses/draws/games noun,
+// wide enough on short questions to reach across "by ... points" into the
+// margin clause's own comparator word (e.g. "over" in "by over 50
+// points"). Worse, COMPARE_OP_WORDS is tested in a fixed vocabulary order,
+// not leftmost-in-text order, so even when the window happened to be wide
+// enough to contain both clauses' operator words, an earlier-listed entry
+// belonging to the OTHER clause (e.g. "at least") could beat a later-listed
+// entry that actually governed THIS clause (e.g. "more than"), regardless
+// of which one appeared first in the sentence. Either mechanism let the
+// having-clause extractor claim -- and strip -- an operator word that
+// belonged to the margin filter, leaving extractMatchFilter to see a bare
+// number and fall back to its own default ('gte'). The result was a
+// silently swapped pair of comparators: this scored `clean` under
+// ISSUE-206's field-blind checks (grain/metric matched) despite answering
+// a different question in 281 corpus rows. The fix (parser.ts,
+// extractHavingClause) bounds the operator search to the text up to and
+// including the count this clause already matched -- never past it, since
+// every COMPARE_OP_WORDS phrase governs a number that follows it
+// immediately, and none of that vocabulary's forms ever apply to this
+// family from the far side of the noun.
+describe('AFLDB-ISSUE-207: numeric operator ownership between having clause and margin filter', () => {
+  it('7 or more wins by over 50 points -> wins keeps the bare-number default, margin keeps "over"', async () => {
+    const p = await plan('Teams with 7 or more wins by over 50 points');
+    expect(p.grain).toBe('team_match');
+    expect(p.havingClause).toEqual({ metric: 'wins', op: 'gte', value: 7 });
+    expect(p.matchFilter).toEqual({ metric: 'win_margin', op: 'gt', value: 50 });
+  });
+
+  it('7 or more losses by over 50 points -> same shape, losses metric', async () => {
+    const p = await plan('Teams with 7 or more losses by over 50 points');
+    expect(p.grain).toBe('team_match');
+    expect(p.havingClause).toEqual({ metric: 'losses', op: 'gte', value: 7 });
+    expect(p.matchFilter).toEqual({ metric: 'loss_margin', op: 'gt', value: 50 });
+  });
+
+  it('at least 7 wins by more than 50 points -> wins keeps "at least", margin keeps "more than"', async () => {
+    const p = await plan('Teams with at least 7 wins by more than 50 points');
+    expect(p.grain).toBe('team_match');
+    expect(p.havingClause).toEqual({ metric: 'wins', op: 'gte', value: 7 });
+    expect(p.matchFilter).toEqual({ metric: 'win_margin', op: 'gt', value: 50 });
+  });
+
+  it('more than 7 wins by at least 50 points -> the reverse pairing, proving list-order does not decide it', async () => {
+    const p = await plan('Teams with more than 7 wins by at least 50 points');
+    expect(p.grain).toBe('team_match');
+    expect(p.havingClause).toEqual({ metric: 'wins', op: 'gt', value: 7 });
+    expect(p.matchFilter).toEqual({ metric: 'win_margin', op: 'gte', value: 50 });
+  });
+
+  it('over 7 wins by over 50 points -> the same operator word on both sides still binds independently', async () => {
+    const p = await plan('Teams with over 7 wins by over 50 points');
+    expect(p.grain).toBe('team_match');
+    expect(p.havingClause).toEqual({ metric: 'wins', op: 'gt', value: 7 });
+    expect(p.matchFilter).toEqual({ metric: 'win_margin', op: 'gt', value: 50 });
+  });
+
+  it('fewer than 7 losses by at least 50 points', async () => {
+    const p = await plan('Teams with fewer than 7 losses by at least 50 points');
+    expect(p.grain).toBe('team_match');
+    expect(p.havingClause).toEqual({ metric: 'losses', op: 'lt', value: 7 });
+    expect(p.matchFilter).toEqual({ metric: 'loss_margin', op: 'gte', value: 50 });
+  });
+
+  it('control: at least 7 wins alone -> unaffected by there being no margin clause', async () => {
+    const p = await plan('Teams with at least 7 wins');
+    expect(p.havingClause).toEqual({ metric: 'wins', op: 'gte', value: 7 });
+    expect(p.matchFilter).toBeUndefined();
+  });
+
+  it('control: more than 7 wins alone -> unaffected by there being no margin clause', async () => {
+    const p = await plan('Teams with more than 7 wins');
+    expect(p.havingClause).toEqual({ metric: 'wins', op: 'gt', value: 7 });
+    expect(p.matchFilter).toBeUndefined();
+  });
+
+  // These two decline today with no wins/losses count in the sentence at
+  // all (extractMatchFilter requires resultMetric to be 'wins'/'losses',
+  // which extractHavingClause never provides here) -- unrelated to the
+  // ownership fix, and unaffected by it. Asserted so a future change to
+  // this decline behaviour is a deliberate, visible choice.
+  it('control: "won by over 50 points" with no explicit wins count still declines, unaffected by the fix', async () => {
+    const result = await parse('Teams that won by over 50 points');
+    expect(result.status).not.toBe('plan');
+  });
+
+  it('control: "won by at least 50 points" with no explicit wins count still declines, unaffected by the fix', async () => {
+    const result = await parse('Teams that won by at least 50 points');
+    expect(result.status).not.toBe('plan');
+  });
+
+  // Known, separate gap -- NOT in scope for ISSUE-207 and not fixed here:
+  // extractMatchFilter's regex has no form for a trailing "or more"/"or
+  // fewer" after the margin number ("by 50 or more points"), so this
+  // declines today for a different reason (no matchFilter match at all,
+  // not an ownership swap). Documented, not fixed, per ISSUE-207's scope.
+  it('known gap (out of scope): "7 wins by 50 or more points" still declines -- trailing margin operator wording is unsupported, not an ownership defect', async () => {
+    const result = await parse('Teams with 7 wins by 50 or more points');
+    expect(result.status).not.toBe('plan');
+  });
+});
+
+// AFLDB-ISSUE-208: extractClubs' role-assignment lookback (nl/parser.ts)
+// tested "does an against-like token exist anywhere in a fixed
+// 20-character window before this club", not "what is the nearest
+// preposition governing it". Two families of ISSUE-206 hard failures
+// traced to that one mechanism:
+//
+// Family A (134 rows) -- "to win FOR North Melbourne" reads the earlier,
+// unrelated "to" (from "to win") as governing, instead of the immediately
+// adjacent "for" -- clubAgainst=Club/clubFor=absent instead of
+// clubFor=Club/clubAgainst=absent.
+//
+// Family B (117 rows) -- "Against Fremantle, ... Melbourne's largest
+// lead": once "Fremantle" is stripped out of the working text, the
+// window before "Melbourne" shrinks enough to pull Fremantle's own
+// "against" into range, marking Melbourne against-governed too --
+// clubFor silently disappears instead of naming the subject club.
+describe('AFLDB-ISSUE-208: club-role ownership -- nearest governing preposition, not a fixed lookback window', () => {
+  describe('Family A: after-siren "to win for CLUB" must not read "to" as governing', () => {
+    it('who kicked the most behinds after the siren to win for Geelong between 2005 and 2015 -> subject club, no opponent', async () => {
+      const p = await plan('who kicked the most behinds after the siren to win for Geelong between 2005 and 2015');
+      expect(p.grain).toBe('after_siren');
+      expect(p.afterSiren).toEqual({ subject: 'player', kickScored: 'behind', kickEffect: 'won' });
+      expect(p.scope.clubFor?.name).toBe('Geelong');
+      expect(p.scope.clubAgainst).toBeUndefined();
+      expect(p.scope.seasonMin).toBe(2005);
+      expect(p.scope.seasonMax).toBe(2015);
+    });
+
+    it('who kicked the most goals after the siren to win for Carlton -> subject club, no opponent', async () => {
+      const p = await plan('who kicked the most goals after the siren to win for Carlton');
+      expect(p.grain).toBe('after_siren');
+      expect(p.afterSiren).toEqual({ subject: 'player', kickScored: 'goal', kickEffect: 'won' });
+      expect(p.scope.clubFor?.name).toBe('Carlton');
+      expect(p.scope.clubAgainst).toBeUndefined();
+    });
+
+    it('who had the most kicks after the siren to win for Richmond -> subject club, no opponent', async () => {
+      const p = await plan('who had the most kicks after the siren to win for Richmond');
+      expect(p.grain).toBe('after_siren');
+      expect(p.afterSiren?.kickEffect).toBe('won');
+      expect(p.scope.clubFor?.name).toBe('Richmond');
+      expect(p.scope.clubAgainst).toBeUndefined();
+    });
+
+    it('control: an explicit opponent alongside "for" still resolves both roles correctly', async () => {
+      const p = await plan('who kicked the most goals after the siren to win for Carlton against Richmond');
+      expect(p.scope.clubFor?.name).toBe('Carlton');
+      expect(p.scope.clubAgainst?.name).toBe('Richmond');
+    });
+  });
+
+  describe('Family B: leading "Against OPPONENT, ... SUBJECT\'s ..." must not lose the subject club', () => {
+    it("against Collingwood, what was Carlton's largest lead at three quarter time since 2000 -> subject club survives stripping the opponent", async () => {
+      const p = await plan("Against Collingwood, what was Carlton's largest lead at three quarter time since 2000");
+      expect(p.grain).toBe('team_match');
+      expect(p.metric).toBe('win_margin');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.scoreCheckpoint).toBe('3QT');
+      expect(p.scope.clubFor?.name).toBe('Carlton');
+      expect(p.scope.clubAgainst?.name).toBe('Collingwood');
+      expect(p.scope.seasonMin).toBe(2000);
+    });
+
+    it("against Richmond, what was Carlton's score at half time in 2017 -> subject club survives stripping the opponent", async () => {
+      const p = await plan("Against Richmond, what was Carlton's score at half time in 2017");
+      expect(p.grain).toBe('team_match');
+      expect(p.metric).toBe('team_score');
+      expect(p.scoreCheckpoint).toBe('HT');
+      expect(p.scope.clubFor?.name).toBe('Carlton');
+      expect(p.scope.clubAgainst?.name).toBe('Richmond');
+      expect(p.scope.seasonMin).toBe(2017);
+      expect(p.scope.seasonMax).toBe(2017);
+    });
+
+    it("against Collingwood, what was Geelong's largest lead at quarter time -> subject club survives stripping the opponent", async () => {
+      const p = await plan("Against Collingwood, what was Geelong's largest lead at quarter time");
+      expect(p.grain).toBe('team_match');
+      expect(p.metric).toBe('win_margin');
+      expect(p.scoreCheckpoint).toBe('QT');
+      expect(p.scope.clubFor?.name).toBe('Geelong');
+      expect(p.scope.clubAgainst?.name).toBe('Collingwood');
+    });
+  });
+
+  describe('controls: ordinary opponent extraction and word-order defaults are unaffected', () => {
+    it('Richmond biggest win against Carlton -> unchanged', async () => {
+      const p = await plan('Richmond biggest win against Carlton');
+      expect(p.scope.clubFor?.name).toBe('Richmond');
+      expect(p.scope.clubAgainst?.name).toBe('Carlton');
+    });
+
+    it('Richmond biggest win versus Carlton -> unchanged', async () => {
+      const p = await plan('Richmond biggest win versus Carlton');
+      expect(p.scope.clubFor?.name).toBe('Richmond');
+      expect(p.scope.clubAgainst?.name).toBe('Carlton');
+    });
+
+    it('Richmond biggest win vs Carlton -> unchanged', async () => {
+      const p = await plan('Richmond biggest win vs Carlton');
+      expect(p.scope.clubFor?.name).toBe('Richmond');
+      expect(p.scope.clubAgainst?.name).toBe('Carlton');
+    });
+
+    it('Richmond biggest win v Carlton -> unchanged', async () => {
+      const p = await plan('Richmond biggest win v Carlton');
+      expect(p.scope.clubFor?.name).toBe('Richmond');
+      expect(p.scope.clubAgainst?.name).toBe('Carlton');
+    });
+
+    it('Richmond worst loss to Carlton -> "to" still governs the opponent when it genuinely is the nearest word', async () => {
+      const p = await plan('Richmond worst loss to Carlton');
+      expect(p.scope.clubFor?.name).toBe('Richmond');
+      expect(p.scope.clubAgainst?.name).toBe('Carlton');
+    });
+
+    it('Richmond biggest win over Carlton -> "over" still governs the opponent when it genuinely is the nearest word', async () => {
+      const p = await plan('Richmond biggest win over Carlton');
+      expect(p.scope.clubFor?.name).toBe('Richmond');
+      expect(p.scope.clubAgainst?.name).toBe('Carlton');
+    });
+
+    it('richmond biggest loss -> a single, ungoverned club still defaults to the subject side', async () => {
+      const p = await plan('richmond biggest loss');
+      expect(p.scope.clubFor?.name).toBe('Richmond');
+      expect(p.scope.clubAgainst).toBeUndefined();
+    });
+
+    it('who has the biggest three quarter time comeback for Adelaide -> trailing "for" still governs the subject, not the opponent', async () => {
+      const p = await plan('who has the biggest three quarter time comeback for Adelaide');
+      expect(p.scope.clubFor?.name).toBe('Adelaide');
+      expect(p.scope.clubAgainst).toBeUndefined();
+    });
+  });
+});
+
+describe('AFLDB-ISSUE-189: club/team subject election', () => {
+  // R2: a club_season plan with no metric and no conditions -- there is no
+  // club-lineage totals grain (all-time premierships, all-time wins).
+  describe('decline: R2, metric-less/condition-less club_season', () => {
+    it('which club has won the most premierships', async () => {
+      const result = await parse('which club has won the most premierships');
+      expect(result.status).not.toBe('plan');
+      expect(result.report.notes.join(' ')).toMatch(/does not total a club's premierships/);
+    });
+
+    it('teams with more than 5 premierships', async () => {
+      const result = await parse('teams with more than 5 premierships');
+      expect(result.status).not.toBe('plan');
+      expect(result.report.notes.join(' ')).toMatch(/does not total a club's premierships/);
+    });
+
+    it('clubs with 10 flags', async () => {
+      const result = await parse('clubs with 10 flags');
+      expect(result.status).not.toBe('plan');
+      expect(result.report.notes.join(' ')).toMatch(/does not total a club's premierships/);
+    });
+
+    it('teams with 5 premierships', async () => {
+      const result = await parse('teams with 5 premierships');
+      expect(result.status).not.toBe('plan');
+      expect(result.report.notes.join(' ')).toMatch(/does not total a club's premierships/);
+    });
+
+    it('teams with the most premierships', async () => {
+      const result = await parse('teams with the most premierships');
+      expect(result.status).not.toBe('plan');
+      expect(result.report.notes.join(' ')).toMatch(/does not total a club's premierships/);
+    });
+  });
+
+  // R3: a ranked club_season metric with no season semantics -- an
+  // unscoped club/team ranking never gets reinterpreted as a best single
+  // season.
+  describe('decline: R3, ranked club_season metric with no season semantics', () => {
+    it('which team has the most wins', async () => {
+      const result = await parse('which team has the most wins');
+      expect(result.status).not.toBe('plan');
+      expect(result.report.notes.join(' ')).toMatch(/ranked one season at a time/);
+    });
+
+    it('teams with the most wins (behaviour change: was previously answered as a season record)', async () => {
+      const result = await parse('teams with the most wins');
+      expect(result.status).not.toBe('plan');
+      expect(result.report.notes.join(' ')).toMatch(/ranked one season at a time/);
+    });
+
+    it('which team has the most wins since 2000 -> a season range still reads as a total over a span', async () => {
+      const result = await parse('which team has the most wins since 2000');
+      expect(result.status).not.toBe('plan');
+      expect(result.report.notes.join(' ')).toMatch(/ranked one season at a time/);
+    });
+
+    it('top 5 teams by percentage', async () => {
+      const result = await parse('top 5 teams by percentage');
+      expect(result.status).not.toBe('plan');
+      expect(result.report.notes.join(' ')).toMatch(/ranked one season at a time/);
+    });
+  });
+
+  describe('positive: club grain answered faithfully', () => {
+    it('which team has the most wins in a season', async () => {
+      const p = await plan('which team has the most wins in a season');
+      expect(p.grain).toBe('club_season');
+      expect(p.metric).toBe('wins');
+      expect(p.agg).toEqual({ kind: 'max' });
+    });
+
+    it('which club had the most losses in 2017', async () => {
+      const p = await plan('which club had the most losses in 2017');
+      expect(p.grain).toBe('club_season');
+      expect(p.metric).toBe('losses');
+      expect(p.scope.seasonMin).toBe(2017);
+      expect(p.scope.seasonMax).toBe(2017);
+    });
+
+    it('the side with the fewest wins in a season', async () => {
+      const p = await plan('the side with the fewest wins in a season');
+      expect(p.grain).toBe('club_season');
+      expect(p.metric).toBe('wins');
+      expect(p.agg).toEqual({ kind: 'min' });
+    });
+
+    it('which clubs won the wooden spoon -> a conditions-only list, no ranked metric', async () => {
+      const p = await plan('which clubs won the wooden spoon');
+      expect(p.grain).toBe('club_season');
+      expect(p.metric).toBeNull();
+      expect(p.clubSeasonConditions).toContainEqual({ kind: 'wooden_spoon' });
+    });
+
+    it('which team has the longest winning streak', async () => {
+      const p = await plan('which team has the longest winning streak');
+      expect(p.grain).toBe('team_streak');
+    });
+  });
+
+  describe('neighbour: player subject kept', () => {
+    it('which player has the most premierships -> player_career, no club cue', async () => {
+      const p = await plan('which player has the most premierships');
+      expect(p.grain).toBe('player_career');
+      expect(p.metric).toBe('premierships');
+    });
+
+    it('players who played for the most clubs -> player_career, a bare non-leading "clubs" is not a subject cue', async () => {
+      const p = await plan('players who played for the most clubs');
+      expect(p.grain).toBe('player_career');
+    });
+  });
+
+  describe('AFLDB-ISSUE-195: premiership + wooden-spoon conjunction ownership', () => {
+    it('teams that won the premiership and the wooden spoon -> both conditions, not a silent narrow to wooden_spoon alone', async () => {
+      const p = await plan('teams that won the premiership and the wooden spoon');
+      expect(p.grain).toBe('club_season');
+      expect(p.clubSeasonConditions).toContainEqual({ kind: 'premier' });
+      expect(p.clubSeasonConditions).toContainEqual({ kind: 'wooden_spoon' });
+      expect(p.metric).toBeNull();
+    });
+
+    it('teams that won the flag and the wooden spoon -> positive control, already-recognised wording', async () => {
+      const p = await plan('teams that won the flag and the wooden spoon');
+      expect(p.grain).toBe('club_season');
+      expect(p.clubSeasonConditions).toContainEqual({ kind: 'premier' });
+      expect(p.clubSeasonConditions).toContainEqual({ kind: 'wooden_spoon' });
+      expect(p.metric).toBeNull();
+    });
+
+    it('teams that were premiers and won the wooden spoon -> alternate phrasing', async () => {
+      const p = await plan('teams that were premiers and won the wooden spoon');
+      expect(p.grain).toBe('club_season');
+      expect(p.clubSeasonConditions).toContainEqual({ kind: 'premier' });
+      expect(p.clubSeasonConditions).toContainEqual({ kind: 'wooden_spoon' });
+    });
+
+    it('premiership teams that won the wooden spoon -> plural "premiership teams" form', async () => {
+      const p = await plan('premiership teams that won the wooden spoon');
+      expect(p.grain).toBe('club_season');
+      expect(p.clubSeasonConditions).toContainEqual({ kind: 'premier' });
+      expect(p.clubSeasonConditions).toContainEqual({ kind: 'wooden_spoon' });
+    });
+
+    it('teams that won the premiership -> standalone gated wording', async () => {
+      const p = await plan('teams that won the premiership');
+      expect(p.grain).toBe('club_season');
+      expect(p.clubSeasonConditions).toEqual([{ kind: 'premier' }]);
+      expect(p.metric).toBeNull();
+    });
+
+    it('teams that played the finals and won the wooden spoon -> guard proof: declines rather than silently answering the wooden spoon half alone', async () => {
+      const result = await parse('teams that played the finals and won the wooden spoon');
+      expect(result.status).not.toBe('plan');
+    });
+
+    it('which clubs won the wooden spoon -> clubs_played carve-out still green', async () => {
+      const p = await plan('which clubs won the wooden spoon');
+      expect(p.grain).toBe('club_season');
+      expect(p.metric).toBeNull();
+      expect(p.clubSeasonConditions).toContainEqual({ kind: 'wooden_spoon' });
+    });
+
+    it('clubs that made finals -> clubs_played carve-out still green', async () => {
+      const p = await plan('clubs that made finals');
+      expect(p.grain).toBe('club_season');
+      expect(p.clubSeasonConditions).toContainEqual({ kind: 'made_finals' });
+    });
+
+    it('clubs that missed finals -> clubs_played carve-out still green', async () => {
+      const p = await plan('clubs that missed finals');
+      expect(p.grain).toBe('club_season');
+      expect(p.clubSeasonConditions).toContainEqual({ kind: 'missed_finals' });
+    });
+  });
 });
 
 describe('12. aggregate-vs-single scope for a named player', () => {
@@ -504,13 +1838,13 @@ describe('12. aggregate-vs-single scope for a named player', () => {
 });
 
 describe('unanswerable topics decline with a reason rather than a wrong answer', () => {
-  it('coaching questions are declined', async () => {
+  it('coaching questions are no longer declined as unsupported (AFLDB-ISSUE-152 F2)', async () => {
+    // The old rule claimed AFLDB held no coaching data at all, which
+    // stopped being true at migration 087. It is deleted, not softened.
     const result = await parse('who coached richmond to the 2017 premiership');
-    expect(result.status).toBe('unanswerable');
-    if (result.status === 'unanswerable') {
-      expect(result.topic).toBe('coaching');
-      expect(result.reason).toMatch(/coaching data/i);
-    }
+    expect(result.status).not.toBe('unanswerable');
+    expect(result.status).toBe('plan');
+    if (result.status === 'plan') expect(result.plan.grain).toBe('coach_record');
   });
 
   it('streak questions are parsed', async () => {
@@ -549,6 +1883,122 @@ describe('confidence gating', () => {
     if (result.status === 'plan') {
       expect(result.report.confidence).toBeGreaterThanOrEqual(NL_CONFIDENCE.clarify);
     }
+  });
+});
+
+/**
+ * AFLDB-ISSUE-211: "after YEAR" as an EXCLUSIVE season lower bound.
+ * scope.seasonMin = YEAR + 1, because AFL seasons are integer years -- this
+ * is what makes it semantically distinct from "since YEAR" (inclusive,
+ * scope.seasonMin = YEAR), asserted directly below. Each grain here mirrors
+ * an already-supported "since YEAR" form so only the bound-arithmetic is
+ * new, not the surrounding grain/metric/scope machinery.
+ */
+describe('AFLDB-ISSUE-211: after YEAR season bound', () => {
+  it('most goals after 2019 -> exclusive lower bound, seasonMin 2020', async () => {
+    // A bare "most X" with a season bound reads as player_season, exactly
+    // like the equivalent "most goals since 2019" -- only the bound
+    // arithmetic differs here, not the grain.
+    const p = await plan('most goals after 2019');
+    expect(p.grain).toBe('player_season');
+    expect(p.metric).toBe('goals');
+    expect(p.scope.seasonMin).toBe(2020);
+    expect(p.scope.seasonMax).toBeUndefined();
+  });
+
+  it('richmond biggest win after 2000 -> exclusive lower bound, seasonMin 2001', async () => {
+    const p = await plan('richmond biggest win after 2000');
+    expect(p.grain).toBe('team_match');
+    expect(p.metric).toBe('win_margin');
+    expect(p.scope.clubFor?.name).toBe('Richmond');
+    expect(p.scope.seasonMin).toBe(2001);
+  });
+
+  it('most brownlow votes after 2010 -> exclusive lower bound, seasonMin 2011', async () => {
+    // Same player_season reading as "most brownlow votes since 2010".
+    const p = await plan('most brownlow votes after 2010');
+    expect(p.grain).toBe('player_season');
+    expect(p.metric).toBe('brownlow_votes');
+    expect(p.scope.seasonMin).toBe(2011);
+  });
+
+  it('most disposals at the MCG after 1995 -> exclusive lower bound, seasonMin 1996', async () => {
+    const p = await plan('most disposals at the MCG after 1995');
+    expect(p.grain).toBe('player_game');
+    expect(p.scope.venue?.name).toBe('Melbourne Cricket Ground');
+    expect(p.scope.seasonMin).toBe(1996);
+  });
+
+  it('teams with the most wins in a season after 2000 -> club_season, exclusive lower bound', async () => {
+    const p = await plan('teams with the most wins in a season after 2000');
+    expect(p.grain).toBe('club_season');
+    expect(p.metric).toBe('wins');
+    expect(p.scope.seasonMin).toBe(2001);
+  });
+
+  it('dusty most goals after 2015 -> named player, exclusive lower bound, no interference with player identity', async () => {
+    const p = await plan('dusty most goals after 2015');
+    expect(p.player?.name).toBe('Dustin Martin');
+    expect(p.metric).toBe('goals');
+    expect(p.scope.seasonMin).toBe(2016);
+  });
+
+  it('adelaide biggest win against gws giants after 2000 -> composition with opponent, no interference with club identity', async () => {
+    const p = await plan('Adelaide biggest win against GWS Giants after 2000');
+    expect(p.scope.clubFor?.name).toBe('Adelaide');
+    expect(p.scope.clubAgainst?.name).toBe('Greater Western Sydney');
+    expect(p.scope.seasonMin).toBe(2001);
+  });
+
+  it('after 2000 -> seasonMin 2001; since 2000 -> seasonMin 2000 (direct semantic contrast)', async () => {
+    const after = await plan('richmond biggest win after 2000');
+    const since = await plan('richmond biggest win since 2000');
+    expect(after.scope.seasonMin).toBe(2001);
+    expect(since.scope.seasonMin).toBe(2000);
+  });
+
+  describe('negative controls: "after" outside a temporal season expression is untouched', () => {
+    it('who kicked the most goals after the siren -> unchanged after-siren plan, no season bound', async () => {
+      const p = await plan('who kicked the most goals after the siren');
+      expect(p.scope.seasonMin).toBeUndefined();
+      expect(p.scope.seasonMax).toBeUndefined();
+    });
+
+    it('who kicked a goal after the siren to win -> unchanged after-siren plan, no season bound', async () => {
+      const p = await plan('who kicked a goal after the siren to win');
+      expect(p.scope.seasonMin).toBeUndefined();
+      expect(p.scope.seasonMax).toBeUndefined();
+    });
+
+    it('who has kicked the most goals after the siren for richmond in the finals after 2000 -> composed: after-siren untouched, season bound applied', async () => {
+      const p = await plan('who has kicked the most goals after the siren for richmond in the finals after 2000');
+      expect(p.scope.clubFor?.name).toBe('Richmond');
+      expect(p.scope.seasonMin).toBe(2001);
+    });
+  });
+
+  describe('boundary years', () => {
+    it('after 1896 -> seasonMin 1897, the first legal season', async () => {
+      const p = await plan('richmond biggest win after 1896');
+      expect(p.scope.seasonMin).toBe(1897);
+    });
+
+    it('after 2026 -> parses, seasonMin 2027, within NL_LIMITS.maxSeason (may return empty results at execution)', async () => {
+      const p = await plan('richmond biggest win after 2026');
+      expect(p.scope.seasonMin).toBe(2027);
+      expect(p.scope.seasonMin).toBeLessThanOrEqual(NL_LIMITS.maxSeason);
+    });
+
+    it('after 9999 -> seasonMin 10000 exceeds NL_LIMITS.maxSeason, refused by validatePlan like any equally out-of-range season bound', async () => {
+      // parseNlQuestion itself has no season-range gate -- extractSeasons
+      // always sets whatever number the wording names (exactly as
+      // "since 9999" -> seasonMin 9999 would), and validatePlan is the
+      // established layer that declines an out-of-range bound.
+      const p = await plan('richmond biggest win after 9999');
+      expect(p.scope.seasonMin).toBe(10000);
+      const result = validatePlan(p);
+      expect('error' in result).toBe(true);
+    });
   });
 });
 
@@ -796,6 +2246,89 @@ describe('regression: two career conditions in one sentence do not cross-contami
     expect(p.metric).toBeNull();
     expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'goals', op: 'gt', value: 5 });
     expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'finals', op: 'gt', value: 5 });
+  });
+
+  // AFLDB-ISSUE-196. CAREER_STAT_WORDS' fixed array order tries clubs_played
+  // (array position 3) before games (array position 5); with no "and"/comma
+  // between the two clauses for the window-clip above to bite on,
+  // clubs_played's backward-looking window used to span the whole sentence
+  // and its leftmost-digit search stole games' own "300", misbinding
+  // clubs_played to 300 and orphaning games/2. extractCareerConditions now
+  // resolves whichever pending stat word's match occurs earliest in the
+  // sentence, so games (which occurs first) claims its own "300" and is
+  // stripped before clubs_played's window is ever built.
+  it('AFLDB-ISSUE-196: "at" no longer lets clubs_played steal games\' number', async () => {
+    const p = await plan('players with 300 games at 2 clubs');
+    expect(p.metric).toBeNull();
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'games', op: 'gte', value: 300 });
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'clubs_played', op: 'gte', value: 2 });
+  });
+
+  it('AFLDB-ISSUE-196: the same defect via "for" instead of "at"', async () => {
+    const p = await plan('players with 300 games for 2 clubs');
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'games', op: 'gte', value: 300 });
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'clubs_played', op: 'gte', value: 2 });
+  });
+
+  // AFLDB-ISSUE-196 addendum (2026-09-16): "across" resolves numeric
+  // ownership correctly (games claims its own 300, clubs_played its own 2)
+  // -- the same sentence-order fix as the "at"/"for" cases above -- but
+  // "across" itself is not in STOPWORDS (unlike "at"/"for"/"with"/"over"),
+  // so it survives extraction as a leftover, unsupported meaningful token
+  // and the plan safely declines rather than executing. This is NOT the
+  // pre-fix defect: the pre-fix defect was a confidently WRONG accepted
+  // plan (clubs_played misbound to 300, status 'plan'); this is a decline
+  // (status 'none'), which is a categorically different, safe outcome.
+  // Adding "across" to STOPWORDS to make this plan is a separate
+  // vocabulary decision this issue deliberately does not make (see
+  // AFLDB-ISSUE-196.md's Addendum).
+  it('AFLDB-ISSUE-196: "across" safely declines on unsupported vocabulary, not the old clubs_played misbinding', async () => {
+    const result = await parse('players with 300 games across 2 clubs');
+    expect(result.status).toBe('none');
+    if (result.status === 'none') {
+      expect(result.reason).toBe('ambiguous');
+    }
+    expect(result.report.unsupportedTerms).toContain('across');
+  });
+
+  it('AFLDB-ISSUE-196: reversed sentence order still binds each clause to its own number', async () => {
+    const p = await plan('players with 2 clubs and 300 games');
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'clubs_played', op: 'gte', value: 2 });
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'games', op: 'gte', value: 300 });
+  });
+
+  // The comparator-misattribution half of the bug: COMPARE_OP_WORDS and the
+  // digit search both used to scan the same unclipped window independently,
+  // so "more than" could land on clubs_played's clause even though it
+  // belongs to games. Sentence-order resolution fixes this too, because
+  // games' whole clause (noun + "more than" + "300") is claimed and
+  // stripped before clubs_played's window is ever built.
+  it('AFLDB-ISSUE-196: a comparator word binds to its own clause, not a neighbouring one', async () => {
+    const p = await plan('players with more than 300 games at 2 clubs');
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'games', op: 'gt', value: 300 });
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'clubs_played', op: 'gte', value: 2 });
+  });
+
+  it('AFLDB-ISSUE-196: "over N" as a comparator also binds to its own clause', async () => {
+    const p = await plan('players with over 300 games at 2 clubs');
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'games', op: 'gt', value: 300 });
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'clubs_played', op: 'gte', value: 2 });
+  });
+
+  it('AFLDB-ISSUE-196: a number-word clause is bound in sentence order too', async () => {
+    const p = await plan('players with three premierships at two clubs');
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'premierships', op: 'gte', value: 3 });
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'clubs_played', op: 'gte', value: 2 });
+  });
+
+  it('AFLDB-ISSUE-196: single-condition control -- a bare games clause is unaffected', async () => {
+    const p = await plan('players with 300 games');
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'games', op: 'gte', value: 300 });
+  });
+
+  it('AFLDB-ISSUE-196: single-condition control -- a bare clubs clause is unaffected', async () => {
+    const p = await plan('players with 2 clubs');
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'clubs_played', op: 'gte', value: 2 });
   });
 });
 
@@ -1110,9 +2643,17 @@ describe('16. marquee matches, rivalries and debut windows (parser v15)', () => 
   });
 
   it('a rivalry whose clubs are not in the directory declines instead of guessing', async () => {
-    // The fixture directory has no Sydney or GWS, so the phrase cannot
-    // resolve; its words stay leftover and the question declines.
-    const result = await parse('players who played in a sydney derby');
+    // RIVALRY_WORDS (nl/vocab.ts) maps this phrase to ['west coast',
+    // 'fremantle'] -- neither club is in the fixture directory, so the
+    // phrase cannot resolve; its words stay leftover and the question
+    // declines. Was 'a sydney derby' (needing 'sydney'/'greater western
+    // sydney') until AFLDB-ISSUE-213 added both of those clubs to this
+    // shared fixture for its own overlapping-name matchup coverage --
+    // swapped to a different, still-genuinely-absent rivalry pair so this
+    // negative control keeps proving the same thing (decline when a
+    // rivalry's clubs are not in the directory) rather than accidentally
+    // start asserting a positive plan.
+    const result = await parse('players who played in a western derby');
     expect(result.status).toBe('none');
   });
 
@@ -1155,5 +2696,2275 @@ describe('16. marquee matches, rivalries and debut windows (parser v15)', () => 
     const p = await plan('players who debuted in a grand final');
     expect(p.boundary).toEqual({ event: 'debut', where: 'grand_final' });
     expect(p.careerPredicates).toEqual([]);
+  });
+});
+
+// ------------------------------------------------- coaching (ISSUE-152 B)
+
+describe('coaching questions (AFLDB-ISSUE-152 Phase B)', () => {
+  it('a coach cue elects the coach_record grain, and an unranked club question is a list', async () => {
+    const p = await plan('who coached richmond');
+    expect(p.grain).toBe('coach_record');
+    expect(p.metric).toBeNull();
+    expect(p.agg).toEqual({ kind: 'list' });
+    expect(p.scope.clubFor?.name).toBe('Richmond');
+    expect(validatePlan(p)).not.toHaveProperty('error');
+  });
+
+  it('"how many coaches has richmond had" is a count, not a ranking', async () => {
+    const p = await plan('how many coaches has richmond had');
+    expect(p.grain).toBe('coach_record');
+    expect(p.agg).toEqual({ kind: 'count' });
+    expect(validatePlan(p)).not.toHaveProperty('error');
+  });
+
+  it('a coach name resolves from the coach directory, never as a player', async () => {
+    const p = await plan('damien hardwick coaching record');
+    expect(p.grain).toBe('coach_record');
+    expect(p.coach).toEqual({
+      id: 17, slug: 'damien-hardwick', name: 'Damien Hardwick', playerId: 900, playerSlug: 'damien-hardwick',
+    });
+    expect(p.player).toBeUndefined();
+    expect(p.scope.clubFor).toBeUndefined();
+  });
+
+  it('a whole career and a record at one club are different plans', async () => {
+    const career = await plan('damien hardwick coaching record');
+    const atClub = await plan('damien hardwick coaching record at richmond');
+    expect(career.scope.clubFor).toBeUndefined();
+    expect(atClub.scope.clubFor?.name).toBe('Richmond');
+    expect(atClub.coach?.id).toBe(17);
+  });
+
+  it('a coach-only person carries no player link', async () => {
+    const p = await plan('cliff rankin coaching record');
+    expect(p.coach?.playerId).toBeNull();
+    expect(p.coach?.playerSlug).toBeNull();
+  });
+
+  it('"players coached by X" is a player question, answered by the coached_by predicate', async () => {
+    const p = await plan('players coached by damien hardwick');
+    expect(p.grain).toBe('player_career');
+    expect(p.careerPredicates).toContainEqual({ builder: 'coached_by', params: { coach: '17' } });
+    expect(p.coach).toBeUndefined();
+  });
+
+  it('"premiership coaches" is a player predicate, NOT the coach-grain premierships metric', async () => {
+    const p = await plan('premiership coaches');
+    expect(p.grain).toBe('player_career');
+    expect(p.careerPredicates).toContainEqual({ builder: 'premiership_coach', params: {} });
+  });
+
+  it('"coaches with the most premierships" is the coach-grain metric, NOT the player predicate', async () => {
+    // D3: the two questions have different answers and must not collapse.
+    const p = await plan('coaches with the most premierships');
+    expect(p.grain).toBe('coach_record');
+    expect(p.metric).toBe('premierships');
+    expect(p.agg).toEqual({ kind: 'max' });
+    expect(p.careerPredicates).toEqual([]);
+  });
+
+  it('reads each coaching metric word behind the cue', async () => {
+    expect((await plan('which coach has coached the most games')).metric).toBe('games');
+    expect((await plan('which coach has the most wins')).metric).toBe('wins');
+    expect((await plan('which coach has coached the most grand finals')).metric).toBe('grand_finals');
+    expect((await plan('which coach has coached the most finals')).metric).toBe('finals');
+    expect((await plan('which coach has the most seasons in charge')).metric).toBe('seasons');
+  });
+
+  it('a coaching threshold becomes the grain\'s own metricCondition and lists qualifiers', async () => {
+    const p = await plan('richmond coaches with 100+ wins');
+    expect(p.grain).toBe('coach_record');
+    expect(p.metric).toBe('wins');
+    expect(p.metricCondition).toEqual({ op: 'gte', value: 100 });
+    expect(p.agg).toEqual({ kind: 'list' });
+    expect(p.careerConditions).toEqual([]);
+    expect(validatePlan(p)).not.toHaveProperty('error');
+  });
+
+  it('"coached more than one club" counts organizations, not raw club identities', async () => {
+    const p = await plan('coaches who have coached more than one club');
+    expect(p.metric).toBe('organizations');
+    expect(p.metricCondition).toEqual({ op: 'gt', value: 1 });
+  });
+
+  it('a top-N count belongs to the aggregation, never to the metric', async () => {
+    const p = await plan('top 5 coaches by premierships');
+    expect(p.agg).toEqual({ kind: 'top_n', n: 5 });
+    expect(p.metricCondition).toBeUndefined();
+  });
+
+  it('a win-percentage ranking carries the 50-game qualifier by default', async () => {
+    const p = await plan('best coaching win percentage');
+    expect(p.metric).toBe('win_pct');
+    expect(p.coachQualifier).toEqual({ minGames: 50 });
+    expect(validatePlan(p)).not.toHaveProperty('error');
+  });
+
+  it('a reader-stated minimum is honoured instead of the default', async () => {
+    const p = await plan('coaches with at least 100 games best win percentage');
+    expect(p.metric).toBe('win_pct');
+    expect(p.coachQualifier).toEqual({ minGames: 100 });
+  });
+
+  it('"no minimum" refuses rather than ranking a one-game sample', async () => {
+    const p = await plan('best coaching win percentage no minimum');
+    expect(p.coachQualifier).toBeUndefined();
+    expect(validatePlan(p)).toHaveProperty('error');
+  });
+
+  it('a season before 1902 is refused by the coaching coverage floor', async () => {
+    const p = await plan('who coached carlton in 1899');
+    const validated = validatePlan(p);
+    expect(validated).toHaveProperty('error');
+    if ('error' in validated) expect(validated.error).toMatch(/coaching records begin in 1902/);
+  });
+
+  it('a season inside coverage is answered, and a future season is left to the empty result', async () => {
+    expect(validatePlan(await plan('who coached richmond in 2017'))).not.toHaveProperty('error');
+    expect(validatePlan(await plan('who coached richmond in 2030'))).not.toHaveProperty('error');
+  });
+
+  it('an ambiguous coach surname declines rather than picking one of two real people', async () => {
+    const result = await parse('pannam coaching record');
+    expect(result.status).not.toBe('plan');
+  });
+
+  it('a per-season coaching split declines rather than answering the all-time total', async () => {
+    const result = await parse('most wins in a season by a coach');
+    expect(result.status).toBe('none');
+    expect(result.report.notes.join(' ')).toMatch(/per-season coaching splits/);
+  });
+
+  it('"Richmond players coached by X" declines: no builder owns the club (ISSUE-110 ownership)', async () => {
+    const p = await plan('richmond players coached by damien hardwick');
+    expect(validatePlan(p)).toHaveProperty('error');
+  });
+
+  it('an absent coach directory declines rather than half-resolving a coaching question', async () => {
+    const noCoaches: NlParseContext = {
+      clubs: CLUBS, venues: VENUES, resolvePlayer: fakeResolvePlayer, resolvePlayerFamily: fakeResolvePlayerFamily,
+    };
+    const result = await parseNlQuestion('damien hardwick coaching record', noCoaches);
+    expect(result.status).not.toBe('plan');
+  });
+
+  describe('no coach cue: every pre-Phase-B reading is unchanged', () => {
+    it('"most wins" stays a career question', async () => {
+      const p = await plan('most wins');
+      expect(p.grain).toBe('player_career');
+      expect(p.metric).toBe('wins');
+    });
+
+    it('"most games" stays a career question', async () => {
+      const p = await plan('most games');
+      expect(p.grain).toBe('player_career');
+      expect(p.metric).toBe('games');
+    });
+
+    it('"richmond most wins in a season" stays a club-season question', async () => {
+      const p = await plan('richmond most wins in a season');
+      expect(p.grain).toBe('club_season');
+      expect(p.metric).toBe('wins');
+    });
+
+    it('"most premierships" stays a career question', async () => {
+      const p = await plan('most premierships');
+      expect(p.grain).toBe('player_career');
+      expect(p.metric).toBe('premierships');
+    });
+  });
+});
+
+describe('after-the-siren questions (AFLDB-ISSUE-152 Phase C)', () => {
+  it('the cue is required: "most goals" alone is still a career-goals ranking', async () => {
+    const p = await plan('most goals');
+    expect(p.grain).toBe('player_career');
+    expect(p.metric).toBe('goals');
+  });
+
+  /**
+   * R0/§15.4's load-bearing precedence rule. Before Phase C the metric
+   * extractor claimed "goals" and only the confidence gate's unresolved
+   * penalty on the leftover "after siren" tokens stopped a career-goals
+   * leaderboard being returned. Once the cue consumes those tokens the
+   * penalty is gone, so "goals" MUST be claimed as the kickScored
+   * dimension first.
+   */
+  it('"goals" is claimed as the kickScored dimension, never as the career goals metric', async () => {
+    const p = await plan('who has kicked the most goals after the siren');
+    expect(p.grain).toBe('after_siren');
+    expect(p.metric).toBe('siren_kicks');
+    expect(p.afterSiren).toEqual({ subject: 'player', kickScored: 'goal' });
+    expect(p.agg).toEqual({ kind: 'max' });
+    expect(validatePlan(p)).not.toHaveProperty('error');
+  });
+
+  it('a bare "kicks after the siren" carries NO kickScored: any kick, including a miss', async () => {
+    const p = await plan('most kicks after the siren');
+    expect(p.grain).toBe('after_siren');
+    expect(p.afterSiren?.kickScored).toBeUndefined();
+    expect(p.afterSiren?.subject).toBe('player');
+  });
+
+  it('a goal after the siren and a goal after the siren TO WIN are different plans', async () => {
+    const goal = await plan('goals after the siren');
+    const toWin = await plan('goals after the siren to win');
+    expect(goal.afterSiren).toEqual({ subject: 'event', kickScored: 'goal' });
+    expect(toWin.afterSiren).toEqual({ subject: 'event', kickScored: 'goal', kickEffect: 'won' });
+  });
+
+  it('"to draw" is the drew effect, distinct from the drawn-match result', async () => {
+    const p = await plan('behinds after the siren to draw');
+    expect(p.afterSiren).toEqual({ subject: 'event', kickScored: 'behind', kickEffect: 'drew' });
+  });
+
+  it('the kicker result is read BEFORE the effect, so "and lost" is never an effect', async () => {
+    const p = await plan('missed after the siren and lost');
+    expect(p.afterSiren).toEqual({ subject: 'event', kickScored: 'none', kickerResult: 'loss' });
+    expect(p.afterSiren?.kickEffect).toBeUndefined();
+  });
+
+  it('"and won" is the kicker result, not the winning-kick effect', async () => {
+    const p = await plan('missed after the siren and won');
+    expect(p.afterSiren).toEqual({ subject: 'event', kickScored: 'none', kickerResult: 'win' });
+  });
+
+  it('occurrence words elect first / most recent, at event subject', async () => {
+    const first = await plan('the first goal after the siren');
+    expect(first.afterSiren).toEqual({ subject: 'event', kickScored: 'goal', occurrence: 'first' });
+    expect(first.agg).toEqual({ kind: 'list' });
+
+    const latest = await plan('the most recent goal after the siren');
+    expect(latest.afterSiren).toEqual({ subject: 'event', kickScored: 'goal', occurrence: 'most_recent' });
+  });
+
+  it('a count cue is an event count, never a player leaderboard', async () => {
+    const p = await plan('how many goals after the siren');
+    expect(p.grain).toBe('after_siren');
+    expect(p.agg).toEqual({ kind: 'count' });
+    expect(p.afterSiren?.subject).toBe('event');
+  });
+
+  it('an unranked question is an event list, not a rank-one leader', async () => {
+    const p = await plan('goals after the siren for richmond');
+    expect(p.agg).toEqual({ kind: 'list' });
+    expect(p.afterSiren?.subject).toBe('event');
+    expect(p.scope.clubFor?.name).toBe('Richmond');
+  });
+
+  it('the opponent role is the kicked-against club', async () => {
+    const p = await plan('goals after the siren against richmond');
+    expect(p.scope.clubAgainst?.name).toBe('Richmond');
+    expect(p.scope.clubFor).toBeUndefined();
+  });
+
+  it('a named player takes the event subject: his events, not a leaderboard of one', async () => {
+    const p = await plan('barry hall goals after the siren');
+    expect(p.grain).toBe('after_siren');
+    expect(p.player?.id).toBe(1001);
+    expect(p.afterSiren?.subject).toBe('event');
+    expect(validatePlan(p)).not.toHaveProperty('error');
+  });
+
+  /**
+   * The explicit inversion of the Phase B rule: for coaching, "finals" was
+   * a METRIC and had to be claimed before extractMatchType. Here finals is
+   * genuine match SCOPE (D4), so the after-siren block must LEAVE it.
+   */
+  it('leaves "finals" for match-type extraction rather than claiming it', async () => {
+    const p = await plan('goals after the siren in the finals');
+    expect(p.grain).toBe('after_siren');
+    expect(p.scope.matchType).toBe('finals');
+    expect(validatePlan(p)).not.toHaveProperty('error');
+  });
+
+  it('combines finals, club lineage and a season range at player subject', async () => {
+    const p = await plan('who has kicked the most goals after the siren for richmond in the finals since 2000');
+    expect(p.grain).toBe('after_siren');
+    expect(p.afterSiren).toEqual({ subject: 'player', kickScored: 'goal' });
+    expect(p.scope.clubFor?.name).toBe('Richmond');
+    expect(p.scope.matchType).toBe('finals');
+    expect(p.scope.seasonMin).toBe(2000);
+    expect(validatePlan(p)).not.toHaveProperty('error');
+  });
+
+  it('a coaching cue and a siren cue together fail closed', async () => {
+    const parsed = await parse('which coach won most games on a goal after the siren');
+    expect(parsed.status).toBe('none');
+    if (parsed.status === 'none') expect(parsed.reason).toBe('unrecognised');
+  });
+
+  it('a bare "siren" with nothing else declines', async () => {
+    const parsed = await parse('siren');
+    expect(parsed.status).toBe('none');
+  });
+
+  // ------------------------------------------------- §15.14 decline table
+
+  it.each([
+    ['C-D1  round scope', 'goals after the siren in round 1'],
+    ['C-D2  venue', 'goals after the siren at the mcg'],
+    ['C-D3  matchup', 'richmond v carlton after the siren'],
+    ['C-D4  coach + siren', 'which coach won most games on a goal after the siren'],
+    ['C-D5  min', 'fewest kicks after the siren'],
+    ['C-D6  coverage floor', 'goals after the siren in 1900'],
+    ['C-D7  per-season grain', 'most goals after the siren in a season'],
+    ['C-D8  siren subtype', 'goals after the siren in extra time'],
+    ['C-D9  shot detail', 'who kicked it out on the full after the siren'],
+    ['C-D10 source scores', 'how much did they win by after the siren'],
+    ['C-D11 competition name', 'goals after the siren in the nab cup'],
+    ['C-D13 cross-grain', '300 game players who kicked a goal after the siren'],
+    ['C-D14 supergoal', 'was it a supergoal after the siren'],
+    ['C-D15 out of family', 'did the siren sound before the kick'],
+  ])('%s declines or fails validation', async (_label, question) => {
+    const parsed = await parse(question);
+    if (parsed.status !== 'plan') return;
+    expect(validatePlan(parsed.plan), question).toHaveProperty('error');
+  });
+});
+
+/**
+ * AFLDB-ISSUE-152 Phase E: the first-kick-goal family closes its two gaps.
+ *
+ * E1-E6 already worked and are covered by §14/§15 above; nothing here
+ * re-tests them except where a Phase E wording has to leave them alone.
+ * What is new is E7 ("a goal with each of their first three kicks") and
+ * E8 ("whose first-kick goal was their only career goal") -- two builders
+ * the grid solver has always had and the parser could never reach.
+ *
+ * E8 was not a decline before it was a MISREAD: the tail "only career
+ * goal" survived step 5a, and extractPlayerMetric read "goal" as the
+ * question's ranking subject. `metric === null` is therefore asserted on
+ * every E8 wording, not just the predicate.
+ */
+describe('first-kick-goal closure (AFLDB-ISSUE-152 Phase E)', () => {
+  function builders(p: NlQueryPlan): string[] {
+    return p.careerPredicates.map((axis) => axis.builder);
+  }
+
+  // ------------------------------------------------------------ E7 (R1)
+
+  describe('E7 — a goal with each of their first N kicks', () => {
+    it.each([
+      ['word numeral', 'players who kicked a goal with each of their first three kicks', '3'],
+      ['bare numeral', 'players who kicked goals with their first 3 kicks', '3'],
+      ['each of the', 'players who kicked a goal with each of the first two kicks', '2'],
+      ['verb form', 'players who goaled with each of their first four kicks', '4'],
+      ['scored form', 'players who scored with each of their first six kicks', '6'],
+      ['subject form', 'players whose first three kicks were all goals', '3'],
+    ])('%s -> first_kick_goal_consecutive_min with the exact bound', async (_label, question, kicks) => {
+      const p = await plan(question);
+      expect(p.grain).toBe('player_career');
+      expect(builders(p)).toEqual(['first_kick_goal_consecutive_min']);
+      expect(p.careerPredicates[0].params).toEqual({ kicks });
+      // The whole span is consumed, so neither "goal" nor "kicks" nor the
+      // numeral survives for the metric extractors to claim.
+      expect(p.metric).toBeNull();
+      expect(p.careerConditions).toEqual([]);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    // E-D3: the column is NOT NULL DEFAULT 1 CHECK (>= 1), so ">= 1" is
+    // exactly the whole family. N = 1 must therefore produce the plain
+    // builder, whose label reads correctly, not a redundant bound.
+    it('N = 1 is the plain family, not a consecutive bound', async () => {
+      const p = await plan('players who kicked a goal with their first one kick');
+      expect(builders(p)).toEqual(['first_kick_goal_player']);
+    });
+
+    it('leaves the base wording exactly as it was', async () => {
+      const p = await plan('players who kicked a goal with their first kick');
+      expect(builders(p)).toEqual(['first_kick_goal_player']);
+    });
+  });
+
+  // ------------------------------------------------------------ E8 (R2)
+
+  describe('E8 — the first-kick goal was their only career goal', () => {
+    it.each([
+      'players whose first-kick goal was their only career goal',
+      'players whose first kick goal was their only goal',
+      'players who kicked a goal with their first kick and never kicked another goal',
+      'players who goaled with their first kick and never scored again',
+    ])('%s -> first_kick_goal_only_career_goal, with no metric misread', async (question) => {
+      const p = await plan(question);
+      expect(p.grain).toBe('player_career');
+      expect(builders(p)).toEqual(['first_kick_goal_only_career_goal']);
+      // The defect this closes: "goal" left in the text became the ranking
+      // subject and the question answered a career-goals leaderboard.
+      expect(p.metric).toBeNull();
+      expect(p.careerConditions).toEqual([]);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    // The cue owns its own negation, exactly as clubs_without does. Without
+    // this the existing guard would read "never kicked another goal" as a
+    // polarity inversion of the whole family and decline a question the
+    // engine now answers exactly.
+    it('the E8 cue owns the negation it contains', async () => {
+      const p = await plan('players who never kicked another goal after their first-kick goal');
+      expect(builders(p)).toEqual(['first_kick_goal_only_career_goal']);
+    });
+  });
+
+  // -------------------------------------------------- composition (R3)
+
+  describe('composition with the scoped builders', () => {
+    it('club + E7 -> the club is owned by first_kick_goal_for_club', async () => {
+      const p = await plan('carlton players who kicked a goal with each of their first three kicks');
+      expect(builders(p)).toEqual(['first_kick_goal_for_club', 'first_kick_goal_consecutive_min']);
+      expect(p.careerPredicates[0].params.club).toBe('2');
+      expect(p.careerPredicates[1].params.kicks).toBe('3');
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('season range + E7 -> the range is owned by first_kick_goal_between', async () => {
+      const p = await plan('players who kicked a goal with each of their first two kicks in the 1940s');
+      expect(builders(p)).toEqual(['first_kick_goal_between', 'first_kick_goal_consecutive_min']);
+      expect(p.careerPredicates[0].params).toEqual({ from: '1940', to: '1949' });
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('club + season + E8 -> all three, in a stable order', async () => {
+      const p = await plan('carlton players since 2000 whose first-kick goal was their only career goal');
+      expect(builders(p)).toEqual([
+        'first_kick_goal_for_club', 'first_kick_goal_between', 'first_kick_goal_only_career_goal',
+      ]);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('a named player keeps the pin and the modifier together', async () => {
+      const p = await plan('did dustin martin kick a goal with each of his first two kicks');
+      expect(p.player?.name).toBe('Dustin Martin');
+      expect(builders(p)).toEqual(['first_kick_goal_consecutive_min']);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+  });
+
+  // ------------------------------------------------ the decline table (R4)
+
+  describe('§17.7 declines', () => {
+    it.each([
+      ['E-DEC-1  kick-level (E9)', 'players who never kicked the ball again after their first-kick goal'],
+      ['E-DEC-1b kick-level (E9)', 'players with a first-kick goal who never had another kick'],
+      ['E-DEC-3  polarity inversion', 'players who never kicked a goal with each of their first three kicks'],
+      ['E-DEC-4  summary + E7', 'which club has had the most players goal with each of their first three kicks'],
+      ['E-DEC-5  summary + E8', 'by decade players whose first-kick goal was their only career goal'],
+      ['E-DEC-8  N = 0', 'players who kicked a goal with each of their first 0 kicks'],
+      ['E-DEC-8b N negative', 'players who kicked a goal with each of their first -2 kicks'],
+      ['E-DEC-8c N absurd', 'players who kicked a goal with each of their first 40 kicks'],
+      ['E-DEC-2  kickless matches (E9)', 'kickless matches before a first kick'],
+      ['E-DEC-9  bare decade', 'players who kicked a goal with each of their first three kicks this decade'],
+    ])('%s declines rather than answering something narrower', async (_label, question) => {
+      const parsed = await parse(question);
+      expect(parsed.status, question).toBe('none');
+    });
+
+    it.each([
+      ['E-DEC-6  venue', 'players who kicked a goal with each of their first three kicks at the mcg'],
+      ['E-DEC-6b opponent', 'players who kicked a goal with each of their first three kicks against collingwood'],
+      ['E-DEC-6c match type', 'players who kicked a goal with each of their first three kicks in a grand final'],
+      ['E-DEC-10 club + decade + venue', 'carlton players who kicked a goal with their first kick in the 1940s at the mcg'],
+    ])('%s is rejected rather than silently unscoped', async (_label, question) => {
+      const parsed = await parse(question);
+      if (parsed.status !== 'plan') return;
+      expect(validatePlan(parsed.plan), question).toHaveProperty('error');
+    });
+
+    // E-DEC-2 and E-DEC-11 are not this family and have no vocabulary of
+    // their own. What matters is only that neither can reach a
+    // first-kick-goal builder; whatever else the parser makes of them is
+    // pre-existing behaviour this phase does not change.
+    it.each([
+      ['E-DEC-2b kickless matches', 'players who did not record a kick in their first two games'],
+      ['E-DEC-11 kicks before first goal', 'how many kicks did dustin martin have before his first goal'],
+    ])('%s never reaches this family', async (_label, question) => {
+      const parsed = await parse(question);
+      if (parsed.status !== 'plan') return;
+      expect(builders(parsed.plan).filter((b) => b.startsWith('first_kick_goal')), question).toEqual([]);
+    });
+  });
+
+  // ------------------------------------------------------------ boundaries
+
+  it('the after-siren suppression still wins over step 5a', async () => {
+    // "the first kick after the siren" contains this family's noun and is
+    // a corpus row of Phase C's own. The siren reading must keep it.
+    const p = await plan('the first kick after the siren');
+    expect(p.grain).toBe('after_siren');
+    expect(builders(p)).toEqual([]);
+  });
+
+  it('leaves the summary grain untouched when no modifier is present', async () => {
+    const p = await plan('first kick goal players by decade');
+    expect(p.grain).toBe('achievement_summary');
+    expect(p.achievementSummary?.kind).toBe('by_decade');
+  });
+});
+
+/**
+ * AFLDB-ISSUE-152 Phase D. Family relationships, in the half of the
+ * family that has a witness in the data.
+ *
+ * Red-before-green: every question below declined before this phase --
+ * recorded in full by the Stage-0 probe, 31 of 31 NONE. The declines at
+ * the end of this block declined then and must keep declining now, which
+ * is the harder half: the supported cues share their words with the
+ * blocked ones ("a twin brother" contains "a brother", "father-son
+ * selections" contains both "father" and "son").
+ */
+describe('family relationships (AFLDB-ISSUE-152 Phase D)', () => {
+  function builders(p: NlQueryPlan): string[] {
+    return p.careerPredicates.map((axis) => axis.builder);
+  }
+
+  // ------------------------------------------------------------------ C2
+
+  describe('C2 -- a brother who played (has_brother, reused unchanged)', () => {
+    it.each([
+      'which players had a brother who played AFL',
+      'players with a brother who also played VFL/AFL',
+      'which AFL players had brothers who played',
+    ])('%s -> the label-backed has_brother predicate', async (question) => {
+      const p = await plan(question);
+      expect(p.grain).toBe('player_career');
+      expect(builders(p)).toEqual(['has_brother']);
+      expect(p.metric).toBeNull();
+      expect(p.agg).toEqual({ kind: 'list' });
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('composes with a career ranking rather than replacing it', async () => {
+      const p = await plan('most games by a player with a brother who played AFL');
+      expect(p.grain).toBe('player_career');
+      expect(p.metric).toBe('games');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(builders(p)).toEqual(['has_brother']);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('a named player is a pinned yes/no, not a list of his brothers', async () => {
+      const p = await plan('did Dustin Martin have a brother who played AFL');
+      expect(p.player?.id).toBe(100);
+      expect(p.relationshipSubject).toBeUndefined();
+      expect(builders(p)).toEqual(['has_brother']);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+  });
+
+  // ------------------------------------------------------------------ C3
+
+  describe('C3 -- parent and child, typed by role', () => {
+    it.each([
+      'players who are the parent or child of another AFL player',
+      'which AFL players are a parent and child',
+    ])('%s -> the symmetric predicate', async (question) => {
+      const p = await plan(question);
+      expect(builders(p)).toEqual(['has_afl_parent_or_child']);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('the father direction', async () => {
+      const p = await plan('players whose father also played AFL');
+      expect(builders(p)).toEqual(['has_afl_father']);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('the son direction', async () => {
+      const p = await plan('players whose son also played AFL');
+      expect(builders(p)).toEqual(['has_afl_son']);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('the two directions are different predicates, never one', async () => {
+      const father = await plan('players whose father also played AFL');
+      const son = await plan('players whose son also played AFL');
+      expect(builders(father)).not.toEqual(builders(son));
+    });
+  });
+
+  // ------------------------------------------------------------------ C4
+
+  describe('C4 -- the relatives of one named player', () => {
+    it('who are Dustin Martin’s brothers', async () => {
+      const p = await plan("who are Dustin Martin's brothers");
+      expect(builders(p)).toEqual(['brother_of_player']);
+      expect(p.careerPredicates[0].params.player).toBe('100');
+      // The named person is the OBJECT: pinning him would return him, or
+      // nobody, instead of his brothers.
+      expect(p.player).toBeUndefined();
+      expect(p.relationshipSubject?.id).toBe(100);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('brothers of Brent Harvey (the "of" wording)', async () => {
+      const p = await plan('brothers of Brent Harvey');
+      expect(builders(p)).toEqual(['brother_of_player']);
+      expect(p.careerPredicates[0].params.player).toBe('2164');
+      expect(p.relationshipSubject?.name).toBe('Brent Harvey');
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('who is Brent Harvey’s son', async () => {
+      const p = await plan("who is Brent Harvey's son");
+      expect(builders(p)).toEqual(['son_of_player']);
+      expect(p.careerPredicates[0].params.player).toBe('2164');
+      expect(p.relationshipSubject?.id).toBe(2164);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('who is Cooper Harvey’s father', async () => {
+      const p = await plan("who is Cooper Harvey's father");
+      expect(builders(p)).toEqual(['father_of_player']);
+      expect(p.careerPredicates[0].params.player).toBe('3048');
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('an ambiguous name fails closed rather than picking a Gary Ablett', async () => {
+      const parsed = await parse('brothers of Gary Ablett');
+      expect(parsed.status).toBe('none');
+    });
+
+    it('a name AFLDB cannot identify fails closed', async () => {
+      const parsed = await parse('brothers of Some Unknown Person');
+      expect(parsed.status).toBe('none');
+    });
+  });
+
+  // ----------------------------------------------------------------- FS4
+
+  describe('FS4 -- fathers of father-son selections (father_son_father, reused)', () => {
+    it.each([
+      'players whose son was selected under the father-son rule',
+      'which players had a son drafted under the father-son rule',
+      'fathers of father-son selections',
+    ])('%s -> father_son_father', async (question) => {
+      const p = await plan(question);
+      expect(builders(p)).toEqual(['father_son_father']);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('composes with a ranking', async () => {
+      const p = await plan('which father-son fathers played the most games');
+      expect(p.metric).toBe('games');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(builders(p)).toEqual(['father_son_father']);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('a father-side ranking with the rule spelled out', async () => {
+      const p = await plan('most games by a father whose son was selected under the father-son rule');
+      expect(p.metric).toBe('games');
+      expect(builders(p)).toEqual(['father_son_father']);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('a pinned father-side yes/no', async () => {
+      const p = await plan('did Brent Harvey have a son selected under the father-son rule');
+      expect(p.player?.id).toBe(2164);
+      expect(builders(p)).toEqual(['father_son_father']);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+  });
+
+  // ----------------------------------------------------------------- FS1
+
+  /**
+   * AFLDB-ISSUE-153 Stage 2. D8 is decided (operator decision Q1): wording
+   * that names the RULE, a SELECTION, a DRAFT or a PICK -- and, under Q1a
+   * option (a), "father-son" plus an explicit ROLE noun -- binds to
+   * father_son_selections, the authoritative record. The son side gets
+   * exactly the wording the father side already ships, and neither side
+   * gets one the other is denied.
+   *
+   * These questions all declined at ISSUE-152 Phase F and are the flip
+   * this stage owns. The block after them is the harder half: the
+   * COLLECTIVE forms share every word with these and must still decline.
+   */
+  describe('FS1 -- selected under the father-son rule (father_son_selection)', () => {
+    it.each([
+      ['the rule itself', 'players selected under the father-son rule'],
+      ['the selection noun', 'father-son selections'],
+      ['picks', 'which players were father-son picks'],
+      ['draftees', 'father-son draftees'],
+      ['the role noun (Q1a), mirroring rel_024', 'father-son sons'],
+    ])('%s -> father_son_selection', async (_label, question) => {
+      const p = await plan(question);
+      expect(p.grain).toBe('player_career');
+      expect(builders(p)).toEqual(['father_son_selection']);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    // Q1 consequence 3, the symmetry clause, made concrete: rel_024 is
+    // pinned as answering on the father side, so its son-side mirror
+    // answers too. This is the one place the two sides could have drifted.
+    it('the son-side mirror of rel_024 ranks, exactly as the father side does', async () => {
+      const p = await plan('which father-son sons played the most games');
+      expect(p.metric).toBe('games');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(builders(p)).toEqual(['father_son_selection']);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('counts the qualifying set', async () => {
+      const p = await plan('how many players were selected under the father-son rule');
+      expect(p.agg).toEqual({ kind: 'count' });
+      expect(builders(p)).toEqual(['father_son_selection']);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    // The father side keeps its claim on wording that names it, even
+    // though that wording also contains an FS1 cue.
+    it('an FS1 cue never takes a question the FATHER side already owns', async () => {
+      for (const question of [
+        'fathers of father-son selections',
+        'players whose son was selected under the father-son rule',
+        'which father-son fathers played the most games',
+      ]) {
+        const p = await plan(question);
+        expect(builders(p), question).toEqual(['father_son_father']);
+      }
+    });
+  });
+
+  // ------------------------------------- the D8 boundary, as narrowed
+
+  describe('the COLLECTIVE father-son forms still decline (D8/Q1, ISSUE-153)', () => {
+    it.each([
+      ['bare players', 'father-son players'],
+      ['pairs', 'father-son pairs'],
+      ['duos', 'father-son duos'],
+      ['families', 'father-son families'],
+    ])('%s', async (_label, question) => {
+      const parsed = await parse(question);
+      expect(parsed.status, question).toBe('none');
+    });
+
+  });
+
+  // ----------------------------------------------------------------- FS6
+
+  /**
+   * AFLDB-ISSUE-153 Stage 4. A distribution of the SELECTIONS, not a list
+   * of the players -- a distinction that is worth 14 of the 17 clubs.
+   */
+  describe('FS6 -- the father-son selection distribution', () => {
+    it.each([
+      ['by club', 'father-son selections by club', 'by_club'],
+      ['per club', 'father-son selections per club', 'by_club'],
+      ['by year', 'father-son selections by year', 'by_draft_year'],
+      ['by draft year', 'father-son selections by draft year', 'by_draft_year'],
+    ])('%s', async (_label, question, kind) => {
+      const p = await plan(question);
+      expect(p.grain).toBe('achievement_summary');
+      expect(p.fatherSonSummary).toEqual({ kind });
+      // The distribution counts selections; it never carries a career
+      // predicate, and it must never be read as a player ranking.
+      expect(builders(p)).toEqual([]);
+      expect(p.metric).toBeNull();
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    // The wrong answer this stage exists to prevent. Left in the text,
+    // "by club" resolves to clubs_played -- how many clubs the player went
+    // on to play for -- which is plausible, believable and not the
+    // question. The cue is consumed before the metric extractor runs.
+    it('"by club" is the selecting club, never the clubs_played metric', async () => {
+      const p = await plan('father-son selections by club');
+      expect(p.metric).not.toBe('clubs_played');
+      expect(p.fatherSonSummary?.kind).toBe('by_club');
+    });
+
+    it('a scope the distribution cannot honour fails closed', async () => {
+      const parsed = await parse('geelong father-son selections by year');
+      expect(parsed.status).toBe('plan');
+      if (parsed.status !== 'plan') return;
+      expect(validatePlan(parsed.plan)).toHaveProperty('error');
+    });
+
+    // FS6 is a shape this one family has, not a grouping the parser now
+    // offers every relationship.
+    it('does not lend its grouping to any other relationship', async () => {
+      const parsed = await parse('players with a brother who played by club');
+      if (parsed.status === 'plan') expect(parsed.plan.fatherSonSummary).toBeUndefined();
+    });
+  });
+
+  // ------------------------------------------------------------ FS2/FS3
+
+  /**
+   * AFLDB-ISSUE-153 Stage 3. father_son_selections is the only one of the
+   * two father-son surfaces that carries a club or a date at all, so these
+   * two scopes exist in this reading and nowhere else. Both are bound as
+   * the builder's own parameters -- the ownership rule ISSUE-110 findings
+   * A and B established -- so neither can be silently discarded.
+   */
+  describe('FS2/FS3 -- the selecting club and the draft year', () => {
+    it('FS2: the club is the SELECTING club, and it is owned by the builder', async () => {
+      const p = await plan('geelong father-son selections');
+      expect(builders(p)).toEqual(['father_son_selection_for_club']);
+      expect(p.careerPredicates[0].params).toEqual({ club: '4' });
+      expect(p.scope.clubFor?.organizationId).toBe(4);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('FS3: the year is a DRAFT year, owned by the builder and labelled as one', async () => {
+      const p = await plan('father-son selections in 2022');
+      expect(builders(p)).toEqual(['father_son_selection_between']);
+      expect(p.careerPredicates[0].params).toEqual({ from: '2022', to: '2022' });
+      expect(validatePlan(p)).not.toHaveProperty('error');
+      // The plan panel is where a reader checks what was answered. 0 of
+      // the 99 selected players debuted in their draft year, so a line
+      // reading "Seasons: 2022-2022" would be wrong about every row.
+      const lines = describePlan(p).join(' ');
+      expect(lines).toContain('Draft years: 2022-2022');
+      expect(lines).not.toContain('Seasons:');
+    });
+
+    it('both scopes compose, each owned by its own builder', async () => {
+      const p = await plan('geelong father-son selections in 2022');
+      expect(builders(p)).toEqual([
+        'father_son_selection_for_club', 'father_son_selection_between',
+      ]);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    // The Stage 0 trap. A question that scopes a year AND talks about
+    // playing is ambiguous between a draft year and a playing season, and
+    // the two readings share not one row -- so the year is left unowned
+    // and the ownership gate refuses the plan.
+    it('a draft year mixed with a playing-season reading fails closed', async () => {
+      const parsed = await parse('father-son selections who played in 2022');
+      expect(parsed.status).toBe('plan');
+      if (parsed.status !== 'plan') return;
+      expect(builders(parsed.plan)).toEqual(['father_son_selection']);
+      expect(parsed.plan.scope.seasonMin).toBe(2022);
+      expect(validatePlan(parsed.plan)).toHaveProperty('error');
+    });
+  });
+
+  // ------------------------------------------------------------------ X3
+
+  /**
+   * AFLDB-ISSUE-153 Stage 5, operator decision Q6. The Phase F in-reading
+   * refusal blocked father-son wording of ANY kind inside a cross-domain
+   * composition, which was wider than F-D1's own justification: it also
+   * refused the FATHER side, whose wording ships and answers everywhere
+   * else in the product. Narrowed to the bare and collective forms.
+   *
+   * Every Phase F freeze holds: conjunction not chronology, and a club
+   * named on one side only still fails closed.
+   */
+  describe('X3 -- the father-son rule composed with actual coaching', () => {
+    it('the son side composes', async () => {
+      const p = await plan('players selected under the father-son rule who also coached');
+      expect(builders(p)).toEqual(['has_coached', 'father_son_selection']);
+      expect(p.agg).toEqual({ kind: 'list' });
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('the father side composes too — the 11 players the old guard also blocked', async () => {
+      const p = await plan('players who were father-son fathers and also coached');
+      expect(builders(p)).toEqual(['has_coached', 'father_son_father']);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('the collective form still declines by name inside the composition', async () => {
+      const parsed = await parse('which father-son players also coached');
+      expect(parsed.status).toBe('none');
+      expect(parsed.report.notes.join(' ')).toMatch(/what "father–son" means on its own/);
+    });
+
+    it('a club named on one side only still fails closed (F-D3)', async () => {
+      const parsed = await parse('players selected under the father-son rule who also coached Geelong');
+      expect(parsed.status).toBe('none');
+    });
+
+    it('the temporal readings are still refused by name (D9/F-D2)', async () => {
+      for (const question of [
+        'players selected under the father-son rule who later coached',
+        'father-son selections who went on to coach',
+      ]) {
+        const parsed = await parse(question);
+        expect(parsed.status, question).toBe('none');
+      }
+    });
+  });
+
+  // ---------------------------------------------------- out of scope
+
+  describe('the relationship families with no builder decline by name', () => {
+    it.each([
+      ['sisters', 'which players had a sister who played'],
+      ['twins', 'which players had a twin brother who played AFL'],
+      ['cousins', 'which AFL players are cousins'],
+      ['mothers', 'which players had a mother who played'],
+      // AFLDB-ISSUE-153 Stage 6 (D6) answers exactly three family-grain
+      // phrasings now -- see 'the family grain (AFLDB-ISSUE-153 Stage 6,
+      // D6)' below. Every OTHER family/relatives wording, vague or named,
+      // still declines here exactly as it did before Stage 6.
+      ['vague family wording', "who are Dustin Martin's family members"],
+      ['vague relatedness', 'AFL players related to Phil Krakouer'],
+      ['pairings, not players', 'parent and child pairs who both played AFL'],
+    ])('%s', async (_label, question) => {
+      const parsed = await parse(question);
+      expect(parsed.status, question).toBe('none');
+    });
+  });
+
+  // ------------------------------------------------ family grain (Stage 6)
+
+  describe('the family grain (AFLDB-ISSUE-153 Stage 6, D6)', () => {
+    it('C1 "biggest football families" ranks combined career games', async () => {
+      const p = await plan('biggest football families');
+      expect(p.grain).toBe('family');
+      expect(p.metric).toBe('combined_games');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.metricCondition).toBeUndefined();
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('C1 "which family has the most AFL players" ranks linked members, never combined games', async () => {
+      const p = await plan('which family has the most AFL players');
+      expect(p.grain).toBe('family');
+      expect(p.metric).toBe('linked_members');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('C5 "families with three AFL players" thresholds linked members as a list, never a ranking', async () => {
+      const p = await plan('families with three AFL players');
+      expect(p.grain).toBe('family');
+      expect(p.metric).toBe('linked_members');
+      expect(p.metricCondition).toEqual({ op: 'gte', value: 3 });
+      expect(p.agg).toEqual({ kind: 'list' });
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('C5 honours an explicit comparison word instead of defaulting to gte', async () => {
+      const p = await plan('families with at least four players');
+      expect(p.grain).toBe('family');
+      expect(p.metricCondition).toEqual({ op: 'gte', value: 4 });
+    });
+
+    it('C5 reads "more than" as a strict bound, not the bare-number default', async () => {
+      const p = await plan('families with more than two players');
+      expect(p.metricCondition).toEqual({ op: 'gt', value: 2 });
+    });
+
+    it('every other family/relatives wording keeps declining (no regression)', async () => {
+      for (const question of [
+        "who are Dustin Martin's family members",
+        'AFL players related to Phil Krakouer',
+      ]) {
+        const parsed = await parse(question);
+        expect(parsed.status, question).toBe('none');
+      }
+    });
+
+    it('the family grain has no club, season or player to filter by -- refused, never discarded', async () => {
+      const parsed = await parse('biggest football family for richmond');
+      if (parsed.status !== 'plan') return;
+      expect(validatePlan(parsed.plan)).toHaveProperty('error');
+    });
+
+    it('the two metrics never share a phrasing', async () => {
+      // Same underlying data, deliberately worded two ways: one must never
+      // silently answer the other's question (Stage 0 measured up to a
+      // 301-rank-place disagreement between them).
+      const biggest = await plan('biggest football families');
+      const mostPlayers = await plan('which family has the most AFL players');
+      expect(biggest.metric).not.toBe(mostPlayers.metric);
+    });
+  });
+
+  // ------------------------------------------- ownership and collisions
+
+  describe('composition beyond the relationship itself', () => {
+    it('a count question counts the qualifying set', async () => {
+      const p = await plan('how many players had a brother who played AFL');
+      expect(p.agg).toEqual({ kind: 'count' });
+      expect(builders(p)).toEqual(['has_brother']);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('two relationships compose as two predicates, ANDed', async () => {
+      const p = await plan('players with a brother and a father who played AFL');
+      expect(builders(p)).toEqual(['has_brother', 'has_afl_father']);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('a career threshold survives alongside a per-player relationship', async () => {
+      // The ISSUE-110 shape: a condition the plan cannot honour must never
+      // be silently dropped. Here it IS honoured, as a career condition.
+      const p = await plan('brothers of Brent Harvey who played 100 games');
+      expect(builders(p)).toEqual(['brother_of_player']);
+      expect(p.careerConditions).toEqual([{ kind: 'column', column: 'games', op: 'gte', value: 100 }]);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+  });
+
+  describe('scope this family cannot own is refused, never discarded', () => {
+    it.each([
+      ['a club', 'richmond players with a brother who played'],
+      ['a season range', 'players with a brother who played since 2000'],
+      ['a venue', 'players with a brother who played at the mcg'],
+    ])('%s', async (_label, question) => {
+      const parsed = await parse(question);
+      if (parsed.status !== 'plan') return;
+      expect(validatePlan(parsed.plan), question).toHaveProperty('error');
+    });
+
+    it('a season-grain ranking declines rather than dropping the relationship', async () => {
+      const parsed = await parse('most goals in 2015 by a player with a brother who played');
+      expect(parsed.status).toBe('none');
+    });
+
+    it('a surname that is also a relationship word is still a player', async () => {
+      const p = await plan('most goals by ben cousins');
+      expect(p.player?.name).toBe('Ben Cousins');
+      expect(builders(p)).toEqual([]);
+    });
+  });
+});
+
+/**
+ * AFLDB-ISSUE-152 Phase F. The cross-domain composition: one person who
+ * both played and coached. The R0 probe recorded on the issue measured
+ * that NONE of these wordings produced a plan under v38 -- and that one
+ * of them ("played for Richmond and coached Collingwood") reached
+ * validatePlan as a coach_record carrying an opponent, refused there
+ * rather than answered.
+ */
+describe('played and also coached (AFLDB-ISSUE-152 Phase F)', () => {
+  function builders(p: NlQueryPlan): string[] {
+    return p.careerPredicates.map((axis) => axis.builder);
+  }
+
+  // ------------------------------------------------------------------ X1
+
+  describe('X1 -- played and also coached', () => {
+    it.each([
+      'players who also coached',
+      'which players both played and coached',
+      'players who played and coached',
+      'players who played vfl afl and also coached',
+    ])('%s -> has_coached at career grain', async (question) => {
+      const p = await plan(question);
+      expect(p.grain).toBe('player_career');
+      expect(builders(p)).toEqual(['has_coached']);
+      expect(p.metric).toBeNull();
+      expect(p.scope.clubFor).toBeUndefined();
+      expect(p.crossDomainClubs).toBeUndefined();
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('"how many" is a count of the same population', async () => {
+      const p = await plan('how many players have played and coached');
+      expect(builders(p)).toEqual(['has_coached']);
+      expect(p.agg).toEqual({ kind: 'count' });
+    });
+
+    it('a career metric ranks players WITHIN the composition', async () => {
+      const p = await plan('most career games among players who also coached');
+      expect(p.grain).toBe('player_career');
+      expect(p.metric).toBe('games');
+      expect(builders(p)).toEqual(['has_coached']);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+  });
+
+  // ------------------------------------------------------------------ X2
+
+  describe('X2 -- played for a club and also coached a club', () => {
+    it.each([
+      'players who played for richmond and also coached richmond',
+      'who both played for and coached richmond',
+      'richmond players who also coached richmond',
+    ])('%s -> both clubs as builder parameters', async (question) => {
+      const p = await plan(question);
+      expect(p.grain).toBe('player_career');
+      expect(builders(p)).toEqual(['played_for_club', 'coached_club']);
+      expect(p.careerPredicates[0].params.club).toBe('1');
+      expect(p.careerPredicates[1].params.club).toBe('1');
+      // THE structural decision of this phase: no scope.clubFor, so the
+      // compiler's generic playing-club filter can never be suppressed by
+      // a coaching predicate.
+      expect(p.scope.clubFor).toBeUndefined();
+      expect(p.scope.clubAgainst).toBeUndefined();
+      expect(p.crossDomainClubs?.played.name).toBe('Richmond');
+      expect(p.crossDomainClubs?.coached.name).toBe('Richmond');
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('the asymmetric form binds two different organizations', async () => {
+      const p = await plan('players who played for richmond and coached collingwood');
+      expect(builders(p)).toEqual(['played_for_club', 'coached_club']);
+      expect(p.careerPredicates[0].params.club).toBe('1');
+      expect(p.careerPredicates[1].params.club).toBe('3');
+      expect(p.crossDomainClubs?.played.name).toBe('Richmond');
+      expect(p.crossDomainClubs?.coached.name).toBe('Collingwood');
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+  });
+
+  // ---------------------------------------------------- temporal declines
+
+  describe('temporal wording declines by name, never silently stripped (D9/F-D2)', () => {
+    it.each([
+      'players who later coached richmond',
+      'players who went on to coach',
+      'players who became a coach',
+      'players who played and then coached',
+      'players who coached after they retired',
+    ])('%s', async (question) => {
+      const parsed = await parse(question);
+      expect(parsed.status).toBe('none');
+      expect(parsed.report.notes.join(' ')).toContain('does not record the order');
+    });
+  });
+
+  // -------------------------------------------------- one-sided declines
+
+  describe('a club on one side only declines (F-D3)', () => {
+    it.each([
+      'richmond players who also coached',
+      'players who coached richmond and also played',
+    ])('%s', async (question) => {
+      const parsed = await parse(question);
+      expect(parsed.status).toBe('none');
+      expect(parsed.report.notes.join(' ')).toContain('must name the club on');
+    });
+  });
+
+  // -------------------------------------------------- unsupported scope
+
+  describe('scope neither builder owns is refused, never discarded', () => {
+    it('an opponent declines at parse -- this reading clears clubAgainst', async () => {
+      const parsed = await parse('players who played and also coached against carlton');
+      expect(parsed.status).toBe('none');
+      expect(parsed.report.notes.join(' ')).toContain('cannot also be scoped to an opponent');
+    });
+
+    it.each([
+      ['a season', 'players who played and also coached in 1990'],
+      ['a venue', 'players who played and also coached at the mcg'],
+      ['a round', 'players who played and also coached in round 5'],
+      ['a match type', 'players who played and also coached in finals'],
+    ])('%s is refused at validatePlan', async (_label, question) => {
+      const parsed = await parse(question);
+      if (parsed.status !== 'plan') return;
+      expect(validatePlan(parsed.plan), question).toHaveProperty('error');
+    });
+  });
+
+  // ----------------------------------------------------- boundaries kept
+
+  describe('the boundaries this phase does not move', () => {
+    it('the son-side father-son composition is still deferred (F-D1)', async () => {
+      const parsed = await parse('players selected under the father son rule who also coached');
+      expect(parsed.status).toBe('none');
+    });
+
+    it('a coaching record is still a coaching record', async () => {
+      const p = await plan('richmond coaching record');
+      expect(p.grain).toBe('coach_record');
+      expect(p.scope.clubFor?.name).toBe('Richmond');
+    });
+
+    it('coached_by is untouched', async () => {
+      const p = await plan('players coached by damien hardwick');
+      expect(builders(p)).toEqual(['coached_by']);
+    });
+
+    it('premiership_coach is untouched', async () => {
+      const p = await plan('premiership coaches');
+      expect(builders(p)).toEqual(['premiership_coach']);
+    });
+
+    it('"Richmond players coached by Damien Hardwick" still fails the ownership gate', async () => {
+      const parsed = await parse('richmond players coached by damien hardwick');
+      expect(parsed.status).toBe('plan');
+      if (parsed.status !== 'plan') return;
+      expect(validatePlan(parsed.plan)).toHaveProperty('error');
+    });
+  });
+});
+
+// -----------------------------------------------------------------------
+// AFLDB-ISSUE-197 -- surname/family candidate completeness
+// -----------------------------------------------------------------------
+// resolvePlayer's 5-row cap was the SOLE candidate source for both the
+// accept branch and this ambiguity/family branch, so the real Ablett
+// family (7) was silently truncated to 5 and the documented >12 decline
+// (a generic surname clash: Brown, Smith, Johnson, ...) could never fire --
+// `plausible` was always a subset of a <=5-row array. A dedicated
+// resolvePlayerFamily resolver now supplies this branch's candidates
+// instead, fetching up to NL_LIMITS.maxPlayerCandidates + 1 under the
+// parser's own whole-word-prefix predicate (mirrored in SQL in production,
+// see db/queries/nl/resolve.ts). These cases are DB-free: a fake
+// resolvePlayerFamily stands in for the query, proving the parser's own
+// branch logic against the new data source. The production resolver
+// boundary itself -- the real query returning the true, complete family --
+// is proved separately in tests/integration/nl-semantic-mapping.test.ts.
+describe('AFLDB-ISSUE-197: surname/family candidate completeness', () => {
+  function familyOf(n: number, idBase = 9000): NlPlayerCandidate[] {
+    return Array.from({ length: n }, (_, i) => ({
+      ref: { id: idBase + i, slug: `ablett-fixture-${i}`, name: `Ablett Fixture${i}` },
+      score: 300,
+    }));
+  }
+
+  function ctxWithFamily(family: NlPlayerCandidate[]): NlParseContext {
+    return {
+      ...ctx,
+      resolvePlayer: () => Promise.resolve([]),
+      resolvePlayerFamily: () => Promise.resolve(family),
+    };
+  }
+
+  it('2 plausible candidates ranks the complete family', async () => {
+    const family = familyOf(2);
+    const parsed = await parseNlQuestion('ablett most goals', ctxWithFamily(family));
+    expect(parsed.status).toBe('plan');
+    if (parsed.status !== 'plan') return;
+    expect(parsed.plan.scope.playerIdIn).toEqual(family.map((c) => c.ref.id));
+    expect(parsed.plan.player).toBeUndefined();
+  });
+
+  it('exactly 12 plausible candidates (the low boundary) ranks the complete family', async () => {
+    const family = familyOf(NL_LIMITS.maxPlayerCandidates);
+    const parsed = await parseNlQuestion('ablett most goals', ctxWithFamily(family));
+    expect(parsed.status).toBe('plan');
+    if (parsed.status !== 'plan') return;
+    expect(parsed.plan.scope.playerIdIn).toHaveLength(NL_LIMITS.maxPlayerCandidates);
+    expect(parsed.plan.scope.playerIdIn).toEqual(family.map((c) => c.ref.id));
+  });
+
+  it('exactly 13 plausible candidates (the high boundary) declines as ambiguous, not >= 12', async () => {
+    const family = familyOf(NL_LIMITS.maxPlayerCandidates + 1);
+    const parsed = await parseNlQuestion('ablett most goals', ctxWithFamily(family));
+    expect(parsed.status).toBe('none');
+    if (parsed.status !== 'none') return;
+    expect(parsed.reason).toBe('ambiguous');
+    expect(parsed.report.ambiguousPlayer).toBe('ablett');
+  });
+
+  it('0 or 1 plausible family candidates stays an unknown-spelling decline, not ambiguity', async () => {
+    // "smoth" -> one weak fuzzy John Smith match via the ordinary resolver,
+    // but the family resolver -- run against the SAME whole-word-prefix
+    // rule -- finds only that one genuine match too. One plausible
+    // candidate is an unresolved/unknown spelling, never ambiguity
+    // (parser.ts's NL-022 contract), regardless of which resolver supplied
+    // the count.
+    const weakMatch: NlPlayerCandidate = {
+      ref: { id: 500, slug: 'john-smith', name: 'John Smith' }, score: 410,
+    };
+    const parsed = await parseNlQuestion('smoth most goals', {
+      ...ctx,
+      resolvePlayer: () => Promise.resolve([weakMatch]),
+      resolvePlayerFamily: () => Promise.resolve([weakMatch]),
+    });
+    expect(parsed.status).toBe('none');
+    if (parsed.status !== 'none') return;
+    expect(parsed.report.ambiguousPlayer).toBeUndefined();
+    expect(parsed.report.unsupportedTerms).toContain('smoth');
+  });
+
+  it('a candidate that does not satisfy the whole-word-prefix predicate is dropped before ranking (defence-in-depth)', async () => {
+    // A deliberately wrong test double: resolvePlayerFamily returns a
+    // candidate ("Bogus Player") that does not plausibly spell "ablett" at
+    // all. The retained candidateNameWords filter must still apply to
+    // whatever the resolver returns rather than trusting it unconditionally
+    // -- production's own SQL mirrors the same predicate, but this proves
+    // the parser does not blindly rank a resolver's raw output.
+    const family = [
+      ...familyOf(2),
+      { ref: { id: 9999, slug: 'bogus-player', name: 'Bogus Player' }, score: 300 },
+    ];
+    const parsed = await parseNlQuestion('ablett most goals', ctxWithFamily(family));
+    expect(parsed.status).toBe('plan');
+    if (parsed.status !== 'plan') return;
+    expect(parsed.plan.scope.playerIdIn).toEqual([9000, 9001]);
+    expect(parsed.plan.scope.playerIdIn).not.toContain(9999);
+  });
+
+  // Full-name/accept-branch behaviour is untouched by this issue:
+  // resolvePlayer's 5-row cap and PLAYER_ACCEPT_SCORE gate are unchanged,
+  // and the existing corpus above (e.g. "dustin martin", and the
+  // duplicate-canonical-name "gary ablett" case) already pins it -- nothing
+  // new is asserted here, this note only records why (§9 item 5).
+
+  // An operator DB-backed run caught this exact boundary: an earlier
+  // version of the integration fixture (tests/integration/nl-semantic-mapping.test.ts)
+  // used a surname-FIRST synthetic name ("Zqfamseven Player0"), which
+  // scores at searchPlayers's prefix tier (>=500) and so crossed
+  // PLAYER_ACCEPT_SCORE -- landing in the ACCEPT branch's own nameMatches
+  // check (which still reads resolvePlayer's 5-capped `candidates`, never
+  // resolvePlayerFamily) instead of ever reaching the family branch this
+  // issue fixes. That branch-selection gate is deliberate, existing,
+  // unchanged-by-this-issue behaviour (parser.ts's §15 out-of-scope
+  // observation) -- not a defect resolvePlayerFamily should have caught.
+  // Pinned here so a future fixture cannot reintroduce the same mistake
+  // without a DB-backed test run to catch it.
+  it('a resolvePlayer top score at/above PLAYER_ACCEPT_SCORE still commits via the accept branch, never reaching resolvePlayerFamily', async () => {
+    let familyCalled = false;
+    const acceptCtx: NlParseContext = {
+      ...ctx,
+      resolvePlayer: () => Promise.resolve([
+        { ref: { id: 7001, slug: 'prefix-match-one', name: 'Prefixmatch One' }, score: 500 },
+        { ref: { id: 7002, slug: 'prefix-match-two', name: 'Prefixmatch Two' }, score: 480 },
+      ]),
+      // A complete, well-formed 2-candidate family -- if this were ever
+      // consulted, the mention would rank as a family instead of
+      // committing to one player at reduced certainty.
+      resolvePlayerFamily: () => {
+        familyCalled = true;
+        return Promise.resolve([
+          { ref: { id: 7001, slug: 'prefix-match-one', name: 'Prefixmatch One' }, score: 500 },
+          { ref: { id: 7002, slug: 'prefix-match-two', name: 'Prefixmatch Two' }, score: 480 },
+        ]);
+      },
+    };
+    const parsed = await parseNlQuestion('prefixmatch most goals', acceptCtx);
+    expect(familyCalled).toBe(false);
+    expect(parsed.status).toBe('none');
+    if (parsed.status !== 'none') return;
+    expect(parsed.reason).toBe('ambiguous');
+    // Declined via the accept branch's own nameMatches path, not the
+    // family branch: no scope.playerIdIn was ever built, so there is
+    // nothing for report.ambiguousPlayer (the family branch's own field)
+    // to carry.
+    expect(parsed.report.ambiguousPlayer).toBeUndefined();
+  });
+});
+
+// -----------------------------------------------------------------------
+// AFLDB-ISSUE-198 -- hyphen/underscore/slash word-boundary consistency
+// -----------------------------------------------------------------------
+// candidateNameWords used to tokenise a candidate's name by plain
+// `\s+`-splitting, while afldb_normalise_name (and the search_name/
+// search_alias columns resolvePlayerFamily reads) treats hyphens,
+// underscores and slashes as ADDITIONAL word breaks, and apostrophes/full
+// stops as deletions rather than breaks. A hyphenated surname was
+// therefore one TypeScript word and two SQL words: "Darcy Byrne-Jones"
+// and "David Rhys-Jones" silently dropped out of the family re-check,
+// undercounting a real 13-identity "Jones" family to 11 and ranking a
+// confident, wrong answer instead of declining. candidatePlayerSpan had a
+// related, one-stage-earlier defect: its `^[a-z]+$` token filter rejected
+// any hyphen/apostrophe-bearing token outright, so a full-name mention of
+// such a player could lose the surname before any resolver ran. Both are
+// fixed by one shared word-boundary contract, `splitNameWords` in
+// parser.ts, applied everywhere a candidate's name or the reader's own
+// mention text is compared word-for-word.
+describe('AFLDB-ISSUE-198: hyphen/underscore/slash word-boundary consistency', () => {
+  function jonesFamily(total: number, hyphenatedCount: number, idBase = 9500): NlPlayerCandidate[] {
+    return Array.from({ length: total }, (_, i) => ({
+      ref: {
+        id: idBase + i,
+        slug: `jones-fixture-${i}`,
+        name: i < hyphenatedCount ? `Xx Byrne-Jones${i}` : `Jones Fixture${i}`,
+      },
+      score: 300,
+    }));
+  }
+
+  function ctxWithFamily(family: NlPlayerCandidate[]): NlParseContext {
+    return { ...ctx, resolvePlayer: () => Promise.resolve([]), resolvePlayerFamily: () => Promise.resolve(family) };
+  }
+
+  it('13-candidate family with 2 hyphenated-surname members declines as ambiguous (true count 13, not undercounted 11)', async () => {
+    const family = jonesFamily(NL_LIMITS.maxPlayerCandidates + 1, 2);
+    const parsed = await parseNlQuestion('jones most games', ctxWithFamily(family));
+    expect(parsed.status).toBe('none');
+    if (parsed.status !== 'none') return;
+    expect(parsed.reason).toBe('ambiguous');
+    expect(parsed.report.ambiguousPlayer).toBe('jones');
+  });
+
+  it('12-candidate family with 2 hyphenated-surname members ranks the complete family, hyphenated members included', async () => {
+    const family = jonesFamily(NL_LIMITS.maxPlayerCandidates, 2);
+    const parsed = await parseNlQuestion('jones most games', ctxWithFamily(family));
+    expect(parsed.status).toBe('plan');
+    if (parsed.status !== 'plan') return;
+    expect(parsed.plan.scope.playerIdIn).toEqual(family.map((c) => c.ref.id));
+    expect(parsed.plan.scope.playerIdIn).toContain(9500);
+    expect(parsed.plan.scope.playerIdIn).toContain(9501);
+  });
+
+  it('a 7-candidate family (the real Ablett shape) still ranks completely -- unaffected by the hyphen fix', async () => {
+    const family = Array.from({ length: 7 }, (_, i) => ({
+      ref: { id: 9600 + i, slug: `ablett-fixture-${i}`, name: `Ablett Fixture${i}` },
+      score: 300,
+    }));
+    const parsed = await parseNlQuestion('ablett most goals', ctxWithFamily(family));
+    expect(parsed.status).toBe('plan');
+    if (parsed.status !== 'plan') return;
+    expect(parsed.plan.scope.playerIdIn).toHaveLength(7);
+  });
+
+  it('a full-name mention with a literal hyphen resolves via the accept branch with no leftover unjustified token', async () => {
+    const rhysJones: NlPlayerCandidate = {
+      ref: { id: 9700, slug: 'david-rhys-jones', name: 'David Rhys-Jones' }, score: 1000,
+    };
+    const fullNameCtx: NlParseContext = {
+      ...ctx,
+      // Stands in for searchPlayers's own afldb_normalise_name(query) call
+      // (src/db/queries/search.ts:86), which normalises the WHOLE input
+      // string server-side -- a hyphen reaching this function unsplit is
+      // exactly what production sees and already handles.
+      resolvePlayer: (name: string) => Promise.resolve(
+        name.toLowerCase().replace(/[-_/]/g, ' ').replace(/\s+/g, ' ').trim() === 'david rhys jones'
+          ? [rhysJones] : [],
+      ),
+      resolvePlayerFamily: () => Promise.resolve([]),
+    };
+    const parsed = await parseNlQuestion('david rhys-jones most games', fullNameCtx);
+    expect(parsed.status).toBe('plan');
+    if (parsed.status !== 'plan') return;
+    expect(parsed.plan.player?.name).toBe('David Rhys-Jones');
+    expect(parsed.report.unsupportedTerms).toEqual([]);
+    expect(parsed.report.confidence).toBe(1);
+  });
+
+  it('an apostrophe-surname full-name mention resolves via the accept branch (apostrophe is a deletion, not a word split)', async () => {
+    const oBrien: NlPlayerCandidate = {
+      ref: { id: 9701, slug: 'xx-obrien', name: "Xx O'Brien" }, score: 1000,
+    };
+    const apostropheCtx: NlParseContext = {
+      ...ctx,
+      resolvePlayer: (name: string) => Promise.resolve(
+        name.toLowerCase().replace(/['’.]/g, '').replace(/\s+/g, ' ').trim() === 'xx obrien'
+          ? [oBrien] : [],
+      ),
+      resolvePlayerFamily: () => Promise.resolve([]),
+    };
+    const parsed = await parseNlQuestion("xx o'brien most games", apostropheCtx);
+    expect(parsed.status).toBe('plan');
+    if (parsed.status !== 'plan') return;
+    expect(parsed.plan.player?.name).toBe("Xx O'Brien");
+    expect(parsed.report.unsupportedTerms).toEqual([]);
+  });
+
+  it('apostrophe behaviour does not become word-splitting: a bare apostrophe surname stays one word against a plausible family', async () => {
+    // Two players sharing an apostrophe surname -- if the apostrophe were
+    // ever treated as a word break, "o'brien" would spuriously match a
+    // plain surname "brien" or "o" fragment as well as itself.
+    const family: NlPlayerCandidate[] = [
+      { ref: { id: 9702, slug: 'aa-obrien', name: "Aa O'Brien" }, score: 300 },
+      { ref: { id: 9703, slug: 'bb-obrien', name: "Bb O'Brien" }, score: 290 },
+    ];
+    const parsed = await parseNlQuestion("o'brien most games", ctxWithFamily(family));
+    expect(parsed.status).toBe('plan');
+    if (parsed.status !== 'plan') return;
+    expect(parsed.plan.scope.playerIdIn).toEqual([9702, 9703]);
+  });
+
+  it('a bare hyphenated surname mention (no given name) reaches resolvePlayerFamily with flattened, per-word tokens', async () => {
+    // resolvePlayerFamily normalises each element of `tokens` INDIVIDUALLY
+    // as one SQL term (resolve.ts's `q` CTE): a hyphenated mention word
+    // must already arrive as two separate plain-word elements, or SQL
+    // builds one unmatchable multi-word term instead of two real ones.
+    let receivedTokens: string[] = [];
+    const family: NlPlayerCandidate[] = [
+      { ref: { id: 9704, slug: 'aa-byrne-jones', name: 'Aa Byrne-Jones' }, score: 100 },
+      { ref: { id: 9705, slug: 'bb-byrne-jones', name: 'Bb Byrne-Jones' }, score: 90 },
+    ];
+    const flattenedCtx: NlParseContext = {
+      ...ctx,
+      resolvePlayer: () => Promise.resolve([]),
+      resolvePlayerFamily: (tokens: string[]) => {
+        receivedTokens = tokens;
+        return Promise.resolve(family);
+      },
+    };
+    const parsed = await parseNlQuestion('byrne-jones most games', flattenedCtx);
+    expect(receivedTokens).toEqual(['byrne', 'jones']);
+    expect(parsed.status).toBe('plan');
+    if (parsed.status !== 'plan') return;
+    expect(parsed.report.unsupportedTerms).toEqual([]);
+    expect(parsed.plan.scope.playerIdIn).toEqual([9704, 9705]);
+  });
+
+  it('underscore and slash separators behave as word breaks too, matching a plain multi-word family mention', async () => {
+    // No production vocabulary currently feeds underscore/slash into a
+    // player mention, but afldb_normalise_name's contract treats them
+    // exactly like hyphens (099_normalise_unicode_whitespace.sql:71-91),
+    // so splitNameWords must too.
+    const family: NlPlayerCandidate[] = [
+      { ref: { id: 9706, slug: 'aa-van-der-berg', name: 'Aa Van_Der/Berg' }, score: 100 },
+      { ref: { id: 9707, slug: 'bb-van-der-berg', name: 'Bb Van_Der/Berg' }, score: 90 },
+    ];
+    const parsed = await parseNlQuestion('van der berg most games', ctxWithFamily(family));
+    expect(parsed.status).toBe('plan');
+    if (parsed.status !== 'plan') return;
+    expect(parsed.plan.scope.playerIdIn).toEqual([9706, 9707]);
+  });
+
+  it('a candidate that fails the whole-word-prefix predicate is still dropped after the hyphen fix (defence-in-depth intact)', async () => {
+    const family = [
+      ...jonesFamily(2, 1),
+      { ref: { id: 9999, slug: 'bogus-player', name: 'Bogus Player' }, score: 300 },
+    ];
+    const parsed = await parseNlQuestion('jones most goals', ctxWithFamily(family));
+    expect(parsed.status).toBe('plan');
+    if (parsed.status !== 'plan') return;
+    expect(parsed.plan.scope.playerIdIn).toEqual([9500, 9501]);
+    expect(parsed.plan.scope.playerIdIn).not.toContain(9999);
+  });
+
+  // Suffix/alias/nickname/noise-token and the full existing ISSUE-197
+  // boundary corpus (2/12/13-candidate plain families, the 0/1-candidate
+  // non-ambiguity contract, Dustin Martin, the Gary Ablett exact-duplicate
+  // case) are asserted unmodified by the describe block above this one --
+  // nothing new is asserted here, this note only records why (§9 item 4-5).
+});
+
+/**
+ * AFLDB-ISSUE-210. ISSUE-206's exploratory triage found the imperative/
+ * structural-phrasing family ("find", "show", "show me", "list", "give
+ * me") was the dominant soft-decline mechanism (~10,000+ rows): the
+ * leading verb survived canonicalise() as an unmatched leftover token and
+ * tripped the generic decline gate even though grain/metric/scope were
+ * otherwise fully resolvable. The fix is a single ANCHORED strip in
+ * canonicalise() (nl/vocab.ts) -- consumed at most once, only at the very
+ * start of the string -- so every pair below must produce the IDENTICAL
+ * structured plan to its already-supported core form. Against parser v57
+ * (pre-fix) every "wrapped" query in the first block declines or produces
+ * a materially different plan from its core form; against v58 (post-fix,
+ * PARSER_VERSION bumped 57->58) they are identical. See AFLDB-ISSUE-210.md
+ * for the full RED/GREEN record and the exact evidence this was built
+ * from.
+ */
+describe('17. AFLDB-ISSUE-210 imperative/request-wrapper phrasing', () => {
+  /**
+   * Deep-equality on the STRUCTURED PLAN only (never on the NlParse
+   * envelope) is deliberate: `report`/`notes`/consumed-token evidence are
+   * allowed to differ between a wrapped and bare question (the wrapper
+   * itself is a consumed token in one but not the other), but every
+   * meaningful semantic field -- grain, metric, agg, scope, conditions --
+   * must not.
+   */
+  async function expectSameStructuredPlan(wrapped: string, core: string): Promise<void> {
+    const wrappedPlan = await plan(wrapped);
+    const corePlan = await plan(core);
+    expect(wrappedPlan, `"${wrapped}" -> plan differs from its core form "${core}"`).toEqual(corePlan);
+  }
+
+  describe('supported wrapper families, across several already-supported grains', () => {
+    it('"find" + season query (player_season, bare year)', async () => {
+      // The core form keeps the leading "the" the wrapped form leaves
+      // behind after "find " is consumed -- STOPWORDS carries "the" as
+      // semantically inert (nl/vocab.ts:874), but this pairing proves it
+      // structurally rather than assuming it.
+      await expectSameStructuredPlan(
+        'Find the most goals in 2023',
+        'the most goals in 2023',
+      );
+    });
+
+    it('"give me" + club-scoped season leaderboard (player_season)', async () => {
+      await expectSameStructuredPlan(
+        'Give me the most goals by a richmond player in 2017',
+        'the most goals by a richmond player in 2017',
+      );
+    });
+
+    it('"show" (bare, no "me") + club result/extrema (team_match)', async () => {
+      await expectSameStructuredPlan(
+        'Show richmond biggest win since 2000',
+        'richmond biggest win since 2000',
+      );
+    });
+
+    it('"show me" + club result/extrema -- regression guard for the pre-existing CONVERSATIONAL_FILLER entry, unchanged by this fix', async () => {
+      await expectSameStructuredPlan(
+        "Show me Richmond's biggest win",
+        "Richmond's biggest win",
+      );
+    });
+
+    it('"list" + career threshold (player_career)', async () => {
+      await expectSameStructuredPlan(
+        'List players with at least 300 games',
+        'players with at least 300 games',
+      );
+    });
+
+    it('"find" + venue/opponent-scoped named-player stat (player_game)', async () => {
+      await expectSameStructuredPlan(
+        'Find dusty total goals against carlton',
+        'dusty total goals against carlton',
+      );
+    });
+
+    it('"list" + head-to-head compare_wins (AFLDB-ISSUE-209 family)', async () => {
+      await expectSameStructuredPlan(
+        'List which of Richmond and Carlton has more wins head to head',
+        'Which of Richmond and Carlton has more wins head to head',
+      );
+    });
+
+    it('"give me" + a coaching record (coach_record)', async () => {
+      await expectSameStructuredPlan(
+        'Give me damien hardwick coaching record',
+        'damien hardwick coaching record',
+      );
+    });
+  });
+
+  describe('negative controls: the wrapper strip must not reach into meaningful phrasing', () => {
+    it('leading "find the big sticks" (the goals idiom) is untouched -- the metric is not lost', async () => {
+      // Real supported grammar, not manufactured nonsense: `/\bfind the
+      // (?:big )?sticks\b/` in nl/vocab.ts's metric-word table already
+      // maps this idiom to 'goals'. Without the negative lookahead on
+      // "find" in LEADING_REQUEST_PREFIX_RE, a leading occurrence of this
+      // exact idiom would have "find " stripped as a request wrapper,
+      // leaving "the big sticks" -- which matches no vocabulary at all --
+      // and the question would decline instead of resolving the metric.
+      const p = await plan('Find the big sticks leader for Richmond');
+      expect(p.metric).toBe('goals');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.scope.clubFor?.name).toBe('Richmond');
+    });
+
+    it('fail-closed: a wrapper around genuine gibberish still declines, not rescued by consuming the leading word', async () => {
+      const result = await parse('Show me purple elephant sandwich');
+      expect(result.status).toBe('none');
+      if (result.status === 'none') expect(result.reason).toBe('unrecognised');
+    });
+
+    it('fail-closed: a wrapper around a recognised-but-unsupported topic still declines the same way as the bare form', async () => {
+      const wrapped = await parse('Find the youngest player ever');
+      const bare = await parse('youngest player ever');
+      expect(wrapped.status).toBe('unanswerable');
+      expect(bare.status).toBe('unanswerable');
+    });
+  });
+});
+
+// AFLDB-ISSUE-213: extractClubs (nl/parser.ts) re-derived a matched club's
+// position by searching the ORIGINAL question text for `\bmatchedText\b`
+// and taking the first hit. When the second club's name is a whole word
+// embedded inside the first (already-matched) club's own name --
+// "melbourne" inside "north melbourne", "adelaide" inside "port adelaide",
+// "sydney" inside "greater western sydney" -- that search found the
+// embedded occurrence, not the real, later standalone mention. The
+// computed gap between the two clubs came out empty or negative, the
+// literal "versus"/"vs"/"v" separator between them was never recognised,
+// and the parser fell back to directional clubFor/clubAgainst roles
+// instead of forming the unordered scope.matchup an "A versus B" question
+// is supposed to produce. Root cause confirmed by ISSUE-212's corrected
+// exploratory V2 oracle (row 20609919) and re-verified against current
+// source for this issue. Fixed by firstUnclaimedOccurrence, which excludes
+// any span an earlier club match in the same call has already claimed.
+describe('AFLDB-ISSUE-213: overlapping club names must not steal each other\'s matched span', () => {
+  describe('confirmed defect: "North Melbourne versus Melbourne" (row 20609919)', () => {
+    it('Largest winning margin for North Melbourne versus Melbourne at Adelaide Oval -> unordered matchup, both clubs, no clubFor/clubAgainst', async () => {
+      const p = await plan('Largest winning margin for North Melbourne versus Melbourne at Adelaide Oval');
+      expect(p.grain).toBe('team_match');
+      expect(p.metric).toBe('win_margin');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.scope.matchup?.clubA.name).toBe('North Melbourne');
+      expect(p.scope.matchup?.clubB.name).toBe('Melbourne');
+      expect(p.scope.clubFor).toBeUndefined();
+      expect(p.scope.clubAgainst).toBeUndefined();
+      expect(p.scope.venue?.name).toBe('Adelaide Oval');
+    });
+
+    // Investigated per ISSUE-213: does the defect depend on word order?
+    // "Melbourne versus North Melbourne" was already correct before the
+    // fix (findClub picks the longest available NAME regardless of where
+    // it sits in the text, so "North Melbourne" -- not "Melbourne" -- is
+    // always matched first here too; the standalone "Melbourne" then
+    // happens to be the FIRST \bmelbourne\b in the string, so even the old
+    // plain first-match search found the real mention). Kept as a
+    // regression control so a future change cannot silently break the
+    // direction that already worked.
+    it('reverse order: Largest winning margin for Melbourne versus North Melbourne at Adelaide Oval -> unordered matchup, both clubs', async () => {
+      const p = await plan('Largest winning margin for Melbourne versus North Melbourne at Adelaide Oval');
+      expect(p.scope.matchup?.clubA.name).toBe('Melbourne');
+      expect(p.scope.matchup?.clubB.name).toBe('North Melbourne');
+      expect(p.scope.clubFor).toBeUndefined();
+      expect(p.scope.clubAgainst).toBeUndefined();
+    });
+  });
+
+  // ISSUE-212 named these as structurally similar, source-derived
+  // hypotheses only -- not previously empirically confirmed. Traced by
+  // hand against the same extractClubs mechanism as the confirmed row:
+  // both reproduce the identical failure (the shorter name is the tail
+  // word of the longer one, so it is always the first `\bname\b` hit in
+  // the original text once the longer name is matched first).
+  describe('candidate pair, confirmed to reproduce the same mechanism: "Port Adelaide versus Adelaide"', () => {
+    it('Largest winning margin for Port Adelaide versus Adelaide -> unordered matchup, both clubs', async () => {
+      const p = await plan('Largest winning margin for Port Adelaide versus Adelaide');
+      expect(p.scope.matchup?.clubA.name).toBe('Port Adelaide');
+      expect(p.scope.matchup?.clubB.name).toBe('Adelaide');
+      expect(p.scope.clubFor).toBeUndefined();
+      expect(p.scope.clubAgainst).toBeUndefined();
+    });
+
+    it('reverse order: Largest winning margin for Adelaide versus Port Adelaide -> unordered matchup, both clubs', async () => {
+      const p = await plan('Largest winning margin for Adelaide versus Port Adelaide');
+      expect(p.scope.matchup?.clubA.name).toBe('Adelaide');
+      expect(p.scope.matchup?.clubB.name).toBe('Port Adelaide');
+      expect(p.scope.clubFor).toBeUndefined();
+      expect(p.scope.clubAgainst).toBeUndefined();
+    });
+  });
+
+  describe('candidate pair, confirmed to reproduce the same mechanism: "Greater Western Sydney versus Sydney"', () => {
+    it('Largest winning margin for Greater Western Sydney versus Sydney -> unordered matchup, both clubs', async () => {
+      const p = await plan('Largest winning margin for Greater Western Sydney versus Sydney');
+      expect(p.scope.matchup?.clubA.name).toBe('Greater Western Sydney');
+      expect(p.scope.matchup?.clubB.name).toBe('Sydney');
+      expect(p.scope.clubFor).toBeUndefined();
+      expect(p.scope.clubAgainst).toBeUndefined();
+    });
+
+    it('reverse order: Largest winning margin for Sydney versus Greater Western Sydney -> unordered matchup, both clubs', async () => {
+      const p = await plan('Largest winning margin for Sydney versus Greater Western Sydney');
+      expect(p.scope.matchup?.clubA.name).toBe('Sydney');
+      expect(p.scope.matchup?.clubB.name).toBe('Greater Western Sydney');
+      expect(p.scope.clubFor).toBeUndefined();
+      expect(p.scope.clubAgainst).toBeUndefined();
+    });
+  });
+
+  // The fix must not turn every symmetric "A versus/vs/v B" club pair into
+  // a special case -- ordinary pairs with no name overlap at all must keep
+  // producing exactly the same unordered matchup they always have.
+  describe('regression: ordinary non-overlapping symmetric wording is unaffected', () => {
+    it('Largest winning margin for Sydney versus Richmond -> unordered matchup', async () => {
+      const p = await plan('Largest winning margin for Sydney versus Richmond');
+      expect(p.scope.matchup?.clubA.name).toBe('Sydney');
+      expect(p.scope.matchup?.clubB.name).toBe('Richmond');
+    });
+
+    it('Largest winning margin for Collingwood vs Carlton -> unordered matchup', async () => {
+      const p = await plan('Largest winning margin for Collingwood vs Carlton');
+      expect(p.scope.matchup?.clubA.name).toBe('Collingwood');
+      expect(p.scope.matchup?.clubB.name).toBe('Carlton');
+    });
+
+    it('Largest winning margin for Essendon v Hawthorn -> unordered matchup', async () => {
+      const p = await plan('Largest winning margin for Essendon v Hawthorn');
+      expect(p.scope.matchup?.clubA.name).toBe('Essendon');
+      expect(p.scope.matchup?.clubB.name).toBe('Hawthorn');
+    });
+  });
+
+  // Directional wording must stay directional -- the fix touches only how
+  // a matched club's POSITION is found, never the "for"/"against"/"to"
+  // role-governing logic itself, so an overlapping-name pair phrased
+  // directionally (not bare "A versus B") must still resolve clubFor/
+  // clubAgainst, not collapse into matchup.
+  describe('regression: directional wording for an overlapping-name pair stays directional, not matchup', () => {
+    it('North Melbourne biggest win against Melbourne -> clubFor/clubAgainst, no matchup', async () => {
+      const p = await plan('North Melbourne biggest win against Melbourne');
+      expect(p.scope.clubFor?.name).toBe('North Melbourne');
+      expect(p.scope.clubAgainst?.name).toBe('Melbourne');
+      expect(p.scope.matchup).toBeUndefined();
+    });
+
+    it('biggest win by Port Adelaide against Adelaide -> clubFor/clubAgainst, no matchup', async () => {
+      const p = await plan('biggest win by Port Adelaide against Adelaide');
+      expect(p.scope.clubFor?.name).toBe('Port Adelaide');
+      expect(p.scope.clubAgainst?.name).toBe('Adelaide');
+      expect(p.scope.matchup).toBeUndefined();
+    });
+  });
+
+  // Club names that share partial text but are NOT a full-name collision
+  // (one name is not a whole-word substring of the other) never entered
+  // firstUnclaimedOccurrence's overlap branch at all -- included as a
+  // sanity control, not because the old code mishandled it.
+  describe('control: partial-text club names that are not a whole-word collision are unaffected', () => {
+    it('Largest winning margin for Adelaide versus Greater Western Sydney -> unordered matchup ("Adelaide" is not a whole-word substring of "Greater Western Sydney")', async () => {
+      const p = await plan('Largest winning margin for Adelaide versus Greater Western Sydney');
+      expect(p.scope.matchup?.clubA.name).toBe('Adelaide');
+      expect(p.scope.matchup?.clubB.name).toBe('Greater Western Sydney');
+    });
+  });
+});
+
+/**
+ * AFLDB-ISSUE-215. The exploratory V2 corpus's `career_numeric_binding`
+ * family builds five templates from one shared pool of two numeric career
+ * conditions; two of the five -- `/2`, "who has the most career S among
+ * players with A and B", and `/3`, "for CLUB, find players with A plus
+ * B" -- declined unsupported_term even though every OTHER template in the
+ * same family (joined by "and"/comma instead) already worked.
+ *
+ * Investigation found this is NOT one shared root cause:
+ *
+ *  - `/3` is a pure wrapper-vocabulary gap. Both numeric conditions were
+ *    ALREADY binding correctly; only the wrapper words "find" (mid-
+ *    sentence, behind a leading "for CLUB," scope clause the existing
+ *    leading-only wrapper strip, AFLDB-ISSUE-210, never reaches) and
+ *    "plus" (a second, unrecognised spelling of the "and" conjunction
+ *    every other template already uses) survived as leftover tokens.
+ *  - `/2` shares that SAME category of gap -- "among" is a third
+ *    unrecognised wrapper word, structurally identical to "find"/"plus"
+ *    -- but ALSO carries a second, independent, more severe defect `/3`
+ *    cannot have at all (its template has no ranked metric to collide
+ *    with): extractCareerConditions resolves a stat word's EARLIEST
+ *    occurrence in the sentence for processing order, but never retried a
+ *    LATER occurrence when the first had no adjacent number. "who has the
+ *    most career GOALS among players with ... zero GOALS" puts the stat
+ *    word's ranking mention before its condition mention; the column used
+ *    to be abandoned right there, silently discarding the real "zero
+ *    goals" condition rather than declining on it. See the "metric/
+ *    condition collision" cases below.
+ *
+ * Neither fix is forced together beyond both living in
+ * extractCareerConditions/canonicalise: the wrapper-vocabulary gaps are
+ * each fixed narrowly per word (gated on the specific supported
+ * construction, never a blanket STOPWORDS/strip addition), and the
+ * predicate-loss fix is fully generic -- it retries occurrences of
+ * whichever stat word collided, never assumes which column or template.
+ *
+ * PARSER_VERSION 61 -> 62.
+ */
+describe('19. AFLDB-ISSUE-215 career numeric-binding phrasing ("plus"/"among" wrappers, metric/condition collision)', () => {
+  describe('/3-style: "for CLUB, find players with A plus B"', () => {
+    it('club-scoped, a positive "at least" clause plus a "zero" equality clause', async () => {
+      const p = await plan('For Richmond, find players with at least 20 finals plus zero goals');
+      expect(p.grain).toBe('player_career');
+      expect(p.agg).toEqual({ kind: 'list' });
+      expect(p.metric).toBeNull();
+      expect(p.scope.clubFor?.name).toBe('Richmond');
+      expect(p.careerConditions).toEqual([
+        { kind: 'column', column: 'finals', op: 'gte', value: 20 },
+        { kind: 'column', column: 'goals', op: 'eq', value: 0 },
+      ]);
+    });
+
+    it('club-scoped, two "at least"/"fewer than" clauses', async () => {
+      const p = await plan('For Richmond, find players with at least 20 finals plus fewer than 5 losses');
+      expect(p.grain).toBe('player_career');
+      expect(p.scope.clubFor?.name).toBe('Richmond');
+      expect(p.careerConditions).toEqual([
+        { kind: 'column', column: 'finals', op: 'gte', value: 20 },
+        { kind: 'column', column: 'losses', op: 'lt', value: 5 },
+      ]);
+    });
+
+    it('club-scoped, a "no" negative clause plus an "at most" clause', async () => {
+      const p = await plan('For Adelaide, find players with no premierships plus at most 10 Brownlow votes');
+      expect(p.grain).toBe('player_career');
+      expect(p.scope.clubFor?.name).toBe('Adelaide');
+      expect(p.careerConditions).toEqual([
+        { kind: 'column', column: 'premierships', op: 'eq', value: 0 },
+        { kind: 'column', column: 'brownlow_votes', op: 'lte', value: 10 },
+      ]);
+    });
+  });
+
+  // Host validation (parser v62, commit 5eca839) found a second "plus"
+  // ownership gap the three cases above didn't exercise: a positive
+  // clause FIRST, "plus", then a "no X" negative clause SECOND. Two
+  // independent causes, both fixed generically (no metric combination or
+  // sample string special-cased):
+  //
+  //  1. The clause-boundary lookback that finds "plus" (and "and"/",")
+  //     was fixed at a 20-character budget -- long enough for a short
+  //     comparator like "at least"/"exactly", but "no more than " alone
+  //     is 13 characters, which together with "plus " (5) and a number
+  //     could put the boundary more than 20 characters back, outside the
+  //     lookback entirely. Widened to 40 characters, comfortably fitting
+  //     the longest COMPARE_OP_WORDS phrase ("no greater than") plus a
+  //     4-digit number and the joining word -- the search still takes the
+  //     NEAREST boundary within that span, so it can only reveal a
+  //     previously-invisible real boundary, never reach past it into an
+  //     earlier clause.
+  //  2. The "no X" negative-condition loop (checked before the numeric
+  //     pending-stat loop) matches and strips only the "no X" phrase
+  //     itself, with no knowledge of a neighbouring "plus" on either
+  //     side. A LEADING "plus" ("... goals PLUS no premierships") is now
+  //     checked and consumed there too, only once the negative clause
+  //     itself actually bound. A TRAILING "plus" ("no premierships PLUS
+  //     ...") needs no new handling: that ordering leaves "plus"
+  //     immediately in front of the SECOND (pending-loop) clause instead,
+  //     which the pending loop's own boundary search already finds from
+  //     the other direction (proven by the "no premierships plus at most
+  //     10 Brownlow votes" case above).
+  describe('/3-style, follow-up: a positive clause first, "plus", then a "no X" negative clause', () => {
+    it('a comparator clause plus a "no" negative clause ("no more than"-length boundary not involved)', async () => {
+      const p = await plan('For Sydney, find players with more than 50 goals plus no premierships');
+      expect(p.grain).toBe('player_career');
+      expect(p.scope.clubFor?.name).toBe('Sydney');
+      expect(p.careerConditions).toEqual([
+        { kind: 'column', column: 'premierships', op: 'eq', value: 0 },
+        { kind: 'column', column: 'goals', op: 'gt', value: 50 },
+      ]);
+    });
+
+    it('two positive comparator clauses, the second a long "no more than" phrase (boundary-lookback widening)', async () => {
+      const p = await plan('For Port Adelaide, find players with exactly 3 premierships plus no more than 250 games');
+      expect(p.grain).toBe('player_career');
+      expect(p.scope.clubFor?.name).toBe('Port Adelaide');
+      expect(p.careerConditions).toEqual([
+        { kind: 'column', column: 'premierships', op: 'eq', value: 3 },
+        { kind: 'column', column: 'games', op: 'lte', value: 250 },
+      ]);
+    });
+
+    it('a long "no more than" comparator clause plus a "no" negative clause (both fixes needed together)', async () => {
+      const p = await plan('For Essendon, find players with no more than 250 games plus no premierships');
+      expect(p.grain).toBe('player_career');
+      expect(p.scope.clubFor?.name).toBe('Essendon');
+      expect(p.careerConditions).toEqual([
+        { kind: 'column', column: 'premierships', op: 'eq', value: 0 },
+        { kind: 'column', column: 'games', op: 'lte', value: 250 },
+      ]);
+    });
+  });
+
+  describe('/2-style: "who has the most career S among players with A and B"', () => {
+    it('ranked metric distinct from both conditions', async () => {
+      const p = await plan('Who has the most career games among players with fewer than 5 losses and at most 10 Brownlow votes');
+      expect(p.grain).toBe('player_career');
+      expect(p.metric).toBe('games');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.scope).toEqual({});
+      expect(p.careerConditions).toEqual([
+        { kind: 'column', column: 'losses', op: 'lt', value: 5 },
+        { kind: 'column', column: 'brownlow_votes', op: 'lte', value: 10 },
+      ]);
+    });
+
+    it('ranked metric (clubs_played) distinct from both conditions', async () => {
+      const p = await plan('Who has the most career clubs among players with exactly 3 premierships and fewer than 5 losses');
+      expect(p.grain).toBe('player_career');
+      expect(p.metric).toBe('clubs_played');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.careerConditions).toEqual([
+        { kind: 'column', column: 'premierships', op: 'eq', value: 3 },
+        { kind: 'column', column: 'losses', op: 'lt', value: 5 },
+      ]);
+    });
+
+    // The metric/condition collision: the ranked metric's own stat word
+    // ("goals") is ALSO the field of one of the two conditions ("zero
+    // goals"), and the metric's mention comes FIRST in the sentence --
+    // exactly the ordering that used to make extractCareerConditions
+    // abandon the column on the ranking mention's own lack of a number,
+    // silently discarding the real "zero goals" condition sitting after
+    // it. Asserted with an exact careerConditions array (not just
+    // toContainEqual) so a regression that duplicates or drops either
+    // condition fails loudly.
+    it('metric/condition collision -- the ranked metric shares its column with a "zero" condition stated later in the same sentence', async () => {
+      const p = await plan('Who has the most career goals among players with at least 200 games and zero goals');
+      expect(p.grain).toBe('player_career');
+      expect(p.metric).toBe('goals');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.careerConditions).toEqual([
+        { kind: 'column', column: 'goals', op: 'eq', value: 0 },
+        { kind: 'column', column: 'games', op: 'gte', value: 200 },
+      ]);
+    });
+
+    // The same collision on the OTHER field ("games" is both the ranked
+    // metric and one of the two bound conditions), proving the fix is
+    // generic to whichever column collides, not special-cased to "goals".
+    it('metric/condition collision on the OTHER field ("games" is both the ranked metric and a bound condition)', async () => {
+      const p = await plan('Who has the most career games among players with at least 200 games and zero goals');
+      expect(p.grain).toBe('player_career');
+      expect(p.metric).toBe('games');
+      expect(p.careerConditions).toEqual([
+        { kind: 'column', column: 'games', op: 'gte', value: 200 },
+        { kind: 'column', column: 'goals', op: 'eq', value: 0 },
+      ]);
+    });
+  });
+
+  describe('regression: existing career_numeric_binding wordings are unchanged', () => {
+    it('"and"-joined conditions still bind both exactly as before', async () => {
+      const p = await plan('List players with at least 20 finals and zero goals');
+      expect(p.agg).toEqual({ kind: 'list' });
+      expect(p.careerConditions).toEqual([
+        { kind: 'column', column: 'finals', op: 'gte', value: 20 },
+        { kind: 'column', column: 'goals', op: 'eq', value: 0 },
+      ]);
+    });
+
+    it('comma-joined conditions still bind both exactly as before', async () => {
+      const p = await plan('Players who have at least 20 finals, zero goals');
+      expect(p.careerConditions).toEqual([
+        { kind: 'column', column: 'finals', op: 'gte', value: 20 },
+        { kind: 'column', column: 'goals', op: 'eq', value: 0 },
+      ]);
+    });
+
+    it('trailing-metric wording ("of players with A and B, who has the fewest career S") is unaffected', async () => {
+      const p = await plan('Of players with at least 20 finals and zero goals, who has the fewest career games');
+      expect(p.metric).toBe('games');
+      expect(p.agg).toEqual({ kind: 'min' });
+      expect(p.careerConditions).toEqual([
+        { kind: 'column', column: 'finals', op: 'gte', value: 20 },
+        { kind: 'column', column: 'goals', op: 'eq', value: 0 },
+      ]);
+    });
+
+    it('a valid single career numeric condition (no conjunction at all) is unchanged', async () => {
+      const p = await plan('players with at least 300 games');
+      expect(p.careerConditions).toEqual([{ kind: 'column', column: 'games', op: 'gte', value: 300 }]);
+    });
+
+    it('"most flags" still ranks by premierships (single occurrence, no adjacent number anywhere) rather than the occurrence-retry loop finding a spurious match', async () => {
+      const p = await plan('most flags');
+      expect(p.metric).toBe('premierships');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.careerConditions).toEqual([]);
+    });
+  });
+
+  describe('negative controls: "plus"/"among"/"find" are not globally ignored', () => {
+    // Proves the widened (20 -> 40 character) boundary-probe lookback
+    // takes the NEAREST boundary within its span, never a more distant
+    // one: three chained clauses ("and" then "plus"), where the "and"
+    // boundary sits well within the OLD 20-character budget too. If
+    // widening the probe had made it prefer a farther-back boundary over
+    // a closer one, this would misbind "goals" to the wrong clause or
+    // lose "losses" the way the pre-fix "300 clubs and over 10
+    // premierships" defect this window discipline was built against did.
+    it('three chained conditions ("and" then "plus") each bind to their own clause, not a farther one', async () => {
+      const p = await plan('players with 20 finals and 5 losses plus zero goals');
+      expect(p.careerConditions).toEqual([
+        { kind: 'column', column: 'finals', op: 'gte', value: 20 },
+        { kind: 'column', column: 'losses', op: 'gte', value: 5 },
+        { kind: 'column', column: 'goals', op: 'eq', value: 0 },
+      ]);
+    });
+    it('"plus" beside a genuinely unsupported second clause still declines, not silently swallowed', async () => {
+      const result = await parse('players with at least 20 finals plus a puppy');
+      expect(result.status).not.toBe('plan');
+      expect(result.report.unsupportedTerms.some((t) => t.includes('plus'))).toBe(true);
+    });
+
+    it('"plus" with no preceding bound numeric clause at all still declines', async () => {
+      const result = await parse('players with plus zero goals');
+      expect(result.status).not.toBe('plan');
+      expect(result.report.unsupportedTerms).toContain('plus');
+    });
+
+    it('"plus" outside the career-numeric-binding construction entirely still declines', async () => {
+      const result = await parse('richmond biggest win plus their finals record');
+      expect(result.status).not.toBe('plan');
+      expect(result.report.unsupportedTerms.some((t) => t.includes('plus'))).toBe(true);
+    });
+
+    it('"among" with no numeric career condition present is not swallowed by the new gated consumption', async () => {
+      const result = await parse('most career goals among players');
+      expect(result.status).not.toBe('plan');
+      expect(result.report.unsupportedTerms).toContain('among');
+    });
+
+    it('a bare mid-sentence "find" with no leading "for" scope clause in front of it still declines (not a blanket strip)', async () => {
+      const result = await parse('since 2000, find the most goals');
+      expect(result.status).not.toBe('plan');
+      expect(result.report.unsupportedTerms).toContain('find');
+    });
+  });
+});
+
+// AFLDB-ISSUE-218: three exploratory `team_match_result` clusters -- `/2`
+// ("by how much did X lose to Y in their most lopsided meeting..."), `/1`
+// ("at V, find the widest X win/loss to Y...") and `/0` ("what was X'
+// biggest victory against Y..."). Source inspection (parser.ts's
+// extractClubs/nearestGoverningPreposition, vocab.ts's TEAM_METRIC_WORDS/
+// AGG_WORDS) proved `/1` and `/2` already extract both clubs and the
+// correct win/loss direction correctly -- their only defect was leftover
+// WRAPPER vocabulary ("widest", a leading "at V, find" request verb,
+// "how much"/"lopsided meeting"), never a semantic misread. `/0`'s failure
+// is a single, fully unrelated token, "bombers'" -- the trailing-apostrophe
+// plural possessive club alias canonicalise()'s `/['’]s\b/g` strip does not
+// reach (that strip only matches an apostrophe BEFORE a trailing "s", e.g.
+// "richmond's", not one after an already-plural noun) -- the same generic
+// alias defect AFLDB-ISSUE-214 already found and deliberately left
+// unfixed for `club_season_rank`. `/0` is deferred here for the same
+// reason: it shares no mechanism with `/1`/`/2` and belongs in a future
+// cross-family possessive-alias issue instead.
+describe('AFLDB-ISSUE-218: team-match result phrasing', () => {
+  describe('/2: "by how much did X lose to Y in their most lopsided meeting..."', () => {
+    it('Collingwood loses to Carlton at Adelaide Oval after 1999 -- direction, venue and exclusive lower bound all preserved', async () => {
+      const p = await plan('By how much did Pies lose to Carlton in their most lopsided meeting at Adelaide Oval after 1999');
+      expect(p.grain).toBe('team_match');
+      expect(p.metric).toBe('loss_margin');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.scope.clubFor?.name).toBe('Collingwood');
+      expect(p.scope.clubAgainst?.name).toBe('Carlton');
+      expect(p.scope.venue?.name).toBe('Adelaide Oval');
+      // AFLDB-ISSUE-211: "after 1999" is an EXCLUSIVE lower bound.
+      expect(p.scope.seasonMin).toBe(2000);
+    });
+
+    it('Hawthorn loses to Geelong at the MCG since 2000 -- a different club pair/venue and the inclusive "since" bound', async () => {
+      const p = await plan('By how much did Hawthorn lose to Geelong in their most lopsided meeting at the MCG since 2000');
+      expect(p.grain).toBe('team_match');
+      expect(p.metric).toBe('loss_margin');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.scope.clubFor?.name).toBe('Hawthorn');
+      expect(p.scope.clubAgainst?.name).toBe('Geelong');
+      expect(p.scope.venue?.name).toBe('Melbourne Cricket Ground');
+      expect(p.scope.seasonMin).toBe(2000);
+    });
+
+    it('Richmond loses to Carlton in 2017 -- no venue named at all', async () => {
+      const p = await plan('By how much did Richmond lose to Carlton in their most lopsided meeting in 2017');
+      expect(p.grain).toBe('team_match');
+      expect(p.metric).toBe('loss_margin');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.scope.clubFor?.name).toBe('Richmond');
+      expect(p.scope.clubAgainst?.name).toBe('Carlton');
+      expect(p.scope.venue).toBeUndefined();
+      expect(p.scope.seasonMin).toBe(2017);
+      expect(p.scope.seasonMax).toBe(2017);
+    });
+
+    // Required by the runbook: "Pies lose to Carlton" and "Pies beat
+    // Carlton" must not collapse to the same reading. Same subject club,
+    // opposite verb -- clubFor stays Collingwood in both, but the metric
+    // (and so the winner/loser direction) flips.
+    it('distinguishes "Pies lose to Carlton" (Collingwood loses) from "Pies beat Carlton" (Collingwood wins)', async () => {
+      const lose = await plan('By how much did Pies lose to Carlton in their most lopsided meeting at Adelaide Oval after 1999');
+      expect(lose.scope.clubFor?.name).toBe('Collingwood');
+      expect(lose.scope.clubAgainst?.name).toBe('Carlton');
+      expect(lose.metric).toBe('loss_margin');
+
+      const beat = await plan('By how much did Pies beat Carlton in their most lopsided meeting at Adelaide Oval after 1999');
+      expect(beat.scope.clubFor?.name).toBe('Collingwood');
+      expect(beat.scope.clubAgainst?.name).toBe('Carlton');
+      expect(beat.metric).toBe('win_margin');
+    });
+  });
+
+  describe('/1: "at V, find the widest X win/loss to Y..."', () => {
+    it('Collingwood\'s widest win to North Melbourne at the MCG in 2023', async () => {
+      const p = await plan('At the MCG, find the widest Pies win to North Melbourne in 2023');
+      expect(p.grain).toBe('team_match');
+      expect(p.metric).toBe('win_margin');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.scope.clubFor?.name).toBe('Collingwood');
+      expect(p.scope.clubAgainst?.name).toBe('North Melbourne');
+      expect(p.scope.venue?.name).toBe('Melbourne Cricket Ground');
+      expect(p.scope.seasonMin).toBe(2023);
+      expect(p.scope.seasonMax).toBe(2023);
+    });
+
+    it('Greater Western Sydney\'s widest loss to Sydney at Docklands in 2017 -- a multi-word club name plus the noun "loss" instead of the verb', async () => {
+      const p = await plan('At Docklands, find the widest Greater Western Sydney loss to Sydney in 2017');
+      expect(p.grain).toBe('team_match');
+      expect(p.metric).toBe('loss_margin');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.scope.clubFor?.name).toBe('Greater Western Sydney');
+      expect(p.scope.clubAgainst?.name).toBe('Sydney');
+      expect(p.scope.venue?.name).toBe('Docklands Stadium');
+    });
+
+    it('Richmond\'s widest win to Carlton at Adelaide Oval since 2000', async () => {
+      const p = await plan('At Adelaide Oval, find the widest Richmond win to Carlton since 2000');
+      expect(p.grain).toBe('team_match');
+      expect(p.metric).toBe('win_margin');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.scope.clubFor?.name).toBe('Richmond');
+      expect(p.scope.clubAgainst?.name).toBe('Carlton');
+      expect(p.scope.venue?.name).toBe('Adelaide Oval');
+      expect(p.scope.seasonMin).toBe(2000);
+    });
+  });
+
+  describe('/0: deferred -- a distinct, pre-existing possessive-club-alias defect, not fixed by this issue', () => {
+    it('"Bombers\' biggest victory against Pies" still declines exactly as before -- the trailing-apostrophe alias is untouched by this fix', async () => {
+      const result = await parse('What was Bombers\' biggest victory against Pies at Optus Stadium in 2017');
+      expect(result.status).not.toBe('plan');
+      expect(result.report.unsupportedTerms.join(' ')).toContain('bombers');
+    });
+  });
+
+  describe('regression controls', () => {
+    it('an already-supported directional WIN query is unchanged', async () => {
+      const p = await plan('Richmond biggest win since 2000');
+      expect(p.grain).toBe('team_match');
+      expect(p.metric).toBe('win_margin');
+      expect(p.scope.clubFor?.name).toBe('Richmond');
+      expect(p.scope.seasonMin).toBe(2000);
+    });
+
+    it('an already-supported directional LOSS query is unchanged', async () => {
+      const p = await plan('Adelaide worst loss to GWS Giants');
+      expect(p.grain).toBe('team_match');
+      expect(p.metric).toBe('loss_margin');
+      expect(p.scope.clubFor?.name).toBe('Adelaide');
+      expect(p.scope.clubAgainst?.name).toBe('Greater Western Sydney');
+    });
+
+    it('an ordinary head-to-head query still reads as head-to-head, not a result-record query', async () => {
+      const p = await plan('Which of Richmond and Carlton has more wins head to head');
+      expect(p.grain).toBe('head_to_head');
+      expect(p.headToHead?.kind).toBe('compare_wins');
+    });
+
+    it('symmetric "versus" matchup parsing (AFLDB-ISSUE-213) is unaffected', async () => {
+      const p = await plan('Largest winning margin for North Melbourne versus Melbourne at Adelaide Oval');
+      expect(p.scope.matchup?.clubA.name).toBe('North Melbourne');
+      expect(p.scope.matchup?.clubB.name).toBe('Melbourne');
+      expect(p.scope.clubFor).toBeUndefined();
+      expect(p.scope.clubAgainst).toBeUndefined();
+    });
+
+    it('venue ownership stays intact alongside the new wrapper consumption', async () => {
+      const p = await plan('At the MCG, find the widest Pies win to North Melbourne in 2023');
+      expect(p.scope.venue?.name).toBe('Melbourne Cricket Ground');
+    });
+
+    it('"find" is still not globally ignored -- a bare mid-sentence "find" with no leading "for"/"at" scope clause still declines', async () => {
+      const result = await parse('since 2000, find the widest richmond win');
+      expect(result.status).not.toBe('plan');
+      expect(result.report.unsupportedTerms).toContain('find');
+    });
+
+    it('"widest" contributes aggregation only, exactly like "biggest" -- it does not rescue an otherwise-unsupported question', async () => {
+      const result = await parse('the widest jumper number ever worn by a player');
+      expect(result.status).not.toBe('plan');
+    });
+
+    it('"widest" still generalises beyond this issue\'s two templates -- e.g. "widest lead"', async () => {
+      const p = await plan('Richmond\'s widest lead against Carlton');
+      expect(p.grain).toBe('team_match');
+      expect(p.metric).toBe('win_margin');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.scope.clubFor?.name).toBe('Richmond');
+      expect(p.scope.clubAgainst?.name).toBe('Carlton');
+    });
+
+    it('"meeting" is not globally ignored -- only the specific "lopsided meeting" idiom is consumed, a bare "meeting" still declines', async () => {
+      const result = await parse('Richmond biggest win against Carlton in their meeting at the MCG');
+      expect(result.status).not.toBe('plan');
+      expect(result.report.unsupportedTerms).toContain('meeting');
+    });
+
+    it('unrelated "lost" usage still declines on its own genuinely unsupported term, not rescued by the new loss_margin verb reading', async () => {
+      const result = await parse('Which player has lost the most hair');
+      expect(result.status).not.toBe('plan');
+      expect(result.report.unsupportedTerms).toContain('hair');
+    });
+
+    it('team score/crowd record queries remain in their own family, unaffected by the new verb vocabulary', async () => {
+      const p = await plan('Adelaide highest score against GWS Giants');
+      expect(p.grain).toBe('team_match');
+      expect(p.metric).toBe('team_score');
+      expect(p.scope.clubFor?.name).toBe('Adelaide');
+      expect(p.scope.clubAgainst?.name).toBe('Greater Western Sydney');
+    });
+
+    it('team streak queries remain unaffected by the new "lose"/"beat" verb vocabulary', async () => {
+      const p = await plan('which team has the longest winning streak');
+      expect(p.grain).toBe('team_streak');
+      expect(p.streakDefinition).toEqual({ kind: 'win' });
+    });
   });
 });

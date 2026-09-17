@@ -15,8 +15,31 @@ import type {
  * Bump ALGORITHM_VERSION whenever anything below changes. Cached
  * suggestions carry the version they were computed under and are
  * refused at approval when it no longer matches.
+ *
+ * v3 (AFLDB-ISSUE-164 P3A): for NON-DRAFT sources, club comparison runs
+ * through the continuing club (clubs.organization_id) rather than the
+ * raw club identity, for both the club reward and the
+ * club_not_in_history contradiction (S1). Draft sources stay on raw
+ * clubs.id, exactly as v2 compared them: S1 is authorised for non-draft
+ * sources in this tranche and draft_person scoring may not move before
+ * Tier 2 can validate it (see SourceEvidence.clubMatch),
+ * and hall_of_fame / honour_team_members club text is resolved read-time
+ * to a continuing club so those two sources can reach club evidence at
+ * all (S3/S4). The S3/S4 weights below are null -- the signals are
+ * implemented and the resolution is plumbed, but nothing is scored from
+ * them until the P3B grid picks the weights, because the runbook freezes
+ * no candidate number for them (sec 7 step 3). S1 alone changes scores
+ * and contradictions, so the version moves.
+ *
+ * v2 (AFLDB-ISSUE-164 P1a): afldb_normalise_name() now canonicalises
+ * Unicode whitespace, so a name separated by U+00A0 reaches name_exact
+ * and strongName where it previously reached only name_trigram_high
+ * (migration 099). Nothing in the policy below moved, but the matching
+ * semantics did, which is exactly what the version string is for: every
+ * v1 cached suggestion is now stale and must be labelled as such until
+ * the cache is refreshed.
  */
-export const ALGORITHM_VERSION = 'v1';
+export const ALGORITHM_VERSION = 'v3';
 
 export const MATCH_POLICY = {
   scoring: {
@@ -40,6 +63,24 @@ export const MATCH_POLICY = {
     club: {
       clubSeason: 36,
       clubAnywhere: 15,
+      /**
+       * Club text resolved from hall_of_fame / honour_team_members
+       * (S3/S4). Both are 15, selected by AFLDB-ISSUE-164 P3B's measured
+       * grid: 15/15 produced the whole of the measurable identity
+       * improvement (two Hall of Fame Top-1 corrections, six fewer
+       * ambiguous rows, no correct Top-1 lost, Very High and bulk
+       * unchanged), and 23, 24 and 29 added only score and band
+       * inflation on top of it. The lowest weight that buys the
+       * improvement is the one that ships.
+       *
+       * These two are the ONLY weights a calibration run may override,
+       * and it does so by an explicit option on the measurement entry
+       * point, never by editing this file and never from the
+       * environment (see calibration.ts). Everything the application
+       * scores reads the 15s below.
+       */
+      clubTextInSpan: 15,
+      clubTextAnywhere: 15,
     },
     /** Playing era, from active seasons only -- never induction or draft years. */
     era: {
@@ -158,11 +199,24 @@ export const MATCH_POLICY = {
      * never reach the band, and so have NO measured bulk population.
      * Absence of failures in a population of zero is not evidence of
      * safety.
+     *
+     * draft_person is SUSPENDED (AFLDB-ISSUE-164 D-9), not withdrawn on
+     * new evidence against it. Its 2,319-row admission above is the
+     * ISSUE-075 historical calibration, which the current backtest
+     * cannot re-run: the executable baseline holds FIVE labelled
+     * draft rows against 5,052 unmatched. Migration 099 lifts the whole
+     * NBSP-affected draft population from name_trigram_high to
+     * name_exact at once, so leaving the class admitted would present a
+     * large new unattended-approval set backed by five labelled rows.
+     * Suggestions and one-at-a-time human approval are unaffected; only
+     * the unattended path is closed. ISSUE-164 P1c re-gates the class
+     * under the frozen sec 9.1 standard (>= 253 bulk-eligible confirmed
+     * rows, 0 false positives) and nothing else may re-admit it.
      */
     sourceTypes: {
       award_winners: true,
       award_nominations: true,
-      draft_person: true,
+      draft_person: false,
       player_achievements: true,
       captaincies: false,
       hall_of_fame: false,

@@ -51,7 +51,17 @@ export function isLinkTargetTable(value: string): value is LinkTargetTable {
 }
 
 /** Statuses that mean "no confirmed link" and so belong in the queue. */
-const UNRESOLVED = ['ambiguous', 'unmatched', 'implausible'] as const;
+/**
+ * The link statuses the review queue holds -- everything that is neither an
+ * importer-confirmed 'unique' nor a human-decided 'resolved'.
+ *
+ * Exported for AFLDB-ISSUE-160's `/admin/draft` deep link, so that surface
+ * decides whether a selection belongs in this queue by reading THIS list
+ * rather than restating it (`needsPlayerLinkReview`, `admin-draft.ts`).
+ */
+export const UNRESOLVED_LINK_STATUSES = ['ambiguous', 'unmatched', 'implausible'] as const;
+
+const UNRESOLVED = UNRESOLVED_LINK_STATUSES;
 
 export type UnresolvedLinkRow = {
   targetTable: LinkTargetTable;
@@ -94,7 +104,11 @@ export async function listUnresolvedLinks(
         FROM award_winners w
         JOIN awards a ON a.id = w.award_id
         LEFT JOIN clubs c ON c.id = w.club_id
+       -- AFLDB-ISSUE-165 D-10. A voided row is one that should never have
+       -- existed, so asking a curator to identify the person in it is asking
+       -- them to do work on a record AFLDB has already retracted.
        WHERE w.link_status_value::text = ANY(${statusValues})
+         AND w.status <> 'void'
       UNION ALL
       SELECT 'award_nominations', n.id, n.player_name_raw,
              n.link_status_value::text,
@@ -116,6 +130,7 @@ export async function listUnresolvedLinks(
         FROM hall_of_fame h
         LEFT JOIN aflw.players ap ON lower(trim(ap.display_name)) = lower(trim(h.name))
        WHERE h.link_status_value::text = ANY(${statusValues})
+         AND h.status <> 'void'
          AND ap.slug IS NULL
          AND lower(COALESCE(h.category, '')) NOT IN ('media', 'umpire', 'administrator', 'pioneer')
       UNION ALL
@@ -125,6 +140,7 @@ export async function listUnresolvedLinks(
              'honour_team_members', m.id
         FROM honour_team_members m
        WHERE m.link_status_value::text = ANY(${statusValues})
+         AND m.status <> 'void'
       UNION ALL
       SELECT 'captaincies', cp.id, cp.player_name_raw,
              cp.link_status_value::text,
@@ -140,7 +156,12 @@ export async function listUnresolvedLinks(
                        pa.season::text),
              'player_achievements', pa.id
         FROM player_achievements pa
+      -- AFLDB-ISSUE-167 sec 7 / D-2: a voided achievement leaves the queue
+      -- (it is retracted, so there is nothing left to link), while
+      -- after_siren_kicks deliberately never enters LINK_TARGET_TABLES at
+      -- all. Same rule as hall_of_fame and honour_team_members above.
        WHERE pa.link_status_value::text = ANY(${statusValues})
+         AND pa.status = 'active'
       UNION ALL
       SELECT 'draft_picks', dp.id, dp.player_name_raw,
              dp.link_status_value::text,
@@ -524,7 +545,9 @@ export async function createPlayerAndResolveLink(input: {
       if (decision.type === 'confirmed_unlinked') return 'stale_unlinked';
       if (decision.type === 'linked') return 'already_resolved';
 
-      const player = await createPlayerInTransaction(tx, input.player);
+      const player = await createPlayerInTransaction(tx, input.player, {
+        adminUserId: input.adminUserId,
+      });
       await applyLockedLink(
         tx,
         input.targetTable,
@@ -640,6 +663,25 @@ export async function setSuggestionStatus(
 export type SuggestedLinkMethod = 'suggested' | 'bulk_suggested';
 
 /**
+ * What the queue page had on screen for this row, read out of the cache
+ * SERVER-side by the calling action. Never a browser value.
+ */
+export type DisplayedSuggestion = {
+  algorithmVersion: string;
+  score: number;
+};
+
+/**
+ * Approval outcome. `notice` is reporting, not permission: it appears
+ * only on an approval that already passed every check, to say that the
+ * suggestion shown to the reviewer was computed under an older
+ * algorithm version than the one the link was actually approved on.
+ */
+export type SuggestionResolveResult =
+  | { ok: true; notice?: string }
+  | { ok: false; error: string };
+
+/**
  * Approve a suggested match.
  *
  * The cache is advice, not authority, so none of it is trusted here.
@@ -657,6 +699,11 @@ export type SuggestedLinkMethod = 'suggested' | 'bulk_suggested';
  * A score posted by the browser is therefore incapable of influencing
  * anything: it is not read, and a stale page fails step 4 rather than
  * quietly linking a player the evidence no longer supports.
+ *
+ * `displayed` changes none of that. It is the cached version and score
+ * the action read from the database before calling here, and it is used
+ * only to REPORT that the screen was stale once the fresh score has
+ * already carried the decision on its own.
  */
 export async function resolveLinkFromSuggestion(input: {
   targetTable: LinkTargetTable;
@@ -665,7 +712,8 @@ export async function resolveLinkFromSuggestion(input: {
   adminUserId: number;
   method: SuggestedLinkMethod;
   note?: string | null;
-}): Promise<ResolveResult> {
+  displayed?: DisplayedSuggestion | null;
+}): Promise<SuggestionResolveResult> {
   const importUrl = process.env.AFLDB_IMPORT_DATABASE_URL;
   if (!importUrl) return { ok: false, error: 'AFLDB_IMPORT_DATABASE_URL is not configured.' };
 
@@ -716,10 +764,19 @@ export async function resolveLinkFromSuggestion(input: {
         matchScore: best.score,
         algorithmVersion: assessment.algorithmVersion,
       });
-      return { ok: true as const };
-    }) as { ok: true } | { ok: false; error: string };
 
-    if (outcome.ok) return { ok: true };
+      // Reporting only, and only after the fresh score has already
+      // approved the link on its own evidence.
+      const displayed = input.displayed;
+      const notice = displayed && displayed.algorithmVersion !== assessment.algorithmVersion
+        ? `The suggestion on screen was stale: shown as ${displayed.algorithmVersion} `
+          + `score ${displayed.score}; approved on ${assessment.algorithmVersion} `
+          + `score ${best.score}.`
+        : undefined;
+      return notice ? { ok: true as const, notice } : { ok: true as const };
+    }) as { ok: true; notice?: string } | { ok: false; error: string };
+
+    if (outcome.ok) return outcome.notice ? { ok: true, notice: outcome.notice } : { ok: true };
     const messages: Record<string, string> = {
       stale: 'No unresolved row with that id — it may already be linked.',
       evidence: 'The source row could not be re-read for scoring.',

@@ -8,8 +8,9 @@ import { revalidatePath } from 'next/cache';
  * ride the *same* handle without a real PostgreSQL connection. The
  * PostgreSQL-level contract -- the retained closure, the locks, the
  * restricted role -- is proven separately by
- * tests/integration/nl-search-telemetry-clear.test.ts; requireSuperAdmin()'s
- * own role/session logic is proven by tests/auth.test.ts. What this file
+ * tests/integration/nl-search-telemetry-clear.test.ts; the guard's own
+ * role/session logic (requireCapability('operations.nlTelemetry') since
+ * AFLDB-ISSUE-158, super-admin-only) is proven by tests/auth.test.ts. What this file
  * proves is that the action wires the approved contract together correctly:
  * guard first, phrase second, one transaction, the approved count payload
  * only, and revalidation gated on committed success.
@@ -18,7 +19,7 @@ import { revalidatePath } from 'next/cache';
 const FAKE_TX = Symbol('tx') as unknown;
 
 const mocks = vi.hoisted(() => ({
-  requireSuperAdmin: vi.fn(),
+  requireCapability: vi.fn(),
   auditInTransaction: vi.fn(),
   audit: vi.fn(),
   clearNlSearchTelemetry: vi.fn(),
@@ -41,7 +42,7 @@ vi.mock('@/db/queries/nl-search-telemetry-clear', () => ({
 }));
 
 vi.mock('@/lib/auth/session', () => ({
-  requireSuperAdmin: mocks.requireSuperAdmin,
+  requireCapability: mocks.requireCapability,
   auditInTransaction: mocks.auditInTransaction,
   audit: mocks.audit,
 }));
@@ -67,7 +68,7 @@ function formWith(confirmation?: string): FormData {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.requireSuperAdmin.mockResolvedValue(ADMIN);
+  mocks.requireCapability.mockResolvedValue(ADMIN);
   // Mirrors postgres.js: the callback runs on the transaction handle, and
   // whatever it returns (or throws) is what begin() resolves (or rejects)
   // with -- no swallowing, so a thrown auditInTransaction/clear failure
@@ -84,15 +85,16 @@ describe('clearTelemetry', () => {
 
     expect(result.error).toBeUndefined();
     expect(result.counts).toEqual(COUNTS);
-    expect(mocks.requireSuperAdmin).toHaveBeenCalledOnce();
+    expect(mocks.requireCapability).toHaveBeenCalledOnce();
+    expect(mocks.requireCapability).toHaveBeenCalledWith('operations.nlTelemetry');
   });
 
-  it('stops at the guard before any mutation when requireSuperAdmin rejects', async () => {
-    // requireSuperAdmin() redirects (throws) for an unauthenticated caller,
+  it('stops at the guard before any mutation when requireCapability rejects', async () => {
+    // requireCapability() redirects (throws) for an unauthenticated caller,
     // a plain admin and a contributor alike -- all three collapse to the
     // same "the guard rejected" case from this action's point of view; the
     // guard's own role-by-role logic is exercised in tests/auth.test.ts.
-    mocks.requireSuperAdmin.mockRejectedValue(new Error('redirect: /admin'));
+    mocks.requireCapability.mockRejectedValue(new Error('redirect: /admin'));
 
     await expect(clearTelemetry({}, formWith(NL_TELEMETRY_CLEAR_PHRASE))).rejects.toThrow('redirect: /admin');
 
@@ -123,12 +125,12 @@ describe('clearTelemetry', () => {
     expect(revalidatePath).not.toHaveBeenCalled();
   });
 
-  it('still requires requireSuperAdmin() even when the confirmation is absent', async () => {
+  it('still runs the capability guard even when the confirmation is absent', async () => {
     // The guard must run before confirmation parsing (§6), not merely
     // before the transaction -- so it fires on every call, not only the
     // ones that reach a valid phrase.
     await clearTelemetry({}, formWith());
-    expect(mocks.requireSuperAdmin).toHaveBeenCalledOnce();
+    expect(mocks.requireCapability).toHaveBeenCalledOnce();
   });
 
   it('runs clearNlSearchTelemetry and auditInTransaction on the same transaction handle', async () => {

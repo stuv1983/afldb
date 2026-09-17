@@ -5,13 +5,14 @@ import Link from 'next/link';
 import { ConsentBanner } from '@/components/ConsentBanner';
 import { PrimaryNav, TabBar } from '@/components/SiteNav';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import { getSiteFooter, getSiteTheme } from '@/db/queries/site-settings';
+import { getSiteFooter, getSiteLayout, getSiteTheme } from '@/db/queries/site-settings';
 import { HEALTH_INIT_SCRIPT } from '@/lib/health-init-script';
 import { indexingEnabled } from '@/lib/indexing';
 import { siteUrl } from '@/lib/seo';
 import { THEME_INIT_SCRIPT } from '@/lib/theme';
 import '@/styles/globals.css';
 import '@/styles/themes.css';
+import '@/styles/layouts.css';
 
 const baseUrl = siteUrl();
 
@@ -89,12 +90,36 @@ export const metadata: Metadata = {
  */
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const fonts = `${newsreader.variable} ${plexSans.variable} ${plexMono.variable}`;
-  const [footer, siteTheme] = await Promise.all([getSiteFooter(), getSiteTheme()]);
+  const [footer, siteTheme, siteLayout] = await Promise.all([
+    getSiteFooter(),
+    getSiteTheme(),
+    getSiteLayout(),
+  ]);
+  // The `sidebar` preset moves `PrimaryNav` out of the header and beside
+  // `main` in a two-column shell (`src/styles/layouts.css`); every other
+  // preset renders it in the header as before. This is the one difference
+  // pure CSS cannot express, because it changes which element is PrimaryNav's
+  // parent. Both branches render the exact same `PrimaryNav`/`TabBar`
+  // components — see issues/closed/AFLDB-ISSUE-173.md — so the nav model and its
+  // interactions (including the mobile TabBar) are never duplicated.
+  //
+  // `<main id="main">` must wrap ONLY page content in both presets: the
+  // "Skip to content" link targets `#main`, and PrimaryNav must be a
+  // sibling of `<main>`, not a child of it, or the skip link stops
+  // skipping the nav and the nav/main landmarks nest (AFLDB-ISSUE-173
+  // web-interface-guidelines remediation).
+  const sidebarLayout = siteLayout === 'sidebar';
 
   return (
     // The pre-paint script below sets data-theme on this element, so the
     // server markup and the first client render legitimately differ.
-    <html lang="en-AU" className={fonts} data-site-theme={siteTheme} suppressHydrationWarning>
+    <html
+      lang="en-AU"
+      className={fonts}
+      data-site-theme={siteTheme}
+      data-site-layout={siteLayout}
+      suppressHydrationWarning
+    >
       <head>
         {/* Blocking and first in <head>: the stored theme must be applied
             before any styled markup paints, or a reader who chose dark
@@ -115,14 +140,31 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <Link href="/" className="brand">AFLDB</Link>
               <span className="span">1897 — Present</span>
             </div>
-            <PrimaryNav />
+            {!sidebarLayout && <PrimaryNav />}
             <ThemeToggle />
           </div>
         </header>
 
-        <main id="main">
-          <div className="container">{children}</div>
-        </main>
+        {sidebarLayout ? (
+          // Same shape as the admin shell's own nav-beside-content grid
+          // (`.admin-shell` in globals.css): a `.container` that drops its
+          // max-width when it directly contains this structural class, so
+          // the sidebar and the wider content column can use the space a
+          // single reading column would not need. This wrapper is a plain
+          // div, not a landmark, so `.layout-nav` (PrimaryNav) and
+          // `<main id="main">` are sibling landmarks beneath it — never one
+          // nested inside the other.
+          <div className="container layout-shell">
+            <div className="layout-nav">
+              <PrimaryNav />
+            </div>
+            <main id="main" className="layout-main">{children}</main>
+          </div>
+        ) : (
+          <main id="main">
+            <div className="container">{children}</div>
+          </main>
+        )}
 
         <footer className="site-footer">
           <div className="container">

@@ -2,14 +2,13 @@
 
 import { revalidatePath } from 'next/cache';
 
-import { createAwardWinner, createHallOfFameInductee, createHonourTeamMember } from '@/db/queries/awards-admin';
 import { saveEdit } from '@/db/queries/data-edits';
 import { createMatch, deleteMatch } from '@/db/queries/match-admin';
 import { saveMatchSheet } from '@/db/queries/match-sheet';
-import { createPlayer, type DraftPickInput } from '@/db/queries/players';
+import { createPlayer } from '@/db/queries/players';
 import { validateAdminMatchNumbers } from '@/lib/admin-match';
 import { EDITABLE_ENTITIES } from '@/lib/edit/spec';
-import { audit, requireSuperAdmin } from '@/lib/auth/session';
+import { audit, requireCapability } from '@/lib/auth/session';
 import { validateMatchSheetPayload } from '@/lib/match-sheet';
 
 export type SimpleAdminActionState = {
@@ -57,7 +56,7 @@ export async function createPlayerAction(
   _prev: CreatePlayerActionState,
   formData: FormData,
 ): Promise<CreatePlayerActionState> {
-  const admin = await requireSuperAdmin();
+  const admin = await requireCapability('data.dataEditor');
 
   const displayName = String(formData.get('displayName') ?? '').trim();
   if (!displayName || displayName.length > 100) {
@@ -77,38 +76,19 @@ export async function createPlayerAction(
 
   const notes = String(formData.get('notes') ?? '').trim() || null;
 
-  // Draft information (optional)
-  const recruitedFrom = String(formData.get('recruitedFrom') ?? '').trim() || null;
-  const rawDraftYear = formData.get('draftYear');
-  const draftYear = rawDraftYear !== null && rawDraftYear !== ''
-    && Number.isInteger(Number(rawDraftYear)) ? Number(rawDraftYear) : null;
-  const draftType = String(formData.get('draftType') ?? '').trim() || null;
-  const rawPickNumber = formData.get('pickNumber');
-  const pickNumber = rawPickNumber && Number.isInteger(Number(rawPickNumber)) ? Number(rawPickNumber) : null;
-  const rawDraftClubId = formData.get('draftClubId');
-  const draftClubId = rawDraftClubId && Number.isInteger(Number(rawDraftClubId)) ? Number(rawDraftClubId) : null;
-  const rawDraftAge = formData.get('draftAge');
-  const draftAge = rawDraftAge && Number.isInteger(Number(rawDraftAge)) ? Number(rawDraftAge) : null;
-  const pickNote = String(formData.get('pickNote') ?? '').trim() || null;
-
-  const hasDraftInfo = Boolean(
-    recruitedFrom || rawDraftYear || draftType || rawPickNumber
-    || rawDraftClubId || rawDraftAge || pickNote,
-  );
-  let draftInfo: DraftPickInput | null = null;
-  if (hasDraftInfo) {
-    if (draftYear === null || draftYear < 1981 || draftYear > 2100) {
-      return { error: 'A valid draft year (1981–2100) is required with draft details.' };
-    }
-    draftInfo = {
-      recruitedFrom,
-      draftYear,
-      draftType,
-      pickNumber,
-      clubId: draftClubId,
-      draftAge,
-      pickNote,
-    };
+  // AFLDB-ISSUE-160 D-5. Draft selections have exactly one mutation contract
+  // now (`src/db/queries/admin-draft.ts`), reached from /admin/draft. This
+  // form created a `draft_picks` row with `source_id`, `player_url` and
+  // `source_record_id` all NULL: outside every identity, absent from a
+  // promoted database, and reachable by the generic editor only under a
+  // shared `null|null|<year>|null` override key. Rejecting the fields here --
+  // rather than ignoring them -- means a stale client cannot silently drop a
+  // selection an administrator believed they had recorded.
+  const DRAFT_FIELDS = [
+    'recruitedFrom', 'draftYear', 'draftType', 'pickNumber', 'draftClubId', 'draftAge', 'pickNote',
+  ];
+  if (DRAFT_FIELDS.some((field) => String(formData.get(field) ?? '').trim() !== '')) {
+    return { error: 'Draft selections are edited in /admin/draft.' };
   }
 
   try {
@@ -124,7 +104,6 @@ export async function createPlayerAction(
       heightCm,
       weightKg,
       notes,
-      draftInfo,
     }, { adminUserId: admin.id, note: notes });
 
     let warning: string | undefined;
@@ -132,7 +111,6 @@ export async function createPlayerAction(
       await audit('player.created', {
         playerId: player.id,
         displayName: player.displayName,
-        hasDraftInfo: Boolean(draftInfo),
       }, { userId: admin.id, label: admin.email });
     } catch (error) {
       console.error('Failed to log administrative audit for player creation', error);
@@ -142,261 +120,13 @@ export async function createPlayerAction(
     revalidatePath('/', 'layout');
 
     return {
-      message: `Created player "${player.displayName}" (ID #${player.id})${draftInfo ? ' with draft selection record' : ''}.`,
+      message: `Created player "${player.displayName}" (ID #${player.id}).`,
       createdId: player.id,
       warning,
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return { error: `Could not create player: ${msg}` };
-  }
-}
-
-/**
- * Super Admin Action: Add an Award Winner (see changeLog.md).
- */
-export async function createAwardWinnerAction(
-  _prev: SimpleAdminActionState,
-  formData: FormData,
-): Promise<SimpleAdminActionState> {
-  const admin = await requireSuperAdmin();
-
-  const awardId = Number(formData.get('awardId'));
-  if (!Number.isInteger(awardId) || awardId <= 0) {
-    return { error: 'Please select an award.' };
-  }
-
-  const season = Number(formData.get('season'));
-  if (!Number.isInteger(season) || season < 1897 || season > 2100) {
-    return { error: 'Valid season year is required (1897–2100).' };
-  }
-
-  const rawPlayerId = formData.get('playerId');
-  const playerId = rawPlayerId && Number.isInteger(Number(rawPlayerId)) && Number(rawPlayerId) > 0
-    ? Number(rawPlayerId)
-    : null;
-  const playerNameRaw = String(formData.get('playerNameRaw') ?? '').trim() || null;
-
-  if (!playerId && !playerNameRaw) {
-    return { error: 'Either select a player or enter a recipient name.' };
-  }
-
-  const rawClubId = formData.get('clubId');
-  const clubId = rawClubId && Number.isInteger(Number(rawClubId)) && Number(rawClubId) > 0
-    ? Number(rawClubId)
-    : null;
-
-  const rawVotes = formData.get('votes');
-  const votes = rawVotes !== null && rawVotes !== '' ? Number(rawVotes) : null;
-  if (votes !== null && (!Number.isFinite(votes) || votes < 0 || votes > 999_999.99)) {
-    return { error: 'Votes or statistic must be from 0 to 999999.99.' };
-  }
-  const position = String(formData.get('position') ?? '').trim() || null;
-  const isCaptain = formData.get('isCaptain') === 'true' || formData.get('isCaptain') === 'on';
-  const isViceCaptain = formData.get('isViceCaptain') === 'true' || formData.get('isViceCaptain') === 'on';
-  const note = String(formData.get('note') ?? '').trim() || null;
-
-  try {
-    const result = await createAwardWinner({
-      awardId,
-      season,
-      playerId,
-      playerNameRaw,
-      clubId,
-      votes,
-      position,
-      isCaptain,
-      isViceCaptain,
-      note,
-      adminUserId: admin.id,
-    });
-
-    let warning: string | undefined;
-    try {
-      await audit('award_winner.created', {
-        awardId,
-        season,
-        playerId,
-        winnerId: result.id,
-      }, { userId: admin.id, label: admin.email });
-    } catch (error) {
-      console.error('Failed to log administrative audit for award winner creation', error);
-      warning = combineWarnings(warning, ACTIVITY_AUDIT_WARNING);
-    }
-
-    revalidatePath('/', 'layout');
-
-    return {
-      message: `Added award recipient for season ${season} (Record #${result.id}).`,
-      createdId: result.id,
-      warning,
-    };
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return { error: `Failed to add award winner: ${msg}` };
-  }
-}
-
-/**
- * Super Admin Action: Add a Hall of Fame Inductee (see changeLog.md).
- */
-export async function createHallOfFameAction(
-  _prev: SimpleAdminActionState,
-  formData: FormData,
-): Promise<SimpleAdminActionState> {
-  const admin = await requireSuperAdmin();
-
-  const name = String(formData.get('name') ?? '').trim();
-  const rawPlayerId = formData.get('playerId');
-  const playerId = rawPlayerId && Number.isInteger(Number(rawPlayerId)) && Number(rawPlayerId) > 0
-    ? Number(rawPlayerId)
-    : null;
-
-  if (!name && !playerId) {
-    return { error: 'Inductee name is required.' };
-  }
-
-  const category = String(formData.get('category') ?? 'Player').trim() || 'Player';
-  const categories = ['Player', 'Coach', 'Umpire', 'Media', 'Administrator', 'Pioneer'];
-  if (!categories.includes(category)) return { error: 'Invalid Hall of Fame category.' };
-  const rawInductedYear = formData.get('inductedYear');
-  const inductedYear = rawInductedYear !== null && rawInductedYear !== ''
-    ? Number(rawInductedYear)
-    : null;
-  if (inductedYear === null || !Number.isInteger(inductedYear) || inductedYear < 1996 || inductedYear > 2100) {
-    return { error: 'Valid inducted year is required (1996–2100).' };
-  }
-
-  const isLegend = formData.get('isLegend') === 'true' || formData.get('isLegend') === 'on';
-  const rawLegendYear = formData.get('legendYear');
-  const legendYear = isLegend && rawLegendYear !== null && rawLegendYear !== ''
-    ? Number(rawLegendYear)
-    : null;
-  if (isLegend && (
-    legendYear === null
-    || !Number.isInteger(legendYear)
-    || legendYear < inductedYear
-    || legendYear > 2100
-  )) {
-    return { error: 'Legend year must be from the induction year to 2100.' };
-  }
-
-  const clubNameRaw = String(formData.get('clubNameRaw') ?? '').trim() || null;
-  const state = String(formData.get('state') ?? '').trim() || null;
-  const playingCareer = String(formData.get('playingCareer') ?? '').trim() || null;
-  const notes = String(formData.get('notes') ?? '').trim() || null;
-
-  try {
-    const result = await createHallOfFameInductee({
-      name,
-      playerId,
-      category,
-      inductedYear,
-      isLegend,
-      legendYear,
-      clubNameRaw,
-      state,
-      playingCareer,
-      notes,
-      adminUserId: admin.id,
-    });
-
-    let warning: string | undefined;
-    try {
-      await audit('hall_of_fame.created', {
-        name,
-        year: inductedYear,
-        isLegend,
-        id: result.id,
-      }, { userId: admin.id, label: admin.email });
-    } catch (error) {
-      console.error('Failed to log administrative audit for Hall of Fame creation', error);
-      warning = combineWarnings(warning, ACTIVITY_AUDIT_WARNING);
-    }
-
-    revalidatePath('/', 'layout');
-
-    return {
-      message: `Added Hall of Fame inductee "${name}" in ${inductedYear} (Record #${result.id}).`,
-      createdId: result.id,
-      warning,
-    };
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return { error: `Failed to add Hall of Fame inductee: ${msg}` };
-  }
-}
-
-/**
- * Super Admin Action: Add a Representative / Honour Team Member (see changeLog.md).
- */
-export async function createHonourTeamMemberAction(
-  _prev: SimpleAdminActionState,
-  formData: FormData,
-): Promise<SimpleAdminActionState> {
-  const admin = await requireSuperAdmin();
-
-  const teamName = String(formData.get('teamName') ?? '').trim();
-  if (!teamName) {
-    return { error: 'Team name is required.' };
-  }
-
-  const rawPlayerId = formData.get('playerId');
-  const playerId = rawPlayerId && Number.isInteger(Number(rawPlayerId)) && Number(rawPlayerId) > 0
-    ? Number(rawPlayerId)
-    : null;
-  const playerNameRaw = String(formData.get('playerNameRaw') ?? '').trim() || null;
-
-  if (!playerId && !playerNameRaw) {
-    return { error: 'Either select a player or enter a player name.' };
-  }
-
-  const position = String(formData.get('position') ?? '').trim() || null;
-  const role = String(formData.get('role') ?? '').trim() || null;
-  const clubNameRaw = String(formData.get('clubNameRaw') ?? '').trim() || null;
-  const rawSortOrder = formData.get('sortOrder');
-  const sortOrder = rawSortOrder !== null && rawSortOrder !== '' ? Number(rawSortOrder) : 0;
-  if (!Number.isInteger(sortOrder) || sortOrder < 0 || sortOrder > 50) {
-    return { error: 'Lineup order must be a whole number from 0 to 50.' };
-  }
-  const note = String(formData.get('note') ?? '').trim() || null;
-
-  try {
-    const result = await createHonourTeamMember({
-      teamName,
-      playerId,
-      playerNameRaw,
-      position,
-      role,
-      clubNameRaw,
-      sortOrder,
-      note,
-      adminUserId: admin.id,
-    });
-
-    let warning: string | undefined;
-    try {
-      await audit('honour_team_member.created', {
-        teamName,
-        playerName: playerNameRaw,
-        playerId,
-        id: result.id,
-      }, { userId: admin.id, label: admin.email });
-    } catch (error) {
-      console.error('Failed to log administrative audit for honour-team creation', error);
-      warning = combineWarnings(warning, ACTIVITY_AUDIT_WARNING);
-    }
-
-    revalidatePath('/', 'layout');
-
-    return {
-      message: `Added member to "${teamName}" (Record #${result.id}).`,
-      createdId: result.id,
-      warning,
-    };
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return { error: `Failed to add honour team member: ${msg}` };
   }
 }
 
@@ -410,11 +140,17 @@ export async function saveDataEdit(
   _prev: DataEditState,
   formData: FormData,
 ): Promise<DataEditState> {
-  const admin = await requireSuperAdmin();
+  const admin = await requireCapability('data.dataEditor');
 
   const entityKey = String(formData.get('entity') ?? '');
   const entity = EDITABLE_ENTITIES[entityKey];
   if (!entity) return { error: 'Unknown entity.' };
+  // AFLDB-ISSUE-160 D-5: one draft mutation contract, and it is not this one.
+  // Refused here as well as in saveEdit() so the boundary is visible at the
+  // Server Action, which is what a stale client actually reaches.
+  if (entityKey === 'draft_picks') {
+    return { error: 'Draft selections are edited in /admin/draft.' };
+  }
 
   const rowId = Number(formData.get('rowId'));
   if (!Number.isInteger(rowId) || rowId <= 0) return { error: 'Bad row id.' };
@@ -468,7 +204,7 @@ export async function saveMatchSheetAction(
   _prev: MatchSheetActionState,
   formData: FormData,
 ): Promise<MatchSheetActionState> {
-  const admin = await requireSuperAdmin();
+  const admin = await requireCapability('data.dataEditor');
 
   const matchId = Number(formData.get('matchId'));
   if (!Number.isInteger(matchId) || matchId <= 0) {
@@ -532,7 +268,7 @@ export async function createMatchAction(
   _prev: SimpleAdminActionState,
   formData: FormData,
 ): Promise<SimpleAdminActionState> {
-  const admin = await requireSuperAdmin();
+  const admin = await requireCapability('data.dataEditor');
 
   const season = Number(formData.get('season'));
   if (!Number.isInteger(season) || season < 1897 || season > 2100) {
@@ -542,6 +278,8 @@ export async function createMatchAction(
   const roundTypeValue = String(formData.get('roundType') ?? 'home_and_away') || 'home_and_away';
   const roundTypes = [
     'home_and_away',
+    // Explicitly selectable, never inferred from free text (ISSUE-129 §8.4 item 9).
+    'wildcard_final',
     'elimination_final',
     'qualifying_final',
     'semi_final',
@@ -685,7 +423,7 @@ export async function deleteMatchAction(
   _prev: SimpleAdminActionState,
   formData: FormData,
 ): Promise<SimpleAdminActionState> {
-  const admin = await requireSuperAdmin();
+  const admin = await requireCapability('data.dataEditor');
 
   const matchId = Number(formData.get('matchId'));
   if (!Number.isInteger(matchId) || matchId <= 0) {

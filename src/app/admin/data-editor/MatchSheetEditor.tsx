@@ -236,7 +236,10 @@ export function MatchSheetEditor({
       hitouts: p.hitouts !== '' ? Number(p.hitouts) : null,
       freesFor: p.freesFor !== '' ? Number(p.freesFor) : null,
       freesAgainst: p.freesAgainst !== '' ? Number(p.freesAgainst) : null,
-      brownlowVotes: p.brownlowVotes !== '' ? Number(p.brownlowVotes) : null,
+      // AFLDB-ISSUE-155 §27.15: Brownlow votes are a canonical fact owned by
+      // Brownlow administration (/admin/brownlow). The match sheet no longer
+      // submits them — the mirror is displayed read-only below — and
+      // validateMatchSheetPayload refuses any non-null value it is sent.
     }));
 
     return JSON.stringify({
@@ -444,18 +447,11 @@ export function MatchSheetEditor({
                       style={{ width: '2.8rem', textAlign: 'right', padding: '0.2rem' }}
                     />
                   </td>
-                  <td className="num">
-                    <select
-                      value={p.brownlowVotes}
-                      onChange={(e) => handleFieldChange(p.playerId, 'brownlowVotes', e.target.value)}
-                      style={{ width: '3rem', padding: '0.2rem' }}
-                    >
-                      <option value="">—</option>
-                      <option value="0">0</option>
-                      <option value="1">1</option>
-                      <option value="2">2</option>
-                      <option value="3">3</option>
-                    </select>
+                  {/* AFLDB-ISSUE-155 §27.15: read-only mirror. The vote is
+                      entered and finalised in Brownlow administration; the
+                      input is removed so nothing can be typed here. */}
+                  <td className="num muted" title="Brownlow votes — managed in Brownlow administration">
+                    {p.brownlowVotes === '' ? '—' : p.brownlowVotes}
                   </td>
                   <td>
                     <button
@@ -547,6 +543,20 @@ export function MatchSheetEditor({
           </div>
         </div>
       </div>
+
+      {/* AFLDB-ISSUE-155 §27.15: the match sheet is no longer a Brownlow writer. */}
+      <p className="muted" style={{ margin: 0, fontSize: '0.85rem' }}>
+        {match.roundType === 'home_and_away' && match.roundNumber !== null ? (
+          <>
+            Brownlow votes (BV) are read-only here.{' '}
+            <Link href={`/admin/brownlow/${match.season}/${match.roundNumber}#match-${match.id}`}>
+              Manage them in Brownlow administration →
+            </Link>
+          </>
+        ) : (
+          'Brownlow votes are not awarded in finals; the BV column is read-only.'
+        )}
+      </p>
 
       {state.message && (
         <div style={{ padding: '0.75rem 1rem', background: 'var(--bg-subtle)', borderRadius: '6px', borderLeft: '4px solid var(--accent)' }}>

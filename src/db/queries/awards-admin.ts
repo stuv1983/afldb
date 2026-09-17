@@ -5,6 +5,29 @@ import { randomUUID } from 'node:crypto';
 import postgres from 'postgres';
 import { recordDataEdit } from '@/db/queries/audit-log';
 
+/**
+ * RETIRED FROM THE APPLICATION (AFLDB-ISSUE-165 §6.8). Not the create path.
+ *
+ * These three creators were what `/admin/data-editor` called until Stage 6.
+ * Nothing in `src/` calls them now: `/admin/awards` owns creating an award
+ * winner, a Hall of Fame induction and an honour-team selection, through
+ * `src/db/queries/admin-awards.ts`, which writes a `data_overrides` durable
+ * record beside the canonical row in the same transaction. These did not, so a
+ * record created through them did not survive a rebuild — which is the defect
+ * that moved them, not a tidy-up.
+ *
+ * DO NOT ADD A CALLER. Two creators for one table is exactly the state §6.8
+ * exists to end; if something here is needed, move it into `admin-awards.ts`.
+ *
+ * The file is retained for now because `tests/awards-admin.test.ts` and
+ * `tests/integration/awards-reload-links.test.ts` exercise contracts through
+ * it that are worth keeping — the Brownlow refusal, the historical-club-identity
+ * resolution and the ISSUE-080 §5.3 advisory lock, whose two frozen literals
+ * `tests/awards-admin.test.ts` pins against `import_awards.py` from HERE.
+ * Retiring the module means porting those assertions first, and that is
+ * recorded as closeout work rather than done in the same breath as the move.
+ */
+
 const MANUAL_ADMIN_SOURCE_KEY = 'manual_admin_edit';
 const BROWNLOW_AWARD_SLUG = 'brownlow-medal';
 

@@ -49,9 +49,11 @@ export function InviteManager({
         </label>
         <label>
           Role
+          {/* AFLDB-ISSUE-186 Phase A: Contributor removed from the supported
+              invite roles -- createInvite() refuses one server-side too, so
+              this is UI convenience, not the actual boundary. */}
           <select name="role" defaultValue="admin">
             <option value="admin">Admin</option>
-            <option value="contributor">Contributor (upload only)</option>
             {canGrantSuperAdmin && <option value="super_admin">Super admin</option>}
           </select>
         </label>

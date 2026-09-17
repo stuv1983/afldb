@@ -686,8 +686,18 @@ describe("snapshot layout", () => {
   it("keeps raw snapshots gitignored while manifests stay tracked", () => {
     const gitignore = readFileSync(join(root, ".gitignore"), "utf8");
     expect(gitignore).toContain("/data/*");
-    expect(gitignore).not.toContain("!/data/sources");
     expect(gitignore).not.toMatch(/^docs\b/m);
+    // AFLDB-ISSUE-118 §23.28 tracks two small parsed coach CSVs under a deep
+    // scoped opt-in. That is the ONLY thing un-ignored under data/sources/: the
+    // raw DraftGuru / fitzRoy / AFL API working areas beside them stay ignored.
+    const sourceOptIns = gitignore.split(/\r?\n/).filter((l) => l.startsWith("!/data/sources"));
+    expect(sourceOptIns).toEqual([
+      "!/data/sources/",
+      "!/data/sources/afltables/",
+      "!/data/sources/afltables/coaches/",
+      "!/data/sources/afltables/coaches/*/",
+      "!/data/sources/afltables/coaches/*/parsed/",
+    ]);
   });
 
   it("the retrospective CSV manifest refuses identity/import without opening a file", () => {

@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 
 import { authSql } from '@/db/authClient';
 import { deleteMedia as deleteMediaRow } from '@/db/queries/site-content';
-import { audit, requireSuperAdmin } from '@/lib/auth/session';
+import { audit, requireCapability } from '@/lib/auth/session';
 import { describePublishResult, publishApex } from '@/lib/apex-publish';
 import { parseApexContent, parseSiteFooter } from '@/lib/site-content';
 import { SETTING_KEYS, parsePageIntros } from '@/lib/site-settings';
@@ -29,7 +29,7 @@ export async function saveSiteContent(
   _previous: ContentState,
   formData: FormData,
 ): Promise<ContentState> {
-  const admin = await requireSuperAdmin();
+  const admin = await requireCapability('site.content');
 
   const decode = (field: string): unknown => {
     try {
@@ -101,7 +101,7 @@ export async function republishApex(
   _previous: ContentState,
   _formData: FormData,
 ): Promise<ContentState> {
-  const admin = await requireSuperAdmin();
+  const admin = await requireCapability('site.content');
 
   const result = await publishApex();
 
@@ -130,7 +130,7 @@ export async function deleteMedia(
   _previous: ContentState,
   formData: FormData,
 ): Promise<ContentState> {
-  const admin = await requireSuperAdmin();
+  const admin = await requireCapability('site.content');
   const name = String(formData.get('name') ?? '');
   if (!name) return { error: 'No image named.' };
 

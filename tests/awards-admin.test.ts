@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -505,6 +505,46 @@ describe('data_edits migration contract', () => {
   });
 });
 
+describe('awards & honours lifecycle migration contract (AFLDB-ISSUE-165)', () => {
+  const migration = readFileSync(
+    join(process.cwd(), 'src', 'db', 'migrations', '101_awards_honours_lifecycle.sql'),
+    'utf8',
+  ).replace(/\r\n/g, '\n');
+  const TABLES = ['award_winners', 'hall_of_fame', 'honour_team_members'];
+
+  it('adds the same three columns and the same two CHECKs to each of the three tables', () => {
+    for (const table of TABLES) {
+      const block = migration.slice(
+        migration.indexOf(`ALTER TABLE ${table}\n  ADD COLUMN status`),
+      );
+      const statement = block.slice(0, block.indexOf(';'));
+      expect(statement, table).toContain("ADD COLUMN status        text        NOT NULL DEFAULT 'active'");
+      expect(statement, table).toContain('ADD COLUMN status_reason text');
+      expect(statement, table).toContain('ADD COLUMN updated_at    timestamptz NOT NULL DEFAULT now()');
+      expect(statement, table).toContain("CHECK (status IN ('active', 'void'))");
+      expect(statement, table).toContain("CHECK (status <> 'void' OR status_reason IS NOT NULL)");
+      // No created_at: data_edits already records when a row was made and by
+      // whom, and back-filling 3,712 rows with "whenever this migration ran"
+      // would invent evidence.
+      expect(statement, table).not.toContain('created_at');
+    }
+  });
+
+  it('changes no privilege and creates no trigger', () => {
+    // All three predate migrations 039 and 045, so the catalogue-derived seeds
+    // of afldb_meta.app_readable_tables and afldb_meta.import_writable_tables
+    // already carry them and the grants are table-level — two new columns and
+    // three rebuilt indexes need nothing further.
+    expect(migration).not.toMatch(/\bGRANT\b/);
+    expect(migration).not.toContain('grant_app_read');
+    expect(migration).not.toContain('grant_import_write');
+    expect(migration).not.toMatch(/CREATE (OR REPLACE )?(TRIGGER|FUNCTION)/);
+    // And it writes no data: status defaults to 'active' for every existing
+    // row, so there is nothing to back-fill.
+    expect(migration).not.toMatch(/\b(INSERT INTO|UPDATE \w+\s+SET|DELETE FROM)\b/);
+  });
+});
+
 describe('atomic audit grant migration contract (AFLDB-ISSUE-027)', () => {
   it('grants afldb_import append-only access to both audit tables, guarded on the role', () => {
     const migration = readFileSync(
@@ -561,62 +601,114 @@ describe('honour-team advisory-lock identity contract (AFLDB-ISSUE-080 §5.3)', 
   // Deriving the key twice — hashtext, language-level hashing, anything
   // computed — is exactly what this contract forbids, so the constants are
   // asserted as literals in both languages.
-  it('freezes the same two integer constants in the importer and the admin path', () => {
+  // AFLDB-ISSUE-165 Stage 7: the LIVE honour-team identity writer is
+  // `admin-awards.ts`. Until Stage 6 it was `awards-admin.ts`, and this
+  // contract moved with neither — it went on pinning the module that no
+  // longer has a caller, so the literal the running application actually
+  // contends on was unpinned. Both are asserted now: the retired module
+  // while it survives (it is still the create path two integration suites
+  // reach), and the live one because it is the one that matters.
+  const LOCK_WRITERS = [
+    ['src/db/queries/admin-awards.ts', 'live — /admin/awards'],
+    ['src/db/queries/awards-admin.ts', 'retired — AFLDB-ISSUE-165 §18.6'],
+  ] as const;
+
+  it('freezes the same two integer constants in the importer and every admin path', () => {
     const importer = readFileSync(
       join(process.cwd(), 'tools', 'migration', 'import_awards.py'),
-      'utf8',
-    );
-    const admin = readFileSync(
-      join(process.cwd(), 'src', 'db', 'queries', 'awards-admin.ts'),
       'utf8',
     );
 
     expect(importer).toContain('HONOUR_TEAM_LOCK_NAMESPACE = 717275');
     expect(importer).toContain('HONOUR_TEAM_LOCK_KEY = 1');
-    expect(admin).toContain('const HONOUR_TEAM_LOCK_NAMESPACE = 717275');
-    expect(admin).toContain('const HONOUR_TEAM_LOCK_KEY = 1');
 
     // Transaction scope only: session locks would strand on a crashed
     // request, and a hashed identity could silently diverge between the
     // two languages.
     expect(importer).toContain('pg_advisory_xact_lock');
-    expect(admin).toContain('pg_try_advisory_xact_lock');
     expect(importer).not.toContain('hashtext');
-    expect(admin).not.toContain('hashtext');
+
+    for (const [path, role] of LOCK_WRITERS) {
+      const admin = readFileSync(join(process.cwd(), ...path.split('/')), 'utf8');
+
+      expect(admin, `${path} (${role})`).toContain(
+        'const HONOUR_TEAM_LOCK_NAMESPACE = 717275',
+      );
+      expect(admin, `${path} (${role})`).toContain('const HONOUR_TEAM_LOCK_KEY = 1');
+      expect(admin, `${path} (${role})`).toContain('pg_try_advisory_xact_lock');
+      expect(admin, `${path} (${role})`).not.toContain('hashtext');
+    }
   });
 });
 
-describe('awards admin audit-warning UI contract', () => {
+/**
+ * The awards creation surface, after AFLDB-ISSUE-165 §6.8 moved it.
+ *
+ * These assertions used to read `/admin/data-editor`. They now read
+ * `/admin/awards`, and the pair of them together is the contract: the new home
+ * carries the whole thing, and the old home carries NONE of it. A test that
+ * only checked the new location would pass just as happily with two
+ * independent creators still live.
+ */
+describe('awards admin creation surface', () => {
+  const awardsSource = (...parts: string[]) =>
+    readFileSync(join(process.cwd(), 'src', 'app', 'admin', 'awards', ...parts), 'utf8');
+
   it('keeps only the best-effort activity-audit warning; the required-audit warning state is gone', () => {
-    const actions = readFileSync(
-      join(process.cwd(), 'src', 'app', 'admin', 'data-editor', 'actions.ts'),
-      'utf8',
-    );
-    // Required data_edits audits are atomic with the mutation now
-    // (AFLDB-ISSUE-027): a "committed but unaudited" warning can no
-    // longer exist, so no action may read result.auditWarning or write
+    const actions = awardsSource('actions.ts');
+    // Required data_edits audits are atomic with the mutation
+    // (AFLDB-ISSUE-027): a "committed but unaudited" warning can no longer
+    // exist for them, so no action may read result.auditWarning or write
     // data_edits itself on the auth pool.
     expect(actions).not.toContain('auditWarning');
     expect(actions).not.toContain('authSql');
     expect(actions).not.toContain('INSERT INTO data_edits');
     // The intentionally best-effort activity audit keeps its warning.
-    expect(actions).toContain('warning?: string');
     expect(actions).toContain('ACTIVITY_AUDIT_WARNING');
     expect(actions).toContain('Do not submit it again');
+    expect(awardsSource('submit-helper.ts')).toContain('warning?: string');
 
-    for (const form of ['AwardWinnerForm.tsx', 'HallOfFameForm.tsx', 'HonourTeamForm.tsx']) {
-      const source = readFileSync(
-        join(process.cwd(), 'src', 'app', 'admin', 'data-editor', form),
-        'utf8',
-      );
-      expect(source).toContain('state.warning');
+    // Every surface that can make a change shows it, so the one instruction
+    // that matters -- do not submit again -- always reaches the operator.
+    for (const panel of [
+      'AwardWinnerForm.tsx', 'HallOfFameForm.tsx', 'HonourTeamForm.tsx',
+      'WinnerCorrectionPanel.tsx', 'HallOfFameCorrectionPanel.tsx',
+      'HonourTeamCorrectionPanel.tsx', 'LifecyclePanel.tsx', 'ReplacePanel.tsx',
+    ]) {
+      expect(awardsSource(panel), panel).toContain('state.warning');
     }
+  });
 
-    const awardForm = readFileSync(
-      join(process.cwd(), 'src', 'app', 'admin', 'data-editor', 'AwardWinnerForm.tsx'),
-      'utf8',
-    );
-    expect(awardForm).toContain("award.slug !== 'brownlow-medal'");
-    expect(awardForm).toContain('cannot be added here');
+  it('never offers the Brownlow Medal as a recordable award', () => {
+    // The mutation contract refuses the slug outright; the form must not offer
+    // it either, so the refusal is never the first an administrator hears of a
+    // rule the authoritative season-votes dataset already settles.
+    expect(awardsSource('AwardWinnerFields.tsx')).toContain("award.slug !== 'brownlow-medal'");
+    expect(awardsSource('winners', 'new', 'page.tsx')).toContain('Brownlow');
+  });
+
+  it('guards every awards Server Action with data.awards.edit and nothing weaker', () => {
+    const actions = awardsSource('actions.ts');
+    const guards = [...actions.matchAll(/await requireCapability\('([^']+)'\)/g)].map((m) => m[1]);
+    expect(guards.length).toBeGreaterThanOrEqual(15);
+    expect([...new Set(guards)]).toEqual(['data.awards.edit']);
+    // The capability that was moved FROM must not survive anywhere here.
+    expect(actions).not.toContain('data.dataEditor');
+  });
+
+  it('leaves no awards creation path behind in /admin/data-editor (§6.8)', () => {
+    const editorDir = join(process.cwd(), 'src', 'app', 'admin', 'data-editor');
+    for (const form of ['AwardWinnerForm.tsx', 'HallOfFameForm.tsx', 'HonourTeamForm.tsx']) {
+      expect(existsSync(join(editorDir, form)), `${form} still exists in data-editor`).toBe(false);
+    }
+    const editorActions = readFileSync(join(editorDir, 'actions.ts'), 'utf8');
+    for (const gone of [
+      'createAwardWinner', 'createHallOfFameInductee', 'createHonourTeamMember',
+      'awards-admin',
+    ]) {
+      expect(editorActions, `data-editor/actions.ts still references ${gone}`).not.toContain(gone);
+    }
+    // The compatibility pointer the Draft move established, not a silent gap.
+    expect(readFileSync(join(editorDir, 'page.tsx'), 'utf8')).toContain('/admin/awards');
   });
 });

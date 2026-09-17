@@ -1,0 +1,89 @@
+/* ==========================================================================
+   Frontend Layouts
+   ========================================================================== */
+
+/*
+ * Structural presets, independent of the frontend theme in `themes.css`.
+ *
+ * This file must never redeclare a theme-owned token (colour, radius,
+ * `--font-*`, `--measure`, `--gutter`): it reads those tokens for spacing
+ * consistency but does not define them, so any theme/layout combination
+ * stays coherent. See issues/closed/AFLDB-ISSUE-173.md for the full design rationale.
+ *
+ * `classic` (the default) needs no rules here — it is today's markup,
+ * unchanged. Everything below applies to the `sidebar` preset only, whose
+ * one structural difference (`PrimaryNav` as a sibling of `<main>` instead
+ * of inside the header) is built in `src/app/layout.tsx`; this file
+ * positions it.
+ */
+
+/* Same shape as `.admin-shell` in globals.css: a `.container` that drops its
+   own max-width once it is also the structural shell, so the sidebar and the
+   wider content column can use the space a single reading column would not
+   need. `padding-inline` is left alone, so the outer edge gutter is exactly
+   the theme's `--gutter`. */
+.container.layout-shell {
+  max-width: none;
+  display: grid;
+  grid-template-columns: minmax(0, 15rem) minmax(0, 1fr);
+  gap: 2rem;
+  align-items: start;
+  /* `<main>` is now a grid item (`.layout-main`) rather than the wrapper
+     around this whole shell (skip-link/landmark fix, AFLDB-ISSUE-173), so
+     globals.css's bare `main { min-height; padding }` rule no longer covers
+     `.layout-nav`. Reproduced here, `padding-block` only so the `.container`
+     gutter (`padding-inline`) is untouched, to keep the same vertical
+     rhythm across both grid columns that the old single `<main>` gave. */
+  min-height: 72vh;
+  padding-block: clamp(1.5rem, 3vw, 2.25rem) 3.5rem;
+}
+
+.layout-nav {
+  position: sticky;
+  top: 1.5rem;
+}
+
+/* Reuses `PrimaryNav`'s own `.site-nav` markup and route data verbatim —
+   only its orientation changes, from the header's horizontal row to a
+   vertical list beside the content column. */
+[data-site-layout='sidebar'] .layout-nav .site-nav {
+  flex-direction: column;
+  align-items: stretch;
+  flex-wrap: nowrap;
+  gap: 0;
+}
+[data-site-layout='sidebar'] .layout-nav .site-nav a {
+  padding: 0.55rem 0.3rem;
+  border-bottom: 1px solid var(--border);
+}
+[data-site-layout='sidebar'] .layout-nav .site-nav a:last-child {
+  border-bottom: none;
+}
+
+.layout-main {
+  min-width: 0;
+  /* `.layout-main` is `<main>` itself now, so it also picks up globals.css's
+     bare `main { min-height; padding }` rule directly. Zeroed here so that
+     rhythm is supplied once, by `.container.layout-shell` above, rather than
+     doubled/misaligned against `.layout-nav`. */
+  min-height: 0;
+  padding: 0;
+}
+
+/* Below the same 640px breakpoint at which the header already hides
+   `.site-nav` in favour of the bottom `TabBar` (globals.css), the sidebar
+   preset converges on that exact same mobile navigation rather than
+   introducing a second one: the nav column disappears and the shell
+   collapses to one column. */
+@media (max-width: 640px) {
+  .container.layout-shell {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    /* Matches globals.css's own `@media (max-width: 640px) { main { padding
+       … } }` value, which `.layout-main` no longer receives (zeroed above). */
+    padding-block: 1.25rem 2.25rem;
+  }
+  .layout-nav {
+    display: none;
+  }
+}

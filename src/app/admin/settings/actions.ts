@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 
 import { authSql } from '@/db/authClient';
-import { audit, requireSuperAdmin } from '@/lib/auth/session';
+import { audit, requireCapability } from '@/lib/auth/session';
 import { sendEmail } from '@/lib/email/send';
 import {
   SETTING_KEYS,
@@ -19,6 +19,7 @@ import {
   parsePlaceholderInterval,
   parsePlaceholders,
   parseSearchAnimation,
+  parseSiteLayout,
   parseSiteTheme,
   type HomeSectionId,
 } from '@/lib/site-settings';
@@ -41,7 +42,7 @@ export async function saveSiteSettings(
   _previous: SettingsState,
   formData: FormData,
 ): Promise<SettingsState> {
-  const admin = await requireSuperAdmin();
+  const admin = await requireCapability('site.settings');
 
   const order = String(formData.get('order') ?? '')
     .split(',')
@@ -89,6 +90,7 @@ export async function saveSiteSettings(
   );
   
   const frontendTheme = parseSiteTheme(formData.get('frontendTheme'));
+  const frontendLayout = parseSiteLayout(formData.get('frontendLayout'));
 
   await authSql.begin(async (tx) => {
     for (const [key, value] of [
@@ -106,6 +108,7 @@ export async function saveSiteSettings(
       [SETTING_KEYS.searchPlaceholderInterval, searchPlaceholderInterval],
       [SETTING_KEYS.searchPlaceholderAnimation, searchPlaceholderAnimation],
       [SETTING_KEYS.frontendTheme, frontendTheme],
+      [SETTING_KEYS.frontendLayout, frontendLayout],
     ] as const) {
       await tx`
         INSERT INTO site_settings (key, value, updated_by)
@@ -129,6 +132,7 @@ export async function saveSiteSettings(
     searchPlaceholderInterval,
     searchPlaceholderAnimation,
     frontendTheme,
+    frontendLayout,
   }, { userId: admin.id, label: admin.email });
 
   revalidatePath('/', 'layout');
@@ -149,7 +153,7 @@ export async function sendTestEmail(
   _previous: SettingsState,
   formData: FormData,
 ): Promise<SettingsState> {
-  const admin = await requireSuperAdmin();
+  const admin = await requireCapability('site.settings');
   const to = parseEarlyAccessNotifyTo(formData.get('testTo'));
 
   const result = await sendEmail({

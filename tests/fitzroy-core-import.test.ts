@@ -282,6 +282,30 @@ describe('fitzRoy core importer contracts (AFLDB-ISSUE-093 §13.4a)', () => {
     expect(importerSource).not.toMatch(/^from common import/m);
   });
 
+  // AFLDB-ISSUE-155 §27.11: manual > settle > rebuild. This loader deletes the
+  // round votes of every season the snapshot carries; an admin-finalised match
+  // must stop it before that delete, not be quietly rebuilt over. A rebuild
+  // database holds no manual rows, so a real rebuild is unaffected. Source
+  // contract only — the executed refusal is in tests/integration/admin-brownlow.test.ts.
+  it('refuses a round-vote reload over admin-finalised matches (§27.11)', () => {
+    expect(importerSource).toContain('SOURCE_KEY_MANUAL = "manual_admin_edit"');
+
+    const start = importerSource.indexOf('def import_brownlow_round_votes');
+    expect(start).toBeGreaterThan(-1);
+    const body = importerSource.slice(start, importerSource.indexOf('\ndef ', start + 1));
+    const guardAt = body.indexOf('SOURCE_KEY_MANUAL');
+    const deleteAt = body.indexOf('DELETE FROM brownlow_round_votes');
+    expect(guardAt).toBeGreaterThan(-1);
+    expect(deleteAt).toBeGreaterThan(-1);
+    // The refusal has to be evaluated before the destructive statement.
+    expect(guardAt).toBeLessThan(deleteAt);
+    expect(body).toContain('hold admin-finalised Brownlow ');
+    expect(body).toContain('reload refused');
+    expect(body).toMatch(/raise RuntimeError\(/);
+    // Scoped to the snapshot's own seasons, exactly like the delete it guards.
+    expect(body).toMatch(/b\.season = ANY\(%s\)/);
+  });
+
   it('pins the explicit stat field mapping by name, not CSV position', () => {
     for (const [src, target] of EXPECTED_STAT_MAP) {
       expect(importerSource).toContain(`("${src}", "${target}")`);
@@ -538,14 +562,17 @@ describe.skipIf(!canSpawn)('snapshot validation and scan (no database)', () => {
     expect(String(result.stderr)).toContain('refusing to collapse two players');
   });
 
-  it('accepts a row whose stable ID is absent but whose profile URL is canonical', () => {
-    // Measured on the real 1897-2025 acquisition: 83 rows across 5 players carry a
+  it('accepts a debut row whose stable ID is absent but whose profile URL is canonical', () => {
+    // Measured on the real 1897-2025 acquisition: 83 rows across 5 profile URLs carry a
     // canonical URL and no ID. The ID never reaches a database column, so requiring it
-    // would discard five real players for a value the schema does not keep.
+    // would discard real players for a value the schema does not keep. AFLDB-ISSUE-136
+    // narrowed this: a blank-ID profile is accepted as a NEW player only when AFL Tables'
+    // own career-game count says it is a debut (career game 1); a blank-ID profile that
+    // continues a career is refused unless a tracked continuity rule names it (below).
     const snapshot = buildSnapshot({
       playerStats: {
         'player_stats_2024.csv': {
-          rows: [psRow(M1, { ...P_A, id: '' }), psRow(M1, P_B),
+          rows: [psRow(M1, { ...P_A, id: '', career: '1' }), psRow(M1, P_B),
             psRow(M2, P_C), psRow(M2, P_D)],
         },
       },
@@ -983,6 +1010,674 @@ describe.skipIf(!canSpawn)('in-season completeness gates (AFLDB-ISSUE-099)', () 
  * pairs = 4 rows where AFL Tables has 2. The correction drops the two rows that
  * correspond to no real appearance; the two genuine rows are already correct.
  */
+/* ------------------------------------------------------------------ *
+ * AFLDB-ISSUE-136 — a renumbered AFL Tables profile URL must not split a
+ * career into two canonical players.
+ *
+ * fitzRoy serves completed seasons from its cached release and scrapes the
+ * newest season live, so a player whose AFL Tables profile was renumbered
+ * arrives under a NEW url with a BLANK ID. Identity is the url, so the
+ * importer seeded a second player. The fix is a tracked, fail-closed
+ * `profile_url_continuity` rule bound to source evidence (the continuing
+ * ID, the seasons, the row count, and AFL Tables' own career-game count
+ * continuing by exactly one); a blank-ID profile no rule names is refused
+ * unless it is a career-game-1 debut. Measured on full-history-20260902:
+ * four renumbered profiles (Cameron, Graham, Ross, Williams) and one
+ * debutant (Billy Wilson).
+ * ------------------------------------------------------------------ */
+describe.skipIf(!canSpawn)('renumbered profile URL continuity (AFLDB-ISSUE-136)', () => {
+  const contractPath = join(root, 'tools', 'rebuild', 'fitzroy', 'fitzroy-contract.json');
+  const REAL_CONTRACT = JSON.parse(readFileSync(contractPath, 'utf8'));
+
+  /** The 2025 fixture match: same clubs as M1, one season later. */
+  const M_2025: FixtureMatch = { ...M1, game: '3', date: '2025-03-14' };
+
+  /** P_A's profile as AFL Tables renumbered it: blank ID, new suffix, career continues. */
+  const P_A_RENUMBERED: FixturePlayer = {
+    ...P_A, id: '',
+    url: 'https://afltables.com/afl/stats/players/J/John_Smith3.html', career: '30',
+  };
+
+  const RULE = {
+    id: 'fixture-john-smith-renumbered-profile',
+    dataset: 'player_stats',
+    file: 'player_stats_2025.csv',
+    continuing_url: 'players/J/John_Smith0.html',
+    renumbered_url: 'players/J/John_Smith3.html',
+    expect: {
+      continuing_id: '101', continuing_last_season: 2024, continuing_last_career_game: 29,
+      renumbered_first_season: 2025, renumbered_last_season: 2025,
+      renumbered_first_career_game: 30, renumbered_rows: 1,
+    },
+    authority: 'fixture', reason: 'fixture',
+  };
+
+  /** The real contract with ONLY these continuity rules, written for --contract. */
+  function contractWith(rules: unknown[]): string {
+    const dir = mkdtempSync(join(tmpdir(), 'issue136-contract-'));
+    tempDirs.push(dir);
+    const contract = {
+      ...REAL_CONTRACT,
+      profile_url_continuity: { ...REAL_CONTRACT.profile_url_continuity, rules },
+    };
+    const path = join(dir, 'fitzroy-contract.json');
+    writeFileSync(path, JSON.stringify(contract, null, 2), 'utf8');
+    return path;
+  }
+
+  /** 2024 (P_A with ID) + 2025 (P_A renumbered, blank ID). */
+  function splitSnapshot(
+    renumbered: Partial<FixturePlayer> = {}, continuing: Partial<FixturePlayer> = {},
+    extra2024: Cell[][] = [],
+  ) {
+    return buildSnapshot({
+      results: [resultsRow(M1), resultsRow(M2), resultsRow(M_2025, 2025)],
+      playerStats: {
+        'player_stats_2024.csv': {
+          rows: [psRow(M1, { ...P_A, ...continuing }), psRow(M1, P_B),
+            psRow(M2, P_C), psRow(M2, P_D), ...extra2024],
+        },
+        'player_stats_2025.csv': {
+          rows: [psRow(M_2025, { ...P_A_RENUMBERED, ...renumbered }, { Season: 2025 }),
+            psRow(M_2025, P_B, { Season: 2025 })],
+        },
+      },
+      range: { from: 2024, to: 2025 },
+    });
+  }
+
+  const runWith = (snapshot: { dir: string; manifest: string }, contract: string) =>
+    spawnSync(python, [importerPath, '--label', LABEL,
+      '--snapshot-dir', snapshot.dir, '--manifest', snapshot.manifest,
+      '--validate-only', '--contract', contract], { cwd: root, encoding: 'utf8' });
+
+  type ContinuityRule = {
+    id: string; file: string; continuing_url: string; renumbered_url: string;
+    expect: Record<string, number> & { continuing_id: string };
+  };
+
+  it('the tracked contract names exactly the four measured renumberings, and not the debutant', () => {
+    const rules: ContinuityRule[] = REAL_CONTRACT.profile_url_continuity.rules;
+    expect(rules.map((r) => r.id).sort()).toEqual([
+      '2025-charlie-cameron-renumbered-profile',
+      '2025-jack-graham-renumbered-profile',
+      '2025-jack-ross-renumbered-profile',
+      '2025-jack-williams-renumbered-profile',
+    ]);
+    expect(rules.map((r) => [r.continuing_url, r.renumbered_url])).toEqual([
+      ['players/C/Charlie_Cameron.html', 'players/C/Charlie_Cameron3.html'],
+      ['players/J/Jack_Graham.html', 'players/J/Jack_Graham2.html'],
+      ['players/J/Jack_Ross.html', 'players/J/Jack_Ross3.html'],
+      ['players/J/Jack_Williams.html', 'players/J/Jack_Williams3.html'],
+    ]);
+    for (const r of rules) {
+      expect(r.file).toBe('player_stats_2025.csv');
+      expect(r.expect.renumbered_first_career_game)
+        .toBe(r.expect.continuing_last_career_game + 1);
+      expect(r.expect.continuing_last_season).toBeLessThan(r.expect.renumbered_first_season);
+    }
+    // 25 + 18 + 23 + 13 = the 79 blank-ID rows that are renumberings; the other 4 of the
+    // 83 are Billy Wilson's debut season, which no rule may name.
+    expect(rules.reduce((n, r) => n + r.expect.renumbered_rows, 0)).toBe(79);
+    expect(JSON.stringify(rules)).not.toContain('Billy_Wilson');
+    expect(REAL_CONTRACT.profile_url_continuity.is_alias).toBe(false);
+  });
+
+  it('pins the fail-closed structure in the importer', () => {
+    expect(importerSource).toContain('def load_profile_continuity_rules');
+    expect(importerSource).toContain('def apply_profile_continuity');
+    expect(importerSource).toContain('def refuse_unresolved_renumbering');
+    // In-season the fold and the refusal are both disabled — the settle resolves
+    // registered identities and never seeds a player.
+    expect(importerSource).toContain('None if args.require_in_season');
+    // A database that already holds the split HALTs before the reconciliation DELETE.
+    const splitHalt = importerSource.indexOf('f"external-identity split');
+    const reconcileDelete = importerSource.indexOf('DELETE FROM external_identities');
+    expect(splitHalt).toBeGreaterThan(-1);
+    expect(splitHalt).toBeLessThan(reconcileDelete);
+    // Every profile path of a player is registered to the one players.id.
+    expect(importerSource).toContain('for path in sorted(fact.urls):');
+    // Nothing name-based was introduced.
+    expect(importerSource).not.toMatch(/fuzzy|difflib|SequenceMatcher/);
+  });
+
+  it('without a rule, a blank-ID profile that continues a career is refused, never seeded', () => {
+    const result = runWith(splitSnapshot(), contractWith([]));
+    expect(result.status).not.toBe(0);
+    expect(String(result.stderr)).toContain('players/J/John_Smith3.html');
+    expect(String(result.stderr)).toContain('career game 30');
+    expect(String(result.stderr)).toContain('no profile_url_continuity rule names it');
+    expect(String(result.stderr)).toContain('Refusing to seed a new player');
+    expect(String(result.stderr)).toContain('never identity');
+  });
+
+  it('under a tracked rule the renumbered profile folds into the continuing player', () => {
+    const result = runWith(splitSnapshot(), contractWith([RULE]));
+    expect(result.status).toBe(0);
+    const out = String(result.stdout);
+    // Four fixture players, not five: the fold happened.
+    expect(out).toMatch(/players\s+4\b/);
+    expect(out).toMatch(/players_with_renumbered_profile\s+1\b/);
+    expect(out).toContain('profile URL continuity applied (AFLDB-ISSUE-136)');
+    expect(out).toContain('players/J/John_Smith3.html -> players/J/John_Smith0.html');
+    expect(out).toContain('career games 29 -> 30');
+    // Still two John Smiths: P_B (ID 102, its own url) is untouched by the fold.
+    expect(out).not.toContain('John_Smith1.html ->');
+  });
+
+  it('a blank-ID profile that debuts at career game 1 is a new player and needs no rule', () => {
+    // Billy Wilson's shape: no ID, first row career game 1, same surname as older
+    // profiles. Never folded, never refused.
+    const result = runWith(splitSnapshot({ career: '1', first: 'Billy', sur: 'Smith',
+      url: 'https://afltables.com/afl/stats/players/B/Billy_Smith2.html' }), contractWith([]));
+    expect(result.status).toBe(0);
+    expect(String(result.stdout)).toMatch(/players\s+5\b/);
+    expect(String(result.stdout)).not.toContain('continuity applied');
+  });
+
+  it('a rule is out of scope when the artefact it names is absent, and the refusal still runs', () => {
+    // The real contract's four rules name player_stats_2025.csv; a 2024-only snapshot
+    // has nothing to fold and passes exactly as before.
+    const ok = run(buildSnapshot());
+    expect(ok.status).toBe(0);
+    expect(String(ok.stdout)).not.toContain('continuity applied');
+    // ...but a blank-ID veteran in that same 2024-only snapshot is still refused.
+    const bad = run(buildSnapshot({
+      playerStats: {
+        'player_stats_2024.csv': {
+          rows: [psRow(M1, { ...P_A, id: '', career: '29' }), psRow(M1, P_B),
+            psRow(M2, P_C), psRow(M2, P_D)],
+        },
+      },
+    }));
+    expect(bad.status).not.toBe(0);
+    expect(String(bad.stderr)).toContain('no profile_url_continuity rule names it');
+  });
+
+  it('a rule in scope whose continuing profile is absent is refused (partial snapshot)', () => {
+    const snapshot = buildSnapshot({
+      results: [resultsRow(M_2025, 2025)],
+      playerStats: {
+        'player_stats_2025.csv': {
+          rows: [psRow(M_2025, P_A_RENUMBERED, { Season: 2025 }),
+            psRow(M_2025, P_B, { Season: 2025 })],
+        },
+      },
+      range: { from: 2025, to: 2025 },
+    });
+    const result = runWith(snapshot, contractWith([RULE]));
+    expect(result.status).not.toBe(0);
+    expect(String(result.stderr)).toContain('has no rows in this snapshot');
+  });
+
+  it('refuses when the renumbered profile carries a fitzRoy ID', () => {
+    const result = runWith(splitSnapshot({ id: '999' }), contractWith([RULE]));
+    expect(result.status).not.toBe(0);
+    expect(String(result.stderr)).toContain('carries fitzRoy ID 999');
+  });
+
+  it('refuses when the continuing profile does not carry the bound ID', () => {
+    const result = runWith(splitSnapshot(), contractWith([
+      { ...RULE, expect: { ...RULE.expect, continuing_id: '102' } }]));
+    expect(result.status).not.toBe(0);
+    expect(String(result.stderr)).toContain("rule binds '102'");
+  });
+
+  it("refuses when AFL Tables' career-game numbering does not continue by one", () => {
+    const result = runWith(splitSnapshot({ career: '31' }), contractWith([RULE]));
+    expect(result.status).not.toBe(0);
+    expect(String(result.stderr)).toContain('career games run 29 -> 31');
+  });
+
+  it('refuses when the boundary row has no career-game count to prove continuity', () => {
+    const result = runWith(splitSnapshot({ career: '' }), contractWith([RULE]));
+    expect(result.status).not.toBe(0);
+    expect(String(result.stderr)).toContain('continuity cannot be proved');
+  });
+
+  it('refuses when the two profiles overlap in a season', () => {
+    // The renumbered url also appears in 2024 (a second Sydney row in M1 under its own
+    // url), so its span is 2024-2025, not 2025.
+    const result = runWith(splitSnapshot({}, {}, [psRow(M1, { ...P_A_RENUMBERED, career: '29' })]),
+      contractWith([RULE]));
+    expect(result.status).not.toBe(0);
+    expect(String(result.stderr)).toContain('spans 2024-2025');
+  });
+
+  it('refuses when the two profiles disagree on DOB or on the name fields', () => {
+    const dob = runWith(splitSnapshot({ dob: '1-Jan-1990' }), contractWith([RULE]));
+    expect(dob.status).not.toBe(0);
+    expect(String(dob.stderr)).toContain('DOB disagrees');
+
+    const name = runWith(splitSnapshot({ first: 'Jon' }), contractWith([RULE]));
+    expect(name.status).not.toBe(0);
+    expect(String(name.stderr)).toContain('name fields disagree');
+  });
+
+  it('refuses when the bound row count or seasons no longer match the artefacts', () => {
+    const rows = runWith(splitSnapshot(), contractWith([
+      { ...RULE, expect: { ...RULE.expect, renumbered_rows: 2 } }]));
+    expect(rows.status).not.toBe(0);
+    expect(String(rows.stderr)).toContain('carries 1 row(s), rule binds 2');
+
+    const seasons = runWith(splitSnapshot(), contractWith([
+      { ...RULE, expect: { ...RULE.expect, continuing_last_season: 2023 } }]));
+    expect(seasons.status).not.toBe(0);
+    expect(String(seasons.stderr)).toContain('continuing profile ends in 2024, rule binds 2023');
+  });
+
+  it('refuses a malformed rule before any row is read', () => {
+    const same = runWith(splitSnapshot(), contractWith([
+      { ...RULE, renumbered_url: RULE.continuing_url }]));
+    expect(same.status).not.toBe(0);
+    expect(String(same.stderr)).toContain('is malformed');
+
+    const gap = runWith(splitSnapshot(), contractWith([
+      { ...RULE, expect: { ...RULE.expect, renumbered_first_career_game: 31 } }]));
+    expect(gap.status).not.toBe(0);
+    expect(String(gap.stderr)).toContain('continuing_last_career_game + 1');
+
+    const raw = runWith(splitSnapshot(), contractWith([
+      { ...RULE, renumbered_url: P_A_RENUMBERED.url }]));
+    expect(raw.status).not.toBe(0);
+    expect(String(raw.stderr)).toContain('normalised profile path');
+  });
+
+  it('never applies in-season: a blank-ID veteran row still validates under --require-in-season', () => {
+    const SEASONS = JSON.parse(readFileSync(
+      join(root, 'data', 'reference', 'seasons.json'), 'utf8'));
+    const season = SEASONS.in_progress_seasons[0] as number;
+    const IM: FixtureMatch = { ...M1, date: `${season}-03-05` };
+    const snapshot = buildSnapshot({
+      results: [resultsRow(IM, season)],
+      playerStats: {
+        [`player_stats_${season}.csv`]: {
+          rows: [psRow(IM, { ...P_A_RENUMBERED, career: '45' }, { Season: season }),
+            psRow(IM, P_B, { Season: season })],
+        },
+      },
+      range: { from: season, to: season },
+      mutateManifest: (m) => { m.acquisition_kind = 'in_season_partial'; },
+    });
+    const result = spawnSync(python, [importerPath, '--label', LABEL,
+      '--snapshot-dir', snapshot.dir, '--manifest', snapshot.manifest,
+      '--validate-only', '--require-in-season'], { cwd: root, encoding: 'utf8' });
+    expect(result.status).toBe(0);
+    expect(String(result.stdout)).toContain('in-season gates PASSED');
+    expect(String(result.stdout) + String(result.stderr)).not.toContain('continuity');
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * AFLDB-ISSUE-128 — an in-season run may not report success while it
+ * silently drops rows AFL Tables supplied.
+ * ------------------------------------------------------------------ */
+
+/**
+ * The fixture is the REAL 2026 Wildcard Final vocabulary, measured from the
+ * live source on 2026-09-03, not an invented sentinel:
+ *
+ *   results.csv        Round = 'WF', Round.Type = 'Regular', Round.Number = ''
+ *   player_stats.csv   Round = 'Wildcard Final'
+ *
+ * `fetch_results_afltables()` reads afltables.com/afl/stats/biglists/bg3.txt
+ * live and returned both 28/29-Aug-2026 Wildcard Finals; `Round.Number` is
+ * blank because fitzRoy's own `round_levels` factor has no `WF` level, and
+ * `Round.Type` says `Regular` for the same reason. Neither vocabulary is in
+ * `FINALS_CODES`, so both rows lose their identity here.
+ *
+ * What this suite pins is NOT that AFLDB imports them — it cannot, because
+ * `matches.round_type` is an enum with no wildcard member (`AFLDB-ISSUE-129`
+ * owns that decision). It is that the run SAYS SO. The measured behaviour
+ * before this change was 209 acquired matches, 207 emitted, 94 unkeyed
+ * rejections, exit 0, and a nightly job reporting success.
+ */
+const M_HA_2026: FixtureMatch = {
+  game: '17043', date: '2026-08-23', roundResults: 'R25', roundStats: '25',
+  roundType: 'Regular', roundNumber: '25', time: '1220', venue: 'Docklands',
+  att: '29200', home: 'Essendon', away: 'Port Adelaide',
+  hg: 14, hb: 11, hp: 95, ag: 16, ab: 9, ap: 105, margin: -10,
+  hq: [[2, 5, 17], [5, 8, 38], [9, 9, 63], [14, 11, 95]],
+  aq: [[3, 3, 21], [8, 6, 54], [9, 8, 62], [16, 9, 105]],
+};
+
+/** 28-Aug-2026 Wildcard Final, exactly as AFL Tables publishes it. */
+const M_WF_2026: FixtureMatch = {
+  game: '17046', date: '2026-08-28', roundResults: 'WF', roundStats: 'Wildcard Final',
+  // fitzRoy cannot rank a round code its factor has no level for, so the
+  // acquired row genuinely carries an empty Round.Number and 'Regular'.
+  roundType: 'Regular', roundNumber: '', time: '1940', venue: 'M.C.G.',
+  att: '61000', home: 'Footscray', away: 'Collingwood',
+  hg: 14, hb: 12, hp: 96, ag: 14, ab: 9, ap: 93, margin: 3,
+  hq: [[3, 4, 22], [7, 7, 49], [11, 9, 75], [14, 12, 96]],
+  aq: [[4, 2, 26], [8, 4, 52], [11, 7, 73], [14, 9, 93]],
+};
+
+/** Rostered to the fixture's own clubs: the match join is by Playing.for. */
+const P_ESS: FixturePlayer = {
+  id: '201', first: 'Zach', sur: 'Merrett',
+  url: 'https://afltables.com/afl/stats/players/Z/Zach_Merrett.html',
+  dob: '', votes: '3', playingFor: 'Essendon', career: '260', jumper: '7',
+};
+const P_PORT: FixturePlayer = {
+  id: '202', first: 'Connor', sur: 'Rozee',
+  url: 'https://afltables.com/afl/stats/players/C/Connor_Rozee.html',
+  dob: '', votes: '2', playingFor: 'Port Adelaide', career: '140', jumper: '8',
+};
+const P_COLL: FixturePlayer = {
+  id: '203', first: 'Nick', sur: 'Daicos',
+  url: 'https://afltables.com/afl/stats/players/N/Nick_Daicos.html',
+  dob: '', votes: '', playingFor: 'Collingwood', career: '90', jumper: '35',
+};
+
+const WF_PLAYER: FixturePlayer = {
+  id: '105', first: 'Adam', sur: 'Treloar',
+  url: 'https://afltables.com/afl/stats/players/A/Adam_Treloar.html',
+  dob: '', votes: '', playingFor: 'Footscray', career: '240', jumper: '2',
+};
+
+function inSeason2026Snapshot(): { dir: string; manifest: string } {
+  const ps = (m: FixtureMatch, p: FixturePlayer) => psRow(m, p, {
+    Season: 2026, Round: m.roundStats, Attendance: m.att,
+  });
+  return buildSnapshot({
+    range: { from: 2026, to: 2026 },
+    results: [resultsRow(M_HA_2026, 2026), resultsRow(M_WF_2026, 2026)],
+    playerStats: {
+      'player_stats_2026.csv': {
+        rows: [
+          ps(M_HA_2026, P_ESS), ps(M_HA_2026, P_PORT),
+          ps(M_WF_2026, WF_PLAYER), ps(M_WF_2026, P_COLL),
+        ],
+      },
+    },
+    // The in-season adjudicator refuses anything that is not an
+    // in_season_partial, so the fixture must declare what it really is.
+    mutateManifest: (manifest) => { manifest.acquisition_kind = 'in_season_partial'; },
+  });
+}
+
+function emitInSeason(
+  snapshot: { dir: string; manifest: string },
+): { run: ReturnType<typeof spawnSync>; bundlePath: string } {
+  const bundlePath = join(snapshot.dir, 'observations.json');
+  const emitted = spawnSync(python, [importerPath,
+    '--label', LABEL, '--snapshot-dir', snapshot.dir, '--manifest', snapshot.manifest,
+    '--require-in-season', '--on-record-error', 'reject',
+    '--emit-observations', bundlePath], { cwd: root, encoding: 'utf8' });
+  return { run: emitted, bundlePath };
+}
+
+/**
+ * A round code neither grain recognises. AFLDB-ISSUE-129 taught the importer
+ * 'WF' / 'Wildcard Final', so the ISSUE-128 reporting guarantee needs a
+ * genuinely unrepresentable row to keep proving itself. This is that row, and
+ * it must stay unknown: never teach the importer 'XF'.
+ */
+const M_UNKNOWN_2026: FixtureMatch = {
+  ...M_WF_2026, game: '17048', date: '2026-08-30',
+  roundResults: 'XF', roundStats: 'XF',
+  home: 'Melbourne', away: 'Carlton',
+};
+
+/** The same in-season path carrying one row AFLDB genuinely cannot represent. */
+function inSeason2026UnrepresentableSnapshot(): { dir: string; manifest: string } {
+  const ps = (m: FixtureMatch, p: FixturePlayer) => psRow(m, p, {
+    Season: 2026, Round: m.roundStats, Attendance: m.att,
+  });
+  return buildSnapshot({
+    range: { from: 2026, to: 2026 },
+    results: [resultsRow(M_HA_2026, 2026), resultsRow(M_UNKNOWN_2026, 2026)],
+    playerStats: {
+      'player_stats_2026.csv': {
+        rows: [
+          ps(M_HA_2026, P_ESS), ps(M_HA_2026, P_PORT),
+          ps(M_UNKNOWN_2026, WF_PLAYER), ps(M_UNKNOWN_2026, P_COLL),
+        ],
+      },
+    },
+    mutateManifest: (manifest) => { manifest.acquisition_kind = 'in_season_partial'; },
+  });
+}
+
+describe('AFLDB-ISSUE-129 — the Wildcard Final round vocabulary', () => {
+  /**
+   * The round normalisers, exercised through the REAL importer module rather
+   * than a re-implementation. §8.4 item 6: exact deterministic mappings only,
+   * so the near-misses matter as much as the hits.
+   */
+  function normaliseRounds(cases: [string, 'results' | 'stats'][]): string[] {
+    const script = `
+import json, sys, pathlib
+sys.path.insert(0, "tools/migration"); sys.argv = ["x"]
+import import_fitzroy_core as ifc
+out = []
+for raw, grain in json.loads(${JSON.stringify(JSON.stringify(cases))}):
+    try:
+        if grain == "results":
+            code, rtype = ifc.normalise_results_round(raw, "t")
+            out.append(code + "|" + rtype)
+        else:
+            out.append(ifc.normalise_stats_round(raw, "t"))
+    except Exception as exc:
+        out.append("REFUSED:" + type(exc).__name__)
+print(json.dumps(out))
+`;
+    const run = spawnSync(python, ['-c', script], { cwd: root, encoding: 'utf8' });
+    if (run.status !== 0) throw new Error(run.stderr || 'normaliser spawn failed');
+    return JSON.parse(run.stdout) as string[];
+  }
+
+  it.runIf(canSpawn)('maps both source vocabularies to wildcard_final, exactly', () => {
+    expect(normaliseRounds([
+      ['WF', 'results'],
+      ['Wildcard Final', 'stats'],
+      ['WF', 'stats'],
+    ])).toEqual(['WF|wildcard_final', 'WF', 'WF']);
+  });
+
+  it.runIf(canSpawn)('refuses every near miss rather than guessing', () => {
+    // No case-folding, no partial match, no regex, no fallback. Each of these
+    // would be a silent mis-import if the mapping were fuzzy.
+    expect(normaliseRounds([
+      ['wildcard final', 'stats'],
+      ['WILDCARD FINAL', 'stats'],
+      ['Wildcard', 'stats'],
+      ['Wildcard Finals', 'stats'],
+      ['Wildcard  Final', 'stats'],
+      ['wf', 'results'],
+      ['WFX', 'results'],
+      ['W', 'results'],
+      ['Wildcard Final', 'results'],
+    ])).toEqual(Array(9).fill('REFUSED:MatchIdentityError'));
+  });
+
+  it.runIf(canSpawn)('keeps the existing round vocabulary unchanged', () => {
+    expect(normaliseRounds([
+      ['R1', 'results'], ['R25', 'results'], ['EF', 'results'], ['GF', 'results'],
+      ['1', 'stats'], ['GF', 'stats'], ['ZZ', 'results'],
+    ])).toEqual([
+      '1|home_and_away', '25|home_and_away', 'EF|elimination_final',
+      'GF|grand_final', '1', 'GF', 'REFUSED:MatchIdentityError',
+    ]);
+  });
+
+  it.runIf(canSpawn)('treats a Wildcard Final as never polled for the Brownlow', () => {
+    // The gate is `round_code in FINALS_CODES`, which also protects the
+    // int(round_code) round-vote key from a ValueError on 'WF'.
+    const script = `
+import json, sys
+sys.path.insert(0, "tools/migration"); sys.argv = ["x"]
+import import_fitzroy_core as ifc
+print(json.dumps({"wf": ifc.FINALS_CODES.get("WF"),
+                  "aliases": ifc.STATS_ROUND_ALIASES}))
+`;
+    const run = spawnSync(python, ['-c', script], { cwd: root, encoding: 'utf8' });
+    expect(run.status, String(run.stderr)).toBe(0);
+    expect(JSON.parse(run.stdout)).toEqual({
+      wf: 'wildcard_final', aliases: { 'Wildcard Final': 'WF' },
+    });
+  });
+});
+
+describe('AFLDB-ISSUE-128/129 — in-season source completeness is reported, not swallowed', () => {
+  it.runIf(canSpawn)('now emits the Wildcard Final it used to drop', () => {
+    // AFLDB-ISSUE-128 pinned this fixture while the rows were UNREPRESENTABLE:
+    // 1 match emitted, 3 unkeyed rejections, both enumerations incomplete. Those
+    // assertions are inverted here, deliberately, because ISSUE-129 made the
+    // rows representable -- not deleted, so the fixture still carries the exact
+    // real 2026 vocabulary measured from the live source.
+    const emitted = emitInSeason(inSeason2026Snapshot());
+    expect(emitted.run.status, String(emitted.run.stderr)).toBe(0);
+
+    const bundle = JSON.parse(readFileSync(emitted.bundlePath, 'utf8'));
+    expect(bundle.counts.matches).toBe(2);
+    expect(bundle.counts.player_match_rows).toBe(4);
+    expect(bundle.counts.unkeyed_rejections).toBe(0);
+
+    const matches = bundle.records.filter(
+      (record: { family: string }) => record.family === 'afltables.match',
+    );
+    const ha = matches.find(
+      (r: { external_record_id: string }) => r.external_record_id.includes('|25|'),
+    );
+    expect(ha.rejection).toBeNull();
+    expect(ha.projection).toMatchObject({
+      home_score: 95, away_score: 105, round_code: '25', round_type: 'home_and_away',
+      is_final: false, season: 2026,
+    });
+
+    // The row that used to vanish. Identity, round code and type are all the
+    // canonical ones; round_number stays NULL, which matches_round_number_ck
+    // requires for anything that is not home-and-away.
+    const wildcard = matches.find(
+      (r: { external_record_id: string }) => r.external_record_id.includes('|WF|'),
+    );
+    // The source says "Footscray"; the era-correct 2026 identity is Western
+    // Bulldogs, which the club resolver applies exactly as it does elsewhere.
+    expect(wildcard.external_record_id).toBe('2026|WF|2026-08-28|Western Bulldogs|Collingwood');
+    expect(wildcard.rejection).toBeNull();
+    expect(wildcard.projection).toMatchObject({
+      season: 2026, round_code: 'WF', round_type: 'wildcard_final',
+      round_number: null,
+      // Structural, per ISSUE-129 §8.4 item 2: not a home-and-away
+      // premiership-points match. It is NOT a finals-series appearance, which
+      // matches.is_finals_series answers instead.
+      is_final: true,
+      home_score: 96, away_score: 93,
+    });
+
+    // The 2026-08-28 date is now present rather than absent -- the exact
+    // inversion of the ISSUE-128 assertion.
+    expect(JSON.stringify(bundle.records)).toContain('2026-08-28');
+
+    // Player grain: both grains agreed on the round, so neither row was
+    // rejected on a round mismatch against results.csv.
+    const wfPlayers = bundle.records.filter(
+      (r: { family: string; projection?: { round_code?: string } }) =>
+        r.family === 'afltables.player_match_stats' && r.projection?.round_code === 'WF',
+    );
+    expect(wfPlayers).toHaveLength(2);
+    for (const row of wfPlayers) {
+      expect(row.rejection).toBeNull();
+      expect(row.projection).toMatchObject({
+        season: 2026, round_code: 'WF', round_number: null, is_final: true,
+      });
+      // Never polled: no brownlow_round_votes row is projected for a Wildcard
+      // Final, and NA stays NULL rather than becoming a zero.
+      expect(row.projection.brownlow_round_vote).toBeNull();
+      expect(row.projection.stats.brownlow_votes).toBeNull();
+    }
+
+    for (const enumeration of bundle.enumerations) {
+      expect(enumeration.complete).toBe(true);
+    }
+  });
+
+  it.runIf(canSpawn)('reports COMPLETE for the Wildcard Final snapshot', () => {
+    const out = String(emitInSeason(inSeason2026Snapshot()).run.stdout);
+    expect(out).toContain('SOURCE COMPLETENESS: COMPLETE');
+    expect(out).not.toContain('INCOMPLETE');
+  });
+
+  it.runIf(canSpawn)('still states INCOMPLETE for a round it genuinely cannot represent', () => {
+    // ISSUE-128's guarantee, re-proved on a vocabulary AFLDB does not know. Teaching
+    // the importer one new round must not switch the reporting off for the next one.
+    const emitted = emitInSeason(inSeason2026UnrepresentableSnapshot());
+    expect(emitted.run.status, String(emitted.run.stderr)).toBe(0);
+    const out = String(emitted.run.stdout);
+
+    expect(out).toContain('SOURCE COMPLETENESS: INCOMPLETE');
+    expect(out).toContain('3 acquired row(s) had no identity AFLDB could represent');
+    expect(out).toContain('afltables.match / no_match_identity: 1 row(s)');
+    expect(out).toContain('afltables.player_match_stats / no_player_match_identity: 2 row(s)');
+    expect(out).toContain('is NOT sweepable');
+    expect(out).toContain('Do NOT read this run as a complete import of the season');
+    expect(out).toContain('source outage');
+
+    const bundle = JSON.parse(readFileSync(emitted.bundlePath, 'utf8'));
+    expect(bundle.counts.matches).toBe(1);
+    expect(bundle.counts.unkeyed_rejections).toBe(3);
+    for (const enumeration of bundle.enumerations) {
+      expect(enumeration.complete).toBe(false);
+      expect(enumeration.incomplete_reason).toMatch(/no provable identity/);
+    }
+  });
+
+  it.runIf(canSpawn)('reports COMPLETE when every acquired row is represented', () => {
+    // The same in-season path with the Wildcard Final removed. Proves the
+    // verdict is a measurement rather than a permanent warning, and that a bye
+    // or a quiet week reads as complete instead of raising an alarm nobody can
+    // act on.
+    const snapshot = buildSnapshot({
+      range: { from: 2026, to: 2026 },
+      results: [resultsRow(M_HA_2026, 2026)],
+      playerStats: {
+        'player_stats_2026.csv': {
+          rows: [
+            psRow(M_HA_2026, P_ESS, { Season: 2026, Round: '25', Attendance: M_HA_2026.att }),
+            psRow(M_HA_2026, P_PORT, { Season: 2026, Round: '25', Attendance: M_HA_2026.att }),
+          ],
+        },
+      },
+      mutateManifest: (manifest) => { manifest.acquisition_kind = 'in_season_partial'; },
+    });
+    const emitted = emitInSeason(snapshot);
+
+    expect(emitted.run.status, String(emitted.run.stderr)).toBe(0);
+    expect(String(emitted.run.stdout)).toContain('SOURCE COMPLETENESS: COMPLETE');
+    expect(String(emitted.run.stdout)).not.toContain('INCOMPLETE');
+
+    const bundle = JSON.parse(readFileSync(emitted.bundlePath, 'utf8'));
+    expect(bundle.counts.unkeyed_rejections).toBe(0);
+    for (const enumeration of bundle.enumerations) expect(enumeration.complete).toBe(true);
+  });
+
+  it.runIf(canSpawn)('is idempotent: the same input emits an identical bundle', () => {
+    // Re-emission over the same acquired rows must produce the same evidence,
+    // so a rerun cannot make the completeness verdict drift.
+    const snapshot = inSeason2026Snapshot();
+    const first = emitInSeason(snapshot);
+    const firstBundle = readFileSync(first.bundlePath, 'utf8');
+    const second = emitInSeason(snapshot);
+    expect(second.run.status).toBe(0);
+    expect(readFileSync(second.bundlePath, 'utf8')).toBe(firstBundle);
+  });
+
+  it('the historical rebuild path still ABORTS on an unknown round code', () => {
+    // --on-record-error reject is in-season only by design (ISSUE-099 F6). A
+    // clean rebuild must never drop a record it cannot interpret. 'WF' is no
+    // longer such a record (ISSUE-129), so this uses a code that still is.
+    const wildcard = resultsRow(M1);
+    wildcard[2] = 'XF';
+    const snapshot = buildSnapshot({ results: [wildcard, resultsRow(M2)] });
+    const result = run(snapshot);
+    expect(result.status).not.toBe(0);
+    expect(String(result.stderr)).toContain('unrecognised results round code');
+  });
+
+});
+
 describe('fitzRoy source row corrections', () => {
   const contract = JSON.parse(readFileSync(
     join(root, 'tools', 'rebuild', 'fitzroy', 'fitzroy-contract.json'), 'utf8'));

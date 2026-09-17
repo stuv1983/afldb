@@ -59,6 +59,9 @@ import parse_draft_snapshot as parser_mod  # noqa: E402  (tested Stage A parser,
 
 SOURCE_KEY = "draftguru"
 AFLTABLES_SOURCE_KEY = "afltables"
+# AFLDB-ISSUE-160 §8.3: the durable identity of a player an administrator created
+# through their draft selection, before any source has published them.
+MANUAL_SOURCE_KEY = "manual_admin_edit"
 AFLTABLES_MATCH_METHOD = "afltables_profile_url"
 
 # Provenance written onto a link, so its authority is visible in the row itself.
@@ -307,6 +310,18 @@ def load_ledger() -> dict[str, dict]:
                 if external_id != url:
                     raise ImportFailure(
                         "a draftguru target's external_id differs from its decision key")
+            elif source == MANUAL_SOURCE_KEY:
+                # AFLDB-ISSUE-160 §8.3. The token is a randomUUID minted by the admin
+                # surface; its only structural contract is that it is a non-empty
+                # opaque string, and that no two decisions claim the same one -- which
+                # would be two people claiming one canonical player.
+                if not isinstance(external_id, str) or not external_id.strip():
+                    raise ImportFailure("a manual_admin_edit target carries no token")
+                if external_id in claimed:
+                    raise ImportFailure(
+                        "two ledger decisions claim one manual identity; refusing to "
+                        "merge two people")
+                claimed[external_id] = url
             else:
                 raise ImportFailure(f"unknown ledger target source {source!r}")
         else:
@@ -576,10 +591,32 @@ def seed_player(cur, display_name_raw: str) -> int:
     return player_id
 
 
+def resolve_manual_players(cur) -> dict[str, list[int]]:
+    """manual_admin_edit token -> canonical player ids (AFLDB-ISSUE-160 §8.3).
+
+    The mirror of ``resolve_afltables_players``. A ledger decision may name an
+    administrator-created player by the token that player was minted with, which is the
+    only durable identity such a player has before the source publishes them.
+    """
+    cur.execute(
+        """SELECT e.external_id, e.player_id
+             FROM external_identities e
+             JOIN sources s ON s.id = e.source_id
+            WHERE s.key = 'manual_admin_edit'
+              AND e.match_method = 'manual_admin_edit'
+              AND e.status IN ('unique','resolved')
+              AND e.player_id IS NOT NULL""")
+    out: dict[str, list[int]] = {}
+    for external_id, player_id in cur.fetchall():
+        out.setdefault(external_id, []).append(player_id)
+    return out
+
+
 def apply_authority(cur, rep, persons: dict[str, dict], ledger: dict[str, dict],
                     live: dict[str, dict], bridges: dict[str, str],
                     afl_players: dict[str, list[int]], source_id: int,
-                    dg_identities: dict[str, int], seeds_allowed: bool) -> dict:
+                    dg_identities: dict[str, int], seeds_allowed: bool,
+                    manual_players: dict[str, list[int]] | None = None) -> dict:
     """Decide every person's link, in the settled authority order. Fail closed on ambiguity."""
     stats = {"ledger": 0, "live_override": 0, "bridge": 0, "unmatched": 0, "seeded": 0}
 
@@ -627,6 +664,19 @@ def apply_authority(cur, rep, persons: dict[str, dict], ledger: dict[str, dict],
                     f"an explicit decision's AFL Tables target resolves to {len(candidates)} "
                     "canonical players after the fitzRoy import; expected exactly one. "
                     "Refusing to create a replacement player from DraftGuru data.")
+            player_id = candidates[0]
+        elif target["source"] == MANUAL_SOURCE_KEY:
+            # AFLDB-ISSUE-160 §8.3. The player was created by an administrator and is
+            # re-created on a rebuilt database by replay_admin_overrides(players), which
+            # runs before this importer. Resolve the token; NEVER seed a second player
+            # for it -- that is the duplicate this branch exists to prevent.
+            candidates = (manual_players or {}).get(target["external_id"], [])
+            if len(candidates) != 1:
+                raise ImportFailure(
+                    f"an explicit decision's manual-identity target resolves to "
+                    f"{len(candidates)} canonical players; expected exactly one. The "
+                    "administrator-created player it names is missing from this database "
+                    "-- replay the players admin overrides before this import.")
             player_id = candidates[0]
         else:
             existing = dg_identities.get(url)
@@ -783,6 +833,7 @@ def run_import(args, prepared: dict, rep) -> int:
             afltables_source_id = resolve_source_id(cur, AFLTABLES_SOURCE_KEY)
             club_ids = resolve_club_ids(cur)
             afl_players = resolve_afltables_players(cur, afltables_source_id)
+            manual_players = resolve_manual_players(cur)
             live = read_live_decisions(cur, source_id)
 
             cur.execute(
@@ -795,6 +846,7 @@ def run_import(args, prepared: dict, rep) -> int:
             authority = apply_authority(
                 cur, rep, persons, prepared["ledger"], live, prepared["bridges"],
                 afl_players, source_id, dg_identities, seeds_allowed=not args.no_seed,
+                manual_players=manual_players,
             )
 
             # dg_person_id is a per-load rank, so a reload can PERMUTE it; migration 069 made

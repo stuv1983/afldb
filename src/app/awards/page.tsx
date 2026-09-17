@@ -97,6 +97,23 @@ export default async function AwardsPage() {
         leagues who never played VFL/AFL.
       </p>
 
+      {/* Brownlow votes are a season-by-season record, not one of the
+          `awards` rows above, so it gets its own card here rather than a
+          category slot — this is Brownlow's route into the site now that
+          it is no longer a top-level nav item (AFLDB-ISSUE-172). */}
+      <section className="section">
+        <h2>Brownlow Medal</h2>
+        <p className="section-note">
+          Vote counts by season, from 1924.
+        </p>
+        <div className="grid">
+          <Link href="/brownlow" className="card">
+            <h3>Brownlow Medal</h3>
+            <div className="meta">Vote counts by season</div>
+          </Link>
+        </div>
+      </section>
+
       {CATEGORY_ORDER.filter((c) => byCategory.has(c)).map((category) => {
         const heading = CATEGORY_HEADINGS[category];
         const list = byCategory.get(category)!;

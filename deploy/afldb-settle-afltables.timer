@@ -1,0 +1,23 @@
+[Unit]
+Description=AFLDB — nightly in-season AFL Tables settle pass
+
+[Timer]
+# The overnight settle window: AFLDB-ISSUE-122 §19 and
+# docs/acquisition/AFLDB-2026-API-ACQUISITION.md §5, "Overnight settle
+# (T+12-24 h) ... nightly in season". OnCalendar is evaluated in the host's
+# timezone, which is Australia/Melbourne on both AFLDB hosts.
+#
+# Out of season the unit exits 0 without doing anything (there is no
+# in-progress season in data/reference/seasons.json), so the timer is left
+# enabled all year rather than being switched on and off by hand.
+OnCalendar=*-*-* 04:30
+# AFL Tables is a small third-party site. Do not hit it at a round number
+# alongside everything else that fires on a schedule.
+RandomizedDelaySec=15min
+AccuracySec=1min
+# A missed run — the droplet was down, or rebooted through the window —
+# catches up once on the next boot instead of skipping that night entirely.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

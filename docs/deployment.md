@@ -50,6 +50,18 @@ Everything else runs unprivileged as `arm`.
 
 ## 3. Routine deployment
 
+Before install/migration/build work, run the shared read-only gate from the checkout being
+deployed. It refuses a dirty or stale checkout, migration collisions, an unexpected database,
+checksum/parity drift, missing environment/tooling, and an unguarded Git Bash/MSYS shell:
+
+```bash
+npm run preflight -- --mode deploy --environment dev \
+    --dsn-env AFLDB_OWNER_DATABASE_URL --expect-database afldb_dev
+```
+
+From a workstation add `--ssh-host streamanator`; on the host itself omit it. The preflight
+does not fetch, migrate, deploy, restart, or print a DSN. Resolve every `FAIL` before continuing.
+
 ```bash
 cd ~/projects/afldb
 git pull
@@ -60,6 +72,10 @@ npm run build                # production build + standalone preparation
 sudo systemctl restart afldb
 ```
 
+The migration runner repeats the collision/base guard immediately before any shared DEV/PROD
+apply. An unmerged migration belongs on `afldb_test`; a conscious DEV-only exception requires
+`--allow-branch-local`. Production never accepts that acknowledgement.
+
 From a Windows workstation with SSH access to the development host, the same
 routine can be run with:
 
@@ -69,6 +85,38 @@ powershell -ExecutionPolicy Bypass -File .\deploy\sync-dev.ps1
 
 Use `-WhatIf` to print the target without touching the server, and
 `-SkipMigrate`, `-SkipBuild` or `-SkipRestart` for narrower maintenance runs.
+
+Before fetching, `sync-dev.ps1` classifies the remote checkout instead of treating every
+untracked path as equivalent:
+
+- any tracked or staged modification, deletion, rename or copy is a blocker;
+- an unknown untracked file or directory is a blocker;
+- these narrowly recognised operational artifacts warn and continue:
+  `.deploy-backups/`, root-level `.env.bak-*`, root-level `FETCH_HEAD`, root-level
+  `afldb-ui-questions-*.csv`, and
+  `docs/rebuild-manifests/afltables_fitzroy_core/settle-*.json`;
+- `.env`, other manifests, source/config/scripts/migrations and arbitrary JSON/CSV files are
+  not allowlisted.
+
+The preflight prints counts for tracked modifications, known operational untracked artifacts
+and unknown untracked paths, and lists every path in every non-empty class. `-AllowDirtyServer` remains an explicit
+escape hatch for tracked or unknown blockers: it prints every bypassed blocker and a warning,
+then continues. Known artifacts are preserved in either mode. The deploy never runs `git clean`,
+resets tracked files, or deletes backups, manifests, evidence or other checkout content.
+
+After the single restart/systemd respawn, the script polls readiness every 2 seconds for up to
+120 seconds by default. A ready response must be HTTP 200 JSON with both `status: "ok"` and
+`database: "ok"`; an open port alone is insufficient. Connection refusal/reset, a startup
+non-200 and an unhealthy payload are retried while systemd still reports a live/transitional
+service. `-Issue107Gate` validates the `x-afldb-build` header in the same retry loop, preserving
+its built-versus-live identity gate. The bounds are maintainable through
+`-ReadinessTimeoutSeconds` and `-ReadinessIntervalSeconds`.
+
+If systemd reports `failed` or `inactive/dead`, waiting stops immediately. A terminal failure
+or timeout exits nonzero and prints only bounded diagnostics: the last probe status/error,
+20 service-status lines, 40 recent journal lines, the elapsed wait and a listener check for the
+health URL's explicit port. Readiness testing is DB-free and simulated; do not restart DEV merely
+to test this logic.
 
 For AFLDB-ISSUE-107's controlled Next.js 16 deployment, first set
 `AFLDB_TRACE_REQUESTS=on` in the development host's `.env`, retain
@@ -186,45 +234,133 @@ curl http://10.0.40.100:8090/api/health   # through the proxy
 
 Returns `{"status":"ok","database":"ok","latencyMs":N}`, or HTTP 503 with `"database":"unreachable"`. It deliberately reveals no version, hostname or connection detail. Caddy polls it every 30 s.
 
-## 6a. Clean test rebuild (`afldb_test`)
+## 6a. Clean rebuild (`afldb_test`, and the `code_test_db` rehearsal)
 
-The canonical clean rebuild of the **test** database is one command:
+The canonical clean rebuild is one runner with **two explicitly supported destructive
+targets** (AFLDB-ISSUE-093 §10; the second added by AFLDB-ISSUE-146):
+
+| Target | Purpose | Selected by | Dedicated DSN variables |
+|---|---|---|---|
+| `afldb_test` | normal test/integration rebuild | default (no `--target`), or `--target afldb_test` | `AFLDB_TEST_DATABASE_URL` (owner), `AFLDB_TEST_IMPORT_DATABASE_URL` (import) |
+| `code_test_db` | disposable full-rebuild rehearsal | `--target code_test_db` only | `AFLDB_CODE_TEST_DATABASE_URL` (owner), `AFLDB_CODE_TEST_IMPORT_DATABASE_URL` (import) |
+
+Normal test rebuild — unchanged:
 
 ```bash
-npm run db:test:rebuild -- --fitzroy-label <full-history-label> \
-                           --acknowledge-destroy afldb_test
+npm run db:test:rebuild -- --acknowledge-destroy afldb_test
 ```
 
-Add `--plan` to print the stage graph and exit without touching anything.
+Rehearsal rebuild of `code_test_db` — the same runner, the same stage graph, nothing reduced:
 
-**It is destructive.** It drops every table, non-public schema, routine and type in
-`afldb_test` — a genuine clean slate, not a truncation — while preserving the `pg_trgm` and
-`unaccent` extensions, which are owned by another role. It refuses any target whose name is
-not exactly `afldb_test`, rejects `afldb_dev` and production by name, and requires you to
-name the database in `--acknowledge-destroy`.
+```bash
+npm run db:test:rebuild -- --target code_test_db --acknowledge-destroy code_test_db
+```
+
+```powershell
+npm run db:test:rebuild -- --target code_test_db --acknowledge-destroy code_test_db
+```
+
+Add `--plan` to print the stage graph and exit without touching anything. The core source is
+never named on the command line (it is the single accepted baseline in
+`data/reference/fitzroy-accepted-baselines.json`); `--fitzroy-label <label>
+--acknowledge-partial-fitzroy` is only for a deliberate partial rebuild.
+
+**It is destructive.** It drops every table, non-public schema, routine and type in the
+selected database — a genuine clean slate, not a truncation — while preserving the `pg_trgm`
+and `unaccent` extensions, which are owned by another role. The `code_test_db` rehearsal exists
+so a complete clean rebuild can be proven without touching `afldb_test`, `afldb_dev`, any
+retained `*_pre_rebuild_*` database or production.
+
+**Target contract — every refusal happens before any database contact:**
+
+- The target is an allowlist of exactly `afldb_test` and `code_test_db`. Anything else is
+  refused by name: `afldb_dev`, `afldb_prod`, any name containing `prod`, any preserved
+  `*pre_rebuild*` database, and any other database — an arbitrary `*_test` name such as
+  `random_test` included.
+- `--acknowledge-destroy` must name the selected database **exactly**: `afldb_test` for the
+  default target, `code_test_db` for the rehearsal. `--target code_test_db
+  --acknowledge-destroy afldb_test` is refused, and so is the reverse.
+- Each target reads only its own DSN variables. The rehearsal never borrows
+  `AFLDB_TEST_DATABASE_URL`, and the test rebuild never reads `AFLDB_CODE_TEST_*`. A missing
+  variable is a refusal, not a fallback.
+- The database named inside the DSN must equal the selected target. The target is never
+  inferred from a DSN: `AFLDB_CODE_TEST_DATABASE_URL` pointing at any database other than
+  `code_test_db` is refused, as is `AFLDB_TEST_DATABASE_URL` pointing at `code_test_db`.
+- The import DSN must name the same database as the owner DSN. Without a restricted import
+  credential the runner fails closed; `--allow-owner-import-dsn` is the only, explicit,
+  substitution.
+- A bare `--target` with no value is refused rather than falling through to the default.
+- No refusal message ever includes a DSN, host or credential — database and variable names
+  only.
+
+`code_test_db` must already exist and be owned by `afldb_owner` (no DSN in the credential model
+can create or drop a database); the runner resets it in place exactly as it resets `afldb_test`.
+`tools/maintenance/00_install_postgres.sh` bootstraps it alongside `afldb_dev` and `afldb_test` —
+including the `pg_trgm` and `unaccent` extensions migration `008_search.sql` requires — so a host
+provisioned through the normal bootstrap procedure never hits the AFLDB-ISSUE-146 missing-extension
+defect a manually created `code_test_db` did. `npm run db:test:prove-reset` remains pinned to
+`afldb_test` only.
 
 **Preflight runs before any destruction.** Every tracked DraftGuru input is checked and
 `import_draftguru.py --validate-only` must report 42 sha256-verified year pages, 5,057
 persons and 6,810 picks. A missing input fails while the database is still intact.
 
-Stage order (fixed):
+Stage order (fixed). `planStages()` in `tools/db/rebuild-test.ts` is the authority; the
+stage `id` is what `--plan` prints and what a failure names.
 
-| # | Stage | Credential |
-|---|---|---|
-| 1 | preflight | none — no database contact |
-| 2 | database reset | `AFLDB_TEST_DATABASE_URL` (owner) |
-| 3 | migrations (`db:migrate:test`) | `AFLDB_TEST_DATABASE_URL` |
-| 4 | privileges (`db:privileges:test`) | `AFLDB_TEST_DATABASE_URL` |
-| 5 | reference data | `AFLDB_TEST_IMPORT_DATABASE_URL` |
-| 6 | fitzRoy / AFL Tables core | `AFLDB_TEST_IMPORT_DATABASE_URL` |
-| 7 | **DraftGuru** | `AFLDB_TEST_IMPORT_DATABASE_URL` |
-| 8 | derived summaries | `AFLDB_TEST_IMPORT_DATABASE_URL` |
-| 9 | fingerprints / row counts | `AFLDB_TEST_DATABASE_URL` |
+| # | `id` | Stage | Credential |
+|---|---|---|---|
+| 1 | `precheck` | every required input, before anything is destroyed | none — no database contact |
+| 2 | `recreate` | database reset (clean slate, not a truncation) | `AFLDB_TEST_DATABASE_URL` (owner) |
+| 3 | `migrations` | migrations — the complete tracked set, `001` through the current terminal migration, no hard-coded count (`db:migrate:test`; `db:migrate:code-test` for the rehearsal) | `AFLDB_TEST_DATABASE_URL` |
+| 4 | `privileges` | privileges (`db:privileges:test`; `db:privileges:code-test` for the rehearsal) | `AFLDB_TEST_DATABASE_URL` |
+| 5 | `reference` | reference data | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 6 | `fitzroy` | fitzRoy / AFL Tables core | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 7 | `heights` | heights — AFL Tables player-details register | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 8 | `heights-afl-api` | heights — AFL API season rosters (evidence only) | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 9 | `heights-wikipedia` | heights — tracked adjudication set (evidence only) | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 10 | `birth-dates` | birth dates — AFL Tables club player lists | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 11 | `coaches` | coaches + match coaches — AFL Tables coach pages | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 12 | `father-son` | father–son selections — tracked Wikipedia list | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 13 | `siblings` | sibling relationships — tracked families export | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 14 | `after-siren` | after-the-siren kicks — tracked exports | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 15 | `after-siren-reconcile` | **validation** — loaded rows vs a fresh re-resolution | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 16 | `draftguru` | **DraftGuru** | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 17 | `awards-honours` | **awards & honours** (tracked manifests) | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 18 | `brownlow-season` | Brownlow season totals — tracked artefact | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 19 | `derived` | derived summaries | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 20 | `coleman` | Coleman (derived) | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 21 | `ladder-witness` | **validation** — cross-check `club_seasons` | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 22 | `fingerprints` | **validation** — per-domain row counts vs the contracts | `AFLDB_TEST_DATABASE_URL` |
 
-Data stages need `AFLDB_TEST_IMPORT_DATABASE_URL` — a restricted `afldb_import` DSN for the
-test database. The runner **fails closed** without it and never inherits the development
-`AFLDB_IMPORT_DATABASE_URL`, which points at `afldb_dev`. `--allow-owner-import-dsn` runs the
-data stages as owner deliberately, at the cost of the AFLDB-ISSUE-083 blind spot.
+Stages 7–15 are the AFLDB-ISSUE-118 additions (§23.19, §23.24, §23.27, §23.29, §23.31,
+§23.33–§23.35). Every one reads a tracked, manifest-pinned artefact, contacts no network, and
+resolves people **only** through the AFL Tables profile-url identities `fitzroy` registers —
+which is why they all follow it and why nothing later reads them. `after-siren-reconcile` and
+`ladder-witness` are validation stages: they open one connection and write nothing.
+
+**There is no Gridley stage.** The captured external grid corpus (migration 080,
+`external_grid_sources` / `external_grids` / `external_grid_axes`) is not produced by a
+rebuild, so a rebuilt database carries those tables empty apart from 080's own seed row. It is
+preserved across a promotion by the contract instead — `docs/production-promotion.md` §1 and
+§7.4b (AFLDB-ISSUE-141).
+
+The awards & honours stage (AFLDB-ISSUE-112) runs the eight manifest-backed
+groups and carries **no** `AFLDB_LEGACY_SQLITE` in its environment; the legacy
+`awards` group is deliberately not in it. It follows DraftGuru because every
+family carries player links and the canonical `players` population must be
+complete first. Coleman keeps its own later stage because it is derived and
+must run after `season_metadata` (AFLDB-ISSUE-111).
+
+The credential column is written for the default target. Under `--target code_test_db` every
+stage is identical and reads `AFLDB_CODE_TEST_DATABASE_URL` / `AFLDB_CODE_TEST_IMPORT_DATABASE_URL`
+wherever the table says `AFLDB_TEST_*`; the stage ids, order and validation gates do not change.
+
+Data stages need the target's restricted `afldb_import` DSN (`AFLDB_TEST_IMPORT_DATABASE_URL`,
+or `AFLDB_CODE_TEST_IMPORT_DATABASE_URL` for the rehearsal). The runner **fails closed** without
+it and never inherits the development `AFLDB_IMPORT_DATABASE_URL`, which points at `afldb_dev`.
+`--allow-owner-import-dsn` runs the data stages as owner deliberately, at the cost of the
+AFLDB-ISSUE-083 blind spot.
 
 `--fitzroy-label` is required and must name a manifest declaring `full_history`.
 `trial-2024` is a trial snapshot and can never satisfy full-history mode; use
@@ -234,6 +370,17 @@ DraftGuru's canonical source is the accepted Stage A snapshot plus the tracked e
 contracts and the explicit-decision ledger. **It has no `AFLDB_LEGACY_SQLITE` dependency**,
 and the retired `tools/migration/import_draft.py` is never invoked. A Stage B3 person-page
 bridge is optional and absent by default; unbridged persons stay `unmatched`.
+
+## 6b. Promoting a rebuilt database to production (`AFLDB-ISSUE-125`)
+
+A rebuilt `afldb_test` is **never restored over `afldb_prod`**. It is restored into a new
+candidate database on the production host, every production-owned table in the candidate
+is reinstated from the mandatory pre-cutover backup, a read-only checker refuses any
+test-fixture identity, and only then are the two databases renamed. The full procedure,
+the per-table contract and the rollback are in
+[production-promotion.md](production-promotion.md); the checker is
+`npm run db:promotion:check` (`tools/db/promotion-check.ts`, read-only by construction) and
+the contract is `tools/db/promotion-inventory.ts`.
 
 ## 7. Data refresh
 
@@ -246,7 +393,10 @@ source .venv/bin/activate    # or use ./.venv/bin/python directly
 ./.venv/bin/python tools/migration/import_legacy_afl.py       # ~114s  core reload
 ./.venv/bin/python tools/migration/enrich_birth_dates.py      # ~6s    DOB recovery
 ./.venv/bin/python tools/rebuild/draftguru/import_draftguru.py  # draft rows and people
-./.venv/bin/python tools/migration/import_awards.py           # awards and representative teams
+./.venv/bin/python tools/migration/import_awards.py --groups \
+    all_australian under_22 rising_star club_bf named_medals \
+    hall_of_fame honour_teams captaincies                     # awards and honours, manifest-backed
+./.venv/bin/python tools/migration/import_brownlow_season.py  # season Brownlow totals, artefact-backed
 ./.venv/bin/python tools/migration/rebuild_derived.py         # ~30s   summaries
 ./.venv/bin/python tools/migration/import_awards.py --groups coleman  # after season_metadata
 ./.venv/bin/python tools/validation/validate_migration.py     # every check must pass
@@ -259,6 +409,54 @@ the accepted Stage A snapshot and the tracked reference/decision artefacts, and 
 `AFLDB_LEGACY_SQLITE` dependency. `tools/migration/import_draft.py` is **retired** and now
 fails fast if invoked. Add `--validate-only` to check every input without touching the
 database, or `--dry-run` to run the whole transaction and roll it back.
+
+### Awards and honours no longer need the legacy SQLite database
+
+`import_awards.py` used to require `AFLDB_LEGACY_SQLITE` for every group but
+`under_22`. Since AFLDB-ISSUE-112 all nine award and honour families load from
+tracked manifests under `data/awards/`, or derive from AFLDB's own canonical
+facts, and the refresh step above names them explicitly so **no step in this
+sequence reads a legacy SQLite database**:
+
+| Group | Source |
+|---|---|
+| `all_australian` | `data/awards/all-australian.csv` + `award-definitions.csv` |
+| `under_22` | `data/awards/22-under-22.csv` |
+| `rising_star` | `data/awards/rising-star.csv`, `rising-star-winners.csv` + `award-definitions.csv` |
+| `club_bf` | `data/awards/club-best-and-fairest{,-definitions}.csv` |
+| `named_medals` | `data/awards/named-medals{,-definitions}.csv` |
+| `hall_of_fame` | `data/awards/hall-of-fame.csv` |
+| `honour_teams` | `data/awards/honour-teams.csv` |
+| `captaincies` | `data/awards/captaincies.csv` |
+| `coleman` | derived from `player_match_stats` (AFLDB-ISSUE-111) |
+
+Every manifest family that carries a bootstrap `player_id` re-resolves it
+through `data/awards/player-identity.csv` and an adjudicated `unique` or
+`resolved` AFL Tables profile identity in `external_identities`. It never trusts
+the integer itself: that integer belongs to the database the manifest was
+bootstrapped from, and a canonical rebuild re-seeds `players.id`. A row whose
+identity is missing or does not resolve to exactly one current player loads
+**unlinked** and is named in the run's output; it is never guessed from a name.
+The 22 Under 22 manifest and Coleman derivation do not carry those bootstrap
+player ids and keep their own existing identity contracts.
+
+The bare `./.venv/bin/python tools/migration/import_awards.py` (no `--groups`)
+still selects the legacy `awards` group and therefore still demands
+`AFLDB_LEGACY_SQLITE`. **That group is compatibility-only.** It now creates no
+award definition and no winner row that another group does not already own, and
+it is not part of the canonical rebuild or of this refresh sequence. Run it only
+for a deliberate full re-extract from a legacy database you still hold.
+
+`import_brownlow_season.py` (AFLDB-ISSUE-113) is the only writer of
+`brownlow_season_votes`. It loads the tracked artefact `data/brownlow/season-votes.csv`
+(verified against `data/brownlow/season-votes.manifest.json` before any database
+contact), resolves every row through the AFL Tables profile identity in
+`external_identities`, and writes nothing unless every row resolves — zero rejections or
+no write. It truncates only `brownlow_season_votes`; `brownlow_round_votes` belongs to
+the fitzRoy/settle writers and is never touched. The legacy `brownlow` group of
+`import_legacy_afl.py`, which truncated both tables from the retired SQLite source, no
+longer exists. It must run before `rebuild_derived.py`, which reads the season table to
+derive `player_season_stats.brownlow_votes` / `brownlow_status` and the career totals.
 
 The order matters. `rebuild_derived.py` must run last of the summary builders: it reads the tables the earlier steps write, and its first target, `season_metadata`, decides whether a season is still in progress — which in turn decides whether that season's Brownlow reads as a zero or as "not yet awarded".
 
@@ -303,6 +501,8 @@ nothing else is reading, and re-run from the start after any failure.
 
 **Cache invalidation.** Historical pages are cached for 1–24 hours. After an import, a rebuild and restart refreshes them; a full restart is not otherwise required. Rebuilding is preferred over waiting for revalidation, because prerendered pages are regenerated at build time.
 
+**The nightly in-season settle is the exception, and publishes itself (§7c).** A manual import is a supervised act with a rebuild at the end of it; the 04:30 settle is not, and it changes exactly one season. It therefore asks the running site to invalidate that one page once its transaction has committed, instead of leaving readers on pre-settle output for the rest of the ISR hour (`AFLDB-ISSUE-134`).
+
 ## 7a. AFLW staging refresh
 
 AFLW lives in `staging_aflw` only. It is not yet in the normalised model, is
@@ -331,6 +531,489 @@ Running SQL against the server from the workstation is easiest by piping a
 file into `psql` over stdin — `cat q.sql | ssh arm@10.0.40.100 '... psql "$DSN" -f -'`.
 An inline heredoc inside a quoted `ssh` argument silently eats `''`, which
 turns `WHERE conference = ''` into a syntax error.
+
+## 7b. In-season AFL Tables settle (scheduled)
+
+`AFLDB-ISSUE-122`. Once a night, in season, AFL Tables is acquired through
+fitzRoy, adjudicated offline, and applied canonically without a human. The
+chain is:
+
+```text
+acquire_core.R --acquire --in-season          network; writes files, manifest LAST
+  -> import_fitzroy_core.py --require-in-season --on-record-error reject
+     --emit-observations                       offline; never opens a database
+  -> settle-afltables.ts --apply --auto-apply --require-complete-source
+                                                the only step that reaches PostgreSQL
+```
+
+`deploy/afldb-settle-afltables.sh` runs those three steps under `set -e`,
+`deploy/afldb-settle-afltables.service` runs the script as a `oneshot`, and
+`deploy/afldb-settle-afltables.timer` fires it nightly. The season comes from
+`data/reference/seasons.json` `in_progress_seasons` and the datasets from the
+contract's own `in_season` block, so neither is duplicated in the unit.
+
+Before the launcher begins acquisition it prints a copy/paste monitoring block: the exact launcher
+and PID, process watch, a `pg_stat_activity` watch using the same import role without exposing its
+DSN, journal tail, success/failure markers, a 10-minute no-progress stall threshold and the measured
+duration ranges. `AFLDB_SETTLE_SUCCESS` is the terminal success marker and
+`AFLDB_SETTLE_FAILURE` includes the label and exit code. Routine no-change host-local evidence is
+about 51 seconds; a fresh approximately 9,823-record run took 1 h 57 min over a workstation tunnel
+and must be supervised outside the scheduled unit's one-hour timeout. Elapsed time alone is not a
+stall signal.
+
+**Squiggle and Kali are never invoked automatically**, and since §11.2 of
+ISSUE-122 neither can write a canonical row at all. There is no fallback
+canonical authority: if this chain fails, the season does not advance until it
+succeeds.
+
+### R and the pinned fitzRoy
+
+`acquire_core.R` needs R (>= 4.1), `jsonlite`, `digest`, and fitzRoy at
+**exactly** the version pinned in
+`tools/rebuild/fitzroy/fitzroy-contract.json` (`pinned_version`, currently
+`1.8.0`). It compares the installed version with `identical()` and refuses to
+acquire on a mismatch, so an unnoticed upstream upgrade fails the run rather
+than silently changing the source schema.
+
+Ubuntu 24.04's own `r-base-core` (4.3.3) satisfies the requirement, and Ubuntu
+packages all but two of fitzRoy's dependency tree, so the install compiles
+almost nothing — which matters on the 2 vCPU / 4 GB droplet, which has no
+swap. Only `janitor` (pure R) and `nanoparquet` (C) come from CRAN.
+
+```bash
+sudo apt-get update
+sudo apt-get install -y --no-install-recommends \
+  r-base-core r-base-dev \
+  r-cran-jsonlite r-cran-digest \
+  r-cran-cli r-cran-dplyr r-cran-glue r-cran-httr r-cran-httr2 \
+  r-cran-lifecycle r-cran-lubridate r-cran-magrittr r-cran-purrr \
+  r-cran-readr r-cran-rlang r-cran-rvest r-cran-snakecase r-cran-stringi \
+  r-cran-stringr r-cran-tibble r-cran-tidyr r-cran-tidyselect r-cran-xml2
+```
+
+Install fitzRoy itself from a **dated Posit Package Manager snapshot**, not
+from `latest`. The snapshot is the pin: `install.packages("fitzRoy")` against
+`latest` installs whatever CRAN carries that day, which is how a contract pin
+quietly stops matching. A dated snapshot reinstalls the same 1.8.0 in a year's
+time.
+
+```bash
+# The snapshot date must be one on which fitzRoy 1.8.0 was current
+# (published 2026-08-23). Re-date this only when the contract pin changes.
+sudo Rscript -e 'install.packages("fitzRoy",
+  repos = "https://packagemanager.posit.co/cran/__linux__/noble/2026-09-01",
+  lib   = "/usr/local/lib/R/site-library")'
+```
+
+**`/usr/local/lib/R/site-library` is AFLDB's canonical R library on every
+deployed host.** It is the system-wide library `r-base-core` creates, it is on
+R's default `.libPaths()` with nothing configured, it sits outside `$HOME`
+(which the unit mounts read-only), and the service never writes to it at run
+time. Every `install.packages()` in this section names it with `lib =`; the
+`apt` `r-cran-*` packages land beside it in `/usr/lib/R/site-library`. A host
+installed this way needs **no** R-related setting in `.env` and no systemd
+environment at all.
+
+#### Where the unit looks for the library (`AFLDB-ISSUE-130`)
+
+`Rscript` under systemd computes `.libPaths()` from `R_LIBS`, `R_LIBS_USER`,
+the site library and the system library — and from nothing else. systemd
+sources no login shell, so an `R_LIBS_USER` exported from `~/.bashrc` or
+`~/.profile` does not exist for the unit, and packages installed into `~/R`
+from an interactive session are on no path the service can see. That is the
+failure `AFLDB-ISSUE-130` records: the unit died with `Package 'jsonlite' is
+required` while the packages were installed and healthy in `/home/arm/R/library`.
+
+The tracked chain therefore resolves R the same way it resolves `python3` and
+`node`, in one sourced fragment, `deploy/afldb-r-env.sh`, shared by the settle
+script and the preflight below:
+
+- `AFLDB_RSCRIPT` — the interpreter, default `/usr/bin/Rscript`;
+- `AFLDB_R_LIBS` — **optional**, one extra library directory. When set it is
+  prepended to `R_LIBS` (additive, so the `apt` site library stays visible;
+  `R_LIBS_SITE` would replace it) and it **must exist**: R silently drops a
+  missing directory from `.libPaths()`, so the fragment refuses instead, and
+  the unit fails before a snapshot label exists.
+
+`AFLDB_R_LIBS` is an explicit escape hatch for a host whose packages
+genuinely live somewhere other than the canonical library. It belongs in
+`.env`, which the unit already loads through `EnvironmentFile=`. It is **not**
+part of the normal installation: a host built by the commands above leaves it
+unset. Two things are not acceptable substitutes:
+
+- a hand-written `/etc/systemd/system/afldb-settle-afltables.service.d/*.conf`
+  drop-in — it is invisible to every deployment, every clone and every
+  re-provisioned host, which is exactly how ISSUE-130 happened;
+- `~/.Renviron` — R does read it under systemd, but it is the same class of
+  untracked, per-host state, and the preflight warns when one exists.
+
+The supported path depends on no interactive-shell startup file.
+
+**Verify the runtime — this is the gate, not the install log.** The preflight
+starts R the way the unit will (it sources the same fragment), prints
+`R.version.string`, the effective `.libPaths()` and the `R_LIBS*` environment
+R saw, checks that `jsonlite`, `digest` and `fitzRoy` are visible and where
+each resolves from, and compares the installed fitzRoy with `pinned_version`
+read from `fitzroy-contract.json`. It installs nothing and opens nothing; it
+exits non-zero with every failure listed.
+
+```bash
+cd ~/projects/afldb
+
+# 1. interactive-shell check: proves the packages and the pin, from YOUR shell.
+sh deploy/afldb-r-preflight.sh
+
+# 2. service-equivalent check: the same script as user arm, with the unit's
+#    working directory, its EnvironmentFile (so AFLDB_R_LIBS from .env
+#    applies) and its filesystem hardening, and WITHOUT your login shell.
+#    This is the environment that failed in ISSUE-130; step 1 alone cannot
+#    prove it. The exit status is the preflight's own.
+sudo systemd-run --wait --pipe --collect --unit=afldb-r-preflight \
+  -p User=arm -p Group=arm \
+  -p WorkingDirectory=/home/arm/projects/afldb \
+  -p EnvironmentFile=/home/arm/projects/afldb/.env \
+  -p ProtectHome=read-only -p ProtectSystem=strict -p PrivateTmp=true \
+  -p NoNewPrivileges=true \
+  /bin/sh /home/arm/projects/afldb/deploy/afldb-r-preflight.sh
+
+# 3. the unit itself declares no environment of its own; it must print exactly
+#    `Environment=` — anything else is an untracked drop-in (see below).
+systemctl show afldb-settle-afltables.service -p Environment
+```
+
+Both preflight runs must end with `R PREFLIGHT: OK`. If the pin fails, stop:
+do not pass `--allow-version-mismatch` to work around it. Re-pinning the
+contract is a deliberate, reviewed edit with fresh probe evidence behind it.
+If a package is `MISSING` in step 2 but present in step 1, the packages are in
+a library your shell can see and the service cannot — reinstall them into the
+canonical library, or declare that directory as `AFLDB_R_LIBS` in `.env`.
+
+**Removing an untracked drop-in.** A host that was made to work with a
+hand-written `r-library.conf` (the ISSUE-130 stop-gap) must have it removed
+once the tracked fix is deployed, or the tracked declaration is never actually
+exercised:
+
+```bash
+sudo rm /etc/systemd/system/afldb-settle-afltables.service.d/r-library.conf
+sudo rmdir /etc/systemd/system/afldb-settle-afltables.service.d   # only if now empty
+sudo systemctl daemon-reload
+systemctl show afldb-settle-afltables.service -p Environment       # must print: Environment=
+```
+
+then repeat preflight step 2 and one supervised `systemctl start`.
+
+**How a future deployment verifies the pin.** It does not need to remember to:
+`acquire_core.R` re-reads `fitzroy-contract.json` and re-checks the installed
+version on **every** run, and records the version actually used in every probe
+and manifest. An R upgrade that moves fitzRoy therefore fails the next timer
+firing loudly, and no snapshot is produced. The preflight reports the same
+comparison earlier, at deploy time, from the same contract field.
+
+### Installing the service and timer
+
+```bash
+cd ~/projects/afldb
+
+# The unit mounts $HOME read-only and opens exactly two writable paths.
+# Both must exist BEFORE it starts, or systemd refuses to start it —
+# deliberately, so a missing directory is not an EROFS halfway through a fetch.
+mkdir -p data/sources/afltables/fitzroy_core
+ls -d docs/rebuild-manifests/afltables_fitzroy_core   # tracked; present after a deploy
+
+sudo cp deploy/afldb-settle-afltables.service deploy/afldb-settle-afltables.timer \
+        /etc/systemd/system/
+sudo systemctl daemon-reload
+```
+
+Do **not** enable the timer yet — validate first (below).
+
+### Environment
+
+The unit needs one credential: `AFLDB_IMPORT_DATABASE_URL` (the `afldb_import`
+role), read from `.env` by `EnvironmentFile=`. Every other DSN and secret
+`.env` carries is dropped with `UnsetEnvironment=`, so this is the one unit
+besides the importers that holds a writing DSN, and it holds only that one.
+
+No Python virtualenv is required. The offline adjudication and emission path
+of `import_fitzroy_core.py` imports only the standard library — `psycopg`
+arrives through a lazy `from common import ...` inside the database branch,
+which `--emit-observations` returns before ever reaching. System
+`/usr/bin/python3` is enough.
+
+### Supervised validation, in escalation order
+
+Run these by hand, in order, and stop at the first failure. Nothing is
+scheduled until step 9 passes.
+
+```bash
+cd ~/projects/afldb
+
+# 1-2. runtime, library and the pin — the preflight, twice: from this shell,
+#      then service-equivalent through systemd-run (the exact command is in
+#      "R and the pinned fitzRoy" above). Both must print `R PREFLIGHT: OK`.
+#      An interactive Rscript check is NOT a substitute: the unit's library
+#      path is not your shell's (AFLDB-ISSUE-130).
+sh deploy/afldb-r-preflight.sh
+
+# 3. acquisition only. Writes files; the manifest is written LAST
+L=settle-$(date +%Y-%m-%d-%H%M)
+Rscript tools/rebuild/fitzroy/acquire_core.R --acquire --in-season \
+  --label "$L" --from 2026 --to 2026
+ls -l docs/rebuild-manifests/afltables_fitzroy_core/$L.json   # exists => acquisition finished
+
+# 4. offline adjudication + observation bundle. No database is opened
+python3 tools/migration/import_fitzroy_core.py --label "$L" \
+  --require-in-season --on-record-error reject \
+  --emit-observations "data/sources/afltables/fitzroy_core/$L/observations.json"
+
+# 5. safe preview: the full automatic path against real constraints and
+#    privileges, rolled back at the end
+node_modules/.bin/tsx tools/current-season/settle-afltables.ts \
+  --label "$L" --dry-run --auto-apply
+
+# 6. the real run
+node_modules/.bin/tsx tools/current-season/settle-afltables.ts \
+  --label "$L" --apply --auto-apply
+
+# 7. the exception report and the counters printed by step 6
+node_modules/.bin/tsx tools/current-season/settle-afltables.ts --label "$L" --report
+
+# 8. idempotence: acquire a fresh snapshot over the same upstream data and
+#    settle it again. Every canonical and ledger counter must be 0
+L2=settle-$(date +%Y-%m-%d-%H%M)
+Rscript tools/rebuild/fitzroy/acquire_core.R --acquire --in-season \
+  --label "$L2" --from 2026 --to 2026
+python3 tools/migration/import_fitzroy_core.py --label "$L2" \
+  --require-in-season --on-record-error reject \
+  --emit-observations "data/sources/afltables/fitzroy_core/$L2/observations.json"
+node_modules/.bin/tsx tools/current-season/settle-afltables.ts \
+  --label "$L2" --apply --auto-apply
+
+# 9. only now, schedule it
+sudo systemctl enable --now afldb-settle-afltables.timer
+```
+
+Step 6 prints `canonicalRowsInserted`, `canonicalRowsUpdated`,
+`canonicalApplicationsLogged`, `canonicalApplyRefusals` and
+`canonicalApplyFailures`. Step 8 must print zero for the first three: a
+canonical or ledger write on a rerun over identical source data is stop
+condition **SC3**, not a curiosity.
+
+**Prerequisites.** The migration and `db:privileges` go **before** the code
+that depends on them (the `AFLDB-ISSUE-027` lesson): the settle path needs
+migration `083_canonical_auto_apply.sql` applied and
+`tools/maintenance/privileges.sql` re-run, or the applier fails closed on a
+missing grant. Do not start step 3 on a host whose schema is behind.
+
+### Running, inspecting and stopping it
+
+```bash
+systemctl list-timers afldb-settle-afltables.timer   # next and last firing
+systemctl status afldb-settle-afltables.service      # last run's result
+journalctl -u afldb-settle-afltables --since yesterday
+journalctl -u afldb-settle-afltables -f              # live, during a manual run
+
+sudo systemctl start afldb-settle-afltables.service  # one supervised run, now
+
+sudo systemctl disable --now afldb-settle-afltables.timer   # stop scheduling
+```
+
+Disabling the timer is always safe: the chain holds no state between runs, so
+nothing is left half-done. The service unit stays installed and can still be
+started by hand.
+
+### A FAILED unit that still wrote data — `--require-complete-source`
+
+`AFLDB-ISSUE-128`. The settle CLI's last step evaluates a **source-completeness
+verdict** and, under `--require-complete-source`, exits non-zero when the
+verdict is not `complete`. The unit then shows `failed` even though the run
+committed.
+
+**That is deliberate, and it is not a half-finished write.** The exit code is
+decided *after* `runSettleCli()` returns, so the transaction has already
+committed: every record AFLDB could represent has landed and the rerun is
+still idempotent. What the exit code reports is that AFL Tables supplied rows
+this chain could **not** represent, which before ISSUE-128 was invisible — the
+2026-09-03 measurement was 209 matches acquired, 207 emitted, 94 rows dropped,
+exit 0, and a nightly job reporting success.
+
+When the unit goes red, read the emission step, not the settle step:
+
+```bash
+journalctl -u afldb-settle-afltables --since yesterday | grep -A 12 'SOURCE COMPLETENESS'
+```
+
+It names the family, the reason and the offending source lines. The verdict is
+computed from the source's own counters, never from a calendar, so a bye, the
+gap before finals and the whole off-season all read `complete` — a red unit
+always means a real coverage gap. The same verdict is on
+`/admin/current-season` above the run counters.
+
+Removing the flag would restore the silent-success behaviour and is not a fix
+for a red unit.
+
+### Cadence, failure and retry
+
+| | |
+|---|---|
+| Cadence | `OnCalendar=*-*-* 04:30` local, `RandomizedDelaySec=15min`. The overnight settle window (`docs/acquisition/AFLDB-2026-API-ACQUISITION.md` §5, T+12–24 h) |
+| Missed run | `Persistent=true` — a run missed because the host was down catches up once after boot |
+| Out of season | The script finds no in-progress season, logs that, and exits 0. The timer is left enabled all year |
+| Failed acquisition | The manifest is written last, so a failed fetch leaves no manifest; the script removes the manifest-less working directory. The adjudicator never runs and PostgreSQL is never opened. The unit fails, `systemctl status` shows it, and the next firing retries from the start |
+| Failed settle | The transaction rolls back. The snapshot and its manifest are kept — they are the evidence — and are never rewritten, because snapshots are immutable |
+| Fallback | **None.** Squiggle and Kali are not invoked and cannot write canonically. A failure means the season does not advance, never that a weaker source silently does it instead |
+
+Each run writes a new snapshot under `data/sources/` (gitignored) and a new
+provenance manifest under `docs/rebuild-manifests/afltables_fitzroy_core/`,
+which is a **tracked** directory — so nightly manifests accumulate there as
+untracked files. They are small and `git pull` is unaffected, but they are
+worth pruning or committing periodically rather than letting a season's worth
+build up unnoticed.
+
+### On-demand refresh from the admin surface (`AFLDB-ISSUE-127`)
+
+A Super Admin can start **this same unit** immediately from
+`/admin/current-season` — "Fetch current AFL data now" — instead of waiting for
+04:30. It is the same script, the same gates, the same transaction and the same
+fail-closed behaviour; the control takes no season, label, source or force
+input, because the action accepts none.
+
+**Concurrency is systemd's.** A start job for a unit that already has one is
+merged into the existing job, so a second Super Admin, or a click landing
+during the timer's run, cannot start a second ingestion transaction. The panel
+reports "already running" rather than pretending it started something.
+
+**The result comes from `import_batches`, not the journal.** The settle stamps
+its whole counter set into `validation_result` on the way out, so the panel
+reads the structured row. Note that the row is written *inside* the run's
+transaction and is invisible until it commits — during a run the panel shows
+the unit as running and the *previous* run's batch, labelled as such.
+
+Two host steps enable it. **Until both are done the control is inert and says
+so**; nothing fails and nothing half-works, and the nightly timer is unaffected
+either way.
+
+```bash
+cd ~/projects/afldb
+
+# 1. The permission. One action, one verb, one unit, one user.
+sudo install -m 644 -o root -g root   deploy/afldb-settle-afltables-trigger.rules   /etc/polkit-1/rules.d/50-afldb-settle-afltables.rules
+sudo systemctl restart polkit
+
+# 2. The application flag, then a restart to pick it up.
+echo 'AFLDB_SETTLE_TRIGGER=systemd' >> .env
+sudo systemctl restart afldb
+
+# Verify, as the app user, WITHOUT sudo. This is the exact call the app makes.
+sudo -u arm /usr/bin/systemctl show afldb-settle-afltables.service --property=ActiveState
+sudo -u arm /usr/bin/systemctl start --no-block afldb-settle-afltables.service
+systemctl status afldb-settle-afltables.service
+```
+
+**Why polkit and not sudo.** `deploy/afldb.service` sets
+`NoNewPrivileges=true`. Under that, the kernel ignores the setuid bit, so
+`sudo` cannot elevate no matter what `/etc/sudoers.d` permits — making sudo
+work would mean removing that hardening from the public web service. A
+`systemctl start` from a non-root user is instead a D-Bus call to PID 1
+authorized by polkit, which involves no setuid binary and so works unchanged.
+**`deploy/afldb.service` is not modified.** Reading unit state
+(`systemctl show`) is unprivileged and needs no rule at all.
+
+**What the rule does not grant.** Not `stop`, `restart`, `enable`, `disable`,
+`mask` or `kill`; not any other unit; no shell and no root. The unit name is
+spelled out rather than pattern-matched, so a future similarly-named unit
+cannot inherit the grant.
+
+**To revoke it,** remove either half — delete the rules file and restart
+polkit, or unset `AFLDB_SETTLE_TRIGGER` and restart `afldb`. The scheduled
+timer keeps running in both cases.
+
+## 7c. Publishing a settled season (`AFLDB-ISSUE-134`)
+
+`/seasons/[year]` is ISR: `revalidate = 3600`, and `generateStaticParams()`
+prerenders every season at build time. The nightly settle runs out of process,
+so without this step a settle that lands real matches at 04:35 is invisible to
+readers until the page's hour expires. Measured on production
+(`AFLDB-ISSUE-133`): prerendered 22:14:46, rows committed 22:37:47, page
+regenerated 23:50:48.
+
+**Why it is a loopback request and not `revalidatePath()` in the settle.**
+`revalidatePath()` only exists inside a Next server context, and Next 16 keeps
+page invalidation in *per-process* memory — a module-level tag map, plus an
+in-memory cache in front of the file cache. `deploy/server-cluster.mjs` runs
+`AFLDB_WORKERS` independent processes behind one socket, so a single request
+invalidates a single worker. The settle therefore posts on fresh connections
+until every worker ordinal has answered, and reports a failure if it cannot
+reach them all. Deleting `.next` cache files would not work either: the
+in-memory cache is read first.
+
+Two host steps, and **until both are done the settle is inert** — it runs and
+commits exactly as before, and the page falls back to expiring on its own.
+
+```bash
+cd ~/projects/afldb
+
+# 1. The origin of the local site (the port Caddy proxies to) and a secret.
+#    Generate the secret on the host; never commit it.
+echo "AFLDB_REVALIDATE_URL=http://127.0.0.1:3100" >> .env
+echo "AFLDB_REVALIDATE_SECRET=$(openssl rand -hex 32)" >> .env
+
+# 2. The web service must be restarted to see the secret. The settle unit
+#    reads .env at each start and needs nothing.
+sudo systemctl restart afldb
+```
+
+Verify without waiting for 04:30 — this is the exact request the settle makes,
+and it should answer `{"ok":true,...}` naming the worker that handled it:
+
+```bash
+curl -s -X POST http://127.0.0.1:3100/api/internal/revalidate-season   -H "x-afldb-revalidate-secret: $(grep '^AFLDB_REVALIDATE_SECRET=' .env | cut -d= -f2-)"   -H 'content-type: application/json' -d '{"season":2026}'
+```
+
+**What the secret authorises.** One thing: asking the site to re-render
+`/seasons/<year>`. The body carries an integer year and nothing else — the
+path is composed server-side — so there is no arbitrary path, pattern, layout
+or tag to purge. Unconfigured, it answers 503.
+
+**Why the internet cannot reach it.** The route serves a request only when its
+forwarded client address resolves to loopback, and that value is trustworthy
+because of two things this repository controls:
+
+- **Every proxy block overwrites the header.** `deploy/Caddyfile` and
+  `deploy/Caddyfile.production` set `header_up X-Forwarded-For {remote_host}`
+  on each `reverse_proxy`, and drop `X-Real-IP` and `Forwarded`. A public
+  client that sends `X-Forwarded-For: 127.0.0.1` has it *replaced* with the
+  address Caddy observed before Node sees it. `src/lib/auth/session.ts` already
+  stakes the audit trail on the same property.
+- **The application is bound to loopback.** `deploy/afldb.service` sets
+  `HOSTNAME=127.0.0.1`, so the only way to the port without passing through
+  Caddy is to already be on the host.
+
+A comma-separated chain, a non-loopback address, or a malformed value is
+refused — the deployment produces exactly one hop, so anything else means the
+contract changed and no loopback claim can be believed. Both properties are
+asserted against the tracked files in
+`tests/settle-season-revalidation.test.ts`, so an append/trust change to a
+Caddyfile cannot quietly invalidate the model.
+
+> **NOT "the forwarding headers must be absent".** That was the first version
+> of this gate and it made the route 404 on *every* request on the real host
+> (`AFLDB-ISSUE-134` §10.2). Next 16 synthesises `x-forwarded-for` and
+> `x-forwarded-host` on every request before any handler runs
+> (`base-server.js`), filling them from the socket address and the `Host`
+> header when the proxy did not — so **absence is not a loopback signal**, and
+> a direct loopback POST carries both headers too. `x-forwarded-host` is not a
+> gate at all: it is client input on both paths.
+
+**When it fires.** Only after the settle transaction has committed, and only
+when that run actually wrote a canonical or ledger row. The idempotent 0/0
+rerun — most nights out of season, and any repeat over unchanged source data —
+makes no request at all.
+
+**When it fails.** The unit goes red and the journal says why, exactly as
+`--require-complete-source` does. **The data is committed and correct; only
+the cache invalidation did not happen**, so the page reverts to expiring on
+its own hour. Nothing is retried and nothing is rolled back.
 
 ## 8. Testing
 
@@ -401,6 +1084,11 @@ All configuration is in `/home/arm/projects/afldb/.env` (mode 600, owner `arm`),
 | `AFLDB_POOL_MAX` | app pool size **per worker** (default 10) |
 | `AFLDB_BUILD_WORKERS` | caps `next build` static-generation workers; unset = Next's default |
 | `AFLDB_STATEMENT_TIMEOUT_MS` | per-connection statement timeout |
+| `AFLDB_SETTLE_TRIGGER` | `systemd` enables the Super Admin on-demand settle trigger (§7b). Anything else, including unset, leaves it inert |
+| `AFLDB_REVALIDATE_URL` | **optional**, e.g. `http://127.0.0.1:3100` — the loopback origin the settle posts its finished season to (§7c). Must be loopback; a non-loopback host is refused |
+| `AFLDB_REVALIDATE_SECRET` | **optional** — the shared secret for that one route. Set both or neither; one alone is refused |
+| `AFLDB_R_LIBS` | **optional**, normally unset. One extra R library directory for the settle unit, prepended to `R_LIBS`; must exist. The canonical library `/usr/local/lib/R/site-library` needs nothing (§7b, `AFLDB-ISSUE-130`) |
+| `AFLDB_RSCRIPT` | **optional**, default `/usr/bin/Rscript` — the interpreter the settle unit runs (§7b) |
 
 **The web service does not receive them all.** `.env` is the whole project's
 configuration, so the unit loads it and then drops the import, owner, test and

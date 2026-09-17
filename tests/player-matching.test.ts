@@ -1,8 +1,25 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
+import {
+  clubTextCalibration,
+  clubTextWeights,
+  policySnapshot,
+  setClubTextCalibration,
+} from '@/lib/player-matching/calibration';
 import { ALGORITHM_VERSION, assessMatch, MATCH_POLICY } from '@/lib/player-matching/confidence';
 import { parseCareerSpan } from '@/lib/player-matching/parse-career-span';
+import {
+  buildClubTextIndex,
+  normaliseClubText,
+  resolveClubText,
+  splitClubText,
+} from '@/lib/player-matching/club-identity';
 import { scoreCandidate } from '@/lib/player-matching/score-candidate';
+import {
+  applyClubTextCalibration,
+  describeClubTextCalibration,
+  parseClubTextCalibration,
+} from '../tools/matching/policy-options';
 import {
   getLinkUniquenessScope,
   resolutionKey,
@@ -36,7 +53,10 @@ function source(overrides: Partial<SourceEvidence> = {}): SourceEvidence {
     normalisedName: 'john smith',
     temporal: [],
     clubId: null,
+    clubOrganizationId: null,
+    clubMatch: 'lineage',
     clubNameRaw: null,
+    resolvedClubs: [],
     reportedGames: null,
     reportedGoals: null,
     context: 'Test award',
@@ -59,7 +79,7 @@ function candidate(overrides: Partial<CandidateEvidence> = {}): CandidateEvidenc
     finalSeason: 1999,
     careerGames: 150,
     careerGoals: 60,
-    clubs: [{ clubId: 7, games: 150, firstSeason: 1990, lastSeason: 1999 }],
+    clubs: [{ clubId: 7, organizationId: null, games: 150, firstSeason: 1990, lastSeason: 1999 }],
     clubHistoryComplete: true,
     uniquenessConflict: null,
     ...overrides,
@@ -135,6 +155,721 @@ describe('name evidence', () => {
       candidate({ nameSimilarity: 0.95 }),
     );
     expect(scored.strongName).toBe(false);
+  });
+});
+
+/**
+ * AFLDB-ISSUE-164 P1a. The normaliser itself is SQL and is proven in
+ * tests/integration/player-matching.test.ts against the real function.
+ * What belongs here is the consequence: the scorer's verdict on the two
+ * strings the normaliser can hand it for the same visual name.
+ */
+describe('Unicode whitespace in source names', () => {
+  /** U+00A0 NO-BREAK SPACE, built by code point so it stays visible in this file. */
+  const NBSP = String.fromCharCode(0x00a0);
+
+  const draftRow = () => source({
+    rawName: `Aaron${NBSP}Cadman`,
+    clubId: 7,
+    temporal: [{ kind: 'draft_year', year: 2022 }],
+    reportedGames: 150,
+    reportedGoals: 60,
+  });
+  const player = () => candidate({
+    displayName: 'Aaron Cadman',
+    searchName: 'aaron cadman',
+    debutSeason: 2023,
+    finalSeason: 2032,
+  });
+
+  it('paid a preserved U+00A0 as a fuzzy name, capping the draft row at 79', () => {
+    // The defect, pinned so the composition ISSUE-164 P0 measured stays
+    // legible: the strings are visually identical and similarity is
+    // 1.00, but they are not byte-equal, so the exact arm cannot fire.
+    const scored = scoreCandidate(
+      source({ ...draftRow(), normalisedName: `aaron${NBSP}cadman` }),
+      player(),
+    );
+    expect(signals(scored)).toEqual([
+      'name_trigram_high', 'club_anywhere', 'draft_year_before_debut',
+      'draft_games_exact', 'draft_goals_exact',
+    ]);
+    expect(scored.score).toBe(79);
+    expect(scored.strongName).toBe(false);
+  });
+
+  it('pays the canonicalised name as exact, the same as its ASCII form', () => {
+    // Migration 099 canonicalises U+00A0 to an ordinary space, so the
+    // source normalises to the byte-equal 'aaron cadman'. Only the name
+    // family moves: 26 -> 44, and the row becomes strongly named.
+    const scored = scoreCandidate(
+      source({ ...draftRow(), normalisedName: 'aaron cadman' }),
+      player(),
+    );
+    expect(signals(scored)).toEqual([
+      'name_exact', 'club_anywhere', 'draft_year_before_debut',
+      'draft_games_exact', 'draft_goals_exact',
+    ]);
+    expect(scored.score).toBe(97);
+    expect(scored.strongName).toBe(true);
+  });
+
+  it('ships the changed matching semantics under a new algorithm version', () => {
+    // Every cached v1 suggestion is stale the moment 099 lands; the
+    // version string is what makes that visible rather than silent.
+    expect(ALGORITHM_VERSION).toBe('v3');
+  });
+});
+
+describe('club text resolution (D-4, read time, exact only)', () => {
+  // A slice of the real shapes in data/awards/hall-of-fame.csv and
+  // data/awards/honour-teams.csv: pipe-separated Hall of Fame lists,
+  // comma-separated honour-team lists, competition tags, parentheticals
+  // and a long tail of SANFL/WAFL/Tasmanian clubs AFLDB does not hold.
+  const CARLTON = 2;
+  const FOOTSCRAY = 5;
+  const WESTERN_BULLDOGS = 6;
+  const BULLDOGS_ORG = 6;
+  const BEARS = 10;
+  const LIONS = 11;
+
+  const index = buildClubTextIndex([
+    { text: 'Carlton', clubId: CARLTON, organizationId: CARLTON },
+    { text: 'Footscray', clubId: FOOTSCRAY, organizationId: BULLDOGS_ORG },
+    { text: 'Western Bulldogs', clubId: WESTERN_BULLDOGS, organizationId: BULLDOGS_ORG },
+    { text: 'Bulldogs', clubId: WESTERN_BULLDOGS, organizationId: BULLDOGS_ORG },
+    // The genuinely ambiguous string: two organizations, one short name.
+    { text: 'Brisbane', clubId: BEARS, organizationId: BEARS },
+    { text: 'Brisbane', clubId: LIONS, organizationId: LIONS },
+    { text: 'Fremantle', clubId: 17, organizationId: 17 },
+  ]);
+
+  const orgs = (raw: string | null) =>
+    resolveClubText(raw, index).map((c) => c.organizationId);
+
+  it('normalises case and Unicode whitespace, and nothing else', () => {
+    expect(normaliseClubText('  Western   Bulldogs ')).toBe('western bulldogs');
+    expect(normaliseClubText('Western Bulldogs')).toBe('western bulldogs');
+    expect(normaliseClubText('Fremantle (1882)')).toBe('fremantle (1882)');
+  });
+
+  it('splits on the separators both sources actually use', () => {
+    expect(splitClubText('Collingwood | Fitzroy')).toEqual(['Collingwood', 'Fitzroy']);
+    expect(splitClubText('Claremont, North Melbourne, St Kilda'))
+      .toEqual(['Claremont', 'North Melbourne', 'St Kilda']);
+  });
+
+  it('resolves an exact club name', () => {
+    expect(orgs('Carlton')).toEqual([CARLTON]);
+  });
+
+  it('resolves every identity of a lineage to the same continuing club', () => {
+    expect(orgs('Footscray')).toEqual([BULLDOGS_ORG]);
+    expect(orgs('Western Bulldogs')).toEqual([BULLDOGS_ORG]);
+    expect(orgs('Bulldogs')).toEqual([BULLDOGS_ORG]);
+  });
+
+  it('keeps a multi-club field multi-club', () => {
+    expect(orgs('Footscray | Carlton')).toEqual([BULLDOGS_ORG, CARLTON]);
+  });
+
+  it('reports one continuing club once, however many identities it names', () => {
+    expect(orgs('Western Bulldogs | Footscray')).toEqual([BULLDOGS_ORG]);
+  });
+
+  it('drops a competition tag rather than guessing at it', () => {
+    expect(orgs('Carlton, VFL')).toEqual([CARLTON]);
+    expect(orgs('Norwood, SANFL, ANFC')).toEqual([]);
+  });
+
+  it('fails closed on text that names two continuing clubs', () => {
+    // Brisbane Bears and Brisbane Lions are separate organizations, so
+    // "Brisbane" cannot be resolved to either without inventing a fact.
+    expect(orgs('Brisbane')).toEqual([]);
+  });
+
+  it('resolves nothing for a club AFLDB does not hold', () => {
+    expect(orgs('Norwood | Sturt')).toEqual([]);
+    expect(orgs('former coach of North Melbourne')).toEqual([]);
+    expect(orgs('')).toEqual([]);
+    expect(orgs(null)).toEqual([]);
+  });
+
+  it('never resolves a near miss', () => {
+    // Trigram resolution would turn each of these into a real club.
+    expect(orgs('Carltonn')).toEqual([]);
+    expect(orgs('West Bulldogs')).toEqual([]);
+    expect(orgs('South Adelaide')).toEqual([]);
+  });
+
+  it('does not strip a parenthetical that changes which club is meant', () => {
+    // "Fremantle (1882)" is an 1882 Victorian club, not the AFL one.
+    expect(orgs('Fremantle (1882)')).toEqual([]);
+    expect(orgs('Fremantle')).toEqual([17]);
+  });
+
+  it('resolves a bracketed former identity of the same continuing club', () => {
+    // "Western Bulldogs (Footscray)" is the form twelve Hall of Fame
+    // rows use. Both halves are canonical clubs of one lineage.
+    const resolved = resolveClubText('Western Bulldogs (Footscray)', index);
+    expect(resolved.map((c) => c.organizationId)).toEqual([BULLDOGS_ORG]);
+    expect(resolved[0].clubIds).toEqual([FOOTSCRAY, WESTERN_BULLDOGS]);
+  });
+
+  it('refuses a bracketed form whose halves are not one continuing club', () => {
+    expect(orgs('Carlton (Footscray)')).toEqual([]);
+    expect(orgs('Fremantle (1882)')).toEqual([]);
+    expect(orgs('Glenorchy (New Town)')).toEqual([]);
+  });
+
+  it('is order-independent and deterministic', () => {
+    expect(orgs('Footscray | Carlton')).toEqual(orgs('Footscray | Carlton'));
+  });
+});
+
+describe('club lineage (S1)', () => {
+  // player_clubs records the identity played under. A source row naming
+  // another identity of the same continuing club is the same club, and
+  // AFLDB has exactly these cases: Footscray/Western Bulldogs, South
+  // Melbourne/Sydney, North Melbourne/Kangaroos. Fitzroy is a lineage of
+  // its own, because a merger is not a rename.
+  const FOOTSCRAY = 5;
+  const WESTERN_BULLDOGS = 6;
+  const BULLDOGS_ORG = 6;
+  const FITZROY = 9;
+  const FITZROY_ORG = 9;
+  const BRISBANE_LIONS_ORG = 11;
+
+  const footscrayCareer = () =>
+    candidate({
+      clubs: [{
+        clubId: FOOTSCRAY,
+        organizationId: BULLDOGS_ORG,
+        games: 150,
+        firstSeason: 1990,
+        lastSeason: 1999,
+      }],
+    });
+
+  const bulldogsSource = () =>
+    source({
+      clubId: WESTERN_BULLDOGS,
+      clubOrganizationId: BULLDOGS_ORG,
+      clubNameRaw: 'Western Bulldogs',
+      temporal: [activeSeason(1994)],
+    });
+
+  it('matches a source club to the same continuing club under an older identity', () => {
+    const scored = scoreCandidate(bulldogsSource(), footscrayCareer());
+    expect(signals(scored)).toContain('club_in_season');
+  });
+
+  it('raises no club contradiction against the same continuing club', () => {
+    // The v2 rule compared clubs.id and called this "never played for
+    // Western Bulldogs" against a complete Footscray career.
+    const scored = scoreCandidate(bulldogsSource(), footscrayCareer());
+    expect(scored.conflicts.map((c) => c.reason)).not.toContain('club_not_in_history');
+    expect(scored.conflicts).toEqual([]);
+  });
+
+  it('still contradicts a genuinely different club', () => {
+    const scored = scoreCandidate(
+      source({
+        clubId: FITZROY,
+        clubOrganizationId: FITZROY_ORG,
+        clubNameRaw: 'Fitzroy',
+        temporal: [activeSeason(1994)],
+      }),
+      footscrayCareer(),
+    );
+    expect(scored.conflicts.map((c) => c.reason)).toContain('club_not_in_history');
+  });
+
+  it('does not treat a merger as lineage: Fitzroy is not Brisbane Lions', () => {
+    // migration 017 keeps them separate organizations on purpose --
+    // Fitzroy's record stays Fitzroy's -- so a Fitzroy source row must
+    // not be corroborated by a Brisbane Lions career.
+    const scored = scoreCandidate(
+      source({ clubId: FITZROY, clubOrganizationId: FITZROY_ORG, temporal: [activeSeason(1994)] }),
+      candidate({
+        clubs: [{
+          clubId: 11,
+          organizationId: BRISBANE_LIONS_ORG,
+          games: 150,
+          firstSeason: 1990,
+          lastSeason: 1999,
+        }],
+      }),
+    );
+    expect(signals(scored)).not.toContain('club_in_season');
+    expect(signals(scored)).not.toContain('club_anywhere');
+    expect(scored.conflicts.map((c) => c.reason)).toContain('club_not_in_history');
+  });
+
+  it('falls back to the raw club id when AFLDB records no lineage', () => {
+    const scored = scoreCandidate(
+      source({ clubId: 7, clubOrganizationId: null, temporal: [activeSeason(1994)] }),
+      candidate(),
+    );
+    expect(signals(scored)).toContain('club_in_season');
+  });
+
+  it('still scores one club signal, never two', () => {
+    const scored = scoreCandidate(
+      source({
+        clubId: WESTERN_BULLDOGS,
+        clubOrganizationId: BULLDOGS_ORG,
+        clubNameRaw: 'Western Bulldogs',
+        resolvedClubs: [{ text: 'Footscray', clubIds: [FOOTSCRAY], organizationId: BULLDOGS_ORG }],
+        temporal: [activeSeason(1994)],
+      }),
+      footscrayCareer(),
+    );
+    expect(scored.evidence.filter((e) => e.family === 'club')).toHaveLength(1);
+  });
+});
+
+describe('club lineage scope: draft sources keep v2 semantics', () => {
+  // S1 is authorised for non-draft sources in this tranche only.
+  // Lineage-aware club matching moved draft_person scoring on the
+  // unresolved queue -- 40 rows into Very High, 16 changed Top-1
+  // suggestions -- and no labelled set covers draft identity well
+  // enough to accept that yet. The lineage is still carried on the
+  // row; the scorer simply may not consult it for draft sources.
+  const FOOTSCRAY = 5;
+  const WESTERN_BULLDOGS = 6;
+  const BULLDOGS_ORG = 6;
+
+  const draftSource = (overrides: Partial<SourceEvidence> = {}) =>
+    source({
+      target: {
+        targetTable: 'draft_picks',
+        targetId: 1,
+        resolutionEntityType: 'draft_person',
+        resolutionEntityId: 1,
+      },
+      clubId: WESTERN_BULLDOGS,
+      clubOrganizationId: BULLDOGS_ORG,
+      clubMatch: 'club_id',
+      clubNameRaw: 'Western Bulldogs',
+      temporal: [activeSeason(1994)],
+      ...overrides,
+    });
+
+  const footscrayCareer = (overrides: Partial<CandidateEvidence> = {}) =>
+    candidate({
+      clubs: [{
+        clubId: FOOTSCRAY,
+        organizationId: BULLDOGS_ORG,
+        games: 150,
+        firstSeason: 1990,
+        lastSeason: 1999,
+      }],
+      ...overrides,
+    });
+
+  it('does not credit a draft club through the continuing organization', () => {
+    const scored = scoreCandidate(draftSource(), footscrayCareer());
+    expect(signals(scored)).not.toContain('club_in_season');
+    expect(signals(scored)).not.toContain('club_anywhere');
+    expect(scored.evidence.filter((e) => e.family === 'club')).toEqual([]);
+  });
+
+  it('still credits a draft club on a raw club-id match', () => {
+    const scored = scoreCandidate(
+      draftSource({ clubId: FOOTSCRAY, clubNameRaw: 'Footscray' }),
+      footscrayCareer(),
+    );
+    expect(signals(scored)).toContain('club_in_season');
+  });
+
+  it('preserves v2 draft contradiction semantics through the organization', () => {
+    // v2 raised no club_not_in_history here either, because the source
+    // names no AFLDB season the player was AT that club; what must not
+    // happen is the lineage changing the answer in either direction.
+    const withoutLineage = scoreCandidate(
+      draftSource({ clubOrganizationId: null }),
+      footscrayCareer({ clubHistoryComplete: true }),
+    );
+    const withLineage = scoreCandidate(
+      draftSource(),
+      footscrayCareer({ clubHistoryComplete: true }),
+    );
+    expect(withLineage.conflicts).toEqual(withoutLineage.conflicts);
+    expect(withLineage.conflicts.map((c) => c.reason)).toContain('club_not_in_history');
+  });
+
+  it('scores identically whether or not the lineage is carried', () => {
+    // The whole point of the gate: carrying organization_id on a draft
+    // row must be inert. Score, signals, conflicts, gap and band all
+    // stay exactly where v2 left them.
+    const blind = scoreCandidate(
+      draftSource({ clubOrganizationId: null }),
+      footscrayCareer({ clubHistoryComplete: true }),
+    );
+    const carried = scoreCandidate(
+      draftSource(),
+      footscrayCareer({ clubHistoryComplete: true }),
+    );
+    expect(carried).toEqual(blind);
+  });
+
+  it('leaves non-draft sources lineage-aware', () => {
+    // The scope gate is per source, not a global retreat from S1.
+    const scored = scoreCandidate(
+      source({
+        clubId: WESTERN_BULLDOGS,
+        clubOrganizationId: BULLDOGS_ORG,
+        clubMatch: 'lineage',
+        clubNameRaw: 'Western Bulldogs',
+        temporal: [activeSeason(1994)],
+      }),
+      footscrayCareer(),
+    );
+    expect(signals(scored)).toContain('club_in_season');
+  });
+});
+
+describe('club text evidence (S3/S4)', () => {
+  const SOUTH_MELBOURNE = 15;
+  const SYDNEY = 16;
+  const SYDNEY_ORG = 16;
+
+  const swansCareer = () =>
+    candidate({
+      clubs: [{
+        clubId: SOUTH_MELBOURNE,
+        organizationId: SYDNEY_ORG,
+        games: 150,
+        firstSeason: 1990,
+        lastSeason: 1999,
+      }],
+    });
+
+  const elsewhereCareer = () =>
+    candidate({
+      clubs: [{ clubId: 7, organizationId: 7, games: 150, firstSeason: 1990, lastSeason: 1999 }],
+    });
+
+  const hallOfFame = (overrides: Partial<SourceEvidence> = {}) =>
+    source({
+      target: {
+        targetTable: 'hall_of_fame',
+        targetId: 1,
+        resolutionEntityType: 'hall_of_fame',
+        resolutionEntityId: 1,
+      },
+      clubId: null,
+      clubNameRaw: 'Sydney',
+      resolvedClubs: [{ text: 'Sydney', clubIds: [SYDNEY], organizationId: SYDNEY_ORG }],
+      temporal: [{ kind: 'active_range', first: 1990, last: 1999 }],
+      ...overrides,
+    });
+
+  /**
+   * P3B's grid selected 15/15, so the shipped policy now scores club
+   * text. The cases below still declare their own weights where the
+   * point is the selection logic rather than the number, so that a
+   * future recalibration moves one shipped constant and not a suite.
+   */
+  function withClubTextWeights<T>(inSpan: number, anywhere: number, fn: () => T): T {
+    setClubTextCalibration({ clubTextInSpan: inSpan, clubTextAnywhere: anywhere });
+    try {
+      return fn();
+    } finally {
+      setClubTextCalibration(null);
+    }
+  }
+
+  it('scores club text at the shipped 15/15, with no override set', () => {
+    expect(MATCH_POLICY.scoring.club.clubTextInSpan).toBe(15);
+    expect(MATCH_POLICY.scoring.club.clubTextAnywhere).toBe(15);
+
+    // S3: the club sits inside the span the source itself asserts.
+    const inSpan = scoreCandidate(hallOfFame(), swansCareer());
+    expect(signals(inSpan)).toContain('club_in_span');
+    expect(inSpan.evidence.find((e) => e.family === 'club')?.points).toBe(15);
+
+    // S4: no asserted span, so the weaker club-text signal applies.
+    const anywhere = scoreCandidate(hallOfFame({ temporal: [] }), swansCareer());
+    expect(signals(anywhere)).toContain('club_text_anywhere');
+    expect(anywhere.evidence.find((e) => e.family === 'club')?.points).toBe(15);
+  });
+
+  it('still scores exactly one club-family signal under the shipped policy', () => {
+    const scored = scoreCandidate(hallOfFame(), swansCareer());
+    expect(scored.evidence.filter((e) => e.family === 'club')).toHaveLength(1);
+    expect(signals(scored)).not.toContain('club_text_anywhere');
+  });
+
+  it('shipped policy: unresolved club text scores nothing and conflicts with nothing', () => {
+    // Most of a Hall of Fame club list is SANFL/WAFL/Tasmanian. Now that
+    // the weight is non-zero, "not an AFLDB club" must still be silence.
+    const scored = scoreCandidate(
+      hallOfFame({ clubNameRaw: 'Norwood | Sturt', resolvedClubs: [] }),
+      swansCareer(),
+    );
+    expect(scored.evidence.filter((e) => e.family === 'club')).toEqual([]);
+    expect(scored.conflicts).toEqual([]);
+  });
+
+  it('shipped policy: a club the candidate never played for raises no contradiction', () => {
+    const scored = scoreCandidate(hallOfFame(), elsewhereCareer());
+    expect(scored.evidence.filter((e) => e.family === 'club')).toEqual([]);
+    expect(scored.conflicts).toEqual([]);
+  });
+
+  it('never raises a contradiction from club text, resolved or not', () => {
+    for (const resolvedClubs of [[], hallOfFame().resolvedClubs]) {
+      const scored = withClubTextWeights(20, 12, () =>
+        scoreCandidate(hallOfFame({ resolvedClubs }), elsewhereCareer()));
+      expect(scored.conflicts).toEqual([]);
+    }
+  });
+
+  it('S3 credits a club inside the stated career span, through lineage', () => {
+    const scored = withClubTextWeights(20, 12, () =>
+      scoreCandidate(hallOfFame(), swansCareer()));
+    expect(signals(scored)).toContain('club_in_span');
+    expect(scored.evidence.find((e) => e.family === 'club')?.points).toBe(20);
+  });
+
+  it('S3 takes precedence over S4, and only one club signal scores', () => {
+    const scored = withClubTextWeights(20, 12, () =>
+      scoreCandidate(hallOfFame(), swansCareer()));
+    expect(scored.evidence.filter((e) => e.family === 'club')).toHaveLength(1);
+    expect(signals(scored)).not.toContain('club_text_anywhere');
+  });
+
+  it('S4 credits the club when it sits outside the stated span', () => {
+    const scored = withClubTextWeights(20, 12, () => scoreCandidate(
+      hallOfFame({ temporal: [{ kind: 'active_range', first: 1970, last: 1979 }] }),
+      swansCareer(),
+    ));
+    expect(signals(scored)).toContain('club_text_anywhere');
+  });
+
+  it('S4 alone applies when the source states no span (honour teams)', () => {
+    const scored = withClubTextWeights(20, 12, () =>
+      scoreCandidate(hallOfFame({ temporal: [] }), swansCareer()));
+    expect(signals(scored)).toContain('club_text_anywhere');
+  });
+
+  it('unresolved club text gives no signal and no conflict', () => {
+    const scored = withClubTextWeights(20, 12, () => scoreCandidate(
+      hallOfFame({ clubNameRaw: 'Norwood | Sturt', resolvedClubs: [] }),
+      swansCareer(),
+    ));
+    expect(scored.evidence.filter((e) => e.family === 'club')).toEqual([]);
+    expect(scored.conflicts).toEqual([]);
+  });
+
+  it('a club the candidate never played for is unknown, not disagreement', () => {
+    const scored = withClubTextWeights(20, 12, () =>
+      scoreCandidate(hallOfFame(), elsewhereCareer()));
+    expect(scored.evidence.filter((e) => e.family === 'club')).toEqual([]);
+    expect(scored.conflicts).toEqual([]);
+  });
+
+  it('credits a multi-club source row on whichever club the career shows', () => {
+    const scored = withClubTextWeights(20, 12, () => scoreCandidate(
+      hallOfFame({
+        clubNameRaw: 'Collingwood | Sydney',
+        resolvedClubs: [
+          { text: 'Collingwood', clubIds: [3], organizationId: 3 },
+          { text: 'Sydney', clubIds: [SYDNEY], organizationId: SYDNEY_ORG },
+        ],
+      }),
+      swansCareer(),
+    ));
+    expect(scored.evidence.filter((e) => e.family === 'club')).toHaveLength(1);
+    expect(scored.evidence.find((e) => e.family === 'club')?.detail).toContain('Sydney');
+  });
+
+  it('does not resolve club text when the source carries a club id', () => {
+    // One club fact, one club signal: award and achievement rows carry
+    // both a club_id and its printed name and must not pay twice.
+    const scored = withClubTextWeights(20, 12, () => scoreCandidate(
+      source({
+        clubId: 7,
+        clubNameRaw: 'Richmond',
+        resolvedClubs: [],
+        temporal: [activeSeason(1994)],
+      }),
+      candidate(),
+    ));
+    expect(scored.evidence.filter((e) => e.family === 'club')).toHaveLength(1);
+    expect(signals(scored)).toContain('club_in_season');
+  });
+});
+
+describe('S3/S4 calibration overrides (AFLDB-ISSUE-164 P3B)', () => {
+  /**
+   * The grid measured four candidate weight pairs against one database
+   * and selected 15/15, which now ships. The mechanism stays for the
+   * next such question, and what must remain impossible is a run whose
+   * numbers came from an edit of confidence.ts, an environment
+   * variable, or a half-declared pair -- and an override that leaks
+   * into the shipped policy or outlives the run that declared it.
+   */
+  const SYDNEY = 16;
+  const SYDNEY_ORG = 16;
+
+  const swansCareer = () =>
+    candidate({
+      clubs: [{
+        clubId: SYDNEY,
+        organizationId: SYDNEY_ORG,
+        games: 150,
+        firstSeason: 1990,
+        lastSeason: 1999,
+      }],
+    });
+
+  const hallOfFame = (overrides: Partial<SourceEvidence> = {}) =>
+    source({
+      target: {
+        targetTable: 'hall_of_fame',
+        targetId: 1,
+        resolutionEntityType: 'hall_of_fame',
+        resolutionEntityId: 1,
+      },
+      clubId: null,
+      clubNameRaw: 'Sydney',
+      resolvedClubs: [{ text: 'Sydney', clubIds: [SYDNEY], organizationId: SYDNEY_ORG }],
+      temporal: [{ kind: 'active_range', first: 1990, last: 1999 }],
+      ...overrides,
+    });
+
+  afterEach(() => setClubTextCalibration(null));
+
+  it('omitting the options leaves the shipped 15/15 policy', () => {
+    expect(parseClubTextCalibration([])).toBeNull();
+    const applied = applyClubTextCalibration(['--table', 'hall_of_fame', '--limit', '10']);
+    expect(applied).toEqual({
+      clubTextInSpan: 15,
+      clubTextAnywhere: 15,
+      source: 'shipped',
+    });
+    expect(clubTextWeights()).toEqual({ clubTextInSpan: 15, clubTextAnywhere: 15 });
+    const scored = scoreCandidate(hallOfFame(), swansCareer());
+    expect(signals(scored)).toContain('club_in_span');
+    expect(scored.evidence.find((e) => e.family === 'club')?.points).toBe(15);
+    // A shipped run reports the shipped numbers, not a leftover override.
+    expect(policySnapshot().scoring.club.clubTextInSpan).toBe(15);
+    expect(policySnapshot().scoring.club.clubTextAnywhere).toBe(15);
+  });
+
+  it('records an explicit 15/15 row as an override, not as the shipped default', () => {
+    const applied = applyClubTextCalibration([
+      '--club-text-in-span', '15', '--club-text-anywhere', '15', '--out', 'x.json',
+    ]);
+    expect(applied).toEqual({
+      clubTextInSpan: 15,
+      clubTextAnywhere: 15,
+      source: 'calibration-override',
+    });
+    expect(clubTextCalibration()).toEqual(applied);
+    expect(describeClubTextCalibration(applied)).toContain('S3 clubTextInSpan=15');
+    expect(describeClubTextCalibration(applied)).toContain('S4 clubTextAnywhere=15');
+
+    const scored = scoreCandidate(hallOfFame(), swansCareer());
+    expect(signals(scored)).toContain('club_in_span');
+    expect(scored.evidence.find((e) => e.family === 'club')?.points).toBe(15);
+    // Recorded where a report reads it, not only where the scorer does.
+    expect(policySnapshot().scoring.club.clubTextInSpan).toBe(15);
+    expect(policySnapshot().scoring.club.clubTextAnywhere).toBe(15);
+  });
+
+  it('is deterministic: the same row scores the same twice', () => {
+    for (const [inSpan, anywhere] of [[23, 15], [24, 15], [29, 15]] as const) {
+      applyClubTextCalibration([
+        '--club-text-in-span', String(inSpan), '--club-text-anywhere', String(anywhere),
+      ]);
+      const first = scoreCandidate(hallOfFame(), swansCareer());
+      const second = scoreCandidate(hallOfFame(), swansCareer());
+      expect(second).toEqual(first);
+      expect(first.evidence.find((e) => e.family === 'club')?.points).toBe(inSpan);
+      // S4 is what a source stating no span can reach.
+      const noSpan = scoreCandidate(hallOfFame({ temporal: [] }), swansCareer());
+      expect(signals(noSpan)).toContain('club_text_anywhere');
+      expect(noSpan.evidence.find((e) => e.family === 'club')?.points).toBe(anywhere);
+    }
+  });
+
+  it('fails closed on a malformed, negative or half-declared pair', () => {
+    const bad: string[][] = [
+      ['--club-text-in-span', '15'],
+      ['--club-text-anywhere', '15'],
+      ['--club-text-in-span', '-5', '--club-text-anywhere', '15'],
+      ['--club-text-in-span', 'fifteen', '--club-text-anywhere', '15'],
+      ['--club-text-in-span', '15.5', '--club-text-anywhere', '15'],
+      ['--club-text-in-span', '1e1', '--club-text-anywhere', '15'],
+      ['--club-text-in-span', '', '--club-text-anywhere', '15'],
+      ['--club-text-in-span', '101', '--club-text-anywhere', '15'],
+      // The flag swallowing the next option is a typo, not a weight.
+      ['--club-text-in-span', '--club-text-anywhere', '15'],
+      ['--club-text-in-span', '15', '--club-text-anywhere'],
+    ];
+    for (const argv of bad) {
+      expect(() => parseClubTextCalibration(argv), argv.join(' ')).toThrow();
+    }
+    // A refused run never leaves a partial policy behind.
+    expect(clubTextWeights()).toEqual({ clubTextInSpan: 15, clubTextAnywhere: 15 });
+    expect(() => setClubTextCalibration({ clubTextInSpan: -1, clubTextAnywhere: 15 })).toThrow();
+    expect(() => setClubTextCalibration(
+      { clubTextInSpan: Number.NaN, clubTextAnywhere: 15 })).toThrow();
+    expect(clubTextWeights()).toEqual({ clubTextInSpan: 15, clubTextAnywhere: 15 });
+  });
+
+  it('never moves the shipped policy, whatever a calibration run declares', () => {
+    applyClubTextCalibration(['--club-text-in-span', '29', '--club-text-anywhere', '15']);
+    // MATCH_POLICY is what the application, the admin page and the
+    // approval path read through. The override may not reach it.
+    expect(MATCH_POLICY.scoring.club.clubTextInSpan).toBe(15);
+    expect(MATCH_POLICY.scoring.club.clubTextAnywhere).toBe(15);
+    expect(scoreCandidate(hallOfFame(), swansCareer())
+      .evidence.find((e) => e.family === 'club')?.points).toBe(29);
+
+    // Reset returns to the shipped pair, not to "not scored".
+    setClubTextCalibration(null);
+    expect(clubTextCalibration()).toEqual({
+      clubTextInSpan: 15,
+      clubTextAnywhere: 15,
+      source: 'shipped',
+    });
+    expect(scoreCandidate(hallOfFame(), swansCareer())
+      .evidence.find((e) => e.family === 'club')?.points).toBe(15);
+  });
+
+  it('leaves draft scoring untouched at every grid weight (D-9 scope)', () => {
+    // Draft rows carry a club_id and no resolved club text, so S3/S4 are
+    // unreachable for them by construction. Pinned rather than assumed:
+    // the grid must not move a single draft number.
+    const draftSource = () =>
+      source({
+        target: {
+          targetTable: 'draft_picks',
+          targetId: 1,
+          resolutionEntityType: 'draft_person',
+          resolutionEntityId: 1,
+        },
+        clubId: SYDNEY,
+        clubOrganizationId: SYDNEY_ORG,
+        clubMatch: 'club_id',
+        clubNameRaw: 'Sydney',
+        temporal: [activeSeason(1994), { kind: 'draft_year', year: 1989 }],
+        reportedGames: 150,
+        reportedGoals: 60,
+      });
+
+    const shipped = scoreCandidate(draftSource(), swansCareer());
+    for (const [inSpan, anywhere] of [[15, 15], [23, 15], [24, 15], [29, 15]] as const) {
+      applyClubTextCalibration([
+        '--club-text-in-span', String(inSpan), '--club-text-anywhere', String(anywhere),
+      ]);
+      expect(scoreCandidate(draftSource(), swansCareer())).toEqual(shipped);
+    }
   });
 });
 
@@ -512,15 +1247,27 @@ describe('bulk eligibility is decided per source class', () => {
     );
 
   it('admits the classes whose measured population showed no false positive', () => {
-    // award_winners 2,750 bulk / 0 FP; draft_person 2,319 / 0;
-    // award_nominations 702 / 0; player_achievements 253 / 0.
+    // award_winners 2,750 bulk / 0 FP; award_nominations 702 / 0;
+    // player_achievements 253 / 0.
     for (const sourceType of [
-      'award_winners', 'award_nominations', 'draft_person', 'player_achievements',
+      'award_winners', 'award_nominations', 'player_achievements',
     ]) {
       const assessment = assessMatch([perfect()], sourceType);
       expect(assessment.band).toBe('very_high');
       expect(assessment.bulkEligible).toBe(true);
     }
+  });
+
+  it('suspends draft_person from unattended approval while still suggesting it', () => {
+    // AFLDB-ISSUE-164 D-9. The 2,319-row admission is ISSUE-075
+    // historical evidence the current backtest cannot reproduce -- the
+    // executable baseline holds five labelled draft rows. Migration 099
+    // lifts the whole NBSP-affected draft population to name_exact at
+    // once, so the unattended path is closed until P1c re-gates the
+    // class. The suggestion itself is unchanged.
+    const assessment = assessMatch([perfect()], 'draft_person');
+    expect(assessment.band).toBe('very_high');
+    expect(assessment.bulkEligible).toBe(false);
   });
 
   it('keeps captaincies out of bulk while still suggesting it', () => {

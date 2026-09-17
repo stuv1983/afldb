@@ -97,7 +97,7 @@ export type StressExpectation = {
   verificationLevel: StressVerificationLevel;
   equivalenceGroup: string;
   question: string;
-  status: 'success' | 'decline';
+  status: 'success' | 'decline' | 'audit';
   grain?: NlGrain;
   mode?: 'single' | 'sum';
   /** Already translated into this codebase's metric names. */
@@ -124,6 +124,29 @@ export type StressExpectation = {
   resultCount?: number;
   tieCount?: number;
   notes: string;
+  /**
+   * AFLDB-ISSUE-212. Blank (every V1/frozen-corpus row, and any V2 row with
+   * genuinely directional wording) keeps the club/opponent slots checked as
+   * `clubFor`/`clubAgainst`, exactly as before. `'matchup'` marks a row whose
+   * own wording ("A versus/vs/v B", adjacent) the implemented parser
+   * contract always reads as the unordered pair `scope.matchup` regardless
+   * of any other preposition in the sentence -- so `club`/`opponent` here
+   * name the two participants, not a for/against pair, and are checked as a
+   * set. New, optional column (`expected_scope_kind`); its absence is what
+   * lets one scorer serve both corpus versions without a version flag.
+   */
+  scopeKind?: 'matchup';
+  /**
+   * AFLDB-ISSUE-212, achievement_summary only. The grain's actual answer
+   * shape is owned entirely by `achievementSummary.kind`
+   * (`src/db/queries/nl/achievement-summary.ts` switches on nothing else);
+   * `plan.agg` is a vestigial default for this grain with no behavioural
+   * effect. New, optional column (`expected_achievement_kind`); when unset,
+   * this grain simply asserts nothing about its answer shape (the same
+   * "blank column asserts nothing" rule every other column already follows)
+   * rather than being special-cased away from the generic aggregation check.
+   */
+  achievementSummaryKind?: string;
 };
 
 /** The first VFL season. A lower bound of this year excludes nothing, so it is indistinguishable from no lower bound. */
@@ -132,6 +155,7 @@ const FIRST_SEASON = 1897;
 const MATCH_TYPES: Record<string, NlMatchType> = {
   final: 'finals',
   finals: 'finals',
+  wildcard_final: 'wildcard_final',
   grand_final: 'grand_final',
   preliminary_final: 'preliminary_final',
   semi_final: 'semi_final',
@@ -202,7 +226,8 @@ export function toExpectation(row: Record<string, string>): StressExpectation | 
   const question = (row.question ?? '').trim();
   if (!question) return null;
 
-  const status = row.expected_status === 'decline' ? 'decline' : 'success';
+  const status = row.expected_status === 'audit' ? 'audit'
+    : row.expected_status === 'decline' ? 'decline' : 'success';
   const rawMetric = row.expected_metric || undefined;
   const resultSide = row.expected_result || undefined;
 
@@ -255,6 +280,8 @@ export function toExpectation(row: Record<string, string>): StressExpectation | 
     resultCount: num(row.expected_result_count),
     tieCount: num(row.expected_tie_count),
     notes: row.notes ?? '',
+    scopeKind: row.expected_scope_kind === 'matchup' ? 'matchup' : undefined,
+    achievementSummaryKind: row.expected_achievement_kind || undefined,
   };
 }
 
@@ -353,6 +380,16 @@ function finding(
 export type EntityIndex = {
   clubOrgId(name: string): number | undefined;
   venueId(name: string): number | undefined;
+  /**
+   * AFLDB-ISSUE-212. Optional, and only ever defined when the run's engine
+   * could resolve the named player to exactly one id -- unlike clubs and
+   * venues, the player population is too large to preload, so a corpus run
+   * builds this from the same resolver the parser itself uses, for exactly
+   * the distinct names its own rows mention (see stress-test.ts). Absent
+   * (DB-free unit tests, or a name the resolver could not settle) falls
+   * back to `sameName`, exactly like an unindexed club or venue.
+   */
+  playerId?(name: string): number | undefined;
 };
 
 function normaliseName(value: string): string {
@@ -409,6 +446,10 @@ export function scoreRow(
     findings.push(finding(cls, 'hard', expected.status, actual.errorMessage ?? 'error'));
     return findings;
   }
+
+  // Exploratory rows with an unresolved interpretation are observations,
+  // never a semantic pass/fail oracle. Parser crashes remain reportable.
+  if (expected.status === 'audit') return findings;
 
   // ---- status ------------------------------------------------------------
 
@@ -497,7 +538,19 @@ export function scoreRow(
     findings.push(finding('WRONG_METRIC', 'hard', expected.metricAlternatives.join(' or '), plan.metric));
   }
 
-  if (expected.aggregation && plan.agg.kind !== expected.aggregation) {
+  // achievement_summary's answer shape is owned by achievementSummary.kind,
+  // not agg (see StressExpectation.achievementSummaryKind) -- checked below,
+  // separately from the generic aggregation rule every other grain still
+  // uses at full strength.
+  if (expected.grain === 'achievement_summary') {
+    if (expected.achievementSummaryKind && plan.achievementSummary?.kind !== expected.achievementSummaryKind) {
+      findings.push(finding(
+        'WRONG_AGGREGATION', 'hard',
+        `achievementSummary.kind=${expected.achievementSummaryKind}`,
+        plan.achievementSummary ? `achievementSummary.kind=${plan.achievementSummary.kind}` : undefined,
+      ));
+    }
+  } else if (expected.aggregation && plan.agg.kind !== expected.aggregation) {
     findings.push(finding('WRONG_AGGREGATION', 'hard', expected.aggregation, plan.agg.kind));
   }
 
@@ -520,17 +573,30 @@ export function scoreRow(
     wantId?: number;
     gotId?: number;
   }[] = [
-    { label: 'player', cls: 'WRONG_PLAYER', want: expected.player, got: plan.player?.name },
     {
-      label: 'club', cls: 'WRONG_CLUB', want: expected.club, got: plan.scope.clubFor?.name,
-      wantId: expected.club ? index?.clubOrgId(expected.club) : undefined,
-      gotId: plan.scope.clubFor?.organizationId,
+      label: 'player', cls: 'WRONG_PLAYER', want: expected.player, got: plan.player?.name,
+      // AFLDB-ISSUE-212: prefer id identity, exactly like club/venue below,
+      // so two players who share a canonical display name (e.g. "Gary
+      // Ablett" for both Snr and Jnr) are told apart by who they actually
+      // are rather than by a string comparison that can never distinguish
+      // them. `wantId` stays undefined -- falling back to `sameName` below,
+      // unchanged -- whenever the run has no player index or the name
+      // resolves ambiguously; nothing here names a specific player.
+      wantId: expected.player ? index?.playerId?.(expected.player) : undefined,
+      gotId: plan.player?.id,
     },
-    {
-      label: 'opponent', cls: 'WRONG_OPPONENT', want: expected.opponent, got: plan.scope.clubAgainst?.name,
-      wantId: expected.opponent ? index?.clubOrgId(expected.opponent) : undefined,
-      gotId: plan.scope.clubAgainst?.organizationId,
-    },
+    ...(expected.scopeKind === 'matchup' ? [] : [
+      {
+        label: 'club', cls: 'WRONG_CLUB' as const, want: expected.club, got: plan.scope.clubFor?.name,
+        wantId: expected.club ? index?.clubOrgId(expected.club) : undefined,
+        gotId: plan.scope.clubFor?.organizationId,
+      },
+      {
+        label: 'opponent', cls: 'WRONG_OPPONENT' as const, want: expected.opponent, got: plan.scope.clubAgainst?.name,
+        wantId: expected.opponent ? index?.clubOrgId(expected.opponent) : undefined,
+        gotId: plan.scope.clubAgainst?.organizationId,
+      },
+    ]),
     {
       label: 'venue', cls: 'WRONG_VENUE', want: expected.venue, got: plan.scope.venue?.name,
       wantId: expected.venue ? index?.venueId(expected.venue) : undefined,
@@ -547,6 +613,31 @@ export function scoreRow(
       ? slot.wantId === slot.gotId
       : sameName(slot.want, slot.got);
     if (!matched) findings.push(finding(slot.cls, 'hard', slot.want, slot.got));
+  }
+
+  // AFLDB-ISSUE-212: a symmetric "A versus/vs/v B" row names two clubs with
+  // no for/against relationship -- the parser's own contract for that exact
+  // adjacency (extractClubs, parser.ts) is the unordered pair scope.matchup,
+  // regardless of any other preposition the sentence carries. Checked as a
+  // set of two identities, not as clubFor/clubAgainst, and only for rows
+  // that assert this shape via scopeKind (see StressExpectation.scopeKind).
+  if (expected.scopeKind === 'matchup') {
+    const wantNames = [expected.club, expected.opponent].filter((name): name is string => Boolean(name));
+    if (wantNames.length > 0) {
+      const matchup = plan.scope.matchup;
+      if (!matchup) {
+        findings.push(finding('DROPPED_FILTER', 'hard', `matchup=${wantNames.join(' vs ')}`, 'absent'));
+      } else {
+        const gotClubs = [matchup.clubA, matchup.clubB];
+        const allPresent = wantNames.every((want) => gotClubs.some((got) => {
+          const wantId = index?.clubOrgId(want);
+          return wantId !== undefined ? wantId === got.organizationId : sameName(want, got.name);
+        }));
+        if (!allPresent) {
+          findings.push(finding('WRONG_CLUB', 'hard', wantNames.join(' vs '), gotClubs.map((c) => c.name).join(' vs ')));
+        }
+      }
+    }
   }
 
   // 1897 is the first VFL season, so "since 1897" and no lower bound at

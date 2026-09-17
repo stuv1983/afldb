@@ -1,12 +1,14 @@
 import type { Metadata } from 'next';
 
-import { requireSuperAdmin } from '@/lib/auth/session';
+import { readSettleRunStatus, type SettleRunStatus } from '@/lib/acquisition/settle-status';
+import { requireCapability } from '@/lib/auth/session';
 import { getCurrentSeasonReport } from '@/lib/external-afl/current-season-import';
 
 import {
   CurrentSeasonControls,
   CurrentSeasonReportTable,
 } from './CurrentSeasonControls';
+import { SettleRunPanel } from './SettleRunPanel';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,9 +18,20 @@ export const metadata: Metadata = {
 };
 
 export default async function CurrentSeasonPage() {
-  await requireSuperAdmin();
+  await requireCapability('acquisition.currentSeason');
 
   const year = new Date().getFullYear();
+
+  // AFLDB-ISSUE-127. Never allowed to take the page down: a host without
+  // systemd, or a database that refuses the batch read, must still render the
+  // fallback diagnostics below.
+  let settleStatus: SettleRunStatus | undefined;
+  try {
+    settleStatus = await readSettleRunStatus();
+  } catch {
+    settleStatus = undefined;
+  }
+
   let report = null;
   let reportError: string | null = null;
   try {
@@ -30,17 +43,33 @@ export default async function CurrentSeasonPage() {
   return (
     <>
       <div className="page-header">
-        <h1>Current season refresh</h1>
+        <h1>Current season</h1>
         <p className="subtitle">
-          Fetch current AFL match results from server-side external APIs, stage the raw payloads,
-          and fill completed match gaps without exposing provider keys to the browser.
+          <strong>AFL Tables, acquired via fitzRoy, is the primary and only automatic
+          current-season source.</strong> It is the only provider with canonical-write
+          authority. Squiggle and Kali AFL Stats are deprecated fallback providers, kept for
+          manual diagnostics and corroboration evidence only.
+        </p>
+      </div>
+
+      <SettleRunPanel initialStatus={settleStatus} />
+
+      <div className="page-header">
+        <h2>Deprecated fallback diagnostics — Squiggle and Kali AFL Stats</h2>
+        <p className="subtitle">
+          Acquire Squiggle and Kali observations server-side and retain staging and history for
+          diagnostics or explicit human fallback investigation without exposing provider keys.
         </p>
       </div>
 
       <p className="notice">
-        Auto update uses Kali AFL Stats, stages fresh API rows, and inserts completed matches
-        that AFLDB can resolve unambiguously. Existing final scores are left alone unless the
-        manual overwrite option is deliberately selected.
+        <strong>These controls are not the current-season refresh.</strong> Squiggle and Kali
+        are deprecated fallback sources with no canonical-write authority: nothing here inserts
+        or updates a canonical match, and nothing here can change an existing final score. They
+        are also never invoked automatically. To refresh current-season data, use the AFL Tables
+        control above. AFL Tables itself is deliberately absent from the source list below,
+        because it is not acquired through this path — duplicating it here would be a second
+        ingestion implementation.
       </p>
 
       <CurrentSeasonControls year={year} />

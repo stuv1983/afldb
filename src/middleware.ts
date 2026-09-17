@@ -31,6 +31,7 @@ const PUBLIC_PREFIXES = [
   '/api/health',     // uptime checks predate any visitor
   '/api/health-event', // client-side failure reports; a broken page must still be able to report itself
   '/api/admin/email-intake', // machine-to-machine, gated by its own shared secret, not a session
+  '/api/internal/revalidate-season', // the settle publishing its own season; loopback + shared secret (AFLDB-ISSUE-134)
   '/api/early-access', // the apex coming-soon page's form; queues a request, admits nobody
   '/robots.txt',     // crawlers must read the disallow, not a redirect
   '/favicon.ico',

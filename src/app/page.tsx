@@ -3,15 +3,18 @@ import Link from 'next/link';
 import { Fragment } from 'react';
 
 import { JsonLd } from '@/components/JsonLd';
+import { HomeRecordPanel } from '@/components/HomeRecordPanel';
 import { SearchBox } from '@/components/SearchBox';
+import { BROWSE_SECTIONS } from '@/lib/site-nav-model';
 import { sql } from '@/db/client';
 import { getVaultMeetings } from '@/db/queries/matches';
-import { RECORD_CATEGORIES, getCareerRecord } from '@/db/queries/records';
+import { getHomeRecord } from '@/db/queries/home-records';
 import { getSiteSettings } from '@/db/queries/site-settings';
 import {
-  formatDate, formatNumber, formatRoundShort, matchPath, playerPath, seasonPath,
+  formatDate, formatNumber, formatRoundShort, matchPath, seasonPath,
 } from '@/lib/format';
 import { pageMetadata } from '@/lib/seo';
+import { getHomeRecordDefinition } from '@/lib/home-records';
 import {
   homeSection, homeSectionRows, visibleHomeSections, type HomeSectionId,
 } from '@/lib/site-settings';
@@ -67,21 +70,18 @@ async function getOverview() {
 export default async function HomePage() {
   const settings = await getSiteSettings();
   const visible = visibleHomeSections(settings.homeLayout);
-  const record = RECORD_CATEGORIES[settings.homeRecord];
+  const record = getHomeRecordDefinition(settings.homeRecord);
 
   // Only the sections actually being rendered are queried: hiding a panel in
   // /admin/settings should cost the front page a round trip, not just a
   // <section>.
-  const [overview, vault, leaders] = await Promise.all([
+  const [overview, vault, homeRecord] = await Promise.all([
     getOverview(),
     visible.includes('vault') ? getVaultMeetings(6) : Promise.resolve([]),
     visible.includes('record')
-      ? getCareerRecord(settings.homeRecord, 5)
-      : Promise.resolve([]),
+      ? getHomeRecord(record.value, 5)
+      : Promise.resolve({ definition: record, rows: [] }),
   ]);
-
-  // Bars are drawn against the leader, so the top row always reads full.
-  const top = leaders[0]?.value ?? 0;
 
   const sections: Record<HomeSectionId, React.ReactNode> = {
     stats: (
@@ -141,49 +141,15 @@ export default async function HomePage() {
       </section>
     ),
 
-    record: (
-      <section>
-        <div className="split-head">
-          <h2>Record of the week</h2>
-          <Link className="more" href={`/records/${record.slug}`}>All →</Link>
-        </div>
-        <p className="lede">{record.definition}</p>
-
-        {leaders.map((p) => (
-          <div className="meter" key={p.playerId}>
-            <div className="meter-head">
-              <Link href={playerPath(p.slug, p.playerId)}>{p.displayName}</Link>
-              <span className="meter-value">{formatNumber(p.value)}</span>
-            </div>
-            <div className="meter-track">
-              <div
-                className="meter-fill"
-                style={{ width: top > 0 ? `${(p.value / top) * 100}%` : '0%' }}
-              />
-            </div>
-          </div>
-        ))}
-
-        {record.coverage && <p className="footnote">{record.coverage}</p>}
-      </section>
-    ),
+    record: <HomeRecordPanel result={homeRecord} />,
 
     browse: (
       <section className="section">
         <h2>Browse the record</h2>
         <nav className="grid" aria-label="Browse">
-          {[
-            { href: '/players', title: 'Players', meta: 'Every player since 1897, filtered by career statistics' },
-            { href: '/clubs', title: 'Clubs', meta: 'Current and historical clubs' },
-            { href: '/seasons', title: 'Seasons', meta: 'Ladders, results and finals' },
-            { href: '/records', title: 'Records', meta: 'Career, season and single-game' },
-            { href: '/brownlow', title: 'Brownlow', meta: 'Vote counts by season' },
-            { href: '/awards', title: 'Awards', meta: 'All-Australian, Rising Star, Hall of Fame' },
-            { href: '/draft', title: 'Draft', meta: 'Every selection, by year and club' },
-            { href: '/match-search', title: 'Match Search', meta: 'Find games by scoreline and margin' },
-          ].map((item) => (
+          {BROWSE_SECTIONS.map((item) => (
             <Link key={item.href} href={item.href} className="card">
-              <h3>{item.title}</h3>
+              <h3>{item.label}</h3>
               <div className="meta">{item.meta}</div>
             </Link>
           ))}

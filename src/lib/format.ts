@@ -73,6 +73,11 @@ export function formatScore(
 }
 
 const ROUND_LABELS: Record<string, string> = {
+  // The AFL Wildcard Round (AFLDB-ISSUE-129). Every AFL call site of
+  // formatRound/formatRoundShort passes no `fallback` — only AFLW does — so an
+  // entry here is required, not cosmetic: without it the UI would render the bare
+  // identifier `wildcard_final`, including as a season-page heading and anchor id.
+  wildcard_final: 'Wildcard Final',
   elimination_final: 'Elimination Final',
   qualifying_final: 'Qualifying Final',
   semi_final: 'Semi Final',
@@ -81,6 +86,7 @@ const ROUND_LABELS: Record<string, string> = {
 };
 
 const ROUND_SHORT: Record<string, string> = {
+  wildcard_final: 'WF',
   elimination_final: 'EF',
   qualifying_final: 'QF',
   semi_final: 'SF',
@@ -200,6 +206,31 @@ export function seasonPath(year: number): string {
 
 export function awardPath(slug: string): string {
   return `/awards/${slug}`;
+}
+
+export function coachPath(slug: string, id: number): string {
+  return `/coaches/${slug}-${id}`;
+}
+
+/**
+ * Where a coach's name should link FROM A COACHING CONTEXT: always that
+ * coach's own `/coaches/[slug]-id` page.
+ *
+ * AFLDB-ISSUE-170 Stage 1E: the two routes are route-contextual
+ * presentations of the same person, not duplicates. A reader who reached a
+ * name through the coaches index, a coach records board, a club's coaching
+ * history or a coach comparison asked for the COACHING record, so they are
+ * given the coach page — whether or not that person also played. The player
+ * page stays the player-centric presentation and keeps its own coaching
+ * section; it is reached through player surfaces, and from the coach page's
+ * own "View playing career" link.
+ *
+ * Before Stage 1E a player-linked coach was sent to `/players` here because
+ * `/coaches/[slug]-id` permanently redirected them there; that redirect is
+ * gone, so this is no longer a redirect-avoiding shortcut.
+ */
+export function coachProfilePath(coach: { slug: string; coachId: number }): string {
+  return coachPath(coach.slug, coach.coachId);
 }
 
 export function awardSeasonPath(slug: string, season: number): string {

@@ -1,0 +1,344 @@
+source_key,name,inducted_year,category,is_legend,legend_year,club,state,playing_career,removed_year,player_id,link_status,note,source_citation
+hof:1,Albert Chadwick,1996,player,false,,Melbourne | Hawthorn,Victoria,"1920-1928, 1929",,2666,resolved,"no player with this name · 141 (45), 17 (8)",wikipedia
+hof:2,Albert Collier,1996,player,false,,Collingwood | Fitzroy,Victoria,"1925-1930, 1933-1939, 1941-1942",,2702,unique,"205 (54), 12 (12)",wikipedia
+hof:3,Albert Thurgood,1996,player,false,,Essendon,Victoria,"1892-1902, 1906",,4675,unique,,wikipedia
+hof:4,Alex Jesaulenko,1996,player,true,2008,Carlton | St Kilda,Victoria,"1967-1979, 1980-1981",,1844,unique,,wikipedia
+hof:5,Allan Hopkins,1996,player,false,,Western Bulldogs (Footscray),Victoria,1925-1934,,1467,unique,,wikipedia
+hof:6,Allan Jeans,1996,coach,false,,St Kilda | Hawthorn | Richmond,,,,3121,unique,,wikipedia
+hof:7,Allan La Fontaine,1996,player,false,,Melbourne,Victoria,"1934-1942, 1945",,3183,unique,,wikipedia
+hof:8,Allen Aylett,1996,player,false,,North Melbourne,Victoria,1952-1964,,1498,unique,220 (311),wikipedia
+hof:9,Barrie Robran,1996,player,true,2001,North Adelaide,South Australia,1967-1980,,,unmatched,no player with this name,wikipedia
+hof:10,Barry Cable,1996,removed,false,,Perth | North Melbourne | East Perth,Western Australia,"1962-1969, 1971-1973, 1970, 1974-1977, 1978-1979",2023,2327,unique,"225 (325), 115 (133), 43 (50)",wikipedia
+hof:11,Bernie Quinlan,1996,player,false,,Western Bulldogs (Footscray) | Fitzroy,Victoria,"1969-1977, 1978-1986",,2091,unique,,wikipedia
+hof:12,Bernie Smith,1996,player,false,,West Adelaide | Geelong,South Australia,"1945-1947, 1948-1958",,2175,unique,,wikipedia
+hof:13,Bill Hutchison,1996,player,true,2003,Essendon,Victoria,1942-1957,,1828,unique,,wikipedia
+hof:14,Bill Mohr,1996,player,false,,St Kilda,Victoria,1929-1941,,1993,unique,,wikipedia
+hof:15,Bill Walker,1996,player,true,2026,Swan Districts,Western Australia,1961-1976,,,implausible,"3 name match(es), none with a career overlapping 1961-1976",wikipedia
+hof:16,Bob Davis,1996,player,false,,Geelong,Victoria,1948-1958,,1967,unique,189 (141),wikipedia
+hof:17,Bob Pratt,1996,player,true,1996,South Melbourne,Victoria,"1930-1939, 1946",,2082,unique,,wikipedia
+hof:18,Bob Quinn,1996,player,false,,Port Adelaide,South Australia,"1933-1940, 1945-1947",,,unmatched,no player with this name,wikipedia
+hof:19,Bob Rose,1996,player,false,,Collingwood,Victoria,1946-1955,,2129,unique,,wikipedia
+hof:20,Bob Skilton,1996,player,true,1996,South Melbourne,Victoria,"1956-1968, 1970-1971",,3702,unique,,wikipedia
+hof:21,Bruce Doull,1996,player,false,,Carlton,Victoria,1969-1986,,1680,unique,,wikipedia
+hof:22,Carji Greeves,1996,player,false,,Geelong,Victoria,1923-1933,,2959,resolved,no player with this name,wikipedia
+hof:23,Charlie Pannam,1996,player,false,,Collingwood | Richmond,Victoria,"1894-1907, 1908",,4474,unique,,wikipedia
+hof:24,Charlie Sutton,1996,player,false,,Footscray,Victoria,1942-1956,,3756,unique,,wikipedia
+hof:25,Colin Watson,1996,player,false,,St Kilda,Victoria,"1920, 1922-1925, 1933-1935",,3852,unique,,wikipedia
+hof:26,Dan Minogue,1996,player,false,,Collingwood | Richmond | Hawthorn,Victoria,"1911-1916, 1920-1925, 1926",,6022,unique,,wikipedia
+hof:27,Dan Moriarty,1996,player,false,,South Adelaide,South Australia,1919-1925,,,implausible,"1 name match(es), none with a career overlapping 1919-1925",wikipedia
+hof:28,Darrel Baldock,1996,player,true,2006,St Kilda | East Devonport | La Trobe | New Norfolk,Victoria,"1962-1968, 1955-1958, 1959-1961, 1969-1973, 1974",,2518,unique,"119 (237), 71, 158, 4",wikipedia
+hof:29,Dave McNamara,1996,player,false,,St Kilda,Victoria,1905-1923,,5226,unique,,wikipedia
+hof:30,David Christy,1996,player,false,,Ballarat | Melbourne | Fremantle (1882) | Imperials | East Fremantle,Victoria,"1885-1888, 1891-1896, 1896-1897, 1898-1912",,,unmatched,"no player with this name · 44 (18), 88 (67), 11 (1), 6 (0), 196 (191)",wikipedia
+hof:31,Dick Lee,1996,player,false,,Collingwood,Victoria,1906-1922,,5405,unique,,wikipedia
+hof:32,Dick Reynolds,1996,player,true,1996,Essendon,Victoria,1933-1951,,3578,unique,,wikipedia
+hof:33,Doug Wade,1996,player,false,,Geelong | North Melbourne,Victoria,"1961-1972, 1973-1975",,2245,unique,,wikipedia
+hof:34,Fos Williams,1996,coach,false,,Port Adelaide | West Adelaide | South Adelaide,,,,,unmatched,no player with this name,wikipedia
+hof:35,Francis Bourke,1996,player,false,,Richmond,Victoria,1967-1981,,1539,unique,300 (71),wikipedia
+hof:36,Frank Hughes,1996,coach,false,,Richmond | Melbourne,,,,6252,resolved,chosen over 2 other(s) on games played,wikipedia
+hof:37,Gary Dempsey,1996,player,false,,Western Bulldogs (Footscray) | North Melbourne,Victoria,"1967-1978, 1979-1984",,1667,unique,"207 (105), 122 (39)",wikipedia
+hof:38,George Coulthard,1996,player,false,,Carlton,Victoria,1876-1882,,,unmatched,no player with this name · 87 (57),wikipedia
+hof:39,George Moloney,1996,player,false,,Geelong | Claremont,Victoria,"1931-1935, 1927-1930, 1936-1945",,1995,resolved,chosen over 1 other(s) on games played,wikipedia
+hof:40,George Todd,1996,player,false,,Geelong,Victoria,1922-1934,,3789,unique,,wikipedia
+hof:41,Gordon Coventry,1996,player,true,1998,Collingwood,Victoria,1920-1937,,1628,unique,306 (1299),wikipedia
+hof:42,Graham 'Polly' Farmer,1996,player,false,,East Perth | Geelong | West Perth,Western Australia,"1953-1961, 1962-1967, 1968-1971",,2861,resolved,no player with this name,wikipedia
+hof:43,Graham Arthur,1996,player,false,,Hawthorn,Victoria,1955-1968,,2468,unique,232 (201),wikipedia
+hof:44,Graham Moss,1996,player,false,,Essendon | Claremont,Victoria,"1973-1976, 1969-1972, 1977-1985",,2007,unique,,wikipedia
+hof:45,Harry Collier,1996,player,false,,Collingwood,Victoria,1926-1940,,1612,unique,253 (299),wikipedia
+hof:46,Harry Vallence,1996,player,false,,Carlton,Victoria,1926-1938,,2239,unique,,wikipedia
+hof:47,Haydn Bunton Jr,1996,coach,false,,Norwood | Launceston | Swan Districts | Subiaco | South Adelaide | Sturt,,,,1466,unique,,wikipedia
+hof:48,Haydn Bunton Sr,1996,player,false,,Fitzroy | Subiaco | Port Adelaide,Victoria,"1931-1937, 1942, 1938-1941, 1945",,1466,unique,"119 (207), 72 (190), 17 (30)",wikipedia
+hof:49,Henry Young,1996,player,false,,Geelong,Victoria,1893-1910,,4414,unique,,wikipedia
+hof:50,Horrie Clover,1996,player,false,,Carlton,Victoria,1920-1931,,2694,unique,147 (396),wikipedia
+hof:51,Ian Stewart,1996,player,true,1997,St Kilda | Richmond | Hobart,Victoria,"1963-1970, 1971-1975, 1962",,2193,unique,,wikipedia
+hof:52,Ivor Warne-Smith,1996,player,false,,Melbourne | Latrobe,Victoria,"1919, 1925-1932, 1920-1924",,2253,unique,,wikipedia
+hof:53,Jack 'Dinny' Reedman,1996,player,false,,Hotham (SAFA) | South Adelaide | North Adelaide,South Australia,"1887-1888, 1889-1898, 1899-1907, 1909",,,unmatched,"no player with this name · 172, 115",wikipedia
+hof:54,Jack Clarke (Vic),1996,player,false,,Essendon,Victoria,1951-1967,,,unmatched,no player with this name · 263 (180),wikipedia
+hof:55,Jack Dyer,1996,player,true,1996,Richmond,Victoria,1931-1949,,2820,unique,,wikipedia
+hof:56,Jack Mueller,1996,player,false,,Melbourne,Victoria,1934-1950,,3399,unique,,wikipedia
+hof:57,Jack Oatey,1996,coach,true,2021,Norwood | West Adelaide | Sturt,,,,8744,unique,,wikipedia
+hof:58,Jack Regan,1996,player,false,,Collingwood,Victoria,"1930-1941, 1943, 1946",,3570,unique,,wikipedia
+hof:59,Jack Titus,1996,player,false,,Richmond,Victoria,1926-1943,,2224,unique,,wikipedia
+hof:60,Jack Worrall,1996,player,false,,Fitzroy,Victoria,1884-1893,,,unmatched,no player with this name,wikipedia
+hof:61,Jock McHale,1996,player,true,2005,Collingwood,Victoria,1903-1920,,5099,unique,,wikipedia
+hof:62,John Coleman,1996,player,true,1996,Essendon,Victoria,1949-1954,,1614,unique,98 (537),wikipedia
+hof:63,John Daly,1996,player,false,,Norwood | West Adelaide,South Australia,"1887-1898, 1899-1904",,,implausible,"1 name match(es), none with a career overlapping 1887-1904 · 119 (12), 56 (9)",wikipedia
+hof:64,John Kennedy Sr,1996,coach,false,,Hawthorn | North Melbourne,,,,1893,resolved,John Kennedy (1979-1991); John Kennedy (1950-1959),wikipedia
+hof:65,John Nicholls,1996,player,true,1996,Carlton,Victoria,1957-1974,,3422,unique,,wikipedia
+hof:66,John Rantall,1996,player,false,,South Melbourne | North Melbourne | Fitzroy,Victoria,"1963-1972, 1976-1979, 1973-1975, 1980",,2095,unique,,wikipedia
+hof:67,John Schultz,1996,player,false,,Western Bulldogs (Footscray),Victoria,1958-1968,,9788,unique,,wikipedia
+hof:68,Johnny Leonard,1996,coach,false,,South Melbourne | West Perth | Claremont,,,,3209,unique,,wikipedia
+hof:69,Johnny Lewis,1996,player,false,,North Melbourne | Melbourne,Victoria,"1925-1935, 1936-1938",,,unmatched,no player with this name,wikipedia
+hof:70,Keith Greig,1996,player,false,,North Melbourne,Victoria,1971-1985,,1765,unique,,wikipedia
+hof:71,Kevin Bartlett,1996,player,true,2000,Richmond,Victoria,1965-1983,,1509,unique,403 (778),wikipedia
+hof:72,Kevin Murray,1996,player,true,2010,Fitzroy | East Perth,Victoria,"1955-1964, 1967-1974, 1965-1966",,2018,unique,,wikipedia
+hof:73,Laurie Nash,1996,player,false,,South Melbourne | Camberwell | City,Victoria,"1933-1937, 1945, 1938-1941, 1930-1932",,3415,unique,,wikipedia
+hof:74,Leigh Matthews,1996,player,true,1996,Hawthorn,Victoria,1969-1985,,1949,unique,,wikipedia
+hof:75,Len Fitzgerald,1996,player,false,,Collingwood | Sturt,Victoria,"1945-1950, 1951-1955, 1959-1962",,2882,unique,,wikipedia
+hof:76,Les Foote,1996,player,false,,North Melbourne | St Kilda,Victoria,"1941-1951, 1954-1955",,1728,unique,,wikipedia
+hof:77,Lindsay Head,1996,player,false,,West Torrens,South Australia,1952-1970,,,unmatched,no player with this name,wikipedia
+hof:78,Lou Richards,1996,player,false,,Collingwood,Victoria,1941-1955,,3582,unique,,wikipedia
+hof:79,Malcolm Blight,1996,player,true,2017,Woodville | North Melbourne,South Australia,"1968-1973, 1983-1985, 1974-1982",,1534,unique,"152 (342), 178 (444)",wikipedia
+hof:80,Mark Tandy,1996,player,false,,South Melbourne,Victoria,1911-1926,,3767,unique,,wikipedia
+hof:81,Merv McIntosh,1996,player,true,2021,Perth,Western Australia,"1939-1941, 1946-1955",,,unmatched,no player with this name,wikipedia
+hof:82,Michael Tuck,1996,player,false,,Hawthorn,Victoria,1972-1991,,1319,unique,,wikipedia
+hof:83,Norm Smith,1996,player,true,2007,Melbourne | Fitzroy | South Melbourne,Victoria,"1935-1948, 1949-1950",,3711,unique,,wikipedia
+hof:84,Percy Beames,1996,player,false,,Melbourne,Victoria,1931-1944,,1516,unique,213 (323),wikipedia
+hof:85,Percy Bentley,1996,player,false,,Richmond,Victoria,1925-1940,,,unmatched,no player with this name · 263 (275),wikipedia
+hof:86,Peter Burns,1996,player,false,,Ballarat Imperial | South Melbourne | Geelong,Victoria,"1885, 1885-1891, 1892-1902",,4384,unique,"2 (5), 126 (100), 177 (34)",wikipedia
+hof:87,Peter Hudson,1996,player,true,1999,Hawthorn | New Norfolk | Glenorchy,Victoria,"1967-1974, 1963-1966, 1975-1976, 1978-1979, 1981",,1822,unique,,wikipedia
+hof:88,Peter Knights,1996,player,false,,Hawthorn,Victoria,1969-1985,,1882,unique,,wikipedia
+hof:89,Phonse Kyne,1996,player,false,,Collingwood,Victoria,"1934-1944, 1946-1950",,3182,unique,,wikipedia
+hof:90,Reg Hickey,1996,player,false,,Geelong,Victoria,1926-1940,,1468,unique,,wikipedia
+hof:91,Robert Flower,1996,player,false,,Melbourne,Victoria,1973-1987,,1725,unique,,wikipedia
+hof:92,Rod McGregor,1996,player,false,,Carlton,Victoria,"1905-1912, 1914-1920",,5285,unique,,wikipedia
+hof:93,Ron Barassi,1996,player,true,1996,Melbourne | Carlton,Victoria,"1953-1964, 1965-1969",,2521,unique,"204 (295), 50 (35)",wikipedia
+hof:94,Ron Clegg,1996,player,false,,South Melbourne,Victoria,1945-1960,,1605,unique,231 (156),wikipedia
+hof:95,Roy Cazaly,1996,player,true,1996,St Kilda | South Melbourne | City | Preston | North Hobart | Glenorchy (New Town) | Camberwell,Victoria,"1911-1920, 1921-24, 1926-27, 1928-1930, 1931, 1932-1933, 1934-1936, 1941",,2665,unique,"99 (39), 99 (128), 51 (62), 19 (26), 26 (35), 47 (41), 2 (1)",wikipedia
+hof:96,Roy Wright,1996,player,false,,Richmond,Victoria,1946-1959,,2296,unique,,wikipedia
+hof:97,Royce Hart,1996,player,true,2013,Richmond | Glenelg,Victoria,"1967-1977, 1969",,2367,unique,,wikipedia
+hof:98,Russell Ebert,1996,player,true,2022,Port Adelaide | North Melbourne,South Australia,"1968-1978, 1980-1985, 1979",,1697,unique,,wikipedia
+hof:99,Simon Madden,1996,player,false,,Essendon,Victoria,1974-1992,,1302,unique,,wikipedia
+hof:100,Syd Coventry,1996,player,false,,Collingwood,Victoria,1922-1934,,1629,unique,227 (62),wikipedia
+hof:101,Ted Whitten,1996,player,true,1996,Western Bulldogs (Footscray),Victoria,1951-1970,,2268,unique,,wikipedia
+hof:102,Tom Fitzmaurice,1996,player,false,,Essendon | Geelong | North Melbourne,Victoria,"1918-1924, 1925-1928, 1932-1935",,2881,unique,,wikipedia
+hof:103,Tom Hafey,1996,coach,false,,Richmond | Collingwood | Geelong | Sydney,,,,2985,unique,,wikipedia
+hof:104,Tom MacKenzie,1996,player,false,,West Torrens | North Adelaide,South Australia,"1900-1904, 1909-1914, 1905-1908",,,unmatched,no player with this name,wikipedia
+hof:105,Vic Belcher,1996,player,false,,South Melbourne,Victoria,"1907-1915, 1917-1920",,5438,unique,226 (62),wikipedia
+hof:106,Vic Cumberland,1996,player,false,,Melbourne | St Kilda | Sturt,Victoria,"1898-1901, 1903-1904, 1907-1908, 1912-1915, 1920, 1909-1911",,4489,unique,"50 (15), 126 (72), 37 (33)",wikipedia
+hof:107,Vic Thorp,1996,player,false,,Richmond,Victoria,1910-1925,,3777,unique,,wikipedia
+hof:108,Walter Scott,1996,player,false,,Norwood,South Australia,1920-1932,,,unmatched,no player with this name,wikipedia
+hof:109,Wels Eicke,1996,player,false,,St Kilda | North Melbourne,Victoria,"1909-1924, 1926, 1925-1926",,2835,unique,,wikipedia
+hof:110,William Truscott,1996,player,false,,East Fremantle,Western Australia,1913-1924,,,unmatched,no player with this name,wikipedia
+hof:111,Barry Davis,1997,player,false,,Essendon | North Melbourne,Victoria,"1961-1972, 1973-1975",,1654,unique,"218 (65), 71 (54)",wikipedia
+hof:112,Neil Kerley,1997,player,false,,West Adelaide | South Adelaide | Glenelg,South Australia,"1952, 1955-1963, 1964-1966, 1967-1969",,,unmatched,no player with this name,wikipedia
+hof:113,Wayne Schimmelbusch,1997,player,false,,North Melbourne,Victoria,1973-1987,,2145,unique,,wikipedia
+hof:114,Allan Ruthven,1998,player,false,,Fitzroy,Victoria,1940-1954,,,unmatched,no player with this name,wikipedia
+hof:115,Fred Flanagan,1998,player,false,,Geelong,Victoria,1946-1955,,2887,unique,,wikipedia
+hof:116,Ken Farmer,1998,player,true,2025,North Adelaide,South Australia,1929-1941,,,unmatched,no player with this name · 224 (1417),wikipedia
+hof:117,Len Thompson,1998,player,false,,Collingwood | South Melbourne | Fitzroy,Victoria,"1965-1978, 1979, 1980",,2215,unique,,wikipedia
+hof:118,Terry Daniher,1998,player,false,,South Melbourne | Essendon,Victoria,"1976-1977, 1978-1992",,1311,unique,"19 (22), 294 (447)",wikipedia
+hof:119,Bob Hank,1999,player,false,,West Torrens,South Australia,1945-1958,,,unmatched,no player with this name,wikipedia
+hof:120,Dermott Brereton,1999,player,false,,Hawthorn | Sydney | Collingwood,Victoria,"1982-1992, 1994, 1995",,234,unique,"189 (427), 7 (7), 15 (30)",wikipedia
+hof:121,Garry Wilson,1999,player,false,,Fitzroy,Victoria,1971-1984,,2274,unique,,wikipedia
+hof:122,Gary Ayres,1999,player,false,,Hawthorn,Victoria,1978-1993,,1257,unique,269 (70),wikipedia
+hof:123,Jack Clarke (WA),1999,player,false,,East Fremantle,Western Australia,1952-1962,,,unmatched,no player with this name · 206 (6),wikipedia
+hof:124,Peter Bedford,1999,player,false,,Port Melbourne | South Melbourne | Carlton,Victoria,"1965-1967, 1978-1979, 1968-1976, 1977-1978",,1519,unique,"69, 178 (325), 8 (4)",wikipedia
+hof:125,Peter Daicos,1999,player,false,,Collingwood,Victoria,1979-1993,,1253,unique,250 (549),wikipedia
+hof:126,Peter McKenna,1999,player,false,,Collingwood | Carlton,Victoria,"1965-1975, 1977",,1969,unique,,wikipedia
+hof:127,Stephen Michael,1999,player,false,,South Fremantle,Western Australia,1975-1985,,,unmatched,no player with this name · 243 (231),wikipedia
+hof:128,Bill Goggin,2000,player,false,,Geelong,Victoria,1958-1971,,2940,unique,,wikipedia
+hof:129,David Dench,2000,player,false,,North Melbourne,Victoria,1969-1984,,1669,unique,275 (29),wikipedia
+hof:130,Des Fothergill,2000,player,false,,Collingwood,Victoria,1937-1947,,2892,unique,,wikipedia
+hof:131,Geoff Southby,2000,player,false,,Carlton,Victoria,1971-1984,,2183,unique,,wikipedia
+hof:132,Gerard Healy,2000,player,false,,Melbourne | Sydney,Victoria,"1979-1985, 1986-1990",,1366,unique,,wikipedia
+hof:133,Ross Glendinning,2000,player,false,,East Perth | West Coast | North Melbourne,Western Australia,"1974-1977, 1987-1988, 1977-1986",,1757,unique,,wikipedia
+hof:134,Tim Watson,2000,player,false,,Essendon,Victoria,"1977-1991, 1993-1994",,1162,unique,,wikipedia
+hof:135,Barry Round,2001,player,false,,Western Bulldogs (Footscray) | Sydney,Victoria,"1968-1975, 1976-1985",,2131,unique,,wikipedia
+hof:136,Dale Weightman,2001,player,false,,Richmond,Victoria,1978-1993,,1256,unique,,wikipedia
+hof:137,Don Scott,2001,player,false,,Hawthorn,Victoria,1967-1981,,2147,unique,,wikipedia
+hof:138,Greg Williams,2001,player,false,,Geelong | Carlton | Sydney,Victoria,"1984-1985, 1986-1991, 1992-1997",,142,unique,,wikipedia
+hof:139,Jack Sheedy,2001,player,false,,East Fremantle | East Perth | South Melbourne,Western Australia,"1942-1944, 1946-1955, 1956-1962",,8745,unique,,wikipedia
+hof:140,Ken Fraser,2001,player,false,,Essendon,Victoria,1958-1968,,2901,unique,,wikipedia
+hof:141,Norman Ware,2001,player,false,,Western Bulldogs (Footscray),Victoria,1932-1946,,,unmatched,no player with this name,wikipedia
+hof:142,Stephen Kernahan,2001,player,false,,Glenelg | Carlton,South Australia,"1981-1985, 1986-1997",,148,unique,,wikipedia
+hof:143,David Parkin,2002,coach,false,,Hawthorn | Carlton | Fitzroy,,,,2055,unique,,wikipedia
+hof:144,Geof Motley,2002,player,false,,Port Adelaide,South Australia,1953-1966,,,unmatched,no player with this name,wikipedia
+hof:145,George Doig,2002,player,false,,East Fremantle,Western Australia,"1933-1941, 1945",,,unmatched,no player with this name · 1096 (202),wikipedia
+hof:146,Jason Dunstall,2002,player,true,2024,Coorparoo | Hawthorn,Queensland,"1984, 1985-1998",,632,unique,,wikipedia
+hof:147,John Cahill,2002,coach,false,,Port Adelaide | Collingwood | West Adelaide | South Adelaide,,,,,unmatched,no player with this name,wikipedia
+hof:148,John Newman,2002,player,false,,Geelong,Victoria,1964-1980,,,unmatched,no player with this name,wikipedia
+hof:149,Arthur Olliver,2003,player,false,,Western Bulldogs (Footscray),Victoria,1935-1950,,3476,unique,,wikipedia
+hof:150,Herbie Matthews,2003,player,false,,South Melbourne,Victoria,1932-1945,,3275,unique,,wikipedia
+hof:151,Jim Stynes,2003,player,false,,Melbourne,Victoria,1987-1998,,702,unique,,wikipedia
+hof:152,John Platten,2003,player,false,,Central District | Hawthorn,South Australia,"1981-1985, 1998, 1986-1997",,636,unique,"107 (254), 258 (228)",wikipedia
+hof:153,John Todd,2003,coach,false,,Swan Districts | East Fremantle | South Fremantle | West Coast,,,,,unmatched,no player with this name,wikipedia
+hof:154,Wayne Richardson,2003,player,false,,Collingwood,Victoria,1966-1978,,2109,unique,,wikipedia
+hof:155,Carl Ditterich,2004,player,false,,St Kilda | Melbourne,Victoria,"1963-1972, 1976-1978, 1973-1975, 1979-1980",,1675,unique,"203 (156), 82 (43)",wikipedia
+hof:156,Denis Marshall,2004,player,false,,Claremont | Geelong,Western Australia,"1958-1963, 1969-1972, 1964-1968",,1264,unique,,wikipedia
+hof:157,Doug Hawkins,2004,player,false,,Western Bulldogs (Footscray) | Fitzroy,Victoria,"1978-1994, 1995",,380,unique,,wikipedia
+hof:158,Jack Moriarty,2004,player,false,,Essendon | Fitzroy,Victoria,"1922, 1924-1933",,3382,unique,,wikipedia
+hof:159,Phillip Matson,2004,coach,false,,Subiaco | East Perth,,,,,unmatched,no player with this name,wikipedia
+hof:160,Gary Ablett Sr.,2005,player,false,,Hawthorn | Geelong,Victoria,"1982, 1984-1997",,567,unique,"6 (10), 242 (1021)",wikipedia
+hof:161,Ian Nankervis,2005,player,false,,Geelong,Victoria,1967-1983,,2023,resolved,chosen over 1 other(s) on games played,wikipedia
+hof:162,Kelvin Moore,2005,player,false,,Hawthorn,Victoria,1970-1984,,1999,unique,,wikipedia
+hof:163,Paul Roos,2005,player,false,,Fitzroy | Sydney,Victoria,"1982-1994, 1995-1998",,985,unique,,wikipedia
+hof:164,Peter Moore,2005,player,false,,Collingwood | Melbourne,Victoria,"1974-1982, 1983-1987",,2000,unique,,wikipedia
+hof:165,Stephen Silvagni,2005,player,false,,Carlton,Victoria,1985-2001,,136,unique,,wikipedia
+hof:166,Stuart Spencer,2005,player,false,,Melbourne | Clarence,Victoria,"1950-1956, 1957-1967",,2184,unique,,wikipedia
+hof:167,Craig Bradley,2006,player,false,,Port Adelaide | Carlton,South Australia,"1981-1985, 1986-2002",,151,unique,"98 (97), 375 (247)",wikipedia
+hof:168,John Murphy,2006,player,false,,Fitzroy | South Melbourne | North Melbourne,Victoria,"1967-1977, 1978-1979, 1979-1980",,,ambiguous,John Murphy (1967-1980); John Murphy (1970-1973),wikipedia
+hof:169,Peter Matera,2006,player,false,,South Fremantle | West Coast,Western Australia,"1987-1989, 1990-2002",,1040,unique,"60 (88), 253 (217)",wikipedia
+hof:170,Robert Walls,2006,player,false,,Carlton | Fitzroy,Victoria,"1967-1978, 1978-1980",,2248,unique,,wikipedia
+hof:171,Steve Marsh,2006,player,false,,South Fremantle | East Fremantle,Western Australia,"1945-1956, 1957-1958, 1960",,,unmatched,"no player with this name · 226 (418), 39 (51)",wikipedia
+hof:172,Tony Lockett,2006,player,true,2015,St Kilda | Sydney,Victoria,"1983-1994, 1995-1999, 2002",,990,unique,,wikipedia
+hof:173,Wilfred Smallhorn,2006,player,false,,Fitzroy,Victoria,1930-1940,,2173,unique,,wikipedia
+hof:174,Darren Jarman,2007,player,false,,North Adelaide | Adelaide | Hawthorn,South Australia,"1985-1990, 1996-2001, 1991-1995",,36,unique,,wikipedia
+hof:175,Dean Kemp,2007,player,false,,West Coast | Subiaco,Western Australia,"1990-2001, 1989-1991",,1028,unique,,wikipedia
+hof:176,Frank Johnson,2007,player,false,,South Melbourne | Port Melbourne,Victoria,"1960-1964, 1950-1957",,3130,resolved,chosen over 1 other(s) on games played,wikipedia
+hof:177,Michael Long,2007,player,false,,West Torrens | Essendon,South Australia,"1987-1988, 1989-2001",,313,unique,,wikipedia
+hof:178,Murray Weideman,2007,player,false,,West Adelaide | Collingwood,South Australia,"1968-1969, 1953-1963",,3865,unique,,wikipedia
+hof:179,Paul Kelly,2007,player,false,,Sydney,New South Wales,1990-2002,,993,unique,,wikipedia
+hof:180,Robert DiPierdomenico,2007,player,false,,Hawthorn,Victoria,1975-1991,,1350,unique,240 (130),wikipedia
+hof:181,Des Tuddenham,2008,player,false,,Collingwood | Essendon,Victoria,"1962-1971, 1976-1977, 1972-1975",,2228,unique,,wikipedia
+hof:182,Garry Hocking,2008,player,false,,Geelong,Victoria,1987-2001,,577,unique,,wikipedia
+hof:183,Gavin Brown,2008,player,false,,Collingwood,Victoria,1987-2000,,216,unique,254 (195),wikipedia
+hof:184,Glen Jakovich,2008,player,false,,South Fremantle | West Coast,Western Australia,"1989-1991, 1991-2004",,1038,unique,"51 (109), 276 (60)",wikipedia
+hof:185,Kevin Sheedy,2008,player,true,2018,Richmond | Essendon | GWS Giants,Victoria,1967-1979,,2163,unique,,wikipedia
+hof:186,Noel Teasdale,2008,player,false,,North Melbourne,Victoria,1956-1967,,3772,unique,,wikipedia
+hof:187,Bill Morris,2009,player,false,,Richmond,Victoria,1942-1951,,3388,unique,,wikipedia
+hof:188,Chris Langford,2009,player,false,,Hawthorn,Victoria,1983-1997,,639,unique,,wikipedia
+hof:189,Guy McKenna,2009,player,false,,Claremont | West Coast,Western Australia,"1985-1987, 1988-2000",,1032,unique,"50 (5), 267 (28)",wikipedia
+hof:190,Ken Hands,2009,player,false,,Carlton,Victoria,1945-1957,,1781,unique,,wikipedia
+hof:191,Mark Bickley,2009,player,false,,South Adelaide | Adelaide,South Australia,"1989-1990, 1991-2003",,12,unique,"53 (43), 272 (77)",wikipedia
+hof:192,Peter Carey,2009,player,false,,Glenelg,South Australia,1971-1988,,,unmatched,no player with this name · 448 (521),wikipedia
+hof:193,Brian Dixon,2010,player,false,,Melbourne,Victoria,1954-1968,,2787,unique,,wikipedia
+hof:194,Gavin Wanganeen,2010,player,false,,Port Adelaide | Essendon,South Australia,"1990, 1997-2006, 1991-1996",,303,unique,,wikipedia
+hof:195,Ross Smith,2010,player,false,,St Kilda | Subiaco,Victoria,"1961-1972, 1975, 1973-1974",,2429,unique,,wikipedia
+hof:196,Stan Heal,2010,player,false,,West Perth | Melbourne,Western Australia,"1939-1953, 1941",,8380,unique,,wikipedia
+hof:197,Tony Shaw,2010,player,false,,Collingwood,Victoria,1978-1994,,1166,unique,,wikipedia
+hof:198,Wayne Carey,2010,player,false,,North Melbourne | Adelaide,Victoria,"1989-2001, 2003-2004",,766,unique,"244 (671), 28 (56)",wikipedia
+hof:199,Horrie Gorringe,2011,player,false,,Cananore,Tasmania,1914-1930,,,unmatched,no player with this name,wikipedia
+hof:200,James Hird,2011,player,false,,Essendon,Victoria,1992-2007,,312,unique,,wikipedia
+hof:201,Mark Ricciuto,2011,player,false,,West Adelaide | Adelaide,South Australia,"1992-1993, 1993-2007",,4,unique,,wikipedia
+hof:202,Michael Voss,2011,player,false,,Brisbane Bears | Brisbane Lions,Queensland,"1992-1996, 1997-2006",,102,unique,,wikipedia
+hof:203,Nathan Buckley,2011,player,false,,Port Adelaide | Brisbane Bears | Collingwood,South Australia,"1991-1992, 1993, 1994-2007",,217,unique,"37 (44), 20 (21), 260 (263)",wikipedia
+hof:204,Bob Johnson,2012,player,false,,Melbourne | Oakleigh | East Fremantle | Subiaco,Victoria,"1954-1961, 1970-1973, 1962-1966, 1967",,1894,unique,,wikipedia
+hof:205,Chris Grant,2012,player,false,,Western Bulldogs (Footscray),Victoria,1990-2007,,422,unique,,wikipedia
+hof:206,Glenn Archer,2012,player,false,,North Melbourne,Victoria,1992-2007,,777,unique,311 (148),wikipedia
+hof:207,Graham Cornes,2012,player,false,,Glenelg | South Adelaide | North Melbourne,South Australia,"1967-1982, 1983-1984, 1979",,10988,unique,"317 (339), 47 (42), 5 (10)",wikipedia
+hof:208,Robert Harvey,2012,player,false,,St Kilda,Victoria,1988-2008,,930,unique,,wikipedia
+hof:209,Shane Crawford,2012,player,false,,Hawthorn,Victoria,1993-2008,,633,unique,305 (224),wikipedia
+hof:210,Brian Peake,2013,player,false,,East Fremantle | Perth | Geelong,Western Australia,"1972-1981, 1985-1990, 1981-1984",,2063,unique,,wikipedia
+hof:211,Hassa Mann,2013,player,false,,Melbourne | South Fremantle,Victoria,"1959-1968, 1969-1971",,3261,unique,"178 (193), 62 (133)",wikipedia
+hof:212,Matthew Lloyd,2013,player,false,,Essendon,Victoria,1995-2009,,336,unique,,wikipedia
+hof:213,Rick Davies,2013,player,false,,Sturt | South Adelaide | Hawthorn,South Australia,"1970-1980, 1982-1984, 1985-1986, 1981",,1658,unique,"317 (635), 33 (146), 20 (37)",wikipedia
+hof:214,Scott West,2013,player,false,,Western Bulldogs (Footscray),Victoria,1993-2008,,418,unique,,wikipedia
+hof:215,Andrew McLeod,2014,player,false,,Port Adelaide | Adelaide,South Australia,"1994, 1995-2010",,30,unique,,wikipedia
+hof:216,Anthony Koutoufides,2014,player,false,,Carlton,Victoria,1992-2007,,144,unique,,wikipedia
+hof:217,Brad Johnson,2014,player,false,,Western Bulldogs (Footscray),Victoria,1994-2010,,421,unique,,wikipedia
+hof:218,Ern Henfry,2014,player,false,,Perth | Carlton,Western Australia,"1937-1941, 1945, 1953-1954, 1944, 1947-1952",,3040,unique,,wikipedia
+hof:219,James Thompson,2014,pioneer,false,,,,,,,unmatched,no player with this name,wikipedia
+hof:220,Jerry Bryant,2014,pioneer,false,,,,,,,unmatched,no player with this name,wikipedia
+hof:221,Matthew Richardson,2014,player,false,,Richmond,Victoria,1993-2009,,870,unique,,wikipedia
+hof:222,Thomas H. Smith,2014,pioneer,false,,,,,,,unmatched,no player with this name,wikipedia
+hof:223,Warren Tredrea,2014,player,false,,Port Adelaide,South Australia,1996-2010,,831,unique,,wikipedia
+hof:224,William Hammersley,2014,pioneer,false,,,,,,,unmatched,no player with this name,wikipedia
+hof:225,Austin Robertson Jr.,2015,player,false,,Subiaco | South Melbourne,Western Australia,"1962-1965, 1967-1974, 1966",,3600,unique,,wikipedia
+hof:226,Jason Akermanis,2015,player,false,,Brisbane Bears | Brisbane Lions | Western Bulldogs,Queensland,"1995-1996, 1997-2006, 2007-2010",,119,unique,"38 (44), 210 (263), 77 (114)",wikipedia
+hof:227,Michael O'Loughlin,2015,player,false,,Sydney,New South Wales,1995-2009,,1000,unique,,wikipedia
+hof:228,Neil Roberts,2015,player,false,,St Kilda,Victoria,1952-1962,,2116,unique,,wikipedia
+hof:229,Peter Bell,2015,player,false,,South Fremantle | Fremantle | North Melbourne,Western Australia,"1994-1995, 2009, 1995, 2001-2008, 1996-2000",,486,unique,"49 (58), 163 (130), 123 (120)",wikipedia
+hof:230,Ben Hart,2016,player,false,,North Adelaide | Adelaide,South Australia,"1990-1991, 1992-2006",,22,unique,,wikipedia
+hof:231,Maurice Rioli,2016,player,false,,South Fremantle | Richmond,Western Australia,"1975-1981, 1988-1990, 1982-1987",,2113,unique,"168 (133), 118 (80)",wikipedia
+hof:232,Nigel Lappin,2016,player,false,,Brisbane Bears | Brisbane Lions,Queensland,"1994-1996, 1997-2008",,100,unique,,wikipedia
+hof:233,Paul Bagshaw,2016,player,false,,Sturt,South Australia,1964-1980,,,unmatched,no player with this name · 360 (258),wikipedia
+hof:234,Paul Salmon,2016,player,false,,Essendon | Hawthorn,Victoria,"1983-1995, 2000, 1996-2000",,314,unique,,wikipedia
+hof:235,Ray Sorrell,2016,player,false,,East Fremantle | South Fremantle,Western Australia,"1956-1963, 1967-1968, 1964-1965",,,unmatched,"no player with this name · 156 (55), 22 (8)",wikipedia
+hof:236,Verdun Howell,2016,player,false,,City South | St Kilda,Tasmania,"1953-1957, 1958-1968",,3091,unique,,wikipedia
+hof:237,Anthony Stevens,2017,player,false,,North Melbourne,Victoria,1989-2004,,772,unique,,wikipedia
+hof:238,Barry Hall,2017,player,false,,St Kilda | Sydney | Western Bulldogs,Victoria,"1996-2001, 2002-2009, 2010-2011",,953,unique,,wikipedia
+hof:239,Charles Kingston,2017,pioneer,false,,,,,,,unmatched,no player with this name,wikipedia
+hof:240,John Acraman,2017,pioneer,false,,,,,,,unmatched,no player with this name,wikipedia
+hof:241,John Halbert,2017,player,false,,Sturt,South Australia,1955-1968,,,unmatched,no player with this name,wikipedia
+hof:242,Richard Twopeny,2017,pioneer,false,,,,,,,unmatched,no player with this name,wikipedia
+hof:243,Ron Todd,2017,player,false,,Collingwood | Williamstown,Victoria,"1935-1939, 1940-1941, 1945-1949",,3790,unique,,wikipedia
+hof:244,Simon Goodwin,2017,player,false,,Adelaide,South Australia,1997-2010,,51,unique,275 (162),wikipedia
+hof:245,Bernie Naylor,2018,player,false,,South Fremantle,Western Australia,1941-1954,,,unmatched,no player with this name · 194 (1034),wikipedia
+hof:246,David Neitz,2018,player,false,,Melbourne,Victoria,1993-2008,,689,unique,,wikipedia
+hof:247,Matthew Scarlett,2018,player,false,,Geelong,Victoria,1998-2012,,604,unique,,wikipedia
+hof:248,Mel Whinnen,2018,player,false,,West Perth,Western Australia,1960-1977,,,unmatched,no player with this name,wikipedia
+hof:249,Terry Wallace,2018,player,false,,Hawthorn | Richmond | Footscray,Victoria,"1978-1986, 1987, 1988-1991",,1371,unique,,wikipedia
+hof:250,Wayne Johnston,2018,player,false,,Carlton,Victoria,1979-1990,,1849,unique,,wikipedia
+hof:251,Brad Hardie,2019,player,false,,South Fremantle | Footscray | Brisbane Bears | Collingwood,Western Australia,"1979-1984, 1993, 1985-1986, 1987-1991, 1992",,1300,unique,"140 (308), 47 (28), 101 (192), 2 (2)",wikipedia
+hof:252,Jim Deane,2019,player,false,,South Adelaide | Richmond,South Australia,"1945-1953, 1955-1957, 1954-1955",,1661,unique,"157 (95), 33 (17)",wikipedia
+hof:253,Ken Hunter,2019,player,false,,Claremont | Carlton,Western Australia,"1975-1980, 1980-1989",,1826,unique,,wikipedia
+hof:254,Mick Malthouse,2019,coach,false,,Footscray | West Coast | Collingwood | Carlton,,,,2377,unique,,wikipedia
+hof:255,Trevor Barker,2019,player,false,,St Kilda,Victoria,1975-1989,,1511,unique,230 (134),wikipedia
+hof:256,Dean Cox,2020,player,false,,East Perth | West Coast,Western Australia,"1999-2003, 2001-2014",,1079,unique,"26 (9), 290 (169)",wikipedia
+hof:257,Greg Phillips,2020,player,false,,Port Adelaide | Collingwood,South Australia,"1976-1982, 1987-1993, 1983-1986",,2074,unique,,wikipedia
+hof:258,John Abley,2020,player,false,,Port Adelaide,South Australia,1950-1961,,,unmatched,no player with this name · 212 (1),wikipedia
+hof:259,Jonathan Brown,2020,player,false,,Brisbane Lions,Queensland,2000-2014,,1092,unique,256 (594),wikipedia
+hof:260,Lenny Hayes,2020,player,false,,St Kilda,Victoria,1999-2014,,966,unique,,wikipedia
+hof:261,Simon Black,2020,player,false,,East Fremantle | Brisbane Lions,Western Australia,"1997, 1998-2013",,1083,unique,"2 (0), 322 (171)",wikipedia
+hof:262,Chris Judd,2021,player,false,,West Coast | Carlton,Western Australia,"2002-2007, 2008-2015",,1122,unique,,wikipedia
+hof:263,Debbie Lee,2021,player,false,,East Brunswick Scorpions (VWFL) St Albans Spurs (VWFL),Victoria,1991-2014,,,unmatched,no player with this name · 302,wikipedia
+hof:264,Nathan Burke,2021,player,false,,St Kilda,Victoria,1987-2003,,919,unique,323 (123),wikipedia
+hof:265,Robert Wiley,2021,player,false,,Perth | Richmond | West Coast,Western Australia,"1974-78, 1984-88, 1979-1983, 1987",,2280,unique,"179 (415), 95 (127), 18 (24)",wikipedia
+hof:266,Bill Dempsey,2022,player,false,,West Perth,Western Australia,1960-1976,,,unmatched,no player with this name · 343 (89),wikipedia
+hof:267,Brent Harvey,2022,player,false,,North Melbourne,Victoria,1996-2016,,788,unique,,wikipedia
+hof:268,Matthew Pavlich,2022,player,false,,Woodville-West Torrens | Fremantle,South Australia,"1999, 2000-2016",,544,unique,,wikipedia
+hof:269,Michael Taylor,2022,player,false,,Norwood | Collingwood,South Australia,"1972-1980, 1985-1987, 1981-1984",,2207,unique,,wikipedia
+hof:270,Mike Fitzpatrick,2022,player,false,,Subiaco | Carlton,Western Australia,"1970-1974, 1975-1983",,1722,unique,,wikipedia
+hof:271,Nicky Winmar,2022,removed,false,,South Fremantle | St Kilda | Western Bulldogs,Western Australia,"1983-1986, 1987-1998, 1999",2026,461,unique,"58 (98), 230 (283), 21 (34)",wikipedia
+hof:272,Ted Tyson,2022,player,false,,West Perth,Western Australia,"1930-1941, 1945",,,unmatched,no player with this name,wikipedia
+hof:273,Terry Cashion,2022,player,false,,New Town | South Melbourne | Clarence | Longford | Sandy Bay,Tasmania,"1939-1941, 1942, 1946-1947, 1948-1951, 1952-1954",,8520,unique,5 (5),wikipedia
+hof:274,Corey Enright,2023,player,false,,Geelong,Victoria,2001-2016,,621,unique,,wikipedia
+hof:275,Jimmy Bartel,2023,player,false,,Geelong,Victoria,2002-2016,,1106,unique,305 (202),wikipedia
+hof:276,Mark Williams,2023,player,false,,West Adelaide | Port Adelaide | Collingwood | Brisbane Bears,South Australia,"1976-1978, 1979-80, 1990-92, 1981-1986, 1987-1990",,2281,resolved,chosen over 2 other(s) on games played,wikipedia
+hof:277,Michael Aish,2023,player,false,,Norwood,South Australia,1979-1993,,,unmatched,no player with this name · 307 (449),wikipedia
+hof:278,Sam Mitchell,2023,player,false,,Hawthorn | West Coast,Victoria,"2002-2016, 2017",,1135,unique,,wikipedia
+hof:279,Tom Leahy,2023,player,false,,West Adelaide | North Adelaide,South Australia,"1905-1909, 1910-1915, 1919-1921",,,unmatched,no player with this name,wikipedia
+hof:280,Chris McDermott,2024,player,false,,Glenelg | Adelaide | North Adelaide,South Australia,"1981-1996, 1991-1996, 1997",,17,unique,"227 (154), 117 (25), 10 (0)",wikipedia
+hof:281,Dane Swan,2024,player,false,,Collingwood,Victoria,2003-2016,,1460,unique,258 (211),wikipedia
+hof:282,Kelvin Templeton,2024,player,false,,Footscray | Melbourne,Victoria,"1974-1982, 1983-1985",,2210,unique,"143 (434), 34 (99)",wikipedia
+hof:283,Michael Graham,2024,player,false,,Sturt | St Mary's,South Australia,1971-1986,,,unmatched,"no player with this name · 282 (455), 230",wikipedia
+hof:284,Ralph Robertson,2024,player,false,,St Kilda | East Sydney | North Shore,Victoria,"1899-1900, 1903-1909, 1909-1914",,4647,unique,14 (1),wikipedia
+hof:285,Ray Schofield,2024,player,false,,West Perth,Western Australia,1946-1958,,,unmatched,no player with this name · 259 (169),wikipedia
+hof:286,Daisy Pearce,2025,player,false,,Melbourne (AFLW),Victoria,2017-2022 (season 7),,,unmatched,no player with this name · 55 (25),wikipedia
+hof:287,Erin Phillips,2025,player,false,,Adelaide (AFLW) Port Adelaide (AFLW),South Australia,2017-2022 (S6) 2022 (S7)-2023,,,unmatched,no player with this name · 46 (50) 20 (3),wikipedia
+hof:288,Garry Lyon,2025,player,false,,Melbourne,Victoria,1986-1999,,695,unique,226 (426),wikipedia
+hof:289,George Owens,2025,player,false,,East Perth,Western Australia,1917-1932,,,unmatched,no player with this name · 195 (226),wikipedia
+hof:290,John Leedham,2025,player,false,,North Launceston | Campbell Town | North Hobart,Tasmania,"1946-1950, 1953, 1951-1952, 1954-1959",,,unmatched,no player with this name,wikipedia
+hof:291,Luke Hodge,2025,player,false,,Hawthorn | Brisbane Lions,Victoria,"2002-2017, 2018-2019",,1134,unique,"305 (193), 41 (1)",wikipedia
+hof:292,Nick Riewoldt,2025,player,false,,St Kilda,Victoria,2001-2017,,981,unique,336 (718),wikipedia
+hof:293,Peter Darley,2025,player,false,,South Adelaide,South Australia,1962-1974,,,unmatched,no player with this name · 206 (123),wikipedia
+hof:294,David Kantilla,2026,player,false,,St Mary's (NTFL) | South Adelaide,Northern Territory,"1958-1969, 1961-1966",,,unmatched,"no player with this name · c. 180, 113 (106)",wikipedia
+hof:295,Dustin Fletcher,2026,player,false,,Essendon,Victoria,1993-2015,,304,unique,400 (71),wikipedia
+hof:296,Gary Ablett Jr.,2026,player,false,,Geelong | Gold Coast,Victoria,"2002-2010, 2018-2020, 2011-2017",,1105,unique,"247 (321), 110 (124)",wikipedia
+hof:297,John Worsfold,2026,player,false,,West Coast,Western Australia,1987-1998,,1037,unique,209 (37),wikipedia
+hof:298,Tim Evans,2026,player,false,,Geelong | Port Adelaide,Tasmania / South Australia,"1971-1974, 1975-1986",,1709,unique,"59 (26), 232 (1019)",wikipedia
+hof:299,Alf Brown,,media,false,,"print, Victoria",,,,,unmatched,no player with this name,wikipedia
+hof:300,Bill Deller,,umpire,false,,,,,,,unmatched,no player with this name,wikipedia
+hof:301,Bob Hammond,,administrator,false,,"Adelaide, AFL",,,,1774,unique,,wikipedia
+hof:302,Bob McLean,,administrator,false,,"Port Adelaide, SANFL",,,,8388,unique,,wikipedia
+hof:303,Bob Scott,,umpire,false,,,,,,6613,unique,,wikipedia
+hof:304,Brett Allen,,umpire,false,,,,,,,unmatched,no player with this name,wikipedia
+hof:305,Bruce Andrew,,administrator,false,,"Collingwood, ANFC",,,,7418,resolved,chosen over 1 other(s) on games played,wikipedia
+hof:306,Bruce McAvaney,,media,false,,"radio and television, national",,,,,unmatched,no player with this name,wikipedia
+hof:307,Bryan Sheehan,,umpire,false,,,,,,,unmatched,no player with this name,wikipedia
+hof:308,Charles Brownlow,,administrator,false,,"Geelong, VFL, ANFC",,,,,unmatched,no player with this name,wikipedia
+hof:309,Dennis Cometti,,media,false,,"radio and television, national",,,,,unmatched,no player with this name,wikipedia
+hof:310,Dr William C. McClelland,,administrator,false,,"Melbourne, VFL",,,,,unmatched,no player with this name,wikipedia
+hof:311,Eric McCutchan,,administrator,false,,VFL,,,,,unmatched,no player with this name,wikipedia
+hof:312,Geoff Christian,,media,false,,"radio and print, Western Australia",,,,,unmatched,no player with this name,wikipedia
+hof:313,Graham Farmer,,legend,true,1996,,,,,2861,unique,,wikipedia
+hof:314,H. C. A. Harrison,,administrator,false,,"Melbourne, VFA",,,,,unmatched,no player with this name,wikipedia
+hof:315,Harry Beitzel,,media,false,,"radio and print, Victoria",,,,,unmatched,no player with this name,wikipedia
+hof:316,Hayden Kennedy,,umpire,false,,,,,,,unmatched,no player with this name,wikipedia
+hof:317,Haydn Bunton Sr.,,legend,true,1996,,,,,1466,unique,,wikipedia
+hof:318,Hector DeLacy,,media,false,,"print, Victoria",,,,,unmatched,no player with this name,wikipedia
+hof:319,"Henry ""Ivo"" Crapp",,umpire,false,,,,,,,unmatched,no player with this name,wikipedia
+hof:320,Hugh Buggy,,media,false,,"print, Victoria",,,,,unmatched,no player with this name,wikipedia
+hof:321,Ian Robinson,,umpire,false,,,,,,,unmatched,no player with this name,wikipedia
+hof:322,Jack Elder,,umpire,false,,,,,,,unmatched,no player with this name,wikipedia
+hof:323,Jack Hamilton,,administrator,false,,VFL,,,,1776,resolved,chosen over 1 other(s) on games played,wikipedia
+hof:324,Jack McMurray Jr.,,umpire,false,,,,,,,unmatched,no player with this name,wikipedia
+hof:325,Jack McMurray Sr.,,umpire,false,,,,,,,unmatched,no player with this name,wikipedia
+hof:326,Jeff Crouch,,umpire,false,,,,,,,unmatched,no player with this name,wikipedia
+hof:327,John Kennedy Sr.,,legend,true,2020,,,,,1893,resolved,John Kennedy (1979-1991); John Kennedy (1950-1959),wikipedia
+hof:328,Ken Aplin,,umpire,false,,,,,,,unmatched,no player with this name,wikipedia
+hof:329,Likely 'Like' McBrien,,administrator,false,,"South Melbourne, VFL",,,,,unmatched,no player with this name,wikipedia
+hof:330,Max Basheer,,administrator,false,,SANFL,,,,,unmatched,no player with this name,wikipedia
+hof:331,Norman Banks,,media,false,,"radio, Victoria",,,,,unmatched,no player with this name,wikipedia
+hof:332,Pat Rodriguez,,administrator,false,,"Claremont, WAFL, ANFC",,,,,unmatched,no player with this name,wikipedia
+hof:333,Ray Scott,,umpire,false,,,,,,,unmatched,no player with this name,wikipedia
+hof:334,Reginald Wilmot,,media,false,,"print, Victoria",,,,,unmatched,no player with this name,wikipedia
+hof:335,Ron Casey,,media,false,,"radio and television, Victoria",,,,,unmatched,no player with this name,wikipedia
+hof:336,Ron Evans,,administrator,false,,"Essendon, AFL",,,,,ambiguous,Ron Evans (1958-1962); Ron Evans (1946-1950),wikipedia
+hof:337,Ross Oakley,,administrator,false,,VFL/AFL,,,,3434,unique,,wikipedia
+hof:338,Rowan Sawers,,umpire,false,,,,,,,unmatched,no player with this name,wikipedia
+hof:339,Sir Kenneth Luke,,administrator,false,,"Carlton, VFL",,,,,unmatched,no player with this name,wikipedia
+hof:340,Thomas Hill,,administrator,false,,"Norwood, SANFL, ANFC",,,,,unmatched,no player with this name,wikipedia
+hof:341,Tom McArthur,,umpire,false,,,,,,,unmatched,no player with this name,wikipedia
+hof:342,Tom Wills,,administrator,false,,Melbourne,,,,,unmatched,no player with this name,wikipedia
+hof:343,Tony Charlton,,media,false,,"radio and television, Victoria",,,,,unmatched,no player with this name,wikipedia

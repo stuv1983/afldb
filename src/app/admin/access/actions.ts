@@ -3,8 +3,9 @@
 import { revalidatePath } from 'next/cache';
 
 import { authSql } from '@/db/authClient';
+import { deleteRetiredAccessCode, retirementReason } from '@/db/queries/access-codes';
 import { generateToken, sha256Hex } from '@/lib/auth/crypto';
-import { audit, requireAdmin } from '@/lib/auth/session';
+import { audit, auditInTransaction, requireCapability } from '@/lib/auth/session';
 import { parseIntInRange } from '@/lib/params';
 
 export type AccessState = {
@@ -18,7 +19,7 @@ export async function createAccessCode(
   _previous: AccessState,
   formData: FormData,
 ): Promise<AccessState> {
-  const admin = await requireAdmin();
+  const admin = await requireCapability('people.betaAccess');
   const label = String(formData.get('label') ?? '').trim();
   // parseIntInRange rejects non-integers up front; the old hand-rolled
   // Math.min(Math.max(Number(...))) let a non-numeric field become NaN and
@@ -63,7 +64,7 @@ export async function revokeAccessCode(
   _previous: AccessState,
   formData: FormData,
 ): Promise<AccessState> {
-  const admin = await requireAdmin();
+  const admin = await requireCapability('people.betaAccess');
   const id = Number(formData.get('id'));
   if (!Number.isInteger(id)) return { error: 'Bad code id.' };
 
@@ -80,11 +81,79 @@ export async function revokeAccessCode(
   return { message: `Code “${row.label}” revoked. Existing sessions expire with the epoch or TTL.` };
 }
 
+/**
+ * Permanently delete a RETIRED access code (AFLDB-ISSUE-117).
+ *
+ * Retired means revoked or spent — see deleteRetiredAccessCode for why
+ * those two and not expiry. A spent code is deletable directly: making
+ * an admin revoke something the database already refuses was ceremony,
+ * not safety. An active code that could still be redeemed must be
+ * revoked first, and that is enforced below rather than assumed.
+ *
+ * This is the only action in this file that destroys anything. Three
+ * things make that safe, and none of them is the button being hidden:
+ *
+ *   1. requireCapability('people.betaAccess'), as every action in this
+ *      file does -- Admin-and-up, the boundary requireAdmin() drew before
+ *      AFLDB-ISSUE-158. It re-checks the database row, so a revoked or
+ *      disabled admin's cookie buys nothing here either.
+ *   2. The eligibility predicate is inside the DELETE itself
+ *      (deleteRetiredAccessCode). A still-redeemable code named by a
+ *      hand-rolled POST matches no row and is refused, so retirement is
+ *      a genuine precondition rather than a convention of the UI.
+ *   3. The audit row is written inside the same transaction as the
+ *      delete — auditInTransaction, not audit — so there is no window
+ *      in which the code is gone and the trail does not say who removed
+ *      it. The detail carries the id, the label, the use count and
+ *      WHICH rule made the row disposable — enough to reconstruct what
+ *      was destroyed and why it was allowed. It cannot carry the code:
+ *      only the sha256 was ever stored, and that goes with the row.
+ */
+export async function deleteAccessCode(
+  _previous: AccessState,
+  formData: FormData,
+): Promise<AccessState> {
+  const admin = await requireCapability('people.betaAccess');
+  const id = Number(formData.get('id'));
+  if (!Number.isInteger(id)) return { error: 'Bad code id.' };
+
+  const deleted = await authSql.begin(async (tx) => {
+    const row = await deleteRetiredAccessCode(tx, id);
+    if (!row) return null;
+
+    await auditInTransaction(
+      tx,
+      'access.code_deleted',
+      {
+        codeId: row.id,
+        label: row.label,
+        reason: retirementReason(row),
+        revokedAt: row.revokedAt?.toISOString() ?? null,
+        useCount: row.useCount,
+        maxUses: row.maxUses,
+      },
+      { userId: admin.id, label: admin.email },
+    );
+    return row;
+  });
+
+  // One message for "still redeemable", "never existed" and "someone
+  // else just deleted it". Distinguishing them would tell an
+  // unauthenticated caller which ids are real, and an admin who can see
+  // the table does not need the endpoint to tell them.
+  if (!deleted) {
+    return { error: 'Only a revoked or spent code can be deleted. Revoke it first.' };
+  }
+
+  revalidatePath('/admin/access');
+  return { message: `Code “${deleted.label}” permanently deleted.` };
+}
+
 export async function addAllowedEmail(
   _previous: AccessState,
   formData: FormData,
 ): Promise<AccessState> {
-  const admin = await requireAdmin();
+  const admin = await requireCapability('people.betaAccess');
   const email = String(formData.get('email') ?? '').trim().toLowerCase();
   const note = String(formData.get('note') ?? '').trim() || null;
 
@@ -100,58 +169,99 @@ export async function addAllowedEmail(
   return { message: `${email} can now request a sign-in link on the beta page.` };
 }
 
+/**
+ * Approve a pending join request (AFLDB-ISSUE-178).
+ *
+ * The three writes -- the request becoming approved, the email landing in
+ * beta_allowed_emails, and the access.join_approved audit row -- share one
+ * transaction (authSql.begin, auditInTransaction) for the same reason
+ * deleteAccessCode's do: a request must never end up "approved" without
+ * actually being allowlisted, and an approval must never go live without
+ * the audit row that says who allowed it and why. The `WHERE id = ? AND
+ * status = 'pending'` predicate on the first UPDATE is unchanged and is
+ * still what decides the race between two administrators -- whichever
+ * transaction's UPDATE commits first advances the row past 'pending' and
+ * the other's RETURNING is empty, inside or outside a transaction.
+ */
 export async function approveJoinRequest(
   _previous: AccessState,
   formData: FormData,
 ): Promise<AccessState> {
-  const admin = await requireAdmin();
+  const admin = await requireCapability('people.betaAccess');
   const id = Number(formData.get('id'));
   if (!Number.isInteger(id)) return { error: 'Bad request id.' };
 
-  const [row] = await authSql<{ email: string }[]>`
-    UPDATE beta_join_requests SET status = 'approved', reviewed_by = ${admin.id}, reviewed_at = now()
-     WHERE id = ${id} AND status = 'pending'
-    RETURNING email
-  `;
-  if (!row) return { error: 'Already reviewed or not found.' };
+  const email = await authSql.begin(async (tx) => {
+    const [row] = await tx<{ email: string }[]>`
+      UPDATE beta_join_requests SET status = 'approved', reviewed_by = ${admin.id}, reviewed_at = now()
+       WHERE id = ${id} AND status = 'pending'
+      RETURNING email
+    `;
+    if (!row) return null;
 
-  await authSql`
-    INSERT INTO beta_allowed_emails (email, note, added_by)
-    VALUES (${row.email}, 'via join request', ${admin.id})
-    ON CONFLICT (email) DO UPDATE SET revoked_at = NULL, note = EXCLUDED.note
-  `;
-  await audit('access.join_approved', { requestId: id, email: row.email },
-    { userId: admin.id, label: admin.email });
+    await tx`
+      INSERT INTO beta_allowed_emails (email, note, added_by)
+      VALUES (${row.email}, 'via join request', ${admin.id})
+      ON CONFLICT (email) DO UPDATE SET revoked_at = NULL, note = EXCLUDED.note
+    `;
+    await auditInTransaction(tx, 'access.join_approved', { requestId: id, email: row.email },
+      { userId: admin.id, label: admin.email });
+
+    return row.email;
+  });
+
+  if (!email) return { error: 'Already reviewed or not found.' };
+
   revalidatePath('/admin/access');
-  return { message: `${row.email} approved and allowlisted.` };
+  return { message: `${email} approved and allowlisted.` };
 }
 
+/**
+ * Deny a pending join request (AFLDB-ISSUE-179).
+ *
+ * The narrower sibling of approveJoinRequest's ISSUE-178 fix: denial does
+ * not allowlist anything, but the request becoming 'denied' and the
+ * access.join_denied audit row must still land together. Before this fix
+ * they were two independent statements on the pooled `audit()`, so a
+ * request could be permanently recorded as denied with no audit trail if
+ * the second write failed. Same shape as approveJoinRequest: one
+ * `authSql.begin` transaction, `auditInTransaction` for the audit row, and
+ * the unchanged `WHERE id = ? AND status = 'pending'` predicate deciding
+ * the race against a concurrent approve or deny of the same row.
+ */
 export async function denyJoinRequest(
   _previous: AccessState,
   formData: FormData,
 ): Promise<AccessState> {
-  const admin = await requireAdmin();
+  const admin = await requireCapability('people.betaAccess');
   const id = Number(formData.get('id'));
   if (!Number.isInteger(id)) return { error: 'Bad request id.' };
 
-  const [row] = await authSql<{ email: string }[]>`
-    UPDATE beta_join_requests SET status = 'denied', reviewed_by = ${admin.id}, reviewed_at = now()
-     WHERE id = ${id} AND status = 'pending'
-    RETURNING email
-  `;
-  if (!row) return { error: 'Already reviewed or not found.' };
+  const email = await authSql.begin(async (tx) => {
+    const [row] = await tx<{ email: string }[]>`
+      UPDATE beta_join_requests SET status = 'denied', reviewed_by = ${admin.id}, reviewed_at = now()
+       WHERE id = ${id} AND status = 'pending'
+      RETURNING email
+    `;
+    if (!row) return null;
 
-  await audit('access.join_denied', { requestId: id, email: row.email },
-    { userId: admin.id, label: admin.email });
+    await auditInTransaction(tx, 'access.join_denied', { requestId: id, email: row.email },
+      { userId: admin.id, label: admin.email });
+
+    return row.email;
+  });
+
+  if (!email) return { error: 'Already reviewed or not found.' };
+
   revalidatePath('/admin/access');
-  return { message: `${row.email} denied.` };
+  return { message: `${email} denied.` };
 }
 
 export async function revokeAllowedEmail(
   _previous: AccessState,
   formData: FormData,
 ): Promise<AccessState> {
-  const admin = await requireAdmin();
+  const admin = await requireCapability('people.betaAccess');
   const id = Number(formData.get('id'));
   if (!Number.isInteger(id)) return { error: 'Bad id.' };
 

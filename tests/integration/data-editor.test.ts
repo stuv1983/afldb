@@ -5,7 +5,9 @@ import { sql } from '@/db/client';
 import { saveEdit } from '@/db/queries/data-edits';
 import { saveMatchSheet } from '@/db/queries/match-sheet';
 import { recomputeClubSeasons } from '@/db/queries/player-derived';
+import { BROWNLOW_MATCH_SHEET_REFUSAL } from '@/lib/match-sheet';
 import { createImportRoleParityHarness } from './import-role-parity';
+import { seedWildcardFinalSeason, type WildcardFixture } from './wildcard-final-fixture';
 
 // Ensure saveMatchSheet uses the test database.
 process.env.AFLDB_IMPORT_DATABASE_URL = process.env.AFLDB_TEST_DATABASE_URL;
@@ -25,6 +27,7 @@ const TEST_NOTES = [
   'issue-083 restricted import-role audit proof',
   'issue-109 restricted override proof',
   'issue-109 restricted override restore',
+  'issue-132 wildcard brownlow refusal',
 ];
 let adminUserId = 0;
 let createdThrowawayAdmin = false;
@@ -574,5 +577,194 @@ describe('Targeted club_seasons rebuild (AFLDB-ISSUE-015)', () => {
       expect(homeAfter.pts).toBe(homeBefore.pts - 4);
       expect(awayAfter.pts).toBe(awayBefore.pts + 4);
     });
+  });
+});
+
+/**
+ * AFLDB-ISSUE-132 T6, restated by AFLDB-ISSUE-155 §27.15.
+ *
+ * The match sheet used to be the only writer of a per-match Brownlow vote, and
+ * T6/T6b pinned the two conditions under which it refused one: `is_final`, and
+ * an allocation that was not exactly 3-2-1. Phase C1 makes the match-level vote
+ * a canonical fact owned by Brownlow administration, so the match sheet refuses
+ * a Brownlow value **unconditionally** -- for a final, for a home-and-away
+ * match, complete or partial, and for an explicit zero -- with the one redirect
+ * message. The refusal is the payload validator's and therefore still precedes
+ * every write, which is what these two cases continue to prove.
+ *
+ * The Wildcard Final case is retained deliberately: the season it fixtures
+ * (2088; 2087 belongs to database.test.ts) is the ISSUE-129 regression, and it
+ * would be a silent loss of coverage to drop it just because the reason for the
+ * refusal changed. T6b now uses the fixture's home-and-away match instead of a
+ * partial allocation, because "any match" is the new contract.
+ */
+describe('AFLDB-ISSUE-155 §27.15: the match sheet is not a Brownlow writer', () => {
+  let fixture: WildcardFixture;
+  let thirdPlayerId = 0;
+  let homeAndAwayMatchId = 0;
+  let homeAndAwayPlayerId = 0;
+  let homeAndAwayClubId = 0;
+
+  beforeAll(async () => {
+    fixture = await seedWildcardFinalSeason(2088);
+    const [third] = await sql<{ id: number }[]>`
+      SELECT id FROM players
+       WHERE id NOT IN (${fixture.wildcardOnlyPlayerId}, ${fixture.finalsSeriesPlayerId})
+       ORDER BY id
+       LIMIT 1
+    `;
+    if (!third) throw new Error('T6 needs a third existing player row in the test database.');
+    thirdPlayerId = third.id;
+
+    // A home-and-away match of the same fixture season. It deliberately has no
+    // line-up: the refusal is the payload validator's, so it fires before any
+    // read, and "no row was created at all" is a stronger proof of that than a
+    // row left unchanged. The player is a seeded one so a regression that did
+    // write would be removed by the fixture's own cleanup.
+    const [ha] = await sql<{ matchId: number; clubId: number }[]>`
+      SELECT id AS "matchId", home_club_id AS "clubId"
+        FROM matches
+       WHERE season = ${fixture.season}
+         AND round_type = 'home_and_away'
+       ORDER BY id
+       LIMIT 1
+    `;
+    if (!ha) throw new Error('T6b needs a home-and-away match in the 2088 fixture.');
+    homeAndAwayMatchId = ha.matchId;
+    homeAndAwayClubId = ha.clubId;
+    homeAndAwayPlayerId = fixture.wildcardOnlyPlayerId;
+  });
+
+  afterAll(async () => {
+    await fixture?.cleanup();
+  });
+
+  const readRow = async () => {
+    const [row] = await sql<{ brownlowVotes: number | null; kicks: number | null }[]>`
+      SELECT brownlow_votes AS "brownlowVotes", kicks
+        FROM player_match_stats
+       WHERE match_id = ${fixture.wildcardMatchId}
+         AND player_id = ${fixture.wildcardOnlyPlayerId}
+    `;
+    return row;
+  };
+
+  const expectNothingWritten = async (before: { brownlowVotes: number | null; kicks: number | null }) => {
+    // The refusal precedes every write: the votes stay NULL, the kick edit in
+    // the same sheet is rolled back with it, and no audit row was committed.
+    const after = await readRow();
+    expect(after.brownlowVotes).toBeNull();
+    expect(after.kicks).toBe(before.kicks);
+
+    const [audit] = await sql<{ count: number }[]>`
+      SELECT count(*)::int AS count
+        FROM data_edits
+       WHERE table_name = 'matches' AND row_id = ${fixture.wildcardMatchId}
+    `;
+    expect(audit.count).toBe(0);
+  };
+
+  const readAnyRow = async (matchId: number, playerId: number) => {
+    const [row] = await sql<{ brownlowVotes: number | null; kicks: number | null }[]>`
+      SELECT brownlow_votes AS "brownlowVotes", kicks
+        FROM player_match_stats
+       WHERE match_id = ${matchId} AND player_id = ${playerId}
+    `;
+    return row;
+  };
+
+  it('T6: a complete Brownlow allocation is refused on a Wildcard Final and nothing is written', async () => {
+    const before = await readRow();
+    expect(before).toBeDefined();
+    expect(before.brownlowVotes).toBeNull();
+
+    const result = await saveMatchSheet({
+      matchId: fixture.wildcardMatchId,
+      syncMatchScores: false,
+      players: [
+        {
+          playerId: fixture.wildcardOnlyPlayerId,
+          clubId: fixture.wildcardWinnerClubId,
+          kicks: (before.kicks ?? 0) + 1,
+          brownlowVotes: 3,
+        },
+        {
+          playerId: fixture.finalsSeriesPlayerId,
+          clubId: fixture.wildcardWinnerClubId,
+          brownlowVotes: 2,
+        },
+        {
+          playerId: thirdPlayerId,
+          clubId: fixture.wildcardLoserClubId,
+          brownlowVotes: 1,
+        },
+      ],
+      adminUserId,
+      note: 'issue-132 wildcard brownlow refusal',
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('unreachable');
+    expect(result.error).toBe(BROWNLOW_MATCH_SHEET_REFUSAL);
+    expect(result.error).toContain('/admin/brownlow');
+
+    await expectNothingWritten(before);
+  });
+
+  it('T6b: a single Brownlow value is refused on a home-and-away match too, before any write', async () => {
+    expect(await readAnyRow(homeAndAwayMatchId, homeAndAwayPlayerId)).toBeUndefined();
+
+    const result = await saveMatchSheet({
+      matchId: homeAndAwayMatchId,
+      syncMatchScores: false,
+      players: [{
+        playerId: homeAndAwayPlayerId,
+        clubId: homeAndAwayClubId,
+        kicks: 11,
+        brownlowVotes: 3,
+      }],
+      adminUserId,
+      note: 'issue-132 wildcard brownlow refusal',
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('unreachable');
+    expect(result.error).toBe(BROWNLOW_MATCH_SHEET_REFUSAL);
+
+    // The whole sheet was rejected: the line-up row it would have created does
+    // not exist, and no audit row was committed.
+    expect(await readAnyRow(homeAndAwayMatchId, homeAndAwayPlayerId)).toBeUndefined();
+    const [audit] = await sql<{ count: number }[]>`
+      SELECT count(*)::int AS count
+        FROM data_edits
+       WHERE table_name = 'matches' AND row_id = ${homeAndAwayMatchId}
+    `;
+    expect(audit.count).toBe(0);
+  });
+
+  it('T6c: an explicit zero is refused as firmly as a vote', async () => {
+    // A published zero ("played, polled nothing") is a canonical Brownlow fact
+    // in its own right (§27.5 P1), not an absence, so the match sheet must not
+    // be able to assert one either. `null` and absent remain the only ways to
+    // say "this sheet has nothing to say about the Brownlow".
+    const before = await readRow();
+
+    const result = await saveMatchSheet({
+      matchId: fixture.wildcardMatchId,
+      syncMatchScores: false,
+      players: [{
+        playerId: fixture.wildcardOnlyPlayerId,
+        clubId: fixture.wildcardWinnerClubId,
+        brownlowVotes: 0,
+      }],
+      adminUserId,
+      note: 'issue-132 wildcard brownlow refusal',
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('unreachable');
+    expect(result.error).toBe(BROWNLOW_MATCH_SHEET_REFUSAL);
+
+    await expectNothingWritten(before);
   });
 });

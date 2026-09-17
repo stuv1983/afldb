@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
 import { UploadForm } from '@/app/admin/upload/UploadForm';
-import { requireUploader } from '@/lib/auth/session';
+import { requireCapability } from '@/lib/auth/session';
 import { DATASETS } from '@/lib/ingest/datasets';
 
 export const dynamic = 'force-dynamic';
@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 };
 
 export default async function UploadPage() {
-  await requireUploader();
+  await requireCapability('acquisition.legacyIntake');
 
   const datasets = Object.values(DATASETS).map((d) => ({
     key: d.key,

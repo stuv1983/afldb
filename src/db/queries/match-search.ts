@@ -82,9 +82,13 @@ export async function runMatchSearch(
   }
 
   if (query.matchType === 'finals') {
-    conditions.push(sql`m.is_final`);
+    // The finals series, so is_finals_series: a wildcard final is is_final = true
+    // but is not a finals-series match (AFLDB-ISSUE-129 §8.4).
+    conditions.push(sql`m.is_finals_series`);
   } else if (query.matchType === 'home_and_away') {
     conditions.push(sql`NOT m.is_final`);
+  } else if (query.matchType === 'wildcard_final') {
+    conditions.push(sql`m.round_type = 'wildcard_final'`);
   }
 
   const where = conditions.length

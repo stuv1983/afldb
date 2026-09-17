@@ -231,7 +231,10 @@ export const QUERYABLE_TABLES: Record<string, AnchorDef> = {
       season: { key: 'season', label: 'Season', column: 'm.season', kind: 'integer' },
       round_code: { key: 'round_code', label: 'Round', column: 'm.round_code', kind: 'text' },
       round_type: { key: 'round_type', label: 'Round type', column: 'm.round_type::text', kind: 'text' },
-      is_final: { key: 'is_final', label: 'Is final', column: 'm.is_final', kind: 'boolean' },
+      // 'is_final' is the structural "not home-and-away" flag; 'is_finals_series' is
+      // finals-series membership. They differ only for a Wildcard Final (ISSUE-129 §8.4).
+      is_final: { key: 'is_final', label: 'Not home-and-away', column: 'm.is_final', kind: 'boolean' },
+      is_finals_series: { key: 'is_finals_series', label: 'Finals series', column: 'm.is_finals_series', kind: 'boolean' },
       match_date: { key: 'match_date', label: 'Match date', column: 'm.match_date', kind: 'date' },
       venue_raw: { key: 'venue_raw', label: 'Venue (as recorded)', column: 'm.venue_raw', kind: 'text' },
       home_club: { key: 'home_club', label: 'Home club', column: 'hc.name', kind: 'text' },
@@ -354,7 +357,8 @@ export const RELATIONSHIPS: Record<string, RelationshipDef> = {
       season: { key: 'season', label: 'Season', column: 'r_m.season', kind: 'integer' },
       match_date: { key: 'match_date', label: 'Match date', column: 'r_m.match_date', kind: 'date' },
       round_code: { key: 'round_code', label: 'Round', column: 'r_m.round_code', kind: 'text' },
-      is_final: { key: 'is_final', label: 'Is final', column: 'r_m.is_final', kind: 'boolean' },
+      is_final: { key: 'is_final', label: 'Not home-and-away', column: 'r_m.is_final', kind: 'boolean' },
+      is_finals_series: { key: 'is_finals_series', label: 'Finals series', column: 'r_m.is_finals_series', kind: 'boolean' },
       club: { key: 'club', label: 'Club (on the day)', column: 'r_cl.name', kind: 'text' },
       jumper_number: { key: 'jumper_number', label: 'Jumper number', column: 'r_pms.jumper_number', kind: 'text' },
       kicks: { key: 'kicks', label: 'Kicks', column: 'r_pms.kicks', kind: 'integer' },
@@ -414,9 +418,16 @@ export const RELATIONSHIPS: Record<string, RelationshipDef> = {
     key: 'player.hall_of_fame',
     subject: 'player',
     label: 'Hall of Fame',
-    hint: 'Hall of Fame entries linked to this player.',
+    hint: 'Hall of Fame entries linked to this player. Voided records are never returned.',
     subqueryFrom: 'hall_of_fame r_hof',
-    correlation: 'r_hof.player_id = p.id',
+    // AFLDB-ISSUE-165 §4.4. The correlation carries the lifecycle filter so
+    // it cannot be forgotten by a column: this tool is admin-facing, but it
+    // answers questions about the SAME canonical fact the public Hall of
+    // Fame page, the Grid Solver and NL search answer, and a QA tool that
+    // disagreed with them about who is in the Hall of Fame would be worse
+    // than useless. `removed_year` stays a plain correctable column below --
+    // a removed inductee was genuinely inducted and is genuinely here.
+    correlation: "r_hof.player_id = p.id AND r_hof.status = 'active'",
     targetTable: 'hall_of_fame',
     cardinality: 'many',
     columns: {
@@ -453,9 +464,10 @@ export const RELATIONSHIPS: Record<string, RelationshipDef> = {
     key: 'player.awards',
     subject: 'player',
     label: 'Awards',
-    hint: 'Award-winner records linked to this player.',
+    hint: 'Award-winner records linked to this player. Voided records are never returned.',
     subqueryFrom: 'award_winners r_aw JOIN awards r_a ON r_a.id = r_aw.award_id',
-    correlation: 'r_aw.player_id = p.id',
+    /** Same lifecycle rule, same reason as `player.hall_of_fame` above. */
+    correlation: "r_aw.player_id = p.id AND r_aw.status = 'active'",
     targetTable: 'award_winners',
     cardinality: 'many',
     columns: {
@@ -532,7 +544,8 @@ export const RELATIONSHIPS: Record<string, RelationshipDef> = {
       season: { key: 'season', label: 'Season', column: 'r_m.season', kind: 'integer' },
       round_code: { key: 'round_code', label: 'Round', column: 'r_m.round_code', kind: 'text' },
       round_type: { key: 'round_type', label: 'Round type', column: 'r_m.round_type::text', kind: 'text' },
-      is_final: { key: 'is_final', label: 'Is final', column: 'r_m.is_final', kind: 'boolean' },
+      is_final: { key: 'is_final', label: 'Not home-and-away', column: 'r_m.is_final', kind: 'boolean' },
+      is_finals_series: { key: 'is_finals_series', label: 'Finals series', column: 'r_m.is_finals_series', kind: 'boolean' },
       match_date: { key: 'match_date', label: 'Match date', column: 'r_m.match_date', kind: 'date' },
       venue_raw: { key: 'venue_raw', label: 'Venue (as recorded)', column: 'r_m.venue_raw', kind: 'text' },
       home_score: { key: 'home_score', label: 'Home score', column: 'r_m.home_score', kind: 'integer' },

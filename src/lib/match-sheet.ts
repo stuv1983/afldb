@@ -12,6 +12,12 @@ export type PlayerMatchStatInput = {
   hitouts?: number | null;
   freesFor?: number | null;
   freesAgainst?: number | null;
+  /**
+   * Read-only mirror of the canonical match-level Brownlow fact
+   * (AFLDB-ISSUE-155 §27.15). The match sheet no longer writes it; a non-null
+   * value is refused at the write boundary below so a stale editor cannot
+   * overwrite the mirror maintained by Brownlow administration.
+   */
   brownlowVotes?: number | null;
 };
 
@@ -37,11 +43,17 @@ const STAT_LIMITS = {
   hitouts: 120,
   freesFor: 30,
   freesAgainst: 30,
-  brownlowVotes: 3,
 } as const satisfies Record<
-  Exclude<keyof PlayerMatchStatInput, 'playerId' | 'clubId' | 'jumperNumber'>,
+  Exclude<
+    keyof PlayerMatchStatInput,
+    'playerId' | 'clubId' | 'jumperNumber' | 'brownlowVotes'
+  >,
   number
 >;
+
+/** AFLDB-ISSUE-155 §27.15: the single refusal message for a legacy vote write. */
+export const BROWNLOW_MATCH_SHEET_REFUSAL =
+  'Brownlow votes are managed in Brownlow administration (/admin/brownlow) and cannot be saved from the match sheet.';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -128,9 +140,17 @@ export function validateMatchSheetPayload(value: unknown): ValidationResult {
     }
     playerIds.add(rawPlayer.playerId);
 
+    // AFLDB-ISSUE-155 §27.15: the canonical Brownlow fact is written only by
+    // Brownlow administration. Refuse rather than silently drop the value, so a
+    // stale editor cannot appear to have saved a vote it did not save.
+    if (rawPlayer.brownlowVotes !== undefined && rawPlayer.brownlowVotes !== null) {
+      return { ok: false, error: BROWNLOW_MATCH_SHEET_REFUSAL };
+    }
+
     const player: PlayerMatchStatInput = {
       playerId: rawPlayer.playerId,
       clubId: rawPlayer.clubId,
+      brownlowVotes: null,
     };
 
     const rawJumper = rawPlayer.jumperNumber;
@@ -171,19 +191,6 @@ export function validateMatchSheetPayload(value: unknown): ValidationResult {
     }
 
     players.push(player);
-  }
-
-  const recordedVotes = players
-    .map((player) => player.brownlowVotes)
-    .filter((votes): votes is number => votes !== null && votes !== undefined);
-  if (recordedVotes.length > 0) {
-    const count = (votes: number) => recordedVotes.filter((value) => value === votes).length;
-    if (count(3) !== 1 || count(2) !== 1 || count(1) !== 1) {
-      return {
-        ok: false,
-        error: 'A recorded Brownlow allocation requires exactly one player with 3 votes, one with 2, and one with 1.',
-      };
-    }
   }
 
   return { ok: true, value: { players, removedPlayerIds } };

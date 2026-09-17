@@ -13,8 +13,11 @@ import {
   setSuggestionStatus,
   type LinkTargetTable,
 } from '@/db/queries/player-links';
-import { refreshMatchCandidates } from '@/db/queries/player-match-candidates';
-import { audit, requireSuperAdmin } from '@/lib/auth/session';
+import {
+  readCachedSuggestionVersions,
+  refreshMatchCandidates,
+} from '@/db/queries/player-match-candidates';
+import { audit, requireCapability } from '@/lib/auth/session';
 
 export type PlayerLinkActionState = { error?: string; message?: string; warning?: string };
 
@@ -58,7 +61,7 @@ export async function linkPlayer(
   _prev: PlayerLinkActionState,
   formData: FormData,
 ): Promise<PlayerLinkActionState> {
-  const admin = await requireSuperAdmin();
+  const admin = await requireCapability('data.playerLinks');
 
   const { targets, error } = parseTargets(formData);
   if (error || !targets) return { error };
@@ -96,7 +99,7 @@ export async function confirmUnlinked(
   _prev: PlayerLinkActionState,
   formData: FormData,
 ): Promise<PlayerLinkActionState> {
-  const admin = await requireSuperAdmin();
+  const admin = await requireCapability('data.playerLinks');
 
   const { targets, error } = parseTargets(formData);
   if (error || !targets) return { error };
@@ -122,7 +125,7 @@ export async function reviewSuggestion(
   _prev: PlayerLinkActionState,
   formData: FormData,
 ): Promise<PlayerLinkActionState> {
-  const admin = await requireSuperAdmin();
+  const admin = await requireCapability('data.playerLinks');
 
   const id = Number(formData.get('suggestionId'));
   if (!Number.isInteger(id) || id <= 0) return { error: 'Bad suggestion id.' };
@@ -144,7 +147,7 @@ export async function createAndLinkPlayer(
   _prev: PlayerLinkActionState,
   formData: FormData,
 ): Promise<PlayerLinkActionState> {
-  const admin = await requireSuperAdmin();
+  const admin = await requireCapability('data.playerLinks');
 
   const { targets, error } = parseTargets(formData);
   if (error || !targets) return { error };
@@ -246,7 +249,7 @@ export async function approveSuggestion(
   _prev: PlayerLinkActionState,
   formData: FormData,
 ): Promise<PlayerLinkActionState> {
-  const admin = await requireSuperAdmin();
+  const admin = await requireCapability('data.playerLinks');
 
   const { targets, error } = parseTargets(formData);
   if (error || !targets) return { error };
@@ -263,18 +266,23 @@ export async function approveSuggestion(
   if (note.length > 2000) return { error: 'Notes are limited to 2000 characters.' };
 
   const { targetTable, targetId } = targets[0];
+  // What the queue showed, read from the cache here rather than taken
+  // from the request. Used only to report staleness afterwards.
+  const displayed = (await readCachedSuggestionVersions(sql, [{ targetTable, targetId }]))
+    .get(`${targetTable}:${targetId}`) ?? null;
+
   const result = await resolveLinkFromSuggestion({
-    targetTable, targetId, playerId, adminUserId: admin.id, method: 'suggested', note,
+    targetTable, targetId, playerId, adminUserId: admin.id, method: 'suggested', note, displayed,
   });
   if (!result.ok) return { error: result.error };
 
-  let warning: string | undefined;
+  let warning: string | undefined = result.notice;
   try {
     await audit('player_link.suggestion_approved', { targetTable, targetId, playerId },
       { userId: admin.id, label: admin.email });
   } catch (auditError) {
     console.error('Failed to log administrative audit for suggestion approval', auditError);
-    warning = ACTIVITY_AUDIT_WARNING;
+    warning = combineWarnings(warning, ACTIVITY_AUDIT_WARNING);
   }
 
   return { message: 'Suggested match approved.', warning };
@@ -294,7 +302,7 @@ export async function bulkApproveSuggestions(
   _prev: PlayerLinkActionState,
   formData: FormData,
 ): Promise<PlayerLinkActionState> {
-  const admin = await requireSuperAdmin();
+  const admin = await requireCapability('data.playerLinks');
 
   const { targets, error } = parseTargets(formData);
   if (error || !targets) return { error };
@@ -309,7 +317,13 @@ export async function bulkApproveSuggestions(
 
   let approved = 0;
   const skipped: string[] = [];
+  const stale: string[] = [];
   let warning: string | undefined;
+
+  // One set-wise read of what the queue showed, so every row in the
+  // batch is checked for staleness on the same terms as a single
+  // approval -- and from the database, not the request.
+  const displayedByTarget = await readCachedSuggestionVersions(sql, targets);
 
   for (const [index, { targetTable, targetId }] of targets.entries()) {
     const playerId = Number(playerIds[index]);
@@ -319,12 +333,19 @@ export async function bulkApproveSuggestions(
     }
 
     const result = await resolveLinkFromSuggestion({
-      targetTable, targetId, playerId, adminUserId: admin.id, method: 'bulk_suggested', note,
+      targetTable,
+      targetId,
+      playerId,
+      adminUserId: admin.id,
+      method: 'bulk_suggested',
+      note,
+      displayed: displayedByTarget.get(`${targetTable}:${targetId}`) ?? null,
     });
     if (!result.ok) {
       skipped.push(`${targetTable}:${targetId} — ${result.error}`);
       continue;
     }
+    if (result.notice) stale.push(`${targetTable}:${targetId} — ${result.notice}`);
     approved += 1;
 
     try {
@@ -337,6 +358,10 @@ export async function bulkApproveSuggestions(
   }
 
   const summary = `Approved ${approved} suggested match(es).`;
+  const staleWarning = stale.length > 0
+    ? `${stale.length} row(s) were shown under an older algorithm version and were approved on `
+      + `the current one: ${stale.slice(0, 5).join('; ')}${stale.length > 5 ? ' …' : ''}`
+    : undefined;
   if (skipped.length > 0) {
     return {
       message: summary,
@@ -344,10 +369,11 @@ export async function bulkApproveSuggestions(
         warning,
         `${skipped.length} left for review: ${skipped.slice(0, 5).join('; ')}`
         + (skipped.length > 5 ? ' …' : ''),
+        staleWarning,
       ),
     };
   }
-  return { message: summary, warning };
+  return { message: summary, warning: combineWarnings(warning, staleWarning) };
 }
 
 /**
@@ -361,7 +387,7 @@ export async function refreshSuggestions(
   _prev: PlayerLinkActionState,
   _formData: FormData,
 ): Promise<PlayerLinkActionState> {
-  const admin = await requireSuperAdmin();
+  const admin = await requireCapability('data.playerLinks');
 
   try {
     const result = await refreshMatchCandidates(sql, authSql);

@@ -227,6 +227,35 @@ describe('sitemap', () => {
     expect(await generateSitemaps()).toEqual([]);
     expect(await sitemap({ id: 0 })).toEqual([]);
   });
+
+  /**
+   * AFLDB-ISSUE-144. /clubs/compare is one document with view state, not a
+   * family of documents: 21 organisations are 210 unordered pairs, and each
+   * pair multiplied by every season, match filter and history page is tens
+   * of thousands of URLs whose canonical is the ordered pair anyway. The
+   * base surface is listed; nothing else about the comparison is.
+   */
+  it('lists the club comparison surface once and enumerates no pair', async () => {
+    process.env.AFLDB_INDEXING = 'on';
+    vi.resetModules();
+    const { default: sitemap } = await import('@/app/sitemap');
+
+    const segment = await sitemap({ id: 0 });
+    const urls = segment.map((entry) => entry.url);
+    expect(urls.filter((url) => url.endsWith('/clubs/compare'))).toEqual([
+      'https://afldb.com/clubs/compare',
+    ]);
+
+    // No segment, not just this one, may publish a parameterised comparison.
+    const segments = await Promise.all(
+      [0, 1, 100, 200, 300].map((id) => sitemap({ id })),
+    );
+    for (const url of segments.flat().map((entry) => entry.url)) {
+      expect(url).not.toContain('club1=');
+      expect(url).not.toContain('club2=');
+      expect(url).not.toContain('matchType=');
+    }
+  });
 });
 
 describe('structured data', () => {

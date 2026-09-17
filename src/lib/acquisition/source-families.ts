@@ -47,6 +47,25 @@ export type IndependenceEvidence =
 
 export type PromotionPolicy = 'never' | 'reviewed' | 'not_yet_declared';
 
+/**
+ * AFLDB-ISSUE-122 §10 — what a DISAGREEING independence group does to this
+ * family's own proposal.
+ *
+ * `blocking` is the ISSUE-096 behaviour and stays the default for every
+ * family that does not declare otherwise: any disagreeing group refuses the
+ * proposal outright. `advisory` removes the veto and nothing else — the
+ * corroboration report is still computed, `agreeing_groups` /
+ * `disagreeing_groups` are still recorded on the ledger row, and the
+ * `source_disagreement` `data_issues` row is still opened and deduplicated.
+ * Evidence is preserved; only the refusal is withdrawn.
+ *
+ * Declared `advisory` for `afltables`/`match` and `afltables`/
+ * `player_match_stats` (approved decision 5): Squiggle and Kali are being
+ * retired and must never become a prerequisite for an AFL Tables canonical
+ * write, nor be able to veto one.
+ */
+export type CorroborationPolicy = 'blocking' | 'advisory';
+
 export type RoundMappingStatus = 'anchors_only' | 'complete';
 
 export type SourceRegistration = {
@@ -93,6 +112,8 @@ export type SourceFamilyContract = {
   independence: FamilyIndependence;
   promotionPolicy: PromotionPolicy;
   promotionOwner: string | null;
+  /** Optional in the JSON; absent reads as `blocking` (ISSUE-122 §10). */
+  corroborationPolicy: CorroborationPolicy;
   evidence: readonly string[];
   notes: readonly string[];
 };
@@ -121,6 +142,10 @@ const INDEPENDENCE_EVIDENCE: readonly IndependenceEvidence[] = [
   'proven_independent', 'proven_derived', 'assumed_derived_pending_probe',
 ];
 const PROMOTION_POLICIES: readonly PromotionPolicy[] = ['never', 'reviewed', 'not_yet_declared'];
+const CORROBORATION_POLICIES: readonly CorroborationPolicy[] = ['blocking', 'advisory'];
+
+/** The fail-closed reading of an undeclared family (ISSUE-122 §10). */
+export const DEFAULT_CORROBORATION_POLICY: CorroborationPolicy = 'blocking';
 const ROUND_MAPPING_STATUSES: readonly RoundMappingStatus[] = ['anchors_only', 'complete'];
 
 const SOURCE_KEYS = ['registered_by', 'registered_in', 'registration_owner', 'notes'];
@@ -131,8 +156,16 @@ const FAMILY_KEYS = [
   'source_key', 'family', 'endpoint', 'status', 'external_key', 'required_columns',
   'known_columns', 'known_columns_status', 'hash_exclusions', 'source_updated_at_field',
   'zero_is_missing_columns', 'round_vocabulary', 'independence', 'promotion_policy',
-  'promotion_owner', 'evidence', 'notes',
+  'promotion_owner', 'corroboration_policy', 'evidence', 'notes',
 ];
+/**
+ * Keys a family MAY omit. `expectKeys` otherwise requires every declared key,
+ * which is the fail-closed default and stays that way: `corroboration_policy`
+ * is optional only because an absent one has an unambiguous, strictly
+ * fail-closed reading (`blocking`), so the existing families keep today's
+ * behaviour with no edit (ISSUE-122 §10).
+ */
+const OPTIONAL_FAMILY_KEYS = ['corroboration_policy'];
 const ROOT_KEYS = ['$comment', 'contract_version', 'sources', 'round_vocabularies', 'families'];
 
 function fail(message: string): never {
@@ -147,12 +180,17 @@ function record(value: unknown, path: string): Record<string, unknown> {
 }
 
 /** An unexpected key is drift, so the registry refuses rather than ignoring it. */
-function expectKeys(row: Record<string, unknown>, allowed: readonly string[], path: string): void {
+function expectKeys(
+  row: Record<string, unknown>, allowed: readonly string[], path: string,
+  optional: readonly string[] = [],
+): void {
   const unexpected = Object.keys(row).filter((key) => !allowed.includes(key));
   if (unexpected.length > 0) {
     fail(`${path} carries unexpected key(s): ${unexpected.sort().join(', ')}.`);
   }
-  const missing = allowed.filter((key) => key !== '$comment' && !(key in row));
+  const missing = allowed.filter(
+    (key) => key !== '$comment' && !optional.includes(key) && !(key in row),
+  );
   if (missing.length > 0) {
     fail(`${path} is missing key(s): ${missing.join(', ')}.`);
   }
@@ -260,7 +298,7 @@ function parseVocabulary(key: string, raw: unknown): RoundVocabulary {
 function parseFamily(raw: unknown, index: number): SourceFamilyContract {
   const path = `families[${index}]`;
   const row = record(raw, path);
-  expectKeys(row, FAMILY_KEYS, path);
+  expectKeys(row, FAMILY_KEYS, path, OPTIONAL_FAMILY_KEYS);
 
   const sourceKey = text(row.source_key, `${path}.source_key`);
   const family = text(row.family, `${path}.family`);
@@ -355,6 +393,13 @@ function parseFamily(raw: unknown, index: number): SourceFamilyContract {
     },
     promotionPolicy: enumValue(row.promotion_policy, PROMOTION_POLICIES, `${label}.promotion_policy`),
     promotionOwner: optionalText(row.promotion_owner, `${label}.promotion_owner`),
+    // Undeclared reads as `blocking`: an omitted policy must never be the
+    // permissive one. `null` is NOT the same as omitted and still fails.
+    corroborationPolicy: row.corroboration_policy === undefined
+      ? DEFAULT_CORROBORATION_POLICY
+      : enumValue(
+        row.corroboration_policy, CORROBORATION_POLICIES, `${label}.corroboration_policy`,
+      ),
     evidence: nonEmptyTextArray(row.evidence, `${label}.evidence`),
     notes: textArray(row.notes, `${label}.notes`),
   };

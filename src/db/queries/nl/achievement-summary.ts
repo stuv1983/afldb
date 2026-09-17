@@ -28,6 +28,14 @@ import type { NlAchievementGroupRow, NlAnswerPayload } from '@/search/nl/answer-
  * "measured across N players" describes the population actually counted.
  */
 const LINKED = sql`player_id IS NOT NULL AND link_status_value IN ('unique', 'resolved')`;
+/**
+ * The lifecycle filter (migration 102, AFLDB-ISSUE-167 §7), applied to every
+ * query here for the same reason `LINKED` is: an answer that counts a record
+ * an administrator has voided is a wrong answer, and NL answers are the
+ * surface where a wrong number reads as most authoritative. `= 'active'`
+ * rather than `<> 'void'` -- the column is NOT NULL under a two-value CHECK.
+ */
+const ACTIVE = sql`status = 'active'`;
 
 export async function answerAchievementSummary(plan: NlQueryPlan): Promise<NlAnswerPayload> {
   const summary = plan.achievementSummary!;
@@ -50,7 +58,7 @@ export async function answerAchievementSummary(plan: NlQueryPlan): Promise<NlAns
 
   const [{ total }] = await sql<{ total: number }[]>`
     SELECT count(*)::int AS total FROM player_achievements a
-     WHERE a.achievement_type = ${type} AND a.${LINKED} AND ${scoped}
+     WHERE a.achievement_type = ${type} AND a.${ACTIVE} AND a.${LINKED} AND ${scoped}
   `;
 
   const base = { kind: 'achievement_summary' as const, achievementLabel: achievement.label, total };
@@ -65,7 +73,7 @@ export async function answerAchievementSummary(plan: NlQueryPlan): Promise<NlAns
           FROM player_achievements a
           JOIN clubs cl ON cl.id = a.club_id
           JOIN club_organizations o ON o.id = cl.organization_id
-         WHERE a.achievement_type = ${type} AND a.${LINKED} AND ${scoped}
+         WHERE a.achievement_type = ${type} AND a.${ACTIVE} AND a.${LINKED} AND ${scoped}
          GROUP BY o.id, o.name, o.slug
          ORDER BY count(*) DESC, o.name
       `;
@@ -85,7 +93,7 @@ export async function answerAchievementSummary(plan: NlQueryPlan): Promise<NlAns
            SELECT 1 FROM player_achievements a
              JOIN clubs cl ON cl.id = a.club_id
             WHERE cl.organization_id = o.id
-              AND a.achievement_type = ${type} AND a.${LINKED} AND ${scoped}
+              AND a.achievement_type = ${type} AND a.${ACTIVE} AND a.${LINKED} AND ${scoped}
          )
          ORDER BY o.name
       `;
@@ -96,7 +104,7 @@ export async function answerAchievementSummary(plan: NlQueryPlan): Promise<NlAns
       const rows = await sql<{ decade: number; value: number }[]>`
         SELECT (a.season / 10) * 10 AS decade, count(*)::int AS value
           FROM player_achievements a
-         WHERE a.achievement_type = ${type} AND a.${LINKED} AND ${scoped}
+         WHERE a.achievement_type = ${type} AND a.${ACTIVE} AND a.${LINKED} AND ${scoped}
          GROUP BY (a.season / 10) * 10
          ORDER BY (a.season / 10) * 10
       `;
@@ -107,7 +115,7 @@ export async function answerAchievementSummary(plan: NlQueryPlan): Promise<NlAns
       const rows = await sql<{ season: number; value: number }[]>`
         SELECT a.season, count(*)::int AS value
           FROM player_achievements a
-         WHERE a.achievement_type = ${type} AND a.${LINKED} AND ${scoped}
+         WHERE a.achievement_type = ${type} AND a.${ACTIVE} AND a.${LINKED} AND ${scoped}
          GROUP BY a.season
          ORDER BY count(*) DESC, a.season DESC
       `;
@@ -133,7 +141,7 @@ export async function answerAchievementSummary(plan: NlQueryPlan): Promise<NlAns
                  ) AS position
             FROM player_achievements a
             LEFT JOIN matches m ON m.id = a.match_id
-           WHERE a.achievement_type = ${type} AND a.${LINKED} AND ${scoped}
+           WHERE a.achievement_type = ${type} AND a.${ACTIVE} AND a.${LINKED} AND ${scoped}
         )
         SELECT o.season, o.player_id AS "playerId", p.display_name AS "playerName",
                p.slug AS "playerSlug", o.round_raw AS "roundRaw"

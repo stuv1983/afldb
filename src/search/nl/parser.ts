@@ -23,18 +23,27 @@ import {
   isNlCareerColumn,
   isNlMetric,
   NL_ACHIEVEMENTS,
+  NL_COACH_WIN_PCT,
   NL_CONFIDENCE,
   NL_LIMITS,
   PARSER_VERSION,
   type NlAchievementKey,
   type NlAchievementSummaryKind,
+  type NlAfterSiren,
+  type NlAfterSirenEffect,
+  type NlAfterSirenKickerResult,
+  type NlAfterSirenOccurrence,
+  type NlAfterSirenScored,
+  type NlAfterSirenSubject,
   type NlAggregation,
   type NlBoundary,
   type NlCareerColumn,
   type NlCareerCondition,
   type NlClubSeasonCondition,
+  type NlCoachRef,
   type NlCompareOp,
   type NlDeclineReason,
+  type NlHavingMetric,
   type NlMatchScope,
   type NlMatchType,
   type NlMetricCondition,
@@ -46,21 +55,36 @@ import {
 import type { GridAxisState } from '@/search/grid-solver-spec';
 import { extractHeadToHeadCue } from '@/search/nl/semantic-intents';
 import {
-  findClub, findVenue, stripMatch,
-  type NlClubDirectoryEntry, type NlEntityMatch, type NlVenueDirectoryEntry,
+  findClub, findCoach, findVenue, stripMatch,
+  type NlClubDirectoryEntry, type NlCoachDirectoryEntry, type NlEntityMatch, type NlVenueDirectoryEntry,
 } from '@/search/nl/entities';
 import {
   ACHIEVEMENT_SUMMARY_CUES,
-  AGAINST_PREPOSITION, AGG_WORDS, AGGREGATE_TOTAL_WORDS, AWARD_WORDS,
-  BARE_YEAR_RE, BEFORE_RE, BETWEEN_RE, CLUB_SEASON_CONDITION_WORDS, CLUB_SEASON_METRIC_WORDS,
-  FIRST_KICK_GOAL_RE,
+  AGAINST_PREPOSITION, FOR_PREPOSITION, AGG_WORDS, AGGREGATE_TOTAL_WORDS, AWARD_WORDS,
+  AFTER_RE, BARE_YEAR_RE, BEFORE_RE, BETWEEN_RE, CLUB_SEASON_CONDITION_WORDS, CLUB_SEASON_METRIC_WORDS,
+  CLUB_SEASON_PREMIERSHIP_SUBJECT_GATED, CLUB_SEASON_RANK_SEASON_CUE_RE, CLUB_SEASON_SEASONAL_ADJECTIVE_RE,
+  PLAYER_SEASON_LEADERBOARD_TALLY_RE, PLAYER_SEASON_LEADERBOARD_SEASONAL_RE, PLAYER_SEASON_LEADERBOARD_POSTED_RE,
+  WHICH_MATCH_SAW_RE, PLAYER_GAME_SINGLE_COLLECT_RE, PLAYER_GAME_SINGLE_HAUL_RE, PLAYER_GAME_SINGLE_PEAK_RE,
+  AFTER_SIREN_CUE_RE, AFTER_SIREN_EFFECT_WORDS, AFTER_SIREN_KICK_NOUN_RE, AFTER_SIREN_OCCURRENCE_WORDS,
+  AFTER_SIREN_PLAYER_SUBJECT_RE, AFTER_SIREN_RESULT_WORDS, AFTER_SIREN_SCORED_WORDS,
+  COACH_CUE_RE, COACH_METRIC_WORDS, COACH_NO_QUALIFIER_RE, COACH_WIN_PCT_RE, COACHED_BY_RE, PREMIERSHIP_COACH_RE,
+  CROSS_DOMAIN_COACH_VERB_SOURCE, CROSS_DOMAIN_COMPOSITION_RE, CROSS_DOMAIN_CONSUME_RE,
+  CROSS_DOMAIN_PLAY_VERB_SOURCE, CROSS_DOMAIN_SHARED_CLUB_RE, CROSS_DOMAIN_TEMPORAL_RE,
+  FIRST_KICK_CONSECUTIVE_MAX, FIRST_KICK_CONSECUTIVE_RE, FIRST_KICK_GOAL_RE,
+  FIRST_KICK_NO_FURTHER_KICKS_CUES, FIRST_KICK_ONLY_GOAL_CUES, readFirstKickCount,
+  FATHER_SON_FATHER_CUES, FATHER_SON_FATHER_NOISE, FATHER_SON_RULE_RE,
+  FATHER_SON_SELECTION_CUES, FATHER_SON_PLAYING_SEASON_MIX_RE, FATHER_SON_SUMMARY_CUES,
+  FAMILY_BIGGEST_RE, FAMILY_MOST_PLAYERS_RE, FAMILY_SIZE_CLAUSE_RE, FAMILY_SIZE_OP_WORDS,
+  RELATIONSHIP_CLAUSE_NOISE, RELATIONSHIP_OF_PLAYER_RE, RELATIONSHIP_OUT_OF_SCOPE,
+  RELATIONSHIP_POPULATION_CUES, RELATIONSHIP_POSSESSIVE_RE, RELATIONSHIP_SYMMETRIC_CUES,
   DECADE_RE,
   MATCH_EVENT_WORDS, RIVALRY_WORDS,
-  CLUB_SUBJECT_LEADING, COMPARE_OP_WORDS,
+  CLUB_SUBJECT_LEADING, CLUB_SUBJECT_CUE, COMPARE_OP_WORDS,
   IN_A_FINAL, IN_A_GRAND_FINAL, IN_ONE_GAME, IN_ONE_SEASON,
   MATCH_TYPE_WORDS, METRIC_HIGHER_IS_WORSE, METRIC_WORDS, NEGATION_WORDS, NUMBER_PLUS_RE,
   NUMBER_WORDS, OVER_CAREER, POLARITY_AGG_RE,
   PLAYER_NICKNAMES, SINCE_RE, STAT_GAMES_IDIOM_WORDS, STOPWORDS, TEAM_METRIC_WORDS, STREAK_WORDS, PERIOD_SPLIT_WORDS, TOP_N_RE,
+  TEAM_MATCH_RESULT_HOW_MUCH_RE, TEAM_MATCH_RESULT_LOPSIDED_RE,
   UNANSWERABLE_TOPICS, canonicalise, readCount,
 } from '@/search/nl/vocab';
 
@@ -79,8 +103,26 @@ export type NlPlayerCandidate = {
 export type NlParseContext = {
   clubs: NlClubDirectoryEntry[];
   venues: NlVenueDirectoryEntry[];
-  /** The one async dependency. Delegates to searchPlayers in production; tests inject a fake. */
+  /**
+   * Optional, defaulting to none: every existing caller and test builds
+   * this context as an object literal, and an ABSENT coach directory must
+   * decline a coaching question rather than answer it from a half-resolved
+   * identity. Production wires it in buildNlParseContext.
+   */
+  coaches?: NlCoachDirectoryEntry[];
+  /** Delegates to searchPlayers in production; tests inject a fake. */
   resolvePlayer: (name: string) => Promise<NlPlayerCandidate[]>;
+  /**
+   * AFLDB-ISSUE-197: the complete set of plausible identities for a bare
+   * surname/family mention, up to `NL_LIMITS.maxPlayerCandidates + 1` --
+   * NOT resolvePlayer's 5-row cap, which silently truncated real families
+   * (Ablett) and made the parser's own >12-decline rule unreachable.
+   * Required, not optional: an absent implementation must be a compile
+   * error, not a silent fall-back to the truncated candidate set that
+   * caused this issue. Production wires resolvePlayerFamily
+   * (resolve.ts); tests inject a fake.
+   */
+  resolvePlayerFamily: (tokens: string[]) => Promise<NlPlayerCandidate[]>;
 };
 
 /** A player mention is trusted at prefix-match strength or better -- the same threshold searchPlayers's own ranking uses to mean "clearly this one". */
@@ -119,19 +161,71 @@ type ClubExtraction = {
   consumed: string[];
 };
 
-/** Where a matched phrase sits in the original question, word-boundary anchored so "melbourne" does not report the position of "north melbourne". */
-function phrasePosition(text: string, phrase: string): number {
-  const at = new RegExp(`\\b${phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).exec(text);
-  return at ? at.index : Number.MAX_SAFE_INTEGER;
-}
-
-function phraseEnd(text: string, phrase: string): number {
-  const at = new RegExp(`\\b${phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).exec(text);
-  return at ? at.index + at[0].length : Number.MAX_SAFE_INTEGER;
+/**
+ * The occurrence of `phrase` in the original question that does not fall
+ * inside a span another club match has already claimed.
+ *
+ * AFLDB-ISSUE-213: a word-boundary search for a SHORTER club's name can
+ * still match inside a LONGER club's own name that contains it as a whole
+ * word ("melbourne" inside "north melbourne", boundary or not -- the space
+ * before it is itself a word boundary). A plain first-match search for the
+ * second club therefore rebound onto the first club's own span instead of
+ * the real, later mention: "North Melbourne versus Melbourne" measured
+ * "Melbourne" at the position of the "Melbourne" embedded in "North
+ * Melbourne", made the computed gap between the two mentions empty, and
+ * silently dropped the "versus" separator -- so the unordered matchup never
+ * formed and the parser fell back to directional roles instead. Excluding
+ * spans already claimed by an earlier match in this same extraction call
+ * fixes it generically, for any pair of club names in this relationship,
+ * without naming either one.
+ */
+function firstUnclaimedOccurrence(
+  text: string,
+  phrase: string,
+  claimed: readonly { at: number; end: number }[],
+): { start: number; end: number } | undefined {
+  const re = new RegExp(`\\b${phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'g');
+  for (let m = re.exec(text); m !== null; m = re.exec(text)) {
+    const start = m.index;
+    const end = start + m[0].length;
+    if (!claimed.some((span) => start < span.end && end > span.at)) return { start, end };
+  }
+  return undefined;
 }
 
 /**
- * Finds up to two club mentions and assigns each a role by the
+ * The nearest preposition governing a club mention: the FOR_PREPOSITION or
+ * AGAINST_PREPOSITION token immediately before it (through at most one
+ * determiner "the"/"a"/"an"), not any against-like token merely present
+ * somewhere in a fixed lookback window.
+ *
+ * AFLDB-ISSUE-208: the previous test (`AGAINST_PREPOSITION.test(before)`
+ * against a fixed 20-character window) asked "does an against-like token
+ * exist anywhere in this window", not "what governs this club". That could
+ * not tell "to win FOR North Melbourne" (the immediately preceding word is
+ * "for"; "to" is just an earlier, unrelated word the window also happened
+ * to contain) from "biggest loss TO Carlton" (the immediately preceding
+ * word genuinely is "to") -- 134 after-siren rows lost their subject club
+ * this way. Anchoring to the single nearest token fixes it, and as a
+ * side effect also makes the check immune to `working`'s own mutation: a
+ * second club's window used to shrink as earlier matches were spliced out
+ * of `working`, which could pull an already-consumed club's own "against"
+ * into range of a later, unrelated club ("Against Fremantle, ... what was
+ * Melbourne's largest lead" read Melbourne as against-governed too, once
+ * stripping "Fremantle" closed the gap) -- 117 team-checkpoint rows lost
+ * their subject club this way. Checked against the ORIGINAL text handed to
+ * extractClubs, which this function never mutates, so the answer no longer
+ * depends on what has or hasn't been stripped from `working` yet.
+ */
+function nearestGoverningPreposition(before: string): 'for' | 'against' | undefined {
+  const trimmed = before.replace(/\s+$/, '').replace(/\s+(?:the|an?)$/, '');
+  if (new RegExp(`${AGAINST_PREPOSITION.source}$`).test(trimmed)) return 'against';
+  if (new RegExp(`${FOR_PREPOSITION.source}$`).test(trimmed)) return 'for';
+  return undefined;
+}
+
+/**
+ * Finds up to two club mentions and assigns each a role by the nearest
  * preposition governing it: "against/versus/vs/v/to/over" -> the
  * opponent, "for/by/from" or no preposition at all -> the subject side.
  * "richmond biggest loss to carlton" and "biggest win for richmond
@@ -157,17 +251,22 @@ function extractClubs(text: string, clubs: readonly NlClubDirectoryEntry[]): Clu
     if (!match) break;
     consumed.push(match.matchedText);
 
-    // Look at a short window before the match for a governing preposition.
-    const idx = working.toLowerCase().indexOf(match.matchedText);
-    const before = idx >= 0 ? working.slice(Math.max(0, idx - 20), idx) : '';
+    // Measured against the ORIGINAL text, never `working`: `working` has
+    // had earlier matches spliced out, so both its offsets AND the words
+    // that end up adjacent to this mention no longer describe the
+    // question the reader typed (see nearestGoverningPreposition above).
+    // Excludes spans already claimed by an earlier club this same call, so
+    // a shorter name embedded inside an already-matched longer one cannot
+    // steal its span (AFLDB-ISSUE-213; see firstUnclaimedOccurrence above).
+    const occurrence = firstUnclaimedOccurrence(text, match.matchedText, found);
+    const at = occurrence?.start ?? Number.MAX_SAFE_INTEGER;
+    const end = occurrence?.end ?? Number.MAX_SAFE_INTEGER;
+    const before = occurrence ? text.slice(Math.max(0, at - 20), at) : '';
     found.push({
       match,
-      governedAgainst: AGAINST_PREPOSITION.test(before),
-      // Measured against the ORIGINAL text: `working` has had earlier
-      // matches spliced out, so its offsets no longer describe the
-      // question the reader typed.
-      at: phrasePosition(text, match.matchedText),
-      end: phraseEnd(text, match.matchedText),
+      governedAgainst: nearestGoverningPreposition(before) === 'against',
+      at,
+      end,
     });
     working = stripMatch(working, match.matchedText);
   }
@@ -196,6 +295,110 @@ function extractClubs(text: string, clubs: readonly NlClubDirectoryEntry[]): Clu
   }
 
   return { text: working, clubFor, clubAgainst, matchup, consumed };
+}
+
+// ------------------------------------------- cross-domain club role scoping
+
+type CrossDomainClubs =
+  | { ok: true; played?: NlEntityMatch<NlClubDirectoryEntry>; coached?: NlEntityMatch<NlClubDirectoryEntry> }
+  | { ok: false; reason: 'side' | 'opponent' };
+
+/** Every start offset of a word-boundary-anchored phrase, not just the first. */
+function allPhrasePositions(text: string, phrase: string): number[] {
+  const re = new RegExp(`\\b${phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'g');
+  const out: number[] = [];
+  for (let m = re.exec(text); m !== null; m = re.exec(text)) out.push(m.index);
+  return out;
+}
+
+function allCuePositions(text: string, source: string): number[] {
+  const re = new RegExp(source, 'g');
+  const out: number[] = [];
+  for (let m = re.exec(text); m !== null; m = re.exec(text)) out.push(m.index);
+  return out;
+}
+
+/**
+ * AFLDB-ISSUE-152 Phase F. Which side of "played ... and also coached ..."
+ * each club mention sits on, decided by the nearest VERB before it in the
+ * question as the reader wrote it -- not by extractClubs' clubFor/against
+ * roles, which are governed by prepositions and mean something else
+ * entirely here.
+ *
+ * "played for Richmond and also coached Richmond" is ONE club name in two
+ * places, so positions are read per OCCURRENCE: extractClubs collapses
+ * both mentions into a single entity match, and asking only where the
+ * first one sits would put the whole question on the playing side.
+ *
+ * Fails closed, deliberately and in three ways (operator decision F-D3):
+ * a mention with no verb before it at all ("Richmond players who also
+ * coached"), a side left empty while the other is filled ("players who
+ * coached Richmond and also played"), and two different clubs on one
+ * side. Each is a legitimate question; none has an owned coaching-club
+ * target in the wording, and guessing one is how a club filter comes to
+ * mean something the reader did not ask for.
+ */
+function assignCrossDomainClubs(
+  scanText: string,
+  mentions: readonly (NlEntityMatch<NlClubDirectoryEntry> | undefined)[],
+): CrossDomainClubs {
+  const distinct = new Map<string, NlEntityMatch<NlClubDirectoryEntry>>();
+  for (const m of mentions) {
+    if (m) distinct.set(`${m.entity.organizationId}|${m.matchedText}`, m);
+  }
+  if (distinct.size === 0) return { ok: true };
+
+  const playAt = allCuePositions(scanText, CROSS_DOMAIN_PLAY_VERB_SOURCE);
+  const coachAt = allCuePositions(scanText, CROSS_DOMAIN_COACH_VERB_SOURCE);
+
+  let played: NlEntityMatch<NlClubDirectoryEntry> | undefined;
+  let coached: NlEntityMatch<NlClubDirectoryEntry> | undefined;
+  for (const mention of distinct.values()) {
+    for (const at of allPhrasePositions(scanText, mention.matchedText)) {
+      // An OPPONENT is match scope, and neither cross-domain builder owns
+      // one. Caught here rather than left to validatePlan because this
+      // reading clears clubAgainst on its way to binding both sides:
+      // without this, "played and also coached AGAINST Carlton" would
+      // bind Carlton as the coached club and answer confidently.
+      if (AGAINST_PREPOSITION.test(scanText.slice(Math.max(0, at - 20), at))) {
+        return { ok: false, reason: 'opponent' };
+      }
+      const lastPlay = playAt.filter((i) => i < at).pop() ?? -1;
+      const lastCoach = coachAt.filter((i) => i < at).pop() ?? -1;
+      if (lastPlay < 0 && lastCoach < 0) {
+        // "Richmond players who also coached Richmond" -- the club as a
+        // leading noun adjunct on "players" IS the playing side, and it
+        // is the only unverbed position with an unambiguous role. Any
+        // other bare mention declines.
+        const after = scanText.slice(at + mention.matchedText.length);
+        if (!/^\s+players?\b/.test(after)) return { ok: false, reason: 'side' };
+        if (played && played.entity.organizationId !== mention.entity.organizationId) {
+          return { ok: false, reason: 'side' };
+        }
+        played = mention;
+        continue;
+      }
+      if (lastPlay > lastCoach) {
+        if (played && played.entity.organizationId !== mention.entity.organizationId) {
+          return { ok: false, reason: 'side' };
+        }
+        played = mention;
+      } else {
+        if (coached && coached.entity.organizationId !== mention.entity.organizationId) {
+          return { ok: false, reason: 'side' };
+        }
+        coached = mention;
+      }
+    }
+  }
+
+  // "both played for and coached Richmond": the two verbs are conjoined
+  // with no club between them, so the one club named after them is on
+  // both sides. Only this exact shape -- never inferred from a club
+  // merely appearing somewhere on its own.
+  if (!played && coached && CROSS_DOMAIN_SHARED_CLUB_RE.test(scanText)) played = coached;
+  if ((played && !coached) || (!played && coached)) return { ok: false, reason: 'side' };
+  return { ok: true, played, coached };
 }
 
 // ------------------------------------------------------------------ seasons
@@ -244,6 +447,20 @@ function extractSeasons(text: string): SeasonExtraction {
     seasonMin = Number(since[1]);
     consumed.push(since[0]);
     working = working.replace(SINCE_RE, ' ');
+  } else {
+    // AFLDB-ISSUE-211: "after YEAR" is an EXCLUSIVE lower bound, distinct
+    // from "since YEAR" (inclusive) -- seasons run in whole years, so the
+    // inclusive plan bound is YEAR + 1. Checked only when "since" didn't
+    // already claim a lower bound; the two words never co-occur as two
+    // competing lower bounds in practice, and AFTER_RE only ever matches a
+    // literal year immediately after the word, so "after the siren" and
+    // other non-temporal "after" phrasing are never touched.
+    const after = AFTER_RE.exec(working);
+    if (after) {
+      seasonMin = Number(after[1]) + 1;
+      consumed.push(after[0]);
+      working = working.replace(AFTER_RE, ' ');
+    }
   }
   const before = BEFORE_RE.exec(working);
   if (before) {
@@ -368,18 +585,48 @@ function extractAward(text: string): { text: string; awardKey?: 'all_australian'
  * matched, so the deliberately broad cue phrases ("which club", "by
  * decade") cannot elect the summary grain on their own.
  */
-function extractFirstKickGoal(text: string): {
+type FirstKickGoalExtraction = {
   text: string;
   achievementKey?: NlAchievementKey;
   summaryKind?: NlAchievementSummaryKind;
   negatedAchievement?: boolean;
+  /** E7: the bound for first_kick_goal_consecutive_min. Only ever >= 2. */
+  consecutiveKicks?: number;
+  /** E8: first_kick_goal_only_career_goal. */
+  onlyCareerGoal?: boolean;
+  /** E-DEC-8: an N outside [1, FIRST_KICK_CONSECUTIVE_MAX]. */
+  countOutOfRange?: boolean;
+  /** E-DEC-4/5: an E7/E8 modifier the summary grain cannot carry. */
+  modifierWithSummary?: boolean;
+  /** E-DEC-1: the kick-level claim (E9), never folded into the E8 cue. */
+  kickLevelResidual?: boolean;
   consumed: string[];
-} {
-  const match = FIRST_KICK_GOAL_RE.exec(text);
+};
+
+function extractFirstKickGoal(text: string): FirstKickGoalExtraction {
+  // E7 is tried FIRST because it subsumes the base phrase: "a goal with
+  // each of their first three kicks" contains no "first kick" for
+  // FIRST_KICK_GOAL_RE to match, and a partial match here would strand
+  // the numeral and the plural "kicks" for the metric extractors.
+  const consecutive = FIRST_KICK_CONSECUTIVE_RE.exec(text);
+  const match = consecutive ?? FIRST_KICK_GOAL_RE.exec(text);
   if (!match) return { text, consumed: [] };
 
   const consumed = [match[0]];
   let remaining = stripMatch(text, match[0]);
+
+  let consecutiveKicks: number | undefined;
+  if (consecutive) {
+    const captured = consecutive.slice(1).find((group) => group !== undefined);
+    const count = captured === undefined ? null : readFirstKickCount(captured);
+    if (count === null || count < 1 || count > FIRST_KICK_CONSECUTIVE_MAX) {
+      return { text: remaining, countOutOfRange: true, consumed };
+    }
+    // E-D3. N = 1 IS the plain family: the column is NOT NULL DEFAULT 1
+    // with a CHECK (>= 1), so `consecutive_goal_kicks >= 1` is every row
+    // the base builder already returns, and its label reads correctly.
+    if (count >= 2) consecutiveKicks = count;
+  }
 
   let summaryKind: NlAchievementSummaryKind | undefined;
   for (const [re, kind] of ACHIEVEMENT_SUMMARY_CUES) {
@@ -392,21 +639,289 @@ function extractFirstKickGoal(text: string): {
     }
   }
 
+  // E9, checked BEFORE the goal-level cue so the two can never be
+  // conflated: no_further_career_kicks is a kick-level claim AFLDB does
+  // not expose, and "never kicked the ball again" is not a longer way of
+  // saying "never kicked another goal".
+  for (const re of FIRST_KICK_NO_FURTHER_KICKS_CUES) {
+    const cueMatch = re.exec(remaining);
+    if (cueMatch) {
+      consumed.push(cueMatch[0]);
+      return { text: stripMatch(remaining, cueMatch[0]), kickLevelResidual: true, consumed };
+    }
+  }
+
+  // E8. Consumed here, ahead of extractPlayerMetric and
+  // extractCareerConditions, which is the entire defect this closes: the
+  // tail's "goal" was being read as the question's ranking subject.
+  let onlyCareerGoal = false;
+  for (const re of FIRST_KICK_ONLY_GOAL_CUES) {
+    const cueMatch = re.exec(remaining);
+    if (cueMatch) {
+      onlyCareerGoal = true;
+      consumed.push(cueMatch[0]);
+      remaining = stripMatch(remaining, cueMatch[0]);
+      break;
+    }
+  }
+
+  // achievement_summary carries no careerPredicates, so a modifier that
+  // reached that grain would be dropped on the way to SQL -- the
+  // ISSUE-110 silent-scope defect. Declining by name is the honest
+  // outcome, and is preferred to leaving the span as a leftover token
+  // because those leftovers are "goal" and "kick": both METRIC_WORDS.
+  if (summaryKind && (consecutiveKicks !== undefined || onlyCareerGoal)) {
+    return { text: remaining, modifierWithSummary: true, consumed };
+  }
+
   // A negation governing the phrase itself ("players who NEVER kicked a
   // goal with their first kick") inverts the question into one this
   // engine cannot answer -- the achievement table records who DID it, and
   // "never" is a stopword, so without this check the polarity-inverted
-  // list would have executed at full confidence. The one negated shape
-  // that IS supported is "which clubs have never had one", where the
-  // clubs_without cue owns the negation. Anything else declines.
+  // list would have executed at full confidence. The negated shapes that
+  // ARE supported are the ones whose own cue owns the negation: "which
+  // clubs have never had one", and E8's "never kicked another goal".
+  // Anything else declines.
   const before = text.slice(0, match.index);
   const negatedAchievement = /\b(?:never|not|didn'?t|hasn'?t|hadn'?t|haven'?t|without)\b[^.,;?]*$/.test(before)
-    && summaryKind !== 'clubs_without';
+    && summaryKind !== 'clubs_without' && !onlyCareerGoal;
   if (negatedAchievement) {
     return { text: remaining, negatedAchievement, consumed };
   }
 
-  return { text: remaining, achievementKey: 'first_kick_goal', summaryKind, consumed };
+  return {
+    text: remaining,
+    achievementKey: 'first_kick_goal',
+    summaryKind,
+    ...(consecutiveKicks !== undefined ? { consecutiveKicks } : {}),
+    ...(onlyCareerGoal ? { onlyCareerGoal } : {}),
+    consumed,
+  };
+}
+
+// --------------------------------------------------- family relationships
+
+/** The per-player relationship builders, keyed by the noun the reader used. */
+const RELATIONSHIP_OF_PLAYER_BUILDER: Record<string, 'brother_of_player' | 'father_of_player' | 'son_of_player'> = {
+  brother: 'brother_of_player',
+  brothers: 'brother_of_player',
+  father: 'father_of_player',
+  fathers: 'father_of_player',
+  son: 'son_of_player',
+  sons: 'son_of_player',
+};
+
+/** Possessive nouns that name a family AFLDB cannot answer, with the reason. */
+const RELATIONSHIP_POSSESSIVE_DECLINE: [RegExp, string][] = [
+  [/^sisters?$/, 'AFLDB records 8 sister relationships and has no way to search them; only brothers are searchable.'],
+  [/^twins?$/, 'AFLDB\'s brother record does not separate twins from other brothers, so a twins-only question cannot be answered.'],
+  [/^cousins?$/, 'AFLDB holds no cousin relationships at all.'],
+  [/^(?:mothers?|daughters?)$/, 'Every parent-child relationship AFLDB records is a father and a son.'],
+  [/^(?:famil(?:y|ies)|family members?|relatives?)$/, 'AFLDB cannot yet answer a question about a football family as a whole.'],
+];
+
+type RelationshipExtraction = {
+  text: string;
+  consumed: string[];
+  /** Parameterless population predicates this reading emits. */
+  builders?: string[];
+  /** A per-player reading, awaiting the named person's id at plan assembly. */
+  ofPlayerBuilder?: 'brother_of_player' | 'father_of_player' | 'son_of_player';
+  /** A recognised relationship family this engine cannot answer; the value is the reason to state. */
+  declined?: string;
+};
+
+/**
+ * AFLDB-ISSUE-152 Phase D. Reads a family-relationship question, in the
+ * half of the family that has a witness in the data.
+ *
+ * Order is the whole design, and each step exists to stop the next one
+ * claiming something it must not:
+ *
+ *  1. FS4 first -- the FATHER's side of the father-son draft rule.
+ *  2. Any OTHER father-son wording then stops this extractor dead,
+ *     consuming nothing, so FS1/FS2/FS3/FS6 keep declining on their own
+ *     leftover tokens until AFLDB-ISSUE-153 settles what the bare phrase
+ *     means (D8). Without this step the "father"/"son" cues below would
+ *     read "father-son selections" as a parent-child question and answer
+ *     a different question confidently.
+ *  3. The out-of-scope families, BEFORE the supported ones, because "a
+ *     twin brother" contains "a brother" and "a sister" contains none of
+ *     them but must still decline by name rather than as an unknown word.
+ *  4. The per-player readings, which need the noun claimed before the
+ *     player-name scan runs -- "who is Brent Harvey's son" resolves the
+ *     player only once "son" is out of the way.
+ *  5. The symmetric parent-or-child reading, ahead of the directional
+ *     ones, so "the parent or child of another player" is one question.
+ *  6. The directional population readings.
+ *
+ * `raw` is the reader's original question: canonicalise strips the
+ * possessive that distinguishes "Brent Harvey's son" from "did Brent
+ * Harvey have a son", so that apostrophe has to be read here.
+ */
+function extractRelationship(text: string, raw: string): RelationshipExtraction {
+  const consumed: string[] = [];
+  const finish = (result: Omit<RelationshipExtraction, 'text' | 'consumed'>, remaining: string): RelationshipExtraction => {
+    let cleaned = remaining;
+    for (const noise of RELATIONSHIP_CLAUSE_NOISE) {
+      const match = noise.exec(cleaned);
+      if (!match) continue;
+      // Replaced directly rather than through stripMatch: "vfl/" ends in
+      // a non-word character, so stripMatch's trailing \b would not match
+      // it and the token would survive as an unexplained leftover.
+      consumed.push(match[0]);
+      cleaned = cleaned.replace(noise, ' ').replace(/\s+/g, ' ').trim();
+    }
+    return { text: cleaned, consumed, ...result };
+  };
+
+  // 1. FS4.
+  for (const cue of FATHER_SON_FATHER_CUES) {
+    const match = cue.exec(text);
+    if (!match) continue;
+    consumed.push(match[0]);
+    let remaining = stripMatch(text, match[0]);
+    for (const noise of FATHER_SON_FATHER_NOISE) {
+      const noiseMatch = noise.exec(remaining);
+      if (!noiseMatch) continue;
+      consumed.push(noiseMatch[0]);
+      remaining = stripMatch(remaining, noiseMatch[0]);
+    }
+    return finish({ builders: ['father_son_father'] }, remaining);
+  }
+
+  // 1b. FS1 -- the son's side of the same rule (AFLDB-ISSUE-153 Stage 2,
+  // decision Q1/Q1a). Checked here, after FS4 and before the guard, so
+  // the father side keeps its claim on the wording it already ships
+  // ("fathers of father-son selections" is a father question, not a son
+  // question that happens to contain "selections"), and so the guard
+  // below is left holding only the bare and collective forms.
+  for (const cue of FATHER_SON_SELECTION_CUES) {
+    const match = cue.exec(text);
+    if (!match) continue;
+    consumed.push(match[0]);
+    let remaining = stripMatch(text, match[0]);
+    for (const noise of FATHER_SON_FATHER_NOISE) {
+      const noiseMatch = noise.exec(remaining);
+      if (!noiseMatch) continue;
+      consumed.push(noiseMatch[0]);
+      remaining = stripMatch(remaining, noiseMatch[0]);
+    }
+    return finish({ builders: ['father_son_selection'] }, remaining);
+  }
+
+  // 2. The D8 guard -- now only the bare and collective father-son forms.
+  if (FATHER_SON_RULE_RE.test(text)) return { text, consumed: [] };
+
+  // 3. Out of scope, by name.
+  const possessive = RELATIONSHIP_POSSESSIVE_RE.exec(raw.toLowerCase());
+  const possessiveNoun = possessive?.[1];
+  if (possessiveNoun) {
+    for (const [re, reason] of RELATIONSHIP_POSSESSIVE_DECLINE) {
+      if (re.test(possessiveNoun)) return { text, consumed: [], declined: reason };
+    }
+  }
+  for (const [re, reason] of RELATIONSHIP_OUT_OF_SCOPE) {
+    if (re.test(text)) return { text, consumed: [], declined: reason };
+  }
+
+  // 4. The per-player readings.
+  const ofForm = RELATIONSHIP_OF_PLAYER_RE.exec(text);
+  if (ofForm) {
+    consumed.push(ofForm[0]);
+    return finish(
+      { ofPlayerBuilder: RELATIONSHIP_OF_PLAYER_BUILDER[ofForm[1]] },
+      stripMatch(text, ofForm[0]),
+    );
+  }
+  if (possessiveNoun && Object.hasOwn(RELATIONSHIP_OF_PLAYER_BUILDER, possessiveNoun)) {
+    const noun = new RegExp(String.raw`\b${possessiveNoun}\b`).exec(text);
+    if (noun) {
+      consumed.push(noun[0]);
+      return finish(
+        { ofPlayerBuilder: RELATIONSHIP_OF_PLAYER_BUILDER[possessiveNoun] },
+        stripMatch(text, noun[0]),
+      );
+    }
+  }
+
+  // 5. The symmetric reading.
+  if (RELATIONSHIP_SYMMETRIC_CUES.some((cue) => cue.test(text))) {
+    let remaining = text;
+    for (const cue of RELATIONSHIP_SYMMETRIC_CUES) {
+      const match = cue.exec(remaining);
+      if (!match) continue;
+      consumed.push(match[0]);
+      remaining = stripMatch(remaining, match[0]);
+    }
+    return finish({ builders: ['has_afl_parent_or_child'] }, remaining);
+  }
+
+  // 6. The directional population readings.
+  const builders: string[] = [];
+  let remaining = text;
+  for (const [cue, builder] of RELATIONSHIP_POPULATION_CUES) {
+    const match = cue.exec(remaining);
+    if (!match) continue;
+    builders.push(builder);
+    consumed.push(match[0]);
+    remaining = stripMatch(remaining, match[0]);
+  }
+  if (builders.length === 0) return { text, consumed: [] };
+  return finish({ builders }, remaining);
+}
+
+// --------------------------------------------------------- family grain
+
+type FamilyGrainExtraction = {
+  text: string;
+  consumed: string[];
+  family?: { metric: 'combined_games' | 'linked_members'; metricCondition?: NlMetricCondition };
+};
+
+/**
+ * AFLDB-ISSUE-153 Stage 6 (decision D6). Claims exactly the three tested
+ * family-GRAIN phrasings -- "biggest football family/families", "which
+ * family has the most AFL players", "families with three AFL players" --
+ * and nothing else. Called BEFORE extractRelationship, on purpose: a
+ * match here removes the family/families word from `text`, so
+ * RELATIONSHIP_OUT_OF_SCOPE's own family/relatives entry (checked inside
+ * extractRelationship) never gets to test a phrasing this function has
+ * already claimed. Every other family/relatives wording reaches
+ * extractRelationship completely untouched and keeps declining exactly as
+ * it did before Stage 6.
+ *
+ * Order among the three cues does not matter -- none of their trigger
+ * words overlap -- but is kept in the order the runbook lists them (C1
+ * "biggest", C1 "most players", C5 "with N players").
+ */
+function extractFamilyGrain(text: string): FamilyGrainExtraction {
+  const biggest = FAMILY_BIGGEST_RE.exec(text);
+  if (biggest) {
+    return { text: stripMatch(text, biggest[0]), consumed: [biggest[0]], family: { metric: 'combined_games' } };
+  }
+
+  const mostPlayers = FAMILY_MOST_PLAYERS_RE.exec(text);
+  if (mostPlayers) {
+    return { text: stripMatch(text, mostPlayers[0]), consumed: [mostPlayers[0]], family: { metric: 'linked_members' } };
+  }
+
+  const sizeClause = FAMILY_SIZE_CLAUSE_RE.exec(text);
+  if (sizeClause) {
+    const opPhrase = sizeClause[1];
+    const op = opPhrase ? FAMILY_SIZE_OP_WORDS[opPhrase] : 'gte';
+    const countWord = sizeClause[2];
+    const value = /^\d+$/.test(countWord) ? Number(countWord) : NUMBER_WORDS[countWord];
+    if (value !== undefined && op) {
+      return {
+        text: stripMatch(text, sizeClause[0]),
+        consumed: [sizeClause[0]],
+        family: { metric: 'linked_members', metricCondition: { op, value } },
+      };
+    }
+  }
+
+  return { text, consumed: [] };
 }
 
 // ------------------------------------------- marquee matches & rivalries
@@ -639,127 +1154,276 @@ function extractCareerConditions(text: string): {
     if (match) {
       conditions.push({ kind: 'column', column, op: 'eq', value: 0 });
       consumed.push(match[0]);
-      working = stripMatch(working, match[0]);
+      let spanStart = match.index;
+      let spanEnd = match.index + match[0].length;
+      // AFLDB-ISSUE-215 (follow-up). "plus" immediately touching this
+      // negative clause ("... 50 goals PLUS no premierships") is the same
+      // numeric-binding conjunction the pending-stat loop below already
+      // recognizes between two POSITIVE clauses -- but this loop runs
+      // FIRST and matches/strips only the "no X" phrase itself, with no
+      // knowledge of a neighbouring boundary word on either side. A
+      // trailing "plus" ("no premierships PLUS at most 10 votes") does
+      // not need handling here: that ordering leaves "plus" immediately
+      // in front of the SECOND (pending-loop) clause instead, which the
+      // pending loop's own boundary search already finds and consumes
+      // from the other direction. Checked and consumed only once this
+      // clause has actually bound, matching the pending loop's own "only
+      // once it binds" discipline -- a "plus" beside a clause that didn't
+      // bind is still left for the leftover-token decline.
+      const beforeText = working.slice(0, spanStart);
+      const afterText = working.slice(spanEnd);
+      const plusBefore = /\bplus\s+$/.exec(beforeText);
+      const plusAfter = /^\s+plus\b/.exec(afterText);
+      if (plusBefore) {
+        consumed.push('plus');
+        spanStart -= plusBefore[0].length;
+      } else if (plusAfter) {
+        consumed.push('plus');
+        spanEnd += plusAfter[0].length;
+      }
+      working = `${working.slice(0, spanStart)} ${working.slice(spanEnd)}`.replace(/\s+/g, ' ').trim();
     }
   }
 
   // "exactly two clubs", "250 games", "200+ games", "at least 50 votes".
-  for (const [re, column] of CAREER_STAT_WORDS) {
-    const match = re.exec(working);
-    if (!match) continue;
-    // A window before the stat word carries the count and its operator.
-    const idx = working.indexOf(match[0]);
-
-    // "3 grand finals", "played in at least 1 preliminary final" -- the
-    // bare /\bfinals?\b/ entry above reads ANY qualified final phrase as
-    // the generic any-type career total (c.finals), leaving "grand" or
-    // "preliminary"/"prelim" as an unconsumed word the entity scan then
-    // misreads as an unresolved player name and declines on. GRID_BUILDERS
-    // has a dedicated min-count builder for exactly these two final round
-    // types (semi/qualifying/elimination finals have none), so a
-    // qualifier immediately before "final(s)" answers through that
-    // instead. Detected AHEAD of the 20-char lookback below, not after,
-    // because that lookback is sized for a short stat word: "preliminary
-    // " alone is 12 characters, which for "3 or more preliminary finals"
-    // pushed the leading digit outside the window entirely -- the
-    // condition silently vanished (`value` stayed null) rather than
-    // falling back to the generic reading. Extending the lookback by the
-    // qualifier's own length keeps the number search's effective budget
-    // the same regardless of which qualifier, if any, preceded the word.
-    let qualifierBuilder: 'grand_finals_played_min' | 'prelim_finals_played_min' | null = null;
-    let qualifierSpan: { start: number; end: number; text: string } | null = null;
-    if (column === 'finals') {
-      const qualifierProbe = working.slice(Math.max(0, idx - 15), idx);
-      const qualifierMatch = /\b(grand|preliminary|prelim)\b\s*$/i.exec(qualifierProbe);
-      if (qualifierMatch) {
-        qualifierBuilder = qualifierMatch[1].toLowerCase() === 'grand'
-          ? 'grand_finals_played_min' : 'prelim_finals_played_min';
-        const qualifierStart = Math.max(0, idx - 15) + qualifierMatch.index;
-        qualifierSpan = { start: qualifierStart, end: qualifierStart + qualifierMatch[1].length, text: qualifierMatch[1] };
-      }
+  //
+  // Entries are resolved in the order their stat word actually occurs in
+  // `working` (sentence order), not CAREER_STAT_WORDS's fixed vocabulary
+  // order. "players with 300 games at 2 clubs" -- CAREER_STAT_WORDS tries
+  // clubs_played (array position 3) before games (array position 5); with
+  // no "and"/comma between the two clauses for the window-clip below to
+  // bite on, clubs_played's backward-looking window used to span the
+  // whole sentence and its leftmost-digit search stole games' own "300",
+  // leaving clubs_played misbound to 300 and games/2 orphaned. Resolving
+  // whichever pending stat word's match occurs earliest in `working`
+  // instead means the earlier clause's noun, comparator and number are
+  // matched and stripped from `working` before the later clause's window
+  // is ever built, so the later window can no longer reach back across a
+  // preposition into a clause that has already claimed its own number.
+  const pending = new Set(CAREER_STAT_WORDS);
+  while (pending.size > 0) {
+    let best: { entry: [RegExp, NlCareerColumn]; match: RegExpExecArray; idx: number } | null = null;
+    for (const entry of pending) {
+      const [candidateRe] = entry;
+      const candidateMatch = candidateRe.exec(working);
+      if (!candidateMatch) continue;
+      const candidateIdx = working.indexOf(candidateMatch[0]);
+      if (!best || candidateIdx < best.idx) best = { entry, match: candidateMatch, idx: candidateIdx };
     }
-    const outerStart = Math.max(0, idx - 20 - (qualifierSpan ? idx - qualifierSpan.start : 0));
-    // Clipped at the nearest preceding clause boundary (a comma, or "and")
-    // so the window can never reach into a NEIGHBOURING numeric clause --
-    // "players with more than 300 clubs and over 10 premierships" found
-    // 250k-corpus rows where premierships (checked first: CAREER_STAT_WORDS
-    // is in a fixed order, not the order the words appear in the
-    // sentence) opened a 20-char window that reached back across "and"
-    // into "300 clubs", read digit-boundary \b(\d{1,4})\b against the
-    // slice "0 clubs and over 10" and matched the leftmost token -- the
-    // truncated tail "0" left behind when the slice cut "300" in half, a
-    // false number \b treats as complete because it evaluates against the
-    // window substring, not the original text. That produced
-    // premierships=0 (should be 10) AND, since the matched span included
-    // that stray "0", deleted it from the middle of "300" for every
-    // later clause too, leaving clubs_played to read "30". Clipping the
-    // window at the clause boundary means a clause's number search can
-    // never see a token that belongs to the clause before it.
-    const priorText = working.slice(outerStart, idx);
-    const lastAnd = priorText.toLowerCase().lastIndexOf(' and ');
-    const lastComma = priorText.lastIndexOf(',');
-    const boundaryEnd = Math.max(lastAnd >= 0 ? lastAnd + 5 : -1, lastComma >= 0 ? lastComma + 1 : -1);
-    const windowStart = boundaryEnd >= 0 ? outerStart + boundaryEnd : outerStart;
-    const window = working.slice(windowStart, idx + match[0].length);
+    if (!best) break;
+    pending.delete(best.entry);
+    const [candidateRe, column] = best.entry;
 
-    const plus = NUMBER_PLUS_RE.exec(window);
-    let op: NlCompareOp = 'gte';
-    let value: number | null = null;
-    // Spans are recorded as absolute positions in `working` rather than as
-    // text to search for again. "players with 3 games and exactly 3 clubs"
-    // is why: both counts are the string "3", so removing the one this
-    // clause used by first-occurrence deleted the OTHER clause's number
-    // instead, leaving "games" with nothing to bind to and silently
-    // dropping the condition.
-    const spans: { start: number; end: number; text: string }[] = [
-      { start: idx, end: idx + match[0].length, text: match[0] },
-    ];
-    const spanFrom = (m: RegExpExecArray, source = m[0]) => ({
-      start: windowStart + m.index,
-      end: windowStart + m.index + m[0].length,
-      text: source,
-    });
+    // AFLDB-ISSUE-215. A stat word can legitimately occur twice in the
+    // same question: once naming the RANKED SUBJECT ("who has the most
+    // career goals ...") and again inside its own, textually LATER,
+    // numeric condition ("... among players with ... zero goals"). The
+    // earliest-occurrence rule above (needed for the "300 clubs and over
+    // 10 premierships" ordering fix it documents) picks the first
+    // occurrence for PROCESSING ORDER, but that first occurrence is the
+    // ranking mention here, which has no adjacent number -- and used to
+    // make the whole column give up right there, silently discarding the
+    // real "zero goals" condition sitting later in the sentence: the
+    // pending SET already dropped this stat word, so nothing ever looked
+    // at its second occurrence. Retrying successive occurrences of the
+    // SAME stat word (never a different one -- each is still tried once
+    // per occurrence, not once per column) until one has an adjacent
+    // comparator/number, or none do, fixes that without weakening the
+    // "abandon this column, it was just the ranking noun" outcome
+    // ("most flags" below) for a stat word that only ever appears once.
+    const occurrenceRe = new RegExp(candidateRe.source, 'g');
+    let searchFrom = 0;
+    let bound = false;
+    while (!bound) {
+      occurrenceRe.lastIndex = searchFrom;
+      const match = occurrenceRe.exec(working);
+      if (!match) break;
+      const idx = match.index;
+      searchFrom = idx + match[0].length;
 
-    if (plus) {
-      value = Number(plus[1]);
-      op = 'gte';
-      spans.push(spanFrom(plus, plus[0].replace(/\+$/, '')));
-    } else {
-      for (const [opRe, opKind] of COMPARE_OP_WORDS) {
-        const opMatch = opRe.exec(window);
-        if (opMatch) { op = opKind; spans.push(spanFrom(opMatch)); break; }
-      }
-      const digits = /\b(\d{1,4})\b/.exec(window);
-      if (digits) {
-        value = Number(digits[1]);
-        spans.push(spanFrom(digits, digits[1]));
-      } else {
-        for (const [word, n] of Object.entries(NUMBER_WORDS)) {
-          const wordMatch = new RegExp(`\\b${word}\\b`).exec(window);
-          if (wordMatch) { value = n; spans.push(spanFrom(wordMatch)); break; }
+      // "3 grand finals", "played in at least 1 preliminary final" -- the
+      // bare /\bfinals?\b/ entry above reads ANY qualified final phrase as
+      // the generic any-type career total (c.finals), leaving "grand" or
+      // "preliminary"/"prelim" as an unconsumed word the entity scan then
+      // misreads as an unresolved player name and declines on. GRID_BUILDERS
+      // has a dedicated min-count builder for exactly these two final round
+      // types (semi/qualifying/elimination finals have none), so a
+      // qualifier immediately before "final(s)" answers through that
+      // instead. Detected AHEAD of the 20-char lookback below, not after,
+      // because that lookback is sized for a short stat word: "preliminary
+      // " alone is 12 characters, which for "3 or more preliminary finals"
+      // pushed the leading digit outside the window entirely -- the
+      // condition silently vanished (`value` stayed null) rather than
+      // falling back to the generic reading. Extending the lookback by the
+      // qualifier's own length keeps the number search's effective budget
+      // the same regardless of which qualifier, if any, preceded the word.
+      let qualifierBuilder: 'grand_finals_played_min' | 'prelim_finals_played_min' | null = null;
+      let qualifierSpan: { start: number; end: number; text: string } | null = null;
+      if (column === 'finals') {
+        const qualifierProbe = working.slice(Math.max(0, idx - 15), idx);
+        const qualifierMatch = /\b(grand|preliminary|prelim)\b\s*$/i.exec(qualifierProbe);
+        if (qualifierMatch) {
+          qualifierBuilder = qualifierMatch[1].toLowerCase() === 'grand'
+            ? 'grand_finals_played_min' : 'prelim_finals_played_min';
+          const qualifierStart = Math.max(0, idx - 15) + qualifierMatch.index;
+          qualifierSpan = { start: qualifierStart, end: qualifierStart + qualifierMatch[1].length, text: qualifierMatch[1] };
         }
       }
-    }
-    if (value === null) continue;
+      const outerStart = Math.max(0, idx - 20 - (qualifierSpan ? idx - qualifierSpan.start : 0));
+      // Clipped at the nearest preceding clause boundary (a comma, or "and")
+      // so the window can never reach into a NEIGHBOURING numeric clause --
+      // "players with more than 300 clubs and over 10 premierships" found
+      // 250k-corpus rows where premierships (checked first: CAREER_STAT_WORDS
+      // is in a fixed order, not the order the words appear in the
+      // sentence) opened a 20-char window that reached back across "and"
+      // into "300 clubs", read digit-boundary \b(\d{1,4})\b against the
+      // slice "0 clubs and over 10" and matched the leftmost token -- the
+      // truncated tail "0" left behind when the slice cut "300" in half, a
+      // false number \b treats as complete because it evaluates against the
+      // window substring, not the original text. That produced
+      // premierships=0 (should be 10) AND, since the matched span included
+      // that stray "0", deleted it from the middle of "300" for every
+      // later clause too, leaving clubs_played to read "30". Clipping the
+      // window at the clause boundary means a clause's number search can
+      // never see a token that belongs to the clause before it.
+      // AFLDB-ISSUE-215 (follow-up). The BOUNDARY search (finding a
+      // comma/"and"/"plus" at all) needs a wider lookback than the VALUE
+      // search does: "exactly 3 premierships plus no more than 250 games"
+      // -- "no more than " alone is 13 characters, which together with
+      // "plus " (5) and the number (up to 4 digits + a space) can put the
+      // boundary word more than `idx - 20` characters back, outside
+      // `priorText` entirely, so `lastPlus` below always came back -1 and
+      // "plus" was never even considered a candidate boundary -- not
+      // rejected, just invisible to the search. `boundaryProbeText` widens
+      // ONLY the boundary search to comfortably fit the longest
+      // COMPARE_OP_WORDS phrase ("no greater than", 15 characters) plus a
+      // 4-digit number and the joining word itself; `lastIndexOf` still
+      // returns the NEAREST boundary within it, so widening the probe can
+      // only reveal a real boundary that was previously missed, never
+      // reach past it into an earlier, unrelated clause. The VALUE search
+      // below is unaffected: once a boundary is found, `window` still
+      // starts exactly at that boundary, same as before this change.
+      const boundaryProbeStart = Math.max(0, idx - 40 - (qualifierSpan ? idx - qualifierSpan.start : 0));
+      const boundaryProbeText = working.slice(boundaryProbeStart, idx);
+      const lastAnd = boundaryProbeText.toLowerCase().lastIndexOf(' and ');
+      const lastComma = boundaryProbeText.lastIndexOf(',');
+      // "plus" is a second spelling of the exact same clause boundary
+      // "and" already is here -- "at least 20 finals PLUS zero goals"
+      // joins two independent numeric conditions the same way "and" does.
+      // It is deliberately NOT a blanket STOPWORDS entry like "and":
+      // "plus" names nothing else anywhere in this engine's vocabulary,
+      // and adding it there would silently ignore the word in every
+      // OTHER, unrelated construction too. So its span is recorded here
+      // and only actually removed further down, and only once this clause
+      // goes on to bind a real value -- a "plus" in front of a clause that
+      // never binds is left completely alone and the question still
+      // declines on its own leftover text.
+      const lastPlus = boundaryProbeText.toLowerCase().lastIndexOf(' plus ');
+      const boundaryEnd = Math.max(
+        lastAnd >= 0 ? lastAnd + 5 : -1,
+        lastComma >= 0 ? lastComma + 1 : -1,
+        lastPlus >= 0 ? lastPlus + 6 : -1,
+      );
+      const windowStart = boundaryEnd >= 0 ? boundaryProbeStart + boundaryEnd : outerStart;
+      const window = working.slice(windowStart, idx + match[0].length);
+      const plusBoundarySpan = (lastPlus >= 0 && lastPlus + 6 === boundaryEnd)
+        ? { start: boundaryProbeStart + lastPlus + 1, end: boundaryProbeStart + lastPlus + 5, text: 'plus' }
+        : null;
 
-    // The `_min` builders only express a floor ("X+"/"at least"/a bare
-    // number, which all default to 'gte' above); "fewer than 2 grand
-    // finals" has nowhere to go there and falls back to the generic
-    // any-type reading instead of declining outright.
-    if (qualifierBuilder && op === 'gte') {
-      predicates.push({ builder: qualifierBuilder, params: { times: String(value) } });
-      if (qualifierSpan) spans.push(qualifierSpan);
-    } else {
-      conditions.push({ kind: 'column', column, op, value });
+      const plus = NUMBER_PLUS_RE.exec(window);
+      let op: NlCompareOp = 'gte';
+      // Distinct from `op` itself, which cannot tell an explicit "at least"/
+      // "no fewer than" `gte` apart from the implicit bare-number default
+      // `gte` -- needed below to know whether a bound zero was stated with a
+      // comparator or is bare "zero"/"0", which must default to equality
+      // instead ("zero goals" means goals = 0, not goals >= 0, which is
+      // trivially true for every player).
+      let explicitComparator = false;
+      let value: number | null = null;
+      // Spans are recorded as absolute positions in `working` rather than as
+      // text to search for again. "players with 3 games and exactly 3 clubs"
+      // is why: both counts are the string "3", so removing the one this
+      // clause used by first-occurrence deleted the OTHER clause's number
+      // instead, leaving "games" with nothing to bind to and silently
+      // dropping the condition.
+      const spans: { start: number; end: number; text: string }[] = [
+        { start: idx, end: idx + match[0].length, text: match[0] },
+      ];
+      const spanFrom = (m: RegExpExecArray, source = m[0]) => ({
+        start: windowStart + m.index,
+        end: windowStart + m.index + m[0].length,
+        text: source,
+      });
+
+      if (plus) {
+        value = Number(plus[1]);
+        op = 'gte';
+        explicitComparator = true;
+        spans.push(spanFrom(plus, plus[0].replace(/\+$/, '')));
+      } else {
+        for (const [opRe, opKind] of COMPARE_OP_WORDS) {
+          const opMatch = opRe.exec(window);
+          if (opMatch) { op = opKind; explicitComparator = true; spans.push(spanFrom(opMatch)); break; }
+        }
+        const digits = /\b(\d{1,4})\b/.exec(window);
+        if (digits) {
+          value = Number(digits[1]);
+          spans.push(spanFrom(digits, digits[1]));
+        } else {
+          for (const [word, n] of Object.entries(NUMBER_WORDS)) {
+            const wordMatch = new RegExp(`\\b${word}\\b`).exec(window);
+            if (wordMatch) { value = n; spans.push(spanFrom(wordMatch)); break; }
+          }
+        }
+      }
+      if (value === null) continue;
+      if (plusBoundarySpan) spans.push(plusBoundarySpan);
+
+      // A bound zero with no stated comparator means equality ("zero goals"
+      // = "goals = 0"), not the bare-number default above, which is only
+      // correct for a positive count ("300 games" = "at least 300"). An
+      // explicit comparator (including "0+") still wins, same as any other
+      // value.
+      if (value === 0 && !explicitComparator) op = 'eq';
+
+      // The `_min` builders only express a floor ("X+"/"at least"/a bare
+      // number, which all default to 'gte' above); "fewer than 2 grand
+      // finals" has nowhere to go there and falls back to the generic
+      // any-type reading instead of declining outright.
+      if (qualifierBuilder && op === 'gte') {
+        predicates.push({ builder: qualifierBuilder, params: { times: String(value) } });
+        if (qualifierSpan) spans.push(qualifierSpan);
+      } else {
+        conditions.push({ kind: 'column', column, op, value });
+      }
+      for (const span of spans) consumed.push(span.text);
+      // Highest offset first, so removing one span cannot shift the
+      // positions of the ones still to be removed.
+      working = spans
+        .sort((a, b) => b.start - a.start)
+        .reduce((text, span) => `${text.slice(0, span.start)} ${text.slice(span.end)}`, working)
+        .replace(/\s+/g, ' ')
+        .trim();
+      bound = true;
     }
-    for (const span of spans) consumed.push(span.text);
-    // Highest offset first, so removing one span cannot shift the
-    // positions of the ones still to be removed.
-    working = spans
-      .sort((a, b) => b.start - a.start)
-      .reduce((text, span) => `${text.slice(0, span.start)} ${text.slice(span.end)}`, working)
-      .replace(/\s+/g, ' ')
-      .trim();
+  }
+
+  // AFLDB-ISSUE-215. "who has the most career S AMONG PLAYERS WITH A and
+  // B" wraps the identical numeric-binding construction "... players
+  // with A and B" already reads correctly above; only "among"/"amongst"
+  // itself is new vocabulary. Gated on a condition/predicate having
+  // actually been found (never a bare presence check) so a genuinely
+  // unsupported "among ..." elsewhere is not silently swallowed -- see
+  // the regression control for a bare "among" with no numeric condition
+  // alongside it, which must still surface as unsupported. The lookahead
+  // consumes only the cue word itself; "players"/"player" is already
+  // inert STOPWORDS vocabulary and is left in `working` untouched.
+  if (conditions.length > 0 || predicates.length > 0) {
+    const amongMatch = /\bamong(?:st)?\b(?=\s+(?:the\s+)?players?\b)/.exec(working);
+    if (amongMatch) {
+      consumed.push(amongMatch[0]);
+      working = stripMatch(working, amongMatch[0]);
+    }
   }
 
   return { text: working, conditions, predicates, consumed };
@@ -773,11 +1437,17 @@ function extractCareerConditions(text: string): {
  * extractCareerConditions needs) -- each phrase already names exactly one
  * true/false club_seasons column, so a match is the condition.
  */
-function extractClubSeasonConditions(text: string): { text: string; conditions: NlClubSeasonCondition[]; consumed: string[] } {
+function extractClubSeasonConditions(
+  text: string,
+  subjectGated: boolean,
+): { text: string; conditions: NlClubSeasonCondition[]; consumed: string[] } {
   const conditions: NlClubSeasonCondition[] = [];
   const consumed: string[] = [];
   let working = text;
-  for (const [re, kind] of CLUB_SEASON_CONDITION_WORDS) {
+  const words = subjectGated
+    ? [...CLUB_SEASON_CONDITION_WORDS, CLUB_SEASON_PREMIERSHIP_SUBJECT_GATED]
+    : CLUB_SEASON_CONDITION_WORDS;
+  for (const [re, kind] of words) {
     const match = re.exec(working);
     if (!match) continue;
     conditions.push({ kind });
@@ -817,7 +1487,15 @@ function extractRound(text: string): { text: string; roundNumber?: number; consu
 
 // -------------------------------------------------------------- boundary
 
-const DEBUT_RE = /\b(?:first|debut(?:ed)?)\b/;
+// AFLDB-ISSUE-191: bare "first" is NOT a debut cue on its own -- "the
+// first goal", "first quarter" and "first half" all use the same word
+// for a different concept. The debut word only governs the boundary when
+// it is literally "debut(ed)" or when "first" itself immediately governs
+// a game noun ("first game", "first ever game"). Period-split ("first
+// quarter"/"first half") already ran and consumed its own tokens before
+// this function is called, so it cannot collide with FIRST_GAME_RE here.
+const DEBUT_WORD_RE = /\bdebut(?:ed)?\b/;
+const FIRST_GAME_RE = /\bfirst(?:\s+ever)?\s+games?\b/;
 // Deliberately NOT "final" -- that word is the boundary's TARGET
 // (grand_final/final, read from the already-extracted match type), and
 // including it here would make any single-game-scoped question ("most
@@ -839,19 +1517,26 @@ function extractBoundary(
   if (matchType !== 'grand_final' && matchType !== 'finals') return { text, consumed: [] };
   const where: NlBoundary['where'] = matchType === 'grand_final' ? 'grand_final' : 'final';
 
-  const debut = DEBUT_RE.exec(text);
-  const last = !debut ? LAST_GAME_RE.exec(text) : null;
-  const eventMatch = debut ?? last;
+  const debutWord = DEBUT_WORD_RE.exec(text);
+  const firstGame = !debutWord ? FIRST_GAME_RE.exec(text) : null;
+  const last = !debutWord && !firstGame ? LAST_GAME_RE.exec(text) : null;
+  const eventMatch = debutWord ?? firstGame ?? last;
   if (!eventMatch) return { text, consumed: [] };
 
   let working = stripMatch(text, eventMatch[0]);
   const consumed = [eventMatch[0]];
-  const gameWord = /\bgames?\b/.exec(working)?.[0];
-  if (gameWord) {
-    working = stripMatch(working, gameWord);
-    consumed.push(gameWord);
+  // FIRST_GAME_RE already matched "first ... game(s)" as one phrase, so
+  // there is no separate "game" word left to strip. The bare debut word
+  // ("debuted in their first game") and "last"/"retired" both still need
+  // their own, possibly non-adjacent, "game(s)" word stripped separately.
+  if (debutWord || last) {
+    const gameWord = /\bgames?\b/.exec(working)?.[0];
+    if (gameWord) {
+      working = stripMatch(working, gameWord);
+      consumed.push(gameWord);
+    }
   }
-  const event: NlBoundary['event'] = debut ? 'debut' : 'last_game';
+  const event: NlBoundary['event'] = last ? 'last_game' : 'debut';
   return { text: working, boundary: { event, where }, consumed };
 }
 
@@ -941,9 +1626,28 @@ function extractPeriodSplit(text: string): { text: string; periodSplit?: NlQuery
 
 function extractScoreCheckpoint(text: string): { text: string; scoreCheckpoint?: NlQueryPlan['scoreCheckpoint']; consumed: string[] } {
   const entries: [RegExp, NonNullable<NlQueryPlan['scoreCheckpoint']>][] = [
-    [/\bat (?:3qt|three[- ]quarter)[- ]time\b|\b(?:3qt|three[- ]quarter)[- ]time\b/, '3QT'],
+    // AFLDB-ISSUE-205: a trailing "comeback(s)" makes this TEAM_METRIC_WORDS'
+    // own q3_deficit_overcome phrase ("three quarter time comeback"), a
+    // different plan shape validatePlan refuses to combine with
+    // scoreCheckpoint (plan.ts's checkpoint-metric gate). Left unclaimed
+    // here so extractTeamMetric (step 11) sees the intact phrase instead of
+    // just the orphaned word "comeback".
+    [/\bat (?:3qt|three[- ]quarter)[- ]time\b(?!\s+comebacks?\b)|\b(?:3qt|three[- ]quarter)[- ]time\b(?!\s+comebacks?\b)/, '3QT'],
     [/\bat half[- ]time\b|\bhalf[- ]time\b/, 'HT'],
-    [/\bat (?:q(?:uarter)?|qtr|quarter|quatre)[- ]time\b|\b(?:q(?:uarter)?|qtr|quarter|quatre)[- ]time\b/, 'QT'],
+    // AFLDB-ISSUE-205 (operator-validation follow-up): the 3QT guard above
+    // only withholds ITS OWN match on "three quarter time comeback" -- it
+    // does not stop this entry's generic "quarter time" pattern from then
+    // matching the nested substring "quarter time" inside "three quarter
+    // time comeback" and stripping it, leaving "three comeback" (still two
+    // orphaned, unmatched tokens instead of the intact metric phrase). This
+    // entry's own negative lookbehind is required too: it refuses a
+    // "quarter"/"qtr"/"quatre" checkpoint word directly preceded by
+    // "three "/"three-", so the two entries never fight over the same
+    // substring regardless of which one the loop reaches. Genuine Q1
+    // checkpoints ("at quarter time", "leading at quarter time") are
+    // unaffected -- the exclusion only fires when "three" immediately
+    // precedes the checkpoint word.
+    [/\bat (?<!three[- ])(?:q(?:uarter)?|qtr|quarter|quatre)[- ]time\b|\b(?<!three[- ])(?:q(?:uarter)?|qtr|quarter|quatre)[- ]time\b/, 'QT'],
   ];
   for (const [re, checkpoint] of entries) {
     const match = re.exec(text);
@@ -958,17 +1662,55 @@ function extractResultFilter(text: string): { text: string; resultFilter?: NlQue
   return { text: stripMatch(text, match[0]), resultFilter: 'won', consumed: [match[0]] };
 }
 
-function extractHavingClause(text: string): {
+/**
+ * A grouped team-result threshold ("teams with more than 2 wins against
+ * Richmond") counts, per club organization, the matches in scope that
+ * satisfy a per-match result predicate, then thresholds that count.
+ *
+ * Every word in this family is genuinely ambiguous against player career
+ * columns over the SAME vocabulary ("players who have won 3 premierships",
+ * "players with more than 100 wins"), and reading those as a grouped club
+ * count would answer a different question. `games` was gated on a club
+ * subject first (AFLDB-ISSUE-110); the result words need the same
+ * protection, but a positive club-subject cue alone is too narrow -- it is
+ * start-anchored (CLUB_SUBJECT_LEADING) and misses "exactly three wins
+ * against Carlton" / "at least three wins against Carlton", which name no
+ * subject word at all and were already a working grouped reading. So the
+ * words are admitted when the question names a club/team subject, OR when
+ * it names no player subject either; they are refused only when a player
+ * subject is present and no club subject is (AFLDB-ISSUE-188).
+ */
+
+/**
+ * AFLDB-ISSUE-193: career/season-total nouns this family's own words
+ * (draws/wins/losses/games) never mean, checked against the text right
+ * after a candidate number so extractHavingClause below can tell "10" in
+ * "won more than 10 premierships" apart from "10" in "more than 10 wins".
+ * Reuses CAREER_STAT_WORDS's nouns rather than a separate list, minus the
+ * four this family already claims itself.
+ */
+const GOVERNED_NON_RESULT_CAREER_NOUN_RE = new RegExp(
+  `^\\s*(?:${CAREER_STAT_WORDS
+    .filter(([, column]) => column !== 'wins' && column !== 'losses' && column !== 'draws' && column !== 'games')
+    .map(([re]) => re.source)
+    .join('|')})`,
+);
+function extractHavingClause(text: string, clubSubject: boolean, playerSubject: boolean): {
   text: string;
-  havingClause?: { metric: 'wins' | 'losses' | 'draws'; op: NlCompareOp; value: number };
+  havingClause?: { metric: NlHavingMetric; op: NlCompareOp; value: number };
   consumed: string[];
 } {
-  const words: [RegExp, 'wins' | 'losses' | 'draws'][] = [
+  if (!clubSubject && playerSubject) return { text, consumed: [] };
+
+  const words: [RegExp, NlHavingMetric][] = [
     [/\bdraws?\b/, 'draws'],
     [/\bwins?\b/, 'wins'],
     [/\blosses?\b/, 'losses'],
     [/\b(?:lose|lost)\b/, 'losses'],
-    [/\b(?:win|won)\b/, 'wins']
+    [/\b(?:win|won)\b/, 'wins'],
+    // Last, so a result word still governs when both are present:
+    // "teams with more than 2 wins in games against Carlton" counts wins.
+    [/\bgames?\b/, 'games'],
   ];
   let working = text;
   for (const [re, metric] of words) {
@@ -981,31 +1723,71 @@ function extractHavingClause(text: string): {
       let op: NlCompareOp = 'gte';
       let value: number | null = null;
       let countStr = '';
-      
+      let countEnd = -1;
+
       const twice = /\btwice\b/.exec(window);
       const thrice = /\b(?:thrice|3 times)\b/.exec(window);
       const times = /\b(\d{1,4})\s+times\b/.exec(window);
-      if (twice) { value = 2; countStr = twice[0]; }
-      else if (thrice) { value = 3; countStr = thrice[0]; }
-      else if (times) { value = Number(times[1]); countStr = times[0]; }
+      if (twice) { value = 2; countStr = twice[0]; countEnd = twice.index + twice[0].length; }
+      else if (thrice) { value = 3; countStr = thrice[0]; countEnd = thrice.index + thrice[0].length; }
+      else if (times) { value = Number(times[1]); countStr = times[0]; countEnd = times.index + times[0].length; }
       else {
         const digits = /\b(\d{1,4})\b/.exec(window);
-        if (digits) { value = Number(digits[1]); countStr = digits[0]; }
+        if (digits) { value = Number(digits[1]); countStr = digits[0]; countEnd = digits.index + digits[0].length; }
         else {
           // The same number-word vocabulary the threshold extractors use
           // ("exactly three wins against Carlton") -- digits win when both
           // are present, mirroring readCount's rule.
           for (const [word, n] of Object.entries(NUMBER_WORDS)) {
             const wordMatch = new RegExp(`\\b${word}\\b`).exec(window);
-            if (wordMatch) { value = n; countStr = wordMatch[0]; break; }
+            if (wordMatch) { value = n; countStr = wordMatch[0]; countEnd = wordMatch.index + wordMatch[0].length; break; }
           }
+        }
+      }
+
+      // AFLDB-ISSUE-193: the number just found must actually govern THIS
+      // family's grouped match-result noun (or none -- "won more than 10"
+      // bare defaults to games/wins). When the noun immediately after the
+      // number instead names a career/season total AFLDB does not grain
+      // this way ("10 premierships", "5 flags", "2 brownlow medals"),
+      // claiming it here answers a different question -- "clubs that have
+      // won more than 10 premierships" used to elect a team_match wins
+      // having clause and silently lose "premierships" entirely. Checked
+      // against a fresh lookahead from the number's OWN position in
+      // `working`, not a slice of the already-truncated verb `window` --
+      // that window's budget is sized around the verb, and a number near
+      // its far edge (as in the premierships example) can leave too few
+      // characters left inside `window` to see the whole governing noun,
+      // silently under-matching. Never checked against text BEFORE the
+      // number: a LEADING "clubs"/"teams" subject noun must never collide
+      // with this.
+      if (value !== null && countEnd >= 0) {
+        const absoluteCountEnd = windowStart + countEnd;
+        const afterNumber = working.slice(absoluteCountEnd, absoluteCountEnd + 20);
+        if (GOVERNED_NON_RESULT_CAREER_NOUN_RE.test(afterNumber)) {
+          value = null;
+          countStr = '';
         }
       }
 
       if (value !== null) {
         let matchedOperator: string | null = null;
+        // AFLDB-ISSUE-207: bounded to the text up to and including the
+        // count just matched, never past it. Every COMPARE_OP_WORDS phrase
+        // governs a number that follows it immediately, so a genuine
+        // operator for THIS clause can never sit to the right of the count
+        // it was found with. Searching the full +-20 `window` here used to
+        // let an adjacent margin clause's own operator word ("by OVER 50
+        // points") leak in -- and, since COMPARE_OP_WORDS is tested in a
+        // fixed list order rather than leftmost-in-text order, a later-
+        // listed entry belonging to THIS clause (e.g. "more than") could
+        // even lose to an earlier-listed entry from the OTHER clause (e.g.
+        // "at least") despite appearing later in the sentence. Either way
+        // the wrong operator was claimed and stripped, silently swapping
+        // the wins/losses threshold's comparator with the margin filter's.
+        const operatorWindow = window.slice(0, countEnd);
         for (const [operatorPattern, parsedOp] of COMPARE_OP_WORDS) {
-          const operatorMatch = operatorPattern.exec(window);
+          const operatorMatch = operatorPattern.exec(operatorWindow);
           if (!operatorMatch) continue;
           op = parsedOp;
           matchedOperator = operatorMatch[0];
@@ -1025,7 +1807,7 @@ function extractHavingClause(text: string): {
 
 function extractMatchFilter(
   text: string,
-  resultMetric: 'wins' | 'losses' | 'draws' | undefined,
+  resultMetric: NlHavingMetric | undefined,
 ): {
   text: string;
   matchFilter?: { metric: 'win_margin' | 'loss_margin'; op: NlCompareOp; value: number };
@@ -1135,6 +1917,101 @@ function extractPlayerMetricThreshold(text: string): {
   return { text: stripped, metric, condition: { op, value }, consumed };
 }
 
+// ------------------------------------------------------------ coach metric
+
+/**
+ * A coaching metric word, with any comparator/number governing it consumed
+ * ATOMICALLY in the same step -- "more than 200 games", "100+ wins", "at
+ * least 3 premierships". The atomic consumption is what keeps a coaching
+ * threshold away from extractCareerConditions, which would claim it as a
+ * PLAYER career condition that no coaching plan can carry.
+ *
+ * Number lookback follows extractPlayerMetricThreshold's discipline
+ * exactly: a 24-character window clipped at the nearest preceding clause
+ * boundary, so one clause's number search can never see the previous
+ * clause's token. No number means no threshold -- the word is then simply
+ * the ranking subject ("most premierships"), which is a legitimate and
+ * different question.
+ */
+/** The 'games' entry of COACH_METRIC_WORDS, on its own: the win-percentage qualifier is always a games count. */
+const COACH_GAMES_WORDS: [RegExp, string][] = COACH_METRIC_WORDS.filter(([, metric]) => metric === 'games');
+
+function extractCoachMetric(text: string, words: [RegExp, string][] = COACH_METRIC_WORDS): {
+  text: string; metric?: string; condition?: NlMetricCondition; consumed: string[];
+} {
+  let found: { match: RegExpExecArray; metric: string } | null = null;
+  for (const [re, metric] of words) {
+    const match = re.exec(text);
+    if (match) { found = { match, metric }; break; }
+  }
+  if (!found) return { text, consumed: [] };
+  const { match, metric } = found;
+  const idx = match.index;
+
+  const outerStart = Math.max(0, idx - 24);
+  const priorText = text.slice(outerStart, idx);
+  const lastAnd = priorText.toLowerCase().lastIndexOf(' and ');
+  const lastComma = priorText.lastIndexOf(',');
+  const boundaryEnd = Math.max(lastAnd >= 0 ? lastAnd + 5 : -1, lastComma >= 0 ? lastComma + 1 : -1);
+  // A Top-N phrase's own count belongs to the AGGREGATION, not to this
+  // metric: "top 5 coaches by premierships" asks for five coaches, not for
+  // coaches with 5+ premierships. Aggregation is extracted several steps
+  // later, so that number is still sitting in the text here and the window
+  // is clipped past it -- the same reason the clause-boundary clip above
+  // exists, applied to a different neighbour.
+  const topPhrase = /\btop\s+(?:\d{1,3}|[a-z]+)\b/g;
+  let topEnd = -1;
+  for (let m = topPhrase.exec(priorText); m !== null; m = topPhrase.exec(priorText)) {
+    topEnd = m.index + m[0].length;
+  }
+  const clipEnd = Math.max(boundaryEnd, topEnd);
+  const windowStart = clipEnd >= 0 ? outerStart + clipEnd : outerStart;
+  const window = text.slice(windowStart, idx + match[0].length);
+
+  let op: NlCompareOp = 'gte';
+  let value: number | null = null;
+  const spans: { start: number; end: number; text: string }[] = [
+    { start: idx, end: idx + match[0].length, text: match[0] },
+  ];
+  const spanFrom = (m: RegExpExecArray, source = m[0]) => ({
+    start: windowStart + m.index,
+    end: windowStart + m.index + m[0].length,
+    text: source,
+  });
+
+  const plus = NUMBER_PLUS_RE.exec(window);
+  if (plus) {
+    value = Number(plus[1]);
+    spans.push(spanFrom(plus, plus[0].replace(/\+$/, '')));
+  } else {
+    for (const [opRe, opKind] of COMPARE_OP_WORDS) {
+      const opMatch = opRe.exec(window);
+      if (opMatch) { op = opKind; spans.push(spanFrom(opMatch)); break; }
+    }
+    const digits = /\b(\d{1,4})\b/.exec(window);
+    if (digits) {
+      value = Number(digits[1]);
+      spans.push(spanFrom(digits, digits[1]));
+    } else {
+      for (const [word, n] of Object.entries(NUMBER_WORDS)) {
+        const wordMatch = new RegExp(`\\b${word}\\b`).exec(window);
+        if (wordMatch) { value = n; spans.push(spanFrom(wordMatch)); break; }
+      }
+    }
+  }
+  if (value === null) {
+    return { text: stripMatch(text, match[0]), metric, consumed: [match[0]] };
+  }
+
+  const consumed = spans.map((span) => span.text);
+  const stripped = spans
+    .sort((a, b) => b.start - a.start)
+    .reduce((t, span) => `${t.slice(0, span.start)} ${t.slice(span.end)}`, text)
+    .replace(/\s+/g, ' ')
+    .trim();
+  return { text: stripped, metric, condition: { op, value }, consumed };
+}
+
 // ---------------------------------------------------------- player mention
 
 /** "by a/an/the <words> player" names a generic player from a club, not a specific person -- must be read before candidate player-name scanning. */
@@ -1161,7 +2038,21 @@ function extractByClubPlayer(
  */
 function candidatePlayerSpan(text: string): string | null {
   const tokens = text.split(/\s+/).filter(Boolean);
-  const alphaRun = tokens.filter((t) => /^[a-z]+$/.test(t) && !STOPWORDS.has(t));
+  // A raw token survives as a name-word candidate when every word it
+  // contains under the shared word-boundary contract (splitNameWords) is
+  // plain alphabetic -- "byrne-jones" and "o'brien" both qualify (two
+  // words and one respectively), a bare "-" or a digit-bearing token does
+  // not. The ORIGINAL punctuation-bearing token is kept, not its exploded
+  // words: this keeps candidateRaw's tokenisation aligned with
+  // meaningfulTokens' plain `\s+` split elsewhere in the parser (the
+  // confidence/leftover-token accounting at the end of parseNlQuestion),
+  // so a hyphenated name is consumed as the one token it already is there
+  // instead of silently reappearing as an unmatched leftover.
+  const alphaRun = tokens.filter((t) => {
+    if (STOPWORDS.has(t)) return false;
+    const words = splitNameWords(t);
+    return words.length > 0 && words.every((w) => /^[a-z]+$/.test(w));
+  });
   if (alphaRun.length === 0) return null;
   return alphaRun.slice(0, 4).join(' ');
 }
@@ -1174,6 +2065,29 @@ function normalisePlayerSuffixes(name: string): string {
 }
 
 /**
+ * Word-boundary contract for player-name comparison, mirroring
+ * `afldb_normalise_name`'s documented punctuation handling (SQL, migration
+ * `099_normalise_unicode_whitespace.sql:71-91`; restated by its own
+ * `COMMENT ON FUNCTION`): apostrophes and full stops are deletions, not
+ * breaks ("O'Brien" stays one word, "obrien"), while hyphens, underscores
+ * and slashes are additional word boundaries alongside whitespace
+ * ("Byrne-Jones" is two words, matching `players.search_name`/
+ * `player_name_aliases.search_alias`, which are that SQL function's
+ * output). `afldb_normalise_name` remains the single canonical
+ * implementation (AFLDB-ISSUE-164) -- this mirrors only its punctuation
+ * class, not its Unicode-whitespace handling, which JS's own `\s` already
+ * covers. If a future migration adds a new punctuation class there, this
+ * must change with it.
+ */
+function splitNameWords(name: string): string[] {
+  return name
+    .replace(/['’.]/g, '')
+    .replace(/[-_/]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+/**
  * Every word a candidate can justify a mention token against: the words
  * of its canonical name plus, when the resolver matched a different form
  * (an alias), the words of that matched form. The alias is ADDITIONAL
@@ -1183,11 +2097,25 @@ function normalisePlayerSuffixes(name: string): string {
  * and is left in the text for the decline gate.
  */
 function candidateNameWords(c: NlPlayerCandidate): string[] {
-  const words = new Set(normalisePlayerSuffixes(c.ref.name.toLowerCase()).split(/\s+/));
+  const words = new Set(splitNameWords(normalisePlayerSuffixes(c.ref.name.toLowerCase())));
   if (c.matchedName) {
-    for (const w of normalisePlayerSuffixes(c.matchedName.toLowerCase()).split(/\s+/)) words.add(w);
+    for (const w of splitNameWords(normalisePlayerSuffixes(c.matchedName.toLowerCase()))) words.add(w);
   }
   return [...words];
+}
+
+/**
+ * A raw mention token (possibly, under splitNameWords, more than one
+ * SQL-comparable word -- "byrne-jones") is justified against a
+ * candidate's name words when EVERY one of its words is a whole-word
+ * prefix of some name word. A plain single-word token behaves exactly as
+ * before this contract existed.
+ */
+function tokenJustifiedBy(token: string, nameWords: readonly string[]): boolean {
+  const words = splitNameWords(token);
+  return words.length > 0 && words.every(
+    (w) => nameWords.some((nw) => nw.startsWith(normalisePlayerSuffixes(w))),
+  );
 }
 
 // -------------------------------------------------------------- main entry
@@ -1196,6 +2124,11 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   const normalised = canonicalise(query);
   const report = emptyReport(normalised);
   let text = normalised;
+  // AFLDB-ISSUE-189: club/team-subject cue, computed before any extractor
+  // runs. Extractors mutate `text` (extractAggregation strips "teams with"
+  // outright) and the interrogative form ("which club…") is never leading,
+  // so a cue read after extraction depends on extractor order.
+  const clubSubjectPreCue = CLUB_SUBJECT_CUE.test(normalised);
 
   const totalTokens = meaningfulTokens(normalised);
   const consumedTokens: string[] = [];
@@ -1264,7 +2197,13 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   // cannot govern a later club as though the reader wrote "lost to".
   // The cue is committed only after two real clubs resolve.
   const headToHeadResult = extractHeadToHeadCue(text);
-  const clubExtraction = extractClubs(headToHeadResult.cue ? headToHeadResult.text : text, ctx.clubs);
+  // AFLDB-ISSUE-152 Phase F. The text WITH its club mentions still in
+  // place, kept so the cross-domain reading below can tell which side of
+  // "played ... and also coached ..." each club sits on. By the time that
+  // block runs the names have been spliced out of `text` and their
+  // positions -- the only evidence of role -- are gone with them.
+  const clubScanText = headToHeadResult.cue ? headToHeadResult.text : text;
+  const clubExtraction = extractClubs(clubScanText, ctx.clubs);
   text = clubExtraction.text;
   consumedTokens.push(...clubExtraction.consumed);
   let clubFor = byClubPlayer.clubFor ?? clubExtraction.clubFor;
@@ -1302,6 +2241,303 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   text = seasons.text;
   consumedTokens.push(...seasons.consumed);
 
+  // 5c. Coaching. Placed AFTER season extraction, so a year can never be
+  // read as a coaching threshold's number, and BEFORE match-type
+  // extraction, because "grand finals" and "finals" are coaching METRICS
+  // ("which coach has coached the most grand finals") and extractMatchType
+  // would otherwise consume them as match scope, leaving the coaching
+  // question with a scope its compiler refuses.
+  //
+  // Three readings share one cue. "coached by X" / "played under X" and
+  // "premiership coach(es)" are questions about PLAYERS, answered at
+  // player_career grain through the grid solver's own coaching builders;
+  // everything else is a question about a coach's record. Deciding here,
+  // before the player-name scan, is what keeps a coach's name out of
+  // resolvePlayer: 368 of 386 coaches share a name with a player row, and
+  // resolving "damien hardwick" as a PLAYER for a coaching question would
+  // answer with his 207 playing games instead of his 307 coached ones.
+  let coachReading: 'coach_record' | 'coached_by' | 'premiership_coach' | 'coached_population' | null = null;
+  let coach: NlCoachRef | undefined;
+  let coachMetric: string | undefined;
+  let coachCondition: NlMetricCondition | undefined;
+  let coachQualifierMinGames: number | undefined;
+  let coachQualifierRefused = false;
+  // AFLDB-ISSUE-152 Phase F. The clubs the cross-domain composition binds
+  // as BUILDER parameters -- one owned by the playing side, one by the
+  // coaching side. Never scope.clubFor: the generic career club filter
+  // means "played for this club", and letting it stand in for the
+  // coaching side would answer "coached Richmond" (41 people) under a
+  // question that asked who both played for AND coached Richmond (27).
+  let crossDomainPlayedClub: NlEntityMatch<NlClubDirectoryEntry> | undefined;
+  let crossDomainCoachedClub: NlEntityMatch<NlClubDirectoryEntry> | undefined;
+  // AFLDB-ISSUE-153 Stage 5 (X3). The father-son side of a cross-domain
+  // composition, claimed inside the coaching reading because step 5e's
+  // relationship extractor is suppressed for one. Only ever one of the
+  // two explicit builders, and only when the wording named the rule.
+  let crossDomainFatherSonBuilder: 'father_son_selection' | 'father_son_father' | undefined;
+  if (COACH_CUE_RE.test(text) || COACHED_BY_RE.test(text)) {
+    // AFLDB-ISSUE-152 Phase F. The CROSS-DOMAIN reading is elected FIRST,
+    // before coached_by, premiership_coach and coach_record. coach_record
+    // is this block's fallthrough, so electing after it would be useless:
+    // it would already have claimed the question, consumed the coaching
+    // cue, and -- with a club still in scope -- reached validatePlan as a
+    // coaching record it cannot honour. The cue is a COMPOSITION cue, not
+    // the bare COACH_CUE_RE, so an ordinary coaching question is
+    // untouched.
+    if (CROSS_DOMAIN_COMPOSITION_RE.test(text) || CROSS_DOMAIN_TEMPORAL_RE.test(text)) {
+      coachReading = 'coached_population';
+
+      // The temporal refusal, BEFORE any predicate is emitted and before
+      // any word is consumed (D9, upheld by F-D2). Declining here, with a
+      // stated reason, is the whole point: the alternative is a silent
+      // strip that answers a question the reader did not ask.
+      if (CROSS_DOMAIN_TEMPORAL_RE.test(text)) {
+        report.confidence = 1;
+        report.notes.push(
+          'AFLDB does not record the order of a person\'s playing and coaching careers, '
+          + 'so it cannot answer whether one came after the other. '
+          + 'Ask instead who both played and coached.',
+        );
+        return { status: 'none', reason: 'unrecognised', report };
+      }
+
+      // The F-D1 boundary, NARROWED to its own justification
+      // (AFLDB-ISSUE-153 Stage 5, operator decision Q6).
+      //
+      // F-D1's reason was that a phrase which declines on its own must
+      // not become answerable merely by appending "and also coached".
+      // That reason applies to the BARE and COLLECTIVE forms, which still
+      // decline on their own and still decline here. It never applied to
+      // wording that names the rule, a selection, a draft or a pick: the
+      // father side of exactly that wording has shipped and answered
+      // since Phase D (rel_022-rel_024), and the son side answers as of
+      // Stage 2. As written the guard tested for father-son wording of
+      // ANY kind, so it also refused the father-side composition -- an
+      // 11-player answer whose wording is accepted everywhere else in the
+      // product.
+      //
+      // Step 5e's relationship extractor is suppressed for a coaching
+      // reading, so the cue is claimed here instead, and ONLY these two
+      // explicit cue lists are: no other relationship composes with
+      // coaching, and none is being made to.
+      if (FATHER_SON_RULE_RE.test(text)) {
+        const fatherCue = FATHER_SON_FATHER_CUES.find((cue) => cue.test(text));
+        const sonCue = fatherCue ? undefined : FATHER_SON_SELECTION_CUES.find((cue) => cue.test(text));
+        const explicit = fatherCue ?? sonCue;
+        if (!explicit) {
+          report.confidence = 1;
+          report.notes.push(
+            'AFLDB cannot yet answer what "father–son" means on its own, '
+            + 'so it cannot answer it in combination with a coaching question either.',
+          );
+          return { status: 'none', reason: 'unrecognised', report };
+        }
+        const match = explicit.exec(text);
+        if (match) {
+          consumedTokens.push(match[0]);
+          text = stripMatch(text, match[0]);
+          for (const noise of FATHER_SON_FATHER_NOISE) {
+            const noiseMatch = noise.exec(text);
+            if (!noiseMatch) continue;
+            consumedTokens.push(noiseMatch[0]);
+            text = stripMatch(text, noiseMatch[0]);
+          }
+          crossDomainFatherSonBuilder = fatherCue ? 'father_son_father' : 'father_son_selection';
+        }
+      }
+
+      const roles = assignCrossDomainClubs(clubScanText, [
+        clubFor, clubAgainst, matchup?.clubA, matchup?.clubB,
+      ]);
+      if (!roles.ok) {
+        report.confidence = 1;
+        report.notes.push(roles.reason === 'opponent'
+          ? 'A question about who both played and coached cannot also be scoped to an opponent.'
+          : 'A question about who both played for and coached a club must name the club on '
+            + 'each side. AFLDB cannot assume which club the coaching half means.');
+        return { status: 'none', reason: 'unrecognised', report };
+      }
+      crossDomainPlayedClub = roles.played;
+      crossDomainCoachedClub = roles.coached;
+      // Both clubs are now builder parameters. Nothing is left in match
+      // scope for a compiler to drop or a validator to have to guess at.
+      clubFor = undefined;
+      clubAgainst = undefined;
+      matchup = undefined;
+
+      for (let cue = COACH_CUE_RE.exec(text); cue !== null; cue = COACH_CUE_RE.exec(text)) {
+        consumedTokens.push(cue[0]);
+        text = stripMatch(text, cue[0]);
+      }
+      // A plain replace, not stripMatch: some of these matches end in a
+      // slash ("vfl/", what canonicalise leaves of "VFL/AFL"), and
+      // stripMatch's trailing \b would never fire on one -- leaving the
+      // token unconsumed and the loop unable to make progress. The
+      // no-progress guard is the belt to that braces.
+      for (let word = CROSS_DOMAIN_CONSUME_RE.exec(text); word !== null; word = CROSS_DOMAIN_CONSUME_RE.exec(text)) {
+        const next = text.replace(word[0], ' ').replace(/\s+/g, ' ').trim();
+        if (next === text) break;
+        consumedTokens.push(word[0]);
+        text = next;
+      }
+    } else {
+      const coachedBy = COACHED_BY_RE.exec(text);
+      const premiershipCoach = PREMIERSHIP_COACH_RE.exec(text);
+      const cue = COACH_CUE_RE.exec(text);
+      const phrase = coachedBy ?? premiershipCoach ?? cue!;
+      coachReading = coachedBy ? 'coached_by' : premiershipCoach ? 'premiership_coach' : 'coach_record';
+      consumedTokens.push(phrase[0]);
+      text = stripMatch(text, phrase[0]);
+      for (let cueLeft = COACH_CUE_RE.exec(text); cueLeft !== null; cueLeft = COACH_CUE_RE.exec(text)) {
+        consumedTokens.push(cueLeft[0]);
+        text = stripMatch(text, cueLeft[0]);
+      }
+
+      // The coach directory, never searchPlayers. An absent directory (a
+      // caller that did not build one) resolves nothing, which declines.
+      if (coachReading !== 'premiership_coach') {
+        const coachMatch = findCoach(text, ctx.coaches ?? []);
+        if (coachMatch) {
+          coach = {
+            id: coachMatch.entity.id,
+            slug: coachMatch.entity.slug,
+            name: coachMatch.entity.name,
+            playerId: coachMatch.entity.playerId,
+            playerSlug: coachMatch.entity.playerSlug,
+          };
+          text = stripMatch(text, coachMatch.matchedText);
+          consumedTokens.push(coachMatch.matchedText);
+          report.entityResolution.push({
+            mention: coachMatch.matchedText, resolvedTo: coachMatch.entity.name, certainty: 1,
+          });
+        }
+      }
+
+      if (coachReading === 'coach_record') {
+        if (COACH_WIN_PCT_RE.test(text)) {
+          const noQualifier = COACH_NO_QUALIFIER_RE.exec(text);
+          if (noQualifier) {
+            coachQualifierRefused = true;
+            consumedTokens.push(noQualifier[0]);
+            text = stripMatch(text, noQualifier[0]);
+          } else {
+            const qualifier = extractCoachMetric(text, COACH_GAMES_WORDS);
+            if (qualifier.condition && (qualifier.condition.op === 'gte' || qualifier.condition.op === 'gt')) {
+              coachQualifierMinGames = qualifier.condition.value;
+              text = qualifier.text;
+              consumedTokens.push(...qualifier.consumed);
+            }
+          }
+        }
+        const coachMetricResult = extractCoachMetric(text);
+        text = coachMetricResult.text;
+        consumedTokens.push(...coachMetricResult.consumed);
+        coachMetric = coachMetricResult.metric;
+        coachCondition = coachMetricResult.condition;
+      }
+    }
+  }
+
+  // 5d. After the siren (AFLDB-ISSUE-152 Phase C). Placed AFTER season
+  // extraction, so a year is never read as a dimension token, and BEFORE
+  // every metric extractor -- THE critical precedence rule of this phase.
+  // "goals" must be claimed as the kickScored dimension and never as the
+  // player_match_stats goals metric, or "who has kicked the most goals
+  // after the siren" answers with a career-goals leaderboard. Before this
+  // block existed the metric extractor DID claim the word, and only the
+  // confidence gate's penalty on the leftover "after siren" tokens stopped
+  // the wrong answer being returned (the R0 probe, recorded on the issue).
+  //
+  // Deliberately BEFORE, but NOT consuming, extractMatchType. This is an
+  // explicit inversion of the Phase B coaching rule: there "finals" and
+  // "grand finals" were coaching METRICS and had to be claimed first; here
+  // finals is genuine match SCOPE (D4), so the words are left for
+  // extractMatchType to claim as scope.matchType.
+  let afterSirenReading = false;
+  let sirenScored: NlAfterSirenScored | undefined;
+  let sirenEffect: NlAfterSirenEffect | undefined;
+  let sirenKickerResult: NlAfterSirenKickerResult | undefined;
+  let sirenOccurrence: NlAfterSirenOccurrence | undefined;
+  let sirenCondition: NlMetricCondition | undefined;
+  let sirenNounConsumed = false;
+  if (AFTER_SIREN_CUE_RE.test(text)) {
+    // Fail closed: neither grain owns the other's fields, and a coaching
+    // record scoped to after-the-siren kicks is not a question either
+    // compiler can answer.
+    if (coachReading !== null) {
+      report.notes.push('AFLDB cannot combine a coaching question with an after-the-siren question.');
+      report.unsupportedTerms.push('after the siren');
+      return { status: 'none', reason: 'unrecognised', report };
+    }
+    afterSirenReading = true;
+    for (let cue = AFTER_SIREN_CUE_RE.exec(text); cue !== null; cue = AFTER_SIREN_CUE_RE.exec(text)) {
+      consumedTokens.push(cue[0]);
+      text = stripMatch(text, cue[0]);
+    }
+
+    // Occurrence first, so "most recent" is claimed as ONE phrase before
+    // aggregation extraction can read its bare "most" as a superlative.
+    for (const [re, value] of AFTER_SIREN_OCCURRENCE_WORDS) {
+      const match = re.exec(text);
+      if (!match) continue;
+      sirenOccurrence = value;
+      consumedTokens.push(match[0]);
+      text = stripMatch(text, match[0]);
+      break;
+    }
+
+    // The kicker's match RESULT before the kick's EFFECT: "missed after
+    // the siren and lost" is kickerResult='loss', and "and won" is not
+    // kickEffect='won'. The two are semantically different and the
+    // measured (none, none, win) event proves it.
+    for (const [re, value] of AFTER_SIREN_RESULT_WORDS) {
+      const match = re.exec(text);
+      if (!match) continue;
+      sirenKickerResult = value;
+      consumedTokens.push(match[0]);
+      text = stripMatch(text, match[0]);
+      break;
+    }
+    for (const [re, value] of AFTER_SIREN_EFFECT_WORDS) {
+      const match = re.exec(text);
+      if (!match) continue;
+      sirenEffect = value;
+      consumedTokens.push(match[0]);
+      text = stripMatch(text, match[0]);
+      break;
+    }
+
+    // What the kick registered, and any threshold governing it. The
+    // threshold reuses extractCoachMetric's comparator/number lookback
+    // rather than a second copy of it -- the noun here plays exactly the
+    // role a coaching metric word plays there. An ABSENT kickScored means
+    // any kick, INCLUDING a miss: "kicks after the siren" is every event,
+    // not only the ones that scored.
+    let scoredWord: [RegExp, NlAfterSirenScored] | undefined;
+    for (const entry of AFTER_SIREN_SCORED_WORDS) {
+      if (entry[0].test(text)) { scoredWord = entry; break; }
+    }
+    const nounRe = scoredWord?.[0] ?? AFTER_SIREN_KICK_NOUN_RE;
+    if (scoredWord || AFTER_SIREN_KICK_NOUN_RE.test(text)) {
+      const noun = extractCoachMetric(text, [[nounRe, 'siren_kicks']]);
+      text = noun.text;
+      consumedTokens.push(...noun.consumed);
+      sirenScored = scoredWord?.[1];
+      sirenCondition = noun.condition;
+      sirenNounConsumed = true;
+    }
+    // The subject noun again, when a dimension word claimed the first
+    // pass: "kicks after the siren that missed" names both, and the
+    // unclaimed "kicks" would otherwise survive as an unexplained
+    // leftover and decline a question the engine understood completely.
+    const bareNoun = AFTER_SIREN_KICK_NOUN_RE.exec(text);
+    if (bareNoun) {
+      consumedTokens.push(bareNoun[0]);
+      text = stripMatch(text, bareNoun[0]);
+      sirenNounConsumed = true;
+    }
+  }
+
   // A team-scoring word anywhere in the question means a bare "grand
   // final"/"finals" can only be scope, never the player_career metric --
   // see extractMatchType. Peeked before extraction so the decision is made
@@ -1325,7 +2561,14 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   // the whole span first is also what keeps "first" away from the boundary
   // logic further down. See FIRST_KICK_GOAL_RE for the phrases this
   // deliberately does NOT match ("first goal", "debut goal", ...).
-  const achievementResult = extractFirstKickGoal(text);
+  // Suppressed for an after-siren question: the after_siren grain carries
+  // no careerPredicates, so a consumed achievement phrase would be dropped
+  // on the way to the plan -- the ISSUE-110 silent-scope defect. Left in
+  // the text it becomes a leftover token and the question declines, which
+  // is the honest outcome.
+  const achievementResult: FirstKickGoalExtraction = afterSirenReading
+    ? { text, consumed: [] }
+    : extractFirstKickGoal(text);
   text = achievementResult.text;
   consumedTokens.push(...achievementResult.consumed);
   if (achievementResult.negatedAchievement) {
@@ -1334,6 +2577,98 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     // no structure downstream, so this declines as unrecognised; the note
     // tells the reader (and the search log) why.
     notes.push('Questions about players who did not achieve this are not supported.');
+  }
+  // AFLDB-ISSUE-152 Phase E. Three named refusals, each returned here for
+  // the reason the coaching and after-siren per-season gates are: the
+  // question was UNDERSTOOD and cannot be answered, so a named decline
+  // beats a leftover token -- especially when the leftover words would be
+  // "goal" and "kick", which the metric extractors would then read as the
+  // ranking subject and answer a different question confidently.
+  if (achievementResult.kickLevelResidual) {
+    report.confidence = 1;
+    report.notes.push(
+      'AFLDB records whether a first-kick goal was a player\'s only career GOAL, '
+      + 'not whether they ever kicked the football again.',
+    );
+    return { status: 'none', reason: 'unrecognised', report };
+  }
+  if (achievementResult.countOutOfRange) {
+    report.confidence = 1;
+    report.notes.push(
+      `A first-kick goal streak is counted from 1 to ${FIRST_KICK_CONSECUTIVE_MAX} kicks; `
+      + 'that number is outside what this record holds.',
+    );
+    return { status: 'none', reason: 'unrecognised', report };
+  }
+  if (achievementResult.modifierWithSummary) {
+    report.confidence = 1;
+    report.notes.push(
+      'A summary of the first-kick-goal record counts every holder; it cannot also be '
+      + 'narrowed to the multi-kick or only-career-goal subset.',
+    );
+    return { status: 'none', reason: 'unrecognised', report };
+  }
+
+  // 5d-bis. The family GRAIN (AFLDB-ISSUE-153 Stage 6, D6). Claimed BEFORE
+  // extractRelationship for exactly one reason: a match here removes the
+  // family/families word from `text`, so the family/relatives entry in
+  // RELATIONSHIP_OUT_OF_SCOPE (tested inside extractRelationship, next)
+  // never gets a chance to decline a phrasing D6 already answers. Every
+  // other family/relatives wording is untouched.
+  //
+  // Suppressed for a coaching or after-siren question, same as the
+  // relationship extractor immediately below and for the same reason: a
+  // family answer needs no coach/siren context to already be underway.
+  const familyGrainResult: FamilyGrainExtraction = coachReading !== null || afterSirenReading
+    ? { text, consumed: [] }
+    : extractFamilyGrain(text);
+  text = familyGrainResult.text;
+  consumedTokens.push(...familyGrainResult.consumed);
+
+  // 5e. Family relationships (AFLDB-ISSUE-152 Phase D). Placed here, after
+  // the achievement phrase and before every metric extractor and the
+  // player-name scan, for the reason step 5a is: the relationship noun has
+  // to be claimed before "brothers"/"son" can be swallowed into a
+  // candidate player span. "who is Brent Harvey's son" resolved a player
+  // called "brent harvey son" and declined before this ran.
+  //
+  // Suppressed for a coaching or after-siren question, and fails closed
+  // rather than dropping half the reading: neither grain carries
+  // careerPredicates, so a relationship claimed here would be silently
+  // discarded on the way to the plan (the ISSUE-110 defect).
+  const relationshipResult: RelationshipExtraction = coachReading !== null || afterSirenReading
+    ? { text, consumed: [] }
+    : extractRelationship(text, query);
+  text = relationshipResult.text;
+  consumedTokens.push(...relationshipResult.consumed);
+  if (relationshipResult.declined) {
+    report.confidence = 1;
+    report.notes.push(relationshipResult.declined);
+    return { status: 'none', reason: 'unrecognised', report };
+  }
+  const relationshipRead = !!relationshipResult.builders || !!relationshipResult.ofPlayerBuilder;
+
+  // 5e-bis. FS6 (AFLDB-ISSUE-153 Stage 4). A father-son SELECTION question
+  // that also says "by club" or "by year" is asking for a distribution of
+  // the selections, not a list of the players. Claimed here, immediately
+  // after the relationship cue and BEFORE any metric extractor runs: left
+  // in the text, "by club" resolves to the clubs_played metric and the
+  // question answers a career-breadth ranking instead of the grouping it
+  // asked for.
+  //
+  // Only ever elected by wording that already bound to the selection
+  // record, so "brothers by club" is untouched -- FS6 is a shape this one
+  // family has, not a generic grouping the parser now offers everyone.
+  let fatherSonSummaryKind: 'by_club' | 'by_draft_year' | undefined;
+  if (relationshipResult.builders?.includes('father_son_selection')) {
+    for (const [cue, summaryKind] of FATHER_SON_SUMMARY_CUES) {
+      const match = cue.exec(text);
+      if (!match) continue;
+      consumedTokens.push(match[0]);
+      text = stripMatch(text, match[0]);
+      fatherSonSummaryKind = summaryKind;
+      break;
+    }
   }
 
   // 5b. "N disposal games" idiom -- resolves the metric AND acts as a
@@ -1358,8 +2693,13 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   // match-type scope inherently means individual matches of that type,
   // which is the single-game reading by nature -- "most disposals in a
   // final" ranks individual final performances, not a sum across finals.
+  // AFLDB-ISSUE-217: "which match saw <player> collect the most <metric>"
+  // is itself a single-game grain cue -- it names no other construction --
+  // computed here (before the strip loop consumes IN_ONE_GAME et al) so it
+  // can join inOneGame's own election like every other cue below.
+  const whichMatchSawCue = WHICH_MATCH_SAW_RE.test(text);
   const inOneGame = !!idiomMetric || IN_ONE_GAME.test(text) || !!matchTypeResult.matchType
-    || roundResult.roundNumber !== undefined;
+    || roundResult.roundNumber !== undefined || whichMatchSawCue;
   const inOneSeason = IN_ONE_SEASON.test(text);
   const overCareer = OVER_CAREER.test(text);
   // "dusty TOTAL goals against Carlton" -- overrides the named-player
@@ -1381,6 +2721,78 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     }
   }
 
+  // AFLDB-ISSUE-217. Consume "which match saw" itself (it sits ahead of
+  // the player mention, so it must go before candidatePlayerSpan runs at
+  // step 12) and the verb half of its construction, "collect", which sits
+  // AFTER the player mention. Both only ever fire together: gated on the
+  // same whichMatchSawCue.
+  if (whichMatchSawCue) {
+    const leadMatch = WHICH_MATCH_SAW_RE.exec(text);
+    if (leadMatch) {
+      consumedTokens.push(leadMatch[0].trim());
+      text = text.slice(leadMatch[0].length);
+    }
+    const collectMatch = PLAYER_GAME_SINGLE_COLLECT_RE.exec(text);
+    if (collectMatch) {
+      consumedTokens.push(collectMatch[0]);
+      text = stripMatch(text, collectMatch[0]);
+    }
+  }
+
+  // AFLDB-ISSUE-217. "<metric> haul in one match", "peak single-game
+  // <metric>" -- see PLAYER_GAME_SINGLE_HAUL_RE/PLAYER_GAME_SINGLE_PEAK_RE
+  // for the two-part gate (single-game cue already present, AND an actual
+  // player stat word already present) that keeps this from becoming a
+  // blanket strip of two common English words.
+  const playerGameSingleMetricWordPresent = METRIC_WORDS.some(([re]) => re.test(text));
+  if (inOneGame && playerGameSingleMetricWordPresent) {
+    const haulMatch = PLAYER_GAME_SINGLE_HAUL_RE.exec(text);
+    if (haulMatch) {
+      consumedTokens.push(haulMatch[0]);
+      text = stripMatch(text, haulMatch[0]);
+    }
+    const peakMatch = PLAYER_GAME_SINGLE_PEAK_RE.exec(text);
+    if (peakMatch) {
+      consumedTokens.push(peakMatch[0]);
+      text = stripMatch(text, peakMatch[0]);
+    }
+  }
+
+  // AFLDB-ISSUE-216. "posted the highest season tally of <metric>" and "the
+  // best seasonal <metric> total" both name a player-season leaderboard by
+  // their own answer shape -- a single season's tally -- rather than any
+  // globally consumed filler. Gated on an actual player_match_stats
+  // METRIC_WORDS match already being present in `text` (probed here, not
+  // yet consumed -- extractPlayerMetric does not run until step 11) so a
+  // genuinely unrelated "posted"/"season"/"seasonal" is left untouched, the
+  // same discipline CLUB_SEASON_SEASONAL_ADJECTIVE_RE uses for the disjoint
+  // club-season vocabulary. "total" itself needs no separate handling here:
+  // it was already unconditionally stripped by the loop above, and the only
+  // remaining defect is `aggregateTotal` (set a few lines up, from the same
+  // "total") misreading this construction as the generic scoped-running-
+  // total cue -- see the `playerSeasonLeaderboardCue` override at grain
+  // election below.
+  const playerSeasonLeaderboardMetricWordPresent = METRIC_WORDS.some(([re]) => re.test(text));
+  const playerSeasonTallyMatch = playerSeasonLeaderboardMetricWordPresent
+    ? PLAYER_SEASON_LEADERBOARD_TALLY_RE.exec(text) : null;
+  const playerSeasonSeasonalMatch = playerSeasonLeaderboardMetricWordPresent
+    ? PLAYER_SEASON_LEADERBOARD_SEASONAL_RE.exec(text) : null;
+  const playerSeasonLeaderboardCue = !!playerSeasonTallyMatch || !!playerSeasonSeasonalMatch;
+  if (playerSeasonTallyMatch) {
+    consumedTokens.push(playerSeasonTallyMatch[0]);
+    text = stripMatch(text, playerSeasonTallyMatch[0]);
+  }
+  if (playerSeasonSeasonalMatch) {
+    consumedTokens.push(playerSeasonSeasonalMatch[0]);
+    text = stripMatch(text, playerSeasonSeasonalMatch[0]);
+  }
+  const playerSeasonPostedMatch = playerSeasonLeaderboardCue
+    ? PLAYER_SEASON_LEADERBOARD_POSTED_RE.exec(text) : null;
+  if (playerSeasonPostedMatch) {
+    consumedTokens.push(playerSeasonPostedMatch[0]);
+    text = stripMatch(text, playerSeasonPostedMatch[0]);
+  }
+
   const debutGameMatch = /\bon (?:their )?debut\b|\bdebut game\b/.exec(text);
   const debutGame = !!debutGameMatch;
   if (debutGameMatch) {
@@ -1389,6 +2801,20 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   }
 
   const negated = NEGATION_WORDS.test(text);
+
+  // 6.5. Period split / score checkpoint ("first quarter", "at half
+  // time") get first opportunity to consume their tokens, AHEAD of
+  // extractBoundary below. AFLDB-ISSUE-191: "first quarter"/"first half"
+  // are intact phrases PERIOD_SPLIT_WORDS already recognises, but boundary
+  // used to run first and read their bare "first" as a debut event,
+  // stripping it before period-split ever saw the phrase.
+  const periodSplitResult = extractPeriodSplit(text);
+  text = periodSplitResult.text;
+  consumedTokens.push(...periodSplitResult.consumed);
+
+  const scoreCheckpointResult = extractScoreCheckpoint(text);
+  text = scoreCheckpointResult.text;
+  consumedTokens.push(...scoreCheckpointResult.consumed);
 
   // 7. Boundary ("debuted in a grand final", "last game was a final").
   // Reads matchTypeResult, computed above at step 5, rather than
@@ -1400,6 +2826,17 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   if (boundary) consumedTokens.push(...boundaryResult.consumed);
 
   // 8. Aggregation.
+  // Probed BEFORE extractAggregation, which consumes the "<subject>
+  // with" cue outright -- by the time CLUB_SUBJECT_LEADING is tested at
+  // step 10.5 the leading "teams"/"clubs"/"sides" word is already gone.
+  // Only extractHavingClause reads this, to disambiguate "games" and (per
+  // AFLDB-ISSUE-188) to refuse the grouped result words entirely on a
+  // player-subject question ("players with more than 100 wins" would
+  // otherwise lose its own "players" cue to extractAggregation's "<subject>
+  // with" -> list stripping before this ran).
+  const clubSubjectCue = CLUB_SUBJECT_LEADING.test(text.trim());
+  const playerSubjectCue = /\bplayers?\b|\bwho\b/.test(text);
+
   const aggResult = extractAggregation(text);
   text = aggResult.text;
   consumedTokens.push(...aggResult.consumed);
@@ -1408,7 +2845,7 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   text = streakResult.text;
   consumedTokens.push(...streakResult.consumed);
 
-  const havingResult = extractHavingClause(text);
+  const havingResult = extractHavingClause(text, clubSubjectCue, playerSubjectCue);
   text = havingResult.text;
   consumedTokens.push(...havingResult.consumed);
 
@@ -1420,23 +2857,23 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   text = resultFilterResult.text;
   consumedTokens.push(...resultFilterResult.consumed);
 
-  const periodSplitResult = extractPeriodSplit(text);
-  text = periodSplitResult.text;
-  consumedTokens.push(...periodSplitResult.consumed);
-
-  const scoreCheckpointResult = extractScoreCheckpoint(text);
-  text = scoreCheckpointResult.text;
-  consumedTokens.push(...scoreCheckpointResult.consumed);
-
-  const teamMetricResult = extractTeamMetric(text);
+  const teamMetricResult: { text: string; metric?: string; consumed: string[] } =
+    coachReading === 'coach_record' || afterSirenReading ? { text, consumed: [] } : extractTeamMetric(text);
   // Do NOT update text with teamMetricResult.text here.
   // The match is stripped at step 11 instead to allow career conditions
   // to see unstripped words if they overlap.
 
-  const clubSubjectPresent = CLUB_SUBJECT_LEADING.test(text.trim());
+  // AFLDB-ISSUE-189: the pre-computed cue ORs in every existing positive
+  // (for example, where a season prefix has since been stripped from `text`).
+  const clubSubjectPresent = clubSubjectPreCue || CLUB_SUBJECT_LEADING.test(text.trim());
 
   // 10. Career conditions (numeric thresholds/negatives on career columns).
-  const careerResult = extractCareerConditions(text);
+  // Suppressed for an after-siren question for the same reason step 5a is:
+  // the grain carries no careerConditions or careerPredicates, so anything
+  // claimed here would be silently discarded rather than answered.
+  const careerResult = afterSirenReading
+    ? { text, conditions: [] as NlCareerCondition[], predicates: [] as GridAxisState[], consumed: [] as string[] }
+    : extractCareerConditions(text);
   text = careerResult.text;
   consumedTokens.push(...careerResult.consumed);
 
@@ -1475,7 +2912,7 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   // at all); the metric word ("wins"/"losses"/"draws") is only tried once
   // a cue already exists, since those words also name a player career
   // column -- see CLUB_SEASON_METRIC_WORDS's header comment.
-  const clubSeasonConditionResult = extractClubSeasonConditions(text);
+  const clubSeasonConditionResult = extractClubSeasonConditions(text, clubSubjectPresent);
   text = clubSeasonConditionResult.text;
   consumedTokens.push(...clubSeasonConditionResult.consumed);
 
@@ -1492,9 +2929,30 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   // consuming; the guarded extraction below still does the real work.
   const seasonWorded = inOneSeason || seasons.seasonMin !== undefined || seasons.seasonMax !== undefined;
   const clubSeasonMetricWordPresent = CLUB_SEASON_METRIC_WORDS.some(([re]) => re.test(text));
-  const clubSeasonCuePresent = clubSubjectPresent
+  // AFLDB-ISSUE-214: "what season had the highest losses" and "highest
+  // seasonal losses" name the club_season grain unambiguously on their own
+  // -- see the cue comments in vocab.ts -- and both stand in for a
+  // one-season-at-a-time phrasing everywhere seasonWorded does below, so a
+  // club named alongside them with no explicit year ("North Melbourne's
+  // highest seasonal losses") still passes the ISSUE-189 single-season
+  // guard further down. Matched here (ahead of clubSeasonCuePresent, which
+  // reads the result) and consumed immediately so "season"/"seasonal"
+  // never survive as an unclaimed leftover token.
+  const clubSeasonRankSeasonCueMatch = CLUB_SEASON_RANK_SEASON_CUE_RE.exec(text);
+  const clubSeasonSeasonalCueMatch = clubSeasonMetricWordPresent ? CLUB_SEASON_SEASONAL_ADJECTIVE_RE.exec(text) : null;
+  const clubSeasonPerSeasonPhrasing = !!clubSeasonRankSeasonCueMatch || !!clubSeasonSeasonalCueMatch;
+  if (clubSeasonRankSeasonCueMatch) {
+    consumedTokens.push(clubSeasonRankSeasonCueMatch[0]);
+    text = stripMatch(text, clubSeasonRankSeasonCueMatch[0]);
+  }
+  if (clubSeasonSeasonalCueMatch) {
+    consumedTokens.push(clubSeasonSeasonalCueMatch[0]);
+    text = stripMatch(text, clubSeasonSeasonalCueMatch[0]);
+  }
+  const clubSeasonCuePresent = coachReading === null && !afterSirenReading && (clubSubjectPresent
     || clubSeasonConditionResult.conditions.length > 0
-    || (!!clubFor && !teamMetricResult.metric && clubSeasonMetricWordPresent && seasonWorded);
+    || clubSeasonPerSeasonPhrasing
+    || (!!clubFor && !teamMetricResult.metric && clubSeasonMetricWordPresent && seasonWorded));
 
   let clubSeasonMetricResult: { text: string; metric?: string; consumed: string[] } = { text, consumed: [] };
   if (clubSeasonCuePresent && !teamMetricResult.metric) {
@@ -1511,7 +2969,9 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   // Set when a comparator/number was consumed with the metric word; grain
   // election below decides which typed representation honours it.
   let pendingMetricCondition: NlMetricCondition | undefined;
-  if (teamMetricResult.metric) {
+  if (coachReading === 'coach_record' || afterSirenReading) {
+    playerMetricResult = { text, consumed: [] };
+  } else if (teamMetricResult.metric) {
     // Strip the matched word from the CURRENT text, not
     // teamMetricResult.text -- that snapshot was computed back at step 9,
     // before extractCareerConditions/extractClubSeasonConditions (steps
@@ -1522,6 +2982,27 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     // player-name guess).
     text = stripMatch(text, teamMetricResult.consumed[0]);
     consumedTokens.push(...teamMetricResult.consumed);
+
+    // AFLDB-ISSUE-218: two decorative wrappers around a directional
+    // team-match-result construction ("by how much did Pies lose to
+    // Carlton in their most lopsided meeting..."), consumed only now that
+    // the construction is positively recognised -- a win/loss margin
+    // metric AND both clubFor and clubAgainst have already resolved. See
+    // TEAM_MATCH_RESULT_HOW_MUCH_RE/TEAM_MATCH_RESULT_LOPSIDED_RE in
+    // vocab.ts for why neither is a general stopword.
+    if ((teamMetricResult.metric === 'win_margin' || teamMetricResult.metric === 'loss_margin') && clubFor && clubAgainst) {
+      const howMuchMatch = TEAM_MATCH_RESULT_HOW_MUCH_RE.exec(text);
+      if (howMuchMatch) {
+        text = stripMatch(text, howMuchMatch[0]);
+        consumedTokens.push(howMuchMatch[0]);
+      }
+      const lopsidedMatch = TEAM_MATCH_RESULT_LOPSIDED_RE.exec(text);
+      if (lopsidedMatch) {
+        text = stripMatch(text, lopsidedMatch[0]);
+        consumedTokens.push(lopsidedMatch[0]);
+      }
+    }
+
     playerMetricResult = { text, consumed: [] };
   } else if (idiomMetric) {
     playerMetricResult = { text, metric: idiomMetric, consumed: [] };
@@ -1601,6 +3082,23 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     );
     const candidates = await ctx.resolvePlayer(lookupName);
     const top = candidates[0];
+    // AFLDB-ISSUE-197: which branch governs a bare-surname mention is
+    // decided HERE, by resolvePlayer's own top score, before
+    // resolvePlayerFamily is ever consulted. For a real "Given Surname"
+    // player, a bare-surname mention can only reach searchPlayers's
+    // substring tier (250) at best -- 250 + max similarity (100) + max
+    // prominence (40) tops out at 390, structurally below
+    // PLAYER_ACCEPT_SCORE (500), src/db/queries/search.ts:91-95 -- so a
+    // genuine family mention reliably falls to the else-branch below,
+    // where resolvePlayerFamily governs completeness. Only an exact/prefix
+    // tier match (>=500: the mention text itself, or an unusual alias,
+    // starting with it) reaches PLAYER_ACCEPT_SCORE and lands here instead,
+    // where `nameMatches` is intentionally still computed from
+    // resolvePlayer's 5-capped `candidates` -- a narrow, unreproduced,
+    // out-of-scope certainty-calibration gap this issue's runbook (§15)
+    // explicitly did not fix. Do not reproduce a "family" test fixture
+    // with a surname-first synthetic name: that shape crosses this exact
+    // threshold and gets decided here instead of by resolvePlayerFamily.
     if (top && top.score >= PLAYER_ACCEPT_SCORE) {
       player = top.ref;
 
@@ -1616,7 +3114,7 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
       const nicknameTokens = new Set(nicknameKey !== null ? nicknameKey.split(' ') : []);
       const spanTokens = candidateRaw.split(' ');
       const justified = spanTokens.filter(
-        (t) => nicknameTokens.has(t) || nameWords.some((w) => w.startsWith(normalisePlayerSuffixes(t))),
+        (t) => nicknameTokens.has(t) || tokenJustifiedBy(t, nameWords),
       );
       const mention = justified.length > 0 ? justified.join(' ') : candidateRaw;
 
@@ -1632,7 +3130,7 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
       const mentionTokens = justified.length > 0 ? justified : spanTokens;
       const nameMatches = nicknameKey !== null ? 1 : candidates.filter((c) => {
         const words = candidateNameWords(c);
-        return mentionTokens.every((t) => words.some((w) => w.startsWith(normalisePlayerSuffixes(t))));
+        return mentionTokens.every((t) => tokenJustifiedBy(t, words));
       }).length;
 
       const second = candidates[1];
@@ -1670,8 +3168,25 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
       // nameMatches above, and require TWO genuine matches -- candidates
       // that do not even plausibly spell the mention are the resolver
       // casting a wide net, not competing readings of the question.
-      const lookupTokens = lookupName.split(' ');
-      const plausible = candidates.filter((c) => {
+      //
+      // AFLDB-ISSUE-197: `candidates` here is `resolvePlayer`'s 5-row cap,
+      // tuned for confident single-player lookup -- filtering IT for
+      // plausibility can never see more than 5 of a real family (Ablett
+      // is 7) and can never reach the >12 decline below (bounded by 5).
+      // `resolvePlayerFamily` is a second, dedicated data source that
+      // enumerates every plausible identity (up to the cap) directly, so
+      // the completeness/decline decision below sees the true family size
+      // rather than a fixed 5-row window. The whole-word-prefix filter is
+      // still applied to whatever it returns -- defence-in-depth against a
+      // resolver bug, not a substitute for the resolver's own predicate.
+      // Flattened to plain single words (splitNameWords), not just
+      // whitespace-split: resolvePlayerFamily normalises each element of
+      // `tokens` INDIVIDUALLY as one SQL term (resolve.ts's `q` CTE), so a
+      // hyphenated mention word ("byrne-jones") must already be two
+      // elements here, or it becomes one unmatchable multi-word term.
+      const lookupTokens = lookupName.split(' ').flatMap(splitNameWords);
+      const familyCandidates = await ctx.resolvePlayerFamily(lookupTokens);
+      const plausible = familyCandidates.filter((c) => {
         const words = candidateNameWords(c);
         return lookupTokens.every((t) => words.some((w) => w.startsWith(t)));
       });
@@ -1718,6 +3233,23 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     }
   }
 
+  // AFLDB-ISSUE-152 Phase D. A per-player relationship question is ABOUT
+  // somebody, and fails closed when that somebody is not one certain
+  // person: "brothers of Gary Ablett" names two real players 10.9 points
+  // apart, and answering for whichever ranked first would silently pick a
+  // family member's family. An unresolved or merely plausible mention is
+  // the same refusal -- there is no honest answer to "brothers of" nobody.
+  if (relationshipResult.ofPlayerBuilder
+      && (!player || playerCertainty < 1 || ambiguousCandidateIds !== undefined)) {
+    report.confidence = 1;
+    report.notes.push(
+      player
+        ? 'That name matches more than one player, so AFLDB cannot say whose relatives were asked for.'
+        : 'A question about one player\'s relatives has to name a player AFLDB can identify.',
+    );
+    return { status: 'none', reason: player ? 'ambiguous' : 'unrecognised', report };
+  }
+
   // ---------------------------------------------------------- grain election
 
   let grain: NlQueryPlan['grain'];
@@ -1738,7 +3270,21 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     && !matchTypeResult.matchType
   );
 
-  if (achievementResult.achievementKey && achievementResult.summaryKind) {
+  if (familyGrainResult.family) {
+    // AFLDB-ISSUE-153 Stage 6 (D6/C1/C5). Checked first, ahead of every
+    // other branch: the cue only exists because extractFamilyGrain already
+    // matched one of the three locked family-grain phrasings, so nothing
+    // else can be competing for this question.
+    grain = 'family';
+    metric = familyGrainResult.family.metric;
+  } else if (fatherSonSummaryKind) {
+    // AFLDB-ISSUE-153 Stage 4 (FS6). A distribution of SELECTIONS, which
+    // is a group-and-count and not a player list -- the same grain and the
+    // same payload shape an achievement summary uses, over a different
+    // table. Checked first for the same reason that branch is: the cue
+    // only exists because the father-son selection cue already matched.
+    grain = 'achievement_summary';
+  } else if (achievementResult.achievementKey && achievementResult.summaryKind) {
     // "which club has had the most players kick a goal with their first
     // kick" -- a group-and-count over the achievement, not a player list.
     // Checked first: the summary cue only exists because the achievement
@@ -1746,6 +3292,26 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     grain = 'achievement_summary';
   } else if (headToHead) {
     grain = 'head_to_head';
+  } else if (coachReading === 'coached_population') {
+    // AFLDB-ISSUE-152 Phase F. "Who both played and coached" is a fact
+    // about a CAREER, and careerPredicates exist at no other grain.
+    // Placed before the coach_record branch: coach_record is the coaching
+    // block's default reading and would otherwise take a question whose
+    // subject is the player, not the coaching record. A career metric is
+    // still honoured -- "most career games among players who also
+    // coached" ranks players WITHIN the composition, which is a different
+    // record from "most career games" and must not read the same.
+    grain = 'player_career';
+    metric = playerMetricResult.metric ?? null;
+  } else if (coachReading === 'coach_record') {
+    grain = 'coach_record';
+    metric = coachMetric ?? null;
+  } else if (afterSirenReading) {
+    // One metric on purpose: every distinction is a typed DIMENSION, never
+    // a second metric name (the ISSUE-110 two-spellings-of-one-question
+    // failure this grain must not reintroduce).
+    grain = 'after_siren';
+    metric = 'siren_kicks';
   } else if (achievementResult.achievementKey) {
     grain = 'player_career';
   } else if (streakResult.streakDefinition) {
@@ -1757,6 +3323,19 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     grain = 'club_season';
     metric = clubSeasonMetricResult.metric ?? null;
   } else if (boundary) {
+    // AFLDB-ISSUE-191: the boundary grain is a career-membership question
+    // ("did this player's first/last game fall in a final") and has no
+    // metric column of its own. A metric consumed alongside it ("most
+    // goals on debut in a grand final") asks a different, unsupported
+    // question -- refuse it outright rather than silently dropping the
+    // metric and answering plain boundary membership instead.
+    if (playerMetricResult.metric) {
+      report.confidence = 1;
+      report.notes.push(
+        'AFLDB cannot combine a player metric with a debut/last-game boundary question.',
+      );
+      return { status: 'none', reason: 'unrecognised', report };
+    }
     grain = 'player_career';
   } else if (awardResult.awardKey) {
     grain = 'player_career';
@@ -1838,7 +3417,16 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
       // So: any named season scope is a season leaderboard. A reader who
       // wants the total across a span says so ("total tackles since
       // 1900"), and aggregateTotal already routes that to the sum below.
-      !inOneGame && !aggregateTotal && !overCareer
+      //
+      // AFLDB-ISSUE-216: `playerSeasonLeaderboardCue` overrides aggregateTotal
+      // specifically. "the best seasonal goal assists TOTAL" sets
+      // aggregateTotal too (it is the same bare "total" AGGREGATE_TOTAL_WORDS
+      // reads everywhere else), but here "total" is half of "seasonal ...
+      // total" naming a single season's tally, not a request to sum across
+      // every season in scope -- so the cue, positively identified above from
+      // an actual METRIC_WORDS match plus "season tally"/"seasonal", wins over
+      // the generic reading.
+      !inOneGame && (!aggregateTotal || playerSeasonLeaderboardCue) && !overCareer
       && !venue && !clubAgainst && !matchup && !matchTypeResult.matchType
       && (seasons.seasonMin !== undefined || seasons.seasonMax !== undefined)
     ) {
@@ -1883,6 +3471,62 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
 
   if (grain === 'player_game' && mode === undefined) mode = inOneGame ? 'single' : 'sum';
 
+  // AFLDB-ISSUE-152 Phase D. A relationship is a fact about a career, and
+  // careerPredicates exist at no other grain. "most goals in 2015 by a
+  // player with a brother who played" elects player_season, where the
+  // relationship would be dropped on the way to SQL and the reader would
+  // be shown a 2015 goalkicking leaderboard under a question about
+  // brothers. Refusing by name is the honest outcome (ISSUE-110).
+  // AFLDB-ISSUE-153 Stage 4 exempts FS6, and only FS6: its grain carries
+  // no careerPredicates by design, because it does not answer with players
+  // at all. It groups the SELECTIONS -- all 127 of them, including the 28
+  // whose selected player is unlinked -- so there is nothing to drop on
+  // the way to SQL and nothing for this guard to protect. validatePlan
+  // refuses any scope it cannot honour.
+  if (relationshipRead && grain !== 'player_career' && !fatherSonSummaryKind) {
+    report.confidence = 1;
+    report.notes.push(
+      'A family-relationship question is answered across whole careers, '
+      + 'so it cannot also be limited to a single season, game or venue.',
+    );
+    return { status: 'none', reason: 'unrecognised', report };
+  }
+
+  // A coaching record is TOTALLED across the seasons in scope; there is no
+  // per-season coaching grain. "most wins in a season by a coach" would
+  // otherwise consume "in a season" and answer the all-time total under a
+  // question that asked for a single year -- the ISSUE-110 silently
+  // discarded-scope failure. It declines instead.
+  if (grain === 'coach_record' && inOneSeason) {
+    report.confidence = 1;
+    report.notes.push('A coaching record is totalled across the seasons asked for; per-season coaching splits are not supported.');
+    return { status: 'none', reason: 'unrecognised', report };
+  }
+
+  // The same rule for the same reason (§15.14 C-D7): after-siren events are
+  // counted across the seasons in scope, and there is no per-season
+  // after-siren grain. "most goals after the siren in a season" would
+  // otherwise answer the all-time count under a question that asked for a
+  // single year.
+  if (grain === 'after_siren' && inOneSeason) {
+    report.confidence = 1;
+    report.notes.push('After-the-siren kicks are counted across the seasons asked for; there is no per-season after-the-siren record.');
+    return { status: 'none', reason: 'unrecognised', report };
+  }
+
+  // AFLDB-ISSUE-152 Phase E. The E7/E8 modifiers are careerPredicates, and
+  // careerPredicates only exist at player_career grain. Any other grain
+  // would carry the words as consumed and the CONDITION nowhere -- the
+  // ISSUE-110 silent-scope shape -- so the question declines instead.
+  if (
+    grain !== 'player_career'
+    && (achievementResult.consecutiveKicks !== undefined || achievementResult.onlyCareerGoal)
+  ) {
+    report.confidence = 1;
+    report.notes.push('That first-kick-goal detail can only narrow a list of players.');
+    return { status: 'none', reason: 'unrecognised', report };
+  }
+
   // --------------------------------------- typed metric-threshold routing
   //
   // AFLDB-ISSUE-110 workstream B. Two producers feed this:
@@ -1906,6 +3550,13 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   //     STAYS on the plan so validatePlan refuses it honestly -- a parsed
   //     threshold must never silently disappear.
   let metricCondition = pendingMetricCondition;
+  if (grain === 'coach_record') metricCondition = coachCondition;
+  // AFLDB-ISSUE-153 Stage 6 (C5). extractFamilyGrain already bound its own
+  // threshold to the linked_members metric; nothing upstream of grain
+  // election could have produced a competing metricCondition for a family
+  // question, so this simply overwrites whatever pendingMetricCondition
+  // (always undefined here) held.
+  if (grain === 'family') metricCondition = familyGrainResult.family?.metricCondition;
   const soleCareerCondition = careerResult.conditions.length === 1 && careerResult.conditions[0].kind === 'column'
     ? careerResult.conditions[0]
     : null;
@@ -1934,6 +3585,7 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
       grain = 'player_season';
       metric = soleCareerCondition.column;
       metricCondition = { op: soleCareerCondition.op, value: soleCareerCondition.value };
+      careerResult.conditions.splice(0, 1);
     } else {
       const refusedCondition = seasonCondition?.kind === 'column' ? seasonCondition : fallbackCondition;
       if (refusedCondition?.kind === 'column') {
@@ -1956,6 +3608,7 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
       mode = 'single';
       metric = soleCareerCondition.column;
       metricCondition = { op: soleCareerCondition.op, value: soleCareerCondition.value };
+      careerResult.conditions.splice(0, 1);
     } else if (
       !inOneGame
       && (seasons.seasonMin !== undefined || seasons.seasonMax !== undefined)
@@ -1965,6 +3618,7 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
       grain = 'player_season';
       metric = soleCareerCondition.column;
       metricCondition = { op: soleCareerCondition.op, value: soleCareerCondition.value };
+      careerResult.conditions.splice(0, 1);
     } else if (
       // Explicit match-level scope beside a claimed career-vocabulary
       // threshold: "players with more than 2 goals against Carlton" is a
@@ -1984,6 +3638,7 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
       mode = 'sum';
       metric = soleCareerCondition.column;
       metricCondition = { op: soleCareerCondition.op, value: soleCareerCondition.value };
+      careerResult.conditions.splice(0, 1);
     }
   }
   if (metricCondition && grain === 'player_career') {
@@ -2029,6 +3684,81 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     }
   }
 
+  // AFLDB-ISSUE-189 (D1/D2). A club_season ranking answers one season at a
+  // time; there is no club-lineage totals grain (all-time premierships,
+  // all-time wins). Decline by name rather than let answerClubSeason
+  // silently degrade to answerList (R2) or rank a single season under what
+  // reads as an all-time question (R3). Runs before the ISSUE-187 guard so
+  // a club question gets a club-shaped reason rather than the
+  // career-condition note.
+  if (
+    grain === 'club_season' && metric === null && clubSeasonConditionResult.conditions.length === 0
+  ) {
+    report.confidence = 1;
+    report.notes.push('AFLDB answers club questions one season at a time (wins, losses, draws, percentage, premiers, wooden spoons, finals); it does not total a club\'s premierships or other records across its history.');
+    return { status: 'none', reason: 'unrecognised', report };
+  }
+  if (
+    grain === 'club_season' && metric !== null && clubSeasonConditionResult.conditions.length === 0
+    && !inOneSeason
+    && !(seasons.seasonMin !== undefined && seasons.seasonMin === seasons.seasonMax)
+    && !(clubFor && seasonWorded)
+    && !clubSeasonPerSeasonPhrasing
+  ) {
+    report.confidence = 1;
+    report.notes.push('Club wins, losses, draws and percentage are ranked one season at a time; add "in a season" or a year to ask for the best single season. AFLDB does not total them across a club\'s history.');
+    return { status: 'none', reason: 'unrecognised', report };
+  }
+
+  // AFLDB-ISSUE-195. Once grain has elected club_season, playerMetricResult
+  // is never read by any club_season plan field (metric comes only from
+  // clubSeasonMetricResult, conditions only from clubSeasonConditionResult)
+  // -- so a non-null playerMetricResult.metric surviving to this point is a
+  // word the parser recognised as meaningful that the elected grain cannot
+  // represent, not a word that was safely ignored. clubs_played is excluded:
+  // a bare "club(s)" left over here is this question's OWN subject noun
+  // re-matching CAREER_STAT_WORDS' clubs_played entry (confirmed against
+  // "which clubs won the wooden spoon", "which club had the most losses in
+  // 2017", "clubs that made/missed finals" -- all currently-passing tests),
+  // never a second requested semantic.
+  if (
+    grain === 'club_season' && playerMetricResult.metric
+    && playerMetricResult.metric !== 'clubs_played'
+  ) {
+    report.confidence = 1;
+    report.notes.push(
+      `AFLDB could not combine "${playerMetricResult.metric}" with this club-season question in one plan; ask the two questions separately.`,
+    );
+    return { status: 'none', reason: 'unrecognised', report };
+  }
+
+  // AFLDB-ISSUE-187. A non-career grain has no field for a career
+  // condition to ride: player_game/player_season/team_match/etc. compile
+  // to a single scope with at most one metricCondition, never a
+  // career-wide predicate like "no premierships". Every grain branch above
+  // that legitimately repurposes a career condition (the sole-condition
+  // season/game conversions, the "in a game" hoist) removes it from
+  // careerResult.conditions as it does so, so anything still sitting here
+  // is genuinely unconsumed -- the METRIC_WORDS threshold path elects a
+  // non-career grain via pendingMetricCondition without ever looking at
+  // careerResult.conditions at all ("40 disposals in a game and no
+  // premierships" landed on player_game with the premiership condition
+  // simply dropped at the careerConditions assignment below). Refuse by
+  // name rather than silently answering a strict superset of the question.
+  if (
+    grain !== 'player_career' && grain !== 'coach_record'
+    && careerResult.conditions.length > 0
+  ) {
+    const [unconverted] = careerResult.conditions;
+    report.confidence = 1;
+    report.notes.push(
+      unconverted.kind === 'column'
+        ? `That "${unconverted.column}" condition is a career-wide fact and cannot also be limited to this question's other scope.`
+        : 'A career-wide condition in this question cannot also be limited to its other scope.',
+    );
+    return { status: 'none', reason: 'unrecognised', report };
+  }
+
   const scope: NlMatchScope = emptyScope();
   if (clubFor) scope.clubFor = { organizationId: clubFor.entity.organizationId, slug: clubFor.entity.slug, name: clubFor.entity.name };
   if (clubAgainst) scope.clubAgainst = { organizationId: clubAgainst.entity.organizationId, slug: clubAgainst.entity.slug, name: clubAgainst.entity.name };
@@ -2060,7 +3790,8 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     scope.matchType ??= 'home_and_away';
   }
 
-  const careerConditions = grain === 'player_career' ? careerResult.conditions : [];
+  const careerConditions = grain === 'player_career' || grain === 'coach_record'
+    ? careerResult.conditions : [];
 
   // A career predicate reuses the grid solver's builder catalogue, which
   // is where every boolean/categorical career question already lives --
@@ -2077,7 +3808,105 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   // means players who did it FOR Carlton, not players who did it anywhere
   // and later happened to play there, and "in the 1940s" means the feat
   // happened then, which is not always the season they debuted.
-  const careerPredicates: GridAxisState[] = grain === 'player_career' ? [...careerResult.predicates] : [];
+  const careerPredicates: GridAxisState[] = grain === 'player_career' || grain === 'coach_record'
+    ? [...careerResult.predicates] : [];
+  // The two PLAYER-grain coaching readings. coached_by takes the coach as
+  // its only parameter and owns no club or season, so a plan that also
+  // carries either fails the ISSUE-110 ownership gate and declines --
+  // which is the honest outcome until a coached_club builder exists.
+  if (grain === 'player_career' && coachReading === 'coached_by' && coach) {
+    careerPredicates.push({ builder: 'coached_by', params: { coach: String(coach.id) } });
+  }
+  if (grain === 'player_career' && coachReading === 'premiership_coach') {
+    careerPredicates.push({ builder: 'premiership_coach', params: {} });
+  }
+  // AFLDB-ISSUE-152 Phase F. The cross-domain composition, as two
+  // independently compiled predicates over the same p.id. Either BOTH
+  // clubs are bound or NEITHER is -- assignCrossDomainClubs declines a
+  // one-sided composition rather than letting one half reach SQL
+  // unscoped. has_coached and coached_club never appear together: the
+  // club-scoped predicate already asserts the coaching, and asking the
+  // unscoped question alongside it would be a second, wider claim
+  // (validatePlan refuses the pair outright).
+  if (grain === 'player_career' && coachReading === 'coached_population') {
+    if (crossDomainPlayedClub && crossDomainCoachedClub) {
+      careerPredicates.push({
+        builder: 'played_for_club',
+        params: { club: String(crossDomainPlayedClub.entity.organizationId) },
+      });
+      careerPredicates.push({
+        builder: 'coached_club',
+        params: { club: String(crossDomainCoachedClub.entity.organizationId) },
+      });
+    } else {
+      careerPredicates.push({ builder: 'has_coached', params: {} });
+    }
+    // AFLDB-ISSUE-153 Stage 5 (X3). The father-son conjunct, claimed at
+    // the narrowed F-D1 guard above. Emitted UNSCOPED on purpose: X3
+    // names no club and no year, the coaching half owns any club that is
+    // named, and a father-son scope alongside a cross-domain club would
+    // be a composition nothing has proven. It is a conjunction, never a
+    // chronology -- exactly the frozen Phase F contract.
+    if (crossDomainFatherSonBuilder) {
+      careerPredicates.push({ builder: crossDomainFatherSonBuilder, params: {} });
+    }
+  }
+  // AFLDB-ISSUE-152 Phase D. The population readings are parameterless
+  // predicates; the per-player reading takes the resolved person's id as
+  // its parameter and is paired with relationshipSubject on the plan, so
+  // the sentence the reader sees names the same person the SQL binds.
+  // Neither owns a club or a season, so a plan carrying either fails
+  // validatePlan's ownership gate rather than answering unscoped.
+  if (grain === 'player_career' && relationshipResult.builders) {
+    for (const builder of relationshipResult.builders) {
+      // AFLDB-ISSUE-153 Stage 3 (FS2/FS3). The father-son SELECTION is the
+      // one relationship reading that owns scope, because
+      // father_son_selections is the one table that carries any: a
+      // selecting club and a draft year. Both are bound as the builder's
+      // own parameters, exactly as first_kick_goal_for_club /
+      // first_kick_goal_between bind theirs, so validatePlan's ownership
+      // gate sees the field consumed instead of failing it closed -- and
+      // so the year is compiled as draft_year and NEVER as a playing
+      // season. Each scoped builder asserts the selection itself, so the
+      // bare predicate is added only when neither scope claimed it.
+      if (builder === 'father_son_selection') {
+        const scoped: typeof careerPredicates = [];
+        if (clubFor) {
+          scoped.push({
+            builder: 'father_son_selection_for_club',
+            params: { club: String(clubFor.entity.organizationId) },
+          });
+        }
+        // The year is claimed as a DRAFT year -- unless the question also
+        // talks about playing, in which case it is genuinely ambiguous
+        // between a draft year and a playing season, the two share no
+        // rows at all, and the year is deliberately left unowned so
+        // validatePlan's ownership gate refuses the whole plan rather
+        // than answering one of the two questions at random.
+        if (
+          (seasons.seasonMin !== undefined || seasons.seasonMax !== undefined)
+          && !FATHER_SON_PLAYING_SEASON_MIX_RE.test(normalised)
+        ) {
+          scoped.push({
+            builder: 'father_son_selection_between',
+            params: {
+              from: String(seasons.seasonMin ?? NL_LIMITS.minSeason),
+              to: String(seasons.seasonMax ?? NL_LIMITS.maxSeason),
+            },
+          });
+        }
+        careerPredicates.push(...(scoped.length > 0 ? scoped : [{ builder, params: {} }]));
+        continue;
+      }
+      careerPredicates.push({ builder, params: {} });
+    }
+  }
+  if (grain === 'player_career' && relationshipResult.ofPlayerBuilder && player) {
+    careerPredicates.push({
+      builder: relationshipResult.ofPlayerBuilder,
+      params: { player: String(player.id) },
+    });
+  }
   if (grain === 'player_career' && achievementResult.achievementKey) {
     if (clubFor) {
       careerPredicates.push({ builder: 'first_kick_goal_for_club', params: { club: String(clubFor.entity.organizationId) } });
@@ -2090,6 +3919,21 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
           to: String(seasons.seasonMax ?? NL_LIMITS.maxSeason),
         },
       });
+    }
+    // AFLDB-ISSUE-152 Phase E. Neither modifier takes a club or a season,
+    // so neither joins the owning-builder lists: composed with a scoped
+    // builder the club/season stays owned by that one, and the two IN
+    // subqueries cannot combine different rows because player_achievements
+    // holds exactly one first-kick-goal row per person for this source
+    // (player_achievements_source_uq over the tracked manifest).
+    if (achievementResult.consecutiveKicks !== undefined) {
+      careerPredicates.push({
+        builder: 'first_kick_goal_consecutive_min',
+        params: { kicks: String(achievementResult.consecutiveKicks) },
+      });
+    }
+    if (achievementResult.onlyCareerGoal) {
+      careerPredicates.push({ builder: 'first_kick_goal_only_career_goal', params: {} });
     }
     // The bare achievement predicate is only needed when nothing scoped
     // it: each scoped builder already implies it.
@@ -2150,6 +3994,34 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   // maxListRows(100). "players WHO PLAYED on anzac day" is the shape:
   // AGG_WORDS reads "who played" as the "who played the most..." idiom,
   // but with no stat named the honest reading is the full list.
+  /**
+   * Subject election (§15.4), decided here because it is the first point
+   * where BOTH the dimensions (step 5d) and the aggregation (step 8) are
+   * known.
+   *
+   * 'player' when the question ranks, thresholds, or explicitly names the
+   * kickers as its subject; 'event' otherwise -- including every count,
+   * every occurrence, and a NAMED player, whose after-siren record is
+   * their list of kicks, not a leaderboard of one.
+   */
+  const sirenSubject: NlAfterSirenSubject = player
+    ? 'event'
+    : (resolvedAgg?.kind === 'max' || resolvedAgg?.kind === 'min' || resolvedAgg?.kind === 'top_n')
+      || sirenCondition !== undefined
+      || (sirenOccurrence === undefined && AFTER_SIREN_PLAYER_SUBJECT_RE.test(normalised))
+    ? 'player'
+    : 'event';
+
+  const afterSiren: NlAfterSiren | undefined = afterSirenReading
+    ? {
+      subject: sirenSubject,
+      ...(sirenScored !== undefined ? { kickScored: sirenScored } : {}),
+      ...(sirenEffect !== undefined ? { kickEffect: sirenEffect } : {}),
+      ...(sirenKickerResult !== undefined ? { kickerResult: sirenKickerResult } : {}),
+      ...(sirenOccurrence !== undefined ? { occurrence: sirenOccurrence } : {}),
+    }
+    : undefined;
+
   const agg: NlAggregation = headToHead
     ? { kind: 'count' }
     : havingResult.havingClause
@@ -2160,13 +4032,43 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     // leader is exactly the shape the threshold exists to prevent. A
     // min/top_n alongside a threshold is left alone for validatePlan to
     // refuse honestly.
-    : metricCondition && (grain === 'player_game' || grain === 'player_season')
+    : metricCondition && (grain === 'player_game' || grain === 'player_season' || grain === 'coach_record' || grain === 'family')
       && (!resolvedAgg || resolvedAgg.kind === 'max' || resolvedAgg.kind === 'list')
     ? { kind: 'list' }
+    // "who coached Richmond" names no statistic, so there is nothing to
+    // rank: the qualifying set IS the answer, and 42 coaches is a list,
+    // not a leader. A count cue ("how many coaches") keeps its own shape.
+    : grain === 'coach_record' && metric === null
+      && (!resolvedAgg || resolvedAgg.kind === 'max' || resolvedAgg.kind === 'min')
+    ? { kind: 'list' }
+    // An after-siren question with no ranking cue is the qualifying EVENT
+    // LIST, not a rank-one leader: "goals after the siren for Richmond" is
+    // every one of them. A threshold is likewise a list of qualifying
+    // kickers. A min cue is deliberately left alone so validatePlan can
+    // refuse it honestly (D15) rather than have it silently become a list.
+    : grain === 'after_siren'
+    ? (resolvedAgg?.kind === 'count'
+        ? { kind: 'count' }
+        : sirenCondition !== undefined
+        ? { kind: 'list' }
+        : resolvedAgg && resolvedAgg.kind !== 'list'
+        ? resolvedAgg
+        : { kind: 'list' })
     : resolvedAgg && (resolvedAgg.kind === 'max' || resolvedAgg.kind === 'min')
       && metric === null && structureOnly
     ? { kind: 'list' }
     : resolvedAgg ?? (structureOnly ? { kind: 'list' } : { kind: 'max' });
+
+  if (afterSirenReading && sirenCondition !== undefined) metricCondition = sirenCondition;
+
+  // AFLDB-ISSUE-152 Phase D. In a per-player relationship question the
+  // named person is the OBJECT, not the subject: Brent Harvey is not one
+  // of Brent Harvey's brothers, and leaving him in `player` would pin the
+  // answer to his own id and return him, or nobody. He moves to
+  // relationshipSubject, where the predicate's bound parameter already
+  // carries his id and the answer can still say whose brothers these are.
+  const relationshipSubject = relationshipResult.ofPlayerBuilder ? player : undefined;
+  const subjectPlayer = relationshipResult.ofPlayerBuilder ? undefined : player;
 
   const plan: NlQueryPlan = {
     v: 1,
@@ -2174,17 +4076,46 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     metric,
     ...(grain === 'player_game' ? { mode } : {}),
     agg,
-    ...(player ? { player } : {}),
+    ...(subjectPlayer ? { player: subjectPlayer } : {}),
+    ...(relationshipSubject ? { relationshipSubject } : {}),
+    // AFLDB-ISSUE-152 Phase F, and the same contract relationshipSubject
+    // carries: the two organizations the cross-domain predicates already
+    // bind, kept here ONLY so the answer can name them. The ids reaching
+    // SQL are always the builders' own bound parameters, and validatePlan
+    // refuses the plan if these two references and those parameters ever
+    // disagree.
+    ...(crossDomainPlayedClub && crossDomainCoachedClub
+      ? {
+        crossDomainClubs: {
+          played: {
+            organizationId: crossDomainPlayedClub.entity.organizationId,
+            slug: crossDomainPlayedClub.entity.slug,
+            name: crossDomainPlayedClub.entity.name,
+          },
+          coached: {
+            organizationId: crossDomainCoachedClub.entity.organizationId,
+            slug: crossDomainCoachedClub.entity.slug,
+            name: crossDomainCoachedClub.entity.name,
+          },
+        },
+      }
+      : {}),
+    ...(coach && grain === 'coach_record' ? { coach } : {}),
     scope,
     ...(metricCondition ? { metricCondition } : {}),
     careerConditions,
     careerPredicates,
     clubSeasonConditions,
-    ...(grain === 'achievement_summary' && achievementResult.achievementKey && achievementResult.summaryKind
+    ...(grain === 'achievement_summary' && !fatherSonSummaryKind
+      && achievementResult.achievementKey && achievementResult.summaryKind
       ? { achievementSummary: { achievementKey: achievementResult.achievementKey, kind: achievementResult.summaryKind } }
+      : {}),
+    ...(grain === 'achievement_summary' && fatherSonSummaryKind
+      ? { fatherSonSummary: { kind: fatherSonSummaryKind } }
       : {}),
     ...(headToHead ? { headToHead } : {}),
     ...(streakResult.streakDefinition ? { streakDefinition: streakResult.streakDefinition } : {}),
+    ...(afterSiren ? { afterSiren } : {}),
     ...(periodSplitResult.periodSplit ? { periodSplit: periodSplitResult.periodSplit } : {}),
     ...(scoreCheckpointResult.scoreCheckpoint ? { scoreCheckpoint: scoreCheckpointResult.scoreCheckpoint } : {}),
     ...(resultFilterResult.resultFilter ? { resultFilter: resultFilterResult.resultFilter } : {}),
@@ -2192,6 +4123,15 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     ...(havingResult.havingClause ? { havingClause: havingResult.havingClause } : {}),
     ...(matchFilterResult.matchFilter ? { matchFilter: matchFilterResult.matchFilter } : {}),
     ...(boundary ? { boundary } : {}),
+    // The win-percentage qualifier, applied only where it means something:
+    // a ranking. A thresholded LIST of win percentages is already
+    // qualified by its own threshold. Absent when the reader explicitly
+    // asked for no minimum, so validatePlan refuses rather than ranking a
+    // one-game sample.
+    ...(grain === 'coach_record' && metric === 'win_pct' && !coachQualifierRefused
+      && (agg.kind === 'max' || agg.kind === 'min' || agg.kind === 'top_n')
+      ? { coachQualifier: { minGames: coachQualifierMinGames ?? NL_COACH_WIN_PCT.defaultMinGames } }
+      : {}),
     tiePolicy: 'all',
     limit: agg.kind === 'top_n' || agg.kind === 'list' ? 100 : 25,
   };
@@ -2212,6 +4152,18 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   const structuralOk = grain === 'head_to_head' ? !!headToHead && !!scope.matchup
     : grain === 'team_match' ? !!metric || !!havingResult.havingClause
     : grain === 'team_streak' ? !!streakResult.streakDefinition
+    : grain === 'coach_record' ? (metric !== null || !!coach || !!scope.clubFor)
+    // The cue alone is not a question. A bare "siren" carries no
+    // dimension, no subject noun, no scope and no player, and declines
+    // rather than returning the whole curated list.
+    : grain === 'after_siren' ? (
+      !!afterSiren && (
+        sirenScored !== undefined || sirenEffect !== undefined || sirenKickerResult !== undefined
+        || sirenOccurrence !== undefined || sirenNounConsumed || !!player
+        || !!scope.clubFor || !!scope.clubAgainst || scope.matchType !== undefined
+        || scope.seasonMin !== undefined || scope.seasonMax !== undefined
+      )
+    )
     : grain === 'club_season' ? clubSeasonCuePresent
     : grain === 'achievement_summary' ? true
     : grain === 'player_career' ? (metric !== null || careerConditions.length > 0 || careerPredicates.length > 0 || boundary !== undefined)

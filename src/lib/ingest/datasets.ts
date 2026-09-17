@@ -374,6 +374,41 @@ const allAustralian: DatasetSpec = {
 
   async promoteRow(row, resolved, { sql, awardId, sourceId, batchId }) {
     const recordId = `${resolved.season}:${row.player}:${row.club ?? ''}`;
+
+    // AFLDB-ISSUE-165 D-12. This is the SECOND writer of award_winners, and it
+    // knows nothing about the correction/void lifecycle: the upsert below
+    // re-asserts season, player, club, position and the captaincy flags from
+    // the file on every promotion. If an administrator has corrected or voided
+    // the row this file names, promoting over it would silently revert a human
+    // decision that src/db/queries/admin-awards.ts recorded durably — the same
+    // failure the awards importer needed replay_admin_overrides() to avoid.
+    //
+    // The answer here is a REFUSAL, not a replay. Teaching this writer full
+    // override semantics would put a second, divergent implementation of the
+    // replay in the ingest pipeline; refusing states the conflict plainly and
+    // leaves the operator to resolve it in /admin/awards (reinstate the row,
+    // or retire the override) before re-approving the submission. A 'record'
+    // override is deliberately NOT a blocker: those name manual_admin_edit rows
+    // this pipeline can never address, because its own source key is different.
+    const [held] = await sql<{ fieldGroup: string; entityKey: string }[]>`
+      SELECT o.field_group AS "fieldGroup", o.entity_key AS "entityKey"
+        FROM data_overrides o
+        JOIN sources s ON s.id = ${sourceId}
+       WHERE o.entity_type = 'award_winners'
+         AND o.is_active = true
+         AND o.field_group IN ('lifecycle', 'correction')
+         AND o.entity_key = s.key || ':' || ${recordId}
+       ORDER BY o.field_group
+       LIMIT 1
+    `;
+    if (held) {
+      throw new Error(
+        `"${row.player}" (${resolved.season}) carries an active ${held.fieldGroup} `
+        + `decision recorded in /admin/awards (${held.entityKey}). Promoting this file `
+        + 'would overwrite it. Resolve the row there first, then re-approve this submission.',
+      );
+    }
+
     await sql`
       INSERT INTO award_winners
         (award_id, season, player_id, player_name_raw, link_status_value,
@@ -404,12 +439,21 @@ const allAustralian: DatasetSpec = {
 
 // --- Dataset: Match results ---
 
+/**
+ * Round code -> canonical `round_type` for every round that is not home-and-away.
+ * The name is historical: membership means "not a home-and-away premiership-points
+ * round" (`matches.is_final`), not finals-series membership
+ * (`matches.is_finals_series`). `WF` — the AFL Wildcard Round — belongs here and is
+ * deliberately not collapsed into an existing finals type. See AFLDB-ISSUE-129 §8.4.
+ * Kept in step with `FINALS_CODES` in `tools/migration/import_fitzroy_core.py`.
+ */
 const FINALS_ROUND_TYPES: Record<string, string> = {
   EF: 'elimination_final',
   QF: 'qualifying_final',
   SF: 'semi_final',
   PF: 'preliminary_final',
   GF: 'grand_final',
+  WF: 'wildcard_final',
 };
 
 const matchResults: DatasetSpec = {
@@ -444,7 +488,7 @@ const matchResults: DatasetSpec = {
       if (roundNumber !== null) {
         return {
           verdict: 'error',
-          reasons: [`round_code "${roundCode}" is a finals code; round_number must be empty`],
+          reasons: [`round_code "${roundCode}" is a non-home-and-away round code; round_number must be empty`],
         };
       }
       roundType = finalsType;
@@ -453,7 +497,7 @@ const matchResults: DatasetSpec = {
     } else {
       return {
         verdict: 'error',
-        reasons: [`round_code "${roundCode}" is not a recognised finals code (EF/QF/SF/PF/GF) `
+        reasons: [`round_code "${roundCode}" is not a recognised round code (EF/QF/SF/PF/GF/WF) `
           + 'and round_number is empty'],
       };
     }
@@ -537,11 +581,16 @@ const matchResults: DatasetSpec = {
     };
   },
 
-  async promoteRow(row, resolved, { sql }) {
+  async promoteRow(row, resolved, { sql, sourceId, batchId }) {
     // Reproduces the natural key documented on the matches table itself
     // (season|round|date|home|away, using the era-appropriate club
     // identity's name) so re-uploading a corrected file about an
     // existing historical match updates it rather than duplicating it.
+    // AFLDB-ISSUE-185: this same string is also this dataset's
+    // source_record_id -- there is no external id in the CSV to carry
+    // instead (the file has no source_key column, unlike rising_star),
+    // so it follows all_australian's convention of deriving one from the
+    // resolved identifying fields rather than inventing a new format.
     const matchKey = `${resolved.season}|${row.round_code}|${row.match_date}`
       + `|${resolved.home_club_name}|${resolved.away_club_name}`;
 
@@ -550,7 +599,8 @@ const matchResults: DatasetSpec = {
         (match_key, season, round_code, round_number, round_type, is_final,
          match_date, venue_id, venue_raw, home_club_id, away_club_id,
          home_goals, home_behinds, home_score, away_goals, away_behinds, away_score,
-         result, winner_club_id, margin, attendance, attendance_status)
+         result, winner_club_id, margin, attendance, attendance_status,
+         source_id, source_record_id, import_batch_id)
       VALUES
         (${matchKey}, ${resolved.season}, ${row.round_code}, ${resolved.round_number},
          ${resolved.round_type}::round_type, ${resolved.round_type !== 'home_and_away'},
@@ -559,7 +609,8 @@ const matchResults: DatasetSpec = {
          ${resolved.home_goals}, ${resolved.home_behinds}, ${resolved.home_score},
          ${resolved.away_goals}, ${resolved.away_behinds}, ${resolved.away_score},
          ${resolved.result}::match_result, ${resolved.winner_club_id}, ${resolved.margin},
-         ${resolved.attendance}, ${resolved.attendance_status}::coverage_status)
+         ${resolved.attendance}, ${resolved.attendance_status}::coverage_status,
+         ${sourceId || null}, ${matchKey}, ${batchId})
       ON CONFLICT (match_key) DO UPDATE SET
          round_number = EXCLUDED.round_number,
          round_type   = EXCLUDED.round_type,
@@ -577,6 +628,13 @@ const matchResults: DatasetSpec = {
          margin            = EXCLUDED.margin,
          attendance        = EXCLUDED.attendance,
          attendance_status = EXCLUDED.attendance_status
+      -- source_id/source_record_id/import_batch_id are deliberately absent
+      -- from this SET list (AFLDB-ISSUE-185): they are creation provenance,
+      -- stamped once on INSERT only. An UPDATE here means a corrected file
+      -- was re-promoted against an EXISTING canonical row -- which may be
+      -- owned by afltables, manual_admin_edit, or an earlier promotion --
+      -- and must never silently reassign that row's provenance, exactly as
+      -- applyMatchEdit's score/attendance-group corrections never do.
     `;
   },
 };

@@ -297,6 +297,18 @@ BEGIN
     GRANT USAGE ON SEQUENCE data_edits_id_seq TO afldb_import;
   END IF;
 
+  -- Migration 083 (AFLDB-ISSUE-122): the automatic canonical mutation
+  -- ledger. Every machine INSERT/UPDATE of a canonical row writes its
+  -- canonical_applications row in the same savepoint, as afldb_import.
+  -- SELECT + INSERT and USAGE on the identity sequence only -- append-only
+  -- by grant, and deliberately NOT registered in import_writable_tables,
+  -- whose loop above would hand back UPDATE, DELETE and TRUNCATE. No
+  -- sequence SELECT or UPDATE: an INSERT needs neither.
+  IF to_regclass('public.canonical_applications') IS NOT NULL THEN
+    GRANT SELECT, INSERT ON canonical_applications TO afldb_import;
+    GRANT USAGE ON SEQUENCE canonical_applications_id_seq TO afldb_import;
+  END IF;
+
   -- Migrations 073 / 078 (AFLDB-ISSUE-086 / -109): destructive source
   -- reloads read durable human override authority, while saveEdit writes
   -- the override in the same mutation-role transaction as the canonical
@@ -336,6 +348,54 @@ BEGIN
     -- This read is what lets it see them. Read only: no INSERT, UPDATE,
     -- DELETE or TRUNCATE for the import role.
     GRANT SELECT ON player_link_suggestions TO afldb_import;
+  END IF;
+
+  -- Migration 094 (AFLDB-ISSUE-155 Phase C1): the Brownlow administration
+  -- workflow. These two tables record administrative decisions -- who
+  -- drafted, who finalised, who published a season and from which
+  -- revision -- and no ETL job writes them. They are deliberately outside
+  -- import_writable_tables for the 080 reason: that registry's loop grants
+  -- TRUNCATE and unrestricted DELETE, which is precisely the power a
+  -- record of decisions must not hand to a reload path. A promotion or
+  -- restore that loses these rows erases admin decisions silently, which
+  -- is why §27.22 of the issue makes carrying them a stop condition.
+  --
+  -- SELECT is needed for the FOR UPDATE row locks the four transactions
+  -- take, UPDATE for every state transition, INSERT for a first draft and
+  -- the insert-if-absent authority row, DELETE for a discarded entry.
+  -- Neither table owns a sequence: the primary keys are match_id and
+  -- season, both supplied, so there is nothing to grant beside them.
+  -- The revoke loop above strips these each run; re-grant them here. This
+  -- block sits BEFORE the migration-080 block on purpose: the external
+  -- grid corpus test (tests/external-grids-import.test.ts) reads the text
+  -- from the external_grid_sources guard to the next staging guard and
+  -- asserts it grants no DELETE, so nothing carrying a DELETE grant may
+  -- fall inside that span.
+  IF to_regclass('public.brownlow_vote_entry_state') IS NOT NULL THEN
+    GRANT SELECT, INSERT, UPDATE, DELETE ON brownlow_vote_entry_state TO afldb_import;
+  END IF;
+  IF to_regclass('public.brownlow_season_authority') IS NOT NULL THEN
+    GRANT SELECT, INSERT, UPDATE, DELETE ON brownlow_season_authority TO afldb_import;
+  END IF;
+
+  -- Migration 080 (AFLDB-ISSUE-118): the external grid corpus is captured
+  -- historical evidence, so it is deliberately outside
+  -- import_writable_tables -- that registry's loop grants UPDATE, DELETE
+  -- and TRUNCATE, which is precisely the power a corpus of immutable
+  -- captures must not hand out. Append-only by grant, on the 066/073/078
+  -- pattern: read, INSERT, and the one column that supersedes a revision.
+  -- The platform registry is seeded by the migration and is read only.
+  IF to_regclass('public.external_grid_sources') IS NOT NULL THEN
+    GRANT SELECT ON external_grid_sources TO afldb_import;
+  END IF;
+  IF to_regclass('public.external_grids') IS NOT NULL THEN
+    GRANT SELECT, INSERT ON external_grids TO afldb_import;
+    GRANT UPDATE (is_current) ON external_grids TO afldb_import;
+    GRANT USAGE, SELECT ON SEQUENCE external_grids_id_seq TO afldb_import;
+  END IF;
+  IF to_regclass('public.external_grid_axes') IS NOT NULL THEN
+    GRANT SELECT, INSERT ON external_grid_axes TO afldb_import;
+    GRANT USAGE, SELECT ON SEQUENCE external_grid_axes_id_seq TO afldb_import;
   END IF;
 
   -- Staging is the importer's own workspace and holds no operational
@@ -379,7 +439,7 @@ DECLARE
     ['auth_users',             'SELECT, INSERT, UPDATE'],           -- 023
     ['auth_sessions',          'SELECT, INSERT, UPDATE'],           -- 023
     ['auth_audit_log',         'SELECT, INSERT'],                   -- 023
-    ['beta_access_codes',      'SELECT, INSERT, UPDATE'],           -- 023
+    ['beta_access_codes',      'SELECT, INSERT, UPDATE, DELETE'],   -- 023, 091
     ['beta_allowed_emails',    'SELECT, INSERT, UPDATE'],           -- 023
     ['beta_login_tokens',      'SELECT, INSERT, UPDATE'],           -- 023
     ['data_submissions',       'SELECT, INSERT, UPDATE'],           -- 023
@@ -411,6 +471,9 @@ DECLARE
     -- NOT import-writable on purpose: grant_import_write() would hand
     -- back UPDATE/DELETE/TRUNCATE on every reconcile.
     ['promotion_decisions',    'SELECT, INSERT'],                    -- 074
+    -- Read-only: the machine mutation ledger is written by afldb_import
+    -- alone; the admin surface may only read it (see migration 083).
+    ['canonical_applications', 'SELECT'],                            -- 083
     -- Read-only: validation resolves submitted names against these.
     ['players',                'SELECT'],                           -- 023
     ['player_clubs',           'SELECT'],                           -- 023

@@ -113,7 +113,23 @@ describe('isAxisComplete', () => {
 
 describe('GRID_BUILDERS catalogue', () => {
   it('offers AFLPA 22Under22 selection as a dedicated fixed criterion', () => {
-    expect(Object.keys(GRID_BUILDERS)).toHaveLength(108);
+    // 108 before AFLDB-ISSUE-118, which added the 37 builders the Gridley
+    // corpus needed (tests/gridley-compat.test.ts holds the mapping), then
+    // 6 more when it was reopened: the All-Australian final team (3), the
+    // 40-man squad in any season, and the two height bounds; then 1 more with
+    // Stage D1 (dates of birth): age on debut; then 2 with Stage E2 (coaches):
+    // coached_by and premiership_coach; then 2 with family F (father–son):
+    // father_son_selection and father_son_father; then 1 with family F
+    // (siblings): has_brother; then 1 with after-the-siren: after_siren_winner;
+    // then 6 with AFLDB-ISSUE-152 Phase D (family relationships): the three
+    // parent-child population builders and the three per-player ones; then
+    // 2 with AFLDB-ISSUE-152 Phase F (played AND coached): has_coached and
+    // coached_club; then 2 with AFLDB-ISSUE-153 Stage 3 (the father-son
+    // selection's own scopes): father_son_selection_for_club and
+    // father_son_selection_between, the selecting club folded by
+    // organization lineage and the DRAFT year -- which is not a playing
+    // season and is labelled a draft year in every parameter a reader sees.
+    expect(Object.keys(GRID_BUILDERS)).toHaveLength(168);
     expect(GRID_BUILDERS.under_22_selection).toEqual({
       key: 'under_22_selection',
       label: 'Selected in AFLPA 22Under22 team',

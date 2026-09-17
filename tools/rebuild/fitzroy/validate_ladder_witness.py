@@ -22,6 +22,22 @@ canonical matches. Agreement is the acceptance check: it independently validates
 home-and-away match set and its `is_final` classification, because a second toolchain
 computing the same aggregation over the same upstream source must land on the same numbers.
 
+THE WILDCARD ROUND EXCEPTION (AFLDB-ISSUE-129 §8.4 item 10)
+----------------------------------------------------------
+fitzRoy's `Round.Type` is computed as
+`ifelse(Round %in% c("QF","EF","SF","PF","GF"), "Finals", "Regular")`, so from 2026 it
+labels a Wildcard Final row **`Regular`** and folds its result into the ladder. AFLDB does
+not: a wildcard final is `is_final = true` and earns no premiership points. For any season
+containing one, the witness and `club_seasons` are therefore computing two DIFFERENT
+quantities, and a field-by-field diff would be meaningless in both directions — it would
+report AFLDB as wrong, or, if the check were loosened to tolerate it, would stop detecting
+real ladder defects.
+
+The witness is not weakened to make that disagreement disappear. Instead `--compare` asks
+AFLDB (read-only) which seasons actually contain a `wildcard_final` match and declares
+those seasons EXPLICITLY UNCOMPARABLE, naming them and the reason. Every other season is
+compared exactly as strictly as before. A wildcard season is never silently passed.
+
 This file is the ONE authority for the witness. The rebuild calls it, and
 `tests/python/ladder_identity_contract.py` calls it too, so there is no second
 implementation to drift.
@@ -312,6 +328,19 @@ def compare_to_database(resolved: dict[tuple[int, str], dict], rep: Report) -> N
                   FROM club_seasons cs JOIN clubs c ON c.id = cs.club_id
             """)
             db = {(int(r[0]), r[1]): r for r in cur.fetchall()}
+            # See "THE WILDCARD ROUND EXCEPTION" above. Read from AFLDB rather than
+            # hard-coded, so a season is excluded only while it genuinely contains one.
+            cur.execute("""
+                SELECT DISTINCT season FROM matches
+                 WHERE round_type = 'wildcard_final'
+                 ORDER BY season
+            """)
+            wildcard_seasons = {int(r[0]) for r in cur.fetchall()}
+
+    if wildcard_seasons:
+        print(f"        wildcard-round seasons excluded from the field comparison: "
+              f"{sorted(wildcard_seasons)} — fitzRoy labels a WF row Round.Type='Regular' "
+              f"and counts it on the ladder; AFLDB does not (AFLDB-ISSUE-129 §8.4).")
 
     missing = sorted(set(resolved) - set(db))
     extra = sorted(set(db) - set(resolved))
@@ -323,9 +352,13 @@ def compare_to_database(resolved: dict[tuple[int, str], dict], rep: Report) -> N
     # season | team | field | AFLDB | witness — the witness is not authority, so the
     # diagnostic names both sides rather than calling one of them correct.
     diffs: list[str] = []
+    comparable = 0
     for key in sorted(set(resolved) & set(db)):
         w, row = resolved[key], db[key]
         season, slug = key
+        if season in wildcard_seasons:
+            continue
+        comparable += 1
         for field, actual, expected in (
             ("points_for", row[2], w["score_for"]),
             ("points_against", row[3], w["score_against"]),
@@ -343,7 +376,7 @@ def compare_to_database(resolved: dict[tuple[int, str], dict], rep: Report) -> N
                 diffs.append(f"{season} {w['team']} ({slug}) {field}: "
                              f"AFLDB={actual!r} witness={expected!r}")
 
-    rep.check(f"all {len(resolved)} club-seasons agree on every compared field",
+    rep.check(f"all {comparable} comparable club-seasons agree on every compared field",
               not diffs, f"{len(diffs)} disagreements")
     for d in diffs[:20]:
         print(f"        {d}")

@@ -6,6 +6,7 @@ import type postgres from 'postgres';
 import { cache } from 'react';
 
 import { authSql } from '@/db/authClient';
+import { hasCapability, type Capability } from '@/lib/auth/capabilities';
 import { generateToken, sha256Hex } from '@/lib/auth/crypto';
 import {
   ADMIN_COOKIE,
@@ -208,6 +209,13 @@ export const getAdminUser = cache(async function getAdminUser(): Promise<AdminUs
   if (colon <= 0) return null;
   const token = claim.sub.slice(colon + 1);
 
+  // AFLDB-ISSUE-186 Phase A: 'contributor' is deliberately absent from this
+  // list. The role value, and any existing contributor row, are retained
+  // (disabled_at is not touched), but this is the one query every admin
+  // request re-checks (getAdminUser is the authoritative session lookup,
+  // not the signed cookie alone), so excluding the role here is sufficient
+  // to reject an already-issued contributor session on its very next
+  // request -- no session-revocation sweep or disabled_at backfill needed.
   const [row] = await authSql<{
     id: number; email: string; role: 'admin' | 'super_admin' | 'contributor';
     canManageAdmins: boolean; mustChangePassword: boolean;
@@ -220,7 +228,7 @@ export const getAdminUser = cache(async function getAdminUser(): Promise<AdminUs
        AND s.expires_at > now()
        AND s.revoked_at IS NULL
        AND u.disabled_at IS NULL
-       AND u.role IN ('admin', 'super_admin', 'contributor')
+       AND u.role IN ('admin', 'super_admin')
   `;
   return row ?? null;
 });
@@ -271,6 +279,14 @@ export async function requireUploader(): Promise<AdminUser> {
  * centralising it means a new admin route cannot quietly ship with a weaker
  * (or missing) check.
  *
+ * AFLDB-ISSUE-186 Phase A: getAdminUser() no longer returns a contributor
+ * row at all (see its own comment), so the branch below is unreachable
+ * from a real request today. Left in place as defense-in-depth -- nothing
+ * about this function's own contract changes if the role is ever admitted
+ * again upstream -- and because AdminUser['role'] still carries the type
+ * for the account-history/roster surfaces that must keep reading existing
+ * contributor rows (src/db/queries/admin-users.ts, AdminSessionsClient.tsx).
+ *
  * A contributor session passes getAdminUser() (it needs to, for
  * requireUploader() above) but is bounced to /admin/upload here rather
  * than admitted: this is what keeps a contributor out of every other
@@ -307,6 +323,30 @@ export async function requireAdminManager(): Promise<AdminUser> {
   const admin = await requireAdmin();
   if (!hasAdminManagementAccess(admin)) redirect('/admin');
   return admin;
+}
+
+/**
+ * Require a signed-in staff session that holds a specific capability
+ * (`src/lib/auth/capabilities.ts`), or redirect exactly as requireAdmin()
+ * and requireSuperAdmin() do: a contributor bounces to the one route they
+ * may reach, anyone else lacking the capability bounces to the dashboard.
+ *
+ * Introduced by AFLDB-ISSUE-155 Phase A as an alternative to picking
+ * requireAdmin() vs requireSuperAdmin() by hand; since AFLDB-ISSUE-158
+ * (ISSUE-156 P2) it is THE guard for every admin page, route handler and
+ * Server Action whose boundary the capability table names, and the role
+ * guards above remain only where no capability describes the rule (the
+ * dashboard, submission review) or where policy keeps an explicit
+ * super-admin boundary beside the capability (the account lifecycle).
+ * tests/auth.test.ts holds that contract against the source.
+ *
+ * Same session lookup as the role guards -- getAdminUser() is request
+ * cached -- so calling this beside requireSuperAdmin() costs no extra query.
+ */
+export async function requireCapability(capability: Capability): Promise<AdminUser> {
+  const admin = await requireUploader();
+  if (hasCapability(admin, capability)) return admin;
+  redirect(admin.role === 'contributor' ? '/admin/upload' : '/admin');
 }
 
 export async function destroyAdminSession(): Promise<void> {

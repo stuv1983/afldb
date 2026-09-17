@@ -70,7 +70,11 @@ export const MATCH_OUTCOMES = {
 export const MATCH_TYPES = {
   all: 'Any match',
   home_and_away: 'Home-and-away',
+  // "Finals only" means the traditional finals series. A Wildcard Final is
+  // neither home-and-away nor a finals-series match (AFLDB-ISSUE-129 §8.4), so
+  // it gets its own explicit option rather than being unreachable here.
   finals: 'Finals only',
+  wildcard_final: 'Wildcard Final only',
 } as const;
 
 export const DEFAULT_MATCH_SORT = 'date_desc';

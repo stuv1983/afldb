@@ -12,6 +12,24 @@
  *
  *   npx tsx tools/matching/backtest.ts [--table award_winners] [--limit 500]
  *                                      [--out report.json]
+ *                                      [--baseline previous.json]
+ *                                      [--compare-out delta.json]
+ *                                      [--labels draft-labels.json]
+ *                                      [--club-text-in-span N --club-text-anywhere N]
+ *
+ * --club-text-in-span / --club-text-anywhere declare the S3/S4 club-text
+ * weights for one AFLDB-ISSUE-164 P3B grid row. They are a CALIBRATION
+ * mechanism: omitted (the normal case) the shipped policy applies, which
+ * scores nothing from club text. Both must be given together, and the
+ * effective pair is printed and written into every report.
+ *
+ * --labels evaluates against a frozen label file instead of stored links
+ * (AFLDB-ISSUE-164 P1c), for the draft population, whose confirmed-link
+ * count is five. Still read-only: no label is ever written as a link.
+ *
+ * --baseline compares this run against a saved report in the same pass.
+ * To compare two already-saved reports without a database, use the
+ * separate entry point: npm run match:compare -- <baseline> <candidate>.
  */
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -26,8 +44,32 @@ import {
   type SourceEvidenceRow,
 } from '@/db/queries/player-match-candidates';
 import { isLinkTargetTable, type LinkTargetTable } from '@/db/queries/player-links';
-import { ALGORITHM_VERSION, MATCH_POLICY } from '@/lib/player-matching/confidence';
+import { policySnapshot, type ClubTextCalibration } from '@/lib/player-matching/calibration';
+import { ALGORITHM_VERSION } from '@/lib/player-matching/confidence';
 import { resolutionKey, type ConfidenceBand, type MatchAssessment } from '@/lib/player-matching/types';
+
+import {
+  compareBacktests,
+  compareQueues,
+  detectReportKind,
+  emitComparison,
+  readReport,
+  type BacktestReport,
+  type QueueReport,
+} from './compare-reports';
+import {
+  applyClubTextCalibration,
+  describeClubTextCalibration,
+} from './policy-options';
+import {
+  assessLeakage,
+  describeZeroFailureBound,
+  parseLabelSet,
+  requiredZeroFailureSample,
+  smallestSampleExpressing,
+  type Label,
+  type LabelSet,
+} from './label-set';
 
 const PROJECT_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -401,6 +443,10 @@ async function reportQueue(
   table: LinkTargetTable | undefined,
   limit: number | undefined,
   outPath: string | null,
+  baselinePath: string | null,
+  compareOutPath: string | null,
+  startedAt: string,
+  calibration: ClubTextCalibration,
 ): Promise<void> {
   const rows = await fetchSourceEvidence(sql, { status: 'unresolved', table, limit });
   const proposals: Array<Record<string, unknown>> = [];
@@ -436,6 +482,7 @@ async function reportQueue(
   }
 
   console.log('=== UNRESOLVED QUEUE: WHAT WOULD BE PROPOSED ===');
+  console.log(`club-text calibration  ${describeClubTextCalibration(calibration)}`);
   console.log(`queue rows (resolution grain) ${rows.length}`);
   for (const band of BANDS) {
     console.log(`${band.padEnd(10)} ${counts.get(band) ?? 0}`);
@@ -459,11 +506,382 @@ async function reportQueue(
     }
   }
 
+  // Run metadata was added for AFLDB-ISSUE-164 P1 so a queue report can be
+  // compared like a labelled one. `proposals` keeps its place and shape, so
+  // queue-v1-baseline.json (which predates the metadata) still parses; its
+  // metadata simply reads as unknown in a comparison.
+  const queueReport: QueueReport = {
+    algorithmVersion: ALGORITHM_VERSION,
+    gitCommit: gitCommit(),
+    startedAt,
+    tableFilter: table ?? null,
+    calibration,
+    proposals: proposals as unknown as QueueReport['proposals'],
+  };
+
   if (outPath) {
-    writeFileSync(outPath, JSON.stringify({ proposals }, null, 2), 'utf8');
+    writeFileSync(outPath, JSON.stringify(queueReport, null, 2), 'utf8');
     console.log(`
 queue proposals written to ${outPath}`);
   }
+
+  if (baselinePath) {
+    const baseline = readReport(baselinePath);
+    if (detectReportKind(baseline) !== 'queue') {
+      throw new Error(`${baselinePath} is not a queue report; --queue needs a queue baseline.`);
+    }
+    console.log('');
+    console.log(`baseline  ${baselinePath}`);
+    console.log('candidate this run');
+    emitComparison(
+      compareQueues(baseline as QueueReport, queueReport),
+      compareOutPath,
+      [baselinePath, ...(outPath ? [outPath] : [])],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-164 P1c — evaluation against a frozen label set
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolve a label set's natural keys to AFLDB ids, read-only.
+ *
+ * Two independent joins, neither of which touches a name:
+ *
+ *   player_url          -> draft_persons.id     (migration 069's reload key)
+ *   afltables path      -> players.id           (external_identities, the
+ *                                                identity the fitzRoy import
+ *                                                established from AFL Tables)
+ *
+ * A label whose person or whose target cannot be resolved is REPORTED, not
+ * dropped: an unresolvable target usually means the player is one of the
+ * played-but-unregistered people, and silently shrinking the population
+ * would flatter every rate computed from it.
+ */
+async function resolveLabels(
+  sql: postgres.Sql<Record<string, never>>,
+  set: LabelSet,
+): Promise<{
+  byEntityId: Map<number, { label: Label; expectedPlayerId: number | null }>;
+  unresolvedPersons: Label[];
+  unresolvedTargets: Array<{ label: Label; candidateCount: number }>;
+}> {
+  const urls = set.labels.map((l) => l.playerUrl);
+  const identities = set.labels
+    .map((l) => l.afltablesExternalId)
+    .filter((v): v is string => v !== null);
+
+  const personRows = await sql<Array<{ id: number; playerUrl: string }>>`
+    SELECT per.id, per.player_url AS "playerUrl"
+      FROM draft_persons per
+      JOIN sources s ON s.id = per.source_id AND s.key = 'draftguru'
+     WHERE per.player_url = ANY(${urls})
+  `;
+  const personByUrl = new Map(personRows.map((r) => [r.playerUrl, Number(r.id)]));
+
+  const targetRows = identities.length === 0
+    ? []
+    : await sql<Array<{ externalId: string; playerId: number; n: number }>>`
+        SELECT ei.external_id AS "externalId",
+               min(ei.player_id)::int AS "playerId",
+               count(*)::int AS n
+          FROM external_identities ei
+          JOIN sources s ON s.id = ei.source_id AND s.key = 'afltables'
+         WHERE ei.external_id = ANY(${identities})
+           AND ei.match_method = 'afltables_profile_url'
+           AND ei.status IN ('unique', 'resolved')
+           AND ei.player_id IS NOT NULL
+         GROUP BY ei.external_id
+      `;
+  const targetByIdentity = new Map(
+    targetRows.map((r) => [r.externalId, { playerId: Number(r.playerId), n: Number(r.n) }]),
+  );
+
+  const byEntityId = new Map<number, { label: Label; expectedPlayerId: number | null }>();
+  const unresolvedPersons: Label[] = [];
+  const unresolvedTargets: Array<{ label: Label; candidateCount: number }> = [];
+
+  for (const label of set.labels) {
+    const entityId = personByUrl.get(label.playerUrl);
+    if (entityId === undefined) {
+      unresolvedPersons.push(label);
+      continue;
+    }
+    if (label.expect === 'unlinked') {
+      byEntityId.set(entityId, { label, expectedPlayerId: null });
+      continue;
+    }
+    const target = targetByIdentity.get(label.afltablesExternalId!);
+    if (!target || target.n !== 1) {
+      unresolvedTargets.push({ label, candidateCount: target?.n ?? 0 });
+      continue;
+    }
+    byEntityId.set(entityId, { label, expectedPlayerId: target.playerId });
+  }
+
+  return { byEntityId, unresolvedPersons, unresolvedTargets };
+}
+
+/** Which name family paid, reduced to the distinction bulk turns on. */
+function nameEvidenceClass(signals: string[]): 'exact' | 'fuzzy' | 'none' {
+  if (signals.includes('name_exact') || signals.includes('name_alias_exact')) return 'exact';
+  if (signals.some((s) => s.startsWith('name_'))) return 'fuzzy';
+  return 'none';
+}
+
+/**
+ * Score every labelled draft person and report against the label set.
+ *
+ * The labels are NEVER written to the database and never reach candidate
+ * generation or scoring: the known player id is carried beside the
+ * SourceEvidence, exactly as the confirmed-link backtest carries it, and
+ * SourceEvidence has no field that could hold it.
+ */
+async function reportLabelled(
+  sql: postgres.Sql<Record<string, never>>,
+  labelPath: string,
+  outPath: string | null,
+  startedAt: string,
+  calibration: ClubTextCalibration,
+): Promise<number> {
+  const set = parseLabelSet(JSON.parse(readFileSync(labelPath, 'utf8')));
+  const resolved = await resolveLabels(sql, set);
+
+  console.log('=== LABEL SET ===');
+  console.log(`file              ${labelPath}`);
+  console.log(`label set         ${set.labelSet}`);
+  console.log(`source key        ${set.sourceKey}`);
+  console.log(`labels            ${set.labels.length}`);
+  console.log(`  linked          ${set.labels.filter((l) => l.expect === 'linked').length}`);
+  console.log(`  unlinked        ${set.labels.filter((l) => l.expect === 'unlinked').length}`);
+  console.log(`persons resolved  ${resolved.byEntityId.size}`);
+  console.log(`persons not found ${resolved.unresolvedPersons.length}`);
+  console.log(`targets not found ${resolved.unresolvedTargets.length}`);
+
+  console.log('');
+  console.log('=== TRUTH-SOURCE INDEPENDENCE ===');
+  for (const a of assessLeakage(set)) {
+    console.log(
+      `${a.provenance.padEnd(42)} n=${String(a.count).padStart(5)}  rank=${a.rank ?? '?'}  `
+      + `admissible=${a.admissible}  shares=${a.sharedEvidenceFamilies.join(',') || 'nothing'}`,
+    );
+    console.log(`    ${a.reason}`);
+  }
+
+  if (resolved.unresolvedPersons.length > 0) {
+    console.log('');
+    console.log('=== LABELS WHOSE DRAFT PERSON IS NOT IN THIS DATABASE ===');
+    for (const l of resolved.unresolvedPersons) console.log(`  ${l.playerUrl}`);
+  }
+  if (resolved.unresolvedTargets.length > 0) {
+    console.log('');
+    console.log('=== LABELS WHOSE AFL TABLES TARGET RESOLVES TO NO SINGLE PLAYER ===');
+    console.log('(usually a played-but-unregistered player; excluded from every rate below)');
+    for (const t of resolved.unresolvedTargets) {
+      console.log(`  ${t.label.playerUrl} -> ${t.label.afltablesExternalId} (${t.candidateCount} players)`);
+    }
+  }
+
+  // Every draft person, whatever its stored link_status: a labelled row is
+  // usually still `unmatched` in the database, and the five human-decided
+  // ones are `resolved`. Both halves are scored identically.
+  const rows = [
+    ...(await fetchSourceEvidence(sql, { status: 'unresolved', table: 'draft_picks' })),
+    ...(await fetchSourceEvidence(sql, { status: 'trusted', table: 'draft_picks' })),
+  ].filter((r) => resolved.byEntityId.has(r.source.target.resolutionEntityId));
+
+  console.log('');
+  console.log('=== POLICY UNDER TEST ===');
+  console.log(`algorithm version  ${ALGORITHM_VERSION}`);
+  console.log(`git commit         ${gitCommit()}`);
+  console.log(`run started        ${startedAt}`);
+  console.log(`rows scored        ${rows.length}`);
+  console.log(`club-text weights  ${describeClubTextCalibration(calibration)}`);
+
+  const positives: CaseResult[] = [];
+  const negativeRaw: Array<Record<string, unknown>> = [];
+  const BATCH = 250;
+
+  for (let i = 0; i < rows.length; i += BATCH) {
+    const batch = rows.slice(i, i + BATCH);
+    const assessments = await assessSources(sql, batch.map((r) => r.source));
+    for (const row of batch) {
+      const entry = resolved.byEntityId.get(row.source.target.resolutionEntityId)!;
+      const assessment = assessments.get(resolutionKey(row.source.target))!;
+      if (entry.expectedPlayerId === null) {
+        // A true negative: this person correctly has no AFLDB player. There
+        // is no "correct" candidate, so it cannot join the precision tables;
+        // what matters is how confident the scorer was about a wrong answer.
+        negativeRaw.push({
+          key: resolutionKey(row.source.target),
+          targetTable: row.source.target.targetTable,
+          targetId: row.source.target.targetId,
+          rawName: row.source.rawName,
+          context: row.source.context,
+          provenance: entry.label.provenance,
+          band: assessment.band,
+          score: assessment.best?.score ?? null,
+          gap: assessment.gap,
+          ambiguous: assessment.ambiguous,
+          hardConflict: assessment.hardConflict,
+          bulkEligible: assessment.bulkEligible,
+          suggested: assessment.best?.displayName ?? null,
+          suggestedId: assessment.best?.playerId ?? null,
+          signals: (assessment.best?.evidence ?? []).map((e) => e.signal),
+        });
+        continue;
+      }
+      positives.push(
+        toCaseResult(
+          { ...row, knownPlayerId: entry.expectedPlayerId } as SourceEvidenceRow,
+          assessment,
+        ),
+      );
+    }
+    process.stderr.write(`  scored ${Math.min(i + BATCH, rows.length)}/${rows.length}\r`);
+  }
+  process.stderr.write('\n');
+
+  if (positives.length > 0) report(positives);
+
+  console.log('');
+  console.log('=== NAME EVIDENCE ON LABELLED ROWS ===');
+  for (const klass of ['exact', 'fuzzy', 'none'] as const) {
+    const inClass = positives.filter((c) => nameEvidenceClass(c.signals) === klass);
+    if (inClass.length === 0) continue;
+    const correct = inClass.filter((c) => c.correct).length;
+    console.log(
+      `${klass.padEnd(6)} n=${String(inClass.length).padStart(5)}  `
+      + `correct=${String(correct).padStart(5)}  precision=${pct(correct, inClass.length)}`,
+    );
+  }
+
+  console.log('');
+  console.log('=== STRATIFICATION (labelled positives) ===');
+  const strata: Array<[string, (c: CaseResult) => boolean]> = [
+    ['band very_high', (c) => c.band === 'very_high'],
+    ['band high', (c) => c.band === 'high'],
+    ['band medium', (c) => c.band === 'medium'],
+    ['band low', (c) => c.band === 'low'],
+    ['band none', (c) => c.band === 'none'],
+    ['exact-name rival present', (c) => nameEvidenceClass(c.signals) === 'exact' && c.gap === 0],
+    ['ambiguous', (c) => c.ambiguous],
+    ['no rival (gap null)', (c) => c.gap === null],
+    ['hard conflict', (c) => c.hardConflict],
+    ['draft stats exact', (c) => c.signals.includes('draft_games_exact') && c.signals.includes('draft_goals_exact')],
+    ['draft stats drifted', (c) => !c.signals.includes('draft_games_exact')],
+    ['club evidence present', (c) => c.signals.some((s) => s.startsWith('club_'))],
+    ['club evidence absent', (c) => !c.signals.some((s) => s.startsWith('club_'))],
+    ['true player missing from candidates', (c) => c.rank === null],
+  ];
+  for (const [label, test] of strata) {
+    const inStratum = positives.filter(test);
+    const correct = inStratum.filter((c) => c.correct).length;
+    console.log(
+      `${label.padEnd(38)} n=${String(inStratum.length).padStart(5)}  `
+      + `correct=${String(correct).padStart(5)}  precision=${pct(correct, inStratum.length)}`,
+    );
+  }
+
+  console.log('');
+  console.log('=== EVERY WRONG TOP-1 (complete, not sampled) ===');
+  const wrong = positives.filter((c) => !c.correct).sort((a, b) => (a.key < b.key ? -1 : 1));
+  if (wrong.length === 0) console.log('none');
+  for (const c of wrong) {
+    console.log(
+      `  ${c.key} ${c.targetTable}#${c.targetId} "${c.rawName}" (${c.context})`,
+    );
+    console.log(
+      `      chose ${c.chosenName ?? 'nothing'} #${c.chosenPlayerId ?? '-'} score=${c.score} `
+      + `gap=${c.gap} band=${c.band} bulk=${c.bulkEligible} `
+      + `expected #${c.expectedPlayerId} rank=${c.rank ?? 'absent'} signals=${c.signals.join(',')}`,
+    );
+  }
+
+  console.log('');
+  console.log('=== TRUE NEGATIVES: PEOPLE WHO CORRECTLY HAVE NO AFLDB PLAYER ===');
+  console.log(`labelled unlinked and scored  ${negativeRaw.length}`);
+  const negBands = new Map<string, number>();
+  for (const n of negativeRaw) negBands.set(n.band as string, (negBands.get(n.band as string) ?? 0) + 1);
+  for (const band of BANDS) console.log(`${band.padEnd(10)} ${negBands.get(band) ?? 0}`);
+  const negVeryHigh = negativeRaw.filter((n) => n.band === 'very_high');
+  const negBulk = negativeRaw.filter((n) => n.bulkEligible);
+  console.log(`very_high on a person with no player  ${negVeryHigh.length}   <- false positives`);
+  console.log(`bulk-eligible on the same            ${negBulk.length}`);
+  for (const n of negVeryHigh.slice(0, 50)) {
+    console.log(
+      `  ${n.key} "${n.rawName}" (${n.context}) -> ${n.suggested} #${n.suggestedId} `
+      + `score=${n.score} gap=${n.gap} signals=${(n.signals as string[]).join(',')}`,
+    );
+  }
+
+  // §9.1 arithmetic, printed beside the numbers it judges so a bound is
+  // never quoted as if it were an observed rate.
+  const bulkRows = positives.filter((c) => c.bulkEligible);
+  const bulkWrong = bulkRows.filter((c) => !c.correct).length;
+  const vhRows = positives.filter((c) => c.band === 'very_high');
+  const vhWrong = vhRows.filter((c) => !c.correct).length;
+  console.log('');
+  console.log('=== SAMPLE-SIZE ARITHMETIC (§9.1 rule of three) ===');
+  console.log(`labelled positives                 ${positives.length}`);
+  console.log(`very_high n=${vhRows.length} false positives=${vhWrong}`);
+  console.log(`bulk-eligible n=${bulkRows.length} false positives=${bulkWrong}`);
+  console.log(
+    `95% upper bound on bulk FP rate    ${describeZeroFailureBound(bulkRows.length, bulkWrong)}`,
+  );
+  console.log(`§9.1 admission floor               253 rows, 0 FP  (bound 1.181%)`);
+  console.log(`to bound the rate below 0.1%       ${requiredZeroFailureSample(0.001)} rows, 0 FP`);
+  console.log(
+    `smallest n where 99.9% is even expressible with one error   `
+    + `${smallestSampleExpressing(0.999)}`,
+  );
+
+  // D-9: the class is suspended from unattended approval until P1c re-gates
+  // it. A bulk-eligible draft row here is a stop condition, not a result.
+  const draftBulk = [...bulkRows, ...negBulk.map((n) => ({ key: n.key as string }))];
+  if (draftBulk.length > 0) {
+    console.log('');
+    console.log('*** STOP CONDITION *** D-9: draft_person is suspended from unattended');
+    console.log('approval, yet the following rows are bulk-eligible under the current policy:');
+    for (const row of draftBulk.slice(0, 50)) console.log(`  ${row.key}`);
+  }
+
+  if (outPath) {
+    const payload = {
+      algorithmVersion: ALGORITHM_VERSION,
+      gitCommit: gitCommit(),
+      startedAt,
+      tableFilter: 'draft_picks',
+      calibration,
+      policy: policySnapshot(),
+      labelSet: {
+        file: labelPath,
+        name: set.labelSet,
+        sourceKey: set.sourceKey,
+        labels: set.labels.length,
+        linked: set.labels.filter((l) => l.expect === 'linked').length,
+        unlinked: set.labels.filter((l) => l.expect === 'unlinked').length,
+        leakage: assessLeakage(set),
+        unresolvedPersons: resolved.unresolvedPersons.map((l) => l.playerUrl),
+        unresolvedTargets: resolved.unresolvedTargets.map((t) => ({
+          playerUrl: t.label.playerUrl,
+          afltablesExternalId: t.label.afltablesExternalId,
+          candidatePlayers: t.candidateCount,
+        })),
+      },
+      // Same shape the confirmed-link backtest writes, so `npm run
+      // match:compare` reads a label run without knowing it is one.
+      cases: positives.sort((a, b) => (a.key < b.key ? -1 : 1)),
+      negatives: negativeRaw.sort((a, b) => ((a.key as string) < (b.key as string) ? -1 : 1)),
+      falsePositives: [],
+    };
+    writeFileSync(outPath, JSON.stringify(payload, null, 2), 'utf8');
+    console.log(`\nlabel-set results written to ${outPath}`);
+  }
+
+  return draftBulk.length > 0 ? 2 : 0;
 }
 
 async function main(): Promise<void> {
@@ -475,6 +893,9 @@ async function main(): Promise<void> {
   const limitArg = valueFor(argv, '--limit');
   const limit = limitArg ? Number(limitArg) : undefined;
   const outPath = valueFor(argv, '--out');
+  const baselinePath = valueFor(argv, '--baseline');
+  const compareOutPath = valueFor(argv, '--compare-out');
+
   // Score the live review queue instead of confirmed links. There is no
   // ground truth here -- that is the point of the queue -- so this mode
   // reports what would be PROPOSED, for manual inspection. It is the
@@ -483,12 +904,32 @@ async function main(): Promise<void> {
   // in people who have no AFLDB player record at all.
   const queueMode = argv.includes('--queue');
 
+  // AFLDB-ISSUE-164 P1c. Ground truth from a frozen label file rather than
+  // from stored links, because the stored draft population is five rows.
+  // Nothing is written: the labels resolve to ids in read-only SQL and are
+  // carried beside the evidence, never inside it.
+  const labelPath = valueFor(argv, '--labels');
+
+  // AFLDB-ISSUE-164 P3B. Applied once, before anything is scored, and
+  // carried into every report so a grid row can never be filed under the
+  // wrong weights. With the options omitted this is the shipped policy.
+  const calibration = applyClubTextCalibration(argv);
+
   const sql = postgres(backtestUrl(), { max: 1, onnotice: () => {} });
   const startedAt = new Date().toISOString();
 
   try {
+    if (labelPath) {
+      if (queueMode) {
+        throw new Error('--labels and --queue are different populations; pick one.');
+      }
+      const code = await reportLabelled(sql, labelPath, outPath, startedAt, calibration);
+      if (code !== 0) process.exitCode = code;
+      return;
+    }
     if (queueMode) {
-      await reportQueue(sql, table, limit, outPath);
+      await reportQueue(
+        sql, table, limit, outPath, baselinePath, compareOutPath, startedAt, calibration);
       return;
     }
 
@@ -500,7 +941,8 @@ async function main(): Promise<void> {
     console.log(`git commit         ${gitCommit()}`);
     console.log(`run started        ${startedAt}`);
     console.log(`table filter       ${table ?? 'all'}`);
-    console.log(JSON.stringify(MATCH_POLICY, null, 2));
+    console.log(`club-text weights  ${describeClubTextCalibration(calibration)}`);
+    console.log(JSON.stringify(policySnapshot(), null, 2));
 
     const cases: CaseResult[] = [];
     const dossiers: Dossier[] = [];
@@ -535,25 +977,35 @@ async function main(): Promise<void> {
       );
     }
 
+    const backtestReport = {
+      algorithmVersion: ALGORITHM_VERSION,
+      gitCommit: gitCommit(),
+      startedAt,
+      tableFilter: table ?? null,
+      calibration,
+      policy: policySnapshot(),
+      cases,
+      falsePositives: dossiers,
+    };
+
     if (outPath) {
-      writeFileSync(
-        outPath,
-        JSON.stringify(
-          {
-            algorithmVersion: ALGORITHM_VERSION,
-            gitCommit: gitCommit(),
-            startedAt,
-            tableFilter: table ?? null,
-            policy: MATCH_POLICY,
-            cases,
-            falsePositives: dossiers,
-          },
-          null,
-          2,
-        ),
-        'utf8',
-      );
+      writeFileSync(outPath, JSON.stringify(backtestReport, null, 2), 'utf8');
       console.log(`\nfull results written to ${outPath}`);
+    }
+
+    if (baselinePath) {
+      const baseline = readReport(baselinePath);
+      if (detectReportKind(baseline) !== 'backtest') {
+        throw new Error(`${baselinePath} is not a labelled backtest report.`);
+      }
+      console.log('');
+      console.log(`baseline  ${baselinePath}`);
+      console.log('candidate this run');
+      emitComparison(
+        compareBacktests(baseline as BacktestReport, backtestReport as BacktestReport),
+        compareOutPath,
+        [baselinePath, ...(outPath ? [outPath] : [])],
+      );
     }
   } finally {
     await sql.end({ timeout: 5 });

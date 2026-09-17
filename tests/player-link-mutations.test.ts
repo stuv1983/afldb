@@ -7,29 +7,36 @@ const mocks = vi.hoisted(() => ({
   postgres: vi.fn(),
   authSql: vi.fn(),
   sql: vi.fn(),
-  requireSuperAdmin: vi.fn(),
+  requireCapability: vi.fn(),
   audit: vi.fn(),
   revalidatePath: vi.fn(),
   fetchSourceEvidence: vi.fn(),
   assessOneSource: vi.fn(),
+  readCachedSuggestionVersions: vi.fn(),
 }));
 
 vi.mock('postgres', () => ({ default: mocks.postgres }));
 vi.mock('@/db/authClient', () => ({ authSql: mocks.authSql }));
 vi.mock('@/db/client', () => ({ sql: mocks.sql }));
 vi.mock('@/lib/auth/session', () => ({
-  requireSuperAdmin: mocks.requireSuperAdmin,
+  // data.playerLinks / data.dataEditor, both super-admin-only (AFLDB-ISSUE-158).
+  requireCapability: mocks.requireCapability,
   audit: mocks.audit,
 }));
 vi.mock('next/cache', () => ({ revalidatePath: mocks.revalidatePath }));
 vi.mock('@/db/queries/player-match-candidates', () => ({
   fetchSourceEvidence: mocks.fetchSourceEvidence,
   assessOneSource: mocks.assessOneSource,
+  readCachedSuggestionVersions: mocks.readCachedSuggestionVersions,
   refreshMatchCandidates: vi.fn(),
 }));
 
 import { createPlayerAction } from '@/app/admin/data-editor/actions';
-import { confirmUnlinked as confirmUnlinkedAction } from '@/app/admin/player-links/actions';
+import {
+  approveSuggestion,
+  bulkApproveSuggestions,
+  confirmUnlinked as confirmUnlinkedAction,
+} from '@/app/admin/player-links/actions';
 import {
   confirmUnlinked,
   createPlayerAndResolveLink,
@@ -37,7 +44,7 @@ import {
   resolveLink,
   resolveLinkFromSuggestion,
 } from '@/db/queries/player-links';
-import { createPlayer, type DraftPickInput } from '@/db/queries/players';
+import { createPlayer } from '@/db/queries/players';
 
 type SeenQuery = { text: string; values: unknown[] };
 type QueryResponder = (text: string, values: unknown[]) => unknown[];
@@ -80,12 +87,14 @@ beforeEach(() => {
   mocks.authSql.mockReset();
   mocks.authSql.mockResolvedValue([]);
   mocks.sql.mockReset();
-  mocks.requireSuperAdmin.mockReset();
-  mocks.requireSuperAdmin.mockResolvedValue({ id: 5, email: 'admin@example.test' });
+  mocks.requireCapability.mockReset();
+  mocks.requireCapability.mockResolvedValue({ id: 5, email: 'admin@example.test' });
   mocks.audit.mockReset();
   mocks.revalidatePath.mockReset();
   mocks.fetchSourceEvidence.mockReset();
   mocks.assessOneSource.mockReset();
+  mocks.readCachedSuggestionVersions.mockReset();
+  mocks.readCachedSuggestionVersions.mockResolvedValue(new Map());
   process.env.AFLDB_IMPORT_DATABASE_URL = 'postgres://import@example/afldb_test';
   process.env.DATABASE_URL = 'postgres://app@example/afldb_test';
 });
@@ -355,7 +364,7 @@ describe('confirmUnlinked resolution', () => {
   });
 
   it('server action ignores form-supplied previousStatus and forwards only target details', async () => {
-    mocks.requireSuperAdmin.mockResolvedValueOnce({ id: 5, email: 'admin@example.test' });
+    mocks.requireCapability.mockResolvedValueOnce({ id: 5, email: 'admin@example.test' });
     const { tx, seen } = fakeTransaction((text) => {
       if (text.startsWith('SELECT link_status_value::text')) return [{ status: 'unmatched' }];
       return [];
@@ -370,7 +379,7 @@ describe('confirmUnlinked resolution', () => {
     const result = await confirmUnlinkedAction({}, formData);
 
     expect(result).toEqual({ message: expect.stringContaining('Recorded 1 record(s)') });
-    expect(mocks.requireSuperAdmin).toHaveBeenCalledOnce();
+    expect(mocks.requireCapability).toHaveBeenCalledOnce();
 
     const auditInsert = seen.find((query) => (
       query.text.startsWith('INSERT INTO player_link_resolutions')
@@ -445,37 +454,35 @@ describe('22Under22 award-winner resolution', () => {
   });
 });
 
-describe('player creation facts', () => {
-  it('rejects partial draft fields at the server-action boundary', async () => {
+describe('player creation facts (AFLDB-ISSUE-160 §5, gate 3)', () => {
+  it('refuses draft fields at the server-action boundary instead of dropping them', async () => {
+    // D-5: draft selections have exactly one mutation contract, and it is not the
+    // generic data editor. Rejecting rather than ignoring is the point -- a stale
+    // client must not be able to silently discard a selection the administrator
+    // believed they had recorded.
     const formData = new FormData();
     formData.set('displayName', 'New Draftee');
     formData.set('recruitedFrom', 'Murray U18');
 
     const result = await createPlayerAction({}, formData);
 
-    expect(result).toEqual({
-      error: 'A valid draft year (1981–2100) is required with draft details.',
-    });
+    expect(result).toEqual({ error: 'Draft selections are edited in /admin/draft.' });
     expect(mocks.postgres).not.toHaveBeenCalled();
     expect(mocks.audit).not.toHaveBeenCalled();
   });
 
-  it('rejects partial draft information instead of inventing a draft year', async () => {
-    const { tx, seen } = fakeTransaction(() => []);
-    installImportClient(tx);
-
-    const partialDraft = { recruitedFrom: 'Murray U18' } as DraftPickInput;
-    await expect(createPlayer({
-      displayName: 'New Draftee',
-      dob: '2007-03-01',
-      draftInfo: partialDraft,
-    }, { adminUserId: 5 })).rejects.toThrow('An explicit draft year');
-
-    expect(seen.some((query) => query.text.startsWith('INSERT INTO players'))).toBe(false);
-    expect(seen.some((query) => query.text.startsWith('INSERT INTO draft_picks'))).toBe(false);
+  it('refuses every draft field, not only the year', async () => {
+    for (const field of ['draftYear', 'draftType', 'pickNumber', 'draftClubId', 'draftAge', 'pickNote']) {
+      const formData = new FormData();
+      formData.set('displayName', 'New Draftee');
+      formData.set(field, '2005');
+      expect(await createPlayerAction({}, formData), field)
+        .toEqual({ error: 'Draft selections are edited in /admin/draft.' });
+    }
+    expect(mocks.postgres).not.toHaveBeenCalled();
   });
 
-  it('stores the supplied draft year and keeps unrecorded career totals NULL', async () => {
+  it('mints a durable identity and record, and inserts no draft row', async () => {
     const { tx, seen } = fakeTransaction((text) => {
       if (text.startsWith('INSERT INTO players')) {
         return [{ id: 88, slug: 'new-draftee', displayName: 'New Draftee' }];
@@ -487,11 +494,33 @@ describe('player creation facts', () => {
     await createPlayer({
       displayName: 'New Draftee',
       dob: '1980-03-01',
-      draftInfo: { draftYear: 2005, recruitedFrom: 'Murray U18' },
     }, { adminUserId: 5, note: 'Historic draftee backfill' });
 
-    const draftInsert = seen.find((query) => query.text.startsWith('INSERT INTO draft_picks'));
-    expect(draftInsert?.values[0]).toBe(2005);
+    // DEF-4b: the ONLY INSERT INTO draft_picks in src/ is admin-draft.ts.
+    expect(seen.some((query) => query.text.startsWith('INSERT INTO draft_picks'))).toBe(false);
+
+    // DEF-4a: the player gets a durable identity (external_identities) AND a durable
+    // record (data_overrides) in the same transaction, or it is not promotable.
+    const identityInsert = seen.find((q) => q.text.startsWith('INSERT INTO external_identities'));
+    expect(identityInsert, 'no manual identity minted').toBeDefined();
+    expect(identityInsert!.text).toContain("SELECT id FROM sources WHERE key = 'manual_admin_edit'");
+    expect(identityInsert!.text).toContain("'resolved', 0, 'manual_admin_edit'");
+    const token = identityInsert!.values[0] as string;
+    expect(token, 'the token is a randomUUID, never name-derived')
+      .toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+    expect(identityInsert!.values[1]).toBe('New Draftee');
+    expect(identityInsert!.values[2]).toBe(88);
+
+    const overrideInsert = seen.find((q) => q.text.startsWith('INSERT INTO data_overrides'));
+    expect(overrideInsert, 'no durable record written').toBeDefined();
+    expect(overrideInsert!.values[0]).toBe(`manual_admin_edit:${token}`);
+    expect(overrideInsert!.values[1]).toEqual({
+      json: {
+        display_name: 'New Draftee', given_name: 'New', surname: 'Draftee',
+        dob: '1980-03-01', dob_confidence: 'sourced', birth_year: 1980,
+      },
+    });
+    expect(overrideInsert!.values[2]).toBe(5);
 
     // The required data_edits audit is part of the same transaction
     // (AFLDB-ISSUE-027) and snapshots the created identity.
@@ -499,7 +528,7 @@ describe('player creation facts', () => {
     expect(auditInsert?.values).toEqual([
       'players', 88, 'player_creation',
       { json: {} },
-      { json: { displayName: 'New Draftee', hasDraftInfo: true } },
+      { json: { displayName: 'New Draftee' } },
       5, 'Historic draftee backfill',
     ]);
     expect(mocks.authSql).not.toHaveBeenCalled();
@@ -510,22 +539,52 @@ describe('player creation facts', () => {
     );
   });
 
-  it('rejects a draft club identity that was not active in the supplied year', async () => {
-    const { tx, seen } = fakeTransaction((text) => {
-      if (text.startsWith('SELECT c.id, c.name')) {
-        return [{ id: 24, name: 'Western Bulldogs', activeId: 5 }];
-      }
-      return [];
-    });
+  it('derives search_name, slug and sort_name in SQL, by the importer expressions', () => {
+    // §3.2: a replayed twin has to be byte-identical to the row the admin typed, and
+    // the only way to guarantee that is for both sides to run the same SQL. A
+    // JavaScript slug would diverge the moment a name carries an accent or an
+    // apostrophe.
+    const source = readFileSync(join(process.cwd(), 'src/db/queries/players.ts'), 'utf8');
+    const insert = source.slice(source.indexOf('INSERT INTO players ('));
+    expect(insert).toContain('afldb_normalise_name(${displayName})');
+    expect(insert, 'the backslash must survive BOTH the template literal and SQL')
+      .toContain("regexp_replace(afldb_normalise_name(${displayName}), '\\\\s+', '-', 'g')");
+    // A bare \s in a TS template literal is the letter s, so PostgreSQL would
+    // replace every run of "s" in a name with a hyphen.
+    expect(insert).not.toContain("'" + String.fromCharCode(92) + "s+'");
+    expect(insert).toContain("ELSE ${surname}::text || ', ' || ${givenName}::text");
+    // The same two expressions, spelled identically, in the replay that re-creates it.
+    const replay = readFileSync(join(process.cwd(), 'tools/migration/common.py'), 'utf8');
+    expect(replay).toContain('afldb_normalise_name(%(display_name)s)');
+    expect(replay).toContain(
+      "regexp_replace(afldb_normalise_name(%(display_name)s), '\\\\s+', '-', 'g')");
+  });
+
+  it('omits an absent optional field from the durable record, and keeps an explicit null', async () => {
+    // absent-vs-explicit-null is what makes the replay's jsonb_exists arms mean what
+    // they say: an absent key leaves the column alone, an explicit null clears it.
+    const { tx, seen } = fakeTransaction((text) => (
+      text.startsWith('INSERT INTO players')
+        ? [{ id: 91, slug: 'minimal', displayName: 'Minimal' }]
+        : []));
     installImportClient(tx);
 
-    await expect(createPlayer({
-      displayName: 'Historical Draftee',
-      draftInfo: { draftYear: 1981, clubId: 24 },
-    }, { adminUserId: 5 })).rejects.toThrow('not the historical club identity active in 1981');
+    await createPlayer({ displayName: 'Minimal', notes: null }, { adminUserId: 5 });
 
-    expect(seen.some((query) => query.text.includes('afldb_identity_for_season'))).toBe(true);
-    expect(seen.some((query) => query.text.startsWith('INSERT INTO players'))).toBe(false);
+    const overrideInsert = seen.find((q) => q.text.startsWith('INSERT INTO data_overrides'));
+    const payload = (overrideInsert!.values[1] as { json: Record<string, unknown> }).json;
+    expect(Object.keys(payload).sort()).toEqual(['display_name', 'given_name', 'notes', 'surname']);
+    expect(payload.notes).toBeNull();
+    expect('dob' in payload).toBe(false);
+    expect('height_cm' in payload).toBe(false);
+  });
+
+  it('refuses to create a player it cannot attribute the durable record to', async () => {
+    const { tx, seen } = fakeTransaction(() => []);
+    installImportClient(tx);
+    await expect(createPlayer({ displayName: 'Unattributed' }, { adminUserId: 0 }))
+      .rejects.toThrow('valid administrator id');
+    expect(seen.some((q) => q.text.startsWith('INSERT INTO players'))).toBe(false);
   });
 
   it('does not fall back to the read-only application connection', async () => {
@@ -748,6 +807,170 @@ describe('suggested match approval', () => {
     });
     expect(mocks.postgres).not.toHaveBeenCalled();
   });
+
+  /**
+   * Stale cached scoring (AFLDB-ISSUE-164 P2, invariant 13).
+   *
+   * A cached suggestion computed under a different ALGORITHM_VERSION
+   * than the running code must never be presented or acted on
+   * silently. None of this weakens the rule above it: the fresh score
+   * still decides, alone, and the stale figures are only ever reported.
+   */
+  describe('stale cached versions', () => {
+    function formOf(fields: Record<string, string>): FormData {
+      const form = new FormData();
+      for (const [key, value] of Object.entries(fields)) form.set(key, value);
+      return form;
+    }
+
+    it('approves a v1-cached row on the fresh v2 result and reports the staleness', async () => {
+      const { tx, seen } = lockedUnmatchedRow();
+      installImportClient(tx);
+      mocks.fetchSourceEvidence.mockResolvedValue([sourceRow]);
+      mocks.assessOneSource.mockResolvedValue(assessment({
+        algorithmVersion: 'v2',
+        best: { ...assessment().best, score: 92 },
+      }));
+
+      const result = await resolveLinkFromSuggestion({
+        targetTable: 'award_winners', targetId: 412, playerId: 1000,
+        adminUserId: 5, method: 'suggested',
+        displayed: { algorithmVersion: 'v1', score: 79 },
+      });
+
+      expect(result.ok).toBe(true);
+      expect((result as { notice?: string }).notice)
+        .toContain('shown as v1 score 79; approved on v2 score 92');
+      // The recorded score and version are the FRESH ones, never the
+      // ones that were on screen.
+      const auditInsert = seen.find((query) => (
+        query.text.startsWith('INSERT INTO player_link_resolutions')
+      ));
+      expect(auditInsert?.values.slice(-3)).toEqual(['suggested', 92, 'v2']);
+    });
+
+    it('says nothing when the cache and the running matcher agree', async () => {
+      const { tx } = lockedUnmatchedRow();
+      installImportClient(tx);
+      mocks.fetchSourceEvidence.mockResolvedValue([sourceRow]);
+      mocks.assessOneSource.mockResolvedValue(assessment());
+
+      const result = await resolveLinkFromSuggestion({
+        targetTable: 'award_winners', targetId: 412, playerId: 1000,
+        adminUserId: 5, method: 'suggested',
+        displayed: { algorithmVersion: 'v1', score: 97 },
+      });
+
+      expect(result).toEqual({ ok: true });
+    });
+
+    it('refuses a stale row whose fresh best is a different player', async () => {
+      const { tx, seen } = lockedUnmatchedRow();
+      installImportClient(tx);
+      mocks.fetchSourceEvidence.mockResolvedValue([sourceRow]);
+      mocks.assessOneSource.mockResolvedValue(assessment({
+        algorithmVersion: 'v2',
+        best: { ...assessment().best, playerId: 4331, score: 92 },
+      }));
+
+      const result = await resolveLinkFromSuggestion({
+        targetTable: 'award_winners', targetId: 412, playerId: 1000,
+        adminUserId: 5, method: 'suggested',
+        displayed: { algorithmVersion: 'v1', score: 79 },
+      });
+
+      expect(result).toEqual({
+        ok: false,
+        error: expect.stringContaining('no longer supports that player'),
+      });
+      expect(seen.some((q) => q.text.startsWith('UPDATE'))).toBe(false);
+      expect(seen.some((q) => q.text.startsWith('INSERT INTO player_link_resolutions'))).toBe(false);
+    });
+
+    it('refuses a stale bulk row that is no longer bulk-eligible', async () => {
+      const { tx, seen } = lockedUnmatchedRow();
+      installImportClient(tx);
+      mocks.fetchSourceEvidence.mockResolvedValue([sourceRow]);
+      mocks.assessOneSource.mockResolvedValue(assessment({
+        algorithmVersion: 'v2', bulkEligible: false, band: 'high',
+      }));
+
+      const result = await resolveLinkFromSuggestion({
+        targetTable: 'award_winners', targetId: 412, playerId: 1000,
+        adminUserId: 5, method: 'bulk_suggested',
+        displayed: { algorithmVersion: 'v1', score: 97 },
+      });
+
+      expect(result.ok).toBe(false);
+      expect(seen.some((q) => q.text.startsWith('UPDATE'))).toBe(false);
+    });
+
+    it('takes the displayed version from the database, not from the form', async () => {
+      const { tx } = lockedUnmatchedRow();
+      installImportClient(tx);
+      mocks.fetchSourceEvidence.mockResolvedValue([sourceRow]);
+      mocks.assessOneSource.mockResolvedValue(assessment({
+        algorithmVersion: 'v2',
+        best: { ...assessment().best, score: 92 },
+      }));
+      mocks.readCachedSuggestionVersions.mockResolvedValue(new Map([
+        ['award_winners:412', {
+          targetTable: 'award_winners', targetId: 412, algorithmVersion: 'v1', score: 79,
+        }],
+      ]));
+
+      const state = await approveSuggestion({}, formOf({
+        targets: 'award_winners:412:unmatched',
+        playerId: '1000',
+        // A browser trying to claim the cache is current must have no
+        // effect whatsoever.
+        algorithmVersion: 'v2',
+        score: '97',
+      }));
+
+      expect(mocks.readCachedSuggestionVersions).toHaveBeenCalledWith(
+        expect.anything(),
+        [{ targetTable: 'award_winners', targetId: 412 }],
+      );
+      expect(state.message).toBe('Suggested match approved.');
+      expect(state.warning).toContain('shown as v1 score 79; approved on v2 score 92');
+    });
+
+    it('reports stale rows per row in the bulk summary', async () => {
+      const { tx } = lockedUnmatchedRow();
+      installImportClient(tx);
+      mocks.fetchSourceEvidence.mockResolvedValue([sourceRow]);
+      mocks.assessOneSource.mockResolvedValue(assessment({
+        algorithmVersion: 'v2',
+        best: { ...assessment().best, score: 92 },
+      }));
+      mocks.readCachedSuggestionVersions.mockResolvedValue(new Map([
+        ['award_winners:412', {
+          targetTable: 'award_winners', targetId: 412, algorithmVersion: 'v1', score: 79,
+        }],
+        ['award_winners:413', {
+          targetTable: 'award_winners', targetId: 413, algorithmVersion: 'v2', score: 92,
+        }],
+      ]));
+
+      const state = await bulkApproveSuggestions({}, formOf({
+        targets: 'award_winners:412:unmatched,award_winners:413:unmatched',
+        playerIds: '1000,1000',
+      }));
+
+      expect(mocks.readCachedSuggestionVersions).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.arrayContaining([
+          { targetTable: 'award_winners', targetId: 412, previousStatus: 'unmatched' },
+          { targetTable: 'award_winners', targetId: 413, previousStatus: 'unmatched' },
+        ]),
+      );
+      expect(state.message).toBe('Approved 2 suggested match(es).');
+      // Only the row that was actually stale is named.
+      expect(state.warning).toContain('award_winners:412');
+      expect(state.warning).not.toContain('award_winners:413');
+    });
+  });
 });
 
 /**
@@ -796,10 +1019,19 @@ describe('player-link action contracts', () => {
     expect(bulk).not.toMatch(/if \(!result\.ok\) return/);
   });
 
-  it('gates every action behind super admin', () => {
+  it('reads the displayed algorithm version from the cache, never from the request', () => {
+    // Invariant 13: staleness must be established server-side. A
+    // browser-supplied version would let a stale page assert it was
+    // current.
+    expect(actions).toContain('readCachedSuggestionVersions(sql,');
+    expect(actions).not.toContain("formData.get('algorithmVersion')");
+    expect(actions).not.toContain("formData.get('score')");
+  });
+
+  it('gates every action behind the super-admin-only data.playerLinks capability', () => {
     const exported = actions.match(/export async function (\w+)/g) ?? [];
     expect(exported.length).toBeGreaterThanOrEqual(7);
-    const guards = actions.match(/await requireSuperAdmin\(\)/g) ?? [];
+    const guards = actions.match(/await requireCapability\('data\.playerLinks'\)/g) ?? [];
     expect(guards.length).toBe(exported.length);
   });
 });
@@ -850,6 +1082,91 @@ describe('queue page contracts', () => {
     // The page must never form its own view of why a score is what it
     // is; it renders what the scorer recorded.
     expect(page).toContain('match.evidence.map');
+    expect(page).not.toContain('scoreCandidate');
+    expect(page).not.toContain('assessMatch');
+  });
+
+  it('derives staleness from the server-side cache version and shows it', () => {
+    // Invariant 13: the page compares each cached row's version with the
+    // version the running code declares, and says so on the page --
+    // once at the top and again on every affected row.
+    expect(page).toContain("from '@/lib/player-matching/confidence'");
+    expect(page).toContain('ALGORITHM_VERSION');
+    expect(page).toContain('s2.algorithmVersion !== ALGORITHM_VERSION');
+    expect(page).toContain('match.algorithmVersion !== ALGORITHM_VERSION');
+    expect(page).toContain('staleCount > 0');
+    expect(page).toContain('Stale ({match.algorithmVersion})');
+    // The drawer is told both versions so it can warn before approval.
+    expect(page).toContain('currentAlgorithmVersion: ALGORITHM_VERSION');
+    expect(page).toContain('stale,');
+  });
+
+  it('warns in the drawer that a stale score is not what approval will use', () => {
+    const controls = readFileSync(
+      join(process.cwd(), 'src', 'app', 'admin', 'player-links', 'ResolveControls.tsx'),
+      'utf8',
+    );
+    expect(controls).toContain('match.stale');
+    expect(controls).toContain('Stale suggestion');
+    expect(controls).toContain('currentAlgorithmVersion');
+    // The warning sits above the approval form, not after it.
+    expect(controls.indexOf('Stale suggestion'))
+      .toBeLessThan(controls.indexOf('action={approveAction}'));
+  });
+
+  it('explains a capped row rather than leaving the band unexplained', () => {
+    // AFLDB-ISSUE-164 §11 items 1-2 / acceptance §13 item 1. The typed
+    // reasons come from the pure helper and are worded server-side; the
+    // page neither invents them nor rescores to get them.
+    expect(page).toContain("from '@/lib/player-matching/explain-limits'");
+    expect(page).toContain('explainLimits(');
+    expect(page).toContain('profileFromSourceDetail(');
+    expect(page).toContain('describeLimitReason(');
+    expect(page).toContain('{limitLine}');
+    // The group rule reaches the explanation as an input, not as a
+    // second opinion formed inside it.
+    expect(page).toContain('groupDisagrees: group.disagrees');
+  });
+
+  it('sends the drawer the criteria for every suggested row, not only bulk ones', () => {
+    const controls = readFileSync(
+      join(process.cwd(), 'src', 'app', 'admin', 'player-links', 'ResolveControls.tsx'),
+      'utf8',
+    );
+    // §11 item 3: the block used to render only when match.bulkEligible,
+    // which is exactly why a capped row and an unlucky one looked the
+    // same. It now renders whenever there are criteria to show.
+    expect(controls).toContain('match.bulkCriteria.length > 0');
+    expect(controls).not.toContain('{match.bulkEligible && (');
+    expect(controls).toContain("criterion.met ? '✓' : '✗'");
+    // Source-class exclusion and the reachable ceiling are both visible.
+    expect(controls).toContain('match.ceiling');
+    expect(controls).toContain('match.limitReasons');
+    expect(controls).toContain('match.clubTextUnresolved');
+    expect(page).toContain('describeBulkChecklist(');
+    expect(page).toContain('describeCeiling(');
+  });
+
+  it('keeps the stale warning alongside the criteria block', () => {
+    const controls = readFileSync(
+      join(process.cwd(), 'src', 'app', 'admin', 'player-links', 'ResolveControls.tsx'),
+      'utf8',
+    );
+    // Invariant 13 must survive §11: both blocks coexist, and the stale
+    // warning still sits above the approval form.
+    expect(controls).toContain('Stale suggestion');
+    expect(controls.indexOf('Stale suggestion'))
+      .toBeLessThan(controls.indexOf('match.bulkCriteria.length > 0'));
+    expect(controls.indexOf('match.bulkCriteria.length > 0'))
+      .toBeLessThan(controls.indexOf('action={approveAction}'));
+  });
+
+  it('leaves scoring, bands and bulk eligibility to the server', () => {
+    // The explanation layer is additive. Nothing on the page may decide
+    // a band or a bulk flag, and bulkReady is still the cached
+    // assessment narrowed only by the group rule.
+    expect(page).toContain('const bulkReady = (match?.bulkEligible ?? false) && !group.disagrees');
+    expect(page).toContain('bulkEligible: bulkReady,');
     expect(page).not.toContain('scoreCandidate');
     expect(page).not.toContain('assessMatch');
   });

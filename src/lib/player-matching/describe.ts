@@ -1,3 +1,4 @@
+import type { BulkCheck, LimitReason } from '@/lib/player-matching/explain-limits';
 import type { EvidenceItem, HardConflict } from '@/lib/player-matching/types';
 
 /**
@@ -26,7 +27,14 @@ import type { EvidenceItem, HardConflict } from '@/lib/player-matching/types';
  */
 export type SourceDetail =
   | { kind: 'award_winner'; award: string | null; season: number | null;
-      club: string | null; position: string | null }
+      /** COALESCE(clubs.name, club_name_raw): a name, not proof of a club_id. */
+      club: string | null; position: string | null;
+      /**
+       * Whether the row carries a real club_id. Reported separately
+       * because `club` above coalesces the raw text, and the two cases
+       * have different reachable ceilings (AFLDB-ISSUE-164 §3.2).
+       */
+      hasClubId?: boolean }
   | { kind: 'award_nomination'; award: string | null; season: number | null;
       club: string | null; round: number | null }
   | { kind: 'hall_of_fame'; category: string | null; inductedYear: number | null;
@@ -35,7 +43,9 @@ export type SourceDetail =
       role: string | null; club: string | null }
   | { kind: 'captaincy'; season: number | null; club: string | null; role: string | null }
   | { kind: 'achievement'; achievement: string | null; season: number | null;
-      club: string | null; round: string | null }
+      club: string | null; round: string | null;
+      /** As for award_winner: `club` coalesces the raw text. */
+      hasClubId?: boolean }
   | { kind: 'draft'; draftYear: number | null; club: string | null;
       draftType: string | null; pick: number | null;
       reportedGames: number | null; reportedGoals: number | null; picks: number }
@@ -160,6 +170,14 @@ const EVIDENCE_LABELS: Record<string, { short: string; long: string }> = {
   name_surname_initial: { short: 'Surname + initial', long: 'Surname and first initial agree' },
   club_in_season: { short: 'Club + season', long: 'Played for that club in the source season' },
   club_anywhere: { short: 'Club career', long: 'Played for that club at some point' },
+  club_in_span: {
+    short: 'Club + span',
+    long: 'Played for a club the source names, inside the career span it states',
+  },
+  club_text_anywhere: {
+    short: 'Club career',
+    long: 'Played for a club the source names, at some point',
+  },
   era_season_in_career: { short: 'Playing era', long: 'Source season falls inside the AFL career' },
   era_season_near_career: { short: 'Playing era', long: 'Source season sits beside the AFL career' },
   career_span_exact: { short: 'Career span', long: 'Source career span matches exactly' },
@@ -227,28 +245,111 @@ export function describeAlternative(
   return `Next best: ${best.playerName} · ${best.score} (gap ${gap})`;
 }
 
+// ---------------------------------------------------------------------
+// Why a row is where it is (AFLDB-ISSUE-164 §11)
+// ---------------------------------------------------------------------
+
 /**
- * Why a row may be approved unattended, in the four things a reviewer
- * would otherwise have to take on trust.
+ * The bulk criteria in a reviewer's words.
+ *
+ * Shown for EVERY suggested row, not only the ones that already pass:
+ * the queue's whole problem was that a capped row looked identical to an
+ * unlucky one. Each line is the wording of a check explain-limits
+ * evaluated against MATCH_POLICY, so a ✓ here means the same thing the
+ * eligibility rule means by it.
+ *
+ * Wording is deliberately flat about the two different kinds of failure:
+ * a source class that policy excludes says so as policy, and never as a
+ * complaint about the evidence.
  */
-export function describeBulkCriteria(
-  evidence: readonly EvidenceItem[],
-  conflicts: readonly HardConflict[],
-  gap: number | null,
-): string[] {
-  // Counted WITHOUT the name. The eligibility rule wants a name plus at
-  // least one other kind of agreement, so quoting the total here would
-  // credit the name twice -- once as identity, once as corroboration of
-  // itself.
-  const corroborating = independentFamilyCount(evidence.filter((e) => e.family !== 'name'));
-  return [
-    hasStrongNameEvidence(evidence)
-      ? 'Strong identity match'
-      : 'Name evidence is not exact',
-    corroborating >= 1
-      ? `Independent football evidence (${corroborating} kind${corroborating === 1 ? '' : 's'})`
-      : 'Nothing corroborates the name',
-    conflicts.length === 0 ? 'No hard conflicts' : 'Contradicted by the source',
-    gap === null ? 'No credible alternative' : `No close alternative (gap ${gap})`,
-  ];
+export function describeBulkCheck(check: BulkCheck): string {
+  switch (check.key) {
+    case 'strong_name':
+      return check.met ? 'Strong identity match' : 'Name evidence is not exact';
+
+    case 'corroboration':
+      // Quoted as the scorer counts it: independent families including
+      // the name, which is the number the eligibility rule compares.
+      return check.met
+        ? `Independent agreement from ${check.families} evidence families`
+        : `Only ${check.families} evidence family — ${check.required} required`;
+
+    case 'score_floor':
+      return check.met
+        ? `Score ${check.score} clears the bulk floor of ${check.required}`
+        : `Score ${check.score} is below the bulk floor of ${check.required}`;
+
+    case 'gap_floor':
+      if (check.gap === null) return 'No credible alternative';
+      return check.met
+        ? `No close alternative (gap ${check.gap}, floor ${check.required})`
+        : `Next candidate is only ${check.gap} behind — ${check.required} required`;
+
+    case 'no_conflict':
+      return check.met ? 'No hard conflicts' : 'Contradicted by the source';
+
+    case 'source_class':
+      return check.met
+        ? `${check.sourceType} may be approved unattended`
+        : `${check.sourceType} is suggestion-only (policy)`;
+
+    default:
+      return '';
+  }
+}
+
+export function describeBulkChecklist(
+  checks: readonly BulkCheck[],
+): { label: string; met: boolean }[] {
+  return checks.map((check) => ({ label: describeBulkCheck(check), met: check.met }));
+}
+
+/**
+ * One typed limit reason, as the single line the row shows.
+ *
+ * Short by design. A reviewer scanning fifty rows needs the one fact
+ * that explains this row, and the drawer carries the rest.
+ */
+export function describeLimitReason(reason: LimitReason): string {
+  switch (reason.code) {
+    case 'group_disagrees':
+      return 'Records for this name suggest different players';
+
+    case 'hard_conflict':
+      return 'Not approvable: the source contradicts this candidate';
+
+    case 'near_tie':
+      return reason.gap === null
+        ? 'Needs review: the candidates are too close to separate'
+        : `Needs review: the next candidate is only ${reason.gap} behind`;
+
+    case 'source_class_not_bulk':
+      return `Not bulk-ready: ${reason.sourceType} is suggestion-only (policy)`;
+
+    case 'name_not_exact':
+      return 'Not bulk-ready: the name is not an exact match';
+
+    case 'no_independent_corroboration':
+      return 'Not bulk-ready: nothing independent corroborates the name';
+
+    case 'below_bulk_score_floor':
+      return `Not bulk-ready: score ${reason.score} is below the bulk floor of ${reason.required}`;
+
+    case 'below_bulk_gap_floor':
+      return `Not bulk-ready: the gap of ${reason.gap} is below the bulk floor of ${reason.required}`;
+
+    case 'profile_ceiling_below_very_high':
+      return `A ${reason.sourceType} record can reach at most ${reason.ceiling}, `
+        + `below the Very High floor of ${reason.required}`;
+
+    default:
+      return '';
+  }
+}
+
+/** The drawer's ceiling line, stated so it cannot be read as a score. */
+export function describeCeiling(ceiling: number, reachesVeryHigh: boolean): string {
+  return reachesVeryHigh
+    ? `Highest score this record type can reach: ${ceiling}`
+    : `Highest score this record type can reach: ${ceiling} — never Very High`;
 }

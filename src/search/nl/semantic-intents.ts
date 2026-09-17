@@ -28,7 +28,23 @@ export function extractHeadToHeadCue(text: string): HeadToHeadExtraction {
     [/\b(?:how many|number of) draws?\s+between\b/, 'draw_count'],
     [/\bhow many times have\b(?=.*\bdrawn\b)/, 'draw_count'],
     [/\bdraws?\s+(?:against|versus)\b/, 'draw_count'],
-    [/\b(?:who has|who'?s|who|which team has) won more\b/, 'compare_wins'],
+    // AFLDB-ISSUE-209. The 173-row corpus defect this pair fixes is
+    // generated from exactly one template, "Which of A and B has more
+    // wins head to head [temporal]" (tools/nl/generate-exploratory-corpus.mjs,
+    // head_to_head template index 2) -- present-tense "has/have more wins"
+    // rather than "won more", so it fell through to the generic head-to-head
+    // cue below and answered with a record instead of naming the leader.
+    // "has/have the most wins" is the same structurally-bound comparison
+    // (still exactly two clubs) and is accepted for the same reason.
+    // Checked BEFORE the generic head-to-head/record families, same as the
+    // existing "won more" entry, so the comparison reading always wins when
+    // both phrasings are present. Deliberately narrower than a bare "more/
+    // most wins": no "between"/"against the other" variant is added here,
+    // since that wording is claimed earlier by extractClubSeasonMetric's
+    // "most wins" club_season ranking cue (parser.ts) -- a different
+    // mechanism, out of scope for this fix.
+    [/\b(?:who has|who'?s|who|which team has) won more(?:\s+head[- ]to[- ]head)?\b/, 'compare_wins'],
+    [/\b(?:has|have)\s+(?:more|the most)\s+wins\s+head[- ]to[- ]head\b/, 'compare_wins'],
     [/\bhead[- ]to[- ]head(?:\s+(?:record|between))?\b/, 'record'],
     [/\brecord\s+(?:against|versus)\b/, 'record'],
     // Bare two-club "wins against" / "losses against" is the same

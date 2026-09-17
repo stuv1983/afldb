@@ -350,6 +350,20 @@ export default async function SearchPage({
             </section>
           )}
 
+          {results.coaches.length > 0 && (
+            <section className="section">
+              <h2>Coaches</h2>
+              <ul className="ruled-list">
+                {results.coaches.map((r) => (
+                  <li key={r.id}>
+                    <Link href={searchResultHref(r)}>{r.title}</Link>{' '}
+                    {r.subtitle && <span className="muted">— {r.subtitle}</span>}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
           {results.clubs.length > 0 && (
             <section className="section">
               <h2>Clubs</h2>

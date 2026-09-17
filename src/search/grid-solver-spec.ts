@@ -11,12 +11,16 @@
  * auto-grid modes, and the obscurity star-rating (a precomputed score with no
  * AFLDB equivalent — see GridOrder for the substitute).
  *
- * The catalogue is 107 builders across 11 categories, checked against the
- * reference's afl_grid_criteria.md and verified against live data. Family
- * relationships, physical attributes and win-streaks are absent because the
- * data is not there, not because they were skipped (docs/search.md). Derbies
- * have no schema definition either, but matchup_played_min sidesteps that by
- * taking the two clubs as parameters.
+ * The catalogue is 164 builders across 12 categories: the original 107
+ * checked against the reference's afl_grid_criteria.md and verified against
+ * live data, plus the 22Under22 builder and the 29 that AFLDB-ISSUE-118's
+ * Gridley compatibility corpus required (src/search/gridley-compat.ts maps
+ * every stored Gridley criterion onto this catalogue), then the later
+ * additions each recorded beside the builders themselves -- height and age
+ * on debut, the two coaching builders, the father-son pair, has_brother,
+ * after_siren_winner, and AFLDB-ISSUE-152 Phase D's six relationship
+ * builders. Derbies have no schema definition, but the matchup_* builders
+ * sidestep that by taking the two clubs as parameters.
  *
  * Every builder is a fixed, named SQL shape with typed parameters, so unlike
  * the generic query builder nothing here lets a request choose a column or
@@ -30,7 +34,7 @@ import { decodeUrlState, encodeUrlState } from '@/lib/urlState';
 
 export type GridParamKind =
   | 'integer' | 'decimal' | 'season' | 'club' | 'venue' | 'player' | 'stat'
-  | 'award' | 'draftType' | 'signingKind' | 'aaPosition' | 'matchEvent';
+  | 'award' | 'draftType' | 'signingKind' | 'aaPosition' | 'matchEvent' | 'text' | 'coach';
 
 export type GridParamDef = {
   key: string;
@@ -139,6 +143,7 @@ export type GridBuilderDef = {
 const club = (label = 'Club'): GridParamDef => ({ key: 'club', label, kind: 'club' });
 const venue = (label = 'Venue'): GridParamDef => ({ key: 'venue', label, kind: 'venue' });
 const player = (label = 'Player'): GridParamDef => ({ key: 'player', label, kind: 'player' });
+const coach = (label = 'Coach'): GridParamDef => ({ key: 'coach', label, kind: 'coach' });
 const stat = (key = 'stat', label = 'Statistic'): GridParamDef => ({ key, label, kind: 'stat' });
 const int = (key: string, label: string): GridParamDef => ({ key, label, kind: 'integer' });
 const decimal = (key: string, label: string): GridParamDef => ({ key, label, kind: 'decimal' });
@@ -148,6 +153,7 @@ const draftType = (label = 'Draft type'): GridParamDef => ({ key: 'draftType', l
 const signingKind = (label = 'Recruited from'): GridParamDef => ({ key: 'signingKind', label, kind: 'signingKind' });
 const aaPosition = (label = 'Position'): GridParamDef => ({ key: 'position', label, kind: 'aaPosition' });
 const matchEvent = (label = 'Marquee match'): GridParamDef => ({ key: 'event', label, kind: 'matchEvent' });
+const text = (key: string, label: string): GridParamDef => ({ key, label, kind: 'text' });
 
 export const GRID_GROUP_ORDER = [
   'Clubs & journeys',
@@ -159,8 +165,11 @@ export const GRID_GROUP_ORDER = [
   'Rivalries & marquee matches',
   'Teammates',
   'Captaincy',
+  'Coaching',
   'Awards & honours',
   'Draft & recruitment',
+  'Names & numbers',
+  'Biography',
 ] as const;
 
 // Phase A ships infrastructure only: the original 31 builders (unchanged
@@ -181,6 +190,25 @@ export const GRID_BUILDERS: Record<string, GridBuilderDef> = {
   clubs_played_min: { key: 'clubs_played_min', label: 'Played for X+ clubs', group: 'Clubs & journeys', params: [int('clubs', 'Clubs')] },
   goals_at_multiple_clubs_min: { key: 'goals_at_multiple_clubs_min', label: 'X+ goals at 2+ clubs', group: 'Clubs & journeys', params: [int('goals', 'Goals'), int('clubs', 'Clubs')] },
   games_at_multiple_clubs_min: { key: 'games_at_multiple_clubs_min', label: 'X+ games at 2+ clubs', group: 'Clubs & journeys', params: [int('games', 'Games'), int('clubs', 'Clubs')] },
+  // Mergers are link-only in AFLDB's lineage model (club_organization_relations,
+  // relation = 'merged_into'), so played_for_club deliberately stops at the
+  // organization. These two follow the merger link as well, for the question
+  // Gridley asks of the Brisbane Lions: "includes Brisbane Bears and Fitzroy
+  // Lions players" (AFLDB-ISSUE-118 §7.3). Renames are already one organization.
+  played_for_club_incl_merged: { key: 'played_for_club_incl_merged', label: 'Played for club, incl. merged predecessors', group: 'Clubs & journeys', params: [club()] },
+  debut_club_incl_merged: { key: 'debut_club_incl_merged', label: 'First career game for club, incl. merged predecessors', group: 'Clubs & journeys', params: [club()] },
+  // The club-COUNT builders with the same merger fold: Bears/Fitzroy then
+  // Lions is one club here (Michael Voss is a one-club player in this
+  // reading and a two-club player in the organization reading above). The
+  // organization-level originals keep AFLDB's own lineage rule.
+  one_club_player_incl_merged: { key: 'one_club_player_incl_merged', label: 'One-club player, mergers folded', group: 'Clubs & journeys', params: [] },
+  multi_club_player_incl_merged: { key: 'multi_club_player_incl_merged', label: 'Multi-club player, mergers folded', group: 'Clubs & journeys', params: [] },
+  clubs_played_min_incl_merged: { key: 'clubs_played_min_incl_merged', label: 'Played for X+ clubs, mergers folded', group: 'Clubs & journeys', params: [int('clubs', 'Clubs')] },
+  games_at_one_club_min_incl_merged: { key: 'games_at_one_club_min_incl_merged', label: 'X+ games at one club, mergers folded', group: 'Clubs & journeys', params: [int('games', 'Games')] },
+  games_at_multiple_clubs_min_incl_merged: { key: 'games_at_multiple_clubs_min_incl_merged', label: 'X+ games at 2+ clubs, mergers folded', group: 'Clubs & journeys', params: [int('games', 'Games'), int('clubs', 'Clubs')] },
+  goals_at_multiple_clubs_min_incl_merged: { key: 'goals_at_multiple_clubs_min_incl_merged', label: 'X+ goals at 2+ clubs, mergers folded', group: 'Clubs & journeys', params: [int('goals', 'Goals'), int('clubs', 'Clubs')] },
+  finals_clubs_min_incl_merged: { key: 'finals_clubs_min_incl_merged', label: 'Played finals for X+ clubs, mergers folded', group: 'Finals & premierships', params: [int('clubs', 'Clubs')] },
+  grand_final_clubs_min_incl_merged: { key: 'grand_final_clubs_min_incl_merged', label: 'Grand Final for X+ clubs, mergers folded', group: 'Finals & premierships', params: [int('clubs', 'Clubs')] },
 
   // Career milestones
   career_games_min: { key: 'career_games_min', label: 'X+ career games', group: 'Career milestones', params: [int('games', 'Games')] },
@@ -197,6 +225,13 @@ export const GRID_BUILDERS: Record<string, GridBuilderDef> = {
   single_game_stat_min: { key: 'single_game_stat_min', label: 'X+ of a stat in one game', group: 'Single-game feats', params: [stat(), int('x', 'At least')] },
   single_game_two_stats_min: { key: 'single_game_two_stats_min', label: 'Two stats in the same game', group: 'Single-game feats', params: [stat('statA', 'Statistic A'), int('xA', 'At least (A)'), stat('statB', 'Statistic B'), int('xB', 'At least (B)')] },
   games_with_stat_min_count: { key: 'games_with_stat_min_count', label: 'X+ games with Y+ of a stat', group: 'Single-game feats', params: [stat(), int('y', 'At least (per game)'), int('times', 'In this many games')] },
+  // The feat achieved for X+ distinct clubs (organizations, by lineage).
+  single_game_stat_multi_club_min: { key: 'single_game_stat_multi_club_min', label: 'X+ of a stat in one game, for Y+ clubs (mergers folded)', group: 'Single-game feats', params: [stat(), int('x', 'At least'), int('clubs', 'Clubs')] },
+  // AFLDB-ISSUE-118 §23.32–§23.35. A goal or behind kicked after the final
+  // siren (of the match, or of extra time) that WON a premiership-season
+  // match: a curated, cited after_siren_kicks row (migration 089) with the
+  // kicker canonically linked. Never a miss, a draw, or another competition.
+  after_siren_winner: { key: 'after_siren_winner', label: 'Won a game with a kick after the siren', group: 'Single-game feats', params: [] },
 
   // Season & era
   debuted_between: { key: 'debuted_between', label: 'Debuted between seasons', group: 'Season & era', params: [season('from', 'From season'), season('to', 'To season')] },
@@ -217,6 +252,18 @@ export const GRID_BUILDERS: Record<string, GridBuilderDef> = {
   minor_premiership_season: { key: 'minor_premiership_season', label: 'Minor premiership', group: 'Season & era', params: [] },
   never_minor_premier: { key: 'never_minor_premier', label: 'No minor premierships', group: 'Season & era', params: [] },
   minor_premierships_min: { key: 'minor_premierships_min', label: 'X+ minor premierships', group: 'Season & era', params: [int('times', 'Times')] },
+  // Named-season variants of games_in_season_min / season_stat_total_min
+  // (ISSUE-118 §8.2: "20+ games in 2023"). Separate builders rather than an
+  // optional parameter because isAxisComplete requires every declared
+  // parameter to be filled.
+  games_in_named_season_min: { key: 'games_in_named_season_min', label: 'X+ games in a named season', group: 'Season & era', params: [season('season', 'Season'), int('games', 'Games')] },
+  named_season_stat_total_min: { key: 'named_season_stat_total_min', label: 'X+ of a stat in a named season', group: 'Season & era', params: [season('season', 'Season'), stat(), int('x', 'At least')] },
+  // League-wide season rank: "top 10 goalkicker in a season". Standard
+  // competition ranking (rank()), so a tie for the last place is included.
+  league_season_stat_rank_top: { key: 'league_season_stat_rank_top', label: 'Top X in the league for a stat (season)', group: 'Season & era', params: [stat(), int('place', 'Top place')] },
+  club_season_brownlow_leader: { key: 'club_season_brownlow_leader', label: 'Most Brownlow votes at club (season)', group: 'Season & era', params: [] },
+  won_by_margin_min: { key: 'won_by_margin_min', label: 'Played in a win by X+ points', group: 'Season & era', params: [int('margin', 'Margin')] },
+  consecutive_wins_min: { key: 'consecutive_wins_min', label: 'Played in X+ consecutive wins', group: 'Season & era', params: [int('times', 'Wins in a row')] },
 
   // Finals & premierships
   played_in_a_final: { key: 'played_in_a_final', label: 'Played in a final', group: 'Finals & premierships', params: [] },
@@ -242,6 +289,10 @@ export const GRID_BUILDERS: Record<string, GridBuilderDef> = {
   premiership_between_seasons: { key: 'premiership_between_seasons', label: 'Premiership between seasons', group: 'Finals & premierships', params: [season('from', 'From season'), season('to', 'To season')] },
   grand_finals_lost_min: { key: 'grand_finals_lost_min', label: 'Lost X+ Grand Finals', group: 'Finals & premierships', params: [int('times', 'Times')] },
   lost_grand_final_against: { key: 'lost_grand_final_against', label: 'Lost a Grand Final against…', group: 'Finals & premierships', params: [player()] },
+  finals_winning_record: { key: 'finals_winning_record', label: 'More finals wins than losses', group: 'Finals & premierships', params: [] },
+  grand_finals_with_stat_min_count: { key: 'grand_finals_with_stat_min_count', label: 'X+ Grand Finals with Y+ of a stat', group: 'Finals & premierships', params: [stat(), int('y', 'At least (per Grand Final)'), int('times', 'In this many Grand Finals')] },
+  grand_final_won_against_club: { key: 'grand_final_won_against_club', label: 'Won a Grand Final against club', group: 'Finals & premierships', params: [club('Beaten club')] },
+  premiership_captain: { key: 'premiership_captain', label: 'Premiership captain', group: 'Finals & premierships', params: [] },
 
   // Grounds & venues
   played_at_venue: { key: 'played_at_venue', label: 'Played at venue', group: 'Grounds & venues', params: [venue()] },
@@ -264,11 +315,43 @@ export const GRID_BUILDERS: Record<string, GridBuilderDef> = {
   match_event_played: { key: 'match_event_played', label: 'Played in a marquee match', group: 'Rivalries & marquee matches', params: [matchEvent()] },
   match_event_min: { key: 'match_event_min', label: 'X+ marquee matches', group: 'Rivalries & marquee matches', params: [matchEvent(), int('times', 'Matches')] },
   matchup_played_min: { key: 'matchup_played_min', label: 'X+ matches between two clubs', group: 'Rivalries & marquee matches', params: [{ key: 'clubA', label: 'Club A', kind: 'club' }, { key: 'clubB', label: 'Club B', kind: 'club' }, int('times', 'Matches')] },
+  match_event_won: { key: 'match_event_won', label: 'Won a marquee match', group: 'Rivalries & marquee matches', params: [matchEvent()] },
+  // The Big Freeze is the King's Birthday fixture from 2015 on, so a marquee
+  // match bounded by season answers it without a tag of its own.
+  match_event_played_between: { key: 'match_event_played_between', label: 'Played in a marquee match between seasons', group: 'Rivalries & marquee matches', params: [matchEvent(), season('from', 'From season'), season('to', 'To season')] },
+  matchup_won_min: { key: 'matchup_won_min', label: 'X+ wins between two clubs', group: 'Rivalries & marquee matches', params: [{ key: 'clubA', label: 'Club A', kind: 'club' }, { key: 'clubB', label: 'Club B', kind: 'club' }, int('times', 'Wins')] },
+  matchup_game_stat_min: { key: 'matchup_game_stat_min', label: 'X+ of a stat in a match between two clubs', group: 'Rivalries & marquee matches', params: [{ key: 'clubA', label: 'Club A', kind: 'club' }, { key: 'clubB', label: 'Club B', kind: 'club' }, stat(), int('x', 'At least')] },
+  matchup_winning_record: { key: 'matchup_winning_record', label: 'Winning record between two clubs', group: 'Rivalries & marquee matches', params: [{ key: 'clubA', label: 'Club A', kind: 'club' }, { key: 'clubB', label: 'Club B', kind: 'club' }] },
+  // Gather Round (2023-) is the one home-and-away round a season played
+  // entirely in South Australia; it carries no round tag in matches, so the
+  // compiler derives it from the round's venues (grid-solver.ts).
+  gather_round_played: { key: 'gather_round_played', label: 'Played in Gather Round', group: 'Rivalries & marquee matches', params: [] },
+  gather_round_game_stat_min: { key: 'gather_round_game_stat_min', label: 'X+ of a stat in a Gather Round game', group: 'Rivalries & marquee matches', params: [stat(), int('x', 'At least')] },
 
   // Teammates -- the same player_match_stats self-join as
   // getPlayerOverlapSummary in db/queries/player-compare.ts.
   teammate_of: { key: 'teammate_of', label: 'Teammate of…', group: 'Teammates', params: [player()] },
   played_against: { key: 'played_against', label: 'Played against…', group: 'Teammates', params: [player()] },
+
+  // Coaching -- match_coaches is the coaching grain (ISSUE-118 §23.27): a
+  // player was coached by X when they played a match for a club while X was
+  // that club's coach for that exact match. Caretakers and mid-season
+  // changes need no special case; there are no season ranges to get wrong.
+  coached_by: { key: 'coached_by', label: 'Coached by…', group: 'Coaching', params: [coach()] },
+  // A player who, as a coach, coached the winning club in a Grand Final.
+  // Derived from the Grand Final result and that match's coaching
+  // assignment through the coach's proven player link; nothing stored.
+  premiership_coach: { key: 'premiership_coach', label: 'Premiership coach', group: 'Coaching', params: [] },
+  // AFLDB-ISSUE-152 Phase F. A player who ALSO coached -- the cross-domain
+  // composition, and the subject is the coach, not their players (which is
+  // what coached_by answers). A `coaches` row is an IDENTITY claim and
+  // nothing more: 368 linked coach identities exist but only 365 of those
+  // people ever coached a match, so both builders join match_coaches and
+  // neither is satisfied by the identity row alone. Parameterless and
+  // club-scoped are two keys rather than one optional parameter, exactly
+  // as club_captain / club_captain_any already are.
+  has_coached: { key: 'has_coached', label: 'Also coached', group: 'Coaching', params: [] },
+  coached_club: { key: 'coached_club', label: 'Coached club', group: 'Coaching', params: [club()] },
 
   // Captaincy -- club_captain/captain_between_seasons kept their original
   // keys and behaviour from V1 but are relabelled here: they were always
@@ -313,6 +396,30 @@ export const GRID_BUILDERS: Record<string, GridBuilderDef> = {
   rising_star_nominee_for_club: { key: 'rising_star_nominee_for_club', label: 'Rising Star nominee for club', group: 'Awards & honours', params: [club()] },
   rising_star_nominee_for_club_between_seasons: { key: 'rising_star_nominee_for_club_between_seasons', label: 'Rising Star nominee for club, between seasons', group: 'Awards & honours', params: [club(), season('from', 'From season'), season('to', 'To season')] },
   rising_star_nominee_in_season: { key: 'rising_star_nominee_in_season', label: 'Rising Star nominee in season', group: 'Awards & honours', params: [season('season', 'Season')] },
+  // Position groups over the 1991+ named All-Australian positions: the
+  // back six, the forward six and the four on-ball positions. Ruck and
+  // interchange belong to no group, matching the source's own wording.
+  all_australian_defender: { key: 'all_australian_defender', label: 'All-Australian final-team defender (1991 onwards)', group: 'Awards & honours', params: [] },
+  all_australian_forward: { key: 'all_australian_forward', label: 'All-Australian final-team forward (1991 onwards)', group: 'Awards & honours', params: [] },
+  all_australian_midfielder: { key: 'all_australian_midfielder', label: 'All-Australian final-team midfielder (1991 onwards)', group: 'Awards & honours', params: [] },
+  // The final All-Australian team itself (award slug all-australian): the
+  // selected side of 20-22 each season, 1953 onwards, with the 1953-1988
+  // carnival teams and the 1982-1990 VFL Team of the Year in the same
+  // award -- exactly Gridley's definition. NOT the 40/44-man squad, which
+  // is a separate award below. Dedicated builders so the page never
+  // relies on finding "All-Australian Team" inside the generic award
+  // dropdown (it sits under the honour_team group there, not award).
+  // Repeat selections count DISTINCT seasons: the 1984 team lists nine
+  // players under both their club and their state (two rows, one honour).
+  all_australian_team: { key: 'all_australian_team', label: 'All-Australian final team (1953 onwards)', group: 'Awards & honours', params: [] },
+  all_australian_team_min_times: { key: 'all_australian_team_min_times', label: 'All-Australian final team, X+ times', group: 'Awards & honours', params: [int('times', 'Times')] },
+  all_australian_team_between_seasons: { key: 'all_australian_team_between_seasons', label: 'All-Australian final team, between seasons', group: 'Awards & honours', params: [season('from', 'From season'), season('to', 'To season')] },
+  // The 40/44-man squad (award slug all-australian-squad, 2007 onwards):
+  // AFLDB's squad rows are the members NOT selected in the final team, so
+  // a squad member is a squad row OR a final-team row in a squad-era season.
+  all_australian_squad_member: { key: 'all_australian_squad_member', label: 'All-Australian 40-man squad member (2007 onwards)', group: 'Awards & honours', params: [] },
+  all_australian_squad_in_season: { key: 'all_australian_squad_in_season', label: 'All-Australian 40-man squad member, in season', group: 'Awards & honours', params: [season('season', 'Season')] },
+  best_and_fairest_in_premiership_season: { key: 'best_and_fairest_in_premiership_season', label: 'Club best and fairest in a premiership season', group: 'Awards & honours', params: [] },
 
   // Draft & recruitment -- linked rows only (link_status_value IN
   // ('unique','resolved')), the same rule every other draft query follows.
@@ -323,6 +430,67 @@ export const GRID_BUILDERS: Record<string, GridBuilderDef> = {
   drafted_by_club_never_played: { key: 'drafted_by_club_never_played', label: 'Drafted by club, never played there', group: 'Draft & recruitment', params: [club()] },
   recruited_via: { key: 'recruited_via', label: 'Recruited from…', group: 'Draft & recruitment', params: [signingKind()] },
   traded_min_times: { key: 'traded_min_times', label: 'Traded X+ times', group: 'Draft & recruitment', params: [int('times', 'Times')] },
+  // AFLDB-ISSUE-118 §23.29. The AFL father–son rule, from father_son_selections
+  // (the tracked, normalised Wikipedia list; every person linked only through
+  // an AFL Tables profile path). father_son_selection is the SON — a player
+  // selected under the rule (national or rookie draft, or a pre-draft
+  // selection); father_son_father is the FATHER — a player whose son was so
+  // selected. Linked rows only, the draft and Hall of Fame rule.
+  father_son_selection: { key: 'father_son_selection', label: 'Father–son selection', group: 'Draft & recruitment', params: [] },
+  father_son_father: { key: 'father_son_father', label: 'Father of a father–son selection', group: 'Draft & recruitment', params: [] },
+  // AFLDB-ISSUE-153 Stage 3 (FS2/FS3). The club that MADE the selection,
+  // folded by organization lineage, and the year the selection was made.
+  // The year parameter is deliberately labelled "draft year" everywhere a
+  // reader can see it: draft_year is not a playing season, and 0 of the
+  // 99 linked selected players debuted in theirs.
+  father_son_selection_for_club: { key: 'father_son_selection_for_club', label: 'Father–son selection by club', group: 'Draft & recruitment', params: [club()] },
+  father_son_selection_between: { key: 'father_son_selection_between', label: 'Father–son selection, draft years', group: 'Draft & recruitment', params: [season('from', 'From draft year'), season('to', 'To draft year')] },
+  // National draft only (draft_kind = 'national'), unlike draft_pick_between
+  // which spans every draft kind -- "pick 1 in the National Draft".
+  national_draft_pick_between: { key: 'national_draft_pick_between', label: 'National Draft pick between', group: 'Draft & recruitment', params: [int('from', 'From pick'), int('to', 'To pick')] },
+
+  // Names & numbers -- facts about the player record itself.
+  given_name_in: { key: 'given_name_in', label: 'First name is one of…', group: 'Names & numbers', params: [text('names', 'Names (comma-separated)')] },
+  surname_hyphenated: { key: 'surname_hyphenated', label: 'Hyphenated surname', group: 'Names & numbers', params: [] },
+  jumper_number_worn: { key: 'jumper_number_worn', label: 'Wore guernsey number', group: 'Names & numbers', params: [int('number', 'Number')] },
+
+  // Biography -- players.height_cm. NULL means unknown and never qualifies
+  // on either side of the bound; an unknown height is not a short one.
+  height_min: { key: 'height_min', label: 'Height X cm or taller', group: 'Biography', params: [int('cm', 'Centimetres')] },
+  height_max: { key: 'height_max', label: 'Height X cm or shorter', group: 'Biography', params: [int('cm', 'Centimetres')] },
+  // Age on debut in completed years, from players.dob and the derived
+  // player_career_stats.debut_date (AFLDB-ISSUE-118 §23.24/§23.25). Either
+  // unknown and the player never qualifies: an unknown age is not a young one.
+  age_on_debut_min: { key: 'age_on_debut_min', label: 'Aged X or older on debut', group: 'Biography', params: [int('years', 'Years')] },
+  // AFLDB-ISSUE-118 §23.31. A player with at least one brother who played VFL/AFL:
+  // an explicit canonical `sibling` row in player_relationships (the tracked,
+  // normalised Wikipedia football-families export) labelled brothers, both sides
+  // linked through an AFL Tables profile path, the brother with a match played.
+  has_brother: { key: 'has_brother', label: 'Brother played VFL/AFL', group: 'Biography', params: [] },
+  // AFLDB-ISSUE-152 Phase D (C3/C4). The same tracked player_relationships
+  // export, at its OTHER relationship type: `parent_child`, whose roles are
+  // exhaustively father -> son in this database (measured, §22.1) and are
+  // therefore named explicitly rather than inferred from which column a
+  // person sits in. Every one of these applies has_brother's fail-closed
+  // rule: both sides linked to a canonical player, and -- for the "played"
+  // builders -- the OTHER side having played a VFL/AFL match. An unlinked
+  // side is a NAME in the source, never an identity, and can satisfy none
+  // of them.
+  //
+  // parent_child is NOT the father-son draft rule, whatever the two
+  // populations happen to coincide at today: father_son_selection /
+  // father_son_father above are the rule, these are the relationship.
+  // AFLDB-ISSUE-153 decides what the bare phrase "father-son" means.
+  has_afl_father: { key: 'has_afl_father', label: 'Father played VFL/AFL', group: 'Biography', params: [] },
+  has_afl_son: { key: 'has_afl_son', label: 'Son played VFL/AFL', group: 'Biography', params: [] },
+  has_afl_parent_or_child: { key: 'has_afl_parent_or_child', label: 'Parent or child played VFL/AFL', group: 'Biography', params: [] },
+  // The per-player relationship questions ("who are X's brothers"). The
+  // parameter is a player id, bound exactly the way teammate_of binds one;
+  // the answer is a set of canonical players, so a same-named relative is
+  // still a distinct row and no answer is ever deduplicated by name.
+  brother_of_player: { key: 'brother_of_player', label: 'Brother of…', group: 'Biography', params: [player()] },
+  father_of_player: { key: 'father_of_player', label: 'Father of…', group: 'Biography', params: [player()] },
+  son_of_player: { key: 'son_of_player', label: 'Son of…', group: 'Biography', params: [player()] },
 };
 
 export const GRID_BUILDER_KEYS = Object.keys(GRID_BUILDERS);

@@ -140,6 +140,7 @@ export function CreateMatchForm({
               style={{ fontSize: '0.9rem' }}
             >
               <option value="home_and_away">Regular Season (Home & Away)</option>
+              <option value="wildcard_final">Wildcard Final</option>
               <option value="qualifying_final">Qualifying Final</option>
               <option value="elimination_final">Elimination Final</option>
               <option value="semi_final">Semi Final</option>

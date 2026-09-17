@@ -3,23 +3,43 @@ import Link from 'next/link';
 import { notFound, permanentRedirect } from 'next/navigation';
 
 import { Breadcrumbs } from '@/components/Breadcrumbs';
+import { ClubCoachRecords } from '@/components/ClubCoachRecords';
+import { ClubCrowdRecords } from '@/components/ClubCrowdRecords';
+import { ClubHonours } from '@/components/ClubHonours';
+import { ClubLeadership } from '@/components/ClubLeadership';
+import { ClubMatchRecords } from '@/components/ClubMatchRecords';
+import { ClubPlayers } from '@/components/ClubPlayers';
+import { ClubPremierships } from '@/components/ClubPremierships';
+import { ClubPremiershipPlayers } from '@/components/ClubPremiershipPlayers';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { JsonLd } from '@/components/JsonLd';
 import { ReorderableSections } from '@/components/ReorderableSections';
 import { SortableTable } from '@/components/SortableTable';
 import { UnmatchedPlayer } from '@/components/UnmatchedPlayer';
-import { getClubBestAndFairest, getClubCaptains } from '@/db/queries/awards';
+import {
+  getClubBestAndFairest,
+  getClubBrownlowMedallists,
+  getClubCaptains,
+  getClubHonours,
+} from '@/db/queries/awards';
+import { getClubCurrentLeadership } from '@/db/queries/club-leadership';
 import {
   getClub,
+  getClubCrowdRecords,
   getClubEraTotals,
   getClubGoalkickers,
   getClubLeaders,
   getClubLineage,
+  getClubMatchRecords,
+  getClubPlayers,
+  getClubPremierships,
+  getClubPremiershipPlayers,
   getClubRelations,
   getClubSeasons,
   getClubTotals,
   listClubs,
 } from '@/db/queries/clubs';
+import { getClubCoachRecords } from '@/db/queries/coaches';
 import {
   awardPath,
   clubPath,
@@ -93,9 +113,16 @@ export default async function ClubPage({
   // a page headed "Footscray" must not list 2016.
   const isContinuing = club.currentIdentityId === club.id;
 
+  // AFLDB-ISSUE-163 §20.1 (D-12): the current-leadership block belongs only
+  // to the continuing identity's page — an era page keeps its Captains
+  // history table but never carries a "current" statement.
+  const showsCurrentLeadership = isContinuing && club.isCurrent;
+
   const [
     totals, eraTotals, seasons, leaders, goalkickers, lineage, relations,
-    bestAndFairest, captains,
+    bestAndFairest, captains, coachRecords, premierships,
+    matchRecords, crowdRecords, clubPlayers, premiershipPlayers,
+    brownlowMedallists, honours, currentLeadership,
   ] = await Promise.all([
     getClubTotals(club.id),
     getClubEraTotals(club.id),
@@ -106,6 +133,15 @@ export default async function ClubPage({
     getClubRelations(club.id),
     getClubBestAndFairest(club.id, 25),
     getClubCaptains(club.id),
+    getClubCoachRecords(club.id),
+    getClubPremierships(club.id),
+    getClubMatchRecords(club.id),
+    getClubCrowdRecords(club.id),
+    getClubPlayers(club.id),
+    getClubPremiershipPlayers(club.id),
+    getClubBrownlowMedallists(club.id),
+    getClubHonours(club.id),
+    showsCurrentLeadership ? getClubCurrentLeadership(club.id) : Promise.resolve(null),
   ]);
 
   const winRate = totals.played > 0
@@ -119,6 +155,49 @@ export default async function ClubPage({
   const clubRecordName = club.currentIdentityName;
 
   const sections: { id: string; label: string; node: React.ReactNode }[] = [];
+
+  if (premierships.length > 0) {
+    sections.push({
+      id: 'premierships',
+      label: 'Premierships',
+      node: (
+        <ClubPremierships
+          premierships={premierships}
+          clubRecordName={clubRecordName}
+          hasLineage={hasLineage}
+        />
+      ),
+    });
+  }
+
+  if (matchRecords.length > 0) {
+    sections.push({
+      id: 'club-records',
+      label: 'Club records',
+      node: (
+        <ClubMatchRecords
+          records={matchRecords}
+          clubRecordName={clubRecordName}
+          hasLineage={hasLineage}
+        />
+      ),
+    });
+  }
+
+  if (crowdRecords.records.length > 0 || crowdRecords.top.length > 0) {
+    sections.push({
+      id: 'record-crowds',
+      label: 'Record crowds',
+      node: (
+        <ClubCrowdRecords
+          records={crowdRecords.records}
+          top={crowdRecords.top}
+          clubRecordName={clubRecordName}
+          hasLineage={hasLineage}
+        />
+      ),
+    });
+  }
 
   sections.push({
     id: 'games-leaders',
@@ -208,6 +287,34 @@ export default async function ClubPage({
     ),
   });
 
+  if (clubPlayers.length > 0) {
+    sections.push({
+      id: 'players',
+      label: 'Players',
+      node: (
+        <ClubPlayers
+          players={clubPlayers}
+          clubRecordName={clubRecordName}
+          hasLineage={hasLineage}
+        />
+      ),
+    });
+  }
+
+  if (premiershipPlayers.length > 0) {
+    sections.push({
+      id: 'premiership-players',
+      label: 'Premiership players',
+      node: (
+        <ClubPremiershipPlayers
+          players={premiershipPlayers}
+          clubRecordName={clubRecordName}
+          hasLineage={hasLineage}
+        />
+      ),
+    });
+  }
+
   if (bestAndFairest.length > 0) {
     sections.push({
       id: 'best-and-fairest',
@@ -280,14 +387,21 @@ export default async function ClubPage({
                 ...(hasLineage ? [{ key: 'played_as', label: 'Played as', sortType: 'text' as const }] : []),
               ]}
               items={captains.map((c) => ({
-                id: `${c.season}-${c.playerName}`,
+                // AFLDB-ISSUE-163 §32.12 known limitation, fixed: keying on
+                // `${season}-${playerName}` collided when the same player
+                // held two appointments in one season (ended, re-appointed).
+                // `c.id` is already unique -- legacy rows keep their
+                // `captaincies.id`, canonical rows carry a negated
+                // `club_leadership.id` (opaque UI identity; never rely on
+                // the sign) -- so it can never collide.
+                id: String(c.id),
                 values: {
                   season: c.season,
                   captain: c.playerName,
                   ...(hasLineage ? { played_as: c.identityName } : {}),
                 },
                 element: (
-                  <tr key={`${c.season}-${c.playerName}`}>
+                  <tr key={c.id}>
                     <td>{c.season}</td>
                     <td className="wide">
                       {c.playerId && isLinked(c.linkStatus) ? (
@@ -307,6 +421,35 @@ export default async function ClubPage({
           </div>
           </CollapsibleTable>
         </section>
+      ),
+    });
+  }
+
+  if (brownlowMedallists.length > 0 || honours.length > 0) {
+    sections.push({
+      id: 'honours',
+      label: 'Awards & honours',
+      node: (
+        <ClubHonours
+          brownlow={brownlowMedallists}
+          honours={honours}
+          clubRecordName={clubRecordName}
+          hasLineage={hasLineage}
+        />
+      ),
+    });
+  }
+
+  if (coachRecords.length > 0) {
+    sections.push({
+      id: 'coaches',
+      label: 'Coaches',
+      node: (
+        <ClubCoachRecords
+          records={coachRecords}
+          clubRecordName={clubRecordName}
+          hasLineage={hasLineage}
+        />
       ),
     });
   }
@@ -441,6 +584,17 @@ export default async function ClubPage({
           {club.homeState ? ` · ${club.homeState}` : ''}
           {!club.isCurrent && ` · ${club.succession}`}
         </p>
+        {/* /clubs/compare resolves ORGANISATION slugs only, so a historical
+            era seeds the identity its organisation continues under rather
+            than its own slug — current_identity IS that mapping, so no
+            special table is needed. AFLDB-ISSUE-144. */}
+        <p className="section-note">
+          <Link href={`/clubs/compare?club1=${club.currentIdentitySlug}`}>
+            {club.slug === club.currentIdentitySlug
+              ? 'Compare with another club →'
+              : `Compare ${club.currentIdentityName} with another club →`}
+          </Link>
+        </p>
       </div>
 
       {club.notes && <p className="notice">{club.notes}</p>}
@@ -527,6 +681,8 @@ export default async function ClubPage({
           <div className="label">Wooden spoons</div>
         </div>
       </div>
+
+      {currentLeadership && <ClubLeadership leadership={currentLeadership} />}
 
       <ReorderableSections storageKey={`/clubs/${club.slug}`} sections={sections} />
     </>

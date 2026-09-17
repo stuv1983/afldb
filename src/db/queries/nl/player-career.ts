@@ -4,6 +4,7 @@ import { sql } from '@/db/client';
 import { compileAxis } from '@/db/queries/grid-solver';
 import { GRID_STATS } from '@/search/grid-solver-spec';
 import {
+  careerPredicatesOwnClubFor,
   NL_AWARDS,
   NL_CAREER_COLUMNS,
   NL_METRICS,
@@ -47,9 +48,15 @@ function metricValueExpr(plan: NlQueryPlan): SqlFragment {
     // is, and postgres.js hands a bigint back as text -- ::int keeps
     // this a number the same way NlPlayerCareerRow.value promises.
     const slug = NL_AWARDS[def.awardKey].slug;
+    // `status = 'active'` (AFLDB-ISSUE-165 §4.3): an award count is a
+    // football fact, and a voided winner row is an administrator saying the
+    // record should never have existed. The same predicate the public awards
+    // pages and the Grid Solver use, so the three never disagree about how
+    // many times one player won one award.
     return sql`(SELECT count(*)::int FROM award_winners w
                   JOIN awards a ON a.id = w.award_id
                  WHERE a.slug = ${slug} AND w.player_id = p.id
+                   AND w.status = 'active'
                    AND w.link_status_value IN ('unique', 'resolved'))`;
   }
   if (periodSplit && periodSplit !== 'FULL_MATCH') {
@@ -99,6 +106,7 @@ function conditionSql(cond: NlCareerCondition, plan: NlQueryPlan): SqlFragment {
   return sql`(SELECT count(*) FROM award_winners w
                 JOIN awards a ON a.id = w.award_id
                WHERE a.slug = ${slug} AND w.player_id = p.id
+                 AND w.status = 'active'
                  AND w.link_status_value IN ('unique', 'resolved')) ${op} ${cond.value}`;
 }
 
@@ -113,7 +121,7 @@ function conditionSql(cond: NlCareerCondition, plan: NlQueryPlan): SqlFragment {
 function boundarySql(boundary: NlBoundary): SqlFragment {
   const finalCondition = boundary.where === 'grand_final'
     ? sql`m.round_type = 'grand_final'`
-    : sql`m.is_final`;
+    : sql`m.is_finals_series`;
   if (boundary.event === 'debut') {
     return sql`EXISTS (SELECT 1 FROM player_match_stats pms
                           JOIN matches m ON m.id = pms.match_id
@@ -124,9 +132,31 @@ function boundarySql(boundary: NlBoundary): SqlFragment {
                        WHERE pms.player_id = p.id AND m.match_date = c.last_match_date AND ${finalCondition})`;
 }
 
+/**
+ * AFLDB-ISSUE-201: "since"/"before"/"in" YEAR beside a boundary names when
+ * the player's TRUE debut/last game happened, not a window to search
+ * matches in before picking one. c.debut_season/c.final_season are
+ * precomputed, single-valued facts about that real boundary (the same
+ * columns careerRowSelect already projects and debuted_between already
+ * filters in grid-solver.ts), so ANDing a range onto one of them can only
+ * additionally require the already-fixed true boundary to fall in range --
+ * it cannot change which game the boundary is, unlike a range applied to
+ * player_match_stats/matches rows before the boundary is chosen.
+ */
+function boundarySeasonWhere(boundary: NlBoundary, scope: NlQueryPlan['scope']): SqlFragment[] {
+  const seasonColumn = boundary.event === 'debut' ? sql`c.debut_season` : sql`c.final_season`;
+  const clauses: SqlFragment[] = [];
+  if (scope.seasonMin !== undefined) clauses.push(sql`${seasonColumn} >= ${scope.seasonMin}`);
+  if (scope.seasonMax !== undefined) clauses.push(sql`${seasonColumn} <= ${scope.seasonMax}`);
+  return clauses;
+}
+
 function conditionsWhere(plan: NlQueryPlan): SqlFragment[] {
   const clauses: SqlFragment[] = plan.careerConditions.map((condition) => conditionSql(condition, plan));
-  if (plan.boundary) clauses.push(boundarySql(plan.boundary));
+  if (plan.boundary) {
+    clauses.push(boundarySql(plan.boundary));
+    clauses.push(...boundarySeasonWhere(plan.boundary, plan.scope));
+  }
   // A single named player ("Nick Dal Santo most games", "Dusty's debut
   // was a grand final"). Pre-existing gap, not new: player_career had no
   // player filter at all before CAREER_ONLY_METRICS started routing
@@ -143,7 +173,15 @@ function conditionsWhere(plan: NlQueryPlan): SqlFragment[] {
   // An ambiguous surname ("Ablett most goals") -- ranks across every
   // plausible candidate instead of declining. See NlMatchScope.playerIdIn.
   if (plan.scope.playerIdIn) clauses.push(sql`p.id = ANY(${plan.scope.playerIdIn})`);
-  if (plan.scope.clubFor && plan.careerPredicates.length === 0) {
+  // The generic club filter, emitted unless a predicate already carries the
+  // club as a builder parameter (first_kick_goal_for_club scopes the FEAT to
+  // the club, which implies playing for it -- repeating it here would state
+  // the same fact twice). Keyed on ownership rather than on "no predicates
+  // at all": under the old count-based guard a plan mixing a club with a
+  // club-blind predicate reached SQL with no club constraint whatsoever.
+  // validatePlan now refuses that combination, and this is the second half
+  // of the same invariant (AFLDB-ISSUE-110 finding B).
+  if (plan.scope.clubFor && !careerPredicatesOwnClubFor(plan.careerPredicates)) {
     clauses.push(sql`EXISTS (
       SELECT 1 FROM player_match_stats pms
       JOIN clubs pcl ON pcl.id = pms.club_id

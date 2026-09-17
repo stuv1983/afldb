@@ -19,6 +19,12 @@
  * Component form, so it stays free of server-only imports.
  */
 
+import {
+  DEFAULT_HOME_RECORD,
+  HOME_RECORD_VALUES,
+  parseHomeRecordValue,
+  type HomeRecordValue,
+} from '@/lib/home-records';
 import { DEFAULT_SITE_FOOTER, parseSiteFooter, type SiteFooter } from '@/lib/site-content';
 
 export const SETTING_KEYS = {
@@ -47,6 +53,7 @@ export const SETTING_KEYS = {
   searchPlaceholderAnimation: 'search.placeholder_animation',
   pageIntros: 'site.page_intros',
   frontendTheme: 'site.frontend_theme',
+  frontendLayout: 'site.frontend_layout',
 } as const;
 
 // --- Home page layout ---
@@ -83,7 +90,7 @@ export const HOME_SECTIONS: {
   {
     id: 'record',
     label: 'Record of the week',
-    help: 'The top five of one career record, chosen below.',
+    help: 'The leading entries from one curated AFL record, chosen below.',
     panel: true,
   },
   {
@@ -164,31 +171,13 @@ export function homeSectionRows(visible: HomeSectionId[]): HomeSectionId[][] {
 
 // --- Record of the week ---
 
-/**
- * Career records the home panel can lead with.
- *
- * Deliberately only the five the career leaderboard query can answer
- * (`CAREER_COLUMNS` in db/queries/records.ts): the single-game and season
- * categories are ranked per performance rather than per player, so they do
- * not fit the five-name meter the panel draws.
- */
-export const HOME_RECORD_CATEGORIES = [
-  'most-goals',
-  'most-games',
-  'most-finals',
-  'most-premierships',
-  'most-brownlow-votes',
-] as const;
-
-export type HomeRecordCategory = typeof HOME_RECORD_CATEGORIES[number];
-
-export const DEFAULT_HOME_RECORD: HomeRecordCategory = 'most-goals';
+/** Stable setting values, derived from the typed multi-domain catalogue. */
+export const HOME_RECORD_CATEGORIES = HOME_RECORD_VALUES;
+export type HomeRecordCategory = HomeRecordValue;
+export { DEFAULT_HOME_RECORD };
 
 export function parseHomeRecord(value: unknown): HomeRecordCategory {
-  return typeof value === 'string'
-    && (HOME_RECORD_CATEGORIES as readonly string[]).includes(value)
-    ? value as HomeRecordCategory
-    : DEFAULT_HOME_RECORD;
+  return parseHomeRecordValue(value);
 }
 
 // --- AFLW leaders panel ---
@@ -583,6 +572,32 @@ export function parseSiteTheme(value: unknown): SiteTheme {
     : DEFAULT_SITE_THEME;
 }
 
+// --- Frontend Layout ---
+
+/**
+ * The overall page/navigation structure, independent of `SiteTheme` above.
+ *
+ * Theme owns colour, typography and the `--measure`/`--gutter` density
+ * tokens; layout owns composition — where navigation sits and how the
+ * content column is arranged. Neither reads the other, and every
+ * theme/layout combination is valid. See `issues/closed/AFLDB-ISSUE-173.md` for the full
+ * design rationale.
+ */
+export type SiteLayout = 'classic' | 'sidebar';
+
+export const SITE_LAYOUTS: { value: SiteLayout; label: string; help: string }[] = [
+  { value: 'classic', label: 'Classic', help: 'The current top navigation bar and single-column page layout.' },
+  { value: 'sidebar', label: 'Sidebar', help: 'A persistent left-hand navigation with a wider content area for browsing stats. Falls back to the same bottom navigation as Classic on phones and tablets.' },
+];
+
+export const DEFAULT_SITE_LAYOUT: SiteLayout = 'classic';
+
+export function parseSiteLayout(value: unknown): SiteLayout {
+  return SITE_LAYOUTS.some((option) => option.value === value)
+    ? value as SiteLayout
+    : DEFAULT_SITE_LAYOUT;
+}
+
 export type SiteSettings = {
   homeLayout: HomeLayout;
   homeRecord: HomeRecordCategory;
@@ -606,6 +621,7 @@ export type SiteSettings = {
   searchPlaceholderAnimation: SearchAnimationType;
   pageIntros: PageIntros;
   frontendTheme: SiteTheme;
+  frontendLayout: SiteLayout;
 };
 
 export const DEFAULT_SITE_SETTINGS: SiteSettings = {
@@ -625,6 +641,7 @@ export const DEFAULT_SITE_SETTINGS: SiteSettings = {
   searchPlaceholderAnimation: DEFAULT_SEARCH_ANIMATION,
   pageIntros: DEFAULT_PAGE_INTROS,
   frontendTheme: DEFAULT_SITE_THEME,
+  frontendLayout: DEFAULT_SITE_LAYOUT,
 };
 
 /**
@@ -694,5 +711,8 @@ export function parseSiteSettings(
     frontendTheme: byKey.has(SETTING_KEYS.frontendTheme)
       ? parseSiteTheme(byKey.get(SETTING_KEYS.frontendTheme))
       : DEFAULT_SITE_THEME,
+    frontendLayout: byKey.has(SETTING_KEYS.frontendLayout)
+      ? parseSiteLayout(byKey.get(SETTING_KEYS.frontendLayout))
+      : DEFAULT_SITE_LAYOUT,
   };
 }

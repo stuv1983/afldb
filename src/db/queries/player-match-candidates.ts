@@ -4,6 +4,11 @@ import type postgres from 'postgres';
 
 import { ALGORITHM_VERSION, assessMatch, MATCH_POLICY } from '@/lib/player-matching/confidence';
 import { scoreCandidate } from '@/lib/player-matching/score-candidate';
+import {
+  buildClubTextIndex,
+  resolveClubText,
+  type ClubTextIndex,
+} from '@/lib/player-matching/club-identity';
 import type {
   EvidenceItem,
   HardConflict,
@@ -117,7 +122,83 @@ function toTemporal(row: RawSourceRow): TemporalEvidence[] {
   return temporal;
 }
 
-export function toSourceEvidenceRow(row: RawSourceRow): SourceEvidenceRow {
+/**
+ * Club lineage and the canonical club strings, read once per call.
+ *
+ * `clubs` is 24 rows, so this is cheaper than joining lineage into the
+ * seven-branch source UNION and far easier to reason about. The text
+ * index is built in TypeScript from the raw strings so that both sides
+ * of a club-text comparison pass through exactly one normaliser
+ * (`normaliseClubText`); a SQL-side `lower()` and a TypeScript-side
+ * normaliser that drifted apart would silently stop resolving.
+ */
+export type ClubLineage = {
+  /** clubs.id -> clubs.organization_id. */
+  organizationByClubId: Map<number, number | null>;
+  textIndex: ClubTextIndex;
+};
+
+export async function fetchClubLineage(sql: Sql): Promise<ClubLineage> {
+  const rows = await sql<
+    { clubId: number; organizationId: number | null; text: string }[]
+  >`
+    SELECT c.id AS "clubId", c.organization_id AS "organizationId", t.text
+      FROM clubs c
+      CROSS JOIN LATERAL (VALUES (c.name), (c.short_name)) AS t(text)
+    UNION ALL
+    SELECT a.club_id, c.organization_id, a.alias
+      FROM club_aliases a
+      JOIN clubs c ON c.id = a.club_id
+  `;
+  const organizationByClubId = new Map<number, number | null>();
+  const entries: { text: string; clubId: number; organizationId: number | null }[] = [];
+  for (const row of rows) {
+    const clubId = Number(row.clubId);
+    const organizationId = row.organizationId === null ? null : Number(row.organizationId);
+    organizationByClubId.set(clubId, organizationId);
+    entries.push({ text: row.text, clubId, organizationId });
+  }
+  return { organizationByClubId, textIndex: buildClubTextIndex(entries) };
+}
+
+/**
+ * The sources whose club arrives as free text rather than a club_id
+ * (AFLDB-ISSUE-164 S3/S4). Scoped deliberately: a club-less award or
+ * achievement row usually names a club AFLDB does not hold at all,
+ * and widening the rule to those tables is a separate measurement.
+ */
+const CLUB_TEXT_SOURCES: ReadonlySet<string> = new Set([
+  'hall_of_fame',
+  'honour_team_members',
+]);
+
+/**
+ * The sources whose club_id is compared by raw identity, not by
+ * continuing club (AFLDB-ISSUE-164 S1 scope).
+ *
+ * S1 is authorised for non-draft sources in this tranche. Draft picks
+ * are held at v2 semantics deliberately: lineage-aware club matching
+ * lifted 40 draft_person rows into Very High and moved 16 Top-1
+ * suggestions on the unresolved queue, and nothing in the Tier 1
+ * labelled set covers draft identity well enough to bless that. The
+ * lineage is still carried on the row -- the scorer simply may not
+ * consult it for these tables until Tier 2 can measure it.
+ */
+const RAW_CLUB_ID_SOURCES: ReadonlySet<string> = new Set([
+  'draft_picks',
+]);
+
+/** An empty lineage: every club is its own identity, no text resolves. */
+const NO_CLUB_LINEAGE: ClubLineage = {
+  organizationByClubId: new Map(),
+  textIndex: new Map(),
+};
+
+export function toSourceEvidenceRow(
+  row: RawSourceRow,
+  lineage: ClubLineage = NO_CLUB_LINEAGE,
+): SourceEvidenceRow {
+  const clubId = row.clubId === null ? null : Number(row.clubId);
   const target: MatchTarget = {
     targetTable: row.targetTable,
     targetId: Number(row.targetId),
@@ -130,8 +211,19 @@ export function toSourceEvidenceRow(row: RawSourceRow): SourceEvidenceRow {
       rawName: row.rawName,
       normalisedName: row.normalisedName ?? '',
       temporal: toTemporal(row),
-      clubId: row.clubId === null ? null : Number(row.clubId),
+      clubId,
+      clubOrganizationId:
+        clubId === null ? null : lineage.organizationByClubId.get(clubId) ?? null,
+      clubMatch: RAW_CLUB_ID_SOURCES.has(row.targetTable) ? 'club_id' : 'lineage',
       clubNameRaw: row.clubNameRaw,
+      // Only hall_of_fame and honour_team_members are resolved (S3/S4).
+      // They are the two sources that carry club text and no club_id at
+      // all. Everywhere else the club arrives as a foreign key, and
+      // re-resolving the same fact from its printed name would be a
+      // second club signal for one club (sec 6: S1-S4 are one family).
+      resolvedClubs: CLUB_TEXT_SOURCES.has(row.targetTable) && clubId === null
+        ? resolveClubText(row.clubNameRaw, lineage.textIndex)
+        : [],
       reportedGames: row.reportedGames === null ? null : Number(row.reportedGames),
       reportedGoals: row.reportedGoals === null ? null : Number(row.reportedGoals),
       context: row.context ?? '',
@@ -183,7 +275,10 @@ export async function fetchSourceEvidence(
         FROM award_winners w
         JOIN awards a ON a.id = w.award_id
         LEFT JOIN clubs c ON c.id = w.club_id
+       -- AFLDB-ISSUE-165 D-10: a voided row is retracted, so it raises no
+       -- link candidates and appears in no review queue.
        WHERE w.link_status_value::text = ANY(${statuses})
+         AND w.status <> 'void'
       UNION ALL
       SELECT 'award_nominations', n.id, 'award_nominations', n.id, n.player_name_raw,
              afldb_normalise_name(n.player_name_raw),
@@ -209,6 +304,7 @@ export async function fetchSourceEvidence(
         FROM hall_of_fame h
         LEFT JOIN aflw.players ap ON lower(trim(ap.display_name)) = lower(trim(h.name))
        WHERE h.link_status_value::text = ANY(${statuses})
+         AND h.status <> 'void'
          AND ap.slug IS NULL
          AND lower(COALESCE(h.category, '')) NOT IN ('media', 'umpire', 'administrator', 'pioneer')
       UNION ALL
@@ -220,6 +316,7 @@ export async function fetchSourceEvidence(
              m.link_status_value::text, m.team_name, m.player_id
         FROM honour_team_members m
        WHERE m.link_status_value::text = ANY(${statuses})
+         AND m.status <> 'void'
       UNION ALL
       SELECT 'captaincies', cp.id, 'captaincies', cp.id, cp.player_name_raw,
              afldb_normalise_name(cp.player_name_raw),
@@ -238,7 +335,14 @@ export async function fetchSourceEvidence(
              concat_ws(' · ', replace(pa.achievement_type::text, '_', ' '), pa.season::text),
              pa.link_status_value::text, NULL, pa.player_id
         FROM player_achievements pa
+      -- AFLDB-ISSUE-167 sec 7, the same rule as the AFLDB-ISSUE-165 D-10
+      -- branches above: a voided row is retracted, so it raises no link
+      -- candidates and appears in no review queue. Stated as = 'active'
+      -- rather than <> 'void' because migration 102 gave this table a
+      -- two-value NOT NULL lifecycle; the ISSUE-165 tables above have a
+      -- wider vocabulary and correctly negate instead.
        WHERE pa.link_status_value::text = ANY(${statuses})
+         AND pa.status = 'active'
       UNION ALL
       SELECT 'draft_picks', first_pick.id, 'draft_person', per.id, per.display_name_raw,
              afldb_normalise_name(per.display_name_raw),
@@ -265,7 +369,8 @@ export async function fetchSourceEvidence(
     ORDER BY q."targetTable", q."resolutionEntityId"
     ${opts.limit ? sql`LIMIT ${opts.limit}` : sql``}
   `;
-  return rows.map(toSourceEvidenceRow);
+  const lineage = await fetchClubLineage(sql);
+  return rows.map((row) => toSourceEvidenceRow(row, lineage));
 }
 
 type RawCandidateRow = {
@@ -348,20 +453,28 @@ export async function fetchCandidateEvidence(
 
   const playerIds = [...new Set(rows.map((r) => Number(r.playerId)))];
 
+  // organization_id travels with every club row so the scorer can
+  // compare continuing clubs rather than raw identities: player_clubs
+  // holds the identity played under (Footscray), a source row may name
+  // another identity of the same club (Western Bulldogs).
   const clubRows = await sql<
-    { playerId: number; clubId: number; games: number | null;
+    { playerId: number; clubId: number; organizationId: number | null;
+      games: number | null;
       firstSeason: number | null; lastSeason: number | null }[]
   >`
-    SELECT player_id AS "playerId", club_id AS "clubId", games::int AS games,
-           first_season::int AS "firstSeason", last_season::int AS "lastSeason"
-      FROM player_clubs
-     WHERE player_id = ANY(${playerIds})
+    SELECT pc.player_id AS "playerId", pc.club_id AS "clubId",
+           c.organization_id AS "organizationId", pc.games::int AS games,
+           pc.first_season::int AS "firstSeason", pc.last_season::int AS "lastSeason"
+      FROM player_clubs pc
+      LEFT JOIN clubs c ON c.id = pc.club_id
+     WHERE pc.player_id = ANY(${playerIds})
   `;
   const clubsByPlayer = new Map<number, CandidateClub[]>();
   for (const row of clubRows) {
     const list = clubsByPlayer.get(Number(row.playerId)) ?? [];
     list.push({
       clubId: Number(row.clubId),
+      organizationId: row.organizationId === null ? null : Number(row.organizationId),
       games: row.games === null ? null : Number(row.games),
       firstSeason: row.firstSeason === null ? null : Number(row.firstSeason),
       lastSeason: row.lastSeason === null ? null : Number(row.lastSeason),
@@ -395,6 +508,7 @@ export async function fetchCandidateEvidence(
         FROM honour_team_members
        WHERE player_id = ANY(${playerIds})
          AND team_name = ANY(${teamNames})
+         AND status <> 'void'
          AND NOT (id = ANY(${assessedIds}))
     `;
     for (const row of taken) occupiedTeamSlots.add(`${row.teamName}|${row.playerId}`);
@@ -609,6 +723,74 @@ export async function readSuggestionsForEntities(
   return byEntity;
 }
 
+export type CachedSuggestionVersion = {
+  targetTable: LinkTargetTable;
+  targetId: number;
+  /** The version the cached suggestion was computed under. */
+  algorithmVersion: string;
+  /** The score that was on screen, for the stale notice only. */
+  score: number;
+};
+
+/**
+ * What algorithm version the cache holds for each of these targets.
+ *
+ * Deliberately NOT read inside the approval transaction: migration 067
+ * denies afldb_import every privilege on this table precisely so the
+ * approval path cannot read its own advice back. The version is fetched
+ * here on the application's read client -- server-side, never posted by
+ * the browser -- and is used for one thing only: telling the reviewer
+ * that the number they were shown was computed under a different
+ * version than the one that just approved the link. It is never an
+ * input to the decision, which is rescored from source under lock.
+ *
+ * A draft pick resolves through its durable draft person, the same
+ * grain the cache is keyed on, so approving any pick of that person
+ * finds the suggestion that was displayed.
+ */
+export async function readCachedSuggestionVersions(
+  sql: Sql,
+  targets: ReadonlyArray<{ targetTable: LinkTargetTable; targetId: number }>,
+): Promise<Map<string, CachedSuggestionVersion>> {
+  const byTarget = new Map<string, CachedSuggestionVersion>();
+  if (targets.length === 0) return byTarget;
+
+  const tables = targets.map((t) => t.targetTable);
+  const ids = targets.map((t) => t.targetId);
+
+  const rows = await sql<CachedSuggestionVersion[]>`
+    WITH wanted AS (
+      SELECT w.target_table, w.target_id
+        FROM unnest(${tables}::text[], ${ids}::bigint[])
+          AS w(target_table, target_id)
+    ),
+    entity AS (
+      SELECT w.target_table,
+             w.target_id,
+             CASE WHEN w.target_table = 'draft_picks' THEN 'draft_person'
+                  ELSE w.target_table END AS entity_type,
+             CASE WHEN w.target_table = 'draft_picks' THEN dp.draft_person_id
+                  ELSE w.target_id END AS entity_id
+        FROM wanted w
+        LEFT JOIN draft_picks dp
+               ON w.target_table = 'draft_picks' AND dp.id = w.target_id
+    )
+    SELECT e.target_table AS "targetTable",
+           e.target_id::int AS "targetId",
+           c.algorithm_version AS "algorithmVersion",
+           c.score
+      FROM entity e
+      JOIN player_link_match_candidates c
+        ON c.resolution_entity_type = e.entity_type
+       AND c.resolution_entity_id = e.entity_id
+       AND c.rank = 1
+  `;
+  for (const row of rows) {
+    byTarget.set(`${row.targetTable}:${row.targetId}`, row);
+  }
+  return byTarget;
+}
+
 export type RefreshResult = {
   entities: number;
   suggestions: number;
@@ -816,7 +998,12 @@ export async function readSourceDetails(
     SELECT 'award_winners' AS "targetTable", w.id AS "targetId",
            jsonb_build_object(
              'kind', 'award_winner', 'award', a.name, 'season', w.season,
-             'club', COALESCE(c.name, w.club_name_raw), 'position', w.position
+             'club', COALESCE(c.name, w.club_name_raw), 'position', w.position,
+             -- The club NAME above coalesces the raw text, so whether a
+             -- real club_id exists is reported separately: a row with
+             -- only raw text can reach no club evidence at all, and the
+             -- reachable ceiling differs (AFLDB-ISSUE-164 sec 3.2).
+             'hasClubId', w.club_id IS NOT NULL
            ) AS detail
       FROM award_winners w
       JOIN awards a ON a.id = w.award_id
@@ -862,11 +1049,17 @@ export async function readSourceDetails(
            jsonb_build_object(
              'kind', 'achievement', 'achievement', pa.achievement_type::text,
              'season', pa.season, 'club', COALESCE(pac.name, pa.club_name_raw),
-             'round', pa.round_raw
+             'round', pa.round_raw,
+             'hasClubId', pa.club_id IS NOT NULL
            )
       FROM player_achievements pa
       LEFT JOIN clubs pac ON pac.id = pa.club_id
-     WHERE pa.id = ANY(${achievements})
+     -- Belt and braces (AFLDB-ISSUE-167 sec 7). The ids reaching here come
+     -- from fetchSourceEvidence, which already excludes voided rows, so this
+     -- can subtract nothing today; it is stated anyway so a future caller
+     -- that assembles its own id list cannot reintroduce a retracted row
+     -- through the back door of a detail lookup.
+     WHERE pa.id = ANY(${achievements}) AND pa.status = 'active'
     UNION ALL
     SELECT 'draft_picks', dp.id,
            jsonb_build_object(

@@ -6,9 +6,11 @@
 #
 # What it does:
 #   1. Installs PostgreSQL + contrib (for pg_trgm) from the Ubuntu archive
-#   2. Creates the afldb_dev and afldb_test databases
+#   2. Creates the afldb_dev and afldb_test databases, plus code_test_db (AFLDB-ISSUE-146's
+#      disposable full-rebuild rehearsal target) so it exists with the same bootstrap as the
+#      other two — the rehearsal runner itself never creates or drops a database
 #   3. Creates four least-privilege roles with generated random passwords
-#   4. Enables the pg_trgm and unaccent extensions
+#   4. Enables the pg_trgm and unaccent extensions on all three databases
 #   5. Writes credentials to /home/arm/projects/afldb/.env (mode 600, owned by arm)
 #
 # What it deliberately does NOT do:
@@ -82,8 +84,11 @@ ALTER ROLE afldb_auth   WITH PASSWORD '${PW_AUTH}';
 GRANT pg_read_all_data TO afldb_backup;
 SQL
 
-# Databases must be created outside a transaction block.
-for DB in afldb_dev afldb_test; do
+# Databases must be created outside a transaction block. code_test_db is the AFLDB-ISSUE-146
+# disposable full-rebuild rehearsal target: it is bootstrapped here, exactly like afldb_test,
+# because no DSN in the credential model can create a database, and the rehearsal runner
+# (tools/db/rebuild-test.ts) only ever resets it in place once it already exists.
+for DB in afldb_dev afldb_test code_test_db; do
   if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='${DB}'" | grep -q 1; then
     sudo -u postgres createdb -O afldb_owner "${DB}"
     echo "    created database ${DB}"
@@ -93,7 +98,7 @@ for DB in afldb_dev afldb_test; do
 done
 
 echo "==> [4/5] Enabling extensions and setting default privileges"
-for DB in afldb_dev afldb_test; do
+for DB in afldb_dev afldb_test code_test_db; do
   sudo -u postgres psql -v ON_ERROR_STOP=1 -d "${DB}" <<SQL
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 CREATE EXTENSION IF NOT EXISTS unaccent;
@@ -170,9 +175,9 @@ echo "=========================================================="
 echo " AFLDB PostgreSQL bootstrap complete."
 echo
 echo "   PostgreSQL : ${PG_VERSION}"
-echo "   Databases  : afldb_dev, afldb_test"
+echo "   Databases  : afldb_dev, afldb_test, code_test_db"
 echo "   Roles      : afldb_owner, afldb_app, afldb_import, afldb_backup"
-echo "   Extensions : pg_trgm, unaccent"
+echo "   Extensions : pg_trgm, unaccent (all three databases)"
 echo "   Credentials: ${ENV_FILE} (mode 600, owner ${APP_USER})"
 echo
 echo "   Listening  : $(sudo -u postgres psql -tAc 'SHOW listen_addresses') (localhost only)"

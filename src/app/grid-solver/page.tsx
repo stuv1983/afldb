@@ -8,7 +8,8 @@ import { Pagination } from '@/components/Pagination';
 import { ReorderableSections } from '@/components/ReorderableSections';
 import { getClubOrganizationOptions, getVenueOptions } from '@/db/queries/advanced-search';
 import { getAwardOptions } from '@/db/queries/awards';
-import { solveCellRows, solveCellSummary, type GridCellSummary } from '@/db/queries/grid-solver';
+import { getCoachOptions } from '@/db/queries/coaches';
+import { createAxisSetCache, guardCellTimeout, solveCellRows, solveCellSummary, type GridCellOutcome, type GridCellSummary } from '@/db/queries/grid-solver';
 import { getPlayerNames } from '@/db/queries/players';
 import { getSiteSettings } from '@/db/queries/site-settings';
 import { requireAudience } from '@/lib/auth/audience';
@@ -63,58 +64,71 @@ export default async function GridSolverPage({
     .map((a) => Number(a.params.player))
     .filter((id) => Number.isSafeInteger(id) && id > 0);
 
-  const [clubOptions, venueOptions, awardOptions, playerNames] = await Promise.all([
+  const [clubOptions, venueOptions, awardOptions, coachOptions, playerNames] = await Promise.all([
     getClubOrganizationOptions(),
     getVenueOptions(),
     getAwardOptions(),
+    getCoachOptions(),
     getPlayerNames(axisPlayerIds),
   ]);
   const clubNames = new Map(clubOptions.map((c) => [c.id, c.name]));
   const venueNames = new Map(venueOptions.map((v) => [v.id, v.name]));
   const awardNames = new Map(awardOptions.map((a) => [a.id, a.name]));
+  const coachNames = new Map(coachOptions.map((c) => [c.id, c.name]));
 
   // Solve every cell whose row and column are both fully specified --
   // an incomplete axis just says "define both axes", the same first-load
-  // state the reference starts from.
+  // state the reference starts from. A statement timeout is confined to
+  // its own square (guardCellTimeout) so the other eight still render. The
+  // six axis sets are fetched once and shared by the nine cells.
+  const axisCache = createAxisSetCache();
   const cellResults = await Promise.all(
     state.rows.map((rowAxis) => Promise.all(
       state.cols.map((colAxis) => (
         isAxisComplete(rowAxis) && isAxisComplete(colAxis)
-          ? solveCellSummary(rowAxis, colAxis, state.order)
+          ? guardCellTimeout(() => solveCellSummary(rowAxis, colAxis, state.order, axisCache))
           : Promise.resolve(null)
       )),
     )),
   );
-  const cells: (GridCellSummary | null)[][] = cellResults;
+  const cells: (GridCellOutcome<GridCellSummary> | null)[][] = cellResults;
+  cells.forEach((row, r) => row.forEach((cell, c) => {
+    if (cell?.status === 'timeout') {
+      console.error(`[grid-solver] cell ${r}-${c} timed out: ${state.rows[r].builder} x ${state.cols[c].builder}`);
+    }
+  }));
 
-  // The first cell with both axes defined opens automatically, so the
-  // page never lands on an empty drill-down panel.
+  // The first solved cell opens automatically, so the page never lands on
+  // an empty drill-down panel.
   const cellParam = firstValue(params.cell);
   const requested = cellParam ? /^([0-2])-([0-2])$/.exec(cellParam) : null;
   let openCell: [number, number] | null = null;
   if (requested) {
     const r = Number(requested[1]);
     const c = Number(requested[2]);
-    if (cells[r][c]) openCell = [r, c];
+    if (cells[r][c]?.status === 'solved') openCell = [r, c];
   }
   if (!openCell) {
     for (let r = 0; r < 3 && !openCell; r++) {
       for (let c = 0; c < 3 && !openCell; c++) {
-        if (cells[r][c]) openCell = [r, c];
+        if (cells[r][c]?.status === 'solved') openCell = [r, c];
       }
     }
   }
 
   const page = parsePage(firstValue(params.page));
-  const drillDown = openCell
-    ? await solveCellRows(
-      state.rows[openCell[0]], state.cols[openCell[1]], state.order,
+  const open = openCell;
+  const drillDownOutcome = open
+    ? await guardCellTimeout(() => solveCellRows(
+      state.rows[open[0]], state.cols[open[1]], state.order,
       { limit: GRID_LIMITS.defaultRowsPerCell, offset: (page - 1) * GRID_LIMITS.defaultRowsPerCell },
-    )
+      axisCache,
+    ))
     : null;
+  const drillDown = drillDownOutcome?.status === 'solved' ? drillDownOutcome.value : null;
 
-  const lookups = { clubs: clubNames, venues: venueNames, players: playerNames, awards: awardNames };
-  const defined = cells.flat().filter(Boolean).length;
+  const lookups = { clubs: clubNames, venues: venueNames, players: playerNames, awards: awardNames, coaches: coachNames };
+  const defined = cells.flat().filter((cell) => cell?.status === 'solved').length;
 
   // The board and its controls reorder and collapse like any other stack of
   // sections on the site: with nine questions set up, the filters are what a
@@ -132,6 +146,7 @@ export default async function GridSolverPage({
                 clubs={clubOptions}
                 venues={venueOptions}
                 awards={awardOptions}
+                coaches={coachOptions}
                 playerNames={Object.fromEntries(playerNames)}
               />
             </div>
@@ -160,11 +175,20 @@ export default async function GridSolverPage({
                     <tr key={r}>
                       <th scope="row">{describeAxis(rowAxis, lookups)}</th>
                       {state.cols.map((_colAxis, c) => {
-                        const cell = cells[r][c];
+                        const outcome = cells[r][c];
                         const isOpen = openCell?.[0] === r && openCell?.[1] === c;
-                        if (!cell) {
+                        if (!outcome) {
                           return <td key={c} className="muted">define both axes</td>;
                         }
+                        if (outcome.status === 'timeout') {
+                          return (
+                            <td key={c} className="muted">
+                              Timed out
+                              <div style={{ fontSize: '0.78rem' }}>this square took too long to solve</div>
+                            </td>
+                          );
+                        }
+                        const cell = outcome.value;
                         return (
                           <td key={c} style={isOpen ? { background: 'var(--bg-hover)', fontWeight: 650 } : undefined}>
                             <Link href={`/grid-solver?g=${serializeBoardState(state)}&cell=${r}-${c}`}>
@@ -186,6 +210,24 @@ export default async function GridSolverPage({
       ),
     },
   ];
+
+  if (openCell && drillDownOutcome?.status === 'timeout') {
+    sections.push({
+      id: 'grid-drill-down',
+      label: 'Eligible players',
+      node: (
+        <section className="section">
+          <h2>
+            {describeAxis(state.rows[openCell[0]], lookups)} × {describeAxis(state.cols[openCell[1]], lookups)}
+          </h2>
+          <div className="empty">
+            <h2>Timed out</h2>
+            <p>Listing this square took too long. The rest of the board is unaffected.</p>
+          </div>
+        </section>
+      ),
+    });
+  }
 
   if (openCell && drillDown) {
     sections.push({
@@ -262,7 +304,7 @@ function describeAxis(
   axis: GridAxisState,
   lookups: {
     clubs: Map<number, string>; venues: Map<number, string>;
-    players: Map<number, string>; awards: Map<number, string>;
+    players: Map<number, string>; awards: Map<number, string>; coaches: Map<number, string>;
   },
 ): string {
   const def = GRID_BUILDERS[axis.builder];
@@ -277,6 +319,7 @@ function describeAxis(
       case 'venue': return lookups.venues.get(Number(raw)) ?? `Venue #${raw}`;
       case 'player': return lookups.players.get(Number(raw)) ?? `Player #${raw}`;
       case 'award': return lookups.awards.get(Number(raw)) ?? `Award #${raw}`;
+      case 'coach': return lookups.coaches.get(Number(raw)) ?? `Coach #${raw}`;
       case 'stat': return Object.hasOwn(GRID_STATS, raw) ? GRID_STATS[raw as keyof typeof GRID_STATS].label : raw;
       case 'aaPosition': return GRID_AA_POSITIONS.find((o) => o.value === raw)?.label ?? raw;
       default: return raw;

@@ -287,6 +287,12 @@ describe('afldb_auth is confined to the operational tables', () => {
                 ('auth_sessions',        'INSERT'),
                 ('auth_audit_log',       'INSERT'),
                 ('beta_access_codes',    'SELECT'),
+                -- Permanent deletion of a RETIRED code (091,
+                -- AFLDB-ISSUE-117). The role holds no DELETE without
+                -- it and the admin action fails closed; the
+                -- revoked-or-spent rule is enforced by the statement's
+                -- WHERE clause, not by this grant.
+                ('beta_access_codes',    'DELETE'),
                 ('beta_login_tokens',    'INSERT'),
                 ('beta_join_requests',   'SELECT'),
                 ('admin_invites',        'INSERT'),
@@ -320,7 +326,11 @@ describe('afldb_auth is confined to the operational tables', () => {
                 -- The ledger is deliberately NOT import-writable, so this
                 -- grant is the only write path it has.
                 ('promotion_decisions',     'SELECT'),
-                ('promotion_decisions',     'INSERT')
+                ('promotion_decisions',     'INSERT'),
+                -- Automatic canonical mutation ledger (083, AFLDB-ISSUE-122):
+                -- read-only to the admin surface; afldb_import is its only
+                -- writer, asserted in its own section below.
+                ('canonical_applications',  'SELECT')
              ) AS t(name, privilege)
        ORDER BY 1, 2
     `;
@@ -418,9 +428,14 @@ describe('afldb_auth is confined to the operational tables', () => {
     // an incident, or one left by an abandoned migration, survived every
     // run of the script that claims to reconcile privileges.
     //
-    // These five are statistical tables that appear in no afldb_auth grant
+    // These are statistical tables that appear in no afldb_auth grant
     // in any migration, so the role must hold no privilege on them --
     // not even SELECT, which the validation reads are scoped away from.
+    //
+    // The last two are the migration-094 Brownlow workflow tables. They
+    // carry auth_users foreign keys, which is exactly the shape that
+    // tempts a grant to the login role; §27.16 gives it nothing, and the
+    // admin read model reaches them on the app pool like every other read.
     const rows = await sql<{ name: string; privilege: string }[]>`
       SELECT c.relname AS name, p.privilege
         FROM pg_class c
@@ -428,7 +443,8 @@ describe('afldb_auth is confined to the operational tables', () => {
        CROSS JOIN LATERAL (VALUES ('SELECT'), ('INSERT'), ('UPDATE')) AS p(privilege)
        WHERE n.nspname = 'public'
          AND c.relname IN ('player_match_stats', 'brownlow_season_votes',
-                           'draft_picks', 'club_seasons', 'data_issues')
+                           'draft_picks', 'club_seasons', 'data_issues',
+                           'brownlow_vote_entry_state', 'brownlow_season_authority')
          AND has_any_column_privilege(${AUTH_ROLE}, c.oid, p.privilege)
        ORDER BY 1, 2
     `;
@@ -736,9 +752,26 @@ describe('afldb_import is confined to the statistical tables', () => {
     // holds INSERT-only on the audit tables so the required audit row
     // commits inside the mutation transaction. data_overrides is a third,
     // column-scoped exception (migration 078, AFLDB-ISSUE-109), which does
-    // not satisfy this table-level INSERT probe. All three stay out of the
-    // registry on purpose -- registering them would grant full DML -- and
-    // their exact narrow shapes are asserted below.
+    // not satisfy this table-level INSERT probe. canonical_applications
+    // (migration 083, AFLDB-ISSUE-122) is the fourth: the automatic
+    // canonical mutation ledger, SELECT + INSERT and nothing else. All
+    // four stay out of the registry on purpose -- registering them would
+    // grant full DML -- and their exact narrow shapes are asserted below.
+    //
+    // brownlow_vote_entry_state and brownlow_season_authority (migration
+    // 094, AFLDB-ISSUE-155 §27.16) are the fifth and sixth. They are
+    // records of administrative decisions, and the registry's loop grants
+    // TRUNCATE -- the one power a reload path must never hold over them.
+    // They take full row DML minus TRUNCATE, asserted exactly below.
+    //
+    // external_grids and external_grid_axes (migration 080, AFLDB-ISSUE-118
+    // Stage 1) are the seventh and eighth exception, for the same reason:
+    // registering them would hand grant_import_write()'s UPDATE, DELETE and
+    // TRUNCATE to a corpus whose entire value is that a captured board can
+    // never be quietly rewritten. The importer instead holds SELECT,
+    // INSERT, and (on external_grids only) UPDATE of the single is_current
+    // column that supersedes a revision. Their exact narrow shape is
+    // asserted in AFLDB-ISSUE-138's dedicated test below.
     const rows = await sql<{ name: string; registered: boolean; writable: boolean }[]>`
       SELECT c.relname AS name,
              (w.name IS NOT NULL) AS registered,
@@ -748,7 +781,11 @@ describe('afldb_import is confined to the statistical tables', () => {
         LEFT JOIN afldb_meta.import_writable_tables w ON w.name = c.relname
        WHERE n.nspname = 'public'
          AND c.relkind IN ('r', 'p')
-         AND c.relname NOT IN ('data_edits', 'player_link_resolutions')
+         AND c.relname NOT IN ('data_edits', 'player_link_resolutions',
+                               'canonical_applications',
+                               'brownlow_vote_entry_state',
+                               'brownlow_season_authority',
+                               'external_grids', 'external_grid_axes')
        ORDER BY 1
     `;
     expect(rows.length).toBeGreaterThan(0);
@@ -762,6 +799,117 @@ describe('afldb_import is confined to the statistical tables', () => {
       'run npm run db:privileges, or register the table with '
       + "SELECT afldb_meta.grant_import_write('<table>') in its migration",
     ).toEqual([]);
+  });
+
+  it('writes the Brownlow workflow tables but can never truncate them (AFLDB-ISSUE-155 §27.16)', async () => {
+    // Migration 094 grants these two directly instead of registering them.
+    // The registry loop would add TRUNCATE, and these tables are the record
+    // of who drafted, finalised, corrected, voided and published a Brownlow
+    // vote -- a reload path that can empty them erases administrative
+    // decisions silently. The four transactions in admin-brownlow.ts need
+    // SELECT (the FOR UPDATE locks of §27.14), INSERT (first draft, absent
+    // authority row), UPDATE (every transition) and DELETE (a discarded
+    // entry), and nothing else. Neither table owns a sequence: the primary
+    // keys are match_id and season, both supplied by the caller.
+    const rows = await sql<{
+      name: string; selects: boolean; inserts: boolean;
+      updates: boolean; deletes: boolean; truncates: boolean;
+    }[]>`
+      SELECT t.name,
+             has_table_privilege(${IMPORT_ROLE}, t.name, 'SELECT')   AS selects,
+             has_table_privilege(${IMPORT_ROLE}, t.name, 'INSERT')   AS inserts,
+             has_table_privilege(${IMPORT_ROLE}, t.name, 'UPDATE')   AS updates,
+             has_table_privilege(${IMPORT_ROLE}, t.name, 'DELETE')   AS deletes,
+             has_table_privilege(${IMPORT_ROLE}, t.name, 'TRUNCATE') AS truncates
+        FROM (VALUES ('brownlow_vote_entry_state'), ('brownlow_season_authority'))
+             AS t(name)
+       ORDER BY 1
+    `;
+    expect(
+      rows,
+      'run npm run db:privileges: its afldb_import section mirrors the '
+      + 'migration-094 grants after the registry loop revokes them',
+    ).toEqual([
+      { name: 'brownlow_season_authority', selects: true, inserts: true, updates: true, deletes: true, truncates: false },
+      { name: 'brownlow_vote_entry_state', selects: true, inserts: true, updates: true, deletes: true, truncates: false },
+    ]);
+
+    const [sequences] = await sql<{ count: number }[]>`
+      SELECT count(*)::int AS count
+        FROM (VALUES ('brownlow_vote_entry_state'), ('brownlow_season_authority')) AS t(name)
+       CROSS JOIN LATERAL afldb_meta.owned_sequences(t.name) AS s(name)
+    `;
+    expect(sequences?.count).toBe(0);
+  });
+
+  it('appends captured grid boards but can never rewrite or empty the corpus (AFLDB-ISSUE-138)', async () => {
+    // Migration 080 grants these two directly instead of registering them,
+    // for the opposite reason to the Brownlow pair above: the registry
+    // loop hands out UPDATE, DELETE and TRUNCATE, and this corpus's entire
+    // value (ISSUE-118 Stage 1) is that a captured board can never be
+    // quietly rewritten. The importer gets read, append, and -- on
+    // external_grids only -- UPDATE of the single is_current column that
+    // supersedes a revision. Nothing here should ever gain DELETE,
+    // TRUNCATE or a table-level UPDATE.
+    const [tables] = await sql<{
+      gridsSelects: boolean; gridsInserts: boolean; gridsTableUpdate: boolean;
+      gridsCurrentUpdate: boolean; gridsDeletes: boolean; gridsTruncates: boolean;
+      axesSelects: boolean; axesInserts: boolean; axesTableUpdate: boolean;
+      axesDeletes: boolean; axesTruncates: boolean;
+    }[]>`
+      SELECT has_table_privilege(${IMPORT_ROLE}, 'external_grids', 'SELECT')   AS "gridsSelects",
+             has_table_privilege(${IMPORT_ROLE}, 'external_grids', 'INSERT')   AS "gridsInserts",
+             has_table_privilege(${IMPORT_ROLE}, 'external_grids', 'UPDATE')   AS "gridsTableUpdate",
+             has_column_privilege(${IMPORT_ROLE}, 'external_grids', 'is_current', 'UPDATE')
+                                                                                AS "gridsCurrentUpdate",
+             has_table_privilege(${IMPORT_ROLE}, 'external_grids', 'DELETE')   AS "gridsDeletes",
+             has_table_privilege(${IMPORT_ROLE}, 'external_grids', 'TRUNCATE') AS "gridsTruncates",
+             has_table_privilege(${IMPORT_ROLE}, 'external_grid_axes', 'SELECT')   AS "axesSelects",
+             has_table_privilege(${IMPORT_ROLE}, 'external_grid_axes', 'INSERT')   AS "axesInserts",
+             has_table_privilege(${IMPORT_ROLE}, 'external_grid_axes', 'UPDATE')   AS "axesTableUpdate",
+             has_table_privilege(${IMPORT_ROLE}, 'external_grid_axes', 'DELETE')   AS "axesDeletes",
+             has_table_privilege(${IMPORT_ROLE}, 'external_grid_axes', 'TRUNCATE') AS "axesTruncates"
+    `;
+    expect(
+      tables,
+      'run npm run db:privileges: its migration-080 block re-grants the '
+      + 'narrow external-grid shape after the registry revoke loop',
+    ).toEqual({
+      gridsSelects: true, gridsInserts: true, gridsTableUpdate: false,
+      gridsCurrentUpdate: true, gridsDeletes: false, gridsTruncates: false,
+      axesSelects: true, axesInserts: true, axesTableUpdate: false,
+      axesDeletes: false, axesTruncates: false,
+    });
+
+    const sequences = await sql<{
+      name: string; usage: boolean; selects: boolean; updates: boolean;
+    }[]>`
+      SELECT s.name,
+             has_sequence_privilege(${IMPORT_ROLE}, s.name, 'USAGE')  AS usage,
+             has_sequence_privilege(${IMPORT_ROLE}, s.name, 'SELECT') AS selects,
+             has_sequence_privilege(${IMPORT_ROLE}, s.name, 'UPDATE') AS updates
+        FROM (VALUES ('external_grids'), ('external_grid_axes')) AS t(name)
+       CROSS JOIN LATERAL afldb_meta.owned_sequences(t.name) AS s(name)
+       ORDER BY t.name
+    `;
+    expect(sequences).toEqual([
+      { name: 'external_grid_axes_id_seq', usage: true, selects: true, updates: false },
+      { name: 'external_grids_id_seq', usage: true, selects: true, updates: false },
+    ]);
+
+    const registered = await sql<{ name: string; registered: boolean }[]>`
+      SELECT t.name,
+             EXISTS (
+               SELECT 1 FROM afldb_meta.import_writable_tables w
+                WHERE w.name = t.name
+             ) AS registered
+        FROM (VALUES ('external_grids'), ('external_grid_axes')) AS t(name)
+       ORDER BY t.name
+    `;
+    expect(registered).toEqual([
+      { name: 'external_grid_axes', registered: false },
+      { name: 'external_grids', registered: false },
+    ]);
   });
 
   it('appends its own required audit rows and can never rewrite them (AFLDB-ISSUE-027)', async () => {
@@ -811,6 +959,70 @@ describe('afldb_import is confined to the statistical tables', () => {
       { name: 'data_edits_id_seq', usage: true, selects: false, updates: false },
       { name: 'player_link_resolutions_id_seq', usage: true, selects: false, updates: false },
     ]);
+  });
+
+  it('appends the automatic canonical mutation ledger and can never rewrite it (AFLDB-ISSUE-122)', async () => {
+    // Migration 083: every canonical row the automatic AFL Tables settle
+    // path inserts or updates gets a canonical_applications row in the
+    // same savepoint, written as afldb_import. The ledger is append-only
+    // BY GRANT -- SELECT and INSERT, USAGE on its identity sequence, and
+    // nothing else -- and is deliberately not registered as
+    // import-writable, because grant_import_write() would hand back
+    // UPDATE, DELETE and TRUNCATE at the next reconcile.
+    const [ledger] = await sql<{
+      inserts: boolean; selects: boolean; updates: boolean; deletes: boolean;
+      truncates: boolean; registered: boolean;
+    }[]>`
+      SELECT has_table_privilege(${IMPORT_ROLE}, 'canonical_applications', 'INSERT')   AS inserts,
+             has_table_privilege(${IMPORT_ROLE}, 'canonical_applications', 'SELECT')   AS selects,
+             has_table_privilege(${IMPORT_ROLE}, 'canonical_applications', 'UPDATE')   AS updates,
+             has_table_privilege(${IMPORT_ROLE}, 'canonical_applications', 'DELETE')   AS deletes,
+             has_table_privilege(${IMPORT_ROLE}, 'canonical_applications', 'TRUNCATE') AS truncates,
+             EXISTS (SELECT 1 FROM afldb_meta.import_writable_tables
+                      WHERE name = 'canonical_applications') AS registered
+    `;
+    expect(ledger).toEqual({
+      inserts: true, selects: true, updates: false, deletes: false,
+      truncates: false, registered: false,
+    });
+
+    const [sequence] = await sql<{ usage: boolean; selects: boolean; updates: boolean }[]>`
+      SELECT has_sequence_privilege(${IMPORT_ROLE}, 'public.canonical_applications_id_seq', 'USAGE')  AS usage,
+             has_sequence_privilege(${IMPORT_ROLE}, 'public.canonical_applications_id_seq', 'SELECT') AS selects,
+             has_sequence_privilege(${IMPORT_ROLE}, 'public.canonical_applications_id_seq', 'UPDATE') AS updates
+    `;
+    expect(sequence).toEqual({ usage: true, selects: false, updates: false });
+
+    // The other two roles: the admin surface reads the ledger and writes
+    // nothing; the public app cannot see it at all -- it is not a public
+    // read surface and is not registered app-readable.
+    const [others] = await sql<{
+      authSelect: boolean; authWrites: boolean; appAny: boolean; appRegistered: boolean;
+    }[]>`
+      SELECT has_table_privilege(${AUTH_ROLE}, 'canonical_applications', 'SELECT') AS "authSelect",
+             (has_any_column_privilege(${AUTH_ROLE}, 'canonical_applications', 'INSERT')
+              OR has_any_column_privilege(${AUTH_ROLE}, 'canonical_applications', 'UPDATE')
+              OR has_table_privilege(${AUTH_ROLE}, 'canonical_applications', 'DELETE')
+              OR has_table_privilege(${AUTH_ROLE}, 'canonical_applications', 'TRUNCATE')) AS "authWrites",
+             (has_any_column_privilege(${APP_ROLE}, 'canonical_applications', 'SELECT')
+              OR has_any_column_privilege(${APP_ROLE}, 'canonical_applications', 'INSERT')
+              OR has_any_column_privilege(${APP_ROLE}, 'canonical_applications', 'UPDATE')
+              OR has_table_privilege(${APP_ROLE}, 'canonical_applications', 'DELETE')) AS "appAny",
+             EXISTS (SELECT 1 FROM afldb_meta.app_readable_tables
+                      WHERE name = 'canonical_applications') AS "appRegistered"
+    `;
+    expect(others).toEqual({
+      authSelect: true, authWrites: false, appAny: false, appRegistered: false,
+    });
+
+    // No grant was widened alongside it: afldb_import still cannot read
+    // data_edits (066 -- nothing in the import path needs it), and the
+    // human decision ledger is still not import-writable (074).
+    const [unchanged] = await sql<{ dataEditsSelect: boolean; decisionsInsert: boolean }[]>`
+      SELECT has_table_privilege(${IMPORT_ROLE}, 'data_edits', 'SELECT')          AS "dataEditsSelect",
+             has_table_privilege(${IMPORT_ROLE}, 'promotion_decisions', 'INSERT') AS "decisionsInsert"
+    `;
+    expect(unchanged).toEqual({ dataEditsSelect: false, decisionsInsert: false });
   });
 
   it('holds only the Data Editor upsert capability on human overrides (AFLDB-ISSUE-109)', async () => {

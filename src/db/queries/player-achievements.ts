@@ -21,6 +21,18 @@ import { containsPattern } from '@/lib/like';
 
 const FIRST_KICK_GOAL = sql`achievement_type = 'first_kick_goal'`;
 const LINKED = sql`player_id IS NOT NULL AND link_status_value IN ('unique', 'resolved')`;
+/**
+ * The lifecycle filter every public read here carries (migration 102,
+ * AFLDB-ISSUE-167 §7). A voided row is an administrator saying the record was
+ * entered in error and never happened; it is kept rather than deleted so its
+ * `data_edits` history stays resolvable, and it must therefore be excluded
+ * HERE instead. Written as `= 'active'` and not `<> 'void'`: the column is
+ * `NOT NULL DEFAULT 'active'` under a two-value CHECK, so there is no null to
+ * tolerate, and a negated test would silently admit any third state a later
+ * migration adds. The neighbouring AFLDB-ISSUE-165 tables use `<> 'void'`
+ * because their vocabulary is wider; this one deliberately does not.
+ */
+const ACTIVE = sql`status = 'active'`;
 
 export type FirstKickGoalRow = {
   id: number;
@@ -39,6 +51,14 @@ export type FirstKickGoalRow = {
   noFurtherCareerGoals: boolean;
   noFurtherCareerKicks: boolean;
   kicklessMatchesBeforeFirstKick: number;
+};
+
+export type FirstKickGoalRecordRow = {
+  playerId: number;
+  playerSlug: string;
+  playerName: string;
+  season: number;
+  consecutiveGoalKicks: number;
 };
 
 export type FirstKickGoalFeature = 'multi-kick' | 'only-career-goal';
@@ -92,8 +112,28 @@ export async function getFirstKickGoalList(filters: FirstKickGoalFilters = {}): 
         WHEN m.home_club_id = a.club_id THEN m.away_club_id
         WHEN m.away_club_id = a.club_id THEN m.home_club_id
       END
-     WHERE a.${FIRST_KICK_GOAL} AND ${where}
+     WHERE a.${FIRST_KICK_GOAL} AND a.${ACTIVE} AND ${where}
      ORDER BY a.season, a.id
+  `;
+}
+
+/**
+ * Bounded ranked presentation for the home page. This claims a linked
+ * player identity, so it uses the module's existing `LINKED` contract as
+ * well as the active lifecycle filter.
+ */
+export async function getFirstKickGoalRecordLeaders(
+  limit = 5,
+): Promise<FirstKickGoalRecordRow[]> {
+  return sql<FirstKickGoalRecordRow[]>`
+    SELECT a.player_id AS "playerId", p.slug AS "playerSlug",
+           p.display_name AS "playerName", a.season,
+           a.consecutive_goal_kicks AS "consecutiveGoalKicks"
+      FROM player_achievements a
+      JOIN players p ON p.id = a.player_id
+     WHERE a.${FIRST_KICK_GOAL} AND a.${ACTIVE} AND a.${LINKED}
+     ORDER BY a.consecutive_goal_kicks DESC, a.season, a.id
+     LIMIT ${limit}
   `;
 }
 
@@ -121,7 +161,7 @@ export async function getFirstKickGoalSummary(): Promise<{
            count(*) FILTER (WHERE no_further_career_goals)::int AS "onlyCareerGoal",
            count(*) FILTER (WHERE match_id IS NOT NULL)::int AS "matchesResolved"
       FROM player_achievements
-     WHERE ${FIRST_KICK_GOAL}
+     WHERE ${FIRST_KICK_GOAL} AND ${ACTIVE}
   `;
   return row;
 }
@@ -152,7 +192,7 @@ export async function getFirstKickGoalHighlights(): Promise<{
             a.season, a.round_raw AS "roundRaw", a.match_id AS "matchId"
        FROM player_achievements a
        LEFT JOIN players p ON p.id = a.player_id
-      WHERE a.${FIRST_KICK_GOAL}
+      WHERE a.${FIRST_KICK_GOAL} AND a.${ACTIVE}
       ORDER BY a.season ASC, a.id ASC
       LIMIT 1)
     UNION ALL
@@ -161,7 +201,7 @@ export async function getFirstKickGoalHighlights(): Promise<{
             a.season, a.round_raw AS "roundRaw", a.match_id AS "matchId"
        FROM player_achievements a
        LEFT JOIN players p ON p.id = a.player_id
-      WHERE a.${FIRST_KICK_GOAL}
+      WHERE a.${FIRST_KICK_GOAL} AND a.${ACTIVE}
       ORDER BY a.season DESC, a.id DESC
       LIMIT 1)
   `;
@@ -181,7 +221,7 @@ export async function getFirstKickGoalByClub() {
       FROM player_achievements a
       JOIN clubs cl ON cl.id = a.club_id
       JOIN club_organizations o ON o.id = cl.organization_id
-     WHERE a.${FIRST_KICK_GOAL} AND a.${LINKED}
+     WHERE a.${FIRST_KICK_GOAL} AND a.${ACTIVE} AND a.${LINKED}
      GROUP BY o.id, o.name, o.slug
      ORDER BY count(*) DESC, o.name
   `;
@@ -191,7 +231,7 @@ export async function getFirstKickGoalByDecade() {
   return sql<{ decade: number; players: number }[]>`
     SELECT (season / 10) * 10 AS decade, count(*)::int AS players
       FROM player_achievements
-     WHERE ${FIRST_KICK_GOAL} AND ${LINKED}
+     WHERE ${FIRST_KICK_GOAL} AND ${ACTIVE} AND ${LINKED}
      GROUP BY (season / 10) * 10
      ORDER BY (season / 10) * 10
   `;
@@ -206,7 +246,7 @@ export async function getClubsWithoutFirstKickGoal() {
        SELECT 1 FROM player_achievements a
          JOIN clubs cl ON cl.id = a.club_id
         WHERE cl.organization_id = o.id
-          AND a.${FIRST_KICK_GOAL} AND a.${LINKED}
+          AND a.${FIRST_KICK_GOAL} AND a.${ACTIVE} AND a.${LINKED}
      )
      ORDER BY o.name
   `;
@@ -224,7 +264,7 @@ export async function getFirstKickGoalProvenance() {
     SELECT s.name, s.url, s.description, max(a.imported_at) AS "importedAt"
       FROM player_achievements a
       JOIN sources s ON s.id = a.source_id
-     WHERE a.${FIRST_KICK_GOAL}
+     WHERE a.${FIRST_KICK_GOAL} AND a.${ACTIVE}
      GROUP BY s.id, s.name, s.url, s.description
      LIMIT 1
   `;

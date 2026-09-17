@@ -19,6 +19,7 @@ next-env.d.ts
 
 # Agent/editor session state
 .claude/
+/.tmp/issue-206/
 
 # Environment / secrets — never commit
 .env
@@ -35,17 +36,68 @@ next-env.d.ts
 # manifests may opt in explicitly below so a fresh deployment can reproduce
 # the same sourced facts.
 /data/*
+# AFLDB-ISSUE-113: the season-grain Brownlow artefact, its provenance manifest and the
+# identity adjudication file are curated, hash-bound inputs of the canonical rebuild.
+!/data/brownlow/
+/data/brownlow/*
+!/data/brownlow/season-votes.csv
+!/data/brownlow/season-votes.manifest.json
+!/data/brownlow/player-identity.csv
 !/data/awards/
 /data/awards/*
 !/data/awards/22-under-22.csv
+!/data/awards/honour-teams.csv
+!/data/awards/hall-of-fame.csv
+!/data/awards/captaincies.csv
+!/data/awards/rising-star.csv
+!/data/awards/all-australian.csv
+!/data/awards/club-best-and-fairest.csv
+!/data/awards/club-best-and-fairest-definitions.csv
+!/data/awards/named-medals.csv
+!/data/awards/named-medals-definitions.csv
+!/data/awards/award-definitions.csv
+!/data/awards/rising-star-winners.csv
+!/data/awards/player-identity.csv
+# AFLDB-ISSUE-118 §23.19/§23.26: curated, tracked player height evidence (the Wikipedia
+# infobox corroboration set) and the operator adjudications of height source conflicts.
+!/data/players/
+/data/players/*
+!/data/players/height-evidence-wikipedia.csv
+!/data/players/height-adjudications.csv
+!/data/players/father-son-selections.csv
+!/data/players/father-son-selections.source.json
+!/data/players/father-son-adjudications.csv
+# AFLDB-ISSUE-118 §23.31: the normalised sibling pairs, their provenance and the adjudications;
+# the raw operator export under data/players/families/ stays untracked.
+!/data/players/sibling-relationships.csv
+!/data/players/sibling-relationships.source.json
+!/data/players/sibling-adjudications.csv
+!/data/players/sibling-supplements.csv
 !/data/records/
 /data/records/*
 !/data/records/first-kick-goal-ids.csv
+# AFLDB-ISSUE-118 §23.33: the normalised after-siren artefact, provenance and adjudications are tracked;
+# the raw table exports under data/records/after-siren/ stay untracked.
+!/data/records/after-siren-events.csv
+!/data/records/after-siren-events.source.json
+!/data/records/after-siren-adjudications.csv
 # ISSUE-093 Phase-1 canonical reference datasets: curated, reviewable, tracked.
 # Only JSON opts in; raw/large data under data/ (incl. data/sources/) stays ignored.
 !/data/reference/
 /data/reference/*
 !/data/reference/*.json
+# AFLDB-ISSUE-118 §23.27 Stage E2: the parsed AFL Tables coaches snapshot (index + coach
+# pages, two small CSVs per capture) is the rebuild's tracked input; the raw HTML beside
+# it stays local and is hash-bound by the tracked manifest under docs/rebuild-manifests/.
+!/data/sources/
+/data/sources/*
+!/data/sources/afltables/
+/data/sources/afltables/*
+!/data/sources/afltables/coaches/
+/data/sources/afltables/coaches/*
+!/data/sources/afltables/coaches/*/
+/data/sources/afltables/coaches/*/*
+!/data/sources/afltables/coaches/*/parsed/
 *.db
 *.db-journal
 *.db-wal
@@ -74,6 +126,7 @@ test-results/
 playwright-report/
 blob-report/
 .playwright/
+.playwright-mcp/
 
 # Stress-test output. `npm run nl:stress -- --out ./nl-stress-out` is the
 # documented invocation and lands in the repo root; a full run is ~12 MB
@@ -117,3 +170,11 @@ Thumbs.db
 !.vscode/extensions.json
 /afldb-nl-mass-corpus.csv
 /afldb-nl-mass-corpus.csv.summary.json
+
+# ISSUE-164 generated player-matching measurement reports.
+# Keep the frozen v1 baseline inputs tracked; all other reports are reproducible scratch output.
+/backtest-*.json
+/queue-*.json
+/compare-*.json
+!/backtest-v1-baseline.json
+!/queue-v1-baseline.json

@@ -39,9 +39,20 @@ if (cluster.isPrimary) {
   // (by the worker itself) to tell those apart when it matters.
   // cluster.id -> ordinal, so a replacement fork below can inherit the
   // ordinal of the worker it replaces rather than being handed a new one.
+  //
+  // AFLDB_WORKER_COUNT travels with it (AFLDB-ISSUE-134). Post-settle ISR
+  // invalidation has to reach EVERY worker — Next 16 keeps page invalidation
+  // in per-process memory — so the caller posts until every ordinal has
+  // answered, and needs to know how many that is. A worker cannot re-derive
+  // it: AFLDB_WORKERS is unset on hosts taking the min(4, availableParallelism())
+  // default, and availableParallelism() in a worker would report the machine's
+  // cores, not the fork count. The primary is the only process that knows.
   const ordinals = new Map();
   const fork = (ordinal) => {
-    const worker = cluster.fork({ AFLDB_WORKER_ID: String(ordinal) });
+    const worker = cluster.fork({
+      AFLDB_WORKER_ID: String(ordinal),
+      AFLDB_WORKER_COUNT: String(workers),
+    });
     ordinals.set(worker.id, ordinal);
     return worker;
   };

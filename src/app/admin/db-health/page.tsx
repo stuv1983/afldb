@@ -4,7 +4,7 @@ import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { SortableTable } from '@/components/SortableTable';
 import { collectHealthReport } from '@/db/queries/db-health';
 import { formatDate, formatNumber, NOT_RECORDED } from '@/lib/format';
-import { requireSuperAdmin } from '@/lib/auth/session';
+import { requireCapability } from '@/lib/auth/session';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,7 +18,7 @@ function timestamp(value: Date | null): string {
 }
 
 export default async function DatabaseHealthPage() {
-  await requireSuperAdmin();
+  await requireCapability('operations.dbHealth');
 
   const report = await collectHealthReport();
   const { core, tables, rebuilds, reconciliation, statEras, linkQuality, size, submissionBacklog } = report;

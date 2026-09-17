@@ -1,0 +1,34 @@
+source_key,season,club,player,player_id,link_status,candidate_count,votes,source_citation
+rising-star:1993:937,1993,Brisbane,Nathan Buckley,217,resolved,1,,draftguru
+rising-star:1994:938,1994,Brisbane,Chris Scott,97,resolved,1,,draftguru
+rising-star:1995:939,1995,Hawthorn,Nick Holland,637,resolved,1,,draftguru
+rising-star:1996:940,1996,West Coast,Ben Cousins,1051,resolved,1,,draftguru
+rising-star:1997:941,1997,Port Adelaide,Michael Wilson,820,resolved,1,27.00,draftguru
+rising-star:1998:942,1998,North Melbourne,Byron Pickett,791,resolved,1,30.00,draftguru
+rising-star:1999:943,1999,Sydney,Adam Goodes,1012,resolved,1,33.00,draftguru
+rising-star:2000:944,2000,Fremantle,Paul Hasleby,542,resolved,1,33.00,draftguru
+rising-star:2001:945,2001,St Kilda,Justin Koschitzke,977,resolved,1,31.00,draftguru
+rising-star:2002:946,2002,St Kilda,Nick Riewoldt,981,resolved,1,34.00,draftguru
+rising-star:2003:947,2003,Hawthorn,Sam Mitchell,1135,resolved,1,33.00,draftguru
+rising-star:2004:948,2004,Melbourne,Jared Rivers,2309,resolved,1,45.00,draftguru
+rising-star:2005:949,2005,Richmond,Brett Deledio,4068,resolved,1,43.00,draftguru
+rising-star:2006:950,2006,Port Adelaide,Danyle Pearce,4137,resolved,1,43.00,draftguru
+rising-star:2007:951,2007,Geelong,Joel Selwood,11538,resolved,1,44.00,draftguru
+rising-star:2008:952,2008,Fremantle,Rhys Palmer,11641,resolved,1,44.00,draftguru
+rising-star:2009:953,2009,Brisbane,Daniel Rich,11725,resolved,1,45.00,draftguru
+rising-star:2010:954,2010,Sydney,Dan Hannebery,11783,resolved,1,45.00,draftguru
+rising-star:2011:955,2011,Essendon,Dyson Heppell,11896,resolved,1,44.00,draftguru
+rising-star:2012:956,2012,Adelaide,Daniel Talia,11989,resolved,1,43.00,draftguru
+rising-star:2013:957,2013,Gold Coast,Jaeger O'Meara,12141,resolved,1,44.00,draftguru
+rising-star:2014:958,2014,Brisbane,Lewis Taylor,12252,resolved,1,39.00,draftguru
+rising-star:2015:959,2015,Melbourne,Jesse Hogan,12321,resolved,1,49.00,draftguru
+rising-star:2016:960,2016,Sydney,Callum Mills,12413,resolved,1,49.00,draftguru
+rising-star:2017:961,2017,Essendon,Andrew McGrath,12491,resolved,1,51.00,draftguru
+rising-star:2018:962,2018,Collingwood,Jaidyn Stephenson,12587,resolved,1,52.00,draftguru
+rising-star:2019:963,2019,Carlton,Sam Walsh,12684,resolved,1,54.00,draftguru
+rising-star:2020:964,2020,Fremantle,Caleb Serong,12786,resolved,1,48.00,draftguru
+rising-star:2021:965,2021,Melbourne,Luke Jackson,12779,resolved,1,51.00,draftguru
+rising-star:2022:966,2022,Collingwood,Nick Daicos,12943,resolved,1,60.00,draftguru
+rising-star:2023:967,2023,North Melbourne,Harry Sheezel,13034,resolved,1,54.00,draftguru
+rising-star:2024:968,2024,Geelong,Oliver Dempsey,12974,resolved,1,52.00,draftguru
+rising-star:2025:969,2025,Fremantle,Murphy Reid,13180,resolved,1,48.00,draftguru

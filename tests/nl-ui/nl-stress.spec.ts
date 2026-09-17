@@ -51,6 +51,38 @@ const OUT_DIR = resolve('nl-ui-out');
 const BATCH_SIZE = Number(process.env.NL_UI_BATCH ?? 100);
 const RUN_TAG = process.env.NL_UI_RUN_TAG ?? '';
 /**
+ * Optional FLOOR on the interval between question navigations, in
+ * milliseconds. Default 0, so existing runs are unchanged.
+ *
+ * /search enforces a per-IP, per-process rate limit of 30 requests per
+ * 60 seconds ahead of the NL pipeline (src/app/search/rate-limit.ts,
+ * AFLDB-ISSUE-120), and a sweep is by definition one IP asking a great
+ * many questions quickly. The honest way to stay under a real
+ * production limit is to ask more slowly. The alternatives all measure
+ * a deployment nobody runs: raising the limit, spoofing an IP or a
+ * forwarded header, spreading load across forked workers, or
+ * restarting the server between batches to clear its window.
+ *
+ * 2200 ms with ONE Playwright worker is the pacing AFLDB-ISSUE-152
+ * Phase G uses. The floor alone admits at most
+ * floor(60000 / 2200) + 1 = 28 navigations inside any 60-second
+ * window, whatever the server's response time, which clears the limit
+ * of 30 with margin. Pacing is per worker, so N workers multiply the
+ * aggregate rate by N and the guarantee is lost -- keep NL_UI_WORKERS
+ * at 1 whenever this is set.
+ *
+ * Validated rather than coerced: NL_UI_REQUEST_DELAY_MS=2.2s would
+ * otherwise read as NaN, silently disable pacing, and reproduce
+ * exactly the throttled run this exists to prevent.
+ */
+const REQUEST_DELAY_MS = Number(process.env.NL_UI_REQUEST_DELAY_MS ?? 0);
+if (!Number.isSafeInteger(REQUEST_DELAY_MS) || REQUEST_DELAY_MS < 0) {
+  throw new Error(
+    'NL_UI_REQUEST_DELAY_MS must be a non-negative integer number of milliseconds; '
+    + `received ${process.env.NL_UI_REQUEST_DELAY_MS}.`,
+  );
+}
+/**
  * Forensic capture for a hydration-error incident: raw server HTML,
  * post-hydration DOM, screenshot, console, and a same-question clean
  * control, one folder per incident keyed by the corpus row id. See
@@ -548,7 +580,41 @@ async function observe(
         has: page.getByText('Did AFLDB understand this question?'),
       });
       if (await panel.count() === 0) {
-        outcome = 'absent';
+        /**
+         * A throttled load is not an absent answer.
+         *
+         * /search enforces a per-IP, per-PROCESS rate limit of 30
+         * requests per 60 seconds in front of the NL pipeline
+         * (src/app/search/rate-limit.ts, AFLDB-ISSUE-120). A limited
+         * request renders "Too many searches" WITHOUT calling
+         * globalSearch: no plan is built, no query runs, and no
+         * nl_search_log row is written. That page carries no answer
+         * panel -- which is byte-for-byte what a correct decline looks
+         * like to the check above. Scored as `absent` it marks every
+         * throttled plan row a semantic failure AND every throttled
+         * decline row a pass, so a sweep that outruns the limiter
+         * reports fiction in both directions at once (ISSUE-152 Phase
+         * G, 2026-09-08: 30 of 270 questions reached the pipeline; the
+         * other 240 were scored as semantics).
+         *
+         * Recorded as `page_error` -- the EXISTING crash class, which
+         * fails the batch loudly and at once -- rather than as a new
+         * outcome, so plan/decline scoring is untouched
+         * (scoreObservation already fails a crash under every
+         * expectation; tests/nl-ui-corpus.test.ts:322). The fix for a
+         * throttled run is to pace the sweep or give the deployment
+         * more workers, exactly as the deployed cluster does. Never
+         * relax the limiter to make a sweep finish.
+         */
+        const throttled = page.locator('div.empty', {
+          has: page.getByRole('heading', { name: 'Too many searches' }),
+        });
+        if (await throttled.count() > 0) {
+          errors.push('rate limited: /search rendered "Too many searches"');
+          outcome = 'page_error';
+        } else {
+          outcome = 'absent';
+        }
       } else {
         firstVisibleResultAtMs = Date.now() - started;
         const heading = panel.locator('h2').first();
@@ -1131,6 +1197,16 @@ for (const [index, batch] of batches.entries()) {
         JSON.stringify(observation) + '\n',
         'utf8',
       );
+
+      /**
+       * Pacing, at the END of the iteration rather than the start, so
+       * it also separates the last question of one batch from the
+       * first of the next: batches run back to back on one worker,
+       * and the limiter counts per IP, not per page. A deliberate
+       * rate floor, not a wait for a condition -- see
+       * REQUEST_DELAY_MS.
+       */
+      if (REQUEST_DELAY_MS > 0) await page.waitForTimeout(REQUEST_DELAY_MS);
     }
 
     /**

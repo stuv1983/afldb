@@ -1,3 +1,4 @@
+import type { ResolvedSourceClub } from '@/lib/player-matching/club-identity';
 import type { LinkTargetTable } from '@/db/queries/player-links';
 
 /**
@@ -161,6 +162,22 @@ export function getLinkUniquenessScope(
 // The two sides of a comparison
 // ---------------------------------------------------------------------
 
+/**
+ * How one source's `club_id` may be compared to a candidate's clubs.
+ *
+ * 'lineage' compares the continuing club (`organization_id`), so a
+ * source row naming Western Bulldogs corroborates a Footscray career
+ * (AFLDB-ISSUE-164 S1).
+ *
+ * 'club_id' compares raw `clubs.id`, exactly as v2 did. Draft sources
+ * are pinned to it for this tranche: S1 is authorised for non-draft
+ * sources only, and draft_person scoring may not move before Tier 2
+ * labelling can validate it. The lineage is still carried on the row --
+ * it is simply not consulted here -- so lifting the pin later is a
+ * one-line policy change rather than a re-plumbing.
+ */
+export type ClubMatchPolicy = 'lineage' | 'club_id';
+
 export type SourceEvidence = {
   target: MatchTarget;
   /** The name exactly as the source printed it. */
@@ -169,7 +186,25 @@ export type SourceEvidence = {
   normalisedName: string;
   temporal: TemporalEvidence[];
   clubId: number | null;
+  /**
+   * clubs.organization_id for clubId -- the continuing club across
+   * renames and relocations (AFLDB-ISSUE-164 S1). Null when the source
+   * has no club or the identity carries no lineage; never inferred.
+   */
+  clubOrganizationId: number | null;
+  /**
+   * Whether clubOrganizationId may be consulted when comparing clubs.
+   * Set from the source table, never inferred from the data.
+   */
+  clubMatch: ClubMatchPolicy;
   clubNameRaw: string | null;
+  /**
+   * Continuing clubs named by clubNameRaw, resolved read-time by exact
+   * canonical text only (S3/S4, D-4). Empty when the source has no club
+   * text, when the text names no AFLDB club, or when it is ambiguous --
+   * all three mean "unknown", never "not this club".
+   */
+  resolvedClubs: ResolvedSourceClub[];
   /** Draft sources only. Never treated as an AFLDB career total. */
   reportedGames: number | null;
   reportedGoals: number | null;
@@ -182,6 +217,8 @@ export type SourceEvidence = {
 
 export type CandidateClub = {
   clubId: number;
+  /** clubs.organization_id for clubId. Null when AFLDB has no lineage. */
+  organizationId: number | null;
   games: number | null;
   firstSeason: number | null;
   lastSeason: number | null;

@@ -243,7 +243,10 @@ export async function reconcileCareerTotals(): Promise<ReconciliationCheck[]> {
         SELECT pms.player_id, count(*) AS actual
           FROM player_match_stats pms
           JOIN matches m ON m.id = pms.match_id
-         WHERE m.is_final
+         -- Must mirror rebuild_derived.py / player-derived.ts exactly, which
+         -- build player_career_stats.finals from is_finals_series. Using
+         -- is_final here would report false drift for every Wildcard Final.
+         WHERE m.is_finals_series
          GROUP BY pms.player_id
       ) f ON f.player_id = c.player_id
       WHERE c.finals <> COALESCE(f.actual, 0)
@@ -269,7 +272,7 @@ export async function reconcileCareerTotals(): Promise<ReconciliationCheck[]> {
   return [
     { check: 'games: player_career_stats vs. player_match_stats', mismatches: Number(games[0].count) },
     { check: 'goals: player_career_stats vs. player_match_stats', mismatches: Number(goals[0].count) },
-    { check: 'finals: player_career_stats vs. player_match_stats + matches.is_final', mismatches: Number(finals[0].count) },
+    { check: 'finals: player_career_stats vs. player_match_stats + matches.is_finals_series', mismatches: Number(finals[0].count) },
     { check: 'brownlow votes: player_career_stats vs. brownlow_season_votes', mismatches: Number(brownlow[0].count) },
     { check: 'players with match history but no player_career_stats row', mismatches: Number(missing[0].count) },
   ];
@@ -338,6 +341,17 @@ type LinkLayer = {
  * father_link_status), verified against each table's own migration rather
  * than assumed uniform -- father_son_selections carries two independent
  * link-status columns for two different people, so it appears twice.
+ *
+ * DELIBERATELY UNFILTERED BY LIFECYCLE STATUS (AFLDB-ISSUE-165 §4.7). The
+ * three honours tables gained `status` in migration 101, and every PUBLIC
+ * read of them now carries `status = 'active'`. This module must not: it is
+ * the operational health view, and its job is to report the state of the
+ * whole table as the database actually holds it. A voided row still occupies
+ * a row, still carries a link status, and is still something an operator
+ * needs to be able to see. Adding a status filter here would quietly shrink
+ * the counts every other operational reading is compared against -- so do
+ * not "tidy this up" to match the public queries; they answer a different
+ * question.
  */
 const LINK_LAYERS: LinkLayer[] = [
   { table: 'award_winners', label: 'Award winners', statusColumn: 'link_status_value' },

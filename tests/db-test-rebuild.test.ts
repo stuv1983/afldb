@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
 
 import {
@@ -13,12 +13,75 @@ import {
   ladderWitnessLabel,
   ladderWitnessValidateArgv,
   DEFAULT_VENV_PYTHON,
+  DEFAULT_DRAFTGURU_LABEL,
+  DEFAULT_TARGET,
+  REBUILD_TARGETS,
+  parseArgs as parseRebuildArgs,
+  DRAFTGURU_IMPORTER,
+  draftguruImportArgv,
   draftguruValidateArgv,
   FINAL_VALIDATION_MARKER,
   RESET_SQL,
   RebuildRefused,
   assertDestructiveAcknowledgement,
   assertDraftguruPreflight,
+  AWARDS_HONOURS_EXPECTED,
+  AWARDS_HONOURS_GROUPS,
+  awardsHonoursChecks,
+  AFL_API_HEIGHT_LOADER,
+  BIRTH_DATE_LOADER,
+  COACH_LOADER,
+  afltablesClubListPin,
+  afltablesCoachesPin,
+  coachChecks,
+  coachesImportArgv,
+  coachesValidateArgv,
+  FATHER_SON_ADJUDICATIONS,
+  FATHER_SON_CSV,
+  FATHER_SON_LOADER,
+  FATHER_SON_PROVENANCE,
+  fatherSonArgv,
+  fatherSonChecks,
+  fatherSonMeasures,
+  fatherSonValidateArgv,
+  SIBLINGS_ADJUDICATIONS,
+  SIBLINGS_CSV,
+  SIBLINGS_LOADER,
+  SIBLINGS_PROVENANCE,
+  SIBLINGS_SUPPLEMENTS,
+  siblingChecks,
+  siblingMeasures,
+  siblingsArgv,
+  siblingsValidateArgv,
+  AFTER_SIREN_ADJUDICATIONS,
+  AFTER_SIREN_CSV,
+  AFTER_SIREN_LOADER,
+  AFTER_SIREN_PROVENANCE,
+  afterSirenArgv,
+  afterSirenChecks,
+  afterSirenMeasures,
+  afterSirenReconcileArgv,
+  afterSirenValidateArgv,
+  parseCsvRows,
+  birthDateChecks,
+  birthDatesArgv,
+  birthDatesValidateArgv,
+  HEIGHT_LOADER,
+  WIKIPEDIA_HEIGHT_CSV,
+  WIKIPEDIA_HEIGHT_LOADER,
+  wikipediaHeightRows,
+  wikipediaHeightsValidateArgv,
+  aflApiHeightsValidateArgv,
+  aflApiRosterPin,
+  heightChecks,
+  heightEnrichmentPins,
+  heightsValidateArgv,
+  BROWNLOW_SEASON_LOADER,
+  BROWNLOW_SEASON_PREFLIGHT_FILES,
+  brownlowSeasonChecks,
+  brownlowSeasonExpected,
+  brownlowSeasonImportArgv,
+  brownlowSeasonValidateArgv,
   buildFinalValidationSql,
   executeRebuild,
   finalValidationChecks,
@@ -151,11 +214,17 @@ function fakeDeps(failAt?: string) {
 function idsOf(stages: Stage[]) { return stages.map((s) => s.id); }
 
 describe('rebuild target safety', () => {
-  it('refuses a target that is not a _test database', () => {
+  it('refuses a database outside the explicit allowlist', () => {
+    // AFLDB-ISSUE-146 replaced the `_test`-suffix rule with the allowlist; a name that is
+    // not listed is refused whether or not it happens to end in _test.
     expect(() => resolveTarget({
       AFLDB_TEST_DATABASE_URL: 'postgres://u:p@h:5432/afldb_scratch',
       AFLDB_TEST_IMPORT_DATABASE_URL: 'postgres://u:p@h:5432/afldb_scratch',
-    })).toThrow(/ends in _test/);
+    })).toThrow(/only explicit rebuild targets/);
+    expect(() => resolveTarget({
+      AFLDB_TEST_DATABASE_URL: 'postgres://u:p@h:5432/random_test',
+      AFLDB_TEST_IMPORT_DATABASE_URL: 'postgres://u:p@h:5432/random_test',
+    })).toThrow(/only explicit rebuild targets/);
   });
 
   it('refuses afldb_dev by name', () => {
@@ -171,8 +240,7 @@ describe('rebuild target safety', () => {
   });
 
   it('refuses a preserved pre-rebuild database', () => {
-    // Caught by the _test-suffix rule before the pre_rebuild rule is even reached; what
-    // matters is that it is refused, not which guard fires first.
+    // What matters is that it is refused, not which guard fires first.
     expect(() => resolveTarget({
       AFLDB_TEST_DATABASE_URL: 'postgres://u:p@h:5432/afldb_test_pre_rebuild_20260825',
     })).toThrow(RebuildRefused);
@@ -220,6 +288,212 @@ describe('rebuild target safety', () => {
   });
 });
 
+describe('explicit --target and the code_test_db rehearsal (AFLDB-ISSUE-146)', () => {
+  // Distinctive secrets and host, so a leak into any message is unmistakable.
+  const CODE_OWNER = 'postgres://afldb_owner:s3cret-owner-LEAK@db.internal:6543/code_test_db';
+  const CODE_IMPORT = 'postgres://afldb_import:s3cret-import-LEAK@db.internal:6543/code_test_db';
+  const SECRETS = ['s3cret-owner-LEAK', 's3cret-import-LEAK', 'db.internal', '6543', 'postgres://', ':pw@'];
+  const bothEnv = {
+    AFLDB_TEST_DATABASE_URL: OWNER,
+    AFLDB_TEST_IMPORT_DATABASE_URL: IMPORT,
+    AFLDB_CODE_TEST_DATABASE_URL: CODE_OWNER,
+    AFLDB_CODE_TEST_IMPORT_DATABASE_URL: CODE_IMPORT,
+  };
+  const codeTarget = () => target({ database: 'code_test_db', adminDsn: CODE_OWNER, importDsn: CODE_IMPORT });
+
+  /** Run a refusal and hand back its message, failing if nothing was refused. */
+  function refusal(fn: () => unknown): string {
+    try {
+      fn();
+    } catch (error) {
+      expect(error).toBeInstanceOf(RebuildRefused);
+      return (error as Error).message;
+    }
+    throw new Error('expected a RebuildRefused');
+  }
+
+  it('allowlists exactly the two targets and still defaults to afldb_test', () => {
+    expect(Object.keys(REBUILD_TARGETS)).toEqual(['afldb_test', 'code_test_db']);
+    expect(DEFAULT_TARGET).toBe('afldb_test');
+    expect(parseRebuildArgs(['--acknowledge-destroy', 'afldb_test']).target).toBeUndefined();
+
+    const byDefault = resolveTarget(bothEnv);
+    expect(byDefault.database).toBe('afldb_test');
+    expect(byDefault.adminDsn).toBe(OWNER);
+    expect(byDefault.importDsn).toBe(IMPORT);
+    // Even with the rehearsal variables present, the default never reads them.
+    expect(JSON.stringify(byDefault)).not.toContain('code_test_db');
+  });
+
+  it('resolves an explicit afldb_test identically to the default', () => {
+    expect(resolveTarget(bothEnv, { target: 'afldb_test' })).toEqual(resolveTarget(bothEnv));
+  });
+
+  it('resolves code_test_db through its dedicated DSNs and never the test ones', () => {
+    const resolved = resolveTarget(bothEnv, { target: 'code_test_db' });
+    expect(resolved).toEqual({
+      database: 'code_test_db',
+      adminDsn: CODE_OWNER,
+      importDsn: CODE_IMPORT,
+      importIsOwnerSubstitution: false,
+    });
+    expect(JSON.stringify(resolved)).not.toContain('afldb_test');
+  });
+
+  it('requires the acknowledgement to name the selected database exactly', () => {
+    const code = resolveTarget(bothEnv, { target: 'code_test_db' });
+    expect(() => assertDestructiveAcknowledgement(code, 'code_test_db')).not.toThrow();
+    expect(() => assertDestructiveAcknowledgement(code, 'afldb_test'))
+      .toThrow(/--acknowledge-destroy code_test_db/);
+    expect(() => assertDestructiveAcknowledgement(code, undefined))
+      .toThrow(/--acknowledge-destroy code_test_db/);
+    // and the reverse mismatch, exactly as before ISSUE-146
+    expect(() => assertDestructiveAcknowledgement(resolveTarget(bothEnv), 'code_test_db'))
+      .toThrow(/--acknowledge-destroy afldb_test/);
+  });
+
+  it('produces the same stage graph for both targets, differing only in the bound scripts', () => {
+    const forTest = planStages(target(), fitzroy(), OPTS);
+    const forCode = planStages(codeTarget(), fitzroy(), OPTS);
+
+    expect(idsOf(forCode)).toEqual(idsOf(forTest));
+    expect(forCode.map((s) => s.kind)).toEqual(forTest.map((s) => s.kind));
+    expect(forCode.map((s) => s.run)).toEqual(forTest.map((s) => s.run));
+
+    // The schema and privilege stages are the ONLY argv difference, and they bind to the
+    // rehearsal's own package scripts / migrate target.
+    const migrations = forCode.find((s) => s.id === 'migrations')!;
+    expect(migrations.argv).toEqual(['npm', 'run', 'db:migrate:code-test']);
+    expect(migrations.envOverlay).toEqual({ AFLDB_MIGRATE_TARGET: 'code-test' });
+    expect(forCode.find((s) => s.id === 'privileges')!.argv)
+      .toEqual(['npm', 'run', 'db:privileges:code-test']);
+    for (const [i, stage] of forCode.entries()) {
+      if (stage.id === 'migrations' || stage.id === 'privileges') continue;
+      expect(stage.argv, stage.id).toEqual(forTest[i].argv);
+    }
+
+    // Every data stage gets the rehearsal's restricted import DSN, and nothing test-shaped.
+    for (const stage of forCode.filter((s) => s.kind === 'data')) {
+      expect(stage.envOverlay?.AFLDB_IMPORT_DATABASE_URL, stage.id).toBe(CODE_IMPORT);
+    }
+    expect(JSON.stringify(forCode)).not.toContain('afldb_test');
+    expect(JSON.stringify(forCode)).not.toMatch(/\b07\d\b/);
+    expect(JSON.stringify(forCode)).not.toContain('AFLDB_LEGACY_SQLITE');
+  });
+
+  it('refuses forbidden and unlisted targets by name, before reading any DSN', () => {
+    const cases: Array<[string, RegExp]> = [
+      ['afldb_dev', /rejected by name/],
+      ['afldb_prod', /rejected by name/],
+      ['anything-prod', /looks like production/],
+      ['afldb_production_test', /looks like production/],
+      ['random_test', /only explicit rebuild targets/],
+      ['afldb_scratch', /only explicit rebuild targets/],
+      ['afldb_dev_pre_rebuild_20260906-112500', /rejected by name|pre-rebuild/],
+      ['afldb_test_pre_rebuild_20260825', /pre-rebuild databases are read-only/],
+      ['code_test_db_pre_rebuild_20260907', /pre-rebuild databases are read-only/],
+    ];
+    for (const [name, pattern] of cases) {
+      // With no environment at all: the name is refused first, so no DSN is ever consulted.
+      expect(refusal(() => resolveTarget({}, { target: name })), name).toMatch(pattern);
+      // and with every variable present, the answer is the same
+      expect(refusal(() => resolveTarget(bothEnv, { target: name })), name).toMatch(pattern);
+    }
+  });
+
+  it('refuses a code-test DSN whose database is not code_test_db', () => {
+    const wrong = (owner: string, imp?: string) => refusal(() => resolveTarget({
+      ...bothEnv,
+      AFLDB_CODE_TEST_DATABASE_URL: owner,
+      AFLDB_CODE_TEST_IMPORT_DATABASE_URL: imp,
+    }, { target: 'code_test_db' }));
+
+    expect(wrong(OWNER, IMPORT))
+      .toMatch(/AFLDB_CODE_TEST_DATABASE_URL names database 'afldb_test', not the selected target 'code_test_db'/);
+    expect(wrong('postgres://afldb_owner:x@h:5432/afldb_dev')).toMatch(/rejected by name/);
+    expect(wrong('postgres://afldb_owner:x@h:5432/code_test_db_prod')).toMatch(/looks like production/);
+    expect(wrong('postgres://afldb_owner:x@h:5432/code_test_db_pre_rebuild_1')).toMatch(/read-only/);
+    expect(wrong('postgres://afldb_owner:x@h:5432/code_test')).toMatch(/only explicit rebuild targets/);
+    expect(wrong('not a url')).toMatch(/AFLDB_CODE_TEST_DATABASE_URL is not a valid connection URL/);
+    // the import DSN must agree with the owner DSN, and both with the selection
+    expect(wrong(CODE_OWNER, IMPORT))
+      .toMatch(/AFLDB_CODE_TEST_IMPORT_DATABASE_URL names a different database from AFLDB_CODE_TEST_DATABASE_URL/);
+    expect(wrong(CODE_OWNER, 'nope')).toMatch(/AFLDB_CODE_TEST_IMPORT_DATABASE_URL is not a valid connection URL/);
+  });
+
+  it('fails closed when the code-test DSNs are missing, without borrowing the test ones', () => {
+    const testOnly = { AFLDB_TEST_DATABASE_URL: OWNER, AFLDB_TEST_IMPORT_DATABASE_URL: IMPORT };
+    expect(refusal(() => resolveTarget(testOnly, { target: 'code_test_db' })))
+      .toMatch(/AFLDB_CODE_TEST_DATABASE_URL is not set/);
+    expect(refusal(() => resolveTarget({ ...testOnly, AFLDB_CODE_TEST_DATABASE_URL: CODE_OWNER },
+      { target: 'code_test_db' })))
+      .toMatch(/AFLDB_CODE_TEST_IMPORT_DATABASE_URL is not set/);
+    // the owner substitution is the same explicit flag, and substitutes the CODE owner DSN
+    const substituted = resolveTarget({ ...testOnly, AFLDB_CODE_TEST_DATABASE_URL: CODE_OWNER },
+      { target: 'code_test_db', allowOwnerImportDsn: true });
+    expect(substituted.importIsOwnerSubstitution).toBe(true);
+    expect(substituted.importDsn).toBe(CODE_OWNER);
+    // and the reverse: the default target never reads the rehearsal variables
+    expect(refusal(() => resolveTarget({
+      AFLDB_CODE_TEST_DATABASE_URL: CODE_OWNER, AFLDB_CODE_TEST_IMPORT_DATABASE_URL: CODE_IMPORT,
+    }))).toMatch(/AFLDB_TEST_DATABASE_URL is not set/);
+  });
+
+  it('never infers the target from a DSN', () => {
+    // AFLDB_TEST_DATABASE_URL pointing at code_test_db does not make code_test_db the
+    // target; it is a mismatch and a refusal.
+    expect(refusal(() => resolveTarget({
+      AFLDB_TEST_DATABASE_URL: CODE_OWNER, AFLDB_TEST_IMPORT_DATABASE_URL: CODE_IMPORT,
+    }))).toMatch(/AFLDB_TEST_DATABASE_URL names database 'code_test_db', not the selected target 'afldb_test'/);
+    expect(refusal(() => resolveTarget({
+      AFLDB_TEST_DATABASE_URL: CODE_OWNER, AFLDB_TEST_IMPORT_DATABASE_URL: CODE_IMPORT,
+    }, { target: 'afldb_test' }))).toMatch(/not the selected target 'afldb_test'/);
+  });
+
+  it('parses --target and refuses a bare flag rather than defaulting', () => {
+    const parsed = parseRebuildArgs(['--target', 'code_test_db', '--acknowledge-destroy', 'code_test_db']);
+    expect(parsed.target).toBe('code_test_db');
+    expect(parsed.acknowledgeDestroy).toBe('code_test_db');
+    expect(() => parseRebuildArgs(['--target'])).toThrow(/--target needs a database name/);
+    expect(() => parseRebuildArgs(['--target', '--plan'])).toThrow(/--target needs a database name/);
+    // an unlisted name parses (parseArgs is not the gate) and is then refused by resolveTarget
+    expect(refusal(() => resolveTarget(bothEnv, parseRebuildArgs(['--target', 'afldb_dev']))))
+      .toMatch(/rejected by name/);
+  });
+
+  it('refuses through planStages too if a non-allowlisted name ever reached it', () => {
+    expect(() => planStages(target({ database: 'afldb_dev' }), fitzroy(), OPTS))
+      .toThrow(/not an explicit rebuild target/);
+  });
+
+  it('never leaks a DSN, host or credential in any refusal', () => {
+    const secretEnv = {
+      AFLDB_TEST_DATABASE_URL: 'postgres://afldb_owner:s3cret-owner-LEAK@db.internal:6543/afldb_dev',
+      AFLDB_TEST_IMPORT_DATABASE_URL: 'postgres://afldb_import:s3cret-import-LEAK@db.internal:6543/afldb_dev',
+      AFLDB_CODE_TEST_DATABASE_URL: 'postgres://afldb_owner:s3cret-owner-LEAK@db.internal:6543/afldb_test',
+      AFLDB_CODE_TEST_IMPORT_DATABASE_URL: 'postgres://afldb_import:s3cret-import-LEAK@db.internal:6543/code_test_db',
+    };
+    const messages = [
+      refusal(() => resolveTarget(secretEnv)),
+      refusal(() => resolveTarget(secretEnv, { target: 'code_test_db' })),
+      refusal(() => resolveTarget({ ...secretEnv, AFLDB_CODE_TEST_DATABASE_URL: CODE_OWNER,
+        AFLDB_CODE_TEST_IMPORT_DATABASE_URL: undefined }, { target: 'code_test_db' })),
+      refusal(() => resolveTarget({ ...secretEnv, AFLDB_CODE_TEST_DATABASE_URL: CODE_OWNER,
+        AFLDB_CODE_TEST_IMPORT_DATABASE_URL: 'postgres://afldb_import:s3cret-import-LEAK@db.internal:6543/afldb_test' },
+      { target: 'code_test_db' })),
+      refusal(() => resolveTarget(secretEnv, { target: 'afldb_prod' })),
+      refusal(() => resolveTarget({ ...secretEnv, AFLDB_CODE_TEST_DATABASE_URL: 'bad' },
+        { target: 'code_test_db' })),
+      refusal(() => assertDestructiveAcknowledgement(codeTarget(), 'afldb_test')),
+      refusal(() => parseRebuildArgs(['--target'])),
+    ];
+    expect(messages).toHaveLength(8);
+    for (const message of messages) {
+      for (const secret of SECRETS) expect(message, message).not.toContain(secret);
+    }
+  });
+});
+
 describe('fitzRoy source selection', () => {
   it('resolves the accepted canonical baseline with no label at all', () => {
     // The normal path: `npm run db:test:rebuild` needs neither --fitzroy-label nor
@@ -233,11 +507,20 @@ describe('fitzRoy source selection', () => {
     expect(source.selection).toBe('accepted-baseline');
   });
 
-  it('accepts exactly full-history-20260827 from the REAL tracked register', () => {
+  it('accepts exactly full-history-20260902 from the REAL tracked register', () => {
     const real = resolveFitzroySource({});
-    expect(real.label).toBe('full-history-20260827');
+    expect(real.label).toBe('full-history-20260902');
     expect(real.accepted).toBe(true);
     expect(real.selection).toBe('accepted-baseline');
+    // AFLDB-ISSUE-112: full-history-20260827 is still IN the register, retired. Selection
+    // must come from acceptance_status, never from label order, date or filename.
+    expect(real.label).not.toBe('full-history-20260827');
+  });
+
+  it('refuses the retired predecessor by label on the normal path', () => {
+    // The retired baseline is historical evidence, not a selectable source.
+    expect(() => resolveFitzroySource({ fitzroyLabel: 'full-history-20260827' }))
+      .toThrow(/is not the accepted canonical baseline \('full-history-20260902'\)/);
   });
 
   it('never selects trial-2024 on the normal path', () => {
@@ -359,14 +642,14 @@ describe('fitzRoy preflight', () => {
       },
       runSql: (_dsn, sql) => { order.push(`sql:${sql.slice(0, 12)}`); },
     };
-    runPreflight(tracing, resolveFitzroySource({},
+    runPreflight(tracing, OPTS, resolveFitzroySource({},
       { readManifest: () => fullManifest(), readAcceptedRegister: () => register() }));
     expect(order.some((o) => o.includes('import_fitzroy_core.py')
       && o.includes('--require-accepted-baseline'))).toBe(true);
     expect(order.some((o) => o.startsWith('sql:'))).toBe(false);
     // and the runner sequences preflight ahead of the destructive acknowledgement itself
     expect(runnerSource).toMatch(
-      /runPreflight\(deps, fitzroy\);\s*\n\s*assertDestructiveAcknowledgement/);
+      /runPreflight\(deps, opts, fitzroy\);\s*\n\s*assertDestructiveAcknowledgement/);
   });
 
   it('stops before destruction when fitzRoy validation fails', () => {
@@ -377,7 +660,7 @@ describe('fitzRoy preflight', () => {
         ? { status: 1, stdout: '', stderr: 'ERROR' }
         : { status: 0, stdout: '', stderr: '' }),
     };
-    expect(() => runPreflight(failing, fitzroy()))
+    expect(() => runPreflight(failing, OPTS, fitzroy()))
       .toThrow(/fitzRoy preflight failed[\s\S]*Nothing has been destroyed/);
   });
 });
@@ -395,44 +678,123 @@ describe('accepted canonical baseline', () => {
   const registerJson = JSON.parse(registerText);
   const accepted = registerJson.baselines
     .filter((b: any) => b.acceptance_status === 'accepted');
+  // AFLDB-ISSUE-112: the register now carries the retired predecessor as well. It is
+  // historical evidence, and the tests below prove the retirement moved a status without
+  // editing a single hash or measurement in that record.
+  const retired = registerJson.baselines
+    .filter((b: any) => b.acceptance_status === 'retired');
 
   const MANIFEST_PATH = join(root, 'docs', 'rebuild-manifests', 'afltables_fitzroy_core',
-    'full-history-20260827.json');
+    'full-history-20260902.json');
   const manifestBytes = readFileSync(MANIFEST_PATH);
   const manifest = JSON.parse(manifestBytes.toString('utf8'));
+
+  const RETIRED_MANIFEST_PATH = join(root, 'docs', 'rebuild-manifests',
+    'afltables_fitzroy_core', 'full-history-20260827.json');
+  const retiredManifestBytes = readFileSync(RETIRED_MANIFEST_PATH);
+  const retiredManifest = JSON.parse(retiredManifestBytes.toString('utf8'));
 
   // AFLDB-ISSUE-108: the acceptance record binds the manifest by the SHA-256 of its
   // canonical LF bytes. A Windows checkout without .gitattributes renders CRLF, which
   // has a different hash — the binding must be platform-independent, so normalise
   // line endings before hashing. import_fitzroy_core.py sees LF on the supported
   // Linux runtime (and now everywhere, via .gitattributes).
-  const manifestLfSha = createHash('sha256')
-    .update(manifestBytes.toString('utf8').replace(/\r\n/g, '\n'), 'utf8')
+  const lfSha = (bytes: Buffer) => createHash('sha256')
+    .update(bytes.toString('utf8').replace(/\r\n/g, '\n'), 'utf8')
     .digest('hex');
+  const manifestLfSha = lfSha(manifestBytes);
+  const retiredManifestLfSha = lfSha(retiredManifestBytes);
 
   const setDigest = (files: any[]) => createHash('sha256')
     .update(`${files.map((f) => `${f.filename} ${f.sha256} ${f.row_count}`).sort().join('\n')}\n`)
     .digest('hex');
 
-  it('accepts exactly one baseline, and it is full-history-20260827', () => {
+  it('accepts exactly one baseline, and it is full-history-20260902', () => {
+    // Two entries exist; exactly_one_accepted still decides, and it decides on status.
+    expect(registerJson.baselines).toHaveLength(2);
     expect(accepted).toHaveLength(1);
-    expect(accepted[0].snapshot_label).toBe('full-history-20260827');
+    expect(accepted[0].snapshot_label).toBe('full-history-20260902');
     expect(registerJson.selection_policy.rule).toBe('exactly_one_accepted');
     expect(accepted[0].snapshot_dir)
+      .toBe('data/sources/afltables/fitzroy_core/full-history-20260902');
+  });
+
+  it('keeps full-history-20260827 as retired historical evidence', () => {
+    // AFLDB-ISSUE-112: the accepted bytes became unreproducible, so the baseline was
+    // retired rather than deleted or overwritten. 'retired' is the register's own
+    // declared vocabulary, and every entry that is not 'accepted' is unselectable.
+    expect(retired).toHaveLength(1);
+    expect(retired[0].snapshot_label).toBe('full-history-20260827');
+    expect(retired[0].snapshot_dir)
       .toBe('data/sources/afltables/fitzroy_core/full-history-20260827');
+    expect(registerJson.selection_policy.retired_statuses).toContain('retired');
+    expect(registerJson.selection_policy.retired_statuses).not.toContain('accepted');
+    expect(retired[0].superseded_by).toBe('full-history-20260902');
+    expect(accepted[0].supersedes).toBe('full-history-20260827');
+    // The retirement changed a status and added fields. It edited NO evidence: both
+    // hash bindings still describe the bytes the baseline was granted over.
+    expect(retired[0].accepted_on).toBe('2026-08-27');
+    expect(retired[0].acquisition.manifest_sha256).toBe(retiredManifestLfSha);
+    expect(retired[0].acquisition.manifest_sha256)
+      .toBe('a42c6d5faacbcb6f4ce77a93a01f282577797375d14c60ef17f09bff2ab21d09');
+    expect(retired[0].raw_artefacts.artefact_set_sha256)
+      .toBe(setDigest(retiredManifest.files));
+    expect(retired[0].raw_artefacts.artefact_set_sha256)
+      .toBe('8e14ce6198685b9fec568ab3c680cab34783e8e202ab0c7e93f45773d96f4125');
+    // The successor reproduced its predecessor's measured fingerprint exactly - the
+    // retirement moved provenance, not canonical semantics. Compared on the measured
+    // values themselves; only each entry's own prose $comment differs.
+    //
+    // AFLDB-ISSUE-136 (2026-09-04) then amended the ACCEPTED entry only: the importer's
+    // profile_url_continuity transformation folds four renumbered 2025 profiles into
+    // their continuing players, so `players` moved 13,275 -> 13,271 and the accepted
+    // entry gained `players_with_renumbered_profile`. The retired entry is historical
+    // evidence and was deliberately NOT rewritten, so the two differ on exactly that.
+    const gates = (o: any) => {
+      const { $comment, ...rest } = o;
+      return rest;
+    };
+    const { players: acceptedPlayers, players_with_renumbered_profile: folded,
+      ...acceptedRest } = gates(accepted[0].measured);
+    const { players: retiredPlayers, ...retiredRest } = gates(retired[0].measured);
+    expect(acceptedRest).toEqual(retiredRest);
+    expect(retiredPlayers).toBe(13275);
+    expect(acceptedPlayers).toBe(13271);
+    expect(folded).toBe(4);
+    expect(retiredPlayers - acceptedPlayers).toBe(folded);
+    expect(retired[0].measured.players_with_renumbered_profile).toBeUndefined();
+    expect(accepted[0].amendments[0]).toMatchObject({
+      date: '2026-09-04', issue: 'AFLDB-ISSUE-136', kind: 'import_transformation_added',
+    });
+    expect(gates(accepted[0].identity_scan)).toEqual(gates(retired[0].identity_scan));
+    expect(Object.keys(gates(accepted[0].measured))).toHaveLength(13);
+    expect(Object.keys(gates(retired[0].measured))).toHaveLength(12);
+    expect(Object.keys(gates(accepted[0].identity_scan))).toHaveLength(6);
   });
 
   it('binds acceptance to the acquisition manifest bytes', () => {
     expect(accepted[0].acquisition.manifest_sha256).toBe(manifestLfSha);
+    expect(accepted[0].acquisition.manifest_sha256)
+      .toBe('2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1');
+    expect(accepted[0].acquisition.manifest_path)
+      .toBe('docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json');
+    // The predecessor's manifest is a different artefact and can never satisfy this bind.
+    expect(accepted[0].acquisition.manifest_sha256).not.toBe(retiredManifestLfSha);
   });
 
   it('binds acceptance to the raw artefact hash set', () => {
     expect(accepted[0].raw_artefacts.artefact_set_sha256).toBe(setDigest(manifest.files));
+    expect(accepted[0].raw_artefacts.artefact_set_sha256)
+      .toBe('15ba5dc624535d95fd1661c7c5e757ae4fc2d31782a2c0b1414e19358580dd6c');
     expect(accepted[0].raw_artefacts.file_count).toBe(manifest.files.length);
     expect(accepted[0].raw_artefacts.file_count).toBe(131);
     expect(accepted[0].raw_artefacts.total_rows)
       .toBe(manifest.files.reduce((n: number, f: any) => n + f.row_count, 0));
     expect(accepted[0].raw_artefacts.total_rows).toBe(719042);
+    // 130 of the 131 artefacts are shared with the retired baseline; player_details.csv
+    // is not, and that one artefact is the whole reason this is a separate acceptance.
+    expect(accepted[0].raw_artefacts.artefact_set_sha256)
+      .not.toBe(retired[0].raw_artefacts.artefact_set_sha256);
   });
 
   it('detects a modified raw artefact', () => {
@@ -475,8 +837,12 @@ describe('accepted canonical baseline', () => {
     expect(accepted[0].validation.command).toContain('--require-full-history');
     expect(accepted[0].validation.authority)
       .toBe('tools/migration/import_fitzroy_core.py');
+    // AFLDB-ISSUE-136: players is 13,271, not the 13,275 distinct profile URLs — four
+    // renumbered 2025 profiles fold into their continuing players under the tracked
+    // profile_url_continuity rules; identity_scan.distinct_urls stays 13,275 (raw rows).
     expect(accepted[0].measured).toMatchObject({
-      matches: 16838, matches_with_player_rows: 16838, players: 13275,
+      matches: 16838, matches_with_player_rows: 16838, players: 13271,
+      players_with_renumbered_profile: 4,
       player_match_rows: 685471, brownlow_round_vote_rows: 320861,
       seasons_first: 1897, seasons_last: 2025, club_identities: 24,
       venues: 52, attendance_known: 15187, players_with_dob: 855,
@@ -499,6 +865,17 @@ describe('accepted canonical baseline', () => {
     expect(c.source_data[0].rows_dropped).toBe(2);
     expect(c.import_transformation[0].rows_affected).toBe(79);
     expect(c.import_transformation[0].players_affected).toBe(4);
+    // AFLDB-ISSUE-136: the four renumbered-profile continuity rules are an accepted
+    // identity correction of this baseline, bound by rule id to the contract.
+    const contract = JSON.parse(readFileSync(
+      join(root, 'tools', 'rebuild', 'fitzroy', 'fitzroy-contract.json'), 'utf8'));
+    const ruleIds = (contract.profile_url_continuity.rules as { id: string }[])
+      .map((r) => r.id).sort();
+    expect(c.identity_continuity[0].kind).toBe('profile_url_continuity');
+    expect(c.identity_continuity[0].rows_affected).toBe(79);
+    expect(c.identity_continuity[0].players_affected).toBe(4);
+    expect([...c.identity_continuity[0].rule_ids].sort()).toEqual(ruleIds);
+    expect(ruleIds).toHaveLength(4);
   });
 
   it('cannot bypass --require-full-history by hand-editing the record', () => {
@@ -510,13 +887,21 @@ describe('accepted canonical baseline', () => {
     expect(importerSource).not.toMatch(/baseline\[["'](full_history|completeness)["']\]/);
   });
 
-  it('keeps the acquisition manifest inert and unchanged', () => {
-    // The acquisition still self-declares full_history: true and completeness:
-    // full_history - the claim the independent validator rejected. Preserved as evidence.
-    expect(manifest.full_history).toBe(true);
-    expect(manifest.completeness).toBe('full_history');
-    expect(manifest.snapshot_label).toBe('full-history-20260827');
-    expect(manifest.extraction_timestamp_utc).toBe('2026-08-27T01:54:19Z');
+  it('keeps both acquisition manifests inert and unchanged', () => {
+    // The RETIRED acquisition still self-declares full_history: true and completeness:
+    // full_history - the claim the independent validator rejected. Preserved as evidence,
+    // byte-for-byte, by the retirement.
+    expect(retiredManifest.full_history).toBe(true);
+    expect(retiredManifest.completeness).toBe('full_history');
+    expect(retiredManifest.snapshot_label).toBe('full-history-20260827');
+    expect(retiredManifest.extraction_timestamp_utc).toBe('2026-08-27T01:54:19Z');
+    // The ACCEPTED acquisition declines to self-assess and says so. That field is exactly
+    // as inert as the other one: the verdict came from the independent validator, and a
+    // manifest claiming false did not block an acceptance any more than true granted one.
+    expect(manifest.full_history).toBe(false);
+    expect(manifest.completeness).toBe('unvalidated');
+    expect(manifest.snapshot_label).toBe('full-history-20260902');
+    expect(manifest.extraction_timestamp_utc).toBe('2026-09-02T01:00:04Z');
     expect(registerJson.inert_acquisition_fields.fields)
       .toEqual(['full_history', 'completeness', 'completeness_gates']);
     // and nothing in the supported path reads them as a verdict
@@ -607,23 +992,689 @@ describe('stage graph', () => {
     // AFLDB-ISSUE-095 added 'ladder-witness' between derived and fingerprints. It is a
     // VALIDATION stage, not a data stage — the nine-stage DATA topology is unchanged and
     // nothing new imports. See 'ladder witness cross-check' below.
+    // AFLDB-ISSUE-118 §23.19 added 'heights' and 'heights-afl-api' directly after
+    // fitzroy: both read tracked-manifest snapshots already on disk (the baseline's own
+    // register plus a pinned in-season supplement; the pinned AFL API roster set) and
+    // join through the identities and match facts fitzroy just loaded. Neither acquires.
+    // AFLDB-ISSUE-118 §23.33–§23.35 added 'after-siren' (data) and 'after-siren-reconcile'
+    // (validation) directly after 'siblings': the canonical after_siren_kicks events from
+    // the tracked normalised artefact, then a re-resolution check of the loaded table.
     expect(idsOf(stages)).toEqual([
       'precheck', 'recreate', 'migrations', 'privileges',
-      'reference', 'fitzroy', 'draftguru', 'derived',
-      'coleman', 'ladder-witness', 'fingerprints',
+      'reference', 'fitzroy', 'heights', 'heights-afl-api', 'heights-wikipedia', 'birth-dates',
+      'coaches', 'father-son', 'siblings', 'after-siren', 'after-siren-reconcile',
+      'draftguru', 'awards-honours', 'brownlow-season', 'derived', 'coleman',
+      'ladder-witness', 'fingerprints',
     ]);
   });
 
-  it('adds exactly one data stage beyond the four, and it derives rather than acquires', () => {
+  it('adds only non-acquiring data stages beyond the four', () => {
     // AFLDB-ISSUE-111. 'coleman' is the fifth DATA stage. It is admitted because it
     // acquires nothing: no legacy SQLite, no manifest, no network — it reads AFLDB's own
     // canonical match facts and writes the award they imply.
+    // AFLDB-ISSUE-112. 'awards-honours' is the sixth. It acquires nothing either: every
+    // family reads a tracked manifest checked in under data/awards/, and the legacy
+    // SQLite source is never wired back in (operator decision 8).
+    // AFLDB-ISSUE-113. 'brownlow-season' is the seventh, for the same reason: it reads
+    // the tracked artefact under data/brownlow/ — a re-keyed read-only export of the
+    // preserved authoritative table — and never the legacy SQLite or the network.
+    // AFLDB-ISSUE-118 §23.19. 'heights' and 'heights-afl-api' are the eighth and ninth:
+    // manifest-pinned snapshots on disk, no legacy SQLite, no network (see 'height
+    // enrichment' below).
+    // AFLDB-ISSUE-118 §23.33–§23.35. 'after-siren' reads the tracked normalised artefact
+    // (migration 089) and joins through the matches / player_match_stats / identities
+    // fitzroy loaded — no legacy SQLite, no manifest, no network. Its re-resolution check
+    // 'after-siren-reconcile' is a VALIDATION stage and is not in this list.
     expect(idsOf(stages.filter((s) => s.kind === 'data')))
-      .toEqual(['reference', 'fitzroy', 'draftguru', 'derived', 'coleman']);
+      .toEqual(['reference', 'fitzroy', 'heights', 'heights-afl-api', 'heights-wikipedia',
+                'birth-dates', 'coaches', 'father-son', 'siblings', 'after-siren', 'draftguru',
+                'awards-honours', 'brownlow-season', 'derived', 'coleman']);
     const coleman = stages.find((s) => s.id === 'coleman')!;
     expect(coleman.argv).toEqual([
       resolvePython(), 'tools/migration/import_awards.py', '--groups', 'coleman',
     ]);
+  });
+
+  describe('height enrichment (AFLDB-ISSUE-118 §23.19)', () => {
+    const ids = idsOf(stages);
+    const heights = stages.find((s) => s.id === 'heights')!;
+    const aflApi = stages.find((s) => s.id === 'heights-afl-api')!;
+
+    it('binds the register to the accepted baseline and every supplement to the contract pin', () => {
+      const pins = heightEnrichmentPins();
+      expect(pins.supplements.length).toBeGreaterThan(0);
+      expect(heights.argv).toEqual([
+        resolvePython(), HEIGHT_LOADER, '--label', fitzroy().label,
+        ...pins.supplements.flatMap((p) => ['--supplement-label', p.label]),
+      ]);
+      expect(heights.envOverlay).toEqual({ AFLDB_IMPORT_DATABASE_URL: target().importDsn });
+      // The preflight argv is DERIVED from the data argv (the §28.4 rule), so the
+      // snapshot proven and the snapshot imported cannot differ.
+      expect(heightsValidateArgv(fitzroy().label)).toEqual([...heights.argv!, '--validate-only']);
+    });
+
+    it('loads the AFL API roster the contract accepts, as evidence only', () => {
+      const pin = aflApiRosterPin();
+      expect(aflApi.argv).toEqual([resolvePython(), AFL_API_HEIGHT_LOADER, '--label', pin.label]);
+      expect(aflApiHeightsValidateArgv()).toEqual([...aflApi.argv!, '--validate-only']);
+    });
+
+    it('follows fitzroy (identities and match facts) and precedes everything that reads players', () => {
+      expect(ids.indexOf('fitzroy')).toBeLessThan(ids.indexOf('heights'));
+      expect(ids.indexOf('heights')).toBeLessThan(ids.indexOf('heights-afl-api'));
+      expect(ids.indexOf('heights-afl-api')).toBeLessThan(ids.indexOf('heights-wikipedia'));
+      expect(ids.indexOf('heights-wikipedia')).toBeLessThan(ids.indexOf('draftguru'));
+      const wikipedia = stages.find((s) => s.id === 'heights-wikipedia')!;
+      expect(wikipedia.argv).toEqual([resolvePython(), WIKIPEDIA_HEIGHT_LOADER, '--csv', WIKIPEDIA_HEIGHT_CSV]);
+      expect(wikipediaHeightsValidateArgv()).toEqual([...wikipedia.argv!, '--validate-only']);
+      expect(wikipediaHeightRows()).toBeGreaterThan(0);
+      expect(() => wikipediaHeightRows(() => 'afltables_profile,player\n')).toThrow(/no data rows/);
+      for (const stage of [heights, aflApi, wikipedia]) {
+        expect(stage.kind).toBe('data');
+        expect(stage.argv!.join(' ')).not.toMatch(/legacy|sqlite|acquire/i);
+      }
+    });
+
+    it('refuses a contract with no height pin, and a pin whose manifest does not hash to its binding', () => {
+      expect(() => heightEnrichmentPins(() => ({ datasets: { player_details: {} } })))
+        .toThrow(/records no height enrichment binding/);
+      const real = JSON.parse(readFileSync(
+        join(root, 'tools', 'rebuild', 'fitzroy', 'fitzroy-contract.json'), 'utf8'));
+      const tampered = structuredClone(real);
+      tampered.datasets.player_details.height_enrichment.supplements[0].manifest_sha256 = '0'.repeat(64);
+      expect(() => heightEnrichmentPins(() => tampered)).toThrow(/hashes to/);
+      expect(() => aflApiRosterPin(() => ({ roster: {} }))).toThrow(/no accepted roster snapshot/);
+    });
+
+    it('preflights both snapshots offline before the destructive stage and refuses on failure', () => {
+      const draftguruOk = 'snapshot : x (42 year pages, sha256 verified)\n'
+        + 'persons    : 5057\npicks      : 6810\n';
+      const brownlowOk = '{"ok": true}';
+      const withFailing = (failing?: string) => {
+        const commands: string[][] = [];
+        const deps: Deps = {
+          ...fakeDeps().deps,
+          runCommand: (a: string[]) => {
+            commands.push(a);
+            if (failing && a.includes(failing)) return { status: 1, stdout: '', stderr: 'sha256 mismatch' };
+            if (a.includes(BROWNLOW_SEASON_LOADER)) return { status: 0, stdout: brownlowOk, stderr: '' };
+            return { status: 0, stdout: draftguruOk, stderr: '' };
+          },
+        };
+        return { deps, commands };
+      };
+      const { deps, commands } = withFailing();
+      runPreflight(deps, OPTS, fitzroy());
+      const validate = commands.filter((a) => a.includes('--validate-only'));
+      expect(validate.some((a) => a.includes(HEIGHT_LOADER))).toBe(true);
+      expect(validate.some((a) => a.includes(AFL_API_HEIGHT_LOADER))).toBe(true);
+      expect(validate.some((a) => a.includes(WIKIPEDIA_HEIGHT_LOADER))).toBe(true);
+      expect(() => runPreflight(withFailing(WIKIPEDIA_HEIGHT_LOADER).deps, OPTS, fitzroy()))
+        .toThrow(/Wikipedia height preflight failed[\s\S]*Nothing has been destroyed/);
+      expect(() => runPreflight(withFailing(HEIGHT_LOADER).deps, OPTS, fitzroy()))
+        .toThrow(/Height preflight failed[\s\S]*Nothing has been destroyed/);
+      expect(() => runPreflight(withFailing(AFL_API_HEIGHT_LOADER).deps, OPTS, fitzroy()))
+        .toThrow(/AFL API roster preflight failed[\s\S]*Nothing has been destroyed/);
+    });
+
+    it('gates the rebuilt heights on the pinned measurements', () => {
+      const keys = heightChecks().map((c) => c.key);
+      expect(keys).toEqual(['players_with_height', 'height_without_evidence',
+                            'height_conflicts_open', 'players_with_afl_api_height_evidence',
+                            'players_with_wikipedia_height_evidence']);
+      const register = JSON.parse(readFileSync(
+        join(root, 'data', 'reference', 'fitzroy-accepted-baselines.json'), 'utf8'));
+      expect(finalValidationChecks(register).map((c) => c.key)).toEqual(expect.arrayContaining(keys));
+      expect(heightChecks().find((c) => c.key === 'players_with_height')!.expected).toBeGreaterThan(12000);
+    });
+  });
+
+  describe('birth dates (AFLDB-ISSUE-118 §23.24 Stage D1)', () => {
+    const ids = idsOf(stages);
+    const birthDates = stages.find((s) => s.id === 'birth-dates')!;
+    const contractPath = join(root, 'tools', 'rebuild', 'afltables', 'afltables-contract.json');
+
+    it('loads the club-list snapshot the AFL Tables contract accepts, and only that one', () => {
+      const pin = afltablesClubListPin();
+      expect(pin.label).toMatch(/^club-lists-\d{8}$/);
+      expect(birthDates.argv).toEqual([resolvePython(), BIRTH_DATE_LOADER, '--label', pin.label]);
+      expect(birthDatesArgv()).toEqual(birthDates.argv);
+      expect(birthDates.name).toContain(pin.label);
+      expect(birthDates.envOverlay).toEqual({ AFLDB_IMPORT_DATABASE_URL: target().importDsn });
+      // The preflight argv is DERIVED from the data argv (the §28.4 rule).
+      expect(birthDatesValidateArgv()).toEqual([...birthDates.argv!, '--validate-only']);
+      expect(birthDates.kind).toBe('data');
+      expect(birthDates.argv!.join(' ')).not.toMatch(/legacy|sqlite|acquire/i);
+    });
+
+    it('follows heights-wikipedia (the identities fitzroy registered are all it joins on) and precedes draftguru', () => {
+      expect(ids.indexOf('heights-wikipedia')).toBeLessThan(ids.indexOf('birth-dates'));
+      expect(ids.indexOf('birth-dates')).toBeLessThan(ids.indexOf('draftguru'));
+      expect(ids.indexOf('fitzroy')).toBeLessThan(ids.indexOf('birth-dates'));
+    });
+
+    it('refuses a contract with no pin, a tampered manifest hash, and a missing measured value', () => {
+      expect(() => afltablesClubListPin(() => null)).toThrow(/no accepted club-list snapshot/);
+      expect(() => afltablesClubListPin(() => ({ club_player_lists: {} })))
+        .toThrow(/no accepted club-list snapshot/);
+      const real = JSON.parse(readFileSync(contractPath, 'utf8'));
+      const tampered = structuredClone(real);
+      tampered.club_player_lists.accepted_snapshot.manifest_sha256_lf = '0'.repeat(64);
+      expect(() => afltablesClubListPin(() => tampered)).toThrow(/hashes to/);
+      const moved = structuredClone(real);
+      moved.club_player_lists.accepted_snapshot.manifest = 'docs/rebuild-manifests/afltables_club_lists/nope.json';
+      expect(() => afltablesClubListPin(() => moved)).toThrow(/not in this checkout/);
+      const unmeasured = structuredClone(real);
+      delete unmeasured.club_player_lists.accepted_snapshot.measured.dob_without_evidence;
+      expect(() => afltablesClubListPin(() => unmeasured)).toThrow(/dob_without_evidence is not an integer/);
+      // The real pin proves: the tracked manifest hashes to its LF binding on any checkout.
+      expect(afltablesClubListPin().measured.playersWithDob).toBeGreaterThan(13000);
+    });
+
+    it('preflights the snapshot offline before the destructive stage and refuses on failure', () => {
+      const commands: string[][] = [];
+      const withFailing = (failing?: string): Deps => ({
+        ...fakeDeps().deps,
+        runCommand: (a: string[]) => {
+          commands.push(a);
+          if (failing && a.includes(failing)) return { status: 1, stdout: '', stderr: 'sha256 mismatch' };
+          if (a.includes(BROWNLOW_SEASON_LOADER)) return { status: 0, stdout: '{"ok": true}', stderr: '' };
+          return { status: 0, stdout: 'snapshot : x (42 year pages, sha256 verified)\npersons    : 5057\npicks      : 6810\n', stderr: '' };
+        },
+      });
+      runPreflight(withFailing(), OPTS, fitzroy());
+      const validate = commands.filter((a) => a.includes('--validate-only'));
+      expect(validate.some((a) => a.includes(BIRTH_DATE_LOADER) && a.includes(afltablesClubListPin().label))).toBe(true);
+      expect(() => runPreflight(withFailing(BIRTH_DATE_LOADER), OPTS, fitzroy()))
+        .toThrow(/Birth-date preflight failed[\s\S]*Nothing has been destroyed/);
+    });
+
+    it('gates the rebuilt dates on the contract pin: population, evidence link, coverage, conflicts, disagreements', () => {
+      const checks = birthDateChecks();
+      expect(checks.map((c) => c.key)).toEqual([
+        'players_with_dob_after_birth_dates', 'dob_without_evidence', 'players_with_club_list_birth_evidence',
+        'club_list_birth_conflict_players', 'dob_disagreeing_with_club_list',
+      ]);
+      const byKey = Object.fromEntries(checks.map((c) => [c.key, c]));
+      const pin = afltablesClubListPin();
+      expect(byKey.players_with_dob_after_birth_dates.expected).toBe(pin.measured.playersWithDob);
+      expect(byKey.dob_without_evidence.expected).toBe(0);
+      expect(byKey.club_list_birth_conflict_players.expected).toBe(0);
+      expect(byKey.players_with_club_list_birth_evidence.expected).toBeLessThanOrEqual(pin.measured.playersWithDob);
+      expect(byKey.dob_without_evidence.sql).toMatch(/dob_evidence_id IS NULL/);
+      expect(byKey.club_list_birth_conflict_players.sql).toMatch(/count\(DISTINCT e\.dob\) > 1/);
+      expect(byKey.dob_disagreeing_with_club_list.sql).toMatch(/p\.dob <> e\.dob/);
+      for (const c of checks) expect(c.sql).not.toMatch(/'afltables_club_list'.*'wikipedia'/);
+      const register = JSON.parse(readFileSync(
+        join(root, 'data', 'reference', 'fitzroy-accepted-baselines.json'), 'utf8'));
+      const all = finalValidationChecks(register).map((c) => c.key);
+      expect(all).toEqual(expect.arrayContaining(checks.map((c) => c.key)));
+      // Added after the height gates, in stage order.
+      expect(all.indexOf('players_with_dob_after_birth_dates')).toBeGreaterThan(all.indexOf('players_with_wikipedia_height_evidence'));
+    });
+  });
+
+  describe('coaches (AFLDB-ISSUE-118 §23.27 Stage E2)', () => {
+    const ids = idsOf(stages);
+    const coaches = stages.find((s) => s.id === 'coaches')!;
+    const contractPath = join(root, 'tools', 'rebuild', 'afltables', 'afltables-contract.json');
+
+    it('loads the coach-page snapshot the AFL Tables contract accepts, beside the baseline and every pinned supplement', () => {
+      const pin = afltablesCoachesPin();
+      expect(pin.label).toMatch(/^coaches-\d{8}$/);
+      const expected = [resolvePython(), COACH_LOADER, '--label', pin.label, '--fitzroy-label', FULL_LABEL];
+      for (const s of heightEnrichmentPins().supplements) expected.push('--supplement-label', s.label);
+      expect(coaches.argv).toEqual(expected);
+      expect(coachesImportArgv(FULL_LABEL)).toEqual(coaches.argv);
+      expect(coaches.name).toContain(pin.label);
+      expect(coaches.name).toContain(FULL_LABEL);
+      expect(coaches.envOverlay).toEqual({ AFLDB_IMPORT_DATABASE_URL: target().importDsn });
+      // The preflight argv is DERIVED from the data argv (the §28.4 rule).
+      expect(coachesValidateArgv(FULL_LABEL)).toEqual([...coaches.argv!, '--validate-only']);
+      expect(coaches.kind).toBe('data');
+      expect(coaches.argv!.join(' ')).not.toMatch(/legacy|sqlite|acquire/i);
+    });
+
+    it('follows birth-dates (matches, clubs and the afltables identities are all it joins on) and precedes draftguru', () => {
+      expect(ids.indexOf('fitzroy')).toBeLessThan(ids.indexOf('coaches'));
+      expect(ids.indexOf('birth-dates')).toBeLessThan(ids.indexOf('coaches'));
+      expect(ids.indexOf('coaches')).toBeLessThan(ids.indexOf('draftguru'));
+    });
+
+    it('refuses a contract with no pin, a tampered manifest hash, a moved manifest and a missing measured value', () => {
+      expect(() => afltablesCoachesPin(() => null)).toThrow(/no accepted coaches snapshot/);
+      expect(() => afltablesCoachesPin(() => ({ coaches: {} }))).toThrow(/no accepted coaches snapshot/);
+      expect(() => afltablesCoachesPin(() => ({ coaches: { accepted_snapshot: null } }))).toThrow(/no accepted coaches snapshot/);
+      const real = JSON.parse(readFileSync(contractPath, 'utf8'));
+      const tampered = structuredClone(real);
+      tampered.coaches.accepted_snapshot.manifest_sha256_lf = '0'.repeat(64);
+      expect(() => afltablesCoachesPin(() => tampered)).toThrow(/hashes to/);
+      const moved = structuredClone(real);
+      moved.coaches.accepted_snapshot.manifest = 'docs/rebuild-manifests/afltables_coaches/nope.json';
+      expect(() => afltablesCoachesPin(() => moved)).toThrow(/not in this checkout/);
+      const unmeasured = structuredClone(real);
+      delete unmeasured.coaches.accepted_snapshot.measured.coaches_unlinked;
+      expect(() => afltablesCoachesPin(() => unmeasured)).toThrow(/coaches_unlinked is not an integer/);
+      // The real pin proves: the tracked manifest hashes to its LF binding on any checkout.
+      const pin = afltablesCoachesPin();
+      expect(pin.measured.coaches).toBe(pin.measured.coachesLinkedToPlayers + pin.measured.coachesUnlinked);
+      expect(pin.measured.matchCoaches).toBe(2 * pin.measured.matchesWithBothCoaches + pin.measured.matchesWithOneCoach);
+    });
+
+    it('preflights the snapshot offline before the destructive stage and refuses on failure', () => {
+      const commands: string[][] = [];
+      const withFailing = (failing?: string): Deps => ({
+        ...fakeDeps().deps,
+        runCommand: (a: string[]) => {
+          commands.push(a);
+          if (failing && a.includes(failing)) return { status: 1, stdout: '', stderr: 'sha256 mismatch' };
+          if (a.includes(BROWNLOW_SEASON_LOADER)) return { status: 0, stdout: '{"ok": true}', stderr: '' };
+          return { status: 0, stdout: 'snapshot : x (42 year pages, sha256 verified)\npersons    : 5057\npicks      : 6810\n', stderr: '' };
+        },
+      });
+      runPreflight(withFailing(), OPTS, fitzroy());
+      const validate = commands.filter((a) => a.includes('--validate-only'));
+      expect(validate.some((a) => a.includes(COACH_LOADER) && a.includes(afltablesCoachesPin().label) && a.includes(FULL_LABEL))).toBe(true);
+      expect(() => runPreflight(withFailing(COACH_LOADER), OPTS, fitzroy()))
+        .toThrow(/Coaches preflight failed[\s\S]*Nothing has been destroyed/);
+    });
+
+    it('gates the rebuilt coaching on the contract pin: people, proven links only, assignments, coverage shape', () => {
+      const checks = coachChecks();
+      expect(checks.map((c) => c.key)).toEqual([
+        'coaches', 'coaches_linked_to_players', 'coaches_unlinked', 'coaches_linked_outside_unique',
+        'match_coaches', 'matches_with_both_coaches', 'matches_with_one_coach', 'matches_without_coach',
+      ]);
+      const byKey = Object.fromEntries(checks.map((c) => [c.key, c]));
+      const pin = afltablesCoachesPin();
+      expect(byKey.coaches.expected).toBe(pin.measured.coaches);
+      expect(byKey.coaches_linked_outside_unique.expected).toBe(0);
+      expect(byKey.match_coaches.expected).toBe(pin.measured.matchCoaches);
+      expect(byKey.coaches_linked_to_players.sql).toMatch(/link_status_value = 'unique'/);
+      expect(byKey.matches_without_coach.sql).toMatch(/LEFT JOIN match_coaches/);
+      for (const c of checks) expect(c.sql).not.toMatch(/display_name|surname|name_key/); // never a name
+      const register = JSON.parse(readFileSync(
+        join(root, 'data', 'reference', 'fitzroy-accepted-baselines.json'), 'utf8'));
+      const all = finalValidationChecks(register).map((c) => c.key);
+      expect(all).toEqual(expect.arrayContaining(checks.map((c) => c.key)));
+      // Added after the birth-date gates, in stage order.
+      expect(all.indexOf('coaches')).toBeGreaterThan(all.indexOf('dob_disagreeing_with_club_list'));
+    });
+  });
+
+  describe('father–son selections (AFLDB-ISSUE-118 §23.29 family F)', () => {
+    const ids = idsOf(stages);
+    const stage = stages.find((s) => s.id === 'father-son')!;
+    const HEADER = 'source_key,draft_year,competition,selection_pick,selection_raw,club,drafted_player,drafted_games_reported,'
+      + 'drafted_profile,drafted_link,drafted_note,father,father_games_reported,father_profile,father_link,father_note\n';
+    const row = (key: string, son: string, sonLink: string, father: string, fatherLink: string) =>
+      `${key},${key.split(':')[1]},national,1,1,Geelong,"Son, Jr.",10,${son},${sonLink},"n, with a comma",Dad,100,${father},${fatherLink},note\n`;
+
+    it('loads the tracked artefact through the loader\'s load subcommand, and derives the preflight argv from it', () => {
+      expect(stage.argv).toEqual([resolvePython(), FATHER_SON_LOADER, 'load', '--csv', FATHER_SON_CSV, '--provenance', FATHER_SON_PROVENANCE]);
+      expect(fatherSonArgv()).toEqual(stage.argv);
+      expect(fatherSonValidateArgv()).toEqual([...stage.argv!, '--validate-only']);
+      expect(stage.kind).toBe('data');
+      expect(stage.envOverlay).toEqual({ AFLDB_IMPORT_DATABASE_URL: target().importDsn });
+      expect(stage.name).toContain(`${fatherSonMeasures().selections} selections`);
+      expect(stage.argv!.join(' ')).not.toMatch(/legacy|sqlite|acquire|normalize/i);
+      for (const path of [FATHER_SON_CSV, FATHER_SON_ADJUDICATIONS, FATHER_SON_PROVENANCE]) expect(existsSync(join(root, path))).toBe(true);
+    });
+
+    it('follows coaches (players and the afltables identities are all it joins on) and precedes draftguru', () => {
+      expect(ids.indexOf('fitzroy')).toBeLessThan(ids.indexOf('father-son'));
+      expect(ids.indexOf('coaches')).toBeLessThan(ids.indexOf('father-son'));
+      expect(ids.indexOf('father-son')).toBeLessThan(ids.indexOf('draftguru'));
+    });
+
+    it('reads its gate values from the artefact itself and refuses a missing, headerless or self-contradicting one', () => {
+      const m = fatherSonMeasures();
+      expect(m.selections).toBeGreaterThan(100);
+      expect(m.sonsLinked).toBeLessThanOrEqual(m.selections);
+      expect(m.fathersLinked).toBeLessThanOrEqual(m.selections);
+      expect(m.distinctFathersLinked).toBeLessThanOrEqual(m.fathersLinked);
+      expect(() => fatherSonMeasures(() => null)).toThrow(/not in this checkout/);
+      expect(() => fatherSonMeasures(() => 'source_key,draft_year\n')).toThrow(/no data rows or an unexpected header/);
+      expect(() => fatherSonMeasures(() => HEADER)).toThrow(/no data rows/);
+      const ok = HEADER
+        + row('wikipedia-father-son-rule:2001:01', 'players/G/Gary_Ablett1.html', 'unique', 'players/G/Gary_Ablett0.html', 'unique')
+        + row('wikipedia-father-son-rule:2004:01', '', 'unmatched', 'players/G/Gary_Ablett0.html', 'unique')
+        + row('wikipedia-father-son-rule:2004:02', 'players/X/X.html', 'resolved', '', 'unmatched');
+      expect(fatherSonMeasures(() => ok)).toEqual({ selections: 3, sonsLinked: 2, fathersLinked: 2, distinctFathersLinked: 1 });
+      // A trusted status with no profile, or a profile under 'unmatched', is a contradiction the gate refuses to count.
+      expect(() => fatherSonMeasures(() => HEADER + row('wikipedia-father-son-rule:2001:01', '', 'unique', 'players/G/Gary_Ablett0.html', 'unique'))).toThrow(/disagrees with its profile/);
+      expect(() => fatherSonMeasures(() => HEADER + row('wikipedia-father-son-rule:2001:01', 'players/X/X.html', 'unique', 'players/G/G.html', 'unmatched'))).toThrow(/disagrees with its profile/);
+      // The reader honours quoted commas and CRLF.
+      expect(parseCsvRows('a,"b, c","d ""q"""\r\n1,2,3\r\n')).toEqual([['a', 'b, c', 'd "q"'], ['1', '2', '3']]);
+    });
+
+    it('preflights the tracked files and the loader\'s offline validation before the destructive stage', () => {
+      const commands: string[][] = [];
+      const withFailing = (failing?: string): Deps => ({
+        ...fakeDeps().deps,
+        runCommand: (a: string[]) => {
+          commands.push(a);
+          if (failing && a.includes(failing)) return { status: 1, stdout: '', stderr: 'ERROR: columns differ' };
+          if (a.includes(BROWNLOW_SEASON_LOADER)) return { status: 0, stdout: '{"ok": true}', stderr: '' };
+          return { status: 0, stdout: 'snapshot : x (42 year pages, sha256 verified)\npersons    : 5057\npicks      : 6810\n', stderr: '' };
+        },
+      });
+      runPreflight(withFailing(), OPTS, fitzroy());
+      expect(commands.some((a) => a.includes(FATHER_SON_LOADER) && a.includes('load') && a.includes('--validate-only'))).toBe(true);
+      expect(() => runPreflight(withFailing(FATHER_SON_LOADER), OPTS, fitzroy()))
+        .toThrow(/Father–son preflight failed[\s\S]*Nothing has been destroyed/);
+      const ok = withFailing();
+      const missing: Deps = { ...ok, fileExists: (path: string) => path !== FATHER_SON_ADJUDICATIONS && ok.fileExists(path) };
+      expect(() => runPreflight(missing, OPTS, fitzroy())).toThrow(/Father–son preflight: required tracked input is missing[\s\S]*father-son-adjudications/);
+    });
+
+    it('gates the rebuilt selections on the artefact: rows, proven links only, one relationship per selection', () => {
+      const checks = fatherSonChecks();
+      expect(checks.map((c) => c.key)).toEqual([
+        'father_son_selections', 'father_son_sons_linked', 'father_son_fathers_linked', 'father_son_distinct_fathers',
+        'father_son_links_outside_trusted_status', 'player_relationships_parent_child',
+      ]);
+      const byKey = Object.fromEntries(checks.map((c) => [c.key, c]));
+      const m = fatherSonMeasures();
+      expect(byKey.father_son_selections.expected).toBe(m.selections);
+      expect(byKey.father_son_sons_linked.expected).toBe(m.sonsLinked);
+      expect(byKey.father_son_fathers_linked.expected).toBe(m.fathersLinked);
+      expect(byKey.father_son_distinct_fathers.expected).toBe(m.distinctFathersLinked);
+      expect(byKey.father_son_links_outside_trusted_status.expected).toBe(0);
+      expect(byKey.player_relationships_parent_child.expected).toBe(m.selections);
+      for (const c of checks) expect(c.sql).not.toMatch(/display_name|surname|_name_raw|drafted_player_name|father_name/); // never a name
+      const register = JSON.parse(readFileSync(
+        join(root, 'data', 'reference', 'fitzroy-accepted-baselines.json'), 'utf8'));
+      const all = finalValidationChecks(register).map((c) => c.key);
+      expect(all).toEqual(expect.arrayContaining(checks.map((c) => c.key)));
+      // Added after the coach gates, in stage order.
+      expect(all.indexOf('father_son_selections')).toBeGreaterThan(all.indexOf('matches_without_coach'));
+    });
+  });
+
+  describe('sibling pairs (AFLDB-ISSUE-118 §23.31 family F)', () => {
+    const ids = idsOf(stages);
+    const stage = stages.find((s) => s.id === 'siblings')!;
+    const HEADER = 'source_key,family_key,family_name,person_a_name,person_a_role,person_a_wikipedia,person_a_clubs,person_a_legacy,'
+      + 'person_a_profile,person_a_link,person_a_note,person_b_name,person_b_role,person_b_wikipedia,person_b_clubs,person_b_legacy,'
+      + 'person_b_profile,person_b_link,person_b_note,relationship_label,source_label,evidence,extraction_method,source_revision_id,also_source_keys\n';
+    const row = (key: string, a: string, aLink: string, b: string, bLink: string, label = 'brothers') =>
+      `${key},ablett-0004,Ablett,"Ablett, A",brother,u,"Geelong, Hawthorn",unique:1,${a},${aLink},"n, with a comma",B Ablett,sibling,u,,unmatched,${b},${bLink},note,${label},siblings/brothers,"A and B were brothers.",prose_rule,1,\n`;
+
+    it('loads the tracked artefact through the loader\'s load subcommand, and derives the preflight argv from it', () => {
+      expect(stage.argv).toEqual([resolvePython(), SIBLINGS_LOADER, 'load', '--csv', SIBLINGS_CSV, '--provenance', SIBLINGS_PROVENANCE]);
+      expect(siblingsArgv()).toEqual(stage.argv);
+      expect(siblingsValidateArgv()).toEqual([...stage.argv!, '--validate-only']);
+      expect(stage.kind).toBe('data');
+      expect(stage.envOverlay).toEqual({ AFLDB_IMPORT_DATABASE_URL: target().importDsn });
+      expect(stage.name).toContain(`${siblingMeasures().pairs} pairs`);
+      expect(stage.argv!.join(' ')).not.toMatch(/legacy|sqlite|acquire|normalize|families\//i);
+      for (const path of [SIBLINGS_CSV, SIBLINGS_ADJUDICATIONS, SIBLINGS_SUPPLEMENTS, SIBLINGS_PROVENANCE]) expect(existsSync(join(root, path))).toBe(true);
+    });
+
+    it('follows father-son (the same identities) and precedes draftguru', () => {
+      expect(ids.indexOf('fitzroy')).toBeLessThan(ids.indexOf('siblings'));
+      expect(ids.indexOf('father-son')).toBeLessThan(ids.indexOf('siblings'));
+      expect(ids.indexOf('siblings')).toBeLessThan(ids.indexOf('draftguru'));
+    });
+
+    it('reads its gate values from the artefact itself and refuses a missing, headerless or self-contradicting one', () => {
+      const m = siblingMeasures();
+      expect(m.pairs).toBeGreaterThan(400);
+      expect(m.pairsBothLinked).toBeLessThanOrEqual(m.pairs);
+      expect(m.brotherPairsLinked).toBeLessThanOrEqual(m.pairsBothLinked);
+      expect(m.playersWithBrother).toBeLessThanOrEqual(2 * m.brotherPairsLinked);
+      expect(m.unlinkedSides).toBeGreaterThanOrEqual(m.pairs - m.pairsBothLinked);
+      expect(m.unlinkedSides).toBeLessThanOrEqual(2 * (m.pairs - m.pairsBothLinked));
+      expect(() => siblingMeasures(() => null)).toThrow(/not in this checkout/);
+      expect(() => siblingMeasures(() => 'source_key,family_key\n')).toThrow(/no data rows or an unexpected header/);
+      expect(() => siblingMeasures(() => HEADER)).toThrow(/no data rows/);
+      const ok = HEADER
+        + row('000000000000000000000001', 'players/G/Gary_Ablett0.html', 'unique', 'players/G/Geoff_Ablett.html', 'unique')
+        + row('000000000000000000000002', 'players/G/Gary_Ablett0.html', 'unique', 'players/K/Kevin_Ablett.html', 'resolved')
+        + row('000000000000000000000003', 'players/G/Geoff_Ablett.html', 'unique', '', 'unmatched', 'siblings')
+        + row('000000000000000000000004', '', 'ambiguous', '', 'unmatched', 'siblings')
+        + row('000000000000000000000005', 'players/A/A.html', 'unique', 'players/B/B.html', 'unique', 'twins');
+      expect(siblingMeasures(() => ok)).toEqual({ pairs: 5, pairsBothLinked: 3, brotherPairsLinked: 2, playersWithBrother: 3, unlinkedSides: 3 });
+      // A trusted status with no profile, a profile under an untrusted status, or a self-pair is refused.
+      expect(() => siblingMeasures(() => HEADER + row('000000000000000000000001', '', 'unique', 'players/G/Geoff_Ablett.html', 'unique'))).toThrow(/disagrees with its profile/);
+      expect(() => siblingMeasures(() => HEADER + row('000000000000000000000001', 'players/X/X.html', 'ambiguous', '', 'unmatched'))).toThrow(/disagrees with its profile/);
+      expect(() => siblingMeasures(() => HEADER + row('000000000000000000000001', 'players/X/X.html', 'unique', 'players/X/X.html', 'unique'))).toThrow(/links one player to himself/);
+    });
+
+    it('preflights the tracked files and the loader\'s offline validation before the destructive stage', () => {
+      const commands: string[][] = [];
+      const withFailing = (failing?: string): Deps => ({
+        ...fakeDeps().deps,
+        runCommand: (a: string[]) => {
+          commands.push(a);
+          if (failing && a.includes(failing)) return { status: 1, stdout: '', stderr: 'ERROR: columns differ' };
+          if (a.includes(BROWNLOW_SEASON_LOADER)) return { status: 0, stdout: '{"ok": true}', stderr: '' };
+          return { status: 0, stdout: 'snapshot : x (42 year pages, sha256 verified)\npersons    : 5057\npicks      : 6810\n', stderr: '' };
+        },
+      });
+      runPreflight(withFailing(), OPTS, fitzroy());
+      expect(commands.some((a) => a.includes(SIBLINGS_LOADER) && a.includes('load') && a.includes('--validate-only'))).toBe(true);
+      expect(() => runPreflight(withFailing(SIBLINGS_LOADER), OPTS, fitzroy()))
+        .toThrow(/Siblings preflight failed[\s\S]*Nothing has been destroyed/);
+      const ok = withFailing();
+      const missing: Deps = { ...ok, fileExists: (path: string) => path !== SIBLINGS_ADJUDICATIONS && ok.fileExists(path) };
+      expect(() => runPreflight(missing, OPTS, fitzroy())).toThrow(/Siblings preflight: required tracked input is missing[\s\S]*sibling-adjudications/);
+      const noSupplement: Deps = { ...ok, fileExists: (path: string) => path !== SIBLINGS_SUPPLEMENTS && ok.fileExists(path) };
+      expect(() => runPreflight(noSupplement, OPTS, fitzroy())).toThrow(/Siblings preflight: required tracked input is missing[\s\S]*sibling-supplements/);
+    });
+
+    it('gates the rebuilt pairs on the artefact: rows, proven links only, brothers, no self or duplicate pair', () => {
+      const checks = siblingChecks();
+      expect(checks.map((c) => c.key)).toEqual([
+        'player_relationships_sibling', 'sibling_pairs_both_linked', 'sibling_unlinked_sides', 'sibling_brother_pairs_linked',
+        'sibling_players_with_brother', 'sibling_self_pairs', 'sibling_duplicate_pairs',
+      ]);
+      const byKey = Object.fromEntries(checks.map((c) => [c.key, c]));
+      const m = siblingMeasures();
+      expect(byKey.player_relationships_sibling.expected).toBe(m.pairs);
+      expect(byKey.sibling_pairs_both_linked.expected).toBe(m.pairsBothLinked);
+      expect(byKey.sibling_unlinked_sides.expected).toBe(m.unlinkedSides);
+      expect(byKey.sibling_brother_pairs_linked.expected).toBe(m.brotherPairsLinked);
+      expect(byKey.sibling_players_with_brother.expected).toBe(m.playersWithBrother);
+      expect(byKey.sibling_self_pairs.expected).toBe(0);
+      expect(byKey.sibling_duplicate_pairs.expected).toBe(0);
+      for (const c of checks) expect(c.sql).not.toMatch(/display_name|surname|_name_raw|person_a_name|person_b_name|family_key/); // never a name or a family
+      const register = JSON.parse(readFileSync(
+        join(root, 'data', 'reference', 'fitzroy-accepted-baselines.json'), 'utf8'));
+      const all = finalValidationChecks(register).map((c) => c.key);
+      expect(all).toEqual(expect.arrayContaining(checks.map((c) => c.key)));
+      // Added after the father–son gates, in stage order.
+      expect(all.indexOf('player_relationships_sibling')).toBeGreaterThan(all.indexOf('player_relationships_parent_child'));
+    });
+  });
+
+  describe('after-siren events (AFLDB-ISSUE-118 §23.33–§23.35)', () => {
+    const ids = idsOf(stages);
+    const stage = stages.find((s) => s.id === 'after-siren')!;
+    const reconcile = stages.find((s) => s.id === 'after-siren-reconcile')!;
+    const HEADER = 'event_key,season,competition,premiership_season,round_raw,round_code,round_kind,player_name_raw,'
+      + 'player_name,club_raw,opponent_raw,kick_scored,kick_effect,shot_detail,kicker_result,siren,kicker_score_raw,'
+      + 'opponent_score_raw,kicker_points,opponent_points,margin,supergoal_scoring,score_footnote_raw,outcome_raw,'
+      + 'ref_raw,cited,adjudication_keys,source_file,source_table,source_line,note\n';
+    const row = (key: string, prem: string, scored: string, effect: string) =>
+      `${key},2017,VFL/AFL,${prem},EF,EF,final,A B,A B,West Coast,Port Adelaide,${scored},${effect},,`
+      + `${effect === 'won' ? 'win' : effect === 'drew' ? 'draw' : 'loss'},final,10.10 (70),10.9 (69),70,69,1,false,,,[1],true,,f.csv,t,2,\n`;
+
+    it('loads the tracked artefact through the loader\'s load subcommand, and derives the preflight argv from it', () => {
+      expect(stage.argv).toEqual([resolvePython(), AFTER_SIREN_LOADER, 'load', '--csv', AFTER_SIREN_CSV, '--provenance', AFTER_SIREN_PROVENANCE]);
+      expect(afterSirenArgv()).toEqual(stage.argv);
+      expect(afterSirenValidateArgv()).toEqual([...stage.argv!, '--validate-only']);
+      expect(stage.kind).toBe('data');
+      expect(stage.envOverlay).toEqual({ AFLDB_IMPORT_DATABASE_URL: target().importDsn });
+      expect(stage.name).toContain(`${afterSirenMeasures().events} events`);
+      expect(stage.argv!.join(' ')).not.toMatch(/legacy|sqlite|acquire|normalize|after-siren\//i);
+      for (const path of [AFTER_SIREN_CSV, AFTER_SIREN_ADJUDICATIONS, AFTER_SIREN_PROVENANCE]) expect(existsSync(join(root, path))).toBe(true);
+    });
+
+    it('runs a re-resolution reconcile as a validation stage right after the load', () => {
+      expect(reconcile.kind).toBe('validation');
+      expect(reconcile.run).toBe('command');
+      expect(reconcile.argv).toEqual([resolvePython(), AFTER_SIREN_LOADER, 'reconcile', '--csv', AFTER_SIREN_CSV]);
+      expect(afterSirenReconcileArgv()).toEqual(reconcile.argv);
+      expect(reconcile.envOverlay).toEqual({ AFLDB_IMPORT_DATABASE_URL: target().importDsn });
+      expect(ids.indexOf('after-siren-reconcile')).toBe(ids.indexOf('after-siren') + 1);
+    });
+
+    it('follows siblings (the same identities) and precedes draftguru', () => {
+      expect(ids.indexOf('fitzroy')).toBeLessThan(ids.indexOf('after-siren'));
+      expect(ids.indexOf('siblings')).toBeLessThan(ids.indexOf('after-siren'));
+      expect(ids.indexOf('after-siren')).toBeLessThan(ids.indexOf('draftguru'));
+    });
+
+    it('reads its gate values from the artefact itself and refuses a missing or headerless one', () => {
+      const m = afterSirenMeasures();
+      expect(m.events).toBeGreaterThan(100);
+      expect(m.premiershipEvents + m.otherCompetitionEvents).toBe(m.events);
+      expect(m.qualifyingEvents).toBeLessThanOrEqual(m.premiershipEvents);
+      expect(() => afterSirenMeasures(() => null)).toThrow(/not in this checkout/);
+      expect(() => afterSirenMeasures(() => 'event_key,season\n')).toThrow(/no data rows or an unexpected header/);
+      const ok = HEADER
+        + row('e1', 'true', 'goal', 'won')
+        + row('e2', 'true', 'behind', 'won')
+        + row('e3', 'true', 'goal', 'drew')
+        + row('e4', 'true', 'none', 'none')
+        + row('e5', 'false', 'goal', 'won');
+      expect(afterSirenMeasures(() => ok)).toEqual({ events: 5, premiershipEvents: 4, otherCompetitionEvents: 1, qualifyingEvents: 2 });
+    });
+
+    it('preflights the tracked files and the loader\'s offline validation before the destructive stage', () => {
+      const commands: string[][] = [];
+      const withFailing = (failing?: string): Deps => ({
+        ...fakeDeps().deps,
+        runCommand: (a: string[]) => {
+          commands.push(a);
+          if (failing && a.includes(failing) && a.includes('--validate-only')) return { status: 1, stdout: '', stderr: 'ERROR: measures disagree' };
+          if (a.includes(BROWNLOW_SEASON_LOADER)) return { status: 0, stdout: '{"ok": true}', stderr: '' };
+          return { status: 0, stdout: 'snapshot : x (42 year pages, sha256 verified)\npersons    : 5057\npicks      : 6810\n', stderr: '' };
+        },
+      });
+      runPreflight(withFailing(), OPTS, fitzroy());
+      expect(commands.some((a) => a.includes(AFTER_SIREN_LOADER) && a.includes('load') && a.includes('--validate-only'))).toBe(true);
+      expect(() => runPreflight(withFailing(AFTER_SIREN_LOADER), OPTS, fitzroy()))
+        .toThrow(/After-siren preflight failed[\s\S]*Nothing has been destroyed/);
+      const ok = withFailing();
+      const missing: Deps = { ...ok, fileExists: (path: string) => path !== AFTER_SIREN_ADJUDICATIONS && ok.fileExists(path) };
+      expect(() => runPreflight(missing, OPTS, fitzroy())).toThrow(/After-siren preflight: required tracked input is missing[\s\S]*after-siren-adjudications/);
+    });
+
+    it('gates the rebuilt events on the artefact: total, prem split, qualifying set, no duplicate, provenance present', () => {
+      const checks = afterSirenChecks();
+      expect(checks.map((c) => c.key)).toEqual([
+        'after_siren_kicks', 'after_siren_premiership_rows', 'after_siren_other_competition_rows',
+        'after_siren_qualifying_rows', 'after_siren_duplicate_events', 'after_siren_rows_missing_provenance',
+      ]);
+      const byKey = Object.fromEntries(checks.map((c) => [c.key, c]));
+      const m = afterSirenMeasures();
+      expect(byKey.after_siren_kicks.expected).toBe(m.events);
+      expect(byKey.after_siren_premiership_rows.expected).toBe(m.premiershipEvents);
+      expect(byKey.after_siren_other_competition_rows.expected).toBe(m.otherCompetitionEvents);
+      expect(byKey.after_siren_qualifying_rows.expected).toBe(m.qualifyingEvents);
+      expect(byKey.after_siren_duplicate_events.expected).toBe(0);
+      expect(byKey.after_siren_rows_missing_provenance.expected).toBe(0);
+      for (const c of checks) expect(c.sql).not.toMatch(/player_name|club_name_raw|opponent_name_raw/); // never a name
+      const register = JSON.parse(readFileSync(
+        join(root, 'data', 'reference', 'fitzroy-accepted-baselines.json'), 'utf8'));
+      const all = finalValidationChecks(register).map((c) => c.key);
+      expect(all).toEqual(expect.arrayContaining(checks.map((c) => c.key)));
+      // Added after the sibling gates, in stage order.
+      expect(all.indexOf('after_siren_kicks')).toBeGreaterThan(all.indexOf('player_relationships_sibling'));
+    });
+  });
+
+  describe('brownlow season (AFLDB-ISSUE-113 §8.6)', () => {
+    const brownlow = stages.find((s) => s.id === 'brownlow-season')!;
+
+    it('runs after AWARDS & HONOURS and before DERIVED', () => {
+      const ids = idsOf(stages);
+      // fitzroy supplies players and the profile identities every row resolves
+      // through; derived reads the table this stage writes.
+      expect(ids.indexOf('fitzroy')).toBeLessThan(ids.indexOf('brownlow-season'));
+      expect(ids.indexOf('awards-honours')).toBeLessThan(ids.indexOf('brownlow-season'));
+      expect(ids.indexOf('brownlow-season')).toBeLessThan(ids.indexOf('derived'));
+    });
+
+    it('is a data stage that runs the dedicated loader with no legacy source', () => {
+      expect(brownlow.kind).toBe('data');
+      expect(brownlow.argv).toEqual([resolvePython(), BROWNLOW_SEASON_LOADER]);
+      expect(brownlow.argv).toEqual(brownlowSeasonImportArgv());
+      expect(brownlow.envOverlay).toEqual({ AFLDB_IMPORT_DATABASE_URL: target().importDsn });
+      expect(brownlow.envOverlay).not.toHaveProperty('AFLDB_LEGACY_SQLITE');
+    });
+
+    it('preflights the tracked artefact, manifest and adjudication file offline', () => {
+      expect(BROWNLOW_SEASON_PREFLIGHT_FILES).toEqual([
+        'data/brownlow/season-votes.csv',
+        'data/brownlow/season-votes.manifest.json',
+        'data/brownlow/player-identity.csv',
+      ]);
+      expect(brownlowSeasonValidateArgv()).toEqual([
+        resolvePython(), BROWNLOW_SEASON_LOADER, '--validate-only',
+      ]);
+      const draftguruOk = 'snapshot : x (42 year pages, sha256 verified)\n'
+        + 'persons    : 5057\npicks      : 6810\n';
+      const withBrownlow = (status: number): Deps => ({
+        ...fakeDeps().deps,
+        runCommand: (a: string[]) => (a.includes(BROWNLOW_SEASON_LOADER)
+          ? { status, stdout: status ? '{"ok": false, "error": "sha256 mismatch"}' : '{"ok": true}', stderr: '' }
+          : { status: 0, stdout: draftguruOk, stderr: '' }),
+      });
+      expect(() => runPreflight(withBrownlow(0), OPTS)).not.toThrow();
+      // A failing self-validation refuses before anything is destroyed.
+      expect(() => runPreflight(withBrownlow(1), OPTS)).toThrow(RebuildRefused);
+      expect(() => runPreflight(withBrownlow(1), OPTS)).toThrow(/Nothing has been destroyed/);
+      // A missing tracked input refuses too.
+      const missing: Deps = {
+        ...withBrownlow(0),
+        fileExists: (path) => !path.endsWith('season-votes.manifest.json'),
+      };
+      expect(() => runPreflight(missing, OPTS))
+        .toThrow(/required tracked input is missing: data\/brownlow\/season-votes\.manifest\.json/);
+    });
+  });
+
+  describe('awards & honours (AFLDB-ISSUE-112 §7/§24)', () => {
+    const awards = stages.find((s) => s.id === 'awards-honours')!;
+
+    it('runs after DraftGuru and before DERIVED', () => {
+      const ids = idsOf(stages);
+      // Every family carries player links, so the canonical players population
+      // must be complete before it runs.
+      expect(ids.indexOf('draftguru')).toBeLessThan(ids.indexOf('awards-honours'));
+      expect(ids.indexOf('awards-honours')).toBeLessThan(ids.indexOf('derived'));
+    });
+
+    it('runs every legacy-free manifest group and nothing else', () => {
+      expect(awards.argv).toEqual([
+        resolvePython(), 'tools/migration/import_awards.py', '--groups',
+        ...AWARDS_HONOURS_GROUPS,
+      ]);
+      // 'awards' is the legacy re-extract and is the one group that still needs
+      // AFLDB_LEGACY_SQLITE; 'coleman' is derived and has its own stage after
+      // `derived`, where season_metadata has decided which seasons are complete.
+      expect(AWARDS_HONOURS_GROUPS).not.toContain('awards');
+      expect(AWARDS_HONOURS_GROUPS).not.toContain('coleman');
+    });
+
+    it('runs only groups import_awards.py declares legacy-free', () => {
+      const src = readFileSync(
+        join(root, 'tools', 'migration', 'import_awards.py'), 'utf8');
+      const declared = src.slice(src.indexOf('LEGACY_FREE_GROUPS = {'),
+                                 src.indexOf('BATCH_SOURCE_KEYS'));
+      for (const group of AWARDS_HONOURS_GROUPS) {
+        expect(declared).toContain(`"${group}"`);
+      }
+    });
+
+    it('carries no legacy source in its own environment', () => {
+      expect(JSON.stringify(awards)).not.toContain('AFLDB_LEGACY_SQLITE');
+      expect(awards.envOverlay).toEqual({ AFLDB_IMPORT_DATABASE_URL: IMPORT });
+    });
   });
 
   describe('ladder witness cross-check (AFLDB-ISSUE-095 D7)', () => {
@@ -710,15 +1761,15 @@ describe('stage graph', () => {
           ? { status: 2, stdout: 'REFUSED: acquired bytes are absent', stderr: '' }
           : { status: 0, stdout: draftguruOk, stderr: '' }),
       };
-      expect(() => runPreflight(failing)).toThrow(RebuildRefused);
-      expect(() => runPreflight(failing)).toThrow(/Nothing has been destroyed/);
+      expect(() => runPreflight(failing, OPTS)).toThrow(RebuildRefused);
+      expect(() => runPreflight(failing, OPTS)).toThrow(/Nothing has been destroyed/);
 
       // ... and it passes when the bytes are there, so the gate is not vacuous.
       const passing: Deps = {
         ...fakeDeps().deps,
         runCommand: () => ({ status: 0, stdout: draftguruOk, stderr: '' }),
       };
-      expect(() => runPreflight(passing)).not.toThrow();
+      expect(() => runPreflight(passing, OPTS)).not.toThrow();
     });
   });
 
@@ -865,7 +1916,7 @@ describe('Python interpreter resolution', () => {
 
     it('uses the override for both preflights and the witness validator', () => {
       expect(fitzroyValidateArgv(fitzroy())[0]).toBe(OVERRIDE);
-      expect(draftguruValidateArgv()[0]).toBe(OVERRIDE);
+      expect(draftguruValidateArgv(OPTS.draftguruLabel)[0]).toBe(OVERRIDE);
       expect(ladderWitnessValidateArgv()[0]).toBe(OVERRIDE);
     });
   });
@@ -880,11 +1931,11 @@ describe('Python interpreter resolution', () => {
     delete process.env.AFLDB_PYTHON;
     try {
       const deps: Deps = { ...fakeDeps().deps, fileExists: (p: string) => p !== DEFAULT_VENV_PYTHON };
-      expect(() => runPreflight(deps)).toThrow(RebuildRefused);
-      expect(() => runPreflight(deps)).toThrow(new RegExp(
+      expect(() => runPreflight(deps, OPTS)).toThrow(RebuildRefused);
+      expect(() => runPreflight(deps, OPTS)).toThrow(new RegExp(
         `No Python interpreter at .*${DEFAULT_VENV_PYTHON.replace(/[\\/.]/g, '.')}`));
-      expect(() => runPreflight(deps)).toThrow(/AFLDB_PYTHON/);
-      expect(() => runPreflight(deps)).toThrow(/Nothing has been destroyed/);
+      expect(() => runPreflight(deps, OPTS)).toThrow(/AFLDB_PYTHON/);
+      expect(() => runPreflight(deps, OPTS)).toThrow(/Nothing has been destroyed/);
     } finally {
       if (savedPython === undefined) delete process.env.AFLDB_PYTHON;
       else process.env.AFLDB_PYTHON = savedPython;
@@ -905,7 +1956,7 @@ describe('Python interpreter resolution', () => {
     process.env.AFLDB_PYTHON = OVERRIDE;
     try {
       const deps: Deps = { ...fakeDeps().deps, fileExists: (p: string) => p !== OVERRIDE };
-      expect(() => runPreflight(deps)).toThrow(/from AFLDB_PYTHON/);
+      expect(() => runPreflight(deps, OPTS)).toThrow(/from AFLDB_PYTHON/);
     } finally {
       if (saved === undefined) delete process.env.AFLDB_PYTHON;
       else process.env.AFLDB_PYTHON = saved;
@@ -1134,6 +2185,132 @@ describe('final validation', () => {
     });
   });
 
+  describe('awards & honours gates (AFLDB-ISSUE-112)', () => {
+    const gate = (key: string) =>
+      finalValidationChecks(measuredRegister({ matches: 1, seasons_last: 2025 }))
+        .find((c) => c.key === key);
+
+    it('gates every manifest family at its measured row count', () => {
+      const e = AWARDS_HONOURS_EXPECTED;
+      const expected: Record<string, number> = {
+        honour_team_members_rows: e.honourTeamMembers,
+        hall_of_fame_rows: e.hallOfFame,
+        captaincies_rows: e.captaincies,
+        rising_star_nomination_rows: e.risingStarNominations,
+        rising_star_winner_rows: e.risingStarWinners,
+        all_australian_rows: e.allAustralian,
+        club_best_and_fairest_rows: e.clubBestAndFairest,
+        named_medal_rows: e.namedMedals,
+        under_22_rows: e.under22,
+        award_definitions_rows: e.awardDefinitions,
+      };
+      for (const [key, value] of Object.entries(expected)) {
+        expect(gate(key)?.expected, key).toBe(value);
+      }
+    });
+
+    it('gates ROW counts, never link counts', () => {
+      // A row whose player cannot be re-resolved loads present and unlinked
+      // (AFLDB-ISSUE-112 §24.5). A linked-count gate here would turn that into
+      // a rebuild failure and hide the row that actually needs a curator.
+      for (const check of awardsHonoursChecks(2025)) {
+        expect(check.sql).not.toContain('player_id IS NOT NULL');
+      }
+    });
+
+    it('refuses an honours row with no provenance', () => {
+      expect(gate('award_winners_without_a_source')?.expected).toBe(0);
+    });
+
+    it('excludes the current season by the accepted baseline, not a hard-coded year', () => {
+      expect(gate('award_winners_after_accepted_last_season')?.sql)
+        .toContain('season > 2025');
+      expect(awardsHonoursChecks(2026)
+        .find((c) => c.key === 'award_winners_after_accepted_last_season')?.sql)
+        .toContain('season > 2026');
+    });
+
+    it('renders every awards gate into the executed stream', () => {
+      const sql = finalValidationSql();
+      for (const check of awardsHonoursChecks(2025)) {
+        expect(sql).toContain(check.key);
+      }
+    });
+  });
+
+  describe('brownlow season gates (AFLDB-ISSUE-113)', () => {
+    const manifest = JSON.parse(readFileSync(
+      join(root, 'data', 'brownlow', 'season-votes.manifest.json'), 'utf8')) as {
+        artefact: Record<string, number>;
+      };
+    const gate = (key: string) =>
+      finalValidationChecks(measuredRegister({ matches: 1, seasons_last: 2025 }))
+        .find((c) => c.key === key);
+
+    it('reads its expected values from the tracked manifest, never a literal', () => {
+      const e = brownlowSeasonExpected();
+      expect(e).toEqual({
+        rows: manifest.artefact.rows,
+        votesTotal: manifest.artefact.votes_total,
+        winners: manifest.artefact.winners,
+        seasons: manifest.artefact.seasons,
+        firstSeason: manifest.artefact.first_season,
+        lastSeason: manifest.artefact.last_season,
+      });
+      // The measured recovery-source contract (§8.11), asserted here so a regenerated
+      // artefact that silently shrank is caught before it is loaded anywhere.
+      expect(e.rows).toBe(16_120);
+      expect(e.votesTotal).toBe(79_113);
+      expect(e.winners).toBe(112);
+      expect(e.seasons).toBe(98);
+      expect(e.firstSeason).toBe(1924);
+      expect(e.lastSeason).toBe(2025);
+    });
+
+    it('gates rows, total votes, winners and season count at the manifest values', () => {
+      const e = brownlowSeasonExpected();
+      expect(gate('brownlow_season_rows')?.expected).toBe(e.rows);
+      expect(gate('brownlow_season_votes_total')?.expected).toBe(e.votesTotal);
+      expect(gate('brownlow_season_winners')?.expected).toBe(e.winners);
+      expect(gate('brownlow_season_seasons')?.expected).toBe(e.seasons);
+      expect(gate('brownlow_season_first_season')?.expected).toBe(e.firstSeason);
+      expect(gate('brownlow_season_last_season')?.expected).toBe(e.lastSeason);
+    });
+
+    it('refuses rows with foreign provenance or a non-profile key', () => {
+      expect(gate('brownlow_season_rows_not_sourced_from_afltables')?.expected).toBe(0);
+      expect(gate('brownlow_season_rows_not_keyed_by_profile_path')?.sql)
+        .toContain('^brownlow-season:[0-9]{4}:players/');
+    });
+
+    it('excludes the current season by the accepted baseline, not a hard-coded year', () => {
+      expect(gate('brownlow_season_after_accepted_last_season')?.sql)
+        .toContain('season > 2025');
+      expect(brownlowSeasonChecks(2026)
+        .find((c) => c.key === 'brownlow_season_after_accepted_last_season')?.sql)
+        .toContain('season > 2026');
+    });
+
+    it('refuses a missing or malformed manifest rather than gating nothing', () => {
+      expect(() => brownlowSeasonExpected(() => null)).toThrow(RebuildRefused);
+      expect(() => brownlowSeasonExpected(() => ({ artefact: { rows: 'many' } })))
+        .toThrow(RebuildRefused);
+    });
+
+    it('never touches the round-vote table', () => {
+      for (const check of brownlowSeasonChecks(2025)) {
+        expect(check.sql).not.toContain('brownlow_round_votes');
+      }
+    });
+
+    it('renders every Brownlow season gate into the executed stream', () => {
+      const sql = finalValidationSql();
+      for (const check of brownlowSeasonChecks(2025)) {
+        expect(sql).toContain(check.key);
+      }
+    });
+  });
+
   it('refuses a baseline with no measured block rather than validating nothing', () => {
     expect(() => finalValidationChecks(register())).toThrow(RebuildRefused);
   });
@@ -1202,15 +2379,15 @@ describe('DraftGuru preflight', () => {
   });
 
   it('validates with no database and no legacy source', () => {
-    expect(draftguruValidateArgv()).toContain('--validate-only');
-    expect(draftguruValidateArgv().join(' '))
+    expect(draftguruValidateArgv(OPTS.draftguruLabel)).toContain('--validate-only');
+    expect(draftguruValidateArgv(OPTS.draftguruLabel).join(' '))
       .toContain('tools/rebuild/draftguru/import_draftguru.py');
   });
 
   it('stops before destruction when a tracked input is missing', () => {
     const { deps } = fakeDeps();
     const missing: Deps = { ...deps, fileExists: (p) => !p.includes('link-decisions') };
-    expect(() => runPreflight(missing))
+    expect(() => runPreflight(missing, OPTS))
       .toThrow(/draftguru-link-decisions\.json.*Nothing has been destroyed/s);
   });
 
@@ -1220,7 +2397,115 @@ describe('DraftGuru preflight', () => {
       ...deps,
       runCommand: () => ({ status: 1, stdout: '', stderr: 'REFUSED' }),
     };
-    expect(() => runPreflight(failing)).toThrow(/Nothing has been destroyed/);
+    expect(() => runPreflight(failing, OPTS)).toThrow(/Nothing has been destroyed/);
+  });
+});
+
+/*
+ * AFLDB-ISSUE-112 §28.4 — the DraftGuru preflight/data label contract.
+ *
+ * The defect: draftguruValidateArgv() took no label and emitted only --validate-only, so
+ * import_draftguru.py fell back to its own hardcoded STAGE_A_LABEL while the data stage
+ * imported whatever --draftguru-label selected. It only failed closed because the retired
+ * snapshot's bytes were absent; with both snapshot directories on disk the rebuild would
+ * have verified one snapshot and imported another, and then destroyed afldb_test.
+ *
+ * These tests hold the two sides to ONE selection.
+ */
+describe('DraftGuru preflight validates the label the data stage will import', () => {
+  const NEW_LABEL = 'annual-html-20260902';
+  const DRAFTGURU_OK = 'snapshot : x (42 year pages, sha256 verified)\n'
+    + 'persons    : 5057\npicks      : 6810\n';
+
+  /** Runs a real preflight and returns the DraftGuru argv it actually emitted. */
+  function preflightDraftguruArgv(opts: { draftguruLabel: string; planOnly: boolean }) {
+    const seen: string[][] = [];
+    const deps: Deps = {
+      ...fakeDeps().deps,
+      runCommand: (argv) => {
+        seen.push(argv);
+        return { status: 0, stdout: DRAFTGURU_OK, stderr: '' };
+      },
+    };
+    runPreflight(deps, opts);
+    const argv = seen.find((a) => a.includes(DRAFTGURU_IMPORTER));
+    expect(argv, 'preflight ran no DraftGuru validation at all').toBeDefined();
+    return argv!;
+  }
+
+  it('propagates --draftguru-label through to the preflight validator', () => {
+    const opts = parseRebuildArgs(['--draftguru-label', NEW_LABEL,
+                            '--acknowledge-destroy', 'afldb_test']);
+    expect(opts.draftguruLabel).toBe(NEW_LABEL);
+
+    const argv = preflightDraftguruArgv(opts);
+    expect(argv).toContain('--validate-only');
+    expect(argv).toContain('--label');
+    expect(argv[argv.indexOf('--label') + 1]).toBe(NEW_LABEL);
+    // The exact regression: a label-less preflight lets import_draftguru.py fall back to
+    // its own STAGE_A_LABEL default, which is a DIFFERENT snapshot.
+    expect(argv.join(' ')).not.toBe(
+      `${resolvePython()} ${DRAFTGURU_IMPORTER} --validate-only`);
+  });
+
+  it('gives the data stage the same label the preflight proved', () => {
+    const opts = parseRebuildArgs(['--draftguru-label', NEW_LABEL]);
+    const stage = planStages(target(), fitzroy(), opts).find((s) => s.id === 'draftguru')!;
+    expect(stage.argv).toContain('--label');
+    expect(stage.argv![stage.argv!.indexOf('--label') + 1]).toBe(NEW_LABEL);
+    expect(stage.name).toContain(NEW_LABEL);
+
+    // and the two argvs are the SAME selection, not two equal strings by luck
+    expect(preflightDraftguruArgv(opts)).toEqual([...stage.argv!, '--validate-only']);
+  });
+
+  it('makes preflight/data label equality contractual, for any label', () => {
+    // Structural, not incidental: the validator argv is BUILT from the import argv, so no
+    // future label can be selected for one side and not the other.
+    for (const label of [NEW_LABEL, 'annual-html-20260826', 'annual-html-29991231']) {
+      const opts = { draftguruLabel: label, planOnly: false };
+      const stage = planStages(target(), fitzroy(), opts).find((s) => s.id === 'draftguru')!;
+      expect(draftguruImportArgv(label)).toEqual(stage.argv);
+      expect(draftguruValidateArgv(label))
+        .toEqual([...draftguruImportArgv(label), '--validate-only']);
+      expect(preflightDraftguruArgv(opts)).toEqual([...stage.argv!, '--validate-only']);
+    }
+  });
+
+  it('keeps the default label correct, and identical on both sides, with no override', () => {
+    const opts = parseRebuildArgs([]);
+    expect(opts.draftguruLabel).toBe(DEFAULT_DRAFTGURU_LABEL);
+    const stage = planStages(target(), fitzroy(), opts).find((s) => s.id === 'draftguru')!;
+    expect(stage.argv![stage.argv!.indexOf('--label') + 1]).toBe(DEFAULT_DRAFTGURU_LABEL);
+    expect(preflightDraftguruArgv(opts)).toEqual([...stage.argv!, '--validate-only']);
+  });
+
+  it('destroys nothing when the SELECTED snapshot fails validation', () => {
+    // The live failure this fix exists for: the selected snapshot's bytes are absent, so
+    // the importer refuses. Nothing may be reset, and the refusal must name the label that
+    // was actually proven.
+    const sqlRuns: string[] = [];
+    const deps: Deps = {
+      ...fakeDeps().deps,
+      runCommand: (argv) => (argv.includes(NEW_LABEL)
+        ? { status: 1,
+            stdout: `REFUSED: snapshot directory not found: ${NEW_LABEL}`,
+            stderr: '' }
+        : { status: 0, stdout: DRAFTGURU_OK, stderr: '' }),
+      runSql: (_dsn, sql) => { sqlRuns.push(sql); },
+    };
+    const opts = { draftguruLabel: NEW_LABEL, planOnly: false };
+    expect(() => runPreflight(deps, opts)).toThrow(RebuildRefused);
+    expect(() => runPreflight(deps, opts)).toThrow(new RegExp(NEW_LABEL));
+    expect(() => runPreflight(deps, opts)).toThrow(/Nothing has been destroyed/);
+    expect(sqlRuns).toEqual([]);
+    expect(sqlRuns.join('')).not.toContain(RESET_SQL.slice(0, 24));
+
+    // ...and the runner still sequences preflight ahead of BOTH the destructive
+    // acknowledgement and executeRebuild, so no RESET can precede this refusal.
+    const runner = readFileSync(join(root, 'tools', 'db', 'rebuild-test.ts'), 'utf8');
+    expect(runner).toMatch(
+      /runPreflight\(deps, opts, fitzroy\);[\s\S]*assertDestructiveAcknowledgement[\s\S]*executeRebuild\(/);
   });
 });
 
@@ -1630,10 +2915,15 @@ describe('reset proof', () => {
       // literal string as a database name. The getopt invariant this test exists for is
       // unchanged and is now asserted where the argv is actually built.
       const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
-      for (const script of ['db:privileges', 'db:privileges:test']) {
+      const privilegeScripts = {
+        'db:privileges': 'dev',
+        'db:privileges:test': 'test',
+        'db:privileges:code-test': 'code-test', // AFLDB-ISSUE-146
+      };
+      for (const [script, expectedTarget] of Object.entries(privilegeScripts)) {
         const command: string = pkg.scripts[script];
         expect(command, `${script} must not build a psql argv in the shell`)
-          .toBe(`tsx tools/db/privileges.ts --target ${script.endsWith(':test') ? 'test' : 'dev'}`);
+          .toBe(`tsx tools/db/privileges.ts --target ${expectedTarget}`);
         expect(command, `${script} must not depend on shell expansion`)
           .not.toContain('$');
       }
@@ -1653,6 +2943,8 @@ describe('reset proof', () => {
       // Explicitly named targets, exactly as migrate.ts does — never a guessed default DSN.
       expect(source).toContain('AFLDB_OWNER_DATABASE_URL');
       expect(source).toContain('AFLDB_TEST_DATABASE_URL');
+      // AFLDB-ISSUE-146: the rehearsal target is bound to its OWN variable, never test's.
+      expect(source).toMatch(/'code-test': 'AFLDB_CODE_TEST_DATABASE_URL'/);
       // and it never prints what it resolved
       expect(source).not.toMatch(/console\.(log|error)\([^)]*\bdsn\b/);
     });
@@ -1663,7 +2955,14 @@ describe('reset proof', () => {
       // after the destructive reset (§H11 F1).
       const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
       expect(pkg.scripts['db:migrate:test']).toBe('tsx tools/db/migrate.ts --target test');
+      // AFLDB-ISSUE-146: the rehearsal's migrations go through the same explicit-target
+      // path, bound to the rehearsal's own variable and exempt from the shared-ledger guard
+      // exactly as `test` is (both are wiped and rebuilt from nothing).
+      expect(pkg.scripts['db:migrate:code-test']).toBe('tsx tools/db/migrate.ts --target code-test');
       const source = readFileSync(join(root, 'tools', 'db', 'migrate.ts'), 'utf8');
+      expect(source).toMatch(/'code-test': 'AFLDB_CODE_TEST_DATABASE_URL'/);
+      expect(source).toMatch(/DISPOSABLE_TARGETS: readonly Target\[\] = \['test', 'code-test'\]/);
+      expect(source).not.toMatch(/target === 'test'\) return/);
       // The environment variable stays supported, and a disagreement is a refusal rather
       // than a silent preference for one over the other.
       expect(source).toContain('AFLDB_MIGRATE_TARGET');
@@ -2019,11 +3318,16 @@ describe('reset proof', () => {
   describe('identity refusals — every one fires BEFORE the reset', () => {
     const cases: [string, Partial<Identity>, string, RegExp][] = [
       ['a database that is not afldb_test', { database: 'afldb_scratch_test' },
-        'afldb_scratch_test', /only supported rebuild target/],
+        'afldb_scratch_test', /only explicit rebuild targets/],
       ['afldb_dev by name', { database: 'afldb_dev' }, 'afldb_dev', /rejected by name/],
       ['anything that looks like production', { database: 'afldb_prod' }, 'afldb_prod',
         /rejected by name|looks like production/],
-      ['a name that does not end in _test', { database: 'afldb' }, 'afldb', /ends in _test/],
+      ['a name outside the rebuild allowlist', { database: 'afldb' }, 'afldb',
+        /only explicit rebuild targets/],
+      // AFLDB-ISSUE-146: code_test_db is an allowlisted REBUILD target, but this proof stays
+      // pinned to afldb_test — the shared name check passes and the proof's own pin refuses.
+      ['the code_test_db rehearsal target', { database: 'code_test_db' }, 'code_test_db',
+        /only ever runs against 'afldb_test'/],
       ['a server answering a different database from the DSN', { database: 'afldb_dev' },
         'afldb_test', /only ever runs against 'afldb_test'/],
       ['a current_user that is not afldb_owner', { role_name: 'afldb_import' },

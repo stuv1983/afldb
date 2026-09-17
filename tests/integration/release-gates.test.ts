@@ -18,8 +18,6 @@
  */
 import './guard';
 
-import { createHash } from 'node:crypto';
-
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { sql } from '@/db/client';
@@ -49,52 +47,45 @@ afterAll(async () => {
   await sql.end();
 });
 
-/** Same digest as tools/validation/validate_migration.py: id_hash(). */
-function idHash(ids: number[]): string {
-  return createHash('sha256')
-    .update([...ids].sort((a, b) => a - b).join(','))
-    .digest('hex')
-    .slice(0, 16);
-}
-
 // ---------------------------------------------------------------------
 // Brownlow authority
 // ---------------------------------------------------------------------
-// AFLDB-ISSUE-108: the season- and career-grain Brownlow totals (79,113) came from
-// the retired legacy SQLite import. The canonical legacy-free rebuild has NO writer
-// for brownlow_season_votes / player_season_stats.brownlow_votes /
-// player_career_stats.brownlow_votes — see AFLDB-ISSUE-090 §27.5 ("no legacy-free
-// writer for brownlow_season_votes"). The four value assertions below are skipped,
-// not re-pinned to zero: zero is a missing-acquisition gap, not an authoritative
-// total. Re-enable them when a legacy-free season-grain Brownlow acquisition path
-// lands. The structural guards in this block (no award column on the club-grained
-// table, at-most-one season row per player, the legacy career_brownlow column
-// stays unread) still run — they must never regress regardless of acquisition.
-// When re-enabling, also re-address the representative-totals case: player_ids
-// 3702/3578 are retired legacy surrogates the canonical rebuild re-seeded (now David
-// Stark and Des Field). Resolve those witnesses from the data, not by pinned ID.
+// AFLDB-ISSUE-108 retired the legacy SQLite source of the season- and career-grain
+// Brownlow totals (79,113), and until AFLDB-ISSUE-113 the canonical rebuild had NO
+// writer for brownlow_season_votes (AFLDB-ISSUE-090 §27.5), so the value assertions
+// below were skipped rather than re-pinned to zero. AFLDB-ISSUE-113 §8.6 landed the
+// legacy-free writer — tools/migration/import_brownlow_season.py, loading the tracked
+// artefact data/brownlow/season-votes.csv, whose 79,113 total is measured from the
+// preserved authoritative source and verified by the loader before it writes — so
+// they are re-armed. The representative witnesses are resolved FROM THE DATA by AFL
+// Tables profile path, never by a pinned players.id: the canonical rebuild re-seeds
+// that surrogate (the retired pins 3702/3578 had come to denote David Stark and Des
+// Field).
 describe('gate: Brownlow authority', () => {
   const AUTHORITATIVE_TOTAL = 79_113;
 
-  it.skip('season votes total exactly 79,113', async () => {
+  it('season votes total exactly 79,113', async () => {
     const [row] = await sql<{ n: number }[]>`
       SELECT sum(votes)::int AS n FROM brownlow_season_votes
     `;
     expect(row.n).toBe(AUTHORITATIVE_TOTAL);
   });
 
-  it.skip('career totals sum to the authoritative total, not the per-game total', async () => {
-    const [row] = await sql<{ career: number; perGame: number }[]>`
+  it('career totals sum to the authoritative total, not the per-game total', async () => {
+    const [row] = await sql<{ career: number; perGame: number | null }[]>`
       SELECT (SELECT sum(brownlow_votes)::int FROM player_career_stats)  AS career,
              (SELECT sum(brownlow_votes)::int FROM player_match_stats)   AS "perGame"
     `;
     expect(row.career).toBe(AUTHORITATIVE_TOTAL);
-    // The per-game table is incomplete by design; it must never be the
-    // source of a career figure.
-    expect(row.perGame).toBe(46_979);
+    // The per-game table is incomplete by design (1935-1983 was never kept at match
+    // grain); it must never be the source of a career figure. AFLDB-ISSUE-113: the
+    // canonical per-game column is fitzRoy-sourced, so the retired legacy figure
+    // (46,979) is not re-pinned here; the invariant is that it falls short. Measured
+    // on the canonical rebuild (§8.17.3): 46,970 over 336,821 non-NULL rows.
+    expect(row.perGame ?? 0).toBeLessThan(AUTHORITATIVE_TOTAL);
   });
 
-  it.skip('season-grain table cannot inflate the total', async () => {
+  it('season-grain table cannot inflate the total', async () => {
     // The bug this gate exists for: when the season table was keyed by
     // club, 44 polling player-seasons split across two clubs contributed
     // their whole total twice, giving 79,280.
@@ -135,16 +126,56 @@ describe('gate: Brownlow authority', () => {
     expect(rows).toEqual([]);
   });
 
-  it.skip('reports representative career totals', async () => {
-    const rows = await sql<{ id: number; votes: number }[]>`
-      SELECT player_id AS id, brownlow_votes AS votes
-        FROM player_career_stats WHERE player_id IN (3702, 3578)
-       ORDER BY player_id
+  it('reports representative career totals, resolved by profile identity', async () => {
+    const rows = await sql<{ url: string; votes: number; medals: number }[]>`
+      SELECT ei.external_id AS url, c.brownlow_votes AS votes, c.brownlow_medals AS medals
+        FROM player_career_stats c
+        JOIN external_identities ei ON ei.player_id = c.player_id
+        JOIN sources s ON s.id = ei.source_id AND s.key = 'afltables'
+       WHERE ei.match_method = 'afltables_profile_url'
+         AND ei.status IN ('unique', 'resolved')
+         AND ei.external_id IN ('players/D/Dick_Reynolds.html', 'players/B/Bob_Skilton.html',
+                                'players/H/Harley_Reid.html', 'players/M/Matt_Rowell.html',
+                                'players/T/Tom_Green1.html')
     `;
-    // Dick Reynolds: 154 authoritative against 31 per-game.
-    expect(rows.find((r) => r.id === 3578)?.votes).toBe(154);
+    const votes = (url: string) => rows.find((r) => r.url === url)?.votes;
+    // Every witness carries a profile identity, so a silently dropped player cannot
+    // hide behind an undefined lookup.
+    expect(rows).toHaveLength(5);
+    // Dick Reynolds: 154 authoritative against 31 per-game; three medals.
+    expect(votes('players/D/Dick_Reynolds.html')).toBe(154);
     // Bob Skilton: 180 authoritative; the per-game table has nothing at all.
-    expect(rows.find((r) => r.id === 3702)?.votes).toBe(180);
+    expect(votes('players/B/Bob_Skilton.html')).toBe(180);
+    expect(rows.find((r) => r.url === 'players/B/Bob_Skilton.html')?.medals).toBe(3);
+    // AFLDB-ISSUE-113 §8.1: the 1984+ witnesses whose totals the production defect
+    // rendered as 0. Their careers sit inside round-vote coverage, so these are exact.
+    expect(votes('players/H/Harley_Reid.html')).toBe(10);
+    expect(votes('players/M/Matt_Rowell.html')).toBe(89);
+    expect(votes('players/T/Tom_Green1.html')).toBe(73);
+  });
+
+  it('agrees with the canonical round votes for every career inside their coverage', async () => {
+    // AFLDB-ISSUE-113 §8.7 V5, in gate form: for a player whose whole career falls in
+    // 1984+ (complete round-vote coverage), the season-grain total the artefact
+    // supplies must equal the sum of the independently acquired round votes. A
+    // mismatch is a mis-keyed row or a real source disagreement, never noise.
+    const [row] = await sql<{ careers: number; mismatches: number }[]>`
+      WITH span AS (
+        SELECT player_id, min(season) AS first_season
+          FROM player_season_stats GROUP BY player_id
+      ), rounds AS (
+        SELECT player_id, sum(votes)::int AS votes
+          FROM brownlow_round_votes GROUP BY player_id
+      )
+      SELECT count(*)::int AS careers,
+             count(*) FILTER (WHERE c.brownlow_votes <> COALESCE(r.votes, 0))::int AS mismatches
+        FROM player_career_stats c
+        JOIN span sp ON sp.player_id = c.player_id
+        LEFT JOIN rounds r ON r.player_id = c.player_id
+       WHERE sp.first_season >= 1984
+    `;
+    expect(row.careers).toBeGreaterThan(1_000);
+    expect(row.mismatches).toBe(0);
   });
 });
 
@@ -165,15 +196,12 @@ describe('gate: Brownlow coverage semantics', () => {
     }
   });
 
-  // AFLDB-ISSUE-108: this gate is unsatisfiable without a season-grain Brownlow
-  // acquisition, and for a structural reason rather than a numeric one.
   // rebuild_derived.py derives brownlow_status as 'complete' ONLY when
-  // brownlow_season_votes holds a row for that season; the canonical legacy-free
-  // rebuild writes none (AFLDB-ISSUE-090 §27.5), so no season is 'complete' and the
-  // genuine-zero row can never exist. Skipped, not pinned to 0: 0 here would assert
-  // the absence of the very semantics this gate protects. Re-enable — unchanged —
-  // with the legacy-free season-grain Brownlow path.
-  it.skip('records a genuine zero for a player who polled none in a decided season', async () => {
+  // brownlow_season_votes holds a row for that season. Between AFLDB-ISSUE-108 and
+  // AFLDB-ISSUE-113 the canonical rebuild wrote none, so this gate was skipped rather
+  // than pinned to 0 (0 would assert the absence of the very semantics it protects).
+  // Re-armed unchanged with the ISSUE-113 season-grain writer.
+  it('records a genuine zero for a player who polled none in a decided season', async () => {
     const [row] = await sql<{ n: number }[]>`
       SELECT count(*)::int AS n FROM player_season_stats
        WHERE season = 2025 AND brownlow_votes = 0 AND brownlow_status = 'complete'
@@ -225,13 +253,14 @@ describe('gate: Advanced Search regression cases', () => {
   }
 
   // AFLDB-ISSUE-108: this gate measured the legacy per-game Brownlow correction
-  // (269, down from the legacy 750). Under the canonical rebuild there is no
-  // career/season Brownlow acquisition, so "zero Brownlow votes" matches almost
-  // every player and the cohort is meaningless. Skipped rather than re-pinned:
-  // the number it would take (~1,690) is an artefact of the missing acquisition,
-  // not a canonical fact. Re-enable with the legacy-free Brownlow path
-  // (AFLDB-ISSUE-090 §27.5).
-  it.skip('50-199 goals and zero Brownlow votes returns the exact 269 players', async () => {
+  // (269, down from the legacy 750). AFLDB-ISSUE-113 restored the season-grain
+  // acquisition and RE-MEASURED the cohort on the canonically rebuilt afldb_test
+  // (§8.17.3): 261 players (career goals are now fitzRoy-sourced; the legacy 269
+  // was 262 on the pre-ISSUE-136 baseline and 261 once the four renumbered-profile
+  // careers were folded). The membership digest is taken over the AFL Tables
+  // profile identity, as the 1960s-debut gate below does, so it survives the
+  // surrogate players.id re-seed of every rebuild.
+  it('50-199 goals and zero Brownlow votes returns the exact 261 players', async () => {
     const ids = await idsFor({
       goals_min: '50',
       goals_max: '199',
@@ -239,9 +268,24 @@ describe('gate: Advanced Search regression cases', () => {
       brownlow_votes_max: '0',
     });
     // The headline correction. The legacy per-game derivation returned
-    // 750 here; the 481 difference all polled votes between 1935 and 1983.
-    expect(ids.length).toBe(269);
-    expect(idHash(ids)).toBe('ae1eb8efd59b06b3');
+    // 750 here; the difference is all polled votes between 1935 and 1983.
+    expect(ids.length).toBe(261);
+
+    const [digest] = await sql<{ keys: number; hash: string }[]>`
+      SELECT count(*)::int AS keys,
+             substr(encode(sha256(convert_to(
+               string_agg(ei.external_id, ',' ORDER BY ei.external_id), 'UTF8')),
+               'hex'), 1, 16) AS hash
+        FROM external_identities ei
+        JOIN sources s ON s.id = ei.source_id AND s.key = 'afltables'
+       WHERE ei.match_method = 'afltables_profile_url'
+         AND ei.status IN ('unique', 'resolved')
+         AND ei.player_id = ANY(${ids})
+    `;
+    // Every returned player carries one, so a silently dropped identity cannot
+    // hide behind a matching digest.
+    expect(digest.keys).toBe(261);
+    expect(digest.hash).toBe('ca65f15239aaf0b5');
   });
 
   it('debuted in the 1960s with exactly two clubs returns the exact 110 players', async () => {
@@ -692,24 +736,29 @@ describe('gate: absence is never zero', () => {
 // birth-date evidence
 // ---------------------------------------------------------------------
 // AFLDB-ISSUE-108: the 12,478-with-DOB / 883-without / two-conflict figures were
-// the retired legacy SQLite register plus its DOB-enrichment passes (which need
-// AFLDB_LEGACY_SQLITE and gitignored club-list CSVs and are not part of the
-// canonical rebuild — AFLDB-ISSUE-090 retired these as acceptance). The canonical
-// fitzRoy import writes exactly 855 dates, each with evidence, and zero conflicts.
-// The population pins below are re-pinned to the accepted baseline
-// full-history-20260827 (measured.players_with_dob = 855). The two
-// conflict-adjudication tests are skipped: there is no conflict data to exercise
-// them, and that is a missing-enrichment gap, not a regression.
+// the retired legacy SQLite register plus its DOB-enrichment passes.
+// AFLDB-ISSUE-118 §23.24-§23.25 (Stage D1): the canonical rebuild now has a
+// `birth-dates` stage that fills every NULL dob from the AFL Tables all-time club
+// lists (manifest-pinned club-lists-20260905), each with a player_birth_evidence
+// row and linked through dob_evidence_id, never overwriting a fitzRoy date. The
+// pins below are the deterministic-rebuild values, gated in tools/db/rebuild-test.ts
+// birthDateChecks from tools/rebuild/afltables/afltables-contract.json
+// club_player_lists.accepted_snapshot.measured: players_with_dob 13,255,
+// dob_without_evidence 0, dob_disagreeing_with_club_list 2 (Roan Steele, Jack
+// Hayes -- recorded as evidence, adjudication is separate, dob_disputed stays 0).
+// The two conflict-adjudication tests are still skipped: no conflict was
+// adjudicated into dob_disputed, so there is nothing to exercise.
 describe('gate: birth dates', () => {
-  it('populates 855 canonical dates with no conflicts', async () => {
+  it('populates 13,255 canonical dates with no conflicts', async () => {
     const [row] = await sql<{ withDob: number; disputed: number }[]>`
       SELECT count(*) FILTER (WHERE dob IS NOT NULL)::int AS "withDob",
              count(*) FILTER (WHERE dob_disputed)::int    AS disputed
         FROM players
     `;
-    // Accepted baseline full-history-20260827: 855 dates from fitzRoy
-    // player_details; DOB enrichment (12,478) is separate, tracked work.
-    expect(row.withDob).toBe(855);
+    // Deterministic rebuild (§23.25): 855 fitzRoy per-match dates + 12,400 filled
+    // from the club lists = 13,255. Proven by a full afldb_test rebuild 2026-09-06
+    // (FINAL VALIDATION players_with_dob_after_birth_dates = 13255).
+    expect(row.withDob).toBe(13_255);
     expect(row.disputed).toBe(0);
   });
 
@@ -734,16 +783,22 @@ describe('gate: birth dates', () => {
   });
 
   it('keeps the evidence behind every recovered date', async () => {
-    const [row] = await sql<{ evidence: number; linked: number }[]>`
+    const [row] = await sql<{ evidence: number; linked: number; unevidenced: number }[]>`
       SELECT (SELECT count(*)::int FROM player_birth_evidence)          AS evidence,
              (SELECT count(*)::int FROM players WHERE dob_evidence_id IS NOT NULL)
-                                                                        AS linked
+                                                                        AS linked,
+             (SELECT count(*)::int FROM players
+               WHERE dob IS NOT NULL AND dob_evidence_id IS NULL)       AS unevidenced
     `;
-    // AFLDB-ISSUE-108: canonical baseline — one evidence row per canonical date,
-    // every filled date linked to it (was legacy 12,472 / 11,533).
-    expect(row.evidence).toBe(855);
-    // Every filled date points back at the row that justified it.
-    expect(row.linked).toBe(855);
+    // AFLDB-ISSUE-118 §23.25 (Stage D1): a player can now carry more than one
+    // birth-evidence row (a fitzRoy per-match date plus one or more club-list
+    // dates), so the raw count exceeds the dated-player count. Rebuild-measured
+    // 2026-09-06: 14,110 evidence rows behind 13,255 dated players.
+    expect(row.evidence).toBe(14_110);
+    // Every filled date points back at the row that justified it -- the rebuild's
+    // dob_without_evidence gate is 0, so linked equals players_with_dob.
+    expect(row.linked).toBe(13_255);
+    expect(row.unevidenced).toBe(0);
   });
 
   it('matches players on the profile URL rather than the name', async () => {
@@ -797,10 +852,11 @@ describe('gate: birth dates', () => {
       SELECT count(*)::int AS n FROM players
        WHERE dob IS NULL AND dob_confidence = 'unknown'
     `;
-    // AFLDB-ISSUE-108: canonical baseline has 12,422 players with no date (was
-    // legacy 883 after enrichment). Not backfilled with a guess: shown as
-    // "Not recorded". 855 dated + 12,422 undated = 13,277 players.
-    expect(row.n).toBe(12_422);
+    // AFLDB-ISSUE-118 §23.25 (Stage D1): the club-list birth-date stage filled all
+    // but 18 of the previously undated players. Those 18 are genuinely undated in
+    // every canonical source and are shown as "Not recorded", never a guess.
+    // Rebuild-measured 2026-09-06: 13,255 dated + 18 undated = 13,273 players.
+    expect(row.n).toBe(18);
   });
 });
 
@@ -970,14 +1026,42 @@ describe('gate: 2026 is provisional (snapshot-pinned)', () => {
     expect(row.round).not.toBeNull();
   });
 
-  it.skip('reports 2026 Brownlow as pending, never as zero', async () => {
-    const rows = await sql<{ status: string; votes: number | null }[]>`
-      SELECT DISTINCT brownlow_status AS status, brownlow_votes AS votes
-        FROM player_season_stats WHERE season = 2026
+  // AFLDB-ISSUE-113: re-armed with the season-grain writer, which never emits a row
+  // for an in-progress season (the loader refuses one), so 2026 derives as pending.
+  // The accepted canonical baseline ends at 2025: matches, player_match_stats and
+  // player_season_stats hold NO 2026 rows on a canonical rebuild, so the pending
+  // state is asserted through the season-level stat_availability contract, never
+  // through a player_season_stats row count the baseline cannot produce. The
+  // per-row clause is vacuous on the baseline and binds once a settle populates
+  // 2026: no 2026 row may carry a vote or a status other than 'pending'.
+  it('reports 2026 Brownlow as pending, never as zero', async () => {
+    const coverage = await sql<{ season: number; coverage: string }[]>`
+      SELECT season, coverage FROM stat_availability
+       WHERE stat_key = 'brownlow_season_total' AND season IN (2025, 2026)
+       ORDER BY season
     `;
-    expect(rows).toHaveLength(1);
-    expect(rows[0].status).toBe('pending');
-    expect(rows[0].votes).toBeNull();
+    expect(coverage).toEqual([
+      { season: 2025, coverage: 'complete' },
+      { season: 2026, coverage: 'pending' },
+    ]);
+
+    const [season] = await sql<{ status: string }[]>`
+      SELECT status FROM seasons WHERE year = 2026
+    `;
+    expect(season.status).toBe('in_progress');
+
+    const [rows] = await sql<{ seasonRows: number; badRows: number }[]>`
+      SELECT (SELECT count(*)::int FROM brownlow_season_votes WHERE season = 2026)
+               AS "seasonRows",
+             (SELECT count(*)::int FROM player_season_stats
+               WHERE season = 2026
+                 AND (brownlow_votes IS NOT NULL OR brownlow_status <> 'pending'))
+               AS "badRows"
+    `;
+    // No season-grain row exists for a pending award, and no 2026 player-season
+    // may claim a vote or any status but pending — a 0 here would be a lie.
+    expect(rows.seasonRows).toBe(0);
+    expect(rows.badRows).toBe(0);
   });
 
   it('awards no premier and no wooden spoon for 2026', async () => {

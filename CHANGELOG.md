@@ -15,6 +15,3901 @@ commit.
 
 ## [Unreleased]
 
+### NL search: recognised "at V, find the widest..." / "by how much did X lose to Y..." team-match result phrasing, plus a matching exploratory-corpus oracle correction (AFLDB-ISSUE-218) - 17 September 2026
+
+- "At Kardinia Park, find the widest Pies win to North Melbourne in 2023" and "By how much did Pies lose to Carlton in their most lopsided meeting at Adelaide Oval after 1999" both declined outright with `unsupported_term`, even though both already-extracted the correct clubs and win/loss direction — only wrapper vocabulary was missing: "widest" (no synonym entry alongside "biggest"/"largest"), a leading "At V, find..." venue clause (the existing leading-imperative strip only reached a leading "for" scope clause), the verb forms "lose"/"lost"/"beat" of the already-supported win/loss nouns, and the decorative "how much"/"lopsided meeting" wrapper text.
+- Fixed by adding `widest` to the aggregation vocabulary, widening the leading scope-clause request-verb strip to accept `at` as well as `for`, adding `lose`/`loses`/`lost`/`beat`/`beats` as verb forms of the existing win/loss margin metrics, and adding two new wrapper-word consumers ("how much"/"lopsided meeting") gated on an already-recognised, fully directional win/loss-margin construction (both clubs resolved) — no grain-election or club-role ownership logic touched. "What was Bombers'/Dogs'/Brisbane Lions' biggest victory..." (a separate, already-known trailing-apostrophe plural possessive-club-alias defect, the same mechanism AFLDB-ISSUE-214 found for `club_season_rank`) was deliberately left unfixed, recorded as a future cross-family candidate rather than folded into this issue. `PARSER_VERSION` 64 → 65.
+- Round-1 host validation on the frozen V5 stable corpus stayed 12000/12000/0/0 (no regression), and the `team_match_result/1` ("widest...") cluster fully cleared (522 rows) — but the `team_match_result/2` ("by how much...lose...") cluster (569 rows) moved from an honest soft decline into a hard failure, exposing that the exploratory V2 corpus's own expected-plan construction for that one template was wrong, not the parser: its wording ("By how much did O beat/lose-to C...") is the only one of the family's four templates that puts the SECOND-drawn club in the sentence's grammatical-subject position, but its expected `club`/`opponent`/`metric` were still built as though the first-drawn club were the subject, exactly like the other three templates. Confirmed against production SQL (`win_margin`/`loss_margin` are, and always have been, defined relative to `clubFor`) and the parser's own pre-existing, uniformly-applied ownership convention (the ungoverned/subject-named club is always `clubFor`) that the parser's plan was already canonically correct, and confirmed empirically (zero mismatches across every affected row) that only the exploratory generator's template-2 expectation construction needed correcting.
+- Corrected `tools/nl/generate-exploratory-corpus-v2.mjs`'s `team_match_result` generator for template 2 only, so its expected club/opponent/metric are built from the template's real grammatical subject/object instead of the other templates' fixed convention; no question text, row ID, or RNG-consuming call changed, and templates 0/1/3 are untouched. `PARSER_VERSION` unchanged at 65 for this correction (corpus-only, no parser semantics moved).
+- Round-2 host validation confirmed the fix: frozen V5 stayed 12000/12000/0/0; the exploratory V2 corpus moved from the pre-issue baseline (19421 clean / 8109 soft / 0 failed) to 20512 clean / 7018 soft / 0 failed — a net +1091 clean / -1091 soft / 0 failed, reconciling exactly to `team_match_result/1` (522) + `team_match_result/2` (569) = 1091, with both target clusters fully cleared and zero hard failures anywhere in the corpus. A determinism/isolation diff confirmed the correction changed 0 question text and 0 row IDs across all 29,030 rows, with every changed field confined to `team_match_result/2`'s own expectation columns. `team_match_result/0` (56 rows, the deferred possessive-alias cluster) remained unchanged at 56 honest declines throughout both rounds. Implemented on `sonnet/issue-218-team-match-result-phrasing` (unmerged, commits `5bcc957` and `6ed227d`).
+
+### NL search: recognised "...haul in one match..." / "...peak single-game..." / "which match saw...collect..." / "single-match...record" single-match record phrasing (AFLDB-ISSUE-217) - 17 September 2026
+
+- "What was Dustin Martin's biggest Brownlow votes haul in one match during the 2010s", "Find Lance Franklin's peak single-game clearances in 2017", "Which match saw Patrick Dangerfield collect the most goal assists since 2000", and "Find the single-match disposals record for Shane Crawford against Brisbane Lions at Gabba in 2009" all declined outright with an `unsupported_term` naming a POLLUTED player mention (`dustin martin haul`, `lance franklin peak single-game`, `match saw patrick dangerfield collect`, `single-match shane crawford`) even though every one of these is the same already-supported single-player, single-match record question as "Dusty most disposals" — grain/mode election was already correct in every case (a named player's per-game stat already defaults to `player_game`/`single`). The defect was upstream, in player-mention resolution: `candidatePlayerSpan` takes the first four remaining non-stopword alphabetic tokens with no notion of "stop at a non-name word", and "haul", "peak", "single-game"/"single-match", "match", "saw", and "collect" had no vocabulary entry anywhere in the parser, so each survived in the text and was swept into the player-name candidate alongside the real name — the polluted, multi-word span then failed player resolution outright.
+- Fixed by extending the existing single-game grain cue to also recognise the bare "single-game"/"single-match" compound adjective (not only "in a single game/match"), plus three new, narrowly gated wrapper-word consumers: a leading "which match saw" cue (anchored to the very start of the question, mirroring the existing leading-imperative-verb pattern) that also consumes its paired verb "collect"; and "haul"/"peak", each read only once the single-game cue and an actual player-statistic word are both already present in the question — the same two-part gating discipline AFLDB-ISSUE-216's "seasonal" cue uses. No player, club, venue, metric, or exact question is special-cased, and none of the new words was added to any global stopword/filler list; grain election itself was not touched. `PARSER_VERSION` 63 → 64.
+- The adjacent `player_game_scope_collision` family's "single-match `<stat>` record for `<player>` against `<club>` at `<venue>`" phrasing was inspected and confirmed, by direct source trace, to fail through the identical player-span-pollution mechanism (bare "single-match" was its own unconsumed word), so it was included and fixed by the same change rather than opened as a separate issue.
+- Operator-validated on streamanator (commit `879b0e1`): the frozen V5 stable corpus stayed 12000 scored / 12000 clean / 0 soft / 0 failed — no regression. The retained exploratory V2 corpus (29,030 rows, not regenerated) moved from 17612 clean / 9918 soft under parser v63 to 19421 clean / 8109 soft under v64 — 1809 rows moved from an unexpected decline to a clean, correctly-scored plan, with 0 hard failures throughout. All four targeted clusters fully cleared: `player_game_single/0` ("...haul in one match...", 423 rows), `player_game_single/4` ("...peak single-game...", 422 rows), `player_game_single/3` ("which match saw...collect...", 409 rows), and `player_game_scope_collision/3` ("single-match...record...", 555 rows) each went from their full row count to zero remaining unexpected declines. A direct plan-level comparison of the full 29,030-row corpus (v63 vs. v64) found exactly 1809 changed plans and 0 missing rows, reconciling exactly to the four targeted clusters (423 + 422 + 409 + 555 = 1809), with zero unrelated movement. A separate, pre-existing `WRONG_PLAYER` scorer-identity artifact (the Gary Ablett Jnr/Snr canonical-display-name mismatch already tracked from AFLDB-ISSUE-206/210) remains present across several `player_game_single`/`player_game_scope_collision` template rows, unaffected by and unrelated to this fix — left for separate scorer/entity-identity work, not addressed here. Implemented on `sonnet/issue-217-player-game-single-phrasing` (unmerged, commit `879b0e1`).
+
+### NL search: recognised "posted...season tally..." / "...seasonal...total" player-season leaderboard phrasing and fixed a "total" grain-election misroute (AFLDB-ISSUE-216) - 17 September 2026
+
+- "Which player posted the highest season tally of handballs for Collingwood during the 2010s" and "Find the Port Adelaide player with the best seasonal goal assists total after 1999" declined outright with `unsupported_term: posted season tally` / `unsupported_term: seasonal`, even though both are the same already-supported `player_season` leaderboard question as "Most goals by a Richmond player in 2017" — just naming a single season's tally as the answer's own subject instead of the recognised "in `<year>`" filler wording. Neither "posted", "season tally", nor bare "seasonal" was ever consumed by any extractor, so each survived as an unclaimed leftover token and declined a question the parser otherwise understood completely.
+- The two failing clusters did not share one single root cause. Both shared the wrapper-vocabulary gap above, but the "...seasonal...total" phrasing carried a second, independent defect: its own "total" is the identical bare word the parser reads everywhere else as the generic "dusty TOTAL goals against Carlton" scoped-running-total cue. That reading blocked the existing no-player/season-named `player_season` grain-election branch's guard and silently misrouted the unnamed-player question toward a club-scoped `player_game`/sum interpretation (a running total across every game in range) instead of the best single season. The "posted...season tally..." phrasing has no "total"/"combined"/"overall"/"cumulative"/"aggregate" word anywhere in it, so it never carried this second defect.
+- Fixed with three new gated vocabulary entries (`src/search/nl/vocab.ts`): `PLAYER_SEASON_LEADERBOARD_TALLY_RE` reads "season tally" as one phrase, and `PLAYER_SEASON_LEADERBOARD_SEASONAL_RE`/`PLAYER_SEASON_LEADERBOARD_POSTED_RE` read bare "seasonal"/"posted" only once an actual player statistic word is already present in the question — the same gating discipline AFLDB-ISSUE-214's club-season "seasonal" cue uses for its own, disjoint vocabulary (wins/losses/draws/percentage), so the two "seasonal" readings can never collide. A narrow `playerSeasonLeaderboardCue` override in `src/search/nl/parser.ts` lets this positively-identified construction win over the generic "total" reading at grain election specifically, leaving every other use of that generic cue (including the named-player scoped-running-total reading) unchanged. No club, player, metric, or exact question is special-cased, and none of the new words was added to any global stopword/filler list. `PARSER_VERSION` 62 → 63.
+- Operator-validated on streamanator (commit `8de4a96`): the frozen V5 stable corpus stayed 12000 scored / 12000 clean / 0 soft / 0 failed — no regression. The retained exploratory V2 corpus (29,030 rows, not regenerated) moved from 16477 clean / 11053 soft under parser v62 to 17612 clean / 9918 soft under v63 — 1135 rows moved from an unexpected decline to a clean, correctly-scored plan, with 0 hard failures throughout. Both targeted clusters fully cleared: `player_season_leaderboard/0` ("posted...season tally...", 576 rows) 576 → 0, and `player_season_leaderboard/3` ("...seasonal...total", 559 rows) 559 → 0. A direct plan-level comparison of the full 29,030-row corpus (v62 vs. v63) found exactly 1135 changed plans and 0 missing rows, all in the targeted `player_season_leaderboard` template family, with zero unrelated movement. Implemented on `sonnet/issue-216-player-season-leaderboard-phrasing` (unmerged, commit `8de4a96`).
+
+### NL search: recognised "plus"/"among" career-condition phrasing and fixed a repeated-stat predicate-loss defect (AFLDB-ISSUE-215) - 17 September 2026
+
+- "For Adelaide, find players with no premierships plus at most 10 Brownlow votes" and "Who has the most career games among players with fewer than 5 losses and at most 10 Brownlow votes" declined outright with `unsupported_term: find plus` / `unsupported_term: among`, even though both numeric career conditions in each question were already being parsed correctly — only the wrapper words "find" (mid-sentence, behind a leading "for CLUB," scope clause the existing leading-only imperative-verb strip never reached), "plus" (a second, unrecognised spelling of the "and" conjunction already joining every other phrasing of the same question), and "among" (a third unrecognised wrapper word) survived as unclaimed leftover tokens.
+- Separately, a genuine predicate-loss defect was found and fixed: `extractCareerConditions` resolved a stat word's EARLIEST occurrence in a sentence to decide processing order, but that same earliest occurrence was also the only one ever inspected for an adjacent number. A stat word occurring twice in one question — once naming the ranked subject ("who has the most career GOALS ...") and again inside its own, later numeric condition ("... among players with ... zero GOALS") — silently discarded the real condition instead of retrying the word's later occurrence, rather than declining on it honestly.
+- Fixed with a bounded leading-clause request-verb strip behind a literal "for ..." clause (`src/search/nl/vocab.ts`), a "plus"/"among" consumption gated on the specific supported construction they wrap (neither added to the global stopword list, so a "plus"/"among" outside this construction still declines correctly), and a generic occurrence-retry loop in `extractCareerConditions` (`src/search/nl/parser.ts`) that tries successive occurrences of a stat word rather than only the first. A follow-up correction in the same session widened the clause-boundary lookback (20 → 40 characters, needed for a long comparator phrase like "no more than " sitting beside "plus") and taught the "no X" negative-condition matcher to also recognise a neighbouring "plus" — neither special-cases any club, metric, or sample question. `PARSER_VERSION` 61 → 62.
+- Operator-validated on streamanator across two host-validation rounds (commits `5eca839`, `6a341fd`): the frozen V5 stable corpus stayed 12000 scored / 12000 clean / 0 soft / 0 failed throughout — no regression. The retained exploratory V2 corpus (29,030 rows) moved from 15925 clean / 11605 soft under parser v61 to 16477 clean / 11053 soft under v62 (round 1) — 552 rows moved from an unexpected decline to a clean, correctly-scored plan. Of the two targeted clusters, `career_numeric_binding/2` ("who has the most career S among players with A and B") is fully cleared (552 → 0). `career_numeric_binding/3` ("for CLUB, find players with A plus B") split into 491 rows that now reach a structurally correct plan but decline at a separate, pre-existing execution-coverage boundary (confirmed legitimate — AFLDB's SQL compiler has no per-club query path for career condition columns other than `games`, so a club-scoped condition on `finals`/`premierships`/`losses`/`brownlow_votes`/`clubs_played` correctly fails closed rather than silently answering with a whole-career total; recorded as a future SQL-compiler capability candidate, not implemented here) and 209 rows with a residual "plus" recognition gap, fixed the same session and confirmed by round-2 host validation: `career_numeric_binding/3` now stands at 700 structurally-valid plans / 0 parser declines, with all 700 reaching the same legitimate coverage boundary. Direct plan-level comparisons (round 1: v61 vs. v62, 1043 changed plans; round 2: pre- vs. post-correction, 209 changed plans) found 0 missing rows and zero unrelated movement in both. Implemented on `sonnet/issue-215-career-numeric-binding-phrasing` (unmerged, commits `5eca839` and `6a341fd`).
+
+### NL search: recognised "what season had..." / "...seasonal..." club-season rank phrasing (AFLDB-ISSUE-214) - 17 September 2026
+
+- "For Richmond, what season had the lowest wins during the 2010s" and "North Melbourne's highest seasonal losses" declined outright with `unsupported_term: season`/`seasonal`, even though both are the same already-supported `club_season` ranking question as "Richmond's lowest wins in a season" — just naming the season as the answer's own subject, or using the adjective form of "in a season", instead of the recognised filler wording. Neither "what/which season had" nor bare "seasonal" was ever consumed by any extractor, so the word survived as an unclaimed leftover token and declined a question the parser otherwise understood completely; for phrasing with no explicit year, the club-season grain was not even elected at all, since the existing cue required either a leading "teams"/"clubs" subject or an explicit season/year.
+- Added two new gated vocabulary entries (`src/search/nl/vocab.ts`): `CLUB_SEASON_RANK_SEASON_CUE_RE` reads "what/which season had" as an unambiguous club-season cue in its own right, and `CLUB_SEASON_SEASONAL_ADJECTIVE_RE` reads bare "seasonal" only once a club-season metric word (wins/losses/draws/percentage) is already present — the same gating the metric words themselves require. Both fold into the existing `clubSeasonCuePresent` cue and the AFLDB-ISSUE-189 single-season guard in `src/search/nl/parser.ts`, and are consumed from the question text immediately so the word never reaches the leftover-token decline gate. No club name, corpus row, or exact sample string is special-cased; every other club-season cue (a leading "teams"/"clubs" subject, a club-season condition, "in a season", an explicit year) is unaffected. `PARSER_VERSION` 60 → 61.
+- Operator-validated on streamanator (commit `731edd8`): the frozen V5 stable corpus stayed 12000 scored / 12000 clean / 0 soft / 0 failed — no regression. The retained exploratory V2 corpus (29,030 rows, not regenerated) moved from 14879 clean / 12651 soft under parser v60 to 15925 clean / 11605 soft under v61 — 1046 rows moved from an unexpected decline to a clean, correctly-scored plan, with 0 hard failures throughout. A direct plan-level comparison of the full 29,030-row corpus (v60 vs. v61) found exactly 1046 changed plans and 0 missing rows, all in the targeted `club_season_rank` template family, with zero unrelated movement. Of the two targeted soft-failure clusters, `club_season_rank/3` ("what season had...", 642 rows) is fully cleared; `club_season_rank/1` ("...seasonal...", 614 rows) has 404 cleared, with 210 rows exposing a separate, pre-existing possessive-club-alias defect (`Suns'`, `Pies'`, `Bulldogs'` not recognised as club ownership the way a full club name's possessive already is) — deliberately left unfixed and not opened as its own tracked issue in this closeout. Implemented on `sonnet/issue-214-club-season-rank-phrasing` (unmerged, commit `731edd8`).
+
+### NL search: fixed overlapping club-name position bug that suppressed unordered "versus" matchups (AFLDB-ISSUE-213) - 17 September 2026
+
+- `extractClubs` (`src/search/nl/parser.ts`) re-found each matched club's position in the original question with a bare, first-match `\b<name>\b` search of the whole string. A shorter club's name embedded, word-bounded, inside a longer club's own name ("Melbourne" inside "North Melbourne", "Adelaide" inside "Port Adelaide", "Sydney" inside "Greater Western Sydney") is itself a valid word-boundary match, and it comes first in the string — so the search silently bound the shorter club to that embedded occurrence instead of its real, later, standalone mention. The computed gap between the two (wrongly-positioned) clubs came out empty, the literal `versus`/`vs`/`v` separator between them was never recognised, and `scope.matchup` never formed for wording like "Largest winning margin for North Melbourne versus Melbourne" — the parser fell back to directional `clubFor`/`clubAgainst` roles instead, answering a different question than the one asked. A pre-existing defect exposed (not caused) by AFLDB-ISSUE-212's corrected exploratory V2 oracle (row `#20609919`), which asserted the correct `scope.matchup` for the first time where V1's own directional oracle had coincidentally matched the wrong plan.
+- Fixed with a new `firstUnclaimedOccurrence` helper: it scans every word-boundary occurrence of a matched club's name in the original question and returns the first one that does not overlap a span an earlier club match in the same call has already claimed. Generic — no club name, alias, or row id appears in the fix, so it applies identically to any pair of club names in this embedding relationship. The `for`/`against`/`to` role-assignment logic and the exact-`versus`/`vs`/`v`-only matchup check are unchanged; ordinary directional wording and symmetric wording between clubs with no name overlap are unaffected. `PARSER_VERSION` 59 → 60.
+- Operator-validated on streamanator (commit `4f0be951`): the frozen V5 stable corpus stayed 12000 scored / 12000 clean / 0 soft / 0 failed — no regression. The retained ISSUE-212 exploratory V2 corpus (29,030 rows, not regenerated) moved from 1 hard failure under parser v59 to 0 under v60, with row `#20609919` confirmed clean. A direct plan-level comparison of the full 29,030-row corpus (v59 vs. v60) found exactly one changed plan across the entire corpus — the known row, moving from `clubFor=North Melbourne`/`clubAgainst=Melbourne`/`matchup` absent to `scope.matchup={clubA: North Melbourne, clubB: Melbourne}`/`clubFor`,`clubAgainst` absent — with zero unrelated rows changed. The two structurally similar pairs ISSUE-212 had left as unreproduced hypotheses, `Port Adelaide`/`Adelaide` and `Greater Western Sydney`/`Sydney`, were confirmed to share the identical root mechanism. Implemented on `sonnet/issue-213-overlapping-club-matchup` (unmerged, commit `4f0be951`).
+
+### NL search tooling: corrected three exploratory corpus/scorer oracle defects in a new versioned V2 (AFLDB-ISSUE-212) - 17 September 2026
+
+- Not a parser change — `PARSER_VERSION` stays 59, no `src/search/nl/` file touched. AFLDB-ISSUE-206's exploratory corpus had three confirmed oracle/scorer defects, not parser defects: (1) the `team_match_result` "versus" template asserted directional `club`/`opponent` for wording `extractClubs` has always read as the unordered `scope.matchup`; (2) the `achievement_summary` template asserted `expected_aggregation:'count'`, but that grain's answer shape is owned entirely by `achievementSummary.kind` and `plan.agg` has no effect on it; (3) the scorer's player-identity check compared display-name strings only, which can never distinguish Gary Ablett Jnr (id 4701) from Snr (id 4700) since both share the canonical display name "Gary Ablett".
+- Added a new versioned generator, `tools/nl/generate-exploratory-corpus-v2.mjs` (V1's generator and its frozen `/home/arm/nl-exploratory-v1.csv` are untouched), producing the same 29,030 rows/ids/questions as V1 (question generation deliberately unchanged) with corrected expectation fields for the two affected families. `tools/nl/corpus.ts`'s scorer gained two new optional CSV columns (`expected_scope_kind=matchup`, `expected_achievement_kind`), blank on every V1 row so the same scorer serves both corpus versions with no version flag, plus a generic, non-version-gated id-preferring player-identity comparison (mirroring the existing club/venue identity checks) built from the corpus's own distinct player names via the parser's own resolver.
+- Operator-validated on streamanator: V2 generated deterministically (29,030 rows, seed `2060542026`, SHA256 `bb75e4b5067942117c60f8eab6cfd01de4d8fc1e0c4fee07e10650fae97edb4a`, replay-confirmed, 0/0 overlap against frozen V5, 1,500 audit-required); scored against parser v59: 27530 scored / 14878 clean / 12651 soft / **1 failed**; the frozen V1 12,000-row corpus stayed 12000/12000/0/0 under the updated scorer, no regression. A same-corpus, same-parser reconciliation of the pre- vs. post-fix oracle found 1,308 old false hard failures removed (545 matchup, 320 achievement-aggregation, 443 player-identity split 225 Snr/218 Jnr) and 1 newly exposed genuine hard failure — net failed count change -1307, which is two separate movements, not "1307 fixed". The v54 (AFLDB-ISSUE-206) to v59 counts grew (496→545, 283→320, 351→443) because five intervening parser fixes (AFLDB-ISSUE-207..211) let more previously-declined rows reach a scored plan for the first time, exposing more instances of the same three defects.
+- The one newly exposed hard failure (row `#20609919`, "... margin for North Melbourne versus Melbourne at Adelaide Oval ...") is a genuine, distinct, pre-existing `extractClubs` defect — confirmed identical parser plan in V1 and V2 (`clubFor=North Melbourne`, `clubAgainst=Melbourne`, `scope.matchup` absent), not a corpus/scorer artifact. `phrasePosition`/`phraseEnd` re-find each club by a bare word-boundary search of the whole original text; when a shorter club's name is embedded, word-bounded, inside a longer club's own name ("Melbourne" inside "North Melbourne"), that search finds the embedded occurrence instead of the real second mention, and the unordered-matchup check silently fails to form. Deliberately left unfixed and not opened as its own issue in this closeout — see `AFLDB-ISSUE-212.md` §6a. Two structurally similar pairs (`Port Adelaide`/`Adelaide`, `Greater Western Sydney`/`Sydney`) are unreproduced hypotheses only, not confirmed. Implemented on `sonnet/issue-212-exploratory-v2-scoring`.
+
+### NL search: added `after YEAR` as an exclusive season lower bound (AFLDB-ISSUE-211) - 17 September 2026
+
+- `extractSeasons` supported `in YEAR`, `since YEAR`, `before YEAR`, `between YEAR and YEAR`, and decades, but had no form for `after YEAR` — a documented, correctly-labeled decline and the largest single unimplemented soft-decline vocabulary family found by AFLDB-ISSUE-206's exploratory corpus. Questions like "most goals after 2019" or "Richmond's biggest win after 2000" declined outright even though the underlying question was otherwise fully supported.
+- Added a new anchored `AFTER_RE` (`src/search/nl/vocab.ts`) and one new branch in the existing `extractSeasons` (`src/search/nl/parser.ts`), checked only when `since` hasn't already claimed the lower bound: `after YEAR` sets `scope.seasonMin = YEAR + 1`, an exclusive bound deliberately distinct from `since YEAR`'s inclusive one. Because the regex requires a literal 4-digit year immediately after the word, it cannot match `after the siren`, `after their`, or the achievement-clause connective `after|following|since` — no vocabulary/stage reordering elsewhere. `PARSER_VERSION` 58 → 59.
+- Operator-validated on streamanator (commit `c113e6a`): the frozen V5 stable-corpus rerun stayed 12000 scored / 12000 clean / 0 soft / 0 failed, and a direct structured-plan diff of the retained ISSUE-206 29,030-row exploratory corpus (pre-fix v58 vs post-fix v59) found exactly 1406 changed plans, all genuine `after YEAR` temporal wording. Of those, 1262 moved from a soft decline to a clean plan — the intended usability gain; 136 moved to a still-correctly-declined `coverage_unavailable` state under the existing compiler/coverage contract (career-boundary, head-to-head, and unsupported-composition rows now reaching the right gate instead of failing lexically); 8 malformed-input rows remain intentionally manual-audit; and zero rows moved to a hard failure. 118 rows compose `after the siren` with a separate genuine `after YEAR` clause, and both meanings coexist correctly in every one. Implemented on `sonnet/issue-211-after-year-season-bound` (unmerged, commit `c113e6a`).
+
+### NL search: leading imperative/request wrappers ("find", "show", "list", "give me") no longer decline otherwise-supported questions (AFLDB-ISSUE-210) - 17 September 2026
+
+- Questions phrased as a natural request — "Find the players with the most goals in 2023", "Show Richmond's biggest win", "List players with at least 300 games", "Give me the leading goal kickers for Carlton" — silently declined even though the underlying question was already fully supported: `canonicalise()` (`src/search/nl/vocab.ts`) already stripped "show me"/"(please )?tell me"/"please" anywhere in the string, but had no handling for a leading bare `find`/`show`/`list`/`give me`, so the verb survived as an unmatched leftover token and tripped the generic decline gate. Found by AFLDB-ISSUE-206's exploratory corpus as the single largest soft-decline mechanism (~10,000+ of 15,275 soft-decline rows, spanning nearly every grain family).
+- Added one new anchored regex, consumed at most once and only at the very start of the (already-filler-stripped) string, so the same words occurring inside meaningful phrasing elsewhere are never touched. The one real vocabulary collision — the pre-existing "find the (big) sticks" AFL-slang idiom for kicking a goal — is protected by a dedicated negative lookahead on "find" so the idiom keeps resolving to the `goals` metric instead of losing its leading word. No vocabulary table, extraction stage, or ordering changed elsewhere. `PARSER_VERSION` 57 → 58.
+- Operator-validated on streamanator (commit `8324d2a`): the frozen V5 stable-corpus rerun stayed 12000 scored / 12000 clean / 0 soft / 0 failed, and a direct structured-plan diff of the retained ISSUE-206 29,030-row exploratory corpus (pre-fix v57 vs post-fix v58) found exactly 1408 changed plans, all confined to the intended wrapper families (663 `find` / 378 `list` / 367 `show`, 0 unexplained). Of those, 1288 moved from a soft decline to a clean plan — the intended usability gain; 48 moved from soft to a hard scorer failure, all a pre-existing Gary Ablett Jnr/Snr canonical-display-name scorer limitation (already documented in AFLDB-ISSUE-206) newly exposed because those `player_game` plans are now reachable at all, not a new parser defect; and 72 moved from an audit-required decline to a correctly-typed `player_career` relationship plan ("List sons of X with Y") that remains intentionally audit-required by corpus design rather than auto-scored. Implemented on `sonnet/issue-210-imperative-nl-phrasing` (unmerged, commit `8324d2a`).
+
+### NL search: fixed head-to-head "has more wins" wording answering with a generic record instead of naming the leader (AFLDB-ISSUE-209) - 17 September 2026
+
+- "Which of Dogs and Geelong has more wins head to head in 2023" identified both clubs and the head-to-head scope correctly but answered with a generic win/loss/draw record instead of naming which club has more wins: `extractHeadToHeadCue`'s (`src/search/nl/semantic-intents.ts`) `compare_wins` recognition matched only past-tense "who has won more", so present-tense "has more wins ... head to head" fell through to the generic `head to head` → `record` cue, which matches unconditionally on any "head to head" mention. Found by AFLDB-ISSUE-206's exploratory corpus, generated entirely from one template ("Which of A and B has more wins head to head [temporal]").
+- Added a dedicated "has/have (more|the most) wins head to head" pattern, plus a trailing-"head to head" extension to the existing "won more" pattern (a related atomic-consumption gap found during test-matrix reconciliation), both checked before the generic record families. Neither match spans the club-name tokens, and the comparison only commits once `extractClubs` resolves exactly two real clubs — the existing safety net against a lone "most wins" ranking question being misread. `PARSER_VERSION` 56 → 57. Two adjacent wordings ("has more wins between A/B", "has more wins against the other") were investigated and deliberately not fixed — they are claimed first by `extractClubSeasonMetric`'s "most wins" club_season ranking cue, a different mechanism, and are not represented in the actual corpus.
+- Operator-validated on streamanator (commit `f2e067f`): the frozen V5 stable-corpus rerun stayed 12000 scored / 12000 clean / 0 soft / 0 failed, and a direct structured-plan diff of the retained ISSUE-206 29,030-row exploratory corpus (pre-fix v56 vs post-fix v57) found exactly 199 changed plans — all `headToHead.kind: record → compare_wins` in the same wording family, zero collateral movement elsewhere. 173 of the 199 matched ISSUE-206's direct estimate; the remaining 26 also carried a trailing "between YEAR and YEAR" clause that `extractHavingClause` had additionally misread as a grouped wins threshold once "wins" was left as a dangling noun — the same one-pattern fix resolved both symptoms by consuming "wins" atomically, so the validated affected surface is 199 rows, not 173. Implemented on `sonnet/issue-209-head-to-head-more-wins` (unmerged, commit `f2e067f`).
+
+### NL search: fixed club-role ownership loss in `extractClubs` for after-siren and leading-opponent phrasing (AFLDB-ISSUE-208) - 17 September 2026
+
+- Two wordings silently dropped the question's subject club: "who kicked the most goals after the siren **to win for** North Melbourne" resolved North Melbourne as the *opponent* with no subject club at all, and "**Against** Fremantle, what was **Melbourne**'s largest lead at three quarter time" resolved the opponent correctly but dropped Melbourne, the subject, entirely. `extractClubs`'s role check (`src/search/nl/parser.ts`) asked "does an against-like token (`against`/`versus`/`vs`/`v`/`to`/`over`) exist anywhere in a fixed 20-character window before this club", not "what is the nearest phrase governing it" — a distant, unrelated "to" could outrank an immediately adjacent "for", and stripping an earlier club mention out of the working text could shrink a later club's window enough to pull the earlier club's own "against" into range. Found by AFLDB-ISSUE-206's exploratory corpus as 251 hard-failure rows (134 after-siren, 117 leading-opponent/checkpoint).
+- A new `nearestGoverningPreposition` helper anchors the check to the single token immediately before the club mention (through at most one determiner), evaluated against the original question text rather than the text `extractClubs` mutates as it consumes earlier mentions. No vocabulary added, no parser stage reordered; the unordered `scope.matchup` ("A versus B") reading is unchanged. `PARSER_VERSION` 55 → 56.
+- Operator-validated on streamanator (commit `70b72df`): the frozen V5 stable-corpus rerun stayed 12000 scored / 12000 clean / 0 soft / 0 failed, and a direct structured-plan diff of the retained ISSUE-206 29,030-row exploratory corpus (pre-fix v55 vs post-fix v56) found exactly 251 changed plans — the two named families moving exactly as intended, zero unrelated plan movement — clearing all 251 confirmed parser-defect hard failures (aggregate hard failures 1381 → 1130, soft/audit-required unchanged). Implemented on `sonnet/issue-208-club-role-ownership` (unmerged, commit `70b72df`).
+
+### NL search: fixed numeric operator ownership crossing between a grouped wins/losses threshold and its margin filter (AFLDB-ISSUE-207) - 16 September 2026
+
+- Questions combining a grouped result count with a per-match margin filter — "teams with 7 or more wins by over 50 points" — could silently swap the two clauses' comparators: `extractHavingClause`'s operator search scanned a fixed-width window wide enough to reach across "by ... points" into the adjacent margin clause, and separately gave a fixed vocabulary-list-order match priority over the clause's own, correctly-positioned operator word. Both mechanisms let the wins/losses threshold claim an operator that belonged to the margin filter (or vice versa), leaving the other clause to fall back to its own default. Both fields still validated, so the defect was silent (found by AFLDB-ISSUE-206's exploratory corpus in 281 rows, undetected by earlier grain/metric-only scoring).
+- `extractHavingClause`'s operator search (`src/search/nl/parser.ts`) is now bounded to the text up to and including the count it already matched for that clause, never past it — every supported comparator word governs a number immediately after it, so this cannot reach into a neighbouring clause. No vocabulary added, no defaults changed, no parser stage reordered. `PARSER_VERSION` 54 → 55.
+- Operator-validated on streamanator: the frozen V5 stable-corpus rerun stayed 12000 scored / 12000 clean / 0 soft / 0 failed, and a direct structured-plan diff of the retained ISSUE-206 29,030-row exploratory corpus (pre-fix v54 vs post-fix v55) found exactly 281 changed plans, all `havingClause.op: gt->gte` paired with `matchFilter.op: gte->gt` — the intended pairing — with zero collateral movement elsewhere in the corpus. Implemented on `sonnet/issue-207-numeric-operator-ownership` (unmerged, commit `4ecdd77a`).
+
+### NL search: deterministic large-scale exploratory corpus and audit-aware stress reporting (AFLDB-ISSUE-206) - 16 September 2026
+
+- Added a seeded 29,030-row exploratory NL corpus generator, V5 overlap/duplicate guard and distribution manifest, plus parse-only triage tooling that groups findings without using parser output as expected truth.
+- The stress harness now records uncertain `audit` rows without scoring their semantic interpretation, while retaining parser crashes as failures, and recognizes wildcard-final expectations. The frozen V5 corpus and parser version 54 are unchanged.
+- The first parser-v54 exploratory run found accepted-plan scope and condition errors; the ranked evidence and corpus/scorer limitations are recorded in `AFLDB-ISSUE-206.md`. Parser fixes are deferred for operator-reviewed follow-on issues.
+
+### NL search: fixed an extraction-order defect that silenced the already-implemented Q3-comeback team-match metric, and corrected the 70-row WRONG_FAILURE_REASON stress-corpus family (AFLDB-ISSUE-205) - 16 September 2026
+
+- AFLDB-ISSUE-200's `TAXONOMY_DRIFT` disposition for the remaining 70 `WRONG_FAILURE_REASON` stress-corpus
+  rows ("only the failure-reason label differs, no semantic-correctness defect") was **incomplete**: 42 of
+  the 70 had a real parser defect silencing an already-implemented, fully-wired metric, not a benign label
+  mismatch. Stage 2 itself is not reopened by this finding; it remains closed.
+- **Root cause (42 rows, "Adelaide biggest three quarter time comeback" and its "since YEAR"/trailing-
+  club-phrasing/short-form variants):** `q3_deficit_overcome` (`src/db/queries/nl/team-match.ts`,
+  `TEAM_METRIC_WORDS` in `src/search/nl/vocab.ts`) is a real, fully implemented team_match metric —
+  the biggest three-quarter-time deficit a club overcame to win — but was unreachable. Two extraction
+  stages in `extractScoreCheckpoint` (`src/search/nl/parser.ts`) each independently consumed the
+  checkpoint phrase before `extractTeamMetric` (a later pipeline stage) could see it intact: first the
+  `'3QT'` entry ate `"three quarter time"` outright; after guarding that (withholding the match only when
+  a comeback word follows), the generic `'QT'` entry was still free to match the nested substring
+  `"quarter time"` inside the same phrase, leaving `"three"` and `"comeback"` both orphaned. Both entries
+  now carry a targeted exclusion (a negative lookahead on `'3QT'`, a negative lookbehind on `'QT'`
+  refusing a checkpoint word directly preceded by `"three "`/`"three-"`) so the intact phrase survives for
+  `extractTeamMetric`. Genuine score-checkpoint questions ("leading at three quarter time", "score at
+  quarter time") are unaffected by construction. `PARSER_VERSION` 53 → 54.
+- **Root cause (28 rows, "Adelaide largest comeback from quarter time" and its variants):** genuinely
+  unsupported. AFL terminology distinguishes quarter time (end of Q1) from three-quarter time; no
+  `q1_deficit_overcome` metric exists in NL search (the underlying data is used only by the separate
+  club-comparison feature's own hardcoded stat cards). **No Q1 comeback feature was added** — a deliberate
+  scope decision. These rows remain declines; only their stale `expected_failure_reason=unsupported_topic`
+  (never a live label for this phrase — `UNANSWERABLE_TOPICS` has no comeback entry of any kind) is
+  corrected to the runtime's own honest `unsupported_term`.
+- Regression coverage: `tests/nl-parser.test.ts` (10 new cases: the 5 Q3-comeback phrasings, 4 negative
+  score-checkpoint/Q1-checkpoint controls, 1 Family-B decline control) and one new DB-backed
+  `tests/integration/nl-answers-team-club.test.ts` case proving `q3_deficit_overcome`'s SQL path against
+  independently hand-written SQL (this metric had zero live-answer coverage before this issue).
+- Corrected via a new guarded, self-verifying, DB-backed script,
+  `tools/nl/fix-issue-205-comeback-taxonomy.ts` — DB-backed because the 42 Q3-comeback rows' corrected
+  plan-shape fields (grain/metric/aggregation/club/season) are read directly off each row's own real
+  re-parse through the fixed parser rather than hand-authored, and every row is required to actually
+  re-parse to the audited shape or the whole run aborts. Regression coverage:
+  `tests/nl-issue-205-corpus-fix.test.ts` (15 cases, DB-free via a fake parse engine).
+- Operator validation surfaced and fixed two correction-tool-only defects (no parser/runtime defect in
+  either): (1) candidacy was originally gated on the old-state fact `decline`+`unsupported_topic` before
+  checking question-text identity, which correctly failed closed on an unrelated live `unsupported_topic`
+  family (fantasy/SuperCoach) sharing that same old-state shape — fixed by deciding candidacy from
+  question-text family signature alone, first, and only then verifying old-state on an already-identified
+  candidate; (2) the DB-free correction-tool test fixture leaked a filler-row default
+  (`expected_grain='player_game'`) into its synthetic decline rows, which the correction tool's own
+  fail-closed old-state assertion correctly caught (test-fixture-only, no production code changed).
+- Operator-validated end-to-end: `tests/nl-parser.test.ts` 446/446, `tests/integration/nl-answers-team-
+  club.test.ts` 35/35, `tsc --noEmit` clean, `tests/nl-issue-205-corpus-fix.test.ts` 15/15. Real V4 → V5
+  correction: 70/70 target rows modified (42 Family A, 28 Family B), 0 non-target rows touched
+  (independently re-verified against the raw CSV: same 12000-row id set, 0 unexpected changed ids/fields).
+  Parser-v54 parse-only rerun against V5: **12000 scored / 12000 clean / 0 soft / 0 failed** — the entire
+  70-row soft family cleared with zero collateral movement. V5 is now the stable regression-corpus
+  baseline (`/home/arm/nl-stress-corpus-v5.csv`), superseding V4.
+
+### NL search stress corpus: corrected 180 stale pre-1965/1987 finals-stat coverage expectations (AFLDB-ISSUE-204) - 16 September 2026
+
+- 180 rows of the retained V3 NL stress corpus (disposals/marks/tackles, single-player `max`
+  questions, finals/Grand Finals, seasons 1897-1926) still asserted `expected_status=success`, a stale
+  expectation predating the coverage floors in `NL_COVERAGE` (`src/search/nl/plan.ts`):
+  disposals/marks are covered from 1965, tackles from 1987 (two separate floors, not one). For every
+  row in this family the requested season is before both floors, so `nlCoverageGap` already declines
+  correctly at runtime — this was a corpus-only correction, not a parser/runtime defect.
+- Corrected via a new guarded, self-verifying script,
+  `tools/nl/fix-issue-204-stale-coverage-expectations.ts` (following the ISSUE-201 precedent), which
+  derives its 180 targets from each row's own structural signature rather than a hardcoded id list, and
+  aborts writing anything if the derived count/distribution doesn't match the audited 180 exactly.
+  Corrected fields: `expected_status=decline`, `verification_level=EXPECTED_DECLINE`,
+  `expected_failure_reason=coverage_unavailable`, coverage-behaviour/min-confidence fields cleared.
+- Regression coverage: `tests/nl-issue-204-corpus-fix.test.ts` (34 cases).
+- Operator validation surfaced and fixed three independent, correction-tool-only defects during
+  candidate targeting (no parser/runtime defect in any of the three): (1) a category+template-only
+  candidate selector matched 996 real-corpus rows instead of 180, requiring targeting on the row's full
+  structural signature (grain/mode/aggregation/metric/match-type/season-shape); (2) the question-text
+  checker's plain-finals regex was singular-only (`/\bfinal\b/i`) and rejected the corpus's real plural
+  "...in finals in YEAR" wording, widened to `/\bfinals?\b/i`; (3) the season-shape candidacy gate
+  wrongly required `expected_season_from === expected_season_to` for every row, but the corpus records
+  a Grand Final's season only in `expected_season_from` (blank `expected_season_to`), fixed by branching
+  the check on `expected_match_type`.
+- `PARSER_VERSION` unchanged at 53; no `src/search/nl/` or `src/db/` file touched.
+- Operator-validated: focused tests and `tsc --noEmit` passed. Real V3 → V4 correction: 180/180 target
+  rows modified, 0 non-target rows touched (independently re-verified against the raw CSV, same 12000-row
+  id set, no unexpected changed fields). Parser-v53 rerun against V4: 12000 scored / 11930 clean / 70
+  soft / 0 failed (down from 250 soft on V3) — the 180 `UNEXPECTED_DECLINE` rows cleared, zero new soft
+  rows, zero semantic changes among rows that remained soft. The remaining 70 soft rows are the
+  pre-existing `WRONG_FAILURE_REASON` taxonomy-drift family (AFLDB-ISSUE-200), tracked separately and
+  unaffected by this change.
+- This resolves the fourth and last of AFLDB-ISSUE-200's follow-on families; the Stage 2 NL corpus audit
+  is now closed.
+
+### NL search: "zero" now parses as an exact-equality career condition (AFLDB-ISSUE-203) - 16 September 2026
+
+- `NUMBER_WORDS` (`src/search/nl/vocab.ts`) had no `zero` entry, so the word survived into
+  `unsupportedTerms` for `player_career` questions such as "players with 4 games and zero goals" —
+  15 corpus rows declined with `unsupported_term`="zero".
+- Added `zero: 0` to `NUMBER_WORDS`. On its own this would have converted the 15 declines into 15
+  silently wrong answers, because `extractCareerConditions` defaults a comparator-less numeric
+  clause to `op: 'gte'` (correct for positive counts, but `goals >= 0` is trivially true for every
+  player). `extractCareerConditions` now tracks whether a comparator was explicit and forces
+  `op = 'eq'` for a comparator-less zero-valued clause; explicit-comparator semantics (e.g. "at
+  least zero", "more than zero") are unchanged. The existing `no`/`never`/`without` negative-trigger
+  paths were already correct and are unaffected.
+- `PARSER_VERSION` 52 → 53.
+- Regression coverage added to `tests/nl-parser.test.ts` (the bug's exact shape, a bare
+  single-condition control, a digit-`0` control, a positive-number-word control, explicit-comparator
+  cases, the existing negative-trigger forms, and an unrelated unsupported-word control).
+- Operator-validated: `tests/nl-parser.test.ts` and `tsc --noEmit` passed. Stable V3 stress corpus
+  moved 12,000 scored / 11,735 clean / 265 soft / 0 failed (v52) → 12,000 / 11,750 / 250 / 0 (v53):
+  exactly the 15 known zero-word soft failures cleared, zero new soft rows, zero semantic changes
+  among the 250 rows that remained soft (180 pre-existing stale pre-1965 coverage expectations, 70
+  pre-existing taxonomy-drift rows).
+- Residual, unexercised edge noted for future reference: the `eq` override runs before the
+  `grand_finals`/`prelim_finals` qualifier-builder check, so a hypothetical "0 grand finals"-shaped
+  clause would read as a plain equality condition rather than a `grand_finals_played_min`
+  predicate. Not exercised by the corpus, not fixed, not a regression.
+
+### NL search: "GWS Giants" no longer strands "gws" as an unsupported term (AFLDB-ISSUE-202) - 16 September 2026
+
+- `CLUB_NICKNAMES` (`src/search/nl/vocab.ts`) had only the independent single-word nicknames `gws`
+  and `giants`, both merged onto the Greater Western Sydney organization but with no combined
+  two-word alias. `extractClubs`'s two-match-slot-per-question span matcher spent one slot on the
+  subject club and the other on `giants`, correctly resolving `clubAgainst` but leaving the literal
+  token `gws` unconsumed; it surfaced in `report.unsupportedTerms` and the question declined
+  `unsupported_term` even though the club identity had already resolved correctly. Added a combined
+  `'gws giants': 'greater western sydney'` entry, the same multi-word-alias mechanism already used
+  for `'same olds': 'essendon'`. No change to `extractClubs`, `findClub`/`findLongestMatch`,
+  `consumedSet`/`leftoverTokens`, or `declineFailureReason` — this is a directory-completeness fix,
+  not a matching-code or unsupported-term-detection change.
+- `PARSER_VERSION` 51 → 52, since this changes which plan a previously-declining question resolves
+  to.
+- Regression tests added to `tests/nl-parser.test.ts` (against/versus/over/to phrasing, a `score`
+  metric case, a `since YEAR` case, bare `GWS`/`Giants` still resolving unchanged, and a negative
+  case proving an unrelated unsupported word adjacent to `gws` still declines).
+- Operator-validated: 428/428 `tests/nl-parser.test.ts`, clean `tsc --noEmit`. Stable V3 stress
+  corpus moved 12,000 scored / 11,535 clean / 465 soft / 0 failed (v51) → 12,000 / 11,735 / 265 / 0
+  (v52): all 128 `unsupported_term|tm|gws` manifestations cleared (`UNEXPECTED_DECLINE` 323 → 195),
+  with zero new soft findings and zero semantic changes among the rows that remained soft.
+- The same alias also fully resolved all 72 pre-existing `GRAIN_EQUIVALENT` rows (GWS Giants
+  player-season leading-goalkicker questions, e.g. "GWS Giants player with most goals in 1897"):
+  previously accepted only as an equivalent `player_season -> player_game/sum` grain substitution
+  because "GWS Giants" did not fully resolve as a single club mention, they now match the corpus's
+  exact expected semantics once the full phrase resolves as one entity. This is a normalization
+  improvement from the same root cause, not a separate change or a regression.
+- Final soft composition (265): `UNEXPECTED_DECLINE` 195 (180 stale pre-1965 coverage expectations +
+  15 `zero` word-form parser defect, both pre-existing and out of scope for this issue) and
+  `WRONG_FAILURE_REASON` 70 (pre-existing taxonomy-drift family, unchanged). No GWS-related soft
+  findings remain.
+
+### NL search: career-boundary questions now accept a season range owned by the boundary itself (AFLDB-ISSUE-201) - 16 September 2026
+
+- `validatePlan` (`src/search/nl/plan.ts`) rejected any `player_career` plan carrying a season range
+  unless a career predicate/condition owned it, which made no exception for `raw.boundary`
+  (`NlBoundary`, e.g. "first game" / "last game" at a final or Grand Final) — a separate, already
+  independently-validated top-level plan field. A boundary question naming a year or range ("players
+  whose first game was a Grand Final in 1897") always hit the generic rejection, even though the range
+  names when the boundary event happened, not a career-aggregation window. The validator now also
+  exempts a plan carrying `raw.boundary`, unchanged for every other `player_career` season-range case.
+- `conditionsWhere` (`src/db/queries/nl/player-career.ts`) never read the season range for boundary
+  plans at all, so relaxing the validator alone would have silently ignored the requested year. A new
+  `boundarySeasonWhere` helper now ANDs the range against the boundary-appropriate precomputed column
+  (`c.debut_season` for a `debut` boundary, `c.final_season` for `last_game`), applied to the player's
+  true boundary game, never to "search matches in range, then pick the first/last one."
+- `PARSER_VERSION` 50 → 51, per the AFLDB-ISSUE-110 precedent that a validator-only change to plan
+  outcomes is version-worthy.
+- Regression tests added to `tests/nl-parser.test.ts`, `tests/nl-plan.test.ts` (including a negative
+  regression proving the exemption is boundary-only) and `tests/integration/nl-answers.test.ts`
+  (DB-backed, including an existence-guarded counter-example proving the fix filters on the true
+  boundary, not on matches-in-range).
+- Operator-validated: 774/774 focused unit tests (`nl-parser.test.ts`, `nl-plan.test.ts`,
+  `nl-semantic-mapping.test.ts`), 33/33 `tests/integration/nl-answers.test.ts`, clean `tsc --noEmit`.
+  Stable V2-derived stress corpus moved 12,000 scored / 10,937 clean / 1,063 soft / 0 failed (v50) →
+  12,000 / 11,533 / 467 / 0 (v51): 596 of AFLDB-ISSUE-200's 598 `PLANNER_VALIDATOR_BUG`
+  `coverage_unavailable|boundary` manifestations cleared, with zero new soft findings and zero
+  collateral movement in the other five ISSUE-200 clusters.
+- The remaining 2 of those 598 (id 9907 "players whose first game was a Grand Final before 1897", id
+  10294 "players whose debut was a Grand Final before 1897") both resolve to `seasonMax = 1896`, one
+  season before `NL_LIMITS.minSeason` (1897, the first VFL season) — v51 correctly declines both
+  `coverage_unavailable` / "Season is out of range.", so these were stale corpus expectations, not
+  implementation defects. Corrected with a new checked-in, self-verifying script,
+  `tools/nl/fix-issue-201-stale-boundary-expectations.ts` (pattern: AFLDB-ISSUE-199's
+  `fix-issue-199-stale-expectations.ts`), which asserts each row's exact question text and pre-state
+  before rewriting it to this repository's established `EXPECTED_DECLINE`/`coverage_unavailable`
+  shape, refusing to run on any mismatch. Unit tests: `tests/nl-issue-201-corpus-fix.test.ts` (17/17
+  passed).
+- Final stable-corpus result after both corrections: 12,000 scored / 11,535 clean / 465 soft / 0
+  failed (`GRAIN_EQUIVALENT` 72, `UNEXPECTED_DECLINE` 323, `WRONG_FAILURE_REASON` 70), with an
+  independent before/after row-diff confirming the only two ids that moved were 9907 and 10294, and
+  zero semantic changes among the rows that remained soft. The 465 remaining soft findings are all
+  already-known, out-of-scope families (180 stale pre-1965 FGF coverage expectations, 128 GWS
+  unsupported-term parser bug, 15 `zero` word-form parser bug, 72 accepted grain equivalence, 70
+  accepted taxonomy drift).
+
+### NL stress corpus: all 1,063 remaining soft findings audited and classified (AFLDB-ISSUE-200) - 16 September 2026
+
+- AFLDB-ISSUE-199 resolved every hard failure in the V1 12,000-row NL stress corpus but explicitly
+  left its 1,063 soft findings (`GRAIN_EQUIVALENT` 72, `UNEXPECTED_DECLINE` 921,
+  `WRONG_FAILURE_REASON` 70) unaudited. Every one of those 1,063 rows now carries an evidence-backed
+  disposition, confirmed by the audit tool's own run against the real DEV artifacts.
+- Added two checked-in, DB-free `tools/nl/` scripts (plus a shared constants module) that re-score
+  every row with the existing, unmodified `scoreRow`/`verdict` exports (so classification can never
+  diverge from a real stress run) and mechanically cluster the results:
+  `audit-issue-200-extract.ts` (results.jsonl -> per-row audit CSV) and
+  `audit-issue-200-cluster.ts` (audit CSV -> cluster summary, and `--apply-dispositions` -> final
+  classified CSV). Added `tools/nl/issue-200-dispositions.csv`, the checked-in six-cluster
+  disposition mapping.
+- The real DEV run found exactly six clusters partitioning all 1,063 rows:
+  `PLANNER_VALIDATOR_BUG` 598 (career-boundary questions wrongly rejected by the generic
+  `player_career` season-range validator), `STALE_CORPUS_EXPECTATION` 180 (pre-1965 disposals/
+  marks/tackles finals questions the corpus still expects to succeed), `PARSER_BUG` 143
+  ("GWS"/"GWS Giants" leaking into unsupported-term detection, 128; the word "zero" not binding as
+  numeric-zero in career conditions, 15), `GRAIN_EQUIVALENT_LEGITIMATE` 72 (an intentionally
+  accepted scorer leniency, no defect), and `TAXONOMY_DRIFT` 70 (a correct decline under the wrong
+  diagnostic label, no semantic defect).
+- No parser, planner, scorer or runtime behaviour changed, `PARSER_VERSION` unchanged, and neither
+  external corpus file was modified — this is audit/classification tooling and its recorded
+  evidence only. The three defect families and the one guarded corpus-correction task identified
+  above are recorded for future follow-on issues, not opened as tracked issues in this closeout.
+
+### NL stress corpus: 173 stale hard-failure expectations corrected after Stage 2 parser hardening (AFLDB-ISSUE-199) - 16 September 2026
+
+- The external V1 12,000-row NL stress corpus (`~/nl-stress-corpus.csv`, outside this Git repository)
+  carried 173 rows still labelled `expected_status=decline` from before three features they now exercise
+  successfully had shipped: the true 7-identity Ablett family (AFLDB-ISSUE-197), team-streak questions
+  (parser v16), and coach-record questions (parser v35, migration 087). Parser v50 correctly answers all
+  173; the corpus's own expectations were stale, not the parser.
+- Added `tools/nl/fix-issue-199-stale-expectations.ts`, a checked-in, self-verifying correction script
+  (reusing `tools/nl/corpus.ts`'s CSV reader): it asserts the corpus has exactly 12,000 rows and that
+  the 173 audited target ids are currently `expected_status=decline`, rewrites only those rows'
+  expectation columns to the audited success shape (each row's own question text is checked against its
+  audited metric/group before being corrected), leaves every other row and column byte-identical, and
+  refuses to run — writing nothing — if any assumption does not hold. Run by the operator against the
+  real canonical CSV, producing a separate corrected file rather than overwriting the input.
+- No parser/planner/application code changed; `PARSER_VERSION` stays 50. This is a test-tooling/corpus
+  data fix only.
+- Operator-validated on the dev host: correction tool changed exactly the 173 target rows and no others
+  (5 Ablett + 112 team-streak + 56 coach-record); re-running `npm run nl:stress` against the corrected
+  corpus on parser v50 moved `AMBIGUITY_NOT_DETECTED`/hard failures 173 → 0 with the three unrelated soft
+  classes (`GRAIN_EQUIVALENT` 72, `UNEXPECTED_DECLINE` 921, `WRONG_FAILURE_REASON` 70) unchanged.
+- Stage 2 remains open: those three soft classes (1,063 rows) are unaudited and may hide their own stale
+  expectations, a decision for a future triage.
+
+### NL search: hyphenated/apostrophe-surname family members no longer silently dropped from the ambiguity re-check (AFLDB-ISSUE-198) - 16 September 2026
+
+- `candidateNameWords` (`src/search/nl/parser.ts`), the parser's defence-in-depth re-check on
+  `resolvePlayerFamily`'s plausible-candidate list, tokenised each candidate's name by plain
+  whitespace-splitting. SQL's `afldb_normalise_name` (and the `search_name`/`search_alias` columns
+  `resolvePlayerFamily` reads) already treats hyphens, underscores and slashes as word breaks, so a
+  hyphenated surname was one word to TypeScript and two words to SQL. A real 13-member Jones family
+  (including `Darcy Byrne-Jones` and `David Rhys-Jones`) undercounted to 11 under the re-check,
+  crossed back under `NL_LIMITS.maxPlayerCandidates` (12), and ranked a confident wrong answer
+  instead of declining as ambiguous.
+- `candidatePlayerSpan` separately rejected any token containing a hyphen or apostrophe outright, so
+  a full-name mention of such a player (e.g. "David Rhys-Jones most games") could lose the surname
+  before any resolver ran, risking a wrong-answer accept-branch match on the given name alone.
+- A new shared helper, `splitNameWords`, mirrors `afldb_normalise_name`'s documented punctuation
+  contract (hyphens/underscores/slashes are word breaks; apostrophes/full stops are deletions, not
+  breaks) in TypeScript, used by `candidateNameWords`, the accept-branch token-justification checks,
+  the ambiguity branch's resolver lookup, and `candidatePlayerSpan`'s widened acceptance test.
+  `candidatePlayerSpan` keeps the original punctuation-bearing token intact when it accepts it
+  (rather than splitting it into separate words), so end-of-pipeline confidence/leftover-token
+  accounting — which compares against the original query's plain-whitespace token count — stays
+  correct.
+- Generic surname families with hyphenated members (e.g. Jones) now correctly decline as ambiguous
+  when they exceed the 12-candidate cap, and full-name queries for hyphenated/apostrophe-surnamed
+  players (e.g. Rhys-Jones, Byrne-Jones, O'Brien) now resolve to the named player instead of a
+  same-given-name decoy or an undetected mention. No SQL/schema/`resolve.ts` change.
+- `PARSER_VERSION` 49 -> 50.
+
+### NL search: bare-surname family ranking no longer resolves against a silently truncated 5-candidate list (AFLDB-ISSUE-197) - 16 September 2026
+
+- `resolvePlayer` (`src/db/queries/nl/resolve.ts`) hard-capped every surname/family candidate lookup
+  at 5 rows via `searchPlayers`, and that same 5-row array was the *only* candidate source the
+  parser's ambiguity branch had to decide "2–12 plausible identities, rank the complete family" vs.
+  ">12 plausible identities, decline as a generic surname clash" (`NL_LIMITS.maxPlayerCandidates`).
+  Because the array could never exceed 5 rows, the documented `> 12` decline was unreachable in
+  production, and a real family larger than 5 (Ablett: 7) silently ranked over an incomplete subset.
+- A new dedicated resolver, `resolvePlayerFamily` (`src/db/queries/nl/resolve.ts`), implements the
+  parser's own whole-word-prefix plausibility predicate directly in SQL against
+  `players`/`player_name_aliases` — not `searchPlayers`'s looser substring/trigram ranking, which can
+  let an unrelated substring match crowd a true family member out of a bounded result window — and
+  fetches `NL_LIMITS.maxPlayerCandidates + 1` (13) deduplicated-per-player rows, letting the parser
+  tell "≤12, complete" from ">12, decline" from one call. The parser's ambiguity branch
+  (`src/search/nl/parser.ts`) now reads this instead of filtering `resolvePlayer`'s 5-capped array,
+  keeping the existing whole-word-prefix filter as a defence-in-depth check on whatever the resolver
+  returns.
+- "Ablett most goals"/"most games" now ranks across the complete 7-player family instead of a
+  5-player subset that could omit the true career leader. Generic surnames past the 12-candidate cap
+  (Brown, Smith, Johnson, Williams, Jones, Wilson, Anderson, ...) now decline as ambiguous instead of
+  answering confidently over an arbitrary 5-player subset — for example "Brown most goals" no longer
+  answers "Ben Brown, 360" when the true surname-family leader is Jonathan Brown at 594.
+- `resolvePlayer`'s 5-row cap and the accept branch (a single confident name match) are unchanged.
+  No schema/migration change. `PARSER_VERSION` bumped 48 → 49.
+
+### NL search: a club-season "won the premiership" no longer strands its condition when conjoined with another (AFLDB-ISSUE-195) - 16 September 2026
+
+- `CLUB_SEASON_CONDITION_WORDS`' `premier` entry (`src/search/nl/vocab.ts`) now also accepts plural
+  "premiership team(s)/side(s)" wording. A new, separately-gated entry recognises "won the/a
+  premiership" — tried only when the question already carries an independent club/team subject cue
+  (`clubSubjectPresent`), so it cannot manufacture a false club-season reading for a player-subject
+  question such as "Dusty won the premiership with Richmond in 2017". Both map to the same existing
+  `'premier'` club-season condition.
+- "teams that won the premiership and the wooden spoon" previously planned `club_season` with only
+  `wooden_spoon` in `clubSeasonConditions` — the still-unrecognised "premiership" word was silently
+  stolen by the bare career-metric fallback and then discarded because no `club_season` plan field
+  reads it. It now correctly carries both `premier` and `wooden_spoon` conditions.
+- A new, narrowly-scoped ownership guard closes the general mechanism, not just this one trigger:
+  once grain elects `club_season`, a leftover recognised career-stat word (for example "finals" in
+  "teams that played the finals and won the wooden spoon") now declines by name instead of letting
+  the plan silently answer only its other, recognised condition. `clubs_played` is exempted, since a
+  bare "club(s)" left over in several valid club-season questions is that question's own subject
+  noun re-matching the same vocabulary entry, not a second requested semantic.
+- AFLDB-ISSUE-189's all-time club/team premiership declines ("which team has won the most
+  premierships", "teams with more than 5 premierships") and AFLDB-ISSUE-188's player-career
+  premiership queries ("players who have won 3 premierships", "which player has the most
+  premierships") are unaffected. No new club-season grain, condition kind, or generic
+  consumed/unowned-token framework was introduced; no SQL/compiler/schema change. `PARSER_VERSION`
+  bumped 47 → 48.
+
+### NL search: career-condition numbers no longer cross prepositional clause boundaries (AFLDB-ISSUE-196) - 16 September 2026
+
+- `extractCareerConditions` (`src/search/nl/parser.ts`) now resolves pending `CAREER_STAT_WORDS`
+  entries in the order their stat word occurs in the question, not in `CAREER_STAT_WORDS`'s fixed
+  vocabulary order. Each entry's noun, comparator and number are matched and stripped from the
+  working text before the next pending entry's backward lookback window is built, so a
+  later-in-vocabulary noun can no longer reach across an earlier, unconsumed clause's own number or
+  comparator and steal it.
+- "players with 300 games at 2 clubs" previously bound `clubs_played >= 300` (stealing `games`'s own
+  `300`) while silently orphaning the literal `2` and leaking `games` as a bare ranking metric. It
+  now correctly binds `games >= 300` and `clubs_played >= 2`. The same fix applies to the `for` and
+  `over` linking words, comparator wording ("more than"/"over N"), reversed clause order, and
+  number-word forms ("three premierships at two clubs"). A related comparator-misattribution failure
+  (`"players with more than 300 games at 2 clubs"` binding `op: 'gt'` to `clubs_played` instead of
+  `games`) is fixed by the same mechanism.
+- `"players with 300 games across 2 clubs"` intentionally still declines: `across` is not in
+  `STOPWORDS` (unlike `at`/`for`/`with`/`over`), so it remains an unsupported leftover token even
+  though both numeric conditions resolve correctly internally. This is expected current vocabulary
+  behaviour, not a regression; adding `across` to `STOPWORDS` is a separate, out-of-scope vocabulary
+  decision this issue does not make.
+- No new career-condition grain, column, metric, or generic consumed/unowned-token framework was
+  introduced. `PARSER_VERSION` bumped to 47.
+
+### NL search: matchup-scoped symmetric team-match rankings no longer duplicate a match per side (AFLDB-ISSUE-194) - 16 September 2026
+
+- `answerTeamMatch` (`src/db/queries/nl/team-match.ts`) now applies the AFLDB-ISSUE-192 canonical
+  home-side restriction for `attendance`/`total_score` whenever there is no `clubFor`/`clubAgainst`
+  scope, `scope.matchup` included. Only `clubFor`/`clubAgainst` are perspective-sensitive
+  (directional); `scope.matchup` is a symmetric physical-match filter (either club can be home or
+  away), so it no longer suppresses canonicalisation.
+- "biggest crowd richmond v carlton" and equivalent `total_score` matchup questions previously
+  ranked each physical match twice — once per `SIDES` perspective — doubling row counts and
+  producing ranking patterns like `1,1,3,3,5,5` instead of `1,2,3,4,5`. They now emit one row per
+  physical match, matching AFLDB-ISSUE-192's existing unscoped/side-scoped behaviour.
+- `validatePlan` (`src/search/nl/plan.ts`) already refuses a plan combining `scope.matchup` with
+  `scope.clubFor`/`scope.clubAgainst`, so a matchup constraint can never mask a genuine directional
+  side scope. `clubFor`/`clubAgainst` behaviour and non-symmetric team-match metrics are unchanged.
+  No new grain, metric, or parser semantics; `PARSER_VERSION` not bumped; no SQL/schema change
+  beyond the narrowed gate condition.
+
+### NL search: symmetric team-match rankings no longer duplicate a match per side (AFLDB-ISSUE-192) - 15 September 2026
+
+- `answerTeamMatch` (`src/db/queries/nl/team-match.ts`) ranks `attendance` and `total_score` once
+  per physical match instead of once per participating club. The `SIDES` CTE intentionally emits
+  one row per club so every match has two perspective rows; `attendance` and `total_score` are
+  symmetric match-level metrics, so both rows carried the same value and tied at the same rank,
+  letting one match appear twice — halving an effective top-N and doubling the reported `total`.
+- The fix restricts a symmetric, unscoped ranking to the canonical home-side row
+  (`t.club_id = m.home_club_id`), and applies only when the metric is `attendance` or
+  `total_score` and the scope carries no `clubFor`/`clubAgainst`/`matchup`. Side-scoped queries are
+  unchanged, and side-dependent metrics (`team_score`, `opponent_score`, `win_margin`,
+  `loss_margin`, `q3_deficit_overcome`) are unchanged. No generic deduplication framework was
+  introduced.
+
+### NL search: a club-subject "won more than N premierships/flags" no longer counts match wins (AFLDB-ISSUE-193) - 15 September 2026
+
+- `extractHavingClause` (`src/search/nl/parser.ts`) no longer claims a number for a grouped
+  team-result threshold (wins/losses/draws/games) without checking which noun that number actually
+  governs. A new guard checks the text immediately following the candidate number against
+  non-result career/season nouns (`premierships`/`flags`, `finals`, `clubs`, `goals`, `brownlow
+  medals`/`votes`) before claiming the threshold; when one of those nouns is what the number
+  governs, the extractor makes no claim at all.
+- "clubs that have won more than 10 premierships" previously elected `team_match` with
+  `havingClause { metric: 'wins', op: 'gt', value: 10 }`, silently answering a match-win threshold
+  instead of a premiership count. It now falls through to the existing AFLDB-ISSUE-189 fail-closed
+  behaviour and declines by name, since AFLDB still has no all-time club-premiership totals grain.
+  This is a wrong-answer prevention fix, not new premiership-total support.
+- Legitimate grouped team-result questions are unchanged: "teams with more than 2 wins against
+  Richmond" and "teams to lose 5 times by more than 100 points" still plan as before.
+- `PARSER_VERSION` bumped to 46.
+
+### NL search: the boundary extractor no longer claims bare "first" in finals scope (AFLDB-ISSUE-191) - 15 September 2026
+
+- Period-split and score-checkpoint extraction (`extractPeriodSplit`, `extractScoreCheckpoint` in
+  `src/search/nl/parser.ts`) now run before boundary extraction, so phrases such as "first quarter"
+  and "first half" are consumed intact before the boundary extractor can read a bare "first" out of
+  them. Previously boundary ran first and stripped "first" as a debut cue, leaving "quarter"
+  stranded and declining a question the engine already knows how to answer.
+- The boundary debut cue (`DEBUT_RE` in `parser.ts`) is tightened: bare "first" no longer elects a
+  debut boundary by itself. Debut semantics now require the literal word "debut"/"debuted", or
+  "first" directly governing a game noun ("first game", "first ever game").
+- Grain election now fails closed when a genuine boundary is elected alongside an independently
+  consumed player metric, instead of silently dropping the metric and answering plain boundary
+  membership: a boundary question has no metric column of its own.
+- "who kicked the first goal in a grand final" no longer becomes a debut/boundary plan (it declines,
+  since AFLDB has no first-scorer data). "highest first quarter score in a grand final" now
+  correctly plans as a period-split `team_match` (`periodSplit: 'Q1'`, `matchType: 'grand_final'`),
+  instead of declining on a stranded "quarter".
+- Legitimate boundary questions are unaffected: "players whose first game was a grand final",
+  "players whose last game was a grand final", and "players who debuted in a grand final" all still
+  plan as before.
+- `PARSER_VERSION` bumped to 45.
+
+### NL search: a game/season stat threshold no longer silently drops a co-occurring career condition (AFLDB-ISSUE-187) - 15 September 2026
+
+- Grain election (`src/search/nl/parser.ts`) now fails closed when it elects a non-career grain
+  (`player_game`, `player_season`, `team_match`, etc.) while `careerResult.conditions` still holds
+  a condition no conversion path consumed. Previously a `METRIC_WORDS` stat threshold (e.g. "40
+  disposals in a game") could route straight to `player_game` while a co-occurring career-vocabulary
+  clause ("no premierships", "200 games") was claimed by `extractCareerConditions` but never
+  consumed, then silently discarded at the final `careerConditions` assignment — the plan answered
+  the narrower per-game question with confidence 1.00 as if it were the whole question asked.
+- Affected phrasings now decline (`status: 'none'`, `reason: 'unrecognised'`) naming the stranded
+  condition, instead of answering a strict superset of the question: "players with 40 disposals in
+  a game and no premierships", "players with more than 30 disposals and 5 goals in a game",
+  "players with 300 games and more than 30 disposals in a game", "richmond players with 40
+  disposals in a game and 200 games".
+- The pre-existing sole-career-condition conversions onto `player_season`/`player_game` (a single
+  career-vocabulary threshold reinterpreted via the question's own season/single-game/scoped-total
+  wording) are unchanged in behaviour and now explicitly remove the condition they repurpose from
+  `careerResult.conditions`, so they are not caught by the new guard.
+- Unaffected: valid career-grain questions, and single-clause non-career thresholds with no
+  career condition present, plan exactly as before.
+- `PARSER_VERSION` bumped to 43.
+
+### NL search: player-subject "won"/"win"/"wins" questions no longer misroute to a grouped club wins count (AFLDB-ISSUE-188) - 15 September 2026
+
+- `extractHavingClause` (`src/search/nl/parser.ts`) now refuses its whole grouped-result word
+  list (`draws`/`wins`/`losses`/`lose`/`lost`/`win`/`won`/`games`) when the question has a player
+  subject ("players"/"who") and no club/team subject. Previously only `games` was gated on a club
+  subject; the result words were assumed unambiguous, so "players who have won 3 premierships",
+  "players who won 2 brownlow medals" and "players with more than 100 wins" had "won"/"win"/"wins"
+  claimed as a grouped `team_match` having clause, the stripped number left the real career stat
+  word ("premierships"/"brownlow medals") with no number to bind, and the question answered a
+  club-wins count list instead of the intended player list.
+- Refused player-subject questions now fall through to the existing career-condition extractor,
+  producing a `player_career` condition on the correct column (`premierships`, `brownlow_medals`,
+  `wins`) instead of a `team_match` having clause.
+- Unaffected: explicit club/team-subject grouped readings ("clubs that have won more than 10
+  premierships", "teams with more than 2 wins against Richmond") and subject-less grouped readings
+  ("exactly three wins against Carlton") are unchanged.
+- `PARSER_VERSION` bumped to 42.
+
+### NL search: "how many" declines instead of silently answering a single-game/season/match leader (AFLDB-ISSUE-190) - 15 September 2026
+
+- `validatePlan` (`src/search/nl/plan.ts`) now refuses a `count` aggregation on `player_game`,
+  `player_season` and `team_match` outright, and on `player_career`/`club_season` whenever a
+  metric is named. Previously these grains' compilers ranked rows via a shared `rankCutoff`
+  helper that treated any non-`top_n` aggregation as cutoff 1, so "how many goals has X kicked"
+  and similar phrasings answered a single best game/season/match under a confident "count"
+  headline instead of a real total.
+- Unaffected: `player_career`/`club_season` questions with no named metric (e.g. "how many
+  players had a brother who played AFL") still answer a genuine row count, as do
+  `head_to_head`, `coach_record` and `after_siren` questions, all of which already implement
+  count semantics correctly.
+- No parser or vocabulary change; `PARSER_VERSION` is unchanged.
+
+### NL search: a club/team subject is captured before extraction; unscoped club/team rankings decline instead of answering at player grain or dumping club seasons (AFLDB-ISSUE-189) - 15 September 2026
+
+- Added `CLUB_SUBJECT_CUE` (`src/search/nl/vocab.ts`), evaluated on the canonicalised question
+  before any extractor runs, and fed into club-season grain election
+  (`src/search/nl/parser.ts`) alongside the existing post-extraction `CLUB_SUBJECT_LEADING` probe.
+  Previously the only subject check ran on already-mutated text, so "which club has won the most
+  premierships" (the subject word is never leading) and "teams with the most premierships" (the
+  leading words are consumed by aggregation extraction first) lost their club/team subject
+  entirely and fell through to `player_career`, answering a player board for a club question.
+- Grain election now declines two club_season shapes by name instead of answering them: a plan
+  with no metric and no club-season condition ("which club has won the most premierships", "teams
+  with 5 premierships" — AFLDB has no club-lineage totals grain for all-time premierships/wins/etc);
+  and a ranked metric (wins/losses/draws/percentage) with no season semantics ("which team has the
+  most wins", "top 5 teams by percentage", "which team has the most wins since 2000") — these no
+  longer silently answer a best single season for what reads as an all-time question.
+  `validatePlan` (`src/search/nl/plan.ts`) carries a matching backstop refusing any club_season
+  ranking plan (`max`/`min`/`top_n`) with no metric and no conditions, closing the same path for
+  any future parser change or a directly constructed plan.
+- Unaffected: valid season-scoped club/team questions ("which team has the most wins in a season",
+  "which club had the most losses in 2017", "which clubs won the wooden spoon") continue to answer
+  at `club_season` exactly as before; a bare, non-leading "clubs"/"teams" ("players who played for
+  the most clubs") keeps meaning the player-career `clubs_played` column; grains that already
+  answered club/team subjects correctly (`team_match` including having clauses, `team_streak`,
+  `head_to_head`, `achievement_summary`, `coach_record`, family, and the named-club NL-017 path)
+  are unchanged; the ISSUE-188 `extractHavingClause` club-subject having-clause gate is untouched.
+- A related club-subject misread — "clubs that have won more than 10 premierships" counting match
+  wins via a `team_match` having clause — is tracked separately as AFLDB-ISSUE-193 and was not
+  fixed here.
+- `PARSER_VERSION` bumped to 44.
+
+### Contributor account/access retired; deprecated CSV pipeline left in place for later cleanup (AFLDB-ISSUE-186) - 15 September 2026
+
+- The `contributor` staff role — the account type behind the deprecated `/admin/upload` CSV
+  submission workflow — can no longer authenticate or establish a usable admin session.
+  `getAdminUser()` (`src/lib/auth/session.ts`) and `adminLogin()`
+  (`src/app/admin/login/actions.ts`) both now exclude `role='contributor'` from their queries,
+  independent of `disabled_at`. An already-issued contributor session fails on its very next
+  authenticated request, because `getAdminUser()` re-checks the account's role on every request —
+  no session-revocation sweep was needed.
+- No new contributor account can be created or redeemed through any supported path: the admin
+  invite form no longer offers "Contributor", `createInvite()` refuses a server-side request for
+  `role=contributor` outright, and `beginEnrolment()`/`confirmEnrolment()` both refuse to redeem
+  an invite link already carrying `role='contributor'` (including one minted before this change).
+- Existing historical `contributor` identities are fully retained: no `auth_users` row was
+  deleted, mutated or reclassified, the `'contributor'` DB enum/check value (migration 033) is
+  unchanged, and every existing FK attribution to a contributor account (for example
+  `data_submissions.uploaded_by`/`reviewed_by`) remains intact. A contributor account still
+  remains readable in the admin roster and history views. Reactivating a deactivated contributor
+  account restores `disabled_at IS NULL` but does not restore the ability to sign in — the
+  authentication boundary excludes the role itself, independent of `disabled_at`.
+- The deprecated CSV submission pipeline itself is unchanged and left in place for a later
+  cleanup phase: `/admin/upload`, `/admin/submissions/[id]`, `src/lib/ingest/pipeline.ts`,
+  `datasets.ts` and `csv.ts`, `/api/admin/email-intake`, `tools/email_intake/`, the
+  `deploy/afldb-email-intake.service`/`.timer` unit definitions, `data_submissions`,
+  `data_submission_rows`, `acquisition.legacyIntake`, `sources.key='sports_data_lab'` and
+  `import_batches` are all untouched.
+- AFL Tables/current-season ingestion, observation, settle and reconciliation are unaffected —
+  no file in that subsystem was touched.
+- No migration, no schema or grant change, and no data backfill of any kind. AFLDB-ISSUE-185's
+  provenance fix is unaffected and remains correct.
+
+### Reviewed match-result submissions now preserve provenance on promotion (AFLDB-ISSUE-185) - 15 September 2026
+
+- `matchResults.promoteRow()` (the `match_results` CSV admin-upload dataset,
+  `src/lib/ingest/datasets.ts`) now writes `source_id`, `source_record_id` and `import_batch_id`
+  on every canonical match it creates, using the `sourceId`/`batchId` the promotion pipeline
+  (`src/lib/ingest/pipeline.ts`) already resolves for every dataset — previously received and
+  silently discarded, unlike its sibling `playerMatchStats.promoteRow()`, which already wrote
+  `source_id`/`import_batch_id`.
+- `source_id` resolves to the existing shared `sources.key = 'sports_data_lab'` row, the same
+  source every admin-upload dataset promotes under. `source_record_id` reuses the dataset's
+  existing `match_key` compound identity (season|round|date|home|away) — there is no external id
+  in this CSV format to carry instead, so this follows the `all_australian` dataset's established
+  convention of deriving an identity from the resolved fields, rather than inventing a new format
+  or reusing AFLDB-ISSUE-184's `match:<uuid>` minted-token convention (a different creation path).
+- Re-promoting a corrected file against an **existing** canonical match (`ON CONFLICT (match_key)
+  DO UPDATE`) never rewrites that row's `source_id`/`source_record_id`/`import_batch_id` — a match
+  already owned by `afltables`, `manual_admin_edit`, or an earlier promotion keeps its original
+  provenance untouched, exactly as every other manual/admin correction path already leaves
+  provenance stable once set.
+- Because the settle/canonical-apply reconciliation ownership gate already reads `matches.source_id`
+  generically, a `match_results`-promoted match is now treated as owned by `sports_data_lab` and
+  refused for adoption by a foreign source on both the automatic (unattended settle) and the
+  human-reviewed promotion path. No change was made to the reconciliation logic itself; only the
+  provenance value `matchResults.promoteRow()` writes changed.
+- No migration, no source-registry seed, and no backfill. A DEV read-only audit of `afldb_dev`
+  found zero historical `match_results` import batches and zero `match_results` data submissions —
+  every one of the 17,051 provenanced matches in `afldb_dev` is `afltables`-sourced, and this
+  change is a forward correctness fix with no historical rows to reconcile. The one pre-existing
+  `NULL`-source match (id 17269, a 2026 semi-final, already noted under AFLDB-ISSUE-184) remains
+  unrelated and unprovable, and was left untouched.
+
+### Admin-created matches now carry manual creation provenance (AFLDB-ISSUE-184) - 15 September 2026
+
+- `createMatch()` now stamps every admin-created canonical match with `source_id` resolved to the
+  existing shared `sources.key = 'manual_admin_edit'` row (the same source every other manual/admin
+  writer in the repository already uses for players, coaches, draft picks, fixtures, club
+  leadership and special records), instead of leaving match provenance entirely `NULL`.
+- `source_record_id` is a stable identity token minted once at creation — `match:<uuid>` — and
+  never regenerated by a later edit or by anything else.
+- Provenance survives every subsequent correction: an edit through the admin data editor updates
+  only the corrected field and records the change in `data_edits`; it never rewrites
+  `source_id`/`source_record_id`. An imported match's original source provenance is likewise
+  preserved by any manual correction, unchanged from existing behaviour.
+- Because the settle/canonical-apply reconciliation ownership gate (`autoApplyOwnership()` /
+  `evaluateTargetOwnership()`) already reads `matches.source_id` generically, a newly
+  admin-created match is now treated as owned by `manual_admin_edit` and refused for adoption by a
+  foreign source on both the automatic (unattended settle) and the human-reviewed promotion path —
+  previously a `NULL`-provenance admin-created row was refused only by the automatic path and
+  remained adoptable through the reviewed promotion queue. No change was made to the reconciliation
+  logic itself; only the provenance value `createMatch()` writes changed.
+- `import_batch_id` stays `NULL` for admin-created matches (no batch-run import produced the row).
+- No migration, no source-registry seed, and no backfill of existing rows. A DEV read-only audit of
+  `afldb_dev` (17,052 matches) found exactly one pre-existing `NULL`-source row (a 2026 semi-final),
+  whose origin cannot be established retrospectively from available evidence and which was
+  deliberately left unbackfilled.
+
+### Admin-created match round_code fallback now uses the established numbered-round vocabulary (AFLDB-ISSUE-183) - 15 September 2026
+
+- `createMatch()`'s blank/omitted-`roundCode` fallback for a normal numbered home-and-away round now
+  derives `round_code` as the plain decimal string (e.g. `"5"`), matching the vocabulary every other
+  writer already uses (`src/lib/external-afl/current-season-import.ts`,
+  `src/lib/ingest/datasets.ts`), instead of the previous `` `R${roundNumber}` `` (e.g. `"R5"`).
+- Explicitly supplied `roundCode` values and finals/special-round derivation (`GF`/`PF`/`SF`/`QF`/
+  `EF`/`WF`) are unchanged.
+- A DEV read-only audit of `afldb_dev` found the existing home-and-away `round_code` vocabulary
+  already fully numeric — 16,327 numeric rows, 0 `R`-prefixed rows — so no historical backfill or
+  migration was required.
+
+### Admin canonical match creation refuses duplicates by canonical identity, not match_key text (AFLDB-ISSUE-182) - 15 September 2026
+
+- `createMatch()`'s duplicate pre-check now compares canonical, DB-typed columns — `season`,
+  `round_type`, `round_number` (NULL-safe), `match_date`, `home_club_id`, `away_club_id` — instead
+  of comparing the `match_key` string. `match_key` has three mutually incompatible rendering schemes
+  across this repository (this admin path: club IDs; manual dataset ingest: club names; the
+  canonical-apply/settle path: the legacy bundle's own key, carried verbatim), so a row for the same
+  real match written under a different scheme previously would not share this path's key and could
+  be silently duplicated. Home/away order is compared exactly, not symmetrically. A defensive catch
+  for SQLSTATE 23505 (the pre-existing `matches_match_key_key` UNIQUE constraint) was added around
+  the transaction, translating a genuine concurrent-submission race into the same friendly,
+  detail-free message — this is a backstop for that pre-existing constraint, not a new
+  concurrency guarantee over the canonical tuple (no database uniqueness constraint over it was
+  added).
+- `tests/integration/match-admin-create.test.ts` added: the first database-backed integration
+  coverage for `createMatch()`, including the cross-rendering duplicate regression (a match seeded
+  with a club-NAME-keyed `match_key` is still recognised as a duplicate of an admin create using the
+  same canonical identity), successful creation, home==away rejection, a bounded-lifespan club
+  identity rejected outside its valid season, and rollback of the match and its quarter-score
+  collateral when the required audit write fails.
+- No migration, schema change, or privilege change. `createMatch()`'s provenance behaviour
+  (`matches.source_id`/`source_record_id` left unpopulated on admin-created rows) is unchanged — no
+  established manual-admin convention for that exists on `matches` today; see the issue entry for
+  the follow-up recommendation.
+
+### Match deletion refuses cleanly when AFL API lineup staging still references it (AFLDB-ISSUE-181) - 15 September 2026
+
+- `deleteMatch` now explicitly checks `staging.afl_api_lineup` before any destructive work. A
+  match still referenced by an AFL API team-announcement lineup row is refused with a message
+  naming the row count and each distinct season/provider-game the announcement was for, instead of
+  falling through to the generic dependency-refusal message. The lineup rows, and the staging
+  observation lineage behind them, are never touched, nulled or detached.
+- The existing generic SQLSTATE 23503 fallback (AFLDB-ISSUE-177) remains as the
+  race/concurrency/unknown-dependency backstop. A repository-wide inventory of every foreign key
+  into `matches(id)` found no remaining un-pre-checked dependency, so integration coverage for that
+  fallback now proves the actual race window it exists for, via a test-only trigger, rather than
+  relying on a permanently-unchecked table. No migration was required, and no privilege was
+  widened.
+
+### Match deletion refuses cleanly when player period statistics still reference it (AFLDB-ISSUE-180) - 15 September 2026
+
+- `deleteMatch` now explicitly checks `player_match_period_stats` before any destructive work.
+  A match still carrying quarter-by-quarter player statistics is refused with a message naming
+  the row and distinct-player counts, instead of falling through to the generic dependency-refusal
+  message. The period-stat rows are never touched or detached.
+- The existing generic SQLSTATE 23503 fallback (AFLDB-ISSUE-177) remains as the
+  concurrency/unknown-dependency backstop. At the time of this change it was also the only guard
+  for `staging.afl_api_lineup.match_id`; see AFLDB-ISSUE-181, which added a named refusal for that
+  dependency too. No migration was required, and no privilege was widened.
+
+### Join-request denial commits atomically with its audit row (AFLDB-ISSUE-179) - 15 September 2026
+
+- `denyJoinRequest` now runs the `beta_join_requests` denial and the `access.join_denied` audit
+  row inside one transaction (`authSql.begin` with `auditInTransaction`), instead of as two
+  independent statements. Previously a failure on the audit write could leave a request
+  permanently recorded as denied with no audit trail.
+- The existing `WHERE id = ? AND status = 'pending'` predicate is unchanged and remains the sole
+  eligibility/concurrency boundary. No intermediate status was introduced, no migration was
+  required, and no privilege was widened. `approveJoinRequest` (AFLDB-ISSUE-178) is unaffected.
+
+### Join-request approval commits atomically with its allowlist entry and audit row (AFLDB-ISSUE-178) - 15 September 2026
+
+- `approveJoinRequest` now runs the `beta_join_requests` approval, the `beta_allowed_emails`
+  insert/reactivation and the `access.join_approved` audit row inside one transaction
+  (`authSql.begin` with `auditInTransaction`), instead of as three independent statements.
+  Previously a failure on either of the last two could leave a request recorded as approved
+  without the email actually being allowlisted, or an approval live with no audit trail.
+- The existing `WHERE id = ? AND status = 'pending'` predicate is unchanged and remains the sole
+  eligibility/concurrency boundary — two administrators approving the same request still cannot
+  both succeed. No intermediate status was introduced, no migration was required, and no privilege
+  was widened.
+
+### Match deletion refuses cleanly when a current-season staging link still points at it (AFLDB-ISSUE-177) - 15 September 2026
+
+- `deleteMatch` now checks `staging.external_current_matches.local_match_id` before deleting a
+  match and refuses with a named `<sourceKey> <externalGameId>` list when a current-season staging
+  row still points at it, instead of letting the underlying foreign-key constraint fail with a raw
+  PostgreSQL error. The staging link is never nulled or detached — reconciliation provenance for
+  the current-season importer is preserved, and the admin is directed to resolve the link through
+  the current-season import process.
+- The FK remains in place as a concurrency backstop: a race between the pre-check and the delete is
+  still caught, with only SQLSTATE 23503 mapped to the same generic dependency-refusal message; all
+  other errors continue to throw. No migration or privilege change was required.
+
+### Submission promotion is locked and commits atomically with its status transition (AFLDB-ISSUE-175) - 15 September 2026
+
+- `promoteSubmission` now locks the `data_submissions` row (`SELECT ... FOR UPDATE`) and commits
+  the promoted data together with the final `promoted`/`failed` status write in the same
+  `afldb_import` transaction. Previously the status flip was a separate, unguarded statement:
+  two concurrent promotions of the same submission could both apply, and a promotion whose data
+  commit succeeded but whose trailing status write failed could leave the submission looking
+  `approved` — and rejectable — after its data was already live.
+- Promotion eligibility is unchanged (`approved` or a previously `failed` submission may be
+  promoted); a retry from `failed` that fails again stays `failed` with the updated error. No
+  intermediate status was introduced, no migration was required, and no privilege was widened —
+  the fix uses a column grant on `data_submissions` that migration 023 already made to
+  `afldb_import`.
+
+### Special-record admin mutations validate the match link before writing (AFLDB-ISSUE-176) - 15 September 2026
+
+- `createFirstKickGoal`/`replaceFirstKickGoal` (`player_achievements`) and
+  `createAfterSirenKick`/`replaceAfterSirenKick` (`after_siren_kicks`) now refuse a supplied
+  `matchId` unless the match exists, belongs to the record's own `season`, and — when a `playerId`
+  is also supplied — that player has a `player_match_stats` row for the match. The refusal happens
+  before any write: not the canonical row, not the durable `data_overrides` payload, not the
+  `data_edits` audit row.
+- No data repair was required: a read-only DEV audit found 0 existing special-record rows
+  violating the invariant.
+
+### Coaches page family: disclosures, deduplicated totals, expandable tables, deterministic comparison grid (AFLDB-ISSUE-174) - 15 September 2026
+
+- Implemented the `issues/closed/AFLDB-ISSUE-174.md` design/planning runbook's phased plan (§18 Phases 1-4) on
+  top of the existing "almanac" design system and the `AFLDB-ISSUE-173` `classic`/`sidebar`
+  layouts — no new visual identity, no schema/query/route/permission change.
+- `/coaches/[slug]`: "Coaching record" and "History against club" are now `CollapsibleTable`
+  disclosures, matching every other AFLDB profile page. `CoachCareerBody` gained a
+  `showTotalsTable` prop (default `true`); the standalone page passes `showTotalsTable={false}` so
+  the `.stat-strip` headline is no longer immediately followed by a second `CoachTotalsTable`
+  showing the same six numbers. `PlayerCoachingCareer` is unaffected — its call site keeps the
+  default `true`. `CoachClubTable`/`CoachVenueHistoryTable` gained `ExpandableTableFrame` wiring on
+  this route via a new `expandWideTables` prop (default `false`, also preserving
+  `PlayerCoachingCareer`'s existing rendering).
+- `CoachOpponentSelector` dropped its `fieldset`/`legend`/`.filter-grid` wrapper for a plain
+  `<label htmlFor>+<select>`, matching the player-linked `CoachOpponentHistoryClient` control
+  exactly. The `AFLDB-ISSUE-172` `router.push(..., { scroll: false })` fix is untouched and was
+  re-verified working (no full reload, no scroll-to-top) on both layouts.
+- `/coaches`: default sort changed from `games desc` to `name asc`, so the index reads as a
+  browse/lookup surface rather than competing with `/records/coaches`' leaderboard framing. Added
+  one cross-link from the index to `/records/coaches`.
+- `/coaches/compare`: `CoachComparisonCareer` ("Career", "Biggest win and loss", "Venue history")
+  and `CoachHeadToHeadSection` ("Head-to-head") are now independent `CollapsibleTable` disclosures,
+  matching the player page's stacked-disclosure convention. The two-coach comparison tables remain
+  side-by-side per-coach tables, deliberately not merged into a single metric-rows table — changing
+  only the coach side of that convention would create presentation drift from `ClubComparisonCareer`.
+  `getCoachRecordsByMetric` remains unused/unexposed, per the runbook's explicit non-goal.
+- The compare page's comparison grid now switches deterministically between one and two columns at
+  a fixed available-content-width threshold (a CSS container query, `.grid-compare-container` /
+  `.grid-compare`, 672px), rather than `.grid-panels`' generic `auto-fit` reflow, which previously
+  collapsed to one column at a threshold that silently shifted with the `sidebar` layout's narrower
+  content column. Verified to switch independently and correctly per layout at the same viewport
+  (e.g. 1024px: two columns in `classic`, one column in `sidebar`, because their actual content
+  widths differ).
+- **Found and fixed during rendered acceptance:** the first version of the container-query rule put
+  `container-type: inline-size` and the `@container` override on the same class, which silently
+  never applied (a size-containment container cannot be the query target of its own `@container`
+  rule) — the grid was still running on plain `auto-fit`, which happened to look right at most
+  probed widths only because its own natural breakpoint sits close to the intended one. Fixed by
+  moving `container-type` onto a dedicated wrapping `.grid-compare-container` element around each
+  of the three comparison grids.
+- Validated with focused unit tests across five suites (`coach-career-record`,
+  `coach-profile-route`, `coaches`, `coach-comparison-career`, `coach-head-to-head-view`) — 81/81 —
+  and a manual DEV-database-backed rendered-acceptance pass (Playwright) across `classic`/`sidebar`
+  at 375/640/768/1024/1440px covering the index, a multi-club coach, a single-club coach, the
+  zero-game coach case, the compare page and the opponent-history interaction: no horizontal
+  overflow, no hydration/console errors, `ExpandableTableFrame` keyboard/focus behaviour intact.
+  `npm run typecheck` also passed.
+- **Final Vercel Web Interface Guidelines review:** 0 MUST FIX, 1 SHOULD FIX found and fixed —
+  `CoachHeadToHeadVenueTable` (9 columns, the widest table in this feature) was missing the
+  `ExpandableTableFrame` wiring the runbook's own table strategy called for, unlike the
+  equal/lesser-width club and venue tables Phase 1 already wired; `CoachHeadToHead.tsx` now wraps
+  it the same way. `tests/coach-head-to-head-view.test.ts` extended; post-fix regression 16/16.
+  Remaining findings were optional or pre-existing site convention, out of scope.
+
+### Super Admin selectable frontend layout styles (AFLDB-ISSUE-173) - 15 September 2026
+
+- Added a new, independent Super Admin setting, **Layout** (`classic | sidebar`, default
+  `classic`), alongside the existing **Appearance** theme setting. `classic` is today's frontend,
+  unchanged; `sidebar` moves the primary navigation to a persistent left-hand column beside a
+  wider content area. Any theme can be combined with any layout. An unrecognised or malformed
+  stored value falls back safely to `classic`.
+- Resolved server-side in the root layout, alongside the existing theme read, and exposed via a
+  new `data-site-layout` attribute on `<html>`. The shared navigation model and every
+  `PrimaryNav`/`TabBar` component are reused unmodified between presets — only `PrimaryNav`'s
+  placement in the DOM differs. Both presets converge on the existing mobile `TabBar`; no new
+  mobile navigation was added.
+- Corrected the Appearance section's admin copy, which previously overstated that changing the
+  theme also changed page layout.
+- No database migration — the setting is a new key in the existing generic `site_settings` table.
+  No new cache-invalidation work — the existing unconditional root-layout revalidation already
+  covers it.
+- A Vercel Web Interface Guidelines quality-gate review found that the `sidebar` preset's "Skip to
+  content" link no longer bypassed `PrimaryNav`, and that the persistent `PrimaryNav` landmark was
+  nested inside the `<main>` landmark — both because `PrimaryNav` was rendered inside
+  `<main id="main">`. Fixed the same day: `<main id="main">` now wraps only page content, and in
+  the `sidebar` preset `PrimaryNav` is a sibling of `<main>` under a non-landmark wrapper rather
+  than a child of it; `classic` is unchanged. A re-audit confirmed both findings resolved with no
+  new findings.
+- Validated with focused unit tests (41/41), a clean typecheck, and a manual DEV rendered-
+  acceptance pass (Playwright) across `classic`/`sidebar` on desktop and mobile, settings
+  persistence and theme independence, and landmark/skip-link structure, with no ISSUE-173 defects
+  found.
+
+### Public site UI/UX cleanup: navigation, redundant search controls, Coaches interaction, expandable tables, comparison ordering (AFLDB-ISSUE-172) - 15 September 2026
+
+- Removed **Match Search** and **Brownlow** from the main navigation. Both routes are unchanged and
+  fully functional, and both keep their existing home-page "Browse the record" tile. Brownlow is now
+  discoverable from `/awards`, which gained its own Brownlow Medal card.
+- Removed the "Advanced search" filter panel from `/clubs` entirely (state, succession and
+  season-range filtering, and their empty-state wording); the page is a plain, unfiltered club
+  browse/list. `TableFilters` and every other page that uses it are unchanged.
+- Removed the static "Example searches" section from `/players`. The real search/filter
+  functionality is unchanged.
+- `/coaches/[slug]`'s "Choose an opponent" selector no longer performs a full page reload and no
+  longer throws the reader back to the top of the page on every opponent change — it now updates via
+  client-side navigation (`router.push(..., { scroll: false })`), the same approach already used on
+  the player-linked coaching surface. Query and statistical semantics are unchanged; the previous
+  no-JavaScript form submission is a deliberate, accepted trade-off.
+- Removed the "Swap the order of the two clubs/coaches" controls from `/clubs/compare` and
+  `/coaches/compare`. Investigation confirmed they only reversed presentation order (which side each
+  club/coach's data renders on) and never changed the underlying head-to-head data or query.
+- Added a reusable "Expand table" capability: any table wrapped in the new `ExpandableTableFrame`
+  can grow to fill the viewport (with Escape-to-close, a focus trap, body-scroll locking, and focus
+  restored to the trigger on close) without losing its sort, filter or pagination state. Wired into
+  the Coaches list for this issue; other tables adopt it opportunistically, ahead of the Coaches
+  page's separate design review.
+
+### AFL home-page “Record of the week” expands into a typed multi-domain catalogue (AFLDB-ISSUE-171) - 14 September 2026
+
+- The Super Admin site-setting now offers 22 grouped AFL records across player career, match and
+  season performances, coaching, venues, after-the-siren kicks and first-kick goals. The five
+  existing stored values keep their identifiers and meaning; stale or malformed values fall back
+  safely, and the home page executes only the selected bounded provider.
+- The public panel now renders domain-specific player, match, coach and venue links, visible units,
+  coverage notes, optional destinations and an empty state. AFLW settings and behaviour are unchanged.
+- The selection-specific public card/page is now named **Father–Son Selections**, remaining distinct
+  from the sibling-family board **Most Games by Family**.
+
+### Coach profiles gained a full historical record and a two-coach comparison surface (AFLDB-ISSUE-170) - 14 September 2026
+
+- `/coaches/[slug]` now renders a coach-oriented profile for every coach, including a person who
+  also played — career totals (with W–L–D added to the stat strip), club history, biggest win and
+  biggest loss, venue history, and record against a selected opponent club scoped by club
+  organisation lineage. The permanent redirect that previously sent a player-linked coach's coach
+  URL to their player page was removed, so `/coaches/[slug]` and `/players/[slug]` are now each
+  self-canonical (linked via `sameAs`) rather than one being an alias of the other; the pages
+  cross-link with "View coaching career →" and "View playing career →". `coachProfilePath` now
+  always resolves to the coach route, so roughly 368 previously-redirecting coach pages are
+  sitemap-published for the first time.
+- Added `/coaches/compare` for two-coach comparison: side-by-side career totals, direct
+  head-to-head derived only from matches where both coaches were assigned to opposing clubs,
+  finals/Grand Final meeting context, venue records, career-overlap seasons, and first/latest
+  direct meetings. Fixed a mobile layout overflow on the comparison page (reduced from roughly
+  782–785px to 375px of page width against a 390px viewport).
+- All figures are derived from canonical `coaches` / `match_coaches` / `matches` / `clubs` /
+  `venues` data; no new tables or stored coach summaries were introduced.
+
+### Cloudflare Web Analytics injection disabled at the edge, preserving the no-third-party-analytics privacy commitment (AFLDB-ISSUE-169) - 14 September 2026
+
+- Cloudflare Web Analytics / RUM was found enabled at the edge for the `afldb.com` zone, silently
+  injecting a third-party analytics beacon into every page load. AFLDB's CSP was correctly blocking
+  it, so no visitor data ever reached Cloudflare — but the edge configuration contradicted the
+  site's published `/privacy` commitment that there is no third-party analytics. Web Analytics / RUM
+  was changed from "Enable, excluding visitor data in the EU" to "Disable," so the edge no longer
+  attempts to inject it at all.
+- This is a Cloudflare dashboard change only. No application code, CSP or deployment configuration
+  changed.
+
+### The Admin Centre batch, the awards and special-record lifecycles and the player-link recalibration are live in production (AFLDB-ISSUE-156) - 14 September 2026
+
+- Production was 50 commits behind and is now deployed at `a5c4a04`, with migrations `099`, `100`,
+  `101` and `102` applied in that order before the code. `afldb_prod` carries 102 of 102 migrations
+  with nothing pending. What actually reached readers and administrators: the awards / Hall of Fame
+  / honour-team lifecycle (`AFLDB-ISSUE-165`), the curated special-record lifecycle
+  (`AFLDB-ISSUE-167`), the real HTTP redirect on unauthorised admin requests
+  (`AFLDB-ISSUE-166`), the family and father-son search semantics (`AFLDB-ISSUE-153`), the
+  player-link confidence recalibration (`AFLDB-ISSUE-164`) and the comparison-metadata fix on soft
+  navigation (`AFLDB-ISSUE-144`). The Admin Centre batch's own migrations (`096`–`098`) had already
+  reached production on 12 September; this deployment brought production the code that uses them.
+- **Nothing in the football record changed.** Whole-table fingerprints taken before the migrations
+  and again after the restart are byte-identical for first-kick goals, after-the-siren kicks, award
+  winners, Hall of Fame, honour-team members and both normalised name columns. The new lifecycle
+  columns arrived with every existing row `active` and not one row suppressed.
+- Migration `099` replaces the name-normalisation function so Unicode separators such as
+  `NO-BREAK SPACE` are treated as spaces. On production's current names it changed **zero rows** —
+  measured before it ran, not assumed — so its effect is the corrected function and four rebuilt
+  trigram indexes, which is what the player-link matcher needed.
+- **Accepted on production the same day** by rendered browser checks as real Super Admin, Admin and
+  Contributor accounts, without changing a single record: every surface in the release renders, the
+  special-record and awards counts on screen match the database exactly, an Admin can read every
+  record but the controls that change one are absent from the page rather than merely hidden, and a
+  Contributor reaches none of it. Every refused request is a real redirect, not a page that loads and
+  then bounces.
+- Operational notes: no privilege reconciliation was required or performed (migrations `096`–`098`
+  carry their own grants; `101` and `102` contain none by design), and `afldb_auth` still holds no
+  grant of any kind on the special-record tables. No replay adapter was run — replay belongs to the
+  rebuilt-database promotion procedure, not to an in-place deployment, and production held no
+  human-override rows to replay. A proven production backup was taken first.
+
+### Curated special records gain a correction, suppression and replacement lifecycle (AFLDB-ISSUE-167, ISSUE-156 P4) - 14 September 2026
+
+- The two curated special-record families — first-kick goals (`/records/first-kick-goal`) and kicks
+  after the siren (`/records/after-the-siren`) — could be loaded from their tracked sources and read,
+  and nothing else. A wrong row could only be repaired by editing the source manifest and reloading.
+  A Super Admin can now **create, correct, suppress, reinstate and replace** one from
+  **Admin Centre → Data → Special records**.
+- **Suppressing is not deleting.** A suppressed record needs a written reason, leaves every public
+  surface, and is kept — so the decision, its reason and its audit history survive, and a rebuild
+  re-asserts it rather than losing it. Reinstating restores the record without erasing the earlier
+  suppression. A wrong *identity* — the wrong person, the wrong match, a source record id belonging
+  to something else — is repaired by Replace, which suppresses the old record and records the
+  correct one as a single change, never by editing the identity in place.
+- Gated by a new permission, `data.specialRecords.edit`, enforced on the server for every action
+  rather than by hiding buttons. Admins keep read access to every record, its provenance and its
+  full history and see no way to change one; a Contributor reaches none of it.
+- **Every change is durable and audited together.** The record, the operator's decision and the
+  audit entry are written in one transaction — if any part fails, none of it happens — and the
+  decision is stored so the next import, and a full database rebuild, re-apply it instead of
+  quietly reverting it.
+- **Two people cannot overwrite each other.** A form opened before the record changed is refused
+  with a plain message and writes nothing at all, rather than silently applying stale values over
+  someone else's work or an importer's.
+- Affected public pages are refreshed after a change is saved, through a fixed list of allowed
+  pages, and the browser is never left waiting on the save.
+- **Deleting a match that carries a curated special record is now refused** with a message naming
+  the record and where to go instead. Previously a match deletion silently destroyed a first-kick
+  record as collateral, and an after-the-siren record turned the same deletion into an unreadable
+  database error.
+- Two faults were found by running the surface for real, and both are fixed. Every save,
+  suppression and reinstatement returned a server error, because of a module rule the production
+  build and the unit tests cannot see — only invoking the action does. And the Special records
+  landing page told a Super Admin the surface was read-only while showing them the controls that
+  change records; it now says what each administrator can actually do.
+- Migration `102_special_records_lifecycle.sql` is applied to the **test and development
+  databases**. This work is **live on the development site and accepted there; production is
+  unchanged** and is a later, separate decision.
+
+### Admin player-link suggestion URLs no longer 404 (AFLDB-ISSUE-168) - 14 September 2026
+
+- On **Admin → Player links**, the link to a suggested AFLDB player next to a queue row 404'd on
+  click, and Next's prefetch logged a 404 per suggestion. The link was missing the player id its
+  route requires; it now uses the same canonical `/players/<slug>-<id>` path every other
+  player-link on the site already used. Admin-only; no public page, matching logic or routing
+  changed. **Merged and deployed to development; accepted there 2026-09-14.** Production keeps the
+  pre-existing 404 until this ships through a future normal production deployment.
+
+### Admin pages now refuse an unauthorised request with a real HTTP redirect (AFLDB-ISSUE-166) - 13 September 2026
+
+- Refusing to show someone an admin page they may not see is supposed to be an HTTP redirect. For
+  every page under `/admin` it had quietly become something weaker: the response went out as
+  `200 OK` carrying a hidden `<meta http-equiv="refresh">` tag, and the browser acted on that tag a
+  second later. To a person clicking around, the refusal looked correct — they were moved off the
+  page as expected. To anything that is not a browser — a script, a crawler, an uptime monitor — it
+  looked like the request had **succeeded**, because nothing but a browser obeys a meta-refresh.
+- **No unauthorised person could read anything they were not entitled to, and nothing could be
+  changed.** The permission check ran, and ran before any protected data was fetched, so a refused
+  request returned an empty page frame showing only "Loading…" — no data, no form, no table. Saving
+  or changing data was never affected, and neither were the API-style routes. What was wrong was
+  the *signal*, not the boundary: the refusal was real but was being announced in a way only a
+  browser understood.
+- The cause was a single shared file, `src/app/admin/loading.tsx`, which provided the brief
+  "Loading…" placeholder for the whole admin area. Because it appeared before the page's permission
+  check had finished, the response had already begun — and once a response has begun, its status can
+  no longer be changed to a redirect. Removing it restores a proper redirect for every admin page at
+  once.
+- The placeholder was there for a reason — clicking an admin menu item used to give no feedback at
+  all until the next page was ready — so that feedback has moved to the menu link itself, which now
+  shows a small pending indicator while the page is being fetched. It appears on the exact link that
+  was clicked rather than blanking the whole page.
+- A regression test now fails the build if anything reintroduces a loading placeholder above the
+  admin permission checks, so this cannot come back quietly.
+- **Live on DEV and confirmed working there.** Checked on the deployed site from both sides of the
+  boundary: an ordinary administrator asking for a page they may not see is now turned away by the
+  response itself rather than by a tag inside it, with no page frame returned at all, while the
+  pages they *are* entitled to still open normally — and a Super Admin still reaches every one of
+  those pages, and the admin CSV export, exactly as before. The replacement navigation feedback was
+  checked on DEV too: clicking an admin menu item shows the small pending marker beside that link
+  while the next page is being fetched, and the page then opens normally. No migration was needed.
+  Production is untouched.
+
+### Awards, Hall of Fame and honour teams gain a correction, voiding and replacement lifecycle (AFLDB-ISSUE-165, ISSUE-156 P5) - 13 September 2026
+
+- Until now an award winner, a Hall of Fame induction and an honour-team selection could only be
+  **created**. Nothing in AFLDB could edit, void, replace or restore one, and there was no
+  domain-specific permission — every awards action shared the single Data Editor capability.
+- All three records now have a full lifecycle: correct the safely-correctable facts, void a record
+  that should never have existed, reinstate one voided in error, and replace a wrong record with
+  the right one. Nothing is ever deleted and nothing is silently overwritten: a void keeps the row
+  and its audit trail, and a wrong *identity* (who won, which award, which season, which team) can
+  only be void-and-replaced, never edited in place. Every mutation writes its audit row in the same
+  transaction as the change itself, so a failure takes both.
+- **A correction now survives the next import.** This is the substance of the change rather than a
+  detail of it. `tools/migration/import_awards.py` reloads every award group from its source on
+  every run, and previously had no knowledge of a human decision — so a correction made today would
+  have been silently reverted the next time that award group was imported. Each lifecycle decision
+  is now recorded durably beside the row and replayed by the importer immediately after the group it
+  belongs to, which also means a decision survives a full database rebuild, where the rows
+  themselves are re-created from scratch.
+- Voided records disappear from the public site everywhere they appeared — award pages, season
+  pages, the Hall of Fame, honour-team pages, player and club honours, the Grid Solver,
+  natural-language search and the sitemap — and reappear if reinstated. A Hall of Fame inductee
+  recorded as *removed* in a given year stays public: that is history, and is kept distinct from
+  "this row was a data-entry error".
+- New **Admin Centre → Data → Awards & honours** surface at `/admin/awards`, with separate sections
+  for award winners, the Hall of Fame and honour teams: filtered lists showing where each record
+  came from and whether it is active or voided, detail pages that show identity facts as read-only
+  with the reason, a two-step preview before any replacement, and each record's own audit history.
+  Admins and above can read it; only a Super Admin can change anything.
+- The three awards forms move out of `/admin/data-editor`, which now carries a pointer to the new
+  home, so there is exactly one place an awards record can be created.
+- Migration `101_awards_honours_lifecycle.sql`. Applied on DEV (101/101, 0 pending) and this
+  lifecycle's code is deployed there. Production status is not recorded here and must not be
+  inferred from this entry.
+
+### Brownlow round administration confirmed live in production (AFLDB-ISSUE-155) - 13 September 2026
+
+- Final production browser acceptance confirms Brownlow round administration (Admin Centre →
+  Data → Brownlow, implemented 10 September 2026) is live and working correctly against the real
+  production database: Super Admins and Admins can enter and save draft votes per match; only a
+  Super Admin can finalise, correct, void a match or publish a season's total; a Contributor has
+  no access at all. A draft carries no public effect until a Super Admin finalises and publishes
+  it, confirmed live by an accepted test draft that left the public Brownlow pages unchanged.
+- No behaviour changed this session — this is a closeout confirmation, not a new deployment.
+
+### Production first-kick-goal search restored after the database rebuild dropped its data (AFLDB-ISSUE-152) - 13 September 2026
+
+- "Players who kicked a goal with their first kick" and related first-kick-goal questions were
+  parsing and executing correctly on production but answering 0 results, because the curated
+  `player_achievements` first-kick-goal population had not been carried over by the canonical
+  database rebuild/cutover — not a code or parser defect.
+- Restored via the existing tracked importer (`tools/records/import-first-kick-goal.ts`), first
+  rehearsed on DEV then applied to production: 334 rows imported (330 player-linked, 328
+  match-linked, seasons 1911–2026). Production first-kick-goal search and the
+  `/records/first-kick-goal` page now answer correctly again.
+
+### New public Records pages for football families, father-son selections, coaches and after-the-siren kicks (AFLDB-ISSUE-139) - 13 September 2026
+
+- Four new curated Records pages, each linked from `/records` and reused from the existing
+  `/records/first-kick-goal` design: `/records/family` (sibling families ranked by combined career
+  games), `/records/father-son` (players selected under the father-son rule), `/records/coaches`
+  (career games and win percentage) and `/records/after-the-siren` (attempts and goals kicked after
+  the final siren).
+- A new `Coaches` entry was added to the site navigation (desktop nav and the phone `More` menu),
+  alongside the existing individual coach profile pages.
+- This closes out the `afldb_dev` identity-convergence work that unblocked the pages: `afldb_dev` is
+  now the promoted, rebuilt canonical-identity lineage, so every AFL Tables profile-url-based loader
+  (father-son, siblings, coaches) can resolve on it.
+
+### The search box can now answer questions about a whole football family, not just one player (AFLDB-ISSUE-153 Stage 6) - 13 September 2026
+
+- The search box can now be asked "biggest football families" and answers with the sibling family holding
+  the most combined career games, matching what the Family Records page already ranks by. A separate
+  wording, "which family has the most AFL players", ranks by linked member count instead - the two answer
+  different questions and disagree on today's data by up to 301 rank places, so neither wording can stand
+  in for the other.
+- "Families with three AFL players" is now answered as a count of qualifying families, not a single
+  ranked leader.
+- A family of one is not a family: any sibling group AFLDB has linked only one side of is excluded from
+  every family answer. Two players who share a display name (both "Gary Ablett") are always distinguished
+  by their player id, never by name, and a relative AFLDB has not matched to a player profile is named
+  nowhere in the answer.
+- Every other wording naming a "family" or "relatives" - a named player's family, cousins, in-laws,
+  grandparents and the like - still declines exactly as before; this only answers the three phrasings
+  above.
+
+### Production's actual cutover is reconciled: the 20260907-234124 promotion completed under AFLDB-ISSUE-125, and AFLDB-ISSUE-137 closes on lineage-independent identity - 12 September 2026 (event: 8 September 2026)
+
+- **The paused `20260907-234124` production promotion resumed and completed** at
+  **2026-09-08 01:11:24.440219 AEST**, using the staged-reinstatement fix built under
+  `AFLDB-ISSUE-151` and attributed to `AFLDB-ISSUE-125`: `auth_audit_log` id 196
+  (`database.promoted`), candidate `afldb_prod_candidate_20260907-234124` replacing `afldb_prod`. The
+  pre-cutover database survives as `afldb_prod_pre_rebuild_20260907-234124`. A read-only
+  pre/post comparison of governed production-only state found no unexplained loss: `auth_users`,
+  `admin_invites`, `site_settings`, `site_media`, `data_edits`, `data_overrides`,
+  `data_submissions` and `player_link_resolutions` all matched exactly; `auth_audit_log` and
+  `beta_access_codes` growth and the `canonical_applications` reset to the rebuild's fresh settle
+  history are expected. This completion was not reflected in tracking until reconciled 2026-09-12.
+- **`AFLDB-ISSUE-137` is Resolved**, on different grounds than its 2026-09-04 in-place production
+  repair anticipated. That repair (identity re-point batch 741, Brownlow load batch 742) was real and
+  held in its own lineage, but the promotion above replaced that lineage with a canonical rebuild that
+  already carries the `AFLDB-ISSUE-136` folds — the four duplicate players never existed in it, and the
+  repair's retired surrogate ids (2608/6296/6525/6626) now belong to unrelated real players. Closure
+  is verified on lineage-independent stable identity (AFL Tables profile-url, name, DOB):
+  `issues/closed/AFLDB-ISSUE-137-closure-check.sql`, read-only against `afldb_prod`, **22/22 PASS**. The
+  2026-09-04 repair's dump, T1 SQL and settle-check are retained as historical evidence only and must
+  not be re-run against current production.
+- `AFLDB-ISSUE-151` stays Open — its code fix was implemented, merged and is what the completed
+  promotion above actually ran; the standalone database rehearsal script was never executed, and
+  resolving the issue on the strength of the live production result instead is an operator decision.
+
+### The player-link queue explains why a row is where it is (AFLDB-ISSUE-164 P5) - 12 September 2026
+
+- **Every suggested row now states, in one line under its band, the single most important reason
+  it is not bulk-ready.** A reviewer reading "Low · 44" against a name they recognise could not
+  previously tell an unlucky row from a structurally impossible one. The reasons are typed, not
+  prose: a hard conflict, a near tie, a source class policy excludes, a non-exact name, missing
+  independent corroboration, the bulk score or gap floor, or a record type whose reachable
+  ceiling is below Very High -- reported in that order, most decisive first.
+- **The drawer shows all six bulk criteria with ✓/✗ for every suggested row, not only the rows
+  that already pass.** Showing them only on eligible rows was exactly why a capped row and an
+  unlucky one looked identical. Alongside them it now prints the highest score the record type
+  can reach, so a Hall of Fame row that tops out at 76 says so rather than appearing to have
+  underperformed.
+- **Policy exclusion is stated as policy, never as a complaint about the evidence.** A captaincy
+  scoring 97 on every family reads "captaincies is suggestion-only (policy)" with all six
+  evidence criteria still ticked. Club text that names no AFLDB club is reported as counting
+  neither for nor against, rather than silently vanishing from the arithmetic.
+- Explainability only: it reads the assessment the server already computed and the shipped
+  policy, and returns reasons. No weight, band, gap, bulk rule, source admission or
+  `ALGORITHM_VERSION` changed; the matcher stays at `v3` and `draft_person` stays suspended from
+  unattended approval.
+
+### Club text now scores, at the lowest weight that earns it (AFLDB-ISSUE-164 P3B) - 12 September 2026
+
+- **`club_in_span` and `club_text_anywhere` ship at 15 points each.** P3A resolved Hall of Fame
+  and honour-team club text and deliberately scored nothing with it, leaving the weight to a
+  measured grid. The grid has been run: 15/15 against a null/null control corrects two Hall of
+  Fame top-1 suggestions (two different Frank Hugheses, two different Mark Williamses) and drops
+  six rows out of ambiguity, while the Very High count, the single Very High false positive, the
+  bulk population (3,817 of 3,817, no false positives) and the nine hard conflicts are all
+  unchanged. No correct top-1 became wrong.
+- **Higher weights were rejected for inflating confidence without improving identity.** S3 at
+  23, 24 and 29 fixed nothing further: 24 moved 151 Hall of Fame rows from High to Very High,
+  all of them correct and none of them newly *resolved*. Very High is a claim about certainty,
+  not a reward for carrying more kinds of evidence, so the lowest weight that buys the whole
+  measurable improvement is the one that ships.
+- **The unresolved queue gains no confidence anywhere.** Its population, Very High count, bulk
+  count, hard conflicts and aggregate ambiguity are identical before and after, `draft_person`
+  is untouched, and the one changed suggestion (George Coulthard) scores 15 against a career-span
+  conflict and stays unbanded -- a hint for a human, not a link. One Hall of Fame row (John
+  Murphy) became *ambiguous* because its runner-up rose too: two near-identical candidates
+  refusing to look settled is the safety rule working, not a regression.
+- **The calibration override survives the decision it was built for.** Runs still declare a
+  candidate pair on the command line and still record which pair they used, but omitting the
+  options -- every application code path -- now means the shipped 15/15 rather than "not
+  scored", and an override still cannot reach `MATCH_POLICY`. No environment variable, then or
+  now.
+- No band, gap, bulk floor, draft rule or `ALGORITHM_VERSION` changed: draft matching keeps raw
+  club-id semantics, Hall of Fame and honour-team rows remain suggestion-only, `draft_person`
+  remains suspended from unattended approval, and the version stays `v3`.
+
+### A club is the club it became (AFLDB-ISSUE-164 P3A) - 12 September 2026
+
+- **Club evidence now compares continuing clubs, not raw club identities.** `player_clubs`
+  records the identity a player actually played under -- Footscray, South Melbourne -- while a
+  source row may name another identity of the same club. The matcher compared
+  `clubs.id`, so it lost real agreement and, against a complete club history, could raise
+  "never played for Western Bulldogs" about a Footscray career. Both the club reward and the
+  `club_not_in_history` contradiction now run through `clubs.organization_id`, falling back to
+  the raw id wherever AFLDB records no lineage. A merger is still not a lineage: migration 017
+  keeps Fitzroy and Brisbane Lions separate on purpose, so a Fitzroy row is never corroborated
+  by a Brisbane Lions career.
+- **Hall of Fame and honour-team club text is resolved, exactly or not at all.** Those two
+  sources carry a human-written club list and no club id, which is why they reached no club
+  evidence at all. The list is split on the separators the sources really use, and each name is
+  matched exactly against `clubs.name`, `clubs.short_name` or `club_aliases.alias` -- never
+  fuzzily. Text that names two continuing clubs, or a club AFLDB does not hold, resolves to
+  nothing: most of a Hall of Fame club list is SANFL, WAFL and Tasmanian clubs, and "not an
+  AFLDB club" is not evidence against anybody. Unresolved text produces no signal, no negative
+  evidence and no contradiction; a multi-club career stays multi-club; no raw source text is
+  rewritten and no migration is needed.
+- **The two new signals are implemented and score nothing yet.** `club_in_span` (a named club
+  inside the career span the Hall of Fame row itself asserts) and `club_text_anywhere` carry
+  null weights, because the weight belongs to a measured grid rather than to whoever wrote the
+  code. `ALGORITHM_VERSION` moves to `v3` for the lineage change alone, so every cached
+  suggestion is visibly stale until the queue is refreshed.
+- **No draft behaviour changed.** Draft timing, draft games and goals, the bands, the gap rules
+  and the bulk floors are untouched, and `draft_person` remains suspended from unattended
+  approval.
+
+### A cached suggestion never passes as a current one (AFLDB-ISSUE-164 P2) - 12 September 2026
+
+- **The player-link queue tells an admin when the scores it is showing are out of date.** Cached
+  suggestions carry the algorithm version they were computed under. When any of them differs
+  from the version the running code declares, a banner appears at the top of the queue naming
+  both versions and the affected row count, and each affected row carries a "Stale (v1)" badge
+  beside its band.
+- **The drawer repeats the warning above the Approve button**, stating that the displayed score
+  and evidence were computed by the older matcher and that approving re-scores the record under
+  the current one.
+- **Approval never uses the number on the screen.** The approval action locks the row, re-reads
+  it, and re-scores it under the running algorithm. If the fresh evidence names a different
+  player, or no longer supports the match, the approval is refused with the existing
+  changed/conflict/weak/not-bulk message. When it does still support the match, the approval
+  completes and returns a notice that the suggestion shown was stale -- "shown as v1 score 79;
+  approved on v3 score 92" -- and the score and version recorded are the fresh ones.
+- **Bulk approval reports the same per row**, in its existing approved/skipped summary, so a
+  stale row inside a batch is named individually rather than absorbed into a total.
+- The comparison is made server-side against the version the code itself declares; nothing about
+  staleness comes from the browser, and there is no path that approves on a cached score.
+
+### The matcher can be measured against ground truth it does not store (AFLDB-ISSUE-164 P1c) - 12 September 2026
+
+- **`npm run match:backtest -- --labels <file>`** scores a source population against a **frozen
+  label file** instead of against stored links. AFLDB's confirmed-link backtest can only measure
+  what someone has already linked, and for the draft source that is five rows -- the five
+  explicit human decisions in `data/reference/draftguru-link-decisions.json` -- against 5,052
+  unmatched people. No draft precision, Very High precision or bulk-safety claim is supportable
+  from five rows, so the labels are supplied separately and **never written as links**: they
+  resolve to ids in read-only SQL and are carried beside the evidence, which has no field that
+  could hold an answer. Alongside the standard report the run adds the sections a calibration
+  population needs -- truth-source independence, exact-versus-fuzzy name evidence, a fourteen
+  bucket stratification, **every** wrong top-1 rather than a sample, and a true-negative table
+  naming every person the matcher rated Very High who correctly has no AFLDB player at all. A
+  label whose person or whose target does not resolve is reported, never dropped; quietly
+  shrinking a population flatters every rate computed from it.
+- **A label must say where it came from, and the matcher's own opinion is refused by name.** A
+  suggestion the scorer produced cannot be ground truth about the scorer however confident it
+  was, so `scorer_top1`, `match_suggestion`, `bulk_approval` and the cached candidate table are
+  rejected at parse time; an unrecognised provenance is reported as unassessed rather than
+  trusted. Labels are keyed on the durable DraftGuru `player_url`, never a surrogate id, and two
+  labels for one person -- or two people claiming one AFLDB player -- raise an error naming both
+  sides. That is a finding for a curator, not something a tool resolves by choosing.
+- **`npm run match:draft-labels`** builds such a file offline from a person-page snapshot,
+  taking the page's own outbound AFL Tables link as the identity. The match is URL to URL, so no
+  name, club, draft year, games, goals or era -- every family the scorer scores -- is reused to
+  establish the truth it is measured against. A missing link is **not** read as "no such player":
+  a negative is emitted only when the page shows no identity *and* the person is in a declared
+  zero-senior-game cohort, and everyone else is reported as unlabelled.
+- **An empty sample no longer reads as an observed failure.** The report's 95% zero-failure
+  bound line said "a failure was observed, so the zero-failure rule does not apply" whenever no
+  bound could be computed -- including when the bulk population was simply *empty*, which is
+  exactly what a suspended class produces. The Tier 1 draft run hit that case and would have
+  reported a clean, suspended population as though it had made a false positive. The line now
+  distinguishes three states: no bulk-eligible rows at all, a population with failures (naming
+  the count), and a clean population with its computed bound.
+- No scoring behaviour, weight, band, gap or bulk threshold changed, and `draft_person` remains
+  suspended from unattended approval: a bulk-eligible draft row in a label run is still a stop
+  condition that exits 2.
+
+### Matching reports can be compared against a frozen baseline (AFLDB-ISSUE-164 P1) - 12 September 2026
+
+- **`npm run match:compare -- <baseline.json> <candidate.json>`** compares two saved
+  player-link matching reports and prints, with a machine-readable `--out` twin, the run
+  metadata of both, the deltas in candidate-generation recall, top-1/3/5, band counts, Very
+  High and bulk counts, precision and false positives, ambiguity and hard conflicts, the same
+  set per logical source type, and a **row-level band-migration matrix** joined on the
+  resolution key. Aggregates are derived from the joined rows, never synthesised from counts:
+  identical band totals can hide any number of offsetting moves, so a matrix built from
+  aggregates would be a fiction. Row-level lists name every changed top-1 (with correctness on
+  both sides), every change in the expected player's rank, every band change with direction,
+  ambiguity gained and lost, material gap movement, bulk eligibility gained and lost, and every
+  move between exact-name and fuzzy-name evidence. Output ordering is by resolution key, so
+  repeated runs on the same inputs are byte-identical. Neither input file can be overwritten.
+- **Any bulk-eligible draft row in the candidate run is reported as a stop condition** and
+  exits 2 (distinct from 1, a tool failure), because ISSUE-164 D-9 suspends `draft_person`
+  unattended approval until the class is re-gated on a large enough confirmed population.
+- `npm run match:backtest` gains `--baseline <json>` (compare this run against a saved report in
+  the same pass, in labelled and `--queue` modes) and `--compare-out <json>`. **The queue report
+  now carries run metadata** — `algorithmVersion`, `gitCommit`, `startedAt`, `tableFilter` —
+  beside its unchanged `proposals` array; reports written before this change still parse, with
+  their metadata reported as unknown rather than guessed. No scoring behaviour changed.
+
+### Name normalisation canonicalises Unicode whitespace; the player-link matcher moves to `v2` (AFLDB-ISSUE-164 P1a) - 12 September 2026
+
+- **`afldb_normalise_name()` now treats Unicode whitespace as whitespace** (migration 099). The
+  function collapsed ASCII whitespace only, so a name whose word separator is U+00A0 NO-BREAK
+  SPACE survived normalisation intact and could never be byte-equal to the `players.search_name`
+  it was meant to match. ISSUE-164 P0 measured that this affects **5,057 of 5,057 `draft_persons`
+  rows -- 100% of the draft source**: a visually identical name reached the scorer only through
+  the trigram arm at similarity 1.00 and was paid `name_trigram_high` (26) instead of `name_exact`
+  (44), which also failed `strongName` and so structurally barred the row from unattended
+  approval at any score. The 79-point draft plateau recorded on the issue is that defect, not a
+  weighting problem. The migration canonicalises a named, explicit list of Unicode space
+  separators (U+00A0, U+1680, U+2000-U+200A, U+2028, U+2029, U+202F, U+205F, U+3000) to an
+  ordinary space before the existing lower/unaccent/strip/collapse pipeline; zero-width characters
+  are deliberately left alone. No punctuation, accent or transliteration behaviour changed, and no
+  raw source column was rewritten -- only the derived `players.search_name` and
+  `player_name_aliases.search_alias` are recomputed, and the four expression indexes over the
+  function are rebuilt in the same transaction.
+- **`ALGORITHM_VERSION` is `v2`.** No weight, band, gap or bulk threshold moved, but the matching
+  semantics did, so every cached `v1` suggestion is stale until the queue is refreshed -- which
+  the stale-cache detection shipped just before this (ISSUE-164 P2) makes visible on the page and
+  reports at approval. Approval itself is unchanged: it still re-locks, re-reads and re-scores
+  under the running code, and the cached score is never acted on.
+- **`draft_person` is suspended from unattended bulk approval** (ISSUE-164 D-9). Its admission
+  rests on ISSUE-075's 2,319-row calibration, which the current backtest cannot reproduce -- the
+  executable baseline holds five labelled draft rows against 5,052 unmatched. Because the
+  normalisation fix lifts the whole affected draft population to `name_exact` at once, leaving the
+  class admitted would present a large new unattended-approval set backed by five labelled rows.
+  Draft suggestions and one-at-a-time human approval are unaffected; only the unattended path is
+  closed, and only ISSUE-164 P1c can re-open it.
+
+### The Admin Centre batch is accepted on DEV, and AFLDB-ISSUE-160, 161, 162 and 163 close (ISSUE-156 P3b–P3e) - 12 September 2026
+
+- Draft administration (160), season-list administration (161), fixture administration (162) and
+  club leadership (163) were deployed to DEV together from `main` `3272434` -- migrations 096, 097
+  and 098 applied in order, privileges reconciled, then the code -- and accepted there: the
+  production build clean with all 1,533 static pages generated, the service healthy, `/api/health`
+  reporting the database ok, every functional workflow of the four surfaces exercised as Admin and
+  Super Admin, and layout accepted at desktop (1440 and 1024), tablet (768) and phone (375) with
+  global navigation and accessibility/focus spot checks. All four issues are Resolved. PROD is
+  untouched; promotion is a separate, later step under the ISSUE-151 contract, and the checklist
+  it inherits from this batch is recorded on the ISSUE-156 umbrella. **Correction (2026-09-12):
+  Production is not untouched** — current `afldb_prod` carries migrations 092–098, applied
+  2026-09-12, and the production host checkout was observed at `0955db3`. The exact Admin Centre
+  production acceptance/deployment scope was not reconstructed as part of the `AFLDB-ISSUE-137`
+  investigation.
+- The operator's device priority for the Admin Centre is now recorded: laptop/desktop is the
+  primary admin workspace, iPad/tablet a first-class one, and a phone a functional fallback.
+  Phone-only cosmetic polish does not hold an Admin Centre issue open.
+- **Fixed before release: a fixture admin form pulled the server-only mutation module toward the
+  browser.** The DEV production build refused the whole batch because three fixture Client
+  Components imported the round and batch-size constants from `src/db/queries/admin-fixtures.ts`,
+  which carries `server-only`; `tsc` and vitest both stub that marker, so only the bundler could
+  see it. The pure fixture vocabulary (round types, finals codes, statuses, the round and batch-row
+  bounds and their guards) now lives in a server-neutral `src/lib/fixtures/spec.ts` that the
+  mutation module re-exports unchanged -- one definition, nothing duplicated, no query or SQL
+  moved -- and a regression walks every Client Component in `src/` and fails on any value import
+  from `@/db/`.
+- Responsive fixes found by the batch acceptance: admin table headers no longer displace their
+  data rows (a shared fix, re-tested on the fixture Round 1 and Round 2 tables at 1024 and 768);
+  the Season Lists pages no longer overflow a phone viewport -- the "First authoritative season"
+  and season badges wrap instead of overlapping adjacent cells, the visually-hidden Actions
+  header stays accessible, and Remove / Transfer stay reachable through the table's own contained
+  scrolling (document width 360 against a 375 viewport on all three routes); two further admin
+  responsive-layout commits (`e638d61`, `9727ad5`) shipped with them.
+- Known, non-blocking limitations carried forward as follow-ups rather than converted into
+  features: for club leadership, the appoint-path audit row omits the derivable `entity_key`, the
+  public Captains table has no period column (so co-captains and a mid-season change read as two
+  rows for one season), and the replay validates a date's shape rather than the calendar; for
+  fixtures, the batch form is a scrolling table below 768px and the venue-slug replay limit
+  stands. Draft administration's PROD read-only probes and operator decision S-1 move to the
+  promotion checklist. Details in each runbook's Resolution section.
+
+### Club captains and vice-captains become real records (AFLDB-ISSUE-163 Stage 1, ISSUE-156 P3e) - 12 September 2026
+
+- AFLDB has always shown club captains, but only as an imported honours list: 1,774 rows
+  transcribed from Wikipedia covering 1897-2026, captains only, matched by the spelling of a
+  person's name, with a free-text period such as "2022 (co-captain), 2023- (sole captain)". There
+  was no way to record who the captain *is*, to change one mid-season, to record a vice-captain, or
+  to say that a recorded captaincy had ended. Migration 098 adds `club_leadership`: one row asserts
+  *this player was appointed to this role, at this club, for this season*.
+- **Co-captains are simply two captains.** The role vocabulary is `captain` and `vice_captain`, and
+  nothing else. Two people holding the office at once is two captain appointments -- which is how
+  the existing data already describes it -- so a co-captaincy needs no special row type, and a
+  co-captain who becomes the sole captain needs no rewriting. A club may name as many vice-captains
+  as it actually has.
+- **"Current" means the record says so, not that a date has passed.** An appointment is `active`,
+  `ended` or `void`, and the public page reads the status. Start and end dates are evidence and are
+  optional: a captain announced in December with no date attached is stored with no date, never with
+  an invented 1 January.
+- **Nothing is ever deleted, and a mistake is not the same as a change.** An appointment that really
+  finished is `ended` and stays as history; a row entered in error is `void` and also stays, marked
+  as never having been valid, with the reason recorded. A mid-season change of captain keeps both
+  people: the outgoing appointment ends, the incoming one begins, and both remain true.
+- **A leader is chosen from the club's own list.** A player can only be appointed while they hold
+  that club's playing-list place for that season. If they are later removed from the list or
+  transferred, the appointment stands -- it is the record of who held the office, and it is not
+  silently rewritten by a later correction to the list.
+- **Public pages never answer one season from two sources.** Seasons before 2027 come from the
+  historical honours record exactly as they do today; 2027 onwards comes from the new one. The club
+  page's captains table and a player's captaincy honours both use that same boundary, so nothing is
+  duplicated at the join and a 2027 captaincy is a captaincy honour like any other. The honours
+  import itself is untouched, and a vice-captaincy never appears as a captaincy.
+- Every appointment is durably recorded and is re-created by the same replay that restores
+  administered coaches, players, draft selections and playing lists, so a rebuild or a production
+  promotion cannot lose one -- including the ended and void ones.
+- Backend only in this stage: see the Stage 2 entry immediately below for the administration
+  screens and the public club page block.
+
+### Club leadership ships an admin surface and a public club page block (AFLDB-ISSUE-163 Stage 2, ISSUE-156 P3e) - 12 September 2026
+
+- A **Leadership** section on the existing `/admin/season-lists/[season]/[club]` page lets Admin
+  (read) and Super Admin (appoint/replace/end/reinstate/correct/void) see and maintain a club's
+  captains and vice-captains: a "Current" grouping (Captain/Co-captains, Vice-captain/Vice-captains),
+  a collapsed History of ended appointments, and voided appointments behind their own "show voided"
+  toggle, kept visually distinct rather than hidden. Every row links to its own audit trail. No new
+  route, no new nav item and no new capability -- `data.seasonLists.read`/`.edit` are reused exactly
+  as planned.
+- The player selector for appointing or replacing a leader is the club's own season-list membership
+  only -- never a global player search and never free text -- with each candidate's own current role
+  annotated so a second captain is never chosen by accident.
+- **A second active captain is never recorded silently.** Appointing or reinstating a captain
+  alongside a sitting one is refused until the operator explicitly confirms the co-captaincy; the
+  refusal names who is already captain, and the interface's only next step is a clearly-worded
+  "confirm co-captaincy" action -- there is no checkbox that defaults to checked and no automatic
+  retry.
+- **Replacing a leader is one workflow, not two separate edits.** Replace shows what will happen --
+  which appointment ends, who begins, from when -- before anything is submitted, and always leaves
+  both the outgoing and incoming appointment as their own honest rows.
+- End and Void are two different concepts, never sibling buttons: ending says an appointment was
+  valid and has ceased; voiding says the record should never have existed, requires a mandatory
+  reason, and is terminal -- a voided appointment offers no further controls, exactly as an
+  already-void fixture record does. Correcting an appointment can only change its dates and note;
+  changing who held a role, or which club or season it was for, is deliberately not offered here --
+  that is a void plus a new appointment.
+- Every mutation carries the appointment's last-seen `updatedAt`; a page left open while someone
+  else changed the same appointment is refused with a plain "reload and try again" rather than
+  silently overwriting the other change.
+- The season overview (`/admin/season-lists/[season]`) gains a Captain column -- one name, "Co-
+  captains" for two or more, or an empty state, with a marker when an active leader is no longer on
+  the club's list. Vice-captains are deliberately not shown in this column.
+- The public club page gains a compact current-leadership block, directly below the club's season
+  totals, for the continuing identity only: Captain/Co-captains and Vice-captain/Vice-captains, each
+  name linking to the player, omitted entirely when nothing is currently active. A leadership change
+  revalidates only the affected organisation's own `/clubs/<slug>` paths, through a new
+  capability-gated `/admin/season-lists/revalidate` route that admits nothing else -- the first
+  season-list mutation with a public consumer.
+- The club page's existing Captains history table was fixed to key each row on its own database id
+  rather than on `season` + player name, which could collide when the same player held two
+  appointments in one season (ended, then re-appointed) -- a rendering fix, not a data change.
+- A co-captaincy confirmation belongs to the exact appointment it was asked about: changing the role
+  or the player after a refusal withdraws the confirm step and asks again, so a warning given about
+  one player can never be spent on another. Recording an appointment also leaves the Appoint form
+  standing rather than replacing it with a receipt -- a club normally names a captain and two or
+  three vice-captains in one sitting, and each of those should not cost a page reload.
+- Responsive: the Leadership section uses stacked controls rather than a wide table, and remains
+  usable at 375px; rendered browser acceptance across roles and widths passed on DEV on
+  12 September 2026 with the combined Admin Centre batch (see the batch entry above).
+
+### AFLDB learns what an UNPLAYED match is (AFLDB-ISSUE-162 Stage 1, ISSUE-156 P3d) - 11 September 2026
+
+- Until now AFLDB could not represent a match that had not been played. `matches` requires
+  `home_score`, `away_score`, `result` and `margin` to be present, and every consumer of it -- the
+  club ladder, season metadata, round ladders, club and venue records, natural-language search and
+  the Grid Solver -- reads "a row exists" as "this game was played". A scheduled game put in there
+  with placeholder scores would have counted as a 0-0 draw. Migration 097 adds `fixtures`: one row
+  asserts *this match is scheduled to occur*. It holds a season, a round, two clubs, and optionally
+  a date, a local start time and a venue -- and **no score, result, margin, attendance, lineup or
+  statistic column at all**, so a fixture cannot be mistaken for a result by any query, now or later.
+- **"Played" is worked out when you look, never stored.** A fixture is played when exactly one
+  `matches` row exists for the same season, the same round and the same two clubs. The rule uses
+  only those exact facts, so a game that is moved to a different day, a different time or a
+  different ground still resolves -- and when two results could be the same fixture, it links
+  neither and says so, rather than guessing.
+- **A fixture keeps its identity for life.** Its key is minted once when it is created and is never
+  changed by a reschedule, a venue change, a round correction, a club correction, a cancellation or
+  by the game eventually being played.
+- **Nothing is ever deleted.** A game that was really called off is `cancelled` and can be
+  reinstated; a row entered by mistake is `void` and stays for the record. Both keep their history
+  and their audit trail.
+- Unknown means unknown: a date, time or venue that has not been announced is stored as empty, never
+  as midnight or as a made-up "TBC" ground. No placeholder clubs are invented for finals either -- a
+  final is entered once its two teams are known.
+- Every fixture is durably recorded and is re-created by the same replay that restores administered
+  coaches, players, draft selections and playing lists, so a rebuild or a production promotion
+  cannot lose one -- including the cancelled and void ones.
+- `matches` itself is untouched, and no ladder, record, statistic, search answer or Grid Solver
+  answer can move because a fixture was entered. AFL Tables ingestion is unchanged and never reads
+  or writes fixtures.
+- Backend only in this stage: there is no public fixture page and no admin screen yet. Deploying it
+  requires migration 097, then `npm run db:privileges`, then the application code, in that order.
+
+### Fixture administration ships an admin surface (AFLDB-ISSUE-162 Stage 2, ISSUE-156 P3d) - 11 September 2026
+
+- `/admin/fixtures`, `/admin/fixtures/[season]`, `/admin/fixtures/[season]/new` and
+  `/admin/fixtures/[season]/[fixtureKey]` give Admin (read) and Super Admin (edit) a supported way
+  to see and maintain a season's schedule: the season selector shows every administrable season
+  with its fixture, round, played, TBC and cancelled counts and a diagnostics badge; the season
+  page groups fixtures by round with filters (round, club, status, TBC-only, played/unplayed, show
+  voided) and a diagnostics panel that only ever reports; the detail page shows the read-time played
+  resolution with a link to the match once it uniquely resolves, and locks every schedule/round/
+  venue/club control once played -- notes remain editable regardless of state.
+- Two entry paths: a single-fixture form, and a round-at-a-time batch with an optional
+  paste-to-prefill textarea. The batch is previewed server-side before anything is written, and
+  Confirm is bound to the exact rows that preview described -- any change to a row or the round
+  header after previewing retires it and asks for a fresh preview, the `CopyForwardPanel` lesson
+  from season-list administration. A round is written all-or-nothing: one invalid row leaves the
+  whole round uncommitted.
+- Cancel, reinstate and void render as three visibly different actions, never equivalent buttons.
+  Cancel and void each require an explicit confirmation and a reason; void is described as more
+  severe than cancelling -- "this record should never have existed", not "this game did not
+  happen" -- and voiding an already-cancelled fixture says plainly that it reclassifies a real
+  cancellation as a data-entry error. Void is terminal and offers no reinstate.
+- New capabilities `data.fixtures.read` (Admin and Super Admin) and `data.fixtures.edit` (Super
+  Admin only) are declared and enforced at every page and Server Action boundary this issue adds;
+  entering a score or result is not among them -- that stays with match administration. A Fixtures
+  link appears in the Admin Centre sidebar's Data group, after Season lists, for anyone who holds
+  `data.fixtures.read`. No public page changes and no revalidation route was added: every action
+  here returns no paths to revalidate.
+- A voided fixture is presented as the terminal record it is: like a played one it shows its
+  identity, schedule and notes and no schedule, venue, round or club control, so no screen offers
+  an edit the server will refuse. Returning a date to TBC returns its start time to TBC with it,
+  on the single form, in the batch and on reschedule -- AFLDB stores an unknown time as unknown,
+  never as a time attached to no day. On the single-fixture form the cleared time now also
+  *disappears* (found by the 2026-09-12 DEV browser acceptance): the control was disabled but kept
+  displaying the old value, so the screen showed a start time the stored record would not carry.
+
+### AFLDB learns what a club's playing list is (AFLDB-ISSUE-161 Stage 1, ISSUE-156 P3c) - 11 September 2026
+
+- Until now AFLDB held no concept of a **playing list**. Every player-club relationship it stored
+  was inferred from matches actually played -- `player_clubs`, `player_club_season_stats`,
+  `player_season_stats`, `player_career_stats` and `club_seasons` are all truncated and rebuilt
+  from `player_match_stats` -- so a player who was *listed* but had not *played* had no club
+  anywhere in the model, and "who is currently on this club's list" was not a question any query
+  could answer. Migration 096 adds `season_list_members`: one row asserts *this player was a
+  member of this club's list for this season*. It is administrative intent, never participation;
+  `player_club_season_stats` continues to mean "played for", and nothing derived changes meaning.
+- A listed player may have played no games and hold no statistics at all -- the point of the new
+  table, and impossible in every table that existed before it.
+- **2027 is the first authoritative list season.** Earlier seasons are represented by matches
+  played, not by lists, and match appearances are never promoted into membership: there is no
+  bulk seed and no appearance-derived provenance. The 2026 appearances a club page shows while
+  building its first list are a clearly-labelled review panel, and each player added from it is an
+  explicit decision recorded as an ordinary addition that merely notes where the administrator was
+  looking.
+- **"Retired" is not stored anywhere, and nothing new about a player is.** Removing a player from
+  a list means only that they are not on that club's list for that season: no player flag moves,
+  no earlier season is touched, and no career statistic, draft row or link changes. A player who
+  returns is simply listed again. While a season's clubs are not all populated, "no membership"
+  means *unknown*, not *retired*, and the season overview shows which clubs are still empty.
+- A player holds **at most one** club's list place per season, enforced by the database. Measured
+  on the rebuilt test database before the constraint was written: across 1897-2026 only 249
+  player-seasons ever involved two clubs and the latest is 1992, the residue of the pre-1993
+  clearance era; from 2000 onward there are none.
+- Season lists need no fixture, no match and no season row to exist. A list for next season can be
+  built before anything about that season has been scheduled, and the clubs offered are the ones
+  currently competing -- so the tracked season register, the club table and the ladder tables are
+  never written to in order to make administration possible.
+- Administered lists survive a database rebuild and a production promotion: each membership carries
+  a durable record keyed by club, season and the player's permanent identity, replayed
+  fail-closed after players are restored. A removal is durable too -- it is recorded as an
+  intentional removal that no later import and no replay may undo.
+- Backend only in this stage: the administration screens, their permissions and the draft
+  handoff arrive with the Admin Centre batch.
+
+### Season list administration ships an admin surface (AFLDB-ISSUE-161 Stage 2, ISSUE-156 P3c) - 11 September 2026
+
+- `/admin/season-lists`, `/admin/season-lists/[season]` and `/admin/season-lists/[season]/[club]`
+  give Admin (read) and Super Admin (edit) a supported way to see and manage every club's playing
+  list: the season selector shows every administrable season from 2027 with its completeness; the
+  season overview shows each eligible club's member count against the previous season -- list-to-
+  list from 2028, explicitly labelled non-authoritative appearances for 2027, never called "the
+  2026 list"; the club page is the operational surface -- members whether or not they have played,
+  filters, and (Super Admin) Add, Remove and Transfer.
+- Removing a player says exactly what happens -- "Remove from the season list" -- never "retire":
+  no career, draft or global-retirement state moves, and a mistaken removal is reversed by adding
+  the player again. Transfer is the atomic backend primitive end to end, never a client-side
+  remove followed by an add, so a failure never leaves a player unlisted.
+- Copy-forward carries a season's lists onto the next season's identities, previewed before
+  anything is written and refused by name if a target club already holds rows or has no identity
+  in the target season. It is not offered for 2027: the season page explains why and points at the
+  club page's 2026 appearances review panel instead, where every addition is an explicit,
+  individually audited decision -- never a bulk seed from participation data.
+- The draft administration screens now offer a season-list handoff: after recording a selection,
+  or from an existing selection's detail page, a link offers to add that player to next season's
+  list at the club they were selected by. It is a link only -- nothing about a draft selection
+  ever writes a list membership, and the link hides itself when the following season is not yet
+  administrable.
+- New capabilities `data.seasonLists.read` (Admin and Super Admin) and `data.seasonLists.edit`
+  (Super Admin only) are declared and enforced at every page and Server Action boundary this issue
+  adds; no Admin mutation exists. A Season lists link appears in the Admin Centre sidebar's Data
+  group, after Draft administration, for anyone who holds `data.seasonLists.read`. No public page
+  changes and no revalidation route was added: every action here returns no paths to revalidate.
+
+### Draft administration gains one mutation contract, and admin-created people become promotable (AFLDB-ISSUE-160 Stage 1, ISSUE-156 P3b) - 11 September 2026
+
+- `createPlayerInTransaction()` -- the one player-creation primitive in `src/` -- now mints a
+  durable identity for every player it creates: an `external_identities (manual_admin_edit,
+  <token>)` row and a whole-row `data_overrides ('players', 'manual_admin_edit:<token>',
+  'identity')` record, in the same transaction. This is behavioural and it closes a real gap:
+  before it, an admin-created player was named by nothing outside its own id, so
+  `replay_admin_overrides` could not patch it, no replay re-created it after a destructive
+  reload, and its `player_creation` audit rows resolved to nothing on a promotion -- which
+  STOPS a PROD promotion. It also derives `search_name`, `slug` and `sort_name` in SQL, by the
+  same expressions the fitzRoy importer and the replay use, so a replayed player is
+  byte-identical to the one the administrator typed. (Deriving the slug in JavaScript was also
+  producing a wrong one: the `'\s+'` in the old template literal was the letter `s`, so every
+  run of `s` in a name became a hyphen.)
+- New `src/db/queries/admin-draft.ts` is the only `INSERT INTO draft_picks` in `src/`, and the
+  only place draft selections are created, corrected, relinked, adopted or retired. A manual
+  selection is an ordinary `draft_picks` row under the `manual_admin_edit` source with
+  `player_url = 'manual:<token>'` -- inside migration 069's partial reload key, and unable to
+  collide with the DraftGuru URL contract. Its durable record names its player by IDENTITY and
+  its club by SLUG, never by an id a promotion renumbers. Every mutation is one import-role
+  transaction: canonical write, `data_overrides`, `recordDataEdit()`, all or nothing.
+- Draft selections can now be created for a player who does not exist yet, atomically. The
+  duplicate contract refuses rather than guesses: an existing player with the same normalised
+  name and no distinguishing date of birth is a hard refusal, a namesake with a different
+  recorded date needs an explicit confirmation, and an unlinked DraftGuru selection for the
+  same event is surfaced so the administrator links it instead. No fuzzy score decides identity
+  anywhere. A pick number already held in the same draft and kind is refused outright --
+  measured: zero such collisions exist across all 6,810 source selections.
+- `replay_admin_overrides()` gains manual branches for `players` and `draft_picks`, each
+  fail-closed over the whole active set before it writes: an administrator-created footballer
+  and their selections are re-created on a rebuilt database rather than vanishing at the swap.
+  When the player has since debuted and their AFL Tables profile was attached, the replay
+  BINDS the token onto the existing source-created row instead of inserting a twin. The
+  ordering `players` -> `draft_picks` is binding, and `docs/production-promotion.md` §8 now
+  says so and includes `draft_picks` in the replay loop.
+- `tools/migration/import_fitzroy_core.py` refuses, fail-closed, to insert a new canonical
+  player whose normalised name matches an administrator-created player still awaiting an AFL
+  Tables identity, unless both dates of birth are known and different. The rule is symmetric:
+  an unknown date on either side refuses, because an unknown date distinguishes nobody. The
+  guard runs only in the new-player INSERT branch, never writes `external_identities`, never
+  sets a `player_id`, and has exactly two outcomes -- safe to insert, or fail the whole players
+  batch with the manual player named. A name and a date may refuse an unsafe insert here; they
+  may never link a player.
+- Promotion lineage: `data_edits` rows with `table_name = 'draft_picks'` now have a stable
+  identity (`<source key>|<player_url>|<draft_year>|<draft_kind>`) and are remapped or refused.
+  They were previously reinstated with their integer `row_id` unchanged and never counted,
+  listed or remapped -- silent misattribution on any lineage-changing promotion. The `players`
+  rule admits the manual token alongside the AFL Tables path, one identity per player, path
+  first. A selection carrying no `source_id` has no key and reports unresolved rather than
+  being carried across by an integer that now names someone else.
+- `/admin/data-editor` is no longer a second draft writer: `saveDataEdit` and `saveEdit` refuse
+  `draft_picks`, `getEditableRow` returns nothing for it, and `CreatePlayerForm` has lost its
+  draft block. `EDITABLE_ENTITIES.draft_picks` stays as the field spec the new surface
+  validates with, and gains a `selection_facts` group (pick number, club) the generic editor
+  never had. This also removes the writer that produced `null|null|<year>|null` override keys
+  for admin-created selections -- one key shared by every admin pick of a year, which the
+  UNIQUE made the second edit silently overwrite and which no replay could ever match.
+- A pre-ISSUE-160 selection with no provenance can be adopted, one row at a time, by an
+  explicit Super Admin action that mints its identity and durable record -- and the linked
+  player's identity too, when that player has none. A second identity is never minted when a
+  valid one already exists. There is no bulk backfill, because a durable record needs an
+  administrator to attribute it to and a migration cannot supply one.
+
+### Draft administration ships an admin surface (AFLDB-ISSUE-160 Stage 2, ISSUE-156 P3b) - 11 September 2026
+
+- `/admin/draft`, `/admin/draft/new` and `/admin/draft/[id]` give Admin and Super Admin a
+  supported way to see, search and (Super Admin only) correct every draft selection AFLDB
+  holds, whatever its provenance: filter by year/kind/club/name/provenance/link-state, never
+  render a NULL pick number as `0`, and see provenance and override state on every row. The
+  detail page shows exactly the mutation panel the row's provenance admits under Stage 1's
+  contract -- source-field-group corrections and override retirement for a DraftGuru row;
+  whole-row edit, relink, AFL Tables identity attach, supersede and retirement for a manual row;
+  adoption for a pre-ISSUE-160 legacy row -- never a generic form that suggests more is editable
+  than actually is.
+- The new-selection wizard makes search-before-create real: the operator searches existing
+  players first, and creating a new person is a separate, explicit control that reveals its own
+  sub-form -- there is no default fallthrough from "no result yet" into "create anyway". Every
+  duplicate/conflict refusal and confirmation Stage 1's contract can produce (a likely duplicate
+  with no distinguishing date of birth, a distinct namesake, an unlinked source selection
+  already listing this person, a NULL pick number on a numbered board) is surfaced inline, with
+  focus restored to the control that triggered it on a refusal.
+- New capabilities `data.draft.read` (Admin and Super Admin) and `data.draft.edit` (Super Admin
+  only) are declared and enforced by `requireCapability()` at every page, route and Server
+  Action boundary this issue adds -- new-player creation and AFL Tables identity attachment sit
+  under `.edit`, not a third capability. A Draft administration link appears in the Admin Centre
+  sidebar's Data group, after Coaches, for anyone who holds `data.draft.read`.
+- `/admin/data-editor` no longer shows a draft search form or results table: the "Draft picks"
+  section is a single link to `/admin/draft`, and opening a stale `?entity=draft_picks&id=`
+  bookmark now shows a link to the selection's new home instead of a false "not found".
+- The list also filters by review state, so the selections that need a human are reachable
+  without reading every page: `override` (the selection carries an active durable
+  correction), `duplicate` (a manual selection whose player now also holds a source-owned
+  selection for the same draft event -- the state retirement and supersession exist to
+  resolve), and `awaiting-identity` (the selection's player holds an admin-created identity
+  and no AFL Tables profile yet, so a future source import would otherwise split them in
+  two). Every one is derived from rows the database already holds -- an override row, a
+  second selection, an identity row -- never from a name comparison, and nothing new is
+  stored to support them.
+- An unresolved DraftGuru selection now links straight to its decision in Player links.
+  Linking a source-owned selection to a player is person-grained and stays where it already
+  lives; draft administration points at it rather than offering a second way to do it. The
+  link is offered only for rows Player links actually owns -- never for a manual selection,
+  a legacy row, or an already-linked one -- and only to a viewer who may open that page.
+- The ISSUE-159 coach admin surface's revalidate-route and submit-helper machinery is
+  generalised into `src/lib/admin/revalidate-route.ts` and
+  `src/components/admin/action-submit.ts` and shared with draft administration; coaches'
+  own files became thin, behaviour-preserving wrappers over the shared modules. Each domain
+  keeps its own capability guard and its own path allowlist -- nothing became more permissive.
+- **Fixed before release (found by the 2026-09-12 DEV browser acceptance):** every
+  `/admin/draft/[id]` render failed with the site error boundary, for every selection and for
+  both Admin and Super Admin. The concurrency revision each edit form carries is the highest
+  `data_edits` id recorded about the selection, and both the page and the compare-and-swap read
+  it on a role that may not: `data_edits` is an operational audit table registered to
+  `afldb_auth` alone -- `afldb_app` is not in `afldb_meta.app_readable_tables` and `afldb_import`
+  holds `INSERT` on it and nothing more -- so the read was `permission denied for table
+  data_edits`. Both now read it on the audit pool. No schema, capability, authority-model or
+  privilege change: the grants were already right and the code was asking the wrong role.
+
+### Coach data becomes administrable, and the settle proof stops depending on deploy order (AFLDB-ISSUE-159 Stage 1, ISSUE-156 P3) - 11 September 2026
+
+- The nightly settle's override-scope proof no longer pins the `data_overrides.entity_type`
+  CHECK as an exact set. `src/lib/acquisition/manual-authority.ts` now proves only what the
+  proposition needs — the CHECK is readable and unambiguous, it admits none of
+  `match_period_scores` / `player_match_stats` / `brownlow_round_votes`, the editor spec exposes
+  none of them either, and every editor entity is admitted by the CHECK. Every previous refusal
+  is retained. This is behavioural: under the old exact-set proof, widening the CHECK degraded
+  those three targets from **apply** to propose-only in *either* deploy order, with no safe
+  sequence in either direction. There is now no such window.
+- Migration 095 admits `coaches` and `match_coaches` as `data_overrides` entity types, and
+  `coaches` (only) as a `data_edits` table name, so a human decision about a coach or a coaching
+  assignment has a durable record that destructive reloads replay and an audit row written in
+  the same transaction as the write. A coaching-assignment edit is audited against its match
+  (`table_name = 'matches'`, `field_group = 'coach_assignment'`) because `match_coaches` has a
+  composite primary key and `data_edits.row_id` is a single bigint.
+- An administrator-created coach — a person AFL Tables publishes no page for — is an ordinary
+  `coaches` row carrying a synthetic `manual:<opaque permanent token>` in **both**
+  `afltables_coach_path` and `name_key`, under the existing `manual_admin_edit` source. Two new
+  CHECKs make that structural rather than conventional: `coaches_path_namespace_ck` confines
+  every identity to one of the two namespaces, and `coaches_manual_identity_ck` forbids a
+  half-namespaced row. The half-namespaced shape is the one that matters — a manual row holding
+  a real `"Surname, Given"` string would raise a unique violation on a *non-target* constraint
+  the first time AFL Tables published that person, which is not an upsert: it aborts the whole
+  nightly coach import batch. No column was relaxed, no unique constraint dropped, no table or
+  column added, and no data was backfilled.
+- `replay_admin_overrides` gains `coaches` and `match_coaches` branches, called from
+  `import_match_coaches.py` at two ordered positions inside the import transaction: coaches
+  immediately after the coaches upsert, assignments after the assignment upsert. The ordering is
+  load-bearing — the `(match_id, club_id)` primary key carries no source, so a source refresh
+  *will* overwrite a manual assignment on a team-match it later covers, and replaying afterwards
+  is what makes the human decision win visibly and durably. Both branches refuse rather than
+  skip: an override whose match key, club slug, coach path or player profile path does not
+  resolve raises before anything is written, naming the offending keys. A coaching-assignment
+  override is keyed `<match_key>|<club slug>`, and because `matches.match_key` is itself
+  pipe-delimited (`season|round|date|home|away`), that key decodes on its **last** delimiter —
+  one decode, read by both the refusal check and the write.
+- Promotion lineage gains a coach identity rule. `coaches.afltables_coach_path` — NOT NULL
+  UNIQUE, minted once, never name-derived — is how a `data_edits` coach row is remapped when the
+  candidate does not share the replaced database's id lineage, and it resolves an
+  administrator-created coach exactly as it resolves a sourced one. The promotion runbook's
+  replay step now names every entity type the CHECK admits and the order they must run in: the
+  `coaches` replay carries an entire row rather than a field patch, so until it runs, a manually
+  created coach does not exist in the promoted database at all.
+
+### Coach administration ships an admin surface, and AFLDB-ISSUE-159 closes (Stage 2, ISSUE-156 P3) - 11 September 2026
+
+- `/admin/coaches` (search by name, filter by provenance / link status / active override, a
+  bounded create panel) and `/admin/coaches/[id]` (read-only identity and provenance, editable
+  metadata, player linkage, club-and-season-bounded coaching assignments) give AFLDB its first
+  coach administration surface. Reading is `data.coaches.read` (Admin and up); every mutation
+  is `data.coaches.edit` (Super Admin only) — a coach edit becomes a public statistical fact
+  immediately, with no draft stage.
+- Creating a coach AFL Tables never published a page for refuses a duplicate outright when an
+  existing coach shares the name and the same-or-unrecorded date of birth, and asks for an
+  explicit confirmation (never a silent guess) when the name matches but the date of birth
+  differs. Player linkage resolves only through the tracked AFL Tables identity
+  (`external_identities`), never by name, and a link a tracked
+  `afltables-contract.json` correction already governs is refused rather than silently
+  overridden.
+- Every mutation — create, edit, link/unlink, assign/clear, retire an override — writes the
+  canonical row, the durable `data_overrides` record and the `data_edits` audit row as one
+  transaction: none of the three survives without the other two.
+- No coach Server Action calls `revalidatePath` in-action (a deliberately more conservative
+  choice than the existing Brownlow/player-links actions): a dedicated
+  `/admin/coaches/revalidate` route does, invoked by the browser only after an action has
+  already resolved.
+- Validated end to end on real DEV (`6299bf8`): a live three-role Playwright permission matrix
+  (Super Admin / Admin / Contributor), responsive and keyboard-focus acceptance at
+  320/768/1000/1280/1920, and the full create/edit/link/assign/override-retirement flow,
+  alongside `npx tsc --noEmit` and 161 affected automated tests, all green. `AFLDB-ISSUE-159`
+  is Resolved; not yet merged to `main`.
+
+### Admin Centre capabilities are enforced, not decorative (AFLDB-ISSUE-158, ISSUE-156 P2) - 11 September 2026
+
+- Every admin page, route handler and Server Action under `/admin` now authorises through
+  `requireCapability('<name>')` against the one capability table in
+  `src/lib/auth/capabilities.ts`, the same table the sidebar reads. 54 role-guard call sites in
+  28 files were swapped for the capability that names the same boundary: same viewers admitted,
+  same redirects (`/admin/upload` for a contributor, `/admin` otherwise), same request-cached
+  session lookup. All 18 declared capabilities are enforced somewhere real.
+- Role guards remain only where policy keeps them: the dashboard (`requireAdmin`), submission
+  review and promotion (`requireAdmin` / `requireSuperAdmin`, no capability describes them), the
+  change-password page (`requireSignedIn`), and the administrator account lifecycle, which keeps
+  `requireSuperAdmin()` first and now also asserts `people.admins.lifecycle` beside it.
+- Policy fix: `people.admins.manage` no longer admits a contributor row carrying
+  `can_manage_admins` (the app never writes one, but nothing forbade it); the capability now
+  equals the `requireAdminManager()` rule it replaces. No other capability's admitted set changed.
+- Tests: `tests/auth.test.ts` reads the admin source and fails on drift — a capability declared
+  but unenforced, a boundary that awaits anything before its guard or has none, a role guard kept
+  where policy did not name it (or missing where it did), a nav link whose page does not enforce
+  its capability, or a capability looser or tighter than the role guard it replaced; plus
+  `requireCapability()` run for real per capability and viewer without a database. No migration,
+  no privilege change.
+
+### Admin Centre audit trail (AFLDB-ISSUE-157, ISSUE-156 P1) - 11 September 2026
+
+- New read-only `/admin/audit` page in the Operations group, open to every Admin and Super
+  Admin, that makes the two audit ledgers inspectable without SQL: "Sign-ins & administration"
+  over `auth_audit_log` (who, when, action, decoded `detail` payload as key/value pairs, IP) and
+  "Data edits" over `data_edits` (which entity, which field group, each changed field as
+  before → after, who, note). Filters for actor (recorded label, current email, or user id),
+  action or table / row id / field group, and a UTC calendar-date range; every view is a
+  shareable URL; 50 rows a page, paged on the server.
+- New `/admin/audit/entity/[table]/[rowId]` page: one entity's complete edit history, newest
+  first, each snapshot rendered field by field (before / after, `null` printed as `null` because
+  in this schema it means "not recorded").
+- New capability `operations.audit.read` (Admin-and-up), enforced with `requireCapability()`
+  before any read on both routes. A contributor is redirected with no query issued; an invalid
+  table or row id in the entity URL is a 404, not a query.
+- SELECT-only reader module `src/db/queries/audit-reader.ts` on the auth pool. Bigint ids are
+  selected as text and kept as strings; jsonb payloads are never decoded a second time; filter
+  values are bound, with LIKE metacharacters escaped. No migration and no privilege change:
+  `afldb_auth` already held SELECT on both tables.
+- The player-links pager is now the shared `src/components/admin/AdminPager.tsx`, used by both
+  routes; the dashboard's "Recent activity" links to the full trail.
+- Tests: capability and nav contract in `tests/auth.test.ts`; `tests/admin-audit-viewer.test.ts`
+  (helpers, reader SQL through a fake pool, route boundary for all three roles);
+  `tests/integration/admin-audit.test.ts` (filter correctness on `afldb_test`, always rolled back).
+
+### Brownlow administration browser-acceptance fixes and promotion-contract support (AFLDB-ISSUE-155) - 10 September 2026
+
+- A stale-tab refusal in the vote editor no longer resets the operator's in-progress selection
+  or reason. Reconciliation is now decided from a recorded `revision:canonicalFingerprint` pair
+  rather than a `useEffect` dependency array, because the App Router re-creates the route
+  subtree's effects after every Server Action round-trip and a dependency array cannot detect
+  that.
+- Every vote-editor action (Save draft / Finalise / Correct / Void) now dispatches inside
+  `startTransition`, clearing a React console error ("called outside of a transition") that
+  previously fired on every submission, success or refusal.
+- Keyboard focus is restored to the control that started an action once a refusal completes, and
+  moved into the publish confirmation block when it is revealed (back to "Publish season…" on
+  Cancel) — previously both a refusal and a panel reveal/cancel dropped focus to `document.body`,
+  leaving a keyboard-only operator to tab in from the top of the page.
+- The canonical-fingerprint compare-and-set digest is split into its own server-only module
+  (`src/lib/brownlow/fingerprint.ts`) so `node:crypto` never enters the client bundle that
+  imports `entry.ts`'s browser-safe constants.
+- The promotion contract (`tools/db/promotion-inventory.ts`) now covers the two Brownlow
+  workflow tables added in Phase C1 — `brownlow_vote_entry_state` (staged reinstatement with a
+  `match_id` lineage remap, via a new `rowIdColumn` mechanism for tables whose primary key is
+  the remapped column itself) and `brownlow_season_authority`. Player-slot columns remap through
+  the existing AFL Tables profile-url identity. This was the last known implementation item
+  blocking a safe production promotion after this issue ships; final regression, promotion-check
+  and deploy validation are still pending before ISSUE-155 can close.
+
+### Brownlow administration has a UI (AFLDB-ISSUE-155 Phase C2) - 10 September 2026
+
+- `/admin/brownlow` is the place Brownlow votes are now entered, finalised and published. It
+  lists every polled season with its status, coverage counts, publication authority and last
+  editor; drills into a season's rounds and their completeness; and, per round, shows every
+  home-and-away match with an inline editor. Finals never appear — no votes are awarded in them.
+- Each match editor lists only the players in that match's canonical line-up, grouped by club
+  with their jumper numbers (jumper numbers are text, not numbers). Three type-ahead selectors
+  award the 3, the 2 and the 1; a player already chosen for one cannot be chosen for another.
+  An incomplete selection can be saved as a draft; finalising needs all three and a complete
+  line-up. Where the line-up is short, the editor says which side is short and links to the
+  match sheet, and finalise/void are blocked until it is repaired. Source-published votes can
+  be adopted into the selection with one control.
+- The controls follow the capability split: an Admin may save drafts; only a Super Admin sees
+  working Finalise, Correct, Void and Publish controls — an Admin sees them disabled with the
+  reason. Correcting a finalised match and voiding one each require a typed reason, and the
+  editor says plainly that a correction changes canonical facts and that a void withdraws the
+  vote values while keeping the participation record.
+- The season page carries the publish panel: publication readiness, the blockers the backend
+  would return, an ineligible-player multi-select prefilled from the current season rows, and a
+  source-vs-manual authority line. Publishing is a two-step confirm, Super Admin only, and a
+  stale season revision comes back as a reload prompt rather than a generic error. For a
+  source-published season the round-fact-vs-published-total disagreement is shown on the page.
+- A stale-tab conflict on any of these — someone else finalised the match, a settle landed a
+  vote, the season moved — is surfaced as "someone changed this while you were editing it,
+  reload" with the entered values preserved, never as a silent overwrite and never as
+  "already decided". Backend refusals `stale`, `already_final` and `forbidden` are written to
+  the audit trail; ordinary validation refusals are not.
+- The legacy match sheet's Brownlow column is now read-only: it shows the recorded value or a
+  dash, submits nothing, and points authorised admins at `/admin/brownlow`. This pairs with the
+  Phase C1 rule that the match sheet refuses any Brownlow value — normal match-sheet editing is
+  now compatible with that rule because the value is never sent.
+- The Data section of the admin sidebar gains a Brownlow link (visible to every staff role
+  above contributor), and the dashboard shows the current season's count of home-and-away
+  matches still without finalised votes.
+
+### Brownlow votes have a canonical match identity (AFLDB-ISSUE-155 Phase C1) - 10 September 2026
+
+- A Brownlow vote is now a fact about a **match**, not just about a season and a round number.
+  `brownlow_round_votes` gained a match identifier, deterministically backfilled from each player's
+  own line-up row - 320,861 of 320,861 rows resolved to exactly one match, with no guessing by
+  name, date or club - and the database now states the Brownlow rule itself: within one match a
+  player holds at most one allocation, and at most one player holds each of the 3, the 2 and the 1.
+  A vote that cannot be attributed to a match keeps no match, is reported as unresolved, and is
+  never invented.
+- Behind that sit a draft/final/void workflow per match and a publication record per season, so an
+  administrator's unfinished work is never a row in a public fact table. An admin may draft; only a
+  super admin may finalise, correct, void or publish. Corrections are direct, reasoned and fully
+  audited, and a correction inside an already-published season re-derives that season's totals in
+  the same transaction - there is no published-but-stale state to notice later.
+- Publication derives a season's totals from the finalised matches and takes authority for them.
+  Seasons nobody has administered keep the totals their source published, and where the match-level
+  facts disagree with those totals the difference is **shown, never applied**. Derived season and
+  career figures move with a publication, in the same transaction.
+- **The match sheet no longer writes Brownlow votes.** It refuses any Brownlow value with a message
+  pointing at Brownlow administration, and it preserves the recorded value through every save, so a
+  stale editor can no longer overwrite a vote. Deleting a match that carries a Brownlow decision
+  now fails rather than discarding the decision, and it fails with a message naming the decision
+  and where to withdraw it, before any part of the deletion is attempted.
+- When two administrators submit the same match at the same moment, the one who loses the race is
+  told that the match changed while they were editing it and to reload - not that the match was
+  already decided. They acted on a page that had stopped being true, which is a different problem
+  with a different fix. Submitting against a match you can see is already decided still says so,
+  and still points at Correct.
+- Reload paths can no longer overwrite an administrator's decision. The season-totals artefact
+  loader refuses to reload over an admin-published season, and the fitzRoy rebuild loader refuses
+  to rebuild the round votes of a season holding admin-finalised matches. Both fail closed with a
+  message naming the seasons. A rebuild of a fresh database is unaffected.
+- Fixed while validating the above: entering votes for a completed season that had no published
+  season totals yet would have locked the workflow out of that season after the first match, by
+  recomputing the coverage grid to say the season had no medal. A season holding Brownlow decisions
+  is now reported as partially covered until it is published.
+- Also fixed while validating the above: the Brownlow test fixture could leave rows behind in the
+  integration database. Its data is committed by design - the code under test opens its own
+  connections and could not otherwise see it - and cleanup used to be reachable only through the
+  value the seed returned, so a timed-out setup left committed rows with no way to remove them, and
+  the fixture's own collision guard then refused every later run. Cleanup is now registered before
+  the first row is written, each seed runs on its own connection, and teardown cancels the seed,
+  waits for it to stop, closes that connection if it has not, and only then removes the rows -
+  once, idempotently, and failing loudly rather than reporting a clean database it did not clean.
+  Both abandonment paths are exercised by direct test, and the affected database was independently
+  verified clean afterwards.
+
+### Administrator account lifecycle (AFLDB-ISSUE-155 Phase B) - 10 September 2026
+
+- A super admin can now promote, demote, deactivate and reactivate an administrator account from
+  `/admin/admins`, instead of an account's role and status being changeable only in the database.
+  Demotion also clears `can_manage_admins`; deactivation asks for the account's email to be typed
+  and for a short reason.
+- Accounts are never deleted. Deactivation is the end of access, not the end of the record: the
+  account and everything it has ever edited, reviewed or resolved are kept, and a deactivated
+  account cannot sign in and holds no live session. Reactivation restores access and revives no
+  previous session.
+- The site cannot be left without a way in. Demoting or deactivating the last super admin who could
+  actually sign in - enabled, with a password and an enrolled authenticator - is refused, and the
+  count is taken inside the same transaction as the change, under an advisory lock, so two super
+  admins acting at the same moment cannot each remove the other. Nobody can demote or deactivate
+  their own account.
+- Every successful change signs the target out of all their sessions and writes its audit row in
+  the same transaction as the change itself: if the trail cannot be written, nothing is. Refusals
+  that say something about a real account - a stale page, a self-action, a lost invariant - are
+  audited too, and a stale page is told the account changed rather than being silently reapplied.
+- Lifecycle actions are super-admin-only, enforced by the Server Actions themselves.
+  `can_manage_admins` keeps its existing invite and password-reset delegation and gains no power
+  over roles or account status. An ordinary admin keeps the page and their own sessions, and can
+  now sign out only their own session rather than anyone's.
+
+### Admin Centre navigation and capability policy (AFLDB-ISSUE-155 Phase A) - 10 September 2026
+
+- The admin sidebar's flat, hand-conditioned link list is replaced with a grouped Admin Centre
+  layout — Overview, Data, Acquisition, People & access, Site, Operations, Account — driven by a
+  new central capability policy (`src/lib/auth/capabilities.ts`) rather than a `superAdmin ? … : …`
+  local to the nav. Every existing route keeps its own server-side guard unchanged; the policy
+  describes enforcement that already existed, it grants nothing new.
+- The Grid Solver link is removed from the admin sidebar — it is a public tool, not an
+  administrative capability — while `/admin/grid-solver` remains as a compatibility redirect for
+  old bookmarks.
+- The admin dashboard gained two overview badges: pending submissions and, for super admins,
+  unresolved player links, each linking to the page that resolves it.
+- Fixed a pre-existing responsive defect in the admin sidebar: on a narrow screen the sidebar was
+  meant to default to collapsed (a single toggle button), but a CSS rule forced it open regardless
+  of that state, so every mobile admin page load showed the full sidebar above the page content.
+
+### Father-son records now say what they are, and the search box can answer them (AFLDB-ISSUE-153 Stages 1-5) - 9 September 2026
+
+- The Father-Son Records page described itself as a board of "father and son pairs". It is not: every
+  row on it is a *selection made under the AFL father-son rule*, and a father and son who both played
+  without such a selection are not on it. The page now says so, names `father_son_selections` as the
+  authority for those selections, explains that the rows it reads are that record's own projection, and
+  says plainly which facts - the selecting club, the draft year, the pick and the draft pathway - live
+  only on the selection record and so are not shown. The board itself was not re-pointed or restructured:
+  the two are the same 127 selections, measured row for row.
+- The Family Records board says a family is a set of players linked as siblings. Its query did not say
+  so, and grouped whatever relationship types happened to carry a family key. It now states siblings
+  explicitly. On today's data this changes nothing - no father-son row carries a family key - which is
+  exactly why it was worth stating before the data can change it.
+- The search box can now be asked about the father-son rule from the selected player's side, not only
+  the father's: "players selected under the father-son rule", "father-son selections", "which players
+  were father-son picks", "father-son sons". The wording has to name the rule, a selection, a draft or a
+  pick, or pair "father-son" with the role - the same test that already applied to the father's side, so
+  neither side is given a wording the other is denied.
+- The bare and collective phrasings still decline, and say why: "father-son players", "father-son pairs",
+  "father-son duos" and "father-son families" are genuinely ambiguous between the draft rule and any
+  father and son who both played, and questions about the second are already answerable in words that
+  cannot be misread ("players whose father also played AFL").
+- Those questions can now be scoped: "Geelong father-son selections" means the club that MADE the
+  selection, counted through the club's whole history - the Kangaroos with North Melbourne, Footscray
+  with the Western Bulldogs - but never folding Fitzroy into Brisbane, which was a merger rather than a
+  rename.
+- A year on a father-son selection question is the DRAFT year, and the answer says "in the 2022 draft"
+  rather than "in 2022", because they are not the same thing and never have been here: of the 99 selected
+  players AFLDB has linked, not one debuted in the season they were drafted. Sixty debuted a year later
+  and thirty-nine two or more years later. A question that mixes a year with a question about playing now
+  declines rather than picking one of the two readings.
+- "Father-son selections by club" and "by draft year" answer as distributions. They count SELECTIONS -
+  all 127 of them - and not the 99 whose selected player AFLDB has linked to a profile, because a
+  selection whose player is unmatched was still a selection the club made. The two counts are not close:
+  they differ for 14 of the 17 clubs, and for Carlton they are 13 and 7. The answer says it is counting
+  selections, and discloses the 99 beside the distribution instead of quietly using it.
+- "Players selected under the father-son rule who also coached" answers, as does the father's side,
+  "players who were father-son fathers and also coached". Both mean the two things are true of the same
+  person; neither claims one came after the other, and "later coached" and "went on to coach" still
+  decline for that reason.
+- Those two answers now SAY they are about coaching. The sentence above the results was built from the
+  first family the question matched, so "players selected under the father-son rule who also coached"
+  and "players who were father-son fathers and also coached" described only the father-son half and
+  dropped the coaching half. The rows were always right - one person and eleven people respectively -
+  but the sentence read as though it were describing the ninety-nine and the hundred and seven who
+  merely qualify under the rule. Every condition a question carries is now named in the answer.
+- Those answers have now been run through a real browser against a real build, and they are green.
+  The 319-question and 349-question sweeps AFLDB runs before shipping search changes came back 242
+  answered / 77 declined and 258 answered / 91 declined: exactly the five questions this work made
+  answerable moved from declined to answered, and nothing else moved. Nothing failed, nothing went
+  unscored, and not one page errored or was throttled. The build under test was proved to be this
+  one first, by asking it the father-son-rule question that every earlier build declines.
+- This checkpoint covers Stages 1-5 and the Stage 7 durability invariant only. Stage 6 (the family
+  grain and its ranking contract) has not started and is not authorised by this entry.
+
+### Natural-language search - who both played and coached (AFLDB-ISSUE-152 Phase F) - 9 September 2026
+
+- AFLDB knows who played and it knows who coached, and until now the search box could not be asked
+  about the people who did both. It can now: "which players both played and coached", "players who
+  played VFL/AFL and also coached", "how many players have played and coached", and the club form -
+  "players who played for Richmond and also coached Richmond", "who both played for and coached the
+  Western Bulldogs", "players who played for Richmond and coached Collingwood". The composition also
+  ranks, so "most career games among players who also coached" ranks careers within that group
+  rather than ignoring half the question.
+- Holding a coach's page is not the same as having coached a match, and the two answers differ. The
+  search counts only people with an actual coaching appearance, which is 365 people rather than the
+  368 who merely hold a linked coaching identity.
+- A club on the coaching side means the club through its whole history, not one of its historical
+  names. Someone who coached the Bulldogs answers to Footscray and to the Western Bulldogs; someone
+  who coached Sydney answers to South Melbourne. Answering only the exact recorded name would have
+  quietly excluded most of them.
+- The two halves of a club question stay independent. Coaching a club does not imply having played
+  for it - fourteen people coached Richmond and never played there - so "played for Richmond and
+  also coached Richmond" returns the 27 who did both, not the 41 who coached them.
+- Both clubs are always named on their own side of the answer, and a list longer than the hundred
+  rows shown says so in the answer itself.
+- Questions AFLDB cannot honestly answer decline by name and say why. It does not record which of a
+  person's two careers came first, so "players who later coached", "players who went on to coach"
+  and "which players became a coach after retiring" all decline and say so, rather than being
+  quietly reinterpreted as the question it can answer. A club named on only one side ("Richmond
+  players who also coached") declines rather than guessing which club the coaching half means, and
+  a season, venue, opponent, round or match type on one of these questions is refused rather than
+  dropped. Father-son selections in combination with coaching are still not supported and are being
+  decided separately.
+- These questions have now been asked through a real browser against a real build, and they are
+  green. All 349 questions in the combined new-family set behaved exactly as written down: 253
+  answered, 96 declined, nothing failed, nothing went unscored, and not one page errored or was
+  throttled.
+- The 1,495-question regression sweep that guards everything AFLDB could already answer was then
+  run again in full. It came back 1,435 answered and 60 declined - its exact previous shape.
+  Another parser version, two more grid builders and a whole new kind of question moved no
+  existing answer in either direction.
+- Before any of that counted, the running site had to prove it was actually serving this change:
+  "players who also coached" had to answer "365 players match" first. A sweep whose numbers look
+  clean but whose build predates the work measures nothing, and that check is now a precondition
+  rather than a courtesy.
+- The same check confirmed the long-list disclosure end to end: 365 people match, a hundred are
+  shown, the page says "Showing 100 of 365", and the answer itself says the displayed rows are not
+  the whole list.
+- No application, parser, planner, query, schema or permission behaviour changed during that
+  acceptance. Two test type contracts were corrected and the sweep harness was taught the name of
+  the new question set; neither changes what AFLDB answers.
+
+### Natural-language search - football families become answerable, in the half the data can prove (AFLDB-ISSUE-152 Phase D) - 9 September 2026
+
+- AFLDB has recorded who is whose brother, father and son for a long time, and the search box could
+  not be asked about any of it. It can now: "which players had a brother who played AFL", "players
+  whose father also played AFL", "who are Brent Harvey's brothers", "which father-son fathers played
+  the most games". The relationship also composes with a ranking, so "most games by a player with a
+  brother who played AFL" ranks careers within the relationship instead of ignoring one half of the
+  question, and a named player gets a straight yes or no.
+- Direction is read from the recorded roles, never from which side of the row a person happens to
+  sit on. "Players whose father played" and "players whose son played" are two different questions
+  with two different answers, and neither is the other one relabelled.
+- "Brother" continues to mean the recorded brother relationships specifically, not siblings in
+  general - AFLDB also records sisters and unsexed sibling rows, and reading those as brothers would
+  be an invention.
+- A relative AFLDB has not linked to a player is a name in a source, not a person in the database,
+  and it now says so in the answer rather than quietly counting or quietly dropping them. Two
+  relatives who share a name - there are two Gary Abletts, father and son - stay two people.
+- Questions this data cannot honestly answer now decline by name instead of failing as gibberish:
+  sisters, twins, cousins, grandparents, in-laws, mothers and daughters, "family members of X",
+  "related to X", and anything about a football family as a whole. Each says what AFLDB actually
+  holds. Asking about the football families themselves, and about father-son draft selections as
+  such, is still not supported and is being decided separately.
+- Every answer says which relationship it answered. A list that is longer than the hundred rows a
+  page shows now says so in the answer itself - "658 players qualify... it is not the whole list" -
+  rather than leaving the reader to notice the table footer.
+- One question that used to work kept working, and now has a test to keep it that way: Ben Cousins's
+  surname is also a family word, and "most goals by ben cousins" is a goals question.
+- Showing part of a long list is now a stated decision rather than an implicit one. A relationship
+  question that matches more than a page of players reports the true total, shows the same capped
+  table every other list uses, and says in the answer that what is displayed is not the whole list.
+  Nothing is silently cut, and no question is refused merely for having a lot of correct answers.
+- Forty-eight of these questions - twenty-six that should be answered and twenty-two that should be
+  declined - are now part of the browser sweep AFLDB runs before shipping search changes, each one
+  checked against the real database before being written down. They are added alongside the existing
+  271-question and 1,495-question sweeps rather than replacing either, so the earlier results stay
+  exactly as they were recorded.
+- That sweep has now been run through a real browser against a real build, and it is green. All 319
+  questions in the combined set behaved exactly as written down: 238 answered, 81 declined, nothing
+  failed, nothing went unscored, and not one page errored or was throttled.
+- The 1,495-question regression sweep that guards everything AFLDB could already answer was then run
+  again in full. It came back 1,435 answered and 60 declined - its exact previous shape. Six new
+  relationship builders and another parser version moved no existing answer in either direction.
+- A first attempt at the new sweep was thrown away rather than reported. It had been run against a
+  build that predated the relationship work, so it was asking the new questions of the old search
+  engine: the numbers looked clean and meant nothing. A sweep now has to demonstrate that the build
+  underneath it actually contains the change before any of its results are counted.
+- The questions AFLDB still cannot answer honestly - football families as a whole, and father-son
+  draft selections as such - are unchanged by all of this. They still decline by name, and what they
+  should mean is still being decided.
+
+### Natural-language search - the new record families pass a full browser sweep, and the existing 1,495-question gate is untouched (AFLDB-ISSUE-152 Phase G) - 9 September 2026
+
+- The coaching, after-the-siren and first-kick-goal questions added over the last three parser
+  versions have now been asked through a real browser against a real build, not just through unit
+  tests. All 271 of them agreed with what they were supposed to do: 212 answered, 59 declined,
+  nothing failed, nothing went unscored, and not one page errored.
+- The 1,495-question regression corpus that guards everything AFLDB could already answer was then
+  re-run in full. It came back 1,435 answered and 60 declined - its exact previous shape. Two new
+  grains, a deleted false decline and three new refusals moved no existing answer in either
+  direction.
+- A sweep can no longer mistake rate limiting for an answer. `/search` limits how many questions one
+  address may ask per minute, and a limited page renders "Too many searches" with no answer section -
+  which looked byte-for-byte identical to a correct decline. A sweep that outran the limiter therefore
+  reported fiction in both directions at once: every throttled real question counted as a failure, and
+  every throttled decline counted as a pass. Throttling is now detected by name and reported as the
+  loud page-level error it is, so a run either measures the search engine or says plainly that it did
+  not.
+- Sweeps can also now pace themselves, and the pacing is validated rather than assumed. A delay
+  written as "2.2s" instead of 2200 would previously have read as not-a-number, silently switched
+  pacing off, and produced exactly the throttled run the setting exists to prevent. It is now
+  rejected outright.
+- Two players are named Gary Ablett, and the tests now say so. Asked about an unsuffixed "Gary
+  Ablett", AFLDB declines rather than guessing which of the two it means - that has been true since
+  the ambiguity rules were written, and it is correct. But a test fixture had long stood in a single
+  invented candidate for that name, which made the bare name look uniquely resolvable to anyone
+  writing tests against it. The fixture now carries both players, the ambiguity contract is asserted
+  directly, and the question that exposed the gap is kept as a permanent decline case.
+- Rendered acceptance is now a repeatable procedure rather than a set of one-off commands: tunnel,
+  server, static verification, a short paced smoke test, then the two sweeps, with status and
+  post-mortem tools alongside. Preserved evidence from a completed run is immutable and a re-run
+  refuses to overwrite it, so a later run can never quietly replace the record it is meant to be
+  compared against.
+- No application, parser, planner, query, schema or permission behaviour changed in this work. The
+  corpus grew by one decline case and one question was rewritten to name a player unambiguously; the
+  strict corpus-size guard that caught the change was kept, not relaxed.
+
+### Natural-language search - the first-kick-goal record answers its last two questions (AFLDB-ISSUE-152 Phase E) - 9 September 2026
+
+- AFLDB's curated first-kick-goal record has been searchable in plain English for a while: who did it,
+  who did it for a club, who did it in a decade, the first and most recent, and the by-club/by-decade
+  summaries. Two things it records were unreachable. "Players who kicked a goal with each of their
+  first three kicks" and "players whose first-kick goal was their only career goal" now answer, using
+  two conditions the database has always held and the search engine could never ask for. No new data,
+  no new query and no schema change - the wiring was the gap.
+- The second one was not a decline before it was a MISREAD. "Whose first-kick goal was their only career
+  goal" left the word "goal" sitting in the question after the rest had been understood, and the ranking
+  logic picked it up: the site would confidently return a career-goals leaderboard under a question about
+  players who kicked exactly one goal. That reading is now impossible.
+- "Never" is read as part of the claim, not as a reversal of it. "Players who never kicked another goal
+  after their first-kick goal" is the same question as "whose first-kick goal was their only career
+  goal", and both answer. Asking for the opposite of the record - "players who never kicked a goal with
+  their first kick" - still declines, because the record lists who DID it and nothing else.
+- Only career GOALS and never kicking again are different claims, and the site now says so out loud.
+  AFLDB records whether a player ever kicked another goal (23 players did not); whether they ever kicked
+  the football again is a different, kick-level fact it does not answer (4 rows carry it, and they are
+  a different set). Asking the second gets a named explanation, not a silent answer to the first.
+- Three questions that cannot be answered now say so by name rather than trailing off into a low-confidence
+  decline: a club-by-club or decade-by-decade SUMMARY cannot also be narrowed to the multi-kick or
+  only-career-goal subset (the summary counts every holder); a streak length outside 1-10 kicks is outside
+  what the record holds; and the kick-level claim above. Each explains itself in a sentence.
+- Asking about one player gets a yes or a no. "Did Dustin Martin kick a goal with his first kick" used to
+  answer "0 players match". It now answers with the player's name, yes or no, and names the conditions
+  that were checked. List questions are unchanged.
+- The answer counts only players AFLDB has linked to a person. The record board at /records/first-kick-goal
+  lists unlinked rows too, so a search answer is deliberately a slightly smaller set - 330 of 334 on the
+  reference data - and the answer text says so rather than quietly absorbing the difference.
+- Search behaviour version 37. Answers already given are unaffected; no page, board or import changed.
+
+### Natural-language search - after-the-siren questions are answerable (AFLDB-ISSUE-152 Phase C) - 8 September 2026
+
+- AFLDB has held a curated, cited list of kicks after the siren since migration 089 - 126 events
+  from 1913 onward, each classified on three independent axes. The natural-language engine could
+  not reach any of it: "who has kicked the most goals after the siren" declined, and the only
+  reason it declined rather than answering wrongly was that the leftover words "after siren"
+  dragged confidence below the gate. The metric extractor had already claimed "goals" as the
+  career-goals statistic. A tenth grain, `after_siren`, now owns the family, and the parser claims
+  the siren vocabulary BEFORE any metric extractor so that reading can never surface.
+- The three dimensions stay independent and are never merged. What the kick REGISTERED
+  (goal / behind / nothing), what it did to the RESULT (won / drew / nothing), and the match result
+  from the KICKER's side are separate typed fields, ANDed. "A goal after the siren" and "a goal
+  after the siren to win" are different populations, and the answer text names every applied
+  dimension so a reader can see which question was answered. One measured event is a kick that
+  scored nothing, changed nothing, and whose side won anyway - which is why the third axis exists.
+- An absent outcome means EVERY kick, misses included: "kicks after the siren" is all 126 events,
+  not only the ones that scored.
+- Every superlative in this family is a tie. The measured ceiling is two, so "most goals after the
+  siren" names Barry Hall AND Gary Rohan, and "most kicks after the siren" names nine players.
+  An answer that named one of them would be wrong by construction.
+- A kick with no canonical match link is counted, listed, attributed to its club and its kicker,
+  and classified on all three axes. It is excluded only from the two things `matches` owns:
+  ordering ("the first", "the most recent") and finals scope. The answer says how many were left
+  out and why, rather than dropping them silently.
+- Finals scope reads `matches.round_type`, never the source's own round text. One 1980 event is
+  recorded with the round "GF" in a non-premiership Escort Championships match, and a round-shaped
+  filter over that text would return it as a Grand Final. "After the siren in a Grand Final" is an
+  honest empty result: no VFL/AFL Grand Final after-siren event exists.
+- Every after-the-siren answer carries a permanent caveat that this is a curated, cited list of
+  individual events, not a systematic record of every kick after every siren. A coverage floor
+  alone would have implied a completeness the family does not have.
+- Declines are explicit rather than approximate: a round number, a venue, a two-club matchup, a
+  per-season split, the siren subtype, the shot detail, the verbatim source scores, the competition
+  name, and "fewest kicks after the siren" - which has no meaningful answer, because the set is
+  defined by having at least one.
+- Migration `093_nl_search_log_after_siren_grain.sql` extends the telemetry grain constraint, which
+  is the fourth time that constraint has had to catch up with the grain vocabulary. Without it every
+  after-the-siren answer would render correctly while its telemetry row was rejected and dropped in
+  silence. The requirement was proven by a failing test before the migration was written, and the
+  migration must reach each database before the code that needs it.
+- `PARSER_VERSION` 35 -> 36.
+
+
+### Natural-language search - coaching questions are answerable, and the false coaching decline is gone (AFLDB-ISSUE-152) - 8 September 2026
+
+- AFLDB has held canonical coaching data since migration 087: 386 coaches and 32,034
+  `match_coaches` rows spanning 1902-2025. The natural-language engine nonetheless declined
+  every question containing the word "coach" with the stated reason "AFLDB has no coaching data
+  at all - no coach, no coach-per-club-season, nothing." That sentence had been untrue since the
+  data landed, and it was the first rule the parser consulted, so no coaching question could
+  reach anything downstream. The rule is deleted in the same change that makes coaching
+  answerable - never softened while still refusing.
+- A new `coach_record` grain answers a coach's record from `match_coaches` joined to
+  `matches`, the same canonical per-match assignment `/coaches` and `/records/coaches`
+  already read. `coaches.source_games_coached` remains evidence only and is read nowhere.
+  Supported: who has coached a club, how many coaches a club has had, a coach's whole career, a
+  coach's record at one club, club and league rankings by games/wins/draws/losses/finals/grand
+  finals/premierships/seasons in charge/clubs coached, thresholds on any of them, season-scoped
+  coaching, plus the two player-grain readings - "players coached by X" and "premiership
+  coaches" - through the Grid Solver's existing coaching builders.
+- A coach reference is deliberately distinct from a player reference. 368 of the 386 coaches are
+  uniquely linked to a player and 18 have no player row at all, so a player-shaped reference is
+  structurally blind to 4.7% of coaches; and for the same human the two numbers differ (Mick
+  Malthouse: 174 games played, 718 coached). A coach's name resolves in the coach directory only
+  under a coaching cue, so "most games" keeps its career reading. A surname shared by two
+  coaches - Pannam, Smith - is not an alias at all and declines rather than guessing.
+- Club scope folds the `organization_id` lineage exactly as the club page does: Footscray-era
+  coaching counts towards Western Bulldogs, and nothing of Fitzroy's reaches Brisbane Lions.
+  "Coached more than one club" counts organizations, never raw club identities.
+- Win percentage is the site's draw-weighted `(W + D/2) / G`, never `W / G`, and a
+  win-percentage ranking always states its qualifier - 50 games coached by default, or the
+  reader's own minimum - because at 50+ games the leader is Cliff Rankin at 78.95% from 57
+  games. A ranking with no qualifier at all is refused rather than answered from a one-game
+  sample.
+- A tenure is never rendered as a continuous run: Jack Titus coached Richmond in 1937 and again
+  in 1965, so a row shows the season span with the count of seasons in charge beside it.
+- Coaching coverage is a floor at 1902 and nothing more. A question about 1899 is refused with
+  that reason; a question about a season AFTER the last recorded one is a genuine empty result,
+  not a refusal, so no last season is hard-coded. The floor makes no claim that every season
+  from 1902 onward is completely recorded.
+- Coaching questions Phase B does not support - assistant/caretaker roles, coach-versus-coach
+  head-to-head, coaching awards, tenure reasons, contracts, salaries, state or other-competition
+  coaching, per-season coaching splits, and "Richmond players coached by X" (no builder owns the
+  club) - now decline through the ordinary path, which says the question was not understood
+  rather than claiming data that exists does not. Parser version 34 -> 35.
+- Phase B needs one migration, `092_nl_search_log_coach_record_grain.sql`, because the ninth
+  supported NL grain exposed schema drift in migration 079: `nl_search_log.grain`'s CHECK
+  constraint still listed the eight grains that existed when 079 was written, so a
+  `coach_record` telemetry row was rejected by the database. `logNlSearch` deliberately
+  swallows an INSERT failure so telemetry can never turn a correct answer into a failed search,
+  which meant coaching questions would have answered correctly while every coaching row was
+  dropped from the search log in silence - the same failure 055 and 079 each repaired for an
+  earlier grain. 092 is forward-only and strictly widening: all eight existing grains are kept
+  verbatim, the constraint is not weakened, and `logNlSearch` is unchanged. It must be applied
+  before the code reaches an environment. The contract test now drives its accepted list from
+  the `NlGrain` type and also proves an unsupported grain is still rejected, so the tenth grain
+  fails a test instead of silently losing its telemetry.
+
+### Natural-language search - "teams with N games against <club>" is answerable (AFLDB-ISSUE-110) - 8 September 2026
+
+- `games` joins `wins`, `losses` and `draws` as a grouped team-result metric. A rendered UI
+  acceptance run over the 1,440-question realistic corpus left exactly one failing family:
+  every `teams with {more than|at least|at most} 2 games against <club>` question came back
+  unanswerable while its wins/losses siblings answered. The word was not a grouped metric, so
+  the question fell through to a `player_career` games column that still carried the opponent
+  scope, and the career backstop correctly refused it - the refusal was honest, the routing
+  was not.
+- `games` is the un-predicated member of the same organization-level family: every match
+  already inside the scope counts, where the result metrics count only the matches the club
+  won, lost or drew. The grouping, the organization-lineage opponent semantics and the
+  parameterised SQL are unchanged; the result-clause chain in `src/db/queries/nl/team-match.ts`
+  is now exhaustive rather than ending in a bare `else` for draws, which would otherwise have
+  counted drawn matches for the new metric.
+- The word is admitted only behind an explicit club subject (`teams`/`clubs`/`sides`), probed
+  before `extractAggregation` consumes the `<subject> with` cue. `games` names a career column
+  over the same vocabulary, so `players with more than 200 games` keeps its career reading; a
+  result word still governs when both are present. A margin filter still cannot attach to a
+  games count. Parser version 33 -> 34.
+
+### Natural-language search - a career question may only keep the scope something consumes (AFLDB-ISSUE-110) - 8 September 2026
+
+- A career-grain plan carrying a season range or a club now has to prove that something
+  actually reads it. Until now the presence of any career predicate exempted the plan from
+  both career-grain backstops, but a grid builder consumes only its own parameters, so
+  `players with at least 3 grand finals since 2000` counted grand finals over whole careers
+  and `Carlton players who debuted since 2000` listed every club's debutants - each with the
+  discarded scope still shown in the "what AFLDB decided you meant" panel.
+- Ownership is now declared per builder in `src/search/nl/plan.ts`: the season range survives
+  only for `debuted_between` / `first_kick_goal_between`, the club only for
+  `first_kick_goal_for_club`, and the career compiler emits its generic club filter on the same
+  test rather than on "no predicates at all". Anything unowned refuses:
+  `A career question cannot be restricted to a season range.` or the new
+  `This kind of career question cannot be limited to one club.` A club beside a club-blind
+  predicate is deliberately declined rather than folded into a played-for-club reading, because
+  "Carlton players who played in 3 grand finals" has two plausible meanings that return
+  different players.
+- Unaffected: club-scoped career totals and thresholds (`most games for Geelong`,
+  `players with at least 200 games for Collingwood`), debut windows
+  (`players who debuted in the 1990s`), scoped achievements
+  (`players who kicked a goal with their first kick for Carlton in the 1940s`) and every
+  question in the two realistic UI corpora - all 1,495 were re-parsed and re-validated, and
+  none is affected by the new rule.
+- The plan trace also stopped calling a scoped total a single-match search: a `player_game`
+  plan in `sum` mode (`most goals for Geelong`) now reads "Searched for the highest total
+  goals", matching the answer text below it.
+- `PARSER_VERSION` 32 -> 33. No migration, schema, privilege, route or deployment change.
+
+### Production promotion - staged reinstatement of NOT NULL lineage-bound references (AFLDB-ISSUE-151) - 8 September 2026
+
+- The generated promotion plan (`npm run db:promotion:check -- --plan`) no longer restores a
+  reinstated table straight into `public` when one of its NOT NULL foreign keys into rebuilt
+  data is lineage-bound with a stable identity. Found by the first real production promotion
+  (stamp `20260907-234124`): `external_grid_sources` row 1 carried `ingest_source_id = 57`
+  (old `sources` 57 = gridley), the rebuilt candidate's gridley row is `sources` 7 and its id
+  57 does not exist, so the plain `pg_restore` met the immediate FK before the evidenced
+  AFLDB-ISSUE-142 remap (57 -> gridley -> 7) could run.
+- Such a table is now **staged**, decided by the contract's shape and never by name
+  (`isStagedReinstatement` in `tools/db/promotion-inventory.ts`; today exactly
+  `external_grid_sources`). Two new generated files, `promotion-stage.sql` and
+  `promotion-promote-staged.sql`, and a re-sequenced `promotion-reinstate.sh`: direct restores
+  (2), stage into `promotion_staging.<t>` with the dump's `COPY` header redirected and
+  grep-guarded (2b), the `--lineage-remap-out` file applied once at a fixed step with its
+  `UPDATE` targeting the staging copy (2c), promotion into `public` under the FK with
+  `OVERRIDING SYSTEM VALUE` so ids are preserved, refusing any unsettled reference before the
+  `INSERT` (2d), then the staged table's dependants `external_grids` / `external_grid_axes`
+  (2e). No constraint is dropped, deferred or disabled and no `sources` row is inserted.
+- `--phase restored` now writes the `--lineage-remap-out` file on a shared lineage too, as an
+  explicit no-op, so the plan's remap step always has its file. The plan validator refuses a
+  plain restore of a staged table, a misordered stage/remap/promote/dependants lifecycle and
+  every constraint bypass; the checker output, contract remediations, acceptance checklist and
+  `docs/production-promotion.md` (§1, §6, §7, §7.2, §7.4b, §7.4c) now say the same thing about
+  when the remap runs. Nullable-reference handling (§7.4) and the `external_grids.import_batch_id`
+  operator decision (§7.4b) are unchanged. Two hardening points: `--phase pre-cutover` refuses
+  when a staged table is empty or absent in the replaced database (the promotion cannot tell an
+  empty restore from one that never ran, so the invariant is asserted before any plan exists),
+  and a leftover `promotion_staging` schema fails closed everywhere (refused by every checker
+  phase, by `CREATE SCHEMA`, and by the plan validator for any `IF [NOT] EXISTS` or out-of-place
+  `DROP SCHEMA`) with §7.2 requiring inspection and a recorded finding before any hand cleanup or
+  retry. `issues/closed/ISSUE-151-staged-reinstate-rehearsal.sh` reproduces
+  the exact case on two throwaway databases.
+
+### Public UI - historical venue record pages (AFLDB-ISSUE-150) - 7 September 2026
+
+- Every public AFL/VFL venue page (`/venues/[slug]`) is rebuilt from a truncated "most recent 50
+  matches" list into a historical record page. All figures come from data AFLDB already holds; no
+  migration, schema, index or privilege change. New sections, each omitted when the venue has no
+  data for it:
+  - **Overview** - total matches at the ground, how many have no recorded attendance, and the
+    first and most recent recorded match (linked, with date, round, clubs, score and crowd).
+  - **Venue records** - highest attendance, lowest *recorded* attendance, highest single-team
+    score and biggest winning margin, each linked to its match with the clubs and date. A match
+    with no attendance figure is never counted as a small crowd; a genuine recorded 0 is kept.
+  - **Club records** - win-draw-loss and win percentage for every historical club identity that
+    has played at the venue, most games first. Footscray and the Western Bulldogs (and South
+    Melbourne and Sydney) stay as separate rows for the eras they played under. Win % is
+    `wins / games * 100`; a draw is not counted as half a win.
+  - **Player leaders** - the top five players at the ground for games, goals, marks, kicks and
+    handballs. Games count player-match rows at the venue. The statistical totals sum only the
+    matches where the statistic was recorded - a value that was not collected in that era is
+    never treated as 0 - and the marks / kicks / handballs boards are headed "Recorded" and show
+    the number of recorded games each total is drawn from.
+  - **Match history** - the arbitrary 50-match ceiling is removed. The venue page previews the
+    ten most recent matches and links to a new paginated route, `/venues/[slug]/matches`
+    (100 per page, newest first, stable ordering), that carries the complete history. The MCG's
+    ~16,000 matches are no longer loaded in one response.
+- New typed query functions in `src/db/queries/venues.ts` (`getVenueOverview`,
+  `getVenueClubRecords`, `getVenueRecords`, `getVenuePlayerLeaders`, `getVenueMatches`), each
+  scoped by `matches.venue_id`, run in parallel from the page, with deterministic tie-breaks on
+  every leaderboard and record so the database's row order never decides which row is shown.
+
+### Public UI - club historical records and player honours on club pages (AFLDB-ISSUE-149) - 7 September 2026
+
+- Every public AFL club page gains six data sections, all derived from data AFLDB already owns,
+  all counting every era of a club that has traded under more than one name, and each omitted when
+  the club has no data for it:
+  - **Club records** - biggest win, biggest loss, highest and lowest score the club itself has
+    made in a match, and the highest- and lowest-scoring matches the club has played (combined
+    score of both sides). Every score is shown from the club's perspective whether the club was
+    home or away. Where a record is shared, the most recent match is shown.
+  - **Record crowds** - the club's highest home-and-away crowd, highest finals crowd and highest
+    Grand Final crowd, plus its five largest crowds at any match. Matches with no recorded
+    attendance are excluded; a blank crowd is never shown as zero.
+  - **Players** - the complete list of every player in the canonical `player_clubs` record for the
+    club, with that club's games and goals only, as one player per row with a season range.
+    Default-collapsed because for an old club it runs to many hundreds of names, but never
+    truncated and sortable by any column.
+  - **Premiership players** - the players in each of the club's premiership sides, grouped by
+    season, newest first, from the canonical `player_club_season_stats.is_premier` flag. The
+    premiership seasons agree with the club's won Grand Finals shown in the Premierships section.
+  - **Awards & honours** - Brownlow Medallists, and Coleman Medal / Norm Smith / All-Australian /
+    Rising Star and similar national honours, won by a player *while at this club*. Each honour is
+    attributed to the club the player represented in the award season, so an honour earned at
+    another club is never shown.
+- The existing Premierships, Coaches, games and goalkicking leaders, best-and-fairest, captains
+  and season-history sections are unchanged.
+- No schema change, no migration, no new index, no cached or materialised data. Every section is
+  a focused club-scoped query over existing canonical tables.
+
+### Public UI - club coaching records and premierships on club pages (AFLDB-ISSUE-148) - 7 September 2026
+
+- Every public AFL club page now has a **Premierships** section: one row per premiership the club
+  has won - year, the beaten Grand Final opponent, the score from the premiership club's
+  perspective, the venue, the date and the crowd - newest first. A premiership is a won Grand
+  Final drawn from the canonical match record; a Grand Final that ended in a draw is not counted
+  (its replay is). The crowd is left blank where the attendance was never recorded. On a club that
+  has traded under more than one name the section counts every era of the club, matching the
+  premiership count already shown in the page's headline totals. A club with no premierships has
+  no Premierships section.
+- Every public AFL club page now has a **Coaches** section: one row per coach who has coached
+  that club, with that coach's record while coaching *that* club - games, wins, draws, losses,
+  a **Span** column (first and last season coached, shown as a range) and win percentage. A coach
+  who coached more than one club shows only the matches they coached for the club whose page it
+  is; a coach with more than one separate period in charge of the club is shown once, with the
+  periods combined, so the Span is a first/last range rather than a statement that every season
+  in it was coached.
+- Games, wins, draws and losses are counted from the canonical per-match coaching record
+  (`match_coaches` joined to `matches`), never from the AFL Tables coach index's own stored
+  total, which is not club-specific. `games = wins + draws + losses` always holds; an equal-scores
+  match counts as a draw.
+- Win percentage uses the same draw-weighted convention as the Coach Records board and the coach
+  career panel - `(wins + draws / 2) / games` - and the section states it.
+- Coaches are listed most recently in charge first. A coach who also played at senior level links
+  to their player profile; a coach who did not links to their coach page.
+- On a club that has traded under more than one name, the section counts every era of the club,
+  consistent with the games and goalkicking leaders already shown on the page. A club with no
+  per-match coaching data simply has no Coaches section.
+
+### Public UI - responsive navigation and dense-table affordance (AFLDB-ISSUE-147) - 7 September 2026
+
+- The phone navigation now reaches every primary destination. Previously the fixed bottom bar
+  carried only Home, Players, Seasons, Records and AFLW, so Clubs, Venues, Coaches, Brownlow,
+  Awards, Draft and Match Search were unreachable without the desktop site (the `/aflw` bar had the
+  same gap). The bar now shows Home, Players, Clubs, Seasons and a **More** button that opens a
+  sheet listing the complete primary set — the same list the wide-screen masthead shows in full.
+- Desktop and phone navigation, and the home "Browse the record" grid, are now derived from one
+  definition (`src/lib/site-nav-model.ts`), so a destination can no longer be added to one and
+  silently missing from another. The home grid gains a **Coaches** card it had been missing.
+- The "More" sheet is a modal dialog: focus moves into it on open and returns to the button on
+  close, Tab is trapped inside it, the page behind is scroll-locked, and it closes on Escape, a
+  backdrop tap, choosing a destination, or a browser back gesture.
+- The masthead navigation no longer overflows the wordmark between roughly 640 px and 900 px; the
+  links wrap to a second right-aligned row.
+- Wide statistical tables that scroll sideways now show a soft edge shadow on whichever side still
+  has off-screen columns, so it is visible that more data (and the column sort controls) are there.
+  Tables that already fit are unchanged.
+
+### Host bootstrap - provision `code_test_db` extensions (AFLDB-ISSUE-146 follow-up) - 7 September 2026
+
+- `tools/maintenance/00_install_postgres.sh` now creates and provisions `code_test_db` (the
+  AFLDB-ISSUE-146 disposable full-rebuild rehearsal target) alongside `afldb_dev` and
+  `afldb_test`: same idempotent create-if-absent step, and the same `pg_trgm`/`unaccent`
+  extensions, schema ownership and default-privilege reconciliation. A manually created
+  `code_test_db` had been missing both extensions, which failed the first real rehearsal
+  rebuild at migration `008_search.sql` (`function public.unaccent(unknown, text) does not
+  exist`); after manual extension provisioning the same rehearsal completed successfully (all
+  91 migrations, all 22 stages, ladder witness passed, final validation 85/85). No change to
+  any migration or to the rebuild runner's guardrails; selecting `code_test_db` as a rebuild
+  target remains an explicit, separate operator opt-in.
+
+### Rebuild tooling - `code_test_db` rehearsal target (AFLDB-ISSUE-146) - 7 September 2026
+
+- `npm run db:test:rebuild` now accepts an explicit `--target <database>` restricted to an
+  allowlist of exactly `afldb_test` (still the default) and the new disposable full-rebuild
+  rehearsal database `code_test_db`. The rehearsal runs the identical stage graph — reset,
+  the complete migration set, privileges, every canonical data stage and the final
+  validation — through its own dedicated `AFLDB_CODE_TEST_DATABASE_URL` /
+  `AFLDB_CODE_TEST_IMPORT_DATABASE_URL`, never the `afldb_test` variables. The former
+  `_test`-suffix rule is replaced by the allowlist, so `afldb_dev`, anything containing
+  `prod`, preserved `*pre_rebuild*` databases and arbitrary `*_test` names are all refused
+  by name before any DSN is read; `--acknowledge-destroy` must name the selected database
+  exactly, and a DSN naming any other database than the selected target is refused.
+- `tools/db/migrate.ts` and `tools/db/privileges.ts` gained the matching explicit
+  `code-test` target (`db:migrate:code-test`, `db:privileges:code-test`), bound to the same
+  dedicated variable; `code-test` shares `test`'s disposable-target exemption from the
+  shared-ledger migration guard and nothing else. `db:test:prove-reset` stays pinned to
+  `afldb_test`.
+
+### Post-ISSUE-139 workflow hardening - Stage 7 - 7 September 2026
+
+- Made promotion-plan output fail before writing any file when any of its six destinations
+  already exists, preventing a later collision from leaving a misleading partial plan. Added a
+  DB-free regression that preserves the existing operator-owned file and proves no sibling plan
+  files are created.
+- Updated the DEV promotion record to distinguish the completed `079`/`091` migration
+  reconciliation and lineage replacement from conditions a future promotion should assume.
+- Fixed merge-readiness staged/unstaged reporting: the first porcelain status line lost its leading
+  column to a trim, so an unstaged-only path was counted as staged. READY/BLOCKED was unaffected; the
+  counts and path lines now match `git status --porcelain`, with a regression pinning the case.
+
+### Post-ISSUE-139 workflow hardening - Stage 6 - 7 September 2026
+
+- Added explicit implementation/merge/read-only preflight modes, a fail-closed issue-worktree
+  bootstrap from fetched exact main, and a read-only merge-readiness report covering branch/main
+  relationships, dirty/staged/untracked paths, migration collisions, declared file scope, recorded
+  validation and runbook hard blockers. The shared cross-ref migration scanner now uses Node's
+  supported raw-buffer child-process mode, so its live Git blob inventory no longer fails on the
+  invalid `encoding: "buffer"` option.
+- Deployment dirty-state output now lists every known preserved artifact as well as every blocker.
+  The scheduled settle launcher prints reusable process/database/log monitoring commands, measured
+  duration context and explicit success/failure markers before long work begins.
+- Documented the standard issue lifecycle and compact runbook/ledger discipline so issue evidence
+  stays in its runbook while the open index and changelog remain concise.
+
+### Post-ISSUE-139 workflow hardening - Stage 5 - 7 September 2026
+
+- Bounded successful current-season canonical-apply savepoints with an explicit PostgreSQL
+  anchor/release lifecycle, while preserving postgres.js row-level rollback isolation on failure.
+  A fresh 9,823-observation `afldb_test` settle improved from approximately 3:49:00 to
+  1:57:19.272 over the measured workstation tunnel (48.8% faster); 9,011 successful units held
+  at most one transaction-ID lock at boundary samples, and commit took 10.857 ms.
+- Added a deterministic structural regression that pins savepoint creation, successful release,
+  and failure rollback/release ordering without a workstation-dependent wall-clock assertion.
+
+### Post-ISSUE-139 workflow hardening - Stage 3 - 6 September 2026
+
+- DEV deployment now uses bounded post-restart readiness polling (120 seconds, every 2 seconds)
+  and requires the `/api/health` HTTP/JSON contract, while preserving the ISSUE-107 live-build
+  header gate. Definitive systemd failure stops early; timeout/failure emits bounded service,
+  journal, listener and last-probe diagnostics and remains nonzero.
+- Remote checkout safety now distinguishes tracked changes, narrowly recognised operational
+  untracked artifacts and unknown untracked paths. Known backups/settle manifests/diagnostic
+  corpora warn and remain preserved; tracked or unknown paths still block unless the operator
+  explicitly uses the fully reported `-AllowDirtyServer` escape hatch. No cleanup/reset is run.
+
+### Post-ISSUE-139 workflow hardening - Stage 2 - 6 September 2026
+
+- Promotion plans now validate their contract and assembled truncate/restore artefacts before
+  writing any plan file. The fail-closed checks cover contradictory dispositions, explicit FK
+  dependency order, the complete rebuilt-referrer DROP/TRUNCATE/ADD lifecycle, DELETE/CASCADE
+  substitution, FK-unsafe AFLW schema truncation/TOC restore, and historical-only restore,
+  sequence or remap writes.
+- Public and `staging_aflw` restore dependencies are explicit contract data and regression-tested
+  against migration 025. The Gridley corpus source reference now resolves old id to candidate id
+  through stable `sources.key`, generating a guarded remap without assuming the numeric ids from
+  the ISSUE-139 promotion; its source/grid/axis restore order and import-batch decision remain
+  structurally pinned.
+
+### Post-ISSUE-139 workflow hardening - Stage 1 - 6 September 2026
+
+- Added one read-only `npm run preflight` entry point for implementation, rebuild, promotion
+  and deploy preparation. It fails closed on wrong/main/dirty/stale worktree state, migration
+  collisions and unsafe branch migration sets; checks `.env`, required variable names and
+  tools without printing values; optionally proves SSH reachability; and, for operational
+  modes, verifies database identity/role/reachability and migration parity read-only.
+- Added deterministic migration prefix/name/content collision detection across current,
+  unmerged and main/origin refs plus worktrees. The migration runner now repeats the guard
+  before shared DEV/PROD applies, refuses unmerged migrations by default, keeps `*_test` as
+  the safe target, and permits only an explicit DEV `--allow-branch-local` acknowledgement.
+- Promotion plan generation now rejects Git Bash/MSYS-rewritten Linux dump paths, shell-quotes
+  accepted host paths, quotes generated SQL identifiers, and emits generated swap/rollback SQL.
+  The hyphenated `afldb_dev_pre_rebuild_20260906-112500` failure is pinned by regression tests.
+
+### AFLDB-ISSUE-144 — Club Rivalry Explorer redesign - 7 September 2026
+
+- `/clubs/compare` is now all-time-first rather than season-first: the season selector and every
+  per-season block (record/ladder/scoring/team-stats/player-leaders/Brownlow) are removed from this
+  surface. The underlying selected-season query layer is untouched and still fully covered by its own
+  integration suite; only this page stopped using it.
+- Added an era explorer: a chip for every decade the chosen pair has actually met in (discovered from
+  their own meeting history, never a fixed list), plus "All time". Choosing an era narrows Rivalry
+  records and Match history to that decade and resets pagination; a new era is a new population, the
+  same treatment changing the match-type filter already gets. Streaks, Venues, Players and Brownlow
+  stay all-time regardless — a decade boundary would truncate a cross-boundary streak, and the design
+  review kept the other sections as whole-of-rivalry context.
+- Split the former single head-to-head block into four sections and reordered the page: Header → Hero
+  (all-time summary) → Era explorer → Rivalry records (records, streaks, decade breakdown, period-score
+  leads/comebacks/turnarounds) → Venues → Players → Brownlow → Match history (its own local match-type
+  filter, moved out of the shared controls form). Venues, Players, Brownlow and Match history are each
+  one collapsed disclosure; Rivalry records stays always expanded.
+- The shareable URL carries `era` and `matchType` alongside `page`; the SEO canonical URL continues to
+  carry the ordered pair only, with era/matchType/page/season never reaching it.
+- Fixed a heading-hierarchy defect found during acceptance: three subsections nested inside an
+  already-top-level section ("Leads, comebacks and turnarounds" under Rivalry records; "Every connected
+  player" and "Average leaderboards" under Players) were rendering as a second `<h2>` instead of
+  continuing the section's own outline. `CollapsiblePanel`/`CollapsibleTable` gained an optional
+  heading-level option (defaulting to `<h2>`, unchanged everywhere else on the site) so a nested
+  disclosure can render at the level that actually continues its parent section.
+
+### AFLDB-ISSUE-145 — Venues exposed in site navigation - 6 September 2026
+
+- The existing `/venues` index is now linked from the primary navigation (a `Venues` entry after
+  `Seasons`) and from the home page's "Browse the record" card grid (a `Venues` card after `Seasons`).
+  The page, its query and its data were already in the tree; this is navigation exposure only, with no
+  migration, schema, or query change.
+
+### AFLDB-ISSUE-144 — Public club-vs-club comparison - 6 September 2026
+
+- Added `/clubs/compare`, a public AFL-only comparison of two club organisations covering selected-
+  season record/ladder/scoring/team-stats/player-leaders/Brownlow, complete head-to-head history
+  (meetings, records, streaks, venues, leaders, match-scoped Brownlow coverage), decade-by-decade H2H
+  breakdowns, period-score rivalry records (biggest leads and comebacks by quarter/half/three-quarter
+  time), coverage-aware H2H player averages (minimum 5 recorded games per metric), and connected-
+  player history (every player who represented both organisations, direction, intervening clubs, and
+  club-attributed Brownlow history).
+- Entry points added from `/clubs` (`Compare clubs →`) and every club page (`Compare with another
+  club →`, seeded with that club's current organisation).
+- Season selection defaults to the maximum canonical season and is entirely data-driven: no season,
+  year, or metric-year cutoff is hard-coded, so newly ingested seasons and Brownlow coverage becoming
+  complete require no code change to appear.
+- Statistical coverage is always disclosed rather than guessed — partial, pending, and not-collected
+  metrics are shown as such, and a missing recorded value is never presented as zero.
+
+### AFLDB-ISSUE-139 — Family, Father–Son, Coach and After-the-Siren Records; Coaches navigation - 6 September 2026
+
+- Four new curated Records boards read from data the DEV promotion above makes reachable: Most Games
+  by Family (linked sibling families, `player_relationships.family_key`), Father–Son Records
+  (`relationship = 'parent_child'`, read separately from sibling families and never merged with them),
+  Coach Records (most games coached, best win percentage at a 50-game minimum), and After-the-Siren
+  Records (most attempts, most goals — first/latest occurrence for each drawn only from the matching
+  kind of event). A `Coaches` entry was added to the main navigation; the existing `/coaches` index and
+  coach-only profile route needed no change. No migration, no new table.
+- Fixed a synthetic-draw defect while building the coach win-percentage query: counting draws as
+  `m.winner_club_id IS NULL` alone, across the `LEFT JOIN match_coaches`/`matches` a zero-game coach
+  uses, would have credited them a draw they never played.
+
+### AFLDB-ISSUE-139 — `afldb_dev` promoted onto the canonical AFL Tables identity lineage - 6 September 2026
+
+- The development database was replaced through the `AFLDB-ISSUE-125` promotion contract under
+  `--environment dev` (`AFLDB-ISSUE-141`/`142`/`143`): the accepted `afldb_test` rebuild was restored
+  into `afldb_dev_candidate_20260906-112500`, every DEV-only state class was treated as decided
+  (identities, beta access, settings, uploads, overrides, telemetry, the captured Gridley corpus under
+  its original import batches 82/84 with the source key re-resolved to the candidate's `sources` id;
+  `data_edits` and `player_link_resolutions` withheld as historical-only), grants reconciled, all
+  five checker phases recorded, and the databases swapped by rename. The previous database is
+  retained as `afldb_dev_pre_rebuild_20260906-112500` until the record is closed. 13,271 of 13,273
+  players now carry an AFL Tables profile identity (previously 12,472 of 13,363), so the coach,
+  father-son and sibling loaders that could not run on DEV are represented from the rebuild.
+- The 2026 season was re-acquired through the supported settle ladder (batch 86: 209 matches,
+  10,683 canonical rows; batch 87 appended finals week 1). The first settle into empty staging
+  took 3 h 49 min against 51 s once staging held the season — recorded as a performance finding
+  for follow-up, not fixed here.
+- `AFLDB-ISSUE-140`'s 17 duplicate 2026 matches do not exist on the promoted lineage (re-measured
+  0 / 0 / 0); the old lineage holding them is retained for that issue's writer identification.
+
+### AFLDB-ISSUE-139 — Two generated promotion-plan steps could not run on a live database - 6 September 2026
+
+- The first live run of the `AFLDB-ISSUE-125` promotion plan (the DEV promotion, candidate
+  `afldb_dev_candidate_20260906-112500`) refused twice inside `promotion-truncate.sql` and once in
+  `promotion-reinstate.sh`, each time atomically and before any row was lost. Both defects are in
+  the tracked generator (`tools/db/promotion-inventory.ts`) and would have refused a production
+  promotion identically.
+- **Truncate.** PostgreSQL refuses `TRUNCATE` on a referenced table unless every referrer is in
+  the same statement, and the check is structural (both tables empty still refuses). The
+  **rebuilt** `promotion_candidates` holds `resolved_decision_id → promotion_decisions(id)`
+  (migration 074), so the contract's one-statement truncate could never run; emptying
+  `promotion_decisions` with `DELETE` instead only moved the refusal to `auth_users`, which
+  `promotion_decisions` references. The generated file is now one transaction that drops exactly
+  that constraint (`REBUILT_REFERRER_FKS`), runs the same single `TRUNCATE`, and re-adds the
+  constraint by its original name — the `ADD CONSTRAINT` re-validates every rebuilt row, so a
+  rebuilt row still pointing at a decision refuses the whole file. The `staging_aflw` block
+  likewise truncated one table at a time and failed on `matches → fixtures`; it is now one
+  `TRUNCATE` over every table of the schema.
+- **Reinstate.** `pg_restore --data-only --schema=staging_aflw` restores in TOC (alphabetical)
+  order, so `fixtures` arrived before `seasons` and the single transaction rolled back. The
+  schema-level contract entry now declares its tables in FK order (`TableTreatment.tables`) and the
+  plan emits one `--schema=staging_aflw --table=<t>` line per table; a schema entry without that
+  list is refused rather than restored in TOC order.
+- `tests/db-promotion-check.test.ts` pins all three: the drop/truncate/re-add order and the 074
+  constraint name against the migration text, the single-statement schema truncate, and the
+  schema table list against migration 025's `CREATE TABLE` / `REFERENCES` clauses.
+  `docs/production-promotion.md` §7.1 and §7.2 describe both.
+
+### AFLDB-ISSUE-143 — The promotion contract can express an intentional historical-only disposition - 6 September 2026
+
+- `docs/production-promotion.md` §7.4c had named two supportable answers for a lineage-bound
+  ledger row that cannot be evidenced across an id-lineage change, and the tooling could execute
+  **neither**: `--phase restored` FAILed on any unresolved row, the generated plan reinstated every
+  `reinstate` table with no way to exclude one, and `--phase candidate --compare` would then have
+  refused the omission from the other side. A promotion that met a real lineage change — which on
+  `afldb_dev` is every promotion — could not pass, whichever answer the operator chose.
+- **The executable answer is a contract declaration, not a flag.** A table may now carry a
+  `historicalOnly` entry in `tools/db/promotion-inventory.ts` naming the environments it applies to,
+  **every** lineage-bound column of that table, the deciding issue, a summary and the full reason.
+  One declaration drives four things together, so the gate, the plan and the comparison cannot
+  disagree: the plan omits the table's `pg_restore` line and prints an `INTENTIONALLY NOT
+  REINSTATED` block with the reason; the candidate is still truncated, so `--phase candidate`
+  expects **0** rows instead of the snapshot's count; `--phase restored` reports the column as
+  `hist` with its count and per-id reasons rather than `FAIL`, and generates no statement for it in
+  `--lineage-remap-out`; and the `database.promoted` audit marker carries a `historical_only` array
+  plus a recorded-gap sentence per table, so the promoted database records what it was not given.
+- **Fail-closed everywhere else, by construction.** There is no command-line override and no
+  verdict-level relaxation: acceptance is decided per `(table, column, environment)` by
+  `judgeLineage()`, so another table, another column of the *same* table, or the same table under
+  an undeclared environment all still refuse exactly as before. `assertContractCoherent()` runs
+  before the checker's first query and refuses a declaration that names only some of its table's
+  lineage-bound columns, sits on a table that is not reinstated, names an unknown environment, has
+  an empty reason — or that the generated plan would still reinstate. Adding a new lineage-bound
+  column to a declared table therefore re-opens the decision rather than inheriting it.
+- **Nothing is deleted and nothing is remapped by name.** The withheld rows stay in the mandatory
+  pre-cutover dump and the retained `<live>_pre_rebuild_<stamp>` database; the identity rules,
+  `resolveLineageRemap` and the AFLDB-ISSUE-142 remap path are untouched, and a row that *can* be
+  evidenced is still remapped through its stable external identity.
+- **Production behaviour is unchanged.** Nothing is declared for `--environment prod`: the prod
+  plan, its resync SQL and its audit marker are byte-identical to before, and an unresolved id
+  still refuses there in every case. Declared today, for `--environment dev` only:
+  `player_link_resolutions` (`player_id`, `target_id` — the seven honours tables `target_id` points
+  at carry no external key, so not one row can be evidenced, and remapping `player_id` alone is
+  explicitly not an answer) and `data_edits` (`row_id` — every lineage-bound row is in the
+  bootstrap id space, and two of its matches were created and then deleted on `afldb_dev` itself).
+  §7.4c answer (1), reinstating such a table as a not-live historical ledger, remains deliberately
+  **unimplemented** and still refuses.
+
+### AFLDB-ISSUE-117 — Retired access keys can be permanently deleted from `/admin/access` - 6 September 2026
+
+- Beta access keys gain the last step of their lifecycle: **Active → Revoke → Delete**. Revoking
+  still only sets `beta_access_codes.revoked_at` and keeps the record, which is what makes it the
+  right way to stop a key immediately; a key can now also be removed once it is finished with,
+  instead of sitting in the admin list forever. Revoke's semantics and visibility are unchanged.
+- **A key is deletable once it is *retired* — revoked, or spent.** A spent key
+  (`use_count >= max_uses`) deletes directly: requiring an admin to revoke something the database
+  already refuses was ceremony, and because Revoke is only offered while a key is `live`, a spent
+  key previously could be neither revoked nor deleted and simply accumulated. A key that could
+  still admit somebody is still refused — a **partly used** key has admissions left, and an
+  **unlimited** key (`max_uses IS NULL`, migration 036) is never spent and must be revoked first.
+  The rule is a strict subset of the redeem query's own refusal conditions, so widening what may be
+  deleted did not put a single live key at risk. An **expired** key stays undeletable by design:
+  expiry passes on its own, with nobody deciding anything, and deletion is irreversible.
+- **The retired-only rule is in the statement, not the browser.** `deleteRetiredAccessCode`
+  (`src/db/queries/access-codes.ts`) carries
+  `WHERE id = … AND (revoked_at IS NOT NULL OR (max_uses IS NOT NULL AND use_count >= max_uses))`,
+  so a request naming a still-redeemable key's id matches no row and deletes nothing. Hiding the
+  button on an active key is presentation; this predicate is the rule. "Not retired", "never
+  existed" and "already deleted" return one message, so the endpoint cannot be used to discover
+  which ids exist.
+- **The deletion cannot outlive its audit.** `access.code_deleted` is written with
+  `auditInTransaction` (AFLDB-ISSUE-119) inside the same `authSql.begin` as the DELETE, so a failed
+  audit rolls the deletion back — the auth-pool counterpart of the guarantee `AFLDB-ISSUE-027` gave
+  the import role. The trail records the key's id, label, use count and **which rule** made it
+  disposable (`revoked` or `spent`), which is enough to say what was destroyed and why it was
+  allowed, and no secret: only the sha256 of the code was ever stored and it leaves with the row.
+- **Migration 091** grants `afldb_auth` `DELETE` on `beta_access_codes` — a privilege it did not
+  hold, so without this the feature fails closed on a permission error. `tools/maintenance/
+  privileges.sql` is updated in step, because its `afldb_auth` section is subtractive and would
+  otherwise revoke the grant at the next reconcile or restore, and
+  `tests/integration/privileges.test.ts` now asserts the grant so that regression fails in CI rather
+  than in the admin UI. **Deploy order is load-bearing: apply migration 091 and `privileges.sql`
+  before the code.**
+- Checked before introducing the DELETE: no foreign key references `beta_access_codes`, and while a
+  beta session's claim subject embeds `code:<id>`, `hasBetaAccess()` and the middleware verify the
+  signed claim alone and never look that id up. Deleting a key therefore ends no live session — and
+  neither does revoking one; the epoch and the TTL remain the only ways to cut a beta session short.
+  Ids are `GENERATED ALWAYS AS IDENTITY`, so a freed id is never reissued.
+- On a revoked **or spent** row the admin UI shows **Delete…**, which opens an in-row confirmation
+  naming the key and its state before anything is submitted, styled apart from Revoke with a new
+  `.btn-danger`.
+- **Numbering note.** This work was written on 2026-08-31 as migration `079_access_code_delete.sql`
+  on the unmerged branch `claude/issue-116` and applied to `afldb_dev` from there; `main`
+  subsequently took `079` for `079_nl_search_log_head_to_head_grain.sql`. The migration is therefore
+  renumbered **091** (confirmed free across every ref and every worktree). `afldb_dev` keeps an
+  applied ledger row for the old name that no checkout can reproduce; it is not edited or deleted,
+  applying `091` there is safe because `GRANT` is idempotent, and the resulting
+  `db:promotion:check --phase pre-cutover` parity refusal on `afldb_dev` remains truthful and
+  expected — see `AFLDB-ISSUE-142` Finding C.
+### AFLDB-ISSUE-142 — the promotion contract classifies `player_match_period_stats`, and proves id lineage instead of id existence - 6 September 2026
+
+- **`npm run db:promotion:check` no longer refuses every real database.** `player_match_period_stats` (migration `062`) was the one public table any migration creates that is in neither `afldb_meta.import_writable_tables` nor the promotion contract, so the fail-closed classification gate refused **every phase on every database**, `--phase source` on a rebuilt `afldb_test` included. It is now decided in the contract as `rebuilt` / `compare: zero` — **not** registered import-writable, because `afldb_meta.grant_import_write()` registers *and* grants in one statement and would hand `afldb_import` UPDATE, DELETE and TRUNCATE (restored at every `privileges.sql` reconcile) for a writer that does not exist: nothing in the tree writes the table, no rebuild stage produces it, the NL period-split read paths are refused upstream by the plan validator, and it holds 0 rows everywhere. No migration, no schema change, no privilege change. `compare: zero` is the tripwire that forces the decision to be revisited the day a writer exists.
+- **The unit suite reads the registry instead of assuming it.** `tests/db-promotion-check.test.ts` now reconstructs `import_writable_tables` from the migrations themselves — migration 045's catalogue seed, with its exclusion list parsed out of the migration rather than re-typed, plus every later `grant_import_write()` — and runs the real classifier over it. The pinned football list is asserted equal to that derivation, so a future 062-shaped migration fails at test time rather than at promotion time.
+- **A promotion now proves that a reinstated id still means the same thing.** The existing dangling-reference probe asks only whether an id *exists* in the candidate; when the candidate comes from a different id lineage almost every id exists and denotes a different row, so "0 missing" is exactly what a silent misattribution looks like. A new `--phase restored` gate reads the **stable external identity** of sampled ids on both databases — the AFL Tables profile url (`external_identities`, source `afltables`, `match_method` `afltables_profile_url`, status unique/resolved) for a player, `matches.match_key` for a match — and passes, generating nothing, when every comparable sample agrees. Nothing comparable counts as a lineage change, so a missing identity layer can never read as safe.
+- **Where the lineage did change, every id-keyed human/admin row is resolved from evidence or refuses.** `player_link_resolutions.player_id`, `player_link_resolutions.target_id` and `data_edits.row_id` are declared in the contract as lineage-bound. An id is remapped only when exactly one identity is read for it in the replaced database and exactly one candidate row carries that same identity string; no identity, two identities, an identity absent from the candidate or an identity resolving to two rows each **refuse**, naming the id, the reason and the rows that carry it. Identity merges are surfaced, not hidden. No name is ever used, in either direction. `--lineage-remap-out <file>` writes the result as SQL: one guarded `UPDATE` per row with its `old id -> identity -> new id` evidence, `-- UNRESOLVED` lines for everything unevidenced, and a verification query that must return zero rows. It never inserts, deletes or truncates, so the append-only ledgers keep every audit field.
+- **`player_link_resolutions.target_id` is declared to have no stable identity, deliberately.** Its seven honours tables are import-writable, the rebuild assigns their ids and no external key for one of their rows exists, so the gate refuses rather than reinstating a decision attached to a different honours row — remapping only the player would produce a row that looks resolved, names the right person and points at the wrong target. `docs/production-promotion.md` §7.4c records the two supportable answers (a historical audit ledger of the replaced database, or a recorded gap on the `promotion_decisions` reasoning) and that rows are never dropped to make a gate pass.
+- **Production behaviour is unchanged.** The new gate runs only at `restored`, which already opened both connections, and a production candidate is a rebuild of production's own lineage, so it passes and generates nothing. No existing verdict, refusal, flag default or generated plan file changes.
+- **Docs.** `docs/production-promotion.md` gains the `player_match_period_stats` treatment and the reasoning behind it, a new **§7.4c** (id-keyed human/admin rows across a lineage change), and two DEV-specific conditions in §13: that `afldb_dev`'s id lineage really does change, and that its `UNKNOWN 079_access_code_delete.sql` migration-parity refusal — an unmerged branch's migration that cannot merge at that number — is truthful, is not special-cased, and is reconciled by the promotion itself.
+
+### AFLDB-ISSUE-141 — the promotion contract classifies migration 080, and takes an explicit environment - 6 September 2026
+
+- **The captured Gridley corpus can no longer be silently dropped by a promotion.** `external_grid_sources`, `external_grids` and `external_grid_axes` (migration `080`) are deliberately not import-writable and were in neither classification set, so the fail-closed gate refused every database carrying `080` and — the substantive defect — a generated plan named them in neither the truncate list nor the reinstate list. Because there is no Gridley rebuild stage, the swap would have replaced an explicitly immutable captured corpus with the candidate's empty tables, unnoticed. All three now have an explicit `reinstate` / `compare: equal` treatment in FK order (`external_grid_sources` 20 → `external_grids` 30 → `external_grid_axes` 40), so the truncate removes migration 080's own seed row before the dump's row is restored onto the same id. None was added to `import_writable_tables`; migration 080's privileges are unchanged; no schema migration.
+- **The corpus's two NOT NULL references into rebuilt data are now declared and probed.** `external_grid_sources.ingest_source_id` → `sources` and `external_grids.import_batch_id` → `import_batches` are `footballRefs`, so `--phase restored` reports them instead of a `pg_restore` discovering them. Neither can take the nullable exception path, so each carries a written remediation the checker prints beside the refusal, and `docs/production-promotion.md` §7.4b records the two supportable answers for `import_batch_id` (reinstate the referenced batch rows first, or open one batch in the candidate and state the rewrite in the promotion record) — never dropping rows to make the FK pass. New acceptance-checklist item.
+- **`npm run db:promotion:check` takes `--environment prod|dev`, defaulting to `prod`.** The live name, candidate prefix, pre-rebuild prefix, rebuilt source and host label are now one environment descriptor consulted by `assertDatabaseForPhase()`, `assertOldDatabaseName()` and the `--plan` prefix check, so the supported procedure can converge `afldb_dev` (`AFLDB-ISSUE-139`) instead of hand-written per-table dump/restore. Production behaviour is unchanged without the flag. The environment is never inferred from a database name, the matrix stays fail-closed in both directions (a `prod` name under `dev` and a `dev` name under `prod` are both refused), and no phase becomes name-free. The generated plan, its acceptance command and the `database.promoted` audit marker all name the environment.
+- **Two DEV-only gate relaxations, both explicit.** The test-fixture identity refusal is unchanged everywhere; under `--environment dev` only, `--allow-fixture-identities` accepts the rows consciously — the scan still runs, the verdict becomes `WARN`, and the ten-row sample cap is lifted so **every** offending address is printed. The flag is refused under `prod`, including the implicit `prod` of no `--environment` and the modes that never consult it. `--expect-super-admin` is enforced on DEV exactly as on production when it is given, and otherwise `WARN`s that it is not enforced — optional, never silently dropped.
+- **Note for production.** Migration `080` is deliberately not applied on `afldb_prod`, so the classification gate now reports `MISSING public.external_grid_*` there. That database already fails the migration-parity gate for the same reason; applying `080` (empty tables, equal against a zero snapshot) clears both together.
+- **Docs.** `docs/production-promotion.md` retitled and extended with the migration-080 treatments, a two-environment phase table, §7.4b and a new §13 (promoting a DEV database, and why DEV is not production authority). `docs/deployment.md` §6a's stale 12-row rebuild-stage table replaced with the actual **22** `planStages()` stages, each with its stage `id` and credential, and an explicit note that there is no Gridley stage.
+
+### AFLDB-ISSUE-118 — after-the-siren in the deterministic rebuild; FK index; final closure proof (Resolved) - 6 September 2026
+
+- **After-the-siren canonical events are now rebuilt from tracked inputs.** `db:test:rebuild` gains a data stage `after-siren` (after `siblings`) that loads `after_siren_kicks` (migration 089) from the tracked normalised artefact, and a validation stage `after-siren-reconcile` that re-resolves the artefact against the just-loaded database (38 checks, every expectation derived, never a typed constant). Six artefact-derived final-validation gates (126 events, 121 premiership / 5 other competition, 64 qualifying, 0 duplicates, 0 missing provenance). Rebuild stages 20 → 22, final validation 79 → 85.
+- **`after_siren.py` no-match player fallback.** The club-season participation fallback now reads `player_match_stats` + `matches` directly instead of the derived `player_club_season_stats`, which is not yet built when the stage runs. Four other-competition rows (a 1980 Escort Championships GF and NAB Cup / JLT rows) that previously loaded unlinked in a full rebuild now link by club-season participation, matching the hand-load state.
+- **Migration `090`** — `ix_players_height_evidence_id` (partial, `WHERE height_evidence_id IS NOT NULL`) covers the foreign key migration `086` added to `players` without an index.
+- **Resolved.** The Gridley compatibility corpus is proven against a fresh 22-stage deterministic `afldb_test` rebuild: every valid criterion in accepted canonical scope is answered or evidence-classified, `incorrect known answer` and ISSUE-118 solver timeouts are zero, all reconciliation and rebuild gates pass, every canonical domain has a public UI exposure path, and exactly the seven §23.36 accepted deferrals (`season2024player`, `intrulesplayer`, `irish`, `recruitedByDodoro`, `nfl`, `spoils5season`, `tasmanian`) remain unsupported. Runbook `issues/closed/AFLDB-ISSUE-118.md` §23.38.
+
+### AFLDB-ISSUE-118 public UI exposure — coach-only profiles, after-the-siren, disclosure consistency - 6 September 2026
+
+- **Coach-only public profiles.** New `/coaches/[slug]-id` route: a coaching-first profile (games, win %, record, finals, Grand Finals, premierships, club-by-club stints) for a `coaches.player_id IS NULL` person. A coach linked to a player permanently redirects to that player's canonical page instead of a second profile. New `/coaches` discovery index lists every coach, linked ones routing straight to their player page. New read models `getCoach` (thin identity) and `listCoaches`.
+- **After-the-siren on player profiles.** New `getPlayerAfterSirenEvents` read model over `after_siren_kicks` (migration 089), read-only. New `PlayerAfterSirenEvents` component: a collapsed-by-default ruled list with plain-language wording (`Goal/Behind after the siren to win/draw`, `Missed after the siren`, explicit extra-time wording, `Missed before extra time`), match and club links where canonical routing resolves them, and a visible "uncited" note for an uncited event. Renders nothing for a player with no events.
+- **Coach discovery/search.** New search result type `coach`; `searchCoaches` (scoped to `player_id IS NULL`, so a player who also coached is never listed twice) wired into global search and autocomplete.
+- **Player profile — disclosure and accessibility polish.** Family and Honours are now `CollapsiblePanel` sections (Family notes a relative count); the generic Honours list no longer independently repeats the Brownlow Medal (already covered by the stat strip and the dedicated Brownlow section); the disputed-date-of-birth explanation is now visible text rather than a `title` attribute; Career & Biography now groups identity facts (date of birth, height, weight) before career-record facts. Default section order updated: Family and Coaching Career now follow Match log, and a new After-the-siren section (collapsed by default) follows Coaching Career.
+- **Sitemap.** `/coaches` and coach-only profile URLs added.
+
+### AFLDB-ISSUE-118 after-the-siren — Grid Solver `after_siren_winner`, Gridley `winaftersiren` mapped - 5 September 2026
+
+- **Grid Solver.** New builder `after_siren_winner` (*Single-game feats*; `GRID_BUILDERS` 158): a canonically linked kicker of a goal or behind after the final (or end-of-extra-time) siren that won a premiership-season match, read from `after_siren_kicks` (migration 089). Misses, draws, other competitions and unlinked kickers never qualify. 63 rows / 61 players on `afldb_test`.
+- **Gridley corpus.** `winaftersiren` mapped (data-absent criteria 8 → 7); `unsupported` 90 → 78 cells, cells solved 9,842 → 9,854, `incorrect known answer` 0, the only after-siren findings `time of board`; `after_siren_kicks` added to the corpus dataset-gap probe.
+
+### AFLDB-ISSUE-118 after-the-siren — canonical `after_siren_kicks` model (migration 089) and the tracked normalised artefact - 5 September 2026
+
+- **Model.** New table `after_siren_kicks` (migration `089`), on the `player_achievements` (053) discipline but a dedicated match-event shape: kicker (nullable link, source spelling kept), opponent, competition + `premiership_season`, season, verbatim round, nullable match, what the kick scored (goal / behind / none), what it did to the result (won / drew / none), the kicker's result, which siren it followed (final / end of regulation / end of extra time), the source's verbatim final score and points, `cited`. CHECKs enforce the event semantics. Nothing in it is specific to a Grid Solver criterion. Applied to `afldb_test` (and to `afldb_dev`, schema only).
+- **Artefact.** `tools/migration/after_siren.py normalize [--check]` normalises the eight Wikipedia table exports ("List of kicks after the siren in the VFL/AFL"; raw files untracked) into the tracked `data/records/after-siren-events.csv` (126 events: 62 goal-won, 6 behind-won, 9 goal-drawn, 3 behind-drawn, 46 missed; 121 premiership-season + 5 pre-season/night-series kept with their competition), its provenance and four evidence-dated adjudications (Shuey 2017 extra-time goal to win; King 1994 regulation-time miss before an extra-time win; Zurhaar 2026 uncited; Hickey 1944 source score arithmetic). Offline, deterministic, byte-identical regeneration; every source row represented once. Tests: `tests/after-siren-normalisation.test.ts`.
+- **Loader.** `after_siren.py load` (`--validate-only`, `--dry-run`, `--dsn-env`; idempotent) resolves each event canonically and fail-closed, with no fuzzy matching and no name-only link: club by name/alias to exactly one club organisation; match by (season, round, both organisations) with the source's own points as the independent check (which is what separates the drawn 1972 semi-final from its replay) and the Opening-Round retry only in a season of that shape; kicker as the one player of that name in that match for that club from `player_match_stats`, falling back to club-season participation where there is no match, with `father_son.py`'s generational-suffix rule for same-name players. A linked kicker's goals/behinds in the match must not be a recorded zero; a NULL is "not recorded", never zero. On `afldb_test`: **126 rows, 120 kickers linked (111 distinct) and 6 unresolved, 116 matches linked and 10 NULL** — the 5 other-competition rows by model, and 5 2026 rows plus one 2011 pre-season kicker because this rebuild carries no 2026 season and no 2011 premiership game for that name. `winaftersiren`'s later filter selects 64 rows over 62 kickers. Second and third identical runs: 0 inserted, 0 changed, 0 stale removed, every row still on its first batch.
+- **Reconciliation.** `after_siren.py reconcile` re-resolves the artefact against the same database and checks the loaded table against it — counts, link and match tallies, duplicate and source-uniqueness gates, and each of the four adjudications applied exactly once — deriving every expectation from the artefact or that re-resolution, never a typed constant. 38/38 pass on `afldb_test`.
+
+### AFLDB-ISSUE-118 family F — siblings: `player_relationships` `sibling` rows from the tracked football-families export, `has_brother`, Gridley `brother` mapped
+
+- **Sibling relationships are canonical.** `tools/migration/family_siblings.py normalize` resolves the 485 `sibling` rows of the operator's export of Wikipedia's "List of Australian rules football families" (revision 1365040810; raw under `data/players/families/`, untracked) to AFL Tables profile paths — name, listed-club lineage, the article title's birth year against the canonical date of birth, never a name alone — and writes the tracked artefact `data/players/sibling-relationships.csv` (498 pairs: 484 export pairs after one duplicated family is merged, plus 14 evidenced supplements), its provenance, 8 evidence-dated identity adjudications and `data/players/sibling-supplements.csv` (pairs the export lacks — Gary Ablett Jr ↔ Nathan Ablett and 13 others — each admitted only on a quoted sentence from the people's own articles). Absence of an export row is unknown coverage, never "no brother". The canonical label states what is evidenced (`brothers`, `twin brothers`, `sisters`, else the export's label); pairs are ordered deterministically, self-pairs and duplicate canonical pairs refuse.
+- **Loader.** `family_siblings.py load` (`--validate-only`, `--dry-run`, idempotent: a second run changes nothing) links only through `external_identities`; 498 rows, 389 with both people linked, 658 players with a linked brother on `afldb_test`. No migration.
+- **Rebuild.** New `siblings` data stage after `father-son` (tracked-file and `--validate-only` preflight; seven artefact-derived gates incl. self-pairs 0 and duplicate pairs 0). Stages 19 → 20, final checks 72 → 79. Clean unattended rebuild proven 2026-09-05 (22 min, FINAL VALIDATION 79/79).
+- **Grid Solver.** Biography gains `has_brother` (a player with an explicit canonical brothers row to another VFL/AFL player who played a match). `GRID_BUILDERS` 157.
+- **Player pages.** `getPlayerFamily` returns `relationship_label` and the family card renders Brother / Twin brother / Sister / Sibling from it instead of assuming every sibling row is a brother.
+- **Gridley corpus regression.** `brother` maps (data-absent criteria 9 → 8, occurrences 83 → 30; `unsupported` cells 249 → 90; cells solved 9,686 → 9,842; `incorrect known answer` 0); a new `source coverage gap` category names a brother cell the canonical sources cannot yet evidence (21 cells, one player) instead of calling AFLDB wrong or right.
+
+### AFLDB-ISSUE-118 family F — father–son rule selections: `father_son_selections` + `player_relationships` populated, `father_son_father` / `father_son_selection` - 5 September 2026
+
+- **The father–son rule is canonical.** The two migration-006 tables are populated for the first time from a tracked, normalised copy of Wikipedia's "List of father–son selections" (article *Father–son rule*, revision 1370239415): `data/players/father-son-selections.csv` — 127 selections 1988–2025, the seven source columns verbatim plus each person's AFL Tables profile path and link status — and `data/players/father-son-selections.source.json`. `tools/migration/father_son.py normalize` resolved every son and father once, deterministically (name + debut window/lead + the drafting club's lineage; `Sr.`/`Jr.` only on a unique debut season; the list's own 0-games / state-league annotations are the only zero-candidate non-links) and refuses any ambiguity; seven evidence-dated adjudications (`data/players/father-son-adjudications.csv`: two name variants, four state-league-qualified fathers tied by their Wikipedia articles, one explicit non-link) must each be needed and apply exactly once. Result: 99 sons and 123 fathers (107 distinct) linked, 28 sons who never played and 4 fathers with no VFL/AFL career left unlinked. `normalize --check` proves the tracked artefact is byte-identical to a regeneration.
+- **Loader and schema.** `father_son.py load` (`--validate-only`, `--dry-run`, idempotent) resolves profile paths only through `external_identities`, refuses an unresolvable path or a status that disagrees with it, and writes `father_son_selections` plus one `parent_child` row per selection in `player_relationships` (names verbatim, links where proven) in one batch. Migration `088_father_son_link_checks.sql`: draft_persons-style CHECKs on both link columns, pair uniqueness, column comments; both tables were already in the read/write registries.
+- **Rebuild.** New `father-son` data stage in `db:test:rebuild` after `coaches` (tracked-file and `--validate-only` preflight before the destructive reset; six final gates read from the artefact itself — 127 / 99 / 123 / 107 / 0 outside a trusted status / 127 relationships). Stage order 18 → 19, FINAL VALIDATION 66 → 72 checks; the six gates evaluated 6/6 against the hand-loaded `afldb_test` (the unattended rebuild is the next checkpoint's proof).
+- **Grid Solver.** Draft & recruitment gains `father_son_father` (a player whose son was selected under the rule) and `father_son_selection` (a player selected under it), linked rows only. `GRID_BUILDERS` 154 → 156.
+- **Gridley corpus regression.** `fathersonfather` maps (data-absent criteria 10 → 9, occurrences 86 → 83); its 9 cells (107 eligible fathers) produce no finding of any category; corpus `unsupported` 258 → 249 cells, cells solved 9,677 → 9,686, `incorrect known answer` 0, timeouts 0; strict run fails only on `unsupported` 249 + `dataset gap` 354. `brother` (53 occurrences) stays data-absent: the only sibling source AFLDB holds is the legacy Wikipedia-families SQLite on the DEV host (485 sibling pairs), whose export is recorded as the operator step (runbook §23.29 F.12).
+
+### AFLDB-ISSUE-118 Stage E2 — coaches: AFL Tables coach pages, `coaches` + `match_coaches`, `coached_by` / `premiership_coach` - 5 September 2026
+
+- **Coaching is canonical.** Migration `087_coaches.sql`: `coaches` (one row per person who coached a VFL/AFL match, keyed by the AFL Tables coach page; `player_id` nullable, linked to the existing `players` row ONLY through the page's Player Stats profile path and `external_identities` — never by name; coach-only people such as Chris Fagan, John Todd and Neil Craig have no player row and none is fabricated) and `match_coaches` (`match, club, coach` — the assignment at match grain, so caretakers and mid-season changes need no season ranges). Games, W/D/L, finals, Grand Finals and premierships are derived from `match_coaches ⋈ matches`, never stored. Both tables registered for `afldb_app` read and `afldb_import` write.
+- **Source and loader.** `tools/rebuild/afltables/acquire_coaches.py` captures the coaches index and its 386 pages under the contract's HTTP policy (parsed CSVs tracked, raw HTML hash-bound, tracked manifest `docs/rebuild-manifests/afltables_coaches/coaches-20260905.json`, pinned in `afltables-contract.json` `coaches.accepted_snapshot`). `tools/migration/import_match_coaches.py` folds the accepted fitzRoy baseline's per-match `Coach` column (one string per match and club, refusing anything else) to those pages by exact string, resolves matches by `match_key` and clubs by historical identity, links players only through profile paths (four page hrefs AFL Tables does not serve as printed are corrected by dated, evidence-recorded contract rules), and upserts both tables in one batch — `--validate-only`, `--dry-run`, idempotent. On `afldb_test`: 386 coaches (368 linked, 18 coach-only), 32,034 assignments, matches with both / one / no coach 15,817 / 400 / 621 (the source's own gaps before 1923 and eleven in 1940).
+- **Rebuild.** New `coaches` data stage in `db:test:rebuild` after `birth-dates` (pin read fail-closed, `--validate-only` preflight before the destructive reset, eight final gates from the pin's `measured` block). Stage order 17 → 18, FINAL VALIDATION 58 → 66 checks; clean unattended rebuild of `afldb_test` proven 2026-09-05 (22 min, 66/66).
+- **Grid Solver.** New Coaching group: `coached_by` (played a match for a club while that coach was assigned to it for that exact match) and `premiership_coach` (a coach with a proven player identity who coached a Grand Final winner). New `coach` parameter kind with a picker (`getCoachOptions`). `GRID_BUILDERS` 152 → 154.
+- **Gridley corpus regression.** `premcoach` and the seven `coachedBy*` criteria map (data-absent criteria 18 → 10, occurrences 102 → 86); corpus `unsupported` 306 → 258 cells, cells solved 9,629 → 9,677, `incorrect known answer` 0; Gridley's list-grain "played on a team coached by" (Heppell and Daniher under Goodwin's one 2013 caretaker match, which neither played in) is classified under the documented `list membership` difference; strict run fails only on `unsupported` 258 + `dataset gap` 354.
+
+### AFLDB-ISSUE-118 Stage E1 — height source conflicts adjudicated on evidence - 5 September 2026
+
+- **No canonical height changed.** The three players the §23.19 precedence decision left as open `source conflict` (Paddy McCartin, Jamarra Ugle-Hagan, Nathan Brown; 102 Gridley cells) were adjudicated against every source AFLDB holds (runbook §23.26). Nathan Brown's Wikipedia article is now tied to the Bulldogs/Richmond player through the Stage D1 date of birth (1978-02-10) and joins the tracked corroboration set `data/players/height-evidence-wikipedia.csv` (83 → 84 rows; the `players_with_wikipedia_height_evidence` rebuild gate derives from the row count); at 183 cm it sits on AFLDB's side of the bound, so his cells are `external source disagreement` under the unchanged rule. McCartin (register 194; AFL listing and uncited Wikipedia 195) and Ugle-Hagan (194; 197) keep the AFL Tables value under §23.19 rule 1.
+- **Tracked operator adjudications.** New `data/players/height-adjudications.csv` (profile-keyed, decision, reason, date, reference) read by `tests/height-adjudications.ts`, fail-closed on shape; a record applies only while the canonical height and the exact competing evidence are those it was decided on (`adjudicationStaleness`), otherwise the cell returns to `source conflict`. `.gitignore` now opts `/data/players/` in explicitly for both curated files.
+- **Gridley corpus regression** (`tests/integration/gridley-corpus.test.ts`): new informational category `adjudicated source conflict` (62 cells / 2 players, reported, never failed); `source conflict` 102 → 0, `external source disagreement` 202 → 242, `incorrect known answer` 0; strict acceptance now fails only on `unsupported` 306 + `dataset gap` 354 (failing cells 762 → 660). `tests/height-reconciliation.test.ts` gains the artefact contract and staleness cases (10/10).
+
+### AFLDB-ISSUE-118 Stages H3/H4 — height source precedence, heights in the rebuild, seven named medals, six captaincy lineages - 5 September 2026
+
+- **Height evidence, three sources.** New `tools/rebuild/afl_api/acquire_rosters.R` (AFL API season rosters 2012–2026, contract block `roster`, tracked manifest `docs/rebuild-manifests/afl_api/rosters-20260905.json`), `tools/migration/enrich_heights_afl_api.py` (fail-closed identity by name + club + season, then surname + club + season + guernsey; 1,824 players on `afldb_test`) and `tools/migration/enrich_heights_wikipedia.py` with the tracked `data/players/height-evidence-wikipedia.csv` (83-player adjudication set). Both write `player_height_evidence` rows only; the AFL Tables register remains the canonical authority for `players.height_cm` and no canonical height changed (runbook §23.19).
+- **Gridley corpus regression** (`tests/integration/gridley-corpus.test.ts`) classifies height cells from the evidence rows: `external source disagreement` (informational) and `source conflict` (still fails); `incorrect known answer` 299 → 0 on `afldb_test`.
+- **`db:test:rebuild`** gains `heights`, `heights-afl-api` and `heights-wikipedia` stages after `fitzroy`, pinned in `tools/rebuild/fitzroy/fitzroy-contract.json` (`height_enrichment`, in-season supplement bound by manifest SHA-256) and `tools/rebuild/afl_api/afl-api-contract.json` (`roster.accepted_snapshot`); offline `--validate-only` preflights; five new final-validation gates (12,487 / 0 / 0 / 1,824 / 83).
+- **Named medals:** Anzac, Showdown, Glendinning–Allan, Brett Kirk, Marcus Ashcroft, Goal of the Year, Mark of the Year — 7 definitions and 328 Wikipedia-cited winner rows in `data/awards/named-medals*.csv`; `import_awards.py` keeps row-level provenance (`draftguru` / `wikipedia`); `gridley-compat.ts` maps the seven Gridley ids to `award_winner`.
+- **Captaincies:** 399 rows for Geelong, Hawthorn, West Coast, Fitzroy, Brisbane Bears and University in `data/awards/captaincies.csv` (1,774 total, all linked on `afldb_test`); the Gridley captain criteria are no longer partial.
+- Identity census `data/awards/player-identity.csv` 1,745 → 1,863 rows (12 without a rebuild-stable identity, was 18).
+- **Rebuild gate proven (§23.23):** a clean unattended `db:test:rebuild` of the full 16-stage graph (heights, AFL API and Wikipedia evidence, medals, captaincies) completed in 22 minutes with FINAL VALIDATION 53/53. **Premiership captains:** Gridley's key names one premiership captain per flag; AFLDB's `premiership_captain` keeps its documented semantics (every appointed captain who played in and won the Grand Final) — the corpus regression now classifies a co-captain cell from AFLDB's own captaincy evidence as `external source disagreement`; `incorrect known answer` 5 → 0 on `afldb_test`, no solver or data change.
+- **Dates of birth (Stage D1, §23.24):** new AFL Tables acquisition `tools/rebuild/afltables/acquire_club_lists.R` (contract `afltables-contract.json`, the 21 all-time club pages fitzRoy reads but strips of DOB and profile links; manifest-pinned `club-lists-20260905`, 16,731 rows) and loader `tools/migration/enrich_birth_dates_afltables.py` (identity by profile path only, evidence rows in `player_birth_evidence`, fills NULL `players.dob` only): 12,400 dates filled on `afldb_test` (855 → 13,255 players). **Stage D1 completed (§23.25):** `db:test:rebuild` gains a `birth-dates` stage after `heights-wikipedia`, its snapshot pinned fail-closed in `afltables-contract.json` (`club_player_lists.accepted_snapshot`, LF manifest hash + `measured` block), `--validate-only` in the preflight, and five final-validation gates (`players_with_dob_after_birth_dates` 13,255, `dob_without_evidence` 0, `players_with_club_list_birth_evidence` 13,255, `club_list_birth_conflict_players` 0, `dob_disagreeing_with_club_list` 2). The loader's writes are batched (two `COPY`s into `ON COMMIT DROP` temp tables, one keyed upsert, one join `UPDATE`, an in-transaction evidence-link check): 1.2 s instead of 1,658 s over the tunnel, still idempotent (a rerun fills 0). **Grid Solver:** new `Biography` builder `age_on_debut_min` ("Aged X or older on debut": completed years on debut day from `players.dob` and `player_career_stats.debut_date`; an unknown date never qualifies); Gridley's `22+ YEARS OLD / ON DEBUT` maps to it (data-absent criteria 19 → 18, occurrences 103 → 102).
+
+
+### AFLDB-ISSUE-118 Stage H2 — player heights from the AFL Tables register - 5 September 2026
+
+- **`players.height_cm` is populated** (12,487 players on `afldb_test`, 11,740 on `afldb_dev`;
+  production with the next deploy) from the already-acquired AFL Tables `player_details` register
+  in the tracked fitzRoy snapshot `full-history-20260902`, supplemented by the tracked in-season
+  `issue129-t7-20260903` rows for current players. The Grid Solver's *Height X cm or taller /
+  shorter* builders and Gridley's `195cm OR TALLER` / `180cm OR SHORTER` now answer from real data;
+  a player the register does not cover stays NULL and never qualifies.
+- **Migration `086_player_height_evidence.sql`**: `player_height_evidence` (every asserted height
+  with its source, external id, occurrences and batch; unique per player/source/height) and
+  `players.height_evidence_id`, on the birth-evidence pattern; registered for `afldb_app` read and
+  `afldb_import` write.
+- **`tools/migration/enrich_heights.py`**: manifest-verified, fail-closed reconciliation of the
+  register (no stable id) to canonical players through the snapshot's own per-match profile URLs
+  — club + games + goals + exact season set + the source's spelling of the name → the AFL Tables
+  identity `external_identities` already holds. Nothing is matched against AFLDB by name; zero,
+  several or differently-spelled candidates are rejected with the source row; two heights for one
+  player fill nothing and open a `data_issue`; existing values are never overwritten; re-runs are
+  idempotent and record their counters on the import batch.
+- **Gridley height oracle** (`tests/integration/gridley-height-oracle.test.ts`, opt-in) and the
+  shared oracle scaffold `tests/integration/gridley-oracle-bridge.ts` (extracted from the
+  All-Australian oracle, output unchanged): coverage before/after apply and a false-positive /
+  false-negative answer-key comparison. Result: every bridgeable Gridley height-key player has a
+  height; 83 players differ from Gridley's own height figure (a source difference, recorded in the
+  runbook, left red in the corpus regression rather than reclassified).
+- `tests/db-promotion-check.test.ts` now pins `player_height_evidence` and the three
+  `external_grid_*` tables from migration 080 that had never been classified.
+
+### AFLDB-ISSUE-118 Stage AA3 — the 1983–1988 VFL Teams of the Year join the All-Australian source - 5 September 2026
+
+- **`data/awards/all-australian.csv`: 1,158 → 1,244 rows.** The VFL Team of the Year for **1983,
+  1986, 1987 and 1988** (20 / 22 / 22 / 22 selections) is now held alongside the State of Origin
+  carnival team of the same season, as the honour's definition (VFL Team of the Year 1982–90 plus
+  the carnivals 1953–88) requires; the bootstrap had only the carnival team in those four years.
+  Source: Wikipedia *All-Australian team* § "VFL/AFL Team of the Year: 1982–1990" (`wikipedia`
+  provenance, `aah:` keys, names verbatim). Every new row links to a player; seven players were
+  added to `data/awards/player-identity.csv` (1,738 → 1,745).
+- **`tools/migration/all_australian.py`:** declared counts bumped (wikipedia 252 → 338, linked
+  1,078 → 1,164); the natural identity is `(source, season, player, club)` because a player named in
+  both teams of one season is two selections in two teams, not a duplicate. Award semantics and
+  the Grid Solver builders are unchanged: "X+ times" still counts distinct seasons, which the
+  Gridley corpus now confirms (a player in both 1988 teams and no other season is not a "2x").
+- **Effect on the Grid Solver:** 13 of the 14 players the Gridley answer keys listed as
+  All-Australians that AFLDB lacked (Brereton, Krakouer, Rhys-Jones, Kappler, Stretch, Brian Taylor,
+  Barry Mitchell, Hawkins, Royal, Quinlan, Malarkey, Wallace, Pert) now answer correctly; the
+  oracle's source-missing count fell from 315 answer entries to 11, all one Gridley-side claim
+  (Greg Anderson as a 2x) that no source supports. Loaded on `afldb_dev` and `afldb_test`;
+  production receives it with the next deploy and `import_awards.py --groups all_australian`.
+### AFLDB-ISSUE-118 (reopened) — All-Australian final team, height builders, strict Gridley regression - 5 September 2026
+
+- **Reopened:** the 5 September closeout counted 28 valid Gridley criteria as acceptable because
+  they were classified data-absent; the acceptance is now zero unsupported valid criteria
+  (`issues/closed/AFLDB-ISSUE-118.md` §23). The earlier entry below is retained as history.
+- **Grid Solver catalogue: 137 → 151** (`src/search/grid-solver-spec.ts`,
+  `src/db/queries/grid-solver.ts`): the **All-Australian final team** as its own question —
+  `all_australian_team`, `all_australian_team_min_times` (counts distinct seasons, so the 1984
+  club+state double listing is one selection), `all_australian_team_between_seasons` — kept
+  distinct from the **40-man squad** (`all_australian_squad_member`, and
+  `all_australian_squad_in_season` relabelled "40-man squad member, in season"); position
+  builders relabelled "final-team … (1991 onwards)". New `Biography` group with `height_min` /
+  `height_max` ("Height X cm or taller / shorter"); an unknown height never qualifies.
+- **Gridley mapping** (`src/search/gridley-compat.ts`): the 12 All-Australian criteria map to the
+  final-team builders instead of the generic award dropdown; `height195` / `height180` map to the
+  height builders. Data-absent debt 28 → 26 criteria (267 → 125 occurrences), pinned in
+  `tests/gridley-compat.test.ts`.
+- **`tests/integration/gridley-corpus.test.ts` fails by default** on any unsupported, dataset-gap
+  or partial-data finding (`AFLDB_GRIDLEY_DIAGNOSTIC=1` restores counted-and-named for
+  development); a `heights` probe names the empty height column.
+- No data was loaded: the height source decision (AFL Tables `player_details`, already acquired,
+  needs a cross-source reconciliation) is recorded for a High session.
+
+### AFLDB-ISSUE-137 — production identity reconciliation and Brownlow season restoration - 4 September 2026
+
+- **Production data repair (`afldb_prod`, 2026-09-04 12:18–12:24 AEST).** The four canonical player
+  splits that `AFLDB-ISSUE-136` fixed at rebuild time (Charlie Cameron, Jack Graham, Jack Ross, Jack
+  Williams — each a career player plus a 2025-only duplicate keyed on the renumbered AFL Tables url)
+  were reconciled in place by one count-asserted owner transaction (`issues/open/AFLDB-ISSUE-137-t1.sql`,
+  rehearsed with `ROLLBACK` first): 298 foreign-key re-points (4 identities, 146 `player_match_stats`,
+  75 `brownlow_round_votes`, 5 `award_winners`, 1 `award_nominations`, 67 settle projections),
+  `final_season` extended to 2026 on the four career rows, the four duplicate `players` rows retired
+  (ids 2608, 6296, 6525, 6626 — their URLs now 404), audit `import_batches` row 741. Derived tables
+  rebuilt; DB-health reconciliation 0 on every check.
+- **Brownlow season votes restored on production.** `tools/migration/import_brownlow_season.py` loaded
+  the tracked `data/brownlow/` artefact (`AFLDB-ISSUE-113`) into the previously empty
+  `brownlow_season_votes`: 16,120 rows / 79,113 votes / 112 winners / 98 seasons (1924–2025) / 4,275
+  players, 0 rejections (batch 742); `brownlow_round_votes` untouched (320,861 rows / 44,478 votes).
+  Derived career and season Brownlow totals now sum to 79,113 (Reid 10, Rowell 89, Green 73,
+  Reynolds 154, Skilton 180; Cameron 25, Graham 9 on the surviving ids). `/brownlow`, `/brownlow/[year]`,
+  player pages, the Grid Solver Brownlow axes and the sitemap Brownlow years are therefore populated on
+  production once the post-repair build is live.
+- Rollback point retained: `afldb_prod-20260904-115413.dump` (sha256 `b77ebce0…f499`, restore-tested,
+  off-host copy) until close-out.
+
+### AFLDB-ISSUE-118 — Gridley compatibility corpus and Grid Solver completeness - 4 September 2026
+
+- **Grid Solver catalogue: 108 → 137 builders** (`src/search/grid-solver-spec.ts`,
+  `src/db/queries/grid-solver.ts`): merged-lineage club membership and debut
+  (`played_for_club_incl_merged`, `debut_club_incl_merged`), named-season games and totals,
+  league top-N rank for a stat, club Brownlow-vote leader, played in a win by X+ points, X+
+  consecutive wins, finals winning record, X+ Grand Finals with Y+ of a stat, Grand Final won
+  against a club, premiership captain, club B&F in a premiership season, matchup wins / stat /
+  winning record between two clubs, marquee match won and marquee match between seasons,
+  Gather Round played / stat, All-Australian defender/forward/midfielder and squad-in-season,
+  National Draft pick range, first name in a list, hyphenated surname, guernsey number worn,
+  single-game feat for X+ clubs. New `Names & numbers` group and a `text` parameter kind.
+- **Cell queries are now set-then-rank:** each axis's eligible set is one statement, cells
+  intersect in the application and rank with the ids bound as a hashed constant array; the page
+  shares its six axis sets across nine cells. Removes the Nested Loop Semi Join / Materialize
+  rescans behind ISSUE-076/103 for the whole catalogue (worst corpus cell 10.9 s → 0.06 s). No
+  timeout, index or schema change.
+- **A statement timeout no longer crashes `/grid-solver`:** SQLSTATE 57014 is confined to its
+  square ("Timed out"), logged server-side, everything else still throws
+  (`guardCellTimeout`). Production digest `1511510695` is this timeout class (as ISSUE-076
+  established from the dev journal).
+- **`club_season_brownlow_leader`** takes the club from `player_club_season_stats`, not the
+  NULL `brownlow_season_votes.club_id`.
+- **Gridley corpus retained as a regression asset:** migration `080_external_grids.sql`, the
+  Stage 1/2 importers and acquisition tool (recovered from `opus/gridley-corpus`),
+  `tools/gridley/export_corpus.py`, the deterministic fixtures `tests/fixtures/gridley/corpus.json`
+  and `corpus-answers.json.gz` (1,143 boards, 839 criteria, 1,512,436 answer-key entries),
+  `src/search/gridley-compat.ts` (every criterion mapped or explicitly data-absent),
+  `tests/gridley-compat.test.ts` (offline denominator) and
+  `tests/integration/gridley-corpus.test.ts` (every cell through the production solver,
+  checked against Gridley's own answer keys for the 405 bridged players).
+- `docs/search.md` §7 updated.
+- **Deployed 2026-09-05:** merged to `main` (`4efdf70`), DEV build `tmEQ-3b-HBNZtkAw90Aag`, PROD
+  build `pEc4154P6P0QK8Hjoo5Uj`; the ISSUE-076 board, the heaviest corpus pair and the corpus's
+  worst cell resolve with no timeouts on both hosts, and production's journal shows no recurrence
+  of digest `1511510695`. Migration `080` was deliberately not applied on production: the Grid
+  Solver runtime does not read `external_grids` (corpus storage for tests and tools only).
+
+### AFLDB-ISSUE-126 — production-only state recovered after the 2026-09-02 cutover - 4 September 2026
+
+- **Recovered on `afldb_prod`** (from `afldb_prod_auth_recovery` and the pre-cutover dump,
+  operator-approved per table, every script rehearsed and then committed one unit at a time
+  behind fail-closed count assertions): the 92 pre-cutover `auth_audit_log` rows with their
+  original ids 90–181 plus an explicit `database.recovered` marker (id 182) that names the
+  cutover, the source, the restored and post-cutover id ranges, the gaps and every retired
+  set; the 7 `site_settings` rows that encoded operator choices (apex document and footer,
+  early-access intro/notify/questions, home record-of-the-week and AFLW leaders) together
+  with the `site_media` row the apex page references; and all eight `staging_aflw` tables
+  (51,018 rows), so the public AFLW read model is populated again.
+- **Deliberately not restored:** the 4 default-equal settings, the spent single-use beta
+  code, 17 expired sessions, the pending join request, 2 `data_edits` and 8 player-link rows
+  whose entity ids did not survive the rebuild (to be redone through the admin UI on the
+  current ids), and pre-cutover telemetry whose ids collide.
+- **Scripts** `issues/closed/AFLDB-ISSUE-126-*.{sh,sql}` (commit-gated). Rehearsal found and
+  fixed two defects: a `grep -q` under `pipefail` that refused on SIGPIPE, and a `setval`
+  that survived `ROLLBACK` because sequences are non-transactional — it now runs only in the
+  commit branch, and the operator-approved reset restored the sequence before T1.
+- **Accepted.** Database-level acceptance passed in full, and so did the browser pass: the
+  operator's post-recovery super-admin login was written as audit id 183 immediately after the
+  marker, `/admin/settings`, `/admin/content` and `/admin/access` show the restored values, and
+  `/`, `/aflw`, `/aflw/seasons`, `/aflw/seasons/2025` and an AFLW match page all render the
+  recovered state — `/aflw` at 960 players / 710 matches / 11 seasons / 29,878 player games with
+  the restored `games` leader board, `/` with the restored Brownlow-votes record of the week and
+  footer. The home and AFLW landing pages briefly kept serving the deploy's build-time
+  prerender because both are `revalidate = 3600` and Next keeps that page cache per cluster
+  worker; both regenerated on their own window, and nothing was saved, published, revalidated,
+  restarted, cache-deleted or deployed to force it. No application, schema, migration or
+  privilege change was made or needed.
+- `afldb_prod_auth_recovery` is **retained**; dropping it is a separate, explicitly approved
+  destructive action. The T0 backup and its verified off-host copy are retained; only the host
+  scratch under `/home/arm/i126*` was removed at close-out.
+
+### AFLDB-ISSUE-125 — promoting a rebuilt database to production without losing production-only state - 4 September 2026
+
+- **The gap.** The 2026-09-02 cutover restored the rebuilt `afldb_test` dump over `afldb_prod`,
+  replacing every application-, auth- and operations-owned table along with the football data
+  and promoting a test fixture super admin. Nothing in the repository enumerated
+  production-only tables or refused a test identity.
+- **The procedure** (`docs/production-promotion.md`). The rebuilt dump is restored into a new
+  `afldb_prod_candidate_<stamp>`; every non-rebuilt table in the candidate is truncated and
+  reinstated from the mandatory, hashed, restore-proven pre-cutover backup in foreign-key
+  order; identity sequences are re-synced; a `database.promoted` row is written to the
+  reinstated audit log; `privileges.sql` runs; acceptance passes; then the two databases are
+  renamed (`afldb_prod` → `afldb_prod_pre_rebuild_<stamp>`, kept). Rollback is the renames
+  reversed. `auth_sessions`, `beta_login_tokens` and `promotion_decisions` are reset by
+  decision; `data_overrides` are replayed onto the promoted rows; `staging_aflw` is reinstated
+  because the rebuild never produces it.
+- **The contract** (`tools/db/promotion-inventory.ts`). Every `public` table is either in
+  `afldb_meta.import_writable_tables` (rebuilt data) or has an explicit treatment; the two
+  acquisition schemas are decided by ownership. A table in neither set, or in both, is a refusal.
+- **The checker** (`npm run db:promotion:check`, read-only by construction). Phases `source`,
+  `pre-cutover`, `restored`, `candidate`, `production`, each bound to one database name; gates
+  for identity, classification, migration parity, **test-fixture identities** (any address on a
+  reserved domain — `.test`, `.example`, `.invalid`, `.localhost`, `example.com/net/org` — in
+  any email-bearing table refuses), the expected super admin, counts against the pre-cutover
+  snapshot, reconciled grants and dangling references into rebuilt data; `--plan` generates the
+  truncate/reinstate/re-sync/marker files, `--checklist` prints the acceptance list.
+- **Validation.** 37 DB-free tests (`tests/db-promotion-check.test.ts`) pin the contract against
+  the migration files, the predicate in both its TypeScript and SQL forms, the generated plan
+  and the checker's read-only property. No production database was touched.
+
+### AFLDB-ISSUE-134 — a settled season is published to the public cache instead of waiting out its ISR hour - 4 September 2026
+
+- **The limitation.** `/seasons/[year]` is ISR (`revalidate = 3600`, every season prerendered at
+  build), and the nightly in-season settle is an out-of-process systemd job. Nothing connected
+  the two, so a settle that landed real matches was invisible to readers until the page's hour
+  expired. Measured on production in `AFLDB-ISSUE-133`: prerendered 22:14:46, rows committed
+  22:37:47, page regenerated 23:50:48.
+- **The change.** After its transaction commits — and only when the run actually wrote a
+  canonical or ledger row — the settle posts that one season to a loopback route which calls
+  `revalidatePath('/seasons/<year>')`. It reposts on **fresh TCP connections** until every worker
+  ordinal has answered, and reports a failure if it cannot reach them all. That is not belt and
+  braces: Next 16 keeps page invalidation in per-process memory and `deploy/server-cluster.mjs`
+  runs 2–4 independent workers behind one socket, so a single request invalidates a single
+  worker. The idempotent 0/0 rerun — most nights out of season, and any repeat over unchanged
+  source data — makes no request at all.
+- **Behaviour change.** On a host that sets `AFLDB_REVALIDATE_URL` and `AFLDB_REVALIDATE_SECRET`
+  (`docs/deployment.md` §7c), readers see a settled season on their next visit rather than up to
+  an hour later. Until both are set the settle runs and commits exactly as before and the page
+  falls back to expiring on its own. A failed invalidation fails the unit loudly and changes
+  nothing about the data, which is committed and correct.
+- **Security.** The route accepts an integer season and nothing else — the path is composed
+  server-side — so there is no arbitrary path, pattern, layout or tag to purge; the shared
+  secret is compared in constant time; only failed secret checks are rate-limited; an
+  unconfigured host answers 503. Reachability is gated on the **forwarded client address
+  resolving to loopback**. An earlier version of that gate instead required the forwarding
+  headers to be *absent*, which Next 16 makes meaningless — it synthesises `x-forwarded-for` and
+  `x-forwarded-host` on every request before any handler runs — and the route answered 404 to
+  everything, including its own caller. The gate now rests on the deployment contract: both
+  Caddyfiles set `header_up X-Forwarded-For {remote_host}` on every `reverse_proxy` block
+  (overwrite, never append) and drop `X-Real-IP`/`Forwarded`, and `deploy/afldb.service` binds
+  the application to `127.0.0.1`. Chains, non-loopback addresses and malformed values fail
+  closed. Verified on the development host through the real proxy: a client presenting the
+  correct secret **and** a spoofed `X-Forwarded-For: 127.0.0.1` is refused.
+- **Regression cover.** The route's tests now build requests the way the framework actually
+  delivers them, and a static suite asserts the Caddy and systemd lines the security model rests
+  on, so an overwrite-to-append change cannot silently invalidate it.
+
+### AFLDB-ISSUE-116 — the Data QA search stops after the page instead of reading the whole result set - 4 September 2026
+
+- **The defect.** `/admin/query-builder` (super-admin Data QA search) asked PostgreSQL for the page
+  and its total in one statement, carrying `count(*) OVER () AS "__total"` on every page row. The
+  planner costs that as a fast-start ordered walk, but a window aggregate cannot emit its first row
+  until it has consumed every qualifying row, so the `ORDER BY … LIMIT 50` bought nothing. The
+  `player_match_stats` anchor read all 685,471 rows and spilled 3,401 temp blocks **with no filter
+  card at all**, and the defect was not anchor-specific: `players` filtered by "has no captaincy
+  row linked as unique" cost over a second for a predicate that counts in 16.6 ms on its own.
+- **The fix.** The page and the total are now two statements inside one
+  `REPEATABLE READ READ ONLY` transaction, splicing the same compiled `WHERE` fragment so they can
+  never describe different questions. The page query keeps its fast-start plan and really does stop
+  after 50 rows; the count runs unordered and unlimited. A short page proves its own exact total
+  (`offset + rows returned`), so the count statement is not issued at all for a result that fits on
+  one page or matches nothing. `SET LOCAL jit = off` precedes the count: without a `LIMIT` its cost
+  estimate carries the whole relation, which put it past PostgreSQL's JIT thresholds and cost about
+  1.15 s of compiling 104 functions for 75 ms of work.
+- **Behaviour change.** Measured end to end against the canonical test database (PostgreSQL 16.15),
+  with the 5 s statement timeout unchanged, no index added and no schema change: the
+  `player_match_stats` anchor alone **1144.5 → 353.4 ms** and `players` × captaincies `NOT EXISTS`
+  **1073.4 → 320.9 ms**, both now under the 1,000 ms target the tool holds every other shape to.
+  One user-visible correction comes with it: the total used to be read off the page's first row, so
+  asking for a page past the end reported "0 rows match" for a query with matches. It is now the
+  whole match count on every page. Filtering, sort, pagination, exact totals, parameter binding and
+  the catalogue-only identifier rule are otherwise unchanged.
+- **Scope.** Related-domain cards remain unavailable under the `player_match_stats` anchor
+  (`subjects: []`, the AFLDB-ISSUE-115 boundary); the post-fix evidence that this may now be
+  reconsiderable is recorded, but re-admitting them is a separate decision.
+
+### AFLDB-ISSUE-124 — the afldb.service crash-loop limiter is now actually in effect - 4 September 2026
+
+- **The defect.** `deploy/afldb.service` declared its crash-loop rate limiter as
+  `StartLimitIntervalSec=120` and `StartLimitBurst=5` in the **`[Service]`** section. systemd reads
+  both keys from **`[Unit]`** only; in `[Service]` they are unknown keys and are dropped, with
+  `afldb.service:65: Unknown key name 'StartLimitIntervalSec' in section 'Service', ignoring.` from
+  `systemd-analyze`. The unit therefore ran on the `10s` default interval, and the limiter its own
+  comment described had never engaged. Pre-existing since the unit was written; found while
+  verifying the `AFLDB-ISSUE-122` settle units.
+- **The fix.** Both directives moved to `[Unit]`, values unchanged at `120`/`5`, with the rationale
+  comment moved alongside them and a pointer comment left in `[Service]` so the next reader is not
+  led back to the wrong section. No other directive altered. The other four units under `deploy/`
+  were swept and carry no second occurrence.
+- **Behaviour change.** `afldb.service` now gives up after 5 starts within 120 seconds instead of
+  restarting forever at the `10s` default, so a crash loop becomes visible rather than silently
+  retried. `Restart=always`/`RestartSec=5` are unchanged; a healthy service is unaffected.
+- **Deployment.** The values are unit-object properties, so `systemctl daemon-reload` applies them
+  and **no service restart is required** — proved on both hosts by an unchanged `MainPID`.
+  Development (`streamanator`) and production both report `StartLimitIntervalUSec=2min` (was `10s`),
+  `StartLimitBurst=5`, a clean `systemd-analyze verify`, and healthy loopback and public
+  `/api/health`. Production kept `MainPID=803941` across the reload and stayed `active`; the
+  installed unit is `root root 644`. Any host installing this unit needs a `daemon-reload` to pick
+  the change up; nothing else.
+
+### AFLDB-ISSUE-136 — a renumbered AFL Tables profile URL no longer splits a career into two canonical players - 4 September 2026
+
+- **The defect.** fitzRoy serves completed seasons from its cached release but scrapes the newest
+  season live from afltables.com. When AFL Tables renumbers an existing player's profile (a
+  same-name debutant shifts the numeric suffix), the live rows arrive under the NEW url with a
+  BLANK fitzRoy `ID`, because fitzRoy's cached identity table has no entry for that url. Player
+  identity is the profile url, so `import_fitzroy_core.py` seeded a second canonical player for
+  the same footballer. In the accepted `full-history-20260902` snapshot this split four
+  careers — Charlie Cameron (`Charlie_Cameron.html` → `Charlie_Cameron3.html`), Jack Graham
+  (`Jack_Graham.html` → `Jack_Graham2.html`), Jack Ross (`Jack_Ross.html` → `Jack_Ross3.html`) and
+  Jack Williams (`Jack_Williams.html` → `Jack_Williams3.html`), 79 rows, all 2025 — so their
+  2019–2024 Brownlow round votes stayed on the career player while season rows, awards and
+  the 2026 settle's rows keyed on the live url attached to a 2025-only duplicate (the
+  `AFLDB-ISSUE-113` V5 34-vote gap). The fifth blank-ID profile, Billy Wilson
+  (`Billy_Wilson2.html`, career game 1 on debut), is a genuine new player and is untouched.
+- **The rule: tracked, fail-closed continuity, never inference.** A new `profile_url_continuity`
+  block in `tools/rebuild/fitzroy/fitzroy-contract.json` names, per player, the continuing
+  (ID-bearing) profile and the renumbered profile and binds exact snapshot evidence: the
+  continuing fitzRoy ID and last season, the renumbered profile's seasons and row count, and —
+  the source-stable proof — AFL Tables' own `Career.Games` continuing by exactly one from the
+  continuing profile's last appearance to the renumbered profile's first (229 → 230, 131 → 132,
+  70 → 71, 29 → 30). The importer folds the renumbered profile into the continuing player only
+  when every bound fact holds, and refuses if the renumbered profile carries an ID, the seasons
+  overlap, the name fields or DOBs disagree, or any count drifts. Names are a consistency guard,
+  never evidence. A rule is in scope only when the artefact it names is in the snapshot, exactly
+  like `source_row_corrections`.
+- **No rule, no guess.** A blank-ID profile whose first snapshot row is not career game 1 — the
+  source itself asserting earlier appearances the profile does not cover — is now refused
+  outright until a rule is reviewed for it; a blank-ID profile that debuts at career game 1 is
+  accepted as a new player. Never applied in-season: the settle resolves every url through the
+  identities the rebuild registered and leaves an unregistered url unresolved.
+- **Both urls, one player.** `import_players()` registers every profile path of a folded player
+  in `external_identities` against the one `players.id` (the renumbered path's `notes` names the
+  rule), so the settle, the awards census (`data/awards/player-identity.csv` already maps these
+  players to the live urls) and the Brownlow writers resolve either url to the same career. A
+  database that already holds the split (the two paths registered to different players) makes
+  the import HALT before any delete or upsert — no merge, no choice.
+- **Acceptance record amended, not re-blessed.** `data/reference/fitzroy-accepted-baselines.json`
+  (`full-history-20260902`) records the change as a dated amendment: `measured.players`
+  13,275 → 13,271, new `players_with_renumbered_profile: 4`, and an `identity_continuity`
+  correction bound to the four rule ids. Bytes, hashes and every identity-scan figure are
+  unchanged; `distinct_urls` stays 13,275. `db:test:rebuild`'s final validation now counts
+  `players` as DISTINCT players behind the AFL Tables identities and gates the folded count, so
+  a rebuild that re-split them fails there. Offline validation of the accepted snapshot:
+  **`accepted canonical baseline VERIFIED`, players 13,271, four rules applied.**
+- **Proven in PostgreSQL.** The canonical `db:test:rebuild` of the accepted snapshot on the shared
+  `afldb_test` passed all 39 final-validation checks (`players = 13271`,
+  `players_with_renumbered_profile = 4`, 685,471 player-match rows, 320,861 Brownlow round rows);
+  exactly four players hold both a continuing and a renumbered AFL Tables path; the four careers
+  carry their 2025 rows, DOBs and awards, and Billy Wilson is a separate 2025 debut. The
+  `AFLDB-ISSUE-113` V5 witness on that database closes its identity gap: no player-season with
+  positive round votes lacks a season row under the same player (was 10 / 34 votes) and the
+  derived season-grain Brownlow total is 79,113 (was 79,079). The split HALT was exercised against
+  the real database and rolled back cleanly. Production still holds the split — tracked as
+  `AFLDB-ISSUE-137`.
+
+### AFLDB-ISSUE-113 — season-grain Brownlow totals are loaded from a tracked artefact, never the legacy SQLite - 4 September 2026
+
+- `brownlow_season_votes` — the authoritative basis for every career and season Brownlow total,
+  the `/brownlow` pages, the sitemap's Brownlow routes and six Grid Solver axes — now has a
+  legacy-free writer. `tools/migration/import_brownlow_season.py` loads
+  `data/brownlow/season-votes.csv`, a read-only, hash-recorded export of the pre-cutover
+  authoritative table (16,120 rows / 79,113 votes / 112 winners / 98 decided seasons, 1924-1941
+  and 1946-2025), verified against `data/brownlow/season-votes.manifest.json` before any
+  database contact. Every row is keyed by the AFL Tables profile path and resolved through
+  `external_identities`, fail-closed: any unresolved or ambiguous row is a recorded rejection and
+  the load writes nothing. The 174 legacy players with no profile path are adjudicated in the
+  tracked `data/brownlow/player-identity.csv` (by round-vote witness, unique name-and-span, or
+  operator decision); the loader itself never matches on a name. Five further rows in the same
+  file are explicit operator overrides (2026-09-04) of a recovery-bridge path that AFL Tables
+  does not use (Archie Roberts 1934, Glen Scanlon 1977, Jack Patterson 1931-35, Lyall Anderson
+  1958, Stephen Icke 1976-84; 14 rows / 77 votes): the artefact builder replaces a bridged path
+  only for a row naming that exact legacy player and its exact original path, records the
+  replaced path in the manifest, and applies no fuzzy, spelling, span or alias matching. NULL
+  polling counts stay NULL.
+- The canonical rebuild gains a `brownlow-season` data stage between `awards-honours` and
+  `derived`, preflighted offline, with Stage-9 gates for rows, total votes, winners, season span
+  and provenance read from the manifest. The legacy `brownlow` group of `import_legacy_afl.py` —
+  which also truncated the canonically-owned `brownlow_round_votes` — is removed; the new loader
+  truncates only the season table.
+- The Brownlow release gates skipped since AFLDB-ISSUE-108 are re-armed, with their witnesses
+  resolved by profile identity rather than pinned surrogate ids, plus a new gate that every
+  1984-onward career total equals its round-vote sum.
+- The "2026 Brownlow pending" release gate now asserts the pending state through the
+  season-level `stat_availability` contract (`brownlow_season_total` exactly `2025 complete`,
+  `2026 pending`, `seasons.status` in progress, no 2026 season-grain row, and no 2026
+  player-season carrying a vote or any status but pending) instead of requiring a 2026
+  `player_season_stats` row that a canonical rebuild of the accepted baseline never contains.
+  2026 is still never treated as complete or as zero.
+- Two legacy integration pins moved by the `AFLDB-ISSUE-136` fold are re-pinned with
+  attribution: players honestly without a date 12,422 → 12,418 (the four folded duplicates were
+  undated 2025-only rows) and 200-249 games with 16+ finals 115 → 114 (Charlie Cameron is one
+  player with 254 games). The "50-199 goals and zero Brownlow votes" cohort gates, skipped since
+  AFLDB-ISSUE-108, are re-armed at the re-measured 261 with a profile-identity membership digest.
+- Validated end to end on the canonical `db:test:rebuild` of `afldb_test` with the ISSUE-136
+  fold (13 stages, 48 final checks): V1-V13 green — round-vote witness 0 / 0 / 0 over 8,570
+  player-seasons, season / career / derived totals 79,113, the two integration suites 105 passed
+  / 0 failed, and a second loader run idempotent (16,120 / 16,120 / 0 rejected; season-table and
+  round-table content fingerprints unchanged). Committed on `claude/issue-113`; not merged, not
+  deployed. **Production still shows the empty-season-table symptom** until the load is applied
+  there, sequenced after the `AFLDB-ISSUE-137` identity repair
+  (`issues/closed/AFLDB-ISSUE-113.md` §8.18).
+
+### AFLDB-ISSUE-131 — an upstream match rekey now updates the canonical match instead of duplicating it - 3 September 2026
+
+- **The defect.** `matches.match_key` is `season|round_code|match_date|home|away`, and the identical
+  five-part string is also the match family's `external_record_id`. It is therefore a content address
+  over mutable scheduling metadata, and it was the only handle either side of the pipeline had. When
+  AFL Tables revised a round or a date on a match AFLDB had already materialised, both moved together:
+  `reconcile()` saw a record it had never observed, the applier's only canonical lookup was by
+  `match_key` and missed, and a **second** canonical row was inserted for a fixture that already had
+  one. `matches` carries no constraint on the real-world fixture, so the duplicate was admissible; the
+  vanished identity was swept `absent`, and absence is observation state only, so nothing ever
+  revisited the stale row — it kept its `match_period_scores` and `player_match_stats` forever. A
+  general rekey defect; ISSUE-129's Wildcard Final reclassification was the trigger that exposed it.
+- **Rekey in place, on deterministic evidence only.** On a `match_key` miss the settle now looks for a
+  canonical row that is provably the same fixture under an identity the source has retired: exact
+  season and **both** club ids, at most one of `round_code` / `match_date` moved, the row owned by AFL
+  Tables, and its source record absent from a scope the run proved complete. Exactly one candidate is
+  UPDATED in place. **The canonical `matches.id` is preserved**, so every child row and every
+  provenance reference stays attached — zero child mutation, and no DELETE on any path.
+  `match_key` joins the proposed field set on that path only, so the move diffs, is covered by the
+  staleness hash, reaches the reviewer as a correction, and lands in `canonical_applications` with the
+  old rendering in `previous_values` and the new one in `new_values`.
+- **Human decisions travel with the match.** `data_overrides.entity_key` for a match *is* the
+  `match_key`, so a rekey silently orphaned every active human override. Authority is now asked under
+  both renderings, and active overrides are carried to the new key inside the same savepoint; the old
+  row is deactivated, never deleted. The run reports how many it carried
+  (`canonicalOverridesCarried`), so moving a human's pinned decision is never silent.
+- **Three fail-closed refusals, no force flag.** `rekey_ambiguous` (more than one row could be the
+  rekey), `rekey_would_merge` (the fixture already holds two canonical rows — which now also stops the
+  ordinary update of the live one rather than deepening the duplication) and `rekey_override_conflict`
+  (a live override under both renderings). Each writes nothing, opens a `canonical_apply_failed`
+  finding and surfaces in the settle exception report. **Two populated canonical rows are never merged
+  automatically.**
+- **A rekey refusal stops the whole fixture, not just the `matches` row.** A refusal says the run
+  cannot name the canonical row that *is* this real-world match, so every dependent target of that
+  fixture is withheld for the rest of the run: `match_period_scores` in the same savepoint, and
+  `player_match_stats`, which is settled afterwards in the same transaction and would otherwise have
+  written against the live half of a duplicated fixture. The specific refusal travels with the block
+  rather than being flattened into a generic failure, so the exception report still names the
+  evidence that stopped each target.
+- **`tools/current-season/repair-match-rekeys.ts`** (new) repairs rows already made stale. Dry run by
+  default; `--apply` requires the hash of the plan that was reviewed and re-derives the plan inside the
+  transaction, aborting if it moved. It runs as the restricted `afldb_import` role, prints the resolved
+  database, requires `--season`, uses per-fixture savepoints, writes a ledger row per mutation, and
+  prints the duplicate-fixture and finals-accounting counts before and after. Three actions only —
+  rekey in place, report only, refuse — and never a DELETE.
+- **Fixed in passing.** The settle exception report named a stale import batch: `latestBatchOf()`
+  ordered by an `id::text AS id` output alias, so batches sorted as text and `'963'` sorted above
+  `'1062'`. It could only fire once batch ids crossed a digit-count boundary.
+- **No migration.** The identity fix needs no schema change.
+
+
+### AFLDB-ISSUE-130 — the settle service's R library is declared by the repository and gated at deploy time - 3 September 2026
+
+- **The defect.** `afldb-settle-afltables.service` failed on the dev host at step 1 with
+  `Package 'jsonlite' is required` while `jsonlite` and `fitzRoy` 1.8.0 were installed and healthy —
+  in `/home/arm/R/library`, which is on no `.libPaths()` under systemd (no login shell, the unit
+  declares no environment, `~/.Renviron` sets nothing). An **untracked** host drop-in setting
+  `R_LIBS_USER` was what made the nightly settle work. Nothing in the repository declared the R
+  library, and `docs/deployment.md` verified the install only from an interactive shell, which is
+  not the environment that fails.
+- **Declared.** New sourced `deploy/afldb-r-env.sh` resolves `AFLDB_RSCRIPT` and, only when the
+  optional `AFLDB_R_LIBS` is set, prepends it to `R_LIBS` (additive; `R_LIBS_SITE` is not used so the
+  apt-installed site library is never displaced). It **refuses, exit 1, if that directory does not
+  exist**, because R drops a missing library path silently. `/usr/local/lib/R/site-library` is the
+  canonical library on every deployed host; the override is an explicit escape hatch, not part of the
+  documented install.
+- **Gated.** New `deploy/afldb-r-preflight.sh` is the deploy-time check: one `Rscript` run that
+  prints the R version, `R_LIBS*` and `.libPaths()`, proves a configured `AFLDB_R_LIBS` really
+  appears on `.libPaths()`, reports `jsonlite`/`digest`/`fitzRoy` with the library each resolves
+  from, compares fitzRoy with `pinned_version` **read from** `fitzroy-contract.json` (never
+  hard-coded), warns when a `~/.Renviron` exists, installs nothing, and exits 1 on any failure.
+  `docs/deployment.md` §7b makes it mandatory before the timer is enabled — from the operator's
+  shell **and** service-equivalently under `systemd-run` with the unit's sandbox — and records the
+  removal of the hand-written drop-in.
+- **Both scripts resolve their project root from their own location** (`AFLDB_PROJECT_ROOT` still
+  overrides). The settle script previously hard-coded `/home/arm/projects/afldb`, so a worktree
+  checkout silently ran against the canonical checkout. Chain, flags, label, trap, season gate,
+  exit semantics and the unit file are unchanged.
+- **Validated.** Dev host, tracked unit, drop-in **removed**, `Environment=` empty, packages in the
+  canonical layout: supervised settle `settle-2026-2026-09-03-1633` completed — 209 matches, 9,614
+  player-match rows, 0 unkeyed, `SOURCE COMPLETENESS: COMPLETE`, exit 0 — the scenario that
+  originally failed. Preflight `R PREFLIGHT: OK` interactively and under `systemd-run`. 24 new
+  assertions in `tests/current-season-import.test.ts`, including an executing alternate-checkout
+  harness; vitest 252/252, `sh -n` and eslint clean.
+- **Production inspected read-only and already compliant:** at `250caa2` the tracked unit runs with
+  no drop-in, R 4.3.3, `jsonlite`/`digest` from apt and fitzRoy 1.8.0 in
+  `/usr/local/lib/R/site-library` — nothing to reconcile. **Not merged to `main`, not deployed.**
+  After the normal controlled deploy, `sh deploy/afldb-r-preflight.sh` on production must end
+  `R PREFLIGHT: OK` before the settle timer runs on the new code.
+
+### AFLDB-ISSUE-129 — the AFL Wildcard Round is representable, and "a final" is now two questions - 3 September 2026
+
+- **The gap.** AFL Tables publishes a Wildcard Final round from 2026 — 28-Aug Western Bulldogs v
+  Collingwood and 29-Aug Melbourne v Carlton, results code `WF`, plus 92 player-match rows — and
+  AFLDB's `round_type` enum had no member that could carry it. Those rows had no representable
+  identity, so they became unkeyed rejections and both presence enumerations went incomplete.
+  `AFLDB-ISSUE-128` made that loss audible; this change makes the rows land.
+- **`round_type` gains `wildcard_final`** (migration `084`), positioned after `home_and_away` so
+  the enum's declaration order stays chronological. It is deliberately **not** collapsed into
+  `elimination_final` or any other existing finals type. `matches_is_final_ck` is unchanged, so
+  a wildcard final carries `is_final = true` by construction and 129 seasons of history are
+  untouched.
+- **`matches.is_finals_series`** (migration `085`) is a new generated column and the single
+  definition of finals-series membership. The Wildcard Round is the first round in AFL history
+  where two questions that shared one answer come apart:
+  - `is_final` — *is this outside the home-and-away premiership-points season?* **True** for a
+    wildcard final, which is why the ladder, premiership points and Brownlow polling keep
+    reading it and are correct with no change.
+  - `is_finals_series` — *is this part of the traditional finals series?* **False** for a
+    wildcard final.
+- **Every "did they play finals" answer now reads `is_finals_series`**: `player_career_stats`
+  and `player_season_stats` `finals`, `club_seasons.finals_played`, the `db-health` finals
+  parity check, all Grid Solver finals criteria, the natural-language *finals* match type, and
+  the Match Search "Finals only" filter. The decisive consequence, and the reason a plain
+  "counts as a final" was rejected: a club seeded 9th that loses its Wildcard Final and never
+  reaches the eight has `finals_played = 0` and answers **missed the finals**.
+- **Both source vocabularies are taught together, exactly.** `results.csv` `WF` and
+  `player_stats` `Wildcard Final` map to `wildcard_final` through explicit tables — no regex, no
+  case-folding, no prefix matching, no fallback — and the two grains must agree or the importer
+  rejects every player row on a round mismatch. fitzRoy's own `Round.Type` stays untrusted for
+  this round: it reports `Regular`. The same code is taught to the manual CSV ingest path and to
+  the external-provider corroboration matcher.
+- **Not polled for the Brownlow.** `WF` joins `FINALS_CODES`, which gates round-vote derivation
+  and also protects the round-vote key from `int('WF')`.
+- **User-visible surfaces.** `Wildcard Final` / `WF` display labels; a `wildcard final` /
+  `wildcard finals` / `wildcard round` natural-language match type that is read before the bare
+  "finals" rule rather than swallowed by it; a `wildcard final` site-search round; a
+  `Wildcard Final only` Match Search filter; an explicit `Wildcard Final` option in the admin
+  match editor, never inferred from free text; and `is_finals_series` as a Query Builder field
+  alongside `is_final`, which is relabelled `Not home-and-away` so the two stop reading as
+  synonyms.
+- **The ISSUE-095 ladder witness is preserved, not loosened.** fitzRoy labels a `WF` row
+  `Round.Type = "Regular"` and counts it on its own ladder, so for any season containing a
+  Wildcard Round the witness and `club_seasons` compute different quantities. Those seasons are
+  now named and declared explicitly uncomparable; every other season is compared exactly as
+  strictly as before.
+- **Proved against the live source.** The 2026 snapshot was re-acquired from AFL Tables through
+  the pinned fitzRoy 1.8.0 and re-emitted: **209 matches and 9,614 player-match rows, 0
+  rejections, 0 unkeyed rejections, both presence enumerations complete, verdict
+  `SOURCE COMPLETENESS: COMPLETE`** — where the same source previously emitted 207 / 9,522 with
+  94 unrepresentable rows. The two Wildcard Finals and their 92 player rows are exactly the
+  difference. `AFLDB-ISSUE-128` needed no code change: its verdict is a measurement, and the
+  measurement moved. The fitzRoy ladder witness independently confirms nothing historical moved
+  — 1,622 club-seasons agree with `club_seasons` on points, percentage and ladder position.
+- **Regression coverage.** The `AFLDB-ISSUE-128` fixture — which carries the real 2026 `WF` /
+  `Wildcard Final` vocabulary measured from the live source — had its assertions **inverted, not
+  deleted**: it now proves 2 matches and 4 player rows emitted, 0 unkeyed rejections and both
+  enumerations complete. ISSUE-128's own guarantee is re-proved on a round code AFLDB still does
+  not know, so teaching one round did not switch the reporting off for the next.
+- **Accepted and closed 2026-09-03.** The full 16-case acceptance plan is green against `afldb_test`
+  at migration `085`: five touched integration suites **268 passed / 5 skipped / 0 failed**, 84 unit
+  test files **2,753 passed**, typecheck clean, 0 lint findings in changed or new code, and the
+  decisive no-historical-regression gate — `is_finals_series <> (is_final AND round_type <>
+  'wildcard_final')` across full history — returns **0 mismatches**. **Not yet deployed:** `084` and
+  `085` are applied to `afldb_test` only; `afldb_dev` and production remain at `083`, and
+  `db:privileges` was not run. `AFLDB-ISSUE-128` and `AFLDB-ISSUE-129` ship **together** — 128 alone
+  makes the nightly settle unit report `failed` every night the 2026 Wildcard Round is in the
+  acquired window, and 129 is what makes the rows land.
+
+### AFLDB-ISSUE-128 — a current-season settle can no longer report success while dropping rows AFL Tables supplied - 3 September 2026
+
+- **The defect, measured rather than inferred.** A real in-season chain run against the live
+  source acquired **209** matches and **9,614** player-match rows from AFL Tables, emitted an
+  observation bundle carrying **207** and **9,522** with **94** unkeyed rejections and both
+  presence enumerations marked `complete: false` — and **exited 0**. The settle counted the same
+  facts and exited 0, the systemd unit went green, and the admin surface projected none of it.
+  Those are the same figures the production `AFLDB-ISSUE-122` run recorded on snapshot
+  `settle-2026-09-02-1958`, so production dropped the entire 2026 Wildcard Round and reported a
+  clean pass. Every stage behaved correctly and fail-closed; not one of them was audible.
+- **`import_fitzroy_core.py` now states a completeness verdict.** The emission prints a
+  `SOURCE COMPLETENESS` block naming the family, the reason, the row count and the offending
+  source lines. It still exits 0, deliberately: the records AFLDB *can* represent must still
+  reach the settle.
+- **`settle-afltables.ts --require-complete-source` makes an incomplete source a failed run.**
+  The verdict is evaluated **after** the settle transaction has committed, so every representable
+  record still lands and a rerun is still idempotent — all the exit code costs the run is its
+  claim to have imported the season. `deploy/afldb-settle-afltables.sh` passes the flag, so the
+  nightly unit reports `failed` rather than success when rows were dropped.
+- **The verdict is built from the source's own evidence, never from a calendar.** It reads the
+  unrepresentable-row, unprojected-record and unswept-scope counters the settle already writes.
+  A bye, the gap before finals and the whole off-season acquire nothing, produce zero
+  unrepresentable rows and read `complete`, so a red state always means a real coverage gap. A run
+  that recorded no counters reads `unknown`, never `complete`.
+- **`/admin/current-season` shows the verdict above the run counters**, and the settle result now
+  projects the five snapshot coverage counters (`snapshotMatches`, `snapshotPlayerMatchRows`,
+  `snapshotRejections`, `snapshotUnkeyedRejections`, `absenceSweepSkipped`). The verdict is derived
+  on read, so a batch row written before this change still gets a reading.
+- **The legacy Kali "auto" path is removed, not relabelled.** `mode=auto` — which meant
+  "Kali + apply", the retired automatic writer's exact shape — is gone, and an unknown mode is now
+  **refused** rather than reinterpreted, so a stale client cannot resurrect it by name.
+  `parseCurrentSeasonSources()` no longer defaults to `kali`; there is no default fallback source
+  at all. The fallback control is manual-only, requires an explicit source, marks both providers
+  deprecated, and defaults to Squiggle.
+- **Provider precedence is stated where an operator reads it.** `/admin/current-season` says that
+  AFL Tables via fitzRoy is the primary and only automatic current-season source and the only one
+  with canonical-write authority, and says explicitly why AFL Tables is absent from the fallback
+  source list — acquiring it there would be a second ingestion implementation inside Next.js.
+- **The reported stale-`fitzRoy_data`-cache theory was false and nothing was changed for it.**
+  `fetch_results_afltables()` reads `afltables.com/afl/stats/biglists/bg3.txt` live with no cache
+  in the path; the player-stats cache was current through 2026-08-29. `No new data found!
+  Returning cached data` means the cache is up to date, not stale.
+- **No behaviour was weakened.** Squiggle and Kali gained nothing: still deprecated, still
+  non-writing, still never invoked automatically, and the fallback action still hardcodes
+  `insertMissingMatches = false`. Existing final scores are untouched, the historical rebuild path
+  still aborts on a record it cannot interpret, and no schema, migration, privilege, settle-library
+  or canonical-apply code changed.
+- **Validated end to end on dev, then accepted on `afldb_test`.** The real systemd chain against
+  `afldb_dev` committed `import_batches` **87** as `completed` with 980 canonical rows and 0 apply
+  failures while the unit exited **1** with `Source INCOMPLETE: 94 unrepresentable row(s), 2 unswept
+  scope(s)` — the same run that previously exited 0 with a clean counter table. No Wildcard data was
+  guessed into canonical storage. `tests/integration/settle-afltables.test.ts` then passed **44 / 1
+  skipped / 0 failed** against `afldb_test` (the skip is the pre-existing restricted
+  `afldb_import`-role check on an unset `AFLDB_TEST_IMPORT_DATABASE_URL`). **Not yet deployed to
+  production:** while `AFLDB-ISSUE-129` is undecided, the nightly unit will report `failed` every
+  night the 2026 Wildcard Round is in the acquired window.
+
+### AFLDB-ISSUE-129 — raised: AFL Tables' Wildcard Final has no canonical representation - 3 September 2026
+
+- **Raised, not fixed.** Two completed 2026 matches (28-Aug Western Bulldogs v Collingwood,
+  29-Aug Melbourne v Carlton) and their 92 player-match rows are acquired correctly and cannot be
+  stored: `matches.round_type` is a PostgreSQL enum with six members and no wildcard, and a
+  wildcard final cannot be modelled as home-and-away because it has no round number. Storing it
+  needs a new enum value **and** an AFLDB-wide decision on whether it counts as a finals
+  appearance — `is_final` is derived from `round_type` by CHECK, so the choice propagates through
+  finals counts, search filters, NL answers, Grid Solver criteria and career aggregates. No
+  migration number is claimed and no code was written; the decision blocks all implementation.
+
+### AFLDB-ISSUE-127 — a Super Admin can trigger the AFL Tables current-season refresh on demand - 3 September 2026
+
+- **`/admin/current-season` gains a Super Admin-only "Fetch current AFL data now" control.** It
+  starts *the same* `afldb-settle-afltables.service` unit the nightly `AFLDB-ISSUE-122` timer
+  starts — the same acquisition, the same adjudication, the same gates, the same transaction and
+  the same fail-closed behaviour. There is one ingestion implementation, not two, and no
+  acquisition, adjudication, canonical-write, ownership, provenance or derived-recompute logic
+  was duplicated into the web application. The timer cadence is unchanged.
+- **The control takes no options.** Both Server Actions declare zero parameters, so there is no
+  season, label, path, source, force or bypass value to accept; the host boundary is `execFile`
+  with a fixed argv array of module constants, with no shell and nothing user-supplied anywhere
+  near it. Authorization is enforced server-side by the existing `requireSuperAdmin()` guard, not
+  by a hidden button.
+- **A second run cannot start while one is going.** Concurrency is systemd's own job semantics —
+  a start job for a unit that already has one is merged into it — so a second Super Admin, or a
+  press landing during the 04:30 timer run, is told "already running" and starts nothing. There
+  is no application-memory lock.
+- **The result comes from AFLDB's own structured record.** The panel reads the newest
+  `import_batches` row the settle writes, including its `validation_result` counters (canonical
+  rows inserted/updated, ledger rows, apply refusals and failures, unresolved identities,
+  advisory disagreements, and whether the derived recompute ran), on the read-only application
+  role. No journal text is scraped, and the importing DSN is never opened by the web service.
+  Because that row is written inside the run's transaction, the panel reports the service state
+  and the last committed run as two separately labelled facts rather than merging them.
+- **Every press is audited** as `current_season.settle_triggered`, carrying the actor, the unit,
+  the outcome and the batch id that was newest before the press. No credential or environment
+  value is recorded.
+- **Off by default, and fails closed.** The control is inert unless `AFLDB_SETTLE_TRIGGER=systemd`
+  is set *and* the polkit rule `deploy/afldb-settle-afltables-trigger.rules` is installed, and it
+  says so plainly when it is not. That rule is scoped to one action, one verb, one unit and one
+  user; `sudo` is impossible here because the web service runs under `NoNewPrivileges=true`, and
+  that hardening was kept rather than traded away — `deploy/afldb.service` is unchanged. Squiggle
+  and Kali remain non-writing; the canonical controls retired by `AFLDB-ISSUE-122` were not
+  restored. See `docs/deployment.md` §7b.
+
+### AFLDB-ISSUE-122 — automatic current-season AFL Tables canonical ingestion is live in production (Resolved) - 3 September 2026
+
+- **Current-season AFL Tables data now becomes canonical automatically, with no routine admin
+  review.** The nightly chain acquires AFL Tables through fitzRoy, adjudicates and emits
+  observations offline, then applies them canonically behind the existing nine reconciliation
+  gates plus five stronger automatic-path gates re-evaluated inside the write savepoint: season,
+  match completion, ownership, canonical baseline and human authority. Before this, valid new
+  games were acquired, validated, persisted and projected but never became canonical.
+- **Every canonical mutation is audited.** The append-only `canonical_applications` ledger row is
+  written in the *same savepoint* as the mutation it describes, so a canonical row can never exist
+  without its ledger row or the reverse. `promotion_decisions` remains human-only — no machine
+  writes it, and nothing auto-applied is ever marked accepted.
+- **Reruns are free.** An identical rerun writes no canonical row and no ledger row. Proven on
+  production: the first apply wrote 10,582 canonical rows and 9,133 ledger rows with zero refusals
+  and zero failures; the identical rerun immediately after wrote nothing at all.
+- **Failure is isolated and fails closed.** An unresolved player identity blocks only that
+  player's own rows — the match and every other player still land, and the row becomes an
+  exception-queue candidate. An unresolved club fails closed for its whole match family. An
+  unmapped venue is *not* a failure: `venue_id` stays NULL, `venue_raw` carries the real string,
+  and the literal `'Unknown'` is never written. A manual override, a foreign-owned row or a
+  source-less row is never adopted automatically.
+- **Squiggle and Kali have no canonical writer at all** and are never invoked by the scheduled
+  job. They keep acquisition, observations, staging, diagnostics and provenance.
+  `current-season:update --update-matches` refuses explicitly. **There is no fallback canonical
+  authority**: if the chain fails, the season does not advance until it succeeds, and the failed
+  run leaves no consumable partial snapshot.
+- The nightly `afldb-settle-afltables` timer is **enabled and active on production**
+  (`Persistent=true`, so a run missed while the host is down catches up once). Out of season the
+  run exits successfully without doing anything, so the timer stays enabled all year.
+- Production is deployed at `main` merge `250caa2`, schema through migration `083` with 0 pending
+  and `db:privileges` reconciled, with R 4.3.3 and fitzRoy 1.8.0 installed and version-pinned.
+- The 2026 season baseline on production was replaced with a clean rebuilt database (16,838
+  matches, seasons 1897–2025) after a full pre-cutover backup and a matching SHA-256 transfer
+  check. That promotion also reset production-only application state; the real production super
+  admin was restored from the pre-cutover backup and admin login verified, and the remaining
+  production-only rows are preserved in a recovery database pending `AFLDB-ISSUE-126`.
+- The one-time `--adopt-foreign-2026` transition (runbook §14/S9) was measured and is **not
+  required**: every pre-existing 2026 row was legacy-loaded, which the adoption rules refuse, so
+  the adoptable set was empty. It was never built.
+- `afldb.com` is unchanged and intentionally remains the static holding page, with
+  `beta.afldb.com` as the application upstream.
+- Follow-ups routed and not implemented: `AFLDB-ISSUE-123` (settle performance at steady state),
+  `AFLDB-ISSUE-124` (`afldb.service` `StartLimitIntervalSec` is in the wrong section and is
+  ignored), `AFLDB-ISSUE-125` (a documented procedure for preserving production-only state during
+  a canonical database promotion) and `AFLDB-ISSUE-126` (decide and act on the production-only
+  state held in the recovery database).
+
+### AFLDB-ISSUE-122 — scheduled in-season settle, stage S8 scheduling (In progress) - 2 September 2026
+
+- New `deploy/afldb-settle-afltables.service`, `.timer` and `.sh` run the approved in-season chain
+  as a nightly `oneshot`: AFL Tables is acquired through fitzRoy, adjudicated and emitted offline,
+  then applied canonically by the guarded automatic path. The season comes from
+  `data/reference/seasons.json` and the datasets from the acquisition contract, so neither is
+  duplicated in the unit and neither needs editing at season rollover.
+- The unit carries the email-intake hardening block with two deliberate widenings — writable paths
+  for the acquisition working area and the provenance manifests, and `AF_UNIX` for the PostgreSQL
+  socket. `AFLDB_IMPORT_DATABASE_URL` is the only database credential it keeps; every other DSN and
+  secret `.env` carries is dropped.
+- Failure is fail-closed and self-retrying: a failed acquisition writes no manifest, has its partial
+  working directory removed, never reaches PostgreSQL, fails the unit visibly and is retried at the
+  next firing. `Persistent=true` catches up a run missed while the host was down. Out of season the
+  run exits successfully without doing anything, so the timer can stay enabled all year.
+- **Squiggle and Kali are never invoked automatically and have no canonical writer at all.** There is
+  no fallback canonical authority: if the chain fails, the season does not advance until it succeeds.
+- `docs/deployment.md` gained §7b: installing R and the pinned fitzRoy, verifying the pin, installing
+  and enabling the service and timer, the environment requirement, the supervised validation ladder,
+  journal inspection, a manual supervised run, cadence and retry behaviour, and how to disable the
+  timer safely.
+- Not yet operating: production has neither R nor the ISSUE-122 code, so no unit is installed and no
+  timer is enabled anywhere.
+
+### AFLDB-ISSUE-122 — Squiggle/Kali canonical-write retirement, stage S7 (In progress) - 2 September 2026
+
+- Squiggle and Kali remain available as deprecated fallback sources for acquisition, immutable
+  observation history, staging, diagnostics, explicit human fallback investigation,
+  corroboration evidence and historical provenance, but their legacy current-season path can no
+  longer insert or update canonical `matches` rows. Its canonical insert/update counters are
+  structurally zero and no replacement fallback writer was introduced.
+- `current-season:update --update-matches` now fails explicitly with an AFLDB-ISSUE-122
+  deprecation error; the existing `--insert-missing-matches` refusal remains unchanged.
+- The existing super-admin current-season controls no longer expose or submit `updateMatches` and
+  now describe Squiggle/Kali operations as staging/diagnostic fallback investigation only.
+- Existing current-season regression coverage now proves source acquisition, observation/history,
+  staging and corroboration diagnostics remain available while canonical DML and the retired admin
+  plumbing are absent.
+
+### AFLDB-ISSUE-122 — automatic current-season canonical ingestion, stage S6 run integration (In progress) - 2 September 2026
+
+- **The automatic path is now an operator command.** `npm run settle:afltables -- --label
+  <snapshot> --apply --auto-apply` lands a validated AFL Tables snapshot canonically in one
+  transaction; `--dry-run --auto-apply` runs exactly the same path against real constraints and
+  privileges and rolls it all back, so what the preview shows is what the commit does. Without
+  `--auto-apply` the tool behaves exactly as before: observations, staging and review candidates
+  only. There is no force flag and no bypass, and a mistyped flag is refused rather than ignored.
+  Nothing is scheduled yet.
+- **Derived data keeps up with canonical data.** When a run writes a canonical row, the season's
+  metadata, ladder (`club_seasons`), and the written players' club, season and career aggregates
+  are recomputed once, inside the same transaction, using the existing targeted recompute the
+  admin editors already use. A run that writes nothing recomputes nothing. A recompute failure
+  fails the run rather than committing facts beside stale aggregates.
+- **A player's career game number is derived by AFLDB, not copied from the source, on the
+  automatic path.** Both the applier and the recompute were writing it, which would have caused
+  one spurious canonical write and audit row every night over identical source data. The
+  automatic applier now leaves it to the recompute; a source-side change to it still surfaces
+  as a review candidate.
+- **The exception report separates what needs attention from what is history.** After a
+  committed apply, and on `--report`, the tool lists the active exceptions — unresolved player
+  identities with the source name, profile URL, club, season, round, match and reason, and
+  whether the match itself landed; other open review candidates; open apply failures and source
+  disagreements — apart from review candidates left pending only because their record has since
+  applied, which are shown as moot and retained as history.
+- Each run's batch record now also carries the count of automatic writes a re-read gate refused,
+  advisory source disagreements, and whether and how widely the derived recompute ran.
+- Two defects in the stage-S5 applier were found by the end-to-end rerun proof and fixed: an
+  update to a player's match statistics referenced a column that table does not have, and a
+  retry that landed after an earlier failure did not close its own failure finding.
+
+### AFLDB-ISSUE-122 — automatic current-season canonical ingestion, stage S5 the applier (In progress) - 2 September 2026
+
+- **A valid new AFL Tables game now becomes canonical on its own.** Once the source publishes a
+  completed match, the settle pass writes the match, its quarter-by-quarter scores and every
+  resolvable player's statistics into the canonical tables, with no administrator clicking
+  approve. Human review becomes the exception path rather than the normal one — the change of
+  product policy AFLDB-ISSUE-096 and -099 deliberately left unbuilt.
+- The automatic write is off unless a run asks for it, so nothing that ran before behaves
+  differently. Every existing guarantee that the settle pass writes no canonical data still holds
+  for every existing caller.
+- A record is applied as a whole or not at all. A match and its period scores land together, and a
+  player's statistics land with their Brownlow votes; a failure in one rolls back only that
+  record. One player whose identity cannot be resolved no longer costs the match or their
+  team-mates their data, and a malformed record cannot leave a match with half its scoreline.
+- Every automatic canonical change is audited. Each insert and update writes an append-only
+  `canonical_applications` row inside the same database savepoint, naming the run, the exact
+  source version that justified it, the target, and the field values before and after. A canonical
+  change without its audit row, or an audit row without its change, is impossible rather than
+  merely unlikely.
+- Nothing is written on trust. Ownership, the human-override state and the canonical baseline are
+  all re-read at the moment of writing, so an administrator's override committed part-way through
+  a run still stops the write it covers. A row another source owns, or one whose provenance cannot
+  be established, is refused and routed to review — never adopted.
+- Absent values stay absent. A statistic that was not recorded is never written as zero, an
+  attendance figure that was never collected is never invented, an unmapped venue keeps its real
+  name with no canonical venue, extra time is never manufactured, and a Brownlow round with no
+  published vote gets no row at all. Zero Brownlow rows during the season is the correct outcome.
+- A record whose player identity is resolved later lands on the next run without the source having
+  to change, and a record that is already correct writes nothing at all.
+- A successful automatic write never creates a review item and never marks one approved. Review
+  decisions remain something only a person makes.
+- A deprecated fallback source that disagrees can no longer block an AFL Tables write, while the
+  disagreement is still recorded as a data-quality finding for someone to look at.
+
+### AFLDB-ISSUE-122 — automatic current-season canonical ingestion, stages S3 ownership and S4 corroboration policy (In progress) - 2 September 2026
+
+- All four AFL Tables canonical targets are now ownership-determinate. Migration 083 gave
+  `match_period_scores` and `brownlow_round_votes` their provenance columns, so the settle
+  resolver's `TARGETS_WITHOUT_SOURCE_ID` special case — which made both permanently
+  indeterminate — is removed, and `resolveTarget()` reads the real `source_id` for all four.
+  A period set's ownership is the owner shared by every one of its rows; a mixed set still fails
+  closed. `source_id` is read for ownership only and never enters the compared values, so a run
+  cannot mistake provenance for a score correction.
+- A new automatic-path ownership predicate refuses more than the generic one: an absent row is
+  insertable, an AFL Tables-owned row updateable, a foreign-owned row refused, and a row whose
+  `source_id` is NULL is refused as ownership-indeterminate. A source-less row cannot be proven
+  unowned from anything the settle role can read, so it is never adopted unattended — it stays
+  promotable by a human through the reviewed queue. The generic ownership gate is unchanged.
+- Source families can now declare `corroboration_policy`. `blocking` is the default for every
+  family that does not declare one, so undeclared behaviour is exactly as before. The two AFL
+  Tables families declare `advisory`: a disagreeing independence group no longer vetoes their
+  proposal. Squiggle and Kali — both being retired — can neither block an AFL Tables write nor
+  become a prerequisite for one.
+- Advisory withdraws the veto and nothing else. Corroboration is still classified, agreeing and
+  disagreeing groups are still recorded, and the `source_disagreement` data issue is still opened
+  and deduplicated — it is now raised from the corroboration evidence rather than from the
+  refusal verb, which also means a disagreement that coincides with a manual-authority conflict
+  now records its finding where previously it recorded none.
+- Still no canonical write: these stages decide when one would be permitted, and by whom.
+
+### AFLDB-ISSUE-122 — automatic current-season canonical ingestion, stage S2 manual authority (In progress) - 2 September 2026
+
+- The AFL Tables settle path now has a real manual-authority provider,
+  `src/lib/acquisition/manual-authority.ts`, in place of the `UNAVAILABLE_MANUAL_AUTHORITY` stub
+  that refused everything. It reads `data_overrides` — the authority record — and never
+  `data_edits`, so no grant was widened: `afldb_import` still holds INSERT and no SELECT on the
+  audit log.
+- For `matches` it maps a proposal's changed fields onto the `src/lib/edit/spec.ts` field groups
+  and refuses on any intersection with an active override, and refuses an `attendance` change on
+  a match whose `attendance_source_id` already cites `manual_admin_edit`.
+- For `match_period_scores`, `player_match_stats` and `brownlow_round_votes` it answers "clear"
+  only while migration 073's `entity_type` CHECK and the editor spec together make a human
+  override for them unrepresentable; both facts are re-checked at load time, and either one
+  changing turns the answer back into a refusal. Migration 073 is unchanged.
+- Every query error, unreadable result and ambiguous question answers "indeterminate", which
+  refuses. There is no force flag. The snapshot is taken inside the settle run's own transaction.
+- Still no canonical write: this stage only decides when one would be permitted.
+
+### AFLDB-ISSUE-122 — automatic current-season canonical ingestion, stage S1 schema (In progress) - 2 September 2026
+
+- Migration `083_canonical_auto_apply.sql` completes provenance on the two canonical targets that
+  had none: `match_period_scores` and `brownlow_round_votes` gain the standard
+  `source_id` / `source_record_id` / `import_batch_id` / `imported_at` quartet, and
+  `player_match_stats` gains its missing `source_record_id` (AFLDB-ISSUE-099 A1/A2/A3).
+- New append-only `canonical_applications` ledger for machine-made canonical mutations: one row
+  per insert/update, bound by composite foreign key to the exact `staging.source_record_versions`
+  row that justified it, with before/after value sets bounded to 64-key JSON objects.
+  `afldb_import` holds SELECT + INSERT and sequence USAGE only; `afldb_auth` SELECT only; no
+  `afldb_app` access; no UPDATE/DELETE/TRUNCATE for any application role. Registered in
+  `tools/maintenance/privileges.sql`; `tests/integration/privileges.test.ts` pins the shape.
+- Applied to `afldb_test` only. No writer exists yet; settle, reconciliation and the
+  Squiggle/Kali path are unchanged in this stage.
+
+### AFLDB-ISSUE-102 — canonical awards and honours acquisition is legacy-free (Resolved) - 2 September 2026
+
+- Closed the parent acquisition dependency after all eight acceptance criteria passed. The
+  canonical rebuild and standing refresh now restore every ISSUE-111/112 awards and honours
+  family from tracked manifests or canonical AFLDB facts with `AFLDB_LEGACY_SQLITE` unset;
+  FINAL VALIDATION passed 38/38 at the exact family counts.
+- The post-rebuild link audit found zero orphan and zero wrong-player attachments across all
+  five awards link-target tables, while manual linked and `confirmed_unlinked` decisions retain
+  their semantics. `docs/deployment.md` §7 records the operational path and isolates the bare
+  compatibility-only legacy `awards` re-extract from routine operation.
+- `AFLDB-ISSUE-113` remains open by design for the separate `brownlow_season_votes`
+  dependency in `import_legacy_afl.py`; the unrelated query-builder timing regression remains
+  owned by `AFLDB-ISSUE-116`.
+
+### AFLDB-ISSUE-112 — the rebuild's DraftGuru preflight now proves the snapshot it is about to import - 2 September 2026
+
+- **Destructive-rebuild safety fix.** `npm run db:test:rebuild` accepted
+  `--draftguru-label` for its DraftGuru **data** stage but never passed it to the
+  DraftGuru **preflight**: `draftguruValidateArgv()` took no label and emitted
+  only `--validate-only`, so `import_draftguru.py` fell back to its own
+  hardcoded `STAGE_A_LABEL`. The two sides could therefore name different
+  snapshots — with both snapshot directories present the rebuild would have
+  verified one, destroyed `afldb_test`, and imported the other. It failed closed
+  only because the retired snapshot's raw bytes happened to be absent.
+- **Fixed at the wiring, not by repointing the constant.** The preflight command
+  line is now *derived from* the data-stage command line
+  (`draftguruValidateArgv(label) = [...draftguruImportArgv(label), '--validate-only']`),
+  and `runPreflight()` takes the same `Options` object `planStages()` builds the
+  data stages from. The preflight and the data stage are structurally incapable
+  of selecting different DraftGuru snapshots, for this label change and every
+  future one. `import_draftguru.py` is unchanged; the runner's
+  `DEFAULT_DRAFTGURU_LABEL` is unchanged and is now always passed explicitly to
+  both sides. Refusals name the label that was proven.
+- **The canonical rebuild is proven end to end.** `afldb_test` was rebuilt from
+  the newly accepted `full-history-20260902` (resolved from the acceptance
+  register — no `--fitzroy-label`), `annual-html-20260902` and the unchanged
+  `ladder-20260828` witness, with `AFLDB_LEGACY_SQLITE` unset throughout.
+  **FINAL VALIDATION passed all 38 checks.** Every awards and honours family
+  restored at its exact expected count — honour teams 113, Hall of Fame 343,
+  captaincies 1,375, Rising Star nominations 766 (33 winners), All-Australian
+  1,158, club best-and-fairest 752, named medals 979, 22 Under 22 330, award
+  definitions 39, and zero award winners without a source. Coleman is unchanged
+  from `AFLDB-ISSUE-111`: 46 rows across 46 seasons from 1980, none unlinked.
+  The ladder witness D7 cross-check agrees with `club_seasons` on all 1,622
+  club-seasons on every compared field.
+- **Award player links survive the rebuild with no wrong-player attachment.**
+  Zero orphan `player_id` values across `award_winners`, `award_nominations`,
+  `hall_of_fame`, `honour_team_members` and `captaincies`; captaincies and
+  Coleman are fully linked. Unresolvable identities remain unlinked rather than
+  guessed — nothing is resolved by name.
+- **`AFLDB-ISSUE-112` is resolved.** All eight gates G1-G8 pass; the seven
+  formerly legacy-dependent awards and honours families now load from tracked
+  manifests and are restored and gated by the canonical rebuild.
+
+### AFLDB-ISSUE-112 — the canonical rebuild's accepted source snapshots move to new labels - 2 September 2026
+
+- **The accepted fitzRoy core baseline is now `full-history-20260902`.** The
+  previously accepted `full-history-20260827` is **retired**: its raw artefacts
+  were lost, and reacquisition proved they cannot be reproduced — 130 of its 131
+  files re-acquire byte-identically, but AFL Tables' `player_details` content
+  drifted upstream after the 2026-08-27 extraction, and the original bytes no
+  longer exist anywhere to diff against. The successor was validated
+  independently by `import_fitzroy_core.py --validate-only
+  --require-full-history` **before** any acceptance record for it existed, and
+  reproduces **every** measured drift gate exactly: 16,838 matches, 13,275
+  players, 685,471 player-match rows, 52 venues, 320,861 Brownlow round-vote
+  rows, and an identity scan of 685,473 rows with 83 missing ids and zero
+  missing or malformed URLs. Canonical semantics are unchanged; only the
+  snapshot's provenance moved.
+- **The accepted DraftGuru Stage A snapshot is now `annual-html-20260902`,** from
+  a complete 42-year re-acquisition. `annual-html-20260826` is historical and
+  superseded: its pages are Rails-rendered and carry a per-render CSRF token, so
+  its accepted bytes cannot be reproduced by any refetch, independently of
+  whether the data changed. The new snapshot re-proves the parity baseline
+  exactly — **6,810 rows, 5,057 distinct persons, parity PASS** — with identical
+  event totals, special-pick totals, schema variants and per-year row counts and
+  schema fingerprints. Every raw page hashes differently (the CSRF token, plus a
+  `Content-Type` header change on 13 pages); that is render drift only, and no
+  parsed-data or schema validation was relaxed to accept it.
+- **`data/reference/fitzroy-accepted-baselines.json` now carries two entries**
+  under the unchanged `exactly_one_accepted` selection policy, using the
+  register's own `retired` lifecycle vocabulary. Each entry states its own
+  reasons in-register. **No historical acquisition manifest was rewritten,
+  renamed or deleted**, and no hash, measurement or accepted correction in the
+  retired record was edited. The ladder witness `ladder-20260828` is unchanged
+  and re-validated.
+- **Operational note.** The rebuild resolves the fitzRoy label from the register,
+  so `--fitzroy-label full-history-20260827` is now refused and no fitzRoy flag
+  is needed. The DraftGuru label is still a CLI default naming the retired
+  snapshot, so a rebuild must pass `--draftguru-label annual-html-20260902`
+  until that default is repointed.
+
+### AFLDB-ISSUE-112 — awards and honours load from tracked manifests, and their player links survive a rebuild - 2 September 2026
+
+- **Awards and honours no longer read the legacy SQLite database.** All nine
+  families — All-Australian, 22 Under 22, Rising Star, club best-and-fairest,
+  named medals, Hall of Fame, honour teams, captaincies and Coleman — now load
+  from checked-in manifests under `data/awards/`, or derive from AFLDB's own
+  match facts. A single `import_awards.py --groups …` run over the eight
+  manifest groups completes with `AFLDB_LEGACY_SQLITE` unset. The last two
+  award definitions that only the legacy `awards` group created,
+  `all-australian` and `rising-star`, are now tracked in
+  `data/awards/award-definitions.csv`, and the 33 `rising-star` winner rows —
+  which no manifest owned and which the legacy reload still wrote — in
+  `data/awards/rising-star-winners.csv`.
+- **Corrected: a manifest's `player_id` no longer decides a player link.** That
+  integer belongs to the database the manifest was bootstrapped from, and the
+  canonical rebuild re-seeds `players.id`. Measured against a canonically
+  rebuilt database, **none of the 12,392 ids present in both denoted the same
+  footballer**, and the loaders' existence check kept every link — so 5,141 of
+  5,194 awards links would have been attached to a different player. Links now
+  resolve through `data/awards/player-identity.csv` and the AFL Tables profile
+  identity in `external_identities`, failing closed: an uncensused id refuses
+  the run, and a player with no such identity loads **unlinked and named in the
+  output**, never guessed from a name. The resolver now also excludes ambiguous
+  identity rows and accepts exactly one distinct `unique`/`resolved` target.
+  The prior DB-backed closeout run preserved 5,138 of 5,194 links and enumerated
+  56 unresolved rows.
+- An already-adjudicated tracked DraftGuru link decision now supplies Matthew
+  Rendell's AFL Tables identity, covering four additional manifest links without
+  name matching. The remaining repository identity gap is 18 players / 33
+  manifest rows, all fail-closed; the improved DB count awaits the next reload.
+- **The canonical test rebuild has an awards-and-honours restoration stage.**
+  `tools/db/rebuild-test.ts` gains an AWARDS & HONOURS stage between DraftGuru
+  and DERIVED, carrying no legacy source, with per-family row-count gates in
+  final validation. Coleman keeps its own later stage, unchanged. End-to-end
+  execution remains blocked on the absent accepted raw snapshots.
+- The 21 previously legacy-gated reload/link fixtures now exercise manifest
+  groups while preserving their decision replay, ownership, idempotency and
+  cross-family assertions. Their DB-backed rerun is still required before G3
+  or the non-vacuous G5 contract can pass.
+- The legacy `awards` group is retained as **compatibility-only** for a
+  deliberate full re-extract; it is no longer part of the rebuild or of the
+  standing refresh sequence, and `docs/deployment.md` names the manifest groups
+  explicitly instead.
+- No migration and no privilege change.
+
 ### AFLDB-ISSUE-121 — administrative audit payloads are stored as JSONB objects - 1 September 2026
 
 - `auth_audit_log.detail` now stores a real JSONB **object**. Every row ever

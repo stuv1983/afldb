@@ -8,9 +8,19 @@
  */
 import './guard';
 
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { sql } from '@/db/client';
+import { reconcileCareerTotals } from '@/db/queries/db-health';
+import { searchAdminMatches } from '@/db/queries/match-admin';
+import { runMatchSearch } from '@/db/queries/match-search';
+import { getSeasonMatches } from '@/db/queries/matches';
+import { getPlayerMatches } from '@/db/queries/players';
+import { getSeasonRoundLadder } from '@/db/queries/rounds';
+import { searchRounds } from '@/db/queries/search';
+import { formatRound, formatRoundShort } from '@/lib/format';
+import { seedWildcardFinalSeason, type WildcardFixture } from './wildcard-final-fixture';
+import type { MatchType } from '@/search/match-spec';
 import type { NlGrain } from '@/search/nl/plan';
 
 const SUPPORTED_NL_GRAINS = {
@@ -22,6 +32,9 @@ const SUPPORTED_NL_GRAINS = {
   team_streak: true,
   head_to_head: true,
   achievement_summary: true,
+  coach_record: true,
+  after_siren: true,
+  family: true,
 } satisfies Record<NlGrain, true>;
 
 afterAll(async () => {
@@ -78,7 +91,7 @@ describe('schema', () => {
     expect(row.c).toBe('nic naitanui');
   });
 
-  it('accepts every supported NL telemetry grain including head_to_head', async () => {
+  it('accepts every supported NL telemetry grain and rejects an unsupported one', async () => {
     const grains = Object.keys(SUPPORTED_NL_GRAINS) as NlGrain[];
     const inserted: NlGrain[] = [];
 
@@ -102,7 +115,22 @@ describe('schema', () => {
     ).rejects.toThrow('accepted NL grain rows');
 
     expect(inserted.sort()).toEqual([...grains].sort());
-    expect(inserted).toContain('head_to_head');
+    // Every grain added since 046 first wrote the constraint has drifted
+    // from it, and each drift needed its own repair: 055 for
+    // achievement_summary, 079 for team_streak and head_to_head, 092 for
+    // coach_record, 093 for after_siren, 100 for family. The two most recent
+    // stay named here so reverting either migration fails this test by
+    // name, not just by list length.
+    expect(inserted).toContain('after_siren');
+    expect(inserted).toContain('family');
+
+    // Widening the CHECK must not have turned it into a formality: a grain
+    // no NlGrain value names is still refused by the database.
+    const unsupported = `not_a_grain_${Math.random().toString(36).slice(2, 10)}`;
+    await expectRejected((tx) => tx`
+      INSERT INTO nl_search_log (question, outcome, grain, result_count, duration_ms)
+      VALUES ('NL grain schema contract: unsupported', 'answered', ${unsupported}, 1, 0)
+    `);
   });
 
   it('refuses a match whose margin disagrees with its scores', async () => {
@@ -221,16 +249,14 @@ describe('data integrity', () => {
   });
 });
 
-// AFLDB-ISSUE-108: the canonical legacy-free rebuild has no writer for
-// brownlow_season_votes or player_career_stats.brownlow_votes
-// (AFLDB-ISSUE-090 §27.5), so the authoritative-total assertions (79,113) and the
-// legacy per-game figure (46,979) no longer describe the dataset. Skipped, not
-// re-pinned to zero; re-enable with a legacy-free season-grain Brownlow path.
-// When re-enabling, also re-address the Bob Skilton case below: player_id 3702 is a
-// retired legacy surrogate that the canonical rebuild re-seeded (it is now David
-// Stark). Resolve the witness from the data, as the club-identity gates now do.
+// AFLDB-ISSUE-108 retired the legacy source of brownlow_season_votes and these
+// assertions were skipped rather than re-pinned to zero. AFLDB-ISSUE-113 §8.6 landed
+// the legacy-free season-grain writer (tools/migration/import_brownlow_season.py over
+// the tracked artefact data/brownlow/season-votes.csv), so they are re-armed. The
+// Bob Skilton witness is resolved from the data by AFL Tables profile path: the
+// retired pin 3702 is a legacy surrogate the canonical rebuild re-seeded.
 describe('Brownlow correctness', () => {
-  it.skip('uses the authoritative season totals for career votes', async () => {
+  it('uses the authoritative season totals for career votes', async () => {
     const [row] = await sql<{ career: number; authoritative: number }[]>`
       SELECT (SELECT sum(brownlow_votes) FROM player_career_stats)::int AS career,
              (SELECT sum(votes) FROM brownlow_season_votes)::int        AS authoritative
@@ -239,20 +265,26 @@ describe('Brownlow correctness', () => {
     expect(row.career).toBe(79_113);
   });
 
-  it.skip('does not derive career votes from per-game votes', async () => {
-    const [row] = await sql<{ perGame: number }[]>`
+  it('does not derive career votes from per-game votes', async () => {
+    const [row] = await sql<{ perGame: number | null }[]>`
       SELECT sum(brownlow_votes)::int AS "perGame" FROM player_match_stats
     `;
     // Per-game votes are incomplete (1935-1983 missing) and must not be
-    // the basis of a career total.
-    expect(row.perGame).toBe(46_979);
-    expect(row.perGame).toBeLessThan(79_113);
+    // the basis of a career total. AFLDB-ISSUE-113: the canonical per-game column
+    // is fitzRoy-sourced, so the retired legacy figure (46,979) is not re-pinned;
+    // the invariant is that it falls short of the authoritative total.
+    expect(row.perGame ?? 0).toBeLessThan(79_113);
   });
 
-  it.skip('credits Bob Skilton with the votes the legacy derivation lost', async () => {
+  it('credits Bob Skilton with the votes the legacy derivation lost', async () => {
     const [row] = await sql<{ votes: number; medals: number }[]>`
-      SELECT brownlow_votes AS votes, brownlow_medals AS medals
-        FROM player_career_stats WHERE player_id = 3702
+      SELECT c.brownlow_votes AS votes, c.brownlow_medals AS medals
+        FROM player_career_stats c
+        JOIN external_identities ei ON ei.player_id = c.player_id
+        JOIN sources s ON s.id = ei.source_id AND s.key = 'afltables'
+       WHERE ei.match_method = 'afltables_profile_url'
+         AND ei.status IN ('unique', 'resolved')
+         AND ei.external_id = 'players/B/Bob_Skilton.html'
     `;
     expect(row.votes).toBe(180);
     expect(row.medals).toBe(3);
@@ -439,19 +471,22 @@ describe('advanced search regression cases', () => {
       SELECT count(*)::int AS n FROM player_career_stats
        WHERE games BETWEEN 200 AND 249 AND finals >= 16
     `;
-    expect(row.n).toBe(115);
+    // AFLDB-ISSUE-136: 115 → 114 — Charlie Cameron is one canonical player with
+    // 254 games / 27 finals once his renumbered AFL Tables profile was folded, so
+    // he has left the 200-249 band.
+    expect(row.n).toBe(114);
   });
 
-  // AFLDB-ISSUE-108: skipped — with no canonical career-Brownlow acquisition,
-  // player_career_stats.brownlow_votes is 0 for almost every player, so this cohort
-  // no longer isolates anything. Re-enable with the legacy-free Brownlow path.
-  it.skip('50-199 goals and no Brownlow votes', async () => {
+  // AFLDB-ISSUE-108: skipped while no canonical career-Brownlow acquisition existed.
+  // AFLDB-ISSUE-113 restored the acquisition and re-measured the cohort on the
+  // canonically rebuilt afldb_test (§8.17.3): 261, not the legacy 269 (career goals
+  // are now fitzRoy-sourced) and not the 750 the per-game derivation produced.
+  it('50-199 goals and no Brownlow votes', async () => {
     const [row] = await sql<{ n: number }[]>`
       SELECT count(*)::int AS n FROM player_career_stats
        WHERE goals BETWEEN 50 AND 199 AND brownlow_votes = 0
     `;
-    // 269, not the 750 the legacy per-game derivation produced.
-    expect(row.n).toBe(269);
+    expect(row.n).toBe(261);
   });
 
   it('200+ games, 100+ goals and 15+ finals', async () => {
@@ -482,5 +517,279 @@ describe('query performance', () => {
        ORDER BY m.match_date DESC LIMIT 50
     `;
     expect(Date.now() - started).toBeLessThan(200);
+  });
+});
+
+/**
+ * AFLDB-ISSUE-129 §11 T9 and T10 — the player-career and ladder halves of the
+ * §8.4 decision, over a reserved fixture season.
+ *
+ * T9: a player whose only appearance is a Wildcard Final has played one game
+ * and NO finals, because `player_career_stats.finals` counts
+ * `matches.is_finals_series`. T10: the Wildcard Final moves no ladder figure —
+ * no premiership points, no played/win/loss, no score — and never appears in
+ * the round ladder, which reads `round_type = 'home_and_away'`.
+ */
+describe('AFLDB-ISSUE-129 wildcard finals semantics (player career and ladder)', () => {
+  let fixture: WildcardFixture;
+
+  beforeAll(async () => {
+    fixture = await seedWildcardFinalSeason(2096);
+  });
+
+  afterAll(async () => {
+    await fixture?.cleanup();
+  });
+
+  it('T9: a wildcard-only player has games = 1 and finals = 0', async () => {
+    const [row] = await sql<{ games: number; finals: number }[]>`
+      SELECT games, finals FROM player_career_stats WHERE player_id = ${fixture.wildcardOnlyPlayerId}
+    `;
+    expect(row.games).toBe(1);
+    expect(row.finals).toBe(0);
+  });
+
+  it('T9: an elimination-final player is still counted as a finals game', async () => {
+    const [row] = await sql<{ games: number; finals: number }[]>`
+      SELECT games, finals FROM player_career_stats WHERE player_id = ${fixture.finalsSeriesPlayerId}
+    `;
+    expect(row.games).toBe(1);
+    expect(row.finals).toBe(1);
+  });
+
+  it('T9: db-health finals parity reports 0 mismatches with the fixture present', async () => {
+    const checks = await reconcileCareerTotals();
+    const finals = checks.find((check) => check.check.startsWith('finals:'));
+    expect(finals).toBeDefined();
+    expect(finals!.mismatches).toBe(0);
+  });
+
+  it('T10: the Wildcard Final contributes nothing to club_seasons', async () => {
+    const rows = await sql<{
+      clubId: number; played: number; wins: number; losses: number;
+      pointsFor: number; pointsAgainst: number; premiershipPoints: number;
+    }[]>`
+      SELECT club_id AS "clubId", played, wins, losses,
+             points_for AS "pointsFor", points_against AS "pointsAgainst",
+             premiership_points AS "premiershipPoints"
+        FROM club_seasons WHERE season = ${fixture.season} ORDER BY club_id
+    `;
+    // Four clubs, one home-and-away match each: the two finals are invisible here.
+    expect(rows).toHaveLength(4);
+    for (const row of rows) expect(row.played).toBe(1);
+
+    const loser = rows.find((row) => row.clubId === fixture.wildcardLoserClubId)!;
+    // Lost the home-and-away match 80-100 and lost the Wildcard Final 93-96.
+    // Only the first is on the ladder.
+    expect(loser.wins).toBe(0);
+    expect(loser.losses).toBe(1);
+    expect(loser.pointsFor).toBe(80);
+    expect(loser.pointsAgainst).toBe(100);
+    expect(loser.premiershipPoints).toBe(0);
+
+    const winner = rows.find((row) => row.clubId === fixture.wildcardWinnerClubId)!;
+    // Won the home-and-away match 100-80 and two finals; still 1 win, 4 points.
+    expect(winner.wins).toBe(1);
+    expect(winner.pointsFor).toBe(100);
+    expect(winner.pointsAgainst).toBe(80);
+    expect(winner.premiershipPoints).toBe(4);
+  });
+
+  it('T10: the Wildcard Final does not appear in the round ladder', async () => {
+    const ladder = await getSeasonRoundLadder(fixture.season);
+    expect(ladder.length).toBeGreaterThan(0);
+    // Round 1 only: the WF and EF carry no round_number and no ladder row.
+    expect([...new Set(ladder.map((row) => row.roundNumber))]).toEqual([1]);
+    for (const row of ladder) {
+      expect(row.played).toBe(1);
+      expect(row.premiershipPoints).toBe(row.wins * 4 + row.draws * 2);
+    }
+  });
+
+  /**
+   * T16, the half a fixture can prove. `validate_ladder_witness.py --compare`
+   * asks AFLDB which seasons contain a `wildcard_final` and declares exactly
+   * those UNCOMPARABLE, because fitzRoy labels a WF row `Round.Type='Regular'`
+   * and counts it on the ladder while AFLDB does not (ISSUE-129 §8.4 item 10).
+   * The exclusion is driven by this query, so a wildcard season can never be
+   * silently passed — and a season without one is never excluded.
+   */
+  it('T16: the ladder witness wildcard-season query names the fixture season', async () => {
+    const rows = await sql<{ season: number }[]>`
+      SELECT DISTINCT season FROM matches
+       WHERE round_type = 'wildcard_final'
+       ORDER BY season
+    `;
+    const seasons = rows.map((row) => row.season);
+    expect(seasons).toContain(fixture.season);
+    // Nothing historical is dragged into the exclusion.
+    expect(seasons.filter((season) => season < 2026)).toEqual([]);
+  });
+
+  it('T10: the wildcard match is is_final but not is_finals_series', async () => {
+    const [row] = await sql<{ isFinal: boolean; isFinalsSeries: boolean; roundNumber: number | null }[]>`
+      SELECT is_final AS "isFinal", is_finals_series AS "isFinalsSeries",
+             round_number AS "roundNumber"
+        FROM matches WHERE id = ${fixture.wildcardMatchId}
+    `;
+    expect(row.isFinal).toBe(true);
+    expect(row.isFinalsSeries).toBe(false);
+    expect(row.roundNumber).toBeNull();
+  });
+});
+
+/**
+ * AFLDB-ISSUE-132 — the query surfaces the public season, match-search,
+ * site-search, player and admin pages actually call. ISSUE-129 above pins the
+ * derived aggregates; this pins what each page renders from a `wildcard_final`
+ * row: visible, labelled "Wildcard Final" / "WF", ordered between the last
+ * home-and-away round and the finals series, and on the excluded side of every
+ * finals-only filter. Fixture season 2087 (2096 belongs to ISSUE-129 above).
+ */
+describe('AFLDB-ISSUE-132 wildcard final visibility (public and admin query surfaces)', () => {
+  let fixture: WildcardFixture;
+
+  beforeAll(async () => {
+    fixture = await seedWildcardFinalSeason(2087);
+  });
+
+  afterAll(async () => {
+    await fixture?.cleanup();
+  });
+
+  it('T1: getSeasonMatches orders H&A → WF → finals and groups like the season page', async () => {
+    const rows = await getSeasonMatches(fixture.season);
+    expect(rows.map((row) => row.roundType)).toEqual([
+      'home_and_away', 'home_and_away', 'wildcard_final', 'elimination_final',
+    ]);
+
+    // Exactly the grouping src/app/seasons/[year]/page.tsx performs: keyed by
+    // formatRound() in first-seen (chronological) order, anchor id derived from
+    // the label.
+    const groups = new Map<string, typeof rows>();
+    for (const row of rows) {
+      const key = formatRound(row.roundType, row.roundNumber);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(row);
+    }
+    const labels = [...groups.keys()];
+    expect(labels).toEqual(['Round 1', 'Wildcard Final', 'Elimination Final']);
+    expect(labels.map((label) => label.toLowerCase().replace(/\s+/g, '-')))
+      .toEqual(['round-1', 'wildcard-final', 'elimination-final']);
+
+    const wildcardGroup = groups.get('Wildcard Final')!;
+    expect(wildcardGroup).toHaveLength(1);
+    expect(wildcardGroup[0].id).toBe(fixture.wildcardMatchId);
+    expect(wildcardGroup[0].roundNumber).toBeNull();
+
+    // The WF sits strictly after the last home-and-away match and strictly
+    // before the first finals-series match.
+    const lastHomeAndAway = rows[1].matchDate.getTime();
+    const wildcard = rows[2].matchDate.getTime();
+    const firstFinal = rows[3].matchDate.getTime();
+    expect(wildcard).toBeGreaterThan(lastHomeAndAway);
+    expect(wildcard).toBeLessThan(firstFinal);
+  });
+
+  it('T2: runMatchSearch match types put the WF on the right side of every filter', async () => {
+    const search = (matchType: MatchType) => runMatchSearch({
+      filters: [{ field: 'season', min: fixture.season, max: fixture.season }],
+      clubSlugs: [],
+      outcome: 'all',
+      matchType,
+      sort: 'date_asc',
+      page: 1,
+      pageSize: 50,
+    });
+
+    const all = await search('all');
+    expect(all.total).toBe(4);
+    expect(all.rows.map((row) => row.roundType)).toEqual([
+      'home_and_away', 'home_and_away', 'wildcard_final', 'elimination_final',
+    ]);
+
+    const homeAndAway = await search('home_and_away');
+    expect(homeAndAway.total).toBe(2);
+    expect(homeAndAway.rows.every((row) => row.roundType === 'home_and_away')).toBe(true);
+    expect(homeAndAway.rows.map((row) => row.id)).not.toContain(fixture.wildcardMatchId);
+
+    const finals = await search('finals');
+    expect(finals.total).toBe(1);
+    expect(finals.rows.map((row) => row.id)).toEqual([fixture.eliminationMatchId]);
+
+    const wildcard = await search('wildcard_final');
+    expect(wildcard.total).toBe(1);
+    expect(wildcard.rows.map((row) => row.id)).toEqual([fixture.wildcardMatchId]);
+    expect(wildcard.rows[0].roundType).toBe('wildcard_final');
+  });
+
+  it('T3: searchRounds returns the anchor the season page emits for the WF', async () => {
+    const expectedSlug = `${fixture.season}#wildcard-final`;
+    // The page's anchor for the WF group, derived exactly as in T1.
+    const pageAnchor = formatRound('wildcard_final', null).toLowerCase().replace(/\s+/g, '-');
+    expect(expectedSlug).toBe(`${fixture.season}#${pageAnchor}`);
+
+    const yearFirst = await searchRounds(`${fixture.season} wildcard final`);
+    expect(yearFirst).toHaveLength(1);
+    expect(yearFirst[0]).toMatchObject({
+      type: 'round',
+      id: fixture.season,
+      slug: expectedSlug,
+      title: `Wildcard Final, ${fixture.season}`,
+      subtitle: null,
+    });
+
+    const yearLast = await searchRounds(`wildcard final ${fixture.season}`);
+    expect(yearLast).toEqual(yearFirst);
+
+    // A numbered round stays home_and_away only: the WF never leaks into it.
+    const roundOne = await searchRounds(`round 1 ${fixture.season}`);
+    expect(roundOne).toHaveLength(1);
+    expect(roundOne[0]).toMatchObject({
+      type: 'round',
+      slug: `${fixture.season}#round-1`,
+      title: `Round 1, ${fixture.season}`,
+      subtitle: '2 matches',
+    });
+  });
+
+  it('T4: getPlayerMatches shows the WF row, labelled WF, for the wildcard-only player', async () => {
+    const { rows, total } = await getPlayerMatches(fixture.wildcardOnlyPlayerId, {
+      limit: 20, offset: 0,
+    });
+    expect(total).toBe(1);
+    expect(rows).toHaveLength(1);
+    const [row] = rows;
+    expect(row.matchId).toBe(fixture.wildcardMatchId);
+    expect(row.season).toBe(fixture.season);
+    expect(row.roundType).toBe('wildcard_final');
+    expect(row.roundNumber).toBeNull();
+    expect(formatRoundShort(row.roundType, row.roundNumber)).toBe('WF');
+    expect(formatRound(row.roundType, row.roundNumber)).toBe('Wildcard Final');
+    // On the winning side of the WF; no Brownlow votes exist for it.
+    expect(row.outcome).toBe('W');
+    expect(row.brownlowVotes).toBeNull();
+  });
+
+  it('T5: searchAdminMatches lists the WF for the season and drops it under a round-number filter', async () => {
+    const season = await searchAdminMatches({ season: fixture.season });
+    expect(season.total).toBe(4);
+    expect(season.rows).toHaveLength(4);
+    const wildcard = season.rows.find((row) => row.id === fixture.wildcardMatchId);
+    expect(wildcard).toBeDefined();
+    expect(wildcard!.roundType).toBe('wildcard_final');
+    expect(wildcard!.roundCode).toBe('WF');
+    expect(wildcard!.roundNumber).toBeNull();
+    expect(wildcard!.playerCount).toBe(1);
+
+    // Newest first: EF, WF, then the two home-and-away matches.
+    expect(season.rows.map((row) => row.roundType)).toEqual([
+      'elimination_final', 'wildcard_final', 'home_and_away', 'home_and_away',
+    ]);
+
+    const roundOne = await searchAdminMatches({ season: fixture.season, roundNumber: 1 });
+    expect(roundOne.total).toBe(2);
+    expect(roundOne.rows.every((row) => row.roundNumber === 1)).toBe(true);
+    expect(roundOne.rows.map((row) => row.id)).not.toContain(fixture.wildcardMatchId);
   });
 });

@@ -143,6 +143,23 @@ For an in-progress season every derived figure is provisional: no premier, no wo
 
 **Grand Final replays.** 1948, 1977 and 2010 each have two Grand Final rows. Joining on `round_type` alone returns both, duplicating the season and leaving one copy with a null premier. Premier queries select the decisive, non-drawn match.
 
+### 4.8 The Wildcard Round, and the two finals questions
+
+From 2026 the AFL plays a **Wildcard Round** between the home-and-away season and the finals series: the clubs seeded 7–10 play off for finals places 7 and 8. AFL Tables publishes it as round code `WF` (and, at the player grain, `Wildcard Final`). AFLDB stores it as its own `round_type`, `wildcard_final`; it is never collapsed into an existing finals type.
+
+It is the first round in AFL history where two questions that used to share one answer come apart, so `matches` carries **two** flags and they are not interchangeable:
+
+| Column | Question it answers | Wildcard Final |
+|---|---|---|
+| `is_final` | is this outside the home-and-away premiership-points season? | **true** |
+| `is_finals_series` | is this part of the traditional finals series? | **false** |
+
+`is_final` stays CHECK-derived as `round_type <> 'home_and_away'` and is the right filter for premiership points, the ladder, and Brownlow eligibility — a Wildcard Final earns no points, does not move the ladder and is not polled. `is_finals_series` is a generated column and is the **single** definition of finals-series membership: every "made finals", "finals appearances", "played in finals", "won a final" answer — career and season aggregates, `club_seasons.finals_played`, finals-only search filters, natural-language *finals* questions and Grid Solver finals criteria — reads it, and no call site re-spells the predicate.
+
+The decisive consequence: a club seeded 9th that loses its Wildcard Final and never reaches the eight has `finals_played = 0` and answers *missed the finals*. This is AFLDB's position from 2026 onward (`AFLDB-ISSUE-129`).
+
+One asymmetry is deliberate and documented at `tools/rebuild/fitzroy/validate_ladder_witness.py`: fitzRoy labels a `WF` row `Round.Type = "Regular"` and folds it into its own ladder, so for any season containing a Wildcard Round the ISSUE-095 ladder witness and `club_seasons` compute different quantities. Those seasons are declared explicitly uncomparable by name rather than the check being loosened.
+
 ## 5. Application structure
 
 ```text

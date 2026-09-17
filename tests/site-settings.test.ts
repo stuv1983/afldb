@@ -9,6 +9,10 @@ import { describe, expect, it } from 'vitest';
 
 import { DEFAULT_SITE_FOOTER } from '@/lib/site-content';
 import {
+  HOME_RECORD_CATALOGUE,
+  homeRecordOptionGroups,
+} from '@/lib/home-records';
+import {
   DEFAULT_AFL_PLACEHOLDERS,
   DEFAULT_AFLW_PLACEHOLDERS,
   DEFAULT_EARLY_ACCESS_INTRO,
@@ -20,6 +24,7 @@ import {
   DEFAULT_PAGE_INTROS,
   DEFAULT_PLACEHOLDER_INTERVAL,
   DEFAULT_SEARCH_ANIMATION,
+  DEFAULT_SITE_LAYOUT,
   DEFAULT_SITE_THEME,
   EARLY_ACCESS_LIMITS,
   HOME_SECTIONS,
@@ -34,6 +39,7 @@ import {
   parsePlaceholderInterval,
   parsePlaceholders,
   parseSearchAnimation,
+  parseSiteLayout,
   parseSiteSettings,
   visibleHomeSections,
   type HomeSectionId,
@@ -100,9 +106,25 @@ describe('homeSectionRows', () => {
 });
 
 describe('single-value settings', () => {
-  it('rejects a record category the career leaderboard cannot answer', () => {
-    expect(parseHomeRecord('most-goals-in-a-game')).toBe(DEFAULT_HOME_RECORD);
-    expect(parseHomeRecord('most-games')).toBe('most-games');
+  it('accepts every legacy record value and representative expanded domains', () => {
+    for (const value of [
+      'most-goals', 'most-games', 'most-finals', 'most-premierships',
+      'most-brownlow-votes',
+    ]) {
+      expect(parseHomeRecord(value)).toBe(value);
+    }
+    expect(parseHomeRecord('most-goals-in-a-game')).toBe('most-goals-in-a-game');
+    expect(parseHomeRecord('coach-most-wins')).toBe('coach-most-wins');
+    expect(parseHomeRecord('venue-most-finals')).toBe('venue-most-finals');
+    expect(parseHomeRecord('after-siren-most-goals')).toBe('after-siren-most-goals');
+    expect(parseHomeRecord('first-kick-most-consecutive-goals'))
+      .toBe('first-kick-most-consecutive-goals');
+  });
+
+  it('falls back safely for stale and malformed record values', () => {
+    for (const value of ['most-marks', 'constructor', '', null, 42, {}]) {
+      expect(parseHomeRecord(value)).toBe(DEFAULT_HOME_RECORD);
+    }
   });
 
   it('falls back to super admins when the audience is unrecognised', () => {
@@ -117,6 +139,44 @@ describe('single-value settings', () => {
   it('accepts the AFLW leader categories and nothing else', () => {
     expect(parseAflwLeaders('tackles')).toBe('tackles');
     expect(parseAflwLeaders('metres_gained')).toBe('goals');
+  });
+});
+
+describe('home record catalogue', () => {
+  it('has unique stable values and a complete provider/render contract', () => {
+    const values = HOME_RECORD_CATALOGUE.map((entry) => entry.value);
+    expect(new Set(values).size).toBe(values.length);
+
+    for (const entry of HOME_RECORD_CATALOGUE) {
+      expect(entry.adminLabel).toBeTruthy();
+      expect(entry.publicTitle).toBeTruthy();
+      expect(entry.definition).toBeTruthy();
+      expect(entry.unit).toBeTruthy();
+      expect(entry.provider.kind).toBeTruthy();
+      expect(entry.renderKind).toBeTruthy();
+      const expectedRender = {
+        career: 'player-total',
+        match: 'player-match',
+        season: 'player-season',
+        coach: 'coach-total',
+        venue: 'venue-total',
+        'after-siren': 'special-player-total',
+        'first-kick': 'special-player-total',
+      } as const;
+      expect(entry.renderKind).toBe(expectedRender[entry.provider.kind]);
+    }
+  });
+
+  it('builds manageable admin groups with representative expanded options', () => {
+    const groups = homeRecordOptionGroups();
+    expect(groups.map((group) => group.label)).toEqual([
+      'Players — Career', 'Players — Match', 'Players — Season',
+      'Coaches', 'Venues', 'Special records',
+    ]);
+    expect(groups.find((group) => group.id === 'coaches')?.options)
+      .toContainEqual({ value: 'coach-most-wins', label: 'Most Wins Coached' });
+    expect(groups.find((group) => group.id === 'venues')?.options)
+      .toContainEqual({ value: 'venue-most-finals', label: 'Most Finals Hosted' });
   });
 });
 
@@ -139,6 +199,7 @@ describe('parseSiteSettings', () => {
       searchPlaceholderAnimation: DEFAULT_SEARCH_ANIMATION,
       pageIntros: DEFAULT_PAGE_INTROS,
       frontendTheme: DEFAULT_SITE_THEME,
+      frontendLayout: DEFAULT_SITE_LAYOUT,
     });
   });
 
@@ -179,6 +240,49 @@ describe('parseSiteSettings', () => {
     expect(settings.gridAudience).toBe('admin');
     expect(settings.homeRecord).toBe('most-premierships');
     expect(settings.homeLayout).toEqual(DEFAULT_HOME_LAYOUT);
+  });
+
+  it('keeps the frontend theme and the frontend layout as independent settings', () => {
+    // AFLDB-ISSUE-173: a layout preset is a separate axis from the colour/
+    // typography theme, stored under a separate key, and neither read
+    // depends on the other.
+    const both = parseSiteSettings([
+      { key: SETTING_KEYS.frontendTheme, value: 'modern' },
+      { key: SETTING_KEYS.frontendLayout, value: 'sidebar' },
+    ]);
+    expect(both.frontendTheme).toBe('modern');
+    expect(both.frontendLayout).toBe('sidebar');
+
+    // Setting one must not move the other off its own default.
+    const themeOnly = parseSiteSettings([
+      { key: SETTING_KEYS.frontendTheme, value: 'editorial' },
+    ]);
+    expect(themeOnly.frontendTheme).toBe('editorial');
+    expect(themeOnly.frontendLayout).toBe(DEFAULT_SITE_LAYOUT);
+
+    const layoutOnly = parseSiteSettings([
+      { key: SETTING_KEYS.frontendLayout, value: 'sidebar' },
+    ]);
+    expect(layoutOnly.frontendLayout).toBe('sidebar');
+    expect(layoutOnly.frontendTheme).toBe(DEFAULT_SITE_THEME);
+  });
+});
+
+describe('parseSiteLayout', () => {
+  it('accepts every declared layout value', () => {
+    expect(parseSiteLayout('classic')).toBe('classic');
+    expect(parseSiteLayout('sidebar')).toBe('sidebar');
+  });
+
+  it('falls back to classic for a missing or unrecognised value', () => {
+    // The same direction as `parseGridAudience`: a settings row that fails
+    // to parse must not be the thing that restructures the public site.
+    expect(parseSiteLayout(undefined)).toBe(DEFAULT_SITE_LAYOUT);
+    expect(parseSiteLayout(null)).toBe(DEFAULT_SITE_LAYOUT);
+    expect(parseSiteLayout('')).toBe(DEFAULT_SITE_LAYOUT);
+    expect(parseSiteLayout('dashboard')).toBe(DEFAULT_SITE_LAYOUT);
+    expect(parseSiteLayout(42)).toBe(DEFAULT_SITE_LAYOUT);
+    expect(DEFAULT_SITE_LAYOUT).toBe('classic');
   });
 });
 

@@ -7,13 +7,15 @@
  */
 import './guard';
 
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { sql } from '@/db/client';
+import { getClubSeasons } from '@/db/queries/clubs';
 import { answerClubSeason } from '@/db/queries/nl/club-season';
 import { answerTeamMatch } from '@/db/queries/nl/team-match';
 import { answerTeamStreak } from '@/db/queries/nl/team-streak';
 import { validatePlan, type NlQueryPlan } from '@/search/nl/plan';
+import { seedWildcardFinalSeason, type WildcardFixture } from './wildcard-final-fixture';
 import type {
   NlAnswerPayload, NlClubSeasonRow, NlTeamAggregateRow, NlTeamMatchRow, NlTeamStreakRow,
 } from '@/search/nl/answer-types';
@@ -182,6 +184,29 @@ describe('team_match matches hand-written SQL', () => {
     expect(lead!.value).toBe(expected.max);
   });
 
+  it('AFLDB-ISSUE-205: q3_deficit_overcome answers the biggest three-quarter-time deficit the eventual winner overcame', async () => {
+    // Proves the metric's SQL path (team-match.ts's metricValueExpr
+    // 'q3_deficit_overcome' case) is actually reachable now that the
+    // parser-level extraction-order bug is fixed -- this metric had zero
+    // live-answer coverage before AFLDB-ISSUE-205.
+    const { lead } = await teamMatch({ metric: 'q3_deficit_overcome', agg: { kind: 'max' } });
+    expect(lead).not.toBeNull();
+
+    const [expected] = await sql<{ max: number }[]>`
+      SELECT max(
+        CASE
+          WHEN m.winner_club_id = m.home_club_id AND aq.points > hq.points THEN aq.points - hq.points
+          WHEN m.winner_club_id = m.away_club_id AND hq.points > aq.points THEN hq.points - aq.points
+        END
+      )::int AS max
+        FROM matches m
+        JOIN match_period_scores hq ON hq.match_id = m.id AND hq.club_id = m.home_club_id AND hq.period = 3
+        JOIN match_period_scores aq ON aq.match_id = m.id AND aq.club_id = m.away_club_id AND aq.period = 3
+       WHERE m.winner_club_id IS NOT NULL
+    `;
+    expect(lead!.value).toBe(expected.max);
+  });
+
   it('derives half-time margin from cumulative checkpoints', async () => {
     const { lead } = await teamMatch({ metric: 'win_margin', scoreCheckpoint: 'HT', agg: { kind: 'max' } });
     expect(lead).not.toBeNull();
@@ -263,6 +288,95 @@ describe('team_match matches hand-written SQL', () => {
     expect(new Map(actual.rows.map((r) => [r.organizationId, r.value])))
       .toEqual(new Map(expected.map((r) => [r.organizationId, r.value])));
     expect(actual.total).toBe(expected.length);
+  });
+
+  it.each([
+    ['gt', '>'],
+    ['gte', '>='],
+    ['lte', '<='],
+  ] as const)('counts every match in scope for a grouped games threshold (%s)', async (op, sqlOp) => {
+    // AFLDB-ISSUE-110: 'games' is the un-predicated member of the
+    // grouped-threshold family -- no result clause at all -- and it must
+    // still group by organization lineage, exactly as wins/losses do.
+    // Both the threshold and the witness opponent are derived from the data
+    // rather than fixed, so each operator has a genuine non-empty witness.
+    // A fixed `2` only witnesses gt/gte: no two organizations in the corpus
+    // have met as few as twice, so `<= 2` is legitimately empty for every
+    // opponent and would assert nothing about grouping.
+    const [{ smallest }] = await sql<{ smallest: number }[]>`
+      WITH sides AS (
+        SELECT m.home_club_id AS club_id, m.away_club_id AS opponent_id FROM matches m
+        UNION ALL
+        SELECT m.away_club_id, m.home_club_id FROM matches m
+      )
+      SELECT min(games)::int AS smallest FROM (
+        SELECT count(*) AS games
+          FROM sides s
+          JOIN clubs own ON own.id = s.club_id
+          JOIN clubs opp ON opp.id = s.opponent_id
+         GROUP BY opp.organization_id, own.organization_id
+      ) pairs
+    `;
+    // `<=` needs a threshold the sparsest pairing can reach; `>`/`>=` are
+    // satisfied by every pairing at the same value, so one value serves both.
+    const threshold = op === 'lte' ? smallest : 2;
+    const [opponent] = await sql<{ organizationId: number }[]>`
+      WITH sides AS (
+        SELECT m.home_club_id AS club_id, m.away_club_id AS opponent_id FROM matches m
+        UNION ALL
+        SELECT m.away_club_id, m.home_club_id FROM matches m
+      ), pairs AS (
+        SELECT opp.organization_id AS opponent_org, count(*)::int AS games
+          FROM sides s
+          JOIN clubs own ON own.id = s.club_id
+          JOIN clubs opp ON opp.id = s.opponent_id
+         GROUP BY opp.organization_id, own.organization_id
+      )
+      SELECT opponent_org AS "organizationId"
+        FROM pairs
+       WHERE games ${sql.unsafe(sqlOp)} ${threshold}
+       GROUP BY opponent_org
+       ORDER BY count(*) DESC, opponent_org
+       LIMIT 1
+    `;
+    expect(opponent).toBeDefined();
+    const actual = await teamAggregate({
+      havingClause: { metric: 'games', op, value: threshold },
+      scope: { clubAgainst: { organizationId: opponent.organizationId, slug: 'x', name: 'x' } },
+    }, 1000);
+    const expected = await sql<{ organizationId: number; value: number }[]>`
+      WITH sides AS (
+        SELECT m.home_club_id AS club_id, m.away_club_id AS opponent_id FROM matches m
+        UNION ALL
+        SELECT m.away_club_id, m.home_club_id FROM matches m
+      )
+      SELECT own.organization_id AS "organizationId", count(*)::int AS value
+        FROM sides s
+        JOIN clubs own ON own.id = s.club_id
+        JOIN clubs opp ON opp.id = s.opponent_id
+       WHERE opp.organization_id = ${opponent.organizationId}
+       GROUP BY own.organization_id
+      HAVING count(*) ${sql.unsafe(sqlOp)} ${threshold}
+       ORDER BY value DESC, own.organization_id
+    `;
+    expect(new Map(actual.rows.map((r) => [r.organizationId, r.value])))
+      .toEqual(new Map(expected.map((r) => [r.organizationId, r.value])));
+    expect(actual.total).toBe(expected.length);
+    expect(actual.rows.length).toBeGreaterThan(0);
+  });
+
+  it('a grouped games count is not silently read as a draws count', async () => {
+    // The result-clause chain used to end in a bare `else` for draws, so
+    // any metric added beside it would have counted drawn matches.
+    const games = await teamAggregate({ havingClause: { metric: 'games', op: 'gte', value: 1 } });
+    const draws = await teamAggregate({ havingClause: { metric: 'draws', op: 'gte', value: 1 } });
+    const [{ total }] = await sql<{ total: number }[]>`
+      SELECT count(*)::int AS total FROM matches m WHERE m.winner_club_id IS NULL
+    `;
+    const gamesTotal = games.rows.reduce((sum, r) => sum + r.value, 0);
+    const drawsTotal = draws.rows.reduce((sum, r) => sum + r.value, 0);
+    expect(drawsTotal).toBe(total * 2);
+    expect(gamesTotal).toBeGreaterThan(drawsTotal);
   });
 
   it('filters 100-point losses before grouping and applying the requested count threshold', async () => {
@@ -361,6 +475,183 @@ describe('team_match matches hand-written SQL', () => {
       expect(m.margin).toBeGreaterThanOrEqual(sample.margin - 1); // Margin
     }
   });
+
+  describe('AFLDB-ISSUE-192 symmetric metrics rank one row per match', () => {
+    it('unscoped "highest attendance" returns distinct matchIds with total equal to the distinct count', async () => {
+      const { rows, total } = await teamMatch({ metric: 'attendance', agg: { kind: 'top_n', n: 5 } }, 100);
+      expect(rows.length).toBeGreaterThan(0);
+
+      const matchIds = rows.map((r) => r.matchId);
+      expect(new Set(matchIds).size).toBe(matchIds.length);
+      // total (window count()) must equal the number of distinct matches returned,
+      // not double it the way one row per SIDES perspective would.
+      expect(total).toBe(matchIds.length);
+    });
+
+    it('unscoped "highest combined score" (total_score) returns each match once', async () => {
+      const { rows, total } = await teamMatch({ metric: 'total_score', agg: { kind: 'top_n', n: 5 } }, 100);
+      expect(rows.length).toBeGreaterThan(0);
+
+      const matchIds = rows.map((r) => r.matchId);
+      expect(new Set(matchIds).size).toBe(matchIds.length);
+      expect(total).toBe(matchIds.length);
+
+      const [expected] = await sql<{ max: number }[]>`
+        SELECT max(home_score + away_score) AS max FROM matches
+        WHERE home_score IS NOT NULL AND away_score IS NOT NULL
+      `;
+      expect(rows[0].value).toBe(expected.max);
+    });
+
+    it('"top 5" by total_score returns five distinct matches, not three matches in six rows', async () => {
+      const { rows } = await teamMatch({ metric: 'total_score', agg: { kind: 'top_n', n: 5 } }, 100);
+      const matchIds = rows.map((r) => r.matchId);
+      expect(new Set(matchIds).size).toBe(matchIds.length);
+      expect(matchIds.length).toBeGreaterThanOrEqual(5);
+    });
+
+    it('a clubFor-scoped total_score ranking still returns one row per that club\'s match (side-specific scope preserved)', async () => {
+      const [org] = await sql<{ id: number }[]>`SELECT id FROM club_organizations ORDER BY id LIMIT 1`;
+      const { rows } = await teamMatch({
+        metric: 'total_score', agg: { kind: 'top_n', n: 5 },
+        scope: { clubFor: { organizationId: org.id, slug: 'x', name: 'x' } },
+      }, 100);
+      expect(rows.length).toBeGreaterThan(0);
+
+      const matchIds = rows.map((r) => r.matchId);
+      expect(new Set(matchIds).size).toBe(matchIds.length);
+
+      const [expected] = await sql<{ count: string }[]>`
+        SELECT count(*) AS count FROM matches
+        WHERE (home_club_id IN (SELECT id FROM clubs WHERE organization_id = ${org.id})
+               OR away_club_id IN (SELECT id FROM clubs WHERE organization_id = ${org.id}))
+          AND home_score IS NOT NULL AND away_score IS NOT NULL
+      `;
+      expect(Number(expected.count)).toBeGreaterThanOrEqual(matchIds.length);
+    });
+
+    describe('AFLDB-ISSUE-194 matchup-scoped symmetric metrics still rank one row per physical match', () => {
+      async function matchupScope(): Promise<{ clubA: { organizationId: number; slug: string; name: string }; clubB: { organizationId: number; slug: string; name: string } }> {
+        const [adelaide] = await sql<{ id: number }[]>`SELECT id FROM club_organizations WHERE slug = 'adelaide'`;
+        const [brisbaneBears] = await sql<{ id: number }[]>`SELECT id FROM club_organizations WHERE slug = 'brisbane-bears'`;
+        return {
+          clubA: { organizationId: adelaide.id, slug: 'adelaide', name: 'Adelaide' },
+          clubB: { organizationId: brisbaneBears.id, slug: 'brisbane-bears', name: 'Brisbane Bears' },
+        };
+      }
+
+      const matchupFilterSql = (orgIdA: number, orgIdB: number) => sql`
+        ((home_club_id IN (SELECT id FROM clubs WHERE organization_id = ${orgIdA})
+          AND away_club_id IN (SELECT id FROM clubs WHERE organization_id = ${orgIdB}))
+         OR (home_club_id IN (SELECT id FROM clubs WHERE organization_id = ${orgIdB})
+             AND away_club_id IN (SELECT id FROM clubs WHERE organization_id = ${orgIdA})))
+      `;
+
+      // Distinct eligible physical matches, uncapped -- used only to prove the
+      // fixture has more than `n` matches, so the ranking-limit assertions
+      // below actually exercise the cutoff rather than happening to pass
+      // because every eligible match fits under it.
+      async function eligibleMatchCount(orgIdA: number, orgIdB: number, metricColumn: 'attendance' | 'total_score'): Promise<number> {
+        const notNull = metricColumn === 'attendance'
+          ? sql`attendance IS NOT NULL`
+          : sql`home_score IS NOT NULL AND away_score IS NOT NULL`;
+        const [row] = await sql<{ count: string }[]>`
+          SELECT count(*) AS count FROM matches
+           WHERE ${matchupFilterSql(orgIdA, orgIdB)} AND ${notNull}
+        `;
+        return Number(row.count);
+      }
+
+      // Same rank()/rnk<=n/ORDER BY value DESC, matchDate shape the compiler
+      // uses (team-match.ts), applied directly to `matches` since
+      // attendance/total_score are per-match, not per-side, values.
+      async function topNAttendance(orgIdA: number, orgIdB: number, n: number): Promise<{ id: number; value: number }[]> {
+        const rows = await sql<{ id: number; value: number }[]>`
+          WITH scored AS (
+            SELECT id, attendance AS value, match_date,
+                   rank() OVER (ORDER BY attendance DESC) AS rnk
+              FROM matches
+             WHERE ${matchupFilterSql(orgIdA, orgIdB)} AND attendance IS NOT NULL
+          )
+          SELECT id, value FROM scored WHERE rnk <= ${n} ORDER BY value DESC, match_date
+        `;
+        return rows;
+      }
+
+      async function topNTotalScore(orgIdA: number, orgIdB: number, n: number): Promise<{ id: number; value: number }[]> {
+        const rows = await sql<{ id: number; value: number }[]>`
+          WITH scored AS (
+            SELECT id, (home_score + away_score) AS value, match_date,
+                   rank() OVER (ORDER BY (home_score + away_score) DESC) AS rnk
+              FROM matches
+             WHERE ${matchupFilterSql(orgIdA, orgIdB)} AND home_score IS NOT NULL AND away_score IS NOT NULL
+          )
+          SELECT id, value FROM scored WHERE rnk <= ${n} ORDER BY value DESC, match_date
+        `;
+        return rows;
+      }
+
+      it('matchup-scoped "biggest crowd" (attendance) returns the top-5 physical matches, not doubled perspective rows', async () => {
+        const matchup = await matchupScope();
+        const eligible = await eligibleMatchCount(matchup.clubA.organizationId, matchup.clubB.organizationId, 'attendance');
+        expect(eligible).toBeGreaterThan(5); // otherwise this test can't exercise the ranking limit
+
+        const { rows, total } = await teamMatch({
+          metric: 'attendance', agg: { kind: 'top_n', n: 5 },
+          scope: { matchup },
+        }, 100);
+
+        const matchIds = rows.map((r) => r.matchId);
+        expect(new Set(matchIds).size).toBe(matchIds.length); // no physical match appears twice
+        expect(total).toBe(matchIds.length); // total = ranked row count (post rnk<=n), not the full 9-match history
+
+        const expected = await topNAttendance(matchup.clubA.organizationId, matchup.clubB.organizationId, 5);
+        expect(matchIds).toEqual(expected.map((r) => r.id));
+        expect(rows.map((r) => r.value)).toEqual(expected.map((r) => r.value));
+      });
+
+      it('matchup-scoped "highest combined score" (total_score) returns the top-5 physical matches, not doubled perspective rows', async () => {
+        const matchup = await matchupScope();
+        const eligible = await eligibleMatchCount(matchup.clubA.organizationId, matchup.clubB.organizationId, 'total_score');
+        expect(eligible).toBeGreaterThan(5);
+
+        const { rows, total } = await teamMatch({
+          metric: 'total_score', agg: { kind: 'top_n', n: 5 },
+          scope: { matchup },
+        }, 100);
+
+        const matchIds = rows.map((r) => r.matchId);
+        expect(new Set(matchIds).size).toBe(matchIds.length);
+        expect(total).toBe(matchIds.length);
+
+        const expected = await topNTotalScore(matchup.clubA.organizationId, matchup.clubB.organizationId, 5);
+        expect(matchIds).toEqual(expected.map((r) => r.id));
+        expect(rows.map((r) => r.value)).toEqual(expected.map((r) => r.value));
+
+        // Ranking correctness: value strictly non-increasing across returned rows.
+        for (let i = 1; i < rows.length; i++) {
+          expect(rows[i].value).toBeLessThanOrEqual(rows[i - 1].value);
+        }
+      });
+
+      it('matchup scope cannot coexist with clubFor/clubAgainst (validatePlan rejects it, confirming matchup and side scope are mutually exclusive)', async () => {
+        const matchup = await matchupScope();
+        const raw: NlQueryPlan = {
+          v: 1, grain: 'team_match', metric: 'total_score', agg: { kind: 'max' },
+          scope: { matchup, clubFor: matchup.clubA },
+          careerConditions: [], careerPredicates: [], clubSeasonConditions: [],
+          tiePolicy: 'all', limit: 25,
+        };
+        const validated = validatePlan(raw);
+        expect('error' in validated).toBe(true);
+      });
+    });
+
+    it('side-dependent metrics (team_score) are unaffected and keep ranking both sides', async () => {
+      const { rows } = await teamMatch({ metric: 'team_score', agg: { kind: 'top_n', n: 5 } }, 100);
+      expect(rows.length).toBeGreaterThanOrEqual(5);
+    });
+  });
 });
 
 describe('club_season matches hand-written SQL', () => {
@@ -456,5 +747,80 @@ describe('team_streak matches chronological truth', () => {
     expect(lead).not.toBeNull();
     expect(lead!.clubId).toBe(org.id);
     expect(lead!.streakLength).toBe(longest);
+  });
+});
+
+/**
+ * AFLDB-ISSUE-129 §11 T8 — the core of the §8.4 decision at the club-season
+ * grain. A Wildcard Final is `is_final = true` and `is_finals_series = false`,
+ * so losing one is not "making the finals": the 9th-placed club that loses the
+ * Wildcard Round and goes home must read exactly like a club that missed the
+ * eight, and the club that wins it and then plays an Elimination Final must
+ * count that ONE final, not two.
+ */
+describe('AFLDB-ISSUE-129 wildcard finals semantics (club_season)', () => {
+  let fixture: WildcardFixture;
+
+  beforeAll(async () => {
+    fixture = await seedWildcardFinalSeason(2095);
+  });
+
+  afterAll(async () => {
+    await fixture?.cleanup();
+  });
+
+  it('a club that loses a Wildcard Final and plays no other final has finals_played = 0', async () => {
+    const [row] = await sql<{ finalsPlayed: number; played: number }[]>`
+      SELECT finals_played AS "finalsPlayed", played
+        FROM club_seasons
+       WHERE season = ${fixture.season} AND club_id = ${fixture.wildcardLoserClubId}
+    `;
+    expect(row.finalsPlayed).toBe(0);
+    // And the Wildcard Final contributed nothing to the home-and-away record.
+    expect(row.played).toBe(1);
+  });
+
+  it('that club answers "missed finals", and never "made finals"', async () => {
+    const seasonScope = { seasonMin: fixture.season, seasonMax: fixture.season };
+    const missed = await clubSeason({
+      clubSeasonConditions: [{ kind: 'missed_finals' }], scope: seasonScope,
+    }, 100);
+    const made = await clubSeason({
+      clubSeasonConditions: [{ kind: 'made_finals' }], scope: seasonScope,
+    }, 100);
+
+    expect(missed.rows.map((row) => row.clubId).sort()).toEqual(
+      [fixture.wildcardLoserClubId, fixture.homeAndAwayOnlyClubId].sort(),
+    );
+    expect(made.rows.map((row) => row.clubId).sort()).toEqual(
+      [fixture.wildcardWinnerClubId, fixture.eliminationLoserClubId].sort(),
+    );
+  });
+
+  it('shows 0 finals appearances on the club page for the wildcard loser', async () => {
+    const rows = await getClubSeasons(fixture.wildcardLoserClubId, 'era');
+    const row = rows.find((entry) => entry.season === fixture.season);
+    expect(row).toBeDefined();
+    expect(row!.finalsPlayed).toBe(0);
+  });
+
+  it('counts the wildcard winner\'s Elimination Final ONCE, not twice', async () => {
+    const [row] = await sql<{ finalsPlayed: number }[]>`
+      SELECT finals_played AS "finalsPlayed"
+        FROM club_seasons
+       WHERE season = ${fixture.season} AND club_id = ${fixture.wildcardWinnerClubId}
+    `;
+    expect(row.finalsPlayed).toBe(1);
+
+    // The club played two is_final matches; exactly one of them is the series.
+    const [counts] = await sql<{ isFinal: string; isSeries: string }[]>`
+      SELECT count(*) FILTER (WHERE is_final)         AS "isFinal",
+             count(*) FILTER (WHERE is_finals_series) AS "isSeries"
+        FROM matches
+       WHERE season = ${fixture.season}
+         AND ${fixture.wildcardWinnerClubId} IN (home_club_id, away_club_id)
+    `;
+    expect(Number(counts.isFinal)).toBe(2);
+    expect(Number(counts.isSeries)).toBe(1);
   });
 });

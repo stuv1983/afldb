@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
@@ -22,6 +22,64 @@ describe('admin match mutation source contracts', () => {
     }
     expect(playerDerived).toContain('FROM brownlow_season_votes');
     expect(playerDerived).not.toMatch(/(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+brownlow_season_votes/i);
+  });
+
+  // AFLDB-ISSUE-155 §27.15: the match sheet stopped being a Brownlow writer in
+  // Phase C1. The column must not appear in the upsert at all — a stale editor
+  // posting the mirror back would otherwise overwrite the canonical fact, and
+  // the finals/stat_availability gates that existed only to guard that write
+  // went with it.
+  it('never writes player_match_stats.brownlow_votes from the match sheet', () => {
+    expect(matchSheet).not.toMatch(/brownlow_votes\s*=/i);
+    expect(matchSheet).not.toContain('p.brownlowVotes');
+    expect(matchSheet).not.toContain('brownlow_match_votes');
+    expect(matchSheet).not.toContain('Brownlow votes cannot be recorded for finals');
+  });
+
+  // §27.27 C1 source contract. The settle applier is the one other permitted
+  // writer (§27.11: ownership-gated, and it refuses a manual-owned row); every
+  // other application write of a Brownlow fact must go through the Phase C
+  // transactions so the audit, revision CAS and provenance cannot be bypassed.
+  it('keeps Brownlow fact writes to the canonical writer and the settle applier', () => {
+    const writers = new Set<string>();
+    const walk = (dir: string) => {
+      for (const entry of readdirSync(join(process.cwd(), dir), { withFileTypes: true })) {
+        const rel = `${dir}/${entry.name}`;
+        if (entry.isDirectory()) walk(rel);
+        else if (/\.tsx?$/.test(entry.name)) {
+          const text = readFileSync(join(process.cwd(), rel), 'utf8');
+          if (/(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+brownlow_(?:round_votes|season_votes|vote_entry_state|season_authority)\b/i.test(text)) {
+            writers.add(rel);
+          }
+        }
+      }
+    };
+    walk('src');
+
+    expect([...writers].sort()).toEqual([
+      'src/db/queries/admin-brownlow.ts',
+      'src/lib/acquisition/canonical-apply.ts',
+    ]);
+  });
+
+  // AFLDB-ISSUE-129 §8.4 item 9: a super admin may select wildcard_final wherever
+  // an explicit round_type is already selectable, and it is never inferred. All
+  // three admin surfaces have to agree, or an operator can never repair a
+  // Wildcard Final through the data editor.
+  it('lets admin tooling select wildcard_final explicitly on every surface', () => {
+    const createForm = source('src', 'app', 'admin', 'data-editor', 'CreateMatchForm.tsx');
+    const actions = source('src', 'app', 'admin', 'data-editor', 'actions.ts');
+
+    expect(createForm).toContain('<option value="wildcard_final">Wildcard Final</option>');
+    // The server action's allow-list is the real gate; the form alone proves nothing.
+    expect(actions).toMatch(/roundTypes = \[[^\]]*'wildcard_final'/s);
+    expect(matchAdmin).toMatch(/roundType: [^;]*'wildcard_final'/);
+    // A non-home-and-away round derives its code from the type, so an omitted
+    // round_code must become 'WF' rather than the generic 'Final' default.
+    expect(matchAdmin).toContain("case 'wildcard_final': roundCode = 'WF'; break;");
+    // round_number stays NULL: isFinal is derived from round_type, and
+    // matches_round_number_ck forbids a number on anything but home-and-away.
+    expect(matchAdmin).toContain("const isFinal = input.roundType !== 'home_and_away';");
   });
 
   it('keeps prepared tagged queries to one SQL command', () => {
@@ -154,5 +212,51 @@ describe('admin match mutation source contracts', () => {
     expect(dataEdits).toContain('recomputeSeasonBrownlowStatus(tx, match.season)');
     expect(dataEdits.indexOf('recomputeSeasonMetadata(tx, match.season)'))
       .toBeLessThan(dataEdits.indexOf('recomputePlayerDerivedStats(tx, affectedIds, match.season)'));
+  });
+
+  // AFLDB-ISSUE-167 §8.3, the THIRD destruction path — the one outside both
+  // importers, which no reload-survival mechanism covered.
+  //
+  // Until Stage 6, deleting a match ran `DELETE FROM player_achievements WHERE
+  // match_id = $1` and silently destroyed a curated first-kick-goal record: a
+  // Phase E fact with its own durable `data_overrides` decision and its own
+  // audit trail, gone as collateral, with the override left naming nothing.
+  // `after_siren_kicks.match_id` was not deleted there at all — migration 089
+  // declares it `REFERENCES matches(id)` with no ON DELETE clause, so the
+  // default NO ACTION turned the same delete into a raw foreign-key violation,
+  // which is not control flow a Data Editor user can act on.
+  it('refuses to delete a match carrying a curated special record (AFLDB-ISSUE-167)', () => {
+    // Read as CODE, not prose: the refusal's own comment quotes the statement
+    // it replaced, and a comment must never be what satisfies or defeats this.
+    const code = matchAdmin
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/^[ 	]*\/\/.*$/gm, '');
+    // Neither table may be deleted from here, ever again.
+    expect(code).not.toMatch(/DELETE\s+FROM\s+player_achievements/i);
+    expect(code).not.toMatch(/DELETE\s+FROM\s+after_siren_kicks/i);
+
+    // Both families are inspected, and both by match_id.
+    expect(matchAdmin).toContain('player_achievements WHERE match_id');
+    expect(matchAdmin).toContain('after_siren_kicks WHERE match_id');
+
+    // The refusal is actionable in the shape §8.3 asks for: it says the match
+    // cannot be deleted, names the records, and says where to go instead.
+    expect(matchAdmin).toContain('cannot be deleted');
+    expect(matchAdmin).toContain('Suppress or reassign');
+    expect(matchAdmin).toContain('/admin/records/');
+  });
+
+  it('makes that refusal before anything destructive runs', () => {
+    // The same discipline the Brownlow refusal already follows: refuse first,
+    // rather than raise a foreign-key violation part-way through a delete.
+    const collateral = matchAdmin.indexOf('const collateral = await tx');
+    const firstDestruction = matchAdmin.search(
+      /clearPlayerClubMatchReferences\(tx|DELETE\s+FROM\s+player_match_stats/i,
+    );
+    expect(collateral).toBeGreaterThan(-1);
+    expect(firstDestruction).toBeGreaterThan(-1);
+    expect(collateral).toBeLessThan(firstDestruction);
+    // And it stays beside the Brownlow refusal it is modelled on.
+    expect(matchAdmin).toContain('carries a Brownlow vote entry');
   });
 });
