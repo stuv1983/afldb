@@ -262,10 +262,23 @@ function ParamInput({
     );
   }
 
-  if (param.kind === 'draftType' || param.kind === 'signingKind' || param.kind === 'matchEvent') {
-    const options = param.kind === 'draftType' ? GRID_DRAFT_TYPES
-      : param.kind === 'signingKind' ? GRID_SIGNING_KINDS
-        : GRID_MATCH_EVENTS;
+  if (param.kind === 'draftType') {
+    // draft_kind values with form labels; a legacy raw-label value in an old
+    // share link is not in the list and shows as "Choose…" until re-picked,
+    // but still compiles (resolveDraftKind in grid-solver.ts).
+    return (
+      <label>
+        {param.label}
+        <select value={value} onChange={(e) => onChange(e.target.value)}>
+          <option value="">Choose…</option>
+          {GRID_DRAFT_TYPES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+      </label>
+    );
+  }
+
+  if (param.kind === 'signingKind' || param.kind === 'matchEvent') {
+    const options = param.kind === 'signingKind' ? GRID_SIGNING_KINDS : GRID_MATCH_EVENTS;
     return (
       <label>
         {param.label}

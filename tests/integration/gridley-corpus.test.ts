@@ -331,8 +331,11 @@ beforeAll(async () => {
              (SELECT count(*) FROM player_relationships WHERE relationship = 'sibling' AND person_a_player_id IS NOT NULL AND person_b_player_id IS NOT NULL) AS "siblings",
              (SELECT count(*) FROM after_siren_kicks WHERE player_id IS NOT NULL) AS "afterSiren"`,
   ]);
-  // A dataset counts as present when at least half of it is usable: afldb_dev
-  // links 5,103 of 6,810 draft picks; a rebuilt afldb_test links 5.
+  // A dataset counts as present when at least half of it is usable. Every
+  // current database links 5 of 6,810 draft picks (the tracked human decisions;
+  // the legacy auto-linker was retired and AFLDB-ISSUE-164 D-9 suspends
+  // unattended draft linking -- AFLDB-ISSUE-221), so the draft builders are a
+  // dataset gap until that population exists.
   gaps = {
     maxSeason: probe.maxSeason,
     draftLinks: Number(probe.draftLinked) * 2 >= Number(probe.draftTotal),
