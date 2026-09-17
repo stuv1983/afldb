@@ -818,6 +818,129 @@ describe('11. player-season queries', () => {
     expect(p.scope.seasonMin).toBe(2017);
     expect(p.scope.seasonMax).toBe(2017);
   });
+
+  // AFLDB-ISSUE-216: player_season_leaderboard/0 ("posted the highest season
+  // tally of <metric>") and /3 ("the best seasonal <metric> total") are two
+  // English phrasings of the already-supported "most <metric> by a <club>
+  // player in <year(s)>" construction above, phrased around their own answer
+  // shape (a single season's tally) instead of "in <year>" filler. Neither
+  // wrapper word ("posted"/"season"/"tally"/"seasonal") was ever consumed by
+  // any extractor, so both declined unsupported_term. /3 additionally hit a
+  // second, independent defect: its own "total" is the same bare word
+  // AGGREGATE_TOTAL_WORDS reads everywhere else as a scoped-running-total cue
+  // ("dusty total goals against Carlton"), which misrouted grain election to
+  // player_game/sum instead of player_season -- fixed by
+  // playerSeasonLeaderboardCue overriding aggregateTotal only when the
+  // player-season leaderboard construction is positively identified.
+  describe('AFLDB-ISSUE-216: "posted...season tally..." / "...seasonal...total" leaderboard phrasing', () => {
+    it('which player posted the highest season tally of handballs for Collingwood during the 2010s -> player_season, max, decade range preserved', async () => {
+      const p = await plan('which player posted the highest season tally of handballs for Collingwood during the 2010s');
+      expect(p.grain).toBe('player_season');
+      expect(p.metric).toBe('handballs');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.scope.clubFor?.name).toBe('Collingwood');
+      expect(p.scope.seasonMin).toBe(2010);
+      expect(p.scope.seasonMax).toBe(2019);
+      expect(p.player).toBeUndefined();
+    });
+
+    it('which player posted the highest season tally of kicks for Richmond after 1999 -> player_season, exclusive lower bound', async () => {
+      const p = await plan('which player posted the highest season tally of kicks for Richmond after 1999');
+      expect(p.grain).toBe('player_season');
+      expect(p.metric).toBe('kicks');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.scope.clubFor?.name).toBe('Richmond');
+      expect(p.scope.seasonMin).toBe(2000);
+      expect(p.scope.seasonMax).toBeUndefined();
+    });
+
+    it('which player posted the highest season tally of goal assists for Geelong in 2017 -> player_season, exact year', async () => {
+      const p = await plan('which player posted the highest season tally of goal assists for Geelong in 2017');
+      expect(p.grain).toBe('player_season');
+      expect(p.metric).toBe('goal_assists');
+      expect(p.scope.clubFor?.name).toBe('Geelong');
+      expect(p.scope.seasonMin).toBe(2017);
+      expect(p.scope.seasonMax).toBe(2017);
+    });
+
+    it('find the Port Adelaide player with the best seasonal goal assists total after 1999 -> player_season, NOT player_game/sum', async () => {
+      const p = await plan('find the Port Adelaide player with the best seasonal goal assists total after 1999');
+      expect(p.grain).toBe('player_season');
+      expect(p.metric).toBe('goal_assists');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.scope.clubFor?.name).toBe('Port Adelaide');
+      expect(p.scope.seasonMin).toBe(2000);
+      expect(p.scope.seasonMax).toBeUndefined();
+      expect(p.player).toBeUndefined();
+    });
+
+    it('find the Geelong player with the best seasonal kicks total before 2019 -> player_season, inclusive upper bound', async () => {
+      const p = await plan('find the Geelong player with the best seasonal kicks total before 2019');
+      expect(p.grain).toBe('player_season');
+      expect(p.metric).toBe('kicks');
+      expect(p.scope.clubFor?.name).toBe('Geelong');
+      expect(p.scope.seasonMax).toBe(2018);
+    });
+
+    it('find the Sydney player with the best seasonal handballs total in 2017 -> player_season, exact year', async () => {
+      const p = await plan('find the Sydney player with the best seasonal handballs total in 2017');
+      expect(p.grain).toBe('player_season');
+      expect(p.metric).toBe('handballs');
+      expect(p.scope.clubFor?.name).toBe('Sydney');
+      expect(p.scope.seasonMin).toBe(2017);
+      expect(p.scope.seasonMax).toBe(2017);
+    });
+
+    it('regression: "most goals by a richmond player in 2017" (already-supported wording) is unchanged by the new cues', async () => {
+      const p = await plan('most goals by a richmond player in 2017');
+      expect(p.grain).toBe('player_season');
+      expect(p.metric).toBe('goals');
+      expect(p.scope.clubFor?.name).toBe('Richmond');
+      expect(p.scope.seasonMin).toBe(2017);
+      expect(p.scope.seasonMax).toBe(2017);
+    });
+
+    it('regression: "dusty total goals against Carlton" (named player, scoped running total) is unchanged -- player_game/sum, not player_season', async () => {
+      const p = await plan('dusty total goals against carlton');
+      expect(p.grain).toBe('player_game');
+      expect(p.mode).toBe('sum');
+    });
+
+    it('regression: bare "seasonal" with no player metric word still declines (richmond seasonal vibes)', async () => {
+      const result = await parse('richmond seasonal vibes');
+      expect(result.status).not.toBe('plan');
+    });
+
+    it('regression: bare "tally" with no "season" still declines as an unsupported term', async () => {
+      const result = await parse('most tally of goals for richmond in 2017');
+      expect(result.status).not.toBe('plan');
+      expect(result.report.unsupportedTerms).toContain('tally');
+    });
+
+    it('regression: bare "posted" alone (no season-tally/seasonal construction) does not become a universal request wrapper', async () => {
+      const result = await parse('richmond posted a big score against carlton');
+      expect(result.status).not.toBe('plan');
+      expect(result.report.unsupportedTerms).toContain('posted big');
+    });
+
+    it('regression: "total" is still not globally consumed away from its meaning -- club_season "seasonal" cue from ISSUE-214 is unchanged', async () => {
+      const p = await plan("north melbourne's highest seasonal losses");
+      expect(p.grain).toBe('club_season');
+      expect(p.metric).toBe('losses');
+    });
+
+    it('regression: career leaderboard wording stays career-grained, not misread as a season leaderboard', async () => {
+      const p = await plan('who has the most career goals');
+      expect(p.grain).toBe('player_career');
+      expect(p.metric).toBe('goals');
+    });
+
+    it('regression: single-game leaderboard wording stays game-grained, not misread as a season leaderboard', async () => {
+      const p = await plan('most disposals in a final');
+      expect(p.grain).toBe('player_game');
+      expect(p.mode).toBe('single');
+    });
+  });
 });
 
 describe('13. club_season queries', () => {

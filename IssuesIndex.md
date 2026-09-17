@@ -4,7 +4,25 @@
 >
 > `issues.md` is the authoritative detailed ledger.
 
-**Open issues:** 0
+**Open issues:** 1
+
+**AFLDB-ISSUE-216 IMPLEMENTED, NOT YET RESOLVED** (Sonnet 5, awaiting operator host validation on
+streamanator) — `player_season_leaderboard`'s two exploratory clusters (`/0` 576 rows "posted the
+highest season tally of `<stat>` for `<club>` `<time>`", `/3` 559 rows "the best seasonal `<stat>` total
+`<time>`") do NOT share one root mechanism: both leave "posted"/"season"/"tally"/"seasonal" unconsumed
+as leftover wrapper vocabulary (shared gap), but `/3` additionally carries an independent grain-election
+defect — its own "total" collides with the generic `AGGREGATE_TOTAL_WORDS` scoped-running-total cue and
+silently misrouted the unnamed-player question to `player_game`/`sum` instead of `player_season`. Fixed
+with three new gated vocabulary entries (`PLAYER_SEASON_LEADERBOARD_TALLY_RE`,
+`PLAYER_SEASON_LEADERBOARD_SEASONAL_RE`, `PLAYER_SEASON_LEADERBOARD_POSTED_RE`, all gated on an actual
+player-stat `METRIC_WORDS` match) plus a narrow `playerSeasonLeaderboardCue` override on the
+`aggregateTotal` grain-election guard — no club, player, or metric special-cased. `PARSER_VERSION` 62 →
+63. Implementation this session on `sonnet/issue-216-player-season-leaderboard-phrasing`, unmerged.
+Local: `tests/nl-parser.test.ts` 554/554 (541 + 13 new), broader gates (`nl-regression-corpus` 163/163,
+`nl-semantic-mapping` 174/174, `nl-stress-corpus` 65/65 = 402/402), `typecheck` clean. Host validation
+(frozen V5 + exploratory V2 on streamanator, then a v62-vs-v63 plan comparison) not yet run — status
+stays IMPLEMENTED, NOT YET RESOLVED until it completes. See `issues.md` and `AFLDB-ISSUE-216.md` for the
+full record.
 
 **AFLDB-ISSUE-215 resolved 2026-09-17** (Sonnet 5, operator-validated on streamanator, two
 host-validation rounds) — `career_numeric_binding`'s two exploratory clusters (`/3` 700 rows "for CLUB,
