@@ -353,6 +353,11 @@ def profile_person(contract: dict, person: dict, http_record: dict | None,
             "afltables_identity_reason": "page was not fetched -- terminal failure record",
             "draftguru_self_links": [],
             "external_vocabulary": [],
+            "wikipedia_hrefs": [],
+            "wikipedia_href_count": 0,
+            "distinct_wikipedia_href_count": 0,
+            "wikipedia_url": None,
+            "wikipedia_url_reason": "page was not fetched -- terminal failure record",
             "flags": {
                 "no_afltables_link": True,
                 "multiple_afltables_candidates": False,
@@ -369,9 +374,11 @@ def profile_person(contract: dict, person: dict, http_record: dict | None,
     page = extract_page(raw, http_record or {})
     anchors = page.pop("anchors")
 
+    wikipedia_hosts = set(contract["person_stage"]["wikipedia_link"]["hosts"])
     afltables: list[dict] = []
     self_links: list[dict] = []
     vocabulary: list[dict] = []
+    wikipedia_links: list[dict] = []
     for anchor in anchors:
         href = anchor["href"]
         if is_afltables_reference(href):
@@ -383,10 +390,25 @@ def profile_person(contract: dict, person: dict, http_record: dict | None,
             afltables.append(classified)
             continue
         scheme, host, _rest = _split_url(href)
+        if host in wikipedia_hosts:
+            # AFLDB-ISSUE-222: captured for later human identity review only -- never
+            # fetched, never canonicalised, never touching the AFL Tables bridge. Recorded
+            # verbatim exactly as observed; ambiguity/relatedness are never resolved here
+            # (contract person_stage.wikipedia_link.ambiguity_rule / relatedness_rule).
+            wikipedia_links.append({
+                "href": href,                       # verbatim, never rewritten
+                "host": host,
+                "anchor_text": anchor.get("text", ""),
+                "document_index": anchor["index"],
+                "$note": "evidence only for later human identity review -- never fetched, "
+                         "never identity, never touches the AFL Tables bridge",
+            })
         if host and host != base_host:
             # Every non-DraftGuru external host is recorded as vocabulary/evidence.
             # Measurement only: no host here is ever an identity source, and only the
-            # AFL Tables vocabulary above can produce an external identity.
+            # AFL Tables vocabulary above can produce an external identity. (A Wikipedia
+            # href lands here too, unchanged -- the dedicated wikipedia_hrefs/wikipedia_url
+            # fields above are additive, not a replacement for this general stream.)
             vocabulary.append({
                 "host": host,
                 "href": href,                       # verbatim
@@ -417,6 +439,18 @@ def profile_person(contract: dict, person: dict, http_record: dict | None,
         reason = (f"{len(canonical_ids)} distinct AFL Tables identities on one page -- "
                   "ambiguous, reported and never resolved by guessing")
 
+    distinct_wikipedia_hrefs = sorted({item["href"] for item in wikipedia_links})
+    if len(distinct_wikipedia_hrefs) == 1:
+        wikipedia_url, wikipedia_url_reason = distinct_wikipedia_hrefs[0], None
+    elif not distinct_wikipedia_hrefs:
+        wikipedia_url = None
+        wikipedia_url_reason = "no Wikipedia href on the page"
+    else:
+        wikipedia_url = None
+        wikipedia_url_reason = (
+            f"{len(distinct_wikipedia_hrefs)} distinct Wikipedia hrefs on one page -- "
+            "ambiguous, reported and never resolved by guessing")
+
     disagreeing = [link for link in self_links if link["canonical"] != player_url]
 
     record.update({
@@ -430,6 +464,11 @@ def profile_person(contract: dict, person: dict, http_record: dict | None,
         "afltables_identity_reason": reason,
         "draftguru_self_links": self_links,
         "external_vocabulary": vocabulary,
+        "wikipedia_hrefs": wikipedia_links,
+        "wikipedia_href_count": len(wikipedia_links),
+        "distinct_wikipedia_href_count": len(distinct_wikipedia_hrefs),
+        "wikipedia_url": wikipedia_url,
+        "wikipedia_url_reason": wikipedia_url_reason,
         "flags": {
             "no_afltables_link": not afltables,
             "multiple_afltables_candidates": len(canonical_ids) > 1,
@@ -452,13 +491,18 @@ def _pct(part: int, whole: int) -> float | None:
     return None if whole == 0 else round(100.0 * part / whole, 2)
 
 
-def aggregate(contract: dict, sample: dict, records: list[dict]) -> dict:
+def aggregate(contract: dict, sample: dict, records: list[dict],
+              year_top10_index: dict[str, dict] | None = None) -> dict:
     by_url = {r["player_url"]: r for r in records}
-    cohorts = contract["person_stage"]["sample_contract"]["primary_cohorts"]
+    is_b3 = sample.get("stage") == "B3"
+    cohorts = (["population"] if is_b3
+               else contract["person_stage"]["sample_contract"]["primary_cohorts"])
 
     fetched = [r for r in records if r["terminal_classification"] == "fetched"]
     failed = [r for r in records if r["terminal_classification"] == "failed"]
     with_identity = [r for r in fetched if r["afltables_identity"]]
+    with_wikipedia = [r for r in fetched if r["wikipedia_url"]]
+    ambiguous_wikipedia = [r for r in fetched if r["distinct_wikipedia_href_count"] > 1]
 
     cohort_rows: dict[str, dict] = {}
     for cohort in cohorts:
@@ -562,6 +606,15 @@ def aggregate(contract: dict, sample: dict, records: list[dict]) -> dict:
             **cohort_rows.get("residual", {}),
         },
         "zero_game_bridge": cohort_rows.get("zero_game_control", {}),
+        "wikipedia_link": {
+            "$question": "how many persons expose a person-page Wikipedia link, captured for "
+                         "later human identity review only -- never fetched, never identity, "
+                         "never touching the AFL Tables bridge",
+            "with_wikipedia_url": len(with_wikipedia),
+            "ambiguous_multiple_hrefs": len(ambiguous_wikipedia),
+            "coverage_pct_of_requested": _pct(len(with_wikipedia), len(records)),
+            "coverage_pct_of_fetched": _pct(len(with_wikipedia), len(fetched)),
+        },
         "url_form_vocabulary": dict(sorted(vocabulary.items())),
         "external_vocabulary_hosts": dict(sorted(external_hosts.items())),
         "external_vocabulary_hosts_outside_contract": sorted(unrecognised_hosts),
@@ -581,6 +634,33 @@ def aggregate(contract: dict, sample: dict, records: list[dict]) -> dict:
             if not r["afltables_identity"]],
         "$missing_from_sample": sorted(set(p["player_url"] for p in sample["persons"])
                                        - set(by_url)),
+        "crawl_failure_ceiling": crawl_failure_ceiling_report(contract, sample, failed, records),
+        "failure_concentration": failure_concentration_breakdown(contract, failed,
+                                                                   year_top10_index)
+                                  if is_b3 else {"available": False,
+                                                 "$note": "not a Stage B3 run"},
+    }
+
+
+def crawl_failure_ceiling_report(contract: dict, sample: dict, failed: list[dict],
+                                 records: list[dict]) -> dict:
+    """The §2.6 item 1 run-health ceiling. B1 has no declared ceiling (its 120-person
+    profiling run is not the whole-population acquisition this gates); B3 reads its
+    ceiling from the contract. Reporting only -- exceeding it is a finding for the
+    operator to diagnose before any retry decision, never an automatic action here."""
+    if sample.get("stage") != "B3":
+        return {"available": False, "$note": "not a Stage B3 run"}
+    ceiling_pct = contract["person_stage"]["b3"]["crawl_failure_ceiling_pct"]
+    observed_pct = _pct(len(failed), len(records)) or 0.0
+    return {
+        "available": True,
+        "ceiling_pct": ceiling_pct,
+        "observed_pct": observed_pct,
+        "failed": len(failed),
+        "requested": len(records),
+        "exceeded": observed_pct > ceiling_pct,
+        "$note": "says nothing about coverage (revised runbook §2.6 item 1) -- a run under "
+                 "the ceiling can still carry a concentrated gap (see failure_concentration)",
     }
 
 
@@ -615,16 +695,148 @@ def person_filename(contract: dict, person: dict) -> str:
 def load_sample(contract: dict, person_dir: Path, sample_path: Path | None) -> dict:
     path = sample_path or (person_dir / "sample.json")
     if not path.is_file():
-        raise ProfileError(f"missing Stage B1 sample.json: {path}")
+        raise ProfileError(f"missing sample.json: {path}")
     sample = json.loads(path.read_bytes().decode("utf-8"))
-    expected = contract["person_stage"]["sample_contract"]
-    if sample.get("counts", {}).get("total") != expected["total"]:
-        raise ProfileError(
-            f"sample.json holds {sample.get('counts', {}).get('total')} persons, contract "
-            f"requires {expected['total']}")
-    if sample.get("counts", {}).get("by_primary_cohort") != expected["primary_cohorts"]:
-        raise ProfileError("sample.json primary_cohort counts do not match the frozen contract")
+    stage = sample.get("stage")
+    if stage == "B3":
+        _validate_b3_sample(contract, sample)
+    elif stage in (None, "B1"):
+        # B1 (an explicit older sample carries no "stage" field): the frozen 120 contract.
+        expected = contract["person_stage"]["sample_contract"]
+        if sample.get("counts", {}).get("total") != expected["total"]:
+            raise ProfileError(
+                f"sample.json holds {sample.get('counts', {}).get('total')} persons, "
+                f"contract requires {expected['total']}")
+        if sample.get("counts", {}).get("by_primary_cohort") != expected["primary_cohorts"]:
+            raise ProfileError(
+                "sample.json primary_cohort counts do not match the frozen contract")
+    else:
+        raise ProfileError(f"sample.json declares unknown stage {stage!r}")
     return sample
+
+
+def _validate_b3_sample(contract: dict, sample: dict) -> None:
+    """AFLDB-ISSUE-222 Stage B3: a whole-population sample, one cohort ('population'),
+    no fixed total -- the population size is derived from the Stage A snapshot at build
+    time (stage_b3_population.py), never pinned here as a constant."""
+    if contract.get("person_stage", {}).get("b3") is None:
+        raise ProfileError(
+            "sample.json declares stage 'B3' but the contract carries no person_stage.b3 "
+            "block")
+    counts = sample.get("counts", {})
+    total = counts.get("total")
+    by_cohort = counts.get("by_primary_cohort", {})
+    if not isinstance(total, int) or total <= 0:
+        raise ProfileError(f"B3 sample.json counts.total is not a positive integer: {total!r}")
+    if by_cohort != {"population": total}:
+        raise ProfileError(
+            f"B3 sample.json counts.by_primary_cohort must be exactly "
+            f"{{'population': {total}}}, got {by_cohort!r}")
+    persons = sample.get("persons", [])
+    if len(persons) != total:
+        raise ProfileError(
+            f"B3 sample.json declares {total} persons but carries {len(persons)}")
+    for person in persons:
+        if person.get("primary_cohort") != "population":
+            raise ProfileError(
+                f"B3 sample.json person {person.get('player_url')!r} carries primary_cohort "
+                f"{person.get('primary_cohort')!r}, expected 'population'")
+
+
+# ---------------------------------------------------------------------------
+# Stage B3 by-year / national-top-10 failure breakdown (revised runbook §2.6
+# item 2; contract person_stage.b3.concentration_triggers). Offline: reads
+# only the accepted Stage A snapshot's own parsed/rows.jsonl -- never a
+# database, never a name.
+# ---------------------------------------------------------------------------
+
+NATIONAL_EVENT_TYPES_RAW = frozenset({"National", "National Draft", None})
+
+
+def load_year_top10_index(stage_a_dir: Path, event_kinds_path: Path | None = None) -> dict[str, dict]:
+    """player_url -> {"first_year": int, "top10_national": bool}, from Stage A rows.jsonl.
+
+    A person's 'year' is the minimum draft_year recorded for their player_url. National
+    top-10 membership uses the same event-kind vocabulary the importer uses
+    (data/reference/draftguru-event-kinds.json): event_type_raw in {"National",
+    "National Draft", null} identifies a national draft row (the 1981/1982/1987 absent-Draft-
+    column years are national by contract), and pick_number BETWEEN 1 AND 10 identifies a
+    top-10 selection.
+    """
+    rows_path = stage_a_dir / "parsed" / "rows.jsonl"
+    if not rows_path.is_file():
+        raise ProfileError(f"missing Stage A parsed/rows.jsonl: {rows_path}")
+    if event_kinds_path is not None and not event_kinds_path.is_file():
+        raise ProfileError(f"missing DraftGuru event-kinds reference: {event_kinds_path}")
+
+    index: dict[str, dict] = {}
+    for line in rows_path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        record = json.loads(line)
+        url = record["player_url"]
+        year = record.get("draft_year")
+        entry = index.setdefault(url, {"first_year": None, "top10_national": False})
+        if year is not None and (entry["first_year"] is None or year < entry["first_year"]):
+            entry["first_year"] = year
+        event_type_raw = record.get("event_type_raw")
+        pick_number = record.get("pick_number")
+        if event_type_raw in NATIONAL_EVENT_TYPES_RAW and isinstance(pick_number, int) \
+                and 1 <= pick_number <= 10:
+            entry["top10_national"] = True
+    return index
+
+
+def failure_concentration_breakdown(contract: dict, failed_records: list[dict],
+                                    total_by_url: dict[str, dict] | None) -> dict:
+    """The §2.6 item 2 report: failures broken down by draft year and national top-10
+    membership, plus whether the contract's declared triggers fire. Reporting only -- no
+    retry decision is made here."""
+    if total_by_url is None:
+        return {"available": False,
+                "$note": "no year/top-10 index supplied -- not a Stage B3 acquisition run"}
+
+    b3 = contract["person_stage"]["b3"]["concentration_triggers"]
+    by_year_total: dict[int, int] = {}
+    for entry in total_by_url.values():
+        year = entry["first_year"]
+        if year is not None:
+            by_year_total[year] = by_year_total.get(year, 0) + 1
+
+    by_year_failed: dict[int, int] = {}
+    top10_failed: list[str] = []
+    for record in failed_records:
+        url = record["player_url"]
+        entry = total_by_url.get(url, {})
+        year = entry.get("first_year")
+        if year is not None:
+            by_year_failed[year] = by_year_failed.get(year, 0) + 1
+        if entry.get("top10_national"):
+            top10_failed.append(url)
+
+    by_year_pct: dict[str, float] = {}
+    triggered_years: list[int] = []
+    for year, failed_count in sorted(by_year_failed.items()):
+        total = by_year_total.get(year, 0)
+        pct = _pct(failed_count, total) or 0.0
+        by_year_pct[str(year)] = pct
+        if total and pct > b3["by_year_failed_pct"]:
+            triggered_years.append(year)
+
+    return {
+        "available": True,
+        "by_year_failed_count": {str(y): n for y, n in sorted(by_year_failed.items())},
+        "by_year_total": {str(y): n for y, n in sorted(by_year_total.items())},
+        "by_year_failed_pct": by_year_pct,
+        "by_year_trigger_pct": b3["by_year_failed_pct"],
+        "years_triggered": sorted(triggered_years),
+        "national_top10_failed_player_urls": sorted(top10_failed),
+        "national_top10_trigger_fired": bool(top10_failed) and b3["any_national_top10_failed"],
+        "retry_decision_required": bool(triggered_years) or bool(top10_failed),
+        "$note": "a triggered concentration is a reporting finding requiring an explicit "
+                 "operator retry decision (revised runbook §2.6 item 2) before Phase 3 -- "
+                 "this function makes no retry decision itself",
+    }
 
 
 def load_person_artifacts(contract: dict, person_dir: Path, person: dict
@@ -644,8 +856,13 @@ def load_person_artifacts(contract: dict, person_dir: Path, person: dict
 
 
 def run_profile(contract: dict, person_dir: Path, sample: dict, *,
-                require_complete: bool, write: bool = True) -> dict:
-    """Profile every person in the sample.  Offline; nothing is fetched here."""
+                require_complete: bool, write: bool = True,
+                year_top10_index: dict[str, dict] | None = None) -> dict:
+    """Profile every person in the sample.  Offline; nothing is fetched here.
+
+    ``year_top10_index`` (Stage B3 only) is the ``load_year_top10_index()`` lookup used for
+    the by-year / national-top-10 failure-concentration breakdown; B1 callers omit it.
+    """
     records = []
     for person in sorted(sample["persons"], key=lambda p: (p["slug"], int(p["ordinal"]))):
         http_record, raw = load_person_artifacts(contract, person_dir, person)
@@ -664,7 +881,7 @@ def run_profile(contract: dict, person_dir: Path, sample: dict, *,
                 f"{len(terminal)} of {len(sample['persons'])} identities carry a terminal "
                 "classification -- incomplete experiment")
 
-    summary = aggregate(contract, sample, records)
+    summary = aggregate(contract, sample, records, year_top10_index)
 
     paths = {}
     if write:

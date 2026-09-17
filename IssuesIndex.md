@@ -4,7 +4,7 @@
 >
 > `issues.md` is the authoritative detailed ledger.
 
-**Open issues:** 1
+**Open issues:** 3
 
 ### AFLDB-ISSUE-220 — Web service credential boundary contradicts the application's `afldb_import` requirement; owner-role code-test DSN and a complete `.env` copy reach the internet-facing process
 - **Severity:** High. **Area:** deployment / runtime security.
@@ -29,6 +29,61 @@
 - **Next action:** operator runs the Git/DEV rollout (commit → `merge:ready` → push/merge → `sync-dev.ps1`
   build → manual unit reinstall + restart → names-only checks + Admin Centre write/revert), then PROD
   read-only checks. Resolve only once DEV steps 1–5 and PROD steps 2–3/6 (runbook §8/§9) pass.
+
+### AFLDB-ISSUE-222 — Trusted draft-player linking: DraftGuru Stage B3 person-page acquisition and the person-page bridge into `draft_persons` / `draft_picks`
+- **Severity:** High. **Area:** data acquisition / import — `tools/rebuild/draftguru/`,
+  `tools/db/rebuild-test.ts`. Successor to `AFLDB-ISSUE-164` D-9 / `AFLDB-ISSUE-093` Stage B3
+  (neither reopened; D-9 unchanged), per `AFLDB-ISSUE-221`'s follow-up.
+- **State:** Open (2026-09-18). Runbook `AFLDB-ISSUE-222.md` (revision 2) approved for **Phase 1
+  only** (tooling + isolated-test-database validation); O-1–O-3 and Phase 2 (network acquisition)
+  remain pending separate operator approval. Phase 1 implemented in worktree `afldb-issue-222`
+  (Sonnet 5, uncommitted): new `stage_b3_population.py` (whole-population sample) and
+  `export_person_bridge.py` (`--source-evidence`/`--resolve-against`/`--review-sample`); the
+  contract's new `person_stage.b3` block; `profile_person_pages.py`/`acquire_persons.py` extended
+  for the B3 shape and the §2.6 by-year/top-10 failure breakdown; `rebuild-test.ts` threads an
+  optional `--draftguru-bridge` through preflight, the data stage and FINAL VALIDATION;
+  `gridley-corpus.test.ts` gained the scoring-only `AFLDB_GRIDLEY_SCORE_DRAFT=1` override. No
+  network request made; no DEV/PROD write; no `apply_authority()`/D-9 change.
+- **Key files:** `tools/rebuild/draftguru/{draftguru-contract.json, stage_b3_population.py (new),
+  export_person_bridge.py (new), profile_person_pages.py, acquire_persons.py}`,
+  `tools/db/rebuild-test.ts`, `tests/integration/gridley-corpus.test.ts`,
+  `tests/draftguru-acquisition.test.ts`, `tests/db-test-rebuild.test.ts`,
+  `tests/integration/draftguru-import.test.ts`.
+- **Local validation (2026-09-18, closed out):** the accepted Stage A DraftGuru snapshot was
+  located on `streamanator`, sha256-verified against the tracked manifest (42/42 pages, 0
+  mismatches), copied into this worktree and re-verified byte-exact locally, as separately
+  authorised (not a fresh acquisition). `npx vitest run tests/integration/draftguru-import.test.ts`
+  (session-only DSN port override to the existing 55432 tunnel, `.env` unchanged, no credentials
+  printed) then ran for real against `afldb_test`: found and fixed one bug in this issue's own new
+  test (wrong expected HALT-message substring — the importer's actual behaviour was already
+  correct), then **24/24 passed, 0 failed, 0 skipped** — bridge propagation, idempotency,
+  unregistered-target handling on both the importer's own HALT and
+  `export_person_bridge.py --resolve-against`, human-decision precedence, and rollback/audit
+  behaviour all genuinely confirmed by execution. `afldb_test` reconfirmed settled back to its
+  exact baseline afterward. DB-free suites moved to **174 passed / 3 skipped / 178 total** (the 3
+  skips need artefacts not authorised for this pass — `full-history-20260826` /
+  `person-html-20260826` — still pre-existing, still not B3-specific); `tests/db-test-rebuild.test.ts`
+  293/293; `tsc`/`eslint` clean. AFLDB-ISSUE-223 unaffected. **Phase 1 gate: satisfied.**
+- **O-1/O-2/O-3 decided 2026-09-18** (n = 598 random stratum + full census; no importer change;
+  2%/5%/any-top-10 stop conditions — the latter two already match Phase 1's implemented
+  defaults). **Phase 2 authorised, narrowly:** exactly one new whole-population acquisition run;
+  no database import, DEV/PROD write, deployment, or Phase 3+. Handoff:
+  `AFLDB-ISSUE-222-PHASE2-HANDOFF.md`.
+- **Next action:** operator runs the Phase 2 acquisition from that handoff. See `issues.md` for
+  the full record.
+
+### AFLDB-ISSUE-223 — Pre-existing test regression from AFLDB-ISSUE-221: `GRID_DRAFT_TYPES` reshaped, a `draftguru-acquisition.test.ts` vocabulary-parity test now fails
+- **Severity:** Low. **Area:** test tooling — `tests/draftguru-acquisition.test.ts`,
+  `src/search/grid-solver-spec.ts`.
+- **State:** Open (2026-09-18, found incidentally during AFLDB-ISSUE-222 Phase 1 validation, not
+  caused by it). `AFLDB-ISSUE-221` (commit `f1a8daca`) reshaped `GRID_DRAFT_TYPES` from a bare
+  `as const` string array to `{ value; label }[]` (so the Draft-type dropdown lists "National
+  Draft" once); the "keeps the mapping's draft_type vocabulary set-equal to GRID_DRAFT_TYPES"
+  test's regex extraction no longer matches. DB-free unit test only; no production code affected.
+- **Key files:** `tests/draftguru-acquisition.test.ts` (the failing assertion),
+  `src/search/grid-solver-spec.ts` (the reshaped export, not itself defective).
+- **Next action:** update the test's extraction to the current `{value,label}[]` shape (or import
+  the module directly) and re-confirm the vocabulary is still set-equal in both directions.
 
 **AFLDB-ISSUE-221 resolved 2026-09-18** (implemented 2026-09-17 by Fable 5.1; committed, merged
 and DEV-verified 2026-09-18 by Sonnet 5) — Grid Solver draft-criteria review: honest "No data"

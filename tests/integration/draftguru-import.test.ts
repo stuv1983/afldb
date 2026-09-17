@@ -511,6 +511,149 @@ describe.skipIf(!canRun)(
       expect(after.playerId,
         'the human decision must survive a contradicting bridge').toBe(before.playerId);
     }, 900_000);
+
+    // -----------------------------------------------------------------------
+    // AFLDB-ISSUE-222 Phase 1 (revised runbook §3.3 W-unregistered, §4.5, §7.4). A bridge
+    // is recomputed on every run (§4.3), so re-loading the SAME dataset twice must be a
+    // no-op, and a dataset naming an identity this target has not registered must HALT --
+    // never silently drop the entry.
+    // -----------------------------------------------------------------------
+
+    it('is idempotent when the same bridge dataset is loaded twice', async () => {
+      const [candidate] = await sql<{ url: string }[]>`
+        SELECT player_url AS url FROM draft_persons
+         WHERE source_id = ${draftguruSourceId} AND player_id IS NULL
+         ORDER BY player_url LIMIT 1`;
+      const [target] = await sql<{ externalId: string }[]>`
+        SELECT external_id AS "externalId" FROM external_identities
+         WHERE source_id = ${afltablesSourceId} AND player_id IS NOT NULL
+           AND external_id ~ '^players/[A-Za-z]/[^/]+\\.html$'
+         ORDER BY external_id LIMIT 1`;
+
+      withTempJson({
+        schema_version: 1,
+        bridges: [{ player_url: candidate.url, afltables_external_id: target.externalId }],
+      }, (path) => {
+        const first = runImporter(['--bridge', path]);
+        expect(first.status).toBe(0);
+        const second = runImporter(['--bridge', path]);
+        expect(second.stdout + second.stderr).not.toMatch(/REFUSED|Traceback/);
+        expect(second.status).toBe(0);
+      });
+
+      const [after] = await sql<{ playerId: number | null; status: string; method: string | null }[]>`
+        SELECT player_id AS "playerId", link_status::text AS status, match_method AS method
+          FROM draft_persons
+         WHERE source_id = ${draftguruSourceId} AND player_url = ${candidate.url}`;
+      expect(after.status).toBe('unique');
+      expect(after.method).toBe('draftguru_person_page_afltables_bridge');
+
+      const back = runImporter();
+      expect(back.status).toBe(0);
+    }, 900_000);
+
+    it('halts and creates no replacement when a bridge names an unregistered afltables target',
+      async () => {
+      const [candidate] = await sql<{ url: string }[]>`
+        SELECT player_url AS url FROM draft_persons
+         WHERE source_id = ${draftguruSourceId} AND player_id IS NULL
+         ORDER BY player_url LIMIT 1`;
+      const NEVER_REGISTERED = 'players/Z/Afldb_Issue_222_Never_Registered.html';
+
+      withTempJson({
+        schema_version: 1,
+        bridges: [{ player_url: candidate.url, afltables_external_id: NEVER_REGISTERED }],
+      }, (path) => {
+        const run = runImporter(['--bridge', path]);
+        expect(run.status).toBe(1);
+        // The bridge path's own HALT (apply_authority() step 2): "a bridge target resolves
+        // to 0 canonical players ... expected exactly one" -- distinct wording from the
+        // ledger path's "Refusing to create a replacement player" (see the 'missing
+        // afltables target' describe block above, which exercises that path instead).
+        expect(run.stdout).toContain('resolves to 0 canonical players');
+        expect(run.stdout).toContain('expected exactly one');
+      });
+
+      const [after] = await sql<{ playerId: number | null }[]>`
+        SELECT player_id AS "playerId" FROM draft_persons
+         WHERE source_id = ${draftguruSourceId} AND player_url = ${candidate.url}`;
+      expect(after.playerId).toBeNull();
+
+      const restored = runImporter();
+      expect(restored.status).toBe(0);
+    }, 900_000);
+
+    it('export_person_bridge --resolve-against withholds an unregistered identity, and the '
+      + 'filtered deployment dataset imports with 0 HALTs', async () => {
+      const [candidate] = await sql<{ url: string }[]>`
+        SELECT player_url AS url FROM draft_persons
+         WHERE source_id = ${draftguruSourceId} AND player_id IS NULL
+         ORDER BY player_url LIMIT 1`;
+      const [target] = await sql<{ externalId: string }[]>`
+        SELECT external_id AS "externalId" FROM external_identities
+         WHERE source_id = ${afltablesSourceId} AND player_id IS NOT NULL
+           AND external_id ~ '^players/[A-Za-z]/[^/]+\\.html$'
+         ORDER BY external_id LIMIT 1`;
+      const NEVER_REGISTERED = 'players/Z/Afldb_Issue_222_Never_Registered.html';
+      const [unbridgedOther] = await sql<{ url: string }[]>`
+        SELECT player_url AS url FROM draft_persons
+         WHERE source_id = ${draftguruSourceId} AND player_id IS NULL
+           AND player_url <> ${candidate.url}
+         ORDER BY player_url LIMIT 1`;
+
+      const dir = mkdtempSync(join(tmpdir(), 'afldb-i222-bridge-'));
+      try {
+        const parentPath = join(dir, 'parent.json');
+        const deployPath = join(dir, 'deploy.json');
+        writeFileSync(parentPath, JSON.stringify({
+          schema_version: 1,
+          bridges: [
+            { player_url: candidate.url, afltables_external_id: target.externalId },
+            { player_url: unbridgedOther.url, afltables_external_id: NEVER_REGISTERED },
+          ],
+        }), 'utf8');
+
+        const resolve = spawnSync(python, [
+          'tools/rebuild/draftguru/export_person_bridge.py', '--resolve-against', 'afldb_test',
+          '--parent', parentPath, '--out', deployPath,
+        ], { encoding: 'utf8', cwd: root });
+        expect(resolve.stdout + resolve.stderr).not.toMatch(/Traceback/);
+        expect(resolve.status).toBe(0);
+
+        const deployment = JSON.parse(readFileSync(deployPath, 'utf8'));
+        expect(deployment.bridges).toEqual([
+          { player_url: candidate.url, afltables_external_id: target.externalId },
+        ]);
+        const withheldUrls = deployment.withheld
+          .map((w: { player_url: string }) => w.player_url);
+        expect(withheldUrls).toContain(unbridgedOther.url);
+        const withheldReasons: Record<string, string> = Object.fromEntries(
+          deployment.withheld.map((w: { player_url: string; reason: string }) =>
+            [w.player_url, w.reason]));
+        expect(withheldReasons[unbridgedOther.url]).toBe('target_not_registered');
+
+        const run = runImporter(['--bridge', deployPath]);
+        expect(run.stdout + run.stderr).not.toMatch(/REFUSED|Traceback/);
+        expect(run.status).toBe(0);
+
+        const [linked] = await sql<{ playerId: number | null; status: string }[]>`
+          SELECT player_id AS "playerId", link_status::text AS status FROM draft_persons
+           WHERE source_id = ${draftguruSourceId} AND player_url = ${candidate.url}`;
+        expect(linked.playerId).not.toBeNull();
+        expect(linked.status).toBe('unique');
+
+        const [untouched] = await sql<{ playerId: number | null }[]>`
+          SELECT player_id AS "playerId" FROM draft_persons
+           WHERE source_id = ${draftguruSourceId} AND player_url = ${unbridgedOther.url}`;
+        expect(untouched.playerId,
+          'the withheld person must stay unmatched, never dropped silently').toBeNull();
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+
+      const restored = runImporter();
+      expect(restored.status).toBe(0);
+    }, 900_000);
   });
 
   // -----------------------------------------------------------------------

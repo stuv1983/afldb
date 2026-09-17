@@ -323,7 +323,7 @@ def build_manifest(contract: dict, label: str, *, sample: dict,
 
     return {
         "source": "DraftGuru (draftguru.com.au) person pages",
-        "stage": "B1",
+        "stage": sample.get("stage", "B1"),
         "purpose": "PROFILING ONLY — measures whether a person page exposes a "
                    "deterministic player_url -> AFL Tables identity bridge. This snapshot "
                    "is never an import source.",
@@ -495,8 +495,15 @@ def main(argv: list[str] | None = None) -> int:
                   "for resume.", file=sys.stderr)
             return 1
 
+        year_top10_index = None
+        if sample.get("stage") == "B3":
+            snapshot_root = Path(args.snapshot_root) if args.snapshot_root \
+                else (REPO_ROOT / contract["snapshot"]["root"])
+            year_top10_stage_a_dir = (snapshot_root / sample["stage_a_source"]["label"]).resolve()
+            year_top10_index = person_profiler.load_year_top10_index(year_top10_stage_a_dir)
         outcome = person_profiler.run_profile(contract, person_dir, sample,
-                                              require_complete=True, write=True)
+                                              require_complete=True, write=True,
+                                              year_top10_index=year_top10_index)
         parsed_paths = outcome["paths"]
         for key, path in parsed_paths.items():
             if not path.is_file():

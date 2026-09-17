@@ -1460,6 +1460,154 @@ describe("Stage B1 person profiler (synthetic pages)", () => {
 });
 
 // ---------------------------------------------------------------------------
+// AFLDB-ISSUE-222 (operator instruction 2026-09-18) — person-page Wikipedia link capture.
+// Evidence only, for later human identity review: never fetched, never canonicalised, never
+// an identity source, never touching the AFL Tables bridge or apply_authority(). Deliberately
+// a SEPARATE fixture from profiledFixture() above, so its hardcoded counts (requested: 7,
+// cohort breakdowns) are undisturbed.
+// ---------------------------------------------------------------------------
+
+describe("Stage B1/B3 person profiler — Wikipedia link capture", () => {
+  type WikipediaProfileRecord = {
+    wikipedia_url: string | null;
+    wikipedia_url_reason: string | null;
+    wikipedia_href_count: number;
+    distinct_wikipedia_href_count: number;
+    wikipedia_hrefs: { href: string; host: string; $note: string }[];
+    external_vocabulary: { host: string }[];
+    afltables_identity: string | null;
+  };
+
+  function wikipediaFixture(): { records: Record<string, WikipediaProfileRecord> } {
+    const fixture = buildB1Fixture();
+    expect(freezeSample(fixture).status).toBe(0);
+    const dir = fixture.personDir;
+    seedPerson(dir, "brad_miller", 1, {
+      // an AFL Tables link, but NO Wikipedia link at all -- absence must be recorded
+      // honestly, never invented.
+      html: synthPage("Brad Miller",
+        ["http://afltables.com/afl/stats/players/B/Brad_Miller.html"]),
+    });
+    seedPerson(dir, "andrew_hill", 1, {
+      // exactly one Wikipedia href -- the ordinary case.
+      html: synthPage("Andrew Hill", ["https://en.wikipedia.org/wiki/Andrew_Hill"]),
+    });
+    seedPerson(dir, "adam_houlihan", 1, {
+      // two DISTINCT Wikipedia hrefs on one page -- ambiguous, never resolved by guessing.
+      html: synthPage("Adam Houlihan", [
+        "https://en.wikipedia.org/wiki/Adam_Houlihan",
+        "https://en.wikipedia.org/wiki/Adam_Houlihan_(footballer)",
+      ]),
+    });
+    seedPerson(dir, "michael_brown", 1, {
+      // one Wikipedia href present, but plainly not a player biography (a general AFL
+      // topic page) -- "unrelated". The profiler never fetches Wikipedia, so it cannot
+      // judge relevance; it must still capture this exactly like any other single href.
+      html: synthPage("Michael Brown",
+        ["https://en.wikipedia.org/wiki/Australian_Football_League"]),
+    });
+    seedPerson(dir, "alex_van%20wyk", 1, {
+      // the SAME href linked twice -- not ambiguous, must deduplicate to one candidate.
+      html: synthPage("Alex van Wyk", [
+        "https://en.wikipedia.org/wiki/Alex_van_Wyk",
+        "https://en.wikipedia.org/wiki/Alex_van_Wyk",
+      ]),
+    });
+    const run = runProfiler(["--label", B1_LABEL, "--snapshot-root", fixture.snapRoot]);
+    expect(run.stderr).toBe("");
+    expect(run.status).toBe(0);
+    return { records: readProfileRecords(dir) };
+  }
+
+  itPy("captures a single person-page Wikipedia href verbatim, additively to the general vocabulary stream", () => {
+    const { records } = wikipediaFixture();
+    const hill = records[`${BASE}/players/andrew_hill/1`];
+    expect(hill.wikipedia_url).toBe("https://en.wikipedia.org/wiki/Andrew_Hill");
+    expect(hill.wikipedia_url_reason).toBeNull();
+    expect(hill.wikipedia_href_count).toBe(1);
+    expect(hill.distinct_wikipedia_href_count).toBe(1);
+    expect(hill.wikipedia_hrefs[0].href).toBe("https://en.wikipedia.org/wiki/Andrew_Hill");
+    expect(hill.wikipedia_hrefs[0].host).toBe("en.wikipedia.org");
+    // still present in the pre-existing general vocabulary stream too -- additive, not a
+    // replacement (existing "classifies a page with no AFL Tables link" test already pins
+    // this for the same fixture-independent behaviour).
+    expect(hill.external_vocabulary.map((v: { host: string }) => v.host))
+      .toContain("en.wikipedia.org");
+    // never touches AFL Tables identity resolution
+    expect(hill.afltables_identity).toBeNull();
+  });
+
+  itPy("records absence honestly -- no Wikipedia href on the page means null, never invented", () => {
+    const { records } = wikipediaFixture();
+    const brad = records[`${BASE}/players/brad_miller/1`];
+    expect(brad.wikipedia_href_count).toBe(0);
+    expect(brad.distinct_wikipedia_href_count).toBe(0);
+    expect(brad.wikipedia_url).toBeNull();
+    expect(brad.wikipedia_url_reason).toContain("no Wikipedia href");
+    expect(brad.wikipedia_hrefs).toEqual([]);
+    // the AFL Tables identity this person DOES carry is unaffected by any of this
+    expect(brad.afltables_identity).toBe("players/B/Brad_Miller.html");
+  });
+
+  itPy("refuses to choose between multiple distinct Wikipedia candidates on one page", () => {
+    const { records } = wikipediaFixture();
+    const adam = records[`${BASE}/players/adam_houlihan/1`];
+    expect(adam.wikipedia_href_count).toBe(2);
+    expect(adam.distinct_wikipedia_href_count).toBe(2);
+    expect(adam.wikipedia_url).toBeNull();
+    expect(adam.wikipedia_url_reason).toContain("ambiguous");
+    expect(adam.wikipedia_hrefs.map((w: { href: string }) => w.href).sort()).toEqual([
+      "https://en.wikipedia.org/wiki/Adam_Houlihan",
+      "https://en.wikipedia.org/wiki/Adam_Houlihan_(footballer)",
+    ]);
+  });
+
+  itPy("captures an unrelated Wikipedia link verbatim -- relevance is never judged or fetched", () => {
+    const { records } = wikipediaFixture();
+    const brown = records[`${BASE}/players/michael_brown/1`];
+    expect(brown.wikipedia_href_count).toBe(1);
+    expect(brown.distinct_wikipedia_href_count).toBe(1);
+    expect(brown.wikipedia_url).toBe("https://en.wikipedia.org/wiki/Australian_Football_League");
+    expect(brown.wikipedia_url_reason).toBeNull();
+    expect(brown.wikipedia_hrefs[0].$note).toContain("later human identity review");
+  });
+
+  itPy("deduplicates the identical href linked twice -- not ambiguous", () => {
+    const { records } = wikipediaFixture();
+    const alex = records[`${BASE}/players/alex_van%20wyk/1`];
+    expect(alex.wikipedia_href_count).toBe(2);              // both anchor occurrences kept
+    expect(alex.distinct_wikipedia_href_count).toBe(1);      // one distinct candidate
+    expect(alex.wikipedia_url).toBe("https://en.wikipedia.org/wiki/Alex_van_Wyk");
+    expect(alex.wikipedia_url_reason).toBeNull();
+  });
+
+  itPy("reports Wikipedia coverage in the aggregate, separately from AFL Tables coverage", () => {
+    const fixture = buildB1Fixture();
+    expect(freezeSample(fixture).status).toBe(0);
+    seedPerson(fixture.personDir, "brad_miller", 1, {
+      html: synthPage("Brad Miller", ["http://afltables.com/afl/stats/players/B/Brad_Miller.html"]),
+    });
+    seedPerson(fixture.personDir, "andrew_hill", 1, {
+      html: synthPage("Andrew Hill", ["https://en.wikipedia.org/wiki/Andrew_Hill"]),
+    });
+    seedPerson(fixture.personDir, "adam_houlihan", 1, {
+      html: synthPage("Adam Houlihan", [
+        "https://en.wikipedia.org/wiki/Adam_Houlihan",
+        "https://en.wikipedia.org/wiki/Adam_Houlihan_(footballer)",
+      ]),
+    });
+    const run = runProfiler(["--label", B1_LABEL, "--snapshot-root", fixture.snapRoot]);
+    expect(run.status).toBe(0);
+    const summary = JSON.parse(readFileSync(
+      join(fixture.personDir, "parsed", "afltables_link_profile.json"), "utf8"));
+    expect(summary.wikipedia_link.with_wikipedia_url).toBe(1);        // andrew_hill only
+    expect(summary.wikipedia_link.ambiguous_multiple_hrefs).toBe(1);  // adam_houlihan only
+    const records = readProfileRecords(fixture.personDir);
+    expect(records[`${BASE}/players/brad_miller/1`].wikipedia_url).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Completion, manifest and resume semantics (offline, fully-classified snapshot)
 // ---------------------------------------------------------------------------
 
@@ -2342,5 +2490,403 @@ describe("Stage B2-3 explicit-decision ledger contract", () => {
       expect(d.identity_evidence).toBe("stage_b1_person_page_bridge");
       expect(d.target.source).toBe("afltables");
     }
+  });
+});
+
+// ===========================================================================
+// AFLDB-ISSUE-222 Stage B3 — whole-population person-page acquisition and the
+// person-page bridge (revised runbook §2, §3.3, §4.5, §5 Phase 1). Offline: every
+// test below uses a synthetic Stage A fixture (buildB1Fixture, already proven
+// above) and hand-built profiling output. Zero network, zero database.
+// ===========================================================================
+
+const b3SamplePath = join(root, "tools", "rebuild", "draftguru", "stage_b3_population.py");
+const exportBridgePath = join(root, "tools", "rebuild", "draftguru", "export_person_bridge.py");
+const b3SampleSource = readFileSync(b3SamplePath, "utf8");
+const exportBridgeSource = readFileSync(exportBridgePath, "utf8");
+const b3Contract = contract.person_stage.b3;
+
+const B3_LABEL = "person-html-20990102";
+
+function url(slug: string, ordinal = 1): string {
+  return `${BASE}/players/${slug}/${ordinal}`;
+}
+
+function runB3Sample(args: string[]): SpawnSyncReturns<string> {
+  return spawnSync(python, [b3SamplePath, ...args], { encoding: "utf8" });
+}
+function runExportBridge(args: string[]): SpawnSyncReturns<string> {
+  return spawnSync(python, [exportBridgePath, ...args], { encoding: "utf8" });
+}
+function freezeB3Sample(fixture: B1Fixture, extra: string[] = []): SpawnSyncReturns<string> {
+  return runB3Sample([
+    "--label", B3_LABEL,
+    "--stage-a-label", STAGE_A_FIXTURE_LABEL,
+    "--snapshot-root", fixture.snapRoot,
+    "--manifest-dir", fixture.manifestDir,
+    ...extra,
+  ]);
+}
+
+describe("Stage B3 contract (person_stage.b3)", () => {
+  it("declares the whole-population rule and reuses the Stage B1 label pattern", () => {
+    expect(b3Contract.stage).toBe("B3");
+    expect(b3Contract.person_snapshot.label_pattern)
+      .toBe(personStage.person_snapshot.label_pattern);
+    expect(b3Contract.person_snapshot.refused_labels.map((r: { label: string }) => r.label))
+      .toContain("person-html-20260826");
+    expect(b3Contract.sample_contract.primary_cohort).toBe("population");
+    expect(b3Contract.sample_contract.zero_game_cohort_tag).toBe("games_zero");
+  });
+
+  it("pins the crawl-failure ceiling and concentration triggers (runbook §2.6)", () => {
+    expect(b3Contract.crawl_failure_ceiling_pct).toBe(2.0);
+    expect(b3Contract.concentration_triggers.by_year_failed_pct).toBe(5.0);
+    expect(b3Contract.concentration_triggers.any_national_top10_failed).toBe(true);
+  });
+
+  it("restates the profiler's admissibility flags by name, exhaustively", () => {
+    const reasons = b3Contract.admissibility_flags.withhold_reasons;
+    expect(Object.keys(reasons).sort()).toEqual([
+      "malformed_afltables_link", "missing_or_dead_page", "multiple_afltables_candidates",
+      "no_afltables_link", "non_reducing_host", "parse_error", "self_link_disagreement",
+    ].sort());
+  });
+
+  it("declares the bridge dataset schema as additive to load_bridge()'s schema_version 1", () => {
+    expect(b3Contract.bridge_dataset_schema.schema_version).toBe(1);
+    expect(b3Contract.bridge_dataset_schema.additive_keys)
+      .toEqual(["withheld", "provenance", "parent_sha256", "target_registration"]);
+  });
+
+  it("never declares identity_complete/import_capable true for the raw snapshot itself", () => {
+    expect(b3Contract.manifest.rule).toContain("NEVER themselves become");
+  });
+});
+
+// The module docstring necessarily NAMES what it does not do ("zero legacy SQLite"), so
+// absence assertions run against the source with that docstring removed — the same
+// convention tests/draftguru-import.test.ts already applies to import_draftguru.py.
+function stripDocstring(source: string): string {
+  const first = source.indexOf('"""');
+  const second = source.indexOf('"""', first + 3);
+  return second === -1 ? source : source.slice(second + 3);
+}
+const b3SampleCode = stripDocstring(b3SampleSource);
+const exportBridgeCode = stripDocstring(exportBridgeSource);
+
+describe("Stage B3 sources (static pins)", () => {
+  it("carries zero legacy-store, zero application-database and zero network dependency", () => {
+    const lower = b3SampleCode.toLowerCase();
+    for (const forbidden of [
+      "afldb_legacy_sqlite", "sqlite", "connect_legacy",
+      "database_url", "postgres", "psql", "afldb_test_pre_rebuild",
+    ]) {
+      expect(lower).not.toContain(forbidden);
+    }
+    expect(b3SampleCode).not.toMatch(/^\s*(?:import|from)\s+(urllib|socket|requests)\b/m);
+  });
+
+  it("performs no destructive filesystem or data operation anywhere", () => {
+    for (const source of [b3SampleCode, exportBridgeCode]) {
+      for (const forbidden of ["DELETE", "TRUNCATE", "delete_missing", "rmtree", "os.remove", "unlink("]) {
+        expect(source).not.toContain(forbidden);
+      }
+    }
+  });
+
+  it("the exporter self-validates every dataset it writes against the load_bridge() schema", () => {
+    expect(exportBridgeSource).toContain("self_validate_bridge_schema");
+    expect(exportBridgeSource).toContain("readback");
+  });
+
+  it("the exporter opens no database connection outside --resolve-against", () => {
+    // psycopg is imported only inside read_target_registration(), never at module scope
+    // (a module-level import would be indented 0 columns; the real import sits inside a
+    // function body and is therefore indented).
+    expect(exportBridgeSource).not.toMatch(/^import psycopg/m);
+    expect(exportBridgeSource).toMatch(/^\s+import psycopg/m);
+  });
+});
+
+describe("Stage B3 population sample (spawned, synthetic Stage A fixture)", () => {
+  itPy("selects the WHOLE Stage A population as one 'population' cohort", () => {
+    const fixture = buildB1Fixture();
+    const run = freezeB3Sample(fixture);
+    expect(run.stderr).toBe("");
+    expect(run.status).toBe(0);
+    const sample = JSON.parse(
+      readFileSync(join(fixture.snapRoot, B3_LABEL, "sample.json"), "utf8"));
+    expect(sample.stage).toBe("B3");
+    expect(sample.counts.total).toBe(fixture.personCount);
+    expect(sample.counts.by_primary_cohort).toEqual({ population: fixture.personCount });
+    expect(sample.persons).toHaveLength(fixture.personCount);
+    expect(new Set(sample.selected_player_urls).size).toBe(fixture.personCount);
+    for (const person of sample.persons) {
+      expect(person.primary_cohort).toBe("population");
+    }
+  });
+
+  itPy("refuses to write under the accepted Stage B1 label", () => {
+    const fixture = buildB1Fixture();
+    const run = runB3Sample([
+      "--label", "person-html-20260826",
+      "--stage-a-label", STAGE_A_FIXTURE_LABEL,
+      "--snapshot-root", fixture.snapRoot, "--manifest-dir", fixture.manifestDir,
+    ]);
+    expect(run.status).toBe(1);
+    expect(run.stderr).toContain("refused for a Stage B3 population write");
+  });
+
+  itPy("is deterministic: a rebuild is byte-identical and --validate-only proves it", () => {
+    const fixture = buildB1Fixture();
+    expect(freezeB3Sample(fixture).status).toBe(0);
+    const first = readFileSync(join(fixture.snapRoot, B3_LABEL, "sample.json"));
+    expect(freezeB3Sample(fixture).status).toBe(0);
+    expect(readFileSync(join(fixture.snapRoot, B3_LABEL, "sample.json")).equals(first)).toBe(true);
+    const validate = freezeB3Sample(fixture, ["--validate-only"]);
+    expect(validate.status).toBe(0);
+    expect(validate.stdout).toContain("byte-identical");
+  });
+
+  itPy("tags reported-zero-games persons descriptively, never as a selection criterion", () => {
+    const fixture = buildB1Fixture();
+    expect(freezeB3Sample(fixture).status).toBe(0);
+    const sample = JSON.parse(
+      readFileSync(join(fixture.snapRoot, B3_LABEL, "sample.json"), "utf8"));
+    const zeroGame = sample.persons.filter((p: { eligibility_tags: string[] }) => p.eligibility_tags.includes("games_zero"));
+    expect(zeroGame.length).toBeGreaterThan(0);
+    for (const person of zeroGame) {
+      expect(person.reported_games_basis.all_rows_zero).toBe(true);
+      expect(person.primary_cohort).toBe("population");   // never re-cohorted by the tag
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Bridge export (source-evidence / resolve-against / review-sample) — hand-built
+// profiling output, so collision/withhold logic is tested directly and cheaply.
+// ---------------------------------------------------------------------------
+
+function buildBridgeFixture(records: unknown[]): {
+  snapRoot: string; manifestDir: string; label: string; profilePath: string;
+} {
+  const snapRoot = mkdtempSync(join(tmpdir(), "draftguru-b3-bridge-"));
+  const manifestDir = mkdtempSync(join(tmpdir(), "draftguru-b3-bridge-manifest-"));
+  const label = "person-html-20990103";
+  const personDir = join(snapRoot, label);
+  mkdirSync(join(personDir, "parsed"), { recursive: true });
+  const profilePath = join(personDir, "parsed", "person_profile.jsonl");
+  const bytes = Buffer.from(
+    `${(records as unknown[]).map((r) => JSON.stringify(r)).join("\n")}\n`, "utf8");
+  writeFileSync(profilePath, bytes);
+  writeFileSync(join(manifestDir, `${label}.json`), `${JSON.stringify({
+    snapshot_label: label,
+    stage: "B3",
+    sample_basis: {
+      stage_a_label: STAGE_A_FIXTURE_LABEL,
+      stage_a_manifest_sha256: "0".repeat(64),
+    },
+    parsed_outputs: {
+      person_profile: { path: "parsed/person_profile.jsonl", sha256: sha256(bytes) },
+    },
+  }, null, 2)}\n`, "utf8");
+  return { snapRoot, manifestDir, label, profilePath };
+}
+
+const NO_FLAGS = {
+  no_afltables_link: false, multiple_afltables_candidates: false, malformed_afltables_link: false,
+  missing_or_dead_page: false, self_link_disagreement: false, non_reducing_host: false, parse_error: false,
+};
+
+function canonicalRecord(url: string, identity: string) {
+  return {
+    player_url: url, terminal_classification: "fetched", afltables_identity: identity,
+    afltables_identity_reason: null, flags: { ...NO_FLAGS },
+  };
+}
+function noHrefRecord(url: string) {
+  return {
+    player_url: url, terminal_classification: "fetched", afltables_identity: null,
+    afltables_identity_reason: "no AFL Tables href on the page",
+    flags: { ...NO_FLAGS, no_afltables_link: true },
+  };
+}
+function pageFailedRecord(url: string) {
+  return {
+    player_url: url, terminal_classification: "failed", afltables_identity: null,
+    afltables_identity_reason: "page was not fetched -- terminal failure record",
+    flags: { ...NO_FLAGS, no_afltables_link: true, missing_or_dead_page: true },
+  };
+}
+function multipleCandidatesRecord(url: string) {
+  return {
+    player_url: url, terminal_classification: "fetched", afltables_identity: null,
+    afltables_identity_reason: "2 distinct AFL Tables identities on one page",
+    flags: { ...NO_FLAGS, multiple_afltables_candidates: true },
+  };
+}
+
+describe("Stage B3 bridge export --source-evidence", () => {
+  itPy("classifies every admissibility outcome by name, matching the contract", () => {
+    const fixture = buildBridgeFixture([
+      canonicalRecord(url("alice"), "players/A/Alice.html"),
+      noHrefRecord(url("bob")),
+      pageFailedRecord(url("carol")),
+      multipleCandidatesRecord(url("erin")),
+    ]);
+    const out = join(fixture.snapRoot, "parent.json");
+    const run = runExportBridge([
+      "--source-evidence", "--label", fixture.label,
+      "--snapshot-root", fixture.snapRoot, "--manifest-dir", fixture.manifestDir,
+      "--out", out,
+    ]);
+    expect(run.stderr).toBe("");
+    expect(run.status).toBe(0);
+    const parent = JSON.parse(readFileSync(out, "utf8"));
+    expect(parent.schema_version).toBe(1);
+    expect(parent.bridges).toEqual([
+      { player_url: url("alice"), afltables_external_id: "players/A/Alice.html" },
+    ]);
+    const reasons = Object.fromEntries(
+      parent.withheld.map((w: { player_url: string; reason: string }) => [w.player_url, w.reason]));
+    expect(reasons[url("bob")]).toBe("U-no-href");
+    expect(reasons[url("carol")]).toBe("U-page-failed");
+    expect(reasons[url("erin")]).toBe("U-inadmissible:multiple_afltables_candidates");
+    expect(parent.provenance.stage_a_label).toBe(STAGE_A_FIXTURE_LABEL);
+  });
+
+  itPy("refuses an unacknowledged collision and writes nothing", () => {
+    const fixture = buildBridgeFixture([
+      canonicalRecord(url("alice"), "players/A/Alice.html"),
+      canonicalRecord(url("dave"), "players/A/Alice.html"),
+    ]);
+    const out = join(fixture.snapRoot, "parent.json");
+    const run = runExportBridge([
+      "--source-evidence", "--label", fixture.label,
+      "--snapshot-root", fixture.snapRoot, "--manifest-dir", fixture.manifestDir,
+      "--out", out,
+    ]);
+    expect(run.status).toBe(1);
+    expect(run.stderr).toContain("acknowledge-bridge-collisions");
+    expect(existsSync(out)).toBe(false);
+  });
+
+  itPy("withholds BOTH sides of an acknowledged collision -- never a merge", () => {
+    const fixture = buildBridgeFixture([
+      canonicalRecord(url("alice"), "players/A/Alice.html"),
+      canonicalRecord(url("dave"), "players/A/Alice.html"),
+    ]);
+    const out = join(fixture.snapRoot, "parent.json");
+    const run = runExportBridge([
+      "--source-evidence", "--label", fixture.label,
+      "--snapshot-root", fixture.snapRoot, "--manifest-dir", fixture.manifestDir,
+      "--acknowledge-bridge-collisions", "--out", out,
+    ]);
+    expect(run.status).toBe(0);
+    const parent = JSON.parse(readFileSync(out, "utf8"));
+    expect(parent.bridges).toEqual([]);
+    const reasons = Object.fromEntries(
+      parent.withheld.map((w: { player_url: string; reason: string }) => [w.player_url, w.reason]));
+    expect(reasons[url("alice")]).toMatch(/^collision:/);
+    expect(reasons[url("dave")]).toMatch(/^collision:/);
+  });
+
+  itPy("refuses when the profiling output does not match the tracked manifest sha256", () => {
+    const fixture = buildBridgeFixture([canonicalRecord(url("alice"), "players/A/Alice.html")]);
+    writeFileSync(fixture.profilePath,
+      `${JSON.stringify(canonicalRecord(url("alice"), "players/A/Tampered.html"))}\n`, "utf8");
+    const out = join(fixture.snapRoot, "parent.json");
+    const run = runExportBridge([
+      "--source-evidence", "--label", fixture.label,
+      "--snapshot-root", fixture.snapRoot, "--manifest-dir", fixture.manifestDir,
+      "--out", out,
+    ]);
+    expect(run.status).toBe(1);
+    expect(run.stderr).toContain("does not match the tracked manifest");
+    expect(existsSync(out)).toBe(false);
+  });
+
+  itPy("every output round-trips through the local load_bridge()-shape self-check", () => {
+    const fixture = buildBridgeFixture([
+      canonicalRecord(url("alice"), "players/A/Alice.html"),
+      canonicalRecord(url("erin"), "players/E/Erin.html"),
+    ]);
+    const out = join(fixture.snapRoot, "parent.json");
+    expect(runExportBridge([
+      "--source-evidence", "--label", fixture.label,
+      "--snapshot-root", fixture.snapRoot, "--manifest-dir", fixture.manifestDir,
+      "--out", out,
+    ]).status).toBe(0);
+    const parent = JSON.parse(readFileSync(out, "utf8"));
+    expect(parent.bridges).toHaveLength(2);
+    // schema_version 1 and bridges[] are exactly what import_draftguru.py's load_bridge()
+    // reads; the extra keys (withheld, provenance) must not break that reader.
+    expect(parent.schema_version).toBe(1);
+    for (const entry of parent.bridges) {
+      expect(entry).toHaveProperty("player_url");
+      expect(entry).toHaveProperty("afltables_external_id");
+    }
+  });
+});
+
+describe("Stage B3 bridge export --review-sample", () => {
+  function buildReviewFixture() {
+    const fixture = buildBridgeFixture([
+      canonicalRecord(url("alice"), "players/A/Alice.html"),   // national pick 3 -> census
+      canonicalRecord(url("dave"), "players/D/Dave.html"),     // national pick 9 -> census
+      canonicalRecord(url("bob2"), "players/B/Bob2.html"),     // national pick 55 -> random
+      canonicalRecord(url("carol2"), "players/C/Carol2.html"), // rookie -> random
+    ]);
+    mkdirSync(join(fixture.snapRoot, STAGE_A_FIXTURE_LABEL, "parsed"), { recursive: true });
+    writeFileSync(join(fixture.snapRoot, STAGE_A_FIXTURE_LABEL, "parsed", "rows.jsonl"), [
+      { player_url: url("alice"), draft_year: 2001, event_type_raw: "National", pick_number: 3 },
+      { player_url: url("dave"), draft_year: 2001, event_type_raw: "National", pick_number: 9 },
+      { player_url: url("bob2"), draft_year: 2002, event_type_raw: "National", pick_number: 55 },
+      { player_url: url("carol2"), draft_year: 2003, event_type_raw: "Rookie", pick_number: 12 },
+    ].map((r) => JSON.stringify(r)).join("\n") + "\n", "utf8");
+    const parentOut = join(fixture.snapRoot, "parent.json");
+    expect(runExportBridge([
+      "--source-evidence", "--label", fixture.label,
+      "--snapshot-root", fixture.snapRoot, "--manifest-dir", fixture.manifestDir,
+      "--out", parentOut,
+    ]).status).toBe(0);
+    return { fixture, parentOut };
+  }
+
+  itPy("puts every bridged national top-10 person in the census stratum, exhaustively", () => {
+    const { fixture, parentOut } = buildReviewFixture();
+    const reviewOut = join(fixture.snapRoot, "review.json");
+    const run = runExportBridge([
+      "--review-sample", parentOut, "--snapshot-root", fixture.snapRoot,
+      "--salt", "AFLDB-ISSUE-222/test-v1", "--n", "10", "--out", reviewOut,
+    ]);
+    expect(run.stderr).toBe("");
+    expect(run.status).toBe(0);
+    const review = JSON.parse(readFileSync(reviewOut, "utf8"));
+    const census = review.census_stratum.map((c: { player_url: string }) => c.player_url).sort();
+    expect(census).toEqual([url("alice"), url("dave")].sort());
+    const random = review.random_stratum.map((c: { player_url: string }) => c.player_url).sort();
+    expect(random).toEqual([url("bob2"), url("carol2")].sort());
+    expect(new Set([...census, ...random]).size).toBe(4);   // no overlap
+    for (const entry of [...review.census_stratum, ...review.random_stratum]) {
+      expect(entry.verdict).toBeNull();   // unreviewed
+    }
+  });
+
+  itPy("the random stratum is deterministic for one salt and n truncates it", () => {
+    const { fixture, parentOut } = buildReviewFixture();
+    const outA = join(fixture.snapRoot, "review-a.json");
+    const outB = join(fixture.snapRoot, "review-b.json");
+    for (const out of [outA, outB]) {
+      expect(runExportBridge([
+        "--review-sample", parentOut, "--snapshot-root", fixture.snapRoot,
+        "--salt", "AFLDB-ISSUE-222/test-v1", "--n", "1", "--out", out,
+      ]).status).toBe(0);
+    }
+    const a = JSON.parse(readFileSync(outA, "utf8"));
+    const b = JSON.parse(readFileSync(outB, "utf8"));
+    expect(a.random_stratum).toEqual(b.random_stratum);
+    expect(a.random_stratum).toHaveLength(1);
   });
 });

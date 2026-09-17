@@ -4,11 +4,13 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 1
+**Open issues:** 3
 
 | ID | Title | Severity | Area | State | Next action |
 |---|---|---|---|---|---|
 | AFLDB-ISSUE-220 | Web service credential boundary contradicts the application's `afldb_import` requirement; owner-role code-test DSN and a complete `.env` copy reach the internet-facing process | High | Deployment / runtime security | Open — DEV evidence complete 2026-09-17; runtime branch (a) settled from Next source: the standalone server loads `.next/standalone/.env` at start-up | Sonnet 5 implements `AFLDB-ISSUE-220.md` §6 in a fresh worktree; first establish the build copy mechanism (§4b) |
+| AFLDB-ISSUE-222 | Trusted draft-player linking: DraftGuru Stage B3 person-page acquisition and the person-page bridge into `draft_persons`/`draft_picks` (successor to ISSUE-164 D-9 / ISSUE-093 Stage B3, per ISSUE-221's follow-up) | High | Data acquisition / import — `tools/rebuild/draftguru/`, `tools/db/rebuild-test.ts` | Open — Phase 1 tooling implemented and unit-validated 2026-09-18 (Sonnet 5); Phase 2 (network acquisition) and Phase 3 (bridge derivation/review) NOT authorised or started; no DB/DEV/PROD write | Operator decides O-1 (review-sample n), O-2 (provenance in `external_identities.notes`), O-3 (crawl-failure ceiling/concentration triggers) and separately approves Phase 2 acquisition before `AFLDB-ISSUE-222.md` §5 Phase 2 runs |
+| AFLDB-ISSUE-223 | Pre-existing DB-free test regression: `tests/draftguru-acquisition.test.ts`'s "keeps the mapping's draft_type vocabulary set-equal to GRID_DRAFT_TYPES" fails on current `main` — `GRID_DRAFT_TYPES` in `src/search/grid-solver-spec.ts` was reshaped from a bare string array to `{ value; label }[]` by AFLDB-ISSUE-221 (`f1a8daca`), and the consuming regex (`/export const GRID_DRAFT_TYPES = \[([\s\S]*?)\] as const;/`) no longer matches | Low | Test tooling — `tests/draftguru-acquisition.test.ts`, `src/search/grid-solver-spec.ts` | Open — found 2026-09-18 during AFLDB-ISSUE-222 Phase 1 validation; confirmed via `git log -1 -- src/search/grid-solver-spec.ts` = `f1a8daca` (the ISSUE-221 implementation commit); no production code affected, DB-free unit test only | Update the test's extraction regex (or assertion) to the current `GRID_DRAFT_TYPES: { value; label }[]` shape and re-verify the vocabulary is still set-equal in both directions |
 
 AFLDB-ISSUE-220 opened 2026-09-17 (Fable 5.1 code review outside NL search, DEV evidence
 operator-gathered on streamanator, no values printed). `deploy/afldb.service` drops
@@ -35350,3 +35352,394 @@ this issue's scope was the five Grid Solver defects and honest reporting of the 
   unrelated to the current main-only workflow (see Commit/merge/DEV rollout above); it is now on
   `main`. No tracked issue opened — recorded here for the operator's awareness in case another
   process expects the old branch name.
+
+## AFLDB-ISSUE-222 — Trusted draft-player linking: DraftGuru Stage B3 person-page acquisition and the person-page bridge into `draft_persons` / `draft_picks`
+
+**Status: Open.** Successor to the draft-linkage follow-up recorded on `AFLDB-ISSUE-221`
+(resolved above) and to `AFLDB-ISSUE-164` D-9 / `AFLDB-ISSUE-093` Stage B3 (neither reopened;
+D-9 stays in force). Full runbook: `AFLDB-ISSUE-222.md` (revision 2, operator-approved for
+Phase 1 only). Full evidence: `AFLDB-ISSUE-221.md` §2–§5.
+
+### Root cause of the reported gap (cited, not re-investigated)
+Every `draft_picks`-backed answer in the product is drawn from 5 linked rows of 6,810 on every
+current database — the 5 explicit human decisions in `data/reference/draftguru-link-decisions.json`.
+The historical automatic linker (retired `tools/migration/import_draft.py`) is permanently excluded
+(`AFLDB-ISSUE-093` Stage B2-7); nothing human was lost and nothing is recoverable by repair — the
+population must be acquired from DraftGuru person pages and bridged to AFL Tables identities
+(`AFLDB-ISSUE-093` Stage B3, `AFLDB-ISSUE-164` §12 P1c).
+
+### Phase 1 implementation (2026-09-18, Sonnet 5, worktree `afldb-issue-222`, branch `sonnet/issue-222`)
+
+Boundary honoured: no network request; no database write outside the isolated integration-test
+database, and only through the test suites; no change to `apply_authority()`'s authority order
+or HALT semantics; no change to any Stage A/B1 artefact; `person-html-20260826` stays refused for
+Stage B3 writes; no name-based matching anywhere; `AFLDB-ISSUE-164` D-9 untouched.
+
+**Files changed:**
+- `tools/rebuild/draftguru/draftguru-contract.json` — new `person_stage.b3` block (population
+  rule, label-pattern reuse with `person-html-20260826` explicitly refused, sample contract,
+  manifest-earning conditions, crawl-failure ceiling 2.0%, concentration triggers, admissibility
+  flags restated by name, bridge-dataset schema, review-sample stratification rule).
+- `tools/rebuild/draftguru/stage_b3_population.py` (new) — whole-population sample freeze: every
+  distinct `player_url` in the accepted Stage A snapshot, one `primary_cohort: "population"`,
+  refuses the Stage B1 accepted label outright, deterministic/timestamp-free.
+- `tools/rebuild/draftguru/profile_person_pages.py` — `load_sample()` now accepts a Stage B3
+  population-shaped sample (validated against the Stage A-derived count, never a fixed 120) as
+  well as the unchanged Stage B1 120-person contract; new `load_year_top10_national_urls()` /
+  `load_year_top10_index()`, `crawl_failure_ceiling_report()` and
+  `failure_concentration_breakdown()` add the §2.6 by-year / national-top-10 reporting to the
+  profiler aggregate (`afltables_link_profile.json`), gated to Stage B3 samples only.
+- `tools/rebuild/draftguru/acquire_persons.py` — the acquisition manifest's `stage` field now
+  reflects the sample's own declared stage (was hardcoded `"B1"`); threads the Stage A
+  year/top-10 index into `run_profile()` for Stage B3 runs.
+- `tools/rebuild/draftguru/export_person_bridge.py` (new) — `--source-evidence` (offline,
+  applies every §14 admissibility flag, refuses an unacknowledged AFL-Tables-identity
+  collision, writes the immutable source-evidence parent), `--resolve-against <target>`
+  (read-only, rolled-back registration export against `afldb_test`/`dev`, filters to identities
+  registered exactly once, writes the per-target deployment dataset), `--review-sample`
+  (offline, the §3.5 census + salted random strata). Every output self-validates against a
+  local, dependency-free reimplementation of `import_draftguru.py`'s `load_bridge()` schema
+  check before being written.
+- `tools/db/rebuild-test.ts` — new `Options.draftguruBridge` / `--draftguru-bridge`;
+  `draftguruImportArgv()` / `draftguruValidateArgv()` gain an optional `bridge` parameter
+  (`--bridge <path>`); the `draftguru` stage and its preflight now prove the bridge file exists
+  before anything is destroyed; `finalValidationChecks()` gains an optional `draftguru.bridged`
+  expectation (`draft_persons_bridged`, `link_status = 'unique' AND match_method =
+  'draftguru_person_page_afltables_bridge'`); `finalValidationSql()` now accepts the bridge path
+  and reads the expected count from the SAME deployment dataset the data stage imports, never a
+  typed constant. Absent by default — every existing no-bridge test and the full 285/293→293/293
+  rebuild-test suite pass unchanged.
+- `tests/integration/gridley-corpus.test.ts` — new `AFLDB_GRIDLEY_SCORE_DRAFT=1` override forces
+  `gaps.draftLinks = true` (the probe's measured value is still logged); every other gap, the
+  strict/diagnostic split and the "NOT an acceptance run" notice are untouched.
+- `tests/draftguru-acquisition.test.ts` — extended (DB-free) with the Stage B3 contract pins,
+  source pins, `stage_b3_population.py` spawn tests (whole-population selection, refusal of the
+  accepted Stage B1 label, determinism, zero-game tagging) and `export_person_bridge.py` spawn
+  tests (admissibility classification, unacknowledged/acknowledged collision handling, manifest
+  sha256 tamper detection, `load_bridge()`-shape self-validation, review-sample census/random
+  stratification and determinism).
+- `tests/db-test-rebuild.test.ts` — extended with the bridge-wiring unit tests (argv threading,
+  preflight file-existence gate, `finalValidationChecks`/`finalValidationSql` bridged
+  expectation, refusal on a missing/malformed bridge file).
+- `tests/integration/draftguru-import.test.ts` — extended (isolated `afldb_test`, **not run this
+  session — see Blockers**) with: idempotent reload of the same `--bridge` dataset; HALT and no
+  replacement player when a bridge names an unregistered AFL Tables identity; and
+  `export_person_bridge.py --resolve-against afldb_test` withholding that unregistered identity
+  (`target_not_registered`) so the filtered deployment dataset then imports with 0 HALTs.
+- `IssuesIndex.md`, `issues.md` (this entry and the Open Issues table) — tracking only.
+
+**Deliberately not implemented in Phase 1** (later phases, per the runbook): the
+`draftguruLabel`/Stage A parity regression checks against the 120 B1 anchors (Phase 2); the O-2
+`external_identities.notes` provenance extension to `import_draftguru.py` (default: not changed);
+PROD support in `export_person_bridge.py --resolve-against` (explicitly refused — no reviewed
+read-only PROD DSN path exists yet for this tool).
+
+### Validation (2026-09-18, Sonnet 5, workstation)
+- DB-free: `npx vitest run tests/draftguru-acquisition.test.ts tests/draftguru-import.test.ts` —
+  **168/168 new-and-existing tests pass**, 9 skipped (no `.venv`/Stage A snapshot in this
+  worktree — Python-spawn tests skip by existing design), **1 pre-existing failure, unrelated**
+  (see `AFLDB-ISSUE-223`).
+- `npx vitest run tests/db-test-rebuild.test.ts` — **293/293 pass** (8 new bridge-wiring tests;
+  0 regressions in the 285 pre-existing tests).
+- `npx tsc --noEmit -p .` — **clean**.
+- `npx eslint` on every touched/new file — **clean** for `tools/db/rebuild-test.ts`,
+  `tests/integration/gridley-corpus.test.ts`, `tests/db-test-rebuild.test.ts` and
+  `tests/integration/draftguru-import.test.ts`; `tests/draftguru-acquisition.test.ts` carries
+  49 **pre-existing** `@typescript-eslint/no-explicit-any` violations (all at lines ≤2328, none
+  introduced by this change — confirmed the edit is purely additive via `git diff --stat`); every
+  line this issue added (≥2348) is lint-clean.
+- Smoke-tested `stage_b3_population.py` and `export_person_bridge.py` end-to-end against a
+  synthetic Stage A fixture outside the repo (`D:\tmp`, removed after) before writing the vitest
+  suite: whole-population selection, unacknowledged/acknowledged collision handling, and
+  review-sample census/random stratification all matched expectations.
+- Not run this session (no `.env` in this worktree — `data/reference` DSNs are unconfigured):
+  `tests/integration/draftguru-import.test.ts`'s new isolated-`afldb_test` cases, and therefore
+  the runbook's §5 Phase 1 "isolated test database" gate is only **code-complete, not executed**.
+  `npm run build`, browser checks, DEV/PROD — out of Phase 1's boundary regardless.
+
+### Phase 1 validation, continued (2026-09-18, Sonnet 5, workstation, operator-supplied `.env`)
+
+The operator copied the real `.env` into this worktree. Re-validated in order:
+
+1. **Target/guard verification, no credentials printed.** Parsed `.env` offline (never sourced):
+   `AFLDB_TEST_DATABASE_URL` targets database `afldb_test` (path component only, printed);
+   `AFLDB_IMPORT_DATABASE_URL`/`AFLDB_OWNER_DATABASE_URL` target `afldb_dev`, as expected.
+   `tests/setup.ts:48` confirmed by inspection: `if (!/_test$/.test(database)) throw` — any
+   non-`_test`-suffixed name is refused before any query runs.
+2. **`npx vitest run tests/integration/draftguru-import.test.ts` — first attempt (port 5432, the
+   `.env` default): FAILED at the suite's own connectivity preflight** —
+   `tests/integration/guard.ts` threw `Integration test database preflight failed
+   (host=127.0.0.1, port=5432, database=afldb_test)`. **1 test file failed to start, 0 tests
+   collected.** This workstation has no local PostgreSQL; `afldb_test` is reached only through an
+   SSH tunnel (established convention, see prior sessions' notes) — a local port check (no SSH
+   invoked) confirmed a tunnel was already listening on **55432**, not the `.env` default 5432.
+3. **Same command, rerun with the port corrected to 55432 via a session-only environment
+   override (`.env` on disk untouched, DSN never printed)**, and `AFLDB_TEST_IMPORT_DATABASE_URL`
+   derived the same way a prior session did (swap `AFLDB_IMPORT_DATABASE_URL`'s database name to
+   `afldb_test`, same tunnel port — `afldb_import` already has rights on `afldb_test`): the
+   connectivity preflight now **passed**, but the whole `describe.skipIf(!canRun)` block still
+   **skipped — 24 tests skipped, 0 passed, 0 failed.** Root cause, confirmed by inspection of
+   `canSpawnImporter` in the test file: it additionally requires
+   `data/sources/draftguru/annual-html-20260826/raw/years` to exist locally — the accepted Stage A
+   snapshot's raw HTML pages. **This directory does not exist in this worktree** (it is
+   gitignored, as Stage A always has been) and, checked across every sibling worktree on this
+   machine, exists nowhere reachable except as an **empty placeholder directory** in the main
+   `afldb` checkout (`annual-html-20260826/` with no `raw/years` inside). Re-acquiring it would be
+   genuine network acquisition, which the operator explicitly excluded from this pass.
+   **Consequence: no test that spawns the real `import_draftguru.py` — new or pre-existing — can
+   run in this environment right now**, DB-backed or DB-free (the DB-free
+   `tests/draftguru-import.test.ts` bridge tests are gated on the identical directory and were
+   already skipped for the same reason before this pass, see below).
+4. **`export_person_bridge.py --resolve-against afldb_test` verified directly against the live
+   database** (bypassing the vitest gate, since this code path needs no Stage A snapshot — only a
+   database connection and a hand-built bridge JSON; one rolled-back read-only transaction, no
+   writes): built a parent bridge naming one **real** registered AFL Tables identity (queried
+   read-only) plus one never-registered fake identity; ran the corrected tool with
+   `AFLDB_TEST_DATABASE_URL` (the fixed env var, not the nonexistent
+   `AFLDB_TEST_OWNER_DATABASE_URL` from the first Phase 1 pass) pointed at the tunnel. **Result:
+   PASS** — the registered identity stayed in `bridges[]`, the fake one was withheld with reason
+   `target_not_registered`; `target_registration.count` reported 13,275 (consistent with this
+   database's known registered-identity population). This is the "withheld on a resolved
+   [deployment] one" half of the runbook's unregistered-target requirement, confirmed for real.
+5. **Propagation invariant checked read-only against `afldb_test`'s current live state** (not a
+   fresh reload — that needs the missing Stage A snapshot): for every `draft_picks` row, its
+   `player_id`/`link_status`/`match_method` must equal its `draft_persons` row's. **0 mismatches
+   across all 6,810 picks** (5 resolved/human-linked, 0 bridge-linked — matching the known
+   pre-bridge baseline). This confirms the invariant `pick_rows()` is supposed to maintain
+   currently holds, but does **not** exercise a fresh `--bridge` reload.
+6. **The other properties the runbook requires — idempotency of a `--bridge` reload, HALT on an
+   unregistered target through the real importer (not just the pre-filtering
+   `--resolve-against` step), human-decision precedence across a reload, and the rollback/audit
+   behaviour on a failed run — remain unverified by execution this session**, blocked by item 3.
+   The code for all four (three of them entirely pre-existing `import_draftguru.py` behaviour,
+   unchanged by this issue) was reviewed at the source level in the first Phase 1 pass and the
+   new regression tests for them are written in `tests/integration/draftguru-import.test.ts`, but
+   **written and code-reviewed is not the same as executed, and is not claimed as validated here.**
+
+**Exact counts, reported separately (the prior "168/168 pass … 1 failure" phrasing was
+ambiguous):**
+
+| Suite | Passed | Failed | Skipped | Total |
+|---|---|---|---|---|
+| `tests/draftguru-acquisition.test.ts` + `tests/draftguru-import.test.ts` (DB-free) | 168 | 1 (AFLDB-ISSUE-223, pre-existing, unrelated) | 9 | 178 |
+| `tests/db-test-rebuild.test.ts` | 293 | 0 | 0 | 293 |
+| `tests/integration/draftguru-import.test.ts` (port 5432, no tunnel) | 0 | 0 test files ran — suite failed to start (1 failed test **file**, connectivity preflight) | 0 | 0 tests collected |
+| `tests/integration/draftguru-import.test.ts` (port 55432, tunnel, Stage A snapshot absent) | 0 | 0 | 24 | 24 |
+
+**Which of the 9 DB-free skips cover new Stage B3 behaviour: none.** All 9 are pre-existing gates
+requiring either the accepted Stage A raw-HTML snapshot or the frozen CSV parity corpus (both
+absent, both predating this issue, neither is B3-specific):
+`snapshot layout > the frozen CSV corpus itself is intact`; `frozen Stage B1 sample (local
+snapshot) > rebuilds byte-identically` / `is the frozen 120/8/68/30/14 contract`; `legacy draft
+importer retirement > actually fails when invoked`; and four `DraftGuru importer — Phase A
+against the accepted snapshot` cases (`validates the whole input set without a database`,
+`accepts a well-formed synthetic bridge dataset`, `refuses a bridge that binds one AFL Tables
+identity to two persons`, `refuses a bridge whose identity is not the canonical profile form`,
+`refuses a bridge keyed on a non-canonical player_url`). Every Stage B3 test this issue added
+(`stage_b3_population.py`, `export_person_bridge.py`) uses a **synthetic** fixture built with
+`mkdtempSync`, not the accepted snapshot, and is gated only on Python being available — all of
+them already ran for real and passed, counted in the 168.
+
+### Phase 1 validation, closed out (2026-09-18, Sonnet 5, workstation, real `afldb_test` over the live 55432 tunnel)
+
+The operator confirmed SSH to `streamanator` and authorised locating/copying the existing
+(already-acquired) accepted Stage A snapshot — not a fresh acquisition. Sequence:
+
+1. **Located** the snapshot on `streamanator` at
+   `/home/arm/projects/afldb/data/sources/draftguru/annual-html-20260826` (14 MB) via the
+   existing SSH access (Windows OpenSSH + the already-loaded agent key; the on-disk
+   `~/.ssh/id_ed25519` Git Bash tried first is not the authorised key for this host and was not
+   used further).
+2. **Verified before copying**: all 42 `raw/years/*.html` pages' sha256 matched the tracked
+   `docs/rebuild-manifests/draftguru/annual-html-20260826.json` exactly (0 mismatches); remote
+   `parsed/persons.jsonl` / `parsed/rows.jsonl` line counts were 5,057 / 6,810, matching the
+   manifest's `distinct_player_url_count` / `total_rows`.
+3. **Copied** via `scp -r` into this worktree's (gitignored) `data/sources/draftguru/`, then
+   **re-verified byte-exact locally**: all 42 raw pages' sha256 matched the manifest again after
+   transfer (0 mismatches) — no CRLF/encoding corruption.
+4. **Connectivity confirmed** against `afldb_test` (read-only `SELECT`, existing 55432 tunnel, no
+   new tunnel started) before any test ran: baseline reconfirmed unchanged (6,810 picks, 5
+   resolved/human-linked, 0 bridge-linked, 0 propagation mismatches).
+5. **`npx vitest run tests/integration/draftguru-import.test.ts`**, session-only DSN port
+   override to 55432 (`.env` on disk untouched, DSN never printed): **first run 23/24 passed, 1
+   failed** — the failure was a bug in this issue's own new test (`halts and creates no
+   replacement when a bridge names an unregistered afltables target` asserted the WRONG expected
+   substring, `'Refusing to create a replacement player'`, which belongs to the ledger-path HALT
+   exercised by the pre-existing `missing afltables target` test; the bridge path's own HALT
+   message is `"a bridge target resolves to 0 canonical players ... expected exactly one"` —
+   corrected the assertion text; the importer's actual behaviour was already correct). Re-ran the
+   corrected test alone (PASS), then the **whole suite clean: 24/24 passed, 0 failed, 0
+   skipped**, ~870s. `afldb_test` reconfirmed settled back to the exact baseline afterward (6,810
+   / 5 resolved / 0 bridge-linked / 0 mismatches) — the suite's own teardown/reload-to-baseline
+   worked correctly.
+6. DB-free suites re-run with the snapshot now present: `tests/draftguru-acquisition.test.ts` +
+   `tests/draftguru-import.test.ts` moved from **168 passed / 9 skipped** to **174 passed / 3
+   skipped** (178 total); the 3 remaining skips (frozen CSV parity corpus, Stage B1's own
+   120-sample local rebuild check) need `full-history-20260826` / `person-html-20260826`, which
+   were **not** copied this pass (only `annual-html-20260826` was authorised) — still pre-existing
+   gates, still none is B3-specific. The 1 pre-existing `GRID_DRAFT_TYPES` failure
+   (AFLDB-ISSUE-223) is unaffected, confirmed still present and still unrelated. `tsc --noEmit`
+   clean; `eslint` clean on the corrected file.
+
+**Runbook coverage now genuinely confirmed by execution, not just code review:** bridge
+propagation (every linking/reload test), idempotency (`is idempotent when the same bridge
+dataset is loaded twice`), unregistered-target handling on **both** paths (the real importer's
+own HALT, and `export_person_bridge.py --resolve-against` withholding it so the filtered
+deployment dataset then imports with 0 HALTs), human-decision precedence (5 tests in `live human
+decision authority`, plus the bridge-contradicts-a-decision HALT), and rollback/durable-audit
+behaviour (`failed run: rollback and durable audit`).
+
+### Blockers for Phase 1 closure — final status
+1. ~~No `.env` in this worktree~~ — resolved.
+2. ~~`.env` names port 5432; the tunnel is on 55432~~ — worked around with a session-only
+   override every run this session; `.env` on disk is unchanged (still names 5432), so a future
+   session will need the same override, or the operator can correct it durably.
+3. ~~Accepted Stage A snapshot absent~~ — resolved: verified and copied from `streamanator` as
+   authorised (data/sources/draftguru/ stays gitignored, nothing committed).
+4. ~~`--resolve-against` env-var naming bug~~ — verified fixed against the real database.
+5. ~~New test asserting the wrong HALT message substring~~ — found and fixed this pass.
+
+**Phase 1 gate: satisfied.** Every requirement listed in the revised runbook's §5 Phase 1 gate —
+DB-free tooling tests, `tsc`/`eslint`, and the isolated-`afldb_test` integration suite covering
+propagation, idempotency, unregistered-target handling, human-decision precedence and
+rollback/audit — is now genuinely executed and green. Remaining pre-existing, out-of-scope items
+(AFLDB-ISSUE-223; the 3 DB-free skips needing artefacts not authorised for this pass) are tracked
+separately and do not gate Phase 1.
+
+### O-1 / O-2 / O-3 — DECIDED 2026-09-18 (operator), recorded in `AFLDB-ISSUE-222.md` §0/§3.5/§4.3/§2.6/§8.2
+- **O-1** census stratum in full (every bridged National Draft top-10 person) plus a random
+  stratum of **n = 598** of the remaining bridged persons (the §3.5 0.5%-bound row). The
+  revision 2 sampling rule (salted `sha256(salt + "\|" + player_url)` ordering,
+  `"AFLDB-ISSUE-222/v1"` salt) and failure-handling rule (no redraw-until-clean) are preserved
+  unchanged — this decision sets `n` only.
+- **O-2** no change to `import_draftguru.py`'s `external_identities.notes`; provenance stays in
+  the dataset artefacts and `draft_persons.confidence_notes`, exactly as already implemented.
+- **O-3** stop for diagnosis when: overall terminal-failure rate exceeds 2%; any single draft
+  year's failure rate exceeds 5%; or any failed identity holds a National Draft top-10 pick.
+  Matches the contract's `person_stage.b3.crawl_failure_ceiling_pct` (2.0) and
+  `concentration_triggers` exactly — already implemented in Phase 1, no code change required.
+
+### Phase 2 — AUTHORISED, narrowly (2026-09-18)
+The operator authorised **exactly one** new Stage B3 whole-population acquisition run (one new
+immutable `person-html-<YYYYMMDD>` snapshot), under the existing robots/pacing/retry/immutability
+rules. **Not authorised:** any database import, any DEV/PROD write, deployment, or Phase 3/4/5.
+Recorded in `AFLDB-ISSUE-222.md` §11.3. The fresh-session handoff for the acquisition session is
+`AFLDB-ISSUE-222-PHASE2-HANDOFF.md` (see below) — that document, not this paragraph, is the
+operating brief; its own boundary section is authoritative for what the acquisition session may
+and may not do.
+
+### Additional requirement before commit — person-page Wikipedia link capture (2026-09-18)
+Operator instruction: DraftGuru person pages also link to a player's Wikipedia page; capture
+these during the planned Phase 2 acquisition for later human identity review, without fetching
+Wikipedia, changing canonical player links or altering the AFL Tables bridge in any way.
+
+**Checked first:** the parser already recorded a Wikipedia href generically, inside
+`external_vocabulary` (one bucket for every non-AFL-Tables external host on the page,
+`recognised_vocabulary: true` for `wikipedia.org`/`en.wikipedia.org`) — but with no dedicated
+field, no single-candidate/ambiguity resolution, and no way to query "does this person have a
+captured Wikipedia link" without scanning that generic list. **Extended, additively** (the
+generic `external_vocabulary` capture is unchanged, still runs):
+- New contract block `person_stage.wikipedia_link` (`tools/rebuild/draftguru/draftguru-contract.json`):
+  hosts, identity/ambiguity/relatedness/fetch rules — explicit that a Wikipedia href is evidence
+  only, never identity, never fetched, in any phase.
+- `profile_person_pages.py` `profile_person()`: new `wikipedia_hrefs` (every anchor occurrence,
+  verbatim), `wikipedia_href_count` / `distinct_wikipedia_href_count`, `wikipedia_url` /
+  `wikipedia_url_reason` (the single distinct candidate, or `null` with a reason for absence or
+  ambiguity — never guessed). A single captured link is **not** verified relevant (the tool
+  cannot know without fetching Wikipedia, which it never does) — a documented limitation, not a
+  defect. `aggregate()` gains a `wikipedia_link` coverage section
+  (`with_wikipedia_url`/`ambiguous_multiple_hrefs`/coverage percentages).
+- Tests added to `tests/draftguru-acquisition.test.ts` (DB-free, synthetic fixtures, separate
+  from the existing `profiledFixture()` so its hardcoded counts are undisturbed): single href
+  captured verbatim and additively to the general vocabulary stream; absence recorded honestly;
+  multiple distinct hrefs refused/ambiguous; a present-but-plainly-**unrelated** href (a general
+  AFL topic page, not a player biography) still captured verbatim because relevance is never
+  judged; the identical href linked twice deduplicated to one candidate, not ambiguous; aggregate
+  coverage counts. **6 new tests, all passing.**
+- **Validation (DB-free only — nothing touching the database changed):**
+  `vitest run tests/draftguru-acquisition.test.ts tests/draftguru-import.test.ts` **180 passed /
+  1 failed (still AFLDB-ISSUE-223, unrelated) / 3 skipped (unchanged) / 184 total**; `tsc --noEmit`
+  clean; `eslint` clean on every touched line (verified by line-range check against the known
+  pre-existing-error line numbers). The isolated-`afldb_test` integration suite was **not**
+  re-run — this change has no database interaction to exercise.
+- Updated `AFLDB-ISSUE-222-PHASE2-HANDOFF.md` §1/§5a/§8/§9 with the capture behaviour, the new
+  output fields, and what to report — no new acquisition command; capture happens inside the
+  already-authorised profiling step.
+
+### Next action
+Operator runs the acquisition session from `AFLDB-ISSUE-222-PHASE2-HANDOFF.md`. After Phase 2
+completes: the operator reviews the run (crawl-failure ceiling/concentration findings per O-3),
+then Phase 3 (bridge derivation + §3.5 review, using the now-DECIDED n = 598) requires its own
+separate authorisation — not implied by the Phase 2 authorisation above.
+
+### Follow-up assessment (bounded, written only — no code, no network) — Wikipedia and existing AFLDB records for persons unresolved after the DraftGuru bridge
+
+Requested by the operator: whether Wikipedia and AFLDB's own existing records could help resolve
+persons the DraftGuru person-page bridge leaves `U-no-href` / `U-inadmissible` (§3.3). This is an
+assessment only — **not** a second matching implementation, and it does not weaken any trusted-
+link requirement or reopen D-9. No network request was made to produce it; it reasons from the
+contract and B2/B3 admissibility model already in the repository.
+
+- **Existing AFLDB records (cross-referencing a DraftGuru person against AFLDB's own players by
+  name/club/era):** this is structurally the *matcher* route ISSUE-164 §12 P1c and this runbook's
+  §1.4/§4.1 already exclude from automatic approval — it is exactly what D-9 suspends. **No
+  change recommended.** It remains legitimate only as *corroborating* evidence a human curator
+  weighs at `/admin/player-links` on an individually-reviewed person, exactly as today; it should
+  never become an automatic link and needs no new tooling.
+- **Wikipedia:** structurally different from a name match. A Wikipedia article's own outbound
+  link to an AFL Tables profile page is, like DraftGuru's, an *editorial URL assertion* — the same
+  admissibility class the DraftGuru bridge already uses (§3.2: name-free, URL-to-URL, not the
+  matcher, so it needs no §9.1). The Stage B1/B3 profiler already records non-DraftGuru external
+  links (including `wikipedia.org`/`en.wikipedia.org`) as `external_vocabulary` — vocabulary
+  evidence only, never identity (contract `person_stage.external_vocabulary_hosts` /
+  `external_vocabulary_rule`) — so the capture mechanism already exists and needs no new parsing
+  concept, only a decision to acquire and admit it.
+- **What a genuine Wikipedia bridge would require, sized honestly:** its own acquisition contract
+  (Wikipedia's own rate-limit/API terms, a stable page-identity form, disambiguation-page and
+  redirect handling), its own admissibility flags (an infobox/external-links section can carry
+  more than one plausible AFL Tables link, or none), and its own §3.5-equivalent independent
+  precision review before any link it proposes could ship — realistically a project close to the
+  size of Stage B3 itself, not a Phase 1 add-on.
+- **Recommendation:** do not start this now. Reconsider **at the first residual report after
+  bridge derivation** — i.e. as soon as Phase 3's §6.1 reconciliation states the
+  `U-no-href`/`U-inadmissible` residual population for real, not necessarily waiting for Phase 5
+  closeout. If that residual is large and concentrated among historically notable players (more
+  likely to carry a Wikipedia article), a scoped "Stage B4 Wikipedia bridge" candidate could be
+  proposed then, governed by the identical URL-mediated admissibility discipline and its own
+  independent review — never a name match, never bulk-approved without meeting an equivalent to
+  §9.1 or D-9's own successor standard. Not opened as a tracked issue; recorded here only as a
+  bounded assessment per the operator's request. Kept available now rather than deferred, per the
+  operator's 2026-09-18 instruction.
+
+## AFLDB-ISSUE-223 — Pre-existing test regression from AFLDB-ISSUE-221: `GRID_DRAFT_TYPES` reshaped, `draftguru-acquisition.test.ts`'s vocabulary-parity test now fails
+
+**Status: Open.** Found 2026-09-18 (Sonnet 5) while running the DB-free suite as part of
+`AFLDB-ISSUE-222` Phase 1 validation. Not caused by, and not fixed under, ISSUE-222.
+
+**Symptom:** `tests/draftguru-acquisition.test.ts` → "Stage B2-2 event-kind mapping contract" →
+"keeps the mapping's draft_type vocabulary set-equal to GRID_DRAFT_TYPES" fails with
+`AssertionError: expected null not to be null` at the regex extraction step.
+
+**Root cause:** the test reads `src/search/grid-solver-spec.ts` and extracts `GRID_DRAFT_TYPES`
+with `/export const GRID_DRAFT_TYPES = \[([\s\S]*?)\] as const;/`. `AFLDB-ISSUE-221` (commit
+`f1a8daca`, confirmed via `git log -1 -- src/search/grid-solver-spec.ts`) reshaped
+`GRID_DRAFT_TYPES` from a bare `as const` string array into
+`export const GRID_DRAFT_TYPES: { value: string; label: string }[] = [...]` — a `{value,label}`
+pair per kind, needed so the Draft-type dropdown can list "National Draft" once instead of a
+raw-label duplicate (ISSUE-221's DEV check (d)). The test's regex no longer matches the new
+declaration and the test was not among the suites ISSUE-221's own validation section ran
+(`grid-solver-spec`/`grid-solver-timeout`/`gridley-compat`/`grid-solver-under22` only).
+
+**Impact:** DB-free unit test only; no production/query code affected. The underlying claim the
+test protects (the importer's `draft_type` vocabulary — `data/reference/draftguru-event-kinds.json`
+— stays set-equal with the Grid Solver's offered kinds, in both directions) is not otherwise
+re-verified while this test fails.
+
+**Validation:** reproduced via `npx vitest run tests/draftguru-acquisition.test.ts` on a clean
+`sonnet/issue-222` worktree at `main`'s tip plus this session's purely-additive changes (confirmed
+via `git diff --stat` that no pre-issue-222 line was touched).
+
+**Next action:** update the test's extraction (read `GRID_DRAFT_TYPES`'s `value` fields — e.g.
+match `value:\s*'([^']+)'` inside the array literal, or import the module directly rather than
+regexing the source) and re-confirm the vocabulary is still set-equal in both directions before
+resolving.

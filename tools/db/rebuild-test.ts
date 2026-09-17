@@ -120,6 +120,13 @@ export type Options = {
   acknowledgePartialFitzroy?: boolean;
   allowOwnerImportDsn?: boolean;
   draftguruLabel: string;
+  /**
+   * `--draftguru-bridge`. AFLDB-ISSUE-222 Phase 1: the tracked per-target deployment
+   * bridge dataset (revised runbook §4.5) passed to import_draftguru.py's own `--bridge`.
+   * Absent by default, in which case the importer makes no bridge-derived link, exactly
+   * as before this option existed.
+   */
+  draftguruBridge?: string;
   planOnly: boolean;
 };
 
@@ -720,10 +727,11 @@ export function planStages(target: ResolvedTarget, fitzroy: FitzroySource,
       // Must follow fitzroy: three tracked explicit decisions target canonical AFL Tables
       // identities and the importer HALTs rather than invent a replacement player.
       id: 'draftguru',
-      name: `DRAFTGURU — ${opts.draftguruLabel}`,
+      name: `DRAFTGURU — ${opts.draftguruLabel}`
+        + (opts.draftguruBridge ? ` + bridge ${opts.draftguruBridge}` : ''),
       kind: 'data',
       run: 'command',
-      argv: draftguruImportArgv(opts.draftguruLabel, python),
+      argv: draftguruImportArgv(opts.draftguruLabel, python, opts.draftguruBridge),
       envOverlay: dataEnv,
     },
     {
@@ -817,7 +825,7 @@ export function planStages(target: ResolvedTarget, fitzroy: FitzroySource,
       name: 'FINAL VALIDATION — per-domain row counts against the accepted contracts',
       kind: 'validation',
       run: 'validate',
-      sql: finalValidationSql(),
+      sql: finalValidationSql(opts.draftguruBridge),
     },
   ];
 }
@@ -1091,8 +1099,11 @@ export const DRAFTGURU_IMPORTER = 'tools/rebuild/draftguru/import_draftguru.py';
  * its single interpreter resolution.
  */
 export function draftguruImportArgv(label: string,
-                                    python: string = resolvePython()): string[] {
-  return [python, DRAFTGURU_IMPORTER, '--label', label];
+                                    python: string = resolvePython(),
+                                    bridge?: string): string[] {
+  const argv = [python, DRAFTGURU_IMPORTER, '--label', label];
+  if (bridge) argv.push('--bridge', bridge);
+  return argv;
 }
 
 /**
@@ -1104,8 +1115,9 @@ export function draftguruImportArgv(label: string,
  * one argv from the other makes the two structurally incapable of disagreeing.
  */
 export function draftguruValidateArgv(label: string,
-                                      python: string = resolvePython()): string[] {
-  return [...draftguruImportArgv(label, python), '--validate-only'];
+                                      python: string = resolvePython(),
+                                      bridge?: string): string[] {
+  return [...draftguruImportArgv(label, python, bridge), '--validate-only'];
 }
 
 /** The counts the DraftGuru preflight must see before anything is destroyed. */
@@ -1207,7 +1219,7 @@ export type FinalCheck = { key: string; sql: string; expected: number };
 /** Build the check list from the tracked register. Refuses rather than guessing. */
 export function finalValidationChecks(
   register: Record<string, unknown> | null,
-  draftguru: { persons: number; picks: number } = DRAFTGURU_EXPECTED,
+  draftguru: { persons: number; picks: number; bridged?: number } = DRAFTGURU_EXPECTED,
 ): FinalCheck[] {
   const label = selectAcceptedBaseline(register).label;
   const baseline = ((register!.baselines ?? []) as Array<Record<string, unknown>>)
@@ -1251,6 +1263,17 @@ export function finalValidationChecks(
                 expected: draftguru.persons });
   checks.push({ key: 'draft_picks', sql: 'SELECT count(*) FROM draft_picks',
                 expected: draftguru.picks });
+  // AFLDB-ISSUE-222 Phase 1 (revised runbook §2.4, §6.1). Present only when the caller
+  // supplies the deployment dataset's own bridges.length as draftguru.bridged — this is
+  // NOT read from the accepted-baseline register, which carries no bridge concept.
+  if (draftguru.bridged !== undefined) {
+    checks.push({
+      key: 'draft_persons_bridged',
+      sql: "SELECT count(*) FROM draft_persons WHERE link_status = 'unique' "
+        + "AND match_method = 'draftguru_person_page_afltables_bridge'",
+      expected: draftguru.bridged,
+    });
+  }
 
   // AFLDB-ISSUE-095 D7. The club_seasons gate §8 of the runbook deferred until the
   // domain had a canonical contract. It now has one — the table is derived from this
@@ -1486,13 +1509,36 @@ END $afldb_final$;
 
 export const FINAL_VALIDATION_MARKER = 'AFLDB-FINAL-VALIDATION';
 
-/** The stream stage 9 runs, built from the tracked register at plan time. */
-export function finalValidationSql(): string {
+/**
+ * The stream stage 9 runs, built from the tracked register at plan time.
+ *
+ * `draftguruBridgePath`, when given (AFLDB-ISSUE-222 Phase 1, revised runbook §2.4,
+ * §6.1), is the SAME deployment dataset the `draftguru` data stage imports — the FINAL
+ * VALIDATION `draft_persons_bridged` expectation is read from that dataset's own
+ * `bridges.length`, never a typed constant, so the offline dataset and the database gate
+ * cannot drift apart.
+ */
+export function finalValidationSql(draftguruBridgePath?: string): string {
   const path = join(REPO_ROOT, ACCEPTED_BASELINES);
   const register = existsSync(path)
     ? JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>
     : null;
-  return buildFinalValidationSql(finalValidationChecks(register));
+  let draftguru: { persons: number; picks: number; bridged?: number } = DRAFTGURU_EXPECTED;
+  if (draftguruBridgePath) {
+    const bridgeAbs = isAbsolute(draftguruBridgePath)
+      ? draftguruBridgePath : join(REPO_ROOT, draftguruBridgePath);
+    if (!existsSync(bridgeAbs)) {
+      throw new RebuildRefused(
+        `FINAL VALIDATION: the supplied bridge dataset is missing: ${draftguruBridgePath}.`);
+    }
+    const bridgeDoc = JSON.parse(readFileSync(bridgeAbs, 'utf8')) as { bridges?: unknown[] };
+    if (!Array.isArray(bridgeDoc.bridges)) {
+      throw new RebuildRefused(
+        `FINAL VALIDATION: ${draftguruBridgePath} does not carry a bridges[] array.`);
+    }
+    draftguru = { ...DRAFTGURU_EXPECTED, bridged: bridgeDoc.bridges.length };
+  }
+  return buildFinalValidationSql(finalValidationChecks(register, draftguru));
 }
 
 /**
@@ -1703,12 +1749,22 @@ export function runPreflight(deps: Deps, opts: Options, source?: FitzroySource):
         + 'Nothing has been destroyed.');
     }
   }
-  // The label proven here is opts.draftguruLabel — the one the data stage will import.
-  const result = deps.runCommand(draftguruValidateArgv(opts.draftguruLabel), {});
+  // AFLDB-ISSUE-222 Phase 1: when a bridge dataset is supplied, it is proven present
+  // BEFORE anything is destroyed, exactly like the other tracked DraftGuru inputs above.
+  if (opts.draftguruBridge && !deps.fileExists(opts.draftguruBridge)) {
+    throw new RebuildRefused(
+      `DraftGuru preflight: the supplied bridge dataset is missing: ${opts.draftguruBridge}. `
+      + 'Nothing has been destroyed.');
+  }
+  // The label (and bridge, if any) proven here are opts.draftguruLabel / opts.draftguruBridge
+  // — the ones the data stage will import.
+  const result = deps.runCommand(
+    draftguruValidateArgv(opts.draftguruLabel, python, opts.draftguruBridge), {});
   if (result.status !== 0) {
     throw new RebuildRefused(
       'DraftGuru preflight failed (import_draftguru.py --validate-only '
-      + `--label ${opts.draftguruLabel}). `
+      + `--label ${opts.draftguruLabel}`
+      + `${opts.draftguruBridge ? ` --bridge ${opts.draftguruBridge}` : ''}). `
       + `Nothing has been destroyed.\n${result.stdout}${result.stderr}`);
   }
   assertDraftguruPreflight(result.stdout);
@@ -2580,6 +2636,7 @@ export function parseArgs(argv: string[]): Options {
       i += 1;
     } else if (arg === '--fitzroy-label') opts.fitzroyLabel = argv[++i];
     else if (arg === '--draftguru-label') opts.draftguruLabel = argv[++i];
+    else if (arg === '--draftguru-bridge') opts.draftguruBridge = argv[++i];
     else if (arg === '--acknowledge-destroy') opts.acknowledgeDestroy = argv[++i];
     else if (arg === '--acknowledge-partial-fitzroy') opts.acknowledgePartialFitzroy = true;
     else if (arg === '--allow-owner-import-dsn') opts.allowOwnerImportDsn = true;
@@ -2678,7 +2735,8 @@ async function main(): Promise<number> {
     + (fitzroy.accepted
       ? ' (ACCEPTED canonical full-history baseline)'
       : ' (PARTIAL — explicitly acknowledged)'));
-  console.log(`  draftguru     : ${opts.draftguruLabel}`);
+  console.log(`  draftguru     : ${opts.draftguruLabel}`
+    + (opts.draftguruBridge ? ` + bridge ${opts.draftguruBridge}` : ' (no bridge dataset)'));
   if (target.importIsOwnerSubstitution) {
     console.log('  WARNING: data stages run as OWNER (--allow-owner-import-dsn). '
       + 'A missing afldb_import grant will not be caught — see AFLDB-ISSUE-083.');

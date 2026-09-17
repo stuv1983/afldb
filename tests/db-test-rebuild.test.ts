@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { isAbsolute, join } from 'node:path';
 
 import {
@@ -3684,6 +3685,123 @@ describe('wiring', () => {
       const text = readFileSync(join(root, 'docs', doc), 'utf8');
       expect(text, `${doc} does not name the canonical rebuild`)
         .toContain('npm run db:test:rebuild');
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-222 Phase 1 — the DraftGuru bridge dataset threaded through the
+// rebuild (revised runbook §2.4, §5 Phase 1 item 5, §6.1). Absent by default:
+// every assertion above this point already proves the no-bridge behaviour is
+// unchanged (285/285 passing with no bridge-related edits to those tests).
+// ---------------------------------------------------------------------------
+
+describe('DraftGuru bridge wiring (AFLDB-ISSUE-222 Phase 1)', () => {
+  const BRIDGE_LABEL = 'annual-html-20260826';
+
+  function withTempBridgeFile(bridgeCount: number, body: (path: string) => void): void {
+    const dir = mkdtempSync(join(tmpdir(), 'afldb-i222-bridge-'));
+    try {
+      const path = join(dir, 'bridge.json');
+      writeFileSync(path, JSON.stringify({
+        schema_version: 1,
+        bridges: Array.from({ length: bridgeCount }, (_, i) => ({
+          player_url: `https://www.draftguru.com.au/players/fixture_${i}/1`,
+          afltables_external_id: `players/F/Fixture_${i}.html`,
+        })),
+      }));
+      body(path);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  it('draftguruImportArgv appends --bridge only when one is supplied', () => {
+    expect(draftguruImportArgv(BRIDGE_LABEL, 'python')).toEqual(
+      ['python', DRAFTGURU_IMPORTER, '--label', BRIDGE_LABEL]);
+    expect(draftguruImportArgv(BRIDGE_LABEL, 'python', '/tmp/bridge.json')).toEqual(
+      ['python', DRAFTGURU_IMPORTER, '--label', BRIDGE_LABEL, '--bridge', '/tmp/bridge.json']);
+  });
+
+  it('draftguruValidateArgv carries the bridge through to --validate-only', () => {
+    expect(draftguruValidateArgv(BRIDGE_LABEL, 'python', '/tmp/bridge.json')).toEqual([
+      'python', DRAFTGURU_IMPORTER, '--label', BRIDGE_LABEL,
+      '--bridge', '/tmp/bridge.json', '--validate-only',
+    ]);
+  });
+
+  it('planStages threads opts.draftguruBridge into the draftguru data stage', () => {
+    const withoutBridge = planStages(target(), fitzroy(), OPTS)
+      .find((s) => s.id === 'draftguru')!;
+    expect(withoutBridge.argv).not.toContain('--bridge');
+
+    // planStages also builds the FINAL VALIDATION stage's SQL from the same bridge path
+    // (see the 'finalValidationSql' tests below), so a real file is required here too.
+    withTempBridgeFile(3, (bridgePath) => {
+      const withBridge = planStages(target(), fitzroy(),
+        { ...OPTS, draftguruBridge: bridgePath }).find((s) => s.id === 'draftguru')!;
+      expect(withBridge.argv).toContain('--bridge');
+      expect(withBridge.argv![withBridge.argv!.indexOf('--bridge') + 1]).toBe(bridgePath);
+      expect(withBridge.name).toContain(bridgePath);
+    });
+  });
+
+  it('runPreflight proves the bridge file exists before anything is destroyed', () => {
+    const { deps } = fakeDeps();
+    let checked: string | undefined;
+    deps.fileExists = (path: string) => {
+      if (path === '/does/not/exist.json') { checked = path; return false; }
+      return true;
+    };
+    expect(() => runPreflight(deps,
+      { ...OPTS, draftguruBridge: '/does/not/exist.json' }))
+      .toThrow(/bridge dataset is missing.*Nothing has been destroyed/s);
+    expect(checked).toBe('/does/not/exist.json');
+  });
+
+  it('finalValidationChecks adds draft_persons_bridged only when draftguru.bridged is given', () => {
+    const minimalRegister = {
+      contract: 'afldb.fitzroy.accepted_baselines',
+      schema_version: 1,
+      selection_policy: { rule: 'exactly_one_accepted' },
+      baselines: [{ snapshot_label: FULL_LABEL, acceptance_status: 'accepted', measured: {} }],
+    };
+    const withoutBridge = finalValidationChecks(minimalRegister);
+    expect(withoutBridge.find((c) => c.key === 'draft_persons_bridged')).toBeUndefined();
+
+    const withBridge = finalValidationChecks(minimalRegister,
+      { ...DRAFTGURU_EXPECTED, bridged: 3405 });
+    const check = withBridge.find((c) => c.key === 'draft_persons_bridged');
+    expect(check).toBeDefined();
+    expect(check!.expected).toBe(3405);
+    expect(check!.sql).toContain("match_method = 'draftguru_person_page_afltables_bridge'");
+    expect(check!.sql).toContain("link_status = 'unique'");
+  });
+
+  it('finalValidationSql reads bridged from the SAME deployment dataset the data stage imports', () => {
+    withTempBridgeFile(7, (path) => {
+      const sql = finalValidationSql(path);
+      expect(sql).toContain('draft_persons_bridged');
+      expect(sql).toContain('IS DISTINCT FROM 7::bigint');
+    });
+    // absent by default: no bridge-shaped expectation appears
+    expect(finalValidationSql()).not.toContain('draft_persons_bridged');
+  });
+
+  it('finalValidationSql refuses a bridge path that does not exist', () => {
+    expect(() => finalValidationSql('/does/not/exist.json')).toThrow(RebuildRefused);
+    expect(() => finalValidationSql('/does/not/exist.json'))
+      .toThrow(/bridge dataset is missing/);
+  });
+
+  it('finalValidationSql refuses a bridge file with no bridges[] array', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'afldb-i222-bridge-bad-'));
+    try {
+      const path = join(dir, 'bad.json');
+      writeFileSync(path, JSON.stringify({ schema_version: 1 }));
+      expect(() => finalValidationSql(path)).toThrow(/does not carry a bridges\[\] array/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
     }
   });
 });

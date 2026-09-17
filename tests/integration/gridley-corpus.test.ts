@@ -207,6 +207,18 @@ const gapLog: string[] = [];
 let gaps: DatasetGaps = { maxSeason: 0, draftLinks: true, matchEvents: true, heights: true, dobs: true, coaches: true, fatherSon: true, siblings: true, afterSiren: true };
 /** Diagnostic mode: dataset-shaped findings are counted and named instead of failing. Never the default. */
 const DIAGNOSTIC = process.env.AFLDB_GRIDLEY_DIAGNOSTIC === '1';
+/**
+ * AFLDB-ISSUE-222 §6.3 item 2. The probe's 50% draftLinks threshold means a bridged
+ * population below it cannot be scored against Gridley's answer keys at all -- every
+ * draft criterion is routed straight to `dataset gap` before any known-answer comparison
+ * runs. This override forces `gaps.draftLinks = true` so the six draft criteria are
+ * evaluated on the real linked population regardless of the probe. It changes nothing
+ * else: the probe's measured value is still logged, every other `gaps.*` flag, the
+ * strict/diagnostic split and the "NOT an acceptance run" notice are untouched. Intended
+ * to run together with AFLDB_GRIDLEY_DIAGNOSTIC=1 (revised runbook §6.3 item 3) so a
+ * still-incomplete bridged population reports findings instead of hard-failing.
+ */
+const SCORE_DRAFT = process.env.AFLDB_GRIDLEY_SCORE_DRAFT === '1';
 /** Criteria whose builder reads a dataset this database does not carry. */
 const gappedCriteria = new Set<string>();
 /** Gridley player id -> AFLDB player id, from the corpus' own player-valued criteria. */
@@ -338,7 +350,7 @@ beforeAll(async () => {
   // dataset gap until that population exists.
   gaps = {
     maxSeason: probe.maxSeason,
-    draftLinks: Number(probe.draftLinked) * 2 >= Number(probe.draftTotal),
+    draftLinks: SCORE_DRAFT || Number(probe.draftLinked) * 2 >= Number(probe.draftTotal),
     matchEvents: Number(probe.matchEvents) > 0,
     heights: Number(probe.heights) > 0,
     // ISSUE-118 Stage D1: fitzRoy alone dates ~6% of players (855); the birth-dates
@@ -353,6 +365,11 @@ beforeAll(async () => {
     // ISSUE-118 §23.35: the after-siren load carries the tracked Wikipedia after-the-siren artefact.
     afterSiren: Number(probe.afterSiren) > 0,
   };
+  if (SCORE_DRAFT) {
+    console.log(`[gridley-corpus] AFLDB_GRIDLEY_SCORE_DRAFT=1: draft criteria are scored `
+      + `regardless of the draftLinks probe (measured ${probe.draftLinked}/${probe.draftTotal} `
+      + 'linked). This is NOT an acceptance run.');
+  }
   for (const p of players) finalSeasons.set(p.id, p.finalSeason);
   for (const h of hof) if (h.inductedYear !== null) hallOfFameYears.set(h.playerId, h.inductedYear);
   for (const e of evidence) {

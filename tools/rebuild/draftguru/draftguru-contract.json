@@ -154,6 +154,15 @@
       "identity_rule": "an AFL Tables identity is taken from the href alone; it is NEVER inferred from a rendered player name",
       "collision_rule": "two DraftGuru persons resolving to one AFL Tables profile is a finding, never an instruction to merge"
     },
+    "wikipedia_link": {
+      "$comment": "AFLDB-ISSUE-222 (operator instruction 2026-09-18). DraftGuru person pages also link to a player's Wikipedia page; captured for LATER HUMAN IDENTITY REVIEW only, alongside (not instead of) the AFL Tables bridge. Never fetched, never canonicalised, never an identity source, never touching draft_persons.player_id, the AFL Tables bridge or apply_authority() in any way.",
+      "hosts": ["wikipedia.org", "en.wikipedia.org"],
+      "schemes": ["http", "https"],
+      "identity_rule": "a Wikipedia href is recorded verbatim as evidence only — it is NEVER treated as identity and NEVER resolved automatically; zero, one or more than one Wikipedia href on one page are all recorded exactly as found, never guessed or filtered by presumed relevance",
+      "ambiguity_rule": "more than one DISTINCT Wikipedia href on one page is recorded as ambiguous (wikipedia_url null, wikipedia_url_reason set) — never resolved by picking one; the SAME href linked more than once is not ambiguous",
+      "relatedness_rule": "the profiler cannot judge whether a captured Wikipedia href is actually about this person without fetching Wikipedia, which it never does — a single Wikipedia href is captured as wikipedia_url even when it may later prove unrelated; that is a documented limitation for a human reviewer, not a defect",
+      "fetch_rule": "the Wikipedia page itself is never fetched by this tooling, in Phase 1, Phase 2 or any later phase referenced by this contract — only the href already present on the downloaded DraftGuru page is captured"
+    },
     "external_vocabulary_hosts": ["wikipedia.org", "en.wikipedia.org", "afl.com.au", "www.afl.com.au"],
     "external_vocabulary_rule": "non-AFL-Tables external links are recorded as vocabulary only — never as identity",
     "http_policy": "inherits the Stage A http_policy above unchanged: concurrency 1, 1.5s minimum pacing, 20s timeout, 3 retries at 2/4/8s on timeout/connection-error/5xx/429, same-host redirects only, robots.txt respected with /players/* explicitly checked",
@@ -169,6 +178,68 @@
       "fetched": "a raw response file AND its HTTP metadata record both exist",
       "failed": "the retry policy was exhausted or a deterministic terminal HTTP failure occurred, AND an HTTP record exists carrying the exact player_url, the classification, the HTTP status where available, the reason and the attempt evidence",
       "resume": "successful raw+HTTP pairs and terminal failure records are both reused and never silently retried, rewritten or reclassified; retrying a terminal failure requires an explicit future decision"
+    },
+    "b3": {
+      "$comment": "AFLDB-ISSUE-222 Stage B3 (revised runbook §2, §5 Phase 1 item 1) — the whole-population DraftGuru person-page acquisition that produces the person-page -> AFL Tables identity BRIDGE dataset. Additive: no Stage A or Stage B1 (person_stage) key above is changed, and person-html-20260826 (the accepted Stage B1 snapshot) is refused outright for a B3 write so it can never be promoted in place (B2 handoff §18). B3 reuses the Stage B1 label pattern, layout, http_policy, terminal_classification and afltables_link vocabulary UNCHANGED — only the population rule, completion rule, manifest-earning conditions and the failure-reporting shape below are new.",
+      "stage": "B3",
+      "population_rule": "every distinct player_url in the accepted Stage A snapshot's parsed/persons.jsonl -- not scoped by reported_games (B2 handoff §18)",
+      "person_snapshot": {
+        "label_pattern": "^person-html-[0-9]{8}$",
+        "refused_labels": [
+          { "label": "person-html-20260826", "reason": "the accepted Stage B1 profiling snapshot -- immutable, identity_complete:false, import_capable:false, and never promoted in place or reused for a Stage B3 population write (B2 handoff §18)" }
+        ]
+      },
+      "sample_contract": {
+        "primary_cohort": "population",
+        "total_rule": "equals the accepted Stage A snapshot's distinct_player_url_count (measured 5,057 on annual-html-20260826) -- never a fixed constant here, so a later Stage A re-acquisition cannot silently drift from this pin",
+        "descriptive_tags": ["games_zero", "games_positive"],
+        "zero_game_cohort_tag": "games_zero",
+        "ordering": "slug then ordinal for acquisition, byte-identical across runs -- there is no stratified random draw because the population is taken in full"
+      },
+      "manifest": {
+        "identity_complete_conditions": [
+          "fetched + failed = distinct_persons (every identity in the population carries a terminal classification)",
+          "the crawl-failure ceiling (crawl_failure_ceiling_pct) was not exceeded, or an operator retry decision is recorded",
+          "every concentration trigger was evaluated and, where triggered, an operator retry decision is recorded"
+        ],
+        "import_capable_conditions": [
+          "identity_complete is true",
+          "the source-evidence bridge dataset (export_person_bridge.py --source-evidence) has been derived from this snapshot and self-validated through the importer's load_bridge() schema",
+          "the independent bridge-precision review (revised runbook §3.5) has recorded 0 failures on the version that ships"
+        ],
+        "rule": "B3 profiling output (person_profile.jsonl, afltables_link_profile.json) and this acquisition manifest NEVER themselves become identity_complete/import_capable -- those conditions govern only the DERIVED bridge dataset artefacts under data/reference/, produced by export_person_bridge.py, never the raw snapshot manifest, which stays profiling evidence exactly like Stage B1's."
+      },
+      "crawl_failure_ceiling_pct": 2.0,
+      "concentration_triggers": {
+        "by_year_failed_pct": 5.0,
+        "any_national_top10_failed": true,
+        "$note": "a person's 'year' is the minimum draft_year the accepted Stage A snapshot records for that player_url; national top-10 membership is measured from Stage A rows.jsonl (event_type_raw identifying a national draft per data/reference/draftguru-event-kinds.json, pick_number BETWEEN 1 AND 10). A concentrated gap requires an explicit retry decision before Phase 3 and is never hidden behind an acceptable overall percentage."
+      },
+      "admissibility_flags": {
+        "$comment": "restates the profiler's per-person flags (profile_person_pages.py profile_person()) by name -- the exact set that makes a bridged pair B-linked vs withheld (revised runbook §3.3). Produced unchanged from Stage B1's profiler and consumed by export_person_bridge.py.",
+        "canonical_required": "afltables_identity is non-null and distinct_afltables_identity_count == 1",
+        "withhold_reasons": {
+          "no_afltables_link": "U-no-href -- no AFL Tables href on the page",
+          "multiple_afltables_candidates": "U-inadmissible -- more than one distinct canonical AFL Tables identity on one page",
+          "malformed_afltables_link": "U-inadmissible -- a candidate href is malformed or an unexpected path shape",
+          "non_reducing_host": "U-inadmissible -- a www.afltables.com host does not reduce under the existing canonicaliser (a FINDING, never silently repaired)",
+          "self_link_disagreement": "U-inadmissible -- a DraftGuru self-link on the page names a different player_url than the one requested",
+          "parse_error": "U-inadmissible -- the page failed to parse",
+          "missing_or_dead_page": "U-page-failed -- terminal fetch failure"
+        }
+      },
+      "bridge_dataset_schema": {
+        "$comment": "both the source-evidence parent and each per-target deployment child use the importer's existing load_bridge() schema (schema_version 1, bridges[]) unchanged; the keys below are additive and are ignored by load_bridge().",
+        "schema_version": 1,
+        "additive_keys": ["withheld", "provenance", "parent_sha256", "target_registration"],
+        "withheld_entry": { "player_url": "string", "reason": "one of admissibility_flags.withhold_reasons' keys, 'target_not_registered', 'target_ambiguous', or 'review_failure:<mechanism>'" },
+        "provenance": { "label": "the B3 snapshot label the parent was derived from", "manifest_sha256": "that snapshot's acquisition manifest sha256", "exporter_version": "export_person_bridge.py's EXPORTER_VERSION" }
+      },
+      "review_sample": {
+        "census_stratum": "every B-linked person holding a National Draft pick 1-10 (Stage A rows.jsonl, national event kind, pick_number BETWEEN 1 AND 10), reviewed exhaustively -- never sampled",
+        "random_stratum_ordering": "sha256(salt + '|' + player_url utf-8) hex ascending, first n",
+        "default_salt_prefix": "AFLDB-ISSUE-222/v"
+      }
     }
   },
   "club_resolution": {
