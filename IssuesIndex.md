@@ -6,27 +6,38 @@
 
 **Open issues:** 1
 
-**AFLDB-ISSUE-218 — IMPLEMENTED, NOT YET RESOLVED** (Sonnet 5) — Severity: low
-(parser feature gap, no data/security impact). Area: NL search
-(`src/search/nl/parser.ts`, `src/search/nl/vocab.ts`). `team_match_result/1`
-("at V, find the widest X win/loss to Y...", 522 rows) and `/2` ("by how much
-did X lose to Y in their most lopsided meeting...", 569 rows) shared one
-wrapper-vocabulary-only mechanism (both already extracted clubs/direction
-correctly); fixed by adding `widest` to `AGG_WORDS`, widening the leading
-scope-clause request-verb strip to `at` as well as `for`, adding verb forms
-`lose`/`lost`/`beat` to `TEAM_METRIC_WORDS`, and gating two new decorative
-wrapper words ("how much"/"lopsided meeting") on an already-recognised
-directional result construction. `team_match_result/0` (56 rows, "Bombers'
-biggest victory...") is a DISTINCT, already-known possessive-club-alias
-defect (same mechanism as AFLDB-ISSUE-214's `club_season_rank` residue) and
-was deliberately deferred, not fixed here. `PARSER_VERSION` 64 → 65.
-Implementation on `sonnet/issue-218-team-match-result-phrasing`, unmerged.
-Local: `tests/nl-parser.test.ts` 595/595 (575 + 20 new), broader gates
-(`nl-regression-corpus` 163/163, `nl-semantic-mapping` 174/174,
-`nl-stress-corpus` 65/65 = 402/402), `typecheck` clean. **Next action:**
-operator host validation on `streamanator` per `AFLDB-ISSUE-218.md` §12
-(frozen V5 rerun, exploratory V2 rescore, target-cluster reconciliation,
-direct v64-vs-v65 plan comparison) before resolution/`CHANGELOG.md` entry.
+**AFLDB-ISSUE-218 — IMPLEMENTED, NOT YET RESOLVED, REOPENED after round-1 host
+validation** (Sonnet 5) — Severity: low (parser feature gap, no data/security
+impact). Area: NL search (`src/search/nl/parser.ts`, `src/search/nl/vocab.ts`,
+`tools/nl/generate-exploratory-corpus-v2.mjs`). `team_match_result/1` (522
+rows) and `/2` (569 rows) shared one wrapper-vocabulary-only mechanism (both
+already extracted clubs/direction correctly); fixed with additive vocabulary
+only. `PARSER_VERSION` 64 → 65. Round-1 host validation (commit `5bcc957`)
+found V5 GREEN but `/1` clean (522→0, as intended) while `/2` moved from an
+honest soft decline into a **569-row HARD FAILURE** — worse than the
+pre-fix state, so the issue was reopened rather than closed. Re-investigation
+(this session) traced production SQL (`src/db/queries/nl/team-match.ts`) and
+the parser's pre-existing, uniformly-applied `clubFor`=subject convention
+against every pre-issue directional test, then directly inspected and
+empirically probed `tools/nl/generate-exploratory-corpus-v2.mjs`'s
+`team_match_result` generator: templates 0/1/3 all keep club `c` as the
+sentence's grammatical subject, but template 2 alone renders `o` as subject
+and `c` as object without a corresponding fix to its expected `club`/
+`opponent`/`metric` triple — a genuine, template-2-only **exploratory V2
+generator/oracle defect**, confirmed empirically (0 mismatches across a full
+local regeneration's 576 `/2` rows vs. the real, unmodified parser). **Parser
+v65 is correct and untouched; only the generator's template-2 expectation
+construction was corrected.** `PARSER_VERSION` stays 65 (no parser semantics
+changed in the correction). `team_match_result/0` (56 rows) remains
+deliberately deferred, unaffected by either round. Implementation on
+`sonnet/issue-218-team-match-result-phrasing`, unmerged. Local (unchanged
+from round 1, since no parser/vocab/plan source changed in the correction):
+`tests/nl-parser.test.ts` 595/595, broader gates 402/402, `typecheck` clean.
+**Next action:** operator ROUND-2 host validation on `streamanator` per
+`AFLDB-ISSUE-218.md` §20 — regenerate the V2 corpus from the corrected
+generator (same seed/baseline), confirm 0 question-text/other-template
+movement, re-score, and confirm **0 failed** before resolution/`CHANGELOG.md`
+entry.
 
 **AFLDB-ISSUE-217 resolved 2026-09-17** (Sonnet 5, operator-validated on streamanator) —
 `player_game_single`'s three large exploratory clusters (`/0` 423 rows "biggest `<metric>` haul in one

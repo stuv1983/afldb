@@ -312,7 +312,34 @@ const families = [
     // CORPUS_ORACLE_DEFECT confirmed on AFLDB-ISSUE-206. Templates 0-2 use
     // against/to/word-order, which the parser reads directionally, and are
     // unaffected (expected_scope_kind stays blank for them).
-    return row('team_match_result',template,q,temporal({grain:'team_match',metric,aggregation:'max',club:c[1],opponent:o[1],venue:v[1]},t),{depth:5,scope:'club+opponent+venue+time',scopeKind:template===3?'matchup':undefined});
+    //
+    // AFLDB-ISSUE-218 (host-validation correction, confirmed CORPUS_ORACLE_
+    // DEFECT, not a parser regression). Templates 0, 1 and 3 all render C
+    // as the sentence's grammatical subject throughout ("C's biggest
+    // victory/defeat...", "the widest C win/loss to O...", "...margin for
+    // C..."), so the parser's established, already-shipped clubFor
+    // convention (clubFor = the ungoverned/subject-named mention, see
+    // extractClubs/nearestGoverningPreposition in src/search/nl/parser.ts)
+    // always binds clubFor=C for those three -- exactly matching the fixed
+    // `club:c[1]` this generator used unconditionally below. Template 2
+    // alone puts O, not C, in that subject position ("did O beat/lose-to
+    // C") -- the ONE template in this family built the opposite way round
+    // -- so a parser applying that SAME, unchanged convention correctly
+    // binds clubFor=O for template 2, not C. The fixed `club:c[1]`/
+    // `opponent:o[1]` mapping never accounted for template 2's reversed
+    // subject, so every one of its rows asserted the wrong club identity
+    // AND (since win_margin/loss_margin describe whichever club is bound
+    // as clubFor) the wrong metric -- confirmed empirically: the parser's
+    // actual output for a template-2 row always equals `club:o[1],
+    // opponent:c[1]` with the metric's polarity inverted relative to the
+    // shared `metric` variable above (O's result is the exact mirror of
+    // C's, since exactly one of two clubs wins a non-drawn match).
+    // Templates 0, 1 and 3 are untouched; only template 2's expected
+    // triple is computed from O's perspective instead of C's.
+    const resultOwner = template === 2 ? o : c;
+    const resultOpponent = template === 2 ? c : o;
+    const resultMetric = template === 2 ? (lose ? 'win_margin' : 'loss_margin') : metric;
+    return row('team_match_result',template,q,temporal({grain:'team_match',metric:resultMetric,aggregation:'max',club:resultOwner[1],opponent:resultOpponent[1],venue:v[1]},t),{depth:5,scope:'club+opponent+venue+time',scopeKind:template===3?'matchup':undefined});
   }},
   { name:'team_match_score_crowd', n:1500, make() {
     const c=C(), o=distinctClub(c), t=T(), mt=MT(), kind=pick([['score','team_score'],['combined score','total_score'],['crowd','attendance']]), template=pick([0,1,2,3]);
