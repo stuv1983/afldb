@@ -4,7 +4,30 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 0
+**Open issues:** 1
+
+| ID | Title | Severity | Area | State | Next action |
+|---|---|---|---|---|---|
+| AFLDB-ISSUE-220 | Web service credential boundary contradicts the application's `afldb_import` requirement; owner-role code-test DSN and a complete `.env` copy reach the internet-facing process | High | Deployment / runtime security | Open — DEV evidence complete 2026-09-17; runtime branch (a) settled from Next source: the standalone server loads `.next/standalone/.env` at start-up | Sonnet 5 implements `AFLDB-ISSUE-220.md` §6 in a fresh worktree; first establish the build copy mechanism (§4b) |
+
+AFLDB-ISSUE-220 opened 2026-09-17 (Fable 5.1 code review outside NL search, DEV evidence
+operator-gathered on streamanator, no values printed). `deploy/afldb.service` drops
+`AFLDB_IMPORT_DATABASE_URL` with `UnsetEnvironment=` and, with `docs/deployment.md` §9, claims the
+web process holds only the read-only `DATABASE_URL`; twenty-one application modules require
+`AFLDB_IMPORT_DATABASE_URL` for every Admin Centre statistical mutation since migration 066. Two
+confirmed boundary failures: (1) the running process's initial environment holds
+`AFLDB_CODE_TEST_DATABASE_URL` (an **owner-role** DSN, `docs/deployment.md:245`) and
+`AFLDB_CODE_TEST_IMPORT_DATABASE_URL`, both added by AFLDB-ISSUE-146 after the unset list was
+written and never added to it; (2) `.next/standalone/.env` exists on DEV with the same variable
+names as the project `.env` (import, owner, backup, test, SMTP and API credentials), produced by
+the build and outside the unit's control. Settled the same day from Next.js source on DEV: the
+standalone `server.js` `chdir`s into the standalone root, `BaseServer` calls
+`this.loadEnvConfig()` → `@next/env.loadEnvConfig(this.dir, …)` unconditionally, and the
+`STANDALONE_CONFIG` early return in `config.js` bypasses only that file's own loader — so every
+credential in the copied `.env` is live in the web process and `UnsetEnvironment=` is bypassed
+(branch (a); admin mutations work only because of it). How the build copies `.env` into the
+standalone tree is deliberately left unestablished for the implementation task. See the detailed
+entry at the end of this file and `AFLDB-ISSUE-220.md`. No product or deployment code changed.
 
 AFLDB-ISSUE-219 resolved 2026-09-17 (Sonnet 5, operator-validated on streamanator) -- cross-family
 NL defect: a plural club/venue alias already ending in "s" takes a bare trailing apostrophe for
@@ -34834,3 +34857,198 @@ Stage 2.
   ```
   Manual row-ID reconciliation from `failures.csv` (`nl:stress:compare` could not perform its own row-severity comparison against these V1-shape runs even after `--report-only` — a harness limitation, not a validation failure; the aggregate totals plus this manual reconciliation, both from the runs' own output files, substitute as the direct proof): v65 7018 finding rows → v66 6654; **364 improved, 0 regressed, 6654 still soft** (unchanged, unrelated). Improvement clusters, summing exactly to 364: `club_season_rank` 210 (the AFLDB-ISSUE-214 §10c residual, exactly), `team_streak` 75, `team_match_result` 56 (the AFLDB-ISSUE-218 `/0` cluster, exactly), `team_checkpoint_collision` 16, `q3_comeback_near_miss` 7. **Scope proof:** all 364 improved questions contain a trailing-apostrophe token; 0 improved questions lack one. Aliases represented (summing to 364): Giants' 51, Bombers' 48, Pies' 45, Dogs' 45, Swans' 44, Suns' 42, Tigers' 34, Bulldogs' 33, Lions' 22.
 - **Resolution:** **RESOLVED 2026-09-17.** All required outcomes met: implementation and own tests fully correct (local 605/605, host-reconfirmed 605/605); broader gates 402/402 both locally and on host; cross-family fix confirmed on real host/runtime/database across five families (exceeding the required minimum of two), with an explicit scope proof that every improved row carries a trailing-apostrophe alias and none lack one; zero hard regressions in either corpus (the three V5 failures proven pre-existing via decisive control); zero unrelated movement in the exploratory V2 diff. `PARSER_VERSION` 66 final. See `AFLDB-ISSUE-219.md` §14 for the full host-validation record and `CHANGELOG.md` for the retained summary.
+
+## AFLDB-ISSUE-220 — Web service credential boundary contradicts the application's `afldb_import` requirement; owner-role code-test DSN and a complete `.env` copy reach the internet-facing process
+
+- **Status:** Open (opened 2026-09-17). Implemented 2026-09-17 (Sonnet 5, worktree `afldb-issue-220`,
+  uncommitted) — see Implementation below; pending operator DEV/PROD verification before resolution.
+- **Severity:** High. Security posture (a documented credential isolation that does not hold, and
+  an owner-role DSN live in the public web process) and, depending on the open runtime question,
+  availability of the entire Admin Centre write path.
+- **Area:** Deployment / runtime — `deploy/afldb.service`, `docs/deployment.md` §9,
+  `tools/build/prepare-standalone.mjs`, the Next.js standalone build output.
+- **Found:** 2026-09-17, Fable 5.1 code review of AFLDB outside NL search (Pass 4, deployment and
+  runtime safety). Host facts below were gathered by the operator on streamanator (DEV) with
+  read-only commands that printed variable names and source line numbers only; no credential
+  value was displayed or recorded anywhere.
+- **Key files:** `deploy/afldb.service:35-44` (`UnsetEnvironment=` and its comment),
+  `docs/deployment.md:1093-1097` (§9 "The service process holds only `DATABASE_URL`, which
+  cannot write") and `docs/deployment.md:245` (`AFLDB_CODE_TEST_DATABASE_URL` is the **owner**
+  DSN for `code_test_db`, `AFLDB_CODE_TEST_IMPORT_DATABASE_URL` the import DSN),
+  `tools/build/prepare-standalone.mjs` (copies static/public/coming-soon into
+  `.next/standalone`, never inspects `.env`), `.gitignore:11,25-28` (`.next/` and `.env*`
+  ignored), the twenty-one `process.env.AFLDB_IMPORT_DATABASE_URL` readers:
+  `src/db/queries/admin-{awards,brownlow,club-leadership,coaches,draft,fixtures,season-lists,special-records}.ts`,
+  `src/db/queries/{awards-admin,data-edits,match-admin,match-sheet,player-links,players}.ts`,
+  `src/lib/ingest/pipeline.ts:257`, `src/lib/external-afl/current-season-import.ts:376`;
+  `tests/current-season-import.test.ts:4801-4802` (pins the *settle* unit's DSN list only),
+  `tests/settle-season-revalidation.test.ts:1073` (the only test reading `deploy/afldb.service`).
+
+### Trigger
+Install `deploy/afldb.service` as tracked on any host, or build with `output: 'standalone'` on a
+host whose project `.env` holds the full credential set, then (a) inspect the web process's
+credentials and (b) invoke any `afldb_import`-backed admin mutation (data editor, awards,
+coaches, draft, season lists, fixtures, Brownlow, special records, player links, match sheet,
+legacy submission promotion, current-season refresh).
+
+### Expected
+The unit, `docs/deployment.md` §9 and the application agree on the DSN set the web process holds;
+the stated isolation ("a compromise there cannot reach a role that can write, migrate or dump")
+is true; every credential the process holds is one it needs; the build output carries no
+credential file.
+
+### Actual (confirmed)
+1. **Boundary claim vs application requirement (source, current tree).** The unit removes
+   `AFLDB_IMPORT_DATABASE_URL` from the service environment and its comment says the website
+   needs only the read-only app role. Since migration 066 (AFLDB-ISSUE-027, 2026-08-22) every
+   Admin Centre statistical mutation opens an `afldb_import` connection from
+   `process.env.AFLDB_IMPORT_DATABASE_URL` and fails closed without it. The docs still describe
+   the pre-066 contract. Nothing in `src/`, `deploy/server-cluster.mjs` or
+   `tools/build/prepare-standalone.mjs` reads `.env` for the web process.
+2. **Owner-role DSN in the internet-facing process (DEV host evidence, 2026-09-17).** The running
+   service's initial environment contains `DATABASE_URL`, `AFLDB_AUTH_DATABASE_URL`,
+   `AFLDB_CODE_TEST_DATABASE_URL` and `AFLDB_CODE_TEST_IMPORT_DATABASE_URL`. The last two were
+   introduced by AFLDB-ISSUE-146 (code-test rebuild rehearsal) after the unit's unset list was
+   written and were never added to it. `AFLDB_CODE_TEST_DATABASE_URL` is an owner-role DSN, so
+   the public web process can create, alter and drop objects in `code_test_db`, and
+   `AFLDB_CODE_TEST_IMPORT_DATABASE_URL` gives it a second import-role credential. The unit's
+   hand-typed deny list therefore fails open for every DSN added after it was written — the same
+   shape as the `privileges.sql` hand-typed `afldb_auth` list already known to silently miss new
+   tables.
+3. **Complete `.env` copy inside the build output (DEV host evidence, 2026-09-17).**
+   `/home/arm/projects/afldb/.next/standalone/.env` exists and carries the same variable names as
+   the project `.env`: import, owner, backup, test, SMTP and API credentials included. No
+   repository code copies it there; `.next/` and `.env*` are both git-ignored; the only writer of
+   `.next/standalone/` other than `prepare-standalone.mjs` is `next build`, so the copy is the
+   framework's own file tracing of the env file it loaded at build time. That file sits inside a
+   directory the unit grants `ReadWritePaths=` to, is deployed with every build, and is outside
+   the unit's `UnsetEnvironment=` mechanism entirely.
+
+### Runtime branch — SETTLED 2026-09-17: branch (a), from Next.js source on the DEV host
+The operator read the control flow in the installed Next.js (`node_modules/next/dist/server/`)
+and the generated `.next/standalone/server.js` on streamanator (source lines only, no values):
+- `.next/standalone/server.js` sets its directory to `__dirname` (the standalone root) and
+  `chdir`s into it, so the server's `dir` is the directory that holds the copied `.env` (E6).
+- `BaseServer`'s constructor calls `this.loadEnvConfig()`; `NextServer.loadEnvConfig()` calls
+  `@next/env`'s `loadEnvConfig(this.dir, …)`. That call is unconditional on the production
+  start-up path.
+- The `__NEXT_PRIVATE_STANDALONE_CONFIG` early return in `config.js` bypasses only
+  `loadConfig`'s own env-loader call; it does not reach or skip the `BaseServer` call.
+**Consequence (branch (a)).** Every variable in `.next/standalone/.env` — import, owner, backup,
+test, SMTP and API credentials — is loaded into the web process at start-up. `UnsetEnvironment=`
+in `deploy/afldb.service` removes those names from the exec-time environment and nothing else;
+the framework puts them straight back. The Admin Centre's `afldb_import` writes work on DEV only
+because the documented boundary is bypassed, which reconciles the AFLDB-ISSUE-155/165/167 DEV
+acceptances with AFLDB-ISSUE-107's exec-time `/proc/<pid>/environ` view (E8), and makes the
+"cannot reach a role that can write, migrate or dump" claim false on any host built this way.
+Branch (b) (admin mutations failing closed) is ruled out for DEV.
+
+**Kept separate, not established:** *how* `.env` comes to be in `.next/standalone/`. The
+build-trace lines the operator displayed did not establish the copying mechanism. The evidence is
+only that no repository code writes it (E7) and that it is present after `next build`. The
+implementation task must identify the mechanism from the installed Next's build code or
+`node_modules/next/dist/docs/` before choosing how to exclude it (runbook §5, §6 step 4).
+
+**Independently observed, separate from the loading path:** the two code-test DSNs (E5),
+including the owner-role `AFLDB_CODE_TEST_DATABASE_URL`, are present in the service's *initial*
+(exec-time) environment because the unit's deny list never names them. That gap exists whether
+or not the standalone `.env` is loaded, and is fixed by the unit alone.
+
+### First wrong layer
+Deployment contract. `deploy/afldb.service` and `docs/deployment.md` §9 were written for the
+pre-066 world and never revised when admin writes moved onto `afldb_import`; the deny list was
+never extended when AFLDB-ISSUE-146 added the code-test DSNs; and no test pins the web unit's
+credential set against the application's requirement (the existing contract test pins only the
+settle unit).
+
+### Root cause (as far as established)
+- Findings 1 and 2: a hand-maintained deny list (`UnsetEnvironment=`) as the sole credential
+  boundary, with no allow-list, no test, and no review step when new DSN names are introduced.
+- Finding 3 (corrected 2026-09-17, implementation §4b): **not** ordinary output-file-tracing.
+  `writeStandaloneDirectory` in the installed Next 16.3.1's own `next/dist/build/index.js`
+  (lines 321–345) copies any file whose loaded env path is exactly `.env` or `.env.production`
+  into `.next/standalone/` unconditionally, in a hardcoded loop entirely separate from
+  `copyTracedFiles`/output file tracing. No `next.config.ts` knob (`outputFileTracingExcludes`
+  included) reaches or suppresses this loop — confirmed by reading the loop itself, not inferred.
+  The project's build wrapper never checked for the resulting file.
+
+### Reproduction (read-only, names only)
+1. `ssh arm@10.0.40.100 "tr '\0' '\n' </proc/$(systemctl show afldb -p MainPID --value)/environ | grep -oE '^[A-Z_]*DATABASE_URL' | sort"` — expect the two `AFLDB_CODE_TEST_*` names beside `DATABASE_URL` and `AFLDB_AUTH_DATABASE_URL`.
+2. `ssh arm@10.0.40.100 "grep -oE '^[A-Za-z_][A-Za-z0-9_]*=' ~/projects/afldb/.next/standalone/.env | sed 's/=$//' | sort"` — expect the full project variable-name set.
+3. Runtime branch: read the control flow at the reported `loadEnvConfig` / `STANDALONE_CONFIG` lines (runbook §4).
+
+### Implementation (Sonnet 5, 2026-09-17, worktree `afldb-issue-220`, uncommitted)
+
+**§4b established.** Read `node_modules/next/dist/build/index.js` (Next 16.3.1, via a sibling
+worktree's `node_modules` — this worktree has none) — `writeStandaloneDirectory` (lines 321–345)
+copies `requiredServerFiles.files` plus, separately, any `loadedEnvFiles` entry whose path is
+`.env` or `.env.production`, unconditionally, for every `output: 'standalone'` build. This is a
+hardcoded file copy, not output-file-tracing, so `next.config.ts` is correctly left untouched
+(runbook §5's "only if" does not apply — recorded, not guessed). `node_modules/next/dist/docs/`
+has no page describing this copy either way. Fix has to live in the build wrapper, which the
+runbook's §5 already anticipated (the `prepare-standalone.mjs` assertion item).
+
+**Runbook refinement (not a contradiction of established facts):** §5/§6 step 6 said to derive the
+web unit's expected DSN set from `docs/deployment.md`'s §9 table "so a future DSN cannot be missed
+again." That table was itself missing five real, code-referenced DSN names (`AFLDB_AUTH_DATABASE_URL`,
+`AFLDB_TEST_IMPORT_DATABASE_URL`, `AFLDB_TEST_AUTH_DATABASE_URL`, `AFLDB_CODE_TEST_DATABASE_URL`,
+`AFLDB_CODE_TEST_IMPORT_DATABASE_URL`) — deriving the contract test from it as written would have
+reproduced this issue's exact mechanism inside the new test. Derived the test from `.env.example`
+instead (the tracked, complete, git-versioned template `docs/deployment.md:1069` already calls
+authoritative) and brought the §9 table up to the same completeness as part of the same doc-alignment
+step, rather than opening a separate issue for a doc gap discovered while fixing this one.
+
+**Changes:**
+- `deploy/afldb.service` — `UnsetEnvironment=` now denies `AFLDB_OWNER_DATABASE_URL
+  AFLDB_TEST_DATABASE_URL AFLDB_TEST_IMPORT_DATABASE_URL AFLDB_TEST_AUTH_DATABASE_URL
+  AFLDB_CODE_TEST_DATABASE_URL AFLDB_CODE_TEST_IMPORT_DATABASE_URL AFLDB_BACKUP_DATABASE_URL
+  AFLDB_PROD_DATABASE_URL` (F-A: added the two code-test names and the two test-role names that
+  were never in the list; F-C: removed `AFLDB_IMPORT_DATABASE_URL`, which the process genuinely
+  needs since migration 066). Kept: `DATABASE_URL`, `AFLDB_AUTH_DATABASE_URL`,
+  `AFLDB_IMPORT_DATABASE_URL`. Comment rewritten to state the three-DSN contract and point at the
+  new test.
+- `tools/build/env-in-standalone.mjs` (new) — `findEnvFiles`/`removeEnvFiles`, pure functions
+  isolated from `prepare-standalone.mjs`'s top-level side effects so a test can exercise real
+  removal behaviour against a scratch directory instead of the real build output.
+- `tools/build/prepare-standalone.mjs` — calls `removeEnvFiles(standalone)` right after confirming
+  `.next/standalone` exists; `process.exit(1)` if any `.env*` survives (F-B).
+- `docs/deployment.md` §9 — added the five missing DSN rows; rewrote the "does not receive them
+  all" paragraph for the three-DSN contract and named the new test; added a paragraph on the build
+  output no longer carrying `.env*`, citing this issue's §4b.
+- `tests/deploy-web-unit.test.ts` (new; no existing suite fit — the one deploy-contract suite,
+  `tests/settle-season-revalidation.test.ts`, pins the reverse-proxy/HOSTNAME contract, not
+  credentials) — three `describe` blocks: (1) derives the full `*_DATABASE_URL` name set from
+  `.env.example` and asserts the unit keeps exactly the three and denies every other one by name,
+  so a future addition to `.env.example` fails this test until the unit is updated; (2) exercises
+  `removeEnvFiles`/`findEnvFiles` against a real scratch directory (creates `.env` + `.env.production`
+  + unrelated files, asserts only the env files are removed) and pins that `prepare-standalone.mjs`
+  calls it and exits 1 if anything survives; (3) pins `docs/deployment.md` against the stale
+  "holds only `DATABASE_URL`" sentence and checks every `.env.example` DSN name is documented.
+
+**Not changed:** `next.config.ts` (no knob applies, see above); the settle unit and its own
+`AFLDB_IMPORT_DATABASE_URL`-only contract (`tests/current-season-import.test.ts:4801-4802`, a
+different file, unaffected); `.env`/`.env.example` values (no secret touched).
+
+### Validation
+
+**Local, operator-run 2026-09-17 (worktree `afldb-issue-220`):**
+- `npx --no-install vitest run tests/deploy-web-unit.test.ts` — **15/15 passed.**
+- `npx --no-install tsc --noEmit` — **clean** (confirms the new `tests/deploy-web-unit.test.ts` →
+  `tools/build/env-in-standalone.mjs` `.mjs`-by-extension import resolves correctly under
+  `moduleResolution: bundler` + `allowJs`, the one open risk noted at implementation time).
+
+**Still outstanding** (runbook §8 steps 2–6, this issue's acceptance criteria, §9): DEV unit
+reinstall + restart, the two DEV names-only checks (running process holds exactly
+`AFLDB_AUTH_DATABASE_URL AFLDB_IMPORT_DATABASE_URL DATABASE_URL`; no `.env*` under
+`.next/standalone/`), one `afldb_import`-backed Admin Centre write + revert on DEV, `npm run build`
+on DEV with the new `prepare-standalone.mjs` assertion passing, then PROD read-only steps 2–3
+before any PROD unit change (PROD still not inspected for this issue) and steps 2–3 again after.
+Status stays **Open** until that evidence is in hand — no further implementation changes pending
+this validation.
+
+### Follow-up
+- Related closed issues: AFLDB-ISSUE-027 (migration 066 moved admin writes to `afldb_import`),
+  AFLDB-ISSUE-107 (exec-time environment evidence, 2026-08-29), AFLDB-ISSUE-122 (settle unit
+  precedent for keeping exactly one writing DSN), AFLDB-ISSUE-146 (introduced the code-test DSNs).
+- PROD has not been inspected; the runbook requires the same names-only checks there before any
+  unit change.
