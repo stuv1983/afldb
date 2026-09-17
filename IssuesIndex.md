@@ -4,40 +4,51 @@
 >
 > `issues.md` is the authoritative detailed ledger.
 
-**Open issues:** 1
+**Open issues:** 0
 
-**AFLDB-ISSUE-218 — IMPLEMENTED, NOT YET RESOLVED, REOPENED after round-1 host
-validation** (Sonnet 5) — Severity: low (parser feature gap, no data/security
-impact). Area: NL search (`src/search/nl/parser.ts`, `src/search/nl/vocab.ts`,
-`tools/nl/generate-exploratory-corpus-v2.mjs`). `team_match_result/1` (522
-rows) and `/2` (569 rows) shared one wrapper-vocabulary-only mechanism (both
-already extracted clubs/direction correctly); fixed with additive vocabulary
-only. `PARSER_VERSION` 64 → 65. Round-1 host validation (commit `5bcc957`)
-found V5 GREEN but `/1` clean (522→0, as intended) while `/2` moved from an
-honest soft decline into a **569-row HARD FAILURE** — worse than the
-pre-fix state, so the issue was reopened rather than closed. Re-investigation
-(this session) traced production SQL (`src/db/queries/nl/team-match.ts`) and
-the parser's pre-existing, uniformly-applied `clubFor`=subject convention
-against every pre-issue directional test, then directly inspected and
-empirically probed `tools/nl/generate-exploratory-corpus-v2.mjs`'s
-`team_match_result` generator: templates 0/1/3 all keep club `c` as the
+**AFLDB-ISSUE-218 resolved 2026-09-17** (Sonnet 5, operator-validated on
+streamanator across two host-validation rounds) — `team_match_result/1` (522
+rows, "at V, find the widest X win/loss to Y...") and `/2` (569 rows, "by how
+much did X lose to Y in their most lopsided meeting...") shared one
+wrapper-vocabulary-only mechanism (both already extracted clubs/direction
+correctly); fixed with additive vocabulary only (`widest` in `AGG_WORDS`, a
+leading scope-clause request-verb strip widened to `at` as well as `for`,
+verb forms `lose`/`lost`/`beat` in `TEAM_METRIC_WORDS`, two narrowly-gated
+wrapper consumers for "how much"/"lopsided meeting"), no grain-election or
+club-role logic touched, `PARSER_VERSION` 64 → 65. Round-1 host validation
+(commit `5bcc957`) found V5 green and `/1` fully cleared (522→0), but exposed
+`/2` moving from an honest soft decline into a 569-row HARD FAILURE — worse
+than the pre-fix state — so the issue was reopened rather than closed.
+Re-investigation traced production SQL (`src/db/queries/nl/team-match.ts`'s
+clubFor-relative `win_margin`/`loss_margin`) and the parser's pre-existing,
+uniformly-applied `clubFor`=subject convention against every pre-issue
+directional test, then found and confirmed (empirically, 0 mismatches across
+every affected row) a genuine, isolated **exploratory V2 generator/oracle
+defect**: `team_match_result`'s templates 0/1/3 all keep club `c` as the
 sentence's grammatical subject, but template 2 alone renders `o` as subject
 and `c` as object without a corresponding fix to its expected `club`/
-`opponent`/`metric` triple — a genuine, template-2-only **exploratory V2
-generator/oracle defect**, confirmed empirically (0 mismatches across a full
-local regeneration's 576 `/2` rows vs. the real, unmodified parser). **Parser
-v65 is correct and untouched; only the generator's template-2 expectation
-construction was corrected.** `PARSER_VERSION` stays 65 (no parser semantics
-changed in the correction). `team_match_result/0` (56 rows) remains
-deliberately deferred, unaffected by either round. Implementation on
-`sonnet/issue-218-team-match-result-phrasing`, unmerged. Local (unchanged
-from round 1, since no parser/vocab/plan source changed in the correction):
-`tests/nl-parser.test.ts` 595/595, broader gates 402/402, `typecheck` clean.
-**Next action:** operator ROUND-2 host validation on `streamanator` per
-`AFLDB-ISSUE-218.md` §20 — regenerate the V2 corpus from the corrected
-generator (same seed/baseline), confirm 0 question-text/other-template
-movement, re-score, and confirm **0 failed** before resolution/`CHANGELOG.md`
-entry.
+`opponent`/`metric` triple. Parser v65 was confirmed correct and untouched;
+only the generator's template-2 expectation construction was corrected
+(commit `6ed227d`), `PARSER_VERSION` staying at 65 (corpus-only correction).
+Round-2 host validation confirmed **0 failed**: frozen V5 stayed
+12000/12000/0/0; exploratory V2 moved v64 baseline (19421 clean/8109
+soft/0 failed) → v65-corrected (20512 clean/7018 soft/0 failed), net
+**+1091 clean/-1091 soft/0 failed**, reconciling exactly to `522 + 569 =
+1091`; a determinism/isolation diff confirmed 0 question-text/row-id changes
+anywhere in the 29,030-row corpus, with all 569 changed rows confined to
+`team_match_result/2`'s own expectation columns. `team_match_result/0` (56
+rows, "Bombers'"/"Dogs'"/"Brisbane Lions'" possessive aliases) remains
+unchanged at 56 honest declines throughout both rounds — a distinct,
+already-known trailing-apostrophe plural possessive-alias defect (the same
+mechanism AFLDB-ISSUE-214 already found and left unfixed for
+`club_season_rank`), deliberately deferred as a future cross-family issue
+candidate, not opened as its own tracked issue in this closeout.
+Implementation commits `5bcc957` (parser) and `6ed227d` (exploratory oracle
+correction) on `sonnet/issue-218-team-match-result-phrasing`, unmerged.
+Local: `tests/nl-parser.test.ts` 595/595, broader gates (`nl-regression-corpus`
+163/163, `nl-semantic-mapping` 174/174, `nl-stress-corpus` 65/65 = 402/402),
+`typecheck` clean. See `issues.md` and `AFLDB-ISSUE-218.md` for the full
+record.
 
 **AFLDB-ISSUE-217 resolved 2026-09-17** (Sonnet 5, operator-validated on streamanator) —
 `player_game_single`'s three large exploratory clusters (`/0` 423 rows "biggest `<metric>` haul in one

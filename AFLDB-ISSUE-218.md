@@ -1,11 +1,14 @@
 # AFLDB-ISSUE-218 — `team_match_result` "widest"/"how much...lose"/"lopsided meeting" phrasing declines with `unsupported_term`
 
-**Status:** IMPLEMENTED, NOT YET RESOLVED (Sonnet 5). Round 1 host validation
-(commit `5bcc957`, `PARSER_VERSION = 65`) found V5 green but exposed a genuine
-`team_match_result/2` semantic discrepancy — re-investigated in §14-§18 below
-and determined to be an exploratory V2 GENERATOR/ORACLE defect, not a parser
-regression. Corrected in this same session (generator-only, `PARSER_VERSION`
-unchanged at 65). Awaiting round-2 operator host validation on `streamanator`.
+**Status:** RESOLVED 2026-09-17 (Sonnet 5, operator-validated on `streamanator`
+across two host-validation rounds). Round 1 host validation (commit `5bcc957`,
+`PARSER_VERSION = 65`) found V5 green but exposed a genuine `team_match_result/2`
+semantic discrepancy — re-investigated in §14-§18 below and determined to be an
+exploratory V2 GENERATOR/ORACLE defect, not a parser regression. Corrected
+(generator-only, `PARSER_VERSION` unchanged at 65, commit `6ed227d`). Round 2
+host validation (§21) confirmed **0 failed**, exactly the intended +1091/-1091
+clean/soft movement, and 0 unrelated corpus movement. See §21-§22 for the full
+closeout record.
 
 ## 0. Round-1 host validation result (superseded investigation, see §14+)
 
@@ -257,9 +260,9 @@ Unchanged: **65**. Production parser semantics did not move in this correction �
 
 ## 19. Documentation status
 
-`issues.md` and `IssuesIndex.md` updated to record: the round-1 host result, the reopened investigation, the root-cause determination (oracle defect, not parser), and the correction made. Status remains **IMPLEMENTED, NOT YET RESOLVED**. `CHANGELOG.md` still not touched.
+`issues.md` and `IssuesIndex.md` updated to record: the round-1 host result, the reopened investigation, the root-cause determination (oracle defect, not parser), and the correction made (commit `6ed227d`). Status was **IMPLEMENTED, NOT YET RESOLVED** pending round 2; see §21-§22 for the actual round-2 result and final resolution.
 
-## 20. Expected host validation, ROUND 2 (NOT YET RUN)
+## 20. Expected host validation, ROUND 2 (confirmed — see §21)
 
 The frozen `/home/arm/nl-exploratory-v2.csv` on `streamanator` must be REGENERATED (not hand-patched) from the corrected `tools/nl/generate-exploratory-corpus-v2.mjs`, using the SAME real V5 baseline and the SAME seed (`2060542026`, the script's default — do not pass `--seed`), to produce a byte-for-byte-identical-except-`/2`-expectations replacement corpus:
 
@@ -278,3 +281,73 @@ Then:
 4. A direct structured-plan comparison of `nl-exploratory-v2.csv` (round-1) vs `nl-exploratory-v2-corrected.csv` scored at the SAME `PARSER_VERSION = 65`: expect the ONLY rows whose scored outcome changes are the `team_match_result/2` rows (failed → clean), zero unrelated movement, and the actual PLAN each of those rows produces is IDENTICAL before and after (only the CSV's own expectation columns changed — the parser was never touched).
 
 Status stays IMPLEMENTED, NOT YET RESOLVED until round 2 reconciles with 0 failed and the above confirmations. Only then update `CHANGELOG.md` and close the issue.
+
+## 21. Host validation, ROUND 2 (streamanator) — ACTUAL RESULT
+
+Commit `6ed227d` ("Correct team match result exploratory oracle"), parser unchanged at `PARSER_VERSION = 65`.
+
+**Determinism / corpus-isolation proof** — `/home/arm/nl-exploratory-v2-corrected.csv` regenerated from the corrected generator against the same real V5 baseline and the same default seed (`2060542026`), compared against the round-1 frozen `/home/arm/nl-exploratory-v2.csv`:
+
+```text
+old rows: 29030
+new rows: 29030
+id diffs: 0
+question diffs: 0
+changed rows: 569
+```
+
+Changed rows are exclusively `team_match_result/2`. Changed fields are exclusively `equivalence_group`, `expected_club`, `expected_metric`, `expected_opponent` — no `question` text and no `id` changed anywhere in the 29,030-row corpus. This confirms the correction predicted in §16 landed exactly as designed: isolated to one template's expectation columns, with zero effect on corpus identity/wording.
+
+**Frozen V5 re-run** at `PARSER_VERSION = 65`:
+
+```text
+12000 scored
+12000 clean
+0 soft
+0 failed
+```
+
+Unchanged from round 1 — no parser regression, as expected (no parser code moved between rounds).
+
+**Corrected exploratory V2** re-scored at `PARSER_VERSION = 65`:
+
+```text
+27530 scored
+20512 clean
+7018 soft
+0 failed
+1500 audit-required
+```
+
+Compared with the v64 baseline (pre-ISSUE-218):
+
+```text
+v64 baseline:      19421 clean / 8109 soft / 0 failed
+v65 corrected:     20512 clean / 7018 soft / 0 failed
+net:               +1091 clean / -1091 soft / 0 failed
+```
+
+`+1091` reconciles exactly to `team_match_result/1` (522 rows) `+ team_match_result/2` (569 rows) `= 1091` — the full intended scope of this issue, with **zero hard failures** anywhere in the corpus, satisfying the critical guardrail.
+
+**Target-family reconciliation:**
+
+```text
+team_match_result/1: 522 -> 0 unexpected declines
+team_match_result/2: 569 -> 0 unexpected declines / 0 failures
+team_match_result/0:  56 -> 56 honest declines (unchanged, deliberately deferred)
+```
+
+Both target clusters (`/1`, `/2`) are fully cleared. `/0` is untouched in both count and content, exactly as intended.
+
+## 22. Resolution
+
+**RESOLVED 2026-09-17** (Sonnet 5, operator-validated on `streamanator` across two host-validation rounds).
+
+- `team_match_result/1` (522 rows, "at V, find the widest X win/loss to Y...") and `team_match_result/2` (569 rows, "by how much did X lose to Y in their most lopsided meeting...") both fully cleared — `/1` by the round-1 parser fix (wrapper-vocabulary additions only: `widest` in `AGG_WORDS`, a widened leading scope-clause request-verb strip covering `at` as well as `for`, verb forms `lose`/`lost`/`beat` in `TEAM_METRIC_WORDS`, and two narrowly-gated wrapper consumers for "how much"/"lopsided meeting"); `/2` by a round-2 correction to the exploratory V2 generator's OWN expectation construction, not the parser, once host validation proved the round-1 parser plan was already canonically correct (verified against `src/db/queries/nl/team-match.ts`'s clubFor-relative `win_margin`/`loss_margin` SQL semantics and the parser's pre-existing, uniformly-applied subject-is-`clubFor` ownership convention, and confirmed empirically with zero mismatches across every affected row).
+- `team_match_result/0` (56 rows, "What was Bombers'/Dogs'/Brisbane Lions' biggest victory/defeat...") is a distinct, already-known trailing-apostrophe plural possessive-alias defect (the same mechanism AFLDB-ISSUE-214 already found and left unfixed for `club_season_rank`, and plausibly recurring in `team_streak`/checkpoint-record wording per that issue's own residual-pattern list) — deliberately **not** fixed here, and confirmed by both host rounds to remain exactly 56 honest declines throughout, unaffected by either the parser fix or the oracle correction. Recorded as a candidate for a future, cross-family possessive-alias issue.
+- `PARSER_VERSION` moved 64 → 65 exactly once (round 1's genuine parser-semantics change); the round-2 correction was corpus-only and did not move it again.
+- Both host-validation rounds confirm: frozen V5 stayed 12000/12000/0/0 throughout; the exploratory V2 corpus moved by exactly `+1091` clean / `-1091` soft / `0` failed against the pre-issue v64 baseline, reconciling exactly to `522 + 569 = 1091`; the oracle correction changed 0 row IDs and 0 question text across all 29,030 rows, confined entirely to `team_match_result/2`'s own expectation columns.
+- Local: `tests/nl-parser.test.ts` 595/595, broader gates (`nl-regression-corpus` 163/163, `nl-semantic-mapping` 174/174, `nl-stress-corpus` 65/65 = 402/402), `typecheck` clean — unchanged across both rounds since the round-2 correction touched only `tools/nl/generate-exploratory-corpus-v2.mjs`.
+- Implementation commits: `5bcc957` ("Fix team match result phrasing", parser + vocab + RED tests) and `6ed227d` ("Correct team match result exploratory oracle", generator only), both on `sonnet/issue-218-team-match-result-phrasing`, unmerged.
+
+See `issues.md` and `CHANGELOG.md` for the full record.
