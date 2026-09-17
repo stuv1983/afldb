@@ -634,7 +634,23 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
 // claimed the lower bound; `since`/`before`/`between`/exact-year/decade
 // semantics are otherwise unchanged. This was AFLDB-ISSUE-206's largest
 // unimplemented soft-decline vocabulary family (~1,200+ exploratory rows).
-export const PARSER_VERSION = 59;
+// v60 -- AFLDB-ISSUE-213: extractClubs (nl/parser.ts) no longer re-finds a
+// club mention's position with a plain first-match word-boundary search of
+// the original question. A shorter club's name can occur, word-boundary
+// and all, embedded inside a longer club's own name that was already
+// matched earlier in the same call ("Melbourne" inside "North Melbourne");
+// the old search silently rebound the shorter club onto the longer club's
+// own span instead of its real, later mention, so "North Melbourne versus
+// Melbourne" computed an empty gap between the two clubs, the "versus"
+// separator went unrecognized, and the parser fell back to directional
+// clubFor/clubAgainst roles instead of forming scope.matchup. The new
+// firstUnclaimedOccurrence helper excludes spans already claimed by an
+// earlier club this same call, so the search finds the real second
+// mention generically, for any pair of club names in this relationship --
+// no club is named in the fix. Ordinary symmetric "A versus/vs/v B"
+// wording with no name overlap, and directional "for"/"against"/"to"
+// phrasing, are both unaffected.
+export const PARSER_VERSION = 60;
 
 // ------------------------------------------------------------------ grain
 

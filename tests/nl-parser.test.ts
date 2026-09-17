@@ -23,11 +23,23 @@ const CLUBS: NlClubDirectoryEntry[] = [
   // which carries 'gws' and 'giants' as independent one-word nicknames plus
   // the combined 'gws giants' alias added for this issue.
   { organizationId: 7, slug: 'gws', name: 'Greater Western Sydney', names: ['greater western sydney', 'gws', 'giants', 'gws giants'] },
+  // AFLDB-ISSUE-213: three overlapping-name pairs, where the shorter name
+  // occurs as a whole word embedded inside the longer one ("melbourne"
+  // inside "north melbourne", "adelaide" inside "port adelaide", "sydney"
+  // inside "greater western sydney").
+  { organizationId: 8, slug: 'melbourne', name: 'Melbourne', names: ['melbourne', 'demons', 'dees'] },
+  { organizationId: 9, slug: 'north-melbourne', name: 'North Melbourne', names: ['north melbourne', 'kangaroos', 'roos'] },
+  { organizationId: 10, slug: 'sydney', name: 'Sydney', names: ['sydney', 'swans'] },
+  // AFLDB-ISSUE-213: no name-overlap regression pair for the "v" separator.
+  { organizationId: 11, slug: 'essendon', name: 'Essendon', names: ['essendon', 'bombers'] },
+  { organizationId: 12, slug: 'hawthorn', name: 'Hawthorn', names: ['hawthorn', 'hawks'] },
 ];
 
 const VENUES: NlVenueDirectoryEntry[] = [
   { id: 1, slug: 'mcg', name: 'Melbourne Cricket Ground', names: ['mcg', 'melbourne cricket ground', 'the g'] },
   { id: 2, slug: 'docklands', name: 'Docklands Stadium', names: ['docklands', 'marvel', 'etihad'] },
+  // AFLDB-ISSUE-213: the venue named in the confirmed defect's exact wording.
+  { id: 3, slug: 'adelaide-oval', name: 'Adelaide Oval', names: ['adelaide oval'] },
 ];
 
 /**
@@ -2192,10 +2204,17 @@ describe('16. marquee matches, rivalries and debut windows (parser v15)', () => 
   });
 
   it('a rivalry whose clubs are not in the directory declines instead of guessing', async () => {
-    // The fixture directory has no Sydney (GWS was added for AFLDB-ISSUE-202,
-    // but Sydney remains absent), so the phrase cannot resolve; its words
-    // stay leftover and the question declines.
-    const result = await parse('players who played in a sydney derby');
+    // RIVALRY_WORDS (nl/vocab.ts) maps this phrase to ['west coast',
+    // 'fremantle'] -- neither club is in the fixture directory, so the
+    // phrase cannot resolve; its words stay leftover and the question
+    // declines. Was 'a sydney derby' (needing 'sydney'/'greater western
+    // sydney') until AFLDB-ISSUE-213 added both of those clubs to this
+    // shared fixture for its own overlapping-name matchup coverage --
+    // swapped to a different, still-genuinely-absent rivalry pair so this
+    // negative control keeps proving the same thing (decline when a
+    // rivalry's clubs are not in the directory) rather than accidentally
+    // start asserting a positive plan.
+    const result = await parse('players who played in a western derby');
     expect(result.status).toBe('none');
   });
 
@@ -3882,6 +3901,152 @@ describe('17. AFLDB-ISSUE-210 imperative/request-wrapper phrasing', () => {
       const bare = await parse('youngest player ever');
       expect(wrapped.status).toBe('unanswerable');
       expect(bare.status).toBe('unanswerable');
+    });
+  });
+});
+
+// AFLDB-ISSUE-213: extractClubs (nl/parser.ts) re-derived a matched club's
+// position by searching the ORIGINAL question text for `\bmatchedText\b`
+// and taking the first hit. When the second club's name is a whole word
+// embedded inside the first (already-matched) club's own name --
+// "melbourne" inside "north melbourne", "adelaide" inside "port adelaide",
+// "sydney" inside "greater western sydney" -- that search found the
+// embedded occurrence, not the real, later standalone mention. The
+// computed gap between the two clubs came out empty or negative, the
+// literal "versus"/"vs"/"v" separator between them was never recognised,
+// and the parser fell back to directional clubFor/clubAgainst roles
+// instead of forming the unordered scope.matchup an "A versus B" question
+// is supposed to produce. Root cause confirmed by ISSUE-212's corrected
+// exploratory V2 oracle (row 20609919) and re-verified against current
+// source for this issue. Fixed by firstUnclaimedOccurrence, which excludes
+// any span an earlier club match in the same call has already claimed.
+describe('AFLDB-ISSUE-213: overlapping club names must not steal each other\'s matched span', () => {
+  describe('confirmed defect: "North Melbourne versus Melbourne" (row 20609919)', () => {
+    it('Largest winning margin for North Melbourne versus Melbourne at Adelaide Oval -> unordered matchup, both clubs, no clubFor/clubAgainst', async () => {
+      const p = await plan('Largest winning margin for North Melbourne versus Melbourne at Adelaide Oval');
+      expect(p.grain).toBe('team_match');
+      expect(p.metric).toBe('win_margin');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.scope.matchup?.clubA.name).toBe('North Melbourne');
+      expect(p.scope.matchup?.clubB.name).toBe('Melbourne');
+      expect(p.scope.clubFor).toBeUndefined();
+      expect(p.scope.clubAgainst).toBeUndefined();
+      expect(p.scope.venue?.name).toBe('Adelaide Oval');
+    });
+
+    // Investigated per ISSUE-213: does the defect depend on word order?
+    // "Melbourne versus North Melbourne" was already correct before the
+    // fix (findClub picks the longest available NAME regardless of where
+    // it sits in the text, so "North Melbourne" -- not "Melbourne" -- is
+    // always matched first here too; the standalone "Melbourne" then
+    // happens to be the FIRST \bmelbourne\b in the string, so even the old
+    // plain first-match search found the real mention). Kept as a
+    // regression control so a future change cannot silently break the
+    // direction that already worked.
+    it('reverse order: Largest winning margin for Melbourne versus North Melbourne at Adelaide Oval -> unordered matchup, both clubs', async () => {
+      const p = await plan('Largest winning margin for Melbourne versus North Melbourne at Adelaide Oval');
+      expect(p.scope.matchup?.clubA.name).toBe('Melbourne');
+      expect(p.scope.matchup?.clubB.name).toBe('North Melbourne');
+      expect(p.scope.clubFor).toBeUndefined();
+      expect(p.scope.clubAgainst).toBeUndefined();
+    });
+  });
+
+  // ISSUE-212 named these as structurally similar, source-derived
+  // hypotheses only -- not previously empirically confirmed. Traced by
+  // hand against the same extractClubs mechanism as the confirmed row:
+  // both reproduce the identical failure (the shorter name is the tail
+  // word of the longer one, so it is always the first `\bname\b` hit in
+  // the original text once the longer name is matched first).
+  describe('candidate pair, confirmed to reproduce the same mechanism: "Port Adelaide versus Adelaide"', () => {
+    it('Largest winning margin for Port Adelaide versus Adelaide -> unordered matchup, both clubs', async () => {
+      const p = await plan('Largest winning margin for Port Adelaide versus Adelaide');
+      expect(p.scope.matchup?.clubA.name).toBe('Port Adelaide');
+      expect(p.scope.matchup?.clubB.name).toBe('Adelaide');
+      expect(p.scope.clubFor).toBeUndefined();
+      expect(p.scope.clubAgainst).toBeUndefined();
+    });
+
+    it('reverse order: Largest winning margin for Adelaide versus Port Adelaide -> unordered matchup, both clubs', async () => {
+      const p = await plan('Largest winning margin for Adelaide versus Port Adelaide');
+      expect(p.scope.matchup?.clubA.name).toBe('Adelaide');
+      expect(p.scope.matchup?.clubB.name).toBe('Port Adelaide');
+      expect(p.scope.clubFor).toBeUndefined();
+      expect(p.scope.clubAgainst).toBeUndefined();
+    });
+  });
+
+  describe('candidate pair, confirmed to reproduce the same mechanism: "Greater Western Sydney versus Sydney"', () => {
+    it('Largest winning margin for Greater Western Sydney versus Sydney -> unordered matchup, both clubs', async () => {
+      const p = await plan('Largest winning margin for Greater Western Sydney versus Sydney');
+      expect(p.scope.matchup?.clubA.name).toBe('Greater Western Sydney');
+      expect(p.scope.matchup?.clubB.name).toBe('Sydney');
+      expect(p.scope.clubFor).toBeUndefined();
+      expect(p.scope.clubAgainst).toBeUndefined();
+    });
+
+    it('reverse order: Largest winning margin for Sydney versus Greater Western Sydney -> unordered matchup, both clubs', async () => {
+      const p = await plan('Largest winning margin for Sydney versus Greater Western Sydney');
+      expect(p.scope.matchup?.clubA.name).toBe('Sydney');
+      expect(p.scope.matchup?.clubB.name).toBe('Greater Western Sydney');
+      expect(p.scope.clubFor).toBeUndefined();
+      expect(p.scope.clubAgainst).toBeUndefined();
+    });
+  });
+
+  // The fix must not turn every symmetric "A versus/vs/v B" club pair into
+  // a special case -- ordinary pairs with no name overlap at all must keep
+  // producing exactly the same unordered matchup they always have.
+  describe('regression: ordinary non-overlapping symmetric wording is unaffected', () => {
+    it('Largest winning margin for Sydney versus Richmond -> unordered matchup', async () => {
+      const p = await plan('Largest winning margin for Sydney versus Richmond');
+      expect(p.scope.matchup?.clubA.name).toBe('Sydney');
+      expect(p.scope.matchup?.clubB.name).toBe('Richmond');
+    });
+
+    it('Largest winning margin for Collingwood vs Carlton -> unordered matchup', async () => {
+      const p = await plan('Largest winning margin for Collingwood vs Carlton');
+      expect(p.scope.matchup?.clubA.name).toBe('Collingwood');
+      expect(p.scope.matchup?.clubB.name).toBe('Carlton');
+    });
+
+    it('Largest winning margin for Essendon v Hawthorn -> unordered matchup', async () => {
+      const p = await plan('Largest winning margin for Essendon v Hawthorn');
+      expect(p.scope.matchup?.clubA.name).toBe('Essendon');
+      expect(p.scope.matchup?.clubB.name).toBe('Hawthorn');
+    });
+  });
+
+  // Directional wording must stay directional -- the fix touches only how
+  // a matched club's POSITION is found, never the "for"/"against"/"to"
+  // role-governing logic itself, so an overlapping-name pair phrased
+  // directionally (not bare "A versus B") must still resolve clubFor/
+  // clubAgainst, not collapse into matchup.
+  describe('regression: directional wording for an overlapping-name pair stays directional, not matchup', () => {
+    it('North Melbourne biggest win against Melbourne -> clubFor/clubAgainst, no matchup', async () => {
+      const p = await plan('North Melbourne biggest win against Melbourne');
+      expect(p.scope.clubFor?.name).toBe('North Melbourne');
+      expect(p.scope.clubAgainst?.name).toBe('Melbourne');
+      expect(p.scope.matchup).toBeUndefined();
+    });
+
+    it('biggest win by Port Adelaide against Adelaide -> clubFor/clubAgainst, no matchup', async () => {
+      const p = await plan('biggest win by Port Adelaide against Adelaide');
+      expect(p.scope.clubFor?.name).toBe('Port Adelaide');
+      expect(p.scope.clubAgainst?.name).toBe('Adelaide');
+      expect(p.scope.matchup).toBeUndefined();
+    });
+  });
+
+  // Club names that share partial text but are NOT a full-name collision
+  // (one name is not a whole-word substring of the other) never entered
+  // firstUnclaimedOccurrence's overlap branch at all -- included as a
+  // sanity control, not because the old code mishandled it.
+  describe('control: partial-text club names that are not a whole-word collision are unaffected', () => {
+    it('Largest winning margin for Adelaide versus Greater Western Sydney -> unordered matchup ("Adelaide" is not a whole-word substring of "Greater Western Sydney")', async () => {
+      const p = await plan('Largest winning margin for Adelaide versus Greater Western Sydney');
+      expect(p.scope.matchup?.clubA.name).toBe('Adelaide');
+      expect(p.scope.matchup?.clubB.name).toBe('Greater Western Sydney');
     });
   });
 });

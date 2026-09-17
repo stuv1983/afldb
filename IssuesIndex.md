@@ -4,7 +4,28 @@
 >
 > `issues.md` is the authoritative detailed ledger.
 
-**Open issues:** 0
+**Open issues:** 1
+
+**AFLDB-ISSUE-213** — IMPLEMENTED, NOT YET RESOLVED 2026-09-17 (Sonnet 5). Severity: parser defect
+(pre-existing, exposed by ISSUE-212's corrected exploratory V2 oracle, not caused by it). Area: NL
+search club-role scoping (`src/search/nl/parser.ts`, `extractClubs`). `phrasePosition`/`phraseEnd`
+re-found a matched club's position with a bare first-match `\b<name>\b` search of the whole original
+question, so a shorter club's name embedded, word-bounded, inside a longer club's own name
+("Melbourne" inside "North Melbourne") silently rebound onto the longer club's own span instead of
+the real, later standalone mention — the computed gap between the two clubs came out empty, the
+`versus`/`vs`/`v` separator was never recognised, and `scope.matchup` never formed for wording like
+"North Melbourne versus Melbourne" (confirmed row `#20609919`), falling back to directional
+`clubFor`/`clubAgainst` instead. Fixed with a new `firstUnclaimedOccurrence` helper that excludes
+spans an earlier club match in the same call has already claimed, generic across any overlapping-name
+pair — no club special-cased. `PARSER_VERSION` 59 → 60. `Port Adelaide`/`Adelaide` and
+`Greater Western Sydney`/`Sydney` confirmed to reproduce the identical mechanism by source trace (not
+yet executed — see below). Implemented on `sonnet/issue-213-overlapping-club-matchup`
+(worktree `D:\dev\afldb-issue-213`), unmerged. Local verification complete: `tests/nl-parser.test.ts` 509/509 (one pre-existing negative-control test
+needed a fixture-only swap after this issue's new club fixtures invalidated its "absent club" assumption
+— not a parser regression, see `issues.md`), broader gates (`nl-regression-corpus`, `nl-semantic-mapping`,
+`nl-stress-corpus`) 402/402, `typecheck` clean. **Next action:** validate on streamanator (frozen V5 stays
+12000/12000/0/0, V2 row `#20609919` moves hard-failure → clean, V2 aggregate hard failures 1 → 0) before
+this resolves. See `issues.md` and `AFLDB-ISSUE-213.md` for the full record.
 
 **AFLDB-ISSUE-212 resolved 2026-09-17** (Sonnet 5, operator-validated on streamanator) — follow-on item
 (4) of `AFLDB-ISSUE-206.md`'s six proposals: corrected the exploratory NL corpus/scorer's three
