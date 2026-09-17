@@ -1,6 +1,6 @@
 # AFLDB-ISSUE-217 — `player_game_single` "haul"/"peak single-game"/"which match saw...collect" phrasing declines with `unsupported_term`
 
-Status: **IMPLEMENTED, NOT YET RESOLVED** — awaiting operator host validation on `streamanator`.
+Status: **RESOLVED 2026-09-17** — operator-validated on `streamanator`, commit `879b0e1`.
 
 ## 1. Problem, as given
 
@@ -268,25 +268,97 @@ V2 generator/scorer untouched (corpus expectation verified correct, not changed)
 `tests/nl-parser.test.ts`). One zero-byte stray artefact (`2`, a shell-redirect-parsing artefact from an
 earlier command this session) was found and deleted, positively identified as session-created.
 
-## 12. Host validation — not yet run
+## 12. Host validation (streamanator, 2026-09-17), commit `879b0e1`, `PARSER_VERSION = 64`
 
-Recommended commands for the operator on `streamanator`:
+**Frozen V5 stable corpus:**
 
-1. Frozen V5 rerun against `PARSER_VERSION` 64 — expect **12000 scored / 12000 clean / 0 soft / 0
-   failed**, unchanged.
-2. Retained exploratory V2 corpus (`/home/arm/nl-exploratory-v2.csv`) rerun against v64 — report new
-   scored/clean/soft/failed/audit-required counts against the v63 baseline (27530 / 17612 / 9918 / 0 /
-   1500).
-3. `player_game_single/0`, `/4`, `/3` remaining counts, and `player_game_scope_collision/3` remaining
-   count — expect 0 in all four if the fix generalises as traced in §3 (NOT promised in advance, per the
-   issue's own instruction).
-4. A direct v63-vs-v64 structured-plan comparison across all 29,030 rows — confirm changed-plan count, 0
-   missing rows, and zero unrelated movement outside the four target clusters. If the fix generalises
-   exactly as traced, the expected changed-row count is `423 + 422 + 409 + 555 = 1809`, but this is a
-   traced expectation to be confirmed by evidence, not a promised result.
+```text
+12000 scored
+12000 clean
+0 soft
+0 failed
+```
+
+No stable-corpus regression.
+
+**Exploratory V2 (retained 29,030-row corpus, not regenerated):**
+
+```text
+                v63 baseline      v64 result
+input:          29030             29030
+scored:         27530             27530
+clean:          17612             19421
+soft:            9918              8109
+failed:              0                 0
+audit-required:   1500              1500
+```
+
+Net movement: clean +1809, soft -1809, failed 0.
+
+**Target-family reconciliation.** The primary target (`player_game_single/0` 423, `/4` 422, `/3` 409 =
+1254 rows) plus the adjacent same-mechanism target (`player_game_scope_collision/3`, 555 rows) totals
+1809 rows. After v64, the explicit target unexpected-decline check found none remaining in any of the
+four groups:
+
+```text
+player_game_single/0:               423 -> 0 unexpected declines
+player_game_single/4:                422 -> 0 unexpected declines
+player_game_single/3:                409 -> 0 unexpected declines
+player_game_scope_collision/3:       555 -> 0 unexpected declines
+```
+
+All 1,809 target rows cleared.
+
+**Direct v63-vs-v64 structured-plan diff** across
+`/home/arm/nl-exploratory-v2-v63-validation/results.jsonl` vs.
+`/home/arm/nl-exploratory-v2-v64-validation/results.jsonl` (saved as
+`/home/arm/issue-217-v63-v64-plan-diff.json`):
+
+```text
+v63 rows: 29030
+v64 rows: 29030
+missing: 0
+changed plans: 1809
+```
+
+The changed-plan count reconciles exactly: `423 + 422 + 409 + 555 = 1809`. The changed rows are
+exclusively target constructions (e.g. "Find the single-match disposals record for Shane Crawford
+against Brisbane Lions at Gabba in 2009", "What was Chris Judd's biggest goals haul in one match in
+2009", "What was Dustin Martin's biggest Brownlow votes haul in one match during the 2010s", "Find Lance
+Franklin's peak single-game clearances in 2017", "Which match saw Patrick Dangerfield collect the most
+goal assists since 2000"), with zero unrelated plan movement observed.
+
+### Remaining scorer-identity artifacts (not this issue)
+
+The v64 triage still shows `WRONG_PLAYER` groups within the affected template families:
+
+```text
+77 player_game_scope_collision/3
+76 player_game_scope_collision/0
+70 player_game_scope_collision/1
+67 player_game_scope_collision/2
+
+59 player_game_single/4
+58 player_game_single/2
+54 player_game_single/1
+53 player_game_single/3
+49 player_game_single/0
+```
+
+Classified `bucket = scorer_identity_artifact`, source area = entity resolver / club-role ownership —
+this is the pre-existing Gary Ablett Jnr/Snr canonical-display-name mismatch already tracked from
+AFLDB-ISSUE-206/210 (player ID resolves correctly; only the scorer's display-name string comparison is
+wrong). These groups are not `UNEXPECTED_DECLINE`, appear across templates this issue did not modify as
+well as ones it did, and are independent of the player-span wrapper-pollution mechanism fixed here. Left
+as separate, already-tracked scorer/entity-identity work — not touched in this closeout.
 
 ## 13. Resolution
 
-**NOT YET RESOLVED.** Status stays `IMPLEMENTED, NOT YET RESOLVED` until the operator runs the host
-validation in §12 on `streamanator` and confirms the expected outcomes. `CHANGELOG.md` entry deferred
-until then, per the issue's explicit instruction.
+**RESOLVED 2026-09-17.** All required outcomes met: all four targeted clusters cleared
+(`player_game_single/0` 423→0, `/4` 422→0, `/3` 409→0, `player_game_scope_collision/3` 555→0); frozen V5
+unaffected (12000/12000/0/0); V2 gains exactly 1809 clean rows with 0 hard failures throughout; the
+direct 29,030-row plan comparison confirms exactly 1809 changed plans, 0 missing rows, reconciling
+exactly to the four target clusters with zero unrelated movement; `PARSER_VERSION` bumped exactly once,
+63 → 64. The remaining Gary Ablett Jnr/Snr `WRONG_PLAYER` rows are confirmed independent, pre-existing
+scorer-identity artifacts, not a residual defect of this issue. See `CHANGELOG.md` for the retained
+project-change record.
