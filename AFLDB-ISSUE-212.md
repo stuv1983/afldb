@@ -1,11 +1,12 @@
 # AFLDB-ISSUE-212 — Exploratory V2: correct three confirmed V1 corpus/scorer oracle defects
 
-Status: IMPLEMENTED, NOT YET RESOLVED. Local (DB-free) implementation and RED/GREEN test
-authorship complete on `sonnet/issue-212-exploratory-v2-scoring`. Host generation and validation on
-streamanator are outstanding — do not mark RESOLVED until those run. This is follow-on item (4) of
-`AFLDB-ISSUE-206.md`'s six proposals: "Correct the exploratory oracle's symmetric-matchup and
-achievement aggregation assertions in a future versioned corpus, and make player identity scoring
-ID-aware. Preserve V1 run and its findings."
+Status: **RESOLVED 2026-09-17.** Local (DB-free) implementation, RED/GREEN tests, and streamanator
+host generation/validation are all complete. This is follow-on item (4) of `AFLDB-ISSUE-206.md`'s six
+proposals: "Correct the exploratory oracle's symmetric-matchup and achievement aggregation assertions
+in a future versioned corpus, and make player identity scoring ID-aware. Preserve V1 run and its
+findings." See §8 for the final validated host evidence and §6a for one genuine, distinct,
+newly-discovered parser defect this issue's corrected oracle exposed (not fixed here, recorded as a
+follow-up finding for a separate future issue).
 
 Not a parser-feature issue. `PARSER_VERSION` stays `59` (unchanged); no `src/search/nl/parser.ts`,
 `vocab.ts` or `semantic-intents.ts` file was touched.
@@ -121,8 +122,8 @@ actually owns it, not blanket-relaxed:
 
 Added to `tests/nl-stress-corpus.test.ts`. RED evidence for each: the finding these tests assert
 against is the ISSUE-206-confirmed defect quoted from source in §1 above (the pre-fix `scoreRow` code
-this session started from). **Local GREEN confirmation via `npx vitest run` is an outstanding operator
-action** (see §7) — not claimed here per CLAUDE.md's evidence discipline.
+this session started from). Closure is based on the host validation in §8, run against the actual
+generated V2 corpus and current parser v59 — the decisive evidence for this issue's own defects.
 
 - **Symmetric matchup** (`describe('AFLDB-ISSUE-212: symmetric "versus" matchup scoring')`): passes
   with both expected clubs present in `scope.matchup` in either order; a directional-shaped plan
@@ -154,32 +155,176 @@ action** (see §7) — not claimed here per CLAUDE.md's evidence discipline.
   *not* gated by corpus version, because it is strictly more precise and only activates when
   `stress-test.ts`'s engine can resolve a name to exactly one id — it cannot regress a row that already
   passed by name (a name match with a resolvable, disagreeing id would itself be a real defect worth
-  surfacing, not a false failure to guard against). A V1 rerun with the updated scorer is *expected* to
-  remain **12000/12000/0/0** on the frozen corpus; this is unverified until the host rerun in §7 runs
-  and must be confirmed there before this issue can resolve.
+  surfacing, not a false failure to guard against). **Confirmed** (see §8): the frozen V5 12,000-row
+  corpus rerun with the updated scorer stayed **12000 scored / 12000 clean / 0 soft / 0 failed** — no
+  regression from this issue's scorer changes.
 - V1's own file, its 12,000-row expectations, and every retained v54–v59 result artifact are untouched.
 
-## 7. Outstanding — required before RESOLVED
+## 6a. Newly discovered, distinct parser defect (not fixed here, correctly still hard-fails under V2)
 
-Local, DB-free work (generator, scorer, tests, docs) is complete. Still required, per the issue's own
-closure gate ("Do not mark RESOLVED until V2 has been generated and validated on streamanator"):
+While reasoning about the corrected V2 oracle's coverage, row `#20609919` ("... margin for North
+Melbourne versus Melbourne at Adelaide Oval ...") was confirmed (parser result identical across V1 and
+V2 — same id, same question, same parse) to produce `clubFor=North Melbourne, clubAgainst=Melbourne,
+scope.matchup=absent`, not the unordered matchup this template's wording asserts under V2. This is
+**not** a corpus/scorer defect and **not** something ISSUE-212 introduced — the parser plan is
+unchanged between runs; V1's directional oracle happened to match by coincidence (see mechanism
+below), which is exactly the kind of false-clean result this issue's V2 corpus exists to stop hiding.
 
-1. Run the commands in §8 below (operator- or explicitly-authorised-session-executed, per
-   `CLAUDE.md`'s Git/shell boundary).
-2. Confirm `npx vitest run tests/nl-stress-corpus.test.ts` and `npm run typecheck` pass locally.
-3. Generate V2 on streamanator, confirm deterministic replay (two runs, identical SHA256), duplicate
-   IDs = 0, duplicate questions = 0.
-4. Confirm V2-vs-frozen-V5 overlap is 0/0 (same invariant the generator already enforces and throws on).
-5. Run parser v59 against V2 into `/home/arm/nl-exploratory-v2-v59-validation`.
-6. Confirm the three corrected clusters (symmetric matchup, achievement summary, Gary Ablett identity)
-   no longer appear as hard failures, and report the *exact* V2 counts (not V1's carried-forward
-   numbers) for clean/soft/failed and for each corrected cluster.
-7. Confirm the frozen V1 12,000-row rerun with the updated scorer stays 12000/12000/0/0 (§6's
-   documented exception).
-8. Update this file's Status to RESOLVED with the actual counts, update `issues.md`/`IssuesIndex.md`,
-   and add a `CHANGELOG.md` entry during closeout.
+**Source-verified mechanism:** `extractClubs` (`parser.ts:220-268`) correctly identifies both club
+mentions via `findClub` (longest-alias matching finds "North Melbourne" as one mention, not two), but
+its *positional* recomputation for the unordered-matchup check re-derives each mention's span with
+`phrasePosition`/`phraseEnd` (`parser.ts:162-170`), both `new RegExp('\\b'+phrase+'\\b').exec(text)` —
+a bare regex search of the **entire original text** for the matched club's own display string, taking
+whichever occurrence comes first. When the second club's display text also occurs, word-bounded, as a
+substring of the first club's own display text (here, "Melbourne" is word-bounded inside "North
+Melbourne"), this search finds that embedded occurrence — which sits *before* the first club's own
+span ends — instead of the real, later, standalone "versus Melbourne" mention. `between = text.slice
+(left.end, right.at)` (`parser.ts:249`) then computes a negative/empty slice, `between !== 'versus'`,
+and `matchup` never forms; the same buggy `at` also feeds `nearestGoverningPreposition`'s own lookback
+for the second club, so the role-assignment fallback (`parser.ts:258-266`, the *unordered* branch that
+runs when nothing is `governedAgainst`) resolves `clubFor`/`clubAgainst` by original draw order instead
+— which is why the result reads as directionally "correct" here (`clubFor=North Melbourne,
+clubAgainst=Melbourne` matches the template's own `club`/`opponent` assignment) rather than obviously
+wrong. This is a coincidence of word order, not a safety net: the same mechanism could just as easily
+assign the roles the other way for a differently-ordered pair.
 
-## 8. Exact commands for the operator
+**Scope decision: do not suppress this in the V2 oracle.** The wording "for A versus B" is
+structurally identical regardless of which two clubs fill A/B, so `expected_scope_kind='matchup'`
+correctly applies to every `team_match_result` template-3 row uniformly, including this one — the
+resulting hard failure is a true, previously-hidden defect finding, exactly the "cleaner evidence for
+future parser work" this issue exists to produce (see Purpose). Special-casing the generator to avoid
+asserting `matchup` for these club pairs would re-hide the same defect V1's directional oracle already
+hid, the opposite of this issue's intent. No `corpus.ts`/generator change was made for this.
+
+**Other pairs in the generator's own `CLUBS` array with the identical structural shape** (a shorter
+club's display text is a whole word inside a longer club's display text, in the order the "... for A
+versus B ..." template draws them — i.e. the longer name drawn as `c` and the shorter as `o`), which
+the same source-verified mechanism would predict to produce the same kind of hard failure:
+
+- `c[0]='Port Adelaide'`, `o[0]='Adelaide'`
+- `c[0]='Greater Western Sydney'`, `o[0]='Sydney'`
+
+(The reverse draw order for each pair — e.g. `c[0]='Melbourne'`, `o[0]='North Melbourne'` — does *not*
+trigger it: the shorter name drawn first has no earlier embedded occurrence to collide with, traced
+through the same source above.)
+
+**These two pairs are hypotheses from source inspection only and have not been empirically
+reproduced.** The actual host validation run (§8) found exactly **one** genuine hard failure in the
+whole 27,530-row scored V2 corpus — row `#20609919` — meaning that, in this specific seeded generation,
+either `distinctClub` never drew the `Port Adelaide`/`Adelaide` or `Greater Western Sydney`/`Sydney`
+pair in this exact order for a `team_match_result` template-3 row, or it did and the predicted mechanism
+did not reproduce for it. Both remain open, unconfirmed possibilities; nothing in this session's host
+run distinguishes between them, and no further investigation was performed (out of scope for this
+closeout). Only `North Melbourne`/`Melbourne` (row `#20609919`) is empirically confirmed.
+
+Recorded here as a genuine finding for a possible **separate future issue** — **no next issue number is
+allocated in this closeout**, per this repository's convention for an out-of-scope discovery made while
+resolving a different issue (e.g. ISSUE-208's `assignCrossDomainClubs` finding). An operator may open a
+tracked issue for it, scoped to confirming or ruling out the two unreproduced pairs before deciding
+whether to fix the underlying `phrasePosition`/`phraseEnd` mechanism.
+
+## 7. Closeout checklist (all complete)
+
+Per the issue's own closure gate ("Do not mark RESOLVED until V2 has been generated and validated on
+streamanator"), all of the following were completed before this issue was marked RESOLVED:
+
+1. Ran the commands in §9 below on streamanator.
+2. Generated V2 on streamanator; confirmed deterministic replay (two runs, identical SHA256) — see §8.
+3. Confirmed V2-vs-frozen-V5 overlap is 0/0 (the same invariant the generator itself enforces and
+   throws on) — see §8.
+4. Ran parser v59 against V2 into `/home/arm/nl-exploratory-v2-v59-validation` — see §8.
+5. Confirmed the three corrected clusters (symmetric matchup, achievement summary, Gary Ablett
+   identity) no longer appear as false hard failures, and recorded the *exact* V2 counts (not V1's
+   carried-forward numbers) — see §8.
+6. Confirmed the frozen V1 12,000-row rerun with the updated scorer stays 12000/12000/0/0 (§6).
+7. Confirmed exactly one genuine, distinct, previously-hidden hard failure (§6a, row `#20609919`) — a
+   pre-existing parser defect this issue's corrected oracle exposed, not a corpus/scorer defect and not
+   introduced by this issue. Not fixed here; recorded as a follow-up finding for a possible separate
+   future issue, with no issue number allocated in this closeout.
+8. Updated this file's Status to RESOLVED, `issues.md`, `IssuesIndex.md`, and `CHANGELOG.md`.
+
+## 8. Final host validation evidence (streamanator, 2026-09-17)
+
+**V2 generation:**
+
+```text
+29,030 rows
+seed 2060542026
+SHA256 bb75e4b5067942117c60f8eab6cfd01de4d8fc1e0c4fee07e10650fae97edb4a
+deterministic replay confirmed (two runs, identical SHA256)
+V5 exact overlap: 0
+V5 normalized overlap: 0
+1,500 audit-required (unscored, same audit population as V1)
+```
+
+**Frozen V1 12,000-row corpus, rerun with the updated scorer:**
+
+```text
+12000 scored
+12000 clean
+0 soft
+0 failed
+```
+
+No regression — confirms §6's documented exception (player-identity id-preference) did not disturb the
+frozen corpus.
+
+**Exploratory V2, parser v59:**
+
+```text
+27,530 scored
+14,878 clean
+12,651 soft
+1 failed
+1,500 audit-required
+55 diagnostic groups
+```
+
+**V1-v59 → V2-v59 hard-failure reconciliation.** This compares the *same* V1 corpus rows and the *same*
+current parser (v59) scored two ways — once under the pre-ISSUE-212 oracle (`V1-v59`), once under this
+issue's corrected oracle (`V2-v59`) — not V1's original v54 numbers from `AFLDB-ISSUE-206.md`:
+
+```text
+1308 old hard failures removed (V1-v59 → V2-v59)
+1 newly exposed genuine hard failure (row #20609919, see §6a)
+net failed count change = -1307
+```
+
+This is **not** "1307 failures fixed" — it is two separate, opposite-direction movements that happen to
+net to -1307: 1,308 rows that were hard-failing only because of the three confirmed corpus/scorer oracle
+defects (§1) now correctly score clean or soft, and 1 row that was previously hard-passing by
+coincidence (§6a) now correctly hard-fails on a genuine, different, pre-existing parser defect the
+corrected oracle no longer accidentally hides.
+
+**Removed-hard-failure breakdown (1,308 total):**
+
+| Category | Rows |
+| --- | --- |
+| `team_match_result` (symmetric matchup fix) | 545 |
+| `achievement_summary` (aggregation fix) | 320 |
+| `player_game_scope_collision` (player-identity fix) | 213 |
+| `player_game_scoped_total` (player-identity fix) | 118 |
+| `player_game_single` (player-identity fix) | 112 |
+
+The three `player_game_*` rows total **443** player-identity removals, split:
+
+```text
+225 Gary Ablett Snr
+218 Gary Ablett Jnr
+```
+
+**Why these counts exceed AFLDB-ISSUE-206's original figures (496 / 283 / 351):** `AFLDB-ISSUE-206.md`'s
+counts were measured against parser v54. Five parser fixes landed between v54 and v59
+(AFLDB-ISSUE-207 through 211), each of which moved previously-*declined* rows into a scored plan for the
+first time (most directly, AFLDB-ISSUE-210's imperative-phrasing fix and AFLDB-ISSUE-211's `after YEAR`
+fix — both explicitly recorded exposing more Gary-Ablett-pattern rows as they became newly reachable).
+None of those fixes touched `extractClubs`'s matchup detection, `achievementSummary` aggregation, or
+player-identity resolution — they are unrelated parser-vocabulary gains that simply let more rows *reach*
+the same three pre-existing oracle/scorer defects this issue corrects. The v54→v59 counts growing
+(545 vs 496, 320 vs 283, 443 vs 351) is the expected, correct consequence of that reachability increase,
+not a sign of a new or different defect.
+
+## 9. Commands used for host validation
 
 Local (this workstation or any checkout of this branch):
 
