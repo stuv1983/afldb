@@ -658,7 +658,30 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
 // question outright. Every other club_season cue (a leading "teams"/
 // "clubs" subject, a club-season condition, "in a season", an explicit
 // year) is unaffected.
-export const PARSER_VERSION = 61;
+//
+// AFLDB-ISSUE-215: two independent fixes to career_numeric_binding
+// phrasing. (1) canonicalise() (nl/vocab.ts) now also strips a leading
+// imperative/request verb ("find"/"show"/"list"/"give me") when it sits
+// immediately behind a leading "for <scope>," clause instead of at the
+// very start of the string -- "for Adelaide, find players with ..." --
+// bounded to a handful of words so it can only ever reach the length of
+// a real leading scope clause, never an arbitrary run of text; the
+// captured clause itself is put back, never deleted. (2)
+// extractCareerConditions (nl/parser.ts) now recognizes "plus" as a
+// second spelling of the same clause-boundary "and" already is between
+// two numeric career conditions (gated to only the boundary immediately
+// in front of a clause that actually binds a value, never a blanket
+// STOPWORDS addition), and recognizes "among players" as a wrapper
+// around the same construction, gated on a real condition/predicate
+// having been found. Alongside those two wrapper-vocabulary gaps, a
+// genuine, independent predicate-loss defect was fixed: a stat word's
+// FIRST occurrence in a sentence used to be the only one ever tried, so
+// "who has the most career GOALS among players with ... zero GOALS" --
+// where the ranking mention has no adjacent number -- silently dropped
+// the real "zero goals" condition instead of retrying the word's later
+// occurrence. The retry is generic to any stat column, not special-cased
+// to any one metric/condition pair.
+export const PARSER_VERSION = 62;
 
 // ------------------------------------------------------------------ grain
 
