@@ -6,6 +6,23 @@
 
 **Open issues:** 0
 
+**Fable NL code review — FINAL: PASS (2026-09-17, Fable 5.1, operator-validated on streamanator).**
+Lineage: Stage 1 found eight defects (F1–F8) → Stage 2 confirmed them as AFLDB-ISSUE-187..192,
+hardening added 193..196, the corpus audit's 40 genuine fail-open rows became 197 (all resolved
+2026-09-15/16) → the 168 stale `AMBIGUITY_NOT_DETECTED` expectations (112 team-streak + 56
+coach-record, plus 5 Ablett = 173) were corrected under AFLDB-ISSUE-199, then V3/V4/V5 under
+201/204/205 → 198..219 hardened further to parser v66. This acceptance pass re-verified every
+187..197 fix in the current tree (not from issue status), confirmed the AFLDB-ISSUE-197 family
+contract (complete candidates via `resolvePlayerFamily`, 2–12 ranks, >12 declines and is
+reachable, direct resolution distinct), and reran the frozen V5 corpus parse+execute on v66:
+11997/0/3. The three failures (`verified_finals_without_premiership`, rows 41–43) were adjudicated
+`STALE/INVALID EXPECTATION` from current canonical data (Dane Rampe and Nick Dal Santo genuinely
+tied at 24 finals, 0 premierships, nobody else at 24) and corrected V5 → V6 by the new fail-closed
+script `tools/nl/fix-stale-finals-without-premiership-tie.ts` (3/3 targets, 0 non-targets).
+**Final V6: 12000/12000 clean / 0 soft / 0 failed / 0 errors.** V6 is now the stable baseline. No
+new issue opened; no production code changed. Volatility note: Rampe is active mid-2026-finals, so
+another final would re-stale rows 41–43 honestly (see the script header / `issues.md` ISSUE-219).
+
 **AFLDB-ISSUE-219 resolved 2026-09-17** (Sonnet 5, operator-validated on streamanator) —
 cross-family NL defect: a plural club/venue alias already ending in "s" takes a bare trailing
 apostrophe for its possessive ("Bombers'", "Dogs'", "Lions'", the AFLDB-ISSUE-214 §10c residual's
