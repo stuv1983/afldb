@@ -161,7 +161,7 @@ corpus asserts meaning, so an empty result is reported and not scored.
 | `failures.csv` | Every failing row with its plan, for sorting and filtering in a spreadsheet. |
 | `results.jsonl` | One line per question — full expectation, observation and findings. The input to `--report-only`. |
 | `summary.json` | Headline counts, for comparing one run against the next. |
-| `entity-index.json` | Club/venue name → id lookups, so `--report-only` needs no database. |
+| `entity-index.json` | Club/venue/player name → id lookups, so `--report-only` needs no database. |
 
 The point of a fixed corpus is the *second* run. Fix the rules behind the
 biggest clusters, run the identical file again, and the movement in
@@ -210,6 +210,36 @@ says "Greater Western Sydney", while "Sydney" is a substring of "Greater
 Western Sydney" and "Melbourne" of "North Melbourne" — so a substring
 match would score the two most important mix-ups as passes. Any corpus
 name the directories do not recognise is reported before the run starts.
+
+The named player is compared the same way (AFLDB-ISSUE-212): by id, through
+the same `resolvePlayer` the parser itself calls, whenever the run can
+settle the name to exactly one candidate without a rival. There is no
+small fixed player directory to preload, so this is built per run from
+just the distinct names that run's rows mention, and a name the resolver
+cannot settle falls back to comparing display-name strings, exactly like
+an unindexed club or venue -- which is why two players who share a
+canonical display name (both generations of "Gary Ablett" are named "Gary
+Ablett" in the database; only their qualified corpus names, "Gary Ablett
+Jnr"/"Gary Ablett Snr", disambiguate them) are still told apart correctly
+as long as the corpus itself names them unambiguously.
+
+Two further `expected_*` columns are optional and version-scoped, read
+only when present so one scorer serves every corpus that carries the
+classic column schema without a version flag:
+
+- `expected_scope_kind` = `matchup` marks a row whose own wording ("A
+  versus/vs/v B", clubs adjacent) the parser always reads as the unordered
+  pair `scope.matchup`, regardless of any other preposition in the
+  sentence. `expected_club`/`expected_opponent` then name the row's two
+  participants, checked as a set, not as a for/against pair. Blank (every
+  V1 row) keeps the existing directional `clubFor`/`clubAgainst` check.
+- `expected_achievement_kind` names the `achievementSummary.kind` an
+  `achievement_summary` row's answer shape actually turns on
+  (`src/db/queries/nl/achievement-summary.ts`); `expected_aggregation` is
+  not the authoritative field for this one grain (`plan.agg` is a
+  vestigial default there) and is skipped in favour of this column when
+  it is set. Every other grain's `expected_aggregation` is checked exactly
+  as before.
 
 The scoring rules have their own tests in `tests/nl-stress-corpus.test.ts`;
 a harness that mis-scores is worse than no harness.

@@ -6,6 +6,36 @@
 
 **Open issues:** 0
 
+**AFLDB-ISSUE-212 resolved 2026-09-17** (Sonnet 5, operator-validated on streamanator) — follow-on item
+(4) of `AFLDB-ISSUE-206.md`'s six proposals: corrected the exploratory NL corpus/scorer's three
+confirmed V1 oracle defects (496-row symmetric "versus" matchup, 283-row achievement-summary
+aggregation, 351-row Gary Ablett Jnr/Snr identity, all at parser v54) in a new versioned
+`tools/nl/generate-exploratory-corpus-v2.mjs` + `tools/nl/corpus.ts` scorer contract. Not a
+parser-feature issue: `PARSER_VERSION` unchanged at 59, no `src/search/nl/{parser,vocab,
+semantic-intents}.ts` file touched. Operator-validated on streamanator: V2 (29,030 rows, seed
+`2060542026`, SHA256 `bb75e4b5067942117c60f8eab6cfd01de4d8fc1e0c4fee07e10650fae97edb4a`, deterministic
+replay confirmed, V5 exact/normalized overlap 0/0, 1,500 audit-required) scored against parser v59:
+**27530 scored / 14878 clean / 12651 soft / 1 failed**; the frozen V1 12,000-row corpus stayed
+**12000/12000/0/0** under the updated scorer, no regression. A same-corpus, same-parser (v59)
+reconciliation of the pre- vs. post-ISSUE-212 oracle found **1308 old false hard failures removed**
+(545 `team_match_result` matchup + 320 `achievement_summary` aggregation + 443 player-identity, split
+225 Gary Ablett Snr / 218 Jnr) **and 1 newly exposed genuine hard failure** — net failed count change
+-1307, not "1307 fixed". The v54→v59 counts (496→545, 283→320, 351→443) grew because
+AFLDB-ISSUE-207..211 landed in between and let more previously-declined rows reach a scored plan for
+the first time, exposing more instances of the same three pre-existing defects — none of those five
+fixes touched matchup detection, achievement aggregation, or player-identity resolution themselves.
+The one newly exposed hard failure (row #20609919, "... margin for North Melbourne versus Melbourne at
+Adelaide Oval ...") is a genuine, distinct, pre-existing `extractClubs` defect (`phrasePosition`/
+`phraseEnd` re-finding a club's position via a bare word-boundary search of the whole original text can
+find a shorter club's name embedded inside a longer club's own name, here "Melbourne" inside "North
+Melbourne", instead of the real second mention, silently preventing the unordered matchup from
+forming) — confirmed identical parser plan in V1 and V2, not a corpus/scorer defect and not introduced
+by this issue, deliberately left unfixed and **not opened as its own tracked issue in this closeout**.
+Two structurally similar pairs (`Port Adelaide`/`Adelaide`, `Greater Western Sydney`/`Sydney`) are
+**unreproduced hypotheses only** — the actual host run found exactly one failure total, so neither is
+confirmed to have been drawn by this seed or to reproduce the mechanism. See `issues.md` and
+`AFLDB-ISSUE-212.md` (§6a, §8) for the full record.
+
 **AFLDB-ISSUE-211 resolved 2026-09-17** (Sonnet 5, operator-validated on streamanator) — follow-on item
 (5) of `AFLDB-ISSUE-206.md`'s six proposals, the largest single unimplemented soft-decline vocabulary
 family it found: `extractSeasons` (`src/search/nl/parser.ts`, `src/search/nl/vocab.ts` new `AFTER_RE`)

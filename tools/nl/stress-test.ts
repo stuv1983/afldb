@@ -229,6 +229,35 @@ async function loadV1Engine(): Promise<StressEngine & { index: EntityIndex; club
 }
 
 /**
+ * AFLDB-ISSUE-212. Resolves exactly the player names this run's corpus
+ * mentions to a stable id, through the same resolver the parser itself
+ * calls (`ctx.resolvePlayer`, already memoised in engine.ts) -- never a
+ * separate lookup that could disagree with what the plan actually carries.
+ *
+ * Unlike clubs and venues there is no small fixed directory to preload
+ * wholesale, so this is built from the corpus's own distinct names, and
+ * only for a name the resolver settles without a rival: the top candidate
+ * is kept only when it is the sole one, or strictly outscores the next
+ * one. An unsettled name is not an error here -- it just leaves that name
+ * unindexed, which scoreRow already treats exactly like an unindexed club
+ * or venue (falls back to comparing the plan's own resolved display name).
+ */
+async function buildPlayerIndex(
+  names: Iterable<string>,
+  resolvePlayer: StressEngine['ctx']['resolvePlayer'],
+): Promise<Record<string, number>> {
+  const byName: Record<string, number> = {};
+  for (const name of new Set([...names].filter(Boolean))) {
+    const candidates = await resolvePlayer(name);
+    if (candidates.length === 0) continue;
+    const [top, next] = [...candidates].sort((a, b) => b.score - a.score);
+    if (next && next.score >= top.score) continue;
+    byName[normaliseKey(name)] = top.ref.id;
+  }
+  return byName;
+}
+
+/**
  * Every club and venue the corpus names, checked against the directories
  * before the run starts.
  *
@@ -243,13 +272,18 @@ function reportUnindexedEntities(rows: StressExpectation[], index: EntityIndex):
       if (name && index.clubOrgId(name) === undefined) missing.add(`club: ${name}`);
     }
     if (row.venue && index.venueId(row.venue) === undefined) missing.add(`venue: ${row.venue}`);
+    // AFLDB-ISSUE-212: unlike club/venue this is expected to be non-empty on
+    // a genuinely ambiguous name (the resolver found more than one
+    // plausible player and buildPlayerIndex correctly declined to guess) --
+    // reported for visibility, not as a defect.
+    if (row.player && index.playerId?.(row.player) === undefined) missing.add(`player: ${row.player}`);
   }
   if (missing.size === 0) {
-    process.stdout.write('Every club and venue the corpus names resolves to a database identity.\n');
+    process.stdout.write('Every club, venue and player the corpus names resolves to a database identity.\n');
     return;
   }
   process.stdout.write(
-    `WARNING: ${missing.size} corpus entity names are unknown to the club/venue directories, `
+    `WARNING: ${missing.size} corpus entity names are unknown to the club/venue/player directories, `
     + `so those rows fall back to exact name matching:\n  ${[...missing].join('\n  ')}\n`,
   );
 }
@@ -286,20 +320,28 @@ function score(records: RunRecord[], index?: EntityIndex): Scored[] {
  * mistake in the scoring rules gets corrected without spending another
  * night on the queries.
  */
-function saveEntityIndex(clubs: Record<string, number>, venues: Record<string, number>): void {
-  writeFileSync(join(OUT_DIR, 'entity-index.json'), `${JSON.stringify({ clubs, venues })}\n`, 'utf8');
+function saveEntityIndex(
+  clubs: Record<string, number>,
+  venues: Record<string, number>,
+  players: Record<string, number>,
+): void {
+  writeFileSync(join(OUT_DIR, 'entity-index.json'), `${JSON.stringify({ clubs, venues, players })}\n`, 'utf8');
 }
 
 function loadEntityIndex(): EntityIndex | undefined {
   const path = join(OUT_DIR, 'entity-index.json');
   if (!existsSync(path)) return undefined;
-  const { clubs, venues } = JSON.parse(readFileSync(path, 'utf8')) as {
-    clubs: Record<string, number>; venues: Record<string, number>;
+  const { clubs, venues, players } = JSON.parse(readFileSync(path, 'utf8')) as {
+    clubs: Record<string, number>; venues: Record<string, number>; players?: Record<string, number>;
   };
   return {
     clubOrgId: (name) => clubs[normaliseKey(name)]
       ?? clubs[normaliseKey(CORPUS_CLUB_SPELLINGS[name] ?? '')],
     venueId: (name) => venues[normaliseKey(name)],
+    // AFLDB-ISSUE-212: absent on an entity-index.json written before this
+    // change, in which case player identity falls back to name comparison
+    // for a --report-only re-score, exactly as it always did.
+    playerId: players ? (name) => players[normaliseKey(name)] : undefined,
   };
 }
 
@@ -660,8 +702,13 @@ async function main(): Promise<void> {
   );
 
   const engine = await loadV1Engine();
+  const playerKeys = await buildPlayerIndex(
+    rows.map((row) => row.player).filter((name): name is string => Boolean(name)),
+    engine.ctx.resolvePlayer,
+  );
+  engine.index.playerId = (name) => playerKeys[normaliseKey(name)];
   reportUnindexedEntities(rows, engine.index);
-  saveEntityIndex(engine.clubKeys, engine.venueKeys);
+  saveEntityIndex(engine.clubKeys, engine.venueKeys, playerKeys);
   process.stdout.write('\n');
 
   const stream = createWriteStream(resultsPath, { flags: RESUME ? 'a' : 'w' });

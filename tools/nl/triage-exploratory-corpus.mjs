@@ -1,9 +1,16 @@
 #!/usr/bin/env node
-/** ISSUE-206 parse-only triage. No parser imports and no expectation mutation.
- * Reads the frozen generator CSV plus stress-test artifacts and groups the
- * differences by family/field/signature. The existing scorer remains the
- * source of headline verdicts; this script adds diagnostic plan fields its
- * V1 schema does not compare and excludes explicit audit-required rows.
+/** ISSUE-206 parse-only triage, and its own comparisons updated for
+ * AFLDB-ISSUE-212's corrected V2 corpus/scorer contract. No parser imports
+ * and no expectation mutation. Reads the frozen generator CSV plus
+ * stress-test artifacts and groups the differences by family/field/
+ * signature. The existing scorer (tools/nl/corpus.ts) remains the source of
+ * headline verdicts; this script adds diagnostic plan fields its V1 schema
+ * does not compare and excludes explicit audit-required rows.
+ *
+ * Version detection is per row, exactly like the scorer: `r.expected_scope_kind`
+ * and `r.expected_achievement_kind` are new, optional columns that are blank
+ * on every V1 row, so a V1 corpus is diagnosed exactly as before and a V2
+ * corpus gets the corrected comparison automatically -- no --version flag.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 
@@ -78,8 +85,19 @@ for(const rec of results){
   cmp('mode',r.expected_mode,p.mode,'WRONG_MODE');
   cmp('aggregation',r.expected_aggregation,p.agg?.kind,'WRONG_AGGREGATION');
   cmp('player',r.expected_player,p.player?.name,'WRONG_PLAYER',true);
-  cmp('clubFor',r.expected_club,p.scope?.clubFor?.name,'OWNERSHIP_LOSS',true);
-  cmp('clubAgainst',r.expected_opponent,p.scope?.clubAgainst?.name,'OWNERSHIP_LOSS',true);
+  if(r.expected_scope_kind==='matchup'){
+    // AFLDB-ISSUE-212: this exact "A versus/vs/v B" adjacency is always the
+    // unordered pair scope.matchup (see tools/nl/corpus.ts); expected_club/
+    // expected_opponent name the row's two participants, not a for/against
+    // pair, and are compared as a set. Blank on every V1 row -- takes the
+    // clubFor/clubAgainst branch below exactly as before.
+    const want=[r.expected_club,r.expected_opponent].filter(Boolean).map(norm).sort().join('|');
+    const got=[p.scope?.matchup?.clubA?.name,p.scope?.matchup?.clubB?.name].map(norm).sort().join('|');
+    if(want&&want!==got)add(r,a,'OWNERSHIP_LOSS','matchup',want,got);
+  } else {
+    cmp('clubFor',r.expected_club,p.scope?.clubFor?.name,'OWNERSHIP_LOSS',true);
+    cmp('clubAgainst',r.expected_opponent,p.scope?.clubAgainst?.name,'OWNERSHIP_LOSS',true);
+  }
   cmp('venue',r.expected_venue,p.scope?.venue?.name,'OWNERSHIP_LOSS',true);
   cmp('seasonMin',numeric(r.expected_season_from),p.scope?.seasonMin,'WRONG_SCOPE');
   cmp('seasonMax',numeric(r.expected_season_to),p.scope?.seasonMax,'WRONG_SCOPE');
