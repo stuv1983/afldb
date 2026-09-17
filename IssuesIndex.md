@@ -6,6 +6,104 @@
 
 **Open issues:** 0
 
+**Fable NL code review — FINAL: PASS (2026-09-17, Fable 5.1, operator-validated on streamanator).**
+Lineage: Stage 1 found eight defects (F1–F8) → Stage 2 confirmed them as AFLDB-ISSUE-187..192,
+hardening added 193..196, the corpus audit's 40 genuine fail-open rows became 197 (all resolved
+2026-09-15/16) → the 168 stale `AMBIGUITY_NOT_DETECTED` expectations (112 team-streak + 56
+coach-record, plus 5 Ablett = 173) were corrected under AFLDB-ISSUE-199, then V3/V4/V5 under
+201/204/205 → 198..219 hardened further to parser v66. This acceptance pass re-verified every
+187..197 fix in the current tree (not from issue status), confirmed the AFLDB-ISSUE-197 family
+contract (complete candidates via `resolvePlayerFamily`, 2–12 ranks, >12 declines and is
+reachable, direct resolution distinct), and reran the frozen V5 corpus parse+execute on v66:
+11997/0/3. The three failures (`verified_finals_without_premiership`, rows 41–43) were adjudicated
+`STALE/INVALID EXPECTATION` from current canonical data (Dane Rampe and Nick Dal Santo genuinely
+tied at 24 finals, 0 premierships, nobody else at 24) and corrected V5 → V6 by the new fail-closed
+script `tools/nl/fix-stale-finals-without-premiership-tie.ts` (3/3 targets, 0 non-targets).
+**Final V6: 12000/12000 clean / 0 soft / 0 failed / 0 errors.** V6 is now the stable baseline. No
+new issue opened; no production code changed. Volatility note: Rampe is active mid-2026-finals, so
+another final would re-stale rows 41–43 honestly (see the script header / `issues.md` ISSUE-219).
+
+**AFLDB-ISSUE-219 resolved 2026-09-17** (Sonnet 5, operator-validated on streamanator) —
+cross-family NL defect: a plural club/venue alias already ending in "s" takes a bare trailing
+apostrophe for its possessive ("Bombers'", "Dogs'", "Lions'", the AFLDB-ISSUE-214 §10c residual's
+"Suns'"/"Pies'"/"Bulldogs'"), which `canonicalise()`'s existing `'s\b` strip
+(`src/search/nl/vocab.ts`) never matched (it requires a literal "s" after the apostrophe).
+Club/venue matching itself already resolved these aliases correctly via word-boundary regexes;
+only the final leftover-token comparison in `parseNlQuestion` (`src/search/nl/parser.ts`) ever
+disagreed, because `meaningfulTokens`' whitespace split kept the apostrophe attached to the word
+while the matched/consumed span did not. Confirmed a shared `canonicalise()` defect, not a
+per-builder one, by tracing `tools/nl/generate-exploratory-corpus-v2.mjs`'s `possessive()` helper
+(line 178) across five families: `team_match_result`, `team_checkpoint_collision`,
+`q3_comeback_near_miss`, `club_season_rank` (the ISSUE-214 residual) and `team_streak`. Fixed with
+one new generic trailing-apostrophe strip in `canonicalise()`, mirroring the existing `'s` rule
+rather than special-casing any club — no apostrophe made globally ignorable (only a trailing one
+immediately before whitespace/end-of-string; a mid-word apostrophe like `o'brien` is untouched).
+`PARSER_VERSION` 65 → 66 (baseline corrected during reconciliation with `AFLDB-ISSUE-218`, which
+already holds 64 → 65 on `dev`). `AFLDB-ISSUE-218` (below) **independently found and deliberately
+deferred the identical defect** for its own `team_match_result/0` cluster (56 rows,
+"Bombers'"/"Dogs'"/"Brisbane Lions'"), naming this exact cross-family issue as its recorded
+follow-up candidate — confirming this issue's root-cause finding a second, independent way,
+alongside AFLDB-ISSUE-214 §10c. Local: `tests/nl-parser.test.ts` **605/605**, broader gates
+**402/402**, `typecheck` clean. **Host validation (streamanator):** no established mechanism
+existed to transport uncommitted code to a host, so a temporary, isolated `git worktree`
+(`/home/arm/nl-issue219-validation`, off `origin/dev` at `a98c3e42`) was created and a `git diff`
+patch applied — a clean `git apply --check` itself served as the identity proof;
+`/home/arm/projects/afldb` and the retained git stash were never touched, and the temp worktree
+was removed after validation. Host suites reconfirmed 605/605 + 402/402 + clean typecheck.
+Exploratory V2 (29,030 rows, the AFLDB-ISSUE-218-corrected corpus) moved **20512 → 20876 clean**
+(+364 / -364 soft / 0 failed), reconciling exactly across five families (`club_season_rank` 210,
+`team_streak` 75, `team_match_result` 56, `team_checkpoint_collision` 16,
+`q3_comeback_near_miss` 7) — every one of the 364 improved rows confirmed to carry a
+trailing-apostrophe alias, zero that don't. The frozen V1/"V5" corpus's three failing rows (a
+stale `verified_finals_without_premiership` fact check, Nick Dal Santo → Dane Rampe tie count)
+were proven via a decisive v65-vs-v66 control against the same current database to be pre-existing
+data drift, **not** a regression — flagged as a stale-corpus-expectation candidate, not opened as
+its own issue in this closeout. See `issues.md` and `AFLDB-ISSUE-219.md` §14 for the full record.
+
+**AFLDB-ISSUE-218 resolved 2026-09-17** (Sonnet 5, operator-validated on
+streamanator across two host-validation rounds) — `team_match_result/1` (522
+rows, "at V, find the widest X win/loss to Y...") and `/2` (569 rows, "by how
+much did X lose to Y in their most lopsided meeting...") shared one
+wrapper-vocabulary-only mechanism (both already extracted clubs/direction
+correctly); fixed with additive vocabulary only (`widest` in `AGG_WORDS`, a
+leading scope-clause request-verb strip widened to `at` as well as `for`,
+verb forms `lose`/`lost`/`beat` in `TEAM_METRIC_WORDS`, two narrowly-gated
+wrapper consumers for "how much"/"lopsided meeting"), no grain-election or
+club-role logic touched, `PARSER_VERSION` 64 → 65. Round-1 host validation
+(commit `5bcc957`) found V5 green and `/1` fully cleared (522→0), but exposed
+`/2` moving from an honest soft decline into a 569-row HARD FAILURE — worse
+than the pre-fix state — so the issue was reopened rather than closed.
+Re-investigation traced production SQL (`src/db/queries/nl/team-match.ts`'s
+clubFor-relative `win_margin`/`loss_margin`) and the parser's pre-existing,
+uniformly-applied `clubFor`=subject convention against every pre-issue
+directional test, then found and confirmed (empirically, 0 mismatches across
+every affected row) a genuine, isolated **exploratory V2 generator/oracle
+defect**: `team_match_result`'s templates 0/1/3 all keep club `c` as the
+sentence's grammatical subject, but template 2 alone renders `o` as subject
+and `c` as object without a corresponding fix to its expected `club`/
+`opponent`/`metric` triple. Parser v65 was confirmed correct and untouched;
+only the generator's template-2 expectation construction was corrected
+(commit `6ed227d`), `PARSER_VERSION` staying at 65 (corpus-only correction).
+Round-2 host validation confirmed **0 failed**: frozen V5 stayed
+12000/12000/0/0; exploratory V2 moved v64 baseline (19421 clean/8109
+soft/0 failed) → v65-corrected (20512 clean/7018 soft/0 failed), net
+**+1091 clean/-1091 soft/0 failed**, reconciling exactly to `522 + 569 =
+1091`; a determinism/isolation diff confirmed 0 question-text/row-id changes
+anywhere in the 29,030-row corpus, with all 569 changed rows confined to
+`team_match_result/2`'s own expectation columns. `team_match_result/0` (56
+rows, "Bombers'"/"Dogs'"/"Brisbane Lions'" possessive aliases) remains
+unchanged at 56 honest declines throughout both rounds — a distinct,
+already-known trailing-apostrophe plural possessive-alias defect (the same
+mechanism AFLDB-ISSUE-214 already found and left unfixed for
+`club_season_rank`), deliberately deferred as a future cross-family issue
+candidate, not opened as its own tracked issue in this closeout.
+Implementation commits `5bcc957` (parser) and `6ed227d` (exploratory oracle
+correction) on `sonnet/issue-218-team-match-result-phrasing`, unmerged.
+Local: `tests/nl-parser.test.ts` 595/595, broader gates (`nl-regression-corpus`
+163/163, `nl-semantic-mapping` 174/174, `nl-stress-corpus` 65/65 = 402/402),
+`typecheck` clean. See `issues.md` and `AFLDB-ISSUE-218.md` for the full
+record.
+
 **AFLDB-ISSUE-217 resolved 2026-09-17** (Sonnet 5, operator-validated on streamanator) —
 `player_game_single`'s three large exploratory clusters (`/0` 423 rows "biggest `<metric>` haul in one
 match", `/4` 422 rows "peak single-game `<metric>`", `/3` 409 rows "which match saw `<player>` collect

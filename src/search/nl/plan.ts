@@ -707,7 +707,43 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
 // the second phrasing separately misread as the generic AGGREGATE_TOTAL_WORDS
 // scoped-running-total cue, which misrouted grain election to player_game/sum
 // instead of player_season. See parser.ts's playerSeasonLeaderboardCue.
-export const PARSER_VERSION = 64;
+// v65 -- AFLDB-ISSUE-218: team_match_result/1 and /2 exploratory phrasing.
+// `/1` ("at V, find the widest X win/loss to Y...") and `/2` ("by how much
+// did X lose to Y in their most lopsided meeting...") already extracted
+// both clubs and the correct win/loss direction; only wrapper vocabulary
+// was ever missing -- "widest" (AGG_WORDS), a leading "at V, find" request
+// verb (vocab.ts's widened LEADING_SCOPE_CLAUSE_REQUEST_PREFIX_RE), the
+// verb forms "lose"/"lost"/"beat" of the existing win/loss margin nouns
+// (TEAM_METRIC_WORDS), and the decorative "how much"/"lopsided meeting"
+// wrapper around an already-elected result construction (vocab.ts's
+// TEAM_MATCH_RESULT_HOW_MUCH_RE/TEAM_MATCH_RESULT_LOPSIDED_RE, consumed by
+// parser.ts only once a win/loss margin metric and both clubFor/
+// clubAgainst have resolved). `/0` ("what was X' biggest victory...") is a
+// distinct, pre-existing possessive-club-alias defect (the same one
+// AFLDB-ISSUE-214 found for club_season_rank) and is deliberately NOT
+// fixed here.
+// v66 -- AFLDB-ISSUE-219: a shared canonicalise() (nl/vocab.ts) defect, not a
+// per-grain one -- the same trailing-apostrophe possessive-alias defect
+// AFLDB-ISSUE-214 (club_season_rank) and AFLDB-ISSUE-218 (team_match_result/0)
+// both independently found and deliberately deferred as a future cross-family
+// issue. A plural club/venue alias already ending in "s" takes a bare
+// trailing apostrophe for its possessive ("Bombers'", "Dogs'", "Lions'"),
+// which the existing "'s" strip never matched (it requires an "s" after the
+// apostrophe). Club/venue matching itself already resolved these correctly
+// via word-boundary regexes; only the final leftover-token comparison ever
+// saw the mismatch, because meaningfulTokens' whitespace split kept the
+// apostrophe attached to the word while the matched/consumed span did not
+// carry it -- reported as unsupported_term: "bombers'" etc. Fixed once,
+// generically, in canonicalise(): any word-final apostrophe immediately
+// before whitespace/end-of-string is now stripped the same way "'s" already
+// is, mirroring the existing rule rather than special-casing any
+// club/venue/alias. Confirmed cross-family via
+// tools/nl/generate-exploratory-corpus-v2.mjs's possessive() helper
+// (line 178), used by team_match_result (both /0's leading-club form and
+// the AFLDB-ISSUE-218 §3 residual note), team_checkpoint_collision,
+// q3_comeback_near_miss, club_season_rank (the AFLDB-ISSUE-214 residual) and
+// team_streak.
+export const PARSER_VERSION = 66;
 
 // ------------------------------------------------------------------ grain
 

@@ -128,9 +128,19 @@ const LEADING_REQUEST_PREFIX_RE = /^(?:give me|find(?!\s+the\s+(?:big\s+)?sticks
  * real leading scope clause, never an arbitrary run of unrelated text.
  * The captured clause is put back afterwards (never deleted): whatever
  * it names still has to reach the extraction stage that reads it.
+ *
+ * AFLDB-ISSUE-218 widened the leading preposition from "for" alone to
+ * "for"/"at" -- "At Kardinia Park, find the widest ..." puts the same
+ * wrapper verb behind a leading VENUE scope clause instead of a club one.
+ * "at" is the same generic, recognised venue-scoping preposition
+ * AT_PREPOSITION already reads anywhere else it appears (venue extraction
+ * runs on the full text regardless of what precedes it), not a venue name
+ * special-cased here. "on" is deliberately left out: no corpus wording
+ * ever puts a request verb behind a leading "on" clause, and admitting it
+ * would widen the match with no evidence it is ever needed.
  */
-const LEADING_FOR_CLAUSE_REQUEST_PREFIX_RE =
-  /^(for\s+(?:\S+\s+){1,4})(?:give me|find(?!\s+the\s+(?:big\s+)?sticks\b)|show|list)\b\s*/;
+const LEADING_SCOPE_CLAUSE_REQUEST_PREFIX_RE =
+  /^((?:for|at)\s+(?:\S+\s+){1,4})(?:give me|find(?!\s+the\s+(?:big\s+)?sticks\b)|show|list)\b\s*/;
 
 /**
  * Lowercase, strip possessives and punctuation the vocabulary below isn't
@@ -149,10 +159,25 @@ export function canonicalise(raw: string): string {
     // leftover token. Hyphens and apostrophes are deliberately NOT here --
     // "inside-fifties", "home-and-away" and "o'brien" all need theirs.
     .replace(/[.,!?:;—–…"“”()[\]]/g, ' ');
+  // AFLDB-ISSUE-219: a plural noun/alias already ending in "s" takes a bare
+  // trailing apostrophe for its possessive ("Bombers'", "Dogs'", "Lions'"),
+  // not "'s" -- the '['’]s\b' strip above only matches when an "s" follows
+  // the apostrophe, so this form survived untouched all the way to
+  // meaningfulTokens' whitespace split, attaching the punctuation mark to
+  // the word (e.g. "bombers'") and desyncing it from the plain alias
+  // (e.g. "bombers") that club/venue/vocabulary matching consumes -- the
+  // matched span itself was already correct, only the leftover-token
+  // comparison at the end of parseNlQuestion ever saw the mismatch. Only a
+  // trailing apostrophe immediately before whitespace/end-of-string
+  // qualifies (punctuation is already spaces by this point), so a mid-word
+  // apostrophe like "o'brien" -- never followed by a boundary here -- is
+  // untouched; this is the general possessive case the existing "'s" strip
+  // above already handles for every other word, not a club-specific rule.
+  text = text.replace(/(\w)['’](?=\s|$)/g, '$1');
   for (const filler of CONVERSATIONAL_FILLER) text = text.replace(filler, ' ');
   text = text.replace(/\s+/g, ' ').trim();
   text = text.replace(LEADING_REQUEST_PREFIX_RE, '').trim();
-  text = text.replace(LEADING_FOR_CLAUSE_REQUEST_PREFIX_RE, '$1').replace(/\s+/g, ' ').trim();
+  text = text.replace(LEADING_SCOPE_CLAUSE_REQUEST_PREFIX_RE, '$1').replace(/\s+/g, ' ').trim();
   return canonicaliseStatWords(text);
 }
 
@@ -218,7 +243,11 @@ export const AGG_WORDS: [RegExp, AggWord][] = [
   // only, which is what made the failure look like an exotic two-clause
   // interaction rather than one missing lookbehind: the second "at most"
   // was always read correctly. 6,428 questions in the qualification run.
-  [/\b(?:highest|best|biggest|largest|greatest|longest|maximum|record|holder|holders|leader|leaders|leading|led|heaviest)\b|(?<!\bat )\bmost\b/, 'max'],
+  // AFLDB-ISSUE-218: "widest" ("the widest win/loss/margin/lead") is the
+  // same superlative as "biggest"/"largest" and belongs in the same
+  // unconditional word -> max mapping, not a team-match-only special case
+  // -- exactly the discipline the other words in this list already follow.
+  [/\b(?:highest|best|biggest|largest|widest|greatest|longest|maximum|record|holder|holders|leader|leaders|leading|led|heaviest)\b|(?<!\bat )\bmost\b/, 'max'],
   // Bare "least" is deliberately excluded: "at least" (an operator
   // phrase, handled by COMPARE_OP_WORDS) is far more common in real
   // questions than "least" meaning minimum, and the two must not compete.
@@ -294,6 +323,19 @@ export const TEAM_METRIC_WORDS: [RegExp, 'win_margin' | 'loss_margin' | 'team_sc
   [/\bmargin\b/, 'win_margin'],
   [/\b(?:win|victory|victories|thrashing|thumping|blowout(?: win)?)\b/, 'win_margin'],
   [/\b(?:loss|defeat|beating)\b/, 'loss_margin'],
+  // AFLDB-ISSUE-218: the VERB forms of the same two outcomes ("did Pies
+  // LOSE TO Carlton", "O BEAT C"), distinct from the noun phrases above.
+  // Whichever club is the grammatical subject of either verb is always the
+  // ungoverned mention extractClubs already binds to clubFor (nothing here
+  // reads sentence position itself) -- "lose"/"lost" means clubFor is the
+  // losing side, "beat"/"beats" means clubFor is the winning side, exactly
+  // mirroring how "loss"/"win" already work for the club named without a
+  // preposition. "lost"/"lose" is tried first by extractHavingClause
+  // (parser.ts) for a NUMBERED threshold ("teams that have lost 3 times");
+  // that extractor leaves the text untouched when no count follows, so a
+  // bare, uncounted "lose"/"lost" always reaches this table.
+  [/\b(?:lose|loses|lost)\b/, 'loss_margin'],
+  [/\bbeats?\b/, 'win_margin'],
   // total_score BEFORE team_score: extraction returns the first match,
   // and \bscore\b matches inside "combined score", so the other order
   // makes total_score unreachable -- "highest combined score" silently
@@ -302,6 +344,33 @@ export const TEAM_METRIC_WORDS: [RegExp, 'win_margin' | 'loss_margin' | 'team_sc
   [/\b(?:score|points scored)\b/, 'team_score'],
   [/\b(?:crowd|attendance)\b/, 'attendance'],
 ];
+
+/**
+ * AFLDB-ISSUE-218: two decorative wrappers around an already-elected
+ * directional team-match-result construction ("By how much did Pies lose
+ * to Carlton in their most lopsided meeting..."). Neither is a general
+ * stopword -- both are read by parser.ts ONLY after a win/loss margin
+ * metric has matched AND both clubFor and clubAgainst have resolved, i.e.
+ * only once the sentence is already positively recognised as this
+ * construction, exactly the discipline extractMatchType's `allowBare`
+ * and the PLAYER_SEASON_LEADERBOARD_* wrapper words already follow.
+ *
+ * TEAM_MATCH_RESULT_HOW_MUCH_RE: "by how much did X lose/beat Y" is asking
+ * for the margin value itself -- the same question "X's biggest loss to Y"
+ * already answers once win_margin/loss_margin, clubFor and clubAgainst are
+ * all bound, so "how much" carries no extra meaning to preserve.
+ *
+ * TEAM_MATCH_RESULT_LOPSIDED_RE: "most lopsided meeting" is conventional
+ * synonymy for "biggest margin" -- the max aggregation itself already
+ * comes from "most" (AGG_WORDS), so "lopsided" and its noun ("meeting"/
+ * "match"/"game"/"contest"/"encounter" -- generic synonyms for one game
+ * between two clubs, not this corpus's exact wording) add no further
+ * semantics once bound. Deliberately requires "lopsided" immediately
+ * before the noun: a bare "meeting"/"match"/"game" with no "lopsided"
+ * still declines like any other genuinely unsupported leftover word.
+ */
+export const TEAM_MATCH_RESULT_HOW_MUCH_RE = /\bhow much\b/;
+export const TEAM_MATCH_RESULT_LOPSIDED_RE = /\blopsided (?:meeting|match|game|contest|encounter)s?\b/;
 
 export const PERIOD_SPLIT_WORDS: [RegExp, 'Q1' | 'Q2' | 'Q3' | 'Q4' | 'H1' | 'H2' | 'FULL_MATCH'][] = [
   [/\b(?:q1|first (?:quarter|term))\b/, 'Q1'],

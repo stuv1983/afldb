@@ -84,6 +84,7 @@ import {
   MATCH_TYPE_WORDS, METRIC_HIGHER_IS_WORSE, METRIC_WORDS, NEGATION_WORDS, NUMBER_PLUS_RE,
   NUMBER_WORDS, OVER_CAREER, POLARITY_AGG_RE,
   PLAYER_NICKNAMES, SINCE_RE, STAT_GAMES_IDIOM_WORDS, STOPWORDS, TEAM_METRIC_WORDS, STREAK_WORDS, PERIOD_SPLIT_WORDS, TOP_N_RE,
+  TEAM_MATCH_RESULT_HOW_MUCH_RE, TEAM_MATCH_RESULT_LOPSIDED_RE,
   UNANSWERABLE_TOPICS, canonicalise, readCount,
 } from '@/search/nl/vocab';
 
@@ -2981,6 +2982,27 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     // player-name guess).
     text = stripMatch(text, teamMetricResult.consumed[0]);
     consumedTokens.push(...teamMetricResult.consumed);
+
+    // AFLDB-ISSUE-218: two decorative wrappers around a directional
+    // team-match-result construction ("by how much did Pies lose to
+    // Carlton in their most lopsided meeting..."), consumed only now that
+    // the construction is positively recognised -- a win/loss margin
+    // metric AND both clubFor and clubAgainst have already resolved. See
+    // TEAM_MATCH_RESULT_HOW_MUCH_RE/TEAM_MATCH_RESULT_LOPSIDED_RE in
+    // vocab.ts for why neither is a general stopword.
+    if ((teamMetricResult.metric === 'win_margin' || teamMetricResult.metric === 'loss_margin') && clubFor && clubAgainst) {
+      const howMuchMatch = TEAM_MATCH_RESULT_HOW_MUCH_RE.exec(text);
+      if (howMuchMatch) {
+        text = stripMatch(text, howMuchMatch[0]);
+        consumedTokens.push(howMuchMatch[0]);
+      }
+      const lopsidedMatch = TEAM_MATCH_RESULT_LOPSIDED_RE.exec(text);
+      if (lopsidedMatch) {
+        text = stripMatch(text, lopsidedMatch[0]);
+        consumedTokens.push(lopsidedMatch[0]);
+      }
+    }
+
     playerMetricResult = { text, consumed: [] };
   } else if (idiomMetric) {
     playerMetricResult = { text, metric: idiomMetric, consumed: [] };
