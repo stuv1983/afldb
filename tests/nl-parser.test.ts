@@ -4787,7 +4787,10 @@ describe('19. AFLDB-ISSUE-215 career numeric-binding phrasing ("plus"/"among" wr
 // alias defect AFLDB-ISSUE-214 already found and deliberately left
 // unfixed for `club_season_rank`. `/0` is deferred here for the same
 // reason: it shares no mechanism with `/1`/`/2` and belongs in a future
-// cross-family possessive-alias issue instead.
+// cross-family possessive-alias issue instead. (That future issue is
+// AFLDB-ISSUE-219, which fixed canonicalise() generically -- see the
+// updated `/0` describe block below, retained as a handoff record rather
+// than deleted.)
 describe('AFLDB-ISSUE-218: team-match result phrasing', () => {
   describe('/2: "by how much did X lose to Y in their most lopsided meeting..."', () => {
     it('Collingwood loses to Carlton at Adelaide Oval after 1999 -- direction, venue and exclusive lower bound all preserved', async () => {
@@ -4877,11 +4880,26 @@ describe('AFLDB-ISSUE-218: team-match result phrasing', () => {
     });
   });
 
-  describe('/0: deferred -- a distinct, pre-existing possessive-club-alias defect, not fixed by this issue', () => {
-    it('"Bombers\' biggest victory against Pies" still declines exactly as before -- the trailing-apostrophe alias is untouched by this fix', async () => {
-      const result = await parse('What was Bombers\' biggest victory against Pies at Optus Stadium in 2017');
-      expect(result.status).not.toBe('plan');
-      expect(result.report.unsupportedTerms.join(' ')).toContain('bombers');
+  // /0 was deliberately deferred here, not fixed: "Bombers'" is a distinct,
+  // pre-existing trailing-apostrophe possessive-club-alias defect (the same
+  // mechanism AFLDB-ISSUE-214 already found for club_season_rank), out of
+  // this issue's scope. AFLDB-ISSUE-219 is the cross-family issue that fix
+  // was deferred to, and it now fixes canonicalise() generically -- so the
+  // deferred behaviour this test originally pinned (declines on "bombers'")
+  // is obsolete, not a regression. Retained as a cross-issue handoff record
+  // rather than deleted, now asserting the current correct plan for the
+  // identical query this issue's own investigation used.
+  describe('/0: deferred here, resolved by AFLDB-ISSUE-219 -- the trailing-apostrophe possessive-alias defect', () => {
+    it('"Bombers\' biggest victory against Pies at Optus Stadium in 2017" now resolves correctly (AFLDB-ISSUE-219), superseding this issue\'s deferred decline', async () => {
+      const p = await plan('What was Bombers\' biggest victory against Pies at Optus Stadium in 2017');
+      expect(p.grain).toBe('team_match');
+      expect(p.metric).toBe('win_margin');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.scope.clubFor?.name).toBe('Essendon');
+      expect(p.scope.clubAgainst?.name).toBe('Collingwood');
+      expect(p.scope.venue?.name).toBe('Optus Stadium');
+      expect(p.scope.seasonMin).toBe(2017);
+      expect(p.scope.seasonMax).toBe(2017);
     });
   });
 
@@ -4965,6 +4983,123 @@ describe('AFLDB-ISSUE-218: team-match result phrasing', () => {
       const p = await plan('which team has the longest winning streak');
       expect(p.grain).toBe('team_streak');
       expect(p.streakDefinition).toEqual({ kind: 'win' });
+    });
+  });
+});
+
+// AFLDB-ISSUE-219: canonicalise() (nl/vocab.ts) already strips a singular
+// possessive ("richmond's" -> "richmond") but only when an "s" follows the
+// apostrophe. A plural club/venue alias that already ends in "s" takes a
+// bare trailing apostrophe for its own possessive ("Bombers'", "Pies'",
+// "Lions'"), which survived untouched all the way to the final
+// leftover-token comparison -- club/venue matching itself already resolved
+// the alias correctly; only meaningfulTokens' whitespace split, which kept
+// the apostrophe attached to the token, ever disagreed with the plain
+// alias the matched/consumed span carries. This is the SAME defect
+// AFLDB-ISSUE-218 independently found for `team_match_result/0` (see the
+// "/0: deferred" describe block above) and AFLDB-ISSUE-214 independently
+// found for `club_season_rank` -- both issues deliberately deferred it as
+// a future cross-family issue rather than fixing it per-builder; this is
+// that issue. Confirmed a genuinely shared, cross-family canonicalise()
+// defect (not a single builder's), via
+// tools/nl/generate-exploratory-corpus-v2.mjs's possessive() helper
+// (line 178, "/s$/i.test(name) ? \"'\" : \"'s\""), used across
+// team_match_result, team_checkpoint_collision, q3_comeback_near_miss,
+// club_season_rank (the AFLDB-ISSUE-214 residual) and team_streak.
+// `Suns`/`Dogs`/`Western Bulldogs` are not in this file's shared CLUBS
+// fixture (same substitution practice AFLDB-ISSUE-214 used):
+// `Bombers`/`Pies`/`Lions`/`Giants`, all real plural nicknames already in
+// the fixture, stand in -- same defect mechanism, no wording special-cased
+// in the fix itself.
+describe('AFLDB-ISSUE-219: trailing-apostrophe plural club-alias possessives ("Bombers\'", "Pies\'", "Lions\'")', () => {
+  describe('cross-family: the same alias now resolves identically with or without the trailing apostrophe', () => {
+    it('team_match_result: "Bombers\' biggest victory against Pies" -> win_margin, clubFor/clubAgainst resolve, no leftover "pies\'"/"bombers\'"', async () => {
+      const result = await parse("What was Bombers' biggest victory against Pies");
+      expect(result.status).toBe('plan');
+      if (result.status !== 'plan') return;
+      const p = result.plan;
+      expect(p.grain).toBe('team_match');
+      expect(p.metric).toBe('win_margin');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.scope.clubFor?.name).toBe('Essendon');
+      expect(p.scope.clubAgainst?.name).toBe('Collingwood');
+      expect(result.report.unsupportedTerms).toEqual([]);
+    });
+
+    it('club_season_rank: "Pies\' highest seasonal wins in 2017" -> the exact AFLDB-ISSUE-214 §10c residual family, now clean', async () => {
+      const p = await plan("Pies' highest seasonal wins in 2017");
+      expect(p.grain).toBe('club_season');
+      expect(p.metric).toBe('wins');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.scope.clubFor?.name).toBe('Collingwood');
+      expect(p.scope.seasonMin).toBe(2017);
+      expect(p.scope.seasonMax).toBe(2017);
+    });
+
+    it('team_streak: "What is Bombers\' longest winning streak against Pies" -> streakDefinition/clubFor/clubAgainst all resolve', async () => {
+      const p = await plan("What is Bombers' longest winning streak against Pies");
+      expect(p.grain).toBe('team_streak');
+      expect(p.streakDefinition).toEqual({ kind: 'win' });
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.scope.clubFor?.name).toBe('Essendon');
+      expect(p.scope.clubAgainst?.name).toBe('Collingwood');
+    });
+
+    it('multi-word combined alias: "What was GWS Giants\' biggest win against Adelaide" -> the possessive still lands on the whole combined alias', async () => {
+      const p = await plan("What was GWS Giants' biggest win against Adelaide");
+      expect(p.grain).toBe('team_match');
+      expect(p.metric).toBe('win_margin');
+      expect(p.scope.clubFor?.name).toBe('Greater Western Sydney');
+      expect(p.scope.clubAgainst?.name).toBe('Adelaide');
+    });
+  });
+
+  describe('regression: ordinary forms are unaffected', () => {
+    it('the plain, non-possessive alias is unchanged', async () => {
+      const p = await plan('Bombers biggest victory against Pies');
+      expect(p.grain).toBe('team_match');
+      expect(p.scope.clubFor?.name).toBe('Essendon');
+      expect(p.scope.clubAgainst?.name).toBe('Collingwood');
+    });
+
+    it('a singular club\'s ordinary "\'s" possessive is unchanged (pre-existing behaviour, not touched by this fix)', async () => {
+      const p = await plan("Essendon's biggest victory against Pies");
+      expect(p.grain).toBe('team_match');
+      expect(p.scope.clubFor?.name).toBe('Essendon');
+      expect(p.scope.clubAgainst?.name).toBe('Collingwood');
+    });
+
+    it('multi-word club names without a possessive are unchanged', async () => {
+      const p = await plan('North Melbourne biggest win against Essendon');
+      expect(p.grain).toBe('team_match');
+      expect(p.scope.clubFor?.name).toBe('North Melbourne');
+    });
+
+    it('a player name containing a mid-word apostrophe is unaffected -- the fix only strips a trailing apostrophe before whitespace/end-of-string', async () => {
+      const oBrien: NlPlayerCandidate = { ref: { id: 9710, slug: 'yy-obrien', name: "Yy O'Brien" }, score: 1000 };
+      const apostropheCtx: NlParseContext = {
+        ...ctx,
+        resolvePlayer: (name: string) => Promise.resolve(
+          name.toLowerCase().replace(/['’.]/g, '').replace(/\s+/g, ' ').trim() === 'yy obrien' ? [oBrien] : [],
+        ),
+        resolvePlayerFamily: () => Promise.resolve([]),
+      };
+      const parsed = await parseNlQuestion("yy o'brien most games", apostropheCtx);
+      expect(parsed.status).toBe('plan');
+      if (parsed.status !== 'plan') return;
+      expect(parsed.plan.player?.name).toBe("Yy O'Brien");
+      expect(parsed.report.unsupportedTerms).toEqual([]);
+    });
+
+    it('an unknown word with a trailing apostrophe still fails closed, not silently accepted as a club', async () => {
+      const result = await parse("What was Glorbins' biggest victory against Pies");
+      expect(result.status).not.toBe('plan');
+      expect(result.report.unsupportedTerms.some((t) => t.includes('glorbin'))).toBe(true);
+    });
+
+    it('a bare, cue-less trailing apostrophe with no supported construction around it still declines', async () => {
+      const result = await parse("Richmond's supporters' favourite ground");
+      expect(result.status).not.toBe('plan');
     });
   });
 });
