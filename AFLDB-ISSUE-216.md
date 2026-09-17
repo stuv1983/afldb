@@ -1,6 +1,6 @@
 # AFLDB-ISSUE-216 — `player_season_leaderboard` "posted...season tally..." / "...seasonal...total" phrasing declines with `unsupported_term`
 
-Status: **IMPLEMENTED, NOT YET RESOLVED** — awaiting operator host validation on `streamanator`.
+Status: **RESOLVED 2026-09-17** — operator-validated on `streamanator`, commit `8de4a96`.
 
 ## 1. Problem, as given
 
@@ -242,25 +242,70 @@ Seven regression controls:
   `src/search/nl/plan.ts`, `src/search/nl/vocab.ts`, `tests/nl-parser.test.ts`); no stray/zero-byte
   artefacts found.
 
-## 11. Host validation — outstanding
+## 11. Host validation (streamanator, commit `8de4a96`, `PARSER_VERSION = 63`) — complete
 
-Not yet run. Recommended commands on `streamanator`, in order:
+### 11a. Frozen V5
 
-1. Frozen V5 stable corpus (`/home/arm/nl-stress-corpus-v5.csv`) under `PARSER_VERSION = 63` — expect
-   unchanged **12000 scored / 12000 clean / 0 soft / 0 failed**.
-2. Frozen exploratory V2 corpus (`/home/arm/nl-exploratory-v2.csv`) under `PARSER_VERSION = 63` — v62
-   baseline is **27530 scored / 16477 clean / 11053 soft / 0 failed / 1500 audit-required**.
-3. A direct v62-vs-v63 structured-plan comparison of the full 29,030-row exploratory V2 corpus before
-   closeout, the same way ISSUE-214/ISSUE-215 reconciled their target clusters.
+**12000 scored / 12000 clean / 0 soft / 0 failed** — unchanged from the v62 baseline. No stable-corpus
+regression.
 
-Expected outcome, **not promised**: `player_season_leaderboard/0` (576 rows) clearing fully — a pure
-wrapper-vocabulary gap with no known residual mechanism. `player_season_leaderboard/3` (559 rows) clearing
-fully or substantially — wrapper gap plus grain-election fix, no known residual mechanism identified during
-implementation, but not host-verified. Host validation must determine the exact `/0`/`/3` remaining counts,
-aggregate clean/soft movement, hard failures (expect 0), and whether any unrelated plan changed. Do not
-assume all 1135 rows move before host validation returns.
+### 11b. Exploratory V2
+
+Same frozen 29,030-row corpus, not regenerated.
+
+| | v62 baseline | v63 candidate |
+|---|---|---|
+| scored | 27530 | 27530 |
+| clean | 16477 | 17612 |
+| soft | 11053 | 9918 |
+| failed | 0 | 0 |
+| audit-required | 1500 | 1500 |
+
+Net movement: **clean +1135 / soft -1135 / failed 0**.
+
+### 11c. Target-cluster reconciliation
+
+| Cluster | Before v63 | After v63 |
+|---|---|---|
+| `player_season_leaderboard/0` | 576 | 0 |
+| `player_season_leaderboard/3` | 559 | 0 |
+| **Total** | **1135** | **0** |
+
+`576 + 559 = 1135`, exactly matching the aggregate clean/soft movement in §11b. Both target clusters
+fully cleared; the `player_season_leaderboard` family has no remaining triage group. This confirms §3's
+expectation — `/0`'s pure wrapper-vocabulary gap and `/3`'s wrapper gap plus grain-election fix both
+resolved with no residual mechanism surfacing in either cluster.
+
+### 11d. Direct plan comparison
+
+Comparison of `/home/arm/nl-exploratory-v2-v62-r2/results.jsonl` vs.
+`/home/arm/nl-exploratory-v2-v63-validation/results.jsonl`:
+
+```text
+v62 rows: 29030
+v63 rows: 29030
+missing: 0
+changed plans: 1135
+```
+
+Structured diff saved at `/home/arm/issue-216-v62-v63-plan-diff.json`. The changed-plan count reconciles
+exactly to §11c (576 + 559 = 1135). Representative changed rows are exclusively target-family examples:
+
+```text
+Which player posted the highest season tally of handballs for Collingwood during the 2010s
+Which player posted the highest season tally of kicks for Tigers after 1999
+Find the Port Adelaide player with the best seasonal goal assists total after 1999
+Find the Fremantle player with the best seasonal kicks total before 2019
+```
+
+No unrelated movement was observed.
 
 ## 12. Resolution
 
-NOT YET RESOLVED. Awaiting operator host validation on `streamanator` per §11. `CHANGELOG.md` entry
-deferred until validation completes, per this issue's own instructions.
+RESOLVED 2026-09-17. All required outcomes met: `/0` and `/3` confirmed to share only a partial
+wrapper-vocabulary mechanism, with `/3` carrying an independent, additional grain-election defect (§3);
+both fixed together as tightly-scoped variants of one supported construction (§5); frozen V5 unaffected
+(§11a); exploratory V2 gains exactly 1135 clean rows with 0 hard failures (§11b); both target clusters
+fully cleared, 576 → 0 and 559 → 0 (§11c); and the direct 29,030-row plan comparison confirms exactly
+1135 changed plans with zero unrelated movement (§11d). See `issues.md` and `CHANGELOG.md` for the
+cross-referenced record.
