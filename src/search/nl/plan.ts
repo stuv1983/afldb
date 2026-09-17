@@ -681,6 +681,25 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
 // the real "zero goals" condition instead of retrying the word's later
 // occurrence. The retry is generic to any stat column, not special-cased
 // to any one metric/condition pair.
+//
+// AFLDB-ISSUE-215 follow-up (same version -- a correction to the v62
+// "plus" fix above, not a new semantic feature): host validation found
+// two more gaps in "plus" ownership, both in extractCareerConditions
+// (nl/parser.ts). (a) The clause-boundary lookback that finds "plus"
+// (and "and"/",") searched only 20 characters back -- long enough for a
+// short comparator ("at least"/"exactly"), but "no more than " alone is
+// 13 characters, which together with "plus " and a number could put the
+// boundary more than 20 characters back and make it invisible. Widened
+// to 40 characters (comfortably fitting the longest COMPARE_OP_WORDS
+// phrase plus a 4-digit number and the joining word); the search still
+// returns the NEAREST boundary within that span, so widening it can only
+// reveal a real boundary that was missed, never reach past it into an
+// earlier clause. (b) The "no X" negative-condition loop (checked before
+// the numeric pending-stat loop) matched and stripped only the "no X"
+// phrase itself, with no knowledge of a neighbouring "plus" on either
+// side -- a LEADING "plus" ("... goals PLUS no premierships") is now
+// checked and consumed there too, only once the negative clause itself
+// actually bound.
 export const PARSER_VERSION = 62;
 
 // ------------------------------------------------------------------ grain

@@ -1,6 +1,9 @@
 # AFLDB-ISSUE-215 — `career_numeric_binding` "plus"/"among" phrasing declines with `unsupported_term`
 
-- **Status:** IMPLEMENTED, NOT YET RESOLVED. Awaiting operator host validation on streamanator.
+- **Status:** IMPLEMENTED, NOT YET RESOLVED. First host-validation round (commit `5eca839`, parser
+  v62) is in and reconciled (§14); it found and this session fixed one more residual "plus" ownership
+  gap (§15-§16), all still `PARSER_VERSION` 62 (a correction, not a new semantic feature). Awaiting a
+  second operator host-validation round on streamanator before this issue can resolve.
 - **Worktree:** `sonnet/issue-215-career-numeric-binding-phrasing`, base `origin/main` after AFLDB-ISSUE-214 (`6a224dde`).
 - **Baseline:** clean `main` after AFLDB-ISSUE-214, `PARSER_VERSION` 61 → 62.
 
@@ -313,55 +316,289 @@ tests/nl-stress-corpus.test.ts:      65/65 passed
 
 `typecheck`: clean. `PARSER_VERSION` confirmed 62.
 
-## 10. Host validation (streamanator) — PENDING
+## 10. Host validation round 1 (streamanator, commit `5eca839`, `PARSER_VERSION = 62`) — complete
 
-Not yet run. Recommended commands, matching the frozen-corpus contract this issue's runbook
-specifies:
+### 10a. Frozen V5
 
 ```text
-/home/arm/nl-stress-corpus-v5.csv       -- frozen V5 stable, must stay 12000/12000/0/0
-/home/arm/nl-exploratory-v2.csv         -- exploratory V2, current baseline under v61:
-                                            29030 input / 27530 scored / 15925 clean /
-                                            11605 soft / 0 failed / 1500 audit-required
+12000 scored
+12000 clean
+0 soft
+0 failed
 ```
 
-Expected to establish, per the runbook's requirements — none promised in advance:
+No stable-corpus regression.
 
-- how many `career_numeric_binding/2` rows move (552 targeted; the collision sub-case is a MINORITY
-  of `/2` — only rows where the randomly-picked ranked metric's field coincides with one of the two
-  randomly-picked condition fields, roughly 2/11 of `/2` rows by construction, not all 552 need the
-  §5d fix specifically to clear, but the "among" wrapper fix alone should clear the rest);
-- how many `career_numeric_binding/3` rows move (700 targeted, wrapper-vocabulary-only);
-- whether any residual subcluster remains in either template;
-- whether any unrelated plan changes anywhere in the 29,030-row corpus (a direct v61-vs-v62 plan
-  comparison, matching the pattern used for every prior issue in this series);
-- no new hard failures.
+### 10b. Exploratory V2
 
-## 11. Guardrails honoured
+```text
+v61: 15925 clean / 11605 soft / 0 failed
+v62: 16477 clean / 11053 soft / 0 failed
+net: clean +552, soft -552, failed 0
+```
+
+### 10c. Target-cluster reconciliation
+
+```text
+career_numeric_binding/2: 552 previous unexpected declines -> 0 remaining -> FULLY FIXED
+career_numeric_binding/3: 700 previous unsupported_term declines ->
+  491 coverage_unavailable
+  209 unsupported_term: plus
+  0 clean so far
+```
+
+### 10d. Direct plan comparison
+
+```text
+v61 rows: 29030, v62 rows: 29030, missing: 0, changed plans: 1043
+552 (/2) + 491 (/3, now reaching a plan that then fails validatePlan) = 1043
+```
+
+The remaining 209 `/3` rows stay `plan: null` in both versions, so they never enter the plan diff at
+all — consistent with a parser-level decline (§16), not an execution-level one.
+
+## 11. Follow-up investigation: 491 `/3` rows now `coverage_unavailable`
+
+### 11a. The exact guard
+
+`src/search/nl/plan.ts`'s `validatePlan`, `raw.grain === 'player_career' && raw.scope.clubFor` branch
+(~line 2366):
+
+```ts
+if (raw.grain === 'player_career' && raw.scope.clubFor && raw.careerPredicates.length === 0) {
+  const def = raw.metric ? NL_METRICS.player_career[raw.metric] : undefined;
+  const scopedGamesConditions = raw.metric === null
+    && raw.careerConditions.length > 0
+    && raw.careerConditions.every((condition) => condition.kind === 'column' && condition.column === 'games');
+  const scopedRankedMetric = raw.metric !== null
+    && (raw.metric === 'games' || (def?.kind === 'column' && !!def.statKey));
+  if (!scopedGamesConditions && !scopedRankedMetric) {
+    return { error: 'This career statistic cannot currently be totalled for one club.' };
+  }
+  ...
+}
+```
+
+`tools/nl/v2-runner.ts`'s `observe()` maps any `validatePlan` `{error}` result to
+`failureReason: 'coverage_unavailable'` — the plan itself parsed correctly (confirmed by the host
+output's own plan dumps: `grain`/`agg`/`scope.clubFor`/`careerConditions` are all exactly right), but
+is refused before it ever reaches SQL.
+
+### 11b. Rationale, verified against the SQL compiler
+
+`src/db/queries/nl/player-career.ts`'s `conditionSql` special-cases a per-club value for exactly ONE
+column:
+
+```ts
+if (cond.column === 'games' && plan.scope.clubFor) {
+  return sql`${clubAppearanceCount(plan.scope.clubFor.organizationId)} ${op} ${cond.value}`;
+}
+const column = sql.unsafe(NL_CAREER_COLUMNS[cond.column]);
+return sql`${column} ${op} ${cond.value}`;
+```
+
+Every other condition column falls through to `NL_CAREER_COLUMNS[cond.column]` — a precomputed
+**whole-career** total (`c.finals`, `c.premierships`, `c.goals`, `c.losses`, `c.brownlow_votes`, ...),
+never scoped to the named club. `career_numeric_binding/3` always has exactly TWO DISTINCT condition
+fields (the generator explicitly excludes picking the same field twice) and `metric: ''`
+(`aggregation: 'list'`) — so `scopedGamesConditions` (requires EVERY condition to be `games`) can
+**never** be true for two distinct fields, and `scopedRankedMetric` can never be true either
+(`raw.metric` is always `null`). **Every parseable `/3` row with a club scope structurally fails this
+guard, unconditionally, regardless of which two fields were picked** — confirmed by the host numbers:
+491 = every row that reached a plan at all (700 − 209 still-declining-in-parsing rows).
+
+The guard's own surrounding comment cites its origin directly: AFLDB-ISSUE-110 finding B — a
+club-scoped career plan that silently used the whole-career total while claiming to answer a
+club-scoped question (the exact SQL shape `conditionSql` would otherwise emit here). This guard exists
+specifically to fail closed rather than repeat that defect.
+
+### 11c. A genuine, separate asymmetry (found, not fixed)
+
+`goals` (unlike `finals`/`premierships`/`losses`/`brownlow_votes`/`clubs_played`) DOES carry a
+`statKey` in `NL_METRICS.player_career` (`plan.ts` line 1069:
+`columnMetric('goals', 'Goals', 'c.goals', 'goals')`), and `metricValueExpr` (the RANKED-metric value
+expression, same file, lines 76-87) already proves a correct per-club SQL shape for it:
+
+```ts
+if (plan.scope.clubFor) {
+  ...
+  if (def.statKey) {
+    return sql`(SELECT sum(pms.${sql.unsafe(def.statKey)})::int
+                  FROM player_match_stats pms JOIN clubs pcl ON pcl.id = pms.club_id
+                 WHERE pms.player_id = p.id AND pcl.organization_id = ${organizationId})`;
+  }
+}
+```
+
+`conditionSql` never reuses this pattern for a CONDITION's threshold — only for the ranked `metric`.
+So even the one CONDITIONS-pool combination that is, in principle, fully answerable with EXISTING data
+and an EXISTING proven SQL shape (`games` + `goals` together) currently fails the same guard, because
+(a) the guard's `scopedGamesConditions` branch requires every condition to be `games`, not "every
+condition is club-scopable", and (b) `conditionSql` has no club-scoped path for `goals` to fall back on
+even if the guard allowed it.
+
+### 11d. Classification
+
+**(1) Legitimate coverage limitation** for all 491 rows as currently executable, **not** a parser
+defect, **not** an overly broad guard for the specific field combinations these rows use. Reasoning:
+
+- Every `/3` row necessarily uses two DISTINCT fields from `{games, goals, premierships,
+  brownlow_votes, clubs_played, finals, losses}`. Of those seven, only `games` (via
+  `clubAppearanceCount`) and `goals` (via a live per-match sum, proven for the metric path but not
+  reused for conditions) have ANY per-club SQL shape anywhere in this codebase. The other five
+  (`premierships`, `brownlow_votes`, `clubs_played`, `finals`, `losses`) are precomputed whole-career
+  facts with no live per-match join built for "did this happen while at club X" — building one (e.g. a
+  `clubAppearanceCount`-style `count(DISTINCT match) WHERE is_finals_series AND club = X` for finals)
+  is plausible future work, but does not exist today.
+- Even the ONE combination that is fully answerable today with proven SQL patterns (`games` + `goals`)
+  currently fails, because `conditionSql` doesn't reuse `metricValueExpr`'s existing per-club-sum shape
+  for a condition threshold — a genuine, narrow, **separate** gap, flagged in §11c and **not fixed
+  here**: it requires new SQL in `conditionSql` (a `player-career.ts` change, not a parser change), is
+  outside this issue's charter (parser wrapper-vocabulary ownership), and per the runbook's explicit
+  instruction not to weaken the guard without first proving it wrong for the cases it actually blocks.
+  This one combination is a minority even of the 491 (`games`+`goals` is 1 of the
+  `C(7,2) = 21` possible unordered field pairs).
+- The guard fails CLOSED with an honest, specific message ("This career statistic cannot currently be
+  totalled for one club") rather than silently answering with the whole-career total dressed up as a
+  club total — exactly the ISSUE-110 finding B failure mode it was built to prevent. Removing or
+  weakening it would reintroduce a silent-wrong-answer defect for a real, current data/execution gap.
+- The exploratory corpus's oracle marks every `career_numeric_binding/3` row `expected_status:
+  success` unconditionally, without distinguishing which field pairs are actually club-scopable today
+  — a genuine corpus/execution-semantics mismatch in the SENSE that the oracle doesn't yet model this
+  distinction, but per the runbook's explicit instruction **the generator/scorer is not modified here**
+  to "make the result green"; this is recorded as an observation only (§14).
+
+**Not fixed, not touched:** `validatePlan`'s guard, `conditionSql`, `metricValueExpr`. No corpus
+generator/scorer file touched.
+
+## 12. Follow-up correction: 209 residual `/3` "plus" ownership rows — FIXED
+
+### 12a. Root cause A — boundary lookback too short
+
+`extractCareerConditions`'s clause-boundary search (finding "and"/","/"plus" at all, to know where the
+current clause's own value-search window should start) was clipped to the SAME fixed 20-character
+lookback the value search itself uses (`outerStart = idx - 20`). "no more than " alone is 13
+characters; together with "plus " (5) and a number (up to 4 digits + a space), the true boundary could
+sit more than 20 characters back from the stat word — invisible to `lastIndexOf`, not merely unmatched.
+Confirmed by debug trace: "For Port Adelaide, find players with exactly 3 premierships plus no more
+than 250 games" bound both conditions correctly but left "plus" as the sole leftover token, with
+`report.consumed` showing no `plus` entry at all.
+
+### 12b. Root cause B — the negative-condition loop never looks for a neighbouring "plus"
+
+`extractCareerConditions`'s `negativeTargets` loop (the "no X"/"never X"/"without X" zero-condition
+matcher, which runs BEFORE the numeric pending-stat loop) matches and strips only the "no X" phrase
+itself, with no knowledge of a "plus" immediately touching it on either side. For "For Sydney, find
+players with more than 50 goals plus no premierships", the loop found and stripped "no premierships"
+cleanly but left the preceding "plus" completely untouched — the pending-stat loop's own boundary
+search (which DOES look for "plus") never runs for this clause, because it was never a pending-stat
+match at all (it went through the negative-condition path instead).
+
+Both are the SAME `/3` "plus" ownership mechanism §5b targeted, exposed by combinations the three
+original representative rows didn't happen to construct — confirmed, not assumed, by reproducing all
+three host examples locally before making any change (RED), then verifying each turns GREEN after each
+fix independently (root cause A alone fixed the "Port Adelaide" example; root cause B was still needed
+for the other two).
+
+### 12c. Fix, both in `src/search/nl/parser.ts`, `extractCareerConditions`
+
+**A.** The boundary search now uses its own, wider probe span (`boundaryProbeStart`, 40 characters —
+comfortably larger than the longest `COMPARE_OP_WORDS` phrase, `"no greater than"`, plus a 4-digit
+number and the joining word), separate from the value-search `outerStart` (unchanged at 20 characters).
+`lastIndexOf` still returns the NEAREST boundary within the wider span, so this can only reveal a real
+boundary that was previously invisible — it can never reach past the nearest one into an earlier,
+unrelated clause (proven by a new three-clause regression control, §13).
+
+**B.** The `negativeTargets` loop now checks the text immediately before (and, for symmetry, after) its
+own match for a lone `plus`, and folds it into the same removed span — but ONLY once its own "no X"
+clause has actually matched (the identical "only once it binds" discipline §5b's original fix uses). A
+TRAILING "plus" after a negative clause needs no new handling: that ordering leaves "plus" in front of
+the SECOND (pending-loop) clause instead, already covered by the pending loop's own boundary search
+(proven by the pre-existing, still-passing "no premierships plus at most 10 Brownlow votes" case).
+
+No metric combination, club name, or sample string is special-cased in either fix; both are keyed on
+generic textual structure (comparator-phrase length, "no X" match adjacency).
+
+### 12d. RED tests added (before the fix; confirmed to fail against the pre-fix source, then pass after)
+
+New `describe` block in `tests/nl-parser.test.ts`, nested in the existing "19. AFLDB-ISSUE-215 ..."
+suite: the three host examples verbatim (club names already in the shared `CLUBS` fixture — Sydney,
+Port Adelaide; `Fremantle` substituted with `Essendon`, not in the fixture), each asserting the full
+`careerConditions` array. Plus a new negative-control regression proving the widened boundary probe
+still finds the NEAREST boundary in a three-clause sentence ("and" then "plus"), not a farther one.
+
+## 13. Local verification after the follow-up correction — complete
+
+```text
+$ npx vitest run tests/nl-parser.test.ts
+-> Test Files 1 passed (1), Tests 540 passed (540)
+
+$ npx vitest run tests/nl-regression-corpus.test.ts tests/nl-semantic-mapping.test.ts tests/nl-stress-corpus.test.ts
+-> Test Files 3 passed (3), Tests 402 passed (402)
+
+$ npm run typecheck
+-> Generating route types... / Types generated successfully; tsc --noEmit clean
+```
+
+`PARSER_VERSION` confirmed still 62 (a correction to the same version, not a new semantic feature, per
+this session's explicit instruction).
+
+## 14. Guardrails honoured
 
 No club name, corpus ID, exact metric/condition pair, or sample string special-cased in
 `parser.ts`/`vocab.ts` (test-file club substitutions are fixture-availability choices only). "plus"
 and "among" are NOT added to `STOPWORDS` or any other blanket-ignore list — both remain gated to the
 specific supported construction, with regression controls proving they still surface as
-`unsupported_term` outside it (§8). "find" is only additionally stripped behind a literal leading
-"for ..." clause, never any leading clause generically. No unrelated NL family touched. Exploratory
-V2 generator/scorer untouched — corpus expectation verified correct, not changed (§4).
+`unsupported_term` outside it (§8, §12d). "find" is only additionally stripped behind a literal leading
+"for ..." clause, never any leading clause generically. No unrelated NL family touched. Exploratory V2
+generator/scorer untouched — corpus expectation verified correct, not changed (§4); the
+`career_numeric_binding/3` oracle's unconditional `expected_status: success` across all field pairs was
+found to not yet distinguish club-scopable from non-club-scopable combinations (§11d), but this is
+recorded as an observation only, not corrected, per the runbook's explicit instruction not to modify
+the generator/scorer to make the result green. `validatePlan`'s club-scoped-career-condition guard
+(§11a) was investigated and NOT weakened or removed — classified a legitimate current coverage
+limitation (§11d), with the SQL-level evidence (§11b, §11c) recorded for a future issue rather than
+acted on here.
 
-## 12. Residual subcases deliberately left out of this closeout
+## 15. Residual subcases deliberately left out of this closeout
 
-- The exact proportion of `/2`'s 552 rows that hit the §3b metric/condition collision specifically
-  (versus the "among" wrapper gap alone) is not counted locally — this worktree has no access to the
-  real 29,030-row corpus, only the six representative rows and additional hand-built probes. Host
-  validation (§10) will give the real split.
+- **491 `coverage_unavailable` rows (§11):** classified a legitimate, currently-real coverage
+  limitation — `conditionSql` (`src/db/queries/nl/player-career.ts`) has no per-club SQL path for any
+  condition column except `games`, and does not reuse the per-club sum shape `metricValueExpr` already
+  proves for `goals` as a ranked metric. Building either (a genuine per-club query for
+  `finals`/`premierships`/`losses`/`brownlow_votes`/`clubs_played`, or reusing the existing `goals`
+  per-club pattern for a condition threshold) is real future SQL-compiler work, explicitly out of this
+  issue's parser-ownership charter, and not attempted here. Recorded as a follow-up candidate only; no
+  new tracked issue opened in this session.
 - A non-corpus phrasing probed during investigation — "most career `<S>` **with** `<conditions>`" (no
   "players"/"among" at all) — hits a separate, pre-existing, unrelated scope guard ("that condition is
   a career-wide fact and cannot also be limited to this question's other scope") once both conditions
   correctly bind. This is NOT a `career_numeric_binding` corpus construction (every real template uses
   "players with"), is unaffected by this issue's fix either way, and is left untouched.
 
-## 13. Resolution
+## 16. Resolution
 
-**NOT YET RESOLVED.** Implementation complete and locally verified (§9); awaiting operator host
-validation (§10) before this issue can close per the runbook's explicit instruction to keep status at
-"IMPLEMENTED, NOT YET RESOLVED" until then. `CHANGELOG.md` resolution entry intentionally not yet
-added, per the same instruction.
+**NOT YET RESOLVED.** Round 1 of host validation (§10) is in and fully reconciled: `career_numeric_binding/2`
+is fully fixed (552 → 0); `career_numeric_binding/3` split into 491 legitimate coverage-limitation
+declines (§11, not a defect) and 209 residual parser-ownership declines, which this session
+investigated, reproduced with RED tests, and fixed (§12) — all still under `PARSER_VERSION` 62. Local
+verification after the correction is clean (§13). Status stays "IMPLEMENTED, NOT YET RESOLVED" per
+this session's explicit instruction until the operator reruns host validation (§17) and confirms the
+209-row fix and zero unrelated movement on streamanator. `CHANGELOG.md` resolution entry intentionally
+not yet added.
+
+## 17. Exact host commands to rerun
+
+```text
+frozen V5:        /home/arm/nl-stress-corpus-v5.csv   -- must stay 12000/12000/0/0
+exploratory V2:    /home/arm/nl-exploratory-v2.csv     -- v62 baseline (round 1): 16477 clean / 11053 soft / 0 failed
+```
+
+Re-run exploratory V2 against this session's corrected commit (still `PARSER_VERSION` 62) and reconcile:
+
+- `career_numeric_binding/3`'s 209 `unsupported_term: plus` rows -- expected to move to clean;
+- `career_numeric_binding/3`'s 491 `coverage_unavailable` rows -- expected to remain
+  `coverage_unavailable` (§11, not touched by this correction);
+- a direct plan comparison against the round-1 (commit `5eca839`) results to confirm exactly ~209
+  changed plans (the residual `/3` rows moving from `plan: null` to a real plan), zero unrelated
+  movement elsewhere in the 29,030-row corpus, and no new hard failures.

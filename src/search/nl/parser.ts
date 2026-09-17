@@ -1151,7 +1151,34 @@ function extractCareerConditions(text: string): {
     if (match) {
       conditions.push({ kind: 'column', column, op: 'eq', value: 0 });
       consumed.push(match[0]);
-      working = stripMatch(working, match[0]);
+      let spanStart = match.index;
+      let spanEnd = match.index + match[0].length;
+      // AFLDB-ISSUE-215 (follow-up). "plus" immediately touching this
+      // negative clause ("... 50 goals PLUS no premierships") is the same
+      // numeric-binding conjunction the pending-stat loop below already
+      // recognizes between two POSITIVE clauses -- but this loop runs
+      // FIRST and matches/strips only the "no X" phrase itself, with no
+      // knowledge of a neighbouring boundary word on either side. A
+      // trailing "plus" ("no premierships PLUS at most 10 votes") does
+      // not need handling here: that ordering leaves "plus" immediately
+      // in front of the SECOND (pending-loop) clause instead, which the
+      // pending loop's own boundary search already finds and consumes
+      // from the other direction. Checked and consumed only once this
+      // clause has actually bound, matching the pending loop's own "only
+      // once it binds" discipline -- a "plus" beside a clause that didn't
+      // bind is still left for the leftover-token decline.
+      const beforeText = working.slice(0, spanStart);
+      const afterText = working.slice(spanEnd);
+      const plusBefore = /\bplus\s+$/.exec(beforeText);
+      const plusAfter = /^\s+plus\b/.exec(afterText);
+      if (plusBefore) {
+        consumed.push('plus');
+        spanStart -= plusBefore[0].length;
+      } else if (plusAfter) {
+        consumed.push('plus');
+        spanEnd += plusAfter[0].length;
+      }
+      working = `${working.slice(0, spanStart)} ${working.slice(spanEnd)}`.replace(/\s+/g, ' ').trim();
     }
   }
 
@@ -1256,30 +1283,48 @@ function extractCareerConditions(text: string): {
       // later clause too, leaving clubs_played to read "30". Clipping the
       // window at the clause boundary means a clause's number search can
       // never see a token that belongs to the clause before it.
-      const priorText = working.slice(outerStart, idx);
-      const lastAnd = priorText.toLowerCase().lastIndexOf(' and ');
-      const lastComma = priorText.lastIndexOf(',');
-      // AFLDB-ISSUE-215. "plus" is a second spelling of the exact same
-      // clause boundary "and" already is here -- "at least 20 finals PLUS
-      // zero goals" joins two independent numeric conditions the same way
-      // "and" does. It is deliberately NOT a blanket STOPWORDS entry like
-      // "and": "plus" names nothing else anywhere in this engine's
-      // vocabulary, and adding it there would silently ignore the word in
-      // every OTHER, unrelated construction too. So its span is recorded
-      // here and only actually removed further down, and only once this
-      // clause goes on to bind a real value -- a "plus" in front of a
-      // clause that never binds is left completely alone and the question
-      // still declines on its own leftover text.
-      const lastPlus = priorText.toLowerCase().lastIndexOf(' plus ');
+      // AFLDB-ISSUE-215 (follow-up). The BOUNDARY search (finding a
+      // comma/"and"/"plus" at all) needs a wider lookback than the VALUE
+      // search does: "exactly 3 premierships plus no more than 250 games"
+      // -- "no more than " alone is 13 characters, which together with
+      // "plus " (5) and the number (up to 4 digits + a space) can put the
+      // boundary word more than `idx - 20` characters back, outside
+      // `priorText` entirely, so `lastPlus` below always came back -1 and
+      // "plus" was never even considered a candidate boundary -- not
+      // rejected, just invisible to the search. `boundaryProbeText` widens
+      // ONLY the boundary search to comfortably fit the longest
+      // COMPARE_OP_WORDS phrase ("no greater than", 15 characters) plus a
+      // 4-digit number and the joining word itself; `lastIndexOf` still
+      // returns the NEAREST boundary within it, so widening the probe can
+      // only reveal a real boundary that was previously missed, never
+      // reach past it into an earlier, unrelated clause. The VALUE search
+      // below is unaffected: once a boundary is found, `window` still
+      // starts exactly at that boundary, same as before this change.
+      const boundaryProbeStart = Math.max(0, idx - 40 - (qualifierSpan ? idx - qualifierSpan.start : 0));
+      const boundaryProbeText = working.slice(boundaryProbeStart, idx);
+      const lastAnd = boundaryProbeText.toLowerCase().lastIndexOf(' and ');
+      const lastComma = boundaryProbeText.lastIndexOf(',');
+      // "plus" is a second spelling of the exact same clause boundary
+      // "and" already is here -- "at least 20 finals PLUS zero goals"
+      // joins two independent numeric conditions the same way "and" does.
+      // It is deliberately NOT a blanket STOPWORDS entry like "and":
+      // "plus" names nothing else anywhere in this engine's vocabulary,
+      // and adding it there would silently ignore the word in every
+      // OTHER, unrelated construction too. So its span is recorded here
+      // and only actually removed further down, and only once this clause
+      // goes on to bind a real value -- a "plus" in front of a clause that
+      // never binds is left completely alone and the question still
+      // declines on its own leftover text.
+      const lastPlus = boundaryProbeText.toLowerCase().lastIndexOf(' plus ');
       const boundaryEnd = Math.max(
         lastAnd >= 0 ? lastAnd + 5 : -1,
         lastComma >= 0 ? lastComma + 1 : -1,
         lastPlus >= 0 ? lastPlus + 6 : -1,
       );
-      const windowStart = boundaryEnd >= 0 ? outerStart + boundaryEnd : outerStart;
+      const windowStart = boundaryEnd >= 0 ? boundaryProbeStart + boundaryEnd : outerStart;
       const window = working.slice(windowStart, idx + match[0].length);
       const plusBoundarySpan = (lastPlus >= 0 && lastPlus + 6 === boundaryEnd)
-        ? { start: outerStart + lastPlus + 1, end: outerStart + lastPlus + 5, text: 'plus' }
+        ? { start: boundaryProbeStart + lastPlus + 1, end: boundaryProbeStart + lastPlus + 5, text: 'plus' }
         : null;
 
       const plus = NUMBER_PLUS_RE.exec(window);

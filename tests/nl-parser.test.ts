@@ -4212,6 +4212,66 @@ describe('19. AFLDB-ISSUE-215 career numeric-binding phrasing ("plus"/"among" wr
     });
   });
 
+  // Host validation (parser v62, commit 5eca839) found a second "plus"
+  // ownership gap the three cases above didn't exercise: a positive
+  // clause FIRST, "plus", then a "no X" negative clause SECOND. Two
+  // independent causes, both fixed generically (no metric combination or
+  // sample string special-cased):
+  //
+  //  1. The clause-boundary lookback that finds "plus" (and "and"/",")
+  //     was fixed at a 20-character budget -- long enough for a short
+  //     comparator like "at least"/"exactly", but "no more than " alone
+  //     is 13 characters, which together with "plus " (5) and a number
+  //     could put the boundary more than 20 characters back, outside the
+  //     lookback entirely. Widened to 40 characters, comfortably fitting
+  //     the longest COMPARE_OP_WORDS phrase ("no greater than") plus a
+  //     4-digit number and the joining word -- the search still takes the
+  //     NEAREST boundary within that span, so it can only reveal a
+  //     previously-invisible real boundary, never reach past it into an
+  //     earlier clause.
+  //  2. The "no X" negative-condition loop (checked before the numeric
+  //     pending-stat loop) matches and strips only the "no X" phrase
+  //     itself, with no knowledge of a neighbouring "plus" on either
+  //     side. A LEADING "plus" ("... goals PLUS no premierships") is now
+  //     checked and consumed there too, only once the negative clause
+  //     itself actually bound. A TRAILING "plus" ("no premierships PLUS
+  //     ...") needs no new handling: that ordering leaves "plus"
+  //     immediately in front of the SECOND (pending-loop) clause instead,
+  //     which the pending loop's own boundary search already finds from
+  //     the other direction (proven by the "no premierships plus at most
+  //     10 Brownlow votes" case above).
+  describe('/3-style, follow-up: a positive clause first, "plus", then a "no X" negative clause', () => {
+    it('a comparator clause plus a "no" negative clause ("no more than"-length boundary not involved)', async () => {
+      const p = await plan('For Sydney, find players with more than 50 goals plus no premierships');
+      expect(p.grain).toBe('player_career');
+      expect(p.scope.clubFor?.name).toBe('Sydney');
+      expect(p.careerConditions).toEqual([
+        { kind: 'column', column: 'premierships', op: 'eq', value: 0 },
+        { kind: 'column', column: 'goals', op: 'gt', value: 50 },
+      ]);
+    });
+
+    it('two positive comparator clauses, the second a long "no more than" phrase (boundary-lookback widening)', async () => {
+      const p = await plan('For Port Adelaide, find players with exactly 3 premierships plus no more than 250 games');
+      expect(p.grain).toBe('player_career');
+      expect(p.scope.clubFor?.name).toBe('Port Adelaide');
+      expect(p.careerConditions).toEqual([
+        { kind: 'column', column: 'premierships', op: 'eq', value: 3 },
+        { kind: 'column', column: 'games', op: 'lte', value: 250 },
+      ]);
+    });
+
+    it('a long "no more than" comparator clause plus a "no" negative clause (both fixes needed together)', async () => {
+      const p = await plan('For Essendon, find players with no more than 250 games plus no premierships');
+      expect(p.grain).toBe('player_career');
+      expect(p.scope.clubFor?.name).toBe('Essendon');
+      expect(p.careerConditions).toEqual([
+        { kind: 'column', column: 'premierships', op: 'eq', value: 0 },
+        { kind: 'column', column: 'games', op: 'lte', value: 250 },
+      ]);
+    });
+  });
+
   describe('/2-style: "who has the most career S among players with A and B"', () => {
     it('ranked metric distinct from both conditions', async () => {
       const p = await plan('Who has the most career games among players with fewer than 5 losses and at most 10 Brownlow votes');
@@ -4312,6 +4372,22 @@ describe('19. AFLDB-ISSUE-215 career numeric-binding phrasing ("plus"/"among" wr
   });
 
   describe('negative controls: "plus"/"among"/"find" are not globally ignored', () => {
+    // Proves the widened (20 -> 40 character) boundary-probe lookback
+    // takes the NEAREST boundary within its span, never a more distant
+    // one: three chained clauses ("and" then "plus"), where the "and"
+    // boundary sits well within the OLD 20-character budget too. If
+    // widening the probe had made it prefer a farther-back boundary over
+    // a closer one, this would misbind "goals" to the wrong clause or
+    // lose "losses" the way the pre-fix "300 clubs and over 10
+    // premierships" defect this window discipline was built against did.
+    it('three chained conditions ("and" then "plus") each bind to their own clause, not a farther one', async () => {
+      const p = await plan('players with 20 finals and 5 losses plus zero goals');
+      expect(p.careerConditions).toEqual([
+        { kind: 'column', column: 'finals', op: 'gte', value: 20 },
+        { kind: 'column', column: 'losses', op: 'gte', value: 5 },
+        { kind: 'column', column: 'goals', op: 'eq', value: 0 },
+      ]);
+    });
     it('"plus" beside a genuinely unsupported second clause still declines, not silently swallowed', async () => {
       const result = await parse('players with at least 20 finals plus a puppy');
       expect(result.status).not.toBe('plan');
