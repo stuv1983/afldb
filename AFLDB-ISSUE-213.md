@@ -1,11 +1,10 @@
 # AFLDB-ISSUE-213 — `extractClubs` overlapping club-name position bug breaks unordered matchup detection
 
-Status: **IMPLEMENTED, NOT YET RESOLVED 2026-09-17.** Local (DB-free) implementation, RED-reproduction
-test authorship, and local test/typecheck verification are all complete on
-`sonnet/issue-213-overlapping-club-matchup` (`npm ci` was run by the operator after the initial
-implementation pass; see §6a for one fixture-only correction found once tests could actually execute).
-Host validation on streamanator (frozen V5 + exploratory V2 against `/home/arm/nl-exploratory-v2.csv`)
-is outstanding. See §8 for exact commands.
+Status: **RESOLVED 2026-09-17.** Implementation commit `4f0be951` ("Fix overlapping club matchup
+parsing") on `sonnet/issue-213-overlapping-club-matchup`. Local (DB-free) implementation, RED-
+reproduction test authorship, local test/typecheck verification, and streamanator host validation are
+all complete. See §6a for one fixture-only correction found once tests could actually execute, and §8
+for the final host validation evidence.
 
 ## 1. Confirmed defect (from AFLDB-ISSUE-212's closeout)
 
@@ -215,49 +214,69 @@ npm run typecheck
 synthetic in-memory plans, not the parser itself, and was unaffected by either this issue's parser fix
 or the fixture correction, as expected.
 
-## 8. Host validation (streamanator) — commands for the operator, not yet run
+## 8. Host validation (streamanator) — evidence
 
-Do **not** regenerate the V2 corpus — reuse the existing, frozen `/home/arm/nl-exploratory-v2.csv` from
-ISSUE-212 (29,030 rows, seed `2060542026`, SHA256
-`bb75e4b5067942117c60f8eab6cfd01de4d8fc1e0c4fee07e10650fae97edb4a`).
+Validated commit/version: `4f0be951`, `PARSER_VERSION = 60`. The existing, frozen
+`/home/arm/nl-exploratory-v2.csv` from ISSUE-212 (29,030 rows, seed `2060542026`) was reused, not
+regenerated.
 
-```sh
-# 1. Frozen V5 stable corpus must stay 12000/12000/0/0 under v60.
-npm run nl:stress -- --corpus /home/arm/nl-stress-corpus-v5.csv \
-  --out /home/arm/nl-stress-v5-v60-recheck
+**Frozen V5 (stable regression corpus):**
 
-# 2. Exploratory V2 against parser v60 (parse-only, matching ISSUE-212 §9's own invocation).
-npm run nl:stress -- --corpus /home/arm/nl-exploratory-v2.csv \
-  --out /home/arm/nl-exploratory-v2-v60-validation --parse-only --concurrency 6
-
-node tools/nl/triage-exploratory-corpus.mjs \
-  --corpus /home/arm/nl-exploratory-v2.csv \
-  --results /home/arm/nl-exploratory-v2-v60-validation/results.jsonl \
-  --failures /home/arm/nl-exploratory-v2-v60-validation/failures.csv \
-  --summary /home/arm/nl-exploratory-v2-v60-validation/summary.json \
-  --out /home/arm/nl-exploratory-v2-v60-validation/triage.md \
-  --json /home/arm/nl-exploratory-v2-v60-validation/triage.json
-
-# 3. Row 20609919 specifically: confirm it is no longer in the failure set.
-grep -w 20609919 /home/arm/nl-exploratory-v2-v60-validation/failures.csv || echo "row 20609919 not in failures -- clean"
-
-# 4. Structured plan-diff/reconciliation against ISSUE-212's retained v59 V2 run, if that run
-#    directory (named exactly this way in AFLDB-ISSUE-212.md §9) is still present on the host --
-#    confirms no row other than 20609919 moved, in either direction.
-npm run nl:stress:compare -- /home/arm/nl-exploratory-v2-v59-validation /home/arm/nl-exploratory-v2-v60-validation
+```
+12000 scored
+12000 clean
+0 soft
+0 failed
 ```
 
-**Required outcomes before this issue resolves:**
+No stable-corpus regression.
 
-1. Frozen V5 stays `12000 scored / 12000 clean / 0 soft / 0 failed`.
-2. V2 row `20609919` moves from hard failure to clean.
-3. V2 aggregate hard failures move `1 -> 0`, unless an independent, unrelated hard failure appears (which
-   would itself need investigating separately, not folded into this issue's evidence).
-4. No unrelated row changes — the `nl:stress:compare` regressions table must be empty, and any row
-   movement outside `20609919` must be explained before this issue is marked resolved.
+**Exploratory V2, parser v59 baseline vs. v60 candidate:**
 
-**Do not claim these results before the operator actually runs them.** This document records the
-commands, not their output.
+| | v59 | v60 |
+| --- | --- | --- |
+| scored | 27530 | 27530 |
+| clean | 14878 | 14879 |
+| soft | 12651 | 12651 |
+| failed | 1 | 0 |
+| audit-required | 1500 | 1500 |
+
+Net movement: clean +1, soft 0, fail -1, audit 0. Row `20609919` ("Largest winning margin for North
+Melbourne versus Melbourne at Adelaide Oval") is absent from v60's `failures.csv`.
+
+**Direct plan-level reconciliation** (`/home/arm/nl-exploratory-v2-v59-validation/results.jsonl` vs.
+`/home/arm/nl-exploratory-v2-v60-validation/results.jsonl`, saved as
+`/home/arm/issue-213-v59-v60-plan-diff.json`):
+
+```
+v59 rows: 29030
+v60 rows: 29030
+missing from v59: 0
+changed plans: 1
+```
+
+The single changed row is `20609919`. Before (v59): `scope.clubFor = North Melbourne`,
+`scope.clubAgainst = Melbourne`, `scope.venue = Adelaide Oval`, `scope.matchup` absent. After (v60):
+`scope.matchup.clubA = North Melbourne`, `scope.matchup.clubB = Melbourne`, `scope.venue = Adelaide
+Oval`, `clubFor`/`clubAgainst` absent. All other plan fields on that row, and every field on all 29,029
+other rows, are unchanged. The parser change is exactly isolated to the known defect across the entire
+corpus — no unrelated row moved.
+
+**Comparator note:** `npm run nl:stress:compare` could not produce a row-severity reconciliation table
+because the stored `results.jsonl` files did not carry findings (including after `--report-only`) —
+this is a limitation of that comparator tool against these two run directories, not a validation
+failure. Each run's own `summary`/`run` metadata gave the authoritative totals above, and the direct
+plan-level comparison gave stronger row-level evidence than the comparator would have (exactly 1 changed
+plan, exactly the intended row, 0 unrelated changes), so the outcome required by §"Required outcomes"
+below is fully evidenced without it.
+
+**Required outcomes — all met:**
+
+1. Frozen V5 stays `12000 scored / 12000 clean / 0 soft / 0 failed`. **Met.**
+2. V2 row `20609919` moves from hard failure to clean. **Met.**
+3. V2 aggregate hard failures move `1 -> 0`, with no independent unrelated hard failure appearing.
+   **Met.**
+4. No unrelated row changes. **Met** — the direct 29,030-row plan diff found exactly one changed row.
 
 ## 9. Guardrails honoured
 
@@ -267,13 +286,34 @@ commands, not their output.
   between the two mentions; the fix only corrects how each mention's position is measured.
 - `AFLDB-ISSUE-212`'s V2 corpus/scorer files (`tools/nl/generate-exploratory-corpus-v2.mjs`,
   `tools/nl/corpus.ts`) not touched.
-- No directional club query converted to matchup (§6 regression coverage).
-- No soft-fail family unrelated to this defect touched.
-- No Git commit, push, merge, branch deletion, or worktree removal performed this session. Read-only
-  Git inspection only.
+- No directional club query converted to matchup (§6 regression coverage), confirmed again by the
+  29,030-row direct plan diff (§8): zero directional rows moved to `matchup`.
+- No soft-fail family unrelated to this defect touched — V2 soft count unchanged at 12651.
+- No Git command of any kind run during this closeout session (documentation-only edits to
+  `AFLDB-ISSUE-213.md`, `issues.md`, `IssuesIndex.md`, `CHANGELOG.md`). The implementation commit
+  `4f0be951` already existed on the branch before this closeout began.
 
 ## 10. Worktree status
 
-Reviewed at the end of this session (see the final response for the exact command output and file
-list) — no untracked files beyond the ones this session intentionally created
-(`AFLDB-ISSUE-213.md` itself) were found; all other changes are edits to already-tracked files.
+`src/search/nl/parser.ts`, `src/search/nl/plan.ts`, and `tests/nl-parser.test.ts` were not modified
+during this closeout session — only the four documentation files listed above were touched.
+
+## 11. Resolution
+
+**RESOLVED 2026-09-17.** All closeout criteria met:
+
+- Root cause confirmed from current source (§2).
+- Generic occurrence-span ownership fix implemented (§4), no club name special-cased.
+- `PARSER_VERSION` bumped exactly once, 59 → 60 (§5).
+- Local focused tests: `tests/nl-parser.test.ts` 509/509.
+- Broader local regression: `tests/nl-regression-corpus.test.ts` 163/163,
+  `tests/nl-semantic-mapping.test.ts` 174/174, `tests/nl-stress-corpus.test.ts` 65/65 — 402/402 total.
+- `npm run typecheck` clean.
+- Frozen V5 unaffected: 12000/12000/0/0 under parser v60.
+- Exploratory V2 hard failures: 1 → 0; row `20609919` confirmed clean.
+- Direct 29,030-row plan comparison: exactly one changed plan (row `20609919`), zero unrelated changes.
+- One fixture-only test correction (§6a) required no production code change and did not weaken or
+  convert the negative control it corrected.
+
+Implementation commit: `4f0be951` ("Fix overlapping club matchup parsing"),
+`sonnet/issue-213-overlapping-club-matchup`.
