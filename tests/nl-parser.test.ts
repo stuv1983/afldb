@@ -872,6 +872,94 @@ describe('13. club_season queries', () => {
     const p = await plan('most goals against carlton by a richmond player');
     expect(p.grain).not.toBe('club_season');
   });
+
+  // AFLDB-ISSUE-214: "what season had the highest/lowest <metric>" and
+  // "<club>'s highest/lowest seasonal <metric>" are the same club_season
+  // ranking construction as the already-supported "<club>'s highest/lowest
+  // <metric> in a season" -- naming the season as the answer's subject
+  // instead of "in a season" filler. Both used to decline with
+  // unsupported_term: season / unsupported_term: seasonal because neither
+  // word was ever consumed by any extractor.
+  describe('AFLDB-ISSUE-214: "what season had..." / "...seasonal..." rank phrasing', () => {
+    it('for Richmond, what season had the lowest wins during the 2010s -> club_season, min, decade range preserved', async () => {
+      const p = await plan('for Richmond, what season had the lowest wins during the 2010s');
+      expect(p.grain).toBe('club_season');
+      expect(p.metric).toBe('wins');
+      expect(p.agg).toEqual({ kind: 'min' });
+      expect(p.scope.clubFor?.name).toBe('Richmond');
+      expect(p.scope.seasonMin).toBe(2010);
+      expect(p.scope.seasonMax).toBe(2019);
+    });
+
+    it('for Swans, what season had the highest losses -> club_season, max, no explicit year required', async () => {
+      const p = await plan('for Swans, what season had the highest losses');
+      expect(p.grain).toBe('club_season');
+      expect(p.metric).toBe('losses');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.scope.clubFor?.name).toBe('Sydney');
+    });
+
+    it('for Carlton, what season had the highest losses in 2017 -> club_season, explicit year preserved', async () => {
+      const p = await plan('for Carlton, what season had the highest losses in 2017');
+      expect(p.grain).toBe('club_season');
+      expect(p.metric).toBe('losses');
+      expect(p.scope.clubFor?.name).toBe('Carlton');
+      expect(p.scope.seasonMin).toBe(2017);
+      expect(p.scope.seasonMax).toBe(2017);
+    });
+
+    it("north melbourne's highest seasonal losses -> club_season, max, no explicit year required", async () => {
+      const p = await plan("north melbourne's highest seasonal losses");
+      expect(p.grain).toBe('club_season');
+      expect(p.metric).toBe('losses');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.scope.clubFor?.name).toBe('North Melbourne');
+    });
+
+    it("sydney's highest seasonal draws in 2017 -> club_season, draws stays a distinct metric, year preserved", async () => {
+      const p = await plan("sydney's highest seasonal draws in 2017");
+      expect(p.grain).toBe('club_season');
+      expect(p.metric).toBe('draws');
+      expect(p.scope.clubFor?.name).toBe('Sydney');
+      expect(p.scope.seasonMin).toBe(2017);
+      expect(p.scope.seasonMax).toBe(2017);
+    });
+
+    it("greater western sydney's highest seasonal losses in 2023 -> club_season, year preserved", async () => {
+      const p = await plan("greater western sydney's highest seasonal losses in 2023");
+      expect(p.grain).toBe('club_season');
+      expect(p.metric).toBe('losses');
+      expect(p.scope.clubFor?.name).toBe('Greater Western Sydney');
+      expect(p.scope.seasonMin).toBe(2023);
+      expect(p.scope.seasonMax).toBe(2023);
+    });
+
+    it('regression: "teams with the most wins in a season" is unchanged by the new cues', async () => {
+      const p = await plan('teams with the most wins in a season');
+      expect(p.grain).toBe('club_season');
+      expect(p.metric).toBe('wins');
+      expect(p.agg).toEqual({ kind: 'max' });
+    });
+
+    it('regression: "which club had the most losses in 2017" is unchanged by the new cues', async () => {
+      const p = await plan('which club had the most losses in 2017');
+      expect(p.grain).toBe('club_season');
+      expect(p.metric).toBe('losses');
+      expect(p.scope.seasonMin).toBe(2017);
+      expect(p.scope.seasonMax).toBe(2017);
+    });
+
+    it('regression: "which team has the most wins" (no season wording) still declines -- bare "season"/"seasonal" was not made globally ignorable', async () => {
+      const result = await parse('which team has the most wins');
+      expect(result.status).not.toBe('plan');
+      expect(result.report.notes.join(' ')).toMatch(/ranked one season at a time/);
+    });
+
+    it('regression: a genuinely unsupported term next to "seasonal" still declines (the word is only read this way alongside a club-season metric)', async () => {
+      const result = await parse('richmond seasonal vibes');
+      expect(result.status).not.toBe('plan');
+    });
+  });
 });
 
 describe('regression: extractHavingClause requires a club/team subject (AFLDB-ISSUE-188)', () => {

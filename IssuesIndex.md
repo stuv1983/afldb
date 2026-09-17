@@ -4,7 +4,9 @@
 >
 > `issues.md` is the authoritative detailed ledger.
 
-**Open issues:** 0
+**Open issues:** 1
+
+**AFLDB-ISSUE-214 — `club_season_rank` "what season had..."/"...seasonal..." phrasing (OPEN, IMPLEMENTED, NOT YET RESOLVED, 2026-09-17).** Severity: low (exploratory-corpus soft-decline, no hard failures, no prod incident). Area: NL parser, `club_season` grain (`src/search/nl/parser.ts`, `src/search/nl/vocab.ts`). State: root cause confirmed and fixed locally (`PARSER_VERSION` 60 → 61); "what/which season had" and adjective "seasonal" were never consumed by any extractor, so they survived as an `unsupported_term` leftover even when the surrounding club_season construction was otherwise fully understood. Local `tests/nl-parser.test.ts` 519/519, `nl-regression-corpus`+`nl-semantic-mapping`+`nl-stress-corpus` 402/402, `typecheck` clean, all on worktree `sonnet/issue-214-club-season-rank-phrasing`, unmerged. Next action: operator host validation on streamanator (frozen V5 + exploratory V2 corpora), then close out and add the `CHANGELOG.md` entry. See `issues.md` and `AFLDB-ISSUE-214.md` for the full record.
 
 **AFLDB-ISSUE-213 resolved 2026-09-17** (Sonnet 5, operator-validated on streamanator) — a pre-existing
 `extractClubs` defect (`src/search/nl/parser.ts`) exposed by, not caused by, ISSUE-212's corrected
