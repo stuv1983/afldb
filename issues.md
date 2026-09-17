@@ -4,45 +4,48 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 1
+**Open issues:** 0
 
 | ID | Severity | Area | State | Next action |
 |---|---|---|---|---|
-| AFLDB-ISSUE-215 | Medium | NL search (`src/search/nl/`) | IMPLEMENTED, NOT YET RESOLVED | Operator host validation on streamanator (frozen V5 + exploratory V2), then v61-vs-v62 plan diff |
 
-AFLDB-ISSUE-215 IMPLEMENTED 2026-09-17 (Sonnet 5), NOT YET RESOLVED -- see its detailed entry below.
-`career_numeric_binding`'s two large exploratory clusters (`/3`, 700 rows, "for CLUB, find players
-with A plus B"; `/2`, 552 rows, "who has the most career S among players with A and B") do NOT share
-one root mechanism. `/3` is a pure wrapper-vocabulary gap ("find" mid-sentence behind a leading "for"
-clause, "plus" as an unrecognised conjunction) -- both numeric conditions were already binding
-correctly. `/2` shares that same category of gap ("among") but ALSO carries an independent,
-genuine predicate-loss defect `/3`'s template cannot have (no ranked metric to collide with):
-`extractCareerConditions` only ever inspected a stat word's EARLIEST occurrence, so "most career
-GOALS among players with ... zero GOALS" silently dropped the "zero goals" condition instead of
-retrying the word's later occurrence. Fixed with a bounded leading-clause request-verb strip
-(`vocab.ts`), a "plus"/"among" consumption gated on the specific supported construction (never added
-to `STOPWORDS`), and a generic occurrence-retry loop in `extractCareerConditions` (`parser.ts`).
-`PARSER_VERSION` 61 -> 62. **Round-1 host validation** (commit `5eca839`, operator, streamanator):
-frozen V5 stayed 12000/12000/0/0; exploratory V2 moved 15925 -> 16477 clean (+552), `/2` fully fixed
-(552 -> 0); `/3` split into 491 `coverage_unavailable` + 209 `unsupported_term: plus`. **491
-`coverage_unavailable` investigated and classified a legitimate, currently-real coverage limitation,
-NOT a parser/guard defect**: `validatePlan`'s club-scoped-career-condition guard
-(`src/search/nl/plan.ts`) fails closed because `conditionSql` (`src/db/queries/nl/player-career.ts`)
-has no per-club SQL path for any condition column except `games`, and doesn't reuse the per-club sum
-shape already proven for `goals` as a ranked metric -- guard NOT weakened, no corpus/scorer file
-touched, see `AFLDB-ISSUE-215.md` §11 for the full SQL-level evidence. **209 `unsupported_term: plus`
-rows investigated and fixed** (same session, same `PARSER_VERSION` 62 -- a correction, not a new
-semantic change): two more "plus" ownership gaps in `extractCareerConditions` -- a 20-character
-clause-boundary lookback too short for a long comparator phrase like "no more than " (widened to 40,
-still takes the nearest boundary, proven safe by a new three-clause regression control), and the
-"no X" negative-condition loop never checking for a neighbouring "plus" at all (now does, gated on its
-own clause having actually bound). RED tests added reproducing all three host examples before the fix.
-Implementation commit pending (uncommitted in worktree
-`sonnet/issue-215-career-numeric-binding-phrasing`). Local after the correction:
-`tests/nl-parser.test.ts` 540/540, broader gates (`nl-regression-corpus` 163/163,
-`nl-semantic-mapping` 174/174, `nl-stress-corpus` 65/65 = 402/402), `typecheck` clean. Round-2 host
-validation NOT YET RUN -- status stays IMPLEMENTED, NOT YET RESOLVED until the operator re-validates
-on streamanator. See `AFLDB-ISSUE-215.md` for the full record.
+AFLDB-ISSUE-215 resolved 2026-09-17 (Sonnet 5, operator-validated on streamanator, two host-validation
+rounds) -- see its detailed entry below. `career_numeric_binding`'s two large exploratory clusters
+(`/3`, 700 rows, "for CLUB, find players with A plus B"; `/2`, 552 rows, "who has the most career S
+among players with A and B") do NOT share one root mechanism. `/3` is a pure wrapper-vocabulary gap
+("find" mid-sentence behind a leading "for" clause, "plus" as an unrecognised conjunction) -- both
+numeric conditions were already binding correctly. `/2` shares that same category of gap ("among") but
+ALSO carries an independent, genuine predicate-loss defect `/3`'s template cannot have (no ranked
+metric to collide with): `extractCareerConditions` only ever inspected a stat word's EARLIEST
+occurrence, so "most career GOALS among players with ... zero GOALS" silently dropped the "zero goals"
+condition instead of retrying the word's later occurrence. Fixed with a bounded leading-clause
+request-verb strip (`vocab.ts`), a "plus"/"among" consumption gated on the specific supported
+construction (never added to `STOPWORDS`), and a generic occurrence-retry loop in
+`extractCareerConditions` (`parser.ts`). `PARSER_VERSION` 61 -> 62. **Round-1 host validation** (commit
+`5eca839`): frozen V5 stayed 12000/12000/0/0; exploratory V2 moved 15925 -> 16477 clean (+552), `/2`
+fully fixed (552 -> 0); `/3` split into 491 `coverage_unavailable` + 209 `unsupported_term: plus`. The
+491 were investigated and classified a **legitimate, currently-real coverage limitation, not a
+parser/guard defect**: `validatePlan`'s club-scoped-career-condition guard (`src/search/nl/plan.ts`)
+fails closed because `conditionSql` (`src/db/queries/nl/player-career.ts`) has no per-club SQL path for
+any condition column except `games`, and doesn't reuse the per-club sum shape already proven for
+`goals` as a ranked metric -- guard NOT weakened, no corpus/scorer file touched, recorded as a future
+SQL-compiler capability candidate, not opened as a new tracked issue. The 209 were a second, residual
+"plus" ownership gap in `extractCareerConditions` -- a 20-character clause-boundary lookback too short
+for a long comparator phrase like "no more than " (widened to 40, still takes the nearest boundary,
+proven safe by a new three-clause regression control), and the "no X" negative-condition loop never
+checking for a neighbouring "plus" at all (now does, gated on its own clause having actually bound) --
+fixed the same session under the same `PARSER_VERSION` 62 (a correction, not a new semantic change).
+**Round-2 host validation** (commit `6a341fd`): frozen V5 stayed 12000/12000/0/0 again; exploratory V2
+aggregate held at 16477 clean / 11053 soft / 0 failed (expected -- the 209 corrected rows moved from
+one `soft` classification, `unsupported_term`, to another, `coverage_unavailable`, so the top-line
+aggregate does not move); `career_numeric_binding/3` final triage: 700 `coverage_unavailable`, 0
+`unsupported_term` -- **all 700 `/3` rows now produce structurally valid plans**. A round-1-to-round-2
+direct plan comparison found exactly 209 changed plans, 0 missing, zero unrelated movement, confirming
+the correction. Implementation commits `5eca839` ("Fix career numeric binding phrasing") and `6a341fd`
+("Complete career numeric plus binding") on `sonnet/issue-215-career-numeric-binding-phrasing`,
+unmerged. Local: `tests/nl-parser.test.ts` 540/540, broader gates (`nl-regression-corpus` 163/163,
+`nl-semantic-mapping` 174/174, `nl-stress-corpus` 65/65 = 402/402), `typecheck` clean. See `issues.md`
+and `AFLDB-ISSUE-215.md` for the full record.
 
 AFLDB-ISSUE-214 resolved 2026-09-17 (Sonnet 5, operator-validated on streamanator) -- see its
 detailed entry below. `club_season_rank` "what season had..."/"...seasonal..." phrasing now elects
@@ -34669,7 +34672,7 @@ Stage 2.
 
 ## AFLDB-ISSUE-215 — `career_numeric_binding` "plus"/"among" phrasing declines with `unsupported_term`
 
-- **Status:** IMPLEMENTED 2026-09-17 (Sonnet 5), NOT YET RESOLVED. Round-1 host validation (commit `5eca839`) is in and reconciled; a follow-up correction (still `PARSER_VERSION` 62) fixed a residual `/3` "plus" ownership gap it found. Awaiting round-2 operator host validation on streamanator.
+- **Status:** RESOLVED 2026-09-17 (Sonnet 5, operator-validated on streamanator, two host-validation rounds). Round-1 host validation (commit `5eca839`) fully fixed `/2` and cleared 491 of 700 `/3` rows to a valid parsed plan; the remaining 209 `/3` rows were a residual "plus" ownership gap, fixed the same session under the same `PARSER_VERSION` 62, and confirmed by round-2 host validation (commit `6a341fd`) -- all 700 `/3` rows now produce structurally valid plans, declining only at the legitimate `coverage_unavailable` execution boundary.
 - **Worktree:** `sonnet/issue-215-career-numeric-binding-phrasing`, base `origin/main` after AFLDB-ISSUE-214 (`6a224dde`).
 - **Baseline:** clean `main` after AFLDB-ISSUE-214, `PARSER_VERSION` 61. Exploratory V2 (parser v61): 29030 input / 27530 scored / 15925 clean / 11605 soft / 0 failed / 1500 audit-required. Two soft-failure clusters targeted: `career_numeric_binding/3` (700 rows) and `career_numeric_binding/2` (552 rows), combined 1252 rows.
 - **Scope proof (`tools/nl/generate-exploratory-corpus-v2.mjs`, `career_numeric_binding` generator, lines ~284-299):** five templates share one pool of two numeric career conditions; `/2` is template 2 ("who has the most career S among players with A and B"), `/3` is template 3 ("for CLUB, find players with A plus B"); templates 0/1/4 (joined by "and"/comma) already score clean. Debug-traced every representative row directly against the current parser before writing any fix: for all three `/3` rows, both numeric conditions were ALREADY binding correctly, and the only leftover tokens were `"find plus"` — pure wrapper vocabulary. For `/2`, two of three rows failed on `"among"` alone with both conditions already correct underneath; the first representative row ("... most career goals among players with at least 200 games and zero goals") additionally lost its "zero goals" condition entirely to a second, independent defect. **Conclusion: `/2` and `/3` do NOT share one single root mechanism** — they share the same CATEGORY of gap (an unrecognised wrapper word around an otherwise-fully-supported construction), but `/2` additionally carries a genuine predicate-loss defect `/3`'s template cannot exhibit at all (no ranked metric to collide with).
@@ -34689,5 +34692,6 @@ Stage 2.
 - **Follow-up investigation, 491 `coverage_unavailable` (`AFLDB-ISSUE-215.md` §11):** the exact guard is `validatePlan`'s `raw.grain === 'player_career' && raw.scope.clubFor` branch (`src/search/nl/plan.ts` ~line 2366), which requires either every condition to be `games` or a club-scopable ranked metric — neither is ever true for `career_numeric_binding/3` (always two DISTINCT condition fields, `metric` always `null`). Traced into `conditionSql`/`metricValueExpr` (`src/db/queries/nl/player-career.ts`): only `games` (via `clubAppearanceCount`) and, for the RANKED METRIC only, `goals` (via a live per-match per-club sum) have any per-club SQL path anywhere in this codebase; the other five possible condition fields (`premierships`/`brownlow_votes`/`clubs_played`/`finals`/`losses`) have none. **Classified a legitimate, currently-real coverage limitation, not a parser/guard defect** — the guard fails closed exactly as AFLDB-ISSUE-110 finding B requires (never silently answer a club-scoped question with a whole-career total). A genuine, narrower asymmetry was found and documented but NOT fixed: `conditionSql` doesn't reuse `metricValueExpr`'s already-proven per-club-sum shape for a `goals` CONDITION (only for the ranked metric), so even the one CONDITIONS-pool pair fully answerable today (`games`+`goals`) currently fails too — flagged as future SQL-compiler work, outside this issue's parser-ownership charter, guard not weakened, no corpus/scorer file touched.
 - **Follow-up correction, 209 `unsupported_term: plus` (`AFLDB-ISSUE-215.md` §12), same `PARSER_VERSION` 62:** two more "plus" ownership gaps in `extractCareerConditions`, both reproduced locally (RED) before fixing. (a) The clause-boundary lookback that finds "plus"/"and"/"," was fixed at 20 characters — too short once a long comparator phrase like "no more than " (13 chars) sits on the far side; widened to a separate 40-character boundary-probe span (still returns the NEAREST boundary, proven safe by a new three-clause "and" + "plus" regression control, so it cannot reach past the nearest boundary into an earlier clause). (b) The `negativeTargets` ("no X") loop matched and stripped only the "no X" phrase itself with no awareness of a neighbouring "plus"; a LEADING "plus" is now checked and consumed there too, gated on that clause having actually bound (a TRAILING "plus" needed no fix — already covered by the pending-loop's own boundary search from the other direction). RED tests added reproducing all three host examples verbatim (Sydney, Port Adelaide already in the shared fixture; `Fremantle` substituted with `Essendon`).
 - **Local verification after the correction:** `npx vitest run tests/nl-parser.test.ts` → 540/540 passed. Broader gates → 402/402 passed. `npm run typecheck` → clean. `PARSER_VERSION` confirmed still 62 (correction, not a new semantic feature).
-- **Host validation round 2:** NOT YET RUN. Recommended: re-run exploratory V2 against this session's corrected commit (still `PARSER_VERSION` 62) — expect the 209 `unsupported_term: plus` rows to move to clean and the 491 `coverage_unavailable` rows to remain unchanged — plus a direct plan comparison against the round-1 (`5eca839`) results confirming ~209 changed plans and zero unrelated movement.
-- **Resolution:** NOT YET RESOLVED. Status stays IMPLEMENTED, NOT YET RESOLVED until operator round-2 host validation completes, per the issue's own runbook instruction. `CHANGELOG.md` entry intentionally not yet added. See `AFLDB-ISSUE-215.md` for the full record.
+- **Round-2 host validation (streamanator, commit `6a341fd`, `PARSER_VERSION 62`):** frozen V5 stayed 12000/12000/0/0, second confirmation. Exploratory V2 aggregate held at 16477 clean / 11053 soft / 0 failed / 1500 audit-required — unchanged from round 1 by construction, since the 209 corrected rows moved between two `soft` classifications (`unsupported_term` → `coverage_unavailable`), not into `clean`. `career_numeric_binding/3` final triage: 700 `coverage_unavailable`, 0 `unsupported_term` — **all 700 `/3` rows now produce structurally valid plans**. A direct round-1-vs-round-2 plan comparison found exactly 209 changed plans, 0 missing, zero unrelated movement elsewhere in the 29,030-row corpus, confirming the correction took effect exactly as intended.
+- **Final accounting:** `career_numeric_binding/2` 552 parser failures → 0 (clean). `career_numeric_binding/3` 700 parser failures → 700 valid parsed plans (491 in round 1, 209 in round 2), all reaching the same legitimate `coverage_unavailable` execution-coverage boundary (§11/§15 of `AFLDB-ISSUE-215.md`) — a pre-existing, unrelated SQL-compiler limitation outside this issue's parser-ownership charter, recorded as a future capability candidate and not opened as a new tracked issue. Net exploratory V2 clean improvement attributable to this issue: +552 clean / -552 soft / 0 hard regression (round 1; unchanged by round 2 as expected). Separately, 209 rows moved from a parser-ownership decline (`unsupported_term`) to an execution-coverage decline (`coverage_unavailable`) — a real, proven fix not visible in the top-line clean/soft aggregate since both are `soft`.
+- **Resolution:** RESOLVED 2026-09-17. Both host-validation rounds complete and reconciled; `PARSER_VERSION` bumped exactly once (61 → 62); frozen V5 unaffected across both rounds; all `/2` and `/3` parser-ownership defects fixed; remaining `/3` declines confirmed legitimate coverage limitations, not parser defects. See `AFLDB-ISSUE-215.md` §19 and `CHANGELOG.md` for the full record.

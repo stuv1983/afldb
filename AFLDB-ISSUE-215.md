@@ -1,11 +1,16 @@
 # AFLDB-ISSUE-215 — `career_numeric_binding` "plus"/"among" phrasing declines with `unsupported_term`
 
-- **Status:** IMPLEMENTED, NOT YET RESOLVED. First host-validation round (commit `5eca839`, parser
-  v62) is in and reconciled (§14); it found and this session fixed one more residual "plus" ownership
-  gap (§15-§16), all still `PARSER_VERSION` 62 (a correction, not a new semantic feature). Awaiting a
-  second operator host-validation round on streamanator before this issue can resolve.
+- **Status:** RESOLVED 2026-09-17 (Sonnet 5, operator-validated on streamanator, two host-validation
+  rounds). Round 1 (commit `5eca839`, §10) fully cleared `career_numeric_binding/2` and cleared 491 of
+  700 `/3` rows to a valid parsed plan; the remaining 209 `/3` rows were a second, residual "plus"
+  ownership gap (§11-§12), fixed the same session under the same `PARSER_VERSION` 62 (a correction, not
+  a new semantic feature) and confirmed by round 2 (commit `6a341fd`, §16). All 700 `/3` rows now
+  produce structurally valid `player_career` plans; the 491 that still decline do so at the legitimate
+  `coverage_unavailable` execution boundary (§11), not a parser defect.
 - **Worktree:** `sonnet/issue-215-career-numeric-binding-phrasing`, base `origin/main` after AFLDB-ISSUE-214 (`6a224dde`).
 - **Baseline:** clean `main` after AFLDB-ISSUE-214, `PARSER_VERSION` 61 → 62.
+- **Implementation commits:** `5eca839` ("Fix career numeric binding phrasing"), `6a341fd` ("Complete
+  career numeric plus binding").
 
 ## 1. Problem, as given
 
@@ -560,45 +565,125 @@ the generator/scorer to make the result green. `validatePlan`'s club-scoped-care
 limitation (§11d), with the SQL-level evidence (§11b, §11c) recorded for a future issue rather than
 acted on here.
 
-## 15. Residual subcases deliberately left out of this closeout
+## 15. Residual, permanent future-work candidate (not a parser defect, not fixed here)
 
-- **491 `coverage_unavailable` rows (§11):** classified a legitimate, currently-real coverage
-  limitation — `conditionSql` (`src/db/queries/nl/player-career.ts`) has no per-club SQL path for any
-  condition column except `games`, and does not reuse the per-club sum shape `metricValueExpr` already
-  proves for `goals` as a ranked metric. Building either (a genuine per-club query for
-  `finals`/`premierships`/`losses`/`brownlow_votes`/`clubs_played`, or reusing the existing `goals`
-  per-club pattern for a condition threshold) is real future SQL-compiler work, explicitly out of this
-  issue's parser-ownership charter, and not attempted here. Recorded as a follow-up candidate only; no
-  new tracked issue opened in this session.
-- A non-corpus phrasing probed during investigation — "most career `<S>` **with** `<conditions>`" (no
-  "players"/"among" at all) — hits a separate, pre-existing, unrelated scope guard ("that condition is
-  a career-wide fact and cannot also be limited to this question's other scope") once both conditions
-  correctly bind. This is NOT a `career_numeric_binding` corpus construction (every real template uses
-  "players with"), is unaffected by this issue's fix either way, and is left untouched.
+**491 `coverage_unavailable` rows (§11), confirmed unchanged and final by round 2 (§16):** classified a
+legitimate, currently-real coverage limitation — `conditionSql`
+(`src/db/queries/nl/player-career.ts`) has no per-club SQL path for any condition column except
+`games`, and does not reuse the per-club sum shape `metricValueExpr` already proves for `goals` as a
+ranked metric. Building either (a genuine per-club query for
+`finals`/`premierships`/`losses`/`brownlow_votes`/`clubs_played`, or reusing the existing `goals`
+per-club pattern for a condition threshold) is real future SQL-compiler work, explicitly out of this
+issue's parser-ownership charter, and **not attempted in this issue**. Recorded here as a follow-up
+candidate only; no new tracked issue opened.
 
-## 16. Resolution
+A non-corpus phrasing probed during investigation — "most career `<S>` **with** `<conditions>`" (no
+"players"/"among" at all) — hits a separate, pre-existing, unrelated scope guard ("that condition is a
+career-wide fact and cannot also be limited to this question's other scope") once both conditions
+correctly bind. This is NOT a `career_numeric_binding` corpus construction (every real template uses
+"players with"), is unaffected by this issue's fix either way, and is left untouched.
 
-**NOT YET RESOLVED.** Round 1 of host validation (§10) is in and fully reconciled: `career_numeric_binding/2`
-is fully fixed (552 → 0); `career_numeric_binding/3` split into 491 legitimate coverage-limitation
-declines (§11, not a defect) and 209 residual parser-ownership declines, which this session
-investigated, reproduced with RED tests, and fixed (§12) — all still under `PARSER_VERSION` 62. Local
-verification after the correction is clean (§13). Status stays "IMPLEMENTED, NOT YET RESOLVED" per
-this session's explicit instruction until the operator reruns host validation (§17) and confirms the
-209-row fix and zero unrelated movement on streamanator. `CHANGELOG.md` resolution entry intentionally
-not yet added.
+## 16. Host validation round 2 (streamanator, commit `6a341fd`, `PARSER_VERSION = 62`) — complete
 
-## 17. Exact host commands to rerun
+### 16a. Frozen V5
 
 ```text
-frozen V5:        /home/arm/nl-stress-corpus-v5.csv   -- must stay 12000/12000/0/0
-exploratory V2:    /home/arm/nl-exploratory-v2.csv     -- v62 baseline (round 1): 16477 clean / 11053 soft / 0 failed
+12000 scored
+12000 clean
+0 soft
+0 failed
 ```
 
-Re-run exploratory V2 against this session's corrected commit (still `PARSER_VERSION` 62) and reconcile:
+No stable-corpus regression, second confirmation.
 
-- `career_numeric_binding/3`'s 209 `unsupported_term: plus` rows -- expected to move to clean;
-- `career_numeric_binding/3`'s 491 `coverage_unavailable` rows -- expected to remain
-  `coverage_unavailable` (§11, not touched by this correction);
-- a direct plan comparison against the round-1 (commit `5eca839`) results to confirm exactly ~209
-  changed plans (the residual `/3` rows moving from `plan: null` to a real plan), zero unrelated
-  movement elsewhere in the 29,030-row corpus, and no new hard failures.
+### 16b. Exploratory V2
+
+```text
+16477 clean
+11053 soft
+0 failed
+1500 audit-required
+```
+
+Aggregate unchanged from round 1 (§10b) — expected, not a null result: the 209 corrected rows moved
+`unsupported_term` (a soft-decline classification) → a valid parsed plan → `coverage_unavailable` (also
+a soft-decline classification). Both are `soft`, so the aggregate clean/soft counts do not move; the
+row-level plan diff (§17) is what proves the correction actually took effect.
+
+### 16c. Final target-family triage
+
+```text
+career_numeric_binding/2: 0 remaining
+career_numeric_binding/3: 700 coverage_unavailable, 0 unsupported_term
+```
+
+All 700 `/3` rows now reach a structurally valid `player_career` plan (grain, scope.clubFor, and both
+`careerConditions` all correct — confirmed by the host's own plan dumps for representative rows,
+including the four new examples in the round-2 request: "For Sydney, find players with more than 50
+goals plus no premierships", "For Port Adelaide, find players with exactly 3 premierships plus no more
+than 250 games", "For Fremantle, find players with no more than 250 games plus no premierships", "For
+Dogs, find players with zero goals plus no premierships", "For Brisbane Lions, find players with more
+than 50 goals plus at least three clubs"); each then legitimately declines at the `coverage_unavailable`
+execution boundary documented in §11.
+
+## 17. Round-1 → round-2 direct plan reconciliation
+
+```text
+/home/arm/nl-exploratory-v2-v62-validation/results.jsonl (round 1, commit 5eca839)
+vs
+/home/arm/nl-exploratory-v2-v62-r2/results.jsonl (round 2, commit 6a341fd)
+
+round 1 rows: 29030
+round 2 rows: 29030
+missing: 0
+changed plans: 209
+```
+
+The 209 changed rows are exactly the former `/3` `unsupported_term: plus` cases — moving from
+`plan: null` (declined in parsing) to a real, structurally correct plan (which then meets the
+`coverage_unavailable` guard, §11) — with zero unrelated movement anywhere else in the 29,030-row
+corpus. Structured diff saved as `/home/arm/issue-215-v62-r1-r2-plan-diff.json`.
+
+## 18. Final ISSUE-215 accounting
+
+```text
+career_numeric_binding/2: 552 parser failures -> 0 (clean)
+career_numeric_binding/3: 700 parser failures -> 700 valid parsed plans
+  491 became valid plans in round 1 (commit 5eca839)
+  209 became valid plans in round 2 (commit 6a341fd)
+```
+
+Of the 700 `/3` plans, all reach the same legitimate `coverage_unavailable` execution-coverage boundary
+(§11, §15) — a pre-existing, unrelated SQL-compiler limitation this issue's charter is parser ownership,
+not execution coverage, and does not extend to.
+
+Overall exploratory V2 clean improvement attributable to this issue: **+552 clean, -552 soft, 0 hard
+regression** (round 1, §10b; unchanged by round 2, §16b, as expected — see §16b). Separately, and not
+reflected in the clean/soft aggregate because both are `soft` classifications: **209 rows corrected from
+`unsupported_term` (a parser-ownership decline) to a valid-plan `coverage_unavailable` (an
+execution-coverage decline)** — a real fix, proven by the row-level plan diff in §17, not visible in the
+top-line aggregate.
+
+## 19. Resolution
+
+**RESOLVED 2026-09-17.** All required outcomes met:
+
+- `career_numeric_binding/2` fully fixed (552 → 0, §10c, confirmed unchanged by §16c);
+- `career_numeric_binding/3` wrapper-vocabulary and "plus" ownership parsing fully fixed — all 700 rows
+  now produce structurally valid plans (491 in round 1, §10c; 209 in round 2 via the follow-up
+  correction, §12, §17);
+- the repeated-stat-occurrence predicate-loss defect is fixed (§3b, §5d, §6);
+- the remaining `/3` declines (700 of 700, at the `coverage_unavailable` boundary) are confirmed
+  legitimate execution-coverage limitations, not parser defects (§11, §15);
+- `PARSER_VERSION` bumped exactly once, 61 → 62 (§7); the round-2 follow-up is a correction under the
+  same version, not a second bump;
+- final local verification: `tests/nl-parser.test.ts` 540/540 (§13); broader regression 402/402 (§13);
+  `typecheck` clean (§13);
+- frozen V5 stayed 12000 scored / 12000 clean / 0 soft / 0 failed across both host-validation rounds
+  (§10a, §16a) — no stable-corpus regression;
+- exploratory V2 hard failures remained 0 throughout (§10b, §16b);
+- round-1 direct plan comparison reconciled exactly 1043 changed plans (552 + 491), 0 missing (§10d);
+- round-2 direct plan comparison reconciled exactly 209 additional changed plans, 0 missing, zero
+  unrelated movement (§17).
+
+See `issues.md` and `CHANGELOG.md` for the retained ledger/user-facing summary.
