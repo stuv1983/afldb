@@ -700,7 +700,14 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
 // side -- a LEADING "plus" ("... goals PLUS no premierships") is now
 // checked and consumed there too, only once the negative clause itself
 // actually bound.
-export const PARSER_VERSION = 62;
+// v63 -- AFLDB-ISSUE-216: player_season_leaderboard/0 and /3 exploratory
+// phrasing. "posted the highest season tally of <metric>" and "the best
+// seasonal <metric> total" both name a player-season leaderboard by their
+// own answer shape; neither wrapper word was ever consumed, and "total" in
+// the second phrasing separately misread as the generic AGGREGATE_TOTAL_WORDS
+// scoped-running-total cue, which misrouted grain election to player_game/sum
+// instead of player_season. See parser.ts's playerSeasonLeaderboardCue.
+export const PARSER_VERSION = 63;
 
 // ------------------------------------------------------------------ grain
 

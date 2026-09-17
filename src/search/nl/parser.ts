@@ -63,6 +63,7 @@ import {
   AGAINST_PREPOSITION, FOR_PREPOSITION, AGG_WORDS, AGGREGATE_TOTAL_WORDS, AWARD_WORDS,
   AFTER_RE, BARE_YEAR_RE, BEFORE_RE, BETWEEN_RE, CLUB_SEASON_CONDITION_WORDS, CLUB_SEASON_METRIC_WORDS,
   CLUB_SEASON_PREMIERSHIP_SUBJECT_GATED, CLUB_SEASON_RANK_SEASON_CUE_RE, CLUB_SEASON_SEASONAL_ADJECTIVE_RE,
+  PLAYER_SEASON_LEADERBOARD_TALLY_RE, PLAYER_SEASON_LEADERBOARD_SEASONAL_RE, PLAYER_SEASON_LEADERBOARD_POSTED_RE,
   AFTER_SIREN_CUE_RE, AFTER_SIREN_EFFECT_WORDS, AFTER_SIREN_KICK_NOUN_RE, AFTER_SIREN_OCCURRENCE_WORDS,
   AFTER_SIREN_PLAYER_SUBJECT_RE, AFTER_SIREN_RESULT_WORDS, AFTER_SIREN_SCORED_WORDS,
   COACH_CUE_RE, COACH_METRIC_WORDS, COACH_NO_QUALIFIER_RE, COACH_WIN_PCT_RE, COACHED_BY_RE, PREMIERSHIP_COACH_RE,
@@ -2713,6 +2714,41 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     }
   }
 
+  // AFLDB-ISSUE-216. "posted the highest season tally of <metric>" and "the
+  // best seasonal <metric> total" both name a player-season leaderboard by
+  // their own answer shape -- a single season's tally -- rather than any
+  // globally consumed filler. Gated on an actual player_match_stats
+  // METRIC_WORDS match already being present in `text` (probed here, not
+  // yet consumed -- extractPlayerMetric does not run until step 11) so a
+  // genuinely unrelated "posted"/"season"/"seasonal" is left untouched, the
+  // same discipline CLUB_SEASON_SEASONAL_ADJECTIVE_RE uses for the disjoint
+  // club-season vocabulary. "total" itself needs no separate handling here:
+  // it was already unconditionally stripped by the loop above, and the only
+  // remaining defect is `aggregateTotal` (set a few lines up, from the same
+  // "total") misreading this construction as the generic scoped-running-
+  // total cue -- see the `playerSeasonLeaderboardCue` override at grain
+  // election below.
+  const playerSeasonLeaderboardMetricWordPresent = METRIC_WORDS.some(([re]) => re.test(text));
+  const playerSeasonTallyMatch = playerSeasonLeaderboardMetricWordPresent
+    ? PLAYER_SEASON_LEADERBOARD_TALLY_RE.exec(text) : null;
+  const playerSeasonSeasonalMatch = playerSeasonLeaderboardMetricWordPresent
+    ? PLAYER_SEASON_LEADERBOARD_SEASONAL_RE.exec(text) : null;
+  const playerSeasonLeaderboardCue = !!playerSeasonTallyMatch || !!playerSeasonSeasonalMatch;
+  if (playerSeasonTallyMatch) {
+    consumedTokens.push(playerSeasonTallyMatch[0]);
+    text = stripMatch(text, playerSeasonTallyMatch[0]);
+  }
+  if (playerSeasonSeasonalMatch) {
+    consumedTokens.push(playerSeasonSeasonalMatch[0]);
+    text = stripMatch(text, playerSeasonSeasonalMatch[0]);
+  }
+  const playerSeasonPostedMatch = playerSeasonLeaderboardCue
+    ? PLAYER_SEASON_LEADERBOARD_POSTED_RE.exec(text) : null;
+  if (playerSeasonPostedMatch) {
+    consumedTokens.push(playerSeasonPostedMatch[0]);
+    text = stripMatch(text, playerSeasonPostedMatch[0]);
+  }
+
   const debutGameMatch = /\bon (?:their )?debut\b|\bdebut game\b/.exec(text);
   const debutGame = !!debutGameMatch;
   if (debutGameMatch) {
@@ -3316,7 +3352,16 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
       // So: any named season scope is a season leaderboard. A reader who
       // wants the total across a span says so ("total tackles since
       // 1900"), and aggregateTotal already routes that to the sum below.
-      !inOneGame && !aggregateTotal && !overCareer
+      //
+      // AFLDB-ISSUE-216: `playerSeasonLeaderboardCue` overrides aggregateTotal
+      // specifically. "the best seasonal goal assists TOTAL" sets
+      // aggregateTotal too (it is the same bare "total" AGGREGATE_TOTAL_WORDS
+      // reads everywhere else), but here "total" is half of "seasonal ...
+      // total" naming a single season's tally, not a request to sum across
+      // every season in scope -- so the cue, positively identified above from
+      // an actual METRIC_WORDS match plus "season tally"/"seasonal", wins over
+      // the generic reading.
+      !inOneGame && (!aggregateTotal || playerSeasonLeaderboardCue) && !overCareer
       && !venue && !clubAgainst && !matchup && !matchTypeResult.matchType
       && (seasons.seasonMin !== undefined || seasons.seasonMax !== undefined)
     ) {

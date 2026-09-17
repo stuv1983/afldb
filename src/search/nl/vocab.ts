@@ -356,6 +356,41 @@ export const CLUB_SEASON_RANK_SEASON_CUE_RE = /\b(?:what|which)\s+season\s+had\b
 export const CLUB_SEASON_SEASONAL_ADJECTIVE_RE = /\bseasonal\b/;
 
 /**
+ * AFLDB-ISSUE-216: "posted the highest season tally of <metric>" is a
+ * player-season leaderboard question phrased around its own answer shape --
+ * a single season's tally of a player stat -- rather than the
+ * already-supported "most <metric> in <year>" wording. Matched as one
+ * phrase, the same structural choice CLUB_SEASON_RANK_SEASON_CUE_RE (above)
+ * made for the sibling club_season construction, so "season" never survives
+ * as an unclaimed leftover token on its own.
+ */
+export const PLAYER_SEASON_LEADERBOARD_TALLY_RE = /\bseason tally\b/;
+
+/**
+ * "the best seasonal <metric> total" -- the adjective form of "season
+ * tally", naming the same player-season leaderboard construction. Bare
+ * "seasonal" names nothing on its own, so parser.ts only reads it this way
+ * once an actual player_match_stats METRIC_WORDS match is already present
+ * in the question -- the same gating discipline
+ * CLUB_SEASON_SEASONAL_ADJECTIVE_RE uses for the disjoint club-season
+ * vocabulary (wins/losses/draws/percentage). The two cues can never both
+ * match the same "seasonal": a question naming a player stat word never
+ * also matches CLUB_SEASON_METRIC_WORDS, and vice versa.
+ */
+export const PLAYER_SEASON_LEADERBOARD_SEASONAL_RE = /\bseasonal\b/;
+
+/**
+ * "who POSTED the highest season tally..." -- a request-wrapper verb for
+ * the player-season leaderboard construction, structurally the same role
+ * LEADING_REQUEST_PREFIX_RE's "find"/"show"/"list" play elsewhere. Read
+ * only once PLAYER_SEASON_LEADERBOARD_TALLY_RE or
+ * PLAYER_SEASON_LEADERBOARD_SEASONAL_RE has already matched, so a bare
+ * "posted" in unrelated text (e.g. "posted a big score") is never touched
+ * and "posted" does not become a universal request wrapper.
+ */
+export const PLAYER_SEASON_LEADERBOARD_POSTED_RE = /\bposted\b/;
+
+/**
  * Any coaching cue, and the gate for COACH_METRIC_WORDS below. Nothing in
  * the coaching vocabulary is tried until this matches, for exactly the
  * reason CLUB_SEASON_METRIC_WORDS is gated: "games", "wins", "losses" and
