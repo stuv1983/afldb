@@ -1,8 +1,8 @@
 # AFLDB-ISSUE-214 — `club_season_rank` "what season had..."/"...seasonal..." phrasing declines with `unsupported_term: season`/`seasonal`
 
-- **Status:** IMPLEMENTED, NOT YET RESOLVED, 2026-09-17 (Sonnet 5).
-- **Worktree:** `sonnet/issue-214-club-season-rank-phrasing`, base `a0da645f`, uncommitted.
-- **Baseline:** clean `main` after AFLDB-ISSUE-213, `PARSER_VERSION` 60.
+- **Status:** RESOLVED 2026-09-17 (Sonnet 5, operator-validated on streamanator).
+- **Worktree:** `sonnet/issue-214-club-season-rank-phrasing`, base `a0da645f`. Implementation commit `731edd8` ("Support club season rank phrasing").
+- **Baseline:** clean `main` after AFLDB-ISSUE-213, `PARSER_VERSION` 60 → 61.
 
 ## 1. Problem, as given
 
@@ -203,30 +203,133 @@ $ npm run typecheck
 -> Generating route types... / Types generated successfully; tsc --noEmit clean
 ```
 
-`PARSER_VERSION` confirmed 61.
-
-## 10. Host validation (streamanator) — NOT YET RUN
-
-Recommended exact commands for the operator, against the same frozen corpora used by prior issues:
+Broken out by suite for the closeout record:
 
 ```text
-/home/arm/nl-stress-corpus-v5.csv
-/home/arm/nl-exploratory-v2.csv
+tests/nl-parser.test.ts:            519/519 passed
+tests/nl-regression-corpus.test.ts: 163/163 passed
+tests/nl-semantic-mapping.test.ts:  174/174 passed
+tests/nl-stress-corpus.test.ts:      65/65 passed
+------------------------------------------------
+                                    402/402 passed
 ```
 
-Expected:
+`typecheck`: clean. `PARSER_VERSION` confirmed 61.
 
-- Frozen V5 stable corpus: remains **12000 scored / 12000 clean / 0 soft / 0 failed** — no
-  stable-corpus regression expected, since no V5-relevant vocabulary was touched.
-- Exploratory V2 (same frozen 29,030-row corpus, re-scored under `PARSER_VERSION` 61 without
-  regenerating): some or all of the 1256 targeted `club_season_rank/1` + `club_season_rank/3` rows
-  move from soft `UNEXPECTED_DECLINE` to clean/supported. **Exact count not promised** — a handful
-  of rows in those clusters may combine this phrasing with other still-unsupported wording and stay
-  soft for a different reason; that would not indicate a defect in this fix.
-- No new hard failures; no unrelated plan movement outside the targeted clusters.
-- Recommend the same direct pre/post `PARSER_VERSION` plan-level reconciliation AFLDB-ISSUE-213 used
-  (a full-corpus `results.jsonl` diff between v60 and v61) to confirm the fix is isolated to the
-  intended rows before closing out.
+## 10. Host validation (streamanator) — complete
+
+Validated commit/version: `731edd8`, `PARSER_VERSION = 61`.
+
+### 10a. Frozen V5
+
+```text
+12000 scored
+12000 clean
+0 soft
+0 failed
+```
+
+No stable-corpus regression.
+
+### 10b. Exploratory V2
+
+Parser v60 baseline:
+
+```text
+27530 scored
+14879 clean
+12651 soft
+0 failed
+1500 audit-required
+```
+
+Parser v61:
+
+```text
+27530 scored
+15925 clean
+11605 soft
+0 failed
+1500 audit-required
+```
+
+Net movement: clean +1046, soft -1046, failed 0, audit-required 0.
+
+### 10c. Target-cluster reconciliation
+
+Initial ISSUE-214 targets (parser v60):
+
+```text
+club_season_rank/3 — 642 unexpected declines
+club_season_rank/1 — 614 unexpected declines
+```
+
+After parser v61:
+
+```text
+club_season_rank/3 — 0 remaining from the targeted season-ranking phrasing defect
+club_season_rank/1 — 210 remaining
+```
+
+`642 + (614 - 210) = 1046`, exactly matching the aggregate soft→clean movement in §10b. The entire
+`/3` cluster (template 3, "what season had the highest/lowest `<metric>`") is cleared. 404 of 614
+`/1` rows (template 1, "`<club>`'s highest/lowest seasonal `<metric>`") are cleared; 210 remain.
+
+The remaining 210 `/1` rows are **not** still failing on "seasonal" — the season-ranking phrasing
+this issue targeted is confirmed working for them. Representative remaining rows:
+
+```text
+20600206 — Suns' lowest seasonal losses before 2019
+  -> unsupported_term: suns'
+
+20600323 — Pies' highest seasonal wins in 2017
+  -> unsupported_term: pies'
+
+20600424 — Western Bulldogs' highest seasonal percentage since 2000
+  -> unsupported_term: bulldogs'
+```
+
+This is a **separate, pre-existing defect**: the possessive apostrophe on a club alias/nickname
+(`Suns'`, `Pies'`, `Bulldogs'`) is not being stripped/matched as club ownership the way the full
+club name's possessive form (`Sydney's`, `North Melbourne's`) already is in this issue's own test
+fixtures. It is orthogonal to the season-ranking cue this issue fixed: every one of these rows
+already carries the correct "seasonal `<metric>`" construction and would resolve if the club alias
+itself were recognised. **Not folded into ISSUE-214** — documented here as a follow-up candidate
+only; no new tracked issue opened in this closeout (that decision, and any severity/reproduction
+work, is left to a future session that can inspect `findClub`/alias matching directly).
+
+### 10d. Direct plan comparison
+
+A direct v60 → v61 comparison of:
+
+```text
+/home/arm/nl-exploratory-v2-v60-validation/results.jsonl
+/home/arm/nl-exploratory-v2-v61-validation/results.jsonl
+```
+
+found:
+
+```text
+v60 rows: 29030
+v61 rows: 29030
+missing from v60: 0
+changed plans: 1046
+```
+
+Structured diff saved as `/home/arm/issue-214-v60-v61-plan-diff.json`. The first changed rows are
+all representative target-family season-rank constructions, including:
+
+```text
+For Suns, what season had the lowest wins during the 2010s
+For Swans, what season had the highest losses
+North Melbourne's highest seasonal losses
+Sydney's highest seasonal draws in 2017
+For West Coast, what season had the highest losses in 2017
+Greater Western Sydney's highest seasonal losses in 2023
+```
+
+No rows were missing between runs — the fix is isolated to exactly the 1046 rows in §10b/§10c, with
+zero unrelated movement.
 
 ## 11. Guardrails honoured
 
@@ -234,9 +337,26 @@ No club name, corpus ID, or exact sample string special-cased in `parser.ts`/`vo
 club substitutions are fixture-availability choices, not production logic). "season"/"seasonal" not
 deleted or made globally ignorable outside the two new structurally-gated cues. No unrelated NL
 family touched. Exploratory V2 generator/scorer untouched — corpus expectation verified correct, not
-changed. `CHANGELOG.md` entry deliberately withheld pending host validation.
+changed. The separate possessive-club-alias defect found during host validation (§10c) was not
+folded into this issue's fix and no source file was touched for it.
 
 ## 12. Resolution
 
-Not yet resolved. Pending operator host validation on streamanator, then close-out and the
-`CHANGELOG.md` entry.
+**RESOLVED 2026-09-17.** All required outcomes met:
+
+- both target phrasing clusters confirmed to share one parser ownership/cue mechanism (§2);
+- `PARSER_VERSION` bumped exactly once, 60 → 61;
+- local parser tests 519/519; broader regression 402/402; typecheck clean;
+- frozen V5 remains 12000/12000/0/0 — no stable-corpus regression;
+- exploratory V2 gains exactly 1046 clean rows, soft failures drop exactly 1046, hard failures
+  remain 0, audit-required unchanged at 1500;
+- the entire `club_season_rank/3` cluster (642 rows) is cleared;
+- 404 of 614 `club_season_rank/1` rows are cleared;
+- the remaining 210 `/1` rows expose a separate, pre-existing possessive-club-alias defect
+  (`Suns'`/`Pies'`/`Bulldogs'` etc.), not the season-ranking defect this issue targeted — recorded
+  as a follow-up candidate only (§10c), not folded into this issue and not opened as a new tracked
+  issue in this closeout;
+- a direct 29,030-row plan-level comparison (v60 vs. v61) confirms exactly 1046 changed plans and 0
+  missing rows, with the changed rows matching the target family.
+
+See `issues.md` for the ledger entry and `CHANGELOG.md` for the retained user-facing summary.
