@@ -4,7 +4,43 @@
 >
 > `issues.md` is the authoritative detailed ledger.
 
-**Open issues:** 0
+**Open issues:** 1
+
+### AFLDB-ISSUE-220 — Web service credential boundary contradicts the application's `afldb_import` requirement; owner-role code-test DSN and a complete `.env` copy reach the internet-facing process
+- **Severity:** High. **Area:** deployment / runtime security.
+- **State:** Open (2026-09-17). Implemented in worktree `afldb-issue-220` (Sonnet 5, uncommitted),
+  pending operator DEV/PROD verification. §4b established: `writeStandaloneDirectory` in the
+  installed Next 16.3.1's own `next/dist/build/index.js` copies `.env`/`.env.production` into
+  `.next/standalone/` unconditionally, in a hardcoded loop with no `next.config.ts` knob to
+  suppress it — `next.config.ts` correctly left untouched. `deploy/afldb.service` now unsets
+  `AFLDB_OWNER_DATABASE_URL AFLDB_TEST_DATABASE_URL AFLDB_TEST_IMPORT_DATABASE_URL
+  AFLDB_TEST_AUTH_DATABASE_URL AFLDB_CODE_TEST_DATABASE_URL AFLDB_CODE_TEST_IMPORT_DATABASE_URL
+  AFLDB_BACKUP_DATABASE_URL AFLDB_PROD_DATABASE_URL` and keeps exactly `DATABASE_URL`,
+  `AFLDB_AUTH_DATABASE_URL`, `AFLDB_IMPORT_DATABASE_URL`; `tools/build/prepare-standalone.mjs`
+  now deletes any `.env*` under the standalone tree and fails the build if one survives; new
+  `tests/deploy-web-unit.test.ts` derives the full DSN name set from `.env.example` (found
+  `docs/deployment.md`'s §9 table was itself missing 5 real DSN names — completed it rather than
+  deriving from the incomplete table, see `issues.md` Implementation section). PROD still not
+  inspected.
+- **Key files:** `deploy/afldb.service`, `docs/deployment.md` §9, `tools/build/prepare-standalone.mjs`,
+  `tools/build/env-in-standalone.mjs` (new), `tests/deploy-web-unit.test.ts` (new).
+- **Local validation (2026-09-17):** `vitest run tests/deploy-web-unit.test.ts` **15/15 passed**;
+  `tsc --noEmit` **clean**. DEV/PROD not yet run.
+- **Next action:** operator runs the Git/DEV rollout (commit → `merge:ready` → push/merge → `sync-dev.ps1`
+  build → manual unit reinstall + restart → names-only checks + Admin Centre write/revert), then PROD
+  read-only checks. Resolve only once DEV steps 1–5 and PROD steps 2–3/6 (runbook §8/§9) pass.
+
+**Fable code review outside NL search — 2026-09-17 (Fable 5.1, review and planning only).**
+Reviewed with native inspection: authentication/session/middleware/capabilities and every auth
+Server Action (no defect); the admin `*-actions.ts` files the 2026-09-15 mutation audit's glob did
+not match, content publish/upload, settle trigger, and the public writers (no defect); all seven
+route handlers and every `sql.unsafe` sink traced to a module allowlist (no defect); the tracked
+deploy units, cluster entry point, both Caddyfiles, settle chain, build wrapper, DB clients
+(**AFLDB-ISSUE-220** opened). Not reviewed: `deploy/sync-dev.ps1` body, `tools/maintenance/*`,
+migrations, the admin action modules already covered by the 2026-09-15 audit,
+`tools/email_intake/`, page components beyond their query allowlists, `src/db/queries/admin-users.ts`.
+Residual, no new ID: `/api/admin/email-intake` still admits `contributor` senders — deferred under
+resolved AFLDB-ISSUE-186 Phase B. No project-wide PASS is claimed.
 
 **Fable NL code review — FINAL: PASS (2026-09-17, Fable 5.1, operator-validated on streamanator).**
 Lineage: Stage 1 found eight defects (F1–F8) → Stage 2 confirmed them as AFLDB-ISSUE-187..192,

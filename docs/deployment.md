@@ -1073,10 +1073,15 @@ All configuration is in `/home/arm/projects/afldb/.env` (mode 600, owner `arm`),
 | Variable | Purpose |
 |---|---|
 | `DATABASE_URL` | read-only app role (`afldb_app`) |
-| `AFLDB_IMPORT_DATABASE_URL` | ETL writes (`afldb_import`) |
+| `AFLDB_IMPORT_DATABASE_URL` | ETL writes and every Admin Centre statistical mutation (`afldb_import`, migration 066) |
+| `AFLDB_AUTH_DATABASE_URL` | operational auth/submission tables (`afldb_auth`, migration 023) |
 | `AFLDB_OWNER_DATABASE_URL` | migrations, target `dev` (`afldb_owner`) |
 | `AFLDB_PROD_DATABASE_URL` | migrations, target `prod` — unset here |
-| `AFLDB_TEST_DATABASE_URL` | integration tests (must name a `_test` database) |
+| `AFLDB_TEST_DATABASE_URL` | integration tests (must name a `_test` database) (`afldb_owner`) |
+| `AFLDB_TEST_IMPORT_DATABASE_URL` | **optional**, restricted importer-role integration tests (`afldb_import`, same `_test` database) |
+| `AFLDB_TEST_AUTH_DATABASE_URL` | **optional**, restricted auth-role integration tests (`afldb_auth`, same `_test` database) |
+| `AFLDB_CODE_TEST_DATABASE_URL` | **optional** (AFLDB-ISSUE-146), disposable full-rebuild rehearsal, `code_test_db` only (`afldb_owner`) |
+| `AFLDB_CODE_TEST_IMPORT_DATABASE_URL` | **optional** (AFLDB-ISSUE-146), same rehearsal, `code_test_db` only (`afldb_import`) |
 | `AFLDB_BACKUP_DATABASE_URL` | `pg_dump` (`afldb_backup`, read-only) |
 | `AFLDB_ENV` | `development` \| `production` — **transport security**: Secure cookies, HSTS, strict CSP |
 | `AFLDB_INDEXING` | `on` enables indexing; anything else = `noindex`. Separate from `AFLDB_ENV` |
@@ -1091,10 +1096,23 @@ All configuration is in `/home/arm/projects/afldb/.env` (mode 600, owner `arm`),
 | `AFLDB_RSCRIPT` | **optional**, default `/usr/bin/Rscript` — the interpreter the settle unit runs (§7b) |
 
 **The web service does not receive them all.** `.env` is the whole project's
-configuration, so the unit loads it and then drops the import, owner, test and
-backup DSNs with `UnsetEnvironment=`. The service process holds only
-`DATABASE_URL`, which cannot write. Migrations, imports and backups read
-`.env` directly and are unaffected.
+configuration, so the unit loads it and then drops every DSN except three
+with `UnsetEnvironment=`: `DATABASE_URL` (read-only), `AFLDB_AUTH_DATABASE_URL`
+(the operational auth/submission tables) and `AFLDB_IMPORT_DATABASE_URL`
+(every Admin Centre statistical mutation has required this role since
+migration 066 / AFLDB-ISSUE-027, and the process cannot serve `/admin`
+without it). The schema owner, every test/code-test DSN, the backup role and
+the prod DSN are unset. `tests/deploy-web-unit.test.ts` derives the full DSN
+name set from `.env.example` and fails if a future one is missing from this
+table, the unit's deny list or the three kept names (AFLDB-ISSUE-220).
+Migrations, imports, tests and backups read `.env` directly and are
+unaffected.
+
+The build output itself must also carry no credential: `next build` copies
+`.env`/`.env.production` into `.next/standalone/` unconditionally for every
+`output: 'standalone'` build, with no `next.config.ts` knob to suppress it
+(AFLDB-ISSUE-220 §4b). `npm run build`'s `prepare-standalone.mjs` step
+deletes any `.env*` file it finds there and fails the build if one survives.
 
 `npm run db:migrate` targets `dev`. `AFLDB_MIGRATE_TARGET` accepts `dev`,
 `test` or `prod` and **refuses to run on anything else** rather than falling

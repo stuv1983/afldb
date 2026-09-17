@@ -12,6 +12,7 @@
  */
 import { cp, access, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
+import { removeEnvFiles } from './env-in-standalone.mjs';
 
 const root = process.cwd();
 const standalone = join(root, '.next', 'standalone');
@@ -29,6 +30,20 @@ if (!(await exists(standalone))) {
   console.error('prepare-standalone: .next/standalone not found — run `next build` first.');
   process.exit(1);
 }
+
+// AFLDB-ISSUE-220: next build copies `.env`/`.env.production` into the
+// standalone tree unconditionally (see tools/build/env-in-standalone.mjs).
+// The web unit's UnsetEnvironment= only strips the exec-time environment;
+// this bundle is what put every credential straight back at start-up. Strip
+// it here and refuse to ship if anything survives.
+const remainingEnvFiles = await removeEnvFiles(standalone);
+if (remainingEnvFiles.length > 0) {
+  console.error(
+    `prepare-standalone: refusing to ship — ${remainingEnvFiles.join(', ')} still present under .next/standalone`,
+  );
+  process.exit(1);
+}
+console.log('prepare-standalone: confirmed no .env* under .next/standalone');
 
 // Check build-time AFLDB_ENV security flag (see changeLog.md).
 const isProductionBuild = process.env.AFLDB_ENV === 'production';
