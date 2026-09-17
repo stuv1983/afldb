@@ -158,15 +158,36 @@ type ClubExtraction = {
   consumed: string[];
 };
 
-/** Where a matched phrase sits in the original question, word-boundary anchored so "melbourne" does not report the position of "north melbourne". */
-function phrasePosition(text: string, phrase: string): number {
-  const at = new RegExp(`\\b${phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).exec(text);
-  return at ? at.index : Number.MAX_SAFE_INTEGER;
-}
-
-function phraseEnd(text: string, phrase: string): number {
-  const at = new RegExp(`\\b${phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).exec(text);
-  return at ? at.index + at[0].length : Number.MAX_SAFE_INTEGER;
+/**
+ * The occurrence of `phrase` in the original question that does not fall
+ * inside a span another club match has already claimed.
+ *
+ * AFLDB-ISSUE-213: a word-boundary search for a SHORTER club's name can
+ * still match inside a LONGER club's own name that contains it as a whole
+ * word ("melbourne" inside "north melbourne", boundary or not -- the space
+ * before it is itself a word boundary). A plain first-match search for the
+ * second club therefore rebound onto the first club's own span instead of
+ * the real, later mention: "North Melbourne versus Melbourne" measured
+ * "Melbourne" at the position of the "Melbourne" embedded in "North
+ * Melbourne", made the computed gap between the two mentions empty, and
+ * silently dropped the "versus" separator -- so the unordered matchup never
+ * formed and the parser fell back to directional roles instead. Excluding
+ * spans already claimed by an earlier match in this same extraction call
+ * fixes it generically, for any pair of club names in this relationship,
+ * without naming either one.
+ */
+function firstUnclaimedOccurrence(
+  text: string,
+  phrase: string,
+  claimed: readonly { at: number; end: number }[],
+): { start: number; end: number } | undefined {
+  const re = new RegExp(`\\b${phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'g');
+  for (let m = re.exec(text); m !== null; m = re.exec(text)) {
+    const start = m.index;
+    const end = start + m[0].length;
+    if (!claimed.some((span) => start < span.end && end > span.at)) return { start, end };
+  }
+  return undefined;
 }
 
 /**
@@ -231,13 +252,18 @@ function extractClubs(text: string, clubs: readonly NlClubDirectoryEntry[]): Clu
     // had earlier matches spliced out, so both its offsets AND the words
     // that end up adjacent to this mention no longer describe the
     // question the reader typed (see nearestGoverningPreposition above).
-    const at = phrasePosition(text, match.matchedText);
-    const before = at !== Number.MAX_SAFE_INTEGER ? text.slice(Math.max(0, at - 20), at) : '';
+    // Excludes spans already claimed by an earlier club this same call, so
+    // a shorter name embedded inside an already-matched longer one cannot
+    // steal its span (AFLDB-ISSUE-213; see firstUnclaimedOccurrence above).
+    const occurrence = firstUnclaimedOccurrence(text, match.matchedText, found);
+    const at = occurrence?.start ?? Number.MAX_SAFE_INTEGER;
+    const end = occurrence?.end ?? Number.MAX_SAFE_INTEGER;
+    const before = occurrence ? text.slice(Math.max(0, at - 20), at) : '';
     found.push({
       match,
       governedAgainst: nearestGoverningPreposition(before) === 'against',
       at,
-      end: phraseEnd(text, match.matchedText),
+      end,
     });
     working = stripMatch(working, match.matchedText);
   }
