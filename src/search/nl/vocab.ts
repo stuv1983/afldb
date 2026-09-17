@@ -313,6 +313,29 @@ export const CLUB_SEASON_METRIC_WORDS: [RegExp, 'wins' | 'losses' | 'draws' | 'p
 ];
 
 /**
+ * AFLDB-ISSUE-214: "what season had the highest losses" is a club_season
+ * ranking question phrased around its own answer column -- the reader is
+ * naming the season as what they want back, exactly the row club_season
+ * already ranks and returns -- instead of the already-supported "in a
+ * season" filler. This is an unambiguous club-season cue on its own, the
+ * same structural role CLUB_SUBJECT_LEADING plays for "teams"/"clubs"
+ * questions, and is matched as one phrase so parser.ts can consume it
+ * whole: "season" must never survive as an unclaimed leftover token when
+ * this construction is what put it there.
+ */
+export const CLUB_SEASON_RANK_SEASON_CUE_RE = /\b(?:what|which)\s+season\s+had\b/;
+
+/**
+ * "highest seasonal losses" -- the adjective form of "in a season", stated
+ * directly against a club-season ranking metric. Bare "seasonal" names
+ * nothing on its own (there is no generic seasonal grain), so parser.ts
+ * only reads it this way once a CLUB_SEASON_METRIC_WORDS match is already
+ * present -- the same gating CLUB_SEASON_METRIC_WORDS itself requires
+ * before being tried at all.
+ */
+export const CLUB_SEASON_SEASONAL_ADJECTIVE_RE = /\bseasonal\b/;
+
+/**
  * Any coaching cue, and the gate for COACH_METRIC_WORDS below. Nothing in
  * the coaching vocabulary is tried until this matches, for exactly the
  * reason CLUB_SEASON_METRIC_WORDS is gated: "games", "wins", "losses" and

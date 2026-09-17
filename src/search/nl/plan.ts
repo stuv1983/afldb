@@ -650,7 +650,15 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
 // no club is named in the fix. Ordinary symmetric "A versus/vs/v B"
 // wording with no name overlap, and directional "for"/"against"/"to"
 // phrasing, are both unaffected.
-export const PARSER_VERSION = 60;
+//
+// AFLDB-ISSUE-214: "what season had the highest/lowest <metric>" and
+// "<club>'s highest/lowest seasonal <metric>" now elect club_season and
+// consume "season"/"seasonal" as part of that construction, instead of
+// leaving the word as an unclaimed leftover token that declined the
+// question outright. Every other club_season cue (a leading "teams"/
+// "clubs" subject, a club-season condition, "in a season", an explicit
+// year) is unaffected.
+export const PARSER_VERSION = 61;
 
 // ------------------------------------------------------------------ grain
 

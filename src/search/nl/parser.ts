@@ -62,7 +62,7 @@ import {
   ACHIEVEMENT_SUMMARY_CUES,
   AGAINST_PREPOSITION, FOR_PREPOSITION, AGG_WORDS, AGGREGATE_TOTAL_WORDS, AWARD_WORDS,
   AFTER_RE, BARE_YEAR_RE, BEFORE_RE, BETWEEN_RE, CLUB_SEASON_CONDITION_WORDS, CLUB_SEASON_METRIC_WORDS,
-  CLUB_SEASON_PREMIERSHIP_SUBJECT_GATED,
+  CLUB_SEASON_PREMIERSHIP_SUBJECT_GATED, CLUB_SEASON_RANK_SEASON_CUE_RE, CLUB_SEASON_SEASONAL_ADJECTIVE_RE,
   AFTER_SIREN_CUE_RE, AFTER_SIREN_EFFECT_WORDS, AFTER_SIREN_KICK_NOUN_RE, AFTER_SIREN_OCCURRENCE_WORDS,
   AFTER_SIREN_PLAYER_SUBJECT_RE, AFTER_SIREN_RESULT_WORDS, AFTER_SIREN_SCORED_WORDS,
   COACH_CUE_RE, COACH_METRIC_WORDS, COACH_NO_QUALIFIER_RE, COACH_WIN_PCT_RE, COACHED_BY_RE, PREMIERSHIP_COACH_RE,
@@ -2738,8 +2738,29 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   // consuming; the guarded extraction below still does the real work.
   const seasonWorded = inOneSeason || seasons.seasonMin !== undefined || seasons.seasonMax !== undefined;
   const clubSeasonMetricWordPresent = CLUB_SEASON_METRIC_WORDS.some(([re]) => re.test(text));
+  // AFLDB-ISSUE-214: "what season had the highest losses" and "highest
+  // seasonal losses" name the club_season grain unambiguously on their own
+  // -- see the cue comments in vocab.ts -- and both stand in for a
+  // one-season-at-a-time phrasing everywhere seasonWorded does below, so a
+  // club named alongside them with no explicit year ("North Melbourne's
+  // highest seasonal losses") still passes the ISSUE-189 single-season
+  // guard further down. Matched here (ahead of clubSeasonCuePresent, which
+  // reads the result) and consumed immediately so "season"/"seasonal"
+  // never survive as an unclaimed leftover token.
+  const clubSeasonRankSeasonCueMatch = CLUB_SEASON_RANK_SEASON_CUE_RE.exec(text);
+  const clubSeasonSeasonalCueMatch = clubSeasonMetricWordPresent ? CLUB_SEASON_SEASONAL_ADJECTIVE_RE.exec(text) : null;
+  const clubSeasonPerSeasonPhrasing = !!clubSeasonRankSeasonCueMatch || !!clubSeasonSeasonalCueMatch;
+  if (clubSeasonRankSeasonCueMatch) {
+    consumedTokens.push(clubSeasonRankSeasonCueMatch[0]);
+    text = stripMatch(text, clubSeasonRankSeasonCueMatch[0]);
+  }
+  if (clubSeasonSeasonalCueMatch) {
+    consumedTokens.push(clubSeasonSeasonalCueMatch[0]);
+    text = stripMatch(text, clubSeasonSeasonalCueMatch[0]);
+  }
   const clubSeasonCuePresent = coachReading === null && !afterSirenReading && (clubSubjectPresent
     || clubSeasonConditionResult.conditions.length > 0
+    || clubSeasonPerSeasonPhrasing
     || (!!clubFor && !teamMetricResult.metric && clubSeasonMetricWordPresent && seasonWorded));
 
   let clubSeasonMetricResult: { text: string; metric?: string; consumed: string[] } = { text, consumed: [] };
@@ -3461,6 +3482,7 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     && !inOneSeason
     && !(seasons.seasonMin !== undefined && seasons.seasonMin === seasons.seasonMax)
     && !(clubFor && seasonWorded)
+    && !clubSeasonPerSeasonPhrasing
   ) {
     report.confidence = 1;
     report.notes.push('Club wins, losses, draws and percentage are ranked one season at a time; add "in a season" or a year to ask for the best single season. AFLDB does not total them across a club\'s history.');
