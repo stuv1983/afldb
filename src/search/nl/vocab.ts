@@ -114,6 +114,25 @@ export const CONVERSATIONAL_FILLER: RegExp[] = [
 const LEADING_REQUEST_PREFIX_RE = /^(?:give me|find(?!\s+the\s+(?:big\s+)?sticks\b)|show|list)\b\s*/;
 
 /**
+ * AFLDB-ISSUE-215. LEADING_REQUEST_PREFIX_RE only reaches a request verb
+ * sitting at the very front of the string. "For Adelaide, find players
+ * with ..." puts the identical wrapper verb one clause later, behind a
+ * leading "for" scope clause -- "for" is already a generic, recognised
+ * club-scoping preposition (extractClubs reads it the same way anywhere
+ * else it appears), not a club name special-cased here. By the time this
+ * runs the clause's own comma is already gone (the punctuation strip
+ * below turns it into a space before either prefix regex is tried), so
+ * there is nothing left to anchor on except "for" itself and a bounded
+ * word count -- capped at four words, longer than any name in this
+ * engine's directories, so this can only ever reach the length of a
+ * real leading scope clause, never an arbitrary run of unrelated text.
+ * The captured clause is put back afterwards (never deleted): whatever
+ * it names still has to reach the extraction stage that reads it.
+ */
+const LEADING_FOR_CLAUSE_REQUEST_PREFIX_RE =
+  /^(for\s+(?:\S+\s+){1,4})(?:give me|find(?!\s+the\s+(?:big\s+)?sticks\b)|show|list)\b\s*/;
+
+/**
  * Lowercase, strip possessives and punctuation the vocabulary below isn't
  * written to expect, drop conversational filler, consume a leading
  * imperative request wrapper, and apply query-intent.ts's number-word
@@ -133,6 +152,7 @@ export function canonicalise(raw: string): string {
   for (const filler of CONVERSATIONAL_FILLER) text = text.replace(filler, ' ');
   text = text.replace(/\s+/g, ' ').trim();
   text = text.replace(LEADING_REQUEST_PREFIX_RE, '').trim();
+  text = text.replace(LEADING_FOR_CLAUSE_REQUEST_PREFIX_RE, '$1').replace(/\s+/g, ' ').trim();
   return canonicaliseStatWords(text);
 }
 

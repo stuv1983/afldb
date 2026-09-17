@@ -6,6 +6,34 @@
 
 **Open issues:** 0
 
+**AFLDB-ISSUE-215 resolved 2026-09-17** (Sonnet 5, operator-validated on streamanator, two
+host-validation rounds) — `career_numeric_binding`'s two exploratory clusters (`/3` 700 rows "for CLUB,
+find players with A plus B", `/2` 552 rows "who has the most career S among players with A and B") do
+NOT share one root mechanism — `/3` is a pure wrapper-vocabulary gap ("find" behind a leading "for"
+clause, "plus" as an unrecognised conjunction); `/2` shares that gap ("among") plus an independent,
+genuine predicate-loss defect (a stat word's earliest occurrence was the only one ever tried, silently
+dropping a same-column condition stated after the ranking mention). Both fixed; `PARSER_VERSION` 61 →
+62. Round-1 host validation (commit `5eca839`): frozen V5 stayed 12000/12000/0/0; `/2` fully fixed
+(552 → 0); `/3` split into 491 `coverage_unavailable` and 209 `unsupported_term: plus`. The 491 were
+investigated and classified a **legitimate, currently-real coverage limitation, not a parser/guard
+defect** — `conditionSql` (`src/db/queries/nl/player-career.ts`) has no per-club SQL path for any
+career condition column except `games`, and `validatePlan`'s club-scoped-career-condition guard
+(`src/search/nl/plan.ts`) correctly fails closed rather than silently answer with a whole-career total
+— guard NOT weakened, no corpus/scorer file touched, recorded as a future SQL-compiler capability
+candidate (see `AFLDB-ISSUE-215.md` §11, §15). The 209 were a second, residual "plus" ownership gap in
+`extractCareerConditions` — a 20-character clause-boundary lookback too short for a long comparator
+phrase like "no more than " (widened to 40, proven safe by a new three-clause regression control), and
+the "no X" negative-condition loop never checking for a neighbouring "plus" — fixed the same session
+under the same `PARSER_VERSION` 62 (a correction, not a new semantic feature). Round-2 host validation
+(commit `6a341fd`) confirmed the fix: frozen V5 stayed 12000/12000/0/0 again; `career_numeric_binding/3`
+final triage is 700 `coverage_unavailable` / 0 `unsupported_term` — **all 700 `/3` rows now produce
+structurally valid plans**; a direct round-1-vs-round-2 plan comparison found exactly 209 changed
+plans, 0 missing, zero unrelated movement. Implementation commits `5eca839` and `6a341fd` on
+`sonnet/issue-215-career-numeric-binding-phrasing`, unmerged. Local: `tests/nl-parser.test.ts`
+540/540, broader gates (`nl-regression-corpus` 163/163, `nl-semantic-mapping` 174/174,
+`nl-stress-corpus` 65/65 = 402/402), `typecheck` clean. See `issues.md` and `AFLDB-ISSUE-215.md` for
+the full record.
+
 **AFLDB-ISSUE-214 resolved 2026-09-17** (Sonnet 5, operator-validated on streamanator) — `club_season_rank`'s "what season had the highest/lowest `<metric>`" and "`<club>`'s highest/lowest seasonal `<metric>`" phrasings declined with `unsupported_term: season`/`seasonal`: neither word was ever consumed by any extractor, so it survived as a leftover token even when the surrounding club-season construction was otherwise fully understood. Confirmed both failing clusters (`club_season_rank/1`, `club_season_rank/3`) are two English phrasings of one already-supported semantic construction, not two mechanisms. Fixed with two new gated vocabulary entries (`CLUB_SEASON_RANK_SEASON_CUE_RE`, `CLUB_SEASON_SEASONAL_ADJECTIVE_RE`) folded into the existing `clubSeasonCuePresent`/single-season-guard logic — no club name, corpus ID, or exact sample string special-cased. `PARSER_VERSION` 60 → 61. Implementation commit `731edd8` on `sonnet/issue-214-club-season-rank-phrasing`, unmerged. Local: `tests/nl-parser.test.ts` 519/519, broader gates (`nl-regression-corpus` 163/163, `nl-semantic-mapping` 174/174, `nl-stress-corpus` 65/65 = 402/402), `typecheck` clean. Operator-validated on streamanator: frozen V5 stayed **12000/12000/0/0**; exploratory V2 moved **14879 → 15925 clean (+1046)**, **12651 → 11605 soft (-1046)**, 0 failed throughout. The full `club_season_rank/3` cluster (642 rows) cleared; 404 of 614 `club_season_rank/1` rows cleared, 210 remaining on a separate, pre-existing possessive-club-alias defect (`Suns'`/`Pies'`/`Bulldogs'`) deliberately **not folded into this issue and not opened as its own tracked issue** — recorded as a follow-up candidate only. A direct 29,030-row plan-level comparison (v60 vs. v61) found exactly **1046 changed plans, 0 missing rows**, all in the target family, zero unrelated movement. See `issues.md` and `AFLDB-ISSUE-214.md` for the full record.
 
 **AFLDB-ISSUE-213 resolved 2026-09-17** (Sonnet 5, operator-validated on streamanator) — a pre-existing

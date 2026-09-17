@@ -4138,3 +4138,284 @@ describe('AFLDB-ISSUE-213: overlapping club names must not steal each other\'s m
     });
   });
 });
+
+/**
+ * AFLDB-ISSUE-215. The exploratory V2 corpus's `career_numeric_binding`
+ * family builds five templates from one shared pool of two numeric career
+ * conditions; two of the five -- `/2`, "who has the most career S among
+ * players with A and B", and `/3`, "for CLUB, find players with A plus
+ * B" -- declined unsupported_term even though every OTHER template in the
+ * same family (joined by "and"/comma instead) already worked.
+ *
+ * Investigation found this is NOT one shared root cause:
+ *
+ *  - `/3` is a pure wrapper-vocabulary gap. Both numeric conditions were
+ *    ALREADY binding correctly; only the wrapper words "find" (mid-
+ *    sentence, behind a leading "for CLUB," scope clause the existing
+ *    leading-only wrapper strip, AFLDB-ISSUE-210, never reaches) and
+ *    "plus" (a second, unrecognised spelling of the "and" conjunction
+ *    every other template already uses) survived as leftover tokens.
+ *  - `/2` shares that SAME category of gap -- "among" is a third
+ *    unrecognised wrapper word, structurally identical to "find"/"plus"
+ *    -- but ALSO carries a second, independent, more severe defect `/3`
+ *    cannot have at all (its template has no ranked metric to collide
+ *    with): extractCareerConditions resolves a stat word's EARLIEST
+ *    occurrence in the sentence for processing order, but never retried a
+ *    LATER occurrence when the first had no adjacent number. "who has the
+ *    most career GOALS among players with ... zero GOALS" puts the stat
+ *    word's ranking mention before its condition mention; the column used
+ *    to be abandoned right there, silently discarding the real "zero
+ *    goals" condition rather than declining on it. See the "metric/
+ *    condition collision" cases below.
+ *
+ * Neither fix is forced together beyond both living in
+ * extractCareerConditions/canonicalise: the wrapper-vocabulary gaps are
+ * each fixed narrowly per word (gated on the specific supported
+ * construction, never a blanket STOPWORDS/strip addition), and the
+ * predicate-loss fix is fully generic -- it retries occurrences of
+ * whichever stat word collided, never assumes which column or template.
+ *
+ * PARSER_VERSION 61 -> 62.
+ */
+describe('19. AFLDB-ISSUE-215 career numeric-binding phrasing ("plus"/"among" wrappers, metric/condition collision)', () => {
+  describe('/3-style: "for CLUB, find players with A plus B"', () => {
+    it('club-scoped, a positive "at least" clause plus a "zero" equality clause', async () => {
+      const p = await plan('For Richmond, find players with at least 20 finals plus zero goals');
+      expect(p.grain).toBe('player_career');
+      expect(p.agg).toEqual({ kind: 'list' });
+      expect(p.metric).toBeNull();
+      expect(p.scope.clubFor?.name).toBe('Richmond');
+      expect(p.careerConditions).toEqual([
+        { kind: 'column', column: 'finals', op: 'gte', value: 20 },
+        { kind: 'column', column: 'goals', op: 'eq', value: 0 },
+      ]);
+    });
+
+    it('club-scoped, two "at least"/"fewer than" clauses', async () => {
+      const p = await plan('For Richmond, find players with at least 20 finals plus fewer than 5 losses');
+      expect(p.grain).toBe('player_career');
+      expect(p.scope.clubFor?.name).toBe('Richmond');
+      expect(p.careerConditions).toEqual([
+        { kind: 'column', column: 'finals', op: 'gte', value: 20 },
+        { kind: 'column', column: 'losses', op: 'lt', value: 5 },
+      ]);
+    });
+
+    it('club-scoped, a "no" negative clause plus an "at most" clause', async () => {
+      const p = await plan('For Adelaide, find players with no premierships plus at most 10 Brownlow votes');
+      expect(p.grain).toBe('player_career');
+      expect(p.scope.clubFor?.name).toBe('Adelaide');
+      expect(p.careerConditions).toEqual([
+        { kind: 'column', column: 'premierships', op: 'eq', value: 0 },
+        { kind: 'column', column: 'brownlow_votes', op: 'lte', value: 10 },
+      ]);
+    });
+  });
+
+  // Host validation (parser v62, commit 5eca839) found a second "plus"
+  // ownership gap the three cases above didn't exercise: a positive
+  // clause FIRST, "plus", then a "no X" negative clause SECOND. Two
+  // independent causes, both fixed generically (no metric combination or
+  // sample string special-cased):
+  //
+  //  1. The clause-boundary lookback that finds "plus" (and "and"/",")
+  //     was fixed at a 20-character budget -- long enough for a short
+  //     comparator like "at least"/"exactly", but "no more than " alone
+  //     is 13 characters, which together with "plus " (5) and a number
+  //     could put the boundary more than 20 characters back, outside the
+  //     lookback entirely. Widened to 40 characters, comfortably fitting
+  //     the longest COMPARE_OP_WORDS phrase ("no greater than") plus a
+  //     4-digit number and the joining word -- the search still takes the
+  //     NEAREST boundary within that span, so it can only reveal a
+  //     previously-invisible real boundary, never reach past it into an
+  //     earlier clause.
+  //  2. The "no X" negative-condition loop (checked before the numeric
+  //     pending-stat loop) matches and strips only the "no X" phrase
+  //     itself, with no knowledge of a neighbouring "plus" on either
+  //     side. A LEADING "plus" ("... goals PLUS no premierships") is now
+  //     checked and consumed there too, only once the negative clause
+  //     itself actually bound. A TRAILING "plus" ("no premierships PLUS
+  //     ...") needs no new handling: that ordering leaves "plus"
+  //     immediately in front of the SECOND (pending-loop) clause instead,
+  //     which the pending loop's own boundary search already finds from
+  //     the other direction (proven by the "no premierships plus at most
+  //     10 Brownlow votes" case above).
+  describe('/3-style, follow-up: a positive clause first, "plus", then a "no X" negative clause', () => {
+    it('a comparator clause plus a "no" negative clause ("no more than"-length boundary not involved)', async () => {
+      const p = await plan('For Sydney, find players with more than 50 goals plus no premierships');
+      expect(p.grain).toBe('player_career');
+      expect(p.scope.clubFor?.name).toBe('Sydney');
+      expect(p.careerConditions).toEqual([
+        { kind: 'column', column: 'premierships', op: 'eq', value: 0 },
+        { kind: 'column', column: 'goals', op: 'gt', value: 50 },
+      ]);
+    });
+
+    it('two positive comparator clauses, the second a long "no more than" phrase (boundary-lookback widening)', async () => {
+      const p = await plan('For Port Adelaide, find players with exactly 3 premierships plus no more than 250 games');
+      expect(p.grain).toBe('player_career');
+      expect(p.scope.clubFor?.name).toBe('Port Adelaide');
+      expect(p.careerConditions).toEqual([
+        { kind: 'column', column: 'premierships', op: 'eq', value: 3 },
+        { kind: 'column', column: 'games', op: 'lte', value: 250 },
+      ]);
+    });
+
+    it('a long "no more than" comparator clause plus a "no" negative clause (both fixes needed together)', async () => {
+      const p = await plan('For Essendon, find players with no more than 250 games plus no premierships');
+      expect(p.grain).toBe('player_career');
+      expect(p.scope.clubFor?.name).toBe('Essendon');
+      expect(p.careerConditions).toEqual([
+        { kind: 'column', column: 'premierships', op: 'eq', value: 0 },
+        { kind: 'column', column: 'games', op: 'lte', value: 250 },
+      ]);
+    });
+  });
+
+  describe('/2-style: "who has the most career S among players with A and B"', () => {
+    it('ranked metric distinct from both conditions', async () => {
+      const p = await plan('Who has the most career games among players with fewer than 5 losses and at most 10 Brownlow votes');
+      expect(p.grain).toBe('player_career');
+      expect(p.metric).toBe('games');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.scope).toEqual({});
+      expect(p.careerConditions).toEqual([
+        { kind: 'column', column: 'losses', op: 'lt', value: 5 },
+        { kind: 'column', column: 'brownlow_votes', op: 'lte', value: 10 },
+      ]);
+    });
+
+    it('ranked metric (clubs_played) distinct from both conditions', async () => {
+      const p = await plan('Who has the most career clubs among players with exactly 3 premierships and fewer than 5 losses');
+      expect(p.grain).toBe('player_career');
+      expect(p.metric).toBe('clubs_played');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.careerConditions).toEqual([
+        { kind: 'column', column: 'premierships', op: 'eq', value: 3 },
+        { kind: 'column', column: 'losses', op: 'lt', value: 5 },
+      ]);
+    });
+
+    // The metric/condition collision: the ranked metric's own stat word
+    // ("goals") is ALSO the field of one of the two conditions ("zero
+    // goals"), and the metric's mention comes FIRST in the sentence --
+    // exactly the ordering that used to make extractCareerConditions
+    // abandon the column on the ranking mention's own lack of a number,
+    // silently discarding the real "zero goals" condition sitting after
+    // it. Asserted with an exact careerConditions array (not just
+    // toContainEqual) so a regression that duplicates or drops either
+    // condition fails loudly.
+    it('metric/condition collision -- the ranked metric shares its column with a "zero" condition stated later in the same sentence', async () => {
+      const p = await plan('Who has the most career goals among players with at least 200 games and zero goals');
+      expect(p.grain).toBe('player_career');
+      expect(p.metric).toBe('goals');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.careerConditions).toEqual([
+        { kind: 'column', column: 'goals', op: 'eq', value: 0 },
+        { kind: 'column', column: 'games', op: 'gte', value: 200 },
+      ]);
+    });
+
+    // The same collision on the OTHER field ("games" is both the ranked
+    // metric and one of the two bound conditions), proving the fix is
+    // generic to whichever column collides, not special-cased to "goals".
+    it('metric/condition collision on the OTHER field ("games" is both the ranked metric and a bound condition)', async () => {
+      const p = await plan('Who has the most career games among players with at least 200 games and zero goals');
+      expect(p.grain).toBe('player_career');
+      expect(p.metric).toBe('games');
+      expect(p.careerConditions).toEqual([
+        { kind: 'column', column: 'games', op: 'gte', value: 200 },
+        { kind: 'column', column: 'goals', op: 'eq', value: 0 },
+      ]);
+    });
+  });
+
+  describe('regression: existing career_numeric_binding wordings are unchanged', () => {
+    it('"and"-joined conditions still bind both exactly as before', async () => {
+      const p = await plan('List players with at least 20 finals and zero goals');
+      expect(p.agg).toEqual({ kind: 'list' });
+      expect(p.careerConditions).toEqual([
+        { kind: 'column', column: 'finals', op: 'gte', value: 20 },
+        { kind: 'column', column: 'goals', op: 'eq', value: 0 },
+      ]);
+    });
+
+    it('comma-joined conditions still bind both exactly as before', async () => {
+      const p = await plan('Players who have at least 20 finals, zero goals');
+      expect(p.careerConditions).toEqual([
+        { kind: 'column', column: 'finals', op: 'gte', value: 20 },
+        { kind: 'column', column: 'goals', op: 'eq', value: 0 },
+      ]);
+    });
+
+    it('trailing-metric wording ("of players with A and B, who has the fewest career S") is unaffected', async () => {
+      const p = await plan('Of players with at least 20 finals and zero goals, who has the fewest career games');
+      expect(p.metric).toBe('games');
+      expect(p.agg).toEqual({ kind: 'min' });
+      expect(p.careerConditions).toEqual([
+        { kind: 'column', column: 'finals', op: 'gte', value: 20 },
+        { kind: 'column', column: 'goals', op: 'eq', value: 0 },
+      ]);
+    });
+
+    it('a valid single career numeric condition (no conjunction at all) is unchanged', async () => {
+      const p = await plan('players with at least 300 games');
+      expect(p.careerConditions).toEqual([{ kind: 'column', column: 'games', op: 'gte', value: 300 }]);
+    });
+
+    it('"most flags" still ranks by premierships (single occurrence, no adjacent number anywhere) rather than the occurrence-retry loop finding a spurious match', async () => {
+      const p = await plan('most flags');
+      expect(p.metric).toBe('premierships');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.careerConditions).toEqual([]);
+    });
+  });
+
+  describe('negative controls: "plus"/"among"/"find" are not globally ignored', () => {
+    // Proves the widened (20 -> 40 character) boundary-probe lookback
+    // takes the NEAREST boundary within its span, never a more distant
+    // one: three chained clauses ("and" then "plus"), where the "and"
+    // boundary sits well within the OLD 20-character budget too. If
+    // widening the probe had made it prefer a farther-back boundary over
+    // a closer one, this would misbind "goals" to the wrong clause or
+    // lose "losses" the way the pre-fix "300 clubs and over 10
+    // premierships" defect this window discipline was built against did.
+    it('three chained conditions ("and" then "plus") each bind to their own clause, not a farther one', async () => {
+      const p = await plan('players with 20 finals and 5 losses plus zero goals');
+      expect(p.careerConditions).toEqual([
+        { kind: 'column', column: 'finals', op: 'gte', value: 20 },
+        { kind: 'column', column: 'losses', op: 'gte', value: 5 },
+        { kind: 'column', column: 'goals', op: 'eq', value: 0 },
+      ]);
+    });
+    it('"plus" beside a genuinely unsupported second clause still declines, not silently swallowed', async () => {
+      const result = await parse('players with at least 20 finals plus a puppy');
+      expect(result.status).not.toBe('plan');
+      expect(result.report.unsupportedTerms.some((t) => t.includes('plus'))).toBe(true);
+    });
+
+    it('"plus" with no preceding bound numeric clause at all still declines', async () => {
+      const result = await parse('players with plus zero goals');
+      expect(result.status).not.toBe('plan');
+      expect(result.report.unsupportedTerms).toContain('plus');
+    });
+
+    it('"plus" outside the career-numeric-binding construction entirely still declines', async () => {
+      const result = await parse('richmond biggest win plus their finals record');
+      expect(result.status).not.toBe('plan');
+      expect(result.report.unsupportedTerms.some((t) => t.includes('plus'))).toBe(true);
+    });
+
+    it('"among" with no numeric career condition present is not swallowed by the new gated consumption', async () => {
+      const result = await parse('most career goals among players');
+      expect(result.status).not.toBe('plan');
+      expect(result.report.unsupportedTerms).toContain('among');
+    });
+
+    it('a bare mid-sentence "find" with no leading "for" scope clause in front of it still declines (not a blanket strip)', async () => {
+      const result = await parse('since 2000, find the most goals');
+      expect(result.status).not.toBe('plan');
+      expect(result.report.unsupportedTerms).toContain('find');
+    });
+  });
+});

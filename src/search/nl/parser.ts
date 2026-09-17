@@ -1151,7 +1151,34 @@ function extractCareerConditions(text: string): {
     if (match) {
       conditions.push({ kind: 'column', column, op: 'eq', value: 0 });
       consumed.push(match[0]);
-      working = stripMatch(working, match[0]);
+      let spanStart = match.index;
+      let spanEnd = match.index + match[0].length;
+      // AFLDB-ISSUE-215 (follow-up). "plus" immediately touching this
+      // negative clause ("... 50 goals PLUS no premierships") is the same
+      // numeric-binding conjunction the pending-stat loop below already
+      // recognizes between two POSITIVE clauses -- but this loop runs
+      // FIRST and matches/strips only the "no X" phrase itself, with no
+      // knowledge of a neighbouring boundary word on either side. A
+      // trailing "plus" ("no premierships PLUS at most 10 votes") does
+      // not need handling here: that ordering leaves "plus" immediately
+      // in front of the SECOND (pending-loop) clause instead, which the
+      // pending loop's own boundary search already finds and consumes
+      // from the other direction. Checked and consumed only once this
+      // clause has actually bound, matching the pending loop's own "only
+      // once it binds" discipline -- a "plus" beside a clause that didn't
+      // bind is still left for the leftover-token decline.
+      const beforeText = working.slice(0, spanStart);
+      const afterText = working.slice(spanEnd);
+      const plusBefore = /\bplus\s+$/.exec(beforeText);
+      const plusAfter = /^\s+plus\b/.exec(afterText);
+      if (plusBefore) {
+        consumed.push('plus');
+        spanStart -= plusBefore[0].length;
+      } else if (plusAfter) {
+        consumed.push('plus');
+        spanEnd += plusAfter[0].length;
+      }
+      working = `${working.slice(0, spanStart)} ${working.slice(spanEnd)}`.replace(/\s+/g, ' ').trim();
     }
   }
 
@@ -1182,134 +1209,218 @@ function extractCareerConditions(text: string): {
     }
     if (!best) break;
     pending.delete(best.entry);
-    const [, column] = best.entry;
-    const { match, idx } = best;
+    const [candidateRe, column] = best.entry;
 
-    // "3 grand finals", "played in at least 1 preliminary final" -- the
-    // bare /\bfinals?\b/ entry above reads ANY qualified final phrase as
-    // the generic any-type career total (c.finals), leaving "grand" or
-    // "preliminary"/"prelim" as an unconsumed word the entity scan then
-    // misreads as an unresolved player name and declines on. GRID_BUILDERS
-    // has a dedicated min-count builder for exactly these two final round
-    // types (semi/qualifying/elimination finals have none), so a
-    // qualifier immediately before "final(s)" answers through that
-    // instead. Detected AHEAD of the 20-char lookback below, not after,
-    // because that lookback is sized for a short stat word: "preliminary
-    // " alone is 12 characters, which for "3 or more preliminary finals"
-    // pushed the leading digit outside the window entirely -- the
-    // condition silently vanished (`value` stayed null) rather than
-    // falling back to the generic reading. Extending the lookback by the
-    // qualifier's own length keeps the number search's effective budget
-    // the same regardless of which qualifier, if any, preceded the word.
-    let qualifierBuilder: 'grand_finals_played_min' | 'prelim_finals_played_min' | null = null;
-    let qualifierSpan: { start: number; end: number; text: string } | null = null;
-    if (column === 'finals') {
-      const qualifierProbe = working.slice(Math.max(0, idx - 15), idx);
-      const qualifierMatch = /\b(grand|preliminary|prelim)\b\s*$/i.exec(qualifierProbe);
-      if (qualifierMatch) {
-        qualifierBuilder = qualifierMatch[1].toLowerCase() === 'grand'
-          ? 'grand_finals_played_min' : 'prelim_finals_played_min';
-        const qualifierStart = Math.max(0, idx - 15) + qualifierMatch.index;
-        qualifierSpan = { start: qualifierStart, end: qualifierStart + qualifierMatch[1].length, text: qualifierMatch[1] };
-      }
-    }
-    const outerStart = Math.max(0, idx - 20 - (qualifierSpan ? idx - qualifierSpan.start : 0));
-    // Clipped at the nearest preceding clause boundary (a comma, or "and")
-    // so the window can never reach into a NEIGHBOURING numeric clause --
-    // "players with more than 300 clubs and over 10 premierships" found
-    // 250k-corpus rows where premierships (checked first: CAREER_STAT_WORDS
-    // is in a fixed order, not the order the words appear in the
-    // sentence) opened a 20-char window that reached back across "and"
-    // into "300 clubs", read digit-boundary \b(\d{1,4})\b against the
-    // slice "0 clubs and over 10" and matched the leftmost token -- the
-    // truncated tail "0" left behind when the slice cut "300" in half, a
-    // false number \b treats as complete because it evaluates against the
-    // window substring, not the original text. That produced
-    // premierships=0 (should be 10) AND, since the matched span included
-    // that stray "0", deleted it from the middle of "300" for every
-    // later clause too, leaving clubs_played to read "30". Clipping the
-    // window at the clause boundary means a clause's number search can
-    // never see a token that belongs to the clause before it.
-    const priorText = working.slice(outerStart, idx);
-    const lastAnd = priorText.toLowerCase().lastIndexOf(' and ');
-    const lastComma = priorText.lastIndexOf(',');
-    const boundaryEnd = Math.max(lastAnd >= 0 ? lastAnd + 5 : -1, lastComma >= 0 ? lastComma + 1 : -1);
-    const windowStart = boundaryEnd >= 0 ? outerStart + boundaryEnd : outerStart;
-    const window = working.slice(windowStart, idx + match[0].length);
+    // AFLDB-ISSUE-215. A stat word can legitimately occur twice in the
+    // same question: once naming the RANKED SUBJECT ("who has the most
+    // career goals ...") and again inside its own, textually LATER,
+    // numeric condition ("... among players with ... zero goals"). The
+    // earliest-occurrence rule above (needed for the "300 clubs and over
+    // 10 premierships" ordering fix it documents) picks the first
+    // occurrence for PROCESSING ORDER, but that first occurrence is the
+    // ranking mention here, which has no adjacent number -- and used to
+    // make the whole column give up right there, silently discarding the
+    // real "zero goals" condition sitting later in the sentence: the
+    // pending SET already dropped this stat word, so nothing ever looked
+    // at its second occurrence. Retrying successive occurrences of the
+    // SAME stat word (never a different one -- each is still tried once
+    // per occurrence, not once per column) until one has an adjacent
+    // comparator/number, or none do, fixes that without weakening the
+    // "abandon this column, it was just the ranking noun" outcome
+    // ("most flags" below) for a stat word that only ever appears once.
+    const occurrenceRe = new RegExp(candidateRe.source, 'g');
+    let searchFrom = 0;
+    let bound = false;
+    while (!bound) {
+      occurrenceRe.lastIndex = searchFrom;
+      const match = occurrenceRe.exec(working);
+      if (!match) break;
+      const idx = match.index;
+      searchFrom = idx + match[0].length;
 
-    const plus = NUMBER_PLUS_RE.exec(window);
-    let op: NlCompareOp = 'gte';
-    // Distinct from `op` itself, which cannot tell an explicit "at least"/
-    // "no fewer than" `gte` apart from the implicit bare-number default
-    // `gte` -- needed below to know whether a bound zero was stated with a
-    // comparator or is bare "zero"/"0", which must default to equality
-    // instead ("zero goals" means goals = 0, not goals >= 0, which is
-    // trivially true for every player).
-    let explicitComparator = false;
-    let value: number | null = null;
-    // Spans are recorded as absolute positions in `working` rather than as
-    // text to search for again. "players with 3 games and exactly 3 clubs"
-    // is why: both counts are the string "3", so removing the one this
-    // clause used by first-occurrence deleted the OTHER clause's number
-    // instead, leaving "games" with nothing to bind to and silently
-    // dropping the condition.
-    const spans: { start: number; end: number; text: string }[] = [
-      { start: idx, end: idx + match[0].length, text: match[0] },
-    ];
-    const spanFrom = (m: RegExpExecArray, source = m[0]) => ({
-      start: windowStart + m.index,
-      end: windowStart + m.index + m[0].length,
-      text: source,
-    });
-
-    if (plus) {
-      value = Number(plus[1]);
-      op = 'gte';
-      explicitComparator = true;
-      spans.push(spanFrom(plus, plus[0].replace(/\+$/, '')));
-    } else {
-      for (const [opRe, opKind] of COMPARE_OP_WORDS) {
-        const opMatch = opRe.exec(window);
-        if (opMatch) { op = opKind; explicitComparator = true; spans.push(spanFrom(opMatch)); break; }
-      }
-      const digits = /\b(\d{1,4})\b/.exec(window);
-      if (digits) {
-        value = Number(digits[1]);
-        spans.push(spanFrom(digits, digits[1]));
-      } else {
-        for (const [word, n] of Object.entries(NUMBER_WORDS)) {
-          const wordMatch = new RegExp(`\\b${word}\\b`).exec(window);
-          if (wordMatch) { value = n; spans.push(spanFrom(wordMatch)); break; }
+      // "3 grand finals", "played in at least 1 preliminary final" -- the
+      // bare /\bfinals?\b/ entry above reads ANY qualified final phrase as
+      // the generic any-type career total (c.finals), leaving "grand" or
+      // "preliminary"/"prelim" as an unconsumed word the entity scan then
+      // misreads as an unresolved player name and declines on. GRID_BUILDERS
+      // has a dedicated min-count builder for exactly these two final round
+      // types (semi/qualifying/elimination finals have none), so a
+      // qualifier immediately before "final(s)" answers through that
+      // instead. Detected AHEAD of the 20-char lookback below, not after,
+      // because that lookback is sized for a short stat word: "preliminary
+      // " alone is 12 characters, which for "3 or more preliminary finals"
+      // pushed the leading digit outside the window entirely -- the
+      // condition silently vanished (`value` stayed null) rather than
+      // falling back to the generic reading. Extending the lookback by the
+      // qualifier's own length keeps the number search's effective budget
+      // the same regardless of which qualifier, if any, preceded the word.
+      let qualifierBuilder: 'grand_finals_played_min' | 'prelim_finals_played_min' | null = null;
+      let qualifierSpan: { start: number; end: number; text: string } | null = null;
+      if (column === 'finals') {
+        const qualifierProbe = working.slice(Math.max(0, idx - 15), idx);
+        const qualifierMatch = /\b(grand|preliminary|prelim)\b\s*$/i.exec(qualifierProbe);
+        if (qualifierMatch) {
+          qualifierBuilder = qualifierMatch[1].toLowerCase() === 'grand'
+            ? 'grand_finals_played_min' : 'prelim_finals_played_min';
+          const qualifierStart = Math.max(0, idx - 15) + qualifierMatch.index;
+          qualifierSpan = { start: qualifierStart, end: qualifierStart + qualifierMatch[1].length, text: qualifierMatch[1] };
         }
       }
-    }
-    if (value === null) continue;
+      const outerStart = Math.max(0, idx - 20 - (qualifierSpan ? idx - qualifierSpan.start : 0));
+      // Clipped at the nearest preceding clause boundary (a comma, or "and")
+      // so the window can never reach into a NEIGHBOURING numeric clause --
+      // "players with more than 300 clubs and over 10 premierships" found
+      // 250k-corpus rows where premierships (checked first: CAREER_STAT_WORDS
+      // is in a fixed order, not the order the words appear in the
+      // sentence) opened a 20-char window that reached back across "and"
+      // into "300 clubs", read digit-boundary \b(\d{1,4})\b against the
+      // slice "0 clubs and over 10" and matched the leftmost token -- the
+      // truncated tail "0" left behind when the slice cut "300" in half, a
+      // false number \b treats as complete because it evaluates against the
+      // window substring, not the original text. That produced
+      // premierships=0 (should be 10) AND, since the matched span included
+      // that stray "0", deleted it from the middle of "300" for every
+      // later clause too, leaving clubs_played to read "30". Clipping the
+      // window at the clause boundary means a clause's number search can
+      // never see a token that belongs to the clause before it.
+      // AFLDB-ISSUE-215 (follow-up). The BOUNDARY search (finding a
+      // comma/"and"/"plus" at all) needs a wider lookback than the VALUE
+      // search does: "exactly 3 premierships plus no more than 250 games"
+      // -- "no more than " alone is 13 characters, which together with
+      // "plus " (5) and the number (up to 4 digits + a space) can put the
+      // boundary word more than `idx - 20` characters back, outside
+      // `priorText` entirely, so `lastPlus` below always came back -1 and
+      // "plus" was never even considered a candidate boundary -- not
+      // rejected, just invisible to the search. `boundaryProbeText` widens
+      // ONLY the boundary search to comfortably fit the longest
+      // COMPARE_OP_WORDS phrase ("no greater than", 15 characters) plus a
+      // 4-digit number and the joining word itself; `lastIndexOf` still
+      // returns the NEAREST boundary within it, so widening the probe can
+      // only reveal a real boundary that was previously missed, never
+      // reach past it into an earlier, unrelated clause. The VALUE search
+      // below is unaffected: once a boundary is found, `window` still
+      // starts exactly at that boundary, same as before this change.
+      const boundaryProbeStart = Math.max(0, idx - 40 - (qualifierSpan ? idx - qualifierSpan.start : 0));
+      const boundaryProbeText = working.slice(boundaryProbeStart, idx);
+      const lastAnd = boundaryProbeText.toLowerCase().lastIndexOf(' and ');
+      const lastComma = boundaryProbeText.lastIndexOf(',');
+      // "plus" is a second spelling of the exact same clause boundary
+      // "and" already is here -- "at least 20 finals PLUS zero goals"
+      // joins two independent numeric conditions the same way "and" does.
+      // It is deliberately NOT a blanket STOPWORDS entry like "and":
+      // "plus" names nothing else anywhere in this engine's vocabulary,
+      // and adding it there would silently ignore the word in every
+      // OTHER, unrelated construction too. So its span is recorded here
+      // and only actually removed further down, and only once this clause
+      // goes on to bind a real value -- a "plus" in front of a clause that
+      // never binds is left completely alone and the question still
+      // declines on its own leftover text.
+      const lastPlus = boundaryProbeText.toLowerCase().lastIndexOf(' plus ');
+      const boundaryEnd = Math.max(
+        lastAnd >= 0 ? lastAnd + 5 : -1,
+        lastComma >= 0 ? lastComma + 1 : -1,
+        lastPlus >= 0 ? lastPlus + 6 : -1,
+      );
+      const windowStart = boundaryEnd >= 0 ? boundaryProbeStart + boundaryEnd : outerStart;
+      const window = working.slice(windowStart, idx + match[0].length);
+      const plusBoundarySpan = (lastPlus >= 0 && lastPlus + 6 === boundaryEnd)
+        ? { start: boundaryProbeStart + lastPlus + 1, end: boundaryProbeStart + lastPlus + 5, text: 'plus' }
+        : null;
 
-    // A bound zero with no stated comparator means equality ("zero goals"
-    // = "goals = 0"), not the bare-number default above, which is only
-    // correct for a positive count ("300 games" = "at least 300"). An
-    // explicit comparator (including "0+") still wins, same as any other
-    // value.
-    if (value === 0 && !explicitComparator) op = 'eq';
+      const plus = NUMBER_PLUS_RE.exec(window);
+      let op: NlCompareOp = 'gte';
+      // Distinct from `op` itself, which cannot tell an explicit "at least"/
+      // "no fewer than" `gte` apart from the implicit bare-number default
+      // `gte` -- needed below to know whether a bound zero was stated with a
+      // comparator or is bare "zero"/"0", which must default to equality
+      // instead ("zero goals" means goals = 0, not goals >= 0, which is
+      // trivially true for every player).
+      let explicitComparator = false;
+      let value: number | null = null;
+      // Spans are recorded as absolute positions in `working` rather than as
+      // text to search for again. "players with 3 games and exactly 3 clubs"
+      // is why: both counts are the string "3", so removing the one this
+      // clause used by first-occurrence deleted the OTHER clause's number
+      // instead, leaving "games" with nothing to bind to and silently
+      // dropping the condition.
+      const spans: { start: number; end: number; text: string }[] = [
+        { start: idx, end: idx + match[0].length, text: match[0] },
+      ];
+      const spanFrom = (m: RegExpExecArray, source = m[0]) => ({
+        start: windowStart + m.index,
+        end: windowStart + m.index + m[0].length,
+        text: source,
+      });
 
-    // The `_min` builders only express a floor ("X+"/"at least"/a bare
-    // number, which all default to 'gte' above); "fewer than 2 grand
-    // finals" has nowhere to go there and falls back to the generic
-    // any-type reading instead of declining outright.
-    if (qualifierBuilder && op === 'gte') {
-      predicates.push({ builder: qualifierBuilder, params: { times: String(value) } });
-      if (qualifierSpan) spans.push(qualifierSpan);
-    } else {
-      conditions.push({ kind: 'column', column, op, value });
+      if (plus) {
+        value = Number(plus[1]);
+        op = 'gte';
+        explicitComparator = true;
+        spans.push(spanFrom(plus, plus[0].replace(/\+$/, '')));
+      } else {
+        for (const [opRe, opKind] of COMPARE_OP_WORDS) {
+          const opMatch = opRe.exec(window);
+          if (opMatch) { op = opKind; explicitComparator = true; spans.push(spanFrom(opMatch)); break; }
+        }
+        const digits = /\b(\d{1,4})\b/.exec(window);
+        if (digits) {
+          value = Number(digits[1]);
+          spans.push(spanFrom(digits, digits[1]));
+        } else {
+          for (const [word, n] of Object.entries(NUMBER_WORDS)) {
+            const wordMatch = new RegExp(`\\b${word}\\b`).exec(window);
+            if (wordMatch) { value = n; spans.push(spanFrom(wordMatch)); break; }
+          }
+        }
+      }
+      if (value === null) continue;
+      if (plusBoundarySpan) spans.push(plusBoundarySpan);
+
+      // A bound zero with no stated comparator means equality ("zero goals"
+      // = "goals = 0"), not the bare-number default above, which is only
+      // correct for a positive count ("300 games" = "at least 300"). An
+      // explicit comparator (including "0+") still wins, same as any other
+      // value.
+      if (value === 0 && !explicitComparator) op = 'eq';
+
+      // The `_min` builders only express a floor ("X+"/"at least"/a bare
+      // number, which all default to 'gte' above); "fewer than 2 grand
+      // finals" has nowhere to go there and falls back to the generic
+      // any-type reading instead of declining outright.
+      if (qualifierBuilder && op === 'gte') {
+        predicates.push({ builder: qualifierBuilder, params: { times: String(value) } });
+        if (qualifierSpan) spans.push(qualifierSpan);
+      } else {
+        conditions.push({ kind: 'column', column, op, value });
+      }
+      for (const span of spans) consumed.push(span.text);
+      // Highest offset first, so removing one span cannot shift the
+      // positions of the ones still to be removed.
+      working = spans
+        .sort((a, b) => b.start - a.start)
+        .reduce((text, span) => `${text.slice(0, span.start)} ${text.slice(span.end)}`, working)
+        .replace(/\s+/g, ' ')
+        .trim();
+      bound = true;
     }
-    for (const span of spans) consumed.push(span.text);
-    // Highest offset first, so removing one span cannot shift the
-    // positions of the ones still to be removed.
-    working = spans
-      .sort((a, b) => b.start - a.start)
-      .reduce((text, span) => `${text.slice(0, span.start)} ${text.slice(span.end)}`, working)
-      .replace(/\s+/g, ' ')
-      .trim();
+  }
+
+  // AFLDB-ISSUE-215. "who has the most career S AMONG PLAYERS WITH A and
+  // B" wraps the identical numeric-binding construction "... players
+  // with A and B" already reads correctly above; only "among"/"amongst"
+  // itself is new vocabulary. Gated on a condition/predicate having
+  // actually been found (never a bare presence check) so a genuinely
+  // unsupported "among ..." elsewhere is not silently swallowed -- see
+  // the regression control for a bare "among" with no numeric condition
+  // alongside it, which must still surface as unsupported. The lookahead
+  // consumes only the cue word itself; "players"/"player" is already
+  // inert STOPWORDS vocabulary and is left in `working` untouched.
+  if (conditions.length > 0 || predicates.length > 0) {
+    const amongMatch = /\bamong(?:st)?\b(?=\s+(?:the\s+)?players?\b)/.exec(working);
+    if (amongMatch) {
+      consumed.push(amongMatch[0]);
+      working = stripMatch(working, amongMatch[0]);
+    }
   }
 
   return { text: working, conditions, predicates, consumed };
