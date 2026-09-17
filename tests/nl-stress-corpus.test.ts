@@ -495,6 +495,158 @@ describe('verified facts, coverage, confidence and empty results', () => {
   });
 });
 
+// ---------------------------------------------- AFLDB-ISSUE-212 (exploratory V2)
+
+describe('AFLDB-ISSUE-212: symmetric "versus" matchup scoring', () => {
+  // The parser's own contract for two clubs with nothing but v/vs/versus
+  // between them is the unordered pair scope.matchup, regardless of any
+  // other preposition in the sentence (extractClubs, parser.ts). A row
+  // asserting that shape sets scopeKind: 'matchup' and names its two
+  // participants in club/opponent; scoreRow must check them as a set.
+  const symmetric = expectation({
+    grain: 'team_match', mode: undefined, metric: 'win_margin', aggregation: 'max',
+    club: 'Sydney', opponent: 'Richmond', scopeKind: 'matchup',
+  });
+  const matchupPlan = (clubA: string, clubB: string, ids: Record<string, number>) => plan({
+    grain: 'team_match', mode: undefined, metric: 'win_margin',
+    scope: {
+      matchup: {
+        clubA: { organizationId: ids[clubA], slug: clubA.toLowerCase(), name: clubA },
+        clubB: { organizationId: ids[clubB], slug: clubB.toLowerCase(), name: clubB },
+      },
+    },
+  });
+  const ids = { Sydney: 17, Richmond: 6 };
+
+  it('passes when the plan carries both expected clubs as an unordered matchup', () => {
+    expect(scoreRow(symmetric, observed({ plan: matchupPlan('Sydney', 'Richmond', ids) }))).toEqual([]);
+  });
+
+  it('passes with the pair in the opposite order -- the wording asserts no direction', () => {
+    expect(scoreRow(symmetric, observed({ plan: matchupPlan('Richmond', 'Sydney', ids) }))).toEqual([]);
+  });
+
+  it('a directional-shaped plan (clubFor/clubAgainst, no matchup) is a dropped filter, not a pass', () => {
+    const a = observed({
+      plan: plan({
+        grain: 'team_match', mode: undefined, metric: 'win_margin',
+        scope: {
+          clubFor: { organizationId: 17, slug: 'sydney', name: 'Sydney' },
+          clubAgainst: { organizationId: 6, slug: 'richmond', name: 'Richmond' },
+        },
+      }),
+    });
+    expect(classes(symmetric, a)).toContain('DROPPED_FILTER');
+  });
+
+  it('a matchup missing one of the two expected clubs is a hard failure', () => {
+    const a = observed({ plan: matchupPlan('Sydney', 'Carlton', { ...ids, Carlton: 3 }) });
+    expect(classes(symmetric, a, index)).toContain('WRONG_CLUB');
+  });
+
+  it('negative control: genuinely directional wording is still checked directionally', () => {
+    // No scopeKind: 'matchup' here -- this is the pre-existing, unaffected
+    // path. A plan with the two clubs swapped between clubFor/clubAgainst
+    // must still fail, exactly as it always did.
+    const directional = expectation({
+      grain: 'team_match', mode: undefined, metric: 'win_margin', aggregation: 'max',
+      club: 'Sydney', opponent: 'Richmond',
+    });
+    const swapped = observed({
+      plan: plan({
+        grain: 'team_match', mode: undefined, metric: 'win_margin',
+        scope: {
+          clubFor: { organizationId: 6, slug: 'richmond', name: 'Richmond' },
+          clubAgainst: { organizationId: 17, slug: 'sydney', name: 'Sydney' },
+        },
+      }),
+    });
+    expect(classes(directional, swapped, index)).toEqual(expect.arrayContaining(['WRONG_CLUB', 'WRONG_OPPONENT']));
+
+    const correct = observed({
+      plan: plan({
+        grain: 'team_match', mode: undefined, metric: 'win_margin',
+        scope: {
+          clubFor: { organizationId: 17, slug: 'sydney', name: 'Sydney' },
+          clubAgainst: { organizationId: 6, slug: 'richmond', name: 'Richmond' },
+        },
+      }),
+    });
+    expect(scoreRow(directional, correct, index)).toEqual([]);
+  });
+});
+
+describe('AFLDB-ISSUE-212: achievement_summary scored by achievementSummary.kind', () => {
+  // src/db/queries/nl/achievement-summary.ts groups entirely on
+  // achievementSummary.kind; plan.agg is a vestigial default for this
+  // grain (parser.ts falls through to {kind:'max'} with no aggregation cue
+  // of its own) and has no effect on the answer's shape.
+  const byClub = expectation({
+    category: 'achievement_summary', grain: 'achievement_summary', mode: undefined,
+    metric: undefined, aggregation: undefined, achievementSummaryKind: 'by_club',
+  });
+
+  it('a semantically correct plan passes despite carrying the generic default aggregation', () => {
+    const a = observed({
+      plan: plan({
+        grain: 'achievement_summary', metric: null, mode: undefined, agg: { kind: 'max' },
+        achievementSummary: { achievementKey: 'first_kick_goal', kind: 'by_club' },
+      }),
+    });
+    expect(scoreRow(byClub, a)).toEqual([]);
+  });
+
+  it('a genuinely wrong summary shape is still a hard failure', () => {
+    const a = observed({
+      plan: plan({
+        grain: 'achievement_summary', metric: null, mode: undefined, agg: { kind: 'max' },
+        achievementSummary: { achievementKey: 'first_kick_goal', kind: 'by_decade' },
+      }),
+    });
+    expect(classes(byClub, a)).toContain('WRONG_AGGREGATION');
+  });
+
+  it('negative control: an ordinary grain\'s aggregation mismatch still fails -- this is not made globally optional', () => {
+    const e = expectation({ aggregation: 'count' });
+    const a = observed({ plan: plan({ agg: { kind: 'max' } }) });
+    expect(classes(e, a)).toContain('WRONG_AGGREGATION');
+  });
+});
+
+describe('AFLDB-ISSUE-212: player identity prefers a resolved id over display-name text', () => {
+  // Gary Ablett Jnr (id 4701) and Gary Ablett Snr (id 4700) share the one
+  // canonical display name "Gary Ablett" -- a name-only comparison of a
+  // qualified corpus name against that shared display name can never pass.
+  const PLAYER_IDS: Record<string, number> = { 'Gary Ablett Jnr': 4701, 'Gary Ablett Snr': 4700 };
+  const withPlayers = { ...index, playerId: (name: string) => PLAYER_IDS[name] };
+
+  it('a correct distinct id passes despite the shared canonical display name', () => {
+    const e = expectation({ player: 'Gary Ablett Jnr' });
+    const a = observed({ plan: plan({ player: { id: 4701, slug: 'gary-ablett-jnr', name: 'Gary Ablett' } }) });
+    expect(scoreRow(e, a, withPlayers)).toEqual([]);
+  });
+
+  it('the wrong distinct id is a hard failure even though the display name still matches', () => {
+    const e = expectation({ player: 'Gary Ablett Jnr' });
+    const a = observed({ plan: plan({ player: { id: 4700, slug: 'gary-ablett-snr', name: 'Gary Ablett' } }) });
+    expect(classes(e, a, withPlayers)).toContain('WRONG_PLAYER');
+  });
+
+  it('an ordinary uniquely-named player is unaffected: no index entry falls back to name matching', () => {
+    const e = expectation({ player: 'Dustin Martin' });
+    const right = observed({ plan: plan({ player: { id: 1, slug: 'dustin-martin', name: 'Dustin Martin' } }) });
+    const wrong = observed({ plan: plan({ player: { id: 2, slug: 'chris-judd', name: 'Chris Judd' } }) });
+    expect(scoreRow(e, right, withPlayers)).toEqual([]);
+    expect(classes(e, wrong, withPlayers)).toContain('WRONG_PLAYER');
+  });
+
+  it('with no player index at all, scoring is exactly the pre-ISSUE-212 name comparison', () => {
+    const e = expectation({ player: 'Gary Ablett Jnr' });
+    const a = observed({ plan: plan({ player: { id: 4701, slug: 'gary-ablett-jnr', name: 'Gary Ablett' } }) });
+    expect(classes(e, a)).toContain('WRONG_PLAYER');
+  });
+});
+
 describe('verdict', () => {
   it('one hard finding fails the row whatever else it carries', () => {
     expect(verdict([

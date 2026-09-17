@@ -4,7 +4,22 @@
 >
 > `issues.md` is the authoritative detailed ledger.
 
-**Open issues:** 0
+**Open issues:** 1
+
+**AFLDB-ISSUE-212** — IMPLEMENTED, NOT RESOLVED (Sonnet 5) — follow-on item (4) of
+`AFLDB-ISSUE-206.md`'s six proposals: correct the exploratory NL corpus/scorer's three confirmed V1
+oracle defects (496-row symmetric "versus" matchup, 283-row achievement-summary aggregation, 351-row
+Gary Ablett Jnr/Snr identity) in a new versioned `tools/nl/generate-exploratory-corpus-v2.mjs` +
+`tools/nl/corpus.ts` scorer contract. Not a parser-feature issue: `PARSER_VERSION` unchanged at 59, no
+`src/search/nl/{parser,vocab,semantic-intents}.ts` file touched. Area: deterministic NL search tooling
+(`tools/nl/`). Current state: local (DB-free) implementation, generator/scorer changes and RED/GREEN
+tests complete on `sonnet/issue-212-exploratory-v2-scoring`; unverified locally (no `npx vitest`/`npm
+run typecheck` run yet) and no host generation/validation on streamanator yet — both are explicit
+closure gates. Key files: `tools/nl/corpus.ts`, `tools/nl/stress-test.ts`,
+`tools/nl/generate-exploratory-corpus-v2.mjs`, `tools/nl/triage-exploratory-corpus.mjs`,
+`tests/nl-stress-corpus.test.ts`. Next action: run `npx vitest run tests/nl-stress-corpus.test.ts` +
+`npm run typecheck` locally, then the streamanator generation/validation sequence in
+`AFLDB-ISSUE-212.md` §8. See `issues.md` and `AFLDB-ISSUE-212.md` for the full record.
 
 **AFLDB-ISSUE-211 resolved 2026-09-17** (Sonnet 5, operator-validated on streamanator) — follow-on item
 (5) of `AFLDB-ISSUE-206.md`'s six proposals, the largest single unimplemented soft-decline vocabulary
