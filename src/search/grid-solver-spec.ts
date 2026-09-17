@@ -94,10 +94,62 @@ export function isGridStatKey(value: string): value is GridStatKey {
 // named questions, so a fixed set of option lists fits it, and it avoids
 // another server round-trip for a dropdown that essentially never changes.
 
-export const GRID_DRAFT_TYPES = [
-  'National', 'National Draft', 'Rookie', 'Trade', 'Pre-Season', 'Pre-Draft',
-  'Mid-Season', 'Post-Draft', 'Free Agency', 'Mini-Draft', 'Training Squad Selection',
-] as const;
+// AFLDB-ISSUE-221. The draft-type question is asked of draft_picks.draft_kind,
+// the frozen DraftGuru event-kind enumeration (migration 069,
+// data/reference/draftguru-event-kinds.json), NOT of draft_picks.draft_type,
+// which is the source's own label and spells the same national draft two
+// ways: the 1981/1982/1987 pages carry no Draft column, so those 113 rows are
+// ('National Draft', 'national') while every other national row is
+// ('National', 'national'). Offering the raw labels split one draft into two
+// dropdown entries and made "National" silently miss three drafts. The
+// values here are the ten kinds, verbatim; the labels are for the form.
+export const GRID_DRAFT_TYPES: { value: string; label: string }[] = [
+  { value: 'national', label: 'National Draft' },
+  { value: 'rookie', label: 'Rookie Draft' },
+  { value: 'preseason', label: 'Pre-Season Draft' },
+  { value: 'pre_draft', label: 'Pre-Draft selection' },
+  { value: 'midseason', label: 'Mid-Season Draft' },
+  { value: 'post_draft', label: 'Post-Draft selection' },
+  { value: 'trade', label: 'Trade' },
+  { value: 'free_agency', label: 'Free Agency' },
+  { value: 'mini_draft', label: 'Mini-Draft' },
+  { value: 'training_squad_selection', label: 'Training Squad Selection' },
+];
+
+/**
+ * The raw draft_type labels the builder accepted before AFLDB-ISSUE-221, so a
+ * share link or Gridley rule written against them still means the same
+ * thing. Both national spellings resolve to the one kind; the table is the
+ * contract's own draft_type -> draft_kind pairs, never a mechanical
+ * transform (the contract forbids one: 'Pre-Season' -> 'preseason' but
+ * 'Pre-Draft' -> 'pre_draft').
+ */
+const LEGACY_DRAFT_TYPE_LABELS: Record<string, string> = {
+  'National': 'national',
+  'National Draft': 'national',
+  'Rookie': 'rookie',
+  'Trade': 'trade',
+  'Pre-Season': 'preseason',
+  'Pre-Draft': 'pre_draft',
+  'Mid-Season': 'midseason',
+  'Post-Draft': 'post_draft',
+  'Free Agency': 'free_agency',
+  'Mini-Draft': 'mini_draft',
+  'Training Squad Selection': 'training_squad_selection',
+};
+
+/** The draft_kind a draftType parameter names -- a kind value or a legacy label -- or null when it names neither. */
+export function resolveDraftKind(value: string): string | null {
+  const trimmed = value.trim();
+  if (GRID_DRAFT_TYPES.some((o) => o.value === trimmed)) return trimmed;
+  return Object.hasOwn(LEGACY_DRAFT_TYPE_LABELS, trimmed) ? LEGACY_DRAFT_TYPE_LABELS[trimmed] : null;
+}
+
+/** The form label for a draftType parameter value; the raw value when it resolves to no kind. */
+export function draftTypeLabel(value: string): string {
+  const kind = resolveDraftKind(value);
+  return GRID_DRAFT_TYPES.find((o) => o.value === kind)?.label ?? value;
+}
 
 export const GRID_SIGNING_KINDS = [
   'Academy', 'Foundation', 'Father-Son', 'Zone', 'International', 'SSP',
@@ -423,9 +475,15 @@ export const GRID_BUILDERS: Record<string, GridBuilderDef> = {
 
   // Draft & recruitment -- linked rows only (link_status_value IN
   // ('unique','resolved')), the same rule every other draft query follows.
+  // draft_picks is the whole DraftGuru recruitment history, so the three
+  // builders that say "drafted" (drafted_by_club, drafted_by_club_never_played,
+  // draft_year_between) exclude the trade and free-agency kinds -- a list move
+  // is not a draft selection (AFLDB-ISSUE-221). draft_pick_between never saw
+  // those rows anyway: the source records no pick number for them.
   drafted_by_club: { key: 'drafted_by_club', label: 'Drafted by club', group: 'Draft & recruitment', params: [club()] },
   draft_pick_between: { key: 'draft_pick_between', label: 'Draft pick between', group: 'Draft & recruitment', params: [int('from', 'From pick'), int('to', 'To pick')] },
   draft_year_between: { key: 'draft_year_between', label: 'Drafted between years', group: 'Draft & recruitment', params: [season('from', 'From year'), season('to', 'To year')] },
+  // Asked of draft_kind (GRID_DRAFT_TYPES); a legacy raw label still resolves.
   draft_type_is: { key: 'draft_type_is', label: 'Draft type', group: 'Draft & recruitment', params: [draftType()] },
   drafted_by_club_never_played: { key: 'drafted_by_club_never_played', label: 'Drafted by club, never played there', group: 'Draft & recruitment', params: [club()] },
   recruited_via: { key: 'recruited_via', label: 'Recruited from…', group: 'Draft & recruitment', params: [signingKind()] },

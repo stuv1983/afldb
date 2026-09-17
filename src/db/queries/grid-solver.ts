@@ -6,6 +6,7 @@ import {
   GRID_LIMITS,
   GRID_STATS,
   isGridStatKey,
+  resolveDraftKind,
   type GridAxisState,
   type GridOrder,
   type GridStatKey,
@@ -29,26 +30,60 @@ import {
 
 type SqlFragment = ReturnType<typeof sql>;
 
-function parseIntParam(raw: string, label: string): number {
+/**
+ * A parameter the request supplied that no builder can be compiled from:
+ * missing, not a number, out of range, or naming an unknown statistic or
+ * draft kind. Distinct from every other error so the page can confine it to
+ * the squares that use the axis (guardCellTimeout) instead of rejecting the
+ * whole render -- a share link is hand-editable, and the form's number
+ * inputs accept any magnitude (AFLDB-ISSUE-221).
+ */
+export class GridAxisError extends Error {
+  override readonly name = 'GridAxisError';
+}
+
+/**
+ * Bounds on request-supplied numbers. Thresholds, seasons, picks, votes,
+ * margins and heights are all compared against smallint or integer columns;
+ * PostgreSQL rejects an over-range bound value as a data exception (22003)
+ * before the query runs, which a URL token or a typed number reaches
+ * trivially. smallint is the tightest column type any threshold meets and
+ * no honest threshold exceeds it (the largest career stat total is
+ * ~13,000). Ids are compared with integer keys and get the integer range.
+ */
+const SMALLINT_MAX = 32_767;
+const INT_MAX = 2_147_483_647;
+
+function parseIntParam(raw: string, label: string, max: number): number {
   const n = Number(raw);
-  if (!Number.isFinite(n) || !Number.isInteger(n)) throw new Error(`${label} must be a whole number.`);
+  if (!Number.isFinite(n) || !Number.isInteger(n) || n < 0 || n > max) {
+    throw new GridAxisError(`${label} must be a whole number between 0 and ${max}.`);
+  }
   return n;
 }
 
 function parseDecimalParam(raw: string, label: string): number {
   const n = Number(raw);
-  if (!Number.isFinite(n)) throw new Error(`${label} must be a number.`);
+  if (!Number.isFinite(n) || n < 0 || n > SMALLINT_MAX) {
+    throw new GridAxisError(`${label} must be a number between 0 and ${SMALLINT_MAX}.`);
+  }
   return n;
 }
 
 function requireParam(axis: GridAxisState, key: string, label: string): string {
   const value = axis.params[key];
-  if (value === undefined || value.trim() === '') throw new Error(`${label} is required.`);
+  if (value === undefined || value.trim() === '') throw new GridAxisError(`${label} is required.`);
   return value.trim();
 }
 
+/** A threshold, season, pick, count or measurement: a whole number in the smallint range. */
 function requireInt(axis: GridAxisState, key: string, label: string): number {
-  return parseIntParam(requireParam(axis, key, label), label);
+  return parseIntParam(requireParam(axis, key, label), label, SMALLINT_MAX);
+}
+
+/** A club/venue/player/award/coach id: a whole number in the integer range. */
+function requireId(axis: GridAxisState, key: string, label: string): number {
+  return parseIntParam(requireParam(axis, key, label), label, INT_MAX);
 }
 
 function requireDecimal(axis: GridAxisState, key: string, label: string): number {
@@ -67,7 +102,7 @@ function requireDecimal(axis: GridAxisState, key: string, label: string): number
  */
 function requireStatKeyAt(axis: GridAxisState, key: string, label: string): GridStatKey {
   const value = requireParam(axis, key, label);
-  if (!isGridStatKey(value)) throw new Error(`Unknown statistic: ${value}`);
+  if (!isGridStatKey(value)) throw new GridAxisError(`Unknown statistic: ${value}`);
   return value;
 }
 
@@ -237,6 +272,12 @@ function ledSeasonRows(statKey: GridStatKey): SqlFragment {
                 WHERE t2.season = t.season AND t2.club_id = t.club_id AND t2.total > t.total)`;
 }
 
+/** A draft_picks row that is a draft selection rather than a trade or free-agency list move (AFLDB-ISSUE-221). */
+function notAListMove(alias: string): SqlFragment {
+  const kind = sql.unsafe(`${alias}.draft_kind`);
+  return sql`(${kind} IS DISTINCT FROM 'trade' AND ${kind} IS DISTINCT FROM 'free_agency')`;
+}
+
 // One dispatch per builder is the clearest shape here; splitting it up
 // would scatter the catalogue across files for no real benefit.
 //
@@ -253,23 +294,23 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
   switch (axis.builder) {
     // -- Clubs & journeys ---------------------------------------------
     case 'played_for_club': {
-      const orgId = requireInt(axis, 'club', 'Club');
+      const orgId = requireId(axis, 'club', 'Club');
       return sql`p.id IN (SELECT pc.player_id FROM player_clubs pc
                             WHERE pc.club_id IN (SELECT id FROM clubs WHERE organization_id = ${orgId}))`;
     }
     case 'debut_club': {
-      const orgId = requireInt(axis, 'club', 'Club');
+      const orgId = requireId(axis, 'club', 'Club');
       return sql`p.id IN (SELECT player_id FROM player_match_stats
                             WHERE career_game_no = 1
                               AND club_id IN (SELECT id FROM clubs WHERE organization_id = ${orgId}))`;
     }
     case 'played_for_club_incl_merged': {
-      const orgId = requireInt(axis, 'club', 'Club');
+      const orgId = requireId(axis, 'club', 'Club');
       return sql`p.id IN (SELECT pc.player_id FROM player_clubs pc
                             WHERE pc.club_id IN (${clubIdsInclMerged(orgId)}))`;
     }
     case 'debut_club_incl_merged': {
-      const orgId = requireInt(axis, 'club', 'Club');
+      const orgId = requireId(axis, 'club', 'Club');
       return sql`p.id IN (SELECT player_id FROM player_match_stats
                             WHERE career_game_no = 1
                               AND club_id IN (${clubIdsInclMerged(orgId)}))`;
@@ -715,7 +756,7 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
                            GROUP BY pms.player_id HAVING count(*) >= ${n})`;
     }
     case 'lost_grand_final_against': {
-      const otherId = requireInt(axis, 'player', 'Player');
+      const otherId = requireId(axis, 'player', 'Player');
       return sql`p.id IN (SELECT pms1.player_id FROM player_match_stats pms1
                             JOIN matches m ON m.id = pms1.match_id
                             JOIN player_match_stats pms2
@@ -745,7 +786,7 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
     case 'grand_final_won_against_club': {
       // The beaten side is whichever club in the match is not the player's;
       // resolved by lineage like every club parameter.
-      const orgId = requireInt(axis, 'club', 'Beaten club');
+      const orgId = requireId(axis, 'club', 'Beaten club');
       return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
                             JOIN matches m ON m.id = pms.match_id
                             JOIN clubs loser ON loser.id = CASE WHEN m.home_club_id = pms.club_id THEN m.away_club_id ELSE m.home_club_id END
@@ -766,13 +807,13 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
 
     // -- Grounds & venues -------------------------------------------------
     case 'played_at_venue': {
-      const venueId = requireInt(axis, 'venue', 'Venue');
+      const venueId = requireId(axis, 'venue', 'Venue');
       return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
                             JOIN matches m ON m.id = pms.match_id
                            WHERE m.venue_id = ${venueId})`;
     }
     case 'games_at_venue_min': {
-      const venueId = requireInt(axis, 'venue', 'Venue');
+      const venueId = requireId(axis, 'venue', 'Venue');
       const n = requireInt(axis, 'games', 'Games');
       return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
                             JOIN matches m ON m.id = pms.match_id
@@ -780,7 +821,7 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
                            GROUP BY pms.player_id HAVING count(*) >= ${n})`;
     }
     case 'won_final_at_venue': {
-      const venueId = requireInt(axis, 'venue', 'Venue');
+      const venueId = requireId(axis, 'venue', 'Venue');
       // Build the distinct winner-player set once. Under the ISSUE-076
       // workload, the previous IN form produced a repeatedly scanned,
       // materialised qualifying-player set in the surrounding join shape.
@@ -792,7 +833,7 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
                                      AND m.winner_club_id = pms.club_id))`;
     }
     case 'venue_game_stat_min': {
-      const venueId = requireInt(axis, 'venue', 'Venue');
+      const venueId = requireId(axis, 'venue', 'Venue');
       const statKey = requireStatKey(axis);
       const n = requireInt(axis, 'x', 'At least');
       return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
@@ -800,7 +841,7 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
                            WHERE m.venue_id = ${venueId} AND ${sql.unsafe(`pms.${statKey}`)} >= ${n})`;
     }
     case 'venue_stat_total_min': {
-      const venueId = requireInt(axis, 'venue', 'Venue');
+      const venueId = requireId(axis, 'venue', 'Venue');
       const statKey = requireStatKey(axis);
       const n = requireInt(axis, 'x', 'At least');
       return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
@@ -814,7 +855,7 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
       // foot there does not satisfy "X or fewer goals" vacuously. Goals
       // are recorded for every player-game (never NULL-for-era), so the
       // coalesce only covers the empty-sum edge, not missing data.
-      const venueId = requireInt(axis, 'venue', 'Venue');
+      const venueId = requireId(axis, 'venue', 'Venue');
       const n = requireInt(axis, 'goals', 'Goals');
       return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
                             JOIN matches m ON m.id = pms.match_id
@@ -844,8 +885,8 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
       // club-scoped builder, so a Showdown filter spans any rename on
       // either side. The player only has to have played IN the match,
       // for either organization.
-      const orgA = requireInt(axis, 'clubA', 'Club A');
-      const orgB = requireInt(axis, 'clubB', 'Club B');
+      const orgA = requireId(axis, 'clubA', 'Club A');
+      const orgB = requireId(axis, 'clubB', 'Club B');
       const n = requireInt(axis, 'times', 'Matches');
       return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
                             JOIN matches m ON m.id = pms.match_id
@@ -868,8 +909,8 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
                            WHERE m.match_event = ${event} AND m.season BETWEEN ${lo} AND ${hi})`;
     }
     case 'matchup_won_min': {
-      const orgA = requireInt(axis, 'clubA', 'Club A');
-      const orgB = requireInt(axis, 'clubB', 'Club B');
+      const orgA = requireId(axis, 'clubA', 'Club A');
+      const orgB = requireId(axis, 'clubB', 'Club B');
       const n = requireInt(axis, 'times', 'Wins');
       return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
                             JOIN matches m ON m.id = pms.match_id
@@ -879,8 +920,8 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
                            GROUP BY pms.player_id HAVING count(*) >= ${n})`;
     }
     case 'matchup_game_stat_min': {
-      const orgA = requireInt(axis, 'clubA', 'Club A');
-      const orgB = requireInt(axis, 'clubB', 'Club B');
+      const orgA = requireId(axis, 'clubA', 'Club A');
+      const orgB = requireId(axis, 'clubB', 'Club B');
       const statKey = requireStatKey(axis);
       const n = requireInt(axis, 'x', 'At least');
       return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
@@ -890,8 +931,8 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
                            WHERE ${matchupMatchFilter(orgA, orgB)} AND ${sql.unsafe(`pms.${statKey}`)} >= ${n})`;
     }
     case 'matchup_winning_record': {
-      const orgA = requireInt(axis, 'clubA', 'Club A');
-      const orgB = requireInt(axis, 'clubB', 'Club B');
+      const orgA = requireId(axis, 'clubA', 'Club A');
+      const orgB = requireId(axis, 'clubB', 'Club B');
       return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
                             JOIN matches m ON m.id = pms.match_id
                             JOIN clubs home ON home.id = m.home_club_id
@@ -915,14 +956,14 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
     // -- Teammates -- the same self-join as getPlayerOverlapSummary
     // in db/queries/player-compare.ts. ------------------------------
     case 'teammate_of': {
-      const otherId = requireInt(axis, 'player', 'Player');
+      const otherId = requireId(axis, 'player', 'Player');
       return sql`p.id IN (SELECT pcs1.player_id FROM player_club_season_stats pcs1
                             JOIN player_club_season_stats pcs2
                               ON pcs2.season = pcs1.season AND pcs2.club_id = pcs1.club_id
                            WHERE pcs2.player_id = ${otherId} AND pcs1.player_id <> ${otherId})`;
     }
     case 'played_against': {
-      const otherId = requireInt(axis, 'player', 'Player');
+      const otherId = requireId(axis, 'player', 'Player');
       return sql`p.id IN (SELECT pms1.player_id FROM player_match_stats pms1
                             JOIN player_match_stats pms2
                               ON pms2.match_id = pms1.match_id AND pms2.club_id <> pms1.club_id
@@ -933,7 +974,7 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
     // the coaching grain; a coaching relationship exists per match played,
     // so a caretaker's one game counts and a season range is never assumed.
     case 'coached_by': {
-      const coachId = requireInt(axis, 'coach', 'Coach');
+      const coachId = requireId(axis, 'coach', 'Coach');
       return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
                             JOIN match_coaches mc ON mc.match_id = pms.match_id AND mc.club_id = pms.club_id
                            WHERE mc.coach_id = ${coachId})`;
@@ -965,7 +1006,7 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
     // raw-id comparison would silently answer a narrower question. A rename
     // folds and a merger never does, both automatic from organization_id.
     case 'coached_club': {
-      const orgId = requireInt(axis, 'club', 'Club');
+      const orgId = requireId(axis, 'club', 'Club');
       return sql`p.id IN (SELECT c.player_id FROM coaches c
                             JOIN match_coaches mc ON mc.coach_id = c.id
                            WHERE c.player_id IS NOT NULL AND c.link_status_value = 'unique'
@@ -975,7 +1016,7 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
     // -- Captaincy -- no CHECK constraint ties captaincies.player_id to
     // its link_status_value, so both are checked explicitly. -----------
     case 'club_captain': {
-      const orgId = requireInt(axis, 'club', 'Club');
+      const orgId = requireId(axis, 'club', 'Club');
       return sql`p.id IN (SELECT cp.player_id FROM captaincies cp
                             WHERE cp.player_id IS NOT NULL
                               AND cp.link_status_value IN ('unique', 'resolved')
@@ -993,7 +1034,7 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
                             WHERE player_id IS NOT NULL
                               AND link_status_value IN ('unique', 'resolved'))`;
     case 'captain_of_club_between_seasons': {
-      const orgId = requireInt(axis, 'club', 'Club');
+      const orgId = requireId(axis, 'club', 'Club');
       const [lo, hi] = orderedRange(axis, 'from', 'From season', 'to', 'To season');
       return sql`p.id IN (SELECT cp.player_id FROM captaincies cp
                             WHERE cp.player_id IS NOT NULL
@@ -1050,7 +1091,7 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
     case 'first_kick_goal_for_club': {
       // By lineage, like every other club-scoped builder, so a Western
       // Bulldogs filter includes the Footscray era.
-      const orgId = requireInt(axis, 'club', 'Club');
+      const orgId = requireId(axis, 'club', 'Club');
       return sql`p.id IN (SELECT a.player_id FROM player_achievements a
                             JOIN clubs cl ON cl.id = a.club_id
                            WHERE a.achievement_type = 'first_kick_goal' AND a.status = 'active'
@@ -1076,14 +1117,14 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
     // param itself (an id) is ever request-supplied, and it is always a
     // bound value, never an identifier. ------------------------------
     case 'award_winner': {
-      const awardId = requireInt(axis, 'award', 'Award');
+      const awardId = requireId(axis, 'award', 'Award');
       return sql`p.id IN (SELECT player_id FROM award_winners
                             WHERE player_id IS NOT NULL AND status = 'active'
                               AND link_status_value IN ('unique', 'resolved')
                               AND award_id = ${awardId})`;
     }
     case 'award_winner_min_times': {
-      const awardId = requireInt(axis, 'award', 'Award');
+      const awardId = requireId(axis, 'award', 'Award');
       const n = requireInt(axis, 'times', 'Times');
       return sql`p.id IN (SELECT player_id FROM award_winners
                             WHERE player_id IS NOT NULL AND status = 'active'
@@ -1092,7 +1133,7 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
                            GROUP BY player_id HAVING count(*) >= ${n})`;
     }
     case 'award_winner_between_seasons': {
-      const awardId = requireInt(axis, 'award', 'Award');
+      const awardId = requireId(axis, 'award', 'Award');
       const [lo, hi] = orderedRange(axis, 'from', 'From season', 'to', 'To season');
       return sql`p.id IN (SELECT player_id FROM award_winners
                             WHERE player_id IS NOT NULL AND status = 'active'
@@ -1173,7 +1214,7 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
                              AND n.player_id IS NOT NULL AND n.link_status_value IN ('unique', 'resolved'))`;
     }
     case 'rising_star_nominee_for_club': {
-      const orgId = requireInt(axis, 'club', 'Club');
+      const orgId = requireId(axis, 'club', 'Club');
       return sql`p.id IN (SELECT n.player_id FROM award_nominations n
                             JOIN awards a ON a.id = n.award_id
                            WHERE a.slug = 'rising-star'
@@ -1181,7 +1222,7 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
                              AND n.player_id IS NOT NULL AND n.link_status_value IN ('unique', 'resolved'))`;
     }
     case 'rising_star_nominee_for_club_between_seasons': {
-      const orgId = requireInt(axis, 'club', 'Club');
+      const orgId = requireId(axis, 'club', 'Club');
       const [lo, hi] = orderedRange(axis, 'from', 'From season', 'to', 'To season');
       return sql`p.id IN (SELECT n.player_id FROM award_nominations n
                             JOIN awards a ON a.id = n.award_id
@@ -1272,14 +1313,24 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
     // -- Draft & recruitment -- draft_picks_link_ck (migration 019)
     // already guarantees link_status_value IN ('unique','resolved')
     // implies player_id IS NOT NULL, so that check is not repeated here.
-    // draftType/signingKind are bound values from a fixed, hand-verified
-    // vocabulary (GRID_DRAFT_TYPES/GRID_SIGNING_KINDS); like club/venue
-    // ids, an unrecognised value is just safe SQL that matches nothing,
-    // not an identifier that needs an isXxx() check. --------------------
+    // signingKind is a bound value from a fixed, hand-verified vocabulary
+    // (GRID_SIGNING_KINDS); like club/venue ids, an unrecognised value is
+    // just safe SQL that matches nothing, not an identifier that needs an
+    // isXxx() check. draftType resolves to a draft_kind first
+    // (resolveDraftKind) because the raw draft_type label spells the
+    // national draft two ways (AFLDB-ISSUE-221).
+    //
+    // draft_picks is the whole recruitment history, trades and free-agency
+    // signings included (draft_kind 'trade' / 'free_agency', 929 + 128 of
+    // which carry the RECEIVING club as club_id). A list move is not a draft
+    // selection, so the three builders that say "drafted" exclude those two
+    // kinds; the exclusion is IS DISTINCT FROM so a legacy row with no kind
+    // recorded still counts as the draft row its draft_type says it is. ----
     case 'drafted_by_club': {
-      const orgId = requireInt(axis, 'club', 'Club');
+      const orgId = requireId(axis, 'club', 'Club');
       return sql`p.id IN (SELECT dp.player_id FROM draft_picks dp
                             WHERE dp.link_status_value IN ('unique', 'resolved')
+                              AND ${notAListMove('dp')}
                               AND dp.club_id IN (SELECT id FROM clubs WHERE organization_id = ${orgId}))`;
     }
     case 'draft_pick_between': {
@@ -1290,19 +1341,22 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
     }
     case 'draft_year_between': {
       const [lo, hi] = orderedRange(axis, 'from', 'From year', 'to', 'To year');
-      return sql`p.id IN (SELECT player_id FROM draft_picks
-                            WHERE link_status_value IN ('unique', 'resolved')
-                              AND draft_year BETWEEN ${lo} AND ${hi})`;
-    }
-    case 'draft_type_is': {
-      const draftTypeValue = requireParam(axis, 'draftType', 'Draft type');
-      return sql`p.id IN (SELECT player_id FROM draft_picks
-                            WHERE link_status_value IN ('unique', 'resolved') AND draft_type = ${draftTypeValue})`;
-    }
-    case 'drafted_by_club_never_played': {
-      const orgId = requireInt(axis, 'club', 'Club');
       return sql`p.id IN (SELECT dp.player_id FROM draft_picks dp
                             WHERE dp.link_status_value IN ('unique', 'resolved')
+                              AND ${notAListMove('dp')}
+                              AND dp.draft_year BETWEEN ${lo} AND ${hi})`;
+    }
+    case 'draft_type_is': {
+      const kind = resolveDraftKind(requireParam(axis, 'draftType', 'Draft type'));
+      if (kind === null) throw new GridAxisError('Draft type is not one of the recorded draft kinds.');
+      return sql`p.id IN (SELECT player_id FROM draft_picks
+                            WHERE link_status_value IN ('unique', 'resolved') AND draft_kind = ${kind})`;
+    }
+    case 'drafted_by_club_never_played': {
+      const orgId = requireId(axis, 'club', 'Club');
+      return sql`p.id IN (SELECT dp.player_id FROM draft_picks dp
+                            WHERE dp.link_status_value IN ('unique', 'resolved')
+                              AND ${notAListMove('dp')}
                               AND dp.club_id IN (SELECT id FROM clubs WHERE organization_id = ${orgId})
                               AND NOT EXISTS (
                                 SELECT 1 FROM player_clubs pc
@@ -1345,7 +1399,7 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
     // club that MADE the selection, which is not the same question as
     // the club the player went on to play for.
     case 'father_son_selection_for_club': {
-      const orgId = requireInt(axis, 'club', 'Club');
+      const orgId = requireId(axis, 'club', 'Club');
       return sql`p.id IN (SELECT fss.drafted_player_id FROM father_son_selections fss
                            WHERE fss.drafted_player_id IS NOT NULL
                              AND fss.drafted_link_status IN ('unique', 'resolved')
@@ -1419,7 +1473,7 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
     // opposite side is a name in the source and satisfies nothing, which
     // is the fail-closed half of the same rule.
     case 'brother_of_player': {
-      const otherId = requireInt(axis, 'player', 'Player');
+      const otherId = requireId(axis, 'player', 'Player');
       return sql`p.id IN (SELECT r.person_a_player_id FROM player_relationships r
                            WHERE r.relationship = 'sibling'
                              AND r.relationship_label IN ('brothers', 'twin brothers')
@@ -1433,7 +1487,7 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
                              AND r.person_b_player_id IS NOT NULL)`;
     }
     case 'father_of_player': {
-      const otherId = requireInt(axis, 'player', 'Player');
+      const otherId = requireId(axis, 'player', 'Player');
       return sql`p.id IN (SELECT r.person_a_player_id FROM player_relationships r
                            WHERE r.relationship = 'parent_child'
                              AND r.person_a_role = 'father' AND r.person_b_role = 'son'
@@ -1441,7 +1495,7 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
                              AND r.person_a_player_id IS NOT NULL)`;
     }
     case 'son_of_player': {
-      const otherId = requireInt(axis, 'player', 'Player');
+      const otherId = requireId(axis, 'player', 'Player');
       return sql`p.id IN (SELECT r.person_b_player_id FROM player_relationships r
                            WHERE r.relationship = 'parent_child'
                              AND r.person_a_role = 'father' AND r.person_b_role = 'son'
@@ -1461,7 +1515,7 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
       // insensitively. Never an identifier.
       const names = requireParam(axis, 'names', 'Names')
         .split(',').map((s) => s.trim().toLowerCase()).filter((s) => s !== '');
-      if (names.length === 0) throw new Error('Names is required.');
+      if (names.length === 0) throw new GridAxisError('Names is required.');
       return sql`lower(split_part(p.given_name, ' ', 1)) = ANY(${names})`;
     }
     case 'surname_hyphenated':
@@ -1550,14 +1604,19 @@ export function axisPlayerIds(axis: GridAxisState, cache?: AxisSetCache): Promis
   return pending;
 }
 
+/** The ids in every one of the sets, smallest set first. */
+function intersectSets(sets: Set<number>[]): number[] {
+  const ordered = [...sets].sort((a, b) => a.size - b.size);
+  let ids = [...ordered[0]];
+  for (const other of ordered.slice(1)) ids = ids.filter((id) => other.has(id));
+  return ids;
+}
+
 /** The ids satisfying every axis: the intersection of their sets, smallest first. */
 async function eligiblePlayerIds(axes: readonly GridAxisState[], cache?: AxisSetCache): Promise<number[] | null> {
   if (axes.length === 0) return null; // every player
   const sets = await Promise.all(axes.map((axis) => axisPlayerIds(axis, cache)));
-  sets.sort((a, b) => a.size - b.size);
-  let ids = [...sets[0]];
-  for (const other of sets.slice(1)) ids = ids.filter((id) => other.has(id));
-  return ids;
+  return intersectSets(sets);
 }
 
 /** PostgreSQL SQLSTATE 57014: the statement hit AFLDB_STATEMENT_TIMEOUT_MS and was cancelled. */
@@ -1565,7 +1624,11 @@ export function isStatementTimeout(err: unknown): boolean {
   return typeof err === 'object' && err !== null && (err as { code?: unknown }).code === '57014';
 }
 
-export type GridCellOutcome<T> = { status: 'solved'; value: T } | { status: 'timeout' };
+export type GridCellOutcome<T> =
+  | { status: 'solved'; value: T }
+  | { status: 'timeout' }
+  /** An axis parameter no builder can be compiled from (GridAxisError); the message is the parameter's own. */
+  | { status: 'invalid'; message: string };
 
 /**
  * Confine one cell's statement timeout to that cell. Before AFLDB-ISSUE-118
@@ -1574,20 +1637,35 @@ export type GridCellOutcome<T> = { status: 'solved'; value: T } | { status: 'tim
  * 1511510695 in production telemetry, the same digest ISSUE-076 traced to
  * 57014 on dev). The timeout is still a defect to fix at the query -- the
  * Gridley corpus suite gates every predicate -- but it is a defect in one
- * square, so it is reported as one square. Anything that is not a
- * timeout still throws.
+ * square, so it is reported as one square.
+ *
+ * AFLDB-ISSUE-221 confines a GridAxisError the same way: a share link
+ * carrying "199999" as a season, or a typed threshold past the column's
+ * range, is a defect in the axis that supplied it, and the other squares
+ * still render. Anything else -- a permission error, a dead pool, a
+ * data exception the bounds should have made unreachable -- still throws.
  */
 export async function guardCellTimeout<T>(work: () => Promise<T>): Promise<GridCellOutcome<T>> {
   try {
     return { status: 'solved', value: await work() };
   } catch (err) {
     if (isStatementTimeout(err)) return { status: 'timeout' };
+    if (err instanceof GridAxisError) return { status: 'invalid', message: err.message };
     throw err;
   }
 }
 
 export type GridCellSummary = {
   eligible: number;
+  /**
+   * Which of the two axes matched no player at all on its own, when the
+   * cell is empty. An empty intersection of two populated sets is "no
+   * player satisfies both"; an empty axis is a question this database
+   * cannot answer for anyone (the eight draft_picks builders while the
+   * pick-to-player links stand at 5 of 6,810, AFLDB-ISSUE-221), and the
+   * page says which rather than presenting the two alike.
+   */
+  emptyAxis: 'row' | 'col' | 'both' | null;
   top: {
     id: number;
     slug: string;
@@ -1605,8 +1683,12 @@ export async function solveCellSummary(
   order: GridOrder,
   cache?: AxisSetCache,
 ): Promise<GridCellSummary> {
-  const ids = await eligiblePlayerIds([row, col], cache);
-  if (ids !== null && ids.length === 0) return { eligible: 0, top: null };
+  const [rowSet, colSet] = await Promise.all([axisPlayerIds(row, cache), axisPlayerIds(col, cache)]);
+  const ids: number[] | null = intersectSets([rowSet, colSet]);
+  if (ids.length === 0) {
+    const emptyAxis = rowSet.size === 0 && colSet.size === 0 ? 'both' : rowSet.size === 0 ? 'row' : colSet.size === 0 ? 'col' : null;
+    return { eligible: 0, emptyAxis, top: null };
+  }
 
   const [top] = await sql<{
     id: number; slug: string; displayName: string;
@@ -1619,9 +1701,10 @@ export async function solveCellSummary(
      ORDER BY ${sql.unsafe(GRID_ORDER_SQL[order])}
      LIMIT 1
   `;
-  if (!top) return { eligible: 0, top: null };
+  if (!top) return { eligible: 0, emptyAxis: null, top: null };
   return {
     eligible: ids === null ? await countAllPlayers() : ids.length,
+    emptyAxis: null,
     top: {
       id: top.id, slug: top.slug, displayName: top.displayName,
       debutSeason: top.debutSeason, finalSeason: top.finalSeason, games: top.games,

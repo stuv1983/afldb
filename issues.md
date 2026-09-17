@@ -4,10 +4,11 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 1
+**Open issues:** 2
 
 | ID | Title | Severity | Area | State | Next action |
 |---|---|---|---|---|---|
+| AFLDB-ISSUE-221 | Grid Solver cannot answer draft criteria ("Top 10 draft pick"): pick-to-player links stand at 5 of 6,810; review fixed five Grid Solver defects around it | Medium | Grid Solver / draft data linkage | Open — implemented in worktree `afldb-issue-221` (Fable 5.1, uncommitted), locally validated 2026-09-17 | Operator commit → `merge:ready` → DEV smoke (draft axis renders "No data"; bad token value renders "Invalid value" squares; Reset resets). Draft-link population stays an ISSUE-164 D-9 decision |
 | AFLDB-ISSUE-220 | Web service credential boundary contradicts the application's `afldb_import` requirement; owner-role code-test DSN and a complete `.env` copy reach the internet-facing process | High | Deployment / runtime security | Open — DEV evidence complete 2026-09-17; runtime branch (a) settled from Next source: the standalone server loads `.next/standalone/.env` at start-up | Sonnet 5 implements `AFLDB-ISSUE-220.md` §6 in a fresh worktree; first establish the build copy mechanism (§4b) |
 
 AFLDB-ISSUE-220 opened 2026-09-17 (Fable 5.1 code review outside NL search, DEV evidence
@@ -35052,3 +35053,243 @@ this validation.
   precedent for keeping exactly one writing DSN), AFLDB-ISSUE-146 (introduced the code-test DSNs).
 - PROD has not been inspected; the runbook requires the same names-only checks there before any
   unit change.
+
+---
+
+## AFLDB-ISSUE-221 — Grid Solver cannot answer draft criteria ("Top 10 draft pick"): pick-to-player links stand at 5 of 6,810, and the review found five Grid Solver defects around it
+
+- **Status:** Open (opened 2026-09-17). Implemented 2026-09-17 (Fable 5.1, worktree
+  `afldb-issue-221`, branch `fable/issue-221-grid-solver-draft`, uncommitted) — see Implementation
+  and Validation below; pending operator commit and DEV verification before resolution. The
+  reported symptom's root cause (draft-pick linkage) is **not** fixed here and is recorded under
+  Follow-up as an AFLDB-ISSUE-164 D-9 decision.
+- **Severity:** Medium. Correctness of presentation (a false "No player satisfies both axes"),
+  three builders answering a wider question than their label ("drafted" including trades and
+  free-agency signings), one builder splitting one draft into two dropdown entries, a whole-page
+  error boundary reachable from a typed number, and a Reset that did not reset. No security
+  finding: every request value is still a bound parameter; the `stat` family remains the only
+  request value that reaches an identifier position and is still checked against `GRID_STATS`.
+- **Area:** Grid Solver — `src/search/grid-solver-spec.ts`, `src/db/queries/grid-solver.ts`,
+  `src/app/grid-solver/page.tsx`, `src/app/grid-solver/GridSolverForm.tsx`,
+  `src/search/gridley-compat.ts`; draft data linkage (`draft_picks`, `draft_persons`).
+- **Found:** 2026-09-17, reported by the operator; reproduced and reviewed by Fable 5.1 (this
+  entry). Database facts below were measured read-only on `afldb_dev` and `afldb_test` over the
+  55432 tunnel with the `afldb_app` / `afldb_owner` roles; no credential was displayed or recorded.
+- **Handoff:** `AFLDB-ISSUE-221.md` (repository root) — the cross-session closeout and the brief
+  for reopening AFLDB-ISSUE-164 to write the trusted draft-player-linking runbook (evidence
+  pointers, D-9 context, unresolved decisions U1–U6, reading order, remaining DEV checks).
+- **Key files:** `src/db/queries/grid-solver.ts` (compiler: `parseIntParam`/`requireInt`/
+  `requireId`, `GridAxisError`, `notAListMove`, the eight `draft_picks` cases, `solveCellSummary`,
+  `guardCellTimeout`), `src/search/grid-solver-spec.ts` (`GRID_DRAFT_TYPES`, `resolveDraftKind`,
+  `draftTypeLabel`), `src/app/grid-solver/page.tsx` (`boardToken`, `emptyAxisNote`, the
+  `invalid` and `No data` renderings, `describeAxis`), `src/app/grid-solver/GridSolverForm.tsx`
+  (draft-type select), `src/search/gridley-compat.ts` (`pickrookie`, `freeagent1`, `fatherson`),
+  `data/reference/draftguru-event-kinds.json` (the frozen draft-kind contract),
+  `tests/grid-solver-spec.test.ts`, `tests/grid-solver-timeout.test.ts`,
+  `tests/gridley-compat.test.ts`, `tests/integration/grid-solver.test.ts`.
+
+### Trigger
+Set any Grid Solver axis to a `draft_picks` builder — the Gridley criterion
+"Top 10 draft pick — Player was a top 10 pick in the National Draft. Includes drafts from 1981
+to present." maps (`src/search/gridley-compat.ts`, rule `picktop10`) to
+`national_draft_pick_between(from 1, to 10)` — and solve.
+
+### Expected
+Squares list the top-10 national picks who satisfy the other axis; where the database genuinely
+cannot answer a question, the page says so rather than presenting an empty intersection.
+
+### Actual (reproduced 2026-09-17)
+Rendered through the real `/grid-solver` page component (server-rendered to static HTML against
+`afldb_test` with only the audience gate and Next navigation stubbed — the page is
+`super_admin`-gated on every reachable database and the permission classifier declined
+publishing it on the disposable test database, so a browser session was not available): with
+`national_draft_pick_between(1,10)`, `drafted_by_club(1)` and `draft_type_is('Rookie')` as rows
+against three populated columns, **all nine squares rendered "No answer / 0 eligible"** and the
+drill-down said **"No player satisfies both axes."**
+
+### Root cause of the reported symptom — a data-linkage gap, not a compiler defect
+- The compat mapping is correct (`picktop10` → `national_draft_pick_between {from:'1',to:'10'}`,
+  pinned by `tests/gridley-compat.test.ts`) and the compiled predicate is correct
+  (`draft_kind = 'national' AND pick_number BETWEEN 1 AND 10`, linked rows only).
+- **Both `afldb_dev` and `afldb_test` hold 6,810 `draft_picks` rows of which exactly 5 carry a
+  trusted link** (`link_status_value = 'resolved'`, `match_method =
+  'draftguru_explicit_admin_decision'`: Matt Rendell 1991 pick 76, Ryan O'Keefe 1999 pick 56,
+  Nathan Fyfe 2009 pick 20, Riley Onley 2025 rookie 3, Fred Rodriguez 2025 rookie 1); 6,805 are
+  `unmatched`. `draft_persons` is the same: 5 resolved / 5,052 unmatched, and no person links
+  where its pick does not. `draft_kind` is populated on every row (3,089 national, 1,209 rookie,
+  990 trade, 541 preseason, 370 pre_draft, 280 midseason, 188 post_draft, 138 free_agency,
+  4 mini_draft, 1 training_squad_selection); `pick_number` is NULL on every trade, pre_draft,
+  post_draft and free_agency row and on no other kind.
+- Why: the legacy automatic name linker was retired under AFLDB-ISSUE-093 (the
+  `tools/migration/import_draft.py` tombstone), its 2,319-row population ruled inadmissible and
+  never replayed; AFLDB-ISSUE-164 (RESOLVED 2026-09-12) reconciled the five rows to the five
+  explicit human decisions in the tracked DraftGuru ledger, ran the Tier 1 labelling (114 labels,
+  bulk-eligible n = 0) and left **D-9 in force: `draft_person` suspended from unattended
+  approval**. `tests/integration/gridley-corpus.test.ts` already classifies every `draft_picks`
+  builder as a probed `dataset gap` on this baseline (`draftLinks` = linked × 2 ≥ total is
+  false), which is why the corpus gate never surfaced it as a solver failure. The comment there
+  ("afldb_dev links 5,103 of 6,810") is stale: `afldb_dev` now links 5 as well.
+- Consequence: **every one of the eight `draft_picks` builders** (`drafted_by_club`,
+  `draft_pick_between`, `draft_year_between`, `draft_type_is`, `drafted_by_club_never_played`,
+  `recruited_via`, `traded_min_times`, `national_draft_pick_between`) answers from at most those
+  five players on every current database. The `father_son_selections`-backed builders are
+  unaffected (99 linked selected players, 123 linked fathers).
+
+### Review findings (Grid Solver, systematic) — dispositions
+Each was reproduced or proved from code/data before any change; the numbering is the order found.
+
+1. **Presentation defect (fixed).** An axis whose own eligible set is empty was rendered exactly
+   like a genuine empty intersection ("No answer", "No player satisfies both axes"). The six axis
+   sets are already fetched once per board (`AxisSetCache`), so the distinction costs nothing.
+2. **`draft_type_is` compared the source's raw label (fixed).** `GRID_DRAFT_TYPES` offered
+   `'National'` and `'National Draft'` as two dropdown entries and the compiler bound the label
+   against `draft_picks.draft_type`. Per `data/reference/draftguru-event-kinds.json`
+   (`absent_column`) the 1981/1982/1987 annual pages carry no Draft column and those 113 rows are
+   `('National Draft', 'national')` while every other national row is `('National', 'national')`;
+   `national_draft_pick_between` already read `draft_kind`. Proved from the contract and the row
+   counts above (2,976 + 113).
+3. **"Drafted" builders counted list moves (fixed).** `draft_picks` holds 990 trade and 138
+   free-agency rows; 929 and 128 of them carry the **receiving** club as `club_id` (measured,
+   e.g. 2025 trade rows for Ben Ainsworth → Carlton, Jack Steele → Melbourne). `drafted_by_club`,
+   `drafted_by_club_never_played` and `draft_year_between` therefore read "traded to" as "drafted
+   by" and a trade year as a draft year. `draft_pick_between` was unaffected (no pick number on
+   those rows); `traded_min_times` is the builder that wants them.
+4. **Gridley `fatherson` read the unlinked table (fixed).** The rule mapped "FATHER SON PICK —
+   Selected under the Father-Son rule in the national draft (since 1986)" to
+   `recruited_via('Father-Son')`, i.e. `draft_picks.signing_kind` (118 rows, 0 linked), while
+   its partner `fathersonfather` and the ISSUE-118 §7 table both name `father_son_selections`
+   (fully linked). Remapped to `father_son_selection`. Corpus effect: see Validation.
+5. **Unbounded numeric parameters rejected the whole page (fixed).** `parseIntParam` accepted any
+   integer and the columns are smallint/integer (measured: `matches.season`,
+   `player_career_stats.debut_season`, `draft_picks.pick_number`, `brownlow_season_votes.votes`,
+   `matches.margin`, `players.height_cm` … are `smallint`); PostgreSQL rejects the bound value
+   with SQLSTATE 22003 (`value "199999" is out of range for type smallint`, reproduced), which
+   `guardCellTimeout` rightly does not swallow, so the render rejected and the route showed the
+   error boundary — reproduced through the page component for a `199999` season and for a
+   non-numeric `abc`. The form's `<input type="number">` accepts any magnitude, so this is
+   reachable without editing a token.
+6. **Reset did not reset the filters (fixed).** `GridSolverForm` seeds `useState` from
+   `initialState` and was rendered without a key; on the soft navigation `router.push('/grid-solver')`
+   React preserves the client component and its state, so the board showed the default while the
+   six editors kept the previous questions. Proved from the component and page source (the same
+   pattern the reference `key`-on-navigation guidance exists for); a browser session was not
+   available (audience gate, above), so the regression pin is on the page source.
+7. **Two integration oracles were stale (test expectations, fixed).** The ISSUE-076 and ISSUE-103
+   won-final oracles in `tests/integration/grid-solver.test.ts` read `m.is_final`; the solver
+   reads `m.is_finals_series` by contract (AFLDB-ISSUE-129 §8.4, Wildcard Final ≠ finals series).
+   The real 2026 Wildcard Final rows (2 on `afldb_test`; the fixture seasons are 2095–2097 and
+   were not the cause) made the oracles count the wildcard winners: 3,658 vs 3,644 and 283 vs
+   282 — the two "pre-existing grid-solver failures" the 2026-09-13 full-suite baseline recorded,
+   now explained. A third failing precondition (`after_siren_winner` expects an unlinked
+   premiership-season winner in the load; 124 of 126 rows link and neither unlinked row is one)
+   was a fact about the database, not the solver, and is now reported rather than required.
+8. **Reviewed and found sound (no change):** parameterisation (every request value is bound; the
+   `stat`/`statA`/`statB` family is the only identifier position and is allowlisted before
+   `sql.unsafe`), the linked-row rule on every honours/draft/relationship builder, organization
+   lineage on every club scope with the merger fold opt-in only, NULL-vs-zero handling on the
+   era-limited stats (`IS NOT NULL` on averages, goals-only for the `venue_goals_max` upper
+   bound, `IS NOT NULL` on heights and dates), the finals-series contract, the drawn-Grand-Final
+   handling, `consecutive_wins_min`'s gaps-and-islands over `career_game_no`, the per-axis
+   statement shape and `AxisSetCache` sharing (a rejected axis promise is shared, so one bad axis
+   fails its three squares consistently), `guardCellTimeout`'s narrow catch, URL-state
+   validation (`validateAxis` accepts only known builders and string params, truncated to 200
+   chars, under a 4,096-char token cap), and the drill-down's page/offset handling.
+9. **Observed, not a defect, not changed:** `draft_pick_between` deliberately spans every draft
+   kind (rookie, preseason, midseason, mini-draft picks all carry numbers) and its label says so;
+   `jumper_number_worn` compares the source's text number exactly (a `'07'` would miss — no
+   such value found); `club_season_brownlow_leader` compares across clubs for a player who
+   changed clubs mid-season (rare; not measured).
+
+### Scope decisions
+- **Not fixed here: the draft-pick linkage itself.** Populating `draft_picks.player_id` is a
+  data-acquisition and governance question settled by AFLDB-ISSUE-164 (truth source = the
+  DraftGuru person-page AFL Tables href, to be acquired; D-9 suspends the class; the §9.1
+  standard unmet). Re-opening it is an operator decision; the Grid Solver now reports the gap
+  honestly instead of hiding it.
+- **Not changed: `recruited_via` and `traded_min_times` semantics** — both read the columns their
+  labels name and were verified on the fixture.
+- **Legacy compatibility kept:** an old share link carrying `draftType: 'National Draft'` (or any
+  raw label) still compiles to the same kind; only an unknown value is refused.
+
+### Implementation (2026-09-17)
+- `src/search/grid-solver-spec.ts`: `GRID_DRAFT_TYPES` is now the ten frozen kinds with labels;
+  `resolveDraftKind()` (kind or legacy raw label → kind, else `null`); `draftTypeLabel()`;
+  catalogue comments on the "drafted" exclusion.
+- `src/db/queries/grid-solver.ts`: `GridAxisError`; `parseIntParam(raw, label, max)` requires a
+  whole number in `[0, max]` — `requireInt` (thresholds/seasons/picks/counts/measurements) at
+  32,767, new `requireId` (club/venue/player/award/coach, 38 call sites) at 2,147,483,647;
+  `requireDecimal` requires a finite number in `[0, 32767]`; `requireParam`/`requireStatKeyAt`/
+  `given_name_in` throw `GridAxisError`; `notAListMove(alias)` (`draft_kind IS DISTINCT FROM
+  'trade' AND … 'free_agency'`) applied to `drafted_by_club`, `drafted_by_club_never_played`,
+  `draft_year_between`; `draft_type_is` binds the resolved kind against `draft_kind`;
+  `intersectSets()` factored out; `solveCellSummary` returns `emptyAxis: 'row' | 'col' | 'both'
+  | null` from the two axis sets it already has; `GridCellOutcome` gains `{ status: 'invalid';
+  message }` and `guardCellTimeout` confines a `GridAxisError` to its square (everything else
+  still throws).
+- `src/app/grid-solver/page.tsx`: one `boardToken` reused for every link and as the form's `key`;
+  "Invalid value" squares; "No data" squares and drill-down naming the empty question;
+  `describeAxis` labels a draft kind.
+- `src/app/grid-solver/GridSolverForm.tsx`: the draft-type select renders kind values with labels.
+- `src/search/gridley-compat.ts`: `pickrookie` → `draftType: 'rookie'`, `freeagent1` →
+  `'free_agency'`, `fatherson` → `father_son_selection`.
+- Tests: `tests/grid-solver-spec.test.ts` (+3: vocabulary pinned to the contract,
+  `resolveDraftKind`, `draftTypeLabel`); `tests/grid-solver-timeout.test.ts` (+4: bounds, unknown
+  stat/kind, confinement, page-source pins; the `sql` mock gains `unsafe`);
+  `tests/gridley-compat.test.ts` (+1: every draft rule pinned, every bound `draftType` resolves);
+  `tests/integration/grid-solver.test.ts` (+4 in a new committed, namespaced draft fixture
+  describe — one player `issue221-draft-fixture` with a 1982 `'National Draft'` pick 7, a 1996
+  rookie pick 3, 1999 and 2015 trades and a 2013 free-agency signing on three organizations,
+  removed in `afterAll`; `fillerAxis` supplies `'national'` for the draft-type kind; the two
+  oracles read `is_finals_series`; the after-siren precondition is reported);
+  `tests/integration/gridley-corpus.test.ts` (comment only: the `draftLinks` probe's stale
+  "afldb_dev links 5,103" note corrected; the probe itself is unchanged).
+- `CHANGELOG.md` (Unreleased), `IssuesIndex.md`, this ledger and the Open Issues table.
+
+### Validation (2026-09-17, workstation, `afldb_test` over the 55432 tunnel)
+- Baseline before any change: unit suites (`grid-solver-spec`, `grid-solver-timeout`,
+  `gridley-compat`, `grid-solver-under22`) **40/40**; `tests/integration/grid-solver.test.ts`
+  **209 passed / 3 failed of 212** (the ISSUE-103 oracle 3,658 vs 3,644, the after-siren
+  precondition, and — on a second run — the ISSUE-076 oracle 283 vs 282; all three explained in
+  finding 7 above).
+- After: unit suites **48/48**; `tests/integration/grid-solver.test.ts` **216/216**;
+  `npx tsc --noEmit -p .` **clean** (twice, after source and after test edits).
+- Rendered reproduction harness (scratch, deleted before commit): before — 9 × "No answer",
+  drill-down "No player satisfies both axes."; after — 9 × "No data … the row question matches
+  any player here", drill-down "No data — No player in this database matches this question:
+  National Draft pick between (1, 10)."; a `199999` season token — before: the render rejected
+  with SQLSTATE 22003; after: three "Invalid value — To season must be a whole number between 0
+  and 32767." squares, six solved, "6 of 9 squares solved".
+- Gridley corpus (`tests/integration/gridley-corpus.test.ts`, `AFLDB_GRIDLEY_DIAGNOSTIC=1`,
+  310 s): **1,163 passed / 3 failed of 1,166** — the same pre-existing failures the 2026-09-13
+  full-suite baseline recorded, none touching a changed criterion or builder: two 2026 debutants
+  the database does not hold (`willem-duursma-teammate-13491`, `jagga-smith-teammate-13333`:
+  the "bridges" count 399 vs 401 and the 6 `parse` cells) and 37 `incorrect known answer` cells
+  all on `captain`, `teammates-100/150`, `games100clubs2` and `clubbestfairest` pairs. Every
+  mapped criterion compiled and answered with no error; no criterion over 4 s (three at ~1.8 s,
+  the known `moreFFthanFAcareer` / `teammates-*` shapes). **`fatherson` now answers: 99 players
+  (`father_son_selection`), its 5 findings across the 9 boards all informational `time of board`,
+  0 `incorrect known answer`** — i.e. Gridley's own answer keys agree with the tracked list,
+  pre-draft and rookie selections included, exactly as `fathersonfather` (107) already did.
+  `pick1`/`picktop5`/`picktop10`/`pickrookie`/`freeagent1`/`traded1` remain probed `dataset gap`
+  (0 players each — the linkage gap above), the classification the suite already made for them.
+  Findings by category: time of board 20,612; list membership 1,214; external source
+  disagreement 383; dataset gap 322; unsupported 78 (the seven §23.36 deferrals); adjudicated
+  source conflict 63; source coverage gap 54; incorrect known answer 37; parse 6.
+- Lint (`eslint` on every touched file): **clean**.
+- Not run: `npm run build`, the browser E2E suites, DEV/PROD. No Git command was executed.
+
+### Follow-up (recorded, not fixed here)
+- **Draft-pick linkage population** — the actual cause of the report. Every `draft_picks` builder,
+  `/draft/[year]`, the player-profile draft card and the query builder's `player.draft_picks`
+  relationship all answer from 5 linked rows on every current database. Owner: AFLDB-ISSUE-164's
+  D-9 decision (the DraftGuru person-page acquisition and the §9.1 standard). The Grid Solver now
+  reports it as "No data".
+- The rendered-page reproduction had to be done through a test-harness render because
+  `/grid-solver` is `super_admin`-gated on `afldb_dev` and `afldb_test` (no
+  `grid_solver.audience` row; default `super_admin`) — a DEV browser check of the three renderings
+  above is part of the resolution gate.
+- **2026-09-18:** the draft-linkage follow-up is now tracked as **AFLDB-ISSUE-222** (successor,
+  U1; draft runbook `AFLDB-ISSUE-222.md`). Per U6 this issue's commit/merge and DEV smoke —
+  including check (a), the "No data" rendering, which is only observable while the gap exists —
+  complete before any linkage population reaches DEV. This issue's pending-validation status is
+  unchanged.

@@ -14,7 +14,7 @@ import { performance } from 'node:perf_hooks';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { sql } from '@/db/client';
-import { solveCellRows, solveCellSummary } from '@/db/queries/grid-solver';
+import { compileAxis, solveCellRows, solveCellSummary } from '@/db/queries/grid-solver';
 import { getPlayerOverlapSummary } from '@/db/queries/player-compare';
 import {
   GRID_BUILDER_KEYS,
@@ -29,12 +29,18 @@ afterAll(async () => {
   await sql.end();
 });
 
-/** Syntactically valid params for any builder -- real ids are not needed: every param lands as a bound literal inside a WHERE clause, never an identifier, so a nonexistent id is safe SQL that just matches nothing. */
+/**
+ * Syntactically valid params for any builder -- real ids are not needed: every
+ * param lands as a bound literal inside a WHERE clause, never an identifier, so
+ * a nonexistent id is safe SQL that just matches nothing. The two closed
+ * vocabularies the compiler validates before binding (a statistic, a draft
+ * kind -- AFLDB-ISSUE-221) get a member of the vocabulary.
+ */
 function fillerAxis(builderKey: string): GridAxisState {
   const def = GRID_BUILDERS[builderKey];
   const params: Record<string, string> = {};
   for (const p of def.params) {
-    params[p.key] = p.kind === 'stat' ? 'disposals' : '1';
+    params[p.key] = p.kind === 'stat' ? 'disposals' : p.kind === 'draftType' ? 'national' : '1';
   }
   return { builder: builderKey, params };
 }
@@ -258,7 +264,11 @@ describe('grid solver correctness', () => {
           FROM player_match_stats pms
           JOIN matches m ON m.id = pms.match_id
          WHERE m.venue_id = ${identity.venueId}
-           AND m.is_final
+           -- The finals series, the solver's own contract (AFLDB-ISSUE-129
+           -- §8.4): the real 2026 Wildcard Final at this venue made an
+           -- is_final oracle count one winner the solver rightly excludes
+           -- (283 against 282, the pre-existing failure AFLDB-ISSUE-221 traced).
+           AND m.is_finals_series
            AND m.winner_club_id = pms.club_id
       ), row_memberships AS (
         SELECT 0 AS row_index, player_id FROM multi_club_players
@@ -632,8 +642,14 @@ describe('grid solver correctness', () => {
       `;
       for (const r of only) expect(truthIds.has(r.id), `${e.kind}: player ${r.id}`).toBe(false);
     }
+    // An unlinked kicker is excluded by the player_id IS NOT NULL clause the
+    // truth set above already applies; whether the load carries one is a fact
+    // about the database (124 of 126 rows link on the 2026-09-17 afldb_test,
+    // none of the unlinked two a premiership-season winner), not a solver
+    // property, so its presence is reported rather than required
+    // (AFLDB-ISSUE-221).
     const [unlinked] = await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM after_siren_kicks WHERE player_id IS NULL AND premiership_season AND kick_effect = 'won'`;
-    expect(unlinked.n).toBeGreaterThan(0);
+    if (unlinked.n === 0) console.log('[grid-solver] after_siren_kicks holds no unlinked premiership-season winner on this database; the unlinked exclusion is exercised by the truth set alone');
     // Luke Shuey's 2017 elimination-final goal after the end-of-extra-time siren
     // (§23.33 adjudication asr-adj-001) qualifies; David King's 1994 miss before
     // extra time (asr-adj-002, siren = end_of_regulation) does not.
@@ -785,7 +801,12 @@ describe('grid solver correctness', () => {
           JOIN matches m
             ON m.id = pms.match_id
            AND m.winner_club_id = pms.club_id
-         WHERE m.is_final
+         -- A final in the traditional finals series, the solver's own contract
+         -- (AFLDB-ISSUE-129 §8.4): a Wildcard Final is is_final = true but
+         -- is_finals_series = false, and the real 2026 rows made an is_final
+         -- oracle disagree with the solver by the wildcard winners
+         -- (AFLDB-ISSUE-221 baseline: 3,658 against 3,644).
+         WHERE m.is_finals_series
          GROUP BY pms.player_id
       ),
       never_winning_final_players AS (
@@ -1073,5 +1094,134 @@ describe('AFLDB-ISSUE-129 wildcard finals semantics (grid solver)', () => {
     expect(never.sort()).toEqual(
       [fixture.wildcardOnlyPlayerId, fixture.finalsSeriesPlayerId].sort(),
     );
+  });
+});
+
+/**
+ * AFLDB-ISSUE-221 -- the draft builders against rows that actually link.
+ *
+ * afldb_test links 5 of 6,810 draft_picks (the tracked human decisions, the
+ * only population D-9 of AFLDB-ISSUE-164 admits), none of them a top-10
+ * national pick, a trade or a free-agency signing, so no live row can prove
+ * the eight draft_picks builders and the "every builder compiles" loop above
+ * proves only that they run. This seeds ONE committed, namespaced player with
+ * exactly the row shapes the builders must tell apart -- the 1982 'National
+ * Draft' spelling, a rookie pick, two trades and a free-agency signing, each
+ * on a different club -- and removes them afterwards, the
+ * wildcard-final-fixture convention (committed, namespaced, fail-closed on a
+ * collision).
+ */
+describe('draft builders on a committed draft fixture (AFLDB-ISSUE-221)', () => {
+  const SLUG = 'issue221-draft-fixture';
+  let playerId = 0;
+  let orgDrafted = 0;
+  let orgTradedTo = 0;
+  let orgFreeAgentTo = 0;
+
+  const cleanup = async () => {
+    const ids = (await sql<{ id: number }[]>`SELECT id::int AS id FROM players WHERE slug = ${SLUG}`).map((r) => r.id);
+    if (ids.length === 0) return;
+    await sql`DELETE FROM draft_picks WHERE player_id = ANY(${ids})`;
+    await sql`DELETE FROM player_career_stats WHERE player_id = ANY(${ids})`;
+    await sql`DELETE FROM players WHERE id = ANY(${ids})`;
+  };
+
+  beforeAll(async () => {
+    const existing = await sql`SELECT id FROM players WHERE slug = ${SLUG}`;
+    if (existing.length > 0) throw new Error(`Refusing to run: players.slug ${SLUG} already exists. Remove it deliberately.`);
+    const clubs = await sql<{ id: number; org: number }[]>`
+      SELECT DISTINCT ON (organization_id) id::int AS id, organization_id::int AS org
+        FROM clubs WHERE organization_id IS NOT NULL ORDER BY organization_id, id LIMIT 3`;
+    expect(clubs).toHaveLength(3);
+    const [drafted, tradedTo, freeAgentTo] = clubs;
+    orgDrafted = drafted.org;
+    orgTradedTo = tradedTo.org;
+    orgFreeAgentTo = freeAgentTo.org;
+    try {
+      const [p] = await sql<{ id: number }[]>`
+        INSERT INTO players (display_name, sort_name, search_name, slug)
+        VALUES ('Issue221 Draftee', 'Issue221 Draftee', 'issue221 draftee', ${SLUG}) RETURNING id::int AS id`;
+      playerId = p.id;
+      // The solver's base relation is players JOIN player_career_stats; a
+      // drafted player who never played has a zero row, not no row.
+      await sql`INSERT INTO player_career_stats (player_id, games, clubs_played, seasons_played) VALUES (${playerId}, 0, 0, 0)`;
+      const pick = (year: number, type: string, kind: string, pickNumber: number | null, clubId: number, signingKind: string | null) => sql`
+        INSERT INTO draft_picks (draft_year, draft_type, draft_kind, pick_number, player_id, player_name_raw, link_status_value, club_id, signing_kind)
+        VALUES (${year}, ${type}, ${kind}, ${pickNumber}, ${playerId}, 'Issue221 Draftee', 'resolved', ${clubId}, ${signingKind})`;
+      await pick(1982, 'National Draft', 'national', 7, drafted.id, 'Father-Son');
+      await pick(1996, 'Rookie', 'rookie', 3, drafted.id, null);
+      await pick(1999, 'Trade', 'trade', null, tradedTo.id, null);
+      await pick(2013, 'Free Agency', 'free_agency', null, freeAgentTo.id, 'FA');
+      await pick(2015, 'Trade', 'trade', null, drafted.id, null);
+    } catch (error) {
+      await cleanup();
+      throw error;
+    }
+  });
+
+  afterAll(cleanup);
+
+  /** Whether the fixture player satisfies the axis, through the production compiler on the solver's own base relation. */
+  const has = async (axis: GridAxisState): Promise<boolean> => {
+    const rows = await sql<{ id: number }[]>`
+      SELECT p.id FROM players p JOIN player_career_stats c ON c.player_id = p.id
+       WHERE ${compileAxis(axis)} AND p.id = ${playerId}`;
+    return rows.length === 1;
+  };
+
+  it('national_draft_pick_between reads the 1982 "National Draft" spelling as a national pick; draft_pick_between spans every kind', async () => {
+    expect(await has({ builder: 'national_draft_pick_between', params: { from: '1', to: '10' } })).toBe(true);
+    expect(await has({ builder: 'national_draft_pick_between', params: { from: '1', to: '5' } })).toBe(false);
+    expect(await has({ builder: 'national_draft_pick_between', params: { from: '3', to: '3' } })).toBe(false); // the rookie pick is not national
+    expect(await has({ builder: 'draft_pick_between', params: { from: '3', to: '3' } })).toBe(true);
+  });
+
+  it('draft_type_is is asked of draft_kind, so both national spellings and a legacy label find the same row', async () => {
+    for (const draftType of ['national', 'National', 'National Draft']) {
+      expect(await has({ builder: 'draft_type_is', params: { draftType } }), draftType).toBe(true);
+    }
+    expect(await has({ builder: 'draft_type_is', params: { draftType: 'rookie' } })).toBe(true);
+    expect(await has({ builder: 'draft_type_is', params: { draftType: 'free_agency' } })).toBe(true);
+    expect(await has({ builder: 'draft_type_is', params: { draftType: 'midseason' } })).toBe(false);
+    // The raw-label comparison this replaced could only have found the 1982
+    // row under the spelling the source used for it.
+    const [raw] = await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM draft_picks WHERE player_id = ${playerId} AND draft_type = 'National'`;
+    expect(raw.n).toBe(0);
+  });
+
+  it('the "drafted" builders exclude the trade and free-agency list moves, which the trade builder counts', async () => {
+    expect(await has({ builder: 'drafted_by_club', params: { club: String(orgDrafted) } })).toBe(true);
+    expect(await has({ builder: 'drafted_by_club', params: { club: String(orgTradedTo) } })).toBe(false);
+    expect(await has({ builder: 'drafted_by_club', params: { club: String(orgFreeAgentTo) } })).toBe(false);
+    // No player_clubs row at all, so "never played there" holds for the drafting club and nowhere else.
+    expect(await has({ builder: 'drafted_by_club_never_played', params: { club: String(orgDrafted) } })).toBe(true);
+    expect(await has({ builder: 'drafted_by_club_never_played', params: { club: String(orgTradedTo) } })).toBe(false);
+    expect(await has({ builder: 'draft_year_between', params: { from: '1982', to: '1982' } })).toBe(true);
+    expect(await has({ builder: 'draft_year_between', params: { from: '1996', to: '1996' } })).toBe(true);
+    expect(await has({ builder: 'draft_year_between', params: { from: '1999', to: '1999' } })).toBe(false);
+    expect(await has({ builder: 'draft_year_between', params: { from: '2013', to: '2013' } })).toBe(false);
+    expect(await has({ builder: 'traded_min_times', params: { times: '2' } })).toBe(true);
+    expect(await has({ builder: 'traded_min_times', params: { times: '3' } })).toBe(false);
+    expect(await has({ builder: 'recruited_via', params: { signingKind: 'Father-Son' } })).toBe(true);
+    expect(await has({ builder: 'recruited_via', params: { signingKind: 'Academy' } })).toBe(false);
+  });
+
+  it('solveCellSummary tells an axis nobody matches apart from an empty intersection', async () => {
+    // No player debuted in season 1: an axis with no answers of its own.
+    const nobody: GridAxisState = { builder: 'debuted_between', params: { from: '1', to: '1' } };
+    const anyone: GridAxisState = { builder: 'career_games_min', params: { games: '0' } };
+    expect(await solveCellSummary(nobody, anyone, 'games_asc')).toEqual({ eligible: 0, emptyAxis: 'row', top: null });
+    expect(await solveCellSummary(anyone, nobody, 'games_asc')).toEqual({ eligible: 0, emptyAxis: 'col', top: null });
+    expect(await solveCellSummary(nobody, nobody, 'games_asc')).toEqual({ eligible: 0, emptyAxis: 'both', top: null });
+    // Two populated axes with nothing in common: a genuine "no player satisfies both".
+    const disjoint = await solveCellSummary(
+      { builder: 'career_games_min', params: { games: '10' } },
+      { builder: 'career_games_max', params: { games: '5' } },
+      'games_asc',
+    );
+    expect(disjoint).toEqual({ eligible: 0, emptyAxis: null, top: null });
+    const populated = await solveCellSummary(anyone, anyone, 'games_asc');
+    expect(populated.emptyAxis).toBeNull();
+    expect(populated.eligible).toBeGreaterThan(0);
   });
 });

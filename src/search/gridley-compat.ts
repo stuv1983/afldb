@@ -484,10 +484,24 @@ export const GRIDLEY_RULES: Record<string, Rule> = {
   pick1: fixed('PICK 1', mapped('national_draft_pick_between', { from: '1', to: '1' })),
   picktop5: fixed('TOP 5', mapped('national_draft_pick_between', { from: '1', to: '5' })),
   picktop10: fixed('TOP 10', mapped('national_draft_pick_between', { from: '1', to: '10' })),
-  pickrookie: fixed('ROOKIE', mapped('draft_type_is', { draftType: 'Rookie' })),
+  // draftType names a draft_kind (AFLDB-ISSUE-221): 'rookie' is every Rookie
+  // Draft row; 'free_agency' is the free-agency kind, whose signing_kind is
+  // FA or DFA -- Gridley's "free agent, restricted free agent, or delisted
+  // free agent" -- so no signing filter is needed on top of it.
+  pickrookie: fixed('ROOKIE', mapped('draft_type_is', { draftType: 'rookie' })),
   traded1: fixed('TRADED', mapped('traded_min_times', { times: '1' })),
-  freeagent1: fixed('FREE AGENT', mapped('draft_type_is', { draftType: 'Free Agency' })),
-  fatherson: fixed('FATHER SON PICK', mapped('recruited_via', { signingKind: 'Father-Son' })),
+  freeagent1: fixed('FREE AGENT', mapped('draft_type_is', { draftType: 'free_agency' })),
+  // "Selected under the Father-Son rule in the national draft (since 1986)":
+  // the SON of a father_son_selections row -- the tracked, normalised list
+  // ISSUE-118 §7 named for this criterion, and the same table its partner
+  // `fathersonfather` already reads. Until AFLDB-ISSUE-221 this mapped to
+  // recruited_via('Father-Son'), which reads draft_picks.signing_kind and
+  // therefore depends on the pick-to-player links (5 of 6,810 today), so
+  // the criterion could never be answered even though the father-son list
+  // is fully linked. The tracked list includes pre-draft and rookie-draft
+  // selections under the same rule; Gridley's answer keys decide whether
+  // that is wider, exactly as for fathersonfather.
+  fatherson: fixed('FATHER SON PICK', mapped('father_son_selection')),
   // "Player has had a son selected under the Father-Son rule in the national
   // draft (since 1986)": the FATHER of a father_son_selections row (ISSUE-118
   // §23.29). The tracked list includes pre-draft and rookie-draft selections

@@ -17,6 +17,7 @@ import { formatNumber, formatSpan, playerPath } from '@/lib/format';
 import { firstValue, parsePage } from '@/lib/params';
 import {
   DEFAULT_BOARD_STATE,
+  draftTypeLabel,
   GRID_AA_POSITIONS,
   GRID_BUILDERS,
   GRID_LIMITS,
@@ -58,6 +59,12 @@ export default async function GridSolverPage({
   const params = await searchParams;
   const token = firstValue(params.g);
   const state: GridBoardState = (token && parseBoardState(token)) || DEFAULT_BOARD_STATE;
+  // One token per board, reused for every link on the page and as the
+  // form's key: the form keeps its own copy of the board in client state,
+  // and on a soft navigation React keeps that state unless the element is
+  // keyed, so without this "Reset" cleared the board but left the filters
+  // showing the old questions (AFLDB-ISSUE-221).
+  const boardToken = serializeBoardState(state);
 
   const axisPlayerIds = [...state.rows, ...state.cols]
     .filter((a) => GRID_BUILDERS[a.builder]?.params.some((p) => p.kind === 'player'))
@@ -75,6 +82,7 @@ export default async function GridSolverPage({
   const venueNames = new Map(venueOptions.map((v) => [v.id, v.name]));
   const awardNames = new Map(awardOptions.map((a) => [a.id, a.name]));
   const coachNames = new Map(coachOptions.map((c) => [c.id, c.name]));
+  const lookups = { clubs: clubNames, venues: venueNames, players: playerNames, awards: awardNames, coaches: coachNames };
 
   // Solve every cell whose row and column are both fully specified --
   // an incomplete axis just says "define both axes", the same first-load
@@ -97,6 +105,18 @@ export default async function GridSolverPage({
       console.error(`[grid-solver] cell ${r}-${c} timed out: ${state.rows[r].builder} x ${state.cols[c].builder}`);
     }
   }));
+  // "No answer" is honest only when both questions have answers of their
+  // own. An axis that matches nobody in this database (a question whose
+  // dataset is unlinked or absent) is reported as such on every square it
+  // touches, so a reader is not told "no player satisfies both" about a
+  // pair the database never evaluated.
+  const emptyAxisNote = (r: number, c: number, emptyAxis: GridCellSummary['emptyAxis']): string | null => {
+    if (!emptyAxis) return null;
+    const which = emptyAxis === 'both'
+      ? `${describeAxis(state.rows[r], lookups)} and ${describeAxis(state.cols[c], lookups)}`
+      : describeAxis(emptyAxis === 'row' ? state.rows[r] : state.cols[c], lookups);
+    return `No player in this database matches ${emptyAxis === 'both' ? 'either question' : 'this question'}: ${which}.`;
+  };
 
   // The first solved cell opens automatically, so the page never lands on
   // an empty drill-down panel.
@@ -126,8 +146,9 @@ export default async function GridSolverPage({
     ))
     : null;
   const drillDown = drillDownOutcome?.status === 'solved' ? drillDownOutcome.value : null;
+  const openSummary = open && cells[open[0]][open[1]];
+  const openEmptyAxis = open && openSummary?.status === 'solved' ? emptyAxisNote(open[0], open[1], openSummary.value.emptyAxis) : null;
 
-  const lookups = { clubs: clubNames, venues: venueNames, players: playerNames, awards: awardNames, coaches: coachNames };
   const defined = cells.flat().filter((cell) => cell?.status === 'solved').length;
 
   // The board and its controls reorder and collapse like any other stack of
@@ -142,6 +163,7 @@ export default async function GridSolverPage({
           <CollapsiblePanel title="Search filters" note="Six axes and a ranking">
             <div style={{ padding: '0.75rem 0.9rem 0.9rem' }}>
               <GridSolverForm
+                key={boardToken}
                 initialState={state}
                 clubs={clubOptions}
                 venues={venueOptions}
@@ -188,10 +210,28 @@ export default async function GridSolverPage({
                             </td>
                           );
                         }
+                        if (outcome.status === 'invalid') {
+                          return (
+                            <td key={c} className="muted">
+                              Invalid value
+                              <div style={{ fontSize: '0.78rem' }}>{outcome.message}</div>
+                            </td>
+                          );
+                        }
                         const cell = outcome.value;
+                        if (cell.emptyAxis) {
+                          return (
+                            <td key={c} className="muted">
+                              <Link href={`/grid-solver?g=${boardToken}&cell=${r}-${c}`}>No data</Link>
+                              <div style={{ fontSize: '0.78rem' }}>
+                                {cell.emptyAxis === 'both' ? 'neither question' : cell.emptyAxis === 'row' ? 'the row question' : 'the column question'} matches any player here
+                              </div>
+                            </td>
+                          );
+                        }
                         return (
                           <td key={c} style={isOpen ? { background: 'var(--bg-hover)', fontWeight: 650 } : undefined}>
-                            <Link href={`/grid-solver?g=${serializeBoardState(state)}&cell=${r}-${c}`}>
+                            <Link href={`/grid-solver?g=${boardToken}&cell=${r}-${c}`}>
                               {cell.eligible === 0 ? 'No answer' : cell.top?.displayName}
                             </Link>
                             <div className="muted" style={{ fontSize: '0.78rem' }}>
@@ -241,8 +281,8 @@ export default async function GridSolverPage({
 
           {drillDown.total === 0 ? (
             <div className="empty">
-              <h2>No answer</h2>
-              <p>No player satisfies both axes.</p>
+              <h2>{openEmptyAxis ? 'No data' : 'No answer'}</h2>
+              <p>{openEmptyAxis ?? 'No player satisfies both axes.'}</p>
             </div>
           ) : (
             <>
@@ -273,7 +313,7 @@ export default async function GridSolverPage({
 
               <Pagination
                 basePath="/grid-solver"
-                params={{ g: serializeBoardState(state), cell: `${openCell[0]}-${openCell[1]}` }}
+                params={{ g: boardToken, cell: `${openCell[0]}-${openCell[1]}` }}
                 page={page}
                 pageSize={GRID_LIMITS.defaultRowsPerCell}
                 total={drillDown.total}
@@ -322,6 +362,7 @@ function describeAxis(
       case 'coach': return lookups.coaches.get(Number(raw)) ?? `Coach #${raw}`;
       case 'stat': return Object.hasOwn(GRID_STATS, raw) ? GRID_STATS[raw as keyof typeof GRID_STATS].label : raw;
       case 'aaPosition': return GRID_AA_POSITIONS.find((o) => o.value === raw)?.label ?? raw;
+      case 'draftType': return draftTypeLabel(raw);
       default: return raw;
     }
   });

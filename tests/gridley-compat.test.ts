@@ -15,7 +15,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { GRID_BUILDERS, isAxisComplete } from '@/search/grid-solver-spec';
+import { GRID_BUILDERS, isAxisComplete, resolveDraftKind } from '@/search/grid-solver-spec';
 import {
   GRIDLEY_CLUB_CODES,
   GRIDLEY_RULES,
@@ -270,5 +270,28 @@ describe('Gridley semantics that are decided by arithmetic or lineage, not by lo
     expect(normalisePlayerName('JAEGER OMEARA')).toBe('jaeger omeara');
     expect(normalisePlayerName('Jason Horne-Francis')).toBe('jason hornefrancis');
     expect(normalisePlayerName('Sam De Koning')).toBe('sam de koning');
+  });
+
+  it('draft criteria name a draft_kind, and both father-son criteria read the tracked list (AFLDB-ISSUE-221)', () => {
+    expect(map('pick1', 'PICK 1', 'NATIONAL DRAFT')).toMatchObject({ axis: { builder: 'national_draft_pick_between', params: { from: '1', to: '1' } } });
+    expect(map('picktop5', 'TOP 5', 'DRAFT PICK')).toMatchObject({ axis: { builder: 'national_draft_pick_between', params: { from: '1', to: '5' } } });
+    expect(map('picktop10', 'TOP 10', 'DRAFT PICK')).toMatchObject({ axis: { builder: 'national_draft_pick_between', params: { from: '1', to: '10' } } });
+    // draft_kind values, never the source's raw draft_type label, which spells
+    // the national draft two ways ('National' / 'National Draft').
+    expect(map('pickrookie', 'ROOKIE', 'DRAFT PICK')).toMatchObject({ axis: { builder: 'draft_type_is', params: { draftType: 'rookie' } } });
+    expect(map('freeagent1', 'FREE AGENT', 'SIGNING')).toMatchObject({ axis: { builder: 'draft_type_is', params: { draftType: 'free_agency' } } });
+    expect(map('traded1', 'TRADED', '1+ TIMES')).toMatchObject({ axis: { builder: 'traded_min_times', params: { times: '1' } } });
+    // The son and the father of a father_son_selections row: the fully linked
+    // tracked list, not draft_picks.signing_kind, which needs a pick-to-player
+    // link the database holds for 5 of 6,810 rows.
+    expect(map('fatherson', 'FATHER SON PICK', 'SINCE 1986')).toMatchObject({ axis: { builder: 'father_son_selection', params: {} } });
+    expect(map('fathersonfather', 'FATHER OF', 'A FATHER-SON PICK')).toMatchObject({ axis: { builder: 'father_son_father', params: {} } });
+    // Every draftType a rule binds is a kind the compiler resolves.
+    for (const [id, rule] of Object.entries(GRIDLEY_RULES)) {
+      const mapping = map(id, rule.titles[0]);
+      if (mapping.status === 'mapped' && mapping.axis.builder === 'draft_type_is') {
+        expect(resolveDraftKind(mapping.axis.params.draftType), id).not.toBeNull();
+      }
+    }
   });
 });

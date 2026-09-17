@@ -1,12 +1,18 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import { encodeUrlState } from '@/lib/urlState';
 import {
   DEFAULT_BOARD_STATE,
+  draftTypeLabel,
   GRID_BUILDERS,
+  GRID_DRAFT_TYPES,
   GRID_LIMITS,
   isAxisComplete,
   parseBoardState,
+  resolveDraftKind,
   serializeBoardState,
   type GridBoardState,
 } from '@/search/grid-solver-spec';
@@ -151,5 +157,41 @@ describe('GRID_BUILDERS catalogue', () => {
       const keys = def.params.map((p) => p.key);
       expect(new Set(keys).size, key).toBe(keys.length);
     }
+  });
+});
+
+describe('draft type vocabulary (AFLDB-ISSUE-221)', () => {
+  // The ONE authority for draft_kind (migration 069): the frozen DraftGuru
+  // event-kind contract, whose draft_type column is the source's raw label.
+  const contract = JSON.parse(readFileSync(join(__dirname, '..', 'data', 'reference', 'draftguru-event-kinds.json'), 'utf8')) as {
+    events: { draft_type: string; draft_kind: string }[];
+    absent_column: { draft_type: string; draft_kind: string };
+  };
+  const pairs = [...contract.events, contract.absent_column];
+
+  it('offers exactly the frozen draft kinds, once each, with distinct labels', () => {
+    expect(GRID_DRAFT_TYPES.map((o) => o.value).sort()).toEqual([...new Set(pairs.map((p) => p.draft_kind))].sort());
+    expect(new Set(GRID_DRAFT_TYPES.map((o) => o.label)).size).toBe(GRID_DRAFT_TYPES.length);
+  });
+
+  it('resolves a kind or a legacy raw label -- both national spellings to the one kind -- and nothing else', () => {
+    for (const p of pairs) {
+      expect(resolveDraftKind(p.draft_kind), p.draft_kind).toBe(p.draft_kind);
+      expect(resolveDraftKind(p.draft_type), p.draft_type).toBe(p.draft_kind);
+    }
+    expect(resolveDraftKind('National')).toBe('national');
+    expect(resolveDraftKind('National Draft')).toBe('national');
+    // The contract forbids deriving the kind mechanically: 'Pre-Season' is
+    // 'preseason', so the mechanical spelling is not a kind.
+    expect(resolveDraftKind('pre_season')).toBeNull();
+    expect(resolveDraftKind('')).toBeNull();
+    expect(resolveDraftKind("national' OR 1=1")).toBeNull();
+  });
+
+  it('labels a kind for the board and falls back to the raw value', () => {
+    expect(draftTypeLabel('national')).toBe('National Draft');
+    expect(draftTypeLabel('National Draft')).toBe('National Draft');
+    expect(draftTypeLabel('free_agency')).toBe('Free Agency');
+    expect(draftTypeLabel('bogus')).toBe('bogus');
   });
 });
