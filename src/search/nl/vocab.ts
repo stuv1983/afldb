@@ -159,6 +159,21 @@ export function canonicalise(raw: string): string {
     // leftover token. Hyphens and apostrophes are deliberately NOT here --
     // "inside-fifties", "home-and-away" and "o'brien" all need theirs.
     .replace(/[.,!?:;—–…"“”()[\]]/g, ' ');
+  // AFLDB-ISSUE-219: a plural noun/alias already ending in "s" takes a bare
+  // trailing apostrophe for its possessive ("Bombers'", "Dogs'", "Lions'"),
+  // not "'s" -- the '['’]s\b' strip above only matches when an "s" follows
+  // the apostrophe, so this form survived untouched all the way to
+  // meaningfulTokens' whitespace split, attaching the punctuation mark to
+  // the word (e.g. "bombers'") and desyncing it from the plain alias
+  // (e.g. "bombers") that club/venue/vocabulary matching consumes -- the
+  // matched span itself was already correct, only the leftover-token
+  // comparison at the end of parseNlQuestion ever saw the mismatch. Only a
+  // trailing apostrophe immediately before whitespace/end-of-string
+  // qualifies (punctuation is already spaces by this point), so a mid-word
+  // apostrophe like "o'brien" -- never followed by a boundary here -- is
+  // untouched; this is the general possessive case the existing "'s" strip
+  // above already handles for every other word, not a club-specific rule.
+  text = text.replace(/(\w)['’](?=\s|$)/g, '$1');
   for (const filler of CONVERSATIONAL_FILLER) text = text.replace(filler, ' ');
   text = text.replace(/\s+/g, ' ').trim();
   text = text.replace(LEADING_REQUEST_PREFIX_RE, '').trim();

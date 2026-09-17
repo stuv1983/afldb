@@ -722,7 +722,28 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
 // distinct, pre-existing possessive-club-alias defect (the same one
 // AFLDB-ISSUE-214 found for club_season_rank) and is deliberately NOT
 // fixed here.
-export const PARSER_VERSION = 65;
+// v66 -- AFLDB-ISSUE-219: a shared canonicalise() (nl/vocab.ts) defect, not a
+// per-grain one -- the same trailing-apostrophe possessive-alias defect
+// AFLDB-ISSUE-214 (club_season_rank) and AFLDB-ISSUE-218 (team_match_result/0)
+// both independently found and deliberately deferred as a future cross-family
+// issue. A plural club/venue alias already ending in "s" takes a bare
+// trailing apostrophe for its possessive ("Bombers'", "Dogs'", "Lions'"),
+// which the existing "'s" strip never matched (it requires an "s" after the
+// apostrophe). Club/venue matching itself already resolved these correctly
+// via word-boundary regexes; only the final leftover-token comparison ever
+// saw the mismatch, because meaningfulTokens' whitespace split kept the
+// apostrophe attached to the word while the matched/consumed span did not
+// carry it -- reported as unsupported_term: "bombers'" etc. Fixed once,
+// generically, in canonicalise(): any word-final apostrophe immediately
+// before whitespace/end-of-string is now stripped the same way "'s" already
+// is, mirroring the existing rule rather than special-casing any
+// club/venue/alias. Confirmed cross-family via
+// tools/nl/generate-exploratory-corpus-v2.mjs's possessive() helper
+// (line 178), used by team_match_result (both /0's leading-club form and
+// the AFLDB-ISSUE-218 §3 residual note), team_checkpoint_collision,
+// q3_comeback_near_miss, club_season_rank (the AFLDB-ISSUE-214 residual) and
+// team_streak.
+export const PARSER_VERSION = 66;
 
 // ------------------------------------------------------------------ grain
 

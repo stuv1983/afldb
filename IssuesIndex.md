@@ -6,6 +6,43 @@
 
 **Open issues:** 0
 
+**AFLDB-ISSUE-219 resolved 2026-09-17** (Sonnet 5, operator-validated on streamanator) —
+cross-family NL defect: a plural club/venue alias already ending in "s" takes a bare trailing
+apostrophe for its possessive ("Bombers'", "Dogs'", "Lions'", the AFLDB-ISSUE-214 §10c residual's
+"Suns'"/"Pies'"/"Bulldogs'"), which `canonicalise()`'s existing `'s\b` strip
+(`src/search/nl/vocab.ts`) never matched (it requires a literal "s" after the apostrophe).
+Club/venue matching itself already resolved these aliases correctly via word-boundary regexes;
+only the final leftover-token comparison in `parseNlQuestion` (`src/search/nl/parser.ts`) ever
+disagreed, because `meaningfulTokens`' whitespace split kept the apostrophe attached to the word
+while the matched/consumed span did not. Confirmed a shared `canonicalise()` defect, not a
+per-builder one, by tracing `tools/nl/generate-exploratory-corpus-v2.mjs`'s `possessive()` helper
+(line 178) across five families: `team_match_result`, `team_checkpoint_collision`,
+`q3_comeback_near_miss`, `club_season_rank` (the ISSUE-214 residual) and `team_streak`. Fixed with
+one new generic trailing-apostrophe strip in `canonicalise()`, mirroring the existing `'s` rule
+rather than special-casing any club — no apostrophe made globally ignorable (only a trailing one
+immediately before whitespace/end-of-string; a mid-word apostrophe like `o'brien` is untouched).
+`PARSER_VERSION` 65 → 66 (baseline corrected during reconciliation with `AFLDB-ISSUE-218`, which
+already holds 64 → 65 on `dev`). `AFLDB-ISSUE-218` (below) **independently found and deliberately
+deferred the identical defect** for its own `team_match_result/0` cluster (56 rows,
+"Bombers'"/"Dogs'"/"Brisbane Lions'"), naming this exact cross-family issue as its recorded
+follow-up candidate — confirming this issue's root-cause finding a second, independent way,
+alongside AFLDB-ISSUE-214 §10c. Local: `tests/nl-parser.test.ts` **605/605**, broader gates
+**402/402**, `typecheck` clean. **Host validation (streamanator):** no established mechanism
+existed to transport uncommitted code to a host, so a temporary, isolated `git worktree`
+(`/home/arm/nl-issue219-validation`, off `origin/dev` at `a98c3e42`) was created and a `git diff`
+patch applied — a clean `git apply --check` itself served as the identity proof;
+`/home/arm/projects/afldb` and the retained git stash were never touched, and the temp worktree
+was removed after validation. Host suites reconfirmed 605/605 + 402/402 + clean typecheck.
+Exploratory V2 (29,030 rows, the AFLDB-ISSUE-218-corrected corpus) moved **20512 → 20876 clean**
+(+364 / -364 soft / 0 failed), reconciling exactly across five families (`club_season_rank` 210,
+`team_streak` 75, `team_match_result` 56, `team_checkpoint_collision` 16,
+`q3_comeback_near_miss` 7) — every one of the 364 improved rows confirmed to carry a
+trailing-apostrophe alias, zero that don't. The frozen V1/"V5" corpus's three failing rows (a
+stale `verified_finals_without_premiership` fact check, Nick Dal Santo → Dane Rampe tie count)
+were proven via a decisive v65-vs-v66 control against the same current database to be pre-existing
+data drift, **not** a regression — flagged as a stale-corpus-expectation candidate, not opened as
+its own issue in this closeout. See `issues.md` and `AFLDB-ISSUE-219.md` §14 for the full record.
+
 **AFLDB-ISSUE-218 resolved 2026-09-17** (Sonnet 5, operator-validated on
 streamanator across two host-validation rounds) — `team_match_result/1` (522
 rows, "at V, find the widest X win/loss to Y...") and `/2` (569 rows, "by how
