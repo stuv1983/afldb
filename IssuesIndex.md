@@ -4,31 +4,7 @@
 >
 > `issues.md` is the authoritative detailed ledger.
 
-**Open issues:** 2
-
-### AFLDB-ISSUE-221 — Grid Solver cannot answer draft criteria ("Top 10 draft pick"): pick-to-player links stand at 5 of 6,810, and the review found five Grid Solver defects around it
-- **Severity:** Medium. **Area:** Grid Solver (`src/search/grid-solver-spec.ts`, `src/db/queries/grid-solver.ts`,
-  `src/app/grid-solver/`, `src/search/gridley-compat.ts`) / draft data linkage.
-- **State:** Open (2026-09-17). Implemented in worktree `afldb-issue-221` (Fable 5.1, uncommitted),
-  pending operator commit and DEV verification. The reported symptom is a **data-linkage gap**
-  (AFLDB-ISSUE-164 D-9 keeps unattended draft linking suspended; the 5 links are the tracked human
-  decisions) — recorded as follow-up, not fixed here. Fixed in scope: honest "No data" squares for an
-  axis that matches nobody; `draft_type_is` asked of `draft_kind` (legacy labels still resolve);
-  trade/free-agency rows excluded from the three "drafted" builders; Gridley `fatherson` →
-  `father_son_selection`; bounded numeric parameters with a per-square "Invalid value" instead of the
-  error boundary; the form keyed by the board token so Reset resets; two stale `is_final` test oracles.
-- **Local validation (2026-09-17):** unit suites **48/48**; `tests/integration/grid-solver.test.ts`
-  **216/216** (was 209/212: the two `is_final` oracles and the after-siren precondition explained and
-  fixed); Gridley corpus diagnostic **1,163/1,166** with only the known pre-existing failures (two 2026
-  debutants, captain/teammates answer keys) and `fatherson` now answering 99 players with 0
-  disagreements; `tsc --noEmit` clean; eslint clean. DEV not yet run.
-- **Handoff:** `AFLDB-ISSUE-221.md` (root) — closeout plus the brief for reopening AFLDB-ISSUE-164
-  (trusted draft-player-linking runbook): draft-link evidence, affected builders, D-9 context,
-  unresolved decisions U1–U6, reading order, remaining DEV checks.
-- **Next action:** operator reviews and commits; `merge:ready`; DEV smoke of `/grid-solver` with a draft
-  axis (expect "No data", not "No answer"), a `199999` season in the token (expect three "Invalid value"
-  squares), and Reset. Draft-link population is planned under a successor issue (**AFLDB-ISSUE-222**, draft runbook pending operator approval); per
-  its U6 this issue's commit/merge and DEV smoke complete before any linkage reaches DEV.
+**Open issues:** 1
 
 ### AFLDB-ISSUE-220 — Web service credential boundary contradicts the application's `afldb_import` requirement; owner-role code-test DSN and a complete `.env` copy reach the internet-facing process
 - **Severity:** High. **Area:** deployment / runtime security.
@@ -53,6 +29,22 @@
 - **Next action:** operator runs the Git/DEV rollout (commit → `merge:ready` → push/merge → `sync-dev.ps1`
   build → manual unit reinstall + restart → names-only checks + Admin Centre write/revert), then PROD
   read-only checks. Resolve only once DEV steps 1–5 and PROD steps 2–3/6 (runbook §8/§9) pass.
+
+**AFLDB-ISSUE-221 resolved 2026-09-18** (implemented 2026-09-17 by Fable 5.1; committed, merged
+and DEV-verified 2026-09-18 by Sonnet 5) — Grid Solver draft-criteria review: honest "No data"
+squares for an axis matching nobody, `draft_type_is` reads `draft_kind`, trade/free-agency rows
+excluded from the three "drafted" builders, Gridley `fatherson` remapped to
+`father_son_selection`, bounded numeric parameters with a per-square "Invalid value", the form
+keyed by the board token so Reset resets, two stale `is_final` test oracles corrected. Committed
+`f1a8daca`, merged to `main` at `159518ec`, deployed to DEV (`sync-dev.ps1 -RemoteRef main`,
+revision `159518e`; found and corrected the DEV host's Git checkout sitting on a stale `dev`
+branch, fast-forwarded 62 commits including AFLDB-ISSUE-220 and the NL-search chain
+AFLDB-ISSUE-204–219 that had not reached DEV via this path before). All four required DEV browser
+checks plus a valid non-draft answer check passed in a real authenticated `super_admin` session
+via Playwright MCP (the operator signed in directly; the audience gate was not bypassed). The
+reported symptom's root cause (draft-pick linkage, 5 of 6,810) is unfixed by design and now
+tracked as **AFLDB-ISSUE-222** (draft runbook, awaiting operator approval). See `issues.md` for
+the full record.
 
 **Fable code review outside NL search — 2026-09-17 (Fable 5.1, review and planning only).**
 Reviewed with native inspection: authentication/session/middleware/capabilities and every auth

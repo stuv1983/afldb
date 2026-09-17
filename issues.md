@@ -4,11 +4,10 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 2
+**Open issues:** 1
 
 | ID | Title | Severity | Area | State | Next action |
 |---|---|---|---|---|---|
-| AFLDB-ISSUE-221 | Grid Solver cannot answer draft criteria ("Top 10 draft pick"): pick-to-player links stand at 5 of 6,810; review fixed five Grid Solver defects around it | Medium | Grid Solver / draft data linkage | Open — implemented in worktree `afldb-issue-221` (Fable 5.1, uncommitted), locally validated 2026-09-17 | Operator commit → `merge:ready` → DEV smoke (draft axis renders "No data"; bad token value renders "Invalid value" squares; Reset resets). Draft-link population stays an ISSUE-164 D-9 decision |
 | AFLDB-ISSUE-220 | Web service credential boundary contradicts the application's `afldb_import` requirement; owner-role code-test DSN and a complete `.env` copy reach the internet-facing process | High | Deployment / runtime security | Open — DEV evidence complete 2026-09-17; runtime branch (a) settled from Next source: the standalone server loads `.next/standalone/.env` at start-up | Sonnet 5 implements `AFLDB-ISSUE-220.md` §6 in a fresh worktree; first establish the build copy mechanism (§4b) |
 
 AFLDB-ISSUE-220 opened 2026-09-17 (Fable 5.1 code review outside NL search, DEV evidence
@@ -35058,11 +35057,12 @@ this validation.
 
 ## AFLDB-ISSUE-221 — Grid Solver cannot answer draft criteria ("Top 10 draft pick"): pick-to-player links stand at 5 of 6,810, and the review found five Grid Solver defects around it
 
-- **Status:** Open (opened 2026-09-17). Implemented 2026-09-17 (Fable 5.1, worktree
-  `afldb-issue-221`, branch `fable/issue-221-grid-solver-draft`, uncommitted) — see Implementation
-  and Validation below; pending operator commit and DEV verification before resolution. The
+- **Status:** **Resolved 2026-09-18** (implemented 2026-09-17 by Fable 5.1; committed, merged and
+  DEV-verified 2026-09-18 by Sonnet 5). Commit `f1a8daca` on `fable/issue-221-grid-solver-draft`,
+  merged to `main` at `159518ec`, deployed to DEV (`sync-dev.ps1 -RemoteRef main`, revision
+  `159518e`) and verified in a real authenticated browser session — see DEV validation below. The
   reported symptom's root cause (draft-pick linkage) is **not** fixed here and is recorded under
-  Follow-up as an AFLDB-ISSUE-164 D-9 decision.
+  Follow-up as an AFLDB-ISSUE-164 D-9 decision, now tracked as AFLDB-ISSUE-222.
 - **Severity:** Medium. Correctness of presentation (a false "No player satisfies both axes"),
   three builders answering a wider question than their label ("drafted" including trades and
   free-agency signings), one builder splitting one draft into two dropdown entries, a whole-page
@@ -35276,20 +35276,77 @@ Each was reproduced or proved from code/data before any change; the numbering is
   disagreement 383; dataset gap 322; unsupported 78 (the seven §23.36 deferrals); adjudicated
   source conflict 63; source coverage gap 54; incorrect known answer 37; parse 6.
 - Lint (`eslint` on every touched file): **clean**.
-- Not run: `npm run build`, the browser E2E suites, DEV/PROD. No Git command was executed.
+- Not run 2026-09-17: `npm run build`, the browser E2E suites, DEV/PROD. No Git command was
+  executed that session.
+
+### Commit, merge and DEV rollout (2026-09-18, Sonnet 5)
+- Reconfirmed the 2026-09-17 evidence rather than repeating it: `npx tsc --noEmit -p .` clean;
+  unit suites `grid-solver-spec`/`grid-solver-timeout`/`gridley-compat`/`grid-solver-under22`
+  **48/48**; `eslint` clean on every touched file. The DB-backed integration/corpus suites were
+  not re-run (no DB DSN configured in this worktree; the diff was unchanged since 2026-09-17).
+- Committed `f1a8daca` (14 files: 5 source, 5 tests, `AFLDB-ISSUE-221.md`, `CHANGELOG.md`,
+  `IssuesIndex.md`, `issues.md`), keeping the uncommitted AFLDB-ISSUE-222 planning material out of
+  the commit (selective staging: staged the combined diff, stripped the ISSUE-222-only hunks from
+  the index, restored the working tree from a byte-verified backup).
+  `npm run merge:ready -- --issue 221`: **READY**, 0 blockers — the only pre-restore FAIL
+  ("issue worktree is clean") was the preserved AFLDB-ISSUE-222 draft material and pre-existing,
+  unrelated 0-byte stray files, not this issue's scope; every substantive check passed (14/14
+  expected files, 0 unexpected; branch ahead 1/behind 0 of main; migration parity; runbook
+  readiness). `npm run preflight -- --mode merge`: **READY**. Merged to `main` at `159518ec`
+  (`--no-ff`), pushed to `origin/main`.
+- **DEV deployment finding:** `deploy/sync-dev.ps1` initially showed no code change because the
+  DEV host's Git checkout was on a stale branch literally named `dev` (last advanced 2026-09-17,
+  unrelated to the current main-only workflow) — `git pull --ff-only` on that branch correctly had
+  nothing to pull. Re-ran with `-RemoteRef main`, which fast-forwarded the host **62 commits**
+  (`23e9ae0` → `159518e`), bringing in this issue **and** everything already on `main` that had
+  apparently never reached DEV via this path before (AFLDB-ISSUE-220 and the NL-search chain
+  AFLDB-ISSUE-204–219). Migrations: 102/102 already applied, nothing pending (this issue carries
+  none). Build succeeded; service restarted; health check passed:
+  `{"status":"ok","database":"ok","latencyMs":31}`. Confirmed post-deploy: `/grid-solver` returns
+  `307` (audience gate intact, unchanged), `/api/health` returns `200`.
+
+### DEV validation (2026-09-18, Sonnet 5, Playwright MCP against `http://10.0.40.100:8090`, revision `159518e`)
+Real authenticated `super_admin` browser session (the operator signed in directly; the audience
+gate was not bypassed or weakened). All four required checks plus a valid non-draft answer check
+passed:
+- **(a) Unlinked draft axis:** row = National Draft pick between (1, 10), three populated
+  columns → all three squares rendered **"No data — the row question matches any player here"**;
+  drill-down heading "National Draft pick between (1, 10) × Played in a decade (1990)", body
+  **"No data — No player in this database matches this question: National Draft pick between
+  (1, 10)."** — matches the 2026-09-17 harness reproduction exactly.
+- **(b) Invalid bound:** row = Debuted between seasons (1990, 199999) → exactly **three
+  "Invalid value — To season must be a whole number between 0 and 32767."** squares in that row;
+  the other six squares (two unaffected rows × three columns) still solved normally with real
+  player data (e.g. 426/527/554 eligible).
+- **(c) Reset:** after setting a draft axis and an invalid-bound axis, clicking Reset returned the
+  URL to `/grid-solver` (no `?g=` token) and every one of the six axis editors (category, question
+  and parameter fields) back to the true page default — not merely the board.
+- **(d) Draft type dropdown:** exactly **ten kinds** listed (National Draft, Rookie Draft,
+  Pre-Season Draft, Pre-Draft selection, Mid-Season Draft, Post-Draft selection, Trade, Free
+  Agency, Mini-Draft, Training Squad Selection) plus the "Choose…" placeholder; "National Draft"
+  appears once, not split from a raw-label duplicate.
+- **Valid non-draft answer + drill-down:** the default board (X+ career games × Played in a
+  decade) solved 9/9 with real players (e.g. Jeff Chandler, Brad Dodd) and a working "Eligible
+  players" drill-down (864 eligible, paginated 1–25 of 864).
+
+### Resolution (2026-09-18)
+**Status:** Resolved. Every check in §6 of `AFLDB-ISSUE-221.md` passed against real DEV data
+through a real authenticated browser session. Root cause of the reported symptom (draft-pick
+linkage) remains unfixed by design and is tracked as follow-up below, not a resolution blocker —
+this issue's scope was the five Grid Solver defects and honest reporting of the gap, both done.
 
 ### Follow-up (recorded, not fixed here)
 - **Draft-pick linkage population** — the actual cause of the report. Every `draft_picks` builder,
   `/draft/[year]`, the player-profile draft card and the query builder's `player.draft_picks`
   relationship all answer from 5 linked rows on every current database. Owner: AFLDB-ISSUE-164's
-  D-9 decision (the DraftGuru person-page acquisition and the §9.1 standard). The Grid Solver now
-  reports it as "No data".
-- The rendered-page reproduction had to be done through a test-harness render because
-  `/grid-solver` is `super_admin`-gated on `afldb_dev` and `afldb_test` (no
-  `grid_solver.audience` row; default `super_admin`) — a DEV browser check of the three renderings
-  above is part of the resolution gate.
-- **2026-09-18:** the draft-linkage follow-up is now tracked as **AFLDB-ISSUE-222** (successor,
-  U1; draft runbook `AFLDB-ISSUE-222.md`). Per U6 this issue's commit/merge and DEV smoke —
-  including check (a), the "No data" rendering, which is only observable while the gap exists —
-  complete before any linkage population reaches DEV. This issue's pending-validation status is
-  unchanged.
+  D-9 decision (the DraftGuru person-page acquisition and the §9.1 standard), now tracked as
+  **AFLDB-ISSUE-222** (draft runbook `AFLDB-ISSUE-222.md`, awaiting operator approval — not
+  executed by this closeout). The Grid Solver reports the gap as "No data" until it is populated.
+- The rendered-page reproduction on 2026-09-17 had to be done through a test-harness render
+  because `/grid-solver` is `super_admin`-gated on `afldb_dev` and `afldb_test` (no
+  `grid_solver.audience` row; default `super_admin`); the 2026-09-18 DEV validation above is the
+  real browser confirmation that closes that gap.
+- **DEV host branch drift:** the DEV deploy host's Git checkout was found on a stale `dev` branch
+  unrelated to the current main-only workflow (see Commit/merge/DEV rollout above); it is now on
+  `main`. No tracked issue opened — recorded here for the operator's awareness in case another
+  process expects the old branch name.
