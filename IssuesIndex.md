@@ -359,6 +359,14 @@
   executed); full detail `AFLDB-ISSUE-222.md` §11.19.15 item 2. Tooling checkpoint now committed
   (`5987ac2e`); earlier "uncommitted" statements in that section are historical record only. No
   database, Git, network or deployment command ran; the exercise remains not run.
+- **`-WhatIf` preflight fix (2026-09-19, Sonnet 5, fourth pass).** `-WhatIf` correctly suppressed
+  directory creation and passed the read-only guards, but then invoked a bare `pwsh` for the
+  backup, which is not installed on this workstation -- it failed safely only by accident. Fixed:
+  new `-PowerShellExe` parameter (edition-defaulted, required to exist), backup invoked through
+  it, and an explicit `$WhatIfPreference` early exit moved to immediately after the connection
+  guards, before the backup. New static regression `tests/s74-rollback-exercise-static.test.ps1`
+  (AST-only, verified to fail against the reintroduced bug). Full detail
+  `AFLDB-ISSUE-222.md` §11.19.15. No database, Git, network or deployment command ran.
 
 ### AFLDB-ISSUE-225 — Gridley corpus: 37 pre-existing `incorrect known answer` cells on non-draft criteria, present on `afldb_test` before AFLDB-ISSUE-222 and untouched by it
 - **Severity:** Medium. **Area:** Grid Solver / canonical data — `captaincies`,

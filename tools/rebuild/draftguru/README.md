@@ -1027,10 +1027,14 @@ snapshot stage, by `s74-rollback-exercise.ps1` below; it is not intended to be r
 The full §7.4 mandatory reversal exercise, fail-closed, self-contained: connection guards (both
 DSNs must parse to `127.0.0.1:55432/afldb_test`, probed read-only for `current_database()` /
 `current_user`, and the TCP port reconfirmed immediately before the first mutation -- neither DSN
-is ever printed); a fresh backup via `backup-afldb-test.ps1`, independently re-verified (SHA-256
-recomputed, `pg_restore --list` rerun, never merely trusted); a baseline `bridge_import_gate.py
-plan` (`BASE`); a deliberate typed confirmation before anything mutates; then, twice,
-`import_draftguru.py --no-seed` (reverse, no `--bridge`) → a read-only `plan` (`R1`/`R2`,
+is ever printed); **immediately afterward, an explicit `-WhatIf` early exit** that prints
+backup/import/snapshot were skipped and returns successfully, strictly before anything else runs;
+a fresh backup via `backup-afldb-test.ps1` -- invoked through `-PowerShellExe`
+(`-NoProfile -ExecutionPolicy Bypass -File`), **never** a bare `pwsh` -- independently re-verified
+(SHA-256 recomputed, `pg_restore --list` rerun, never merely trusted); a baseline
+`bridge_import_gate.py plan` (`BASE`); a deliberate typed confirmation before anything mutates (a
+second, defence-in-depth guard for an explicit `-Confirm:$false` or an interactive decline); then,
+twice, `import_draftguru.py --no-seed` (reverse, no `--bridge`) → a read-only `plan` (`R1`/`R2`,
 predicting the reload) → `import_draftguru.py --no-seed --bridge <child>` (load) → `verify` using
 that plan's **own** printed hashes and `import_batches_before` (never recomputed, never assumed)
 → a `psql \copy` snapshot (`s74-snapshot.sql`). S0=S2 and S1=S3 are asserted by
@@ -1042,11 +1046,39 @@ it resolves inside the repository), so nothing is ever left as an untracked file
 On any failure it throws immediately and attempts no automatic restore -- recovery is the tracked
 three-tier procedure in `AFLDB-ISSUE-222.md` §11.19.4.
 
+**`-PowerShellExe`** names the exact executable used to invoke `backup-afldb-test.ps1` as a child
+process -- never assumed to be on `PATH` (`pwsh` in particular may not be installed at all; this
+workstation has no `pwsh.exe`). Defaults to the executable for the *current* session's edition,
+resolved from `$PSHOME`: Windows PowerShell → `$PSHOME\powershell.exe`; PowerShell Core →
+`$PSHOME\pwsh.exe`. Required to exist and resolved to an absolute path before anything else runs.
+
+**`-WhatIf`, precisely (fourth-pass fix):** path resolution (including evidence-directory
+creation, itself a ShouldProcess-aware `New-Item` call and therefore automatically suppressed) and
+the read-only connection guards are allowed to run. The script then checks `$WhatIfPreference`
+explicitly, immediately after those guards, and exits before the backup, before any
+`import_draftguru.py` call, and before any `psql` snapshot export. This explicit check exists
+because an external process (`-PowerShellExe`) has no concept of `$WhatIfPreference` and would
+otherwise run for real under `-WhatIf` -- which is exactly what happened on this workstation
+before the fix: `-WhatIf` correctly suppressed directory creation and ran the read-only guards,
+then continued into the backup step and invoked a bare `pwsh`, which is not installed here (no
+evidence directory or backup was created only because `pwsh` happened to be absent, not because
+the script refused).
+
+`tests/s74-rollback-exercise-static.test.ps1` (new, DB-free, AST-only -- run directly with
+`powershell -NoProfile -ExecutionPolicy Bypass -File tests\s74-rollback-exercise-static.test.ps1`,
+never wired into `npm test`, matching `tests/sync-dev-static.test.ps1`'s existing precedent) pins,
+by parsing the script's `Parser::ParseFile()` AST and never executing it: no bare `pwsh` command
+invocation remains; the backup is invoked through the `$PowerShellExe` variable, carrying
+`-NoProfile -ExecutionPolicy Bypass -File $BackupScript`; and the first `$WhatIfPreference`
+reference's source offset precedes the backup invocation's offset, with that branch confirmed to
+`return`/`exit` and to never itself reference `$PowerShellExe` or the importer.
+
 Full step-by-step detail, the authoritative S0/S1/S2/S3 definitions and why a script was written
-instead of a longer copy/paste runbook block: `AFLDB-ISSUE-222.md` §11.19.15 item 2 (third-pass
-correction). Syntax-checked with `[System.Management.Automation.Language.Parser]::ParseFile()`;
-**never executed** by the model, and must never be executed against `afldb_dev` -- §7.4's exercise
-is `afldb_test`-only.
+instead of a longer copy/paste runbook block: `AFLDB-ISSUE-222.md` §11.19.15 item 2 (third- and
+fourth-pass corrections). Syntax-checked with
+`[System.Management.Automation.Language.Parser]::ParseFile()`; **never executed** by the model
+(the static regression above parses it but never runs it), and must never be executed against
+`afldb_dev` -- §7.4's exercise is `afldb_test`-only.
 
 ### `afldb_test` import complete and verified (2026-09-19, operator-reported)
 

@@ -36964,6 +36964,19 @@ PENDING.** Full record: `AFLDB-ISSUE-222.md` §11.12, `AFLDB-ISSUE-222-PHASE3-CO
   statements in this section describe the state as of when they were written and are preserved as
   historical record. No code that runs against a database changed; no database, Git, network or
   deployment command ran; the §7.4 exercise itself remains not run.
+- **`-WhatIf` preflight fix — failed safely, but only by accident (2026-09-19, Sonnet 5, fourth
+  pass).** The operator ran `s74-rollback-exercise.ps1 -WhatIf`: directory creation and the
+  read-only connection guards behaved correctly, but the script then continued into the backup
+  step and invoked a bare `pwsh`, which is not installed on this workstation — no backup was
+  created, but only because `pwsh` happened to be absent, not because `-WhatIf` refused it. Fixed
+  with a new `-PowerShellExe` parameter (defaulted per PowerShell edition, required to exist), the
+  backup now invoked through it (`-NoProfile -ExecutionPolicy Bypass -File`), and an explicit
+  `$WhatIfPreference` early exit placed immediately after the connection guards, before the
+  backup. A new DB-free static regression, `tests/s74-rollback-exercise-static.test.ps1`, pins the
+  fix by parsing the script's AST (never executing it): no bare `pwsh`, backup invoked via
+  `$PowerShellExe`, and the `$WhatIfPreference` check precedes the backup invocation in source
+  order; verified to fail against a scratch copy with the old bug reintroduced. Full detail
+  `AFLDB-ISSUE-222.md` §11.19.15. No database, Git, network or deployment command ran.
 
 ## AFLDB-ISSUE-223 — Pre-existing test regression from AFLDB-ISSUE-221: `GRID_DRAFT_TYPES` reshaped, `draftguru-acquisition.test.ts`'s vocabulary-parity test now fails
 

@@ -38,11 +38,21 @@
   Path (repository-relative or absolute) to the pinned afldb_test deployment child. Defaults to
   the same child the accepted 2026-09-19 import used.
 
+.PARAMETER PowerShellExe
+  The exact PowerShell executable used to invoke tools\maintenance\backup-afldb-test.ps1 as a
+  child process. Never assumed to be on PATH -- `pwsh` in particular may not be installed at all
+  (Windows PowerShell 5.1 has no `pwsh.exe`). Defaults to the executable for the CURRENT session's
+  edition, resolved from $PSHOME: Windows PowerShell -> $PSHOME\powershell.exe; PowerShell Core ->
+  $PSHOME\pwsh.exe. Resolved to an absolute path and required to exist before anything else runs;
+  a missing executable is a REFUSED error, not a fallback to a different one.
+
 .EXAMPLE
   powershell -ExecutionPolicy Bypass -File tools\rebuild\draftguru\s74-rollback-exercise.ps1
 
 .EXAMPLE
-  # Dry-run the confirmation gate only -- prints what would happen, touches nothing.
+  # Preflight only: path resolution and the read-only connection guards run; the script then
+  # prints that backup/import/snapshot were skipped and exits successfully. Nothing is written,
+  # nothing is mutated, and backup-afldb-test.ps1 is never invoked.
   powershell -ExecutionPolicy Bypass -File tools\rebuild\draftguru\s74-rollback-exercise.ps1 -WhatIf
 
 .NOTES
@@ -51,7 +61,20 @@
     * AFLDB_TEST_DATABASE_URL and AFLDB_IMPORT_DATABASE_URL both set to that tunnel, targeting
       afldb_test (never the default .env values, which target afldb_dev);
     * the pinned v2 afldb_test deployment child unchanged since the last accepted import;
-    * a Python interpreter on PATH with psycopg importable.
+    * a Python interpreter on PATH with psycopg importable;
+    * the PowerShell executable named by -PowerShellExe (see above) actually exists.
+
+  -WhatIf, precisely: path resolution (including evidence-directory creation, which is itself a
+  ShouldProcess-aware New-Item call and is therefore automatically suppressed) and the read-only
+  DSN/database/role connection probes are allowed to run under -WhatIf. Immediately afterward the
+  script checks $WhatIfPreference explicitly and, if true, prints that the backup and every
+  mutating step were skipped and exits successfully -- it never reaches
+  tools\maintenance\backup-afldb-test.ps1, import_draftguru.py, or a psql snapshot export, and it
+  never writes an evidence file. This check exists as an explicit early exit, separate from
+  ShouldProcess's usual automatic handling, specifically because backup-afldb-test.ps1 is invoked
+  as an external process (through -PowerShellExe): unlike a ShouldProcess-aware cmdlet such as
+  New-Item, an external executable has no concept of $WhatIfPreference and would run for real if
+  this script did not check for -WhatIf itself before invoking it.
 
   S0/S1/S2/S3, precisely: afldb_test starts this exercise in the POST-import (bridged) state --
   the real, already-accepted import. That starting state is NOT S0; it is what the step-2 backup
@@ -83,6 +106,7 @@ param(
   [string] $Bridge = 'data/reference/draftguru-person-bridge-20260918-v2.afldb_test.json',
   [string] $PgBin = 'C:\Program Files\PostgreSQL\16\bin',
   [string] $PythonExe = 'python',
+  [string] $PowerShellExe = $(if ($PSVersionTable.PSEdition -eq 'Core') { Join-Path $PSHOME 'pwsh.exe' } else { Join-Path $PSHOME 'powershell.exe' }),
   [string] $ExpectedHost = '127.0.0.1',
   [int]    $ExpectedPort = 55432,
   [string] $ExpectedDatabase = 'afldb_test',
@@ -103,6 +127,16 @@ $GatePy = Join-Path $PSScriptRoot 'bridge_import_gate.py'
 $BackupScript = (Resolve-Path (Join-Path $RepoRoot 'tools\maintenance\backup-afldb-test.ps1')).Path
 $PsqlExe = Join-Path $PgBin 'psql.exe'
 $PgRestoreExe = Join-Path $PgBin 'pg_restore.exe'
+
+# -PowerShellExe is never assumed to be on PATH (pwsh in particular may not be installed at all --
+# Windows PowerShell 5.1 has no pwsh.exe). Required and resolved to an absolute path up front,
+# exactly like every other external tool this script depends on.
+if (-not (Test-Path -LiteralPath $PowerShellExe)) {
+  throw ("REFUSED: -PowerShellExe not found: $PowerShellExe -- never assumes pwsh is on PATH; " +
+    "pass the exact executable for this session's edition ($($PSVersionTable.PSEdition))")
+}
+$PowerShellExe = (Resolve-Path -LiteralPath $PowerShellExe).Path
+
 foreach ($p in @($SnapshotSql, $ImporterPy, $GatePy, $BackupScript, $PsqlExe, $PgRestoreExe)) {
   if (-not (Test-Path -LiteralPath $p)) { throw "REFUSED: required file not found: $p" }
 }
@@ -312,11 +346,28 @@ if ($importParts[0] -ne $ExpectedImportRole -or $importParts[1] -ne $ExpectedDat
 Write-Host "    both DSNs verified: current_database() = $ExpectedDatabase; import role = $ExpectedImportRole (values never printed)"
 
 # ---------------------------------------------------------------------------
+# WhatIf preflight-only exit -- immediately after the connection guards, before anything that
+# mutates or writes anything. Path resolution above (including evidence-directory creation via
+# New-Item, itself ShouldProcess-aware) and the read-only guards just above are allowed to run
+# under -WhatIf. This explicit check exists because the very next step invokes
+# backup-afldb-test.ps1 as an EXTERNAL PROCESS (through -PowerShellExe): unlike a
+# ShouldProcess-aware cmdlet, an external executable has no concept of $WhatIfPreference and
+# would run for real -- writing a multi-hundred-MB dump -- if this script did not check for
+# -WhatIf itself first.
+# ---------------------------------------------------------------------------
+
+if ($WhatIfPreference) {
+  Write-Host "`n==> -WhatIf: path resolution and read-only connection guards passed."
+  Write-Host '    Backup, import_draftguru.py and every psql snapshot export were SKIPPED -- nothing was written or mutated.'
+  return
+}
+
+# ---------------------------------------------------------------------------
 # 2. Fresh backup -- the recovery point for the STARTING post-import database (never S0).
 # ---------------------------------------------------------------------------
 
 Write-Host "`n==> 2. Fresh afldb_test backup"
-$backupOutput = & pwsh -NoProfile -File $BackupScript
+$backupOutput = & $PowerShellExe -NoProfile -ExecutionPolicy Bypass -File $BackupScript
 if ($LASTEXITCODE -ne 0) { throw "REFUSED: backup-afldb-test.ps1 exited $LASTEXITCODE" }
 $backupOutput | ForEach-Object { Write-Host $_ }
 $backupFileLine = $backupOutput | Where-Object { $_ -match '^\s*file\s+(.+)$' } | Select-Object -Last 1
@@ -360,9 +411,12 @@ $BASE = Read-GatePlanValues -Result $baseResult
 Write-Host "    BASE import_batches_before = $($BASE.before)"
 
 # ---------------------------------------------------------------------------
-# Deliberate pause before the first mutation. No placeholder substitution is required anywhere
-# in this script (every value below is captured and threaded programmatically); this gate exists
-# purely so a human deliberately authorises the mutating half of the run.
+# Deliberate pause before the first mutation. -WhatIf already returned above, before the backup
+# ever ran; ShouldProcess is kept here too as defence in depth (it also covers an explicit
+# -Confirm:$false or an interactive "No" at the confirmation prompt ConfirmImpact='High' can
+# trigger). No placeholder substitution is required anywhere in this script (every value below is
+# captured and threaded programmatically); the typed phrase below exists purely so a human
+# deliberately authorises the mutating half of the run.
 # ---------------------------------------------------------------------------
 
 Write-Host "`n==> About to REVERSE afldb_test (mutating). Verified backup: $backupFile"

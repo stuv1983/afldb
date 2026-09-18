@@ -3429,6 +3429,40 @@ re-verification, a refuse-if-exists evidence directory) need real control flow t
 Nothing was executed: no database, Git, network or deployment command ran for this pass, and the
 exercise itself remains **not run**.
 
+**Correction (2026-09-19, fourth pass, Sonnet 5, High) — the committed script's `-WhatIf`
+preflight failed safely, but only by accident.** The operator ran
+`s74-rollback-exercise.ps1 -WhatIf` on this workstation. Observed: path resolution and directory
+creation were correctly suppressed by `-WhatIf` (an automatic consequence of `New-Item` being
+ShouldProcess-aware and consulting `$WhatIfPreference`); the read-only connection guards passed;
+the script then **incorrectly continued into the backup step**, invoked a bare `pwsh`, which is
+**not installed on this workstation**, and failed there — no evidence directory or backup was
+created and no importer ran, but only because `pwsh` happened to be absent, not because the
+script itself refused. On a machine where `pwsh` exists, `-WhatIf` would have run the real backup
+(and only the backup, since the deliberate-confirmation gate that follows it does correctly stop a
+`-WhatIf` run before any mutation) — a genuine, if narrow, "dry run does something real" defect.
+Root cause: the script's own `ShouldProcess` gate sat immediately before the *first mutating*
+step (REVERSE #1), one step after the backup, so `-WhatIf` never had a chance to prevent the
+backup invocation; and the backup was invoked as `& pwsh ...`, assuming `pwsh` on `PATH`, which is
+never guaranteed (Windows PowerShell 5.1 ships no `pwsh.exe` at all). Fixed by (1) a new
+`-PowerShellExe` parameter, defaulted to `$PSHOME\pwsh.exe` under PowerShell Core or
+`$PSHOME\powershell.exe` under Windows PowerShell, required to exist and resolved to an absolute
+path before anything else runs; (2) the backup now invoked as
+`& $PowerShellExe -NoProfile -ExecutionPolicy Bypass -File $BackupScript`, never a bare `pwsh`;
+(3) an explicit `if ($WhatIfPreference) { ...; return }` early exit placed immediately after the
+connection guards — the first point in the script's execution order after which `-WhatIf` must
+change behaviour — printing that backup/import/snapshot were skipped and returning successfully,
+strictly before the backup step. A new DB-free static regression,
+`tests/s74-rollback-exercise-static.test.ps1`, pins all three facts by parsing the script's own
+AST (never executing it): no bare `pwsh` command remains; the backup invocation's command name is
+the `$PowerShellExe` variable, carrying `-NoProfile -ExecutionPolicy Bypass -File $BackupScript`;
+and the first `$WhatIfPreference` reference's source offset precedes the backup invocation's
+offset, with the `$WhatIfPreference` branch itself verified to contain a `return`/`exit` and to
+never reference `$PowerShellExe` or `$ImporterPy` (confirming the early exit is real, not merely
+present in the file). The test was verified to fail against a scratch copy with the old `& pwsh`
+invocation reintroduced, and to pass against the fixed script, before being kept. Nothing was
+executed against `afldb_test`, `afldb_dev`, or any other database for this pass: no backup, no
+importer run, no Git action, no deployment. `git diff --check` reported no whitespace errors.
+
 **1. §7.4 interpretation — no new capability was required, though two small tracked helpers were
 written.** §7.4 (line 897) says in its own text: "a comparison script for S0–S3 is proposed
 tooling ... the `afldb_test` exercise may use `psql` `\copy` exports diffed offline". The
@@ -3488,21 +3522,33 @@ review above):
    read-only probe over each then requires `current_database() = afldb_test` (test DSN) and
    `current_user = afldb_import` **and** `current_database() = afldb_test` (import DSN). The TCP
    port is confirmed open again immediately before the first mutating call.
-1. **Fresh backup**, via `backup-afldb-test.ps1`. The script parses the backup's own printed file
-   path and SHA-256, requires the file to be non-zero length, **independently recomputes** the
-   SHA-256 (never trusting the printed value alone), and re-runs `pg_restore --list` itself to
-   confirm the archive is readable. The path, recomputed hash, object count and the tracked
-   recovery reference (§11.19.4 below) are written to `backup-manifest.txt` in the evidence
-   directory. **This backup is the recovery point for the untouched, already-verified STARTING
-   post-import database -- it is not a snapshot of S0** (see the definitions below). No automatic
-   restore is ever attempted, on any failure, at any point in the script.
+0a. **`-WhatIf` stops here, before anything else.** Immediately after the connection guards, an
+   explicit `if ($WhatIfPreference) { ...; return }` prints that backup/import/snapshot were
+   skipped and exits successfully — **before** the backup is invoked. This is a fourth-pass fix
+   (see the correction above): it exists because the backup is an *external process*
+   (`-PowerShellExe`), which has no concept of `$WhatIfPreference` and would otherwise run for
+   real even under `-WhatIf`, unlike the `New-Item` evidence-directory creation above, which is
+   automatically suppressed because it is itself a ShouldProcess-aware cmdlet.
+1. **Fresh backup**, via `backup-afldb-test.ps1`, invoked as
+   `& $PowerShellExe -NoProfile -ExecutionPolicy Bypass -File $BackupScript` -- **never** a bare
+   `pwsh` (never assumed to be on `PATH`; `-PowerShellExe` defaults to `$PSHOME\pwsh.exe` under
+   PowerShell Core or `$PSHOME\powershell.exe` under Windows PowerShell, and is required to exist
+   before anything else runs). The script parses the backup's own printed file path and SHA-256,
+   requires the file to be non-zero length, **independently recomputes** the SHA-256 (never
+   trusting the printed value alone), and re-runs `pg_restore --list` itself to confirm the
+   archive is readable. The path, recomputed hash, object count and the tracked recovery
+   reference (§11.19.4 below) are written to `backup-manifest.txt` in the evidence directory.
+   **This backup is the recovery point for the untouched, already-verified STARTING post-import
+   database -- it is not a snapshot of S0** (see the definitions below). No automatic restore is
+   ever attempted, on any failure, at any point in the script.
 2. **Baseline plan (`BASE`)** -- `bridge_import_gate.py plan --target test` against the untouched
    starting state, before anything mutates. Its four hashes and `import_batches_before` are parsed
    from the tool's own printed output (never guessed) and become the values every later stage must
    reproduce.
 3. **A deliberate, typed confirmation** ("I have a fresh verified afldb_test backup and intend to
-   reverse and reload the bridge"), after which the script proceeds only if it is typed exactly.
-   `-WhatIf` stops here without touching anything.
+   reverse and reload the bridge"), after which the script proceeds only if it is typed exactly --
+   `ShouldProcess` defence in depth for an explicit `-Confirm:$false` or an interactive decline
+   (`-WhatIf` itself already returned at step 0a, before this point is ever reached).
 4. **REVERSE #1** -- `import_draftguru.py --no-seed` (no `--bridge`).
 5. **Capture S0** -- the six `s74-snapshot.sql` row-sets, via `psql`, session forced read-only.
 6. **Plan R1** -- `bridge_import_gate.py plan --target test --bridge <child>`, predicting LOAD #1
@@ -3627,6 +3673,19 @@ never executed, never connecting to anything. `git diff --check` reported no whi
 The script itself was not run: no backup, no reversal, no load, no snapshot, no database
 connection of any kind.
 
+**Fourth-pass validation (the `-WhatIf`/`-PowerShellExe` fix above).**
+`[System.Management.Automation.Language.Parser]::ParseFile()` — 0 errors on both
+`s74-rollback-exercise.ps1` and the new `tests/s74-rollback-exercise-static.test.ps1`. The new
+static regression was run directly (`powershell -NoProfile -ExecutionPolicy Bypass -File
+tests\s74-rollback-exercise-static.test.ps1`) and passed against the fixed script; it was also
+run against a scratch copy with the old bare `& pwsh` invocation reintroduced and confirmed to
+**fail** there, proving the regression is real, not vacuous (the scratch copy was deleted
+afterward; nothing under version control was touched by that check). `git diff --check` reported
+no whitespace errors. No Python/TypeScript file changed. Nothing was executed against
+`afldb_test`, `afldb_dev`, or any database: no backup, no `import_draftguru.py`, no
+`bridge_import_gate.py` run against a real connection, no Git mutation, no DEV action, no
+deployment.
+
 **6. Exact operator commands, in order, for the remainder of this closeout.** Every `<...>` value
 must be read off the immediately preceding step's own output, never assumed or reused from an
 older run. This is the corrected release order (2026-09-19, second pass): the tooling is checked
@@ -3750,9 +3809,18 @@ historical record; they no longer describe the current state.** Everything from 
 this section's prose, and the new `tools/rebuild/draftguru/s74-rollback-exercise.ps1` — remains
 **uncommitted** as of this pass.
 
-**Files changed by this third pass:** `AFLDB-ISSUE-222.md` (this section: items 1 and 2 rewritten;
+**Files changed by the third pass:** `AFLDB-ISSUE-222.md` (this section: items 1 and 2 rewritten;
 this closing note), `tools/rebuild/draftguru/s74-rollback-exercise.ps1` (new), plus short pointer
 additions to `issues.md` and `IssuesIndex.md`. `tools/rebuild/draftguru/README.md` gained a
 corresponding update. No code that runs against a database changed (`bridge_import_gate.py`,
 `s74-snapshot.sql`, `import_draftguru.py`, and every test are byte-identical to `5987ac2e`); no
 canonical bridge artefact, ISSUE-224/225 content, or Gridley classification was touched.
+
+**Files changed by the fourth pass (the `-WhatIf`/`-PowerShellExe` fix):**
+`tools/rebuild/draftguru/s74-rollback-exercise.ps1` (the `-PowerShellExe` parameter, the moved
+`$WhatIfPreference` early exit, the corrected backup invocation), `tests/s74-rollback-exercise-static.test.ps1`
+(new), `AFLDB-ISSUE-222.md` (this section), `tools/rebuild/draftguru/README.md`, plus short
+pointer additions to `issues.md` and `IssuesIndex.md`. `bridge_import_gate.py`, `s74-snapshot.sql`,
+`import_draftguru.py` and every Python test remain byte-identical to `5987ac2e`; no canonical
+bridge artefact, ISSUE-224/225 content, or Gridley classification was touched; nothing was run
+against `afldb_test`, `afldb_dev`, or any database.
