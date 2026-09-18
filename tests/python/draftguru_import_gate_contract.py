@@ -95,6 +95,8 @@ CHILD = {
                  {"player_url": R, "reason": "different_person_wrong_href"}],
 }
 CHILD_SHA = "c" * 64
+# Same shape, a different target: proves the gate's DEV generalisation without duplicating the frame.
+DEV_CHILD = dict(CHILD, target="afldb_dev")
 
 
 def prepared_frame() -> dict:
@@ -125,8 +127,8 @@ class Rep:
 class World:
     """The scripted database. ``pre()`` is the state before the import, ``post()`` after."""
 
-    def __init__(self, *, bridged: bool) -> None:
-        self.settings = ("on", "on", "afldb_test", "UTC")
+    def __init__(self, *, bridged: bool, database: str = "afldb_test") -> None:
+        self.settings = ("on", "on", database, "UTC")
         self.afl_players = {A_AFL: [1001], B_AFL: [1002], R_AFL: [1003], E_AFL: [1004]}
         self.live_rows: list = []
         self.dg_identities = {B: 1002}
@@ -217,7 +219,8 @@ LAST_OUTPUT: list[str] = []
 
 def run(mode: str, world: World, *, prepared: dict | None = None, child: dict | None = None,
         expect: dict | None = None, rejected: dict | None = None,
-        parent_map: dict | None = None) -> tuple[dict, fake.FakeConnection]:
+        parent_map: dict | None = None,
+        required_database: str = tool.REQUIRED_DATABASE) -> tuple[dict, fake.FakeConnection]:
     """Runs the gate on the scripted world; the emitted lines land in LAST_OUTPUT."""
     conn = fake.FakeConnection(world.responders())
     LAST_OUTPUT.clear()
@@ -225,7 +228,7 @@ def run(mode: str, world: World, *, prepared: dict | None = None, child: dict | 
                             PARENT_MAP if parent_map is None else parent_map, LABEL, lambda: conn,
                             expect=expect, population=POPULATION,
                             rejected=REJECTED if rejected is None else rejected,
-                            emit=LAST_OUTPUT.append)
+                            emit=LAST_OUTPUT.append, required_database=required_database)
     return summary, conn
 
 
@@ -319,15 +322,59 @@ for env, expect_ok in ((None, False), ("postgresql://u:pw@h:5432/afldb_dev", Fal
                        ("mysql://u:pw@h/afldb_test", False),
                        ("postgresql://u:pw@h:5432/afldb_test?sslmode=require", True)):
     try:
-        tool.resolve_dsn({} if env is None else {tool.DSN_ENV: env})
+        # No target argument at all -- the legacy/default call every pre-existing caller made.
+        tool.resolve_dsn(environ={} if env is None else {tool.DSN_ENV: env})
         ok = True
         message = ""
     except tool.GateError as exc:
         ok = False
         message = str(exc)
-    check(f"2.1 DSN guard for {env!r}: {'accepted' if expect_ok else 'refused'}", ok == expect_ok, message)
+    check(f"2.1 legacy/default resolve_dsn() (no --target) for {env!r}: "
+          f"{'accepted' if expect_ok else 'refused'}", ok == expect_ok, message)
     if not ok:
         check("2.2 the refusal never echoes the DSN or a password", "pw" not in message and "@h" not in message)
+
+section("2b. --target generalisation: explicit test, explicit dev, DSN separation, PROD refusal")
+
+check("2b.0 the default target is test, and dev is a separate, closed second entry",
+      sorted(tool.TARGETS) == ["dev", "test"] and tool.TARGETS["test"]["database"] == "afldb_test"
+      and tool.TARGETS["dev"]["database"] == "afldb_dev")
+check("2b.0a test and dev read different environment variables (never the importer's write DSN)",
+      tool.TARGETS["test"]["dsn_env"] == tool.DSN_ENV == "AFLDB_TEST_DATABASE_URL"
+      and tool.TARGETS["dev"]["dsn_env"] == "AFLDB_DEV_DATABASE_URL"
+      and "AFLDB_IMPORT_DATABASE_URL" not in (tool.TARGETS["test"]["dsn_env"], tool.TARGETS["dev"]["dsn_env"])
+      and "AFLDB_OWNER_DATABASE_URL" not in (tool.TARGETS["test"]["dsn_env"], tool.TARGETS["dev"]["dsn_env"]))
+
+for target, env, expect_ok in (
+        ("test", None, False),
+        ("test", "postgresql://u:pw@h:5432/afldb_test", True),
+        ("test", "postgresql://u:pw@h:5432/afldb_dev", False),
+        ("dev", None, False),
+        ("dev", "postgresql://u:pw@h:5432/afldb_dev", True),
+        ("dev", "postgresql://u:pw@h:5432/afldb_test", False),
+        ("dev", "postgresql://u:pw@h:5432/afldb_import", False),
+):
+    dsn_env = tool.TARGETS[target]["dsn_env"]
+    try:
+        tool.resolve_dsn(target, {} if env is None else {dsn_env: env})
+        ok = True
+        message = ""
+    except tool.GateError as exc:
+        ok = False
+        message = str(exc)
+    check(f"2b.1 explicit --target {target} DSN guard for {env!r}: "
+          f"{'accepted' if expect_ok else 'refused'}", ok == expect_ok, message)
+    if not ok:
+        check("2b.2 the refusal never echoes the DSN or a password", "pw" not in message and "@h" not in message)
+
+for bad_target in ("prod", "PROD", "afldb_prod", ""):
+    try:
+        tool.resolve_dsn(bad_target, {"AFLDB_PROD_DATABASE_URL": "postgresql://u:pw@h:5432/afldb_prod"})
+        prod_ok, prod_message = True, ""
+    except tool.GateError as exc:
+        prod_ok, prod_message = False, str(exc)
+    check(f"2b.3 target {bad_target!r} is refused before any DSN is read -- no PROD target exists",
+          not prod_ok and "no PROD target" in prod_message, prod_message)
 
 sneaky = World(bridged=False)
 sneaky.settings = ("off", "on", "afldb_test", "UTC")
@@ -733,6 +780,126 @@ check("6.3 a DSN for another database exits 2 and never prints the DSN",
       rc_wrong == tool.EXIT_ERROR and "ERROR:" in out2.getvalue()
       and "afldb_dev" not in out2.getvalue() and "pw" not in out2.getvalue()
       and "@h:" not in out2.getvalue())
+
+# ---------------------------------------------------------------------------
+# 7. --target dev generalisation: full plan/verify parity, cross-target refusal
+# ---------------------------------------------------------------------------
+
+section("7. --target dev: plan/verify parity with test, on the same frame")
+
+dev_pre = World(bridged=False, database="afldb_dev")
+dev_plan, dev_conn = run("plan", dev_pre, child=DEV_CHILD, required_database="afldb_dev")
+check("7.1 a DEV-target plan over the equivalent frame holds and reproduces the test-target hashes",
+      not dev_plan["failures"]
+      and dev_plan["after_state_sha256"] == plan["after_state_sha256"]
+      and dev_plan["picks_after_sha256"] == plan["picks_after_sha256"]
+      and dev_plan["newly_linked_sha256"] == plan["newly_linked_sha256"]
+      and dev_plan["baseline_sha256"] == plan["baseline_sha256"],
+      str(dev_plan["failures"]))
+check("7.2 the DEV plan's hashed summary records target_database=afldb_dev",
+      dev_plan["target_database"] == "afldb_dev")
+check("7.3 the DEV plan is read-only too: SELECT only, one rollback, closed, no autocommit toggle",
+      only_selects(dev_conn) and dev_conn.rollbacks == 1 and dev_conn.closed and dev_conn.commits == 0
+      and not any(k == "autocommit" for k, _, _ in dev_conn.log))
+
+dev_plan2, _ = run("plan", World(bridged=False, database="afldb_dev"), child=DEV_CHILD,
+                   required_database="afldb_dev")
+check("7.4 a second DEV plan over the same state reproduces the summary_sha256 deterministically",
+      dev_plan2["summary_sha256"] == dev_plan["summary_sha256"])
+
+dev_post = World(bridged=True, database="afldb_dev")
+dev_expect = {"after_state_sha256": dev_plan["after_state_sha256"],
+              "picks_after_sha256": dev_plan["picks_after_sha256"],
+              "newly_linked_sha256": dev_plan["newly_linked_sha256"],
+              "baseline_sha256": dev_plan["baseline_sha256"],
+              "batches_before": dev_plan["import_batches_before"]}
+dev_verify, dev_vconn = run("verify", dev_post, child=DEV_CHILD, expect=dev_expect,
+                            required_database="afldb_dev")
+check("7.5 the DEV verify holds against the DEV plan's four hashes and batch count",
+      not dev_verify["failures"], str(dev_verify["failures"]))
+check("7.6 the DEV verify's hashed summary also records target_database=afldb_dev",
+      dev_verify["target_database"] == "afldb_dev")
+
+dev_wrong_db = World(bridged=False, database="afldb_test")
+try:
+    run("plan", dev_wrong_db, child=DEV_CHILD, required_database="afldb_dev")
+    dev_db_refused = False
+except tool.GateError as exc:
+    dev_db_refused = "connected database" in str(exc)
+check("7.7 a server reporting afldb_test when required_database is afldb_dev is refused before any read",
+      dev_db_refused)
+
+section("8. Refusal of cross-target child artefacts")
+
+with tempfile.TemporaryDirectory() as tmp:
+    test_child_path = Path(tmp) / "test_child.json"
+    test_child_path.write_text(json.dumps(CHILD), encoding="utf-8")
+    test_child_sha = tool.sha256_bytes(test_child_path.read_bytes())
+    try:
+        tool.load_child(test_child_path, test_child_sha, None, required_database="afldb_dev")
+        cross_ok, cross_message = True, ""
+    except tool.GateError as exc:
+        cross_ok, cross_message = False, str(exc)
+    check("8.1 an afldb_test-labelled child is refused when required_database is afldb_dev",
+          not cross_ok and "afldb_dev" in cross_message, cross_message)
+
+    dev_child_path = Path(tmp) / "dev_child.json"
+    dev_child_path.write_text(json.dumps(DEV_CHILD), encoding="utf-8")
+    dev_child_sha = tool.sha256_bytes(dev_child_path.read_bytes())
+    doc, digest = tool.load_child(dev_child_path, dev_child_sha, None, required_database="afldb_dev")
+    check("8.2 an afldb_dev-labelled child loads cleanly under required_database=afldb_dev",
+          digest == dev_child_sha and doc["target"] == "afldb_dev")
+    try:
+        tool.load_child(dev_child_path, dev_child_sha, None, required_database="afldb_test")
+        reverse_ok = True
+    except tool.GateError:
+        reverse_ok = False
+    check("8.3 the reverse is also refused: an afldb_dev-labelled child under required_database=afldb_test",
+          not reverse_ok)
+
+section("9. CLI --target dev: mandatory --bridge, no silent afldb_test reuse, no PROD choice")
+
+saved_dev_dsn = os.environ.pop("AFLDB_DEV_DATABASE_URL", None)
+tool.open_read_only = never_connect
+common_saved_load = None
+try:
+    import common as common_mod
+    common_saved_load = common_mod.load_env
+    common_mod.load_env = lambda *_a, **_k: None
+    out3 = io.StringIO()
+    with contextlib.redirect_stdout(out3):
+        rc_dev_no_bridge = tool.main(["plan", "--target", "dev"])
+    os.environ["AFLDB_DEV_DATABASE_URL"] = "postgresql://u:pw@h:5432/afldb_dev"
+    out4 = io.StringIO()
+    with contextlib.redirect_stdout(out4):
+        rc_dev_still_no_bridge = tool.main(["plan", "--target", "dev"])
+    out5 = io.StringIO()
+    with contextlib.redirect_stdout(out5):
+        rc_dev_reuse = tool.main(["plan", "--target", "dev", "--bridge", tool.CHILD_REL])
+    with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+        try:
+            tool.main(["plan", "--target", "prod"])
+            prod_choice_refused = False
+        except SystemExit as exc:
+            prod_choice_refused = exc.code not in (0, tool.EXIT_OK)
+finally:
+    tool.open_read_only = original_open
+    if common_saved_load is not None:
+        common_mod.load_env = common_saved_load
+    if saved_dev_dsn is None:
+        os.environ.pop("AFLDB_DEV_DATABASE_URL", None)
+    else:
+        os.environ["AFLDB_DEV_DATABASE_URL"] = saved_dev_dsn
+
+check("9.1 --target dev with no --bridge and no AFLDB_DEV_DATABASE_URL exits ERROR "
+      "before any DSN is read (never reaches open_read_only)",
+      rc_dev_no_bridge == tool.EXIT_ERROR and "--bridge is required" in out3.getvalue())
+check("9.2 --target dev with AFLDB_DEV_DATABASE_URL set but still no --bridge still exits ERROR",
+      rc_dev_still_no_bridge == tool.EXIT_ERROR and "--bridge is required" in out4.getvalue())
+check("9.3 --target dev with --bridge pointed at the afldb_test child is refused "
+      "(must not silently reuse the afldb_test child)",
+      rc_dev_reuse == tool.EXIT_ERROR and "must not be the afldb_test child" in out5.getvalue())
+check("9.4 --target prod does not exist as a choice", prod_choice_refused)
 
 # ---------------------------------------------------------------------------
 

@@ -3381,3 +3381,352 @@ operator's commit is the next step.
 
 **Files changed by this pass:** this file, `issues.md`, `IssuesIndex.md`, `CHANGELOG.md`. No other
 repository file touched; no test, classifier or canonical bridge artefact changed.
+
+#### 11.19.15 §7.4 exercise defined for the operator; the DraftGuru bridge import gate generalised to `afldb_dev` (no database, Git, network or deployment command run) (2026-09-19, Sonnet 5, High)
+
+**Scope of this pass.** The operator authorised (§11.19.14 addendum) closing this issue's
+trusted linkage into DEV: commit → `merge:ready` → merge/push → `sync-dev.ps1` → `afldb_dev`
+import → smoke. §7.4's own text (line 877) requires its S0–S3 rollback exercise "before any DEV
+command". Two things blocked that: (1) §7.4's exercise was "not drafted" (§11.19.14); (2)
+`bridge_import_gate.py` could only ever address `afldb_test`. This pass removes both blockers.
+Nothing on `afldb_test` or `afldb_dev` was touched; no DEV child was generated; no Git, network
+or deployment command ran; AFLDB-ISSUE-224/225 were not expanded; the canonical v1/v2 parent and
+`afldb_test` child artefacts were not modified.
+
+**Correction (2026-09-19, second pass, Sonnet 5, High) — sequencing and terminology only, no
+code/test/artefact change.** The operator command sequence originally drafted below (item 6) put
+`sync-dev.ps1` (which builds, restarts and health-checks the DEV site) *before* the DEV child was
+generated and *before* the real DEV import/verify — the release order actually wanted is: commit
+the tooling as its own checkpoint → run §7.4 → generate and commit the DEV child alongside the
+§7.4 evidence → merge → back up `afldb_dev` → import and independently verify the database → only
+then deploy/restart the site via `sync-dev.ps1` → smoke → a separate documentation-only closure
+commit. Item 6 below is corrected to that order. This correction also makes the S0/S1/S2/S3
+terminology explicit (see the definitions immediately before the command block in item 2) and
+removes a manual `npm run build && sudo systemctl restart afldb` step that duplicated exactly what
+`sync-dev.ps1` already performs (build, restart, and its own health-readiness poll) — leaving one
+deployment path, not two. Nothing else in this section changed: the §7.4 interpretation (item 1),
+the `bridge_import_gate.py --target` generalisation (item 3), validation (item 5), and every file
+already committed or proposed are unaffected. No command was run for this correction beyond
+read-only inspection of `deploy/sync-dev.ps1` to confirm it already performs the build/restart/
+health sequence.
+
+**1. §7.4 interpretation — no new tooling was required.** §7.4 (line 897) says in its own text:
+"a comparison script for S0–S3 is proposed tooling ... the `afldb_test` exercise may use `psql`
+`\copy` exports diffed offline". The mandatory exercise itself is two existing operations run in
+sequence — `import_draftguru.py` with `--bridge <the pinned v2 afldb_test child>` (load) and
+without it (reversal, §7.4's "Initial-load rollback") — with `psql \copy` snapshots taken between
+them and diffed offline. Nothing about the exercise's five numbered steps (lines 879–895) needs a
+capability the importer, `psql`, and `bridge_import_gate.py` do not already have. No helper script
+was written.
+
+**2. The exact operator sequence for §7.4 on `afldb_test`.** `afldb_test` is **already** in the
+post-load state from the real, twice-verified 2026-09-19 import (§11.19.9, plan `966897b9…`,
+verify `32cf72a5…`) — there is no separate "before the bridge" snapshot on file, because that
+import happened before this exercise was drafted. The sequence below therefore performs the
+exercise's load/reverse cycle **twice** starting from that already-loaded state, so every one of
+§7.4's five assertions (S0=S2, S1=S3, `bridges.length` movement, everything else untouched) is
+proven directly rather than assumed from an earlier, differently-shaped baseline. It ends with
+`afldb_test` back in exactly its current, already-verified state.
+
+Preconditions the operator confirms before starting: a current shell with `AFLDB_TEST_DATABASE_URL`
+set to `afldb_test`, and `AFLDB_IMPORT_DATABASE_URL` set to the same `afldb_import`-role,
+`afldb_test`-targeted DSN used for the original 2026-09-19 import (never the default `.env` value,
+which targets `afldb_dev`).
+
+**S0/S1/S2/S3 defined (this is the authoritative definition; nowhere else in this issue's
+tracking describes S0 differently).** `afldb_test` starts this exercise in the **post-import
+(bridged) state** — the real, twice-verified 2026-09-19 import (§11.19.9). That starting state is
+**not** S0; it is what step 0's backup preserves as the recovery point, and it is what S1 (below)
+reconstructs.
+
+- **S0 -- the reconstructed pre-bridge state.** Captured only *after* deliberately reversing the
+  starting (already-bridged) database (step 1, "REVERSE #1"). §7.4's own text (line 879)
+  explicitly allows this: "Snapshot S0 (pre-bridge, after the plain rebuild **or after step 4
+  below**)" — i.e. S0 need not come from a fresh, never-bridged database; it may be reached by
+  undoing an existing load first, which is exactly this case. **S0 is never the untouched starting
+  database** — that database is already bridged, and a snapshot of it untouched would be S1, not
+  S0.
+- **S1 -- the post-load (bridged) state.** Captured after loading the pinned v2 `afldb_test` child
+  (step 3, "LOAD #1"). Because the same, already-in-production child is reloaded onto the same
+  already-bridged rows, S1 reconstructs — and step 4's `bridge_import_gate.py verify` independently
+  confirms it equals — the exercise's own starting state (the one the backup protects).
+- **S2 -- the second reconstructed pre-bridge state.** Captured after a second reversal (step 5).
+  Must equal S0 **exactly**, row for row (§7.4 line 892).
+- **S3 -- the second post-load state.** Captured after a second load of the same child (step 7).
+  Must equal S1 **exactly**, row for row -- proving the restoration is idempotent (§7.4 line 894).
+
+**The pre-exercise backup (step 0) is the recovery point for the starting POST-import database --
+not a snapshot of S0.** If any assertion below fails, the operator restores `afldb_test` from that
+backup (the known-good, already-verified bridged state), never from an S0/S1/S2/S3 CSV, and stops
+per §7.4's "any difference outside the asserted set -> STOP" (line 899).
+
+```powershell
+# 0. Fresh backup -- a NEW dump distinct from afldb_test-20260919-051022.dump. This is the
+#    recovery point for the CURRENT, already-verified, post-import (bridged) database -- the
+#    starting state of this exercise, and NOT the same thing as "S0" (see the definitions above).
+pwsh -File tools/maintenance/backup-afldb-test.ps1
+
+# 0a. Re-confirm the CURRENT state is exactly the last verified import before touching anything.
+#     Capture this run's four hashes -- they are what the exercise's final state must reproduce.
+$env:PGOPTIONS = $null
+python tools/rebuild/draftguru/bridge_import_gate.py plan --target test `
+  > s74-plan-baseline.txt
+# read after_state_sha256 / picks_after_sha256 / newly_linked_sha256 / baseline_sha256 /
+# import_batches_before off s74-plan-baseline.txt -- call them $BASE_*
+
+mkdir S0, S1, S2, S3 -Force
+$snapshot = 'tools/rebuild/draftguru/s74-snapshot.sql'   # written once, see below; never executed by the model
+
+# 1. REVERSE #1 (mutating): the "Initial-load rollback" of §7.4 -- un-links every bridge person.
+python tools/rebuild/draftguru/import_draftguru.py    # no --bridge
+
+# 2. Snapshot S0 (pre-bridge state, captured after the reversal -- explicitly sanctioned by
+#    §7.4's own parenthetical, line 879: "after the plain rebuild or after step 4 below").
+Push-Location S0
+$env:PGOPTIONS = '-c default_transaction_read_only=on'
+& "C:\Program Files\PostgreSQL\16\bin\psql.exe" -X -v ON_ERROR_STOP=1 `
+  -f "..\$snapshot" -d $env:AFLDB_TEST_DATABASE_URL
+Pop-Location
+
+# 3. LOAD #1 (mutating): reload the SAME pinned v2 afldb_test child already in production use.
+$env:PGOPTIONS = $null
+python tools/rebuild/draftguru/import_draftguru.py `
+  --bridge data/reference/draftguru-person-bridge-20260918-v2.afldb_test.json
+
+# 4. Snapshot S1 (post-load). Cross-check with the read-only gate before trusting the CSVs:
+python tools/rebuild/draftguru/bridge_import_gate.py verify --target test `
+  --expect-after-sha256 <$BASE_after_state_sha256> `
+  --expect-picks-after-sha256 <$BASE_picks_after_sha256> `
+  --expect-newly-linked-sha256 <$BASE_newly_linked_sha256> `
+  --expect-baseline-sha256 <$BASE_baseline_sha256> `
+  --expect-batches-before <import_batches count printed by step 1's plain run + 1>
+Push-Location S1
+$env:PGOPTIONS = '-c default_transaction_read_only=on'
+& "C:\Program Files\PostgreSQL\16\bin\psql.exe" -X -v ON_ERROR_STOP=1 `
+  -f "..\$snapshot" -d $env:AFLDB_TEST_DATABASE_URL
+Pop-Location
+
+# 5. REVERSE #2 (mutating).
+$env:PGOPTIONS = $null
+python tools/rebuild/draftguru/import_draftguru.py    # no --bridge
+
+# 6. Snapshot S2. Assert S2 = S0 EXACTLY (six file-pairs, byte for byte):
+foreach ($f in 'persons.csv','picks_dg.csv','picks_manual_null.csv','identities.csv',
+               'resolutions.csv','overrides.csv') {
+  Compare-Object (Get-Content "S0\$f") (Get-Content "S2\$f")
+}
+# ^ run this AFTER capturing S2 below; an empty result for every file is the pass condition.
+Push-Location S2
+$env:PGOPTIONS = '-c default_transaction_read_only=on'
+& "C:\Program Files\PostgreSQL\16\bin\psql.exe" -X -v ON_ERROR_STOP=1 `
+  -f "..\$snapshot" -d $env:AFLDB_TEST_DATABASE_URL
+Pop-Location
+
+# 7. LOAD #2 (mutating): restores afldb_test to its real, expected, already-verified state.
+$env:PGOPTIONS = $null
+python tools/rebuild/draftguru/import_draftguru.py `
+  --bridge data/reference/draftguru-person-bridge-20260918-v2.afldb_test.json
+
+# 8. Snapshot S3. Assert S3 = S1 EXACTLY (idempotent restoration):
+Push-Location S3
+$env:PGOPTIONS = '-c default_transaction_read_only=on'
+& "C:\Program Files\PostgreSQL\16\bin\psql.exe" -X -v ON_ERROR_STOP=1 `
+  -f "..\$snapshot" -d $env:AFLDB_TEST_DATABASE_URL
+Pop-Location
+foreach ($f in 'persons.csv','picks_dg.csv','picks_manual_null.csv','identities.csv',
+               'resolutions.csv','overrides.csv') {
+  Compare-Object (Get-Content "S1\$f") (Get-Content "S3\$f")
+}
+
+# 9. Final independent proof the restored state matches the ORIGINAL 2026-09-19 import exactly
+#    (not just this exercise's own S1/S3): reuse the very hashes captured in step 0a.
+python tools/rebuild/draftguru/bridge_import_gate.py verify --target test `
+  --expect-after-sha256 <$BASE_after_state_sha256> `
+  --expect-picks-after-sha256 <$BASE_picks_after_sha256> `
+  --expect-newly-linked-sha256 <$BASE_newly_linked_sha256> `
+  --expect-baseline-sha256 <$BASE_baseline_sha256> `
+  --expect-batches-before <import_batches_before printed by THIS step's own preceding plan, i.e.
+                            $BASE's import_batches_before + 3 (reverse/load/reverse already run)>
+```
+
+Any `Compare-Object` output at step 6 or step 8, any `bridge_import_gate.py` `REFUSED`, or any
+`import_draftguru.py` HALT is a STOP per §7.4 (line 899): the reversal is not proven and the
+`afldb_dev` import must not proceed. `import_batches` gains exactly 4 rows across steps 1/3/5/7
+(reverse, load, reverse, load); `bridge_import_gate.py`'s own printed `import_batches_before` /
+`import_batches_expected_after` counters at each `plan`/`verify` call are the authoritative count
+to track, per its existing contract (§ `bridge_import_gate.py` README) — never a guessed number.
+
+**`tools/rebuild/draftguru/s74-snapshot.sql`** (new, read-only, six `\copy` statements over
+exactly the row sets §7.4 names — `draft_persons`/`draft_picks` link columns for
+`source_id = draftguru`, every `source_id IS NULL` pick in full, `external_identities(draftguru)`
+link columns, `player_link_resolutions` for `draft_picks` in full, `data_overrides` for
+`draft_picks` in full — ordered by natural key so two snapshots of the same state are byte
+identical). Written once as a tracked, reusable script because the operator runs it four times in
+one sitting and a hand-typed `\copy` list repeated four times is exactly the kind of typo risk a
+safety exercise should not carry; it issues no write and is the direct implementation of §7.4's own
+"`psql` `\copy` exports diffed offline" text, not new tooling beyond it.
+
+**3. `bridge_import_gate.py` generalised to `--target {test, dev}`.** Full detail in
+`tools/rebuild/draftguru/README.md`. Summary: `--target` defaults to `test` (every pre-existing
+invocation is unchanged); `dev` reads its own `AFLDB_DEV_DATABASE_URL` (new — mirrors
+`AFLDB_TEST_DATABASE_URL`'s naming exactly; deliberately never the importer's own write-role DSN
+or the migration schema-owner DSN, so this read-only gate can never silently follow an edit made
+to either of those); `dev` requires the connected database to be exactly `afldb_dev`; `dev` has no
+default `--bridge` (mandatory, and refused outright if it resolves to the `afldb_test` child
+path); a child whose own `target` field does not match the selected database is refused
+regardless of path; there is no PROD entry in the closed target list and no way to add one from
+the command line. Plan/verify's read-only discipline (session + `SELECT`-only cursor enforcement,
+rollback-and-close unconditionally, no DSN/credential ever printed) is identical across both
+targets.
+
+**4. The DEV child does not exist yet and was not generated this pass.** Producing
+`data/reference/draftguru-person-bridge-20260918-v2.afldb_dev.json` needs
+`export_person_bridge.py --resolve-against dev` run against a real `afldb_dev` connection (per
+`tools/rebuild/draftguru/README.md`'s existing `--resolve-against` tool, itself already
+target-agnostic — it takes the target name and required database on its own command line and was
+not modified this pass). Per the corrected release order in item 6 below, this is a **pre-merge**
+step: the operator generates and validates the DEV child from the still-open feature branch (a
+read-only `afldb_dev` connection is all it needs — the DEV site's deployed *code* does not need to
+be current for this, since the child is produced by a workstation-run Python tool, not by the
+running Next.js app), then commits that child file together with the §7.4 evidence in the "final
+pre-deployment commit" (item 6 step 5), before `merge:ready`/merge/push. `sync-dev.ps1` runs much
+later in the corrected order — after the DEV database is imported and independently verified, not
+before.
+
+**5. Validation (DB-free only; nothing executed against a database).**
+`python -m py_compile tools/rebuild/draftguru/bridge_import_gate.py
+tests/python/draftguru_import_gate_contract.py` clean;
+`python tests/python/draftguru_import_gate_contract.py` — every check holds, including new
+coverage for: the legacy/default (no `--target`) invocation, explicit `--target test`, explicit
+`--target dev`, per-target DSN environment selection, per-target database-name guards, refusal of
+a cross-target child artefact in both directions, refusal of `prod`/unknown/empty target strings,
+a full DEV-target `plan`→`verify` run reproducing the test-target's own hashes on the identical
+fixture frame, and CLI-level coverage of the mandatory-`--bridge`/no-silent-afldb_test-reuse/
+no-PROD-choice guards;
+`npx vitest run tests/draftguru-acquisition.test.ts -t "DraftGuru bridge import gate"` — 2 passed,
+0 failed (this includes the pre-existing source-text contract asserting the module never names
+the importer's write DSN or the migration owner DSN by string — the new docstring/comments were
+worded to respect that literally). No TypeScript changed; no lint run (no linted file touched).
+The Gridley corpus was not rerun.
+
+**6. Exact operator commands, in order, for the remainder of this closeout.** Every `<...>` value
+must be read off the immediately preceding step's own output, never assumed or reused from an
+older run. This is the corrected release order (2026-09-19, second pass): the tooling is checked
+in as its own reviewable unit before it is exercised; the DEV child and the §7.4 evidence travel
+in the same pre-deployment commit as everything else the DEV import needs; the database is
+imported and independently verified *before* the site is ever rebuilt or restarted; `sync-dev.ps1`
+therefore runs once, last, as the single deployment path -- never duplicated by a manual
+build/restart.
+
+```text
+# 1) Tooling checkpoint -- commit the validated gate, the §7.4 helper and this documentation on
+#    their own, before anything is exercised against a real database.
+git add tools/rebuild/draftguru/bridge_import_gate.py tools/rebuild/draftguru/s74-snapshot.sql \
+  tests/python/draftguru_import_gate_contract.py tools/rebuild/draftguru/README.md \
+  AFLDB-ISSUE-222.md issues.md IssuesIndex.md CHANGELOG.md .env.example docs/deployment.md \
+  deploy/afldb.service deploy/afldb-email-intake.service deploy/afldb-settle-afltables.service
+git commit -m "AFLDB-ISSUE-222: DraftGuru bridge import gate --target {test,dev}; §7.4 exercise defined"
+
+# 2) §7.4 on afldb_test, using the tooling just committed -- the full sequence in item 2 above,
+#    including the S0/S1/S2/S3 definitions immediately before it. STOP on any failure; restore
+#    from the step-0 backup, never from an S0/S1/S2/S3 CSV.
+
+# 3) Record the exercise's exact evidence in this file (S0/S1/S2/S3 hashes or Compare-Object
+#    results, the four import_batches rows, the final bridge_import_gate.py verify output) as a
+#    dated addendum -- the same discipline every other operator-reported result in this issue
+#    follows.
+
+# 4) Generate and validate the DEV-specific child -- pre-merge, read-only against afldb_dev (a
+#    workstation-run Python tool; the DEV site's deployed code does not need to be current yet).
+python tools/rebuild/draftguru/export_person_bridge.py --resolve-against dev \
+  --parent data/reference/draftguru-person-bridge-20260918-v2.json \
+  --out data/reference/draftguru-person-bridge-20260918-v2.afldb_dev.json
+python tools/rebuild/draftguru/validate_person_bridge_child.py \
+  --root . # or --expect-sha256 <the new child's own sha256, printed by the export step>
+
+# 5) Final pre-deployment commit -- the DEV child plus the §7.4 evidence from step 3, still on
+#    the feature branch.
+git add data/reference/draftguru-person-bridge-20260918-v2.afldb_dev.json AFLDB-ISSUE-222.md
+git commit -m "AFLDB-ISSUE-222: afldb_dev deployment child; §7.4 afldb_test rollback evidence"
+
+# 6) merge:ready.
+npm run merge:ready -- --issue 222
+
+# 7) Merge/push to main (operator-run; the model executes no Git command).
+
+# 8) Fresh afldb_dev backup (the DEV-host twin of backup-afldb-test.ps1 / backup.sh; confirm the
+#    exact script name/path from docs/deployment.md before running -- not re-derived here). This
+#    is the afldb_dev recovery point, exactly as step 0's backup-afldb-test.ps1 was for afldb_test.
+
+# 9) DEV validate-only, then a transactional dry run (AFLDB_IMPORT_DATABASE_URL pointed at
+#    afldb_dev -- the DEFAULT .env value on the DEV host, per docs/deployment.md §7).
+python tools/rebuild/draftguru/import_draftguru.py --validate-only \
+  --bridge data/reference/draftguru-person-bridge-20260918-v2.afldb_dev.json
+python tools/rebuild/draftguru/import_draftguru.py --dry-run \
+  --bridge data/reference/draftguru-person-bridge-20260918-v2.afldb_dev.json
+
+# 10) DEV read-only plan -- capture every generated hash plus import_batches_before. Nothing in
+#     the database changes yet.
+python tools/rebuild/draftguru/bridge_import_gate.py plan --target dev \
+  --bridge data/reference/draftguru-person-bridge-20260918-v2.afldb_dev.json
+# read after_state_sha256 / picks_after_sha256 / newly_linked_sha256 / baseline_sha256 /
+# import_batches_before off this plan's output -- call them $DEV_*
+
+# 11) The real DEV import.
+python tools/rebuild/draftguru/import_draftguru.py \
+  --bridge data/reference/draftguru-person-bridge-20260918-v2.afldb_dev.json
+
+# 12) Two independent DEV verifies, using the $DEV_* values captured in step 10 (the §7.5
+#     "deterministic" requirement: both must print the identical summary_sha256).
+python tools/rebuild/draftguru/bridge_import_gate.py verify --target dev \
+  --bridge data/reference/draftguru-person-bridge-20260918-v2.afldb_dev.json \
+  --expect-after-sha256 <$DEV_after_state_sha256> \
+  --expect-picks-after-sha256 <$DEV_picks_after_sha256> \
+  --expect-newly-linked-sha256 <$DEV_newly_linked_sha256> \
+  --expect-baseline-sha256 <$DEV_baseline_sha256> \
+  --expect-batches-before <$DEV_import_batches_before>
+python tools/rebuild/draftguru/bridge_import_gate.py verify --target dev \
+  --bridge data/reference/draftguru-person-bridge-20260918-v2.afldb_dev.json \
+  --expect-after-sha256 <$DEV_after_state_sha256> \
+  --expect-picks-after-sha256 <$DEV_picks_after_sha256> \
+  --expect-newly-linked-sha256 <$DEV_newly_linked_sha256> \
+  --expect-baseline-sha256 <$DEV_baseline_sha256> \
+  --expect-batches-before <$DEV_import_batches_before>
+# confirm both runs printed the same summary_sha256. Only past this point is afldb_dev's data
+# independently proven -- everything before here touched no deployed code and no live traffic.
+
+# 13) ONLY NOW, with the database independently verified twice, sync and deploy DEV code.
+#     sync-dev.ps1 already performs git pull, npm ci, npm run db:migrate, npm run build, the
+#     systemd restart, and its own readiness (health) poll -- there is no separate manual
+#     "npm run build && sudo systemctl restart afldb" step; running one here would duplicate what
+#     this single command already does and create two competing deployment paths.
+deploy/sync-dev.ps1
+
+# 14) Health and Grid Solver draft smoke checks: the four DEV browser checks named in §6.6, plus
+#     a Grid Solver draft-criterion smoke (a national-draft-pick query on a known-linked player)
+#     against the DEV site -- on top of sync-dev.ps1's own automated /api/health readiness poll.
+
+# 15) Documentation-only closure commit (operator, after (1)-(14) all hold): mark ISSUE-222
+#     Resolved in issues.md, remove it from IssuesIndex.md / the Open Issues table, add the
+#     CHANGELOG.md entry. This commit touches no code and no data artefact.
+```
+
+**Database/Git/network/deployment actions this pass: none.** No `psql`, no `import_draftguru.py`,
+no `bridge_import_gate.py` run against a real connection, no backup, no commit, no push, no
+`sync-dev.ps1`, no `export_person_bridge.py --resolve-against dev`. AFLDB-ISSUE-224 and
+AFLDB-ISSUE-225 were not touched or expanded. The canonical v1/v2 parent, the `afldb_test` child,
+and every Gridley corpus artefact are unchanged. The second (correction) pass ran no command
+beyond a read-only `Read` of `deploy/sync-dev.ps1` to confirm its existing build/restart/health
+sequence before removing the duplicate manual step.
+
+**Files changed across both passes (original implementation + the sequencing/terminology
+correction above), all still uncommitted:** `tools/rebuild/draftguru/bridge_import_gate.py`
+(generalised to `--target {test, dev}`), `tools/rebuild/draftguru/s74-snapshot.sql` (new),
+`tests/python/draftguru_import_gate_contract.py` (extended), `tools/rebuild/draftguru/README.md`,
+this file, `issues.md`, `IssuesIndex.md`, `CHANGELOG.md` (the new `AFLDB_DEV_DATABASE_URL`
+required updating the ISSUE-220 credential-boundary documentation and deny lists), `.env.example`,
+`docs/deployment.md`, `deploy/afldb.service`, `deploy/afldb-email-intake.service`,
+`deploy/afldb-settle-afltables.service`. The correction pass itself touched only this file (the
+operator-sequence and S0/S1/S2/S3 text in items 2, 4 and 6, plus this note). No test, classifier,
+canonical bridge artefact, ISSUE-224/225 content, or Gridley classification was touched by either
+pass.

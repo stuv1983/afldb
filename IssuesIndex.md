@@ -330,6 +330,27 @@
   before the `afldb_dev` import step — it is no longer deferred. Remaining Phase 4a items
   (§6.1 pick level, §6.2, remaining §6.4, §6.8 items 2–4) stay deferred; PROD stays out of scope.
   AFLDB-ISSUE-226/227 do not exist in this repository and are not blocking.
+- **§7.4 exercise defined; DEV gate generalised (2026-09-19, Sonnet 5, §11.19.15, uncommitted).**
+  The exact operator command sequence for §7.4 on `afldb_test` (two load/reverse cycles, `psql
+  \copy` snapshots via the new `tools/rebuild/draftguru/s74-snapshot.sql`, `Compare-Object`
+  diffing) is written up but **not executed** by the model. `bridge_import_gate.py` now takes
+  `--target {test, dev}` (default `test`, unchanged); `dev` reads a new, dedicated
+  `AFLDB_DEV_DATABASE_URL`, requires `afldb_dev`, has no default `--bridge`, and refuses reuse of
+  the `afldb_test` child. DB-free validation (`py_compile`, the extended import-gate contract, the
+  affected vitest specs including the ISSUE-220 credential-boundary suite after the new DSN was
+  added to `.env.example`/`docs/deployment.md`/the three service units' `UnsetEnvironment=`) all
+  pass. No DEV child was generated; no database, Git, network or deployment command ran.
+- **Sequencing/terminology correction (2026-09-19, Sonnet 5, second pass, documentation only).**
+  The operator sequence above put `sync-dev.ps1` before the DEV child was generated and before
+  the real DEV import/verify. Corrected order (full detail `AFLDB-ISSUE-222.md` §11.19.15 item 6):
+  commit tooling checkpoint → §7.4 on `afldb_test` → record evidence → generate/validate DEV child
+  (pre-merge, read-only) → final pre-deployment commit (DEV child + §7.4 evidence) →
+  `merge:ready` → merge/push → fresh `afldb_dev` backup → DEV validate-only/dry-run → DEV
+  read-only plan (capture hashes + `import_batches_before`) → real DEV import → two independent
+  DEV verifies → **only then** `sync-dev.ps1` → smoke → separate closure commit. Also made
+  explicit which of S0/S1/S2/S3 is the reconstructed pre-bridge state vs. the backed-up
+  post-import starting state, and removed a manual build/restart step duplicating `sync-dev.ps1`.
+  No code, test, artefact or database touched.
 
 ### AFLDB-ISSUE-225 — Gridley corpus: 37 pre-existing `incorrect known answer` cells on non-draft criteria, present on `afldb_test` before AFLDB-ISSUE-222 and untouched by it
 - **Severity:** Medium. **Area:** Grid Solver / canonical data — `captaincies`,

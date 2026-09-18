@@ -1082,6 +1082,7 @@ All configuration is in `/home/arm/projects/afldb/.env` (mode 600, owner `arm`),
 | `AFLDB_TEST_AUTH_DATABASE_URL` | **optional**, restricted auth-role integration tests (`afldb_auth`, same `_test` database) |
 | `AFLDB_CODE_TEST_DATABASE_URL` | **optional** (AFLDB-ISSUE-146), disposable full-rebuild rehearsal, `code_test_db` only (`afldb_owner`) |
 | `AFLDB_CODE_TEST_IMPORT_DATABASE_URL` | **optional** (AFLDB-ISSUE-146), same rehearsal, `code_test_db` only (`afldb_import`) |
+| `AFLDB_DEV_DATABASE_URL` | **optional** (AFLDB-ISSUE-222), `tools/rebuild/draftguru/bridge_import_gate.py --target dev` only (`afldb_dev`, read-only enforced at the session level, not by role — never the import or owner DSN) |
 | `AFLDB_BACKUP_DATABASE_URL` | `pg_dump` (`afldb_backup`, read-only) |
 | `AFLDB_ENV` | `development` \| `production` — **transport security**: Secure cookies, HSTS, strict CSP |
 | `AFLDB_INDEXING` | `on` enables indexing; anything else = `noindex`. Separate from `AFLDB_ENV` |

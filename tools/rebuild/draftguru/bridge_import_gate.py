@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """AFLDB-ISSUE-222 -- read-only pre-import PLAN and post-import VERIFY gates for the DraftGuru
-person-page bridge import into ``afldb_test``.
+person-page bridge import. Default target ``afldb_test``; ``--target dev`` generalises the same
+gate to ``afldb_dev`` under its own, separately-guarded DSN. There is no PROD target.
 
     python tools/rebuild/draftguru/bridge_import_gate.py plan \\
         --bridge data/reference/draftguru-person-bridge-20260918-v2.afldb_test.json
@@ -11,6 +12,17 @@ person-page bridge import into ``afldb_test``.
         --expect-newly-linked-sha256 <from the plan> --expect-baseline-sha256 <from the plan> \\
         --expect-batches-before <from the plan>
 
+    # DEV -- --target and an explicit --bridge are both mandatory; there is no default DEV
+    # child (the afldb_test child above must never be reused against DEV).
+    python tools/rebuild/draftguru/bridge_import_gate.py plan --target dev \\
+        --bridge data/reference/draftguru-person-bridge-20260918-v2.afldb_dev.json
+
+    python tools/rebuild/draftguru/bridge_import_gate.py verify --target dev \\
+        --bridge data/reference/draftguru-person-bridge-20260918-v2.afldb_dev.json \\
+        --expect-after-sha256 <from the DEV plan> --expect-picks-after-sha256 <from the DEV plan> \\
+        --expect-newly-linked-sha256 <from the DEV plan> --expect-baseline-sha256 <from the DEV plan> \\
+        --expect-batches-before <from the DEV plan>
+
 Both modes are the same read: the accepted Stage A snapshot is re-verified and re-parsed by
 ``import_draftguru.validate()`` exactly as the importer does (sha256 of every raw page, the
 frozen contracts, the six-decision ledger, the bridge dataset through ``load_bridge``), the
@@ -20,21 +32,38 @@ with seeding forbidden. The result is the exact row state the importer would wri
 compares it with what is stored NOW and refuses on anything but the planned link changes;
 ``verify`` compares it with what is stored AFTER the import and refuses on any difference.
 
-Database discipline (identical in both modes):
+Database discipline (identical in every target):
 
-  * the only DSN read is ``AFLDB_TEST_DATABASE_URL`` and its path must be exactly
-    ``/afldb_test``; the server's ``current_database()`` is checked again after connecting;
+  * ``--target`` selects the database by name only, from a fixed, closed list (``test`` ->
+    ``afldb_test``, ``dev`` -> ``afldb_dev``; no PROD target exists and none can be added by a
+    command-line value); the default is ``test``, so every pre-existing invocation with no
+    ``--target`` is unchanged;
+  * each target reads its OWN DSN environment variable -- ``AFLDB_TEST_DATABASE_URL`` for
+    ``test``, ``AFLDB_DEV_DATABASE_URL`` for ``dev`` -- deliberately never the importer's own
+    elevated write-role DSN or the migration schema-owner DSN (the latter documented elsewhere
+    as "used only by migrations"): a gate that shared a DSN with a writer could silently start
+    reading through a connection whose privileges or pooling something else depends on, and a
+    future edit to the write DSN must never change what this read-only gate is pointed at. The
+    DSN's path must be exactly ``/afldb_test`` or ``/afldb_dev`` respectively; the server's
+    ``current_database()`` is checked again after connecting;
+  * ``dev`` has no default bridge dataset -- ``--bridge`` is mandatory for ``--target dev`` and
+    is refused outright if it resolves to the ``afldb_test`` child path, so a DEV run can never
+    silently verify the test child instead; the child's own ``target`` field is also checked
+    against the selected database, so an ``afldb_test``-labelled child is refused under
+    ``--target dev`` even if some other path pointed at it;
   * the connection is opened with ``default_transaction_read_only=on`` and ``TimeZone=UTC``,
     marked read-only and REPEATABLE READ, and the server's ``transaction_read_only`` and
     ``default_transaction_read_only`` are both asserted ``on`` before any other statement;
   * every statement passes through a cursor wrapper that refuses anything but ``SELECT``;
   * the transaction is rolled back and the connection closed unconditionally;
   * nothing is written to disk -- no artefact, no checkpoint, no log file;
-  * the DSN and credentials are never printed; connection errors are reported by class only.
+  * the DSN and credentials are never printed; connection errors are reported by class only;
+  * every guard above runs, and fails closed, before any target data is read.
 
 Exit status: 0 = every check held (plan: proceed / verify: import proven); 1 = refused (a check
-failed -- fail closed); 2 = the gate could not run (structural error). Two runs over the same
-state with the same arguments print the same ``summary_sha256``.
+failed -- fail closed); 2 = the gate could not run (structural error, including an unknown
+``--target``, a missing DSN, or a missing mandatory ``--bridge``). Two runs over the same state
+with the same arguments and target print the same ``summary_sha256``.
 """
 
 from __future__ import annotations
@@ -76,6 +105,32 @@ EXPECTED_CHILD_COUNTS = {
     "U-no-href": 1493, "target_not_registered": 94, "different_person_wrong_href": 2,
 }
 EXPECTED_POPULATION = {"persons": imp.EXPECTED_PERSONS, "picks": imp.EXPECTED_ROWS}
+
+# DEV generalises the same gate to a second, separately-guarded database. It reads its OWN DSN
+# environment variable -- never the importer's own elevated write-role DSN, whose target this
+# gate must never silently follow, and never the migration schema-owner DSN (documented in
+# .env.example as "used only by migrations"). Naming it AFLDB_DEV_DATABASE_URL mirrors
+# AFLDB_TEST_DATABASE_URL exactly: a bare, database-named DSN dedicated to this gate, enforced
+# read-only at the session and cursor level exactly as the test target already is, never by
+# relying on a lower-privilege role. There is no PROD entry, deliberately: this dict is the
+# closed list of targets this tool will ever connect to, and it cannot be extended from the
+# command line.
+DEV_DATABASE = "afldb_dev"
+DEV_DSN_ENV = "AFLDB_DEV_DATABASE_URL"
+
+TARGETS: dict[str, dict[str, Any]] = {
+    "test": {
+        "database": REQUIRED_DATABASE, "dsn_env": DSN_ENV,
+        "child_rel": CHILD_REL, "expected_child_sha256": EXPECTED_CHILD_SHA256,
+        "expected_child_counts": EXPECTED_CHILD_COUNTS,
+    },
+    "dev": {
+        # No default child, no pinned hash, no pinned counts: the DEV deployment child does not
+        # exist yet. --bridge and (optionally) --expect-child-sha256 must be supplied explicitly.
+        "database": DEV_DATABASE, "dsn_env": DEV_DSN_ENV,
+        "child_rel": None, "expected_child_sha256": None, "expected_child_counts": None,
+    },
+}
 
 _DG = "https://www.draftguru.com.au/players/"
 # The two Phase 3 rejections (AFLDB-ISSUE-222.md §11.13/§11.14): neither person may link and
@@ -189,17 +244,23 @@ class SelectOnlyCursor:
         return False
 
 
-def resolve_dsn(environ: dict | None = None) -> str:
+def resolve_dsn(target: str = "test", environ: dict | None = None) -> str:
+    """Resolve the DSN for ``target`` (default ``"test"``, matching every pre-existing
+    invocation). Fails closed on an unknown target -- there is no PROD entry to fall through to."""
+    if target not in TARGETS:
+        raise GateError(f"unknown --target {target!r} -- only {sorted(TARGETS)} exist (no PROD target)")
+    cfg = TARGETS[target]
+    dsn_env, required_database = cfg["dsn_env"], cfg["database"]
     env = os.environ if environ is None else environ
-    dsn = env.get(DSN_ENV)
+    dsn = env.get(dsn_env)
     if not dsn:
-        raise GateError(f"{DSN_ENV} is not set -- refusing to plan or verify against an unknown target")
+        raise GateError(f"{dsn_env} is not set -- refusing to plan or verify against an unknown target")
     dsn = dsn.strip()
     parsed = urlparse(dsn)
     if parsed.scheme not in ("postgresql", "postgres"):
-        raise GateError(f"{DSN_ENV} is not a postgresql:// DSN")
-    if parsed.path.lstrip("/") != REQUIRED_DATABASE:
-        raise GateError(f"{DSN_ENV} does not target /{REQUIRED_DATABASE} -- refusing")
+        raise GateError(f"{dsn_env} is not a postgresql:// DSN")
+    if parsed.path.lstrip("/") != required_database:
+        raise GateError(f"{dsn_env} does not target /{required_database} -- refusing")
     return dsn
 
 
@@ -222,26 +283,27 @@ def open_read_only(dsn: str) -> Any:
     return conn
 
 
-def assert_read_only(cur: SelectOnlyCursor) -> dict:
+def assert_read_only(cur: SelectOnlyCursor, required_database: str = REQUIRED_DATABASE) -> dict:
     cur.execute("SELECT current_setting('transaction_read_only'), "
                 "current_setting('default_transaction_read_only'), current_database(), "
                 "current_setting('TimeZone')")
     txn_ro, default_ro, database, tz = cur.fetchone()
     if txn_ro != "on" or default_ro != "on":
         raise GateError("REFUSED: the server reports the transaction is not read-only")
-    if database != REQUIRED_DATABASE:
-        raise GateError(f"REFUSED: connected database is not {REQUIRED_DATABASE}")
+    if database != required_database:
+        raise GateError(f"REFUSED: connected database is not {required_database}")
     return {"transaction_read_only": txn_ro, "default_transaction_read_only": default_ro,
             "current_database": database, "timezone": tz}
 
 
-def with_read_only(conn_factory: Callable[[], Any], body: Callable[[SelectOnlyCursor, dict], Any]) -> Any:
+def with_read_only(conn_factory: Callable[[], Any], body: Callable[[SelectOnlyCursor, dict], Any],
+                    required_database: str = REQUIRED_DATABASE) -> Any:
     """Open, assert, run ``body``, then roll back and close no matter what."""
     conn = conn_factory()
     try:
         with conn.cursor() as raw:
             cur = SelectOnlyCursor(raw)
-            settings = assert_read_only(cur)
+            settings = assert_read_only(cur, required_database)
             return body(cur, settings)
     finally:
         try:
@@ -254,7 +316,8 @@ def with_read_only(conn_factory: Callable[[], Any], body: Callable[[SelectOnlyCu
 # Datasets (hash-pinned)
 # ---------------------------------------------------------------------------
 
-def load_child(path: Path, expect_sha256: str | None, expect_counts: dict | None) -> tuple[dict, str]:
+def load_child(path: Path, expect_sha256: str | None, expect_counts: dict | None,
+               required_database: str = REQUIRED_DATABASE) -> tuple[dict, str]:
     if not path.is_file():
         raise GateError(f"bridge dataset not found: {path.as_posix()}")
     data = path.read_bytes()
@@ -265,8 +328,8 @@ def load_child(path: Path, expect_sha256: str | None, expect_counts: dict | None
     doc = json.loads(data.decode("utf-8"))
     if doc.get("kind") != "deployment":
         raise GateError("REFUSED: the dataset is not a deployment child (kind != 'deployment')")
-    if doc.get("target") != REQUIRED_DATABASE:
-        raise GateError(f"REFUSED: the child targets {doc.get('target')!r}, not {REQUIRED_DATABASE}")
+    if doc.get("target") != required_database:
+        raise GateError(f"REFUSED: the child targets {doc.get('target')!r}, not {required_database}")
     if doc.get("schema_version") != 1:
         raise GateError("REFUSED: unsupported child schema_version")
     withheld = doc.get("withheld") or []
@@ -724,8 +787,11 @@ def totals(expected_persons: dict, expected_picks: dict) -> dict:
 def run_gate(mode: str, prepared: dict, child: dict, child_sha256: str, parent_map: dict[str, str],
              label: str, conn_factory: Callable[[], Any], *, expect: dict | None = None,
              population: dict | None = None, rejected: dict | None = None,
-             print_manifest: bool = False, emit: Callable[[str], None] = print) -> dict:
-    """Shared body of ``plan`` and ``verify``. Returns the summary (with ``failures``)."""
+             print_manifest: bool = False, emit: Callable[[str], None] = print,
+             required_database: str = REQUIRED_DATABASE) -> dict:
+    """Shared body of ``plan`` and ``verify``. Returns the summary (with ``failures``).
+    ``required_database`` defaults to ``afldb_test``, matching every pre-existing caller that
+    does not pass it; ``main()`` passes the selected target's database explicitly."""
     if mode not in ("plan", "verify"):
         raise GateError(f"unknown mode {mode!r}")
     rep = Report(emit)
@@ -736,6 +802,7 @@ def run_gate(mode: str, prepared: dict, child: dict, child_sha256: str, parent_m
     withheld = child.get("withheld") or []
     withheld_urls = {w["player_url"]: w["reason"] for w in withheld}
     summary: dict[str, Any] = {"tool": TOOL, "tool_version": TOOL_VERSION, "mode": mode,
+                               "target_database": required_database,
                                "child_sha256": child_sha256, "stage_a_label": label,
                                "expect": expect}
 
@@ -762,14 +829,14 @@ def run_gate(mode: str, prepared: dict, child: dict, child_sha256: str, parent_m
         rep.check("2.1 server confirms transaction_read_only=on and default_transaction_read_only=on",
                   settings["transaction_read_only"] == "on"
                   and settings["default_transaction_read_only"] == "on")
-        rep.check(f"2.2 current_database() is {REQUIRED_DATABASE}",
-                  settings["current_database"] == REQUIRED_DATABASE)
+        rep.check(f"2.2 current_database() is {required_database}",
+                  settings["current_database"] == required_database)
         rep.check("2.3 session TimeZone is UTC (digest stability)", settings["timezone"] == "UTC",
                   str(settings["timezone"]))
         return read_target(cur, rep)
 
     try:
-        target = with_read_only(conn_factory, body)
+        target = with_read_only(conn_factory, body, required_database)
     except imp.ImportFailure as exc:
         rep.check("2.4 the target's live decisions are consistent (read_live_decisions)", False, str(exc))
         return _finish(summary, rep, emit)
@@ -1062,9 +1129,17 @@ def _finish(summary: dict, rep: Report, emit: Callable[[str], None]) -> dict:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("mode", choices=("plan", "verify"))
-    ap.add_argument("--bridge", default=CHILD_REL, help="the afldb_test deployment child")
+    ap.add_argument("--target", choices=sorted(TARGETS), default="test",
+                    help="which database this gate reads (default test = afldb_test; "
+                         "dev = afldb_dev; no PROD target exists)")
+    ap.add_argument("--bridge", default=None,
+                    help="the target's deployment child; defaults to the pinned afldb_test "
+                         "child for --target test, and is MANDATORY (no default) for any "
+                         "other target")
     ap.add_argument("--parent", default=PARENT_REL, help="the v2 source-evidence parent")
-    ap.add_argument("--expect-child-sha256", default=EXPECTED_CHILD_SHA256)
+    ap.add_argument("--expect-child-sha256", default=None,
+                    help="defaults to the pinned afldb_test child hash for --target test; "
+                         "no default for any other target (no DEV child is pinned yet)")
     ap.add_argument("--expect-parent-sha256", default=EXPECTED_PARENT_SHA256)
     ap.add_argument("--label", default=imp.STAGE_A_LABEL)
     ap.add_argument("--snapshot-root", default=None)
@@ -1076,19 +1151,37 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--expect-baseline-sha256")
     ap.add_argument("--expect-batches-before", type=int)
     args = ap.parse_args(argv)
+    cfg = TARGETS[args.target]
 
-    print(f"AFLDB DraftGuru bridge import gate -- {args.mode} (read-only, {REQUIRED_DATABASE} only)")
+    print(f"AFLDB DraftGuru bridge import gate -- {args.mode} (read-only, {cfg['database']} "
+          f"only) [target={args.target}]")
+    if args.bridge is None:
+        if cfg["child_rel"] is None:
+            print(f"\nERROR: --bridge is required for --target {args.target} "
+                  f"(no default {cfg['database']} child exists; the afldb_test child must "
+                  "never be reused against it)")
+            return EXIT_ERROR
+        args.bridge = cfg["child_rel"]
+    if args.expect_child_sha256 is None:
+        args.expect_child_sha256 = cfg["expected_child_sha256"]
+
     try:
         from common import load_env
         load_env()
-        dsn = resolve_dsn()
+        dsn = resolve_dsn(args.target)
         child_path = Path(args.bridge)
         if not child_path.is_absolute():
             child_path = REPO_ROOT / child_path
+        if args.target != "test":
+            test_default_child = (REPO_ROOT / CHILD_REL).resolve()
+            if child_path.resolve() == test_default_child:
+                raise GateError(f"REFUSED: --bridge for --target {args.target} must not be "
+                                "the afldb_test child")
         parent_path = Path(args.parent)
         if not parent_path.is_absolute():
             parent_path = REPO_ROOT / parent_path
-        child, child_sha = load_child(child_path, args.expect_child_sha256, EXPECTED_CHILD_COUNTS)
+        child, child_sha = load_child(child_path, args.expect_child_sha256,
+                                      cfg["expected_child_counts"], required_database=cfg["database"])
         parent_map = load_parent_map(parent_path, child, args.expect_parent_sha256)
         prepared = imp.validate(SimpleNamespace(label=args.label, snapshot_root=args.snapshot_root,
                                                 bridge=str(child_path)))
@@ -1107,7 +1200,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         summary = run_gate(args.mode, prepared, child, child_sha, parent_map, args.label,
                            lambda: open_read_only(dsn), expect=expect,
-                           print_manifest=args.print_manifest)
+                           print_manifest=args.print_manifest, required_database=cfg["database"])
     except GateError as exc:
         print(f"\nERROR: {exc}")
         return EXIT_ERROR

@@ -877,7 +877,7 @@ identity-evaluable, 16 `target_not_registered` terminally withheld, 69/69 verdic
 (0.5134% at n = 582). No import has been run on the strength of this; the pre-import gates below
 come next.
 
-## `bridge_import_gate.py` -- read-only pre-import PLAN and post-import VERIFY (`afldb_test` only)
+## `bridge_import_gate.py` -- read-only pre-import PLAN and post-import VERIFY (`afldb_test` / `afldb_dev`)
 
     python tests/python/draftguru_import_atomicity_contract.py
     python tests/python/draftguru_import_gate_contract.py
@@ -957,6 +957,77 @@ inside the block, `analyze()`'s own commit landed the data before `batch.finish(
 `backup.sh`: custom format, compress 6, no-owner, partial-then-rename, `pg_restore --list`
 verification, SHA-256, password in `PGPASSWORD` only, refuses any DSN not naming `afldb_test`,
 writes under `D:\backups\afldb\issue-222` by default -- outside the repository).
+
+### `--target {test, dev}` (2026-09-19, AFLDB-ISSUE-222 §11.19.15)
+
+`--target` selects which database this gate reads, from a fixed, closed list -- `test` ->
+`afldb_test` (the default; every invocation with no `--target` is unchanged), `dev` ->
+`afldb_dev`. There is no PROD entry and none can be added from the command line; an unknown
+target is refused before any DSN is read.
+
+Each target reads its OWN DSN environment variable: `AFLDB_TEST_DATABASE_URL` for `test`,
+**`AFLDB_DEV_DATABASE_URL`** (new) for `dev` -- deliberately never `AFLDB_IMPORT_DATABASE_URL`
+(the importer's own elevated write role, whose target this gate must never silently follow if
+that DSN is later repointed) and never `AFLDB_OWNER_DATABASE_URL` (documented in `.env.example`
+as "used only by migrations"). `AFLDB_DEV_DATABASE_URL` is not in `.env.example` yet -- the
+operator adds it there (and to `.env`) pointed at `afldb_dev` before running `--target dev`; its
+path must be exactly `/afldb_dev`, checked before and again after connecting, exactly as
+`afldb_test` already is. Read-only enforcement (session `default_transaction_read_only=on` +
+REPEATABLE READ, the `SELECT`-only cursor wrapper, unconditional rollback-and-close, DSN/password
+never printed) is identical for both targets.
+
+`dev` has **no default `--bridge`** -- the DEV deployment child does not exist yet, and one must
+be supplied explicitly:
+
+    python tools/rebuild/draftguru/bridge_import_gate.py plan --target dev \
+      --bridge data/reference/draftguru-person-bridge-20260918-v2.afldb_dev.json
+
+    python tools/rebuild/draftguru/bridge_import_gate.py verify --target dev \
+      --bridge data/reference/draftguru-person-bridge-20260918-v2.afldb_dev.json \
+      --expect-after-sha256 <plan> --expect-picks-after-sha256 <plan> \
+      --expect-newly-linked-sha256 <plan> --expect-baseline-sha256 <plan> --expect-batches-before <plan>
+
+`--bridge` is refused outright if it resolves to the pinned `afldb_test` child path, so a DEV run
+can never silently verify the test child instead of a real DEV one. Independently of that guard,
+the child's own `target` field is checked against the selected database (`load_child`), so an
+`afldb_test`-labelled child is refused under `--target dev` even via some other path, and vice
+versa. `--expect-child-sha256` also has no default for `dev` (no DEV child hash is pinned yet);
+pass it explicitly once a DEV child exists and its hash is known, exactly as `plan`'s own output
+supplies `--expect-*` for `verify`.
+
+The DEV deployment child itself is produced the same way the `afldb_test` one was, via
+`export_person_bridge.py --resolve-against dev` (see above; that tool was already target-agnostic
+and needed no change), against a real `afldb_dev` connection -- not by this gate, which never
+writes a file.
+
+**Contract coverage:** `tests/python/draftguru_import_gate_contract.py` pins the legacy/default
+(no `--target`) invocation, explicit `--target test`, explicit `--target dev`, per-target DSN
+environment selection, per-target database-name guards, refusal of a cross-target child artefact
+in both directions, refusal of `prod`/unknown/empty target strings, a full DEV-target
+`plan`->`verify` run reproducing the test-target's own hashes on the identical fixture frame, and
+the CLI-level mandatory-`--bridge` / no-silent-afldb_test-reuse / no-PROD-choice guards.
+
+### `s74-snapshot.sql` -- the AFLDB-ISSUE-222 §7.4 rollback-exercise snapshot (read-only)
+
+Six `\copy ... TO` statements over exactly the row sets `AFLDB-ISSUE-222.md` §7.4 names for the
+mandatory S0/S1/S2/S3 comparison (`draft_persons`/`draft_picks` link columns for the DraftGuru
+source, every manual `source_id IS NULL` pick in full, `external_identities(draftguru)` link
+columns, `player_link_resolutions`/`data_overrides` for `draft_picks` in full), each ordered by a
+natural key so two snapshots of the same state are byte-identical CSVs. Run from inside a fresh
+per-stage directory:
+
+    $env:PGOPTIONS = '-c default_transaction_read_only=on'
+    & "C:\Program Files\PostgreSQL\16\bin\psql.exe" -X -v ON_ERROR_STOP=1 `
+      -f ..\s74-snapshot.sql -d $env:AFLDB_TEST_DATABASE_URL
+
+Writes only the six CSV files in the current directory; issues no write to the database. This is
+the direct implementation of §7.4's own text ("a comparison script for S0–S3 is proposed tooling
+... the `afldb_test` exercise may use `psql` `\copy` exports diffed offline"), written once as a
+tracked script because the operator runs it four times in one sitting and a hand-typed `\copy`
+list repeated four times is exactly the kind of typo risk a safety exercise should not carry. The
+exact operator sequence around it (reverse / load / reverse / load, with `Compare-Object` between
+stages) is recorded in `AFLDB-ISSUE-222.md` §11.19.15; it was defined but **not executed** by the
+model, and must never be executed against `afldb_dev` -- §7.4's exercise is `afldb_test`-only.
 
 ### `afldb_test` import complete and verified (2026-09-19, operator-reported)
 

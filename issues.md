@@ -36907,6 +36907,50 @@ PENDING.** Full record: `AFLDB-ISSUE-222.md` §11.12, `AFLDB-ISSUE-222-PHASE3-CO
   already achieved, not for an actual DEV promotion. PROD remains out of scope. AFLDB-ISSUE-226
   and AFLDB-ISSUE-227 do not exist anywhere in this repository (no `issues.md`/`IssuesIndex.md`
   entry, no dedicated file, no Git history reference) and therefore cannot block this closeout.
+- **§7.4 exercise defined and the DEV gate generalised (2026-09-19, Sonnet 5, High).** Scope:
+  remove the two remaining blockers to the DEV closeout named above — the §7.4 rollback proof
+  and a `bridge_import_gate.py` that can address `afldb_dev` at all. No database, Git, network or
+  deployment command was run; nothing on `afldb_test`/`afldb_dev` was touched; ISSUE-224/225 were
+  not expanded.
+  §7.4's own text (`AFLDB-ISSUE-222.md` §7.4, "a comparison script for S0–S3 is proposed tooling
+  ... the `afldb_test` exercise may use `psql` `\copy` exports diffed offline") does not require
+  new tooling — the existing `import_draftguru.py` (with/without `--bridge`) plus `psql \copy`
+  already demonstrates load → reversal → reload. The exact operator sequence and every
+  `\copy`/comparison command are recorded in `AFLDB-ISSUE-222.md` (this pass's dated addendum);
+  no code was written for it and none was run.
+  `tools/rebuild/draftguru/bridge_import_gate.py` gained a `--target {test,dev}` argument
+  (default `test`, fully backward compatible: every pre-existing invocation with no `--target` is
+  unchanged). `dev` reads its own `AFLDB_DEV_DATABASE_URL` (new; mirrors the existing
+  `AFLDB_TEST_DATABASE_URL` naming, deliberately never the importer's write DSN or the migration
+  owner DSN), requires `--target dev`'s database to be exactly `afldb_dev`, has no default
+  `--bridge` (mandatory for `dev`, and refused outright if it resolves to the `afldb_test`
+  child), and refuses any target outside `{test, dev}` before any DSN is read — there is no PROD
+  entry. `tests/python/draftguru_import_gate_contract.py` gained explicit test/dev/unknown-target
+  DSN-guard coverage, a full DEV-target plan/verify parity run reproducing the test-target's
+  hashes, cross-target child-artefact refusal in both directions, and CLI-level coverage of the
+  mandatory-`--bridge`/no-silent-reuse/no-PROD-choice guards; the two pre-existing calls that
+  bound their environ dict positionally were updated to the new `(target, environ)` signature and
+  otherwise unchanged. Validation: `python -m py_compile` clean;
+  `python tests/python/draftguru_import_gate_contract.py` — all checks hold (was already fully
+  green before this change; every prior check plus the new target ones now pass);
+  `npx vitest run tests/draftguru-acquisition.test.ts -t "DraftGuru bridge import gate"` — 2
+  passed (including the source-text contract that the module never names the importer's write or
+  migration-owner DSN, which the new docstring/comments were written to respect literally). No
+  DEV child dataset was generated this pass — that remains the operator's post-merge step.
+- **Sequencing/terminology correction (2026-09-19, Sonnet 5, second pass, documentation only).**
+  The operator sequence drafted immediately above put `sync-dev.ps1` before the DEV child was
+  generated and before the real DEV import/verify. Corrected release order (recorded in full in
+  `AFLDB-ISSUE-222.md` §11.19.15, item 6): commit the tooling checkpoint → run §7.4 on `afldb_test`
+  → record its evidence → generate/validate the DEV child (pre-merge, read-only against
+  `afldb_dev`) → a final pre-deployment commit carrying the DEV child and the §7.4 evidence →
+  `merge:ready` → merge/push → fresh `afldb_dev` backup → DEV validate-only/dry-run → DEV
+  read-only plan (capture every hash + `import_batches_before`) → real DEV import → two
+  independent DEV verifies → **only then** `deploy/sync-dev.ps1` → health/Grid-Solver smoke → a
+  separate documentation-only closure commit. The same edit made explicit which of S0/S1/S2/S3 is
+  the reconstructed pre-bridge state versus the untouched (backed-up) starting state, and removed
+  a manual `npm run build && sudo systemctl restart afldb` step that duplicated what
+  `sync-dev.ps1` already performs. No code, test, canonical artefact or database was touched; no
+  command beyond a read-only inspection of `deploy/sync-dev.ps1` was run.
 
 ## AFLDB-ISSUE-223 — Pre-existing test regression from AFLDB-ISSUE-221: `GRID_DRAFT_TYPES` reshaped, `draftguru-acquisition.test.ts`'s vocabulary-parity test now fails
 

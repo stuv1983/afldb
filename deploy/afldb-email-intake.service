@@ -28,7 +28,7 @@ EnvironmentFile=/home/arm/projects/afldb/.env
 # be delivered to the app this time (a restart, a timeout) and is still
 # unread for the next run to retry. It is reported as a failed run on
 # purpose -- one is noise during a deploy, a run of them is not.
-UnsetEnvironment=AFLDB_IMPORT_DATABASE_URL AFLDB_OWNER_DATABASE_URL AFLDB_AUTH_DATABASE_URL AFLDB_TEST_DATABASE_URL AFLDB_BACKUP_DATABASE_URL AFLDB_PROD_DATABASE_URL DATABASE_URL
+UnsetEnvironment=AFLDB_IMPORT_DATABASE_URL AFLDB_OWNER_DATABASE_URL AFLDB_AUTH_DATABASE_URL AFLDB_TEST_DATABASE_URL AFLDB_DEV_DATABASE_URL AFLDB_BACKUP_DATABASE_URL AFLDB_PROD_DATABASE_URL DATABASE_URL
 
 StandardOutput=journal
 StandardError=journal
