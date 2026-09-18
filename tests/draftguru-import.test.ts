@@ -18,7 +18,9 @@ import { join } from "node:path";
 
 const root = process.cwd();
 const importerPath = join(root, "tools", "rebuild", "draftguru", "import_draftguru.py");
-const importerSource = readFileSync(importerPath, "utf8");
+// Normalised to LF once, so every slice/index/regex pin below sees one representation
+// regardless of the checkout's autocrlf setting (Windows worktrees read back CRLF).
+const importerSource = readFileSync(importerPath, "utf8").replace(/\r\n/g, "\n");
 
 /*
  * The module docstring documents the boundaries this importer respects, so it
@@ -48,6 +50,13 @@ function hasSnapshot(): boolean {
 }
 
 const itPy = hasPython() && hasSnapshot() ? it : it.skip;
+
+/** The scripted-connection contracts import tools/migration/common.py, which imports psycopg. */
+function hasPsycopg(): boolean {
+  return spawnSync(python, ["-c", "import psycopg"], { encoding: "utf8" }).status === 0;
+}
+
+const itPyDriver = hasPython() && hasPsycopg() ? it : it.skip;
 
 function runImporter(args: string[]) {
   return spawnSync(python, [importerPath, ...args], { encoding: "utf8", cwd: root });
@@ -210,6 +219,39 @@ describe("DraftGuru importer — privileges and transaction", () => {
     expect(importerSource).toContain("UNREACHABLE under migration 069's key");
     expect(importerSource).toContain("PARTIAL on");
     expect(importerSource).toContain("'ownership boundary'");
+  });
+
+  it("commits the data and the completed batch status together: ANALYZE runs after the batch block", () => {
+    // AFLDB-ISSUE-222 pre-import review: analyze() commits whatever transaction is open before
+    // it toggles autocommit, so calling it INSIDE the import_batch block split the data commit
+    // from batch.finish("completed"). The call must sit after the block, at function level.
+    const block = importerSource.slice(
+      importerSource.indexOf("with import_batch(pg, SOURCE_KEY"),
+      importerSource.indexOf("    analyze(pg, \"draft_persons\""));
+    expect(block).not.toContain("analyze(pg");
+    expect(importerSource).toMatch(/\n    analyze\(pg, "draft_persons", "draft_picks", "external_identities"\)\n\n    return 0/);
+    expect(importerSource).toContain("Deliberately OUTSIDE the batch block");
+  });
+
+  it("describes --dry-run exactly: data rolled back, failed audit row retained", () => {
+    expect(importerSource).toContain("DRY_RUN_MESSAGE = (");
+    expect(importerSource).toContain('print("\\n" + DRY_RUN_MESSAGE)');
+    expect(importerCode).not.toContain("nothing was written");
+    expect(importerSource).toContain("is retained with status 'failed' and error 'DryRunComplete: '");
+  });
+
+  // AFLDB-ISSUE-222 -- the transaction order proven against a scripted connection
+  // (tests/python/draftguru_import_atomicity_contract.py): one commit before the first data
+  // statement, none between it and the 'completed' batch row, rollback-then-failed-row on an
+  // injected error and on --dry-run, refusal before any write on a bridge/human contradiction,
+  // and DraftGuru-scoped writes only. No snapshot, no database, no network.
+  itPyDriver("rolls back on failure and commits data + status once (scripted connection)", () => {
+    const result = spawnSync(python,
+      ["tests/python/draftguru_import_atomicity_contract.py"],
+      { cwd: root, encoding: "utf8" });
+    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+    expect(result.stdout).toContain("All DraftGuru importer atomicity checks hold.");
+    expect(result.stdout).not.toContain("FAIL ");
   });
 });
 

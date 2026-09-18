@@ -1,0 +1,1871 @@
+{
+  "audit": {
+    "count": 30,
+    "input_set_sha256": "0d8e568705c79b4e2252b290b5d21efc95ebe29051e85753aefcd5264188ffb2",
+    "salt": "AFLDB-ISSUE-222/audit-v1",
+    "selection": "first 30 of offline_strong rows outside classes 1-10, sha256(salt+\"|\"+player_url) hex ascending, ties by URL"
+  },
+  "child_sha256": "596bbb684424b40f43c22368f1b77aa4198eec8b56a1109a7bb587c5c7a9a27f",
+  "classes": {
+    "10_weak_or_suffix_or_continuity": [
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/chris_johnson/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 75,
+        "stratum": "census"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/josh_kennedy/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 214,
+        "stratum": "census"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_limited",
+        "player_url": "https://www.draftguru.com.au/players/keith_thomas/2",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 227,
+        "stratum": "census"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/michael_gardiner/2",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 281,
+        "stratum": "census"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/nathan_brown/2",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 294,
+        "stratum": "census"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/nathan_brown/3",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT_TOLERANCE",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 295,
+        "stratum": "census"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/tom_green/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 375,
+        "stratum": "census"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/tom_williams/2",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 377,
+        "stratum": "census"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/chris_waterson/2",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT_TOLERANCE",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 415,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/bailey_williams/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 420,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/sam_butler/2",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 439,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/danny_hughes/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT_TOLERANCE",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 448,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/shane_bond/2",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 466,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/mark_majerczak/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_BEFORE_EARLIEST_RECRUITMENT",
+          "SPAN_CONTAINS_EARLIEST_RECRUITMENT_YEAR",
+          "GAMES_INCONSISTENT"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 470,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/john_fidge/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_BEFORE_EARLIEST_RECRUITMENT",
+          "SPAN_CONTAINS_EARLIEST_RECRUITMENT_YEAR",
+          "GAMES_INCONSISTENT"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 478,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/david_clarke/2",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 490,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/jack_graham/3",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 503,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/michael_clark/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 536,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/tom_murphy/2",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 538,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/harrison_jones/1",
+        "reason_codes": [
+          "NAME_VARIANT",
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 539,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/archie_roberts/2",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 542,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/mark_fraser/2",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_BEFORE_EARLIEST_RECRUITMENT",
+          "SPAN_CONTAINS_EARLIEST_RECRUITMENT_YEAR",
+          "GAMES_INCONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 547,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/robert_walker/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_BEFORE_EARLIEST_RECRUITMENT",
+          "SPAN_CONTAINS_EARLIEST_RECRUITMENT_YEAR",
+          "GAMES_INCONSISTENT"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 579,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/josh_kennedy/2",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 592,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/tom_campbell/2",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 600,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/brian_wilson/2",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_BEFORE_EARLIEST_RECRUITMENT",
+          "SPAN_CONTAINS_EARLIEST_RECRUITMENT_YEAR",
+          "GAMES_INCONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 630,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/jack_carroll/2",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 657,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/tony_elshaug/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_BEFORE_EARLIEST_RECRUITMENT",
+          "SPAN_CONTAINS_EARLIEST_RECRUITMENT_YEAR",
+          "GAMES_INCONSISTENT"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 662,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/harrison_jones/2",
+        "reason_codes": [
+          "NAME_VARIANT",
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 671,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/eddie_ford/2",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 676,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/nathan_brown/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 748,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/tom_gilligan/2",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT_TOLERANCE",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 781,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/callum_brown/2",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 789,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/tom_lynch/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 864,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/david_king/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 912,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/jack_ross/3",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 936,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/scott_thompson/3",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 938,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_contradict",
+        "player_url": "https://www.draftguru.com.au/players/simon_taylor/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_BEFORE_EARLIEST_RECRUITMENT",
+          "CAREER_ENDED_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_INCONSISTENT"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 948,
+        "stratum": "random"
+      }
+    ],
+    "11_deterministic_audit": [
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/chad_morrison/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 970,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/ben_speight/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 827,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/matt_clape/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 270,
+        "stratum": "census"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/jarrad_mcveigh/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 179,
+        "stratum": "census"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/jamarra_ugle-hagan/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_INCONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 171,
+        "stratum": "census"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/stephen_coniglio/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 361,
+        "stratum": "census"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/sean_denham/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "SPAN_CONTAINS_EARLIEST_RECRUITMENT_YEAR",
+          "GAMES_INCONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 792,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/zach_reid/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 397,
+        "stratum": "census"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/nick_mitchell/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 566,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/cameron_venables/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT_TOLERANCE",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 544,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/jake_stringer/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 170,
+        "stratum": "census"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/bryce_retzlaff/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 903,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/ken_judge/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 228,
+        "stratum": "census"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/dean_turner/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT_TOLERANCE",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 117,
+        "stratum": "census"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/jesse_dattoli/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 668,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/jeff_white/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 188,
+        "stratum": "census"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/matthew_kreuzer/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 274,
+        "stratum": "census"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/paddy_ryder/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 314,
+        "stratum": "census"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/ty_zantuck/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 971,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/david_ogg/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT_TOLERANCE",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 114,
+        "stratum": "census"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/wayne_hernaman/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 387,
+        "stratum": "census"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/peter_matera/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 321,
+        "stratum": "census"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/will_schofield/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT_TOLERANCE",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 506,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/andrew_purser/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT_TOLERANCE",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 25,
+        "stratum": "census"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/daniel_healy/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 99,
+        "stratum": "census"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/will_hams/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 865,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/darren_baxter/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "SPAN_CONTAINS_EARLIEST_RECRUITMENT_YEAR",
+          "GAMES_INCONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 453,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/josh_wooden/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT_TOLERANCE",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 522,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/darcy_tucker/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 404,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/tim_taranto/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 370,
+        "stratum": "census"
+      }
+    ],
+    "1_offline_contradict": [
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_contradict",
+        "player_url": "https://www.draftguru.com.au/players/tim_walsh/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONFLICT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 371,
+        "stratum": "census"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_contradict",
+        "player_url": "https://www.draftguru.com.au/players/peter_whyte/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_BEFORE_EARLIEST_RECRUITMENT",
+          "CAREER_ENDED_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_INCONSISTENT"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 428,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_contradict",
+        "player_url": "https://www.draftguru.com.au/players/craig_somerville/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "CAREER_ENDED_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_INCONSISTENT"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 586,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_contradict",
+        "player_url": "https://www.draftguru.com.au/players/bret_hutchinson/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_BEFORE_EARLIEST_RECRUITMENT",
+          "CAREER_ENDED_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_INCONSISTENT"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 625,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_contradict",
+        "player_url": "https://www.draftguru.com.au/players/tim_bourke/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "CAREER_ENDED_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_INCONSISTENT"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 659,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_contradict",
+        "player_url": "https://www.draftguru.com.au/players/darren_mead/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONFLICT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 766,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_contradict",
+        "player_url": "https://www.draftguru.com.au/players/david_williams/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT_TOLERANCE",
+          "DEBUT_BEFORE_EARLIEST_RECRUITMENT",
+          "CAREER_ENDED_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_INCONSISTENT"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 874,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_contradict",
+        "player_url": "https://www.draftguru.com.au/players/simon_taylor/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_BEFORE_EARLIEST_RECRUITMENT",
+          "CAREER_ENDED_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_INCONSISTENT"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 948,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_contradict",
+        "player_url": "https://www.draftguru.com.au/players/glen_bartlett/1",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_BEFORE_EARLIEST_RECRUITMENT",
+          "CAREER_ENDED_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_INCONSISTENT"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 961,
+        "stratum": "random"
+      }
+    ],
+    "2_offline_limited": [
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_limited",
+        "player_url": "https://www.draftguru.com.au/players/keith_thomas/2",
+        "reason_codes": [
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 227,
+        "stratum": "census"
+      }
+    ],
+    "3_target_unregistered": [
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "target_unregistered",
+        "player_url": "https://www.draftguru.com.au/players/cooper_duff-tytler/1",
+        "reason_codes": [
+          "TARGET_NOT_REGISTERED"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 89,
+        "stratum": "census"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "target_unregistered",
+        "player_url": "https://www.draftguru.com.au/players/daniel_annable/1",
+        "reason_codes": [
+          "TARGET_NOT_REGISTERED"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 96,
+        "stratum": "census"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "target_unregistered",
+        "player_url": "https://www.draftguru.com.au/players/dylan_patterson/1",
+        "reason_codes": [
+          "TARGET_NOT_REGISTERED"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 125,
+        "stratum": "census"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "target_unregistered",
+        "player_url": "https://www.draftguru.com.au/players/harry_dean/1",
+        "reason_codes": [
+          "TARGET_NOT_REGISTERED"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 148,
+        "stratum": "census"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "target_unregistered",
+        "player_url": "https://www.draftguru.com.au/players/jacob_farrow/1",
+        "reason_codes": [
+          "TARGET_NOT_REGISTERED"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 164,
+        "stratum": "census"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "target_unregistered",
+        "player_url": "https://www.draftguru.com.au/players/jagga_smith/1",
+        "reason_codes": [
+          "TARGET_NOT_REGISTERED"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 167,
+        "stratum": "census"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "target_unregistered",
+        "player_url": "https://www.draftguru.com.au/players/joel_smith/1",
+        "reason_codes": [
+          "TARGET_NOT_REGISTERED"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 197,
+        "stratum": "census"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "target_unregistered",
+        "player_url": "https://www.draftguru.com.au/players/sam_cumming/1",
+        "reason_codes": [
+          "TARGET_NOT_REGISTERED"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 343,
+        "stratum": "census"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "target_unregistered",
+        "player_url": "https://www.draftguru.com.au/players/sam_grlj/1",
+        "reason_codes": [
+          "TARGET_NOT_REGISTERED"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 346,
+        "stratum": "census"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "target_unregistered",
+        "player_url": "https://www.draftguru.com.au/players/sullivan_robey/1",
+        "reason_codes": [
+          "TARGET_NOT_REGISTERED"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 368,
+        "stratum": "census"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "target_unregistered",
+        "player_url": "https://www.draftguru.com.au/players/willem_duursma/1",
+        "reason_codes": [
+          "TARGET_NOT_REGISTERED"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 394,
+        "stratum": "census"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "target_unregistered",
+        "player_url": "https://www.draftguru.com.au/players/zeke_uwland/1",
+        "reason_codes": [
+          "TARGET_NOT_REGISTERED"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 399,
+        "stratum": "census"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "target_unregistered",
+        "player_url": "https://www.draftguru.com.au/players/toby_murray/1",
+        "reason_codes": [
+          "TARGET_NOT_REGISTERED"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 540,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "target_unregistered",
+        "player_url": "https://www.draftguru.com.au/players/mitch_zadow/1",
+        "reason_codes": [
+          "TARGET_NOT_REGISTERED"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 609,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "target_unregistered",
+        "player_url": "https://www.draftguru.com.au/players/billy_cootee/1",
+        "reason_codes": [
+          "TARGET_NOT_REGISTERED"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 656,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "target_unregistered",
+        "player_url": "https://www.draftguru.com.au/players/milan_murdock/1",
+        "reason_codes": [
+          "TARGET_NOT_REGISTERED"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 677,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "target_unregistered",
+        "player_url": "https://www.draftguru.com.au/players/angus_anderson/1",
+        "reason_codes": [
+          "TARGET_NOT_REGISTERED"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 678,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "target_unregistered",
+        "player_url": "https://www.draftguru.com.au/players/josh_lai/1",
+        "reason_codes": [
+          "TARGET_NOT_REGISTERED"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 711,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "target_unregistered",
+        "player_url": "https://www.draftguru.com.au/players/mitch_edwards/1",
+        "reason_codes": [
+          "TARGET_NOT_REGISTERED"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 714,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "target_unregistered",
+        "player_url": "https://www.draftguru.com.au/players/tom_murphy/1",
+        "reason_codes": [
+          "TARGET_NOT_REGISTERED"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 716,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "target_unregistered",
+        "player_url": "https://www.draftguru.com.au/players/mitch_podhajski/1",
+        "reason_codes": [
+          "TARGET_NOT_REGISTERED"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 724,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "target_unregistered",
+        "player_url": "https://www.draftguru.com.au/players/noah_mraz/1",
+        "reason_codes": [
+          "TARGET_NOT_REGISTERED"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 846,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "target_unregistered",
+        "player_url": "https://www.draftguru.com.au/players/noah_howes/1",
+        "reason_codes": [
+          "TARGET_NOT_REGISTERED"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 857,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "target_unregistered",
+        "player_url": "https://www.draftguru.com.au/players/sam_swadling/1",
+        "reason_codes": [
+          "TARGET_NOT_REGISTERED"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 883,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "target_unregistered",
+        "player_url": "https://www.draftguru.com.au/players/josh_smith/1",
+        "reason_codes": [
+          "TARGET_NOT_REGISTERED"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 884,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "target_unregistered",
+        "player_url": "https://www.draftguru.com.au/players/stephen_schwerdt/1",
+        "reason_codes": [
+          "TARGET_NOT_REGISTERED"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 933,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "target_unregistered",
+        "player_url": "https://www.draftguru.com.au/players/caleb_lewis/1",
+        "reason_codes": [
+          "TARGET_NOT_REGISTERED"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 934,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "target_unregistered",
+        "player_url": "https://www.draftguru.com.au/players/zane_zakostelsky/1",
+        "reason_codes": [
+          "TARGET_NOT_REGISTERED"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 943,
+        "stratum": "random"
+      }
+    ],
+    "4_offline_unavailable": [],
+    "5_tooling_or_schema_error": [],
+    "6_numbering": [
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "target_unregistered",
+        "player_url": "https://www.draftguru.com.au/players/joel_smith/1",
+        "reason_codes": [
+          "TARGET_NOT_REGISTERED"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 197,
+        "stratum": "census"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "target_unregistered",
+        "player_url": "https://www.draftguru.com.au/players/tom_murphy/1",
+        "reason_codes": [
+          "TARGET_NOT_REGISTERED"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 716,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "target_unregistered",
+        "player_url": "https://www.draftguru.com.au/players/josh_smith/1",
+        "reason_codes": [
+          "TARGET_NOT_REGISTERED"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 884,
+        "stratum": "random"
+      }
+    ],
+    "7_spelling_or_name_variant": [
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/dan_curtin/1",
+        "reason_codes": [
+          "NAME_VARIANT",
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 95,
+        "stratum": "census"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/matthew_scharenberg/1",
+        "reason_codes": [
+          "NAME_VARIANT",
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 278,
+        "stratum": "census"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/ed_allan/1",
+        "reason_codes": [
+          "NAME_VARIANT",
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 474,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/harrison_jones/1",
+        "reason_codes": [
+          "NAME_VARIANT",
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 539,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/harrison_jones/2",
+        "reason_codes": [
+          "NAME_VARIANT",
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 671,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/lachlan_fogarty/1",
+        "reason_codes": [
+          "NAME_VARIANT",
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 703,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/ollie_hanrahan/1",
+        "reason_codes": [
+          "NAME_VARIANT",
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 752,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/lachie_bramble/1",
+        "reason_codes": [
+          "NAME_VARIANT",
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_BEFORE_EARLIEST_RECRUITMENT",
+          "SPAN_CONTAINS_EARLIEST_RECRUITMENT_YEAR",
+          "GAMES_INCONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 793,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/lachie_sullivan/1",
+        "reason_codes": [
+          "NAME_VARIANT",
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 830,
+        "stratum": "random"
+      },
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "offline_strong",
+        "player_url": "https://www.draftguru.com.au/players/matt_cottrell/1",
+        "reason_codes": [
+          "NAME_VARIANT",
+          "BIRTH_YEAR_CONSISTENT",
+          "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+          "GAMES_CONSISTENT",
+          "CLUB_HISTORY_OVERLAPS"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 983,
+        "stratum": "random"
+      }
+    ],
+    "8_schwerdt": [
+      {
+        "evidence": null,
+        "notes": null,
+        "operator_verdict": null,
+        "outcome": "target_unregistered",
+        "player_url": "https://www.draftguru.com.au/players/stephen_schwerdt/1",
+        "reason_codes": [
+          "TARGET_NOT_REGISTERED"
+        ],
+        "reviewed_utc": null,
+        "sample_index": 933,
+        "stratum": "random"
+      }
+    ],
+    "9_ledger_overlap": []
+  },
+  "generated_utc": "2026-09-18T02:53:39Z",
+  "parent_sha256": "92ff142ef71d175046b4949b0a85d5925bc396d3586b5b1fc3f44e51f097320e",
+  "review_method": "offline-retained-evidence+operator-exception-audit",
+  "sample_sha256": "036cc0826428c03a622448d299b803c23bac011bd5cd92eea86c4283e445ba84",
+  "schema_version": 1,
+  "verdicts_sha256": "5830946d0fdcbd0bbd1d992ebd730feb89b6708d0d330fcecd09e3f14401962a"
+}

@@ -1,0 +1,100 @@
+{
+  "$comment": "AFLDB-ISSUE-222 bridge v2 withheld/rejection manifest. Every row here was an ACCEPTED v1 parent mapping that the completed operator adjudication rejected as different_person_wrong_href. The rejected AFL Tables target is recorded for audit only and is never an accepted link; no alternative identity is guessed. These persons remain withheld pending a curator.",
+  "generated_utc": "2026-09-18T08:43:12Z",
+  "generated_utc_basis": "frozen to the operator verdict artefact's review_completed_utc; not a wall clock",
+  "issue": "AFLDB-ISSUE-222",
+  "label": "20260918-v1",
+  "rows": [
+    {
+      "decided_utc": "2026-09-18T07:54:16Z",
+      "draftguru_name": "Craig Somerville",
+      "draftguru_url": "https://www.draftguru.com.au/players/craig_somerville/1",
+      "event_club_provenance": {
+        "event_club": "Brisbane",
+        "event_club_appearance_relationship_derived": "no_senior_appearance_ever",
+        "event_club_appearance_relationship_message": "Never played a senior game for Brisbane.",
+        "event_club_observation": "no_senior_appearance_ever",
+        "event_club_observation_notes": null
+      },
+      "global_order": 7,
+      "group": "relisting",
+      "machine_classification": "relisting_signature_review",
+      "operator_notes_verbatim": "https://en.wikipedia.org/wiki/Craig_Somerville",
+      "operator_reason": "different_person_wrong_href",
+      "pack_ordinal": 7,
+      "rejected_afltables_target": "players/C/Craig_Somerville.html",
+      "retained_target_evidence": {
+        "retained_birth_year": 1968,
+        "retained_career_end": 1986,
+        "retained_career_games": 8,
+        "retained_career_start": 1986,
+        "retained_clubs": [
+          "Footscray"
+        ],
+        "retained_target_name": "Craig Somerville"
+      },
+      "row_ordinal_in_group": 7,
+      "v1_afldb_test_child_status": "bridged",
+      "withheld_in": "bridge v2 source-evidence parent"
+    },
+    {
+      "decided_utc": "2026-09-18T07:56:42Z",
+      "draftguru_name": "David Sullivan",
+      "draftguru_url": "https://www.draftguru.com.au/players/david_sullivan/1",
+      "event_club_provenance": {
+        "event_club": "Richmond",
+        "event_club_appearance_relationship_derived": "no_senior_appearance_ever",
+        "event_club_appearance_relationship_message": "Never played a senior game for Richmond.",
+        "event_club_observation": "no_senior_appearance_ever",
+        "event_club_observation_notes": null
+      },
+      "global_order": 10,
+      "group": "relisting",
+      "machine_classification": "relisting_signature_review",
+      "operator_notes_verbatim": "https://en.wikipedia.org/wiki/David_Sullivan_(footballer)\n",
+      "operator_reason": "different_person_wrong_href",
+      "pack_ordinal": 10,
+      "rejected_afltables_target": "players/D/David_Sullivan.html",
+      "retained_target_evidence": {
+        "retained_birth_year": 1966,
+        "retained_career_end": 1988,
+        "retained_career_games": 11,
+        "retained_career_start": 1986,
+        "retained_clubs": [
+          "Essendon",
+          "Hawthorn"
+        ],
+        "retained_target_name": "David Sullivan"
+      },
+      "row_ordinal_in_group": 10,
+      "v1_afldb_test_child_status": "bridged",
+      "withheld_in": "bridge v2 source-evidence parent"
+    }
+  ],
+  "rows_sha256": "00f19ccf1041fb073c685bc62edce9281ef2f70cb8489d972169f130098f989d",
+  "schema_version": 1,
+  "source_hash_links": [
+    {
+      "label": "child_v1_afldb_test",
+      "path": "data/reference/draftguru-person-bridge-20260918-v1.afldb_test.json",
+      "sha256": "596bbb684424b40f43c22368f1b77aa4198eec8b56a1109a7bb587c5c7a9a27f"
+    },
+    {
+      "label": "operator_verdicts_json",
+      "path": "docs/rebuild-manifests/draftguru/bridge-operator-verdicts-20260918-v1.json",
+      "sha256": "b2ae2f4022cd3c22e91bfe6e399538949c02fe8cada95b5c355e6516c82a8822"
+    },
+    {
+      "label": "parent_v1",
+      "path": "data/reference/draftguru-person-bridge-20260918-v1.json",
+      "sha256": "92ff142ef71d175046b4949b0a85d5925bc396d3586b5b1fc3f44e51f097320e"
+    }
+  ],
+  "tool": {
+    "path": "tools/rebuild/draftguru/build_person_bridge_v2.py",
+    "version": "1.0.0"
+  },
+  "totals": {
+    "withheld": 2
+  }
+}

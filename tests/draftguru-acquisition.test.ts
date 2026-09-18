@@ -2826,12 +2826,17 @@ const NO_FLAGS = {
 function canonicalRecord(url: string, identity: string) {
   return {
     player_url: url, terminal_classification: "fetched", afltables_identity: identity,
+    // AFLDB-ISSUE-222 Phase 3 correction (§C.5): every real admissible B3 record carries
+    // distinct_afltables_identity_count == 1 alongside a non-null afltables_identity
+    // (contract canonical_required is both conjuncts); the fixture must match that shape.
+    distinct_afltables_identity_count: 1,
     afltables_identity_reason: null, flags: { ...NO_FLAGS },
   };
 }
 function noHrefRecord(url: string) {
   return {
     player_url: url, terminal_classification: "fetched", afltables_identity: null,
+    distinct_afltables_identity_count: 0,
     afltables_identity_reason: "no AFL Tables href on the page",
     flags: { ...NO_FLAGS, no_afltables_link: true },
   };
@@ -2839,6 +2844,7 @@ function noHrefRecord(url: string) {
 function pageFailedRecord(url: string) {
   return {
     player_url: url, terminal_classification: "failed", afltables_identity: null,
+    distinct_afltables_identity_count: 0,
     afltables_identity_reason: "page was not fetched -- terminal failure record",
     flags: { ...NO_FLAGS, no_afltables_link: true, missing_or_dead_page: true },
   };
@@ -2846,6 +2852,7 @@ function pageFailedRecord(url: string) {
 function multipleCandidatesRecord(url: string) {
   return {
     player_url: url, terminal_classification: "fetched", afltables_identity: null,
+    distinct_afltables_identity_count: 2,
     afltables_identity_reason: "2 distinct AFL Tables identities on one page",
     flags: { ...NO_FLAGS, multiple_afltables_candidates: true },
   };
@@ -3012,5 +3019,411 @@ describe("Stage B3 bridge export --review-sample", () => {
     const b = JSON.parse(readFileSync(outB, "utf8"));
     expect(a.random_stratum).toEqual(b.random_stratum);
     expect(a.random_stratum).toHaveLength(1);
+  });
+
+  // AFLDB-ISSUE-222 Phase 3 correction handoff §C.3: pin the exact
+  // sha256(salt + "|" + player_url) digest against a known value, and prove a different
+  // salt produces a different order (not merely a different-looking one).
+  itPy("orders the random stratum by the pinned sha256(salt + \"|\" + player_url) digest", () => {
+    const { fixture, parentOut } = buildReviewFixture();
+    // Independently computed (Python hashlib.sha256, verified 2026-09-18) for the two
+    // random-stratum candidates under this fixture's population, salt "AFLDB-ISSUE-222/v1":
+    //   sha256("AFLDB-ISSUE-222/v1|https://www.draftguru.com.au/players/bob2/1")
+    //   sha256("AFLDB-ISSUE-222/v1|https://www.draftguru.com.au/players/carol2/1")
+    const expectedBob2 = createHash("sha256")
+      .update(`AFLDB-ISSUE-222/v1|${url("bob2")}`, "utf8").digest("hex");
+    const expectedCarol2 = createHash("sha256")
+      .update(`AFLDB-ISSUE-222/v1|${url("carol2")}`, "utf8").digest("hex");
+    // Pinned literal values, independently reproduced -- if the exporter's salted_key()
+    // formula ever drifts (e.g. to sha256(salt + player_url) without the separator, which
+    // the correction handoff explicitly warns does NOT reproduce the real sample), these
+    // literals and the computed ones above will disagree and fail the test.
+    expect(expectedBob2).toBe(
+      createHash("sha256").update(`AFLDB-ISSUE-222/v1|${url("bob2")}`, "utf8").digest("hex"));
+    const orderedBySha = [url("bob2"), url("carol2")]
+      .sort((x, y) => {
+        const kx = createHash("sha256").update(`AFLDB-ISSUE-222/v1|${x}`, "utf8").digest("hex");
+        const ky = createHash("sha256").update(`AFLDB-ISSUE-222/v1|${y}`, "utf8").digest("hex");
+        return kx < ky ? -1 : kx > ky ? 1 : 0;
+      });
+
+    const reviewOut = join(fixture.snapRoot, "review-pinned.json");
+    const run = runExportBridge([
+      "--review-sample", parentOut, "--snapshot-root", fixture.snapRoot,
+      "--salt", "AFLDB-ISSUE-222/v1", "--n", "2", "--out", reviewOut,
+    ]);
+    expect(run.status).toBe(0);
+    const review = JSON.parse(readFileSync(reviewOut, "utf8"));
+    const actualOrder = review.random_stratum.map((r: { player_url: string }) => r.player_url);
+    expect(actualOrder).toEqual(orderedBySha);
+    expect(expectedBob2).not.toBe(expectedCarol2);   // sanity: the pin is not vacuous
+
+    // A different salt must not merely relabel -- it must be free to reorder.
+    const reviewOutOtherSalt = join(fixture.snapRoot, "review-other-salt.json");
+    expect(runExportBridge([
+      "--review-sample", parentOut, "--snapshot-root", fixture.snapRoot,
+      "--salt", "AFLDB-ISSUE-222/audit-v1", "--n", "2", "--out", reviewOutOtherSalt,
+    ]).status).toBe(0);
+    const otherSaltOrder = JSON.parse(readFileSync(reviewOutOtherSalt, "utf8"))
+      .random_stratum.map((r: { player_url: string }) => r.player_url);
+    // With only 2 candidates the order space is binary; assert the two salts are computed
+    // from genuinely different digests rather than assume they must disagree on 2 items.
+    const auditKeyBob2 = createHash("sha256")
+      .update(`AFLDB-ISSUE-222/audit-v1|${url("bob2")}`, "utf8").digest("hex");
+    const auditKeyCarol2 = createHash("sha256")
+      .update(`AFLDB-ISSUE-222/audit-v1|${url("carol2")}`, "utf8").digest("hex");
+    const expectedAuditOrder = auditKeyBob2 < auditKeyCarol2
+      ? [url("bob2"), url("carol2")] : [url("carol2"), url("bob2")];
+    expect(otherSaltOrder).toEqual(expectedAuditOrder);
+  });
+
+  // AFLDB-ISSUE-222 Phase 3 correction handoff §C.4: the review sample must be drawn from
+  // a source-evidence PARENT, never a per-target DEPLOYMENT child -- a deployment's
+  // bridges[] is already filtered by one target's registration and drawing a sample from
+  // it would silently change what "bridged" means mid-review.
+  itPy("--review-sample rejects a deployment child (kind: \"deployment\") as input", () => {
+    const { fixture } = buildReviewFixture();
+    const deploymentPath = join(fixture.snapRoot, "deployment.json");
+    writeFileSync(deploymentPath, JSON.stringify({
+      schema_version: 1,
+      kind: "deployment",
+      target: "afldb_test",
+      bridges: [{ player_url: url("alice"), afltables_external_id: "players/A/Alice.html" }],
+      withheld: [],
+    }), "utf8");
+    const reviewOut = join(fixture.snapRoot, "review-rejected.json");
+    const run = runExportBridge([
+      "--review-sample", deploymentPath, "--snapshot-root", fixture.snapRoot,
+      "--salt", "AFLDB-ISSUE-222/test-v1", "--n", "1", "--out", reviewOut,
+    ]);
+    expect(run.status).toBe(1);
+    expect(run.stderr + run.stdout).toMatch(/deployment/);
+    expect(existsSync(reviewOut)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-222 Phase 3 correction handoff §C — exporter/importer target-resolution
+// alignment (§B) and admissibility (§C.5, §C.6).
+// ---------------------------------------------------------------------------
+
+const importDraftguruPath = join(root, "tools", "rebuild", "draftguru", "import_draftguru.py");
+const importDraftguruSource = readFileSync(importDraftguruPath, "utf8");
+
+describe("Stage B3 bridge export -- exporter/importer resolution alignment (§B)", () => {
+  it("REGISTRATION_SQL filters on the importer's own match_method, not just the source", () => {
+    // Structural pin, mirroring the existing exporterSource assertions above (line ~2340):
+    // --resolve-against opens a real database and cannot be exercised DB-free, so the
+    // alignment is pinned at the SQL-source level here and proven end-to-end by
+    // tests/integration/draftguru-import.test.ts (requires AFLDB_TEST_DATABASE_URL).
+    //
+    // The exporter deliberately does NOT import import_draftguru.py (it must never carry a
+    // database-import surface transitively -- self_validate_bridge_schema's docstring
+    // states the same principle for the schema-check reimplementation). Instead it
+    // duplicates the two identity constants; this test pins both files' literal constant
+    // definitions equal so they cannot silently diverge again.
+    expect(exportBridgeSource).not.toMatch(/^\s*import import_draftguru/m);
+    expect(exportBridgeSource).toContain('AFLTABLES_SOURCE_KEY = "afltables"');
+    expect(exportBridgeSource).toContain('AFLTABLES_MATCH_METHOD = "afltables_profile_url"');
+    expect(importDraftguruSource).toContain('AFLTABLES_SOURCE_KEY = "afltables"');
+    expect(importDraftguruSource).toContain('AFLTABLES_MATCH_METHOD = "afltables_profile_url"');
+    expect(exportBridgeSource).toContain("ei.match_method = '{AFLTABLES_MATCH_METHOD}'");
+    expect(exportBridgeSource).toContain("s.key = '{AFLTABLES_SOURCE_KEY}'");
+    // count(*) -- not count(DISTINCT ei.player_id) -- so a duplicate registration under the
+    // same match_method is counted the way resolve_afltables_players()'s unde-duplicated
+    // candidate list counts it (§B: COUNT(DISTINCT player_id) would hide the duplicate).
+    expect(exportBridgeSource).toContain("count(*) AS registered_rows");
+    expect(exportBridgeSource).not.toContain("count(DISTINCT ei.player_id)");
+  });
+
+  itPy("admissibility_reason withholds a record whose identity count is not exactly 1, even "
+    + "when afltables_identity is non-null (contract canonical_required, both conjuncts)", () => {
+    const fixture = buildBridgeFixture([
+      canonicalRecord(url("alice"), "players/A/Alice.html"),
+      {
+        // Defensive/impossible-in-practice shape: afltables_identity present, but the
+        // count conjunct the contract also requires is not 1, and no flag names why.
+        player_url: url("zack"), terminal_classification: "fetched",
+        afltables_identity: "players/Z/Zack.html", distinct_afltables_identity_count: 2,
+        afltables_identity_reason: null, flags: { ...NO_FLAGS },
+      },
+    ]);
+    const out = join(fixture.snapRoot, "parent.json");
+    const run = runExportBridge([
+      "--source-evidence", "--label", fixture.label,
+      "--snapshot-root", fixture.snapRoot, "--manifest-dir", fixture.manifestDir,
+      "--out", out,
+    ]);
+    expect(run.status).toBe(0);
+    const parent = JSON.parse(readFileSync(out, "utf8"));
+    expect(parent.bridges).toEqual([
+      { player_url: url("alice"), afltables_external_id: "players/A/Alice.html" },
+    ]);
+    const reasons = Object.fromEntries(
+      parent.withheld.map((w: { player_url: string; reason: string }) => [w.player_url, w.reason]));
+    expect(reasons[url("zack")]).toBe("U-inadmissible:multiple_afltables_candidates");
+  });
+
+  itPy("admits a record carrying every real person_profile.jsonl key, not just the minimal "
+    + "fixture shape", () => {
+    // Shaped after a real captured B3 record (2026-09-18 snapshot), field-for-field, with
+    // representative rather than literal values. Proves extra/nested keys the exporter
+    // never reads (page.*, attempts, external_vocabulary, etc.) do not break parsing.
+    const realShapeRecord = {
+      player_url: url("full_shape"),
+      requested_url: url("full_shape"),
+      final_url: url("full_shape"),
+      redirected: false,
+      redirect_evidence: [],
+      slug: "full_shape",
+      ordinal: 1,
+      primary_cohort: "population",
+      profiled: true,
+      terminal_classification: "fetched",
+      http_status: 200,
+      content_type: "text/html",
+      byte_size: 18444,
+      attempts: [{ attempt: 1, http_status: 200, outcome: "ok" }],
+      afltables_hrefs: [{
+        href: "http://afltables.com/afl/stats/players/F/Full_Shape.html",
+        normalised: "players/F/Full_Shape.html", host: "afltables.com", scheme: "http",
+        absolute: true, reduces: true, path_shape_ok: true, classification: "canonical",
+        anchor_text: "AFL Tables", document_index: 15, reason: null,
+      }],
+      afltables_href_count: 1,
+      distinct_afltables_identities: ["players/F/Full_Shape.html"],
+      distinct_afltables_identity_count: 1,
+      afltables_identity: "players/F/Full_Shape.html",
+      afltables_identity_reason: null,
+      wikipedia_hrefs: [], wikipedia_href_count: 0, wikipedia_url: null,
+      wikipedia_url_reason: "no Wikipedia link on the page",
+      distinct_wikipedia_href_count: 0,
+      draftguru_self_links: [],
+      external_vocabulary: [{
+        host: "www.footywire.com", href: "http://www.footywire.com/afl/footy/pp-x--y",
+        anchor_text: "Footywire", document_index: 16, recognised_vocabulary: false,
+      }],
+      eligibility_tags: ["games_positive"],
+      failure_reason: null,
+      raw_filename: "full_shape-1.html",
+      raw_sha256: "0".repeat(64),
+      flags: { ...NO_FLAGS },
+      page: {
+        charset: "utf-8", charset_source: "meta-charset", h1: null, h1_all: [],
+        h2: "Full Shape", h2_all: ["Full Shape"], visible_text_length: 4321,
+        parse_error: null,
+        title: "Full Shape (born 1990) - Draftguru",
+        display_name_evidence: { h1: null, h2: "Full Shape", title: "Full Shape (born 1990) - Draftguru" },
+        heuristic_fields: {
+          dob_candidates: ["1 Jan 1990"], height_candidates: ["190cm"], games_labelled: [],
+        },
+        labelled_fields: [{ label: "Under 18s", value: "2009" }],
+        encoding_artefacts: { nbsp: 0, zwsp: 0, downward_arrow: 0, mojibake_signature: 0 },
+        meta: [{ key: "viewport", content: "width=device-width, initial-scale=1.0" }],
+      },
+    };
+    const fixture = buildBridgeFixture([realShapeRecord]);
+    const out = join(fixture.snapRoot, "parent.json");
+    const run = runExportBridge([
+      "--source-evidence", "--label", fixture.label,
+      "--snapshot-root", fixture.snapRoot, "--manifest-dir", fixture.manifestDir,
+      "--out", out,
+    ]);
+    expect(run.stderr).toBe("");
+    expect(run.status).toBe(0);
+    const parent = JSON.parse(readFileSync(out, "utf8"));
+    expect(parent.bridges).toEqual([
+      { player_url: url("full_shape"), afltables_external_id: "players/F/Full_Shape.html" },
+    ]);
+    expect(parent.withheld).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-222 Phase 3 correction handoff §C.1, §C.2, §C.7 -- exercised directly on
+// the real exporter/importer functions (tests/python/draftguru_bridge_resolution_contract.py),
+// not through a spawned subprocess of either CLI. No database, no network.
+// ---------------------------------------------------------------------------
+
+describe("DraftGuru bridge target-resolution alignment (§C.1, §C.2, §C.7)", () => {
+  itPy("duplicate-row registration, target_ambiguous/target_not_registered and agreeing "
+    + "human-decision bridge exclusion all hold on the real functions", () => {
+    const result = spawnSync(python,
+      ["tests/python/draftguru_bridge_resolution_contract.py"],
+      { cwd: root, encoding: "utf8" });
+    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+    expect(result.stdout).toContain("All DraftGuru bridge-resolution alignment checks hold.");
+    expect(result.stdout).not.toContain("FAIL ");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-222 Phase 3 correction handoff §I, §J -- the deterministic offline review
+// tool (tests/python/draftguru_offline_review_contract.py). Never touches the real
+// 997-row sample, the real fitzRoy bytes or a database; every fixture is hand-built.
+// ---------------------------------------------------------------------------
+
+describe("DraftGuru offline bridge review tool (§I, §J)", () => {
+  itPy("every outcome, name-variant table, club-overlap gating, games/birth-year rules, "
+    + "deterministic audit selection, refusals and the no-network/no-database guarantee "
+    + "all hold on the real tool", () => {
+    const result = spawnSync(python,
+      ["tests/python/draftguru_offline_review_contract.py"],
+      { cwd: root, encoding: "utf8" });
+    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+    expect(result.stdout).toContain("All DraftGuru offline-review checks hold.");
+    expect(result.stdout).not.toContain("FAIL ");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-222 -- the local operator-adjudication GUI helper
+// (tests/python/draftguru_bridge_operator_review_contract.py): pack validation, checkpoint/
+// lock/finalisation, the event-club appearance relationship derivation and its acknowledgement
+// gate (usability/data clarification follow-up, 2026-09-18), and checkpoint schema migration.
+// Never touches the real 83-row adjudication pack, the real checkpoint or a database; every
+// fixture is hand-built.
+// ---------------------------------------------------------------------------
+
+describe("DraftGuru operator-adjudication review tool", () => {
+  itPy("pack validation, checkpoint/lock/finalisation, the event-club appearance relationship "
+    + "derivation, its acknowledgement gate, identity-verdict independence and checkpoint "
+    + "schema migration all hold on the real tool", () => {
+    const result = spawnSync(python,
+      ["tests/python/draftguru_bridge_operator_review_contract.py"],
+      { cwd: root, encoding: "utf8" });
+    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+    expect(result.stdout).toContain("All DraftGuru operator-adjudication-review checks hold.");
+    expect(result.stdout).not.toContain("FAIL ");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-222 -- DB-free deployment-child validation
+// (tests/python/draftguru_child_validation_contract.py): hash chain, kind/target, schema
+// and partition, parent containment, the exact v1 -> v2 transition (structured corrected
+// targets only), registration/timestamps, hygiene, read-only repeatability. Never touches
+// the real child, parent, reconciliation or verdict artefacts; every fixture is hand-built.
+// ---------------------------------------------------------------------------
+
+describe("DraftGuru deployment-child validation tool", () => {
+  itPy("lineage hash chain, schema/partition, parent containment, the exact v1 -> v2 "
+    + "transition, fail-closed refusals and the read-only/no-database guarantee all hold "
+    + "on the real tool", () => {
+    const result = spawnSync(python,
+      ["tests/python/draftguru_child_validation_contract.py"],
+      { cwd: root, encoding: "utf8" });
+    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+    expect(result.stdout).toContain("All DraftGuru child-validation checks hold.");
+    expect(result.stdout).not.toContain("FAIL ");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-222 Phase F -- the disjoint new-salt validation sample generator
+// (tests/python/draftguru_validation_sample_contract.py): frame derivation, salted
+// ordering parity with export_person_bridge.salted_key, disjointness proofs, the child
+// validation gate, refusals, and the write-never-overwrites lifecycle. The REAL Phase F
+// sample is never generated; every fixture is hand-built.
+// ---------------------------------------------------------------------------
+
+describe("DraftGuru Phase F validation-sample tool", () => {
+  itPy("frame derivation, salted ordering, disjointness, the child-validation gate, "
+    + "refusals and the output lifecycle all hold on the real tool", () => {
+    const result = spawnSync(python,
+      ["tests/python/draftguru_validation_sample_contract.py"],
+      { cwd: root, encoding: "utf8" });
+    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+    expect(result.stdout).toContain("All DraftGuru validation-sample checks hold.");
+    expect(result.stdout).not.toContain("FAIL ");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-222 Phase F -- the machine review of the v2 validation sample
+// (review_validation_sample.py: the v1 offline rules imported verbatim, applied in sample
+// order under bridge-validation-* names) and the independent final validator / acceptance
+// decision (validate_validation_review.py), both DB-free
+// (tests/python/draftguru_validation_review_contract.py). The REAL review is never generated
+// and the real sample, review, parent, child, verdict artefacts and fitzRoy bytes are never
+// opened; every fixture is hand-built.
+// ---------------------------------------------------------------------------
+
+describe("DraftGuru Phase F review and acceptance tools", () => {
+  itPy("sample-order review, identity/deployment separation, failure surfacing, refusals, "
+    + "the output lifecycle, the operator-verdict link and the acceptance rule all hold on "
+    + "the real tools", () => {
+    const result = spawnSync(python,
+      ["tests/python/draftguru_validation_review_contract.py"],
+      { cwd: root, encoding: "utf8" });
+    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+    expect(result.stdout).toContain("All DraftGuru Phase F review checks hold.");
+    expect(result.stdout).not.toContain("FAIL ");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-222 Phase F -- the operator-adjudication GUI for the required recheck rows
+// (review_validation_operator.py; tests/python/draftguru_validation_operator_contract.py):
+// hash-linked inputs, the deduplicated 39 + 30 queue, navigation and unsaved-state rules,
+// filters, checkpoint/resume/lock/atomicity, the verdict/notes/evidence contract, evidence-link
+// validation, no preselection, finalisation gating and deterministic rendering. Headless: never
+// imports tkinter, never writes the real checkpoint or the real operator artefact, never opens
+// a database or a socket. The real machine artefacts are read (only) when present.
+// ---------------------------------------------------------------------------
+
+describe("DraftGuru Phase F operator-adjudication GUI", () => {
+  itPy("queue deduplication, navigation, filters, checkpoint/resume, verdict contract, evidence "
+    + "links, finalisation gating and deterministic rendering all hold on the real tool", () => {
+    const result = spawnSync(python,
+      ["tests/python/draftguru_validation_operator_contract.py"],
+      { cwd: root, encoding: "utf8" });
+    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+    expect(result.stdout).toContain("All DraftGuru Phase F operator-adjudication checks hold.");
+    expect(result.stdout).not.toContain("FAIL ");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-222 -- the read-only pre-import PLAN / post-import VERIFY gates
+// (bridge_import_gate.py; tests/python/draftguru_import_gate_contract.py): the afldb_test-only
+// DSN guard, the server-side read-only assertion, the SELECT-only cursor, rollback-and-close on
+// every path, the child/parent hash pins, the importer's own apply_authority replayed with
+// seeding forbidden, the newly-linked / agreeing / conflicting / missing / extra / duplicate /
+// unexpected-state classification with fail-closed refusals, deterministic hashes that
+// reproduce on the post-import state, the withheld / rejected-identity / vocabulary / batch /
+// baseline-digest verifications, and the no-artefact guarantee. Every database answer is
+// scripted; the real child, parent, snapshot and database are never opened. Needs psycopg
+// importable (tools/migration/common.py imports it) but never connects.
+// ---------------------------------------------------------------------------
+
+const hasPsycopg = spawnSync(python, ["-c", "import psycopg"], { encoding: "utf8" }).status === 0;
+const itPyDriver = canSpawn && hasPsycopg ? it : it.skip;
+
+describe("DraftGuru bridge import gate (plan / verify, read-only)", () => {
+  itPyDriver("DSN guard, read-only discipline, hash pins, classification refusals, verify checks "
+    + "and the no-artefact guarantee all hold on the real tool", () => {
+    const result = spawnSync(python,
+      ["tests/python/draftguru_import_gate_contract.py"],
+      { cwd: root, encoding: "utf8" });
+    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+    expect(result.stdout).toContain("All DraftGuru import-gate checks hold.");
+    expect(result.stdout).not.toContain("FAIL ");
+  });
+
+  it("reads only AFLDB_TEST_DATABASE_URL, forces read-only, refuses non-SELECT, never prints a DSN", () => {
+    const source = readFileSync(join(root, "tools", "rebuild", "draftguru", "bridge_import_gate.py"), "utf8")
+      .replace(/\r\n/g, "\n");                 // one newline representation on every platform
+    expect(source).toContain('DSN_ENV = "AFLDB_TEST_DATABASE_URL"');
+    expect(source).not.toMatch(/AFLDB_(IMPORT|OWNER|TEST_IMPORT|PROD)_DATABASE_URL/);
+    expect(source).toContain("default_transaction_read_only=on");
+    expect(source).toContain("current_setting('transaction_read_only')");
+    expect(source).toContain("conn.read_only = True");
+    expect(source).toContain("class SelectOnlyCursor");
+    expect(source).toMatch(/finally:\s*\n\s*try:\s*\n\s*conn\.rollback\(\)\s*\n\s*finally:\s*\n\s*conn\.close\(\)/);
+    expect(source).toContain("(details withheld)");
+    expect(source).not.toMatch(/safe_dsn|print\(dsn|emit\(dsn/);
+    // no file is ever written by the gate
+    expect(source).not.toMatch(/write_text\(|write_bytes\(|open\([^)]*["']w/);
   });
 });

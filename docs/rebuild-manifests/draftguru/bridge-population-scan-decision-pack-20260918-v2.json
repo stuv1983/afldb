@@ -1,0 +1,1149 @@
+{
+  "baseline_current_state": {
+    "bridge_linked_picks": 5101,
+    "bridged_rows": 3463,
+    "human_linked_picks": 5,
+    "national_top10_persons_covered": 387,
+    "national_top10_picks_covered": 389,
+    "national_top10_total_persons": 418,
+    "national_top10_total_picks": 420,
+    "net_new_bridge_rows": 3460,
+    "note": "This pass is a classification correction only. No row is excluded from the bridge and no bridge v2 dataset is generated, so every baseline figure above is unchanged from AFLDB-ISSUE-222.md section 11.5/11.8. The withdrawn v1 pack's Scenario A/B/C exclusion projections do not apply -- exclusion is an operator decision not yet made.",
+    "total_picks": 6810,
+    "unlinked_picks": 1704,
+    "unresolved_persons": 1592
+  },
+  "boundaries_held": [
+    "no network",
+    "no database",
+    "no SSH tunnel",
+    "no Playwright",
+    "no importer",
+    "no exporter",
+    "no bridge v2 generation",
+    "no v2 validation sample generation",
+    "no parent/child/sample overwrite",
+    "no operator_verdict set",
+    "no Git command",
+    "AFLDB-ISSUE-221.md untouched",
+    "Phase 3 remains PENDING",
+    "Phase 4 unauthorised",
+    "v1 population-scan and decision-pack artefacts preserved unmodified as superseded evidence"
+  ],
+  "correction_summary": {
+    "former_clean_companion_count": 21,
+    "former_confirmed_count": 23,
+    "outcome_added": "relisting_signature_review",
+    "outcome_removed": "confirmed_source_mislink",
+    "reason": "Independent review, 2026-09-18: DraftGuru's per-entry games figure is games following that listing, not career games; Stage A's listed age agrees with the retained target's birth year on every affected row; the v1 scanner's confirmed_source_mislink (23) vs population_clean (21, sharing the identical shape) split was an arbitrary one-year career-ended/recruitment boundary, not a real distinction. All 44 rows are now one neutral class requiring operator adjudication -- never a confirmed mislink, never automatically safe.",
+    "total_relisting_rows": 44
+  },
+  "hash_links": {
+    "corrected_population_scan_v2_rows_sha256": "ad134d1447b10b6a9880e14507be6d88da8001659b69ab996d91580cbb64908f",
+    "v1_population_scan_rows_sha256_reverified_unchanged": "ddd5faba8a292d91b52d5beef86f9aae91dfef0ab2a14dec9ba5894f2968c8c0"
+  },
+  "human_authority_overlap_rows": [
+    {
+      "draftguru_url": "https://www.draftguru.com.au/players/matt_rendell/1",
+      "ledger_status": "linked_agreeing",
+      "picks": 1,
+      "retained_target": "Matthew Rendell",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "draftguru_url": "https://www.draftguru.com.au/players/nathan_fyfe/1",
+      "ledger_status": "linked_agreeing",
+      "picks": 1,
+      "retained_target": "Nat Fyfe",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "draftguru_url": "https://www.draftguru.com.au/players/ryan_o'keefe/1",
+      "ledger_status": "linked_agreeing",
+      "picks": 1,
+      "retained_target": "Ryan OKeefe",
+      "sample_bucket": "non_sample"
+    }
+  ],
+  "insufficient_evidence_groups": {
+    "OFFLINE_LIMITED": {
+      "child_status": {
+        "bridged": 13
+      },
+      "count": 13,
+      "game_cohort": {
+        "positive": 12,
+        "zero": 1
+      },
+      "pick_sum": 20,
+      "recommended_disposition": "withhold",
+      "sample_bucket": {
+        "census": 2,
+        "non_sample": 11
+      }
+    },
+    "TARGET_NOT_REGISTERED_NO_EVIDENCE": {
+      "child_status": {
+        "target_not_registered": 94
+      },
+      "count": 94,
+      "game_cohort": {
+        "positive": 94
+      },
+      "pick_sum": 98,
+      "recommended_disposition": "withhold",
+      "sample_bucket": {
+        "census": 11,
+        "non_sample": 70,
+        "random": 13
+      }
+    }
+  },
+  "issue": "AFLDB-ISSUE-222",
+  "label": "20260918-v2",
+  "operator_decisions": [
+    {
+      "id": 1,
+      "operator_verdict": "",
+      "question": "Approve routing all 44 relisting_signature_review rows to the operator adjudication pack for a same_person_valid_relisting / different_person_wrong_href / undetermined_withhold verdict (no automatic exclude_from_bridge)?"
+    },
+    {
+      "id": 2,
+      "operator_verdict": "",
+      "question": "Approve withholding the 2 suspected_source_mislink rows pending manual confirmation (not excluding as mislinks)?"
+    },
+    {
+      "id": 3,
+      "operator_verdict": "",
+      "question": "Approve routing the 7 source_discrepancy_same_person rows to manual curation (not auto-admitting)?"
+    },
+    {
+      "id": 4,
+      "operator_verdict": "",
+      "question": "Approve withholding all 107 insufficient_evidence rows by default (never registration lag without retained proof)?"
+    },
+    {
+      "id": 5,
+      "operator_verdict": "",
+      "question": "Approve retaining human authority for the 3 human_authority_overlap rows, outside the net-new bridge count?"
+    },
+    {
+      "id": 6,
+      "operator_verdict": "",
+      "question": "Is an independent review required before any bridge v2 generation?"
+    },
+    {
+      "id": 7,
+      "operator_verdict": "",
+      "question": "Sample redraw/top-up policy for a future validation sample: new salt AFLDB-ISSUE-222/v2, n=598, disjoint from prior discovery/random rows, generated only after bridge v2 is frozen -- confirm this contract, or specify a different one?"
+    }
+  ],
+  "phase_3_status": "PENDING -- this pack decides nothing, imports nothing, sets no operator_verdict",
+  "reconciliation": {
+    "affected_draft_pick_count_by_outcome": {
+      "human_authority_overlap": 3,
+      "insufficient_evidence": 118,
+      "population_clean": 5028,
+      "relisting_signature_review": 50,
+      "source_discrepancy_same_person": 11,
+      "suspected_source_mislink": 3
+    },
+    "by_outcome_x_child_status": {
+      "human_authority_overlap": {
+        "bridged": 3
+      },
+      "insufficient_evidence": {
+        "bridged": 13,
+        "target_not_registered": 94
+      },
+      "population_clean": {
+        "bridged": 3401
+      },
+      "relisting_signature_review": {
+        "bridged": 44
+      },
+      "source_discrepancy_same_person": {
+        "target_not_registered": 7
+      },
+      "suspected_source_mislink": {
+        "bridged": 2
+      },
+      "tooling_or_schema_error": {}
+    },
+    "by_outcome_x_draftguru_game_cohort": {
+      "human_authority_overlap": {
+        "positive": 3
+      },
+      "insufficient_evidence": {
+        "positive": 106,
+        "zero": 1
+      },
+      "population_clean": {
+        "positive": 3401
+      },
+      "relisting_signature_review": {
+        "zero": 44
+      },
+      "source_discrepancy_same_person": {
+        "positive": 7
+      },
+      "suspected_source_mislink": {
+        "positive": 2
+      },
+      "tooling_or_schema_error": {}
+    },
+    "by_outcome_x_ledger_status": {
+      "human_authority_overlap": {
+        "linked_agreeing": 3
+      },
+      "insufficient_evidence": {
+        "none": 107
+      },
+      "population_clean": {
+        "none": 3401
+      },
+      "relisting_signature_review": {
+        "none": 44
+      },
+      "source_discrepancy_same_person": {
+        "none": 7
+      },
+      "suspected_source_mislink": {
+        "none": 2
+      },
+      "tooling_or_schema_error": {}
+    },
+    "by_outcome_x_sample_bucket": {
+      "human_authority_overlap": {
+        "non_sample": 3
+      },
+      "insufficient_evidence": {
+        "census": 13,
+        "non_sample": 81,
+        "random": 13
+      },
+      "population_clean": {
+        "census": 385,
+        "non_sample": 2445,
+        "random": 571
+      },
+      "relisting_signature_review": {
+        "non_sample": 33,
+        "random": 11
+      },
+      "source_discrepancy_same_person": {
+        "census": 1,
+        "non_sample": 3,
+        "random": 3
+      },
+      "suspected_source_mislink": {
+        "non_sample": 2
+      },
+      "tooling_or_schema_error": {}
+    },
+    "relisting_signature_review_former_label_breakdown": {
+      "was_confirmed_source_mislink_v1": {
+        "count": 23,
+        "sample_bucket": {
+          "non_sample": 16,
+          "random": 7
+        }
+      },
+      "was_population_clean_v1": {
+        "count": 21,
+        "sample_bucket": {
+          "non_sample": 17,
+          "random": 4
+        }
+      }
+    },
+    "row_count_by_outcome": {
+      "human_authority_overlap": 3,
+      "insufficient_evidence": 107,
+      "population_clean": 3401,
+      "relisting_signature_review": 44,
+      "source_discrepancy_same_person": 7,
+      "suspected_source_mislink": 2,
+      "tooling_or_schema_error": 0
+    },
+    "target_not_registered_decomposition": {
+      "insufficient_evidence_target_not_registered": 94,
+      "source_discrepancy_same_person_target_not_registered": 7,
+      "sum_check_equals_101": 101,
+      "total_target_not_registered_child_rows": 101
+    }
+  },
+  "relisting_signature_review_rows": [
+    {
+      "captured_afltables_href": "players/A/Andrew_Krakouer0.html",
+      "child": "bridged",
+      "draftguru_games": 0,
+      "draftguru_name": "Andrew Krakouer",
+      "draftguru_url": "https://www.draftguru.com.au/players/andrew_krakouer/1",
+      "event_kind": "Mid-Season",
+      "event_year": 1992,
+      "operator_verdict": "",
+      "picks": 1,
+      "recommended_disposition": "operator_adjudication_required",
+      "retained_target": "Andrew Krakouer",
+      "sample_bucket": "non_sample",
+      "target_career_games": 8,
+      "target_career_span": "1989-1990",
+      "was_v1_confirmed_or_clean": "confirmed_source_mislink (v1)"
+    },
+    {
+      "captured_afltables_href": "players/A/Andrew_Tarpey.html",
+      "child": "bridged",
+      "draftguru_games": 0,
+      "draftguru_name": "Andrew Tarpey",
+      "draftguru_url": "https://www.draftguru.com.au/players/andrew_tarpey/1",
+      "event_kind": "Mid-Season",
+      "event_year": 1991,
+      "operator_verdict": "",
+      "picks": 1,
+      "recommended_disposition": "operator_adjudication_required",
+      "retained_target": "Andrew Tarpey",
+      "sample_bucket": "non_sample",
+      "target_career_games": 9,
+      "target_career_span": "1988-1991",
+      "was_v1_confirmed_or_clean": "population_clean (v1)"
+    },
+    {
+      "captured_afltables_href": "players/A/Athas_Hrysoulakis.html",
+      "child": "bridged",
+      "draftguru_games": 0,
+      "draftguru_name": "Athas Hrysoulakis",
+      "draftguru_url": "https://www.draftguru.com.au/players/athas_hrysoulakis/1",
+      "event_kind": "Mid-Season",
+      "event_year": 1990,
+      "operator_verdict": "",
+      "picks": 1,
+      "recommended_disposition": "operator_adjudication_required",
+      "retained_target": "Athas Hrysoulakis",
+      "sample_bucket": "non_sample",
+      "target_career_games": 19,
+      "target_career_span": "1987-1990",
+      "was_v1_confirmed_or_clean": "population_clean (v1)"
+    },
+    {
+      "captured_afltables_href": "players/B/Bradley_Sparks.html",
+      "child": "bridged",
+      "draftguru_games": 0,
+      "draftguru_name": "Bradley Sparks",
+      "draftguru_url": "https://www.draftguru.com.au/players/bradley_sparks/1",
+      "event_kind": "Pre-Draft",
+      "event_year": 1990,
+      "operator_verdict": "",
+      "picks": 1,
+      "recommended_disposition": "operator_adjudication_required",
+      "retained_target": "Bradley Sparks",
+      "sample_bucket": "non_sample",
+      "target_career_games": 4,
+      "target_career_span": "1987-1988",
+      "was_v1_confirmed_or_clean": "confirmed_source_mislink (v1)"
+    },
+    {
+      "captured_afltables_href": "players/B/Bret_Hutchinson.html",
+      "child": "bridged",
+      "draftguru_games": 0,
+      "draftguru_name": "Bret Hutchinson",
+      "draftguru_url": "https://www.draftguru.com.au/players/bret_hutchinson/1",
+      "event_kind": "Pre-Season",
+      "event_year": 1989,
+      "operator_verdict": "",
+      "picks": 1,
+      "recommended_disposition": "operator_adjudication_required",
+      "retained_target": "Bret Hutchinson",
+      "sample_bucket": "random",
+      "target_career_games": 1,
+      "target_career_span": "1985-1985",
+      "was_v1_confirmed_or_clean": "confirmed_source_mislink (v1)"
+    },
+    {
+      "captured_afltables_href": "players/C/Chris_ODwyer.html",
+      "child": "bridged",
+      "draftguru_games": 0,
+      "draftguru_name": "Chris O'Dwyer",
+      "draftguru_url": "https://www.draftguru.com.au/players/chris_o'dwyer/1",
+      "event_kind": "Pre-Season",
+      "event_year": 1992,
+      "operator_verdict": "",
+      "picks": 1,
+      "recommended_disposition": "operator_adjudication_required",
+      "retained_target": "Chris ODwyer",
+      "sample_bucket": "non_sample",
+      "target_career_games": 8,
+      "target_career_span": "1990-1991",
+      "was_v1_confirmed_or_clean": "confirmed_source_mislink (v1)"
+    },
+    {
+      "captured_afltables_href": "players/C/Craig_Somerville.html",
+      "child": "bridged",
+      "draftguru_games": 0,
+      "draftguru_name": "Craig Somerville",
+      "draftguru_url": "https://www.draftguru.com.au/players/craig_somerville/1",
+      "event_kind": "Trade",
+      "event_year": 1988,
+      "operator_verdict": "",
+      "picks": 1,
+      "recommended_disposition": "operator_adjudication_required",
+      "retained_target": "Craig Somerville",
+      "sample_bucket": "random",
+      "target_career_games": 8,
+      "target_career_span": "1986-1986",
+      "was_v1_confirmed_or_clean": "confirmed_source_mislink (v1)"
+    },
+    {
+      "captured_afltables_href": "players/D/Darren_Morgan.html",
+      "child": "bridged",
+      "draftguru_games": 0,
+      "draftguru_name": "Darren Morgan",
+      "draftguru_url": "https://www.draftguru.com.au/players/darren_morgan/1",
+      "event_kind": "Pre-Draft",
+      "event_year": 1990,
+      "operator_verdict": "",
+      "picks": 2,
+      "recommended_disposition": "operator_adjudication_required",
+      "retained_target": "Darren Morgan",
+      "sample_bucket": "non_sample",
+      "target_career_games": 92,
+      "target_career_span": "1984-1990",
+      "was_v1_confirmed_or_clean": "population_clean (v1)"
+    },
+    {
+      "captured_afltables_href": "players/D/Darren_Williams.html",
+      "child": "bridged",
+      "draftguru_games": 0,
+      "draftguru_name": "Darren Williams",
+      "draftguru_url": "https://www.draftguru.com.au/players/darren_williams/1",
+      "event_kind": "Pre-Season",
+      "event_year": 1990,
+      "operator_verdict": "",
+      "picks": 1,
+      "recommended_disposition": "operator_adjudication_required",
+      "retained_target": "Darren Williams",
+      "sample_bucket": "non_sample",
+      "target_career_games": 109,
+      "target_career_span": "1979-1989",
+      "was_v1_confirmed_or_clean": "confirmed_source_mislink (v1)"
+    },
+    {
+      "captured_afltables_href": "players/D/David_Sullivan.html",
+      "child": "bridged",
+      "draftguru_games": 0,
+      "draftguru_name": "David Sullivan",
+      "draftguru_url": "https://www.draftguru.com.au/players/david_sullivan/1",
+      "event_kind": "Pre-Season",
+      "event_year": 1989,
+      "operator_verdict": "",
+      "picks": 1,
+      "recommended_disposition": "operator_adjudication_required",
+      "retained_target": "David Sullivan",
+      "sample_bucket": "non_sample",
+      "target_career_games": 11,
+      "target_career_span": "1986-1988",
+      "was_v1_confirmed_or_clean": "confirmed_source_mislink (v1)"
+    },
+    {
+      "captured_afltables_href": "players/D/David_Williams.html",
+      "child": "bridged",
+      "draftguru_games": 0,
+      "draftguru_name": "David Williams",
+      "draftguru_url": "https://www.draftguru.com.au/players/david_williams/1",
+      "event_kind": "Pre-Season",
+      "event_year": 1989,
+      "operator_verdict": "",
+      "picks": 1,
+      "recommended_disposition": "operator_adjudication_required",
+      "retained_target": "David Williams",
+      "sample_bucket": "random",
+      "target_career_games": 67,
+      "target_career_span": "1983-1988",
+      "was_v1_confirmed_or_clean": "confirmed_source_mislink (v1)"
+    },
+    {
+      "captured_afltables_href": "players/D/Dean_Strauch.html",
+      "child": "bridged",
+      "draftguru_games": 0,
+      "draftguru_name": "Dean Strauch",
+      "draftguru_url": "https://www.draftguru.com.au/players/dean_strauch/1",
+      "event_kind": "Mid-Season",
+      "event_year": 1989,
+      "operator_verdict": "",
+      "picks": 2,
+      "recommended_disposition": "operator_adjudication_required",
+      "retained_target": "Dean Strauch",
+      "sample_bucket": "non_sample",
+      "target_career_games": 5,
+      "target_career_span": "1986-1989",
+      "was_v1_confirmed_or_clean": "population_clean (v1)"
+    },
+    {
+      "captured_afltables_href": "players/G/Gary_Keane.html",
+      "child": "bridged",
+      "draftguru_games": 0,
+      "draftguru_name": "Gary Keane",
+      "draftguru_url": "https://www.draftguru.com.au/players/gary_keane/1",
+      "event_kind": "Trade",
+      "event_year": 1989,
+      "operator_verdict": "",
+      "picks": 1,
+      "recommended_disposition": "operator_adjudication_required",
+      "retained_target": "Gary Keane",
+      "sample_bucket": "non_sample",
+      "target_career_games": 55,
+      "target_career_span": "1985-1988",
+      "was_v1_confirmed_or_clean": "confirmed_source_mislink (v1)"
+    },
+    {
+      "captured_afltables_href": "players/G/Gerard_Healy.html",
+      "child": "bridged",
+      "draftguru_games": 0,
+      "draftguru_name": "Gerard Healy",
+      "draftguru_url": "https://www.draftguru.com.au/players/gerard_healy/1",
+      "event_kind": "Pre-Season",
+      "event_year": 1990,
+      "operator_verdict": "",
+      "picks": 1,
+      "recommended_disposition": "operator_adjudication_required",
+      "retained_target": "Gerard Healy",
+      "sample_bucket": "non_sample",
+      "target_career_games": 211,
+      "target_career_span": "1979-1990",
+      "was_v1_confirmed_or_clean": "population_clean (v1)"
+    },
+    {
+      "captured_afltables_href": "players/G/Glen_Bartlett.html",
+      "child": "bridged",
+      "draftguru_games": 0,
+      "draftguru_name": "Glen Bartlett",
+      "draftguru_url": "https://www.draftguru.com.au/players/glen_bartlett/1",
+      "event_kind": "Mid-Season",
+      "event_year": 1989,
+      "operator_verdict": "",
+      "picks": 1,
+      "recommended_disposition": "operator_adjudication_required",
+      "retained_target": "Glen Bartlett",
+      "sample_bucket": "random",
+      "target_career_games": 4,
+      "target_career_span": "1987-1987",
+      "was_v1_confirmed_or_clean": "confirmed_source_mislink (v1)"
+    },
+    {
+      "captured_afltables_href": "players/G/Gordon_Fode.html",
+      "child": "bridged",
+      "draftguru_games": 0,
+      "draftguru_name": "Gordon Fode",
+      "draftguru_url": "https://www.draftguru.com.au/players/gordon_fode/1",
+      "event_kind": "Pre-Season",
+      "event_year": 1995,
+      "operator_verdict": "",
+      "picks": 1,
+      "recommended_disposition": "operator_adjudication_required",
+      "retained_target": "Gordon Fode",
+      "sample_bucket": "non_sample",
+      "target_career_games": 52,
+      "target_career_span": "1988-1995",
+      "was_v1_confirmed_or_clean": "population_clean (v1)"
+    },
+    {
+      "captured_afltables_href": "players/I/Ian_Rickman.html",
+      "child": "bridged",
+      "draftguru_games": 0,
+      "draftguru_name": "Ian Rickman",
+      "draftguru_url": "https://www.draftguru.com.au/players/ian_rickman/1",
+      "event_kind": "Pre-Season",
+      "event_year": 1989,
+      "operator_verdict": "",
+      "picks": 1,
+      "recommended_disposition": "operator_adjudication_required",
+      "retained_target": "Ian Rickman",
+      "sample_bucket": "non_sample",
+      "target_career_games": 11,
+      "target_career_span": "1982-1984",
+      "was_v1_confirmed_or_clean": "confirmed_source_mislink (v1)"
+    },
+    {
+      "captured_afltables_href": "players/J/Jason_Daniltchenko.html",
+      "child": "bridged",
+      "draftguru_games": 0,
+      "draftguru_name": "Jason Daniltchenko",
+      "draftguru_url": "https://www.draftguru.com.au/players/jason_daniltchenko/1",
+      "event_kind": "Pre-Season",
+      "event_year": 1997,
+      "operator_verdict": "",
+      "picks": 1,
+      "recommended_disposition": "operator_adjudication_required",
+      "retained_target": "Jason Daniltchenko",
+      "sample_bucket": "non_sample",
+      "target_career_games": 29,
+      "target_career_span": "1993-1997",
+      "was_v1_confirmed_or_clean": "population_clean (v1)"
+    },
+    {
+      "captured_afltables_href": "players/J/John_Ahern.html",
+      "child": "bridged",
+      "draftguru_games": 0,
+      "draftguru_name": "John Ahern",
+      "draftguru_url": "https://www.draftguru.com.au/players/john_ahern/1",
+      "event_kind": "Trade",
+      "event_year": 1990,
+      "operator_verdict": "",
+      "picks": 1,
+      "recommended_disposition": "operator_adjudication_required",
+      "retained_target": "John Ahern",
+      "sample_bucket": "non_sample",
+      "target_career_games": 2,
+      "target_career_span": "1989-1989",
+      "was_v1_confirmed_or_clean": "confirmed_source_mislink (v1)"
+    },
+    {
+      "captured_afltables_href": "players/J/John_Fidge.html",
+      "child": "bridged",
+      "draftguru_games": 0,
+      "draftguru_name": "John Fidge",
+      "draftguru_url": "https://www.draftguru.com.au/players/john_fidge/1",
+      "event_kind": "Pre-Draft",
+      "event_year": 1989,
+      "operator_verdict": "",
+      "picks": 2,
+      "recommended_disposition": "operator_adjudication_required",
+      "retained_target": "John Fidge",
+      "sample_bucket": "random",
+      "target_career_games": 59,
+      "target_career_span": "1984-1989",
+      "was_v1_confirmed_or_clean": "population_clean (v1)"
+    },
+    {
+      "captured_afltables_href": "players/J/John_Peter-Budge.html",
+      "child": "bridged",
+      "draftguru_games": 0,
+      "draftguru_name": "John Peter-Budge",
+      "draftguru_url": "https://www.draftguru.com.au/players/john_peter-budge/1",
+      "event_kind": "National",
+      "event_year": 1990,
+      "operator_verdict": "",
+      "picks": 1,
+      "recommended_disposition": "operator_adjudication_required",
+      "retained_target": "John Peter-Budge",
+      "sample_bucket": "non_sample",
+      "target_career_games": 45,
+      "target_career_span": "1986-1988",
+      "was_v1_confirmed_or_clean": "confirmed_source_mislink (v1)"
+    },
+    {
+      "captured_afltables_href": "players/J/Justin_Pickering.html",
+      "child": "bridged",
+      "draftguru_games": 0,
+      "draftguru_name": "Justin Pickering",
+      "draftguru_url": "https://www.draftguru.com.au/players/justin_pickering/1",
+      "event_kind": "National",
+      "event_year": 1991,
+      "operator_verdict": "",
+      "picks": 1,
+      "recommended_disposition": "operator_adjudication_required",
+      "retained_target": "Justin Pickering",
+      "sample_bucket": "non_sample",
+      "target_career_games": 59,
+      "target_career_span": "1988-1991",
+      "was_v1_confirmed_or_clean": "population_clean (v1)"
+    },
+    {
+      "captured_afltables_href": "players/L/Lynton_Fitzpatrick.html",
+      "child": "bridged",
+      "draftguru_games": 0,
+      "draftguru_name": "Lynton Fitzpatrick",
+      "draftguru_url": "https://www.draftguru.com.au/players/lynton_fitzpatrick/1",
+      "event_kind": "Pre-Season",
+      "event_year": 1989,
+      "operator_verdict": "",
+      "picks": 1,
+      "recommended_disposition": "operator_adjudication_required",
+      "retained_target": "Lynton Fitzpatrick",
+      "sample_bucket": "non_sample",
+      "target_career_games": 18,
+      "target_career_span": "1987-1989",
+      "was_v1_confirmed_or_clean": "population_clean (v1)"
+    },
+    {
+      "captured_afltables_href": "players/M/Mark_Majerczak.html",
+      "child": "bridged",
+      "draftguru_games": 0,
+      "draftguru_name": "Mark Majerczak",
+      "draftguru_url": "https://www.draftguru.com.au/players/mark_majerczak/1",
+      "event_kind": "Pre-Season",
+      "event_year": 1991,
+      "operator_verdict": "",
+      "picks": 1,
+      "recommended_disposition": "operator_adjudication_required",
+      "retained_target": "Mark Majerczak",
+      "sample_bucket": "random",
+      "target_career_games": 17,
+      "target_career_span": "1987-1991",
+      "was_v1_confirmed_or_clean": "population_clean (v1)"
+    },
+    {
+      "captured_afltables_href": "players/M/Mark_McLeod.html",
+      "child": "bridged",
+      "draftguru_games": 0,
+      "draftguru_name": "Mark McLeod",
+      "draftguru_url": "https://www.draftguru.com.au/players/mark_mcleod/1",
+      "event_kind": "Pre-Season",
+      "event_year": 1990,
+      "operator_verdict": "",
+      "picks": 1,
+      "recommended_disposition": "operator_adjudication_required",
+      "retained_target": "Mark McLeod",
+      "sample_bucket": "non_sample",
+      "target_career_games": 3,
+      "target_career_span": "1989-1989",
+      "was_v1_confirmed_or_clean": "confirmed_source_mislink (v1)"
+    },
+    {
+      "captured_afltables_href": "players/M/Mark_ODonoghue.html",
+      "child": "bridged",
+      "draftguru_games": 0,
+      "draftguru_name": "Mark O'Donoghue",
+      "draftguru_url": "https://www.draftguru.com.au/players/mark_o'donoghue/1",
+      "event_kind": "Trade",
+      "event_year": 1988,
+      "operator_verdict": "",
+      "picks": 1,
+      "recommended_disposition": "operator_adjudication_required",
+      "retained_target": "Mark ODonoghue",
+      "sample_bucket": "non_sample",
+      "target_career_games": 2,
+      "target_career_span": "1988-1988",
+      "was_v1_confirmed_or_clean": "population_clean (v1)"
+    },
+    {
+      "captured_afltables_href": "players/M/Mark_Pitura.html",
+      "child": "bridged",
+      "draftguru_games": 0,
+      "draftguru_name": "Mark Pitura",
+      "draftguru_url": "https://www.draftguru.com.au/players/mark_pitura/1",
+      "event_kind": "Pre-Season",
+      "event_year": 1995,
+      "operator_verdict": "",
+      "picks": 1,
+      "recommended_disposition": "operator_adjudication_required",
+      "retained_target": "Mark Pitura",
+      "sample_bucket": "non_sample",
+      "target_career_games": 2,
+      "target_career_span": "1993-1993",
+      "was_v1_confirmed_or_clean": "confirmed_source_mislink (v1)"
+    },
+    {
+      "captured_afltables_href": "players/M/Michael_Garvey.html",
+      "child": "bridged",
+      "draftguru_games": 0,
+      "draftguru_name": "Michael Garvey",
+      "draftguru_url": "https://www.draftguru.com.au/players/michael_garvey/1",
+      "event_kind": "Pre-Season",
+      "event_year": 1989,
+      "operator_verdict": "",
+      "picks": 1,
+      "recommended_disposition": "operator_adjudication_required",
+      "retained_target": "Michael Garvey",
+      "sample_bucket": "non_sample",
+      "target_career_games": 3,
+      "target_career_span": "1988-1989",
+      "was_v1_confirmed_or_clean": "population_clean (v1)"
+    },
+    {
+      "captured_afltables_href": "players/N/Nathan_Irvin.html",
+      "child": "bridged",
+      "draftguru_games": 0,
+      "draftguru_name": "Nathan Irvin",
+      "draftguru_url": "https://www.draftguru.com.au/players/nathan_irvin/1",
+      "event_kind": "National",
+      "event_year": 1994,
+      "operator_verdict": "",
+      "picks": 1,
+      "recommended_disposition": "operator_adjudication_required",
+      "retained_target": "Nathan Irvin",
+      "sample_bucket": "non_sample",
+      "target_career_games": 1,
+      "target_career_span": "1993-1993",
+      "was_v1_confirmed_or_clean": "confirmed_source_mislink (v1)"
+    },
+    {
+      "captured_afltables_href": "players/P/Paul_Mifka.html",
+      "child": "bridged",
+      "draftguru_games": 0,
+      "draftguru_name": "Paul Mifka",
+      "draftguru_url": "https://www.draftguru.com.au/players/paul_mifka/1",
+      "event_kind": "Pre-Draft",
+      "event_year": 1990,
+      "operator_verdict": "",
+      "picks": 1,
+      "recommended_disposition": "operator_adjudication_required",
+      "retained_target": "Paul Mifka",
+      "sample_bucket": "non_sample",
+      "target_career_games": 1,
+      "target_career_span": "1987-1987",
+      "was_v1_confirmed_or_clean": "confirmed_source_mislink (v1)"
+    },
+    {
+      "captured_afltables_href": "players/P/Paul_Tuddenham.html",
+      "child": "bridged",
+      "draftguru_games": 0,
+      "draftguru_name": "Paul Tuddenham",
+      "draftguru_url": "https://www.draftguru.com.au/players/paul_tuddenham/1",
+      "event_kind": "Pre-Season",
+      "event_year": 1991,
+      "operator_verdict": "",
+      "picks": 1,
+      "recommended_disposition": "operator_adjudication_required",
+      "retained_target": "Paul Tuddenham",
+      "sample_bucket": "non_sample",
+      "target_career_games": 40,
+      "target_career_span": "1987-1991",
+      "was_v1_confirmed_or_clean": "population_clean (v1)"
+    },
+    {
+      "captured_afltables_href": "players/P/Peter_Baldwin.html",
+      "child": "bridged",
+      "draftguru_games": 0,
+      "draftguru_name": "Peter Baldwin",
+      "draftguru_url": "https://www.draftguru.com.au/players/peter_baldwin/1",
+      "event_kind": "Pre-Season",
+      "event_year": 1990,
+      "operator_verdict": "",
+      "picks": 2,
+      "recommended_disposition": "operator_adjudication_required",
+      "retained_target": "Peter Baldwin",
+      "sample_bucket": "non_sample",
+      "target_career_games": 5,
+      "target_career_span": "1987-1990",
+      "was_v1_confirmed_or_clean": "population_clean (v1)"
+    },
+    {
+      "captured_afltables_href": "players/P/Peter_Freeman.html",
+      "child": "bridged",
+      "draftguru_games": 0,
+      "draftguru_name": "Peter Freeman",
+      "draftguru_url": "https://www.draftguru.com.au/players/peter_freeman/1",
+      "event_kind": "National",
+      "event_year": 1991,
+      "operator_verdict": "",
+      "picks": 1,
+      "recommended_disposition": "operator_adjudication_required",
+      "retained_target": "Peter Freeman",
+      "sample_bucket": "non_sample",
+      "target_career_games": 5,
+      "target_career_span": "1988-1990",
+      "was_v1_confirmed_or_clean": "confirmed_source_mislink (v1)"
+    },
+    {
+      "captured_afltables_href": "players/P/Peter_Whyte.html",
+      "child": "bridged",
+      "draftguru_games": 0,
+      "draftguru_name": "Peter Whyte",
+      "draftguru_url": "https://www.draftguru.com.au/players/peter_whyte/1",
+      "event_kind": "National",
+      "event_year": 1990,
+      "operator_verdict": "",
+      "picks": 1,
+      "recommended_disposition": "operator_adjudication_required",
+      "retained_target": "Peter Whyte",
+      "sample_bucket": "random",
+      "target_career_games": 22,
+      "target_career_span": "1986-1988",
+      "was_v1_confirmed_or_clean": "confirmed_source_mislink (v1)"
+    },
+    {
+      "captured_afltables_href": "players/R/Ricky_Jackson.html",
+      "child": "bridged",
+      "draftguru_games": 0,
+      "draftguru_name": "Ricky Jackson",
+      "draftguru_url": "https://www.draftguru.com.au/players/ricky_jackson/1",
+      "event_kind": "Trade",
+      "event_year": 1991,
+      "operator_verdict": "",
+      "picks": 1,
+      "recommended_disposition": "operator_adjudication_required",
+      "retained_target": "Ricky Jackson",
+      "sample_bucket": "non_sample",
+      "target_career_games": 80,
+      "target_career_span": "1986-1991",
+      "was_v1_confirmed_or_clean": "population_clean (v1)"
+    },
+    {
+      "captured_afltables_href": "players/R/Robert_Walker.html",
+      "child": "bridged",
+      "draftguru_games": 0,
+      "draftguru_name": "Robert Walker",
+      "draftguru_url": "https://www.draftguru.com.au/players/robert_walker/1",
+      "event_kind": "Pre-Season",
+      "event_year": 1992,
+      "operator_verdict": "",
+      "picks": 1,
+      "recommended_disposition": "operator_adjudication_required",
+      "retained_target": "Robert Walker",
+      "sample_bucket": "random",
+      "target_career_games": 5,
+      "target_career_span": "1990-1992",
+      "was_v1_confirmed_or_clean": "population_clean (v1)"
+    },
+    {
+      "captured_afltables_href": "players/R/Rodney_Gladman.html",
+      "child": "bridged",
+      "draftguru_games": 0,
+      "draftguru_name": "Rodney Gladman",
+      "draftguru_url": "https://www.draftguru.com.au/players/rodney_gladman/1",
+      "event_kind": "Pre-Season",
+      "event_year": 1989,
+      "operator_verdict": "",
+      "picks": 1,
+      "recommended_disposition": "operator_adjudication_required",
+      "retained_target": "Rodney Gladman",
+      "sample_bucket": "non_sample",
+      "target_career_games": 1,
+      "target_career_span": "1987-1987",
+      "was_v1_confirmed_or_clean": "confirmed_source_mislink (v1)"
+    },
+    {
+      "captured_afltables_href": "players/S/Simon_Hawking.html",
+      "child": "bridged",
+      "draftguru_games": 0,
+      "draftguru_name": "Simon Hawking",
+      "draftguru_url": "https://www.draftguru.com.au/players/simon_hawking/1",
+      "event_kind": "Pre-Draft",
+      "event_year": 1996,
+      "operator_verdict": "",
+      "picks": 3,
+      "recommended_disposition": "operator_adjudication_required",
+      "retained_target": "Simon Hawking",
+      "sample_bucket": "non_sample",
+      "target_career_games": 60,
+      "target_career_span": "1993-1996",
+      "was_v1_confirmed_or_clean": "population_clean (v1)"
+    },
+    {
+      "captured_afltables_href": "players/S/Simon_Luhrs.html",
+      "child": "bridged",
+      "draftguru_games": 0,
+      "draftguru_name": "Simon Luhrs",
+      "draftguru_url": "https://www.draftguru.com.au/players/simon_luhrs/1",
+      "event_kind": "Mid-Season",
+      "event_year": 1992,
+      "operator_verdict": "",
+      "picks": 1,
+      "recommended_disposition": "operator_adjudication_required",
+      "retained_target": "Simon Luhrs",
+      "sample_bucket": "non_sample",
+      "target_career_games": 12,
+      "target_career_span": "1991-1992",
+      "was_v1_confirmed_or_clean": "population_clean (v1)"
+    },
+    {
+      "captured_afltables_href": "players/S/Simon_Taylor0.html",
+      "child": "bridged",
+      "draftguru_games": 0,
+      "draftguru_name": "Simon Taylor",
+      "draftguru_url": "https://www.draftguru.com.au/players/simon_taylor/1",
+      "event_kind": "Pre-Season",
+      "event_year": 1991,
+      "operator_verdict": "",
+      "picks": 1,
+      "recommended_disposition": "operator_adjudication_required",
+      "retained_target": "Simon Taylor",
+      "sample_bucket": "random",
+      "target_career_games": 2,
+      "target_career_span": "1989-1989",
+      "was_v1_confirmed_or_clean": "confirmed_source_mislink (v1)"
+    },
+    {
+      "captured_afltables_href": "players/T/Tim_Bourke.html",
+      "child": "bridged",
+      "draftguru_games": 0,
+      "draftguru_name": "Tim Bourke",
+      "draftguru_url": "https://www.draftguru.com.au/players/tim_bourke/1",
+      "event_kind": "Trade",
+      "event_year": 1991,
+      "operator_verdict": "",
+      "picks": 1,
+      "recommended_disposition": "operator_adjudication_required",
+      "retained_target": "Tim Bourke",
+      "sample_bucket": "random",
+      "target_career_games": 5,
+      "target_career_span": "1989-1990",
+      "was_v1_confirmed_or_clean": "confirmed_source_mislink (v1)"
+    },
+    {
+      "captured_afltables_href": "players/T/Tony_Elshaug.html",
+      "child": "bridged",
+      "draftguru_games": 0,
+      "draftguru_name": "Tony Elshaug",
+      "draftguru_url": "https://www.draftguru.com.au/players/tony_elshaug/1",
+      "event_kind": "Pre-Season",
+      "event_year": 1988,
+      "operator_verdict": "",
+      "picks": 1,
+      "recommended_disposition": "operator_adjudication_required",
+      "retained_target": "Tony Elshaug",
+      "sample_bucket": "random",
+      "target_career_games": 137,
+      "target_career_span": "1979-1988",
+      "was_v1_confirmed_or_clean": "population_clean (v1)"
+    },
+    {
+      "captured_afltables_href": "players/T/Tony_Furey.html",
+      "child": "bridged",
+      "draftguru_games": 0,
+      "draftguru_name": "Tony Furey",
+      "draftguru_url": "https://www.draftguru.com.au/players/tony_furey/1",
+      "event_kind": "Pre-Season",
+      "event_year": 1988,
+      "operator_verdict": "",
+      "picks": 1,
+      "recommended_disposition": "operator_adjudication_required",
+      "retained_target": "Tony Furey",
+      "sample_bucket": "non_sample",
+      "target_career_games": 41,
+      "target_career_span": "1983-1985",
+      "was_v1_confirmed_or_clean": "confirmed_source_mislink (v1)"
+    },
+    {
+      "captured_afltables_href": "players/W/Warren_Dean.html",
+      "child": "bridged",
+      "draftguru_games": 0,
+      "draftguru_name": "Warren Dean",
+      "draftguru_url": "https://www.draftguru.com.au/players/warren_dean/1",
+      "event_kind": "Pre-Season",
+      "event_year": 1989,
+      "operator_verdict": "",
+      "picks": 1,
+      "recommended_disposition": "operator_adjudication_required",
+      "retained_target": "Warren Dean",
+      "sample_bucket": "non_sample",
+      "target_career_games": 32,
+      "target_career_span": "1987-1989",
+      "was_v1_confirmed_or_clean": "population_clean (v1)"
+    }
+  ],
+  "sample_and_statistical_impact": {
+    "census_stratum_n": 399,
+    "future_validation_required": "A new, disjoint, new-salt (AFLDB-ISSUE-222/v2) validation sample of non-census bridge-v2 rows, n=598, is required before any formal residual-error bound can be claimed -- not generated by this pass; bridge v2 must first be frozen after operator adjudication of this pack and the operator adjudication pack.",
+    "original_598_random_selection_retained": true,
+    "random_stratum_n": 598,
+    "recalculated_0_51pct_claim_status": "WITHDRAWN for two independent reasons: (1) circular -- population_clean is defined by the same machine rule whose error rate the bound purports to measure, so a zero-failure count over that population proves nothing about rows the rule itself might misclassify; (2) its 588 denominator was itself computed wrongly even under the v1 labels -- 598 - 7 - 3 = 588 never subtracted the 13 random-stratum insufficient_evidence/target_not_registered rows, silently counting them as confirmed-clean survivors. No formal residual-error bound exists.",
+    "redraw_or_topup_decided_this_pass": false,
+    "v1_label_random_stratum_breakdown_used_only_to_show_the_588_error": {
+      "insufficient_evidence": 13,
+      "machine_flagged_confirmed_source_mislink_v1": 7,
+      "note": "575 + 7 + 3 + 13 = 598. The withdrawn claim computed 598 - 7 - 3 = 588 as 'clean survivors', omitting the 13 insufficient_evidence rows from the subtraction. The TRUE clean-survivor count under these v1 labels was 575, not 588.",
+      "population_clean": 575,
+      "source_discrepancy_same_person": 3,
+      "total": 598
+    },
+    "v2_current_random_stratum_breakdown": {
+      "insufficient_evidence": 13,
+      "note": "This is the CURRENT, corrected classification of the random stratum. It is descriptive only -- no confidence-bound interpretation is claimed.",
+      "population_clean": 571,
+      "relisting_signature_review": 11,
+      "source_discrepancy_same_person": 3,
+      "total": 598
+    },
+    "zero_failure_bound_original_claim_n598_pct": 0.5,
+    "zero_failure_bound_original_claim_status": "WITHDRAWN (unchanged from v1 -- this claim was already invalid before this pass's classification correction: it presupposed 0 failures in the random stratum, but 7 confirmed_source_mislink + 3 source_discrepancy_same_person rows were within it, a 1.171% observed rate)"
+  },
+  "schema_version": 2,
+  "source_discrepancy_same_person_rows": [
+    {
+      "captured_href": "players/A/Aaron_Black.html",
+      "child": "target_not_registered",
+      "corrected_identity": "players/A/Aaron_Black0.html",
+      "draftguru_url": "https://www.draftguru.com.au/players/aaron_black/1",
+      "operator_verdict": "",
+      "picks": 2,
+      "sample_bucket": "non_sample"
+    },
+    {
+      "captured_href": "players/A/Alwyn_Davey.html",
+      "child": "target_not_registered",
+      "corrected_identity": "players/A/Alwyn_Davey0.html",
+      "draftguru_url": "https://www.draftguru.com.au/players/alwyn_davey/1",
+      "operator_verdict": "",
+      "picks": 1,
+      "sample_bucket": "non_sample"
+    },
+    {
+      "captured_href": "players/J/Joel_Smith.html",
+      "child": "target_not_registered",
+      "corrected_identity": "players/J/Joel_Smith0.html",
+      "draftguru_url": "https://www.draftguru.com.au/players/joel_smith/1",
+      "operator_verdict": "",
+      "picks": 2,
+      "sample_bucket": "census"
+    },
+    {
+      "captured_href": "players/J/Josh_Smith.html",
+      "child": "target_not_registered",
+      "corrected_identity": "players/J/Josh_Smith0.html",
+      "draftguru_url": "https://www.draftguru.com.au/players/josh_smith/1",
+      "operator_verdict": "",
+      "picks": 1,
+      "sample_bucket": "random"
+    },
+    {
+      "captured_href": "players/S/Sam_Butler.html",
+      "child": "target_not_registered",
+      "corrected_identity": "players/S/Sam_Butler0.html",
+      "draftguru_url": "https://www.draftguru.com.au/players/sam_butler/1",
+      "operator_verdict": "",
+      "picks": 1,
+      "sample_bucket": "non_sample"
+    },
+    {
+      "captured_href": "players/S/Steven_Schwerdt.html",
+      "child": "target_not_registered",
+      "corrected_identity": "players/S/Stephen_Schwerdt.html",
+      "draftguru_url": "https://www.draftguru.com.au/players/stephen_schwerdt/1",
+      "operator_verdict": "",
+      "picks": 2,
+      "sample_bucket": "random"
+    },
+    {
+      "captured_href": "players/T/Tom_Murphy.html",
+      "child": "target_not_registered",
+      "corrected_identity": "players/T/Tom_Murphy0.html",
+      "draftguru_url": "https://www.draftguru.com.au/players/tom_murphy/1",
+      "operator_verdict": "",
+      "picks": 2,
+      "sample_bucket": "random"
+    }
+  ],
+  "supersedes": "20260918-v1 (bridge-population-scan-decision-pack-20260918-v1.{md,csv,json} -- preserved unmodified as superseded evidence, never overwritten)",
+  "suspected_source_mislink_rows": [
+    {
+      "captured_href": "players/A/Adrian_De_Luca.html",
+      "child": "bridged",
+      "dg_birth_year": 1982,
+      "dg_games": 46,
+      "draftguru_url": "https://www.draftguru.com.au/players/adrian_deluca/1",
+      "operator_verdict": "",
+      "picks": 1,
+      "reason": "OTHER_CONTRADICTION:SURNAME_DIFFERENT",
+      "retained_target": "Adrian De Luca",
+      "sample_bucket": "non_sample",
+      "target_birth_year": 1982,
+      "target_span": "2004-2006"
+    },
+    {
+      "captured_href": "players/S/Setanta_OhAilpin.html",
+      "child": "bridged",
+      "dg_birth_year": 1983,
+      "dg_games": 88,
+      "draftguru_url": "https://www.draftguru.com.au/players/setanta_%C3%B3%20hailp%C3%ADn/1",
+      "operator_verdict": "",
+      "picks": 2,
+      "reason": "OTHER_CONTRADICTION:SURNAME_DIFFERENT",
+      "retained_target": "Setanta OhAilpin",
+      "sample_bucket": "non_sample",
+      "target_birth_year": 1983,
+      "target_span": "2005-2013"
+    }
+  ]
+}

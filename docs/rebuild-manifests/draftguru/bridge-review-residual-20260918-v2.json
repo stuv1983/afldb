@@ -1,0 +1,68 @@
+{
+  "categories": {
+    "offline_contradict": {
+      "count": 7,
+      "urls": [
+        "https://www.draftguru.com.au/players/peter_whyte/1",
+        "https://www.draftguru.com.au/players/craig_somerville/1",
+        "https://www.draftguru.com.au/players/bret_hutchinson/1",
+        "https://www.draftguru.com.au/players/tim_bourke/1",
+        "https://www.draftguru.com.au/players/david_williams/1",
+        "https://www.draftguru.com.au/players/simon_taylor/1",
+        "https://www.draftguru.com.au/players/glen_bartlett/1"
+      ]
+    },
+    "offline_limited": {
+      "count": 2,
+      "urls": [
+        "https://www.draftguru.com.au/players/keith_thomas/2",
+        "https://www.draftguru.com.au/players/tim_walsh/1"
+      ]
+    },
+    "offline_unavailable": {
+      "count": 0,
+      "urls": []
+    },
+    "target_unregistered": {
+      "count": 28,
+      "urls": [
+        "https://www.draftguru.com.au/players/cooper_duff-tytler/1",
+        "https://www.draftguru.com.au/players/daniel_annable/1",
+        "https://www.draftguru.com.au/players/dylan_patterson/1",
+        "https://www.draftguru.com.au/players/harry_dean/1",
+        "https://www.draftguru.com.au/players/jacob_farrow/1",
+        "https://www.draftguru.com.au/players/jagga_smith/1",
+        "https://www.draftguru.com.au/players/joel_smith/1",
+        "https://www.draftguru.com.au/players/sam_cumming/1",
+        "https://www.draftguru.com.au/players/sam_grlj/1",
+        "https://www.draftguru.com.au/players/sullivan_robey/1",
+        "https://www.draftguru.com.au/players/willem_duursma/1",
+        "https://www.draftguru.com.au/players/zeke_uwland/1",
+        "https://www.draftguru.com.au/players/toby_murray/1",
+        "https://www.draftguru.com.au/players/mitch_zadow/1",
+        "https://www.draftguru.com.au/players/billy_cootee/1",
+        "https://www.draftguru.com.au/players/milan_murdock/1",
+        "https://www.draftguru.com.au/players/angus_anderson/1",
+        "https://www.draftguru.com.au/players/josh_lai/1",
+        "https://www.draftguru.com.au/players/mitch_edwards/1",
+        "https://www.draftguru.com.au/players/tom_murphy/1",
+        "https://www.draftguru.com.au/players/mitch_podhajski/1",
+        "https://www.draftguru.com.au/players/noah_mraz/1",
+        "https://www.draftguru.com.au/players/noah_howes/1",
+        "https://www.draftguru.com.au/players/sam_swadling/1",
+        "https://www.draftguru.com.au/players/josh_smith/1",
+        "https://www.draftguru.com.au/players/stephen_schwerdt/1",
+        "https://www.draftguru.com.au/players/caleb_lewis/1",
+        "https://www.draftguru.com.au/players/zane_zakostelsky/1"
+      ]
+    },
+    "tooling_or_schema_error": {
+      "count": 0,
+      "urls": []
+    }
+  },
+  "generated_utc": "2026-09-18T03:13:54Z",
+  "network_acquisition_required": false,
+  "note": "No row in this run was found to require a live network fetch before operator adjudication; see runbook \u00a79 for the category-by-category recommended next evidence.",
+  "schema_version": 1
+}

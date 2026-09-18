@@ -1,0 +1,4005 @@
+{
+  "$comment": "AFLDB-ISSUE-222 \u00a73.5 bridge-precision review sample. Two pre-declared strata, unreviewed -- verdicts are recorded separately and this file is never edited to add them.",
+  "census_stratum": [
+    {
+      "player_url": "https://www.draftguru.com.au/players/aaron_cadman/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/aaron_fiora/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/aaron_francis/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/aaron_naughton/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/adam_cerra/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/adam_cooney/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/adam_heuskes/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/adam_tomlinson/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/alan_didak/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/alan_johnson/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/alex_mcdonald/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/alix_tauru/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/allan_sidebottom/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/allen_jakovich/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/andrew_brayshaw/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/andrew_brockhurst/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/andrew_gaff/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/andrew_lamprill/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/andrew_mackie/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/andrew_mcdougall/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/andrew_mcgovern/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/andrew_mcgrath/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/andrew_moore/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/andrew_payze/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/andrew_purser/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/andrew_rogers/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/andrew_walker/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/angus_brayshaw/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/anthony_banik/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/anthony_morabito/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/anthony_rocca/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/archie_perkins/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ashley_sampi/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/bailey_humphrey/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/bailey_smith/2",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/beau_dowler/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ben_ainsworth/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ben_cunnington/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ben_king/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ben_mcevoy/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ben_reid/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ben_wilson/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/bill_lokan/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/billy_longer/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/blake_caracella/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/bowen_lockwood/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/brad_ottens/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/brad_rowe/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/brad_sheppard/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/brad_tunbridge/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/braeden_campbell/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/brendan_krummel/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/brendon_fewster/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/brendon_goddard/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/brenton_phillips/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/brett_chalmers/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/brett_deledio/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/brock_mclean/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/bryce_gibbs/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/cale_morton/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/caleb_marchbank/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/caleb_serong/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/caleb_windsor/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/callum_ah%20chee/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/callum_mills/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/cam_mackenzie/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/cam_rayner/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/carl_dilena/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/caydn_beetham/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/chad_cornes/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/chad_wingard/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/chayce_jones/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/chris_egan/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/chris_heffernan/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/chris_johnson/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/chris_judd/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/chris_masten/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/chris_mcdermott/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/chris_naish/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/chris_tarrant/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/chris_yarran/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/christian_petracca/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/christian_salem/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/clayton_oliver/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/clive_waterhouse/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/colby_mckercher/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/colin_sylvia/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/connor_rozee/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/cooper_duff-tytler/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/craig_holden/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/dale_kickett/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/dale_thomas/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/damian_cupido/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/damian_hampson/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/dan_curtin/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/daniel_annable/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/daniel_gorringe/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/daniel_harford/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/daniel_healy/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/daniel_mcalister/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/daniel_motlop/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/daniel_rich/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/daniel_wells/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/danny_roach/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/darcy_moore/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/darcy_parish/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/darren_davies/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/darren_gaspar/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/darren_kowal/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/david_armitage/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/david_donato/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/david_hale/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/david_myers/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/david_ogg/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/david_swallow/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/david_trotter/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/dean_turner/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/denver_grainger-barras/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/des_headland/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/dion_prestia/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/dion_scott/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/dom_tyson/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/drew_banfield/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/dustin_martin/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/dylan_patterson/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/dylan_smith/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/dylan_stephens/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/dyson_heppell/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/elijah_hollands/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/elijah_tsatas/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ethan_read/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/farren_ray/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/finn_callaghan/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/finn_o'sullivan/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/fischer_mcasey/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/gary_rohan/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/gary_shaw/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/george_wardlaw/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/glenn_gorman/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/graham_polak/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/graham_wright/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/grantley_fielke/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/griffin_logue/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/hamish_hartlett/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/hamish_mcintosh/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/harley_bennell/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/harley_reid/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/harry_dean/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/harry_mckay/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/harry_sheezel/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/harvey_langford/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/hayden_young/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/hugh_mccluggage/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/hunter_clark/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/izak_rankine/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jack_billings/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jack_bowes/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jack_lukosius/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jack_macrae/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jack_scrimshaw/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jack_trengove/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jack_watts/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jack_ziebell/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jacob_farrow/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jacob_hopper/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jacob_weitering/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jagga_smith/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jaidyn_stephenson/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jake_melksham/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jake_stringer/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jamarra_ugle-hagan/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/james_aish/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/james_cook/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/james_walker/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jared_brennan/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jared_crouch/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jared_polec/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jarrad_grant/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jarrad_mcveigh/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jarrad_oakley-nicholls/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jarrod_pickett/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jarryd_roughead/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jason_horne-francis/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jason_laycock/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jason_mccartney/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jason_norrish/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jed_walter/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jeff_white/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jeremy_guard/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jhye_clark/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jimmy_bartel/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jimmy_toumpas/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jody_arnol/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/joe_daniher/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/joel_corey/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/joel_selwood/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/joel_smith/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/john_brinkkotter/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/john_butcher/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/john_hutton/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/john_meesen/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/john_rombotis/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jonathan_o'rourke/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jonathon_patton/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jordan_de%20goey/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jordan_lewis/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jordan_mcmahon/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jordan_russell/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/josh_caddy/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/josh_carr/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/josh_fraser/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/josh_gibcus/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/josh_kelly/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/josh_kennedy/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/josh_rachele/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/josh_schache/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/josh_ward/2",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jude_bolton/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/justin_koschitzke/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/justin_leppitsch/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/justin_longmuir/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/justin_murphy/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jye_amiss/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/kade_kolodjashnij/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/kane_tenace/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/kayne_pettifer/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/keith_thomas/2",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ken_judge/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/kepler_bradley/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/kris_massie/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/lachie_ash/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/lachie_henderson/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/lachie_plowman/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/lachie_whitfield/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/lachlan_hansen/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/lance_franklin/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/laurence_angwin/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/leigh_brockman/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/leigh_brown/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/leo_lombard/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/leon_cameron/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/levi_ashcroft/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/liam_henry/2",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/liam_sumner/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/lochie_o'brien/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/logan_mcdonald/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/luke_ball/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/luke_brennan/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/luke_davies-uniacke/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/luke_hodge/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/luke_jackson/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/luke_livingston/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/luke_mcdonald/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/luke_mcpharlin/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/luke_power/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/mac_andrew/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/marc_murphy/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/marcus_bontempelli/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/marcus_drum/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/marcus_seecamp/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/mark_bolton/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/mark_brayshaw/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/mark_harwood/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/mark_kinnear/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/mark_mcveigh/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/mark_naley/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/martin_leslie/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/martin_pike/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/matt_buntine/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/matt_clape/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/matt_rowell/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/mattaes_phillipou/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/matthew_croft/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/matthew_kreuzer/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/matthew_leuenberger/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/matthew_pavlich/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/matthew_primus/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/matthew_scharenberg/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/max_king/2",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/michael_frost/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/michael_gardiner/2",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/michael_hurley/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/michael_murphy/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/michael_parsons/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/michael_prior/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/michael_stevens/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/michael_symons/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/michael_werner/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/mitch_clark/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/mitch_thorp/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/murray_vance/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/nakia_cockatoo/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/nate_caddy/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/nathan_brown/2",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/nathan_brown/3",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/nathan_chapman/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/nathan_freeman/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/neil_erasmus/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/nic_fosdike/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/nic_naitanui/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/nick_blakey/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/nick_coffield/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/nick_daicos/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/nick_haynes/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/nick_riewoldt/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/nick_vlastuin/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/nick_watson/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/nigel_lappin/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/nik_cox/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/noah_anderson/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ollie_wines/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/paddy_dow/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/paddy_mccartin/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/paddy_ryder/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/patrick_dangerfield/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/paul_ahern/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/paul_gow/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/paul_hasleby/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/paul_symmons/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/peter_higgins/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/peter_matera/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/peter_motley/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/peter_wright/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/phil_davis/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/raphael_clarke/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ray_sterrett/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/reece_conca/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/reuben_ginbey/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/rhys_palmer/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/richard_cousins/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/richard_lounder/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/richard_tambling/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/riley_thilthorpe/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/robert_mcmahon/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/robert_pyman/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/rod_lester-smith/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/rory_hilton/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/rowan_warfe/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ryan_fitzgerald/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ryan_griffen/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ryley_dunn/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ryley_sanders/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/sam_cumming/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/sam_darcy/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/sam_day/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/sam_grlj/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/sam_lalor/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/sam_mayes/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/sam_petrevski-seton/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/sam_power/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/sam_walsh/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/sam_weideman/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/scott_bamford/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/scott_gumbleton/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/scott_lucas/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/scott_pendlebury/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/shane_o'bree/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/shannon_grant/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/sid_draper/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/simon_prestigiacomo/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/stephen_coniglio/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/stephen_edgar/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/stephen_hill/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/stephen_hooper/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/stephen_o'reilly/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/steven_febey/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/steven_salopek/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/sullivan_robey/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/tarryn_thomas/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/tim_taranto/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/tim_walsh/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/tobie_travaglia/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/todd_breman/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/tom_boyd/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/tom_green/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/tom_scully/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/tom_williams/2",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/tony_brown/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/tony_mcguinness/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/travis_boak/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/travis_johnstone/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/trent_cotchin/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/trent_croad/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/trent_cummings/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/trent_ormond-allen/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ty_vickery/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/wayne_hernaman/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/wayne_otway/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/will_ashcroft/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/will_brodie/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/will_hoskin-elliott/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/will_phillips/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/will_setterfield/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/willem_duursma/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/xavier_clarke/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/xavier_ellis/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/zach_reid/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/zane_duursma/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/zeke_uwland/1",
+      "verdict": null
+    }
+  ],
+  "exporter": "tools/rebuild/draftguru/export_person_bridge.py",
+  "exporter_version": "1.0.0",
+  "generated_utc": "2026-09-18T00:56:33Z",
+  "n": 598,
+  "population": {
+    "bridged_total": 3564,
+    "census_stratum_total": 399,
+    "random_stratum_population": 3165
+  },
+  "random_stratum": [
+    {
+      "player_url": "https://www.draftguru.com.au/players/ben_schwarze/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/gavin_mitchell/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/cooper_harvey/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/andy_moniz-wakefield/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/darcy_tucker/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/david_mirra/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/dayne_beams/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/darren_bradshaw/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/joe_anderson/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/kieren_jack/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/shaun_rehn/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/don_pyke/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/james_strauss/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/justin_sweeney/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/michael_evans/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/chris_waterson/2",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/nick_gill/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/stefan_martin/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/brad_johnson/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/brodie_holland/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/bailey_williams/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/james_sicily/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/dean_lupson/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/richard_hadley/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/eric_mackenzie/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/andy_goodwin/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/simon_buckley/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/charlie_dean/2",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/peter_whyte/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/eric_lissenden/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/peter_filandia/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ben_fixter/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/darren_denneman/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/fabian_francis/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/matt_shaw/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/darren_flanigan/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ashton_moir/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jeremy_finlayson/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/adam_richardson/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/sam_butler/2",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/marley_williams/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/daniel_bell/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/matthew_dent/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/chad_davis/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/chris_burgess/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/robert_scott/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/sam_blease/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/marty_warry/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/danny_hughes/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ahmed_saad/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/mykelti_lefau/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/will_lorenz/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/aaron_vandenberg/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/darren_baxter/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/luke_penny/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/robbie_mccomb/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/matthew_westhoff/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/tristen_walker/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jacob_konstanty/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/daniel_cross/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/nick_davis/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/mitch_mcgovern/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/brett_bewley/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/matt_de%20boer/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/shaun_mcmanus/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/lucas_herbert/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/shane_bond/2",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jed_bews/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/matthew_connell/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/david_zaharakis/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/mark_majerczak/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/nick_winmar/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/kristian_bardsley/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jy_farrar/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ed_allan/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/trent_bianco/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/kurt_heatherley/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/darcy_daniher/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/john_fidge/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/liam_anthony/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/maverick_weller/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/bruce_lindsay/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/brayden_lyle/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/shannon_rusca/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/paul_roos/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/james_ezard/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/andrew_kellaway/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/dean_anderson/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/andrew_lovett/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/lewis_johnston/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/david_clarke/2",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jonathan_hay/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ben_walton/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/alex_pearce/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/matthew_scarlett/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/steven_cummings/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/adam_hunter/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ilija_grgic/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/marc_woolnough/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/robert_hickmott/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/andrew_mcinnes/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ben_robbins/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/josh_green/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jack_graham/3",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/andrew_dimattina/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/chris_groom/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/will_schofield/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/courtney_johns/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/roarke_smith/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ben_sexton/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/dermot_mcnicholl/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/chris_duthy/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/simon_verbeek/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/michael_johnson/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/max_heath/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/allen_christensen/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/hugh_bond/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ashley_mcgrath/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/mark_merenda/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/roger_delaney/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/kane_cornes/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/roger_james/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/josh_wooden/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/mitch_owens/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/cale_hooker/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/darcy_fogarty/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/shayne_smith/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/sean_lemmens/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/anthony_mcdonald/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/tyson_goldsack/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ryan_jackson/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/james_byrne/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/stephen_williams/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/archer_reid/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/george_stevens/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/pearce_hanley/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/michael_clark/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/stephen_powell/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/tom_murphy/2",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/harrison_jones/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/toby_murray/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jason_wild/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/archie_roberts/2",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/alistair_smith/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/cameron_venables/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/toby_nankervis/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/brett_spinks/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/mark_fraser/2",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jesse_hogan/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/sam_iles/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/matthew_kluzek/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/mark_west/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/martin_whitelaw/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/james_stewart/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/corey_enright/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/kyal_horsley/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/austin_mccrabb/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/beau_waters/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/bo_nixon/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/sam_cranage/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/scott_thornton/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/matthew_lappin/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ian_downsborough/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/john_blakey/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/lachlan_sim/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/james_manson/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/nick_mitchell/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/corey_gault/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/nathan_krakouer/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/john_mrakov/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/toby_bedford/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ben_griffiths/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ben_doolan/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ned_mchenry/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jed_adams/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/peter_worsfold/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/adam_saliba/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/tom_bell/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/paul_licuria/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/robert_walker/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/scott_taylor/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/darryl_wakelin/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/brandon_white/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/david_bourke/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/rhys_o'keeffe/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/brad_fisher/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/craig_somerville/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/aaron_henneman/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/mark_athorn/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/david_johnson/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/orazio_fantasia/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/lachlan_blakiston/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/josh_kennedy/2",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/derick_wanganeen/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/brodie_moles/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/beau_mcdonald/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/anthony_miles/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jeremy_cameron/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/chad_fletcher/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/michael_newton/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/tom_campbell/2",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/damien_ryan/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jay_nash/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/james_jordon/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/brodie_murdoch/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/david_cockatoo-collins/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/grant_birchall/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/shane_fell/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/marc_lock/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/mitch_zadow/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/julian_rowe/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/sam_powell-pepper/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jeff_garlett/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/josh_gibson/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/luke_mcguane/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ryan_cook/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/harry_barnett/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/josh_worrell/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jason_baldwin/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/robbie_gray/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/irving_mosquito/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ben_kennedy/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/dylan_addison/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/connor_ballenden/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/sam_mcfarlane/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/bret_hutchinson/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/marcus_picken/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/darren_milburn/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/trent_west/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ben_beams/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/brian_wilson/2",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/adam_carter/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/kaiden_brand/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/israel_folau/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/matthew_shir/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/brady_rawlings/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/dylan_clarke/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/scott_stevens/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/matthew_dundas/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/travis_gaspar/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/mitch_morton/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/tom_ledger/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jeremy_sharp/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/mal_michael/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/dion_miles/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/leigh_osborne/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jed_lamb/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/eli_templeton/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/josh_deluca/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/courtenay_dempsey/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/cameron_ling/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/mark_baguley/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/dylan_van%20unen/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/nathan_turvey/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jacob_ballard/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/chad_rintoul/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/billy_cootee/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jack_carroll/2",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/miles_bergman/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/tim_bourke/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/zane_trew/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/connor_budarick/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/tony_elshaug/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/matt_carroll/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/oscar_adams/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jayden_laverde/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/malcolm_rosas/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/troy_taylor/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jesse_dattoli/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/billy_hartung/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/seb_tape/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/harrison_jones/2",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/robert_campbell/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/toby_conway/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/tim_hazell/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/sam_philp/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/eddie_ford/2",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/milan_murdock/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/angus_anderson/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jackson_paine/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/lionel_proctor/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/daniel_connors/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/daniel_donati/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/brad_howard/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/phil_krakouer/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/alipate_carlile/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/daniel_mcconnell/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/luke_weller/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/sam_dwyer/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jake_spencer/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/gary_pert/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/aldo_dipetta/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/frazer_dale/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/nicholas_beardsley/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/matt_guelfi/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jason_taylor/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/domenic_cassisi/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/kallan_dawson/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/glenn_kilpatrick/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/cameron_cloke/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/caleb_poulter/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/stuart_bown/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/phillip_read/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/lachlan_fogarty/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/steven_may/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jesse_crichton/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/spencer_white/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jeremy_mcgovern/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/zac_taylor/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/isaac_quaynor/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/connor_menadue/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/josh_lai/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/paul_patterson/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jack_steven/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/mitch_edwards/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/sean_wellman/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/tom_murphy/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/daniel_merrett/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/luke_webster/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/scott_watters/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/charlie_constable/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/billy_frampton/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jarrod_cameron/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/tanner_bruhn/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/mitch_podhajski/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/billie_smedts/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/lawson_humphries/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ryan_maric/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/nic_martin/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/charlie_spargo/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/brenton_klaebe/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/mitch_wallis/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/luke_darcy/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/brent_moloney/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/simon_goodwin/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/henry_playfair/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jeremy_humm/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/campbell_gray/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/angelo_lekkas/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/james_davies/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/leigh_colbert/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jake_waterman/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/simon_godfrey/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/joel_macdonald/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/daniel_venables/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jordan_clark/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ian_callinan/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/tony_lynn/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/nathan_brown/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/robert_haddrill/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jacob_bauer/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/daniel_talia/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ollie_hanrahan/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/patrick_cripps/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/warren_campbell/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jai_newcombe/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/matthew_parker/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/matthew_dick/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/scott_simister/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/tory_dickson/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/peter_miller/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/alastair_lynch/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/luke_beveridge/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/isaac_cumming/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/darren_smith/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/michael_talia/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/darren_mead/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/tony_malakellis/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/chris_dawes/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/nathan_wilson/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/david_round/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/justin_charles/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/dylan_williams/2",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/logan_evans/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/justin_crow/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/kristian_jaksch/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jason_ashby/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/luke_lowden/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jason_love/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/bruce_lindner/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/kayle_kirby/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/tom_gilligan/2",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/tony_symonds/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/mark_bunn/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/chris_mayne/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/andrew_mcleod/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/matt_rosa/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/joel_amartey/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/neville_jetta/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/callum_brown/2",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/chance_bateman/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ned_reeves/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/sean_denham/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/lachie_bramble/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/clinton_shaw/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ricky_dyson/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jake_rogers/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/david_teague/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/matthew_spangher/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jeremy_howe/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/luke_mccabe/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/greg_bentley/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jason_castagna/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/simon_white/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/paul_thomas/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/toby_greene/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/stephen_oliver/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/josh_mellington/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/rhys_unwin/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/shayne_stevenson/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/tim_rieniets/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/callum_wilson/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ben_miller/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/luke_williams/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/luke_norman/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/llane_spaanderman/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/mitch_clisby/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/tom_logan/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/max_lynch/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/tyler_sellers/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/craig_mcrae/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/timmy_sumner/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/paul_evans/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/blake_acres/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/matthew_carr/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/garry_phillips/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/nick_hanson/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ben_speight/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/daniel_wulf/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/wayne_lamb/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/lachie_sullivan/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/cooper_trembath/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/sam_fisher/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jamie_bennell/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/george_horlin-smith/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/will_day/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/nathan_lonie/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/joel_patfull/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/xavier_o'neill/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/darren_bolton/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/kamdyn_mcintosh/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/daniel_foster/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ben_hollands/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/josaia_delana/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ewan_thompson/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/curtly_hampton/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/noah_mraz/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/chad_liddell/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/nathan_vardy/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/harvey_thomas/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/james_harmes/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/kade_simpson/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/brenton_harris/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/matthew_rogers/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/james_podsiadly/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/danny_dickfos/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/brett_allison/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/noah_howes/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/john_georgiades/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/sean_o'keeffe/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/john_barker/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ashley_green/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/kieran_sporn/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/scott_welsh/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/tom_lynch/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/will_hams/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/steven_stretch/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ben_warren/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/tom_hislop/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/danny_stanley/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/brendan_lee/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/garth_taylor/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jarrod_kayler-thomson/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/murray_wrensted/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/david_williams/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/tom_hawkins/2",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jacob_blight/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/josh_simpson/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/andrew_siegert/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/matt_priddis/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/scott_harding/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/anthony_mellington/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/brad_davis/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/sam_swadling/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/josh_smith/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/hayden_skipworth/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/lachlan_murphy/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/michael_pettigrew/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jordan_doering/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/hugh_dixon/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/stuart_maxfield/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/steven_greene/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/rhys_mathieson/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/david_palm/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/bradd_dalziell/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/matthew_warnock/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/sean_simpson/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/fraser_mcinnes/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/bryan_beinke/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/will_slade/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/danny_del-re/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jon_ballantyne/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/dylan_mclaren/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/bryce_retzlaff/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/lance_collard/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/brad_campbell/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/adam_kennedy/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jake_king/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/liam_ryan/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/brad_pearce/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/peter_vardy/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/will_thursfield/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/david_king/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/david_sierakowski/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/nicholas_bruton/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/david_calthorpe/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/karl_amon/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/luke_parker/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ryan_gardner/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/carter_michael/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/paul_puopolo/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/aaron_joseph/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jarrod_garlett/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/anthony_ingerson/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/tony_bourke/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/david_wittey/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/tim_o'brien/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/brad_miller/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/liam_duggan/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/blake_hardwick/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/josh_battle/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/matthew_mansfield/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jase_burgoyne/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/stephen_schwerdt/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/caleb_lewis/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/dean_solomon/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jack_ross/3",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/brodie_grundy/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/scott_thompson/3",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/tom_jonas/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/tim_mohr/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/blaine_boekhorst/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/levi_casboult/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/zane_zakostelsky/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jay_rantall/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/zach_tuohy/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/matthew_spencer/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/anthony_mcdonald-tipungwuti/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/simon_taylor/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ben_cunningham/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/kane_lucas/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/kade_chandler/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/tomas_bugg/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/cooper_stephens/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jason_carter/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/errol_gulden/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/lachlan_keeffe/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/miller_bergman/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/josh_hall/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/alex_cincotta/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jesse_lonergan/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/glen_bartlett/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/brad_mckenzie/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/tom_warhurst/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/josh_francou/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/tim_clarke/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jackson_merrett/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/glen_coghlan/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/niall_mckeever/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jared_petrenko/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/chad_morrison/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ty_zantuck/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ben_davies/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/damien_gaspar/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jackson_allen/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/bigoa_nyuon/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/justin_wood/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/patrick_naish/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/zak_jones/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/craig_bird/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/keren_ugle/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/andrew_dunkley/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/brad_boyd/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/matt_cottrell/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/andy_otten/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jake_barrett/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/andrew_strijk/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/brandan_parfitt/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/adrian_mcadam/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/ryan_lonie/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/chris_ladhams/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/luke_mullins/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/danyle_pearce/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jack_steele/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/emerson_jeka/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/jason_holmes/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/shane_kersten/1",
+      "verdict": null
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/isaac_weetra/1",
+      "verdict": null
+    }
+  ],
+  "salt": "AFLDB-ISSUE-222/v1"
+}

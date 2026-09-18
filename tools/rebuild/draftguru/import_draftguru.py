@@ -39,6 +39,17 @@ fail before a database connection does. The write phase runs in one ``import_bat
 transaction scoped to ``source_id = draftguru``; admin-created picks (``source_id IS NULL``)
 are outside its UPDATE, INSERT and DELETE alike. Connection is through
 ``AFLDB_IMPORT_DATABASE_URL`` — the ``afldb_import`` role — never owner access.
+
+Atomicity (AFLDB-ISSUE-222 pre-import review, 2026-09-18)
+---------------------------------------------------------
+Exactly two commits happen on the write path: ``import_batch`` commits the ``running`` batch
+row before any data statement, and ``ImportBatch.finish("completed")`` commits every data
+write **and** the ``completed`` status in one transaction. ``analyze()`` -- which commits
+whatever is open before it toggles autocommit -- is therefore called only AFTER the batch
+block has closed, so it can never split the data commit from the audit row's status. Any
+exception inside the block, ``--dry-run`` included, rolls the whole data transaction back
+before the ``failed`` batch row is recorded. ``tests/python/draftguru_import_atomicity_contract.py``
+proves this order against a scripted connection without a database.
 """
 
 from __future__ import annotations
@@ -106,6 +117,18 @@ PICK_COLUMNS = (
 
 # The states that mean "no confirmed link" (migration 019's CHECK vocabulary).
 UNLINKED_DEFAULT = "unmatched"
+
+# What --dry-run leaves behind, stated exactly (AFLDB-ISSUE-222 closeout, 2026-09-19): every data
+# write is rolled back, but import_batch() records the run as a FAILED batch row whose error is
+# "DryRunComplete: " -- that audit row is committed and retained, so the earlier wording that
+# claimed no write at all was never true of import_batches.
+# tests/python/draftguru_import_atomicity_contract.py pins both halves of this statement
+# against the scripted connection.
+DRY_RUN_MESSAGE = (
+    "DRY RUN — every data write was rolled back (draft_persons, draft_picks, "
+    "external_identities and players are unchanged); the import_batches audit row for this run "
+    "is retained with status 'failed' and error 'DryRunComplete: '."
+)
 
 
 class ImportFailure(RuntimeError):
@@ -940,7 +963,13 @@ def run_import(args, prepared: dict, rep) -> int:
         if args.dry_run:
             raise DryRunComplete()
 
-        analyze(pg, "draft_persons", "draft_picks", "external_identities")
+    # Deliberately OUTSIDE the batch block. analyze() commits any open transaction before it
+    # switches to autocommit; inside the block that commit landed the data BEFORE
+    # batch.finish("completed") ran, leaving a window in which a crash or a failed ANALYZE
+    # left committed data beside a `running` / `failed` batch row. Here the data and the
+    # `completed` status share the single commit issued by import_batch's success path, and
+    # ANALYZE runs on an already-consistent database (planner statistics only; never data).
+    analyze(pg, "draft_persons", "draft_picks", "external_identities")
 
     return 0
 
@@ -986,7 +1015,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         return run_import(args, prepared, rep)
     except DryRunComplete:
-        print("\nDRY RUN — the transaction was rolled back; nothing was written.")
+        print("\n" + DRY_RUN_MESSAGE)
         return 0
     except ImportFailure as exc:
         print(f"\nREFUSED: {exc}")

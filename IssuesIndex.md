@@ -4,7 +4,7 @@
 >
 > `issues.md` is the authoritative detailed ledger.
 
-**Open issues:** 3
+**Open issues:** 5
 
 ### AFLDB-ISSUE-220 — Web service credential boundary contradicts the application's `afldb_import` requirement; owner-role code-test DSN and a complete `.env` copy reach the internet-facing process
 - **Severity:** High. **Area:** deployment / runtime security.
@@ -34,9 +34,18 @@
 - **Severity:** High. **Area:** data acquisition / import — `tools/rebuild/draftguru/`,
   `tools/db/rebuild-test.ts`. Successor to `AFLDB-ISSUE-164` D-9 / `AFLDB-ISSUE-093` Stage B3
   (neither reopened; D-9 unchanged), per `AFLDB-ISSUE-221`'s follow-up.
-- **State:** Open (2026-09-18). Runbook `AFLDB-ISSUE-222.md` (revision 2) approved for **Phase 1
-  only** (tooling + isolated-test-database validation); O-1–O-3 and Phase 2 (network acquisition)
-  remain pending separate operator approval. Phase 1 implemented in worktree `afldb-issue-222`
+- **State:** Open (2026-09-18). Phases 1–3 each separately authorised and executed (see below).
+  **Phase 3 operator adjudication of the 83-row pack COMPLETE and independently validated
+  (2026-09-18)** — 81 rows bridge-v2 eligible, 2 withheld (`different_person_wrong_href`); see
+  `AFLDB-ISSUE-222.md` §11.13, `issues.md`. **The bridge v2 SOURCE-EVIDENCE parent was generated
+  DB-free on 2026-09-18** (§11.14; 3,564 → 3,562 accepted, 1,493 → 1,495 withheld over 5,057
+  persons). **The v2 `afldb_test` deployment child was resolved read-only by the operator on
+  2026-09-18** (3,468 accepted / 1,589 withheld; §11.15). **Phase 3 acceptance itself remains
+  PENDING** — the child's independent DB-free validation has not yet been run, and the disjoint
+  new-salt validation sample (Phase F) has not been generated;
+  no database import has occurred and `afldb_test`/DEV/PROD are unchanged. Phase 4 (rebuild integration) is not authorised until Phase
+  3 acceptance passes. Runbook `AFLDB-ISSUE-222.md` (revision 2). Phase 1 implemented
+  in worktree `afldb-issue-222`
   (Sonnet 5, uncommitted): new `stage_b3_population.py` (whole-population sample) and
   `export_person_bridge.py` (`--source-evidence`/`--resolve-against`/`--review-sample`); the
   contract's new `person_stage.b3` block; `profile_person_pages.py`/`acquire_persons.py` extended
@@ -76,8 +85,292 @@
   new regression tests; B1 output unchanged); aggregation resumed with zero network requests.
   Manifest written, both O-3 conditions pass clean (0% failures; no year/top-10 concentration).
   AFL Tables coverage 3,564/5,057 (70.48%); Wikipedia coverage 1,943/5,057 (38.42%).
-- **Next action:** Phase 3 (bridge derivation + §3.5 review, n = 598) requires its own separate
-  operator authorisation — not implied by Phase 2. See `issues.md` for the full record.
+- **Phase 3 executed 2026-09-18** (derivation + `afldb_test` resolution + reconciliation): parent
+  bridge 3,564/1,493 (0 collisions); `afldb_test` deployment child 3,463 bridges/1,594 withheld
+  (101 `target_not_registered` — 6 AFL Tables numeric-disambiguation, 2 spelling/name-change found
+  by an untracked fuzzy search, `stephen_schwerdt/1` a likely third spelling case, the rest
+  concentrated in 2023–2025; **"registration lag" retired 2026-09-18** — an offline measurement
+  found 0 of the 101 paths appear in the accepted fitzRoy snapshot's 13,275-URL set while all
+  3,463 bridged paths do, so "not registered" means no appearance in the accepted 1897–2025
+  source, not `afldb_test` staleness). Person-level 5,057 reconciled exactly (`B-linked` 3,460 +
+  3 agreeing human-decision rows = the 3,463 bridged, asserted separately); top-10 420/418 at
+  92.62% projected coverage, 0 unexplained finding. §3.5 review sample generated (399 census + 598
+  random, disjoint); an automated read-only cross-check (name + age/DOB, no external fetch) found
+  0 genuine contradictions across all 997 sampled persons.
+- **Independent review 2026-09-18 (Fable):** datasets reproduce exactly and are sound; evidence
+  corrections required before review — importer will apply **3,460** net-new links (not 3,463;
+  three agreeing human-decision rows), exporter/importer target-resolution divergence, residual
+  "registration lag" narrative not reproducible, verdict-storage contradiction. Spec:
+  `AFLDB-ISSUE-222-PHASE3-CORRECTION-HANDOFF.md`.
+- **Decision O-4 revision 2 (2026-09-18, prospective; revision 1 "Playwright for all 997"
+  superseded before execution, never run):** retained fitzRoy/AFLDB evidence is checked **first** —
+  all 997 immutable sample rows compared offline against the captured DraftGuru snapshot, the
+  accepted fitzRoy `full-history-20260902` snapshot (bytes retained off-tree in the operator's
+  backup root, hash-match 131/131) and the `afldb_test` registered identities; operator reviews every
+  exception plus a deterministic 30-row audit. **Live AFL Tables acquisition is not authorised**
+  (residual reported first, new authorisation required); Playwright is an exception tool only.
+  Measured: 969/997 rows join to retained facts with three signals beyond name; 28 are
+  `target_not_registered`, and 0 of the 101 such paths appear in the snapshot's 13,275-URL set
+  ("not in the accepted 2025 baseline", not lag). Contract: `AFLDB-ISSUE-222-OFFLINE-REVIEW-RUNBOOK.md`.
+- **Corrections implemented, offline comparison executed 2026-09-18 (Sonnet 5, High; uncommitted):**
+  handoff §6 A–K corrections implemented (exporter/importer match-method + count alignment, an
+  `admissibility_reason()` conjunct gap, seven regression tests, DB-free `--validate-only` run on
+  the real child, acceptance-arithmetic and "registration lag" documentation corrections); new
+  `tools/rebuild/draftguru/review_person_bridge_offline.py` built and run twice over all 997 real
+  sample rows with identical `rows_sha256`: `offline_strong` 959, `offline_limited` 1,
+  `offline_contradict` 9 (2 predicted birth-year conflicts + 7 new career-ended-before-recruitment
+  veteran-redraft findings), `target_unregistered` 28 (exactly as predicted), 0
+  unavailable/tooling-error. Verdict/recheck/residual artefacts written
+  (`docs/rebuild-manifests/draftguru/bridge-review-{verdicts,recheck,residual}-20260918-v1.*`); 112
+  distinct rows need operator recheck; the 30-row audit is drawn and recorded. DB-free tests: 191
+  total (187 passed, 1 pre-existing `AFLDB-ISSUE-223`, 3 skipped); `tsc` clean. No database,
+  network, Playwright, import, DEV/PROD or Git action. Full record: `AFLDB-ISSUE-222.md` §11.8,
+  `issues.md`.
+- **Recheck analysis and tool correction 2026-09-18 (Sonnet 5, High; uncommitted):** found and
+  fixed a tool defect (`implied_birth_year` trusted a literal `Age="0"` fitzRoy source-data
+  sentinel; population check found 10/3,564 bridged identities affected, 2 in-sample); reran the
+  997-row comparison twice with identical `rows_sha256` — totals now `offline_strong` 960,
+  `offline_limited` 2, `offline_contradict` 7, `target_unregistered` 28 (v2 artefacts; v1 retained
+  as superseded evidence). Analysed all 111 v2 recheck rows and wrote a reviewer sign-off pack
+  (`bridge-review-signoff-20260918-v1.{md,csv,json}`) with a recommended verdict and reason per
+  row: `agree` 76, `withhold` 24, `contradict` 7 (all `CAREER_ENDED_BEFORE_EARLIEST_RECRUITMENT`;
+  **this sign-off pack's characterisation of these 7 as "confirmed genuine DraftGuru-side mislinks"
+  is WITHDRAWN by the 2026-09-18 independent review below — they are 7 of the 44
+  `relisting_signature_review` rows, requiring operator adjudication, not confirmed mislinks**),
+  plus 4
+  `source_discrepancy_same_person` (3 numbering + Schwerdt, strongly evidenced beyond name but
+  routed to operator curation, not auto-applied). No `operator_verdict` set on any row.
+- **Population-wide offline mislink scan 2026-09-18 (Sonnet 5, High; uncommitted).**
+  **`confirmed_source_mislink` (23) WITHDRAWN — see the correction bullet below.** Scanned all
+  **3,564** parent bridge candidates with a new
+  `tools/rebuild/draftguru/scan_person_bridge_population.py` (v1.0.0, superseded by v2). Found and
+  fixed an inert-on-sample ledger-agreement bug (`TOOL_VERSION` → 1.0.2; sample `rows_sha256`
+  reproduced byte-identical). v1 artefacts
+  (`docs/rebuild-manifests/draftguru/bridge-population-scan-20260918-v1.{json,csv,md}` + manifest)
+  preserved unchanged as superseded evidence. Full record: `AFLDB-ISSUE-222.md` §11.9, `issues.md`.
+- **Population-scan decision pack completed 2026-09-18 (Sonnet 5, High; uncommitted).**
+  **The `~0.51%`/588-clean-survivor statistical claim in this pack is WITHDRAWN — see the
+  correction bullet below.** v1 pack
+  (`docs/rebuild-manifests/draftguru/bridge-population-scan-decision-pack-20260918-v1.{md,csv,json}`)
+  preserved unchanged as superseded evidence. No file was renamed or deleted
+  (`docs/rebuild-manifests/draftguruff-20260918-v1.md` never existed under any name; the earlier
+  reference to it was a malformed string).
+- **Independent statistical review, scanner correction, operator adjudication pack 2026-09-18
+  (Fable 5.1 review; Sonnet 5, High correction; uncommitted).** Independent review found
+  `confirmed_source_mislink` invalid (DraftGuru's per-entry games figure means games following that
+  listing, not career games; Stage A's listed age agrees with the retained birth year on all 23
+  rows) and found 21 further rows sharing the identical shape that v1 had called
+  `population_clean` only because of an arbitrary one-year career-ended/recruitment boundary.
+  Corrected scanner (`SCANNER_VERSION` 2.0.0): removed `confirmed_source_mislink`; added
+  `relisting_signature_review` (44 rows = 23 former + 21 companions, one neutral class, uniform
+  regardless of which side of the old boundary a row fell on). Reran twice, identical
+  `rows_sha256` `ad134d14…` (v1's `ddd5faba…` re-verified unchanged): `population_clean` 3,401,
+  **`relisting_signature_review` 44**, `suspected_source_mislink` 2, `source_discrepancy_same_person`
+  7, `insufficient_evidence` 107, `human_authority_overlap` 3, `tooling_or_schema_error` 0 (sums to
+  3,564). The `~0.51%` bound is withdrawn for two reasons: circularity (bounds the same rule it
+  measures) and an arithmetic error (the "588" denominator never subtracted 13
+  `insufficient_evidence` random-stratum rows; the true v1-label clean-survivor count was 575, not
+  588). No formal residual bound exists. Corrected artefacts:
+  `bridge-population-scan-{20260918-v2.json,20260918-v2.csv,manifest-20260918-v2.json,
+  signoff-20260918-v2.md,decision-pack-20260918-v2.{md,csv,json}}`; new operator adjudication pack
+  `bridge-operator-adjudication-pack-20260918-v1.{md,csv,json}` (44 relisting + 2 tokenisation + 7
+  discrepancy + 30 audit rows, every `operator_verdict` blank). Also corrected: a redraw-salt
+  conflict between `AFLDB-ISSUE-222-PHASE3-CORRECTION-HANDOFF.md` §7 gate 9 and §3.5 item 4 (§3.5
+  item 4's new-salt rule governs). Full record: `AFLDB-ISSUE-222.md` §11.11, `issues.md`.
+- **Next action:** the §3.5/§6.5 gate is **PENDING**. The operator works
+  `bridge-operator-adjudication-pack-20260918-v1.md` (44 relisting-signature + 2 tokenisation + 7
+  source-discrepancy + 30-audit rows) alongside the existing 997-row recheck queue and the
+  `bridge-population-scan-decision-pack-20260918-v2.md` §10 decision table (relisting adjudication +
+  2 suspected + 7 source-discrepancy + 107 insufficient + 3 human-authority dispositions, whether an
+  independent review is required before bridge v2, and sample redraw/top-up policy), decides
+  whether/how to generate a corrected bridge v2 parent/child, sets `operator_verdict` on every
+  mandatory recheck row, and confirms the 30-row audit. Separately, a future DB-enabled session
+  determines whether the exporter/importer alignment changes the generated `afldb_test` child's
+  contents (untestable without a database) and may run the tracked read-only registration extract
+  for `players.id` values. **No database import, DEV/PROD or Phase 4 action is authorised.** See
+  `issues.md` for the full record.
+- **Local operator-adjudication GUI helper built 2026-09-18 (Sonnet 5, High; uncommitted).** New
+  `tools/rebuild/draftguru/review_bridge_operator.py` (Tkinter, dependency-free) lets the operator
+  work the 83-row adjudication pack without hand-editing JSON: read-only against the pack and its
+  hash-linked inputs, sets no verdict itself, checkpoints atomically under gitignored
+  `data/review/draftguru-bridge-operator-20260918-v1/`, and on finalisation writes
+  `docs/rebuild-manifests/draftguru/bridge-operator-verdicts-20260918-v1.{json,csv,md}`. Launch:
+  `python tools\rebuild\draftguru\review_bridge_operator.py` (discovered interpreter
+  `C:\Users\stuar\AppData\Local\Programs\Python\Python312\python.exe`; no `.venv` present in this
+  worktree). New test `tests/python/draftguru_bridge_operator_review_contract.py`. **No operator
+  verdict entered; GUI not launched by this pass.** Full record: `AFLDB-ISSUE-222.md` §11.12,
+  `issues.md`.
+- **Operator adjudication COMPLETE and independently validated (2026-09-18, operator).** All 83
+  rows of the adjudication pack decided and independently verified (`py_compile`, the complete
+  DraftGuru operator-review contract suite, `--validate-final-output` — all PASS). 81 rows
+  bridge-v2 eligible; 2 withheld as `different_person_wrong_href` (Craig Somerville, David
+  Sullivan). Bridge v2, target-resolution rerun and the disjoint new-salt validation sample
+  (Phase F) are **not** done; no database import; `afldb_test`/DEV/PROD unchanged. Full record:
+  `AFLDB-ISSUE-222.md` §11.13, `AFLDB-ISSUE-222-PHASE3-CORRECTION-HANDOFF.md` §13, `issues.md`.
+- **Bridge v2 source-evidence parent generated 2026-09-18 (DB-free, operator-executed;
+  uncommitted).** New `tools/rebuild/draftguru/build_person_bridge_v2.py` + DB-free contract
+  `tests/python/draftguru_bridge_v2_contract.py` applied the 83 verdicts to the frozen v1 parent:
+  population 5,057, accepted 3,564 → 3,562, withheld 1,493 → 1,495, unchanged 3,481, confirmed 74,
+  corrected 7, removed/withheld 2, added 0, unaccounted 0 — the net accepted change is **−2, not
+  +81**. Operator reported `py_compile`, the bridge-v2 contract and the four existing contracts all
+  PASS, `--write` then a second `--write` reporting all six artefacts `identical`, and independent
+  `Get-FileHash` agreement. Parent `ad25d965…`, `rows_sha256` `ce7816f7…` (all seven hashes in
+  `issues.md` / §11.14). `child_status = "requires --resolve-against afldb_test"`; **no child
+  artefact exists**, the 7 corrected targets have never been measured against a database, and the
+  2 rejected identities are absent from `bridges[]`. Full record: `AFLDB-ISSUE-222.md` §11.14,
+  `AFLDB-ISSUE-222-PHASE3-CORRECTION-HANDOFF.md` §14, `issues.md`.
+- **Resolver safeguards added 2026-09-18 (not yet exercised):** `export_person_bridge.py`
+  `--resolve-against` now refuses a `kind: "deployment"` input and refuses to overwrite `--parent`
+  or an existing `--out` without `--allow-overwrite`; `draftguru_bridge_resolution_contract.py`
+  gains an AST proof that every executable SQL statement is a SELECT, nothing commits, and the one
+  `connect()` forces `default_transaction_read_only=on`.
+- **v2 `afldb_test` child resolved 2026-09-18 (operator-executed, read-only; uncommitted):**
+  sha256 `b996c60e…`, accepted 3,468 / withheld 1,589 / 5,057, registration 13,275. File-level
+  reading agrees with the expected transition (7 corrected in, 2 rejected withheld, 101 → 94
+  `target_not_registered`); **the per-row proof is not yet run.** Prepared, not executed:
+  `tools/rebuild/draftguru/validate_person_bridge_child.py` (read-only DB-free validator),
+  `tools/rebuild/draftguru/build_validation_sample.py` (Phase F, salt `AFLDB-ISSUE-222/v2`,
+  `n = 598`, gated on the validator), two `tests/python/` contracts + vitest wiring. Decisions
+  O-5/O-6/O-7 in `AFLDB-ISSUE-222.md` §11.15.
+- **Child validated and Phase F sample generated 2026-09-18 (operator-executed; uncommitted):**
+  real child validation passed twice (`summary_sha256` `5bc5336b…`), importer `--validate-only`
+  passed DB-free, and `build_validation_sample.py --write` produced
+  `bridge-validation-sample-20260918-v2.{json,csv}` (`6523bad6…` / `afa2b917…`, `rows_sha256`
+  `91be2942…`; n 598, frame 2,529, 582 bridged + 16 `target_not_registered`, zero overlaps) under
+  O-5/O-6/O-7. The sample is UNREVIEWED. Prepared, not run: `review_validation_sample.py`
+  (Phase F machine review, v1 rules imported verbatim), `validate_validation_review.py` (final
+  validator/acceptance), contract + vitest wiring. Record: `AFLDB-ISSUE-222.md` §11.16–§11.17.
+- **Phase F machine review generated and validated 2026-09-18 (operator-executed; uncommitted):**
+  `bridge-validation-verdicts-20260918-v2.{json,csv}` (`2caf980b…` / `d2a5c336…`), recheck
+  `3e509021…`, residual `d20a3c6f…`, `rows_sha256` `14d918a1…`; 578 strong / 4 limited / 16
+  `target_unregistered` / 0 contradict; 39 mandatory + 30 audit = 69 required rows (O-9 confirmed).
+  `validate_validation_review.py` clean, `summary_sha256` `7657fd85…`, exit 2 (pending: 69/69
+  rows lack an operator verdict). Built, not run: `tools/rebuild/draftguru/review_validation_operator.py`
+  (DB-free operator-adjudication GUI over the 69 rows, checkpoint under
+  `data/review/draftguru-validation-operator-20260918-v2/`), contract
+  `tests/python/draftguru_validation_operator_contract.py` + vitest wiring. Record:
+  `AFLDB-ISSUE-222.md` §11.18.
+- **Phase F ACCEPTED (2026-09-18, operator-reported; uncommitted):** operator artefact
+  `bridge-validation-operator-verdicts-20260918-v2.json` `b8cf98bb…`; final validator
+  `summary_sha256` `63c89265…`, ACCEPTANCE: ACCEPTED — 598 rows, 582 identity-evaluable, 16
+  `target_not_registered` terminally withheld, 69/69 verdicts `agree`, 0 contradict, 0
+  undetermined, 0 failures; one-sided 95% upper error bound 0.4997% (n 598) / 0.5134% (n 582).
+  O-8 resolved by the run as recheck+audit coverage. Deployment child unchanged (`b996c60e…`,
+  3,468 / 1,589). Importer `--validate-only` passed, no database contacted.
+- **Pre-import assessment and gates BUILT, not run (2026-09-18, Fable 5.1):** code-level
+  import-scope/rollback review recorded in `AFLDB-ISSUE-222.md` §11.19; importer commit-order
+  correction (`analyze()` moved after the batch block so data + `completed` status commit
+  together) with `tests/python/draftguru_import_atomicity_contract.py`; read-only
+  `tools/rebuild/draftguru/bridge_import_gate.py plan|verify` (`afldb_test` only, SELECT only,
+  replays `apply_authority()`, fail-closed classification, ordered content hashes) with
+  `tests/python/draftguru_import_gate_contract.py`; `tools/maintenance/backup-afldb-test.ps1`.
+  The 16 sampled / 94 child `target_not_registered` rows are tracked separately as
+  `AFLDB-ISSUE-224`.
+- **`afldb_test` import COMPLETE and verified twice (2026-09-19, operator-executed; uncommitted):**
+  backup `afldb_test-20260919-051022.dump` (`aa4f1cac…`, catalogue-readable, not restore-proven);
+  plan `966897b9…` (`import_batches` 191 before the dry-run, 192 after it, 193 after the
+  import); import as `afldb_import|afldb_test`, authority ledger 6 /
+  bridge 3,465 / unmatched 1,587 / seeded 0; verify `32cf72a5…` VERIFY: OK — 3,470 linked
+  persons, 5,115 linked picks (75.11%), `unique|bridge` 3,465, `resolved|ledger` 5, zero
+  remaining changes, 1,589 withheld unlinked, rejected identities absent, baseline unchanged.
+  **Phase 3 accepted on evidence pending the operator's commit; Phase 4a database acceptance NOT
+  yet satisfied** (§6.1 pick level, §6.2, §6.3, remaining §6.4, §6.8 items 2–4, §7.4 outstanding).
+  No DEV/PROD action. Record and decisions: `AFLDB-ISSUE-222.md` §11.19.9.
+- **Read-only validation run (2026-09-19, operator, no write):** SQL checks PASS;
+  `draft-linkage.test.ts` 10/11 — six draft builders and the ISSUE-221 cell populated (388); the
+  one failure was a query fan-out onto the second registered path of the four ISSUE-136
+  renumbered players (same humans, tracked rules), not a wrong link — corrected in test code with
+  a DB-free regression (`tests/draft-linkage-invariants*.ts`); Gridley corpus not yet run.
+  Record: `AFLDB-ISSUE-222.md` §11.19.10.
+- **Gridley corpus run (2026-09-19, operator, read-only, no write/rollback):** 1,163/1,166;
+  report sha256 `7f14ff2c…`. Three failures: two 2026 embedded players unresolved (an ISSUE-224
+  register gap the resolver reported as an override mismatch — corpus defect, corrected in test
+  code with a DB-free pin), bridges 399/401 (same two), and **99 `incorrect known answer` cells
+  pending triage decisions** = 62 draft cells on nine linked players (Brad Crouch 2054 ×39: his
+  2011 Mini-Draft pick 2 vs Gridley's "National Draft" TOP 5/10 — Gridley's key; eight
+  `pickrookie` players ×23: no Rookie row on their linked DraftGuru pages — source coverage gap
+  or Gridley's key, not link/vocabulary/builder) + 37 pre-existing non-draft cells on 14 players
+  (2026-09-17 residue). No category reclassified; triage evidence now appended to draft
+  findings. **Phase 4a still pending.** Record: `AFLDB-ISSUE-222.md` §11.19.11.
+- **Decisions 2026-09-19 (§11.19.12):** D1 approved narrowly — Crouch's 39 cells become an
+  evidence-keyed Gridley-key `external source disagreement` (one rule, row named, national
+  semantics untouched, DB-free pinned). D2 pending — eight rookie cases unclassified; review pack
+  `docs/rebuild-manifests/draftguru/rookie-relisting-independent-review-20260919-v1.md` (no
+  network used; citations to be filled). D3 — the 37 non-draft cells are now AFLDB-ISSUE-225.
+  D4 completed — read-only query confirmed: max match season 2026, max debut season 2025, no NBSP
+  names, no player rows and no AFL Tables identities for Jagga Smith / Willem Duursma
+  (ISSUE-224 registration gap; encoding excluded). Full corpus not rerun. Phase 4a pending.
+- **D2 completed (2026-09-19, Sonnet 5, §11.19.13):** all eight `pickrookie` players
+  independently confirmed **Gridley supported** (six primary AFL/club sources; Davis and Gibbs on
+  reputable secondary sources, flagged; Rischitelli's pick number secondary-only) — review pack
+  verdicts filled in. Implemented as a per-person tracked outcome artefact
+  (`data/players/rookie-relisting-outcomes.csv`, keyed by AFL Tables profile) and one pure,
+  evidence-keyed rule (`rookieSourceCoverageGap`, `tests/gridley-corpus-support.ts`) firing only
+  for a reviewed `gridley_supported` player on `draft_type_is(rookie)` with triage cause
+  `no_linked_row_matches` — no name/id hard-coded, no general rule, D1 unaffected. Wired into
+  `tests/integration/gridley-corpus.test.ts` as `source coverage gap` (still `DATA_GAPS`, fails
+  strict). Seven new DB-free tests pin the required properties. `tsc`/vitest (42/42)/eslint clean.
+  No Git/DB/import/full-corpus command run; §7.4 not touched.
+- **Full corpus rerun (2026-09-19, operator-reported, read-only; verified by direct inspection,
+  `AFLDB-ISSUE-222.md` §11.19.14):** `incorrect known answer` 99 → **37**, exactly the
+  AFLDB-ISSUE-225 cells (confirmed record-for-record: `captain` 20, `teammates-150` 14,
+  `teammates-100` 1, `games250sameclub` 1, `games100clubs2` 1), zero draft-criterion cells
+  remaining; `source coverage gap` 77, `external source disagreement` 422, `dataset gap` 48,
+  `parse` 0 — all exactly as projected. Report sha256 `659e29ed…` (size/hash not yet independently
+  recomputed; operator command pending). **§7.4 scope decision:** belongs to Phase 4a
+  (`afldb_test` rebuild + rollback, gates Phase 4b DEV/PROD), not to Phase 3 (trusted-linkage
+  import, already complete and now corpus-proven) — deferred with the rest of Phase 4a, not
+  required for this closure. No DB write/rollback/Git action this pass.
+- **Current state:** core trusted-linkage corpus gate satisfied. **Kept Open** — not marked
+  Resolved, since the standard lifecycle (commit → `merge:ready` → push/merge → `sync-dev.ps1` →
+  DEV smoke → close) has not run; everything remains uncommitted.
+- **Next action:** operator reviews and commits the reviewed local change, then
+  `npm run merge:ready -- --issue 222`. **Correction (2026-09-19):** DEV promotion is now
+  authorised for this pass, so §7.4 (the `afldb_test` S0–S3 rollback exercise) is required
+  before the `afldb_dev` import step — it is no longer deferred. Remaining Phase 4a items
+  (§6.1 pick level, §6.2, remaining §6.4, §6.8 items 2–4) stay deferred; PROD stays out of scope.
+  AFLDB-ISSUE-226/227 do not exist in this repository and are not blocking.
+
+### AFLDB-ISSUE-225 — Gridley corpus: 37 pre-existing `incorrect known answer` cells on non-draft criteria, present on `afldb_test` before AFLDB-ISSUE-222 and untouched by it
+- **Severity:** Medium. **Area:** Grid Solver / canonical data — `captaincies`,
+  `player_club_season_stats`, club lineage; `tests/integration/gridley-corpus.test.ts`.
+- **State:** Open (2026-09-19, ISSUE-222 decision D3). 37 cells, all "Gridley lists, AFLDB
+  omits", identical in the 2026-09-17 pre-import run and the 2026-09-19 run (report
+  `7f14ff2c…`): `captain` 20 (Cameron Bruce 2489 ×11, Steven May 12093 ×9), `teammates-150` 14
+  (ten players, board #1024), `teammates-100` 1 (Angus Brayshaw 669), `games250sameclub` 1
+  (David Swallow 3581), `games100clubs2` 1 (Dylan Shiel 4006). ISSUE-118 closed at 0; the cells
+  arrived with the 2026-09-13 `afldb_test` baseline. Root cause not investigated; not a draft
+  matter.
+- **Key files:** `src/db/queries/grid-solver.ts` (`club_captain_any`, `career_teammates_min`,
+  `games_at_*_incl_merged`), `captaincies`, `player_club_season_stats`, the corpus suite.
+- **Next action:** targeted read-only queries on `afldb_test` (captaincies rows for 2489/12093;
+  teammate recounts for the board-1024/993 players; lineage for 3581/4006), then classify each
+  cell from canonical evidence — never by a blanket exception.
+
+### AFLDB-ISSUE-224 — DraftGuru persons whose AFL Tables identity is not registered on the target (`target_not_registered`): post-baseline debutants and numbering/spelling cases cannot link until the identity is registered
+- **Severity:** Medium. **Area:** player registration / import — `external_identities`
+  (`afltables`, `afltables_profile_url`), fitzRoy core acquisition, current-season settle;
+  `tools/rebuild/draftguru/export_person_bridge.py --resolve-against`.
+- **State:** Open (2026-09-18, deferred from AFLDB-ISSUE-222 Phase F). 94 bridge-admissible v2
+  parent persons are withheld `target_not_registered` in the `afldb_test` child (16 of them in the
+  Phase F sample, all operator-verdict `agree`, terminally withheld; none may be added by the
+  ISSUE-222 import). Measured (handoff §10.3): 0 of the withheld paths appear in the accepted
+  fitzRoy `full-history-20260902` 13,275-URL set, i.e. no appearance in seasons 1897–2025;
+  15 of the 16 sampled are 2021–2025 draftees (10 from 2025), 1 is a 1992 spelling case
+  (Matthew Capuano). Strong example: Hussien El Achkar (`hussien_el%20achkar/1`, 2025 National
+  pick 53, Essendon) — DraftGuru and AFL Tables agree on name, DOB 02 Apr 2007, club, 9 games,
+  10 goals; AFLDB search returns no player; he remains withheld. Cause of the registration gap
+  (how a post-baseline debutant acquires an `afltables_profile_url` registration) NOT
+  investigated here. Confirmed shape (ISSUE-222 D4, read-only query 2026-09-19): `afldb_test`
+  holds 2026 matches (max season 2026) while its player register ends at 2025 (max debut 2025);
+  Jagga Smith and Willem Duursma have no player row and no AFL Tables identity; no NBSP names.
+- **Key files:** `tools/migration/import_fitzroy_core.py` (registration), `deploy/afldb-settle-afltables.sh`
+  / current-season import, `data/reference/draftguru-person-bridge-20260918-v2.json` (the 94 identities),
+  `docs/rebuild-manifests/draftguru/bridge-validation-verdicts-20260918-v2.csv` (`target_unregistered` rows).
+- **Next action:** after ISSUE-222's `afldb_test` import is verified, establish how the 2026
+  debutants (and the numbering/spelling cases) become registered identities on each target; then
+  re-resolve a new deployment child against that registration (`--resolve-against`, new hash,
+  §4.5) — never by editing the child or the importer's HALT.
 
 ### AFLDB-ISSUE-223 — Pre-existing test regression from AFLDB-ISSUE-221: `GRID_DRAFT_TYPES` reshaped, a `draftguru-acquisition.test.ts` vocabulary-parity test now fails
 - **Severity:** Low. **Area:** test tooling — `tests/draftguru-acquisition.test.ts`,

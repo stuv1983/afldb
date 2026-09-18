@@ -1,0 +1,93 @@
+{
+  "completed_utc": "2026-09-18T03:46:01Z",
+  "database_connections": 0,
+  "generated_utc": "2026-09-18T03:46:01Z",
+  "inputs": {
+    "aliases": {
+      "path": "data/reference/player-name-aliases.json",
+      "sha256": "c77ccbf8b995c56dd9f33b53bb1907115acefe7b090facf6760b200e1d491ee0"
+    },
+    "b3_manifest": {
+      "path": "docs/rebuild-manifests/draftguru/person-html-20260918.json",
+      "sha256": "5e944d0e57985593cbe35f15d5b46613d1d8e0843895a47db3dcd99f1f2538a7"
+    },
+    "child": {
+      "path": "data/reference/draftguru-person-bridge-20260918-v1.afldb_test.json",
+      "sha256": "596bbb684424b40f43c22368f1b77aa4198eec8b56a1109a7bb587c5c7a9a27f"
+    },
+    "fitzroy_contract": {
+      "path": "tools/rebuild/fitzroy/fitzroy-contract.json",
+      "sha256": "e4001a8d3a9ec3afb936f9c09cabf5921cd203978c4061465655d2b756e7a466"
+    },
+    "fitzroy_manifest": {
+      "path": "docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json",
+      "sha256": "2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1"
+    },
+    "fitzroy_register": {
+      "path": "data/reference/fitzroy-accepted-baselines.json",
+      "sha256": "c68083aed64e894566054404b93032698e9664d79db377080ad795724d032eef"
+    },
+    "fitzroy_snapshot": {
+      "artefact_set_sha256": "15ba5dc624535d95fd1661c7c5e757ae4fc2d31782a2c0b1414e19358580dd6c",
+      "files_verified": 131,
+      "label": "full-history-20260902",
+      "snapshot_dir": "data/sources/afltables/fitzroy_core/full-history-20260902"
+    },
+    "ledger": {
+      "path": "data/reference/draftguru-link-decisions.json",
+      "sha256": "13ea051e6620a1320e3e60cc34d58ece9c7f08be3205d248c93787edc9a931a1"
+    },
+    "parent": {
+      "path": "data/reference/draftguru-person-bridge-20260918-v1.json",
+      "sha256": "92ff142ef71d175046b4949b0a85d5925bc396d3586b5b1fc3f44e51f097320e"
+    },
+    "profile": {
+      "path": "data/sources/draftguru/person-html-20260918/parsed/person_profile.jsonl",
+      "sha256": "bad43909112aae4b318336ca4de8576e67608202dd077fdc2f89188b7a04aa37"
+    },
+    "stage_a_manifest": {
+      "path": "docs/rebuild-manifests/draftguru/annual-html-20260826.json",
+      "sha256": "d06bf6be358663ad3c44a56066c9096fbc4bdf4760349ed181a642476d374652"
+    },
+    "stage_a_persons": {
+      "path": "data/sources/draftguru/annual-html-20260826/parsed/persons.jsonl",
+      "sha256": "95c98f2aa272b598543357908c91f8b104b5ff501a66405fb1da0a50a4ebcb9d"
+    },
+    "stage_a_rows": {
+      "path": "data/sources/draftguru/annual-html-20260826/parsed/rows.jsonl",
+      "sha256": "06936baca3b37133949847e7589008a06be76bbc8f1fb5b4d2fef8b743838a64"
+    }
+  },
+  "issue": "AFLDB-ISSUE-222",
+  "network_requests": 0,
+  "offline_only": true,
+  "phase_3_status": "PENDING -- this scan does not accept Phase 3, authorise an import, or set any operator_verdict",
+  "population_scan_csv": {
+    "sha256": "ac0903ec1d1ba7efd8556706516a19747e8995b273c23ff36ed15ec182dcbba6"
+  },
+  "population_scan_json": {
+    "sha256": "b38d55fc5739584076ba19231f06f5812a4c44de79845e2c7c026dec20e3eb97"
+  },
+  "reused_review_tool": {
+    "path": "tools/rebuild/draftguru/review_person_bridge_offline.py",
+    "version": "1.0.2"
+  },
+  "rows_sha256": "ddd5faba8a292d91b52d5beef86f9aae91dfef0ab2a14dec9ba5894f2968c8c0",
+  "scan_method": "offline-retained-evidence-population-scan",
+  "scanner": {
+    "path": "tools/rebuild/draftguru/scan_person_bridge_population.py",
+    "version": "1.0.0"
+  },
+  "schema_version": 1,
+  "total_expected_rows": 3564,
+  "totals": {
+    "completed": 3564,
+    "confirmed_source_mislink": 23,
+    "human_authority_overlap": 3,
+    "insufficient_evidence": 107,
+    "population_clean": 3422,
+    "source_discrepancy_same_person": 7,
+    "suspected_source_mislink": 2,
+    "tooling_or_schema_error": 0
+  }
+}

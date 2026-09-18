@@ -44,6 +44,14 @@ TOOL_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(TOOL_DIR))
 import parse_draft_snapshot as snapshot_parser  # noqa: E402
 import stage_b1_sample as b1                     # noqa: E402  (sha256_hex, dump_bytes, atomic_write_bytes)
+# import_draftguru.py is deliberately NOT imported here (see self_validate_bridge_schema's
+# docstring below): this exporter must never carry a database-import surface transitively,
+# even though import_draftguru itself only imports psycopg inside its write-phase functions
+# today. AFLDB-ISSUE-222 Phase 3 correction (§B) instead DUPLICATES the two identity
+# constants that must stay byte-identical to import_draftguru.py's own
+# AFLTABLES_SOURCE_KEY / AFLTABLES_MATCH_METHOD; a source-text test in
+# tests/draftguru-acquisition.test.ts pins both files' literals equal so the two tools
+# cannot silently diverge again.
 
 REPO_ROOT = TOOL_DIR.parents[2]
 
@@ -52,6 +60,11 @@ EXPORTER_VERSION = "1.0.0"
 BRIDGE_SCHEMA_VERSION = 1
 
 AFLTABLES_PATH_RE = re.compile(r"^players/[A-Za-z]/[^/]+\.html$")
+
+# Must equal import_draftguru.py's AFLTABLES_SOURCE_KEY / AFLTABLES_MATCH_METHOD exactly
+# (§B above; pinned equal by test).
+AFLTABLES_SOURCE_KEY = "afltables"
+AFLTABLES_MATCH_METHOD = "afltables_profile_url"
 
 # target -> (env var carrying an owner-role DSN, required database name in its path).
 # AFLDB_TEST_DATABASE_URL is itself the owner-role DSN for afldb_test (docs/deployment.md
@@ -142,15 +155,31 @@ def write_dataset(path: Path, payload: dict, url_re: re.Pattern) -> str:
 
 def admissibility_reason(record: dict) -> str | None:
     """One §3.3 outcome-code-shaped reason, or None when the person IS admissible
-    (B-linked candidate). Mirrors contract person_stage.b3.admissibility_flags exactly."""
+    (B-linked candidate). Mirrors contract person_stage.b3.admissibility_flags exactly.
+
+    AFLDB-ISSUE-222 Phase 3 correction (§C.5): the contract's `canonical_required` is
+    "afltables_identity is non-null AND distinct_afltables_identity_count == 1" -- both
+    conjuncts, not the first alone. A record with a non-null afltables_identity but a
+    distinct_afltables_identity_count other than 1 is not admissible and must fall through
+    to the ordinary flag-based reasons below (multiple_afltables_candidates first, since
+    that is what such a record almost always means). On the real captured
+    person_profile.jsonl the two conditions never diverge (measured 2026-09-18: 3,564
+    records with afltables_identity all carry count == 1), so this closes a latent gap
+    without changing the accepted parent bridge's contents.
+    """
     if record.get("terminal_classification") == "failed":
         return "U-page-failed"
     flags = record.get("flags") or {}
     if flags.get("missing_or_dead_page"):
         return "U-page-failed"
-    if record.get("afltables_identity"):
+    if record.get("afltables_identity") and record.get("distinct_afltables_identity_count") == 1:
         return None
     if flags.get("multiple_afltables_candidates"):
+        return "U-inadmissible:multiple_afltables_candidates"
+    if record.get("afltables_identity") and record.get("distinct_afltables_identity_count") != 1:
+        # afltables_identity is non-null but the count conjunct failed and no explicit flag
+        # named why (an upstream acquisition invariant this exporter does not control) --
+        # still fails closed as the ambiguous-candidate case, never as U-no-href.
         return "U-inadmissible:multiple_afltables_candidates"
     if flags.get("malformed_afltables_link"):
         return "U-inadmissible:malformed_afltables_link"
@@ -305,18 +334,34 @@ def resolve_target_dsn(target: str, dsn_env_override: str | None) -> tuple[str, 
     return dsn, (required_db or "")
 
 
-REGISTRATION_SQL = """
-SELECT ei.external_id, count(DISTINCT ei.player_id) AS distinct_players
+# AFLDB-ISSUE-222 Phase 3 correction (§B): this must select EXACTLY the rows
+# import_draftguru.resolve_afltables_players() would resolve an identity against -- same
+# source join, same status filter, same player_id IS NOT NULL, and (the divergence an
+# independent review found) the SAME match_method filter. Without the match_method filter an
+# identity registered under some other match_method (e.g. a manual/fuzzy correction) passed
+# this exporter as "registered" but resolved to zero candidates at import (HALT).
+#
+# The importer does not de-duplicate: resolve_afltables_players() appends one player_id per
+# *row* it reads, so a target_id genuinely registered twice under the same match_method --
+# even to the same player -- produces a 2-element candidate list and apply_authority() HALTs
+# on `len(candidates) != 1`. COUNT(DISTINCT ei.player_id) would hide that duplicate-row case
+# (both rows same player -> distinct count 1) and let the exporter call it "registered
+# exactly once" while the importer would still HALT on it. COUNT(*) mirrors len(candidates)
+# exactly and preserves that fail-closed behaviour instead of papering over it.
+REGISTRATION_SQL = f"""
+SELECT ei.external_id, count(*) AS registered_rows
   FROM external_identities ei
-  JOIN sources s ON s.id = ei.source_id AND s.key = 'afltables'
+  JOIN sources s ON s.id = ei.source_id AND s.key = '{AFLTABLES_SOURCE_KEY}'
  WHERE ei.player_id IS NOT NULL AND ei.status IN ('unique', 'resolved')
+   AND ei.match_method = '{AFLTABLES_MATCH_METHOD}'
  GROUP BY ei.external_id
 """
 
 
 def read_target_registration(dsn: str) -> dict[str, int]:
-    """external_id -> distinct registered player count. One rolled-back, read-only
-    transaction; nothing is ever written."""
+    """external_id -> registered-row count under the importer's own resolution semantics
+    (§B above -- not a distinct-player count). One rolled-back, read-only transaction;
+    nothing is ever written."""
     import psycopg
     conn = psycopg.connect(dsn, options="-c default_transaction_read_only=on")
     try:
@@ -336,6 +381,52 @@ def read_target_registration(dsn: str) -> dict[str, int]:
         finally:
             conn.close()
     return {external_id: count for external_id, count in rows}
+
+
+def assert_resolvable_parent(parent: dict) -> None:
+    """--resolve-against takes the SOURCE-EVIDENCE parent, never a per-target deployment
+    child.
+
+    This is the resolve-side twin of the guard --review-sample already carries (§C.4).
+    Resolving a child would filter an already-filtered dataset against a second
+    registration measurement, silently narrowing bridges[] and re-stamping the result as a
+    fresh deployment artefact. With the v2 parent and the v1 afldb_test child now sitting
+    in data/reference/ under names that differ by one suffix, that is an ordinary typo, so
+    it fails closed here. A dataset that declares no `kind` at all is accepted: the minimal
+    hand-built parents used by the integration tests carry only schema_version/bridges.
+    """
+    kind = parent.get("kind")
+    if kind == "deployment":
+        raise BridgeExportError(
+            "--resolve-against requires the SOURCE-EVIDENCE parent bridge dataset, not a "
+            f"per-target deployment child (this input declares kind={kind!r}, target="
+            f"{parent.get('target')!r}). Resolving an already-resolved dataset would filter "
+            "it a second time. Pass the parent produced by --source-evidence or by "
+            "build_person_bridge_v2.py.")
+
+
+def assert_writable_out(out_path: Path, *, parent_path: Path, allow_overwrite: bool) -> None:
+    """Refuse to write over the input, or over any existing file, without an explicit flag.
+
+    atomic_write_bytes() replaces its target silently. The immutable inputs of a completed,
+    hash-verified artefact now live in the same directory as this mode's output
+    (data/reference/draftguru-person-bridge-20260918-v1.afldb_test.json is a pinned input of
+    the v2 reconciliation), so a mistyped --out would destroy tracked evidence with no
+    warning. Unlike the v2 generator's outputs, a deployment child carries a wall-clock
+    generated_utc and a live target_registration measurement, so a rerun is never
+    byte-identical and cannot be proven idempotent -- overwriting is therefore always a
+    deliberate operator decision, never an inferred one.
+    """
+    if out_path.resolve() == parent_path.resolve():
+        raise BridgeExportError(
+            f"--out and --parent are the same file ({out_path}); refusing to overwrite the "
+            "source-evidence parent with its own deployment child")
+    if out_path.exists() and not allow_overwrite:
+        raise BridgeExportError(
+            f"{out_path} already exists; refusing to overwrite it. A deployment child is a "
+            "live measurement and a rerun is never byte-identical, so an overwrite cannot be "
+            "shown to be idempotent. Choose a new --out, or pass --allow-overwrite "
+            "deliberately.")
 
 
 def build_deployment_dataset(contract: dict, *, parent: dict, target: str,
@@ -400,6 +491,19 @@ def load_top10_national_urls(stage_a_dir: Path) -> set[str]:
 
 def build_review_sample(contract: dict, *, parent_or_deployment: dict, snapshot_root: Path | None,
                         salt: str, n: int) -> dict:
+    # AFLDB-ISSUE-222 Phase 3 correction (§C.4): the review sample is drawn on the
+    # source-evidence PARENT only (revised runbook §4.5, correction handoff §5). A
+    # per-target DEPLOYMENT dataset's bridges[] is already filtered by one target's
+    # registration, so drawing a sample from it would silently change what "bridged" means
+    # mid-review and could omit target_not_registered rows the review must cover. Refuse
+    # explicitly rather than rely on a missing/absent provenance field to catch it.
+    kind = parent_or_deployment.get("kind")
+    if kind == "deployment":
+        raise BridgeExportError(
+            "--review-sample requires the source-evidence PARENT bridge dataset, not a "
+            f"per-target deployment child (this input declares kind={kind!r}, target="
+            f"{parent_or_deployment.get('target')!r}). Pass the parent produced by "
+            "--source-evidence.")
     stage_a_label = parent_or_deployment.get("provenance", {}).get("stage_a_label")
     if not stage_a_label:
         raise BridgeExportError("the bridge dataset carries no provenance.stage_a_label")
@@ -454,6 +558,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--parent", help="the source-evidence parent path (--resolve-against)")
     parser.add_argument("--dsn-env", help="override the DSN environment variable name "
                                           "(--resolve-against; primarily for tests)")
+    parser.add_argument("--allow-overwrite", action="store_true",
+                        help="permit --resolve-against to replace an existing --out file "
+                             "(never inferred: a deployment child is a live measurement)")
 
     parser.add_argument("--salt", help="the declared random-stratum salt (--review-sample)")
     parser.add_argument("--n", type=int, help="random-stratum size (--review-sample)")
@@ -487,6 +594,11 @@ def main(argv: list[str] | None = None) -> int:
             parent = load_json(parent_path, "source-evidence parent bridge dataset")
             parent = dict(parent)
             parent["$parent_sha256"] = b1.sha256_hex(parent_path.read_bytes())
+            # Both guards run before any DSN is read or any connection is opened, so a
+            # refusal here never touches the database.
+            assert_resolvable_parent(parent)
+            assert_writable_out(out_path, parent_path=parent_path,
+                                allow_overwrite=args.allow_overwrite)
             dsn, _db = resolve_target_dsn(args.resolve_against, args.dsn_env)
             registration = read_target_registration(dsn)
             payload = build_deployment_dataset(

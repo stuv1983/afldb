@@ -47,11 +47,12 @@ import {
   type GridleyItem,
   type GridleyLookups,
   type GridleyMapping,
-  type GridleyPlayerRef,
 } from '@/search/gridley-compat';
 import { type GridAxisState } from '@/search/grid-solver-spec';
 import { loadAnswers, loadCorpus, type CorpusBoard } from '../gridley-compat.test';
+import { buildResolver, nationalPickKeyDisagreement, playerRegisterHorizon, rookieSourceCoverageGap, triageDraftFinding, type LinkedDraftRow, type PlayerRow } from '../gridley-corpus-support';
 import { adjudicationStaleness, loadHeightAdjudications, type HeightAdjudication } from '../height-adjudications';
+import { loadRookieRelistingOutcomes, type RookieRelistingOutcome } from '../rookie-relisting-outcomes';
 
 afterAll(async () => {
   await sql.end();
@@ -59,44 +60,10 @@ afterAll(async () => {
 
 // ---------------------------------------------------------------------------
 // Player resolution: by normalised full name; ambiguous names are settled by
-// the debut season recorded here, each one checked against Gridley's own
-// answer key for that player's teammate cells (ISSUE-118 §Stage 2).
+// the debut season recorded in PLAYER_OVERRIDES (tests/gridley-corpus-support.ts,
+// pure and pinned DB-free), each one checked against Gridley's own answer key
+// for that player's teammate cells (ISSUE-118 §Stage 2).
 // ---------------------------------------------------------------------------
-
-const PLAYER_OVERRIDES: Record<string, { name: string; debutSeason: number }> = {
-  // Gridley's 'joshjkennedy' is the West Coast Josh J. Kennedy (Carlton debut
-  // 2006): its cells against West Coast hold 134 answers and his teammate set
-  // there has 133 players, the Sydney namesake's 8. 'josh-p-kennedy' is the
-  // Sydney one (Hawthorn debut 2008): 118 vs 111 / 6.
-  joshjkennedy: { name: 'Josh Kennedy', debutSeason: 2006 },
-  'josh-p-kennedy-teammate-4298': { name: 'Josh Kennedy', debutSeason: 2008 },
-  // Three Nathan Browns: 'nathanbrownwb' says Bulldogs; 5429 against the
-  // Bulldogs column holds 74 answers and the 1997 debutant's set there is 69
-  // (the others 3 and 7).
-  nathanbrownwb: { name: 'Nathan Brown', debutSeason: 1997 },
-  'nathan-brown-teammate-5429': { name: 'Nathan Brown', debutSeason: 1997 },
-  scottthompsonad: { name: 'Scott Thompson', debutSeason: 2001 },
-  tomhickey: { name: 'Tom Hickey', debutSeason: 2011 },
-  garyablettjr: { name: 'Gary Ablett', debutSeason: 2002 },
-  'gary-ablett-teammate-2602': { name: 'Gary Ablett', debutSeason: 2002 },
-  // Melbourne's Mitch Brown (2011): 46 of Gridley's 59 against Melbourne, the
-  // West Coast one 3. GWS's Sam Reid (2010): 109 of 135 against Sydney.
-  'mitch-brown-teammate-5382': { name: 'Mitch Brown', debutSeason: 2011 },
-  'sam-reid-teammate-6501': { name: 'Sam Reid', debutSeason: 2010 },
-  'peter-bell-teammate-5825': { name: 'Peter Bell', debutSeason: 1995 },
-  'charlie-cameron-teammate-1418': { name: 'Charlie Cameron', debutSeason: 2014 },
-  'andrew-krakouer-teammate-323': { name: 'Andrew Krakouer', debutSeason: 2001 },
-  'matthew-kennedy-teammate-5127': { name: 'Matthew Kennedy', debutSeason: 2016 },
-  'archie-roberts-teammate-13198': { name: 'Archie Roberts', debutSeason: 2024 },
-  'maurice-rioli jr-teammate-5166': { name: 'Maurice Rioli', debutSeason: 2021 },
-  'jamie-elliott-teammate-3716': { name: 'Jamie Elliott', debutSeason: 2012 },
-  'lindsay-thomas-teammate-4855': { name: 'Lindsay Thomas', debutSeason: 2007 },
-  // Gridley titles him "Marty"; AFLDB records the given name.
-  martymattner: { name: 'Martin Mattner', debutSeason: 2002 },
-  // 2026 debutants: present only on a database that holds the 2026 season.
-  'willem-duursma-teammate-13491': { name: 'Willem Duursma', debutSeason: 2026 },
-  'jagga-smith-teammate-13333': { name: 'Jagga Smith', debutSeason: 2026 },
-};
 
 /**
  * Datasets the corpus depends on that a rebuilt afldb_test may not carry.
@@ -105,7 +72,8 @@ const PLAYER_OVERRIDES: Record<string, { name: string; debutSeason: number }> = 
  * solver failure, and the list of such criteria is asserted so a gap cannot
  * widen silently. On a database with the data, the list must be empty.
  */
-type DatasetGaps = { maxSeason: number; draftLinks: boolean; matchEvents: boolean; heights: boolean; dobs: boolean; coaches: boolean; fatherSon: boolean; siblings: boolean; afterSiren: boolean };
+/** `maxSeason` is the match horizon (max matches.season); `registerSeason` the player register's (max debut season). They differ on a database holding a new season's matches before its debutants are registered (AFLDB-ISSUE-224). */
+type DatasetGaps = { maxSeason: number; registerSeason: number; draftLinks: boolean; matchEvents: boolean; heights: boolean; dobs: boolean; coaches: boolean; fatherSon: boolean; siblings: boolean; afterSiren: boolean };
 const SIBLING_BUILDERS = new Set(['has_brother']);
 const AFTER_SIREN_BUILDERS = new Set(['after_siren_winner']);
 const HEIGHT_BUILDERS = new Set(['height_min', 'height_max']);
@@ -115,7 +83,6 @@ const FATHER_SON_BUILDERS = new Set(['father_son_selection', 'father_son_father'
 const DRAFT_BUILDERS = new Set(['national_draft_pick_between', 'draft_pick_between', 'draft_year_between', 'draft_type_is', 'drafted_by_club', 'drafted_by_club_never_played', 'recruited_via', 'traded_min_times']);
 const MATCH_EVENT_BUILDERS = new Set(['match_event_played', 'match_event_min', 'match_event_won', 'match_event_played_between']);
 
-type PlayerRow = { id: number; displayName: string; givenName: string | null; surname: string | null; debutSeason: number | null; finalSeason: number | null };
 type CoachRow = { id: number; displayName: string };
 
 /**
@@ -138,36 +105,6 @@ function buildCoachResolver(coaches: CoachRow[], unresolvedLog: string[], gapLog
     const candidates = byName.get(normalisePlayerName(ref.name)) ?? [];
     if (candidates.length === 1) return candidates[0].id;
     unresolvedLog.push(`${ref.criterionId}: coach "${ref.name}" matched ${candidates.length} coaches`);
-    return null;
-  };
-}
-
-function buildResolver(players: PlayerRow[], unresolvedLog: string[], gapLog: string[], maxSeason: number): (ref: GridleyPlayerRef) => number | null {
-  const byName = new Map<string, PlayerRow[]>();
-  for (const p of players) {
-    const keys = new Set([normalisePlayerName(p.displayName), normalisePlayerName(`${p.givenName ?? ''} ${p.surname ?? ''}`)]);
-    for (const k of keys) {
-      if (!k) continue;
-      const list = byName.get(k) ?? [];
-      list.push(p);
-      byName.set(k, list);
-    }
-  }
-  return (ref) => {
-    const override = PLAYER_OVERRIDES[ref.criterionId];
-    if (override) {
-      const hit = (byName.get(normalisePlayerName(override.name)) ?? []).filter((p) => p.debutSeason === override.debutSeason);
-      if (hit.length === 1) return hit[0].id;
-      if (hit.length === 0 && override.debutSeason > maxSeason) {
-        gapLog.push(`${ref.criterionId}: ${override.name} debuted in ${override.debutSeason}; this database ends at season ${maxSeason}`);
-        return null;
-      }
-      unresolvedLog.push(`${ref.criterionId}: override ${override.name}/${override.debutSeason} matched ${hit.length} players`);
-      return null;
-    }
-    const candidates = byName.get(normalisePlayerName(ref.name)) ?? [];
-    if (candidates.length === 1) return candidates[0].id;
-    unresolvedLog.push(`${ref.criterionId}: "${ref.name}" matched ${candidates.length} players${candidates.length ? ` (${candidates.map((c) => `${c.id}/${c.debutSeason}`).join(', ')})` : ''}`);
     return null;
   };
 }
@@ -204,7 +141,7 @@ const criteria = new Map<string, CriterionRecord>();
 const findings: CellFinding[] = [];
 const unresolvedLog: string[] = [];
 const gapLog: string[] = [];
-let gaps: DatasetGaps = { maxSeason: 0, draftLinks: true, matchEvents: true, heights: true, dobs: true, coaches: true, fatherSon: true, siblings: true, afterSiren: true };
+let gaps: DatasetGaps = { maxSeason: 0, registerSeason: 0, draftLinks: true, matchEvents: true, heights: true, dobs: true, coaches: true, fatherSon: true, siblings: true, afterSiren: true };
 /** Diagnostic mode: dataset-shaped findings are counted and named instead of failing. Never the default. */
 const DIAGNOSTIC = process.env.AFLDB_GRIDLEY_DIAGNOSTIC === '1';
 /**
@@ -225,6 +162,13 @@ const gappedCriteria = new Set<string>();
 const bridge = new Map<number, number>();
 /** AFLDB player id -> final season, for the date-aware oracle. */
 const finalSeasons = new Map<number, number | null>();
+/**
+ * AFLDB-ISSUE-222 §6.3 item 4. AFLDB player id -> every trusted-linked draft_picks row. A
+ * draft-criterion disagreement on a bridged player is triaged from these rows (unlinked / a
+ * satisfying row / a non-national pick inside a national range / no matching row) and the
+ * evidence is appended to the finding's detail. The category is NOT changed by the triage.
+ */
+const linkedDraftRows = new Map<number, LinkedDraftRow[]>();
 /** AFLDB player id -> Hall of Fame induction year: an honour a retired player can still gain after a board's date. */
 const hallOfFameYears = new Map<number, number>();
 /**
@@ -243,6 +187,15 @@ const heightEvidence = new Map<number, { source: string; height: number }[]>();
  */
 const heightAdjudications = new Map<number, HeightAdjudication & { stale: string | null }>();
 /**
+ * AFLDB-ISSUE-222 §11.19.12/§11.19.13, operator decision D2. AFLDB player id -> the tracked,
+ * independently-sourced review outcome of a `pickrookie` disagreement (data/players/
+ * rookie-relisting-outcomes.csv), keyed by the AFL Tables profile the player's afltables
+ * identity holds. Only a `gridley_supported` row is ever read for classification
+ * (rookieSourceCoverageGap, tests/gridley-corpus-support.ts); a player absent from this map,
+ * or present with any other verdict, is never reclassified.
+ */
+const rookieOutcomes = new Map<number, RookieRelistingOutcome>();
+/**
  * ISSUE-118 §23.23. AFLDB player id -> the co-captaincy AFLDB's own canonical data records for a
  * premiership: more than one linked captain of the premier club that season, each of whom played in
  * and won the Grand Final. Built from captaincies + match facts, never from Gridley's answer.
@@ -252,7 +205,7 @@ const coCaptaincy = new Map<number, string>();
 const INFORMATIONAL: Record<string, string> = {
   'time of board': "Gridley's answer key is frozen at the board's date and the player was still playing then; AFLDB answers for today",
   'list membership': "Gridley's club, decade, teammate, club-count, wooden-spoon, minor-premiership and coached-by criteria include players merely listed by a club that season (a trade-period move, the suspended 2016 Essendon players, a listed player who did not play a caretaker coach's one match); AFLDB models games played",
-  'external source disagreement': "a height cell where every independent source AFLDB holds (AFL API roster, Wikipedia infobox) sits on AFLDB's side of the bound and none on Gridley's (ISSUE-118 §23.19); or a premiership-captain cell where AFLDB's canonical captaincies record the player as one of several captains of the premier club that season who all played and won the Grand Final, and Gridley's key names one premiership captain per flag (ISSUE-118 §23.23). AFLDB's answer is source-backed; the definitions differ",
+  'external source disagreement': "a height cell where every independent source AFLDB holds (AFL API roster, Wikipedia infobox) sits on AFLDB's side of the bound and none on Gridley's (ISSUE-118 §23.19); or a premiership-captain cell where AFLDB's canonical captaincies record the player as one of several captains of the premier club that season who all played and won the Grand Final, and Gridley's key names one premiership captain per flag (ISSUE-118 §23.23); or a National Draft pick-range cell where Gridley lists a linked player whose only trusted-linked pick inside the range is a non-national selection, named in the finding (AFLDB-ISSUE-222 §11.19.12 D1). AFLDB's answer is source-backed; the definitions differ",
   'adjudicated source conflict': "a height source conflict the operator has reviewed against every source AFLDB holds and decided in a tracked record (data/players/height-adjudications.csv, ISSUE-118 §23.26): AFL Tables is retained under the §23.19 precedence policy and the competing values are named; the record applies only while the canonical height and the competing evidence are exactly those it was decided on",
 };
 /** ISSUE-118 §23.31: the cited brothers rows behind each has_brother player (player id -> evidence), for the reverse direction. */
@@ -267,7 +220,7 @@ const DATA_GAPS: Record<string, string> = {
   'dataset gap': 'this database lacks a dataset the criterion reads (draft links, marquee tags, a later season, player heights, dates of birth, coaches, after-the-siren events)',
   'partial dataset': 'a mapped criterion whose builder reads a dataset its mapping note declares partial (none since AFLDB-ISSUE-118 §23.21 completed captaincies)',
   'source conflict': "a height cell where an independent source supports Gridley's side of the bound, or no independent source exists; AFLDB keeps the AFL Tables value (ISSUE-118 §23.19) but its answer is not proven, so the cell stays open",
-  'source coverage gap': "a has_brother cell where Gridley lists a player and AFLDB's canonical sibling sources (the tracked Wikipedia football-families export and its evidenced supplements, ISSUE-118 §23.31) carry no brothers row linking him to a VFL/AFL player. The absence of a row is UNKNOWN coverage, never 'no brother': the cell stays open until an explicitly evidenced pair is admitted through data/players/sibling-supplements.csv",
+  'source coverage gap': "a has_brother cell where Gridley lists a player and AFLDB's canonical sibling sources (the tracked Wikipedia football-families export and its evidenced supplements, ISSUE-118 §23.31) carry no brothers row linking him to a VFL/AFL player -- the absence of a row is UNKNOWN coverage, never 'no brother', open until an explicitly evidenced pair is admitted through data/players/sibling-supplements.csv; or a pickrookie cell where Gridley lists a linked player whose DraftGuru page carries no Rookie event, and an independent source AFLDB has reviewed confirms the selection anyway (data/players/rookie-relisting-outcomes.csv, AFLDB-ISSUE-222 §11.19.12/§11.19.13 D2) -- a DraftGuru source-coverage gap, not a linkage or builder defect, open until DraftGuru's rows are supplemented",
 };
 /**
  * ISSUE-118 §23.36 (W.2): the formally accepted residual unsupported-valid criteria.
@@ -303,7 +256,7 @@ async function eligibleSet(axis: GridAxisState): Promise<Set<number>> {
 }
 
 beforeAll(async () => {
-  const [clubs, venues, awards, players, coaches, hof, evidence, profiles, coCaptains, [probe]] = await Promise.all([
+  const [clubs, venues, awards, players, coaches, hof, evidence, profiles, coCaptains, [probe], draftRows] = await Promise.all([
     sql<{ slug: string; id: number }[]>`SELECT slug, id FROM club_organizations`,
     sql<{ name: string; id: number }[]>`SELECT canonical_name AS name, id FROM venues`,
     sql<{ slug: string; id: number }[]>`SELECT slug, id FROM awards`,
@@ -342,7 +295,18 @@ beforeAll(async () => {
              (SELECT count(*) FROM father_son_selections WHERE father_player_id IS NOT NULL) AS "fatherSon",
              (SELECT count(*) FROM player_relationships WHERE relationship = 'sibling' AND person_a_player_id IS NOT NULL AND person_b_player_id IS NOT NULL) AS "siblings",
              (SELECT count(*) FROM after_siren_kicks WHERE player_id IS NOT NULL) AS "afterSiren"`,
+    // Every trusted-linked draft row, for the §6.3 triage of draft-criterion findings.
+    sql<{ playerId: number; draftYear: number; draftKind: string | null; pickNumber: number | null; club: string | null }[]>`
+      SELECT dp.player_id AS "playerId", dp.draft_year::int AS "draftYear", dp.draft_kind AS "draftKind",
+             dp.pick_number::int AS "pickNumber", c.name AS club
+        FROM draft_picks dp LEFT JOIN clubs c ON c.id = dp.club_id
+       WHERE dp.link_status_value IN ('unique', 'resolved') AND dp.player_id IS NOT NULL`,
   ]);
+  for (const r of draftRows) {
+    const l = linkedDraftRows.get(r.playerId) ?? [];
+    l.push({ draftYear: r.draftYear, draftKind: r.draftKind, pickNumber: r.pickNumber, club: r.club });
+    linkedDraftRows.set(r.playerId, l);
+  }
   // A dataset counts as present when at least half of it is usable. Every
   // current database links 5 of 6,810 draft picks (the tracked human decisions;
   // the legacy auto-linker was retired and AFLDB-ISSUE-164 D-9 suspends
@@ -350,6 +314,7 @@ beforeAll(async () => {
   // dataset gap until that population exists.
   gaps = {
     maxSeason: probe.maxSeason,
+    registerSeason: playerRegisterHorizon(players),
     draftLinks: SCORE_DRAFT || Number(probe.draftLinked) * 2 >= Number(probe.draftTotal),
     matchEvents: Number(probe.matchEvents) > 0,
     heights: Number(probe.heights) > 0,
@@ -380,6 +345,11 @@ beforeAll(async () => {
     const row = byProfile.get(adj.afltablesProfile);
     if (!row) continue; // this database has no afltables identity for the profile: nothing to adjudicate
     heightAdjudications.set(row.playerId, { ...adj, stale: adjudicationStaleness(adj, row.height, heightEvidence.get(row.playerId) ?? []) });
+  }
+  for (const outcome of loadRookieRelistingOutcomes()) {
+    const row = byProfile.get(outcome.afltablesProfile);
+    if (!row) continue; // this database has no afltables identity for the profile: nothing to classify
+    rookieOutcomes.set(row.playerId, outcome);
   }
   for (const r of coCaptains) {
     coCaptaincy.set(r.playerId, `${coCaptaincy.get(r.playerId) ? `${coCaptaincy.get(r.playerId)}; ` : ''}co-captain of ${r.club} ${r.season} with ${r.others} (all played and won the Grand Final)`);
@@ -453,7 +423,7 @@ describe('Gridley corpus -- criteria', () => {
     const empty = [...criteria.values()].filter((r) => r.set !== null && r.set.size === 0 && !gappedCriteria.has(r.id));
     expect(empty.map((r) => `${r.id} [${r.occurrences}] -> ${describeAxis(r.mapping)}`)).toEqual([]);
     // And a probed gap must actually be a gap here: on a complete database the list is empty.
-    if (gaps.draftLinks && gaps.matchEvents && gaps.heights && gaps.dobs && gaps.coaches && gaps.fatherSon && gaps.siblings && gaps.afterSiren && gaps.maxSeason >= 2026) expect([...gappedCriteria]).toEqual([]);
+    if (gaps.draftLinks && gaps.matchEvents && gaps.heights && gaps.dobs && gaps.coaches && gaps.fatherSon && gaps.siblings && gaps.afterSiren && gaps.maxSeason >= 2026 && gaps.registerSeason >= 2026) expect([...gappedCriteria]).toEqual([]);
   });
 
   it('leaves unsupported exactly the §23.36 accepted deferrals -- no more, no fewer', () => {
@@ -476,10 +446,10 @@ describe('Gridley corpus -- criteria', () => {
       console.log('[gridley-corpus] AFLDB_GRIDLEY_DIAGNOSTIC=1: unsupported criteria and dataset gaps are counted, not failed. This is NOT an acceptance run.');
       return;
     }
-    // Strict mode only: a database that carries every ISSUE-118 dataset AND reaches
-    // season 2026 has nothing here. The repository-standard afldb_test baseline ends
-    // at 2025, so this fails strict on 2026-debutant teammate refs; the acceptance
-    // proof is the diagnostic corpus run.
+    // Strict mode only: a database that carries every ISSUE-118 dataset AND whose player
+    // register reaches season 2026 has nothing here. The repository-standard afldb_test
+    // baseline registers players to 2025 (it may still hold 2026 matches), so this fails
+    // strict on 2026-debutant teammate refs; the acceptance proof is the diagnostic corpus run.
     expect([...gappedCriteria].sort()).toEqual([]);
   });
 
@@ -600,7 +570,7 @@ describe('Gridley corpus -- every cell through solveCellSummary', () => {
         const mappedIdx = [rowRec, colRec].map((x, i) => (x.mapping.status === 'mapped' ? i : -1)).filter((i) => i >= 0);
         const lackingIdx = !inAfldb ? mappedIdx.filter((i, n) => !sets[n].has(afldbId)) : [];
         const lacking = lackingIdx.map((i) => axisItems[i].id).join('+');
-        const detail = `gridley player ${gid} = afldb ${afldbId}: Gridley ${inGridley ? 'lists' : 'omits'}, AFLDB ${inAfldb ? 'lists' : 'omits'}${lacking ? ` (missing from ${lacking})` : ''}`;
+        let detail = `gridley player ${gid} = afldb ${afldbId}: Gridley ${inGridley ? 'lists' : 'omits'}, AFLDB ${inAfldb ? 'lists' : 'omits'}${lacking ? ` (missing from ${lacking})` : ''}`;
         const finalSeason = finalSeasons.get(afldbId) ?? null;
         const inductedAfterBoard = axisBuilders.includes('hall_of_fame_player') && (hallOfFameYears.get(afldbId) ?? 0) >= boardYear;
         let category: CellFinding['category'] = 'incorrect known answer';
@@ -667,6 +637,38 @@ describe('Gridley corpus -- every cell through solveCellSummary', () => {
               findings.push({ ...base, category: 'source conflict', detail: `${detail}; ${independent.length === 0 ? 'no independent height source' : `independent sources on Gridley's side: ${list(onGridleySide)}${onAfldbSide.length ? `; on AFLDB's side: ${list(onAfldbSide)}` : ''}`}` });
             }
             continue;
+          }
+        }
+        // AFLDB-ISSUE-222 §6.3 item 4. A draft-criterion disagreement on a bridged player:
+        // append the triage from AFLDB's own linked draft rows (tests/gridley-corpus-support.ts).
+        // Evidence only -- the category stays `incorrect known answer` until an operator
+        // decision records the cause (linkage / builder semantics / Gridley's key / source gap).
+        // The one decided cause (§11.19.12 D1, approved narrowly): a national-pick cell where
+        // Gridley lists a linked player whose only pick inside the range is a non-national
+        // selection is Gridley's own key -> `external source disagreement`, the row named.
+        if (category === 'incorrect known answer') {
+          const di = axisBuilders.findIndex((b) => DRAFT_BUILDERS.has(b));
+          if (di >= 0 && (inAfldb || lackingIdx.includes(di))) {
+            const m = [rowRec, colRec][di].mapping;
+            if (m.status === 'mapped') {
+              const rows = linkedDraftRows.get(afldbId) ?? [];
+              const keyDisagreement = inGridley && !inAfldb && lackingIdx.includes(di) ? nationalPickKeyDisagreement(rows, m.axis) : null;
+              if (keyDisagreement !== null) {
+                findings.push({ ...base, category: 'external source disagreement', detail: `${detail}; ${keyDisagreement}` });
+                continue;
+              }
+              // AFLDB-ISSUE-222 §11.19.12/§11.19.13, operator decision D2: the same direction as
+              // D1 (Gridley lists, AFLDB omits, this draft axis is the lacking axis), but for a
+              // `pickrookie` cell on one of the exact players an independent source confirmed.
+              const sourceGap = inGridley && !inAfldb && lackingIdx.includes(di)
+                ? rookieSourceCoverageGap(rows, m.axis, rookieOutcomes.get(afldbId)) : null;
+              if (sourceGap !== null) {
+                findings.push({ ...base, category: 'source coverage gap', detail: `${detail}; ${sourceGap}` });
+                continue;
+              }
+              const t = triageDraftFinding(rows, m.axis);
+              detail = `${detail}; draft triage [${t.cause}]: ${t.evidence}`;
+            }
           }
         }
         findings.push({ ...base, category, detail });

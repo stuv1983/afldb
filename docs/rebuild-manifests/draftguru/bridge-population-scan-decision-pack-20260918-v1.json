@@ -1,0 +1,2286 @@
+{
+  "baseline_current_state": {
+    "bridge_linked_picks": 5101,
+    "bridged_rows": 3463,
+    "human_linked_picks": 5,
+    "national_top10_persons_covered": 387,
+    "national_top10_picks_covered": 389,
+    "national_top10_total_persons": 418,
+    "national_top10_total_picks": 420,
+    "net_new_bridge_rows": 3460,
+    "total_picks": 6810,
+    "unlinked_picks": 1704,
+    "unresolved_persons": 1592
+  },
+  "boundaries_held": [
+    "no network",
+    "no database",
+    "no SSH tunnel",
+    "no Playwright",
+    "no importer",
+    "no exporter rewrite of immutable artefacts",
+    "no bridge v2 generation",
+    "no parent/child/sample overwrite",
+    "no operator_verdict set",
+    "no Git command",
+    "AFLDB-ISSUE-221.md untouched",
+    "Phase 3 remains PENDING",
+    "Phase 4 unauthorised"
+  ],
+  "confirmed_source_mislink_rows": [
+    {
+      "affected_pick_count": 1,
+      "captured_afltables_href": "players/A/Andrew_Krakouer0.html",
+      "child_membership": "bridged",
+      "contradiction_reason": "ZERO_GAME_DRAFTEE_RESOLVES_TO_RETIRED_NAMESAKE",
+      "draftguru_games": 0,
+      "draftguru_goals": 0,
+      "draftguru_name": "Andrew Krakouer",
+      "draftguru_url": "https://www.draftguru.com.au/players/andrew_krakouer/1",
+      "earliest_original_recruitment_event": "Mid-Season",
+      "earliest_original_recruitment_year": 1992,
+      "operator_verdict": "",
+      "reason_codes": [
+        "BIRTH_YEAR_CONSISTENT",
+        "DEBUT_BEFORE_EARLIEST_RECRUITMENT",
+        "CAREER_ENDED_BEFORE_EARLIEST_RECRUITMENT",
+        "GAMES_INCONSISTENT",
+        "CLUB_HISTORY_OVERLAPS"
+      ],
+      "recommended_disposition": "exclude_from_bridge",
+      "retained_target_identity": [
+        "11422"
+      ],
+      "retained_target_name": "Andrew Krakouer",
+      "sample_bucket": "non_sample",
+      "sample_status": "non_sample",
+      "target_career_games": 8,
+      "target_career_goals": 8,
+      "target_career_span": "1989-1990"
+    },
+    {
+      "affected_pick_count": 1,
+      "captured_afltables_href": "players/B/Bradley_Sparks.html",
+      "child_membership": "bridged",
+      "contradiction_reason": "ZERO_GAME_DRAFTEE_RESOLVES_TO_RETIRED_NAMESAKE",
+      "draftguru_games": 0,
+      "draftguru_goals": 0,
+      "draftguru_name": "Bradley Sparks",
+      "draftguru_url": "https://www.draftguru.com.au/players/bradley_sparks/1",
+      "earliest_original_recruitment_event": "Pre-Draft",
+      "earliest_original_recruitment_year": 1990,
+      "operator_verdict": "",
+      "reason_codes": [
+        "BIRTH_YEAR_CONSISTENT",
+        "DEBUT_BEFORE_EARLIEST_RECRUITMENT",
+        "CAREER_ENDED_BEFORE_EARLIEST_RECRUITMENT",
+        "GAMES_INCONSISTENT"
+      ],
+      "recommended_disposition": "exclude_from_bridge",
+      "retained_target_identity": [
+        "11336"
+      ],
+      "retained_target_name": "Bradley Sparks",
+      "sample_bucket": "non_sample",
+      "sample_status": "non_sample",
+      "target_career_games": 4,
+      "target_career_goals": 4,
+      "target_career_span": "1987-1988"
+    },
+    {
+      "affected_pick_count": 1,
+      "captured_afltables_href": "players/B/Bret_Hutchinson.html",
+      "child_membership": "bridged",
+      "contradiction_reason": "ZERO_GAME_DRAFTEE_RESOLVES_TO_RETIRED_NAMESAKE",
+      "draftguru_games": 0,
+      "draftguru_goals": 0,
+      "draftguru_name": "Bret Hutchinson",
+      "draftguru_url": "https://www.draftguru.com.au/players/bret_hutchinson/1",
+      "earliest_original_recruitment_event": "Pre-Season",
+      "earliest_original_recruitment_year": 1989,
+      "operator_verdict": "",
+      "reason_codes": [
+        "BIRTH_YEAR_CONSISTENT",
+        "DEBUT_BEFORE_EARLIEST_RECRUITMENT",
+        "CAREER_ENDED_BEFORE_EARLIEST_RECRUITMENT",
+        "GAMES_INCONSISTENT"
+      ],
+      "recommended_disposition": "exclude_from_bridge",
+      "retained_target_identity": [
+        "11251"
+      ],
+      "retained_target_name": "Bret Hutchinson",
+      "sample_bucket": "random",
+      "sample_status": "originally_sampled",
+      "target_career_games": 1,
+      "target_career_goals": 0,
+      "target_career_span": "1985-1985"
+    },
+    {
+      "affected_pick_count": 1,
+      "captured_afltables_href": "players/C/Chris_ODwyer.html",
+      "child_membership": "bridged",
+      "contradiction_reason": "ZERO_GAME_DRAFTEE_RESOLVES_TO_RETIRED_NAMESAKE",
+      "draftguru_games": 0,
+      "draftguru_goals": 0,
+      "draftguru_name": "Chris O'Dwyer",
+      "draftguru_url": "https://www.draftguru.com.au/players/chris_o'dwyer/1",
+      "earliest_original_recruitment_event": "Pre-Season",
+      "earliest_original_recruitment_year": 1992,
+      "operator_verdict": "",
+      "reason_codes": [
+        "BIRTH_YEAR_CONSISTENT",
+        "DEBUT_BEFORE_EARLIEST_RECRUITMENT",
+        "CAREER_ENDED_BEFORE_EARLIEST_RECRUITMENT",
+        "GAMES_INCONSISTENT"
+      ],
+      "recommended_disposition": "exclude_from_bridge",
+      "retained_target_identity": [
+        "11466"
+      ],
+      "retained_target_name": "Chris ODwyer",
+      "sample_bucket": "non_sample",
+      "sample_status": "non_sample",
+      "target_career_games": 8,
+      "target_career_goals": 1,
+      "target_career_span": "1990-1991"
+    },
+    {
+      "affected_pick_count": 1,
+      "captured_afltables_href": "players/C/Craig_Somerville.html",
+      "child_membership": "bridged",
+      "contradiction_reason": "ZERO_GAME_DRAFTEE_RESOLVES_TO_RETIRED_NAMESAKE",
+      "draftguru_games": 0,
+      "draftguru_goals": 0,
+      "draftguru_name": "Craig Somerville",
+      "draftguru_url": "https://www.draftguru.com.au/players/craig_somerville/1",
+      "earliest_original_recruitment_event": null,
+      "earliest_original_recruitment_year": null,
+      "operator_verdict": "",
+      "reason_codes": [
+        "BIRTH_YEAR_CONSISTENT",
+        "CAREER_ENDED_BEFORE_EARLIEST_RECRUITMENT",
+        "GAMES_INCONSISTENT"
+      ],
+      "recommended_disposition": "exclude_from_bridge",
+      "retained_target_identity": [
+        "11313"
+      ],
+      "retained_target_name": "Craig Somerville",
+      "sample_bucket": "random",
+      "sample_status": "originally_sampled",
+      "target_career_games": 8,
+      "target_career_goals": 7,
+      "target_career_span": "1986-1986"
+    },
+    {
+      "affected_pick_count": 1,
+      "captured_afltables_href": "players/D/Darren_Williams.html",
+      "child_membership": "bridged",
+      "contradiction_reason": "ZERO_GAME_DRAFTEE_RESOLVES_TO_RETIRED_NAMESAKE",
+      "draftguru_games": 0,
+      "draftguru_goals": 0,
+      "draftguru_name": "Darren Williams",
+      "draftguru_url": "https://www.draftguru.com.au/players/darren_williams/1",
+      "earliest_original_recruitment_event": "Pre-Season",
+      "earliest_original_recruitment_year": 1990,
+      "operator_verdict": "",
+      "reason_codes": [
+        "BIRTH_YEAR_CONSISTENT",
+        "DEBUT_BEFORE_EARLIEST_RECRUITMENT",
+        "CAREER_ENDED_BEFORE_EARLIEST_RECRUITMENT",
+        "GAMES_INCONSISTENT",
+        "CLUB_HISTORY_OVERLAPS"
+      ],
+      "recommended_disposition": "exclude_from_bridge",
+      "retained_target_identity": [
+        "1372"
+      ],
+      "retained_target_name": "Darren Williams",
+      "sample_bucket": "non_sample",
+      "sample_status": "non_sample",
+      "target_career_games": 109,
+      "target_career_goals": 94,
+      "target_career_span": "1979-1989"
+    },
+    {
+      "affected_pick_count": 1,
+      "captured_afltables_href": "players/D/David_Sullivan.html",
+      "child_membership": "bridged",
+      "contradiction_reason": "ZERO_GAME_DRAFTEE_RESOLVES_TO_RETIRED_NAMESAKE",
+      "draftguru_games": 0,
+      "draftguru_goals": 0,
+      "draftguru_name": "David Sullivan",
+      "draftguru_url": "https://www.draftguru.com.au/players/david_sullivan/1",
+      "earliest_original_recruitment_event": "Pre-Season",
+      "earliest_original_recruitment_year": 1989,
+      "operator_verdict": "",
+      "reason_codes": [
+        "BIRTH_YEAR_CONSISTENT",
+        "DEBUT_BEFORE_EARLIEST_RECRUITMENT",
+        "CAREER_ENDED_BEFORE_EARLIEST_RECRUITMENT",
+        "GAMES_INCONSISTENT"
+      ],
+      "recommended_disposition": "exclude_from_bridge",
+      "retained_target_identity": [
+        "11323"
+      ],
+      "retained_target_name": "David Sullivan",
+      "sample_bucket": "non_sample",
+      "sample_status": "non_sample",
+      "target_career_games": 11,
+      "target_career_goals": 14,
+      "target_career_span": "1986-1988"
+    },
+    {
+      "affected_pick_count": 1,
+      "captured_afltables_href": "players/D/David_Williams.html",
+      "child_membership": "bridged",
+      "contradiction_reason": "ZERO_GAME_DRAFTEE_RESOLVES_TO_RETIRED_NAMESAKE",
+      "draftguru_games": 0,
+      "draftguru_goals": 0,
+      "draftguru_name": "David Williams",
+      "draftguru_url": "https://www.draftguru.com.au/players/david_williams/1",
+      "earliest_original_recruitment_event": "Pre-Season",
+      "earliest_original_recruitment_year": 1989,
+      "operator_verdict": "",
+      "reason_codes": [
+        "BIRTH_YEAR_CONSISTENT_TOLERANCE",
+        "DEBUT_BEFORE_EARLIEST_RECRUITMENT",
+        "CAREER_ENDED_BEFORE_EARLIEST_RECRUITMENT",
+        "GAMES_INCONSISTENT"
+      ],
+      "recommended_disposition": "exclude_from_bridge",
+      "retained_target_identity": [
+        "2284"
+      ],
+      "retained_target_name": "David Williams",
+      "sample_bucket": "random",
+      "sample_status": "originally_sampled",
+      "target_career_games": 67,
+      "target_career_goals": 102,
+      "target_career_span": "1983-1988"
+    },
+    {
+      "affected_pick_count": 1,
+      "captured_afltables_href": "players/G/Gary_Keane.html",
+      "child_membership": "bridged",
+      "contradiction_reason": "ZERO_GAME_DRAFTEE_RESOLVES_TO_RETIRED_NAMESAKE",
+      "draftguru_games": 0,
+      "draftguru_goals": 0,
+      "draftguru_name": "Gary Keane",
+      "draftguru_url": "https://www.draftguru.com.au/players/gary_keane/1",
+      "earliest_original_recruitment_event": null,
+      "earliest_original_recruitment_year": null,
+      "operator_verdict": "",
+      "reason_codes": [
+        "BIRTH_YEAR_CONSISTENT",
+        "CAREER_ENDED_BEFORE_EARLIEST_RECRUITMENT",
+        "GAMES_INCONSISTENT"
+      ],
+      "recommended_disposition": "exclude_from_bridge",
+      "retained_target_identity": [
+        "1862"
+      ],
+      "retained_target_name": "Gary Keane",
+      "sample_bucket": "non_sample",
+      "sample_status": "non_sample",
+      "target_career_games": 55,
+      "target_career_goals": 55,
+      "target_career_span": "1985-1988"
+    },
+    {
+      "affected_pick_count": 1,
+      "captured_afltables_href": "players/G/Glen_Bartlett.html",
+      "child_membership": "bridged",
+      "contradiction_reason": "ZERO_GAME_DRAFTEE_RESOLVES_TO_RETIRED_NAMESAKE",
+      "draftguru_games": 0,
+      "draftguru_goals": 0,
+      "draftguru_name": "Glen Bartlett",
+      "draftguru_url": "https://www.draftguru.com.au/players/glen_bartlett/1",
+      "earliest_original_recruitment_event": "Mid-Season",
+      "earliest_original_recruitment_year": 1989,
+      "operator_verdict": "",
+      "reason_codes": [
+        "BIRTH_YEAR_CONSISTENT",
+        "DEBUT_BEFORE_EARLIEST_RECRUITMENT",
+        "CAREER_ENDED_BEFORE_EARLIEST_RECRUITMENT",
+        "GAMES_INCONSISTENT"
+      ],
+      "recommended_disposition": "exclude_from_bridge",
+      "retained_target_identity": [
+        "11339"
+      ],
+      "retained_target_name": "Glen Bartlett",
+      "sample_bucket": "random",
+      "sample_status": "originally_sampled",
+      "target_career_games": 4,
+      "target_career_goals": 0,
+      "target_career_span": "1987-1987"
+    },
+    {
+      "affected_pick_count": 1,
+      "captured_afltables_href": "players/I/Ian_Rickman.html",
+      "child_membership": "bridged",
+      "contradiction_reason": "ZERO_GAME_DRAFTEE_RESOLVES_TO_RETIRED_NAMESAKE",
+      "draftguru_games": 0,
+      "draftguru_goals": 0,
+      "draftguru_name": "Ian Rickman",
+      "draftguru_url": "https://www.draftguru.com.au/players/ian_rickman/1",
+      "earliest_original_recruitment_event": "Pre-Season",
+      "earliest_original_recruitment_year": 1989,
+      "operator_verdict": "",
+      "reason_codes": [
+        "BIRTH_YEAR_CONSISTENT",
+        "DEBUT_BEFORE_EARLIEST_RECRUITMENT",
+        "CAREER_ENDED_BEFORE_EARLIEST_RECRUITMENT",
+        "GAMES_INCONSISTENT",
+        "CLUB_HISTORY_OVERLAPS"
+      ],
+      "recommended_disposition": "exclude_from_bridge",
+      "retained_target_identity": [
+        "2112"
+      ],
+      "retained_target_name": "Ian Rickman",
+      "sample_bucket": "non_sample",
+      "sample_status": "non_sample",
+      "target_career_games": 11,
+      "target_career_goals": 10,
+      "target_career_span": "1982-1984"
+    },
+    {
+      "affected_pick_count": 1,
+      "captured_afltables_href": "players/J/John_Ahern.html",
+      "child_membership": "bridged",
+      "contradiction_reason": "ZERO_GAME_DRAFTEE_RESOLVES_TO_RETIRED_NAMESAKE",
+      "draftguru_games": 0,
+      "draftguru_goals": 0,
+      "draftguru_name": "John Ahern",
+      "draftguru_url": "https://www.draftguru.com.au/players/john_ahern/1",
+      "earliest_original_recruitment_event": null,
+      "earliest_original_recruitment_year": null,
+      "operator_verdict": "",
+      "reason_codes": [
+        "BIRTH_YEAR_CONSISTENT",
+        "CAREER_ENDED_BEFORE_EARLIEST_RECRUITMENT",
+        "GAMES_INCONSISTENT"
+      ],
+      "recommended_disposition": "exclude_from_bridge",
+      "retained_target_identity": [
+        "11424"
+      ],
+      "retained_target_name": "John Ahern",
+      "sample_bucket": "non_sample",
+      "sample_status": "non_sample",
+      "target_career_games": 2,
+      "target_career_goals": 0,
+      "target_career_span": "1989-1989"
+    },
+    {
+      "affected_pick_count": 1,
+      "captured_afltables_href": "players/J/John_Peter-Budge.html",
+      "child_membership": "bridged",
+      "contradiction_reason": "ZERO_GAME_DRAFTEE_RESOLVES_TO_RETIRED_NAMESAKE",
+      "draftguru_games": 0,
+      "draftguru_goals": 0,
+      "draftguru_name": "John Peter-Budge",
+      "draftguru_url": "https://www.draftguru.com.au/players/john_peter-budge/1",
+      "earliest_original_recruitment_event": "National",
+      "earliest_original_recruitment_year": 1990,
+      "operator_verdict": "",
+      "reason_codes": [
+        "BIRTH_YEAR_CONSISTENT",
+        "DEBUT_BEFORE_EARLIEST_RECRUITMENT",
+        "CAREER_ENDED_BEFORE_EARLIEST_RECRUITMENT",
+        "GAMES_INCONSISTENT"
+      ],
+      "recommended_disposition": "exclude_from_bridge",
+      "retained_target_identity": [
+        "11303"
+      ],
+      "retained_target_name": "John Peter-Budge",
+      "sample_bucket": "non_sample",
+      "sample_status": "non_sample",
+      "target_career_games": 45,
+      "target_career_goals": 26,
+      "target_career_span": "1986-1988"
+    },
+    {
+      "affected_pick_count": 1,
+      "captured_afltables_href": "players/M/Mark_McLeod.html",
+      "child_membership": "bridged",
+      "contradiction_reason": "ZERO_GAME_DRAFTEE_RESOLVES_TO_RETIRED_NAMESAKE",
+      "draftguru_games": 0,
+      "draftguru_goals": 0,
+      "draftguru_name": "Mark McLeod",
+      "draftguru_url": "https://www.draftguru.com.au/players/mark_mcleod/1",
+      "earliest_original_recruitment_event": "Pre-Season",
+      "earliest_original_recruitment_year": 1990,
+      "operator_verdict": "",
+      "reason_codes": [
+        "BIRTH_YEAR_CONSISTENT_TOLERANCE",
+        "DEBUT_BEFORE_EARLIEST_RECRUITMENT",
+        "CAREER_ENDED_BEFORE_EARLIEST_RECRUITMENT",
+        "GAMES_INCONSISTENT"
+      ],
+      "recommended_disposition": "exclude_from_bridge",
+      "retained_target_identity": [
+        "11432"
+      ],
+      "retained_target_name": "Mark McLeod",
+      "sample_bucket": "non_sample",
+      "sample_status": "non_sample",
+      "target_career_games": 3,
+      "target_career_goals": 0,
+      "target_career_span": "1989-1989"
+    },
+    {
+      "affected_pick_count": 1,
+      "captured_afltables_href": "players/M/Mark_Pitura.html",
+      "child_membership": "bridged",
+      "contradiction_reason": "ZERO_GAME_DRAFTEE_RESOLVES_TO_RETIRED_NAMESAKE",
+      "draftguru_games": 0,
+      "draftguru_goals": 0,
+      "draftguru_name": "Mark Pitura",
+      "draftguru_url": "https://www.draftguru.com.au/players/mark_pitura/1",
+      "earliest_original_recruitment_event": "Pre-Season",
+      "earliest_original_recruitment_year": 1995,
+      "operator_verdict": "",
+      "reason_codes": [
+        "BIRTH_YEAR_CONSISTENT",
+        "DEBUT_BEFORE_EARLIEST_RECRUITMENT",
+        "CAREER_ENDED_BEFORE_EARLIEST_RECRUITMENT",
+        "GAMES_INCONSISTENT"
+      ],
+      "recommended_disposition": "exclude_from_bridge",
+      "retained_target_identity": [
+        "4020"
+      ],
+      "retained_target_name": "Mark Pitura",
+      "sample_bucket": "non_sample",
+      "sample_status": "non_sample",
+      "target_career_games": 2,
+      "target_career_goals": 0,
+      "target_career_span": "1993-1993"
+    },
+    {
+      "affected_pick_count": 1,
+      "captured_afltables_href": "players/N/Nathan_Irvin.html",
+      "child_membership": "bridged",
+      "contradiction_reason": "ZERO_GAME_DRAFTEE_RESOLVES_TO_RETIRED_NAMESAKE",
+      "draftguru_games": 0,
+      "draftguru_goals": 0,
+      "draftguru_name": "Nathan Irvin",
+      "draftguru_url": "https://www.draftguru.com.au/players/nathan_irvin/1",
+      "earliest_original_recruitment_event": "National",
+      "earliest_original_recruitment_year": 1994,
+      "operator_verdict": "",
+      "reason_codes": [
+        "BIRTH_YEAR_CONSISTENT",
+        "DEBUT_BEFORE_EARLIEST_RECRUITMENT",
+        "CAREER_ENDED_BEFORE_EARLIEST_RECRUITMENT",
+        "GAMES_INCONSISTENT"
+      ],
+      "recommended_disposition": "exclude_from_bridge",
+      "retained_target_identity": [
+        "4032"
+      ],
+      "retained_target_name": "Nathan Irvin",
+      "sample_bucket": "non_sample",
+      "sample_status": "non_sample",
+      "target_career_games": 1,
+      "target_career_goals": 0,
+      "target_career_span": "1993-1993"
+    },
+    {
+      "affected_pick_count": 1,
+      "captured_afltables_href": "players/P/Paul_Mifka.html",
+      "child_membership": "bridged",
+      "contradiction_reason": "ZERO_GAME_DRAFTEE_RESOLVES_TO_RETIRED_NAMESAKE",
+      "draftguru_games": 0,
+      "draftguru_goals": 0,
+      "draftguru_name": "Paul Mifka",
+      "draftguru_url": "https://www.draftguru.com.au/players/paul_mifka/1",
+      "earliest_original_recruitment_event": "Pre-Draft",
+      "earliest_original_recruitment_year": 1990,
+      "operator_verdict": "",
+      "reason_codes": [
+        "BIRTH_YEAR_CONSISTENT",
+        "DEBUT_BEFORE_EARLIEST_RECRUITMENT",
+        "CAREER_ENDED_BEFORE_EARLIEST_RECRUITMENT",
+        "GAMES_INCONSISTENT"
+      ],
+      "recommended_disposition": "exclude_from_bridge",
+      "retained_target_identity": [
+        "11343"
+      ],
+      "retained_target_name": "Paul Mifka",
+      "sample_bucket": "non_sample",
+      "sample_status": "non_sample",
+      "target_career_games": 1,
+      "target_career_goals": 0,
+      "target_career_span": "1987-1987"
+    },
+    {
+      "affected_pick_count": 1,
+      "captured_afltables_href": "players/P/Peter_Freeman.html",
+      "child_membership": "bridged",
+      "contradiction_reason": "ZERO_GAME_DRAFTEE_RESOLVES_TO_RETIRED_NAMESAKE",
+      "draftguru_games": 0,
+      "draftguru_goals": 0,
+      "draftguru_name": "Peter Freeman",
+      "draftguru_url": "https://www.draftguru.com.au/players/peter_freeman/1",
+      "earliest_original_recruitment_event": "National",
+      "earliest_original_recruitment_year": 1991,
+      "operator_verdict": "",
+      "reason_codes": [
+        "BIRTH_YEAR_CONSISTENT",
+        "DEBUT_BEFORE_EARLIEST_RECRUITMENT",
+        "CAREER_ENDED_BEFORE_EARLIEST_RECRUITMENT",
+        "GAMES_INCONSISTENT"
+      ],
+      "recommended_disposition": "exclude_from_bridge",
+      "retained_target_identity": [
+        "11394"
+      ],
+      "retained_target_name": "Peter Freeman",
+      "sample_bucket": "non_sample",
+      "sample_status": "non_sample",
+      "target_career_games": 5,
+      "target_career_goals": 0,
+      "target_career_span": "1988-1990"
+    },
+    {
+      "affected_pick_count": 1,
+      "captured_afltables_href": "players/P/Peter_Whyte.html",
+      "child_membership": "bridged",
+      "contradiction_reason": "ZERO_GAME_DRAFTEE_RESOLVES_TO_RETIRED_NAMESAKE",
+      "draftguru_games": 0,
+      "draftguru_goals": 0,
+      "draftguru_name": "Peter Whyte",
+      "draftguru_url": "https://www.draftguru.com.au/players/peter_whyte/1",
+      "earliest_original_recruitment_event": "National",
+      "earliest_original_recruitment_year": 1990,
+      "operator_verdict": "",
+      "reason_codes": [
+        "BIRTH_YEAR_CONSISTENT",
+        "DEBUT_BEFORE_EARLIEST_RECRUITMENT",
+        "CAREER_ENDED_BEFORE_EARLIEST_RECRUITMENT",
+        "GAMES_INCONSISTENT"
+      ],
+      "recommended_disposition": "exclude_from_bridge",
+      "retained_target_identity": [
+        "11322"
+      ],
+      "retained_target_name": "Peter Whyte",
+      "sample_bucket": "random",
+      "sample_status": "originally_sampled",
+      "target_career_games": 22,
+      "target_career_goals": 3,
+      "target_career_span": "1986-1988"
+    },
+    {
+      "affected_pick_count": 1,
+      "captured_afltables_href": "players/R/Rodney_Gladman.html",
+      "child_membership": "bridged",
+      "contradiction_reason": "ZERO_GAME_DRAFTEE_RESOLVES_TO_RETIRED_NAMESAKE",
+      "draftguru_games": 0,
+      "draftguru_goals": 0,
+      "draftguru_name": "Rodney Gladman",
+      "draftguru_url": "https://www.draftguru.com.au/players/rodney_gladman/1",
+      "earliest_original_recruitment_event": "Pre-Season",
+      "earliest_original_recruitment_year": 1989,
+      "operator_verdict": "",
+      "reason_codes": [
+        "BIRTH_YEAR_CONSISTENT",
+        "DEBUT_BEFORE_EARLIEST_RECRUITMENT",
+        "CAREER_ENDED_BEFORE_EARLIEST_RECRUITMENT",
+        "GAMES_INCONSISTENT"
+      ],
+      "recommended_disposition": "exclude_from_bridge",
+      "retained_target_identity": [
+        "11337"
+      ],
+      "retained_target_name": "Rodney Gladman",
+      "sample_bucket": "non_sample",
+      "sample_status": "non_sample",
+      "target_career_games": 1,
+      "target_career_goals": 0,
+      "target_career_span": "1987-1987"
+    },
+    {
+      "affected_pick_count": 1,
+      "captured_afltables_href": "players/S/Simon_Taylor0.html",
+      "child_membership": "bridged",
+      "contradiction_reason": "ZERO_GAME_DRAFTEE_RESOLVES_TO_RETIRED_NAMESAKE",
+      "draftguru_games": 0,
+      "draftguru_goals": 0,
+      "draftguru_name": "Simon Taylor",
+      "draftguru_url": "https://www.draftguru.com.au/players/simon_taylor/1",
+      "earliest_original_recruitment_event": "Pre-Season",
+      "earliest_original_recruitment_year": 1991,
+      "operator_verdict": "",
+      "reason_codes": [
+        "BIRTH_YEAR_CONSISTENT",
+        "DEBUT_BEFORE_EARLIEST_RECRUITMENT",
+        "CAREER_ENDED_BEFORE_EARLIEST_RECRUITMENT",
+        "GAMES_INCONSISTENT"
+      ],
+      "recommended_disposition": "exclude_from_bridge",
+      "retained_target_identity": [
+        "11448"
+      ],
+      "retained_target_name": "Simon Taylor",
+      "sample_bucket": "random",
+      "sample_status": "originally_sampled",
+      "target_career_games": 2,
+      "target_career_goals": 1,
+      "target_career_span": "1989-1989"
+    },
+    {
+      "affected_pick_count": 1,
+      "captured_afltables_href": "players/T/Tim_Bourke.html",
+      "child_membership": "bridged",
+      "contradiction_reason": "ZERO_GAME_DRAFTEE_RESOLVES_TO_RETIRED_NAMESAKE",
+      "draftguru_games": 0,
+      "draftguru_goals": 0,
+      "draftguru_name": "Tim Bourke",
+      "draftguru_url": "https://www.draftguru.com.au/players/tim_bourke/1",
+      "earliest_original_recruitment_event": null,
+      "earliest_original_recruitment_year": null,
+      "operator_verdict": "",
+      "reason_codes": [
+        "BIRTH_YEAR_CONSISTENT",
+        "CAREER_ENDED_BEFORE_EARLIEST_RECRUITMENT",
+        "GAMES_INCONSISTENT"
+      ],
+      "recommended_disposition": "exclude_from_bridge",
+      "retained_target_identity": [
+        "11442"
+      ],
+      "retained_target_name": "Tim Bourke",
+      "sample_bucket": "random",
+      "sample_status": "originally_sampled",
+      "target_career_games": 5,
+      "target_career_goals": 0,
+      "target_career_span": "1989-1990"
+    },
+    {
+      "affected_pick_count": 1,
+      "captured_afltables_href": "players/T/Tony_Furey.html",
+      "child_membership": "bridged",
+      "contradiction_reason": "ZERO_GAME_DRAFTEE_RESOLVES_TO_RETIRED_NAMESAKE",
+      "draftguru_games": 0,
+      "draftguru_goals": 0,
+      "draftguru_name": "Tony Furey",
+      "draftguru_url": "https://www.draftguru.com.au/players/tony_furey/1",
+      "earliest_original_recruitment_event": "Pre-Season",
+      "earliest_original_recruitment_year": 1988,
+      "operator_verdict": "",
+      "reason_codes": [
+        "BIRTH_YEAR_CONSISTENT",
+        "DEBUT_BEFORE_EARLIEST_RECRUITMENT",
+        "CAREER_ENDED_BEFORE_EARLIEST_RECRUITMENT",
+        "GAMES_INCONSISTENT",
+        "CLUB_HISTORY_OVERLAPS"
+      ],
+      "recommended_disposition": "exclude_from_bridge",
+      "retained_target_identity": [
+        "1743"
+      ],
+      "retained_target_name": "Tony Furey",
+      "sample_bucket": "non_sample",
+      "sample_status": "non_sample",
+      "target_career_games": 41,
+      "target_career_goals": 29,
+      "target_career_span": "1983-1985"
+    }
+  ],
+  "human_authority_overlap_rows": [
+    {
+      "affected_pick_count": 1,
+      "captured_afltables_href": "players/M/Matthew_Rendell.html",
+      "draftguru_url": "https://www.draftguru.com.au/players/matt_rendell/1",
+      "ledger_status": "linked_agreeing",
+      "recommended_disposition": "retain_human_authority",
+      "retained_target_name": "Matthew Rendell",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "captured_afltables_href": "players/N/Nat_Fyfe.html",
+      "draftguru_url": "https://www.draftguru.com.au/players/nathan_fyfe/1",
+      "ledger_status": "linked_agreeing",
+      "recommended_disposition": "retain_human_authority",
+      "retained_target_name": "Nat Fyfe",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "captured_afltables_href": "players/R/Ryan_OKeefe.html",
+      "draftguru_url": "https://www.draftguru.com.au/players/ryan_o'keefe/1",
+      "ledger_status": "linked_agreeing",
+      "recommended_disposition": "retain_human_authority",
+      "retained_target_name": "Ryan OKeefe",
+      "sample_bucket": "non_sample"
+    }
+  ],
+  "insufficient_evidence_groups": {
+    "OFFLINE_LIMITED": {
+      "count": 13,
+      "game_positive": 12,
+      "game_unknown": 0,
+      "game_zero": 1,
+      "pick_sum": 20,
+      "recommended_disposition": "withhold",
+      "sample_bucket": {
+        "census": 2,
+        "non_sample": 11
+      },
+      "target_registered": 13,
+      "target_unregistered": 0
+    },
+    "TARGET_NOT_REGISTERED_NO_EVIDENCE": {
+      "count": 94,
+      "game_positive": 94,
+      "game_unknown": 0,
+      "game_zero": 0,
+      "pick_sum": 98,
+      "recommended_disposition": "withhold",
+      "sample_bucket": {
+        "census": 11,
+        "non_sample": 70,
+        "random": 13
+      },
+      "target_registered": 0,
+      "target_unregistered": 94
+    }
+  },
+  "insufficient_evidence_rows_full": [
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 1,
+      "player_url": "https://www.draftguru.com.au/players/aidan_schubert/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 3,
+      "player_url": "https://www.draftguru.com.au/players/alex_van%20wyk/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 16,
+      "player_url": "https://www.draftguru.com.au/players/angus_anderson/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "random"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 2,
+      "player_url": "https://www.draftguru.com.au/players/archie_ludowyke/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 6,
+      "player_url": "https://www.draftguru.com.au/players/balyn_o'brien/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 9,
+      "player_url": "https://www.draftguru.com.au/players/beau_addinsall/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 9,
+      "player_url": "https://www.draftguru.com.au/players/billy_cootee/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "random"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 5,
+      "player_url": "https://www.draftguru.com.au/players/bodie_ryan/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 3,
+      "child_status": "bridged",
+      "draftguru_games": 300,
+      "player_url": "https://www.draftguru.com.au/players/brad_hill/1",
+      "population_reason": "OFFLINE_LIMITED",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "bridged",
+      "draftguru_games": 9,
+      "player_url": "https://www.draftguru.com.au/players/bradley_lynch/1",
+      "population_reason": "OFFLINE_LIMITED",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 2,
+      "player_url": "https://www.draftguru.com.au/players/caleb_lewis/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "random"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 4,
+      "player_url": "https://www.draftguru.com.au/players/cam_nairn/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 2,
+      "child_status": "bridged",
+      "draftguru_games": 70,
+      "player_url": "https://www.draftguru.com.au/players/cameron_mccarthy/1",
+      "population_reason": "OFFLINE_LIMITED",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 2,
+      "child_status": "bridged",
+      "draftguru_games": 113,
+      "player_url": "https://www.draftguru.com.au/players/cameron_sutcliffe/1",
+      "population_reason": "OFFLINE_LIMITED",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 10,
+      "player_url": "https://www.draftguru.com.au/players/campbell_lake/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 3,
+      "player_url": "https://www.draftguru.com.au/players/charlie_banfield/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 2,
+      "player_url": "https://www.draftguru.com.au/players/charlie_edwards/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 9,
+      "player_url": "https://www.draftguru.com.au/players/chris_scerri/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 4,
+      "player_url": "https://www.draftguru.com.au/players/cody_curtin/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 16,
+      "player_url": "https://www.draftguru.com.au/players/cooper_duff-tytler/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "census"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 3,
+      "player_url": "https://www.draftguru.com.au/players/daniel_annable/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "census"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 99,
+      "player_url": "https://www.draftguru.com.au/players/dean_laidley/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 5,
+      "player_url": "https://www.draftguru.com.au/players/dylan_patterson/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "census"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 15,
+      "player_url": "https://www.draftguru.com.au/players/dyson_sharp/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 2,
+      "child_status": "bridged",
+      "draftguru_games": 50,
+      "player_url": "https://www.draftguru.com.au/players/elliot_himmelberg/1",
+      "population_reason": "OFFLINE_LIMITED",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 1,
+      "player_url": "https://www.draftguru.com.au/players/flynn_riley/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 20,
+      "player_url": "https://www.draftguru.com.au/players/harry_dean/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "census"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 10,
+      "player_url": "https://www.draftguru.com.au/players/harry_kyle/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 5,
+      "player_url": "https://www.draftguru.com.au/players/harry_oliver/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "bridged",
+      "draftguru_games": 13,
+      "player_url": "https://www.draftguru.com.au/players/hewago%20paul_oea/1",
+      "population_reason": "OFFLINE_LIMITED",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 2,
+      "child_status": "target_not_registered",
+      "draftguru_games": 11,
+      "player_url": "https://www.draftguru.com.au/players/hugo_hall-kahan/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 9,
+      "player_url": "https://www.draftguru.com.au/players/hussien_el%20achkar/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 5,
+      "player_url": "https://www.draftguru.com.au/players/jack_dalton/2",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 8,
+      "player_url": "https://www.draftguru.com.au/players/jack_ison/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 5,
+      "player_url": "https://www.draftguru.com.au/players/jack_ough/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 11,
+      "player_url": "https://www.draftguru.com.au/players/jack_watkins/2",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 21,
+      "player_url": "https://www.draftguru.com.au/players/jacob_farrow/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "census"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 23,
+      "player_url": "https://www.draftguru.com.au/players/jagga_smith/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "census"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 9,
+      "player_url": "https://www.draftguru.com.au/players/jai_murray/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 6,
+      "player_url": "https://www.draftguru.com.au/players/jaxon_artemis/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 6,
+      "player_url": "https://www.draftguru.com.au/players/jay_polkinghorne/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 10,
+      "player_url": "https://www.draftguru.com.au/players/joel_fitzgerald/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 2,
+      "child_status": "bridged",
+      "draftguru_games": 20,
+      "player_url": "https://www.draftguru.com.au/players/jonathon_ross/1",
+      "population_reason": "OFFLINE_LIMITED",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 19,
+      "player_url": "https://www.draftguru.com.au/players/josh_lai/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "random"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 15,
+      "player_url": "https://www.draftguru.com.au/players/josh_lindsay/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "bridged",
+      "draftguru_games": 28,
+      "player_url": "https://www.draftguru.com.au/players/keith_thomas/2",
+      "population_reason": "OFFLINE_LIMITED",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "census"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 11,
+      "player_url": "https://www.draftguru.com.au/players/kye_annand/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 10,
+      "player_url": "https://www.draftguru.com.au/players/lachie_jaques/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 2,
+      "player_url": "https://www.draftguru.com.au/players/lachlan_carmichael/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 2,
+      "player_url": "https://www.draftguru.com.au/players/lachlan_smith/4",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 6,
+      "player_url": "https://www.draftguru.com.au/players/lachy_dovaston/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 16,
+      "player_url": "https://www.draftguru.com.au/players/latrelle_pickett/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 8,
+      "player_url": "https://www.draftguru.com.au/players/liam_puncher/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 7,
+      "player_url": "https://www.draftguru.com.au/players/louis_emmett/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 2,
+      "player_url": "https://www.draftguru.com.au/players/lukas_cooke/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 6,
+      "player_url": "https://www.draftguru.com.au/players/luke_kennedy/2",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 3,
+      "player_url": "https://www.draftguru.com.au/players/luker_kentfield/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 10,
+      "player_url": "https://www.draftguru.com.au/players/marcus_herbert/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 2,
+      "player_url": "https://www.draftguru.com.au/players/matt_hill/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 2,
+      "child_status": "target_not_registered",
+      "draftguru_games": 107,
+      "player_url": "https://www.draftguru.com.au/players/matthew_capuano/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 2,
+      "player_url": "https://www.draftguru.com.au/players/max_beattie/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 12,
+      "player_url": "https://www.draftguru.com.au/players/max_kondogiannis/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 23,
+      "player_url": "https://www.draftguru.com.au/players/michael_sellwood/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 20,
+      "player_url": "https://www.draftguru.com.au/players/milan_murdock/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "random"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 18,
+      "player_url": "https://www.draftguru.com.au/players/mitch_edwards/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "random"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 2,
+      "player_url": "https://www.draftguru.com.au/players/mitch_podhajski/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "random"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 9,
+      "player_url": "https://www.draftguru.com.au/players/mitch_zadow/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "random"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 2,
+      "player_url": "https://www.draftguru.com.au/players/noah_howes/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "random"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 4,
+      "player_url": "https://www.draftguru.com.au/players/noah_mraz/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "random"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 3,
+      "player_url": "https://www.draftguru.com.au/players/noah_roberts-thomson/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "bridged",
+      "draftguru_games": 16,
+      "player_url": "https://www.draftguru.com.au/players/oli_wiltshire/1",
+      "population_reason": "OFFLINE_LIMITED",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 4,
+      "player_url": "https://www.draftguru.com.au/players/oliver_francou/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 7,
+      "player_url": "https://www.draftguru.com.au/players/oliver_hayes-brown/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 4,
+      "player_url": "https://www.draftguru.com.au/players/ollie_greeves/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 5,
+      "player_url": "https://www.draftguru.com.au/players/ollie_hannaford/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 2,
+      "player_url": "https://www.draftguru.com.au/players/oscar_ryan/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 8,
+      "player_url": "https://www.draftguru.com.au/players/oscar_steene/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 11,
+      "player_url": "https://www.draftguru.com.au/players/paddy_cross/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "bridged",
+      "draftguru_games": 4,
+      "player_url": "https://www.draftguru.com.au/players/patrick_kerr/1",
+      "population_reason": "OFFLINE_LIMITED",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 2,
+      "child_status": "target_not_registered",
+      "draftguru_games": 18,
+      "player_url": "https://www.draftguru.com.au/players/patrick_retschko/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 16,
+      "player_url": "https://www.draftguru.com.au/players/phoenix_gothard/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "bridged",
+      "draftguru_games": 145,
+      "player_url": "https://www.draftguru.com.au/players/richie_vandenberg/1",
+      "population_reason": "OFFLINE_LIMITED",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 8,
+      "player_url": "https://www.draftguru.com.au/players/riley_hamilton/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 14,
+      "player_url": "https://www.draftguru.com.au/players/sam_cumming/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "census"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 21,
+      "player_url": "https://www.draftguru.com.au/players/sam_grlj/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "census"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 8,
+      "player_url": "https://www.draftguru.com.au/players/sam_swadling/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "random"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 15,
+      "player_url": "https://www.draftguru.com.au/players/sullivan_robey/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "census"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 18,
+      "player_url": "https://www.draftguru.com.au/players/talor_byrne/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 2,
+      "player_url": "https://www.draftguru.com.au/players/taylor_goad/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 2,
+      "child_status": "bridged",
+      "draftguru_games": 0,
+      "player_url": "https://www.draftguru.com.au/players/terry_board/2",
+      "population_reason": "OFFLINE_LIMITED",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "bridged",
+      "draftguru_games": 1,
+      "player_url": "https://www.draftguru.com.au/players/tim_walsh/1",
+      "population_reason": "OFFLINE_LIMITED",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "census"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 13,
+      "player_url": "https://www.draftguru.com.au/players/toby_murray/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "random"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 1,
+      "player_url": "https://www.draftguru.com.au/players/tobyn_murray/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 5,
+      "player_url": "https://www.draftguru.com.au/players/tom_anastasopoulos/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 17,
+      "player_url": "https://www.draftguru.com.au/players/tom_blamires/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 5,
+      "player_url": "https://www.draftguru.com.au/players/tom_burton/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 2,
+      "child_status": "target_not_registered",
+      "draftguru_games": 14,
+      "player_url": "https://www.draftguru.com.au/players/wade_derksen/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 14,
+      "player_url": "https://www.draftguru.com.au/players/will_edwards/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 3,
+      "player_url": "https://www.draftguru.com.au/players/will_green/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 12,
+      "player_url": "https://www.draftguru.com.au/players/will_lewis/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 4,
+      "player_url": "https://www.draftguru.com.au/players/will_mccabe/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 22,
+      "player_url": "https://www.draftguru.com.au/players/willem_duursma/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "census"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 10,
+      "player_url": "https://www.draftguru.com.au/players/xavier_bamert/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 2,
+      "player_url": "https://www.draftguru.com.au/players/xavier_taylor/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 2,
+      "player_url": "https://www.draftguru.com.au/players/zane_peucker/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 3,
+      "player_url": "https://www.draftguru.com.au/players/zane_zakostelsky/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "random"
+    },
+    {
+      "affected_pick_count": 1,
+      "child_status": "target_not_registered",
+      "draftguru_games": 17,
+      "player_url": "https://www.draftguru.com.au/players/zeke_uwland/1",
+      "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE",
+      "recommended_disposition": "withhold",
+      "sample_bucket": "census"
+    }
+  ],
+  "issue": "AFLDB-ISSUE-222",
+  "label": "20260918-v1",
+  "operator_decisions": [
+    {
+      "id": 1,
+      "operator_verdict": "",
+      "question": "Approve excluding all 23 confirmed_source_mislink rows from bridge v2 (exclude_from_bridge)?"
+    },
+    {
+      "id": 2,
+      "operator_verdict": "",
+      "question": "Approve withholding the 2 suspected_source_mislink rows pending manual confirmation (not excluding as mislinks)?"
+    },
+    {
+      "id": 3,
+      "operator_verdict": "",
+      "question": "Approve routing the 7 source_discrepancy_same_person rows to manual curation (not auto-admitting)?"
+    },
+    {
+      "id": 4,
+      "operator_verdict": "",
+      "question": "Approve withholding all 107 insufficient_evidence rows under Scenario B (default: withhold, not registration lag)?"
+    },
+    {
+      "id": 5,
+      "operator_verdict": "",
+      "question": "Approve retaining human authority for the 3 human_authority_overlap rows (matt_rendell/1, nathan_fyfe/1, ryan_o'keefe/1), outside the net-new bridge count?"
+    },
+    {
+      "id": 6,
+      "operator_verdict": "",
+      "question": "Is Scenario B (conservative: population_clean only, 3,422 net-new) the basis for a future bridge v2 dataset?"
+    },
+    {
+      "id": 7,
+      "operator_verdict": "",
+      "question": "Is an independent (Fable) review required before any bridge v2 generation?"
+    },
+    {
+      "id": 8,
+      "operator_verdict": "",
+      "question": "Sample redraw/top-up policy: retain the existing 997-row sample as-is / independent-salt v2 redraw / top-up the random stratum -- decision deferred to independent review per governance rule?"
+    }
+  ],
+  "phase_3_status": "PENDING -- this pack decides nothing, imports nothing, sets no operator_verdict",
+  "reconciliation": {
+    "affected_draft_pick_count_by_outcome": {
+      "confirmed_source_mislink": 23,
+      "human_authority_overlap": 3,
+      "insufficient_evidence": 118,
+      "population_clean": 5055,
+      "source_discrepancy_same_person": 11,
+      "suspected_source_mislink": 3,
+      "tooling_or_schema_error": 0
+    },
+    "by_outcome_x_child_status": {
+      "confirmed_source_mislink": {
+        "bridged": 23
+      },
+      "human_authority_overlap": {
+        "bridged": 3
+      },
+      "insufficient_evidence": {
+        "bridged": 13,
+        "target_not_registered": 94
+      },
+      "population_clean": {
+        "bridged": 3422
+      },
+      "source_discrepancy_same_person": {
+        "target_not_registered": 7
+      },
+      "suspected_source_mislink": {
+        "bridged": 2
+      },
+      "tooling_or_schema_error": {}
+    },
+    "by_outcome_x_draftguru_game_cohort": {
+      "confirmed_source_mislink": {
+        "zero": 23
+      },
+      "human_authority_overlap": {
+        "positive": 3
+      },
+      "insufficient_evidence": {
+        "positive": 106,
+        "zero": 1
+      },
+      "population_clean": {
+        "positive": 3401,
+        "zero": 21
+      },
+      "source_discrepancy_same_person": {
+        "positive": 7
+      },
+      "suspected_source_mislink": {
+        "positive": 2
+      },
+      "tooling_or_schema_error": {}
+    },
+    "by_outcome_x_ledger_status": {
+      "confirmed_source_mislink": {
+        "none": 23
+      },
+      "human_authority_overlap": {
+        "linked_agreeing": 3
+      },
+      "insufficient_evidence": {
+        "none": 107
+      },
+      "population_clean": {
+        "none": 3422
+      },
+      "source_discrepancy_same_person": {
+        "none": 7
+      },
+      "suspected_source_mislink": {
+        "none": 2
+      },
+      "tooling_or_schema_error": {}
+    },
+    "by_outcome_x_sample_bucket": {
+      "confirmed_source_mislink": {
+        "non_sample": 16,
+        "random": 7
+      },
+      "human_authority_overlap": {
+        "non_sample": 3
+      },
+      "insufficient_evidence": {
+        "census": 13,
+        "non_sample": 81,
+        "random": 13
+      },
+      "population_clean": {
+        "census": 385,
+        "non_sample": 2462,
+        "random": 575
+      },
+      "source_discrepancy_same_person": {
+        "census": 1,
+        "non_sample": 3,
+        "random": 3
+      },
+      "suspected_source_mislink": {
+        "non_sample": 2
+      },
+      "tooling_or_schema_error": {}
+    },
+    "census_stratum_non_clean_rows": [
+      {
+        "child_status": "target_not_registered",
+        "pick_count": 1,
+        "player_url": "https://www.draftguru.com.au/players/cooper_duff-tytler/1",
+        "population_outcome": "insufficient_evidence",
+        "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE"
+      },
+      {
+        "child_status": "target_not_registered",
+        "pick_count": 1,
+        "player_url": "https://www.draftguru.com.au/players/daniel_annable/1",
+        "population_outcome": "insufficient_evidence",
+        "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE"
+      },
+      {
+        "child_status": "target_not_registered",
+        "pick_count": 1,
+        "player_url": "https://www.draftguru.com.au/players/dylan_patterson/1",
+        "population_outcome": "insufficient_evidence",
+        "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE"
+      },
+      {
+        "child_status": "target_not_registered",
+        "pick_count": 1,
+        "player_url": "https://www.draftguru.com.au/players/harry_dean/1",
+        "population_outcome": "insufficient_evidence",
+        "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE"
+      },
+      {
+        "child_status": "target_not_registered",
+        "pick_count": 1,
+        "player_url": "https://www.draftguru.com.au/players/jacob_farrow/1",
+        "population_outcome": "insufficient_evidence",
+        "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE"
+      },
+      {
+        "child_status": "target_not_registered",
+        "pick_count": 1,
+        "player_url": "https://www.draftguru.com.au/players/jagga_smith/1",
+        "population_outcome": "insufficient_evidence",
+        "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE"
+      },
+      {
+        "child_status": "target_not_registered",
+        "pick_count": 2,
+        "player_url": "https://www.draftguru.com.au/players/joel_smith/1",
+        "population_outcome": "source_discrepancy_same_person",
+        "population_reason": "ALTERNATE_REGISTERED_IDENTITY_CORROBORATED"
+      },
+      {
+        "child_status": "bridged",
+        "pick_count": 1,
+        "player_url": "https://www.draftguru.com.au/players/keith_thomas/2",
+        "population_outcome": "insufficient_evidence",
+        "population_reason": "OFFLINE_LIMITED"
+      },
+      {
+        "child_status": "target_not_registered",
+        "pick_count": 1,
+        "player_url": "https://www.draftguru.com.au/players/sam_cumming/1",
+        "population_outcome": "insufficient_evidence",
+        "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE"
+      },
+      {
+        "child_status": "target_not_registered",
+        "pick_count": 1,
+        "player_url": "https://www.draftguru.com.au/players/sam_grlj/1",
+        "population_outcome": "insufficient_evidence",
+        "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE"
+      },
+      {
+        "child_status": "target_not_registered",
+        "pick_count": 1,
+        "player_url": "https://www.draftguru.com.au/players/sullivan_robey/1",
+        "population_outcome": "insufficient_evidence",
+        "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE"
+      },
+      {
+        "child_status": "bridged",
+        "pick_count": 1,
+        "player_url": "https://www.draftguru.com.au/players/tim_walsh/1",
+        "population_outcome": "insufficient_evidence",
+        "population_reason": "OFFLINE_LIMITED"
+      },
+      {
+        "child_status": "target_not_registered",
+        "pick_count": 1,
+        "player_url": "https://www.draftguru.com.au/players/willem_duursma/1",
+        "population_outcome": "insufficient_evidence",
+        "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE"
+      },
+      {
+        "child_status": "target_not_registered",
+        "pick_count": 1,
+        "player_url": "https://www.draftguru.com.au/players/zeke_uwland/1",
+        "population_outcome": "insufficient_evidence",
+        "population_reason": "TARGET_NOT_REGISTERED_NO_EVIDENCE"
+      }
+    ],
+    "distinct_draft_persons_by_outcome": {
+      "confirmed_source_mislink": 23,
+      "human_authority_overlap": 3,
+      "insufficient_evidence": 107,
+      "population_clean": 3422,
+      "source_discrepancy_same_person": 7,
+      "suspected_source_mislink": 2,
+      "tooling_or_schema_error": 0
+    },
+    "insufficient_evidence_groups": {
+      "OFFLINE_LIMITED": {
+        "count": 13,
+        "game_positive": 12,
+        "game_unknown": 0,
+        "game_zero": 1,
+        "pick_sum": 20,
+        "recommended_disposition": "withhold",
+        "sample_bucket": {
+          "census": 2,
+          "non_sample": 11
+        },
+        "target_registered": 13,
+        "target_unregistered": 0
+      },
+      "TARGET_NOT_REGISTERED_NO_EVIDENCE": {
+        "count": 94,
+        "game_positive": 94,
+        "game_unknown": 0,
+        "game_zero": 0,
+        "pick_sum": 98,
+        "recommended_disposition": "withhold",
+        "sample_bucket": {
+          "census": 11,
+          "non_sample": 70,
+          "random": 13
+        },
+        "target_registered": 0,
+        "target_unregistered": 94
+      }
+    },
+    "row_count_by_outcome": {
+      "confirmed_source_mislink": 23,
+      "human_authority_overlap": 3,
+      "insufficient_evidence": 107,
+      "population_clean": 3422,
+      "source_discrepancy_same_person": 7,
+      "suspected_source_mislink": 2,
+      "tooling_or_schema_error": 0
+    },
+    "target_not_registered_decomposition": {
+      "confirmed_or_suspected_that_are_target_not_registered": 0,
+      "insufficient_evidence_target_not_registered": 94,
+      "source_discrepancy_same_person_target_not_registered": 7,
+      "sum_check_equals_101": 101,
+      "total_target_not_registered_child_rows": 101
+    }
+  },
+  "sample_and_statistical_impact": {
+    "census_stratum_n": 399,
+    "confirmed_mislinks_by_bucket": {
+      "census": 0,
+      "non_sample": 16,
+      "random": 7
+    },
+    "discrepancy_by_bucket": {
+      "census": 1,
+      "non_sample": 3,
+      "random": 3
+    },
+    "original_598_random_selection_retained": true,
+    "random_stratum_clean_survivors_after_removing_confirmed_and_discrepancy_and_suspected": 588,
+    "random_stratum_n": 598,
+    "random_stratum_observed_failure_rate_pct": 1.171,
+    "random_stratum_observed_failures": 7,
+    "redraw_or_topup_decided_this_pass": false,
+    "redraw_recommendation": "Present for independent review, not decided here (governance rule): the random stratum was not a zero-failure draw as originally assumed, but the population scan has since exhaustively resolved the specific mechanism found. Whether an independent-salt v2 redraw or top-up is still warranted to bound OTHER undiscovered failure modes is an operator/independent-review decision (runbook Sec.7 item 9), not decided in this pass.",
+    "reviewed_clean_survivor_count_total_sample": 986,
+    "suspected_by_bucket": {
+      "census": 0,
+      "non_sample": 2,
+      "random": 0
+    },
+    "zero_failure_bound_original_claim_n598_pct": 0.5,
+    "zero_failure_bound_original_claim_status": "NOT VALID AS STATED -- the original O-3 claim of a zero-observed-failure bound on n=598 presupposed 0 failures; the Phase 3 sample review that prompted this population scan actually found 7 confirmed_source_mislink rows plus 3 source_discrepancy_same_person rows within the random stratum, so the n=598 draw was NOT a zero-failure sample for the mislink mechanism",
+    "zero_failure_bound_recalculated_n": 588,
+    "zero_failure_bound_recalculated_on_clean_survivors_pct": 0.508,
+    "zero_failure_bound_recalculated_validity": "Statistically valid ONLY as a residual bound on further-undiscovered failure MODES beyond the 23 confirmed_source_mislink signature, which this pass's population scan already resolved exhaustively (a census, not a sample, for that specific signature) across all 3,564 candidates. It is not needed to bound the confirmed-mislink rate itself, which is now known exactly (23/3564 = 0.645%, exhaustive)."
+  },
+  "scenario_a_remove_confirmed_only": {
+    "bridge_linked_picks": 5078,
+    "bridged_rows": 3440,
+    "excludes": "23 confirmed_source_mislink only",
+    "national_top10_note": "unchanged -- 0 of the 23 confirmed are in the census stratum (top-10 population)",
+    "national_top10_persons_covered": 387,
+    "national_top10_picks_covered": 389,
+    "net_new_bridge_rows": 3437,
+    "unlinked_picks": 1727,
+    "unresolved_persons": 1615
+  },
+  "scenario_b_conservative_proposed_import": {
+    "admits": "3,422 population_clean rows only; 3 human-authority overlaps retained outside the net-new count",
+    "bridge_linked_picks": 5055,
+    "bridged_rows": 3425,
+    "national_top10_affected_rows": [
+      "https://www.draftguru.com.au/players/keith_thomas/2",
+      "https://www.draftguru.com.au/players/tim_walsh/1"
+    ],
+    "national_top10_note": "2 currently-bridged national top-10 census person(s) additionally withheld (https://www.draftguru.com.au/players/keith_thomas/2, https://www.draftguru.com.au/players/tim_walsh/1), each holding exactly 1 affected pick per retained evidence; 0 of the 23 confirmed / 2 suspected / 7 discrepancy rows are in the census stratum",
+    "national_top10_persons_covered": 385,
+    "national_top10_picks_covered": 387,
+    "net_new_bridge_rows": 3422,
+    "unlinked_picks": 1750,
+    "unresolved_persons": 1630,
+    "withholds": "23 confirmed + 2 suspected + 7 same-person discrepancies (manual curation) + 107 insufficient_evidence"
+  },
+  "scenario_c_hypothetical_after_curation": {
+    "approved": false,
+    "basis": "Scenario B plus successful manual curation of all 7 source_discrepancy_same_person rows",
+    "bridge_linked_picks": 5066,
+    "hypothetical": true,
+    "national_top10_note": "1 of the 7 discrepancy rows (joel_smith/1) is in the census stratum but was ALREADY target_not_registered (not part of the current 387/389 baseline), so successful curation would be a net gain of at most 1 top-10 person/pick over Scenario B, not a restoration of a loss",
+    "net_new_bridge_rows": 3429,
+    "suspected_and_insufficient": "remain withheld, unchanged from Scenario B",
+    "unlinked_picks": 1739,
+    "unresolved_persons": 1623
+  },
+  "source_discrepancy_other_three_non_numbering_spelling": [
+    "https://www.draftguru.com.au/players/aaron_black/1",
+    "https://www.draftguru.com.au/players/alwyn_davey/1",
+    "https://www.draftguru.com.au/players/sam_butler/1"
+  ],
+  "source_discrepancy_same_person_rows": [
+    {
+      "affected_pick_count": 2,
+      "captured_afltables_href": "players/A/Aaron_Black.html",
+      "child_membership": "target_not_registered",
+      "clubs": [
+        "Geelong",
+        "North Melbourne"
+      ],
+      "corrected_identity_candidate": "players/A/Aaron_Black0.html",
+      "draftguru_birth_year": 1990,
+      "draftguru_games": 57,
+      "draftguru_url": "https://www.draftguru.com.au/players/aaron_black/1",
+      "operator_verdict": "",
+      "recommended_disposition": "manual_curation",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 1,
+      "captured_afltables_href": "players/A/Alwyn_Davey.html",
+      "child_membership": "target_not_registered",
+      "clubs": [
+        "Essendon"
+      ],
+      "corrected_identity_candidate": "players/A/Alwyn_Davey0.html",
+      "draftguru_birth_year": 1984,
+      "draftguru_games": 100,
+      "draftguru_url": "https://www.draftguru.com.au/players/alwyn_davey/1",
+      "operator_verdict": "",
+      "recommended_disposition": "manual_curation",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 2,
+      "captured_afltables_href": "players/J/Joel_Smith.html",
+      "child_membership": "target_not_registered",
+      "clubs": [
+        "Hawthorn",
+        "St Kilda"
+      ],
+      "corrected_identity_candidate": "players/J/Joel_Smith0.html",
+      "draftguru_birth_year": 1977,
+      "draftguru_games": 221,
+      "draftguru_url": "https://www.draftguru.com.au/players/joel_smith/1",
+      "operator_verdict": "",
+      "recommended_disposition": "manual_curation",
+      "sample_bucket": "census"
+    },
+    {
+      "affected_pick_count": 1,
+      "captured_afltables_href": "players/J/Josh_Smith.html",
+      "child_membership": "target_not_registered",
+      "clubs": [
+        "North Melbourne"
+      ],
+      "corrected_identity_candidate": "players/J/Josh_Smith0.html",
+      "draftguru_birth_year": 1986,
+      "draftguru_games": 11,
+      "draftguru_url": "https://www.draftguru.com.au/players/josh_smith/1",
+      "operator_verdict": "",
+      "recommended_disposition": "manual_curation",
+      "sample_bucket": "random"
+    },
+    {
+      "affected_pick_count": 1,
+      "captured_afltables_href": "players/S/Sam_Butler.html",
+      "child_membership": "target_not_registered",
+      "clubs": [
+        "West Coast"
+      ],
+      "corrected_identity_candidate": "players/S/Sam_Butler0.html",
+      "draftguru_birth_year": 1986,
+      "draftguru_games": 166,
+      "draftguru_url": "https://www.draftguru.com.au/players/sam_butler/1",
+      "operator_verdict": "",
+      "recommended_disposition": "manual_curation",
+      "sample_bucket": "non_sample"
+    },
+    {
+      "affected_pick_count": 2,
+      "captured_afltables_href": "players/S/Steven_Schwerdt.html",
+      "child_membership": "target_not_registered",
+      "clubs": [
+        "Adelaide",
+        "West Coast"
+      ],
+      "corrected_identity_candidate": "players/S/Stephen_Schwerdt.html",
+      "draftguru_birth_year": 1968,
+      "draftguru_games": 25,
+      "draftguru_url": "https://www.draftguru.com.au/players/stephen_schwerdt/1",
+      "operator_verdict": "",
+      "recommended_disposition": "manual_curation",
+      "sample_bucket": "random"
+    },
+    {
+      "affected_pick_count": 2,
+      "captured_afltables_href": "players/T/Tom_Murphy.html",
+      "child_membership": "target_not_registered",
+      "clubs": [
+        "Gold Coast",
+        "Hawthorn"
+      ],
+      "corrected_identity_candidate": "players/T/Tom_Murphy0.html",
+      "draftguru_birth_year": 1986,
+      "draftguru_games": 113,
+      "draftguru_url": "https://www.draftguru.com.au/players/tom_murphy/1",
+      "operator_verdict": "",
+      "recommended_disposition": "manual_curation",
+      "sample_bucket": "random"
+    }
+  ],
+  "source_population_scan": {
+    "csv": "docs/rebuild-manifests/draftguru/bridge-population-scan-20260918-v1.csv",
+    "json": "docs/rebuild-manifests/draftguru/bridge-population-scan-20260918-v1.json",
+    "manifest": "docs/rebuild-manifests/draftguru/bridge-population-scan-manifest-20260918-v1.json",
+    "rows_sha256": "ddd5faba8a292d91b52d5beef86f9aae91dfef0ab2a14dec9ba5894f2968c8c0",
+    "total_rows": 3564
+  },
+  "suspected_source_mislink_rows": [
+    {
+      "affected_pick_count": 1,
+      "captured_afltables_href": "players/A/Adrian_De_Luca.html",
+      "child_membership": "bridged",
+      "draftguru_birth_year": 1982,
+      "draftguru_games": 46,
+      "draftguru_name": "Adrian Deluca",
+      "draftguru_url": "https://www.draftguru.com.au/players/adrian_deluca/1",
+      "earliest_recruitment_event": "National",
+      "earliest_recruitment_year": 2003,
+      "operator_verdict": "",
+      "population_reason": "OTHER_CONTRADICTION:SURNAME_DIFFERENT",
+      "reason_codes": [
+        "SURNAME_DIFFERENT",
+        "BIRTH_YEAR_CONSISTENT",
+        "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+        "GAMES_CONSISTENT",
+        "CLUB_HISTORY_OVERLAPS"
+      ],
+      "recommended_disposition": "manual_curation (withhold pending operator confirmation)",
+      "retained_target_name": "Adrian De Luca",
+      "sample_bucket": "non_sample",
+      "target_birth_year": 1982,
+      "target_career_games": 46,
+      "target_career_span": "2004-2006"
+    },
+    {
+      "affected_pick_count": 2,
+      "captured_afltables_href": "players/S/Setanta_OhAilpin.html",
+      "child_membership": "bridged",
+      "draftguru_birth_year": 1983,
+      "draftguru_games": 88,
+      "draftguru_name": "Setanta Ó hAilpín",
+      "draftguru_url": "https://www.draftguru.com.au/players/setanta_%C3%B3%20hailp%C3%ADn/1",
+      "earliest_recruitment_event": "Rookie",
+      "earliest_recruitment_year": 2003,
+      "operator_verdict": "",
+      "population_reason": "OTHER_CONTRADICTION:SURNAME_DIFFERENT",
+      "reason_codes": [
+        "SURNAME_DIFFERENT",
+        "BIRTH_YEAR_CONSISTENT",
+        "DEBUT_NOT_BEFORE_EARLIEST_RECRUITMENT",
+        "GAMES_CONSISTENT",
+        "CLUB_HISTORY_OVERLAPS"
+      ],
+      "recommended_disposition": "manual_curation (withhold pending operator confirmation)",
+      "retained_target_name": "Setanta OhAilpin",
+      "sample_bucket": "non_sample",
+      "target_birth_year": 1983,
+      "target_career_games": 88,
+      "target_career_span": "2005-2013"
+    }
+  ],
+  "totals": {
+    "confirmed_source_mislink": 23,
+    "human_authority_overlap": 3,
+    "insufficient_evidence": 107,
+    "population_clean": 3422,
+    "source_discrepancy_same_person": 7,
+    "suspected_source_mislink": 2,
+    "tooling_or_schema_error": 0,
+    "total": 3564
+  }
+}

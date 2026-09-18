@@ -25,6 +25,8 @@ import {
   type GridleyLookups,
   type GridleyMapping,
 } from '@/search/gridley-compat';
+import { buildResolver, nationalPickKeyDisagreement, rookieSourceCoverageGap, triageDraftFinding, type LinkedDraftRow, type PlayerRow } from './gridley-corpus-support';
+import { loadRookieRelistingOutcomes, type RookieRelistingOutcome } from './rookie-relisting-outcomes';
 
 const FIXTURES = join(__dirname, 'fixtures', 'gridley');
 
@@ -272,6 +274,17 @@ describe('Gridley semantics that are decided by arithmetic or lineage, not by lo
     expect(normalisePlayerName('Sam De Koning')).toBe('sam de koning');
   });
 
+  it('keys a no-break-space name exactly like its ASCII spelling (AFLDB-ISSUE-222 corpus triage)', () => {
+    // DraftGuru renders every player name with U+00A0 ("Jagga Smith"; a cp850 console shows
+    // it as "JaggaáSmith"). The strip of non-[a-z0-9 ] characters used to delete the NBSP and
+    // fuse the tokens into "jaggasmith", so a register holding such a name could never match a
+    // Gridley title. Every Unicode space is folded to an ordinary space first.
+    expect(normalisePlayerName('Jagga Smith')).toBe('jagga smith');
+    expect(normalisePlayerName('Jagga Smith')).toBe(normalisePlayerName('JAGGA SMITH'));
+    expect(normalisePlayerName('Willem Duursma')).toBe('willem duursma');
+    expect(normalisePlayerName('  Sam \t De Koning ')).toBe('sam de koning');
+  });
+
   it('draft criteria name a draft_kind, and both father-son criteria read the tracked list (AFLDB-ISSUE-221)', () => {
     expect(map('pick1', 'PICK 1', 'NATIONAL DRAFT')).toMatchObject({ axis: { builder: 'national_draft_pick_between', params: { from: '1', to: '1' } } });
     expect(map('picktop5', 'TOP 5', 'DRAFT PICK')).toMatchObject({ axis: { builder: 'national_draft_pick_between', params: { from: '1', to: '5' } } });
@@ -292,6 +305,207 @@ describe('Gridley semantics that are decided by arithmetic or lineage, not by lo
       if (mapping.status === 'mapped' && mapping.axis.builder === 'draft_type_is') {
         expect(resolveDraftKind(mapping.axis.params.draftType), id).not.toBeNull();
       }
+    }
+  });
+});
+
+/*
+ * AFLDB-ISSUE-222 §6.3 — the corpus suite's pure helpers (tests/gridley-corpus-support.ts),
+ * pinned DB-free against the exact shapes the 2026-09-19 afldb_test corpus run produced
+ * (report sha256 7f14ff2c…): two 2026 debutants the player register does not hold although the
+ * database carries 2026 matches, a mini-draft pick Gridley counts as a national top-10 pick,
+ * and eight rookie re-listings the linked DraftGuru pages do not carry.
+ */
+describe('Gridley corpus support (AFLDB-ISSUE-222)', () => {
+  const player = (id: number, displayName: string, debutSeason: number | null, finalSeason: number | null = debutSeason): PlayerRow => {
+    const [givenName, ...rest] = displayName.split(' ');
+    return { id, displayName, givenName, surname: rest.join(' '), debutSeason, finalSeason };
+  };
+  const ref = (criterionId: string, name: string) => ({ criterionId, name, gridleyPlayerId: null, champId: null });
+  // A register that ends at the accepted 2025 baseline.
+  const register2025 = [player(1, 'Alpha One', 1999, 2010), player(2, 'Josh Kennedy', 2006, 2022), player(3, 'Beta Two', 2025)];
+
+  it('resolver: a 2026 override with no namesake is a REGISTER gap when no player debuted after 2025, even though the database holds 2026 matches', () => {
+    const unresolved: string[] = [];
+    const gaps: string[] = [];
+    const resolve = buildResolver(register2025, unresolved, gaps, 2026);
+    expect(resolve(ref('jagga-smith-teammate-13333', 'JAGGA SMITH'))).toBeNull();
+    expect(resolve(ref('willem-duursma-teammate-13491', 'WILLEM DUURSMA'))).toBeNull();
+    expect(unresolved).toEqual([]);
+    expect(gaps).toHaveLength(2);
+    expect(gaps[0]).toMatch(/^jagga-smith-teammate-13333: Jagga Smith debuted in 2026; no player on this database debuted after season 2025 .*AFLDB-ISSUE-224/);
+    expect(gaps[1]).toMatch(/^willem-duursma-teammate-13491: Willem Duursma debuted in 2026; no player on this database debuted after season 2025/);
+  });
+
+  it('resolver: the match-horizon gap is unchanged when the database itself ends before the debut', () => {
+    const unresolved: string[] = [];
+    const gaps: string[] = [];
+    buildResolver(register2025, unresolved, gaps, 2025)(ref('jagga-smith-teammate-13333', 'JAGGA SMITH'));
+    expect(unresolved).toEqual([]);
+    expect(gaps).toEqual(['jagga-smith-teammate-13333: Jagga Smith debuted in 2026; this database ends at season 2025']);
+  });
+
+  it('resolver: once the register holds a 2026 debut, a missing 2026 override is UNRESOLVED (a fault, not a gap)', () => {
+    const unresolved: string[] = [];
+    const gaps: string[] = [];
+    const resolve = buildResolver([...register2025, player(4, 'Gamma Three', 2026)], unresolved, gaps, 2026);
+    expect(resolve(ref('jagga-smith-teammate-13333', 'JAGGA SMITH'))).toBeNull();
+    expect(gaps).toEqual([]);
+    expect(unresolved).toEqual(['jagga-smith-teammate-13333: override Jagga Smith/2026 matched 0 players']);
+  });
+
+  it('resolver: a namesake with another debut season is never a gap', () => {
+    const unresolved: string[] = [];
+    const gaps: string[] = [];
+    const resolve = buildResolver(register2025, unresolved, gaps, 2026, { 'x-teammate-1': { name: 'Josh Kennedy', debutSeason: 2026 } });
+    expect(resolve(ref('x-teammate-1', 'JOSH KENNEDY'))).toBeNull();
+    expect(gaps).toEqual([]);
+    expect(unresolved).toEqual(['x-teammate-1: override Josh Kennedy/2026 matched 0 players']);
+  });
+
+  it('resolver: an override that hits exactly one debut resolves; a plain name resolves only when unique', () => {
+    const unresolved: string[] = [];
+    const gaps: string[] = [];
+    const two = [...register2025, player(5, 'Josh Kennedy', 2008, 2020)];
+    const resolve = buildResolver(two, unresolved, gaps, 2026);
+    expect(resolve(ref('josh-p-kennedy-teammate-4298', 'JOSH KENNEDY'))).toBe(5);
+    expect(resolve(ref('joshjkennedy', 'JOSH KENNEDY'))).toBe(2);
+    expect(resolve(ref('alpha-one-teammate-9', 'ALPHA ONE'))).toBe(1);
+    expect(resolve(ref('some-josh-kennedy-teammate-7', 'JOSH KENNEDY'))).toBeNull();
+    expect(unresolved).toEqual(['some-josh-kennedy-teammate-7: "JOSH KENNEDY" matched 2 players (2/2006, 5/2008)']);
+    expect(gaps).toEqual([]);
+  });
+
+  // The linked DraftGuru rows of the players behind the 2026-09-19 draft findings
+  // (data/sources/draftguru/annual-html-20260826/parsed/rows.jsonl, bridged persons).
+  const crouch: LinkedDraftRow[] = [
+    { draftYear: 2011, draftKind: 'mini_draft', pickNumber: 2, club: 'Adelaide' },
+    { draftYear: 2020, draftKind: 'free_agency', pickNumber: null, club: 'St Kilda' },
+  ];
+  const henderson: LinkedDraftRow[] = [
+    { draftYear: 2007, draftKind: 'national', pickNumber: 8, club: 'Brisbane Lions' },
+    { draftYear: 2009, draftKind: 'trade', pickNumber: null, club: 'Carlton' },
+    { draftYear: 2015, draftKind: 'trade', pickNumber: null, club: 'Geelong' },
+  ];
+  const gwsSamReid: LinkedDraftRow[] = [
+    { draftYear: 2007, draftKind: 'national', pickNumber: 35, club: 'Western Bulldogs' },
+    { draftYear: 2011, draftKind: 'pre_draft', pickNumber: null, club: 'Greater Western Sydney' },
+    { draftYear: 2015, draftKind: 'rookie', pickNumber: 8, club: 'Greater Western Sydney' },
+  ];
+  const top10 = { builder: 'national_draft_pick_between', params: { from: '1', to: '10' } };
+  const rookie = { builder: 'draft_type_is', params: { draftType: 'rookie' } };
+
+  it('triage: Brad Crouch (afldb 2054) -- a 2011 Mini-Draft pick 2 is inside TOP 5 / TOP 10 but is not a national pick', () => {
+    expect(triageDraftFinding(crouch, top10)).toEqual({
+      cause: 'non_national_pick_in_range',
+      evidence: 'no linked national pick 1-10, but 2011 mini_draft pick 2 (Adelaide) is inside the range under another event kind; linked draft rows: 2011 mini_draft pick 2 (Adelaide); 2020 free_agency (St Kilda)',
+    });
+    expect(triageDraftFinding(crouch, { builder: 'national_draft_pick_between', params: { from: '1', to: '5' } }).cause).toBe('non_national_pick_in_range');
+    // PICK 1 is simply not held, of any kind; the any-kind builder is satisfied.
+    expect(triageDraftFinding(crouch, { builder: 'national_draft_pick_between', params: { from: '1', to: '1' } }).cause).toBe('no_linked_row_matches');
+    expect(triageDraftFinding(crouch, { builder: 'draft_pick_between', params: { from: '1', to: '10' } }).cause).toBe('satisfied');
+    expect(triageDraftFinding(crouch, { builder: 'draft_type_is', params: { draftType: 'Mini-Draft' } }).cause).toBe('satisfied');
+  });
+
+  it('triage: Lachie Henderson (afldb 8350) -- the linked DraftGuru page carries no Rookie event, so pickrookie has nothing to read', () => {
+    expect(triageDraftFinding(henderson, rookie)).toEqual({
+      cause: 'no_linked_row_matches',
+      evidence: 'the linked source carries no rookie event for this person; linked draft rows: 2007 national pick 8 (Brisbane Lions); 2009 trade (Carlton); 2015 trade (Geelong)',
+    });
+    expect(triageDraftFinding(henderson, top10).cause).toBe('satisfied');
+    expect(triageDraftFinding(henderson, { builder: 'traded_min_times', params: { times: '1' } }).cause).toBe('satisfied');
+    expect(triageDraftFinding(henderson, { builder: 'traded_min_times', params: { times: '3' } }).cause).toBe('no_linked_row_matches');
+    expect(triageDraftFinding(crouch, { builder: 'traded_min_times', params: { times: '1' } }).cause).toBe('no_linked_row_matches');
+  });
+
+  it('triage: a late-career rookie re-listing the source DOES carry satisfies pickrookie (GWS Sam Reid, 2015 Rookie pick 8)', () => {
+    expect(triageDraftFinding(gwsSamReid, rookie).cause).toBe('satisfied');
+    // His only pick inside 1-10 is that rookie pick 8: not a national pick.
+    expect(triageDraftFinding(gwsSamReid, top10).cause).toBe('non_national_pick_in_range');
+    expect(triageDraftFinding(gwsSamReid, { builder: 'national_draft_pick_between', params: { from: '30', to: '40' } }).cause).toBe('satisfied');
+  });
+
+  it('D1 (§11.19.12): the national-pick key disagreement fires only for a non-national pick inside a national range', () => {
+    // Crouch: TOP 5 and TOP 10 are Gridley's key counting the 2011 mini-draft; PICK 1 has no evidence.
+    expect(nationalPickKeyDisagreement(crouch, top10)).toBe(
+      "Gridley's key counts a non-national selection as a National Draft pick 1-10 (AFLDB-ISSUE-222 §11.19.12 D1): no linked national pick 1-10, but 2011 mini_draft pick 2 (Adelaide) is inside the range under another event kind; linked draft rows: 2011 mini_draft pick 2 (Adelaide); 2020 free_agency (St Kilda)",
+    );
+    expect(nationalPickKeyDisagreement(crouch, { builder: 'national_draft_pick_between', params: { from: '5', to: '1' } })).toMatch(/^Gridley's key counts a non-national selection as a National Draft pick 1-5 /);
+    expect(nationalPickKeyDisagreement(crouch, { builder: 'national_draft_pick_between', params: { from: '1', to: '1' } })).toBeNull();
+    // A real national pick inside the range: AFLDB must list him, so no disagreement is claimed.
+    expect(nationalPickKeyDisagreement(henderson, top10)).toBeNull();
+    // Unlinked: a linkage matter, never Gridley's key.
+    expect(nationalPickKeyDisagreement([], top10)).toBeNull();
+    // Not a national-range builder: the rule does not reach pickrookie or the any-kind range.
+    expect(nationalPickKeyDisagreement(crouch, rookie)).toBeNull();
+    expect(nationalPickKeyDisagreement(crouch, { builder: 'draft_pick_between', params: { from: '1', to: '10' } })).toBeNull();
+    // The national semantics of the builder are untouched: TOP 10 still maps national-only.
+    expect(mapGridleyCriterion({ id: 'picktop10', title: 'TOP 10', subtitle: 'DRAFT PICK', description: null, type: null }, STUB_LOOKUPS))
+      .toMatchObject({ axis: { builder: 'national_draft_pick_between', params: { from: '1', to: '10' } } });
+  });
+
+  it('triage: no linked row at all is a linkage gap, never a source or key finding; an unread builder is unassessed', () => {
+    expect(triageDraftFinding([], top10)).toEqual({ cause: 'unlinked', evidence: 'linked draft rows: no trusted-linked draft row' });
+    expect(triageDraftFinding([], rookie).cause).toBe('unlinked');
+    expect(triageDraftFinding(henderson, { builder: 'drafted_by_club', params: { club: '4' } }).cause).toBe('unassessed');
+  });
+
+  // AFLDB-ISSUE-222 §11.19.12/§11.19.13, operator decision D2: the tracked, independently-sourced
+  // review of the eight pickrookie disagreements (data/players/rookie-relisting-outcomes.csv).
+  const hendersonOutcome: RookieRelistingOutcome = {
+    afltablesProfile: 'players/L/Lachie_Henderson.html', player: 'Lachie Henderson', eventYear: 2019,
+    eventClub: 'Geelong', pick: 35, evidenceStrength: 'primary', verdict: 'gridley_supported',
+    evidence: "geelongcats.com.au: 'Pick 35, Rookie Draft, Geelong Football Club'",
+    decidedOn: '2026-09-19', reference: 'AFLDB-ISSUE-222 §11.19.13 D2',
+  };
+
+  it('D2 (§11.19.12/§11.19.13): a reviewed gridley_supported outcome classifies its pickrookie cell as a source coverage gap', () => {
+    expect(rookieSourceCoverageGap(henderson, rookie, hendersonOutcome)).toBe(
+      "an independent source confirms a Rookie Draft selection DraftGuru's linked page omits (AFLDB-ISSUE-222 §11.19.13 D2): pick 35 (Geelong, 2019); geelongcats.com.au: 'Pick 35, Rookie Draft, Geelong Football Club'",
+    );
+  });
+
+  it('D2: a player with no reviewed outcome is never reclassified, even with the identical no_linked_row_matches cause -- there is no general rule', () => {
+    expect(rookieSourceCoverageGap(henderson, rookie, undefined)).toBeNull();
+    expect(rookieSourceCoverageGap(crouch, rookie, undefined)).toBeNull();
+  });
+
+  it('D2: a draftguru_supported or undetermined verdict records review history but never reclassifies a cell', () => {
+    expect(rookieSourceCoverageGap(henderson, rookie, { ...hendersonOutcome, verdict: 'draftguru_supported' })).toBeNull();
+    expect(rookieSourceCoverageGap(henderson, rookie, { ...hendersonOutcome, verdict: 'undetermined' })).toBeNull();
+  });
+
+  it('D2: the outcome is read only for the pickrookie (draft_type_is rookie) axis; another builder is unaffected', () => {
+    expect(rookieSourceCoverageGap(henderson, top10, hendersonOutcome)).toBeNull();
+    expect(rookieSourceCoverageGap(henderson, { builder: 'draft_type_is', params: { draftType: 'Trade' } }, hendersonOutcome)).toBeNull();
+    expect(rookieSourceCoverageGap(henderson, { builder: 'traded_min_times', params: { times: '1' } }, hendersonOutcome)).toBeNull();
+  });
+
+  it('D2: an unlinked player is unaffected even under a matching outcome -- a linkage matter, never a source gap', () => {
+    expect(rookieSourceCoverageGap([], rookie, hendersonOutcome)).toBeNull();
+  });
+
+  it('D2 and D1 do not interfere: D1 stays national-only, D2 stays rookie-only, and a satisfied cause blocks either rule', () => {
+    // Crouch is not reviewed for D2; D1 still fires for his national range, independent of D2.
+    expect(rookieSourceCoverageGap(crouch, rookie, undefined)).toBeNull();
+    expect(nationalPickKeyDisagreement(crouch, top10)).not.toBeNull();
+    expect(rookieSourceCoverageGap(crouch, top10, undefined)).toBeNull();
+    // Henderson's real national pick means neither rule has anything to say about top10.
+    expect(nationalPickKeyDisagreement(henderson, top10)).toBeNull();
+    expect(rookieSourceCoverageGap(henderson, top10, hendersonOutcome)).toBeNull();
+    // A satisfied rookie cause (GWS Sam Reid's own real rookie row) blocks D2 even under an
+    // (unrealistic, but probative) matching outcome: the rule reads the triage cause, not identity.
+    expect(rookieSourceCoverageGap(gwsSamReid, rookie, hendersonOutcome)).toBeNull();
+  });
+
+  it('D2: every row of the real tracked artefact is recognised by the classifier (data/players/rookie-relisting-outcomes.csv)', () => {
+    const outcomes = loadRookieRelistingOutcomes();
+    expect(outcomes).toHaveLength(8);
+    const noRookieRow: LinkedDraftRow[] = [{ draftYear: 2001, draftKind: 'national', pickNumber: 1, club: 'Some Club' }];
+    for (const outcome of outcomes) {
+      expect(outcome.verdict).toBe('gridley_supported');
+      expect(rookieSourceCoverageGap(noRookieRow, rookie, outcome)).toContain(outcome.reference);
+      expect(rookieSourceCoverageGap(noRookieRow, rookie, outcome)).toContain(`pick ${outcome.pick}`);
     }
   });
 });

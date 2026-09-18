@@ -1,0 +1,55 @@
+{
+  "categories": {
+    "offline_contradict": {
+      "count": 0,
+      "urls": []
+    },
+    "offline_limited": {
+      "count": 4,
+      "urls": [
+        "https://www.draftguru.com.au/players/cameron_mccarthy/1",
+        "https://www.draftguru.com.au/players/richie_vandenberg/1",
+        "https://www.draftguru.com.au/players/cameron_sutcliffe/1",
+        "https://www.draftguru.com.au/players/jonathon_ross/1"
+      ]
+    },
+    "offline_unavailable": {
+      "count": 0,
+      "urls": []
+    },
+    "target_unregistered": {
+      "count": 16,
+      "urls": [
+        "https://www.draftguru.com.au/players/balyn_o'brien/1",
+        "https://www.draftguru.com.au/players/patrick_retschko/1",
+        "https://www.draftguru.com.au/players/matt_hill/1",
+        "https://www.draftguru.com.au/players/hugo_hall-kahan/1",
+        "https://www.draftguru.com.au/players/kye_annand/1",
+        "https://www.draftguru.com.au/players/matthew_capuano/1",
+        "https://www.draftguru.com.au/players/oscar_ryan/1",
+        "https://www.draftguru.com.au/players/jack_dalton/2",
+        "https://www.draftguru.com.au/players/hussien_el%20achkar/1",
+        "https://www.draftguru.com.au/players/oscar_steene/1",
+        "https://www.draftguru.com.au/players/zane_peucker/1",
+        "https://www.draftguru.com.au/players/tom_blamires/1",
+        "https://www.draftguru.com.au/players/jack_watkins/2",
+        "https://www.draftguru.com.au/players/archie_ludowyke/1",
+        "https://www.draftguru.com.au/players/chris_scerri/1",
+        "https://www.draftguru.com.au/players/lachlan_carmichael/1"
+      ]
+    },
+    "tooling_or_schema_error": {
+      "count": 0,
+      "urls": []
+    }
+  },
+  "generated_utc": "2026-09-18T09:59:26Z",
+  "issue": "AFLDB-ISSUE-222",
+  "label": "20260918-v2",
+  "network_acquisition_required": false,
+  "note": "No row in this run was found to require a live network fetch before operator adjudication; see runbook \u00a79 for the category-by-category recommended next evidence.",
+  "phase": "F",
+  "sample_sha256": "6523bad65d8d92bb2c1bc792d6799660e681c047fdcb5bc2581d85dbf5665578",
+  "schema_version": 1,
+  "verdicts_sha256": "2caf980b0a9246c784334c357f08818da7d06f716a672768a3050b4c92fae766"
+}

@@ -1,0 +1,285 @@
+{
+  "$comment": "AFLDB-ISSUE-222 bridge v2 reconciliation manifest. Machine-readable record of the exact v1 -> v2 source-evidence parent transformation produced from the completed operator adjudication. NO database resolution, network request, importer run, DEV/PROD action or Git command was performed.",
+  "child_status": "requires --resolve-against afldb_test",
+  "child_status_detail": {
+    "$comment": "PLANNING FIGURES ONLY. No v2 child artefact exists and none was generated. These numbers do not predict how many corrected targets will resolve, and no final v2 child accepted/withheld count is published here.",
+    "corrected_parent_targets_pending_db_resolution": [
+      "https://www.draftguru.com.au/players/aaron_black/1",
+      "https://www.draftguru.com.au/players/alwyn_davey/1",
+      "https://www.draftguru.com.au/players/joel_smith/1",
+      "https://www.draftguru.com.au/players/josh_smith/1",
+      "https://www.draftguru.com.au/players/sam_butler/1",
+      "https://www.draftguru.com.au/players/stephen_schwerdt/1",
+      "https://www.draftguru.com.au/players/tom_murphy/1"
+    ],
+    "corrected_parent_targets_pending_db_resolution_count": 7,
+    "regeneration_command": "python tools/rebuild/draftguru/export_person_bridge.py --resolve-against afldb_test (against a backed-up afldb_test)",
+    "v1_resolved_child_accepted": 3463,
+    "v1_resolved_child_path": "data/reference/draftguru-person-bridge-20260918-v1.afldb_test.json",
+    "v1_resolved_child_sha256": "596bbb684424b40f43c22368f1b77aa4198eec8b56a1109a7bb587c5c7a9a27f",
+    "v1_rows_eligible_for_unchanged_carry_forward": 3461
+  },
+  "completion_status": "bridge_v2_source_evidence_parent_generated",
+  "counts": {
+    "accepted_delta": -2,
+    "accepted_v1": 3564,
+    "accepted_v2": 3562,
+    "distinct_persons_v1": 3564,
+    "distinct_persons_v2": 3562,
+    "distinct_targets_v1": 3564,
+    "distinct_targets_v2": 3562,
+    "population": 5057,
+    "unaccounted_rows": 0,
+    "withheld_delta": 2,
+    "withheld_v1": 1493,
+    "withheld_v2": 1495
+  },
+  "decisions": {
+    "by_verdict": {
+      "agree": 30,
+      "approve_manual_curation": 7,
+      "different_person_wrong_href": 2,
+      "same_person_valid_href": 2,
+      "same_person_valid_relisting": 42
+    },
+    "negative_excluded": 2,
+    "positive_represented": 81,
+    "total": 83,
+    "uncertain": 0
+  },
+  "deterministic_generation": "PASS (frozen timestamp; content-addressed rows_sha256)",
+  "event_reconciliation": {
+    "distinct_event_persons": 5057,
+    "duplicate_event_identities": 0,
+    "events_blocked_by_withheld_rows": 2,
+    "events_total": 6810,
+    "orphan_event_persons": 0,
+    "persons_with_multiple_events": 1473,
+    "persons_with_same_club_repeat_event": 74,
+    "referential_integrity": "PASS",
+    "relisting_persons_holding_exactly_one_parent_row": 42,
+    "relisting_persons_with_multiple_events": 5,
+    "relisting_persons_with_same_club_repeat_event": 0
+  },
+  "generated_utc": "2026-09-18T08:43:12Z",
+  "generated_utc_basis": "frozen to the operator verdict artefact's review_completed_utc so every artefact is byte-reproducible; not a wall-clock generation time",
+  "issue": "AFLDB-ISSUE-222",
+  "label": "20260918-v1",
+  "lineage": {
+    "actions_by_type": {
+      "added": 0,
+      "confirmed": 74,
+      "corrected": 7,
+      "removed_withheld": 2,
+      "unchanged": 3481
+    },
+    "added": 0,
+    "changed_rows": [
+      {
+        "action": "corrected",
+        "draftguru_url": "https://www.draftguru.com.au/players/aaron_black/1",
+        "group": "discrepancy",
+        "operator_verdict": "approve_manual_curation",
+        "rejected_afltables_target": null,
+        "v1_afltables_external_id": "players/A/Aaron_Black.html",
+        "v2_afltables_external_id": "players/A/Aaron_Black0.html"
+      },
+      {
+        "action": "corrected",
+        "draftguru_url": "https://www.draftguru.com.au/players/alwyn_davey/1",
+        "group": "discrepancy",
+        "operator_verdict": "approve_manual_curation",
+        "rejected_afltables_target": null,
+        "v1_afltables_external_id": "players/A/Alwyn_Davey.html",
+        "v2_afltables_external_id": "players/A/Alwyn_Davey0.html"
+      },
+      {
+        "action": "removed_withheld",
+        "draftguru_url": "https://www.draftguru.com.au/players/craig_somerville/1",
+        "group": "relisting",
+        "operator_verdict": "different_person_wrong_href",
+        "rejected_afltables_target": "players/C/Craig_Somerville.html",
+        "v1_afltables_external_id": "players/C/Craig_Somerville.html",
+        "v2_afltables_external_id": null
+      },
+      {
+        "action": "removed_withheld",
+        "draftguru_url": "https://www.draftguru.com.au/players/david_sullivan/1",
+        "group": "relisting",
+        "operator_verdict": "different_person_wrong_href",
+        "rejected_afltables_target": "players/D/David_Sullivan.html",
+        "v1_afltables_external_id": "players/D/David_Sullivan.html",
+        "v2_afltables_external_id": null
+      },
+      {
+        "action": "corrected",
+        "draftguru_url": "https://www.draftguru.com.au/players/joel_smith/1",
+        "group": "discrepancy",
+        "operator_verdict": "approve_manual_curation",
+        "rejected_afltables_target": null,
+        "v1_afltables_external_id": "players/J/Joel_Smith.html",
+        "v2_afltables_external_id": "players/J/Joel_Smith0.html"
+      },
+      {
+        "action": "corrected",
+        "draftguru_url": "https://www.draftguru.com.au/players/josh_smith/1",
+        "group": "discrepancy",
+        "operator_verdict": "approve_manual_curation",
+        "rejected_afltables_target": null,
+        "v1_afltables_external_id": "players/J/Josh_Smith.html",
+        "v2_afltables_external_id": "players/J/Josh_Smith0.html"
+      },
+      {
+        "action": "corrected",
+        "draftguru_url": "https://www.draftguru.com.au/players/sam_butler/1",
+        "group": "discrepancy",
+        "operator_verdict": "approve_manual_curation",
+        "rejected_afltables_target": null,
+        "v1_afltables_external_id": "players/S/Sam_Butler.html",
+        "v2_afltables_external_id": "players/S/Sam_Butler0.html"
+      },
+      {
+        "action": "corrected",
+        "draftguru_url": "https://www.draftguru.com.au/players/stephen_schwerdt/1",
+        "group": "discrepancy",
+        "operator_verdict": "approve_manual_curation",
+        "rejected_afltables_target": null,
+        "v1_afltables_external_id": "players/S/Steven_Schwerdt.html",
+        "v2_afltables_external_id": "players/S/Stephen_Schwerdt.html"
+      },
+      {
+        "action": "corrected",
+        "draftguru_url": "https://www.draftguru.com.au/players/tom_murphy/1",
+        "group": "discrepancy",
+        "operator_verdict": "approve_manual_curation",
+        "rejected_afltables_target": null,
+        "v1_afltables_external_id": "players/T/Tom_Murphy.html",
+        "v2_afltables_external_id": "players/T/Tom_Murphy0.html"
+      }
+    ],
+    "confirmed_no_content_change": 74,
+    "corrected": 7,
+    "removed_withheld": 2,
+    "unchanged_content": 3555,
+    "unchanged_untouched": 3481
+  },
+  "no_absolute_paths_or_credentials": "PASS",
+  "not_performed": [
+    "target resolution against afldb_test",
+    "any database connection",
+    "any network request",
+    "any importer run",
+    "generation of the v2 afldb_test child deployment dataset",
+    "generation of the new disjoint-salt validation sample",
+    "any DEV or PROD action",
+    "any Git command"
+  ],
+  "output_paths": {
+    "parent_csv": "docs/rebuild-manifests/draftguru/bridge-v2-parent-20260918-v1.csv",
+    "parent_v2": "data/reference/draftguru-person-bridge-20260918-v2.json",
+    "reconciliation": "docs/rebuild-manifests/draftguru/bridge-v2-reconciliation-20260918-v1.json",
+    "summary_md": "docs/rebuild-manifests/draftguru/bridge-v2-summary-20260918-v1.md",
+    "withheld_csv": "docs/rebuild-manifests/draftguru/bridge-v2-withheld-20260918-v1.csv",
+    "withheld_json": "docs/rebuild-manifests/draftguru/bridge-v2-withheld-20260918-v1.json"
+  },
+  "outputs": [
+    {
+      "key": "parent_csv",
+      "path": "docs/rebuild-manifests/draftguru/bridge-v2-parent-20260918-v1.csv",
+      "sha256": "8405de83ccf03d0771ad01c3523a82e19e3419222bf0d590c09ea09a11faeee9"
+    },
+    {
+      "key": "parent_v2",
+      "path": "data/reference/draftguru-person-bridge-20260918-v2.json",
+      "sha256": "ad25d965cba72b97be895451dc488bf03a1899421e902394baa52a620abe8e57"
+    },
+    {
+      "key": "withheld_csv",
+      "path": "docs/rebuild-manifests/draftguru/bridge-v2-withheld-20260918-v1.csv",
+      "sha256": "d57cbda472e1477710f0634df258822170ca48e7290d6ee35472e0667820774f"
+    },
+    {
+      "key": "withheld_json",
+      "path": "docs/rebuild-manifests/draftguru/bridge-v2-withheld-20260918-v1.json",
+      "sha256": "3fb2903d18180d687fa54fe75c6fc0ec4e49b6932d1fa8e3b426414a9ab3c9bc"
+    }
+  ],
+  "parent_v1": {
+    "path": "data/reference/draftguru-person-bridge-20260918-v1.json",
+    "sha256": "92ff142ef71d175046b4949b0a85d5925bc396d3586b5b1fc3f44e51f097320e"
+  },
+  "parent_v2": {
+    "path": "data/reference/draftguru-person-bridge-20260918-v2.json",
+    "rows_sha256": "ce7816f7905f8a758761676ce50f2673055cc0be9c5174d004fdee7931327e7f",
+    "sha256": "ad25d965cba72b97be895451dc488bf03a1899421e902394baa52a620abe8e57"
+  },
+  "referential_integrity": {
+    "bridges_withheld_partition_population": "PASS",
+    "duplicate_parent_key": 0,
+    "duplicate_target": 0,
+    "orphan_event_persons": 0,
+    "parent_to_stage_a_events": "PASS",
+    "result": "PASS"
+  },
+  "schema_version": 1,
+  "source_hash_links": [
+    {
+      "label": "adjudication_pack_json",
+      "path": "docs/rebuild-manifests/draftguru/bridge-operator-adjudication-pack-20260918-v1.json",
+      "sha256": "02d0cbe995b4482cf249fe216a10da18b325de6dfcb0504df2d3dbcba31ae292"
+    },
+    {
+      "label": "child_v1_afldb_test",
+      "path": "data/reference/draftguru-person-bridge-20260918-v1.afldb_test.json",
+      "sha256": "596bbb684424b40f43c22368f1b77aa4198eec8b56a1109a7bb587c5c7a9a27f"
+    },
+    {
+      "label": "operator_verdicts_csv",
+      "path": "docs/rebuild-manifests/draftguru/bridge-operator-verdicts-20260918-v1.csv",
+      "sha256": "a74c6f185030cba3d58bd54b755eae14db3a006ad45ade19ec0f5bd8eaf17267"
+    },
+    {
+      "label": "operator_verdicts_json",
+      "path": "docs/rebuild-manifests/draftguru/bridge-operator-verdicts-20260918-v1.json",
+      "sha256": "b2ae2f4022cd3c22e91bfe6e399538949c02fe8cada95b5c355e6516c82a8822"
+    },
+    {
+      "label": "operator_verdicts_md",
+      "path": "docs/rebuild-manifests/draftguru/bridge-operator-verdicts-20260918-v1.md",
+      "sha256": "60c529df55313099f85b52af977512fa4fed8f5076fb7ce7263d04e2c05732c0"
+    },
+    {
+      "label": "parent_v1",
+      "path": "data/reference/draftguru-person-bridge-20260918-v1.json",
+      "sha256": "92ff142ef71d175046b4949b0a85d5925bc396d3586b5b1fc3f44e51f097320e"
+    },
+    {
+      "label": "review_sample_v1",
+      "path": "docs/rebuild-manifests/draftguru/bridge-review-20260918-v1.json",
+      "sha256": "036cc0826428c03a622448d299b803c23bac011bd5cd92eea86c4283e445ba84"
+    },
+    {
+      "label": "stage_a_rows",
+      "path": "data/sources/draftguru/annual-html-20260826/parsed/rows.jsonl",
+      "sha256": "06936baca3b37133949847e7589008a06be76bbc8f1fb5b4d2fef8b743838a64"
+    }
+  ],
+  "tool": {
+    "path": "tools/rebuild/draftguru/build_person_bridge_v2.py",
+    "version": "1.0.0"
+  },
+  "withheld_rows": [
+    {
+      "draftguru_url": "https://www.draftguru.com.au/players/craig_somerville/1",
+      "global_order": 7,
+      "operator_verdict": "different_person_wrong_href",
+      "rejected_afltables_target": "players/C/Craig_Somerville.html"
+    },
+    {
+      "draftguru_url": "https://www.draftguru.com.au/players/david_sullivan/1",
+      "global_order": 10,
+      "operator_verdict": "different_person_wrong_href",
+      "rejected_afltables_target": "players/D/David_Sullivan.html"
+    }
+  ]
+}

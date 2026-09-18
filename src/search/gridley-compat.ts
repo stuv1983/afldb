@@ -637,6 +637,10 @@ export function normalisePlayerName(name: string): string {
   return name
     .normalize('NFD').replace(/[̀-ͯ]/g, '')
     .toLowerCase()
+    // Every Unicode space (a no-break space included: DraftGuru renders "Jagga Smith")
+    // is an ordinary space BEFORE the strip below, which would otherwise delete it and fuse
+    // the two names into one token that matches nothing.
+    .replace(/\s+/g, ' ')
     .replace(/[^a-z0-9 ]+/g, '')
     .replace(/\b(jr|jnr|sr|snr)\b/g, '')
     .replace(/\s+/g, ' ')

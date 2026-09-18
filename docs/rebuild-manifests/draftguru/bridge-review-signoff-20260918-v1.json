@@ -1,0 +1,1813 @@
+{
+  "audit_summary": {
+    "confirmed_clean": true,
+    "count": 30,
+    "method": "Every one of the 30 rows' retained evidence (birth year vs DraftGuru title year, games/goals vs Stage A parity figures, debut season vs earliest original recruitment, club history overlap) was independently re-read from the verdict artefact's evidence block and manually recomputed against the runbook §5 rules, not merely accepted from the machine's offline_strong label.",
+    "result": "All 30 confirm cleanly as offline_strong; no disagreement found. Informational codes present on some rows (GAMES_INCONSISTENT, DEBUT_BEFORE_EARLIEST_RECRUITMENT, BIRTH_YEAR_CONSISTENT_TOLERANCE) are correctly non-blocking per runbook §5 and do not indicate a problem.",
+    "salt": "AFLDB-ISSUE-222/audit-v1",
+    "unchanged_between_v1_and_v2": true
+  },
+  "boundaries_confirmed": {
+    "database_connections": 0,
+    "dev_or_prod_actions": 0,
+    "git_commands_executed": 0,
+    "import_or_link_actions": 0,
+    "network_requests": 0,
+    "phase_4_started": false
+  },
+  "generated_utc": "2026-09-18T03:21:36Z",
+  "inputs": {
+    "child": {
+      "path": "data/reference/draftguru-person-bridge-20260918-v1.afldb_test.json",
+      "sha256": "596bbb684424b40f43c22368f1b77aa4198eec8b56a1109a7bb587c5c7a9a27f"
+    },
+    "fitzroy_manifest": {
+      "path": "docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json",
+      "sha256": "2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1"
+    },
+    "parent": {
+      "path": "data/reference/draftguru-person-bridge-20260918-v1.json",
+      "sha256": "92ff142ef71d175046b4949b0a85d5925bc396d3586b5b1fc3f44e51f097320e"
+    },
+    "recheck_v1": {
+      "path": "docs/rebuild-manifests/draftguru/bridge-review-recheck-20260918-v1.json",
+      "sha256": "e1462729c7c5711d57080cff2e7a3cb993745958ab04ce733a955ecfee9d6f88"
+    },
+    "recheck_v2": {
+      "path": "docs/rebuild-manifests/draftguru/bridge-review-recheck-20260918-v2.json",
+      "sha256": "fd1d58879d118b6b912f7359b07cfa7e2d2a5970556164e83115c04bc7ca408b"
+    },
+    "sample": {
+      "path": "docs/rebuild-manifests/draftguru/bridge-review-20260918-v1.json",
+      "sha256": "036cc0826428c03a622448d299b803c23bac011bd5cd92eea86c4283e445ba84"
+    },
+    "verdicts_v1": {
+      "path": "docs/rebuild-manifests/draftguru/bridge-review-verdicts-20260918-v1.json",
+      "sha256": "5830946d0fdcbd0bbd1d992ebd730feb89b6708d0d330fcecd09e3f14401962a"
+    },
+    "verdicts_v2": {
+      "path": "docs/rebuild-manifests/draftguru/bridge-review-verdicts-20260918-v2.json",
+      "rows_sha256": "412f0b595d7cf068acee85d414d2aaf90217de871d4138908da1c67559a2eb53",
+      "sha256": "a7d78f0faebf5fe954104d2ee6894d62a14413e33b2cd81d7260963f3440a847"
+    }
+  },
+  "issue": "AFLDB-ISSUE-222",
+  "mandatory_recheck_row_count": 111,
+  "mandatory_recheck_row_count_note": "112 under v1 (pre-tool-correction); 111 under v2 after the Darren_Mead row resolved to a clean offline_strong and left the recheck population (see tooling_correction).",
+  "operator_decision_table_urls": [
+    "https://www.draftguru.com.au/players/bret_hutchinson/1",
+    "https://www.draftguru.com.au/players/craig_somerville/1",
+    "https://www.draftguru.com.au/players/david_williams/1",
+    "https://www.draftguru.com.au/players/glen_bartlett/1",
+    "https://www.draftguru.com.au/players/joel_smith/1",
+    "https://www.draftguru.com.au/players/josh_smith/1",
+    "https://www.draftguru.com.au/players/peter_whyte/1",
+    "https://www.draftguru.com.au/players/simon_taylor/1",
+    "https://www.draftguru.com.au/players/stephen_schwerdt/1",
+    "https://www.draftguru.com.au/players/tim_bourke/1",
+    "https://www.draftguru.com.au/players/tom_murphy/1"
+  ],
+  "phase": "Phase 3 operator sign-off pack (recommendations only -- operator fields blank)",
+  "phase_3_status": "PENDING operator sign-off -- no operator_verdict has been set on any row; this pack contains recommendations only.",
+  "recommendation_totals": {
+    "agree": 76,
+    "contradict": 7,
+    "source_discrepancy_same_person": 4,
+    "withhold": 24
+  },
+  "review_method": "offline-retained-evidence+operator-exception-audit",
+  "rows": [
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/P/Peter_Whyte.html",
+      "draftguru_evidence": "Peter Whyte (title says born 1969); games=0 goals=0 (Aug-2026 capture); draft rows: 1990 National pick 68 Brisbane",
+      "machine_outcome": "offline_contradict",
+      "player_url": "https://www.draftguru.com.au/players/peter_whyte/1",
+      "recheck_classes": [
+        "1_offline_contradict"
+      ],
+      "recommendation_reason": "Genuine different-person mismatch, source-side (DraftGuru href), not a tool or AFLDB defect. DraftGuru's own capture records 0 career games for this specific drafted entry (i.e. this person never played a senior game), but the href players/P/Peter_Whyte.html resolves to an unrelated, already-established AFL/VFL player whose retained career (1986-1988, 22 games) ended before this person's earliest recruitment year. All 7 sampled career-ended contradictions share this identical signature (zero-games draftee linked to an unrelated retired namesake); recommend the bridge for this specific DraftGuru identity remain withheld.",
+      "recommended_verdict": "contradict",
+      "retained_evidence": "Peter Whyte; birth_year=1969; games=22 goals=3; span 1986-1988; clubs=Geelong",
+      "sample_index": 428,
+      "stratum": "random",
+      "visible_name": "Peter Whyte"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/C/Craig_Somerville.html",
+      "draftguru_evidence": "Craig Somerville (title says born 1968); games=0 goals=0 (Aug-2026 capture); draft rows: 1988 Trade pick None Brisbane",
+      "machine_outcome": "offline_contradict",
+      "player_url": "https://www.draftguru.com.au/players/craig_somerville/1",
+      "recheck_classes": [
+        "1_offline_contradict"
+      ],
+      "recommendation_reason": "Genuine different-person mismatch, source-side (DraftGuru href), not a tool or AFLDB defect. DraftGuru's own capture records 0 career games for this specific drafted entry (i.e. this person never played a senior game), but the href players/C/Craig_Somerville.html resolves to an unrelated, already-established AFL/VFL player whose retained career (1986-1986, 8 games) ended before this person's earliest recruitment year. All 7 sampled career-ended contradictions share this identical signature (zero-games draftee linked to an unrelated retired namesake); recommend the bridge for this specific DraftGuru identity remain withheld.",
+      "recommended_verdict": "contradict",
+      "retained_evidence": "Craig Somerville; birth_year=1968; games=8 goals=7; span 1986-1986; clubs=Footscray",
+      "sample_index": 586,
+      "stratum": "random",
+      "visible_name": "Craig Somerville"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/B/Bret_Hutchinson.html",
+      "draftguru_evidence": "Bret Hutchinson (title says born 1964); games=0 goals=0 (Aug-2026 capture); draft rows: 1989 Pre-Season pick 38 West Coast",
+      "machine_outcome": "offline_contradict",
+      "player_url": "https://www.draftguru.com.au/players/bret_hutchinson/1",
+      "recheck_classes": [
+        "1_offline_contradict"
+      ],
+      "recommendation_reason": "Genuine different-person mismatch, source-side (DraftGuru href), not a tool or AFLDB defect. DraftGuru's own capture records 0 career games for this specific drafted entry (i.e. this person never played a senior game), but the href players/B/Bret_Hutchinson.html resolves to an unrelated, already-established AFL/VFL player whose retained career (1985-1985, 1 games) ended before this person's earliest recruitment year. All 7 sampled career-ended contradictions share this identical signature (zero-games draftee linked to an unrelated retired namesake); recommend the bridge for this specific DraftGuru identity remain withheld.",
+      "recommended_verdict": "contradict",
+      "retained_evidence": "Bret Hutchinson; birth_year=1964; games=1 goals=0; span 1985-1985; clubs=Melbourne",
+      "sample_index": 625,
+      "stratum": "random",
+      "visible_name": "Bret Hutchinson"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/T/Tim_Bourke.html",
+      "draftguru_evidence": "Tim Bourke (title says born 1969); games=0 goals=0 (Aug-2026 capture); draft rows: 1991 Trade pick None North Melbourne",
+      "machine_outcome": "offline_contradict",
+      "player_url": "https://www.draftguru.com.au/players/tim_bourke/1",
+      "recheck_classes": [
+        "1_offline_contradict"
+      ],
+      "recommendation_reason": "Genuine different-person mismatch, source-side (DraftGuru href), not a tool or AFLDB defect. DraftGuru's own capture records 0 career games for this specific drafted entry (i.e. this person never played a senior game), but the href players/T/Tim_Bourke.html resolves to an unrelated, already-established AFL/VFL player whose retained career (1989-1990, 5 games) ended before this person's earliest recruitment year. All 7 sampled career-ended contradictions share this identical signature (zero-games draftee linked to an unrelated retired namesake); recommend the bridge for this specific DraftGuru identity remain withheld.",
+      "recommended_verdict": "contradict",
+      "retained_evidence": "Tim Bourke; birth_year=1969; games=5 goals=0; span 1989-1990; clubs=Geelong",
+      "sample_index": 659,
+      "stratum": "random",
+      "visible_name": "Tim Bourke"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/D/David_Williams.html",
+      "draftguru_evidence": "David Williams (title says born 1961); games=0 goals=0 (Aug-2026 capture); draft rows: 1989 Pre-Season pick 7 Richmond",
+      "machine_outcome": "offline_contradict",
+      "player_url": "https://www.draftguru.com.au/players/david_williams/1",
+      "recheck_classes": [
+        "1_offline_contradict"
+      ],
+      "recommendation_reason": "Genuine different-person mismatch, source-side (DraftGuru href), not a tool or AFLDB defect. DraftGuru's own capture records 0 career games for this specific drafted entry (i.e. this person never played a senior game), but the href players/D/David_Williams.html resolves to an unrelated, already-established AFL/VFL player whose retained career (1983-1988, 67 games) ended before this person's earliest recruitment year. All 7 sampled career-ended contradictions share this identical signature (zero-games draftee linked to an unrelated retired namesake); recommend the bridge for this specific DraftGuru identity remain withheld.",
+      "recommended_verdict": "contradict",
+      "retained_evidence": "David Williams; birth_year=1962; games=67 goals=102; span 1983-1988; clubs=Melbourne",
+      "sample_index": 874,
+      "stratum": "random",
+      "visible_name": "David Williams"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/S/Simon_Taylor0.html",
+      "draftguru_evidence": "Simon Taylor (title says born 1970); games=0 goals=0 (Aug-2026 capture); draft rows: 1991 Pre-Season pick 30 Fitzroy",
+      "machine_outcome": "offline_contradict",
+      "player_url": "https://www.draftguru.com.au/players/simon_taylor/1",
+      "recheck_classes": [
+        "10_weak_or_suffix_or_continuity",
+        "1_offline_contradict"
+      ],
+      "recommendation_reason": "Genuine different-person mismatch, source-side (DraftGuru href), not a tool or AFLDB defect. DraftGuru's own capture records 0 career games for this specific drafted entry (i.e. this person never played a senior game), but the href players/S/Simon_Taylor0.html resolves to an unrelated, already-established AFL/VFL player whose retained career (1989-1989, 2 games) ended before this person's earliest recruitment year. All 7 sampled career-ended contradictions share this identical signature (zero-games draftee linked to an unrelated retired namesake); recommend the bridge for this specific DraftGuru identity remain withheld.",
+      "recommended_verdict": "contradict",
+      "retained_evidence": "Simon Taylor; birth_year=1970; games=2 goals=1; span 1989-1989; clubs=Collingwood",
+      "sample_index": 948,
+      "stratum": "random",
+      "visible_name": "Simon Taylor"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/G/Glen_Bartlett.html",
+      "draftguru_evidence": "Glen Bartlett (title says born 1964); games=0 goals=0 (Aug-2026 capture); draft rows: 1989 Mid-Season pick 38 Brisbane",
+      "machine_outcome": "offline_contradict",
+      "player_url": "https://www.draftguru.com.au/players/glen_bartlett/1",
+      "recheck_classes": [
+        "1_offline_contradict"
+      ],
+      "recommendation_reason": "Genuine different-person mismatch, source-side (DraftGuru href), not a tool or AFLDB defect. DraftGuru's own capture records 0 career games for this specific drafted entry (i.e. this person never played a senior game), but the href players/G/Glen_Bartlett.html resolves to an unrelated, already-established AFL/VFL player whose retained career (1987-1987, 4 games) ended before this person's earliest recruitment year. All 7 sampled career-ended contradictions share this identical signature (zero-games draftee linked to an unrelated retired namesake); recommend the bridge for this specific DraftGuru identity remain withheld.",
+      "recommended_verdict": "contradict",
+      "retained_evidence": "Glen Bartlett; birth_year=1964; games=4 goals=0; span 1987-1987; clubs=West Coast",
+      "sample_index": 961,
+      "stratum": "random",
+      "visible_name": "Glen Bartlett"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/K/Keith_Thomas1.html",
+      "draftguru_evidence": "Keith Thomas (title says born 1961); games=28 goals=15 (Aug-2026 capture); draft rows: 1982 National pick 5 Melbourne",
+      "machine_outcome": "offline_limited",
+      "player_url": "https://www.draftguru.com.au/players/keith_thomas/2",
+      "recheck_classes": [
+        "10_weak_or_suffix_or_continuity",
+        "2_offline_limited"
+      ],
+      "recommendation_reason": "Numeric-suffix identity (Keith_Thomas1.html) with no club overlap (DraftGuru's sole draft-club Melbourne 1982 vs retained club Fitzroy), which is why the tool correctly withholds offline_strong for a suffixed path here. Birth year (1961/1961 exact) and games (28/28 exact) both corroborate strongly. Recommend confirming despite the missing club-overlap signal.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Keith Thomas; birth_year=1961; games=28 goals=15; span 1987-1988; clubs=Fitzroy",
+      "sample_index": 227,
+      "stratum": "census",
+      "visible_name": "Keith Thomas"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/T/Tim_Walsh.html",
+      "draftguru_evidence": "Tim Walsh (title says born 1985); games=1 goals=1 (Aug-2026 capture); draft rows: 2002 National pick 4 Western Bulldogs",
+      "machine_outcome": "offline_limited",
+      "player_url": "https://www.draftguru.com.au/players/tim_walsh/1",
+      "recheck_classes": [
+        "2_offline_limited"
+      ],
+      "recommendation_reason": "Age-calculation boundary issue, not a contradiction: this identity's only retained dated row records a literal Age=\"0\" source-data sentinel (confirmed via the AGE_ARTIFACT_FLOOR tool correction; population check found 10/3,564 bridged identities share this artifact). No valid retained age evidence exists at all for this identity, hence BIRTH_YEAR_UNAVAILABLE (honest, not a guess). Games (1/1), club (Western Bulldogs/Western Bulldogs) and debut-timing all match exactly. Recommend confirming the identity on the strength of the non-birth-year signals.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Tim Walsh; birth_year=None; games=1 goals=1; span 2005-2005; clubs=Western Bulldogs",
+      "sample_index": 371,
+      "stratum": "census",
+      "visible_name": "Tim Walsh"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/J/Joel_Smith.html",
+      "draftguru_evidence": "Joel Smith (title says born 1977); games=163 goals=39 (Aug-2026 capture); draft rows: 1994 National pick 5 St Kilda; 1997 Pre-Season pick 2 Hawthorn",
+      "machine_outcome": "target_unregistered",
+      "player_url": "https://www.draftguru.com.au/players/joel_smith/1",
+      "recheck_classes": [
+        "3_target_unregistered",
+        "6_numbering"
+      ],
+      "recommendation_reason": "DraftGuru's captured href names the plain, unsuffixed path (players/J/Joel_Smith.html), which does not exist in the accepted snapshot -- only the suffixed 0/1 variants do (AFL Tables retroactively numbers every name shared by 2+ players). players/J/Joel_Smith0.html matches on three independent signals beyond name: games 221/221 exact, birth year ~1977 (from Age at debut) matching the DraftGuru title year, and club history (St Kilda, Hawthorn) matching exactly (span 1995-2007). This is sufficient corroboration to identify the correct registered target, but the existing bridge contract joins on the literal captured href only and has no suffix-fallback; recommend NOT auto-applying this bridge, and instead routing to operator player-link curation naming players/J/Joel_Smith0.html as the deterministic correction. Machine outcome (target_unregistered) is correct under the current contract and is left unchanged.",
+      "recommended_verdict": "source_discrepancy_same_person",
+      "retained_evidence": "NOT REGISTERED on afldb_test (no retained snapshot rows for this identity)",
+      "sample_index": 197,
+      "stratum": "census",
+      "visible_name": "Joel Smith"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/T/Tom_Murphy.html",
+      "draftguru_evidence": "Tom Murphy (title says born 1986); games=18 goals=0 (Aug-2026 capture); draft rows: 2004 National pick 21 Hawthorn; 2012 Free Agency pick None Gold Coast",
+      "machine_outcome": "target_unregistered",
+      "player_url": "https://www.draftguru.com.au/players/tom_murphy/1",
+      "recheck_classes": [
+        "3_target_unregistered",
+        "6_numbering"
+      ],
+      "recommendation_reason": "DraftGuru's captured href names the plain, unsuffixed path (players/T/Tom_Murphy.html), which does not exist in the accepted snapshot -- only the suffixed 0/1 variants do (AFL Tables retroactively numbers every name shared by 2+ players). players/T/Tom_Murphy0.html matches on three independent signals beyond name: games 113/113 exact, birth year ~1986 (from Age at debut) matching the DraftGuru title year, and club history (Hawthorn, Gold Coast) matching exactly (span 2005-2014). This is sufficient corroboration to identify the correct registered target, but the existing bridge contract joins on the literal captured href only and has no suffix-fallback; recommend NOT auto-applying this bridge, and instead routing to operator player-link curation naming players/T/Tom_Murphy0.html as the deterministic correction. Machine outcome (target_unregistered) is correct under the current contract and is left unchanged.",
+      "recommended_verdict": "source_discrepancy_same_person",
+      "retained_evidence": "NOT REGISTERED on afldb_test (no retained snapshot rows for this identity)",
+      "sample_index": 716,
+      "stratum": "random",
+      "visible_name": "Tom Murphy"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/J/Josh_Smith.html",
+      "draftguru_evidence": "Josh Smith (title says born 1986); games=11 goals=2 (Aug-2026 capture); draft rows: 2007 National pick 62 North Melbourne",
+      "machine_outcome": "target_unregistered",
+      "player_url": "https://www.draftguru.com.au/players/josh_smith/1",
+      "recheck_classes": [
+        "3_target_unregistered",
+        "6_numbering"
+      ],
+      "recommendation_reason": "DraftGuru's captured href names the plain, unsuffixed path (players/J/Josh_Smith.html), which does not exist in the accepted snapshot -- only the suffixed 0/1 variants do (AFL Tables retroactively numbers every name shared by 2+ players). players/J/Josh_Smith0.html matches on three independent signals beyond name: games 11/11 exact, birth year ~1986 (from Age at debut) matching the DraftGuru title year, and club history (North Melbourne) matching exactly (span 2008-2010). This is sufficient corroboration to identify the correct registered target, but the existing bridge contract joins on the literal captured href only and has no suffix-fallback; recommend NOT auto-applying this bridge, and instead routing to operator player-link curation naming players/J/Josh_Smith0.html as the deterministic correction. Machine outcome (target_unregistered) is correct under the current contract and is left unchanged.",
+      "recommended_verdict": "source_discrepancy_same_person",
+      "retained_evidence": "NOT REGISTERED on afldb_test (no retained snapshot rows for this identity)",
+      "sample_index": 884,
+      "stratum": "random",
+      "visible_name": "Josh Smith"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/S/Steven_Schwerdt.html",
+      "draftguru_evidence": "Stephen Schwerdt (title says born 1968); games=25 goals=4 (Aug-2026 capture); draft rows: 1989 National pick 78 West Coast; 1990 Pre-Draft pick None Adelaide",
+      "machine_outcome": "target_unregistered",
+      "player_url": "https://www.draftguru.com.au/players/stephen_schwerdt/1",
+      "recheck_classes": [
+        "3_target_unregistered",
+        "8_schwerdt"
+      ],
+      "recommendation_reason": "Third spelling case confirmed (as the runbook anticipated): DraftGuru's href literally names Steven_Schwerdt.html, which is absent from the accepted snapshot; players/S/Stephen_Schwerdt.html exists and its visible name on DraftGuru's own captured page is already spelled \"Stephen\" (matching the correctly-spelled identity, not the href's \"Steven\"). Corroboration beyond name: games 25/25 exact, birth year 1968 exact match (Age at debut), club Adelaide exact match, span 1992-1994. Recommend operator player-link curation to players/S/Stephen_Schwerdt.html rather than auto-applying; machine outcome (target_unregistered) is left unchanged.",
+      "recommended_verdict": "source_discrepancy_same_person",
+      "retained_evidence": "NOT REGISTERED on afldb_test (no retained snapshot rows for this identity)",
+      "sample_index": 933,
+      "stratum": "random",
+      "visible_name": "Stephen Schwerdt"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/D/Daniel_Curtin.html",
+      "draftguru_evidence": "Dan Curtin (title says born 2005); games=48 goals=17 (Aug-2026 capture); draft rows: 2023 National pick 8 Adelaide",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/dan_curtin/1",
+      "recheck_classes": [
+        "7_spelling_or_name_variant"
+      ],
+      "recommendation_reason": "Listed name-variant pair (diminutive/formal or spelling form); birth year, games and club evidence corroborate the same person beyond the name variant itself. Confirm the variant pairing.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Daniel Curtin; birth_year=2005; games=32 goals=14; span 2024-2025; clubs=Adelaide",
+      "sample_index": 95,
+      "stratum": "census",
+      "visible_name": "Dan Curtin"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/M/Matt_Scharenberg.html",
+      "draftguru_evidence": "Matthew Scharenberg (title says born 1995); games=41 goals=0 (Aug-2026 capture); draft rows: 2013 National pick 6 Collingwood",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/matthew_scharenberg/1",
+      "recheck_classes": [
+        "7_spelling_or_name_variant"
+      ],
+      "recommendation_reason": "Listed name-variant pair (diminutive/formal or spelling form); birth year, games and club evidence corroborate the same person beyond the name variant itself. Confirm the variant pairing.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Matt Scharenberg; birth_year=1995; games=41 goals=0; span 2015-2020; clubs=Collingwood",
+      "sample_index": 278,
+      "stratum": "census",
+      "visible_name": "Matthew Scharenberg"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/E/Edward_Allan.html",
+      "draftguru_evidence": "Ed Allan (title says born 2004); games=33 goals=8 (Aug-2026 capture); draft rows: 2022 National pick 19 Collingwood",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/ed_allan/1",
+      "recheck_classes": [
+        "7_spelling_or_name_variant"
+      ],
+      "recommendation_reason": "Listed name-variant pair (diminutive/formal or spelling form); birth year, games and club evidence corroborate the same person beyond the name variant itself. Confirm the variant pairing.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Edward Allan; birth_year=2004; games=15 goals=2; span 2024-2025; clubs=Collingwood",
+      "sample_index": 474,
+      "stratum": "random",
+      "visible_name": "Ed Allan"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/H/Harry_Jones1.html",
+      "draftguru_evidence": "Harrison Jones (title says born 1999); games=1 goals=0 (Aug-2026 capture); draft rows: 2017 Rookie pick 7 Hawthorn",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/harrison_jones/1",
+      "recheck_classes": [
+        "10_weak_or_suffix_or_continuity",
+        "7_spelling_or_name_variant"
+      ],
+      "recommendation_reason": "Listed name-variant pair (diminutive/formal or spelling form); birth year, games and club evidence corroborate the same person beyond the name variant itself. Confirm the variant pairing.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Harry Jones; birth_year=1999; games=1 goals=0; span 2020-2020; clubs=Hawthorn",
+      "sample_index": 539,
+      "stratum": "random",
+      "visible_name": "Harrison Jones"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/H/Harry_Jones2.html",
+      "draftguru_evidence": "Harrison Jones (title says born 2001); games=66 goals=57 (Aug-2026 capture); draft rows: 2019 National pick 30 Essendon",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/harrison_jones/2",
+      "recheck_classes": [
+        "10_weak_or_suffix_or_continuity",
+        "7_spelling_or_name_variant"
+      ],
+      "recommendation_reason": "Listed name-variant pair (diminutive/formal or spelling form); birth year, games and club evidence corroborate the same person beyond the name variant itself. Confirm the variant pairing.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Harry Jones; birth_year=2001; games=59 goals=55; span 2021-2025; clubs=Essendon",
+      "sample_index": 671,
+      "stratum": "random",
+      "visible_name": "Harrison Jones"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/L/Lachie_Fogarty.html",
+      "draftguru_evidence": "Lachlan Fogarty (title says born 1999); games=69 goals=30 (Aug-2026 capture); draft rows: 2017 National pick 22 Geelong; 2020 Trade pick None Carlton",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/lachlan_fogarty/1",
+      "recheck_classes": [
+        "7_spelling_or_name_variant"
+      ],
+      "recommendation_reason": "Listed name-variant pair (diminutive/formal or spelling form); birth year, games and club evidence corroborate the same person beyond the name variant itself. Confirm the variant pairing.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Lachie Fogarty; birth_year=1999; games=90 goals=36; span 2018-2025; clubs=Carlton, Geelong",
+      "sample_index": 703,
+      "stratum": "random",
+      "visible_name": "Lachlan Fogarty"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/O/Oliver_Hanrahan.html",
+      "draftguru_evidence": "Ollie Hanrahan (title says born 1998); games=29 goals=18 (Aug-2026 capture); draft rows: 2016 Rookie pick 14 Hawthorn",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/ollie_hanrahan/1",
+      "recheck_classes": [
+        "7_spelling_or_name_variant"
+      ],
+      "recommendation_reason": "Listed name-variant pair (diminutive/formal or spelling form); birth year, games and club evidence corroborate the same person beyond the name variant itself. Confirm the variant pairing.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Oliver Hanrahan; birth_year=1998; games=29 goals=18; span 2019-2021; clubs=Hawthorn",
+      "sample_index": 752,
+      "stratum": "random",
+      "visible_name": "Ollie Hanrahan"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/L/Lachlan_Bramble.html",
+      "draftguru_evidence": "Lachie Bramble (title says born 1998); games=70 goals=11 (Aug-2026 capture); draft rows: 2023 Post-Draft pick None Western Bulldogs",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/lachie_bramble/1",
+      "recheck_classes": [
+        "7_spelling_or_name_variant"
+      ],
+      "recommendation_reason": "Listed name-variant pair (diminutive/formal or spelling form); birth year, games and club evidence corroborate the same person beyond the name variant itself. Confirm the variant pairing.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Lachlan Bramble; birth_year=1998; games=77 goals=9; span 2021-2025; clubs=Hawthorn, Western Bulldogs",
+      "sample_index": 793,
+      "stratum": "random",
+      "visible_name": "Lachie Bramble"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/L/Lachlan_Sullivan.html",
+      "draftguru_evidence": "Lachie Sullivan (title says born 1997); games=26 goals=10 (Aug-2026 capture); draft rows: 2023 Post-Draft pick None Collingwood",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/lachie_sullivan/1",
+      "recheck_classes": [
+        "7_spelling_or_name_variant"
+      ],
+      "recommendation_reason": "Listed name-variant pair (diminutive/formal or spelling form); birth year, games and club evidence corroborate the same person beyond the name variant itself. Confirm the variant pairing.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Lachlan Sullivan; birth_year=1997; games=24 goals=8; span 2024-2025; clubs=Collingwood",
+      "sample_index": 830,
+      "stratum": "random",
+      "visible_name": "Lachie Sullivan"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/M/Matthew_Cottrell.html",
+      "draftguru_evidence": "Matt Cottrell (title says born 2000); games=86 goals=41 (Aug-2026 capture); draft rows: 2018 Post-Draft pick None Carlton",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/matt_cottrell/1",
+      "recheck_classes": [
+        "7_spelling_or_name_variant"
+      ],
+      "recommendation_reason": "Listed name-variant pair (diminutive/formal or spelling form); birth year, games and club evidence corroborate the same person beyond the name variant itself. Confirm the variant pairing.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Matthew Cottrell; birth_year=2000; games=74 goals=36; span 2020-2025; clubs=Carlton",
+      "sample_index": 983,
+      "stratum": "random",
+      "visible_name": "Matt Cottrell"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/C/Cooper_Duff-Tytler.html",
+      "draftguru_evidence": "Cooper Duff-Tytler (title says born 2007); games=16 goals=4 (Aug-2026 capture); draft rows: 2025 National pick 4 West Coast",
+      "machine_outcome": "target_unregistered",
+      "player_url": "https://www.draftguru.com.au/players/cooper_duff-tytler/1",
+      "recheck_classes": [
+        "3_target_unregistered"
+      ],
+      "recommendation_reason": "No retained evidence exists at all for this identity (absent from the accepted snapshot's 13,275-URL set through season 2025). Earliest DraftGuru draft year 2025 is consistent with the measured finding (§10.3) that all 101 target_not_registered paths in the full child are simply not yet in the accepted historical baseline, not a staleness or misregistration defect. Continued withholding recommended; no forced match.",
+      "recommended_verdict": "withhold",
+      "retained_evidence": "NOT REGISTERED on afldb_test (no retained snapshot rows for this identity)",
+      "sample_index": 89,
+      "stratum": "census",
+      "visible_name": "Cooper Duff-Tytler"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/D/Daniel_Annable.html",
+      "draftguru_evidence": "Daniel Annable (title says born 2007); games=3 goals=1 (Aug-2026 capture); draft rows: 2025 National pick 6 Brisbane",
+      "machine_outcome": "target_unregistered",
+      "player_url": "https://www.draftguru.com.au/players/daniel_annable/1",
+      "recheck_classes": [
+        "3_target_unregistered"
+      ],
+      "recommendation_reason": "No retained evidence exists at all for this identity (absent from the accepted snapshot's 13,275-URL set through season 2025). Earliest DraftGuru draft year 2025 is consistent with the measured finding (§10.3) that all 101 target_not_registered paths in the full child are simply not yet in the accepted historical baseline, not a staleness or misregistration defect. Continued withholding recommended; no forced match.",
+      "recommended_verdict": "withhold",
+      "retained_evidence": "NOT REGISTERED on afldb_test (no retained snapshot rows for this identity)",
+      "sample_index": 96,
+      "stratum": "census",
+      "visible_name": "Daniel Annable"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/D/Dylan_Patterson.html",
+      "draftguru_evidence": "Dylan Patterson (title says born 2007); games=5 goals=3 (Aug-2026 capture); draft rows: 2025 National pick 5 Gold Coast",
+      "machine_outcome": "target_unregistered",
+      "player_url": "https://www.draftguru.com.au/players/dylan_patterson/1",
+      "recheck_classes": [
+        "3_target_unregistered"
+      ],
+      "recommendation_reason": "No retained evidence exists at all for this identity (absent from the accepted snapshot's 13,275-URL set through season 2025). Earliest DraftGuru draft year 2025 is consistent with the measured finding (§10.3) that all 101 target_not_registered paths in the full child are simply not yet in the accepted historical baseline, not a staleness or misregistration defect. Continued withholding recommended; no forced match.",
+      "recommended_verdict": "withhold",
+      "retained_evidence": "NOT REGISTERED on afldb_test (no retained snapshot rows for this identity)",
+      "sample_index": 125,
+      "stratum": "census",
+      "visible_name": "Dylan Patterson"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/H/Harry_Dean.html",
+      "draftguru_evidence": "Harry Dean (title says born 2007); games=20 goals=1 (Aug-2026 capture); draft rows: 2025 National pick 3 Carlton",
+      "machine_outcome": "target_unregistered",
+      "player_url": "https://www.draftguru.com.au/players/harry_dean/1",
+      "recheck_classes": [
+        "3_target_unregistered"
+      ],
+      "recommendation_reason": "No retained evidence exists at all for this identity (absent from the accepted snapshot's 13,275-URL set through season 2025). Earliest DraftGuru draft year 2025 is consistent with the measured finding (§10.3) that all 101 target_not_registered paths in the full child are simply not yet in the accepted historical baseline, not a staleness or misregistration defect. Continued withholding recommended; no forced match.",
+      "recommended_verdict": "withhold",
+      "retained_evidence": "NOT REGISTERED on afldb_test (no retained snapshot rows for this identity)",
+      "sample_index": 148,
+      "stratum": "census",
+      "visible_name": "Harry Dean"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/J/Jacob_Farrow.html",
+      "draftguru_evidence": "Jacob Farrow (title says born 2007); games=21 goals=4 (Aug-2026 capture); draft rows: 2025 National pick 10 Essendon",
+      "machine_outcome": "target_unregistered",
+      "player_url": "https://www.draftguru.com.au/players/jacob_farrow/1",
+      "recheck_classes": [
+        "3_target_unregistered"
+      ],
+      "recommendation_reason": "No retained evidence exists at all for this identity (absent from the accepted snapshot's 13,275-URL set through season 2025). Earliest DraftGuru draft year 2025 is consistent with the measured finding (§10.3) that all 101 target_not_registered paths in the full child are simply not yet in the accepted historical baseline, not a staleness or misregistration defect. Continued withholding recommended; no forced match.",
+      "recommended_verdict": "withhold",
+      "retained_evidence": "NOT REGISTERED on afldb_test (no retained snapshot rows for this identity)",
+      "sample_index": 164,
+      "stratum": "census",
+      "visible_name": "Jacob Farrow"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/J/Jagga_Smith.html",
+      "draftguru_evidence": "Jagga Smith (title says born 2006); games=23 goals=8 (Aug-2026 capture); draft rows: 2024 National pick 3 Carlton",
+      "machine_outcome": "target_unregistered",
+      "player_url": "https://www.draftguru.com.au/players/jagga_smith/1",
+      "recheck_classes": [
+        "3_target_unregistered"
+      ],
+      "recommendation_reason": "No retained evidence exists at all for this identity (absent from the accepted snapshot's 13,275-URL set through season 2025). Earliest DraftGuru draft year 2024 is consistent with the measured finding (§10.3) that all 101 target_not_registered paths in the full child are simply not yet in the accepted historical baseline, not a staleness or misregistration defect. Continued withholding recommended; no forced match.",
+      "recommended_verdict": "withhold",
+      "retained_evidence": "NOT REGISTERED on afldb_test (no retained snapshot rows for this identity)",
+      "sample_index": 167,
+      "stratum": "census",
+      "visible_name": "Jagga Smith"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/S/Sam_Cumming.html",
+      "draftguru_evidence": "Sam Cumming (title says born 2007); games=14 goals=8 (Aug-2026 capture); draft rows: 2025 National pick 7 Richmond",
+      "machine_outcome": "target_unregistered",
+      "player_url": "https://www.draftguru.com.au/players/sam_cumming/1",
+      "recheck_classes": [
+        "3_target_unregistered"
+      ],
+      "recommendation_reason": "No retained evidence exists at all for this identity (absent from the accepted snapshot's 13,275-URL set through season 2025). Earliest DraftGuru draft year 2025 is consistent with the measured finding (§10.3) that all 101 target_not_registered paths in the full child are simply not yet in the accepted historical baseline, not a staleness or misregistration defect. Continued withholding recommended; no forced match.",
+      "recommended_verdict": "withhold",
+      "retained_evidence": "NOT REGISTERED on afldb_test (no retained snapshot rows for this identity)",
+      "sample_index": 343,
+      "stratum": "census",
+      "visible_name": "Sam Cumming"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/S/Sam_Grlj.html",
+      "draftguru_evidence": "Sam Grlj (title says born 2007); games=21 goals=2 (Aug-2026 capture); draft rows: 2025 National pick 8 Richmond",
+      "machine_outcome": "target_unregistered",
+      "player_url": "https://www.draftguru.com.au/players/sam_grlj/1",
+      "recheck_classes": [
+        "3_target_unregistered"
+      ],
+      "recommendation_reason": "No retained evidence exists at all for this identity (absent from the accepted snapshot's 13,275-URL set through season 2025). Earliest DraftGuru draft year 2025 is consistent with the measured finding (§10.3) that all 101 target_not_registered paths in the full child are simply not yet in the accepted historical baseline, not a staleness or misregistration defect. Continued withholding recommended; no forced match.",
+      "recommended_verdict": "withhold",
+      "retained_evidence": "NOT REGISTERED on afldb_test (no retained snapshot rows for this identity)",
+      "sample_index": 346,
+      "stratum": "census",
+      "visible_name": "Sam Grlj"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/S/Sullivan_Robey.html",
+      "draftguru_evidence": "Sullivan Robey (title says born 2007); games=15 goals=9 (Aug-2026 capture); draft rows: 2025 National pick 9 Essendon",
+      "machine_outcome": "target_unregistered",
+      "player_url": "https://www.draftguru.com.au/players/sullivan_robey/1",
+      "recheck_classes": [
+        "3_target_unregistered"
+      ],
+      "recommendation_reason": "No retained evidence exists at all for this identity (absent from the accepted snapshot's 13,275-URL set through season 2025). Earliest DraftGuru draft year 2025 is consistent with the measured finding (§10.3) that all 101 target_not_registered paths in the full child are simply not yet in the accepted historical baseline, not a staleness or misregistration defect. Continued withholding recommended; no forced match.",
+      "recommended_verdict": "withhold",
+      "retained_evidence": "NOT REGISTERED on afldb_test (no retained snapshot rows for this identity)",
+      "sample_index": 368,
+      "stratum": "census",
+      "visible_name": "Sullivan Robey"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/W/Willem_Duursma.html",
+      "draftguru_evidence": "Willem Duursma (title says born 2007); games=22 goals=14 (Aug-2026 capture); draft rows: 2025 National pick 1 West Coast",
+      "machine_outcome": "target_unregistered",
+      "player_url": "https://www.draftguru.com.au/players/willem_duursma/1",
+      "recheck_classes": [
+        "3_target_unregistered"
+      ],
+      "recommendation_reason": "No retained evidence exists at all for this identity (absent from the accepted snapshot's 13,275-URL set through season 2025). Earliest DraftGuru draft year 2025 is consistent with the measured finding (§10.3) that all 101 target_not_registered paths in the full child are simply not yet in the accepted historical baseline, not a staleness or misregistration defect. Continued withholding recommended; no forced match.",
+      "recommended_verdict": "withhold",
+      "retained_evidence": "NOT REGISTERED on afldb_test (no retained snapshot rows for this identity)",
+      "sample_index": 394,
+      "stratum": "census",
+      "visible_name": "Willem Duursma"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/Z/Zeke_Uwland.html",
+      "draftguru_evidence": "Zeke Uwland (title says born 2007); games=17 goals=7 (Aug-2026 capture); draft rows: 2025 National pick 2 Gold Coast",
+      "machine_outcome": "target_unregistered",
+      "player_url": "https://www.draftguru.com.au/players/zeke_uwland/1",
+      "recheck_classes": [
+        "3_target_unregistered"
+      ],
+      "recommendation_reason": "No retained evidence exists at all for this identity (absent from the accepted snapshot's 13,275-URL set through season 2025). Earliest DraftGuru draft year 2025 is consistent with the measured finding (§10.3) that all 101 target_not_registered paths in the full child are simply not yet in the accepted historical baseline, not a staleness or misregistration defect. Continued withholding recommended; no forced match.",
+      "recommended_verdict": "withhold",
+      "retained_evidence": "NOT REGISTERED on afldb_test (no retained snapshot rows for this identity)",
+      "sample_index": 399,
+      "stratum": "census",
+      "visible_name": "Zeke Uwland"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/T/Toby_Murray.html",
+      "draftguru_evidence": "Toby Murray (title says born 2003); games=13 goals=9 (Aug-2026 capture); draft rows: 2023 Mid-Season pick 7 Adelaide",
+      "machine_outcome": "target_unregistered",
+      "player_url": "https://www.draftguru.com.au/players/toby_murray/1",
+      "recheck_classes": [
+        "3_target_unregistered"
+      ],
+      "recommendation_reason": "No retained evidence exists at all for this identity (absent from the accepted snapshot's 13,275-URL set through season 2025). Earliest DraftGuru draft year 2023 is consistent with the measured finding (§10.3) that all 101 target_not_registered paths in the full child are simply not yet in the accepted historical baseline, not a staleness or misregistration defect. Continued withholding recommended; no forced match.",
+      "recommended_verdict": "withhold",
+      "retained_evidence": "NOT REGISTERED on afldb_test (no retained snapshot rows for this identity)",
+      "sample_index": 540,
+      "stratum": "random",
+      "visible_name": "Toby Murray"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/M/Mitch_Zadow.html",
+      "draftguru_evidence": "Mitch Zadow (title says born 2004); games=9 goals=8 (Aug-2026 capture); draft rows: 2025 Post-Draft pick None Port Adelaide",
+      "machine_outcome": "target_unregistered",
+      "player_url": "https://www.draftguru.com.au/players/mitch_zadow/1",
+      "recheck_classes": [
+        "3_target_unregistered"
+      ],
+      "recommendation_reason": "No retained evidence exists at all for this identity (absent from the accepted snapshot's 13,275-URL set through season 2025). Earliest DraftGuru draft year 2025 is consistent with the measured finding (§10.3) that all 101 target_not_registered paths in the full child are simply not yet in the accepted historical baseline, not a staleness or misregistration defect. Continued withholding recommended; no forced match.",
+      "recommended_verdict": "withhold",
+      "retained_evidence": "NOT REGISTERED on afldb_test (no retained snapshot rows for this identity)",
+      "sample_index": 609,
+      "stratum": "random",
+      "visible_name": "Mitch Zadow"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/B/Billy_Cootee.html",
+      "draftguru_evidence": "Billy Cootee (title says born 2002); games=9 goals=12 (Aug-2026 capture); draft rows: 2025 National pick 42 Sydney",
+      "machine_outcome": "target_unregistered",
+      "player_url": "https://www.draftguru.com.au/players/billy_cootee/1",
+      "recheck_classes": [
+        "3_target_unregistered"
+      ],
+      "recommendation_reason": "No retained evidence exists at all for this identity (absent from the accepted snapshot's 13,275-URL set through season 2025). Earliest DraftGuru draft year 2025 is consistent with the measured finding (§10.3) that all 101 target_not_registered paths in the full child are simply not yet in the accepted historical baseline, not a staleness or misregistration defect. Continued withholding recommended; no forced match.",
+      "recommended_verdict": "withhold",
+      "retained_evidence": "NOT REGISTERED on afldb_test (no retained snapshot rows for this identity)",
+      "sample_index": 656,
+      "stratum": "random",
+      "visible_name": "Billy Cootee"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/M/Milan_Murdock.html",
+      "draftguru_evidence": "Milan Murdock (title says born 2000); games=20 goals=19 (Aug-2026 capture); draft rows: 2025 Post-Draft pick None West Coast",
+      "machine_outcome": "target_unregistered",
+      "player_url": "https://www.draftguru.com.au/players/milan_murdock/1",
+      "recheck_classes": [
+        "3_target_unregistered"
+      ],
+      "recommendation_reason": "No retained evidence exists at all for this identity (absent from the accepted snapshot's 13,275-URL set through season 2025). Earliest DraftGuru draft year 2025 is consistent with the measured finding (§10.3) that all 101 target_not_registered paths in the full child are simply not yet in the accepted historical baseline, not a staleness or misregistration defect. Continued withholding recommended; no forced match.",
+      "recommended_verdict": "withhold",
+      "retained_evidence": "NOT REGISTERED on afldb_test (no retained snapshot rows for this identity)",
+      "sample_index": 677,
+      "stratum": "random",
+      "visible_name": "Milan Murdock"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/A/Angus_Anderson.html",
+      "draftguru_evidence": "Angus Anderson (title says born 2003); games=16 goals=18 (Aug-2026 capture); draft rows: 2025 National pick 57 Collingwood",
+      "machine_outcome": "target_unregistered",
+      "player_url": "https://www.draftguru.com.au/players/angus_anderson/1",
+      "recheck_classes": [
+        "3_target_unregistered"
+      ],
+      "recommendation_reason": "No retained evidence exists at all for this identity (absent from the accepted snapshot's 13,275-URL set through season 2025). Earliest DraftGuru draft year 2025 is consistent with the measured finding (§10.3) that all 101 target_not_registered paths in the full child are simply not yet in the accepted historical baseline, not a staleness or misregistration defect. Continued withholding recommended; no forced match.",
+      "recommended_verdict": "withhold",
+      "retained_evidence": "NOT REGISTERED on afldb_test (no retained snapshot rows for this identity)",
+      "sample_index": 678,
+      "stratum": "random",
+      "visible_name": "Angus Anderson"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/J/Josh_Lai.html",
+      "draftguru_evidence": "Josh Lai (title says born 2005); games=19 goals=0 (Aug-2026 capture); draft rows: 2024 Post-Draft pick None Port Adelaide",
+      "machine_outcome": "target_unregistered",
+      "player_url": "https://www.draftguru.com.au/players/josh_lai/1",
+      "recheck_classes": [
+        "3_target_unregistered"
+      ],
+      "recommendation_reason": "No retained evidence exists at all for this identity (absent from the accepted snapshot's 13,275-URL set through season 2025). Earliest DraftGuru draft year 2024 is consistent with the measured finding (§10.3) that all 101 target_not_registered paths in the full child are simply not yet in the accepted historical baseline, not a staleness or misregistration defect. Continued withholding recommended; no forced match.",
+      "recommended_verdict": "withhold",
+      "retained_evidence": "NOT REGISTERED on afldb_test (no retained snapshot rows for this identity)",
+      "sample_index": 711,
+      "stratum": "random",
+      "visible_name": "Josh Lai"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/M/Mitchell_Edwards.html",
+      "draftguru_evidence": "Mitch Edwards (title says born 2005); games=18 goals=3 (Aug-2026 capture); draft rows: 2023 National pick 32 Geelong",
+      "machine_outcome": "target_unregistered",
+      "player_url": "https://www.draftguru.com.au/players/mitch_edwards/1",
+      "recheck_classes": [
+        "3_target_unregistered"
+      ],
+      "recommendation_reason": "No retained evidence exists at all for this identity (absent from the accepted snapshot's 13,275-URL set through season 2025). Earliest DraftGuru draft year 2023 is consistent with the measured finding (§10.3) that all 101 target_not_registered paths in the full child are simply not yet in the accepted historical baseline, not a staleness or misregistration defect. Continued withholding recommended; no forced match.",
+      "recommended_verdict": "withhold",
+      "retained_evidence": "NOT REGISTERED on afldb_test (no retained snapshot rows for this identity)",
+      "sample_index": 714,
+      "stratum": "random",
+      "visible_name": "Mitch Edwards"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/M/Mitch_Podhajski.html",
+      "draftguru_evidence": "Mitch Podhajski (title says born 1999); games=2 goals=1 (Aug-2026 capture); draft rows: 2025 Mid-Season pick 18 Collingwood",
+      "machine_outcome": "target_unregistered",
+      "player_url": "https://www.draftguru.com.au/players/mitch_podhajski/1",
+      "recheck_classes": [
+        "3_target_unregistered"
+      ],
+      "recommendation_reason": "No retained evidence exists at all for this identity (absent from the accepted snapshot's 13,275-URL set through season 2025). Earliest DraftGuru draft year 2025 is consistent with the measured finding (§10.3) that all 101 target_not_registered paths in the full child are simply not yet in the accepted historical baseline, not a staleness or misregistration defect. Continued withholding recommended; no forced match.",
+      "recommended_verdict": "withhold",
+      "retained_evidence": "NOT REGISTERED on afldb_test (no retained snapshot rows for this identity)",
+      "sample_index": 724,
+      "stratum": "random",
+      "visible_name": "Mitch Podhajski"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/N/Noah_Mraz.html",
+      "draftguru_evidence": "Noah Mraz (title says born 2006); games=4 goals=1 (Aug-2026 capture); draft rows: 2024 National pick 35 Hawthorn",
+      "machine_outcome": "target_unregistered",
+      "player_url": "https://www.draftguru.com.au/players/noah_mraz/1",
+      "recheck_classes": [
+        "3_target_unregistered"
+      ],
+      "recommendation_reason": "No retained evidence exists at all for this identity (absent from the accepted snapshot's 13,275-URL set through season 2025). Earliest DraftGuru draft year 2024 is consistent with the measured finding (§10.3) that all 101 target_not_registered paths in the full child are simply not yet in the accepted historical baseline, not a staleness or misregistration defect. Continued withholding recommended; no forced match.",
+      "recommended_verdict": "withhold",
+      "retained_evidence": "NOT REGISTERED on afldb_test (no retained snapshot rows for this identity)",
+      "sample_index": 846,
+      "stratum": "random",
+      "visible_name": "Noah Mraz"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/N/Noah_Howes.html",
+      "draftguru_evidence": "Noah Howes (title says born 2005); games=2 goals=0 (Aug-2026 capture); draft rows: 2024 Mid-Season pick 15 Collingwood",
+      "machine_outcome": "target_unregistered",
+      "player_url": "https://www.draftguru.com.au/players/noah_howes/1",
+      "recheck_classes": [
+        "3_target_unregistered"
+      ],
+      "recommendation_reason": "No retained evidence exists at all for this identity (absent from the accepted snapshot's 13,275-URL set through season 2025). Earliest DraftGuru draft year 2024 is consistent with the measured finding (§10.3) that all 101 target_not_registered paths in the full child are simply not yet in the accepted historical baseline, not a staleness or misregistration defect. Continued withholding recommended; no forced match.",
+      "recommended_verdict": "withhold",
+      "retained_evidence": "NOT REGISTERED on afldb_test (no retained snapshot rows for this identity)",
+      "sample_index": 857,
+      "stratum": "random",
+      "visible_name": "Noah Howes"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/S/Sam_Swadling.html",
+      "draftguru_evidence": "Sam Swadling (title says born 2007); games=8 goals=6 (Aug-2026 capture); draft rows: 2025 National pick 37 Collingwood",
+      "machine_outcome": "target_unregistered",
+      "player_url": "https://www.draftguru.com.au/players/sam_swadling/1",
+      "recheck_classes": [
+        "3_target_unregistered"
+      ],
+      "recommendation_reason": "No retained evidence exists at all for this identity (absent from the accepted snapshot's 13,275-URL set through season 2025). Earliest DraftGuru draft year 2025 is consistent with the measured finding (§10.3) that all 101 target_not_registered paths in the full child are simply not yet in the accepted historical baseline, not a staleness or misregistration defect. Continued withholding recommended; no forced match.",
+      "recommended_verdict": "withhold",
+      "retained_evidence": "NOT REGISTERED on afldb_test (no retained snapshot rows for this identity)",
+      "sample_index": 883,
+      "stratum": "random",
+      "visible_name": "Sam Swadling"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/C/Caleb_Lewis.html",
+      "draftguru_evidence": "Caleb Lewis (title says born 2003); games=2 goals=0 (Aug-2026 capture); draft rows: 2024 Mid-Season pick 14 Gold Coast",
+      "machine_outcome": "target_unregistered",
+      "player_url": "https://www.draftguru.com.au/players/caleb_lewis/1",
+      "recheck_classes": [
+        "3_target_unregistered"
+      ],
+      "recommendation_reason": "No retained evidence exists at all for this identity (absent from the accepted snapshot's 13,275-URL set through season 2025). Earliest DraftGuru draft year 2024 is consistent with the measured finding (§10.3) that all 101 target_not_registered paths in the full child are simply not yet in the accepted historical baseline, not a staleness or misregistration defect. Continued withholding recommended; no forced match.",
+      "recommended_verdict": "withhold",
+      "retained_evidence": "NOT REGISTERED on afldb_test (no retained snapshot rows for this identity)",
+      "sample_index": 934,
+      "stratum": "random",
+      "visible_name": "Caleb Lewis"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/Z/Zane_Zakostelsky.html",
+      "draftguru_evidence": "Zane Zakostelsky (title says born 2005); games=3 goals=1 (Aug-2026 capture); draft rows: 2023 National pick 51 Brisbane",
+      "machine_outcome": "target_unregistered",
+      "player_url": "https://www.draftguru.com.au/players/zane_zakostelsky/1",
+      "recheck_classes": [
+        "3_target_unregistered"
+      ],
+      "recommendation_reason": "No retained evidence exists at all for this identity (absent from the accepted snapshot's 13,275-URL set through season 2025). Earliest DraftGuru draft year 2023 is consistent with the measured finding (§10.3) that all 101 target_not_registered paths in the full child are simply not yet in the accepted historical baseline, not a staleness or misregistration defect. Continued withholding recommended; no forced match.",
+      "recommended_verdict": "withhold",
+      "retained_evidence": "NOT REGISTERED on afldb_test (no retained snapshot rows for this identity)",
+      "sample_index": 943,
+      "stratum": "random",
+      "visible_name": "Zane Zakostelsky"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/C/Chris_Johnson0.html",
+      "draftguru_evidence": "Chris Johnson (title says born 1976); games=205 goals=105 (Aug-2026 capture); draft rows: 1993 National pick 7 Fitzroy; 1996 Pre-Draft pick None Brisbane",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/chris_johnson/1",
+      "recheck_classes": [
+        "10_weak_or_suffix_or_continuity"
+      ],
+      "recommendation_reason": "Reviewed the flagged corroboration gap (weak single-signal evidence, numeric-suffix identity, or continuity-rule path) directly against the retained facts; the corroborating signals present (birth year, games, club overlap as applicable) support the offline_strong classification. Confirm.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Chris Johnson; birth_year=1976; games=264 goals=172; span 1994-2007; clubs=Brisbane Lions, Fitzroy",
+      "sample_index": 75,
+      "stratum": "census",
+      "visible_name": "Chris Johnson"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/J/Josh_Kennedy0.html",
+      "draftguru_evidence": "Josh Kennedy (title says born 1987); games=271 goals=712 (Aug-2026 capture); draft rows: 2005 National pick 4 Carlton; 2007 Trade pick None West Coast",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/josh_kennedy/1",
+      "recheck_classes": [
+        "10_weak_or_suffix_or_continuity"
+      ],
+      "recommendation_reason": "Reviewed the flagged corroboration gap (weak single-signal evidence, numeric-suffix identity, or continuity-rule path) directly against the retained facts; the corroborating signals present (birth year, games, club overlap as applicable) support the offline_strong classification. Confirm.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Josh Kennedy; birth_year=1987; games=293 goals=723; span 2006-2022; clubs=Carlton, West Coast",
+      "sample_index": 214,
+      "stratum": "census",
+      "visible_name": "Josh Kennedy"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/M/Michael_Gardiner0.html",
+      "draftguru_evidence": "Michael Gardiner (title says born 1979); games=52 goals=23 (Aug-2026 capture); draft rows: 1996 National pick 1 West Coast; 2006 Trade pick None St Kilda",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/michael_gardiner/2",
+      "recheck_classes": [
+        "10_weak_or_suffix_or_continuity"
+      ],
+      "recommendation_reason": "Reviewed the flagged corroboration gap (weak single-signal evidence, numeric-suffix identity, or continuity-rule path) directly against the retained facts; the corroborating signals present (birth year, games, club overlap as applicable) support the offline_strong classification. Confirm.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Michael Gardiner; birth_year=1979; games=181 goals=110; span 1997-2011; clubs=St Kilda, West Coast",
+      "sample_index": 281,
+      "stratum": "census",
+      "visible_name": "Michael Gardiner"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/N/Nathan_Brown1.html",
+      "draftguru_evidence": "Nathan Brown (title says born 1978); games=82 goals=143 (Aug-2026 capture); draft rows: 1996 National pick 10 Western Bulldogs; 2003 Trade pick None Richmond",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/nathan_brown/2",
+      "recheck_classes": [
+        "10_weak_or_suffix_or_continuity"
+      ],
+      "recommendation_reason": "Reviewed the flagged corroboration gap (weak single-signal evidence, numeric-suffix identity, or continuity-rule path) directly against the retained facts; the corroborating signals present (birth year, games, club overlap as applicable) support the offline_strong classification. Confirm.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Nathan Brown; birth_year=1978; games=219 goals=349; span 1997-2009; clubs=Richmond, Western Bulldogs",
+      "sample_index": 294,
+      "stratum": "census",
+      "visible_name": "Nathan Brown"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/N/Nathan_Brown2.html",
+      "draftguru_evidence": "Nathan Brown (title says born 1988); games=53 goals=0 (Aug-2026 capture); draft rows: 2006 National pick 10 Collingwood; 2016 Free Agency pick None St Kilda",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/nathan_brown/3",
+      "recheck_classes": [
+        "10_weak_or_suffix_or_continuity"
+      ],
+      "recommendation_reason": "Reviewed the flagged corroboration gap (weak single-signal evidence, numeric-suffix identity, or continuity-rule path) directly against the retained facts; the corroborating signals present (birth year, games, club overlap as applicable) support the offline_strong classification. Confirm.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Nathan Brown; birth_year=1989; games=183 goals=7; span 2008-2019; clubs=Collingwood, St Kilda",
+      "sample_index": 295,
+      "stratum": "census",
+      "visible_name": "Nathan Brown"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/T/Tom_Green1.html",
+      "draftguru_evidence": "Tom Green (title says born 2001); games=115 goals=49 (Aug-2026 capture); draft rows: 2019 National pick 10 GWS",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/tom_green/1",
+      "recheck_classes": [
+        "10_weak_or_suffix_or_continuity"
+      ],
+      "recommendation_reason": "Reviewed the flagged corroboration gap (weak single-signal evidence, numeric-suffix identity, or continuity-rule path) directly against the retained facts; the corroborating signals present (birth year, games, club overlap as applicable) support the offline_strong classification. Confirm.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Tom Green; birth_year=2001; games=115 goals=49; span 2020-2025; clubs=Greater Western Sydney",
+      "sample_index": 375,
+      "stratum": "census",
+      "visible_name": "Tom Green"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/T/Tom_Williams1.html",
+      "draftguru_evidence": "Tom Williams (title says born 1986); games=85 goals=14 (Aug-2026 capture); draft rows: 2004 National pick 6 Western Bulldogs",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/tom_williams/2",
+      "recheck_classes": [
+        "10_weak_or_suffix_or_continuity"
+      ],
+      "recommendation_reason": "Reviewed the flagged corroboration gap (weak single-signal evidence, numeric-suffix identity, or continuity-rule path) directly against the retained facts; the corroborating signals present (birth year, games, club overlap as applicable) support the offline_strong classification. Confirm.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Tom Williams; birth_year=1986; games=85 goals=14; span 2007-2014; clubs=Western Bulldogs",
+      "sample_index": 377,
+      "stratum": "census",
+      "visible_name": "Tom Williams"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/C/Chris_Waterson0.html",
+      "draftguru_evidence": "Chris Waterson (title says born 1969); games=13 goals=7 (Aug-2026 capture); draft rows: 1987 National pick 17 Fitzroy",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/chris_waterson/2",
+      "recheck_classes": [
+        "10_weak_or_suffix_or_continuity"
+      ],
+      "recommendation_reason": "Reviewed the flagged corroboration gap (weak single-signal evidence, numeric-suffix identity, or continuity-rule path) directly against the retained facts; the corroborating signals present (birth year, games, club overlap as applicable) support the offline_strong classification. Confirm.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Chris Waterson; birth_year=1970; games=13 goals=7; span 1990-1991; clubs=Fitzroy",
+      "sample_index": 415,
+      "stratum": "random",
+      "visible_name": "Chris Waterson"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/B/Bailey_Williams0.html",
+      "draftguru_evidence": "Bailey Williams (title says born 1997); games=191 goals=50 (Aug-2026 capture); draft rows: 2015 National pick 48 Western Bulldogs",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/bailey_williams/1",
+      "recheck_classes": [
+        "10_weak_or_suffix_or_continuity"
+      ],
+      "recommendation_reason": "Reviewed the flagged corroboration gap (weak single-signal evidence, numeric-suffix identity, or continuity-rule path) directly against the retained facts; the corroborating signals present (birth year, games, club overlap as applicable) support the offline_strong classification. Confirm.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Bailey Williams; birth_year=1997; games=174 goals=43; span 2016-2025; clubs=Western Bulldogs",
+      "sample_index": 420,
+      "stratum": "random",
+      "visible_name": "Bailey Williams"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/S/Sam_Butler1.html",
+      "draftguru_evidence": "Sam Butler (title says born 2003); games=33 goals=19 (Aug-2026 capture); draft rows: 2021 National pick 23 Hawthorn",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/sam_butler/2",
+      "recheck_classes": [
+        "10_weak_or_suffix_or_continuity"
+      ],
+      "recommendation_reason": "Reviewed the flagged corroboration gap (weak single-signal evidence, numeric-suffix identity, or continuity-rule path) directly against the retained facts; the corroborating signals present (birth year, games, club overlap as applicable) support the offline_strong classification. Confirm.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Sam Butler; birth_year=2003; games=25 goals=15; span 2022-2025; clubs=Hawthorn",
+      "sample_index": 439,
+      "stratum": "random",
+      "visible_name": "Sam Butler"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/D/Danny_Hughes0.html",
+      "draftguru_evidence": "Danny Hughes (title says born 1963); games=11 goals=1 (Aug-2026 capture); draft rows: 1981 National pick 13 Melbourne; 1990 Pre-Draft pick None Adelaide",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/danny_hughes/1",
+      "recheck_classes": [
+        "10_weak_or_suffix_or_continuity"
+      ],
+      "recommendation_reason": "Reviewed the flagged corroboration gap (weak single-signal evidence, numeric-suffix identity, or continuity-rule path) directly against the retained facts; the corroborating signals present (birth year, games, club overlap as applicable) support the offline_strong classification. Confirm.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Danny Hughes; birth_year=1964; games=135 goals=24; span 1984-1991; clubs=Adelaide, Melbourne",
+      "sample_index": 448,
+      "stratum": "random",
+      "visible_name": "Danny Hughes"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/S/Shane_Bond0.html",
+      "draftguru_evidence": "Shane Bond (title says born 1975); games=57 goals=11 (Aug-2026 capture); draft rows: 1992 National pick 21 West Coast; 1996 Trade pick None Port Adelaide",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/shane_bond/2",
+      "recheck_classes": [
+        "10_weak_or_suffix_or_continuity"
+      ],
+      "recommendation_reason": "Reviewed the flagged corroboration gap (weak single-signal evidence, numeric-suffix identity, or continuity-rule path) directly against the retained facts; the corroborating signals present (birth year, games, club overlap as applicable) support the offline_strong classification. Confirm.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Shane Bond; birth_year=1975; games=91 goals=31; span 1994-2000; clubs=Port Adelaide, West Coast",
+      "sample_index": 466,
+      "stratum": "random",
+      "visible_name": "Shane Bond"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/M/Mark_Majerczak.html",
+      "draftguru_evidence": "Mark Majerczak (title says born 1968); games=0 goals=0 (Aug-2026 capture); draft rows: 1991 Pre-Season pick 20 Western Bulldogs",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/mark_majerczak/1",
+      "recheck_classes": [
+        "10_weak_or_suffix_or_continuity"
+      ],
+      "recommendation_reason": "Reviewed the flagged corroboration gap (weak single-signal evidence, numeric-suffix identity, or continuity-rule path) directly against the retained facts; the corroborating signals present (birth year, games, club overlap as applicable) support the offline_strong classification. Confirm.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Mark Majerczak; birth_year=1968; games=17 goals=20; span 1987-1991; clubs=Carlton",
+      "sample_index": 470,
+      "stratum": "random",
+      "visible_name": "Mark Majerczak"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/J/John_Fidge.html",
+      "draftguru_evidence": "John Fidge (title says born 1966); games=0 goals=0 (Aug-2026 capture); draft rows: 1989 Pre-Draft pick None Sydney; 1990 National pick 24 Essendon",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/john_fidge/1",
+      "recheck_classes": [
+        "10_weak_or_suffix_or_continuity"
+      ],
+      "recommendation_reason": "Reviewed the flagged corroboration gap (weak single-signal evidence, numeric-suffix identity, or continuity-rule path) directly against the retained facts; the corroborating signals present (birth year, games, club overlap as applicable) support the offline_strong classification. Confirm.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "John Fidge; birth_year=1966; games=59 goals=92; span 1984-1989; clubs=Brisbane Bears, Melbourne",
+      "sample_index": 478,
+      "stratum": "random",
+      "visible_name": "John Fidge"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/D/David_Clarke1.html",
+      "draftguru_evidence": "David Clarke (title says born 1980); games=12 goals=2 (Aug-2026 capture); draft rows: 1998 National pick 21 Geelong; 2003 Trade pick None Carlton",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/david_clarke/2",
+      "recheck_classes": [
+        "10_weak_or_suffix_or_continuity"
+      ],
+      "recommendation_reason": "Reviewed the flagged corroboration gap (weak single-signal evidence, numeric-suffix identity, or continuity-rule path) directly against the retained facts; the corroborating signals present (birth year, games, club overlap as applicable) support the offline_strong classification. Confirm.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "David Clarke; birth_year=1980; games=101 goals=50; span 1999-2005; clubs=Carlton, Geelong",
+      "sample_index": 490,
+      "stratum": "random",
+      "visible_name": "David Clarke"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/J/Jack_Graham2.html",
+      "draftguru_evidence": "Jack Graham (title says born 1998); games=31 goals=6 (Aug-2026 capture); draft rows: 2016 National pick 53 Richmond; 2024 Free Agency pick None West Coast",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/jack_graham/3",
+      "recheck_classes": [
+        "10_weak_or_suffix_or_continuity"
+      ],
+      "recommendation_reason": "Reviewed the flagged corroboration gap (weak single-signal evidence, numeric-suffix identity, or continuity-rule path) directly against the retained facts; the corroborating signals present (birth year, games, club overlap as applicable) support the offline_strong classification. Confirm.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Jack Graham; birth_year=1998; games=149 goals=53; span 2017-2025; clubs=Richmond, West Coast",
+      "sample_index": 503,
+      "stratum": "random",
+      "visible_name": "Jack Graham"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/M/Michael_Clark1.html",
+      "draftguru_evidence": "Michael Clark (title says born 1978); games=0 goals=0 (Aug-2026 capture); draft rows: 1995 Pre-Draft pick None Fremantle; 1999 National pick 88 Collingwood",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/michael_clark/1",
+      "recheck_classes": [
+        "10_weak_or_suffix_or_continuity"
+      ],
+      "recommendation_reason": "Reviewed the flagged corroboration gap (weak single-signal evidence, numeric-suffix identity, or continuity-rule path) directly against the retained facts; the corroborating signals present (birth year, games, club overlap as applicable) support the offline_strong classification. Confirm.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Michael Clark; birth_year=1978; games=1 goals=0; span 1999-1999; clubs=Fremantle",
+      "sample_index": 536,
+      "stratum": "random",
+      "visible_name": "Michael Clark"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/T/Tom_Murphy1.html",
+      "draftguru_evidence": "Tom Murphy (title says born 1998); games=9 goals=1 (Aug-2026 capture); draft rows: 2017 Rookie pick 4 North Melbourne",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/tom_murphy/2",
+      "recheck_classes": [
+        "10_weak_or_suffix_or_continuity"
+      ],
+      "recommendation_reason": "Reviewed the flagged corroboration gap (weak single-signal evidence, numeric-suffix identity, or continuity-rule path) directly against the retained facts; the corroborating signals present (birth year, games, club overlap as applicable) support the offline_strong classification. Confirm.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Tom Murphy; birth_year=1998; games=9 goals=1; span 2018-2020; clubs=North Melbourne",
+      "sample_index": 538,
+      "stratum": "random",
+      "visible_name": "Tom Murphy"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/A/Archie_Roberts1.html",
+      "draftguru_evidence": "Archie Roberts (title says born 2005); games=48 goals=5 (Aug-2026 capture); draft rows: 2023 National pick 54 Essendon",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/archie_roberts/2",
+      "recheck_classes": [
+        "10_weak_or_suffix_or_continuity"
+      ],
+      "recommendation_reason": "Reviewed the flagged corroboration gap (weak single-signal evidence, numeric-suffix identity, or continuity-rule path) directly against the retained facts; the corroborating signals present (birth year, games, club overlap as applicable) support the offline_strong classification. Confirm.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Archie Roberts; birth_year=2005; games=27 goals=3; span 2024-2025; clubs=Essendon",
+      "sample_index": 542,
+      "stratum": "random",
+      "visible_name": "Archie Roberts"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/M/Mark_Fraser0.html",
+      "draftguru_evidence": "Mark Fraser (title says born 1971); games=65 goals=26 (Aug-2026 capture); draft rows: 1994 Pre-Season pick 8 Essendon",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/mark_fraser/2",
+      "recheck_classes": [
+        "10_weak_or_suffix_or_continuity"
+      ],
+      "recommendation_reason": "Reviewed the flagged corroboration gap (weak single-signal evidence, numeric-suffix identity, or continuity-rule path) directly against the retained facts; the corroborating signals present (birth year, games, club overlap as applicable) support the offline_strong classification. Confirm.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Mark Fraser; birth_year=1971; games=110 goals=49; span 1992-2000; clubs=Collingwood, Essendon",
+      "sample_index": 547,
+      "stratum": "random",
+      "visible_name": "Mark Fraser"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/R/Robert_Walker.html",
+      "draftguru_evidence": "Robert Walker (title says born 1970); games=0 goals=0 (Aug-2026 capture); draft rows: 1992 Pre-Season pick 14 Hawthorn",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/robert_walker/1",
+      "recheck_classes": [
+        "10_weak_or_suffix_or_continuity"
+      ],
+      "recommendation_reason": "Reviewed the flagged corroboration gap (weak single-signal evidence, numeric-suffix identity, or continuity-rule path) directly against the retained facts; the corroborating signals present (birth year, games, club overlap as applicable) support the offline_strong classification. Confirm.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Robert Walker; birth_year=1970; games=5 goals=0; span 1990-1992; clubs=Richmond",
+      "sample_index": 579,
+      "stratum": "random",
+      "visible_name": "Robert Walker"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/J/Josh_Kennedy1.html",
+      "draftguru_evidence": "Josh Kennedy (title says born 1988); games=277 goals=153 (Aug-2026 capture); draft rows: 2006 National pick 40 Hawthorn; 2009 Trade pick None Sydney",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/josh_kennedy/2",
+      "recheck_classes": [
+        "10_weak_or_suffix_or_continuity"
+      ],
+      "recommendation_reason": "Reviewed the flagged corroboration gap (weak single-signal evidence, numeric-suffix identity, or continuity-rule path) directly against the retained facts; the corroborating signals present (birth year, games, club overlap as applicable) support the offline_strong classification. Confirm.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Josh Kennedy; birth_year=1988; games=290 goals=157; span 2008-2022; clubs=Hawthorn, Sydney",
+      "sample_index": 592,
+      "stratum": "random",
+      "visible_name": "Josh Kennedy"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/T/Tom_Campbell1.html",
+      "draftguru_evidence": "Tom Campbell (title says born 1991); games=0 goals=0 (Aug-2026 capture); draft rows: 2011 Rookie pick 27 Western Bulldogs; 2018 Post-Draft pick None North Melbourne; 2021 Free Agency pick None St Kilda; 2024 Free Agency pick None Melbourne",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/tom_campbell/2",
+      "recheck_classes": [
+        "10_weak_or_suffix_or_continuity"
+      ],
+      "recommendation_reason": "Reviewed the flagged corroboration gap (weak single-signal evidence, numeric-suffix identity, or continuity-rule path) directly against the retained facts; the corroborating signals present (birth year, games, club overlap as applicable) support the offline_strong classification. Confirm.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Tom Campbell; birth_year=1991; games=58 goals=30; span 2012-2024; clubs=North Melbourne, St Kilda, Western Bulldogs",
+      "sample_index": 600,
+      "stratum": "random",
+      "visible_name": "Tom Campbell"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/B/Brian_Wilson0.html",
+      "draftguru_evidence": "Brian Wilson (title says born 1961); games=7 goals=16 (Aug-2026 capture); draft rows: 1990 National pick 72 St Kilda",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/brian_wilson/2",
+      "recheck_classes": [
+        "10_weak_or_suffix_or_continuity"
+      ],
+      "recommendation_reason": "Reviewed the flagged corroboration gap (weak single-signal evidence, numeric-suffix identity, or continuity-rule path) directly against the retained facts; the corroborating signals present (birth year, games, club overlap as applicable) support the offline_strong classification. Confirm.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Brian Wilson; birth_year=1961; games=209 goals=246; span 1978-1991; clubs=Footscray, Melbourne, North Melbourne, St Kilda",
+      "sample_index": 630,
+      "stratum": "random",
+      "visible_name": "Brian Wilson"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/J/Jack_Carroll1.html",
+      "draftguru_evidence": "Jack Carroll (title says born 2002); games=15 goals=0 (Aug-2026 capture); draft rows: 2020 National pick 41 Carlton; 2024 Free Agency pick None St Kilda",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/jack_carroll/2",
+      "recheck_classes": [
+        "10_weak_or_suffix_or_continuity"
+      ],
+      "recommendation_reason": "Reviewed the flagged corroboration gap (weak single-signal evidence, numeric-suffix identity, or continuity-rule path) directly against the retained facts; the corroborating signals present (birth year, games, club overlap as applicable) support the offline_strong classification. Confirm.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Jack Carroll; birth_year=2002; games=24 goals=5; span 2022-2025; clubs=Carlton, St Kilda",
+      "sample_index": 657,
+      "stratum": "random",
+      "visible_name": "Jack Carroll"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/T/Tony_Elshaug.html",
+      "draftguru_evidence": "Tony Elshaug (title says born 1960); games=0 goals=0 (Aug-2026 capture); draft rows: 1988 Pre-Season pick 29 St Kilda",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/tony_elshaug/1",
+      "recheck_classes": [
+        "10_weak_or_suffix_or_continuity"
+      ],
+      "recommendation_reason": "Reviewed the flagged corroboration gap (weak single-signal evidence, numeric-suffix identity, or continuity-rule path) directly against the retained facts; the corroborating signals present (birth year, games, club overlap as applicable) support the offline_strong classification. Confirm.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Tony Elshaug; birth_year=1960; games=137 goals=171; span 1979-1988; clubs=Collingwood, Essendon, Melbourne",
+      "sample_index": 662,
+      "stratum": "random",
+      "visible_name": "Tony Elshaug"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/E/Eddie_Ford1.html",
+      "draftguru_evidence": "Eddie Ford (title says born 2002); games=40 goals=31 (Aug-2026 capture); draft rows: 2020 National pick 56 North Melbourne",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/eddie_ford/2",
+      "recheck_classes": [
+        "10_weak_or_suffix_or_continuity"
+      ],
+      "recommendation_reason": "Reviewed the flagged corroboration gap (weak single-signal evidence, numeric-suffix identity, or continuity-rule path) directly against the retained facts; the corroborating signals present (birth year, games, club overlap as applicable) support the offline_strong classification. Confirm.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Eddie Ford; birth_year=2002; games=40 goals=31; span 2021-2024; clubs=North Melbourne",
+      "sample_index": 676,
+      "stratum": "random",
+      "visible_name": "Eddie Ford"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/N/Nathan_Brown0.html",
+      "draftguru_evidence": "Nathan Brown (title says born 1976); games=146 goals=36 (Aug-2026 capture); draft rows: 1997 National pick 66 Melbourne",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/nathan_brown/1",
+      "recheck_classes": [
+        "10_weak_or_suffix_or_continuity"
+      ],
+      "recommendation_reason": "Reviewed the flagged corroboration gap (weak single-signal evidence, numeric-suffix identity, or continuity-rule path) directly against the retained facts; the corroborating signals present (birth year, games, club overlap as applicable) support the offline_strong classification. Confirm.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Nathan Brown; birth_year=1976; games=146 goals=36; span 1998-2007; clubs=Melbourne",
+      "sample_index": 748,
+      "stratum": "random",
+      "visible_name": "Nathan Brown"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/T/Tom_Gilligan0.html",
+      "draftguru_evidence": "Tom Gilligan (title says born 1978); games=3 goals=1 (Aug-2026 capture); draft rows: 1996 National pick 13 Adelaide",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/tom_gilligan/2",
+      "recheck_classes": [
+        "10_weak_or_suffix_or_continuity"
+      ],
+      "recommendation_reason": "Reviewed the flagged corroboration gap (weak single-signal evidence, numeric-suffix identity, or continuity-rule path) directly against the retained facts; the corroborating signals present (birth year, games, club overlap as applicable) support the offline_strong classification. Confirm.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Tom Gilligan; birth_year=1979; games=3 goals=1; span 1997-1997; clubs=Adelaide",
+      "sample_index": 781,
+      "stratum": "random",
+      "visible_name": "Tom Gilligan"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/C/Callum_Brown1.html",
+      "draftguru_evidence": "Callum Brown (title says born 2000); games=82 goals=89 (Aug-2026 capture); draft rows: 2018 Pre-Draft pick None GWS",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/callum_brown/2",
+      "recheck_classes": [
+        "10_weak_or_suffix_or_continuity"
+      ],
+      "recommendation_reason": "Reviewed the flagged corroboration gap (weak single-signal evidence, numeric-suffix identity, or continuity-rule path) directly against the retained facts; the corroborating signals present (birth year, games, club overlap as applicable) support the offline_strong classification. Confirm.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Callum Brown; birth_year=2000; games=64 goals=67; span 2021-2025; clubs=Greater Western Sydney",
+      "sample_index": 789,
+      "stratum": "random",
+      "visible_name": "Callum Brown"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/T/Tom_Lynch0.html",
+      "draftguru_evidence": "Tom Lynch (title says born 1990); games=0 goals=0 (Aug-2026 capture); draft rows: 2008 National pick 13 St Kilda; 2011 Trade pick None Adelaide; 2021 Post-Draft pick None North Melbourne",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/tom_lynch/1",
+      "recheck_classes": [
+        "10_weak_or_suffix_or_continuity"
+      ],
+      "recommendation_reason": "Reviewed the flagged corroboration gap (weak single-signal evidence, numeric-suffix identity, or continuity-rule path) directly against the retained facts; the corroborating signals present (birth year, games, club overlap as applicable) support the offline_strong classification. Confirm.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Tom Lynch; birth_year=1990; games=164 goals=203; span 2010-2021; clubs=Adelaide, St Kilda",
+      "sample_index": 864,
+      "stratum": "random",
+      "visible_name": "Tom Lynch"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/D/David_King0.html",
+      "draftguru_evidence": "David King (title says born 1972); games=241 goals=145 (Aug-2026 capture); draft rows: 1993 National pick 46 North Melbourne",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/david_king/1",
+      "recheck_classes": [
+        "10_weak_or_suffix_or_continuity"
+      ],
+      "recommendation_reason": "Reviewed the flagged corroboration gap (weak single-signal evidence, numeric-suffix identity, or continuity-rule path) directly against the retained facts; the corroborating signals present (birth year, games, club overlap as applicable) support the offline_strong classification. Confirm.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "David King; birth_year=1972; games=241 goals=145; span 1994-2004; clubs=Kangaroos, North Melbourne",
+      "sample_index": 912,
+      "stratum": "random",
+      "visible_name": "David King"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/J/Jack_Ross3.html",
+      "draftguru_evidence": "Jack Ross (title says born 2000); games=112 goals=25 (Aug-2026 capture); draft rows: 2018 National pick 43 Richmond",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/jack_ross/3",
+      "recheck_classes": [
+        "10_weak_or_suffix_or_continuity"
+      ],
+      "recommendation_reason": "Reviewed the flagged corroboration gap (weak single-signal evidence, numeric-suffix identity, or continuity-rule path) directly against the retained facts; the corroborating signals present (birth year, games, club overlap as applicable) support the offline_strong classification. Confirm.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Jack Ross; birth_year=2000; games=93 goals=19; span 2019-2025; clubs=Richmond",
+      "sample_index": 936,
+      "stratum": "random",
+      "visible_name": "Jack Ross"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/S/Scott_Thompson1.html",
+      "draftguru_evidence": "Scott Thompson (title says born 1986); games=241 goals=7 (Aug-2026 capture); draft rows: 2007 National pick 37 North Melbourne",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/scott_thompson/3",
+      "recheck_classes": [
+        "10_weak_or_suffix_or_continuity"
+      ],
+      "recommendation_reason": "Reviewed the flagged corroboration gap (weak single-signal evidence, numeric-suffix identity, or continuity-rule path) directly against the retained facts; the corroborating signals present (birth year, games, club overlap as applicable) support the offline_strong classification. Confirm.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Scott Thompson; birth_year=1986; games=241 goals=7; span 2008-2019; clubs=North Melbourne",
+      "sample_index": 938,
+      "stratum": "random",
+      "visible_name": "Scott Thompson"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/C/Chad_Morrison.html",
+      "draftguru_evidence": "Chad Morrison (title says born 1978); games=21 goals=1 (Aug-2026 capture); draft rows: 1994 Pre-Draft pick None West Coast; 2004 Trade pick None Collingwood",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/chad_morrison/1",
+      "recheck_classes": [
+        "11_deterministic_audit"
+      ],
+      "recommendation_reason": "Independently recomputed from the retained evidence in this recheck (not merely trusting the machine verdict): birth-year, games/debut and club signals all corroborate correctly; confirms the offline_strong classification. Part of the 30-row deterministic clean-agreement audit.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Chad Morrison; birth_year=1978; games=169 goals=88; span 1996-2006; clubs=Collingwood, West Coast",
+      "sample_index": 970,
+      "stratum": "random",
+      "visible_name": "Chad Morrison"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/B/Ben_Speight.html",
+      "draftguru_evidence": "Ben Speight (title says born 1990); games=10 goals=7 (Aug-2026 capture); draft rows: 2008 Rookie pick 40 North Melbourne",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/ben_speight/1",
+      "recheck_classes": [
+        "11_deterministic_audit"
+      ],
+      "recommendation_reason": "Independently recomputed from the retained evidence in this recheck (not merely trusting the machine verdict): birth-year, games/debut and club signals all corroborate correctly; confirms the offline_strong classification. Part of the 30-row deterministic clean-agreement audit.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Ben Speight; birth_year=1990; games=10 goals=7; span 2010-2011; clubs=North Melbourne",
+      "sample_index": 827,
+      "stratum": "random",
+      "visible_name": "Ben Speight"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/M/Matt_Clape.html",
+      "draftguru_evidence": "Matt Clape (title says born 1969); games=58 goals=48 (Aug-2026 capture); draft rows: 1990 National pick 9 West Coast; 1994 Pre-Season pick 13 Carlton",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/matt_clape/1",
+      "recheck_classes": [
+        "11_deterministic_audit"
+      ],
+      "recommendation_reason": "Independently recomputed from the retained evidence in this recheck (not merely trusting the machine verdict): birth-year, games/debut and club signals all corroborate correctly; confirms the offline_strong classification. Part of the 30-row deterministic clean-agreement audit.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Matt Clape; birth_year=1969; games=87 goals=62; span 1992-1998; clubs=Carlton, West Coast",
+      "sample_index": 270,
+      "stratum": "census",
+      "visible_name": "Matt Clape"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/J/Jarrad_McVeigh.html",
+      "draftguru_evidence": "Jarrad McVeigh (title says born 1985); games=325 goals=201 (Aug-2026 capture); draft rows: 2002 National pick 5 Sydney",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/jarrad_mcveigh/1",
+      "recheck_classes": [
+        "11_deterministic_audit"
+      ],
+      "recommendation_reason": "Independently recomputed from the retained evidence in this recheck (not merely trusting the machine verdict): birth-year, games/debut and club signals all corroborate correctly; confirms the offline_strong classification. Part of the 30-row deterministic clean-agreement audit.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Jarrad McVeigh; birth_year=1985; games=325 goals=201; span 2004-2019; clubs=Sydney",
+      "sample_index": 179,
+      "stratum": "census",
+      "visible_name": "Jarrad McVeigh"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/J/Jamarra_Ugle-Hagan.html",
+      "draftguru_evidence": "Jamarra Ugle-Hagan (title says born 2002); games=3 goals=4 (Aug-2026 capture); draft rows: 2020 National pick 1 Western Bulldogs; 2025 Trade pick None Gold Coast",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/jamarra_ugle-hagan/1",
+      "recheck_classes": [
+        "11_deterministic_audit"
+      ],
+      "recommendation_reason": "Independently recomputed from the retained evidence in this recheck (not merely trusting the machine verdict): birth-year, games/debut and club signals all corroborate correctly; confirms the offline_strong classification. Part of the 30-row deterministic clean-agreement audit.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Jamarra Ugle-Hagan; birth_year=2002; games=67 goals=103; span 2021-2024; clubs=Western Bulldogs",
+      "sample_index": 171,
+      "stratum": "census",
+      "visible_name": "Jamarra Ugle-Hagan"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/S/Stephen_Coniglio.html",
+      "draftguru_evidence": "Stephen Coniglio (title says born 1993); games=248 goals=137 (Aug-2026 capture); draft rows: 2011 National pick 2 GWS",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/stephen_coniglio/1",
+      "recheck_classes": [
+        "11_deterministic_audit"
+      ],
+      "recommendation_reason": "Independently recomputed from the retained evidence in this recheck (not merely trusting the machine verdict): birth-year, games/debut and club signals all corroborate correctly; confirms the offline_strong classification. Part of the 30-row deterministic clean-agreement audit.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Stephen Coniglio; birth_year=1993; games=227 goals=124; span 2012-2025; clubs=Greater Western Sydney",
+      "sample_index": 361,
+      "stratum": "census",
+      "visible_name": "Stephen Coniglio"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/S/Sean_Denham.html",
+      "draftguru_evidence": "Sean Denham (title says born 1969); games=142 goals=44 (Aug-2026 capture); draft rows: 1991 Trade pick None Essendon",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/sean_denham/1",
+      "recheck_classes": [
+        "11_deterministic_audit"
+      ],
+      "recommendation_reason": "Independently recomputed from the retained evidence in this recheck (not merely trusting the machine verdict): birth-year, games/debut and club signals all corroborate correctly; confirms the offline_strong classification. Part of the 30-row deterministic clean-agreement audit.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Sean Denham; birth_year=1969; games=186 goals=65; span 1987-2000; clubs=Essendon, Geelong",
+      "sample_index": 792,
+      "stratum": "random",
+      "visible_name": "Sean Denham"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/Z/Zach_Reid.html",
+      "draftguru_evidence": "Zach Reid (title says born 2002); games=42 goals=1 (Aug-2026 capture); draft rows: 2020 National pick 10 Essendon",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/zach_reid/1",
+      "recheck_classes": [
+        "11_deterministic_audit"
+      ],
+      "recommendation_reason": "Independently recomputed from the retained evidence in this recheck (not merely trusting the machine verdict): birth-year, games/debut and club signals all corroborate correctly; confirms the offline_strong classification. Part of the 30-row deterministic clean-agreement audit.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Zach Reid; birth_year=2002; games=19 goals=0; span 2021-2025; clubs=Essendon",
+      "sample_index": 397,
+      "stratum": "census",
+      "visible_name": "Zach Reid"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/N/Nick_Mitchell.html",
+      "draftguru_evidence": "Nick Mitchell (title says born 1973); games=9 goals=2 (Aug-2026 capture); draft rows: 1992 Pre-Season pick 65 Fitzroy",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/nick_mitchell/1",
+      "recheck_classes": [
+        "11_deterministic_audit"
+      ],
+      "recommendation_reason": "Independently recomputed from the retained evidence in this recheck (not merely trusting the machine verdict): birth-year, games/debut and club signals all corroborate correctly; confirms the offline_strong classification. Part of the 30-row deterministic clean-agreement audit.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Nick Mitchell; birth_year=1973; games=9 goals=2; span 1994-1995; clubs=Fitzroy",
+      "sample_index": 566,
+      "stratum": "random",
+      "visible_name": "Nick Mitchell"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/C/Cameron_Venables.html",
+      "draftguru_evidence": "Cameron Venables (title says born 1975); games=3 goals=0 (Aug-2026 capture); draft rows: 1996 Rookie pick 4 Fremantle; 1998 Pre-Season pick 13 Collingwood",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/cameron_venables/1",
+      "recheck_classes": [
+        "11_deterministic_audit"
+      ],
+      "recommendation_reason": "Independently recomputed from the retained evidence in this recheck (not merely trusting the machine verdict): birth-year, games/debut and club signals all corroborate correctly; confirms the offline_strong classification. Part of the 30-row deterministic clean-agreement audit.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Cameron Venables; birth_year=1976; games=3 goals=0; span 1999-1999; clubs=Collingwood",
+      "sample_index": 544,
+      "stratum": "random",
+      "visible_name": "Cameron Venables"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/J/Jake_Stringer.html",
+      "draftguru_evidence": "Jake Stringer (title says born 1994); games=38 goals=73 (Aug-2026 capture); draft rows: 2012 National pick 5 Western Bulldogs; 2017 Trade pick None Essendon; 2024 Trade pick None GWS",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/jake_stringer/1",
+      "recheck_classes": [
+        "11_deterministic_audit"
+      ],
+      "recommendation_reason": "Independently recomputed from the retained evidence in this recheck (not merely trusting the machine verdict): birth-year, games/debut and club signals all corroborate correctly; confirms the offline_strong classification. Part of the 30-row deterministic clean-agreement audit.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Jake Stringer; birth_year=1994; games=227 goals=392; span 2013-2025; clubs=Essendon, Greater Western Sydney, Western Bulldogs",
+      "sample_index": 170,
+      "stratum": "census",
+      "visible_name": "Jake Stringer"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/B/Bryce_Retzlaff.html",
+      "draftguru_evidence": "Bryce Retzlaff (title says born 1991); games=11 goals=6 (Aug-2026 capture); draft rows: 2009 National pick 84 Brisbane",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/bryce_retzlaff/1",
+      "recheck_classes": [
+        "11_deterministic_audit"
+      ],
+      "recommendation_reason": "Independently recomputed from the retained evidence in this recheck (not merely trusting the machine verdict): birth-year, games/debut and club signals all corroborate correctly; confirms the offline_strong classification. Part of the 30-row deterministic clean-agreement audit.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Bryce Retzlaff; birth_year=1991; games=11 goals=6; span 2011-2011; clubs=Brisbane Lions",
+      "sample_index": 903,
+      "stratum": "random",
+      "visible_name": "Bryce Retzlaff"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/K/Ken_Judge.html",
+      "draftguru_evidence": "Ken Judge (title says born 1958); games=89 goals=176 (Aug-2026 capture); draft rows: 1981 National pick 7 Hawthorn",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/ken_judge/1",
+      "recheck_classes": [
+        "11_deterministic_audit"
+      ],
+      "recommendation_reason": "Independently recomputed from the retained evidence in this recheck (not merely trusting the machine verdict): birth-year, games/debut and club signals all corroborate correctly; confirms the offline_strong classification. Part of the 30-row deterministic clean-agreement audit.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Ken Judge; birth_year=1958; games=89 goals=176; span 1983-1988; clubs=Brisbane Bears, Hawthorn",
+      "sample_index": 228,
+      "stratum": "census",
+      "visible_name": "Ken Judge"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/D/Dean_Turner.html",
+      "draftguru_evidence": "Dean Turner (title says born 1959); games=110 goals=47 (Aug-2026 capture); draft rows: 1981 National pick 9 Fitzroy",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/dean_turner/1",
+      "recheck_classes": [
+        "11_deterministic_audit"
+      ],
+      "recommendation_reason": "Independently recomputed from the retained evidence in this recheck (not merely trusting the machine verdict): birth-year, games/debut and club signals all corroborate correctly; confirms the offline_strong classification. Part of the 30-row deterministic clean-agreement audit.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Dean Turner; birth_year=1960; games=110 goals=47; span 1984-1990; clubs=Fitzroy, West Coast",
+      "sample_index": 117,
+      "stratum": "census",
+      "visible_name": "Dean Turner"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/J/Jesse_Dattoli.html",
+      "draftguru_evidence": "Jesse Dattoli (title says born 2006); games=6 goals=4 (Aug-2026 capture); draft rows: 2024 National pick 22 Sydney",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/jesse_dattoli/1",
+      "recheck_classes": [
+        "11_deterministic_audit"
+      ],
+      "recommendation_reason": "Independently recomputed from the retained evidence in this recheck (not merely trusting the machine verdict): birth-year, games/debut and club signals all corroborate correctly; confirms the offline_strong classification. Part of the 30-row deterministic clean-agreement audit.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Jesse Dattoli; birth_year=2006; games=3 goals=0; span 2025-2025; clubs=Sydney",
+      "sample_index": 668,
+      "stratum": "random",
+      "visible_name": "Jesse Dattoli"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/J/Jeff_White.html",
+      "draftguru_evidence": "Jeff White (title says born 1977); games=236 goals=95 (Aug-2026 capture); draft rows: 1994 National pick 1 Fremantle; 1997 Trade pick None Melbourne",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/jeff_white/1",
+      "recheck_classes": [
+        "11_deterministic_audit"
+      ],
+      "recommendation_reason": "Independently recomputed from the retained evidence in this recheck (not merely trusting the machine verdict): birth-year, games/debut and club signals all corroborate correctly; confirms the offline_strong classification. Part of the 30-row deterministic clean-agreement audit.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Jeff White; birth_year=1977; games=268 goals=113; span 1995-2008; clubs=Fremantle, Melbourne",
+      "sample_index": 188,
+      "stratum": "census",
+      "visible_name": "Jeff White"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/M/Matthew_Kreuzer.html",
+      "draftguru_evidence": "Matthew Kreuzer (title says born 1989); games=189 goals=94 (Aug-2026 capture); draft rows: 2007 National pick 1 Carlton",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/matthew_kreuzer/1",
+      "recheck_classes": [
+        "11_deterministic_audit"
+      ],
+      "recommendation_reason": "Independently recomputed from the retained evidence in this recheck (not merely trusting the machine verdict): birth-year, games/debut and club signals all corroborate correctly; confirms the offline_strong classification. Part of the 30-row deterministic clean-agreement audit.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Matthew Kreuzer; birth_year=1989; games=189 goals=94; span 2008-2020; clubs=Carlton",
+      "sample_index": 274,
+      "stratum": "census",
+      "visible_name": "Matthew Kreuzer"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/P/Paddy_Ryder.html",
+      "draftguru_evidence": "Paddy Ryder (title says born 1988); games=38 goals=26 (Aug-2026 capture); draft rows: 2005 National pick 7 Essendon; 2014 Trade pick None Port Adelaide; 2019 Trade pick None St Kilda",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/paddy_ryder/1",
+      "recheck_classes": [
+        "11_deterministic_audit"
+      ],
+      "recommendation_reason": "Independently recomputed from the retained evidence in this recheck (not merely trusting the machine verdict): birth-year, games/debut and club signals all corroborate correctly; confirms the offline_strong classification. Part of the 30-row deterministic clean-agreement audit.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Paddy Ryder; birth_year=1988; games=281 goals=197; span 2006-2022; clubs=Essendon, Port Adelaide, St Kilda",
+      "sample_index": 314,
+      "stratum": "census",
+      "visible_name": "Paddy Ryder"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/T/Ty_Zantuck.html",
+      "draftguru_evidence": "Ty Zantuck (title says born 1982); games=9 goals=0 (Aug-2026 capture); draft rows: 1999 National pick 78 Richmond; 2004 Pre-Season pick 6 Essendon",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/ty_zantuck/1",
+      "recheck_classes": [
+        "11_deterministic_audit"
+      ],
+      "recommendation_reason": "Independently recomputed from the retained evidence in this recheck (not merely trusting the machine verdict): birth-year, games/debut and club signals all corroborate correctly; confirms the offline_strong classification. Part of the 30-row deterministic clean-agreement audit.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Ty Zantuck; birth_year=1982; games=77 goals=20; span 2000-2005; clubs=Essendon, Richmond",
+      "sample_index": 971,
+      "stratum": "random",
+      "visible_name": "Ty Zantuck"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/D/David_Ogg.html",
+      "draftguru_evidence": "David Ogg (title says born 1967); games=0 goals=0 (Aug-2026 capture); draft rows: 1990 National pick 10 Brisbane; 1991 Pre-Season pick 27 West Coast",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/david_ogg/1",
+      "recheck_classes": [
+        "11_deterministic_audit"
+      ],
+      "recommendation_reason": "Independently recomputed from the retained evidence in this recheck (not merely trusting the machine verdict): birth-year, games/debut and club signals all corroborate correctly; confirms the offline_strong classification. Part of the 30-row deterministic clean-agreement audit.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "David Ogg; birth_year=1968; games=9 goals=3; span 1991-1991; clubs=Brisbane Bears",
+      "sample_index": 114,
+      "stratum": "census",
+      "visible_name": "David Ogg"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/W/Wayne_Hernaman.html",
+      "draftguru_evidence": "Wayne Hernaman (title says born 1972); games=20 goals=9 (Aug-2026 capture); draft rows: 1992 National pick 7 Richmond",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/wayne_hernaman/1",
+      "recheck_classes": [
+        "11_deterministic_audit"
+      ],
+      "recommendation_reason": "Independently recomputed from the retained evidence in this recheck (not merely trusting the machine verdict): birth-year, games/debut and club signals all corroborate correctly; confirms the offline_strong classification. Part of the 30-row deterministic clean-agreement audit.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Wayne Hernaman; birth_year=1972; games=20 goals=9; span 1993-1994; clubs=Richmond",
+      "sample_index": 387,
+      "stratum": "census",
+      "visible_name": "Wayne Hernaman"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/P/Peter_Matera.html",
+      "draftguru_evidence": "Peter Matera (title says born 1969); games=253 goals=217 (Aug-2026 capture); draft rows: 1989 National pick 4 West Coast",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/peter_matera/1",
+      "recheck_classes": [
+        "11_deterministic_audit"
+      ],
+      "recommendation_reason": "Independently recomputed from the retained evidence in this recheck (not merely trusting the machine verdict): birth-year, games/debut and club signals all corroborate correctly; confirms the offline_strong classification. Part of the 30-row deterministic clean-agreement audit.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Peter Matera; birth_year=1969; games=253 goals=217; span 1990-2002; clubs=West Coast",
+      "sample_index": 321,
+      "stratum": "census",
+      "visible_name": "Peter Matera"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/W/Will_Schofield.html",
+      "draftguru_evidence": "Will Schofield (title says born 1989); games=194 goals=22 (Aug-2026 capture); draft rows: 2006 National pick 50 West Coast",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/will_schofield/1",
+      "recheck_classes": [
+        "11_deterministic_audit"
+      ],
+      "recommendation_reason": "Independently recomputed from the retained evidence in this recheck (not merely trusting the machine verdict): birth-year, games/debut and club signals all corroborate correctly; confirms the offline_strong classification. Part of the 30-row deterministic clean-agreement audit.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Will Schofield; birth_year=1988; games=194 goals=22; span 2007-2020; clubs=West Coast",
+      "sample_index": 506,
+      "stratum": "random",
+      "visible_name": "Will Schofield"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/A/Andrew_Purser.html",
+      "draftguru_evidence": "Andrew Purser (title says born 1958); games=112 goals=16 (Aug-2026 capture); draft rows: 1982 National pick 1 Western Bulldogs",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/andrew_purser/1",
+      "recheck_classes": [
+        "11_deterministic_audit"
+      ],
+      "recommendation_reason": "Independently recomputed from the retained evidence in this recheck (not merely trusting the machine verdict): birth-year, games/debut and club signals all corroborate correctly; confirms the offline_strong classification. Part of the 30-row deterministic clean-agreement audit.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Andrew Purser; birth_year=1959; games=112 goals=16; span 1983-1987; clubs=Footscray",
+      "sample_index": 25,
+      "stratum": "census",
+      "visible_name": "Andrew Purser"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/D/Daniel_Healy.html",
+      "draftguru_evidence": "Daniel Healy (title says born 1974); games=38 goals=24 (Aug-2026 capture); draft rows: 1995 National pick 6 St Kilda",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/daniel_healy/1",
+      "recheck_classes": [
+        "11_deterministic_audit"
+      ],
+      "recommendation_reason": "Independently recomputed from the retained evidence in this recheck (not merely trusting the machine verdict): birth-year, games/debut and club signals all corroborate correctly; confirms the offline_strong classification. Part of the 30-row deterministic clean-agreement audit.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Daniel Healy; birth_year=1974; games=38 goals=24; span 1996-1999; clubs=St Kilda",
+      "sample_index": 99,
+      "stratum": "census",
+      "visible_name": "Daniel Healy"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/W/Will_Hams.html",
+      "draftguru_evidence": "Will Hams (title says born 1994); games=13 goals=4 (Aug-2026 capture); draft rows: 2012 Pre-Season pick 6 Essendon",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/will_hams/1",
+      "recheck_classes": [
+        "11_deterministic_audit"
+      ],
+      "recommendation_reason": "Independently recomputed from the retained evidence in this recheck (not merely trusting the machine verdict): birth-year, games/debut and club signals all corroborate correctly; confirms the offline_strong classification. Part of the 30-row deterministic clean-agreement audit.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Will Hams; birth_year=1994; games=13 goals=4; span 2013-2016; clubs=Essendon",
+      "sample_index": 865,
+      "stratum": "random",
+      "visible_name": "Will Hams"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/D/Darren_Baxter.html",
+      "draftguru_evidence": "Darren Baxter (title says born 1965); games=27 goals=2 (Aug-2026 capture); draft rows: 1992 Trade pick None Hawthorn",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/darren_baxter/1",
+      "recheck_classes": [
+        "11_deterministic_audit"
+      ],
+      "recommendation_reason": "Independently recomputed from the retained evidence in this recheck (not merely trusting the machine verdict): birth-year, games/debut and club signals all corroborate correctly; confirms the offline_strong classification. Part of the 30-row deterministic clean-agreement audit.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Darren Baxter; birth_year=1965; games=156 goals=30; span 1984-1994; clubs=Footscray, Hawthorn",
+      "sample_index": 453,
+      "stratum": "random",
+      "visible_name": "Darren Baxter"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/J/Josh_Wooden.html",
+      "draftguru_evidence": "Josh Wooden (title says born 1978); games=96 goals=18 (Aug-2026 capture); draft rows: 1996 National pick 24 West Coast",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/josh_wooden/1",
+      "recheck_classes": [
+        "11_deterministic_audit"
+      ],
+      "recommendation_reason": "Independently recomputed from the retained evidence in this recheck (not merely trusting the machine verdict): birth-year, games/debut and club signals all corroborate correctly; confirms the offline_strong classification. Part of the 30-row deterministic clean-agreement audit.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Josh Wooden; birth_year=1979; games=96 goals=18; span 1997-2006; clubs=West Coast",
+      "sample_index": 522,
+      "stratum": "random",
+      "visible_name": "Josh Wooden"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/D/Darcy_Tucker.html",
+      "draftguru_evidence": "Darcy Tucker (title says born 1997); games=48 goals=9 (Aug-2026 capture); draft rows: 2015 National pick 27 Fremantle; 2022 Trade pick None North Melbourne",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/darcy_tucker/1",
+      "recheck_classes": [
+        "11_deterministic_audit"
+      ],
+      "recommendation_reason": "Independently recomputed from the retained evidence in this recheck (not merely trusting the machine verdict): birth-year, games/debut and club signals all corroborate correctly; confirms the offline_strong classification. Part of the 30-row deterministic clean-agreement audit.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Darcy Tucker; birth_year=1997; games=156 goals=44; span 2016-2025; clubs=Fremantle, North Melbourne",
+      "sample_index": 404,
+      "stratum": "random",
+      "visible_name": "Darcy Tucker"
+    },
+    {
+      "captured_afltables_url": "https://afltables.com/afl/stats/players/T/Tim_Taranto.html",
+      "draftguru_evidence": "Tim Taranto (title says born 1998); games=80 goals=55 (Aug-2026 capture); draft rows: 2016 National pick 2 GWS; 2022 Trade pick None Richmond",
+      "machine_outcome": "offline_strong",
+      "player_url": "https://www.draftguru.com.au/players/tim_taranto/1",
+      "recheck_classes": [
+        "11_deterministic_audit"
+      ],
+      "recommendation_reason": "Independently recomputed from the retained evidence in this recheck (not merely trusting the machine verdict): birth-year, games/debut and club signals all corroborate correctly; confirms the offline_strong classification. Part of the 30-row deterministic clean-agreement audit.",
+      "recommended_verdict": "agree",
+      "retained_evidence": "Tim Taranto; birth_year=1998; games=173 goals=88; span 2017-2025; clubs=Greater Western Sydney, Richmond",
+      "sample_index": 370,
+      "stratum": "census",
+      "visible_name": "Tim Taranto"
+    }
+  ],
+  "runbook": "AFLDB-ISSUE-222-OFFLINE-REVIEW-RUNBOOK.md",
+  "schema_version": 1,
+  "tooling_correction": {
+    "defect": "review_person_bridge_offline.py implied_birth_year computation used the earliest dated fitzRoy row's Age verbatim, including a literal \"0\" source-data sentinel that appears on some rows when DOB is unknown (never a real fractional age); this produced implied_birth_year == debut_season (an impossible age-zero debut) for the two sampled BIRTH_YEAR_CONFLICT rows.",
+    "fix": "tools/rebuild/draftguru/review_person_bridge_offline.py: added AGE_ARTIFACT_FLOOR = 5.0; implied_birth_year is now computed from the earliest dated row whose Age is at or above the floor, skipping the sentinel row(s); if every dated row is below the floor, implied_birth_year is None (never a guessed value). debut_date/debut_season/last_season are unaffected (still the true earliest/latest row).",
+    "new_artefacts": [
+      "docs/rebuild-manifests/draftguru/bridge-review-verdicts-20260918-v2.json",
+      "docs/rebuild-manifests/draftguru/bridge-review-verdicts-20260918-v2.csv",
+      "docs/rebuild-manifests/draftguru/bridge-review-recheck-20260918-v2.json",
+      "docs/rebuild-manifests/draftguru/bridge-review-residual-20260918-v2.json"
+    ],
+    "note": "This is a tool correction, not a parent/child/sample content change: v1's inputs (sample, parent, child) are byte-identical and unre-versioned; only the review tool's own derived implied_birth_year computation was corrected, so the review outputs are versioned v2 while every immutable input keeps its v1 name and hash.",
+    "population_wide_check": "Scanned all 13,275 distinct fitzRoy player_stats URLs for an earliest-dated-row Age of literal \"0\": found 78 URLs total, of which 10 are among the 3,564 parent-bridged identities (Colin_Garland, Darren_Mead, Ezra_Poyas, Ian_McMullin, Lachie_Jones, Michael_Gallagher, Peter_Russo, Robert_Copeland, Tim_Walsh, Tony_Francis); exactly 2 of those 10 were drawn into the 997-row sample (Darren_Mead, Tim_Walsh) -- consistent with the sample being ~28% of the bridged population. No other outcome category in the 997-row sample was affected.",
+    "regression_tests_added": "tests/python/draftguru_offline_review_contract.py section 14 (4 checks): earliest-row Age=\"0\" is skipped and the next valid row is used; debut_date/debut_season still reflect the true earliest row; a person whose every row is Age=\"0\" gets implied_birth_year=None; that person's debut_date is still recorded.",
+    "rerun_997": {
+      "identical_rows_sha256": true,
+      "no_other_row_changed": true,
+      "rows_changed": [
+        {
+          "after": "offline_strong (BIRTH_YEAR_CONSISTENT, implied_birth_year corrected to 1971, exact match to DraftGuru title year 1971)",
+          "before": "offline_contradict (BIRTH_YEAR_CONFLICT)",
+          "player_url": "https://www.draftguru.com.au/players/darren_mead/1"
+        },
+        {
+          "after": "offline_limited (BIRTH_YEAR_UNAVAILABLE -- this identity's only dated row IS the Age=\"0\" artifact, so no valid age evidence exists at all)",
+          "before": "offline_contradict (BIRTH_YEAR_CONFLICT)",
+          "player_url": "https://www.draftguru.com.au/players/tim_walsh/1"
+        }
+      ],
+      "rows_sha256": "412f0b595d7cf068acee85d414d2aaf90217de871d4138908da1c67559a2eb53",
+      "runs": 2,
+      "totals_after": {
+        "completed": 997,
+        "offline_contradict": 7,
+        "offline_limited": 2,
+        "offline_strong": 960,
+        "offline_unavailable": 0,
+        "remaining": 0,
+        "target_unregistered": 28,
+        "tooling_or_schema_error": 0
+      },
+      "totals_before": {
+        "offline_contradict": 9,
+        "offline_limited": 1,
+        "offline_strong": 959,
+        "offline_unavailable": 0,
+        "target_unregistered": 28,
+        "tooling_or_schema_error": 0
+      }
+    },
+    "superseded_artefacts_preserved": [
+      "docs/rebuild-manifests/draftguru/bridge-review-verdicts-20260918-v1.json (retained, not overwritten)",
+      "docs/rebuild-manifests/draftguru/bridge-review-verdicts-20260918-v1.csv (retained)",
+      "docs/rebuild-manifests/draftguru/bridge-review-recheck-20260918-v1.json (retained)",
+      "docs/rebuild-manifests/draftguru/bridge-review-residual-20260918-v1.json (retained)"
+    ],
+    "test_results": "python tests/python/draftguru_offline_review_contract.py: all checks pass (including the 4 new ones); python tests/python/draftguru_bridge_resolution_contract.py: all checks pass (unaffected); py_compile clean on both the tool and the test file.",
+    "tool_version": "1.0.0 -> 1.0.1"
+  }
+}
