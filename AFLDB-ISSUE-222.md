@@ -3517,6 +3517,141 @@ backup, importer, Git, network or deployment command ran during this (documentat
 pass; only the fixed script's own AST was parsed and the two static/functional regressions above
 were executed, all DB-free.
 
+**Correction (2026-09-19, sixth pass, Opus 5, High) — the second real attempt, honestly recorded:
+the fifth-pass fix held, and the parser then refused the gate's own intended output.** The operator
+ran the fixed script for real against `afldb_test` a second time, with a new `-Label`
+(`s74-20260919-issue222-retry1`). **What succeeded:** the fresh backup
+(`D:\backups\afldb\issue-222\afldb_test-20260919-092814.dump`, independently recomputed SHA-256
+`fc113c97c330e01cd6919ed6423a15e614a0c9b0c10e790ea585983442b3bf99`, `pg_restore --list` read 1,469
+objects) and the baseline `plan`, whose transcript is byte-identical (sha256
+`21f0f554ab2016d732ad2377a1804fb3b3d04691775de2ee015af463f3fdcf66`) to attempt 1's and reports the
+same values: `import_batches_before` **193**, `after_state_sha256 4f0a2cc5…`, `picks_after_sha256
+ffa7fd60…`, `newly_linked_sha256 3ff56047…`, `baseline_sha256 71178a54…`, `summary_sha256
+d4b1fbef…`. **What then failed, again before the deliberate typed confirmation and before any
+mutation:** `REFUSED: 'import_batches_before' appears 2 times in the gate's own output -- refusing
+to guess which is authoritative.`
+
+**Root cause.** The fifth pass hardened `Get-GateValue` to refuse *any* repeated key, on the
+reasoning that "a duplicate is exactly as unsafe as a missing key". That reasoning is right for the
+four hashes and wrong for `import_batches_before`, which a successful `plan` prints **twice by
+design**: once in section 3 (`bridge_import_gate.py` line ~872, with the trailing
+`(draftguru batches now; max id <m>)` detail) and again in section 8's plan verdict (line ~1035,
+bare). Both come from the same read-only snapshot — one `BATCH_COUNT_SQL` read inside one
+REPEATABLE READ transaction — so the two printed numbers are the same number by construction, and
+the gate's own DB-free contract (`tests/python/draftguru_import_gate_contract.py`, checks
+1.12a-1.12c) pins that printed value. **The deeper root cause is the fifth-pass regression test
+itself:** its fixture was *synthetic* and emitted `import_batches_before` once, so it passed while
+the real run failed. A test built from an idea of the tool's output cannot protect a parser of that
+output.
+
+**Consequence.** No confirmation prompt was reached, no `import_draftguru.py` process ran, no
+`import_batches` row was added. `afldb_test` remained at batch count **193**, in the accepted
+post-import state from §11.19.9. No restore was required or performed.
+
+**Fix (sixth pass).** `bridge_import_gate.py` was **not** changed: printing that counter in both
+sections is its contract, not a defect, and a read-only gate must not be reshaped to suit a
+wrapper. Instead `s74-rollback-exercise.ps1` now declares an explicit **per-key** contract in a new
+`Get-GateValueRule` function — the stricter of the two designs considered, chosen because the real
+transcript shows exactly one key that legitimately repeats:
+
+- `after_state_sha256`, `picks_after_sha256`, `newly_linked_sha256`, `baseline_sha256` — appear
+  **exactly once**; value must match `^[0-9a-f]{64}$` (case-sensitively: the gate emits
+  `hexdigest()`). A repeat refuses **even when the two values are identical**, because a repeat of
+  one of these means the gate's output contract changed underneath the script.
+- `import_batches_before` — repeats are allowed, and only for this key; every occurrence must carry
+  the identical value (ordinal comparison, not PowerShell's case-insensitive `-eq`); value must
+  match `^(?:0|[1-9][0-9]{0,8})$`, i.e. a non-negative integer with no sign, no leading zero and
+  short enough that the later `[int]` cast cannot overflow.
+- Any key with no declared rule refuses outright, so a future call site cannot parse an unpinned
+  key by accident.
+
+A generic "duplicates are fine when they agree" rule was rejected for exactly that reason: it would
+silently absorb a change to section 7. Blank/whitespace filtering (`Get-GateParseLines`, fifth
+pass) is unchanged, and `$Result.Output` is still never filtered, so the console echo and the saved
+`*.log` transcripts keep the tool's own output line for line.
+
+`tests/s74-rollback-exercise-gate-parsing.test.ps1` was **replaced**. Its fixture is now the
+byte-exact 93-line transcript of the real attempt-2 `base-plan.log`, reproduced verbatim in the
+test (verified line-for-line, ordinal, against the preserved file, and against attempt 1's
+identical copy) so the test is self-contained and reads nothing outside the repository. It carries
+the two identical `import_batches_before` lines, both `import_batches_expected_after` lines, every
+blank separator, the `changes_sha256` line the script does not consume and the `baseline: {...}`
+line that must never be read as `baseline_sha256`. It proves: exact parsing; identical parsing when
+the separators are whitespace-only instead of empty; refusal of a disagreeing repeat; refusal of an
+*identical* repeat of a once-only key; refusal of a conflicting repeat of a once-only key;
+missing-key refusal for all five keys; five malformed-hash refusals (short, long, non-hex,
+uppercase, `n/a`); seven malformed batch-count refusals (`abc`, `-1`, `1.5`, `0193`, `+193`, `1e3`,
+`9999999999`) with `0` accepted; empty and absent output refusal; unpinned-key refusal; and that
+the attempt-1 unfiltered-array binding defect still reproduces. It was verified to **fail** against
+the fifth-pass parser (reproducing attempt 2's exact refusal message) and against a scratch copy
+with the value-shape check disabled, before being kept; both scratch copies were deleted and
+nothing under version control was touched by those checks.
+
+**Three further defects found by the same audit and fixed in this pass** (none of them the cause of
+either attempt, all of them ahead of the exercise on the path it has not yet reached):
+
+1. **The S0/S1/S2/S3 captures were the only step first exercised *after* a mutation, and they rest
+   on an unproven assumption.** `\copy ... TO 'persons.csv'` resolves its target **client-side**,
+   against psql's own working directory; the script set that with `Push-Location`, which changes
+   PowerShell's location but not `[System.Environment]::CurrentDirectory` — two different things,
+   and which one a child process inherits is a PowerShell implementation detail. Both preserved
+   evidence directories show `S0`-`S3` **empty**: that path has never run. Fixed two ways.
+   `Invoke-Snapshot` is now a thin wrapper over a general `Invoke-PsqlCopyScript`, which sets the
+   PowerShell location **and** the process working directory (restoring both in `finally`), so a
+   relative `\copy` target can only resolve inside the stage directory. And a new tracked
+   one-statement read-only helper, `tools/rebuild/draftguru/s74-snapshot-path-probe.sql`
+   (`\copy (SELECT 1) TO 'snapshot-path-probe.csv'`), is run through that same helper, the same
+   psql flags and the same forced-read-only session as step 1b — immediately after the `-WhatIf`
+   exit and **before the backup**. A wrong working directory now refuses while `afldb_test` is
+   untouched, instead of surfacing immediately after REVERSE #1.
+2. **A refused gate's transcript was the one transcript never saved.** Every call site ran
+   `Assert-GateOk` (which throws) *before* `Save-GateLog`, so a `plan`/`verify` that refused
+   mid-exercise left no `*.log` behind. The two calls are reordered at all six sites.
+3. **Two false safety claims in the script's own comments.** `$PSCmdlet.ShouldProcess` was
+   documented as covering `-Confirm:$false`; it does not — that suppresses the prompt and
+   ShouldProcess returns true, so the typed phrase is the only gate on such a run. And the typed
+   phrase was compared with `-ne`, which is case-**insensitive** in PowerShell, while the prompt
+   says "the exact phrase"; it is now `-cne`. Both comment and comparison are corrected.
+
+**One operational addition.** Everything from REVERSE #1 to the end of step 16 is now wrapped in a
+single `try`/`finally` whose only job is to print, if the run does not reach the end, that
+`afldb_test` may not be in its starting state, the exact tier-1 command (the LOAD is idempotent, so
+it is correct whether the run stopped reversed or already loaded), the verified backup path for
+tiers 2/3, and the §11.19.4 reference. Nothing is ever restored automatically. The enclosed block
+is deliberately not re-indented, so the diff shows the guard and nothing else.
+
+**Findings recorded but deliberately NOT changed this pass** (each would touch a code path the
+connection guards do not prove before a mutation, and the objective is a third attempt that
+succeeds, not a third way to fail):
+
+- `Invoke-ReadOnlySql` and `Invoke-PsqlCopyScript` pass the DSN to `psql` as `-d <dsn>`, so the
+  password appears in that child process's command line (readable by any process running as this
+  user). `tools/maintenance/backup-afldb-test.ps1` already establishes the repository's contract
+  for this — `backup.sh`'s `dsn_scrub`: move the password into `PGPASSWORD` and pass a scrubbed
+  DSN. Nothing is printed or logged, and the same credential is already in `.env`, so this is
+  hygiene rather than exposure. Apply the same scrub **after** §7.4 succeeds.
+- The evidence directory (and `S0`-`S3`) is created *before* the connection guards run, so a guard
+  refusal leaves a stray empty directory and burns that `-Label` under the script's own
+  refuse-if-exists rule. Harmless; pick another label.
+- `Save-GateLog` writes with `Set-Content -Encoding utf8`, which in Windows PowerShell 5.1 means
+  UTF-8 **with BOM** and CRLF line endings. The transcripts are content-complete but not byte-
+  identical to the tool's stdout.
+- `Invoke-Gate` captures only stdout; a Python traceback on stderr reaches the console but not the
+  saved transcript. The non-zero exit still refuses.
+- An untracked zero-byte file literally named `$finalBefore` sits in the worktree root (created
+  2026-09-19 09:30, i.e. just after attempt 2 — shell debris from reading the script, not written
+  by it). It is not part of any change and should be deleted by the operator before the next
+  commit.
+
+**Preserved, untouched by this pass:** both failed attempts' evidence directories
+(`s74-20260919-issue222-final`, `s74-20260919-issue222-retry1`) and both backups
+(`afldb_test-20260919-091558.dump` `51fc825d…`, `afldb_test-20260919-092814.dump` `fc113c97…`).
+Both evidence directories still contain only `backup-manifest.txt` and `base-plan.log` with
+`S0`-`S3` empty, which is itself the proof that neither attempt reached a snapshot, an importer
+call or a confirmation. **The third attempt must use a third, new `-Label`** — neither existing
+directory is reused or overwritten. No database, backup, importer, Git, network or deployment
+command ran during this pass.
+
 **1. §7.4 interpretation — no new capability was required, though two small tracked helpers were
 written.** §7.4 (line 897) says in its own text: "a comparison script for S0–S3 is proposed
 tooling ... the `afldb_test` exercise may use `psql` `\copy` exports diffed offline". The
@@ -3583,6 +3718,13 @@ review above):
    (`-PowerShellExe`), which has no concept of `$WhatIfPreference` and would otherwise run for
    real even under `-WhatIf`, unlike the `New-Item` evidence-directory creation above, which is
    automatically suppressed because it is itself a ShouldProcess-aware cmdlet.
+0b. **Snapshot working-directory preflight** (sixth-pass addition; the script labels this step
+   `1b`). `tools/rebuild/draftguru/s74-snapshot-path-probe.sql` — one read-only
+   `\copy (SELECT 1) TO 'snapshot-path-probe.csv'` — is run through the same helper, psql flags and
+   forced-read-only session a real S0/S1/S2/S3 capture uses, into a `preflight/` directory under the
+   evidence root. `\copy` resolves its target client-side, against psql's own working directory;
+   the captures are the only step that first runs *after* a mutation, so the contract they depend on
+   is proven here, while `afldb_test` is still untouched.
 1. **Fresh backup**, via `backup-afldb-test.ps1`, invoked as
    `& $PowerShellExe -NoProfile -ExecutionPolicy Bypass -File $BackupScript` -- **never** a bare
    `pwsh` (never assumed to be on `PATH`; `-PowerShellExe` defaults to `$PSHOME\pwsh.exe` under
@@ -3754,6 +3896,29 @@ deployment. The preserved evidence directory and backup from the first real atte
 (`s74-20260919-issue222-final`, `afldb_test-20260919-091558.dump`) were not touched, deleted or
 reused.
 
+**Sixth-pass validation (the per-key gate-output contract, the snapshot preflight and the audit
+fixes above) — all DB-free.**
+`[System.Management.Automation.Language.Parser]::ParseFile()` — 0 errors on
+`s74-rollback-exercise.ps1`, `tests/s74-rollback-exercise-static.test.ps1` and the rewritten
+`tests/s74-rollback-exercise-gate-parsing.test.ps1`.
+`tests\s74-rollback-exercise-static.test.ps1` — PASS, unchanged (4 assertions).
+`tests\s74-rollback-exercise-gate-parsing.test.ps1` — PASS against the byte-exact real transcript;
+verified to FAIL against the fifth-pass duplicate rule (reproducing attempt 2's exact refusal
+message) and against a scratch copy with the value-shape check disabled ("expected a throw; none
+occurred"), so it is not vacuous. Both scratch copies were deleted; nothing under version control
+was touched by those checks.
+Fixture fidelity independently checked: the test's embedded 93-line here-string compared
+line-for-line, ordinal, against `s74-20260919-issue222-retry1\base-plan.log` — 0 differing lines;
+that file and `s74-20260919-issue222-final\base-plan.log` both hash to
+`21f0f554ab2016d732ad2377a1804fb3b3d04691775de2ee015af463f3fdcf66`.
+`python tests/python/draftguru_import_gate_contract.py` — all checks hold (rerun to confirm
+`bridge_import_gate.py` is untouched and its 1.12a-1.12c printed-counter contract still stands).
+`git diff --check` — no whitespace errors. No TypeScript or Python file changed; the Gridley corpus
+was not rerun. Nothing was executed against `afldb_test`, `afldb_dev` or any database: no `psql`,
+no backup, no `import_draftguru.py`, no `bridge_import_gate.py` against a real connection, no Git
+mutation, no DEV action, no deployment. The §7.4 exercise itself was **not** attempted a third time
+this pass.
+
 **6. Exact operator commands, in order, for the remainder of this closeout.** Every `<...>` value
 must be read off the immediately preceding step's own output, never assumed or reused from an
 older run. This is the corrected release order (2026-09-19, second pass): the tooling is checked
@@ -3905,3 +4070,16 @@ Python test remain byte-identical to `5987ac2e`; no canonical bridge artefact, I
 content, or Gridley classification was touched. The evidence directory and backup from the first
 real attempt (`s74-20260919-issue222-final`, `afldb_test-20260919-091558.dump`) were not touched,
 deleted or reused. Nothing was run against `afldb_test`, `afldb_dev`, or any database.
+
+**Files changed by the sixth pass (the per-key gate-output contract and the audit fixes):**
+`tools/rebuild/draftguru/s74-rollback-exercise.ps1` (new `Get-GateValueRule`; `Get-GateValue`
+rewritten around it; `Invoke-Snapshot` refactored onto a new `Invoke-PsqlCopyScript` that sets both
+working directories; the step-1b preflight; `Save-GateLog` before `Assert-GateOk` at all six sites;
+`-cne` for the typed phrase; the post-mutation `try`/`finally` recovery banner; header NOTES),
+`tools/rebuild/draftguru/s74-snapshot-path-probe.sql` (new),
+`tests/s74-rollback-exercise-gate-parsing.test.ps1` (rewritten around the real transcript),
+`AFLDB-ISSUE-222.md` (this section), `tools/rebuild/draftguru/README.md`, plus short pointer
+additions to `issues.md` and `IssuesIndex.md`. `bridge_import_gate.py`, `s74-snapshot.sql`,
+`import_draftguru.py` and every Python test remain byte-identical to `5987ac2e`; no canonical
+bridge artefact, ISSUE-224/225 content, or Gridley classification was touched. Both failed
+attempts' evidence directories and both backups were not touched, deleted or reused.

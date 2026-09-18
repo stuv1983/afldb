@@ -5,7 +5,8 @@
 .DESCRIPTION
   Implements AFLDB-ISSUE-222.md §7.4 end to end against afldb_test only:
 
-    connection guards -> fresh backup -> baseline plan (BASE) -> [deliberate confirmation] ->
+    connection guards -> snapshot working-directory preflight -> fresh backup ->
+    baseline plan (BASE) -> [deliberate confirmation] ->
     REVERSE #1 -> capture S0 -> plan R1 -> LOAD #1 -> verify #1 (R1's own values) -> capture S1 ->
     REVERSE #2 -> capture S2 -> assert S2=S0 -> plan R2 -> assert R2=R1 -> LOAD #2 ->
     verify #2 (R2's own values) -> capture S3 -> assert S3=S1 -> final plan -> assert
@@ -97,6 +98,18 @@
   ran); tier 2 restores the step-2 backup into a separate `afldb_test_recovery` database on the
   DEV host, never over afldb_test; tier 3 is the last-resort restore over afldb_test itself,
   followed by `npm run db:privileges:test`. Read that section before touching anything by hand.
+  If the run stops anywhere after the first mutation, a try/finally prints that reference, the
+  exact tier-1 command and the backup path on the console before the error propagates.
+
+  The gate-output parsing contract, precisely: bridge_import_gate.py's printed output is parsed
+  through Get-GateParseLines (blank/whitespace lines removed for PARSING only) and Get-GateValue,
+  which enforces a PER-KEY contract declared in Get-GateValueRule and pinned against the real plan
+  transcript: the four section-7 hashes appear exactly once each and must be 64 lowercase hex
+  characters; import_batches_before is printed twice by a successful plan (section 3 and the
+  section 8 plan verdict), so repeats are accepted for that key alone and only when every
+  occurrence carries the identical value. A missing key, disagreeing repeats, an unexpected repeat
+  or a malformed value all refuse. tests/s74-rollback-exercise-gate-parsing.test.ps1 proves this
+  against the byte-exact preserved transcript of a real run.
 #>
 
 [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
@@ -122,6 +135,7 @@ Set-StrictMode -Version Latest
 
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\..')).Path
 $SnapshotSql = (Resolve-Path (Join-Path $PSScriptRoot 's74-snapshot.sql')).Path
+$SnapshotProbeSql = (Resolve-Path (Join-Path $PSScriptRoot 's74-snapshot-path-probe.sql')).Path
 $ImporterPy = Join-Path $PSScriptRoot 'import_draftguru.py'
 $GatePy = Join-Path $PSScriptRoot 'bridge_import_gate.py'
 $BackupScript = (Resolve-Path (Join-Path $RepoRoot 'tools\maintenance\backup-afldb-test.ps1')).Path
@@ -137,7 +151,7 @@ if (-not (Test-Path -LiteralPath $PowerShellExe)) {
 }
 $PowerShellExe = (Resolve-Path -LiteralPath $PowerShellExe).Path
 
-foreach ($p in @($SnapshotSql, $ImporterPy, $GatePy, $BackupScript, $PsqlExe, $PgRestoreExe)) {
+foreach ($p in @($SnapshotSql, $SnapshotProbeSql, $ImporterPy, $GatePy, $BackupScript, $PsqlExe, $PgRestoreExe)) {
   if (-not (Test-Path -LiteralPath $p)) { throw "REFUSED: required file not found: $p" }
 }
 
@@ -211,26 +225,48 @@ function Invoke-ReadOnlySql {
   }
 }
 
-function Invoke-Snapshot {
-  # Runs s74-snapshot.sql with cwd = $StageDir and the session forced read-only, restoring both
-  # PGOPTIONS and the working directory afterward regardless of outcome.
-  param([Parameter(Mandatory)][string] $StageDir, [Parameter(Mandatory)][string] $Dsn)
+function Invoke-PsqlCopyScript {
+  # Runs a `\copy ... TO '<relative name>'` script with psql's working directory set to $StageDir
+  # and the session forced read-only, restoring PGOPTIONS, the PowerShell location AND the process
+  # working directory afterward regardless of outcome.
+  #
+  # Both working directories are set deliberately. `\copy` resolves its target file CLIENT-side,
+  # against the psql process's own working directory -- and a child process's working directory and
+  # PowerShell's location are not the same thing (Set-Location/Push-Location does not update
+  # [Environment]::CurrentDirectory). Setting both means a relative `\copy` target can only ever
+  # resolve inside $StageDir, whichever of the two a given PowerShell edition hands to the child.
+  param(
+    [Parameter(Mandatory)][string] $StageDir, [Parameter(Mandatory)][string] $Dsn,
+    [Parameter(Mandatory)][string] $SqlFile, [Parameter(Mandatory)][string[]] $ExpectFiles,
+    [Parameter(Mandatory)][string] $What
+  )
+  $stageFull = (Resolve-Path -LiteralPath $StageDir).ProviderPath
   $previousOptions = $env:PGOPTIONS
-  Push-Location -LiteralPath $StageDir
+  $previousProcessCwd = [System.Environment]::CurrentDirectory
+  Push-Location -LiteralPath $stageFull
   try {
+    [System.Environment]::CurrentDirectory = $stageFull
     $env:PGOPTIONS = '-c default_transaction_read_only=on'
-    & $PsqlExe -X -v ON_ERROR_STOP=1 -f $SnapshotSql -d $Dsn
-    if ($LASTEXITCODE -ne 0) { throw "REFUSED: snapshot into $StageDir failed (exit $LASTEXITCODE)" }
+    & $PsqlExe -X -v ON_ERROR_STOP=1 -f $SqlFile -d $Dsn
+    if ($LASTEXITCODE -ne 0) { throw "REFUSED: $What failed (exit $LASTEXITCODE)" }
   }
   finally {
     Pop-Location
+    [System.Environment]::CurrentDirectory = $previousProcessCwd
     $env:PGOPTIONS = $previousOptions
   }
-  foreach ($f in $SnapshotFiles) {
-    if (-not (Test-Path -LiteralPath (Join-Path $StageDir $f))) {
-      throw "REFUSED: snapshot into $StageDir did not produce $f"
+  foreach ($f in $ExpectFiles) {
+    if (-not (Test-Path -LiteralPath (Join-Path $stageFull $f))) {
+      throw ("REFUSED: $What did not produce $f in $stageFull -- psql's copy wrote its relative " +
+        'target somewhere else, so no snapshot from this machine can be trusted')
     }
   }
+}
+
+function Invoke-Snapshot {
+  param([Parameter(Mandatory)][string] $StageDir, [Parameter(Mandatory)][string] $Dsn)
+  Invoke-PsqlCopyScript -StageDir $StageDir -Dsn $Dsn -SqlFile $SnapshotSql `
+    -ExpectFiles $SnapshotFiles -What "snapshot into $StageDir"
 }
 
 function Assert-SnapshotsIdentical {
@@ -280,13 +316,59 @@ function Invoke-Gate {
   return [pscustomobject]@{ Output = $out; ExitCode = $exit }
 }
 
+function Get-GateValueRule {
+  # The per-key contract for bridge_import_gate.py's own printed output, taken from the REAL plan
+  # transcript (preserved at D:\backups\afldb\issue-222\s74-*\base-plan.log), never from a
+  # synthetic sample:
+  #
+  #   * section 7 prints each of the four hashes EXACTLY ONCE, as 64 lowercase hex characters;
+  #   * a successful plan prints import_batches_before TWICE and both times deliberately -- once in
+  #     section 3 ("<n> (draftguru batches now; max id <m>)") and again in section 8's plan verdict
+  #     ("<n>"). Both come from the same read-only snapshot (bridge_import_gate.py's single
+  #     BATCH_COUNT_SQL read), so the two printed numbers are the same number by construction, and
+  #     the gate's own DB-free contract (tests/python/draftguru_import_gate_contract.py checks
+  #     1.12a-1.12c) pins that printed value. That repetition is the gate's contract, not a defect,
+  #     and this script must not ask the gate to change it.
+  #
+  # Repetition is therefore allowed ONLY for the one key the gate really repeats, and only when
+  # every occurrence carries the identical value. A repeat of any other key would mean the gate's
+  # output contract changed underneath this script, which is exactly as unsafe as a missing key --
+  # so it refuses rather than picking one silently.
+  param([Parameter(Mandatory)][string] $Key)
+  $sha256 = @{
+    Pattern      = '^[0-9a-f]{64}$'
+    Describe     = 'a 64-character lowercase hexadecimal sha256'
+    AllowRepeats = $false
+  }
+  $rules = @{
+    'after_state_sha256'    = $sha256
+    'picks_after_sha256'    = $sha256
+    'newly_linked_sha256'   = $sha256
+    'baseline_sha256'       = $sha256
+    'import_batches_before' = @{
+      # Non-negative, no sign, no leading zeros, and short enough that [int] cannot overflow.
+      Pattern      = '^(?:0|[1-9][0-9]{0,8})$'
+      Describe     = 'a non-negative integer'
+      AllowRepeats = $true
+    }
+  }
+  if (-not $rules.ContainsKey($Key)) {
+    throw ("REFUSED: '$Key' has no declared gate-output contract in this script -- refusing to " +
+      'parse a key whose multiplicity and value shape have not been pinned against the real gate output')
+  }
+  return $rules[$Key]
+}
+
 function Get-GateValue {
   # $Lines must already be the filtered "parsing copy" -- see Get-GateParseLines. A blank or
   # whitespace-only array ELEMENT rejects a mandatory [string[]] binding exactly as a bare empty
   # string argument would (a real PowerShell behaviour, hit in the first real §7.4 attempt), so
-  # nothing containing one may ever reach this parameter. Refuses on zero matches (missing key)
-  # or more than one (duplicate key) -- either means the value is not safe to trust silently.
+  # nothing containing one may ever reach this parameter.
+  #
+  # Refusals, all fail-closed: the key is missing; occurrences disagree; the key repeats when its
+  # contract says it appears once; or the value does not match the shape its contract declares.
   param([Parameter(Mandatory)][string[]] $Lines, [Parameter(Mandatory)][string] $Key)
+  $rule = Get-GateValueRule -Key $Key
   $pattern = "^\s*$([regex]::Escape($Key)):\s*(\S+)"
   $found = [System.Collections.Generic.List[string]]::new()
   foreach ($line in $Lines) {
@@ -295,10 +377,28 @@ function Get-GateValue {
   if ($found.Count -eq 0) {
     throw "REFUSED: could not find '$Key' in the gate's own output -- refusing to guess it"
   }
-  if ($found.Count -gt 1) {
-    throw "REFUSED: '$Key' appears $($found.Count) times in the gate's own output -- refusing to guess which is authoritative"
+  # List[string].Contains is an ORDINAL comparison; PowerShell's own -eq / Select-Object -Unique
+  # would treat two values differing only in case as the same, which is not what "identical" means
+  # for a hash.
+  $distinct = [System.Collections.Generic.List[string]]::new()
+  foreach ($v in $found) {
+    if (-not $distinct.Contains($v)) { $distinct.Add($v) }
   }
-  return $found[0]
+  if ($distinct.Count -gt 1) {
+    throw ("REFUSED: '$Key' appears $($found.Count) times in the gate's own output with " +
+      "$($distinct.Count) DIFFERENT values -- refusing to guess which is authoritative")
+  }
+  if ($found.Count -gt 1 -and -not $rule.AllowRepeats) {
+    throw ("REFUSED: '$Key' appears $($found.Count) times in the gate's own output, but its pinned " +
+      'contract is exactly once -- the gate output this script was written against has changed; ' +
+      'refusing to parse it until the contract in Get-GateValueRule is re-pinned')
+  }
+  $value = $distinct[0]
+  if ($value -cnotmatch $rule.Pattern) {
+    throw ("REFUSED: '$Key' is '$value' in the gate's own output, which is not $($rule.Describe) " +
+      '-- refusing to carry a malformed value into a --expect-* argument or a count assertion')
+  }
+  return $value
 }
 
 function Get-GateParseLines {
@@ -319,6 +419,8 @@ function Save-GateLog {
 }
 
 function Assert-GateOk {
+  # Always called AFTER Save-GateLog at every call site, deliberately: a gate that REFUSES is the
+  # transcript most worth keeping, and this function throws.
   param([Parameter(Mandatory)] $Result, [Parameter(Mandatory)][string] $StepLabel)
   $Result.Output | ForEach-Object { Write-Host $_ }
   if ($Result.ExitCode -ne 0) {
@@ -389,6 +491,25 @@ if ($WhatIfPreference) {
 }
 
 # ---------------------------------------------------------------------------
+# 1b. Snapshot working-directory preflight -- read-only, before the backup and before ANY mutation.
+#
+# The S0/S1/S2/S3 captures are the only part of this exercise that depends on psql resolving a
+# relative `\copy` target inside a directory this script chose, and they are the only part that
+# first runs AFTER the database has been mutated. Proving that contract here -- through the very
+# same helper, psql flags and forced-read-only session a real capture uses -- means a wrong
+# working directory refuses while afldb_test is still untouched, instead of surfacing for the
+# first time immediately after REVERSE #1 has already reversed the bridge.
+# ---------------------------------------------------------------------------
+
+Write-Host "`n==> 1b. Snapshot working-directory preflight (read-only)"
+$ProbeDir = Join-Path $EvidenceDir 'preflight'
+New-Item -ItemType Directory -Path $ProbeDir -Force | Out-Null
+Invoke-PsqlCopyScript -StageDir $ProbeDir -Dsn $env:AFLDB_TEST_DATABASE_URL `
+  -SqlFile $SnapshotProbeSql -ExpectFiles @('snapshot-path-probe.csv') `
+  -What 'snapshot working-directory preflight'
+Write-Host "    psql copy writes into the directory this script selects (probe: $ProbeDir)"
+
+# ---------------------------------------------------------------------------
 # 2. Fresh backup -- the recovery point for the STARTING post-import database (never S0).
 # ---------------------------------------------------------------------------
 
@@ -431,32 +552,47 @@ Write-Host "    backup verified: $backupFile ($objectCount objects, sha256 $back
 
 Write-Host "`n==> 3. Baseline plan (BASE)"
 $baseResult = Invoke-Gate -GateArgs @('plan', '--target', 'test', '--bridge', $BridgePath)
-Assert-GateOk -Result $baseResult -StepLabel 'BASE plan'
 Save-GateLog -Result $baseResult -LogName 'base-plan.log'
+Assert-GateOk -Result $baseResult -StepLabel 'BASE plan'
 $BASE = Read-GatePlanValues -Result $baseResult
 Write-Host "    BASE import_batches_before = $($BASE.before)"
 
 # ---------------------------------------------------------------------------
 # Deliberate pause before the first mutation. -WhatIf already returned above, before the backup
-# ever ran; ShouldProcess is kept here too as defence in depth (it also covers an explicit
-# -Confirm:$false or an interactive "No" at the confirmation prompt ConfirmImpact='High' can
-# trigger). No placeholder substitution is required anywhere in this script (every value below is
-# captured and threaded programmatically); the typed phrase below exists purely so a human
-# deliberately authorises the mutating half of the run.
+# ever ran; ShouldProcess is kept here too as defence in depth, for the interactive "No" at the
+# prompt ConfirmImpact='High' triggers. (It does NOT stop a -Confirm:$false run: that suppresses
+# the prompt and ShouldProcess returns true. The typed phrase below is what actually gates such a
+# run.) No placeholder substitution is required anywhere in this script (every value below is
+# captured and threaded programmatically); the typed phrase exists purely so a human deliberately
+# authorises the mutating half of the run.
 # ---------------------------------------------------------------------------
 
 Write-Host "`n==> About to REVERSE afldb_test (mutating). Verified backup: $backupFile"
 if (-not $PSCmdlet.ShouldProcess('afldb_test', 'REVERSE and RELOAD the DraftGuru bridge twice (AFLDB-ISSUE-222 section7.4)')) {
-  Write-Host 'Aborted by -WhatIf/-Confirm:$false. Nothing was touched.'
+  Write-Host 'Aborted by -WhatIf or an interactive decline. Nothing was touched.'
   exit 0
 }
 $phrase = 'I have a fresh verified afldb_test backup and intend to reverse and reload the bridge'
 $typed = Read-Host "Type the exact phrase to continue, or press Ctrl+C to abort:`n  $phrase`n"
-if ($typed -ne $phrase) { throw 'REFUSED: confirmation phrase did not match exactly. Nothing was touched.' }
+# -cne, not -ne: PowerShell's -ne is case-INSENSITIVE, which "the exact phrase" is not.
+if ($typed -cne $phrase) { throw 'REFUSED: confirmation phrase did not match exactly. Nothing was touched.' }
 
 if (-not (Test-TcpPort -ComputerName $ExpectedHost -Port $ExpectedPort)) {
   throw "REFUSED: no TCP listener at ${ExpectedHost}:${ExpectedPort} immediately before the first mutation -- is the tunnel still up?"
 }
+
+# ---------------------------------------------------------------------------
+# Everything from here to the end of step 16 mutates afldb_test. It is wrapped in one try/finally
+# whose only job is to print the recovery reference if the run does not reach the end -- so an
+# operator who hits a failure four importer runs deep does not have to scroll back or find the
+# NOTES to learn what state the database is in. The enclosed block is deliberately NOT re-indented:
+# this guard was added after two aborted attempts, and a whole-block re-indentation would have
+# hidden the real change in the diff. Nothing else about the flow is altered, and no automatic
+# restore is ever attempted.
+# ---------------------------------------------------------------------------
+
+$s74Completed = $false
+try {
 
 # ---------------------------------------------------------------------------
 # 4-5. REVERSE #1, capture S0.
@@ -474,8 +610,8 @@ Invoke-Snapshot -StageDir (Join-Path $EvidenceDir 'S0') -Dsn $env:AFLDB_TEST_DAT
 
 Write-Host "`n==> 6. Plan R1"
 $r1Result = Invoke-Gate -GateArgs @('plan', '--target', 'test', '--bridge', $BridgePath)
-Assert-GateOk -Result $r1Result -StepLabel 'R1 plan'
 Save-GateLog -Result $r1Result -LogName 'r1-plan.log'
+Assert-GateOk -Result $r1Result -StepLabel 'R1 plan'
 $R1 = Read-GatePlanValues -Result $r1Result
 
 # ---------------------------------------------------------------------------
@@ -492,8 +628,8 @@ $v1Result = Invoke-Gate -GateArgs @(
   '--expect-newly-linked-sha256', $R1.newly, '--expect-baseline-sha256', $R1.base,
   '--expect-batches-before', $R1.before
 )
-Assert-GateOk -Result $v1Result -StepLabel 'verify #1'
 Save-GateLog -Result $v1Result -LogName 'verify1.log'
+Assert-GateOk -Result $v1Result -StepLabel 'verify #1'
 Assert-SameHashes -Left $R1 -LeftName 'R1' -Right $BASE -RightName 'BASE'
 
 Write-Host "`n==> 9. Capture S1"
@@ -516,8 +652,8 @@ Assert-SnapshotsIdentical -LeftDir (Join-Path $EvidenceDir 'S0') -RightDir (Join
 
 Write-Host "`n==> 12. Plan R2"
 $r2Result = Invoke-Gate -GateArgs @('plan', '--target', 'test', '--bridge', $BridgePath)
-Assert-GateOk -Result $r2Result -StepLabel 'R2 plan'
 Save-GateLog -Result $r2Result -LogName 'r2-plan.log'
+Assert-GateOk -Result $r2Result -StepLabel 'R2 plan'
 $R2 = Read-GatePlanValues -Result $r2Result
 Assert-SameHashes -Left $R2 -LeftName 'R2' -Right $R1 -RightName 'R1'
 
@@ -535,8 +671,8 @@ $v2Result = Invoke-Gate -GateArgs @(
   '--expect-newly-linked-sha256', $R2.newly, '--expect-baseline-sha256', $R2.base,
   '--expect-batches-before', $R2.before
 )
-Assert-GateOk -Result $v2Result -StepLabel 'verify #2'
 Save-GateLog -Result $v2Result -LogName 'verify2.log'
+Assert-GateOk -Result $v2Result -StepLabel 'verify #2'
 Assert-SameHashes -Left $R2 -LeftName 'R2' -Right $BASE -RightName 'BASE'
 
 Write-Host "`n==> 15. Capture S3 and compare with S1"
@@ -549,8 +685,8 @@ Assert-SnapshotsIdentical -LeftDir (Join-Path $EvidenceDir 'S1') -RightDir (Join
 
 Write-Host "`n==> 16. Final checks"
 $finalResult = Invoke-Gate -GateArgs @('plan', '--target', 'test', '--bridge', $BridgePath)
-Assert-GateOk -Result $finalResult -StepLabel 'final plan'
 Save-GateLog -Result $finalResult -LogName 'final-plan.log'
+Assert-GateOk -Result $finalResult -StepLabel 'final plan'
 $finalParseLines = Get-GateParseLines -Result $finalResult
 $finalBefore = [int](Get-GateValue -Lines $finalParseLines -Key 'import_batches_before')
 if ($finalBefore -ne ($BASE.before + 4)) {
@@ -559,6 +695,26 @@ if ($finalBefore -ne ($BASE.before + 4)) {
 }
 Write-Host "    import_batches: $($BASE.before) -> $finalBefore (+4, as expected)"
 
+$s74Completed = $true
 Write-Host ("`n§7.4 EXERCISE COMPLETE: S0=S2 and S1=S3 (SHA-256, all six files each); R1, R2, " +
   "verify #1 and verify #2 all reproduce BASE's four hashes; import_batches +4 exactly. " +
   "Evidence: $EvidenceDir")
+}
+finally {
+  if (-not $s74Completed) {
+    Write-Host ""
+    Write-Host "!! §7.4 STOPPED INSIDE THE MUTATING HALF -- afldb_test may not be in its starting state."
+    Write-Host "   This script never restores anything automatically. Read the error above, then"
+    Write-Host "   AFLDB-ISSUE-222.md section 11.19.4, 'Rollback, three tiers', before touching anything:"
+    Write-Host "     tier 1 (no restore, usually sufficient; the LOAD is idempotent, so it is correct"
+    Write-Host "       whether the run stopped in a reversed or an already-loaded state):"
+    Write-Host "       $PythonExe $ImporterPy --no-seed --bridge $BridgePath"
+    Write-Host "       then confirm with: $PythonExe $GatePy plan --target test --bridge $BridgePath"
+    Write-Host "       (its four hashes must equal BASE's, recorded in $EvidenceDir\base-plan.log)"
+    Write-Host "     tier 2: restore the step-2 backup into a SEPARATE afldb_test_recovery database."
+    Write-Host "     tier 3 (last resort): restore over afldb_test, then npm run db:privileges:test."
+    Write-Host "   Verified backup for tiers 2/3: $backupFile"
+    Write-Host "   Evidence preserved at: $EvidenceDir"
+    Write-Host ""
+  }
+}

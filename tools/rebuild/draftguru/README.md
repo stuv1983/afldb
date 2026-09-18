@@ -1029,6 +1029,7 @@ DSNs must parse to `127.0.0.1:55432/afldb_test`, probed read-only for `current_d
 `current_user`, and the TCP port reconfirmed immediately before the first mutation -- neither DSN
 is ever printed); **immediately afterward, an explicit `-WhatIf` early exit** that prints
 backup/import/snapshot were skipped and returns successfully, strictly before anything else runs;
+a read-only snapshot working-directory preflight (`s74-snapshot-path-probe.sql`, below);
 a fresh backup via `backup-afldb-test.ps1` -- invoked through `-PowerShellExe`
 (`-NoProfile -ExecutionPolicy Bypass -File`), **never** a bare `pwsh` -- independently re-verified
 (SHA-256 recomputed, `pg_restore --list` rerun, never merely trusted); a baseline
@@ -1064,6 +1065,28 @@ then continued into the backup step and invoked a bare `pwsh`, which is not inst
 evidence directory or backup was created only because `pwsh` happened to be absent, not because
 the script refused).
 
+**Gate-output parsing contract (sixth-pass fix).** The script reads five values off
+`bridge_import_gate.py`'s own printed `plan` output, and `Get-GateValueRule` pins what each one
+looks like, against the *real* transcript rather than a sample of one: the four section-7 hashes
+appear **exactly once** each and must be 64 lowercase hex characters; `import_batches_before` is
+printed **twice** by a successful plan -- section 3 (`193 (draftguru batches now; max id 1382)`)
+and again in section 8's plan verdict (`193`) -- both from the same read-only snapshot, so repeats
+are accepted for that key alone and only when every occurrence carries the identical value. Blank
+and whitespace-only lines are removed for parsing only (`Get-GateParseLines`); the console echo and
+the saved `*.log` transcripts keep the tool's output unchanged. A missing key, disagreeing repeats,
+an unexpected repeat, a malformed value or an unpinned key all refuse. The gate itself was **not**
+changed to suit the wrapper: printing that counter in both sections is the gate's own contract,
+pinned by `tests/python/draftguru_import_gate_contract.py` checks 1.12a-1.12c.
+
+**Snapshot working-directory preflight (sixth-pass addition).** `s74-snapshot-path-probe.sql` is a
+one-statement read-only `\copy (SELECT 1) TO 'snapshot-path-probe.csv'`, run through the *same*
+helper, psql flags and forced-read-only session as a real S0/S1/S2/S3 capture, immediately after
+the `-WhatIf` exit and before the backup. `\copy` resolves its target client-side against psql's
+own working directory, which the script sets per stage (both the PowerShell location and the
+process working directory, which are not the same thing) -- and the captures are the only step that
+first runs *after* the database has been mutated. The probe turns a wrong working directory into a
+refusal while `afldb_test` is still untouched.
+
 `tests/s74-rollback-exercise-static.test.ps1` (new, DB-free, AST-only -- run directly with
 `powershell -NoProfile -ExecutionPolicy Bypass -File tests\s74-rollback-exercise-static.test.ps1`,
 never wired into `npm test`, matching `tests/sync-dev-static.test.ps1`'s existing precedent) pins,
@@ -1072,6 +1095,19 @@ invocation remains; the backup is invoked through the `$PowerShellExe` variable,
 `-NoProfile -ExecutionPolicy Bypass -File $BackupScript`; and the first `$WhatIfPreference`
 reference's source offset precedes the backup invocation's offset, with that branch confirmed to
 `return`/`exit` and to never itself reference `$PowerShellExe` or the importer.
+
+`tests/s74-rollback-exercise-gate-parsing.test.ps1` (DB-free, run the same way) extracts **only**
+the script's `FunctionDefinitionAst` nodes and dot-sources just that text, so `param()`, the
+connection guards, the preflight, the backup and every importer/psql call are unreachable. Its
+fixture is the **byte-exact 93-line transcript of the real attempt-2 `plan`** (verified identical
+to attempt 1's), including the two identical `import_batches_before` lines, the blank separators
+and the `baseline: {...}` line that must never be read as `baseline_sha256`. It proves exact
+parsing, whitespace-separator parity, refusal of disagreeing repeats, refusal of an *identical*
+repeat of a once-only key, missing-key refusal for all five keys, five malformed-hash refusals,
+seven malformed batch-count refusals (with `0` accepted), empty/absent-output refusal,
+unpinned-key refusal, and that the original unfiltered-array binding defect still reproduces. It
+was verified to **fail** against the fifth-pass parser and against a copy with the value-shape
+check disabled, before being kept.
 
 Full step-by-step detail, the authoritative S0/S1/S2/S3 definitions and why a script was written
 instead of a longer copy/paste runbook block: `AFLDB-ISSUE-222.md` §11.19.15 item 2 (third- and

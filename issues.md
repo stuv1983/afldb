@@ -36995,6 +36995,44 @@ PENDING.** Full record: `AFLDB-ISSUE-222.md` §11.12, `AFLDB-ISSUE-222-PHASE3-CO
   all-blank output. The evidence directory `s74-20260919-issue222-final` and the backup dump were
   preserved, untouched; the next attempt must use a new `-Label`. No database, Git, network or
   deployment command ran during the fix pass.
+- **Second real §7.4 attempt — stopped safely again, before confirmation and before any importer
+  invocation (2026-09-19, operator-run + Opus 5 sixth-pass adversarial review).** Backup
+  (`afldb_test-20260919-092814.dump`, sha256 `fc113c97…`, 1,469 objects) and baseline plan both
+  succeeded, the plan transcript byte-identical to attempt 1's (`21f0f554…`, `import_batches_before`
+  193). Then `REFUSED: 'import_batches_before' appears 2 times in the gate's own output`.
+  **Root cause:** a successful `bridge_import_gate.py plan` prints that counter **twice by design**
+  — section 3 (with the `(draftguru batches now; max id …)` detail) and again in section 8's plan
+  verdict — both from one read-only `BATCH_COUNT_SQL` read, and the gate's own DB-free contract
+  (`tests/python/draftguru_import_gate_contract.py` 1.12a-1.12c) pins that printed value. The
+  fifth-pass "any duplicate is as unsafe as a missing key" rule was correct for the four hashes and
+  wrong for this one key; the deeper cause is that the fifth-pass regression's fixture was
+  **synthetic** and printed the counter once, so it passed while the real run failed. No
+  confirmation prompt was reached, no importer ran, no `import_batches` row was added —
+  `afldb_test` remained at 193 and no restore was required. **Fixed in the wrapper, never the
+  gate:** a new `Get-GateValueRule` declares an explicit per-key contract (the four section-7
+  hashes exactly once each, `^[0-9a-f]{64}$` case-sensitive; `import_batches_before` may repeat,
+  accepted only when every occurrence is ordinally identical, `^(?:0|[1-9][0-9]{0,8})$`; any
+  unpinned key refused), and `tests/s74-rollback-exercise-gate-parsing.test.ps1` was rewritten
+  around the byte-exact 93-line real transcript — verified to fail against the fifth-pass parser
+  and against a copy with the value-shape check disabled. **Three further latent defects found by
+  the same audit and fixed**, none of them the cause of either attempt: (1) the S0/S1/S2/S3
+  captures depended on an unproven `\copy` working-directory assumption and were the only step
+  first exercised *after* a mutation — the script now sets both the PowerShell location and the
+  process working directory, and a new tracked read-only helper
+  (`tools/rebuild/draftguru/s74-snapshot-path-probe.sql`) proves the contract before the backup;
+  (2) a refused gate's transcript was never saved, because `Assert-GateOk` (which throws) ran
+  before `Save-GateLog` at all six sites — reordered; (3) the typed confirmation used `-ne`, which
+  is case-insensitive — now `-cne`, and a false comment claiming `ShouldProcess` stops a
+  `-Confirm:$false` run was corrected. A `try`/`finally` now prints the §11.19.4 tier-1 recovery
+  command and the backup path if the run stops after the first mutation. Deferred by decision, to
+  keep the third attempt's surface minimal: moving the psql password out of argv into `PGPASSWORD`
+  (the `backup-afldb-test.ps1` / `backup.sh` `dsn_scrub` pattern) — hygiene, not exposure; apply it
+  after §7.4 succeeds. Both evidence directories (`s74-20260919-issue222-final`,
+  `s74-20260919-issue222-retry1`) and both backups are preserved untouched, each still holding only
+  `backup-manifest.txt` and `base-plan.log` with `S0`-`S3` empty — itself the proof neither attempt
+  reached a snapshot or an importer call. **The third attempt must use a third, new `-Label`.** Full
+  detail `AFLDB-ISSUE-222.md` §11.19.15. No database, Git, network or deployment command ran during
+  this review pass.
 
 ## AFLDB-ISSUE-223 — Pre-existing test regression from AFLDB-ISSUE-221: `GRID_DRAFT_TYPES` reshaped, `draftguru-acquisition.test.ts`'s vocabulary-parity test now fails
 

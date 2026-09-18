@@ -377,6 +377,25 @@
   `s74-20260919-issue222-final` and the backup dump preserved untouched; next attempt needs a new
   `-Label`. Full detail `AFLDB-ISSUE-222.md` §11.19.15. No database, Git, network or deployment
   command ran during the fix.
+- **Second real §7.4 attempt stopped safely, before confirmation/mutation (2026-09-19, Opus 5,
+  sixth pass, adversarial review).** Backup (`afldb_test-20260919-092814.dump`, `fc113c97…`, 1,469
+  objects) and baseline plan both succeeded; the parser then refused `import_batches_before` for
+  appearing twice — which is exactly what a successful `plan` prints (section 3, and again in
+  section 8's plan verdict), from one read-only snapshot, pinned by the gate's own contract. The
+  fifth-pass "any duplicate is unsafe" rule was too blunt, and its regression passed only because
+  its fixture was synthetic. Fixed **in the wrapper, not the gate**: a new `Get-GateValueRule`
+  declares a per-key contract (the four hashes exactly once, 64 lowercase hex;
+  `import_batches_before` may repeat, identical values only, non-negative integer; unpinned keys
+  refused), and the regression is rebuilt on the byte-exact 93-line real transcript, verified to
+  fail against the fifth-pass parser. Three further latent defects fixed: the S0–S3 `\copy`
+  working-directory contract (unproven, and first exercised *after* a mutation) is now set
+  explicitly and proven by a read-only preflight before the backup
+  (`tools/rebuild/draftguru/s74-snapshot-path-probe.sql`, new); a refused gate's transcript is now
+  saved before the assertion that throws; and the typed confirmation is compared case-sensitively.
+  A `try`/`finally` now prints the §11.19.4 tier-1 recovery command if the run stops after the
+  first mutation. `afldb_test` unchanged at batch count 193; both evidence directories and both
+  backups preserved; **the third attempt needs a third, new `-Label`**. Full detail
+  `AFLDB-ISSUE-222.md` §11.19.15. No database, Git, network or deployment command ran.
 
 ### AFLDB-ISSUE-225 — Gridley corpus: 37 pre-existing `incorrect known answer` cells on non-draft criteria, present on `afldb_test` before AFLDB-ISSUE-222 and untouched by it
 - **Severity:** Medium. **Area:** Grid Solver / canonical data — `captaincies`,
