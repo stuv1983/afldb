@@ -320,10 +320,32 @@ def build_manifest(contract: dict, label: str, *, sample: dict,
     link_path = parsed_paths["afltables_link_profile"]
     profile_bytes = profile_path.read_bytes()
     link_bytes = link_path.read_bytes()
+    stage = sample.get("stage", "B1")
+    is_b3 = stage == "B3"
+
+    # AFLDB-ISSUE-222: Stage B1's sample.json carries `residual_input` and a
+    # `selection.control_ordering` stratified-draw description; Stage B3's
+    # whole-population sample.json has neither -- it carries `selection.population_rule`
+    # and no stratified selection at all. Each stage's own provenance is recorded here.
+    sample_basis = {
+        "sample_file": "sample.json",
+        "sample_sha256": sample_sha256,
+        "total": sample["counts"]["total"],
+        "by_primary_cohort": sample["counts"]["by_primary_cohort"],
+        "stage_a_label": sample["stage_a_source"]["label"],
+        "stage_a_manifest_sha256": sample["stage_a_source"]["manifest_sha256"],
+    }
+    if is_b3:
+        sample_basis["selection"] = sample["selection"]["population_rule"]
+        sample_basis["stage_a_persons_jsonl_sha256"] = sample["stage_a_source"]["persons_jsonl_sha256"]
+        sample_basis["stage_a_rows_jsonl_sha256"] = sample["stage_a_source"]["rows_jsonl_sha256"]
+    else:
+        sample_basis["selection"] = sample["selection"]["control_ordering"]
+        sample_basis["residual_input_sha256"] = sample["residual_input"]["sha256"]
 
     return {
         "source": "DraftGuru (draftguru.com.au) person pages",
-        "stage": sample.get("stage", "B1"),
+        "stage": stage,
         "purpose": "PROFILING ONLY — measures whether a person page exposes a "
                    "deterministic player_url -> AFL Tables identity bridge. This snapshot "
                    "is never an import source.",
@@ -351,20 +373,14 @@ def build_manifest(contract: dict, label: str, *, sample: dict,
             "filename_map": "http/persons_index.json",
             "never_identity": "any rendered name",
         },
-        "sample_basis": {
-            "sample_file": "sample.json",
-            "sample_sha256": sample_sha256,
-            "total": sample["counts"]["total"],
-            "by_primary_cohort": sample["counts"]["by_primary_cohort"],
-            "selection": sample["selection"]["control_ordering"],
-            "residual_input_sha256": sample["residual_input"]["sha256"],
-            "stage_a_label": sample["stage_a_source"]["label"],
-            "stage_a_manifest_sha256": sample["stage_a_source"]["manifest_sha256"],
-        },
+        "sample_basis": sample_basis,
         "person_pages": {
-            "stage": "B1",
-            "sample_basis": f"frozen {sample['counts']['total']}-person Stage B1 sample "
-                            f"(sha256 {sample_sha256})",
+            "stage": stage,
+            "sample_basis": (
+                f"Stage B3 whole-population sample, {sample['counts']['total']} persons "
+                f"(sha256 {sample_sha256})" if is_b3 else
+                f"frozen {sample['counts']['total']}-person Stage B1 sample "
+                f"(sha256 {sample_sha256})"),
             "requested": len(result["fetched"]) + len(result["failed"]),
             "fetched": len(result["fetched"]),
             "failed": result["failed"],

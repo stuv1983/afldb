@@ -561,24 +561,41 @@ def aggregate(contract: dict, sample: dict, records: list[dict],
                      "would contradict the source, not the AFLDB model",
         })
 
+    # AFLDB-ISSUE-222: Stage B1's sample.json carries `residual_input` (the census
+    # evidence file recorded by the runbook §30.4 acquisition step); Stage B3's
+    # whole-population sample.json has no such concept -- it carries
+    # `selection.population_rule` instead. Each stage's own provenance is recorded
+    # here; neither stage borrows the other's fields.
+    sample_basis = {
+        "total": sample["counts"]["total"],
+        "by_primary_cohort": sample["counts"]["by_primary_cohort"],
+        "stage_a_label": sample["stage_a_source"]["label"],
+        "stage_a_manifest_sha256": sample["stage_a_source"]["manifest_sha256"],
+    }
+    if is_b3:
+        sample_basis["stage_a_persons_jsonl_sha256"] = sample["stage_a_source"]["persons_jsonl_sha256"]
+        sample_basis["stage_a_rows_jsonl_sha256"] = sample["stage_a_source"]["rows_jsonl_sha256"]
+        sample_basis["population_rule"] = sample["selection"]["population_rule"]
+    else:
+        sample_basis["residual_input_sha256"] = sample["residual_input"]["sha256"]
+
     return {
-        "$comment": "AFLDB-ISSUE-093 Stage B1 aggregate AFL Tables link profile (runbook "
-                    "§30.8). Profiling evidence only -- never an import source, never a "
-                    "merge instruction. Timestamp-free so re-profiling is byte-identical.",
-        "stage": "B1",
+        "$comment": ("AFLDB-ISSUE-222 Stage B3 aggregate AFL Tables link profile (revised "
+                     "runbook §2, §5). Profiling evidence only -- never an import source, "
+                     "never a merge instruction. Timestamp-free so re-profiling is "
+                     "byte-identical."
+                     if is_b3 else
+                     "AFLDB-ISSUE-093 Stage B1 aggregate AFL Tables link profile (runbook "
+                     "§30.8). Profiling evidence only -- never an import source, never a "
+                     "merge instruction. Timestamp-free so re-profiling is byte-identical."),
+        "stage": "B3" if is_b3 else "B1",
         "profile_contract_version": PROFILE_CONTRACT_VERSION,
         "profiler": PROFILER,
         "profiler_version": PROFILER_VERSION,
         "snapshot_label": sample["snapshot_label"],
         "identity_complete": False,
         "import_capable": False,
-        "sample_basis": {
-            "total": sample["counts"]["total"],
-            "by_primary_cohort": sample["counts"]["by_primary_cohort"],
-            "residual_input_sha256": sample["residual_input"]["sha256"],
-            "stage_a_label": sample["stage_a_source"]["label"],
-            "stage_a_manifest_sha256": sample["stage_a_source"]["manifest_sha256"],
-        },
+        "sample_basis": sample_basis,
         "counts": {
             "requested": len(records),
             "fetched": len(fetched),

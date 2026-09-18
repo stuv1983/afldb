@@ -69,8 +69,15 @@
   defaults). **Phase 2 authorised, narrowly:** exactly one new whole-population acquisition run;
   no database import, DEV/PROD write, deployment, or Phase 3+. Handoff:
   `AFLDB-ISSUE-222-PHASE2-HANDOFF.md`.
-- **Next action:** operator runs the Phase 2 acquisition from that handoff. See `issues.md` for
-  the full record.
+- **Phase 2 executed 2026-09-18** (label `person-html-20260918`): fetch layer completed
+  5,057/5,057, 0 failures; post-fetch aggregation then crashed (`KeyError: 'residual_input'` — a
+  pre-existing Phase 1 gap: `aggregate()`/`build_manifest()` unconditionally read Stage B1-only
+  `sample.json` fields absent from Stage B3's). Fixed same day (both functions now stage-aware; 4
+  new regression tests; B1 output unchanged); aggregation resumed with zero network requests.
+  Manifest written, both O-3 conditions pass clean (0% failures; no year/top-10 concentration).
+  AFL Tables coverage 3,564/5,057 (70.48%); Wikipedia coverage 1,943/5,057 (38.42%).
+- **Next action:** Phase 3 (bridge derivation + §3.5 review, n = 598) requires its own separate
+  operator authorisation — not implied by Phase 2. See `issues.md` for the full record.
 
 ### AFLDB-ISSUE-223 — Pre-existing test regression from AFLDB-ISSUE-221: `GRID_DRAFT_TYPES` reshaped, a `draftguru-acquisition.test.ts` vocabulary-parity test now fails
 - **Severity:** Low. **Area:** test tooling — `tests/draftguru-acquisition.test.ts`,

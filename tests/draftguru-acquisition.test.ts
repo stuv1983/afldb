@@ -2664,6 +2664,130 @@ describe("Stage B3 population sample (spawned, synthetic Stage A fixture)", () =
 });
 
 // ---------------------------------------------------------------------------
+// AFLDB-ISSUE-222 regression — Stage B3 whole-population post-fetch aggregation and
+// manifest generation. Before the fix, aggregate() (profile_person_pages.py) and
+// build_manifest() (acquire_persons.py) both unconditionally read Stage B1-only
+// sample.json fields (`residual_input`, `selection.control_ordering`), which a Stage
+// B3 population sample.json does not carry -- crashing with KeyError('residual_input')
+// AFTER all pages had already been fetched (the 2026-09-18 Phase 2 run: 5,057/5,057
+// fetched, zero HTTP failures, then a crash before any parsed output or manifest was
+// written). These tests seed a fully-terminal Stage B3 snapshot (zero network) and
+// drive the exact resume/aggregation/manifest path a real interrupted-then-resumed
+// run takes, via --no-fetch (guarantees zero HTTP requests, fails closed otherwise).
+// ---------------------------------------------------------------------------
+
+interface B3SamplePerson { slug: string; ordinal: number }
+interface B3Sample { counts: { total: number }; persons: B3SamplePerson[] }
+
+describe("Stage B3 post-fetch aggregation and manifest (AFLDB-ISSUE-222 regression)", () => {
+  function seedB3Snapshot(fixture: B1Fixture): { sample: B3Sample; manifestDir: string } {
+    expect(freezeB3Sample(fixture).status).toBe(0);
+    const personDir = join(fixture.snapRoot, B3_LABEL);
+    const sample: B3Sample = JSON.parse(readFileSync(join(personDir, "sample.json"), "utf8"));
+    mkdirSync(join(personDir, "http"), { recursive: true });
+    writeFileSync(join(personDir, "http", "robots_txt.json"), `${JSON.stringify({
+      url: `${BASE}/robots.txt`, http_status: 200, sha256: "c".repeat(64),
+    }, null, 2)}\n`, "utf8");
+    sample.persons.forEach((person: B3SamplePerson, index: number) => {
+      if (index === 0) {
+        seedPerson(personDir, person.slug, person.ordinal, {
+          failure: { status: 404, reason: "SEEDED terminal failure -- must be reused verbatim" },
+        });
+      } else {
+        seedPerson(personDir, person.slug, person.ordinal, {
+          html: synthPage("Synthetic Person",
+            index % 3 === 0
+              ? [`http://afltables.com/afl/stats/players/S/Synthetic_${index}.html`]
+              : []),
+        });
+      }
+    });
+    const manifestDir = mkdtempSync(join(tmpdir(), "draftguru-b3-manifest-"));
+    return { sample, manifestDir };
+  }
+
+  itPy("aggregates a fully-fetched population snapshot without crashing (KeyError regression)", () => {
+    const fixture = buildB1Fixture();
+    const { sample, manifestDir } = seedB3Snapshot(fixture);
+    const run = runPersons([
+      "--label", B3_LABEL, "--snapshot-root", fixture.snapRoot,
+      "--manifest-dir", manifestDir, "--no-fetch"]);
+    expect(run.stderr).not.toContain("Traceback");
+    expect(run.stderr).not.toContain("KeyError");
+    expect(run.status).toBe(0);
+
+    const manifestPath = join(manifestDir, `${B3_LABEL}.json`);
+    expect(existsSync(manifestPath)).toBe(true);
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+    expect(manifest.stage).toBe("B3");
+    expect(manifest.person_pages.stage).toBe("B3");
+    expect(manifest.person_pages.requested).toBe(sample.counts.total);
+    expect(manifest.person_pages.fetched + manifest.person_pages.failed.length)
+      .toBe(sample.counts.total);
+  });
+
+  itPy("records Stage B3's own provenance in sample_basis, never Stage B1's residual_input", () => {
+    const fixture = buildB1Fixture();
+    const { manifestDir } = seedB3Snapshot(fixture);
+    const run = runPersons([
+      "--label", B3_LABEL, "--snapshot-root", fixture.snapRoot,
+      "--manifest-dir", manifestDir, "--no-fetch"]);
+    expect(run.status).toBe(0);
+    const manifest = JSON.parse(readFileSync(join(manifestDir, `${B3_LABEL}.json`), "utf8"));
+    expect(manifest.sample_basis).not.toHaveProperty("residual_input_sha256");
+    expect(manifest.sample_basis.stage_a_label).toBe(STAGE_A_FIXTURE_LABEL);
+    expect(manifest.sample_basis.selection).toContain("every distinct player_url");
+    expect(manifest.afltables_link_profile.sample_basis).not.toHaveProperty("residual_input_sha256");
+    expect(manifest.afltables_link_profile.sample_basis.population_rule)
+      .toContain("every distinct player_url");
+  });
+
+  itPy("computes the O-3 crawl_failure_ceiling and failure_concentration fields for a real B3 run", () => {
+    const fixture = buildB1Fixture();
+    const { manifestDir } = seedB3Snapshot(fixture);
+    const run = runPersons([
+      "--label", B3_LABEL, "--snapshot-root", fixture.snapRoot,
+      "--manifest-dir", manifestDir, "--no-fetch"]);
+    expect(run.status).toBe(0);
+    const manifest = JSON.parse(readFileSync(join(manifestDir, `${B3_LABEL}.json`), "utf8"));
+    const linkProfile = manifest.afltables_link_profile;
+    expect(linkProfile.crawl_failure_ceiling.available).toBe(true);
+    expect(linkProfile.crawl_failure_ceiling.ceiling_pct).toBe(2.0);
+    expect(linkProfile.crawl_failure_ceiling.failed).toBe(1);
+    expect(linkProfile.crawl_failure_ceiling.exceeded).toBe(false);   // 1/146 well under 2%
+    expect(linkProfile.failure_concentration.available).toBe(true);
+    // no synthetic row carries event_type_raw/pick_number, so top-10 membership is never
+    // set -- this stays stable regardless of which sparse synthetic year the single seeded
+    // failure lands in (unlike years_triggered/retry_decision_required, which are sensitive
+    // to that incidental distribution and are not what this regression test is pinning).
+    expect(linkProfile.failure_concentration.national_top10_trigger_fired).toBe(false);
+    expect(linkProfile.failure_concentration.national_top10_failed_player_urls).toEqual([]);
+    expect(typeof linkProfile.failure_concentration.retry_decision_required).toBe("boolean");
+  });
+
+  itPy("profile_person_pages.py run standalone against a B3 sample also stages itself correctly", () => {
+    const fixture = buildB1Fixture();
+    expect(freezeB3Sample(fixture).status).toBe(0);
+    const personDir = join(fixture.snapRoot, B3_LABEL);
+    const sample: B3Sample = JSON.parse(readFileSync(join(personDir, "sample.json"), "utf8"));
+    sample.persons.forEach((person: B3SamplePerson) => {
+      seedPerson(personDir, person.slug, person.ordinal, {
+        html: synthPage("Synthetic Person", []),
+      });
+    });
+    const run = runProfiler(["--label", B3_LABEL, "--snapshot-root", fixture.snapRoot]);
+    expect(run.stderr).toBe("");
+    expect(run.status).toBe(0);
+    const summary = JSON.parse(readFileSync(
+      join(personDir, "parsed", "afltables_link_profile.json"), "utf8"));
+    expect(summary.stage).toBe("B3");
+    expect(summary.sample_basis).not.toHaveProperty("residual_input_sha256");
+    expect(summary.sample_basis.population_rule).toContain("every distinct player_url");
+    expect(summary.coverage.by_primary_cohort.population.persons).toBe(sample.counts.total);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Bridge export (source-evidence / resolve-against / review-sample) — hand-built
 // profiling output, so collision/withhold logic is tested directly and cheaply.
 // ---------------------------------------------------------------------------

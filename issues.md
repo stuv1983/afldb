@@ -35672,6 +35672,115 @@ completes: the operator reviews the run (crawl-failure ceiling/concentration fin
 then Phase 3 (bridge derivation + §3.5 review, using the now-DECIDED n = 598) requires its own
 separate authorisation — not implied by the Phase 2 authorisation above.
 
+### Phase 2 executed — Stage B3 whole-population acquisition, aggregation defect, fix, and result (2026-09-18)
+
+The operator ran the authorised Phase 2 acquisition session (`AFLDB-ISSUE-222-PHASE2-HANDOFF.md`)
+under label `person-html-20260918`. The HTTP fetch layer completed cleanly: all 5,057/5,057
+population identities fetched, zero HTTP failures, zero robots/pacing/retry issues. Immediately
+after the last page was fetched, `acquire_persons.py`'s full-run path crashed during post-fetch
+aggregation, before any parsed output or manifest was written:
+
+```
+File "tools/rebuild/draftguru/profile_person_pages.py", line 578, in aggregate
+    "residual_input_sha256": sample["residual_input"]["sha256"],
+KeyError: 'residual_input'
+```
+
+**Root cause:** `aggregate()` (`profile_person_pages.py`) and `build_manifest()`
+(`acquire_persons.py`) were both hardcoded for the Stage B1 `sample.json` shape — unconditionally
+reading `sample["residual_input"]["sha256"]` (`aggregate()`) and, one level further,
+`sample["selection"]["control_ordering"]` (`build_manifest()`; the same defect, not yet triggered
+because `aggregate()` crashed first). Stage B3's whole-population `sample.json`
+(`stage_b3_population.py`) carries neither key — it has no residual census and no stratified
+selection, only `selection.population_rule`. A pre-existing Phase 1 gap: Phase 1's own test suite
+(§ "Additional requirement before commit" above) never exercised the full `acquire_persons.py`
+non-probe path against a Stage B3 population sample end to end — only `stage_b3_population.py`
+and `export_person_bridge.py` were smoke-tested directly.
+
+Because `run_profile()` calls `aggregate()` *before* any file write (`profile_person_pages.py`
+`run_profile()`), nothing was flushed to disk: no `parsed/person_profile.jsonl`, no
+`afltables_link_profile.json`, no manifest. The raw fetch layer was entirely unaffected — all
+5,057 `raw/persons/*.html` + `http/persons/*.json` sidecars were on disk and correct.
+
+**Fix** (`tools/rebuild/draftguru/profile_person_pages.py`, `tools/rebuild/draftguru/acquire_persons.py`):
+both functions now branch on `sample.get("stage") == "B3"` and build a stage-appropriate
+`sample_basis`/`selection` value — B1 keeps `residual_input_sha256` /
+`selection.control_ordering` byte-for-byte unchanged; B3 instead records
+`selection.population_rule`, `stage_a_persons_jsonl_sha256`, `stage_a_rows_jsonl_sha256`. The
+`"stage"` field in both the aggregate summary and the manifest is now `sample.get("stage", "B1")`
+instead of a hardcoded `"B1"` literal, so a B3 manifest accurately declares itself Stage B3.
+Because both functions serialise with `sort_keys=True`, B1 output is byte-identical to before
+(same keys, same values — only dict insertion order differs, which JSON serialisation does not
+preserve).
+
+**Regression tests added** (`tests/draftguru-acquisition.test.ts`, new describe block "Stage B3
+post-fetch aggregation and manifest (AFLDB-ISSUE-222 regression)", 4 tests, DB-free/offline,
+synthetic Stage A fixture, zero network): a fully-terminal Stage B3 snapshot seeded via the
+existing `seedPerson()` helper, driven through the exact resume path
+(`acquire_persons.py --no-fetch`) a real interrupted-then-resumed run takes — proves no crash/no
+`KeyError`, correct `stage`/`sample_basis` provenance on both the manifest and its embedded
+`afltables_link_profile` (neither borrows a B1-only field), and that `crawl_failure_ceiling` /
+`failure_concentration` compute correctly for a real B3 run; plus one test running
+`profile_person_pages.py` standalone against a B3 sample. One comment draft was caught and fixed
+before commit for containing the substring "psql" (tripping the "zero legacy-store / zero
+application-database dependency" hygiene test at `tests/draftguru-acquisition.test.ts:1004`) —
+reworded without changing meaning.
+
+**Validation:**
+- `npx vitest run tests/draftguru-acquisition.test.ts` — **148 passed / 1 failed (still
+  AFLDB-ISSUE-223, unrelated, confirmed unaffected) / 3 skipped / 152 total** (4 new tests, all
+  passing).
+- `npx vitest run tests/draftguru-import.test.ts` — 36/36, unaffected.
+- `npx tsc --noEmit -p .` — clean.
+- `npx eslint tests/draftguru-acquisition.test.ts` — 49 problems, matching the documented
+  pre-existing `@typescript-eslint/no-explicit-any` baseline exactly (none introduced by the new
+  lines; the two touched `.py` files carry no `.py`-specific lint step in this repo).
+- No database interaction anywhere in this fix, so the isolated-`afldb_test` integration suite
+  was not re-run — nothing it covers changed.
+
+**Resumed acquisition** (zero network — `python tools/rebuild/draftguru/acquire_persons.py
+--label person-html-20260918 --no-fetch`, which fails closed if anything were still pending):
+all 5,057 identities were already terminally classified from the interrupted run (0 failed), so
+the resume fetched nothing (`all requested identities are already terminally classified — nothing
+is fetched, nothing is rewritten`) and only re-ran the now-fixed aggregation/manifest step.
+Result, written to `docs/rebuild-manifests/draftguru/person-html-20260918.json`:
+
+- `fetched: 5057`, `failed: 0`, `requested: 5057` — full population, zero terminal failures.
+- **O-3, both conditions checked, neither fires:**
+  `crawl_failure_ceiling`: `{available: true, ceiling_pct: 2.0, observed_pct: 0.0, failed: 0,
+  requested: 5057, exceeded: false}`. `failure_concentration`: `{available: true,
+  years_triggered: [], national_top10_failed_player_urls: [], national_top10_trigger_fired:
+  false, retry_decision_required: false}`. No stop/diagnosis required; no retry decision to make.
+- AFL Tables identity coverage (accounts for the full 5,057, no residual): single canonical
+  identity `with_afltables_identity: 3564` (70.48% of requested/fetched); absent
+  `without_afltables_link: 1493`; ambiguous `multiple_candidates: 0`; `collisions: 0`;
+  `$missing_from_sample: 0`; `non_reducing_host`/`malformed_links`/`self_link_disagreement`/
+  `parse_errors` all `0` — no malformed-link or identity-drift result was silently absorbed.
+- Wikipedia link capture (§5a, informational only, never identity, never fetched):
+  `with_wikipedia_url: 1943` (38.42% of requested and of fetched — identical since 0 failures),
+  `ambiguous_multiple_hrefs: 0`.
+- Footywire: no dedicated extraction field exists in this tooling (only Wikipedia has one, per
+  the operator's §5a instruction); the generic `external_vocabulary_hosts` tally recorded 2,477
+  raw `www.footywire.com` href occurrences across the 5,057 pages as undifferentiated vocabulary
+  evidence (contract `external_vocabulary_hosts`/`external_vocabulary_rule`) — not a
+  distinct-person coverage count, and building one was outside this fix's authorised scope.
+- `parsed_outputs`: `person_profile.jsonl` 5,057 records; `afltables_link_profile.json` present;
+  both sha256-pinned inside the manifest.
+
+**Nothing beyond acquisition/aggregation occurred:** no `import_draftguru.py`, no
+`export_person_bridge.py`, no database connection of any kind, no DEV/PROD write, no
+build/deploy/merge/push, no Wikipedia/Footywire/AFL-Tables network fetch, no Git command. Phase 3
+(bridge derivation, using the DECIDED n = 598) is unaffected and still requires its own separate
+authorisation — not implied by this execution.
+
+**Files changed this pass:** `tools/rebuild/draftguru/profile_person_pages.py`,
+`tools/rebuild/draftguru/acquire_persons.py`, `tests/draftguru-acquisition.test.ts`,
+`AFLDB-ISSUE-222.md` (§11.4), `AFLDB-ISSUE-222-PHASE2-HANDOFF.md` (§10), `issues.md` (this entry),
+`IssuesIndex.md`. Plus local gitignored acquisition output:
+`data/sources/draftguru/person-html-20260918/` (5,057 raw+http pairs, `parsed/`, `sample.json`)
+and `docs/rebuild-manifests/draftguru/person-html-20260918.json` (new tracked manifest, not yet
+committed — operator handles Git).
+
 ### Follow-up assessment (bounded, written only — no code, no network) — Wikipedia and existing AFLDB records for persons unresolved after the DraftGuru bridge
 
 Requested by the operator: whether Wikipedia and AFLDB's own existing records could help resolve

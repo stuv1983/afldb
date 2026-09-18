@@ -195,3 +195,28 @@ verbatim; whether either stop condition fired; if not, the coverage/cohort break
 and the `wikipedia_link` aggregate from §5a (`with_wikipedia_url`, `ambiguous_multiple_hrefs`,
 both coverage percentages). Do not draft a Phase 3 plan unless asked — this handoff's scope ends
 at the acquisition result.
+
+## 10. STATUS 2026-09-18 — run executed, post-fetch aggregation crashed, fixed, resumed
+
+The `person-html-20260918` acquisition ran exactly as §5 describes and fetched all 5,057 pages
+with zero HTTP failures. Immediately afterwards, the step this document describes as "invoke the
+offline profiler" (§5 step 3, `acquire_persons.py`'s non-probe path) crashed with
+`KeyError: 'residual_input'` before writing any parsed output or manifest — a pre-existing Phase 1
+defect in `aggregate()`/`build_manifest()` (both unconditionally read Stage B1-only `sample.json`
+fields that Stage B3's `sample.json` does not carry), not anything wrong with the acquisition run
+itself or with §5's commands.
+
+**Fixed** in a follow-up session (`tools/rebuild/draftguru/profile_person_pages.py`,
+`tools/rebuild/draftguru/acquire_persons.py` — both now stage-aware; B1 output unchanged; 4 new
+regression tests). Aggregation was then resumed with **zero HTTP requests**
+(`python tools/rebuild/draftguru/acquire_persons.py --label person-html-20260918 --no-fetch` — safe
+because every identity was already terminally classified from the interrupted run) and completed
+successfully: manifest written to
+`docs/rebuild-manifests/draftguru/person-html-20260918.json`, both O-3 conditions pass clean
+(ceiling 0.0% observed vs 2.0%; no year/top-10 concentration trigger). Full detail: `issues.md` →
+`AFLDB-ISSUE-222`, and `AFLDB-ISSUE-222.md` §11.4.
+
+This handoff's own commands (§5) remain correct for a *future* Stage B3 run — the defect was in
+the profiler/adapter code they invoke, not in this document, and that code is now fixed. Phase 2
+for `person-html-20260918` is complete; Phase 3 (bridge derivation) is unaffected and still
+requires its own separate authorisation.

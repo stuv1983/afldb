@@ -1024,3 +1024,33 @@ derivation/review), Phase 4 (rebuild integration) or Phase 5 (closeout). Acquisi
 local, gitignored snapshot only. The next session's own boundary and exact commands are in the
 fresh-session handoff prepared alongside this runbook update (see `issues.md` for its filename and
 location) — that document, not this paragraph, is the operating brief for the acquisition session.
+
+### 11.4 Phase 2 executed — aggregation defect, fix, and result (2026-09-18)
+
+The operator ran the Phase 2 acquisition session under label `person-html-20260918`. The HTTP
+fetch layer completed cleanly (5,057/5,057 fetched, 0 HTTP failures), then `acquire_persons.py`
+crashed during post-fetch aggregation, before any parsed output or manifest was written:
+`KeyError: 'residual_input'` in `profile_person_pages.py`'s `aggregate()`.
+
+**Root cause:** `aggregate()` and `acquire_persons.py`'s `build_manifest()` both unconditionally
+read Stage B1-only `sample.json` fields (`residual_input`, `selection.control_ordering`) that a
+Stage B3 whole-population `sample.json` (`stage_b3_population.py`) does not carry — a pre-existing
+Phase 1 gap never exercised end to end against a full Stage B3 population run.
+
+**Fixed** (same session, separate implementation pass): both functions now branch on
+`sample.get("stage") == "B3"` and build a stage-appropriate `sample_basis`/`selection` — B1's
+output is byte-identical to before (same keys/values under `sort_keys=True` serialisation); B3
+instead records `selection.population_rule`, `stage_a_persons_jsonl_sha256`,
+`stage_a_rows_jsonl_sha256`, and the `"stage"` field is no longer hardcoded to `"B1"`. Four new
+DB-free regression tests added to `tests/draftguru-acquisition.test.ts`. Full detail, validation
+evidence and the resumed-run result: `issues.md` → `AFLDB-ISSUE-222`.
+
+**Resumed aggregation (zero network — all 5,057 identities were already terminal from the
+interrupted run):** `docs/rebuild-manifests/draftguru/person-html-20260918.json` now exists —
+`fetched: 5057`, `failed: 0`. Both O-3 conditions pass clean: `crawl_failure_ceiling.observed_pct`
+0.0 vs ceiling 2.0 (not exceeded); `failure_concentration.retry_decision_required: false`
+(`years_triggered: []`, `national_top10_trigger_fired: false`). AFL Tables identity coverage:
+3,564/5,057 (70.48%) with a single canonical identity, 1,493 absent, 0 ambiguous, 0 collisions.
+Wikipedia link capture (§5a): 1,943/5,057 (38.42%) with a captured candidate, 0 ambiguous.
+Phase 3 (bridge derivation) remains unaffected and still requires its own separate authorisation —
+not implied by this execution.
