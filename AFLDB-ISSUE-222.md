@@ -3410,161 +3410,171 @@ already committed or proposed are unaffected. No command was run for this correc
 read-only inspection of `deploy/sync-dev.ps1` to confirm it already performs the build/restart/
 health sequence.
 
-**1. §7.4 interpretation — no new tooling was required.** §7.4 (line 897) says in its own text:
-"a comparison script for S0–S3 is proposed tooling ... the `afldb_test` exercise may use `psql`
-`\copy` exports diffed offline". The mandatory exercise itself is two existing operations run in
-sequence — `import_draftguru.py` with `--bridge <the pinned v2 afldb_test child>` (load) and
-without it (reversal, §7.4's "Initial-load rollback") — with `psql \copy` snapshots taken between
-them and diffed offline. Nothing about the exercise's five numbered steps (lines 879–895) needs a
-capability the importer, `psql`, and `bridge_import_gate.py` do not already have. No helper script
-was written.
+**Correction (2026-09-19, third pass, Sonnet 5, High) — the §7.4 exercise/runbook itself, not yet
+safe to run.** A reviewer stopped the operator command block the second pass produced: it omitted
+`--no-seed` from every reverse/load call; it captured a snapshot before capturing the read-only
+plan that predicts it, instead of after; it substituted arithmetic (`BASE.before + N`) for
+`--expect-batches-before` instead of reading each run's own printed value; it compared the six
+row-set snapshots with `Compare-Object` over decoded text rather than a fail-closed SHA-256
+comparison of the raw files; the connection guards, evidence-outside-the-repository rule and
+backup re-verification existed only as prose, not as anything that actually enforced them; and
+item 1's "no helper script was written" directly contradicted the `s74-snapshot.sql` paragraph a
+few lines below it. Item 1 and item 2 below are corrected in place (this is draft procedure, never
+executed, so it is corrected rather than superseded by a dated addendum — the historical
+"uncommitted" language a few passes have used is addressed separately, in this section's closing
+note, now that a real commit exists). The fix is a new, small, tracked, self-contained PowerShell
+script, `tools/rebuild/draftguru/s74-rollback-exercise.ps1`, rather than a longer copy/paste
+block, because the corrected requirements (hard guards, fail-closed hashing, independent backup
+re-verification, a refuse-if-exists evidence directory) need real control flow to be trustworthy.
+Nothing was executed: no database, Git, network or deployment command ran for this pass, and the
+exercise itself remains **not run**.
+
+**1. §7.4 interpretation — no new capability was required, though two small tracked helpers were
+written.** §7.4 (line 897) says in its own text: "a comparison script for S0–S3 is proposed
+tooling ... the `afldb_test` exercise may use `psql` `\copy` exports diffed offline". The
+mandatory exercise itself is two existing operations run in sequence — `import_draftguru.py` with
+`--bridge <the pinned v2 afldb_test child>` (load) and without it (reversal, §7.4's "Initial-load
+rollback") — with `psql \copy` snapshots taken between them and diffed offline. Nothing about the
+exercise's five numbered steps (lines 879–895) needs a capability the importer, `psql`, and
+`bridge_import_gate.py` do not already have. **Correction (third pass):** "no new tooling" does
+not mean "no file was written" -- `s74-snapshot.sql` (the `\copy` list itself) and, after this
+pass's correction, `s74-rollback-exercise.ps1` (sequencing, guards and fail-closed comparison) are
+both small, tracked, single-purpose helpers implementing exactly the "`psql` `\copy` exports
+diffed offline" text names — never a general-purpose comparison/orchestration *program*, and
+never a substitute for reading §7.4 itself. See item 2 below for what each one does.
 
 **2. The exact operator sequence for §7.4 on `afldb_test`.** `afldb_test` is **already** in the
 post-load state from the real, twice-verified 2026-09-19 import (§11.19.9, plan `966897b9…`,
 verify `32cf72a5…`) — there is no separate "before the bridge" snapshot on file, because that
-import happened before this exercise was drafted. The sequence below therefore performs the
-exercise's load/reverse cycle **twice** starting from that already-loaded state, so every one of
-§7.4's five assertions (S0=S2, S1=S3, `bridges.length` movement, everything else untouched) is
-proven directly rather than assumed from an earlier, differently-shaped baseline. It ends with
-`afldb_test` back in exactly its current, already-verified state.
+import happened before this exercise was drafted. The exercise therefore performs the load/reverse
+cycle **twice** starting from that already-loaded state, so every one of §7.4's five assertions
+(S0=S2, S1=S3, `bridges.length` movement, everything else untouched) is proven directly rather
+than assumed from an earlier, differently-shaped baseline. It ends with `afldb_test` back in
+exactly its current, already-verified state.
 
-Preconditions the operator confirms before starting: a current shell with `AFLDB_TEST_DATABASE_URL`
-set to `afldb_test`, and `AFLDB_IMPORT_DATABASE_URL` set to the same `afldb_import`-role,
-`afldb_test`-targeted DSN used for the original 2026-09-19 import (never the default `.env` value,
-which targets `afldb_dev`).
+**Correction (2026-09-19, third pass, Sonnet 5, High).** A prior draft of this section (the
+inline `powershell` block previously here) had four defects a reviewer correctly refused to run:
+it omitted `--no-seed` from the reverse/load calls; it captured a snapshot before the read-only
+plan that predicts it, instead of after; it substituted arithmetic for `--expect-batches-before`
+instead of the gate's own printed value; and it compared snapshots with `Compare-Object` over text
+lines rather than a fail-closed SHA-256 comparison of the raw files. Rather than keep growing an
+un-runnable copy/paste block, the corrected procedure is now a single tracked, self-contained
+PowerShell script -- **`tools/rebuild/draftguru/s74-rollback-exercise.ps1`** (new) -- and this
+section describes what it does rather than duplicating its logic (the script's own header comment
+is the authoritative step-by-step reference; this prose must never drift from it). The script was
+written, not merely a longer copy/paste block, because the corrected requirements (hard connection
+guards enforced in code, not prose; fail-closed hashing; a backup that is independently
+re-verified, not merely trusted; an evidence directory the script refuses to reuse) need real
+control flow and error handling to be trustworthy -- a markdown code block cannot enforce
+"throw on the first mismatch" or "restore PGOPTIONS no matter what happens." It remains a small,
+single-purpose script, not a general framework: it does one exercise, on one target, and nothing
+else.
 
-**S0/S1/S2/S3 defined (this is the authoritative definition; nowhere else in this issue's
-tracking describes S0 differently).** `afldb_test` starts this exercise in the **post-import
-(bridged) state** — the real, twice-verified 2026-09-19 import (§11.19.9). That starting state is
-**not** S0; it is what step 0's backup preserves as the recovery point, and it is what S1 (below)
-reconstructs.
+Preconditions the operator confirms before running it: a working tunnel/port-forward to
+`127.0.0.1:55432`; `AFLDB_TEST_DATABASE_URL` and `AFLDB_IMPORT_DATABASE_URL` both set to that
+tunnel, targeting `afldb_test` (never the default `.env` values, which target `afldb_dev`); the
+pinned v2 `afldb_test` deployment child unchanged since the last accepted import.
 
-- **S0 -- the reconstructed pre-bridge state.** Captured only *after* deliberately reversing the
-  starting (already-bridged) database (step 1, "REVERSE #1"). §7.4's own text (line 879)
-  explicitly allows this: "Snapshot S0 (pre-bridge, after the plain rebuild **or after step 4
-  below**)" — i.e. S0 need not come from a fresh, never-bridged database; it may be reached by
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\rebuild\draftguru\s74-rollback-exercise.ps1
+```
+
+**What it does, in order** (identical to the script's own header comment; corrected per the
+review above):
+
+0. **Connection guards, in executable PowerShell, before any mutation.** `AFLDB_TEST_DATABASE_URL`
+   and `AFLDB_IMPORT_DATABASE_URL` must each parse as `postgresql://user:pass@127.0.0.1:55432/afldb_test`
+   (shape and host/port/database checked; the DSN value itself is never printed or logged). A
+   read-only probe over each then requires `current_database() = afldb_test` (test DSN) and
+   `current_user = afldb_import` **and** `current_database() = afldb_test` (import DSN). The TCP
+   port is confirmed open again immediately before the first mutating call.
+1. **Fresh backup**, via `backup-afldb-test.ps1`. The script parses the backup's own printed file
+   path and SHA-256, requires the file to be non-zero length, **independently recomputes** the
+   SHA-256 (never trusting the printed value alone), and re-runs `pg_restore --list` itself to
+   confirm the archive is readable. The path, recomputed hash, object count and the tracked
+   recovery reference (§11.19.4 below) are written to `backup-manifest.txt` in the evidence
+   directory. **This backup is the recovery point for the untouched, already-verified STARTING
+   post-import database -- it is not a snapshot of S0** (see the definitions below). No automatic
+   restore is ever attempted, on any failure, at any point in the script.
+2. **Baseline plan (`BASE`)** -- `bridge_import_gate.py plan --target test` against the untouched
+   starting state, before anything mutates. Its four hashes and `import_batches_before` are parsed
+   from the tool's own printed output (never guessed) and become the values every later stage must
+   reproduce.
+3. **A deliberate, typed confirmation** ("I have a fresh verified afldb_test backup and intend to
+   reverse and reload the bridge"), after which the script proceeds only if it is typed exactly.
+   `-WhatIf` stops here without touching anything.
+4. **REVERSE #1** -- `import_draftguru.py --no-seed` (no `--bridge`).
+5. **Capture S0** -- the six `s74-snapshot.sql` row-sets, via `psql`, session forced read-only.
+6. **Plan R1** -- `bridge_import_gate.py plan --target test --bridge <child>`, predicting LOAD #1
+   from S0. Its hashes and `import_batches_before` are parsed and kept as `R1`.
+7. **LOAD #1** -- `import_draftguru.py --no-seed --bridge <child>`.
+8. **Verify #1**, passing **R1's own captured values** as `--expect-*` (never recomputed, never
+   assumed) -- then asserts `R1` equals `BASE` on all four hashes.
+9. **Capture S1**.
+10. **REVERSE #2** -- `import_draftguru.py --no-seed` (no `--bridge`).
+11. **Capture S2**, then assert **S2 = S0 exactly** -- `Get-FileHash -Algorithm SHA256` over each
+    of the six raw files in turn, throwing immediately on the first mismatch (never `Compare-Object`
+    over decoded text lines, and never claimed "byte for byte" without this).
+12. **Plan R2** -- predicting LOAD #2 from S2 -- then asserts **R2 equals R1** on all four hashes
+    (an internal-consistency check beyond §7.4's literal text: if S2 truly equals S0, reloading the
+    same child onto it must predict exactly what R1 predicted).
+13. **LOAD #2** -- `import_draftguru.py --no-seed --bridge <child>`.
+14. **Verify #2**, passing **R2's own captured values** -- then asserts `R2` equals `BASE`.
+15. **Capture S3**, then assert **S3 = S1 exactly** (same fail-closed SHA-256 method as step 11).
+16. **Final checks** -- one more `plan` reads the current `import_batches_before` and asserts it
+    equals `BASE.before + 4` **exactly** (reverse/load/reverse/load) -- a count assertion, never
+    substituted into any `--expect-batches-before` argument, and never used in place of a gate's
+    own printed value at any step above.
+
+**S0/S1/S2/S3 defined (the authoritative definition; identical in the script's NOTES; nowhere
+else in this issue's tracking describes S0 differently).** `afldb_test` starts this exercise in
+the **post-import (bridged) state** — the real, twice-verified 2026-09-19 import (§11.19.9). That
+starting state is **not** S0; it is what the step-1 backup protects, and what S1 reconstructs.
+
+- **S0 -- the reconstructed pre-bridge state**, captured only *after* REVERSE #1. §7.4's own text
+  (line 879) explicitly allows this: "Snapshot S0 (pre-bridge, after the plain rebuild **or after
+  step 4 below**)" — S0 need not come from a fresh, never-bridged database; it may be reached by
   undoing an existing load first, which is exactly this case. **S0 is never the untouched starting
   database** — that database is already bridged, and a snapshot of it untouched would be S1, not
   S0.
-- **S1 -- the post-load (bridged) state.** Captured after loading the pinned v2 `afldb_test` child
-  (step 3, "LOAD #1"). Because the same, already-in-production child is reloaded onto the same
-  already-bridged rows, S1 reconstructs — and step 4's `bridge_import_gate.py verify` independently
-  confirms it equals — the exercise's own starting state (the one the backup protects).
-- **S2 -- the second reconstructed pre-bridge state.** Captured after a second reversal (step 5).
-  Must equal S0 **exactly**, row for row (§7.4 line 892).
-- **S3 -- the second post-load state.** Captured after a second load of the same child (step 7).
-  Must equal S1 **exactly**, row for row -- proving the restoration is idempotent (§7.4 line 894).
+- **S1 -- the post-load (bridged) state**, captured after LOAD #1. Because the same,
+  already-accepted child is reloaded onto the same reversed rows, S1 reconstructs — and verify #1
+  independently confirms it equals — the exercise's own starting state (the one the backup
+  protects).
+- **S2 -- the second reconstructed pre-bridge state**, captured after REVERSE #2. Must equal S0
+  **exactly**, by SHA-256 over the raw files (§7.4 line 892).
+- **S3 -- the second post-load state**, captured after LOAD #2. Must equal S1 **exactly**, by the
+  same method -- proving the restoration is idempotent (§7.4 line 894).
 
-**The pre-exercise backup (step 0) is the recovery point for the starting POST-import database --
-not a snapshot of S0.** If any assertion below fails, the operator restores `afldb_test` from that
-backup (the known-good, already-verified bridged state), never from an S0/S1/S2/S3 CSV, and stops
-per §7.4's "any difference outside the asserted set -> STOP" (line 899).
+**`import_batches` is deliberately excluded from the S0=S2/S1=S3 file comparison.** It legitimately
+gains one row per mutating call (four total across reverse/load/reverse/load); comparing it as a
+row-image would make S0 and S2 differ by construction. It is instead checked as a *count*
+(`BASE.before + 4`, step 16), read from the gate's own printed `import_batches_before` at every
+stage, never computed or guessed (§7.4's own batch bookkeeping, `bridge_import_gate.py` README).
 
-```powershell
-# 0. Fresh backup -- a NEW dump distinct from afldb_test-20260919-051022.dump. This is the
-#    recovery point for the CURRENT, already-verified, post-import (bridged) database -- the
-#    starting state of this exercise, and NOT the same thing as "S0" (see the definitions above).
-pwsh -File tools/maintenance/backup-afldb-test.ps1
+**Recovery reference (never run automatically by the script).** Any thrown error stops the script
+immediately, leaving `afldb_test` exactly where the last successful step left it. The tracked
+recovery procedure is **§11.19.4 above, "Rollback, three tiers"**: tier 1 is an importer reversal
+(no restore -- likely already the last thing the script ran); tier 2 restores the step-1 backup
+into a separate `afldb_test_recovery` database on the DEV host, never over `afldb_test`; tier 3 is
+the last-resort restore over `afldb_test` itself, followed by `npm run db:privileges:test`. The
+script never attempts any of these itself.
 
-# 0a. Re-confirm the CURRENT state is exactly the last verified import before touching anything.
-#     Capture this run's four hashes -- they are what the exercise's final state must reproduce.
-$env:PGOPTIONS = $null
-python tools/rebuild/draftguru/bridge_import_gate.py plan --target test `
-  > s74-plan-baseline.txt
-# read after_state_sha256 / picks_after_sha256 / newly_linked_sha256 / baseline_sha256 /
-# import_batches_before off s74-plan-baseline.txt -- call them $BASE_*
+**Evidence.** Every snapshot, every `plan`/`verify` transcript and the backup manifest are written
+under a fresh, must-not-already-exist directory beneath `D:\backups\afldb\issue-222` (never inside
+the repository -- the script refuses to run otherwise), so nothing from this exercise is ever left
+as an untracked file in the worktree.
 
-mkdir S0, S1, S2, S3 -Force
-$snapshot = 'tools/rebuild/draftguru/s74-snapshot.sql'   # written once, see below; never executed by the model
-
-# 1. REVERSE #1 (mutating): the "Initial-load rollback" of §7.4 -- un-links every bridge person.
-python tools/rebuild/draftguru/import_draftguru.py    # no --bridge
-
-# 2. Snapshot S0 (pre-bridge state, captured after the reversal -- explicitly sanctioned by
-#    §7.4's own parenthetical, line 879: "after the plain rebuild or after step 4 below").
-Push-Location S0
-$env:PGOPTIONS = '-c default_transaction_read_only=on'
-& "C:\Program Files\PostgreSQL\16\bin\psql.exe" -X -v ON_ERROR_STOP=1 `
-  -f "..\$snapshot" -d $env:AFLDB_TEST_DATABASE_URL
-Pop-Location
-
-# 3. LOAD #1 (mutating): reload the SAME pinned v2 afldb_test child already in production use.
-$env:PGOPTIONS = $null
-python tools/rebuild/draftguru/import_draftguru.py `
-  --bridge data/reference/draftguru-person-bridge-20260918-v2.afldb_test.json
-
-# 4. Snapshot S1 (post-load). Cross-check with the read-only gate before trusting the CSVs:
-python tools/rebuild/draftguru/bridge_import_gate.py verify --target test `
-  --expect-after-sha256 <$BASE_after_state_sha256> `
-  --expect-picks-after-sha256 <$BASE_picks_after_sha256> `
-  --expect-newly-linked-sha256 <$BASE_newly_linked_sha256> `
-  --expect-baseline-sha256 <$BASE_baseline_sha256> `
-  --expect-batches-before <import_batches count printed by step 1's plain run + 1>
-Push-Location S1
-$env:PGOPTIONS = '-c default_transaction_read_only=on'
-& "C:\Program Files\PostgreSQL\16\bin\psql.exe" -X -v ON_ERROR_STOP=1 `
-  -f "..\$snapshot" -d $env:AFLDB_TEST_DATABASE_URL
-Pop-Location
-
-# 5. REVERSE #2 (mutating).
-$env:PGOPTIONS = $null
-python tools/rebuild/draftguru/import_draftguru.py    # no --bridge
-
-# 6. Snapshot S2. Assert S2 = S0 EXACTLY (six file-pairs, byte for byte):
-foreach ($f in 'persons.csv','picks_dg.csv','picks_manual_null.csv','identities.csv',
-               'resolutions.csv','overrides.csv') {
-  Compare-Object (Get-Content "S0\$f") (Get-Content "S2\$f")
-}
-# ^ run this AFTER capturing S2 below; an empty result for every file is the pass condition.
-Push-Location S2
-$env:PGOPTIONS = '-c default_transaction_read_only=on'
-& "C:\Program Files\PostgreSQL\16\bin\psql.exe" -X -v ON_ERROR_STOP=1 `
-  -f "..\$snapshot" -d $env:AFLDB_TEST_DATABASE_URL
-Pop-Location
-
-# 7. LOAD #2 (mutating): restores afldb_test to its real, expected, already-verified state.
-$env:PGOPTIONS = $null
-python tools/rebuild/draftguru/import_draftguru.py `
-  --bridge data/reference/draftguru-person-bridge-20260918-v2.afldb_test.json
-
-# 8. Snapshot S3. Assert S3 = S1 EXACTLY (idempotent restoration):
-Push-Location S3
-$env:PGOPTIONS = '-c default_transaction_read_only=on'
-& "C:\Program Files\PostgreSQL\16\bin\psql.exe" -X -v ON_ERROR_STOP=1 `
-  -f "..\$snapshot" -d $env:AFLDB_TEST_DATABASE_URL
-Pop-Location
-foreach ($f in 'persons.csv','picks_dg.csv','picks_manual_null.csv','identities.csv',
-               'resolutions.csv','overrides.csv') {
-  Compare-Object (Get-Content "S1\$f") (Get-Content "S3\$f")
-}
-
-# 9. Final independent proof the restored state matches the ORIGINAL 2026-09-19 import exactly
-#    (not just this exercise's own S1/S3): reuse the very hashes captured in step 0a.
-python tools/rebuild/draftguru/bridge_import_gate.py verify --target test `
-  --expect-after-sha256 <$BASE_after_state_sha256> `
-  --expect-picks-after-sha256 <$BASE_picks_after_sha256> `
-  --expect-newly-linked-sha256 <$BASE_newly_linked_sha256> `
-  --expect-baseline-sha256 <$BASE_baseline_sha256> `
-  --expect-batches-before <import_batches_before printed by THIS step's own preceding plan, i.e.
-                            $BASE's import_batches_before + 3 (reverse/load/reverse already run)>
-```
-
-Any `Compare-Object` output at step 6 or step 8, any `bridge_import_gate.py` `REFUSED`, or any
-`import_draftguru.py` HALT is a STOP per §7.4 (line 899): the reversal is not proven and the
-`afldb_dev` import must not proceed. `import_batches` gains exactly 4 rows across steps 1/3/5/7
-(reverse, load, reverse, load); `bridge_import_gate.py`'s own printed `import_batches_before` /
-`import_batches_expected_after` counters at each `plan`/`verify` call are the authoritative count
-to track, per its existing contract (§ `bridge_import_gate.py` README) — never a guessed number.
-
-**`tools/rebuild/draftguru/s74-snapshot.sql`** (new, read-only, six `\copy` statements over
-exactly the row sets §7.4 names — `draft_persons`/`draft_picks` link columns for
-`source_id = draftguru`, every `source_id IS NULL` pick in full, `external_identities(draftguru)`
-link columns, `player_link_resolutions` for `draft_picks` in full, `data_overrides` for
-`draft_picks` in full — ordered by natural key so two snapshots of the same state are byte
-identical). Written once as a tracked, reusable script because the operator runs it four times in
-one sitting and a hand-typed `\copy` list repeated four times is exactly the kind of typo risk a
-safety exercise should not carry; it issues no write and is the direct implementation of §7.4's own
-"`psql` `\copy` exports diffed offline" text, not new tooling beyond it.
+**`tools/rebuild/draftguru/s74-snapshot.sql`** (tracked, small, read-only helper -- unchanged by
+this correction). Six `\copy` statements over exactly the row sets §7.4 names — `draft_persons`/
+`draft_picks` link columns for `source_id = draftguru`, every `source_id IS NULL` pick in full,
+`external_identities(draftguru)` link columns, `player_link_resolutions` for `draft_picks` in
+full, `data_overrides` for `draft_picks` in full — ordered by natural key so two snapshots of the
+same state are byte identical. It is the direct implementation of §7.4's own "`psql` `\copy`
+exports diffed offline" text: a small tracked helper, not a full comparison/orchestration program
+in itself -- the sequencing, guards and fail-closed comparison logic that make it safe to run four
+times in one sitting now live in `s74-rollback-exercise.ps1` above, not in a hand-typed runbook
+block.
 
 **3. `bridge_import_gate.py` generalised to `--target {test, dev}`.** Full detail in
 `tools/rebuild/draftguru/README.md`. Summary: `--target` defaults to `test` (every pre-existing
@@ -3608,6 +3618,14 @@ no-PROD-choice guards;
 the importer's write DSN or the migration owner DSN by string — the new docstring/comments were
 worded to respect that literally). No TypeScript changed; no lint run (no linted file touched).
 The Gridley corpus was not rerun.
+
+**Third-pass validation (the correction above).** No Python or TypeScript file changed, so
+`py_compile`/the contract/vitest were not rerun (they remain valid against the unchanged
+`5987ac2e` tooling). The new `tools/rebuild/draftguru/s74-rollback-exercise.ps1` was syntax-checked
+with `[System.Management.Automation.Language.Parser]::ParseFile()` (0 errors) — parsing only,
+never executed, never connecting to anything. `git diff --check` reported no whitespace errors.
+The script itself was not run: no backup, no reversal, no load, no snapshot, no database
+connection of any kind.
 
 **6. Exact operator commands, in order, for the remainder of this closeout.** Every `<...>` value
 must be read off the immediately preceding step's own output, never assumed or reused from an
@@ -3711,22 +3729,30 @@ deploy/sync-dev.ps1
 #     CHANGELOG.md entry. This commit touches no code and no data artefact.
 ```
 
-**Database/Git/network/deployment actions this pass: none.** No `psql`, no `import_draftguru.py`,
-no `bridge_import_gate.py` run against a real connection, no backup, no commit, no push, no
-`sync-dev.ps1`, no `export_person_bridge.py --resolve-against dev`. AFLDB-ISSUE-224 and
+**Database/Git/network/deployment actions across all three passes: none.** No `psql`, no
+`import_draftguru.py`, no `bridge_import_gate.py` run against a real connection, no backup, no
+push, no `sync-dev.ps1`, no `export_person_bridge.py --resolve-against dev`. AFLDB-ISSUE-224 and
 AFLDB-ISSUE-225 were not touched or expanded. The canonical v1/v2 parent, the `afldb_test` child,
-and every Gridley corpus artefact are unchanged. The second (correction) pass ran no command
-beyond a read-only `Read` of `deploy/sync-dev.ps1` to confirm its existing build/restart/health
-sequence before removing the duplicate manual step.
+and every Gridley corpus artefact are unchanged. The second pass ran no command beyond a read-only
+`Read` of `deploy/sync-dev.ps1`. This third pass ran no command beyond `python -m py_compile`
+(unaffected by this pass -- no Python file changed), `[System.Management.Automation.Language.
+Parser]::ParseFile()` over the new `.ps1` (syntax check only, never executed), and `git status` /
+`git diff --check` for the report the operator required.
 
-**Files changed across both passes (original implementation + the sequencing/terminology
-correction above), all still uncommitted:** `tools/rebuild/draftguru/bridge_import_gate.py`
-(generalised to `--target {test, dev}`), `tools/rebuild/draftguru/s74-snapshot.sql` (new),
-`tests/python/draftguru_import_gate_contract.py` (extended), `tools/rebuild/draftguru/README.md`,
-this file, `issues.md`, `IssuesIndex.md`, `CHANGELOG.md` (the new `AFLDB_DEV_DATABASE_URL`
-required updating the ISSUE-220 credential-boundary documentation and deny lists), `.env.example`,
-`docs/deployment.md`, `deploy/afldb.service`, `deploy/afldb-email-intake.service`,
-`deploy/afldb-settle-afltables.service`. The correction pass itself touched only this file (the
-operator-sequence and S0/S1/S2/S3 text in items 2, 4 and 6, plus this note). No test, classifier,
-canonical bridge artefact, ISSUE-224/225 content, or Gridley classification was touched by either
-pass.
+**Tooling checkpoint committed (operator-run, between the second and third pass):** `5987ac2e`
+"feat(draftguru): add DEV gate and reversal tooling" — contains everything the first and second
+passes produced (`bridge_import_gate.py`, `s74-snapshot.sql`, the extended contract, `README.md`,
+this file, `issues.md`, `IssuesIndex.md`, `CHANGELOG.md`, `.env.example`, `docs/deployment.md`,
+the three `deploy/*.service` files). **Statements elsewhere in this section that call those files
+"uncommitted" describe the state as it was at the time they were written and are preserved as
+historical record; they no longer describe the current state.** Everything from this third
+(correction) pass — the `--no-seed`/ordering/hashing/evidence-location/connection-guard fixes to
+this section's prose, and the new `tools/rebuild/draftguru/s74-rollback-exercise.ps1` — remains
+**uncommitted** as of this pass.
+
+**Files changed by this third pass:** `AFLDB-ISSUE-222.md` (this section: items 1 and 2 rewritten;
+this closing note), `tools/rebuild/draftguru/s74-rollback-exercise.ps1` (new), plus short pointer
+additions to `issues.md` and `IssuesIndex.md`. `tools/rebuild/draftguru/README.md` gained a
+corresponding update. No code that runs against a database changed (`bridge_import_gate.py`,
+`s74-snapshot.sql`, `import_draftguru.py`, and every test are byte-identical to `5987ac2e`); no
+canonical bridge artefact, ISSUE-224/225 content, or Gridley classification was touched.

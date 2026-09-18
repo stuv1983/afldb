@@ -1013,21 +1013,40 @@ Six `\copy ... TO` statements over exactly the row sets `AFLDB-ISSUE-222.md` §7
 mandatory S0/S1/S2/S3 comparison (`draft_persons`/`draft_picks` link columns for the DraftGuru
 source, every manual `source_id IS NULL` pick in full, `external_identities(draftguru)` link
 columns, `player_link_resolutions`/`data_overrides` for `draft_picks` in full), each ordered by a
-natural key so two snapshots of the same state are byte-identical CSVs. Run from inside a fresh
-per-stage directory:
+natural key so two snapshots of the same state are byte-identical CSVs. Writes only the six CSV
+files in its working directory; issues no write to the database. This is the direct
+implementation of §7.4's own text ("a comparison script for S0–S3 is proposed tooling ... the
+`afldb_test` exercise may use `psql` `\copy` exports diffed offline") -- a small, tracked helper,
+**not** itself a full comparison/orchestration program. It is invoked automatically, once per
+snapshot stage, by `s74-rollback-exercise.ps1` below; it is not intended to be run by hand.
 
-    $env:PGOPTIONS = '-c default_transaction_read_only=on'
-    & "C:\Program Files\PostgreSQL\16\bin\psql.exe" -X -v ON_ERROR_STOP=1 `
-      -f ..\s74-snapshot.sql -d $env:AFLDB_TEST_DATABASE_URL
+### `s74-rollback-exercise.ps1` -- the AFLDB-ISSUE-222 §7.4 rollback exercise (mutating, `afldb_test` only)
 
-Writes only the six CSV files in the current directory; issues no write to the database. This is
-the direct implementation of §7.4's own text ("a comparison script for S0–S3 is proposed tooling
-... the `afldb_test` exercise may use `psql` `\copy` exports diffed offline"), written once as a
-tracked script because the operator runs it four times in one sitting and a hand-typed `\copy`
-list repeated four times is exactly the kind of typo risk a safety exercise should not carry. The
-exact operator sequence around it (reverse / load / reverse / load, with `Compare-Object` between
-stages) is recorded in `AFLDB-ISSUE-222.md` §11.19.15; it was defined but **not executed** by the
-model, and must never be executed against `afldb_dev` -- §7.4's exercise is `afldb_test`-only.
+    powershell -ExecutionPolicy Bypass -File tools\rebuild\draftguru\s74-rollback-exercise.ps1
+
+The full §7.4 mandatory reversal exercise, fail-closed, self-contained: connection guards (both
+DSNs must parse to `127.0.0.1:55432/afldb_test`, probed read-only for `current_database()` /
+`current_user`, and the TCP port reconfirmed immediately before the first mutation -- neither DSN
+is ever printed); a fresh backup via `backup-afldb-test.ps1`, independently re-verified (SHA-256
+recomputed, `pg_restore --list` rerun, never merely trusted); a baseline `bridge_import_gate.py
+plan` (`BASE`); a deliberate typed confirmation before anything mutates; then, twice,
+`import_draftguru.py --no-seed` (reverse, no `--bridge`) → a read-only `plan` (`R1`/`R2`,
+predicting the reload) → `import_draftguru.py --no-seed --bridge <child>` (load) → `verify` using
+that plan's **own** printed hashes and `import_batches_before` (never recomputed, never assumed)
+→ a `psql \copy` snapshot (`s74-snapshot.sql`). S0=S2 and S1=S3 are asserted by
+`Get-FileHash -Algorithm SHA256` over each of the six raw files, throwing on the first mismatch;
+`R1`/`R2`/both verifies are each asserted to reproduce `BASE`'s four hashes; a final `plan` proves
+`import_batches` grew by exactly 4. Every snapshot, transcript and the backup manifest are written
+under a fresh, must-not-already-exist directory beneath `D:\backups\afldb\issue-222` (refused if
+it resolves inside the repository), so nothing is ever left as an untracked file in the worktree.
+On any failure it throws immediately and attempts no automatic restore -- recovery is the tracked
+three-tier procedure in `AFLDB-ISSUE-222.md` §11.19.4.
+
+Full step-by-step detail, the authoritative S0/S1/S2/S3 definitions and why a script was written
+instead of a longer copy/paste runbook block: `AFLDB-ISSUE-222.md` §11.19.15 item 2 (third-pass
+correction). Syntax-checked with `[System.Management.Automation.Language.Parser]::ParseFile()`;
+**never executed** by the model, and must never be executed against `afldb_dev` -- §7.4's exercise
+is `afldb_test`-only.
 
 ### `afldb_test` import complete and verified (2026-09-19, operator-reported)
 

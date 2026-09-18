@@ -36951,6 +36951,19 @@ PENDING.** Full record: `AFLDB-ISSUE-222.md` §11.12, `AFLDB-ISSUE-222-PHASE3-CO
   a manual `npm run build && sudo systemctl restart afldb` step that duplicated what
   `sync-dev.ps1` already performs. No code, test, canonical artefact or database was touched; no
   command beyond a read-only inspection of `deploy/sync-dev.ps1` was run.
+- **§7.4 exercise/runbook correction — not yet safe to run (2026-09-19, Sonnet 5, third pass,
+  documentation + one new script, nothing executed).** A reviewer stopped the operator command
+  block the prior pass produced before any database command ran: it omitted `--no-seed` from
+  every reverse/load call; captured a snapshot before the plan that predicts it instead of after;
+  substituted arithmetic for `--expect-batches-before` instead of each run's own printed value;
+  and compared the six §7.4 snapshots with `Compare-Object` over text instead of a fail-closed
+  SHA-256 comparison of the raw files. Fixed with a new, small, tracked, self-contained script,
+  `tools/rebuild/draftguru/s74-rollback-exercise.ps1` (syntax-checked, not executed), replacing
+  the inline copy/paste block; full detail `AFLDB-ISSUE-222.md` §11.19.15 item 2. Also noted that
+  the tooling checkpoint is now committed (`5987ac2e`) — earlier "everything is uncommitted"
+  statements in this section describe the state as of when they were written and are preserved as
+  historical record. No code that runs against a database changed; no database, Git, network or
+  deployment command ran; the §7.4 exercise itself remains not run.
 
 ## AFLDB-ISSUE-223 — Pre-existing test regression from AFLDB-ISSUE-221: `GRID_DRAFT_TYPES` reshaped, `draftguru-acquisition.test.ts`'s vocabulary-parity test now fails
 

@@ -351,6 +351,14 @@
   explicit which of S0/S1/S2/S3 is the reconstructed pre-bridge state vs. the backed-up
   post-import starting state, and removed a manual build/restart step duplicating `sync-dev.ps1`.
   No code, test, artefact or database touched.
+- **§7.4 exercise/runbook correction — not yet safe to run (2026-09-19, Sonnet 5, third pass).** A
+  reviewer stopped the prior operator command block before any database command ran: missing
+  `--no-seed`, wrong snapshot/plan order, guessed `--expect-batches-before` instead of each run's
+  own printed value, and text-diff instead of fail-closed SHA-256 comparison. Fixed with a new,
+  small, tracked script, `tools/rebuild/draftguru/s74-rollback-exercise.ps1` (syntax-checked, not
+  executed); full detail `AFLDB-ISSUE-222.md` §11.19.15 item 2. Tooling checkpoint now committed
+  (`5987ac2e`); earlier "uncommitted" statements in that section are historical record only. No
+  database, Git, network or deployment command ran; the exercise remains not run.
 
 ### AFLDB-ISSUE-225 — Gridley corpus: 37 pre-existing `incorrect known answer` cells on non-draft criteria, present on `afldb_test` before AFLDB-ISSUE-222 and untouched by it
 - **Severity:** Medium. **Area:** Grid Solver / canonical data — `captaincies`,
