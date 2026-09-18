@@ -36977,6 +36977,24 @@ PENDING.** Full record: `AFLDB-ISSUE-222.md` §11.12, `AFLDB-ISSUE-222-PHASE3-CO
   `$PowerShellExe`, and the `$WhatIfPreference` check precedes the backup invocation in source
   order; verified to fail against a scratch copy with the old bug reintroduced. Full detail
   `AFLDB-ISSUE-222.md` §11.19.15. No database, Git, network or deployment command ran.
+- **First real §7.4 attempt — stopped safely, before confirmation and before any importer
+  invocation (2026-09-19, operator-run + Sonnet 5 fifth-pass fix).** Backup and baseline plan
+  succeeded (`afldb_test-20260919-091558.dump`, sha256 `51fc825d…`, 1,469 objects;
+  `import_batches_before` 193; four hashes recorded in `AFLDB-ISSUE-222.md` §11.19.15). Then
+  `Read-GatePlanValues: Cannot bind argument to parameter 'Lines' because it is an empty string.`
+  **Root cause:** `Get-GateValue`/`Read-GatePlanValues` passed the gate's own blank separator
+  lines into a mandatory `[string[]]` parameter, which PowerShell rejects for any array containing
+  a blank element. No confirmation prompt was reached, no `import_draftguru.py` ran, no
+  `import_batches` row was added — `afldb_test` remained unchanged at batch count 193. Fixed: a
+  new `Get-GateParseLines` helper filters only the parsing copy (never the console echo or saved
+  transcript); `Get-GateValue` now also refuses a **duplicated** key, not only a missing one. New
+  DB-free regression `tests/s74-rollback-exercise-gate-parsing.test.ps1` extracts only the
+  function definitions from the script's AST (never executing `param()`/the top-level flow),
+  feeds realistic gate output with blank/whitespace lines built from this incident's own reported
+  values, and proves exact parsing plus fail-closed refusal on missing key, duplicate key, and
+  all-blank output. The evidence directory `s74-20260919-issue222-final` and the backup dump were
+  preserved, untouched; the next attempt must use a new `-Label`. No database, Git, network or
+  deployment command ran during the fix pass.
 
 ## AFLDB-ISSUE-223 — Pre-existing test regression from AFLDB-ISSUE-221: `GRID_DRAFT_TYPES` reshaped, `draftguru-acquisition.test.ts`'s vocabulary-parity test now fails
 

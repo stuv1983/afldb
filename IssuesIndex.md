@@ -367,6 +367,16 @@
   guards, before the backup. New static regression `tests/s74-rollback-exercise-static.test.ps1`
   (AST-only, verified to fail against the reintroduced bug). Full detail
   `AFLDB-ISSUE-222.md` §11.19.15. No database, Git, network or deployment command ran.
+- **First real §7.4 attempt stopped safely, before confirmation/mutation (2026-09-19).** Backup
+  and baseline plan succeeded (batch count 193, four hashes recorded); `Read-GatePlanValues` then
+  crashed binding blank gate-output lines to a mandatory `[string[]]` parameter. No importer ran;
+  `afldb_test` unchanged at 193. Fixed: a new `Get-GateParseLines` helper filters only the parsing
+  copy (never the transcript); `Get-GateValue` also now refuses a duplicated key. New DB-free
+  regression `tests/s74-rollback-exercise-gate-parsing.test.ps1` (AST-extracted functions only,
+  realistic blank-line fixtures, missing/duplicate/all-blank refusal proofs). Evidence directory
+  `s74-20260919-issue222-final` and the backup dump preserved untouched; next attempt needs a new
+  `-Label`. Full detail `AFLDB-ISSUE-222.md` §11.19.15. No database, Git, network or deployment
+  command ran during the fix.
 
 ### AFLDB-ISSUE-225 — Gridley corpus: 37 pre-existing `incorrect known answer` cells on non-draft criteria, present on `afldb_test` before AFLDB-ISSUE-222 and untouched by it
 - **Severity:** Medium. **Area:** Grid Solver / canonical data — `captaincies`,

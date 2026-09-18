@@ -281,11 +281,36 @@ function Invoke-Gate {
 }
 
 function Get-GateValue {
+  # $Lines must already be the filtered "parsing copy" -- see Get-GateParseLines. A blank or
+  # whitespace-only array ELEMENT rejects a mandatory [string[]] binding exactly as a bare empty
+  # string argument would (a real PowerShell behaviour, hit in the first real §7.4 attempt), so
+  # nothing containing one may ever reach this parameter. Refuses on zero matches (missing key)
+  # or more than one (duplicate key) -- either means the value is not safe to trust silently.
   param([Parameter(Mandatory)][string[]] $Lines, [Parameter(Mandatory)][string] $Key)
+  $pattern = "^\s*$([regex]::Escape($Key)):\s*(\S+)"
+  $found = [System.Collections.Generic.List[string]]::new()
   foreach ($line in $Lines) {
-    if ($line -match "^\s*$([regex]::Escape($Key)):\s*(\S+)") { return $Matches[1] }
+    if ($line -match $pattern) { $found.Add($Matches[1]) }
   }
-  throw "REFUSED: could not find '$Key' in the gate's own output -- refusing to guess it"
+  if ($found.Count -eq 0) {
+    throw "REFUSED: could not find '$Key' in the gate's own output -- refusing to guess it"
+  }
+  if ($found.Count -gt 1) {
+    throw "REFUSED: '$Key' appears $($found.Count) times in the gate's own output -- refusing to guess which is authoritative"
+  }
+  return $found[0]
+}
+
+function Get-GateParseLines {
+  # The one place blank/whitespace-only lines are removed -- for PARSING only. $Result.Output
+  # itself (the console echo in Assert-GateOk and the *.log transcript in Save-GateLog) is never
+  # touched: this is a separate, filtered copy used only to feed Get-GateValue safely.
+  param([Parameter(Mandatory)] $Result)
+  $parseLines = @($Result.Output | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+  if ($parseLines.Count -eq 0) {
+    throw 'REFUSED: the gate produced no non-blank output lines to parse'
+  }
+  return $parseLines
 }
 
 function Save-GateLog {
@@ -303,12 +328,13 @@ function Assert-GateOk {
 
 function Read-GatePlanValues {
   param([Parameter(Mandatory)] $Result)
+  $parseLines = Get-GateParseLines -Result $Result
   [ordered]@{
-    after  = Get-GateValue -Lines $Result.Output -Key 'after_state_sha256'
-    picks  = Get-GateValue -Lines $Result.Output -Key 'picks_after_sha256'
-    newly  = Get-GateValue -Lines $Result.Output -Key 'newly_linked_sha256'
-    base   = Get-GateValue -Lines $Result.Output -Key 'baseline_sha256'
-    before = [int](Get-GateValue -Lines $Result.Output -Key 'import_batches_before')
+    after  = Get-GateValue -Lines $parseLines -Key 'after_state_sha256'
+    picks  = Get-GateValue -Lines $parseLines -Key 'picks_after_sha256'
+    newly  = Get-GateValue -Lines $parseLines -Key 'newly_linked_sha256'
+    base   = Get-GateValue -Lines $parseLines -Key 'baseline_sha256'
+    before = [int](Get-GateValue -Lines $parseLines -Key 'import_batches_before')
   }
 }
 
@@ -525,7 +551,8 @@ Write-Host "`n==> 16. Final checks"
 $finalResult = Invoke-Gate -GateArgs @('plan', '--target', 'test', '--bridge', $BridgePath)
 Assert-GateOk -Result $finalResult -StepLabel 'final plan'
 Save-GateLog -Result $finalResult -LogName 'final-plan.log'
-$finalBefore = [int](Get-GateValue -Lines $finalResult.Output -Key 'import_batches_before')
+$finalParseLines = Get-GateParseLines -Result $finalResult
+$finalBefore = [int](Get-GateValue -Lines $finalParseLines -Key 'import_batches_before')
 if ($finalBefore -ne ($BASE.before + 4)) {
   throw ("STOP: import_batches grew by $($finalBefore - $BASE.before), not exactly 4 " +
     "(reverse/load/reverse/load) -- investigate before trusting this exercise")

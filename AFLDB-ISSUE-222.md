@@ -3463,6 +3463,60 @@ invocation reintroduced, and to pass against the fixed script, before being kept
 executed against `afldb_test`, `afldb_dev`, or any other database for this pass: no backup, no
 importer run, no Git action, no deployment. `git diff --check` reported no whitespace errors.
 
+**Correction (2026-09-19, fifth pass, Sonnet 5, High) — the first real attempt, honestly
+recorded: stopped safely, before confirmation and before any importer invocation.** The operator
+ran the fixed script for real against `afldb_test`. What succeeded: the fresh backup
+(`D:\backups\afldb\issue-222\afldb_test-20260919-091558.dump`, independently recomputed SHA-256
+`51fc825d686731784c9244368d3a8b20aa5fb8b8df4b88fefd7e359a5931ba85`, `pg_restore --list` read
+1,469 objects) and the baseline `plan` (read-only, `import_batches_before` **193**;
+`after_state_sha256 4f0a2cc567d03f2660132a1cdde66aa5e006c5e1e848a2dc5db724bd726b469d`;
+`picks_after_sha256 ffa7fd60a02d8caee2d9fa22b9500725e9e12fc4ca8aba1d21e94675aa400c8d`;
+`newly_linked_sha256 3ff560472aa38b63a9ef28d57501e31da9cdb907cf44bcf304a42140a02471e3`;
+`baseline_sha256 71178a54376e911d1b374d534c7006ba3097ffd631635de405eaa424c878b4a4`;
+`summary_sha256 d4b1fbef305736ee8c0e70bd7cfc2fa60c48e0cbc3b6edd6af911ffd998782a9`). What then failed,
+before the deliberate typed confirmation and before any mutation: `Read-GatePlanValues: Cannot
+bind argument to parameter 'Lines' because it is an empty string.` **Root cause:** `Invoke-Gate`
+correctly preserved the gate's own blank separator lines in `$Result.Output` (needed unmodified
+for the console echo and the saved `*.log` transcript), but `Get-GateValue`/`Read-GatePlanValues`
+passed that same array directly into a `[Parameter(Mandatory)][string[]]` parameter --
+PowerShell's binder rejects *any* array containing a blank/empty-string element for a mandatory
+parameter, exactly as it would reject a bare empty-string argument. **Consequence:** no
+confirmation prompt was reached, no `import_draftguru.py` process ran, no `import_batches` row
+was added -- `afldb_test` remained in its starting post-import state at batch count 193, and the
+verified backup and its evidence directory are the untouched record of that safe stop.
+
+**Fix.** A new `Get-GateParseLines` helper builds a *separate, filtered* copy of a gate result's
+output (`@($Result.Output | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })`) for parsing
+only; `$Result.Output` itself is never filtered, so `Assert-GateOk`'s console echo and
+`Save-GateLog`'s transcript keep every blank line exactly as the tool printed it.
+`Read-GatePlanValues` and the final-checks call site now both parse through this filtered copy,
+never the raw output. `Get-GateValue` itself was also hardened: it now collects **every** match
+for a key rather than returning on the first, and refuses with a clear message if a required key
+is missing (unchanged) **or appears more than once** (new -- a duplicate is exactly as unsafe as
+a missing key, since neither tells the caller which value is authoritative); `Get-GateParseLines`
+separately refuses if filtering leaves zero lines at all. A new DB-free regression,
+`tests/s74-rollback-exercise-gate-parsing.test.ps1`, extracts *only* the function definitions from
+the script's own AST (`FunctionDefinitionAst` nodes' `Extent.Text`, dot-sourced) so the test never
+executes `param()` or the top-level connection-guard/backup/importer flow, then feeds
+`Read-GatePlanValues` realistic gate output built from this incident's own reported values with
+blank and whitespace-only lines interspersed exactly as the real tool emits them: all four hashes
+and `import_batches_before` parse exactly; a dropped `baseline_sha256` line refuses clearly
+("could not find"); a duplicated `after_state_sha256` line refuses clearly ("appears 2 times");
+output that is entirely blank/whitespace refuses clearly ("no non-blank output lines"); and,
+directly reproducing the original defect, calling `Get-GateValue` on the *unfiltered* array still
+throws PowerShell's own "empty string" binding error, proving the regression is real and the fix
+is load-bearing, not incidental. The pre-existing `tests/s74-rollback-exercise-static.test.ps1`
+(pwsh/`-WhatIf` ordering) was rerun unchanged and still passes.
+
+**Preserved, untouched by this pass:** the evidence directory
+`D:\backups\afldb\issue-222\s74-20260919-issue222-final` and the backup
+`D:\backups\afldb\issue-222\afldb_test-20260919-091558.dump` are the record of the failed attempt
+and remain exactly as the script left them. **The next real attempt must use a new `-Label`** --
+this one is not reused or overwritten, per the script's own refuse-if-exists rule. No database,
+backup, importer, Git, network or deployment command ran during this (documentation and code)
+pass; only the fixed script's own AST was parsed and the two static/functional regressions above
+were executed, all DB-free.
+
 **1. §7.4 interpretation — no new capability was required, though two small tracked helpers were
 written.** §7.4 (line 897) says in its own text: "a comparison script for S0–S3 is proposed
 tooling ... the `afldb_test` exercise may use `psql` `\copy` exports diffed offline". The
@@ -3686,6 +3740,20 @@ no whitespace errors. No Python/TypeScript file changed. Nothing was executed ag
 `bridge_import_gate.py` run against a real connection, no Git mutation, no DEV action, no
 deployment.
 
+**Fifth-pass validation (the gate-output blank-line parsing fix above).**
+`[System.Management.Automation.Language.Parser]::ParseFile()` — 0 errors on
+`s74-rollback-exercise.ps1` and the new `tests/s74-rollback-exercise-gate-parsing.test.ps1`. The
+new functional regression was run directly and passed all five checks (exact parse with blank/
+whitespace lines present; missing-key refusal; duplicate-key refusal; all-blank refusal; the
+original unfiltered-array defect reproduced directly against `Get-GateValue`). The pre-existing
+`tests/s74-rollback-exercise-static.test.ps1` was rerun and still passes. `git diff --check`
+reported no whitespace errors. No Python/TypeScript file changed. Nothing was executed against
+`afldb_test`, `afldb_dev`, or any database this pass: no backup, no `import_draftguru.py`, no
+`bridge_import_gate.py` run against a real connection, no Git mutation, no DEV action, no
+deployment. The preserved evidence directory and backup from the first real attempt
+(`s74-20260919-issue222-final`, `afldb_test-20260919-091558.dump`) were not touched, deleted or
+reused.
+
 **6. Exact operator commands, in order, for the remainder of this closeout.** Every `<...>` value
 must be read off the immediately preceding step's own output, never assumed or reused from an
 older run. This is the corrected release order (2026-09-19, second pass): the tooling is checked
@@ -3824,3 +3892,16 @@ pointer additions to `issues.md` and `IssuesIndex.md`. `bridge_import_gate.py`, 
 `import_draftguru.py` and every Python test remain byte-identical to `5987ac2e`; no canonical
 bridge artefact, ISSUE-224/225 content, or Gridley classification was touched; nothing was run
 against `afldb_test`, `afldb_dev`, or any database.
+
+**Files changed by the fifth pass (the gate-output blank-line parsing fix):**
+`tools/rebuild/draftguru/s74-rollback-exercise.ps1` (`Get-GateValue` hardened against missing
+*and* duplicate keys; new `Get-GateParseLines` helper; `Read-GatePlanValues` and the final-checks
+call site now parse through the filtered copy), `tests/s74-rollback-exercise-gate-parsing.test.ps1`
+(new), `AFLDB-ISSUE-222.md` (this section), plus short pointer additions to `issues.md` and
+`IssuesIndex.md`. `tools/rebuild/draftguru/README.md` was not changed this pass -- it does not
+document the gate-output parsing implementation, only the tool's externally observable contract,
+which is unchanged. `bridge_import_gate.py`, `s74-snapshot.sql`, `import_draftguru.py` and every
+Python test remain byte-identical to `5987ac2e`; no canonical bridge artefact, ISSUE-224/225
+content, or Gridley classification was touched. The evidence directory and backup from the first
+real attempt (`s74-20260919-issue222-final`, `afldb_test-20260919-091558.dump`) were not touched,
+deleted or reused. Nothing was run against `afldb_test`, `afldb_dev`, or any database.
