@@ -147,5 +147,6 @@ as the default and nothing here met the bar for an exception.
 - `.phaneslight/manifest.json` — every installed artifact with sha256 provenance
 - `documentation/architecture/2026-09-19_initial/` — snapshot (overview + 16 module stubs)
 - `.claude/agents/` — the five generated agents
-- `.claude/workflows/` — seven workflows
+- `.claude/workflows/` — nine workflows *(count corrected 2026-09-19 at closure; this line read
+  "seven", contradicting the body of this same summary and the commit message, both of which say nine)*
 - `CLAUDE.md` — Pinned Directives (top) and §15; `CLAUDE.local.md` — the register

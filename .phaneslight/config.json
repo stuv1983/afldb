@@ -329,7 +329,42 @@
         "selected": false
       }
     ],
-    "granted": [],
+    "granted": [
+      {
+        "name": "context7",
+        "type": "mcp",
+        "agents": [
+          "afldb-orchestrator",
+          "afldb-worker"
+        ],
+        "matched": "Next.js 16.3.1 + React 19 (Phase 1) — framework APIs postdate training data, and CLAUDE.md warns of exactly this",
+        "purpose": "live external library documentation lookup",
+        "fallback": "targeted reads of node_modules/next/dist/docs/"
+      },
+      {
+        "name": "semble",
+        "type": "mcp",
+        "agents": [
+          "afldb-orchestrator",
+          "afldb-worker",
+          "afldb-reviewer"
+        ],
+        "matched": "1,442-file TypeScript codebase (Phase 1); two tools of schema against repo-wide grep-and-read sweeps",
+        "purpose": "indexed hybrid code search, for location and for enumeration",
+        "fallback": "Grep/Glob sweeps — costs tokens, never correctness"
+      },
+      {
+        "name": "frontend-design",
+        "type": "skill",
+        "agents": [
+          "afldb-orchestrator",
+          "afldb-worker"
+        ],
+        "matched": "Next.js App Router UI in src/app + src/components (Phase 1)",
+        "purpose": "deliberate visual design guidance on UI work",
+        "fallback": "none required — a skill costs nothing until invoked"
+      }
+    ],
     "failures": [],
     "foreignAssets": {
       "note": "User-authored, NEVER overwritten, regenerated or rostered by any PhanesLight run. Recorded for discovery only.",
@@ -362,7 +397,8 @@
       "otherFiles": [
         "AGENTS.md"
       ]
-    }
+    },
+    "grantedNote": "Populated 2026-09-19 at the bootstrap closure review. The bootstrap left this empty while CLAUDE.md §15 named three grants, so the prose register and its machine-readable counterpart disagreed. The audit workflow's capability-register discipline audits the prose; this is the value it reconciles against. Note afldb-reviewer holds semble but NOT context7, by design — if a finding turns on external library behaviour it cannot confirm from the repository, it says so in the plan and hands that question to the orchestrator rather than guessing."
   },
   "lastRun": {
     "ref": "a76a20880b7e6496491b720995cddc374e35a556",

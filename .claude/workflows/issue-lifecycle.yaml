@@ -10,6 +10,12 @@ governs: >
   Task sequence only. CLAUDE.md §15 governs routing, write rights and spawn grants. This
   workflow codifies the lifecycle already documented at the top of CLAUDE.md and in
   docs/development/WORKFLOW.md; where they differ, CLAUDE.md and WORKFLOW.md win.
+  CLAUDE.md §9 and §12 govern command execution and Git: EVERY `run:` step below, and every
+  worktree, branch, merge-readiness and deploy action, is handed to the user with the exact
+  command unless they have authorised execution for the current task. This workflow touches
+  more command surface than any other in this directory -- worktree creation, branch naming,
+  merge readiness and a DEV deploy -- so the boundary is stated here once and applies to every
+  step, not only to the `commit` step that repeats it.
 
 principle: >
   Use the hardened entry points rather than rebuilding the Git and deploy checks by hand.

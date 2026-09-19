@@ -1,6 +1,14 @@
 name: ui-change
 title: UI change — declare evidence contract, apply, capture, verify
 tier: T1 | T2 | T3   # documentation weight scales; the capture obligation NEVER waives
+
+tier_note: >
+  The `agent:` labels below name the ROLE that owns each step, not a mandatory dispatch. At T1,
+  CLAUDE.md §15's tier table allows "Orchestrator alone, or one mechanic" -- so the orchestrator
+  performs declare, apply AND capture itself, and spawns nothing. Reading these labels as a
+  requirement to dispatch afldb-worker plus afldb-closure for a one-line style tweak would put two
+  subagents on a T1 task, which §15's own table and CLAUDE.md §1 both forbid. Dispatch begins at T2.
+  The capture obligation is unchanged at every tier; only who performs it moves.
 trigger: >
   Any change that alters a rendered user interface: layout, styling, component structure,
   theming, visual states, responsive behaviour. If a human could see the difference in a

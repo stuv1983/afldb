@@ -16,7 +16,17 @@ normal_outcome: >
   verification budget into a bet on the streak continuing.
 
 governs: >
-  Task sequence only. CLAUDE.md §15 governs routing and the severity ladder.
+  Task sequence only. CLAUDE.md §15 governs routing and the severity ladder. CLAUDE.md §9 governs
+  command execution: the `run:` step below is handed to the user unless they have authorised
+  execution for the current task.
+
+engagement: >
+  OPERATOR-INITIATED ONLY. The `trigger` block below names the CONDITIONS under which this audit is
+  worth proposing -- it does NOT authorise starting one. CLAUDE.md §14 ends a task with "Then stop.
+  Do not automatically begin another investigation", §1 forbids beginning unrelated work at a
+  milestone, and the pinned:project deviations make PhanesLight's tiered dispatch available rather
+  than automatic. So: when a trigger condition is met, SAY SO and offer; never self-start, and never
+  fold an audit into an unrelated task because a condition happened to be true.
 
 principle: >
   Audit EXACTLY ONE named discipline per run. A sweep with an open-ended "check everything"

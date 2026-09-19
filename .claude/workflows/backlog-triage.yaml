@@ -19,7 +19,16 @@ normal_outcome: >
 
 governs: >
   Task sequence only. CLAUDE.md §15 governs routing and the severity ladder. §5 governs the
-  AFLDB issue ledger, which this workflow READS and never rewrites.
+  AFLDB issue ledger, which this workflow READS and never rewrites. CLAUDE.md §9 governs command
+  execution: any command this pass needs is handed to the user unless they have authorised
+  execution for the current task.
+
+engagement: >
+  OPERATOR-INITIATED ONLY. The `trigger` block below names the CONDITIONS under which a triage pass
+  is worth proposing -- it does NOT authorise starting one. CLAUDE.md §14 ("Then stop. Do not
+  automatically begin another investigation"), §1, and the pinned:project deviations all bind:
+  PhanesLight's tiered dispatch is available, not automatic. When a condition is met, SAY SO and
+  offer; never self-start.
 
 principle: >
   A deferred finding is a claim about code that has since moved. Six steps later it may have

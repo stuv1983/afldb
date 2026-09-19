@@ -5,3 +5,4 @@
 - plans/ : subfolder (see plans/_index.md)
 - registry/ : subfolder (see registry/_index.md)
 - session-summaries/ : subfolder (see session-summaries/_index.md)
+- README.md : What this tree is for and which AFLDB sources remain authoritative over it

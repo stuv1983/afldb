@@ -72,8 +72,10 @@ steps:
   - id: close
     agent: afldb-closure
     action: >
-      Re-derive the baseline and api-diff. The `api-contract` slice carries all 123 server
-      actions, so a new or removed action shows up there — cross-check it against the plan.
+      Re-derive the baseline and api-diff. The `api-contract` slice carries every server action in
+      the project, so a new or removed action shows up there — cross-check it against the plan.
+      Read the current count from the slice itself (`list-apis api-contract`); do not trust a count
+      written into a procedure, since this step is followed precisely when that number changes.
 
 traps:
   - >

@@ -41,6 +41,13 @@ next-env.d.ts
 .phaneslight/registry/
 .phaneslight/inventory/
 
+# Visual-evidence captures written by afldb-closure under the Visual Evidence Mandate.
+# Screenshots are large, binary, and reproducible by re-running the capture against the same
+# commit, so they are output rather than repository content -- the same reasoning as
+# /artifacts/ and playwright-report/ above. The VERDICT lives in the session summary, which
+# is tracked; only the raw frames are ignored.
+/reports/ui-evidence/
+
 # The Projects-in-Motion register: a personal, per-operator working file that is
 # rewritten constantly. Its closed entries are condensed into tracked archive digests
 # under documentation/archive/projects/, so nothing durable is lost by ignoring it.

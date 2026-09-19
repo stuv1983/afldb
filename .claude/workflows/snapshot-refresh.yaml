@@ -22,7 +22,15 @@ normal_outcome: >
 
 governs: >
   Task sequence only. CLAUDE.md §15 governs routing, write rights and spawn grants.
-  `afldb-orchestrator` is the single writer of architecture snapshots.
+  `afldb-orchestrator` is the single writer of architecture snapshots. CLAUDE.md §9 governs command
+  execution: every `run:` step below is handed to the user unless they have authorised execution for
+  the current task.
+
+engagement: >
+  OPERATOR-INITIATED ONLY. The `trigger` block below names the CONDITIONS under which a refresh is
+  worth proposing -- it does NOT authorise starting one, and a decayed snapshot date is never on its
+  own a reason to begin T3 work. CLAUDE.md §14, §1 and the pinned:project deviations bind: when a
+  condition is met, SAY SO and offer; never self-start.
 
 principle: >
   Snapshots are dated, DECREASINGLY-RELIABLE artifacts, and they are guidance, never source of

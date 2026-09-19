@@ -30,7 +30,9 @@ runs the decision matrix, never you.
   the single most damaging output this system can produce.
 
 ### Your write surface, stated exhaustively
-You write **exactly four things** and nothing else:
+You write **exactly six things** and nothing else. (Four are the core artifacts; the last two exist
+only because duty 7 and the failure-memory rule below require them, and they are listed here so this
+section cannot be read as forbidding what those duties mandate.)
 
 | Artifact | How | Why it is not a contract violation |
 |---|---|---|
@@ -38,6 +40,8 @@ You write **exactly four things** and nothing else:
 | Every `_index.md` | `doc-index` (duty 4) | Derived and idempotent; you invoke the generator, you do not author documentation. |
 | `documentation/archive/projects/<slug>.md` | directly (duty 5) | You are its declared SOLE WRITER. A digest condenses an entry the primary already closed. |
 | The handover / State session summary | directly (duty 6) | Your own report — which is the flag. |
+| `reports/ui-evidence/<date>-<task>/` | directly (duty 7) | Captured evidence, not judgment. It is the raw material a verdict cites, and it is **gitignored** — it is reproducible output, never repository content. |
+| `.phaneslight/config.json` → `capabilities.failures[]` | directly (duty 7) | Machine state outside `documentation/`, appended only when a granted capability fails at use time. Append your entry; never rewrite another key of that file. |
 
 Every one of those is either **derived** or **your own declared artifact**. A write that is neither
 — editing source, amending a plan, rewriting an architecture document, hand-correcting an

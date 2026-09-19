@@ -42,7 +42,7 @@ Read from `package.json` on 2026-09-19, not inferred:
 - **Other runtime deps:** `nodemailer` 9, `qrcode` 1.5, `server-only`.
 - **Test:** `vitest` 4.1 (unit/integration), `@playwright/test` 1.62 (e2e, NL UI sweep, admin nav).
 - **Lint/typecheck:** `eslint` 9 + `eslint-config-next`; `next typegen && tsc --noEmit`.
-- **Secondary languages:** Python (88 files, ETL/rebuild), PowerShell (23), shell (15), SQL (122 migrations).
+- **Secondary languages:** Python (88 files, ETL/rebuild), PowerShell (23), shell (15), SQL (122 tracked `.sql` files repo-wide, of which **102** are ordered migrations under `src/db/migrations/`).
 
 Verification commands (the ones `afldb-closure` re-runs independently):
 `npm run build`, `npm run typecheck`, `npm run lint`, `npm test`, `npm run test:e2e`.
@@ -99,7 +99,7 @@ These 16 modules are the ones recorded in `.phaneslight/config.json` and are wha
 | `app` | `src/app` | 280 | 770 | Routes, layouts, server components, route handlers, server actions |
 | `components` | `src/components` | 56 | 75 | Shared React UI |
 | `styles` | `src/styles` | 3 | 0 | CSS only — not symbol-extracted |
-| `db` | `src/db` | 176 | 1181 | `queries/` (parameterised reads) + `migrations/` (122 ordered SQL) + clients |
+| `db` | `src/db` | 176 | 1181 | `queries/` (parameterised reads) + `migrations/` (**102** ordered SQL) + clients |
 | `lib` | `src/lib` | 87 | 941 | Auth, settings, email, SEO, ingest, shared helpers |
 | `search` | `src/search` | 21 | 412 | Typed search, query builder, Grid Solver, NL search |
 | `tools-db` | `tools/db` | 12 | 311 | Migration runner, privileges, rebuild/fingerprint, promotion check |

@@ -4,10 +4,11 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 5
+**Open issues:** 6
 
 | ID | Title | Severity | Area | State | Next action |
 |---|---|---|---|---|---|
+| AFLDB-ISSUE-226 | Stale `docs/architecture.md` §5/§6: the documented application structure names `src/services/`, `src/db/schema/` (described as a Drizzle schema) and `src/types/`, none of which exist, and no Drizzle dependency is present — the project uses postgres.js directly | Low | Documentation — `docs/architecture.md` §5 "Application structure", §6 "Shared statistical definitions" | Open — found 2026-09-19 during the PhanesLight bootstrap closure review; verified three ways against the tracked tree; no code, data or runtime impact; not corrected under the bootstrap | Correct `docs/architecture.md` §5's directory tree and the Drizzle reference to the actual layout, and re-site §6's "defined once in `src/services`" claim on wherever the shared statistical definitions now live (establish that first — this issue does not assert where they are) |
 | AFLDB-ISSUE-225 | Gridley corpus: 37 pre-existing `incorrect known answer` cells on non-draft criteria (`captain` 20, `teammates-150` 14, `teammates-100` 1, `games250sameclub` 1, `games100clubs2` 1; 14 players) present on `afldb_test` since the 2026-09-13 baseline, untouched by AFLDB-ISSUE-222 | Medium | Grid Solver / canonical data — `captaincies`, `player_club_season_stats`, `tests/integration/gridley-corpus.test.ts` | Open — opened 2026-09-19 under ISSUE-222 decision D3; reproduced 2026-09-17 (pre-import) and 2026-09-19 (report `7f14ff2c…`); root cause not investigated | Investigate the five criteria with targeted read-only queries (captaincies rows for Cameron Bruce / Steven May; the board-1024 teammate counts); classify each cell from canonical evidence; never resolve by reclassification |
 | AFLDB-ISSUE-224 | DraftGuru persons whose AFL Tables identity is not registered on the target (`target_not_registered`): 94 bridge-admissible persons (16 sampled, all operator `agree`) cannot link until the identity is registered — post-baseline (2026) debutants and numbering/spelling cases | Medium | Player registration / import — `external_identities`, fitzRoy core, current-season settle | Open — deferred 2026-09-18 from AFLDB-ISSUE-222 Phase F; none of the 94 is added by the ISSUE-222 import; cause of the registration gap not investigated | After the ISSUE-222 `afldb_test` import verifies, establish the registration path for post-baseline debutants, then re-resolve a new deployment child (§4.5) |
 | AFLDB-ISSUE-220 | Web service credential boundary contradicts the application's `afldb_import` requirement; owner-role code-test DSN and a complete `.env` copy reach the internet-facing process | High | Deployment / runtime security | Open — DEV evidence complete 2026-09-17; runtime branch (a) settled from Next source: the standalone server loads `.next/standalone/.env` at start-up | Sonnet 5 implements `AFLDB-ISSUE-220.md` §6 in a fresh worktree; first establish the build copy mechanism (§4b) |
@@ -37563,3 +37564,61 @@ assertions must not be weakened.
 for players 2489 and 12093; the `career_teammates_min` count for the fourteen board-1024 /
 board-993 players against Gridley's key; `player_clubs` / lineage for 3581 and 4006. Then
 classify each cell and record the cause here.
+
+---
+
+## AFLDB-ISSUE-226 — Stale `docs/architecture.md` §5/§6: documented application structure names `src/services/`, `src/db/schema/` (Drizzle) and `src/types/`, none of which exist
+
+**Status: Open (2026-09-19).** Found during the closure review of the PhanesLight bootstrap commit
+`a59917a4`, while writing the generated bootstrap architecture snapshot. Recorded, deliberately
+**not** corrected under that bootstrap — editing `docs/architecture.md` was outside its scope.
+
+**ID note.** `AFLDB-ISSUE-226` and `AFLDB-ISSUE-227` were previously named in this ledger (in the
+ISSUE-222 §7.4 status correction, 2026-09-19) *only* in a sentence recording that they did not
+exist and therefore could not block that closeout. That statement was accurate when written.
+`226` was the next genuinely unallocated number at the time of this entry — verified by
+`git grep AFLDB-ISSUE-226` returning only that one sentence — and is now allocated here. `227`
+remains unallocated.
+
+**Symptom.** `docs/architecture.md` §5 ("Application structure") presents a directory tree
+containing `src/services/` ("shared statistical definitions"), `src/db/schema/` ("Drizzle
+schema") and `src/types/`. §6 then states that career games, finals, premierships, club count and
+Brownlow votes "are defined once in `src/services` and reused by pages, records and search, so the
+three can never disagree (requirement #95)".
+
+**Evidence (verified 2026-09-19 against the tracked tree, three independent ways):**
+
+1. `git ls-files src | cut -d/ -f2 | sort -u` returns exactly: `app`, `components`, `db`, `lib`,
+   `search`, `styles`, `middleware.ts`. There is no `services` and no `types`.
+2. `git ls-files src/db | cut -d/ -f3 | sort -u` returns exactly: `authClient.ts`, `client.ts`,
+   `migrations`, `queries`. There is no `schema/`.
+3. `grep -i drizzle package.json` returns nothing — Drizzle is in neither `dependencies` nor
+   `devDependencies`. The project accesses PostgreSQL through `postgres` 3.4.9 (postgres.js)
+   directly. A search for imports of `@/services` or `@/types` across `src/` returns no matches.
+
+**Impact.** Documentation only. No application, query, search, admin, data or deployment behaviour
+is affected, and no test depends on it — which is why this is graded **Low** rather than higher.
+The concrete risk is misdirection: a contributor or agent reading §5 may design new shared
+statistical code toward a `src/services/` that does not exist, or assume an ORM the project does
+not use. `CLAUDE.md` §6's repository map — which is what agent task routing actually consults — is
+correct and unaffected, which materially limits the blast radius.
+
+(For cross-reference: the PhanesLight bootstrap graded this **MED** on its own five-point severity
+ladder. AFLDB's High/Medium/Low scale weights product and data impact, on which this is Low. The
+two gradings are consistent, not contradictory.)
+
+**Not established by this issue.** Where the shared statistical definitions named in §6 actually
+live today. This entry asserts only that they are **not** in `src/services/`, because that path
+does not exist. Whether requirement #95's single-definition guarantee still holds — and if so,
+which module now carries it — was **not** investigated and must be established before §6 is
+rewritten. Do not assume it moved to `src/lib/` without checking.
+
+**Next action.** Correct §5's directory tree to the verified layout above and remove the Drizzle
+reference. Then establish where the §6 definitions live and re-site that claim on the real
+location, or record that the single-definition guarantee no longer holds. Re-verify against
+`git ls-files` at the time of the fix rather than against this entry — this evidence is dated
+2026-09-19.
+
+**Reference.** `documentation/architecture/2026-09-19_initial/overview.md` §5 records the same
+finding from the bootstrap side; `documentation/session-summaries/SS00001_phaneslight-bootstrap_2026-09-19.md`
+records it as F-001.

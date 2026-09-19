@@ -4,7 +4,33 @@
 >
 > `issues.md` is the authoritative detailed ledger.
 
-**Open issues:** 4
+**Open issues:** 4 entries below.
+
+> **Index incomplete — `issues.md` is authoritative (noted 2026-09-19).** `issues.md`'s Open Issues
+> table currently carries **6** rows; this index holds 4. Missing here: **AFLDB-ISSUE-222** and
+> **AFLDB-ISSUE-223**. Separately, `AFLDB-ISSUE-223`'s detailed entry in `issues.md` is marked
+> *Resolved 2026-09-19* while its Open Issues table row still reads Open — that row may simply need
+> removing, which would bring the authoritative count to 5. Neither was reconciled here: the
+> PhanesLight bootstrap closure that noted this had no mandate to resolve or re-summarise another
+> session's issues, and a wrong index entry is worse than a missing one. Read `issues.md` for the
+> full open set until this is reconciled.
+
+### AFLDB-ISSUE-226 — Stale `docs/architecture.md` §5/§6: documented application structure names `src/services/`, `src/db/schema/` (Drizzle) and `src/types/`, none of which exist
+- **Severity:** Low. **Area:** documentation — `docs/architecture.md` §5 "Application structure",
+  §6 "Shared statistical definitions".
+- **State:** Open (2026-09-19). Found during the closure review of PhanesLight bootstrap commit
+  `a59917a4`. Verified three ways against the tracked tree: `git ls-files src` returns exactly
+  `app`, `components`, `db`, `lib`, `search`, `styles`, `middleware.ts` (no `services`, no
+  `types`); `git ls-files src/db` returns exactly `authClient.ts`, `client.ts`, `migrations`,
+  `queries` (no `schema/`); `package.json` carries no Drizzle dependency — PostgreSQL is accessed
+  through `postgres` 3.4.9 (postgres.js) directly, and nothing imports `@/services` or `@/types`.
+  Documentation only: no application, query, data or deployment behaviour affected, and
+  `CLAUDE.md` §6's repository map (what agent routing actually reads) is correct and unaffected.
+  Deliberately not corrected under the bootstrap — out of its scope.
+- **Key files:** `docs/architecture.md` §5, §6.
+- **Next action:** correct §5's directory tree and drop the Drizzle reference. Then **establish
+  where the §6 shared statistical definitions actually live** before rewriting that claim — this
+  issue asserts only that they are not in `src/services/`, and does not assert where they are.
 
 ### AFLDB-ISSUE-220 — Web service credential boundary contradicts the application's `afldb_import` requirement; owner-role code-test DSN and a complete `.env` copy reach the internet-facing process
 - **Severity:** High. **Area:** deployment / runtime security.
