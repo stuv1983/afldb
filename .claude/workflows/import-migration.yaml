@@ -1,0 +1,92 @@
+name: import-migration
+title: Data import / enrichment job — source, importer, validation, evidence
+tier: T2 | T3        # T3 once it writes to shared tables or changes derived data
+trigger: >
+  Any change to tools/migration/, tools/rebuild/, tools/aflw/, tools/matching/ or
+  tools/current-season/. Also any re-run of an existing importer against real data.
+
+governs: >
+  Task sequence only. CLAUDE.md §15 governs routing, write rights and spawn grants; §9 and
+  §12 govern command execution and Git. Importers WRITE DATA — nothing here runs on assumption.
+
+principle: >
+  An import is only as good as the evidence it leaves behind. The rule is source -> importer
+  -> validation -> target, and the validation is not optional decoration: it is what makes the
+  import reversible in understanding, if not in effect.
+
+preconditions:
+  - The exact job is named. "The importer" is not a job name.
+  - The target database is named and understood. Real data writes are never incidental.
+  - Whether this is a dry run or an `--apply` run is stated BEFORE the command is composed.
+
+steps:
+  - id: locate
+    agent: afldb-orchestrator
+    action: >
+      Route per CLAUDE.md §7: exact job -> relevant importer -> validation -> source/target tables.
+    reads:
+      - documentation/registry/tools-migration.md
+      - docs/data-dictionary.md
+    note: >
+      Most of this surface is PYTHON and is NOT in the API baseline (33 files in
+      tools/migration, 28 in tools/rebuild, all of tools/aflw and tools/email_intake). A zero
+      entry count in those slices means "not extracted", never "nothing there". Read the code.
+
+  - id: source-truth
+    agent: afldb-orchestrator
+    action: >
+      Name the authoritative source for the facts being imported, and confirm the bytes on
+      disk are the accepted ones. Curated inputs are tracked deliberately in .gitignore
+      negations — if an input is untracked, ask why before trusting it.
+
+  - id: implement
+    agent: afldb-worker
+    action: Change the importer. Disclose every edit.
+    gate: >
+      Escalate MED and above and stop. Anything that changes DERIVED data for existing rows
+      is HIGH at minimum — it rewrites history that other pages already display.
+
+  - id: dry-run
+    agent: afldb-orchestrator
+    action: >
+      Dry run FIRST, always. Read the counts before the rows.
+    gate: >
+      A dry run that reports a row count materially different from the expectation stops the
+      workflow. Investigate the difference; do not proceed to apply "to see what happens".
+
+  - id: validate
+    agent: afldb-orchestrator
+    action: >
+      Run the relevant validation under tools/validation/ or the focused test suite. Prefer
+      counts and aggregates before row detail.
+    test_homes:
+      - tests/under-22-importer.test.ts
+      - tests/current-season-import.test.ts
+      - tests/player-link-*.test.ts
+
+  - id: apply
+    agent: afldb-orchestrator
+    when: The dry run reconciled and the operator has authorised the write.
+    action: Run the REAL importer with `--apply`. Capture the evidence it emits.
+    note: >
+      Settle/import evidence is PERSISTED — import_batches.validation_result holds the
+      counters. Read the persisted record rather than re-deriving from the runtime journal.
+
+  - id: close
+    agent: afldb-closure
+    action: >
+      Re-derive the baseline and api-diff. Reconcile applied against intended. Where the run
+      wrote data, confirm the persisted evidence exists and matches what the report claims.
+
+modelling_rules:
+  - Missing historical statistics mean "NOT RECORDED", not zero. Never coerce NULL to 0 in an importer.
+  - Historical club identity is explicit; renames combine via organization_id, mergers link only.
+  - Player identity uses stable IDs, never names alone. Name-only matching is how two people become one.
+  - Brownlow totals come from their authoritative source.
+  - Opening Round makes external sources look off-by-one from 2024. Verify round alignment before "fixing" it.
+
+acceptance:
+  - The job, the source and the target were each named before execution.
+  - A dry run reconciled against expectation before any `--apply`.
+  - Validation passed and its evidence is persisted, not just reported in chat.
+  - NULL-versus-zero semantics preserved.

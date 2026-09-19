@@ -1,0 +1,101 @@
+name: snapshot-refresh
+kind: RECURRING MAINTENANCE     # triggered by a condition, never by a request
+title: Replace an architecture snapshot whose credibility has decayed
+tier: T3                        # a real snapshot spans every module by definition
+
+trigger:
+  condition: >
+    Any of: (a) the newest snapshot under documentation/architecture/ is more than ~8 weeks
+    old and non-trivial decisions are being made against it; (b) a completed major refactor or
+    milestone; (c) the standing TODO in the bootstrap snapshot is still open; (d) explicit
+    user request.
+  note: >
+    This is the workflow that discharges the BOOTSTRAP snapshot's standing TODO. Without it,
+    `documentation/architecture/2026-09-19_initial/` is scaffolding forever — and it says so
+    of itself in its own first paragraph.
+
+normal_outcome: >
+  Unlike the other maintenance workflows, this one is EXPECTED to produce output: a new dated
+  folder. Finding that the existing snapshot is still accurate is a legitimate outcome too, and
+  is recorded by renaming the folder to the verification date so decay calculations stay
+  meaningful.
+
+governs: >
+  Task sequence only. CLAUDE.md §15 governs routing, write rights and spawn grants.
+  `afldb-orchestrator` is the single writer of architecture snapshots.
+
+principle: >
+  Snapshots are dated, DECREASINGLY-RELIABLE artifacts, and they are guidance, never source of
+  truth. The refresh is not a tidy-up: it is a re-verification against live code. Copying the
+  previous snapshot forward with a new date is worse than leaving the old one, because it
+  launders a stale claim as a fresh one.
+
+steps:
+  - id: scope
+    agent: afldb-orchestrator
+    action: >
+      Take a NEW dated folder: documentation/architecture/<YYYY-MM-DD>_<reason>/. Never edit a
+      past-dated snapshot — those are frozen history and are exempt from every ceiling and
+      conformance rule. A minor in-place correction requires RENAMING the folder to the
+      correction date.
+
+  - id: ground
+    agent: afldb-orchestrator
+    action: >
+      Establish what the project already documents before writing a word. AFLDB carries a
+      mature docs/ tree, and that tree is authoritative — architecture.md, project-brief.md,
+      search.md, data-dictionary.md, deployment.md, aflw.md, plus CLAUDE.md §6–§7.
+    gate: >
+      A snapshot that DUPLICATES docs/ is a maintenance liability: two copies that drift apart
+      and no rule saying which wins. Cite and point; restate only what the module map needs.
+
+  - id: verify-drift
+    agent: afldb-worker
+    tools: [semble]
+    action: >
+      Check each structural claim in the previous snapshot AND in docs/architecture.md against
+      the tracked tree. Report what no longer holds, with evidence.
+    known_open: >
+      As at 2026-09-19, docs/architecture.md §5 describes `src/services/`, `src/db/schema/`
+      (Drizzle) and `src/types/`, none of which exist, and no drizzle dependency is present.
+      §6 rests on the same premise. Confirm whether this is still true before re-reporting it.
+
+  - id: regenerate-baseline
+    agent: afldb-closure
+    action: Re-derive the API baseline so module facts come from current source.
+    run: node .phaneslight/scripts/cli.js regen-registry
+    note: >
+      The baseline covers .ts/.tsx/.sql only. Every slice records `unextractedByExtension`.
+      A zero entry count means "not extracted", NEVER "no surface" — Python is a large,
+      genuinely unextracted surface in this project.
+
+  - id: author
+    agent: afldb-orchestrator
+    action: >
+      Write overview.md (system level) and modules/<module>/overview.md (per module).
+    gate: >
+      A BARE NEGATIVE is forbidden. Never "X is not documented" or "there is no Y". Search the
+      prose first — one `semble search` across documentation/, docs/, README* — and either cite
+      what you find or write the bound explicitly: "Not found by static code inspection or by a
+      documentation-tree search. VERIFY before relying on this." A marker records a limit of
+      the METHOD, not a fact about the project. A confident false negative reads as a finding
+      and gives its reader no reason to re-check it.
+
+  - id: supersede
+    agent: afldb-orchestrator
+    action: >
+      Leave the previous snapshot in place, unedited. Update inbound references to point at
+      the new folder in the SAME change set — a dangling reference is a drift event.
+    run: node .phaneslight/scripts/cli.js doc-index
+
+  - id: close
+    agent: afldb-closure
+    action: >
+      Run doc-index and doc-check; flag any file breaching the ceiling. Confirm no past-dated
+      snapshot was modified.
+
+acceptance:
+  - A new dated folder exists; no past-dated snapshot was edited.
+  - Every structural claim was verified against the tracked tree, not carried forward.
+  - No bare negatives; every gap names the method that failed to find it.
+  - Indexes regenerated and inbound references updated in the same change set.

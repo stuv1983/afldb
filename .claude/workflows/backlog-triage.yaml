@@ -1,0 +1,76 @@
+name: backlog-triage
+kind: RECURRING MAINTENANCE     # triggered by a condition, never by a request
+title: Re-grade deferred findings and open items against the code as it stands now
+tier: T1                        # read-and-grade only; it raises findings, it never acts on them
+
+trigger:
+  condition: >
+    Any of: (a) every 10th session; (b) before starting a new multi-step plan; (c) whenever a
+    handover's open-items list exceeds ~10 entries; (d) whenever a deferred CRIT is more than
+    two sessions old.
+  note: >
+    This is a SCHEDULED workflow. Nobody will ask for it. If it only ever runs when someone
+    remembers, it will not run.
+
+normal_outcome: >
+  FINDING NOTHING IS A SUCCESSFUL RUN. Most items will re-grade unchanged. A triage pass that
+  reports "no change across 14 items" has done its job and must never be treated as wasted, or
+  the next one gets skipped.
+
+governs: >
+  Task sequence only. CLAUDE.md §15 governs routing and the severity ladder. §5 governs the
+  AFLDB issue ledger, which this workflow READS and never rewrites.
+
+principle: >
+  A deferred finding is a claim about code that has since moved. Six steps later it may have
+  been fixed incidentally, or it may have grown. Re-grading against CURRENT code is the whole
+  point — re-reading the old finding's own description is not triage, it is recall.
+
+steps:
+  - id: gather
+    agent: afldb-orchestrator
+    action: >
+      Collect every open item from its actual home. Do not reconstruct from memory.
+    sources:
+      - documentation/session-summaries/  # index-first; read TODOs from recent summaries only
+      - CLAUDE.local.md                   # `Blockers:` lines and 🛑 standing blockers
+      - IssuesIndex.md                    # AFLDB open issues, read ONCE
+      - deferred decision-matrix items recorded in prior step summaries
+    note: >
+      Read the session-summaries `_index.md` first and open only what it points at. NEVER
+      glob-scan documentation/.
+
+  - id: re-derive
+    agent: afldb-orchestrator
+    action: >
+      For each item, open the code it names and check whether the claim still holds. An item
+      whose `file:line` no longer exists is not automatically resolved — the code may have
+      moved. Find it before grading it.
+    delegate: >
+      Where the set is large, dispatch afldb-mechanic to fetch and digest the named locations
+      with file:line references. RE-DERIVE any fact from that digest before writing it into a
+      durable artifact — a mechanic digest is unverified material, not a source.
+
+  - id: re-grade
+    agent: afldb-orchestrator
+    action: >
+      Assign a fresh grade on the severity ladder. Record the DELTA explicitly:
+      unchanged / raised / lowered / resolved-incidentally / no-longer-applicable.
+    gate: >
+      A CRIT or HIGH that survives re-grading goes through the decision matrix again. It does
+      NOT inherit its previous deferral — the deferral was a judgment about a different
+      codebase.
+
+  - id: report
+    agent: afldb-orchestrator
+    action: >
+      Write one session summary with the re-graded list. Items that resolved incidentally are
+      recorded as such, with what fixed them, so the next triage does not re-investigate them.
+    gate: >
+      This workflow RAISES findings; it does not fix them. Acting on a finding mid-triage turns
+      a bounded read-only pass into unbounded work and is how triage stops being run.
+
+acceptance:
+  - Every open item was checked against current code, not against its own description.
+  - Each item carries a fresh grade and an explicit delta.
+  - Nothing was fixed during the pass.

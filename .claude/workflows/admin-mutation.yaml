@@ -1,0 +1,96 @@
+name: admin-mutation
+title: Admin surface change — server actions, authorisation, audit trail
+tier: T2            # T3 the moment it touches src/db or adds a migration
+trigger: >
+  Any change to src/app/admin/, to a 'use server' action module, to the admin navigation, or
+  to anything that writes data on behalf of an administrator.
+
+governs: >
+  Task sequence only. CLAUDE.md §15 governs routing, write rights and spawn grants; §9 and
+  §12 govern command execution and Git.
+
+principle: >
+  Admin mutations are the repository's privileged write path. Three things must hold for every
+  one of them and must be checked explicitly, because none of them fails loudly: the caller is
+  authorised, the write is parameterised, and the action is audited. A mutation that works but
+  is not audited is a defect, not a success.
+
+steps:
+  - id: locate
+    agent: afldb-orchestrator
+    action: >
+      Route per CLAUDE.md §7: admin route -> imported component -> relevant helper/query.
+      Use `semble search`; do not sweep src/app/admin.
+    reads:
+      - documentation/registry/app.md
+      - documentation/registry/lib.md
+
+  - id: authorisation
+    agent: afldb-orchestrator
+    action: >
+      Identify the trust boundary before writing anything. Name which role this action
+      requires (admin vs super_admin) and where that is enforced — in the action itself, not
+      only in the page that renders the button. A server action is directly invocable; page-level
+      gating is not authorisation.
+    gate: >
+      An action reachable without the role it claims to require is CRIT. Escalate immediately.
+
+  - id: implement
+    agent: afldb-worker
+    action: >
+      Implement. Parameterised SQL only. Preserve the existing audit-trail pattern rather than
+      inventing a parallel one — read a neighbouring action first.
+    gate: Escalate MED and above to the spawner and stop.
+
+  - id: test
+    agent: afldb-worker
+    action: >
+      Extend the closest existing suite (CLAUDE.md §10). Do not create a new test file by default.
+    test_homes:
+      - tests/admin-*.test.ts          # one per admin area; match the area you touched
+      - tests/admin-match-mutations.test.ts
+      - tests/match-lineup-editor.test.ts
+      - tests/admin-nav/               # navigation and timing
+
+  - id: verify
+    agent: afldb-orchestrator
+    action: Run the focused admin suite, then typecheck.
+    run: npm test -- <the one admin suite touched> && npm run typecheck
+
+  - id: build-check
+    agent: afldb-orchestrator
+    when: Imports changed in a Client Component.
+    action: Build — the only check that catches a Client Component value-importing a server-only module.
+    run: npm run build
+
+  - id: visual
+    agent: afldb-closure
+    when: The change alters anything rendered.
+    action: Follow the `ui-change` workflow's declare -> capture -> checklist sequence.
+    note: Admin routes are gated; capture without a session yields a 307, not the page.
+
+  - id: close
+    agent: afldb-closure
+    action: >
+      Re-derive the baseline and api-diff. The `api-contract` slice carries all 123 server
+      actions, so a new or removed action shows up there — cross-check it against the plan.
+
+traps:
+  - >
+    A 'use server' module exporting a const ARRAY 500s on first invocation (AFLDB-ISSUE-167).
+    Export functions from action modules; keep constant arrays in a plain module.
+  - >
+    `revalidatePath` called inside a server action hangs the Next client
+    (AFLDB-ISSUE admin player-links, 2026-08-19). Revalidate from the route, not the action.
+  - >
+    Migration + `db:privileges` must deploy BEFORE code, or admin mutations fail closed
+    (AFLDB-ISSUE-027). If this change needs a migration, use the `db-schema-change` workflow.
+  - >
+    Admin mutation findings have historically NOT been reproduced against the database before
+    being reported. Reproduce against a `_test` database before grading anything above LOW.
+
+acceptance:
+  - The required role is named and enforced inside the action, not only at the page.
+  - Writes are parameterised; the existing audit pattern is preserved.
+  - Focused admin suite and typecheck pass.
+  - api-contract slice reconciles with zero unplanned action additions.

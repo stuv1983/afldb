@@ -17,9 +17,34 @@ next-env.d.ts
 # `tsc`, so a committed copy only ever arrives at the next host stale.
 *.tsbuildinfo
 
-# Agent/editor session state
-.claude/
+# Agent/editor session state.
+# Note the `/*` rather than a trailing slash: `.claude/` stops git descending into
+# the directory at all, so no `!` negation beneath it can ever re-include anything.
+# `.claude/*` ignores each entry instead, which leaves the negations below able to fire.
+# The PhanesLight-generated agent roster, workflow definitions and prompt templates are
+# reviewable project infrastructure, not session state, so they are tracked; the real
+# session state (settings.local.json and anything else) stays ignored.
+.claude/*
+!.claude/agents/
+!.claude/workflows/
+!.claude/template/
+!.claude/.phaneslight
 /.tmp/issue-206/
+
+# PhanesLight run state. The shared infrastructure -- config.json, manifest.json and
+# scripts/ -- is tracked; per-run machine state is not. `registry/` is the generated API
+# baseline, regenerated from source by `regen-registry` on every close, so a committed
+# copy only ever arrives stale (the same reasoning as *.tsbuildinfo above).
+.phaneslight/run-progress
+.phaneslight/run-progress.prev
+.phaneslight/returns/
+.phaneslight/registry/
+.phaneslight/inventory/
+
+# The Projects-in-Motion register: a personal, per-operator working file that is
+# rewritten constantly. Its closed entries are condensed into tracked archive digests
+# under documentation/archive/projects/, so nothing durable is lost by ignoring it.
+/CLAUDE.local.md
 
 # Environment / secrets — never commit
 .env

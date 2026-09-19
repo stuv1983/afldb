@@ -1,0 +1,246 @@
+{
+  "manifestVersion": 1,
+  "phanesLightVersion": "3.7.2",
+  "stampedAt": "2026-09-19T14:57:03+10:00",
+  "projectSlug": "afldb",
+  "artifacts": [
+    {
+      "path": ".phaneslight/scripts/api-diff.js",
+      "class": "script",
+      "sha256": "e4fe7ce2effe989cbaa358f1738c0196814b99ec2aac83d6c067f92abc147e7d",
+      "templateSha256": "e4fe7ce2effe989cbaa358f1738c0196814b99ec2aac83d6c067f92abc147e7d",
+      "customized": false
+    },
+    {
+      "path": ".phaneslight/scripts/api-diff.ps1",
+      "class": "script",
+      "sha256": "fbbdbe1f5ba8bed6c3b5cec360306ff45234dbe1b62ef26c2dbd3b43e026a229",
+      "templateSha256": "fbbdbe1f5ba8bed6c3b5cec360306ff45234dbe1b62ef26c2dbd3b43e026a229",
+      "customized": false
+    },
+    {
+      "path": ".phaneslight/scripts/api-diff.sh",
+      "class": "script",
+      "sha256": "e1f4b57a3540361a144357e9e672442b3c937d914518f81c7cdd1401b6b95941",
+      "templateSha256": "e1f4b57a3540361a144357e9e672442b3c937d914518f81c7cdd1401b6b95941",
+      "customized": false
+    },
+    {
+      "path": ".phaneslight/scripts/batch-apply.ps1",
+      "class": "script",
+      "sha256": "387c69ffdf2fdc0420cf3266bd0f7311c9e58b63886fe4150aed541fdfff8a5b",
+      "templateSha256": "387c69ffdf2fdc0420cf3266bd0f7311c9e58b63886fe4150aed541fdfff8a5b",
+      "customized": false
+    },
+    {
+      "path": ".phaneslight/scripts/census-diff.ps1",
+      "class": "script",
+      "sha256": "23ea9993194186c912172a077040299c6dd62f7c0011bb1049bcb15ff2485df9",
+      "templateSha256": "23ea9993194186c912172a077040299c6dd62f7c0011bb1049bcb15ff2485df9",
+      "customized": false
+    },
+    {
+      "path": ".phaneslight/scripts/cli.js",
+      "class": "script",
+      "sha256": "3e20d16fbcf7765e233885fdf592e963bcf123f0f72e0cf982303609dea47961",
+      "templateSha256": "3e20d16fbcf7765e233885fdf592e963bcf123f0f72e0cf982303609dea47961",
+      "customized": false
+    },
+    {
+      "path": ".phaneslight/scripts/doc-check.ps1",
+      "class": "script",
+      "sha256": "19f9ce6fcadf92d8444500395f37c82de2d676415deae0f2167837872c719f02",
+      "templateSha256": "19f9ce6fcadf92d8444500395f37c82de2d676415deae0f2167837872c719f02",
+      "customized": false
+    },
+    {
+      "path": ".phaneslight/scripts/doc-index.ps1",
+      "class": "script",
+      "sha256": "418183ca34c958c24e44edbc9b841aca96d51ae860b4839163a9330c480adfa4",
+      "templateSha256": "418183ca34c958c24e44edbc9b841aca96d51ae860b4839163a9330c480adfa4",
+      "customized": false
+    },
+    {
+      "path": ".phaneslight/scripts/hook-ledger-status.ps1",
+      "class": "hook",
+      "sha256": "b4d4de2bdf314294fb6003ab26d8696478c58fc4cc057351a160422be345d082",
+      "templateSha256": "b4d4de2bdf314294fb6003ab26d8696478c58fc4cc057351a160422be345d082",
+      "customized": false
+    },
+    {
+      "path": ".phaneslight/scripts/hook-size-check.ps1",
+      "class": "hook",
+      "sha256": "45256dee4192a8654deac59ece94aa0ddbb16dca18ea73064cc01527a4e545e5",
+      "templateSha256": "45256dee4192a8654deac59ece94aa0ddbb16dca18ea73064cc01527a4e545e5",
+      "customized": false
+    },
+    {
+      "path": ".phaneslight/scripts/hook-stamp-guard.ps1",
+      "class": "hook",
+      "sha256": "bc20e8bd4f82159fa1059dbdd2f004c0658a5257ab28df8a8ef7d4f4782e7df6",
+      "templateSha256": "bc20e8bd4f82159fa1059dbdd2f004c0658a5257ab28df8a8ef7d4f4782e7df6",
+      "customized": false
+    },
+    {
+      "path": ".phaneslight/scripts/install-templates.ps1",
+      "class": "script",
+      "sha256": "2cf1da19a8f6edfaf0e423b44082652bfb0709d3d6bfbbe0e285b58162ce99c2",
+      "templateSha256": "2cf1da19a8f6edfaf0e423b44082652bfb0709d3d6bfbbe0e285b58162ce99c2",
+      "customized": false
+    },
+    {
+      "path": ".phaneslight/scripts/ledger.ps1",
+      "class": "script",
+      "sha256": "f48322d8998d949dfdf7f5abc6c70989d705fe370abc9b58685d4c256b3bc3dd",
+      "templateSha256": "f48322d8998d949dfdf7f5abc6c70989d705fe370abc9b58685d4c256b3bc3dd",
+      "customized": false
+    },
+    {
+      "path": ".phaneslight/scripts/list-apis.ps1",
+      "class": "script",
+      "sha256": "8d9635bdd86945204c1e5a9156e84c389f5dfa169abdf3ab80b319376ac962b2",
+      "templateSha256": "8d9635bdd86945204c1e5a9156e84c389f5dfa169abdf3ab80b319376ac962b2",
+      "customized": false
+    },
+    {
+      "path": ".phaneslight/scripts/loc-check.ps1",
+      "class": "script",
+      "sha256": "a10e9c668b9b78779a1f02a551eeb3120aa7e139d20480504a5cf87dc58f598e",
+      "templateSha256": "a10e9c668b9b78779a1f02a551eeb3120aa7e139d20480504a5cf87dc58f598e",
+      "customized": false
+    },
+    {
+      "path": ".phaneslight/scripts/manifest-write.ps1",
+      "class": "script",
+      "sha256": "62d4324c5a0bf9a90b01bea118403ba4780fbffb7676a8f584e62fcf7ddb58d7",
+      "templateSha256": "62d4324c5a0bf9a90b01bea118403ba4780fbffb7676a8f584e62fcf7ddb58d7",
+      "customized": false
+    },
+    {
+      "path": ".phaneslight/scripts/module-list.ps1",
+      "class": "script",
+      "sha256": "42f0556f04baded9c4c938574e1fd8257760f98f8e4ec78e7ab959eb7f0e80de",
+      "templateSha256": "42f0556f04baded9c4c938574e1fd8257760f98f8e4ec78e7ab959eb7f0e80de",
+      "customized": false
+    },
+    {
+      "path": ".phaneslight/scripts/new-file.ps1",
+      "class": "script",
+      "sha256": "440abb485e59e89109e9c7ffe25e96b00700670eba297dc40a5af88e5f67b0df",
+      "templateSha256": "440abb485e59e89109e9c7ffe25e96b00700670eba297dc40a5af88e5f67b0df",
+      "customized": false
+    },
+    {
+      "path": ".phaneslight/scripts/phaneslight.cmd",
+      "class": "script",
+      "sha256": "b09903475eebeb670d3274367318f111dfa6e7fb8321dceb470265d7b0ff6fe2",
+      "templateSha256": "b09903475eebeb670d3274367318f111dfa6e7fb8321dceb470265d7b0ff6fe2",
+      "customized": false
+    },
+    {
+      "path": ".phaneslight/scripts/phaneslight.ps1",
+      "class": "script",
+      "sha256": "1da7a6fc1421ade16e6054a33386d44350a6880c14e847bcfab54aa8f22136c1",
+      "templateSha256": "1da7a6fc1421ade16e6054a33386d44350a6880c14e847bcfab54aa8f22136c1",
+      "customized": false
+    },
+    {
+      "path": ".phaneslight/scripts/preflight.ps1",
+      "class": "script",
+      "sha256": "3d003df6f2601beddb360e778128bb0c72dcee1db0256924bf7be10cff8602b7",
+      "templateSha256": "3d003df6f2601beddb360e778128bb0c72dcee1db0256924bf7be10cff8602b7",
+      "customized": false
+    },
+    {
+      "path": ".phaneslight/scripts/regen-registry.js",
+      "class": "script",
+      "sha256": "7e2985b2fa7c9abeaf1cb80355aae8f29f1ce1483f5a1ea6496fb7519ee12284",
+      "templateSha256": "7e2985b2fa7c9abeaf1cb80355aae8f29f1ce1483f5a1ea6496fb7519ee12284",
+      "customized": false
+    },
+    {
+      "path": ".phaneslight/scripts/regen-registry.ps1",
+      "class": "script",
+      "sha256": "1a2b15379e5f4e5ec7a7e064416f1787576d23a16e17e0140a847b88dd32f161",
+      "templateSha256": "1a2b15379e5f4e5ec7a7e064416f1787576d23a16e17e0140a847b88dd32f161",
+      "customized": false
+    },
+    {
+      "path": ".phaneslight/scripts/regen-registry.sh",
+      "class": "script",
+      "sha256": "3a97e7f1b97862aab3afef12b92a4a3f65d041c7dd8c0042b195e61753b70fdc",
+      "templateSha256": "3a97e7f1b97862aab3afef12b92a4a3f65d041c7dd8c0042b195e61753b70fdc",
+      "customized": false
+    },
+    {
+      "path": ".phaneslight/scripts/register-check.ps1",
+      "class": "script",
+      "sha256": "b0a3e3032e4412e7c964b4a03034835e48c9f8ac53266b1fe5e660f8cf7a4fbf",
+      "templateSha256": "b0a3e3032e4412e7c964b4a03034835e48c9f8ac53266b1fe5e660f8cf7a4fbf",
+      "customized": false
+    },
+    {
+      "path": ".phaneslight/scripts/registry-lib.js",
+      "class": "script",
+      "sha256": "5ee3f72378ebd40119d4fb0f8e44c8d17c4278a7b33ed7e24bf73f2c6471f00d",
+      "templateSha256": "5ee3f72378ebd40119d4fb0f8e44c8d17c4278a7b33ed7e24bf73f2c6471f00d",
+      "customized": false
+    },
+    {
+      "path": ".phaneslight/scripts/repo-manifest.ps1",
+      "class": "script",
+      "sha256": "214f6fa166c383f3e6309f5dacf07fca7feb791cdf2e537246049241fb1caaf1",
+      "templateSha256": "214f6fa166c383f3e6309f5dacf07fca7feb791cdf2e537246049241fb1caaf1",
+      "customized": false
+    },
+    {
+      "path": ".phaneslight/scripts/scaffold.ps1",
+      "class": "script",
+      "sha256": "de45e0281f00794a0a947e383c0e149d8eb0beaef0e2a579408d24f25b6428f6",
+      "templateSha256": "de45e0281f00794a0a947e383c0e149d8eb0beaef0e2a579408d24f25b6428f6",
+      "customized": false
+    },
+    {
+      "path": ".phaneslight/scripts/update-preflight.ps1",
+      "class": "script",
+      "sha256": "7b7918a1b92416bf2fc9370237f87b11b6066e898beadae6a3c803aa33900f40",
+      "templateSha256": "7b7918a1b92416bf2fc9370237f87b11b6066e898beadae6a3c803aa33900f40",
+      "customized": false
+    },
+    {
+      "path": ".claude/template/agent-definition.md",
+      "class": "template",
+      "sha256": "6dc2f8a06113bac8731b2a68366efee8fc0cd193fb391bbf5afbe88dc9482db8",
+      "templateSha256": "6dc2f8a06113bac8731b2a68366efee8fc0cd193fb391bbf5afbe88dc9482db8",
+      "customized": false
+    },
+    {
+      "path": ".claude/template/doc-header.md",
+      "class": "template",
+      "sha256": "5e9035e21eb9755ee2fcfbb525a565cb6366020a146118e40ad06d3ecaf9b638",
+      "templateSha256": "5e9035e21eb9755ee2fcfbb525a565cb6366020a146118e40ad06d3ecaf9b638",
+      "customized": false
+    },
+    {
+      "path": ".claude/template/readme-docs.md",
+      "class": "template",
+      "sha256": "bb6e47d8511440ac4042780e6e3f59175f02ac2c5ea76ee9acd5821763918671",
+      "templateSha256": "bb6e47d8511440ac4042780e6e3f59175f02ac2c5ea76ee9acd5821763918671",
+      "customized": false
+    },
+    {
+      "path": ".claude/template/readme-tests.md",
+      "class": "template",
+      "sha256": "790542b3b9579dee2577adb671d5098290bbaf47280cba556485583261a47a1d",
+      "templateSha256": "790542b3b9579dee2577adb671d5098290bbaf47280cba556485583261a47a1d",
+      "customized": false
+    },
+    {
+      "path": ".claude/template/report.md",
+      "class": "template",
+      "sha256": "776110cd3fa4f5ec3ed3e091018aec8865ba5914520eaa3467244d88225c82f1",
+      "templateSha256": "776110cd3fa4f5ec3ed3e091018aec8865ba5914520eaa3467244d88225c82f1",
+      "customized": false
+    }
+  ]
+}

@@ -1,0 +1,125 @@
+name: nl-search-defect
+title: Natural-language search defect — find the first wrong stage
+tier: T2            # promote to T3 the moment the fix crosses into src/db or src/app
+trigger: >
+  A natural-language search query returns the wrong answer, no answer, an unexpected
+  description, or a runtime error. Also the correct entry point for "NL search is broken"
+  reports with no specific query yet.
+
+governs: >
+  Task sequence only. CLAUDE.md §15 governs routing, write rights, spawn grants and the
+  severity ladder; where this file appears to disagree with §15, §15 wins and this file is
+  the defect. CLAUDE.md §9 governs command execution: every `run` step below is handed to
+  the user unless they have authorised execution for the current task.
+
+principle: >
+  AFLDB NL search is DETERMINISTIC. It is a pipeline, not a model:
+  canonicalise -> parse -> plan -> validate -> compile -> PostgreSQL -> answer -> describe/render.
+  The entire job of this workflow is to find the FIRST stage that is wrong and stop looking.
+  Fixing a late stage to compensate for an early one is the failure mode this workflow exists
+  to prevent: it produces a passing query and a corpus regression somewhere else.
+
+preconditions:
+  - The exact failing query string, verbatim. Do not proceed on a paraphrase.
+  - The observed output and the expected output, both stated.
+
+steps:
+  - id: reproduce
+    agent: afldb-orchestrator
+    action: >
+      Reproduce the exact query. Capture the parse and plan output — the minimum evidence
+      that localises the stage — and nothing more.
+    reads:
+      - documentation/architecture/<latest>/modules/search/overview.md
+      - documentation/registry/search.md
+    gate: >
+      STOP if the query cannot be reproduced. An unreproducible NL defect is a reporting
+      problem, not a parser problem, and every downstream step would be guesswork.
+
+  - id: localise
+    agent: afldb-orchestrator
+    action: >
+      Identify the FIRST pipeline stage whose output is wrong. Name it explicitly in the
+      session summary before touching any code.
+    note: >
+      "No data" and "No answer" are DIFFERENT outcomes with different causes (see
+      AFLDB-ISSUE-221). "No data" can mean the plan compiled correctly and the database
+      genuinely has no matching rows — which is a data-coverage finding, not a parser bug,
+      and must not be "fixed" in the parser.
+    gate: >
+      If the first wrong stage is PostgreSQL (the SQL is right, the rows are absent), this
+      is NOT an NL defect. Stop this workflow and re-route to a data-coverage finding.
+
+  - id: read-stage
+    agent: afldb-orchestrator
+    action: >
+      Read only the implementation of the identified stage. Use `semble search` to locate it
+      rather than sweeping src/search.
+    reads:
+      - the single stage implementation under src/search/
+
+  - id: extend-test
+    agent: afldb-worker
+    action: >
+      Extend the CLOSEST existing regression suite. Do NOT create a new test file
+      (CLAUDE.md §10). Add the failing case first and confirm it fails for the stated reason.
+    test_homes:
+      parser: tests/nl-parser.test.ts
+      planner: tests/nl-plan.test.ts
+      describe: tests/nl-describe.test.ts
+      intent: tests/query-intent.test.ts
+      acceptance: tests/nl-audit-acceptance.test.ts
+      postgres: tests/integration/nl-*.test.ts
+      browser: tests/nl-ui/nl-stress.spec.ts
+
+  - id: fix
+    agent: afldb-worker
+    action: Make the smallest correct change at the identified stage. Disclose every edit.
+    gate: >
+      Escalate MED and above to the spawner and stop. A change that widens the parser's
+      accepted grammar is MED at minimum: grammar changes have corpus-wide blast radius.
+
+  - id: verify-focused
+    agent: afldb-orchestrator
+    action: Run the focused suite for the affected stage only.
+    run: npm test -- <the one suite touched>
+
+  - id: verify-corpus
+    agent: afldb-orchestrator
+    action: >
+      Run the NL stress corpora — but ONLY after the focused checks pass.
+    run: npm run nl:stress
+    when: >
+      Any change to the parser, planner or PARSER_VERSION. A describe-only or render-only
+      change does NOT earn a corpus run (CLAUDE.md §8: do not run the full corpus for every
+      parser change).
+    note: >
+      nl:stress uses the CONFIGURED APPLICATION DATABASE, not a _test database. Confirm the
+      target before running. Propose purging closed run_tag rows before a large sweep.
+
+  - id: close
+    agent: afldb-closure
+    action: >
+      Independently re-derive the baseline (`regen-registry` then `api-diff`), re-run the
+      build/typecheck/test yourself, and reconcile applied against intended. Output is a
+      flag, never a fix.
+
+traps:
+  - >
+    SQL regex inside a postgres.js template literal: `'\s+'` is the LETTER s, not whitespace.
+    Escape twice. This has produced silently wrong matching before.
+  - >
+    postgres.js returns int8 (bigint) as a STRING. Cast `::int` in the query or coerce in TS;
+    a string where a number is expected sorts and compares wrongly without throwing.
+  - >
+    PARSER_VERSION must be bumped when parse output changes, or corpus comparisons silently
+    compare across incompatible runs.
+  - >
+    Filter nl_search_log by run_tag when reading telemetry, or you will be reading someone
+    else's sweep.
+
+acceptance:
+  - The first wrong stage is named in the session summary.
+  - A regression case exists in an EXISTING suite and failed before the fix.
+  - Focused suite passes; corpus run only where the change earned one.
+  - afldb-closure reports no unplanned API additions.

@@ -1,0 +1,125 @@
+name: ui-change
+title: UI change — declare evidence contract, apply, capture, verify
+tier: T1 | T2 | T3   # documentation weight scales; the capture obligation NEVER waives
+trigger: >
+  Any change that alters a rendered user interface: layout, styling, component structure,
+  theming, visual states, responsive behaviour. If a human could see the difference in a
+  browser, this workflow applies.
+
+governs: >
+  Task sequence only. CLAUDE.md §15 governs routing, write rights and spawn grants, and
+  carries the Visual Evidence Mandate this workflow implements. CLAUDE.md §9 governs command
+  execution: capture commands are handed to the user unless execution is authorised.
+
+principle: >
+  No UI change is approved by prose. "Looks good", "should render correctly", "this will
+  center the element" are FORBIDDEN as approval grounds at every tier. Only captured images
+  or an explicit VISUAL: UNVERIFIED flag exist. The evidence contract is fixed BEFORE apply,
+  which is what makes post-hoc cherry-picked captures impossible.
+
+steps:
+  - id: declare
+    agent: afldb-orchestrator
+    action: >
+      Declare the evidence contract BEFORE any code is applied, and record it in the session
+      summary. It has three parts and all three are mandatory:
+        1. Target viewport(s).
+        2. Affected screens and states — including empty, loading and error states where the
+           change can reach them.
+        3. The reference design, where one exists (mockup file, spec, or the existing page
+           being matched). "No reference design exists" is an acceptable answer; silence is not.
+    gate: >
+      The orchestrator REFUSES to apply a UI change whose declaration is missing or partial.
+      This gate exists before apply precisely so the evidence cannot be chosen after the fact.
+    defaults:
+      viewports:
+        - 1440x900 desktop
+        - 834x1112 tablet
+        - 390x844 phone
+      note: >
+        Desktop > tablet > phone is this project's established breakpoint ordering
+        (AFLDB-ISSUE-161). Narrow the list only with a stated reason.
+
+  - id: design
+    agent: afldb-worker
+    skill: frontend-design
+    action: >
+      Load the `frontend-design` skill for aesthetic direction on anything beyond a trivial
+      tweak. Absence of the skill is never a blocker.
+    reads:
+      - documentation/architecture/<latest>/modules/components/overview.md
+      - src/styles/ for existing tokens — do NOT invent a parallel colour or spacing scale
+
+  - id: apply
+    agent: afldb-worker
+    action: >
+      Apply the change. Disclose every edit in the report. Where the change spans multiple
+      files or non-adjacent edits, prefer `batch-apply` and self-check the printed review diff
+      edit by edit.
+    gate: Escalate MED and above to the spawner and stop.
+
+  - id: build-check
+    agent: afldb-orchestrator
+    action: Build, for one specific class of defect that nothing cheaper catches.
+    run: npm run build
+    when: >
+      The change adds or alters an import in a Client Component. ONLY `npm run build` catches
+      a Client Component value-importing a server-only module (AFLDB-ISSUE-162); typecheck and
+      unit tests both pass on it.
+
+  - id: capture
+    agent: afldb-closure
+    action: >
+      Capture at EVERY declared viewport using this repository's own Playwright install. No
+      browser MCP is granted; `npx playwright` against the existing configs is the sanctioned
+      path and is already proven by tests/nl-ui/ and tests/admin-nav/.
+    output: reports/ui-evidence/<date>-<task>/
+    note: >
+      Admin and beta routes are gated. An anonymous request returns a 307, not the page, so a
+      capture of a gated route without a session cookie captures the redirect and looks like a
+      blank or wrong render. Mint a beta/admin session first (tests/nl-ui/auth.setup.ts is the
+      working pattern) or the evidence is worthless.
+
+  - id: checklist
+    agent: afldb-closure
+    action: >
+      Run the mechanical pass/fail checklist against the captures and the declared contract.
+      Output is a FLAG graded on the severity ladder, never a fix.
+    checks:
+      - Every declared viewport has a capture. A missing viewport is a FAIL, not an omission.
+      - No horizontal page scroll at the narrowest declared viewport.
+      - No clipped, overlapping or truncated text.
+      - Interactive targets remain reachable and not overlapped.
+      - Both colour schemes render if the change touches theming.
+      - The declared states (empty / loading / error) are each captured where reachable.
+    verdict: >
+      PASS | FAIL (list each failed check, graded) | VISUAL: UNVERIFIED (with diagnosis).
+      Return it to afldb-orchestrator, which runs the decision matrix. Closure never decides.
+
+  - id: unverified-path
+    agent: afldb-closure
+    when: Capture tooling is absent, fails, or returns empty frames.
+    action: >
+      Diagnose WHY — do not simply report failure. Record the diagnosis in
+      `.phaneslight/config.json` `capabilities.failures[]` and in the session summary with an
+      explicit user-eyeball request, then proceed marked VISUAL: UNVERIFIED, which covers
+      code-level correctness only.
+    principle: >
+      Chains never block on missing tooling; they never silently pass visuals either.
+
+traps:
+  - >
+    A 'use server' module that exports a const ARRAY 500s on first invocation
+    (AFLDB-ISSUE-167). If a UI change adds an exported array to an action module, it will
+    fail at runtime and pass every static check.
+  - >
+    `revalidatePath` called inside a server action hangs the client. This surfaces as a UI
+    that never settles, not as an error.
+  - >
+    ISR caches /seasons/[year] for an hour. A page that looks stale after a data change may
+    be correctly cached, not broken — check the on-disk .next entry before chasing a render bug.
+
+acceptance:
+  - The evidence contract was declared BEFORE apply and is in the session summary.
+  - A capture exists for every declared viewport, or VISUAL: UNVERIFIED is flagged with a diagnosis.
+  - The checklist verdict is recorded; no approval rests on prose.

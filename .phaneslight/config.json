@@ -1,0 +1,372 @@
+{
+  "phanesLightVersion": "3.7.2",
+  "projectSlug": "afldb",
+  "projectName": "AFLDB",
+  "projectPurpose": "Public historical Australian Football (AFL/VFL) statistics database: Next.js App Router web application over PostgreSQL, with deterministic natural-language search, a Grid Solver, an admin surface, and a large repeatable import/enrichment toolchain.",
+  "orchestratorStepThreshold": 5,
+  "primaryLanguage": "typescript",
+  "secondaryLanguages": [
+    "sql",
+    "python",
+    "powershell",
+    "shell"
+  ],
+  "buildSystem": "npm",
+  "commands": {
+    "build": "npm run build",
+    "typecheck": "npm run typecheck",
+    "lint": "npm run lint",
+    "test": "npm test",
+    "testE2e": "npm run test:e2e"
+  },
+  "commentSyntax": "//",
+  "docRoot": "documentation",
+  "stampedTrees": [
+    "src",
+    "tests",
+    "documentation"
+  ],
+  "uiSurface": {
+    "present": true,
+    "framework": "next-app-router",
+    "owningModules": [
+      "app",
+      "components",
+      "styles"
+    ],
+    "captureTooling": "repo-playwright",
+    "captureNote": "No browser MCP is granted. Visual evidence is captured by driving the repository's own Playwright install (playwright.config.ts, playwright.nl-stress.config.ts, playwright.admin-nav.config.ts) via npx, which is the leaner path and is already proven by tests/nl-ui/ and tests/admin-nav/.",
+    "defaultViewports": [
+      "1440x900 desktop",
+      "834x1112 tablet",
+      "390x844 phone"
+    ],
+    "viewportNote": "Desktop > tablet > phone is this project's established breakpoint ordering."
+  },
+  "apiSurface": {
+    "present": true,
+    "kind": "http-route-handlers",
+    "declaredContract": null,
+    "extraction": "route-handlers",
+    "paths": [
+      "src/app/api"
+    ],
+    "note": "Seven Next.js route handlers under src/app/api. There is no OpenAPI or GraphQL SDL in the repository, so regen-registry extracts the network contract from the route/handler definitions themselves. Server Actions ('use server' modules) are a second externally-reachable surface and are extracted alongside them."
+  },
+  "modules": [
+    "app",
+    "components",
+    "styles",
+    "db",
+    "lib",
+    "search",
+    "tools-db",
+    "tools-rebuild",
+    "tools-migration",
+    "tools-nl",
+    "tools-matching",
+    "tools-aflw",
+    "tools-maintenance",
+    "tools-email-intake",
+    "tools-ops",
+    "deploy"
+  ],
+  "modulePaths": {
+    "app": [
+      "src/app"
+    ],
+    "components": [
+      "src/components"
+    ],
+    "styles": [
+      "src/styles"
+    ],
+    "db": [
+      "src/db"
+    ],
+    "lib": [
+      "src/lib"
+    ],
+    "search": [
+      "src/search"
+    ],
+    "tools-db": [
+      "tools/db"
+    ],
+    "tools-rebuild": [
+      "tools/rebuild"
+    ],
+    "tools-migration": [
+      "tools/migration"
+    ],
+    "tools-nl": [
+      "tools/nl"
+    ],
+    "tools-matching": [
+      "tools/matching"
+    ],
+    "tools-aflw": [
+      "tools/aflw"
+    ],
+    "tools-maintenance": [
+      "tools/maintenance"
+    ],
+    "tools-email-intake": [
+      "tools/email_intake"
+    ],
+    "tools-ops": [
+      "tools/admin",
+      "tools/build",
+      "tools/current-season",
+      "tools/dev",
+      "tools/gridley",
+      "tools/issue-152",
+      "tools/records",
+      "tools/validation"
+    ],
+    "deploy": [
+      "deploy"
+    ]
+  },
+  "extractors": {
+    "typescript": {
+      "kind": "tsc-api",
+      "note": "Exported symbol extraction over .ts/.tsx via the TypeScript compiler API, which is already a devDependency (typescript ^5.7.0). No new dependency is introduced.",
+      "include": [
+        "**/*.ts",
+        "**/*.tsx"
+      ],
+      "exclude": [
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "**/*.spec.ts",
+        "**/node_modules/**",
+        "**/.next/**"
+      ]
+    },
+    "sql": {
+      "kind": "migration-ledger",
+      "note": "src/db/migrations is an ordered, append-only migration set. The baseline records filenames and a content hash per migration so an edited applied migration is detectable as drift; it does not parse DDL.",
+      "include": [
+        "src/db/migrations/**/*.sql"
+      ]
+    },
+    "routes": {
+      "kind": "next-route-handlers",
+      "note": "Exported HTTP verb handlers (GET/POST/PUT/PATCH/DELETE) from route.ts files, plus 'use server' action modules, recorded as the network-facing contract slice.",
+      "include": [
+        "src/app/**/route.ts",
+        "src/app/**/*action*.ts",
+        "src/app/**/actions.ts"
+      ]
+    }
+  },
+  "doc_discipline": {
+    "index_exclusions": [],
+    "frozen_classes": []
+  },
+  "hooks": {
+    "registration": "plugin",
+    "note": "Registered by the PhanesLight plugin's own hooks/hooks.json, not merged into this project's .claude/settings.json. This project has never carried project-level PhanesLight hook entries, so there is nothing stale to remove.",
+    "gitPreCommitLocCheck": false
+  },
+  "templates": {
+    "version": "3.7.2",
+    "source": "fetched"
+  },
+  "mcpConsent": {
+    "granted": true,
+    "partial": true,
+    "date": "2026-09-19",
+    "version": "3.7.2",
+    "installed": [
+      "context7",
+      "semble"
+    ],
+    "declined": [
+      "serena",
+      "deepwiki"
+    ],
+    "note": "Per-item selection, not a blanket grant. serena was declined despite TypeScript being a covered language: semble already holds the code-discovery slot at two tools of schema, and the operator judged the additional symbol-navigation schema not worth its per-session cost. deepwiki was declined because this project's external dependency set is small and well-known (next, react, postgres.js, nodemailer, qrcode). Do not re-offer either without a new operator decision."
+  },
+  "capabilities": {
+    "inventoryDate": "2026-09-19",
+    "selection": [
+      {
+        "name": "context7",
+        "type": "mcp",
+        "scope": "project",
+        "authOk": true,
+        "source": "standard",
+        "selected": true
+      },
+      {
+        "name": "semble",
+        "type": "mcp",
+        "scope": "user",
+        "authOk": true,
+        "source": "standard",
+        "selected": true
+      },
+      {
+        "name": "frontend-design",
+        "type": "plugin",
+        "scope": "user",
+        "authOk": true,
+        "source": "standard",
+        "selected": true
+      },
+      {
+        "name": "serena",
+        "type": "mcp",
+        "scope": "none",
+        "authOk": null,
+        "source": "standard",
+        "selected": false
+      },
+      {
+        "name": "deepwiki",
+        "type": "mcp",
+        "scope": "none",
+        "authOk": null,
+        "source": "standard",
+        "selected": false
+      },
+      {
+        "name": "playwright",
+        "type": "mcp",
+        "scope": "user",
+        "authOk": true,
+        "source": "detected",
+        "selected": false
+      },
+      {
+        "name": "codebase-memory-mcp",
+        "type": "mcp",
+        "scope": "user",
+        "authOk": true,
+        "source": "detected",
+        "selected": false
+      },
+      {
+        "name": "claude.ai Claude Docs",
+        "type": "mcp",
+        "scope": "user",
+        "authOk": true,
+        "source": "detected",
+        "selected": false
+      },
+      {
+        "name": "claude.ai Google Drive",
+        "type": "mcp",
+        "scope": "user",
+        "authOk": true,
+        "source": "detected",
+        "selected": false
+      },
+      {
+        "name": "plugin:customer-support:slack",
+        "type": "mcp",
+        "scope": "plugin",
+        "authOk": false,
+        "source": "detected",
+        "selected": false
+      },
+      {
+        "name": "plugin:customer-support:intercom",
+        "type": "mcp",
+        "scope": "plugin",
+        "authOk": false,
+        "source": "detected",
+        "selected": false
+      },
+      {
+        "name": "plugin:customer-support:hubspot",
+        "type": "mcp",
+        "scope": "plugin",
+        "authOk": false,
+        "source": "detected",
+        "selected": false
+      },
+      {
+        "name": "plugin:customer-support:guru",
+        "type": "mcp",
+        "scope": "plugin",
+        "authOk": false,
+        "source": "detected",
+        "selected": false
+      },
+      {
+        "name": "plugin:customer-support:atlassian",
+        "type": "mcp",
+        "scope": "plugin",
+        "authOk": false,
+        "source": "detected",
+        "selected": false
+      },
+      {
+        "name": "plugin:customer-support:notion",
+        "type": "mcp",
+        "scope": "plugin",
+        "authOk": false,
+        "source": "detected",
+        "selected": false
+      },
+      {
+        "name": "cowork-plugin-management",
+        "type": "plugin",
+        "scope": "user",
+        "authOk": true,
+        "source": "detected",
+        "selected": false
+      },
+      {
+        "name": "customer-support",
+        "type": "plugin",
+        "scope": "user",
+        "authOk": true,
+        "source": "detected",
+        "selected": false
+      }
+    ],
+    "granted": [],
+    "failures": [],
+    "foreignAssets": {
+      "note": "User-authored, NEVER overwritten, regenerated or rostered by any PhanesLight run. Recorded for discovery only.",
+      "skillTree": ".agents/skills",
+      "skillCount": 22,
+      "skills": [
+        "afldb-admin-mutation-debug",
+        "afldb-api-data-debug",
+        "afldb-auth-security-debug",
+        "afldb-bug-triage",
+        "afldb-data-integrity-debug",
+        "afldb-database-debug",
+        "afldb-db-query-debug",
+        "afldb-debug",
+        "afldb-frontend-theme-review",
+        "afldb-hydration-parallel-debug",
+        "afldb-nextjs-rsc-debug",
+        "afldb-nl-search-audit",
+        "afldb-nl-search-debug",
+        "afldb-performance-debug",
+        "afldb-readme-review",
+        "afldb-regression-gate",
+        "afldb-runtime-deploy-debug",
+        "afldb-ui-playwright-debug",
+        "data-editor-audit",
+        "grid-solver-review",
+        "nl-semantic-mapping",
+        "player-links-confidence-matching"
+      ],
+      "otherFiles": [
+        "AGENTS.md"
+      ]
+    }
+  },
+  "lastRun": {
+    "ref": "a76a20880b7e6496491b720995cddc374e35a556",
+    "date": "2026-09-19",
+    "note": "HEAD at bootstrap close, BEFORE the bootstrap commit. The next update run will therefore see the bootstrap commit itself as a delta and take the full flow, which is the conservative and correct outcome."
+  }
+}

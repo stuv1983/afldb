@@ -1,0 +1,120 @@
+name: db-schema-change
+title: Database schema change — migration, privileges, queries, validation
+tier: T3            # a schema change touches ≥2 modules by definition
+trigger: >
+  Any change to src/db/migrations/, any new table, column, index, view or constraint, and
+  any change to database roles or grants.
+
+governs: >
+  Task sequence only. CLAUDE.md §15 governs routing, write rights, spawn grants and the
+  severity ladder. CLAUDE.md §9 and §12 govern command execution and Git: every `run` step
+  is handed to the user unless they have authorised execution for the current task. This is
+  the highest-risk workflow in the repository — nothing here is executed on assumption.
+
+principle: >
+  Order is the whole workflow. Migration and privileges land BEFORE the code that depends on
+  them, or the application fails closed in production. This is not theoretical: AFLDB-ISSUE-027
+  is exactly this failure — admin mutations failed closed because code deployed ahead of
+  migration 066 and `db:privileges`.
+
+preconditions:
+  - Current usage of the affected tables/columns is known, not assumed. Search first.
+  - The target database is named and understood. Integration databases MUST end in `_test`.
+  - Whether this change reaches production is stated up front, because it changes the plan.
+
+steps:
+  - id: survey-usage
+    agent: afldb-orchestrator
+    action: >
+      Find every caller of the affected tables and columns BEFORE designing the migration.
+      Use `semble search`; this is an enumeration task and a grep sweep is the expensive path.
+    reads:
+      - documentation/registry/db.md
+      - documentation/architecture/<latest>/modules/db/overview.md
+      - docs/data-dictionary.md
+
+  - id: plan
+    agent: afldb-orchestrator
+    action: >
+      Write the plan to documentation/plans/implementation/. It MUST state the API-changes
+      section explicitly — afldb-closure cross-checks the api-diff against it, and an
+      unplanned change is drift even when it compiles.
+    gate: >
+      On a planned launch, afldb-reviewer reviews this plan BEFORE the first execution step.
+      CRIT or HIGH in the plan review stops the run and goes to the user.
+
+  - id: migration
+    agent: afldb-worker
+    action: >
+      Author the migration in src/db/migrations/ with the next ordinal. Append-only.
+    gate: >
+      NEVER edit an applied migration. `migrate.ts` refuses one, and the API baseline hashes
+      migration content precisely so an edited applied migration surfaces as drift at close.
+      A correction is a NEW migration.
+
+  - id: privileges
+    agent: afldb-worker
+    action: >
+      Update privileges for any new object. A new PUBLIC table needs
+      `afldb_meta.grant_app_read()`. Application reads are FAIL-CLOSED: a table without a
+      grant is invisible to the app, and the symptom is empty results, not an error.
+    note: >
+      privileges.sql is the reconciler and is MANDATORY after a restore. Column-level grants
+      may need the import-role parity harness (see AFLDB-ISSUE-165, migration 078).
+
+  - id: queries
+    agent: afldb-worker
+    action: Update the affected queries in src/db/queries/. Parameterised only — never string-built SQL.
+    gate: Escalate MED and above to the spawner and stop.
+
+  - id: apply-local
+    agent: afldb-orchestrator
+    action: Apply the migration to the test database and confirm status.
+    run: npm run db:migrate:test && npm run db:privileges:test
+    gate: >
+      Confirm the target DSN before running. AFLDB_TEST_DATABASE_URL must point at a database
+      whose name ends in `_test`. A migration run against the wrong database is not reversible
+      by this workflow.
+
+  - id: validate
+    agent: afldb-orchestrator
+    action: >
+      Run targeted validation, not a full suite. Prefer counts and aggregates before row
+      detail; filter by known IDs, seasons, clubs or matches; use LIMIT while exploring.
+    run: npm test -- <the affected integration suite>
+
+  - id: typecheck
+    agent: afldb-orchestrator
+    action: Typecheck. A schema change that compiles is not yet a schema change that works.
+    run: npm run typecheck
+
+  - id: close
+    agent: afldb-closure
+    action: >
+      Re-run `regen-registry` and `api-diff <last-phase-ref>`, cross-check against the plan's
+      API-changes section, and report planned-and-found / planned-and-missing / UNPLANNED
+      ADDITIONS. Independently re-run build, typecheck and test. The `db` slice hashes every
+      migration, so a renamed, reordered or edited migration shows up here.
+
+  - id: deploy-order
+    agent: afldb-orchestrator
+    when: This change reaches DEV or PROD.
+    action: >
+      Migration and `db:privileges` FIRST, then the code. Never the reverse.
+    note: >
+      `preflight --mode deploy` never passes before a migration deploy — that is expected,
+      not a blocker to route around. sync-dev.ps1 CANNOT apply an unmerged migration.
+
+modelling_rules:
+  - Missing historical statistics mean "NOT RECORDED", not zero. Preserve NULL-versus-zero semantics.
+  - Historical club identity is explicit; renames combine via organization_id, mergers link only.
+  - Player identity uses stable IDs, never names alone.
+  - Brownlow totals come from their authoritative source, not from recomputation.
+  - Read the current documentation before changing any modelling rule.
+
+acceptance:
+  - Migration applied to a `_test` database and status confirmed.
+  - Privileges reconciled; any new public table is readable by the app role.
+  - Targeted validation passes; typecheck passes.
+  - api-diff reconciles against the plan with zero unplanned additions.
+  - Deployment order recorded if the change is going out.

@@ -1,3 +1,33 @@
+<!-- PINNED DIRECTIVES, DO NOT MOVE FROM TOP, DO NOT DELETE WITHOUT USER CONSENT -->
+> **PINNED PROJECT DIRECTIVES, ALWAYS READ, BINDING.**
+> This block stays at the top of this file. Do NOT delete or relocate any entry
+> without explicit user consent; always ask before removal. It contains binding
+> operating rules from PhanesLight and companion tools. Each tool owns its own
+> namespaced entries and is that namespace's single writer.
+
+<!-- pinned:phaneslight (GENERATED, single-writer PhanesLight, regenerated every run) -->
+> **Per-agent model and effort.** Model is fixed by role, not by judgment: `afldb-orchestrator` runs Opus 5, `afldb-reviewer` runs Fable 5, `afldb-worker` and `afldb-closure` run Sonnet 5, all at `high` effort; `afldb-mechanic` runs Haiku 4.5 with no effort dial. Launch with `--effort high`. Where a pinned model is UNREACHABLE (quota, rate limit, outage), retry three times with exponential backoff, then substitute down the documented ladder and record it in the step session summary, the persisted return, and `pinned:project` if it outlives the step. "Fixed by role" governs the choice, not the availability.
+> **Agent lineup and escalation.** Five agents; see §15 of this file for the full lineup, write rights, spawn grants and severity ladder. In summary: only `afldb-orchestrator` and `afldb-reviewer` may spawn; no agent is ever forked; `afldb-mechanic` NEVER writes code; `afldb-reviewer` never writes code but does write plan files; findings graded MED and above travel up to the spawner (LOW and above from a mechanic). On a planned launch, the orchestrator's FIRST act is a `afldb-reviewer` plan review before any execution step.
+> **Procedure precedence.** Current phaneslight.md/skill and `.claude/workflows/` YAML outrank session-summary narrative on any operating-procedure conflict. Summaries record what happened; they do not define procedure. Re-read the skill, never recall procedure from a summary.
+> **Authorized deviations from the directives above are recorded in `pinned:project` below and OVERRIDE them.** This namespace is regenerated on every run and cannot carry one.
+<!-- /pinned:phaneslight -->
+<!-- pinned:project (OWNER-OWNED, NEVER generated, NEVER regenerated, NEVER deleted by any run) -->
+> **Authorized deviations.** Owner-authorized departures from a generated directive live here, one line each, and OVERRIDE the generated line they name. Empty is the normal state; delete an entry only when the deviation ends.
+>
+> DEVIATION (2026-09-19, owner-authorized): **AFLDB's own §1–§14 below GOVERN wherever they conflict with any PhanesLight-generated directive in this file, in `.claude/workflows/`, or in any generated agent definition.** PhanesLight was installed additively onto an existing, curated operating contract; it did not replace one.
+>   Reason: the operator chose additive installation with AFLDB precedence at bootstrap. See: `documentation/session-summaries/SS00001_phaneslight-bootstrap_2026-09-19.md`.
+>
+> DEVIATION (2026-09-19, owner-authorized): **§1's "Default: zero subagents" still binds the primary session.** PhanesLight's tiered dispatch is available, not automatic: engage `afldb-orchestrator` per §15's threshold, and otherwise work directly. Do NOT read §15 as licence to spawn agents for ordinary focused work.
+>   Reason: AFLDB sessions are deliberately narrow and context-disciplined. See: `CLAUDE.md` §1.
+>
+> DEVIATION (2026-09-19, owner-authorized): **§9 and §12 (user-executed command boundary, Git policy) bind every PhanesLight agent exactly as they bind the primary.** A generated agent's operating protocol lists `phaneslight` scripts it *may* invoke; that is not standing authorisation to execute shell, Git, SQL, SSH, deployment or test commands. Authorisation is per task, from the user.
+>   Reason: §9 is a hard boundary in this repository and PhanesLight installation does not relax it. See: `CLAUDE.md` §9, §12.
+>
+> DEVIATION (2026-09-19, owner-authorized): **Issue and change tracking stays in `issues.md`, `IssuesIndex.md` and `CHANGELOG.md` per §5.** `documentation/` is PhanesLight working memory (session summaries, plans, architecture snapshots, registry annotations); it is NOT an issue ledger and does not supersede §5. `docs/` remains the authoritative human documentation tree.
+>   Reason: AFLDB has an established, authoritative tracking system that predates this install. See: `CLAUDE.md` §5, `documentation/architecture/2026-09-19_initial/overview.md` §0.
+<!-- /pinned:project -->
+<!-- /PINNED DIRECTIVES -->
+
 # CLAUDE.md — AFLDB Repository Instructions
 
 ## Purpose
@@ -561,6 +591,138 @@ Before declaring a behaviour/code/data-changing task complete:
 Then stop.
 
 Do not automatically begin another investigation.
+
+---
+
+# 15. PhanesLight Agent Team
+
+> **Precedence.** §1–§14 above govern wherever they conflict with anything in this section
+> (see the `pinned:project` deviations at the top of this file). This section describes a
+> capability that is **available**, not one that is automatic.
+
+## Engagement: when this section applies at all
+
+**Default remains §1: zero subagents.** Work directly. Engage the team only when one of these holds:
+
+- You are launching a **plan** whose effective scope is **5 or more steps**
+  (`orchestratorStepThreshold` in `.phaneslight/config.json`) and the user has not narrowed it.
+  Then spawn `afldb-orchestrator` and stay slim: read the plan's step list once for structure,
+  build the todolist, handle the spawn and the close, and let it own the steps.
+- The work genuinely spans independent subsystems and parallel investigation materially reduces
+  work (§1's existing "at most one" test, now able to resolve to a tier rather than an ad-hoc agent).
+
+Explicit user narrowing ("only step 1"), a plan of 4 or fewer steps, or any non-plan task: work
+directly. **Ambiguity defaults to NOT engaging**, which is the opposite of the PhanesLight default
+and is deliberate here (§1).
+
+## The lineup
+
+| Agent | Model | Spawned by | Writes to the repository | May spawn |
+|---|---|---|---|---|
+| `afldb-orchestrator` | `opus` | The main session only, at launch | **Yes, unrestricted.** Main executor as well as orchestrator | reviewer, worker, mechanic, closure |
+| `afldb-reviewer` | `fable` | The orchestrator only | **No code.** Plans fixes; **does** write plan files and review artifacts | worker, mechanic |
+| `afldb-worker` | `sonnet` | Orchestrator or reviewer | **Yes, within dispatched scope**; MUST disclose every edit | Nothing |
+| `afldb-mechanic` | `haiku` | Orchestrator or reviewer | **NEVER code.** Mechanical non-code writes only; MUST disclose every edit | Nothing |
+| `afldb-closure` | `sonnet` | The orchestrator only | **No code.** Sole writer of `.phaneslight/registry/` and `documentation/archive/projects/` | Nothing |
+
+**No agent is ever forked** — every spawn carries a self-contained brief. Nesting is at most three
+levels below the main session, which holds by construction since only two roles have a spawn grant.
+**No agent may invoke `afldb-orchestrator`**; only the main session spawns it.
+
+Domain expertise is **not** baked into these five files. The orchestrator composes it per task from
+this file, the relevant `documentation/` slice (index-first) and the affected modules' registry
+files, and injects it into each spawn prompt.
+
+## Escalation (by severity, never by review pass)
+
+Findings are graded **CRIT / HIGH / MED / LOW / INFO**. LOW and INFO create no work anywhere.
+
+- **Worker** escalates **MED and above to its own spawner**, immediately, and stops.
+- **Mechanic** escalates **LOW and above to its own spawner** — one grade lower, because it may not
+  write code and so cannot absorb even a trivial fix.
+- **Orchestrator** holding HIGH or CRIT runs the decision matrix: **defer** (recorded in that step's
+  session summary with grade, `file:line` and a one-line justification, carried into the handover) or
+  **dispatch `afldb-reviewer`**. MED it handles itself; MED never reaches the reviewer.
+- **Reviewer** returns a **plan**, not a fix, and stops. The orchestrator executes it.
+
+**Plan review at launch:** on a planned launch the orchestrator's first act, before any execution
+step, is a `afldb-reviewer` review of the plan it was handed. CRIT or HIGH there stops the run and
+goes to the user. No plan, no plan review.
+
+## Tier triage (first action on every task)
+
+| Tier | Trigger | Loaded context | Agents | Documentation weight |
+|---|---|---|---|---|
+| **T1** | Single-file change, isolated fix. Must not touch exported API surface, and must not need live external state (a DB MCP query to confirm a migration) — either promotes it to T2 | Architecture overview only | Orchestrator alone, or one mechanic | One line in the current session summary |
+| **T2** | Feature or refactor within one module | Overview + that module's deep-dive + its registry file + latest session summary; API queried on demand, never preloaded | Orchestrator + worker(s) + closure at step close | Standalone report + summary entry |
+| **T3** | Multi-module, API change, migration — anything touching ≥2 modules | Overview + all touched module deep-dives + their registry files + active plan | Orchestrator + worker(s), closure between phases | Plan in `documentation/plans/` + reports + summary entry |
+
+**Promotion rule:** any agent realising mid-task that scope exceeds its tier's loaded context MUST
+halt and request promotion rather than improvise outside loaded context.
+
+**Disclosure is universal; only documentation weight scales.** A T1 mechanical edit is still named
+in its report. An undisclosed edit is reported as drift by `afldb-closure`.
+
+T2/T3 work ends with `afldb-closure`, which independently re-derives the API baseline, re-runs the
+build/typecheck/test itself rather than trusting a producer's claim, and reconciles what was applied
+against what was intended. **Its output is a flag, never a fix.**
+
+## UI changes (Visual Evidence Mandate)
+
+Any change altering rendered UI carries a visual evidence obligation at **every** tier. The proposal
+declares target viewport(s), affected screens/states, and the reference design where one exists,
+**before** apply; a proposal missing that declaration is refused. After apply, `afldb-closure`
+captures and runs the pass/fail checklist. **Prose approval ("looks good", "should render
+correctly") is FORBIDDEN as approval grounds.** Only captured images or an explicit
+`VISUAL: UNVERIFIED` flag exist.
+
+Capture uses **this repository's own Playwright install** (`playwright.config.ts`,
+`playwright.nl-stress.config.ts`, `playwright.admin-nav.config.ts`) via `npx` — no browser MCP is
+granted. Where capture is unavailable or returns empty frames, diagnose why, record it in
+`.phaneslight/config.json` `capabilities.failures[]` and the session summary with a user-eyeball
+request, and proceed marked `VISUAL: UNVERIFIED`. Chains never block on missing tooling; they never
+silently pass visuals either.
+
+## Documentation Navigation
+
+**Documentation Navigation:** NEVER bulk-read or glob-scan `documentation/`. Every folder in it
+carries a GENERATED `_index.md`, read the index first, pick the entry, recurse, and load only
+the target file(s). This binds every agent, the mechanic tier included. Indexes are generated by
+`phaneslight doc-index` and hand-editing them is FORBIDDEN, regenerate to update.
+Audit documentation hygiene with `phaneslight doc-check`.
+
+**This governs `documentation/` only.** `docs/`, `issues.md` and `IssuesIndex.md` keep their own
+§3–§5 read discipline, which is unchanged.
+
+## Scripts (procedure belongs in scripts, not in prompts)
+
+Invoke as **`node .phaneslight/scripts/cli.js <cmd>`** — never a bare `phaneslight`, which is on no
+shell's PATH. Subject to §9: listing a script here is not standing authorisation to run it.
+
+`new-file <module> <path> "<desc>"` (the **only** sanctioned file creation; ≥5-word description),
+`loc-check`, `doc-check`, `doc-index`, `register-check`, `module-list`, `list-apis <module>`,
+`regen-registry [module]`, `api-diff <ref> [module]`, `repo-manifest`, `batch-apply`, `ledger`.
+
+The API baseline at `.phaneslight/registry/` is closure's diff substrate and `list-apis`' data
+source — **not** agent reading material, and not documentation. It covers `.ts`/`.tsx`/`.sql` only;
+every slice records what it did **not** examine, so a zero entry count never means "no surface".
+
+## Installed Capability Register
+
+**(GENERATED, regenerated by every `/phaneslight:run` run; hand-editing FORBIDDEN.)**
+
+- `context7` (MCP) → `afldb-orchestrator`, `afldb-worker`: live library documentation lookup; matched: Next.js 16.3.1 + React 19 (Phase 1), whose APIs postdate training data and which this file already warns about; fallback: targeted reads of `node_modules/next/dist/docs/`.
+- `semble` (MCP) → `afldb-orchestrator`, `afldb-worker`: indexed hybrid code search before any repo-wide sweep; matched: 1,442-file TypeScript codebase (Phase 1); fallback: Grep/Glob, which costs tokens but never correctness.
+- `frontend-design` (skill) → any agent on UI work; matched: Next.js App Router UI in `src/app` + `src/components` (Phase 1); fallback: none needed — a skill costs nothing until invoked.
+
+Deliberately **not** granted: `serena`, `deepwiki`, the `playwright` MCP, `codebase-memory-mcp`.
+Rationale is recorded in `SS00001`; do not re-grant without a new operator decision.
+
+## Workflows
+
+Task sequences for this project are codified in `.claude/workflows/`. Choose the workflow matching
+the task and follow it. **§15's lineup and ladder above govern routing, write rights and spawn
+grants; a workflow file that disagrees is the defect.** Workflow YAML never redefines routing.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

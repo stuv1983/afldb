@@ -1,0 +1,90 @@
+name: audit
+kind: RECURRING MAINTENANCE     # triggered by a condition, never by a request
+title: Conformance sweep against one named discipline
+tier: T2                        # analysis-heavy by construction
+
+trigger:
+  condition: >
+    Any of: (a) `register-check` reports SOFT-BREACH or CROP-REQUIRED; (b) `doc-check` reports
+    offenders that have persisted across two sessions; (c) after any run that generated or
+    regenerated more than ~10 files; (d) quarterly, whichever comes first.
+  note: This is a SCHEDULED workflow. Nobody will ask for it.
+
+normal_outcome: >
+  FINDING NOTHING IS A SUCCESSFUL RUN. A clean audit is evidence the disciplines are holding,
+  never evidence the audit is unnecessary. Skipping the next one on a clean streak converts the
+  verification budget into a bet on the streak continuing.
+
+governs: >
+  Task sequence only. CLAUDE.md §15 governs routing and the severity ladder.
+
+principle: >
+  Audit EXACTLY ONE named discipline per run. A sweep with an open-ended "check everything"
+  scope produces a long list nobody acts on. Name the discipline in the first line of the
+  session summary.
+
+disciplines:
+  doc: >
+    `doc-check` offenders — over-ceiling living documents, missing DOC headers, missing or
+    stale indexes. Frozen classes (session summaries, dated snapshots, archive/) are NEVER
+    flagged for content conformance and never retro-edited.
+  stamp: >
+    Files under stampedTrees (src, tests, documentation) created without `new-file` and so
+    missing the header stamp. The stamp is what module slicing keys on.
+  single-writer: >
+    Artifacts with more than one writer. Registry files, the API baseline, indexes, session
+    summaries and archive digests each have exactly one sanctioned writer.
+  capability-register: >
+    Every line of CLAUDE.md §15's Installed Capability Register must name the Phase 1 stack
+    element that matched it. A line whose match cannot be stated should not exist — the grant
+    is revoked and the line deleted.
+  loc: >
+    `loc-check` offenders over the 500-line soft ceiling. ADVISORY: the ceiling is soft, and a
+    coherent 520-line file beats two fragmented ones. Read the count line, which prints LAST.
+
+steps:
+  - id: scope
+    agent: afldb-orchestrator
+    action: Name the single discipline. Record it before gathering anything.
+
+  - id: mechanical-pass
+    agent: afldb-orchestrator
+    action: >
+      Run the script that owns the discipline, where one exists. Procedure belongs in scripts:
+      do not re-implement a size check or an index staleness check in reasoning.
+    run: >
+      node .phaneslight/scripts/cli.js doc-check | loc-check | register-check
+    note: Subject to CLAUDE.md §9 — hand to the user unless execution is authorised.
+
+  - id: enumerate
+    agent: afldb-worker
+    tools: [semble]
+    action: >
+      For disciplines with no owning script (stamp, single-writer, capability-register),
+      enumerate instances across the repository.
+    gate: >
+      This step MUST have `semble`. Enumeration is precisely the workload the grant exists for;
+      an auditor without it reverts to the repo-wide Grep sweep this rubric exists to prevent.
+
+  - id: grade
+    agent: afldb-orchestrator
+    action: >
+      Grade each finding on the severity ladder. Most conformance findings are LOW or INFO and
+      therefore create NO work. Resist inflating them: a long list of MEDs from a hygiene sweep
+      displaces real work.
+
+  - id: disposition
+    agent: afldb-orchestrator
+    action: >
+      Apply LAZY DIGESTION. A pre-existing non-conforming file is fixed the next time its
+      single writer legitimately touches it, as an ordinary T1 task. Open flags live in the
+      session summary TODOs until worked off.
+    gate: >
+      BULK-REWRITING accumulated knowledge to satisfy a discipline in one pass is FORBIDDEN.
+      That is how knowledge gets corrupted at scale. Adopted files (hand-dropped, pre-existing,
+      human-authored) are exempt entirely and are flagged once for user review, never rewritten.
+
+acceptance:
+  - Exactly one discipline was audited and is named in the summary.
+  - Findings are graded, with LOW/INFO left as report-only.
+  - No bulk rewrite occurred; no adopted or frozen file was edited to conform.

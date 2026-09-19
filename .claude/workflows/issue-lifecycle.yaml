@@ -1,0 +1,129 @@
+name: issue-lifecycle
+title: AFLDB standard issue lifecycle — worktree to close
+tier: T2 | T3
+trigger: >
+  Starting tracked work against an AFLDB-ISSUE-NNN. This is the wrapper workflow: the
+  subsystem workflows (nl-search-defect, db-schema-change, admin-mutation, import-migration,
+  ui-change) slot into its `implement` step.
+
+governs: >
+  Task sequence only. CLAUDE.md §15 governs routing, write rights and spawn grants. This
+  workflow codifies the lifecycle already documented at the top of CLAUDE.md and in
+  docs/development/WORKFLOW.md; where they differ, CLAUDE.md and WORKFLOW.md win.
+
+principle: >
+  Use the hardened entry points rather than rebuilding the Git and deploy checks by hand.
+  Each `npm run` below exists because someone previously got the manual version wrong.
+
+steps:
+  - id: orient
+    agent: afldb-orchestrator
+    action: >
+      Read IssuesIndex.md ONCE. Determine whether the task overlaps an open issue. If it does,
+      search issues.md narrowly for that exact entry and read only it.
+    gate: >
+      NEVER bulk-read issues.md. If IssuesIndex.md and issues.md disagree, issues.md is
+      authoritative — synchronise the index.
+    note: >
+      For an existing issue: start from established evidence, verify current code where
+      necessary, update the SAME issue rather than creating a duplicate, and do not repeat
+      established investigation without contradictory evidence.
+
+  - id: runbook-check
+    agent: afldb-orchestrator
+    action: >
+      If an approved <ISSUE-ID>.md runbook exists and the user asked to execute it, treat the
+      runbook as the implementation contract.
+    gate: >
+      Do NOT redesign or broaden an approved runbook during execution. If material evidence
+      contradicts it, STOP and report the contradiction rather than improvising around it.
+
+  - id: worktree
+    agent: afldb-orchestrator
+    action: From clean main, bootstrap a worktree.
+    run: npm run worktree:bootstrap -- --issue NNN --branch <agent>/issue-NNN
+    note: >
+      A new worktree has NEITHER node_modules NOR .env. Junction a sibling worktree's
+      node_modules (verify package-lock.json is identical first) and provide .env separately.
+      NEVER copy .env into a worktree by shell copy — it arrives cp1252-mangled.
+
+  - id: preflight
+    agent: afldb-orchestrator
+    action: Run preflight in the new worktree.
+    run: npm run preflight -- --mode implementation --issue NNN
+    modes:
+      implementation: work in an issue worktree
+      merge: operator work on main
+      read-only: inspection on main
+
+  - id: plan-review
+    agent: afldb-reviewer
+    when: The work was launched with a plan.
+    action: >
+      Review the plan BEFORE the first execution step: what the repository contradicts
+      (checked against code on disk, not against the plan's description of it), sequencing that
+      will not work, missing acceptance checks, and work the plan implies but never states.
+      You MAY amend the plan file; name every file you wrote. You never touch code.
+    gate: CRIT or HIGH in the plan review stops the run and goes to the user.
+
+  - id: implement
+    agent: afldb-orchestrator
+    action: >
+      Execute the matching subsystem workflow. Make the smallest correct change. Do not turn a
+      focused task into a repository-wide investigation.
+
+  - id: validate
+    agent: afldb-orchestrator
+    action: >
+      Use the SMALLEST test that proves the change, escalating only as required:
+      exact reproduction -> focused unit -> focused integration -> route/API -> E2E ->
+      typecheck/build -> broad suite. Do not request full-suite runs while iterating.
+    note: >
+      Before designing verification, read the issue's Validation/Follow-up section so
+      completed work is not repeated.
+
+  - id: commit
+    agent: afldb-orchestrator
+    action: >
+      The OPERATOR commits the reviewed local change. Git is user-operated (CLAUDE.md §12):
+      provide the exact command, do not execute it without explicit authorisation.
+
+  - id: merge-ready
+    agent: afldb-orchestrator
+    action: Check merge readiness.
+    run: npm run merge:ready -- --issue NNN
+
+  - id: deploy-dev
+    agent: afldb-orchestrator
+    action: Operator pushes/merges, then syncs DEV and smokes it.
+    run: deploy/sync-dev.ps1
+    gate: >
+      sync-dev.ps1 CANNOT apply an unmerged migration. If this issue carries one, the
+      migration path in `db-schema-change` applies: migration + privileges BEFORE code.
+    note: >
+      DEV is for the USER to test before prod. Wait for them; do not move DEV under them.
+      DEV is also NOT evidence for semantics decisions.
+
+  - id: close
+    agent: afldb-closure
+    action: >
+      Independent verification: re-derive the baseline, re-run build/typecheck/test yourself,
+      reconcile applied against intended. Flag only; the orchestrator disposes.
+
+  - id: record
+    agent: afldb-orchestrator
+    action: >
+      Resolve the issue ONLY when implementation plus appropriate verification supports it.
+      Set status and resolved date; record actual root cause, fix and validation; preserve
+      useful history; record genuine follow-up separately; remove it from IssuesIndex.md and
+      the Open Issues table; update CHANGELOG.md under `Unreleased` where behaviour materially
+      changed.
+    gate: >
+      If only part is fixed, the issue stays OPEN. Never invent evidence, root cause,
+      validation or resolution.
+
+acceptance:
+  - The issue was read narrowly, not by bulk-reading the ledger.
+  - Verification was the smallest that proves the change, and it passed.
+  - issues.md, IssuesIndex.md and CHANGELOG.md are consistent with what actually happened.
+  - Every changed file is reported.
