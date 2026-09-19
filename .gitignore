@@ -206,10 +206,18 @@ Thumbs.db
 /afldb-nl-mass-corpus.csv
 /afldb-nl-mass-corpus.csv.summary.json
 
-# ISSUE-164 generated player-matching measurement reports.
-# Keep the frozen v1 baseline inputs tracked; all other reports are reproducible scratch output.
+# ISSUE-164 generated player-matching measurement reports. `npm run match:backtest --
+# --out <name>.json` and `npm run match:compare` land in the repository root, and a full
+# run is several MB of reproducible scratch output. Anchored: this is the top-level
+# scratch landing site, not any nested one.
+#
+# The frozen v1 evidence itself is NOT scratch and is no longer written here: the tracked
+# `backtest-v1-baseline.json`, `queue-v1-baseline.json` and the P1c label snapshot
+# `draft-labels-b1-120.json` now live beside their runbook in `issues/closed/`, which no
+# pattern in this file matches. The former `!/backtest-v1-baseline.json` /
+# `!/queue-v1-baseline.json` negations were dropped with that move; re-generating either
+# name at the root is scratch output and is correctly ignored here, while the tracked
+# copies stay tracked at their new path (an ignore rule never affects a tracked path).
 /backtest-*.json
 /queue-*.json
 /compare-*.json
-!/backtest-v1-baseline.json
-!/queue-v1-baseline.json

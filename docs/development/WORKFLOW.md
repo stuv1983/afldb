@@ -113,11 +113,15 @@ Opus should:
 6. design verification;
 7. produce the final approved runbook.
 
-Save the final approved runbook as:
+Save the final approved runbook beside the issue ledger, never at the repository root:
 
 ```text
-<ISSUE-ID>.md
+issues/open/<ISSUE-ID>.md
 ```
+
+Move it to `issues/closed/<ISSUE-ID>.md` when the issue is resolved, alongside any
+`<ISSUE-ID>-*-HANDOFF.md` companions and any evidence artefacts the runbook produced. Both
+`merge:ready` and `worktree:bootstrap` already resolve `issues/open/<ISSUE-ID>.md` first.
 
 For safety-critical work, retain detail that is part of the safety contract. Do not compress away gates, hashes, outcome criteria, stop conditions, or validation requirements merely to save context.
 
@@ -330,9 +334,13 @@ Fast map of current open work only.
 
 Authoritative durable record of problem, evidence, investigation, root cause, fix, validation, and remaining work.
 
-## `<ISSUE-ID>.md`
+## `issues/open/<ISSUE-ID>.md` — and `issues/closed/<ISSUE-ID>.md` once resolved
 
 Approved complex cross-session plan/runbook. Use when a detailed handoff is genuinely needed, not for every trivial issue.
+
+Runbooks live under `issues/`, not at the repository root: `issues/open/` while the issue is open,
+`issues/closed/` once it is resolved, together with its `-HANDOFF.md`/`-REPORT.md` companions and
+any evidence artefacts (`.sql`, `.txt`, `.json`, `.sh`) the runbook produced.
 
 Keep detailed execution evidence and stage handoffs here (or in the exact `issues.md` issue section
 when no separate runbook exists). A later handoff should reference earlier stages instead of copying

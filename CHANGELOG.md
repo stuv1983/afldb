@@ -15,6 +15,43 @@ commit.
 
 ## [Unreleased]
 
+### Repository layout: issue runbooks and ISSUE-164 frozen evidence moved out of the repository root - 19 September 2026
+
+- **What changed.** The repository root no longer accumulates issue documentation or measurement
+  evidence. Thirty-two `AFLDB-ISSUE-*.md` files (189, 195–222 plus the three ISSUE-222
+  `-OFFLINE-REVIEW-RUNBOOK` / `-PHASE2-HANDOFF` / `-PHASE3-CORRECTION-HANDOFF` companions) moved
+  into the existing `issues/` hierarchy: `AFLDB-ISSUE-220.md` — the only one of the thirty-two
+  whose issue is still open — to `issues/open/`, the other thirty-one to `issues/closed/`. The
+  three ISSUE-164 frozen player-matching artefacts `backtest-v1-baseline.json`,
+  `queue-v1-baseline.json` and `draft-labels-b1-120.json` moved to `issues/closed/`, beside the
+  runbook that owns them. Every move was a `git mv` rename at 100% similarity, so file bytes and
+  Git history are unchanged and the ISSUE-164 §2.10 immutability contract (which forbids
+  *regenerating* those filenames, not relocating them) is intact.
+- **Why.** The root had become the default landing site for cross-session runbooks: `issues/closed/`
+  stopped at ISSUE-174 while everything from 189 onward stayed at the root, and `issues/open/` held
+  nothing but its `.gitkeep`. The repository's own tooling already preferred the new location —
+  `tools/dev/merge-readiness.ts` resolves `issues/open/<ISSUE-ID>.md` before the root fallback, and
+  `tools/dev/bootstrap-worktree.ts` accepts the `issues/open/` prefix — so this aligns the tree with
+  the tooling rather than changing either.
+- **Operating-rule updates, so the layout does not re-drift.** `docs/development/WORKFLOW.md` now
+  tells the planning session to save an approved runbook as `issues/open/<ISSUE-ID>.md` and to move
+  it to `issues/closed/` on resolution; `CLAUDE.md` §5, `AGENTS.md` §5 and the `IssuesIndex.md`
+  header state the same rule.
+- **`.gitignore`.** The ISSUE-164 block keeps `/backtest-*.json`, `/queue-*.json` and
+  `/compare-*.json` so regenerated root scratch output stays ignored, and drops the now-dead
+  `!/backtest-v1-baseline.json` / `!/queue-v1-baseline.json` negations; the tracked copies are
+  tracked at their new path, which no pattern in the file matches.
+- **No behaviour change.** No application, search, database, import or deployment behaviour is
+  affected, no issue status or technical conclusion was altered, and no file contents changed. No
+  code reads any of the three relocated JSON artefacts — the only references are operator CLI
+  examples in `tools/matching/` comments and in the ISSUE-164 runbook, which reproduce by supplying
+  the new path. Sealed, hash-bound review artefacts under `docs/rebuild-manifests/draftguru/` were
+  deliberately left untouched.
+- **Note for in-flight branches.** `sonnet/issue-218-team-match-result-phrasing`,
+  `sonnet/issue-219-possessive-club-aliases` and `codex/issue-220` still carry their runbooks at the
+  old root paths. On merge, keep the `issues/{open,closed}/` path and carry the branch's content;
+  commit the `afldb-issue-220` worktree's uncommitted runbook edits before it rebases.
+
 ### AFLDB-ISSUE-222 resolved: DraftGuru person-page bridge live on `afldb_dev`; Grid Solver draft-axis regression resolved on DEV - 19 September 2026
 
 - **What changed for users.** Every draft-selection answer on `afldb.com`'s DEV deployment — Grid

@@ -3,6 +3,11 @@
 > Lightweight session index of open issues only.
 >
 > `issues.md` is the authoritative detailed ledger.
+>
+> Runbooks live under `issues/`, not at the repository root: `issues/open/<ISSUE-ID>.md` while
+> the issue is open, `issues/closed/<ISSUE-ID>.md` once it is resolved, together with any
+> `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
+> filename only; resolved ones are in `issues/closed/`.
 
 **Open issues:** 4
 
@@ -39,6 +44,8 @@
   `docs/deployment.md`'s §9 table was itself missing 5 real DSN names — completed it rather than
   deriving from the incomplete table, see `issues.md` Implementation section). PROD still not
   inspected.
+- **Runbook:** `issues/open/AFLDB-ISSUE-220.md` (relocated from the repository root 2026-09-19;
+  the `afldb-issue-220` worktree still holds its uncommitted copy at the old root path).
 - **Key files:** `deploy/afldb.service`, `docs/deployment.md` §9, `tools/build/prepare-standalone.mjs`,
   `tools/build/env-in-standalone.mjs` (new), `tests/deploy-web-unit.test.ts` (new).
 - **Local validation (2026-09-17):** `vitest run tests/deploy-web-unit.test.ts` **15/15 passed**;

@@ -173,7 +173,7 @@ AFLDB uses:
 - `IssuesIndex.md` — lightweight index of currently open issues only;
 - `issues.md` — authoritative detailed issue ledger;
 - `CHANGELOG.md` — meaningful retained project changes;
-- `<ISSUE-ID>.md` — approved plan/runbook when a complex issue needs a cross-session execution handoff.
+- `issues/open/<ISSUE-ID>.md` — approved plan/runbook when a complex issue needs a cross-session execution handoff; moved to `issues/closed/<ISSUE-ID>.md` on resolution, with its `-HANDOFF.md` companions and evidence artefacts. Runbooks are never left at the repository root.
 
 ## Start of technical work
 
