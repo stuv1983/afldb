@@ -35357,10 +35357,11 @@ this issue's scope was the five Grid Solver defects and honest reporting of the 
 
 ## AFLDB-ISSUE-222 — Trusted draft-player linking: DraftGuru Stage B3 person-page acquisition and the person-page bridge into `draft_persons` / `draft_picks`
 
-**Status: Open.** Successor to the draft-linkage follow-up recorded on `AFLDB-ISSUE-221`
-(resolved above) and to `AFLDB-ISSUE-164` D-9 / `AFLDB-ISSUE-093` Stage B3 (neither reopened;
-D-9 stays in force). Full runbook: `AFLDB-ISSUE-222.md` (revision 2, operator-approved for
-Phase 1 only). Full evidence: `AFLDB-ISSUE-221.md` §2–§5.
+**Status:** **RESOLVED 2026-09-19.** See *Resolution (2026-09-19)* at the foot of this entry. As
+it stood before the closeout (retained): Successor to the draft-linkage follow-up recorded on
+`AFLDB-ISSUE-221` (resolved above) and to `AFLDB-ISSUE-164` D-9 / `AFLDB-ISSUE-093` Stage B3
+(neither reopened; D-9 stays in force). Full runbook: `AFLDB-ISSUE-222.md` (revision 2,
+operator-approved for Phase 1 only). Full evidence: `AFLDB-ISSUE-221.md` §2–§5.
 
 ### Root cause of the reported gap (cited, not re-investigated)
 Every `draft_picks`-backed answer in the product is drawn from 5 linked rows of 6,810 on every
@@ -37277,6 +37278,101 @@ PENDING.** Full record: `AFLDB-ISSUE-222.md` §11.12, `AFLDB-ISSUE-222-PHASE3-CO
   No database, SSH, network, import, dry-run, backup, deployment, browser, Gridley,
   AFLDB-ISSUE-224 or AFLDB-ISSUE-225 command ran; nothing staged or committed;
   AFLDB-ISSUE-222 remains **Open**.
+- **Closure (2026-09-19, operator-executed; §11.19.22).** The corrected §11.19.21 retry order was
+  run in full against `afldb_dev`: link-only validate-only, transactional dry run, authoritative
+  plan, the real `import_draftguru.py --link-only` import, and two independent verifies
+  reproducing the identical `summary_sha256 6a89a1ba092615657672c808ab9e8816db270eee7226d0066b296131b4e0ce44`.
+  Updated rows: `draft_persons` 3,465; `draft_picks` 5,110; `external_identities` 3,465; seeded 0.
+  Final state: 3,470 linked persons, 5,115/6,810 picks linked (75.11%), 1,587 unmatched. Plan
+  hashes: `after_state_sha256 4f0a2cc567d03f2660132a1cdde66aa5e006c5e1e848a2dc5db724bd726b469d`,
+  `picks_after_sha256 ffa7fd60a02d8caee2d9fa22b9500725e9e12fc4ca8aba1d21e94675aa400c8d`,
+  `newly_linked_sha256 3ff560472aa38b63a9ef28d57501e31da9cdb907cf44bcf304a42140a02471e3`,
+  `baseline_sha256 e96bb4d624875ac800f2d50f48b4863be00d148720799e8933996746932fccc2`; plan summary
+  `4b33621ba1a6973323a09a010e1bb4acfd101a26617ad52047e88d8a5dc7e923`. No restore or rerun was
+  required. **Deployed at commit `19eb40c0`**: build `uKIChkbyo_-A3PMi40aFi`, 1,516 static pages,
+  102/102 migrations applied, none pending; `deploy/afldb.service` byte-identical to the live
+  unit; DEV health `status=ok, database=ok, latencyMs=16`; the running `MainPID` carried exactly
+  `DATABASE_URL`, `AFLDB_AUTH_DATABASE_URL`, `AFLDB_IMPORT_DATABASE_URL` and excluded the owner,
+  test, backup and production DSNs (AFLDB-ISSUE-220 boundary holding).
+  **Browser validation (operator-run, no mutation):** public draft pages 1981/1987/2001/2025
+  correct with both linked and unlinked selections rendering; Nat Fyfe's existing 2009 pick 20
+  National/Fremantle linkage unaffected; Chris Judd now shows both his newly linked 2001 pick 3
+  (National, West Coast) and his separate 2007 Trade (Carlton) row; `/admin/player-links` showed
+  1,587 unresolved rows, down from the former near-total population; `/admin/draft` renders all
+  6,810 selections across 137 pages with every filter and "Add a selection" available;
+  `/admin/draft/new` renders the complete form (nothing submitted); "Awaiting AFL Tables identity"
+  is a clean empty state; Grid Solver National Draft pick 1–10 cells return 117/162/185 eligible
+  players instead of "No data" — **the AFLDB-ISSUE-221 draft-axis regression is resolved on
+  DEV**; an invalid upper season (`199999`) affects exactly the three cells it should while the
+  other six remain solved; Reset restores the default board, which solves 9/9; the draft-type
+  dropdown lists exactly ten kinds with National Draft once; no console/server errors remain.
+  Manual link-approval and manual-pick creation were **not executed** (explicitly out of scope,
+  requiring a separately selected reversible fixture and rollback plan; not a closure blocker).
+  **Environment incident, recorded transparently, not softened.** During DEV diagnosis, an unsafe
+  inline PowerShell-to-SSH command's quoting failure let a `>` inside an `==>` console heading act
+  as shell redirection, truncating the remote `.env` to 17 bytes. `afldb.service` stayed running
+  and healthy throughout on its already-loaded environment (explaining why `/api/health` stayed
+  green while `/admin/draft` specifically 500'd with digest `3406633780`, server logs showing
+  `AFLDB_IMPORT_DATABASE_URL is not configured` — an environment defect, **not a React hydration
+  defect**). The corrupted file was preserved untouched at
+  `/home/arm/backups/afldb/issue-222/env-corrupt-20260919-121333.txt` (17 bytes, `arm:arm`, mode
+  `600`, sha256 `7b15578a3528ef528d4d519cefca9b516d6de12c2fa6f89ef7d02ed243578a07`). The `.env` was
+  reconstructed from the exact live `MainPID` values plus freshly, separately authenticated
+  restricted DSNs (final sha256, after backup-credential restoration,
+  `6f2627536b425ec596145d2e8c19bb3261f3d8c095bda70afeb750de8eacb8b1`); the stale installed systemd
+  unit was replaced by the tracked one. **Only `afldb_backup` was deliberately rotated** — the
+  locally preserved password was found stale and was explicitly not reused; the rotated role was
+  verified login-enabled, non-superuser, without createdb/createrole/replication/bypassrls, a
+  member of `pg_read_all_data`, and confirmed authenticating as `afldb_backup@afldb_dev` under a
+  read-only diagnostic session. No temporary `.env` recovery file remained.
+  **Fresh post-import DEV recovery point:** `backup.sh` produced
+  `/home/arm/backups/afldb/afldb_dev-20260919-124047.dump` (30,441,530 bytes, `arm:arm`, mode
+  `600`, sha256 `c0c76bf64cab5fe2e691f5c6f98f89c62422bdf856e98e5018fbe12f1aa10d3a`), reporting
+  1,468 archive objects; `pg_restore --list` separately reports 1,483 total lines — **not the same
+  measurement, and not an object count**. Restore into `afldb_restore_test` completed (`pg_restore`
+  exit 1, only the accepted extension-owner errors); all nine parity checks passed:
+  `player_match_stats` 694,534; `players` 13,273; `matches` 17,054; `clubs` 24; career games
+  694,534; career goals 413,211; Brownlow votes 79,113; unrecorded disposals 248,996;
+  `stat_availability` 3,120. Backup retention remained seven.
+  **Not claimed:** the 1,587 remaining unmatched persons are not resolved (AFLDB-ISSUE-224
+  residue); the two mutation checks were not executed. AFLDB-ISSUE-223/224/225 untouched. PROD not
+  contacted. Full record: `AFLDB-ISSUE-222.md` §11.19.22.
+
+### Resolution (2026-09-19)
+
+**Resolved on DEV acceptance.** The trusted draft-player linking objective is complete and
+independently verified on both `afldb_test` (§11.19.9, corpus-proven at §11.19.14) and `afldb_dev`
+(the closure bullet immediately above). The AFLDB-ISSUE-221 Grid Solver draft-axis regression
+("No data" on a draft criterion) is resolved on DEV: every draft-criterion cell now resolves
+against a real, trusted population instead of the 5-of-6,810 human-decision set. PROD was never
+contacted and no production claim is made; PROD promotion, if wanted, is a separate future
+authorisation.
+
+**Root cause of the original gap, resolved.** Every `draft_picks`-backed answer had been drawn
+from 5 of 6,810 linked rows (the explicit human-decision set); the historical automatic linker
+remains permanently excluded (AFLDB-ISSUE-093 Stage B2-7). The DraftGuru person-page bridge
+(AFLDB-ISSUE-093 Stage B3, AFLDB-ISSUE-164 §12 P1c) now supplies 3,470 linked persons / 5,115
+linked picks (75.11%) on both `afldb_test` and `afldb_dev`, built through the phases recorded
+across this ledger entry: population acquisition, the source-evidence and deployment bridges,
+independent offline review, Phase F statistical validation and acceptance, the read-only import
+gate, the `afldb_test` import, the Gridley corpus proof, and — after the `afldb_dev` Stage A label
+was found to be `annual-html-20260902` rather than the importer's superseded default — the
+fail-closed `--link-only` mode that applies the reviewed linkage without rewriting any
+source-owned Stage A fact.
+
+**What remains open, tracked separately, not reopened here:**
+- **AFLDB-ISSUE-223** — the pre-existing `GRID_DRAFT_TYPES` test regression, unrelated to and
+  unaffected by this closure.
+- **AFLDB-ISSUE-224** — the 1,587 unmatched/`target_not_registered` persons (94 bridge-admissible
+  parent persons withheld on `afldb_test`, the corresponding residue on `afldb_dev`); the
+  registration path for post-baseline debutants and numbering/spelling cases is not established by
+  this issue.
+- **AFLDB-ISSUE-225** — the 37 pre-existing non-draft Gridley cells, present before this issue and
+  untouched by it.
+
+**Not claimed by this resolution:** the 1,587 unmatched/admin-queue rows are not resolved; manual
+link-approval and manual-pick-creation mutation checks were not executed; PROD is untouched;
+AFLDB-ISSUE-223/224/225 are not resolved by this closure.
 
 ## AFLDB-ISSUE-223 — Pre-existing test regression from AFLDB-ISSUE-221: `GRID_DRAFT_TYPES` reshaped, `draftguru-acquisition.test.ts`'s vocabulary-parity test now fails
 

@@ -15,6 +15,36 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-222 resolved: DraftGuru person-page bridge live on `afldb_dev`; Grid Solver draft-axis regression resolved on DEV - 19 September 2026
+
+- **What changed for users.** Every draft-selection answer on `afldb.com`'s DEV deployment — Grid
+  Solver draft criteria, `/players/[id]` selection history, `/admin/draft` and
+  `/admin/player-links` — now draws on 3,470 linked DraftGuru persons and 5,115 of 6,810 draft
+  picks (75.11%), instead of the 5 explicit human-decision links this project shipped with. Grid
+  Solver's National Draft pick-range cells, which previously returned an honest but uninformative
+  "No data" (AFLDB-ISSUE-221), now return real eligible-player sets; Chris Judd's selection history
+  shows both his newly linked 2001 National pick 3 (West Coast) and his existing 2007 Trade
+  (Carlton) row; the admin player-links queue is down to 1,587 unresolved rows.
+- **How it got there.** `import_draftguru.py --link-only` (added earlier this issue, see the entry
+  below) applied the already-reviewed trusted bridge to the population already loaded on
+  `afldb_dev` without rewriting any source-owned Stage A fact. Real run: `draft_persons` 3,465,
+  `draft_picks` 5,110 and `external_identities` 3,465 rows updated, 0 seeded; two independent
+  post-import verifies reproduced the identical `summary_sha256`. Deployed at commit `19eb40c0`
+  (build `uKIChkbyo_-A3PMi40aFi`, 1,516 static pages, 102/102 migrations); DEV health
+  `status=ok, database=ok, latencyMs=16`.
+- **Operational incident, disclosed in full.** During DEV diagnosis, an unsafe inline
+  PowerShell-to-SSH command's quoting failure truncated the deployed `.env` to 17 bytes (a `>`
+  inside a console heading was read as shell redirection). The application process stayed healthy
+  throughout on its already-loaded environment; the truncated file was preserved as evidence, the
+  `.env` was reconstructed from the running process's own environment plus freshly rotated
+  credentials, and the previously stale-on-disk systemd unit was replaced by the tracked one. Only
+  the `afldb_backup` role's password was rotated (verified read-only, non-superuser). A fresh,
+  independently restored-and-verified DEV backup followed (nine parity checks, all passing).
+- **Not resolved by this closure:** the 1,587 remaining unmatched/`target_not_registered` persons
+  (AFLDB-ISSUE-224) and manual link-approval/manual-pick-creation mutation testing (explicitly
+  scoped out, pending a reversible fixture). PROD is untouched. AFLDB-ISSUE-223 and
+  AFLDB-ISSUE-225 remain open and are unaffected by this change.
+
 ### DraftGuru importer: a fail-closed `--link-only` mode for a target whose accepted Stage A snapshot no longer exists (AFLDB-ISSUE-222) - 19 September 2026
 
 - **Why.** `afldb_dev` holds the DraftGuru population loaded from `annual-html-20260902`, the

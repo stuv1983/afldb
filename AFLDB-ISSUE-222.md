@@ -1,9 +1,15 @@
 # AFLDB-ISSUE-222 — Trusted draft-player linking: DraftGuru Stage B3 person-page acquisition and the person-page bridge into `draft_persons` / `draft_picks`
 
-**Status: Phase 1 (tooling + isolated-test-database validation) APPROVED, IMPLEMENTED and
+**Status: RESOLVED 2026-09-19 — see §11.19.22 for the final closure evidence** (real `afldb_dev`
+`--link-only` import committed and twice independently verified, deployment at `19eb40c0`, DEV
+browser validation, a transparently recorded environment-truncation incident and its recovery,
+and a fresh independently verified DEV backup). **As it stood at Phase 1/2 authorisation (retained,
+historical):** Phase 1 (tooling + isolated-test-database validation) APPROVED, IMPLEMENTED and
 CLOSED (2026-09-18) — see §11. O-1/O-2/O-3 DECIDED (2026-09-18) — see §0. Phase 2 (acquisition)
 separately AUTHORISED (2026-09-18) for exactly ONE new whole-population snapshot — see §11.
-Phases 3–5 remain NOT authorised.** Written 2026-09-18 (Fable 5.1, High, planning only, worktree
+Phases 3–5 remained NOT authorised as of that date; Phases 3 and 4 were subsequently executed and
+closed on `afldb_test` and `afldb_dev` respectively (§11.19.9–§11.19.22); Phase 5 (PROD promotion)
+remains NOT authorised and is out of scope for this closure. Written 2026-09-18 (Fable 5.1, High, planning only, worktree
 `D:\dev\afldb-issue-221`, no Git command, no acquisition, no database write). **Revision 2
 (2026-09-18, same session):** revised against an eight-point document review; every review
 finding was verified against the importer, the corpus suite and the governing contracts before
@@ -4754,3 +4760,124 @@ and AFLDB-ISSUE-225 were not touched; `bridge_import_gate.py` and
 staged or committed. **AFLDB-ISSUE-222 remains open**: the corrected DEV link-only dry run, the
 authoritative plan, the real import, its two independent verifies, `sync-dev.ps1` and the
 browser/Grid Solver smoke checks are all still ahead.
+
+---
+
+#### 11.19.22 Closure — real DEV link-only import executed and twice verified, deployment completed, DEV browser validation, an environment-truncation incident and its recovery, and a fresh post-import DEV recovery point (2026-09-19, operator-executed)
+
+**Scope of this pass.** Documentation-only closure. No code, test, bridge artefact, manifest,
+database file, service file or environment file was changed by this pass; no SSH, SQL, import,
+backup, deployment or browser command ran in this pass — the events below were executed and
+reported by the operator on the DEV host, on top of the reporter fix committed at `19eb40c0`
+(§11.19.21).
+
+**1. Corrected retry order executed in full; real link-only DEV import committed.** Following the
+§11.19.21 item-7 order (validate-only → transactional dry run → authoritative plan → real import →
+two independent verifies), the operator ran the real `import_draftguru.py --link-only` import
+against `afldb_dev` using
+`data/reference/draftguru-person-bridge-20260918-v2.afldb_dev.json` (sha256
+`a9652e4a6ca96ced32d64d36cb0a3a1b6cdf1e2591927e628753b399c6647c95`, `target: "dev"`) under the
+asserted Stage A label `annual-html-20260902` — no Stage A page, manifest or parsed artefact was
+read, per the mode's design (§11.19.20). Updated rows: `draft_persons` 3,465; `draft_picks` 5,110;
+`external_identities` 3,465; seeded players 0 (authority never seeds under `--link-only`, matching
+every prior `afldb_test` run). Final state: 3,470 linked persons, 5,115 of 6,810 picks linked
+(75.11% pick capability, unchanged from the `afldb_test` figure in §11.19.9); 1,587 persons remain
+unmatched/in the admin queue. All source-owned/non-link preservation digests (the §11.19.20
+`baseline_sha256` non-link component) held. Plan hashes captured from the authoritative plan:
+`after_state_sha256 4f0a2cc567d03f2660132a1cdde66aa5e006c5e1e848a2dc5db724bd726b469d`,
+`picks_after_sha256 ffa7fd60a02d8caee2d9fa22b9500725e9e12fc4ca8aba1d21e94675aa400c8d`,
+`newly_linked_sha256 3ff560472aa38b63a9ef28d57501e31da9cdb907cf44bcf304a42140a02471e3`,
+`baseline_sha256 e96bb4d624875ac800f2d50f48b4863be00d148720799e8933996746932fccc2`; plan summary
+`4b33621ba1a6973323a09a010e1bb4acfd101a26617ad52047e88d8a5dc7e923`. **Two independent `verify` runs
+reproduced the identical `summary_sha256
+6a89a1ba092615657672c808ab9e8816db270eee7226d0066b296131b4e0ce44`** — the §7.5 determinism
+requirement. Both the import and both verifies passed; no restore and no rerun was required. This
+resolves the reporter defect found at §11.19.21: `Reporter.value()` rendered the string fields
+without error and the linkage committed cleanly.
+
+**2. Deployment.** Final deployed commit `19eb40c0` (this worktree's HEAD, the reporter-fix commit
+on `sonnet/issue-222`). Build ID `uKIChkbyo_-A3PMi40aFi`; build passed, 1,516 static pages. 102/102
+migrations applied on `afldb_dev`, none pending. `deploy/afldb.service` as installed on the DEV
+host is byte-identical to the tracked unit in this repository. DEV health passed after the code
+deployment and, separately, after the environment recovery described in item 4: final reading
+`status=ok, database=ok, latencyMs=16`. The running `MainPID`'s environment was confirmed to
+contain exactly `DATABASE_URL`, `AFLDB_AUTH_DATABASE_URL` and `AFLDB_IMPORT_DATABASE_URL`, and to
+exclude the owner, test, backup and production DSNs — the AFLDB-ISSUE-220 credential-boundary
+contract holding on the deployed unit.
+
+**3. DEV browser validation (operator-run; no mutation performed).** Public draft pages for 1981,
+1987, 2001 and 2025 continued to render correctly with both linked and unlinked selections shown.
+Nat Fyfe's existing 2009 pick 20 National/Fremantle linkage — one of the five pre-existing
+human-decision links, unaffected by this import — remained correct. Chris Judd now shows the newly
+linked 2001 pick 3 National/West Coast row alongside his separate, pre-existing 2007 Trade/Carlton
+row — a two-row selection history resolving correctly through the trusted linkage.
+`/admin/player-links` showed 1,587 unresolved rows, down from the near-total population the page
+showed before this issue's `afldb_test`/`afldb_dev` imports. `/admin/draft` initially returned
+HTTP 500 (digest/reference `3406633780`); server logs identified the exact cause as
+`AFLDB_IMPORT_DATABASE_URL is not configured` — the environment incident in item 4, **not a React
+hydration defect**. After the environment/unit recovery, `/admin/draft` rendered all 6,810
+selections, page 1 of 137, with every filter and "Add a selection" available; `/admin/draft/new`
+rendered the complete form (nothing submitted); the "Awaiting AFL Tables identity" queue view
+produced a clean empty state. Grid Solver National Draft pick 1–10 cells returned 117, 162 and 185
+eligible players respectively instead of "No data" — **the AFLDB-ISSUE-221 regression's root cause
+(draft-pick linkage, 5 of 6,810 before this issue) is resolved on DEV for the draft axis.** An
+invalid upper season (`199999`) affected exactly three cells while the other six on that board
+remained solved; Reset restored the default board and all six editors, and the default board
+solved 9/9. The draft-type dropdown contained exactly ten kinds, with National Draft appearing
+exactly once (the AFLDB-ISSUE-223/ISSUE-221 vocabulary shape, unaffected by this issue). No browser
+console or server errors remained after recovery. **No browser mutation was performed.** Manual
+approval of a suggested link and actual manual-pick creation were **NOT EXECUTED** — they were
+explicitly out of this pass's scope, requiring a separately selected reversible fixture and
+rollback plan, and are not a closure blocker.
+
+**4. Environment incident and recovery — recorded transparently, not softened.** During DEV
+diagnosis, an unsafe inline PowerShell-to-SSH command lost its quoting: a `>` inside an `==>`
+console heading was interpreted as shell redirection, truncating the remote `.env` to 17 bytes.
+The `afldb.service` process itself stayed running and healthy throughout, serving from its
+already-loaded environment (explaining why `/api/health` remained green while `/admin/draft`
+specifically failed — the running process held its old environment in memory, while the failing
+path required a fresh read of the now-truncated file). The corrupted file was preserved, untouched,
+at `/home/arm/backups/afldb/issue-222/env-corrupt-20260919-121333.txt` (17 bytes, `arm:arm`, mode
+`600`, sha256 `7b15578a3528ef528d4d519cefca9b516d6de12c2fa6f89ef7d02ed243578a07`). The environment
+was reconstructed from the exact live `MainPID` values plus separately, freshly authenticated
+restricted DSNs (not copied from the corrupted file or from any cached credential store); the
+recovered `.env` was written `arm:arm`, mode `600`. **Only `afldb_backup` was deliberately
+rotated** during this recovery — the locally preserved `afldb_backup` password was found to be
+stale and was explicitly not reused. The rotated role was verified login-enabled, non-superuser,
+without `createdb`/`createrole`/`replication`/`bypassrls`, and a member of `pg_read_all_data`; it
+authenticated as `afldb_backup@afldb_dev` under a read-only diagnostic session, confirming the
+rotation before it was relied on for the recovery backup in item 5. The stale installed systemd
+unit was replaced by the tracked `deploy/afldb.service` (the byte-identity confirmed in item 2).
+The final recovered `.env`, after the backup-credential restoration, hashes to sha256
+`6f2627536b425ec596145d2e8c19bb3261f3d8c095bda70afeb750de8eacb8b1`. No temporary `.env` recovery
+file was left behind. This incident and its recovery are recorded here in full because the
+operator's closure instructions required it not be hidden or softened; it is a workstation/session
+operational defect (an unsafe ad hoc command), not a defect in any tracked script, and no tracked
+file was found to be the cause.
+
+**5. Final post-import DEV recovery point.** `backup.sh` produced
+`/home/arm/backups/afldb/afldb_dev-20260919-124047.dump` (30,441,530 bytes, `arm:arm`, mode `600`,
+sha256 `c0c76bf64cab5fe2e691f5c6f98f89c62422bdf856e98e5018fbe12f1aa10d3a`), reporting 1,468 archive
+objects; a separate `pg_restore --list` over the same dump produced 1,483 total lines — **the two
+counts are not the same measurement**, and the 1,483 figure is not itself the object count. A
+restore into `afldb_restore_test` completed; `pg_restore`'s exit code 1 contained only the accepted
+extension-owner errors (the same class of error this project's restore procedure already treats as
+non-blocking). All nine parity checks passed against the restored copy: `player_match_stats`
+694,534; `players` 13,273; `matches` 17,054; `clubs` 24; career games 694,534; career goals
+413,211; Brownlow votes 79,113; unrecorded disposals 248,996; `stat_availability` 3,120. Backup
+retention remained at seven.
+
+**6. What this pass does and does not claim.** The core trusted-linkage objective (AFLDB-ISSUE-222's
+purpose) is now complete and verified on both `afldb_test` (§11.19.9, Gridley-proven at §11.19.14)
+and `afldb_dev` (item 1 above, browser-proven at item 3). The AFLDB-ISSUE-221 Grid Solver
+draft-axis regression is resolved on DEV (item 3). **The 1,587 remaining unmatched persons/
+admin-queue rows are NOT claimed resolved** — they are the expected residue of `--no-seed` linking
+(withheld `target_not_registered` persons under AFLDB-ISSUE-224, plus persons with no admissible
+bridge), unaffected by this closure. **Manual link-approval and manual-pick-creation mutation
+checks were NOT executed** — see item 3; this is a recorded scope boundary, not a defect.
+AFLDB-ISSUE-223, AFLDB-ISSUE-224 and AFLDB-ISSUE-225 are untouched and remain open on their own
+evidence. PROD was not contacted at any point in this issue.
+
+**Files changed by this pass:** `AFLDB-ISSUE-222.md` (this section and the status line),
+`issues.md`, `IssuesIndex.md`, `CHANGELOG.md`. Nothing else. **AFLDB-ISSUE-222 is now RESOLVED
+2026-09-19** — see `issues.md`'s *Resolution (2026-09-19)* for the closure record.
