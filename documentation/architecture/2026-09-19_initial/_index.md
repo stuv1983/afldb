@@ -3,3 +3,4 @@
 
 - modules/ : subfolder (see modules/_index.md)
 - overview.md : System level bootstrap snapshot of AFLDB architecture stack and modules
+- agent-operating-model.md : Rationale and worked detail behind the PhanesLight agent operating model

@@ -596,62 +596,51 @@ Do not automatically begin another investigation.
 
 # 15. PhanesLight Agent Team
 
-> **Precedence.** §1–§14 above govern wherever they conflict with anything in this section
-> (see the `pinned:project` deviations at the top of this file). This section describes a
-> capability that is **available**, not one that is automatic.
+> **Precedence.** §1–§14 govern wherever they conflict with this section (see `pinned:project` at
+> the top). This capability is **available, not automatic**. Rationale, boundary cases and the full
+> script surface: `documentation/architecture/2026-09-19_initial/agent-operating-model.md`, which is
+> explanatory only and never overrides this section.
 
 ## Engagement: when this section applies at all
 
-**Default remains §1: zero subagents.** Work directly. Engage the team only when one of these holds:
+**Default remains §1: zero subagents.** Work directly. Engage only when either holds:
 
-- You are launching a **plan** whose effective scope is **5 or more steps**
-  (`orchestratorStepThreshold` in `.phaneslight/config.json`) and the user has not narrowed it.
-  Then spawn `afldb-orchestrator` and stay slim: read the plan's step list once for structure,
-  build the todolist, handle the spawn and the close, and let it own the steps.
-- The work genuinely spans independent subsystems and parallel investigation materially reduces
-  work (§1's existing "at most one" test, now able to resolve to a tier rather than an ad-hoc agent).
+- a **plan of 5+ steps** (`orchestratorStepThreshold` in `.phaneslight/config.json`) is launched and
+  the user has not narrowed it — spawn `afldb-orchestrator`, stay slim, let it own the steps;
+- the work genuinely spans independent subsystems and parallel investigation materially reduces work
+  (§1's "at most one" test, resolved to a tier).
 
-Explicit user narrowing ("only step 1"), a plan of 4 or fewer steps, or any non-plan task: work
-directly. **Ambiguity defaults to NOT engaging**, which is the opposite of the PhanesLight default
-and is deliberate here (§1).
+Explicit narrowing, a plan of ≤4 steps, or any non-plan task: work directly. **Ambiguity defaults
+to NOT engaging** — the inverse of the PhanesLight default, deliberately (§1).
 
 ## The lineup
 
 | Agent | Model | Spawned by | Writes to the repository | May spawn |
 |---|---|---|---|---|
-| `afldb-orchestrator` | `opus` | The main session only, at launch | **Yes, unrestricted.** Main executor as well as orchestrator | reviewer, worker, mechanic, closure |
-| `afldb-reviewer` | `fable` | The orchestrator only | **No code.** Plans fixes; **does** write plan files and review artifacts | worker, mechanic |
+| `afldb-orchestrator` | `opus` | Main session only | **Yes, unrestricted.** Main executor and orchestrator | reviewer, worker, mechanic, closure |
+| `afldb-reviewer` | `fable` | Orchestrator only | **No code.** Plans fixes; **does** write plan files and review artifacts | worker, mechanic |
 | `afldb-worker` | `sonnet` | Orchestrator or reviewer | **Yes, within dispatched scope**; MUST disclose every edit | Nothing |
 | `afldb-mechanic` | `haiku` | Orchestrator or reviewer | **NEVER code.** Mechanical non-code writes only; MUST disclose every edit | Nothing |
-| `afldb-closure` | `sonnet` | The orchestrator only | **No code.** Sole writer of `.phaneslight/registry/` and `documentation/archive/projects/` | Nothing |
+| `afldb-closure` | `sonnet` | Orchestrator only | **No code.** Sole writer of `.phaneslight/registry/` and `documentation/archive/projects/` | Nothing |
 
-**No agent is ever forked** — every spawn carries a self-contained brief. Nesting is at most three
-levels below the main session, which holds by construction since only two roles have a spawn grant.
-**No agent may invoke `afldb-orchestrator`**; only the main session spawns it.
-
-**The write column is PROSE-enforced, not harness-enforced.** `tools:` cannot scope `Write`/`Edit`
-to a path, so the mechanic (which must write docs) holds the worker's write toolset despite "NEVER
-code". Nothing mechanically stops it editing `src/`; what catches it is disclosure plus closure's
-applied-versus-intended reconciliation — which is why an undisclosed edit is drift, not an
-oversight. Spawn grants and models **are** mechanical: only orchestrator and reviewer list `Agent`.
-
-Domain expertise is **not** baked into these five files. The orchestrator composes it per task from
-this file, the relevant `documentation/` slice (index-first) and the affected modules' registry
-files, and injects it into each spawn prompt.
+**No agent is ever forked**; every spawn carries a self-contained brief. **No agent may invoke
+`afldb-orchestrator`** — only the main session does, bounding nesting at three levels. Spawn grants
+and models are **harness-enforced**; the write column is **prose-enforced only**. Domain expertise
+is composed per task into each spawn prompt, never baked into the agent files.
 
 ## Escalation (by severity, never by review pass)
 
-Findings are graded **CRIT / HIGH / MED / LOW / INFO**. LOW and INFO create no work anywhere.
+Grades **CRIT / HIGH / MED / LOW / INFO**. LOW and INFO create no work anywhere.
 
-- **Worker** escalates **MED and above to its own spawner**, immediately, and stops.
-- **Mechanic** escalates **LOW and above to its own spawner** — one grade lower, because it may not
-  write code and so cannot absorb even a trivial fix.
-- **Orchestrator** holding HIGH or CRIT runs the decision matrix: **defer** (recorded in that step's
-  session summary with grade, `file:line` and a one-line justification, carried into the handover) or
-  **dispatch `afldb-reviewer`**. MED it handles itself; MED never reaches the reviewer.
+- **Worker** → **MED and above to its own spawner**, immediately, and stops.
+- **Mechanic** → **LOW and above to its own spawner**: it may not write code, so it cannot absorb
+  even a trivial fix.
+- **Orchestrator** on HIGH/CRIT runs the decision matrix — **defer** (recorded in the step's session
+  summary with grade, `file:line` and a one-line justification, carried into the handover) or
+  **dispatch `afldb-reviewer`**. It handles MED itself; MED never reaches the reviewer.
 - **Reviewer** returns a **plan**, not a fix, and stops. The orchestrator executes it.
 
-**Plan review at launch:** on a planned launch the orchestrator's first act, before any execution
+**Plan review at launch:** the orchestrator's first act on a planned launch, before any execution
 step, is a `afldb-reviewer` review of the plan it was handed. CRIT or HIGH there stops the run and
 goes to the user. No plan, no plan review.
 
@@ -659,59 +648,47 @@ goes to the user. No plan, no plan review.
 
 | Tier | Trigger | Loaded context | Agents | Documentation weight |
 |---|---|---|---|---|
-| **T1** | Single-file change, isolated fix. Must not touch exported API surface, and must not need live external state verified against a running service or DB — either promotes it to T2. (No DB capability is granted to any agent; verifying live DB state is a user-executed command under §9.) | Architecture overview only | Orchestrator alone, or one mechanic — **never two agents**, including on UI tasks | One line in the current session summary |
-| **T2** | Feature or refactor within one module | Overview + that module's deep-dive + its registry file + latest session summary; API queried on demand, never preloaded | Orchestrator + worker(s) + closure at step close | Standalone report + summary entry |
-| **T3** | Multi-module, API change, migration — anything touching ≥2 modules | Overview + all touched module deep-dives + their registry files + active plan | Orchestrator + worker(s), closure between phases | Plan in `documentation/plans/` + reports + summary entry |
+| **T1** | Single-file isolated fix. Touching exported API surface, or needing live service/DB state verified, promotes it to T2. No agent holds a DB capability; live DB checks are user-executed (§9). | Architecture overview only | Orchestrator alone, **or** one mechanic — **never two agents**, UI tasks included | One line in the current session summary |
+| **T2** | Feature or refactor within one module | Overview + that module's deep-dive + registry file + latest session summary; API on demand, never preloaded | Orchestrator + worker(s) + closure at step close | Standalone report + summary entry |
+| **T3** | Multi-module, API change, migration — anything touching ≥2 modules | Overview + all touched deep-dives + their registry files + active plan | Orchestrator + worker(s), closure between phases | Plan in `documentation/plans/` + reports + summary entry |
 
-**Promotion rule:** any agent realising mid-task that scope exceeds its tier's loaded context MUST
-halt and request promotion rather than improvise outside loaded context.
+**Promotion rule:** any agent finding mid-task that scope exceeds its tier's loaded context MUST
+halt and request promotion, never improvise outside it.
 
-**Disclosure is universal; only documentation weight scales.** A T1 mechanical edit is still named
-in its report. An undisclosed edit is reported as drift by `afldb-closure`.
-
-T2/T3 work ends with `afldb-closure`, which independently re-derives the API baseline, re-runs the
-build/typecheck/test itself rather than trusting a producer's claim, and reconciles what was applied
-against what was intended. **Its output is a flag, never a fix.**
+**Disclosure is universal; only documentation weight scales** — a T1 mechanical edit is still named
+in its report, and an **undisclosed edit is drift, not an oversight**: `afldb-closure` reports it as
+such. T2/T3 work ends with `afldb-closure`, which re-derives the API baseline, re-runs
+build/typecheck/test itself rather than trusting a producer's claim, and reconciles applied against
+intended. **Its output is a flag, never a fix.**
 
 ## UI changes (Visual Evidence Mandate)
 
-Any change altering rendered UI carries a visual evidence obligation at **every** tier. The proposal
-declares target viewport(s), affected screens/states, and the reference design where one exists,
-**before** apply; a proposal missing that declaration is refused. After apply, `afldb-closure`
-captures and runs the pass/fail checklist. **Prose approval ("looks good", "should render
-correctly") is FORBIDDEN as approval grounds.** Only captured images or an explicit
-`VISUAL: UNVERIFIED` flag exist.
+Any change altering rendered UI carries a visual evidence obligation at **every** tier. **Before**
+apply the proposal declares target viewport(s), affected screens/states and the reference design
+where one exists; one missing that declaration is refused. After apply `afldb-closure` captures and
+runs the pass/fail checklist. **Prose approval ("looks good", "should render correctly") is
+FORBIDDEN** — only captured images or an explicit `VISUAL: UNVERIFIED` flag exist.
 
-Capture uses **this repository's own Playwright install** (`playwright.config.ts`,
-`playwright.nl-stress.config.ts`, `playwright.admin-nav.config.ts`) via `npx` — no browser MCP is
-granted. Where capture is unavailable or returns empty frames, diagnose why, record it in
-`.phaneslight/config.json` `capabilities.failures[]` and the session summary with a user-eyeball
-request, and proceed marked `VISUAL: UNVERIFIED`. Chains never block on missing tooling; they never
-silently pass visuals either.
+Capture uses **this repository's own Playwright install** via `npx`; no browser MCP is granted. If
+it fails, diagnose why, record it in `.phaneslight/config.json` `capabilities.failures[]` and the
+session summary with a user-eyeball request, then proceed marked `VISUAL: UNVERIFIED` — never block
+on missing tooling, never silently pass a visual.
 
 ## Documentation Navigation
 
-**Documentation Navigation:** NEVER bulk-read or glob-scan `documentation/`. Every folder in it
-carries a GENERATED `_index.md`, read the index first, pick the entry, recurse, and load only
-the target file(s). This binds every agent, the mechanic tier included. Indexes are generated by
-`phaneslight doc-index` and hand-editing them is FORBIDDEN, regenerate to update.
-Audit documentation hygiene with `phaneslight doc-check`.
-
-**This governs `documentation/` only.** `docs/`, `issues.md` and `IssuesIndex.md` keep their own
-§3–§5 read discipline, which is unchanged.
+**NEVER bulk-read or glob-scan `documentation/`.** Every folder carries a GENERATED `_index.md`:
+read it, pick the entry, recurse, load only the target file(s). Binds every agent, mechanic
+included. Hand-editing a generated index is FORBIDDEN — regenerate with `doc-index`, audit with
+`doc-check`. Governs `documentation/` **only**; `docs/`, `issues.md` and `IssuesIndex.md` keep
+their §3–§5 discipline.
 
 ## Scripts (procedure belongs in scripts, not in prompts)
 
 Invoke as **`node .phaneslight/scripts/cli.js <cmd>`** — never a bare `phaneslight`, which is on no
-shell's PATH. Subject to §9: listing a script here is not standing authorisation to run it.
-
-`new-file <module> <path> "<desc>"` (the **only** sanctioned file creation; ≥5-word description),
-`loc-check`, `doc-check`, `doc-index`, `register-check`, `module-list`, `list-apis <module>`,
-`regen-registry [module]`, `api-diff <ref> [module]`, `repo-manifest`, `batch-apply`, `ledger`.
-
-The API baseline at `.phaneslight/registry/` is closure's diff substrate and `list-apis`' data
-source — **not** agent reading material, and not documentation. It covers `.ts`/`.tsx`/`.sql` only;
-every slice records what it did **not** examine, so a zero entry count never means "no surface".
+shell's PATH. **Subject to §9: naming a script is not standing authorisation to run it.**
+`new-file <module> <path> "<desc>"` is the **only** sanctioned file creation (≥5-word description).
+`.phaneslight/registry/` is closure's diff substrate, **not** agent reading material and not
+documentation. Full command table and baseline scope: operating-model doc §11.
 
 ## Installed Capability Register
 
@@ -726,9 +703,9 @@ Rationale is recorded in `SS00001`; do not re-grant without a new operator decis
 
 ## Workflows
 
-Task sequences for this project are codified in `.claude/workflows/`. Choose the workflow matching
-the task and follow it. **§15's lineup and ladder above govern routing, write rights and spawn
-grants; a workflow file that disagrees is the defect.** Workflow YAML never redefines routing.
+Task sequences are codified in `.claude/workflows/`; follow the one matching the task. **§15's
+lineup and ladder govern routing, write rights and spawn grants; a workflow file that disagrees is
+the defect.** Workflow YAML never redefines routing.
 
 <!-- BEGIN:nextjs-agent-rules -->
 
