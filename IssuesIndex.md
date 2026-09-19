@@ -71,19 +71,6 @@
   re-resolve a new deployment child against that registration (`--resolve-against`, new hash,
   §4.5) — never by editing the child or the importer's HALT.
 
-### AFLDB-ISSUE-223 — Pre-existing test regression from AFLDB-ISSUE-221: `GRID_DRAFT_TYPES` reshaped, a `draftguru-acquisition.test.ts` vocabulary-parity test now fails
-- **Severity:** Low. **Area:** test tooling — `tests/draftguru-acquisition.test.ts`,
-  `src/search/grid-solver-spec.ts`.
-- **State:** Open (2026-09-18, found incidentally during AFLDB-ISSUE-222 Phase 1 validation, not
-  caused by it). `AFLDB-ISSUE-221` (commit `f1a8daca`) reshaped `GRID_DRAFT_TYPES` from a bare
-  `as const` string array to `{ value; label }[]` (so the Draft-type dropdown lists "National
-  Draft" once); the "keeps the mapping's draft_type vocabulary set-equal to GRID_DRAFT_TYPES"
-  test's regex extraction no longer matches. DB-free unit test only; no production code affected.
-- **Key files:** `tests/draftguru-acquisition.test.ts` (the failing assertion),
-  `src/search/grid-solver-spec.ts` (the reshaped export, not itself defective).
-- **Next action:** update the test's extraction to the current `{value,label}[]` shape (or import
-  the module directly) and re-confirm the vocabulary is still set-equal in both directions.
-
 **AFLDB-ISSUE-221 resolved 2026-09-18** (implemented 2026-09-17 by Fable 5.1; committed, merged
 and DEV-verified 2026-09-18 by Sonnet 5) — Grid Solver draft-criteria review: honest "No data"
 squares for an axis matching nobody, `draft_type_is` reads `draft_kind`, trade/free-agency rows

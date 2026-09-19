@@ -2096,20 +2096,44 @@ describe("Stage B2-2 event-kind mapping contract", () => {
     expect(new Set(kindsByType.values()).size).toBe(eventKinds.totals.distinct_draft_kind);
   });
 
-  it("keeps the mapping's draft_type vocabulary set-equal to GRID_DRAFT_TYPES", () => {
+  it("keeps the mapping's draft_type vocabulary set-equal to GRID_DRAFT_TYPES/LEGACY_DRAFT_TYPE_LABELS", () => {
+    // AFLDB-ISSUE-221 reshaped GRID_DRAFT_TYPES from a bare raw-label string
+    // array into the deduplicated { value; label } kind list the dropdown
+    // offers, and moved the raw draft_type label vocabulary (still needed to
+    // resolve a pre-ISSUE-221 share link or Gridley rule) to the new
+    // LEGACY_DRAFT_TYPE_LABELS table. The parity contract now spans both.
     const spec = readFileSync(join(root, "src", "search", "grid-solver-spec.ts"), "utf8");
-    const block = /export const GRID_DRAFT_TYPES = \[([\s\S]*?)\] as const;/.exec(spec);
-    expect(block).not.toBeNull();
-    const gridTypes = [...block![1].matchAll(/'([^']+)'/g)].map((m) => m[1]);
 
-    const mappingTypes = [
-      ...eventKinds.events.map((e: any) => e.draft_type),
-      eventKinds.absent_column.draft_type,
-    ];
-    // Both directions: the Grid Solver can offer nothing the importer cannot write,
-    // and the importer can write nothing the Grid Solver cannot offer.
-    expect([...new Set(mappingTypes)].sort()).toEqual([...new Set(gridTypes)].sort());
-    expect(gridTypes).toHaveLength(11);
+    const kindsBlock = /export const GRID_DRAFT_TYPES: \{ value: string; label: string \}\[\] = \[([\s\S]*?)\];/.exec(spec);
+    expect(kindsBlock).not.toBeNull();
+    const gridKinds = [...kindsBlock![1].matchAll(/value:\s*'([^']+)'/g)].map((m) => m[1]);
+
+    const legacyBlock = /const LEGACY_DRAFT_TYPE_LABELS: Record<string, string> = \{([\s\S]*?)\};/.exec(spec);
+    expect(legacyBlock).not.toBeNull();
+    const legacyPairs = [...legacyBlock![1].matchAll(/'([^']+)':\s*'([^']+)'/g)]
+      .map((m) => [m[1], m[2]] as const);
+
+    const kindsByType = new Map<string, string>(
+      eventKinds.events.map((e: any) => [e.draft_type, e.draft_kind]),
+    );
+    kindsByType.set(eventKinds.absent_column.draft_type, eventKinds.absent_column.draft_kind);
+
+    // GRID_DRAFT_TYPES offers the deduplicated draft_kind values only: the
+    // Grid Solver can offer nothing the importer cannot write.
+    expect([...new Set(gridKinds)].sort()).toEqual([...new Set(kindsByType.values())].sort());
+    expect(gridKinds).toHaveLength(10);
+
+    // LEGACY_DRAFT_TYPE_LABELS names exactly the raw draft_type labels the
+    // importer's mapping uses, and resolves each to the correct kind, one
+    // GRID_DRAFT_TYPES still offers: the importer can write nothing the Grid
+    // Solver (directly or via a legacy label) cannot offer.
+    const legacyLabels = legacyPairs.map(([label]) => label);
+    expect([...new Set(legacyLabels)].sort()).toEqual([...kindsByType.keys()].sort());
+    expect(legacyLabels).toHaveLength(11);
+    for (const [label, kind] of legacyPairs) {
+      expect(kind).toBe(kindsByType.get(label));
+      expect(gridKinds).toContain(kind);
+    }
   });
 
   it("keeps the signing head vocabulary set-equal to GRID_SIGNING_KINDS", () => {

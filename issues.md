@@ -37376,36 +37376,83 @@ AFLDB-ISSUE-223/224/225 are not resolved by this closure.
 
 ## AFLDB-ISSUE-223 — Pre-existing test regression from AFLDB-ISSUE-221: `GRID_DRAFT_TYPES` reshaped, `draftguru-acquisition.test.ts`'s vocabulary-parity test now fails
 
-**Status: Open.** Found 2026-09-18 (Sonnet 5) while running the DB-free suite as part of
-`AFLDB-ISSUE-222` Phase 1 validation. Not caused by, and not fixed under, ISSUE-222.
+**Status: Resolved 2026-09-19 (Sonnet 5, operator-validated).** Found 2026-09-18 while running the
+DB-free suite as part of `AFLDB-ISSUE-222` Phase 1 validation. Not caused by, and not fixed
+under, ISSUE-222.
 
 **Symptom:** `tests/draftguru-acquisition.test.ts` → "Stage B2-2 event-kind mapping contract" →
 "keeps the mapping's draft_type vocabulary set-equal to GRID_DRAFT_TYPES" fails with
 `AssertionError: expected null not to be null` at the regex extraction step.
 
-**Root cause:** the test reads `src/search/grid-solver-spec.ts` and extracts `GRID_DRAFT_TYPES`
-with `/export const GRID_DRAFT_TYPES = \[([\s\S]*?)\] as const;/`. `AFLDB-ISSUE-221` (commit
-`f1a8daca`, confirmed via `git log -1 -- src/search/grid-solver-spec.ts`) reshaped
-`GRID_DRAFT_TYPES` from a bare `as const` string array into
-`export const GRID_DRAFT_TYPES: { value: string; label: string }[] = [...]` — a `{value,label}`
-pair per kind, needed so the Draft-type dropdown can list "National Draft" once instead of a
-raw-label duplicate (ISSUE-221's DEV check (d)). The test's regex no longer matches the new
-declaration and the test was not among the suites ISSUE-221's own validation section ran
+**Root cause (confirmed 2026-09-19, code read, not re-derived from the 2026-09-18 note):** the
+test read `src/search/grid-solver-spec.ts` and extracted `GRID_DRAFT_TYPES` with
+`/export const GRID_DRAFT_TYPES = \[([\s\S]*?)\] as const;/`. `AFLDB-ISSUE-221` (commit
+`f1a8daca`) reshaped `GRID_DRAFT_TYPES` from a bare `as const` raw-label string array into
+`export const GRID_DRAFT_TYPES: { value: string; label: string }[] = [...]` — the ten
+deduplicated `draft_kind` values the dropdown now offers — and added a new
+`LEGACY_DRAFT_TYPE_LABELS: Record<string, string>` table holding the eleven raw `draft_type`
+labels (both `'National'` and `'National Draft'` spellings) so a pre-ISSUE-221 share link or
+Gridley rule still resolves. This is more than a broken regex: the test's own vocabulary was
+stale, not just its extraction. `data/reference/draftguru-event-kinds.json`'s `totals` block
+pins `distinct_draft_type: 11` (raw labels) against `distinct_draft_kind: 10` (canonical kinds) —
+comparing the reshaped `GRID_DRAFT_TYPES` (10 kind values) against the 11 raw `draft_type` labels,
+as the original test did, would fail correctly even with a fixed regex, because those two sets
+were never meant to be equal post-ISSUE-221. The parity contract the test protects now spans two
+exports, not one. The test was not among the suites ISSUE-221's own validation section ran
 (`grid-solver-spec`/`grid-solver-timeout`/`gridley-compat`/`grid-solver-under22` only).
 
 **Impact:** DB-free unit test only; no production/query code affected. The underlying claim the
-test protects (the importer's `draft_type` vocabulary — `data/reference/draftguru-event-kinds.json`
-— stays set-equal with the Grid Solver's offered kinds, in both directions) is not otherwise
-re-verified while this test fails.
+test protects (the importer's `draft_type`/`draft_kind` mapping —
+`data/reference/draftguru-event-kinds.json` — stays set-equal with the Grid Solver's offered
+vocabulary, in both directions) was not otherwise re-verified while this test failed.
 
-**Validation:** reproduced via `npx vitest run tests/draftguru-acquisition.test.ts` on a clean
-`sonnet/issue-222` worktree at `main`'s tip plus this session's purely-additive changes (confirmed
-via `git diff --stat` that no pre-issue-222 line was touched).
+**Fix:** `tests/draftguru-acquisition.test.ts` — replaced the single stale assertion with two,
+both regex-extracting from `grid-solver-spec.ts` source text (matching the sibling
+`GRID_SIGNING_KINDS` test's style, no module import introduced):
+1. `GRID_DRAFT_TYPES`'s `value` fields (10) are set-equal to the JSON mapping's distinct
+   `draft_kind` values — the Grid Solver can offer nothing the importer cannot write.
+2. `LEGACY_DRAFT_TYPE_LABELS`'s keys (11) are set-equal to the JSON mapping's distinct raw
+   `draft_type` labels, each legacy entry resolves to the same kind the JSON mapping pins for
+   that label, and that kind is one `GRID_DRAFT_TYPES` still offers — the importer can write
+   nothing the Grid Solver (directly or via a legacy label) cannot offer.
 
-**Next action:** update the test's extraction (read `GRID_DRAFT_TYPES`'s `value` fields — e.g.
-match `value:\s*'([^']+)'` inside the array literal, or import the module directly rather than
-regexing the source) and re-confirm the vocabulary is still set-equal in both directions before
-resolving.
+Confirms `tests/grid-solver-spec.test.ts` ("offers exactly the frozen draft kinds, once each,
+with distinct labels", "resolves a kind or a legacy raw label") already exercises the reshaped
+exports directly via import; this fix brings the DB-free source-text parity test back into
+agreement with that already-current contract instead of introducing a second one.
+
+**Validation — full DraftGuru test file (operator-run 2026-09-19):**
+`npx vitest run tests/draftguru-acquisition.test.ts` → **162 passed, 2 unrelated failures, 3
+skipped.** The fixed "keeps the mapping's draft_type vocabulary set-equal to
+GRID_DRAFT_TYPES/LEGACY_DRAFT_TYPE_LABELS" assertion is among the 162 passes. The 2 failures are
+pre-existing and unrelated to this fix: an ISSUE-222 Phase 3 Markdown artefact hash mismatch, and
+a missing local `data/sources/draftguru/annual-html-20260826` snapshot (gitignored Stage A
+source, not present in this worktree). Neither is addressed here — out of ISSUE-223 scope. This
+run does not mean the whole file passes cleanly; it means the fixed assertion passes and the two
+remaining failures are unrelated to it.
+
+**Validation — isolated ISSUE-223 assertion (operator-run 2026-09-19):**
+`.\node_modules\.bin\vitest.cmd run tests/draftguru-acquisition.test.ts -t "keeps the mapping's
+draft_type vocabulary set-equal to GRID_DRAFT_TYPES/LEGACY_DRAFT_TYPE_LABELS"` → **1 passed, 166
+skipped by the name filter, 1 test file passed, 513 ms.**
+
+**Additional operator-run validation:** `tests/grid-solver-spec.test.ts` 19/19 passed;
+`tsc --noEmit` passed with no errors; `git diff --check` passed (no whitespace errors). The
+zero-byte untracked `draft_kind` file noted at handoff was unrelated tool noise from the prior
+session and has been removed.
+
+**Broader test evidence (not this issue's scope, recorded for context only):** combined
+DraftGuru/Grid Solver run — 181 passed, 2 unrelated failures, 3 skipped (consistent with the two
+runs above: 162 + 19); complete repository run — 5,310 passed, 5 unrelated actual failures, 37
+skipped; integration tests could not initialise in this worktree (expected — DB-free worktree, no
+`AFLDB_TEST_DATABASE_URL`). None of these failures touch the fixed assertion, and none are
+addressed here — out of ISSUE-223 scope.
+
+**Resolution:** the fixed assertion passes both in the full file run and in isolation, and
+`grid-solver-spec.test.ts`/`tsc --noEmit`/`git diff --check` all pass cleanly. The 2 pre-existing,
+unrelated failures in `draftguru-acquisition.test.ts` (ISSUE-222 Markdown artefact hash mismatch;
+missing gitignored Stage A snapshot) remain untouched and are not claimed as fixed. No
+`CHANGELOG.md` entry — test-only fix, no application/data/search/admin behaviour changed.
 
 ## AFLDB-ISSUE-224 — DraftGuru persons whose AFL Tables identity is not registered on the target (`target_not_registered`): post-baseline debutants and numbering/spelling cases cannot link until the identity is registered
 
