@@ -477,19 +477,42 @@
   `draftguru-import.test.ts` 46/46, `tsc` clean, `eslint` unchanged, `git diff --check` clean.
   **No real import has run; `afldb_dev` backup `0768fe01…` intact; the default Stage A label was
   NOT repointed; ISSUE-224/225 untouched.**
+- **First committed link-only DEV dry run FAILED on a reporter type defect; no linkage committed
+  (2026-09-19, Opus 5, §11.19.21, uncommitted fix).** On `6620b279` the DEV `--link-only --dry-run`
+  aborted with `ValueError: Cannot specify ',' with 's'.` at `import_draftguru.py:1307`,
+  `rep.result("mode", LINK_ONLY_MODE)`. **Root cause:** `common.Reporter.result()` is the *count*
+  column (`{count:>9,}` — a thousands separator cannot apply to a string) and `--link-only` was the
+  first caller in `tools/` ever to report a non-numeric value; it passed strings for both `mode`
+  and `stage_a_snapshot`. The 120-check contract missed it because its fake reporter accepted
+  `object`. **No linkage was committed:** the three `UPDATE`s run inside `import_batch()`, whose
+  `except` arm calls `conn.rollback()` before `batch.finish(status="failed", …)`, and `analyze()`
+  is outside the block and never reached — so the only retained state is one `import_batches` row
+  with `status='failed'` and that `ValueError` as its `error` (established from the transaction
+  code; no database contacted). **Fix:** `Reporter` gains `value(label, value)` for strings;
+  `result()` is unchanged, so it still refuses a string and every importer's count formatting is
+  intact. The fake reporter now mirrors the real one's typing, and new checks **7.23–7.25** run the
+  whole link-only write path against the **real** `common.Reporter`, proven RED against `6620b279`
+  (the pre-fix modules reproduce the exact production `ValueError`). Contract now **123/123**;
+  atomicity and import-gate contracts unchanged; `draftguru-import.test.ts` pass; `tsc --noEmit`
+  and `git diff --check` clean; `draftguru-acquisition.test.ts`'s 2 failures are the same
+  pre-existing pair (AFLDB-ISSUE-223 and the `41z` CRLF Markdown hash).
 - **Key files (this pass):** `tools/rebuild/draftguru/{import_draftguru.py, bridge_import_gate.py,
   README.md}`, `tools/migration/common.py`, `tests/python/draftguru_link_only_contract.py` (new),
   `tests/python/draftguru_import_gate_contract.py`, `tests/draftguru-import.test.ts`,
   `tests/draftguru-acquisition.test.ts`.
-- **Next action:** operator stages and commits the `--link-only` importer + gate + contracts +
-  docs, then on the DEV host runs, in this order: `import_draftguru.py --link-only
-  --validate-only`, `--link-only --dry-run`, then `bridge_import_gate.py plan --target dev
-  --link-only --label annual-html-20260902 --bridge
+- **Next action:** operator stages and commits the reporter fix on top of the `--link-only`
+  importer + gate + contracts + docs, then on the DEV host runs, in this order: (1)
+  `import_draftguru.py --link-only --validate-only --bridge <dev child> --no-seed --label
+  annual-html-20260902`; (2) the same command with `--dry-run` instead of `--validate-only`,
+  transcript `…/dev-dryrun-20260919-link-only-retry1.txt`; (3) `bridge_import_gate.py plan --target
+  dev --link-only --label annual-html-20260902 --bridge
   data/reference/draftguru-person-bridge-20260918-v2.afldb_dev.json` writing a NEW transcript
-  `/home/arm/backups/afldb/issue-222/dev-plan-20260919-link-only.txt`. The dry run must precede
-  the plan, because it retains a `failed`/`DryRunComplete` audit row and `verify`'s 8.13 requires
-  exactly `import_batches_before + 1`. Then the real link-only import, two independent verifies,
-  `sync-dev.ps1` and the smoke checks. Nothing is staged or committed by this pass.
+  `/home/arm/backups/afldb/issue-222/dev-plan-20260919-link-only.txt`. **The plan must run after
+  the corrected dry run**, because every dry run retains a `failed` audit row and `verify`'s 8.13
+  requires exactly `import_batches_before + 1`; **no `import_batches_before` value or hash from any
+  earlier attempt may be reused.** Then the real link-only import, two independent verifies,
+  `sync-dev.ps1` and the smoke checks. Nothing is staged or committed by this pass. Full block:
+  `AFLDB-ISSUE-222.md` §11.19.21 item 7.
 
 ### AFLDB-ISSUE-225 — Gridley corpus: 37 pre-existing `incorrect known answer` cells on non-draft criteria, present on `afldb_test` before AFLDB-ISSUE-222 and untouched by it
 - **Severity:** Medium. **Area:** Grid Solver / canonical data — `captaincies`,

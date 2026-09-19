@@ -1304,8 +1304,10 @@ def run_link_only_import(args, prepared: dict, rep) -> int:
             updated = write_link_columns(cur, persons, source_id)
             batch.records_updated = sum(updated.values())
 
-        rep.result("mode", LINK_ONLY_MODE)
-        rep.result("stage_a_snapshot (asserted, not rewritten)", args.label)
+        # value(), not result(): both are strings, and Reporter.result() is the count column
+        # (it renders with a thousands separator, which a string cannot carry).
+        rep.value("mode", LINK_ONLY_MODE)
+        rep.value("stage_a_snapshot (asserted, not rewritten)", args.label)
         rep.result("persons", len(persons))
         rep.result("picks", batch.records_read)
         for name, value in authority.items():

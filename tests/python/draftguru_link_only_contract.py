@@ -487,15 +487,35 @@ section("5. Authority precedence, ambiguity and the fail-closed HALTs")
 
 
 class Rep:
+    """Mirrors ``common.Reporter``'s typing discipline rather than accepting anything.
+
+    The permissive earlier fake -- ``result(label, value: object)`` -- is exactly why the first
+    ``--link-only`` DEV dry run reached the database before dying on
+    ``ValueError: Cannot specify ',' with 's'``: the real ``result()`` is the count column and
+    formats with ``{:>9,}``. So ``result()`` here is numeric-only and strings go to ``value()``,
+    and section 7.23-7.25 runs the write path against the REAL Reporter as well, because a fake
+    -- however strict -- can never prove the real one renders.
+    """
+
     def __init__(self) -> None:
         self.warnings: list[str] = []
-        self.results: list[tuple[str, object]] = []
+        self.results: list[tuple[str, int]] = []
+        self.values: list[tuple[str, str]] = []
 
     def warn(self, message: str) -> None:
         self.warnings.append(message)
 
-    def result(self, label: str, value: object) -> None:
-        self.results.append((label, value))
+    def result(self, label: str, count: int, detail: str = "") -> None:
+        if not isinstance(count, int):
+            raise TypeError(f"Reporter.result() is numeric-only; {label!r} got "
+                            f"{type(count).__name__} -- use Reporter.value()")
+        self.results.append((label, count))
+
+    def value(self, label: str, value: str, detail: str = "") -> None:
+        if not isinstance(value, str):
+            raise TypeError(f"Reporter.value() reports strings; {label!r} got "
+                            f"{type(value).__name__} -- use Reporter.result()")
+        self.values.append((label, value))
 
 
 AFL_PLAYERS = {A_AFL: [1001], B_AFL: [1002], R_AFL: [1003], E_AFL: [1004]}
@@ -684,11 +704,11 @@ def responders(*, extra=None, live=None, linked=False, notes=None):
     return list(extra or []) + base
 
 
-def run_link_only(conn, *, dry_run=False, label=LABEL, prepared=None):
+def run_link_only(conn, *, dry_run=False, label=LABEL, prepared=None, rep=None):
     os.environ["AFLDB_IMPORT_DATABASE_URL"] = "postgresql://contract@never.invalid:1/never_dialled"
     original = common.connect_pg
     common.connect_pg = lambda _dsn=None: conn
-    rep = Rep()
+    rep = Rep() if rep is None else rep
     args = SimpleNamespace(no_seed=True, label=label, link_only=True, dry_run=dry_run,
                            acknowledge_population_drop=False, snapshot_root=None,
                            bridge="child.json", quiet=True)
@@ -779,9 +799,13 @@ check("7.12 the audit row's notes declare mode=link_only, the asserted label and
 check("7.13 the audit row's target_table is draft_persons and records_read is the pick count",
       batch_insert[0][2] == "draft_persons"
       and ("picks", len(PICK_KEYS)) in rep.results, str(rep.results))
-check("7.14 the reporter states the mode and the asserted label",
-      ("mode", imp.LINK_ONLY_MODE) in rep.results
-      and ("stage_a_snapshot (asserted, not rewritten)", LABEL) in rep.results, str(rep.results))
+check("7.14 the reporter states the mode and the asserted label, as STRING values and not as "
+      "counts",
+      ("mode", imp.LINK_ONLY_MODE) in rep.values
+      and ("stage_a_snapshot (asserted, not rewritten)", LABEL) in rep.values
+      and not any(k in ("mode", "stage_a_snapshot (asserted, not rewritten)")
+                  for k, _ in rep.results),
+      str(rep.values) + " / " + str(rep.results))
 
 conn2 = fake.FakeConnection(responders(extra=[(r"UPDATE draft_picks", fake.fail("disk full"))]))
 exc2, _ = run_link_only(conn2)
@@ -830,6 +854,51 @@ check("7.22 re-running over an already-linked target succeeds and is a no-op by 
       exc5 is None and len([s for s in (" ".join(str(p).split())
                                         for k, p, _ in conn5.log if k == "execute")
                             if s.upper().startswith("UPDATE DRAFT")]) == 2, repr(exc5))
+
+# 7.23-7.25: the REAL common.Reporter, not the fake. The first link-only DEV dry run died at
+# `rep.result("mode", LINK_ONLY_MODE)` with `ValueError: Cannot specify ',' with 's'` -- after the
+# three linkage UPDATEs had been sent -- because the fake accepted a string where the real
+# reporter's count column cannot. A permissive fake proves nothing about rendering, so the whole
+# write path runs here against common.Reporter(verbose=True) with its output captured.
+real_rep = common.Reporter(verbose=True)
+conn6 = fake.FakeConnection(responders())
+buf = io.StringIO()
+with contextlib.redirect_stdout(buf):
+    exc6, _ = run_link_only(conn6, rep=real_rep)
+rendered = buf.getvalue()
+check("7.23 the whole link-only write path runs against the REAL common.Reporter without an "
+      "exception (RED before the fix: ValueError: Cannot specify ',' with 's')",
+      exc6 is None, repr(exc6))
+def rendered_row(text: str, label: str) -> str | None:
+    """The trailing value the real reporter printed on ``label``'s own line, or None."""
+    for line in text.splitlines():
+        body = line[4:]
+        if line.startswith("    ") and body.startswith(label):
+            return body[len(label):].strip()
+    return None
+
+
+check("7.24 the real reporter actually rendered the mode, the asserted label and a count",
+      rendered_row(rendered, "mode") == imp.LINK_ONLY_MODE
+      and rendered_row(rendered, "stage_a_snapshot (asserted, not rewritten)") == LABEL
+      and rendered_row(rendered, "picks") == f"{len(PICK_KEYS):,}",
+      repr(rendered))
+real_refuses_string = False
+try:
+    with contextlib.redirect_stdout(io.StringIO()):
+        common.Reporter(verbose=True).result("mode", imp.LINK_ONLY_MODE)
+except ValueError:
+    real_refuses_string = True
+counts = io.StringIO()
+with contextlib.redirect_stdout(counts):
+    common.Reporter(verbose=True).result("picks", 1234567)
+    common.Reporter(verbose=True).value("mode", imp.LINK_ONLY_MODE)
+check("7.25 the fix adds value() without weakening result(): a string is still REFUSED by the "
+      "count column, which keeps its thousands separator, and value() adds none",
+      real_refuses_string
+      and "1,234,567" in counts.getvalue()
+      and f"{imp.LINK_ONLY_MODE}\n" in counts.getvalue(),
+      repr(counts.getvalue()))
 
 
 # ---------------------------------------------------------------------------

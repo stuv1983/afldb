@@ -4563,3 +4563,194 @@ copied or fabricated.
 `AFLDB-ISSUE-222.md` (this section), `issues.md`, `IssuesIndex.md`, `CHANGELOG.md`. Nothing was
 staged or committed. **AFLDB-ISSUE-222 remains open**: the DEV link-only validate-only, dry-run,
 plan, real import, two independent verifies, `sync-dev.ps1` and the smoke checks are still ahead.
+
+#### 11.19.21 First committed link-only DEV dry run FAILED on a reporter type defect after the three linkage `UPDATE`s were sent; rolled back correctly, no linkage committed; fix, real-reporter regression and corrected retry order (2026-09-19, Opus 5)
+
+**No database, SSH, network, import, dry-run, backup, deployment, browser, Gridley,
+AFLDB-ISSUE-224 or AFLDB-ISSUE-225 command was run by the model this pass.** The only commands run
+were `python -m py_compile`, four DB-free contract/test runs, `npx tsc --noEmit`, `git diff --check`
+and two read-only `git show` reads of commit `6620b279`. Nothing was staged or committed.
+
+##### 1. What the operator's run did
+
+On commit `6620b279`, the DEV link-only **transactional dry run** (step 9 of the §11.19.15 item-6
+sequence, in its `--link-only` form) aborted with:
+
+```text
+ValueError: Cannot specify ',' with 's'.
+```
+
+traceback ending at `import_draftguru.py:1307`, `rep.result("mode", LINK_ONLY_MODE)`.
+
+##### 2. Exact root cause — a reporter type error, nothing to do with the data
+
+`tools/migration/common.py`'s `Reporter.result()` is the **count** column:
+
+```python
+print(f"    {label:<34} {count:>9,}{suffix}", flush=True)
+```
+
+The `,` in `{count:>9,}` is the thousands separator, and Python's `str.__format__` rejects a
+thousands separator on a string — hence the exact message. `run_link_only_import()` passed two
+**strings** through it:
+
+```python
+rep.result("mode", LINK_ONLY_MODE)                                  # "link_only"
+rep.result("stage_a_snapshot (asserted, not rewritten)", args.label)  # "annual-html-20260902"
+```
+
+The `--link-only` mode is the first caller anywhere in `tools/` to report a non-numeric value; every
+other `rep.result(...)` call in all 15 importer modules passes a `len()`, a `count(*)` or an integer
+counter, which is why the defect had never been reachable before.
+
+**Why the 120-check DB-free contract did not catch it.** `tests/python/draftguru_link_only_contract.py`'s
+fake reporter was permissive — `def result(self, label: str, value: object)` — so it accepted a
+string where the real `Reporter` cannot render one. The contract proved *what* was reported and
+never that the **real** reporter could render it. That is the testing defect behind the operational
+one, and it is corrected below.
+
+##### 3. The three linkage `UPDATE`s could not have committed — proven from the transaction code
+
+Read against `tools/migration/common.py` (no database was contacted to establish this):
+
+1. `ImportBatch.__post_init__` `INSERT`s the `import_batches` row and **commits it immediately**
+   (`self.conn.commit()`), before any linkage statement. That row therefore exists independently of
+   everything that follows.
+2. `run_link_only_import()` performs all three `UPDATE`s (`write_link_columns()`, line 1304)
+   **inside** the `with import_batch(...)` block and issues **no commit** of its own.
+3. The failing `rep.result(...)` calls are at lines 1307–1308, still **inside** that block. The
+   `ValueError` therefore propagates into `import_batch()`'s `except Exception` arm, which runs
+   `conn.rollback()` **first**, then `batch.finish(status="failed", error=…)`, then re-raises.
+4. `analyze()` — the only statement outside the block — is never reached, so no autocommit switch
+   and no post-commit work occurred.
+
+So the retained state is exactly **one `import_batches` row with `status='failed'` and
+`error="ValueError: Cannot specify ',' with 's'."`**, and **zero** rows changed in `draft_persons`,
+`draft_picks` or `external_identities`. This is the same documented behaviour as a `--dry-run`
+(which raises `DryRunComplete` from the same place), and the contract's checks **7.15–7.18** already
+pin it. The RED run in item 5 below reproduces the audit-row parameters directly:
+`('failed', 6, 0, 4, 0, None, "…", <batch id>)` — `records_updated` counted, status `failed`,
+rollback issued before it, no `ANALYZE`.
+
+**The dry run was a dry run.** Its transaction would have been rolled back on success too. The
+failure changed nothing about `afldb_dev`'s data; it only consumed one `import_batches` id.
+
+##### 4. The fix (smallest type-correct change)
+
+* `tools/migration/common.py` — `Reporter` gains a dedicated **string** reporter beside the count
+  column. `result()` is behaviourally **unchanged**: same signature, same `{count:>9,}` format, so a
+  string is still refused rather than coerced and the thousands separator is intact for all 15
+  existing importers. Its docstring now states the contract and names `value()`.
+
+  ```python
+  def value(self, label: str, value: str, detail: str = "") -> None:
+      if self.verbose:
+          suffix = f"  {detail}" if detail else ""
+          print(f"    {label:<34} {value:>9}{suffix}", flush=True)
+  ```
+
+* `tools/rebuild/draftguru/import_draftguru.py` — the two calls at 1307–1308 become `rep.value(...)`.
+  Nothing else changed: the write set, the statement order, the transaction boundary, the audit
+  row's `notes`, the `no-Stage-A` guarantee, the `--bridge` / `--no-seed` / explicit-`--label`
+  requirements, the gate's hashes and the full reload are all untouched.
+
+##### 5. Regression coverage — the REAL reporter, and proven RED against `6620b279`
+
+`tests/python/draftguru_link_only_contract.py`:
+
+* the fake `Rep` now **mirrors** `common.Reporter`'s typing discipline instead of accepting anything:
+  `result()` raises `TypeError` on a non-`int`, and strings go to `value()`. Check **7.14** asserts
+  the mode and label arrive as string values and that neither appears in the count column.
+* new **7.23–7.25** run the whole link-only write path against **`common.Reporter(verbose=True)`**
+  with stdout captured — not a fake — and assert the run completes, that the reporter actually
+  rendered `mode`, `stage_a_snapshot (asserted, not rewritten)` and a separated count, and that
+  `result()` still refuses a string while keeping its `1,234,567` formatting.
+
+**RED proof.** The current contract file was executed unchanged with `6620b279`'s `common.py` and
+`import_draftguru.py` loaded under their canonical module names (extracted with `git show`, run from
+the session scratchpad; no repository file was modified). Result — the new checks fail, with the
+production error verbatim:
+
+```text
+FAIL  7.1  ... TypeError("Reporter.result() is numeric-only; 'mode' got str -- use Reporter.value()")
+FAIL  7.14 ... [] / []
+FAIL  7.23 the whole link-only write path runs against the REAL common.Reporter without an
+           exception -- ValueError("Cannot specify ',' with 's'.")
+FAIL  7.24 the real reporter actually rendered the mode, the asserted label and a count
+```
+
+(7.17, 7.18 and 7.22 fail on the same cause; the file then aborts at 7.25 on `AttributeError:
+'Reporter' object has no attribute 'value'`, which is itself the absence of the fix.)
+
+##### 6. Validation (DB-free only)
+
+| Command | Result |
+|---|---|
+| `python -m py_compile tools/migration/common.py tools/rebuild/draftguru/import_draftguru.py tests/python/draftguru_link_only_contract.py` | clean |
+| `python tests/python/draftguru_link_only_contract.py` | **123/123 PASS**, 0 FAIL, exit 0 |
+| `python tests/python/draftguru_import_atomicity_contract.py` | all checks hold, exit 0 (unchanged) |
+| `python tests/python/draftguru_import_gate_contract.py` | all checks hold, exit 0 (unchanged) |
+| `npx vitest run tests/draftguru-import.test.ts` | pass |
+| `npx vitest run tests/draftguru-acquisition.test.ts` | 2 failed — **the same two pre-existing failures recorded in §11.19.17 and §11.19.20** (`GRID_DRAFT_TYPES` = AFLDB-ISSUE-223; operator-review `41z` Markdown hash `2ce361f6…` vs pinned `60c529df…`, Windows CRLF). Neither reads any file changed by this pass. |
+| `npx tsc --noEmit` | clean |
+| `git diff --check` | clean |
+
+##### 7. Corrected remote retry order — the dry run must precede the plan
+
+Each link-only dry run **retains a `failed` audit row** (item 3), so it increments
+`import_batches_before`. The authoritative plan must therefore be the **last** read-only step, and
+**no `import_batches_before` value or hash captured before the corrected dry run may be reused** —
+in particular nothing from the failed `6620b279` attempt.
+
+On the DEV host, after the operator has committed this fix and it is present there
+(`AFLDB_IMPORT_DATABASE_URL` = `afldb_dev`, the default DEV `.env` value; `AFLDB_DEV_DATABASE_URL`
+for the gate). Stop at the first non-zero exit or `REFUSED`:
+
+```bash
+CHILD=data/reference/draftguru-person-bridge-20260918-v2.afldb_dev.json
+LABEL=annual-html-20260902   # afldb_dev's accepted snapshot; NOT the CLI default 20260826
+
+# 1) link-only validate-only -- DB-free, contacts nothing
+python tools/rebuild/draftguru/import_draftguru.py --link-only --validate-only \
+  --bridge "$CHILD" --no-seed --label "$LABEL"
+
+# 2) link-only transactional dry run -- sends the three UPDATEs, then rolls them back.
+#    EXPECTED: the authority lines, "mode  link_only", the label line, the write-set lines, the
+#    DRY RUN message, exit 0, and ONE retained import_batches row with status='failed' and
+#    error "DryRunComplete: ". That retained row is expected and must not be deleted.
+python tools/rebuild/draftguru/import_draftguru.py --link-only --dry-run \
+  --bridge "$CHILD" --no-seed --label "$LABEL" \
+  2>&1 | tee /home/arm/backups/afldb/issue-222/dev-dryrun-20260919-link-only-retry1.txt
+
+# 3) authoritative link-only plan -- read-only; run ONLY after step 2, so its
+#    import_batches_before already counts step 2's retained failed row.
+python tools/rebuild/draftguru/bridge_import_gate.py plan --target dev --link-only \
+  --bridge "$CHILD" --label "$LABEL" \
+  --expect-child-sha256 a9652e4a6ca96ced32d64d36cb0a3a1b6cdf1e2591927e628753b399c6647c95 \
+  2>&1 | tee /home/arm/backups/afldb/issue-222/dev-plan-20260919-link-only.txt
+# --expect-child-sha256 is OPTIONAL for --target dev (no DEV child is pinned in TARGETS) but is
+# supplied here deliberately: it is the §11.19.17/§11.19.20 validated child hash, so the plan
+# fails closed if the deployed child is not that artefact.
+# capture after_state_sha256 / picks_after_sha256 / newly_linked_sha256 / baseline_sha256 /
+# import_batches_before from THIS transcript as $DEV_* -- discard every earlier value.
+```
+
+New transcript filenames throughout: the failed attempts' transcripts
+(`dev-plan-20260919-preimport.txt`, `…-retry1.txt` and the operator's failed link-only dry run) are
+retained evidence and must never be overwritten. Steps 11–15 of the §11.19.15 item-6 sequence (the
+real import in its `--link-only` form, the two independent verifies, `sync-dev.ps1`, the smoke
+checks, the closure commit) follow unchanged, using the `$DEV_*` values from step 3 above.
+
+##### 8. Not done in this pass
+
+No Stage A label was repointed; no child, parent, manifest, sample, verdict or review artefact was
+touched; no `20260902` page was reacquired, copied or fabricated; AFLDB-ISSUE-223, AFLDB-ISSUE-224
+and AFLDB-ISSUE-225 were not touched; `bridge_import_gate.py` and
+`tools/rebuild/draftguru/README.md` needed no change (the gate never calls `Reporter`).
+
+**Files changed by this pass:** `tools/migration/common.py`,
+`tools/rebuild/draftguru/import_draftguru.py`, `tests/python/draftguru_link_only_contract.py`,
+`AFLDB-ISSUE-222.md` (this section), `issues.md`, `IssuesIndex.md`, `CHANGELOG.md`. Nothing was
+staged or committed. **AFLDB-ISSUE-222 remains open**: the corrected DEV link-only dry run, the
+authoritative plan, the real import, its two independent verifies, `sync-dev.ps1` and the
+browser/Grid Solver smoke checks are all still ahead.

@@ -906,9 +906,21 @@ class Reporter:
             print(f"  {message}", flush=True)
 
     def result(self, label: str, count: int, detail: str = "") -> None:
+        """Report a NUMERIC result. ``count`` is rendered with a thousands separator, so a
+        string raises ``ValueError: Cannot specify ',' with 's'``. That refusal is the
+        contract, not a defect: this is the count column. Report a string with ``value()``
+        (AFLDB-ISSUE-222, whose first link-only DEV dry run passed ``mode`` through here)."""
         if self.verbose:
             suffix = f"  {detail}" if detail else ""
             print(f"    {label:<34} {count:>9,}{suffix}", flush=True)
+
+    def value(self, label: str, value: str, detail: str = "") -> None:
+        """Report a STRING result in the same column as ``result()``, without the thousands
+        separator a non-number cannot carry. Used for a run's mode and for the label of the
+        snapshot a run asserts but does not rewrite."""
+        if self.verbose:
+            suffix = f"  {detail}" if detail else ""
+            print(f"    {label:<34} {value:>9}{suffix}", flush=True)
 
     def warn(self, message: str) -> None:
         print(f"    WARNING: {message}", flush=True)

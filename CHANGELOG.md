@@ -65,9 +65,21 @@ commit.
   `run_import()` and `validate()` carry no branch on it, and the default Stage A label is
   unchanged. `tools/migration/common.py`'s `import_batch()` gained an optional `notes` parameter
   defaulting to `None`, which is what every existing importer already stored.
-- New DB-free contract `tests/python/draftguru_link_only_contract.py` (120 checks, including
+- New DB-free contract `tests/python/draftguru_link_only_contract.py` (123 checks, including
   falsifiable proofs that a smuggled `SET` column and a moved non-link digest are both caught);
   the existing importer-atomicity and import-gate contracts pass unchanged.
+- **`Reporter.value()` for string results, after the first link-only dry run failed on
+  `ValueError: Cannot specify ',' with 's'` (2026-09-19).** `common.Reporter.result()` is the
+  count column — it formats with `{count:>9,}`, and a thousands separator cannot apply to a
+  string — but `--link-only` reported its `mode` and asserted snapshot label through it, the first
+  non-numeric value any importer had ever passed. `Reporter` now has a dedicated
+  `value(label, value)` for strings; `result()` is unchanged, so it still refuses a string rather
+  than coercing one and every existing importer's count formatting is untouched. **No linkage was
+  committed by the failed run:** the three `UPDATE`s sit inside the `import_batch()` block, which
+  rolls back before recording the batch as `failed`, leaving only that audit row — the behaviour
+  `--dry-run` relies on. The contract's fake reporter, which had accepted arbitrary objects and so
+  hid the defect, now mirrors the real one's typing, and three new checks run the whole link-only
+  write path against the **real** `common.Reporter`, proven RED against the failing commit.
 
 ### DraftGuru importer: data and batch status now commit together; read-only bridge-import plan/verify gates; `afldb_test` backup script (AFLDB-ISSUE-222) - 18 September 2026
 

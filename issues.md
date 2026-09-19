@@ -11,7 +11,7 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-225 | Gridley corpus: 37 pre-existing `incorrect known answer` cells on non-draft criteria (`captain` 20, `teammates-150` 14, `teammates-100` 1, `games250sameclub` 1, `games100clubs2` 1; 14 players) present on `afldb_test` since the 2026-09-13 baseline, untouched by AFLDB-ISSUE-222 | Medium | Grid Solver / canonical data — `captaincies`, `player_club_season_stats`, `tests/integration/gridley-corpus.test.ts` | Open — opened 2026-09-19 under ISSUE-222 decision D3; reproduced 2026-09-17 (pre-import) and 2026-09-19 (report `7f14ff2c…`); root cause not investigated | Investigate the five criteria with targeted read-only queries (captaincies rows for Cameron Bruce / Steven May; the board-1024 teammate counts); classify each cell from canonical evidence; never resolve by reclassification |
 | AFLDB-ISSUE-224 | DraftGuru persons whose AFL Tables identity is not registered on the target (`target_not_registered`): 94 bridge-admissible persons (16 sampled, all operator `agree`) cannot link until the identity is registered — post-baseline (2026) debutants and numbering/spelling cases | Medium | Player registration / import — `external_identities`, fitzRoy core, current-season settle | Open — deferred 2026-09-18 from AFLDB-ISSUE-222 Phase F; none of the 94 is added by the ISSUE-222 import; cause of the registration gap not investigated | After the ISSUE-222 `afldb_test` import verifies, establish the registration path for post-baseline debutants, then re-resolve a new deployment child (§4.5) |
 | AFLDB-ISSUE-220 | Web service credential boundary contradicts the application's `afldb_import` requirement; owner-role code-test DSN and a complete `.env` copy reach the internet-facing process | High | Deployment / runtime security | Open — DEV evidence complete 2026-09-17; runtime branch (a) settled from Next source: the standalone server loads `.next/standalone/.env` at start-up | Sonnet 5 implements `AFLDB-ISSUE-220.md` §6 in a fresh worktree; first establish the build copy mechanism (§4b) |
-| AFLDB-ISSUE-222 | Trusted draft-player linking: DraftGuru Stage B3 person-page acquisition and the person-page bridge into `draft_persons`/`draft_picks` (successor to ISSUE-164 D-9 / ISSUE-093 Stage B3, per ISSUE-221's follow-up) | High | Data acquisition / import — `tools/rebuild/draftguru/`, `tools/db/rebuild-test.ts` | Open — Phases 1–3 executed; Phase F ACCEPTED 2026-09-18 (governance decision 2026-09-19, §11.19.18: Phase F stays accepted at source hash `35c41602…`); `afldb_test` bridge import COMPLETE and verified twice 2026-09-19 (3,470 linked persons, 5,115/6,810 picks; verify `32cf72a5…`); full Gridley corpus rerun done (§11.19.14, 99 → 37 confirmed, zero draft-criterion cells remain); §7.4 rollback exercise SATISFIED 2026-09-19 (§11.19.16); DEV deployment child exported and independently validated (`a9652e4a…`, `target: "dev"`, 48/48, §11.19.17); first real DEV pre-import attempt 2026-09-19 stopped at the read-only `plan` gate on a target-label defect — validate-only and dry-run PASSED, **no real import ran, no row written**, `afldb_dev` backup `0768fe01…` intact (§11.19.19); second DEV attempt 2026-09-19 REFUSED on 6.4/6.6/6.7 — root cause is a Stage A **label** mismatch (`afldb_dev` holds the accepted `annual-html-20260902`; the CLI default still names the superseded `annual-html-20260826`), a deterministic pinned-source mismatch, not drift; the `20260902` raw pages exist nowhere and must not be reacquired, so a fail-closed **`--link-only`** mode was implemented (§11.19.20, DB-free proven 120/120, uncommitted); **no real import has run, no row written**, `afldb_dev` backup `0768fe01…` intact; DEV/PROD data unchanged | Operator: stage and commit the `--link-only` importer + gate + contracts + docs, then on the DEV host run `--link-only --validate-only`, then `--link-only --dry-run`, then `bridge_import_gate.py plan --target dev --link-only --label annual-html-20260902` writing a NEW transcript `/home/arm/backups/afldb/issue-222/dev-plan-20260919-link-only.txt` (the dry run must precede the plan, so `import_batches_before` covers its retained `failed` row) |
+| AFLDB-ISSUE-222 | Trusted draft-player linking: DraftGuru Stage B3 person-page acquisition and the person-page bridge into `draft_persons`/`draft_picks` (successor to ISSUE-164 D-9 / ISSUE-093 Stage B3, per ISSUE-221's follow-up) | High | Data acquisition / import — `tools/rebuild/draftguru/`, `tools/db/rebuild-test.ts` | Open — Phases 1–3 executed; Phase F ACCEPTED 2026-09-18 (governance decision 2026-09-19, §11.19.18: Phase F stays accepted at source hash `35c41602…`); `afldb_test` bridge import COMPLETE and verified twice 2026-09-19 (3,470 linked persons, 5,115/6,810 picks; verify `32cf72a5…`); full Gridley corpus rerun done (§11.19.14, 99 → 37 confirmed, zero draft-criterion cells remain); §7.4 rollback exercise SATISFIED 2026-09-19 (§11.19.16); DEV deployment child exported and independently validated (`a9652e4a…`, `target: "dev"`, 48/48, §11.19.17); first real DEV pre-import attempt 2026-09-19 stopped at the read-only `plan` gate on a target-label defect — validate-only and dry-run PASSED, **no real import ran, no row written**, `afldb_dev` backup `0768fe01…` intact (§11.19.19); second DEV attempt 2026-09-19 REFUSED on 6.4/6.6/6.7 — root cause is a Stage A **label** mismatch (`afldb_dev` holds the accepted `annual-html-20260902`; the CLI default still names the superseded `annual-html-20260826`), a deterministic pinned-source mismatch, not drift; the `20260902` raw pages exist nowhere and must not be reacquired, so a fail-closed **`--link-only`** mode was implemented (§11.19.20, DB-free proven 120/120, uncommitted); the first committed link-only DEV **dry run** (`6620b279`) then FAILED with `ValueError: Cannot specify ',' with 's'.` — `common.Reporter.result()` is the count column (`{count:>9,}`) and the mode reported two strings through it — and the linkage **could not have committed**: the three `UPDATE`s sit inside `import_batch()`, which rolls back before recording the batch `failed`, so only that audit row was retained (§11.19.21, fix + real-reporter regression proven RED against `6620b279`, contract now 123/123, uncommitted); **no real import has run, no row written**, `afldb_dev` backup `0768fe01…` intact; DEV/PROD data unchanged | Operator: stage and commit the `--link-only` importer + gate + contracts + docs **including the `Reporter.value()` fix**, then on the DEV host run, in this order, `--link-only --validate-only`, `--link-only --dry-run` (new transcript), then `bridge_import_gate.py plan --target dev --link-only --label annual-html-20260902` writing a NEW transcript `/home/arm/backups/afldb/issue-222/dev-plan-20260919-link-only.txt`. The plan must run **after** the corrected dry run, since each dry run retains a `failed` audit row; no earlier `import_batches_before` value or hash may be reused (§11.19.21 item 7) |
 | AFLDB-ISSUE-223 | Pre-existing DB-free test regression: `tests/draftguru-acquisition.test.ts`'s "keeps the mapping's draft_type vocabulary set-equal to GRID_DRAFT_TYPES" fails on current `main` — `GRID_DRAFT_TYPES` in `src/search/grid-solver-spec.ts` was reshaped from a bare string array to `{ value; label }[]` by AFLDB-ISSUE-221 (`f1a8daca`), and the consuming regex (`/export const GRID_DRAFT_TYPES = \[([\s\S]*?)\] as const;/`) no longer matches | Low | Test tooling — `tests/draftguru-acquisition.test.ts`, `src/search/grid-solver-spec.ts` | Open — found 2026-09-18 during AFLDB-ISSUE-222 Phase 1 validation; confirmed via `git log -1 -- src/search/grid-solver-spec.ts` = `f1a8daca` (the ISSUE-221 implementation commit); no production code affected, DB-free unit test only | Update the test's extraction regex (or assertion) to the current `GRID_DRAFT_TYPES: { value; label }[]` shape and re-verify the vocabulary is still set-equal in both directions |
 
 AFLDB-ISSUE-220 opened 2026-09-17 (Fable 5.1 code review outside NL search, DEV evidence
@@ -37220,6 +37220,63 @@ PENDING.** Full record: `AFLDB-ISSUE-222.md` §11.12, `AFLDB-ISSUE-222-PHASE3-CO
   verdict or review artefact was touched; no `20260902` page was reacquired, copied or fabricated;
   ISSUE-224/225 untouched. No database, import, dry-run, backup, Git, network, deployment or
   Gridley command ran; nothing staged or committed.
+
+- **First committed link-only DEV dry run FAILED on a reporter type defect; the linkage could not
+  have committed; fixed with a real-reporter regression (2026-09-19, Opus 5,
+  `AFLDB-ISSUE-222.md` §11.19.21; uncommitted).** On `6620b279` the DEV `--link-only --dry-run`
+  aborted with `ValueError: Cannot specify ',' with 's'.`, traceback ending at
+  `import_draftguru.py:1307`, `rep.result("mode", LINK_ONLY_MODE)`.
+  **Root cause:** `tools/migration/common.py`'s `Reporter.result()` is the count column —
+  `print(f"    {label:<34} {count:>9,}{suffix}")` — and Python refuses a thousands separator on a
+  string. `run_link_only_import()` reported two strings through it (`mode` and
+  `stage_a_snapshot (asserted, not rewritten)`); `--link-only` is the first caller anywhere in
+  `tools/` to report a non-numeric value, every other `rep.result(...)` in all 15 importer modules
+  passing a `len()`, a `count(*)` or an integer counter. The 120-check DB-free contract missed it
+  because its fake reporter was `def result(self, label: str, value: object)` — it proved *what*
+  was reported, never that the real reporter could render it.
+  **No linkage was or could have been committed (established from the transaction code; no
+  database was contacted).** `ImportBatch.__post_init__` commits the `import_batches` row
+  immediately, before any linkage statement; the three `UPDATE`s
+  (`write_link_columns()`, line 1304) and the failing reporter calls (1307–1308) are both inside
+  the `with import_batch(...)` block, which issues no commit of its own; `import_batch()`'s
+  `except Exception` arm runs `conn.rollback()` **before** `batch.finish(status="failed", error=…)`
+  and re-raises; `analyze()` sits outside the block and was never reached. Retained state is
+  therefore exactly one `import_batches` row, `status='failed'`, `error="ValueError: Cannot
+  specify ',' with 's'."`, and zero changed rows in `draft_persons`, `draft_picks` or
+  `external_identities` — the same behaviour `--dry-run` relies on and that contract checks
+  7.15–7.18 already pin.
+  **Fix (smallest type-correct):** `Reporter` gains `value(label, value, detail="")`, printing in
+  the same column without the separator; `result()` is behaviourally unchanged, so a string is
+  still refused rather than coerced and all 15 importers' count formatting is untouched; the two
+  importer calls become `rep.value(...)`. Nothing else changed — write set, statement order,
+  transaction boundary, audit `notes`, the no-Stage-A guarantee, the `--bridge` / `--no-seed` /
+  explicit-`--label` requirements, the gate's hashes and summary contracts, and the full reload.
+  **Regression:** the contract's fake `Rep` now mirrors the real reporter's typing (`result()`
+  raises `TypeError` on a non-`int`; strings go to `value()`), check 7.14 requires the mode and
+  label to arrive as string values and in neither count slot, and new **7.23–7.25** run the whole
+  link-only write path against **`common.Reporter(verbose=True)`** with stdout captured, assert
+  the rendered mode/label/count, and assert `result()` still refuses a string while keeping
+  `1,234,567` formatting. **Proven RED against `6620b279`:** the unchanged contract file executed
+  with that commit's `common.py` and `import_draftguru.py` loaded under their canonical module
+  names (read via `git show`, run from the session scratchpad; no repository file modified) fails
+  7.1/7.14/7.17/7.18/7.22/7.23/7.24, with 7.23 reporting the production
+  `ValueError("Cannot specify ',' with 's'.")` verbatim.
+  **Validation (DB-free only):** `py_compile` on the three changed files clean;
+  `draftguru_link_only_contract.py` **123/123 PASS**, exit 0;
+  `draftguru_import_atomicity_contract.py` and `draftguru_import_gate_contract.py` both unchanged
+  and passing; `npx vitest run tests/draftguru-import.test.ts` pass;
+  `npx vitest run tests/draftguru-acquisition.test.ts` 2 failed — the same pre-existing pair
+  recorded in §11.19.17/§11.19.20 (AFLDB-ISSUE-223's `GRID_DRAFT_TYPES`; the operator-review `41z`
+  Markdown hash `2ce361f6…` vs pinned `60c529df…`), neither reading any file changed by this pass;
+  `npx tsc --noEmit` clean; `git diff --check` clean.
+  **Corrected remote retry order (§11.19.21 item 7):** link-only validate-only → link-only
+  transactional dry run → authoritative link-only plan. The plan must be last because every dry
+  run retains a `failed` audit row and `verify`'s 8.13 requires exactly
+  `import_batches_before + 1`; **no `import_batches_before` value or hash captured before the
+  corrected dry run may be reused**, and each attempt writes a new transcript filename.
+  No database, SSH, network, import, dry-run, backup, deployment, browser, Gridley,
+  AFLDB-ISSUE-224 or AFLDB-ISSUE-225 command ran; nothing staged or committed;
+  AFLDB-ISSUE-222 remains **Open**.
 
 ## AFLDB-ISSUE-223 — Pre-existing test regression from AFLDB-ISSUE-221: `GRID_DRAFT_TYPES` reshaped, `draftguru-acquisition.test.ts`'s vocabulary-parity test now fails
 
