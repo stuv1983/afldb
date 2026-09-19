@@ -47,10 +47,16 @@ Database discipline (identical in every target):
     DSN's path must be exactly ``/afldb_test`` or ``/afldb_dev`` respectively; the server's
     ``current_database()`` is checked again after connecting;
   * ``dev`` has no default bridge dataset -- ``--bridge`` is mandatory for ``--target dev`` and
-    is refused outright if it resolves to the ``afldb_test`` child path, so a DEV run can never
-    silently verify the test child instead; the child's own ``target`` field is also checked
-    against the selected database, so an ``afldb_test``-labelled child is refused under
-    ``--target dev`` even if some other path pointed at it;
+    is refused outright if it is the ``afldb_test`` child by resolved path, by the tracked
+    ``.afldb_test.json`` naming convention or by its pinned bytes under any other name, so a DEV
+    run can never silently verify the test child instead; the child's own ``target`` field is
+    also checked -- against the target specification's ``child_target`` LABEL, never against the
+    physical database name -- so an ``afldb_test``-labelled child is refused under ``--target
+    dev`` even if some other path pointed at it. The label and the database name are separate
+    fields because the exporter's own vocabulary (``export_person_bridge.TARGET_DSN_ENV``) is
+    asymmetric: ``--resolve-against afldb_test`` stamps ``target: "afldb_test"`` while
+    ``--resolve-against dev`` stamps ``target: "dev"`` on a child for the ``afldb_dev``
+    database. Only the ``test`` specification says the two are identical;
   * the connection is opened with ``default_transaction_read_only=on`` and ``TimeZone=UTC``,
     marked read-only and REPEATABLE READ, and the server's ``transaction_read_only`` and
     ``default_transaction_read_only`` are both asserted ``on`` before any other statement;
@@ -93,6 +99,18 @@ TOOL_VERSION = "1.0.0"
 DSN_ENV = "AFLDB_TEST_DATABASE_URL"
 REQUIRED_DATABASE = "afldb_test"
 
+# The deployment-target LABEL a child artefact carries in its own ``target`` field. This is the
+# exporter's ``--resolve-against`` value (``export_person_bridge.TARGET_DSN_ENV`` key), NOT the
+# physical database name, and the two are deliberately not the same vocabulary: the accepted
+# ``afldb_test`` child carries ``"afldb_test"`` (which happens to equal its database name) while
+# the accepted ``afldb_dev`` child carries ``"dev"``. Comparing a child's ``target`` with a
+# database name is therefore only ever correct where a target specification says the two are
+# identical, which is why they are separate fields in TARGETS below. These literals are pinned
+# against the exporter's own source by tests/python/draftguru_import_gate_contract.py and match
+# validate_person_bridge_child.TEST_TARGET_LABEL / DEV_TARGET_LABEL exactly.
+TEST_CHILD_TARGET = "afldb_test"
+DEV_CHILD_TARGET = "dev"
+
 CHILD_REL = "data/reference/draftguru-person-bridge-20260918-v2.afldb_test.json"
 EXPECTED_CHILD_SHA256 = "b996c60e9d4de3aeb6f250f360b2a66164a2211b9604338a65918e79fa29e1c5"
 # The child's withheld[] rows carry (player_url, reason) only; the identity a
@@ -118,19 +136,29 @@ EXPECTED_POPULATION = {"persons": imp.EXPECTED_PERSONS, "picks": imp.EXPECTED_RO
 DEV_DATABASE = "afldb_dev"
 DEV_DSN_ENV = "AFLDB_DEV_DATABASE_URL"
 
+# ``database`` is the physical PostgreSQL database this target connects to and asserts through
+# ``current_database()``; ``child_target`` is the LABEL the target's deployment child must carry
+# in its own ``target`` field. They are separate fields on purpose (see TEST_CHILD_TARGET above):
+# they coincide for ``test`` and differ for ``dev``, and nothing in this tool may assume either.
 TARGETS: dict[str, dict[str, Any]] = {
     "test": {
-        "database": REQUIRED_DATABASE, "dsn_env": DSN_ENV,
+        "database": REQUIRED_DATABASE, "child_target": TEST_CHILD_TARGET, "dsn_env": DSN_ENV,
         "child_rel": CHILD_REL, "expected_child_sha256": EXPECTED_CHILD_SHA256,
         "expected_child_counts": EXPECTED_CHILD_COUNTS,
     },
     "dev": {
-        # No default child, no pinned hash, no pinned counts: the DEV deployment child does not
-        # exist yet. --bridge and (optionally) --expect-child-sha256 must be supplied explicitly.
-        "database": DEV_DATABASE, "dsn_env": DEV_DSN_ENV,
+        # No default child, no pinned hash, no pinned counts: a DEV deployment child is a live
+        # per-target registration measurement, so --bridge and (optionally)
+        # --expect-child-sha256 are supplied explicitly on every run.
+        "database": DEV_DATABASE, "child_target": DEV_CHILD_TARGET, "dsn_env": DEV_DSN_ENV,
         "child_rel": None, "expected_child_sha256": None, "expected_child_counts": None,
     },
 }
+
+# A DENY rule only, mirroring validate_person_bridge_child.refuse_test_child_under_dev: the
+# tracked naming convention of the afldb_test child. A filename never grants trust here, it can
+# only lose it.
+TEST_CHILD_SUFFIX = ".afldb_test.json"
 
 _DG = "https://www.draftguru.com.au/players/"
 # The two Phase 3 rejections (AFLDB-ISSUE-222.md §11.13/§11.14): neither person may link and
@@ -317,7 +345,10 @@ def with_read_only(conn_factory: Callable[[], Any], body: Callable[[SelectOnlyCu
 # ---------------------------------------------------------------------------
 
 def load_child(path: Path, expect_sha256: str | None, expect_counts: dict | None,
-               required_database: str = REQUIRED_DATABASE) -> tuple[dict, str]:
+               expect_child_target: str = TEST_CHILD_TARGET) -> tuple[dict, str]:
+    """Load and pin a deployment child. ``expect_child_target`` is the target specification's
+    ``child_target`` LABEL -- the exporter's own ``--resolve-against`` value -- never the
+    physical database name (they differ for DEV; see TEST_CHILD_TARGET)."""
     if not path.is_file():
         raise GateError(f"bridge dataset not found: {path.as_posix()}")
     data = path.read_bytes()
@@ -328,8 +359,11 @@ def load_child(path: Path, expect_sha256: str | None, expect_counts: dict | None
     doc = json.loads(data.decode("utf-8"))
     if doc.get("kind") != "deployment":
         raise GateError("REFUSED: the dataset is not a deployment child (kind != 'deployment')")
-    if doc.get("target") != required_database:
-        raise GateError(f"REFUSED: the child targets {doc.get('target')!r}, not {required_database}")
+    if doc.get("target") != expect_child_target:
+        raise GateError(f"REFUSED: the child targets {doc.get('target')!r}, not "
+                        f"{expect_child_target!r} (the exporter's deployment-target label for "
+                        "this --target; a child is never labelled with a database name unless "
+                        "the target specification says the two are identical)")
     if doc.get("schema_version") != 1:
         raise GateError("REFUSED: unsupported child schema_version")
     withheld = doc.get("withheld") or []
@@ -342,6 +376,28 @@ def load_child(path: Path, expect_sha256: str | None, expect_counts: dict | None
             if observed.get(key, 0) != value:
                 raise GateError(f"REFUSED: child count {key} is {observed.get(key, 0)}, expected {value}")
     return doc, digest
+
+
+def refuse_test_child_under(target: str, child_path: Path) -> None:
+    """Refuse the pinned ``afldb_test`` child under any non-``test`` target -- by resolved path,
+    by the tracked ``.afldb_test.json`` naming convention, and by its pinned bytes under any
+    other name. All three are DENY rules: a name can never make a file trusted here, only
+    refused, and the bytes rule is what stops a rename from laundering the test child into a DEV
+    deployment child. This runs before any DSN is read and before any connection is opened."""
+    if target == "test":
+        return
+    test_default_child = (REPO_ROOT / CHILD_REL).resolve()
+    try:
+        same_file = child_path.resolve() == test_default_child
+    except OSError:                                   # unresolvable path: treat as different
+        same_file = False
+    if same_file or child_path.name.endswith(TEST_CHILD_SUFFIX):
+        raise GateError(f"REFUSED: --bridge for --target {target} must not be the afldb_test "
+                        f"child ({CHILD_REL})")
+    if child_path.is_file() and sha256_bytes(child_path.read_bytes()) == EXPECTED_CHILD_SHA256:
+        raise GateError(f"REFUSED: --bridge for --target {target} must not be the afldb_test "
+                        f"child -- these bytes are the pinned afldb_test child's (sha256 "
+                        f"{EXPECTED_CHILD_SHA256}), whatever the file is called")
 
 
 def load_parent_map(path: Path, child: dict, expect_sha256: str | None) -> dict[str, str]:
@@ -1172,16 +1228,13 @@ def main(argv: list[str] | None = None) -> int:
         child_path = Path(args.bridge)
         if not child_path.is_absolute():
             child_path = REPO_ROOT / child_path
-        if args.target != "test":
-            test_default_child = (REPO_ROOT / CHILD_REL).resolve()
-            if child_path.resolve() == test_default_child:
-                raise GateError(f"REFUSED: --bridge for --target {args.target} must not be "
-                                "the afldb_test child")
+        refuse_test_child_under(args.target, child_path)
         parent_path = Path(args.parent)
         if not parent_path.is_absolute():
             parent_path = REPO_ROOT / parent_path
         child, child_sha = load_child(child_path, args.expect_child_sha256,
-                                      cfg["expected_child_counts"], required_database=cfg["database"])
+                                      cfg["expected_child_counts"],
+                                      expect_child_target=cfg["child_target"])
         parent_map = load_parent_map(parent_path, child, args.expect_parent_sha256)
         prepared = imp.validate(SimpleNamespace(label=args.label, snapshot_root=args.snapshot_root,
                                                 bridge=str(child_path)))

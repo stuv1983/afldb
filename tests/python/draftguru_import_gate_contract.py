@@ -25,6 +25,7 @@ No database connection, no network request, no Git command.
 
 from __future__ import annotations
 
+import ast
 import contextlib
 import copy
 import io
@@ -95,8 +96,19 @@ CHILD = {
                  {"player_url": R, "reason": "different_person_wrong_href"}],
 }
 CHILD_SHA = "c" * 64
-# Same shape, a different target: proves the gate's DEV generalisation without duplicating the frame.
-DEV_CHILD = dict(CHILD, target="afldb_dev")
+# Same shape, the real DEV deployment label: the exporter stamps `--resolve-against dev` verbatim
+# into `target`, so the accepted afldb_dev child carries "dev", NOT the database name. This is the
+# exact shape of data/reference/draftguru-person-bridge-20260918-v2.afldb_dev.json (checked against
+# the real file in section 8 below) and proves the gate's DEV generalisation without duplicating
+# the frame.
+DEV_CHILD = dict(CHILD, target="dev")
+# The database-named mislabel the fail-closed target model must refuse under --target dev: no
+# exporter run ever produces it, so accepting it would mean the gate was comparing the child's
+# target with the physical database name instead of the target specification's label.
+DEV_CHILD_DATABASE_LABELLED = dict(CHILD, target="afldb_dev")
+
+REAL_DEV_CHILD_REL = "data/reference/draftguru-person-bridge-20260918-v2.afldb_dev.json"
+REAL_DEV_CHILD_SHA256 = "a9652e4a6ca96ced32d64d36cb0a3a1b6cdf1e2591927e628753b399c6647c95"
 
 
 def prepared_frame() -> dict:
@@ -339,6 +351,14 @@ section("2b. --target generalisation: explicit test, explicit dev, DSN separatio
 check("2b.0 the default target is test, and dev is a separate, closed second entry",
       sorted(tool.TARGETS) == ["dev", "test"] and tool.TARGETS["test"]["database"] == "afldb_test"
       and tool.TARGETS["dev"]["database"] == "afldb_dev")
+check("2b.0aa the target specification carries the physical database and the child's own "
+      "deployment-target LABEL as SEPARATE fields, and they differ for dev",
+      tool.TARGETS["test"]["database"] == "afldb_test"
+      and tool.TARGETS["test"]["child_target"] == "afldb_test"
+      and tool.TARGETS["dev"]["database"] == "afldb_dev"
+      and tool.TARGETS["dev"]["child_target"] == "dev"
+      and tool.TARGETS["dev"]["database"] != tool.TARGETS["dev"]["child_target"],
+      str({t: (c["database"], c["child_target"]) for t, c in tool.TARGETS.items()}))
 check("2b.0a test and dev read different environment variables (never the importer's write DSN)",
       tool.TARGETS["test"]["dsn_env"] == tool.DSN_ENV == "AFLDB_TEST_DATABASE_URL"
       and tool.TARGETS["dev"]["dsn_env"] == "AFLDB_DEV_DATABASE_URL"
@@ -829,33 +849,144 @@ except tool.GateError as exc:
 check("7.7 a server reporting afldb_test when required_database is afldb_dev is refused before any read",
       dev_db_refused)
 
-section("8. Refusal of cross-target child artefacts")
+# The physical-database guard is on current_database() and stays the DATABASE name: the CLI
+# target label 'dev' is not a database and a server reporting it must be refused, exactly as any
+# other wrong database is. This is the other half of the separated target model.
+dev_label_db = World(bridged=False, database="dev")
+try:
+    run("plan", dev_label_db, child=DEV_CHILD, required_database="afldb_dev")
+    dev_label_refused = False
+except tool.GateError as exc:
+    dev_label_refused = "connected database" in str(exc)
+check("7.8 a server whose current_database() is the LABEL 'dev' is refused -- the DEV physical "
+      "database guard remains exactly afldb_dev", dev_label_refused)
+check("7.9 the DEV target's current_database guard is the database name, not the child label",
+      tool.TARGETS["dev"]["database"] == "afldb_dev" != tool.TARGETS["dev"]["child_target"])
+
+section("8. Refusal of cross-target child artefacts (target LABEL, never the database name)")
+
+DEV_CHILD_TARGET = tool.TARGETS["dev"]["child_target"]
+TEST_CHILD_TARGET = tool.TARGETS["test"]["child_target"]
 
 with tempfile.TemporaryDirectory() as tmp:
     test_child_path = Path(tmp) / "test_child.json"
     test_child_path.write_text(json.dumps(CHILD), encoding="utf-8")
     test_child_sha = tool.sha256_bytes(test_child_path.read_bytes())
     try:
-        tool.load_child(test_child_path, test_child_sha, None, required_database="afldb_dev")
+        tool.load_child(test_child_path, test_child_sha, None,
+                        expect_child_target=DEV_CHILD_TARGET)
         cross_ok, cross_message = True, ""
     except tool.GateError as exc:
         cross_ok, cross_message = False, str(exc)
-    check("8.1 an afldb_test-labelled child is refused when required_database is afldb_dev",
-          not cross_ok and "afldb_dev" in cross_message, cross_message)
+    check("8.1 an afldb_test-labelled child is refused under the dev target label",
+          not cross_ok and "'dev'" in cross_message, cross_message)
 
     dev_child_path = Path(tmp) / "dev_child.json"
     dev_child_path.write_text(json.dumps(DEV_CHILD), encoding="utf-8")
     dev_child_sha = tool.sha256_bytes(dev_child_path.read_bytes())
-    doc, digest = tool.load_child(dev_child_path, dev_child_sha, None, required_database="afldb_dev")
-    check("8.2 an afldb_dev-labelled child loads cleanly under required_database=afldb_dev",
-          digest == dev_child_sha and doc["target"] == "afldb_dev")
+    doc, digest = tool.load_child(dev_child_path, dev_child_sha, None,
+                                  expect_child_target=DEV_CHILD_TARGET)
+    check("8.2 the real DEV child shape (target='dev') loads cleanly under the dev target label",
+          digest == dev_child_sha and doc["target"] == "dev")
     try:
-        tool.load_child(dev_child_path, dev_child_sha, None, required_database="afldb_test")
+        tool.load_child(dev_child_path, dev_child_sha, None,
+                        expect_child_target=TEST_CHILD_TARGET)
         reverse_ok = True
     except tool.GateError:
         reverse_ok = False
-    check("8.3 the reverse is also refused: an afldb_dev-labelled child under required_database=afldb_test",
+    check("8.3 the reverse is also refused: a target='dev' child under the test target label",
           not reverse_ok)
+
+    # The regression the real DEV pre-import attempt hit: a child labelled with the PHYSICAL
+    # database name is not what any exporter run produces, and accepting it would mean the gate
+    # had gone back to comparing child.target with current_database().
+    db_labelled_path = Path(tmp) / "dev_child_database_labelled.json"
+    db_labelled_path.write_text(json.dumps(DEV_CHILD_DATABASE_LABELLED), encoding="utf-8")
+    db_labelled_sha = tool.sha256_bytes(db_labelled_path.read_bytes())
+    try:
+        tool.load_child(db_labelled_path, db_labelled_sha, None,
+                        expect_child_target=DEV_CHILD_TARGET)
+        db_label_ok, db_label_message = True, ""
+    except tool.GateError as exc:
+        db_label_ok, db_label_message = False, str(exc)
+    check("8.4 a child labelled with the PHYSICAL database name ('afldb_dev') is refused under "
+          "the dev target -- the label is never the database name",
+          not db_label_ok and "'afldb_dev'" in db_label_message, db_label_message)
+
+    # DENY-only guards: the afldb_test child cannot be laundered into a DEV run by renaming it.
+    renamed = Path(tmp) / "innocent-looking-child.json"
+    renamed.write_bytes((ROOT / tool.CHILD_REL).read_bytes())
+    try:
+        tool.refuse_test_child_under("dev", renamed)
+        bytes_ok, bytes_message = True, ""
+    except tool.GateError as exc:
+        bytes_ok, bytes_message = False, str(exc)
+    check("8.5 the pinned afldb_test child is refused under --target dev by its BYTES even "
+          "under a neutral filename", not bytes_ok and "sha256" in bytes_message, bytes_message)
+    try:
+        tool.refuse_test_child_under("dev", Path(tmp) / "something-v9.afldb_test.json")
+        name_ok = True
+    except tool.GateError:
+        name_ok = False
+    check("8.6 a .afldb_test.json name is refused under --target dev (DENY rule, file need not "
+          "exist)", not name_ok)
+    try:
+        tool.refuse_test_child_under("test", ROOT / tool.CHILD_REL)
+        test_default_ok = True
+    except tool.GateError:
+        test_default_ok = False
+    check("8.7 the same guard never fires on --target test (the default path is unchanged)",
+          test_default_ok)
+
+section("8b. The real committed DEV child carries the exporter's real label")
+
+real_dev = ROOT / REAL_DEV_CHILD_REL
+check("8b.1 the real DEV deployment child exists, hashes to the operator-reported sha256, and "
+      "declares target='dev'",
+      real_dev.is_file()
+      and tool.sha256_bytes(real_dev.read_bytes()) == REAL_DEV_CHILD_SHA256
+      and json.loads(real_dev.read_bytes().decode("utf-8")).get("target") == DEV_CHILD_TARGET,
+      str(real_dev))
+real_doc, real_digest = tool.load_child(real_dev, REAL_DEV_CHILD_SHA256, None,
+                                        expect_child_target=DEV_CHILD_TARGET)
+check("8b.2 load_child accepts the real DEV child under the dev target label",
+      real_digest == REAL_DEV_CHILD_SHA256 and real_doc["kind"] == "deployment")
+try:
+    tool.load_child(real_dev, REAL_DEV_CHILD_SHA256, None, expect_child_target=TEST_CHILD_TARGET)
+    real_cross_ok = True
+except tool.GateError:
+    real_cross_ok = False
+check("8b.3 the real DEV child is refused under the test target label", not real_cross_ok)
+
+real_test_child = ROOT / tool.CHILD_REL
+real_test_doc, _ = tool.load_child(real_test_child, tool.EXPECTED_CHILD_SHA256,
+                                   tool.EXPECTED_CHILD_COUNTS,
+                                   expect_child_target=TEST_CHILD_TARGET)
+check("8b.4 the real afldb_test child still loads under the test target label with its pinned "
+      "hash and counts, and declares target='afldb_test'",
+      real_test_doc["target"] == "afldb_test")
+
+
+def exporter_target_labels() -> dict:
+    """export_person_bridge.TARGET_DSN_ENV read from source without importing that module
+    (it carries a database surface this contract does not load): label -> required database."""
+    src = (TOOL_DIR / "export_person_bridge.py").read_text(encoding="utf-8")
+    for node in ast.walk(ast.parse(src)):
+        if isinstance(node, ast.Assign) and any(
+                isinstance(t, ast.Name) and t.id == "TARGET_DSN_ENV" for t in node.targets):
+            return {k.value: v.elts[1].value for k, v in zip(node.value.keys, node.value.values)}
+    return {}
+
+
+exporter = exporter_target_labels()
+check("8b.5 every target's child_target is one of the exporter's own TARGET_DSN_ENV labels, and "
+      "each label's exporter database equals this target's physical database",
+      exporter == {"afldb_test": "afldb_test", "dev": "afldb_dev"}
+      and all(cfg["child_target"] in exporter
+              and exporter[cfg["child_target"]] == cfg["database"]
+              for cfg in tool.TARGETS.values())
+      and "prod" not in exporter,
+      str(exporter))
 
 section("9. CLI --target dev: mandatory --bridge, no silent afldb_test reuse, no PROD choice")
 
@@ -900,6 +1031,52 @@ check("9.3 --target dev with --bridge pointed at the afldb_test child is refused
       "(must not silently reuse the afldb_test child)",
       rc_dev_reuse == tool.EXIT_ERROR and "must not be the afldb_test child" in out5.getvalue())
 check("9.4 --target prod does not exist as a choice", prod_choice_refused)
+
+# The exact regression the real DEV pre-import attempt hit: `plan --target dev --bridge <the real
+# DEV child>` refused with "the child targets 'dev', not afldb_dev" before anything else could
+# run. open_read_only is still stubbed to an assertion, so this can never reach a database; the
+# run is expected to stop at the point where it would open a connection -- which is exactly how
+# far a DB-free contract can take it, and is past every offline guard the bug was blocking.
+REACHED = "REFUSED: contract stub -- the gate reached the connection step"
+
+
+def reached_connection(_dsn):
+    raise tool.GateError(REACHED)
+
+
+saved_dev_dsn2 = os.environ.pop("AFLDB_DEV_DATABASE_URL", None)
+tool.open_read_only = never_connect
+common_saved_load2 = None
+try:
+    import common as common_mod2
+    common_saved_load2 = common_mod2.load_env
+    common_mod2.load_env = lambda *_a, **_k: None
+    tool.open_read_only = reached_connection
+    os.environ["AFLDB_DEV_DATABASE_URL"] = "postgresql://u:pw@h:5432/afldb_dev"
+    out6 = io.StringIO()
+    with contextlib.redirect_stdout(out6):
+        rc_dev_real_child = tool.main(["plan", "--target", "dev", "--bridge", REAL_DEV_CHILD_REL])
+finally:
+    tool.open_read_only = original_open
+    if common_saved_load2 is not None:
+        common_mod2.load_env = common_saved_load2
+    if saved_dev_dsn2 is None:
+        os.environ.pop("AFLDB_DEV_DATABASE_URL", None)
+    else:
+        os.environ["AFLDB_DEV_DATABASE_URL"] = saved_dev_dsn2
+
+dev_real_output = out6.getvalue()
+check("9.5 --target dev with the REAL committed DEV child is no longer refused on its target "
+      "label (the exact fail-closed bug the DEV pre-import attempt hit)",
+      "the child targets" not in dev_real_output,
+      str((rc_dev_real_child, dev_real_output.strip().splitlines()[-2:])))
+check("9.6 that run passed every offline guard -- the real DEV child's pinned bytes, the v2 "
+      "parent_sha256 chain and the Stage A snapshot -- and stopped only where it would open a "
+      "connection",
+      rc_dev_real_child == tool.EXIT_ERROR and REACHED in dev_real_output
+      and REAL_DEV_CHILD_SHA256[:16] in dev_real_output
+      and "parent_sha256 chain verified" in dev_real_output,
+      str(dev_real_output.strip().splitlines()[-5:]))
 
 # ---------------------------------------------------------------------------
 

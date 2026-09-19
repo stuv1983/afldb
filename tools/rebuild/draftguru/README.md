@@ -1007,8 +1007,25 @@ path must be exactly `/afldb_dev`, checked before and again after connecting, ex
 REPEATABLE READ, the `SELECT`-only cursor wrapper, unconditional rollback-and-close, DSN/password
 never printed) is identical for both targets.
 
-`dev` has **no default `--bridge`** -- the DEV deployment child does not exist yet, and one must
-be supplied explicitly:
+`--target` is a **closed target specification** in which the physical database and the child
+artefact's own deployment-target label are two separate fields, because the exporter's vocabulary
+is asymmetric (`export_person_bridge.TARGET_DSN_ENV`): `--resolve-against afldb_test` stamps
+`target: "afldb_test"` on a child for the `afldb_test` database, while `--resolve-against dev`
+stamps `target: "dev"` on a child for the `afldb_dev` database.
+
+| `--target` | `database` (`current_database()` guard) | `child_target` (child's `target` field) | DSN env |
+|---|---|---|---|
+| `test` (default) | `afldb_test` | `afldb_test` | `AFLDB_TEST_DATABASE_URL` |
+| `dev` | `afldb_dev` | `dev` | `AFLDB_DEV_DATABASE_URL` |
+
+Only the `test` specification says the two names are identical. The gate never compares a child's
+`target` field with the physical database name; it compares it with the selected target's
+`child_target` label, and it keeps asserting `current_database()` against the `database` name.
+These are the same labels `validate_person_bridge_child.py` uses (`TEST_TARGET_LABEL` /
+`DEV_TARGET_LABEL`), and the contract pins both tools' literals against the exporter's own source.
+
+`dev` has **no default `--bridge`** -- a DEV deployment child is a live per-target registration
+measurement, so one must be supplied explicitly:
 
     python tools/rebuild/draftguru/bridge_import_gate.py plan --target dev \
       --bridge data/reference/draftguru-person-bridge-20260918-v2.afldb_dev.json
@@ -1018,25 +1035,39 @@ be supplied explicitly:
       --expect-after-sha256 <plan> --expect-picks-after-sha256 <plan> \
       --expect-newly-linked-sha256 <plan> --expect-baseline-sha256 <plan> --expect-batches-before <plan>
 
-`--bridge` is refused outright if it resolves to the pinned `afldb_test` child path, so a DEV run
-can never silently verify the test child instead of a real DEV one. Independently of that guard,
-the child's own `target` field is checked against the selected database (`load_child`), so an
-`afldb_test`-labelled child is refused under `--target dev` even via some other path, and vice
-versa. `--expect-child-sha256` also has no default for `dev` (no DEV child hash is pinned yet);
-pass it explicitly once a DEV child exists and its hash is known, exactly as `plan`'s own output
-supplies `--expect-*` for `verify`.
+Under any non-`test` target, `--bridge` is refused outright if it is the pinned `afldb_test` child
+by **resolved path**, by the tracked **`.afldb_test.json` name**, or by its pinned **bytes** under
+any other name (`refuse_test_child_under`, the same three DENY rules
+`validate_person_bridge_child.py` applies) -- so a DEV run can never silently verify the test
+child, and renaming it does not launder it. Independently of that guard, the child's own `target`
+field is checked against the selected target's `child_target` label (`load_child`), so an
+`afldb_test`-labelled child is refused under `--target dev` even via some other path, a
+`dev`-labelled child is refused under `--target test`, and a child mislabelled with a *database*
+name (`afldb_dev`) is refused under `--target dev` as well. `--expect-child-sha256` has no default
+for `dev`; pass the exported child's own hash explicitly, exactly as `plan`'s own output supplies
+`--expect-*` for `verify`.
 
 The DEV deployment child itself is produced the same way the `afldb_test` one was, via
 `export_person_bridge.py --resolve-against dev` (see above; that tool was already target-agnostic
 and needed no change), against a real `afldb_dev` connection -- not by this gate, which never
-writes a file.
+writes a file. The accepted DEV child is
+`data/reference/draftguru-person-bridge-20260918-v2.afldb_dev.json`, sha256 `a9652e4a…`, declaring
+`target: "dev"`.
 
 **Contract coverage:** `tests/python/draftguru_import_gate_contract.py` pins the legacy/default
 (no `--target`) invocation, explicit `--target test`, explicit `--target dev`, per-target DSN
 environment selection, per-target database-name guards, refusal of a cross-target child artefact
 in both directions, refusal of `prod`/unknown/empty target strings, a full DEV-target
 `plan`->`verify` run reproducing the test-target's own hashes on the identical fixture frame, and
-the CLI-level mandatory-`--bridge` / no-silent-afldb_test-reuse / no-PROD-choice guards.
+the CLI-level mandatory-`--bridge` / no-silent-afldb_test-reuse / no-PROD-choice guards. Since
+2026-09-19 it also pins the separated target model itself: `database` and `child_target` as
+distinct fields, the real committed DEV child's `target: "dev"` accepted under `--target dev` and
+refused under `--target test`, a database-named (`afldb_dev`) child refused under `--target dev`,
+the path/name/bytes DENY rules, a server reporting `current_database() = 'dev'` refused (the DEV
+physical-database guard stays exactly `afldb_dev`), the `child_target` -> `database` mapping
+checked against `export_person_bridge.TARGET_DSN_ENV` read from that module's source, and an
+end-to-end CLI `plan --target dev` over the **real** DEV child that passes every offline guard and
+stops only where it would open a connection.
 
 ### `s74-snapshot.sql` -- the AFLDB-ISSUE-222 §7.4 rollback-exercise snapshot (read-only)
 

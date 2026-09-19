@@ -4281,3 +4281,125 @@ Phase F artefact. It does not touch ISSUE-224 or ISSUE-225. It does not stage or
 `IssuesIndex.md`, `CHANGELOG.md`. No code, test, or artefact file was changed; the validator
 implementation, its tests, the DEV child bytes, the canonical parents/test children and the Phase
 F sample/review/verdict artefacts are all untouched by this pass. Nothing was staged or committed.
+
+#### 11.19.19 First real DEV pre-import attempt: validate-only and dry-run PASSED, the `plan` gate REFUSED on a target-label defect; the gate's target model split into database vs child label (2026-09-19, Opus 5)
+
+**The attempt, reported honestly.** The operator ran the §11.19.15 item-6 steps 9-10 against
+`afldb_dev` on the DEV host. **No real import ran; no linkage, person, pick or identity row was
+written or committed.**
+
+1. `import_draftguru.py --validate-only --bridge …afldb_dev.json` — **PASSED**: 5,057 persons,
+   6,810 picks, 3,468 child bridges, **no database contact**.
+2. `import_draftguru.py --dry-run --bridge …afldb_dev.json` — **PASSED** against target
+   `afldb_import@localhost:5432/afldb_dev`: authority ledger 6, authority bridge 3,465, authority
+   unmatched 1,587, authority seeded 0; **all data writes rolled back**. As designed, the dry run
+   retained exactly **one `import_batches` audit row with `status=failed` and the
+   `DryRunComplete` marker** — the tool's deliberate audit-trail behaviour, not a failure of the
+   run and not a data change.
+3. `bridge_import_gate.py plan --target dev --bridge …afldb_dev.json` — **REFUSED**, before any
+   plan output, with:
+
+       ERROR: REFUSED: the child targets 'dev', not afldb_dev
+
+   The refusal was fail-closed and correct in spirit — nothing proceeded — but the check itself
+   was wrong, so the DEV import stopped here.
+
+**Failed plan transcript (preserved outside the repository):**
+`/home/arm/backups/afldb/issue-222/dev-plan-20260919-preimport.txt`.
+
+**The `afldb_dev` recovery point taken before step 9 remains valid and untouched:**
+`/home/arm/backups/afldb/afldb_dev-20260919-102636.dump`, sha256
+`0768fe01cc93aab3a0ba8e6307ccc7d1545baa3369eb727bf77b39806be7e005`.
+
+**Exact root cause.** `bridge_import_gate.load_child()` compared the child artefact's own `target`
+field with the **physical database name** (`required_database`, i.e. `afldb_dev`). The child's
+`target` field is not a database name: it is the exporter's `--resolve-against` label, copied
+verbatim by `export_person_bridge.build_deployment_dataset()`. That vocabulary is **asymmetric**
+by accepted contract — `export_person_bridge.TARGET_DSN_ENV` maps `"afldb_test" -> afldb_test` and
+`"dev" -> afldb_dev` — so the accepted `afldb_test` child carries `"afldb_test"` (which merely
+*happens* to equal its database name) while the accepted `afldb_dev` child carries `"dev"`. The
+gate's single `required_database` field conflated two different things and was only ever correct
+for the `test` target, where the two coincide by accident. `validate_person_bridge_child.py`
+already modelled this correctly (`TEST_TARGET_LABEL` / `DEV_TARGET_LABEL`, §11.19.17); the gate
+did not.
+
+**Target mapping, before and after.**
+
+| `--target` | `current_database()` guard | accepted child `target` — BEFORE | accepted child `target` — AFTER |
+|---|---|---|---|
+| `test` (default) | `afldb_test` | `afldb_test` (= database name) | `afldb_test` (`child_target`, equal by specification) |
+| `dev` | `afldb_dev` | `afldb_dev` ← **wrong; no exporter run ever produces it** | `dev` (`child_target`, the exporter's real label) |
+
+**Change (smallest fail-closed correction; no alias, no child edit).** `TARGETS` now carries
+`database` (physical: the DSN path check and the `current_database()` assertion) and
+`child_target` (the artefact label) as **separate fields**; new module constants
+`TEST_CHILD_TARGET = "afldb_test"` and `DEV_CHILD_TARGET = "dev"` match
+`validate_person_bridge_child.py`'s literals exactly. `load_child()`'s third target parameter is
+now `expect_child_target` and compares against the label, never the database name; its refusal
+message states the distinction. A new `refuse_test_child_under()` helper concentrates the
+afldb_test-child DENY rules and adds the two the gate was missing relative to the validator: the
+`.afldb_test.json` **name** rule and the pinned-**bytes** rule (a rename no longer launders the
+test child into a DEV run). No loose alias was added, no child artefact was edited, and no
+existing refusal was weakened.
+
+**Every safety property preserved (verified by the contract, not asserted):** default target is
+still `test` and every no-`--target` invocation is unchanged in behaviour; `--target dev` still
+requires an explicit `--bridge`; DEV refuses the `afldb_test` child by path, name, bytes and
+target; `test` refuses the DEV child; `prod`/unknown/empty targets remain impossible; the DEV
+`current_database()` guard remains exactly `afldb_dev` (a server reporting the *label* `dev` is
+refused); `AFLDB_DEV_DATABASE_URL` remains separate and mandatory; session read-only, REPEATABLE
+READ, the `SELECT`-only cursor and unconditional rollback-and-close are untouched; no import or
+owner DSN fallback exists; the gate still writes nothing, to disk or to any database. The gate's
+printed output and hashed summary payload are unchanged, so the §7.4 transcript fixture in
+`tests/s74-rollback-exercise-gate-parsing.test.ps1` and every recorded `summary_sha256` still
+describe the current tool.
+
+**Regression coverage added (DB-free) in `tests/python/draftguru_import_gate_contract.py`:**
+2b.0aa (`database` and `child_target` are separate fields and differ for `dev`); 7.8/7.9 (a server
+whose `current_database()` is the label `dev` is refused; the DEV physical guard stays
+`afldb_dev`); 8.1-8.3 (`afldb_test` label refused under `dev`, the real `target: "dev"` shape
+accepted under `dev`, refused under `test`); 8.4 (a child mislabelled `afldb_dev` refused under
+`dev`); 8.5-8.7 (the bytes and name DENY rules fire under `dev` and never under `test`);
+8b.1-8b.4 (the **real committed** DEV child hashes to `a9652e4a…`, declares `target: "dev"`, is
+accepted under `dev` and refused under `test`; the real `afldb_test` child still loads with its
+pinned hash and counts); 8b.5 (each target's `child_target` -> `database` mapping equals
+`export_person_bridge.TARGET_DSN_ENV`, read from that module's source by `ast` without importing
+its database surface); 9.5-9.6 (an end-to-end CLI `plan --target dev` over the **real** DEV child
+is no longer refused on its target label and passes every offline guard — pinned child bytes, the
+v2 `parent_sha256` chain, the Stage A snapshot — stopping only where it would open a connection).
+Sections 1-7 are otherwise unchanged and still pass, including the DEV `plan`->`verify`
+deterministic parity checks (7.1-7.6).
+
+**Validation (DB-free only).** `python -m py_compile` on both changed Python files;
+`python tests/python/draftguru_import_gate_contract.py` — **all checks hold**, exit 0;
+`python tests/python/draftguru_child_validation_contract.py` — all checks hold (unchanged tool,
+run to confirm the two tools' target literals still agree);
+`npx vitest run tests/draftguru-acquisition.test.ts` — 161 passed, 3 skipped, **2 failed, both
+pre-existing and unrelated** and identical to the two recorded in §11.19.17: the `GRID_DRAFT_TYPES`
+mapping contract (AFLDB-ISSUE-223) and check `41z` in
+`draftguru_bridge_operator_review_contract.py` (the committed
+`bridge-operator-verdicts-20260918-v1.md` hashes `2ce361f6…` against a pinned `60c529df…`);
+`npx vitest run tests/draftguru-acquisition.test.ts -t "bridge import gate"` — 2 passed, 164
+skipped; `git diff --check` — clean. The real DEV child and the real `afldb_test` child are
+**byte-identical** to `59a67a9e`
+(`a9652e4a6ca96ced32d64d36cb0a3a1b6cdf1e2591927e628753b399c6647c95` and
+`b996c60e9d4de3aeb6f250f360b2a66164a2211b9604338a65918e79fa29e1c5`).
+
+**Next plan must use a NEW evidence filename.** The failed transcript
+`/home/arm/backups/afldb/issue-222/dev-plan-20260919-preimport.txt` is retained evidence and must
+never be overwritten; the retry writes
+`/home/arm/backups/afldb/issue-222/dev-plan-20260919-preimport-retry1.txt`. The step-9 dry run does
+**not** need repeating (it passed and its retained `status=failed` / `DryRunComplete` audit row is
+expected); resume at §11.19.15 item-6 step 10 with the corrected gate, once the fix below is
+committed and deployed to the DEV host.
+
+**Database/Git/network/deployment actions this pass: none.** No `psql`, no `import_draftguru.py`,
+no `bridge_import_gate.py` against a real connection, no backup, no export, no Git mutation, no
+`sync-dev.ps1`, no Gridley run. AFLDB-ISSUE-224 and AFLDB-ISSUE-225 were not touched. No child,
+parent, verdict, reconciliation, sample or review artefact was modified.
+
+**Files changed by this pass:** `tools/rebuild/draftguru/bridge_import_gate.py`,
+`tests/python/draftguru_import_gate_contract.py`, `tools/rebuild/draftguru/README.md`,
+`AFLDB-ISSUE-222.md` (this section), `issues.md`, `IssuesIndex.md`, `CHANGELOG.md`. Nothing was
+staged or committed. **AFLDB-ISSUE-222 remains open**: the DEV `plan`, the real DEV import, its two
+independent verifies, `sync-dev.ps1` and the browser/Grid Solver smoke checks are still ahead.

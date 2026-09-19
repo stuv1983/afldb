@@ -11,7 +11,7 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-225 | Gridley corpus: 37 pre-existing `incorrect known answer` cells on non-draft criteria (`captain` 20, `teammates-150` 14, `teammates-100` 1, `games250sameclub` 1, `games100clubs2` 1; 14 players) present on `afldb_test` since the 2026-09-13 baseline, untouched by AFLDB-ISSUE-222 | Medium | Grid Solver / canonical data — `captaincies`, `player_club_season_stats`, `tests/integration/gridley-corpus.test.ts` | Open — opened 2026-09-19 under ISSUE-222 decision D3; reproduced 2026-09-17 (pre-import) and 2026-09-19 (report `7f14ff2c…`); root cause not investigated | Investigate the five criteria with targeted read-only queries (captaincies rows for Cameron Bruce / Steven May; the board-1024 teammate counts); classify each cell from canonical evidence; never resolve by reclassification |
 | AFLDB-ISSUE-224 | DraftGuru persons whose AFL Tables identity is not registered on the target (`target_not_registered`): 94 bridge-admissible persons (16 sampled, all operator `agree`) cannot link until the identity is registered — post-baseline (2026) debutants and numbering/spelling cases | Medium | Player registration / import — `external_identities`, fitzRoy core, current-season settle | Open — deferred 2026-09-18 from AFLDB-ISSUE-222 Phase F; none of the 94 is added by the ISSUE-222 import; cause of the registration gap not investigated | After the ISSUE-222 `afldb_test` import verifies, establish the registration path for post-baseline debutants, then re-resolve a new deployment child (§4.5) |
 | AFLDB-ISSUE-220 | Web service credential boundary contradicts the application's `afldb_import` requirement; owner-role code-test DSN and a complete `.env` copy reach the internet-facing process | High | Deployment / runtime security | Open — DEV evidence complete 2026-09-17; runtime branch (a) settled from Next source: the standalone server loads `.next/standalone/.env` at start-up | Sonnet 5 implements `AFLDB-ISSUE-220.md` §6 in a fresh worktree; first establish the build copy mechanism (§4b) |
-| AFLDB-ISSUE-222 | Trusted draft-player linking: DraftGuru Stage B3 person-page acquisition and the person-page bridge into `draft_persons`/`draft_picks` (successor to ISSUE-164 D-9 / ISSUE-093 Stage B3, per ISSUE-221's follow-up) | High | Data acquisition / import — `tools/rebuild/draftguru/`, `tools/db/rebuild-test.ts` | Open — Phases 1–3 executed; Phase F ACCEPTED 2026-09-18; `afldb_test` bridge import COMPLETE and verified twice 2026-09-19 (3,470 linked persons, 5,115/6,810 picks; verify `32cf72a5…`); Phase 3 accepted pending the operator commit; §6.3 item 4 D1 and D2 both implemented 2026-09-19 (§11.19.12/§11.19.13); Phase 4a database acceptance still open (§6.1, §6.2, remaining §6.4, §6.8, §7.4); one full corpus rerun still owed; all work since `ebea0d4c` uncommitted; DEV/PROD unchanged | Run the one full diagnostic corpus rerun now that D1/D2 are implemented (projection: `incorrect known answer` 99 → 37, `source coverage gap` 54 → 77, `external source disagreement` → 422), then the §7.4 reversal exercise; operator commit before any DEV step |
+| AFLDB-ISSUE-222 | Trusted draft-player linking: DraftGuru Stage B3 person-page acquisition and the person-page bridge into `draft_persons`/`draft_picks` (successor to ISSUE-164 D-9 / ISSUE-093 Stage B3, per ISSUE-221's follow-up) | High | Data acquisition / import — `tools/rebuild/draftguru/`, `tools/db/rebuild-test.ts` | Open — Phases 1–3 executed; Phase F ACCEPTED 2026-09-18 (governance decision 2026-09-19, §11.19.18: Phase F stays accepted at source hash `35c41602…`); `afldb_test` bridge import COMPLETE and verified twice 2026-09-19 (3,470 linked persons, 5,115/6,810 picks; verify `32cf72a5…`); full Gridley corpus rerun done (§11.19.14, 99 → 37 confirmed, zero draft-criterion cells remain); §7.4 rollback exercise SATISFIED 2026-09-19 (§11.19.16); DEV deployment child exported and independently validated (`a9652e4a…`, `target: "dev"`, 48/48, §11.19.17); first real DEV pre-import attempt 2026-09-19 stopped at the read-only `plan` gate on a target-label defect — validate-only and dry-run PASSED, **no real import ran, no row written**, `afldb_dev` backup `0768fe01…` intact (§11.19.19); gate target model corrected and covered, uncommitted; DEV/PROD data unchanged | Operator: stage and commit the corrected gate + contract + docs, then resume §11.19.15 item-6 at step 10 — `bridge_import_gate.py plan --target dev` on the DEV host writing a NEW transcript `/home/arm/backups/afldb/issue-222/dev-plan-20260919-preimport-retry1.txt` (never overwrite the failed `…-preimport.txt`); step 9's dry run does not need repeating |
 | AFLDB-ISSUE-223 | Pre-existing DB-free test regression: `tests/draftguru-acquisition.test.ts`'s "keeps the mapping's draft_type vocabulary set-equal to GRID_DRAFT_TYPES" fails on current `main` — `GRID_DRAFT_TYPES` in `src/search/grid-solver-spec.ts` was reshaped from a bare string array to `{ value; label }[]` by AFLDB-ISSUE-221 (`f1a8daca`), and the consuming regex (`/export const GRID_DRAFT_TYPES = \[([\s\S]*?)\] as const;/`) no longer matches | Low | Test tooling — `tests/draftguru-acquisition.test.ts`, `src/search/grid-solver-spec.ts` | Open — found 2026-09-18 during AFLDB-ISSUE-222 Phase 1 validation; confirmed via `git log -1 -- src/search/grid-solver-spec.ts` = `f1a8daca` (the ISSUE-221 implementation commit); no production code affected, DB-free unit test only | Update the test's extraction regex (or assertion) to the current `GRID_DRAFT_TYPES: { value; label }[]` shape and re-verify the vocabulary is still set-equal in both directions |
 
 AFLDB-ISSUE-220 opened 2026-09-17 (Fable 5.1 code review outside NL search, DEV evidence
@@ -37090,6 +37090,42 @@ PENDING.** Full record: `AFLDB-ISSUE-222.md` §11.12, `AFLDB-ISSUE-222-PHASE3-CO
   verdict artefacts, ISSUE-224 and ISSUE-225 all untouched this pass; only `AFLDB-ISSUE-222.md`,
   `issues.md`, `IssuesIndex.md` and `CHANGELOG.md` changed. Read-only `git status`/`git diff --check`
   only; nothing staged or committed.
+- **First real DEV pre-import attempt: validate-only and dry-run PASSED, the `plan` gate REFUSED on
+  a target-label defect; gate target model corrected (2026-09-19, Opus 5, §11.19.19).**
+  **No real import ran and no linkage/person/pick/identity row was written or committed.**
+  Operator-reported: (1) `--validate-only` PASSED — 5,057 persons, 6,810 picks, 3,468 child bridges,
+  no database contact; (2) `--dry-run` PASSED against `afldb_import@localhost:5432/afldb_dev` —
+  authority ledger 6 / bridge 3,465 / unmatched 1,587 / seeded 0, all data writes rolled back, and
+  as designed exactly **one retained `import_batches` audit row with `status=failed` and
+  `DryRunComplete`**; (3) `bridge_import_gate.py plan --target dev` REFUSED with
+  `REFUSED: the child targets 'dev', not afldb_dev` before any plan output. Failed transcript
+  preserved outside the repository at `/home/arm/backups/afldb/issue-222/dev-plan-20260919-preimport.txt`;
+  the pre-attempt backup `/home/arm/backups/afldb/afldb_dev-20260919-102636.dump`
+  (sha256 `0768fe01cc93aab3a0ba8e6307ccc7d1545baa3369eb727bf77b39806be7e005`) remains valid and
+  untouched. **Root cause:** `bridge_import_gate.load_child()` compared the child's own `target`
+  field with the **physical database name**. A child's `target` is the exporter's
+  `--resolve-against` label, and that vocabulary is asymmetric by accepted contract
+  (`export_person_bridge.TARGET_DSN_ENV`: `"afldb_test" -> afldb_test`, `"dev" -> afldb_dev`), so
+  the check was only ever correct for `test`, where the two names coincide by accident.
+  `validate_person_bridge_child.py` already modelled this correctly (§11.19.17); the gate did not.
+  **Fix:** `TARGETS` now carries `database` (physical, for the DSN path check and the
+  `current_database()` assertion) and `child_target` (the artefact label) as **separate fields**;
+  `load_child()` takes `expect_child_target` and never compares against a database name; a new
+  `refuse_test_child_under()` adds the `.afldb_test.json` name rule and the pinned-bytes rule the
+  gate was missing. No alias, no child edit, no weakened refusal; default `test` behaviour, the
+  gate's printed output and its hashed summary payload are all unchanged. New DB-free coverage in
+  `tests/python/draftguru_import_gate_contract.py` (2b.0aa, 7.8-7.9, 8.1-8.7, 8b.1-8b.5, 9.5-9.6),
+  including the **real committed** DEV child (`a9652e4a…`, `target: "dev"`) accepted under `dev`
+  and refused under `test`, a database-named `afldb_dev` child refused, `current_database() = 'dev'`
+  refused, and an end-to-end CLI `plan --target dev` over the real child that clears every offline
+  guard and stops only where it would open a connection. Validation: `py_compile`, the gate contract
+  (all checks hold), the child-validation contract (all checks hold), `draftguru-acquisition.test.ts`
+  — 161 passed / 3 skipped / the same 2 pre-existing unrelated failures (ISSUE-223 `GRID_DRAFT_TYPES`
+  and check `41z`), `git diff --check` clean. Both bridge children byte-identical to `59a67a9e`.
+  The retry must write a NEW transcript (`…/dev-plan-20260919-preimport-retry1.txt`), never
+  overwrite the failed one; step 9's dry run does not need repeating. No database, Git, network,
+  export, import, backup or deployment command ran; ISSUE-224/225 untouched; nothing staged or
+  committed.
 
 ## AFLDB-ISSUE-223 — Pre-existing test regression from AFLDB-ISSUE-221: `GRID_DRAFT_TYPES` reshaped, `draftguru-acquisition.test.ts`'s vocabulary-parity test now fails
 

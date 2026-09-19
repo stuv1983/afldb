@@ -425,10 +425,32 @@
   designed consequence and is not a newly failed review — check 1.3 still confirms the accepted
   child. No historical acceptance artefact rewritten; validator/tests, DEV child, canonical
   parents/test children, Phase F artefacts, ISSUE-224/225 untouched.
-- **Next action:** operator independently runs the DEV validator once (per the §11.19.17
-  command), then stages and commits the reviewed tooling plus the DEV child as the final
-  pre-deployment checkpoint (§11.19.15 item 6 step 5) — nothing is staged or committed by this
-  pass.
+- **First real DEV pre-import attempt stopped at the `plan` gate; gate target model corrected
+  (2026-09-19, Opus 5, §11.19.19, uncommitted).** **No real import ran; no linkage, person, pick
+  or identity row was written or committed.** `--validate-only` PASSED (5,057 persons / 6,810
+  picks / 3,468 child bridges, no database contact); `--dry-run` PASSED against
+  `afldb_import@localhost:5432/afldb_dev` (ledger 6 / bridge 3,465 / unmatched 1,587 / seeded 0,
+  all data writes rolled back, one retained `status=failed` + `DryRunComplete` audit row, as
+  designed); `bridge_import_gate.py plan --target dev` then REFUSED with `REFUSED: the child
+  targets 'dev', not afldb_dev`. Failed transcript preserved at
+  `/home/arm/backups/afldb/issue-222/dev-plan-20260919-preimport.txt`; backup
+  `/home/arm/backups/afldb/afldb_dev-20260919-102636.dump` (`0768fe01…`) valid and untouched.
+  **Root cause:** `load_child()` compared the child's `target` LABEL with the PHYSICAL database
+  name; the exporter's vocabulary is asymmetric (`afldb_test` -> `afldb_test`, `dev` ->
+  `afldb_dev`), so the check only ever worked for `test`. **Fix:** `TARGETS` splits `database`
+  (the `current_database()` guard) from `child_target` (the artefact label); `load_child()` takes
+  `expect_child_target`; a new `refuse_test_child_under()` adds the `.afldb_test.json` name and
+  pinned-bytes DENY rules. No alias, no child edit, no weakened refusal; default `test`, the
+  gate's printed output and its hashed summary are unchanged. New DB-free coverage incl. the real
+  DEV child accepted under `dev` / refused under `test`, an `afldb_dev`-labelled child refused,
+  `current_database() = 'dev'` refused, and a real-child CLI `plan --target dev` clearing every
+  offline guard. Both bridge children byte-identical to `59a67a9e`.
+- **Next action:** operator stages and commits the corrected gate + contract + docs, then resumes
+  §11.19.15 item-6 at **step 10** — `bridge_import_gate.py plan --target dev` on the DEV host,
+  writing a NEW transcript
+  `/home/arm/backups/afldb/issue-222/dev-plan-20260919-preimport-retry1.txt` (never overwrite the
+  failed `…-preimport.txt`). Step 9's dry run does not need repeating. Nothing is staged or
+  committed by this pass.
 
 ### AFLDB-ISSUE-225 — Gridley corpus: 37 pre-existing `incorrect known answer` cells on non-draft criteria, present on `afldb_test` before AFLDB-ISSUE-222 and untouched by it
 - **Severity:** Medium. **Area:** Grid Solver / canonical data — `captaincies`,
