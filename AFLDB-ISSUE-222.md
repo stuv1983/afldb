@@ -4403,3 +4403,163 @@ parent, verdict, reconciliation, sample or review artefact was modified.
 `AFLDB-ISSUE-222.md` (this section), `issues.md`, `IssuesIndex.md`, `CHANGELOG.md`. Nothing was
 staged or committed. **AFLDB-ISSUE-222 remains open**: the DEV `plan`, the real DEV import, its two
 independent verifies, `sync-dev.ps1` and the browser/Grid Solver smoke checks are still ahead.
+
+#### 11.19.20 Second real DEV pre-import attempt REFUSED on 6.4/6.6/6.7 — root cause is a Stage A **label** mismatch, not drift; `--link-only` designed, implemented and DB-free proven (2026-09-19, Opus 5)
+
+**No database, import, dry-run, backup, Git, network, deployment or Gridley command was run by
+the model in this pass. Nothing is staged or committed.**
+
+##### 1. What the retried plan refused on
+
+`bridge_import_gate.py plan --target dev` (transcript
+`/home/arm/backups/afldb/issue-222/dev-plan-20260919-preimport-retry1.txt`) cleared every target,
+child and authority guard and then refused exactly three checks:
+
+| Check | Refusal |
+|---|---|
+| 6.4 | 92 `draft_persons` non-link changes, fields `reported_games` / `reported_goals` |
+| 6.6 | 128 `draft_picks` non-link changes, same two fields |
+| 6.7 | 5,057 `external_identities(draftguru)` `notes` changes — i.e. **every** row |
+
+##### 2. Root cause — a label, not drift
+
+`afldb_dev` was loaded from **`annual-html-20260902`**; the gate and the importer both defaulted
+to **`annual-html-20260826`**.
+
+* `CHANGELOG.md` (2 September 2026) records `annual-html-20260902` as **the accepted** Stage A
+  snapshot and `annual-html-20260826` as *"historical and superseded"*, and closes with the
+  operational note that a rebuild must pass `--draftguru-label annual-html-20260902` "until that
+  default is repointed". Every rebuild from ISSUE-102/112/113/118 did so. The CLI default was
+  never repointed.
+* `reconcile_draftguru_identities()` writes `notes = f"stage_a_snapshot={label}"` on **every**
+  identity row unconditionally, so a label change rewrites all 5,057. The count *is* the
+  signature.
+* `reported_games` / `reported_goals` are the only stored columns derived from the annual pages'
+  volatile Games/Goals cells (`build_picks()`, `max()` per person, copied onto every pick of that
+  person). The two acquisitions are a week apart **inside the 2026 season**, so those cells moved;
+  92 persons → 128 picks is the person→pick fan-out for re-listed players.
+* Offline comparison of the two tracked manifests: identical in **every** structural field —
+  `parity` (status PASS, `csv_total_rows` 6810, event totals, special-pick totals),
+  `identity_validation`, `schema_variants`, `trade_column_profile`, `person_pages`,
+  `known_coverage_gaps`, and the per-page `url`/`raw_filename`/`year` lists — differing only in
+  label, extraction timestamps, `working_directory` and all 42 raw sha256s. The changelog's
+  "render drift only (CSRF token + a `Content-Type` change on 13 pages)" acceptance is not
+  contradicted: **the `parity` block never hashes the Games/Goals cell values**, so a genuine
+  week-of-football movement in those two columns was simply never measured by it.
+
+This was foreseen. §11.19.1's import-scope table already said: *"if `afldb_test` was last loaded
+from `annual-html-20260902`, every `notes` value … would change — the plan refuses on that and
+the label question must be settled first"*. `afldb_test` was in fact last loaded from
+`annual-html-20260826`, which is why its own plan showed zero non-link changes; `afldb_dev` was
+not. The two databases sit on two different accepted snapshots.
+
+**Verdict: a deterministic pinned-source label mismatch, not unexplained drift.** A normal import
+would have been a *regression*, not a refresh: it would move DEV's source-owned data onto a
+retired snapshot and stamp `stage_a_snapshot=annual-html-20260826` on all 5,057 identity rows,
+contradicting the tracked acceptance register.
+
+##### 2a. Why the obvious fix is unavailable
+
+Re-running the import with `--label annual-html-20260902` needs that snapshot's 42 raw pages.
+Exhaustive local and DEV-host searches found no accepted raw page directory or archive. They
+cannot be re-acquired: the pages are Rails-rendered and carry a per-render CSRF token, so a
+refetch would create a **third** label rather than reproduce the accepted bytes. Operator
+decision 2026-09-19: **do not reacquire.**
+
+##### 2b. Why approving the change was rejected
+
+Approving 6.4/6.6/6.7 is also not self-consistent with the existing gate. `baseline_sha256`
+includes `draft_persons_draftguru_nonlink` and `draft_picks_draftguru_nonlink`; an approved
+import moves both, so `verify`'s check **8.14 would then fail**. Approving the refusal would cost
+the post-import verification contract as well as the data.
+
+##### 3. Decision (2026-09-19): implement a fail-closed `--link-only` mode
+
+Apply only the already-reviewed trusted linkage to the existing `afldb_dev` DraftGuru population;
+reload and rewrite no source-owned Stage A data. The mode is built from the stored population, the
+pinned deployment child, the target's registered AFL Tables identities and the tracked ledger plus
+live decisions — never from a snapshot. See `tools/rebuild/draftguru/README.md` §`--link-only` for
+the full contract.
+
+**Committed write set**
+
+| Table | Columns |
+|---|---|
+| `import_batches` | one row; `notes` = `mode=link_only stage_a_snapshot=<label> bridge_sha256=… parent_sha256=…` |
+| `draft_persons` | `player_id`, `link_status`, `match_method`, `confidence_notes`, `is_matching_backlog` |
+| `draft_picks` | `player_id`, `link_status_value`, `match_method`, `confidence_notes` |
+| `external_identities` (`draftguru`) | `player_id`, `status`, `match_method` |
+
+**Two columns beyond the three named in the task specification, and why.** The specification asked
+for `player_id`, `link_status`, `match_method` only.
+
+* `is_matching_backlog` is **structurally mandatory**: migration 019's
+  `draft_persons_backlog_ck` is `NOT is_matching_backlog OR (player_id IS NULL AND
+  COALESCE(reported_games,0) > 0)`. Setting `player_id` on a person the row still flags as backlog
+  violates the CHECK and the statement fails, so the narrow three-column set cannot commit at all.
+* `confidence_notes` is the link's own provenance (`draftguru person-page bridge -> <identity>`).
+  Omitting it leaves ~3,465 newly linked persons carrying provenance describing the previous
+  decision — a false audit trail — and fails the gate's existing verify check **8.4**, which would
+  then have to be weakened. Writing it keeps every existing gate check intact.
+
+Both are link-derived; neither is a Stage A fact. The resulting set is exactly the gate's
+already-reviewed `LINK_COLUMNS` / `PICK_LINK` vocabulary, so checks 6.4/6.6/6.7 keep their
+existing non-link definitions rather than acquiring a second vocabulary.
+
+##### 4. Implementation
+
+`import_draftguru.py` gains a **separate** entry point and write path (`main_link_only()`,
+`validate_link_only()`, `run_link_only_import()`) rather than a flag threaded through the full
+reload, so `run_import()` and `validate()` contain no `link_only` branch and cannot drift. Three
+set-based `UPDATE`s, one per table, each scoped to the DraftGuru `source_id`, keyed on the stored
+row's natural key, each carrying an `IS DISTINCT FROM` guard so a re-run is a genuine no-op. No
+`INSERT`/`DELETE`/`COPY`/temp table/`SET CONSTRAINTS`; `replay_admin_overrides` is not called;
+`players` is never touched. `common.import_batch()` gained an optional `notes=None` parameter —
+additive, every existing caller passes at most four positional arguments and stores `NULL` exactly
+as before.
+
+`bridge_import_gate.py` gains `--link-only`, which models that write set. Checks 6.4/6.6/6.7 are
+**proven, not skipped**, in three layers: the write-set half reads the `SET` clause of the
+importer's own statements back through `set_clause_columns()`; `6.4a`/`6.6a`/`6.7b` require the
+modelled after-state to differ in nothing else; and `verify`'s new `8.15` re-reads four
+server-side digests (`draft_persons_draftguru_nonlink`, `draft_picks_draftguru_nonlink`,
+`external_identities_draftguru_nonlink`, `draft_picks_draftguru_batch_ids`) and requires the
+`baseline_sha256` they belong to to equal the plan's. The last two digests are added **only** in
+link-only mode, so the full path's `baseline_sha256` stays byte-identical to every value already
+recorded against `afldb_test`. `8.12` is inverted (no pick may be re-stamped) rather than dropped;
+`8.10`/`8.10a` require exactly one completed batch declaring `mode=link_only` and the asserted
+label.
+
+##### 5. Validation (DB-free only)
+
+`tests/python/draftguru_link_only_contract.py` (new) — **120/120 PASS**. Includes two falsifiable
+RED proofs: a smuggled extra `SET` column is detected by `link_only_write_set()`, and a moved
+non-link digest makes `verify` refuse on 8.14/8.15. Also proves at runtime that
+`validate_link_only()` completes with every Stage A entry point booby-trapped.
+
+`draftguru_import_atomicity_contract.py` and `draftguru_import_gate_contract.py` both still pass
+**unchanged**, which is the proof that the full reload and the gate's full mode are untouched.
+`tests/draftguru-import.test.ts` 46/46 pass; `tsc --noEmit` clean; `eslint` unchanged at the
+same 49 pre-existing errors in `draftguru-acquisition.test.ts` (0 in added code, proven against a
+pristine HEAD worktree); `git diff --check` clean.
+
+Six DB-free vitest failures remain repository-wide, **all pre-existing**: the `GRID_DRAFT_TYPES`
+vocabulary test (AFLDB-ISSUE-223), the operator-review `41z` Markdown hash and
+`finals-semantics-contract` (both Windows CRLF, reproduced on a pristine HEAD worktree), two
+`honours-lifecycle-public-contract` scans (same), and one `fitzroy-core-import` case that needs a
+live database (`psycopg.errors.ConnectionTimeout` in `connect_pg`, untouched code).
+
+##### 6. Not done in this pass
+
+The default Stage A label was **not** repointed; no child, parent, manifest, sample, verdict or
+review artefact was touched; ISSUE-224/225 were not touched; no `20260902` page was reacquired,
+copied or fabricated.
+
+**Files changed by this pass:** `tools/rebuild/draftguru/import_draftguru.py`,
+`tools/rebuild/draftguru/bridge_import_gate.py`, `tools/migration/common.py`,
+`tests/python/draftguru_link_only_contract.py` (new),
+`tests/python/draftguru_import_gate_contract.py`, `tests/draftguru-import.test.ts`,
+`tests/draftguru-acquisition.test.ts`, `tools/rebuild/draftguru/README.md`,
+`AFLDB-ISSUE-222.md` (this section), `issues.md`, `IssuesIndex.md`, `CHANGELOG.md`. Nothing was
+staged or committed. **AFLDB-ISSUE-222 remains open**: the DEV link-only validate-only, dry-run,
+plan, real import, two independent verifies, `sync-dev.ps1` and the smoke checks are still ahead.

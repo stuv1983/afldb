@@ -255,6 +255,111 @@ describe("DraftGuru importer — privileges and transaction", () => {
   });
 });
 
+/*
+ * AFLDB-ISSUE-222 Phase 4b — --link-only.
+ *
+ * Applies the reviewed trusted linkage to an already-loaded DraftGuru population and rewrites
+ * no source-owned Stage A fact, for a target (afldb_dev) whose accepted snapshot
+ * `annual-html-20260902` no longer exists in raw form anywhere and cannot be re-acquired.
+ *
+ * tests/python/draftguru_link_only_contract.py is the behavioural proof, against the real
+ * modules and the scripted connection. The pins below are the static half: they fail if the
+ * write set widens, if a Stage A entry point reappears on the link-only path, or if the full
+ * reload acquires a link-only branch.
+ */
+describe("DraftGuru importer — --link-only", () => {
+  itPyDriver("write set, no-Stage-A, child partition, preconditions, authority, CLI, atomicity "
+    + "and the gate's link-only plan/verify all hold on the real tools", () => {
+    const result = spawnSync(python,
+      ["tests/python/draftguru_link_only_contract.py"],
+      { cwd: root, encoding: "utf8" });
+    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+    expect(result.stdout).toContain("All DraftGuru link-only checks hold.");
+    expect(result.stdout).not.toContain("FAIL ");
+  });
+
+  it("declares a write set of exactly the link columns, per table", () => {
+    expect(importerSource).toContain(
+      'PERSON_LINK_COLUMNS = ("player_id", "link_status", "match_method", "confidence_notes",\n'
+      + '                       "is_matching_backlog")');
+    expect(importerSource).toContain(
+      'PICK_LINK_COLUMNS = ("player_id", "link_status_value", "match_method", "confidence_notes")');
+    expect(importerSource).toContain(
+      'IDENTITY_LINK_COLUMNS = ("player_id", "status", "match_method")');
+  });
+
+  it("never names a source-owned column in a link-only SET clause", () => {
+    const statements = ["PERSON_LINK_UPDATE_SQL", "PICK_LINK_UPDATE_SQL", "IDENTITY_LINK_UPDATE_SQL"]
+      .map((name) => {
+        const marker = `${name} = """`;
+        const start = importerSource.indexOf(marker);
+        expect(start, name).toBeGreaterThan(-1);
+        const open = start + marker.length;                 // just past the opening quotes
+        return importerSource.slice(open, importerSource.indexOf('"""', open));
+      });
+    for (const sql of statements) {
+      const setClause = sql.slice(sql.indexOf("\n   SET "), sql.indexOf("\n  FROM "));
+      for (const column of ["dg_person_id", "display_name_raw", "name_key", "reported_games",
+        "reported_goals", "import_batch_id", "source_record_id", "detail", "notes",
+        "external_name", "external_url", "candidate_count"]) {
+        // anchored on a word boundary: `confidence_notes = …` is a permitted link column and
+        // must not be read as an assignment to `notes`
+        expect(setClause, `${column} must not be assignable`)
+          .not.toMatch(new RegExp(`(^|[\\s,])${column}\\s*=`, "m"));
+      }
+      // scoped, keyed, and a no-op when the link state already agrees
+      expect(sql).toContain("t.source_id = %s");
+      expect(sql).toContain("IS DISTINCT FROM");
+      expect(sql.trimStart().startsWith("UPDATE ")).toBe(true);
+    }
+  });
+
+  it("reads no Stage A snapshot on the link-only path", () => {
+    const start = importerSource.indexOf("def validate_link_only(");
+    const end = importerSource.indexOf("STORED_PERSON_SQL = ");
+    expect(start).toBeGreaterThan(-1);
+    // The docstring deliberately NAMES the functions it does not call, exactly as the module
+    // docstring names the boundaries the importer respects, so the absence assertion is about
+    // CALLS — `name(` — not about the prose. The AST proof in
+    // tests/python/draftguru_link_only_contract.py §2 is the rigorous form of this.
+    const body = importerSource.slice(start, end);
+    for (const fn of ["verify_stage_a_manifest", "verify_raw_bytes", "resolve_snapshot_dir",
+      "parse_snapshot", "validate_identity", "build_persons", "build_picks"]) {
+      expect(body, `${fn}() must not be called in link-only`).not.toContain(`${fn}(`);
+    }
+    expect(importerSource).toContain("--link-only refuses --snapshot-root");
+  });
+
+  it("is fail-closed on the CLI and keeps the full reload's defaults", () => {
+    expect(importerSource).toContain("--link-only requires --bridge");
+    expect(importerSource).toContain("--link-only requires --no-seed");
+    expect(importerSource).toContain("--link-only requires an explicit --label");
+    expect(importerSource).toContain("--link-only refuses --acknowledge-population-drop");
+    // the effective default label is unchanged; only its explicitness is now observable
+    expect(importerSource).toContain('STAGE_A_LABEL = "annual-html-20260826"');
+    expect(importerSource).toContain("args.label_explicit = args.label is not None");
+    expect(importerSource).toContain("        args.label = STAGE_A_LABEL");
+  });
+
+  it("writes an audit row that names the mode and the asserted label", () => {
+    expect(importerSource).toContain('f"mode={LINK_ONLY_MODE} {IDENTITY_NOTES_PREFIX}{label} "');
+    expect(importerSource).toContain('notes=batch_notes(prepared, args.label)');
+  });
+
+  it("keeps the full reload free of any link-only branch", () => {
+    // run_import() is the last function before main(); link-only lives in its own
+    // run_link_only_import() above the entry point, so the full reload cannot drift.
+    const start = importerSource.indexOf("def run_import(");
+    const end = importerSource.indexOf("def main(");
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    expect(importerSource.slice(start, end)).not.toContain("link_only");
+    expect(importerSource).toContain("def run_link_only_import(");
+    // main() dispatches to a separate entry point rather than threading a flag through
+    expect(importerSource).toContain("    if args.link_only:\n        return main_link_only(args)");
+  });
+});
+
 describe("DraftGuru importer — frozen derivations", () => {
   it("uses the frozen B2-1 name_key rule, not afldb_normalise_name", () => {
     expect(importerSource).toContain("def draftguru_name_key");

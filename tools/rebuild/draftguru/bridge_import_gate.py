@@ -66,10 +66,34 @@ Database discipline (identical in every target):
   * the DSN and credentials are never printed; connection errors are reported by class only;
   * every guard above runs, and fails closed, before any target data is read.
 
+``--link-only`` (AFLDB-ISSUE-222 Phase 4b, 2026-09-19)
+-------------------------------------------------------
+Models the importer's ``--link-only`` write set instead of a full reload, for a target whose
+accepted Stage A snapshot bytes no longer exist anywhere (``afldb_dev``: loaded from
+``annual-html-20260902``, whose Rails-rendered pages carry a per-render CSRF token and cannot
+be re-acquired). ``--label`` becomes mandatory and explicit, and the gate proves it against
+every stored ``external_identities(draftguru).notes`` value rather than trusting it.
+
+    python tools/rebuild/draftguru/bridge_import_gate.py plan --target dev --link-only \\
+        --label annual-html-20260902 \\
+        --bridge data/reference/draftguru-person-bridge-20260918-v2.afldb_dev.json
+
+No Stage A page, manifest or parsed artefact is opened. Checks 6.4, 6.6 and 6.7 are PROVEN, not
+skipped: the write-set half reads the SET clause of the importer's own three UPDATE statements
+back through ``import_draftguru.set_clause_columns`` and requires it to be exactly the link
+columns and disjoint from the non-link ones; the value half requires the modelled after-state
+to differ from the stored rows in nothing else; and ``verify``'s 8.15 re-reads four server-side
+digests covering every non-link column -- including ``import_batch_id``, which the full reload
+rewrites on all 6,810 picks and this mode must not -- and requires them to equal the plan's.
+Every target, database and child-target guard is unchanged and still runs first. The full path
+is untouched: its check list, its hashes and its ``baseline_sha256`` are byte-identical to
+before this mode existed, because every addition is inside ``if link_only``.
+
 Exit status: 0 = every check held (plan: proceed / verify: import proven); 1 = refused (a check
 failed -- fail closed); 2 = the gate could not run (structural error, including an unknown
-``--target``, a missing DSN, or a missing mandatory ``--bridge``). Two runs over the same state
-with the same arguments and target print the same ``summary_sha256``.
+``--target``, a missing DSN, a missing mandatory ``--bridge``, or ``--link-only`` without an
+explicit ``--label``). Two runs over the same state with the same arguments and target print
+the same ``summary_sha256``.
 """
 
 from __future__ import annotations
@@ -176,6 +200,17 @@ PERSON_NONLINK = ("dg_person_id", "display_name_raw", "name_key", "candidate_cou
 PICK_LINK = ("player_id", "link_status_value", "match_method", "confidence_notes")
 PICK_NONLINK = tuple(c for c in imp.PICK_COLUMNS
                      if c not in PICK_LINK and c != "import_batch_id")
+IDENTITY_NONLINK = ("external_name", "external_url", "candidate_count", "notes")
+
+# AFLDB-ISSUE-222 --link-only. The gate's own link vocabulary and the importer's link-only
+# write set must be the SAME set, or the gate would be modelling a write the importer does not
+# make (or missing one it does). Proven at import time rather than by comment, so a change to
+# either side fails immediately and everywhere.
+assert imp.PERSON_LINK_COLUMNS == LINK_COLUMNS
+assert imp.PICK_LINK_COLUMNS == PICK_LINK
+assert not set(imp.PERSON_LINK_COLUMNS) & set(PERSON_NONLINK)
+assert not set(imp.PICK_LINK_COLUMNS) & set(PICK_NONLINK)
+assert not set(imp.IDENTITY_LINK_COLUMNS) & set(IDENTITY_NONLINK)
 
 ALLOWED_PERSON_STATES = {
     ("unique", imp.BRIDGE_MATCH_METHOD, True),
@@ -446,8 +481,12 @@ RESOLUTIONS_SQL = """SELECT id, target_id, action, player_id, previous_status::t
                        FROM player_link_resolutions WHERE target_table = 'draft_picks' ORDER BY id"""
 CLUBS_SQL = "SELECT slug, id, name FROM clubs"
 BATCHES_SQL = """SELECT id, tool, target_table, status::text, records_read, records_inserted,
-                        records_updated, records_rejected, error, started_at::text, completed_at::text
+                        records_updated, records_rejected, error, started_at::text,
+                        completed_at::text, notes
                    FROM import_batches WHERE source_id = %s ORDER BY id DESC LIMIT 5"""
+BATCH_FIELDS = ("id", "tool", "target_table", "status", "records_read", "records_inserted",
+                "records_updated", "records_rejected", "error", "started_at", "completed_at",
+                "notes")
 BATCH_COUNT_SQL = "SELECT count(*), coalesce(max(id), 0) FROM import_batches WHERE source_id = %s"
 IDENTITY_RESOLVE_SQL = """SELECT DISTINCT e.player_id
                             FROM external_identities e JOIN sources s ON s.id = e.source_id
@@ -481,8 +520,37 @@ BASELINE_SQL: dict[str, tuple[str, tuple]] = {
     "player_career_stats": (_ROW_DIGEST.format(order="player_id") + " FROM player_career_stats t", ()),
 }
 
+# AFLDB-ISSUE-222 --link-only: two further server-side digests, added ONLY in that mode.
+#
+# They are the after-the-fact proof for checks 6.7 and 6.6 respectively. The default
+# BASELINE_SQL above deliberately covers neither, and must not: the full reload rewrites
+# `notes` on every identity row and `import_batch_id` on every pick, every run, so pinning them
+# there would make every full-mode verify fail. Link-only writes neither, so in that mode both
+# are preservation invariants. Keeping them in a separate dict is what leaves the full path's
+# `baseline_sha256` bit-identical to every value already recorded against `afldb_test`.
+LINK_ONLY_BASELINE_SQL: dict[str, tuple[str, tuple]] = {
+    "external_identities_draftguru_nonlink": (
+        "SELECT count(*), md5(coalesce(string_agg(json_build_object('id', id, "
+        "'ext', external_id, 'name', external_name, 'url', external_url, "
+        "'cc', candidate_count, 'notes', notes)::text, E'\\n' ORDER BY id), '')) "
+        "FROM external_identities WHERE source_id = %s", ("dg",)),
+    "draft_picks_draftguru_batch_ids": (
+        "SELECT count(*), md5(coalesce(string_agg(json_build_object('id', id, "
+        "'b', import_batch_id)::text, E'\\n' ORDER BY id), '')) "
+        "FROM draft_picks WHERE source_id = %s", ("dg",)),
+}
 
-def read_target(cur: SelectOnlyCursor, rep: Report) -> dict:
+LINK_ONLY_PRESERVATION_DIGESTS = (
+    "draft_persons_draftguru_nonlink", "draft_picks_draftguru_nonlink",
+    "external_identities_draftguru_nonlink", "draft_picks_draftguru_batch_ids",
+)
+
+
+def baseline_sql_for(link_only: bool) -> dict[str, tuple[str, tuple]]:
+    return {**BASELINE_SQL, **LINK_ONLY_BASELINE_SQL} if link_only else BASELINE_SQL
+
+
+def read_target(cur: SelectOnlyCursor, rep: Report, link_only: bool = False) -> dict:
     """Everything the gate needs from the database, in one read-only transaction."""
     source_id = imp.resolve_source_id(cur, imp.SOURCE_KEY)
     afl_source_id = imp.resolve_source_id(cur, imp.AFLTABLES_SOURCE_KEY)
@@ -529,14 +597,12 @@ def read_target(cur: SelectOnlyCursor, rep: Report) -> dict:
     cur.execute(CLUBS_SQL)
     clubs = {slug: (cid, name) for slug, cid, name in cur.fetchall()}
     cur.execute(BATCHES_SQL, (source_id,))
-    batches = [dict(zip(("id", "tool", "target_table", "status", "records_read", "records_inserted",
-                         "records_updated", "records_rejected", "error", "started_at", "completed_at"),
-                        row)) for row in cur.fetchall()]
+    batches = [dict(zip(BATCH_FIELDS, row)) for row in cur.fetchall()]
     cur.execute(BATCH_COUNT_SQL, (source_id,))
     batch_count, batch_max_id = cur.fetchone()
 
     baseline = {}
-    for label, (sql, params) in BASELINE_SQL.items():
+    for label, (sql, params) in baseline_sql_for(link_only).items():
         cur.execute(sql, tuple(source_id if p == "dg" else p for p in params))
         count, digest = cur.fetchone()
         baseline[label] = {"count": int(count), "md5": digest}
@@ -625,6 +691,65 @@ def expected_pick_rows(prepared: dict, persons: dict, target: dict) -> dict:
             "dg_person_id": person["dg_person_id"], "player_url": pick["player_url"],
             "reported_games": person["reported_games"], "reported_goals": person["reported_goals"],
         }
+    return out
+
+
+# ---------------------------------------------------------------------------
+# AFLDB-ISSUE-222 --link-only: the expected state models the link-only write set exactly
+# ---------------------------------------------------------------------------
+# Every non-link value below is COPIED from the stored row rather than derived from a snapshot,
+# because that is precisely what the importer's link-only path does: it never names a non-link
+# column in a SET clause, so the stored value is the expected value by construction. That makes
+# the value-level comparisons (6.4a / 6.6a / 6.7b) a construction guard rather than the
+# preservation proof; the preservation proof is the pair of write-set checks (6.4 / 6.6 / 6.7,
+# read off the importer's own statements) plus the four server-side digests verify re-reads.
+
+def stored_person_frame(target: dict) -> dict:
+    """A ``prepared['persons']``-shaped frame built from the TARGET, for apply_authority."""
+    return {url: {"player_url": url, "dg_person_id": row["dg_person_id"],
+                  "display_name_raw": row["display_name_raw"], "name_key": row["name_key"],
+                  "reported_games": row["reported_games"], "reported_goals": row["reported_goals"]}
+            for url, row in target["persons"].items()}
+
+
+def expected_person_rows_link_only(persons: dict, target: dict) -> dict:
+    out = {}
+    for url, stored in target["persons"].items():
+        p = persons[url]
+        row = {field: stored[field] for field in PERSON_FIELDS if field != "id"}
+        row["player_id"] = p["player_id"]
+        row["link_status"] = p["link_status"]
+        row["match_method"] = p["match_method"]
+        row["confidence_notes"] = p["confidence_notes"]
+        # migration 019's draft_persons_backlog_ck, from the STORED reported_games.
+        row["is_matching_backlog"] = (p["player_id"] is None
+                                      and (stored["reported_games"] or 0) > 0)
+        out[url] = row
+    return out
+
+
+def expected_pick_rows_link_only(persons: dict, target: dict) -> dict:
+    out = {}
+    for key, stored in target["picks"].items():
+        p = persons[stored["player_url"]]
+        row = {field: stored[field] for field in PICK_FIELDS if field != "id"}
+        row["player_id"] = p["player_id"]
+        row["link_status_value"] = p["link_status"]
+        row["match_method"] = p["match_method"]
+        row["confidence_notes"] = p["confidence_notes"]
+        out[key] = row
+    return out
+
+
+def expected_identity_rows_link_only(persons: dict, target: dict) -> dict:
+    out = {}
+    for url, stored in target["identities"].items():
+        p = persons[url]
+        row = dict(stored)
+        row["player_id"] = p["player_id"]
+        row["status"] = p["link_status"] if p["player_id"] is not None else imp.UNLINKED_DEFAULT
+        row["match_method"] = p["match_method"]
+        out[url] = row
     return out
 
 
@@ -844,10 +969,14 @@ def run_gate(mode: str, prepared: dict, child: dict, child_sha256: str, parent_m
              label: str, conn_factory: Callable[[], Any], *, expect: dict | None = None,
              population: dict | None = None, rejected: dict | None = None,
              print_manifest: bool = False, emit: Callable[[str], None] = print,
-             required_database: str = REQUIRED_DATABASE) -> dict:
+             required_database: str = REQUIRED_DATABASE, link_only: bool = False) -> dict:
     """Shared body of ``plan`` and ``verify``. Returns the summary (with ``failures``).
     ``required_database`` defaults to ``afldb_test``, matching every pre-existing caller that
-    does not pass it; ``main()`` passes the selected target's database explicitly."""
+    does not pass it; ``main()`` passes the selected target's database explicitly.
+
+    ``link_only=False`` is the full reload the gate has always modelled; every pre-existing
+    caller keeps it and its check list, hashes and ``baseline_sha256`` are unchanged.
+    ``link_only=True`` models the importer's ``--link-only`` write set instead."""
     if mode not in ("plan", "verify"):
         raise GateError(f"unknown mode {mode!r}")
     rep = Report(emit)
@@ -861,6 +990,11 @@ def run_gate(mode: str, prepared: dict, child: dict, child_sha256: str, parent_m
                                "target_database": required_database,
                                "child_sha256": child_sha256, "stage_a_label": label,
                                "expect": expect}
+    if link_only:
+        # Only ever added in link-only, so the full path's hashed summary payload -- and
+        # therefore its summary_sha256 -- is byte-identical to before this mode existed.
+        summary["mode_scope"] = imp.LINK_ONLY_MODE
+        summary["link_only_write_set"] = {t: list(c) for t, c in imp.link_only_write_set().items()}
 
     rep.section(f"1. {mode}: inputs")
     rep.check("1.1 child sha256 pinned", True, child_sha256[:16])
@@ -877,8 +1011,17 @@ def run_gate(mode: str, prepared: dict, child: dict, child_sha256: str, parent_m
     summary["counts"] = {"bridges": len(bridges), "withheld": len(withheld),
                          "withheld_by_reason": {r: sum(1 for w in withheld if w["reason"] == r)
                                                 for r in sorted(set(withheld_urls.values()))},
-                         "persons_in_snapshot": len(prepared["persons"]),
-                         "picks_in_snapshot": len(prepared["picks"])}
+                         # In link-only there is no snapshot frame at all; the population is
+                         # the target's own, counted in section 3 and pinned by 3.1 / 3.2.
+                         "persons_in_snapshot": len(prepared["persons"]) if not link_only else None,
+                         "picks_in_snapshot": len(prepared["picks"]) if not link_only else None}
+    if link_only:
+        rep.check("1.7 link-only: accepted + withheld partition the whole population exactly",
+                  len(bridges) + len(withheld) == population["persons"]
+                  and not (set(withheld_urls) & set(bridges)),
+                  f"{len(bridges)} + {len(withheld)} vs {population['persons']}")
+        rep.check("1.8 link-only: the child names its pinned source-evidence parent",
+                  bool(re.fullmatch(r"[0-9a-f]{64}", str(child.get("parent_sha256")))))
 
     def body(cur: SelectOnlyCursor, settings: dict) -> dict:
         rep.section("2. read-only connection")
@@ -889,7 +1032,7 @@ def run_gate(mode: str, prepared: dict, child: dict, child_sha256: str, parent_m
                   settings["current_database"] == required_database)
         rep.check("2.3 session TimeZone is UTC (digest stability)", settings["timezone"] == "UTC",
                   str(settings["timezone"]))
-        return read_target(cur, rep)
+        return read_target(cur, rep, link_only=link_only)
 
     try:
         target = with_read_only(conn_factory, body, required_database)
@@ -897,6 +1040,12 @@ def run_gate(mode: str, prepared: dict, child: dict, child_sha256: str, parent_m
         rep.check("2.4 the target's live decisions are consistent (read_live_decisions)", False, str(exc))
         return _finish(summary, rep, emit)
     rep.check("2.4 the target's live decisions are consistent (read_live_decisions)", True)
+
+    if link_only:
+        # The population IS the frame in this mode. Built here, after the read, because the
+        # importer builds it from exactly the same rows at exactly the same point.
+        prepared = dict(prepared)
+        prepared["persons"] = stored_person_frame(target)
 
     rep.section("3. target state")
     stored_persons, stored_picks = target["persons"], target["picks"]
@@ -976,10 +1125,20 @@ def run_gate(mode: str, prepared: dict, child: dict, child_sha256: str, parent_m
     rep.check("5.5 nothing would be seeded", stats["seeded"] == 0)
     summary["authority"] = dict(stats)
 
-    expected_persons = expected_person_rows(persons, target["source_id"])
-    expected_picks = expected_pick_rows(prepared, persons, target)
-    summary["source_override_patches_applied"] = apply_source_overrides(expected_picks, target)
-    expected_ids = expected_identity_rows(persons, label)
+    if link_only:
+        expected_persons = expected_person_rows_link_only(persons, target)
+        expected_picks = expected_pick_rows_link_only(persons, target)
+        # The link-only importer does not call replay_admin_overrides at all, so no
+        # source-owned override is re-applied and no manual selection is re-created. 6.10
+        # below still checks that the target's manual state is coherent; this records that
+        # this mode patches nothing.
+        summary["source_override_patches_applied"] = 0
+        expected_ids = expected_identity_rows_link_only(persons, target)
+    else:
+        expected_persons = expected_person_rows(persons, target["source_id"])
+        expected_picks = expected_pick_rows(prepared, persons, target)
+        summary["source_override_patches_applied"] = apply_source_overrides(expected_picks, target)
+        expected_ids = expected_identity_rows(persons, label)
     linked_ids: dict[int, list] = {}
     for url, r in expected_persons.items():
         if r["player_id"] is not None:
@@ -1025,15 +1184,63 @@ def run_gate(mode: str, prepared: dict, child: dict, child_sha256: str, parent_m
               and not pc["unexpected_link_change"],
               f"dropped {pc['link_dropped'][:3]}, relinked {pc['relinked'][:3]}, "
               f"metadata {pc['link_metadata_change'][:3]}, unexpected {pc['unexpected_link_change'][:3]}")
-    rep.check("6.4 no non-link person column would change", not pc["nonlink_change"],
-              str(pc["nonlink_change"][:3]))
-    rep.check("6.5 dg_person_id is not permuted", not pc["dg_person_id_permutation"],
-              str(len(pc["dg_person_id_permutation"])))
-    rep.check("6.6 no non-link pick column would change (after active source-owned overrides)",
-              not kc["nonlink_change"], str(kc["nonlink_change"][:3]))
-    rep.check("6.7 external_identities(draftguru): no missing/extra row, no change outside link columns",
-              not ic["missing"] and not ic["extra"] and not ic["other_change"],
-              f"missing {ic['missing'][:3]}, extra {ic['extra'][:3]}, other {ic['other_change'][:3]}")
+    if link_only:
+        # 6.4 / 6.6 / 6.7 are PROVEN here, not skipped, and they are proven twice over:
+        #   * the write-set half reads the SET clause of the importer's own three statements
+        #     back through imp.set_clause_columns() and requires it to be exactly the link
+        #     columns and disjoint from the non-link ones -- so no non-link column CAN move;
+        #   * the value half (6.4a / 6.6a / 6.7b) requires the modelled after-state to differ
+        #     from the stored rows in nothing but those columns;
+        #   * and verify's 8.15 re-reads four server-side digests over every non-link column
+        #     (including import_batch_id, which the full reload rewrites and this mode must
+        #     not) and requires them to equal the plan's.
+        write_set = imp.link_only_write_set()
+        rep.check("6.4 link-only: the draft_persons write set is exactly the person link columns "
+                  "and disjoint from every non-link column",
+                  write_set["draft_persons"] == LINK_COLUMNS
+                  and not set(write_set["draft_persons"]) & set(PERSON_NONLINK),
+                  str(write_set["draft_persons"]))
+        rep.check("6.4a link-only: no non-link person column differs from the stored row",
+                  not pc["nonlink_change"], str(pc["nonlink_change"][:3]))
+        rep.check("6.5 dg_person_id is not permuted", not pc["dg_person_id_permutation"],
+                  str(len(pc["dg_person_id_permutation"])))
+        rep.check("6.6 link-only: the draft_picks write set is exactly the pick link columns, "
+                  "disjoint from every non-link column, and never names import_batch_id",
+                  write_set["draft_picks"] == PICK_LINK
+                  and not set(write_set["draft_picks"]) & set(PICK_NONLINK)
+                  and "import_batch_id" not in write_set["draft_picks"],
+                  str(write_set["draft_picks"]))
+        rep.check("6.6a link-only: no non-link pick column differs from the stored row",
+                  not kc["nonlink_change"], str(kc["nonlink_change"][:3]))
+        rep.check("6.7 link-only: the external_identities write set is exactly "
+                  "(player_id, status, match_method) and never names notes",
+                  write_set["external_identities"] == imp.IDENTITY_LINK_COLUMNS
+                  and not set(write_set["external_identities"]) & set(IDENTITY_NONLINK),
+                  str(write_set["external_identities"]))
+        expected_notes = f"{imp.IDENTITY_NOTES_PREFIX}{label}"
+        wrong_notes = sorted({str(r["notes"]) for r in target["identities"].values()
+                              if r["notes"] != expected_notes})
+        summary["identity_notes_label"] = expected_notes
+        summary["identity_notes_mismatches"] = len(
+            [1 for r in target["identities"].values() if r["notes"] != expected_notes])
+        rep.check(f"6.7a link-only: all {len(target['identities'])} stored identity notes are "
+                  f"exactly {expected_notes!r} (the label this run asserts)",
+                  not wrong_notes and len(target["identities"]) == len(stored_persons),
+                  f"{summary['identity_notes_mismatches']} mismatched, e.g. {wrong_notes[:2]}")
+        rep.check("6.7b link-only: no identity row is missing, extra or changed outside the "
+                  "link columns", not ic["missing"] and not ic["extra"] and not ic["other_change"],
+                  f"missing {ic['missing'][:3]}, extra {ic['extra'][:3]}, "
+                  f"other {ic['other_change'][:3]}")
+    else:
+        rep.check("6.4 no non-link person column would change", not pc["nonlink_change"],
+                  str(pc["nonlink_change"][:3]))
+        rep.check("6.5 dg_person_id is not permuted", not pc["dg_person_id_permutation"],
+                  str(len(pc["dg_person_id_permutation"])))
+        rep.check("6.6 no non-link pick column would change (after active source-owned overrides)",
+                  not kc["nonlink_change"], str(kc["nonlink_change"][:3]))
+        rep.check("6.7 external_identities(draftguru): no missing/extra row, no change outside link columns",
+                  not ic["missing"] and not ic["extra"] and not ic["other_change"],
+                  f"missing {ic['missing'][:3]}, extra {ic['extra'][:3]}, other {ic['other_change'][:3]}")
     rep.check("6.8 external_identities link changes are exactly the newly linked persons",
               set(ic["link_change"]) == set(pc["newly_linked"]),
               f"{len(ic['link_change'])} vs {len(pc['newly_linked'])}")
@@ -1137,17 +1344,47 @@ def run_gate(mode: str, prepared: dict, child: dict, child_sha256: str, parent_m
                   not stored_vocab_bad, str(stored_vocab_bad[:3]))
         batches = target["batches"]
         newest = batches[0] if batches else None
-        rep.check("8.10 the newest draftguru import_batches row is a completed import_draftguru.py "
-                  f"run over {population['picks']} records with no error",
-                  bool(newest) and newest["status"] == "completed"
-                  and newest["tool"] == "import_draftguru.py"
-                  and newest["records_read"] == population["picks"] and newest["error"] is None
-                  and newest["completed_at"] is not None, str(newest))
+        common_batch_ok = (bool(newest) and newest["status"] == "completed"
+                           and newest["tool"] == "import_draftguru.py"
+                           and newest["records_read"] == population["picks"]
+                           and newest["error"] is None and newest["completed_at"] is not None)
+        if link_only:
+            expected_notes_prefix = f"mode={imp.LINK_ONLY_MODE} {imp.IDENTITY_NOTES_PREFIX}{label}"
+            notes = str((newest or {}).get("notes") or "")
+            rep.check("8.10 link-only: the newest draftguru import_batches row is a completed "
+                      f"import_draftguru.py run over {population['picks']} records with no error, "
+                      "and its notes declare mode=link_only and the asserted label",
+                      common_batch_ok and notes.startswith(expected_notes_prefix)
+                      and f"bridge_sha256={child_sha256}" in notes,
+                      str({k: (newest or {}).get(k) for k in ("id", "status", "records_read",
+                                                              "error", "notes")}))
+            link_only_batches = [b for b in batches
+                                 if str(b.get("notes") or "").startswith(f"mode={imp.LINK_ONLY_MODE}")
+                                 and b["status"] == "completed"]
+            rep.check("8.10a link-only: exactly one completed link-only batch is present among "
+                      "the newest draftguru batches, and it is the newest",
+                      len(link_only_batches) == 1 and bool(newest)
+                      and link_only_batches[0]["id"] == newest["id"],
+                      str([(b["id"], b["status"]) for b in link_only_batches]))
+        else:
+            rep.check("8.10 the newest draftguru import_batches row is a completed import_draftguru.py "
+                      f"run over {population['picks']} records with no error",
+                      common_batch_ok, str(newest))
         rep.check("8.11 no draftguru import batch is left running",
                   not any(b["status"] == "running" for b in batches))
-        rep.check("8.12 every draftguru pick carries the newest batch id",
-                  bool(newest) and all(p["import_batch_id"] == newest["id"]
-                                       for p in stored_picks.values()))
+        if link_only:
+            # The exact inverse of the full path's 8.12: link-only never names import_batch_id,
+            # so every pick must still carry whatever batch loaded it. Proven by value here and
+            # by the pinned digest in 8.15.
+            rep.check("8.12 link-only: no draftguru pick was re-stamped with the new batch id "
+                      "(import_batch_id is not in the write set)",
+                      bool(newest) and not any(p["import_batch_id"] == newest["id"]
+                                               for p in stored_picks.values()),
+                      str(sorted({p["import_batch_id"] for p in stored_picks.values()})[:5]))
+        else:
+            rep.check("8.12 every draftguru pick carries the newest batch id",
+                      bool(newest) and all(p["import_batch_id"] == newest["id"]
+                                           for p in stored_picks.values()))
         if "batches_before" in expect:
             rep.check("8.13 exactly one draftguru batch was added since the plan",
                       target["batch_count"] == expect["batches_before"] + 1,
@@ -1157,6 +1394,16 @@ def run_gate(mode: str, prepared: dict, child: dict, child_sha256: str, parent_m
             if key in expect:
                 rep.check(f"8.14 {key} equals the plan's value", summary[key] == expect[key],
                           f"observed {summary[key][:16]}..., planned {str(expect[key])[:16]}...")
+        if link_only:
+            missing_digests = [k for k in LINK_ONLY_PRESERVATION_DIGESTS
+                               if k not in target["baseline"]]
+            rep.check("8.15 link-only: all four non-link preservation digests were read, and the "
+                      "baseline they belong to reproduces the plan's baseline_sha256 -- 6.4, 6.6 "
+                      "and 6.7 proven after the fact, server-side, over every non-link column",
+                      not missing_digests and "baseline_sha256" in expect
+                      and summary["baseline_sha256"] == expect["baseline_sha256"],
+                      f"missing {missing_digests}, "
+                      f"baseline pinned: {'baseline_sha256' in expect}")
 
     return _finish(summary, rep, emit)
 
@@ -1197,7 +1444,16 @@ def main(argv: list[str] | None = None) -> int:
                     help="defaults to the pinned afldb_test child hash for --target test; "
                          "no default for any other target (no DEV child is pinned yet)")
     ap.add_argument("--expect-parent-sha256", default=EXPECTED_PARENT_SHA256)
-    ap.add_argument("--label", default=imp.STAGE_A_LABEL)
+    # Default None then substituted, exactly as the importer does: the effective default is
+    # unchanged, and --link-only additionally learns whether the operator stated the label.
+    ap.add_argument("--label", default=None,
+                    help=f"Stage A snapshot label (default {imp.STAGE_A_LABEL}; mandatory and "
+                         "explicit under --link-only, where it is checked against every stored "
+                         "external_identities(draftguru).notes value)")
+    ap.add_argument("--link-only", action="store_true",
+                    help="model the importer's --link-only write set instead of a full reload: "
+                         "no Stage A snapshot is opened, and the non-link state is proven "
+                         "preserved rather than re-derived. Requires an explicit --label.")
     ap.add_argument("--snapshot-root", default=None)
     ap.add_argument("--print-manifest", action="store_true",
                     help="print every bridge-linked (player_url, identity, player_id) row to stdout")
@@ -1208,9 +1464,21 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--expect-batches-before", type=int)
     args = ap.parse_args(argv)
     cfg = TARGETS[args.target]
+    label_explicit = args.label is not None
+    if args.label is None:
+        args.label = imp.STAGE_A_LABEL
 
-    print(f"AFLDB DraftGuru bridge import gate -- {args.mode} (read-only, {cfg['database']} "
-          f"only) [target={args.target}]")
+    scope = " --link-only" if args.link_only else ""
+    print(f"AFLDB DraftGuru bridge import gate -- {args.mode}{scope} (read-only, "
+          f"{cfg['database']} only) [target={args.target}]")
+    if args.link_only and not label_explicit:
+        print("\nERROR: --link-only requires an explicit --label: the mode proves the label "
+              "against every stored external_identities(draftguru).notes value, and a default "
+              "is not an assertion")
+        return EXIT_ERROR
+    if args.link_only and args.snapshot_root is not None:
+        print("\nERROR: --link-only reads no Stage A snapshot, so --snapshot-root cannot apply")
+        return EXIT_ERROR
     if args.bridge is None:
         if cfg["child_rel"] is None:
             print(f"\nERROR: --bridge is required for --target {args.target} "
@@ -1236,12 +1504,23 @@ def main(argv: list[str] | None = None) -> int:
                                       cfg["expected_child_counts"],
                                       expect_child_target=cfg["child_target"])
         parent_map = load_parent_map(parent_path, child, args.expect_parent_sha256)
-        prepared = imp.validate(SimpleNamespace(label=args.label, snapshot_root=args.snapshot_root,
-                                                bridge=str(child_path)))
+        if args.link_only:
+            prepared = imp.validate_link_only(
+                SimpleNamespace(label=args.label, snapshot_root=None, bridge=str(child_path)))
+        else:
+            prepared = imp.validate(SimpleNamespace(label=args.label,
+                                                    snapshot_root=args.snapshot_root,
+                                                    bridge=str(child_path)))
     except (GateError, imp.ImportFailure, imp.parser_mod.ParseFailure) as exc:
         print(f"\nERROR: {exc}")
         return EXIT_ERROR
-    print(f"  snapshot : {args.label} ({prepared['year_count']} year pages, sha256 verified)")
+    if args.link_only:
+        print(f"  snapshot : {args.label} (ASSERTED against the target's stored identity notes; "
+              "no Stage A page, manifest or parsed artefact opened)")
+        for table, columns in imp.link_only_write_set().items():
+            print(f"  write set: {table} -> {', '.join(columns)}")
+    else:
+        print(f"  snapshot : {args.label} ({prepared['year_count']} year pages, sha256 verified)")
     print(f"  child    : {child_path.relative_to(REPO_ROOT).as_posix()} {child_sha[:16]}...")
     print(f"  parent   : {parent_path.relative_to(REPO_ROOT).as_posix()} (parent_sha256 chain verified)")
     expect = {k: v for k, v in (
@@ -1253,7 +1532,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         summary = run_gate(args.mode, prepared, child, child_sha, parent_map, args.label,
                            lambda: open_read_only(dsn), expect=expect,
-                           print_manifest=args.print_manifest, required_database=cfg["database"])
+                           print_manifest=args.print_manifest, required_database=cfg["database"],
+                           link_only=args.link_only)
     except GateError as exc:
         print(f"\nERROR: {exc}")
         return EXIT_ERROR

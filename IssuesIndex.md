@@ -445,12 +445,51 @@
   DEV child accepted under `dev` / refused under `test`, an `afldb_dev`-labelled child refused,
   `current_database() = 'dev'` refused, and a real-child CLI `plan --target dev` clearing every
   offline guard. Both bridge children byte-identical to `59a67a9e`.
-- **Next action:** operator stages and commits the corrected gate + contract + docs, then resumes
-  §11.19.15 item-6 at **step 10** — `bridge_import_gate.py plan --target dev` on the DEV host,
-  writing a NEW transcript
-  `/home/arm/backups/afldb/issue-222/dev-plan-20260919-preimport-retry1.txt` (never overwrite the
-  failed `…-preimport.txt`). Step 9's dry run does not need repeating. Nothing is staged or
-  committed by this pass.
+- **Second real DEV attempt REFUSED on 6.4/6.6/6.7; root cause is a Stage A LABEL mismatch, not
+  drift; fail-closed `--link-only` implemented (2026-09-19, Opus 5, §11.19.20, uncommitted).**
+  The retried plan (`…-preimport-retry1.txt`) cleared every guard and refused exactly three
+  checks: 92 `draft_persons` + 128 `draft_picks` non-link changes (`reported_games`/
+  `reported_goals`) and all **5,057** `external_identities(draftguru)` `notes`. `afldb_dev` holds
+  the population loaded from **`annual-html-20260902`** — the *accepted* Stage A snapshot per
+  `CHANGELOG.md` (2 Sep 2026) — while the importer's and gate's CLI default still names the
+  *superseded* `annual-html-20260826`. `reconcile_draftguru_identities()` rewrites `notes` on
+  every row unconditionally (hence exactly 5,057), and Games/Goals moved between two acquisitions
+  a week apart inside the 2026 season. §11.19.1 had already predicted this refusal and named the
+  label question; `afldb_test` was last loaded from `20260826`, which is why its plan was clean.
+  A normal import would be a **regression**, not a refresh. The `20260902` raw pages exist nowhere
+  and cannot be re-acquired (per-render CSRF token → a third label); approving the change would
+  also fail `verify`'s 8.14, since `baseline_sha256` covers both non-link digests. So a
+  fail-closed **`--link-only`** mode was implemented: separate entry point and write path, no
+  Stage A byte read (AST + booby-trapped runtime proof), expected state built from the stored
+  population + pinned child + registered identities + ledger/live decisions. Write set:
+  `import_batches` (one row, `notes` = `mode=link_only stage_a_snapshot=<label> …`),
+  `draft_persons` (`player_id, link_status, match_method, confidence_notes,
+  is_matching_backlog`), `draft_picks` (`player_id, link_status_value, match_method,
+  confidence_notes`), `external_identities(draftguru)` (`player_id, status, match_method`).
+  `is_matching_backlog` is structurally mandatory (migration 019's `draft_persons_backlog_ck`);
+  `confidence_notes` is link provenance and is required by the gate's existing 8.4. Requires
+  `--bridge`, `--no-seed` and an EXPLICIT `--label` proven against every stored identity `notes`;
+  refuses `--snapshot-root`/`--acknowledge-population-drop`. Gate `--link-only` proves 6.4/6.6/6.7
+  in three layers (SET clauses read back from the importer, value comparisons, and a new `8.15`
+  over four server-side non-link digests); `8.12` inverted, not dropped; full-mode
+  `baseline_sha256` byte-identical. DB-free: new `draftguru_link_only_contract.py` **120/120**
+  (two falsifiable RED proofs), both existing contracts pass **unchanged**,
+  `draftguru-import.test.ts` 46/46, `tsc` clean, `eslint` unchanged, `git diff --check` clean.
+  **No real import has run; `afldb_dev` backup `0768fe01…` intact; the default Stage A label was
+  NOT repointed; ISSUE-224/225 untouched.**
+- **Key files (this pass):** `tools/rebuild/draftguru/{import_draftguru.py, bridge_import_gate.py,
+  README.md}`, `tools/migration/common.py`, `tests/python/draftguru_link_only_contract.py` (new),
+  `tests/python/draftguru_import_gate_contract.py`, `tests/draftguru-import.test.ts`,
+  `tests/draftguru-acquisition.test.ts`.
+- **Next action:** operator stages and commits the `--link-only` importer + gate + contracts +
+  docs, then on the DEV host runs, in this order: `import_draftguru.py --link-only
+  --validate-only`, `--link-only --dry-run`, then `bridge_import_gate.py plan --target dev
+  --link-only --label annual-html-20260902 --bridge
+  data/reference/draftguru-person-bridge-20260918-v2.afldb_dev.json` writing a NEW transcript
+  `/home/arm/backups/afldb/issue-222/dev-plan-20260919-link-only.txt`. The dry run must precede
+  the plan, because it retains a `failed`/`DryRunComplete` audit row and `verify`'s 8.13 requires
+  exactly `import_batches_before + 1`. Then the real link-only import, two independent verifies,
+  `sync-dev.ps1` and the smoke checks. Nothing is staged or committed by this pass.
 
 ### AFLDB-ISSUE-225 — Gridley corpus: 37 pre-existing `incorrect known answer` cells on non-draft criteria, present on `afldb_test` before AFLDB-ISSUE-222 and untouched by it
 - **Severity:** Medium. **Area:** Grid Solver / canonical data — `captaincies`,

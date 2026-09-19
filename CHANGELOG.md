@@ -15,6 +15,60 @@ commit.
 
 ## [Unreleased]
 
+### DraftGuru importer: a fail-closed `--link-only` mode for a target whose accepted Stage A snapshot no longer exists (AFLDB-ISSUE-222) - 19 September 2026
+
+- **Why.** `afldb_dev` holds the DraftGuru population loaded from `annual-html-20260902`, the
+  accepted Stage A snapshot. Those raw pages no longer exist anywhere and cannot be re-acquired —
+  they are Rails-rendered and carry a per-render CSRF token, so a refetch would produce a third
+  label rather than the accepted bytes. Only the superseded `annual-html-20260826` bytes survive.
+  The read-only import gate therefore correctly refused a normal DEV import: it would have
+  rewritten 92 `draft_persons` rows, 128 `draft_picks` rows (`reported_games` / `reported_goals`)
+  and all 5,057 `external_identities(draftguru)` `notes` values, regressing DEV's source-owned
+  data onto a retired snapshot. The refusal was a deterministic pinned-source **label** mismatch,
+  not drift: the importer's and gate's CLI default still names the superseded label, exactly as
+  the 2 September 2026 entry below records.
+- **`import_draftguru.py --link-only`** applies only the already-reviewed trusted linkage to an
+  already-loaded population and rewrites no source-owned Stage A fact. It reads no Stage A page,
+  manifest or parsed artefact; the expected state is built from the stored population, the pinned
+  deployment child, the target's registered AFL Tables identities and the tracked ledger plus live
+  decisions. The committed write set is exactly: one `import_batches` row whose `notes` declare
+  `mode=link_only`, the asserted snapshot label and the child/parent hashes; `draft_persons`
+  `player_id, link_status, match_method, confidence_notes, is_matching_backlog`; `draft_picks`
+  `player_id, link_status_value, match_method, confidence_notes`; and
+  `external_identities(draftguru)` `player_id, status, match_method`. Three set-based `UPDATE`s,
+  scoped to the DraftGuru `source_id`, keyed on each stored row's natural key, each with an
+  `IS DISTINCT FROM` guard so a re-run updates nothing. `is_matching_backlog` is in the set
+  because migration 019's `draft_persons_backlog_ck` makes it impossible to set `player_id`
+  without it; `confidence_notes` because it is the link's own provenance. Everything else —
+  `dg_person_id`, names, `reported_games` / `reported_goals`, `import_batch_id`,
+  `source_record_id`, the identity rows' `notes`, `players`, `data_overrides`, manual selections
+  and every non-DraftGuru row — is never named in a `SET` clause.
+- **Fail-closed.** `--link-only` requires `--bridge`, `--no-seed` and an *explicit* `--label`, and
+  refuses `--snapshot-root` and `--acknowledge-population-drop`. Before writing a row it requires
+  the stored population to be exactly the child's (5,057 persons / 6,810 picks, no missing, extra,
+  duplicate or orphan key), one identity row per person, and **every** identity `notes` value to
+  equal `stage_a_snapshot=<the explicit label>` — so the mode asserts which snapshot the untouched
+  data came from and cannot be made to pass by choosing a label. Authority is the unchanged
+  `apply_authority()` with seeding forbidden. Atomicity matches the full path: linkage and the
+  `completed` status share one commit; failure and `--dry-run` roll the linkage back, leaving only
+  the documented `failed` / `DryRunComplete` audit row.
+- **`bridge_import_gate.py --link-only`** models that write set for `plan` and `verify`. Checks
+  6.4, 6.6 and 6.7 are proven rather than skipped: the `SET` clauses are read back off the
+  importer's own statements and required to be disjoint from every non-link column; the modelled
+  after-state must differ in nothing else; and `verify`'s new `8.15` re-reads four server-side
+  digests over every non-link column — including `import_batch_id`, which a full reload rewrites
+  on all 6,810 picks and this mode must not. Check `8.12` is inverted rather than dropped, and
+  `8.10` now requires the newest batch to declare `mode=link_only` and the asserted label. The two
+  extra digests are added only in link-only mode, so the full path's `baseline_sha256` is
+  byte-identical to every value already recorded against `afldb_test`.
+- **The full reload is untouched.** `--link-only` has its own entry point and write path, so
+  `run_import()` and `validate()` carry no branch on it, and the default Stage A label is
+  unchanged. `tools/migration/common.py`'s `import_batch()` gained an optional `notes` parameter
+  defaulting to `None`, which is what every existing importer already stored.
+- New DB-free contract `tests/python/draftguru_link_only_contract.py` (120 checks, including
+  falsifiable proofs that a smuggled `SET` column and a moved non-link digest are both caught);
+  the existing importer-atomicity and import-gate contracts pass unchanged.
+
 ### DraftGuru importer: data and batch status now commit together; read-only bridge-import plan/verify gates; `afldb_test` backup script (AFLDB-ISSUE-222) - 18 September 2026
 
 - **Importer commit order.** `tools/rebuild/draftguru/import_draftguru.py` called the shared `analyze()` helper inside its `import_batch` block; that helper commits whatever transaction is open before switching to autocommit, so the data writes were committed *before* `batch.finish("completed")` recorded the outcome. A crash or a failed `ANALYZE` in that window left committed data beside a `running` / `failed` `import_batches` row. The call now sits after the block: exactly one commit precedes the first data statement (the `running` row) and the data and the `completed` status land in one commit; any exception, `--dry-run` included, rolls the whole data transaction back before the `failed` row is written. Proven DB-free by `tests/python/draftguru_import_atomicity_contract.py` against a scripted connection (`tests/python/draftguru_fake_pg.py`).

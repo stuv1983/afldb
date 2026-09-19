@@ -1069,6 +1069,137 @@ checked against `export_person_bridge.TARGET_DSN_ENV` read from that module's so
 end-to-end CLI `plan --target dev` over the **real** DEV child that passes every offline guard and
 stops only where it would open a connection.
 
+## `--link-only` -- trusted linkage onto an already-loaded population (2026-09-19, AFLDB-ISSUE-222 Phase 4b)
+
+### Why it exists
+
+`afldb_dev` holds the DraftGuru population loaded from **`annual-html-20260902`**, the accepted
+Stage A snapshot. That snapshot's raw pages no longer exist: they are Rails-rendered and carry a
+per-render CSRF token, so they cannot be re-acquired reproducibly (CHANGELOG, 2 September 2026),
+and an exhaustive local and DEV-host search found no retained copy. Only the **superseded**
+`annual-html-20260826` bytes survive.
+
+A normal import against DEV would therefore have to load the superseded snapshot, which the
+read-only gate correctly refused: it would have rewritten **92 `draft_persons` rows**, **128
+`draft_picks` rows** (`reported_games` / `reported_goals`) and **all 5,057
+`external_identities(draftguru)` `notes`** values, regressing DEV's source-owned data onto a
+retired snapshot. Checks 6.4, 6.6 and 6.7 exist to stop exactly that, and they were right.
+
+`--link-only` is the narrow answer: apply the already-reviewed linkage, rewrite no Stage A fact.
+
+### The committed write set, and nothing else
+
+| Table | Columns written |
+|---|---|
+| `import_batches` | one row; `notes` = `mode=link_only stage_a_snapshot=<label> bridge_sha256=… parent_sha256=…` |
+| `draft_persons` | `player_id`, `link_status`, `match_method`, `confidence_notes`, `is_matching_backlog` |
+| `draft_picks` | `player_id`, `link_status_value`, `match_method`, `confidence_notes` |
+| `external_identities` (source `draftguru` only) | `player_id`, `status`, `match_method` |
+
+Three set-based `UPDATE`s, one per table, each scoped to the DraftGuru `source_id`, each keyed on
+the stored row's own natural key, each carrying an `IS DISTINCT FROM` guard so a re-run over an
+already-linked target updates nothing. No `INSERT`, `DELETE`, `COPY`, `TRUNCATE`, temp table or
+`SET CONSTRAINTS`; `replay_admin_overrides` is not called; `players` is never touched.
+
+`is_matching_backlog` is in the set because migration 019's `draft_persons_backlog_ck`
+(`NOT is_matching_backlog OR (player_id IS NULL AND COALESCE(reported_games,0) > 0)`) makes it
+impossible to omit -- setting `player_id` on a row still flagged as backlog violates the CHECK and
+the statement fails. `confidence_notes` is in it because it is the link's own provenance
+(`draftguru person-page bridge -> <identity>`); a link whose provenance still describes the
+previous decision is a false audit trail, and the gate's verify check 8.4 requires it. Both are
+link-derived. Neither is a Stage A fact.
+
+Everything else is unreachable: `dg_person_id`, `display_name_raw`, `name_key`, `reported_games`,
+`reported_goals`, `import_batch_id`, `source_record_id`, `detail`, every other pick column, the
+identity rows' `external_name` / `external_url` / `candidate_count` / `notes`, `players`,
+`data_overrides`, manual selections and every non-DraftGuru row.
+
+### Fail-closed contract
+
+`--link-only` requires `--bridge`, `--no-seed` and an **explicit** `--label`, and refuses
+`--snapshot-root` and `--acknowledge-population-drop`. It supports `--validate-only` and a
+transactional `--dry-run`. It opens no Stage A page, manifest or parsed artefact at all.
+
+Before it writes a row it requires: the stored population is exactly the child's population
+(5,057 persons / 6,810 picks, no missing, extra, duplicate or orphan key); one
+`external_identities(draftguru)` row per person, no more and no fewer; **every** one of those
+rows' `notes` equal to `stage_a_snapshot=<the explicit label>`; and a child that is a deployment
+artefact whose accepted and withheld lists partition the whole population and which names a pinned
+source-evidence parent. It then replays `apply_authority()` -- the same function, the same order,
+seeding forbidden -- and HALTs on a human/bridge contradiction, an ambiguous or unregistered
+target, a duplicate canonical claim, a seed requirement, a vocabulary violation or a withheld
+person that computed to a link.
+
+The label check is the mode's honesty guarantee: the run asserts which snapshot the untouched
+non-link data came from, and refuses if the target disagrees. It cannot be made to pass by
+choosing a label.
+
+### Atomicity
+
+Identical to the full path. `import_batch` commits the `running` row before any linkage
+statement; the three `UPDATE`s and `batch.finish("completed")` share one commit; `analyze()` runs
+after the block. Any failure rolls the linkage back and records a `failed` batch row; `--dry-run`
+does the same with error `DryRunComplete: `, which is the only row it leaves behind. There is no
+partially linked state.
+
+### The gate's matching `--link-only`
+
+`bridge_import_gate.py plan|verify --link-only --label <label>` models exactly that write set. It
+opens no Stage A snapshot, requires the same explicit label and proves it against every stored
+identity row's `notes`, and keeps every target / database / child-target guard unchanged.
+
+Checks 6.4, 6.6 and 6.7 are **proven, not skipped**, in three layers:
+
+1. the write-set half reads the `SET` clause of the importer's own three statements back through
+   `import_draftguru.set_clause_columns()` and requires it to be exactly the link columns and
+   disjoint from the non-link ones -- so no non-link column *can* move;
+2. `6.4a` / `6.6a` / `6.7b` require the modelled after-state to differ from the stored rows in
+   nothing but those columns;
+3. `verify`'s `8.15` re-reads four server-side digests -- `draft_persons_draftguru_nonlink`,
+   `draft_picks_draftguru_nonlink`, `external_identities_draftguru_nonlink` and
+   `draft_picks_draftguru_batch_ids` -- and requires the `baseline_sha256` they belong to to equal
+   the plan's. The last two are added **only** in link-only mode, because the full reload rewrites
+   `notes` and `import_batch_id` every run; keeping them separate leaves the full path's
+   `baseline_sha256` byte-identical to every value already recorded against `afldb_test`.
+
+`8.12` is inverted rather than dropped: link-only requires that **no** pick was re-stamped with
+the new batch id. `8.10`/`8.10a` require the newest DraftGuru batch to be a completed
+`import_draftguru.py` run whose `notes` declare `mode=link_only`, the asserted label and the child
+hash, and to be the only completed link-only batch among the newest batches. Two independent
+`verify` runs over the same state reproduce the same `summary_sha256`.
+
+### Operator sequence (DEV)
+
+```bash
+# 1. DB-free input validation -- no database contacted, no Stage A page opened
+python tools/rebuild/draftguru/import_draftguru.py --link-only --validate-only \
+  --label annual-html-20260902 --no-seed \
+  --bridge data/reference/draftguru-person-bridge-20260918-v2.afldb_dev.json
+
+# 2. transactional dry run -- every linkage write rolled back, one failed/DryRunComplete row kept
+python tools/rebuild/draftguru/import_draftguru.py --link-only --dry-run \
+  --label annual-html-20260902 --no-seed \
+  --bridge data/reference/draftguru-person-bridge-20260918-v2.afldb_dev.json
+
+# 3. read-only plan -- AFTER the dry run, so import_batches_before is the value verify will use
+python tools/rebuild/draftguru/bridge_import_gate.py plan --target dev --link-only \
+  --label annual-html-20260902 \
+  --bridge data/reference/draftguru-person-bridge-20260918-v2.afldb_dev.json \
+  2>&1 | tee /home/arm/backups/afldb/issue-222/dev-plan-20260919-link-only.txt
+
+# 4. the real import, then two independent verifies with the plan's own printed values
+```
+
+The dry run must come **before** the plan: it retains a `failed` audit row, which increments the
+DraftGuru batch count, and `verify`'s `8.13` requires exactly `import_batches_before + 1`.
+
+### The default Stage A label is deliberately unchanged
+
+`import_draftguru.STAGE_A_LABEL` and `tools/db/rebuild-test.ts`'s `DEFAULT_DRAFTGURU_LABEL` still
+name `annual-html-20260826`. Repointing them is a separate decision and was not made in this pass.
+`--label` now defaults to `None` and is substituted with `STAGE_A_LABEL`, so the effective default
+is unchanged and only its *explicitness* is newly observable.
+
 ### `s74-snapshot.sql` -- the AFLDB-ISSUE-222 §7.4 rollback-exercise snapshot (read-only)
 
 Six `\copy ... TO` statements over exactly the row sets `AFLDB-ISSUE-222.md` §7.4 names for the

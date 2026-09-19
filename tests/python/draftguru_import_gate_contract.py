@@ -166,13 +166,16 @@ class World:
             self.pick_rows[key]["id"] = n
             self.pick_rows[key]["import_batch_id"] = self.batch_id
         self.identity_rows = tool.expected_identity_rows(persons, LABEL)
+        # The trailing None is import_batches.notes, which BATCHES_SQL reads so that verify can
+        # tell a full reload from an AFLDB-ISSUE-222 --link-only run. A full reload writes no
+        # notes, which is exactly what this frame models.
         if bridged:
             self.batches = [(41, "import_draftguru.py", "draft_picks", "completed", 5, 0, 10, 0, None,
-                             "2026-09-18T10:00:00+00:00", "2026-09-18T10:00:05+00:00")]
+                             "2026-09-18T10:00:00+00:00", "2026-09-18T10:00:05+00:00", None)]
             self.batch_count = 4
         else:
             self.batches = [(40, "import_draftguru.py", "draft_picks", "completed", 5, 0, 10, 0, None,
-                             "2026-09-17T10:00:00+00:00", "2026-09-17T10:00:05+00:00")]
+                             "2026-09-17T10:00:00+00:00", "2026-09-17T10:00:05+00:00", None)]
             self.batch_count = 3
         if bridged:
             self.dg_identities = {A: 1001, B: 1002}

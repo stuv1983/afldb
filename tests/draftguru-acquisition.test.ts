@@ -3426,4 +3426,37 @@ describe("DraftGuru bridge import gate (plan / verify, read-only)", () => {
     // no file is ever written by the gate
     expect(source).not.toMatch(/write_text\(|write_bytes\(|open\([^)]*["']w/);
   });
+
+  // AFLDB-ISSUE-222 Phase 4b: --link-only models the importer's link-only write set instead of
+  // a full reload. The behavioural proof is tests/python/draftguru_link_only_contract.py; these
+  // are the static pins that the additions are additive and that 6.4/6.6/6.7 are proven, not
+  // skipped.
+  it("models the link-only write set without weakening 6.4 / 6.6 / 6.7 or the target guards", () => {
+    const source = readFileSync(join(root, "tools", "rebuild", "draftguru", "bridge_import_gate.py"), "utf8")
+      .replace(/\r\n/g, "\n");
+    // the gate's link vocabulary and the importer's write set are proven equal at import time
+    expect(source).toContain("assert imp.PERSON_LINK_COLUMNS == LINK_COLUMNS");
+    expect(source).toContain("assert imp.PICK_LINK_COLUMNS == PICK_LINK");
+    // 6.4 / 6.6 / 6.7 exist in link-only form and read the importer's own statements back
+    expect(source).toContain("6.4 link-only: the draft_persons write set is exactly");
+    expect(source).toContain("6.6 link-only: the draft_picks write set is exactly");
+    expect(source).toContain("6.7 link-only: the external_identities write set is exactly");
+    expect(source).toContain("imp.link_only_write_set()");
+    expect(source).toContain("6.7a link-only: all ");
+    // the preservation digests are additive: the full path's baseline set is untouched
+    expect(source).toContain("LINK_ONLY_BASELINE_SQL");
+    expect(source).toContain("def baseline_sql_for(link_only: bool)");
+    expect(source).toMatch(/return \{\*\*BASELINE_SQL, \*\*LINK_ONLY_BASELINE_SQL\} if link_only else BASELINE_SQL/);
+    expect(source).toContain("LINK_ONLY_PRESERVATION_DIGESTS");
+    expect(source).toContain("8.15 link-only:");
+    // link-only inverts 8.12 rather than dropping it
+    expect(source).toContain("8.12 link-only: no draftguru pick was re-stamped");
+    // an explicit label is mandatory and is proven against the stored notes
+    expect(source).toContain("--link-only requires an explicit --label");
+    // every target / database / child-target guard still runs, unchanged
+    expect(source).toContain("refuse_test_child_under(args.target, child_path)");
+    expect(source).toContain('REQUIRED_DATABASE = "afldb_test"');
+    expect(source).toContain('DEV_DATABASE = "afldb_dev"');
+    expect(source).not.toMatch(/AFLDB_(IMPORT|OWNER|TEST_IMPORT|PROD)_DATABASE_URL/);
+  });
 });

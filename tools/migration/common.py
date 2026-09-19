@@ -261,14 +261,24 @@ class ImportBatch:
 
 @contextmanager
 def import_batch(conn: psycopg.Connection, source_key: str, tool: str,
-                 target_table: str | None = None) -> Iterator[ImportBatch]:
+                 target_table: str | None = None,
+                 notes: str | None = None) -> Iterator[ImportBatch]:
     """Run a block as a tracked import batch.
 
     On success the batch is marked ``completed``; on exception it is
     marked ``failed`` with the error recorded, and the exception
     propagates.
+
+    ``notes`` is written verbatim onto the ``import_batches`` row by
+    ``ImportBatch.__post_init__`` (the column has existed since migration
+    001). It defaults to ``None``, which is exactly what every caller that
+    does not pass it already stored, so no existing importer's audit row
+    changes. AFLDB-ISSUE-222 uses it to record a run's MODE, so a
+    link-only run cannot be mistaken for a full source reload when the
+    audit trail is read back later.
     """
-    batch = ImportBatch(conn=conn, source_key=source_key, tool=tool, target_table=target_table)
+    batch = ImportBatch(conn=conn, source_key=source_key, tool=tool, target_table=target_table,
+                        notes=notes)
     try:
         yield batch
     except Exception as exc:  # noqa: BLE001 - recorded then re-raised
