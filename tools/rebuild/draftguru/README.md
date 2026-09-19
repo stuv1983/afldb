@@ -671,8 +671,39 @@ STRUCTURED `evidence.corrected_identity_candidate` field only; each removal; the
 `target_not_registered` set; no other person changing state), the registration measurement and
 timestamps, and hygiene (no DSN/absolute path/credential; canonical LF bytes). It prints a
 transition table for the changed persons and a `summary_sha256` so two runs can be compared.
-It writes nothing. Any FAIL is exit status 1. Defaults pin the 2026-09-18 v2 `afldb_test` child;
-`--expect-sha256` overrides the expected child hash, `--root` points tests at a fixture tree.
+It writes nothing. Any FAIL is exit status 1. `--root` points tests at a fixture tree.
+
+### Target selection -- `--target {test,dev}` (default `test`)
+
+    python tools/rebuild/draftguru/validate_person_bridge_child.py                      # test
+    python tools/rebuild/draftguru/validate_person_bridge_child.py --target dev \
+      --child data/reference/draftguru-person-bridge-20260918-v2.afldb_dev.json \
+      --expect-sha256 <the DEV child's own sha256, printed by the export step>
+
+`test` is the default and is unchanged from 1.0.0: it pins the v2 `afldb_test` child and its
+hash, `--expect-sha256` still overrides the expected hash, and every check name, `TOOL_VERSION`
+and the resulting `summary_sha256` (`5bc5336b…`) are byte-identical, because that digest is
+pinned Phase F evidence re-verified in process by `build_validation_sample.py`,
+`review_validation_sample.py` and `validate_validation_review.py`.
+
+`dev` defaults nothing. `--child` and `--expect-sha256` are both mandatory (a DEV child is a
+live per-target registration measurement, so the operator-reported hash is the only evidence
+that the file on disk is the child that was exported), the `afldb_test` child is refused three
+ways -- by its pinned path, by the `.afldb_test.json` naming convention and by its pinned bytes
+whatever the file is called -- and the child's own `target` field must be exactly `dev`, the
+exporter's real label in `export_person_bridge.TARGET_DSN_ENV` (the contract pins the two
+labels against that module's source). A child declaring `target: "dev"` fails check 2.3 under
+`--target test`, and one declaring `afldb_test` fails 2.3 under `--target dev`. There is no
+PROD target and no arbitrary target string: anything else is refused before a single lineage
+file is opened. A filename never grants trust here; it can only lose it.
+
+Both targets are checked against the same pinned SOURCE-EVIDENCE lineage, including the
+historical v1 `afldb_test` child, which is the v1 -> v2 transition baseline whichever target is
+being validated. Section 5 and checks 5.1/5.2/6.1/6.2 name that baseline explicitly under
+`--target dev`, so no report line claims the `afldb_test` child is a DEV deployment. The DEV
+expectation pins the operator-reported DEV measurement (3,468 accepted / 1,589 withheld,
+13,275 registered identities); a DEV export measuring anything else is a refusal requiring
+fresh operator evidence, never a pass. No DEV child path or hash is hard-coded.
 
 ## `build_validation_sample.py` -- Phase F disjoint new-salt validation sample (DB-free)
 

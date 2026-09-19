@@ -37033,6 +37033,63 @@ PENDING.** Full record: `AFLDB-ISSUE-222.md` §11.12, `AFLDB-ISSUE-222-PHASE3-CO
   reached a snapshot or an importer call. **The third attempt must use a third, new `-Label`.** Full
   detail `AFLDB-ISSUE-222.md` §11.19.15. No database, Git, network or deployment command ran during
   this review pass.
+- **Third §7.4 attempt (`retry2`) succeeded (2026-09-19, operator-run, Sonnet 5 read-only review).**
+  Full S0–S3 rollback cycle proven on `afldb_test`: backup `afldb_test-20260919-094228.dump`
+  (sha256 `6e82e5db…`, 1,469 objects); batch counter 193 → 194 → 195 → 196 → 197 across exactly
+  four mutating operations (reverse/load/reverse/load, `authority: seeded 0` on all four); the
+  four canonical final-state hashes and all three summary hashes (`verify1`, `verify2`,
+  `final-plan`) confirmed byte-identical against the operator's brief by independent read of the
+  saved transcripts. `S0`≡`S2` and `S1`≡`S3` spot-checked identical on the tracked
+  `paul_seedsman/1`/`timothy_malseed/1` rows; the full twelve-file SHA-256 set was not
+  independently recomputed in this read-only session (would require a shell hashing command or an
+  out-of-discipline whole-file read of six ~5–7k-row CSVs) — a verification command is recorded for
+  the operator if wanted. **§7.4 is satisfied; DEV promotion is unblocked.** ISSUE-222 is **not**
+  marked Resolved — Phase 4b (DEV import, verify, `sync-dev.ps1`, browser smoke) has not run. Full
+  detail `AFLDB-ISSUE-222.md` §11.19.16. No database, Git, network, import, backup or deployment
+  command ran this pass; ISSUE-224/225 untouched.
+- **DEV child exported and independently validated; child validator generalised to `--target {test,dev}`**
+  **(2026-09-19, Opus 5, §11.19.17).** `data/reference/draftguru-person-bridge-20260918-v2.afldb_dev.json`
+  (sha256 `a9652e4a6ca96ced32d64d36cb0a3a1b6cdf1e2591927e628753b399c6647c95`, `target: "dev"`,
+  `parent_sha256 ad25d965…`, 3,468 bridges / 1,589 withheld, `target_registration.count` 13,275)
+  passes all 48 checks, exit 0, `summary_sha256 cd8d6da2…`. **Root cause of the earlier false pass:**
+  `validate_person_bridge_child.py` exposed `--child`, but its `EXPECT` block and pinned lineage were
+  hard-coded to the v2 `afldb_test` child — check 5.1 even compared the *historical v1 child's* own
+  `target` against the target under validation — so the run that omitted `--child` validated the
+  `afldb_test` child (`b996c60e…`) against the DEV hash. **Fix:** an explicit closed `--target {test,dev}`
+  (default `test`, unchanged byte-for-byte: same check names, `TOOL_VERSION` 1.0.0 and the pinned
+  `summary_sha256 5bc5336b…` reproduced); `dev` defaults nothing, requires `--child` and a well-formed
+  `--expect-sha256`, refuses the `afldb_test` child by pinned path, by `.afldb_test.json` name and by
+  its pinned bytes under any name, and requires the child's own `target` to be exactly the exporter's
+  real `dev` label (pinned against `export_person_bridge.TARGET_DSN_ENV` by the contract); no PROD
+  target, no arbitrary target string, no DEV path or hash hard-coded. Target-independent v1→v2
+  source-evidence lineage still runs against the pinned `afldb_test` v1 child and is unweakened; the
+  DEV report now names that baseline explicitly so no line claims it is a DEV deployment. 32 new
+  DB-free contract checks in `tests/python/draftguru_child_validation_contract.py`. **Operator decision
+  pending:** any edit changes the validator's source hash, which is frozen into the accepted Phase F
+  artefacts, so `validate_validation_review.py` now reports `FAIL 2.5 … drifted ['validate_person_bridge_child']`
+  → `ACCEPTANCE: NOT ACCEPTED`, while its check `1.3` still reproduces the accepted child digest — either
+  close Phase F at source hash `35c41602…` or re-freeze under a new salt. DB-free validation only
+  (`py_compile`, the extended contract, both real-lineage validator runs, `draftguru-acquisition.test.ts`:
+  161 passed / 2 pre-existing failures — ISSUE-223 `GRID_DRAFT_TYPES`, and check `41z` whose committed
+  `bridge-operator-verdicts-20260918-v1.md` hashes `2ce361f6…` against a pinned `60c529df…`, both unrelated
+  to this change). Nothing staged or committed; no database, Git, network, export, import, backup or
+  deployment command ran; ISSUE-224/225 untouched.
+- **Governance decision: Phase F stays accepted at its frozen source hash (operator, dated
+  2026-09-19, prospective; §11.19.18).** Phase F remains accepted at source hash `35c41602…`,
+  acceptance evidence `63c89265…` unchanged; the accepted child, parent, verdicts, sample and
+  review bytes are not reopened, regenerated or rewritten. The `--target {test,dev}`
+  generalisation of `validate_person_bridge_child.py` (§11.19.17) is Phase 4b deployment tooling,
+  produced after Phase F closed, to validate the `afldb_dev` child ahead of the DEV import — not a
+  Phase F redo. Its DEV validation (48 checks, exit 0, `summary_sha256 cd8d6da2…`) is additional
+  Phase 4b evidence, not a replacement for or regeneration of Phase F; the unchanged `test`-target
+  path still reproduces the pinned Phase F digest `5bc5336b…` (check 1.3). `validate_validation_review.py`
+  check 2.5's `FAIL … drifted ['validate_person_bridge_child']` → `ACCEPTANCE: NOT ACCEPTED` is the
+  designed, expected result of a post-acceptance tool-hash change and must not be reported as a
+  newly failed Phase F review. No historical acceptance artefact rewritten. Validator
+  implementation/tests, DEV child bytes, canonical parents/test children, Phase F sample/review/
+  verdict artefacts, ISSUE-224 and ISSUE-225 all untouched this pass; only `AFLDB-ISSUE-222.md`,
+  `issues.md`, `IssuesIndex.md` and `CHANGELOG.md` changed. Read-only `git status`/`git diff --check`
+  only; nothing staged or committed.
 
 ## AFLDB-ISSUE-223 — Pre-existing test regression from AFLDB-ISSUE-221: `GRID_DRAFT_TYPES` reshaped, `draftguru-acquisition.test.ts`'s vocabulary-parity test now fails
 

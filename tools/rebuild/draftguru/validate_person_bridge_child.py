@@ -4,12 +4,33 @@ bridge dataset against its pinned lineage.
 
     python tools/rebuild/draftguru/validate_person_bridge_child.py
     python tools/rebuild/draftguru/validate_person_bridge_child.py --expect-sha256 <hex>
+    python tools/rebuild/draftguru/validate_person_bridge_child.py --target dev \
+        --child <repository-relative DEV child> --expect-sha256 <hex>
 
-Default lineage: the 2026-09-18 v2 ``afldb_test`` child
-(``data/reference/draftguru-person-bridge-20260918-v2.afldb_test.json``) against the v2
-SOURCE-EVIDENCE parent, the v1 ``afldb_test`` child, the v2 reconciliation manifest, the
-completed operator verdict artefact and the B3 snapshot manifest. Every pinned input is
-hash-verified before anything is compared; a mismatch is a refusal.
+Target selection is an explicit closed set, ``--target {test,dev}``, default ``test``:
+
+  * ``test`` (the default, unchanged) validates the 2026-09-18 v2 ``afldb_test`` child
+    (``data/reference/draftguru-person-bridge-20260918-v2.afldb_test.json``) and requires the
+    child's ``target`` field to be exactly ``afldb_test``. Every check name, ``TOOL_VERSION``
+    and therefore the ``summary_sha256`` are deliberately unchanged: that digest is pinned as
+    Phase F evidence (``review_validation_sample.CHILD_SUMMARY_SHA256``) and re-verified in
+    process by ``build_validation_sample.py`` and ``validate_validation_review.py``.
+  * ``dev`` validates a DEV deployment child. Nothing is defaulted: ``--child`` and
+    ``--expect-sha256`` are both mandatory, the ``afldb_test`` child is refused (by path, by
+    the ``.afldb_test.json`` naming convention and by its pinned bytes), and the child's own
+    ``target`` field must be exactly ``dev`` -- the exporter's real DEV label in
+    ``export_person_bridge.TARGET_DSN_ENV``, never the DEV database's own name.
+  * there is no PROD target, and an arbitrary target string is a refusal, never a guess.
+
+Trust is never inferred from a filename. It comes from ``--expect-sha256``, from the child's
+own ``target`` field and from the pinned lineage; the filename rules above only ever DENY.
+
+Pinned lineage (identical for both targets, because it is SOURCE evidence and not a
+deployment): the v2 SOURCE-EVIDENCE parent, the v1 parent, the historical v1 ``afldb_test``
+child -- the v1->v2 transition baseline for either target, never a claim that it is a DEV
+deployment -- the v2 reconciliation manifest, the completed operator verdict artefact and the
+B3 snapshot manifest. Every pinned input is hash-verified before anything is compared; a
+mismatch is a refusal.
 
 What is proven (every check prints PASS/FAIL; any FAIL is exit status 1):
 
@@ -48,6 +69,12 @@ import build_person_bridge_v2 as v2gen          # noqa: E402  (DB-free; proven b
 import review_person_bridge_offline as base    # noqa: E402  (DB-free shared helpers)
 
 TOOL = "tools/rebuild/draftguru/validate_person_bridge_child.py"
+# Deliberately held at 1.0.0 by the target generalisation: TOOL_VERSION is hashed into the
+# summary, and the ``afldb_test`` summary_sha256
+# 5bc5336be116cc797b011900b3fdbc010cd4dd59a9eba4c4495c321f7e6ce590 is pinned Phase F evidence
+# that build_validation_sample.py / review_validation_sample.py / validate_validation_review.py
+# reproduce in process. The test target's behaviour, including every check name, is unchanged;
+# bumping this would break that evidence without validating anything new.
 TOOL_VERSION = "1.0.0"
 
 EXPORTER = "tools/rebuild/draftguru/export_person_bridge.py"
@@ -72,6 +99,18 @@ TARGET_WITHHELD_REASONS = frozenset({"target_not_registered", "target_ambiguous"
 
 CHILD_REL = "data/reference/draftguru-person-bridge-20260918-v2.afldb_test.json"
 EXPECTED_CHILD_SHA256 = "b996c60e9d4de3aeb6f250f360b2a66164a2211b9604338a65918e79fa29e1c5"
+
+# The two deployment-target labels a child may declare. These are the exporter's own labels
+# (export_person_bridge.TARGET_DSN_ENV keys), duplicated here rather than imported because that
+# module carries a database surface this validator must never acquire transitively; the
+# contract test pins these literals against the exporter's source so they cannot diverge.
+TEST_TARGET_LABEL = "afldb_test"
+DEV_TARGET_LABEL = "dev"
+
+# A DEV --child is refused when it names the afldb_test child. This is a DENY rule only: a
+# filename never grants trust, it can only lose it.
+TEST_CHILD_SUFFIX = ".afldb_test.json"
+SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
 PINNED_INPUTS: dict[str, tuple[str, str]] = {
     "parent_v2": (
@@ -115,7 +154,15 @@ REMOVED: dict[str, str] = {
 }
 
 EXPECT: dict = {
-    "target": "afldb_test",
+    "target": TEST_TARGET_LABEL,
+    # The v1 child pinned above IS the historical afldb_test deployment child. It is the
+    # v1->v2 transition baseline for every target, so this is a fixed property of that
+    # artefact and never the target under validation (check 5.1).
+    "v1_child_target": TEST_TARGET_LABEL,
+    # Report wording for the baseline. Empty for the test target so every check name -- and
+    # therefore the pinned summary_sha256 -- is byte-identical to 1.0.0; the DEV target names
+    # the baseline explicitly so no report line claims the afldb_test v1 child is a DEV child.
+    "v1_child_prefix": "",
     "label": "person-html-20260918",
     "population": 5057,
     "parent_bridges": 3562,
@@ -128,6 +175,35 @@ EXPECT: dict = {
     "remaining_target_not_registered": 94,
     "u_no_href": 1493,
     "registration_count": 13275,
+}
+
+# The DEV target shares the whole SOURCE-EVIDENCE lineage and differs only in the child's own
+# target label and in the baseline wording. The registration-dependent numbers (child_bridges,
+# child_withheld, remaining_target_not_registered, registration_count) are NOT assumed to equal
+# the test target's: they are pinned here because the operator's DEV export reported exactly
+# these values (3,468 accepted / 1,589 withheld, 13,275 registered identities). A DEV export
+# that measures anything else is a refusal requiring fresh operator evidence, not a pass.
+DEV_EXPECT: dict = dict(EXPECT, target=DEV_TARGET_LABEL, v1_child_prefix=TEST_TARGET_LABEL + " ")
+
+DEFAULT_TARGET = "test"
+
+# The closed target set. "prod" is deliberately absent, exactly as it is absent from the
+# exporter's TARGET_DSN_ENV: no reviewed read-only PROD path exists for this lineage.
+TARGET_SPECS: dict[str, dict] = {
+    "test": {
+        "child_target": TEST_TARGET_LABEL,
+        "default_child": CHILD_REL,
+        "default_sha256": EXPECTED_CHILD_SHA256,
+        "expect": EXPECT,
+    },
+    "dev": {
+        "child_target": DEV_TARGET_LABEL,
+        # No default child and no default hash: a DEV child is a live per-target measurement,
+        # so both are operator-supplied evidence on every run.
+        "default_child": None,
+        "default_sha256": None,
+        "expect": DEV_EXPECT,
+    },
 }
 
 
@@ -400,13 +476,18 @@ def validate(root: Path, *, child_rel: str = CHILD_REL,
               f"{sorted(rejected & set(p2_acc.values()))}")
 
     # -------------------------------------------------------------- 5. transition
-    rep.section("5. Transition from the v1 child")
+    # Target-INDEPENDENT source-evidence lineage: the pinned v1 child is the historical
+    # afldb_test deployment and is the v1->v2 baseline whichever target is being validated.
+    # `base_target` is that artefact's own target, never the target under validation.
+    base_target = expect.get("v1_child_target", TEST_TARGET_LABEL)
+    base_prefix = expect.get("v1_child_prefix", "")
+    rep.section(f"5. Transition from the {base_prefix}v1 child")
     v1_acc = bridge_map(child_v1)
     v1_wh = withheld_map(child_v1)
     p1_acc = bridge_map(parent_v1)
-    rep.check("5.1 the v1 child is the afldb_test deployment of the pinned v1 parent",
+    rep.check(f"5.1 the v1 child is the {base_target} deployment of the pinned v1 parent",
               child_v1.get("kind") == "deployment"
-              and child_v1.get("target") == expect["target"]
+              and child_v1.get("target") == base_target
               and child_v1.get("parent_sha256") == hashes["parent_v1"],
               f"kind {child_v1.get('kind')!r}, target {child_v1.get('target')!r}, "
               f"parent_sha256 {child_v1.get('parent_sha256')!r}")
@@ -416,7 +497,8 @@ def validate(root: Path, *, child_rel: str = CHILD_REL,
     removed = set(v1_acc) - set(v2_acc)
     corrected_expect: dict[str, tuple[str, str]] = dict(expect["corrected"])
     removed_expect: dict[str, str] = dict(expect["removed"])
-    rep.check(f"5.2 exactly {expect['carry_forward']} v1-child mappings carry forward unchanged",
+    rep.check(f"5.2 exactly {expect['carry_forward']} {base_prefix}v1-child mappings carry "
+              "forward unchanged",
               len(carry) == expect["carry_forward"], f"observed {len(carry)}")
     rep.check("5.3 no accepted person changed target in place",
               not changed_in_place, f"{changed_in_place[:5]}")
@@ -556,7 +638,7 @@ def validate(root: Path, *, child_rel: str = CHILD_REL,
     reg = child.get("target_registration") or {}
     reg_v1 = child_v1.get("target_registration") or {}
     rep.check(f"6.1 target_registration.count == {expect['registration_count']} and equals "
-              "the v1 child's measurement",
+              f"the {base_prefix}v1 child's measurement",
               reg.get("count") == expect["registration_count"] == reg_v1.get("count"),
               f"v2 {reg.get('count')!r}, v1 {reg_v1.get('count')!r}")
     gen = parse_utc(child.get("generated_utc"))
@@ -567,7 +649,8 @@ def validate(root: Path, *, child_rel: str = CHILD_REL,
                    and abs((measured - gen).total_seconds()) <= MAX_MEASUREMENT_SKEW_SECONDS
                    and gen > parent_gen and gen > v1_gen)
     rep.check("6.2 generated_utc and measured_at are UTC 'Z' timestamps, agree within "
-              f"{MAX_MEASUREMENT_SKEW_SECONDS}s, and follow the v2 parent and the v1 child",
+              f"{MAX_MEASUREMENT_SKEW_SECONDS}s, and follow the v2 parent and the "
+              f"{base_prefix}v1 child",
               ordered,
               f"generated {child.get('generated_utc')!r}, measured {reg.get('measured_at')!r}, "
               f"parent {parent.get('generated_utc')!r}, v1 child "
@@ -620,21 +703,98 @@ def validate(root: Path, *, child_rel: str = CHILD_REL,
 
 
 # ---------------------------------------------------------------------------
+# Target selection (closed set, fail-closed, nothing inferred from a filename)
+# ---------------------------------------------------------------------------
+
+def refuse_test_child_under_dev(root: Path, child_rel: str) -> None:
+    """Refuse the ``afldb_test`` child under ``--target dev`` -- by path, by the tracked naming
+    convention and by the pinned bytes.
+
+    All three are DENY rules. A name can never make a file trusted here; it can only make it
+    refused. The bytes rule is what makes the guard real: renaming the afldb_test child does
+    not launder it into a DEV deployment child.
+    """
+    child_path = root / child_rel
+    try:
+        same_file = child_path.resolve() == (root / CHILD_REL).resolve()
+    except OSError:                                   # unresolvable path: treat as different
+        same_file = False
+    if same_file or Path(child_rel).name.endswith(TEST_CHILD_SUFFIX):
+        raise ValidationError(
+            f"--target dev refuses --child {child_rel!r}: that is the {TEST_TARGET_LABEL} "
+            f"deployment child ({CHILD_REL}). Validate it with --target test; a DEV run needs "
+            "the child exported by --resolve-against dev.")
+    if child_path.is_file() and base.sha256_bytes(child_path.read_bytes()) \
+            == EXPECTED_CHILD_SHA256:
+        raise ValidationError(
+            f"--target dev refuses --child {child_rel!r}: its bytes are the pinned "
+            f"{TEST_TARGET_LABEL} child's (sha256 {EXPECTED_CHILD_SHA256}), whatever the file "
+            "is called.")
+
+
+def resolve_target(target: str, child: str | None, expect_sha256: str | None,
+                   *, root: Path) -> tuple[str, str | None, dict]:
+    """Map ``--target`` to (child_rel, expected sha256, expectation block).
+
+    ``test`` keeps every 1.0.0 default, so a legacy invocation is unchanged. ``dev`` defaults
+    nothing and requires operator-supplied evidence for both the file and its hash.
+    """
+    if not isinstance(target, str) or target not in TARGET_SPECS:
+        raise ValidationError(
+            f"--target {target!r} is not a supported deployment target. The closed set is "
+            f"{{{', '.join(sorted(TARGET_SPECS))}}}: there is no PROD target for this lineage "
+            "and an arbitrary target string is never inferred.")
+    spec = TARGET_SPECS[target]
+    expect = dict(spec["expect"])
+
+    if target == DEFAULT_TARGET:
+        return (spec["default_child"] if child is None else child,
+                spec["default_sha256"] if expect_sha256 is None else expect_sha256,
+                expect)
+
+    # --target dev
+    if not child:
+        raise ValidationError(
+            "--target dev requires an explicit --child: no DEV child is pinned as a default, "
+            "because a DEV deployment child is a live per-target registration measurement.")
+    if not expect_sha256:
+        raise ValidationError(
+            "--target dev requires --expect-sha256: the operator-reported child hash is the "
+            "only evidence that the file being validated is the DEV child that was exported.")
+    if not SHA256_RE.match(expect_sha256):
+        raise ValidationError(
+            f"--expect-sha256 {expect_sha256!r} is not 64 lowercase hexadecimal digits")
+    refuse_test_child_under_dev(root, child)
+    return child, expect_sha256, expect
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--child", default=CHILD_REL,
-                    help="repository-relative path of the deployment child to validate")
-    ap.add_argument("--expect-sha256", default=EXPECTED_CHILD_SHA256,
-                    help="the operator-reported sha256 the child must hash to")
+    ap.add_argument("--target", default=DEFAULT_TARGET,
+                    help="deployment target to validate: 'test' (default; the pinned "
+                         "afldb_test child) or 'dev' (requires --child and --expect-sha256). "
+                         "Anything else is refused.")
+    ap.add_argument("--child", default=None,
+                    help="repository-relative path of the deployment child to validate "
+                         "(defaults to the pinned afldb_test child under --target test; "
+                         "mandatory under --target dev)")
+    ap.add_argument("--expect-sha256", default=None,
+                    help="the operator-reported sha256 the child must hash to (defaults to "
+                         "the pinned afldb_test child hash under --target test; mandatory "
+                         "under --target dev)")
     ap.add_argument("--root", default=str(REPO_ROOT),
                     help="repository root (tests point this at a fixture tree)")
     args = ap.parse_args(argv)
+    root = Path(args.root)
     try:
-        summary = validate(Path(args.root), child_rel=args.child,
-                           expect_child_sha256=args.expect_sha256)
+        child_rel, expect_sha256, expect = resolve_target(
+            args.target, args.child, args.expect_sha256, root=root)
+        summary = validate(root, child_rel=child_rel,
+                           expect_child_sha256=expect_sha256, expect=expect)
     except base.ToolError as exc:
         print(f"REFUSED: {exc}", file=sys.stderr)
         return 1
