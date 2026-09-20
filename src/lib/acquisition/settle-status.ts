@@ -20,11 +20,15 @@
  */
 import 'server-only';
 
-import { getLatestSettleRun, type SettleRunRecord } from '@/db/queries/settle-runs';
+import {
+  getLatestSettleRun, SETTLE_BATCH_TOOLS, type SettleRunRecord,
+} from '@/db/queries/settle-runs';
 
 import {
   readUnitState,
+  readUnitStateOf,
   settleTriggerConfigured,
+  type SettleUnitKey,
   type SettleUnitState,
 } from './settle-trigger';
 
@@ -66,4 +70,56 @@ export async function readSettleRunStatus(): Promise<SettleRunStatus> {
   }
 
   return { configured, unitError, unit, latestRun, latestRunError };
+}
+
+/** One row of the S8/§17 unit-status table below. */
+export type SettleUnitStatus = {
+  unit: SettleUnitState | null;
+  unitError: string | null;
+  latestRun: SettleRunRecord | null;
+  latestRunError: string | null;
+};
+
+/**
+ * AFLDB-ISSUE-228 S8 (§17): "`settle-status.ts` gains a unit table
+ * `{afltables, afl_api, afl_api_brownlow}`". Same shape and the same
+ * neither-half-takes-the-other-down composition as `readSettleRunStatus()`
+ * above, generalised over the three `SettleUnitKey`s; `configured` stays one
+ * flag because all three units are read through the same
+ * `AFLDB_SETTLE_TRIGGER=systemd` gate. `getLatestSettleRun()`'s `counters`
+ * are `null` for `afl_api`/`afl_api_brownlow` (see that function's doc
+ * comment) — this table reports run identity/status, not yet the full
+ * counter breakdown, for the two new units.
+ *
+ * Wiring this into the rendered `/admin/current-season` panel is a disclosed
+ * follow-up, not done in this pass (CLAUDE.md: no untested UI change under an
+ * inspect/edit-only session).
+ */
+export async function readSettleUnitTableStatus(): Promise<Record<SettleUnitKey, SettleUnitStatus>> {
+  const configured = settleTriggerConfigured();
+
+  const keys: readonly SettleUnitKey[] = ['afltables', 'afl_api', 'afl_api_brownlow'];
+  const rows = await Promise.all(keys.map(async (key): Promise<[SettleUnitKey, SettleUnitStatus]> => {
+    let unit: SettleUnitState | null = null;
+    let unitError: string | null = null;
+    if (configured) {
+      const state = await readUnitStateOf(key);
+      if ('available' in state) unitError = state.reason;
+      else unit = state;
+    } else {
+      unitError = 'On-demand refresh is not enabled on this host.';
+    }
+
+    let latestRun: SettleRunRecord | null = null;
+    let latestRunError: string | null = null;
+    try {
+      latestRun = await getLatestSettleRun(SETTLE_BATCH_TOOLS[key]);
+    } catch (error) {
+      latestRunError = error instanceof Error ? error.message : String(error);
+    }
+
+    return [key, { unit, unitError, latestRun, latestRunError }];
+  }));
+
+  return Object.fromEntries(rows) as Record<SettleUnitKey, SettleUnitStatus>;
 }

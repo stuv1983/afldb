@@ -1,0 +1,110 @@
+{
+  "homeTeamPlayerStats": [
+    {
+      "player": {
+        "player": {
+          "position": "HBFL",
+          "player": {
+            "playerId": "CD_I297354",
+            "playerName": { "givenName": "Karl", "surname": "Amon" },
+            "captain": false,
+            "playerJumperNumber": 10
+          }
+        },
+        "jumperNumber": 10,
+        "photoURL": "https://s.afl.com.au/x.png"
+      },
+      "teamId": "CD_T80",
+      "playerStats": {
+        "stats": {
+          "goals": 0.0, "behinds": 0.0, "superGoals": null,
+          "kicks": 9.0, "handballs": 2.0, "disposals": 11.0, "marks": 3.0, "bounces": 0.0,
+          "tackles": 3.0, "contestedPossessions": 3.0, "uncontestedPossessions": 4.0,
+          "totalPossessions": 7.0, "inside50s": 0.0, "marksInside50": 0.0, "contestedMarks": 0.0,
+          "hitouts": 0.0, "onePercenters": 2.0, "disposalEfficiency": 81.8, "clangers": 1.0,
+          "freesFor": 0.0, "freesAgainst": 0.0, "dreamTeamPoints": 52.0,
+          "clearances": { "centreClearances": 0.0, "stoppageClearances": 0.0, "totalClearances": 0.0 },
+          "rebound50s": 5.0, "goalAssists": 0.0, "goalAccuracy": 0.0, "ratingPoints": 8.0,
+          "ranking": null, "lastUpdated": null, "turnovers": 1.0, "intercepts": 3.0,
+          "tacklesInside50": 0.0, "shotsAtGoal": 0.0, "goalEfficiency": null, "shotEfficiency": null,
+          "interchangeCounts": null, "scoreInvolvements": 2.0, "metresGained": 268.0,
+          "extendedStats": {
+            "effectiveKicks": 7.0, "kickEfficiency": 77.8, "kickToHandballRatio": 4.5,
+            "effectiveDisposals": 9.0, "marksOnLead": 0.0, "interceptMarks": 1.0,
+            "contestedPossessionRate": 42.9, "hitoutsToAdvantage": 0.0, "hitoutWinPercentage": 0.0,
+            "hitoutToAdvantageRate": 0.0, "groundBallGets": 3.0, "f50GroundBallGets": 0.0,
+            "scoreLaunches": 1.0, "pressureActs": 13.0, "defHalfPressureActs": 7.0, "spoils": 2.0,
+            "ruckContests": 0.0, "contestDefOneOnOnes": 1.0, "contestDefLosses": 0.0,
+            "contestDefLossPercentage": 0.0, "contestOffOneOnOnes": 0.0, "contestOffWins": 0.0,
+            "contestOffWinsPercentage": 0.0, "centreBounceAttendances": 0.0, "kickins": 4.0,
+            "kickinsPlayon": 4.0
+          }
+        },
+        "player": {
+          "playerId": "CD_I297354",
+          "playerName": { "givenName": "Karl", "surname": "Amon" },
+          "captain": false,
+          "playerJumperNumber": 10
+        },
+        "teamId": "CD_T80",
+        "gamesPlayed": null,
+        "timeOnGroundPercentage": 81.0,
+        "lastUpdated": "2026-09-19T10:22:58.857+0000"
+      }
+    }
+  ],
+  "awayTeamPlayerStats": [
+    {
+      "player": {
+        "player": {
+          "position": "FF",
+          "player": {
+            "playerId": "CD_I500001",
+            "playerName": { "givenName": "Test", "surname": "Forward" },
+            "captain": false,
+            "playerJumperNumber": 25
+          }
+        },
+        "jumperNumber": 25,
+        "photoURL": "https://s.afl.com.au/y.png"
+      },
+      "teamId": "CD_T20",
+      "playerStats": {
+        "stats": {
+          "goals": 3.0, "behinds": 1.0, "superGoals": null,
+          "kicks": 6.0, "handballs": 3.0, "disposals": 9.0, "marks": 4.0, "bounces": 0.0,
+          "tackles": 1.0, "contestedPossessions": 2.0, "uncontestedPossessions": 5.0,
+          "totalPossessions": 7.0, "inside50s": 1.0, "marksInside50": 2.0, "contestedMarks": 1.0,
+          "hitouts": 0.0, "onePercenters": 0.0, "disposalEfficiency": 88.9, "clangers": 0.0,
+          "freesFor": 1.0, "freesAgainst": 0.0, "dreamTeamPoints": 65.0,
+          "clearances": { "centreClearances": 0.0, "stoppageClearances": 0.0, "totalClearances": 0.0 },
+          "rebound50s": 0.0, "goalAssists": 1.0, "goalAccuracy": 75.0, "ratingPoints": 14.2,
+          "ranking": null, "lastUpdated": null, "turnovers": 0.0, "intercepts": 0.0,
+          "tacklesInside50": 0.0, "shotsAtGoal": 4.0, "goalEfficiency": null, "shotEfficiency": null,
+          "interchangeCounts": null, "scoreInvolvements": 5.0, "metresGained": 140.0,
+          "extendedStats": {
+            "effectiveKicks": 5.0, "kickEfficiency": 83.3, "kickToHandballRatio": 2.0,
+            "effectiveDisposals": 8.0, "marksOnLead": 1.0, "interceptMarks": 0.0,
+            "contestedPossessionRate": 28.6, "hitoutsToAdvantage": 0.0, "hitoutWinPercentage": 0.0,
+            "hitoutToAdvantageRate": 0.0, "groundBallGets": 1.0, "f50GroundBallGets": 0.0,
+            "scoreLaunches": 0.0, "pressureActs": 3.0, "defHalfPressureActs": 0.0, "spoils": 0.0,
+            "ruckContests": 0.0, "contestDefOneOnOnes": 0.0, "contestDefLosses": 0.0,
+            "contestDefLossPercentage": 0.0, "contestOffOneOnOnes": 1.0, "contestOffWins": 1.0,
+            "contestOffWinsPercentage": 100.0, "centreBounceAttendances": 0.0, "kickins": 0.0,
+            "kickinsPlayon": 0.0
+          }
+        },
+        "player": {
+          "playerId": "CD_I500001",
+          "playerName": { "givenName": "Test", "surname": "Forward" },
+          "captain": false,
+          "playerJumperNumber": 25
+        },
+        "teamId": "CD_T20",
+        "gamesPlayed": null,
+        "timeOnGroundPercentage": 90.0,
+        "lastUpdated": "2026-09-19T10:22:58.857+0000"
+      }
+    }
+  ]
+}

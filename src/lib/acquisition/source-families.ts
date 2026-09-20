@@ -22,6 +22,8 @@
  * stages S2–S4 and deliberately live elsewhere.
  */
 
+import { FIXTURE_ROUND_TYPES, type FixtureRoundType } from '@/lib/fixtures/spec';
+
 export class SourceFamilyContractError extends Error {
   constructor(message: string) {
     super(message);
@@ -66,7 +68,7 @@ export type PromotionPolicy = 'never' | 'reviewed' | 'not_yet_declared';
  */
 export type CorroborationPolicy = 'blocking' | 'advisory';
 
-export type RoundMappingStatus = 'anchors_only' | 'complete';
+export type RoundMappingStatus = 'anchors_only' | 'complete' | 'declared';
 
 export type SourceRegistration = {
   key: string;
@@ -82,12 +84,65 @@ export type RoundAnchor = {
   evidence: string;
 };
 
-export type RoundVocabulary = {
+export type AnchorRoundVocabulary = {
   key: string;
+  shape: 'anchors';
   description: string;
-  mappingStatus: RoundMappingStatus;
+  mappingStatus: 'anchors_only' | 'complete';
   mappingOwner: string | null;
   anchors: readonly RoundAnchor[];
+};
+
+/**
+ * AFLDB-ISSUE-228 §6.4 — a fully explicit, per-season round table. Unlike
+ * `AnchorRoundVocabulary`, this shape carries every round the source
+ * publishes for one season, so it can actually DRIVE a translation
+ * (`translateAflRound()` in `afl-api-rounds.ts`) rather than just prove two
+ * anchor points. `mappingStatus` is always `'declared'` for this shape; it is
+ * a distinct value from `'complete'` because nothing here feeds the generic
+ * cross-vocabulary `translateRound()` below, which stays refused for it.
+ */
+export type DeclaredRoundVocabulary = {
+  key: string;
+  shape: 'declared';
+  description: string;
+  mappingStatus: 'declared';
+  season: number;
+  evidence: readonly string[];
+  rounds: readonly DeclaredRoundRow[];
+};
+
+export type RoundVocabulary = AnchorRoundVocabulary | DeclaredRoundVocabulary;
+
+/**
+ * `round_type` exactly as the DB enum and `@/lib/fixtures/spec` declare it,
+ * plus the one JSON-only sentinel `'mixed_finals'` for a round whose
+ * `api_round_number` covers more than one real `round_type` (AFL's combined
+ * Qualifying & Elimination Finals round) and therefore needs
+ * `finalsLabelRules` to resolve one. `'mixed_finals'` is never a value
+ * `translateAflRound()` returns; it only ever appears in the declared table.
+ */
+export type DeclaredRoundType = FixtureRoundType | 'mixed_finals';
+
+/** A `mixed_finals` row's rule for choosing a real `round_type` from the
+ * match's own `metadata.finals_match_label`. `roundType` is never
+ * `'home_and_away'` or `'mixed_finals'` itself — a rule always resolves to
+ * one concrete finals type. */
+export type FinalsLabelRule = {
+  contains: string;
+  roundType: Exclude<FixtureRoundType, 'home_and_away'>;
+};
+
+export type DeclaredRoundRow = {
+  apiRoundNumber: number;
+  apiAbbreviation: string;
+  apiName: string;
+  roundType: DeclaredRoundType;
+  /** Present only for `round_type: 'home_and_away'`; null otherwise (a final
+   * carries no round number, matching `matches_round_number_ck`). */
+  canonicalRoundNumber: number | null;
+  /** Present only for `round_type: 'mixed_finals'`; null otherwise. */
+  finalsLabelRules: readonly FinalsLabelRule[] | null;
 };
 
 export type FamilyIndependence = {
@@ -123,6 +178,14 @@ export type SourceFamilyRegistry = {
   sources: ReadonlyMap<string, SourceRegistration>;
   roundVocabularies: ReadonlyMap<string, RoundVocabulary>;
   families: readonly SourceFamilyContract[];
+  /**
+   * AFLDB-ISSUE-228 §7.5 (Q1) — groups of source keys declared co-sources for
+   * the canonical targets they jointly propose. A co-source-owned row is
+   * CORROBORATED, never refused and never re-owned; every other combination
+   * of owner/proposer stays an ordinary foreign-owner refusal. Each group is
+   * sorted and deduplicated; a source key appears in at most one group.
+   */
+  coSourceGroups: readonly (readonly string[])[];
 };
 
 export type RoundKey = {
@@ -146,11 +209,21 @@ const CORROBORATION_POLICIES: readonly CorroborationPolicy[] = ['blocking', 'adv
 
 /** The fail-closed reading of an undeclared family (ISSUE-122 §10). */
 export const DEFAULT_CORROBORATION_POLICY: CorroborationPolicy = 'blocking';
-const ROUND_MAPPING_STATUSES: readonly RoundMappingStatus[] = ['anchors_only', 'complete'];
+const ROUND_MAPPING_STATUSES: readonly RoundMappingStatus[] = ['anchors_only', 'complete', 'declared'];
+const DECLARED_ROUND_TYPES: readonly DeclaredRoundType[] = [...FIXTURE_ROUND_TYPES, 'mixed_finals'];
+const FINALS_LABEL_ROUND_TYPES: readonly Exclude<FixtureRoundType, 'home_and_away'>[] =
+  FIXTURE_ROUND_TYPES.filter((t): t is Exclude<FixtureRoundType, 'home_and_away'> => t !== 'home_and_away');
 
 const SOURCE_KEYS = ['registered_by', 'registered_in', 'registration_owner', 'notes'];
 const VOCABULARY_KEYS = ['description', 'mapping_status', 'mapping_owner', 'anchors'];
 const ANCHOR_KEYS = ['round_number', 'meaning', 'evidence'];
+const DECLARED_VOCABULARY_KEYS = ['description', 'mapping_status', 'season', 'evidence', 'rounds'];
+const DECLARED_ROUND_ROW_KEYS = [
+  'api_round_number', 'api_abbreviation', 'api_name', 'round_type',
+  'canonical_round_number', 'finals_label_rules',
+];
+const OPTIONAL_DECLARED_ROUND_ROW_KEYS = ['canonical_round_number', 'finals_label_rules'];
+const FINALS_LABEL_RULE_KEYS = ['contains', 'round_type'];
 const INDEPENDENCE_KEYS = ['derives_from', 'group', 'evidence'];
 const FAMILY_KEYS = [
   'source_key', 'family', 'endpoint', 'status', 'external_key', 'required_columns',
@@ -166,7 +239,13 @@ const FAMILY_KEYS = [
  * behaviour with no edit (ISSUE-122 §10).
  */
 const OPTIONAL_FAMILY_KEYS = ['corroboration_policy'];
-const ROOT_KEYS = ['$comment', 'contract_version', 'sources', 'round_vocabularies', 'families'];
+const ROOT_KEYS = [
+  '$comment', 'contract_version', 'sources', 'round_vocabularies', 'families', 'co_source_groups',
+];
+/** AFLDB-ISSUE-228 §7.5 (Q1). Optional: a registry with no declared co-source
+ * group (every family issue before ISSUE-228) reads as an empty list, same
+ * as an absent `corroboration_policy` reads as `blocking`. */
+const OPTIONAL_ROOT_KEYS = ['co_source_groups'];
 
 function fail(message: string): never {
   throw new SourceFamilyContractError(message);
@@ -267,19 +346,136 @@ function parseSource(key: string, raw: unknown): SourceRegistration {
   };
 }
 
-function parseVocabulary(key: string, raw: unknown): RoundVocabulary {
-  const path = `round_vocabularies.${key}`;
+function nonNegativeInt(value: unknown, path: string): number {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
+    fail(`${path} must be a non-negative integer.`);
+  }
+  return value;
+}
+
+function parseFinalsLabelRule(raw: unknown, path: string): FinalsLabelRule {
   const row = record(raw, path);
+  expectKeys(row, FINALS_LABEL_RULE_KEYS, path);
+  return {
+    contains: text(row.contains, `${path}.contains`),
+    roundType: enumValue(row.round_type, FINALS_LABEL_ROUND_TYPES, `${path}.round_type`),
+  };
+}
+
+/**
+ * AFLDB-ISSUE-228 §6.4 — one row of a per-season explicit round table. Every
+ * row names exactly one `api_round_number`; `canonical_round_number` is
+ * declared for a home-and-away row and forbidden everywhere else (a final
+ * carries no round number, `matches_round_number_ck`); `finals_label_rules`
+ * is declared for a `mixed_finals` row (and required non-empty there) and
+ * forbidden everywhere else. Both fields are simply omitted, never `null`,
+ * matching the optional-key convention `corroboration_policy` already uses.
+ */
+function parseDeclaredRoundRow(raw: unknown, path: string): DeclaredRoundRow {
+  const row = record(raw, path);
+  expectKeys(row, DECLARED_ROUND_ROW_KEYS, path, OPTIONAL_DECLARED_ROUND_ROW_KEYS);
+  const apiRoundNumber = nonNegativeInt(row.api_round_number, `${path}.api_round_number`);
+  const roundType = enumValue(row.round_type, DECLARED_ROUND_TYPES, `${path}.round_type`);
+
+  const hasCanonicalNumber = 'canonical_round_number' in row;
+  const hasLabelRules = 'finals_label_rules' in row;
+  if (roundType === 'home_and_away') {
+    if (!hasCanonicalNumber) fail(`${path} is 'home_and_away' but omits canonical_round_number.`);
+    if (hasLabelRules) fail(`${path} is 'home_and_away' but declares finals_label_rules.`);
+  } else if (roundType === 'mixed_finals') {
+    if (hasCanonicalNumber) fail(`${path} is 'mixed_finals' but declares canonical_round_number.`);
+    if (!hasLabelRules) fail(`${path} is 'mixed_finals' but omits finals_label_rules.`);
+  } else {
+    if (hasCanonicalNumber) fail(`${path} is '${roundType}' but declares canonical_round_number.`);
+    if (hasLabelRules) fail(`${path} is '${roundType}' but declares finals_label_rules.`);
+  }
+
+  const canonicalRoundNumber = hasCanonicalNumber
+    ? (() => {
+      const n = nonNegativeInt(row.canonical_round_number, `${path}.canonical_round_number`);
+      if (n < 1) fail(`${path}.canonical_round_number must be at least 1.`);
+      return n;
+    })()
+    : null;
+
+  const finalsLabelRules = hasLabelRules
+    ? (() => {
+      if (!Array.isArray(row.finals_label_rules) || row.finals_label_rules.length === 0) {
+        fail(`${path}.finals_label_rules must be a non-empty array.`);
+      }
+      return row.finals_label_rules.map(
+        (value, index) => parseFinalsLabelRule(value, `${path}.finals_label_rules[${index}]`),
+      );
+    })()
+    : null;
+
+  return {
+    apiRoundNumber,
+    apiAbbreviation: text(row.api_abbreviation, `${path}.api_abbreviation`),
+    apiName: text(row.api_name, `${path}.api_name`),
+    roundType,
+    canonicalRoundNumber,
+    finalsLabelRules,
+  };
+}
+
+function parseDeclaredVocabulary(
+  key: string, row: Record<string, unknown>, path: string,
+): DeclaredRoundVocabulary {
+  expectKeys(row, DECLARED_VOCABULARY_KEYS, path);
+  const season = nonNegativeInt(row.season, `${path}.season`);
+  if (season < 1897) fail(`${path}.season must be a real AFL/VFL season.`);
+  if (!Array.isArray(row.rounds) || row.rounds.length === 0) {
+    fail(`${path}.rounds must be a non-empty array.`);
+  }
+  const rounds = row.rounds.map((value, index) => parseDeclaredRoundRow(value, `${path}.rounds[${index}]`));
+
+  const roundNumbers = rounds.map((r) => r.apiRoundNumber);
+  const dupeRoundNumbers = roundNumbers.filter((n, i) => roundNumbers.indexOf(n) !== i);
+  if (dupeRoundNumbers.length > 0) {
+    fail(`${path}.rounds repeats api_round_number: ${[...new Set(dupeRoundNumbers)].sort().join(', ')}.`);
+  }
+
+  // §6.4: the canonical home-and-away numbers must be a contiguous 1..N run,
+  // so the three writers (this module, createMatch(), admin-fixtures.ts) can
+  // never be handed a gap or a duplicate to render.
+  const canonicalHomeAndAway = rounds
+    .filter((r) => r.roundType === 'home_and_away')
+    .map((r) => r.canonicalRoundNumber!)
+    .sort((a, b) => a - b);
+  if (canonicalHomeAndAway.length === 0) {
+    fail(`${path}.rounds declares no home_and_away round.`);
+  }
+  canonicalHomeAndAway.forEach((n, i) => {
+    if (n !== i + 1) {
+      fail(
+        `${path}.rounds' canonical home-and-away numbers must be contiguous 1..`
+        + `${canonicalHomeAndAway.length}, found ${canonicalHomeAndAway.join(', ')}.`,
+      );
+    }
+  });
+
+  return {
+    key,
+    shape: 'declared',
+    description: text(row.description, `${path}.description`),
+    mappingStatus: 'declared',
+    season,
+    evidence: nonEmptyTextArray(row.evidence, `${path}.evidence`),
+    rounds,
+  };
+}
+
+function parseAnchorVocabulary(
+  key: string, row: Record<string, unknown>, path: string, mappingStatus: 'anchors_only' | 'complete',
+): AnchorRoundVocabulary {
   expectKeys(row, VOCABULARY_KEYS, path);
   if (!Array.isArray(row.anchors)) fail(`${path}.anchors must be an array.`);
   const anchors = row.anchors.map((value, index) => {
     const anchorPath = `${path}.anchors[${index}]`;
     const anchor = record(value, anchorPath);
     expectKeys(anchor, ANCHOR_KEYS, anchorPath);
-    const roundNumber = anchor.round_number;
-    if (typeof roundNumber !== 'number' || !Number.isInteger(roundNumber) || roundNumber < 0) {
-      fail(`${anchorPath}.round_number must be a non-negative integer.`);
-    }
+    const roundNumber = nonNegativeInt(anchor.round_number, `${anchorPath}.round_number`);
     return {
       roundNumber,
       meaning: text(anchor.meaning, `${anchorPath}.meaning`),
@@ -288,11 +484,20 @@ function parseVocabulary(key: string, raw: unknown): RoundVocabulary {
   });
   return {
     key,
+    shape: 'anchors',
     description: text(row.description, `${path}.description`),
-    mappingStatus: enumValue(row.mapping_status, ROUND_MAPPING_STATUSES, `${path}.mapping_status`),
+    mappingStatus,
     mappingOwner: optionalText(row.mapping_owner, `${path}.mapping_owner`),
     anchors,
   };
+}
+
+function parseVocabulary(key: string, raw: unknown): RoundVocabulary {
+  const path = `round_vocabularies.${key}`;
+  const row = record(raw, path);
+  const mappingStatus = enumValue(row.mapping_status, ROUND_MAPPING_STATUSES, `${path}.mapping_status`);
+  if (mappingStatus === 'declared') return parseDeclaredVocabulary(key, row, path);
+  return parseAnchorVocabulary(key, row, path, mappingStatus);
 }
 
 function parseFamily(raw: unknown, index: number): SourceFamilyContract {
@@ -411,7 +616,7 @@ function parseFamily(raw: unknown, index: number): SourceFamilyContract {
  */
 export function parseSourceFamilyRegistry(raw: unknown): SourceFamilyRegistry {
   const root = record(raw, 'registry');
-  expectKeys(root, ROOT_KEYS, 'registry');
+  expectKeys(root, ROOT_KEYS, 'registry', OPTIONAL_ROOT_KEYS);
 
   if (root.contract_version !== CONTRACT_VERSION) {
     fail(`registry.contract_version must be ${CONTRACT_VERSION}, found ${String(root.contract_version)}.`);
@@ -486,7 +691,37 @@ export function parseSourceFamilyRegistry(raw: unknown): SourceFamilyRegistry {
     }
   }
 
-  return { contractVersion: CONTRACT_VERSION, sources, roundVocabularies, families };
+  // AFLDB-ISSUE-228 §7.5 (Q1). Optional, and empty (the pre-ISSUE-228 state)
+  // when omitted. Each group names ≥ 2 distinct, declared source keys; a
+  // source key may belong to at most one group, so "co-source" stays a
+  // symmetric, unambiguous relation rather than a per-pair opt-in.
+  const coSourceGroups: string[][] = [];
+  if (root.co_source_groups !== undefined) {
+    if (!Array.isArray(root.co_source_groups)) fail('registry.co_source_groups must be an array.');
+    const seenInAnyGroup = new Set<string>();
+    root.co_source_groups.forEach((value, index) => {
+      const path = `registry.co_source_groups[${index}]`;
+      const group = nonEmptyTextArray(value, path);
+      if (group.length < 2) fail(`${path} must name at least two source keys.`);
+      for (const key of group) {
+        if (!sources.has(key)) fail(`${path} names an undeclared source key '${key}'.`);
+        if (seenInAnyGroup.has(key)) fail(`${path} names '${key}', which already belongs to another group.`);
+        seenInAnyGroup.add(key);
+      }
+      coSourceGroups.push([...group].sort());
+    });
+  }
+
+  return {
+    contractVersion: CONTRACT_VERSION, sources, roundVocabularies, families, coSourceGroups,
+  };
+}
+
+/** True when `a` and `b` are declared co-sources for at least one target
+ * (AFLDB-ISSUE-228 §7.5, Q1). A source is always its own co-source. */
+export function areCoSources(registry: SourceFamilyRegistry, a: string, b: string): boolean {
+  if (a === b) return true;
+  return registry.coSourceGroups.some((group) => group.includes(a) && group.includes(b));
 }
 
 export function findSourceFamily(
@@ -530,18 +765,36 @@ export function isPromotable(contract: SourceFamilyContract): boolean {
  * The typed-projection gate. A missing required column or an unexpected column
  * is a refusal, never a silent NULL — P3 proved a source's column set can
  * change between two rounds of the same season.
+ *
+ * `requireColumns` (default `true`) exists for AFLDB-ISSUE-228 S7's Brownlow
+ * families, whose one "observation" is a wrapper around a COLLECTION
+ * (`matchVotes[]` / `leaderboard[]`) rather than a single always-present
+ * record: `flattenObservedColumns()` contributes NO path at all for an empty
+ * array (its own documented rule), so a required column declared as
+ * `matchVotes.matchId` etc. can never be observed when the provider
+ * legitimately publishes zero records yet — a valid pre-count state, not a
+ * malformed source. The caller passes `false` only when it has already
+ * established the collection the required columns live under is empty; the
+ * unexpected-column check still runs unconditionally either way, so a
+ * genuinely new/renamed top-level field is still caught even on an empty
+ * publication. Every other family (`match`, `match_roster`,
+ * `player_match_stats`, and AFL Tables' own families) calls this with the
+ * default and is unaffected.
  */
 export function assertProjectableColumns(
   contract: SourceFamilyContract, observedColumns: readonly string[],
+  options: { requireColumns?: boolean } = {},
 ): void {
   const label = `${contract.sourceKey}/${contract.family}`;
   if (contract.requiredColumns === null || contract.knownColumns === null) {
     fail(`${label} declares no column contract, so nothing may be projected from it.`);
   }
-  const observed = new Set(observedColumns);
-  const missing = contract.requiredColumns.filter((column) => !observed.has(column));
-  if (missing.length > 0) {
-    fail(`${label} is missing required column(s): ${missing.join(', ')}.`);
+  if (options.requireColumns ?? true) {
+    const observed = new Set(observedColumns);
+    const missing = contract.requiredColumns.filter((column) => !observed.has(column));
+    if (missing.length > 0) {
+      fail(`${label} is missing required column(s): ${missing.join(', ')}.`);
+    }
   }
   const unexpected = observedColumns.filter((column) => !contract.knownColumns!.includes(column));
   if (unexpected.length > 0) {
@@ -589,9 +842,10 @@ export function translateRound(
     const declared = registry.roundVocabularies.get(vocabulary);
     if (!declared) fail(`Round vocabulary '${vocabulary}' is not declared.`);
     if (declared.mappingStatus !== 'complete') {
+      const owner = declared.shape === 'anchors' ? (declared.mappingOwner ?? 'unassigned') : 'AFLDB-ISSUE-228';
       fail(
         `Round vocabulary '${vocabulary}' is '${declared.mappingStatus}', so no round may be `
-        + `translated to or from it (owner: ${declared.mappingOwner ?? 'unassigned'}).`,
+        + `translated to or from it (owner: ${owner}).`,
       );
     }
   }

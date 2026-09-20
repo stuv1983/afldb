@@ -1,0 +1,82 @@
+[Unit]
+Description=AFLDB — in-season AFL.com.au (afl_api) canonical settle (one run)
+Documentation=https://github.com/afldb
+After=network-online.target postgresql.service afldb.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=arm
+Group=arm
+WorkingDirectory=/home/arm/projects/afldb
+
+# The AFLDB-ISSUE-228 S8 chain, in one script so both steps agree on one
+# season and one acquired snapshot label:
+#
+#   acquire-afl-api.ts --season <S>
+#     -> settle-afl-api.ts --label <L> --apply --auto-apply --require-complete-source
+#
+# Runs under `set -e`: a failed acquisition never reaches settle and
+# PostgreSQL is never opened. acquire-afl-api.ts writes its manifest LAST and
+# self-cleans a manifest-less partial snapshot on the way out (its own
+# `cleanupPartialSnapshot()`), so this unit needs no separate cleanup step.
+#
+# This unit and afldb-settle-afltables.service are independent and may run
+# concurrently: they settle different sources against the co-source
+# ownership policy (§7.5, Q1) — an afltables-owned row observed here is
+# corroborated, never overwritten, and vice versa. Neither unit names the
+# other.
+# Invoked through /bin/sh rather than relying on an executable bit, same
+# convention as afldb-settle-afltables.service.
+ExecStart=/bin/sh /home/arm/projects/afldb/deploy/afldb-settle-afl-api.sh
+
+# A season's CONCLUDED-match acquisition plus settle is bounded network and
+# database work, but AFL.com.au is a third party. Bound the run rather than
+# letting a stalled fetch hold the unit open until the next firing.
+TimeoutStartSec=3600
+
+# PostgreSQL is co-located on a 2 vCPU droplet and this job is not urgent.
+Nice=10
+
+# Same DSN-exposure reasoning as afldb-settle-afltables.service:
+# settle-afl-api.ts connects as afldb_import through
+# AFLDB_IMPORT_DATABASE_URL, which is therefore left off the
+# UnsetEnvironment list below; every other credential .env carries is
+# dropped, so a compromise here cannot reach the owner, auth, backup or app
+# roles. This unit reads no revalidation secret (season-page ISR
+# invalidation is the AFL Tables settle's own concern; this pass adds none
+# for afl_api).
+EnvironmentFile=/home/arm/projects/afldb/.env
+UnsetEnvironment=AFLDB_OWNER_DATABASE_URL AFLDB_AUTH_DATABASE_URL AFLDB_TEST_DATABASE_URL AFLDB_DEV_DATABASE_URL AFLDB_BACKUP_DATABASE_URL AFLDB_PROD_DATABASE_URL DATABASE_URL AFLDB_SESSION_SECRET AFLDB_SMTP_PASSWORD AFLDB_SMTP_USER AFLDB_EMAIL_INTAKE_SECRET AFLDB_REVALIDATE_SECRET
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=afldb-settle-afl-api
+
+# --- Hardening -------------------------------------------------------
+# Modelled on afldb-settle-afltables.service. `ReadWritePaths` is narrower:
+# afl_api snapshots and manifests live entirely under data/sources/afl_api
+# (untracked, .gitignore'd) — there is no tracked
+# docs/rebuild-manifests/afl_api/<label>.json copy step in the current
+# acquire-afl-api.ts implementation (see this pass's session report), so no
+# docs/rebuild-manifests path is granted write access here.
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/arm/projects/afldb/data/sources/afl_api
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+# Node JIT, as in afldb.service / afldb-settle-afltables.service.
+MemoryDenyWriteExecute=false
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM

@@ -34,6 +34,13 @@ not proposals.
 6. **Once complete, that season is re-acquired through the standard full-history fitzRoy
    path and supersedes the in-season provenance.**
 
+> **AMENDED 2026-09-21 (AFLDB-ISSUE-228 S8, operator decision Q7).** Item 6 predates `afl_api`
+> holding any canonical-write authority and is now qualified by §5's amendment below: the
+> rollover supersedes provisional Squiggle/Kali *staging* evidence as before, but it
+> **corroborates, never re-owns, a canonical row `afl_api` independently promoted** — an
+> ownership transfer needs an explicit rule or operator decision, never "the rollover ran
+> later." See §5 for the full wording.
+
 ---
 
 ## Context
@@ -371,6 +378,21 @@ of lineup data into canonical participation.
 > diagnostics or fallback investigation. The overnight AFL Tables settle pass is the guarded
 > automatic canonical path. There is no automatic Squiggle/Kali fallback writer.
 
+> **AMENDED 2026-09-21 (AFLDB-ISSUE-228 S8, operator decision Q7, 2026-09-19).** The Rollover
+> row below no longer says the completed-season re-acquisition "supersedes in-season
+> provenance" — that wording predates `afl_api` holding any canonical-write authority and is
+> incompatible with it. **Corroborate, never re-own:** the fitzRoy/AFL Tables full-history
+> rollover corroborates canonical rows independently sourced by `afl_api` (agreement is
+> recorded; a disagreement opens a `data_issues` `source_disagreement` row, advisory only) and
+> may enrich only through the declared field-group exception (`CO_SOURCE_ENRICHMENT`, today
+> `matches.attendance` only — `AFLDB-ISSUE-228` §7.5). **Any ownership transfer away from the
+> row's first-writer source is an explicit rule or an explicit operator decision, with its own
+> `canonical_applications` ledger rows — never a side effect of the rollover running later.**
+> This amendment updates the doctrine only; the rollover runbook itself (season promotion,
+> `fitzroy-accepted-baselines.json`, `seasons.json.in_progress_seasons`, the Stage-9
+> `matches_after_accepted_last_season` gate) remains `AFLDB-ISSUE-101`/F's own document to
+> update, not this one's.
+
 | Phase | Job | Source | Writes | Cadence |
 |---|---|---|---|---|
 | Preseason (Nov–Feb) | roster refresh | AFL API player details | staging → **reviewed** new players | weekly |
@@ -378,14 +400,14 @@ of lineup data into canonical participation.
 | Team announcement (T−48 h → T−1 h) | lineup capture | `fetch_lineup_afl` | `staging.external_lineups` only | 2×/day match week |
 | Match day | completion watch | Squiggle `complete` / `timestr` | **nothing** | ≤ hourly during matches (respect Standard-API guidance) |
 | Post-match (T+2 h) | provisional score | Squiggle | staging only | per match |
-| Overnight settle (T+12–24 h) | **AFL Tables settle pass** | `acquire_core.R --from 2026 --to 2026` (partial snapshot + SHA-256 manifest) → import | staging → **reviewed** `matches`, `match_period_scores`, `attendance`, `player_match_stats`, `brownlow_round_votes` | nightly in season |
+| Overnight settle (T+12–24 h) | **AFL Tables settle pass, and (AFLDB-ISSUE-228 S8) the independent `afl_api` settle pass** | `acquire_core.R --from 2026 --to 2026` (partial snapshot + SHA-256 manifest) → import; `acquire-afl-api.ts` → `settle-afl-api.ts` | staging → **reviewed** `matches`, `match_period_scores`, `attendance`, `player_match_stats`, `brownlow_round_votes`; co-source corroboration, never re-ownership, between the two (§7.5) | nightly in season |
 | End of round | ladder + diff report | per `AFLDB-ISSUE-095` | staging → **reviewed** `club_seasons` | weekly |
 | End of home-and-away | final ladder, finals qualification | as above | reviewed | once |
 | Finals | as per round | — | reviewed | weekly |
 | Post-Grand Final | premier / wooden spoon / `seasons.status` | derived from matches (existing SQL semantics) | reviewed | once |
-| Awards period (Sep–Oct) | Brownlow votes via settle pass; **everything else manual** | AFL Tables; no API for the rest | reviewed | once |
+| Awards period (Sep–Oct) | Brownlow votes via settle pass (AFL Tables), and independently via the `afl_api` Brownlow settle when enabled for the live count (`AFLDB-ISSUE-228` §10); **everything else manual** | AFL Tables; `afl_api` (live count only); no API for the rest | reviewed | AFL Tables once; `afl_api` polled during the live count only |
 | Draft (Nov–Dec) | DraftGuru re-acquisition | existing path | reviewed | once |
-| **Rollover (Dec–Feb)** | **season promotion [DECISION]** — re-acquire the completed season through the standard full-history path, extend `data/reference/fitzroy-accepted-baselines.json`, supersede in-season provenance, advance `seasons.json.in_progress_seasons`, re-point the Stage-9 `matches_after_accepted_last_season` gate | fitzRoy full-history | reviewed, gated | once per season |
+| **Rollover (Dec–Feb)** | **season promotion [DECISION]** — re-acquire the completed season through the standard full-history path, extend `data/reference/fitzroy-accepted-baselines.json`, **corroborate/enrich (never supersede) any independently-`afl_api`-owned in-season canonical rows per §7.5's field-group rule (AFLDB-ISSUE-228 Q7)**, advance `seasons.json.in_progress_seasons`, re-point the Stage-9 `matches_after_accepted_last_season` gate | fitzRoy full-history | reviewed, gated | once per season |
 
 ---
 

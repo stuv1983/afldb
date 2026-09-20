@@ -1,0 +1,24 @@
+[Unit]
+Description=AFLDB — nightly in-season AFL.com.au (afl_api) settle pass
+
+[Timer]
+# Fires after the AFL Tables timer's own 04:30 window
+# (deploy/afldb-settle-afltables.timer) plus its RandomizedDelaySec, so a
+# nightly afl_api run corroborates against AFL Tables data that has already
+# had its own chance to settle first — not a correctness requirement (Q1
+# co-source corroboration works in either order), just fewer transient
+# `source_disagreement` advisories on a freshly-changed match. OnCalendar is
+# evaluated in the host's timezone (Australia/Melbourne on both AFLDB hosts).
+#
+# Out of season the unit exits 0 without doing anything (no in-progress
+# season in data/reference/seasons.json), so this timer is left enabled all
+# year, same convention as the AFL Tables timer.
+OnCalendar=*-*-* 05:00
+RandomizedDelaySec=15min
+AccuracySec=1min
+# A missed run catches up once on the next boot instead of skipping that
+# night entirely.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

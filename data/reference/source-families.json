@@ -27,11 +27,11 @@
       ]
     },
     "afl_api": {
-      "registered_by": "unregistered",
-      "registered_in": null,
+      "registered_by": "migration",
+      "registered_in": "src/db/migrations/077_afl_api_lineups.sql",
       "registration_owner": "AFLDB-ISSUE-100",
       "notes": [
-        "The AFL.com.au API reached through fitzRoy fetch_lineup_afl / fetch_player_details_afl has NO sources row anywhere today. Declared here so its families carry their proven shape and independence group; registering the row belongs to the family issue that first needs provenance. Until then no family of this source may carry promotion_policy 'reviewed' - enforced by the registry validator."
+        "The AFL.com.au API reached through fitzRoy fetch_lineup_afl / fetch_player_details_afl has a sources row registered by migration 077, idempotently and fail-closed on a pre-existing row with different provenance."
       ]
     }
   },
@@ -82,24 +82,223 @@
         }
       ]
     },
+    "afl_api_2022": {
+      "description": "AFL API explicit round table for 2022 (AFLDB-ISSUE-228 §6.4). No Opening Round, so the home-and-away sequence and the canonical numbering agree exactly. Finals week 1 combines the Qualifying and Elimination Finals under one abbreviation (FW1) with no metadata.finals_match_label anywhere in the season -- verified absent by an anchored search of the whole raw file, not merely unseen in the sampled matches -- so this round can never split and always refuses finals_label_required (§9's documented backtest limitation).",
+      "mapping_status": "declared",
+      "season": 2022,
+      "evidence": [
+        "data/sources/AFLWebsite/AFLGamesSamples/historical-samples/2022/00-season-matches.raw.json, compSeasonId 43, providerId CD_S2022014, 2026-09-19: rounds 1-23 abbreviation 'Rd <n>' / name 'Round <n>'; round 24 'FW1'/'Finals Week 1'; round 25 'SF'/'Semi Finals'; round 26 'PF'/'Preliminary Finals'; round 27 'GF'/'Grand Final'. Zero occurrences of the string 'finals_match_label' anywhere in the file."
+      ],
+      "rounds": [
+        { "api_round_number": 1,  "api_abbreviation": "Rd 1",  "api_name": "Round 1",  "round_type": "home_and_away", "canonical_round_number": 1 },
+        { "api_round_number": 2,  "api_abbreviation": "Rd 2",  "api_name": "Round 2",  "round_type": "home_and_away", "canonical_round_number": 2 },
+        { "api_round_number": 3,  "api_abbreviation": "Rd 3",  "api_name": "Round 3",  "round_type": "home_and_away", "canonical_round_number": 3 },
+        { "api_round_number": 4,  "api_abbreviation": "Rd 4",  "api_name": "Round 4",  "round_type": "home_and_away", "canonical_round_number": 4 },
+        { "api_round_number": 5,  "api_abbreviation": "Rd 5",  "api_name": "Round 5",  "round_type": "home_and_away", "canonical_round_number": 5 },
+        { "api_round_number": 6,  "api_abbreviation": "Rd 6",  "api_name": "Round 6",  "round_type": "home_and_away", "canonical_round_number": 6 },
+        { "api_round_number": 7,  "api_abbreviation": "Rd 7",  "api_name": "Round 7",  "round_type": "home_and_away", "canonical_round_number": 7 },
+        { "api_round_number": 8,  "api_abbreviation": "Rd 8",  "api_name": "Round 8",  "round_type": "home_and_away", "canonical_round_number": 8 },
+        { "api_round_number": 9,  "api_abbreviation": "Rd 9",  "api_name": "Round 9",  "round_type": "home_and_away", "canonical_round_number": 9 },
+        { "api_round_number": 10, "api_abbreviation": "Rd 10", "api_name": "Round 10", "round_type": "home_and_away", "canonical_round_number": 10 },
+        { "api_round_number": 11, "api_abbreviation": "Rd 11", "api_name": "Round 11", "round_type": "home_and_away", "canonical_round_number": 11 },
+        { "api_round_number": 12, "api_abbreviation": "Rd 12", "api_name": "Round 12", "round_type": "home_and_away", "canonical_round_number": 12 },
+        { "api_round_number": 13, "api_abbreviation": "Rd 13", "api_name": "Round 13", "round_type": "home_and_away", "canonical_round_number": 13 },
+        { "api_round_number": 14, "api_abbreviation": "Rd 14", "api_name": "Round 14", "round_type": "home_and_away", "canonical_round_number": 14 },
+        { "api_round_number": 15, "api_abbreviation": "Rd 15", "api_name": "Round 15", "round_type": "home_and_away", "canonical_round_number": 15 },
+        { "api_round_number": 16, "api_abbreviation": "Rd 16", "api_name": "Round 16", "round_type": "home_and_away", "canonical_round_number": 16 },
+        { "api_round_number": 17, "api_abbreviation": "Rd 17", "api_name": "Round 17", "round_type": "home_and_away", "canonical_round_number": 17 },
+        { "api_round_number": 18, "api_abbreviation": "Rd 18", "api_name": "Round 18", "round_type": "home_and_away", "canonical_round_number": 18 },
+        { "api_round_number": 19, "api_abbreviation": "Rd 19", "api_name": "Round 19", "round_type": "home_and_away", "canonical_round_number": 19 },
+        { "api_round_number": 20, "api_abbreviation": "Rd 20", "api_name": "Round 20", "round_type": "home_and_away", "canonical_round_number": 20 },
+        { "api_round_number": 21, "api_abbreviation": "Rd 21", "api_name": "Round 21", "round_type": "home_and_away", "canonical_round_number": 21 },
+        { "api_round_number": 22, "api_abbreviation": "Rd 22", "api_name": "Round 22", "round_type": "home_and_away", "canonical_round_number": 22 },
+        { "api_round_number": 23, "api_abbreviation": "Rd 23", "api_name": "Round 23", "round_type": "home_and_away", "canonical_round_number": 23 },
+        { "api_round_number": 24, "api_abbreviation": "FW1", "api_name": "Finals Week 1", "round_type": "mixed_finals",
+          "finals_label_rules": [
+            { "contains": "Qualifying",  "round_type": "qualifying_final" },
+            { "contains": "Elimination", "round_type": "elimination_final" }
+          ] },
+        { "api_round_number": 25, "api_abbreviation": "SF", "api_name": "Semi Finals",        "round_type": "semi_final" },
+        { "api_round_number": 26, "api_abbreviation": "PF", "api_name": "Preliminary Finals",  "round_type": "preliminary_final" },
+        { "api_round_number": 27, "api_abbreviation": "GF", "api_name": "Grand Final",         "round_type": "grand_final" }
+      ]
+    },
+    "afl_api_2023": {
+      "description": "AFL API explicit round table for 2023 (AFLDB-ISSUE-228 §6.4). No Opening Round. Finals week 1 combines Qualifying and Elimination under FW1 with no metadata.finals_match_label anywhere in the season, same as 2022.",
+      "mapping_status": "declared",
+      "season": 2023,
+      "evidence": [
+        "data/sources/AFLWebsite/AFLGamesSamples/historical-samples/2023/00-season-matches.raw.json, compSeasonId 52, providerId CD_S2023014, 2026-09-19: rounds 1-24 abbreviation 'Rd <n>' / name 'Round <n>'; round 25 'FW1'/'Finals Week 1'; round 26 'SF'/'Semi Finals'; round 27 'PF'/'Preliminary Finals'; round 28 'GF'/'Grand Final'. Zero occurrences of 'finals_match_label' in the file."
+      ],
+      "rounds": [
+        { "api_round_number": 1,  "api_abbreviation": "Rd 1",  "api_name": "Round 1",  "round_type": "home_and_away", "canonical_round_number": 1 },
+        { "api_round_number": 2,  "api_abbreviation": "Rd 2",  "api_name": "Round 2",  "round_type": "home_and_away", "canonical_round_number": 2 },
+        { "api_round_number": 3,  "api_abbreviation": "Rd 3",  "api_name": "Round 3",  "round_type": "home_and_away", "canonical_round_number": 3 },
+        { "api_round_number": 4,  "api_abbreviation": "Rd 4",  "api_name": "Round 4",  "round_type": "home_and_away", "canonical_round_number": 4 },
+        { "api_round_number": 5,  "api_abbreviation": "Rd 5",  "api_name": "Round 5",  "round_type": "home_and_away", "canonical_round_number": 5 },
+        { "api_round_number": 6,  "api_abbreviation": "Rd 6",  "api_name": "Round 6",  "round_type": "home_and_away", "canonical_round_number": 6 },
+        { "api_round_number": 7,  "api_abbreviation": "Rd 7",  "api_name": "Round 7",  "round_type": "home_and_away", "canonical_round_number": 7 },
+        { "api_round_number": 8,  "api_abbreviation": "Rd 8",  "api_name": "Round 8",  "round_type": "home_and_away", "canonical_round_number": 8 },
+        { "api_round_number": 9,  "api_abbreviation": "Rd 9",  "api_name": "Round 9",  "round_type": "home_and_away", "canonical_round_number": 9 },
+        { "api_round_number": 10, "api_abbreviation": "Rd 10", "api_name": "Round 10", "round_type": "home_and_away", "canonical_round_number": 10 },
+        { "api_round_number": 11, "api_abbreviation": "Rd 11", "api_name": "Round 11", "round_type": "home_and_away", "canonical_round_number": 11 },
+        { "api_round_number": 12, "api_abbreviation": "Rd 12", "api_name": "Round 12", "round_type": "home_and_away", "canonical_round_number": 12 },
+        { "api_round_number": 13, "api_abbreviation": "Rd 13", "api_name": "Round 13", "round_type": "home_and_away", "canonical_round_number": 13 },
+        { "api_round_number": 14, "api_abbreviation": "Rd 14", "api_name": "Round 14", "round_type": "home_and_away", "canonical_round_number": 14 },
+        { "api_round_number": 15, "api_abbreviation": "Rd 15", "api_name": "Round 15", "round_type": "home_and_away", "canonical_round_number": 15 },
+        { "api_round_number": 16, "api_abbreviation": "Rd 16", "api_name": "Round 16", "round_type": "home_and_away", "canonical_round_number": 16 },
+        { "api_round_number": 17, "api_abbreviation": "Rd 17", "api_name": "Round 17", "round_type": "home_and_away", "canonical_round_number": 17 },
+        { "api_round_number": 18, "api_abbreviation": "Rd 18", "api_name": "Round 18", "round_type": "home_and_away", "canonical_round_number": 18 },
+        { "api_round_number": 19, "api_abbreviation": "Rd 19", "api_name": "Round 19", "round_type": "home_and_away", "canonical_round_number": 19 },
+        { "api_round_number": 20, "api_abbreviation": "Rd 20", "api_name": "Round 20", "round_type": "home_and_away", "canonical_round_number": 20 },
+        { "api_round_number": 21, "api_abbreviation": "Rd 21", "api_name": "Round 21", "round_type": "home_and_away", "canonical_round_number": 21 },
+        { "api_round_number": 22, "api_abbreviation": "Rd 22", "api_name": "Round 22", "round_type": "home_and_away", "canonical_round_number": 22 },
+        { "api_round_number": 23, "api_abbreviation": "Rd 23", "api_name": "Round 23", "round_type": "home_and_away", "canonical_round_number": 23 },
+        { "api_round_number": 24, "api_abbreviation": "Rd 24", "api_name": "Round 24", "round_type": "home_and_away", "canonical_round_number": 24 },
+        { "api_round_number": 25, "api_abbreviation": "FW1", "api_name": "Finals Week 1", "round_type": "mixed_finals",
+          "finals_label_rules": [
+            { "contains": "Qualifying",  "round_type": "qualifying_final" },
+            { "contains": "Elimination", "round_type": "elimination_final" }
+          ] },
+        { "api_round_number": 26, "api_abbreviation": "SF", "api_name": "Semi Finals",        "round_type": "semi_final" },
+        { "api_round_number": 27, "api_abbreviation": "PF", "api_name": "Preliminary Finals",  "round_type": "preliminary_final" },
+        { "api_round_number": 28, "api_abbreviation": "GF", "api_name": "Grand Final",         "round_type": "grand_final" }
+      ]
+    },
+    "afl_api_2024": {
+      "description": "AFL API explicit round table for 2024 (AFLDB-ISSUE-228 §6.4). First season with an Opening Round (api_round_number 0), so canonical_round_number = api_round_number + 1 throughout the home-and-away sequence. Finals week 1 still combines Qualifying and Elimination under FW1 with no metadata.finals_match_label anywhere in the season.",
+      "mapping_status": "declared",
+      "season": 2024,
+      "evidence": [
+        "data/sources/AFLWebsite/AFLGamesSamples/historical-samples/2024/00-season-matches.raw.json, compSeasonId 62, providerId CD_S2024014, 2026-09-19: round 0 'OR'/'Opening Round'; rounds 1-24 'Rd <n>'/'Round <n>'; round 25 'FW1'/'Finals Week 1'; round 26 'SF'/'Semi Finals'; round 27 'PF'/'Preliminary Finals'; round 28 'GF'/'Grand Final'. Zero occurrences of 'finals_match_label' in the file."
+      ],
+      "rounds": [
+        { "api_round_number": 0,  "api_abbreviation": "OR",    "api_name": "Opening Round", "round_type": "home_and_away", "canonical_round_number": 1 },
+        { "api_round_number": 1,  "api_abbreviation": "Rd 1",  "api_name": "Round 1",  "round_type": "home_and_away", "canonical_round_number": 2 },
+        { "api_round_number": 2,  "api_abbreviation": "Rd 2",  "api_name": "Round 2",  "round_type": "home_and_away", "canonical_round_number": 3 },
+        { "api_round_number": 3,  "api_abbreviation": "Rd 3",  "api_name": "Round 3",  "round_type": "home_and_away", "canonical_round_number": 4 },
+        { "api_round_number": 4,  "api_abbreviation": "Rd 4",  "api_name": "Round 4",  "round_type": "home_and_away", "canonical_round_number": 5 },
+        { "api_round_number": 5,  "api_abbreviation": "Rd 5",  "api_name": "Round 5",  "round_type": "home_and_away", "canonical_round_number": 6 },
+        { "api_round_number": 6,  "api_abbreviation": "Rd 6",  "api_name": "Round 6",  "round_type": "home_and_away", "canonical_round_number": 7 },
+        { "api_round_number": 7,  "api_abbreviation": "Rd 7",  "api_name": "Round 7",  "round_type": "home_and_away", "canonical_round_number": 8 },
+        { "api_round_number": 8,  "api_abbreviation": "Rd 8",  "api_name": "Round 8",  "round_type": "home_and_away", "canonical_round_number": 9 },
+        { "api_round_number": 9,  "api_abbreviation": "Rd 9",  "api_name": "Round 9",  "round_type": "home_and_away", "canonical_round_number": 10 },
+        { "api_round_number": 10, "api_abbreviation": "Rd 10", "api_name": "Round 10", "round_type": "home_and_away", "canonical_round_number": 11 },
+        { "api_round_number": 11, "api_abbreviation": "Rd 11", "api_name": "Round 11", "round_type": "home_and_away", "canonical_round_number": 12 },
+        { "api_round_number": 12, "api_abbreviation": "Rd 12", "api_name": "Round 12", "round_type": "home_and_away", "canonical_round_number": 13 },
+        { "api_round_number": 13, "api_abbreviation": "Rd 13", "api_name": "Round 13", "round_type": "home_and_away", "canonical_round_number": 14 },
+        { "api_round_number": 14, "api_abbreviation": "Rd 14", "api_name": "Round 14", "round_type": "home_and_away", "canonical_round_number": 15 },
+        { "api_round_number": 15, "api_abbreviation": "Rd 15", "api_name": "Round 15", "round_type": "home_and_away", "canonical_round_number": 16 },
+        { "api_round_number": 16, "api_abbreviation": "Rd 16", "api_name": "Round 16", "round_type": "home_and_away", "canonical_round_number": 17 },
+        { "api_round_number": 17, "api_abbreviation": "Rd 17", "api_name": "Round 17", "round_type": "home_and_away", "canonical_round_number": 18 },
+        { "api_round_number": 18, "api_abbreviation": "Rd 18", "api_name": "Round 18", "round_type": "home_and_away", "canonical_round_number": 19 },
+        { "api_round_number": 19, "api_abbreviation": "Rd 19", "api_name": "Round 19", "round_type": "home_and_away", "canonical_round_number": 20 },
+        { "api_round_number": 20, "api_abbreviation": "Rd 20", "api_name": "Round 20", "round_type": "home_and_away", "canonical_round_number": 21 },
+        { "api_round_number": 21, "api_abbreviation": "Rd 21", "api_name": "Round 21", "round_type": "home_and_away", "canonical_round_number": 22 },
+        { "api_round_number": 22, "api_abbreviation": "Rd 22", "api_name": "Round 22", "round_type": "home_and_away", "canonical_round_number": 23 },
+        { "api_round_number": 23, "api_abbreviation": "Rd 23", "api_name": "Round 23", "round_type": "home_and_away", "canonical_round_number": 24 },
+        { "api_round_number": 24, "api_abbreviation": "Rd 24", "api_name": "Round 24", "round_type": "home_and_away", "canonical_round_number": 25 },
+        { "api_round_number": 25, "api_abbreviation": "FW1", "api_name": "Finals Week 1", "round_type": "mixed_finals",
+          "finals_label_rules": [
+            { "contains": "Qualifying",  "round_type": "qualifying_final" },
+            { "contains": "Elimination", "round_type": "elimination_final" }
+          ] },
+        { "api_round_number": 26, "api_abbreviation": "SF", "api_name": "Semi Finals",        "round_type": "semi_final" },
+        { "api_round_number": 27, "api_abbreviation": "PF", "api_name": "Preliminary Finals",  "round_type": "preliminary_final" },
+        { "api_round_number": 28, "api_abbreviation": "GF", "api_name": "Grand Final",         "round_type": "grand_final" }
+      ]
+    },
+    "afl_api_2025": {
+      "description": "AFL API explicit round table for 2025 (AFLDB-ISSUE-228 §6.4). Same shape as 2024: Opening Round present, finals week 1 still combines Qualifying and Elimination under FW1 with no metadata.finals_match_label anywhere in the season. The Wildcard round is a 2026 addition; 2025 has no WF round at all.",
+      "mapping_status": "declared",
+      "season": 2025,
+      "evidence": [
+        "data/sources/AFLWebsite/AFLGamesSamples/historical-samples/2025/00-season-matches.raw.json, compSeasonId 73, providerId CD_S2025014, 2026-09-19: round 0 'OR'/'Opening Round'; rounds 1-24 'Rd <n>'/'Round <n>'; round 25 'FW1'/'Finals Week 1'; round 26 'SF'/'Semi Finals'; round 27 'PF'/'Preliminary Finals'; round 28 'GF'/'Grand Final'. Zero occurrences of 'finals_match_label' in the file."
+      ],
+      "rounds": [
+        { "api_round_number": 0,  "api_abbreviation": "OR",    "api_name": "Opening Round", "round_type": "home_and_away", "canonical_round_number": 1 },
+        { "api_round_number": 1,  "api_abbreviation": "Rd 1",  "api_name": "Round 1",  "round_type": "home_and_away", "canonical_round_number": 2 },
+        { "api_round_number": 2,  "api_abbreviation": "Rd 2",  "api_name": "Round 2",  "round_type": "home_and_away", "canonical_round_number": 3 },
+        { "api_round_number": 3,  "api_abbreviation": "Rd 3",  "api_name": "Round 3",  "round_type": "home_and_away", "canonical_round_number": 4 },
+        { "api_round_number": 4,  "api_abbreviation": "Rd 4",  "api_name": "Round 4",  "round_type": "home_and_away", "canonical_round_number": 5 },
+        { "api_round_number": 5,  "api_abbreviation": "Rd 5",  "api_name": "Round 5",  "round_type": "home_and_away", "canonical_round_number": 6 },
+        { "api_round_number": 6,  "api_abbreviation": "Rd 6",  "api_name": "Round 6",  "round_type": "home_and_away", "canonical_round_number": 7 },
+        { "api_round_number": 7,  "api_abbreviation": "Rd 7",  "api_name": "Round 7",  "round_type": "home_and_away", "canonical_round_number": 8 },
+        { "api_round_number": 8,  "api_abbreviation": "Rd 8",  "api_name": "Round 8",  "round_type": "home_and_away", "canonical_round_number": 9 },
+        { "api_round_number": 9,  "api_abbreviation": "Rd 9",  "api_name": "Round 9",  "round_type": "home_and_away", "canonical_round_number": 10 },
+        { "api_round_number": 10, "api_abbreviation": "Rd 10", "api_name": "Round 10", "round_type": "home_and_away", "canonical_round_number": 11 },
+        { "api_round_number": 11, "api_abbreviation": "Rd 11", "api_name": "Round 11", "round_type": "home_and_away", "canonical_round_number": 12 },
+        { "api_round_number": 12, "api_abbreviation": "Rd 12", "api_name": "Round 12", "round_type": "home_and_away", "canonical_round_number": 13 },
+        { "api_round_number": 13, "api_abbreviation": "Rd 13", "api_name": "Round 13", "round_type": "home_and_away", "canonical_round_number": 14 },
+        { "api_round_number": 14, "api_abbreviation": "Rd 14", "api_name": "Round 14", "round_type": "home_and_away", "canonical_round_number": 15 },
+        { "api_round_number": 15, "api_abbreviation": "Rd 15", "api_name": "Round 15", "round_type": "home_and_away", "canonical_round_number": 16 },
+        { "api_round_number": 16, "api_abbreviation": "Rd 16", "api_name": "Round 16", "round_type": "home_and_away", "canonical_round_number": 17 },
+        { "api_round_number": 17, "api_abbreviation": "Rd 17", "api_name": "Round 17", "round_type": "home_and_away", "canonical_round_number": 18 },
+        { "api_round_number": 18, "api_abbreviation": "Rd 18", "api_name": "Round 18", "round_type": "home_and_away", "canonical_round_number": 19 },
+        { "api_round_number": 19, "api_abbreviation": "Rd 19", "api_name": "Round 19", "round_type": "home_and_away", "canonical_round_number": 20 },
+        { "api_round_number": 20, "api_abbreviation": "Rd 20", "api_name": "Round 20", "round_type": "home_and_away", "canonical_round_number": 21 },
+        { "api_round_number": 21, "api_abbreviation": "Rd 21", "api_name": "Round 21", "round_type": "home_and_away", "canonical_round_number": 22 },
+        { "api_round_number": 22, "api_abbreviation": "Rd 22", "api_name": "Round 22", "round_type": "home_and_away", "canonical_round_number": 23 },
+        { "api_round_number": 23, "api_abbreviation": "Rd 23", "api_name": "Round 23", "round_type": "home_and_away", "canonical_round_number": 24 },
+        { "api_round_number": 24, "api_abbreviation": "Rd 24", "api_name": "Round 24", "round_type": "home_and_away", "canonical_round_number": 25 },
+        { "api_round_number": 25, "api_abbreviation": "FW1", "api_name": "Finals Week 1", "round_type": "mixed_finals",
+          "finals_label_rules": [
+            { "contains": "Qualifying",  "round_type": "qualifying_final" },
+            { "contains": "Elimination", "round_type": "elimination_final" }
+          ] },
+        { "api_round_number": 26, "api_abbreviation": "SF", "api_name": "Semi Finals",        "round_type": "semi_final" },
+        { "api_round_number": 27, "api_abbreviation": "PF", "api_name": "Preliminary Finals",  "round_type": "preliminary_final" },
+        { "api_round_number": 28, "api_abbreviation": "GF", "api_name": "Grand Final",         "round_type": "grand_final" }
+      ]
+    },
     "afl_api_2026": {
-      "description": "AFL API round.roundNumber. Finals share the numeric home-and-away sequence, so the same integer denotes a different round than in the other two vocabularies.",
-      "mapping_status": "anchors_only",
-      "mapping_owner": "AFLDB-ISSUE-100",
-      "anchors": [
-        {
-          "round_number": 20,
-          "meaning": "Round 20 (round.name), a home-and-away round whose name matches its number",
-          "evidence": "P3b"
-        },
-        {
-          "round_number": 25,
-          "meaning": "Wildcard Finals (round.name), NOT the last home-and-away round",
-          "evidence": "P3"
-        }
+      "description": "AFL API explicit round table for 2026 (AFLDB-ISSUE-228 §6.4), REPLACING the anchors_only entry ISSUE-100 declared (P3/P3b anchors are superseded by full enumeration, not lost -- both anchors, round 20 and round 25, are rows below). First season with a standalone Wildcard Finals round (WF) and metadata.finals_match_label on every finals match, which is what lets the combined Qualifying & Elimination Finals round (QE) split cleanly, unlike 2022-2025's FW1.",
+      "mapping_status": "declared",
+      "season": 2026,
+      "evidence": [
+        "data/sources/AFLWebsite/AFLGamesSamples/00-season-matches.raw.json, compSeasonId 85, providerId CD_S2026014, 2026-09-19: round 0 'OR'/'Opening Round'; rounds 1-24 'Rd <n>'/'Round <n>'; round 25 'WF'/'Wildcard Finals'; round 26 'QE'/'Qualifying & Elimination Finals'; round 27 'SF'/'Semi Finals'; round 28 'PF'/'Preliminary Finals'; round 29 'GF'/'Grand Final'. metadata.finals_match_label observed for every finals match: 'First/Second Wildcard Final', 'First/Second Qualifying Final', 'First/Second Elimination Final', 'First/Second Semi Final', 'First/Second Preliminary Final', '2026 Toyota AFL Grand Final'."
+      ],
+      "rounds": [
+        { "api_round_number": 0,  "api_abbreviation": "OR",    "api_name": "Opening Round", "round_type": "home_and_away", "canonical_round_number": 1 },
+        { "api_round_number": 1,  "api_abbreviation": "Rd 1",  "api_name": "Round 1",  "round_type": "home_and_away", "canonical_round_number": 2 },
+        { "api_round_number": 2,  "api_abbreviation": "Rd 2",  "api_name": "Round 2",  "round_type": "home_and_away", "canonical_round_number": 3 },
+        { "api_round_number": 3,  "api_abbreviation": "Rd 3",  "api_name": "Round 3",  "round_type": "home_and_away", "canonical_round_number": 4 },
+        { "api_round_number": 4,  "api_abbreviation": "Rd 4",  "api_name": "Round 4",  "round_type": "home_and_away", "canonical_round_number": 5 },
+        { "api_round_number": 5,  "api_abbreviation": "Rd 5",  "api_name": "Round 5",  "round_type": "home_and_away", "canonical_round_number": 6 },
+        { "api_round_number": 6,  "api_abbreviation": "Rd 6",  "api_name": "Round 6",  "round_type": "home_and_away", "canonical_round_number": 7 },
+        { "api_round_number": 7,  "api_abbreviation": "Rd 7",  "api_name": "Round 7",  "round_type": "home_and_away", "canonical_round_number": 8 },
+        { "api_round_number": 8,  "api_abbreviation": "Rd 8",  "api_name": "Round 8",  "round_type": "home_and_away", "canonical_round_number": 9 },
+        { "api_round_number": 9,  "api_abbreviation": "Rd 9",  "api_name": "Round 9",  "round_type": "home_and_away", "canonical_round_number": 10 },
+        { "api_round_number": 10, "api_abbreviation": "Rd 10", "api_name": "Round 10", "round_type": "home_and_away", "canonical_round_number": 11 },
+        { "api_round_number": 11, "api_abbreviation": "Rd 11", "api_name": "Round 11", "round_type": "home_and_away", "canonical_round_number": 12 },
+        { "api_round_number": 12, "api_abbreviation": "Rd 12", "api_name": "Round 12", "round_type": "home_and_away", "canonical_round_number": 13 },
+        { "api_round_number": 13, "api_abbreviation": "Rd 13", "api_name": "Round 13", "round_type": "home_and_away", "canonical_round_number": 14 },
+        { "api_round_number": 14, "api_abbreviation": "Rd 14", "api_name": "Round 14", "round_type": "home_and_away", "canonical_round_number": 15 },
+        { "api_round_number": 15, "api_abbreviation": "Rd 15", "api_name": "Round 15", "round_type": "home_and_away", "canonical_round_number": 16 },
+        { "api_round_number": 16, "api_abbreviation": "Rd 16", "api_name": "Round 16", "round_type": "home_and_away", "canonical_round_number": 17 },
+        { "api_round_number": 17, "api_abbreviation": "Rd 17", "api_name": "Round 17", "round_type": "home_and_away", "canonical_round_number": 18 },
+        { "api_round_number": 18, "api_abbreviation": "Rd 18", "api_name": "Round 18", "round_type": "home_and_away", "canonical_round_number": 19 },
+        { "api_round_number": 19, "api_abbreviation": "Rd 19", "api_name": "Round 19", "round_type": "home_and_away", "canonical_round_number": 20 },
+        { "api_round_number": 20, "api_abbreviation": "Rd 20", "api_name": "Round 20", "round_type": "home_and_away", "canonical_round_number": 21 },
+        { "api_round_number": 21, "api_abbreviation": "Rd 21", "api_name": "Round 21", "round_type": "home_and_away", "canonical_round_number": 22 },
+        { "api_round_number": 22, "api_abbreviation": "Rd 22", "api_name": "Round 22", "round_type": "home_and_away", "canonical_round_number": 23 },
+        { "api_round_number": 23, "api_abbreviation": "Rd 23", "api_name": "Round 23", "round_type": "home_and_away", "canonical_round_number": 24 },
+        { "api_round_number": 24, "api_abbreviation": "Rd 24", "api_name": "Round 24", "round_type": "home_and_away", "canonical_round_number": 25 },
+        { "api_round_number": 25, "api_abbreviation": "WF", "api_name": "Wildcard Finals", "round_type": "wildcard_final" },
+        { "api_round_number": 26, "api_abbreviation": "QE", "api_name": "Qualifying & Elimination Finals", "round_type": "mixed_finals",
+          "finals_label_rules": [
+            { "contains": "Qualifying",  "round_type": "qualifying_final" },
+            { "contains": "Elimination", "round_type": "elimination_final" }
+          ] },
+        { "api_round_number": 27, "api_abbreviation": "SF", "api_name": "Semi Finals",        "round_type": "semi_final" },
+        { "api_round_number": 28, "api_abbreviation": "PF", "api_name": "Preliminary Finals",  "round_type": "preliminary_final" },
+        { "api_round_number": 29, "api_abbreviation": "GF", "api_name": "Grand Final",         "round_type": "grand_final" }
       ]
     }
   },
+  "co_source_groups": [
+    ["afltables", "afl_api"]
+  ],
   "families": [
     {
       "source_key": "squiggle_api",
@@ -432,6 +631,297 @@
         "BINDING: weightInKg = 0 is systematic zero-as-missing across every row and maps to NULL. Promoting it as a fact would write 0 kg for every player.",
         "This source does NOT displace AFL Tables `url` as primary player identity. providerId is a SECONDARY external_identities row and routes through the AFLDB-ISSUE-092 population-drop gate. A new player remains a human decision.",
         "promotion_policy stays 'not_yet_declared': the roster family has no successor issue and the afl_api source has no sources row, so no promotion may occur. The registry validator enforces both."
+      ]
+    },
+    {
+      "source_key": "afl_api",
+      "family": "match",
+      "endpoint": "AFL API v2 season matches feed, selected record (GET aflapi.afl.com.au/afl/v2/matches?competitionId=1&compSeasonId=<id>, §2.1). No separate per-match fixture endpoint exists; S2's acquire tool selects the record by providerId and writes it as fixture.json.",
+      "status": "declared",
+      "external_key": ["providerId"],
+      "required_columns": [
+        "providerId", "compSeason.providerId", "round.roundNumber", "round.abbreviation", "round.name",
+        "home.team.providerId", "home.score.goals", "home.score.behinds", "home.score.totalScore",
+        "away.team.providerId", "away.score.goals", "away.score.behinds", "away.score.totalScore",
+        "venue.providerId", "venue.name", "utcStartTime", "status"
+      ],
+      "known_columns": [
+        "id", "providerId",
+        "compSeason.id", "compSeason.providerId", "compSeason.name", "compSeason.shortName", "compSeason.currentRoundNumber",
+        "round.id", "round.providerId", "round.abbreviation", "round.name", "round.roundNumber",
+        "round.utcStartTime", "round.utcEndTime",
+        "round.byes.id", "round.byes.providerId", "round.byes.name", "round.byes.abbreviation", "round.byes.nickname",
+        "round.byes.club.id", "round.byes.club.providerId", "round.byes.club.name", "round.byes.club.abbreviation",
+        "round.byes.club.nickname", "round.byes.teamType",
+        "home.team.id", "home.team.providerId", "home.team.name", "home.team.abbreviation", "home.team.nickname",
+        "home.team.club.id", "home.team.club.providerId", "home.team.club.name", "home.team.club.abbreviation",
+        "home.team.club.nickname", "home.team.teamType",
+        "home.score.goals", "home.score.behinds", "home.score.totalScore", "home.score.superGoals",
+        "away.team.id", "away.team.providerId", "away.team.name", "away.team.abbreviation", "away.team.nickname",
+        "away.team.club.id", "away.team.club.providerId", "away.team.club.name", "away.team.club.abbreviation",
+        "away.team.club.nickname", "away.team.teamType",
+        "away.score.goals", "away.score.behinds", "away.score.totalScore", "away.score.superGoals",
+        "venue.id", "venue.providerId", "venue.name", "venue.abbreviation", "venue.location", "venue.state",
+        "venue.timezone", "venue.landOwner",
+        "utcStartTime", "status", "metadata.ticket_link", "metadata.finals_match_label", "metadata.k2k_link",
+        "metadata.prematch_label", "metadata.sold_out"
+      ],
+      "known_columns_status": "complete",
+      "hash_exclusions": [],
+      "source_updated_at_field": null,
+      "zero_is_missing_columns": [],
+      "round_vocabulary": "afl_api_2026",
+      "independence": {
+        "derives_from": null,
+        "group": "afl_api",
+        "evidence": "proven_independent"
+      },
+      "promotion_policy": "reviewed",
+      "promotion_owner": "AFLDB-ISSUE-228",
+      "evidence": [
+        "AFLDB-ISSUE-228 S6 (2026-09-20): promoted from 'not_yet_declared' to 'reviewed' now that the settle successor (settle-afl-api.ts) has landed and the 'afl_api' sources row (migration 077, description amended by 103) exists -- the two preconditions the registry validator enforces before 'reviewed' may be declared.",
+        "AFLDB-ISSUE-228 S3 (2026-09-19): cross-sample key-set comparison of `01-fixture-result.json` for 2022-07-23 R19 SYD v ADEL (CD_M20220141907) against 2026-09-19 PF HAW v BL (CD_M20260142801) found an IDENTICAL leaf-column set at every level (id, providerId, compSeason.*, round.*, home.*, away.*, venue.*, utcStartTime, status, metadata.ticket_link) except `metadata.finals_match_label`, which is present ONLY on the finals sample -- consistent with §6.4's note that 2026 is the first season publishing it on every finals match.",
+        "AFLDB-ISSUE-228 S3 backtest (2026-09-19, corrected pass): the initial two-sample comparison above was INSUFFICIENT. Running `buildAflApiMatchBundle()` against the FULL 14-match tracked corpus (2022-2026, `data/sources/AFLWebsite/AFLGamesSamples`) surfaced two more leaf shapes the two-sample check missed: (a) `round.byes[]` is empty on most samples but POPULATED (a full team-object array: `id`, `providerId`, `name`, `abbreviation`, `nickname`, `club.{id,providerId,name,abbreviation,nickname}`, `teamType`) on 2022-06-16 R14 RICH v CARL (CD_M20220141404), a bye round -- the two original samples both happened to carry zero byes, which is exactly the failure mode of a two-sample comparison the corpus-wide measurement corrects; (b) `metadata.k2k_link` (a 'kick to kick' promo URL string, sibling of `metadata.ticket_link`) is present on 2024-08-04 R21 GWS v HAW (CD_M20240142104) and 2025-05-10 R9 GCFC v WB (CD_M20250140905) but absent from the other 12 samples. Both are now declared in known_columns as a measured, stable UNION with optional fields (never every sample populates every column); no other undeclared column appeared anywhere in the 14-sample corpus, so known_columns_status stays 'complete' on this wider evidence base rather than being downgraded.",
+        "`emitAflApiMatch()` (`src/lib/acquisition/afl-api-bundle.ts`) resolves `home.team.providerId`/`away.team.providerId` through `afl-api-identities.json.teams` (BINDING, all 18 current teams mapped) and `venue.providerId` through `afl-api-identities.json.venues` (INCOMPLETE by evidence, §5.3 -- an unmapped venue is a warning, `venueLegacyName: null`, never a HALT).",
+        "Round translation is delegated entirely to `translateAflRound()` (`afl-api-rounds.ts`, S1); this family declares no round-offset logic of its own, satisfying §19.7's single-call-site requirement.",
+        "AFLDB-ISSUE-228 S7 follow-up (2026-09-20, fixtures-only acquisition of the full real 216-fixture 2025 season feed via the simulator): 11/216 records carry `metadata.prematch_label` (a human-readable string; measured values 'Rescheduled Match' on two ordinary home-and-away rounds (R3, R24), an empty string on one (R17), and finals labels 'Nth Qualifying/Elimination Final', 'Semi Final N', 'Preliminary Final N' on the 9 finals) and 2/216 also carry `metadata.sold_out` (measured value the STRING `'true'`, never a JSON boolean, on both 2025 semi-finals) -- both were previously undeclared and correctly refused every one of those 11 records at the drift gate. Both are now declared in `known_columns` as measured, optional, sibling fields of `metadata.ticket_link`/`metadata.k2k_link`, exactly the same UNION-with-optional-fields precedent those two already established; neither is added to `required_columns`, neither is read or projected by `emitAflApiMatch()`, and adding a `known_columns` entry does not touch `hash_exclusions` or `hashPayload()` (`observations.ts`), so it has zero effect on the semantic hash of any already-persisted observation -- confirmed by inspection: `canonicalisePayload()` reads only `contract.hashExclusions`, never `knownColumns`."
+      ],
+      "notes": [
+        "TWO canonical targets from one observation, matching `afltables.match`'s pattern: `matches` (this family, §11.1) and -- via the SEPARATE `match_roster` family's `periodScores` selection, not this one -- `match_period_scores` (§11.2). This family alone never writes period scores.",
+        "`home_club_id`/`away_club_id` are NOT produced by this DB-free stage: the projection carries `homeClubHist`/`awayClubHist` (the resolved historical identity STRING from `afl-api-identities.json`, e.g. 'Hawthorn'), exactly as `afltables.match`'s `home_team_raw`/`away_team_raw` carry a raw string rather than a numeric id. Real `club_id` resolution is a settle-stage (S6) concern with database access.",
+        "`venue_id` is likewise never a numeric id here; `venueLegacyName` is the resolved AFL Tables spelling where `afl-api-identities.json.venues` covers it (2 of ~17+ observed venues as of S1), `null` otherwise. Completing the venue map remains the one read-only query §5.3 already documents; it is not this stage's blocker.",
+        "`match_date`/`match_time` are DELIBERATELY NOT projected by this family. §11.1 sources them from the roster endpoint's local `venueLocalStartTime` cross-checked against this family's `utcStartTime`; this family exposes only the raw `utcStartTime` it actually carries, and the cross-check/local-time derivation is a `match_roster`-plus-`match` bundling concern (`buildAflApiMatchBundle`), never guessed from `utcStartTime` alone here.",
+        "`attendance`/`attendance_status`/`attendance_source_id` are NOT SOURCED from this family (§11.1: optional enrichment, a different field-group entirely, §7.5 Q2). Nothing here ever proposes an attendance value.",
+        "corroboration_policy is left at the default (`blocking`, undeclared). This is NOT in tension with `co_source_groups: [['afltables','afl_api']]` (Q1): `areCoSources()` already exempts co-source disagreement between afltables and afl_api from any veto at the reconciliation layer, independently of this per-family flag, which only governs a DIFFERENT (non-co-source) disagreeing group.",
+        "promotion_policy is now 'reviewed' (AFLDB-ISSUE-228 S6): the settle successor has landed and `afl_api` carries a `sources` registration row (migration 077)."
+      ]
+    },
+    {
+      "source_key": "afl_api",
+      "family": "match_roster",
+      "endpoint": "GET api.afl.com.au/cfs/afl/matchRoster/full/<CD_M> (CFS, WMCTok-gated, §2.3/§7.1 step 3).",
+      "status": "declared",
+      "external_key": ["matchId"],
+      "required_columns": [
+        "matchId", "status", "competitionId", "roundNumber",
+        "homeTeam.teamId", "homeTeam.positions.position", "homeTeam.positions.player.playerId",
+        "awayTeam.teamId", "awayTeam.positions.position", "awayTeam.positions.player.playerId"
+      ],
+      "known_columns": [
+        "matchId", "status", "competitionId", "roundNumber",
+        "match.venueLocalStartTime",
+        "weather.description", "weather.tempInCelsius", "weather.weatherType",
+        "umpires.umpireName.givenName", "umpires.umpireName.surname", "umpires.umpireId",
+        "umpires.umpireType", "umpires.umpireNumber",
+        "homeTeam.teamId",
+        "homeTeam.positions.position", "homeTeam.positions.player.playerId",
+        "homeTeam.positions.player.playerName.givenName", "homeTeam.positions.player.playerName.surname",
+        "homeTeam.positions.player.captain", "homeTeam.positions.player.playerJumperNumber",
+        "awayTeam.teamId",
+        "awayTeam.positions.position", "awayTeam.positions.player.playerId",
+        "awayTeam.positions.player.playerName.givenName", "awayTeam.positions.player.playerName.surname",
+        "awayTeam.positions.player.captain", "awayTeam.positions.player.playerJumperNumber",
+        "periodScores.matchId", "periodScores.status",
+        "periodScores.homeTeamScore.matchScore.totalScore", "periodScores.homeTeamScore.matchScore.goals",
+        "periodScores.homeTeamScore.matchScore.behinds", "periodScores.homeTeamScore.matchScore.superGoals",
+        "periodScores.homeTeamScore.periodScore.periodNumber",
+        "periodScores.homeTeamScore.periodScore.score.totalScore", "periodScores.homeTeamScore.periodScore.score.goals",
+        "periodScores.homeTeamScore.periodScore.score.behinds", "periodScores.homeTeamScore.periodScore.score.superGoals",
+        "periodScores.homeTeamScore.rushedBehinds", "periodScores.homeTeamScore.minutesInFront",
+        "periodScores.awayTeamScore.matchScore.totalScore", "periodScores.awayTeamScore.matchScore.goals",
+        "periodScores.awayTeamScore.matchScore.behinds", "periodScores.awayTeamScore.matchScore.superGoals",
+        "periodScores.awayTeamScore.periodScore.periodNumber",
+        "periodScores.awayTeamScore.periodScore.score.totalScore", "periodScores.awayTeamScore.periodScore.score.goals",
+        "periodScores.awayTeamScore.periodScore.score.behinds", "periodScores.awayTeamScore.periodScore.score.superGoals",
+        "periodScores.awayTeamScore.rushedBehinds", "periodScores.awayTeamScore.minutesInFront"
+      ],
+      "known_columns_status": "incomplete",
+      "hash_exclusions": [],
+      "source_updated_at_field": null,
+      "zero_is_missing_columns": [],
+      "round_vocabulary": null,
+      "independence": {
+        "derives_from": null,
+        "group": "afl_api",
+        "evidence": "proven_independent"
+      },
+      "promotion_policy": "reviewed",
+      "promotion_owner": "AFLDB-ISSUE-228",
+      "evidence": [
+        "AFLDB-ISSUE-228 S6 (2026-09-20): promoted from 'not_yet_declared' to 'reviewed' alongside `match`/`player_match_stats' -- this family's ONLY promotable target is `match_period_scores`, via its selected `periodScores` entry (§11.2); the roster/position data itself is never written to any canonical target (§11.5).",
+        "AFLDB-ISSUE-228 S3 (2026-09-19): `03-match-roster.raw.json` is measurably a LARGER 'match centre' response than its name suggests. Its root carries (at least) FOUR sibling sections: `match` (a second, differently-shaped fixture summary), `matchRoster` (weather/umpires/team rosters/positions -- what this family actually projects), `recentMatchScores[]` (a head-to-head widget of OTHER matches between the two teams, whose FIRST entry is measured to be this match's own quarter-by-quarter score, selected by `matchId` equality -- never assumed to be entry 0 by position) and at least one further un-catalogued widget (`homeResult`/`awayResult`/`scoreBreakdown` shape) plus a `teamPlayers` squad list. Only `matchRoster` and the ONE matching `recentMatchScores[]` entry are declared/projected; the rest is measured to exist but deliberately out of scope for S3.",
+        "`homeTeam`/`awayTeam` also carry `ins`, `outs`, `milestones[]` and `clubDebuts` keys. Every sample checked in S3 shows these EMPTY for the matches sampled, so their POPULATED leaf shape is unmeasured; `known_columns_status` stays 'incomplete' for exactly this reason and `emitAflApiMatchRoster()` excludes them from the hashed observation rather than guess a shape.",
+        "Cumulative-conversion evidence: the raw `periodScore[]` entries are PER-PERIOD deltas, not running totals -- 2026-09-19 CD_M20260142801 home: 31+36+10+45 = 122, exactly `matchScore.totalScore`. `toCumulative()` derives the running total AFLDB's canonical `period_scores` convention expects (matching `afltables.match`'s own T3-proven cumulative-to-date shape); this is a DERIVED field, never read off the payload."
+      ],
+      "notes": [
+        "ONE observation feeds ONE canonical target in v1: `match_period_scores` (§11.2), via the selected `periodScores` entry only. The roster/position data itself is retained as raw observation and is NOT currently written to any canonical target (§11.5) -- a possible successor family, not an ISSUE-228 write path.",
+        "`periodScores` is ABSENT (the whole sub-object, not merely null fields) whenever the requested match's own id is not found in `recentMatchScores[]`. This must never be treated as a malformed payload; `AflApiMatchRosterProjection.periodScores` is `null` in that case and the §9 assertion-4 cross-check is reported as skipped, never a silent pass.",
+        "`known_columns_status: 'incomplete'` is a DELIBERATE, STANDING declaration, not a placeholder awaiting a routine top-up: it stays incomplete until a sample with a populated `ins`/`outs`/`milestones`/`clubDebuts` is measured and those leaf shapes are added. Until then any real payload carrying a populated late-change or milestone is EXPECTED to throw `unexpected column` -- correct fail-closed behaviour, never to be silenced by widening the scope of the hashed observation without measurement.",
+        "round_vocabulary is null: this family carries `roundNumber` as a plain integer for cross-checking against the `match` family's own (already-translated) round, but never performs its own round translation -- `afl-api-rounds.ts` remains the single call site (§19.7).",
+        "promotion_policy is now 'reviewed' (AFLDB-ISSUE-228 S6)."
+      ]
+    },
+    {
+      "source_key": "afl_api",
+      "family": "player_match_stats",
+      "endpoint": "GET api.afl.com.au/cfs/afl/playerStats/match/<CD_M> (CFS, WMCTok-gated, §2.2/§7.1 step 3).",
+      "status": "declared",
+      "external_key": ["teamId", "playerStats.player.playerId"],
+      "required_columns": ["teamId", "playerStats.player.playerId"],
+      "known_columns": [
+        "teamId",
+        "playerStats.player.playerId", "playerStats.player.playerName.givenName", "playerStats.player.playerName.surname",
+        "playerStats.player.captain", "playerStats.player.playerJumperNumber", "playerStats.teamId",
+        "playerStats.gamesPlayed", "playerStats.timeOnGroundPercentage", "playerStats.lastUpdated",
+        "player.player.position", "player.player.player.playerId", "player.player.player.playerName.givenName",
+        "player.player.player.playerName.surname", "player.player.player.captain",
+        "player.player.player.playerJumperNumber", "player.jumperNumber", "player.photoURL",
+        "playerStats.stats.goals", "playerStats.stats.behinds", "playerStats.stats.superGoals",
+        "playerStats.stats.kicks", "playerStats.stats.handballs", "playerStats.stats.disposals",
+        "playerStats.stats.marks", "playerStats.stats.bounces", "playerStats.stats.tackles",
+        "playerStats.stats.contestedPossessions", "playerStats.stats.uncontestedPossessions",
+        "playerStats.stats.totalPossessions", "playerStats.stats.inside50s", "playerStats.stats.marksInside50",
+        "playerStats.stats.contestedMarks", "playerStats.stats.hitouts", "playerStats.stats.onePercenters",
+        "playerStats.stats.disposalEfficiency", "playerStats.stats.clangers", "playerStats.stats.freesFor",
+        "playerStats.stats.freesAgainst", "playerStats.stats.dreamTeamPoints",
+        "playerStats.stats.clearances.centreClearances", "playerStats.stats.clearances.stoppageClearances",
+        "playerStats.stats.clearances.totalClearances",
+        "playerStats.stats.rebound50s", "playerStats.stats.goalAssists", "playerStats.stats.goalAccuracy",
+        "playerStats.stats.ratingPoints", "playerStats.stats.ranking", "playerStats.stats.lastUpdated",
+        "playerStats.stats.turnovers", "playerStats.stats.intercepts", "playerStats.stats.tacklesInside50",
+        "playerStats.stats.shotsAtGoal", "playerStats.stats.goalEfficiency", "playerStats.stats.shotEfficiency",
+        "playerStats.stats.interchangeCounts", "playerStats.stats.scoreInvolvements", "playerStats.stats.metresGained",
+        "playerStats.stats.extendedStats.effectiveKicks", "playerStats.stats.extendedStats.kickEfficiency",
+        "playerStats.stats.extendedStats.kickToHandballRatio", "playerStats.stats.extendedStats.effectiveDisposals",
+        "playerStats.stats.extendedStats.marksOnLead", "playerStats.stats.extendedStats.interceptMarks",
+        "playerStats.stats.extendedStats.contestedPossessionRate", "playerStats.stats.extendedStats.hitoutsToAdvantage",
+        "playerStats.stats.extendedStats.hitoutWinPercentage", "playerStats.stats.extendedStats.hitoutToAdvantageRate",
+        "playerStats.stats.extendedStats.groundBallGets", "playerStats.stats.extendedStats.f50GroundBallGets",
+        "playerStats.stats.extendedStats.scoreLaunches", "playerStats.stats.extendedStats.pressureActs",
+        "playerStats.stats.extendedStats.defHalfPressureActs", "playerStats.stats.extendedStats.spoils",
+        "playerStats.stats.extendedStats.ruckContests", "playerStats.stats.extendedStats.contestDefOneOnOnes",
+        "playerStats.stats.extendedStats.contestDefLosses", "playerStats.stats.extendedStats.contestDefLossPercentage",
+        "playerStats.stats.extendedStats.contestOffOneOnOnes", "playerStats.stats.extendedStats.contestOffWins",
+        "playerStats.stats.extendedStats.contestOffWinsPercentage", "playerStats.stats.extendedStats.centreBounceAttendances",
+        "playerStats.stats.extendedStats.kickins", "playerStats.stats.extendedStats.kickinsPlayon"
+      ],
+      "known_columns_status": "complete",
+      "hash_exclusions": [],
+      "source_updated_at_field": null,
+      "zero_is_missing_columns": [],
+      "round_vocabulary": null,
+      "independence": {
+        "derives_from": null,
+        "group": "afl_api",
+        "evidence": "proven_independent"
+      },
+      "promotion_policy": "reviewed",
+      "promotion_owner": "AFLDB-ISSUE-228",
+      "evidence": [
+        "AFLDB-ISSUE-228 S6 (2026-09-20): promoted from 'not_yet_declared' to 'reviewed'. Player identity resolves exclusively via `external_identities` (source_id=afl_api, the S5 bootstrap bridge, T1) -- never via the afltables profile-url link, and never by name.",
+        "AFLDB-ISSUE-228 S3 (2026-09-19): cross-sample key-set comparison of `02-player-stats.raw.json` for 2022-07-23 CD_M20220141907 against 2026-09-19 CD_M20260142801 found an IDENTICAL leaf-column set, `extendedStats`' 24 sub-fields included.",
+        "AFLDB-ISSUE-228 S3 backtest (2026-09-19, corrected pass): the 'duplicate JSON key' theory in an earlier draft of this evidence was WRONG. Structurally walking `entry` (both sides, both entries checked at the field-path level rather than eyeballed) across the FULL 14-match corpus (2022-2026, every entry of every sample, verified programmatically) shows player identity at TWO DIFFERENT PATHS, never a shadowed duplicate KEY at the same object: `entry.player.player` (`{position, player:{playerId, playerName:{givenName,surname}, captain, playerJumperNumber}}`, sibling to `entry.player.jumperNumber` and `entry.player.photoURL`) and, separately, `entry.playerStats.player` (the same four identity fields, flat, no `position`), sibling to `entry.playerStats.stats`, `entry.playerStats.teamId`, `entry.playerStats.gamesPlayed`, `entry.playerStats.timeOnGroundPercentage` and `entry.playerStats.lastUpdated`. `gamesPlayed`/`timeOnGroundPercentage`/`lastUpdated` therefore live under `playerStats`, never at the entry's own top level as an earlier draft declared. `emitAflApiPlayerMatchStats()` projects identity from the flat `playerStats.player.*` copy (never `position`-bearing), matching the original, still-correct intent that `position` is never sourced from this family.",
+        "This payload carries NO match-level identity field (`matchId`/`providerId` absent from every sample in full). `providerMatchId` on `AflApiPlayerMatchStatsProjection` is threaded from acquisition context (the `CD_M` used to fetch the endpoint), never read from the payload, and is therefore correctly absent from `external_key`/`known_columns` here -- the staging grain uniqueness (`provider_match_id`, `provider_player_id`, `match_key`) is a migration-103 concern (§12.2), not this registry contract's."
+      ],
+      "notes": [
+        "ONE observation, ONE canonical target in v1: `player_match_stats` (§11.3). `brownlow_votes` is explicitly NOT sourced from this family (that grain lives in `brownlow_match_votes`); `player_match_stats.brownlow_votes` stays NA from this source exactly as it does today.",
+        "`position` is NEVER sourced from this family (see the measured evidence above); it comes from `match_roster`'s `positions[].position` when needed by a future successor. `player.player.position` and the rest of the `player.player.player.*` copy are declared purely for schema-stability/hash purposes, matching `extendedStats.*`'s treatment below -- never read by the emitter.",
+        "`career_game_no` is NOT sourced: `playerStats.gamesPlayed` is measured `null` on every row of every corpus sample, matching §11.3's `not sourced -> NULL` row exactly.",
+        "zero_is_missing_columns is deliberately EMPTY: every statistic here is a genuine recorded value (0.0 is a real zero disposal count, not a sentinel), matching `afltables.player_match_stats`'s own reasoning.",
+        "`extendedStats.*` (Champion Data advanced metrics) are declared as known columns for schema-stability/hash purposes only; NONE of them map to a canonical `player_match_stats` column (§15 Q8: out of scope by the ISSUE-096 exclusion) and none is ever projected into `AflApiPlayerMatchStatsProjection`.",
+        "promotion_policy is now 'reviewed' (AFLDB-ISSUE-228 S6)."
+      ]
+    },
+    {
+      "source_key": "afl_api",
+      "family": "brownlow_match_votes",
+      "endpoint": "GET api.afl.com.au/cfs/afl/bfawards/season/<CD_S...> (CFS, WMCTok-gated, §10).",
+      "status": "declared",
+      "external_key": ["matchVotes.matchId"],
+      "required_columns": [
+        "matchVotes.matchId", "matchVotes.roundNumber",
+        "matchVotes.votes.player.playerId", "matchVotes.votes.team.teamId",
+        "matchVotes.votes.votes", "matchVotes.votes.eligible"
+      ],
+      "known_columns": [
+        "seasonId", "status",
+        "matchVotes.matchId", "matchVotes.roundNumber",
+        "matchVotes.votes.player.photoURL", "matchVotes.votes.player.givenName", "matchVotes.votes.player.surname",
+        "matchVotes.votes.player.playerId", "matchVotes.votes.player.jumper",
+        "matchVotes.votes.team.teamId", "matchVotes.votes.team.teamAbbr",
+        "matchVotes.votes.team.teamName", "matchVotes.votes.team.teamNickname",
+        "matchVotes.votes.votes", "matchVotes.votes.eligible"
+      ],
+      "known_columns_status": "complete",
+      "hash_exclusions": [],
+      "source_updated_at_field": null,
+      "zero_is_missing_columns": [],
+      "round_vocabulary": null,
+      "independence": {
+        "derives_from": null,
+        "group": "afl_api",
+        "evidence": "proven_independent"
+      },
+      "promotion_policy": "reviewed",
+      "promotion_owner": "AFLDB-ISSUE-228",
+      "evidence": [
+        "AFLDB-ISSUE-228 S3 (2026-09-19): cross-season key-set comparison of `01-brownlow-season.raw.json` for 2022 (CD_S2022014, 198 matchVoteRecords / 594 voteRows per `06-validation.json`) against 2025 (CD_S2025014, 207 / 621) found an IDENTICAL leaf-column set.",
+        "`06-validation.json` for both 2022 and 2025 reports `badVoteSetCount: 0`, `duplicateMatchIdCount: 0`, `duplicatePlayerWithinMatchCount: 0`, `unresolvedOfficialMatchIdCount: 0`, `leaderboardMismatchCount: 0` -- the ground truth `emitAflApiBrownlowMatchVotes()`'s own §10 validation (exactly 3 rows, votes {3,2,1}, sum 6, no duplicate player, no duplicate match) is checked against by the S3 backtest harness.",
+        "`voteRows = matchVoteRecords * 3` holds exactly in both seasons (198*3=594, 207*3=621), confirming the 'exactly one 3-row vote set per match' contract at the corpus level, not just per-sample.",
+        "AFLDB-ISSUE-228 S3 backtest (2026-09-19, corrected pass): the column paths above were declared with `team` nested under `player` (`matchVotes.votes.player.team.teamId`) in an earlier draft. Direct inspection of `01-brownlow-season.raw.json` for all four captured seasons (2022, 2023, 2024, 2025) shows `team` is a SIBLING of `player` inside each `votes[]` entry (`{player:{...}, team:{teamId,...}, votes, eligible}`), never nested -- consistent with this plan's own §2.5 payload notes. `emitAflApiBrownlowMatchVotes()` already read `vote.team` (sibling); only this registry's column declaration was wrong, and is corrected here to match the measured, consistently-observed shape rather than the earlier assumption."
+      ],
+      "notes": [
+        "ONE observation, ONE canonical target (eventual, S7): `brownlow_round_votes` via the S5 player bridge and `afl-api-rounds.ts` round translation (§10). round_vocabulary is null here because this family's `roundNumber` needs the SAME per-season table as `match`/`match_roster` (`afl_api_<year>`) but is translated by the caller via `translateAflRound()`, never a second call site (§19.7); declaring it here would invite a duplicate lookup path.",
+        "Finals are excluded naturally (no finals records observed in the feed) AND defensively at the settle layer (S6/S7): a vote record whose resolved match `is_final` refuses. This family's emitter does not itself check `is_final` -- it has no match identity beyond the provider id and round number to check it with.",
+        "A match's vote set is all-or-none (§10): `BrownlowVoteSetError` refuses the WHOLE match's 3 rows on any violation, never a partial write of the rows that happened to validate.",
+        "hash_exclusions is empty: this payload carries no fetch-date or response-noise field.",
+        "promotion_policy is now 'reviewed' (AFLDB-ISSUE-228 S7, 2026-09-20): `settle-afl-api-brownlow.ts` (`src/lib/acquisition/afl-api-brownlow.ts`) implements the settle-and-apply path against `brownlow_round_votes`, atomic at the match-vote-set grain (§10), independently enable/disableable (`AFLDB_AFL_API_BROWNLOW_ENABLED`, default off) and with an `--observe-only` mode. UNEXECUTED — no test, tsc or database command has been run by the assistant (CLAUDE.md §9); pending operator validation against the local Brownlow simulator and then `afldb_test`."
+      ]
+    },
+    {
+      "source_key": "afl_api",
+      "family": "brownlow_leaderboard",
+      "endpoint": "GET api.afl.com.au/cfs/afl/bfawards/leaderboard/season/<CD_S...> (CFS, WMCTok-gated, §10).",
+      "status": "declared",
+      "external_key": ["leaderboard.player.playerId"],
+      "required_columns": [
+        "leaderboard.player.playerId", "leaderboard.team.teamId",
+        "leaderboard.totalVotes", "leaderboard.eligible",
+        "leaderboard.roundByRoundVotes.matchId", "leaderboard.roundByRoundVotes.roundNumber",
+        "leaderboard.roundByRoundVotes.votes"
+      ],
+      "known_columns": [
+        "seasonId", "status", "teamFilter",
+        "leaderboard.player.photoURL", "leaderboard.player.givenName", "leaderboard.player.surname",
+        "leaderboard.player.playerId", "leaderboard.player.jumper",
+        "leaderboard.team.teamId", "leaderboard.team.teamAbbr",
+        "leaderboard.team.teamName", "leaderboard.team.teamNickname",
+        "leaderboard.totalVotes", "leaderboard.eligible", "leaderboard.winner", "leaderboard.leader",
+        "leaderboard.roundByRoundVotes.matchId", "leaderboard.roundByRoundVotes.roundNumber",
+        "leaderboard.roundByRoundVotes.votes",
+        "leaderboard.roundByRoundTotalVotes.roundNumber", "leaderboard.roundByRoundTotalVotes.votes"
+      ],
+      "known_columns_status": "complete",
+      "hash_exclusions": [],
+      "source_updated_at_field": null,
+      "zero_is_missing_columns": [],
+      "round_vocabulary": null,
+      "independence": {
+        "derives_from": null,
+        "group": "afl_api",
+        "evidence": "proven_independent"
+      },
+      "promotion_policy": "not_yet_declared",
+      "promotion_owner": null,
+      "evidence": [
+        "AFLDB-ISSUE-228 S3 (2026-09-19): cross-season key-set comparison of `02-brownlow-leaderboard.raw.json` for 2022 (207 leaderboardPlayers per `06-validation.json`) against 2025 (188) found an IDENTICAL leaf-column set, `leaderboard.winner` and `leaderboard.leader` both present as separate booleans on every entry in both seasons.",
+        "`reconcileBrownlowLeaderboard()` (`afl-api-bundle.ts`) reproduces each player's `votes` total from `brownlow_match_votes`' own vote rows and compares it to this family's `leaderboard.totalVotes`; both 2022 and 2025 `06-validation.json` report `leaderboardMismatchCount: 0`, which the S3 backtest cross-checks by independently re-deriving the totals rather than trusting the source's own validation file alone.",
+        "AFLDB-ISSUE-228 S3 backtest (2026-09-19, corrected pass): two corrections to the original two-sample declaration above, found by direct inspection of `02-brownlow-leaderboard.raw.json` across all four captured seasons (2022-2025), all four agreeing: (a) `team` is a SIBLING of `player` in each `leaderboard[]` entry, never nested under it -- the same correction as `brownlow_match_votes`; (b) the entry's season vote total is keyed `totalVotes`, never a bare `votes` -- an entry also carries a `roundByRoundTotalVotes[]` array (`{roundNumber, votes}`, a per-round rollup distinct from `roundByRoundVotes[]`'s per-match rows), which was entirely undeclared and is added here as a known-but-unprojected column, matching how `extendedStats.*` is treated in `player_match_stats`."
+      ],
+      "notes": [
+        "NOT an automatic canonical target in v1 (§10): `brownlow_season_votes`' loader refuses `in_progress` seasons. ISSUE-228 delivers only the artefact builder (S7); loading it is a rollover step for ISSUE-101/F. This family exists in v1 purely for the reconciliation check above and future artefact rendering.",
+        "`leaderboard.leader` is declared as a known column (measured present, boolean) but is not read by `emitAflApiBrownlowLeaderboard()`'s reconciliation logic and has no current canonical mapping -- carried for schema-stability purposes, matching how `player.captain` is declared but unused in `afl_api.lineup`.",
+        "promotion_policy stays 'not_yet_declared' for the same reason as `brownlow_match_votes`."
       ]
     }
   ]

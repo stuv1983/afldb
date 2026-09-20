@@ -50,9 +50,12 @@ import {
   carryMatchOverrides, findRetiredMatchIdentities,
   type MatchRekeyIdentity, type MatchRekeyScope,
 } from './match-rekey';
-import { canonicalJson, ObservationContractError, type JsonValue } from './observations';
+import {
+  canonicalJson, ObservationContractError, type JsonValue, type ManualAuthorityProvider,
+} from './observations';
 import { baselineCanonicalHash } from './promotion-review';
 import { diffFields, type IdentityResolution, type TargetOwnership } from './reconciliation';
+import { areCoSources, type SourceFamilyRegistry } from './source-families';
 
 type Tx = postgres.TransactionSql;
 
@@ -639,10 +642,30 @@ function jsonbOf(sp: Tx, value: JsonValue): postgres.Parameter<unknown> {
  * The four canonical writers (§7.1)
  * ------------------------------------------------------------------ */
 
-/** The provenance quartet every written canonical row carries (§7.1). */
+/** The provenance quartet every newly-INSERTed canonical row carries (§7.1). */
 function provenance(unit: CanonicalApplyUnitInput): Record<string, JsonValue> {
   return {
     source_id: unit.sourceId,
+    source_record_id: unit.externalRecordId,
+    import_batch_id: unit.batchId as unknown as JsonValue,
+  };
+}
+
+/**
+ * §19.1(e): no code path may set a row's `source_id` on an UPDATE — ownership
+ * is established once, at INSERT, and never changed as a side effect of a
+ * settle (§7.5 Q1: "an ownership transfer, if ever wanted, is an explicit
+ * operator-run script ... never a side effect of a settle"). E3 already
+ * refuses an UPDATE against a foreign-owned row, so the value written here
+ * would always equal the row's existing `source_id` — but this criterion is
+ * proven by a source scan of this file, not by runtime behaviour, so the
+ * column is omitted from every UPDATE's SET list outright rather than relied
+ * on to merely be a no-op. `source_record_id` and `import_batch_id` are
+ * unaffected: they carry the same-owner's latest provenance forward and
+ * `source_record_id` is load-bearing for provider-ID-first resolution.
+ */
+function provenanceForUpdate(unit: CanonicalApplyUnitInput): Record<string, JsonValue> {
+  return {
     source_record_id: unit.externalRecordId,
     import_batch_id: unit.batchId as unknown as JsonValue,
   };
@@ -679,7 +702,7 @@ async function writeMatch(
     `;
     return { rowsInserted: 1, rowsUpdated: 0, targetId: written.id };
   }
-  const patch = { ...plan.newValues, ...provenance(unit) };
+  const patch = { ...plan.newValues, ...provenanceForUpdate(unit) };
   await sp`
     UPDATE matches SET ${sp(patch as never)}, imported_at = now()
      WHERE id = ${plan.targetId as number}
@@ -727,7 +750,7 @@ async function writePeriodScores(
       )
       ON CONFLICT (match_id, club_id, period) DO UPDATE SET
         goals = EXCLUDED.goals, behinds = EXCLUDED.behinds, points = EXCLUDED.points,
-        source_id = EXCLUDED.source_id, source_record_id = EXCLUDED.source_record_id,
+        source_record_id = EXCLUDED.source_record_id,
         import_batch_id = EXCLUDED.import_batch_id, imported_at = now()
       RETURNING (xmax = 0) AS inserted
     `;
@@ -763,7 +786,7 @@ async function writePlayerMatchStats(
   // but NOT `imported_at` — migration 001's quartet helper was never applied
   // to it, unlike the other three targets. Found by the S6 identical-rerun
   // proof, which was the first thing to reach this branch.
-  const patch = { ...plan.newValues, ...provenance(unit) };
+  const patch = { ...plan.newValues, ...provenanceForUpdate(unit) };
   await sp`
     UPDATE player_match_stats SET ${sp(patch as never)}
      WHERE id = ${plan.targetId as number}
@@ -803,7 +826,7 @@ async function writeBrownlowRoundVotes(
     await sp`INSERT INTO brownlow_round_votes ${sp(row as never)}`;
     return { rowsInserted: 1, rowsUpdated: 0 };
   }
-  const patch = { ...plan.newValues, ...provenance(unit) };
+  const patch = { ...plan.newValues, ...provenanceForUpdate(unit) };
   await sp`
     UPDATE brownlow_round_votes SET ${sp(patch as never)}, imported_at = now()
      WHERE id = ${plan.targetId as number}
@@ -1121,3 +1144,216 @@ export async function applyCanonicalUnit(
     results, failure: null, insertedMatchId, rekeyedMatch, fixtureBlocked, overridesCarried,
   };
 }
+
+/* ------------------------------------------------------------------ *
+ * AFLDB-ISSUE-228 §7.5 (Q2) — the one co-source field-group exception:
+ * attendance enrichment.
+ * ------------------------------------------------------------------ */
+
+/**
+ * The declared field-group exception, and NOTHING else (§19.2g): a
+ * DB-free test asserts this object equals exactly `{ matches: { attendance:
+ * [...] } }`.
+ */
+export const CO_SOURCE_ENRICHMENT: Readonly<Record<string, Readonly<Record<string, readonly string[]>>>> = {
+  matches: { attendance: ['attendance', 'attendance_status', 'attendance_source_id'] },
+};
+
+export type AttendanceEnrichmentRefusal =
+  | 'no_canonical_match'
+  | 'not_co_source_owner'
+  | 'already_sourced'
+  | 'manual_authority_conflict'
+  | 'manual_authority_indeterminate'
+  | 'invalid_attendance'
+  | 'nothing_to_write';
+
+export type AttendanceEnrichmentInput = {
+  /** The row's natural key. Enrichment never inserts (§7.5 condition 1). */
+  matchKey: string;
+  /** The source SUPPLYING the attendance figure — today, always `afltables`. */
+  enrichingSourceId: number;
+  enrichingSourceKey: string;
+  batchId: ImportBatchId;
+  /**
+   * The enriching source's OWN current spine version for this match (its
+   * `afltables.match` observation, e.g.) — `canonical_applications`'s FK
+   * requires a real `staging.source_record_versions` row to exist for
+   * `(enrichingSourceId, 'match', matchKey, sourceVersionSeq)`.
+   */
+  sourceVersionSeq: number;
+  /** `data/reference/source-families.json`'s `co_source_groups`, verbatim. */
+  coSourceGroups: SourceFamilyRegistry['coSourceGroups'];
+  /** An integer >= 0, from the enriching source's own typed projection. */
+  attendance: number;
+  /**
+   * The enriching source's OWN `sources.id`, required non-null when
+   * `attendance === 0` (the 020 zero-crowd citation rule, §7.5 condition 5).
+   * `null` otherwise refuses (`invalid_attendance`); a non-zero attendance
+   * never reads this field.
+   */
+  attendanceSourceIdForZero: number | null;
+};
+
+export type AttendanceEnrichmentResult =
+  | { applied: true }
+  | { applied: false; refusal: AttendanceEnrichmentRefusal };
+
+async function ownerSourceKeyOf(sp: Tx, sourceId: number): Promise<string | null> {
+  const [row] = await sp<{ key: string }[]>`SELECT key FROM sources WHERE id = ${sourceId}`;
+  return row?.key ?? null;
+}
+
+/**
+ * The one field-group exception (§7.5, Q2): a declared co-source may enrich
+ * the `attendance` field group on a row it does NOT own, and ONLY that group.
+ *
+ * Every one of the seven numbered conditions is re-evaluated here, inside its
+ * own savepoint, against state re-read there — never carried in from an
+ * earlier pass, exactly as `applyCanonicalUnit()`'s own gates are. This is a
+ * SEPARATE writer, not a relaxation of `autoApplyOwnership()`'s E3 gate: E3
+ * itself is untouched (§19.1d), and this function is reachable only for the
+ * one declared field group, never for any other target or field.
+ *
+ * `matches.source_id` (row ownership) is NEVER written here — only
+ * `attendance`, `attendance_status` and `attendance_source_id` ever appear in
+ * the UPDATE's SET list, satisfying §19.1(e) even for this path.
+ */
+export async function applyAttendanceEnrichment(
+  tx: Tx, input: AttendanceEnrichmentInput,
+): Promise<AttendanceEnrichmentResult> {
+  // Condition 5 (validity), checked before any query: an integer >= 0, and a
+  // genuine zero crowd must cite its own source.
+  if (!Number.isInteger(input.attendance) || input.attendance < 0) {
+    return { applied: false, refusal: 'invalid_attendance' };
+  }
+  if (input.attendance === 0 && input.attendanceSourceIdForZero === null) {
+    return { applied: false, refusal: 'invalid_attendance' };
+  }
+
+  let refusal: AttendanceEnrichmentRefusal | null = null;
+  let applied = false;
+
+  await tx`SAVEPOINT afldb_attendance_enrichment`;
+  try {
+    await tx.savepoint(async (scope) => {
+      const sp = scope as Tx;
+
+      // Condition 1: the canonical row must already exist. Enrichment never
+      // inserts a match.
+      const [row] = await sp<{
+        id: number; season: number; sourceId: number | null; attendanceSourceId: number | null;
+      }[]>`
+        SELECT id::int AS id, season::int AS season,
+               source_id AS "sourceId", attendance_source_id AS "attendanceSourceId"
+          FROM matches WHERE match_key = ${input.matchKey}
+         FOR UPDATE
+      `;
+      if (!row) { refusal = 'no_canonical_match'; return; }
+
+      // Condition 2: the row's current owner must be a DIFFERENT, declared
+      // co-source of the enriching source. An unowned or indeterminate owner,
+      // the enriching source's own row (nothing to enrich), or a non-co-source
+      // foreign owner are all refused — this path adopts no row and widens no
+      // ownership boundary.
+      const ownerKey = row.sourceId === null ? null : await ownerSourceKeyOf(sp, row.sourceId);
+      if (
+        ownerKey === null
+        || ownerKey === input.enrichingSourceKey
+        || !areCoSourcesOf(input.coSourceGroups, ownerKey, input.enrichingSourceKey)
+      ) {
+        refusal = 'not_co_source_owner';
+        return;
+      }
+
+      // Condition 3: the field is unsourced. Because of the 020 CHECK this
+      // implies attendance IS NULL and attendance_status <> 'complete'. A
+      // value that already cites ANY source — afltables, manual_admin_edit or
+      // otherwise — is never touched automatically, whatever its value.
+      if (row.attendanceSourceId !== null) { refusal = 'already_sourced'; return; }
+
+      // Condition 4: no active manual/admin override for this field group,
+      // re-read inside the savepoint exactly as E4 is for the ordinary path.
+      const authority = await loadManualAuthority(sp, row.season);
+      const verdict = authority({
+        entity: 'matches',
+        targetKey: { match_key: input.matchKey },
+        fields: [...CO_SOURCE_ENRICHMENT.matches.attendance],
+      });
+      if (verdict !== 'clear') {
+        refusal = verdict === 'conflict' ? 'manual_authority_conflict' : 'manual_authority_indeterminate';
+        return;
+      }
+
+      // Nothing to write if, impossibly, the exact same value is already
+      // staged (attendance_source_id is NULL here by condition 3, so this can
+      // only ever be reached if attendance itself is somehow already equal —
+      // kept as a defensive refusal, never a silent no-op write).
+      const [current] = await sp<{ attendance: number | null }[]>`
+        SELECT attendance FROM matches WHERE id = ${row.id}
+      `;
+      if (current?.attendance === input.attendance) { refusal = 'nothing_to_write'; return; }
+
+      // Condition 6: only the attendance field group is written.
+      // Condition 7: through the ledger, exactly as every other canonical
+      // write is (target_table = 'matches', verb = 'update', new_values =
+      // exactly the three fields).
+      await sp`
+        UPDATE matches
+           SET attendance = ${input.attendance},
+               attendance_status = 'complete',
+               attendance_source_id = ${input.enrichingSourceId}
+         WHERE id = ${row.id}
+      `;
+      await sp`
+        INSERT INTO canonical_applications (
+          import_batch_id, source_id, family, external_record_id, source_version_seq,
+          target_table, target_key, verb, previous_values, new_values
+        ) VALUES (
+          ${input.batchId}, ${input.enrichingSourceId}, 'match', ${input.matchKey},
+          ${input.sourceVersionSeq},
+          'matches', ${jsonbOf(sp, { match_key: input.matchKey })}, 'update',
+          ${jsonbOf(sp, {
+    attendance: current?.attendance ?? null,
+    attendance_status: 'not_collected',
+    attendance_source_id: null,
+  })},
+          ${jsonbOf(sp, {
+    attendance: input.attendance,
+    attendance_status: 'complete',
+    attendance_source_id: input.enrichingSourceId,
+  })}
+        )
+      `;
+      applied = true;
+    });
+    await tx`RELEASE SAVEPOINT afldb_attendance_enrichment`;
+  } catch (error) {
+    await tx`ROLLBACK TO SAVEPOINT afldb_attendance_enrichment`;
+    await tx`RELEASE SAVEPOINT afldb_attendance_enrichment`;
+    throw error;
+  }
+
+  if (applied) { return { applied: true }; }
+  if (refusal === null) {
+    throw new Error(
+      'applyAttendanceEnrichment: savepoint completed without applying and without recording a refusal reason',
+    );
+  }
+  return { applied: false, refusal };
+}
+
+/** DB-free co-source test, decoupled from a full `SourceFamilyRegistry` so
+ * this module never needs to parse one just to check two keys. */
+function areCoSourcesOf(
+  groups: SourceFamilyRegistry['coSourceGroups'], a: string, b: string,
+): boolean {
+  if (a === b) return true;
+  return groups.some((group) => group.includes(a) && group.includes(b));
+}
+
+// Re-exported so a caller need not import `areCoSources` from
+// `source-families.ts` separately merely to decide whether this path is
+// reachable at all before building the enrichment input.
+export { areCoSources };
+export type { ManualAuthorityProvider };

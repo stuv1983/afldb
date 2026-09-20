@@ -48,6 +48,23 @@ export type SourceCompletenessReason = {
   detail: string;
 };
 
+/**
+ * AFLDB-ISSUE-228 §7.3 (T3) — evidence that never affects the verdict.
+ *
+ * A deferred record (a POSTGAME/pre-CONCLUDED match, or a CONCLUDED match
+ * whose roster/stat families have not yet concluded) is observed, valid and
+ * simply not yet promotable — the opposite of `unrepresentable_rows` /
+ * `rejected_records`, which are genuine drops. Reporting it as a `reason`
+ * would flip a healthy run to `incomplete`; it is informational only.
+ */
+export type SourceCompletenessInformationalCode = 'records_deferred';
+
+export type SourceCompletenessInformational = {
+  code: SourceCompletenessInformationalCode;
+  count: number;
+  detail: string;
+};
+
 export type SourceCompletenessVerdict = {
   status: SourceCompletenessStatus;
   /**
@@ -63,6 +80,8 @@ export type SourceCompletenessVerdict = {
   /** Records the bundle did carry — the denominator the counts above are read against. */
   enumeratedRecords: number;
   reasons: readonly SourceCompletenessReason[];
+  /** Evidence recorded for the operator that never changes `status` (§7.3, T3). */
+  informational: readonly SourceCompletenessInformational[];
   /** One line fit for a terminal, a journal or an admin panel. */
   headline: string;
 };
@@ -81,6 +100,13 @@ export type SourceCompletenessCounters = {
   snapshotRejections: number;
   snapshotUnkeyedRejections: number;
   absenceSweepSkipped: number;
+  /**
+   * AFLDB-ISSUE-228 §7.3 (T3). Records observed but DEFERRED — not yet
+   * CONCLUDED, so nothing was proposed for them. Optional so every existing
+   * caller (the AFL Tables settle, which has no deferral concept) satisfies
+   * this type with no edit; read as 0 when absent.
+   */
+  recordsDeferred?: number;
 };
 
 const UNKNOWN_HEADLINE =
@@ -108,6 +134,7 @@ export function assessSourceCompleteness(
         count: 0,
         detail: 'The run did not record a counter set, so its source coverage is unproven.',
       }],
+      informational: [],
       headline: UNKNOWN_HEADLINE,
     };
   }
@@ -115,8 +142,20 @@ export function assessSourceCompleteness(
   const unrepresentableRows = nonNegative(counters.snapshotUnkeyedRejections);
   const rejectedRecords = nonNegative(counters.snapshotRejections);
   const scopesNotSwept = nonNegative(counters.absenceSweepSkipped);
+  const recordsDeferred = nonNegative(counters.recordsDeferred ?? 0);
   const enumeratedRecords =
     nonNegative(counters.snapshotMatches) + nonNegative(counters.snapshotPlayerMatchRows);
+
+  const informational: SourceCompletenessInformational[] = [];
+  if (recordsDeferred > 0) {
+    informational.push({
+      code: 'records_deferred',
+      count: recordsDeferred,
+      detail:
+        `${recordsDeferred} match(es) observed but not yet concluded; nothing proposed for `
+        + 'them. This never affects the completeness verdict.',
+    });
+  }
 
   const reasons: SourceCompletenessReason[] = [];
   if (unrepresentableRows > 0) {
@@ -156,6 +195,7 @@ export function assessSourceCompleteness(
     scopesNotSwept,
     enumeratedRecords,
     reasons,
+    informational,
     headline: headlineFor(status, unrepresentableRows, rejectedRecords, scopesNotSwept,
       enumeratedRecords),
   };
@@ -201,6 +241,11 @@ export function renderSourceCompleteness(
   const lines = ['', `Source completeness: ${verdict.status.toUpperCase()}`, `  ${verdict.headline}`];
   for (const reason of verdict.reasons) {
     lines.push(`  - ${reason.code}: ${reason.detail}`);
+  }
+  // AFLDB-ISSUE-228 §7.3 (T3): informational, printed regardless of status,
+  // and never itself a reason the status could read as incomplete.
+  for (const info of verdict.informational) {
+    lines.push(`  (info) ${info.code}: ${info.detail}`);
   }
   if (verdict.status === 'incomplete') {
     lines.push(

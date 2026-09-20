@@ -1,0 +1,71 @@
+{
+  "artefact_kind": "afl_api_manual_adjudication",
+  "issue": "AFLDB-ISSUE-228",
+  "runbook_section": "Sec 9.10",
+  "source_key": "afl_api",
+  "match_method": "afl_api_manual_adjudication",
+  "season": 2024,
+  "decision_summary": "AFL API provider id CD_I1020668 is observed in the 2024 Brownlow source as 'Joshua Draper', Fremantle (CD_T60 / FRE). The historical S5b classifier correctly refuses this provider because the provider normalised tuple ('JOSHUA','DRAPER') does not exact-match the canonical roster tuple ('JOSH','DRAPER') -- 'Joshua' is a longer form of the canonical player's given name 'Josh', and neither the S5 stat-vector bootstrap nor the S5b name+team+season bootstrap performs nickname/short-form inference, deliberately, per Sec 6.3/S5b. This is a single, explicit, human-adjudicated identity decision, not a rule change to either bootstrap classifier and not a change to the general S5b name normaliser.",
+  "provider_identity": {
+    "external_id": "CD_I1020668",
+    "observed_given_name": "Joshua",
+    "observed_surname": "Draper",
+    "observed_team_provider_id": "CD_T60",
+    "observed_team_abbr": "FRE",
+    "observed_team_hist": "Fremantle",
+    "observed_team_source": "data/reference/afl-api-identities.json (CD_T60 -> Fremantle, raw_abbreviation FRE)"
+  },
+  "canonical_identity": {
+    "candidate_player_id": 7862,
+    "canonical_name": "Josh Draper",
+    "canonical_afltables_profile_url": "players/J/Josh_Draper.html"
+  },
+  "evidence": [
+    {
+      "source": "issues/closed/backtest-v1-baseline.json",
+      "location": "lines 4228-4244",
+      "content": "{ \"key\": \"award_nominations:164\", \"sourceType\": \"award_nominations\", \"rawName\": \"Josh Draper\", \"context\": \"Rising Star Award · 2024 · Round 20\", \"expectedPlayerId\": 7862, \"chosenPlayerId\": 7862, \"chosenName\": \"Josh Draper\", \"correct\": true, \"band\": \"very_high\" }",
+      "role": "Non-Brownlow repository corroboration only: the award-nominations backtest independently corroborates canonical player_id 7862 as Josh Draper. Does NOT establish the AFL API provider identity (CD_I1020668) -- corroborates only the canonical Josh Draper -> player_id 7862 side of this adjudication."
+    },
+    {
+      "source": "issues/closed/queue-v1-baseline.json",
+      "location": "lines 63044-63055",
+      "content": "{ \"target\": \"draft_picks#6320\", \"entity\": \"draft_person:2546\", \"sourceName\": \"Josh Draper\", \"context\": \"Draft · 2022 · Post-Draft\", \"band\": \"high\", \"score\": 79, \"suggested\": \"Josh Draper\", \"suggestedId\": 7862 }",
+      "role": "Non-Brownlow repository corroboration only: the draft-linking backtest suggestion queue independently corroborates canonical player_id 7862 as Josh Draper. Does NOT establish the AFL API provider identity (CD_I1020668) -- corroborates only the canonical Josh Draper -> player_id 7862 side of this adjudication."
+    },
+    {
+      "source": "data/reference/draftguru-person-bridge-20260918-v2.json",
+      "location": "lines 7172-7175",
+      "content": "{ \"afltables_external_id\": \"players/J/Josh_Draper.html\", \"player_url\": \"https://www.draftguru.com.au/players/josh_draper/1\" }",
+      "role": "Independently resolves players/J/Josh_Draper.html through the accepted ISSUE-222 DraftGuru person bridge."
+    },
+    {
+      "source": "docs/rebuild-manifests/draftguru/bridge-population-scan-20260918-v2.json",
+      "location": "lines 178139-178189",
+      "content": "{ \"draftguru\": { \"captured_identity\": \"players/J/Josh_Draper.html\", \"dob_candidates\": [\"08 Feb 2004\"], \"title_birth_year\": 2004 }, \"expected_afltables_identity\": \"players/J/Josh_Draper.html\", \"recommended_disposition\": \"retain_bridge\", \"retained_target\": { \"clubs\": [\"Fremantle\"], \"debut_date\": \"2024-03-23\", \"debut_season\": 2024 } }",
+      "role": "Independently supports the player/club/profile identity: players/J/Josh_Draper.html, Fremantle, born 2004-02-08, debut 2024-03-23, recommended_disposition retain_bridge."
+    },
+    {
+      "source": "AFL API 2024 Brownlow source",
+      "location": "matchVotes[].votes[] entry for player.playerId CD_I1020668, match CD_M20240141608",
+      "content": "player.givenName \"Joshua\", player.surname \"Draper\"; team.teamId \"CD_T60\", team.teamAbbr \"FRE\", team.teamName \"Fremantle\"",
+      "role": "Establishes ONLY the provider identity/name/team/match context (CD_I1020668 = 'Joshua Draper', Fremantle, 2024, CD_M20240141608). This source is NOT used, and canonical brownlow_round_votes / brownlow_season_votes were NOT inspected or used, as identity evidence for this decision -- identity is established solely by the independent repository sources above."
+    }
+  ],
+  "brownlow_votes_used_as_identity_evidence": false,
+  "operator_decision_note": "Operator-authorized 2026-09-21: do NOT add Joshua -> Josh aliasing or any global nickname/short-form inference to the general S5b name normaliser, do NOT alter S5b matching, do NOT label this row afl_api_name_team_season_bootstrap (it would misstate how it was resolved). This provider id is resolved through this narrowly-scoped, explicit, immutable manual adjudication instead, so the ISSUE-228 Sec 9.10 historical equality proof reaches zero defects without weakening either bootstrap classifier's non-guessing contract. The importer will later independently verify players/J/Josh_Draper.html -> player_id 7862; if that identity check disagrees, validation must HALT.",
+  "providers": {
+    "CD_I1020668": {
+      "disposition": "linked",
+      "candidate_player_id": 7862,
+      "observed_name": "Joshua Draper",
+      "canonical_afltables_profile_url": "players/J/Josh_Draper.html",
+      "evidence_summary": "Manual adjudication (Sec 9.10): AFL API 2024 Brownlow source names CD_I1020668 as Joshua Draper, Fremantle (provider identity/name/team/match context only, not used as identity evidence). issues/closed/backtest-v1-baseline.json (lines 4228-4244) and issues/closed/queue-v1-baseline.json (lines 63044-63055) independently corroborate canonical player_id 7862 as Josh Draper. The accepted ISSUE-222 DraftGuru person bridge (draftguru-person-bridge-20260918-v2.json lines 7172-7175; bridge-population-scan-20260918-v2.json lines 178139-178189) independently resolves and supports the stable AFL Tables profile identity players/J/Josh_Draper.html (Fremantle, born 2004-02-08, debut 2024-03-23, recommended_disposition retain_bridge). Canonical brownlow_round_votes/brownlow_season_votes not used as identity evidence."
+    }
+  },
+  "counts": {
+    "linked": 1,
+    "unresolved": 0,
+    "contradictory": 0
+  }
+}

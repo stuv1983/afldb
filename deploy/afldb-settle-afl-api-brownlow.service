@@ -1,0 +1,70 @@
+[Unit]
+Description=AFLDB — AFL.com.au (afl_api) Brownlow live-count settle (one run)
+Documentation=https://github.com/afldb
+After=network-online.target postgresql.service afldb.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=arm
+Group=arm
+WorkingDirectory=/home/arm/projects/afldb
+
+# §10 "Operational enablement" (DECIDED 2026-09-19, carried into S7/S8): this
+# unit is INDEPENDENT of afldb-settle-afl-api.service — its own unit, its own
+# flag (AFLDB_AFL_API_BROWNLOW_ENABLED), never bundled behind the match
+# timer. The wrapper script checks that flag before doing anything, so this
+# unit is a safe no-op outside the live count even while its timer stays
+# permanently enabled.
+#
+#   acquire-afl-api-brownlow.ts --season <S>
+#     -> settle-afl-api-brownlow.ts --label <L> --apply --auto-apply
+#
+# Do NOT point this at the live AFL endpoint before it has been exercised
+# end-to-end against the local Brownlow simulator in both --observe-only and
+# apply mode (§10; run settle-afl-api-brownlow.ts directly for either mode —
+# this unit always runs the apply path).
+ExecStart=/bin/sh /home/arm/projects/afldb/deploy/afldb-settle-afl-api-brownlow.sh
+
+# A live-count poll is small (one season feed, one leaderboard feed); bound it
+# well short of the next timer firing rather than letting a stalled fetch
+# overlap the next one (systemd merges a start into an already-running job,
+# so this also bounds how long a stuck run can block the next poll).
+TimeoutStartSec=180
+
+Nice=5
+
+# Same DSN-exposure reasoning as the other two settle units:
+# settle-afl-api-brownlow.ts connects as afldb_import through
+# AFLDB_IMPORT_DATABASE_URL, left off the UnsetEnvironment list below; every
+# other credential .env carries is dropped.
+EnvironmentFile=/home/arm/projects/afldb/.env
+UnsetEnvironment=AFLDB_OWNER_DATABASE_URL AFLDB_AUTH_DATABASE_URL AFLDB_TEST_DATABASE_URL AFLDB_DEV_DATABASE_URL AFLDB_BACKUP_DATABASE_URL AFLDB_PROD_DATABASE_URL DATABASE_URL AFLDB_SESSION_SECRET AFLDB_SMTP_PASSWORD AFLDB_SMTP_USER AFLDB_EMAIL_INTAKE_SECRET AFLDB_REVALIDATE_SECRET
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=afldb-settle-afl-api-brownlow
+
+# --- Hardening -------------------------------------------------------
+# Modelled on afldb-settle-afl-api.service. Brownlow snapshots live under
+# their own subtree, separate from the match/stats snapshots, so this unit's
+# write grant does not overlap that unit's.
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/arm/projects/afldb/data/sources/afl_api
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=false
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM

@@ -1,0 +1,244 @@
+{
+  "acceptance_rule": "unique normalised (given_name, surname) match within the canonical season-2024 club roster of the provider's Brownlow-vote team; name+team+season evidence, NOT stat-vector evidence",
+  "counts": {
+    "ambiguous": 0,
+    "contradictory": 0,
+    "linked": 12,
+    "providers_in_scope": 13,
+    "unresolved": 1
+  },
+  "generated_utc": "2026-09-20T21:34:27+00:00",
+  "inputs": [
+    {
+      "file": "data\\sources\\AFLWebsite\\BrownlowSamples\\brownlow-samples\\2024\\01-brownlow-season.raw.json",
+      "sha256": "aa7714424176a6345c9e47c6a0ea7ddeb3e9c325dd71b54d9372236c512b45de"
+    },
+    {
+      "file": "data\\sources\\AFLWebsite\\BrownlowSamples\\brownlow-samples\\2024\\06-validation.json",
+      "sha256": "9b2294beb5c45030d1d278c7cc8993f0e30ee32a1453a480e8af9f84b6776a6d"
+    },
+    {
+      "file": "data\\reference\\afl-api-identities.json",
+      "sha256": "b2dd0784fc88cd801175976c041ddc1e5cc5e399805c06427f41dd06f51d10c2"
+    }
+  ],
+  "match_method": "afl_api_name_team_season_bootstrap",
+  "providers": {
+    "CD_I1002253": {
+      "candidate_player_id": 7965,
+      "candidates": [
+        {
+          "given_name": "Kane",
+          "player_id": 7965,
+          "surname": "Farrell"
+        }
+      ],
+      "canonical_surname": "Farrell",
+      "disposition": "linked",
+      "evidence_summary": "unique 2024 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Kane Farrell",
+      "observed_team_abbr": "PORT",
+      "observed_team_provider_id": "CD_T110",
+      "reason": null
+    },
+    "CD_I1004385": {
+      "candidate_player_id": 10138,
+      "candidates": [
+        {
+          "given_name": "Oscar",
+          "player_id": 10138,
+          "surname": "Allen"
+        }
+      ],
+      "canonical_surname": "Allen",
+      "disposition": "linked",
+      "evidence_summary": "unique 2024 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Oscar Allen",
+      "observed_team_abbr": "WCE",
+      "observed_team_provider_id": "CD_T150",
+      "reason": null
+    },
+    "CD_I1004757": {
+      "candidate_player_id": 1060,
+      "candidates": [
+        {
+          "given_name": "Beau",
+          "player_id": 1060,
+          "surname": "McCreery"
+        }
+      ],
+      "canonical_surname": "McCreery",
+      "disposition": "linked",
+      "evidence_summary": "unique 2024 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Beau McCreery",
+      "observed_team_abbr": "COLL",
+      "observed_team_provider_id": "CD_T40",
+      "reason": null
+    },
+    "CD_I1012862": {
+      "candidate_player_id": 4093,
+      "candidates": [
+        {
+          "given_name": "Elijah",
+          "player_id": 4093,
+          "surname": "Hollands"
+        }
+      ],
+      "canonical_surname": "Hollands",
+      "disposition": "linked",
+      "evidence_summary": "unique 2024 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Elijah Hollands",
+      "observed_team_abbr": "CARL",
+      "observed_team_provider_id": "CD_T30",
+      "reason": null
+    },
+    "CD_I1014026": {
+      "candidate_player_id": 7956,
+      "candidates": [
+        {
+          "given_name": "Kai",
+          "player_id": 7956,
+          "surname": "Lohmann"
+        }
+      ],
+      "canonical_surname": "Lohmann",
+      "disposition": "linked",
+      "evidence_summary": "unique 2024 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Kai Lohmann",
+      "observed_team_abbr": "BL",
+      "observed_team_provider_id": "CD_T20",
+      "reason": null
+    },
+    "CD_I1020594": {
+      "candidate_player_id": 7949,
+      "candidates": [
+        {
+          "given_name": "Jye",
+          "player_id": 7949,
+          "surname": "Amiss"
+        }
+      ],
+      "canonical_surname": "Amiss",
+      "disposition": "linked",
+      "evidence_summary": "unique 2024 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Jye Amiss",
+      "observed_team_abbr": "FRE",
+      "observed_team_provider_id": "CD_T60",
+      "reason": null
+    },
+    "CD_I1020668": {
+      "candidates": [],
+      "disposition": "unresolved",
+      "observed_name": "Joshua Draper",
+      "observed_team_abbr": "FRE",
+      "observed_team_provider_id": "CD_T60",
+      "reason": "no_candidate(club_id=9, season=2024)"
+    },
+    "CD_I281078": {
+      "candidate_player_id": 8803,
+      "candidates": [
+        {
+          "given_name": "Liam",
+          "player_id": 8803,
+          "surname": "Jones"
+        }
+      ],
+      "canonical_surname": "Jones",
+      "disposition": "linked",
+      "evidence_summary": "unique 2024 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Liam Jones",
+      "observed_team_abbr": "WB",
+      "observed_team_provider_id": "CD_T140",
+      "reason": null
+    },
+    "CD_I291570": {
+      "candidate_player_id": 9762,
+      "candidates": [
+        {
+          "given_name": "Nat",
+          "player_id": 9762,
+          "surname": "Fyfe"
+        }
+      ],
+      "canonical_surname": "Fyfe",
+      "disposition": "linked",
+      "evidence_summary": "unique 2024 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Nat Fyfe",
+      "observed_team_abbr": "FRE",
+      "observed_team_provider_id": "CD_T60",
+      "reason": null
+    },
+    "CD_I292128": {
+      "candidate_player_id": 4098,
+      "candidates": [
+        {
+          "given_name": "Elliot",
+          "player_id": 4098,
+          "surname": "Yeo"
+        }
+      ],
+      "canonical_surname": "Yeo",
+      "disposition": "linked",
+      "evidence_summary": "unique 2024 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Elliot Yeo",
+      "observed_team_abbr": "WCE",
+      "observed_team_provider_id": "CD_T150",
+      "reason": null
+    },
+    "CD_I297255": {
+      "candidate_player_id": 9714,
+      "candidates": [
+        {
+          "given_name": "Mitch",
+          "player_id": 9714,
+          "surname": "McGovern"
+        }
+      ],
+      "canonical_surname": "McGovern",
+      "disposition": "linked",
+      "evidence_summary": "unique 2024 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Mitch McGovern",
+      "observed_team_abbr": "CARL",
+      "observed_team_provider_id": "CD_T30",
+      "reason": null
+    },
+    "CD_I998180": {
+      "candidate_player_id": 938,
+      "candidates": [
+        {
+          "given_name": "Bailey",
+          "player_id": 938,
+          "surname": "Banfield"
+        }
+      ],
+      "canonical_surname": "Banfield",
+      "disposition": "linked",
+      "evidence_summary": "unique 2024 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Bailey Banfield",
+      "observed_team_abbr": "FRE",
+      "observed_team_provider_id": "CD_T60",
+      "reason": null
+    },
+    "CD_I998260": {
+      "candidate_player_id": 6151,
+      "candidates": [
+        {
+          "given_name": "Jack",
+          "player_id": 6151,
+          "surname": "Bowes"
+        }
+      ],
+      "canonical_surname": "Bowes",
+      "disposition": "linked",
+      "evidence_summary": "unique 2024 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Jack Bowes",
+      "observed_team_abbr": "GEEL",
+      "observed_team_provider_id": "CD_T70",
+      "reason": null
+    }
+  },
+  "season": 2024,
+  "source_key": "afl_api",
+  "tool": "tools/migration/build_afl_api_brownlow_name_bridge.py",
+  "tool_version": "1.0.0"
+}

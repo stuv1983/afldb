@@ -16,6 +16,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import {
+  areCoSources,
   assertProjectableColumns,
   countIndependentWitnesses,
   DEFAULT_CORROBORATION_POLICY,
@@ -42,6 +43,7 @@ const statDefs = readJson('stat-definitions.json');
 const statAvail = readJson('stat-availability.json');
 const venueCanonical = readJson('venue-canonical.json');
 const sourceFamiliesRaw = readJson('source-families.json');
+const aflApiIdentities = readJson('afl-api-identities.json');
 
 describe('sources dataset', () => {
   it('carries the seven registry rows with unique keys and valid kinds', () => {
@@ -194,6 +196,56 @@ describe('venue canonical dataset', () => {
       'S.C.G.': 'Sydney Cricket Ground',
       'W.A.C.A.': 'WACA Ground',
     });
+  });
+});
+
+/*
+ * AFLDB-ISSUE-228 S1 (§5.3) — the AFL.com.au provider-id maps. Teams validate
+ * against clubs.json 'hist' (never by raw name, per §6.2); the six clubs
+ * whose AFL API raw name differs from legacy_club_hist are the ones §2.1's
+ * evidence names, exactly. Venues are deliberately incomplete (§6.2: an
+ * unmapped venue is a warning, never a HALT) and are not asserted complete.
+ */
+describe('AFL API identity maps (AFLDB-ISSUE-228 S1)', () => {
+  const clubsByHist = new Set(clubs.identities.map((c: any) => c.hist));
+
+  it('declares all 18 current AFL clubs with a unique CD_T id and a hist that resolves', () => {
+    const teamKeys = Object.keys(aflApiIdentities.teams).filter((k) => k !== '$comment');
+    expect(teamKeys).toHaveLength(18);
+    expect(new Set(teamKeys).size).toBe(18);
+    const hists = teamKeys.map((k) => aflApiIdentities.teams[k].hist);
+    expect(new Set(hists).size).toBe(18);
+    for (const hist of hists) expect(clubsByHist.has(hist)).toBe(true);
+    // The six raw names known to differ from legacy_club_hist (§2.1).
+    const differing = teamKeys.filter((k) => aflApiIdentities.teams[k].raw_name !== aflApiIdentities.teams[k].hist);
+    expect(differing.sort()).toEqual(
+      ['CD_T10', 'CD_T1000', 'CD_T1010', 'CD_T150', 'CD_T160', 'CD_T70'].sort(),
+    );
+  });
+
+  it('declares one compSeason id/providerId per captured season, 2022-2026', () => {
+    const seasonKeys = Object.keys(aflApiIdentities.seasons).filter((k) => k !== '$comment');
+    expect(seasonKeys.sort()).toEqual(['2022', '2023', '2024', '2025', '2026']);
+    const ids = seasonKeys.map((y) => aflApiIdentities.seasons[y].compSeasonId);
+    expect(new Set(ids).size).toBe(5);
+    // compSeasonId increases monotonically with year across every captured season.
+    const sorted = [...seasonKeys].sort((a, b) => Number(a) - Number(b));
+    for (let i = 1; i < sorted.length; i++) {
+      expect(aflApiIdentities.seasons[sorted[i]].compSeasonId)
+        .toBeGreaterThan(aflApiIdentities.seasons[sorted[i - 1]].compSeasonId);
+    }
+  });
+
+  it('never guesses a venue mapping: every declared venue also has raw_name evidence', () => {
+    const venueKeys = Object.keys(aflApiIdentities.venues).filter((k) => k !== '$comment');
+    for (const key of venueKeys) {
+      expect(aflApiIdentities.venues[key].raw_name).toBeTruthy();
+      expect(aflApiIdentities.venues[key].legacy_name).toBeTruthy();
+    }
+    // M.C.G./S.C.G. are the only two backed by existing tracked evidence
+    // (venue-canonical.json already documents them as literal AFL Tables
+    // legacy_name spellings, not just display expansions).
+    expect(venueKeys.sort()).toEqual(['CD_V40', 'CD_V60']);
   });
 });
 
@@ -503,8 +555,30 @@ describe('source families dataset (AFLDB-ISSUE-096 S1)', () => {
     expect([...registry.sources.keys()].sort()).toEqual([
       'afl_api', 'afltables', 'kali_afl_stats', 'squiggle_api',
     ]);
-    // A database-local sources.id must never appear in a tracked contract.
-    expect(JSON.stringify(sourceFamiliesRaw)).not.toContain('source_id');
+    // A database-local sources.id must never appear in a tracked contract as an
+    // actual PROPERTY (`"source_id": ...`). This walks real JSON keys only, so it
+    // never rejects a differently-named provenance concept whose key merely
+    // CONTAINS the substring (e.g. `attendance_source_id`, a real matches column
+    // named in explanatory prose) or a prose string that happens to mention it.
+    const forbiddenKey = 'source_id';
+    const findForbiddenKey = (value: unknown, path: string): string | null => {
+      if (Array.isArray(value)) {
+        for (const [index, item] of value.entries()) {
+          const hit = findForbiddenKey(item, `${path}[${index}]`);
+          if (hit) return hit;
+        }
+        return null;
+      }
+      if (value !== null && typeof value === 'object') {
+        for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+          if (key === forbiddenKey) return `${path}.${key}`;
+          const hit = findForbiddenKey(child, `${path}.${key}`);
+          if (hit) return hit;
+        }
+      }
+      return null;
+    };
+    expect(findForbiddenKey(sourceFamiliesRaw, 'registry')).toBeNull();
 
     // Each declared key must exist where the registration says it does.
     expect(sources.sources.map((s: any) => s.key)).toContain('afltables');
@@ -514,8 +588,20 @@ describe('source families dataset (AFLDB-ISSUE-096 S1)', () => {
       expect(registry.sources.get(key)!.registeredBy).toBe('migration');
       expect(migration063).toContain(`('${key}'`);
     }
-    // The AFL API has no sources row anywhere yet; that is recorded, not assumed away.
-    expect(registry.sources.get('afl_api')!.registeredBy).toBe('unregistered');
+    // AFLDB-ISSUE-228 S6-A: the AFL API's sources row is registered by
+    // migration 077 (idempotently, fail-closed on a pre-existing row with
+    // different provenance), not merely a declared reference dataset.
+    expect(registry.sources.get('afl_api')!.registeredBy).toBe('migration');
+    const migration077 = readFileSync(
+      join(root, 'src', 'db', 'migrations', '077_afl_api_lineups.sql'), 'utf8');
+    expect(registry.sources.get('afl_api')!.registeredIn).toBe('src/db/migrations/077_afl_api_lineups.sql');
+    // Whitespace-insensitive: the INSERT sits inside a `DO $$ / IF NOT FOUND`
+    // block, so exact indentation is an implementation detail, not the fact
+    // under test (INSERT INTO sources with these columns, in this order,
+    // VALUES 'afl_api' first).
+    expect(migration077).toMatch(
+      /INSERT\s+INTO\s+sources\s*\(\s*key\s*,\s*name\s*,\s*url\s*,\s*kind\s*,\s*description\s*\)\s*VALUES\s*\(\s*'afl_api'/m,
+    );
     expect(registry.sources.get('afl_api')!.registrationOwner).toBe('AFLDB-ISSUE-100');
   });
 
@@ -574,19 +660,29 @@ describe('source families dataset (AFLDB-ISSUE-096 S1)', () => {
    * promotion_candidate for a human, and never an automatic canonical write.
    * Everything the original assertion protected is still protected below.
    */
-  it('promotes only the two reviewed AFL Tables families, and lineups never at all', () => {
+  it('promotes the AFL Tables and afl_api match-family families, and lineups never at all', () => {
+    // AFLDB-ISSUE-228 S6: afl_api's match/match_roster/player_match_stats
+    // joined the AFL Tables pair once the settle successor landed.
+    // AFLDB-ISSUE-228 S7 (2026-09-20): afl_api/brownlow_match_votes flipped
+    // from 'not_yet_declared' to 'reviewed' once the Brownlow settle engine
+    // (afl-api-brownlow.ts) landed — brownlow_leaderboard stays
+    // 'not_yet_declared' (an artefact-builder input only, isPromotable()
+    // is 'reviewed'-only) and is deliberately NOT in this list.
     expect(registry.families.filter(isPromotable).map((f) => `${f.sourceKey}/${f.family}`).sort())
-      .toEqual(['afltables/match', 'afltables/player_match_stats']);
+      .toEqual([
+        'afl_api/brownlow_match_votes', 'afl_api/match', 'afl_api/match_roster', 'afl_api/player_match_stats',
+        'afltables/match', 'afltables/player_match_stats',
+      ]);
     // `reviewed` is the only promotable policy there is: nothing is automatic.
     for (const family of registry.families.filter(isPromotable)) {
       expect(family.promotionPolicy).toBe('reviewed');
-      expect(family.promotionOwner).toBe('AFLDB-ISSUE-099');
+      expect(family.promotionOwner).toBe(
+        family.sourceKey === 'afl_api' ? 'AFLDB-ISSUE-228' : 'AFLDB-ISSUE-099',
+      );
     }
     expect(getSourceFamily(registry, 'afl_api', 'lineup').promotionPolicy).toBe('never');
     expect(getSourceFamily(registry, 'squiggle_api', 'match').promotionPolicy).toBe('never');
     expect(getSourceFamily(registry, 'kali_afl_stats', 'match').promotionPolicy).toBe('never');
-    // Reviewed promotion cannot be declared for a source with no sources row.
-    refuses((data) => { familyIn(data, 'afl_api', 'roster').promotion_policy = 'reviewed'; });
     // ...nor for a family whose column contract was never proven.
     refuses((data) => {
       familyIn(data, 'kali_afl_stats', 'player_stats').promotion_policy = 'reviewed';
@@ -879,23 +975,14 @@ describe('source families dataset (AFLDB-ISSUE-096 S1)', () => {
     expect(() => roundKeysEqual(openingAfltables, openingSquiggle))
       .toThrow(/different vocabularies/);
 
-    // Every declared mapping is anchors-only, so translation stays refused.
-    for (const vocabulary of registry.roundVocabularies.values()) {
+    // squiggle_2026/kali_2026/afltables_2026 are still anchors-only, so the
+    // GENERIC cross-vocabulary translateRound() stays refused for them.
+    for (const key of ['squiggle_2026', 'kali_2026', 'afltables_2026']) {
+      const vocabulary = registry.roundVocabularies.get(key)!;
       expect(vocabulary.mappingStatus).toBe('anchors_only');
+      if (vocabulary.shape !== 'anchors') throw new Error(`${key} should be the anchors shape`);
+      expect(vocabulary.anchors.length).toBeGreaterThan(0);
     }
-
-    // The AFL API vocabulary now carries both proven anchors. P3b added round
-    // 20, whose name matches its number; P3's round 25 is the one that proves
-    // the integer alone is ambiguous across vocabularies. TWO anchors are still
-    // not a season mapping, so mapping_status must stay anchors_only.
-    const aflApi = registry.roundVocabularies.get('afl_api_2026')!;
-    expect(aflApi.mappingStatus).toBe('anchors_only');
-    expect(aflApi.anchors.map((a) => [a.roundNumber, a.evidence]))
-      .toEqual([[20, 'P3b'], [25, 'P3']]);
-    expect(aflApi.anchors.find((a) => a.roundNumber === 25)!.meaning)
-      .toMatch(/Wildcard Finals/);
-    expect(aflApi.anchors.find((a) => a.roundNumber === 20)!.meaning)
-      .toMatch(/Round 20/);
     expect(() => translateRound(registry, openingSquiggle, 'afltables_2026'))
       .toThrow(/anchors_only/);
     expect(translateRound(registry, openingSquiggle, 'squiggle_2026')).toBe(openingSquiggle);
@@ -908,6 +995,116 @@ describe('source families dataset (AFLDB-ISSUE-096 S1)', () => {
       roundKey(getSourceFamily(registry, 'kali_afl_stats', 'match'), 0, null),
       roundKey(squiggle, 0, null),
     )).toThrow(/different vocabularies/);
+  });
+
+  /*
+   * AFLDB-ISSUE-228 §6.4 — the anchors_only `afl_api_2026` entry ISSUE-100
+   * declared (P3/P3b: two proven points, never a mapping) is REPLACED here by
+   * a fully explicit, per-season round table for every season with a captured
+   * sample (2022-2026). translateAflRound() (afl-api-rounds.ts) is the only
+   * consumer; the generic translateRound() above stays refused for these too,
+   * since 'declared' is a distinct mappingStatus from 'complete'.
+   */
+  describe('AFL API explicit round tables (AFLDB-ISSUE-228 §6.4)', () => {
+    const capturedYears = [2022, 2023, 2024, 2025, 2026];
+
+    it('declares one table per captured season, each a contiguous 1..N home-and-away run', () => {
+      for (const season of capturedYears) {
+        const vocab = registry.roundVocabularies.get(`afl_api_${season}`)!;
+        expect(vocab.mappingStatus).toBe('declared');
+        if (vocab.shape !== 'declared') throw new Error(`afl_api_${season} should be the declared shape`);
+        expect(vocab.season).toBe(season);
+        const haNumbers = vocab.rounds
+          .filter((r) => r.roundType === 'home_and_away')
+          .map((r) => r.canonicalRoundNumber)
+          .sort((a, b) => a! - b!);
+        expect(haNumbers).toEqual(Array.from({ length: haNumbers.length }, (_, i) => i + 1));
+        // Every non-home_and_away, non-mixed row carries no round number at all.
+        for (const row of vocab.rounds) {
+          if (row.roundType === 'home_and_away') continue;
+          expect(row.canonicalRoundNumber).toBeNull();
+        }
+      }
+    });
+
+    it('gives 2024-2026 an Opening Round (offset +1) and 2022/2023 none (offset 0)', () => {
+      for (const season of [2024, 2025, 2026]) {
+        const vocab = registry.roundVocabularies.get(`afl_api_${season}`)!;
+        if (vocab.shape !== 'declared') throw new Error('expected declared shape');
+        const opening = vocab.rounds.find((r) => r.apiRoundNumber === 0)!;
+        expect(opening.apiAbbreviation).toBe('OR');
+        expect(opening.canonicalRoundNumber).toBe(1);
+      }
+      for (const season of [2022, 2023]) {
+        const vocab = registry.roundVocabularies.get(`afl_api_${season}`)!;
+        if (vocab.shape !== 'declared') throw new Error('expected declared shape');
+        expect(vocab.rounds.some((r) => r.apiRoundNumber === 0)).toBe(false);
+        const roundOne = vocab.rounds.find((r) => r.apiRoundNumber === 1)!;
+        expect(roundOne.canonicalRoundNumber).toBe(1);
+      }
+    });
+
+    it('gives 2026 alone a standalone Wildcard round and a labelled QE split', () => {
+      const vocab2026 = registry.roundVocabularies.get('afl_api_2026')!;
+      if (vocab2026.shape !== 'declared') throw new Error('expected declared shape');
+      expect(vocab2026.rounds.find((r) => r.apiAbbreviation === 'WF')!.roundType).toBe('wildcard_final');
+      const qe = vocab2026.rounds.find((r) => r.apiAbbreviation === 'QE')!;
+      expect(qe.roundType).toBe('mixed_finals');
+      expect(qe.finalsLabelRules).toEqual([
+        { contains: 'Qualifying', roundType: 'qualifying_final' },
+        { contains: 'Elimination', roundType: 'elimination_final' },
+      ]);
+      for (const season of [2022, 2023, 2024, 2025]) {
+        const vocab = registry.roundVocabularies.get(`afl_api_${season}`)!;
+        if (vocab.shape !== 'declared') throw new Error('expected declared shape');
+        expect(vocab.rounds.some((r) => r.roundType === 'wildcard_final')).toBe(false);
+        expect(vocab.rounds.find((r) => r.roundType === 'mixed_finals')!.apiAbbreviation).toBe('FW1');
+      }
+    });
+
+    it('fails closed on a declared table with drift (§19.7g)', () => {
+      const mutateRounds = (data: any, fn: (rounds: any[]) => void): void => {
+        fn(data.round_vocabularies.afl_api_2026.rounds);
+      };
+      // Non-contiguous canonical home-and-away numbers.
+      refuses((data) => mutateRounds(data, (rounds) => { rounds[1].canonical_round_number = 99; }));
+      // Duplicate api_round_number.
+      refuses((data) => mutateRounds(data, (rounds) => { rounds[1].api_round_number = rounds[0].api_round_number; }));
+      // A mixed_finals row with no finals_label_rules.
+      refuses((data) => mutateRounds(data, (rounds) => {
+        const qe = rounds.find((r: any) => r.api_abbreviation === 'QE');
+        delete qe.finals_label_rules;
+      }));
+      // A home_and_away row missing its canonical number.
+      refuses((data) => mutateRounds(data, (rounds) => { delete rounds[0].canonical_round_number; }));
+      // A finals row that smuggles in a canonical number.
+      refuses((data) => mutateRounds(data, (rounds) => {
+        const gf = rounds.find((r: any) => r.api_abbreviation === 'GF');
+        gf.canonical_round_number = 30;
+      }));
+    });
+  });
+
+  describe('co-source groups (AFLDB-ISSUE-228 §7.5, Q1)', () => {
+    it('declares afltables and afl_api as one co-source group', () => {
+      expect(registry.coSourceGroups).toEqual([['afl_api', 'afltables']]);
+      expect(areCoSources(registry, 'afltables', 'afl_api')).toBe(true);
+      expect(areCoSources(registry, 'afl_api', 'afltables')).toBe(true);
+      expect(areCoSources(registry, 'afltables', 'squiggle_api')).toBe(false);
+      // A source is trivially its own co-source.
+      expect(areCoSources(registry, 'afltables', 'afltables')).toBe(true);
+    });
+
+    it('is optional and empty when omitted, and fails closed on drift', () => {
+      const data = clone();
+      delete data.co_source_groups;
+      const withoutGroups = parseSourceFamilyRegistry(data);
+      expect(withoutGroups.coSourceGroups).toEqual([]);
+
+      refuses((d) => { d.co_source_groups = [['afltables']]; }); // needs >= 2 keys
+      refuses((d) => { d.co_source_groups = [['afltables', 'not_a_source']]; });
+      refuses((d) => { d.co_source_groups = [['afltables', 'afl_api'], ['afl_api', 'kali_afl_stats']]; });
+    });
   });
 
   it('fails closed on registry drift', () => {

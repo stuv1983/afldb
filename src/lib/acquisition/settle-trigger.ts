@@ -43,6 +43,24 @@ import { execFile } from 'node:child_process';
 export const SETTLE_UNIT = 'afldb-settle-afltables.service';
 
 /**
+ * AFLDB-ISSUE-228 S8 (§17) — the closed table of settle units this module
+ * knows how to READ status for. Adding `afl_api`/`afl_api_brownlow` here does
+ * not weaken the "cannot name another unit" property above: every value is
+ * still a module-level string literal, and a caller can only select one of
+ * the three fixed keys, never supply a unit name itself. `startSettleRun()`
+ * below is deliberately UNCHANGED — it still starts `SETTLE_UNIT` only; the
+ * on-demand admin "start now" trigger for the two new units is not wired in
+ * this pass (see `readUnitStateOf()` doc comment).
+ */
+export type SettleUnitKey = 'afltables' | 'afl_api' | 'afl_api_brownlow';
+
+export const SETTLE_UNITS: Readonly<Record<SettleUnitKey, string>> = {
+  afltables: SETTLE_UNIT,
+  afl_api: 'afldb-settle-afl-api.service',
+  afl_api_brownlow: 'afldb-settle-afl-api-brownlow.service',
+};
+
+/**
  * Absolute and hardcoded. A configurable binary path would be an injection
  * vector for anything that could write `.env`, and buys nothing: systemd
  * hosts put `systemctl` here.
@@ -59,17 +77,20 @@ const START_ARGV: readonly string[] = ['start', '--no-block', SETTLE_UNIT] as co
 /**
  * Exactly the properties the panel reports. `systemctl show` prints one
  * `Key=Value` line per property, in the order requested, and prints an empty
- * value rather than failing for a unit that has never run.
+ * value rather than failing for a unit that has never run. Parametrised over
+ * one of `SETTLE_UNITS`' own values (never a caller-supplied string).
  */
-const SHOW_ARGV: readonly string[] = [
-  'show', SETTLE_UNIT,
-  '--property=ActiveState',
-  '--property=SubState',
-  '--property=Result',
-  '--property=ExecMainStatus',
-  '--property=ActiveEnterTimestamp',
-  '--property=InactiveEnterTimestamp',
-] as const;
+function showArgvFor(unit: string): readonly string[] {
+  return [
+    'show', unit,
+    '--property=ActiveState',
+    '--property=SubState',
+    '--property=Result',
+    '--property=ExecMainStatus',
+    '--property=ActiveEnterTimestamp',
+    '--property=InactiveEnterTimestamp',
+  ] as const;
+}
 
 /** Both calls are quick; a stalled D-Bus call must not hold an admin request. */
 const EXEC_TIMEOUT_MS = 10_000;
@@ -247,15 +268,30 @@ export function unitPhaseOf(activeState: string): SettleUnitPhase {
  * the polkit rule is installed.
  */
 export async function readUnitState(): Promise<SettleUnitState | SettleTriggerUnavailable> {
+  return readUnitStateOf('afltables');
+}
+
+/**
+ * Read one of `SETTLE_UNITS`' state. Same read-only `systemctl show` call as
+ * `readUnitState()` above (no privilege needed, unlike `startSettleRun()`),
+ * generalised over the three known units for the S8/§17 status table.
+ * `readUnitState()` is kept as the unparametrised `afltables` case so every
+ * existing caller (`settle-status.ts`'s `readSettleRunStatus()`,
+ * `actions.ts`) is unaffected.
+ */
+export async function readUnitStateOf(
+  key: SettleUnitKey,
+): Promise<SettleUnitState | SettleTriggerUnavailable> {
   if (!settleTriggerConfigured()) {
     return { available: false, reason: SETTLE_TRIGGER_UNCONFIGURED };
   }
+  const unit = SETTLE_UNITS[key];
   try {
-    const { code, stdout, stderr } = await run(SHOW_ARGV);
+    const { code, stdout, stderr } = await run(showArgvFor(unit));
     if (code !== 0) {
       return {
         available: false,
-        reason: summariseFailure(stderr, stdout, `systemctl show ${SETTLE_UNIT} failed.`),
+        reason: summariseFailure(stderr, stdout, `systemctl show ${unit} failed.`),
       };
     }
     return parseUnitShow(stdout);
@@ -265,7 +301,7 @@ export async function readUnitState(): Promise<SettleUnitState | SettleTriggerUn
     // settle run, and neither should surface a Node error object.
     return {
       available: false,
-      reason: `Could not read ${SETTLE_UNIT} state on this host.`,
+      reason: `Could not read ${unit} state on this host.`,
     };
   }
 }

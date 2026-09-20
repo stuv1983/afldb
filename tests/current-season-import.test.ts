@@ -1494,8 +1494,28 @@ describe('S2 provider provenance', () => {
     const ids = new Map([['squiggle_api', 7]]);
     expect(resolveSourceId(ids, 'squiggle_api')).toBe(7);
     expect(() => resolveSourceId(ids, 'afl_api')).toThrow(/no sources row/);
-    // No tracked contract stores a numeric id.
-    expect(readFileSync('data/reference/source-families.json', 'utf8')).not.toContain('source_id');
+    // No tracked contract stores a database-local numeric sources.id: walk the
+    // parsed document and fail only if a `source_id`-named property holds a
+    // number. Prose mentions and unrelated field names (e.g. the string-keyed
+    // `sources` registry, or `attendance_source_id` as a column-name string)
+    // are not the invariant this guards.
+    const assertNoStoredSourceId = (value: unknown, path: string): void => {
+      if (Array.isArray(value)) {
+        value.forEach((item, index) => assertNoStoredSourceId(item, `${path}[${index}]`));
+        return;
+      }
+      if (value !== null && typeof value === 'object') {
+        for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+          const childPath = `${path}.${key}`;
+          if (key === 'source_id' && typeof child === 'number') {
+            throw new Error(`stored numeric source_id at ${childPath}`);
+          }
+          assertNoStoredSourceId(child, childPath);
+        }
+      }
+    };
+    const contract = JSON.parse(readFileSync('data/reference/source-families.json', 'utf8'));
+    expect(() => assertNoStoredSourceId(contract, '$')).not.toThrow();
   });
 });
 
@@ -4125,6 +4145,27 @@ describe('AFLDB-ISSUE-122 S5 — the canonical applier contract', () => {
     }
   });
 
+  it('never sets source_id on an UPDATE — ownership changes only at INSERT (AFLDB-ISSUE-228 §19.1e)', () => {
+    // The explicit, literal form (an ON CONFLICT ... DO UPDATE SET, as
+    // match_period_scores uses) is caught by a plain text scan.
+    expect(applierCode).not.toMatch(/DO UPDATE SET[\s\S]*?source_id\s*=\s*EXCLUDED\.source_id/);
+    // The other three writers (`writeMatch`, `writePlayerMatchStats`,
+    // `writeBrownlowRoundVotes`) build their UPDATE patch by spreading a
+    // provenance object one statement before the `UPDATE ... SET` itself —
+    // a plain "does this file contain the string source_id" scan cannot see
+    // through that spread, so this asserts each UPDATE patch is built with
+    // the UPDATE-safe helper (no `source_id`) rather than the INSERT one.
+    const updatePatches = [...applierCode.matchAll(
+      /const patch = \{ \.\.\.plan\.newValues, \.\.\.(provenance(?:ForUpdate)?)\(unit\) \};\s*\n\s*await sp`\s*\n\s*UPDATE (\w+) SET/g,
+    )];
+    expect(updatePatches.map((m) => m[2]).sort()).toEqual(
+      ['brownlow_round_votes', 'matches', 'player_match_stats'],
+    );
+    for (const match of updatePatches) {
+      expect(match[1]).toBe('provenanceForUpdate');
+    }
+  });
+
   it('writes neither review ledger: the queue and the decisions stay human', () => {
     // §5.2 / SC8. A successful automatic application creates no candidate and
     // fabricates no admin decision, so the applier names neither table in any
@@ -4352,6 +4393,7 @@ describe('AFLDB-ISSUE-122 S6 — the operational path contract', () => {
         applyFailures: [],
         disagreements: [],
         findingsTruncated: false,
+        deferredRecords: {},
       };
       const text = renderSettleExceptionReport(report).join('\n');
       expect(text).toContain('ACTIVE — requires attention (2)');
@@ -4376,6 +4418,51 @@ describe('AFLDB-ISSUE-122 S6 — the operational path contract', () => {
         }],
       }).join('\n');
       expect(notLanded).toContain('match k: NOT canonical');
+    });
+
+    it('names whichever source produced the report and renders deferred counts '
+      + 'under "Not yet concluded" (AFLDB-ISSUE-228 known-gap-B)', () => {
+      // A complete, minimal, locally-scoped base — the "renders active
+      // exceptions" test above builds its own `report` const in ITS OWN
+      // `it()` function scope, which is not visible here.
+      const baseReport: SettleExceptionReport = {
+        sourceKey: 'afltables',
+        season: 2026,
+        latestBatch: null,
+        unresolvedRecords: [],
+        candidates: { active: [], moot: [] },
+        applyFailures: [],
+        disagreements: [],
+        findingsTruncated: false,
+        deferredRecords: {},
+      };
+
+      const aflApiText = renderSettleExceptionReport({
+        ...baseReport,
+        sourceKey: 'afl_api',
+        deferredRecords: { status_not_concluded: 2, roster_not_concluded: 1 },
+      }).join('\n');
+      // The header names the source that produced the report, verbatim —
+      // never a literal "AFL Tables" label, which would be actively wrong
+      // for any other source's own report.
+      expect(aflApiText).toContain('afl_api settle exceptions — season 2026');
+      expect(aflApiText).not.toContain('AFL Tables settle exceptions');
+      // §19.6(e): deferred != exception. Printed under its own heading,
+      // before ACTIVE, and never counted toward it.
+      expect(aflApiText).toContain('Not yet concluded — observed, nothing proposed (3)');
+      expect(aflApiText).toContain('roster_not_concluded: 1');
+      expect(aflApiText).toContain('status_not_concluded: 2');
+      expect(aflApiText).toContain('ACTIVE — requires attention (0)');
+
+      // Empty deferredRecords: the section is absent entirely, not printed
+      // with a zero count.
+      const noDeferrals = renderSettleExceptionReport({ ...baseReport, sourceKey: 'afl_api' }).join('\n');
+      expect(noDeferrals).not.toContain('Not yet concluded');
+
+      // Existing AFL Tables default behaviour is unchanged: the header still
+      // names 'afltables' verbatim when that is the report's own sourceKey.
+      const afltablesText = renderSettleExceptionReport(baseReport).join('\n');
+      expect(afltablesText).toContain('afltables settle exceptions — season 2026');
     });
   });
 });

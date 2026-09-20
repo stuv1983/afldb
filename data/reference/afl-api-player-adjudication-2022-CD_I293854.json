@@ -1,0 +1,77 @@
+{
+  "artefact_kind": "afl_api_manual_adjudication",
+  "issue": "AFLDB-ISSUE-228",
+  "runbook_section": "Sec 9.10",
+  "source_key": "afl_api",
+  "match_method": "afl_api_manual_adjudication",
+  "season": 2022,
+  "decision_summary": "AFL API provider id CD_I293854 is observed in the 2022 Brownlow source as 'Matt Taberner', Fremantle. 'Matt' is a nickname/short form of the canonical player's given name 'Matthew', so neither the S5 stat-vector bootstrap nor the S5b name+team+season bootstrap can link it (both require an exact normalised name match, deliberately, per Sec 6.3/S5b -- no fuzzy or nickname matching exists anywhere in either classifier). This is a single, explicit, human-adjudicated identity decision, not a rule change to either bootstrap classifier and not a change to the general S5b name normaliser.",
+  "provider_identity": {
+    "external_id": "CD_I293854",
+    "observed_given_name": "Matt",
+    "observed_surname": "Taberner",
+    "observed_team_provider_id": "CD_T60",
+    "observed_team_abbr": "FRE",
+    "observed_team_hist": "Fremantle",
+    "observed_team_source": "data/reference/afl-api-identities.json (CD_T60 -> Fremantle, raw_abbreviation FRE)"
+  },
+  "canonical_identity": {
+    "candidate_player_id": 9321,
+    "canonical_name": "Matthew Taberner",
+    "canonical_afltables_profile_url": "players/M/Matthew_Taberner.html"
+  },
+  "evidence": [
+    {
+      "source": "data/awards/player-identity.csv",
+      "location": "row 1508",
+      "content": "12205,Matthew Taberner,players/M/Matthew_Taberner.html",
+      "role": "Independently establishes the stable AFL Tables profile identity and display name -- players/M/Matthew_Taberner.html / 'Matthew Taberner' -- as canonical. The player_id column in this row (12205) is a legacy afldb_dev bootstrap identifier and is NOT a target/current AFLDB players.id; it is not used as or to establish the canonical player_id. Canonical player_id 9321 is established separately by resolving the stable AFL Tables profile identity players/M/Matthew_Taberner.html through the current AFLDB external identity system."
+    },
+    {
+      "source": "data/reference/draftguru-person-bridge-20260918-v2.json",
+      "location": "line 9405",
+      "content": "{ \"afltables_external_id\": \"players/M/Matthew_Taberner.html\", \"player_url\": \"https://www.draftguru.com.au/players/matthew_taberner/1\" }",
+      "role": "Independently resolves players/M/Matthew_Taberner.html through the accepted ISSUE-222 DraftGuru person bridge."
+    },
+    {
+      "source": "docs/rebuild-manifests/draftguru/bridge-v2-parent-20260918-v1.csv",
+      "location": "line 3331",
+      "content": "https://www.draftguru.com.au/players/matthew_taberner/1,accepted,,players/M/Matthew_Taberner.html,players/M/Matthew_Taberner.html,unchanged,,",
+      "role": "Confirms the same DraftGuru profile is accepted and unchanged against players/M/Matthew_Taberner.html in the ISSUE-222 bridge-v2 parent manifest."
+    },
+    {
+      "source": "issues/closed/backtest-v1-baseline.json",
+      "location": "lines 12837-12846",
+      "content": "{ \"key\": \"award_nominations:504\", \"sourceType\": \"award_nominations\", \"rawName\": \"Matthew Taberner\", \"context\": \"Rising Star Award · 2014 · Round 22\", \"expectedPlayerId\": 9321, \"chosenPlayerId\": 9321, \"chosenName\": \"Matthew Taberner\", \"correct\": true }",
+      "role": "Non-Brownlow repository corroboration only: the award-nominations backtest independently corroborates canonical player_id 9321 as Matthew Taberner. Does NOT establish the AFL API provider identity (CD_I293854) -- corroborates only the canonical Matthew Taberner -> player_id 9321 side of this adjudication."
+    },
+    {
+      "source": "issues/closed/queue-v1-baseline.json",
+      "location": "lines 80903-80915",
+      "content": "{ \"target\": \"draft_picks#4712\", \"entity\": \"draft_person:3330\", \"sourceName\": \"Matthew Taberner\", \"context\": \"Draft · 2012 · Rookie\", \"suggested\": \"Matthew Taberner\", \"suggestedId\": 9321 }",
+      "role": "Non-Brownlow repository corroboration only: the draft-linking backtest suggestion queue independently corroborates canonical player_id 9321 as Matthew Taberner. Does NOT establish the AFL API provider identity (CD_I293854) -- corroborates only the canonical Matthew Taberner -> player_id 9321 side of this adjudication."
+    },
+    {
+      "source": "AFL API 2022 Brownlow source (bfawards/season/<CD_S2022...>)",
+      "location": "matchVotes[].votes[] entries for player.playerId CD_I293854",
+      "content": "player.givenName \"Matt\", player.surname \"Taberner\"; team.teamAbbr \"FRE\"",
+      "role": "Establishes ONLY the provider identity/name/team context (CD_I293854 = 'Matt Taberner', Fremantle, 2022). This source is NOT used, and canonical brownlow_round_votes / brownlow_season_votes were NOT inspected or used, as identity evidence for this decision -- identity is established solely by the two independent repository sources above."
+    }
+  ],
+  "brownlow_votes_used_as_identity_evidence": false,
+  "operator_decision_note": "Operator-authorized 2026-09-21: do NOT add Matt -> Matthew to the general S5b name normaliser, do NOT add global nickname/fuzzy matching, do NOT label this row afl_api_name_team_season_bootstrap (it would misstate how it was resolved). This provider id is resolved through this narrowly-scoped, explicit, immutable manual adjudication instead, so the ISSUE-228 Sec 9.10 historical equality proof reaches zero defects without weakening either bootstrap classifier's non-guessing contract.",
+  "providers": {
+    "CD_I293854": {
+      "disposition": "linked",
+      "candidate_player_id": 9321,
+      "observed_name": "Matt Taberner",
+      "canonical_afltables_profile_url": "players/M/Matthew_Taberner.html",
+      "evidence_summary": "Manual adjudication (Sec 9.10): AFL API 2022 Brownlow source names CD_I293854 as Matt Taberner, Fremantle (provider identity/name/team context only, not used as identity evidence). data/awards/player-identity.csv establishes the stable AFL Tables profile identity and display name (players/M/Matthew_Taberner.html / Matthew Taberner) -- its player_id column (12205) is a legacy afldb_dev bootstrap identifier, not a target/current AFLDB players.id, and is not used to establish the canonical player_id. Canonical player_id 9321 is established by resolving players/M/Matthew_Taberner.html through the current AFLDB external identity system. The accepted ISSUE-222 DraftGuru person bridge (draftguru-person-bridge-20260918-v2.json line 9405; bridge-v2-parent-20260918-v1.csv line 3331) independently corroborates the same stable AFL Tables profile URL, not a numeric AFLDB player_id. Canonical brownlow_round_votes/brownlow_season_votes not used as identity evidence."
+    }
+  },
+  "counts": {
+    "linked": 1,
+    "unresolved": 0,
+    "contradictory": 0
+  }
+}

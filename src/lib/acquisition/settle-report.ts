@@ -137,6 +137,15 @@ export type SettleExceptionReport = {
   disagreements: OpenFinding[];
   /** True when a findings list was cut at `OPEN_FINDING_LIMIT`. */
   findingsTruncated: boolean;
+  /**
+   * AFLDB-ISSUE-228 §7.3/§19.6(e) (T3) — deferred-record counts from the run
+   * that requested this report, keyed by reason. Passed through by the
+   * caller, never queried: a deferred record leaves no `promotion_candidates`,
+   * `data_issues` or `import_rejections` row for this report to find later.
+   * Empty for every caller that supplies nothing (the AFL Tables path, which
+   * has no deferral concept).
+   */
+  deferredRecords: Readonly<Record<string, number>>;
 };
 
 /** How many open findings of each kind the report lists before summarising. */
@@ -218,7 +227,7 @@ async function sourceIdOf(db: Db, sourceKey: string): Promise<number> {
 }
 
 async function latestBatchOf(
-  db: Db, sourceId: number, season: number,
+  db: Db, sourceId: number, season: number, tool: string,
 ): Promise<SettleReportBatch | null> {
   // The batch note is written by `runSettleAfltables()` as
   // `...; season=<year>; mode=<apply|dry-run>`. A dry run's batch row is
@@ -230,7 +239,7 @@ async function latestBatchOf(
            records_read::int AS "recordsRead", records_rejected::int AS "recordsRejected"
       FROM import_batches
      WHERE source_id = ${sourceId}
-       AND tool = ${SETTLE_BATCH_TOOL}
+       AND tool = ${tool}
        AND status = 'completed'
        AND notes LIKE ${`%season=${season};%`}
      -- QUALIFIED, and it has to be. A bare ORDER BY id binds to the OUTPUT
@@ -365,11 +374,36 @@ async function openFindingsOf(
  * connection, inside or outside a transaction.
  */
 export async function buildSettleExceptionReport(
-  db: Db, input: { season: number; sourceKey?: string },
+  db: Db,
+  input: {
+    season: number;
+    sourceKey?: string;
+    /** AFLDB-ISSUE-228: the afl_api settle stamps `'settle-afl-api.ts'`. */
+    tool?: string;
+    /**
+     * AFLDB-ISSUE-228 known-gap-B: `SETTLE_ISSUE_TYPE`/`SETTLE_ISSUE_OWNER`
+     * (defaulted below) are `settle-afltables.ts`'s OWN disagreement stamp
+     * (`'source_disagreement'` / `'AFLDB-ISSUE-099'`) — `settle-afl-api.ts`
+     * writes its corroboration disagreements under its own, different stamp
+     * (`'afl_api_settle'` / `'settle-afl-api.ts'`). Calling this for the
+     * `afl_api` source without overriding both would silently show ZERO
+     * disagreements (querying an issue_type that source never writes) rather
+     * than the AFL Tables ones this function would otherwise mistakenly
+     * surface. Every caller for a non-`afltables` source must pass its own
+     * pair; `tools/current-season/settle-afl-api.ts` does.
+     */
+    disagreementIssueType?: string;
+    disagreementIssueOwner?: string;
+    /** AFLDB-ISSUE-228 §19.6(e): the calling run's own deferred-record counts. */
+    deferredRecords?: Readonly<Record<string, number>>;
+  },
 ): Promise<SettleExceptionReport> {
   const sourceKey = input.sourceKey ?? SETTLE_SOURCE_KEY;
+  const tool = input.tool ?? SETTLE_BATCH_TOOL;
+  const disagreementIssueType = input.disagreementIssueType ?? SETTLE_ISSUE_TYPE;
+  const disagreementIssueOwner = input.disagreementIssueOwner ?? SETTLE_ISSUE_OWNER;
   const sourceId = await sourceIdOf(db, sourceKey);
-  const latestBatch = await latestBatchOf(db, sourceId, input.season);
+  const latestBatch = await latestBatchOf(db, sourceId, input.season, tool);
 
   const unresolvedRecords: UnresolvedRecordException[] = [];
   const candidates = { active: [] as CandidateException[], moot: [] as CandidateException[] };
@@ -385,7 +419,7 @@ export async function buildSettleExceptionReport(
   }
 
   const failures = await openFindingsOf(db, CANONICAL_APPLY_ISSUE_TYPE, CANONICAL_APPLY_ISSUE_OWNER);
-  const disagreements = await openFindingsOf(db, SETTLE_ISSUE_TYPE, SETTLE_ISSUE_OWNER);
+  const disagreements = await openFindingsOf(db, disagreementIssueType, disagreementIssueOwner);
   return {
     sourceKey,
     season: input.season,
@@ -395,6 +429,7 @@ export async function buildSettleExceptionReport(
     applyFailures: failures.findings,
     disagreements: disagreements.findings,
     findingsTruncated: failures.truncated || disagreements.truncated,
+    deferredRecords: input.deferredRecords ?? {},
   };
 }
 
@@ -417,7 +452,7 @@ export function renderSettleExceptionReport(report: SettleExceptionReport): stri
     + report.disagreements.length;
 
   lines.push('');
-  lines.push(`AFL Tables settle exceptions — ${report.sourceKey}, season ${report.season}`);
+  lines.push(`${report.sourceKey} settle exceptions — season ${report.season}`);
   if (report.latestBatch === null) {
     lines.push('  No completed settle batch for this season yet.');
   } else {
@@ -427,6 +462,18 @@ export function renderSettleExceptionReport(report: SettleExceptionReport): stri
       + ` ${report.latestBatch.recordsRead} records read,`
       + ` ${report.latestBatch.recordsRejected} rejection rows.`,
     );
+  }
+
+  // AFLDB-ISSUE-228 §7.3/§19.6(e) (T3): informational, printed before ACTIVE
+  // and never counted toward it — a deferred record is not an exception.
+  const deferredEntries = Object.entries(report.deferredRecords).filter(([, n]) => n > 0);
+  const deferredTotal = deferredEntries.reduce((sum, [, n]) => sum + n, 0);
+  if (deferredTotal > 0) {
+    lines.push('');
+    lines.push(`Not yet concluded — observed, nothing proposed (${deferredTotal})`);
+    for (const [reason, count] of deferredEntries.sort(([a], [b]) => a.localeCompare(b))) {
+      lines.push(`  ${reason}: ${count}`);
+    }
   }
 
   lines.push('');

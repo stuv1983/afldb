@@ -32,6 +32,22 @@ import { sql } from '@/db/client';
 export const SETTLE_BATCH_TOOL = 'settle-afltables.ts';
 
 /**
+ * AFLDB-ISSUE-228 S8 (§17) — the `import_batches.tool` literals the two
+ * `afl_api` settle CLIs stamp (`settle-afl-api.ts:120`,
+ * `afl-api-brownlow.ts:121`). Named here, beside the AFL Tables constant
+ * above, so the admin unit-status table (`settle-status.ts`) can look up any
+ * of the three by the same closed key `settle-trigger.ts` uses
+ * (`SettleUnitKey`), rather than a second copy of the literal.
+ */
+export const SETTLE_BATCH_TOOLS = {
+  afltables: SETTLE_BATCH_TOOL,
+  afl_api: 'settle-afl-api.ts',
+  afl_api_brownlow: 'settle-afl-api-brownlow.ts',
+} as const;
+
+export type SettleBatchTool = typeof SETTLE_BATCH_TOOLS[keyof typeof SETTLE_BATCH_TOOLS];
+
+/**
  * The counters worth putting in front of an operator, extracted by name from
  * `validation_result`.
  *
@@ -171,8 +187,23 @@ type BatchRow = {
  *
  * `ORDER BY id DESC` rather than by timestamp: the id is a monotonic identity
  * column, so it orders runs even when two start in the same millisecond.
+ *
+ * AFLDB-ISSUE-228 S8 (§17): `tool` selects which settle CLI's batches this
+ * reads, defaulting to `SETTLE_BATCH_TOOL` (AFL Tables) so every existing
+ * caller is byte-identical. The `SettleRunCounters` whitelist below is the
+ * AFL Tables settle's own `validation_result` shape (`snapshotMatches`,
+ * `canonicalRowsInserted`, …); the two `afl_api` tools write a differently
+ * named counter set (`AflApiSettleCounters`, `settle-afl-api.ts`) that this
+ * whitelist would silently under-report as zeroes rather than genuinely
+ * project, so `counters`/`sourceCompleteness` are left `null`/`unknown` for
+ * any tool other than `SETTLE_BATCH_TOOL` — batch identity, status,
+ * timestamps, label and season are still returned for all three. A
+ * source-neutral counter projection is a disclosed follow-up, not
+ * implemented here.
  */
-export async function getLatestSettleRun(): Promise<SettleRunRecord | null> {
+export async function getLatestSettleRun(
+  tool: SettleBatchTool = SETTLE_BATCH_TOOL,
+): Promise<SettleRunRecord | null> {
   const [row] = await sql<BatchRow[]>`
     SELECT id::text                  AS id,
            status::text              AS status,
@@ -183,14 +214,14 @@ export async function getLatestSettleRun(): Promise<SettleRunRecord | null> {
            notes                     AS notes,
            validation_result         AS "validationResult"
       FROM import_batches
-     WHERE tool = ${SETTLE_BATCH_TOOL}
+     WHERE tool = ${tool}
      ORDER BY id DESC
      LIMIT 1
   `;
   if (!row) return null;
 
   const { snapshotLabel, season } = parseSettleBatchNote(row.notes);
-  const counters = extractSettleCounters(row.validationResult);
+  const counters = tool === SETTLE_BATCH_TOOL ? extractSettleCounters(row.validationResult) : null;
   return {
     batchId: row.id,
     snapshotLabel,

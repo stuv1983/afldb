@@ -1,0 +1,640 @@
+{
+  "generatedAt": "2026-09-19T20:53:57.220Z",
+  "contractVersion": 1,
+  "files": [
+    {
+      "file": "data/sources/AFLWebsite/AFLGamesSamples/2026-09-18_SYD_v_FRE_CD_M20260142802/01-fixture-result.json",
+      "sha256": "95a173286b7b28abd0bce6b203ddb85a03756f47f6da149b987f2d09a8411c07",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/AFLGamesSamples/2026-09-18_SYD_v_FRE_CD_M20260142802/02-player-stats.raw.json",
+      "sha256": "38f626f7e9a3a826c77ac6749747c91e97f7480bd5df5f61ac3bb45d80b263d3",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/AFLGamesSamples/2026-09-18_SYD_v_FRE_CD_M20260142802/03-match-roster.raw.json",
+      "sha256": "336daceb1bf2c4cd3788e10e55d86bd098fc928b4f24fdff7e1bed5b84464a41",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/AFLGamesSamples/2026-09-19_HAW_v_BL_CD_M20260142801/01-fixture-result.json",
+      "sha256": "be99a262877603dc25f0bdcedef4763edb2baff1f40e52ec85392681be854dc5",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/AFLGamesSamples/2026-09-19_HAW_v_BL_CD_M20260142801/02-player-stats.raw.json",
+      "sha256": "bc27a2e2ad7df0150f9b960d51596a02e3e47fe07e6f0004e9c4df5acfddba9c",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/AFLGamesSamples/2026-09-19_HAW_v_BL_CD_M20260142801/03-match-roster.raw.json",
+      "sha256": "9a29a7daa679b3ac0b878bc5d7b61b78b11433708be4e1d06378a504768c1088",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/AFLGamesSamples/historical-samples/2022/2022-05-07_R8_BL_v_WCE_CD_M20220140807/01-fixture-result.json",
+      "sha256": "b8316649ed7b64e9d815c45f5d771eca0d861645c82bc9c14e3bdaca34a0f599",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/AFLGamesSamples/historical-samples/2022/2022-05-07_R8_BL_v_WCE_CD_M20220140807/02-player-stats.raw.json",
+      "sha256": "5a91aa4896b5a6e0ca1e0de76eeea59bfbfe4bd494141edc29b95cbee0048fe3",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/AFLGamesSamples/historical-samples/2022/2022-05-07_R8_BL_v_WCE_CD_M20220140807/03-match-roster.raw.json",
+      "sha256": "06e2f535d09047c3666bfbd45a500ed2a5d313ec95a8c61255caf70f51957604",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/AFLGamesSamples/historical-samples/2022/2022-06-16_R14_RICH_v_CARL_CD_M20220141404/01-fixture-result.json",
+      "sha256": "42d512392a79a8ba53d39380f714a1438a07ad06ee83dbabec1fff179e892560",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/AFLGamesSamples/historical-samples/2022/2022-06-16_R14_RICH_v_CARL_CD_M20220141404/02-player-stats.raw.json",
+      "sha256": "481324dc7e97afa62a5bc9e5ef7d740a5da7442aa38edae41d9dcd2df6df853f",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/AFLGamesSamples/historical-samples/2022/2022-06-16_R14_RICH_v_CARL_CD_M20220141404/03-match-roster.raw.json",
+      "sha256": "87d609dabbed05c91de78e8c50b1ce89f547cfd2dbf66a39f8f6496344092bd6",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/AFLGamesSamples/historical-samples/2022/2022-07-23_R19_SYD_v_ADEL_CD_M20220141907/01-fixture-result.json",
+      "sha256": "9fcb9969281a74dacc9ec6cf4fd446adf00de686c67eaf055fc73e93d41c5c6a",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/AFLGamesSamples/historical-samples/2022/2022-07-23_R19_SYD_v_ADEL_CD_M20220141907/02-player-stats.raw.json",
+      "sha256": "303943d9d1daa0f470dae51be6354f9a52c1a2b23dbe2541da4512cdf036a0be",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/AFLGamesSamples/historical-samples/2022/2022-07-23_R19_SYD_v_ADEL_CD_M20220141907/03-match-roster.raw.json",
+      "sha256": "6cacca436cd5e5f4f2a5123389f785e71cbbe9cbeab2955a4748c054295e7de6",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/AFLGamesSamples/historical-samples/2023/2023-05-06_R8_GCFC_v_MELB_CD_M20230140804/01-fixture-result.json",
+      "sha256": "36d3a8bfdabe02fcb22a19fe05d6c2a6754bd232b40874c0912bca5cc2a7136d",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/AFLGamesSamples/historical-samples/2023/2023-05-06_R8_GCFC_v_MELB_CD_M20230140804/02-player-stats.raw.json",
+      "sha256": "a1d9dda3fffad4934f405b867ccbe1b004de984becb45848597f06776f090615",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/AFLGamesSamples/historical-samples/2023/2023-05-06_R8_GCFC_v_MELB_CD_M20230140804/03-match-roster.raw.json",
+      "sha256": "798aef4dcd0df0d6a5dbc876c79fe2ca9ad4c29737d19ca7746392b12b9e6570",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/AFLGamesSamples/historical-samples/2023/2023-05-12_R9_RICH_v_GEEL_CD_M20230140901/01-fixture-result.json",
+      "sha256": "e74a32e0620655327a584c8bea587bf343bed5ac76dd6afd3124b30fdddb1ded",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/AFLGamesSamples/historical-samples/2023/2023-05-12_R9_RICH_v_GEEL_CD_M20230140901/02-player-stats.raw.json",
+      "sha256": "ddd41f0d3a4b860aa1ecda3e439d99c2829badddb99fe5234647403ad2b0c147",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/AFLGamesSamples/historical-samples/2023/2023-05-12_R9_RICH_v_GEEL_CD_M20230140901/03-match-roster.raw.json",
+      "sha256": "e6318a12a3f1c4e594fac4c983835e6e1892c293ff99c389a60f23ea4872c661",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/AFLGamesSamples/historical-samples/2023/2023-05-14_R9_ADEL_v_STK_CD_M20230140908/01-fixture-result.json",
+      "sha256": "27f9188f45041f8411c8fa92d99ea3d9e518b1e8630fde4e2a6a32e148064ccf",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/AFLGamesSamples/historical-samples/2023/2023-05-14_R9_ADEL_v_STK_CD_M20230140908/02-player-stats.raw.json",
+      "sha256": "14c3fc4cd774442c32d24d6f1bb7da76b510d0186b9ddb8d609bac73f9e3a2c9",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/AFLGamesSamples/historical-samples/2023/2023-05-14_R9_ADEL_v_STK_CD_M20230140908/03-match-roster.raw.json",
+      "sha256": "50e1e222111dfe7b79ef192698d8fdde1da8c6905e7303e5826f75201b44fbaa",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/AFLGamesSamples/historical-samples/2024/2024-04-27_R7_NMFC_v_ADEL_CD_M20240140705/01-fixture-result.json",
+      "sha256": "13fd2a5a389ec10346c1beb9fc244ad03349915347070512e5695ddb6d48e6f5",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/AFLGamesSamples/historical-samples/2024/2024-04-27_R7_NMFC_v_ADEL_CD_M20240140705/02-player-stats.raw.json",
+      "sha256": "1ffc3d1be41e2f78405d518cfa39e5ce2e56da76c9c150a8d0be7672b46ca93f",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/AFLGamesSamples/historical-samples/2024/2024-04-27_R7_NMFC_v_ADEL_CD_M20240140705/03-match-roster.raw.json",
+      "sha256": "215e137f214b8fc02492d325a57600e5714a70845a9f2c1e362ae3f15cbc65e3",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/AFLGamesSamples/historical-samples/2024/2024-07-13_R18_ADEL_v_STK_CD_M20240141801/01-fixture-result.json",
+      "sha256": "72103331c509b4724f51917814e0e40407e91d19cbaac493f78bb3c17a3bfc1e",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/AFLGamesSamples/historical-samples/2024/2024-07-13_R18_ADEL_v_STK_CD_M20240141801/02-player-stats.raw.json",
+      "sha256": "e90f92e2424f68eedb1518bc6b21587d6e915078fe8297cc7fcb39dc95758065",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/AFLGamesSamples/historical-samples/2024/2024-07-13_R18_ADEL_v_STK_CD_M20240141801/03-match-roster.raw.json",
+      "sha256": "37ee325859fae5e2bdc18e789d6be83b6df5354fbb67f79d0d2b6d3d9ac5b22c",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/AFLGamesSamples/historical-samples/2024/2024-08-04_R21_GWS_v_HAW_CD_M20240142104/01-fixture-result.json",
+      "sha256": "b9e00464b170db3c67c6a903796b873a5c58b165ad2299e7cdd4d923c808a287",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/AFLGamesSamples/historical-samples/2024/2024-08-04_R21_GWS_v_HAW_CD_M20240142104/02-player-stats.raw.json",
+      "sha256": "6c6b8640397aaeaa490ffc82f3090f529b3ff17c3d2937cdf373e43eaa15b572",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/AFLGamesSamples/historical-samples/2024/2024-08-04_R21_GWS_v_HAW_CD_M20240142104/03-match-roster.raw.json",
+      "sha256": "854c53e98c59388dc50add12bd50d7a3706c2a05db408ff74c091cea3b344905",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/AFLGamesSamples/historical-samples/2025/2025-05-04_R8_SYD_v_GWS_CD_M20250140807/01-fixture-result.json",
+      "sha256": "c8ed9332fa3ada63fd04e123f9cd7e079990414ad635cc4d53041de8955349b1",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/AFLGamesSamples/historical-samples/2025/2025-05-04_R8_SYD_v_GWS_CD_M20250140807/02-player-stats.raw.json",
+      "sha256": "450818408b977f838c6754ca995fc0654c5bd0533f15d9ff64642b8b8b8661e8",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/AFLGamesSamples/historical-samples/2025/2025-05-04_R8_SYD_v_GWS_CD_M20250140807/03-match-roster.raw.json",
+      "sha256": "f85def7e9806336c8ede3dfa2c6e572af88a20ef075ffcbfaae592c0efe7b45f",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/AFLGamesSamples/historical-samples/2025/2025-05-10_R9_GCFC_v_WB_CD_M20250140905/01-fixture-result.json",
+      "sha256": "bfa82c4f4ddfee1bbc9acb43108cff86ddcc67b401b8642b104cf9969cd6e4f4",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/AFLGamesSamples/historical-samples/2025/2025-05-10_R9_GCFC_v_WB_CD_M20250140905/02-player-stats.raw.json",
+      "sha256": "4c78aa7fa0a96d61622f47adfe3270ce2b81185e20702e164ffa8c9fd6df3a8e",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/AFLGamesSamples/historical-samples/2025/2025-05-10_R9_GCFC_v_WB_CD_M20250140905/03-match-roster.raw.json",
+      "sha256": "709cffccf3d1b2e1aebbe501b286ec9b113b984c15decb0ac776d2abc76d02a3",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/AFLGamesSamples/historical-samples/2025/2025-08-15_R23_ESS_v_STK_CD_M20250142303/01-fixture-result.json",
+      "sha256": "35fb6cb8569c3d32521a5b9baf7a6a7037b0b22fdebd2cff7e21871891b53e07",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/AFLGamesSamples/historical-samples/2025/2025-08-15_R23_ESS_v_STK_CD_M20250142303/02-player-stats.raw.json",
+      "sha256": "d67fdaf8451cded292297f027c9b0b25d12b91cb7ffb3fb6a84bc9e51e7525ef",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/AFLGamesSamples/historical-samples/2025/2025-08-15_R23_ESS_v_STK_CD_M20250142303/03-match-roster.raw.json",
+      "sha256": "15b9699e5b615bd741551500f7b7ee701d92e8fb46159ef2880067cecd429990",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/AFLGamesSamples/monitor-CD_M20260142801/20260919-214114/01-fixture.json",
+      "sha256": "b6fa1f3ab9d541fbdcc23f77d4d1c74a71ec8efec55beff9a2de58a82573ad14",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/AFLGamesSamples/monitor-CD_M20260142801/20260919-214114/02-player-stats.json",
+      "sha256": "bc27a2e2ad7df0150f9b960d51596a02e3e47fe07e6f0004e9c4df5acfddba9c",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/AFLGamesSamples/monitor-CD_M20260142801/20260919-214114/03-match-roster.json",
+      "sha256": "9a29a7daa679b3ac0b878bc5d7b61b78b11433708be4e1d06378a504768c1088",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/AFLGamesSamples/monitor-CD_M20260142801/20260919-214114/snapshot-meta.json",
+      "sha256": "3b7751ad372f051648ce20db20e9456b53b02f9e5982bd49bd0665db0253f3d2",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/BrownlowSamples/brownlow-samples/2022/01-brownlow-season.raw.json",
+      "sha256": "f252b4e1fa7a77e69f458b0e4a2fa062c2717e63b52df4b58465ce67814865c6",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/BrownlowSamples/brownlow-samples/2022/02-brownlow-leaderboard.raw.json",
+      "sha256": "335540970917d84f061d908c71b90e86cbe4aa21a44f063f72e3da6623efd2f2",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/BrownlowSamples/brownlow-samples/2022/06-validation.json",
+      "sha256": "24c3cdadf8292e3b6cfb8e4be27bd129059c97c3cef56718ec8c663cd02f4475",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/BrownlowSamples/brownlow-samples/2023/01-brownlow-season.raw.json",
+      "sha256": "2bb28650ab4fda85f29770464001547a65ed47d24038068fa6b0d405740a29e5",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/BrownlowSamples/brownlow-samples/2023/02-brownlow-leaderboard.raw.json",
+      "sha256": "ba8a8806b0b8dd59d59a59a704d90d3cfcffedb731a1b4ae715a744424ce9c41",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/BrownlowSamples/brownlow-samples/2023/06-validation.json",
+      "sha256": "205a80a4bc738f748ea24ce276bfe7c19eb1c162fc5b066cf3f6ac076bf2a067",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/BrownlowSamples/brownlow-samples/2024/01-brownlow-season.raw.json",
+      "sha256": "aa7714424176a6345c9e47c6a0ea7ddeb3e9c325dd71b54d9372236c512b45de",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/BrownlowSamples/brownlow-samples/2024/02-brownlow-leaderboard.raw.json",
+      "sha256": "fd74924bd4209f404960376624d7d7703b3852cfaa01fc0550293cc9eb5bae51",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/BrownlowSamples/brownlow-samples/2024/06-validation.json",
+      "sha256": "9b2294beb5c45030d1d278c7cc8993f0e30ee32a1453a480e8af9f84b6776a6d",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/BrownlowSamples/brownlow-samples/2025/01-brownlow-season.raw.json",
+      "sha256": "caefb66a0c4c430adb134a50a84fb50278159bdbc29ce27a6727d80c960d7cc6",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/BrownlowSamples/brownlow-samples/2025/02-brownlow-leaderboard.raw.json",
+      "sha256": "5139c878881fa5e44188b87fc26e9faa09b56129434ebb4897c6a00b7e2b9c27",
+      "status": "present"
+    },
+    {
+      "file": "data/sources/AFLWebsite/BrownlowSamples/brownlow-samples/2025/06-validation.json",
+      "sha256": "c494aa34f5ae556943656d6f7e00faaf44a5c395687b88b11e19b442f5053c24",
+      "status": "present"
+    }
+  ],
+  "assertions": [
+    {
+      "assertion": "1: schema stability (match, player_match_stats leaf sets non-empty and shared)",
+      "outcome": "pass",
+      "detail": "match: 68 column(s); player_match_stats: 168 column(s)."
+    },
+    {
+      "assertion": "2: round mapping (folder R<n> + offset)",
+      "outcome": "pass",
+      "detail": "12/12 matched."
+    },
+    {
+      "assertion": "3: counts and arithmetic (goals*6+behinds == totalScore)",
+      "outcome": "pass",
+      "detail": "14/14 matched."
+    },
+    {
+      "assertion": "4: cumulative conversion reproduces final score",
+      "outcome": "pass",
+      "detail": "14/14 matched (0 match(es) had no own-match recentMatchScores entry — skipped, not failed)."
+    },
+    {
+      "assertion": "5: match_key resolution on afldb_test",
+      "outcome": "skipped",
+      "detail": "requires afldb_test (integration, read-only) — not run by this DB-free harness."
+    },
+    {
+      "assertion": "6: stat parity on afldb_test",
+      "outcome": "skipped",
+      "detail": "requires afldb_test via the S5 bridge — not run by this DB-free harness."
+    },
+    {
+      "assertion": "7: bridge coverage",
+      "outcome": "skipped",
+      "detail": "requires the S5 player bridge, not yet built."
+    },
+    {
+      "assertion": "8: idempotency (re-parse same bytes -> identical semantic hash)",
+      "outcome": "pass",
+      "detail": "14/14 matched."
+    },
+    {
+      "assertion": "9: semantic hash evidence (10:29 vs 21:41 captures)",
+      "outcome": "skipped",
+      "detail": "fixture absent: 1 capture(s) found under monitor-CD_M20260142801 (need 2). Never a silent pass."
+    },
+    {
+      "assertion": "10: Brownlow (vote-set integrity, leaderboard reconciliation, provider ids)",
+      "outcome": "pass",
+      "detail": "4/4 season(s) reconciled with 0 defects."
+    },
+    {
+      "assertion": "10 (cont'd): every matchId resolves to a canonical H&A match on afldb_test",
+      "outcome": "skipped",
+      "detail": "requires afldb_test — not run by this DB-free harness."
+    }
+  ],
+  "discoveredColumns": {
+    "match": [
+      "away.score.behinds",
+      "away.score.goals",
+      "away.score.superGoals",
+      "away.score.totalScore",
+      "away.team.abbreviation",
+      "away.team.club.abbreviation",
+      "away.team.club.id",
+      "away.team.club.name",
+      "away.team.club.nickname",
+      "away.team.club.providerId",
+      "away.team.id",
+      "away.team.name",
+      "away.team.nickname",
+      "away.team.providerId",
+      "away.team.teamType",
+      "compSeason.currentRoundNumber",
+      "compSeason.id",
+      "compSeason.name",
+      "compSeason.providerId",
+      "compSeason.shortName",
+      "home.score.behinds",
+      "home.score.goals",
+      "home.score.superGoals",
+      "home.score.totalScore",
+      "home.team.abbreviation",
+      "home.team.club.abbreviation",
+      "home.team.club.id",
+      "home.team.club.name",
+      "home.team.club.nickname",
+      "home.team.club.providerId",
+      "home.team.id",
+      "home.team.name",
+      "home.team.nickname",
+      "home.team.providerId",
+      "home.team.teamType",
+      "id",
+      "metadata.finals_match_label",
+      "metadata.k2k_link",
+      "metadata.ticket_link",
+      "providerId",
+      "round.abbreviation",
+      "round.byes.abbreviation",
+      "round.byes.club.abbreviation",
+      "round.byes.club.id",
+      "round.byes.club.name",
+      "round.byes.club.nickname",
+      "round.byes.club.providerId",
+      "round.byes.id",
+      "round.byes.name",
+      "round.byes.nickname",
+      "round.byes.providerId",
+      "round.byes.teamType",
+      "round.id",
+      "round.name",
+      "round.providerId",
+      "round.roundNumber",
+      "round.utcEndTime",
+      "round.utcStartTime",
+      "status",
+      "utcStartTime",
+      "venue.abbreviation",
+      "venue.id",
+      "venue.landOwner",
+      "venue.location",
+      "venue.name",
+      "venue.providerId",
+      "venue.state",
+      "venue.timezone"
+    ],
+    "match_roster": [],
+    "player_match_stats": [
+      "awayTeamPlayerStats.player.jumperNumber",
+      "awayTeamPlayerStats.player.photoURL",
+      "awayTeamPlayerStats.player.player.player.captain",
+      "awayTeamPlayerStats.player.player.player.playerId",
+      "awayTeamPlayerStats.player.player.player.playerJumperNumber",
+      "awayTeamPlayerStats.player.player.player.playerName.givenName",
+      "awayTeamPlayerStats.player.player.player.playerName.surname",
+      "awayTeamPlayerStats.player.player.position",
+      "awayTeamPlayerStats.playerStats.gamesPlayed",
+      "awayTeamPlayerStats.playerStats.lastUpdated",
+      "awayTeamPlayerStats.playerStats.player.captain",
+      "awayTeamPlayerStats.playerStats.player.playerId",
+      "awayTeamPlayerStats.playerStats.player.playerJumperNumber",
+      "awayTeamPlayerStats.playerStats.player.playerName.givenName",
+      "awayTeamPlayerStats.playerStats.player.playerName.surname",
+      "awayTeamPlayerStats.playerStats.stats.behinds",
+      "awayTeamPlayerStats.playerStats.stats.bounces",
+      "awayTeamPlayerStats.playerStats.stats.clangers",
+      "awayTeamPlayerStats.playerStats.stats.clearances.centreClearances",
+      "awayTeamPlayerStats.playerStats.stats.clearances.stoppageClearances",
+      "awayTeamPlayerStats.playerStats.stats.clearances.totalClearances",
+      "awayTeamPlayerStats.playerStats.stats.contestedMarks",
+      "awayTeamPlayerStats.playerStats.stats.contestedPossessions",
+      "awayTeamPlayerStats.playerStats.stats.disposalEfficiency",
+      "awayTeamPlayerStats.playerStats.stats.disposals",
+      "awayTeamPlayerStats.playerStats.stats.dreamTeamPoints",
+      "awayTeamPlayerStats.playerStats.stats.extendedStats.centreBounceAttendances",
+      "awayTeamPlayerStats.playerStats.stats.extendedStats.contestDefLossPercentage",
+      "awayTeamPlayerStats.playerStats.stats.extendedStats.contestDefLosses",
+      "awayTeamPlayerStats.playerStats.stats.extendedStats.contestDefOneOnOnes",
+      "awayTeamPlayerStats.playerStats.stats.extendedStats.contestOffOneOnOnes",
+      "awayTeamPlayerStats.playerStats.stats.extendedStats.contestOffWins",
+      "awayTeamPlayerStats.playerStats.stats.extendedStats.contestOffWinsPercentage",
+      "awayTeamPlayerStats.playerStats.stats.extendedStats.contestedPossessionRate",
+      "awayTeamPlayerStats.playerStats.stats.extendedStats.defHalfPressureActs",
+      "awayTeamPlayerStats.playerStats.stats.extendedStats.effectiveDisposals",
+      "awayTeamPlayerStats.playerStats.stats.extendedStats.effectiveKicks",
+      "awayTeamPlayerStats.playerStats.stats.extendedStats.f50GroundBallGets",
+      "awayTeamPlayerStats.playerStats.stats.extendedStats.groundBallGets",
+      "awayTeamPlayerStats.playerStats.stats.extendedStats.hitoutToAdvantageRate",
+      "awayTeamPlayerStats.playerStats.stats.extendedStats.hitoutWinPercentage",
+      "awayTeamPlayerStats.playerStats.stats.extendedStats.hitoutsToAdvantage",
+      "awayTeamPlayerStats.playerStats.stats.extendedStats.interceptMarks",
+      "awayTeamPlayerStats.playerStats.stats.extendedStats.kickEfficiency",
+      "awayTeamPlayerStats.playerStats.stats.extendedStats.kickToHandballRatio",
+      "awayTeamPlayerStats.playerStats.stats.extendedStats.kickins",
+      "awayTeamPlayerStats.playerStats.stats.extendedStats.kickinsPlayon",
+      "awayTeamPlayerStats.playerStats.stats.extendedStats.marksOnLead",
+      "awayTeamPlayerStats.playerStats.stats.extendedStats.pressureActs",
+      "awayTeamPlayerStats.playerStats.stats.extendedStats.ruckContests",
+      "awayTeamPlayerStats.playerStats.stats.extendedStats.scoreLaunches",
+      "awayTeamPlayerStats.playerStats.stats.extendedStats.spoils",
+      "awayTeamPlayerStats.playerStats.stats.freesAgainst",
+      "awayTeamPlayerStats.playerStats.stats.freesFor",
+      "awayTeamPlayerStats.playerStats.stats.goalAccuracy",
+      "awayTeamPlayerStats.playerStats.stats.goalAssists",
+      "awayTeamPlayerStats.playerStats.stats.goalEfficiency",
+      "awayTeamPlayerStats.playerStats.stats.goals",
+      "awayTeamPlayerStats.playerStats.stats.handballs",
+      "awayTeamPlayerStats.playerStats.stats.hitouts",
+      "awayTeamPlayerStats.playerStats.stats.inside50s",
+      "awayTeamPlayerStats.playerStats.stats.intercepts",
+      "awayTeamPlayerStats.playerStats.stats.interchangeCounts",
+      "awayTeamPlayerStats.playerStats.stats.kicks",
+      "awayTeamPlayerStats.playerStats.stats.lastUpdated",
+      "awayTeamPlayerStats.playerStats.stats.marks",
+      "awayTeamPlayerStats.playerStats.stats.marksInside50",
+      "awayTeamPlayerStats.playerStats.stats.metresGained",
+      "awayTeamPlayerStats.playerStats.stats.onePercenters",
+      "awayTeamPlayerStats.playerStats.stats.ranking",
+      "awayTeamPlayerStats.playerStats.stats.ratingPoints",
+      "awayTeamPlayerStats.playerStats.stats.rebound50s",
+      "awayTeamPlayerStats.playerStats.stats.scoreInvolvements",
+      "awayTeamPlayerStats.playerStats.stats.shotEfficiency",
+      "awayTeamPlayerStats.playerStats.stats.shotsAtGoal",
+      "awayTeamPlayerStats.playerStats.stats.superGoals",
+      "awayTeamPlayerStats.playerStats.stats.tackles",
+      "awayTeamPlayerStats.playerStats.stats.tacklesInside50",
+      "awayTeamPlayerStats.playerStats.stats.totalPossessions",
+      "awayTeamPlayerStats.playerStats.stats.turnovers",
+      "awayTeamPlayerStats.playerStats.stats.uncontestedPossessions",
+      "awayTeamPlayerStats.playerStats.teamId",
+      "awayTeamPlayerStats.playerStats.timeOnGroundPercentage",
+      "awayTeamPlayerStats.teamId",
+      "homeTeamPlayerStats.player.jumperNumber",
+      "homeTeamPlayerStats.player.photoURL",
+      "homeTeamPlayerStats.player.player.player.captain",
+      "homeTeamPlayerStats.player.player.player.playerId",
+      "homeTeamPlayerStats.player.player.player.playerJumperNumber",
+      "homeTeamPlayerStats.player.player.player.playerName.givenName",
+      "homeTeamPlayerStats.player.player.player.playerName.surname",
+      "homeTeamPlayerStats.player.player.position",
+      "homeTeamPlayerStats.playerStats.gamesPlayed",
+      "homeTeamPlayerStats.playerStats.lastUpdated",
+      "homeTeamPlayerStats.playerStats.player.captain",
+      "homeTeamPlayerStats.playerStats.player.playerId",
+      "homeTeamPlayerStats.playerStats.player.playerJumperNumber",
+      "homeTeamPlayerStats.playerStats.player.playerName.givenName",
+      "homeTeamPlayerStats.playerStats.player.playerName.surname",
+      "homeTeamPlayerStats.playerStats.stats.behinds",
+      "homeTeamPlayerStats.playerStats.stats.bounces",
+      "homeTeamPlayerStats.playerStats.stats.clangers",
+      "homeTeamPlayerStats.playerStats.stats.clearances.centreClearances",
+      "homeTeamPlayerStats.playerStats.stats.clearances.stoppageClearances",
+      "homeTeamPlayerStats.playerStats.stats.clearances.totalClearances",
+      "homeTeamPlayerStats.playerStats.stats.contestedMarks",
+      "homeTeamPlayerStats.playerStats.stats.contestedPossessions",
+      "homeTeamPlayerStats.playerStats.stats.disposalEfficiency",
+      "homeTeamPlayerStats.playerStats.stats.disposals",
+      "homeTeamPlayerStats.playerStats.stats.dreamTeamPoints",
+      "homeTeamPlayerStats.playerStats.stats.extendedStats.centreBounceAttendances",
+      "homeTeamPlayerStats.playerStats.stats.extendedStats.contestDefLossPercentage",
+      "homeTeamPlayerStats.playerStats.stats.extendedStats.contestDefLosses",
+      "homeTeamPlayerStats.playerStats.stats.extendedStats.contestDefOneOnOnes",
+      "homeTeamPlayerStats.playerStats.stats.extendedStats.contestOffOneOnOnes",
+      "homeTeamPlayerStats.playerStats.stats.extendedStats.contestOffWins",
+      "homeTeamPlayerStats.playerStats.stats.extendedStats.contestOffWinsPercentage",
+      "homeTeamPlayerStats.playerStats.stats.extendedStats.contestedPossessionRate",
+      "homeTeamPlayerStats.playerStats.stats.extendedStats.defHalfPressureActs",
+      "homeTeamPlayerStats.playerStats.stats.extendedStats.effectiveDisposals",
+      "homeTeamPlayerStats.playerStats.stats.extendedStats.effectiveKicks",
+      "homeTeamPlayerStats.playerStats.stats.extendedStats.f50GroundBallGets",
+      "homeTeamPlayerStats.playerStats.stats.extendedStats.groundBallGets",
+      "homeTeamPlayerStats.playerStats.stats.extendedStats.hitoutToAdvantageRate",
+      "homeTeamPlayerStats.playerStats.stats.extendedStats.hitoutWinPercentage",
+      "homeTeamPlayerStats.playerStats.stats.extendedStats.hitoutsToAdvantage",
+      "homeTeamPlayerStats.playerStats.stats.extendedStats.interceptMarks",
+      "homeTeamPlayerStats.playerStats.stats.extendedStats.kickEfficiency",
+      "homeTeamPlayerStats.playerStats.stats.extendedStats.kickToHandballRatio",
+      "homeTeamPlayerStats.playerStats.stats.extendedStats.kickins",
+      "homeTeamPlayerStats.playerStats.stats.extendedStats.kickinsPlayon",
+      "homeTeamPlayerStats.playerStats.stats.extendedStats.marksOnLead",
+      "homeTeamPlayerStats.playerStats.stats.extendedStats.pressureActs",
+      "homeTeamPlayerStats.playerStats.stats.extendedStats.ruckContests",
+      "homeTeamPlayerStats.playerStats.stats.extendedStats.scoreLaunches",
+      "homeTeamPlayerStats.playerStats.stats.extendedStats.spoils",
+      "homeTeamPlayerStats.playerStats.stats.freesAgainst",
+      "homeTeamPlayerStats.playerStats.stats.freesFor",
+      "homeTeamPlayerStats.playerStats.stats.goalAccuracy",
+      "homeTeamPlayerStats.playerStats.stats.goalAssists",
+      "homeTeamPlayerStats.playerStats.stats.goalEfficiency",
+      "homeTeamPlayerStats.playerStats.stats.goals",
+      "homeTeamPlayerStats.playerStats.stats.handballs",
+      "homeTeamPlayerStats.playerStats.stats.hitouts",
+      "homeTeamPlayerStats.playerStats.stats.inside50s",
+      "homeTeamPlayerStats.playerStats.stats.intercepts",
+      "homeTeamPlayerStats.playerStats.stats.interchangeCounts",
+      "homeTeamPlayerStats.playerStats.stats.kicks",
+      "homeTeamPlayerStats.playerStats.stats.lastUpdated",
+      "homeTeamPlayerStats.playerStats.stats.marks",
+      "homeTeamPlayerStats.playerStats.stats.marksInside50",
+      "homeTeamPlayerStats.playerStats.stats.metresGained",
+      "homeTeamPlayerStats.playerStats.stats.onePercenters",
+      "homeTeamPlayerStats.playerStats.stats.ranking",
+      "homeTeamPlayerStats.playerStats.stats.ratingPoints",
+      "homeTeamPlayerStats.playerStats.stats.rebound50s",
+      "homeTeamPlayerStats.playerStats.stats.scoreInvolvements",
+      "homeTeamPlayerStats.playerStats.stats.shotEfficiency",
+      "homeTeamPlayerStats.playerStats.stats.shotsAtGoal",
+      "homeTeamPlayerStats.playerStats.stats.superGoals",
+      "homeTeamPlayerStats.playerStats.stats.tackles",
+      "homeTeamPlayerStats.playerStats.stats.tacklesInside50",
+      "homeTeamPlayerStats.playerStats.stats.totalPossessions",
+      "homeTeamPlayerStats.playerStats.stats.turnovers",
+      "homeTeamPlayerStats.playerStats.stats.uncontestedPossessions",
+      "homeTeamPlayerStats.playerStats.teamId",
+      "homeTeamPlayerStats.playerStats.timeOnGroundPercentage",
+      "homeTeamPlayerStats.teamId"
+    ],
+    "brownlow_match_votes": [
+      "matchVotes.matchId",
+      "matchVotes.roundNumber",
+      "matchVotes.votes.eligible",
+      "matchVotes.votes.player.givenName",
+      "matchVotes.votes.player.jumper",
+      "matchVotes.votes.player.photoURL",
+      "matchVotes.votes.player.playerId",
+      "matchVotes.votes.player.surname",
+      "matchVotes.votes.team.teamAbbr",
+      "matchVotes.votes.team.teamId",
+      "matchVotes.votes.team.teamName",
+      "matchVotes.votes.team.teamNickname",
+      "matchVotes.votes.votes",
+      "seasonId",
+      "status"
+    ],
+    "brownlow_leaderboard": [
+      "leaderboard.eligible",
+      "leaderboard.leader",
+      "leaderboard.player.givenName",
+      "leaderboard.player.jumper",
+      "leaderboard.player.photoURL",
+      "leaderboard.player.playerId",
+      "leaderboard.player.surname",
+      "leaderboard.roundByRoundTotalVotes.roundNumber",
+      "leaderboard.roundByRoundTotalVotes.votes",
+      "leaderboard.roundByRoundVotes.matchId",
+      "leaderboard.roundByRoundVotes.roundNumber",
+      "leaderboard.roundByRoundVotes.votes",
+      "leaderboard.team.teamAbbr",
+      "leaderboard.team.teamId",
+      "leaderboard.team.teamName",
+      "leaderboard.team.teamNickname",
+      "leaderboard.totalVotes",
+      "leaderboard.winner",
+      "seasonId",
+      "status",
+      "teamFilter"
+    ]
+  },
+  "counts": {
+    "matchesChecked": 14,
+    "brownlowSeasonsChecked": 4
+  }
+}

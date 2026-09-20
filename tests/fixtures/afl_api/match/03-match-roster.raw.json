@@ -1,0 +1,111 @@
+{
+  "match": {
+    "name": "Hawthorn v Brisbane Lions",
+    "date": "2026-09-19",
+    "status": "CONCLUDED",
+    "matchId": "CD_M20260142801"
+  },
+  "matchRoster": {
+    "status": "CONCLUDED",
+    "lastUpdated": "2026-09-19T10:22:58.857+0000",
+    "matchId": "CD_M20260142801",
+    "competitionId": "CD_S2026014",
+    "roundNumber": 28,
+    "weather": { "description": "Fine", "tempInCelsius": 14, "weatherType": "FINE" },
+    "umpires": [
+      { "umpireName": { "givenName": "Test", "surname": "Umpire" }, "umpireId": "CD_U1", "umpireType": "FIELD", "umpireNumber": 1 }
+    ],
+    "homeTeam": {
+      "teamName": "Hawthorn",
+      "teamAbbr": "HAW",
+      "teamNickname": "Hawks",
+      "matchId": "CD_M20260142801",
+      "teamId": "CD_T80",
+      "ins": [],
+      "outs": [],
+      "milestones": [],
+      "clubDebuts": [],
+      "positions": [
+        {
+          "position": "HBFL",
+          "player": {
+            "playerId": "CD_I297354",
+            "playerName": { "givenName": "Karl", "surname": "Amon" },
+            "captain": false,
+            "playerJumperNumber": 10
+          }
+        }
+      ]
+    },
+    "awayTeam": {
+      "teamName": "Brisbane Lions",
+      "teamAbbr": "BL",
+      "teamNickname": "Lions",
+      "matchId": "CD_M20260142801",
+      "teamId": "CD_T20",
+      "ins": [],
+      "outs": [],
+      "milestones": [],
+      "clubDebuts": [],
+      "positions": [
+        {
+          "position": "FF",
+          "player": {
+            "playerId": "CD_I500001",
+            "playerName": { "givenName": "Test", "surname": "Forward" },
+            "captain": false,
+            "playerJumperNumber": 25
+          }
+        }
+      ]
+    }
+  },
+  "recentMatchScores": [
+    {
+      "status": "CONCLUDED",
+      "matchId": "CD_M20260142801",
+      "homeTeamScore": {
+        "matchScore": { "totalScore": 122, "goals": 19, "behinds": 8, "superGoals": 0 },
+        "periodScore": [
+          { "periodNumber": 1, "score": { "totalScore": 31, "goals": 5, "behinds": 1, "superGoals": 0 } },
+          { "periodNumber": 2, "score": { "totalScore": 36, "goals": 6, "behinds": 0, "superGoals": 0 } },
+          { "periodNumber": 3, "score": { "totalScore": 10, "goals": 1, "behinds": 4, "superGoals": 0 } },
+          { "periodNumber": 4, "score": { "totalScore": 45, "goals": 7, "behinds": 3, "superGoals": 0 } }
+        ],
+        "rushedBehinds": 1,
+        "minutesInFront": 78
+      },
+      "awayTeamScore": {
+        "matchScore": { "totalScore": 131, "goals": 20, "behinds": 11, "superGoals": 0 },
+        "periodScore": [
+          { "periodNumber": 1, "score": { "totalScore": 25, "goals": 4, "behinds": 1, "superGoals": 0 } },
+          { "periodNumber": 2, "score": { "totalScore": 30, "goals": 5, "behinds": 0, "superGoals": 0 } },
+          { "periodNumber": 3, "score": { "totalScore": 40, "goals": 6, "behinds": 4, "superGoals": 0 } },
+          { "periodNumber": 4, "score": { "totalScore": 36, "goals": 5, "behinds": 6, "superGoals": 0 } }
+        ],
+        "rushedBehinds": 0,
+        "minutesInFront": 42
+      }
+    },
+    {
+      "status": "CONCLUDED",
+      "matchId": "CD_M20260142202",
+      "homeTeamScore": {
+        "matchScore": { "totalScore": 90, "goals": 14, "behinds": 6, "superGoals": 0 },
+        "periodScore": [
+          { "periodNumber": 1, "score": { "totalScore": 90, "goals": 14, "behinds": 6, "superGoals": 0 } }
+        ],
+        "rushedBehinds": 0,
+        "minutesInFront": 0
+      },
+      "awayTeamScore": {
+        "matchScore": { "totalScore": 80, "goals": 12, "behinds": 8, "superGoals": 0 },
+        "periodScore": [
+          { "periodNumber": 1, "score": { "totalScore": 80, "goals": 12, "behinds": 8, "superGoals": 0 } }
+        ],
+        "rushedBehinds": 0,
+        "minutesInFront": 0
+      }
+    }
+  ]
+}

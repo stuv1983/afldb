@@ -72,9 +72,13 @@ import {
 import {
   extractSettleCounters,
   parseSettleBatchNote,
+  SETTLE_BATCH_TOOL,
+  SETTLE_BATCH_TOOLS,
 } from '@/db/queries/settle-runs';
 import {
   parseUnitShow,
+  SETTLE_UNIT,
+  SETTLE_UNITS,
   summariseFailure,
   unitPhaseOf,
 } from '@/lib/acquisition/settle-trigger';
@@ -444,6 +448,37 @@ describe('settle batch projection', () => {
     expect(extractSettleCounters(null)).toBeNull();
     expect(extractSettleCounters(undefined)).toBeNull();
     expect(extractSettleCounters({})?.canonicalRowsInserted).toBe(0);
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * AFLDB-ISSUE-228 S8 (§17) — the three-unit table, additive over the
+ * ISSUE-127 single-unit contract above. DB-free: only the closed literal
+ * maps are asserted, exactly as `deploy/afldb-settle-afl-api*.service`'s
+ * `SyslogIdentifier=`/unit names and `settle-afl-api.ts:120` /
+ * `afl-api-brownlow.ts:121`'s own `SETTLE_BATCH_TOOL` literals name them.
+ * ------------------------------------------------------------------ */
+
+describe('AFLDB-ISSUE-228 S8 — settle unit and batch-tool tables', () => {
+  it('keeps the afltables key byte-identical to the pre-existing single unit', () => {
+    expect(SETTLE_UNITS.afltables).toBe(SETTLE_UNIT);
+    expect(SETTLE_BATCH_TOOLS.afltables).toBe(SETTLE_BATCH_TOOL);
+  });
+
+  it('names exactly the three units the S8 deploy files install', () => {
+    expect(SETTLE_UNITS).toEqual({
+      afltables: 'afldb-settle-afltables.service',
+      afl_api: 'afldb-settle-afl-api.service',
+      afl_api_brownlow: 'afldb-settle-afl-api-brownlow.service',
+    });
+  });
+
+  it('names exactly the three import_batches.tool literals the settle CLIs stamp', () => {
+    expect(SETTLE_BATCH_TOOLS).toEqual({
+      afltables: 'settle-afltables.ts',
+      afl_api: 'settle-afl-api.ts',
+      afl_api_brownlow: 'settle-afl-api-brownlow.ts',
+    });
   });
 });
 

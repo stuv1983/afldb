@@ -1,0 +1,67 @@
+{
+  "seasonId": "CD_S2026014",
+  "status": "IN_PROGRESS",
+  "teamFilter": null,
+  "leaderboard": [
+    {
+      "player": {
+        "photoURL": "https://s.afl.com.au/a.png",
+        "givenName": "Alpha",
+        "surname": "Player",
+        "playerId": "CD_I900001",
+        "jumper": 1
+      },
+      "team": { "teamId": "CD_T80", "teamAbbr": "HAW", "teamName": "Hawthorn", "teamNickname": "Hawks" },
+      "eligible": true,
+      "winner": false,
+      "leader": true,
+      "roundByRoundVotes": [
+        { "matchId": "CD_M20260142801", "roundNumber": 28, "votes": 3 }
+      ],
+      "roundByRoundTotalVotes": [
+        { "roundNumber": 28, "votes": 3 }
+      ],
+      "totalVotes": 3
+    },
+    {
+      "player": {
+        "photoURL": "https://s.afl.com.au/b.png",
+        "givenName": "Bravo",
+        "surname": "Player",
+        "playerId": "CD_I900002",
+        "jumper": 2
+      },
+      "team": { "teamId": "CD_T20", "teamAbbr": "BL", "teamName": "Brisbane Lions", "teamNickname": "Lions" },
+      "eligible": true,
+      "winner": false,
+      "leader": false,
+      "roundByRoundVotes": [
+        { "matchId": "CD_M20260142801", "roundNumber": 28, "votes": 2 }
+      ],
+      "roundByRoundTotalVotes": [
+        { "roundNumber": 28, "votes": 2 }
+      ],
+      "totalVotes": 2
+    },
+    {
+      "player": {
+        "photoURL": "https://s.afl.com.au/c.png",
+        "givenName": "Charlie",
+        "surname": "Player",
+        "playerId": "CD_I900003",
+        "jumper": 3
+      },
+      "team": { "teamId": "CD_T80", "teamAbbr": "HAW", "teamName": "Hawthorn", "teamNickname": "Hawks" },
+      "eligible": true,
+      "winner": false,
+      "leader": false,
+      "roundByRoundVotes": [
+        { "matchId": "CD_M20260142801", "roundNumber": 28, "votes": 1 }
+      ],
+      "roundByRoundTotalVotes": [
+        { "roundNumber": 28, "votes": 1 }
+      ],
+      "totalVotes": 1
+    }
+  ]
+}

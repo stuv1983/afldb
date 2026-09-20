@@ -1,0 +1,1069 @@
+{
+  "acceptance_rule": "unique normalised (given_name, surname) match within the canonical season-2025 club roster of the provider's Brownlow-vote team; name+team+season evidence, NOT stat-vector evidence",
+  "counts": {
+    "ambiguous": 0,
+    "contradictory": 0,
+    "linked": 61,
+    "providers_in_scope": 61,
+    "unresolved": 0
+  },
+  "generated_utc": "2026-09-20T05:53:18+00:00",
+  "inputs": [
+    {
+      "file": "data\\sources\\AFLWebsite\\BrownlowSamples\\brownlow-samples\\2025\\01-brownlow-season.raw.json",
+      "sha256": "caefb66a0c4c430adb134a50a84fb50278159bdbc29ce27a6727d80c960d7cc6"
+    },
+    {
+      "file": "data\\sources\\AFLWebsite\\BrownlowSamples\\brownlow-samples\\2025\\06-validation.json",
+      "sha256": "c494aa34f5ae556943656d6f7e00faaf44a5c395687b88b11e19b442f5053c24"
+    },
+    {
+      "file": "data\\reference\\afl-api-identities.json",
+      "sha256": "b2dd0784fc88cd801175976c041ddc1e5cc5e399805c06427f41dd06f51d10c2"
+    }
+  ],
+  "match_method": "afl_api_name_team_season_bootstrap",
+  "providers": {
+    "CD_I1000860": {
+      "candidate_player_id": 8356,
+      "candidates": [
+        {
+          "given_name": "Lachie",
+          "player_id": 8356,
+          "surname": "Schultz"
+        }
+      ],
+      "canonical_surname": "Schultz",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Lachie Schultz",
+      "observed_team_abbr": "COLL",
+      "observed_team_provider_id": "CD_T40",
+      "reason": null
+    },
+    "CD_I1001299": {
+      "candidate_player_id": 3040,
+      "candidates": [
+        {
+          "given_name": "Connor",
+          "player_id": 3040,
+          "surname": "Rozee"
+        }
+      ],
+      "canonical_surname": "Rozee",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Connor Rozee",
+      "observed_team_abbr": "PORT",
+      "observed_team_provider_id": "CD_T110",
+      "reason": null
+    },
+    "CD_I1002232": {
+      "candidate_player_id": 549,
+      "candidates": [
+        {
+          "given_name": "Andrew",
+          "player_id": 549,
+          "surname": "Brayshaw"
+        }
+      ],
+      "canonical_surname": "Brayshaw",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Andrew Brayshaw",
+      "observed_team_abbr": "FRE",
+      "observed_team_provider_id": "CD_T60",
+      "reason": null
+    },
+    "CD_I1002239": {
+      "candidate_player_id": 28,
+      "candidates": [
+        {
+          "given_name": "Adam",
+          "player_id": 28,
+          "surname": "Cerra"
+        }
+      ],
+      "canonical_surname": "Cerra",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Adam Cerra",
+      "observed_team_abbr": "CARL",
+      "observed_team_provider_id": "CD_T30",
+      "reason": null
+    },
+    "CD_I1005054": {
+      "candidate_player_id": 7859,
+      "candidates": [
+        {
+          "given_name": "Josh",
+          "player_id": 7859,
+          "surname": "Daicos"
+        }
+      ],
+      "canonical_surname": "Daicos",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Josh Daicos",
+      "observed_team_abbr": "COLL",
+      "observed_team_provider_id": "CD_T40",
+      "reason": null
+    },
+    "CD_I1006103": {
+      "candidate_player_id": 7950,
+      "candidates": [
+        {
+          "given_name": "Jye",
+          "player_id": 7950,
+          "surname": "Caldwell"
+        }
+      ],
+      "canonical_surname": "Caldwell",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Jye Caldwell",
+      "observed_team_abbr": "ESS",
+      "observed_team_provider_id": "CD_T50",
+      "reason": null
+    },
+    "CD_I1006121": {
+      "candidate_player_id": 13264,
+      "candidates": [
+        {
+          "given_name": "Zak",
+          "player_id": 13264,
+          "surname": "Butters"
+        }
+      ],
+      "canonical_surname": "Butters",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Zak Butters",
+      "observed_team_abbr": "PORT",
+      "observed_team_provider_id": "CD_T110",
+      "reason": null
+    },
+    "CD_I1006130": {
+      "candidate_player_id": 945,
+      "candidates": [
+        {
+          "given_name": "Bailey",
+          "player_id": 945,
+          "surname": "Smith"
+        }
+      ],
+      "canonical_surname": "Smith",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Bailey Smith",
+      "observed_team_abbr": "GEEL",
+      "observed_team_provider_id": "CD_T70",
+      "reason": null
+    },
+    "CD_I1006148": {
+      "candidate_player_id": 2031,
+      "candidates": [
+        {
+          "given_name": "Bobby",
+          "player_id": 2031,
+          "surname": "Hill"
+        }
+      ],
+      "canonical_surname": "Hill",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Bobby Hill",
+      "observed_team_abbr": "COLL",
+      "observed_team_provider_id": "CD_T40",
+      "reason": null
+    },
+    "CD_I1006152": {
+      "candidate_player_id": 7823,
+      "candidates": [
+        {
+          "given_name": "Jordan",
+          "player_id": 7823,
+          "surname": "Clark"
+        }
+      ],
+      "canonical_surname": "Clark",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Jordan Clark",
+      "observed_team_abbr": "FRE",
+      "observed_team_provider_id": "CD_T60",
+      "reason": null
+    },
+    "CD_I1009191": {
+      "candidate_player_id": 9690,
+      "candidates": [
+        {
+          "given_name": "Miles",
+          "player_id": 9690,
+          "surname": "Bergman"
+        }
+      ],
+      "canonical_surname": "Bergman",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Miles Bergman",
+      "observed_team_abbr": "PORT",
+      "observed_team_provider_id": "CD_T110",
+      "reason": null
+    },
+    "CD_I1009229": {
+      "candidate_player_id": 11620,
+      "candidates": [
+        {
+          "given_name": "Sam",
+          "player_id": 11620,
+          "surname": "De Koning"
+        }
+      ],
+      "canonical_surname": "De Koning",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Sam De Koning",
+      "observed_team_abbr": "GEEL",
+      "observed_team_provider_id": "CD_T70",
+      "reason": null
+    },
+    "CD_I1009241": {
+      "candidate_player_id": 2342,
+      "candidates": [
+        {
+          "given_name": "Brodie",
+          "player_id": 2342,
+          "surname": "Kemp"
+        }
+      ],
+      "canonical_surname": "Kemp",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Brodie Kemp",
+      "observed_team_abbr": "CARL",
+      "observed_team_provider_id": "CD_T30",
+      "reason": null
+    },
+    "CD_I1009256": {
+      "candidate_player_id": 5743,
+      "candidates": [
+        {
+          "given_name": "Hayden",
+          "player_id": 5743,
+          "surname": "Young"
+        }
+      ],
+      "canonical_surname": "Young",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Hayden Young",
+      "observed_team_abbr": "FRE",
+      "observed_team_provider_id": "CD_T60",
+      "reason": null
+    },
+    "CD_I1009399": {
+      "candidate_player_id": 8928,
+      "candidates": [
+        {
+          "given_name": "Luke",
+          "player_id": 8928,
+          "surname": "Jackson"
+        }
+      ],
+      "canonical_surname": "Jackson",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Luke Jackson",
+      "observed_team_abbr": "FRE",
+      "observed_team_provider_id": "CD_T60",
+      "reason": null
+    },
+    "CD_I1009420": {
+      "candidate_player_id": 2464,
+      "candidates": [
+        {
+          "given_name": "Caleb",
+          "player_id": 2464,
+          "surname": "Serong"
+        }
+      ],
+      "canonical_surname": "Serong",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Caleb Serong",
+      "observed_team_abbr": "FRE",
+      "observed_team_provider_id": "CD_T60",
+      "reason": null
+    },
+    "CD_I1010174": {
+      "candidate_player_id": 9704,
+      "candidates": [
+        {
+          "given_name": "Mitch",
+          "player_id": 9704,
+          "surname": "Georgiades"
+        }
+      ],
+      "canonical_surname": "Georgiades",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Mitch Georgiades",
+      "observed_team_abbr": "PORT",
+      "observed_team_provider_id": "CD_T110",
+      "reason": null
+    },
+    "CD_I1011640": {
+      "candidate_player_id": 6841,
+      "candidates": [
+        {
+          "given_name": "Jason",
+          "player_id": 6841,
+          "surname": "Horne-Francis"
+        }
+      ],
+      "canonical_surname": "Horne-Francis",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Jason Horne-Francis",
+      "observed_team_abbr": "PORT",
+      "observed_team_provider_id": "CD_T110",
+      "reason": null
+    },
+    "CD_I1012013": {
+      "candidate_player_id": 9896,
+      "candidates": [
+        {
+          "given_name": "Nic",
+          "player_id": 9896,
+          "surname": "Martin"
+        }
+      ],
+      "canonical_surname": "Martin",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Nic Martin",
+      "observed_team_abbr": "ESS",
+      "observed_team_provider_id": "CD_T50",
+      "reason": null
+    },
+    "CD_I1012819": {
+      "candidate_player_id": 7900,
+      "candidates": [
+        {
+          "given_name": "Josh",
+          "player_id": 7900,
+          "surname": "Treacy"
+        }
+      ],
+      "canonical_surname": "Treacy",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Josh Treacy",
+      "observed_team_abbr": "FRE",
+      "observed_team_provider_id": "CD_T60",
+      "reason": null
+    },
+    "CD_I1013197": {
+      "candidate_player_id": 11601,
+      "candidates": [
+        {
+          "given_name": "Sam",
+          "player_id": 11601,
+          "surname": "Banks"
+        }
+      ],
+      "canonical_surname": "Banks",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Sam Banks",
+      "observed_team_abbr": "RICH",
+      "observed_team_provider_id": "CD_T120",
+      "reason": null
+    },
+    "CD_I1016433": {
+      "candidate_player_id": 11831,
+      "candidates": [
+        {
+          "given_name": "Shannon",
+          "player_id": 11831,
+          "surname": "Neale"
+        }
+      ],
+      "canonical_surname": "Neale",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Shannon Neale",
+      "observed_team_abbr": "GEEL",
+      "observed_team_provider_id": "CD_T70",
+      "reason": null
+    },
+    "CD_I1017067": {
+      "candidate_player_id": 3307,
+      "candidates": [
+        {
+          "given_name": "Darcy",
+          "player_id": 3307,
+          "surname": "Wilmot"
+        }
+      ],
+      "canonical_surname": "Wilmot",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Darcy Wilmot",
+      "observed_team_abbr": "BL",
+      "observed_team_provider_id": "CD_T20",
+      "reason": null
+    },
+    "CD_I1017126": {
+      "candidate_player_id": 11615,
+      "candidates": [
+        {
+          "given_name": "Sam",
+          "player_id": 11615,
+          "surname": "Darcy"
+        }
+      ],
+      "canonical_surname": "Darcy",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Sam Darcy",
+      "observed_team_abbr": "WB",
+      "observed_team_provider_id": "CD_T140",
+      "reason": null
+    },
+    "CD_I1017754": {
+      "candidate_player_id": 10252,
+      "candidates": [
+        {
+          "given_name": "Patrick",
+          "player_id": 10252,
+          "surname": "Voss"
+        }
+      ],
+      "canonical_surname": "Voss",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Patrick Voss",
+      "observed_team_abbr": "FRE",
+      "observed_team_provider_id": "CD_T60",
+      "reason": null
+    },
+    "CD_I1020670": {
+      "candidate_player_id": 4092,
+      "candidates": [
+        {
+          "given_name": "Elijah",
+          "player_id": 4092,
+          "surname": "Hewett"
+        }
+      ],
+      "canonical_surname": "Hewett",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Elijah Hewett",
+      "observed_team_abbr": "WCE",
+      "observed_team_provider_id": "CD_T150",
+      "reason": null
+    },
+    "CD_I1023167": {
+      "candidate_player_id": 2105,
+      "candidates": [
+        {
+          "given_name": "Brady",
+          "player_id": 2105,
+          "surname": "Hough"
+        }
+      ],
+      "canonical_surname": "Hough",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Brady Hough",
+      "observed_team_abbr": "WCE",
+      "observed_team_provider_id": "CD_T150",
+      "reason": null
+    },
+    "CD_I1023261": {
+      "candidate_player_id": 9910,
+      "candidates": [
+        {
+          "given_name": "Nick",
+          "player_id": 9910,
+          "surname": "Daicos"
+        }
+      ],
+      "canonical_surname": "Daicos",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Nick Daicos",
+      "observed_team_abbr": "COLL",
+      "observed_team_provider_id": "CD_T40",
+      "reason": null
+    },
+    "CD_I1023482": {
+      "candidate_player_id": 2484,
+      "candidates": [
+        {
+          "given_name": "Cam",
+          "player_id": 2484,
+          "surname": "Mackenzie"
+        }
+      ],
+      "canonical_surname": "Mackenzie",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Cam Mackenzie",
+      "observed_team_abbr": "HAW",
+      "observed_team_provider_id": "CD_T80",
+      "reason": null
+    },
+    "CD_I1023492": {
+      "candidate_player_id": 5480,
+      "candidates": [
+        {
+          "given_name": "Harley",
+          "player_id": 5480,
+          "surname": "Reid"
+        }
+      ],
+      "canonical_surname": "Reid",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Harley Reid",
+      "observed_team_abbr": "WCE",
+      "observed_team_provider_id": "CD_T150",
+      "reason": null
+    },
+    "CD_I1023517": {
+      "candidate_player_id": 13180,
+      "candidates": [
+        {
+          "given_name": "Will",
+          "player_id": 13180,
+          "surname": "Ashcroft"
+        }
+      ],
+      "canonical_surname": "Ashcroft",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Will Ashcroft",
+      "observed_team_abbr": "BL",
+      "observed_team_provider_id": "CD_T20",
+      "reason": null
+    },
+    "CD_I1023681": {
+      "candidate_player_id": 5047,
+      "candidates": [
+        {
+          "given_name": "George",
+          "player_id": 5047,
+          "surname": "Stevens"
+        }
+      ],
+      "canonical_surname": "Stevens",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "George Stevens",
+      "observed_team_abbr": "GEEL",
+      "observed_team_provider_id": "CD_T70",
+      "reason": null
+    },
+    "CD_I1023708": {
+      "candidate_player_id": 6864,
+      "candidates": [
+        {
+          "given_name": "Jaspa",
+          "player_id": 6864,
+          "surname": "Fletcher"
+        }
+      ],
+      "canonical_surname": "Fletcher",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Jaspa Fletcher",
+      "observed_team_abbr": "BL",
+      "observed_team_provider_id": "CD_T20",
+      "reason": null
+    },
+    "CD_I1028019": {
+      "candidate_player_id": 8877,
+      "candidates": [
+        {
+          "given_name": "Logan",
+          "player_id": 8877,
+          "surname": "Morris"
+        }
+      ],
+      "canonical_surname": "Morris",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Logan Morris",
+      "observed_team_abbr": "BL",
+      "observed_team_provider_id": "CD_T20",
+      "reason": null
+    },
+    "CD_I1028513": {
+      "candidate_player_id": 9738,
+      "candidates": [
+        {
+          "given_name": "Murphy",
+          "player_id": 9738,
+          "surname": "Reid"
+        }
+      ],
+      "canonical_surname": "Reid",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Murphy Reid",
+      "observed_team_abbr": "FRE",
+      "observed_team_provider_id": "CD_T60",
+      "reason": null
+    },
+    "CD_I1029416": {
+      "candidate_player_id": 11585,
+      "candidates": [
+        {
+          "given_name": "Ryan",
+          "player_id": 11585,
+          "surname": "Maric"
+        }
+      ],
+      "canonical_surname": "Maric",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Ryan Maric",
+      "observed_team_abbr": "WCE",
+      "observed_team_provider_id": "CD_T150",
+      "reason": null
+    },
+    "CD_I260257": {
+      "candidate_player_id": 11724,
+      "candidates": [
+        {
+          "given_name": "Scott",
+          "player_id": 11724,
+          "surname": "Pendlebury"
+        }
+      ],
+      "canonical_surname": "Pendlebury",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Scott Pendlebury",
+      "observed_team_abbr": "COLL",
+      "observed_team_provider_id": "CD_T40",
+      "reason": null
+    },
+    "CD_I270917": {
+      "candidate_player_id": 10244,
+      "candidates": [
+        {
+          "given_name": "Patrick",
+          "player_id": 10244,
+          "surname": "Dangerfield"
+        }
+      ],
+      "canonical_surname": "Dangerfield",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Patrick Dangerfield",
+      "observed_team_abbr": "GEEL",
+      "observed_team_provider_id": "CD_T70",
+      "reason": null
+    },
+    "CD_I280824": {
+      "candidate_player_id": 6689,
+      "candidates": [
+        {
+          "given_name": "Jake",
+          "player_id": 6689,
+          "surname": "Melksham"
+        }
+      ],
+      "canonical_surname": "Melksham",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Jake Melksham",
+      "observed_team_abbr": "MELB",
+      "observed_team_provider_id": "CD_T90",
+      "reason": null
+    },
+    "CD_I280965": {
+      "candidate_player_id": 11982,
+      "candidates": [
+        {
+          "given_name": "Steele",
+          "player_id": 11982,
+          "surname": "Sidebottom"
+        }
+      ],
+      "canonical_surname": "Sidebottom",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Steele Sidebottom",
+      "observed_team_abbr": "COLL",
+      "observed_team_provider_id": "CD_T40",
+      "reason": null
+    },
+    "CD_I291313": {
+      "candidate_player_id": 6934,
+      "candidates": [
+        {
+          "given_name": "Jeremy",
+          "player_id": 6934,
+          "surname": "Howe"
+        }
+      ],
+      "canonical_surname": "Howe",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Jeremy Howe",
+      "observed_team_abbr": "COLL",
+      "observed_team_provider_id": "CD_T40",
+      "reason": null
+    },
+    "CD_I291783": {
+      "candidate_player_id": 4006,
+      "candidates": [
+        {
+          "given_name": "Dylan",
+          "player_id": 4006,
+          "surname": "Shiel"
+        }
+      ],
+      "canonical_surname": "Shiel",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Dylan Shiel",
+      "observed_team_abbr": "ESS",
+      "observed_team_provider_id": "CD_T50",
+      "reason": null
+    },
+    "CD_I293801": {
+      "candidate_player_id": 6768,
+      "candidates": [
+        {
+          "given_name": "Jamie",
+          "player_id": 6768,
+          "surname": "Elliott"
+        }
+      ],
+      "canonical_surname": "Elliott",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Jamie Elliott",
+      "observed_team_abbr": "COLL",
+      "observed_team_provider_id": "CD_T40",
+      "reason": null
+    },
+    "CD_I293871": {
+      "candidate_player_id": 6211,
+      "candidates": [
+        {
+          "given_name": "Jack",
+          "player_id": 6211,
+          "surname": "Crisp"
+        }
+      ],
+      "canonical_surname": "Crisp",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Jack Crisp",
+      "observed_team_abbr": "COLL",
+      "observed_team_provider_id": "CD_T40",
+      "reason": null
+    },
+    "CD_I294318": {
+      "candidate_player_id": 10130,
+      "candidates": [
+        {
+          "given_name": "Ollie",
+          "player_id": 10130,
+          "surname": "Wines"
+        }
+      ],
+      "canonical_surname": "Wines",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Ollie Wines",
+      "observed_team_abbr": "PORT",
+      "observed_team_provider_id": "CD_T110",
+      "reason": null
+    },
+    "CD_I294469": {
+      "candidate_player_id": 439,
+      "candidates": [
+        {
+          "given_name": "Aliir",
+          "player_id": 439,
+          "surname": "Aliir"
+        }
+      ],
+      "canonical_surname": "Aliir",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Aliir Aliir",
+      "observed_team_abbr": "PORT",
+      "observed_team_provider_id": "CD_T110",
+      "reason": null
+    },
+    "CD_I294613": {
+      "candidate_player_id": 6671,
+      "candidates": [
+        {
+          "given_name": "Jaeger",
+          "player_id": 6671,
+          "surname": "OMeara"
+        }
+      ],
+      "canonical_surname": "OMeara",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Jaeger O'Meara",
+      "observed_team_abbr": "FRE",
+      "observed_team_provider_id": "CD_T60",
+      "reason": null
+    },
+    "CD_I296347": {
+      "candidate_player_id": 7880,
+      "candidates": [
+        {
+          "given_name": "Josh",
+          "player_id": 7880,
+          "surname": "Kelly"
+        }
+      ],
+      "canonical_surname": "Kelly",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Josh Kelly",
+      "observed_team_abbr": "GWS",
+      "observed_team_provider_id": "CD_T1010",
+      "reason": null
+    },
+    "CD_I296359": {
+      "candidate_player_id": 2819,
+      "candidates": [
+        {
+          "given_name": "Christian",
+          "player_id": 2819,
+          "surname": "Salem"
+        }
+      ],
+      "canonical_surname": "Salem",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Christian Salem",
+      "observed_team_abbr": "MELB",
+      "observed_team_provider_id": "CD_T90",
+      "reason": null
+    },
+    "CD_I297354": {
+      "candidate_player_id": 7974,
+      "candidates": [
+        {
+          "given_name": "Karl",
+          "player_id": 7974,
+          "surname": "Amon"
+        }
+      ],
+      "canonical_surname": "Amon",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Karl Amon",
+      "observed_team_abbr": "HAW",
+      "observed_team_provider_id": "CD_T80",
+      "reason": null
+    },
+    "CD_I298288": {
+      "candidate_player_id": 3303,
+      "candidates": [
+        {
+          "given_name": "Darcy",
+          "player_id": 3303,
+          "surname": "Moore"
+        }
+      ],
+      "canonical_surname": "Moore",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Darcy Moore",
+      "observed_team_abbr": "COLL",
+      "observed_team_provider_id": "CD_T40",
+      "reason": null
+    },
+    "CD_I298409": {
+      "candidate_player_id": 345,
+      "candidates": [
+        {
+          "given_name": "Alex",
+          "player_id": 345,
+          "surname": "Pearce"
+        }
+      ],
+      "canonical_surname": "Pearce",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Alex Pearce",
+      "observed_team_abbr": "FRE",
+      "observed_team_provider_id": "CD_T60",
+      "reason": null
+    },
+    "CD_I992016": {
+      "candidate_player_id": 13259,
+      "candidates": [
+        {
+          "given_name": "Zach",
+          "player_id": 13259,
+          "surname": "Merrett"
+        }
+      ],
+      "canonical_surname": "Merrett",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Zach Merrett",
+      "observed_team_abbr": "ESS",
+      "observed_team_provider_id": "CD_T50",
+      "reason": null
+    },
+    "CD_I993832": {
+      "candidate_player_id": 6666,
+      "candidates": [
+        {
+          "given_name": "Jacob",
+          "player_id": 6666,
+          "surname": "Weitering"
+        }
+      ],
+      "canonical_surname": "Weitering",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Jacob Weitering",
+      "observed_team_abbr": "CARL",
+      "observed_team_provider_id": "CD_T30",
+      "reason": null
+    },
+    "CD_I993834": {
+      "candidate_player_id": 7864,
+      "candidates": [
+        {
+          "given_name": "Josh",
+          "player_id": 7864,
+          "surname": "Dunkley"
+        }
+      ],
+      "canonical_surname": "Dunkley",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Josh Dunkley",
+      "observed_team_abbr": "BL",
+      "observed_team_provider_id": "CD_T20",
+      "reason": null
+    },
+    "CD_I993878": {
+      "candidate_player_id": 11842,
+      "candidates": [
+        {
+          "given_name": "Shaun",
+          "player_id": 11842,
+          "surname": "Mannagh"
+        }
+      ],
+      "canonical_surname": "Mannagh",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Shaun Mannagh",
+      "observed_team_abbr": "GEEL",
+      "observed_team_provider_id": "CD_T70",
+      "reason": null
+    },
+    "CD_I993979": {
+      "candidate_player_id": 11668,
+      "candidates": [
+        {
+          "given_name": "Sam",
+          "player_id": 11668,
+          "surname": "Powell-Pepper"
+        }
+      ],
+      "canonical_surname": "Powell-Pepper",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Sam Powell-Pepper",
+      "observed_team_abbr": "PORT",
+      "observed_team_provider_id": "CD_T110",
+      "reason": null
+    },
+    "CD_I994185": {
+      "candidate_player_id": 7840,
+      "candidates": [
+        {
+          "given_name": "Jordan",
+          "player_id": 7840,
+          "surname": "de Goey"
+        }
+      ],
+      "canonical_surname": "de Goey",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Jordan De Goey",
+      "observed_team_abbr": "COLL",
+      "observed_team_provider_id": "CD_T40",
+      "reason": null
+    },
+    "CD_I994295": {
+      "candidate_player_id": 3191,
+      "candidates": [
+        {
+          "given_name": "Dan",
+          "player_id": 3191,
+          "surname": "Houston"
+        }
+      ],
+      "canonical_surname": "Houston",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Dan Houston",
+      "observed_team_abbr": "COLL",
+      "observed_team_provider_id": "CD_T40",
+      "reason": null
+    },
+    "CD_I997230": {
+      "candidate_player_id": 12906,
+      "candidates": [
+        {
+          "given_name": "Tyson",
+          "player_id": 12906,
+          "surname": "Stengle"
+        }
+      ],
+      "canonical_surname": "Stengle",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Tyson Stengle",
+      "observed_team_abbr": "GEEL",
+      "observed_team_provider_id": "CD_T70",
+      "reason": null
+    },
+    "CD_I998659": {
+      "candidate_player_id": 8952,
+      "candidates": [
+        {
+          "given_name": "Luke",
+          "player_id": 8952,
+          "surname": "Ryan"
+        }
+      ],
+      "canonical_surname": "Ryan",
+      "disposition": "linked",
+      "evidence_summary": "unique 2025 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Luke Ryan",
+      "observed_team_abbr": "FRE",
+      "observed_team_provider_id": "CD_T60",
+      "reason": null
+    }
+  },
+  "season": 2025,
+  "source_key": "afl_api",
+  "tool": "tools/migration/build_afl_api_brownlow_name_bridge.py",
+  "tool_version": "1.0.0"
+}

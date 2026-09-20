@@ -89,6 +89,21 @@ import {
   type SourceFamilyContract,
   type SourceFamilyRegistry,
 } from './source-families';
+import {
+  affectedPlayerIds,
+  agreementRestored as coreAgreementRestored,
+  canonicalApplyIssueKey as coreCanonicalApplyIssueKey,
+  disagreementConflicts as coreDisagreementConflicts,
+  disagreementSeverity as coreDisagreementSeverity,
+  draftDisagreementIssue as coreDraftDisagreementIssue,
+  resolveAppliedFailureFinding as coreResolveAppliedFailureFinding,
+  resolveRestoredDisagreements as coreResolveRestoredDisagreements,
+  settleIssueKey as coreSettleIssueKey,
+  writeSettleDataIssue as coreWriteSettleDataIssue,
+  SCORE_DISAGREEMENT_FIELDS,
+  type DerivedScope,
+  type DisagreementConflict,
+} from './settle-core';
 
 export class SettleContractError extends Error {
   constructor(message: string) {
@@ -339,10 +354,7 @@ export function proposedFieldsFor(targetTable: SettleTargetTable): readonly stri
 export function settleIssueKey(
   wireFamily: string, externalRecordId: string, targetTable: SettleTargetTable,
 ): string {
-  if (!externalRecordId) fail('A data_issues key needs the external record id it describes.');
-  return [
-    SETTLE_SOURCE_KEY, contractFamilyOf(wireFamily), externalRecordId, targetTable,
-  ].join('|');
+  return coreSettleIssueKey(SETTLE_SOURCE_KEY, contractFamilyOf(wireFamily), externalRecordId, targetTable);
 }
 
 /** The one `issue_type` ISSUE-099 writes. Decision C names exactly this case. */
@@ -372,10 +384,7 @@ export type SettleIssueType =
 export function canonicalApplyIssueKey(
   wireFamily: string, externalRecordId: string, targetTable: SettleTargetTable,
 ): string {
-  if (!externalRecordId) fail('A data_issues key needs the external record id it describes.');
-  return [
-    SETTLE_SOURCE_KEY, 'apply', contractFamilyOf(wireFamily), externalRecordId, targetTable,
-  ].join('|');
+  return coreCanonicalApplyIssueKey(SETTLE_SOURCE_KEY, contractFamilyOf(wireFamily), externalRecordId, targetTable);
 }
 
 /**
@@ -400,7 +409,7 @@ export const CANONICAL_APPLY_ISSUE_OWNER = 'AFLDB-ISSUE-122';
 export const CORROBORATED_MATCH_FIELDS = ['home_score', 'away_score', 'attendance'] as const;
 
 /** §13.1: a score disagreement on a completed match is an error, not a warning. */
-export const SCORE_DISAGREEMENT_FIELDS = ['home_score', 'away_score'] as const;
+export { SCORE_DISAGREEMENT_FIELDS };
 
 /**
  * §13.1: a score disagreement on a completed match is an error, not a warning.
@@ -412,11 +421,13 @@ export const SCORE_DISAGREEMENT_FIELDS = ['home_score', 'away_score'] as const;
  * reachable conflict is a score conflict. That is a v1 limitation of the
  * evidence surface, recorded rather than papered over — neither the staging
  * schema nor another source is widened to make `warning` reachable.
+ *
+ * The field list and the classification rule are source-neutral, so this
+ * delegates to `settle-core.ts` (AFLDB-ISSUE-228 S6) rather than keeping a
+ * second copy.
  */
 export function disagreementSeverity(conflictFields: readonly string[]): 'warning' | 'error' {
-  return conflictFields.some((f) => (SCORE_DISAGREEMENT_FIELDS as readonly string[]).includes(f))
-    ? 'error'
-    : 'warning';
+  return coreDisagreementSeverity(conflictFields);
 }
 
 /**
@@ -428,7 +439,7 @@ export function disagreementSeverity(conflictFields: readonly string[]): 'warnin
  * (field, group) pair, and the single-group case degenerates to §13.1's
  * example unchanged.
  */
-export type DisagreementConflict = Readonly<Record<string, JsonValue>>;
+export type { DisagreementConflict };
 
 /**
  * The per-field evidence behind a `source_disagreement`, for the reviewer.
@@ -451,30 +462,7 @@ export function disagreementConflicts(
   claims: readonly ProviderClaim[],
   disagreeingGroups: readonly string[],
 ): readonly DisagreementConflict[] {
-  const disagreeing = new Set(disagreeingGroups);
-  const ordered = [...claims]
-    .filter((claim) => disagreeing.has(claim.contract.independence.group))
-    .sort((a, b) => a.contract.sourceKey.localeCompare(b.contract.sourceKey));
-
-  const conflicts: DisagreementConflict[] = [];
-  for (const field of Object.keys(proposedValues).sort()) {
-    const byGroup = new Map<string, JsonValue>();
-    for (const claim of ordered) {
-      const group = claim.contract.independence.group;
-      if (byGroup.has(group)) continue;
-      if (!(field in claim.values)) continue;
-      if (sameValue(proposedValues[field], claim.values[field])) continue;
-      byGroup.set(group, claim.values[field]);
-    }
-    if (byGroup.size === 0) continue;
-    const conflict: Record<string, JsonValue> = {
-      field,
-      [SETTLE_SOURCE_KEY]: proposedValues[field],
-    };
-    for (const group of [...byGroup.keys()].sort()) conflict[group] = byGroup.get(group) as JsonValue;
-    conflicts.push(conflict);
-  }
-  return conflicts;
+  return coreDisagreementConflicts(SETTLE_SOURCE_KEY, sameValue, proposedValues, claims, disagreeingGroups);
 }
 
 /** One `data_issues` row, drafted but not yet written. §13.1 exactly. */
@@ -511,43 +499,20 @@ export function draftDisagreementIssue(input: {
   claims: readonly ProviderClaim[];
   corroboration: CorroborationReport;
 }): SettleDataIssueDraft {
-  const { corroboration } = input;
-  if (corroboration.disagreeingGroups.length === 0) {
-    fail('A source_disagreement needs at least one disagreeing independence group.');
-  }
-  const conflicts = disagreementConflicts(
-    input.proposedValues, input.claims, corroboration.disagreeingGroups,
-  );
-  if (conflicts.length === 0) {
-    fail(
-      'A source_disagreement names disagreeing groups but no conflicting field; '
-      + 'the evidence does not support the finding.',
-    );
-  }
-
-  const fields = conflicts.map((conflict) => String(conflict.field));
-  const family = contractFamilyOf(input.wireFamily);
-  return {
-    entityType: input.targetTable,
-    entityId: input.targetId,
+  return coreDraftDisagreementIssue({
+    sourceKey: SETTLE_SOURCE_KEY,
+    sameValue,
     issueType: SETTLE_ISSUE_TYPE,
-    issueKey: settleIssueKey(input.wireFamily, input.externalRecordId, input.targetTable),
-    severity: disagreementSeverity(fields),
-    description:
-      `${SETTLE_SOURCE_KEY} disagrees with ${corroboration.disagreeingGroups.join(', ')} `
-      + `on ${fields.join(', ')} for ${input.targetTable} '${input.externalRecordId}'.`,
-    details: {
-      owner: SETTLE_ISSUE_OWNER,
-      source_key: SETTLE_SOURCE_KEY,
-      family,
-      external_record_id: input.externalRecordId,
-      target_table: input.targetTable,
-      source_version_seq: input.sourceVersionSeq,
-      agreeing_groups: [...corroboration.agreeingGroups],
-      disagreeing_groups: [...corroboration.disagreeingGroups],
-      conflicts,
-    },
-  };
+    issueOwner: SETTLE_ISSUE_OWNER,
+    family: contractFamilyOf(input.wireFamily),
+    externalRecordId: input.externalRecordId,
+    targetTable: input.targetTable,
+    targetId: input.targetId,
+    sourceVersionSeq: input.sourceVersionSeq,
+    proposedValues: input.proposedValues,
+    claims: input.claims,
+    corroboration: input.corroboration,
+  }) as SettleDataIssueDraft;
 }
 
 /**
@@ -574,8 +539,7 @@ export function draftDisagreementIssue(input: {
  * "not enumerated" is never "absent" (§19).
  */
 export function agreementRestored(corroboration: CorroborationReport): boolean {
-  return corroboration.disagreeingGroups.length === 0
-    && corroboration.agreeingGroups.length > 0;
+  return coreAgreementRestored(corroboration);
 }
 
 /* ------------------------------------------------------------------ *
@@ -1560,28 +1524,11 @@ function emptyCounters(): SettleCounters {
  * updated; every player with a stats row on one of them is folded in at the
  * end, because a corrected match date or score moves their derived rows
  * exactly as an edit through `match-admin.ts` would.
+ *
+ * `DerivedScope` and `affectedPlayerIds()` are source-neutral and shared with
+ * `settle-core.ts` (AFLDB-ISSUE-228 S6) — imported above rather than defined
+ * here a second time.
  */
-type DerivedScope = {
-  playerIds: Set<number>;
-  matchIds: Set<number>;
-};
-
-/**
- * The player ids `recomputePlayerDerivedStats()` receives: the run's own
- * player-unit writes plus the players on every match the run wrote.
- */
-async function affectedPlayerIds(tx: Tx, scope: DerivedScope): Promise<number[]> {
-  const ids = new Set(scope.playerIds);
-  if (scope.matchIds.size > 0) {
-    const rows = await tx<{ playerId: number }[]>`
-      SELECT DISTINCT player_id::int AS "playerId"
-        FROM player_match_stats
-       WHERE match_id = ANY(${[...scope.matchIds]}::bigint[])
-    `;
-    for (const row of rows) ids.add(row.playerId);
-  }
-  return [...ids].sort((a, b) => a - b);
-}
 
 export type SettleRunOptions = {
   bundle: SettleBundle;
@@ -3287,28 +3234,15 @@ async function corroborationClaims(
  *
  * There is no DELETE and no TRUNCATE on any path (obligation O1). A
  * disagreement that stops reproducing is resolved in place, never removed.
+ *
+ * The write itself is source-neutral and shared with `settle-core.ts`
+ * (AFLDB-ISSUE-228 S6); this wrapper supplies this pass's own
+ * `SettleCounters` shape.
  */
 async function writeSettleDataIssue(
   tx: Tx, draft: SettleDataIssueDraft, counters: SettleCounters,
 ): Promise<void> {
-  const [written] = await tx<{ inserted: boolean }[]>`
-    INSERT INTO data_issues (
-      entity_type, entity_id, issue_type, issue_key, severity, description, details
-    ) VALUES (
-      ${draft.entityType}, ${draft.entityId}, ${draft.issueType}, ${draft.issueKey},
-      ${draft.severity}, ${draft.description}, ${tx.json(draft.details as never)}
-    )
-    ON CONFLICT (issue_type, issue_key)
-      WHERE issue_key IS NOT NULL AND resolved_at IS NULL
-      DO UPDATE SET
-        entity_id = EXCLUDED.entity_id,
-        severity = EXCLUDED.severity,
-        description = EXCLUDED.description,
-        details = EXCLUDED.details
-    RETURNING (xmax = 0) AS inserted
-  `;
-  if (written?.inserted) counters.dataIssuesOpened += 1;
-  else counters.dataIssuesRefreshed += 1;
+  return coreWriteSettleDataIssue(tx, draft, counters);
 }
 
 /**
@@ -3333,21 +3267,15 @@ async function writeSettleDataIssue(
  *
  * `now()` is the current transaction's time, so a dry-run's resolutions roll
  * back with everything else.
+ *
+ * The update itself is source-neutral and shared with `settle-core.ts`
+ * (AFLDB-ISSUE-228 S6); this wrapper supplies this pass's own `issue_type`
+ * and `owner` stamp.
  */
 async function resolveRestoredDisagreements(
   tx: Tx, restoredKeys: ReadonlySet<string>,
 ): Promise<number> {
-  if (restoredKeys.size === 0) return 0;
-  const resolved = await tx<{ id: string }[]>`
-    UPDATE data_issues
-       SET resolved_at = now(), resolution = 'source_agreement_restored'
-     WHERE issue_type = ${SETTLE_ISSUE_TYPE}
-       AND issue_key = ANY(${[...restoredKeys]}::text[])
-       AND resolved_at IS NULL
-       AND details->>'owner' = ${SETTLE_ISSUE_OWNER}
-    RETURNING id
-  `;
-  return resolved.length;
+  return coreResolveRestoredDisagreements(tx, SETTLE_ISSUE_TYPE, SETTLE_ISSUE_OWNER, restoredKeys);
 }
 
 /* -- outcome recording ------------------------------------------------ */
@@ -3429,22 +3357,21 @@ async function recordDisagreementFinding(
  * the applier can only ever close a finding it wrote. A row already closed by
  * an earlier run, or by a super admin, is not closed a second time, which is
  * what keeps the counter idempotent.
+ *
+ * The update itself is source-neutral and shared with `settle-core.ts`
+ * (AFLDB-ISSUE-228 S6); this wrapper supplies this pass's own `issue_type`,
+ * `owner` stamp and issue key, and folds the result into this pass's counters.
  */
 async function resolveAppliedFailureFinding(
   tx: Tx, input: RecordOutcomeInput,
 ): Promise<void> {
-  const resolved = await tx<{ id: string }[]>`
-    UPDATE data_issues
-       SET resolved_at = now(), resolution = 'canonical_apply_succeeded'
-     WHERE issue_type = ${CANONICAL_APPLY_ISSUE_TYPE}
-       AND issue_key = ${canonicalApplyIssueKey(
-    input.wireFamily, input.record.externalRecordId, input.targetTable,
-  )}
-       AND resolved_at IS NULL
-       AND details->>'owner' = ${CANONICAL_APPLY_ISSUE_OWNER}
-    RETURNING id
-  `;
-  input.counters.dataIssuesResolved += resolved.length;
+  const resolved = await coreResolveAppliedFailureFinding(
+    tx,
+    CANONICAL_APPLY_ISSUE_TYPE,
+    CANONICAL_APPLY_ISSUE_OWNER,
+    canonicalApplyIssueKey(input.wireFamily, input.record.externalRecordId, input.targetTable),
+  );
+  input.counters.dataIssuesResolved += resolved;
 }
 
 async function recordOutcome(tx: Tx, input: RecordOutcomeInput): Promise<void> {

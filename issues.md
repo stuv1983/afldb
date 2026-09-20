@@ -4,10 +4,11 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 4
+**Open issues:** 5
 
 | ID | Title | Severity | Area | State | Next action |
 |---|---|---|---|---|---|
+| AFLDB-ISSUE-228 | AFL.com.au official JSON APIs (season matches feed, CFS playerStats / matchRoster, Brownlow bfawards) as the current-season source for completed matches, scores, player stats and Brownlow votes, reducing the AFL Tables dependency | Medium | Data acquisition / Import architecture — `afl_api` source, migration 074 spine, ISSUE-122 automatic path, `external_identities` | Open — plan approved 2026-09-19 (Q1/Q2/Q7 decided); Stages S1–S5 implemented and operator-validated on `afldb_test` (branch `sonnet/issue-228`, all uncommitted); S6–S10 not started | Stage S6: source-parametrised settle (`settle-core.ts` extraction, co-source corroboration, attendance enrichment, provider-id-first resolver, player resolution from `external_identities` only) |
 | AFLDB-ISSUE-226 | Stale `docs/architecture.md` §5/§6: the documented application structure names `src/services/`, `src/db/schema/` (described as a Drizzle schema) and `src/types/`, none of which exist, and no Drizzle dependency is present — the project uses postgres.js directly | Low | Documentation — `docs/architecture.md` §5 "Application structure", §6 "Shared statistical definitions" | Open — found 2026-09-19 during the PhanesLight bootstrap closure review; verified three ways against the tracked tree; no code, data or runtime impact; not corrected under the bootstrap | Correct `docs/architecture.md` §5's directory tree and the Drizzle reference to the actual layout, and re-site §6's "defined once in `src/services`" claim on wherever the shared statistical definitions now live (establish that first — this issue does not assert where they are) |
 | AFLDB-ISSUE-225 | Gridley corpus: 37 pre-existing `incorrect known answer` cells on non-draft criteria (`captain` 20, `teammates-150` 14, `teammates-100` 1, `games250sameclub` 1, `games100clubs2` 1; 14 players) present on `afldb_test` since the 2026-09-13 baseline, untouched by AFLDB-ISSUE-222 | Medium | Grid Solver / canonical data — `captaincies`, `player_club_season_stats`, `tests/integration/gridley-corpus.test.ts` | Open — opened 2026-09-19 under ISSUE-222 decision D3; reproduced 2026-09-17 (pre-import) and 2026-09-19 (report `7f14ff2c…`); root cause not investigated | Investigate the five criteria with targeted read-only queries (captaincies rows for Cameron Bruce / Steven May; the board-1024 teammate counts); classify each cell from canonical evidence; never resolve by reclassification |
 | AFLDB-ISSUE-224 | DraftGuru persons whose AFL Tables identity is not registered on the target (`target_not_registered`): 94 bridge-admissible persons (16 sampled, all operator `agree`) cannot link until the identity is registered — post-baseline (2026) debutants and numbering/spelling cases | Medium | Player registration / import — `external_identities`, fitzRoy core, current-season settle | Open — deferred 2026-09-18 from AFLDB-ISSUE-222 Phase F; none of the 94 is added by the ISSUE-222 import; cause of the registration gap not investigated | After the ISSUE-222 `afldb_test` import verifies, establish the registration path for post-baseline debutants, then re-resolve a new deployment child (§4.5) |
@@ -37620,3 +37621,1931 @@ location, or record that the single-definition guarantee no longer holds. Re-ver
 **Reference.** `documentation/architecture/2026-09-19_initial/overview.md` §5 records the same
 finding from the bootstrap side; `documentation/session-summaries/SS00001_phaneslight-bootstrap_2026-09-19.md`
 records it as F-001.
+
+## AFLDB-ISSUE-228 — AFL.com.au official JSON APIs as the current-season match, stats and Brownlow source
+
+- **Status:** Open — plan approved 2026-09-19 (Q1/Q2/Q7 decided, §0.1). Implementation started
+  2026-09-19 (Sonnet 5, worktree `afldb-issue-228`, branch `sonnet/issue-228`): **Stages S1–S5
+  implemented and operator-validated (`afldb_test` only); S6's read-only settle-planning path
+  (identity context, match/player resolution composition, corroboration classification) is
+  implemented and DB-free-tested but NOT operator-validated against `afldb_test`; the S6 writer
+  (canonical apply) and CLI are not started; S7–S10 not started. All uncommitted.**
+  S1 delivered the registry round-table shape (§6.4) and
+  `co_source_groups` (§7.5) in `source-families.ts`/`.json`, the `translateAflRound()` module
+  (`afl-api-rounds.ts`) with its five typed refusals, the per-season explicit round tables for
+  2022–2026 (verified against the captured samples, not guessed), `afl-api-identities.json` (18
+  clubs, 5 seasons, 2 evidence-backed venues — the rest deliberately unmapped per §6.2), and
+  DB-free tests (`tests/afl-api-rounds.test.ts`, `tests/reference-data.test.ts`). S2 delivered the
+  direct-HTTP acquisition client (`afl-api-client.ts`: request planning for WMCTok/season-matches/
+  playerStats/matchRoster against three independently configurable base URLs — public/CFS/SAPI,
+  the CFS one redirectable to a future Brownlow simulator without touching production code;
+  retry-with-backoff; reissue-the-token-once-on-401/403; minimal season-matches envelope
+  validation and selection) and the acquisition CLI (`acquire-afl-api.ts`: manifest-LAST under
+  `data/sources/afl_api/matches/<label>/`, per-file SHA-256/HTTP-status/ETag/Cache-Control/
+  retrieval-time, the `cleanup_partial` pattern ported from `afldb-settle-afltables.sh` so a
+  failed run leaves no partial snapshot), plus DB-free tests with a stubbed `fetch`
+  (`tests/afl-api-match.test.ts`). The WMCTok `{ token: string }` shape and the
+  `x-media-mis-token` CFS header were **operator-verified live 2026-09-19** (HTTP 200 against
+  `POST .../cfs/afl/WMCTok`, the returned token used successfully against two `bfawards`
+  endpoints; no real token stored anywhere) — the repository just does not yet carry a sanitised
+  live-response evidence FIXTURE for that shape, a distinct, smaller gap than "unmeasured" (§1.2,
+  R6). S3 delivered the bundle emitter (`src/lib/acquisition/afl-api-bundle.ts`: parse -> resolve
+  -> project -> bundle for all five §5.2 families — `match`, `match_roster` (deliberately narrowed
+  to `matchRoster` plus the ONE `recentMatchScores[]` entry matching the requested match, excluding
+  two further un-catalogued widgets measured but out of scope), `player_match_stats` (with a
+  measured, documented duplicate-JSON-key quirk correcting an earlier §11.3 assumption about
+  `jumper_number`), `brownlow_match_votes` (§10's {3,2,1}/sum-6/no-duplicate validation, all-or-
+  none per match) and `brownlow_leaderboard`, plus generic column-flattening/canonical-hash/
+  semantic-hash primitives and a `buildAflApiMatchBundle()` combinator), the DB-free backtest CLI
+  (`tools/current-season/emit-afl-api-bundle.ts`, writes
+  `docs/rebuild-manifests/afl_api/backtest-20260919.json` — **not yet generated; requires an
+  operator run**, see Validation below), hand-trimmed fixtures under `tests/fixtures/afl_api/`, and
+  new tests appended to `tests/afl-api-match.test.ts`. The five `afl_api` families (match,
+  match_roster, player_match_stats, brownlow_match_votes, brownlow_leaderboard) are now declared in
+  `source-families.json`, anchored to the emitter's actual parsed output and cross-validated by
+  hand against both a 2022 and a 2026 sample per family; `match_roster` is deliberately
+  `known_columns_status: 'incomplete'` (ins/outs/milestones/clubDebuts unmeasured when populated),
+  the other four are `'complete'`. No DB, Git, network or deployment command was run.
+  S4 delivered migration `103_afl_api_match_projections.sql` (three typed projections —
+  `staging.afl_api_match`, `staging.afl_api_player_match`, `staging.afl_api_brownlow_vote` — column-
+  for-column following 076/077, plus the `afl_api` source description update and matching grants) and
+  its DB-free shape-gate test `tests/afl-api-match-migration.test.ts` (pattern:
+  `tests/afl-api-lineup-migration.test.ts`). Two design points are recorded in the migration's own
+  header for operator/S6 confirmation rather than decided silently: `attendance_status` is pinned to
+  `not_collected` (afl_api never sources attendance on any path, so this is an S4 implementation
+  decision, not `pending`), and `staging.afl_api_match`'s single `version_seq` FK tracks only the
+  `match` family's spine observation — its period-score and match-date/time columns are populated by
+  the Stage S6 settle writer from the companion `match_roster` observation, which the schema does not
+  and cannot enforce by FK. **S4 operator-executed and validated 2026-09-19**: DB-free suite green
+  (146/146 across `tests/afl-api-rounds.test.ts`, `tests/reference-data.test.ts`,
+  `tests/afl-api-match.test.ts`, `tests/afl-api-match-migration.test.ts`); the S3 corpus backtest
+  (`emit-afl-api-bundle.ts`) reproduced schema stability, round mapping 12/12, score arithmetic
+  14/14, cumulative conversion 14/14, semantic idempotency 14/14 and Brownlow 4/4 seasons with 0
+  defects (assertions 5–7, 9 and the Brownlow match-resolution check remain intentionally SKIPPED —
+  they require the S5 bridge and/or a semantic-hash monitor recapture, per the backtest manifest);
+  migration 103 applied to `afldb_owner@127.0.0.1:55432/afldb_test` (102 already applied, 103 applied
+  clean). Production was not touched. All still uncommitted.
+
+  **S5 (player provider bootstrap bridge, §6.3) implemented 2026-09-20, OPERATOR-EXECUTED AND
+  VALIDATED on `afldb_test` (through the established local SSH tunnel, 127.0.0.1:55432) —
+  see Validation below for the full evidence record.** Delivered:
+  `tools/migration/build_afl_api_player_bridge.py` (offline evidence builder: reads the 14 tracked
+  `data/sources/AFLWebsite/AFLGamesSamples/` sample matches — cross-checking each sample folder name
+  against its own `01-fixture-result.json` payload — resolves each to its afltables-owned canonical
+  match by `(season, match_date, home hist, away hist)` [a deliberately narrower identifier than
+  S6's full provider-id/`match_key` resolution, sufficient and unambiguous for this bootstrap-evidence
+  read], joins each AFL API player-stat row to the canonical `player_match_stats` row at the same
+  club and jumper number, and accepts `CD_I -> player_id` only under §6.3(a)-(d): same player_id
+  across every observed match, that player_id claimed by no other `CD_I`, ≥2 matched matches or one
+  match with ≥10 non-NULL agreeing statistics, and normalised-surname agreement as a validation-only
+  check. Reads `AFLDB_TEST_DATABASE_URL` read-only; writes nothing to any database; writes one
+  evidence artefact, `data/reference/afl-api-player-bridge-<date>.json` (not yet generated — needs
+  an operator run, see Validation below). `tools/migration/import_afl_api_player_bridge.py`
+  (`--validate-only` / `--dry-run` / `--apply`, `common.import_batch()`/`Reporter` conventions): the
+  ONLY writer of `external_identities` for `afl_api`, re-checking LIVE database state at import time
+  (never trusting the artefact's own snapshot) — a new provider id is INSERTed
+  (`status='unique'`, `match_method='afl_api_stat_vector_bootstrap'`), an already-linked provider id
+  to the SAME player is a no-op ("already_linked"), and a provider id already linked to a DIFFERENT
+  player is withheld and opens a `data_issues` row (`afl_api_identity_contradiction`) — the existing
+  link is never modified. `--dry-run` runs the full write path then unconditionally rolls back
+  (no `import_batches` row survives it); `--apply` commits under one tracked batch. DB-free contract
+  test `tests/python/afl_api_bridge_contract.py` covers `num_or_none`/`normalise_surname`/
+  `FOLDER_RE`/`parse_player_stats` and all four §6.3 acceptance/rejection paths (2-match exact link,
+  1-match ≥10-stat link, 1-match <10-stat unresolved, zero-evidence unresolved, one-CD_I-two-players
+  contradictory, two-CD_I-one-player both contradictory, surname-disagreement withheld,
+  classification determinism) against a fake DB cursor, plus the loader's `linked_rows()` filter and
+  DSN-safety refusals — no real sample file, no real `afldb_test` connection.
+
+  **S5 Validation (operator-executed 2026-09-20).** DB-free contract test
+  (`python .\tests\python\afl_api_bridge_contract.py`): all checks passed, including
+  duplicate-player refusal, 2-match/1-match-≥10-stat linking, insufficient/zero-evidence
+  withholding, the two contradiction shapes, surname-disagreement withholding, deterministic
+  classification, loader `linked_rows()` filtering, and DSN-safety (refusing an unset/wrong DB,
+  accepting the `afldb_test` DSN). Builder (`build_afl_api_player_bridge.py --validate-only` then
+  `--write`, counts reproduced identically both times): 14 sample matches discovered, 12 resolved
+  to canonical matches, 2 skipped `no_canonical_match` with no evidence contributed
+  (`CD_M20260142801`, `CD_M20260142802`); 400 providers observed, 398 linked, 2 unresolved, 0
+  contradictory. Artefact written: `data/reference/afl-api-player-bridge-2026-09-20.json`.
+  Unresolved providers (deliberately withheld, fail-closed, not contradictions — do not resolve by
+  name): `CD_I1002231` / Patrick Naish and `CD_I999724` / Declan Mountford, both
+  `no_matching_evidence` (`CD_M20220140807:no_canonical_row_at_jumper`), both `matches: []`.
+  Importer validate-only: artefact declares 398 `linked` ids, `would_link 398 / already_linked 0 /
+  would_HALT_contradiction 0`. The DB-backed dry-run (against `afldb_test` via a temporary
+  process-local `AFLDB_TEST_IMPORT_DATABASE_URL`, derived from the existing test DSN with port
+  5432 swapped for the SSH tunnel's 55432 — never written to disk) reported `linked 398 /
+  already_linked 0 / contradictions_withheld 0`. `--apply` committed
+  (`linked 0 / already_linked 398 / contradictions_withheld 0` — the apply-time labels count
+  against post-commit state, not pre-commit intent; the independent post-apply dry-run is the
+  idempotency evidence). Post-apply dry-run reproduced `linked 0 / already_linked 398 /
+  contradictions_withheld 0` with the same temporary DSN, then the DSN was removed from the shell —
+  proving the resulting `afldb_test` state (398 trusted `afl_api` links, 0 further candidates, 0
+  contradictions) is idempotent for this artefact. Target database confirmed `afldb_test` only;
+  no production, DEV or Git command was run. Trusted-link coverage of observed providers: 398/400
+  = 99.5%. Residual items that remain open and must not be silently resolved: the two unresolved
+  provider ids above, and the two skipped sample matches
+  (`CD_M20260142801`, `CD_M20260142802`, `no_canonical_match`, contributed no evidence to the 398
+  links). S5 is now COMPLETE per its own gate (§16: "backtest §9.5–9.7 on `afldb_test`; §19.4").
+
+  **S6 read-only settle planning (2026-09-20, this milestone) — identity context, resolver
+  composition and the read-only plan; NOT the writer or the CLI.** Delivered, all read-only
+  (SELECT-only, zero INSERT/UPDATE/DELETE, no `staging.*` write, no `applyCanonicalUnit()` call):
+  `renderMatchKey()` added to `settle-core.ts` (the one shared `season|round_code|match_date|home
+  name|away name` renderer, matching `import_fitzroy_core.py::match_key_of()` exactly — AFL Tables
+  never needed a TS copy because its Python importer stamps `match_key` before the spine sees it;
+  `afl_api` has no such upstream stamp). New `src/lib/acquisition/afl-api-match-identity.ts`:
+  `resolveAflApiSourceId()` (`sources.key = 'afl_api'`), `resolveAflApiMatchClubs()` (§6.2,
+  `clubs.legacy_club_hist`, map-only, both sides in one query), and `buildAflApiMatchIdentity()`
+  composing them plus the already-validated S6-D3a `bundle.localMatchDateTime` into the
+  `AflApiMatchIdentity` the S6-D1 resolver needs — failing closed (`unproved_match_date`,
+  `unmapped_club_hist`) rather than ever deriving a match date from UTC alone or a club by name.
+  New `src/lib/acquisition/afl-api-settle-plan.ts`: `planAflApiMatchUnit()` composes the bundle
+  (S3/S6-B), the settle records (S6-C), the identity builder above and the two S6-D1/D2 resolvers
+  into a per-family plan — `match` (deferred / halt / refused / `planned{new_target|update_owned}`
+  / `corroborated`), `match_roster` (deferred / blocked / planned against the match's target id,
+  `null` when the match itself is still `new_target`) and `player_match_stats` (deferred / blocked
+  / refused `unresolved_identity`|`player_identity_ambiguous`|`provider_team_id_unknown` / planned
+  with the resolved `player_id`+`club_id`). §7.5 (Q1) co-source ownership is implemented for the
+  `match` family using the existing, unweakened `evaluateTargetOwnership()` plus `areCoSources()`:
+  a foreign-owned row that is NOT a declared co-source is the ordinary `foreign_owned_collision`
+  refusal; a foreign-owned row that IS a declared co-source (`afltables`+`afl_api`) is classified
+  via `classifyCorroboration()` (agreeing/disagreeing on `home_score`/`away_score`) and reported as
+  `corroborated`, never refused and never re-owned — `matches.source_id` is never written by this
+  module (it only reads). Per-row ownership for `match_period_scores`/`player_match_stats` is
+  deliberately NOT pre-computed here (documented in the module header): Decision E's gates are
+  re-read inside the applier's own savepoint at write time regardless, so a value read during
+  planning could simply be stale by write time. New `tests/afl-api-settle-plan.test.ts` (DB-free,
+  same fake-postgres routing-by-substring convention as the S6-D1/D2 suites in
+  `tests/afl-api-match.test.ts`, extended to interleave interpolated query values into the routed
+  text so two players per unit can be answered differently): identity/club resolution happy-path
+  and fail-closed paths, new-target planning with both players resolving, a per-player
+  `unresolved_identity` refusal that still lets the match plan, `player_identity_ambiguous`,
+  `unproved_match_date` refusing the whole unit, `provider_identity_contradiction` HALT,
+  `provider_id_ambiguous` refusal, §7.3 `status_not_concluded`/`roster_not_concluded` deferral
+  (never misclassified as a refusal), deterministic repeated planning, and the five Q1 ownership
+  branches (agreeing corroboration, disagreeing corroboration, non-co-source
+  `foreign_owned_collision`, unowned, same-source). No test file, tsc run or database/Git command
+  was executed by the assistant (CLAUDE.md §9) — the operator has not yet run `npx vitest run
+  tests/afl-api-settle-plan.test.ts` or `npx tsc --noEmit` against this change.
+  Next: the S6 writer (canonical apply composition) and `tools/current-season/settle-afl-api.ts`.
+
+  **S6 writer + CLI (2026-09-20, this milestone) — canonical apply composition, `settle-afl-api.ts`
+  CLI, integration coverage. UNEXECUTED — no test, tsc, or database/Git command has been run by the
+  assistant (CLAUDE.md §9); every item below is implementation only, pending operator validation.**
+  New `src/lib/acquisition/settle-afl-api.ts`: `runSettleAflApi()` composes the S6-D plan directly
+  into `applyCanonicalUnit()` (per-provider-record `sourceVersionSeq` read back from
+  `staging.source_records` after `persistSourceObservation()`, never hardcoded — a wrong value fails
+  closed against `canonical_applications`' FK to `staging.source_record_versions`), drafts
+  `promotion_candidates` directly (not through `draftCandidate()`/`reconcile()`, which this module
+  deliberately does not use for the `match` family — see the module's own header for why), writes
+  the two migration-103 typed projections (joining the `match_roster` observation's period scores
+  in, cumulative-converted at settle time per the migration's own documented gap), and runs the
+  §7.5 (Q2) attendance-enrichment sweep itself — reading `staging.afltables_match` read-only and
+  calling the existing `applyAttendanceEnrichment()`/`CO_SOURCE_ENRICHMENT` (built in the prior S6
+  pass, previously uncalled) — rather than modifying `settle-afltables.ts`, an explicit
+  operator-confirmed design decision (2026-09-20) made to avoid touching the AFL Tables engine's
+  proven, 5,058-line-tested path. `staging.afltables_match` carries no `match_key` column, so the
+  sweep RENDERS one from the staging row's own resolved fields via the shared `renderMatchKey()`,
+  the same way §6.1 step 2 does, rather than assuming a stored cross-reference — a real bug caught
+  and fixed during this pass before it shipped (an earlier draft assumed the column existed and
+  would have failed at the first live query). A second real bug caught and fixed in the same pass:
+  the player-stats writer's initial field mapping matched `PLAYER_MATCH_STAT_COLUMNS`' snake_case
+  canonical names against the projection's camelCase properties by same-name lookup, which silently
+  nulled seven of twenty-one statistics (`freesFor`, `freesAgainst`, `contestedMarks`,
+  `marksInside50`, `onePercenters`, `goalAssists`, `inside50s`) — replaced with an explicit map.
+  Deliberately out of scope for this milestone (documented in the module header, not silent): the
+  ISSUE-131 retired-identity rekey SEARCH for `afl_api` (every call passes `NO_MATCH_REKEY_SCOPE` —
+  provider-id-first and `match_key` resolution are unaffected); an absence sweep for `afl_api`
+  records. New `tools/current-season/settle-afl-api.ts`: mirrors `settle-afltables.ts`'s CLI
+  contract exactly (`--label`, `--dry-run`/`--apply`, `--auto-apply`, `--report`,
+  `--validate-only`, `--require-complete-source`), reading the acquired snapshot from
+  `data/sources/afl_api/matches/<label>/` per §5.4 and re-hashing its manifest before any
+  connection opens. `package.json` gained `settle:afl-api`. New
+  `tests/integration/settle-afl-api.test.ts` (UNRUN): reuses the real, already-proven-valid sample
+  at `tests/fixtures/afl_api/match/*.json` (Hawthorn v Brisbane Lions, 2026 PF) rather than
+  hand-built JSON, one dedicated provider match id per case; covers a new-match auto-apply
+  (match + period scores + the one bridged player, the other player refused `unresolved_identity`
+  without blocking the match), idempotent rerun, a `provider_identity_contradiction` HALT rolling
+  back its own batch row, Q1 corroboration against a pre-seeded `afltables`-owned fixture row
+  (no write, no re-ownership, `corroboratedForeignOwned` counted), and Q2 attendance enrichment
+  against a pre-seeded `staging.afltables_match` fixture row (ownership unchanged). Does not attempt
+  full §19 parity with the ~5,000-line AFL Tables suite. `source-families.ts` was checked for the
+  "AFL API has no sources row" stale commentary the milestone brief named; none was found — already
+  current. `settle-report.ts` and `source-completeness.ts` needed no change (already
+  source-parametrised from the prior S6 pass). Next: operator validation on `afldb_test`, then S7
+  (Brownlow) — not started.
+
+  **S6 closure pass (2026-09-20, this milestone) — §19 inventory + targeted hardening.
+  UNEXECUTED — no test, tsc, database, Git or deployment command has been run by the assistant
+  (CLAUDE.md §9); every item below is implementation only, pending operator validation. S6 is
+  NOT being marked complete: two known gaps (rekey, absence sweep) are deliberately left open,
+  below.** §19.1(e) ("no code path can set `matches.source_id` on an existing row inside a
+  settle"): TRUE bug, now fixed. `canonical-apply.ts`'s shared `provenance()` was spread into
+  every UPDATE (`writeMatch`, `writePeriodScores`'s `ON CONFLICT DO UPDATE`,
+  `writePlayerMatchStats`, `writeBrownlowRoundVotes`), so every one of the four canonical UPDATE
+  statements set `source_id` in its `SET` list — never to a DIFFERENT value (E3 ownership
+  already refuses a foreign-owned UPDATE, so the value written was always the row's own), but
+  the acceptance criterion is a literal source-scan proof, not a runtime one. Added
+  `provenanceForUpdate()` (no `source_id`) and switched all four UPDATE call sites to it;
+  `source_record_id`/`import_batch_id` provenance is unaffected, so provider-id-first
+  resolution and the `provider_identity_contradiction` HALT are unaffected. Shared with AFL
+  Tables; the value written was already always a no-op for every existing settle-afltables.ts
+  path (an UPDATE only ever reaches an already-same-owner row), so no AFL Tables semantic
+  changes — confirmed by inspection, not by running its suite. New DB-free source-scan test in
+  `tests/current-season-import.test.ts` ("AFLDB-ISSUE-122 S5 — the canonical applier contract").
+  Known-gap-E (duplicate provider id / match_key collision blast radius): traced the actual
+  reachable paths under the current single-connection, sequential-per-unit design — a genuine
+  `matches_match_key` collision cannot be reached in-process (match resolution re-reads
+  `match_key`/provider-id state before every write, inside the same transaction, so a
+  colliding `new_target` INSERT is never attempted; it would already resolve as
+  `update_owned`/corroborated instead), and `applyCanonicalUnit()` already isolates any write
+  failure that DOES occur to its own savepoint (`write_failed`, unit refused, run continues) —
+  the missing half, found and fixed, was that `settle-afl-api.ts`'s `applyUnitOutcome()` only
+  counted `canonicalApplyFailures` and never wrote the `canonical_apply_failed` `data_issues`
+  finding `settle-afltables.ts` writes for the identical case, so a fail-closed refusal was also
+  a SILENT one. Now mirrors AFL Tables exactly (same issue_type/owner, source-scoped issue_key).
+  The true remaining trigger is a cross-process race (two concurrent settle runs); it is
+  structurally handled by the existing savepoint, but proving it needs a two-real-connection
+  concurrency test, which was not attempted (flagged as a follow-up, not fabricated). Known-gap-B
+  (deferred reporting) inspection found a SEPARATE, more serious pre-existing bug, now fixed:
+  `tools/current-season/settle-afl-api.ts` called `buildSettleExceptionReport(sql, { season })`
+  with no `sourceKey`/`tool` override, so both its `--report` mode and its post-apply report were
+  silently querying **AFL Tables'** `import_batches`/`promotion_candidates` (the function's
+  defaults), not `afl_api`'s own; `settle-report.ts`'s open-disagreements lookup was hardcoded to
+  AFL Tables' own `issue_type`/`owner` (`'source_disagreement'`/`AFLDB-ISSUE-099`) with no way to
+  override it, so `afl_api`'s own corroboration disagreements (`issue_type = 'afl_api_settle'`)
+  could never be shown by either CLI's report; and the report header printed the literal string
+  "AFL Tables settle exceptions" regardless of which source produced it. All three fixed:
+  `buildSettleExceptionReport()` gained optional `disagreementIssueType`/`disagreementIssueOwner`
+  params (defaulting to AFL Tables' own values, so `settle-afltables.ts`'s unchanged callers are
+  unaffected); the afl_api CLI now passes its own `sourceKey`/`tool`/issue-type/owner plus
+  `deferredRecords: result.counters.recordsDeferred` on both calls; the header now reads
+  `${report.sourceKey} settle exceptions`. New DB-free tests in `current-season-import.test.ts`
+  covering the generic header and "Not yet concluded" deferred-count rendering. Known-gap-A
+  (promotion-candidate contract) reviewed against migration 074's actual CHECK constraints and
+  the `ux_promotion_candidates_pending` partial unique index: the direct INSERT's `ON CONFLICT`
+  target matches the index exactly (identical rerun refreshes, never duplicates); every verb used
+  (`new`/`corrected`/`unresolved_identity`/`foreign_owned_collision`) is in the CHECK's
+  vocabulary; every call site satisfies `promotion_candidates_target_ck`
+  (`target_id`/`baseline_canonical_hash` null together); the unused `independenceGroup`/
+  `targetKey` parameters are genuinely inert (the table has neither column) rather than a stale
+  assumption. No bug found; no change made. Two gaps deliberately left OPEN, neither named by a
+  literal §19.1-§19.7 acceptance item: **the ISSUE-131 retired-identity rekey SEARCH** is still
+  disabled for `afl_api` (`NO_MATCH_REKEY_SCOPE`, unchanged from the prior pass) — enabling it
+  safely requires understanding `findRetiredMatchIdentities`'s matching heuristic well enough to
+  prove `rekey_would_merge`/`rekey_ambiguous` stay fail-closed for `afl_api`'s own identity
+  shape, which was not attempted without test capability to verify it; and **the `match`-family
+  absence sweep** (§5.2: "absence sweepable for the match family only") has no implementation at
+  all — it needs a season-enumeration-completeness concept `AflApiSettleBundle` does not
+  currently carry (`buildAflApiSettleBundle()` takes a flat unit list, unlike AFL Tables'
+  `SettleBundle.enumerations` that `planAbsenceSweep()` reads), which is new plumbing through the
+  bundle/acquisition layer, not a local fix. Both remain exactly as the module's own header
+  already documented them; S6 is not represented as covering either. Files touched:
+  `src/lib/acquisition/canonical-apply.ts`, `src/lib/acquisition/settle-afl-api.ts`,
+  `src/lib/acquisition/settle-report.ts`, `tools/current-season/settle-afl-api.ts`,
+  `tests/current-season-import.test.ts`.
+
+  **S6 operator validation (per handoff, 2026-09-20):** `npx tsc --noEmit` PASS;
+  `tests/integration/settle-afl-api.test.ts` 5/5 PASS; `tests/current-season-import.test.ts` 258
+  passed / 4 skipped; the DB-free regression set 425+ passing with expected skips after the final
+  fixture repair; `tests/integration/settle-afltables.test.ts` 64 passed / 1 expected skip —
+  confirming the shared `canonical-apply.ts` §19.1(e) fix (`provenanceForUpdate()`) did not
+  regress the AFL Tables path. S6's two deliberately-open gaps (ISSUE-131 rekey search for
+  `afl_api`; the `match`-family absence sweep) are unchanged and do not block S7. **S6 core
+  operational path is now COMPLETE.**
+
+  **S7 (Brownlow integration, §10) implemented 2026-09-20 (fresh session, Sonnet 5, same worktree
+  `afldb-issue-228` / branch `sonnet/issue-228`). UNEXECUTED — no test, tsc, database, Git or
+  deployment command has been run by the assistant (CLAUDE.md §9); every item below is
+  implementation only, pending operator validation against the local Brownlow simulator first and
+  `afldb_test` second.** Reused unchanged: the S3 emitters
+  (`emitAflApiBrownlowMatchVotes`/`emitAflApiBrownlowLeaderboard`/`reconcileBrownlowLeaderboard`,
+  `afl-api-bundle.ts` — §10's {3,2,1}/sum-6/no-duplicate-player validation, all-or-none per match,
+  already implemented at S3), migration 103's `staging.afl_api_brownlow_vote` typed projection
+  (created but deliberately not populated by this pass, see below), the S6-D1 match resolver
+  (`resolveAflApiMatch`), the S6-D2 player resolver (`resolveAflApiPlayer`, i.e. the S5 bridge),
+  `renderMatchKey()` (`settle-core.ts`), and `canonical-apply.ts`'s existing
+  `writeBrownlowRoundVotes()`/`brownlow_round_votes` target — no parallel canonical writer, no new
+  canonical table.
+
+  New `src/lib/acquisition/afl-api-rounds.ts` export `translateAflApiBrownlowRound()`: the
+  Brownlow-specific entry point onto the one round-translation path (§19.7f: no offset arithmetic
+  outside this module). The `bfawards` feed publishes only `roundNumber` (no abbreviation/name/
+  finals label), so this function looks up the declared vocabulary row itself and calls
+  `translateAflRound()` with the row's OWN fields standing in for "observed" (drift detection is
+  simply unavailable for a feed that never publishes the field), then defensively refuses any
+  `roundType !== 'home_and_away'` under a new refusal code, `brownlow_round_not_home_and_away`
+  (added to `AflRoundRefusalCode`). A `mixed_finals` row (2026's `QE`) surfaces as
+  `finals_label_required` one step earlier instead (an equally fail-closed outcome under a
+  different code, documented in the function's own comment, not a second guess). A season with no
+  declared vocabulary at all escalates to a run-level HALT, never a per-vote-set refusal.
+
+  New `src/lib/acquisition/afl-api-brownlow.ts` (the settle engine): `resolveAflApiBrownlowMatch()`
+  resolves a vote's `CD_M` by reading the ALREADY-SETTLED `staging.afl_api_match` row for that
+  provider id (home_club_id/away_club_id/season/round_code/match_date, whichever source currently
+  owns the canonical row) rather than re-parsing a match bundle — the bfawards feed carries
+  nothing to build one from — then defers to the existing `resolveAflApiMatch()` for the actual
+  provider-id-first / `match_key` lookup; a miss is `unknown_match`, never a guess, and this path
+  never proposes `new_target` (Brownlow never creates a match, §10). `planAflApiBrownlowMatchSet()`
+  composes match resolution, round translation and all three players' resolution
+  (`resolveAflApiPlayer`) into one plan; §10's "all-or-none, mirroring the match family" is
+  enforced by refusing the WHOLE 3-vote set on ANY single failure — match unresolved, round
+  refused, any one of the three players unresolved/ambiguous, or two provider players resolving to
+  the same canonical player (`duplicate_player_canonical_identity`, a defensive addition beyond
+  the literal §10 text, in the same spirit as `provider_id_ambiguous`). Finals are excluded
+  defensively twice over: the round translation refuses a non-H&A round, AND the resolved match's
+  own `is_final` (from `staging.afl_api_match`) is checked independently.
+
+  `applyAflApiBrownlowVoteSet()` is the atomicity mechanism §10/§14 require but that
+  `applyCanonicalUnit()` alone does not provide for this target: `brownlow_round_votes` is
+  player-keyed (`season, player_id, round_number`), not match-keyed, so this is neither the match
+  family's one-row atomicity nor the AFL Tables player family's per-player independence. The three
+  players' `applyCanonicalUnit()` calls run inside ONE extra `tx.savepoint()` layer; any of the
+  three landing on anything other than `applied` or the idempotent `nothing_to_write` refusal
+  throws, rolling the WHOLE set back — "no partial 3 or 2 or 1 vote rows" enforced structurally,
+  not by convention. §7.3's general correction table governs `vote-correction` unchanged: an
+  `afl_api`-owned row's changed vote value auto-applies as an ordinary UPDATE through the existing
+  E3/E5 gates (no special-case code was needed or written); a FOREIGN-owned `brownlow_round_votes`
+  row (e.g. already `afltables`-owned) causes the gate to refuse, which — because it is inside the
+  vote-set savepoint — refuses the WHOLE match's set, not just that one player; this is a
+  deliberate, disclosed choice: §10 declares the vote set atomic and does not extend Q1's
+  match-family corroboration exception to this target, so no corroboration path was added for it.
+  Idempotency (`replay-same-payload`) needs no special-case code either: `persistSourceObservation`
+  ing (`head_refreshed` on an unchanged payload) and `applyCanonicalUnit`'s own baseline-hash
+  comparison (`nothing_to_write` when the row already carries the proposed values) already compose
+  to a total no-op on a byte-identical or logically-unchanged re-poll.
+
+  `reconcileAflApiBrownlowSeason()` wraps the existing pure `reconcileBrownlowLeaderboard()`:
+  advisory (never blocking) while the leaderboard's own `status` is not `CONCLUDED`, blocking once
+  it is (§10). No leaderboard spine persistence in this pass (see deferrals below) — the check runs
+  directly off the parsed match-vote and leaderboard records for the run.
+
+  `runSettleAflApiBrownlow()` is the top-level orchestration (mirrors `runSettleAflApi()`'s
+  begin/import_batches/loop shape): persists every `matchVotes[]` entry to the spine regardless of
+  mode (§10 "observe-only": fetch/parse/validate/log), then — unless `--observe-only` — plans and,
+  if `--auto-apply`, applies each match's vote set; a planned-but-not-auto-applied set is counted
+  (`voteSetsWouldAutoApply`) and left unwritten (no promotion_candidates queue exists for Brownlow,
+  matching the project-wide "human accept path stays unimplemented" state — a deliberate,
+  documented scope cut, not an oversight). `isAflApiBrownlowEnabled()` /
+  `AFLDB_AFL_API_BROWNLOW_ENABLED` (default OFF, exact string `'true'` only) gates the run per §10's
+  "Operational enablement" decision — independent of the match-family settle's own timer/flag.
+
+  New CLIs: `tools/current-season/acquire-afl-api-brownlow.ts` (fetches
+  `bfawards/season/<CD_S>` + `bfawards/leaderboard/season/<CD_S>` only, manifest-last, same
+  `cleanup_partial` pattern as `acquire-afl-api.ts`; refuses before any network call unless the
+  enable flag is set) and `tools/current-season/settle-afl-api-brownlow.ts`
+  (`--validate-only` / `--observe-only` / `--dry-run` / `--apply` [`--auto-apply`], manifest
+  re-hash before any DB connection, prints the leaderboard reconciliation and exits non-zero on a
+  HALT or a blocking mismatch). `package.json` gained `acquire:afl-api-brownlow` /
+  `settle:afl-api-brownlow`. Registry: `brownlow_match_votes.promotion_policy` flipped from
+  `not_yet_declared` to `reviewed` (`promotion_owner: "AFLDB-ISSUE-228"`), its stale note
+  corrected. New `tests/afl-api-brownlow.test.ts` (DB-free): `translateAflApiBrownlowRound()`
+  accept/refuse cases (H&A, no-Opening-Round season, finals refusal, unmapped round, missing
+  vocabulary), the enable-flag guard's exact-string contract, and the reconciliation wrapper's
+  advisory-vs-blocking classification.
+
+  **Deliberately deferred, documented not silent (none block correct canonical votes or
+  reconciliation tonight):** (1) `staging.afl_api_brownlow_vote` (migration 103's typed
+  projection) is created but not populated by this pass — the canonical write and its
+  `canonical_applications` ledger row key off `staging.source_record_versions` directly, exactly
+  as the match family's own ledger rows do, so nothing in the write path depends on it; (2) the
+  `brownlow_leaderboard` family's own per-player spine records are not persisted (its
+  `promotion_policy` stays `'never'`; the reconciliation check is a pure in-memory comparison and
+  needs no spine round-trip); (3) no promotion_candidates queue for Brownlow refusals (see above);
+  (4) the ISSUE-113 season-artefact builder
+  (`tools/migration/build_brownlow_season_artefact_from_afl_api.py`, named in the runbook's S7 row)
+  is NOT built — it is a rollover-time artefact for ISSUE-101/F, gated on `stat-availability.json`
+  moving 2026 to `complete`, and is not on the path to a correct live-count write or a controlled
+  production deploy before tomorrow's count. No S6 rekey/absence-sweep work was touched. No S8+
+  (deploy/systemd/docs) work was done. No production, DEV or `afldb_test` database was touched; no
+  Git or deployment command was run.
+
+  **S7 pre-count contract bug fixed 2026-09-20 (operator acceptance test finding, DEV tonight,
+  simulator `afl-api-brownlow-2025-2026-09-20-0320`). UNEXECUTED — no test/tsc/DB/Git command run
+  by the assistant.** `npm run settle:afl-api-brownlow -- --label ... --observe-only --apply`
+  failed immediately with "afl_api/brownlow_match_votes is missing required column(s):
+  matchVotes.matchId, ...". **Root cause:** `assertProjectableColumns()`
+  (`source-families.ts`) — the family-agnostic required/unexpected-column gate every `afl_api`/
+  `afltables` family shares via `projectFamily()`/its own equivalents — assumes a family's one
+  "observation" is a single, always-present record whose required leaf paths are always
+  observable when the family is validly observed at all. That holds for `match`,
+  `match_roster` and `player_match_stats` (each one real object), but `brownlow_match_votes`'
+  (and `brownlow_leaderboard`'s) observation wraps a COLLECTION (`matchVotes[]` /
+  `leaderboard[]`) whose declared required columns (`matchVotes.matchId`,
+  `matchVotes.votes.player.playerId`, etc.) are per PUBLISHED VOTE RECORD, not per response.
+  `flattenObservedColumns()` already documents that an empty array contributes NO path at all
+  (by design, so a field only ever observed empty never joins the contract by accident) — so a
+  legitimate zero-record pre-count publication can never satisfy those required paths, and the
+  generic gate refused it as if the source were malformed. This was **settle/registry-adjacent
+  wiring**, not a bad registry declaration: the six required columns are correctly declared (they
+  ARE required whenever a vote record is actually published); the defect was calling the generic
+  single-record gate against a collection-wrapping observation without ever telling it the
+  collection could legitimately be empty.
+
+  **Fix** (narrowly scoped, no other family's semantics moved): `assertProjectableColumns()`
+  gained an optional `{ requireColumns?: boolean }` parameter (default `true`, so
+  `settle-afltables.ts`, `reconciliation.ts`, `lineup-store.ts` and `lineup-bundle.ts` — every
+  other caller, all still passing exactly two arguments — are byte-identical); the
+  unexpected-column check always runs regardless, so a genuinely new/renamed top-level field is
+  still caught even on an empty publication. `projectFamily()` (`afl-api-bundle.ts`) threads the
+  same optional options object through. `emitAflApiBrownlowMatchVotes()` now calls it with
+  `requireColumns: matchVotes.length > 0`; `emitAflApiBrownlowLeaderboard()` with
+  `requireColumns: leaderboard.length > 0`. Per-field strictness for a record that DOES exist is
+  completely unaffected: it was never enforced by this gate to begin with — `emitAflApiBrownlow-
+  MatchVotes()`'s own `str()`/`num()` extraction inside its per-entry loop (and
+  `BrownlowVoteSetError`'s {3,2,1}/duplicate/exactly-3-rows checks) already fail closed on any
+  record that is actually malformed, independently of the column gate, and were not touched.
+  Files changed: `src/lib/acquisition/source-families.ts`, `src/lib/acquisition/afl-api-bundle.ts`.
+  New DB-free tests appended to the existing S3 describe blocks in `tests/afl-api-match.test.ts`
+  (not a new file — the closest semantic home, where the S3 Brownlow emitter tests already live):
+  an empty `matchVotes[]`/`leaderboard[]` is accepted with zero records and no `matchVotes.*`/
+  `leaderboard.*` leaf observed; a published (non-empty) record still has every declared required
+  column present; a published record with one required field deleted still throws. No change to
+  `afl-api-brownlow.ts` (the S7 settle module) was needed — it already handles an empty record
+  array as a normal zero-iteration loop.
+
+  **S7 one-match acceptance run finding, 2026-09-20 (operator, simulator
+  `afl-api-brownlow-2025-2026-09-20-0330`, one match `CD_M20250140004`, round 0). UNEXECUTED — no
+  test/tsc/DB/Git command run by the assistant.** Observe-only settle reported
+  `voteSetsRefused: {"unknown_match":1}` for the count's first published match.
+  **Root cause: not a resolver defect.** `resolveAflApiBrownlowMatch()` (`afl-api-brownlow.ts`)
+  resolves a vote set's `CD_M…` through `staging.afl_api_match` (migration 103) — the match
+  FAMILY's own typed projection — because the `bfawards` feed carries no home/away/date to render
+  a `match_key` from (§10, §6.1). That projection is written by `projectAflApiMatch()`
+  (`settle-afl-api.ts:1104-1109`) only when the match-family settle
+  (`tools/current-season/settle-afl-api.ts --apply`) has already run for that match's season
+  **inside a COMMITTED transaction** — `--dry-run` rolls the whole run back, staging projection
+  included, exactly as the Brownlow settle's own dry run does. The one-match acceptance run only
+  acquired and settled the Brownlow bundle; the AFL API **match family** bundle for round 0, 2025
+  was never acquired/settled/applied, so `staging.afl_api_match` correctly has no row for
+  `CD_M20250140004` and the resolver correctly refused `unknown_match` — this is the fail-closed
+  behaviour §10/§14 require, not a bug to route around with fuzzy matching, name matching or a
+  fabricated staging row (all explicitly out of scope per the operator's brief). Confirmed
+  scalable to the full season: `acquire-afl-api.ts --season 2025` (default `--status CONCLUDED`,
+  no `--match` filter) fetches the whole completed season in one run, and
+  `settle-afl-api.ts --label <that snapshot> --apply` (no `--auto-apply` needed — an
+  already-`afltables`-owned 2025 match only needs to be `corroborated`, which still writes the
+  staging projection per Q1) stages all ~207 matches in one operational step, ahead of the
+  Brownlow settle, every count night.
+  **Change made:** `tools/current-season/settle-afl-api-brownlow.ts` now prints an actionable
+  hint naming this exact prerequisite whenever `voteSetsRefused.unknown_match > 0`, instead of a
+  bare counter, so an operator is not left to rediscover the sequencing dependency. No change to
+  `afl-api-match-resolver.ts` or `afl-api-brownlow.ts` — both already implement the documented
+  §6.1/§10 contract correctly. **Tests added:** `tests/integration/settle-afl-api-brownlow.test.ts`
+  (new file, DB-backed, follows `tests/integration/settle-afl-api.test.ts`'s committed-fixture
+  pattern) — stages TWO distinct AFL.com.au matches via the real `runSettleAflApi()` writer, then
+  proves `runSettleAflApiBrownlow()` (observe-only, `apply: false`) resolves both to
+  `voteSetsPlanned`/`voteSetsWouldAutoApply` with zero refusals and creates no duplicate canonical
+  match; a second case proves a genuinely never-staged provider id still refuses `unknown_match`
+  cleanly with no HALT. Neither case names the operator's literal `CD_M20250140004`, proving the
+  mechanism generalises rather than being hardcoded to the one acceptance-test id.
+  **Leaderboard status finding (secondary, same run):** the snapshot reported leaderboard
+  `status: CONCLUDED` after only 1/207 matches published. `leaderboardStatus` is a straight
+  passthrough of the provider's own `bfawards/leaderboard/season/<CD_S>` `status` field
+  (`afl-api-bundle.ts:876`, `settle-afl-api-brownlow.ts:153`) — AFLDB derives nothing of its own
+  here, and `reconcileAflApiBrownlowSeason()`'s `blocking = mismatches.length > 0 &&
+  leaderboardStatus === 'CONCLUDED'` matches §10's documented contract exactly (already covered by
+  `tests/afl-api-brownlow.test.ts`'s three reconciliation cases). §2.5's only REAL measured values
+  are pre-season `status: null` (2026) and fully-concluded historical corpora (2022–2025,
+  0 mismatches) — no real mid-count value has ever been captured, so nothing in the evidence
+  contradicts AFLDB's derivation. The local simulator reporting `CONCLUDED` after one match is
+  most likely a simulator fixture artefact (a static/copied status field), not a live-provider
+  behaviour AFLDB has modelled wrong; this run had zero mismatches so no incorrect blocking
+  actually occurred. **Recommendation, not actioned here** (simulator is out of scope for this
+  worktree per the operator's brief): report to Codex that the simulator should model a
+  non-`CONCLUDED` leaderboard status while matches remain unpublished, so the blocking gate is
+  exercised realistically before the real live count.
+
+  **S7 fixture-only identity prerequisite implemented 2026-09-20 (fresh session, Sonnet 5, same
+  worktree `afldb-issue-228` / branch `sonnet/issue-228`, following the operator's simulator
+  evidence audit). UNEXECUTED — no test, tsc, database, Git or deployment command has been run by
+  the assistant (CLAUDE.md §9); every item below is implementation only.**
+
+  **Evidence that triggered this pass.** `source-samples/2025/03-season-matches.raw.json` contains
+  216 real 2025 fixtures, exactly 207 of them non-finals, and those 207 provider match ids EXACTLY
+  equal the 207 Brownlow-voting match ids (rounds 25–28 finals excluded). Only 3 of the 207 have a
+  captured `playerStats`/`matchRoster` pair. The existing acquisition
+  (`tools/current-season/acquire-afl-api.ts`) unconditionally fetches BOTH for every selected
+  CONCLUDED match, so it cannot be pointed at the season without fabricating the missing 204
+  captures — forbidden. Objective: a safe fixture-only identity acquisition/staging mode that
+  gives Brownlow match resolution enough truthful evidence to resolve `CD_M…` to an EXISTING
+  canonical match, without ever fetching player stats, roster, line-ups or any other protected CFS
+  payload, and without weakening the normal full acquisition/settle contract.
+
+  **Why `staging.afl_api_match` (Option A) is not usable.** Migration 103's `staging.afl_api_match`
+  table declares `match_date date NOT NULL`, and its own header states plainly that this column is
+  "Sourced from the companion match_roster observation's venueLocalStartTime" — confirmed by
+  reading `buildAflApiMatchIdentity()` (`afl-api-match-identity.ts`), which refuses
+  `unproved_match_date` whenever `bundle.localMatchDateTime` is `null`, and
+  `deriveAflApiLocalMatchDateTime()` (`afl-api-bundle.ts`), which can only produce that value from
+  the `match_roster` family's `venueLocalStartTime` cross-checked against the `match` family's own
+  `utcStartTime`/`venue.timezone`. A fixture-only acquisition never has a roster capture, so this
+  column can never be truthfully populated by it. Weakening the `NOT NULL` or fabricating a value
+  is exactly what the operator's brief forbids ("We MUST NOT fabricate those CFS payloads"). The
+  `match` family's OWN typed projection (`emitAflApiMatch()`, `AflApiMatchProjection`) is, by
+  contrast, fully derivable from the season fixture feed alone — no roster, no stats — including
+  the translated canonical round and resolved club identity strings; only the BUNDLE step that
+  joins `match` + `match_roster` together (needed for `staging.afl_api_match`) requires the roster.
+  This is the exact, narrow gap the new module fills.
+
+  **Architecture chosen — Option B, a dedicated fixture-identity path, smallest safe
+  implementation:**
+  1. `tools/current-season/acquire-afl-api.ts` gained `--fixtures-only`: fetches the season matches
+     feed only (public base, no `WMCTok`, no CFS request of any kind for any match), writes each
+     selected match's `fixture.json` (unchanged derivation from the season feed, exactly as the
+     full path already does) and a manifest marked `acquisition_kind:
+     'afl_api_fixture_snapshot'` / `fixtures_only: true`, to a SEPARATE snapshot tree
+     (`data/sources/afl_api/fixtures/<label>/`, never `.../matches/<label>/`) so the full settle
+     CLI cannot find it under its own `--label` lookup even by accident. `settle-afl-api.ts` itself
+     gained one defensive check (`verifyManifest()`): a manifest naming
+     `acquisition_kind: 'afl_api_fixture_snapshot'` is refused with a clear pointer to the new
+     tool, rather than an opaque missing-file error deep in `unitSourcesFrom()`. The normal
+     acquisition/settle path is otherwise byte-identical — `fixturesOnly` defaults to
+     `false`/omitted everywhere it was added, and every existing test asserting default behaviour
+     was extended (never weakened) to also assert `fixtures_only: false` / `acquisition_kind:
+     'afl_api_match_snapshot'`.
+  2. New `src/lib/acquisition/afl-api-fixture-identity.ts`: `buildAflApiFixtureRecords()` (pure —
+     `emitAflApiMatch()` per already-selected raw fixture object, isolating one bad record from the
+     rest, exactly as `buildAflApiSettleBundle()` isolates a unit build failure);
+     `persistAflApiFixtureObservations()` — the WHOLE write surface of this mode: persists ONLY the
+     `match` family's own spine observation (`staging.source_records`/`source_record_versions`/
+     `source_payloads`, migration 074 unchanged) using the identical raw payload shape the full
+     settle's own `match`-family spine record already carries (`buildAflApiSettleRecords()` sets
+     `payload: fixtureRaw` for that family too), so a later full acquisition of the same match is a
+     plain head-touch or an ordinary new version (I1/I2) — never a duplicate, never reinterpreted.
+     No `staging.afl_api_match` row, no `matches`/`match_period_scores`/`player_match_stats` write,
+     no promotion candidate, no `data_issues` row: there is no code path in this module that could
+     produce any of them.
+  3. `resolveAflApiMatchViaFixtureObservation()` (same module, read-only): reads the current head
+     payload of the persisted `match`-family spine observation (the same three-table join
+     `persistSourceObservation()` itself uses), re-emits it through `emitAflApiMatch()` to recover
+     `(season, translated round, home club, away club)`, resolves clubs via the existing
+     `resolveAflApiMatchClubs()` (map-only, fails closed on an unmapped `legacy_club_hist`), and
+     issues exactly one `SELECT id FROM matches WHERE season = … AND round_number = … AND
+     home_club_id = … AND away_club_id = …`. 0 rows → `unknown_match`; exactly 1 → resolved; more
+     than 1 → `fixture_identity_ambiguous` — never silently picked, never a name, never round
+     alone, never a fabricated date. Read-only by construction: this function cannot write
+     `matches`, so it can never re-own a foreign-owned (e.g. `afltables`-owned) row or create a
+     duplicate canonical match — the operator's "not permission to rewrite an AFL Tables-owned
+     match" is a structural property here, not a policy note.
+  4. `resolveAflApiBrownlowMatch()` (`afl-api-brownlow.ts`) gained an OPTIONAL fourth parameter,
+     `fixtureIdentityFallback?: { registry, identities }`. When the primary `staging.afl_api_match`
+     lookup finds nothing AND a fallback was supplied, it retries via
+     `resolveAflApiMatchViaFixtureObservation()`; `no_fixture_observation` collapses into the same
+     `unknown_match` the primary path already reports (both mean "nothing to resolve against yet"),
+     every other fixture-identity refusal (`fixture_identity_ambiguous`, `unmapped_club_hist`,
+     `fixture_observation_invalid`, `round_number_unavailable`) surfaces as its own distinct
+     reason, never collapsed. Omitting the parameter (every existing caller) keeps behaviour
+     byte-identical — this is the "no implicit fallback" contract applied at the resolution layer
+     too, not only at acquisition: the fallback runs only when a caller explicitly asks for it.
+     Threaded through `planAflApiBrownlowMatchSet()` and `AflApiBrownlowSettleRunOptions` the same
+     way. New CLI flag `settle-afl-api-brownlow.ts --use-fixture-identity` (off by default) loads
+     `afl-api-identities.json` and builds the fallback only when passed; the existing
+     `unknown_match` operator hint was extended to name this new prerequisite chain.
+  5. New CLI `tools/current-season/settle-afl-api-fixtures.ts` (`npm run
+     settle:afl-api-fixtures -- --label <fixtures-only-snapshot> --apply|--dry-run|--validate-only`):
+     verifies the manifest is genuinely a `--fixtures-only` acquisition (refusing the reverse
+     mismatch too — a full snapshot is never silently treated as fixtures-only), builds the fixture
+     records DB-free, and persists them via `persistAflApiFixtureObservations()` inside one
+     `import_batches` row exactly like every other settle CLI in this issue. No migration was
+     needed anywhere in this pass — every write reuses the existing migration-074 spine unchanged.
+
+  **Operator flow this enables (not yet run):**
+  ```
+  npx tsx tools/current-season/acquire-afl-api.ts --season 2025 --fixtures-only
+  npm run settle:afl-api-fixtures -- --label <fixtures-label> --apply
+  npx tsx tools/current-season/acquire-afl-api-brownlow.ts ...
+  npm run settle:afl-api-brownlow -- --label <brownlow-label> --use-fixture-identity --apply --auto-apply
+  ```
+  For the 3 matches that DO have full captures, the existing
+  `settle-afl-api.ts --apply` path (writing the real `staging.afl_api_match` row) still takes
+  priority automatically — `resolveAflApiBrownlowMatch()` tries that lookup FIRST and only falls
+  back to the fixture-only path when it finds nothing.
+
+  **Tests added** (no test/tsc command run by the assistant): DB-free —
+  `tests/afl-api-match.test.ts` gained a `--fixtures-only` describe block proving the acquisition
+  CLI requests ONLY the season matches feed (a stub with no WMCTok/playerStats/matchRoster handler
+  throws "no handler for …" if the code ever tries one — assertions 1/2), writes to the separate
+  `afl_api/fixtures/` tree, and writes no `token.meta.json`; the existing default-acquisition test
+  was extended to assert `acquisition_kind`/`fixtures_only` (assertion 4, unweakened); a new
+  `buildAflApiFixtureRecords` describe block proves a whole population builds DB-free and isolates
+  one bad record (assertion 3). New `tests/integration/settle-afl-api-fixtures.test.ts` (real
+  `afldb_test`, committed-fixture pattern, own `CD_M2026I228FIX*` namespace, Carlton v Collingwood
+  round 6 2026 — distinct from the sibling Brownlow suite's Hawthorn v Brisbane Lions pairing, and
+  every canonical row it seeds is removed in `afterEach` so no two cases ever see each other's
+  rows): spine-only persistence and I1 idempotency; resolves a fixture-only provider id to an
+  existing AFL-Tables-owned canonical match by (season, round, clubs) with ownership proven
+  unchanged (assertions 5/6); a genuinely unknown fixture refuses `unknown_match` (assertion 8); an
+  ambiguous canonical pair (two rows sharing one season/round/club key) refuses
+  `fixture_identity_ambiguous` rather than guessing (assertion 9); a no-op check that `matches`'
+  row count is unaffected by resolution alone (assertion 10, structural); the Brownlow resolver
+  WITHOUT the fallback still refuses `unknown_match` (assertion 4, default unweakened) and WITH it
+  resolves via the fixture-only observation alone; an end-to-end `runSettleAflApiBrownlow()` run
+  with the fallback plans the vote set with zero refusals, creates no duplicate canonical match and
+  leaves the AFL-Tables-owned row un-re-owned (assertions 6/7/11 — this end-to-end case exercises
+  the real fixture-only prerequisite path the operator's brief asked the existing Brownlow
+  match-resolution suite to cover, without needing to touch that already-passing file).
+
+  **Files changed:** `tools/current-season/acquire-afl-api.ts` (M, `--fixtures-only`),
+  `tools/current-season/settle-afl-api.ts` (M, manifest-kind refusal),
+  `src/lib/acquisition/afl-api-brownlow.ts` (M, optional fallback parameter/type),
+  `tools/current-season/settle-afl-api-brownlow.ts` (M, `--use-fixture-identity`),
+  `src/lib/acquisition/afl-api-fixture-identity.ts` (N),
+  `tools/current-season/settle-afl-api-fixtures.ts` (N), `package.json` (M, `settle:afl-api-fixtures`
+  script), `tests/afl-api-match.test.ts` (M), `tests/integration/settle-afl-api-fixtures.test.ts`
+  (N). No migration. No change to `settle-afl-api.ts`'s match-family write path, `canonical-apply.ts`,
+  `source-completeness.ts`, or any canonical schema.
+
+  **Not done in this pass, deliberately (operator's time-priority instruction):** S6 rekey/absence
+  sweep, attendance, S8+, UI, unrelated refactors, broad documentation cleanup, and the simulator's
+  own 216-fixture expansion (Codex's follow-up, not this worktree). The leaderboard
+  non-`CONCLUDED`-during-count simulator limitation from the prior finding is unchanged and still
+  only a recommendation.
+
+  **S7 fixture-only milestone: two test-harness defects fixed 2026-09-20 (operator validation run,
+  same day). UNEXECUTED by the assistant — no test/tsc/DB/Git command run.** DB-free suites (118/118)
+  and the existing S6 integration suite (5/5) passed unchanged; the new
+  `tests/integration/settle-afl-api-fixtures.test.ts` suite (12 tests) returned 5 pass / 7 fail, plus
+  one `tsc --noEmit` error. Both defects were in the NEW test harness and CLI, not in
+  `afl-api-fixture-identity.ts` or `afl-api-brownlow.ts` — neither production resolver was changed.
+
+  **TSC defect.** `settle-afl-api-fixtures.ts:274`, `counters?.observationsSeen` — "Property
+  'observationsSeen' does not exist on type 'never'". Root cause: `counters` was a `let
+  counters: AflApiFixtureObservationCounters | null = null` REASSIGNED from inside the
+  `sql.begin(async (tx) => {...})` transaction closure (`counters = await
+  persistAflApiFixtureObservations(...)`). The closure is opaque to TypeScript's control-flow
+  analysis, and reassigning a captured outer binding from inside one behaves differently from
+  MUTATING an existing object's properties from inside one — the sibling `runSettleAflApi()`
+  (`settle-afl-api.ts`) never hits this because its own `counters` is a `const` created before the
+  transaction and only ever mutated in place (`counters.canonicalRowsInserted += ...`), never
+  reassigned. **Fix:** converted `settle-afl-api-fixtures.ts`'s `counters` to the same shape —
+  a `const` object created before `sql.begin()`, mutated via `Object.assign(counters, await
+  persistAflApiFixtureObservations(...))` inside the closure — eliminating the reassignment
+  entirely rather than casting past the symptom. Runtime semantics are unchanged: the object is
+  still populated before the `DryRunRollback` throw on every path, so a dry run still reports
+  accurate counters. No change to `afl-api-fixture-identity.ts` (its exported
+  `AflApiFixtureObservationCounters` return shape is untouched).
+
+  **Test cleanup defect (the real bug).** The new integration suite's per-test cleanup ran `DELETE
+  FROM canonical_applications WHERE target_table = 'matches' AND target_id = ANY(...)` —
+  `canonical_applications` (migration 083) has NO `target_id`/`match_id` column at all; its
+  identity is `source_id`/`family`/`external_record_id` plus a jsonb `target_key`. This statement
+  threw on every `afterEach` that had created a canonical match, and because the in-memory
+  `canonicalMatchIds` tracking array was cleared BEFORE the (failing) deletes ran, the synthetic
+  `matches` rows were NEVER actually removed from `afldb_test` while the suite's own bookkeeping
+  believed they were gone. Every subsequent test in the file that shared the same (season=2026,
+  round=6, Carlton, Collingwood) natural key then saw one or more LEFTOVER rows from earlier tests
+  — exactly reproducing the reported cascade (`unknown_match` unexpectedly resolving,
+  `fixture_identity_ambiguous` where exactly one candidate was intended). **Confirmed: no genuine
+  production resolver defect** — `resolveAflApiMatchViaFixtureObservation()`'s season+round+clubs
+  query did exactly what it was asked and found exactly what was actually in the table; the table
+  contents were wrong because cleanup never ran.
+
+  **Fix, full suite-owned cleanup order (child before parent), using the real schema:**
+  `player_match_stats.match_id` (migration 004) has no `ON DELETE CASCADE` and is deleted before
+  `matches`; `match_period_scores.match_id` (migration 003) DOES cascade and needs no explicit
+  delete; `brownlow_round_votes` carries no `match_id` column at all (keyed by `(season, player_id,
+  round_number)`, migration 005) and `canonical_applications` has no FK to `matches.id` at all —
+  neither is ever written by this suite (every `runSettleAflApiBrownlow()` call here uses `apply:
+  false`, which rolls back its whole transaction including spine observations, per that module's
+  own doc comment) so neither needed a real cleanup statement, only a defensive namespace-scoped
+  one (`external_record_id LIKE`) for parity with the sibling suite and to catch a future `apply:
+  true` variant. Spine cleanup (`staging.source_records` → `staging.source_record_versions` →
+  `staging.source_payloads`, exact join the sibling suite already uses) was already correct and is
+  unchanged. Added a defensive `cleanupStaleCanonicalMatches()` sweep (by `match_key LIKE`,
+  namespace-scoped) run in `beforeAll`/`afterAll` so a row left behind by a prior CRASHED run — which
+  the in-memory `canonicalMatchIds` array cannot see in a fresh process — is also caught, and a
+  `beforeAll` precondition check that PROVES (queries, does not assume) the suite's fixed
+  (season, round, home, away) key is empty of any row this suite did not create before any test
+  runs, failing loudly with an explicit message rather than silently corrupting results if
+  afldb_test genuinely already carries real data at that key. Also hardened one test
+  ("never creates a canonical match...") that compared whole-table `matches` row counts, which
+  could have been flaky under concurrent test-file execution in a separate vitest worker — rescoped
+  to this suite's own `match_key` namespace.
+
+  **Files changed:** `tools/current-season/settle-afl-api-fixtures.ts` (M, counters typing/control
+  flow), `tests/integration/settle-afl-api-fixtures.test.ts` (M, cleanup schema fix, stale-row sweep,
+  isolation precondition, de-flaked count assertion). No change to
+  `src/lib/acquisition/afl-api-fixture-identity.ts` or `src/lib/acquisition/afl-api-brownlow.ts`.
+
+  **S7 fixture-only milestone: real-simulator-feed follow-up 2026-09-20 (operator's first full
+  216-fixture 2025 acquisition + settle run). UNEXECUTED by the assistant — no test/tsc/DB/Git
+  command run.** Snapshot `afl-api-2025-2026-09-20-0456`: 216 in feed, 215 selected, settle
+  produced 204 built / 11 build failures, `--apply` retained import batch 1680 with 204 fixture
+  observations and no canonical/staging/stat/promotion writes (as designed).
+
+  **Task 1 — the 11 build failures.** Both drifting fields are genuine, measured AFL API fields,
+  confirmed from the immutable captured `00-season-matches.json`: `metadata.prematch_label` (a
+  human-readable string; measured 'Rescheduled Match' on two ordinary home-and-away rounds R3/R24,
+  an empty string on R17, and finals labels — 'Nth Qualifying/Elimination Final', 'Semi Final N',
+  'Preliminary Final N' — on all 9 2025 finals; NOTABLY `metadata.finals_match_label`, the field
+  §6.4/§2.1 previously documented for finals-label splitting, is `undefined` on every one of these
+  11 records in this fuller 2025 dataset — recorded here as an observation for a future stage, not
+  acted on: round translation/QE-splitting code was explicitly out of scope and was not touched)
+  and `metadata.sold_out` (measured value the STRING `'true'`, never a JSON boolean, on both 2025
+  semi-finals). Both declared as OPTIONAL `known_columns` entries (never `required_columns`,
+  exactly the existing `metadata.k2k_link` precedent), neither read nor projected by
+  `emitAflApiMatch()`, and `assertProjectableColumns()`'s unexpected-column check is otherwise
+  completely unchanged — an actually undeclared field still fails closed. Six new DB-free tests in
+  `tests/afl-api-match.test.ts` cover: accepted-with-label, accepted-with-empty-label,
+  accepted-with-sold_out, accepted-with-neither, still-refuses-a-genuinely-undeclared-field, and
+  never-appears-in-the-projection.
+
+  **Task 2 — reapplying the same immutable snapshot after the registry correction.** Verified by
+  inspection, not executed: `hashPayload()`/`canonicalisePayload()` (`observations.ts`) read only
+  `contract.hashExclusions` (unchanged, still `[]`) — `known_columns` never participates in the
+  hash. The 204 already-persisted observations therefore re-hash identically and
+  `persistSourceObservation()` reports `head_refreshed` for all 204 (no spurious version); the 11
+  previously-refused records now pass `buildAflApiFixtureRecords()` and are persisted for the
+  first time (`version_inserted`, version 1 each — genuinely new, not spurious). No canonical row,
+  no promotion candidate: `persistAflApiFixtureObservations()` has no code path that could write
+  either, unchanged.
+
+  **Task 3 — 216 feed, 215 selected.** The excluded provider id is `CD_M20250140807` (Sydney
+  Swans v GWS GIANTS, Round 8 2025, SCG). Its record in the simulator's season-matches feed
+  carries `status: 'SCHEDULED'` with NO score block at all, so the default `--status CONCLUDED`
+  selection filter correctly excluded it — `selectAflApiMatches()` was not changed, and must not
+  be: it only ever acts on the provider's own reported status, never infers or overrides one.
+  **This IS one of the 207 real Brownlow-voting matches — confirmed, not guessed:** the
+  repository's own tracked historical sample
+  `data/sources/AFLWebsite/AFLGamesSamples/historical-samples/2025/2025-05-04_R8_SYD_v_GWS_CD_M20250140807/01-fixture-result.json`
+  shows this exact match as `status: 'CONCLUDED'`, final score Sydney 87 (12.15) def. GWS 73
+  (10.13), with full captured player stats; and the tracked
+  `data/sources/AFLWebsite/BrownlowSamples/brownlow-samples/2025/01-brownlow-season.raw.json`
+  contains its recorded 3-2-1 vote set (C. Warner 3, T. Green 2, J. Rowbottom 1) among its 207
+  `matchVotes[]` entries. **Root cause is a SIMULATOR data-completeness gap for this ONE record**
+  in its "complete real 2025 season feed" (it reports a real, already-played, already-voted-on
+  match as still `SCHEDULED` with no score) — not a defect in the fixture-only selection contract,
+  which is correctly fail-closed and was left unchanged per the operator's scope instruction.
+  **Safe operator workaround, no code change:** `selectAflApiMatches()`'s existing `--match`
+  override already bypasses the status filter entirely ("this is the ONLY filter — status/since
+  are ignored"), so `acquire-afl-api.ts --season 2025 --fixtures-only --match
+  CD_M20250140807` acquires this one match explicitly into its own small snapshot, settleable via
+  the same `settle-afl-api-fixtures.ts --apply` with no conflict against batch 1680's 204 rows.
+  Recommend reporting the simulator gap to Codex (same pattern as the earlier leaderboard-status
+  finding: a data artifact for one record, not a modelled-wrong behaviour).
+
+  **Files changed:** `data/reference/source-families.json` (M, two known_columns + evidence entry),
+  `tests/afl-api-match.test.ts` (M, six new tests). No change to `acquire-afl-api.ts` (the 216→215
+  investigation did not prove a selection-contract bug), no change to the fixture identity
+  resolver, the Brownlow resolver, S6, attendance, S8+, or any canonical schema.
+
+  **Stale registry-promotion test fixed, and a documented non-Brownlow finals gap, 2026-09-20
+  (second operator validation pass on the real 2025 feed). UNEXECUTED by the assistant — no
+  test/tsc/DB/Git command run.**
+
+  `tests/reference-data.test.ts`'s `'promotes the AFL Tables and afl_api match-family families...'`
+  test asserted the exact promotable-family list from BEFORE S7 flipped
+  `afl_api/brownlow_match_votes` from `not_yet_declared` to `reviewed` (2026-09-20, this same
+  issue's S7 pass) — a stale expected contract, not a registry regression. Fixed the expected list
+  only (added `afl_api/brownlow_match_votes`, alphabetically first); the registry's own
+  `promotion_policy` was not touched. `afl_api/brownlow_leaderboard` correctly stays out of the
+  list — its `promotion_policy` is `not_yet_declared` (an earlier misstatement of this as `'never'`
+  in a draft of this fix was caught and corrected before landing; `isPromotable()` is
+  `promotion_policy === 'reviewed'`-only, `source-families.ts:761`), and `afl_api/lineup` staying
+  `'never'` is unaffected and still separately asserted.
+
+  **Four remaining fixture-only build failures, documented, NOT fixed this pass:**
+  `CD_M20250142501`–`CD_M20250142504` (2025 Round 25, provider abbreviation `FW1`) refuse with
+  `finals_label_required` — `translateAflRound()`'s `mixed_finals` row for this round needs
+  `metadata.finals_match_label` to contain "Qualifying"/"Elimination" to split the round into
+  qualifying vs. elimination finals, but that field is absent from every 2025 record measured;
+  the actual finals-naming field in this fuller 2025 dataset is `metadata.prematch_label`
+  ("1st Qualifying Final", "2nd Elimination Final", ...), which the round-translation contract does
+  not currently read. This is a DIFFERENT, unrelated failure mode from the two `known_columns`
+  drift fields fixed above — a genuine round-vocabulary declaration question for a future stage,
+  not touched here per the operator's explicit instruction: Brownlow excludes finals structurally
+  (both via `translateAflApiBrownlowRound()`'s non-`home_and_away` refusal and the resolved match's
+  own `is_final` check, `afl-api-brownlow.ts`), so these four rows are not on the path to tonight's
+  Brownlow replay. Confirmed safe to leave alone: `buildAflApiFixtureRecords()` isolates one
+  record's build failure from every other (per-record `try`/`catch`, unchanged since it was first
+  built), so these four failures do not block persistence of the other 211 valid fixture-only
+  observations (206 H&A + 5 single-type finals: 2×SF, 2×PF, 1×GF). No change to
+  `afl-api-rounds.ts`, `translateAflRound()`, or any Brownlow/H&A identity code.
+
+  **Files changed:** `tests/reference-data.test.ts` (M, stale expected-list fix only).
+
+  **S7 completed-season Brownlow backtest authority, 2026-09-20 (operator's proven 2025 one-match
+  simulator capture — 207 vote sets, 621 rows, 188 distinct voters, all 188 trusted-resolved,
+  207/207 identity-resolvable — deliberately refused because 2025 is not `in_progress`).
+  UNEXECUTED by the assistant — no test/tsc/DB/Git/deployment command run (CLAUDE.md §9).**
+
+  **Objective:** let the operator run the completed 2025 Brownlow capture through the REAL
+  canonical writer, on `afldb_test` only, without weakening `canonical-apply.ts`'s E2
+  (`season_not_in_progress`) gate for anything else — not `seasons.json`, not the match or
+  player-stats families, not any other Brownlow refusal (identity, ownership, atomicity, round
+  translation, finals exclusion).
+
+  **Seam chosen:** the cleanest, narrowest point already carrying the season array into E2 is
+  `applyAflApiBrownlowVoteSet()`'s own `unitInputFor()` call, which builds each vote's
+  `CanonicalApplyUnitInput.inProgressSeasons` (`canonical-apply.ts:944`,
+  `unit.inProgressSeasons.includes(unit.season)`). `runSettleAflApiBrownlow()` now accepts an
+  optional `completedSeasonBacktestAuthority`; when present, a new private helper
+  `backtestInProgressSeasons()` widens `inProgressSeasons` by the run's own resolved
+  `plan.season` for that one apply call only — nothing else in `afl-api-brownlow.ts` reads it,
+  `canonical-apply.ts` is byte-for-byte unchanged, and the match/player-stats settles
+  (`settle-afl-api.ts`, `settle-afltables.ts`) never construct or see this authority at all.
+
+  **How `afldb_test` is proven:** `requireAflApiBrownlowBacktestDatabase(sql)` (new export,
+  `afl-api-brownlow.ts`) runs `SELECT current_database() AS name` against the LIVE connection
+  that will perform the write and requires the result to equal exactly `'afldb_test'` — the same
+  convention `tools/db/promotion-check.ts`'s `gateIdentity()` already uses for its own
+  database-identity gate. It never inspects the DSN string, an env var name, or a hostname. Any
+  other value (`afldb_dev`, `afldb_prod`, anything else) throws before the CLI ever calls
+  `runSettleAflApiBrownlow()` — no canonical write, no spine observation, nothing.
+
+  **Why dev/production cannot activate it:** the CLI (`tools/current-season/
+  settle-afl-api-brownlow.ts`) only calls `requireAflApiBrownlowBacktestDatabase()` when
+  `--allow-completed-season-backtest` is passed, and only ever passes whichever `sql` connection
+  `AFLDB_IMPORT_DATABASE_URL` (or the test harness's own `AFLDB_TEST_DATABASE_URL`) actually
+  opens — there is no code path that accepts a claimed database name instead of querying the live
+  one, and no environment variable that disables the check. The bypass is therefore inert against
+  any DSN that does not resolve to a database literally named `afldb_test`.
+
+  **Bypass scope (proved by test, not by inspection alone):** the authority is consulted in
+  exactly one `if` in `runSettleAflApiBrownlow()`; every other refusal path
+  (`duplicate_player_canonical_identity`, `unresolved_identity`, `player_identity_ambiguous`,
+  `brownlow_round_not_home_and_away`/`round_unmapped`/`round_vocabulary_drift`,
+  `brownlow_final_match_excluded`, `unknown_match`) is reached and evaluated identically whether
+  or not the authority is present, because none of them read `inProgressSeasons` at all.
+
+  **CLI:** new flag `--allow-completed-season-backtest` on `settle-afl-api-brownlow.ts`. When
+  accepted, prints (never the DSN):
+  ```
+  COMPLETED-SEASON BROWNLOW BACKTEST
+  database: afldb_test
+  season-in-progress gate bypass authorised for this Brownlow run only
+  ```
+  Harmless without `--apply`/`--auto-apply` (a planned-but-unwritten vote set never reaches the
+  gated apply call at all, exactly as `--dry-run`/no-`--auto-apply` already behave).
+
+  **Tests added:** `tests/afl-api-brownlow.test.ts` (DB-free) — `requireAflApiBrownlowBacktestDatabase`
+  against a fake tagged-template `sql`, proving the `afldb_test` grant and the `afldb_dev`/
+  production/arbitrary-name refusals without opening a real connection (item 9 of the operator's
+  test plan: "test the guard/parser/helper directly"). New sibling integration file
+  `tests/integration/settle-afl-api-brownlow-backtest.test.ts` (DB-backed, `afldb_test`) — kept
+  separate from `settle-afl-api-brownlow.test.ts` because that suite's `cleanup()`/`afterAll()`
+  hard-code an exact 2-match (`p`, `q`) ledger a third match would break; this file owns one
+  match and three synthetic voters end to end, under its own NS. Proves, in order: (1) without the
+  authority, `season_not_in_progress` still refuses (`voteSetsApplyFailed: 1`, 0 rows) exactly as
+  default behaviour requires; (2)-(4) with the authority, one atomic 3/2/1 insert
+  (`canonicalRowsInserted: 3`) with 3 matching `canonical_applications` ledger rows; (5) an
+  identical replay (authority still present) is a no-op (`voteSetsNoOp: 1`); (6) the authority
+  does not rescue an invalid vote set (`duplicate_player_canonical_identity`); (7) nor an
+  unresolved/untrusted identity (`unresolved_identity`); (8) nor a finals round
+  (`brownlow_round_not_home_and_away`, proved via the vote's own `apiRoundNumber` against the
+  same non-final match, reusing the DB-free round-translation refusal already proved in
+  `tests/afl-api-brownlow.test.ts` rather than building a second, is_final match and its own
+  `player_clubs`/FK cleanup dance). All 4 pre-existing tests in the sibling suite are unchanged.
+
+  **`match_id` on `brownlow_round_votes`:** deliberately NOT populated by this pass (migration 094
+  made it nullable; the existing writer already leaves it NULL) — recorded as a follow-up only,
+  per the operator's explicit instruction.
+
+  **Operator commands (none run by the assistant):**
+  ```
+  npx tsc --noEmit
+  npx vitest run tests/afl-api-brownlow.test.ts
+  npx vitest run tests/integration/settle-afl-api-brownlow.test.ts \
+    tests/integration/settle-afl-api-brownlow-backtest.test.ts
+
+  npx tsx tools/current-season/settle-afl-api-brownlow.ts \
+    --label afl-api-brownlow-2025-2026-09-20-0330 \
+    --use-fixture-identity --auto-apply --apply --allow-completed-season-backtest
+  ```
+  Expected one-match apply: `voteSetsSeen/Planned: 1`, `voteSetsRefused: {}`,
+  `voteSetsApplyFailed: 0`, `canonicalRowsInserted: 3`, `canonicalRowsUpdated: 0`,
+  `canonicalApplicationsLogged: 3`. Then an exact replay of the same snapshot with the same flags,
+  expected: `canonicalRowsInserted: 0`, `canonicalRowsUpdated: 0`, `voteSetsNoOp: 1`,
+  `voteSetsApplyFailed: 0`.
+
+  **Files changed:** `src/lib/acquisition/afl-api-brownlow.ts` (M — `BROWNLOW_BACKTEST_DATABASE`,
+  `AflApiBrownlowCompletedSeasonBacktestAuthority`, `requireAflApiBrownlowBacktestDatabase()`,
+  `backtestInProgressSeasons()`, `completedSeasonBacktestAuthority` option), `tools/current-season/
+  settle-afl-api-brownlow.ts` (M — `--allow-completed-season-backtest` flag, guard call, banner),
+  `tests/afl-api-brownlow.test.ts` (M — 4 new DB-free guard tests),
+  `tests/integration/settle-afl-api-brownlow-backtest.test.ts` (new — 8 DB-backed tests). No
+  change to `canonical-apply.ts`, `data/reference/seasons.json`, `settle-afl-api.ts`,
+  `settle-afltables.ts`, or `tests/integration/settle-afl-api-brownlow.test.ts`.
+
+  **S7 snapshot-label collision fix, 2026-09-20 (operator's end-to-end Brownlow testing finding,
+  fresh session, Sonnet 5, same worktree), implemented, UNEXECUTED — no test/tsc/DB/Git command
+  run by the assistant (CLAUDE.md §9).**
+
+  **Bug report.** Two Brownlow acquisitions run within the same minute — scenario
+  `bad-vote-values` (36 physical vote rows, `[2,2,1]` for the fault match) and scenario
+  `incomplete-vote-set` (35 physical vote rows, only 2 rows for the fault match) — both received
+  the identical label `afl-api-brownlow-2025-2026-09-20-1008` and therefore the identical
+  manifest path.
+
+  **Root cause, confirmed by code inspection (not yet reproduced by running the tool — no shell
+  command executed this session per §9).** `buildAflApiBrownlowLabel()` and its `acquire-afl-api.ts`
+  sibling `buildAflApiLabel()` stamped only `YYYY-MM-DD-HHMM` (minute granularity, no seconds).
+  Both `runBrownlowAcquisition()` and `runAcquisition()` then called
+  `mkdirSync(snapshotDir, { recursive: true })` on the generated label's directory —
+  `{ recursive: true }` is a silent no-op when the directory already exists (it neither throws nor
+  reports the collision) — so a second acquisition landing on the same label would write its raw
+  files (`writeFileSync`, which truncates/overwrites) and `manifest.json` directly into the FIRST
+  acquisition's directory. Whether the reported pair actually overwrote each other cannot be
+  answered without the operator's actual directory listing/manifest contents from that run (not
+  supplied); the code path that would cause it is confirmed present in both files as described.
+  `acquire-afl-api.ts` (`--fixtures-only` included, since it is the same `runAcquisition()` code
+  path under `data/sources/afl_api/fixtures/<label>/`) has the identical defect — same
+  `buildAflApiLabel()` minute stamp, same non-collision-checked `mkdirSync`.
+
+  **Fix.** (1) Both label builders now render seconds (`YYYY-MM-DD-HHMMSS`), narrowing but not
+  closing the window. (2) New shared primitive `claimSnapshotDir(parentDir, baseLabel, maxAttempts)`
+  in `src/lib/acquisition/snapshot-dir.ts`: creates `parentDir` (recursive), then
+  `mkdirSync(join(parentDir, label))` WITHOUT `recursive` — this throws `EEXIST` on an existing
+  directory rather than silently succeeding — starting with `baseLabel` verbatim and retrying
+  `${baseLabel}-2`, `${baseLabel}-3`, ... on each collision; throws (fails closed) if no candidate
+  is free after `maxAttempts` (default 1000). No directory is ever deleted, truncated or written
+  into by this function — a collision always produces a NEW directory, never a merge into the
+  existing one. (3) `runAcquisition()` (`acquire-afl-api.ts`) and `runBrownlowAcquisition()`
+  (`acquire-afl-api-brownlow.ts`) both now call `claimSnapshotDir()` as their first side effect
+  (before any network request) instead of `mkdirSync(..., { recursive: true })`, and fire a new
+  `deps.onSnapshotDirClaimed?.(dir, label)` callback the instant the directory is claimed. (4) Both
+  tools' `main()` no longer independently recompute the label/directory from a shared `now` for
+  partial-failure cleanup (the old contract, documented in a comment this pass removed as stale);
+  they instead capture the directory via `onSnapshotDirClaimed` and pass that exact path to
+  `cleanupPartialSnapshot()`/`cleanupPartialBrownlowSnapshot()`, so cleanup can never target a
+  different directory than the one the failed run actually claimed (which a collision suffix would
+  otherwise make possible). (5) Nothing else changed: no source payload contents, parsing, CFS
+  behaviour, manifest semantics, feature gates, or settle behaviour. `--label` on every
+  `settle-afl-api*.ts` tool was verified (read-only) to treat the label as an opaque directory name
+  joined onto `snapshotRootOf(projectRoot)` — `season` is always read from `manifest.json`, never
+  parsed out of the label string — so the widened/suffixed label format is a no-op for every
+  settle-side caller.
+
+  **Tests added:** `tests/afl-api-brownlow-acquire.test.ts` (new — no existing suite covers
+  `acquire-afl-api-brownlow.ts` itself; `tests/afl-api-brownlow.test.ts` is explicitly scoped to
+  the DB-free settle-engine pieces). Covers: (A) two acquisitions at an identical mocked
+  wall-clock second get distinct labels/paths (`result2.label === \`${result1.label}-2\``); (B) a
+  pre-existing directory at the generated label is never written into (sentinel file in a
+  pre-created stale directory survives untouched, no `manifest.json` appears in it); (C) both
+  manifests stay readable and their SHA-256 entries match their own snapshot's bytes, proving each
+  payload lands in its own snapshot; (D) a normal single acquisition still lands at the unsuffixed
+  base label; plus a `cleanupPartialBrownlowSnapshot` case proving cleanup after a mid-run failure
+  removes only the failing run's own (suffixed) directory and leaves an earlier complete sibling
+  snapshot untouched. `tests/afl-api-match.test.ts` (M): three new cases under "snapshot collision
+  safety" mirroring (A)/(B) for `acquire-afl-api.ts`, plus (E) an explicit `--fixtures-only` case
+  proving the shared fixture path gets the same collision-safe claim; the pre-existing
+  `buildAflApiLabel` test literal and the happy-path `result.label` assertion were updated from
+  `afl-api-2026-2026-09-19-1430` to `afl-api-2026-2026-09-19-143000` to match the new `HHMMSS`
+  format — not a weakening, the assertion still pins the exact contract, just at the corrected
+  granularity.
+
+  **Operator commands (none run by the assistant):**
+  ```
+  npx tsc --noEmit
+  npx vitest run tests/afl-api-brownlow-acquire.test.ts tests/afl-api-match.test.ts
+  ```
+
+  **Files changed:** `src/lib/acquisition/snapshot-dir.ts` (new — `claimSnapshotDir()`),
+  `tools/current-season/acquire-afl-api.ts` (M — `buildAflApiLabel()` seconds, `claimSnapshotDir()`
+  call, `onSnapshotDirClaimed` dep, `main()` no longer recomputes the label for cleanup),
+  `tools/current-season/acquire-afl-api-brownlow.ts` (M — same four changes, Brownlow side),
+  `tests/afl-api-brownlow-acquire.test.ts` (new), `tests/afl-api-match.test.ts` (M — three new
+  collision-safety tests, two label-literal updates). No change to `acquire-afl-api.ts`'s
+  match-selection/parsing, `acquire-afl-api-brownlow.ts`'s bfawards request planning, any settle
+  tool, any manifest field, or the §10 enable guard.
+
+  **S7 completed-season Brownlow season-artefact builder, 2026-09-20 (fresh session, Sonnet 5,
+  same worktree), implemented, UNEXECUTED — no test/tsc/DB/Git/deployment command run by the
+  assistant (CLAUDE.md §9).**
+
+  **Why.** The frozen §16 stage table names, as part of S7's deliverable, `tools/migration/
+  build_brownlow_season_artefact_from_afl_api.py`. It did not exist before this pass. It is
+  required for the completed-season rollover path ISSUE-101/F will consume, independent of how
+  the separate `staging.afl_api_brownlow_vote` typed-projection gap (deliberately deferred in the
+  earlier S7 pass, see above) is eventually closed. This pass is scoped to exactly the builder and
+  its DB-free contract tests; the projection gap remains untouched.
+
+  **Design.** Offline, deterministic, never writes PostgreSQL. Reads: (1) one immutable,
+  already-acquired AFL API Brownlow snapshot under `data/sources/afl_api/brownlow/<label>/`
+  (`01-brownlow-season.raw.json` / `02-brownlow-leaderboard.raw.json` / `manifest.json`, exactly
+  `acquire-afl-api-brownlow.ts`'s output shape), manifest-hash-verified file-by-file before any
+  content is trusted; (2) an explicit Stage S5 bridge artefact
+  (`data/reference/afl-api-player-bridge-<date>.json`), never "latest"; (3) `afldb_test`
+  READ-ONLY (default `AFLDB_TEST_DATABASE_URL`, hard-pinned required database name, refuses any
+  other target — the same `resolve_dsn()`/`open_read_only()` pattern
+  `build_afl_api_player_bridge.py` already established for this stage), for exactly two facts no
+  tracked file carries: a resolved player's `afltables_profile_url`
+  (`external_identities`, `source_id=afltables`, `match_method='afltables_profile_url'`, refuses
+  on any ambiguity) and their home-and-away games that season (`player_season_stats`,
+  `SUM(games) - SUM(COALESCE(finals,0))` grouped by player — the SUM, not the
+  `admin-brownlow.ts` Map-overwrite reading, so a mid-season trade's two rows both count).
+
+  **Vote-set integrity and the completion gate**, reimplemented in pure Python (cannot import the
+  TypeScript emitters) to match `emitAflApiBrownlowMatchVotes()`/`emitAflApiBrownlowLeaderboard()`
+  exactly: exactly 3 rows per match, values exactly `{3,2,1}`, no duplicate player or match id,
+  every count integral (Sec 4.4). Refuses outright unless BOTH the `matchVotes` feed's own
+  `status` and the leaderboard's own `status` are exactly `CONCLUDED` — never a LIVE or partial
+  count. Reconstructed per-player totals are reconciled against the leaderboard; any mismatch on
+  a CONCLUDED count is a hard, blocking refusal (Sec 10's own "blocking at the end", brought
+  forward to build time rather than left advisory).
+
+  **Identity resolution (Sec 6.3, T1), fail closed.** Every voting player resolves through the S5
+  bridge's `disposition: "linked"` rows only — no fuzzy or name-based matching anywhere. A single
+  unresolved or duplicate-canonical-identity player refuses its WHOLE match's 3-row vote set (Sec
+  10: "a match's vote set is one unit, all-or-none"); one or more refused vote sets refuses THE
+  WHOLE ARTEFACT BUILD, nothing written, every refusal reported (not just the first) — mirroring
+  `import_brownlow_season.py`'s own "zero rejections or no write" contract (Sec 8.6 item 3) one
+  layer upstream of where that loader would otherwise reject a partial file anyway. Ineligibility
+  (`is_ineligible`) is resolved only for players who actually polled (tallied) votes, since an
+  ineligible player who never polled never appears in the sparse artefact regardless.
+
+  **Season-row derivation is a faithful Python port**, not a reinvention: `competition_ranks()` /
+  `derive_season_rows()` reproduce `competitionRanks()`/`deriveSeasonRows()`
+  (`src/lib/brownlow/entry.ts`) line-for-line — the MEASURED (ISSUE-155 preflight P13),
+  already-in-production convention for `vote_rank` (competition rank over ALL polled players),
+  `eligible_rank` (competition rank over the eligible only, NULL for ineligible), `is_winner`
+  (`eligible_rank == 1`, never the AFL API leaderboard's own `winner` flag), and the
+  NULL-for-zero `three_vote_games`/`two_vote_games`/`one_vote_games`. The AFL API leaderboard's
+  own `totalVotes`/`eligible`/`winner` fields are used only as the reconciliation/eligibility
+  witness above, never as the arithmetic source of the season row itself.
+
+  **Round semantics (Sec 5, deliberate, reported for operator confirmation).**
+  `brownlow_season_votes` carries no round column at all, so this builder never resolves a vote
+  set's `CD_M` to a canonical match and never calls `translateAflApiBrownlowRound()` — the Sec 6.4
+  round-translation contract and the Sec 10 "legitimate reschedule" round-selection correction
+  (above) are round-VOTE-grain concerns this artefact structurally cannot regress, because it has
+  no round field to get wrong. Finals exclusion is likewise structural: the bfawards feed never
+  publishes finals vote records, so no defensive per-match `is_final` DB check is added (or
+  possible without a match resolution this artefact does not otherwise require).
+
+  **Provenance and output safety.** Every row carries `source_record_id`-equivalent provenance in
+  the review-only `legacy_source_record_id` column
+  (`afl_api-brownlow-season:<season>:<CD_I>:<snapshot-label>`); `bootstrap_player_id` (also
+  review-only, never matched on by the loader) carries the resolved canonical `players.id` rather
+  than a fabricated legacy id — there is no legacy predecessor for an AFL-API-sourced row, and
+  this is the most truthful non-guessed value available, documented inline. Output is row-for-row
+  byte-compatible with `import_brownlow_season.py`'s pinned `HEADER` and its `(season,
+  afltables_profile_url)` ascending `load_artefact()` ordering (`build()` proves this with a
+  round-trip self-check against that exact loader function before reporting success), written to
+  its OWN season-scoped destination — `data/brownlow/season-votes-afl_api-<season>.csv` +
+  `...manifest.json` — and NEVER the tracked ISSUE-113 master `data/brownlow/season-votes.csv`;
+  merging into that master file is left to the ISSUE-101/F rollover step, deliberately out of
+  scope here. The manifest is this builder's own schema (real snapshot/bridge/DB provenance
+  fields), not `import_brownlow_season.py`'s legacy-recovery-export shape, whose identity
+  adjudication file exists specifically to gap-fill LEGACY rows with no AFL Tables profile path —
+  inapplicable here, since every row this builder emits already carries a DB-verified URL;
+  manufacturing an adjudication file with no factual basis to force that unrelated shape would
+  have been inventing provenance, not reusing a contract. Existing-destination safety follows
+  `build_afl_api_player_bridge.py`'s established `--write` convention exactly: content-equality
+  (ignoring the `built_at_utc` timestamp field) is a silent no-op, any real difference is a hard
+  refusal, and nothing already on disk is ever overwritten or deleted.
+
+  **Tests added:** `tests/python/afl_api_brownlow_season_artefact_contract.py` (new, DB-free,
+  mirrors `afl_api_bridge_contract.py`'s style) — malformed/duplicate vote-set refusals, the
+  CONCLUDED completion gate (both feeds, either missing), leaderboard reconciliation
+  match/mismatch, bridge loading (linked-only, S5 rule-(b) shared-player-id re-check, empty-bridge
+  refusal), per-match all-or-none identity refusal (unresolved player, duplicate canonical
+  identity), ineligible-player handling (resolved only when tallied, missing-leaderboard-entry
+  refusal), `competition_ranks()` ties, the full derive → row → CSV pipeline (values, provenance
+  fields, `HEADER` column completeness, ascending ordering independent of derivation order),
+  determinism across reordered input, a season-total regression proof across two matches under
+  different `api_round_number`s (item I — proves the round-reschedule fix cannot regress an
+  artefact that carries no round field), and the never-silently-overwrite write path (identical
+  content no-ops, differing CSV or manifest content refuses, the original file is left untouched
+  after a refusal). Not yet run by the assistant.
+
+  **Operator commands (none run by the assistant):**
+  ```
+  python tests/python/afl_api_brownlow_season_artefact_contract.py
+  python tools/migration/build_brownlow_season_artefact_from_afl_api.py \
+      --label <acquired-CONCLUDED-brownlow-snapshot-label> \
+      --bridge data/reference/afl-api-player-bridge-2026-09-20.json \
+      --validate-only
+  ```
+  (`--write` only after reviewing the `--validate-only` summary; requires a real CONCLUDED-season
+  AFL API Brownlow snapshot on disk, which has not yet been acquired for any fully decided season
+  in this pass.)
+
+  **Files changed:** `tools/migration/build_brownlow_season_artefact_from_afl_api.py` (new),
+  `tests/python/afl_api_brownlow_season_artefact_contract.py` (new). No existing file modified;
+  `import_brownlow_season.py` is read-only imported for its `HEADER`/`NULLABLE_SMALLINTS`/
+  `load_artefact()` constants/function, never changed. S7's completion state is unchanged by this
+  pass (the `staging.afl_api_brownlow_vote` projection gap remains open); do not mark S7 complete.
+
+  **AFL API Brownlow season-artefact builder identity-union fix, 2026-09-20 (fresh session,
+  Sonnet 5, same worktree), implemented, UNEXECUTED — no test/tsc/DB/Git/deployment command run
+  by the assistant (CLAUDE.md §9).** Two defects found by the operator's real validation of the
+  builder above are fixed here; nothing was DB-validated by the assistant.
+
+  **Defect 1 — `TypeError: Path.read_text() got an unexpected keyword argument 'newline'`
+  (contract test section J).** Root cause: `write_artefact()`'s overwrite-equality check called
+  `csv_path.read_text(encoding="utf-8", newline="")`; `pathlib.Path.read_text()` accepts only
+  `encoding`/`errors`, never `newline` (that parameter exists on `open()`, not on the `Path`
+  convenience method — a real API-shape bug, not a version issue). Fixed by opening the handle
+  directly: `with csv_path.open("r", encoding="utf-8", newline="") as handle: existing_csv =
+  handle.read()`. `newline=""` is preserved exactly as before, so the equality check still reads
+  the existing file's exact bytes with no universal-newline translation — the byte/content-
+  equality overwrite contract is unweakened. New contract-test coverage (not present before):
+  writing then re-comparing a CRLF-newline artefact against otherwise-identical LF-only content
+  now provably refuses rather than being silently treated as equal.
+
+  **Defect 2 — 105 of 207 real 2025 match vote sets refused `unresolved_identity`.** Root cause:
+  the builder's `--validate-only` was run against exactly one bridge artefact,
+  `data/reference/afl-api-player-bridge-2026-09-20.json` (the S5 stat-vector bootstrap, 398/400
+  providers linked). Per the S5b paragraph above, that artefact was already known to be
+  materially incomplete for 2025 Brownlow purposes — the S5 bridge only observes providers
+  appearing in the 14 tracked backtest sample matches (3 of them 2025 matches), so it never
+  contained the 61 providers the operator's 2025 Brownlow census subsequently found and S5b
+  bridged separately, in `data/reference/afl-api-brownlow-name-bridge-2026-09-20.json` (the S5b
+  name+team+season bootstrap, 61/61 linked). This is not an identity-resolution defect in either
+  bridge or in `resolve_season_facts()` — it is a builder defect: the tool accepted only one
+  `--bridge` path and had no way to consume both artefacts the operator's own S5+S5b work had
+  already produced and applied to `afldb_test`.
+
+  **Exact relationship between the two artefacts.** Both are written to one shared contract — a
+  top-level `providers` object keyed by `CD_I…`, each entry carrying `disposition`
+  (`linked`/`unresolved`/`ambiguous`/`contradictory`) and, only when `linked`,
+  `candidate_player_id` — because both are read by the SAME importer,
+  `import_afl_api_player_bridge.py`, whose `ALLOWED_MATCH_METHODS = frozenset({
+  'afl_api_stat_vector_bootstrap', 'afl_api_name_team_season_bootstrap'})` already treats them as
+  two evidence classes on one schema (S5b's own generalisation, above). They differ only in
+  evidence strength (declared via each file's own top-level `match_method`, never hardcoded) and
+  in which 2025 providers each one happens to cover; a given `CD_I` appears as `linked` in at
+  most one of the two in the current real artefacts (disjoint in practice — the S5b builder
+  itself was run only against the 61 S5-unresolved providers — though the fix does not assume
+  disjointness, see below).
+
+  **Identity-union design implemented (`load_bridges()`, new, alongside unchanged `load_bridge()`
+  which single-file callers/tests keep using).** `--bridge` is now `action="append"` (repeatable);
+  `build()` takes `bridge_paths: list[Path]` in place of one `bridge_path: Path`. `load_bridges()`
+  loads every supplied file through the existing single-file `load_bridge()` (which still enforces
+  Sec 6.3 rule (b) — one player_id, no more than one linked provider id — WITHIN a single file),
+  then unions the resulting `linked` maps: an identical `CD_I -> player_id` mapping repeated
+  across files is deduplicated and harmless; a `CD_I` linked to a DIFFERENT `player_id` by a
+  second file is refused (`BrownlowArtefactSourceError`, names both contributing files and both
+  player ids — never silently prefers one file); rule (b) is then RE-CHECKED over the combined
+  map (two files can each be internally consistent and still jointly violate it — e.g. two
+  different `CD_I`s each uniquely linked to the same `player_id` in two separate files); zero
+  files, or a combined map with zero entries, refuses (`BrownlowArtefactSourceError`), matching
+  the existing single-file fail-closed behaviour. Provenance — which file(s) supplied each
+  mapping — is returned alongside the map and threaded into the builder's own manifest (schema
+  bumped `MANIFEST_SCHEMA_VERSION` 1 → 2): `"bridge"` is now a list of `{file, sha256,
+  linked_providers_contributed}` entries, one per supplied `--bridge` artefact, replacing the
+  single-object shape; nothing else in the repository reads that field (confirmed by search), so
+  this is not a breaking change for any consumer. No fuzzy matching was added; no identity
+  requirement was weakened; the DB-verified `afltables_profile_url` lookup (`load_identity_and_
+  games()`, `external_identities`) is untouched.
+
+  **Tests added:** `tests/python/afl_api_brownlow_season_artefact_contract.py` — a new
+  `load_bridges` section (one file still works; two compatible files union successfully; an
+  identical mapping repeated in both files is harmless; provenance names both contributing files
+  for that shared mapping and the single file for a mapping only one file supplies; the same
+  provider linked to different players by two files refuses; a player id claimed by two different
+  provider ids only once two independently-consistent files are combined refuses; zero `--bridge`
+  paths refuses) plus two new assertions in existing section J (a CRLF-newline artefact refuses a
+  later LF-only comparison; re-comparing the same CRLF content is still a no-op). All prior A–J
+  assertions are unchanged (not weakened, not removed).
+
+  **Operator commands (none run by the assistant):**
+  ```
+  python tests/python/afl_api_brownlow_season_artefact_contract.py
+  python tools/migration/build_brownlow_season_artefact_from_afl_api.py \
+      --label afl-api-brownlow-2025-2026-09-20-103946 \
+      --bridge data/reference/afl-api-player-bridge-2026-09-20.json \
+      --bridge data/reference/afl-api-brownlow-name-bridge-2026-09-20.json \
+      --validate-only
+  ```
+  Expected, given the operator's already-applied S5+S5b `afldb_test` state and the 188/188 /
+  207/207 census above: 0 `unresolved_identity` refusals (down from 105/207); the builder proceeds
+  to its read-only `afldb_test` evidence step and reports a full measured summary. Do not
+  hard-code 188/207/0 into the builder itself (the operator's REAL ACCEPTANCE TARGET, honoured —
+  no test asserts these production values). `--write` only after reviewing that summary.
+
+  **Files changed:** `tools/migration/build_brownlow_season_artefact_from_afl_api.py` (M — the two
+  fixes above), `tests/python/afl_api_brownlow_season_artefact_contract.py` (M — new coverage,
+  nothing removed). S7's completion state is unchanged (the `staging.afl_api_brownlow_vote`
+  projection gap remains open); do not mark S7 complete.
+
+  **Season-artefact builder OPERATOR-VALIDATED, 2026-09-20 (operator acceptance evidence supplied
+  the same day the identity-union fix above landed).** Real 2025 Brownlow source: 207 voting
+  matches, 621 vote rows, 188 leaderboard players. Clean full-count settle against that source:
+  `voteSetsSeen: 207`, `voteSetsPlanned: 207`, `voteSetsRefused: {}`,
+  `voteSetsRescheduledRound: 2`, `leaderboardPlayersCompared: 188`, `leaderboardMismatches: 0`.
+  Structural fail-closed cases proven: duplicate-player, bad-vote-values, incomplete-vote-set
+  (source), `unknown_match`/`unresolved_identity` (resolver). Corrections proven: a changed
+  upstream vote set creates exactly one new source version; the corrected replay is
+  unchanged/idempotent. Leaderboard: LIVE mismatch advisory, CONCLUDED mismatch blocking — both
+  exercised. Historical canonical equality: 621/621, 0 missing, 0 unexpected, 0 vote mismatches, 0
+  round drift, 2 legitimate reschedules. The completed-season artefact builder itself: contract
+  suite green, real 2025 `--validate-only` clean (0 `unresolved_identity` refusals once both S5 and
+  S5b bridges were supplied via `--bridge` twice, per the identity-union fix above), a real
+  `--write` produced 188 season rows and exactly 1 winner deterministically, and a second identical
+  `--write` was a content-equality no-op with unchanged hashes. **S5b is complete and applied
+  (188/188), not pending** — unchanged from its own paragraph above, restated here because it is a
+  precondition of this evidence. None of this operator evidence was independently re-run or
+  re-verified by the assistant (CLAUDE.md §9); it is recorded here exactly as the operator supplied
+  it, per §5's "never invent evidence" rule — this paragraph is a record of what the operator
+  reported, not a claim the assistant reproduced it.
+
+  **S7 typed-projection closure, 2026-09-20 (fresh session, Sonnet 5, same worktree
+  `afldb-issue-228` / branch `sonnet/issue-228`), implemented, UNEXECUTED — no test/tsc/DB/Git
+  command has been run by the assistant (CLAUDE.md §9).**
+
+  **The gap, precisely.** Migration 103 declared `staging.afl_api_brownlow_vote` (Decision B: "a
+  family with no typed projection cannot be promoted"), but the S7 pass that implemented the
+  Brownlow settle engine deliberately left it unpopulated (documented in that pass's own module
+  header and in this ledger's "Deliberately deferred" paragraph above): `canonical_applications`
+  and `brownlow_round_votes` keyed off `staging.source_record_versions` directly, and the
+  projection table stayed permanently empty. This closes exactly that gap, and only that gap — it
+  does not touch match/round/player resolution, the all-or-none atomicity savepoint, ownership,
+  correction semantics, or leaderboard reconciliation, all of which are separately proven
+  (§10/§19) and were explicitly off-limits for this pass.
+
+  **Row grain, from migration 103 itself (inspected, not guessed).** One row per vote (one player,
+  one match): `PRIMARY KEY (source_id, family, external_record_id, provider_player_id)`, where
+  `external_record_id = provider_match_id` (the spine record is per-match; the projection explodes
+  it into one row per vote, per the migration's own header). `match_id`/`player_id`/`club_id` are
+  nullable "Option B" columns — observed identity is never withheld pending canonical resolution —
+  but `canonical_round_number` is `NOT NULL`, so a row can only be written once round translation
+  has actually succeeded.
+
+  **Projection lifecycle implemented.** New `projectAflApiBrownlowVoteSet()` (`afl-api-brownlow.ts`)
+  upserts one row per vote for a fully-resolved (`planned`) set only — mirroring
+  `settle-afl-api.ts`'s own `projectAflApiMatch()`/`projectAflApiPlayerMatch()` exactly: written
+  whenever the set resolves, independent of `--auto-apply` (so a `--apply` run without
+  `--auto-apply` still populates the projection, matching the sibling families' "written whenever
+  ... resolved and projected, independent of whether this run wrote ... a canonical change"
+  convention), skipped only under `--observe-only` (whose own established contract already limits
+  every write in this module to the spine observation — this pass does not relax that). Idempotent
+  by construction: `ON CONFLICT (source_id, family, external_record_id, provider_player_id) DO
+  UPDATE`, the same primary key the migration declares, so a byte-identical replay never inserts a
+  second row (`versionSeq` unchanged, values unchanged, a genuine no-op UPDATE). A corrected
+  upstream vote value is represented as an UPDATE-in-place under the new `version_seq` — current
+  state, not append-only history, exactly the convention `staging.afl_api_match`/
+  `staging.afl_api_player_match` already establish for their own corrections; no prior source
+  evidence is destroyed (`staging.source_record_versions` retains the full ordered history
+  regardless, unaffected by this pass). `provider_team_id`/`eligible` are threaded from the
+  already-parsed raw vote record (both fields already existed on it; `AflApiBrownlowVoteUnit`
+  gained them, additive); `matchId` is threaded from the already-resolved
+  `AflApiBrownlowMatchResolution` into the `planned` plan variant (previously computed and
+  discarded, additive change). `club_id` is left NULL throughout: no provider-team-to-club
+  resolution exists anywhere in this settle engine, and §10's Option B column list explicitly
+  names `club_id NULL` as an expected state, not merely a fallback.
+
+  **How canonical planning now depends on the projection.** `unitInputFor()`'s proposed
+  `brownlow_round_votes.votes` value is now read back (`RETURNING votes`) from the projection row
+  the SAME call just wrote, in the SAME transaction — not re-read from the in-memory bundle a
+  second time. `applyAflApiBrownlowVoteSet()` gained a required `projectedVotes` map and throws
+  (refusing the whole set, never silently falling back to the unprojected value) if any unit's
+  provider player id has no corresponding projection entry — a genuine, if narrow, dependency: the
+  canonical write cannot proceed for a vote this run did not just prove it staged. This
+  deliberately stops short of re-deriving match/round/player RESOLUTION itself from the
+  projection table (`planAflApiBrownlowMatchSet()` is untouched) — `settle-afl-api.ts` documents
+  the identical choice for the match family ("the canonical writer below never reads them back —
+  every proposed value comes from the DB-free bundle, exactly as `readFreshTarget()` ... re-reads
+  canonical state itself rather than trusting a projection table"); re-deriving already-proven
+  resolution logic from a staging table would be a redesign of validated Brownlow behaviour, which
+  this task was explicitly instructed not to do, and would risk a second, divergent implementation
+  of the same gates.
+
+  **`promotion_candidates`/`data_issues` — no change, by design.** No `promotion_candidates` queue
+  is added for Brownlow refusals. This matches the project-wide "human accept path stays
+  unimplemented" state (`promotion-review.ts:719`) that the original S7 pass already documented as
+  a deliberate scope cut, and nothing in §10's text requires one — a refused vote set is a hard,
+  all-or-none refusal (`data_issues` + `import_rejections`, unchanged), never routed to an operator
+  review queue as if it were a resolvable ownership/identity ambiguity like the match family's own
+  candidates are.
+
+  **Leaderboard persistence — no schema change, by design.** Migration 103's own header states
+  `afl_api.brownlow_leaderboard` gets NO typed projection because its `promotion_policy` is
+  `'never'` — it is an artefact-builder input only. No typed leaderboard table exists to populate,
+  and the runbook does not call for one; `reconcileAflApiBrownlowSeason()`'s pure in-memory
+  LIVE-advisory/CONCLUDED-blocking comparison is unchanged. This is not a gap this pass left open —
+  it is the frozen design, confirmed by inspection, not assumed.
+
+  **`match_id` on `brownlow_round_votes` — unresolved, reported not silently expanded.** Still not
+  populated by `writeBrownlowRoundVotes()` (`canonical-apply.ts`, shared with other families). No
+  §10/§19 acceptance text found that requires it; the prior S7 round-selection-correction pass
+  already reported this as a low-risk follow-up rather than auto-applying it, on the grounds that
+  `round_number` alone already disambiguates (a club plays each declared round exactly once per
+  season) and that writing it touches shared `canonical-apply.ts`. This pass did not find new
+  evidence changing that conclusion, and `canonical-apply.ts` was not touched. Now that
+  `plan.matchId` is resolved and available in `afl-api-brownlow.ts` (this pass's own addition),
+  wiring it through remains a small, well-scoped follow-up if the operator wants it, but is not
+  implemented here.
+
+  **Correction/ownership behaviour — unchanged, verified by extending existing coverage.** The
+  existing E3/E5 gates, the whole-set savepoint atomicity, and Q1-equivalent
+  foreign-owned-refuses-the-whole-set semantics are untouched. The projection now makes a
+  correction VISIBLE as a changed staged row (new `version_seq`, updated `votes`), verified by a
+  new DB-backed test step (below) that applies a genuine vote-value correction and checks both the
+  projection and the canonical rows update atomically and in place.
+
+  **Tests added/changed.** `tests/integration/settle-afl-api-brownlow.test.ts`'s existing
+  "auto-applies a complete 3/2/1 vote set ... and a replay is a no-op" case gained: (A) assertions
+  that the typed projection carries exactly 3 rows with real resolved `match_id`/`player_id`
+  (and `club_id IS NULL`, the disclosed scope cut) and the correct `canonical_round_number`,
+  immediately after the first real apply; (B) a projection-row-count assertion after the identical
+  replay, proving no duplicate row; (C) a new correction step — two of three votes change value
+  upstream, re-settled with `apply: true, autoApply: true` — asserting the projection updates in
+  place (still 3 rows, new values) and exactly 2 canonical rows are updated (the unchanged third
+  vote's unit correctly returns `nothing_to_write`). `cleanup()` in that file, and in
+  `tests/integration/settle-afl-api-brownlow-reschedule.test.ts` and
+  `tests/integration/settle-afl-api-brownlow-backtest.test.ts` (both of which also run `apply:
+  true, autoApply: true` Brownlow cases), now also deletes this suite's own
+  `staging.afl_api_brownlow_vote` rows, ordered before each file's `DELETE FROM matches` — the new
+  `match_id` FK (`REFERENCES matches(id)`, no `ON DELETE` clause) would otherwise block that
+  delete once real rows exist there. No existing assertion in any of these files, or in
+  `tests/afl-api-brownlow.test.ts` (DB-free) or `tests/afl-api-match-migration.test.ts` (migration
+  shape), asserted the projection table stays empty, so none needed weakening or removal to make
+  this pass's new writes pass. Item D's negative path (the whole set refuses when a projection
+  entry is genuinely missing) is implemented defensively in code
+  (`applyAflApiBrownlowVoteSet()`'s explicit throw) but is not separately covered by a dedicated
+  test in this pass — constructing that scenario needs the internal function called directly with
+  a hand-built `projectedVotes` map missing an entry, which is reachable only through plumbing
+  (`sourceKeysById`, a real `batchId`, a real `sourceVersionSeq`) this pass judged not worth adding
+  test-only surface area for, given the throw is a single, easily-audited defensive line; disclosed
+  here rather than silently assumed covered.
+
+  **Missing-projection regression added, 2026-09-20 (later same day, fresh session, Sonnet 5, same
+  worktree, INSPECT/EDIT only — no test/tsc/DB/Git command run by the assistant, CLAUDE.md §9).**
+  Item D's negative path above is now covered. `tests/integration/settle-afl-api-brownlow.test.ts`
+  gained one new `it()` (match `q`, untouched by every case above it in the file): runs
+  `runSettleAflApiBrownlow({ apply: true, autoApply: false, observeOnly: false })` to commit the
+  set's three real `staging.afl_api_brownlow_vote` rows without ever reaching the canonical-apply
+  path; deletes exactly one of those three rows (the middle voter's) to make it genuinely
+  unavailable; re-resolves the same set's full 3-unit plan through the exported
+  `planAflApiBrownlowMatchSet()` seam; then calls the exported `applyAflApiBrownlowVoteSet()`
+  directly with a `projectedVotes` map built from the two surviving rows. Asserts: the call
+  returns `{ status: 'failed' }` whose `reason` names both the missing `providerPlayerId` and the
+  `providerMatchId`; zero `brownlow_round_votes` rows exist for the set afterward — including for
+  the FIRST unit, whose own projection row was still present and would otherwise have written
+  cleanly before the second unit's throw rolled the whole savepoint back, proving §10/§14
+  whole-set atomicity rather than assuming it; zero `canonical_applications` ledger rows; the
+  spine's `current_version_seq` and version-row count are byte-identical before and after; and the
+  two surviving projection rows are byte-identical before and after the failed apply (no
+  raw-payload fallback reconstructed the deleted one). No production code changed — the existing
+  defensive throw in `applyAflApiBrownlowVoteSet()` (already implemented) was exercised as-is.
+
+  typed Brownlow projection implementation operator validation:
+  - typecheck green
+  - existing focused suite 30/30 green
+  - missing-projection regression added, pending operator execution
+
+  **Files changed (this addendum):** `tests/integration/settle-afl-api-brownlow.test.ts` (M — one
+  new `it()`; two new named imports, `planAflApiBrownlowMatchSet`/`applyAflApiBrownlowVoteSet`,
+  from `afl-api-brownlow.ts`; one new import, `asImportBatchId`, from `import-batch-id.ts`);
+  `issues.md` (M — this addendum). No production file touched. **S7 is still not marked
+  complete — this new test is unexecuted; operator validation is required first.**
+
+  **Operator commands (none run by the assistant):**
+  ```
+  npx tsc --noEmit
+  npx vitest run tests/afl-api-brownlow.test.ts \
+    tests/integration/settle-afl-api-brownlow.test.ts \
+    tests/integration/settle-afl-api-brownlow-reschedule.test.ts \
+    tests/integration/settle-afl-api-brownlow-backtest.test.ts
+  ```
+  Expected: the extended "auto-applies a complete 3/2/1 vote set" case still passes with its new
+  projection/correction assertions added; every other pre-existing assertion in the four files
+  above is unchanged in intent and should pass exactly as before this pass.
+
+  **Files changed:** `src/lib/acquisition/afl-api-brownlow.ts` (M — `AflApiBrownlowVoteUnit`
+  gained `providerTeamId`/`eligible`; the `planned` plan variant gained `matchId`; new
+  `projectAflApiBrownlowVoteSet()`; `unitInputFor()`/`applyAflApiBrownlowVoteSet()` now thread a
+  `projectedVotes` map; `runSettleAflApiBrownlow()` calls the new projector for every non-observe-
+  only planned set; module header comment corrected), `tests/integration/settle-afl-api-brownlow.test.ts`
+  (M — projection/correction assertions, cleanup), `tests/integration/settle-afl-api-brownlow-reschedule.test.ts`
+  (M — cleanup only), `tests/integration/settle-afl-api-brownlow-backtest.test.ts` (M — cleanup
+  only). No change to `canonical-apply.ts`, `afl-api-rounds.ts`, `afl-api-bundle.ts`,
+  `afl-api-match-resolver.ts`, `afl-api-player-resolver.ts`, migration 103, `settle-afl-api.ts`,
+  `settle-afltables.ts`, the CLI (`tools/current-season/settle-afl-api-brownlow.ts`), the
+  season-artefact builder, or any Python file. **S7 is still not marked complete — this closure is
+  implemented and UNEXECUTED; operator validation (above) is required first.**
+  **§9.10 — 2022 season, prerequisite + audit-accounting corrective (2026-09-21), implemented,
+  UNEXECUTED — no test/tsc/DB/Git command run by the assistant (CLAUDE.md §9).** Operator-executed
+  evidence supplied 2026-09-21 established: the 2022 fixture-identity prerequisite is solved (real
+  AFL fixture feed 207 matches, 203 fixture observations persisted, 4 expected
+  `finals_label_required` build failures, Brownlow match-resolution failures dropped 198 -> 0,
+  round-translation failures 0); the remaining 2022 Brownlow equality gap is player identity
+  (parsed source vote rows 594, resolved source keys 510, canonical positive rows 594,
+  `identityFailures` array length 42, match failures 0, round failures 0, unexpected canonical
+  keys 84) — the audit halted because 510 + 42 != 594. Inspection (no DB/test/tsc run) found two
+  defects, both now fixed:
+  (1) **S5b season hardcoding** — `tools/migration/build_afl_api_brownlow_name_bridge.py`'s CLI
+  already accepted `--season`, but `classify()` called `season_club_roster(..., SEASON)` against
+  the module-level `SEASON = 2025` constant regardless, so `--season 2022` compared 2022 Brownlow
+  providers against 2025 club rosters. Fixed by adding an explicit `season` parameter to
+  `classify()`, threaded from `args.season` at the one call site in `main()`, and used in place of
+  the module constant in the roster lookup, the `no_candidate` reason string and the `linked`
+  `evidence_summary` string. `SEASON` now backs only the CLI's own `--season` default (still 2025
+  when omitted); no other behaviour changed.
+  (2) **Audit cached-failure accounting** —
+  `tools/current-season/audit-afl-api-brownlow-canonical-equality.ts` cached a provider player id's
+  resolution outcome keyed by `providerPlayerId` (`playerIdCache: Map<string, number | null>`), but
+  pushed an `identityFailures` entry only on the FIRST occurrence of a failing id; every later
+  physical vote row for that same still-failing id was silently skipped from the report, so
+  `identityFailures.length` measured distinct-failed-provider-ids (42) rather than failed physical
+  rows (84) for 2022. Fixed by caching the RESOLVER CALL only: the cache now stores a discriminated
+  `PlayerVoteResolution` (`{playerId: number; reason: null} | {playerId: null; reason: string}`) via
+  a new exported `resolvePlayerCached()` helper, and the per-vote loop reports one
+  `identityFailures` entry for EVERY physical vote row whose cached-or-fresh outcome is
+  unresolved/refused, still calling the resolver at most once per distinct id. The population
+  arithmetic (`resolved + identity-failed + match-failed + round-failed == parsed`) and its
+  fail-closed reconciliation invariant are unchanged in shape; only the grain of what
+  `identityFailurePhysicalRows` actually counts is corrected. Neither change touches the S5b
+  evidence model (still name+team+season-roster only, never `brownlow_round_votes`/canonical
+  Brownlow recipient/vote value/fuzzy matching), the accepted 2025 artefact, or any production
+  settle/canonical write path — `build_afl_api_brownlow_name_bridge.py` writes no database and no
+  artefact unless `--write` is passed; the audit script is SELECT-only and writes nothing, ever.
+  Also added, to make the audit importable without running its `main()`: the same
+  `invokedDirectly` CLI-entry guard `settle-afl-api-brownlow.ts` already uses
+  (`process.argv[1]`/`import.meta.url` via `relative`/`resolve`/`fileURLToPath`) — behaviour when
+  run directly (`node .../audit-afl-api-brownlow-canonical-equality.ts`) is unchanged.
+  **Tests added:** `tests/python/afl_api_bridge_contract.py` — new
+  `_FakeRosterCursor`/`_FakeRosterConn` recording the `season` value reaching
+  `season_club_roster()`'s own SQL parameters; proves `--season 2022` reaches the roster query
+  (fails against the pre-fix `classify()`, which took no `season` argument at all) and that the
+  omitted-flag CLI default still resolves to 2025. `tests/audit-afl-api-brownlow-canonical-equality.test.ts`
+  (new, DB-free) — exercises the exported `resolvePlayerCached()` directly: a provider id
+  repeated across three physical vote rows calls the injected resolver exactly once but returns
+  three `identityFailures`-worthy outcomes (population arithmetic reconciles at physical-row
+  grain, never distinct-id grain); a second case proves a successful resolution is cached too and
+  that distinct provider ids never share cache state.
+  **Files changed:** `tools/migration/build_afl_api_brownlow_name_bridge.py` (M — `classify()`
+  season parameter); `tools/current-season/audit-afl-api-brownlow-canonical-equality.ts` (M —
+  `PlayerVoteResolution`/`resolvePlayerCached()`, per-vote loop, `invokedDirectly` guard);
+  `tests/python/afl_api_bridge_contract.py` (M — S5b season-threading checks);
+  `tests/audit-afl-api-brownlow-canonical-equality.test.ts` (new); `issues.md` (M — this
+  addendum). No production, DEV or `afldb_test` command was run; no artefact, migration or
+  canonical write occurred.
+  **Operator commands (none run by the assistant):**
+  ```
+  npx tsc --noEmit
+  npx vitest run tests/python/afl_api_bridge_contract.py \
+    tests/audit-afl-api-brownlow-canonical-equality.test.ts
+  python tests/python/afl_api_bridge_contract.py
+  ```
+  (The Python contract file is a standalone script — run it directly with `python`, not through
+  vitest; the vitest line above covers only the new TS test.) After both pass, the 2022 census
+  re-run and the S5b validate-only bridge build for 2022 are, per the operator's own brief:
+  ```
+  npx tsx tools/current-season/audit-afl-api-brownlow-canonical-equality.ts --season 2022
+  python tools/migration/build_afl_api_brownlow_name_bridge.py --validate-only --season 2022
+  ```
+  Expected, per the fixes above: the audit's `identityFailures.length` should now read 84 (not
+  42), its population-reconciliation invariant should pass rather than halt, and the S5b builder's
+  `season_club_roster` evidence should be drawn from the 2022 club rosters rather than 2025's. Do
+  NOT pass `--write` to the builder in this pass — no operator run of the real 2022 bridge build
+  was authorised or performed here (ARTEFACT CONTRACT, above). §9.10 and S7 remain NOT marked
+  complete.
+  **§9.10 — CD_I293854 manual identity adjudication + census diagnostic cleanup (2026-09-21),
+  implemented, UNEXECUTED — no test/tsc/DB/Git/network/deployment command run by the assistant
+  (CLAUDE.md §9).** Per operator evidence communicated in the brief for this pass (commands not
+  re-run by the assistant): the 2022 fixture-identity prerequisite remains complete; the audit
+  accounting fix above is operator-validated; the 2022 census measures 207 distinct provider
+  players, 165 already `trusted_resolved`, 42 outstanding; the S5b name+team+season historical
+  build over that 42 resolves 41 automatically with 0 ambiguous and 0 contradictory, leaving
+  exactly one outstanding provider id: `CD_I293854` ("Matt Taberner", Fremantle, 2022). That id is
+  **intentionally excluded** from S5b's automatic result — "Matt" is a nickname/short form of the
+  canonical player's given name "Matthew", which neither S5's stat-vector bootstrap nor S5b's
+  exact-normalised-name bootstrap will link, deliberately (no fuzzy/nickname matching exists in
+  either classifier, and none was added by this pass). It is instead routed to a new, narrowly-
+  scoped, explicit, immutable **manual adjudication**: canonical identity `players.id 9321`
+  ("Matthew Taberner", `players/M/Matthew_Taberner.html`), backed by two independent, non-Brownlow
+  repository sources — `data/awards/player-identity.csv` row 1508, and the accepted ISSUE-222
+  DraftGuru person bridge (`data/reference/draftguru-person-bridge-20260918-v2.json` line 9405;
+  `docs/rebuild-manifests/draftguru/bridge-v2-parent-20260918-v1.csv` line 3331). The AFL API 2022
+  Brownlow source establishes ONLY the provider's identity/name/team context (`CD_I293854` =
+  "Matt Taberner", Fremantle); **canonical `brownlow_round_votes`/`brownlow_season_votes` were not
+  inspected and were not used as identity evidence** for this decision, per the operator's binding
+  instruction for this pass. This manual adjudication is layered separately from S5b and does not
+  change S5b's own result, which must remain 41 automatic / 1 unresolved.
+  **Importer (`tools/migration/import_afl_api_player_bridge.py`):** added a third allowed
+  `match_method`, `afl_api_manual_adjudication` (`MANUAL_ADJUDICATION_MATCH_METHOD`), to the
+  existing `ALLOWED_MATCH_METHODS` frozenset — the S5b generalisation pattern extended, not a new
+  importer. `apply_rows()`/`run_validate_only()` still write/report each artefact's own declared
+  `match_method` verbatim (never hardcoded), preserving every existing safety property: the
+  `afldb_test` DSN guard, linked-only import, provider→one-canonical-player, contradiction
+  detection (never overwrites an existing conflicting link), validate-only/dry-run/apply, and
+  append-only idempotent replay. Added one new pre-write check specific to this method only
+  (`manual_adjudication_identity_problem()`, called from both `apply_rows()` and
+  `run_validate_only()`): the candidate `player_id` must exist in `players`, and — when the
+  artefact declares `canonical_afltables_profile_url` — that URL must already resolve, via a
+  trusted `external_identities` row (`source=afltables`, `match_method='afltables_profile_url'`),
+  to exactly the candidate `player_id`; either failure refuses the write (`ImportRefused`) before
+  any INSERT, never guesses or silently proceeds.
+  **Artefact:** new `data/reference/afl-api-player-adjudication-2022-CD_I293854.json` — a
+  season/provider-specific, hand-authored, immutable reference artefact (not produced by either
+  builder script), conforming to the existing bridge artefact's minimal load contract
+  (`source_key`, `match_method`, `providers.<external_id>.{disposition,candidate_player_id,
+  observed_name,evidence_summary}`), plus full provenance: provider identity, canonical identity,
+  the two independent evidence citations above (file/line/content/role), an explicit
+  `brownlow_votes_used_as_identity_evidence: false` statement, and the operator's decision note
+  recording that this is deliberately NOT a change to the general S5b name normaliser. No
+  `inputs[]` sha256 pinning block is included — computing file hashes requires running code, which
+  this INSPECT/EDIT-ONLY pass was not authorised to do (CLAUDE.md §9); the loader's `inputs`
+  pinning is optional (`artefact.get("inputs", [])`) and this artefact simply carries none. An
+  operator wanting pinned-input hashes before `--apply` can add an `inputs[]` block using the same
+  `sha256_file()` helper the two builder scripts already use.
+  **Census (`tools/current-season/census-afl-api-brownlow-identities.ts`):** fixed the two
+  confirmed-stale diagnostics only, no change to classification logic. (1) The bucket-summary
+  heading's hard-coded `188` (the 2025 population) is now the actual measured `rows.length` for
+  the selected `--season`, extracted into an exported pure `bucketSummaryHeading()`. (2) The
+  `FIRST_MATCH_CHECK_IDS` block (`CD_M20250140004` + three 2025 provider ids) is now gated to
+  `season === 2025` via an exported pure `shouldRunFirstMatchCheck()`; a non-2025 season prints an
+  explicit skip line instead of running or inventing a first-match check for that season. Both
+  functions follow the same extraction precedent as `resolvePlayerCached()` in the sibling audit
+  script, so the fix is unit-testable without a live DB.
+  **Tests added:** `tests/python/afl_api_bridge_contract.py` — new `loader.MANUAL_ADJUDICATION_MATCH_METHOD`
+  section: the method is in `ALLOWED_MATCH_METHODS`; `load_artefact()` accepts it and still refuses
+  an unknown method; a `_FakeManualAdjudicationCursor` (flags: `players_exists`, `profile_owner`,
+  `existing_link`) proves `apply_rows()` writes the artefact's own `match_method` on the happy
+  path, refuses when the candidate player does not exist, refuses when the declared afltables
+  profile resolves to a different player, still withholds (opens exactly one `data_issues` row,
+  never overwrites) a genuine provider→player conflict, and is idempotent (no re-insert, no
+  `data_issues` row) on identical replay against an already-identically-linked mapping.
+  `tests/census-afl-api-brownlow-identities.test.ts` (new, DB-free) — `bucketSummaryHeading()`
+  reports the measured 2022 figure (207) and remains dynamic for any population including the old
+  hard-coded 2025 figure (188); `shouldRunFirstMatchCheck()` is true only for 2025 and false for
+  2022/2023/2024/2026.
+  **Files changed:** `tools/migration/import_afl_api_player_bridge.py` (M — third match method,
+  `manual_adjudication_identity_problem()`, wired into `apply_rows()`/`run_validate_only()`,
+  docstring); `data/reference/afl-api-player-adjudication-2022-CD_I293854.json` (new artefact);
+  `tools/current-season/census-afl-api-brownlow-identities.ts` (M — `bucketSummaryHeading()`,
+  `shouldRunFirstMatchCheck()` extracted and wired in, no classification-logic change);
+  `tests/python/afl_api_bridge_contract.py` (M — manual-adjudication contract checks);
+  `tests/census-afl-api-brownlow-identities.test.ts` (new); `issues.md` (M — this addendum). No
+  production, DEV or `afldb_test` command was run; no artefact was imported; `build_afl_api_brownlow_name_bridge.py`
+  is unchanged and its result must still read 41 automatic / 1 unresolved. §9.10 and S7 remain NOT
+  marked complete; the manual adjudication is pending operator validation and import.
+  **Operator commands (none run by the assistant):**
+  ```
+  npx tsc --noEmit
+  npx vitest run tests/python/afl_api_bridge_contract.py \
+    tests/census-afl-api-brownlow-identities.test.ts
+  python tests/python/afl_api_bridge_contract.py
+  ```
+  Validate the unchanged automatic 2022 S5b bridge (must still read 41 linked / 1 unresolved):
+  ```
+  python tools/migration/build_afl_api_brownlow_name_bridge.py --validate-only --season 2022
+  ```
+  Write it to a season-labelled immutable filename:
+  ```
+  python tools/migration/build_afl_api_brownlow_name_bridge.py --write --season 2022 \
+    --out data/reference/afl-api-brownlow-name-bridge-2022-<date>.json
+  ```
+  Validate, dry-run, then apply BOTH the automatic 2022 bridge and the manual adjudication
+  together (two separate importer invocations — the importer takes one artefact per run; the
+  manual artefact's filename does not match the automatic bridge's default glob, so it is never
+  picked up implicitly):
+  ```
+  python tools/migration/import_afl_api_player_bridge.py --validate-only \
+    --artefact data/reference/afl-api-brownlow-name-bridge-2022-<date>.json
+  python tools/migration/import_afl_api_player_bridge.py --validate-only \
+    --artefact data/reference/afl-api-player-adjudication-2022-CD_I293854.json
+  python tools/migration/import_afl_api_player_bridge.py --dry-run \
+    --artefact data/reference/afl-api-brownlow-name-bridge-2022-<date>.json
+  python tools/migration/import_afl_api_player_bridge.py --dry-run \
+    --artefact data/reference/afl-api-player-adjudication-2022-CD_I293854.json
+  python tools/migration/import_afl_api_player_bridge.py --apply \
+    --artefact data/reference/afl-api-brownlow-name-bridge-2022-<date>.json
+  python tools/migration/import_afl_api_player_bridge.py --apply \
+    --artefact data/reference/afl-api-player-adjudication-2022-CD_I293854.json
+  ```
+  Census after import (should now show 207 measured providers and CD_I293854 as
+  `trusted_resolved`):
+  ```
+  npx tsx tools/current-season/census-afl-api-brownlow-identities.ts --season 2022
+  ```
+  Equality audit after import (should reconcile with 0 remaining identity failures for
+  `CD_I293854`, subject to whatever other 2022 gaps remain open):
+  ```
+  npx tsx tools/current-season/audit-afl-api-brownlow-canonical-equality.ts --season 2022
+  ```
+  **§9.10 — HISTORICAL CLOSEOUT (2022–2025 Brownlow vote-set equality), 2026-09-21,
+  operator-proven COMPLETE.** Per operator-supplied evidence for this pass (no test/tsc/DB/Git/
+  network/deployment command run by the assistant, CLAUDE.md §9), the historical Brownlow §9.10
+  equality proof is now COMPLETE and PASS for every season 2022–2025:
+
+  | Season | Vote sets | Positive vote rows | Provider identities trusted | Exact canonical equality | Missing | Vote mismatch | Unexpected | Round drift | Identity failures | Match failures | Round failures | Result |
+  |---|---|---|---|---|---|---|---|---|---|---|---|---|
+  | 2022 | 198 | 594 | 207/207 | 594/594 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | PASS |
+  | 2023 | 207 | 621 | 201/201 | 621/621 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | PASS |
+  | 2024 | 207 | 621 | 196/196 | 621/621 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | PASS |
+  | 2025 | 207 | 621 | 188/188 | 621/621 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | PASS |
+
+  **Historical fixture-observation prerequisite** (the real AFL fixture feed persisted to the
+  spine ahead of the Brownlow census/audit, same operator evidence):
+
+  | Season | Feed matches | Observations persisted | Expected `finals_label_required` build failures |
+  |---|---|---|---|
+  | 2022 | 207 | 203 | 4 |
+  | 2023 | 216 | 212 | 4 |
+  | 2024 | 216 | 212 | 4 |
+
+  The four finals-label failures per season are the documented §6.4/§9 `finals_label_required`
+  limitation (2022–2024 feeds carry no `metadata.finals_match_label`); they sit outside the H&A
+  Brownlow population (§10 excludes finals from the vote feed both naturally and defensively) and
+  produced zero Brownlow match-resolution failures.
+
+  **Manual adjudications — current ids, re-confirmed against the artefacts on disk (not
+  re-derived).** `CD_I293854` (2022, "Matt Taberner" / Fremantle) → canonical `player_id 9321`
+  ("Matthew Taberner", `players/M/Matthew_Taberner.html`); `CD_I1006114` (2023, "Bailey J.
+  Williams" / WCE) → canonical `player_id 947` ("Bailey Williams", `players/B/Bailey_Williams1.html`,
+  the West Coast player — `player_id 946`/`Bailey_Williams0.html` is the Western Bulldogs
+  namesake and was explicitly rejected as this row's identity); `CD_I1020668` (2024, "Joshua
+  Draper" / FRE) → canonical `player_id 7862` ("Josh Draper", `players/J/Josh_Draper.html`). All
+  three artefacts (`data/reference/afl-api-player-adjudication-2022-CD_I293854.json`,
+  `-2023-CD_I1006114.json`, `-2024-CD_I1020668.json`) already carry these current ids and were
+  unchanged by this pass. Two narrative mentions that instead said `players.id 12205` for the
+  2022 row (this ledger's own §9.10 CD_I293854 paragraph above, and `IssuesIndex.md`'s summary of
+  it) are corrected in this pass to `9321` — `12205` is a legacy, bootstrap-era id from
+  `data/awards/player-identity.csv` that was explicitly rejected by the manual-adjudication
+  identity preflight documented in that same artefact, and is the CURRENT AFLDB `player_id` for
+  Taylor Walker, not Matthew Taberner; it was only ever written into ledger prose, never into an
+  artefact or the database. Canonical Brownlow votes were not used as identity evidence for this
+  correction, or for any of the three manual adjudications. All three manual artefacts were
+  validate-only checked, dry-run checked and applied to `afldb_test` by the operator before the
+  four seasons' equality passes above.
+
+  **Disposition.** §9.10 historical Brownlow evidence: **CLOSED / PASS for 2022–2025.** **S7
+  itself remains OPEN** — the separate real live-count capture/replay requirement (§10: "capture
+  the raw season and leaderboard feeds every few minutes during the live count") has not yet
+  occurred; the 2026 count is imminent (Grand Final week). S7 is **not** marked complete by this
+  closeout.
+
+  **Assertion 9 (§9.9 semantic-hash evidence) — not silently passed, not irrelevant, status
+  unchanged by this closeout.** Assertion 9 is match-family semantic-hash evidence (the
+  10:29/21:41 `CD_M20260142801` capture pair, §2.4/§9.9), separate from the Brownlow live-count
+  replay this closeout concerns. It remains **SKIPPED**: only one formal monitor capture pair
+  exists on disk in the layout the backtest reads, and §9's design deliberately permits a
+  missing-fixture SKIP rather than a silent PASS ("the backtest skips with an explicit 'fixture
+  absent' outcome ... when a file is missing"). The literal §3/S3 wording requiring the listed
+  backtest sections to be "green" is **not** dispositioned by this pass and remains an explicit
+  closeout item for ISSUE-228 as a whole: before ISSUE-228 is finally marked complete, assertion 9
+  must be either (a) proven with a genuine second monitor capture acquired under the real feed,
+  (b) reconstructed into the formal `docs/rebuild-manifests/afl_api/backtest-20260919.json`
+  monitor-pair layout if the already-mentioned manual second capture's bytes/evidence genuinely
+  exist and are inspected first, or (c) explicitly dispositioned as a permitted SKIP with that
+  reasoning recorded in the backtest manifest itself. No second capture is fabricated here and
+  `backtest-20260919.json` is not regenerated or overwritten by this pass. This is not tonight's
+  Brownlow blocker.
+
+  **Files changed (this closeout):** `issues.md` (M — this paragraph, and the stale
+  `players.id 12205` reference in the preceding §9.10 CD_I293854 paragraph corrected to `9321`);
+  `IssuesIndex.md` (M — same correction, plus the State summary); `issues/open/AFLDB-ISSUE-228.md`
+  (M — status header). No artefact, migration, test, or production file touched; no test/tsc/DB/
+  Git/network/deployment command was run by the assistant.
+  **S8 operations implementation, 2026-09-21 (same pass as the §9.10 closeout above), implemented,
+  UNEXECUTED — INSPECT/EDIT only; no test/tsc/DB/Git/network/deployment command run by the
+  assistant (CLAUDE.md §9).** S8 (§16/§17) delivered against the frozen design, with known gaps
+  from the S2/S6 implementation verified against the runbook text first rather than blindly
+  copying it (several diverged — recorded below, not silently papered over):
+  (A) **`package.json`:** added `acquire:afl-api` (`tsx tools/current-season/acquire-afl-api.ts`)
+  and `emit:afl-api` (`tsx tools/current-season/emit-afl-api-bundle.ts`). **`bridge:afl-api` was
+  deliberately NOT added** — `package.json` wraps only Node/tsx tools everywhere in this
+  repository (verified: zero `python` invocations in any existing script); the bridge is two
+  Python scripts (`build_afl_api_player_bridge.py`, `import_afl_api_player_bridge.py`) with
+  overlapping flag names, always run directly with `python`, exactly like every other migration
+  script in `tools/migration/`. Adding an npm wrapper for them would be inventing a new
+  convention this repository does not have anywhere else. **`emit:afl-api` is also not what §17's
+  original sketch implied**: `emit-afl-api-bundle.ts` is the S3 DB-free BACKTEST harness over the
+  tracked local samples (`--out <path>` only), not a per-`--label` production bundle emitter —
+  the actual S6 architecture fused emission into `settle-afl-api.ts` itself, which builds its own
+  bundle in-process from an already-acquired `--label` snapshot (its own module doc: "acquisition
+  and settle are separate stages; it only ever reads the already-acquired snapshot"). The alias is
+  still added under the requested name, using the one real "emit" entrypoint that exists, with
+  this discrepancy disclosed rather than fabricating a `--label` capability that entrypoint does
+  not have.
+  (B) **`deploy/` (new, not installed/enabled):** `afldb-settle-afl-api.{sh,service,timer}` (nightly
+  05:00, staggered after the AFL Tables 04:30 timer) and `afldb-settle-afl-api-brownlow.{sh,service,timer}`
+  (every 5 min, always-enabled but a no-op unless `AFLDB_AFL_API_BROWNLOW_ENABLED=true`, mirroring
+  the match chain's "no in-progress season" exit-0 shape so a permanently-enabled timer never
+  reports a false "failed" unit for the ~11 months the count is not running). Both chains are two
+  Node steps (no R/Python), unlike the three-step fitzRoy chain; `acquire-afl-api*.ts` already
+  self-clean their own partial snapshot on failure (their own `cleanupPartialSnapshot()`/
+  `cleanupPartialBrownlowSnapshot()`), so neither wrapper re-implements
+  `afldb-settle-afltables.sh`'s `cleanup_partial` trap. Neither acquire tool takes a `--label`
+  input (each mints its own UTC-timestamped, collision-safe label via `claimSnapshotDir()`), so
+  both wrapper scripts parse the label back out of the acquire step's own first stdout line
+  (`... label <value>`) rather than inventing one — the established
+  "manifest written last, self-cleaning on failure" contract is preserved throughout.
+  `ReadWritePaths` is narrower than the AFL Tables unit: `data/sources/afl_api` only — unlike
+  fitzRoy, neither `acquire-afl-api.ts` nor `acquire-afl-api-brownlow.ts` copies its manifest into
+  a tracked `docs/rebuild-manifests/afl_api/<label>.json` (only the untracked per-run
+  `manifest.json` beside the raw payloads exists today), a real gap against §5.4's original plan
+  text that this ops-only pass does not fix. No polkit rule and no on-demand admin "start now"
+  wiring were added for the two new units (see (C)) — deliberately out of scope, not an oversight.
+  (C) **`settle-status.ts`/`settle-trigger.ts` (§17 "unit table, not a second copy"):**
+  `settle-trigger.ts` gained a closed `SettleUnitKey`/`SETTLE_UNITS` table (`afltables`, `afl_api`,
+  `afl_api_brownlow`, each a fixed literal service name) and `readUnitStateOf(key)` — a READ-only
+  `systemctl show` generalisation; `readUnitState()` is kept as `readUnitStateOf('afltables')` so
+  every existing caller is byte-identical. `startSettleRun()` (the PRIVILEGED "start now" action)
+  is deliberately UNCHANGED — still `afltables` only; its "NO ARGUMENTS — structurally, not by
+  convention" security design (actions.ts's own doc comment) is exactly the kind of admin-
+  authorization-surface change the brief said not to redesign. `src/db/queries/settle-runs.ts`
+  gained `SETTLE_BATCH_TOOLS`/`SettleBatchTool` and `getLatestSettleRun(tool = SETTLE_BATCH_TOOL)`;
+  for the two new tools, batch identity/status/timestamps/label/season are returned but
+  `counters`/`sourceCompleteness` stay `null`/`unknown` rather than silently mis-projecting
+  `afl_api`'s differently-shaped `AflApiSettleCounters` through the AFL-Tables-specific
+  `SettleRunCounters` whitelist (which would otherwise report genuine non-zero afl_api counters as
+  zero). `settle-status.ts` gained `readSettleUnitTableStatus()`, composing the above into the
+  three-unit table §17 asks for. **Not wired into the rendered `/admin/current-season` page in
+  this pass** — an untested React/Server-Action change under an INSPECT/EDIT-ONLY session (no
+  build/typecheck/browser check possible) is a bad trade against CLAUDE.md's own UI verification
+  standard; disclosed as a follow-up, not shipped as a silent gap.
+  (D) **`docs/acquisition/AFLDB-2026-API-ACQUISITION.md`:** the stale §5 rollover-row wording
+  ("supersede in-season provenance") is replaced with the accepted Q7 doctrine
+  (corroborate/enrich only, explicit-transfer-only re-ownership, §7.5 cross-referenced), and the
+  same stale doctrine in §0's original standing-policy item 6 is corrected with an inline
+  "AMENDED" note in the document's own established style (original text retained as lineage, not
+  rewritten). The unrelated §6 ladder/`club_seasons` "supersedes the in-season rows" sentence was
+  inspected and left untouched — a different canonical target ISSUE-228 does not touch.
+  (E) **`.env.example`:** documented `AFLDB_AFL_API_BASE_URL` / `_CFS_BASE_URL` / `_SAPI_BASE_URL`
+  (all optional, default to the real AFL.com.au hosts, independently overridable — the CFS one is
+  the Brownlow-simulator redirect point) and `AFLDB_AFL_API_BROWNLOW_ENABLED` (must be exactly
+  `true`; unset is the safe default). No token or credential is documented — the WMCTok media
+  token is fetched at run time and held in memory only. `docs/deployment.md` gained the same four
+  rows in its configuration-variable table and a new `§7d` section describing the S8 deploy files,
+  explicitly marked NOT installed/enabled by this pass.
+  (F) **New `docs/acquisition/AFLDB-2026-BROWNLOW-LIVE-COUNT-RUNBOOK.md`** — the manual, one-off,
+  real-event operator runbook for tonight's local/`afldb_test` acceptance run. Explicitly
+  distinguishes the real AFL public feed / local ISSUE-228 tooling / `afldb_test` acceptance
+  database / later DEV deployment / later PROD deployment, and states plainly that running it
+  does not write to DEV or PROD. Its PowerShell preflight uses
+  `[Environment]::GetEnvironmentVariable($name, 'Process')` for every dynamic environment-variable
+  lookup (never `$env:$name`, which does not interpolate — it looks up a literal variable named
+  `$name`) and a fail-safe database-target check that reuses the established
+  `tools/rebuild/draftguru/s74-rollback-exercise.ps1` `Invoke-ReadOnlySql`/"never print the DSN"
+  pattern verbatim in shape (a forced-read-only `psql -X -At` probe of `current_database()`),
+  adapted to `AFLDB_TEST_DATABASE_URL`/`AFLDB_TEST_IMPORT_DATABASE_URL` and refusing to proceed
+  unless both resolve to exactly `afldb_test`. Operator commands follow the runbook's own
+  validate-only → dry-run → apply order (§17).
+  **Assertion 9 closeout path (recommended, not executed or fabricated):** acquire a genuine
+  second monitor-capture pair under the real feed tonight via the new Brownlow runbook above (the
+  live count is the only remaining natural opportunity before this evidence goes stale); if the
+  operator's already-mentioned manual second capture's bytes genuinely exist on disk in an
+  inspectable form, reconstruct THOSE into the formal `backtest-20260919.json` monitor-pair layout
+  as a second, cheaper option; otherwise disposition assertion 9 as an explicit, documented SKIP
+  in that manifest rather than leaving it an undocumented gap. No second capture was fabricated
+  and `backtest-20260919.json` was not regenerated or overwritten by this pass.
+  **Tests added:** `tests/admin-current-season-settle.test.ts` gained one new DB-free
+  `describe('AFLDB-ISSUE-228 S8 — settle unit and batch-tool tables')` asserting `SETTLE_UNITS`/
+  `SETTLE_BATCH_TOOLS`' exact literal shape (matching the new `.service` files' unit names and the
+  two `afl_api` settle CLIs' own `SETTLE_BATCH_TOOL` literals) and that the `afltables` key stays
+  byte-identical to the pre-existing single-unit constants. No test exercises `getLatestSettleRun`'s
+  new `tool`-branch SQL path or `readSettleUnitTableStatus()`'s composition — neither the old
+  `readSettleRunStatus()` nor `getLatestSettleRun()` has a DB-backed or fully-mocked-composition
+  unit test today either (the existing suite mocks both wholesale for the admin-action tests), so
+  this follows the file's own established coverage boundary rather than inventing a new one.
+  **Files changed:** `package.json` (M), `deploy/afldb-settle-afl-api.sh` (new),
+  `deploy/afldb-settle-afl-api.service` (new), `deploy/afldb-settle-afl-api.timer` (new),
+  `deploy/afldb-settle-afl-api-brownlow.sh` (new), `deploy/afldb-settle-afl-api-brownlow.service`
+  (new), `deploy/afldb-settle-afl-api-brownlow.timer` (new),
+  `src/lib/acquisition/settle-trigger.ts` (M), `src/lib/acquisition/settle-status.ts` (M),
+  `src/db/queries/settle-runs.ts` (M), `docs/acquisition/AFLDB-2026-API-ACQUISITION.md` (M),
+  `docs/acquisition/AFLDB-2026-BROWNLOW-LIVE-COUNT-RUNBOOK.md` (new), `.env.example` (M),
+  `docs/deployment.md` (M), `tests/admin-current-season-settle.test.ts` (M), `issues.md` (M — this
+  paragraph). S9/S10 remain not started; S7 remains open per the closeout above.
+  **Operator commands (none run by the assistant):**
+  ```
+  sh -n deploy/afldb-settle-afl-api.sh
+  sh -n deploy/afldb-settle-afl-api-brownlow.sh
+  npx tsc --noEmit
+  npx vitest run tests/admin-current-season-settle.test.ts
+  ```
+  **S8 operator-validated, 2026-09-21 (later same day) — COMPLETE.** Per operator-supplied
+  evidence for this status-only pass (no test/tsc/DB/Git/network/deployment command run by the
+  assistant, CLAUDE.md §9), every item above has now been run and passed: `npx tsc --noEmit`
+  PASS; `tests/admin-current-season-settle.test.ts` 38/38 PASS; `sh -n
+  deploy/afldb-settle-afl-api.sh` PASS; `sh -n deploy/afldb-settle-afl-api-brownlow.sh` PASS.
+  A systemd safety inspection of the four new unit/timer files PASSED — no `afldb_test`/
+  `afldb_dev`/prod database URL, local SSH tunnel address, or Brownlow simulator URL is
+  hard-coded in any of them. A safety inspection of the new manual Brownlow live-count operator
+  runbook (`docs/acquisition/AFLDB-2026-BROWNLOW-LIVE-COUNT-RUNBOOK.md`) originally found its
+  write-target guard checked the wrong environment variables; **that blocker is now fixed**:
+  `AFLDB_IMPORT_DATABASE_URL` is bound process-locally from `AFLDB_TEST_IMPORT_DATABASE_URL` and
+  independently re-verified by a `SELECT current_database() = 'afldb_test'` probe before any
+  write; real-feed/simulator base-URL overrides are explicitly cleared and positively checked by
+  the same preflight; the 2026 `staging.afl_api_match` prerequisite (populated only once
+  `settle-afl-api.ts --apply` has run for a match) is explicitly documented in the runbook. **No
+  DEV or PROD deployment has occurred.** S8 is COMPLETE. S1–S6 are COMPLETE (per the stage
+  paragraphs above and §9.10's historical closeout). **S7 remains OPEN** — the only remaining S7
+  acceptance item is the real 2026 live-count capture/replay evidence (§10); S7 is not marked
+  complete before that event evidence exists. **S9 is NOT STARTED** — it requires a later DEV
+  dry-run/apply, AFL Tables corroboration and Brownlow replay, all gated on the S7/S8
+  prerequisites above. **Assertion 9 (§9.9) stays explicitly distinct from the Brownlow
+  live-count replay and remains SKIPPED/open**: only one formal monitor-capture pair
+  (`CD_M20260142801`) exists in the layout the backtest reads; it is not PASS and is not closed
+  by tonight's Brownlow snapshots; it must be explicitly dispositioned (proved, reconstructed, or
+  recorded as a permitted SKIP in the backtest manifest — see the §9.10 HISTORICAL CLOSEOUT
+  paragraph above) before ISSUE-228 is finally marked complete. **Files changed (this pass):**
+  `issues.md` (M — this paragraph), `IssuesIndex.md` (M — State/S8/S9 status),
+  `issues/open/AFLDB-ISSUE-228.md` (M — status header). No implementation, runbook contract,
+  `package.json`, deploy file, or `CHANGELOG.md` was touched by this pass.
+- **Severity:** Medium
+- **Area:** Data acquisition / Import architecture / Data integrity — the `afl_api` source
+  (migration 077), the migration-074 observation spine, the ISSUE-122 automatic canonical path,
+  `external_identities`, Brownlow round votes.
+- **Found:** 2026-09-19 (operator investigation of the AFL.com.au fixture/result, CFS
+  `playerStats` / `matchRoster` and `bfawards` endpoints; samples captured locally under
+  `data/sources/AFLWebsite/`, untracked by `.gitignore`).
+- **Runbook:** `issues/open/AFLDB-ISSUE-228.md` — **durable source of truth for this issue**
+  (findings with file:line, payload analysis, source contract, lifecycle, resolution rules,
+  field mapping, gates, backtest, migration 103, stages S0–S10, operations, tests, risks,
+  open questions, and the fixture-ingestion decisions taken now for the successor).
+- **ID note.** 227 remains unallocated (`issues.md` ISSUE-226 ID note); 228 was assigned by the
+  operator's brief and is allocated here.
+- **Related:** `AFLDB-ISSUE-096` (architecture, standing rules), `099`/`122`/`128`/`131` (AFL
+  Tables settle and automatic path), `100` (`afl_api` lineup family, `CD_` identity), `118` H3
+  (`afl_api` rosters, providerId reconciliation without persistence), `113` (Brownlow season
+  totals loader), `162` (`fixtures` table, `(source_id, source_record_id)` reserved for a future
+  importer), `224` (unregistered 2026 debutants — not closed by this issue), `101`/F (rollover
+  doctrine, to be amended).
+
+### Problem
+AFLDB's only canonical current-season path is the nightly AFL Tables settle. AFL.com.au
+publishes official JSON feeds with stable provider identities (`CD_M…`, `CD_S…`, `CD_T…`,
+`CD_I…`), final scores, per-period scores, rushed behinds, full rosters, 23 player rows per
+team with every statistic AFLDB stores except `career_game_no` and `brownlow_votes`, and the
+official Brownlow 3-2-1 votes and leaderboard. Nothing in the repository reads these feeds
+directly (no `WMCTok`/`x-media-mis-token`/CFS code exists); `afl_api` has only the fitzRoy
+lineup (staging-only) and roster (height evidence) families.
+
+### Findings (2026-09-19, read-only; full detail in the runbook §1–§2)
+- The pipeline needed already exists and is source-neutral at the writer:
+  `applyCanonicalUnit()` takes `sourceKey`; only `settle-afltables.ts` is hard-bound to AFL
+  Tables (constants at :108/:113/:121/:1892 and the two 076 projection writers).
+- AFL round numbering: Opening Round = `0`, so canonical H&A round = AFL `roundNumber + 1`
+  for seasons with an Opening Round (2024–2026 feeds); finals `WF`=25, `QE`=26 (split by
+  `metadata.finals_match_label`), `SF`=27, `PF`=28, `GF`=29 in 2026.
+- Roster period scores are per-period increments (AFLDB stores cumulative); rushed behinds are
+  explicit; attendance is absent from all three feeds; `gamesPlayed` is null in every sample.
+- The player-stats schema is byte-stable in key set and order between the 2022 and 2026
+  samples; all counts are floats.
+- The monitor's "changed hashes" after CONCLUDED were not value changes: the first nine stat
+  rows and every `lastUpdated` are identical between the 10:29 and 21:41 captures of
+  `CD_M20260142801`; AFLDB must hash via `canonicalJson()` with measured exclusions.
+- No `external_identities` rows exist for `afl_api`; migration 077 records that no approved
+  deterministic bridge populates one. A deterministic stat-vector bridge against
+  `afltables`-owned 2026 rows is the plan's critical-path stage (S5).
+- Brownlow 2022–2025 feeds validate clean (exactly 3 votes per match, {1,2,3}, no duplicates,
+  totals equal `totalVotes`); `roundNumber` uses AFL API numbering.
+- `fixtures` (097) already reserves `UNIQUE (source_id, source_record_id)` for a future
+  importer; `matches.source_record_id` (064) has no writer — both are where `providerMatchId`
+  belongs.
+
+### Decisions proposed (operator approval required)
+1. Same `afl_api` source; five new families (`match`, `match_roster`, `player_match_stats`,
+   `brownlow_match_votes`, `brownlow_leaderboard`); `match_plays` not declared.
+2. Generalise the settle over a `SettleSourceSpec`; no parallel importer.
+3. Observe every status; promote only `CONCLUDED`; POSTGAME is withheld with a rejection reason.
+4. Provider-id-first match resolution; `matches.source_record_id = providerMatchId`.
+5. Co-source ownership: `afltables` and `afl_api` corroborate each other's rows; only the
+   `attendance` field group crosses owners (per-field-owned since migration 020) — **Q1/Q2**.
+6. Brownlow is a separate stage targeting `brownlow_round_votes`; season totals become an
+   ISSUE-113 artefact at rollover.
+7. Fixture ingestion is a successor (`AFLDB-ISSUE-229` recommended); runbook §13 fixes the
+   identity, resolver-order, status-selected-target and vocabulary decisions now.
+
+### Amendment (2026-09-19, operator decisions and tightening — runbook §0.1, §19)
+- **Q1 APPROVED** co-source corroboration: existing 2026 rows stay `afltables`-owned, rows
+  first promoted from `afl_api` are `afl_api`-owned, nothing is re-owned by corroboration.
+- **Q2 APPROVED** AFL Tables as optional, field-scoped attendance enrichment on
+  `afl_api`-owned matches (gate §7.5: canonical row exists, declared co-source for the
+  attendance group, `matches.attendance_source_id IS NULL`, no active override, valid incoming
+  value, attendance group only, through the applier with a ledger row). **"Status" in that
+  gate is `matches.attendance_status` (migration 020 coverage enum), never match completion:**
+  a CONCLUDED, fully settled match remains eligible for later attendance-only enrichment;
+  missing attendance never blocks promotion.
+- **Q7 APPROVED** rollover re-acquisition corroborates, never re-owns; transfers only by an
+  explicit rule/decision (doc amendment in S8; ISSUE-101/F owns its runbook change).
+- **T1** the stat-vector player bridge is bootstrap/backfill only, writes durable `afl_api`
+  `external_identities` (`unique`, append-only); ingestion resolves from `external_identities`
+  alone and must work with no AFL Tables data present; unresolved/new players are never guessed
+  (ISSUE-224 path).
+- **T2** semantic hashing: raw immutable → parse → canonical JSON → hash; every family ships
+  `hash_exclusions: []`; an exclusion needs ≥ 3 evidence pairs, registry evidence and a fixture
+  regression test (§4.5). The Hawthorn capture pair is evidence, not justification.
+- **T3** POSTGAME is observed/**deferred**, not rejected: bundle contract v2 `deferral` for the
+  `afl_api` spec, no target pass, `recordsDeferred` counters, completeness stays `complete`,
+  reporting never shows POSTGAME → CONCLUDED as failure-then-success. The existing model's
+  inability to express this is documented in §7.3.
+- **T4** one centralised round translation (`src/lib/acquisition/afl-api-rounds.ts`) over an
+  explicit per-season round table (Opening Round, H&A, WF, mixed QE via `finals_match_label`
+  rules, SF/PF/GF); typed refusals incl. `round_vocabulary_missing` (run HALT),
+  `round_unmapped`, `finals_label_required`; no `roundNumber + 1` anywhere else (§6.4).
+- Acceptance criteria/tests for all seven items: runbook §19.1–§19.7.
+
+### Validation
+S1–S3 DB-free: `npx vitest run tests/afl-api-rounds.test.ts tests/reference-data.test.ts tests/afl-api-match.test.ts`
+— 3 files, 121/121 passed (2026-09-19, last confirmed run). S4 (migration 103 + its shape-gate test
+`tests/afl-api-match-migration.test.ts`): written, **not yet run** — no vitest, migration or DB
+command has been executed against it (CLAUDE.md §9 user-executed boundary). The S3 backtest CLI
+(`npx tsx tools/current-season/emit-afl-api-bundle.ts`,
+writes `docs/rebuild-manifests/afl_api/backtest-20260919.json`) must be rerun and stay green before S4
+is trusted, per the runbook's own S3→S4 gate. Backtest design in runbook §9; staged test plan in §18;
+acceptance criteria in §19.
+
+### Next action
+Operator: (1) rerun the S3 backtest CLI and confirm it is still green; (2)
+`npx vitest run tests/afl-api-rounds.test.ts tests/reference-data.test.ts tests/afl-api-match.test.ts tests/afl-api-match-migration.test.ts`;
+(3) apply migration 103 to `afldb_test` only (never `afldb_dev` or production) and confirm it applies
+cleanly; (4) only then mark S4 complete and proceed to S5 (player bridge). Capture the 2026 Brownlow
+feeds with the standalone monitor for later replay (runbook §10) if the live count is still running.

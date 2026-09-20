@@ -1,0 +1,71 @@
+{
+  "artefact_kind": "afl_api_manual_adjudication",
+  "issue": "AFLDB-ISSUE-228",
+  "runbook_section": "Sec 9.10",
+  "source_key": "afl_api",
+  "match_method": "afl_api_manual_adjudication",
+  "season": 2023,
+  "decision_summary": "AFL API provider id CD_I1006114 is observed in the 2023 Brownlow source as 'Bailey J. Williams', West Coast (CD_T150 / WCE). Two current AFLDB players share the display name 'Bailey Williams': player_id 946 (Western Bulldogs, born 1997, 2015 National Draft, players/B/Bailey_Williams0.html) and player_id 947 (West Coast, born 2000, 2018 National Draft, players/B/Bailey_Williams1.html). Because both are named-match candidates for this provider row, neither the S5 stat-vector bootstrap nor the S5b name+team+season bootstrap can safely resolve it without risking a same-name collision, so this is a single, explicit, human-adjudicated identity decision, not a rule change to either bootstrap classifier and not a change to the general S5b name normaliser.",
+  "provider_identity": {
+    "external_id": "CD_I1006114",
+    "observed_given_name": "Bailey J.",
+    "observed_surname": "Williams",
+    "observed_team_provider_id": "CD_T150",
+    "observed_team_abbr": "WCE",
+    "observed_team_hist": "West Coast",
+    "observed_team_source": "data/reference/afl-api-identities.json (CD_T150 -> West Coast, raw_abbreviation WCE)"
+  },
+  "canonical_identity": {
+    "candidate_player_id": 947,
+    "canonical_name": "Bailey Williams",
+    "canonical_afltables_profile_url": "players/B/Bailey_Williams1.html"
+  },
+  "evidence": [
+    {
+      "source": "docs/rebuild-manifests/draftguru/bridge-population-scan-20260918-v2.json",
+      "location": "lines 26713-26808",
+      "content": "{ \"draftguru\": { \"captured_identity\": \"players/B/Bailey_Williams1.html\", \"dob_candidates\": [\"17 Apr 2000\"], \"title_birth_year\": 2000 }, \"expected_afltables_identity\": \"players/B/Bailey_Williams1.html\", \"retained_target\": { \"clubs\": [\"West Coast\"], \"debut_date\": \"2020-08-27\", \"debut_season\": 2020, \"dob_years\": [2000] }, \"stage_a\": { \"earliest_original_recruitment\": { \"draft_year\": 2018, \"event_type_raw\": \"National\" }, \"rows\": [{ \"club_name_raw\": \"West Coast\", \"draft_year\": 2018, \"event_type_raw\": \"National\", \"pick_number\": 35 }] } }",
+      "role": "Independently establishes players/B/Bailey_Williams1.html as the West Coast Bailey Williams: born 2000, 2018 National Draft pick 35, debut 2020-08-27. Distinguishes this profile from the preceding scan entry (players/B/Bailey_Williams0.html, Western Bulldogs, 2015 National Draft pick 48) in the same manifest."
+    },
+    {
+      "source": "issues/closed/queue-v1-baseline.json",
+      "location": "lines 13986-13998 and 14013-14025",
+      "content": "draft_person:392 { \"sourceName\": \"Bailey Williams\", \"context\": \"Draft · 2015 · National\", \"suggestedId\": 946, \"alternatives\": [\"Bailey Williams #947 (26)\", ...] } ; draft_person:393 { \"sourceName\": \"Bailey Williams\", \"context\": \"Draft · 2018 · National\", \"suggestedId\": 947, \"alternatives\": [\"Bailey Williams #946 (26)\", ...] }",
+      "role": "Independently corroborates the split: draft_person:392 (2015 National Draft) resolves to player_id 946, draft_person:393 (2018 National Draft) resolves to player_id 947. This distinguishes the West Coast/2018 player (947) from the Western Bulldogs/2015 player (946) using a source unrelated to the Brownlow provider row."
+    },
+    {
+      "source": "data/reference/draftguru-person-bridge-20260918-v2.json",
+      "location": "line 1085",
+      "content": "{ \"afltables_external_id\": \"players/B/Bailey_Williams1.html\", \"player_url\": \"https://www.draftguru.com.au/players/bailey_williams/2\" }",
+      "role": "Independently resolves players/B/Bailey_Williams1.html through the accepted ISSUE-222 DraftGuru person bridge."
+    },
+    {
+      "source": "docs/rebuild-manifests/draftguru/bridge-v2-parent-20260918-v1.csv",
+      "location": "line 394",
+      "content": "https://www.draftguru.com.au/players/bailey_williams/2,accepted,,players/B/Bailey_Williams1.html,players/B/Bailey_Williams1.html,unchanged,,",
+      "role": "Confirms the same DraftGuru profile is accepted and unchanged against players/B/Bailey_Williams1.html in the ISSUE-222 bridge-v2 parent manifest."
+    },
+    {
+      "source": "AFL API 2023 Brownlow source (data/sources/AFLWebsite/BrownlowSamples/brownlow-samples/2023/01-brownlow-season.raw.json)",
+      "location": "matchVotes[].votes[] entry for player.playerId CD_I1006114, match CD_M20230142008",
+      "content": "player.givenName \"Bailey J.\", player.surname \"Williams\"; team.teamId \"CD_T150\", team.teamAbbr \"WCE\", team.teamName \"West Coast Eagles\"; votes: 1",
+      "role": "Establishes ONLY the provider identity/name/team context (CD_I1006114 = 'Bailey J. Williams', West Coast, 2023, one positive vote row on CD_M20230142008). This source is NOT used, and canonical brownlow_round_votes / brownlow_season_votes were NOT inspected or used, as identity evidence for this decision -- identity is established solely by the independent repository sources above."
+    }
+  ],
+  "brownlow_votes_used_as_identity_evidence": false,
+  "operator_decision_note": "Operator-authorized 2026-09-21: do NOT add any Bailey Williams disambiguation rule to the general S5b name normaliser, do NOT add global same-name/collision matching, do NOT label this row afl_api_name_team_season_bootstrap (it would misstate how it was resolved). CD_I992351 and its associated Western Bulldogs Bailey Williams (player_id 946) were explicitly excluded from this decision and are not evidence for this West Coast provider row. This provider id is resolved through this narrowly-scoped, explicit, immutable manual adjudication instead, so the ISSUE-228 Sec 9.10 historical equality proof reaches zero defects without weakening either bootstrap classifier's non-guessing contract.",
+  "providers": {
+    "CD_I1006114": {
+      "disposition": "linked",
+      "candidate_player_id": 947,
+      "observed_name": "Bailey J. Williams",
+      "canonical_afltables_profile_url": "players/B/Bailey_Williams1.html",
+      "evidence_summary": "Manual adjudication (Sec 9.10): AFL API 2023 Brownlow source names CD_I1006114 as Bailey J. Williams, West Coast (provider identity/name/team context only, not used as identity evidence). docs/rebuild-manifests/draftguru/bridge-population-scan-20260918-v2.json (lines 26713-26808) establishes players/B/Bailey_Williams1.html as the West Coast player: born 2000, 2018 National Draft pick 35, debut 2020-08-27 -- distinct from players/B/Bailey_Williams0.html (Western Bulldogs, born 1997, 2015 National Draft pick 48). issues/closed/queue-v1-baseline.json independently corroborates the same split (draft_person:392 / 2015 National -> player_id 946; draft_person:393 / 2018 National -> player_id 947). The accepted ISSUE-222 DraftGuru person bridge (draftguru-person-bridge-20260918-v2.json line 1085; bridge-v2-parent-20260918-v1.csv line 394) independently corroborates the same stable AFL Tables profile URL, not a numeric AFLDB player_id. Canonical brownlow_round_votes/brownlow_season_votes not used as identity evidence. CD_I992351 (Western Bulldogs Bailey Williams, player_id 946) was explicitly excluded from this decision."
+    }
+  },
+  "counts": {
+    "linked": 1,
+    "unresolved": 0,
+    "contradictory": 0
+  }
+}

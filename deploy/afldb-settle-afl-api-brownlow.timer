@@ -1,0 +1,19 @@
+[Unit]
+Description=AFLDB — AFL.com.au (afl_api) Brownlow live-count poll
+
+[Timer]
+# §10: "capture the raw season and leaderboard feeds every few minutes during
+# the live count" and "max-age=3 respected with a >= 60s poll floor" (§17).
+# Every 5 minutes is comfortably above that floor. This timer is safe to
+# leave permanently enabled: the wrapper script (afldb-settle-afl-api-brownlow.sh)
+# is a no-op whenever AFLDB_AFL_API_BROWNLOW_ENABLED is not 'true', which is
+# the default outside the live count (§10 "Operational enablement").
+#
+# A missed poll during the count is NOT worth a catch-up run once the host is
+# back — the next scheduled poll a few minutes later supersedes it, so
+# Persistent is left at its default (false), unlike the nightly chains.
+OnCalendar=*:0/5
+AccuracySec=30sec
+
+[Install]
+WantedBy=timers.target

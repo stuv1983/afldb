@@ -1,0 +1,37 @@
+{
+  "$comment": "AFLDB-ISSUE-228 S1 (§5.3) — provider-id reference maps for the AFL.com.au JSON APIs (source_key 'afl_api'). Every entry here is transcribed from data/sources/AFLWebsite/AFLGamesSamples/00-season-matches.raw.json (2026) and .../historical-samples/<year>/00-season-matches.raw.json (2022-2025), verified by anchored Grep over the raw single-line JSON, never guessed. Team identities validate against data/reference/clubs.json 'hist' (never by name, per §6.2). Venue identities are DELIBERATELY INCOMPLETE (see 'venues' below); an unmapped venue is a warning and venue_id NULL, never a HALT (§6.2), so shipping this file incomplete is safe by the runbook's own design.",
+  "teams": {
+    "$comment": "CD_T<id> -> clubs.legacy_club_hist, with the exact raw name/abbreviation/nickname AFL.com.au publishes so §6.2's drift check has something to compare against. All 18 rows verified against every team object in the 2026 season-matches sample (218 matches, 436 team slots). Six raw names differ from legacy_club_hist (Adelaide Crows, Geelong Cats, Gold Coast SUNS, GWS GIANTS, Sydney Swans, West Coast Eagles) -- expected, per §2.1.",
+    "CD_T10":   { "hist": "Adelaide",                "raw_name": "Adelaide Crows",      "raw_abbreviation": "ADEL", "raw_nickname": "Crows" },
+    "CD_T20":   { "hist": "Brisbane Lions",          "raw_name": "Brisbane Lions",      "raw_abbreviation": "BL",   "raw_nickname": "Lions" },
+    "CD_T30":   { "hist": "Carlton",                 "raw_name": "Carlton",             "raw_abbreviation": "CARL", "raw_nickname": "Blues" },
+    "CD_T40":   { "hist": "Collingwood",             "raw_name": "Collingwood",         "raw_abbreviation": "COLL", "raw_nickname": "Magpies" },
+    "CD_T50":   { "hist": "Essendon",                "raw_name": "Essendon",            "raw_abbreviation": "ESS",  "raw_nickname": "Bombers" },
+    "CD_T60":   { "hist": "Fremantle",               "raw_name": "Fremantle",           "raw_abbreviation": "FRE",  "raw_nickname": "Dockers" },
+    "CD_T70":   { "hist": "Geelong",                 "raw_name": "Geelong Cats",        "raw_abbreviation": "GEEL", "raw_nickname": "Cats" },
+    "CD_T80":   { "hist": "Hawthorn",                "raw_name": "Hawthorn",            "raw_abbreviation": "HAW",  "raw_nickname": "Hawks" },
+    "CD_T90":   { "hist": "Melbourne",               "raw_name": "Melbourne",           "raw_abbreviation": "MELB", "raw_nickname": "Demons" },
+    "CD_T100":  { "hist": "North Melbourne",         "raw_name": "North Melbourne",     "raw_abbreviation": "NMFC", "raw_nickname": "Kangaroos" },
+    "CD_T110":  { "hist": "Port Adelaide",           "raw_name": "Port Adelaide",       "raw_abbreviation": "PORT", "raw_nickname": "Power" },
+    "CD_T120":  { "hist": "Richmond",                "raw_name": "Richmond",            "raw_abbreviation": "RICH", "raw_nickname": "Tigers" },
+    "CD_T130":  { "hist": "St Kilda",                "raw_name": "St Kilda",            "raw_abbreviation": "STK",  "raw_nickname": "Saints" },
+    "CD_T140":  { "hist": "Western Bulldogs",        "raw_name": "Western Bulldogs",    "raw_abbreviation": "WB",   "raw_nickname": "Bulldogs" },
+    "CD_T150":  { "hist": "West Coast",              "raw_name": "West Coast Eagles",   "raw_abbreviation": "WCE",  "raw_nickname": "Eagles" },
+    "CD_T160":  { "hist": "Sydney",                  "raw_name": "Sydney Swans",        "raw_abbreviation": "SYD",  "raw_nickname": "Swans" },
+    "CD_T1000": { "hist": "Gold Coast",              "raw_name": "Gold Coast SUNS",     "raw_abbreviation": "GCFC", "raw_nickname": "SUNS" },
+    "CD_T1010": { "hist": "Greater Western Sydney",  "raw_name": "GWS GIANTS",          "raw_abbreviation": "GWS",  "raw_nickname": "GIANTS" }
+  },
+  "venues": {
+    "$comment": "INCOMPLETE BY EVIDENCE, NOT BY OMISSION. The 2026 season-matches sample alone names 17 distinct CD_V venues (SCG, MCG, Gabba, Marvel Stadium, GMHBA Stadium, Adelaide Oval, Optus Stadium, Barossa Park, Norwood Oval, UTAS Stadium, Corroboree Group Oval Manuka, TIO Stadium, TIO Traeger Park, Hands Oval, Ninja Stadium, People First Stadium, ENGIE Stadium), and data/reference has no tracked venues.legacy_name list to verify a mapping against -- venues live only in the database, populated by history, not by a static reference dataset. Guessing AFL Tables spellings here (e.g. whether the Gabba is legacy_name 'Gabba' or 'Brisbane Cricket Ground') is exactly the fabrication CLAUDE.md forbids. The two entries below are the only ones with tracked-codebase evidence (data/reference/venue-canonical.json documents 'M.C.G.' and 'S.C.G.' as the literal AFL Tables legacy_name spellings, not just display expansions). Completing this map needs one read-only query the operator should run against afldb_test: SELECT id, legacy_name FROM venues ORDER BY legacy_name; -- every other CD_V stays unmapped (venue_id NULL, warning only, per §6.2) until that evidence lands.",
+    "CD_V40": { "raw_name": "MCG", "legacy_name": "M.C.G." },
+    "CD_V60": { "raw_name": "SCG", "legacy_name": "S.C.G." }
+  },
+  "seasons": {
+    "$comment": "year -> AFL API compSeason numeric id and CD_S providerId, verified from the top-level compSeason object of each season's 00-season-matches.raw.json.",
+    "2022": { "compSeasonId": 43, "providerId": "CD_S2022014" },
+    "2023": { "compSeasonId": 52, "providerId": "CD_S2023014" },
+    "2024": { "compSeasonId": 62, "providerId": "CD_S2024014" },
+    "2025": { "compSeasonId": 73, "providerId": "CD_S2025014" },
+    "2026": { "compSeasonId": 85, "providerId": "CD_S2026014" }
+  }
+}

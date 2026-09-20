@@ -1,0 +1,312 @@
+{
+  "acceptance_rule": "unique normalised (given_name, surname) match within the canonical season-2023 club roster of the provider's Brownlow-vote team; name+team+season evidence, NOT stat-vector evidence",
+  "counts": {
+    "ambiguous": 0,
+    "contradictory": 0,
+    "linked": 16,
+    "providers_in_scope": 17,
+    "unresolved": 1
+  },
+  "generated_utc": "2026-09-20T21:19:21+00:00",
+  "inputs": [
+    {
+      "file": "data\\sources\\AFLWebsite\\BrownlowSamples\\brownlow-samples\\2023\\01-brownlow-season.raw.json",
+      "sha256": "2bb28650ab4fda85f29770464001547a65ed47d24038068fa6b0d405740a29e5"
+    },
+    {
+      "file": "data\\sources\\AFLWebsite\\BrownlowSamples\\brownlow-samples\\2023\\06-validation.json",
+      "sha256": "205a80a4bc738f748ea24ce276bfe7c19eb1c162fc5b066cf3f6ac076bf2a067"
+    },
+    {
+      "file": "data\\reference\\afl-api-identities.json",
+      "sha256": "b2dd0784fc88cd801175976c041ddc1e5cc5e399805c06427f41dd06f51d10c2"
+    }
+  ],
+  "match_method": "afl_api_name_team_season_bootstrap",
+  "providers": {
+    "CD_I1005107": {
+      "candidate_player_id": 9792,
+      "candidates": [
+        {
+          "given_name": "Nathan",
+          "player_id": 9792,
+          "surname": "Murphy"
+        }
+      ],
+      "canonical_surname": "Murphy",
+      "disposition": "linked",
+      "evidence_summary": "unique 2023 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Nathan Murphy",
+      "observed_team_abbr": "COLL",
+      "observed_team_provider_id": "CD_T40",
+      "reason": null
+    },
+    "CD_I1005729": {
+      "candidate_player_id": 12195,
+      "candidates": [
+        {
+          "given_name": "Tarryn",
+          "player_id": 12195,
+          "surname": "Thomas"
+        }
+      ],
+      "canonical_surname": "Thomas",
+      "disposition": "linked",
+      "evidence_summary": "unique 2023 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Tarryn Thomas",
+      "observed_team_abbr": "NMFC",
+      "observed_team_provider_id": "CD_T100",
+      "reason": null
+    },
+    "CD_I1006114": {
+      "candidates": [],
+      "disposition": "unresolved",
+      "observed_name": "Bailey J. Williams",
+      "observed_team_abbr": "WCE",
+      "observed_team_provider_id": "CD_T150",
+      "reason": "no_candidate(club_id=23, season=2023)"
+    },
+    "CD_I1008089": {
+      "candidate_player_id": 6082,
+      "candidates": [
+        {
+          "given_name": "Isaac",
+          "player_id": 6082,
+          "surname": "Quaynor"
+        }
+      ],
+      "canonical_surname": "Quaynor",
+      "disposition": "linked",
+      "evidence_summary": "unique 2023 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Isaac Quaynor",
+      "observed_team_abbr": "COLL",
+      "observed_team_provider_id": "CD_T40",
+      "reason": null
+    },
+    "CD_I1008123": {
+      "candidate_player_id": 6691,
+      "candidates": [
+        {
+          "given_name": "Jake",
+          "player_id": 6691,
+          "surname": "Riccardi"
+        }
+      ],
+      "canonical_surname": "Riccardi",
+      "disposition": "linked",
+      "evidence_summary": "unique 2023 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Jake Riccardi",
+      "observed_team_abbr": "GWS",
+      "observed_team_provider_id": "CD_T1010",
+      "reason": null
+    },
+    "CD_I1011803": {
+      "candidate_player_id": 2945,
+      "candidates": [
+        {
+          "given_name": "Cody",
+          "player_id": 2945,
+          "surname": "Weightman"
+        }
+      ],
+      "canonical_surname": "Weightman",
+      "disposition": "linked",
+      "evidence_summary": "unique 2023 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Cody Weightman",
+      "observed_team_abbr": "WB",
+      "observed_team_provider_id": "CD_T140",
+      "reason": null
+    },
+    "CD_I1013230": {
+      "candidate_player_id": 8876,
+      "candidates": [
+        {
+          "given_name": "Logan",
+          "player_id": 8876,
+          "surname": "McDonald"
+        }
+      ],
+      "canonical_surname": "McDonald",
+      "disposition": "linked",
+      "evidence_summary": "unique 2023 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Logan McDonald",
+      "observed_team_abbr": "SYD",
+      "observed_team_provider_id": "CD_T160",
+      "reason": null
+    },
+    "CD_I280078": {
+      "candidate_player_id": 8954,
+      "candidates": [
+        {
+          "given_name": "Luke",
+          "player_id": 8954,
+          "surname": "Shuey"
+        }
+      ],
+      "canonical_surname": "Shuey",
+      "disposition": "linked",
+      "evidence_summary": "unique 2023 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Luke Shuey",
+      "observed_team_abbr": "WCE",
+      "observed_team_provider_id": "CD_T150",
+      "reason": null
+    },
+    "CD_I291357": {
+      "candidate_player_id": 4742,
+      "candidates": [
+        {
+          "given_name": "Gary",
+          "player_id": 4742,
+          "surname": "Rohan"
+        }
+      ],
+      "canonical_surname": "Rohan",
+      "disposition": "linked",
+      "evidence_summary": "unique 2023 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Gary Rohan",
+      "observed_team_abbr": "GEEL",
+      "observed_team_provider_id": "CD_T70",
+      "reason": null
+    },
+    "CD_I291867": {
+      "candidate_player_id": 1068,
+      "candidates": [
+        {
+          "given_name": "Ben",
+          "player_id": 1068,
+          "surname": "Brown"
+        }
+      ],
+      "canonical_surname": "Brown",
+      "disposition": "linked",
+      "evidence_summary": "unique 2023 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Ben Brown",
+      "observed_team_abbr": "MELB",
+      "observed_team_provider_id": "CD_T90",
+      "reason": null
+    },
+    "CD_I294068": {
+      "candidate_player_id": 610,
+      "candidates": [
+        {
+          "given_name": "Andrew",
+          "player_id": 610,
+          "surname": "Phillips"
+        }
+      ],
+      "canonical_surname": "Phillips",
+      "disposition": "linked",
+      "evidence_summary": "unique 2023 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Andrew Phillips",
+      "observed_team_abbr": "ESS",
+      "observed_team_provider_id": "CD_T50",
+      "reason": null
+    },
+    "CD_I294518": {
+      "candidate_player_id": 7315,
+      "candidates": [
+        {
+          "given_name": "Joe",
+          "player_id": 7315,
+          "surname": "Daniher"
+        }
+      ],
+      "canonical_surname": "Daniher",
+      "disposition": "linked",
+      "evidence_summary": "unique 2023 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Joe Daniher",
+      "observed_team_abbr": "BL",
+      "observed_team_provider_id": "CD_T20",
+      "reason": null
+    },
+    "CD_I295136": {
+      "candidate_player_id": 2459,
+      "candidates": [
+        {
+          "given_name": "Caleb",
+          "player_id": 2459,
+          "surname": "Daniel"
+        }
+      ],
+      "canonical_surname": "Daniel",
+      "disposition": "linked",
+      "evidence_summary": "unique 2023 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Caleb Daniel",
+      "observed_team_abbr": "WB",
+      "observed_team_provider_id": "CD_T140",
+      "reason": null
+    },
+    "CD_I296296": {
+      "candidate_player_id": 3815,
+      "candidates": [
+        {
+          "given_name": "Dom",
+          "player_id": 3815,
+          "surname": "Sheed"
+        }
+      ],
+      "canonical_surname": "Sheed",
+      "disposition": "linked",
+      "evidence_summary": "unique 2023 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Dom Sheed",
+      "observed_team_abbr": "WCE",
+      "observed_team_provider_id": "CD_T150",
+      "reason": null
+    },
+    "CD_I992059": {
+      "candidate_player_id": 11683,
+      "candidates": [
+        {
+          "given_name": "Sam",
+          "player_id": 11683,
+          "surname": "Switkowski"
+        }
+      ],
+      "canonical_surname": "Switkowski",
+      "disposition": "linked",
+      "evidence_summary": "unique 2023 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Sam Switkowski",
+      "observed_team_abbr": "FRE",
+      "observed_team_provider_id": "CD_T60",
+      "reason": null
+    },
+    "CD_I993953": {
+      "candidate_player_id": 4135,
+      "candidates": [
+        {
+          "given_name": "Eric",
+          "player_id": 4135,
+          "surname": "Hipwood"
+        }
+      ],
+      "canonical_surname": "Hipwood",
+      "disposition": "linked",
+      "evidence_summary": "unique 2023 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Eric Hipwood",
+      "observed_team_abbr": "BL",
+      "observed_team_provider_id": "CD_T20",
+      "reason": null
+    },
+    "CD_I999326": {
+      "candidate_player_id": 2053,
+      "candidates": [
+        {
+          "given_name": "Brad",
+          "player_id": 2053,
+          "surname": "Close"
+        }
+      ],
+      "canonical_surname": "Close",
+      "disposition": "linked",
+      "evidence_summary": "unique 2023 club-roster name match (given_name+surname, normalised); NOT a stat-vector match -- operator review recommended before apply",
+      "observed_name": "Brad Close",
+      "observed_team_abbr": "GEEL",
+      "observed_team_provider_id": "CD_T70",
+      "reason": null
+    }
+  },
+  "season": 2023,
+  "source_key": "afl_api",
+  "tool": "tools/migration/build_afl_api_brownlow_name_bridge.py",
+  "tool_version": "1.0.0"
+}
