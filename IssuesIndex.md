@@ -106,7 +106,46 @@
   round trip so a reintroduced bare `=== true` fails the same way again. **S9 remains paused, S7
   remains open, Assertion 9 remains separately open, Brownlow untouched, PROD untouched.**
   See `issues.md` for full detail. All work is
-  uncommitted, branch `sonnet/issue-228`. Implementation history (Sonnet 5, same worktree) —
+  uncommitted, branch `sonnet/issue-228`.
+  **S9 full-season evidence — ACCEPTED, 2026-09-21** (emitter commit `4e67ce38` deployed
+  successfully to DEV): `data/reference/afl-api-player-bridge-2026-full-2026-09-21.json` (SHA-256
+  `845a78d2f4c75d0f8cc2efd3337f895d6c7c795440cc6c343d42bf46140b3f5c`, `match_method
+  afl_api_stat_vector_season`, snapshot `afl-api-2026-2026-09-21-011148`) — **577 linked / 92
+  unresolved / 0 contradictory**, 9,153 linked player-match rows covered / 830 uncovered, 396
+  overlap with the existing trusted current-snapshot coverage / 181 newly linked, **no
+  cross-database numeric player_id parity claim**. Two unresolved canonical matches are concluded
+  2026 Preliminary Finals (`CD_M20260142801`, `CD_M20260142802`). Of the 92: 83 exact
+  normalized-name overlap with ISSUE-224 Category A plus 9 short/formal given-name surface
+  differences — **diagnostic population correlation only, NOT identity evidence**; all 92 remain
+  withheld, ISSUE-224 owns their rollover/registration disposition. **S9 remains STOPPED before
+  any identity import/apply; PROD/Brownlow/S7/Assertion 9 all untouched.** Full detail: `issues.md`
+  "S9 full-season player-bridge evidence — ACCEPTED" paragraph.
+  **S9 importer generalisation, 2026-09-21 (Sonnet 5, same worktree; CLAUDE.md §9 — no
+  test/tsc/DB/Git command run by the assistant; all uncommitted).**
+  `tools/migration/import_afl_api_player_bridge.py` generalised so the accepted artefact above can
+  eventually be validated/dry-run/applied to `afldb_dev` — **this pass imports nothing.** New
+  closed `TARGETS` dict: `--target afldb_test` (default, unchanged) or `--target dev` (read
+  `DATABASE_URL`/write `AFLDB_IMPORT_DATABASE_URL` against `afldb_dev`, `current_user` proven —
+  `afldb_app` validate-only, `afldb_import` dry-run/apply); no PROD target exists or can be added.
+  `--artefact` is now MANDATORY — the lexical "newest file" `default_artefact_path()` fallback is
+  removed. Fourth accepted evidence class `afl_api_stat_vector_season`, gated on the artefact's own
+  declared provenance only (never a DB query): accepted ONLY under `--target dev` with intact
+  `built_from_database`/`read_only`/`season`/`snapshot_label`/`snapshot_manifest_sha256`/
+  `existing_claim_comparison`; refused unconditionally for `--target afldb_test`. Write semantics
+  for all four classes (idempotency, contradiction handling, Sec 9.10 manual-adjudication identity
+  check) are unchanged; `resolveAflApiPlayer()` not modified; no fallback/name/team/jumper/stat
+  matching added. `tests/python/afl_api_bridge_contract.py` extended (DB-free) covering the
+  `TARGETS` wiring, the CLI contract, all three pre-existing classes still accepted for
+  `afldb_test`, the full provenance gate (12 refusal cases + acceptance), and that no refusal
+  exposes a DSN password. `.env.example`'s `AFLDB_DEV_DATABASE_URL` example corrected from
+  `afldb_owner` to `afldb_app` (the restricted read-only role both the ISSUE-222 gate and the S9
+  evidence emitter actually require). **S9 remains STOPPED before any identity import/apply; no DB
+  command of any kind was run; PROD/Brownlow/S7/Assertion 9 all untouched.** Files changed:
+  `tools/migration/import_afl_api_player_bridge.py` (M), `tests/python/afl_api_bridge_contract.py`
+  (M), `.env.example` (M), `issues.md` (M), `IssuesIndex.md` (M — this paragraph plus the
+  `afl-api-snapshot.ts` wording fix above). Operator validation:
+  `python tests/python/afl_api_bridge_contract.py` (DB-free).
+  Implementation history (Sonnet 5, same worktree) —
   **Stages S1, S2, S3 done, all uncommitted** —
   S1: round-table shape + `co_source_groups` added to `source-families.ts`/`.json`,
   `afl-api-rounds.ts` (`translateAflRound()`, five typed refusals), `afl-api-identities.json`
@@ -619,7 +658,8 @@
   `src/db/migrations/103_afl_api_match_projections.sql` (new),
   `tests/afl-api-match-migration.test.ts` (new),
   `tools/migration/build_afl_api_player_bridge.py` (new, S5),
-  `tools/migration/import_afl_api_player_bridge.py` (S5; generalised S5b),
+  `tools/migration/import_afl_api_player_bridge.py` (S5; generalised S5b; S9 target/evidence-class
+  generalisation),
   `tools/migration/build_afl_api_brownlow_name_bridge.py` (new, S5b),
   `tests/python/afl_api_bridge_contract.py` (S5; extended S5b),
   `src/lib/acquisition/afl-api-fixture-identity.ts` (new, S7 follow-up),
@@ -660,8 +700,9 @@
   (new, S8), `src/lib/acquisition/settle-trigger.ts` (M, S8 unit table), `src/lib/acquisition/settle-status.ts`
   (M, S8), `src/db/queries/settle-runs.ts` (M, S8), `docs/acquisition/AFLDB-2026-BROWNLOW-LIVE-COUNT-RUNBOOK.md`
   (new, S8), `tests/admin-current-season-settle.test.ts` (M, S8),
-  `src/lib/acquisition/afl-api-snapshot.ts` (new, S9 — the settle CLI's snapshot helpers, moved
-  verbatim), `tools/current-season/settle-afl-api.ts` (M, S9 — imports them instead of defining
+  `src/lib/acquisition/afl-api-snapshot.ts` (new, S9 — the settle CLI's snapshot helpers, a
+  behaviour-preserving extraction with refusal messages pinned by tests),
+  `tools/current-season/settle-afl-api.ts` (M, S9 — imports them instead of defining
   them; no settle behaviour changed), `src/lib/acquisition/afl-api-player-evidence.ts` (new, S9 —
   the pure evidence engine), `tools/current-season/emit-afl-api-player-bridge.ts` (new, S9 — the
   read-only `afldb_dev` CLI), `tests/afl-api-player-evidence.test.ts` (new, S9),

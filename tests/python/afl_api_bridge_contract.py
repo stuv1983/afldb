@@ -468,7 +468,7 @@ with tempfile.TemporaryDirectory() as tmp:
     tmp_dir = Path(tmp)
 
     accepted_path = _write_manual_artefact(tmp_dir, loader.MANUAL_ADJUDICATION_MATCH_METHOD)
-    accepted_artefact = loader.load_artefact(accepted_path)
+    accepted_artefact = loader.load_artefact(accepted_path, "afldb_test")
     check(
         "load_artefact() accepts an afl_api_manual_adjudication artefact",
         accepted_artefact["match_method"] == loader.MANUAL_ADJUDICATION_MATCH_METHOD,
@@ -476,7 +476,7 @@ with tempfile.TemporaryDirectory() as tmp:
 
     refused_path = _write_manual_artefact(tmp_dir, "some_other_bootstrap")
     try:
-        loader.load_artefact(refused_path)
+        loader.load_artefact(refused_path, "afldb_test")
         check("load_artefact() still rejects an unknown match_method", False, "did not raise")
     except loader.ImportRefused:
         check("load_artefact() still rejects an unknown match_method", True)
@@ -612,6 +612,175 @@ try:
     check("DSN targeting afldb_test is accepted", dsn.endswith("/afldb_test"))
 finally:
     del _os.environ["_AFLDB_BRIDGE_TEST_DSN"]
+
+
+# ---------------------------------------------------------------------------
+# loader: AFLDB-ISSUE-228 S9 -- target generalisation (TARGETS dict wiring).
+# All DB-free: the dict is inspected directly, never a live connection.
+# ---------------------------------------------------------------------------
+
+section("loader.TARGETS (S9 target generalisation)")
+
+check("only afldb_test and dev targets exist -- no PROD target",
+      set(loader.TARGETS) == {"afldb_test", "dev"})
+check("'prod' is not a target", "prod" not in loader.TARGETS)
+check("afldb_test read DSN env is unchanged (AFLDB_TEST_DATABASE_URL)",
+      loader.TARGETS["afldb_test"]["read_dsn_env"] == "AFLDB_TEST_DATABASE_URL")
+check("afldb_test write DSN env is unchanged (AFLDB_TEST_IMPORT_DATABASE_URL)",
+      loader.TARGETS["afldb_test"]["write_dsn_env"] == "AFLDB_TEST_IMPORT_DATABASE_URL")
+check("afldb_test database is unchanged", loader.TARGETS["afldb_test"]["database"] == "afldb_test")
+check("afldb_test carries no role gate (preserves S5/S5b/Sec 9.10 behaviour)",
+      loader.TARGETS["afldb_test"]["read_role"] is None
+      and loader.TARGETS["afldb_test"]["write_role"] is None)
+check("dev read target resolves to DATABASE_URL / afldb_dev",
+      loader.TARGETS["dev"]["read_dsn_env"] == "DATABASE_URL"
+      and loader.TARGETS["dev"]["database"] == "afldb_dev")
+check("dev write target resolves to AFLDB_IMPORT_DATABASE_URL / afldb_dev",
+      loader.TARGETS["dev"]["write_dsn_env"] == "AFLDB_IMPORT_DATABASE_URL"
+      and loader.TARGETS["dev"]["database"] == "afldb_dev")
+check("dev role gates expect afldb_app (read) / afldb_import (write)",
+      loader.TARGETS["dev"]["read_role"] == "afldb_app"
+      and loader.TARGETS["dev"]["write_role"] == "afldb_import")
+
+
+# ---------------------------------------------------------------------------
+# loader: CLI argument contract -- --artefact is mandatory, no PROD target,
+# the old lexical default-artefact selection is gone. Argparse validation
+# happens before common.load_env()/any DB access, so these are DB-free.
+# ---------------------------------------------------------------------------
+
+section("loader CLI argument contract (S9)")
+
+try:
+    loader.main(["--validate-only"])
+    check("--artefact is required", False, "did not raise/exit")
+except SystemExit as exc:
+    check("--artefact is required", exc.code != 0)
+
+check("old lexical default-artefact selection is gone",
+      not hasattr(loader, "default_artefact_path"))
+
+try:
+    loader.main(["--validate-only", "--artefact", "x.json", "--target", "prod"])
+    check("unknown target refused by argparse", False, "did not raise/exit")
+except SystemExit as exc:
+    check("unknown target refused by argparse", exc.code != 0)
+
+
+# ---------------------------------------------------------------------------
+# loader.load_artefact(): the three pre-existing evidence classes are still
+# accepted for --target afldb_test (S9 must not regress S5/S5b/Sec 9.10).
+# ---------------------------------------------------------------------------
+
+section("loader.load_artefact() -- existing three classes still accepted for afldb_test")
+
+
+def _write_artefact(tmp_path: Path, payload: dict, name: str) -> Path:
+    import json as _json
+    path = tmp_path / name
+    path.write_text(_json.dumps(payload), encoding="utf-8")
+    return path
+
+
+_BASE_PROVIDERS = {
+    "CD_I1": {"disposition": "linked", "candidate_player_id": 1, "observed_name": "Test Player",
+              "evidence_summary": "fixture"},
+}
+
+with tempfile.TemporaryDirectory() as tmp:
+    tmp_dir = Path(tmp)
+
+    for _i, _method in enumerate((
+        loader.MATCH_METHOD, loader.NAME_TEAM_SEASON_MATCH_METHOD,
+        loader.MANUAL_ADJUDICATION_MATCH_METHOD,
+    )):
+        _path = _write_artefact(
+            tmp_dir, {"source_key": "afl_api", "match_method": _method, "providers": _BASE_PROVIDERS},
+            name=f"existing-class-{_i}.json",
+        )
+        _artefact = loader.load_artefact(_path, "afldb_test")
+        check(f"{_method!r} still accepted for --target afldb_test", _artefact["match_method"] == _method)
+
+
+# ---------------------------------------------------------------------------
+# loader.load_artefact(): afl_api_stat_vector_season provenance gate (S9).
+# Every check is DB-free: fabricated artefacts only, never a real evidence
+# artefact or a live connection.
+# ---------------------------------------------------------------------------
+
+section("loader.load_artefact() -- afl_api_stat_vector_season provenance gate (S9)")
+
+
+def _season_payload(**overrides) -> dict:
+    payload = {
+        "source_key": "afl_api",
+        "match_method": loader.SEASON_EVIDENCE_MATCH_METHOD,
+        "built_from_database": "afldb_dev",
+        "read_only": True,
+        "season": 2026,
+        "snapshot_label": "afl-api-2026-fixture-label",
+        "snapshot_manifest_sha256": "0" * 64,
+        "existing_claim_comparison": "unproved_cross_database_id_parity",
+        "providers": _BASE_PROVIDERS,
+    }
+    payload.update(overrides)
+    return payload
+
+
+with tempfile.TemporaryDirectory() as tmp:
+    tmp_dir = Path(tmp)
+
+    _ok_path = _write_artefact(tmp_dir, _season_payload(), name="season-ok.json")
+    _accepted = loader.load_artefact(_ok_path, "dev")
+    check(
+        "afl_api_stat_vector_season accepted under --target dev with intact provenance",
+        _accepted["match_method"] == loader.SEASON_EVIDENCE_MATCH_METHOD,
+    )
+
+    _refuse_cases = [
+        ("refused for --target afldb_test", {}, "afldb_test"),
+        ("refused if built_from_database != afldb_dev", {"built_from_database": "afldb_test"}, "dev"),
+        ("refused if read_only is false", {"read_only": False}, "dev"),
+        ("refused if read_only is missing/null", {"read_only": None}, "dev"),
+        ("refused if season is non-numeric", {"season": "2026"}, "dev"),
+        ("refused if season is a bool", {"season": True}, "dev"),
+        ("refused if snapshot_label is empty", {"snapshot_label": ""}, "dev"),
+        ("refused if snapshot_label is missing/null", {"snapshot_label": None}, "dev"),
+        ("refused if snapshot_manifest_sha256 is too short", {"snapshot_manifest_sha256": "abc"}, "dev"),
+        ("refused if snapshot_manifest_sha256 is uppercase", {"snapshot_manifest_sha256": "A" * 64}, "dev"),
+        ("refused if existing_claim_comparison is wrong", {"existing_claim_comparison": "proved"}, "dev"),
+        ("refused if existing_claim_comparison is missing/null", {"existing_claim_comparison": None}, "dev"),
+    ]
+    for _i, (_label, _overrides, _target) in enumerate(_refuse_cases):
+        _path = _write_artefact(tmp_dir, _season_payload(**_overrides), name=f"season-refused-{_i}.json")
+        try:
+            loader.load_artefact(_path, _target)
+            check(f"season evidence {_label}", False, "did not raise")
+        except loader.ImportRefused:
+            check(f"season evidence {_label}", True)
+
+
+# ---------------------------------------------------------------------------
+# loader: DSN/path refusal messages never expose a password or other secret.
+# ---------------------------------------------------------------------------
+
+section("loader refusal messages never expose a secret")
+
+_os.environ["_AFLDB_BRIDGE_TEST_DSN_PW"] = "postgresql://user:supersecretpw@localhost:5432/afldb_dev"
+try:
+    loader._resolve_dsn("_AFLDB_BRIDGE_TEST_DSN_PW", "afldb_test")
+    check("wrong-database DSN refusal raised", False, "did not raise")
+except loader.ImportRefused as exc:
+    check("wrong-database DSN refusal never leaks the password", "supersecretpw" not in str(exc))
+finally:
+    del _os.environ["_AFLDB_BRIDGE_TEST_DSN_PW"]
+
+try:
+    loader.load_artefact(Path("does-not-exist-anywhere.json"), "afldb_test")
+    check("missing-artefact refusal raised", False, "did not raise")
+except loader.ImportRefused as exc:
+    check("missing-artefact refusal names only the path, no secret",
+          "does-not-exist-anywhere.json" in str(exc))
 
 
 # ---------------------------------------------------------------------------

@@ -40,6 +40,32 @@ the declared profile URL is already that player's own trusted
 a bulk classifier and is expected to link a small, explicit set of provider
 ids, one artefact at a time.
 
+AFLDB-ISSUE-228 S9 (2026-09-21): generalised target handling and a fourth
+evidence class. ``--target`` selects the database by name from a closed list
+-- ``afldb_test`` (default, unchanged read/write DSNs and behaviour) or
+``dev`` (``DATABASE_URL`` for read, ``AFLDB_IMPORT_DATABASE_URL`` for write,
+against ``afldb_dev``, with the live session's own ``current_user`` proven
+against the expected role for that target -- ``afldb_app`` read-only,
+``afldb_import`` write). There is deliberately no PROD entry anywhere in
+``TARGETS``: it is a closed list, not extensible from the command line.
+``--artefact`` is now MANDATORY -- there is no "newest artefact under
+data/reference/" fallback, which was a hazard once more than one
+``afl-api-player-bridge-*.json`` artefact could exist there (an older sample
+artefact could otherwise sort after a newer full-season one and be silently
+skipped). The fourth evidence class, ``afl_api_stat_vector_season``, is
+resolved by ``build_afl_api_player_bridge.py``'s full-season sibling against
+``afldb_dev`` read-only, and is accepted ONLY under ``--target dev`` and
+ONLY with intact declared provenance (``built_from_database == "afldb_dev"``,
+``read_only is True``, a numeric ``season``, a non-empty ``snapshot_label``,
+a 64-lowercase-hex ``snapshot_manifest_sha256``, and
+``existing_claim_comparison == "unproved_cross_database_id_parity"``) -- see
+``_season_evidence_provenance_problem()``. It is refused for ``--target
+afldb_test`` unconditionally: its ``candidate_player_id`` values are resolved
+against ``afldb_dev``, and cross-database numeric ``player_id`` parity has
+never been proven. None of this touches write semantics: idempotency,
+contradiction handling and the manual-adjudication identity check below are
+unchanged and apply identically to all four classes.
+
 Modes:
     --validate-only   Read-only. Reports what an apply WOULD do
                        (link / already_linked / would_HALT_contradiction).
@@ -62,10 +88,11 @@ Idempotency (Sec 6.3, Sec 19.4(a)):
     the existing link is never modified or deleted.
 No row is ever UPDATEd or DELETEd by this tool.
 
-Usage:
-    python tools/migration/import_afl_api_player_bridge.py --validate-only
-    python tools/migration/import_afl_api_player_bridge.py --dry-run
-    python tools/migration/import_afl_api_player_bridge.py --apply
+Usage (--artefact is mandatory; --target defaults to afldb_test):
+    python tools/migration/import_afl_api_player_bridge.py --validate-only --artefact <path>
+    python tools/migration/import_afl_api_player_bridge.py --dry-run --artefact <path>
+    python tools/migration/import_afl_api_player_bridge.py --apply --artefact <path>
+    python tools/migration/import_afl_api_player_bridge.py --target dev --validate-only --artefact <path>
 """
 
 from __future__ import annotations
@@ -74,9 +101,11 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlparse
 
 import psycopg
@@ -89,18 +118,51 @@ TOOL_VERSION = "1.0.0"
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-DSN_ENV = "AFLDB_TEST_DATABASE_URL"
-IMPORT_DSN_ENV = "AFLDB_TEST_IMPORT_DATABASE_URL"
-REQUIRED_DATABASE = "afldb_test"
+# Closed target list (AFLDB-ISSUE-228 S9). No PROD entry exists, and none can be added from
+# the command line -- ``--target`` is validated against exactly this dict's keys. ``afldb_test``
+# reproduces S5/S5b/Sec 9.10 behaviour unchanged: no role assertion beyond the read-only/database
+# checks already in force. ``dev`` reads with the ordinary application role (never the DEV
+# evidence emitter's own AFLDB_DEV_DATABASE_URL, and never the migration schema owner) and writes
+# with the importer's elevated role, proving BOTH roles live via current_user before any write
+# statement is sent.
+TARGETS: dict[str, dict[str, Any]] = {
+    "afldb_test": {
+        "database": "afldb_test",
+        "read_dsn_env": "AFLDB_TEST_DATABASE_URL",
+        "write_dsn_env": "AFLDB_TEST_IMPORT_DATABASE_URL",
+        "read_role": None,
+        "write_role": None,
+    },
+    "dev": {
+        "database": "afldb_dev",
+        "read_dsn_env": "DATABASE_URL",
+        "write_dsn_env": "AFLDB_IMPORT_DATABASE_URL",
+        "read_role": "afldb_app",
+        "write_role": "afldb_import",
+    },
+}
 
 SOURCE_KEY = "afl_api"
 MATCH_METHOD = "afl_api_stat_vector_bootstrap"
 NAME_TEAM_SEASON_MATCH_METHOD = "afl_api_name_team_season_bootstrap"
 MANUAL_ADJUDICATION_MATCH_METHOD = "afl_api_manual_adjudication"
+# The S9 full-season evidence class (build_afl_api_player_bridge.py's afldb_dev sibling). Its
+# candidate_player_id values are resolved against afldb_dev, so it is accepted only under
+# --target dev -- see _season_evidence_provenance_problem() and its call from load_artefact().
+SEASON_EVIDENCE_MATCH_METHOD = "afl_api_stat_vector_season"
 ALLOWED_MATCH_METHODS = frozenset({
     MATCH_METHOD, NAME_TEAM_SEASON_MATCH_METHOD, MANUAL_ADJUDICATION_MATCH_METHOD,
+    SEASON_EVIDENCE_MATCH_METHOD,
 })
 CONTRADICTION_ISSUE_TYPE = "afl_api_identity_contradiction"
+
+# afl_api_stat_vector_season provenance gate (AFLDB-ISSUE-228 S9). These are the ACCEPTANCE
+# CONTRACT values, not acceptance evidence for any one artefact -- the season/label/hash of a
+# particular run are read from the artefact itself and never hardcoded here.
+SEASON_EVIDENCE_REQUIRED_TARGET = "dev"
+SEASON_EVIDENCE_REQUIRED_BUILT_FROM_DATABASE = "afldb_dev"
+SEASON_EVIDENCE_REQUIRED_CLAIM_COMPARISON = "unproved_cross_database_id_parity"
+_SHA256_HEX_RE = re.compile(r"^[0-9a-f]{64}$")
 
 # AFLDB-ISSUE-228 Sec 9.10: a single explicit, human-adjudicated CD_I -> player_id
 # decision, evidenced by non-Brownlow repository sources (never by canonical
@@ -134,31 +196,48 @@ def _resolve_dsn(env_name: str, required_database: str) -> str:
     return dsn
 
 
-def open_read_only() -> psycopg.Connection:
-    dsn = _resolve_dsn(DSN_ENV, REQUIRED_DATABASE)
+def open_read_only(target: str) -> psycopg.Connection:
+    cfg = TARGETS[target]
+    dsn = _resolve_dsn(cfg["read_dsn_env"], cfg["database"])
     conn = psycopg.connect(
         dsn, options="-c default_transaction_read_only=on -c TimeZone=UTC",
         application_name="afldb-import-afl-api-player-bridge-validate",
     )
     with conn.cursor() as cur:
         cur.execute(
-            "SELECT current_setting('transaction_read_only'), current_database()"
+            "SELECT current_setting('transaction_read_only'), current_database(), current_user"
         )
-        txn_ro, database = cur.fetchone()
-    if txn_ro != "on" or database != REQUIRED_DATABASE:
-        raise ImportRefused("REFUSED: connection is not a read-only session against afldb_test")
+        txn_ro, database, current_user = cur.fetchone()
+    if txn_ro != "on" or database != cfg["database"]:
+        conn.close()
+        raise ImportRefused(
+            f"REFUSED: connection is not a read-only session against {cfg['database']}"
+        )
+    if cfg["read_role"] is not None and current_user != cfg["read_role"]:
+        conn.close()
+        raise ImportRefused(
+            f"REFUSED: --target {target} requires current_user={cfg['read_role']!r}, "
+            f"got {current_user!r}"
+        )
     return conn
 
 
-def open_write(app_name: str) -> psycopg.Connection:
-    dsn = _resolve_dsn(IMPORT_DSN_ENV, REQUIRED_DATABASE)
+def open_write(target: str, app_name: str) -> psycopg.Connection:
+    cfg = TARGETS[target]
+    dsn = _resolve_dsn(cfg["write_dsn_env"], cfg["database"])
     conn = psycopg.connect(dsn, application_name=app_name)
     with conn.cursor() as cur:
-        cur.execute("SELECT current_database()")
-        (database,) = cur.fetchone()
-    if database != REQUIRED_DATABASE:
+        cur.execute("SELECT current_database(), current_user")
+        database, current_user = cur.fetchone()
+    if database != cfg["database"]:
         conn.close()
-        raise ImportRefused("REFUSED: connection is not against afldb_test")
+        raise ImportRefused(f"REFUSED: connection is not against {cfg['database']}")
+    if cfg["write_role"] is not None and current_user != cfg["write_role"]:
+        conn.close()
+        raise ImportRefused(
+            f"REFUSED: --target {target} requires current_user={cfg['write_role']!r}, "
+            f"got {current_user!r}"
+        )
     return conn
 
 
@@ -166,17 +245,66 @@ def sha256_file(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def load_artefact(path: Path) -> dict:
+def _season_evidence_provenance_problem(artefact: dict, target: str) -> str | None:
+    """Read-only, DB-free provenance gate for SEASON_EVIDENCE_MATCH_METHOD (AFLDB-ISSUE-228 S9).
+
+    Returns None when the artefact's declared provenance is acceptable, else a human-readable
+    refusal reason. Every check is against the artefact's OWN declared fields -- never a live
+    database query, so this runs before any connection is opened. Malformed or missing
+    provenance is a refusal, never a best-effort pass.
+    """
+    if target != SEASON_EVIDENCE_REQUIRED_TARGET:
+        return (
+            f"match_method={SEASON_EVIDENCE_MATCH_METHOD!r} is only accepted under "
+            f"--target {SEASON_EVIDENCE_REQUIRED_TARGET!r}, got --target {target!r} -- its "
+            "candidate_player_id values are resolved against afldb_dev and cross-database "
+            "numeric player_id parity has never been proven"
+        )
+    if artefact.get("built_from_database") != SEASON_EVIDENCE_REQUIRED_BUILT_FROM_DATABASE:
+        return (
+            f"built_from_database is {artefact.get('built_from_database')!r}, expected "
+            f"{SEASON_EVIDENCE_REQUIRED_BUILT_FROM_DATABASE!r}"
+        )
+    if artefact.get("read_only") is not True:
+        return f"read_only is {artefact.get('read_only')!r}, expected exactly true"
+    season = artefact.get("season")
+    if isinstance(season, bool) or not isinstance(season, (int, float)):
+        return f"season is {season!r}, expected a numeric value"
+    snapshot_label = artefact.get("snapshot_label")
+    if not isinstance(snapshot_label, str) or not snapshot_label:
+        return f"snapshot_label is {snapshot_label!r}, expected a non-empty string"
+    snapshot_sha = artefact.get("snapshot_manifest_sha256")
+    if not isinstance(snapshot_sha, str) or not _SHA256_HEX_RE.match(snapshot_sha):
+        return (
+            f"snapshot_manifest_sha256 is {snapshot_sha!r}, expected exactly 64 lowercase hex "
+            "characters"
+        )
+    if artefact.get("existing_claim_comparison") != SEASON_EVIDENCE_REQUIRED_CLAIM_COMPARISON:
+        return (
+            f"existing_claim_comparison is {artefact.get('existing_claim_comparison')!r}, "
+            f"expected {SEASON_EVIDENCE_REQUIRED_CLAIM_COMPARISON!r}"
+        )
+    return None
+
+
+def load_artefact(path: Path, target: str) -> dict:
     if not path.exists():
         raise ImportRefused(f"artefact not found: {path}")
     artefact = json.loads(path.read_text(encoding="utf-8"))
     if artefact.get("source_key") != SOURCE_KEY:
         raise ImportRefused(f"{path}: source_key is {artefact.get('source_key')!r}, expected {SOURCE_KEY!r}")
-    if artefact.get("match_method") not in ALLOWED_MATCH_METHODS:
+    match_method = artefact.get("match_method")
+    if match_method not in ALLOWED_MATCH_METHODS:
         raise ImportRefused(
-            f"{path}: match_method is {artefact.get('match_method')!r}, "
+            f"{path}: match_method is {match_method!r}, "
             f"expected one of {sorted(ALLOWED_MATCH_METHODS)!r}"
         )
+    if match_method == SEASON_EVIDENCE_MATCH_METHOD:
+        problem = _season_evidence_provenance_problem(artefact, target)
+        if problem is not None:
+            raise ImportRefused(
+                f"{path}: {SEASON_EVIDENCE_MATCH_METHOD} evidence refused -- {problem}"
+            )
     for entry in artefact.get("inputs", []):
         file_path = REPO_ROOT / entry["file"]
         if not file_path.exists():
@@ -188,16 +316,6 @@ def load_artefact(path: Path) -> dict:
                 f"{entry['file']} (expected {entry['sha256']}, got {actual})"
             )
     return artefact
-
-
-def default_artefact_path() -> Path:
-    candidates = sorted((REPO_ROOT / "data" / "reference").glob("afl-api-player-bridge-*.json"))
-    if not candidates:
-        raise ImportRefused(
-            "no data/reference/afl-api-player-bridge-*.json artefact found -- "
-            "run build_afl_api_player_bridge.py --write first, or pass --artefact"
-        )
-    return candidates[-1]
 
 
 @dataclass
@@ -354,11 +472,11 @@ class Reporter:
         print(f"    WARNING: {message}", flush=True)
 
 
-def run_validate_only(artefact: dict, rep: Reporter) -> int:
+def run_validate_only(artefact: dict, rep: Reporter, target: str) -> int:
     to_link = linked_rows(artefact)
     match_method = artefact.get("match_method")
     rep.step(f"artefact declares {len(to_link)} 'linked' provider id(s)")
-    conn = open_read_only()
+    conn = open_read_only(target)
     try:
         with conn.cursor() as cur:
             source_id = fetch_source_id(cur)
@@ -393,11 +511,11 @@ def run_validate_only(artefact: dict, rep: Reporter) -> int:
     return 0
 
 
-def run_write(artefact: dict, rep: Reporter, mode: str) -> int:
+def run_write(artefact: dict, rep: Reporter, mode: str, target: str) -> int:
     to_link = linked_rows(artefact)
     match_method = artefact["match_method"]
     rep.step(f"artefact declares {len(to_link)} 'linked' provider id(s), match_method={match_method!r}")
-    conn = open_write(app_name=f"afldb-import-afl-api-player-bridge-{mode}")
+    conn = open_write(target, app_name=f"afldb-import-afl-api-player-bridge-{mode}")
     try:
         if mode == "apply":
             with common.import_batch(conn, SOURCE_KEY, TOOL, target_table="external_identities",
@@ -428,23 +546,25 @@ def main(argv: list[str] | None = None) -> int:
     group.add_argument("--validate-only", action="store_true")
     group.add_argument("--dry-run", action="store_true")
     group.add_argument("--apply", action="store_true")
-    parser.add_argument("--artefact", type=Path, default=None,
-                        help="Path to the afl-api-player-bridge-*.json artefact "
-                             "(default: the newest under data/reference/)")
+    parser.add_argument("--target", choices=sorted(TARGETS), default="afldb_test",
+                        help="database target: afldb_test (default) or dev -- no PROD target "
+                             "exists and none can be added from the command line")
+    parser.add_argument("--artefact", type=Path, required=True,
+                        help="Path to the afl-api-player-bridge-*.json artefact (mandatory -- "
+                             "there is no default/newest-file selection)")
     args = parser.parse_args(argv)
 
     common.load_env()
     rep = Reporter()
     try:
-        artefact_path = args.artefact or default_artefact_path()
-        rep.step(f"loading artefact {artefact_path}")
-        artefact = load_artefact(artefact_path)
+        rep.step(f"loading artefact {args.artefact} (target={args.target})")
+        artefact = load_artefact(args.artefact, args.target)
 
         if args.validate_only:
-            return run_validate_only(artefact, rep)
+            return run_validate_only(artefact, rep, args.target)
         if args.dry_run:
-            return run_write(artefact, rep, "dry-run")
-        return run_write(artefact, rep, "apply")
+            return run_write(artefact, rep, "dry-run", args.target)
+        return run_write(artefact, rep, "apply", args.target)
     except ImportRefused as exc:
         print(f"REFUSED: {exc}", file=sys.stderr)
         return 1
