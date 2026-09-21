@@ -62,6 +62,12 @@ import {
   type AflApiBrownlowMatchVoteRecord,
 } from '../../src/lib/acquisition/afl-api-bundle';
 import { parseSourceFamilyRegistry, type SourceFamilyRegistry } from '../../src/lib/acquisition/source-families';
+import {
+  combineAflApiBrownlowGates,
+  readAflApiIngestionControls,
+  type AflApiIngestionControls,
+} from '../../src/lib/acquisition/afl-api-ingestion-control';
+import { SETTING_KEYS } from '../../src/lib/site-settings';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PROJECT_ROOT = join(__dirname, '..', '..');
@@ -214,7 +220,13 @@ function counterLines(counters: AflApiBrownlowSettleCounters): string[] {
   return lines;
 }
 
-export type AflApiBrownlowSettleCliDeps = { projectRoot?: string; sql?: postgres.Sql; log?: (line: string) => void };
+export type AflApiBrownlowSettleCliDeps = {
+  projectRoot?: string;
+  sql?: postgres.Sql;
+  log?: (line: string) => void;
+  /** Test-only escape hatch for the §D two-key admin gate below; production always reads the database. */
+  ingestionControls?: AflApiIngestionControls;
+};
 export type AflApiBrownlowSettleCliOutcome = {
   args: AflApiBrownlowSettleCliArgs;
   result: AflApiBrownlowSettleRunResult | null;
@@ -240,10 +252,17 @@ export async function runAflApiBrownlowSettleCli(
     return { args, result: null };
   }
 
-  if (!isAflApiBrownlowEnabled(process.env)) {
+  // AFLDB-ISSUE-228 follow-up (§D two-key safety) — BOTH the outer
+  // deployment gate and the inner super-admin DB switch must be true.
+  const deploymentGateEnabled = isAflApiBrownlowEnabled(process.env);
+  const ingestionControls = deps.ingestionControls ?? await readAflApiIngestionControls();
+  const gate = combineAflApiBrownlowGates(deploymentGateEnabled, ingestionControls.brownlowAdminEnabled);
+  if (!gate.effectiveEnabled) {
     throw new Error(
-      `Brownlow settle is disabled by default outside the live count window (§10). `
-      + `Set ${BROWNLOW_ENABLE_ENV}=true to run it.`,
+      'Brownlow settle is disabled outside the live count window (§10, §D two-key safety): '
+      + `deployment gate (${BROWNLOW_ENABLE_ENV}) is ${deploymentGateEnabled ? 'enabled' : 'disabled'}, `
+      + `super-admin setting (site_settings '${SETTING_KEYS.aflApiBrownlowEnabled}') is `
+      + `${ingestionControls.brownlowAdminEnabled ? 'enabled' : 'disabled'}. Both must be enabled.`,
     );
   }
 

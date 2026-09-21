@@ -4,6 +4,8 @@ import { readSettleRunStatus, type SettleRunStatus } from '@/lib/acquisition/set
 import { requireCapability } from '@/lib/auth/session';
 import { getCurrentSeasonReport } from '@/lib/external-afl/current-season-import';
 
+import { readAflApiIngestionAdminView } from './actions';
+import { AflApiIngestionControls } from './AflApiIngestionControls';
 import {
   CurrentSeasonControls,
   CurrentSeasonReportTable,
@@ -40,6 +42,19 @@ export default async function CurrentSeasonPage() {
     reportError = error instanceof Error ? error.message : String(error);
   }
 
+  // AFLDB-ISSUE-228 follow-up. Never allowed to take the page down, matching
+  // the settleStatus/report reads above: a database that has not run the
+  // relevant migration, or a transient read failure, must still render the
+  // rest of the page — the CLI/timer's own fail-closed check does not
+  // depend on this read succeeding.
+  let ingestionView = null;
+  let ingestionViewError: string | null = null;
+  try {
+    ingestionView = await readAflApiIngestionAdminView();
+  } catch (error) {
+    ingestionViewError = error instanceof Error ? error.message : String(error);
+  }
+
   return (
     <>
       <div className="page-header">
@@ -51,6 +66,12 @@ export default async function CurrentSeasonPage() {
           manual diagnostics and corroboration evidence only.
         </p>
       </div>
+
+      {ingestionViewError ? (
+        <p className="notice" role="alert">{ingestionViewError}</p>
+      ) : (
+        ingestionView && <AflApiIngestionControls initialView={ingestionView} />
+      )}
 
       <SettleRunPanel initialStatus={settleStatus} />
 

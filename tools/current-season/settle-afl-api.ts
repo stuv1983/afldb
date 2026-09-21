@@ -52,6 +52,11 @@ import {
   renderSourceCompleteness,
   type SourceCompletenessVerdict,
 } from '../../src/lib/acquisition/source-completeness';
+import {
+  readAflApiIngestionControls,
+  type AflApiIngestionControls,
+} from '../../src/lib/acquisition/afl-api-ingestion-control';
+import { SETTING_KEYS } from '../../src/lib/site-settings';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PROJECT_ROOT = join(__dirname, '..', '..');
@@ -246,6 +251,8 @@ export type AflApiSettleCliDeps = {
   projectRoot?: string;
   sql?: postgres.Sql;
   log?: (line: string) => void;
+  /** Test-only escape hatch for the super-admin ingestion gate below; production always reads the database. */
+  ingestionControls?: AflApiIngestionControls;
 };
 
 export type AflApiSettleCliOutcome = {
@@ -281,6 +288,21 @@ export async function runAflApiSettleCli(
     log('');
     log('--validate-only: manifest, registry and bundle contract verified. No connection opened.');
     return { args, result: null, report: null, sourceCompleteness: null };
+  }
+
+  // AFLDB-ISSUE-228 follow-up (§C, §E, §F) — the super-admin ingestion
+  // switch, checked before the write-capable path (`--apply`/`--dry-run`)
+  // but NOT for `--report`, which is read-only diagnostics (§F: a disabled
+  // switch must not block status/reporting). Fail closed: a missing row or
+  // an unreadable database reads as disabled.
+  if (!args.report) {
+    const ingestionControls = deps.ingestionControls ?? await readAflApiIngestionControls();
+    if (!ingestionControls.currentSeasonEnabled) {
+      throw new Error(
+        `AFL API current-season ingestion is disabled (site_settings '${SETTING_KEYS.aflApiCurrentSeasonEnabled}'). `
+        + 'A super admin must enable it from /admin/current-season before this tool will write anything.',
+      );
+    }
   }
 
   const registry = parseSourceFamilyRegistry(

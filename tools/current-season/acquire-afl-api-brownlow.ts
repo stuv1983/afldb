@@ -40,7 +40,13 @@ import {
   type RetryOptions,
 } from '../../src/lib/acquisition/afl-api-client';
 import { BROWNLOW_ENABLE_ENV, isAflApiBrownlowEnabled } from '../../src/lib/acquisition/afl-api-brownlow';
+import {
+  combineAflApiBrownlowGates,
+  readAflApiIngestionControls,
+  type AflApiIngestionControls,
+} from '../../src/lib/acquisition/afl-api-ingestion-control';
 import { claimSnapshotDir } from '../../src/lib/acquisition/snapshot-dir';
+import { SETTING_KEYS } from '../../src/lib/site-settings';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PROJECT_ROOT = join(__dirname, '..', '..');
@@ -128,6 +134,8 @@ export type RunBrownlowAcquisitionDeps = {
    * `claimSnapshotDir()` may have appended on collision.
    */
   onSnapshotDirClaimed?: (dir: string, label: string) => void;
+  /** Test-only escape hatch for the §D two-key admin gate below; production always reads the database. */
+  ingestionControls?: AflApiIngestionControls;
 };
 
 export type RunBrownlowAcquisitionResult = {
@@ -143,10 +151,20 @@ export async function runBrownlowAcquisition(
 ): Promise<RunBrownlowAcquisitionResult> {
   const projectRoot = deps.projectRoot ?? DEFAULT_PROJECT_ROOT;
   const env = deps.env ?? process.env;
-  if (!isAflApiBrownlowEnabled(env)) {
+  // AFLDB-ISSUE-228 follow-up (§D two-key safety) — BOTH the outer
+  // deployment gate and the inner super-admin DB switch must be true.
+  // Neither can override the other: an operator turning the admin control
+  // on does nothing while AFLDB_AFL_API_BROWNLOW_ENABLED is unset, and
+  // vice versa.
+  const deploymentGateEnabled = isAflApiBrownlowEnabled(env);
+  const ingestionControls = deps.ingestionControls ?? await readAflApiIngestionControls(env);
+  const gate = combineAflApiBrownlowGates(deploymentGateEnabled, ingestionControls.brownlowAdminEnabled);
+  if (!gate.effectiveEnabled) {
     throw new Error(
-      `Brownlow acquisition is disabled by default outside the live count window (§10). `
-      + `Set ${BROWNLOW_ENABLE_ENV}=true to run it.`,
+      'Brownlow acquisition is disabled outside the live count window (§10, §D two-key safety): '
+      + `deployment gate (${BROWNLOW_ENABLE_ENV}) is ${deploymentGateEnabled ? 'enabled' : 'disabled'}, `
+      + `super-admin setting (site_settings '${SETTING_KEYS.aflApiBrownlowEnabled}') is `
+      + `${ingestionControls.brownlowAdminEnabled ? 'enabled' : 'disabled'}. Both must be enabled.`,
     );
   }
   const bases = deps.bases ?? resolveAflApiEndpointBases(env);

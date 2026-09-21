@@ -99,6 +99,15 @@ function stubFetch(
 
 const noSleep = async (): Promise<void> => {};
 
+/**
+ * AFLDB-ISSUE-228 follow-up — `runAcquisition()` now refuses before any
+ * network call unless the super-admin DB switch is enabled
+ * (`src/lib/acquisition/afl-api-ingestion-control.ts`). This file is DB-free
+ * by design (module doc), so every existing happy-path call below supplies
+ * this override rather than falling back to a real database read.
+ */
+const ENABLED_INGESTION_CONTROLS = { currentSeasonEnabled: true, brownlowAdminEnabled: false };
+
 describe('afl-api-client (AFLDB-ISSUE-228 §7.1)', () => {
   describe('resolveAflApiEndpointBases — configurable/redirectable bases', () => {
     it('defaults to the three real AFL.com.au origins', () => {
@@ -410,7 +419,7 @@ describe('acquire-afl-api CLI (AFLDB-ISSUE-228 §7.1, §5.4)', () => {
 
       const result = await runAcquisition(
         { season: 2026, status: null, since: null, match: [] },
-        { fetchImpl, projectRoot, now, retryOpts: { sleep: noSleep } },
+        { fetchImpl, projectRoot, now, retryOpts: { sleep: noSleep }, ingestionControls: ENABLED_INGESTION_CONTROLS },
       );
 
       expect(result.label).toBe('afl-api-2026-2026-09-19-143000');
@@ -452,6 +461,21 @@ describe('acquire-afl-api CLI (AFLDB-ISSUE-228 §7.1, §5.4)', () => {
       for (const entry of manifest.files) expect(JSON.stringify(entry)).not.toContain('tok-1');
     });
 
+    it('AFLDB-ISSUE-228 follow-up: refuses before any network request when the super-admin switch is disabled', async () => {
+      const projectRoot = makeProjectRoot();
+      const { fetchImpl, calls } = stubFetch(happyPathHandlers());
+
+      await expect(runAcquisition(
+        { season: 2026, status: null, since: null, match: [] },
+        {
+          fetchImpl, projectRoot, retryOpts: { sleep: noSleep },
+          ingestionControls: { currentSeasonEnabled: false, brownlowAdminEnabled: false },
+        },
+      )).rejects.toThrow(/current-season ingestion is disabled/);
+
+      expect(calls).toHaveLength(0);
+    });
+
     it('an explicit --match selects regardless of status', async () => {
       const projectRoot = makeProjectRoot();
       const handlers = [
@@ -462,7 +486,7 @@ describe('acquire-afl-api CLI (AFLDB-ISSUE-228 §7.1, §5.4)', () => {
       const { fetchImpl } = stubFetch(handlers);
       const result = await runAcquisition(
         { season: 2026, status: null, since: null, match: ['CD_M2'] },
-        { fetchImpl, projectRoot, now: new Date('2026-09-19T14:30:00Z'), retryOpts: { sleep: noSleep } },
+        { fetchImpl, projectRoot, now: new Date('2026-09-19T14:30:00Z'), retryOpts: { sleep: noSleep }, ingestionControls: ENABLED_INGESTION_CONTROLS },
       );
       expect(result.matchesSelected).toBe(1);
       const manifest = JSON.parse(readFileSync(result.manifestPath, 'utf8'));
@@ -475,7 +499,7 @@ describe('acquire-afl-api CLI (AFLDB-ISSUE-228 §7.1, §5.4)', () => {
       const { fetchImpl } = stubFetch(happyPathHandlers());
       await expect(runAcquisition(
         { season: 2099, status: null, since: null, match: [] },
-        { fetchImpl, projectRoot, retryOpts: { sleep: noSleep } },
+        { fetchImpl, projectRoot, retryOpts: { sleep: noSleep }, ingestionControls: ENABLED_INGESTION_CONTROLS },
       )).rejects.toThrow(/compSeasonId/);
     });
 
@@ -493,7 +517,7 @@ describe('acquire-afl-api CLI (AFLDB-ISSUE-228 §7.1, §5.4)', () => {
 
       await expect(runAcquisition(
         { season: 2026, status: null, since: null, match: [] },
-        { fetchImpl, projectRoot, now, retryOpts: { sleep: noSleep } },
+        { fetchImpl, projectRoot, now, retryOpts: { sleep: noSleep }, ingestionControls: ENABLED_INGESTION_CONTROLS },
       )).rejects.toBeInstanceOf(AflApiRequestError);
 
       // Earlier files landed; the manifest — the sole "this acquisition finished" signal — did not.
@@ -511,7 +535,7 @@ describe('acquire-afl-api CLI (AFLDB-ISSUE-228 §7.1, §5.4)', () => {
       const now = new Date('2026-09-19T14:30:00Z');
       const result = await runAcquisition(
         { season: 2026, status: null, since: null, match: [] },
-        { fetchImpl, projectRoot, now, retryOpts: { sleep: noSleep } },
+        { fetchImpl, projectRoot, now, retryOpts: { sleep: noSleep }, ingestionControls: ENABLED_INGESTION_CONTROLS },
       );
       cleanupPartialSnapshot(result.snapshotDir, () => {});
       expect(existsSync(result.manifestPath)).toBe(true);
@@ -525,13 +549,13 @@ describe('acquire-afl-api CLI (AFLDB-ISSUE-228 §7.1, §5.4)', () => {
         const { fetchImpl: fetchImpl1 } = stubFetch(happyPathHandlers('tok-1'));
         const result1 = await runAcquisition(
           { season: 2026, status: null, since: null, match: [] },
-          { fetchImpl: fetchImpl1, projectRoot, now, retryOpts: { sleep: noSleep } },
+          { fetchImpl: fetchImpl1, projectRoot, now, retryOpts: { sleep: noSleep }, ingestionControls: ENABLED_INGESTION_CONTROLS },
         );
 
         const { fetchImpl: fetchImpl2 } = stubFetch(happyPathHandlers('tok-2'));
         const result2 = await runAcquisition(
           { season: 2026, status: null, since: null, match: [] },
-          { fetchImpl: fetchImpl2, projectRoot, now, retryOpts: { sleep: noSleep } },
+          { fetchImpl: fetchImpl2, projectRoot, now, retryOpts: { sleep: noSleep }, ingestionControls: ENABLED_INGESTION_CONTROLS },
         );
 
         expect(result1.label).not.toBe(result2.label);
@@ -563,7 +587,7 @@ describe('acquire-afl-api CLI (AFLDB-ISSUE-228 §7.1, §5.4)', () => {
         const { fetchImpl } = stubFetch(happyPathHandlers());
         const result = await runAcquisition(
           { season: 2026, status: null, since: null, match: [] },
-          { fetchImpl, projectRoot, now, retryOpts: { sleep: noSleep } },
+          { fetchImpl, projectRoot, now, retryOpts: { sleep: noSleep }, ingestionControls: ENABLED_INGESTION_CONTROLS },
         );
 
         expect(result.label).not.toBe(baseLabel);
@@ -582,13 +606,13 @@ describe('acquire-afl-api CLI (AFLDB-ISSUE-228 §7.1, §5.4)', () => {
         const { fetchImpl: fetchImpl1 } = stubFetch(handlers);
         const result1 = await runAcquisition(
           { season: 2026, status: null, since: null, match: [], fixturesOnly: true },
-          { fetchImpl: fetchImpl1, projectRoot, now, retryOpts: { sleep: noSleep } },
+          { fetchImpl: fetchImpl1, projectRoot, now, retryOpts: { sleep: noSleep }, ingestionControls: ENABLED_INGESTION_CONTROLS },
         );
 
         const { fetchImpl: fetchImpl2 } = stubFetch(handlers);
         const result2 = await runAcquisition(
           { season: 2026, status: null, since: null, match: [], fixturesOnly: true },
-          { fetchImpl: fetchImpl2, projectRoot, now, retryOpts: { sleep: noSleep } },
+          { fetchImpl: fetchImpl2, projectRoot, now, retryOpts: { sleep: noSleep }, ingestionControls: ENABLED_INGESTION_CONTROLS },
         );
 
         expect(result1.label).not.toBe(result2.label);
@@ -616,7 +640,7 @@ describe('acquire-afl-api CLI (AFLDB-ISSUE-228 §7.1, §5.4)', () => {
 
         const result = await runAcquisition(
           { season: 2026, status: null, since: null, match: [], fixturesOnly: true },
-          { fetchImpl, projectRoot, now, retryOpts: { sleep: noSleep } },
+          { fetchImpl, projectRoot, now, retryOpts: { sleep: noSleep }, ingestionControls: ENABLED_INGESTION_CONTROLS },
         );
 
         expect(calls).toHaveLength(1);
@@ -645,7 +669,7 @@ describe('acquire-afl-api CLI (AFLDB-ISSUE-228 §7.1, §5.4)', () => {
         const { fetchImpl, calls } = stubFetch(fixturesOnlyHandlers());
         const result = await runAcquisition(
           { season: 2026, status: null, since: null, match: ['CD_M2'], fixturesOnly: true },
-          { fetchImpl, projectRoot, now: new Date('2026-09-19T14:30:00Z'), retryOpts: { sleep: noSleep } },
+          { fetchImpl, projectRoot, now: new Date('2026-09-19T14:30:00Z'), retryOpts: { sleep: noSleep }, ingestionControls: ENABLED_INGESTION_CONTROLS },
         );
         expect(calls).toHaveLength(1);
         expect(result.matchesSelected).toBe(1);

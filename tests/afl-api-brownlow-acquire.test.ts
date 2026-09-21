@@ -61,6 +61,15 @@ function noSleep(): Promise<void> {
 
 const BROWNLOW_ENV = { AFLDB_AFL_API_BROWNLOW_ENABLED: 'true' };
 
+/**
+ * AFLDB-ISSUE-228 follow-up (§D two-key safety) — `runBrownlowAcquisition()`
+ * now ALSO requires the super-admin DB switch
+ * (`src/lib/acquisition/afl-api-ingestion-control.ts`) alongside the
+ * deployment env var above. This file is DB-free by design (module doc), so
+ * every existing happy-path call below supplies this override.
+ */
+const BROWNLOW_ENABLED_CONTROLS = { currentSeasonEnabled: false, brownlowAdminEnabled: true };
+
 function brownlowHandlers(seasonVotes: unknown, leaderboard: unknown, tokenValue = 'tok-1') {
   return [
     { test: (u: string) => u.endsWith('/afl/WMCTok'), respond: () => jsonResponse({ token: tokenValue }) },
@@ -105,7 +114,7 @@ describe('acquire-afl-api-brownlow.ts — snapshot collision safety (AFLDB-ISSUE
     const result1 = await runBrownlowAcquisition(
       { season: 2025 },
       {
-        fetchImpl: fetchImpl1, projectRoot, now, env: BROWNLOW_ENV, retryOpts: { sleep: noSleep },
+        fetchImpl: fetchImpl1, projectRoot, now, env: BROWNLOW_ENV, ingestionControls: BROWNLOW_ENABLED_CONTROLS, retryOpts: { sleep: noSleep },
       },
     );
 
@@ -113,7 +122,7 @@ describe('acquire-afl-api-brownlow.ts — snapshot collision safety (AFLDB-ISSUE
     const result2 = await runBrownlowAcquisition(
       { season: 2025 },
       {
-        fetchImpl: fetchImpl2, projectRoot, now, env: BROWNLOW_ENV, retryOpts: { sleep: noSleep },
+        fetchImpl: fetchImpl2, projectRoot, now, env: BROWNLOW_ENV, ingestionControls: BROWNLOW_ENABLED_CONTROLS, retryOpts: { sleep: noSleep },
       },
     );
 
@@ -144,6 +153,39 @@ describe('acquire-afl-api-brownlow.ts — snapshot collision safety (AFLDB-ISSUE
     }
   });
 
+  describe('AFLDB-ISSUE-228 follow-up — §D two-key admin gate', () => {
+    const projectRoot0 = () => makeProjectRoot();
+
+    it('refuses before any network request when the deployment env gate is enabled but the admin DB switch is not', async () => {
+      const projectRoot = projectRoot0();
+      // No handlers registered: `stubFetch` throws "no handler for <url>" if
+      // this ever reaches a network call, which is exactly what proves the
+      // refusal happens first.
+      const { fetchImpl } = stubFetch([]);
+
+      await expect(runBrownlowAcquisition(
+        { season: 2025 },
+        {
+          fetchImpl, projectRoot, env: BROWNLOW_ENV, retryOpts: { sleep: noSleep },
+          ingestionControls: { currentSeasonEnabled: false, brownlowAdminEnabled: false },
+        },
+      )).rejects.toThrow(/two-key safety/);
+    });
+
+    it('refuses when the admin DB switch is enabled but the deployment env gate is not', async () => {
+      const projectRoot = projectRoot0();
+      const { fetchImpl } = stubFetch([]);
+
+      await expect(runBrownlowAcquisition(
+        { season: 2025 },
+        {
+          fetchImpl, projectRoot, env: {}, retryOpts: { sleep: noSleep },
+          ingestionControls: { currentSeasonEnabled: false, brownlowAdminEnabled: true },
+        },
+      )).rejects.toThrow(/two-key safety/);
+    });
+  });
+
   it('B: a pre-existing directory at the generated label is never written into or overwritten', async () => {
     const projectRoot = makeProjectRoot();
     const now = new Date('2026-09-20T10:08:00Z');
@@ -157,7 +199,7 @@ describe('acquire-afl-api-brownlow.ts — snapshot collision safety (AFLDB-ISSUE
     const result = await runBrownlowAcquisition(
       { season: 2025 },
       {
-        fetchImpl, projectRoot, now, env: BROWNLOW_ENV, retryOpts: { sleep: noSleep },
+        fetchImpl, projectRoot, now, env: BROWNLOW_ENV, ingestionControls: BROWNLOW_ENABLED_CONTROLS, retryOpts: { sleep: noSleep },
       },
     );
 
@@ -175,7 +217,7 @@ describe('acquire-afl-api-brownlow.ts — snapshot collision safety (AFLDB-ISSUE
     const result = await runBrownlowAcquisition(
       { season: 2025 },
       {
-        fetchImpl, projectRoot, now, env: BROWNLOW_ENV, retryOpts: { sleep: noSleep },
+        fetchImpl, projectRoot, now, env: BROWNLOW_ENV, ingestionControls: BROWNLOW_ENABLED_CONTROLS, retryOpts: { sleep: noSleep },
       },
     );
 
@@ -191,7 +233,7 @@ describe('acquire-afl-api-brownlow.ts — snapshot collision safety (AFLDB-ISSUE
     const first = await runBrownlowAcquisition(
       { season: 2025 },
       {
-        fetchImpl: fetchImplOk, projectRoot, now, env: BROWNLOW_ENV, retryOpts: { sleep: noSleep },
+        fetchImpl: fetchImplOk, projectRoot, now, env: BROWNLOW_ENV, ingestionControls: BROWNLOW_ENABLED_CONTROLS, retryOpts: { sleep: noSleep },
       },
     );
 
@@ -208,7 +250,7 @@ describe('acquire-afl-api-brownlow.ts — snapshot collision safety (AFLDB-ISSUE
         fetchImpl: fetchImplFail,
         projectRoot,
         now,
-        env: BROWNLOW_ENV,
+        env: BROWNLOW_ENV, ingestionControls: BROWNLOW_ENABLED_CONTROLS,
         retryOpts: { sleep: noSleep },
         onSnapshotDirClaimed: (dir) => { claimedSnapshotDir = dir; },
       },

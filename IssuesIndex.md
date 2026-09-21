@@ -14,7 +14,15 @@
 ### AFLDB-ISSUE-228 — AFL.com.au official JSON APIs as the current-season match, stats and Brownlow source
 - **Severity:** Medium. **Area:** data acquisition / import architecture — `afl_api` source,
   migration 074 spine, ISSUE-122 automatic path, `external_identities`, Brownlow round votes.
-- **State:** Open (2026-09-19; status updated 2026-09-21). Plan approved (Q1/Q2/Q7 decided).
+- **State:** Open (2026-09-19; status updated 2026-09-21). **Merged to main and deployed to DEV**
+  (commit `bbf87566`; migration 103 applied; DEV health/smoke PASS; no AFL API timer enabled;
+  Brownlow flag not enabled; PROD untouched). During DEV acceptance the operator found a missing
+  operational capability — no super-admin UI control to enable/disable AFL API current-season or
+  Brownlow ingestion — and **paused S9 before any real-feed write** pending that control. This is
+  being added now (see `issues.md` "operational-control gap found during DEV acceptance" paragraph
+  for the full architecture: two new fail-closed `site_settings` switches, enforced inside every
+  acquire/settle CLI itself, admin panel on `/admin/current-season`); **not yet enabled, S9 still
+  not resumed.** Plan approved (Q1/Q2/Q7 decided).
   **S1–S6 COMPLETE. Historical Brownlow §9.10 CLOSED/PASS for 2022–2025. S8 (operations)
   operator-validated COMPLETE 2026-09-21** (`tsc --noEmit` PASS; `tests/admin-current-season-settle.test.ts`
   38/38 PASS; both `.sh` unit scripts PASS `sh -n`; systemd safety inspection PASS; the
@@ -23,7 +31,33 @@
   sole remaining acceptance item is the real 2026 Brownlow live-count capture/replay evidence.
   **S9 NOT STARTED** (needs a later DEV dry-run/apply, AFL Tables corroboration and Brownlow
   replay after S7/S8). **Assertion 9 (§9.9) remains SKIPPED/open**, explicitly separate from the
-  Brownlow live-count replay — see the S8/§9.10 paragraphs below for full evidence. All work is
+  Brownlow live-count replay — see the S8/§9.10 paragraphs below for full evidence.
+  **Documentation pass, 2026-09-21 (documentation-only; no code/test/migration/DB/Git command
+  run):** `docs/acquisition/AFLDB-2026-API-ACQUISITION.md` §14 is now the canonical
+  architecture/operator entry point for the complete AFL.com.au direct-API integration
+  (provider access, the acquire→settle pipeline, ownership/corroboration/attendance, the
+  migration-103 database model, identity resolution, admin controls, systemd operation, verified
+  manual commands, the Brownlow pipeline, safety, source-to-source reconciliation, acceptance
+  criteria and known limitations), linking to
+  `docs/acquisition/AFLDB-2026-BROWNLOW-LIVE-COUNT-RUNBOOK.md` for the live-count procedure. Two
+  stale/incorrect claims were corrected in the process: the R1–R28 ownership-count evidence is
+  canonical-ownership partitioning, not source-to-source reconciliation; and the earlier
+  "AFL API enriches AFL-Tables-owned attendance" direction is backwards — `afl_api` never
+  proposes/enriches attendance on any path, and the one real enrichment direction is `afltables`
+  attendance into an `afl_api`-owned match (see `issues.md`'s "operational-control gap" paragraph
+  for the original audit these corrections are sourced from). No ISSUE-228 stage status changed
+  by this pass.
+  **Settle-CLI gate follow-up, 2026-09-21 (test-only; no runtime defect, no
+  migration/DB/Git/deployment command run):** a final follow-up review found a BLOCKER — no test
+  drove the fail-closed ingestion gate at the three settle CLI wrappers themselves
+  (`runAflApiSettleCli`, `runAflApiFixturesSettleCli`, `runAflApiBrownlowSettleCli`), only the
+  gate primitives and lower-level settle functions. New `tests/afl-api-settle-cli-gate.test.ts`
+  (DB-free/network-free, via injected `ingestionControls` and a stub that throws the instant the
+  settle DB path is touched) now covers all three wrappers' write-capable-mode refusals,
+  validate-only/report exemptions, the Brownlow two-key combinations, and one real fail-closed
+  `readAflApiIngestionControls({})` result reaching a wrapper. No runtime code changed. **S9
+  remains paused, S7 remains open, Assertion 9 remains separately open, PROD remains untouched.**
+  See `issues.md` for full detail. All work is
   uncommitted, branch `sonnet/issue-228`. Implementation history (Sonnet 5, same worktree) —
   **Stages S1, S2, S3 done, all uncommitted** —
   S1: round-table shape + `co_source_groups` added to `source-families.ts`/`.json`,

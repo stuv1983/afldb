@@ -58,6 +58,15 @@ must be explicitly dispositioned before final ISSUE-228 closeout (see `issues.md
 HISTORICAL CLOSEOUT" for the full Assertion 9 disposition options). Full evidence and file list:
 `issues.md` "S8 operator-validated" paragraph.
 
+**As of 2026-09-21 (later same day): merged to main and deployed to DEV** (commit `bbf87566`).
+During DEV acceptance the operator found no super-admin UI control existed to enable/disable AFL
+API current-season or Brownlow ingestion, and **paused S9 before any real-feed acquisition**
+pending one. Super-admin-controlled, fail-closed, server-side-enforced ingestion switches were
+added this pass — see `issues.md` "operational-control gap found during DEV acceptance" paragraph
+for the full architecture and file list. **This does not change S7 (still OPEN), S9 (still NOT
+STARTED — the control exists but neither switch was enabled and S9 has not resumed) or Assertion 9
+(still SKIPPED/open).**
+
 ## 0.1 Operator decisions recorded 2026-09-19 (binding on every stage below)
 
 | Decision | Ruling | Where applied |

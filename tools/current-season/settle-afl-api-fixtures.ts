@@ -34,8 +34,13 @@ import {
   type AflApiFixtureObservationCounters,
 } from '../../src/lib/acquisition/afl-api-fixture-identity';
 import { resolveAflApiSourceId } from '../../src/lib/acquisition/afl-api-match-identity';
+import {
+  readAflApiIngestionControls,
+  type AflApiIngestionControls,
+} from '../../src/lib/acquisition/afl-api-ingestion-control';
 import { asImportBatchId } from '../../src/lib/import-batch-id';
 import { parseSourceFamilyRegistry, type SourceFamilyRegistry } from '../../src/lib/acquisition/source-families';
+import { SETTING_KEYS } from '../../src/lib/site-settings';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PROJECT_ROOT = join(__dirname, '..', '..');
@@ -177,6 +182,8 @@ export type AflApiFixturesSettleCliDeps = {
   projectRoot?: string;
   sql?: postgres.Sql;
   log?: (line: string) => void;
+  /** Test-only escape hatch for the super-admin ingestion gate below; production always reads the database. */
+  ingestionControls?: AflApiIngestionControls;
 };
 
 export type AflApiFixturesSettleCliOutcome = {
@@ -222,6 +229,17 @@ export async function runAflApiFixturesSettleCli(
     return {
       args, counters: null, buildFailures: buildFailures.length, batchId: null,
     };
+  }
+
+  // AFLDB-ISSUE-228 follow-up (§C, §E, §F) — same gate as settle-afl-api.ts:
+  // this tool has no `--report` mode, so every path past --validate-only is
+  // write-capable and gated. Fail closed.
+  const ingestionControls = deps.ingestionControls ?? await readAflApiIngestionControls();
+  if (!ingestionControls.currentSeasonEnabled) {
+    throw new Error(
+      `AFL API current-season ingestion is disabled (site_settings '${SETTING_KEYS.aflApiCurrentSeasonEnabled}'). `
+      + 'A super admin must enable it from /admin/current-season before this tool will write anything.',
+    );
   }
 
   const ownsClient = deps.sql === undefined;

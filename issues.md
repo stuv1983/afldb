@@ -39439,6 +39439,123 @@ records it as F-001.
   `issues.md` (M — this paragraph), `IssuesIndex.md` (M — State/S8/S9 status),
   `issues/open/AFLDB-ISSUE-228.md` (M — status header). No implementation, runbook contract,
   `package.json`, deploy file, or `CHANGELOG.md` was touched by this pass.
+- **As of 2026-09-21 (operational-control gap found during DEV acceptance, addressed before S9
+  continues):** ISSUE-228 merged to main and deployed to DEV (commit `bbf87566`; migration 103
+  applied; DEV health/smoke PASS; no AFL API timer enabled; Brownlow enable flag not enabled; PROD
+  untouched). During operator review of that DEV state, S9 was **paused before any real-feed
+  acquisition**: there was no super-admin UI control to enable or disable AFL API current-season
+  ingestion or Brownlow live ingestion — the implementation relied entirely on
+  deployment/environment/systemd controls, which the operator does not consider sufficient for
+  routine DEV supervision. **This pass adds super-admin-controlled, fail-closed, server-side-enforced
+  ingestion switches** before S9 resumes: two new `site_settings` (migration 034) rows,
+  `acquisition.afl_api_current_season_enabled` and `acquisition.afl_api_brownlow_enabled`, read
+  through a new `src/lib/acquisition/afl-api-ingestion-control.ts` (a dedicated, short-lived
+  `afldb_app` connection — `afldb_import` is deliberately denied any access to `site_settings`,
+  migration 045 — so no privilege grant was widened and no migration was needed) and enforced
+  inside the acquisition/settle CLIs themselves (`tools/current-season/acquire-afl-api.ts`,
+  `acquire-afl-api-brownlow.ts`, `settle-afl-api.ts`, `settle-afl-api-fixtures.ts`,
+  `settle-afl-api-brownlow.ts`), so a systemd timer or a direct CLI invocation is bound by the same
+  switch the new `/admin/current-season` panel (`AflApiIngestionControls.tsx`,
+  `acquisition.currentSeason` capability, SUPER_ADMIN_ONLY, `auth_audit_log`-audited) writes.
+  Brownlow keeps its existing `AFLDB_AFL_API_BROWNLOW_ENABLED` deployment gate as an outer,
+  UI-unoverridable hard gate; the new admin setting is a second, independent key AND-ed with it
+  (`combineAflApiBrownlowGates`) — neither can enable Brownlow ingestion alone. Current-season
+  ingestion has no environment-level hard gate (none existed before this pass and none was
+  invented); the DB switch is the whole of "enabled" for that family. Read-only paths
+  (`settle-afl-api.ts --report`, every tool's `--validate-only`) are deliberately NOT gated. **This
+  pass does not touch S7, S9 or Assertion 9 status** — S9 remains paused pending operator resumption
+  with the new control now available; S7 remains OPEN per the paragraph above; Assertion 9 (§9.9)
+  remains SKIPPED/open. Neither switch was enabled by this pass. Two findings requested during this
+  same review are reported without implementation, per the operator's explicit scope instruction:
+  (1) the R1-R28 evidence's `afltables_owned + afl_api_owned = total` accounting proves canonical
+  ownership partition, not score/stat source-to-source reconciliation — the actual cross-source
+  comparison surface is `settle-report.ts`'s `sourceDisagreement`/advisory-disagreement counters and
+  `data_issues` rows of type `*_settle` with a disagreement reason, written whenever a corroborating
+  source's observed value differs from the already-canonical one (§7.5 "Ownership between afltables
+  and afl_api"); there is no separate score/stat "reconciliation report" beyond that advisory trail.
+  (2) `matches.source_id`/`attendance_source_id` provenance, verified against
+  `src/lib/acquisition/settle-afl-api.ts` (`proposedAflApiMatchValues` doc comment, §11.1/§19.2(f);
+  `sweepAttendanceEnrichment`/`applyAttendanceEnrichment`, §7.5 Q2) and `canonical-apply.ts`'s
+  generic `applyAttendanceEnrichment()`: the premise in the extraction is backwards, not merely
+  mislabelled. **`afl_api` NEVER proposes or enriches attendance for any match — it has none to
+  give** (`proposedAflApiMatchValues` omits the three attendance fields on every UPDATE and fixes
+  them at `NULL/not_collected/NULL` on INSERT). The one enrichment sweep that exists is triggered
+  from WITHIN `settle-afl-api.ts` but always enriches with `afltables` as the source
+  (`enrichingSourceId: refs.afltablesSourceId, enrichingSourceKey: 'afltables'`, hardcoded at the
+  sweep's one call site) — and it targets matches THIS (afl_api) run currently owns, i.e. an
+  **`afl_api`-owned match receiving `afltables`-sourced attendance**, not the reverse. There is no
+  code path anywhere in the repository where `afl_api` is the `enrichingSourceId` (confirmed:
+  `settle-afltables.ts` never calls `applyAttendanceEnrichment` with `afl_api`, and no other caller
+  of that function exists). So: for an `afl_api`-owned match enriched this way,
+  `matches.source_id = afl_api` (unchanged, enrichment never re-owns) and
+  `attendance_source_id = afltables`. For an `afltables`-owned match, attendance was written
+  directly by `settle-afltables.ts`'s own proposal (`attendance_source_id = afltables`) and no
+  cross-source enrichment ever runs against it (the sweep only iterates `afl_api`'s own owned match
+  keys). **The original extraction's claim — "after AFL API attendance enrichment of an AFL
+  Tables-owned match, matches.source_id remains afltables and attendance_source_id may show
+  afltables" — describes a scenario that does not occur**: AFL Tables-owned matches are never
+  attendance-enriched by this mechanism (they already have their own attendance), and AFL API never
+  enriches anything. The one true statement salvageable from it is that `attendance_source_id` is
+  always `afltables` whenever set at all, for either match owner — but the owner/direction pairing
+  in the original claim is inverted. No canonical data or code was changed to investigate this. **Files changed (this pass):**
+  `issues.md` (M — this paragraph), `src/lib/site-settings.ts` (M), new
+  `src/lib/acquisition/afl-api-ingestion-control.ts`, `tools/current-season/acquire-afl-api.ts` (M),
+  `tools/current-season/acquire-afl-api-brownlow.ts` (M), `tools/current-season/settle-afl-api.ts`
+  (M), `tools/current-season/settle-afl-api-fixtures.ts` (M),
+  `tools/current-season/settle-afl-api-brownlow.ts` (M), `src/app/admin/current-season/actions.ts`
+  (M), new `src/app/admin/current-season/AflApiIngestionControls.tsx`,
+  `src/app/admin/current-season/page.tsx` (M), `tests/afl-api-match.test.ts` (M),
+  `tests/afl-api-brownlow-acquire.test.ts` (M), new `tests/afl-api-ingestion-control.test.ts`. No
+  migration, `package.json`, deploy file, or `CHANGELOG.md` change. No test/tsc/DB/Git/deployment
+  command was run by the assistant (CLAUDE.md §9); the operator runs `npx tsc --noEmit` and the
+  listed test files to validate.
+- **As of 2026-09-21 (documentation pass, documentation-only — no code/test/migration/DB/Git/
+  deployment command run by the assistant, CLAUDE.md §9):** `docs/acquisition/
+  AFLDB-2026-API-ACQUISITION.md` §14 is now the canonical architecture/operator documentation
+  for the complete AFL.com.au direct-API integration (provider/host architecture; the
+  acquire→observe→validate→promote match-family flow; the ownership/corroboration/attendance
+  provenance model; the migration-103 database model; match/player identity resolution
+  including the bootstrap bridge and the fixture-only fallback; the two-key admin ingestion
+  switches; systemd chain operation; a verified manual command reference; the complete Brownlow
+  pipeline including the round-reschedule correction; the 2022–2025 historical closeout;
+  what remains for 2026 live acceptance; the fail-closed safety model; real source-to-source
+  reconciliation coverage; acceptance criteria; and known limitations), cross-referencing
+  `docs/acquisition/AFLDB-2026-BROWNLOW-LIVE-COUNT-RUNBOOK.md` for the live-count operator
+  procedure rather than duplicating it. Two stale/incorrect statements from an earlier
+  documentation draft were corrected during this pass, sourced from this ledger's own
+  "operational-control gap found during DEV acceptance" paragraph above: (1) the R1–R28
+  `afltables_owned + afl_api_owned = total` evidence is canonical-ownership partitioning, not
+  source-to-source reconciliation — the real comparison surface is `classifyCorroboration()`'s
+  match-score comparison plus `settle-report.ts`'s disagreement counters and `data_issues` rows,
+  and it does not cover period scores or player statistics; (2) `afl_api` never proposes or
+  enriches `matches.attendance` on any path — the one real enrichment direction is `afltables`
+  attendance into an `afl_api`-owned match, never the reverse. Files changed: `docs/acquisition/
+  AFLDB-2026-API-ACQUISITION.md` (M), `IssuesIndex.md` (M — this documentation-pass note),
+  `issues.md` (M — this paragraph). No ISSUE-228 stage status (S1–S10, Assertion 9) was changed
+  by this pass.
+- **As of 2026-09-21 (settle-CLI gate follow-up review, test-only — no runtime defect found, no
+  migration/DB/Git/deployment command run by the assistant, CLAUDE.md §9):** the operational-
+  control-gap review above added the fail-closed ingestion switches inside every acquire/settle
+  CLI, but nothing previously drove the three SETTLE CLI wrappers themselves
+  (`runAflApiSettleCli`, `runAflApiFixturesSettleCli`, `runAflApiBrownlowSettleCli`) — existing
+  coverage only exercised the gate primitives and the lower-level settle functions directly, so
+  deleting, inverting or misplacing the wrapper-level gate could still have passed the whole
+  suite. A final follow-up review surfaced this as a BLOCKER. New DB-free, network-free
+  wrapper-level tests (`tests/afl-api-settle-cli-gate.test.ts`) now drive all three CLI functions
+  directly and prove: `--dry-run`/`--apply` refuse before the settle DB path opens on
+  `runAflApiSettleCli`/`runAflApiFixturesSettleCli` while disabled; `--validate-only` (all three)
+  and `--report` (`runAflApiSettleCli` only) remain allowed while disabled; the Brownlow two-key
+  gate refuses `--dry-run`/`--apply`/`--observe-only` on `runAflApiBrownlowSettleCli` for all
+  three disabled combinations (deployment-only, admin-only, neither) and permits progression only
+  when both are true; and a real fail-closed `readAflApiIngestionControls({})` result (no
+  `DATABASE_URL`) fed into a CLI wrapper still refuses. No runtime code change was required — the
+  gate implementation itself was already correct; this pass adds the coverage that was missing.
+  Files changed: new `tests/afl-api-settle-cli-gate.test.ts`; `issues.md` (M — this paragraph),
+  `IssuesIndex.md` (M — companion index note). **S9 remains paused before any real-feed write; S7
+  remains open (2026 Brownlow live-count capture/replay evidence outstanding); Assertion 9 (§9.9)
+  remains separately SKIPPED/open; PROD remains untouched.** No test/tsc/DB/Git/deployment command
+  was run by the assistant; the operator runs `npx vitest run tests/afl-api-settle-cli-gate.test.ts`
+  to validate.
 - **Severity:** Medium
 - **Area:** Data acquisition / Import architecture / Data integrity — the `afl_api` source
   (migration 077), the migration-074 observation spine, the ISSUE-122 automatic canonical path,

@@ -11,9 +11,16 @@ import {
   type CurrentSeasonRunResult,
 } from '@/lib/external-afl/current-season-import';
 import { getLatestSettleRun } from '@/db/queries/settle-runs';
+import { isAflApiBrownlowEnabled } from '@/lib/acquisition/afl-api-brownlow';
+import {
+  combineAflApiBrownlowGates,
+  type AflApiBrownlowEffectiveState,
+} from '@/lib/acquisition/afl-api-ingestion-control';
 import { readSettleRunStatus, type SettleRunStatus } from '@/lib/acquisition/settle-status';
 import { SETTLE_UNIT, startSettleRun } from '@/lib/acquisition/settle-trigger';
+import { authSql } from '@/db/authClient';
 import { audit, requireCapability } from '@/lib/auth/session';
+import { SETTING_KEYS } from '@/lib/site-settings';
 
 export type CurrentSeasonAdminState = {
   error?: string;
@@ -220,4 +227,104 @@ export async function startSettleRunAction(): Promise<SettleRunAdminState> {
 export async function refreshSettleRunStatusAction(): Promise<SettleRunAdminState> {
   await requireCapability('acquisition.currentSeason');
   return { outcome: 'status', status: await readSettleRunStatus() };
+}
+
+/* ------------------------------------------------------------------ *
+ * AFLDB-ISSUE-228 follow-up — super-admin AFL API ingestion switches.
+ *
+ * SUPER ADMIN ONLY (`requireCapability('acquisition.currentSeason')`, the
+ * same boundary the settle controls above use — the capability table
+ * (`src/lib/auth/capabilities.ts`) declares it SUPER_ADMIN_ONLY). Writes
+ * through `authSql` exactly like `saveSiteSettings()`
+ * (`/admin/settings/actions.ts`): one upsert, then one `auth_audit_log` row
+ * via `audit()`, recording actor, action and old/new state. There is no
+ * disabled-button-only control anywhere in this file: every acquire/settle
+ * CLI in `tools/current-season/` reads the same `site_settings` row itself
+ * (`src/lib/acquisition/afl-api-ingestion-control.ts`), so a direct CLI
+ * invocation or a systemd timer is bound by the same switch this action
+ * writes.
+ * ------------------------------------------------------------------ */
+
+export type IngestionControlsAdminState = {
+  error?: string;
+  message?: string;
+};
+
+export type AflApiIngestionAdminView = {
+  currentSeasonEnabled: boolean;
+  brownlow: AflApiBrownlowEffectiveState;
+};
+
+/** Read for the page's initial render and the panel's own refresh. */
+export async function readAflApiIngestionAdminView(): Promise<AflApiIngestionAdminView> {
+  await requireCapability('acquisition.currentSeason');
+  const rows = await authSql<{ key: string; value: unknown }[]>`
+    SELECT key, value FROM site_settings
+     WHERE key IN (${SETTING_KEYS.aflApiCurrentSeasonEnabled}, ${SETTING_KEYS.aflApiBrownlowEnabled})
+  `;
+  const byKey = new Map(rows.map((row) => [row.key, row.value]));
+  const currentSeasonEnabled = byKey.get(SETTING_KEYS.aflApiCurrentSeasonEnabled) === true;
+  const brownlowAdminEnabled = byKey.get(SETTING_KEYS.aflApiBrownlowEnabled) === true;
+  return {
+    currentSeasonEnabled,
+    brownlow: combineAflApiBrownlowGates(isAflApiBrownlowEnabled(), brownlowAdminEnabled),
+  };
+}
+
+async function writeIngestionSwitch(
+  key: string, enabled: boolean, auditAction: string, actor: { id: number; email: string },
+): Promise<void> {
+  await authSql`
+    INSERT INTO site_settings (key, value, updated_by)
+    VALUES (${key}, ${JSON.stringify(enabled)}::jsonb, ${actor.id})
+    ON CONFLICT (key) DO UPDATE
+      SET value = EXCLUDED.value, updated_by = EXCLUDED.updated_by, updated_at = now()
+  `;
+  await audit(auditAction, { enabled }, { userId: actor.id, label: actor.email });
+}
+
+/**
+ * AFL API current-season ingestion (hard requirement E). No deployment-level
+ * gate exists for this family — this switch is the whole of "enabled".
+ */
+export async function setAflApiCurrentSeasonIngestionAction(
+  enabled: boolean,
+): Promise<IngestionControlsAdminState> {
+  const admin = await requireCapability('acquisition.currentSeason');
+  await writeIngestionSwitch(
+    SETTING_KEYS.aflApiCurrentSeasonEnabled, enabled, 'current_season.afl_api_ingestion_set', admin,
+  );
+  revalidatePath('/admin/current-season');
+  return {
+    message: enabled
+      ? 'AFL API current-season ingestion enabled. The nightly timer and any on-demand CLI run will now acquire and settle.'
+      : 'AFL API current-season ingestion disabled. Acquisition and settle both refuse before making a network request.',
+  };
+}
+
+/**
+ * Brownlow live ingestion admin control (hard requirement D). This is only
+ * HALF the gate: `AFLDB_AFL_API_BROWNLOW_ENABLED` (deployment/environment)
+ * is the other, and this action can never set or clear it. Enabling this
+ * setting while the deployment gate is off changes nothing observable.
+ */
+export async function setAflApiBrownlowIngestionAction(
+  enabled: boolean,
+): Promise<IngestionControlsAdminState> {
+  const admin = await requireCapability('acquisition.currentSeason');
+  await writeIngestionSwitch(
+    SETTING_KEYS.aflApiBrownlowEnabled, enabled, 'current_season.afl_api_brownlow_ingestion_set', admin,
+  );
+  revalidatePath('/admin/current-season');
+  const gate = combineAflApiBrownlowGates(isAflApiBrownlowEnabled(), enabled);
+  return {
+    message: gate.effectiveEnabled
+      ? 'Brownlow live ingestion admin control enabled, and the deployment gate is also enabled — '
+        + 'acquisition and settle will now run.'
+      : enabled
+        ? 'Brownlow live ingestion admin control enabled, but the deployment gate '
+          + '(AFLDB_AFL_API_BROWNLOW_ENABLED) is not — nothing changes until that is set on the host.'
+        : 'Brownlow live ingestion admin control disabled. Acquisition and settle both refuse before '
+          + 'making a network request, regardless of the deployment gate.',
+  };
 }

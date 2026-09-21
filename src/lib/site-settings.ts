@@ -54,6 +54,13 @@ export const SETTING_KEYS = {
   pageIntros: 'site.page_intros',
   frontendTheme: 'site.frontend_theme',
   frontendLayout: 'site.frontend_layout',
+  /**
+   * AFLDB-ISSUE-228 follow-up — super-admin ingestion switches. See the
+   * "Acquisition ingestion switches" section below for the fail-closed
+   * contract these two keys share.
+   */
+  aflApiCurrentSeasonEnabled: 'acquisition.afl_api_current_season_enabled',
+  aflApiBrownlowEnabled: 'acquisition.afl_api_brownlow_enabled',
 } as const;
 
 // --- Home page layout ---
@@ -212,6 +219,33 @@ export function aflwLeaderCategory(value: AflwLeaderCategory) {
   return AFLW_LEADER_CATEGORIES.find((option) => option.value === value)
     ?? AFLW_LEADER_CATEGORIES[0];
 }
+
+// --- Acquisition ingestion switches (AFLDB-ISSUE-228 follow-up) ---
+
+/**
+ * Super-admin-controlled kill switches for the AFL API acquisition/settle
+ * chains (`tools/current-season/acquire-afl-api*.ts`,
+ * `tools/current-season/settle-afl-api*.ts`), read by
+ * `src/lib/acquisition/afl-api-ingestion-control.ts` through a dedicated
+ * afldb_app connection so a direct CLI invocation or a systemd timer — not
+ * only the admin UI's button — is bound by the same switch.
+ *
+ * Both default OFF via `parseBooleanSetting` (only the literal `true` is
+ * "on"): a missing row, a malformed value, an unreachable database and an
+ * unset table all fall through to disabled, matching this file's own
+ * `parseGridAudience`/early-access boolean reasoning — this is a control
+ * that gates a WRITE path, so it must never fail open.
+ *
+ * `aflApiBrownlowEnabled` is one half of a two-key gate. The other half,
+ * `AFLDB_AFL_API_BROWNLOW_ENABLED`, is a deployment/environment variable
+ * (`src/lib/acquisition/afl-api-brownlow.ts`) that this admin setting can
+ * never override — both must independently be true before a Brownlow
+ * acquisition or settle proceeds. `aflApiCurrentSeasonEnabled` has no such
+ * outer environment gate: the match/stats family had none before this
+ * change, and none was introduced for it.
+ */
+export const DEFAULT_AFL_API_CURRENT_SEASON_ENABLED = false;
+export const DEFAULT_AFL_API_BROWNLOW_ADMIN_ENABLED = false;
 
 // --- Grid solver audience ---
 
@@ -622,6 +656,9 @@ export type SiteSettings = {
   pageIntros: PageIntros;
   frontendTheme: SiteTheme;
   frontendLayout: SiteLayout;
+  /** AFLDB-ISSUE-228 follow-up. See "Acquisition ingestion switches" above. */
+  aflApiCurrentSeasonEnabled: boolean;
+  aflApiBrownlowEnabled: boolean;
 };
 
 export const DEFAULT_SITE_SETTINGS: SiteSettings = {
@@ -642,6 +679,8 @@ export const DEFAULT_SITE_SETTINGS: SiteSettings = {
   pageIntros: DEFAULT_PAGE_INTROS,
   frontendTheme: DEFAULT_SITE_THEME,
   frontendLayout: DEFAULT_SITE_LAYOUT,
+  aflApiCurrentSeasonEnabled: DEFAULT_AFL_API_CURRENT_SEASON_ENABLED,
+  aflApiBrownlowEnabled: DEFAULT_AFL_API_BROWNLOW_ADMIN_ENABLED,
 };
 
 /**
@@ -714,5 +753,10 @@ export function parseSiteSettings(
     frontendLayout: byKey.has(SETTING_KEYS.frontendLayout)
       ? parseSiteLayout(byKey.get(SETTING_KEYS.frontendLayout))
       : DEFAULT_SITE_LAYOUT,
+    // Fail closed (§B): `parseBooleanSetting` returns `false` for anything
+    // but the literal `true`, so a missing row parses the same as an
+    // explicit `false` — there is no `.has()` branch here on purpose.
+    aflApiCurrentSeasonEnabled: parseBooleanSetting(byKey.get(SETTING_KEYS.aflApiCurrentSeasonEnabled)),
+    aflApiBrownlowEnabled: parseBooleanSetting(byKey.get(SETTING_KEYS.aflApiBrownlowEnabled)),
   };
 }

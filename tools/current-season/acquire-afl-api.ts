@@ -46,7 +46,12 @@ import {
   selectAflApiMatches,
 } from '../../src/lib/acquisition/afl-api-client';
 import { AFL_API_FIXTURE_ACQUISITION_KIND } from '../../src/lib/acquisition/afl-api-fixture-identity';
+import {
+  readAflApiIngestionControls,
+  type AflApiIngestionControls,
+} from '../../src/lib/acquisition/afl-api-ingestion-control';
 import { claimSnapshotDir } from '../../src/lib/acquisition/snapshot-dir';
+import { SETTING_KEYS } from '../../src/lib/site-settings';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PROJECT_ROOT = join(__dirname, '..', '..');
@@ -189,6 +194,8 @@ export type RunAcquisitionDeps = {
    * `claimSnapshotDir()` may have appended on collision.
    */
   onSnapshotDirClaimed?: (dir: string, label: string) => void;
+  /** Test-only escape hatch for the super-admin ingestion gate below; production always reads the database. */
+  ingestionControls?: AflApiIngestionControls;
 };
 
 export type RunAcquisitionResult = {
@@ -214,6 +221,20 @@ export type RunAcquisitionResult = {
 export async function runAcquisition(
   args: AcquireAflApiArgs, deps: RunAcquisitionDeps,
 ): Promise<RunAcquisitionResult> {
+  // AFLDB-ISSUE-228 follow-up (§C, §E) — the super-admin ingestion switch,
+  // checked BEFORE anything else: no file read, no token fetch, no season
+  // request. Fail closed (site-settings.ts `parseBooleanSetting`): a missing
+  // row, an unreadable database or DATABASE_URL being unset all read as
+  // disabled, matching every other enable check in this file's sibling
+  // tools (e.g. `isAflApiBrownlowEnabled` in acquire-afl-api-brownlow.ts).
+  const ingestionControls = deps.ingestionControls ?? await readAflApiIngestionControls();
+  if (!ingestionControls.currentSeasonEnabled) {
+    throw new Error(
+      `AFL API current-season ingestion is disabled (site_settings '${SETTING_KEYS.aflApiCurrentSeasonEnabled}'). `
+      + 'A super admin must enable it from /admin/current-season before this tool will make a network request.',
+    );
+  }
+
   const projectRoot = deps.projectRoot ?? DEFAULT_PROJECT_ROOT;
   const bases = deps.bases ?? resolveAflApiEndpointBases(process.env);
   const retryOpts = deps.retryOpts ?? {};
