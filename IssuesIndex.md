@@ -32,6 +32,15 @@
   **S9 NOT STARTED** (needs a later DEV dry-run/apply, AFL Tables corroboration and Brownlow
   replay after S7/S8). **Assertion 9 (§9.9) remains SKIPPED/open**, explicitly separate from the
   Brownlow live-count replay — see the S8/§9.10 paragraphs below for full evidence.
+  **S9 update, 2026-09-21 (same day):** first real 2026 acquisition PASS on DEV (snapshot
+  `afl-api-2026-2026-09-21-011148`, 217 CONCLUDED matches); `--validate-only` BLOCKED by one
+  measured schema-contract drift (`playerStats.stats.extendedStats` null on exactly one of 9,983
+  player-match rows, undeclared as its own parent path). Root cause confirmed; minimal fix applied
+  to `data/reference/source-families.json` (known-but-not-required) plus four regression tests in
+  `tests/afl-api-match.test.ts` — see `issues.md` "S9 real-feed schema drift" paragraph. Fix was
+  UNVALIDATED/UNDEPLOYED at the time; now **LOCALLY VALIDATED 2026-09-21** (see "S9 — LOCAL
+  VALIDATION COMPLETE" below); still UNDEPLOYED; no DB/Git/deployment command run; S9 has not
+  resumed past `--validate-only`.
   **Documentation pass, 2026-09-21 (documentation-only; no code/test/migration/DB/Git command
   run):** `docs/acquisition/AFLDB-2026-API-ACQUISITION.md` §14 is now the canonical
   architecture/operator entry point for the complete AFL.com.au direct-API integration
@@ -57,6 +66,31 @@
   validate-only/report exemptions, the Brownlow two-key combinations, and one real fail-closed
   `readAflApiIngestionControls({})` result reaching a wrapper. No runtime code changed. **S9
   remains paused, S7 remains open, Assertion 9 remains separately open, PROD remains untouched.**
+  **S9 regression-test correction, 2026-09-21 (test-only; no production code, migration, DB, Git or
+  deployment command run):** operator rerun of the S9 schema-drift fix found `tsc --noEmit` PASS,
+  `tests/reference-data.test.ts` 51/51 PASS, and `tests/afl-api-match.test.ts` 120/121 PASS with one
+  new regression assertion wrong, not a contract failure — the first new S9 test asserted the
+  aggregate `observedColumns` set must exclude `playerStats.stats.extendedStats.effectiveKicks`,
+  but that set is formed across both home and away player stats and the unmutated away-side fixture
+  legitimately still contributes that path (already proved non-redundant by the block's third test).
+  Fixed by removing only that incorrect negative assertion; the bare-parent-path positive assertion
+  is kept. No production code or `source-families.json` changed. **S9 remains stopped before any DB
+  dry-run.** Correction was UNVALIDATED pending operator rerun at the time; now **LOCALLY VALIDATED
+  2026-09-21**. Full detail: `issues.md` "S9 regression-test correction" and "S9 — LOCAL VALIDATION
+  COMPLETE" paragraphs.
+  **S9 — LOCAL VALIDATION COMPLETE, 2026-09-21 (operator-run; no test/tsc/DB/Git/network/deployment
+  command run by the assistant):** combined focused validation of the schema-drift fix and the
+  regression-test correction now PASSES in full — `npx tsc --noEmit` PASS; `tests/afl-api-
+  match.test.ts` 121/121 PASS; `tests/reference-data.test.ts` 51/51 PASS; combined 172/172 PASS;
+  `git diff --check` PASS; worktree contains exactly the four expected modified files, no
+  unexpected untracked files. The earlier 120/121 rerun (one incorrect regression-test assertion)
+  is preserved as evidence, not overwritten. **No DB dry-run has occurred; no deployment of this
+  fix has occurred yet; S9 remains OPEN and stopped before any DB dry-run.** Next sequence: commit/
+  push → exact-SHA DEV deploy → reuse the SAME immutable snapshot
+  `afl-api-2026-2026-09-21-011148` → `--validate-only` must give 217 match units / 0 build
+  failures → only then a DB dry-run is considered. Brownlow/S7 untouched; Assertion 9 remains
+  separately open; PROD untouched. Full detail: `issues.md` "S9 — LOCAL VALIDATION COMPLETE"
+  paragraph.
   **DEV acceptance defect found and fixed, 2026-09-21 (code fix + tests only; no DB/migration/
   Git/deployment command run):** enabling AFL API current-season ingestion on DEV showed
   "enabled" immediately but reverted to "Disabled" on a hard refresh. Root cause:

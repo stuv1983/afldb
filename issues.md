@@ -39556,6 +39556,91 @@ records it as F-001.
   remains separately SKIPPED/open; PROD remains untouched.** No test/tsc/DB/Git/deployment command
   was run by the assistant; the operator runs `npx vitest run tests/afl-api-settle-cli-gate.test.ts`
   to validate.
+- **S9 real-feed schema drift, found and fixed 2026-09-21 (Sonnet 5, same worktree, DEV evidence
+  supplied by the operator; CLAUDE.md §9 — no test/tsc/DB/Git/network/deployment command run by
+  the assistant).** The first real AFL.com.au 2026 acquisition succeeded on DEV (immutable
+  snapshot `afl-api-2026-2026-09-21-011148`, manifest SHA-256
+  `dcbd0626e64a6fcf0ed9c73e910b8b83c10aae50a8552e69be172df184c33ecb`: 218 matches in the season
+  feed, 217 selected as CONCLUDED, 652 manifest files). Running `settle-afl-api.ts
+  --validate-only` against that snapshot (no DB connection opened) built 216/217 match units and
+  refused CD_M20260140305: `afl_api/player_match_stats returned undeclared column(s):
+  playerStats.stats.extendedStats`. A read-only census of every `player-stats.json` in the full
+  217-match snapshot (9,983 player-match rows) found `extendedStats` is an OBJECT on 9,982 rows,
+  measured with the same 26 populated keys already declared in the registry, and NULL on exactly
+  one row: CD_M20260140305, provider player CD_I993799 (homeTeamPlayerStats index 23) — no other
+  field on that row was found anomalous, and this is not evidence CD_I993799 or that match is
+  otherwise invalid. Root cause confirmed from code (`walkColumns()` in
+  `src/lib/acquisition/afl-api-bundle.ts:92-104`): a `null` object is treated as a leaf, so a
+  populated `extendedStats` contributes its 26 child dot-paths while a null `extendedStats`
+  contributes only the bare parent path `playerStats.stats.extendedStats` — a path the registry
+  had never itself declared (only its children were). **Fix:** added
+  `playerStats.stats.extendedStats` to `afl_api`/`player_match_stats`'s `known_columns` in
+  `data/reference/source-families.json` (known-but-not-required, matching the already-nullable
+  child-path convention elsewhere in this registry); no child path removed; `known_columns_status`
+  left at `'complete'`; no hash exclusion added; `flattenObservedColumns()` unchanged;
+  `extendedStats` remains entirely unprojected into `AflApiPlayerMatchStatsProjection` (unchanged
+  from S3). Four new regression cases added to `tests/afl-api-match.test.ts`
+  (`emitAflApiPlayerMatchStats` describe block): accepts a null `extendedStats` parent and leaves
+  the ordinary projected stats correct; `flattenObservedColumns()` reports the bare parent path
+  for a null object; the existing object-shaped fixture coverage (away side) is unaffected; a
+  genuinely undeclared sibling path still fails closed even alongside a null `extendedStats`
+  parent. Files changed: `data/reference/source-families.json` (M — one `known_columns` entry
+  added plus an evidence/notes paragraph), `tests/afl-api-match.test.ts` (M — four new test
+  cases), `issues.md` (M — this paragraph), `IssuesIndex.md` (M — companion status note). **No
+  database, Git, network, test or deployment command was run by the assistant.** The fix was
+  UNVALIDATED locally and UNDEPLOYED at the time this paragraph was written; it is now **LOCALLY
+  VALIDATED as of 2026-09-21** — see the "S9 — LOCAL VALIDATION COMPLETE" paragraph below for the
+  final operator-run evidence. **S9 status: real acquisition PASS; validate-only BLOCKED by
+  this one measured schema-contract drift (now fixed and locally validated); no DB settle/write has
+  occurred on any environment; S9 remains open and has not resumed past validate-only; Brownlow
+  (S7, Assertion 9) is untouched by this pass.** Required acceptance sequence, now that local
+  validation has passed: operator commits/pushes, deploys the exact commit to DEV, reuses the SAME
+  immutable snapshot `afl-api-2026-2026-09-21-011148` (never a replacement acquisition), and
+  requires exactly 217 match units built / 0 build failures from `--validate-only` before any DB
+  dry-run is considered.
+- **S9 regression-test correction, 2026-09-21 (Sonnet 5, same worktree, operator rerun following
+  the S9 schema-drift fix above; CLAUDE.md §9 — no test/tsc/DB/Git/network/deployment command run
+  by the assistant).** Operator validation of the S9 schema-drift fix: `npx tsc --noEmit` PASS;
+  `tests/reference-data.test.ts` 51/51 PASS; `tests/afl-api-match.test.ts` 120/121 PASS with one
+  new regression assertion failing; `git diff --check` PASS. The failure was in the test suite, not
+  in production behaviour: `emitAflApiPlayerMatchStats()` forms one aggregate `observedColumns` set
+  across both `homeTeamPlayerStats` and `awayTeamPlayerStats`, but the first new S9 test
+  (`tests/afl-api-match.test.ts:882`) nulls only the home-side `extendedStats` and then wrongly
+  asserted the aggregate set must NOT contain
+  `playerStats.stats.extendedStats.effectiveKicks` — a path the unmutated, object-shaped away-side
+  fixture legitimately still contributes. That coverage is already proved correct and non-redundant
+  by the very next test in the same block (`tests/afl-api-match.test.ts:903`, "keeps the existing
+  object-shaped extendedStats fixture coverage intact"). **Fix:** removed only the incorrect
+  `expect(observedColumns).not.toContain('playerStats.stats.extendedStats.effectiveKicks')`
+  assertion from the first test; kept
+  `expect(observedColumns).toContain('playerStats.stats.extendedStats')` (proves the null-parent
+  bare path was observed). No production code changed; `data/reference/source-families.json`
+  unchanged (no unrelated mistake found on inspection); the other three S9 regression tests reviewed
+  for duplication and left as-is (each proves a distinct fact: canonical-stats projection unaffected,
+  `flattenObservedColumns()` unit behaviour, away-side coverage intact, and fail-closed on a
+  genuinely undeclared sibling path). Files changed: `tests/afl-api-match.test.ts` (M — one assertion
+  removed), `issues.md` (M — this paragraph), `IssuesIndex.md` (M — companion status note). **S9
+  remains stopped before any DB dry-run; no deployment has occurred.** Correction was UNVALIDATED
+  pending operator rerun at the time this paragraph was written; it is now **LOCALLY VALIDATED as
+  of 2026-09-21** — see the "S9 — LOCAL VALIDATION COMPLETE" paragraph below.
+- **S9 — LOCAL VALIDATION COMPLETE, 2026-09-21 (operator-run; CLAUDE.md §9 — no test/tsc/DB/Git/
+  network/deployment command run by the assistant).** Complete focused local validation of the S9
+  nullable-`extendedStats`-parent contract fix (schema-drift fix above) together with the S9
+  regression-test correction (removal of the one incorrect `observedColumns` assertion, above) now
+  PASSES in full: `npx tsc --noEmit` PASS; `npx vitest run tests/afl-api-match.test.ts
+  tests/reference-data.test.ts` PASS — `tests/afl-api-match.test.ts` 121/121 PASS,
+  `tests/reference-data.test.ts` 51/51 PASS, combined 172/172 PASS; `git diff --check` PASS.
+  Worktree contains exactly `IssuesIndex.md`, `data/reference/source-families.json`, `issues.md`,
+  `tests/afl-api-match.test.ts` modified, with no unexpected untracked files. The earlier rerun's
+  120/121 result (one incorrect regression-test assertion, not a contract failure — see the
+  regression-test-correction paragraph above) is preserved as evidence and is superseded by this
+  disposition, not overwritten. **No DB dry-run has occurred on any environment. No deployment of
+  this fix has occurred yet. S9 remains OPEN and stopped before any DB dry-run.** Next sequence:
+  commit/push → deploy the exact commit (SHA) to DEV → reuse the SAME immutable snapshot
+  `afl-api-2026-2026-09-21-011148` (never a replacement acquisition) → `--validate-only` must give
+  exactly 217 match units built / 0 build failures → only then is a DB dry-run considered. Brownlow
+  (S7, Assertion 9 §9.9) is untouched by this pass and remains separately open. PROD remains
+  untouched.
 - **Severity:** Medium
 - **Area:** Data acquisition / Import architecture / Data integrity — the `afl_api` source
   (migration 077), the migration-074 observation spine, the ISSUE-122 automatic canonical path,

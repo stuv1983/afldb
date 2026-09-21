@@ -877,6 +877,46 @@ describe('afl-api-bundle (AFLDB-ISSUE-228 S3)', () => {
       raw.homeTeamPlayerStats[0].playerStats.stats.kicks = 9.5;
       expect(() => emitAflApiPlayerMatchStats(raw, registry, 'CD_M20260142801')).toThrow(/non_integral_statistic|integral count/);
     });
+
+    describe('extendedStats: null (S9, §11.3 evidence — the nullable parent is known-but-not-required)', () => {
+      it('accepts a null extendedStats parent (measured CD_M20260140305/CD_I993799 shape) and projects the row unaffected', () => {
+        const raw = readFixture('match/02-player-stats.raw.json');
+        raw.homeTeamPlayerStats[0].playerStats.stats.extendedStats = null;
+        const { records, observedColumns } = emitAflApiPlayerMatchStats(raw, registry, 'CD_M20260142801');
+        expect(records).toHaveLength(2);
+        const home = records.find((r) => r.providerTeamId === 'CD_T80')!;
+        // Ordinary projected canonical stats remain correct — the null extendedStats parent affects nothing else.
+        expect(home.providerPlayerId).toBe('CD_I297354');
+        expect(home.kicks).toBe(9);
+        expect(home.disposals).toBe(11);
+        expect(home.clearances).toBe(0);
+        // extendedStats is never projected into AflApiPlayerMatchStatsProjection, null or object-shaped alike.
+        expect((home as unknown as { extendedStats?: unknown }).extendedStats).toBeUndefined();
+        expect(observedColumns).toContain('playerStats.stats.extendedStats');
+      });
+
+      it('flattenObservedColumns() reports the bare parent path for a null extendedStats object', () => {
+        expect(flattenObservedColumns({ stats: { extendedStats: null } })).toEqual(['stats.extendedStats']);
+      });
+
+      it('keeps the existing object-shaped extendedStats fixture coverage intact (away side, unmutated)', () => {
+        const raw = readFixture('match/02-player-stats.raw.json');
+        raw.homeTeamPlayerStats[0].playerStats.stats.extendedStats = null;
+        const { records, observedColumns } = emitAflApiPlayerMatchStats(raw, registry, 'CD_M20260142801');
+        const away = records.find((r) => r.providerTeamId === 'CD_T20')!;
+        expect(away.providerPlayerId).toBe('CD_I500001');
+        expect(away.goals).toBe(3);
+        expect(observedColumns).toContain('playerStats.stats.extendedStats.effectiveKicks');
+      });
+
+      it('still fails closed on a genuinely undeclared sibling path alongside a null extendedStats parent', () => {
+        const raw = readFixture('match/02-player-stats.raw.json');
+        raw.homeTeamPlayerStats[0].playerStats.stats.extendedStats = null;
+        raw.homeTeamPlayerStats[0].playerStats.stats.somethingNew = 1.0;
+        expect(() => emitAflApiPlayerMatchStats(raw, registry, 'CD_M20260142801'))
+          .toThrow(/undeclared column\(s\).*somethingNew/);
+      });
+    });
   });
 
   describe('emitAflApiMatchRoster (§11.2) — narrowed observation + own-match score selection', () => {
