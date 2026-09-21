@@ -19,8 +19,7 @@
  *   --apply [--auto-apply]   the operational path.
  *   --report                 the exception report, read-only.
  */
-import { createHash } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -29,6 +28,11 @@ import postgres from 'postgres';
 import {
   parseAflApiIdentities, type AflApiIdentities,
 } from '../../src/lib/acquisition/afl-api-bundle';
+import {
+  aflApiSnapshotRoot,
+  aflApiUnitSourcesFrom,
+  verifyAflApiSnapshotManifest,
+} from '../../src/lib/acquisition/afl-api-snapshot';
 import {
   buildAflApiSettleBundle,
   runSettleAflApi,
@@ -39,7 +43,6 @@ import {
   type AflApiSettleBundle,
   type AflApiSettleCounters,
   type AflApiSettleRunResult,
-  type AflApiSettleUnitSource,
 } from '../../src/lib/acquisition/settle-afl-api';
 import {
   buildSettleExceptionReport,
@@ -60,10 +63,6 @@ import { SETTING_KEYS } from '../../src/lib/site-settings';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PROJECT_ROOT = join(__dirname, '..', '..');
-
-function snapshotRootOf(projectRoot: string): string {
-  return join(projectRoot, 'data', 'sources', 'afl_api', 'matches');
-}
 
 export type AflApiSettleCliArgs = {
   label: string;
@@ -127,70 +126,11 @@ function readJson(path: string): unknown {
   return JSON.parse(readFileSync(path, 'utf8'));
 }
 
-type ManifestFile = { file: string; sha256: string; status?: string };
-
-/**
- * Offline, fail-closed manifest verification (§5.4/§7.1 step 4): every file
- * the manifest names is re-hashed from disk, exactly as
- * `settle-afltables.ts`'s `loadBundle()` does for the AFL Tables snapshot. A
- * missing manifest or a hash mismatch refuses before any database connection
- * opens.
- */
-function verifyManifest(snapshotDir: string): { manifest: Record<string, unknown>; files: readonly ManifestFile[] } {
-  const manifestPath = join(snapshotDir, 'manifest.json');
-  if (!existsSync(manifestPath)) {
-    throw new Error(`No manifest.json under ${snapshotDir} — the acquisition did not complete (§5.4/§7.1).`);
-  }
-  const manifest = readJson(manifestPath) as {
-    source_key?: unknown; acquisition_kind?: unknown; season?: unknown; files?: unknown;
-  };
-  if (manifest.source_key !== 'afl_api') {
-    throw new Error(`manifest.json names source_key '${String(manifest.source_key)}', expected 'afl_api'.`);
-  }
-  if (manifest.acquisition_kind === 'afl_api_fixture_snapshot') {
-    throw new Error(
-      `'${snapshotDir}' is a --fixtures-only acquisition (acquisition_kind `
-      + "'afl_api_fixture_snapshot') and carries no player-stats.json/match-roster.json — this tool "
-      + "cannot settle it. Use 'settle-afl-api-fixtures.ts --label <snapshot> --apply' instead "
-      + '(AFLDB-ISSUE-228 S7 follow-up).',
-    );
-  }
-  const files = Array.isArray(manifest.files) ? (manifest.files as ManifestFile[]) : [];
-  for (const entry of files) {
-    if (entry.status === 'fixture_absent') continue;
-    const full = join(snapshotDir, entry.file);
-    if (!existsSync(full)) throw new Error(`Manifest names '${entry.file}' but it is not on disk.`);
-    const actual = createHash('sha256').update(readFileSync(full)).digest('hex');
-    if (actual !== entry.sha256) {
-      throw new Error(`'${entry.file}' has changed since acquisition (sha256 mismatch) — refusing to settle it.`);
-    }
-  }
-  return { manifest: manifest as Record<string, unknown>, files };
-}
-
-/**
- * Discover every acquired match directory (one per `CD_M...` provider id)
- * from the manifest's own file list, rather than re-listing the directory —
- * the manifest is the one proof of what acquisition actually wrote (§5.4).
- */
-function unitSourcesFrom(snapshotDir: string, files: readonly ManifestFile[]): AflApiSettleUnitSource[] {
-  const matchDirs = new Set<string>();
-  for (const entry of files) {
-    const parts = entry.file.split('/');
-    if (parts.length === 2 && parts[1] === 'fixture.json') matchDirs.add(parts[0]);
-  }
-  return [...matchDirs].sort().map((dir) => ({
-    fixtureRaw: readJson(join(snapshotDir, dir, 'fixture.json')),
-    rosterRaw: readJson(join(snapshotDir, dir, 'match-roster.json')),
-    playerStatsRaw: readJson(join(snapshotDir, dir, 'player-stats.json')),
-  }));
-}
-
 function loadBundle(
   projectRoot: string, label: string,
 ): { bundle: AflApiSettleBundle; inProgressSeasons: number[] } {
-  const snapshotDir = join(snapshotRootOf(projectRoot), label);
-  const { manifest, files } = verifyManifest(snapshotDir);
+  const snapshotDir = join(aflApiSnapshotRoot(projectRoot), label);
+  const { manifest, files } = verifyAflApiSnapshotManifest(snapshotDir);
   const season = manifest.season;
   if (typeof season !== 'number') throw new Error('manifest.json carries no numeric season.');
 
@@ -208,7 +148,7 @@ function loadBundle(
     ? seasons.in_progress_seasons.filter((year): year is number => typeof year === 'number')
     : [];
 
-  const sources = unitSourcesFrom(snapshotDir, files);
+  const sources = aflApiUnitSourcesFrom(snapshotDir, files);
   const bundle = buildAflApiSettleBundle({ season, snapshotLabel: label, sources, registry, identities });
   return { bundle, inProgressSeasons };
 }

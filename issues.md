@@ -39800,3 +39800,334 @@ pre-exists this task and was not reconciled here, per this task's narrow DEV-def
 - **State: S9 remains paused. S7 remains open. Assertion 9 (§9.9) remains open. Brownlow untouched
   (admin control and deployment gate both still Disabled). PROD untouched — no DB, migration, Git
   or deployment command was run for this fix.**
+
+### S9 — full-2026 player-identity evidence emitter (2026-09-21, implemented, UNEXECUTED)
+
+**Note:** appended at the tail of this append-only entry, same convention as the section above.
+CLAUDE.md §9 observed throughout: the assistant ran **no** test, `tsc`, database, network, Git,
+deployment or `data/sources/` command for this pass. Everything below is code + tests + tracking,
+ready for operator validation.
+
+#### Authoritative state this pass was given (operator-supplied evidence, not re-verified here)
+
+- Main repo clean at `27d7e5aa3bbde9c74e6774b0f9c2832abdfb0f0b`; DEV deployed at that exact commit.
+- Immutable real snapshot exists **on DEV only**: `afl-api-2026-2026-09-21-011148`, manifest
+  sha256 `dcbd0626e64a6fcf0ed9c73e910b8b83c10aae50a8552e69be172df184c33ecb` — **217 matches,
+  9,983 AFL API player-match rows, 669 distinct provider players, 0 missing provider ids.**
+- **First real S9 settle dry-run:** `unresolvedIdentityMatch 0`, **`unresolvedIdentityPlayer
+  9983`**, `corroboratedForeignOwned 215`, `sourceDisagreement 0`, `canonicalApplyFailures 0`,
+  Source completeness **INCOMPLETE**. The whole transaction was **rolled back; no apply
+  occurred**. DEV currently holds **0 `external_identities` rows for source `afl_api`** — which is
+  exactly why all 9,983 player rows were unresolved: the settle engine's runtime resolver is
+  trusted-external-identity-only and DEV has never been given that bridge.
+- **Current tracked trusted artefact union:** 396/669 provider ids covered, 6,824/9,983 rows
+  covered; 273 providers and 3,159 rows uncovered; 0 artefact contradictions.
+- **New read-only DEV census** (proved against `afldb_dev` under `default_transaction_read_only=on`):
+  `CANONICAL_MATCHES_2026 = 216`; `player_match_stats` 2026 — 9,063 rows across 215 matches, 577
+  distinct players; `null_jumper 0`, `nonstandard_jumper 0`, `duplicate_jumper_keys 0`,
+  `max_duplicate_jumper_group 0`, `incomplete_core_vector 0`, **`all_zero_core_vector 6`**.
+  Consequence recorded, not glossed: canonical evidence exists for 215 of the 217 snapshot matches
+  and there are **920 fewer canonical player-match rows than AFL API rows**, so 100% resolution is
+  NOT promised by this design; the duplicate-jumper and jumper-format hazards are not live in this
+  dataset but the all-zero single-match weakness **is** (6 canonical rows).
+
+#### Architecture decision
+
+**No second Python builder, and no generalisation of `build_afl_api_player_bridge.py`.** The S5
+Python builder stays exactly as it is (it is the accepted, operator-validated `afldb_test`
+bootstrap evidence and its artefact is immutable). Full-season evidence is instead emitted by a
+**thin TypeScript CLI over the already-validated S3/S6 snapshot → bundle → match-identity stack**,
+so match date/timezone, round translation, team identity, statistic parsing and canonical match
+identity are **reused, never re-derived** — there is no second timezone implementation anywhere in
+this pass. The runtime resolver `resolveAflApiPlayer()` is **not touched**; no name fallback, no
+fuzzy matching, no nickname inference exists in any file added here.
+
+**Stated precisely, not as blanket reuse:** the emitter calls `resolveAflApiMatch()` with
+`{ kind: 'run_enumeration', scope: NO_MATCH_REKEY_SCOPE }`, which is the settle path's own
+`afl_api` argument (ISSUE-131 retired-identity rekey SEARCH is disabled for `afl_api` and remains
+so). The retired-identity/rekey lookup is therefore **deliberately inert for this evidence
+emitter**: a canonical match whose only route is a retired-identity rekey will NOT resolve here
+and is reported `no_canonical_match`, exactly as the settle path would report it. That is a
+deliberate scope decision, not an accidental difference — this tool must not resolve a match by a
+route the settle engine itself refuses to use.
+
+#### What was implemented
+
+1. **`src/lib/acquisition/afl-api-snapshot.ts` (NEW).** The two previously-private snapshot helpers
+   of `tools/current-season/settle-afl-api.ts` — `verifyManifest()` and `unitSourcesFrom()` —
+   extracted and exported as `verifyAflApiSnapshotManifest()` / `aflApiUnitSourcesFrom()`, plus
+   `aflApiSnapshotRoot()` and a new `aflApiSnapshotManifestSha256()` for artefact provenance. A
+   **behaviour-preserving extraction, with the refusal messages pinned by tests** — same checks,
+   same ordering, same messages (including the `--fixtures-only` refusal), which
+   `tests/afl-api-player-evidence.test.ts` asserts so a future edit cannot drift them. (No
+   byte-identity claim is made: the extraction was not diffed line-for-line, and the tests, not a
+   diff, are what hold the behaviour.)
+2. **`tools/current-season/settle-afl-api.ts` (M).** Imports those helpers instead of defining
+   them. The `createHash`/`existsSync` imports and the now-unused `AflApiSettleUnitSource` type
+   import were dropped. **No settle behaviour changed.**
+3. **`src/lib/acquisition/afl-api-player-evidence.ts` (NEW).** Pure logic — no filesystem, no
+   database, no network, no clock. A faithful port of S5 §6.3 (a)–(d) with the same 13 core
+   columns, the same wider 20-column agreement set, the same `MIN_MATCHES_FOR_LINK = 2` /
+   `MIN_SINGLE_MATCH_AGREEMENT = 10` constants and the same rule ORDER ((a) → (b) → (c) → (d)),
+   plus the three S9 hardenings (below). Also carries the pure DSN/session guards, the
+   report-scoped census gate, the provider-id-set-only existing-claim comparison, and a
+   validation-only observed-name reader.
+4. **`tools/current-season/emit-afl-api-player-bridge.ts` (NEW).** The thin CLI:
+   manifest re-hash → `buildAflApiSettleBundle()` → `buildAflApiMatchIdentity()` →
+   `resolveAflApiMatch()` → read-only canonical `player_match_stats` → the pure engine → report
+   and/or artefact. `--validate-only` and `--out <path>` are mutually exclusive and one is
+   REQUIRED (no implicit output path). Optional `--expect-matches/--expect-rows/--expect-providers`
+   (all three or none) and repeatable `--compare-artefact <path>`.
+5. **`tests/afl-api-player-evidence.test.ts` (NEW).** DB-free, network-free contract tests (below).
+6. **`package.json` (M).** One script line: `emit:afl-api-player-bridge`.
+
+#### Matching contract (unweakened)
+
+Candidate discovery is **only** same resolved canonical match + same canonical club + same jumper
+number. A "matched match" requires all 13 core columns (`kicks, handballs, marks, tackles, goals,
+behinds, hitouts, frees_for, frees_against, inside_50s, clearances, rebounds, goal_assists`)
+non-NULL on BOTH sides and exactly equal. (a) one provider id → one player id; (b) one player id
+claimed by no other provider id (a shared id voids ALL claimants); (c) ≥2 matched matches, or 1
+match with ≥10 agreeing statistics; (d) normalised surname equality, **validation only** — it
+withholds, it never discovers. Rule (d) is **fail-closed**: `normaliseSurname()` renders an
+absent, empty or punctuation-only surname as `''`, and an empty normalisation on EITHER side —
+including BOTH sides — is a disagreement, never two equal empty strings. Only two equal
+**non-empty** normalised surnames pass.
+
+**MEASURED FINDING, recorded rather than assumed:** rule (c)'s single-match `≥10` clause is
+**structurally non-binding**. A hit already requires all 13 core columns non-NULL and equal, and
+core is a subset of the agreement set, so any hit carries **at least 13** agreeing statistics. The
+rule is retained unweakened (it is the accepted S5 contract and it is the correct floor if the
+core vector is ever narrowed), but S9 hardening C below is the only single-match gate that can
+actually withhold a hit. This is proved in the test suite, not asserted.
+
+#### Full-season hardenings
+
+- **A — duplicate canonical key.** If a match's canonical rows contain more than one row for the
+  same `(match_id, club_id, jumper_number)`, that match's **entire** evidence path is refused and
+  counted (`DUPLICATE_CANONICAL_JUMPER_KEYS`, plus a refused-match list). Never last-wins. Two
+  different clubs sharing a jumper number in the same match is NOT a duplicate and is not refused.
+- **B — jumper format.** Both sides normalise through one `normaliseJumperNumber()`. A value that
+  cannot be rendered back identically (`'07'`, `'7A'`, `'N/A'`, `'-1'`, `'1000'`, a non-integral
+  number) is `nonstandard`, reported under `NONSTANDARD_CANONICAL_JUMPERS` with player/club/raw
+  value, and a provider miss in a club that holds one is annotated
+  `no_canonical_row_at_jumper(nonstandard_canonical_jumper_present)` — never silently "no matching
+  player". An absent jumper is counted separately from a malformed one.
+- **C — all-zero single-match vector.** A provider whose ONLY evidence is a single exact match
+  whose core vector is all zeros stays **unresolved** (`ALL_ZERO_SINGLE_MATCH_WITHHELD`).
+  Multi-match handling is deliberately unchanged: one all-zero match alongside other qualifying
+  exact matches withholds nothing, and the linked row's `evidence_summary` says how many of its
+  matches were all-zero.
+
+#### Database safety
+
+Read-only, DEV-only, fail-closed, and **no PROD target, path or environment variable exists
+anywhere in the new code**. The DSN comes from **`AFLDB_DEV_DATABASE_URL`** only — the dedicated
+read-only DEV variable AFLDB-ISSUE-222's `bridge_import_gate.py --target dev` already established
+— never `AFLDB_IMPORT_DATABASE_URL` (the importer's elevated write role) and never
+`AFLDB_OWNER_DATABASE_URL` (migrations only). **A DSN is never accepted on argv** (an unknown flag
+is refused outright). The DSN's path must be exactly `/afldb_dev`, checked before connecting, and
+the refusal message never echoes the DSN or its password. The connection sets
+`default_transaction_read_only` as a **startup parameter** (so a pool reconnect cannot come back
+writable), and the LIVE session is then proven — `current_database() = 'afldb_dev'`,
+`transaction_read_only = 'on'`, `default_transaction_read_only = 'on'` — before any evidence
+statement runs, following the `tools/db/promotion-check.ts` `gateIdentity` convention (never the
+DSN string, never a hostname guess). The tool issues `SELECT` only: there is no INSERT, UPDATE,
+DELETE or DDL statement in the file.
+
+#### Artefact provenance and the cross-database question
+
+The artefact declares `built_from_database` (the **live-proven** database name, not a literal),
+`read_only: true`, `season`, `snapshot_label`, `snapshot_manifest_sha256`, and its own
+`match_method = 'afl_api_stat_vector_season'` — **deliberately distinct** from S5's
+`afl_api_stat_vector_bootstrap` and S5b's `afl_api_name_team_season_bootstrap`, so full-season
+DEV-bound evidence can never be mislabelled as, or merged with, either. Only **tracked**
+repository inputs (`data/reference/source-families.json`, `data/reference/afl-api-identities.json`)
+are SHA-pinned in `inputs`; the hundreds of untracked snapshot payloads are pinned by the single
+`snapshot_manifest_sha256`, which the manifest's own per-file hashes already bind. **The old
+immutable bridge artefacts are not modified, and nothing is imported to DEV by this pass.**
+`--compare-artefact` reports provider-ID-SET overlap only and stamps
+`existing_claim_comparison = unproved_cross_database_id_parity`: numeric `players.id` parity
+between `afldb_test` and `afldb_dev` has **not** been proven, so an equal id is not corroboration
+and an unequal id is not a contradiction, and neither is claimed. The new DEV evidence is not
+weakened by that unproved comparison.
+
+#### Classification scope and reporting
+
+**All 669 provider ids are classified**, not just the 273 currently uncovered — a provider seen
+only in a match that did not resolve canonically is still classified (`unresolved`, reason
+`match_unresolved(<reason>)`), so the DEV-bound evidence stands on its own.
+`--validate-only` prints `SNAPSHOT_MATCHES`, `SNAPSHOT_PLAYER_MATCH_ROWS`,
+`SNAPSHOT_DISTINCT_PROVIDER_PLAYERS`, `BUNDLE_BUILD_FAILURES`, `CANONICAL_MATCHES_RESOLVED`,
+`CANONICAL_MATCHES_UNRESOLVED`, `CANONICAL_PMS_ROWS_READ`, `PROVIDERS_LINKED`,
+`PROVIDERS_UNRESOLVED`, `PROVIDERS_CONTRADICTORY`,
+`PLAYER_MATCH_ROWS_COVERED_BY_LINKED_PROVIDERS`, `PLAYER_MATCH_ROWS_UNCOVERED`,
+`DUPLICATE_CANONICAL_JUMPER_KEYS`, `NONSTANDARD_CANONICAL_JUMPERS` and
+`ALL_ZERO_SINGLE_MATCH_WITHHELD`, plus one line per unresolved provider (provider id, observed
+name, snapshot row count, matched evidence count, reason) and the FULL competing candidate set for
+every contradiction. The acceptance census (217 / 9,983 / 669) is **supplied per run on the
+command line and is not a constant anywhere in the engine** — a test greps the module source to
+keep it that way — and a mismatch is a hard STOP **before any connection is opened**.
+
+#### Artefact write safety
+
+`--out` is explicit and mandatory when writing; there is no default path. A target that already
+exists with identical content (except `generated_utc`) is a no-op; **any real difference is a hard
+refusal**, nothing is ever silently overwritten. A `--out` path under `data/sources/` is refused
+outright. Serialisation sorts object keys recursively (a `JSON.stringify` replacer ARRAY was
+deliberately avoided — it filters keys at every nesting level, not just the top).
+
+#### Tests added (`tests/afl-api-player-evidence.test.ts`, DB-free)
+
+Two exact matches → linked; multi-match linking unaffected by one all-zero match; one provider →
+two players → contradictory with the full competing set; two providers → one player → both
+withheld; a single strong non-zero match → linked; the `≥10` floor retained and proved
+structurally non-binding; an all-zero single match → unresolved; a low-but-non-zero vector still
+links; a NULL core stat on either side → `core_stat_incomplete`, no hit; a value disagreement →
+`core_stat_mismatch`; same surname + different jumper → still a miss (no name-based discovery);
+surname disagreement → unresolved; accent/case/punctuation differences are not disagreements; a
+missing surname is a disagreement on either side and on BOTH sides (published-surname-absent,
+canonical-surname-absent, both absent, both empty, punctuation-only), never a silent pass, while
+two equal non-empty normalised surnames still link; duplicate canonical
+(club, jumper) → whole match refused, rows still counted; two clubs sharing a jumper → not
+refused; the full jumper-normalisation table; malformed canonical jumper reported and annotated;
+absent/malformed provider jumper reasons; absent vs malformed canonical counted separately;
+`provider_team_id_unknown`; providers seen only in unresolved matches still classified;
+determinism under input reordering and stable sort keys; census gate ungated/pass/mismatch and the
+no-hard-coded-figure guard; DSN and live-session guards including a "never echo the password"
+check and explicit `afldb_test`/`afldb_prod` refusals; the distinct `match_method`; the
+provider-ID-set-only comparison; the observed-name reader; and the moved snapshot helpers
+(manifest verification, unit discovery, all five refusal messages, `fixture_absent` skipping and
+the manifest sha256).
+
+#### Findings reported, NOT fixed in this pass (both out of the stated scope)
+
+1. **`import_afl_api_player_bridge.py` cannot import this artefact — and that is currently the
+   safe outcome.** Its `ALLOWED_MATCH_METHODS` does not contain `afl_api_stat_vector_season`, so
+   `load_artefact()` refuses. Before any DEV import is ever attempted the importer must gain that
+   method **and** a database-provenance check, because it hard-pins `REQUIRED_DATABASE =
+   'afldb_test'` and would otherwise be pointed at the wrong database for DEV-built ids.
+2. **Default-artefact-glob hazard.** `default_artefact_path()` globs
+   `data/reference/afl-api-player-bridge-*.json` and takes the LAST sorted entry. The preferred
+   filename `afl-api-player-bridge-2026-full-2026-09-21.json` sorts AFTER
+   `afl-api-player-bridge-2026-09-20.json`, so an operator running the importer **without**
+   `--artefact` would select the DEV-built artefact while connected to `afldb_test`. Finding (1)
+   blocks that today (the method is refused), but the glob should be narrowed or the importer
+   given an explicit provenance gate before finding (1) is resolved. **Until then, always pass
+   `--artefact` explicitly.**
+
+#### State after this pass
+
+**S9 remains STOPPED before any apply.** The emitter has **not** been run against DEV.
+`import_afl_api_player_bridge.py` is unchanged; no `--target dev` was added; the existing 396
+identities were **not** imported; `resolveAflApiPlayer()` is unchanged; nothing under
+`data/sources/` was touched. **PROD untouched. Brownlow/S7 untouched. Assertion 9 (§9.9) remains
+separately open.** `CHANGELOG.md` was deliberately not updated: this pass changes no application,
+search, data, admin, deployment or retained-validation behaviour — it adds an unexecuted
+evidence tool. The changelog entry belongs with the first accepted DEV evidence run.
+
+#### Validation status / next action
+
+Nothing here has been executed. Operator sequence: (1) `npx tsc --noEmit`; (2)
+`npx vitest run tests/afl-api-player-evidence.test.ts`; (3) the unregressed settle suites
+(`tests/afl-api-match.test.ts`, `tests/afl-api-settle-cli-gate.test.ts`,
+`tests/reference-data.test.ts`) to prove the snapshot-helper move is behaviour-neutral; (4) only
+then, on DEV, `AFLDB_DEV_DATABASE_URL` pointed at `afldb_dev` and
+`npm run emit:afl-api-player-bridge -- --label afl-api-2026-2026-09-21-011148 --validate-only
+--expect-matches 217 --expect-rows 9983 --expect-providers 669`.
+
+### S9 — pre-commit correction pass after independent review (2026-09-21, UNEXECUTED)
+
+CLAUDE.md §9 observed: the assistant ran **no** test, `tsc`, database, network, Git, deployment or
+`data/sources/` command for this pass either. The operator's own validation of the section above
+was green before it (`tsc --noEmit` PASS; `tests/afl-api-player-evidence.test.ts` 41/41; the
+affected AFL API regression set 193/193; `tests/python/afl_api_bridge_contract.py` all PASS;
+`git diff --check` PASS). The historical/operator evidence counters recorded above are unchanged.
+
+**Two blockers fixed.**
+
+1. **Rule (d) could fail OPEN when BOTH surnames were absent.**
+   `src/lib/acquisition/afl-api-player-evidence.ts` compared
+   `normaliseSurname(canonicalSurname) !== normaliseSurname(observedSurname)`, and
+   `normaliseSurname(null)` is `''` — so a pair with no surname on either side compared EQUAL and
+   linked with rule (d) never actually validated. Now fail-closed: an empty normalisation on the
+   canonical side, on the observed side, or on both is a disagreement; only two equal **non-empty**
+   normalised surnames pass. Candidate discovery is untouched and surname remains validation-only.
+   New DB-free cases in `tests/afl-api-player-evidence.test.ts`: observed absent + canonical
+   present; canonical absent + observed present; both absent (reason
+   `surname_disagrees(observed=null, canonical=null)`); both empty; punctuation-only on both sides;
+   and two equal non-empty normalised surnames still linking.
+2. **The emitter ignored `rosterDeferral`.** `tools/current-season/emit-afl-api-player-bridge.ts`
+   deferred on `bundle.matchDeferral` alone, but the settle path defers every
+   `player_match_stats` record on `bundle.matchDeferral ?? bundle.rosterDeferral`
+   (`buildAflApiSettleRecords()`'s `rosterOrMatchDeferral`, §7.3 (T3) table row 2). A CONCLUDED
+   fixture with a not-yet-CONCLUDED roster would therefore have contributed stat-vector identity
+   evidence from rows the settle path will not promote. The emitter now uses the same
+   `matchDeferral ?? rosterDeferral` rule and reports `deferred(<reason>)`, so the two cases stay
+   distinguishable. No second deferral rule was invented.
+
+**New DB-free test file `tests/afl-api-player-bridge-cli.test.ts`** (nothing opens a database, makes
+a network request or reads `data/sources/`; the deferral tests pass a `sql` handle that THROWS on
+any property access, so a regression that reached the database fails instead of connecting):
+`--validate-only` alone; `--out <path>` alone; both together refused; neither refused; a partial
+`--expect-*` set refused (all three shapes); all three accepted; an unknown flag refused
+(`--dsn`, `--apply`); `--out` under `data/sources/` refused (absolute, the directory itself, a
+nested snapshot path, and relative forms); legitimate siblings (`data/source-output/`,
+`data/reference/`, `data/sources-archive/`) NOT refused; an existing artefact identical except
+`generated_utc` is a no-op with the file byte-unchanged on disk; a materially different existing
+artefact is a hard refusal with the file byte-unchanged; a new write is recursively key-sorted and
+newline-terminated; a linked `candidate_player_id` survives serialisation as a **JSON number, not a
+string** (the postgres.js `int8`-as-text hazard); and both deferral shapes — `matchDeferral`, and
+`rosterDeferral` with `matchDeferral` null — contribute ZERO identity hits while their rows still
+count towards the snapshot census. `invokedDirectly` is unchanged.
+
+**Windows-safe `data/sources/` refusal.** `assertNotUnderDataSources()` compared resolved paths
+case-SENSITIVELY, so `data/Sources/foo.json` would have been accepted on the Windows workstation
+even though it is the same directory there. It now case-folds where the filesystem does
+(`PATH_COMPARISON_IS_CASE_INSENSITIVE`: win32/darwin; Linux, the supported runtime, stays
+case-sensitive because there `data/Sources/` genuinely is a different directory). Still resolved
+paths, and still an exact-directory-or-separator match, so `data/source-output/` and
+`data/reference/` are unaffected. The test asserts the correct behaviour on both platform classes.
+
+**N5 taken (small and local).** `indexCanonicalJumpers()` recorded a duplicated `(club, jumper)`
+key in `duplicateKeys` but left the last row in `byClubJumper`. The duplicated key is now DELETED
+from the lookup, so an ambiguous key cannot be matched even by a caller that forgets to check;
+`duplicateKeys` is still reported and the caller still refuses the whole match. Proved by a new
+assertion that `byClubJumper.has('10|7') === false` while an unambiguous key in the same index is
+untouched. No pipeline behaviour changes (hardening A already refused the match).
+
+**Wording corrected.** (i) The missing-surname claims now state the fail-closed both-absent
+behaviour. (ii) The "reuses the S3/S6 match-identity stack" claim now states accurately that the
+ISSUE-131 retired-identity/rekey lookup is **deliberately inert** for this emitter because
+`resolveAflApiMatch()` is called with `NO_MATCH_REKEY_SCOPE` (the settle path's own `afl_api`
+argument), so a match reachable only by a retired-identity rekey is reported `no_canonical_match`
+rather than resolved by a route the settle engine refuses to use. (iii) The
+`afl-api-snapshot.ts` extraction is no longer described as "verbatim"/"byte-identical" — it is a
+behaviour-preserving extraction with refusal messages pinned by tests, which is what the evidence
+actually supports. (iv) `normaliseJumperNumber()`'s doc comment wrongly listed `'  '` as
+`nonstandard`; whitespace is trimmed first, so a whitespace-only value is `absent`, and the comment
+now says so.
+
+**Deliberately NOT fixed in this pass** (non-blockers, left as reported): N2 differing
+`--validate-only` semantics across sibling CLIs; N3 the retired-identity difference beyond
+documenting it; N7 malformed-existing-JSON error presentation; N8 the `--label` cosmetic parsing
+issue; N9 the insertion-order comment. `import_afl_api_player_bridge.py` and
+`resolveAflApiPlayer()` were not modified.
+
+**Files changed:** `src/lib/acquisition/afl-api-player-evidence.ts` (M),
+`tools/current-season/emit-afl-api-player-bridge.ts` (M),
+`src/lib/acquisition/afl-api-snapshot.ts` (M, doc comment only),
+`tests/afl-api-player-evidence.test.ts` (M),
+`tests/afl-api-player-bridge-cli.test.ts` (NEW), `issues.md` (M), `IssuesIndex.md` (M).
+
+**State unchanged by this pass: S9 remains STOPPED before apply; the emitter is still UNEXECUTED on
+DEV; no identity import; PROD untouched; S7 separate and open; Assertion 9 (§9.9) separate and
+open.** `CHANGELOG.md` still deliberately not updated — no retained application, search, data,
+admin or deployment behaviour changed.
+
+**Operator validation for this correction pass:**
+
+1. `npx tsc --noEmit`
+2. `npx vitest run tests/afl-api-player-evidence.test.ts tests/afl-api-player-bridge-cli.test.ts`
+3. `npx vitest run tests/afl-api-match.test.ts tests/afl-api-settle-cli-gate.test.ts tests/reference-data.test.ts`
+4. `git diff --check`

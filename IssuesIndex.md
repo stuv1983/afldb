@@ -519,6 +519,98 @@
   missing-fixture SKIP rather than a silent PASS) and is a separate, still-open closeout item for
   ISSUE-228 as a whole, not tonight's Brownlow blocker. Full detail: `issues.md` "§9.10 —
   HISTORICAL CLOSEOUT" paragraph.
+  **S9 full-2026 player-identity evidence emitter, 2026-09-21 — implemented, UNEXECUTED
+  (CLAUDE.md §9: the assistant ran no test/tsc/DB/network/Git/deployment command, and touched
+  nothing under `data/sources/`).** Operator-supplied state this pass was built on: main clean at
+  `27d7e5aa`, DEV deployed at that exact commit; immutable DEV-only snapshot
+  `afl-api-2026-2026-09-21-011148` (manifest sha256 `dcbd0626…`) = **217 matches / 9,983 AFL API
+  player-match rows / 669 distinct provider players / 0 missing provider ids**; **first real S9
+  settle dry-run** = `unresolvedIdentityMatch 0`, **`unresolvedIdentityPlayer 9983`**,
+  `corroboratedForeignOwned 215`, `sourceDisagreement 0`, `canonicalApplyFailures 0`, Source
+  completeness **INCOMPLETE**, whole transaction **rolled back, no apply**; **DEV holds 0
+  `external_identities` rows for source `afl_api`** (the direct cause — the runtime resolver is
+  trusted-external-identity-only); existing tracked artefact union covers **396/669 providers and
+  6,824/9,983 rows** (273 / 3,159 uncovered, 0 contradictions); new read-only DEV census =
+  canonical 2026 matches **216**, `player_match_stats` **9,063 rows / 215 matches / 577 distinct
+  players**, null jumper 0, nonstandard jumper 0, duplicate jumper keys 0, incomplete core vector
+  0, **all-zero core vector 6**. Because canonical evidence exists for only 215 of 217 snapshot
+  matches and there are 920 fewer canonical rows than AFL API rows, **100% resolution is not
+  promised**. **Architecture decision:** no second Python builder and no generalisation of
+  `build_afl_api_player_bridge.py` — full-season evidence is emitted by a thin TypeScript CLI that
+  REUSES the validated S3/S6 snapshot/bundle/match-identity stack (manifest verification, unit
+  discovery, `buildAflApiSettleBundle()`, timezone/local-match-date proof, team identity,
+  `buildAflApiMatchIdentity()`, `resolveAflApiMatch()`), so no second timezone implementation
+  exists; `resolveAflApiPlayer()` is untouched; no name fallback, fuzzy matching or nickname
+  inference anywhere; the ISSUE-131 retired-identity/rekey lookup is **deliberately inert** here
+  (`resolveAflApiMatch()` is called with `NO_MATCH_REKEY_SCOPE`, the settle path's own `afl_api`
+  argument), so a match reachable only by a rekey is reported `no_canonical_match` rather than
+  resolved by a route the settle engine refuses to use. New
+  `src/lib/acquisition/afl-api-snapshot.ts` (a **behaviour-preserving extraction** of the settle
+  CLI's private `verifyManifest()`/`unitSourcesFrom()`, with the refusal messages pinned by test —
+  no byte-identity claimed — plus a manifest-sha256 helper); new pure
+  `src/lib/acquisition/afl-api-player-evidence.ts` (faithful S5 §6.3 (a)–(d) port, same 13 core
+  columns, same ≥2-matches / ≥10-agreeing-stats constants, same rule order, plus three hardenings:
+  **A** a duplicate canonical `(match, club, jumper)` key refuses that whole match's evidence path,
+  never last-wins; **B** explicit jumper normalisation with an unparseable value reported under its
+  own reason/counter, never a silent "no matching player"; **C** an all-zero core vector cannot
+  qualify a provider on single-match evidence alone, multi-match handling deliberately unchanged);
+  new CLI `tools/current-season/emit-afl-api-player-bridge.ts` (read-only `afldb_dev` via
+  **`AFLDB_DEV_DATABASE_URL`** only — never the importer's write role or the migration owner —
+  DSN never accepted on argv, `/afldb_dev` path checked before connecting, live
+  `current_database()`/`transaction_read_only`/`default_transaction_read_only` proven before any
+  statement, SELECT-only, no PROD target/path/env anywhere, `--validate-only` XOR explicit `--out`,
+  never writes under `data/sources/`, never silently overwrites); new DB-free
+  `tests/afl-api-player-evidence.test.ts`. Artefact carries its OWN `match_method =
+  'afl_api_stat_vector_season'` (never conflated with S5's `afl_api_stat_vector_bootstrap` or
+  S5b's `afl_api_name_team_season_bootstrap`), `built_from_database` from the live proof,
+  `read_only`, `season`, `snapshot_label`, `snapshot_manifest_sha256`, and
+  `existing_claim_comparison = unproved_cross_database_id_parity` — **numeric `players.id` parity
+  between `afldb_test` and `afldb_dev` has not been proven, so the old artefacts' candidate ids are
+  never compared numerically and the old artefacts are neither modified nor imported by this pass.**
+  **All 669 providers are classified**, not only the 273 uncovered. **Two measured findings
+  reported, not fixed (out of scope):** (1) the S5 rule-(c) single-match "≥10 agreeing statistics"
+  clause is **structurally non-binding** — a core-vector hit always carries ≥13 — so hardening C is
+  the only effective single-match gate (rule retained unweakened, proved in the suite); (2)
+  `import_afl_api_player_bridge.py` will refuse this artefact (its `ALLOWED_MATCH_METHODS` lacks the
+  new method) **and** its `default_artefact_path()` glob would, once that is fixed, select the
+  DEV-built artefact while hard-pinned to `afldb_test` — always pass `--artefact` explicitly, and
+  give the importer a database-provenance gate before adding the method. **S9 remains STOPPED
+  before apply; the emitter has NOT been run against DEV; `import_afl_api_player_bridge.py` is
+  unchanged; no `--target dev` added; the existing 396 identities were NOT imported; PROD
+  untouched; Brownlow/S7 untouched; Assertion 9 (§9.9) remains separately open.** `CHANGELOG.md`
+  deliberately not updated (no retained behaviour change yet). Full detail, exact operator
+  validation commands and the later DEV `--validate-only` command: `issues.md` "S9 — full-2026
+  player-identity evidence emitter" section.
+  **S9 pre-commit correction pass after independent review, 2026-09-21 (UNEXECUTED; the assistant
+  again ran no test/tsc/DB/network/Git/deployment command and touched nothing under
+  `data/sources/`).** Operator validation of the pass above was green first (`tsc` PASS, 41/41,
+  193/193, Python contract PASS, `git diff --check` PASS); no historical/operator evidence counter
+  was altered. **Two blockers fixed:** (1) rule (d) could fail OPEN — `normaliseSurname(null)` is
+  `''`, so two ABSENT surnames compared equal and linked a pair rule (d) never validated; it is now
+  fail-closed (empty normalisation on either side, or both, is a disagreement; only two equal
+  non-empty normalised surnames pass), with discovery untouched and surname still validation-only;
+  (2) the emitter deferred on `matchDeferral` alone while the settle path defers every
+  `player_match_stats` record on `matchDeferral ?? rosterDeferral` (§7.3 (T3) row 2), so a
+  CONCLUDED fixture with a non-CONCLUDED roster would have contributed identity evidence from rows
+  the settle path will not promote — the emitter now uses the same rule. **New DB-free
+  `tests/afl-api-player-bridge-cli.test.ts`** covering the argument contract (mode XOR, unknown
+  flag, all-or-nothing `--expect-*`), the `data/sources/` output guard, the never-silently-overwrite
+  artefact write, `candidate_player_id` serialising as a JSON **number** not a string (the
+  postgres.js `int8`-as-text hazard), and BOTH deferral shapes contributing zero identity hits (with
+  a `sql` handle that throws on any access, so a regression cannot quietly connect). **Windows-safe
+  output guard:** `assertNotUnderDataSources()` now case-folds resolved paths where the filesystem
+  does (win32/darwin), so `data/Sources/foo.json` is refused on the workstation while Linux keeps
+  case-sensitive semantics and `data/source-output/` / `data/reference/` stay allowed. **N5 taken:**
+  a duplicated canonical `(club, jumper)` key is now DELETED from `byClubJumper`, so it cannot be
+  looked up at all (still reported, caller still refuses the match). Wording corrected for the
+  fail-closed surname behaviour, the deliberately-inert rekey lookup, the "verbatim/byte-identical"
+  extraction claim and `normaliseJumperNumber()`'s whitespace handling. Non-blockers N2/N3/N7/N8/N9
+  deliberately left; `import_afl_api_player_bridge.py` and `resolveAflApiPlayer()` untouched.
+  **S9 still STOPPED before apply, emitter still unexecuted on DEV, no identity import, PROD
+  untouched, S7 separate, Assertion 9 separate/open.** Operator validation: `npx tsc --noEmit`;
+  `npx vitest run tests/afl-api-player-evidence.test.ts tests/afl-api-player-bridge-cli.test.ts`;
+  `npx vitest run tests/afl-api-match.test.ts tests/afl-api-settle-cli-gate.test.ts
+  tests/reference-data.test.ts`; `git diff --check`.
 - **Runbook:** `issues/open/AFLDB-ISSUE-228.md`.
 - **Key files:** `data/reference/source-families.json`, `src/lib/acquisition/source-families.ts`,
   `src/lib/acquisition/afl-api-rounds.ts` (new), `src/lib/acquisition/afl-api-client.ts` (new),
@@ -567,14 +659,25 @@
   `deploy/afldb-settle-afl-api.sh`/`.service`/`.timer` (new, S8), `deploy/afldb-settle-afl-api-brownlow.sh`/`.service`/`.timer`
   (new, S8), `src/lib/acquisition/settle-trigger.ts` (M, S8 unit table), `src/lib/acquisition/settle-status.ts`
   (M, S8), `src/db/queries/settle-runs.ts` (M, S8), `docs/acquisition/AFLDB-2026-BROWNLOW-LIVE-COUNT-RUNBOOK.md`
-  (new, S8), `tests/admin-current-season-settle.test.ts` (M, S8).
+  (new, S8), `tests/admin-current-season-settle.test.ts` (M, S8),
+  `src/lib/acquisition/afl-api-snapshot.ts` (new, S9 — the settle CLI's snapshot helpers, moved
+  verbatim), `tools/current-season/settle-afl-api.ts` (M, S9 — imports them instead of defining
+  them; no settle behaviour changed), `src/lib/acquisition/afl-api-player-evidence.ts` (new, S9 —
+  the pure evidence engine), `tools/current-season/emit-afl-api-player-bridge.ts` (new, S9 — the
+  read-only `afldb_dev` CLI), `tests/afl-api-player-evidence.test.ts` (new, S9),
+  `tests/afl-api-player-bridge-cli.test.ts` (new, S9 correction pass),
+  `package.json` (M, S9 — `emit:afl-api-player-bridge` script).
 - **Amended 2026-09-19:** Q1 co-source corroboration, Q2 field-scoped attendance enrichment
   and Q7 rollover corroborates-never-re-owns are **approved**; the player bridge is
   bootstrap-only with durable `afl_api` identities; hashing starts with empty exclusions
   (evidence-gated); POSTGAME becomes a deferred record (bundle v2), not a rejection; round
   translation is one per-season table in `afl-api-rounds.ts` with typed HALTs. Acceptance
   criteria: runbook §19.
-- **Next action:** Operator validation of the S7 snapshot-label collision fix —
+- **Next action:** Operator validation of the S9 pre-commit correction pass — `npx tsc --noEmit`;
+  `npx vitest run tests/afl-api-player-evidence.test.ts tests/afl-api-player-bridge-cli.test.ts`;
+  `npx vitest run tests/afl-api-match.test.ts tests/afl-api-settle-cli-gate.test.ts
+  tests/reference-data.test.ts`; `git diff --check`. Then operator validation of the S7
+  snapshot-label collision fix —
   `tsc --noEmit`; `npx vitest run tests/afl-api-brownlow-acquire.test.ts tests/afl-api-match.test.ts`
   — before the S7 end-to-end run below picks back up (that run is what surfaced the collision).
   Then operator validation of S7 (including the 2026-09-20 fixture-only identity
