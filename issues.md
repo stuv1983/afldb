@@ -39666,3 +39666,52 @@ Operator: (1) rerun the S3 backtest CLI and confirm it is still green; (2)
 (3) apply migration 103 to `afldb_test` only (never `afldb_dev` or production) and confirm it applies
 cleanly; (4) only then mark S4 complete and proceed to S5 (player bridge). Capture the 2026 Brownlow
 feeds with the standalone monitor for later replay (runbook §10) if the live count is still running.
+
+### DEV acceptance defect: ingestion-switch admin panel persistence (2026-09-21, code fix + tests only)
+
+**Note:** this section is appended at the current tail of a long, append-only entry. The S1–S8
+implementation narrative above this point in the file predates the 2026-09-21 S8/documentation-pass/
+Settle-CLI-gate updates already recorded in `IssuesIndex.md`'s ISSUE-228 entry; that divergence
+pre-exists this task and was not reconciled here, per this task's narrow DEV-defect scope.
+
+- **Observed on DEV:** the new `/admin/current-season` AFL API ingestion panel rendered correctly
+  (initial state: current-season and both Brownlow gates Disabled). Clicking "Enable" for AFL API
+  current-season ingestion showed a success message and "Enabled" immediately, but a normal browser
+  refresh reverted the display to "Disabled". Brownlow was never touched and stayed Disabled
+  throughout. **S9 remained paused pending this investigation**, per the operator's instruction.
+- **Root cause (confirmed by code inspection, not assumption):**
+  `readAflApiIngestionAdminView()` in `src/app/admin/current-season/actions.ts` read the
+  `site_settings` row and compared its raw driver value with a bare `byKey.get(key) === true`.
+  jsonb arrives as raw TEXT on this project's postgres.js client — the same documented hazard as
+  `src/lib/site-settings.ts`'s `fromStore()`, `src/db/queries/awards.ts:227`,
+  `src/db/queries/early-access.ts:57` and `src/db/queries/site-content.ts:38` — so a stored jsonb
+  `true` reads back as the JS string `'true'`, which a strict `=== true` can never match. The
+  write path (`writeIngestionSwitch`, same file) was always correct: it casts
+  `${JSON.stringify(enabled)}::jsonb` and persists the row exactly as intended, confirmed by
+  migration 034's `GRANT SELECT, INSERT, UPDATE ON site_settings TO afldb_auth`, the same role/
+  connection (`authSql` / `AFLDB_AUTH_DATABASE_URL`) both the write and this admin-view read use —
+  there was never a role, connection or key/literal mismatch. The separate CLI/systemd enforcement
+  read, `readAflApiIngestionControls()` in `src/lib/acquisition/afl-api-ingestion-control.ts`,
+  already normalised correctly via `parseSiteSettings()`/`parseBooleanSetting()`, matching the
+  established pattern `src/db/queries/site-settings.ts`'s `getSiteSettingsForAdmin()` uses. Only
+  this one admin-panel read re-derived its own unsafe comparison instead of reusing that pattern —
+  meaning the enable actually persisted and would have been correctly enforced fail-closed-`true` by
+  the real acquire/settle gate, while the admin UI itself misreported it as Disabled after every
+  refresh. Next.js caching/`revalidatePath` was checked and ruled out: the page is
+  `dynamic = 'force-dynamic'` and the defect reproduces identically on a fresh, uncached read.
+- **Fix:** `readAflApiIngestionAdminView()` now calls `parseSiteSettings(rows)` (imported from
+  `@/lib/site-settings`) and reads `settings.aflApiCurrentSeasonEnabled` /
+  `settings.aflApiBrownlowEnabled` instead of comparing the raw row value directly — the same
+  normalisation every other `site_settings` boolean in this codebase already goes through.
+- **Files changed:** `src/app/admin/current-season/actions.ts` (fix);
+  `tests/admin-current-season-settle.test.ts` (new regression coverage: mocks `@/db/authClient`'s
+  `authSql` with an in-memory store that round-trips values as raw jsonb TEXT, the same shape the
+  real driver returns, so a reintroduced bare `=== true`/`=== 'true'` comparison fails the test the
+  same way it failed on DEV; covers enable read-back, disable read-back, the fail-closed
+  no-row-yet case, and current-season/Brownlow independence).
+- **Validation status:** `npx vitest run tests/admin-current-season-settle.test.ts` has **not yet
+  been run by the operator** (CLAUDE.md §9). `npx tsc --noEmit` has likewise not been run against
+  this change. Both are the next required step before this fix is trusted.
+- **State: S9 remains paused. S7 remains open. Assertion 9 (§9.9) remains open. Brownlow untouched
+  (admin control and deployment gate both still Disabled). PROD untouched — no DB, migration, Git
+  or deployment command was run for this fix.**

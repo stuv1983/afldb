@@ -57,6 +57,20 @@
   validate-only/report exemptions, the Brownlow two-key combinations, and one real fail-closed
   `readAflApiIngestionControls({})` result reaching a wrapper. No runtime code changed. **S9
   remains paused, S7 remains open, Assertion 9 remains separately open, PROD remains untouched.**
+  **DEV acceptance defect found and fixed, 2026-09-21 (code fix + tests only; no DB/migration/
+  Git/deployment command run):** enabling AFL API current-season ingestion on DEV showed
+  "enabled" immediately but reverted to "Disabled" on a hard refresh. Root cause:
+  `readAflApiIngestionAdminView()` (`src/app/admin/current-season/actions.ts`) compared the raw
+  `site_settings.value` row with a bare `=== true`; jsonb arrives as raw TEXT on this project's
+  postgres.js client, so a stored `true` reads back as the string `'true'`, which never matches —
+  the write (`writeIngestionSwitch`) and the enforcement read
+  (`readAflApiIngestionControls`, which already used `parseSiteSettings()`) were both correct the
+  whole time; only this one admin-view read was broken, matching the exact "saving changes
+  nothing" hazard `fromStore()` documents. Fixed by routing the read through
+  `parseSiteSettings()`, the same established pattern `getSiteSettingsForAdmin()` uses. New
+  regression coverage in `tests/admin-current-season-settle.test.ts` simulates the raw-text jsonb
+  round trip so a reintroduced bare `=== true` fails the same way again. **S9 remains paused, S7
+  remains open, Assertion 9 remains separately open, Brownlow untouched, PROD untouched.**
   See `issues.md` for full detail. All work is
   uncommitted, branch `sonnet/issue-228`. Implementation history (Sonnet 5, same worktree) —
   **Stages S1, S2, S3 done, all uncommitted** —

@@ -20,7 +20,7 @@ import { readSettleRunStatus, type SettleRunStatus } from '@/lib/acquisition/set
 import { SETTLE_UNIT, startSettleRun } from '@/lib/acquisition/settle-trigger';
 import { authSql } from '@/db/authClient';
 import { audit, requireCapability } from '@/lib/auth/session';
-import { SETTING_KEYS } from '@/lib/site-settings';
+import { parseSiteSettings, SETTING_KEYS } from '@/lib/site-settings';
 
 export type CurrentSeasonAdminState = {
   error?: string;
@@ -255,19 +255,28 @@ export type AflApiIngestionAdminView = {
   brownlow: AflApiBrownlowEffectiveState;
 };
 
-/** Read for the page's initial render and the panel's own refresh. */
+/**
+ * Read for the page's initial render and the panel's own refresh.
+ *
+ * AFLDB-ISSUE-228 — must go through `parseSiteSettings()`, not a bare
+ * `=== true` on the raw row value. jsonb arrives as raw TEXT on this
+ * project's client (see `src/lib/site-settings.ts` `fromStore()`, and the
+ * same note in `awards.ts`/`early-access.ts`/`site-content.ts`): an
+ * enabled row reads back as the STRING `'true'`, which a bare `=== true`
+ * can never match. That silently pinned this view to "disabled" no matter
+ * what was actually stored — the switch persisted correctly the whole
+ * time, but this read could never show it.
+ */
 export async function readAflApiIngestionAdminView(): Promise<AflApiIngestionAdminView> {
   await requireCapability('acquisition.currentSeason');
   const rows = await authSql<{ key: string; value: unknown }[]>`
     SELECT key, value FROM site_settings
      WHERE key IN (${SETTING_KEYS.aflApiCurrentSeasonEnabled}, ${SETTING_KEYS.aflApiBrownlowEnabled})
   `;
-  const byKey = new Map(rows.map((row) => [row.key, row.value]));
-  const currentSeasonEnabled = byKey.get(SETTING_KEYS.aflApiCurrentSeasonEnabled) === true;
-  const brownlowAdminEnabled = byKey.get(SETTING_KEYS.aflApiBrownlowEnabled) === true;
+  const settings = parseSiteSettings(rows);
   return {
-    currentSeasonEnabled,
-    brownlow: combineAflApiBrownlowGates(isAflApiBrownlowEnabled(), brownlowAdminEnabled),
+    currentSeasonEnabled: settings.aflApiCurrentSeasonEnabled,
+    brownlow: combineAflApiBrownlowGates(isAflApiBrownlowEnabled(), settings.aflApiBrownlowEnabled),
   };
 }
 

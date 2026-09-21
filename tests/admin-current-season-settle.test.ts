@@ -25,6 +25,11 @@ const mocks = vi.hoisted(() => ({
   startSettleRun: vi.fn(),
   readSettleRunStatus: vi.fn(),
   getLatestSettleRun: vi.fn(),
+  authSql: vi.fn(),
+}));
+
+vi.mock('@/db/authClient', () => ({
+  authSql: mocks.authSql,
 }));
 
 vi.mock('@/lib/auth/session', () => ({
@@ -66,9 +71,12 @@ vi.mock('@/db/queries/settle-runs', async (importOriginal) => ({
 }));
 
 import {
+  readAflApiIngestionAdminView,
   refreshSettleRunStatusAction,
+  setAflApiCurrentSeasonIngestionAction,
   startSettleRunAction,
 } from '@/app/admin/current-season/actions';
+import { SETTING_KEYS } from '@/lib/site-settings';
 import {
   extractSettleCounters,
   parseSettleBatchNote,
@@ -593,5 +601,94 @@ describe('AFLDB-ISSUE-128 — provider precedence and completeness on the admin 
     expect(actions).toContain('const insertMissingMatches = false;');
     expect(actions).not.toMatch(/insertMissingMatches\s*[:=]\s*true/);
     expect(actions).not.toMatch(/insertMissingMatches\s*[:=]\s*formData/);
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * AFLDB-ISSUE-228 follow-up — AFL API ingestion switch persistence
+ * ------------------------------------------------------------------ *
+ * DEV acceptance defect: enabling the current-season switch showed
+ * "enabled" immediately (the optimistic client update), but reverted to
+ * "Disabled" on a hard refresh even though the row was written correctly.
+ *
+ * Root cause: `readAflApiIngestionAdminView()` compared the raw row value
+ * with a bare `=== true`. jsonb arrives as raw TEXT on this project's
+ * postgres.js client (`src/lib/site-settings.ts` `fromStore()`, and the
+ * same documented hazard in `awards.ts`/`early-access.ts`/`site-content.ts`)
+ * -- a stored `true` reads back as the STRING `'true'`, which `=== true`
+ * can never match. `writeIngestionSwitch()` itself was always correct; only
+ * this read-back was broken, and the fix is routing it through
+ * `parseSiteSettings()` like every other admin settings read
+ * (`getSiteSettingsForAdmin()`) instead of re-deriving its own comparison.
+ *
+ * These tests simulate that raw-text round trip explicitly, so a regression
+ * back to a bare `=== true`/`=== 'true'` comparison fails here the same way
+ * it failed on DEV, without needing a live database.
+ */
+describe('AFL API ingestion switch read-back (AFLDB-ISSUE-228 persistence defect)', () => {
+  /**
+   * Stands in for `site_settings`, storing each value as the raw jsonb TEXT
+   * a real write produces (`JSON.stringify(enabled)`, e.g. the 4-character
+   * string `"true"`) rather than a decoded JS boolean -- reproducing the
+   * exact shape this project's postgres.js client hands back.
+   */
+  function mockSiteSettingsTable(initial: Record<string, string> = {}) {
+    const rows = new Map<string, string>(Object.entries(initial));
+    mocks.authSql.mockImplementation((strings: TemplateStringsArray, ...values: unknown[]) => {
+      const sql = strings.join(' ');
+      if (sql.includes('SELECT')) {
+        const keys = values as string[];
+        return Promise.resolve(
+          keys.filter((key) => rows.has(key)).map((key) => ({ key, value: rows.get(key) })),
+        );
+      }
+      if (sql.includes('INSERT')) {
+        const [key, value] = values as [string, string, number];
+        rows.set(key, value);
+        return Promise.resolve([]);
+      }
+      throw new Error(`Unexpected authSql call in this test: ${sql}`);
+    });
+    return rows;
+  }
+
+  beforeEach(() => {
+    mocks.authSql.mockReset();
+  });
+
+  it('reads a freshly-enabled switch back as enabled', async () => {
+    mockSiteSettingsTable();
+
+    const write = await setAflApiCurrentSeasonIngestionAction(true);
+    expect(write.error).toBeUndefined();
+
+    const view = await readAflApiIngestionAdminView();
+    expect(view.currentSeasonEnabled).toBe(true);
+  });
+
+  it('reads an explicit disable back as disabled after having been enabled', async () => {
+    mockSiteSettingsTable({ [SETTING_KEYS.aflApiCurrentSeasonEnabled]: 'true' });
+
+    const write = await setAflApiCurrentSeasonIngestionAction(false);
+    expect(write.error).toBeUndefined();
+
+    const view = await readAflApiIngestionAdminView();
+    expect(view.currentSeasonEnabled).toBe(false);
+  });
+
+  it('reads disabled when no row has ever been written (fail closed)', async () => {
+    mockSiteSettingsTable();
+
+    const view = await readAflApiIngestionAdminView();
+    expect(view.currentSeasonEnabled).toBe(false);
+    expect(view.brownlow.adminEnabled).toBe(false);
+  });
+
+  it('does not let an enabled current-season switch leak into the independent Brownlow admin flag', async () => {
+    mockSiteSettingsTable({ [SETTING_KEYS.aflApiCurrentSeasonEnabled]: 'true' });
+
+    const view = await readAflApiIngestionAdminView();
+    expect(view.currentSeasonEnabled).toBe(true);
+    expect(view.brownlow.adminEnabled).toBe(false);
   });
 });
