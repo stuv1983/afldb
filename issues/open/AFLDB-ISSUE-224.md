@@ -2392,3 +2392,91 @@ execute the `--apply` code path against DEV**, which does not exist today — `p
 `--apply` for `--target dev` unconditionally (§18.2.2) and enabling it is a deliberate, separate
 code change, not a flag on this command. ISSUE-224 remains BLOCKED per §18.1.6. `afldb_dev` remains
 unwritten.
+
+## §18.4 — Explicit DEV write authorisation gate implemented (2026-09-22, NOT RUN)
+
+This pass replaces §18.2.2/§18.3's unconditional `--apply` refusal for `--target dev` with an
+explicit, issue-specific gate. **No database connection was opened in this pass. No DEV write has
+occurred.** `afldb_dev` remains at the state proven in §18.3.
+
+### 18.4.1 The gate (`register_issue224_s9_players.ts`, `parseArgs`)
+
+`--target dev --apply` is refused unless ALL of the following are also present, checked in this
+order, each with its own refusal message, before any database connection is opened:
+
+1. `--dev-import-role` — without it: `REFUSED: --target dev --apply requires --dev-import-role`.
+2. `--allow-dev-write` — the explicit, issue-specific authorisation; without it: `REFUSED:
+   --target dev --apply requires --allow-dev-write`. Passing `--allow-dev-write` with
+   `--target test` is itself refused (invalid there, per this pass's brief).
+3. `--backup-sha256 <value>` — absent: `REFUSED: ... requires --backup-sha256 <64-hex>`; present
+   but not exactly 64 hex characters: `REFUSED: --backup-sha256 must be exactly 64 hexadecimal
+   characters`. This is an **operator acknowledgement, not proof** — the runner cannot itself
+   verify a remote dump exists — and only a shortened form (`slice(0, 12)…`) is ever printed to
+   the console; the full value and no DSN/credential is ever logged. No SHA is hard-coded in
+   source; the operator supplies the freshly verified pre-write backup hash at execution time.
+
+`--target test` behaviour is completely unchanged (still unconditionally writable via the import
+role); `--target dev` with no `--apply`, or `--apply` missing any one of the three flags above,
+still runs the existing read-only preflight census exactly as in §18.1.4/§18.3.
+
+### 18.4.2 Database/role gate and pre-write re-classification (Task 2/3)
+
+Unchanged from §18.2.2/§18.3: `resolveTarget()` still requires the connected session to prove
+`current_database() = 'afldb_dev'` and `current_user = 'afldb_import'` before anything else. New
+for this pass: when the full DEV write gate passes, the connection additionally becomes writable
+(`default_transaction_read_only` no longer forced on) — this is the only path in the tool that
+can ever open a non-read-only DEV connection.
+
+Inside the same transaction that performs the writes, `--target dev --apply` re-classifies the 92
+target rows against live state and requires the result to come back **exactly**
+`CREATE=92 / ALREADY_SATISFIED=0 / CONFLICT=0 / TOTAL=92` — any drift throws and rolls back before
+a single row is written. This is strictly additional to, not a replacement for, the general
+"any CONFLICT refuses the whole batch" rule shared with `--target test`; `--target test`'s
+existing idempotent behaviour (tolerating `ALREADY_SATISFIED > 0`) is unchanged.
+
+### 18.4.3 Write and post-write postconditions (Task 4/5)
+
+Task 4 (`createPlayerInTransaction` + `attachAflTablesIdentityInTransaction`, one outer
+transaction, no `afl_api` identity attach) is unchanged from §18.1.1 — the DEV path reuses the
+identical write loop as `--target test`.
+
+New: when the DEV gate is engaged, after all 92 writes and before commit, `runDevPostWriteChecks`
+verifies, inside the same transaction: all 92 target AFL Tables identities resolve to a player; 92
+distinct canonical `player_id`s (no identity double-claimed); no duplicate `slug` among the 92
+new players; `players` row count increased by exactly 92 (which, combined with exactly 92 created
+ids, also proves no non-target player was created); 92 `player_career_stats` rows exist for the
+new players; 92 `data_overrides` durability rows carry the attached `afltables_profile_path`; 92
+`data_edits` audit rows exist for the `source_identity` field group. Any failure throws and rolls
+back all 92 writes. This closes the "duplicate slug" evidence gap the §18.3 read-only preflight
+could not close (§18.3, "Duplicate slug guard: does not apply to this pass; not run").
+
+### 18.4.4 Validation this pass (no database connection)
+
+- `npx tsc --noEmit -p tsconfig.json` — clean, 0 errors.
+- New DB-free suite `tests/register-issue224-s9-dev-write-gate.test.ts` (22 tests, all passing):
+  covers each individual missing-flag refusal, malformed-SHA refusals (short, long, non-hex,
+  empty), the full valid DEV-apply combination parsing cleanly, `--allow-dev-write`/
+  `--backup-sha256` being refused under `--target test`, `--target test` retaining its existing
+  unconditional-`--apply` behaviour, no-PROD-target refusal, and `resolveTarget`'s
+  read-only-vs-writable `TargetConfig` shape under every `(target, devImportRole,
+  writeAuthorized)` combination — including the prod-like-path refusal. `parseArgs`/
+  `resolveTarget` are exported for this; `main()`'s own invocation is now guarded behind an
+  entrypoint check so importing the module for these exports never runs the CLI.
+- No SQL, no DEV/`afldb_test` connection, no settle, no bridge rebuild/import, no
+  deployment/`systemctl`, no git commit — all boundaries for this pass held.
+
+### 18.4.5 Proposed final DEV command — NOT RUN
+
+```
+npx tsx --conditions=react-server \
+  tools/rebuild/draftguru/register_issue224_s9_players.ts \
+  --admin-user-id 4 --target dev --dev-import-role --apply --allow-dev-write \
+  --backup-sha256 <64-hex-from-a-freshly-verified-pre-write-backup>
+```
+
+### 18.4.6 Status
+
+**D-8 step 1 is NOT complete.** The gate is implemented and validated DB-free only. Executing it
+against `afldb_dev` requires the operator to take a fresh pre-write backup, independently verify
+it, and supply its real sha256 — none of which happened in this pass. ISSUE-224 remains BLOCKED
+per §18.1.6/§18.3.1.

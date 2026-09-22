@@ -23,11 +23,23 @@
  *
  * Safety
  * ------
- * DEFAULT is read-only classification (no `--apply`). `--apply` is required to write, and is
- * refused outright for `--target dev` — this pass registers to `afldb_test` only; DEV gets a
- * read-only preflight census. There is no PROD target: `resolveTarget()` recognises exactly
- * `test` -> afldb_test and `dev` -> afldb_dev, and refuses a DSN whose path is not exactly
- * that database name (and, belt-and-braces, anything that looks like a prod name).
+ * DEFAULT is read-only classification (no `--apply`). `--apply` is required to write. For
+ * `--target test` this is unchanged: `--apply` writes to `afldb_test` under the ordinary
+ * idempotent CREATE/ALREADY_SATISFIED/CONFLICT rule. For `--target dev`, `--apply` is refused
+ * unless ALL of `--dev-import-role`, `--allow-dev-write` and `--backup-sha256 <64-hex>` are
+ * also present (the explicit DEV write authorisation gate, ISSUE-224 S9 unblock) — see
+ * `parseArgs`. Absent that full combination, DEV stays a read-only preflight census exactly as
+ * before. There is no PROD target: `resolveTarget()` recognises exactly `test` -> afldb_test and
+ * `dev` -> afldb_dev, and refuses a DSN whose path is not exactly that database name (and,
+ * belt-and-braces, anything that looks like a prod name).
+ *
+ * A DEV apply additionally requires, inside the same write transaction and before any row is
+ * written, that re-classification against live `afldb_dev` state come back exactly
+ * CREATE=92 / ALREADY_SATISFIED=0 / CONFLICT=0 — the deliberate first-apply gate for this batch
+ * (Task 3). Any drift from that exact shape refuses and rolls back. After the 92 writes and
+ * before commit, a battery of postconditions (identity resolution, distinct player ids, slug
+ * uniqueness, row counts, durability/audit rows) must all hold or the whole transaction is
+ * rolled back (Task 5).
  *
  * Classification (CREATE / ALREADY_SATISFIED / CONFLICT) is computed from `external_identities`
  * inside the SAME transaction as the writes in `--apply` mode, so the decision that is reported
@@ -37,7 +49,8 @@
  * Usage
  * -----
  *   npx tsx --conditions=react-server tools/rebuild/draftguru/register_issue224_s9_players.ts \
- *     --admin-user-id <n> [--target test|dev] [--dev-import-role] [--apply]
+ *     --admin-user-id <n> [--target test|dev] [--dev-import-role] [--apply] \
+ *     [--allow-dev-write] [--backup-sha256 <64-hex>]
  *
  * `--conditions=react-server` is required (matches `match:backtest` / `records:first-kick-goal`
  * in package.json): every canonical primitive this tool imports carries `import 'server-only'`,
@@ -48,8 +61,17 @@
  * instead connects via the separate, purpose-built `AFLDB_DEV_IMPORT_DATABASE_URL` as the
  * elevated `afldb_import` role, needed for the AFLDB-ISSUE-160 D-2 manual-shell collision guard
  * (`data_overrides` SELECT is `afldb_import`-only, migration 073). There is no fallback between
- * the two variables. Both DEV modes remain read-only preflight: `--apply` is refused for
- * `--target dev` regardless of `--dev-import-role` (ISSUE-224 S9 boundary: no DEV writes yet).
+ * the two variables.
+ *
+ * `--target dev --apply` is refused UNLESS `--dev-import-role`, `--allow-dev-write` and
+ * `--backup-sha256 <64-hex>` are ALL also present (`parseArgs`). `--allow-dev-write` is the
+ * explicit, issue-specific DEV write authorisation; it is invalid (refused) with `--target test`.
+ * `--backup-sha256` is an operator acknowledgement that a pre-write DEV backup has been taken and
+ * independently verified — this runner cannot itself prove the remote dump exists, so it only
+ * validates the value's shape (64 hex characters) and echoes a shortened form back, never the
+ * full value or any credential. Any DEV apply invocation missing one of these, or supplying a
+ * malformed `--backup-sha256`, is refused before any database connection is opened. Without the
+ * full combination, `--target dev` remains a read-only preflight census exactly as before.
  */
 
 import { createHash } from 'node:crypto';
@@ -79,7 +101,7 @@ const PINNED_TARGET_SET_SHA256 =
 const PINNED_DECISION_SHA256 =
   'a795c987ca62cf879cb2ecc3bb61d9e1533eae84882956c442ff252de307be3d';
 
-const EXPECTED_ROW_COUNT = 92;
+export const EXPECTED_ROW_COUNT = 92;
 
 const NOTE = (providerId: string) =>
   `AFLDB-ISSUE-224 S9 batch registration (D-7 approved 2026-09-22); `
@@ -359,7 +381,7 @@ function printReport(classification: Classification[], heading: string, warnings
 // Database targets — closed list, no PROD entry (Task boundaries)
 // ---------------------------------------------------------------------------
 
-type TargetName = 'test' | 'dev';
+export type TargetName = 'test' | 'dev';
 
 type TargetConfig = {
   dsn: string;
@@ -376,7 +398,14 @@ function assertNotProdLike(databasePath: string): void {
   }
 }
 
-function resolveTarget(target: TargetName, devImportRole: boolean): TargetConfig {
+/**
+ * `writeAuthorized` is true only when `--target dev --apply` passed the full explicit gate in
+ * `parseArgs` (`--dev-import-role` + `--allow-dev-write` + valid `--backup-sha256`). It is
+ * ignored for `--target test` (unchanged: always writable via the import role) and for the
+ * ordinary, non-import-role DEV connection (always read-only regardless — `--apply` on that path
+ * is unreachable because `parseArgs` requires `--dev-import-role` for any DEV apply).
+ */
+export function resolveTarget(target: TargetName, devImportRole: boolean, writeAuthorized: boolean): TargetConfig {
   if (target === 'test') {
     const dsn = process.env.AFLDB_TEST_IMPORT_DATABASE_URL;
     if (!dsn) throw new Error('AFLDB_TEST_IMPORT_DATABASE_URL is not set.');
@@ -396,7 +425,9 @@ function resolveTarget(target: TargetName, devImportRole: boolean): TargetConfig
       if (path !== 'afldb_dev') {
         throw new Error(`AFLDB_DEV_IMPORT_DATABASE_URL does not target /afldb_dev (observed /${path}).`);
       }
-      return { dsn, requiredDatabase: 'afldb_dev', requiredUser: 'afldb_import', readOnly: true, canApply: false };
+      return writeAuthorized
+        ? { dsn, requiredDatabase: 'afldb_dev', requiredUser: 'afldb_import', readOnly: false, canApply: true }
+        : { dsn, requiredDatabase: 'afldb_dev', requiredUser: 'afldb_import', readOnly: true, canApply: false };
     }
     const dsn = process.env.AFLDB_DEV_DATABASE_URL;
     if (!dsn) throw new Error('AFLDB_DEV_DATABASE_URL is not set.');
@@ -409,22 +440,161 @@ function resolveTarget(target: TargetName, devImportRole: boolean): TargetConfig
 }
 
 // ---------------------------------------------------------------------------
+// DEV post-write integrity checks (Task 5) — run inside the write transaction,
+// after all 92 writes and BEFORE commit. Any failure throws, which rolls the
+// whole transaction (all 92 rows) back. Not run for --target test: the exact
+// numeric shape here (EXPECTED_ROW_COUNT, not "however many CREATEd") is the
+// deliberate DEV first-apply gate for this batch, not a general-purpose check.
+// ---------------------------------------------------------------------------
+
+async function runDevPostWriteChecks(
+  tx: postgres.TransactionSql,
+  targets: Target[],
+  created: { profilePath: string; playerId: number }[],
+  beforePlayerCount: number,
+): Promise<string[]> {
+  const results: string[] = [];
+  const paths = targets.map((t) => t.profilePath);
+  const createdIds = created.map((c) => c.playerId);
+
+  if (createdIds.length !== EXPECTED_ROW_COUNT) {
+    throw new Error(
+      `postcondition failed: ${createdIds.length} player(s) were created, expected exactly `
+      + `${EXPECTED_ROW_COUNT}.`,
+    );
+  }
+
+  // 92 target AFL Tables identities resolve, each to a distinct player, and no target identity
+  // is claimed by more than one player.
+  const identities = await tx<{ externalId: string; playerId: number | null }[]>`
+    SELECT e.external_id AS "externalId", e.player_id AS "playerId"
+      FROM external_identities e
+      JOIN sources s ON s.id = e.source_id
+     WHERE s.key = 'afltables' AND e.match_method = 'afltables_profile_url'
+       AND e.status IN ('unique', 'resolved')
+       AND e.external_id = ANY(${paths})
+  `;
+  if (identities.length !== EXPECTED_ROW_COUNT || identities.some((i) => i.playerId === null)) {
+    throw new Error(
+      `postcondition failed: ${identities.filter((i) => i.playerId !== null).length}/`
+      + `${EXPECTED_ROW_COUNT} target AFL Tables identities resolve to a player.`,
+    );
+  }
+  results.push(`${EXPECTED_ROW_COUNT}/${EXPECTED_ROW_COUNT} target AFL Tables identities resolve: OK`);
+
+  const distinctPlayerIds = new Set(identities.map((i) => i.playerId));
+  if (distinctPlayerIds.size !== EXPECTED_ROW_COUNT) {
+    throw new Error(
+      `postcondition failed: ${distinctPlayerIds.size} distinct canonical player_id(s) across the `
+      + `${EXPECTED_ROW_COUNT} target identities (expected ${EXPECTED_ROW_COUNT} — an identity is `
+      + `claimed by more than one player).`,
+    );
+  }
+  results.push(`${EXPECTED_ROW_COUNT} distinct canonical player_ids, no identity claimed twice: OK`);
+
+  // No duplicate slug among the 92 newly-created players.
+  const slugRows = await tx<{ slug: string }[]>`
+    SELECT slug FROM players WHERE id = ANY(${createdIds})
+  `;
+  const distinctSlugs = new Set(slugRows.map((r) => r.slug));
+  if (slugRows.length !== EXPECTED_ROW_COUNT || distinctSlugs.size !== EXPECTED_ROW_COUNT) {
+    throw new Error(
+      `postcondition failed: ${slugRows.length} newly-created player row(s) carry `
+      + `${distinctSlugs.size} distinct slug(s) (expected ${EXPECTED_ROW_COUNT} of each).`,
+    );
+  }
+  results.push('no duplicate slug among the newly-created players: OK');
+
+  // Player count increased by exactly 92 — combined with createdIds.length === 92 above, this
+  // also proves no non-target player was created by this batch: every row this batch inserted
+  // into `players` is accounted for in `created`, and nothing else changed the table's size.
+  const [{ count: afterCountRaw }] = await tx<{ count: string }[]>`SELECT count(*)::text AS count FROM players`;
+  const afterCount = Number(afterCountRaw);
+  if (afterCount - beforePlayerCount !== EXPECTED_ROW_COUNT) {
+    throw new Error(
+      `postcondition failed: player count moved from ${beforePlayerCount} to ${afterCount} `
+      + `(delta ${afterCount - beforePlayerCount}, expected exactly +${EXPECTED_ROW_COUNT}).`,
+    );
+  }
+  results.push(`player count increased by exactly ${EXPECTED_ROW_COUNT} (no non-target player created): OK`);
+
+  // 92 required player_career_stats rows exist for the newly-created players.
+  const [{ count: statsCountRaw }] = await tx<{ count: string }[]>`
+    SELECT count(*)::text AS count FROM player_career_stats WHERE player_id = ANY(${createdIds})
+  `;
+  if (Number(statsCountRaw) !== EXPECTED_ROW_COUNT) {
+    throw new Error(
+      `postcondition failed: ${statsCountRaw}/${EXPECTED_ROW_COUNT} player_career_stats row(s) `
+      + 'exist for the newly-created players.',
+    );
+  }
+  results.push(`${EXPECTED_ROW_COUNT}/${EXPECTED_ROW_COUNT} player_career_stats rows exist: OK`);
+
+  // Expected data_overrides durability rows exist for all 92, and each carries the attached
+  // AFL Tables path (i.e. attachAflTablesIdentityInTransaction's UPDATE actually landed).
+  const overrideRows = await tx<{ playerId: number; hasPath: boolean }[]>`
+    SELECT e.player_id AS "playerId",
+           (o.override_values ? 'afltables_profile_path') AS "hasPath"
+      FROM external_identities e
+      JOIN sources s ON s.id = e.source_id
+      JOIN data_overrides o
+        ON o.entity_type = 'players'
+       AND o.entity_key = 'manual_admin_edit:' || e.external_id
+       AND o.field_group = 'identity'
+       AND o.is_active = true
+     WHERE s.key = 'manual_admin_edit'
+       AND e.player_id = ANY(${createdIds})
+  `;
+  const withPath = overrideRows.filter((r) => r.hasPath);
+  if (overrideRows.length !== EXPECTED_ROW_COUNT || withPath.length !== EXPECTED_ROW_COUNT) {
+    throw new Error(
+      `postcondition failed: ${overrideRows.length}/${EXPECTED_ROW_COUNT} data_overrides `
+      + `durability row(s) found, ${withPath.length} carrying afltables_profile_path.`,
+    );
+  }
+  results.push(`${EXPECTED_ROW_COUNT}/${EXPECTED_ROW_COUNT} data_overrides durability rows carry the attached path: OK`);
+
+  // Expected data_edits/audit rows exist for all 92 (recordDataEdit inside
+  // attachAflTablesIdentityInTransaction, field_group 'source_identity').
+  const [{ count: auditCountRaw }] = await tx<{ count: string }[]>`
+    SELECT count(*)::text AS count FROM data_edits
+     WHERE table_name = 'players' AND field_group = 'source_identity' AND row_id = ANY(${createdIds})
+  `;
+  if (Number(auditCountRaw) !== EXPECTED_ROW_COUNT) {
+    throw new Error(
+      `postcondition failed: ${auditCountRaw}/${EXPECTED_ROW_COUNT} data_edits audit row(s) exist `
+      + "for the newly-attached identities' source_identity field group.",
+    );
+  }
+  results.push(`${EXPECTED_ROW_COUNT}/${EXPECTED_ROW_COUNT} data_edits audit rows exist: OK`);
+
+  return results;
+}
+
+// ---------------------------------------------------------------------------
 // CLI
 // ---------------------------------------------------------------------------
 
-type Args = {
+/** Exactly 64 hex characters (case-insensitive), no other shape accepted. */
+export const BACKUP_SHA256_RE = /^[0-9a-fA-F]{64}$/;
+
+export type Args = {
   target: TargetName;
   apply: boolean;
   devImportRole: boolean;
+  allowDevWrite: boolean;
+  backupSha256: string | null;
   adminUserId: number;
   targetSetPath: string;
   decisionPath: string;
 };
 
-function parseArgs(argv: string[]): Args {
+export function parseArgs(argv: string[]): Args {
   let target: TargetName = 'test';
   let apply = false;
   let devImportRole = false;
+  let allowDevWrite = false;
+  let backupSha256: string | null = null;
   let adminUserId: number | null = null;
   let targetSetPath = DEFAULT_TARGET_SET_PATH;
   let decisionPath = DEFAULT_DECISION_PATH;
@@ -434,6 +604,8 @@ function parseArgs(argv: string[]): Args {
     if (arg === '--target') { target = argv[++i] as TargetName; continue; }
     if (arg === '--apply') { apply = true; continue; }
     if (arg === '--dev-import-role') { devImportRole = true; continue; }
+    if (arg === '--allow-dev-write') { allowDevWrite = true; continue; }
+    if (arg === '--backup-sha256') { backupSha256 = argv[++i] ?? null; continue; }
     if (arg === '--admin-user-id') { adminUserId = Number(argv[++i]); continue; }
     if (arg === '--target-set') { targetSetPath = argv[++i]; continue; }
     if (arg === '--decision') { decisionPath = argv[++i]; continue; }
@@ -449,16 +621,52 @@ function parseArgs(argv: string[]): Args {
   if (devImportRole && target !== 'dev') {
     throw new Error("REFUSED: --dev-import-role is only valid with --target dev.");
   }
-  // Applies regardless of --dev-import-role: --target dev --dev-import-role --apply still
-  // refuses (ISSUE-224 S9 boundary: no DEV writes in this pass, privileged or not).
-  if (apply && target === 'dev') {
-    throw new Error(
-      'REFUSED: --apply is not permitted for --target dev in this pass (ISSUE-224 S9 boundary: '
-      + 'no DEV writes). DEV runs read-only preflight only.',
-    );
+  // --allow-dev-write and --backup-sha256 are DEV-apply-only concepts: invalid/irrelevant for
+  // --target test, which keeps its existing unconditional-apply behaviour untouched.
+  if (allowDevWrite && target !== 'dev') {
+    throw new Error("REFUSED: --allow-dev-write is only valid with --target dev.");
+  }
+  if (backupSha256 !== null && target !== 'dev') {
+    throw new Error("REFUSED: --backup-sha256 is only valid with --target dev.");
   }
 
-  return { target, apply, devImportRole, adminUserId, targetSetPath, decisionPath };
+  // The explicit DEV write authorisation gate (ISSUE-224 S9 unblock). ALL FOUR of
+  // --target dev, --dev-import-role, --apply and --allow-dev-write, plus a well-formed
+  // --backup-sha256, are required before a DEV --apply is permitted past this point. No PROD
+  // target exists at all (enforced above and in resolveTarget/assertNotProdLike), and every
+  // other combination — including --target dev --apply alone, or with only some of the three
+  // additional flags — is refused here, before any database connection is opened.
+  if (apply && target === 'dev') {
+    if (!devImportRole) {
+      throw new Error(
+        'REFUSED: --target dev --apply requires --dev-import-role (the elevated afldb_import '
+        + 'connection this gate is built on). DEV runs read-only preflight only without it.',
+      );
+    }
+    if (!allowDevWrite) {
+      throw new Error(
+        'REFUSED: --target dev --apply requires --allow-dev-write (the explicit, issue-specific '
+        + 'DEV write authorisation). DEV runs read-only preflight only without it.',
+      );
+    }
+    if (backupSha256 === null) {
+      throw new Error(
+        'REFUSED: --target dev --apply requires --backup-sha256 <64-hex> — the operator\'s '
+        + 'acknowledgement that a pre-write DEV backup has been taken and verified. This runner '
+        + 'cannot itself prove the remote dump exists; the hash is an acknowledgement, not proof.',
+      );
+    }
+    if (!BACKUP_SHA256_RE.test(backupSha256)) {
+      throw new Error(
+        'REFUSED: --backup-sha256 must be exactly 64 hexadecimal characters (observed a '
+        + 'malformed value); refusing before any database connection is opened.',
+      );
+    }
+  }
+
+  return {
+    target, apply, devImportRole, allowDevWrite, backupSha256, adminUserId, targetSetPath, decisionPath,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -474,7 +682,8 @@ async function main(): Promise<void> {
     + `D-7 sha256=${PINNED_DECISION_SHA256.slice(0, 12)}…).`,
   );
 
-  const cfg = resolveTarget(args.target, args.devImportRole);
+  const devWriteAuthorized = args.apply && args.target === 'dev';
+  const cfg = resolveTarget(args.target, args.devImportRole, devWriteAuthorized);
   const sql = postgres(cfg.dsn, {
     max: 1,
     onnotice: () => {},
@@ -517,7 +726,21 @@ async function main(): Promise<void> {
       return;
     }
 
-    // --apply: afldb_test only (cfg.canApply enforced by parseArgs + resolveTarget already).
+    // --apply: afldb_test (unchanged idempotent behaviour) or, when devWriteAuthorized, the
+    // gated afldb_dev first-apply (cfg.canApply enforced by parseArgs + resolveTarget already).
+    if (devWriteAuthorized) {
+      // Backup SHA is an operator acknowledgement only — never proof — and only its shortened
+      // form is ever printed (Task 2/Task 6: no credential or full-length secret-shaped value
+      // in normal console output).
+      console.log(`DEV backup acknowledgement: sha256=${args.backupSha256!.slice(0, 12)}… (operator-verified, not proven by this runner).`);
+    }
+
+    const [{ count: beforeCountRaw }] = await sql<{ count: string }[]>`SELECT count(*)::text AS count FROM players`;
+    const beforePlayerCount = Number(beforeCountRaw);
+    if (devWriteAuthorized) {
+      console.log(`Before player count: ${beforePlayerCount}`);
+    }
+
     const outcome = await sql.begin(async (tx) => {
       const warnings: string[] = [];
       const classification = await classify(tx, targets, warnings);
@@ -530,6 +753,29 @@ async function main(): Promise<void> {
           `${conflicts.length} CONFLICT row(s) — refusing to write ANY of the ${targets.length} rows. `
           + 'Nothing has been written.',
         );
+      }
+
+      if (devWriteAuthorized) {
+        // Task 3: the deliberate DEV first-apply gate for this batch. Re-classification inside
+        // THIS transaction must come back exactly this shape or the whole batch refuses and
+        // rolls back — a general "no conflicts" check (as above, shared with --target test) is
+        // not sufficient for DEV: any drift in CREATE/ALREADY_SATISFIED counts since the
+        // read-only preflight means live state has moved and this exact batch is no longer safe
+        // to apply blind.
+        const createCount = classification.filter((c) => c.kind === 'CREATE').length;
+        const satisfiedCount = classification.filter((c) => c.kind === 'ALREADY_SATISFIED').length;
+        if (
+          createCount !== EXPECTED_ROW_COUNT
+          || satisfiedCount !== 0
+          || classification.length !== EXPECTED_ROW_COUNT
+        ) {
+          throw new Error(
+            `REFUSED: DEV apply requires exactly CREATE=${EXPECTED_ROW_COUNT}, ALREADY_SATISFIED=0, `
+            + `CONFLICT=0 (observed CREATE=${createCount}, ALREADY_SATISFIED=${satisfiedCount}, `
+            + `CONFLICT=${conflicts.length}, TOTAL=${classification.length}); state has drifted `
+            + 'since the read-only DEV preflight. Nothing has been written.',
+          );
+        }
       }
 
       const created: { profilePath: string; playerId: number }[] = [];
@@ -554,7 +800,16 @@ async function main(): Promise<void> {
         }
         created.push({ profilePath: c.target.profilePath, playerId: player.id });
       }
-      return { created, satisfied: classification.filter((c) => c.kind === 'ALREADY_SATISFIED').length };
+
+      const satisfied = classification.filter((c) => c.kind === 'ALREADY_SATISFIED').length;
+      if (!devWriteAuthorized) {
+        return { created, satisfied, integrityResults: [] as string[] };
+      }
+
+      // Task 5: postconditions, still inside the transaction, before commit. Any failure throws
+      // and rolls back all 92 writes.
+      const integrityResults = await runDevPostWriteChecks(tx, targets, created, beforePlayerCount);
+      return { created, satisfied, integrityResults };
     });
 
     console.log('');
@@ -565,13 +820,27 @@ async function main(): Promise<void> {
     for (const c of outcome.created) {
       console.log(`  player_id=${c.playerId}  ${c.profilePath}`);
     }
+    if (devWriteAuthorized) {
+      console.log('');
+      console.log('Post-write integrity checks (before commit):');
+      for (const r of outcome.integrityResults) {
+        console.log(`  ${r}`);
+      }
+      console.log('Transaction committed = yes');
+    }
   } finally {
     await sql.end({ timeout: 5 });
   }
 }
 
-main().catch((error: unknown) => {
-  console.error('');
-  console.error(`REFUSED: ${error instanceof Error ? error.message : String(error)}`);
-  process.exitCode = 1;
-});
+// Guarded so `parseArgs`/`resolveTarget` can be imported and exercised by DB-free tests without
+// `main()` running against the real CLI argv/environment/filesystem (it would otherwise execute
+// unconditionally on import, since this module doubles as a runnable script).
+const isMainModule = process.argv[1] !== undefined && fileURLToPath(import.meta.url) === process.argv[1];
+if (isMainModule) {
+  main().catch((error: unknown) => {
+    console.error('');
+    console.error(`REFUSED: ${error instanceof Error ? error.message : String(error)}`);
+    process.exitCode = 1;
+  });
+}
