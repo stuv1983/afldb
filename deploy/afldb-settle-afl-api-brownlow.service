@@ -35,11 +35,11 @@ TimeoutStartSec=180
 Nice=5
 
 # Same DSN-exposure reasoning as the other two settle units:
-# settle-afl-api-brownlow.ts connects as afldb_import through
-# AFLDB_IMPORT_DATABASE_URL, left off the UnsetEnvironment list below; every
-# other credential .env carries is dropped.
+# settle-afl-api-brownlow.ts writes through AFLDB_IMPORT_DATABASE_URL and
+# reads the mandatory ingestion gate through DATABASE_URL. Both are retained;
+# every other credential .env carries is dropped.
 EnvironmentFile=/home/arm/projects/afldb/.env
-UnsetEnvironment=AFLDB_OWNER_DATABASE_URL AFLDB_AUTH_DATABASE_URL AFLDB_TEST_DATABASE_URL AFLDB_DEV_DATABASE_URL AFLDB_BACKUP_DATABASE_URL AFLDB_PROD_DATABASE_URL DATABASE_URL AFLDB_SESSION_SECRET AFLDB_SMTP_PASSWORD AFLDB_SMTP_USER AFLDB_EMAIL_INTAKE_SECRET AFLDB_REVALIDATE_SECRET
+UnsetEnvironment=AFLDB_OWNER_DATABASE_URL AFLDB_AUTH_DATABASE_URL AFLDB_TEST_DATABASE_URL AFLDB_DEV_DATABASE_URL AFLDB_BACKUP_DATABASE_URL AFLDB_PROD_DATABASE_URL AFLDB_SESSION_SECRET AFLDB_SMTP_PASSWORD AFLDB_SMTP_USER AFLDB_EMAIL_INTAKE_SECRET AFLDB_REVALIDATE_SECRET
 
 StandardOutput=journal
 StandardError=journal

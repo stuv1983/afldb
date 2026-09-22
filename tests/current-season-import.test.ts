@@ -4608,6 +4608,37 @@ describe('AFLDB-ISSUE-128 — source completeness', () => {
       expect(shell).toContain('AFLDB_SETTLE_FAILURE label=$label exit=$status');
       expect(shell).not.toContain('echo "$AFLDB_IMPORT_DATABASE_URL"');
     });
+
+    /* AFLDB-ISSUE-244 I244-F029 ---------------------------------------
+     * The unit strips DATABASE_URL (among others) through
+     * UnsetEnvironment=; settle-afltables.ts used to hand it straight back
+     * by reopening the same .env through its own private loadEnv(). The
+     * loader now lives in tools/current-season/load-env.ts and obeys
+     * AFLDB_SKIP_DOTENV, which this wrapper exports when — and only when —
+     * systemd started it.
+     *
+     * The loader's BEHAVIOUR is proven in tests/afl-api-ingestion-safety.test.ts;
+     * what is proven here is the wiring this unit depends on.
+     * ----------------------------------------------------------------- */
+    it('stops Node reading .env back in when systemd narrowed the environment', () => {
+      const guard = shell.indexOf('if [ -n "${INVOCATION_ID:-}" ]; then');
+      const exported = shell.indexOf('export AFLDB_SKIP_DOTENV=1');
+      const firstNode = shell.indexOf('"$NODE" "$TSX"');
+      expect(guard).toBeGreaterThan(-1);
+      expect(exported).toBeGreaterThan(guard);
+      // Before the FIRST Node/tsx invocation, or the flag would arrive too
+      // late to matter.
+      expect(firstNode).toBeGreaterThan(exported);
+      // Conditional, never unconditional: a manual run of this script keeps
+      // its .env convenience, so the export must not sit at top level.
+      expect(shell).not.toMatch(/^export AFLDB_SKIP_DOTENV=1$/m);
+    });
+
+    it('takes the shared loader rather than carrying its own copy', () => {
+      expect(cli).toMatch(/^import \{ loadEnv \} from '\.\/load-env';$/m);
+      expect(cli).not.toMatch(/function loadEnv\s*\(/);
+      expect(cli).toContain('loadEnv(DEFAULT_PROJECT_ROOT)');
+    });
   });
 });
 

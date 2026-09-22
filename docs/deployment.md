@@ -1028,13 +1028,36 @@ before any of it runs against the real feed.
 
 | Chain | Script | Unit | Timer | Enable gate |
 |---|---|---|---|---|
-| Match/stats | `deploy/afldb-settle-afl-api.sh` | `afldb-settle-afl-api.service` | `afldb-settle-afl-api.timer` (nightly, 05:00, after the AFL Tables timer) | none — same "no in-progress season" no-op as §7b |
-| Brownlow live count | `deploy/afldb-settle-afl-api-brownlow.sh` | `afldb-settle-afl-api-brownlow.service` | `afldb-settle-afl-api-brownlow.timer` (every 5 min, always enabled) | `AFLDB_AFL_API_BROWNLOW_ENABLED=true` (§9's variable table); the wrapper script itself no-ops when unset, so the timer can stay permanently enabled without ever "failing" outside the count |
+| Match/stats | `deploy/afldb-settle-afl-api.sh` | `afldb-settle-afl-api.service` | `afldb-settle-afl-api.timer` (nightly, 05:00, after the AFL Tables timer) | `site_settings.afl_api_current_season_enabled` must be enabled in the control database |
+| Brownlow live count | `deploy/afldb-settle-afl-api-brownlow.sh` | `afldb-settle-afl-api-brownlow.service` | `afldb-settle-afl-api-brownlow.timer` (every 5 min, always enabled) | `AFLDB_AFL_API_BROWNLOW_ENABLED=true` **and** `site_settings.afl_api_brownlow_enabled` in the control database |
 
 Both chains are two Node steps (`acquire-afl-api*.ts` → `settle-afl-api*.ts`);
 neither uses R or Python, unlike §7b's fitzRoy chain. Both acquisition tools
 write their manifest LAST and self-clean a manifest-less partial snapshot in
 process, so neither wrapper script re-implements §7b's `cleanup_partial` trap.
+Canonical writer CLIs fail closed unless their live `DATABASE_URL` control
+connection permits ingestion and reports the same `current_database()` value as
+the `AFLDB_IMPORT_DATABASE_URL` writer connection. The two service units retain
+only those two required DSNs (plus their non-DSN runtime settings) and continue
+to strip owner, auth, test, development and backup credentials. No DSN values
+belong in a unit file or runbook.
+
+The match/stats wrapper invokes `--apply --auto-apply --require-complete-source`.
+For that explicit mode, an incomplete source refuses the single settle
+transaction before commit: no canonical row, staging observation, projection or
+`import_batches` row is retained, and the unit fails visibly. `--dry-run`
+always rolls back. An operator who deliberately omits `--require-complete-source`
+retains the established partial-apply behaviour.
+
+The Brownlow wrapper invokes `--apply --auto-apply` **without**
+`--use-fixture-identity` (AFLDB-ISSUE-244 I244-F006). `staging.afl_api_match`
+holds only the matches the AFL API settle plans; a match that merely
+corroborates another source's canonical match (most 2026 home-and-away matches)
+has no typed row and resolves only through canonical fixture identity. When a
+snapshot contains such vote sets, the Brownlow CLI therefore **refuses before
+any write** and the unit fails visibly, naming the count and the flag. The
+wrapper does not enable the flag implicitly; whether the scheduled chain should
+pass it is an explicit operator decision, not made here.
 
 **Co-source safety.** These units may run concurrently with
 `afldb-settle-afltables.service` (§7b) without coordination: an `afltables`-
@@ -1139,7 +1162,7 @@ All configuration is in `/home/arm/projects/afldb/.env` (mode 600, owner `arm`),
 
 | Variable | Purpose |
 |---|---|
-| `DATABASE_URL` | read-only app role (`afldb_app`) |
+| `DATABASE_URL` | read-only app role (`afldb_app`). Also the **mandatory ingestion-gate / control DSN** the two AFL API settle units retain (they read the super-admin ingestion switch through it and fail closed when it is unset; ISSUE-244 F005/F016). It is **not** a canonical writer DSN — writes go through `AFLDB_IMPORT_DATABASE_URL` below |
 | `AFLDB_IMPORT_DATABASE_URL` | ETL writes and every Admin Centre statistical mutation (`afldb_import`, migration 066) |
 | `AFLDB_AUTH_DATABASE_URL` | operational auth/submission tables (`afldb_auth`, migration 023) |
 | `AFLDB_OWNER_DATABASE_URL` | migrations, target `dev` (`afldb_owner`) |

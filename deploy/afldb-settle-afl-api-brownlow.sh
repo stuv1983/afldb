@@ -42,10 +42,25 @@ TSX=node_modules/tsx/dist/cli.mjs
 
 cd "$PROJECT_ROOT"
 
+# --- AFLDB-ISSUE-244 I244-F029: keep the stripped credentials stripped -------
+# Same reasoning as deploy/afldb-settle-afl-api.sh: systemd has already applied
+# EnvironmentFile= and then UnsetEnvironment=, and without this flag the two
+# Node CLIs below would reopen $PROJECT_ROOT/.env and hand themselves back the
+# owner/auth/test/backup DSNs and the session, SMTP, intake and revalidation
+# secrets the unit deliberately dropped. INVOCATION_ID comes from systemd and
+# nothing else, so a manual run is unaffected. Set before the FIRST Node/tsx
+# invocation below — and before the §10 gate, which reads only the process
+# environment and is therefore unaffected either way.
+if [ -n "${INVOCATION_ID:-}" ]; then
+  export AFLDB_SKIP_DOTENV=1
+fi
+
 # --- §10 operational enablement gate ----------------------------------------
-# Read directly from .env (systemd's EnvironmentFile= already loads it into
-# the process environment before this script runs; this second read is only
-# for a manual/local invocation of this script outside the unit).
+# Read from the process environment only. Under systemd, EnvironmentFile= has
+# already loaded the flag into it before this script runs; this wrapper never
+# opens or parses .env itself (and, per I244-F029, under systemd the Node CLIs
+# do not reopen it either). A manual/local invocation must export the flag
+# itself.
 if [ "${AFLDB_AFL_API_BROWNLOW_ENABLED:-}" != "true" ]; then
   echo "AFLDB_AFL_API_BROWNLOW_ENABLED is not 'true' — Brownlow settle is disabled outside the" \
        "live count window (§10). Nothing to do."

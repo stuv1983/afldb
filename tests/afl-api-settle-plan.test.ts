@@ -458,6 +458,100 @@ describe('planAflApiMatchUnit (AFLDB-ISSUE-228 S6)', () => {
     });
   });
 
+  // -------------------------------------------------------------------
+  // AFLDB-ISSUE-244 I244-F030: an unresolved record is not proof that no canonical
+  // fixture exists. The plausibility predicate itself is SQL (integration-tested);
+  // these prove the planner's use of its ANSWER, through the same routed fake.
+  // -------------------------------------------------------------------
+
+  describe('unresolved record vs a plausible existing canonical fixture (AFLDB-ISSUE-244 I244-F030)', () => {
+    /** Answers ONLY the F030 helper's query (it alone has no spine join); the retired-identity search stays empty. */
+    const plausible = (rows: unknown[]) => (text: string): unknown[] => (text.includes('source_records') ? [] : rows);
+    const isPlausibilityQuery = (text: string): boolean => /FROM matches m WHERE .* ORDER BY m\.id LIMIT/.test(text)
+      && !text.includes('source_records');
+
+    it('one plausible fixture REFUSES possible_existing_match — never new_target — and roster and players are blocked', async () => {
+      const { bundle, records } = loadBundleAndRecords();
+      const foreign = { id: 501, matchKey: '2026|PF|2026-09-20|Hawthorn|Brisbane Lions', sourceId: 3 };
+      const { sql, seen } = planningSql({
+        matchRespond: () => [], // provider id / match_key: both miss -> unresolved
+        ownerRespond: plausible([foreign]),
+        playerRespond: () => [{ playerId: 900 }],
+      });
+
+      const plan = await planAflApiMatchUnit(sql, registry, SOURCE_ID, bundle, records, {
+        kind: 'run_enumeration', scope: NO_MATCH_REKEY_SCOPE,
+      });
+
+      expect(plan.match).toEqual({
+        status: 'refused', reason: 'possible_existing_match', detail: 'matches.id 501',
+        candidateIds: [501], candidates: [foreign], providerMatchKey: EXPECTED_MATCH_KEY,
+      });
+      expect(plan.match.status).not.toBe('planned');
+      expect(plan.roster).toEqual({ status: 'blocked' });
+      for (const player of plan.players) expect(player.status).toBe('blocked');
+      // Asked once, and only after the provider-id and exact-key lookups had missed.
+      const asked = seen.filter(isPlausibilityQuery);
+      expect(asked).toHaveLength(1);
+      expect(seen.indexOf(asked[0])).toBeGreaterThan(seen.findIndex((text) => text.includes('match_key =')));
+    });
+
+    it('several plausible fixtures refuse too, listing every one — the planner never picks a first, closest or newest', async () => {
+      const { bundle, records } = loadBundleAndRecords();
+      const rows = [
+        { id: 501, matchKey: '2026|PF|2026-09-20|Hawthorn|Brisbane Lions', sourceId: 3 },
+        { id: 502, matchKey: '2026|SF|2026-09-19|Hawthorn|Brisbane Lions', sourceId: null },
+      ];
+      const { sql } = planningSql({ matchRespond: () => [], ownerRespond: plausible(rows) });
+
+      const plan = await planAflApiMatchUnit(sql, registry, SOURCE_ID, bundle, records, {
+        kind: 'run_enumeration', scope: NO_MATCH_REKEY_SCOPE,
+      });
+
+      expect(plan.match).toMatchObject({ status: 'refused', reason: 'possible_existing_match', candidateIds: [501, 502] });
+      // A refusal has no target: nothing was chosen from the candidates.
+      expect(plan.match).not.toHaveProperty('targetId');
+      expect(plan.roster).toEqual({ status: 'blocked' });
+    });
+
+    it('no plausible fixture leaves new_target exactly as it was', async () => {
+      const { bundle, records } = loadBundleAndRecords();
+      const { sql, seen } = planningSql({ matchRespond: () => [], ownerRespond: plausible([]), playerRespond: () => [{ playerId: 900 }] });
+
+      const plan = await planAflApiMatchUnit(sql, registry, SOURCE_ID, bundle, records, {
+        kind: 'run_enumeration', scope: NO_MATCH_REKEY_SCOPE,
+      });
+
+      expect(plan.match).toMatchObject({ status: 'planned', mode: 'new_target', targetId: null, matchKey: EXPECTED_MATCH_KEY });
+      expect(seen.filter(isPlausibilityQuery)).toHaveLength(1);
+    });
+
+    it('a RESOLVED record never asks: the provider-id hit stands, and a deferred record issues no query at all', async () => {
+      const resolved = loadBundleAndRecords();
+      const { sql, seen } = planningSql({
+        matchRespond: (text) => (text.includes('source_record_id =')
+          ? [{ id: 501, season: 2026, homeClubId: HOME_CLUB_ID, awayClubId: AWAY_CLUB_ID, matchKey: EXPECTED_MATCH_KEY }]
+          : []),
+        ownerRespond: (text) => (isPlausibilityQuery(text)
+          ? [{ id: 999, matchKey: 'must-never-be-read', sourceId: 3 }]
+          : [{ sourceKey: 'afl_api', homeScore: 122, awayScore: 131 }]),
+        playerRespond: () => [{ playerId: 900 }],
+      });
+      const plan = await planAflApiMatchUnit(sql, registry, SOURCE_ID, resolved.bundle, resolved.records, {
+        kind: 'run_enumeration', scope: NO_MATCH_REKEY_SCOPE,
+      });
+      expect(plan.match).toMatchObject({ status: 'planned', mode: 'update_owned', targetId: 501 });
+      expect(seen.filter(isPlausibilityQuery)).toHaveLength(0);
+
+      const deferred = loadBundleAndRecords({ fixture: (raw) => { raw.status = 'POSTGAME'; } });
+      const quiet = planningSql({});
+      await planAflApiMatchUnit(quiet.sql, registry, SOURCE_ID, deferred.bundle, deferred.records, {
+        kind: 'run_enumeration', scope: NO_MATCH_REKEY_SCOPE,
+      });
+      expect(quiet.seen).toHaveLength(0);
+    });
+  });
+
   it('throws (never silently plans) when the resolver returns an id readMatchOwnerAndScores cannot find', async () => {
     const { bundle, records } = loadBundleAndRecords();
     const { sql } = planningSql({

@@ -29,6 +29,13 @@
  *     (`match_key`) are unaffected; only the narrow case of an `afl_api` row
  *     whose OWN provider id was never linked and whose natural key has since
  *     been retired is out of scope for this milestone.
+ *   - It never INSERTs a `matches` row for a fixture some canonical row of ANY
+ *     owner may already be (AFLDB-ISSUE-244 I244-F030): an unresolved provider
+ *     record whose season and oriented clubs match a canonical row that differs
+ *     in at most one of round/date is refused (`possible_existing_match`) by the
+ *     planner AND again inside the applier's savepoint. Nothing is linked,
+ *     rekeyed or re-owned; a human decides. "Unresolved" here means no supported
+ *     identity resolution succeeded, not that no canonical fixture exists.
  *   - It does not implement an absence sweep for `afl_api` records.
  *   - Promotion candidates are drafted with a direct INSERT rather than
  *     through `draftCandidate()`, which requires a full `ReconciliationOutcome`
@@ -56,7 +63,13 @@
  */
 import postgres from 'postgres';
 
-import { recomputePlayerDerivedStats } from '../../db/queries/player-derived';
+import { assessSourceCompleteness, type SourceCompletenessVerdict } from './source-completeness';
+import {
+  recomputeClubSeasons,
+  recomputePlayerDerivedStats,
+  recomputeSeasonBrownlowStatus,
+  recomputeSeasonMetadata,
+} from '../../db/queries/player-derived';
 
 import {
   AFL_API_BUNDLE_CONTRACT_VERSION,
@@ -83,7 +96,11 @@ import {
 } from './canonical-apply';
 import { asImportBatchId, type ImportBatchId } from '../import-batch-id';
 import { loadManualAuthority } from './manual-authority';
-import { NO_MATCH_REKEY_SCOPE } from './match-rekey';
+import {
+  NO_MATCH_REKEY_SCOPE,
+  POSSIBLE_EXISTING_MATCH,
+  type PlausibleCanonicalFixture,
+} from './match-rekey';
 import { canonicalJson, type JsonValue } from './observations';
 import { persistSourceObservation } from './observation-store';
 import { baselineCanonicalHash } from './promotion-review';
@@ -96,16 +113,30 @@ import {
 } from './settle-afltables';
 import {
   affectedPlayerIds,
+  APPLY_FINDING_RESOLUTION,
   canonicalApplyIssueKey,
+  clearMatchIdentityFinding,
+  clearSeasonGateFinding,
+  closeApplyFindingIfOpen,
+  describeApplyRefusal,
   disagreementSeverity,
   emptyDerivedScope,
   emptySettleCounters,
+  finalizeSettleImportBatch,
+  newApplyFindingLedger,
+  recordApplyOutcomeFindings,
   recordDeferral,
+  recordMatchIdentityFinding,
   renderMatchKey,
+  resolveApplyFinding,
   resolveRestoredDisagreements,
   settleIssueKey,
+  splitMatchIdentityChange,
   writeSettleDataIssue,
+  type ApplyFindingLedger,
+  type ApplyFindingScope,
   type DerivedScope,
+  type MatchIdentitySplit,
   type SettleCounters,
 } from './settle-core';
 import {
@@ -122,6 +153,13 @@ export const SETTLE_BATCH_TOOL = 'settle-afl-api.ts';
 export const SETTLE_ISSUE_TYPE = 'afl_api_settle';
 export const SETTLE_ISSUE_OWNER = 'settle-afl-api.ts';
 const MATCH_IDENTITY_ISSUE_TYPE = 'afl_api_match_identity_refusal';
+/** I244-F003: a resolved, `afl_api`-owned (or new) match whose provider venue
+ * identity did not resolve to a `venues` row — either the `CD_V` itself is
+ * unmapped, or its mapped `legacy_name` has no matching row. Distinct from
+ * `MATCH_IDENTITY_ISSUE_TYPE`, which is a match-resolution refusal; this
+ * finding is opened on an otherwise-resolved match and is expected to
+ * self-heal (resolve) the run after the map/venues row is corrected. */
+const VENUE_IDENTITY_ISSUE_TYPE = 'afl_api_venue_unmapped';
 
 /* ------------------------------------------------------------------ *
  * Bundle assembly (DB-free) — S3/S6-B/S6-C, offline, before any connection.
@@ -205,10 +243,20 @@ export type AflApiSettleCounters = SettleCounters & {
   snapshotMatches: number;
   snapshotPlayerMatchRows: number;
   buildFailures: number;
+  /** I244-F003: the provider's own `CD_V` is absent from
+   * `afl-api-identities.json.venues` — a stronger claim than `venueUnmapped`
+   * (which means the identity map DID resolve a `legacy_name` but no
+   * `venues` row carries it). Both leave `venue_id` NULL; only this counter
+   * distinguishes "AFLDB has never heard of this venue" from "AFLDB knows
+   * the venue but its `venues` row is missing/misspelled". */
+  venueProviderUnmapped: number;
 };
 
 function emptyAflApiCounters(): AflApiSettleCounters {
-  return { ...emptySettleCounters(), snapshotMatches: 0, snapshotPlayerMatchRows: 0, buildFailures: 0 };
+  return {
+    ...emptySettleCounters(), snapshotMatches: 0, snapshotPlayerMatchRows: 0, buildFailures: 0,
+    venueProviderUnmapped: 0,
+  };
 }
 
 /* ------------------------------------------------------------------ *
@@ -240,6 +288,8 @@ export type AflApiSettleRunOptions = {
   apply: boolean;
   /** ISSUE-122 S6 parity: without this, every promotable proposal is a candidate, never a canonical write. */
   autoApply: boolean;
+  /** Refuse the whole transaction when the acquired source cannot be shown complete. */
+  requireCompleteSource?: boolean;
   /** `data/reference/seasons.json.in_progress_seasons` — E2, re-evaluated at
    * the write exactly as `settle-afltables.ts` does; never inherited from
    * anything computed before the transaction opened. */
@@ -254,6 +304,10 @@ export type AflApiSettleRunResult = {
   counters: AflApiSettleCounters;
   /** Non-null exactly when the run HALTed: nothing in this batch is committed. */
   halt: { reason: string; detail: Readonly<Record<string, unknown>> } | null;
+  /** Why the transaction deliberately rolled back, distinct from a HALT. */
+  rollbackReason: 'dry_run' | 'require_complete_source' | null;
+  /** The verdict evaluated inside the transaction when completeness was required. */
+  sourceCompleteness: SourceCompletenessVerdict | null;
 };
 
 /* ------------------------------------------------------------------ *
@@ -264,6 +318,9 @@ type AflApiRefs = {
   sourceId: number;
   afltablesSourceId: number | null;
   sourceKeysById: ReadonlyMap<number, string>;
+  /** I244-F009: per-run state for automatic-apply refusal findings. Holds no
+   * database state until the first automatic-apply healing check reads it. */
+  applyFindings: ApplyFindingLedger;
 };
 
 async function loadRefs(tx: Tx): Promise<AflApiRefs> {
@@ -274,7 +331,37 @@ async function loadRefs(tx: Tx): Promise<AflApiRefs> {
     sourceId,
     afltablesSourceId: afltables?.id ?? null,
     sourceKeysById: new Map(sources.map((row) => [row.id, row.key])),
+    applyFindings: newApplyFindingLedger(),
   };
+}
+
+/**
+ * I244-F009: the ownership scope of every automatic-apply finding this settle
+ * writes and may close — the same `canonical_apply_failed` type and owner stamp
+ * the failure finding and AFL Tables' rekey refusals use, narrowed to this
+ * source by `source_key`, so this writer can never close AFL Tables' findings.
+ */
+const APPLY_FINDING_SCOPE: ApplyFindingScope = {
+  issueType: CANONICAL_APPLY_ISSUE_TYPE,
+  issueOwner: CANONICAL_APPLY_ISSUE_OWNER,
+  sourceKey: SETTLE_SOURCE_KEY,
+};
+
+/**
+ * I244-F009 self-heal for a target the automatic path did not even offer to the
+ * applier because it no longer differs from canonical state (the source and the
+ * canonical row now agree, or a human corrected the row). The earlier refusal is
+ * moot; it is closed rather than left falsely open.
+ */
+async function closeMootApplyFinding(
+  tx: Tx, refs: AflApiRefs, family: string, externalRecordId: string, targetTable: string,
+  counters: AflApiSettleCounters,
+): Promise<void> {
+  await closeApplyFindingIfOpen(
+    tx, APPLY_FINDING_SCOPE, refs.applyFindings,
+    canonicalApplyIssueKey(SETTLE_SOURCE_KEY, family, externalRecordId, targetTable),
+    APPLY_FINDING_RESOLUTION.notNeeded, counters,
+  );
 }
 
 /** The same double-encoding hazard `canonical-apply.ts` documents: bind
@@ -361,22 +448,125 @@ async function writePromotionCandidate(
  * `promotion_candidates`, whose verb CHECK does not admit them.
  */
 async function writeMatchIdentityIssue(
-  tx: Tx, input: { externalRecordId: string; reason: string; detail?: string },
+  tx: Tx,
+  input: {
+    externalRecordId: string; reason: string; detail?: string;
+    /** I244-F030 (`possible_existing_match`): the bounded candidate list and the rendering the provider would INSERT. */
+    candidates?: readonly PlausibleCanonicalFixture[]; providerMatchKey?: string;
+  },
   counters: AflApiSettleCounters,
 ): Promise<void> {
+  const possibleExisting = input.reason === POSSIBLE_EXISTING_MATCH;
   await writeSettleDataIssue(tx, {
     entityType: 'matches',
     entityId: null,
     issueType: MATCH_IDENTITY_ISSUE_TYPE,
     issueKey: settleIssueKey(SETTLE_SOURCE_KEY, 'match', input.externalRecordId, 'matches'),
     severity: 'error',
-    description: `afl_api match '${input.externalRecordId}' could not be resolved: ${input.reason}.`,
+    description: possibleExisting
+      ? `afl_api match '${input.externalRecordId}' was not inserted: ${input.reason} — `
+        + `${describeApplyRefusal(input.reason).explanation}. Nothing canonical was written.`
+      : `afl_api match '${input.externalRecordId}' could not be resolved: ${input.reason}.`,
     details: {
       owner: SETTLE_ISSUE_OWNER,
       source_key: SETTLE_SOURCE_KEY,
       external_record_id: input.externalRecordId,
       reason: input.reason,
       detail: input.detail ?? null,
+      // Additive and F030-only, so every other reason's finding keeps its shape. Bounded: at most
+      // `PLAUSIBLE_FIXTURE_LIMIT` (id, match_key, source_id) triples — no payload, no proposed values.
+      ...(possibleExisting
+        ? {
+          provider_match_key: input.providerMatchKey ?? null,
+          candidates: (input.candidates ?? []).map((row) => ({
+            match_id: row.id, match_key: row.matchKey, source_id: row.sourceId,
+          })),
+          issue: 'AFLDB-ISSUE-244 I244-F030',
+        }
+        : {}),
+    },
+  }, counters);
+}
+
+/**
+ * I244-F030 self-heal for `afl_api_match_identity_refusal`, which had no
+ * resolved-path healing at all.
+ *
+ * Called once a provider match record has produced a plan that is neither
+ * deferred, HALTed nor refused — i.e. it now RESOLVES normally (an update of an
+ * afl_api-owned row, a corroborated foreign-owned row, or a genuinely new
+ * fixture with no plausible existing row). Any earlier match-identity finding
+ * for that same record is then stale, and is closed as `match_identity_resolved`.
+ *
+ * SCOPE, stated because it is wider than `possible_existing_match` alone: the
+ * finding key is `(afl_api, 'match', <provider match id>, 'matches')` under the
+ * one issue type, so this also closes an open `unmapped_club_hist`,
+ * `unproved_match_date`, `provider_id_ambiguous` or `rekey_*` refusal for the
+ * same record. That is correct rather than incidental: every one of those
+ * refusals is raised BEFORE a plan exists, so a current plan proves the
+ * identity builder and the resolver both succeeded now. A player-level
+ * refusal (`writeMatchIdentityIssue` for a player unit) is keyed on the
+ * player's composite record id and is never touched here.
+ *
+ * Safety is `resolveApplyFinding()`'s own: only an UNRESOLVED row carrying this
+ * writer's `owner` stamp is updated, so a finding a super admin already resolved
+ * is never rewritten and another writer's finding is never closed. Same
+ * transaction as the run (a dry-run or a HALT rolls the heal back with it).
+ */
+async function healMatchIdentityRefusal(
+  tx: Tx, externalRecordId: string, counters: AflApiSettleCounters,
+): Promise<void> {
+  counters.dataIssuesResolved += await resolveApplyFinding(
+    tx, MATCH_IDENTITY_ISSUE_TYPE, SETTLE_ISSUE_OWNER,
+    settleIssueKey(SETTLE_SOURCE_KEY, 'match', externalRecordId, 'matches'),
+    APPLY_FINDING_RESOLUTION.identityResolved,
+  );
+}
+
+/**
+ * I244-F003: opened whenever a `planned` match's provider venue identity did
+ * not resolve — `CD_V` absent from `afl-api-identities.json.venues`
+ * ('provider_unmapped'), or its mapped `legacy_name` matched no `venues` row
+ * ('legacy_name_unresolved'). `entityId` is null for a `new_target` match
+ * (the row does not exist yet) and the canonical id for `update_owned`.
+ * Callers resolve this finding (via `resolveRestoredDisagreements`) the run
+ * a mapping/venues fix makes the identity resolve again — see §10/§11.4 of
+ * I244-F003: a corrected map must self-heal an existing afl_api-owned match.
+ */
+async function writeVenueIdentityIssue(
+  tx: Tx,
+  input: {
+    externalRecordId: string;
+    targetId: number | null;
+    venueProviderId: string;
+    venueRaw: string;
+    venueLegacyName: string | null;
+    reason: 'provider_unmapped' | 'legacy_name_unresolved';
+  },
+  counters: AflApiSettleCounters,
+): Promise<void> {
+  await writeSettleDataIssue(tx, {
+    entityType: 'matches',
+    entityId: input.targetId,
+    issueType: VENUE_IDENTITY_ISSUE_TYPE,
+    issueKey: settleIssueKey(SETTLE_SOURCE_KEY, 'match', input.externalRecordId, 'venue_id'),
+    severity: 'warning',
+    description: input.reason === 'provider_unmapped'
+      ? `afl_api match '${input.externalRecordId}' venue '${input.venueRaw}' (provider `
+        + `${input.venueProviderId}) is not in afl-api-identities.json.venues.`
+      : `afl_api match '${input.externalRecordId}' venue '${input.venueRaw}' (provider `
+        + `${input.venueProviderId}, legacy_name '${input.venueLegacyName}') does not resolve to `
+        + 'a canonical venues row.',
+    details: {
+      owner: SETTLE_ISSUE_OWNER,
+      source_key: SETTLE_SOURCE_KEY,
+      family: 'match',
+      external_record_id: input.externalRecordId,
+      target_table: 'matches',
+      venue_provider_id: input.venueProviderId,
+      venue_raw: input.venueRaw,
+      venue_legacy_name: input.venueLegacyName,
+      reason: input.reason,
     },
   }, counters);
 }
@@ -430,6 +620,17 @@ export function cumulativePeriodsOf(periods: readonly AflApiPeriodScore[]): Cumu
  * never reads them back — every proposed value comes from the DB-free
  * bundle, exactly as `readFreshTarget()` in canonical-apply.ts re-reads
  * canonical state itself rather than trusting a projection table.
+ *
+ * AFLDB-ISSUE-244 I244-F006 — CONTRACT: `staging.afl_api_match` is written
+ * ONLY for a match this settle PLANS (`plan.match.status === 'planned'`:
+ * an `afl_api`-owned match or a new one). A match that only corroborates an
+ * existing foreign-owned canonical match (`corroborated`, e.g. an
+ * `afltables`-owned home-and-away match) is observed on the spine and
+ * counted `corroboratedForeignOwned` but gets NO typed row, so the table is
+ * NOT one row per provider match (real 2026 evidence, not an invariant:
+ * 217 source match heads, 4 typed rows). Consumers that need identity for a
+ * corroborated match — Brownlow — use the canonical fixture-identity path
+ * (`--use-fixture-identity`), never this table.
  * ------------------------------------------------------------------ */
 
 async function projectAflApiMatch(
@@ -767,10 +968,22 @@ async function sweepAttendanceEnrichment(
  * not a distinct one per source), a source-scoped issue_key so the two
  * sources' findings can never collide with each other or with a
  * `SETTLE_ISSUE_TYPE` row for the same record.
+ *
+ * I244-F009 — the other half for a REFUSAL. A target the applier declines
+ * without rolling back (`foreign_source_owner`, `ownership_indeterminate`,
+ * `manual_authority_*`, `stale_canonical_target`, `no_canonical_match`, ...) used
+ * to leave only `canonicalApplyRefusals`, so after the run nobody could say WHICH
+ * target was refused or why (the 31 DEV player-stat refusals were invisible).
+ * It now opens or refreshes ONE finding per refused target under the same key and
+ * type as the failure finding (`recordApplyOutcomeFindings()`, `settle-core.ts`,
+ * which also states why `data_issues` rather than `promotion_candidates`), and
+ * closes it the run the target applies or no longer needs applying. Same
+ * transaction, no new counter, no `import_rejections` row, no canonical write.
  */
 async function applyUnitOutcome(
-  tx: Tx, unitInput: CanonicalApplyUnitInput, outcome: CanonicalApplyUnitResult,
+  tx: Tx, refs: AflApiRefs, unitInput: CanonicalApplyUnitInput, outcome: CanonicalApplyUnitResult,
   counters: AflApiSettleCounters, derived: DerivedScope,
+  targetIds: Readonly<Record<string, number | null>> = {},
 ): Promise<void> {
   for (const result of outcome.results) {
     if (result.applied) {
@@ -782,7 +995,12 @@ async function applyUnitOutcome(
     }
   }
   if (outcome.insertedMatchId !== null) derived.matchIds.add(outcome.insertedMatchId);
-  if (outcome.failure === null) return;
+  if (outcome.failure === null) {
+    await recordApplyOutcomeFindings(
+      tx, APPLY_FINDING_SCOPE, refs.applyFindings, unitInput, outcome.results, targetIds, counters,
+    );
+    return;
+  }
   counters.canonicalApplyFailures += 1;
   for (const target of unitInput.targets) {
     await writeSettleDataIssue(tx, {
@@ -814,6 +1032,39 @@ async function resolveVenueId(tx: Tx, venueLegacyName: string | null): Promise<n
   if (venueLegacyName === null) return null;
   const [row] = await tx<{ id: number }[]>`SELECT id FROM venues WHERE legacy_name = ${venueLegacyName}`;
   return row?.id ?? null;
+}
+
+/**
+ * I244-F010: the targets the AUTOMATIC path may hand to `applyCanonicalUnit()`.
+ *
+ * Every target passes through unchanged except an existing row's `matches`
+ * target (`identitySplit !== null`, i.e. not an INSERT), which is rebuilt
+ * without any identity-bearing field: the proposal, the rendered field list and
+ * the E5 baseline hash over that list all describe only what may be written.
+ * The target is dropped when nothing but identity differs (`renderedFields`
+ * empty — a baseline over no fields is refused by `baselineCanonicalPreimage()`
+ * anyway). `currentValues` is non-null whenever `identitySplit` is.
+ */
+export function automaticApplyTargets(
+  targets: readonly CanonicalApplyTargetInput[],
+  identitySplit: MatchIdentitySplit | null,
+  currentValues: Readonly<Record<string, JsonValue>> | null,
+): CanonicalApplyTargetInput[] {
+  const offered: CanonicalApplyTargetInput[] = [];
+  for (const target of targets) {
+    if (target.targetTable !== 'matches' || identitySplit === null) {
+      offered.push(target);
+      continue;
+    }
+    if (identitySplit.renderedFields.length === 0) continue;
+    offered.push({
+      ...target,
+      proposedValues: identitySplit.proposedValues,
+      renderedFields: identitySplit.renderedFields,
+      renderedBaselineCanonicalHash: baselineCanonicalHash(identitySplit.renderedFields, currentValues),
+    });
+  }
+  return offered;
 }
 
 async function settleMatchUnit(
@@ -926,19 +1177,37 @@ async function settleMatchUnit(
       else counters.unresolvedIdentityMatch += 1;
     } else {
       await writeMatchIdentityIssue(
-        tx, { externalRecordId: bundle.match.sourceRecordId, reason: plan.match.reason, detail: plan.match.detail },
+        tx,
+        {
+          externalRecordId: bundle.match.sourceRecordId, reason: plan.match.reason, detail: plan.match.detail,
+          // I244-F030 only; both are undefined for every other refusal reason.
+          candidates: plan.match.candidates, providerMatchKey: plan.match.providerMatchKey,
+        },
         counters,
       );
       counters.unresolvedIdentityMatch += 1;
     }
+    // A refused match writes NOTHING canonical, projects nothing typed and returns before any
+    // player unit: `matchIdForPlayers` never leaves null, so no period or player row can land
+    // against a fixture this run declined to create (I244-F030 covers `possible_existing_match`).
     await writeImportRejection(
       tx, batchId, bundle.match.sourceRecordId, `matches: ${plan.match.reason}`, matchRecord.payload,
     );
     return;
   }
 
+  // I244-F030 self-heal: the record resolves normally this run, so an earlier
+  // `afl_api_match_identity_refusal` for it is stale (scope: `healMatchIdentityRefusal()`).
+  await healMatchIdentityRefusal(tx, bundle.match.sourceRecordId, counters);
+
   let matchIdForPlayers: number | null = null;
   let matchKeyForPlayers: string | null = null;
+  // I244-F001/F012: only a unit that actually wrote `matches`/
+  // `match_period_scores` this run belongs in the derived-recompute scope.
+  // A corroborated match (never written, §8) and a `planned` match whose
+  // diff is empty (already up to date) must NOT force the season/club/player
+  // recompute below to run on a pure no-op replay.
+  let matchWriteApplied = false;
 
   if (plan.match.status === 'corroborated') {
     counters.corroboratedForeignOwned += 1;
@@ -976,6 +1245,16 @@ async function settleMatchUnit(
     } else {
       await resolveRestoredDisagreements(tx, SETTLE_ISSUE_TYPE, SETTLE_ISSUE_OWNER, new Set([issueKey]));
     }
+    // I244-F030: a corroborated (foreign-owned) match is never applied, so an
+    // apply-time `canonical_apply_failed` refusal an earlier run left for its
+    // `matches` / `match_period_scores` targets — the `possible_existing_match`
+    // one included — no longer describes anything. The F009 healers above never
+    // run on this branch, so it is closed here. Automatic path only, exactly
+    // like every other apply-finding healing check.
+    if (autoApply) {
+      await closeMootApplyFinding(tx, refs, 'match', bundle.match.sourceRecordId, 'matches', counters);
+      await closeMootApplyFinding(tx, refs, 'match', bundle.match.sourceRecordId, 'match_period_scores', counters);
+    }
     // §19.1(a)/(c): never (re-)owned and never written, including attendance.
     matchIdForPlayers = plan.match.targetId;
     matchKeyForPlayers = plan.match.matchKey;
@@ -983,13 +1262,43 @@ async function settleMatchUnit(
     // plan.match.status === 'planned' — new_target or update_owned (by afl_api).
     const isInsert = plan.match.mode === 'new_target';
     const venueId = await resolveVenueId(tx, bundle.match.venueLegacyName);
-    if (bundle.match.venueLegacyName !== null && venueId === null) counters.venueUnmapped += 1;
+    // I244-F003: `venueLegacyName === null` means the provider's own `CD_V`
+    // is absent from afl-api-identities.json.venues — a map miss that the
+    // old `bundle.match.venueLegacyName !== null && venueId === null` guard
+    // could never see, so it silently reached `proposedAflApiMatchValues()`
+    // as an ordinary NULL `venue_id`. Both branches below are now counted,
+    // both open a durable finding, and neither is allowed to auto-apply
+    // (see `venueIdentityUnresolved` gate further down) — a provider venue
+    // identity miss is never treated as an ordinary nullable field.
+    const venueProviderUnmapped = bundle.match.venueLegacyName === null;
+    if (venueProviderUnmapped) counters.venueProviderUnmapped += 1;
+    else if (venueId === null) counters.venueUnmapped += 1;
+    const venueIdentityUnresolved = venueId === null;
+    if (venueIdentityUnresolved) {
+      await writeVenueIdentityIssue(tx, {
+        externalRecordId: bundle.match.sourceRecordId,
+        targetId: plan.match.targetId,
+        venueProviderId: bundle.match.venueProviderId,
+        venueRaw: bundle.match.venueRaw,
+        venueLegacyName: bundle.match.venueLegacyName,
+        reason: venueProviderUnmapped ? 'provider_unmapped' : 'legacy_name_unresolved',
+      }, counters);
+    } else {
+      await resolveRestoredDisagreements(
+        tx, VENUE_IDENTITY_ISSUE_TYPE, SETTLE_ISSUE_OWNER,
+        new Set([settleIssueKey(SETTLE_SOURCE_KEY, 'match', bundle.match.sourceRecordId, 'venue_id')]),
+      );
+    }
     const matchIdentity = { venueId, homeClubId: plan.match.identity.homeClubId, awayClubId: plan.match.identity.awayClubId };
 
     const matchProposed = proposedAflApiMatchValues(bundle, matchIdentity, isInsert);
     const matchFields = Object.keys(matchProposed);
     const currentValues = isInsert ? null : await currentMatchValues(tx, plan.match.targetId as number, matchFields);
     const matchRenderedFields = diffFields(matchProposed, currentValues);
+    // I244-F010: on an UPDATE the identity-bearing fields (`MATCH_IDENTITY_FIELDS`)
+    // are never offered to the applier; see `splitMatchIdentityChange()`. An
+    // INSERT defines the identity and is not split.
+    const identitySplit = isInsert ? null : splitMatchIdentityChange(matchProposed, matchRenderedFields);
 
     const targets: CanonicalApplyTargetInput[] = [];
     if (matchRenderedFields.length > 0) {
@@ -1027,10 +1336,71 @@ async function settleMatchUnit(
       recordDeferral(counters, plan.roster.reason);
     }
 
+    // I244-F010: what the AUTOMATIC path may act on. Identical to `targets`
+    // except that an existing row's `matches` target carries no identity-bearing
+    // field: its proposal, its rendered field list and the E5 baseline hash over
+    // that list are all rebuilt without them, and the target is dropped when
+    // nothing else differs. A review-first run keeps `targets` whole — every
+    // promotable proposal, identity included, is a candidate for a human.
+    const applyTargets = automaticApplyTargets(targets, identitySplit, currentValues);
+
+    // I244-F010: a differing identity is withheld and made durable; an agreeing
+    // one closes the record's earlier finding. Same transaction, same lifecycle
+    // as the F009 refusal findings (its own key, so neither closes the other).
+    // Automatic path only: a review-first run decides nothing about findings.
+    if (autoApply && identitySplit !== null) {
+      if (identitySplit.changedIdentityFields.length > 0) {
+        counters.canonicalApplyRefusals += 1;
+        await recordMatchIdentityFinding(tx, refs.applyFindings, {
+          scope: APPLY_FINDING_SCOPE,
+          family: 'match',
+          externalRecordId: bundle.match.sourceRecordId,
+          matchId: plan.match.targetId,
+          sourceVersionSeq: versionSeqOf('match', bundle.match.sourceRecordId),
+          changedFields: identitySplit.changedIdentityFields,
+          proposedValues: matchProposed,
+          currentValues: currentValues as Record<string, JsonValue>,
+          canonicalMatchKey: plan.match.matchKey,
+          providerMatchKey: plan.match.identity.matchKey,
+        }, counters);
+      } else {
+        await clearMatchIdentityFinding(
+          tx, APPLY_FINDING_SCOPE, refs.applyFindings, 'match', bundle.match.sourceRecordId, counters,
+        );
+      }
+    }
+
+    // I244-F009 self-heal: a target this automatic run evaluated and found to
+    // agree with canonical state has nothing left to apply, so an earlier
+    // refusal finding for it is moot. Evaluated only for a target the run could
+    // actually assess (`matches` always; the period set only when the roster
+    // plan was `planned`), and only on the automatic path — a review-first run
+    // decides nothing about apply findings. `matches` is judged on what the
+    // automatic path may write (`applyTargets`): a difference confined to
+    // identity-bearing fields is F010's finding, not an F009 refusal.
+    if (autoApply) {
+      if (!applyTargets.some((target) => target.targetTable === 'matches')) {
+        await closeMootApplyFinding(tx, refs, 'match', bundle.match.sourceRecordId, 'matches', counters);
+      }
+      if (
+        plan.roster.status === 'planned'
+        && !targets.some((target) => target.targetTable === 'match_period_scores')
+      ) {
+        await closeMootApplyFinding(
+          tx, refs, 'match', bundle.match.sourceRecordId, 'match_period_scores', counters,
+        );
+      }
+    }
+
     matchIdForPlayers = plan.match.targetId;
     matchKeyForPlayers = plan.match.matchKey;
 
-    if (targets.length > 0) {
+    // I244-F010: the automatic path acts on `applyTargets`, a review-first run
+    // on the whole `targets` (see above). Nothing else in this block changed.
+    const routedTargets = autoApply ? applyTargets : targets;
+    const routedMatchFields = routedTargets.find((target) => target.targetTable === 'matches')?.renderedFields ?? [];
+
+    if (routedTargets.length > 0) {
       const matchAuthority = await loadManualAuthority(tx, bundle.match.season);
       // The authority question is asked under the match_key on BOTH paths,
       // including a `new_target` INSERT.
@@ -1056,10 +1426,10 @@ async function settleMatchUnit(
       const authorityConflict = matchAuthority({
         entity: 'matches',
         targetKey: { match_key: plan.match.matchKey },
-        fields: matchRenderedFields.length > 0 ? matchRenderedFields : ['period_scores'],
+        fields: routedMatchFields.length > 0 ? routedMatchFields : ['period_scores'],
       }) !== 'clear';
 
-      if (autoApply && !authorityConflict) {
+      if (autoApply && !authorityConflict && !venueIdentityUnresolved) {
         const unitInput: CanonicalApplyUnitInput = {
           family: 'match',
           externalRecordId: bundle.match.sourceRecordId,
@@ -1072,17 +1442,32 @@ async function settleMatchUnit(
           completionProven: true,
           matchKey: plan.match.matchKey,
           matchRekey: null,
+          // I244-F030: the planner already refused a plausible existing fixture, but that read
+          // binds nothing under READ COMMITTED. A NEW-target INSERT re-asks inside the savepoint
+          // (`readFreshTarget()`); an UPDATE of a resolved row has no INSERT to guard.
+          matchAmbiguity: isInsert
+            ? {
+              identity: {
+                roundCode: plan.match.identity.roundCode, matchDate: plan.match.identity.matchDate,
+                homeClubId: plan.match.identity.homeClubId, awayClubId: plan.match.identity.awayClubId,
+              },
+            }
+            : null,
           playerId: null,
           brownlowRoundNumber: null,
-          targets,
+          targets: routedTargets,
         };
         const outcome: CanonicalApplyUnitResult = await applyCanonicalUnit(tx, unitInput);
-        await applyUnitOutcome(tx, unitInput, outcome, counters, derived);
+        await applyUnitOutcome(tx, refs, unitInput, outcome, counters, derived, {
+          matches: plan.match.targetId,
+          match_period_scores: plan.roster.status === 'planned' ? plan.roster.targetMatchId : null,
+        });
         if (outcome.insertedMatchId !== null) matchIdForPlayers = outcome.insertedMatchId;
+        matchWriteApplied = outcome.results.some((result) => result.applied);
       } else {
         if (authorityConflict) counters.manualAuthorityRefusals += 1;
         const contract = getSourceFamily(registry, SETTLE_SOURCE_KEY, 'match');
-        for (const target of targets) {
+        for (const target of routedTargets) {
           await writePromotionCandidate(tx, {
             sourceId: refs.sourceId, family: 'match',
             independenceGroup: contract.independence?.group ?? SETTLE_SOURCE_KEY,
@@ -1101,9 +1486,11 @@ async function settleMatchUnit(
       }
     }
 
-    // Typed projection (migration 103) — written whenever the match family
-    // itself resolved and projected, independent of whether this run wrote
-    // (or even proposed) a canonical change this time.
+    // Typed projection (migration 103) — written for every PLANNED match
+    // (this `else` branch: afl_api-owned or new), independent of whether
+    // this run wrote (or even proposed) a canonical change this time. A
+    // `corroborated` match takes the branch above and is deliberately NOT
+    // projected (I244-F006): ownership/corroboration semantics are unchanged.
     await projectAflApiMatch(
       tx, refs, unit, versionSeqOf('match', bundle.match.sourceRecordId), batchId, matchIdentity,
     );
@@ -1122,7 +1509,7 @@ async function settleMatchUnit(
     );
   }
 
-  if (matchIdForPlayers !== null) derived.matchIds.add(matchIdForPlayers);
+  if (matchWriteApplied && matchIdForPlayers !== null) derived.matchIds.add(matchIdForPlayers);
 }
 
 async function settlePlayerUnit(
@@ -1218,7 +1605,13 @@ async function settlePlayerUnit(
   if (autoApply) {
     // The automatic path's own emptiness test: a row differing ONLY in a
     // derived-owned field has nothing this path may write.
-    if (automaticFields.length === 0) return;
+    if (automaticFields.length === 0) {
+      // I244-F009 self-heal: nothing left to apply, so an earlier refusal is moot.
+      await closeMootApplyFinding(
+        tx, refs, 'player_match_stats', externalRecordId, 'player_match_stats', counters,
+      );
+      return;
+    }
     const unitInput: CanonicalApplyUnitInput = {
       family: 'player_match_stats',
       externalRecordId,
@@ -1243,7 +1636,9 @@ async function settlePlayerUnit(
       }],
     };
     const outcome = await applyCanonicalUnit(tx, unitInput);
-    await applyUnitOutcome(tx, unitInput, outcome, counters, derived);
+    await applyUnitOutcome(tx, refs, unitInput, outcome, counters, derived, {
+      player_match_stats: existing?.targetId ?? null,
+    });
     for (const result of outcome.results) {
       if (result.applied) derived.playerIds.add(playerPlan.playerId);
     }
@@ -1269,6 +1664,46 @@ async function settlePlayerUnit(
  * The run
  * ------------------------------------------------------------------ */
 
+class RequireCompleteSourceRollback extends Error {
+  constructor(public readonly completeness: SourceCompletenessVerdict) {
+    super(`--require-complete-source refused commit: ${completeness.headline}`);
+    this.name = 'RequireCompleteSourceRollback';
+  }
+}
+
+/**
+ * These counters describe rows or derived values durably written by the
+ * current transaction. A full rollback means none may be reported as an
+ * applied effect. Deliberately retain input/plan facts (for example snapshot
+ * coverage, identity refusals, corroboration and write refusals): they remain
+ * useful to explain why the commit gate refused the run.
+ */
+const FULL_ROLLBACK_DURABLE_COUNTERS = [
+  'payloadsCreated',
+  'versionsAppended',
+  'observationsCorrected',
+  'observationsHistoryOnly',
+  'observationsMarkedAbsent',
+  'observationsReappeared',
+  'projectionRowsWritten',
+  'candidatesCreated',
+  'candidatesRefreshed',
+  'dataIssuesOpened',
+  'dataIssuesRefreshed',
+  'dataIssuesResolved',
+  'canonicalRowsInserted',
+  'canonicalRowsUpdated',
+  'canonicalApplicationsLogged',
+  'attendanceEnrichmentsApplied',
+  'derivedRecomputeRuns',
+  'derivedRecomputePlayers',
+] as const satisfies readonly (keyof AflApiSettleCounters)[];
+
+/** Normalise public counters after the require-complete full transaction rollback. */
+export function normaliseAflApiCountersAfterFullRollback(counters: AflApiSettleCounters): void {
+  for (const counter of FULL_ROLLBACK_DURABLE_COUNTERS) counters[counter] = 0;
+}
+
 export async function runSettleAflApi(
   sql: postgres.Sql, options: AflApiSettleRunOptions,
 ): Promise<AflApiSettleRunResult> {
@@ -1280,6 +1715,8 @@ export async function runSettleAflApi(
   let batchIdText: string | null = null;
   let applied = false;
   let halt: { reason: string; detail: Readonly<Record<string, unknown>> } | null = null;
+  let rollbackReason: AflApiSettleRunResult['rollbackReason'] = null;
+  let sourceCompleteness: SourceCompletenessVerdict | null = null;
 
   try {
     await sql.begin(async (tx) => {
@@ -1305,16 +1742,60 @@ export async function runSettleAflApi(
       }
 
       if (options.autoApply) {
+        // I244-F009: the run-level `season_not_in_progress` finding (written by
+        // the first refused target) is closed the first run the season is
+        // in progress again. A run with no units evaluated nothing and leaves it.
+        if (bundle.units.length > 0) {
+          await clearSeasonGateFinding(
+            tx, APPLY_FINDING_SCOPE, refs.applyFindings, bundle.season, options.inProgressSeasons, counters,
+          );
+        }
         await sweepAttendanceEnrichment(tx, refs, options.registry, runBatchId, ownedMatchKeys, counters);
-        if (derived.playerIds.size > 0 || derived.matchIds.size > 0) {
+        // I244-F001: the established AFL Tables/admin recompute set and
+        // ordering (`settle-afltables.ts:1906-1914`) — season metadata first
+        // because `recomputeClubSeasons()`'s wooden-spoon gate reads
+        // `seasons.status`; `recomputeSeasonBrownlowStatus()` last because
+        // `player_season_stats.brownlow_status` itself depends on season
+        // state. Gated on actual canonical writes, matching the shared
+        // `SettleCounters` contract, so a corroborated/no-op replay (F012)
+        // does not touch `club_seasons`/`seasons` or re-run the player
+        // rebuild. Same transaction as the canonical writes above: a
+        // `--dry-run` rolls every recompute back with everything else, and a
+        // recompute failure fails the whole settle rather than leaving
+        // committed canonical rows beside stale derived ones.
+        if (counters.canonicalRowsInserted + counters.canonicalRowsUpdated > 0) {
           const playerIds = await affectedPlayerIds(tx, derived);
-          if (playerIds.length > 0) {
-            await recomputePlayerDerivedStats(tx, playerIds, bundle.season);
-            counters.derivedRecomputeRuns = 1;
-            counters.derivedRecomputePlayers = playerIds.length;
-          }
+          await recomputeSeasonMetadata(tx, bundle.season);
+          await recomputeClubSeasons(tx, bundle.season);
+          await recomputePlayerDerivedStats(tx, playerIds, bundle.season);
+          await recomputeSeasonBrownlowStatus(tx, bundle.season);
+          counters.derivedRecomputeRuns = 1;
+          counters.derivedRecomputePlayers = playerIds.length;
         }
       }
+
+      if (options.requireCompleteSource && options.apply) {
+        sourceCompleteness = assessSourceCompleteness({
+          snapshotMatches: counters.snapshotMatches,
+          snapshotPlayerMatchRows: counters.snapshotPlayerMatchRows,
+          snapshotRejections: counters.unresolvedIdentityMatch + counters.unresolvedIdentityPlayer,
+          snapshotUnkeyedRejections: counters.buildFailures,
+          absenceSweepSkipped: 0,
+          recordsDeferred: Object.values(counters.recordsDeferred).reduce((total, count) => total + count, 0),
+        });
+        if (sourceCompleteness.status !== 'complete') {
+          throw new RequireCompleteSourceRollback(sourceCompleteness);
+        }
+      }
+
+      // I244-F008: close the batch in THIS transaction, after every write and
+      // after the last gate that can still refuse the run (a refused or halted
+      // run never reaches here and takes its batch row with it). A dry-run
+      // finalises too, so the real UPDATE runs against real constraints and
+      // privileges, and is then rolled back below with everything else. A
+      // failure here fails the transaction — committed data never sits beside
+      // a `running` batch.
+      await finalizeSettleImportBatch(tx, runBatchId, counters);
 
       if (!options.apply) throw new DryRunRollback();
       applied = true;
@@ -1323,6 +1804,15 @@ export async function runSettleAflApi(
     if (error instanceof DryRunRollback) {
       // Deliberate rollback: nothing persisted, including the batch row.
       batchIdText = null;
+      rollbackReason = 'dry_run';
+    } else if (error instanceof RequireCompleteSourceRollback) {
+      // Completeness is evaluated after the run is known but before commit,
+      // so the batch, observations, projections and canonical rows roll back together.
+      batchIdText = null;
+      applied = false;
+      rollbackReason = 'require_complete_source';
+      sourceCompleteness = error.completeness;
+      normaliseAflApiCountersAfterFullRollback(counters);
     } else if (error instanceof AflApiSettleHalt) {
       halt = { reason: error.reason, detail: error.detail };
       batchIdText = null;
@@ -1332,7 +1822,9 @@ export async function runSettleAflApi(
     }
   }
 
-  return { applied, batchId: applied ? batchIdText : null, counters, halt };
+  return {
+    applied, batchId: applied ? batchIdText : null, counters, halt, rollbackReason, sourceCompleteness,
+  };
 }
 
 export { areCoSources };

@@ -39,6 +39,7 @@ import {
   type AflApiIngestionControls,
 } from '../../src/lib/acquisition/afl-api-ingestion-control';
 import { asImportBatchId } from '../../src/lib/import-batch-id';
+import { finalizeSettleImportBatch } from '../../src/lib/acquisition/settle-core';
 import { parseSourceFamilyRegistry, type SourceFamilyRegistry } from '../../src/lib/acquisition/source-families';
 import { SETTING_KEYS } from '../../src/lib/site-settings';
 
@@ -275,6 +276,12 @@ export async function runAflApiFixturesSettleCli(
       Object.assign(counters, await persistAflApiFixtureObservations(tx, {
         sourceId, season, registry, records, batchId, observedAt,
       }));
+
+      // I244-F008: this tool commits an import batch under --apply, so it
+      // closes it in the same transaction (a dry-run finalises too, then
+      // rolls back). It writes no import_rejections, so records_rejected is 0
+      // by the persisted-row count, not by assumption.
+      await finalizeSettleImportBatch(tx, batchId, counters);
 
       if (!args.apply) throw new DryRunRollback();
     });

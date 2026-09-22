@@ -755,6 +755,11 @@ backtest asserts `round_unresolvable` for them rather than guessing.
   provider_team_id, season, api_round_number, canonical_round_number, votes, eligible,
   match_id NULL, player_id NULL, club_id NULL`), target `brownlow_round_votes` (already an
   admitted canonical target with provenance since 083).
+
+  > **Annotation 2026-09-22 (ISSUE-244 F021; original text above is frozen and unchanged).**
+  > The `match_id NULL, player_id NULL` wording is the plan-stage design. The current projection
+  > populates the resolved identifiers, and ISSUE-244 F007 carries `match_id` into
+  > `brownlow_round_votes` (the canonical row) as well.
 - **Logically separate**: its own emitter, validator, CLI (`settle:afl-api-brownlow`), unit
   and status line; it never touches `matches`/`player_match_stats`; the match path never
   writes votes. `player_match_stats.brownlow_votes` is **not** written by this stage (the
@@ -944,6 +949,13 @@ registry entry is approved.
   still auto-apply as ordinary corrections. Time-of-day corrections on a concluded match are
   treated as historically significant too (they change nothing derived, but silently rewriting
   them is the behaviour the brief forbids).
+
+  > **Annotation 2026-09-22 (ISSUE-244 F021; original text above is frozen and unchanged).**
+  > Implemented outcome, ISSUE-244 F010: identity-bearing corrections on an `afl_api`-owned match
+  > are **WITHHELD**, not auto-applied. Each withheld correction creates durable `data_issues`
+  > evidence (self-healing `…|matches:identity` finding) and is **not** emitted as a `corrected`
+  > candidate. `venue_id` and `match_time` are non-identity and may still auto-apply on an
+  > `afl_api`-owned row. No rekey and no migration.
 - Idempotency: unchanged payload → no version, no candidate; the same snapshot replayed → no
   write, no ledger row (existing property).
 - HALT (run-level, §14): provider-identity contradiction; season enumeration shrinking by more
@@ -1038,6 +1050,12 @@ Documentation weight: T3 (multi-module, migration) under CLAUDE.md §15; plan re
 - **Health / status**: `settle-status.ts` gains a unit table `{afltables, afl_api,
   afl_api_brownlow}`; the admin current-season panel shows each unit's last run, completeness
   verdict and the number of pending candidates / unresolved identities.
+
+  > **Annotation 2026-09-22 (ISSUE-244 F021; original text above is frozen and unchanged).**
+  > ISSUE-244 F008 now persists the run's counters and terminal `import_batches` state for the
+  > AFL API units, so the data the panel would read exists. **Admin-panel wiring for both AFL API
+  > units has NOT been done and remains a later follow-up**; the panel does not yet show either
+  > unit's last run or completeness verdict.
 - **Manual review path**: `promotion_candidates` (pending) + `import_rejections` per batch +
   `data_issues` (`source_disagreement`, `canonical_apply_failed`) — the existing surfaces; the
   human accept path stays unimplemented (a separate issue if wanted).

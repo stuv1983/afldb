@@ -25,6 +25,7 @@ import { fileURLToPath } from 'node:url';
 
 import postgres from 'postgres';
 
+import { proveAflApiIngestionPreflight } from '../../src/lib/acquisition/afl-api-ingestion-safety';
 import {
   parseAflApiIdentities, type AflApiIdentities,
 } from '../../src/lib/acquisition/afl-api-bundle';
@@ -55,11 +56,11 @@ import {
   renderSourceCompleteness,
   type SourceCompletenessVerdict,
 } from '../../src/lib/acquisition/source-completeness';
-import {
-  readAflApiIngestionControls,
-  type AflApiIngestionControls,
-} from '../../src/lib/acquisition/afl-api-ingestion-control';
+import { type AflApiIngestionControls } from '../../src/lib/acquisition/afl-api-ingestion-control';
 import { SETTING_KEYS } from '../../src/lib/site-settings';
+// I244-F029: the shared loader, which honours AFLDB_SKIP_DOTENV so a variable
+// this unit's `UnsetEnvironment=` stripped is not read straight back in.
+import { loadEnv } from './load-env';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PROJECT_ROOT = join(__dirname, '..', '..');
@@ -72,22 +73,6 @@ export type AflApiSettleCliArgs = {
   validateOnly: boolean;
   requireCompleteSource: boolean;
 };
-
-function loadEnv(projectRoot: string): void {
-  let contents: string;
-  try {
-    contents = readFileSync(join(projectRoot, '.env'), 'utf8');
-  } catch {
-    return;
-  }
-  for (const line of contents.split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#') || !trimmed.includes('=')) continue;
-    const [key, ...rest] = trimmed.split('=');
-    const name = key.trim();
-    if (!process.env[name]) process.env[name] = rest.join('=').trim();
-  }
-}
 
 function valueFor(argv: readonly string[], flag: string): string | null {
   const index = argv.indexOf(flag);
@@ -175,7 +160,13 @@ function counterLines(counters: AflApiSettleCounters): string[] {
   group('Deferral (§7.3, T3 — informational, never a failure)', ['recordsDeferred']);
   group('Resolution / ownership', [
     'unresolvedIdentityMatch', 'unresolvedIdentityPlayer', 'foreignOwnedCollision',
-    'corroboratedForeignOwned', 'sourceDisagreement', 'manualAuthorityRefusals', 'venueUnmapped',
+    'corroboratedForeignOwned', 'sourceDisagreement', 'manualAuthorityRefusals',
+    // I244-F003: kept as two counters, not one. `venueProviderUnmapped` is the
+    // provider's own CD_V missing from afl-api-identities.json.venues;
+    // `venueUnmapped` is a mapped legacy_name with no matching venues row.
+    // Both now block auto-apply (see settle-afl-api.ts); a zero on both is
+    // required before "every venue identity resolved" is a true statement.
+    'venueProviderUnmapped', 'venueUnmapped',
   ]);
   group('Review', ['candidatesCreated', 'candidatesRefreshed', 'candidatesMootLeftPending']);
   group('Data issues', ['dataIssuesOpened', 'dataIssuesRefreshed', 'dataIssuesResolved']);
@@ -230,19 +221,13 @@ export async function runAflApiSettleCli(
     return { args, result: null, report: null, sourceCompleteness: null };
   }
 
-  // AFLDB-ISSUE-228 follow-up (§C, §E, §F) — the super-admin ingestion
-  // switch, checked before the write-capable path (`--apply`/`--dry-run`)
-  // but NOT for `--report`, which is read-only diagnostics (§F: a disabled
-  // switch must not block status/reporting). Fail closed: a missing row or
-  // an unreadable database reads as disabled.
-  if (!args.report) {
-    const ingestionControls = deps.ingestionControls ?? await readAflApiIngestionControls();
-    if (!ingestionControls.currentSeasonEnabled) {
-      throw new Error(
-        `AFL API current-season ingestion is disabled (site_settings '${SETTING_KEYS.aflApiCurrentSeasonEnabled}'). `
-        + 'A super admin must enable it from /admin/current-season before this tool will write anything.',
-      );
-    }
+  // Test-only gate overrides retain the pre-connection refusal contract. The
+  // production path proves the live control/writer database identity below.
+  if (!args.report && deps.ingestionControls && !deps.ingestionControls.currentSeasonEnabled) {
+    throw new Error(
+      `AFL API current-season ingestion is disabled (site_settings '${SETTING_KEYS.aflApiCurrentSeasonEnabled}'). `
+      + 'A super admin must enable it from /admin/current-season before this tool will write anything.',
+    );
   }
 
   const registry = parseSourceFamilyRegistry(
@@ -264,8 +249,24 @@ export async function runAflApiSettleCli(
       return { args, result: null, report, sourceCompleteness: null };
     }
 
+    const preflight = deps.ingestionControls
+      ? null
+      : await proveAflApiIngestionPreflight(sql);
+    const ingestionControls = deps.ingestionControls ?? preflight!.controls;
+    if (!ingestionControls.currentSeasonEnabled) {
+      throw new Error(
+        `AFL API current-season ingestion is disabled (site_settings '${SETTING_KEYS.aflApiCurrentSeasonEnabled}'). `
+        + 'A super admin must enable it from /admin/current-season before this tool will write anything.',
+      );
+    }
+    if (preflight) {
+      log(`AFL API ingestion preflight: control database = ${preflight.control.database}, `
+        + `writer database = ${preflight.writer.database}.`);
+    }
+
     const result = await runSettleAflApi(sql, {
       bundle, registry, apply: args.apply, autoApply: args.autoApply, inProgressSeasons,
+      requireCompleteSource: args.requireCompleteSource,
     });
 
     if (result.halt) {
@@ -275,9 +276,7 @@ export async function runAflApiSettleCli(
       return { args, result, report: null, sourceCompleteness: null };
     }
 
-    for (const line of counterLines(result.counters)) log(line);
-
-    const sourceCompleteness = assessSourceCompleteness({
+    const sourceCompleteness = result.sourceCompleteness ?? assessSourceCompleteness({
       snapshotMatches: result.counters.snapshotMatches,
       snapshotPlayerMatchRows: result.counters.snapshotPlayerMatchRows,
       snapshotRejections: result.counters.unresolvedIdentityMatch + result.counters.unresolvedIdentityPlayer,
@@ -285,12 +284,25 @@ export async function runAflApiSettleCli(
       absenceSweepSkipped: 0,
       recordsDeferred: Object.values(result.counters.recordsDeferred).reduce((a, b) => a + b, 0),
     });
+
+    if (result.rollbackReason === 'require_complete_source') {
+      for (const line of renderSourceCompleteness(sourceCompleteness)) log(line);
+      log('');
+      log(
+        `COMPLETENESS GATE REFUSED COMMIT: ${sourceCompleteness.headline} `
+        + 'The entire transaction was rolled back: no canonical rows, source observations, projections, '
+        + 'or import_batches row were retained.',
+      );
+      return { args, result, report: null, sourceCompleteness };
+    }
+
+    for (const line of counterLines(result.counters)) log(line);
     for (const line of renderSourceCompleteness(sourceCompleteness)) log(line);
 
     log('');
     if (!result.applied) {
       log(
-        'Dry run. The full write path executed against real constraints and privileges'
+        'Dry-run rollback. The full write path executed against real constraints and privileges'
         + (args.autoApply ? ', the automatic canonical path included' : '')
         + ', then the whole transaction was rolled back. Nothing was retained — not even the '
         + `import_batches row. Re-run with --apply${args.autoApply ? ' --auto-apply' : ''} to keep it.`,
@@ -330,15 +342,7 @@ async function main(): Promise<void> {
     process.exitCode = 1;
     return;
   }
-  if (!outcome.args.requireCompleteSource || outcome.sourceCompleteness === null) return;
-  if (outcome.sourceCompleteness.status === 'complete') return;
-  console.error('');
-  console.error(
-    `--require-complete-source: ${outcome.sourceCompleteness.headline} `
-    + 'Records that could be represented were still applied and the run remains idempotent; '
-    + 'this exit code reports that the import was not complete.',
-  );
-  process.exitCode = 1;
+  if (outcome.result?.rollbackReason === 'require_complete_source') process.exitCode = 1;
 }
 
 const invokedDirectly = process.argv[1] !== undefined

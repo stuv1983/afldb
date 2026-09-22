@@ -46,6 +46,19 @@ TSX=node_modules/tsx/dist/cli.mjs
 
 cd "$PROJECT_ROOT"
 
+# --- AFLDB-ISSUE-244 I244-F029: keep the stripped credentials stripped -------
+# By the time this script runs systemd has applied the unit's EnvironmentFile=
+# and then its UnsetEnvironment=, so the environment we hold is the narrowed
+# one the unit intends. Without this flag the Node CLIs below call their own
+# loadEnv(), reopen the SAME $PROJECT_ROOT/.env and repopulate every variable
+# that is currently unset — which is precisely the list UnsetEnvironment= had
+# just removed. INVOCATION_ID is supplied by systemd and by nothing else, so a
+# manual run of this script keeps its .env convenience unchanged. Set here,
+# before the FIRST Node/tsx invocation below.
+if [ -n "${INVOCATION_ID:-}" ]; then
+  export AFLDB_SKIP_DOTENV=1
+fi
+
 # --- the season -------------------------------------------------------------
 # The same in-progress register the AFL Tables chain reads (§ R7/Q7: one
 # season-of-record, never a second one this source could disagree with).
@@ -123,8 +136,8 @@ echo "acquired label: $label"
 # --- 2. settle (the only step that opens PostgreSQL) -------------------------
 # Builds and re-hashes the observation bundle from the acquired snapshot
 # itself before opening a connection (§ settle-afl-api.ts verifyManifest()).
-# --require-complete-source (ISSUE-128 precedent): an incomplete source is a
-# FAILED unit even though every representable record still lands.
+# --require-complete-source: an incomplete source refuses the transaction
+# before commit, so no canonical, staging or import-batch row is retained.
 echo "[2/2] settle (apply, automatic canonical path)"
 "$NODE" "$TSX" tools/current-season/settle-afl-api.ts \
   --label "$label" --apply --auto-apply --require-complete-source

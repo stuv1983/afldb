@@ -15,6 +15,346 @@ commit.
 
 ## [Unreleased]
 
+### AFL API acceptance review: AFLDB-ISSUE-244 resolved / closed - 22 September 2026
+
+- **AFLDB-ISSUE-244 is RESOLVED / CLOSED — 2026-09-22.** All findings I244-F001 to
+  F031 have terminal dispositions and the final independent closeout audit is
+  complete. No additional technical validation was required after the final
+  documentation/comment reconciliation. The issue record moved to
+  `issues/closed/AFLDB-ISSUE-244.md` and the issue is registered in `issues.md`
+  (the number was kept, not renumbered to ISSUE-227, to preserve the existing
+  `I244-Fxxx` evidence chain). ISSUE-224, ISSUE-228 Q5 and ISSUE-228 S9 remain
+  separate, open work. **Closing ISSUE-244 does not operationally unblock the
+  scheduled `afl_api` timer**, and no PROD deployment or validation is claimed.
+- The AFLDB-ISSUE-244 acceptance register (`issues/closed/AFLDB-ISSUE-244.md` §5) was reconciled
+  against its closeout sections. I244-F001, F002 and F003 were already
+  implemented and validated; their register cells, which still read `OPEN`, now
+  read CLOSED / PASS (no new validation was run). The remaining findings were
+  dispositioned after independent review: F013 (no immediate `afl_api` ISR
+  revalidation) CLOSED / ACCEPTED as a bounded one-hour page-staleness window
+  with no canonical-data effect; F014 (corroboration compares scores only)
+  CLOSED / PASS as an observability limit, not a write-safety gap; F015
+  (`match_time` vocabulary) CLOSED / DEFERRED TO ISSUE-228 Q5, which still owns
+  the decision; F017 (unresolved 2026 debutants) CLOSED / DEFERRED TO
+  ISSUE-224; F026 (planner/writer roster-plan shape) CLOSED / ACCEPTED as
+  deliberate and test-pinned; F029 CLOSED / PASS (see the entry below); F021
+  CLOSED / PASS. No production behaviour changed.
+- F021 documentation corrections: the acquisition doc no longer names ISSUE-095
+  as the open ladder owner (it resolved into `recomputeClubSeasons`), records
+  the DEV full-season player-link evidence (577 linked / 92 unresolved,
+  2026-09-21 snapshot) beside the older `afldb_test` 398/400 as a different
+  evidence set, and states the Brownlow fixture-identity fallback's real match
+  key (season, clubs, exact local date — not round); `docs/deployment.md` now says
+  `DATABASE_URL` is also the mandatory ingestion-gate DSN the AFL API units
+  retain (never the writer DSN); the `rounds.ts` header comment, two deploy-file
+  comments and dated annotations on the frozen ISSUE-228 plan and the ISSUE-228
+  ledger preamble now match current behaviour. The source-completeness verdict's
+  operator-facing text no longer says "AFL Tables" when rendered for an AFL API
+  run (wording only; decision logic, counters and return types unchanged).
+- **Known limitations, not fixed:** a bounded one-hour ISR staleness window
+  after an `afl_api`-only write; and — until ISSUE-224 registers the required
+  2026 debutants and the snapshot is re-settled under ISSUE-228 S9 — the
+  scheduled `afl_api` chain (`--apply --auto-apply --require-complete-source`)
+  refuses an incomplete source before commit and may commit nothing. Closing the
+  ISSUE-244 register does not operationally unblock that timer.
+- Status: AFLDB-ISSUE-244 is RESOLVED / CLOSED — 2026-09-22 (it was READY FOR
+  FINAL CLOSEOUT REVIEW earlier the same day). The final reconciliation is
+  documentation and comments only: nothing was run or re-run, and there is no
+  PROD deployment or validation, no S9 completion and no ISSUE-224 completion.
+
+### Scheduled settle units: a stripped credential is no longer read back out of `.env` - 22 September 2026
+
+- The three settle units load `.env` through `EnvironmentFile=` and then drop
+  the credentials the job has no business holding through `UnsetEnvironment=`.
+  Each unit-invoked CLI then ran its own private `loadEnv()`, which reopened the
+  same `.env` and populated every variable that was currently unset — which is
+  exactly the list systemd had just removed, so the owner, auth, dev, test,
+  backup and production DSNs, the session, SMTP, email-intake and revalidation
+  secrets, and the AFL Tables unit's stripped `DATABASE_URL`, all returned
+  in-process before the first line of work.
+- The five unit-invoked current-season CLIs (`settle-afl-api`,
+  `settle-afl-api-brownlow`, `acquire-afl-api`, `acquire-afl-api-brownlow`,
+  `settle-afltables`) now share one loader, `tools/current-season/load-env.ts`,
+  which returns before opening `.env` when `AFLDB_SKIP_DOTENV=1`. The three
+  systemd wrapper scripts export that flag when — and only when — systemd
+  started them (`INVOCATION_ID`), after `EnvironmentFile=` and
+  `UnsetEnvironment=` have been applied. Parsing and precedence are unchanged:
+  a manual run outside systemd keeps its `.env` convenience, and a variable the
+  process already holds is still never overwritten, so the control/writer
+  same-database check is unaffected. No unit file, DSN selection or hardening
+  directive changed, and no other `loadEnv()` copy in `tools/` was touched.
+- **Limitation, not closed:** this stops rehydration through the application's
+  own loader. It does not make `<repo>/.env` unreadable to the Unix account the
+  units run as; filesystem-level isolation would need per-unit environment
+  fragments, separate service accounts, systemd credentials or permission
+  changes.
+- Tests cover DB-free loader behaviour (including the stripped-then-absent
+  case), CLI wiring, and wrapper/unit static assertions.
+- Status: validated and closed (I244-F029 CLOSED / PASS, 2026-09-22).
+  `npm run typecheck` passes; `tests/afl-api-ingestion-safety.test.ts` 95/95;
+  `tests/current-season-import.test.ts` 260 passed, 4 skipped (the four are
+  ISSUE-130 R-fragment cases, not F029 evidence); independent review PASS. No
+  PostgreSQL validation was required. No PROD or `systemctl` validation was
+  performed and nothing is deployed. AFLDB-ISSUE-244 status: see the
+  reconciliation entry above.
+
+### AFL API refuses to INSERT a fixture that may already exist - 22 September 2026
+
+- An unresolved AFL API match used to be classified `new_target` and INSERTed
+  whenever the provider id and the exact `match_key` both missed. That proves only
+  that the row could not be found: a canonical match another source owns (e.g.
+  `afltables`) has no AFL API provider id, and a one-component round or date
+  disagreement renders a different `match_key`, so both lookups miss for exactly
+  the fixture that already has a row — a second canonical fixture (and its
+  period/player rows) followed. The settle now refuses that INSERT
+  (`possible_existing_match`) when a canonical match of any owner has the same
+  season and oriented clubs and differs in at most one of round or date (the
+  ISSUE-131 identity predicate, shared, without its ownership/retirement
+  requirements). The planner refuses it into the existing
+  `afl_api_match_identity_refusal` finding (bounded candidate ids and keys), and
+  the applier repeats the check inside its savepoint for a new-target INSERT, so a
+  row committed after planning is caught too; a refused match writes no match,
+  period, player or typed-projection row. Nothing is linked, rekeyed or re-owned
+  and no candidate is ever picked; a genuine second meeting (round AND date both
+  differ) and a different season are unaffected. A match record that later
+  resolves closes its stale identity finding (`match_identity_resolved`); a human
+  resolution is never rewritten. No migration. A residual window remains between
+  the applier's final check and its INSERT (no constraint or serialisable
+  isolation is added). Existing integration cases that relied on several matches
+  sharing season, clubs and round, distinguished only by date, now start each case
+  from a clean baseline. The Brownlow integration suite's synthetic match Q now
+  differs from P by round as well as date (API round 6 / canonical `'7'`, P
+  unchanged at API round 5 / canonical `'6'`) so it stays a legitimate new
+  fixture under the guard — a test-fixture adjustment only, with no production
+  semantic change.
+- Status: validated and closed (I244-F030 CLOSED / PASS, 2026-09-22).
+  Production implementation independently reviewed (PASS). Operator validation:
+  `npm run typecheck` passes; DB-free `tests/afl-api-ingestion-safety.test.ts`,
+  `afl-api-settle-plan`, `afl-api-match`, `afl-api-brownlow` and
+  `reference-data` 5 files / 321 of 321; `afldb_test` preflight clean (live
+  identity `afldb_test|afldb_owner`, `transaction_read_only` on, no real 2026
+  Hawthorn-home v Brisbane Lions row, so no collision with the synthetic
+  identities); `tests/integration/settle-afl-api.test.ts` 28/28 including the
+  F030 cases 8/8; `tests/integration/settle-afl-api-brownlow.test.ts` 21/21. No
+  migration. The applier's recheck materially closes the plan-to-apply race but
+  a final SELECT-to-INSERT micro-window remains under READ COMMITTED (absence
+  cannot be row-locked and no constraint is added); absolute race elimination is
+  not claimed. Validated on `afldb_test` only: no DEV, PROD or systemd
+  validation and **not deployed**. The historical `match_key` census
+  (I244-F031) was completed afterwards and closed with no affected population
+  (see the F010 entry). AFLDB-ISSUE-244 status: see the reconciliation entry
+  above.
+
+### AFL API never rewrites a match's identity in place - 21 September 2026
+
+- `matches.match_key` is a content address (`season|round_code|match_date|home|away`)
+  that `data_overrides` and every other source's resolver key on. The AFL API
+  settle used to auto-apply a provider's corrected round or date to an
+  `afl_api`-owned match and leave `match_key` rendering the old identity, so the
+  next source to render the corrected identity missed the row and inserted a
+  duplicate fixture. On an existing row it now never writes `round_code`,
+  `round_number`, `round_type`, `is_final`, `match_date`, the club ids or the
+  season: they are removed from what the applier is offered — changed or not,
+  so a concurrent writer cannot be raced into a half-written identity — while
+  scores, period scores, venue, kick-off time and player rows still auto-apply.
+  A withheld identity difference opens or refreshes one durable
+  `canonical_apply_failed` finding per record (key
+  `afl_api|apply|match|<CD_M…>|matches:identity`,
+  `details->>'refusal' = 'identity_change_requires_review'`, with the differing
+  fields, both `match_key` renderings and the canonical match id), in the run's
+  own transaction. It closes when the provider and the canonical row agree again
+  (the provider reverted, or a supervised repair moved the row and its key
+  together) and is never rewritten once a human resolved it. A proposed identity
+  that already belongs to another match changes nothing. `matches.id`, ownership
+  and manual authority are untouched; the Brownlow `match_id` X -> Y refusal
+  (`match_identity_conflict`) is deliberately unchanged. No migration and no new
+  counter.
+- Status: implemented, independently reviewed and validated (I244-F010
+  CLOSED / PASS, 2026-09-22). Independent Fable review: READY FOR DB-FREE STATIC
+  VALIDATION, with partial non-identity apply during an identity conflict,
+  dependent apply during identity review and `match_time` auto-apply all
+  accepted as safe. Operator validation: `npm run typecheck` passes;
+  `tests/afl-api-ingestion-safety.test.ts` 71/71 and
+  `tests/afl-api-brownlow.test.ts` 47/47 (118/118 combined); targeted
+  `tests/integration/settle-afl-api.test.ts` 20/20 on `afldb_test` (live
+  identity `afldb_test|afldb_owner`, read-only probe). Two successor items
+  were opened and do not invalidate this boundary: I244-F030 (HIGH, planner may
+  INSERT a duplicate fixture when an `afltables`-owned match is dated or
+  rounded differently by the AFL API) and I244-F031 (MEDIUM, read-only census
+  and supervised repair of pre-F010 `match_key` drift). No DEV, PROD, systemd
+  or production validation of F010 itself was performed. **Not deployed.**
+- I244-F031 is now CLOSED / PASS (2026-09-22): the read-only census
+  (reconstructed `season|round_code|YYYY-MM-DD|home|away` key against
+  `matches.match_key`, `afl_api`-owned canonical matches only) was completed on
+  `afldb_test` (`afldb_test|afldb_owner`, `transaction_read_only` on) and on DEV
+  (`afldb_dev|afldb_app`, `transaction_read_only` on, `DATABASE_URL` routed
+  process-locally through `127.0.0.1:55432`, no `.env` change). Both held 0
+  `afl_api`-owned canonical matches and 0 stale `match_key` rows, so there is no
+  affected population and no remediation was required or performed (no repair
+  script, rekey or migration). No PROD census, PROD validation, deployment or
+  repair execution is claimed. AFLDB-ISSUE-244 status: see the reconciliation
+  entry above.
+
+### AFL API acceptance suite proves player-derived state - 22 September 2026
+
+- I244-F011 (test coverage) was reassessed against the current suites. Every
+  gap the original review listed except one is now proven by coverage added
+  while closing F001–F010 and F016 (club/season derived state, Brownlow
+  recipient replacement and `match_id`/coverage, both venue failure classes,
+  gate and control/writer database safety, both systemd units, require-complete
+  rollback, batch lifecycle, durable refusals, identity withholding). The one
+  residual gap — no assertion on `player_season_stats`, `player_career_stats`
+  or `player_clubs` after an AFL API apply, correction or replay — is closed by
+  extending three existing `tests/integration/settle-afl-api.test.ts` cases:
+  after a new match the three rows equal an independent derivation from
+  canonical truth (one game, one final, one loss, nine kicks); after the
+  home-win to away-win correction the player's win becomes a loss with games
+  unchanged (replacement, never accumulation); after an identical replay the
+  rows are byte-identical. No production code changed.
+- Status: validated and closed (I244-F011 CLOSED / PASS, 2026-09-22). Typecheck
+  passed and `tests/integration/settle-afl-api.test.ts` passed 20/20 on
+  `afldb_test`, executing the new player-derived assertions; no Brownlow rerun
+  was needed. I244-F012 (derived recompute ran on corroborated/no-op replays)
+  was reassessed against the current code and found already resolved by the
+  F001 write gate; the same suite proves it (CLOSED / PASS, no code change).
+  **Not deployed.** AFLDB-ISSUE-244 status: see the reconciliation entry above.
+
+### AFL API automatic-apply refusals are now durable - 21 September 2026
+
+- Under `--apply --auto-apply`, a canonical target the applier declines without
+  rolling back — chiefly `foreign_source_owner` (a player-stat row `afltables`
+  owns that differs from the AFL API's proposal), also `ownership_indeterminate`,
+  `manual_authority_*`, `stale_canonical_target` and a dependent
+  `no_canonical_match` — used to leave only the run counter
+  `canonicalApplyRefusals`. It now opens or refreshes one `data_issues` finding
+  per refused target (`canonical_apply_failed`, key
+  `afl_api|apply|<family>|<record>|<target>`, machine reason in
+  `details->>'refusal'`, field names only), in the run's own transaction, so a
+  dry-run, a `--require-complete-source` refusal or a HALT leaves none. An
+  identical replay refreshes the one open row; the finding closes the run the
+  target applies or no longer differs from canonical state. A resolved row is
+  never rewritten. `season_not_in_progress` is one run-level finding per season,
+  not one per target. Nothing canonical is written, ownership is never adopted,
+  `import_rejections` / `records_rejected` are unchanged, and no counter or
+  migration was added. Brownlow and the fixtures-only tool needed no change.
+- Status: implemented, independently reviewed and validated (I244-F009
+  CLOSED / PASS, 2026-09-21). Independent Fable review: READY FOR DB-FREE STATIC
+  VALIDATION. Operator validation: `npm run typecheck` passes;
+  `tests/afl-api-ingestion-safety.test.ts` 46/46 and
+  `tests/afl-api-brownlow.test.ts` 47/47 (93/93 combined); targeted
+  `tests/integration/settle-afl-api.test.ts` 18/18 on `afldb_test` (live identity
+  `afldb_test|afldb_owner`, read-only probe). No DEV, PROD, systemd or production
+  validation was performed. **Not deployed.** AFLDB-ISSUE-244 status: see the
+  reconciliation entry above.
+
+### AFL API import-batch terminal lifecycle - 21 September 2026
+
+- Every AFL API writer that commits an `import_batches` row — the match settle,
+  the Brownlow settle (apply and `--observe-only`) and the fixtures-only settle —
+  now closes it inside the same transaction, through one shared helper
+  (`finalizeSettleImportBatch()` in `settle-core.ts`): `status = 'completed'`,
+  `completed_at`, `records_inserted` (observation versions appended),
+  `records_updated` (0 — the target table is append-only),
+  `records_rejected` (the number of `import_rejections` rows persisted for the
+  batch, per migration 001) and `validation_result` (the run's counters). Before,
+  these batches committed permanently `running` with `completed_at` NULL,
+  `records_rejected = 0` beside real rejection rows, and no counters. A dry-run,
+  a `--require-complete-source` refusal, a HALT or a failed finalisation rolls
+  the batch row back with the run, so `running` now only means a crashed
+  process. No migration. The Brownlow leaderboard reconciliation (pure) is now
+  computed before the transaction so the stamped counters match the returned
+  ones.
+- Status: implemented, independently reviewed and validated (I244-F008
+  CLOSED / PASS, 2026-09-21). Independent Fable review: READY FOR DB-FREE STATIC
+  VALIDATION. Operator validation: `npm run typecheck` passes;
+  `tests/afl-api-ingestion-safety.test.ts` 30/30 and
+  `tests/afl-api-brownlow.test.ts` 47/47 (77/77 combined); targeted
+  `tests/integration/settle-afl-api.test.ts` 16/16 and
+  `tests/integration/settle-afl-api-brownlow.test.ts` 21/21 on `afldb_test`. No
+  DEV, PROD, systemd or production validation was performed. **Not deployed.**
+  AFLDB-ISSUE-244 status: see the reconciliation entry above.
+
+### AFL API typed-staging contract and Brownlow fixture-identity safety - 21 September 2026
+
+- `staging.afl_api_match` is now documented (code comments, acquisition doc,
+  Brownlow runbook) as a typed projection of only the matches the AFL API
+  settle plans (`afl_api`-owned or new); a match that merely corroborates a
+  foreign-owned canonical match (most 2026 home-and-away matches, `afltables`-owned)
+  has no typed row by design. The observed 2026 217-source-heads / 4-typed-rows
+  difference is recorded as evidence, not an invariant. Settle ownership and
+  corroboration behaviour is unchanged.
+- The Brownlow settle CLI now measures, before any write, which vote sets can be
+  identified only through canonical fixture identity. Without an explicit
+  `--use-fixture-identity`, `--dry-run` / `--apply` (with or without
+  `--auto-apply`) refuse before the import batch or any observation is written,
+  with an actionable message; `--observe-only` logs an advisory; `--validate-only`
+  is unaffected. The flag is never enabled implicitly. The runbook's §3.4
+  commands now pass it, and the misleading `unknown_match` hint was corrected.
+- Status: implemented and validated DB-free (I244-F006 CLOSED / PASS, 2026-09-21;
+  `npm run typecheck` and 69/69 across `tests/afl-api-brownlow.test.ts`,
+  `tests/afl-api-settle-cli-gate.test.ts`, `tests/afl-api-ingestion-safety.test.ts`;
+  targeted `tests/integration/settle-afl-api.test.ts` 13/13 on `afldb_test`).
+  **Not deployed.** The scheduled Brownlow timer intentionally does not pass the
+  flag and will fail visibly on such a snapshot until the operator decides
+  otherwise. AFLDB-ISSUE-244 status: see the reconciliation entry above.
+
+### Brownlow match_id persistence and coverage recomputation - 21 September 2026
+
+- The automatic AFL API Brownlow settle now carries the resolved canonical
+  `match_id` (staged identity or the explicit `--use-fixture-identity`
+  fallback) into every `brownlow_round_votes` write — inserts, votes
+  corrections and I244-F002 stale-recipient demotions alike. An existing row
+  that already has the correct votes but `match_id IS NULL` self-heals on its
+  next `--apply --auto-apply` replay with no vote change required. If any
+  existing row the vote set would mutate (a current recipient's, or an
+  AFL-API-owned stale recipient's) already carries a *different* non-null
+  `match_id`, the WHOLE vote set is refused before any write
+  (`match_identity_conflict`, counted in `voteSetsRefused`, one `data_issues`
+  row per provider match); nothing is demoted, changed or healed. Correcting
+  X -> Y remains I244-F010's open scope.
+- A vote correction that permutes values among the same recipients
+  (A3 B2 C1 -> A2 B3 C1) is applied as a two-phase update inside the vote
+  set's savepoint — current recipients whose positive value changes are
+  written to 0, then the final 3/2/1 is claimed — because
+  `UNIQUE (match_id, votes) WHERE votes > 0` (migration 094) admits no
+  single-row write order for a permutation. The temporary writes are ordinary
+  ledgered updates (`canonicalRowsUpdated` rises accordingly) and are not
+  counted in `staleRecipientsDemoted`.
+- After a run whose Brownlow canonical writes actually changed durable
+  state, coverage is recomputed once (`recomputeBrownlowCoverage()`, the
+  same function the admin workflow already uses) inside the SAME
+  transaction as the vote writes; a dry run or a mid-run failure rolls it
+  back with everything else.
+- Status: implemented and validated (I244-F007 CLOSED / PASS, 2026-09-21).
+  The first independent review returned NOT READY on two HIGH findings — the
+  vote-permutation unique-index collision and the non-null `match_id`
+  conflict — both repaired above; the follow-up review cleared them. Operator
+  validation: `npm run typecheck` passes; `tests/afl-api-brownlow.test.ts`
+  47/47; targeted `tests/integration/settle-afl-api-brownlow.test.ts` 17/17 on
+  `afldb_test` (live identity `afldb_test|afldb_owner`, read-only probe). No
+  DEV, PROD, systemd or production validation was performed. **Not
+  deployed.** AFLDB-ISSUE-244 status: see the reconciliation entry above.
+
+### AFL API ingestion safety gates - 21 September 2026
+
+- `--require-complete-source` now refuses an incomplete AFL API apply inside
+  its existing settle transaction, before commit; the resulting rollback is
+  reported separately from a dry run and from a committed apply.
+- Normal and Brownlow AFL API writer CLIs now prove their live control and
+  writer connections name the same database before settling. The paired
+  systemd units retain the required control `DATABASE_URL` while continuing to
+  strip unrelated credentials.
+- Validation (operator-run 2026-09-21): `npm run typecheck` passes;
+  `tests/afl-api-ingestion-safety.test.ts` 10/10 and
+  `tests/afl-api-settle-cli-gate.test.ts` 23/23 pass; the targeted
+  `afldb_test` integration suite `tests/integration/settle-afl-api.test.ts`
+  passes 13/13, and the live control and writer identity probes (read-only
+  transactions) both reported `afldb_test`. No DEV, PROD, deployment or
+  systemctl validation was performed and the unit changes are not deployed.
+  `loadEnv()` could still rehydrate variables the units strip (AFLDB-ISSUE-244
+  I244-F029) — addressed by the 22 September 2026 entry above (validated,
+  CLOSED / PASS; not deployed).
+
 ### Repository layout: issue runbooks and ISSUE-164 frozen evidence moved out of the repository root - 19 September 2026
 
 - **What changed.** The repository root no longer accumulates issue documentation or measurement

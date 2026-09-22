@@ -52,26 +52,12 @@ import {
 } from '../../src/lib/acquisition/afl-api-ingestion-control';
 import { claimSnapshotDir } from '../../src/lib/acquisition/snapshot-dir';
 import { SETTING_KEYS } from '../../src/lib/site-settings';
+// I244-F029: the shared loader, which honours AFLDB_SKIP_DOTENV so a variable
+// this unit's `UnsetEnvironment=` stripped is not read straight back in.
+import { loadEnv } from './load-env';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PROJECT_ROOT = join(__dirname, '..', '..');
-
-function loadEnv(projectRoot: string): void {
-  let contents: string;
-  try {
-    contents = readFileSync(join(projectRoot, '.env'), 'utf8');
-  } catch {
-    return;
-  }
-  for (const line of contents.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
-    const eq = trimmed.indexOf('=');
-    if (eq === -1) continue;
-    const name = trimmed.slice(0, eq).trim();
-    if (!process.env[name]) process.env[name] = trimmed.slice(eq + 1).trim();
-  }
-}
 
 function readJson(path: string): unknown {
   return JSON.parse(readFileSync(path, 'utf8'));

@@ -28,11 +28,14 @@ import { join } from 'node:path';
 
 import type postgres from 'postgres';
 import {
-  afterEach, describe, expect, it,
+  afterEach, beforeEach, describe, expect, it, vi,
 } from 'vitest';
 
-import { BROWNLOW_ENABLE_ENV } from '@/lib/acquisition/afl-api-brownlow';
-import { AFL_API_FIXTURE_ACQUISITION_KIND } from '@/lib/acquisition/afl-api-fixture-identity';
+import { AflApiBrownlowFixtureIdentityRequiredError, BROWNLOW_ENABLE_ENV } from '@/lib/acquisition/afl-api-brownlow';
+import {
+  AFL_API_FIXTURE_ACQUISITION_KIND,
+  resolveAflApiMatchViaFixtureObservation,
+} from '@/lib/acquisition/afl-api-fixture-identity';
 import {
   DISABLED_AFL_API_INGESTION_CONTROLS,
   readAflApiIngestionControls,
@@ -42,8 +45,17 @@ import { runAflApiBrownlowSettleCli } from '../tools/current-season/settle-afl-a
 import { runAflApiFixturesSettleCli } from '../tools/current-season/settle-afl-api-fixtures';
 import { runAflApiSettleCli } from '../tools/current-season/settle-afl-api';
 
+// I244-F006: only the fixture-observation RESOLVER is replaced (used solely by
+// the fixture-identity describe block at the end of this file; every other
+// test here settles zero vote sets and never reaches it). All other exports of
+// the module stay real.
+vi.mock('@/lib/acquisition/afl-api-fixture-identity', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/acquisition/afl-api-fixture-identity')>()),
+  resolveAflApiMatchViaFixtureObservation: vi.fn(),
+}));
+
 const REPO_ROOT = join(__dirname, '..');
-const REFERENCE_FILES = ['source-families.json', 'afl-api-identities.json', 'seasons.json'] as const;
+const REFERENCE_FILES =['source-families.json', 'afl-api-identities.json', 'seasons.json'] as const;
 const SEASON = 2026;
 
 const ENABLED_CONTROLS: AflApiIngestionControls = { currentSeasonEnabled: true, brownlowAdminEnabled: false };
@@ -90,9 +102,12 @@ function makeSqlStub(): { sql: postgres.Sql; touched: { value: boolean } } {
 // ---------------------------------------------------------------------------
 
 const scratchDirs: string[] = [];
+const originalControlDatabaseUrl = process.env.DATABASE_URL;
 
 afterEach(() => {
   for (const dir of scratchDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+  if (originalControlDatabaseUrl === undefined) delete process.env.DATABASE_URL;
+  else process.env.DATABASE_URL = originalControlDatabaseUrl;
 });
 
 function makeProjectRoot(prefix: string): string {
@@ -186,6 +201,19 @@ describe('runAflApiSettleCli — AFLDB-ISSUE-228 follow-up settle-CLI gate cover
       ['--label', label, '--dry-run'],
       { projectRoot, sql, ingestionControls: controls },
     )).rejects.toThrow(/current-season ingestion is disabled/);
+
+    expect(touched.value).toBe(false);
+  });
+
+  it('fails real control preflight before the normal settle can touch its writer', async () => {
+    const { projectRoot, label } = setupSnapshot();
+    const { sql, touched } = makeSqlStub();
+    delete process.env.DATABASE_URL;
+
+    await expect(runAflApiSettleCli(
+      ['--label', label, '--dry-run'],
+      { projectRoot, sql },
+    )).rejects.toThrow('DATABASE_URL is not configured for the control database');
 
     expect(touched.value).toBe(false);
   });
@@ -359,4 +387,223 @@ describe('runAflApiBrownlowSettleCli — AFLDB-ISSUE-228 follow-up two-key settl
       expect(touched.value).toBe(true);
     },
   );
+
+  it('fails real control preflight before the Brownlow settle can touch its writer', async () => {
+    const { projectRoot, label } = setupSnapshot();
+    setDeploymentGate(true);
+    const { sql, touched } = makeSqlStub();
+    delete process.env.DATABASE_URL;
+
+    await expect(runAflApiBrownlowSettleCli(
+      ['--label', label, '--dry-run'],
+      { projectRoot, sql },
+    )).rejects.toThrow('DATABASE_URL is not configured for the control database');
+
+    expect(touched.value).toBe(false);
+  });
+});
+
+describe('runAflApiBrownlowSettleCli — AFLDB-ISSUE-244 I244-F006 fixture-identity contract', () => {
+  // `staging.afl_api_match` holds only the matches the AFL API settle PLANS; a
+  // match that merely corroborates a foreign-owned canonical match has no typed
+  // row and resolves only through `--use-fixture-identity`. These tests drive
+  // the REAL CLI + REAL coverage assessment; only the SQL connection and the
+  // fixture-observation resolver are stand-ins. "Reached the write boundary"
+  // = the run called `sql.begin` (the stub throws there), i.e. the CLI let the
+  // run start; "refused" = the F006 error, thrown before `sql.begin`.
+  class WriteBoundaryReached extends Error {}
+
+  const originalDeploymentEnv = process.env[BROWNLOW_ENABLE_ENV];
+  const resolveViaFixture = vi.mocked(resolveAflApiMatchViaFixtureObservation);
+  const CONTROLS: AflApiIngestionControls = { currentSeasonEnabled: false, brownlowAdminEnabled: true };
+
+  beforeEach(() => {
+    process.env[BROWNLOW_ENABLE_ENV] = 'true';
+    resolveViaFixture.mockReset();
+    resolveViaFixture.mockImplementation(async (_sql, _sourceId, providerMatchId) => (
+      providerMatchId.startsWith('CD_M_CORROBORATED')
+        ? { outcome: 'resolved', matchId: 9001, isFinal: false, season: SEASON }
+        : { outcome: 'refused', reason: 'no_fixture_observation' }
+    ));
+  });
+  afterEach(() => {
+    if (originalDeploymentEnv === undefined) delete process.env[BROWNLOW_ENABLE_ENV];
+    else process.env[BROWNLOW_ENABLE_ENV] = originalDeploymentEnv;
+  });
+
+  function setupVoteSnapshot(providerMatchIds: readonly string[]): { projectRoot: string; label: string } {
+    const projectRoot = makeProjectRoot('afldb-issue-244-f006-');
+    const label = 'f006-brownlow-snapshot';
+    const snapshotDir = join(projectRoot, 'data', 'sources', 'afl_api', 'brownlow', label);
+    mkdirSync(snapshotDir, { recursive: true });
+    writeFileSync(join(snapshotDir, 'manifest.json'), JSON.stringify({ source_key: 'afl_api', season: SEASON, files: [] }));
+    const votes = [3, 2, 1].map((value, i) => ({
+      player: { playerId: `CD_I${i + 1}` }, team: { teamId: 'CD_T10' }, votes: value, eligible: true,
+    }));
+    writeFileSync(
+      join(snapshotDir, '01-brownlow-season.raw.json'),
+      JSON.stringify({
+        seasonId: 'CD_S2026014',
+        status: 'IN_PROGRESS',
+        matchVotes: providerMatchIds.map((matchId) => ({ matchId, roundNumber: 5, votes })),
+      }),
+    );
+    writeFileSync(
+      join(snapshotDir, '02-brownlow-leaderboard.raw.json'),
+      JSON.stringify({
+        seasonId: 'CD_S2026014', status: 'IN_PROGRESS', teamFilter: null, leaderboard: [],
+      }),
+    );
+    return { projectRoot, label };
+  }
+
+  /** `typedProviderIds` are the provider match ids that HAVE a typed
+   * `staging.afl_api_match` row; every other id has none. */
+  function makeIdentitySql(typedProviderIds: readonly string[], databaseName = 'afldb_test') {
+    const state = { writeBoundaryReached: false, queries: 0 };
+    const fn = async (strings: TemplateStringsArray, ...values: unknown[]): Promise<unknown[]> => {
+      state.queries += 1;
+      const text = strings.join('?');
+      if (/current_database\(\)/.test(text)) return [{ name: databaseName }];
+      if (/FROM sources\s+WHERE key = 'afl_api'/.test(text)) return [{ id: 7 }];
+      if (/FROM staging\.afl_api_match/.test(text)) {
+        return typedProviderIds.includes(String(values[1]))
+          ? [{
+            season: SEASON, roundCode: '5', matchDate: '2026-04-11', homeClubId: 1, awayClubId: 2, isFinal: false,
+          }]
+          : [];
+      }
+      if (/round_number AS "roundNumber" FROM matches/.test(text)) return [{ roundNumber: 5 }];
+      throw new Error(`unexpected query in the F006 identity stub: ${text}`);
+    };
+    const begin = async (): Promise<never> => {
+      state.writeBoundaryReached = true;
+      throw new WriteBoundaryReached('the run was allowed to start');
+    };
+    return { sql: Object.assign(fn, { begin }) as unknown as postgres.Sql, state };
+  }
+
+  const REFUSED_MODES: readonly { flags: readonly string[]; mode: 'apply' | 'dry-run' }[] = [
+    { flags: ['--apply', '--auto-apply'], mode: 'apply' },
+    { flags: ['--apply'], mode: 'apply' },
+    { flags: ['--dry-run', '--auto-apply'], mode: 'dry-run' },
+    { flags: ['--dry-run'], mode: 'dry-run' },
+    { flags: [], mode: 'dry-run' },
+  ];
+
+  for (const { flags, mode } of REFUSED_MODES) {
+    it(`refuses before any write (${mode}) when a vote set is resolvable only via fixture identity and the flag is absent: [${flags.join(' ') || 'no mode flag'}]`, async () => {
+      const { projectRoot, label } = setupVoteSnapshot(['CD_M_TYPED', 'CD_M_CORROBORATED_1', 'CD_M_CORROBORATED_2']);
+      const { sql, state } = makeIdentitySql(['CD_M_TYPED']);
+
+      const error = await runAflApiBrownlowSettleCli(
+        ['--label', label, ...flags], { projectRoot, sql, ingestionControls: CONTROLS },
+      ).catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(AflApiBrownlowFixtureIdentityRequiredError);
+      const refusal = error as AflApiBrownlowFixtureIdentityRequiredError;
+      expect(refusal.mode).toBe(mode);
+      expect(refusal.coverage).toMatchObject({
+        voteSetsChecked: 3, withStagedIdentity: 1, unresolvableEvenWithFixtureIdentity: 0,
+      });
+      expect(refusal.coverage.fixtureIdentityRequired).toEqual(['CD_M_CORROBORATED_1', 'CD_M_CORROBORATED_2']);
+      expect(refusal.message).toContain('--use-fixture-identity');
+      expect(state.writeBoundaryReached).toBe(false);
+    });
+  }
+
+  it('with --use-fixture-identity the same snapshot is allowed to start (the fallback is explicit, and the CLI proceeds to its normal stages)', async () => {
+    const { projectRoot, label } = setupVoteSnapshot(['CD_M_TYPED', 'CD_M_CORROBORATED_1']);
+    const { sql, state } = makeIdentitySql(['CD_M_TYPED']);
+    const lines: string[] = [];
+
+    await expect(runAflApiBrownlowSettleCli(
+      ['--label', label, '--apply', '--auto-apply', '--use-fixture-identity'],
+      { projectRoot, sql, ingestionControls: CONTROLS, log: (line) => lines.push(line) },
+    )).rejects.toThrow(WriteBoundaryReached);
+
+    expect(state.writeBoundaryReached).toBe(true);
+    expect(lines.join('\n')).toContain('--use-fixture-identity:');
+  });
+
+  it('an ordinary staged snapshot still starts without the flag: no unnecessary refusal, and the fallback is never consulted', async () => {
+    const { projectRoot, label } = setupVoteSnapshot(['CD_M_TYPED_1', 'CD_M_TYPED_2']);
+    const { sql, state } = makeIdentitySql(['CD_M_TYPED_1', 'CD_M_TYPED_2']);
+
+    await expect(runAflApiBrownlowSettleCli(
+      ['--label', label, '--apply', '--auto-apply'], { projectRoot, sql, ingestionControls: CONTROLS },
+    )).rejects.toThrow(WriteBoundaryReached);
+
+    expect(state.writeBoundaryReached).toBe(true);
+    expect(resolveViaFixture).not.toHaveBeenCalled();
+  });
+
+  it('vote sets that even the fixture path cannot resolve keep their ordinary per-set refusal: no flag-required refusal', async () => {
+    const { projectRoot, label } = setupVoteSnapshot(['CD_M_NO_OBSERVATION']);
+    const { sql, state } = makeIdentitySql([]);
+
+    await expect(runAflApiBrownlowSettleCli(
+      ['--label', label, '--apply', '--auto-apply'], { projectRoot, sql, ingestionControls: CONTROLS },
+    )).rejects.toThrow(WriteBoundaryReached);
+
+    expect(state.writeBoundaryReached).toBe(true);
+  });
+
+  it('--observe-only without the flag is advisory only: it logs the requirement and still starts', async () => {
+    const { projectRoot, label } = setupVoteSnapshot(['CD_M_CORROBORATED_1']);
+    const { sql, state } = makeIdentitySql([]);
+    const lines: string[] = [];
+
+    await expect(runAflApiBrownlowSettleCli(
+      ['--label', label, '--observe-only', '--apply'],
+      { projectRoot, sql, ingestionControls: CONTROLS, log: (line) => lines.push(line) },
+    )).rejects.toThrow(WriteBoundaryReached);
+
+    expect(state.writeBoundaryReached).toBe(true);
+    const output = lines.join('\n');
+    expect(output).toContain('ADVISORY (--observe-only)');
+    expect(output).toContain('--use-fixture-identity');
+    expect(output).toContain('expected by design');
+  });
+
+  it('--validate-only opens no connection and does not assess fixture identity', async () => {
+    const { projectRoot, label } = setupVoteSnapshot(['CD_M_CORROBORATED_1']);
+    const { sql, state } = makeIdentitySql([]);
+
+    const outcome = await runAflApiBrownlowSettleCli(
+      ['--label', label, '--validate-only'], { projectRoot, sql, ingestionControls: CONTROLS },
+    );
+
+    expect(outcome.result).toBeNull();
+    expect(state.queries).toBe(0);
+    expect(resolveViaFixture).not.toHaveBeenCalled();
+  });
+
+  it('does not weaken the completed-season backtest proof: a non-afldb_test database is refused for THAT reason, before fixture identity is assessed', async () => {
+    const { projectRoot, label } = setupVoteSnapshot(['CD_M_CORROBORATED_1']);
+    const { sql, state } = makeIdentitySql([], 'afldb_prod');
+
+    const error = await runAflApiBrownlowSettleCli(
+      ['--label', label, '--apply', '--auto-apply', '--allow-completed-season-backtest'],
+      { projectRoot, sql, ingestionControls: CONTROLS },
+    ).catch((e: unknown) => e);
+
+    expect(error).not.toBeInstanceOf(AflApiBrownlowFixtureIdentityRequiredError);
+    expect((error as Error).message).toMatch(/afldb_prod/);
+    expect(resolveViaFixture).not.toHaveBeenCalled();
+    expect(state.writeBoundaryReached).toBe(false);
+  });
+
+  it('the backtest authority does not bypass the identity requirement on afldb_test', async () => {
+    const { projectRoot, label } = setupVoteSnapshot(['CD_M_CORROBORATED_1']);
+    const { sql, state } = makeIdentitySql([], 'afldb_test');
+
+    const error = await runAflApiBrownlowSettleCli(
+      ['--label', label, '--apply', '--auto-apply', '--allow-completed-season-backtest'],
+      { projectRoot, sql, ingestionControls: CONTROLS },
+    ).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(AflApiBrownlowFixtureIdentityRequiredError);
+    expect(state.writeBoundaryReached).toBe(false);
+  });
 });

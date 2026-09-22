@@ -203,8 +203,20 @@ describe('venue canonical dataset', () => {
  * AFLDB-ISSUE-228 S1 (§5.3) — the AFL.com.au provider-id maps. Teams validate
  * against clubs.json 'hist' (never by raw name, per §6.2); the six clubs
  * whose AFL API raw name differs from legacy_club_hist are the ones §2.1's
- * evidence names, exactly. Venues are deliberately incomplete (§6.2: an
- * unmapped venue is a warning, never a HALT) and are not asserted complete.
+ * evidence names, exactly. As of AFLDB-ISSUE-244 I244-F003 (2026-09-21), this
+ * file declares all 17 distinct provider venue identities observed in the
+ * supported real 2026 AFL API snapshot, each a genuine, evidenced identity,
+ * never a guess (afldb-issue244.md §37.12). An unmapped venue is no longer
+ * merely a warning that leaves `venue_id` NULL: a provider `CD_V` the AFL API
+ * supplies but this map does not cover now fails closed in
+ * `settle-afl-api.ts` — the match is refused from automatic canonical
+ * application, not silently written with a NULL venue (see
+ * `settle-afl-api.ts`'s `venueIdentityUnresolved` gate and
+ * `tests/integration/settle-afl-api.test.ts`'s I244-F003 cases). This file's
+ * contract is specifically the supported 2026 provider venue set — not every
+ * real AFL venue worldwide, historical or future, needs a deterministic
+ * mapping here; a real venue that has never played an AFL API-tracked match
+ * is not a defect in this file.
  */
 describe('AFL API identity maps (AFLDB-ISSUE-228 S1)', () => {
   const clubsByHist = new Set(clubs.identities.map((c: any) => c.hist));
@@ -238,14 +250,35 @@ describe('AFL API identity maps (AFLDB-ISSUE-228 S1)', () => {
 
   it('never guesses a venue mapping: every declared venue also has raw_name evidence', () => {
     const venueKeys = Object.keys(aflApiIdentities.venues).filter((k) => k !== '$comment');
+    expect(new Set(venueKeys).size).toBe(venueKeys.length);
     for (const key of venueKeys) {
       expect(aflApiIdentities.venues[key].raw_name).toBeTruthy();
       expect(aflApiIdentities.venues[key].legacy_name).toBeTruthy();
+      expect(key).toMatch(/^CD_V\d+$/);
     }
-    // M.C.G./S.C.G. are the only two backed by existing tracked evidence
-    // (venue-canonical.json already documents them as literal AFL Tables
-    // legacy_name spellings, not just display expansions).
-    expect(venueKeys.sort()).toEqual(['CD_V40', 'CD_V60']);
+    // AFLDB-ISSUE-244 I244-F003 (2026-09-21, two continuations): a READ-ONLY
+    // query against afldb_test's real `venues` table
+    // (transaction_read_only=on, no row altered) proved nine of these
+    // deterministically, on top of the pre-existing M.C.G./S.C.G. pair —
+    // five via src/search/nl/vocab.ts's tracked VENUE_NICKNAMES evidence
+    // cross-checked against the query's own legacy_name column (Gabba,
+    // Docklands/Marvel Stadium, Kardinia Park/GMHBA Stadium, Perth
+    // Stadium/Optus Stadium, York Park/UTAS Stadium), and four because the
+    // provider's raw venue name is IDENTICAL to a real legacy_name (Adelaide
+    // Oval, Norwood Oval, Hands Oval, Barossa Park). The remaining six were
+    // resolved by authoritative public naming-rights-history evidence — TIO
+    // Stadium/Marrara Oval, TIO Traeger Park/Traeger Park, Corroboree Group
+    // Oval Manuka/Manuka Oval, Ninja Stadium/Bellerive Oval, People First
+    // Stadium/Carrara, ENGIE Stadium/Sydney Showground — see
+    // afldb-issue244.md §37.12 for the full per-venue evidence table. All 17
+    // distinct provider venues observed in the supported real 2026 AFL API
+    // snapshot are now mapped; none was guessed. This list grows only on new
+    // evidence — see this file's own module comment above.
+    expect(venueKeys.sort()).toEqual([
+      'CD_V150', 'CD_V160', 'CD_V190', 'CD_V2', 'CD_V20', 'CD_V200',
+      'CD_V2125', 'CD_V2925', 'CD_V30', 'CD_V374', 'CD_V386', 'CD_V40',
+      'CD_V4105', 'CD_V43', 'CD_V6', 'CD_V60', 'CD_V81',
+    ].sort());
   });
 });
 

@@ -37624,7 +37624,12 @@ records it as F-001.
 
 ## AFLDB-ISSUE-228 — AFL.com.au official JSON APIs as the current-season match, stats and Brownlow source
 
-- **Status:** Open — plan approved 2026-09-19 (Q1/Q2/Q7 decided, §0.1). Implementation started
+- **Status:** Open — plan approved 2026-09-19 (Q1/Q2/Q7 decided, §0.1).
+  **Current-state pointer (2026-09-22, ISSUE-244 F021):** merged and deployed to DEV at
+  `bbf87566`; **S9 paused**; the later dated paragraphs of this entry and `IssuesIndex.md` carry
+  the newer status, and the ISSUE-244 acceptance review record (`issues/closed/AFLDB-ISSUE-244.md`) is the
+  current source for the AFL API acceptance findings. The sentence below is the **2026-09-19
+  historical snapshot**, retained as lineage and **superseded**. Implementation started
   2026-09-19 (Sonnet 5, worktree `afldb-issue-228`, branch `sonnet/issue-228`): **Stages S1–S5
   implemented and operator-validated (`afldb_test` only); S6's read-only settle-planning path
   (identity context, match/player resolution composition, corroboration classification) is
@@ -38086,6 +38091,9 @@ records it as F-001.
   already-`afltables`-owned 2025 match only needs to be `corroborated`, which still writes the
   staging projection per Q1) stages all ~207 matches in one operational step, ahead of the
   Brownlow settle, every count night.
+  *[Annotation 2026-09-22, ISSUE-244 F006/F021 — the parenthetical above is incorrect for a
+  corroborated (foreign-owned) match: no `staging.afl_api_match` row is written for it, so the
+  Brownlow settle needs `--use-fixture-identity` to resolve it. Original text retained as history.]*
   **Change made:** `tools/current-season/settle-afl-api-brownlow.ts` now prints an actionable
   hint naming this exact prerequisite whenever `voteSetsRefused.unknown_match > 0`, instead of a
   bare counter, so an operator is not left to rediscover the sequencing dependency. No change to
@@ -40199,3 +40207,93 @@ admin or deployment behaviour changed.
 2. `npx vitest run tests/afl-api-player-evidence.test.ts tests/afl-api-player-bridge-cli.test.ts`
 3. `npx vitest run tests/afl-api-match.test.ts tests/afl-api-settle-cli-gate.test.ts tests/reference-data.test.ts`
 4. `git diff --check`
+
+## AFLDB-ISSUE-244 — ISSUE-228 AFL API end-to-end acceptance review
+
+- **Status:** Resolved — 2026-09-22.
+- **Severity:** High (review umbrella). The review's own five-point scale graded its worst findings CRITICAL (F001, F002); on
+  AFLDB's High/Medium/Low scale the umbrella is High. Findings by original grade: CRITICAL 2, HIGH 6 (incl. F030), MEDIUM 8
+  (incl. F029, F031), LOW 8, INFO 7 — 31 findings, all terminal.
+- **Area:** AFL API current-season ingestion / ISSUE-228 acceptance / canonical safety.
+- **Record:** `issues/closed/AFLDB-ISSUE-244.md` (the review record, findings register I244-F001…F031, evidence ledger and closeout
+  sections; formerly the repository-root working file `afldb-issue244.md`).
+- **Found:** 2026-09-21 — independent end-to-end acceptance review (Fable 5.1, inspection only) of the ISSUE-228 AFL.com.au API
+  ingestion path. Fixes and validation ran 2026-09-21 → 2026-09-22.
+
+**ID-allocation note (one-time reconciliation).** `ISSUE-244` was used as the working identifier during the independent ISSUE-228
+AFL API acceptance review *before* the work was entered in this ledger, and the stable `I244-Fxxx` finding identifiers were then
+cited throughout the review record, tests, `CHANGELOG.md` and documentation. No other repository issue uses 244. The operator chose
+to keep the number and allocate it here to preserve that evidence chain rather than renumber to `ISSUE-227`. This is a one-off
+reconciliation of an already-established record, **not** a precedent for sequential allocation. `AFLDB-ISSUE-227` remains
+unallocated.
+
+**Summary.** The review found and resolved correctness, durability, identity, derived-data, Brownlow, environment and
+operational-boundary defects between an AFL API fixture and correct, complete canonical data.
+
+**Root cause / major fixes** (detail and evidence per finding in the record):
+
+- **F001** — derived recomputes (`recomputeSeasonMetadata`, `recomputeClubSeasons`, `recomputeSeasonBrownlowStatus`) were not run by
+  the AFL API settle; now correctly gated on actual canonical writes, in the AFL Tables order and transaction.
+- **F002** — a Brownlow recipient-replacement correction left a fourth positive-vote row; stale recipients are now demoted inside
+  the vote-set savepoint.
+- **F003** — venue identity/provider mapping: a provider venue outside the map silently produced `venue_id NULL`; a map miss is now
+  refused/counted as a finding (provider-unmapped vs legacy-name-missing are distinguished) and 2026 coverage is 17/17.
+- **F004** — `--require-complete-source` was evaluated after commit; the completeness gate now refuses before commit.
+- **F005 / F016** — control/writer DB safety and the service DSN boundary: the ingestion gate DSN (`DATABASE_URL`) is retained by the
+  units and never used as the writer DSN; a live control/writer identity preflight (with a secret-safe fail-closed error for a
+  malformed control DSN) runs before any writer-backed work, and the runbook binds the gate DSN to the intended database.
+- **F006** — typed staging / fixture identity contract corrected (`staging.afl_api_match` is owner/new-match proposals only;
+  `--use-fixture-identity` is mandatory for 2026 H&A Brownlow resolution).
+- **F007** — Brownlow `match_id` and vote-set integrity: `match_id` carried and healed; two-phase vote release; whole-set
+  `match_identity_conflict` refusal.
+- **F008** — terminal `import_batches` lifecycle (status, `completed_at`, rejection count, counters) now stamped in-transaction.
+- **F009** — automatic-apply refusals now leave durable `data_issues` findings instead of a bare counter.
+- **F010** — identity-bearing corrections (season/round/date/clubs) are withheld into a self-healing finding rather than silently
+  mutating match identity; no rekey; non-identity fields (scores, `venue_id`, `match_time`) still auto-apply.
+- **F011 / F012** — derived-table test coverage completed; the no-op recompute concern was already resolved by F001's write gate.
+- **F029** — systemd-stripped environment values are no longer normally rehydrated through the current-season `loadEnv()` (shared
+  `tools/current-season/load-env.ts`, `AFLDB_SKIP_DOTENV` set by the wrappers under `INVOCATION_ID`). Accepted limit: the service
+  account can still read `<repo>/.env` directly (ISSUE-220 / infrastructure class).
+- **F030** — duplicate-fixture prevention: a foreign-owned canonical fixture that differs from the AFL API by one identity component
+  (date/round) is refused for review at plan and apply time instead of being INSERTed a second time. A final SELECT → INSERT
+  micro-window is not eliminated (recorded).
+- **F031** — historical stale `match_key` drift census: no affected population; no remediation required.
+- **Dispositioned without code:** F013 accepted (bounded one-hour ISR window); F014 pass (corroboration is scores-only, documented);
+  F015 deferred to ISSUE-228 Q5; F017 deferred to ISSUE-224; F021 documentation/comment corrections; F026 accepted (test-pinned);
+  F018–F020, F022, F024, F025, F027 noted; F023, F028 pass.
+
+**Validation (only what actually occurred; per-finding, as recorded in the record — no combined total is claimed):**
+
+- F001/F011: `settle-afl-api.test.ts` 20/20 on `afldb_test` (`afldb_owner` import role), including the persisted player-derived and
+  club/season assertions.
+- F002: `npm run typecheck` PASS; DB-free `afl-api-brownlow.test.ts` 18/18; `afldb_test` `settle-afl-api-brownlow.test.ts` 12/12
+  (recipient-swap invariant: 3 positive recipients, total 6).
+- F003: 17/17 venue coverage; `reference-data.test.ts` 51/51; typecheck PASS; `afldb_test` 12/12.
+- F004/F005/F016: `afl-api-ingestion-safety.test.ts` 10/10; `afl-api-settle-cli-gate.test.ts` 23/23; `afldb_test` 13/13.
+- F007: DB-free `afl-api-brownlow.test.ts` 47/47; `afldb_test` Brownlow 17/17. F008: DB-free 77/77; `afldb_test` 16/16 and 21/21.
+  F009: DB-free 93/93; `afldb_test` 18/18. F010: DB-free 118/118; `afldb_test` 20/20.
+- **F029:** `npm run typecheck` PASS; `tests/afl-api-ingestion-safety.test.ts` 95/95 PASS; `tests/current-season-import.test.ts`
+  260 passed / 4 skipped (the four skipped are ISSUE-130 R-fragment cases, not F029 evidence). No PostgreSQL validation required.
+- **F030:** DB-free 321/321 PASS; `afldb_test` normal integration 28/28 PASS (F030 describe 8/8); Brownlow integration 21/21 PASS.
+- **F031:** `afldb_test` read-only census — 0 `afl_api`-owned matches, 0 stale `match_key`; DEV read-only census — 0 `afl_api`-owned
+  matches, 0 stale `match_key`.
+- Final documentation / comment reconciliation (§58, §59): no additional technical validation was required or run.
+
+**What closing ISSUE-244 does NOT close or complete (mandatory boundary):**
+
+- **AFLDB-ISSUE-224** — registration/linkage of the unresolved / new 2026 players (92 providers / 830 rows on the 2026-09-21
+  snapshot) — remains open.
+- **AFLDB-ISSUE-228 Q5** — `matches.match_time` vocabulary/normalisation operator decision — remains open (F015 deferred here).
+- **AFLDB-ISSUE-228 S9** — re-settle, DEV smoke and operational acceptance — remains open.
+- **Timer consequence.** The scheduled AFL API chain runs `--apply --auto-apply --require-complete-source`, and after F004 an
+  incomplete source is refused **before commit**. Until ISSUE-224 resolves the required registrations and the snapshot is
+  re-settled under ISSUE-228 S9, the timer may commit nothing. **ISSUE-244 resolved ≠ timer operationally unblocked.**
+- **Known limitations retained:** bounded one-hour ISR staleness after an `afl_api`-only write (F013); the service account can
+  still read `<repo>/.env` directly (F029, ISSUE-220 class); the F030 final SELECT → INSERT micro-window is not eliminated; the
+  admin-panel wiring for the two AFL API units and `SettleRunPanel.tsx:59` "AFL Tables" wording are later follow-ups, not claimed.
+
+**No PROD validation or deployment claim is made by ISSUE-244 closeout.** Not claimed: PROD deployment or validation, S9
+completion, ISSUE-224 completion, 2026 source completeness, or scheduled-timer operational readiness.
+
+**Index/changelog.** Resolved — not added to `IssuesIndex.md` (open issues only) or the Open Issues table. `CHANGELOG.md` records the
+retained behaviour under `Unreleased`.

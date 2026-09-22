@@ -43,6 +43,19 @@ MANIFEST_ROOT=docs/rebuild-manifests/afltables_fitzroy_core
 
 cd "$PROJECT_ROOT"
 
+# --- AFLDB-ISSUE-244 I244-F029: keep the stripped credentials stripped -----
+# systemd has already applied this unit's EnvironmentFile= and then its
+# UnsetEnvironment= by the time we run, so the environment here is the narrowed
+# one the unit intends — including a stripped DATABASE_URL. Without this flag
+# step 3's settle-afltables.ts calls loadEnv(), reopens $PROJECT_ROOT/.env and
+# repopulates everything currently unset, undoing that narrowing in-process.
+# INVOCATION_ID is set by systemd and by nothing else, so a manual run of this
+# script keeps its .env convenience. Set here, before the FIRST Node/tsx
+# invocation (step 3); the R and Python steps do not read this flag.
+if [ -n "${INVOCATION_ID:-}" ]; then
+  export AFLDB_SKIP_DOTENV=1
+fi
+
 # --- the R runtime --------------------------------------------------------
 # AFLDB-ISSUE-130: RSCRIPT and the OPTIONAL AFLDB_R_LIBS library directory are
 # resolved by ONE sourced fragment shared with deploy/afldb-r-preflight.sh, so

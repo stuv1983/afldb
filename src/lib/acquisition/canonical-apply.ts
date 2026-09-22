@@ -47,7 +47,8 @@ import type { ImportBatchId } from '@/lib/import-batch-id';
 
 import { loadManualAuthority } from './manual-authority';
 import {
-  carryMatchOverrides, findRetiredMatchIdentities,
+  carryMatchOverrides, findPlausibleCanonicalFixtures, findRetiredMatchIdentities,
+  POSSIBLE_EXISTING_MATCH,
   type MatchRekeyIdentity, type MatchRekeyScope,
 } from './match-rekey';
 import {
@@ -245,6 +246,25 @@ export type CanonicalApplyUnitInput = {
     scope: MatchRekeyScope;
     identity: Omit<MatchRekeyIdentity, 'season' | 'sourceId' | 'family' | 'matchKey'>;
   } | null;
+  /**
+   * AFLDB-ISSUE-244 I244-F030 — the fixture identity of a `matches` target that
+   * would be INSERTed, so the applier can re-ask, inside the savepoint, whether
+   * some canonical row (of ANY owner) may already be this fixture.
+   *
+   * OPTIONAL and matches-only. Omitted or `null` disables the check entirely,
+   * which is what AFL Tables and every non-match family get: AFL Tables settles
+   * the enumeration it owns and has its own retired-identity search, and a
+   * player/Brownlow unit never inserts a match. Supplied only by the AFL API
+   * match writer, for whom a provider-id miss plus an exact `match_key` miss
+   * proves only that a row could not be FOUND, not that none exists.
+   *
+   * It authorises nothing and selects nothing. A hit REFUSES the INSERT
+   * (`possible_existing_match`); a read here is not a decision about which row
+   * is the match. `season` and `matchKey` come from this unit.
+   */
+  matchAmbiguity?: {
+    identity: Pick<MatchRekeyIdentity, 'roundCode' | 'matchDate' | 'homeClubId' | 'awayClubId'>;
+  } | null;
   /** Player-family units only. */
   playerId: number | null;
   /** Player-family units only: the polled home-and-away round. */
@@ -283,6 +303,15 @@ export type CanonicalApplyRefusal =
   | 'rekey_ambiguous'
   | 'rekey_would_merge'
   | 'rekey_override_conflict'
+  /**
+   * AFLDB-ISSUE-244 I244-F030. The `matches` target would INSERT, but a canonical
+   * row of ANY owner already has this season and these oriented clubs and differs
+   * in at most one of round/date (`findPlausibleCanonicalFixtures()`), so it may
+   * be this very fixture. Fixture-wide, like the rekey refusals: nothing dependent
+   * is written against a match this run declined to create. It links, rekeys and
+   * re-owns nothing; a human decides.
+   */
+  | typeof POSSIBLE_EXISTING_MATCH
   | 'nothing_to_write'
   | 'write_failed';
 
@@ -371,7 +400,7 @@ type FreshTarget = {
 
 /** What `readFreshTarget()` returns instead of a target when it must refuse. */
 type FreshTargetRefusal =
-  | 'no_canonical_match' | 'rekey_ambiguous' | 'rekey_would_merge';
+  | 'no_canonical_match' | 'rekey_ambiguous' | 'rekey_would_merge' | typeof POSSIBLE_EXISTING_MATCH;
 
 /**
  * A `date` column arrives as a Date; every other canonical value arrives as
@@ -476,6 +505,22 @@ async function readFreshTarget(
         currentValues: projectRow(stale, fields),
         rekeyFromMatchKey: stale.match_key as string,
       };
+    }
+    // AFLDB-ISSUE-244 I244-F030. Reached only when the incoming rendering has no
+    // row AND no retired candidate: this is the last question before the target
+    // is declared insertable. Re-derived HERE, inside the savepoint, because the
+    // planner's answer is a READ COMMITTED read that a concurrent commit may have
+    // outdated — the same reason every other identity/authority decision above is
+    // re-read. A hit refuses the INSERT; it never resolves a target from the
+    // candidates. `FOR UPDATE` covers the rows actually returned; it is not a
+    // predicate lock, so the final SELECT -> INSERT window stays (see the helper).
+    if (unit.matchAmbiguity) {
+      const plausible = await findPlausibleCanonicalFixtures(
+        sp,
+        { season: unit.season, matchKey: unit.matchKey, ...unit.matchAmbiguity.identity },
+        true,
+      );
+      if (plausible.length > 0) return POSSIBLE_EXISTING_MATCH;
     }
     return {
       identity: { status: 'new_target', entity: 'matches', targetKey },
@@ -963,7 +1008,16 @@ export async function applyCanonicalUnit(
           // §5.10 again: the rekey refusals are fixture-wide, so the matchId
           // this unit was carrying is retired with them. Nothing may be
           // written against a row whose identity was just refused.
-          if (target.targetTable === 'matches' && isRekeyRefusal(fresh)) {
+          // I244-F030: `possible_existing_match` is fixture-wide for the same
+          // reason. `matchId` is already null on this path (the incoming key has no
+          // row), but the block is what makes the dependent `match_period_scores`
+          // target of THIS unit refuse with the specific reason instead of
+          // resolving against nothing, and what the caller reads to withhold the
+          // fixture's player rows.
+          if (
+            target.targetTable === 'matches'
+            && (isRekeyRefusal(fresh) || fresh === POSSIBLE_EXISTING_MATCH)
+          ) {
             fixtureBlocked = fresh;
             matchId = null;
           }

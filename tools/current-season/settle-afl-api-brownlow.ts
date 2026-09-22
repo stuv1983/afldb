@@ -36,6 +36,35 @@
  *
  * §10 "Operational enablement": every mode past `--validate-only` refuses
  * unless `AFLDB_AFL_API_BROWNLOW_ENABLED=true` is set.
+ *
+ * AFLDB-ISSUE-244 I244-F006 — MATCH-IDENTITY CONTRACT.
+ * `staging.afl_api_match` is a typed projection of the matches the AFL API
+ * match settle PLANS (`afl_api`-owned or new). It is NOT a mirror of every
+ * provider match: a match that merely corroborates an existing foreign-owned
+ * canonical match (e.g. an `afltables`-owned home-and-away match) has no
+ * typed row by design. Such a Brownlow vote set resolves only through
+ * `--use-fixture-identity` (canonical fixture identity, SELECT-only). Before
+ * any write, this CLI measures which of the snapshot's vote sets need that
+ * fallback (`assessAflApiBrownlowMatchIdentityCoverage()`, from the Brownlow
+ * records themselves — never from a source-vs-staging row count) and, when
+ * some do and the flag is absent:
+ *
+ *   --validate-only  no connection is opened, so coverage is not assessed.
+ *   --observe-only   ADVISORY only (log lines): it never attempts a canonical
+ *                    write and its spine observations do not depend on match
+ *                    identity, so the affected sets are simply counted refused.
+ *   --dry-run / --apply (with or without --auto-apply, and with the default
+ *   no-mode-flag dry run)
+ *                    REFUSE before the import batch or any observation is
+ *                    written. `--apply` without `--auto-apply` still commits
+ *                    typed projections plus a data_issues/import_rejections
+ *                    row per refused vote set; `--dry-run` is the rehearsal of
+ *                    `--apply` and must fail the same way.
+ *   --allow-completed-season-backtest
+ *                    changes nothing here: its `afldb_test` proof runs first,
+ *                    and the identity requirement then applies as above.
+ *
+ * The flag is never switched on implicitly.
  */
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
@@ -44,8 +73,12 @@ import { fileURLToPath } from 'node:url';
 
 import postgres from 'postgres';
 
+import { proveAflApiIngestionPreflight } from '../../src/lib/acquisition/afl-api-ingestion-safety';
 import {
   BROWNLOW_ENABLE_ENV,
+  AflApiBrownlowFixtureIdentityRequiredError,
+  assessAflApiBrownlowMatchIdentityCoverage,
+  describeAflApiBrownlowFixtureIdentityRequirement,
   isAflApiBrownlowEnabled,
   requireAflApiBrownlowBacktestDatabase,
   runSettleAflApiBrownlow,
@@ -64,10 +97,12 @@ import {
 import { parseSourceFamilyRegistry, type SourceFamilyRegistry } from '../../src/lib/acquisition/source-families';
 import {
   combineAflApiBrownlowGates,
-  readAflApiIngestionControls,
   type AflApiIngestionControls,
 } from '../../src/lib/acquisition/afl-api-ingestion-control';
 import { SETTING_KEYS } from '../../src/lib/site-settings';
+// I244-F029: the shared loader, which honours AFLDB_SKIP_DOTENV so a variable
+// this unit's `UnsetEnvironment=` stripped is not read straight back in.
+import { loadEnv } from './load-env';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PROJECT_ROOT = join(__dirname, '..', '..');
@@ -84,28 +119,13 @@ export type AflApiBrownlowSettleCliArgs = {
   validateOnly: boolean;
   /** S7 follow-up (2026-09-20): opt in to the fixture-only identity
    * fallback (§ "fixture-only Brownlow identity prerequisite"). Off by
-   * default — omitting it keeps this CLI's behaviour byte-identical to
-   * before the fallback existed; an operator must ask for it explicitly. */
+   * default and NEVER enabled implicitly; an operator must ask for it
+   * explicitly. I244-F006: a write-capable run whose snapshot needs it and
+   * lacks it refuses before any write (see the module doc header). */
   useFixtureIdentity: boolean;
   /** §10 follow-up (2026-09-20): see the module doc header. Off by default. */
   allowCompletedSeasonBacktest: boolean;
 };
-
-function loadEnv(projectRoot: string): void {
-  let contents: string;
-  try {
-    contents = readFileSync(join(projectRoot, '.env'), 'utf8');
-  } catch {
-    return;
-  }
-  for (const line of contents.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#') || !trimmed.includes('=')) continue;
-    const [key, ...rest] = trimmed.split('=');
-    const name = key.trim();
-    if (!process.env[name]) process.env[name] = rest.join('=').trim();
-  }
-}
 
 function valueFor(argv: readonly string[], flag: string): string | null {
   const index = argv.indexOf(flag);
@@ -213,7 +233,7 @@ function counterLines(counters: AflApiBrownlowSettleCounters): string[] {
   group('Observation', ['observationsSeen', 'payloadsCreated', 'versionsAppended', 'observationsUnchanged']);
   group('Canonical', [
     'canonicalRowsInserted', 'canonicalRowsUpdated', 'canonicalApplicationsLogged',
-    'voteSetsNoOp', 'voteSetsApplyFailed',
+    'staleRecipientsDemoted', 'voteSetsNoOp', 'voteSetsApplyFailed', 'coverageRecomputeRuns',
   ]);
   group('Data issues', ['dataIssuesOpened', 'dataIssuesRefreshed']);
   group('Leaderboard reconciliation', ['leaderboardPlayersCompared', 'leaderboardMismatches']);
@@ -253,16 +273,18 @@ export async function runAflApiBrownlowSettleCli(
   }
 
   // AFLDB-ISSUE-228 follow-up (§D two-key safety) — BOTH the outer
-  // deployment gate and the inner super-admin DB switch must be true.
+  // deployment gate and the inner super-admin DB switch must be true. A
+  // test-only control override preserves the existing no-connection gate test.
   const deploymentGateEnabled = isAflApiBrownlowEnabled(process.env);
-  const ingestionControls = deps.ingestionControls ?? await readAflApiIngestionControls();
-  const gate = combineAflApiBrownlowGates(deploymentGateEnabled, ingestionControls.brownlowAdminEnabled);
-  if (!gate.effectiveEnabled) {
+  const overriddenGate = deps.ingestionControls
+    ? combineAflApiBrownlowGates(deploymentGateEnabled, deps.ingestionControls.brownlowAdminEnabled)
+    : null;
+  if (overriddenGate && !overriddenGate.effectiveEnabled) {
     throw new Error(
       'Brownlow settle is disabled outside the live count window (§10, §D two-key safety): '
       + `deployment gate (${BROWNLOW_ENABLE_ENV}) is ${deploymentGateEnabled ? 'enabled' : 'disabled'}, `
       + `super-admin setting (site_settings '${SETTING_KEYS.aflApiBrownlowEnabled}') is `
-      + `${ingestionControls.brownlowAdminEnabled ? 'enabled' : 'disabled'}. Both must be enabled.`,
+      + `${deps.ingestionControls!.brownlowAdminEnabled ? 'enabled' : 'disabled'}. Both must be enabled.`,
     );
   }
 
@@ -271,21 +293,49 @@ export async function runAflApiBrownlowSettleCli(
     ? seasons.in_progress_seasons.filter((year): year is number => typeof year === 'number')
     : [];
 
+  // The identities map is needed to USE the fallback (flag) and, since
+  // I244-F006, to MEASURE whether the snapshot needs it (any vote set at all).
+  // A zero-vote snapshot never reads it unless the flag asks for it.
+  const fixtureIdentityFallbackCandidate: AflApiFixtureIdentityFallback | undefined =
+    args.useFixtureIdentity || snapshot.matchVotes.length > 0
+      ? {
+        registry,
+        identities: parseAflApiIdentities(
+          readJson(join(projectRoot, 'data', 'reference', 'afl-api-identities.json')),
+        ),
+      }
+      : undefined;
   let fixtureIdentityFallback: AflApiFixtureIdentityFallback | undefined;
   if (args.useFixtureIdentity) {
-    const identities = parseAflApiIdentities(
-      readJson(join(projectRoot, 'data', 'reference', 'afl-api-identities.json')),
-    );
-    fixtureIdentityFallback = { registry, identities };
+    fixtureIdentityFallback = fixtureIdentityFallbackCandidate;
     log(
-      '--use-fixture-identity: a vote set with no staging.afl_api_match row will be retried '
-      + 'against the fixture-only observation spine before being refused unknown_match.',
+      '--use-fixture-identity: a vote set with no typed staging.afl_api_match row (the expected state for '
+      + 'a match that only corroborates a foreign-owned canonical match) will be retried against the '
+      + 'fixture-only observation spine before being refused unknown_match.',
     );
   }
 
   const ownsClient = deps.sql === undefined;
   const sql = deps.sql ?? createImportClient();
   try {
+    const preflight = deps.ingestionControls
+      ? null
+      : await proveAflApiIngestionPreflight(sql);
+    const ingestionControls = deps.ingestionControls ?? preflight!.controls;
+    const gate = combineAflApiBrownlowGates(deploymentGateEnabled, ingestionControls.brownlowAdminEnabled);
+    if (!gate.effectiveEnabled) {
+      throw new Error(
+        'Brownlow settle is disabled outside the live count window (§10, §D two-key safety): '
+        + `deployment gate (${BROWNLOW_ENABLE_ENV}) is ${deploymentGateEnabled ? 'enabled' : 'disabled'}, `
+        + `super-admin setting (site_settings '${SETTING_KEYS.aflApiBrownlowEnabled}') is `
+        + `${ingestionControls.brownlowAdminEnabled ? 'enabled' : 'disabled'}. Both must be enabled.`,
+      );
+    }
+    if (preflight) {
+      log(`AFL API Brownlow ingestion preflight: control database = ${preflight.control.database}, `
+        + `writer database = ${preflight.writer.database}.`);
+    }
+
     let completedSeasonBacktestAuthority: AflApiBrownlowCompletedSeasonBacktestAuthority | undefined;
     if (args.allowCompletedSeasonBacktest) {
       // Live current_database() proof — never the DSN string, never a
@@ -296,6 +346,28 @@ export async function runAflApiBrownlowSettleCli(
       log('COMPLETED-SEASON BROWNLOW BACKTEST');
       log(`database: ${completedSeasonBacktestAuthority.verifiedDatabase}`);
       log('season-in-progress gate bypass authorised for this Brownlow run only');
+    }
+
+    // I244-F006: read-only, BEFORE the run opens its transaction (no import
+    // batch, observation, projection, data_issues or rejection exists yet).
+    // Skipped when the operator already passed --use-fixture-identity, and
+    // when there is nothing to resolve.
+    if (!args.useFixtureIdentity && fixtureIdentityFallbackCandidate) {
+      const coverage = await assessAflApiBrownlowMatchIdentityCoverage(
+        sql, snapshot.matchVotes, fixtureIdentityFallbackCandidate,
+      );
+      if (coverage.fixtureIdentityRequired.length > 0) {
+        if (!args.observeOnly) {
+          throw new AflApiBrownlowFixtureIdentityRequiredError(args.apply ? 'apply' : 'dry-run', coverage);
+        }
+        log('');
+        log(
+          `ADVISORY (--observe-only): ${describeAflApiBrownlowFixtureIdentityRequirement(coverage)} `
+          + 'Without --use-fixture-identity those vote sets are counted refused as unknown_match below. '
+          + 'A --dry-run or --apply run would refuse before any write; re-run with --use-fixture-identity '
+          + 'if canonical fixture identity is the intended fallback.',
+        );
+      }
     }
 
     const result = await runSettleAflApiBrownlow(sql, {
@@ -321,25 +393,33 @@ export async function runAflApiBrownlowSettleCli(
 
     for (const line of counterLines(result.counters)) log(line);
 
-    // §10: `unknown_match` means this vote set's `CD_M…` has no
-    // `staging.afl_api_match` row (migration 103) yet — the Brownlow feed
-    // itself carries no home/away/date to resolve a match from (module doc,
-    // `afl-api-brownlow.ts`). This is an ordinary, expected sequencing gap,
-    // never a resolver defect: run `settle-afl-api.ts --label <snapshot>
-    // --apply` for this match's season FIRST (no `--auto-apply` is needed —
-    // an already afltables-owned match only needs to be corroborated, which
-    // still writes the staging projection), then re-run this settle.
+    // §10 / I244-F006: `unknown_match` means neither identity path could
+    // resolve this vote set's `CD_M…`. The Brownlow feed itself carries no
+    // home/away/date, so a match is identified either by a typed
+    // `staging.afl_api_match` row (written ONLY for a match the AFL API settle
+    // plans — afl_api-owned or new; a match that merely corroborates a
+    // foreign-owned canonical match never gets one, by design) or, with
+    // --use-fixture-identity, by its match-family spine observation against
+    // the existing canonical `matches` row. Both need the match family
+    // acquired and settled (`settle-afl-api.ts --apply`, or a --fixtures-only
+    // snapshot via `settle-afl-api-fixtures.ts --apply`) so that observation
+    // exists. Running `settle-afl-api.ts` does NOT create a typed row for a
+    // corroborated match.
     const unknownMatchCount = result.counters.voteSetsRefused.unknown_match ?? 0;
     if (unknownMatchCount > 0) {
       log('');
       log(
-        `${unknownMatchCount} vote set(s) refused as 'unknown_match': the match family's own `
-        + "staging.afl_api_match projection has no row for that provider match id yet. Run "
-        + "'tools/current-season/settle-afl-api.ts --label <snapshot> --apply' for this season "
-        + 'BEFORE the Brownlow settle, then re-run (§10). If a full match/roster/stats acquisition '
-        + "is not available for every match (e.g. simulator coverage), acquire a --fixtures-only "
-        + "snapshot, settle it with 'settle-afl-api-fixtures.ts --apply', and re-run THIS command "
-        + 'with --use-fixture-identity.',
+        `${unknownMatchCount} vote set(s) refused as 'unknown_match': no typed staging.afl_api_match row exists `
+        + 'for that provider match id'
+        + (args.useFixtureIdentity
+          ? ', and the fixture-identity fallback found no unique canonical match for it (no match-family '
+            + 'observation, or no canonical match with that season/clubs/date).'
+          : ', and --use-fixture-identity was not supplied.')
+        + " Ensure the match family for this season is acquired and settled ('settle-afl-api.ts --label "
+        + "<snapshot> --apply', or a --fixtures-only snapshot with 'settle-afl-api-fixtures.ts --apply') "
+        + 'so its match observation exists, then re-run. A match that only corroborates a foreign-owned '
+        + 'canonical match never receives a typed staging.afl_api_match row; it resolves only via '
+        + '--use-fixture-identity.',
       );
     }
 
@@ -368,7 +448,9 @@ export async function runAflApiBrownlowSettleCli(
       log(
         `Applied as import batch ${result.batchId}: ${result.counters.canonicalRowsInserted} canonical row(s) `
         + `inserted, ${result.counters.canonicalRowsUpdated} updated, ${result.counters.voteSetsNoOp} vote set(s) `
-        + `already up to date, ${result.counters.voteSetsApplyFailed} vote set(s) rolled back on write failure.`
+        + `already up to date, ${result.counters.voteSetsApplyFailed} vote set(s) rolled back on write failure, `
+        + `${result.counters.voteSetsRefused.match_identity_conflict ?? 0} vote set(s) refused for `
+        + 'match_identity_conflict (nothing written; see data_issues).'
         + (args.autoApply ? '' : ' No canonical row was written: the automatic path runs only with --auto-apply.'),
       );
     }

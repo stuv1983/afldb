@@ -22,9 +22,14 @@
  *   3. The AFLDB-ISSUE-131 retired-identity search
  *      (`findRetiredMatchIdentities`), restricted to `afl_api`-owned rows by
  *      its own `source_id` filter.
- *   4. Otherwise `unresolved` — no canonical match exists yet. This module
- *      never proposes `new_target`; that classification (and any write) is
- *      the settle engine's job.
+ *   4. Otherwise `unresolved` — no SUPPORTED identity resolution succeeded
+ *      (provider id, exact `match_key`, proven-retired identity). That does NOT
+ *      mean no canonical fixture exists: a row another source owns is invisible
+ *      to steps 1 and 3, and a one-component round/date disagreement misses step
+ *      2. This module never proposes `new_target`; that classification (and any
+ *      write) is the settle engine's job, and it must first ask whether an
+ *      INSERT is safe (`findPlausibleCanonicalFixtures`, AFLDB-ISSUE-244
+ *      I244-F030) — this resolver stays read-only and authority-free.
  *
  * Steps 2 and 3 run together, exactly as `resolveTarget()` runs them on both
  * its hit and miss paths: a `match_key` hit alongside a retired-identity hit

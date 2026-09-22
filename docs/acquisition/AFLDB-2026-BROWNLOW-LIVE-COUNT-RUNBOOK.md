@@ -60,7 +60,8 @@ integration DSN.
 
 This reuses the established "verify without ever printing the DSN" guard
 (`tools/rebuild/draftguru/s74-rollback-exercise.ps1`'s `Assert-Dsn` /
-`Invoke-ReadOnlySql` pattern), adapted to this runbook's two variables. It
+`Invoke-ReadOnlySql` pattern), adapted to this runbook's control-plus-writer
+binding. It
 does **not** invent a new database check: same shape, same `psql -X -At`
 read-only probe, same "value never logged" contract.
 
@@ -131,21 +132,29 @@ if ($importProbe -ne $ExpectedDatabase) {
 }
 Write-Host "    both DSNs verified: current_database() = $ExpectedDatabase (values never printed)"
 
-Write-Host "==> 3. Positive write-target guard — bind AND verify the variable the settle CLIs actually read"
-# tools/current-season/settle-afl-api.ts and settle-afl-api-brownlow.ts both
-# call `process.env.AFLDB_IMPORT_DATABASE_URL` directly; neither reads
-# AFLDB_TEST_DATABASE_URL or AFLDB_TEST_IMPORT_DATABASE_URL. §1-2 above prove
-# those two are afldb_test; this step makes the variable the CLIs will
-# actually use identical to the already-verified import DSN, THEN re-proves
-# it independently, rather than trusting the assignment.
+Write-Host "==> 3. Positive control + write-target guard — bind AND verify both variables the settle CLIs actually read"
+# tools/current-season/settle-afl-api.ts and settle-afl-api-brownlow.ts read
+# their control gate through `process.env.DATABASE_URL` and open their
+# canonical writer through `process.env.AFLDB_IMPORT_DATABASE_URL`. Neither
+# reads AFLDB_TEST_DATABASE_URL or AFLDB_TEST_IMPORT_DATABASE_URL directly.
+# §1-2 prove those test DSNs name afldb_test; this step process-locally binds
+# both variables the CLIs actually use, then independently re-proves each
+# live database name rather than trusting either assignment.
+$requiredControlDsn = Test-RequiredEnvVar -Name 'AFLDB_TEST_DATABASE_URL'
 $requiredImportDsn = Test-RequiredEnvVar -Name 'AFLDB_TEST_IMPORT_DATABASE_URL'
+$env:DATABASE_URL = $requiredControlDsn
 $env:AFLDB_IMPORT_DATABASE_URL = $requiredImportDsn
+$controlProbe = (Invoke-ReadOnlySql -Dsn ([Environment]::GetEnvironmentVariable('DATABASE_URL', 'Process')) -Sql 'SELECT current_database();' | Select-Object -First 1)
+if ($controlProbe -ne $ExpectedDatabase) {
+  throw "REFUSED: DATABASE_URL's current_database() is '$controlProbe', not '$ExpectedDatabase'. " +
+        "settle-afl-api.ts / settle-afl-api-brownlow.ts would read the ingestion gate there — refusing to proceed."
+}
 $boundProbe = (Invoke-ReadOnlySql -Dsn ([Environment]::GetEnvironmentVariable('AFLDB_IMPORT_DATABASE_URL', 'Process')) -Sql 'SELECT current_database();' | Select-Object -First 1)
 if ($boundProbe -ne $ExpectedDatabase) {
   throw "REFUSED: AFLDB_IMPORT_DATABASE_URL's current_database() is '$boundProbe', not '$ExpectedDatabase'. " +
         "settle-afl-api.ts / settle-afl-api-brownlow.ts would write there — refusing to proceed."
 }
-Write-Host "    AFLDB_IMPORT_DATABASE_URL bound to the afldb_test import DSN and independently re-verified"
+Write-Host "    DATABASE_URL control DB and AFLDB_IMPORT_DATABASE_URL writer DB both independently re-verified as afldb_test"
 Write-Host "    (process-local only: NOT written to .env; no DEV/PROD deployment happens as a result of this)"
 
 Write-Host "==> 4. Real-feed override clearing — remove any simulator base-URL overrides for THIS shell"
@@ -178,8 +187,8 @@ the mistake this preflight exists to catch before any acquisition or settle
 command runs.
 
 **Step 3 is process-local for this shell only.** Do not add
-`AFLDB_IMPORT_DATABASE_URL=...` to the repository's tracked `.env`. This
-reassignment is acceptance-only, proves the write path for tonight's manual
+`DATABASE_URL=...` or `AFLDB_IMPORT_DATABASE_URL=...` to the repository's tracked `.env`. These
+process-local bindings are acceptance-only, prove both the control and write paths for tonight's manual
 run, and has no bearing on — and does not perform — any DEV or PROD
 deployment (see §0's table above).
 
@@ -187,7 +196,7 @@ deployment (see §0's table above).
 
 Run these from the repository root, in the same shell §2's preflight passed
 in (`AFLDB_AFL_API_BROWNLOW_ENABLED=true` and the §2-step-3
-`AFLDB_IMPORT_DATABASE_URL` guard must both still hold). Substitute the season
+`DATABASE_URL` / `AFLDB_IMPORT_DATABASE_URL` guards must both still hold). Substitute the season
 and whatever label each acquire step actually prints — do not guess a label.
 
 ### 3.1 Safety banner — read this before running anything below
@@ -201,16 +210,43 @@ and whatever label each acquire step actually prints — do not guess a label.
 Everything from here down talks to the real `aflapi.afl.com.au` /
 `api.afl.com.au/cfs` feed over the open internet, and writes only to the
 `afldb_test` acceptance database via the process-local
-`AFLDB_IMPORT_DATABASE_URL` binding §2 proved. See §0's table if any of those
+`DATABASE_URL` control binding and `AFLDB_IMPORT_DATABASE_URL` writer binding §2 proved. See §0's table if any of those
 three terms is unclear before proceeding.
 
-### 3.2 2026 match-family prerequisite (`staging.afl_api_match`)
+### 3.2 2026 match-family prerequisite (match observations; NOT a complete `staging.afl_api_match`)
 
-Brownlow vote-set match resolution needs an already-settled
-`staging.afl_api_match` row for each match (`settle-afl-api-brownlow.ts`'s own
-error text: *"staging.afl_api_match projection has no row for that provider
-match id yet"*). Acquire and settle the real 2026 match family **first**,
-using dynamic label extraction — never a guessed or hand-typed label:
+> **AFLDB-ISSUE-244 I244-F006 — read this before §3.4.** `staging.afl_api_match`
+> is **not** a mirror of every AFL API match. It is a typed projection written
+> only for matches the AFL API settle *plans* (an `afl_api`-owned or new
+> match). A match that merely **corroborates** an existing canonical match
+> owned by another source — for 2026, almost every home-and-away match is
+> `afltables`-owned — is recorded on the observation spine and counted
+> `corroboratedForeignOwned`, but receives **no** typed row. That is by design,
+> not a defect, and the settle in this section does not change it.
+>
+> Evidence from the real 2026 acquisition (evidence, **not** an invariant —
+> re-measure, never assume): **217** source match heads, **4**
+> `staging.afl_api_match` rows. The difference is the corroborated
+> foreign-owned matches.
+>
+> Consequence for Brownlow: those corroborated matches can be identified only
+> through canonical fixture identity, i.e. **`--use-fixture-identity` is
+> required for the 2026 home-and-away match identity under the current data
+> state**, and §3.4 passes it. Whether a *future* season needs it depends on
+> which source owns its matches when Brownlow is settled; do not assume either
+> way. A `--dry-run` / `--apply` without the flag **refuses before any write**
+> when any vote set would need it (§3.4); `--use-fixture-identity` is never
+> enabled for you.
+
+What this step is still needed for: the fixture-identity path reads each
+match's **match-family observation** (spine) and resolves it to exactly one
+existing canonical `matches` row by season, home/away club and venue-local
+date. That observation is written by the settle below (`--apply`, no
+`--auto-apply` needed). It also stages `staging.afl_api_match` rows for the
+few matches the settle plans; Brownlow uses a typed row when one exists and the
+fixture path otherwise. Acquire and settle the real 2026 match family
+**first**, using dynamic label extraction — never a guessed or hand-typed
+label:
 
 ```powershell
 # --- 2026 match-family acquisition (network; real feed) --------------------
@@ -238,18 +274,20 @@ npx tsx tools/current-season/settle-afl-api.ts --label $matchLabel --validate-on
 # 2. Dry-run — full write path against real constraints/privileges, rolled back
 npx tsx tools/current-season/settle-afl-api.ts --label $matchLabel --dry-run --auto-apply
 
-# 3. Apply WITHOUT --auto-apply — persists the staging.afl_api_match prerequisite;
+# 3. Apply WITHOUT --auto-apply — persists the match-family observations (and a
+#    typed staging.afl_api_match row only for the matches this settle plans);
 #    "No canonical row was written: the automatic path runs only with --auto-apply."
 #    (settle-afl-api.ts's own log line). This is the established
 #    corroboration/staging path: it does NOT transfer or re-own the foreign
-#    AFL Tables canonical match rows.
+#    AFL Tables canonical match rows, and it does NOT create a typed
+#    staging.afl_api_match row for them (I244-F006).
 npx tsx tools/current-season/settle-afl-api.ts --label $matchLabel --apply
 ```
 
 Do not add `--auto-apply` to step 3 above for this prerequisite: the whole
-point is staging-only persistence against `afldb_test`, not a canonical
-match-record write. Confirm the §2-step-3 guard already passed in this same
-session before running step 2 or step 3 (both are apply-capable).
+point is staging/observation-only persistence against `afldb_test`, not a
+canonical match-record write. Confirm the §2-step-3 guard already passed in
+this same session before running step 2 or step 3 (both are apply-capable).
 
 ### 3.3 Live Brownlow acquisition
 
@@ -277,22 +315,43 @@ below.
 
 ### 3.4 Brownlow settle order, for each snapshot label
 
-Confirm the §2-step-3 `AFLDB_IMPORT_DATABASE_URL` guard already passed in this
+Confirm the §2-step-3 `DATABASE_URL` / `AFLDB_IMPORT_DATABASE_URL` guards already passed in this
 same session before running B, C or D below — each is apply-capable.
 
 ```powershell
 # A. Validate-only — manifest re-hash + registry + record parse; no DB connection
+#    (no connection, so the fixture-identity requirement is NOT assessed here)
 npx tsx tools/current-season/settle-afl-api-brownlow.ts --label $brownlowLabel --validate-only
 
 # B. Observe — persists source/spine observation; prevents any canonical vote write
-npx tsx tools/current-season/settle-afl-api-brownlow.ts --label $brownlowLabel --observe-only --apply
+npx tsx tools/current-season/settle-afl-api-brownlow.ts --label $brownlowLabel --observe-only --apply --use-fixture-identity
 
 # C. Dry-run — full write path against real constraints/privileges, then rolled back
-npx tsx tools/current-season/settle-afl-api-brownlow.ts --label $brownlowLabel --dry-run --auto-apply
+npx tsx tools/current-season/settle-afl-api-brownlow.ts --label $brownlowLabel --dry-run --auto-apply --use-fixture-identity
 
 # D. Apply — the operational path, against afldb_test only
-npx tsx tools/current-season/settle-afl-api-brownlow.ts --label $brownlowLabel --apply --auto-apply
+npx tsx tools/current-season/settle-afl-api-brownlow.ts --label $brownlowLabel --apply --auto-apply --use-fixture-identity
 ```
+
+`--use-fixture-identity` (I244-F006) is part of B, C and D for the 2026
+home-and-away count under the current data state — see §3.2: most 2026 matches
+corroborate an `afltables`-owned canonical match and have no typed
+`staging.afl_api_match` row, so canonical fixture identity is their only
+identity source. It is **never enabled automatically**. What each mode does
+when the flag is omitted and some vote sets would need it (the CLI measures
+this from the snapshot's own vote sets, before any write):
+
+| Mode | Without `--use-fixture-identity` |
+|---|---|
+| `--validate-only` | Not assessed (no connection is opened). |
+| `--observe-only` (any other flags) | **Advisory log line only** — no canonical write is attempted and its spine observations do not depend on match identity; the affected vote sets are counted `unknown_match`. |
+| `--dry-run`, `--apply` (with or without `--auto-apply`), or no mode flag | **Refuses before any write** (no import batch, observation, projection or data_issues row) with the vote-set count, a bounded sample of provider match ids, and the flag to re-run with. `--dry-run` is the rehearsal of `--apply`, so it fails identically. |
+
+A vote set that cannot be resolved by *either* path (no match observation,
+ambiguous, unmapped club) is not affected by the flag: it stays an ordinary
+per-set `unknown_match`/`fixture_identity_ambiguous` refusal in the run's
+counters. The gate, live-database-identity and completed-season-backtest
+protections are unchanged and run first.
 
 Do **not** add `--allow-completed-season-backtest` to any of the above for
 live 2026 — that flag exists for the S10 completed-season backtest authority,
@@ -302,6 +361,70 @@ authority path for an in-progress season.
 A repeat `--apply --auto-apply` over an unchanged snapshot is an idempotent
 no-op (§10); a changed vote value is an in-place correction, atomically
 applied per vote set.
+
+**AFLDB-ISSUE-244 I244-F007 (match_id + coverage).** Every canonical
+`brownlow_round_votes` write above — an insert, a votes correction or an
+I244-F002 demotion — now also proposes that vote set's resolved canonical
+`match_id` (staged or `--use-fixture-identity`, same field). A pre-F007 row
+that already carries the correct votes but `match_id IS NULL` is healed to the
+resolved id on its next `--apply --auto-apply` replay with no vote change
+required — this is expected, appears as an ordinary `canonicalRowsUpdated`,
+and is safe to run once per season to backfill existing rows. A row that
+already carries a **different, non-null** `match_id` **refuses the entire
+provider vote set before any write** (`voteSetsRefused.match_identity_conflict`,
+plus one `data_issues` row per provider match whose `details` name the
+conflicting players, the existing `match_id` and the newly resolved one): no
+demotion, no vote change, no `match_id` heal, no ledger row, and no coverage
+recompute caused by that set. The refusal covers every existing row the set
+would mutate — the current recipients' rows and the AFL-API-owned stale
+recipients' rows of the same provider match — and only those. Correcting an
+existing non-null `match_id` (X -> Y) is never done automatically: I244-F010
+reviewed it and left it fail-closed — the refusal above stands and the
+conflict is operator-reviewed (a `match_id` is a foreign-key identity claim, and
+no rule proves Y rather than X is the right match). A conflicting row is also
+**not** "pinned while its other fields update". After any run whose Brownlow canonical writes actually changed
+durable state, `recomputeBrownlowCoverage()` runs once, in the SAME
+transaction, for the settled season — `--dry-run` still exercises it but rolls
+it back with everything else, so `result.applied` (not the
+`coverageRecomputeRuns` counter, which reports what was attempted) is what
+tells you whether it committed.
+
+**Vote permutations are a two-phase update.** `brownlow_round_votes` carries
+`UNIQUE (match_id, votes) WHERE match_id IS NOT NULL AND votes > 0` (migration
+094), and every write now carries `match_id`. A provider correction that
+re-awards values among the SAME recipients (A3 B2 C1 -> A2 B3 C1, or the
+3-cycle C3 A2 B1) cannot be written one row at a time in any order without a
+transient duplicate, so inside the vote set's single savepoint the apply first
+writes `votes = 0` for every current recipient whose existing positive value
+differs from its target (a published zero is outside the index), then claims
+the final 3/2/1. Expect the ledger to show both writes: those temporary
+releases raise `canonicalRowsUpdated` / `canonicalApplicationsLogged` by one per
+released recipient, but they are **not** stale demotions —
+`staleRecipientsDemoted` counts only players who left the positive set. The
+whole set (stale demotions, releases, claims) rolls back together if any step
+fails.
+
+**The run's `import_batches` row is closed in the same transaction (I244-F008).**
+Every Brownlow run that commits — `--apply`, `--apply --auto-apply`, and
+`--observe-only` alike — leaves a `completed` batch with `completed_at` set, and a
+`--dry-run`, run-level HALT or thrown error leaves **none** (the batch row rolls
+back with everything else). Read a committed batch like this:
+
+- `records_read` = vote sets in the snapshot; `records_inserted` = new
+  `brownlow_match_votes` observation versions; `records_updated` is always `0`
+  (that table is append-only, so an unchanged replay is `0` / `0`).
+- `records_rejected` = the number of `import_rejections` rows the run wrote — one
+  per vote set refused at planning (`unknown_match`, `round_unmapped`, …). It is
+  **not** `voteSetsRefused`: an apply-time `match_identity_conflict` refusal
+  writes a `data_issues` row but no rejection row, and `--observe-only` writes
+  neither, so its `records_rejected` is `0` while `voteSetsRefused` may not be.
+- `validation_result` = the run's counters verbatim (including
+  `canonicalRowsInserted`/`canonicalRowsUpdated`, `voteSetsNoOp`,
+  `staleRecipientsDemoted`, `coverageRecomputeRuns` and the leaderboard
+  comparison counters).
+
+A `running` batch left behind therefore means a crashed process, not a finished
+count.
 
 ### 3.5 Leaderboard reconciliation — read the CLI's own verdict
 
@@ -354,6 +477,6 @@ Across tonight's captures, the evidence record should show:
   clean — do NOT close assertion 9 / `monitor-CD_M20260142801`
   (`issues/open/AFLDB-ISSUE-228.md` §9.9/§19.5). Record tonight's evidence on
   its own terms; do not write it up as closing that follow-up.
-- Unset `AFLDB_AFL_API_BROWNLOW_ENABLED` and `AFLDB_IMPORT_DATABASE_URL` in
+- Unset `AFLDB_AFL_API_BROWNLOW_ENABLED`, `DATABASE_URL` and `AFLDB_IMPORT_DATABASE_URL` in
   the shell before closing it, and confirm neither is present in the
   repository's tracked `.env`.

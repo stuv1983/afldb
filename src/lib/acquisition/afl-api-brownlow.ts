@@ -28,10 +28,24 @@
  *     The bfawards feed carries only `matchId` and `roundNumber` — no
  *     home/away/date to render a `match_key` from — so this module resolves
  *     a vote's match through the ALREADY-PROJECTED `staging.afl_api_match`
- *     row for the same provider id (written by the match family's own S6
- *     settle, independent of which source owns the canonical row), rather
- *     than re-parsing a bundle. No row there is `unknown_match` (§10 fault
- *     scenario), never a guess.
+ *     row for the same provider id, rather than re-parsing a bundle. No row
+ *     there is `unknown_match` (§10 fault scenario), never a guess.
+ *
+ *     AFLDB-ISSUE-244 I244-F006 — WHAT THAT ROW IS AND IS NOT. The match
+ *     family's settle (`settle-afl-api.ts`) writes `staging.afl_api_match`
+ *     only for a match it PLANS (an `afl_api`-owned match or a new one). A
+ *     provider match that merely corroborates an existing FOREIGN-owned
+ *     canonical match (e.g. `afltables`, which owns most home-and-away
+ *     matches of an in-progress season) is observed on the spine and counted
+ *     `corroboratedForeignOwned`, but never receives a typed row — so the
+ *     table is NOT a mirror of every provider match. (Real 2026 evidence,
+ *     not an invariant: 217 source match heads, 4 typed rows.) A Brownlow
+ *     vote set for a corroborated match therefore has no staged identity BY
+ *     DESIGN and resolves only through the opt-in canonical fixture-identity
+ *     fallback (`--use-fixture-identity`). `assessAflApiBrownlowMatchIdentityCoverage()`
+ *     measures exactly that population from the Brownlow records themselves,
+ *     and the CLI refuses a write-capable run that would need the fallback
+ *     without the flag — the fallback is never enabled implicitly.
  *   - **No promotion_candidates queue.** The human-reviewed path is
  *     unimplemented project-wide (`promotion-review.ts:719`); this stage
  *     does not add one for Brownlow. A vote set that would change a
@@ -96,8 +110,10 @@ import { NO_MATCH_REKEY_SCOPE } from './match-rekey';
 import type { JsonValue } from './observations';
 import { persistSourceObservation, type PersistObservationResult } from './observation-store';
 import { baselineCanonicalHash } from './promotion-review';
+import { recomputeBrownlowCoverage } from '../../db/queries/player-derived';
 import {
   emptySettleCounters,
+  finalizeSettleImportBatch,
   renderMatchKey,
   settleIssueKey,
   writeSettleDataIssue,
@@ -124,7 +140,14 @@ export const SETTLE_ISSUE_OWNER = 'settle-afl-api-brownlow.ts';
 
 const BROWNLOW_MATCH_VOTES_FAMILY = 'brownlow_match_votes';
 const BROWNLOW_VOTE_TARGET = 'brownlow_round_votes';
-const BROWNLOW_ROUND_VOTES_FIELDS = ['played', 'votes'] as const;
+/** AFLDB-ISSUE-244 I244-F007: `match_id` joined `played`/`votes` as a rendered,
+ * proposable field once the canonical match resolver's identity started being
+ * carried into the proposal (`unitInputFor()`, `proposedBrownlowMatchId()`
+ * below) — `readFreshTarget()`/`writeBrownlowRoundVotes()` (`canonical-apply.ts`)
+ * need no change at all: both already derive their field set from
+ * `Object.keys(target.proposedValues)`, so a new proposed key is diffed,
+ * gated and written by the SAME generic machinery every other field uses. */
+const BROWNLOW_ROUND_VOTES_FIELDS = ['played', 'votes', 'match_id'] as const;
 
 /* ------------------------------------------------------------------ *
  * §10 "Operational enablement" — default OFF, independent of the
@@ -207,7 +230,9 @@ export type AflApiBrownlowSettleCounters = SettleCounters & {
   voteSetsWouldAutoApply: number;
   /** The whole 3-row set was refused — `unknown_match`, `round_unmapped`,
    * `brownlow_round_not_home_and_away`, `unresolved_identity`,
-   * `player_identity_ambiguous` — by reason. */
+   * `player_identity_ambiguous`, and (AFLDB-ISSUE-244 I244-F007, refused at
+   * apply time, before any write, AFTER the set was counted in
+   * `voteSetsPlanned`) `match_identity_conflict` — by reason. */
   voteSetsRefused: Record<string, number>;
   /** A vote set's canonical write rolled back inside its own savepoint (§10 atomicity). */
   voteSetsApplyFailed: number;
@@ -219,6 +244,29 @@ export type AflApiBrownlowSettleCounters = SettleCounters & {
    * guess), always written under the canonical match's round. Counted, not
    * hidden — §10's "do not silently hide mismatches". */
   voteSetsRescheduledRound: number;
+  /** AFLDB-ISSUE-244 I244-F002: AFL-API-owned canonical recipients of a match's
+   * PREVIOUS vote set who are absent from the corrected set, demoted to
+   * `played = true, votes = 0` inside that set's own savepoint. Each demotion
+   * is also one `canonicalRowsUpdated` and one `canonicalApplicationsLogged`
+   * (it is an ordinary ledgered UPDATE); this counter is the only place a
+   * recipient replacement is distinguishable from an ordinary tally change.
+   * AFLDB-ISSUE-244 I244-F007: a CURRENT recipient's temporary release to 0
+   * (the two-phase update of a vote permutation, `applyAflApiBrownlowVoteSet()`)
+   * is NOT a stale demotion and never counted here — it appears only in
+   * `canonicalRowsUpdated` / `canonicalApplicationsLogged`, which therefore
+   * rise by 1 per released recipient. */
+  staleRecipientsDemoted: number;
+  /** AFLDB-ISSUE-244 I244-F007: 1 when this run's Brownlow canonical writes
+   * (any `applied` vote set — an insert, a votes correction, a demotion or a
+   * bare `match_id` heal) changed durable state and `recomputeBrownlowCoverage()`
+   * therefore ran once, inside the SAME transaction, for `options.season`; 0
+   * when every vote set was refused, a no-op or never attempted
+   * (`--observe-only`, planned-only). A `--dry-run` (`apply: false`) that DID
+   * reach the recompute still reports it here — `result.applied` is what
+   * tells the caller whether anything, including this, was actually
+   * committed (§21: dry-run rolls the WHOLE transaction back, coverage
+   * recompute included). */
+  coverageRecomputeRuns: number;
   leaderboardPlayersCompared: number;
   leaderboardMismatches: number;
 };
@@ -233,6 +281,8 @@ export function emptyAflApiBrownlowCounters(): AflApiBrownlowSettleCounters {
     voteSetsApplyFailed: 0,
     voteSetsNoOp: 0,
     voteSetsRescheduledRound: 0,
+    staleRecipientsDemoted: 0,
+    coverageRecomputeRuns: 0,
     leaderboardPlayersCompared: 0,
     leaderboardMismatches: 0,
   };
@@ -313,13 +363,17 @@ export type AflApiBrownlowMatchResolution =
 /**
  * Optional fixture-only identity evidence (S7 follow-up, 2026-09-20):
  * when supplied, a vote set whose match has no `staging.afl_api_match` row
- * yet (the normal match-family settle never ran for that match) is retried
- * against the fixture-only observation spine — see
+ * (the match-family settle never planned that match — either it has not run
+ * yet, or the match only CORROBORATES a foreign-owned canonical match and so
+ * never receives a typed row by design, AFLDB-ISSUE-244 I244-F006) is
+ * retried against the fixture-only observation spine — see
  * `afl-api-fixture-identity.ts` for why that path never touches
  * `staging.afl_api_match` and can never re-own or duplicate a canonical
- * match. Omitting this parameter keeps every existing caller's behaviour
- * byte-identical: the fallback never runs unless a caller explicitly opts
- * in by supplying it.
+ * match. Omitting this parameter keeps the resolver itself byte-identical:
+ * the fallback never runs unless a caller explicitly opts in by supplying
+ * it. The Brownlow CLI does NOT supply it implicitly; it refuses a
+ * write-capable run that needs it and lacks the operator's explicit
+ * `--use-fixture-identity` (see `assessAflApiBrownlowMatchIdentityCoverage()`).
  */
 export type AflApiFixtureIdentityFallback = {
   registry: SourceFamilyRegistry;
@@ -427,6 +481,108 @@ export async function resolveAflApiBrownlowMatch(
   return {
     outcome: 'resolved', matchId: resolution.targetId, isFinal: staged.isFinal, season: staged.season, roundNumber,
   };
+}
+
+/* ------------------------------------------------------------------ *
+ * AFLDB-ISSUE-244 I244-F006 — match-identity coverage of a Brownlow
+ * snapshot, and the explicit-fallback requirement it implies.
+ *
+ * `staging.afl_api_match` is a typed projection of the matches the match-
+ * family settle PLANS (`afl_api`-owned or new). It is not a mirror of every
+ * provider match: a match that only corroborates a foreign-owned canonical
+ * match has no typed row by design (see the module doc comment). This
+ * measures, from the Brownlow records that actually need a match, which of
+ * them have a typed identity and which can only be resolved through the
+ * canonical fixture-identity fallback. It deliberately does NOT compare
+ * source-match and staging-row counts — that difference is expected — and it
+ * reuses `resolveAflApiBrownlowMatch()` rather than re-implementing any
+ * resolution. SELECT-only.
+ * ------------------------------------------------------------------ */
+
+export type AflApiBrownlowMatchIdentityCoverage = {
+  /** Vote sets examined (one per `matchVotes[]` entry). */
+  voteSetsChecked: number;
+  /** Vote sets whose provider match id has a typed `staging.afl_api_match` row. */
+  withStagedIdentity: number;
+  /** Provider match ids with NO typed row that the fixture-identity fallback
+   * resolves to exactly one existing canonical match — these resolve ONLY
+   * with `--use-fixture-identity`. */
+  fixtureIdentityRequired: readonly string[];
+  /** Vote sets with no typed row that the fallback cannot resolve either
+   * (no fixture observation, ambiguity, unmapped club, ...). Unchanged by the
+   * flag: they stay per-set refusals in the run itself. */
+  unresolvableEvenWithFixtureIdentity: number;
+};
+
+export async function assessAflApiBrownlowMatchIdentityCoverage(
+  sql: ReadOnlySql,
+  matchVotes: readonly AflApiBrownlowMatchVoteRecord[],
+  fixtureIdentityFallback: AflApiFixtureIdentityFallback,
+): Promise<AflApiBrownlowMatchIdentityCoverage> {
+  const sourceId = await resolveAflApiSourceId(sql);
+  let withStagedIdentity = 0;
+  let unresolvable = 0;
+  const fixtureIdentityRequired: string[] = [];
+  for (const { providerMatchId } of matchVotes) {
+    if ((await readStagedMatch(sql, sourceId, providerMatchId)) !== null) {
+      withStagedIdentity += 1;
+      continue;
+    }
+    const viaFixture = await resolveAflApiBrownlowMatch(sql, sourceId, providerMatchId, fixtureIdentityFallback);
+    if (viaFixture.outcome === 'resolved') fixtureIdentityRequired.push(providerMatchId);
+    else unresolvable += 1;
+  }
+  return {
+    voteSetsChecked: matchVotes.length,
+    withStagedIdentity,
+    fixtureIdentityRequired,
+    unresolvableEvenWithFixtureIdentity: unresolvable,
+  };
+}
+
+const FIXTURE_IDENTITY_ID_SAMPLE = 10;
+
+/**
+ * The operator-facing explanation shared by the refusal and the observe-only
+ * advisory. Safe facts only: counts, the exact flag, a bounded sample of
+ * provider match ids (never a payload, DSN or credential). Wording is
+ * deliberately not "staging is incomplete" — the absence is expected.
+ */
+export function describeAflApiBrownlowFixtureIdentityRequirement(
+  coverage: AflApiBrownlowMatchIdentityCoverage,
+): string {
+  const ids = coverage.fixtureIdentityRequired;
+  const sample = ids.slice(0, FIXTURE_IDENTITY_ID_SAMPLE).join(', ')
+    + (ids.length > FIXTURE_IDENTITY_ID_SAMPLE ? `, ... (+${ids.length - FIXTURE_IDENTITY_ID_SAMPLE} more)` : '');
+  return (
+    `${ids.length} of ${coverage.voteSetsChecked} Brownlow vote set(s) have no typed staging.afl_api_match `
+    + 'identity but resolve to exactly one existing canonical match through canonical fixture identity '
+    + `(provider match ids: ${sample}). This is expected by design: staging.afl_api_match holds only the matches `
+    + 'the AFL API settle plans (afl_api-owned or new); a match that merely corroborates an existing '
+    + 'foreign-owned canonical match (for example an afltables-owned home-and-away match) has no typed row. '
+    + `${coverage.withStagedIdentity} vote set(s) have a typed row; `
+    + `${coverage.unresolvableEvenWithFixtureIdentity} could not be resolved by either path.`
+  );
+}
+
+/**
+ * Thrown by the Brownlow CLI, before any write, when a write-capable run
+ * needs canonical fixture identity to resolve part of the snapshot and the
+ * operator did not pass `--use-fixture-identity`. The flag is never enabled
+ * implicitly: an operator must ask for the canonical-fixture fallback.
+ */
+export class AflApiBrownlowFixtureIdentityRequiredError extends Error {
+  constructor(
+    public readonly mode: 'apply' | 'dry-run',
+    public readonly coverage: AflApiBrownlowMatchIdentityCoverage,
+  ) {
+    super(
+      `Brownlow --${mode} refused before any write: ${describeAflApiBrownlowFixtureIdentityRequirement(coverage)} `
+      + 'Re-run with --use-fixture-identity if canonical fixture identity is the intended fallback '
+      + '(it is never enabled automatically). Nothing was written.',
+    );
+    this.name = 'AflApiBrownlowFixtureIdentityRequiredError';
+  }
 }
 
 /* ------------------------------------------------------------------ *
@@ -670,32 +826,203 @@ async function projectAflApiBrownlowVoteSet(
  * ------------------------------------------------------------------ */
 
 export type AflApiBrownlowApplyOutcome =
-  | { status: 'applied'; rowsInserted: number; rowsUpdated: number }
+  /** `rowsUpdated` INCLUDES `recipientsDemoted` (each stale-recipient demotion is an ordinary
+   * ledgered UPDATE) AND every temporary positive-slot release (I244-F007 two-phase update, see
+   * `applyAflApiBrownlowVoteSet()`) — `recipientsDemoted` alone counts the stale recipients
+   * (players no longer in the current 3/2/1 set), never a current recipient's temporary release. */
+  | { status: 'applied'; rowsInserted: number; rowsUpdated: number; recipientsDemoted: number }
   | { status: 'no_op' }
+  /** AFLDB-ISSUE-244 I244-F007 — the whole vote set was refused BEFORE any write: an existing
+   * row this set would mutate already carries a non-null `match_id` that differs from the match
+   * this provider set resolved to. Nothing was demoted, released, claimed or healed. */
+  | {
+    status: 'refused'; reason: typeof BROWNLOW_MATCH_IDENTITY_CONFLICT;
+    resolvedMatchId: number; conflicts: readonly BrownlowMatchIdentityConflict[];
+  }
   | { status: 'failed'; reason: string };
+
+type BrownlowRoundVoteRow = { played: boolean; votes: number; match_id: number | null };
+
+/** The `voteSetsRefused` key / data-issue reason for {@link BrownlowMatchIdentityConflict}. */
+export const BROWNLOW_MATCH_IDENTITY_CONFLICT = 'match_identity_conflict' as const;
+
+/**
+ * AFLDB-ISSUE-244 I244-F007 — one existing `brownlow_round_votes` row the current provider
+ * vote set would mutate, whose non-null `match_id` contradicts the canonical match the set
+ * resolved to.
+ *
+ * `scope` mirrors I244-F002's own split: `current` is a row of a player in the current 3/2/1
+ * set; `stale` is an AFL-API-owned positive row of THIS provider match whose player the
+ * corrected set no longer contains and which the set would therefore demote. `aflApiOwned` is
+ * `false` only for a `current` recipient whose row belongs to another source: such a row would
+ * also be refused by `canonical-apply.ts`'s ownership gate, but its contradicting identity is
+ * the more specific fact and it must never reach the match_id proposal.
+ */
+export type BrownlowMatchIdentityConflict = {
+  playerId: number;
+  votes: number;
+  existingMatchId: number;
+  resolvedMatchId: number;
+  scope: 'current' | 'stale';
+  aflApiOwned: boolean;
+};
+
+/** One existing row of a player this vote set is about to write (current OR stale recipient). */
+export type BrownlowExistingSetRow = {
+  playerId: number;
+  votes: number;
+  matchId: number | null;
+  aflApiOwned: boolean;
+};
+
+/**
+ * AFLDB-ISSUE-244 I244-F007 blocker 2 — the pure identity preflight decision. Given the existing
+ * rows of every player the set would write (`applyAflApiBrownlowVoteSet()` reads them before its
+ * first write) and the canonical match this provider set resolved to, returns every row whose
+ * non-null `match_id` differs from `resolvedMatchId`. Empty means safe: every row is either
+ * absent, `match_id IS NULL` (NULL -> resolved healing, F007's whole job) or already equal
+ * (idempotent replay).
+ *
+ * A non-empty result refuses the ENTIRE set before any write. Correcting X -> Y is I244-F010's
+ * question, never answered here.
+ */
+export function brownlowMatchIdentityConflicts(
+  rows: readonly BrownlowExistingSetRow[],
+  currentPlayerIds: ReadonlySet<number>,
+  resolvedMatchId: number,
+): BrownlowMatchIdentityConflict[] {
+  const conflicts: BrownlowMatchIdentityConflict[] = [];
+  for (const row of rows) {
+    if (row.matchId === null || row.matchId === resolvedMatchId) continue;
+    conflicts.push({
+      playerId: row.playerId,
+      votes: row.votes,
+      existingMatchId: row.matchId,
+      resolvedMatchId,
+      scope: currentPlayerIds.has(row.playerId) ? 'current' : 'stale',
+      aflApiOwned: row.aflApiOwned,
+    });
+  }
+  return conflicts.sort((a, b) => a.playerId - b.playerId);
+}
+
+/**
+ * AFLDB-ISSUE-244 I244-F007 blocker 1 — which CURRENT recipients must temporarily release their
+ * positive vote slot before the final 3/2/1 is claimed.
+ *
+ * `ux_brownlow_round_votes_match_value` (migration 094) is `UNIQUE (match_id, votes) WHERE
+ * match_id IS NOT NULL AND votes > 0`, and F007 populates `match_id` on every write. Rewriting
+ * recipients one at a time can therefore collide with a row that has not been rewritten yet:
+ * A3 B2 C1 -> A2 B3 C1 writing A first attempts (M, 2) while B still holds it, and NO row order
+ * fixes every permutation. Every current recipient that already holds a POSITIVE value which
+ * differs from its target is released to 0 first (a published zero is outside the index), so by
+ * the time any final value is claimed no slot the target permutation needs is still occupied.
+ *
+ * A recipient with no row, an existing zero (holds no slot) or an existing value already equal to
+ * its target is never released — the identical-replay case stays a no-op. Returned in ascending
+ * player id so the ledger order is deterministic.
+ */
+export function planBrownlowPositiveSlotReleases(
+  existingVotesByPlayer: ReadonlyMap<number, number>,
+  targetVotesByPlayer: ReadonlyMap<number, number>,
+): number[] {
+  const releases: number[] = [];
+  for (const [playerId, target] of targetVotesByPlayer) {
+    const existing = existingVotesByPlayer.get(playerId);
+    if (existing !== undefined && existing > 0 && existing !== target) releases.push(playerId);
+  }
+  return releases.sort((a, b) => a - b);
+}
+
+/** Thrown inside the vote set's savepoint so the (write-free) preflight refusal unwinds it structurally. */
+class BrownlowMatchIdentityConflictError extends Error {
+  constructor(
+    public readonly resolvedMatchId: number,
+    public readonly conflicts: readonly BrownlowMatchIdentityConflict[],
+  ) {
+    super(`${BROWNLOW_MATCH_IDENTITY_CONFLICT}: ${conflicts.length} existing row(s) carry a match_id other than ${resolvedMatchId}`);
+  }
+}
 
 async function currentBrownlowRoundVote(
   sql: Tx, season: number, playerId: number, roundNumber: number,
-): Promise<{ played: boolean; votes: number } | null> {
-  const [row] = await sql<{ played: boolean; votes: number }[]>`
-    SELECT played, votes FROM brownlow_round_votes
+): Promise<BrownlowRoundVoteRow | null> {
+  const [row] = await sql<BrownlowRoundVoteRow[]>`
+    SELECT played, votes, match_id FROM brownlow_round_votes
      WHERE season = ${season} AND player_id = ${playerId} AND round_number = ${roundNumber}
   `;
   return row ?? null;
 }
 
-function unitInputFor(
+/**
+ * AFLDB-ISSUE-244 I244-F007 — what `match_id` to PROPOSE for one player's
+ * `brownlow_round_votes` row, given the canonical match THIS run resolved
+ * (`resolvedMatchId`, from `planAflApiBrownlowMatchSet()` — staged identity
+ * and the `--use-fixture-identity` fallback both terminate in the same
+ * `AflApiBrownlowMatchSetPlan.matchId`, so this function does not know or
+ * care which one produced it) and whatever `match_id` the row already
+ * carries (`currentMatchId`, or `null`/`undefined` for a brand-new row).
+ *
+ *   - no existing row, or an existing row with `match_id IS NULL`
+ *     -> propose the resolved id. This is F007's whole job: a fresh insert
+ *        carries it from the start, and a pre-F007 row (votes already
+ *        written, `match_id` never populated) is healed on its next replay
+ *        with no vote change required.
+ *   - an existing row whose `match_id` already equals the resolved id
+ *     -> propose the same id back. An ordinary idempotent no-op, exactly
+ *        like proposing an unchanged `votes` value.
+ *   - an existing row whose `match_id` is a DIFFERENT non-null value
+ *     -> THROWS. This is an identity-bearing correction (non-null match X
+ *        -> different match Y), I244-F010's territory, not F007's. It is
+ *        NOT a safe proposal and there is no "pin the current id and let
+ *        the other fields update" fallback: that pinned `match_id = X`
+ *        while `votes` and `source_record_id` moved to a provider match
+ *        that resolves to Y — a canonical row contradicting itself. The
+ *        caller (`applyAflApiBrownlowVoteSet()`) must therefore have
+ *        refused the WHOLE vote set (`brownlowMatchIdentityConflicts()`,
+ *        `match_identity_conflict`) BEFORE any write; this throw is the
+ *        structural backstop that makes reaching here a defect rather than
+ *        a silent decision, and it rolls the vote set's savepoint back.
+ */
+export function proposedBrownlowMatchId(
+  resolvedMatchId: number, currentMatchId: number | null | undefined,
+): number {
+  if (currentMatchId === null || currentMatchId === undefined) return resolvedMatchId;
+  if (currentMatchId === resolvedMatchId) return resolvedMatchId;
+  throw new Error(
+    `${BROWNLOW_MATCH_IDENTITY_CONFLICT}: refusing to propose match_id ${resolvedMatchId} for a row that `
+    + `already carries match_id ${currentMatchId} (X -> Y correction is I244-F010, never written by F007).`,
+  );
+}
+
+/**
+ * Exported for DB-free coverage (`tests/afl-api-brownlow.test.ts`) of the
+ * AFLDB-ISSUE-244 I244-F007 proposal wiring: this function itself opens no
+ * connection and awaits nothing, so a synthetic `currentValues` is enough to
+ * prove `proposedBrownlowMatchId()`'s decision actually reaches
+ * `CanonicalApplyUnitInput.targets[0].proposedValues.match_id`, the exact
+ * shape `applyCanonicalUnit()` (`canonical-apply.ts`) reads.
+ */
+export function unitInputFor(
   sourceId: number, sourceKeysById: ReadonlyMap<number, string>, batchId: ImportBatchId,
   inProgressSeasons: readonly number[], providerMatchId: string, sourceVersionSeq: number,
-  season: number, canonicalRoundNumber: number, unit: AflApiBrownlowVoteUnit,
-  currentValues: Readonly<Record<string, JsonValue>> | null,
-  projectedVotes: number,
+  season: number, canonicalRoundNumber: number, playerId: number,
+  currentValues: Readonly<BrownlowRoundVoteRow> | null,
+  proposedVotes: number,
+  resolvedMatchId: number,
 ): CanonicalApplyUnitInput {
-  // AFLDB-ISSUE-228 S7 typed-projection closure: the proposed vote value is
-  // the one just written to (and read back from) staging.afl_api_brownlow_vote
-  // — see projectAflApiBrownlowVoteSet()'s doc comment — never a second,
-  // independent read of unit.votes.
-  const proposedValues: Readonly<Record<string, JsonValue>> = { played: true, votes: projectedVotes };
+  // AFLDB-ISSUE-228 S7 typed-projection closure: for a CURRENT recipient the
+  // proposed vote value is the one just written to (and read back from)
+  // staging.afl_api_brownlow_vote — see projectAflApiBrownlowVoteSet()'s doc
+  // comment — never a second, independent read of unit.votes. For a stale
+  // recipient (AFLDB-ISSUE-244 I244-F002) it is the literal 0: the projection
+  // holds no row for a departed recipient in the current version, and its
+  // `votes IN (1, 2, 3)` CHECK could not hold a 0 anyway.
+  const proposedValues: Readonly<Record<string, JsonValue>> = {
+    played: true,
+    votes: proposedVotes,
+    match_id: proposedBrownlowMatchId(resolvedMatchId, currentValues === null ? null : currentValues.match_id),
+  };
   const target: CanonicalApplyTargetInput = {
     targetTable: BROWNLOW_VOTE_TARGET,
     invitation: 'candidate',
@@ -718,10 +1045,165 @@ function unitInputFor(
     completionProven: true,
     matchKey: providerMatchId,
     matchRekey: null,
-    playerId: unit.playerId,
+    playerId,
     brownlowRoundNumber: canonicalRoundNumber,
     targets: [target],
   };
+}
+
+/** Input of `applyAflApiBrownlowVoteSet()`; see its doc comment for the contract. */
+export type AflApiBrownlowApplyInput = {
+  sourceId: number;
+  sourceKeysById: ReadonlyMap<number, string>;
+  batchId: ImportBatchId;
+  inProgressSeasons: readonly number[];
+  providerMatchId: string;
+  sourceVersionSeq: number;
+  season: number;
+  canonicalRoundNumber: number;
+  /** AFLDB-ISSUE-244 I244-F007 — the canonical match this whole provider
+   * match's vote set resolved to (`AflApiBrownlowMatchSetPlan.matchId`,
+   * `planAflApiBrownlowMatchSet()`). One provider match, one resolved
+   * canonical match: every unit below — the three current recipients AND
+   * any demoted stale recipient — proposes THIS SAME id, never a per-player
+   * re-resolution. A row that already carries a DIFFERENT non-null id refuses
+   * the whole set before any write (`brownlowMatchIdentityConflicts()`). */
+  matchId: number;
+  units: readonly AflApiBrownlowVoteUnit[];
+  projectedVotes: ReadonlyMap<string, number>;
+};
+
+/**
+ * One `applyCanonicalUnit()` call for one player's `brownlow_round_votes` row,
+ * returning what it wrote. Anything other than `applied` or the idempotent
+ * `nothing_to_write` refusal throws (caught by the caller's savepoint), so the
+ * whole vote set rolls back.
+ */
+async function applyBrownlowRoundVote(
+  scope: Tx, input: AflApiBrownlowApplyInput, playerId: number, proposedVotes: number,
+): Promise<{ applied: boolean; rowsInserted: number; rowsUpdated: number }> {
+  const currentValues = await currentBrownlowRoundVote(
+    scope, input.season, playerId, input.canonicalRoundNumber,
+  );
+  const unitInput = unitInputFor(
+    input.sourceId, input.sourceKeysById, input.batchId, input.inProgressSeasons,
+    input.providerMatchId, input.sourceVersionSeq, input.season, input.canonicalRoundNumber,
+    playerId, currentValues, proposedVotes, input.matchId,
+  );
+  const outcome = await applyCanonicalUnit(scope, unitInput);
+  if (outcome.failure !== null) {
+    throw new Error(`brownlow_round_votes write failed for player ${playerId}: ${outcome.failure.message}`);
+  }
+  let applied = false;
+  let rowsInserted = 0;
+  let rowsUpdated = 0;
+  for (const result of outcome.results) {
+    if (result.applied) {
+      applied = true;
+      rowsInserted += result.rowsInserted;
+      rowsUpdated += result.rowsUpdated;
+    } else if (result.refusal !== 'nothing_to_write') {
+      throw new Error(`brownlow_round_votes refused for player ${playerId}: ${result.refusal}`);
+    }
+  }
+  return { applied, rowsInserted, rowsUpdated };
+}
+
+/**
+ * AFLDB-ISSUE-244 I244-F002 — the AFL-API-owned recipients of THIS provider
+ * match's earlier vote set that the current set no longer contains.
+ *
+ * The identity boundary is PROVENANCE, all of: this season, this canonical
+ * round, `source_id` = the AFL API source, `source_record_id` = this provider
+ * match id, `votes > 0`, `player_id` not a current recipient. Deliberately NOT
+ * season + round alone (a round holds several matches whose rows must never be
+ * touched), and not club/name/fuzzy evidence. Still keyed on
+ * `source_record_id`, not `brownlow_round_votes.match_id`, even after
+ * AFLDB-ISSUE-244 I244-F007 started populating that column: `source_record_id`
+ * is provenance identity — which provider observation wrote the row — and
+ * stays correct for a row F007 has not yet healed (`match_id` still NULL) on
+ * this very replay, whereas `match_id` alone could not distinguish a
+ * not-yet-healed row from one that was never this provider match's at all.
+ *
+ * `votes > 0` is what makes the correction idempotent: a recipient already at 0
+ * is never work again. Rows owned by anyone else (manual, AFL Tables, NULL
+ * `source_id`) or carrying another match's `source_record_id` do not satisfy
+ * the predicate and are never demoted here.
+ */
+async function staleAflApiBrownlowRecipients(
+  scope: Tx, input: AflApiBrownlowApplyInput, currentPlayerIds: readonly number[],
+): Promise<number[]> {
+  const rows = await scope<{ playerId: number }[]>`
+    SELECT player_id::int AS "playerId"
+      FROM brownlow_round_votes
+     WHERE season = ${input.season}
+       AND round_number = ${input.canonicalRoundNumber}
+       AND source_id = ${input.sourceId}
+       AND source_record_id = ${input.providerMatchId}
+       AND votes > 0
+       AND NOT (player_id = ANY(${[...currentPlayerIds]}::int[]))
+     ORDER BY player_id
+  `;
+  return rows.map((row) => row.playerId);
+}
+
+/**
+ * AFLDB-ISSUE-244 I244-F007 — the existing `brownlow_round_votes` row of each given player for
+ * this season and canonical round, read (never written) before the vote set's first write. The
+ * caller passes exactly the players it is about to write: the current recipients and the stale
+ * recipients `staleAflApiBrownlowRecipients()` returned. It is deliberately NOT a scan of the
+ * round, the season or a player's other rows, so a row that belongs to another provider match
+ * (which the write never touches) can neither block this set nor be read here.
+ */
+async function existingBrownlowSetRows(
+  scope: Tx, input: AflApiBrownlowApplyInput, playerIds: readonly number[],
+): Promise<BrownlowExistingSetRow[]> {
+  const rows = await scope<{ playerId: number; votes: number; matchId: number | null; aflApiOwned: boolean }[]>`
+    SELECT player_id::int AS "playerId", votes::int AS votes, match_id::int AS "matchId",
+           COALESCE(source_id = ${input.sourceId}, false) AS "aflApiOwned"
+      FROM brownlow_round_votes
+     WHERE season = ${input.season}
+       AND round_number = ${input.canonicalRoundNumber}
+       AND player_id = ANY(${[...playerIds]}::int[])
+     ORDER BY player_id
+  `;
+  return rows;
+}
+
+/**
+ * AFLDB-ISSUE-244 I244-F002 post-condition, inside the vote set's savepoint:
+ * the positive `brownlow_round_votes` rows carrying THIS provider match's
+ * provenance must equal the current recipients exactly — same players, same
+ * votes (so, given the emitter's {3, 2, 1} validation, three rows summing to
+ * 6). A mismatch means canonical state would keep a stale AFL-API-owned
+ * recipient (or lack a current one); it throws so the set rolls back and is
+ * reported as `voteSetsApplyFailed` + a data issue rather than tolerated.
+ */
+async function assertBrownlowProviderMatchPositiveSet(
+  scope: Tx, input: AflApiBrownlowApplyInput, expected: ReadonlyMap<number, number>,
+): Promise<void> {
+  const rows = await scope<{ playerId: number; votes: number }[]>`
+    SELECT player_id::int AS "playerId", votes::int AS votes
+      FROM brownlow_round_votes
+     WHERE season = ${input.season}
+       AND round_number = ${input.canonicalRoundNumber}
+       AND source_id = ${input.sourceId}
+       AND source_record_id = ${input.providerMatchId}
+       AND votes > 0
+     ORDER BY player_id
+  `;
+  const actual = new Map(rows.map((row) => [row.playerId, row.votes]));
+  const matches = actual.size === expected.size
+    && [...expected].every(([playerId, votes]) => actual.get(playerId) === votes);
+  if (!matches) {
+    const render = (m: ReadonlyMap<number, number>): string => JSON.stringify(
+      [...m].sort((a, b) => a[0] - b[0]).map(([playerId, votes]) => ({ playerId, votes })),
+    );
+    throw new Error(
+      `brownlow_round_votes post-condition failed for match ${input.providerMatchId}: the AFL API's `
+      + `positive rows are ${render(actual)} but the current vote set is ${render(expected)}.`,
+    );
+  }
 }
 
 /**
@@ -739,28 +1221,82 @@ function unitInputFor(
  * was skipped or failed silently) and refuses the whole set rather than
  * falling back to the unprojected value — the canonical write must never
  * proceed from a vote this run did not just prove it staged.
+ *
+ * AFLDB-ISSUE-244 I244-F002 — RECIPIENT REPLACEMENT. The set is the canonical
+ * unit, so a provider correction that swaps a recipient (A3 B2 C1 -> A3 B2 D1)
+ * must also retire C. AFLDB-ISSUE-244 I244-F007 adds the match-identity
+ * preflight and the two-phase positive-slot release (below). The apply
+ * therefore does, in the SAME savepoint and in this order:
+ *
+ *   0. resolve every current recipient's projected vote UP FRONT (a missing
+ *      projection refuses the whole set before any write);
+ *   1. PREFLIGHT match identity (`brownlowMatchIdentityConflicts()`, read-only):
+ *      read the existing row of every player this set would write — current
+ *      recipients and the stale recipients of step 2 — and refuse the ENTIRE
+ *      set (`match_identity_conflict`) if any carries a non-null `match_id`
+ *      other than `input.matchId`. Nothing has been written yet, so a refusal
+ *      leaves no demotion, release, claim, heal or ledger row;
+ *   2. demote every stale recipient (`staleAflApiBrownlowRecipients()`) to
+ *      `played = true, votes = 0` through `applyCanonicalUnit()` — ownership,
+ *      manual-authority, stale-baseline gates, provenance and the
+ *      `canonical_applications` ledger all apply exactly as for any write;
+ *   3. RELEASE (phase 1 of the two-phase update): write `votes = 0` for every
+ *      CURRENT recipient whose existing positive value differs from its target
+ *      (`planBrownlowPositiveSlotReleases()`);
+ *   4. CLAIM (phase 2): write the current three recipients' final 3/2/1;
+ *   5. prove the post-condition (`assertBrownlowProviderMatchPositiveSet()`):
+ *      the AFL-API-owned positive rows of THIS provider match are exactly the
+ *      current recipients with exactly the projected votes.
+ *
+ * WHY TWO PHASES. `ux_brownlow_round_votes_match_value` (migration 094) is
+ * `UNIQUE (match_id, votes) WHERE match_id IS NOT NULL AND votes > 0`, and
+ * F007 proposes `match_id` on every write (demotions and releases included,
+ * via the SAME `input.matchId` every `applyBrownlowRoundVote()` call in this
+ * savepoint carries). Stale demotion first (step 2) keeps a REPLACEMENT safe
+ * (were D written before C's demotion, C and D would both briefly hold
+ * `(X, 1)`), but it cannot keep a PERMUTATION of the same recipients safe:
+ * A3 B2 C1 -> A2 B3 C1 writing A first claims (M, 2) while B still holds it,
+ * and no row order resolves every permutation (C3 A2 B1 is a 3-cycle). Step 3
+ * empties every slot the target permutation needs before step 4 claims any of
+ * them; a published zero is outside the partial index.
+ *
+ * COUNTER / LEDGER SEMANTICS. Releases are ordinary ledgered UPDATEs: each is
+ * one `rowsUpdated` (so `canonicalRowsUpdated` / `canonicalApplicationsLogged`
+ * report the truthful, higher two-phase count) but NEVER a `recipientsDemoted`
+ * — A and B in the swap above are still current recipients, and
+ * `staleRecipientsDemoted` stays specific to players who left the positive set.
+ * The run-level "something changed" flag (`anyCanonicalBrownlowChange`, which
+ * gates the coverage recompute) is set by the caller only from an `applied`
+ * outcome, i.e. after this savepoint completed — a temporary release inside a
+ * savepoint that later rolls back can never set it.
+ *
+ * Any refusal, failure or post-condition mismatch throws, rolling back the
+ * demotions, releases AND claims together: never C = 0 with D missing, nor
+ * A = 0 with B = 0 and nothing claimed. The post-condition also runs when
+ * nothing was written, so a vote set left stale by a pre-F002 run heals on its
+ * next replay.
  */
 export async function applyAflApiBrownlowVoteSet(
   tx: Tx,
-  input: {
-    sourceId: number;
-    sourceKeysById: ReadonlyMap<number, string>;
-    batchId: ImportBatchId;
-    inProgressSeasons: readonly number[];
-    providerMatchId: string;
-    sourceVersionSeq: number;
-    season: number;
-    canonicalRoundNumber: number;
-    units: readonly AflApiBrownlowVoteUnit[];
-    projectedVotes: ReadonlyMap<string, number>;
-  },
+  input: AflApiBrownlowApplyInput,
 ): Promise<AflApiBrownlowApplyOutcome> {
   try {
     let rowsInserted = 0;
     let rowsUpdated = 0;
+    let recipientsDemoted = 0;
     let anyWrite = false;
+    const record = (written: { applied: boolean; rowsInserted: number; rowsUpdated: number }): boolean => {
+      if (!written.applied) return false;
+      rowsInserted += written.rowsInserted;
+      rowsUpdated += written.rowsUpdated;
+      anyWrite = true;
+      return true;
+    };
     await tx.savepoint(async (sp) => {
       const scope = sp as Tx;
+
+      // 0. Every current recipient's projected vote, before anything is read or written.
+      const expected = new Map<number, number>();
       for (const unit of input.units) {
         const projected = input.projectedVotes.get(unit.providerPlayerId);
         if (projected === undefined) {
@@ -770,35 +1306,45 @@ export async function applyAflApiBrownlowVoteSet(
             + 'brownlow_round_votes from an unprojected vote.',
           );
         }
-        const currentValues = await currentBrownlowRoundVote(
-          scope, input.season, unit.playerId, input.canonicalRoundNumber,
-        );
-        const unitInput = unitInputFor(
-          input.sourceId, input.sourceKeysById, input.batchId, input.inProgressSeasons,
-          input.providerMatchId, input.sourceVersionSeq, input.season, input.canonicalRoundNumber,
-          unit, currentValues, projected,
-        );
-        const outcome = await applyCanonicalUnit(scope, unitInput);
-        if (outcome.failure !== null) {
-          throw new Error(
-            `brownlow_round_votes write failed for player ${unit.playerId}: ${outcome.failure.message}`,
-          );
-        }
-        for (const result of outcome.results) {
-          if (result.applied) {
-            rowsInserted += result.rowsInserted;
-            rowsUpdated += result.rowsUpdated;
-            anyWrite = true;
-          } else if (result.refusal !== 'nothing_to_write') {
-            throw new Error(
-              `brownlow_round_votes refused for player ${unit.playerId}: ${result.refusal}`,
-            );
-          }
-        }
+        expected.set(unit.playerId, projected);
       }
+      const currentPlayerIds = [...expected.keys()];
+
+      const stale = await staleAflApiBrownlowRecipients(scope, input, currentPlayerIds);
+
+      // 1. Match-identity preflight — read-only, before ANY write.
+      const existing = await existingBrownlowSetRows(scope, input, [...currentPlayerIds, ...stale]);
+      const conflicts = brownlowMatchIdentityConflicts(existing, new Set(currentPlayerIds), input.matchId);
+      if (conflicts.length > 0) throw new BrownlowMatchIdentityConflictError(input.matchId, conflicts);
+
+      // 2. True stale recipients (players leaving the positive set).
+      for (const playerId of stale) {
+        if (record(await applyBrownlowRoundVote(scope, input, playerId, 0))) recipientsDemoted += 1;
+      }
+
+      // 3. Phase 1 — release the positive slots a permutation of the CURRENT recipients needs.
+      const existingVotes = new Map(existing.map((row) => [row.playerId, row.votes]));
+      for (const playerId of planBrownlowPositiveSlotReleases(existingVotes, expected)) {
+        record(await applyBrownlowRoundVote(scope, input, playerId, 0));
+      }
+
+      // 4. Phase 2 — claim the final 3/2/1.
+      for (const unit of input.units) {
+        record(await applyBrownlowRoundVote(scope, input, unit.playerId, expected.get(unit.playerId) as number));
+      }
+
+      await assertBrownlowProviderMatchPositiveSet(scope, input, expected);
     });
-    return anyWrite ? { status: 'applied', rowsInserted, rowsUpdated } : { status: 'no_op' };
+    return anyWrite
+      ? { status: 'applied', rowsInserted, rowsUpdated, recipientsDemoted }
+      : { status: 'no_op' };
   } catch (error) {
+    if (error instanceof BrownlowMatchIdentityConflictError) {
+      return {
+        status: 'refused', reason: BROWNLOW_MATCH_IDENTITY_CONFLICT,
+        resolvedMatchId: error.resolvedMatchId, conflicts: error.conflicts,
+      };
+    }
     return { status: 'failed', reason: error instanceof Error ? error.message : String(error) };
   }
 }
@@ -876,6 +1422,14 @@ export async function runSettleAflApiBrownlow(
   const counters = emptyAflApiBrownlowCounters();
   const contract = getSourceFamily(options.registry, SETTLE_SOURCE_KEY, BROWNLOW_MATCH_VOTES_FAMILY);
 
+  // I244-F008: a pure comparison of the two acquired feeds, needing no
+  // database. Computed BEFORE the transaction so the leaderboard counters are
+  // final when the batch's `validation_result` is stamped inside it — the
+  // batch must not say 0 compared while the returned counters say otherwise.
+  const reconciliation = reconcileAflApiBrownlowSeason(options.matchVotes, options.leaderboard, options.leaderboardStatus);
+  counters.leaderboardPlayersCompared = reconciliation.compared;
+  counters.leaderboardMismatches = reconciliation.mismatches.length;
+
   let batchIdText: string | null = null;
   let applied = false;
   let halt: { reason: string; detail: Readonly<Record<string, unknown>> } | null = null;
@@ -899,6 +1453,12 @@ export async function runSettleAflApiBrownlow(
       `;
       const batchId = asImportBatchId(batch.id);
       batchIdText = batch.id;
+      // AFLDB-ISSUE-244 I244-F007 §9/§10: recompute coverage AT MOST once for
+      // this run, and only if some Brownlow canonical write actually changed
+      // durable state (an insert, a votes correction, a demotion or a bare
+      // `match_id` heal) — never merely because a vote set was observed,
+      // planned or left stale by `--observe-only`/no `--auto-apply`.
+      let anyCanonicalBrownlowChange = false;
 
       for (const record of options.matchVotes) {
         counters.voteSetsSeen += 1;
@@ -1004,15 +1564,43 @@ export async function runSettleAflApiBrownlow(
         const outcome = await applyAflApiBrownlowVoteSet(tx, {
           sourceId, sourceKeysById, batchId, inProgressSeasons: inProgressSeasonsForApply,
           providerMatchId: record.providerMatchId, sourceVersionSeq: head.versionSeq,
-          season: plan.season, canonicalRoundNumber: plan.canonicalRoundNumber, units: plan.units,
-          projectedVotes,
+          season: plan.season, canonicalRoundNumber: plan.canonicalRoundNumber, matchId: plan.matchId,
+          units: plan.units, projectedVotes,
         });
         if (outcome.status === 'applied') {
           counters.canonicalRowsInserted += outcome.rowsInserted;
           counters.canonicalRowsUpdated += outcome.rowsUpdated;
           counters.canonicalApplicationsLogged += outcome.rowsInserted + outcome.rowsUpdated;
+          counters.staleRecipientsDemoted += outcome.recipientsDemoted;
+          anyCanonicalBrownlowChange = true;
         } else if (outcome.status === 'no_op') {
           counters.voteSetsNoOp += 1;
+        } else if (outcome.status === 'refused') {
+          // AFLDB-ISSUE-244 I244-F007: refused BEFORE any write (an existing row this set would
+          // mutate carries a non-null match_id other than the resolved one). Deliberately NOT
+          // `anyCanonicalBrownlowChange` (nothing changed, so no coverage recompute is owed) and
+          // NOT `voteSetsApplyFailed` (no write was attempted). One data issue per provider match,
+          // keyed exactly like the other Brownlow findings so a replay refreshes it in place.
+          recordRefusal(counters, outcome.reason);
+          await writeSettleDataIssue(tx, {
+            entityType: BROWNLOW_VOTE_TARGET,
+            entityId: null,
+            issueType: SETTLE_ISSUE_TYPE,
+            issueKey: settleIssueKey(SETTLE_SOURCE_KEY, BROWNLOW_MATCH_VOTES_FAMILY, record.providerMatchId, BROWNLOW_VOTE_TARGET),
+            severity: 'error',
+            description: `afl_api Brownlow match '${record.providerMatchId}' vote set refused: ${outcome.reason} — `
+              + `an existing brownlow_round_votes row already carries a different match_id than the resolved `
+              + `match ${outcome.resolvedMatchId}; nothing was written (correction is I244-F010).`,
+            details: {
+              owner: SETTLE_ISSUE_OWNER, source_key: SETTLE_SOURCE_KEY,
+              provider_match_id: record.providerMatchId, source_record_id: record.providerMatchId,
+              reason: outcome.reason, resolved_match_id: outcome.resolvedMatchId,
+              conflicts: outcome.conflicts.map((c) => ({
+                player_id: c.playerId, votes: c.votes, existing_match_id: c.existingMatchId,
+                resolved_match_id: c.resolvedMatchId, scope: c.scope, afl_api_owned: c.aflApiOwned,
+              })),
+            },
+          }, counters);
         } else {
           counters.voteSetsApplyFailed += 1;
           await writeSettleDataIssue(tx, {
@@ -1031,6 +1619,28 @@ export async function runSettleAflApiBrownlow(
         }
       }
 
+      // AFLDB-ISSUE-244 I244-F007 §9/§10: part of the SAME transaction as the
+      // vote/match_id writes above — a `--dry-run` (`apply: false`) throws
+      // `DryRunRollback()` immediately below and rolls this back together
+      // with everything else; a mid-run failure elsewhere in this callback
+      // rolls it back too, `postgres.js`'s `sql.begin()` own guarantee. Uses
+      // the EXISTING recompute helper (`admin-brownlow.ts` calls the same
+      // function, the same way, after its own committed vote writes) — no
+      // duplicated coverage logic.
+      if (anyCanonicalBrownlowChange) {
+        await recomputeBrownlowCoverage(tx, options.season);
+        counters.coverageRecomputeRuns += 1;
+      }
+
+      // I244-F008: close the batch in THIS transaction, after every vote-set
+      // write, refusal record and the coverage recompute above. An
+      // observe-only run that commits its spine observations is a committed
+      // batch and is closed exactly like an applying one. A dry-run finalises
+      // too (real UPDATE, real privileges) and is then rolled back below; a
+      // finalisation failure fails the transaction, never leaving committed
+      // votes beside a `running` batch.
+      await finalizeSettleImportBatch(tx, batchId, counters);
+
       if (!options.apply) throw new DryRunRollback();
       applied = true;
     });
@@ -1045,10 +1655,6 @@ export async function runSettleAflApiBrownlow(
       throw error;
     }
   }
-
-  const reconciliation = reconcileAflApiBrownlowSeason(options.matchVotes, options.leaderboard, options.leaderboardStatus);
-  counters.leaderboardPlayersCompared = reconciliation.compared;
-  counters.leaderboardMismatches = reconciliation.mismatches.length;
 
   return { applied, batchId: applied ? batchIdText : null, counters, reconciliation, halt };
 }

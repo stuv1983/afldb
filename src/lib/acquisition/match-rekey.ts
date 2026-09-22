@@ -97,6 +97,35 @@ export type RetiredMatchIdentity = {
 };
 
 /**
+ * The fields of an incoming fixture the same-fixture identity predicate reads.
+ * `MatchRekeyIdentity` satisfies it, so the two callers below hand over the
+ * identity they already hold.
+ */
+export type SameFixtureIdentity = Pick<
+  MatchRekeyIdentity, 'season' | 'matchKey' | 'roundCode' | 'matchDate' | 'homeClubId' | 'awayClubId'
+>;
+
+/**
+ * The ONE same-fixture identity predicate, over `matches m` (AFLDB-ISSUE-131 §5.3
+ * rule 1, and AFLDB-ISSUE-244 I244-F030). Season and BOTH oriented club ids agree
+ * exactly, the rendering differs, and at most one of `round_code` / `match_date`
+ * differs. No date window, no scoring, no swapped orientation, no venue.
+ *
+ * It is a fragment so `findRetiredMatchIdentities()` and
+ * `findPlausibleCanonicalFixtures()` cannot drift apart: each adds only its own
+ * authority requirements on top (ownership, spine join, retirement proof for the
+ * first; none for the second).
+ */
+function sameFixtureIdentity(sql: Sql, identity: SameFixtureIdentity) {
+  return sql`m.season = ${identity.season}
+       AND m.home_club_id = ${identity.homeClubId}
+       AND m.away_club_id = ${identity.awayClubId}
+       AND m.match_key <> ${identity.matchKey}
+       AND ((m.round_code IS DISTINCT FROM ${identity.roundCode})::int
+          + (m.match_date IS DISTINCT FROM ${identity.matchDate}::date)::int) <= 1`;
+}
+
+/**
  * Every canonical row that is provably the same fixture under a source
  * identity this run no longer publishes. Zero, one or many — the caller
  * refuses on many and never merges.
@@ -135,15 +164,82 @@ export async function findRetiredMatchIdentities(
         ON r.source_id = ${identity.sourceId}
        AND r.family = ${identity.family}
        AND r.external_record_id = m.source_record_id
-     WHERE m.season = ${identity.season}
+     WHERE ${sameFixtureIdentity(sql, identity)}
        AND m.source_id = ${identity.sourceId}
-       AND m.home_club_id = ${identity.homeClubId}
-       AND m.away_club_id = ${identity.awayClubId}
-       AND m.match_key <> ${identity.matchKey}
        AND ${retired}
-       AND ((m.round_code IS DISTINCT FROM ${identity.roundCode})::int
-          + (m.match_date IS DISTINCT FROM ${identity.matchDate}::date)::int) <= 1
      ORDER BY m.id
+     ${lock ? sql`FOR UPDATE OF m` : sql``}
+  `;
+  return [...rows];
+}
+
+/* ------------------------------------------------------------------ *
+ * AFLDB-ISSUE-244 I244-F030 — "an automatic INSERT is unsafe here"
+ * ------------------------------------------------------------------ */
+
+/** The stable machine reason, shared by the planner, the applier and the finding vocabulary. */
+export const POSSIBLE_EXISTING_MATCH = 'possible_existing_match';
+
+/**
+ * At most this many candidates are returned (and therefore persisted in a
+ * finding). The answer to "is an INSERT unsafe" is `length > 0`; the cap only
+ * bounds diagnostics.
+ */
+export const PLAUSIBLE_FIXTURE_LIMIT = 10;
+
+export type PlausibleCanonicalFixture = {
+  id: number;
+  matchKey: string;
+  /** `matches.source_id` of the candidate; `null` = provenance unknown. Diagnostic only. */
+  sourceId: number | null;
+};
+
+/**
+ * Every canonical `matches` row that MAY be the same real-world fixture as the
+ * incoming one, under ANY owner.
+ *
+ * **This grants no authority.** It is not retirement proof, not a link and not a
+ * rekey: the result never selects a target, never adopts ownership and never
+ * moves a key. Its one meaning is that an automatic INSERT of the incoming
+ * rendering is unsafe, because a provider-id miss and an exact `match_key` miss
+ * prove only that this source cannot FIND a row — not that none exists. A row
+ * owned by another source (or by none) cannot be found by an `afl_api` provider
+ * id, and a one-component date or round disagreement renders a different
+ * `match_key`, so both lookups miss for exactly the fixture that already has a
+ * canonical row.
+ *
+ * Deliberately narrower than "similar": the predicate is `sameFixtureIdentity()`
+ * verbatim (same season, same oriented clubs, at most ONE of round/date
+ * differing). Two clubs that meet twice in a season differ in BOTH, so a genuine
+ * second meeting is never returned.
+ *
+ * `lock` takes `FOR UPDATE OF m` on the rows actually returned, inside the
+ * applier's savepoint. That serialises concurrent writers of a VISIBLE row; it is
+ * not a predicate lock, and nothing here can stop a matching row that does not
+ * exist yet from committing between this SELECT and the caller's INSERT. That
+ * residual window is accepted (I244-F030 §9): closing it needs a uniqueness or
+ * exclusion constraint or serialisable isolation, none of which F030 adds.
+ *
+ * An empty identity fails CLOSED (throws): "cannot tell" must never read as "no
+ * candidate", which is the opposite of what the retired-identity search may do.
+ */
+export async function findPlausibleCanonicalFixtures(
+  sql: Sql, identity: SameFixtureIdentity, lock = false,
+): Promise<PlausibleCanonicalFixture[]> {
+  if (!identity.matchKey || !identity.roundCode || !identity.matchDate) {
+    throw new Error(
+      'findPlausibleCanonicalFixtures() needs a rendered match_key, round_code and match_date; '
+      + 'an incomplete identity cannot prove that no canonical fixture exists.',
+    );
+  }
+  const rows = await sql<PlausibleCanonicalFixture[]>`
+    SELECT m.id::int AS id,
+           m.match_key AS "matchKey",
+           m.source_id::int AS "sourceId"
+      FROM matches m
+     WHERE ${sameFixtureIdentity(sql, identity)}
+     ORDER BY m.id
+     LIMIT ${PLAUSIBLE_FIXTURE_LIMIT}
      ${lock ? sql`FOR UPDATE OF m` : sql``}
   `;
   return [...rows];

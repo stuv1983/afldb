@@ -59,11 +59,14 @@ Nice=10
 # sense the DSNs above are. Both are absent on a host that has not been
 # provisioned for this, and the tool is then inert.
 #
-# Honest limitation: settle-afltables.ts also reads .env itself (it fills in
-# only names not already in its environment), so the Node step can still see
-# the other DSNs. UnsetEnvironment is defence in depth for the R and Python
-# steps, which never read .env, rather than an airtight boundary for the whole
-# chain. The tool opens AFLDB_IMPORT_DATABASE_URL and nothing else.
+# Actual flow under systemd (AFLDB-ISSUE-244 I244-F029): the wrapper sees the
+# systemd-provided INVOCATION_ID and exports AFLDB_SKIP_DOTENV=1, so the shared
+# tools/current-season/load-env.ts does NOT reopen .env and the Node step does
+# not hand itself back the names UnsetEnvironment removed. Honest limitation:
+# this stops application-level rehydration only; it does not make .env
+# unreadable to the service account, so UnsetEnvironment is still not an airtight
+# secret boundary (filesystem-level isolation is a separate hardening concern;
+# see ISSUE-220). The tool opens AFLDB_IMPORT_DATABASE_URL and nothing else.
 EnvironmentFile=/home/arm/projects/afldb/.env
 UnsetEnvironment=AFLDB_OWNER_DATABASE_URL AFLDB_AUTH_DATABASE_URL AFLDB_TEST_DATABASE_URL AFLDB_DEV_DATABASE_URL AFLDB_BACKUP_DATABASE_URL AFLDB_PROD_DATABASE_URL DATABASE_URL AFLDB_SESSION_SECRET AFLDB_SMTP_PASSWORD AFLDB_SMTP_USER AFLDB_EMAIL_INTAKE_SECRET
 

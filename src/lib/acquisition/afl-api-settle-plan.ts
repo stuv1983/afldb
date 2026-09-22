@@ -49,7 +49,12 @@ import {
   type AflApiMatchIdentity,
 } from './afl-api-match-resolver';
 import { resolveAflApiPlayer } from './afl-api-player-resolver';
-import type { MatchRetirementEvidence } from './match-rekey';
+import {
+  findPlausibleCanonicalFixtures,
+  POSSIBLE_EXISTING_MATCH,
+  type MatchRetirementEvidence,
+  type PlausibleCanonicalFixture,
+} from './match-rekey';
 import {
   classifyCorroboration,
   evaluateTargetOwnership,
@@ -109,7 +114,19 @@ export type AflApiMatchFamilyPlan =
     observed: { season: number; homeClubId: number; awayClubId: number };
     incoming: { season: number; homeClubId: number; awayClubId: number };
   }
-  | { status: 'refused'; reason: string; detail?: string; candidateIds?: readonly number[] }
+  | {
+    status: 'refused';
+    reason: string;
+    detail?: string;
+    candidateIds?: readonly number[];
+    /**
+     * I244-F030 (`possible_existing_match` only): the bounded diagnostic list of
+     * canonical rows that may already be this fixture, and the rendering the
+     * provider would have INSERTed. Evidence for a human — never a target.
+     */
+    candidates?: readonly PlausibleCanonicalFixture[];
+    providerMatchKey?: string;
+  }
   | { status: 'planned'; mode: 'new_target'; targetId: null; matchKey: string; identity: AflApiMatchIdentity }
   | {
     status: 'planned';
@@ -258,9 +275,32 @@ async function planMatchFamily(
     return { status: 'refused', reason: resolution.reason, candidateIds: resolution.candidateIds };
   }
   if (resolution.outcome === 'unresolved') {
-    // §6.1 step 4: no canonical row exists yet. `afl_api` naturally becomes
-    // the owner of a row first promoted from it (§7.5) — the writer's job,
-    // never this planner's.
+    // §6.1 step 4 says only that no SUPPORTED identity resolution succeeded:
+    // not by provider id, not by the exact match_key, not as a proven-retired
+    // identity. It does NOT say no canonical fixture exists — a row another
+    // source owns cannot be found by an afl_api provider id, and a one-component
+    // round/date disagreement renders a different match_key, so both lookups miss
+    // for precisely the fixture that already has a row (AFLDB-ISSUE-244 I244-F030).
+    //
+    // So the question that decides whether an automatic INSERT is safe is asked
+    // here, once, before `new_target` is offered. Any hit refuses; the candidates
+    // are diagnostics for a human and NEVER become `targetId` — no first, no
+    // closest, no newest, no link, no rekey, no ownership change. The applier
+    // asks the same question again inside its savepoint (`canonical-apply.ts`),
+    // because this read is READ COMMITTED and binds nothing.
+    const plausible = await findPlausibleCanonicalFixtures(sql, identity);
+    if (plausible.length > 0) {
+      return {
+        status: 'refused',
+        reason: POSSIBLE_EXISTING_MATCH,
+        detail: `matches.id ${plausible.map((row) => row.id).join(', ')}`,
+        candidateIds: plausible.map((row) => row.id),
+        candidates: plausible,
+        providerMatchKey: identity.matchKey,
+      };
+    }
+    // Zero plausible fixtures: `afl_api` naturally becomes the owner of a row
+    // first promoted from it (§7.5) — the writer's job, never this planner's.
     return { status: 'planned', mode: 'new_target', targetId: null, matchKey: identity.matchKey, identity };
   }
 

@@ -338,7 +338,7 @@ Promotion policy per §0: staging always automatic, canonical always reviewed.
 | Player identity | AFL Tables `ID` + profile URL | AFL API providerId (stage as a second `external_identities` row) | `players`, `external_identities` | AFL Tables ID: **stable, proven** | **Reviewed** — a new player is always a human decision | Never match on name. `external_identities` writes go through the `AFLDB-ISSUE-092` population-drop gate. |
 | Rosters / DOB / height / weight / jumper | AFL API `fetch_player_details_afl` | AFL Tables `player_details` (HT/WT/Cap/#, **no DOB, no stable ID**) | `players`, `player_birth_evidence` | `providerId` `CD_I…`, stable and shared with the lineup endpoint **[PROBE P4]** | Reviewed | DOB writes must respect the `dob_conflict` ownership rules from `AFLDB-ISSUE-090` / migration 072. **`weightInKg` is 0 for 46/46 rows — map to NULL, never 0.** |
 | Lineups / team announcements / late changes / subs | AFL API `fetch_lineup_afl` | — | **new** `staging.external_lineups` | `providerId` / `teamId` / `player.playerId` — 0 duplicates over 572 rows **[PROBE P3, P3b]** | Stage auto; **never promoted** **[DECISION]** | Only free lineup source found. Unofficial endpoint. Column set varies by round because **`lateChanges` is conditional** (19 vs 20, now fully enumerated **[P3b]**); **no substitute field exists** — `EMERG`/`INT` are positions — and **no substitution semantics are derivable**: `lateChanges` is team-grain free text with no player ids, and pre/post-change row state is unknown. `player.captain` is a sentinel (572/572 `FALSE`) and is not projected. **Absence sweeping disabled** — match-set completeness is proven, row-grain completeness is not. |
-| Ladder / team-season | **owned by `AFLDB-ISSUE-095`** — see §6 | Squiggle `q=standings` (all 15 fields **[PROBE]**); AFL Tables season ladder; `fetch_ladder_afl` | `club_seasons` | — | Reviewed | Do **not** pre-empt ISSUE-095's D1–D7. This document supplies source evidence only. |
+| Ladder / team-season | **resolved by `AFLDB-ISSUE-095` into `recomputeClubSeasons`** — see §6 | Squiggle `q=standings` (all 15 fields **[PROBE]**); AFL Tables season ladder; `fetch_ladder_afl` | `club_seasons` | — | Reviewed | *(Corrected 2026-09-22, ISSUE-244 F021.)* `club_seasons` is derived from canonical `matches` by `recomputeClubSeasons`; ISSUE-095's D1–D7 are implemented, not open (§6 correction box). The AFL API settle also invokes the recompute after applicable canonical writes (ISSUE-244 F001). No new ladder implementation is implied here. The source evidence listed is retained as lineage. |
 | Awards — Brownlow | AFL Tables `Brownlow.Votes` | — | `brownlow_round_votes`, `brownlow_season_votes` | — | Reviewed | Already solved by the fitzRoy path. |
 | Awards — Coleman | derived from `player_match_stats.goals` | — | `award_winners` | — | Reviewed | Derivable, not acquired. Confirm the H&A-only rule before deriving. |
 | Awards — Rising Star, All-Australian, AFLCA, AFLPA, club B&F | **no API** | FootyWire / Wikipedia scrapes (existing) | `award_winners`, `award_nominations`, `honour_team_members` | — | Manual | `import_awards.py` still requires `AFLDB_LEGACY_SQLITE` — see issue G. |
@@ -1188,7 +1188,7 @@ plan is the design contract, this section is what actually shipped.
 | S2 acquisition client/CLI | **COMPLETE** |
 | S3 bundle emitter + backtest | **COMPLETE** |
 | S4 migration 103 (typed projections) | **COMPLETE**, applied to `afldb_test` |
-| S5 player provider bootstrap bridge | **COMPLETE**, 398/400 providers linked (afldb_test) |
+| S5 player provider bootstrap bridge | **COMPLETE**, 398/400 providers linked (afldb_test). *(Annotated 2026-09-22, ISSUE-244 F021.)* Current DEV full-season evidence, 2026-09-21 snapshot: **577 linked, 92 unresolved**. The `afldb_test` link set (398/400) and the DEV full-season evidence (577 linked / 92 unresolved) are **different datasets / evidence sets**, not a regression or a correction of one by the other; the earlier figure is retained as history. The 92 unresolved providers are owned by ISSUE-224. |
 | S6 settle writer (match/roster/player-stats) | **COMPLETE**, operator-validated |
 | S7 Brownlow settle engine + typed projection | **Implemented and operator-validated for historical replay (2022–2025, see §14.10) and for the completed 2025 season backtest. The real 2026 live-count capture/replay requirement is the one item still open** — see §14.11. |
 | S8 operations (systemd units, docs, admin controls) | **COMPLETE**. Deploy files exist and are **NOT installed or enabled** on any host. |
@@ -1266,6 +1266,8 @@ AFL API (public feed + 2 CFS endpoints per match)
   -> settle plan (afl-api-settle-plan.ts)                          — identity, ownership, corroboration (S6-D)
   -> canonical writer (settle-afl-api.ts + canonical-apply.ts)     — matches / match_period_scores / player_match_stats
   -> typed projections (staging.afl_api_match / afl_api_player_match, migration 103)
+       — a match row only for a match the settle PLANS (afl_api-owned or new), never for a
+       corroborated foreign-owned match (§14.4, I244-F006)
   -> reporting (settle-report.ts)
 ```
 
@@ -1438,6 +1440,194 @@ attendance is unsourced. Every other already-sourced field (scores, period score
 is protected by ordinary ownership/authority rules and moves only through `corrected`
 candidates, never automatically.
 
+**Import-batch lifecycle (AFLDB-ISSUE-244 I244-F008).** Every AFL API writer that commits an
+`import_batches` row — `settle-afl-api.ts`, `settle-afl-api-brownlow.ts` (apply *and*
+`--observe-only`) and `settle-afl-api-fixtures.ts` — closes that row in the **same transaction**:
+
+```text
+BEGIN
+  INSERT import_batches            (status 'running', started_at, records_read)
+  observe / plan / write / record import_rejections and data_issues
+  [--require-complete-source gate  -> refuses => whole transaction rolls back, batch row included]
+  finalizeSettleImportBatch()      (status 'completed', completed_at, counters)   <- settle-core.ts
+  [--dry-run                       -> rolls back, batch row included]
+COMMIT
+```
+
+- **A row with `status = 'running'` can therefore only mean a crashed process**, never a
+  finished run whose writer forgot to close it. Dry-run, a `--require-complete-source`
+  refusal, a run-level HALT and any thrown error roll the batch row back with everything else,
+  so **no committed batch exists for a run that did not commit**. Pre-transaction refusals (the
+  ingestion gate, the F016 database-identity check, the F006 fixture-identity requirement)
+  never open a batch at all. A dry-run still executes the real finalising `UPDATE` before it
+  rolls back, so it proves that statement against the real privileges.
+- If the finalising `UPDATE` does not close exactly one `running` row, or fails, the
+  transaction fails — committed data is never left beside an open batch.
+- A committed run that refused some *records* (an unresolved player, an unknown Brownlow match)
+  is still `completed`: `import_status` is `running | completed | failed | rolled_back`, and
+  record-level refusals are reported by `records_rejected`, not by a different status.
+
+Column semantics (migration 001; the AFL Tables settle and `tools/migration/common.py` follow
+the same contract):
+
+| Column | Value | Source of truth |
+|---|---|---|
+| `status` | `completed` | the only terminal state a committed run can have |
+| `started_at` | transaction start (schema default) | database |
+| `completed_at` | `clock_timestamp()` at finalisation | database (`>= started_at`; `now()` would equal `started_at` exactly) |
+| `records_read` | records the run was handed (settle records / vote sets) | stamped at open; equals `observationsSeen` |
+| `records_inserted` | new `staging.source_record_versions` rows (the batch's own `target_table`) | `versionsAppended` |
+| `records_updated` | `0` — that table is append-only; an unchanged replay writes no version | constant |
+| `records_rejected` | **number of `import_rejections` rows persisted for the batch** | `SELECT count(*)` of the rows the transaction wrote, never an in-memory counter |
+| `validation_result` | the run's counters, verbatim | the returned `counters` object |
+
+Two consequences worth knowing when reading a batch. **`records_rejected` counts rows, not
+refusals:** an unresolved player writes one `import_rejections` row; a Brownlow
+`match_identity_conflict` refusal writes a `data_issues` row only (an automatic-apply refusal
+finding is likewise a `data_issues` row — see the F009 subsection below) and `--observe-only`
+writes no diagnostic rows at all, so `voteSetsRefused` in
+`validation_result` can exceed `records_rejected`. **Canonical outcomes are not in
+`records_inserted`/`records_updated`** — `canonicalRowsInserted`, `canonicalRowsUpdated` and the
+rest are in `validation_result`, which is also where the admin read model looks for them. An
+identical replay is a *new, terminal* batch: `records_inserted = 0`, `records_updated = 0`, all
+canonical counters `0`, and `records_rejected` equal to the rejection rows that replay itself
+wrote (an unbridged player is refused — and rejected — again).
+
+**Automatic-apply refusals (AFLDB-ISSUE-244 I244-F009).** Under `--apply --auto-apply`, a target
+`applyCanonicalUnit()` *declines without rolling back* used to leave nothing but the run counter
+`canonicalApplyRefusals`: after the run nobody could say **which** target was refused or **why**
+(the canonical example is a player-stat row `afltables` owns that differs from what `afl_api`
+proposes — `foreign_source_owner`). Each such target now opens (or refreshes) **one** durable
+finding, in the run's own transaction. Nothing canonical is written and ownership is never adopted.
+
+| | |
+|---|---|
+| Where | `data_issues`, `issue_type = 'canonical_apply_failed'`, `details->>'owner' = 'AFLDB-ISSUE-122'`, `details->>'source_key' = 'afl_api'`. Listed by the settle exception report's *Open canonical apply failures* section (`settle-report.ts`) — that section now holds refusals as well as failures. |
+| Key | `afl_api\|apply\|<family>\|<external record id>\|<target table>` — the **same** key as the failure finding for the target, so one open row describes the target's latest unresolved automatic-apply outcome |
+| Reason | `details->>'refusal'`, the applier's own vocabulary verbatim: `foreign_source_owner`, `ownership_indeterminate`, `manual_authority_conflict`, `manual_authority_indeterminate`, `stale_canonical_target`, `no_canonical_match` (a dependent target whose match was itself refused). `description` carries the same code in words. `details` also names the canonical target, `family`, `external_record_id`, `source_version_seq`, the **field names** that would have changed and the `match_key` — never proposed values, payloads or error text. |
+| Severity | `warning` for a refusal that is working as designed (`foreign_source_owner`, `manual_authority_conflict`, `stale_canonical_target`, `no_canonical_match`); `error` for a fail-closed one (`ownership_indeterminate`, `manual_authority_indeterminate`) |
+| Not a finding | `nothing_to_write` (state already matches; it closes an open finding instead); `write_failed` (already durable as the existing failure finding) |
+| Season gate | `season_not_in_progress` refuses *every* target of the season identically, so it is **one** run-level finding per season (`afl_api\|apply\|season\|<year>\|seasons`), not one per target |
+
+*Replay.* One open row per key (`uq_data_issues_open_by_key`): an identical replay refreshes it in
+place (`dataIssuesRefreshed`), a changed reason updates the same row, and nothing is duplicated.
+*Self-heal.* The finding closes — in the same transaction — the run its target either applies
+(`resolution = 'canonical_apply_succeeded'`), no longer differs from canonical state
+(`'canonical_apply_not_needed'`, e.g. the other source was corrected to agree) or, for the season
+gate, the season is in progress again (`'canonical_apply_refusal_cleared'`). The writer only ever
+closes an **unresolved** row carrying its own `owner` and `source_key`. *Human decisions.* A row a
+super admin resolved is never rewritten. If the refusal condition still holds, the next run opens
+exactly one fresh finding beside it (the unique index is partial on unresolved rows) and later runs
+refresh that one — the same recurrence contract every settle finding has; there is no
+"acknowledged, do not re-raise" state. *Transaction.* Findings are written on the run's own
+transaction, so `--dry-run`, a `--require-complete-source` refusal (F004) and a HALT leave none.
+
+*Why `data_issues`, not `promotion_candidates` or `import_rejections`.* `promotion_candidates` is
+the human review queue for a **proposal**: its verbs are the reconciliation vocabulary (it has no
+`stale_canonical_target`, no distinct `ownership_indeterminate`, nothing for `no_canonical_match`),
+it has no reason column, and a candidate can only leave `pending` together with an append-only
+`promotion_decisions` row naming a human `admin_user_id` — which the automatic path may not
+fabricate. It therefore could never self-heal (an existing pending candidate is left pending and
+counted `candidatesMootLeftPending`). `import_rejections` records a **source** record the writer
+rejected and feeds `records_rejected` (F008); a refused canonical write is a record the source
+delivered and the spine observed, so nothing is written to it and `records_rejected` is unchanged.
+No new counter was added: `dataIssuesOpened` / `dataIssuesRefreshed` / `dataIssuesResolved` carry
+it, and `canonicalApplyRefusals` keeps its existing meaning (it also counts `nothing_to_write`).
+
+*Already durable, deliberately not duplicated:* a match refused at planning
+(`foreign_owned_collision`, `unresolved_identity` → pending candidate plus `import_rejections`;
+other match-identity refusals → `afl_api_match_identity_refusal`); a provider venue that does not
+resolve (`afl_api_venue_unmapped`, I244-F003); a match whose `data_overrides` authority conflicts
+at the pre-check (a `corrected`/`new` candidate, `manualAuthorityRefusals`); an unbridged player
+(candidate plus `import_rejections`); a corroboration disagreement (`afl_api_settle`); every
+Brownlow refusal (`data_issues`, `import_rejections`; I244-F002/F007) and a failed write
+(`canonical_apply_failed`). The fixtures-only tool never attempts canonical promotion. Correcting an
+identity-bearing field is a separate contract, decided by I244-F010 (next subsection): F009 only
+records a refusal.
+
+*Reading it:* `SELECT issue_key, severity, details->>'refusal' AS refusal, description FROM
+data_issues WHERE issue_type = 'canonical_apply_failed' AND resolved_at IS NULL AND
+details->>'source_key' = 'afl_api' ORDER BY issue_key;`
+
+**Identity-bearing corrections (AFLDB-ISSUE-244 I244-F010).** `matches.match_key` is
+`season|round_code|match_date|home club name|away club name` — a **content address**, not a surrogate
+id, and three things key on it as text: `data_overrides.entity_key` (human authority), the applier's
+own lookup, and every other source's resolver. It is UNIQUE and is never recomputed by a database
+trigger. Before F010, a provider correction to the round or date of an `afl_api`-owned match
+auto-applied the new column values and left `match_key` rendering the old identity; the next source
+to render the corrected identity (AFL Tables, by `match_key`) then missed the row and inserted a
+duplicate fixture.
+
+| Field | In `match_key` | Constrained to another column | Treatment on an **existing** row |
+|---|---|---|---|
+| `season` | yes | — | never proposed; a provider-id hit whose season differs HALTs (`provider_identity_contradiction`) |
+| `round_code` | yes | drives the next three | **withheld** |
+| `round_number`, `round_type`, `is_final` | no | `matches_round_number_ck`, `matches_is_final_ck` tie them to `round_code` | **withheld with `round_code`**, as one group (writing one alone violates a CHECK) |
+| `match_date` | yes | — | **withheld** |
+| `home_club_id`, `away_club_id` | yes (as club *names*) | `matches_clubs_differ_ck` | **withheld**; in practice unreachable — a club change on a provider-id hit HALTs first |
+| `venue_id`, `venue_raw`, `match_time` | no | — | ordinary auto-apply (F003 governs venue) |
+| scores, `result`, `winner_club_id`, `margin`, attendance | no | `matches_margin_ck`, `matches_winner_ck` (derived from scores and clubs only) | ordinary auto-apply |
+
+*The rule.* The AFL API settle never writes an identity-bearing field on an existing row: they are
+absent from the proposal the applier is offered (`splitMatchIdentityChange()`,
+`automaticApplyTargets()`), **changed or not** — so a concurrent writer moving a field between the
+run's read and the applier's re-read cannot be written back with `match_key` behind it. An INSERT
+defines the identity and is not split (its `match_key` and columns come from the same bundle; a
+collision with an existing key fails the unit's savepoint on `matches_match_key_key` as
+`canonical_apply_failed`, never an overwrite or merge). Everything else in the same record —
+scores, period scores, venue, kick-off time, player rows — still auto-applies, exactly as the
+ISSUE-228 runbook §13.5 requires ("scores and period scores may still auto-apply"). Nothing is
+partially applied *within* identity: no state can commit with a new round or date and the old key.
+
+*Why not rekey.* The one rekey the applier supports (`match-rekey.ts`, ISSUE-131) proves the old
+identity **retired** from a spine enumeration; the AFL API settle passes `NO_MATCH_REKEY_SCOPE`,
+which proves nothing, and its own evidence is a provider id that is never retired. Supporting it
+would mean a second retirement proof inside the shared applier, key propagation through the run's
+in-memory references, the staging projections and `data_overrides`, and a collision policy — for a
+case the runbook makes review-only, and for which no human path exists to apply an accepted
+correction (the admin match editor changes attendance, scores, `match_time`, `match_event` and notes
+only). Three incompatible `match_key` renderings also exist (ISSUE-182), so "consistent with the
+row" has no single meaning for a rekey to target.
+
+| | |
+|---|---|
+| Where | `data_issues`, `issue_type = 'canonical_apply_failed'`, owner `AFLDB-ISSUE-122`, `source_key = 'afl_api'` — listed with the F009 refusals in the settle report's *Open canonical apply failures* |
+| Key | `afl_api\|apply\|match\|<CD_M…>\|matches:identity` — its **own** key, so neither this finding nor the F009 `…\|matches` finding can close the other |
+| Reason | `details->>'refusal' = 'identity_change_requires_review'`. `details` carries `fields` (the differing identity fields), `changes` (`{field, canonical, provider}` scalars for those fields only), `canonical_match_key`, `provider_match_key`, `match_id`, `source_version_seq`. No payload, no other proposed value, no error text |
+| Severity | `warning` |
+| Counters | `canonicalApplyRefusals` +1 per record per run; `dataIssuesOpened` / `Refreshed` / `Resolved` carry the lifecycle. No counter or migration was added |
+| Replay | an identical replay refreshes the one open row; a provider that moves to a third identity refreshes the same row with the current evidence |
+| Self-heal | closes (`canonical_apply_not_needed`) the run the source and the canonical row agree on identity again — the provider reverted, or the canonical row was corrected under human authority. Checked on every automatic run that resolves the record to an `afl_api`-owned row |
+| Human decision | a resolved row is never rewritten; a persisting difference opens one fresh row beside it (the F009 contract) |
+| Transaction | the run's own; a dry-run, an F004 refusal and a HALT leave none, and no derived recompute runs for a refused identity |
+| Review-first | a run without `--auto-apply` still drafts the whole proposal, identity included, as a `corrected` candidate; the finding is automatic-path only |
+
+*Collision.* The provider-id hit resolves the record to its existing row without consulting the
+proposed key, so a proposed identity that already belongs to **another** canonical match changes
+nothing: both rows stay byte-identical, nothing is merged or deleted, and the finding's
+`provider_match_key` names the other row's key for the operator.
+
+*Ownership and authority.* A foreign-owned row is not an update target (planner: `corroborated`
+or `foreign_owned_collision`), an unowned row is refused `ownership_indeterminate` for the rest of
+its fields, and manual authority is asked only about fields the applier may write — identity never
+reaches it, so it cannot be bypassed. **Correcting an identity is a supervised operator action**
+(update the columns and `match_key` together, carrying `data_overrides` — the ISSUE-131 §8 repair
+tool's territory); the next settle recognises the repaired row through its provider id and closes
+the finding. **Brownlow is unchanged:** an existing non-null `match_id` X that differs from the
+resolved Y still refuses the whole vote set (`match_identity_conflict`, F007) and stays
+operator-reviewed; F010 does not reassign it.
+
+*Not covered by F010 (recorded, not fixed).* (a) A row `afltables` owns whose date the AFL API
+disagrees with is not found by provider id or by `match_key`, so the AFL API inserts a second row
+— a cross-source identity disagreement that predates and is independent of F010. (b) Rows on which
+an earlier, pre-F010 run already moved a column and left `match_key` behind are not detected;
+measure them read-only before relying on the key for such rows.
+
+*Reading it:* `SELECT issue_key, severity, details->'fields' AS fields, details->>'canonical_match_key'
+AS canonical, details->>'provider_match_key' AS provider FROM data_issues WHERE issue_type =
+'canonical_apply_failed' AND resolved_at IS NULL AND details->>'refusal' =
+'identity_change_requires_review' ORDER BY issue_key;`
+
 ## 14.4 Database model (migration 103)
 
 Migration 103 is **additive only** — no canonical column or CHECK constraint changes anywhere.
@@ -1446,7 +1636,7 @@ feeds a promotion; a family with no typed projection cannot be promoted."*
 
 | Table | Grain | Identity | Notable properties |
 |---|---|---|---|
-| `staging.afl_api_match` | one row per `match`-family observation, fully resolved | `(source_id, family, external_record_id)`, `family='match'` pinned | Carries **both** the `match` family's own facts AND the companion `match_roster` family's period-score/local-time facts — its single `version_seq` FK tracks only the `match` family's own spine version; the period-score columns are joined in by the S6 settle writer, which the schema cannot itself enforce (documented as a known gap in the migration's own header). Attendance is pinned to a single fixed state (`NULL`/`not_collected`/`NULL`) via a CHECK, not merely a non-complete range, because this source never has an attendance-complete branch on any path. |
+| `staging.afl_api_match` | one row per **planned** `match`-family observation (an `afl_api`-owned or new match), fully resolved — **not** one row per provider match | `(source_id, family, external_record_id)`, `family='match'` pinned | **AFLDB-ISSUE-244 I244-F006 contract:** written only when the settle plans the match; a provider match that merely corroborates an existing foreign-owned canonical match (e.g. an `afltables`-owned 2026 home-and-away match) is observed on the spine and counted `corroboratedForeignOwned` but gets **no** row here, by design. Real 2026 evidence (not an invariant): 217 source match heads, 4 rows. Brownlow therefore resolves a corroborated match only via `--use-fixture-identity` (§14.5/§14.9). Carries **both** the `match` family's own facts AND the companion `match_roster` family's period-score/local-time facts — its single `version_seq` FK tracks only the `match` family's own spine version; the period-score columns are joined in by the S6 settle writer, which the schema cannot itself enforce (documented as a known gap in the migration's own header). Attendance is pinned to a single fixed state (`NULL`/`not_collected`/`NULL`) via a CHECK, not merely a non-complete range, because this source never has an attendance-complete branch on any path. |
 | `staging.afl_api_player_match` | one row per resolved `player_match_stats` observation | `(source_id, family, external_record_id)`, `external_record_id = <CD_M>\|<CD_T>\|<CD_I>` | No `brownlow_votes`/`brownlow_round_number` columns — Brownlow is a fully separate family and table, never carried on the stat row. `career_game_no` is always NULL (measured: `gamesPlayed` is `null` on every sampled row 2022–2026). Keyed by natural `match_key`, not a `match_id` FK — a canonically rebuilt database has zero 2026 matches, so a hard FK here would make every in-season projection unwritable before the first match promotes. |
 | `staging.afl_api_brownlow_vote` | **one row per vote** (explodes the match-grain spine record) | `(source_id, family, external_record_id, provider_player_id)` | Option-B nullable canonical identity (`match_id`/`player_id`/`club_id` all nullable) — the same shape `afl_api_lineup` (077) already establishes: a vote is observed because the provider published it; canonical resolvability is separate enrichment. `club_id` is left NULL throughout (no provider-team-to-club resolution exists in this settle). `canonical_round_number` is `NOT NULL` — a row can only be written once round translation has succeeded. **Populated** by the S7 typed-projection closure (2026-09-20) for every fully-resolved (`planned`) vote set, independent of `--auto-apply`; skipped only under `--observe-only`. |
 
@@ -1483,7 +1673,24 @@ Grants mirror migrations 076/077 exactly: `afldb_import` gets full DML, `afldb_a
 3. **Then the ISSUE-131 retired-identity search** — **deliberately disabled for `afl_api`**
    (`NO_MATCH_REKEY_SCOPE` passed at every call site). A provider id whose own natural key has
    since been retired is out of scope for this stage; steps 1–2 are unaffected. See §14.15.
-4. Otherwise `new_target`.
+4. **Otherwise the resolver returns `unresolved` — which means only that no supported identity
+   resolution succeeded, not that no canonical fixture exists** (a row another source owns is
+   invisible to a provider-id lookup, and a one-component round/date disagreement renders a
+   different `match_key`). Before `new_target` is offered the planner (`planMatchFamily()`) asks
+   `findPlausibleCanonicalFixtures()` (`match-rekey.ts`, AFLDB-ISSUE-244 I244-F030): is there a
+   canonical row of **any owner** with the same season and the same oriented home/away clubs, a
+   different `match_key`, and **at most one** of `round_code` / `match_date` differing? That is
+   the same predicate the ISSUE-131 search uses (one shared fragment), minus its authority
+   requirements. Any hit refuses the INSERT with `possible_existing_match` (an
+   `afl_api_match_identity_refusal` finding listing the bounded candidate ids/keys, plus the
+   usual `import_rejections` row; no `matches`, period, player or typed-projection write). The
+   candidates are diagnostics: **nothing is linked, rekeyed, re-owned or picked**, and there is no
+   date window, scoring or venue test. A genuine second meeting differs in **both** round and
+   date and is unaffected. The applier repeats the same check inside its savepoint for a
+   new-target INSERT (READ COMMITTED makes the planner's read non-binding); the residual window
+   between that final SELECT and the INSERT is accepted, because closing it needs a constraint or
+   serialisable isolation. A resolved provider record closes its stale identity finding
+   (`match_identity_resolved`). Zero hits: `new_target`.
 
 A provider-id hit whose observed `(season, home, away)` differ from the payload is a run-level
 **HALT** (`provider_identity_contradiction`) — never a silent rekey.
@@ -1491,18 +1698,25 @@ A provider-id hit whose observed `(season, home, away)` differ from the payload 
 **Fixture-only identity fallback (S7 follow-up, 2026-09-20).** Brownlow's `bfawards` feed
 carries only `matchId`/`roundNumber` — no home/away/date to build a `match_key` from — so
 Brownlow resolves a vote's match through the **already-settled** `staging.afl_api_match`
-projection (written by the match family's own settle, independent of which source owns the
-canonical row), never by re-parsing a bundle. When that row does not exist (the match-family
+projection when the match family's settle planned that match (an `afl_api`-owned or new match),
+never by re-parsing a bundle. A match that only corroborates a foreign-owned canonical match has
+**no** typed row by design (§14.4, I244-F006), so those matches resolve only through the fallback
+below. When the row does not exist (for that reason, or because the match-family
 settle has not yet run for that match), a match-only `--fixtures-only` acquisition
 (`acquire-afl-api.ts --fixtures-only`, `settle-afl-api-fixtures.ts`) persists **only** the
 `match` family's own spine observation — no `staging.afl_api_match` row, no canonical write, no
 promotion candidate — and `resolveAflApiMatchViaFixtureObservation()` resolves a Brownlow vote's
-match by re-emitting that observation and matching `(season, round, home club, away club)`
-against existing `matches` rows: 0 candidates → `unknown_match`, exactly 1 → resolved, more than
+match by re-emitting that observation and matching `(season, home club, away club, exact
+venue-local match date)` (never provider round, never `match_key`; corrected 2026-09-22,
+ISSUE-244 F021) against existing `matches` rows: 0 candidates → `unknown_match`, exactly 1 → resolved, more than
 1 → `fixture_identity_ambiguous` (never guessed). This path is **read-only** by construction —
 it cannot write `matches`, so it can never re-own a foreign-owned row or create a duplicate. It
-is opt-in only (`--use-fixture-identity` on the Brownlow settle CLI); every existing caller that
-omits it is byte-identical to before it existed.
+is opt-in only (`--use-fixture-identity` on the Brownlow settle CLI) and is **never enabled
+implicitly**. Since I244-F006 the Brownlow CLI measures, from the snapshot's own vote sets and
+before any write, how many have no typed row but resolve through the fallback: `--dry-run` /
+`--apply` refuse (before any write) when that count is non-zero and the flag is absent;
+`--observe-only` logs an advisory; `--validate-only` opens no connection and does not assess it.
+The resolver function itself is unchanged for any caller that omits the fallback.
 
 **Team/venue identity.** `CD_T…` → `clubs.legacy_club_hist` through the tracked
 `data/reference/afl-api-identities.json` map only (18 clubs); an observed name/abbreviation that
@@ -1774,13 +1988,20 @@ behaviour and `applyCanonicalUnit()`'s own baseline-hash comparison already comp
 no-op on a byte-identical or logically-unchanged re-poll — proven by a dedicated integration
 test (`voteSetsNoOp`).
 
-**Match-family prerequisite, ordering.** A Brownlow vote set for a match refuses `unknown_match`
-until that match's own family has been settled (`settle-afl-api.ts --apply`, without
-`--auto-apply` is sufficient — the projection write alone is what Brownlow needs). The safe
-operational sequence for a whole season is: acquire+settle the match family for the season
-first (stages every match's `staging.afl_api_match` row in one pass, ahead of the count), then
-run the Brownlow chain. The Brownlow settle CLI prints an actionable hint naming this exact
-prerequisite whenever `voteSetsRefused.unknown_match > 0`.
+**Match-family prerequisite, ordering (corrected, AFLDB-ISSUE-244 I244-F006).** A Brownlow vote
+set for a match refuses `unknown_match` until Brownlow can identify that match: through a typed
+`staging.afl_api_match` row (written by `settle-afl-api.ts` **only for a match it plans** — an
+`afl_api`-owned or new one) or, with `--use-fixture-identity`, through that match's match-family
+observation resolved against the existing canonical `matches` row. `settle-afl-api.ts --apply`
+(without `--auto-apply`) persists those observations for every acquired match but does **not**
+stage a typed row for a match that only corroborates a foreign-owned canonical match, so it does
+not by itself make a corroborated match resolvable without `--use-fixture-identity`. The safe
+sequence for a season is: acquire+settle the match family first, then run the Brownlow chain
+**with `--use-fixture-identity` whenever the snapshot contains matches owned by another source**
+(for the real 2026 home-and-away matches, under the current data state, it does). A write-capable
+Brownlow run that needs the fallback and lacks the flag refuses before any write, naming the
+count, a sample of provider match ids and the flag. The CLI's `unknown_match` hint is printed
+whenever `voteSetsRefused.unknown_match > 0`.
 
 **Operational enablement.** Independently enable/disableable from the match-family settle
 (§14.6/§14.7), defaults to disabled outside the live-count period, supports an `--observe-only`
@@ -1898,6 +2119,18 @@ Assertion 9 (§14.15) — that is match-family semantic-hash evidence, a distinc
 - **Dry-run rollback**: `--dry-run` executes the complete write path against real
   constraints/privileges, then unconditionally rolls back — proving the path is genuinely
   write-capable without committing anything.
+- **Import-batch lifecycle** (§14.3, I244-F008): a committed run's batch is closed
+  (`completed`, `completed_at`, counters) inside the same transaction; a run that rolls back
+  leaves no batch, so `status = 'running'` means a crashed process, not a finished run.
+- **Automatic-apply refusals** (§14.3, I244-F009): a target the applier refuses without rolling
+  back is never silent — one durable `canonical_apply_failed` finding per target with the machine
+  reason, refreshed on replay, closed when the target applies or no longer differs, and rolled
+  back with the run on a dry-run, an F004 refusal or a HALT.
+- **Identity-bearing corrections** (§14.3, I244-F010): the AFL API settle never writes a round,
+  date, club or season field on an existing `matches` row, so `match_key` can never be left
+  rendering an identity the row no longer has. The difference is one durable finding
+  (`…|matches:identity`), refreshed on replay and closed when the sides agree again; the rest of the
+  record still applies.
 - **Source completeness**: `recordsDeferred` (POSTGAME/pre-CONCLUDED matches) are excluded from
   `snapshotRejections` and from every completeness verdict — a season whose only non-applied
   records are legitimately not-yet-concluded reports `complete` and exits 0; a genuine gate
@@ -1946,7 +2179,7 @@ is the **entire** cross-source comparison surface — there is no separate score
 | Match scores (`home_score`/`away_score`) | **Yes** — `classifyCorroboration()` on every corroboration encounter |
 | Match result/margin | derived from scores, not separately compared |
 | Period scores | **No** — not part of `CORROBORATED_MATCH_FIELDS`; not separately reconciled |
-| Player match statistics | **No routine reconciliation** — the S5/S5b player-identity bridge compares stat vectors as *identity evidence* (§14.5), but that is a one-time linking exercise, not an ongoing source-disagreement surface like the match family's |
+| Player match statistics | **No routine reconciliation** — the S5/S5b player-identity bridge compares stat vectors as *identity evidence* (§14.5), but that is a one-time linking exercise, not an ongoing source-disagreement surface like the match family's. A row `afltables` owns that differs from `afl_api`'s proposal is, since I244-F009, *recorded* as a `foreign_source_owner` refusal finding (§14.3) — a durable trace of the disagreement, not a comparison of every stat between the sources |
 | Brownlow votes | **Yes**, but against the leaderboard feed (the same source's own aggregate), not against AFL Tables — see §14.9; AFL Tables carries no separate live Brownlow feed to reconcile against in-season |
 
 **Do not claim a stat is "reconciled" unless it appears in the table above as compared.** The
@@ -1966,12 +2199,14 @@ compare quarter-by-quarter period scores or individual player statistics between
 | `corroboratedForeignOwned` | **No** — expected whenever the snapshot overlaps `afltables`-owned matches | Confirms co-source corroboration is running, not an error |
 | `unresolvedIdentityMatch` | **No**, but should track the bridge's known unresolved list | An unbridged/debutant player; the match still applies |
 | `canonicalApplyFailures` | Yes, for a healthy run | A write genuinely failed inside its savepoint; check the paired `canonical_apply_failed` `data_issues` row |
+| `canonicalApplyRefusals` | **No** — expected whenever `afltables` owns a row `afl_api` disagrees with | A target was declined without rolling back (it also counts `nothing_to_write`). Each real refusal has one open `canonical_apply_failed` finding whose `details->>'refusal'` names the reason (§14.3, I244-F009); `dataIssuesOpened`/`Refreshed`/`Resolved` count its lifecycle. A withheld identity-bearing correction (I244-F010, `identity_change_requires_review`) also counts here, once per record per run |
 | `attendanceEnrichmentsApplied` | **No** — non-zero whenever an `afltables`-owned attendance value newly fills an `afl_api`-owned match's gap | Expected, not a defect |
 | a rerun's `canonicalRowsInserted`/`Updated` | Yes, for an identical replay | Confirms idempotency |
 
 **Brownlow settle, typical counters:** `voteSetsSeen` should equal the snapshot's published vote
-sets; `voteSetsRefused` (by reason) should be explainable (usually `unknown_match` before the
-match-family prerequisite has run, or a genuinely unresolved player); `voteSetsApplyFailed`
+sets; `voteSetsRefused` (by reason) should be explainable (`unknown_match` when neither the typed
+staging row nor — with `--use-fixture-identity` — the fixture path identifies the match, e.g.
+before the match-family prerequisite has run; or a genuinely unresolved player); `voteSetsApplyFailed`
 should be zero for a healthy run; `voteSetsNoOp` non-zero on a replay is expected;
 `voteSetsRescheduledRound` non-zero is informational, not a defect (§14.9);
 `leaderboardMismatches` non-zero is advisory while `LIVE`, must be zero (or explicitly
@@ -1997,7 +2232,19 @@ investigated) once `CONCLUDED`.
   convention); the 21 measured-but-unstored `extendedStats`/percentage/efficiency fields
   (§4.2/§14.2) are retained in the raw payload but never projected.
 - **Source-comparison coverage** (§14.13): match scores only — period scores and player
-  statistics are not reconciled between `afltables` and `afl_api` on an ongoing basis.
+  statistics are not reconciled between `afltables` and `afl_api` on an ongoing basis. This is
+  an accepted observability/provenance-breadth limit, not a canonical-write safety gap
+  (ISSUE-244 F014, CLOSED / PASS).
+- **No immediate ISR revalidation after an `afl_api` apply** (ISSUE-244 F013, CLOSED / ACCEPTED):
+  the `afl_api` settle does not call `revalidateSeason()`, so a season page can stay stale for up
+  to the one-hour ISR window after an `afl_api`-only write. Bounded, no canonical-data effect;
+  an AFL Tables write may revalidate the same surface earlier, and the ISSUE-228 S9 DEV smoke
+  covers `/seasons/2026`.
+- **Scheduled chain may commit nothing until ISSUE-224 + S9** (ISSUE-244 F017, CLOSED / DEFERRED
+  TO ISSUE-224): the nightly `afl_api` unit runs `--apply --auto-apply --require-complete-source`,
+  and the F004 pre-commit refusal means an incomplete source refuses before commit. Until ISSUE-224
+  registers the required 2026 debutants and the snapshot is re-settled under ISSUE-228 S9, the
+  scheduled `afl_api` chain may commit nothing.
 - **Finals/round quirks**: the 2025 `metadata.prematch_label` vs. `metadata.finals_match_label`
   divergence (§14.2) leaves four 2025 fixture-only records refusing
   `finals_label_required`; not fixed by this documentation pass. 2022–2024 finals cannot be

@@ -5,9 +5,11 @@ import { sql } from '@/db/client';
 /**
  * Round-grain views derived live from `matches` and `brownlow_round_votes`.
  *
- * `club_seasons` (the season page's final ladder) is loaded from an
- * external end-of-season ladder and has no round grain — see the
- * `club_seasons` REBUILDS block in tools/migration/rebuild_derived.py.
+ * `club_seasons` (the season page's final ladder) is derived from canonical
+ * `matches` by `recomputeClubSeasons` (ISSUE-095; also invoked after
+ * applicable afl_api canonical writes, ISSUE-244 F001) and has no round
+ * grain — see the `club_seasons` REBUILDS block in
+ * tools/migration/rebuild_derived.py.
  * There is no equivalent published source for "the ladder after round N",
  * so it is computed here from `matches` instead, one query per season
  * covering every round at once rather than one query per round.

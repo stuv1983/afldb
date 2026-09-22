@@ -1,5 +1,6 @@
 /**
- * AFLDB-ISSUE-128 — the source-completeness verdict for an AFL Tables settle run.
+ * AFLDB-ISSUE-128 — the source-completeness verdict and its rendering for
+ * current-season settle runs (AFL Tables and AFL API).
  *
  * WHY THIS EXISTS. `AFLDB-ISSUE-122`'s chain is fail-closed at every stage
  * that could corrupt data, and correctly so: a source row AFLDB cannot
@@ -110,7 +111,7 @@ export type SourceCompletenessCounters = {
 };
 
 const UNKNOWN_HEADLINE =
-  'Source completeness UNKNOWN: the run recorded no counters, so whether AFL Tables '
+  'Source completeness UNKNOWN: the run recorded no counters, so whether the source '
   + 'supplied rows this run could not represent is not established.';
 
 /**
@@ -163,7 +164,7 @@ export function assessSourceCompleteness(
       code: 'unrepresentable_rows',
       count: unrepresentableRows,
       detail:
-        `${unrepresentableRows} row(s) acquired from AFL Tables had no identity AFLDB could `
+        `${unrepresentableRows} row(s) acquired from the source had no identity AFLDB could `
         + 'represent, so they are not in the snapshot enumeration at all and cannot reach '
         + 'canonical data. They were observed upstream and dropped here.',
     });
@@ -222,7 +223,7 @@ function headlineFor(
 ): string {
   if (status === 'complete') {
     return enumeratedRecords === 0
-      ? 'Source complete: AFL Tables supplied no rows for this scope, and none were dropped.'
+      ? 'Source complete: the source supplied no rows for this scope, and none were dropped.'
       : `Source complete: all ${enumeratedRecords} acquired record(s) were represented, `
         + 'none were dropped, and every scope was proven sweepable.';
   }
@@ -231,7 +232,7 @@ function headlineFor(
   if (rejectedRecords > 0) parts.push(`${rejectedRecords} unprojected record(s)`);
   if (scopesNotSwept > 0) parts.push(`${scopesNotSwept} unswept scope(s)`);
   return `Source INCOMPLETE: ${parts.join(', ')}. This run must not be read as a `
-    + 'complete import of AFL Tables current-season data.';
+    + 'complete import of the current-season data from the source.';
 }
 
 /** The verdict as terminal/journal lines. Used by the settle CLI. */
