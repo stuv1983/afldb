@@ -2988,7 +2988,7 @@ Both require `AFLDB_DEV_DATABASE_URL` set in `.env` (role `afldb_app`) and, per 
 `data/sources/afl_api/matches/` junction/copy in this worktree or execution from the main
 `D:\dev\afldb` checkout. **Neither command has been run.**
 
-## 20.4 Boundary statement for this pass
+## 20.4 Boundary statement for this pass (§20)
 
 **Written:** this file (§20), `issues.md`, `IssuesIndex.md`, and a short cross-reference in
 `issues/open/AFLDB-ISSUE-228.md`. Nothing else.
@@ -3001,6 +3001,694 @@ created. §20.1 is a transcription of an operator-reported result, not independe
 `src/lib/acquisition/afl-api-player-evidence.ts`, `tools/migration/import_afl_api_player_bridge.py`,
 `.env.example`, `package.json`, and the on-disk contents of this worktree's and the main
 checkout's `data/sources/`.
+
+---
+
+# 21. D-8 step 3 is BLOCKED by a two-row canonical name defect on `afldb_dev` — sanctioned correction path, recurrence fix and expected bridge movement (2026-09-22, preparation pass; NOTHING RUN, NOTHING COMMITTED)
+
+**Boundary up front.** This pass wrote repository files only. No database was connected to, no
+DEV or PROD write was attempted, no AFL API bridge was emitted, no AFL API identity was imported,
+no settle was run, nothing was committed, no test/typecheck/build was executed. Every DEV figure
+below is transcribed from the operator's read-only session, not independently reproduced.
+
+## 21.1 The defect, exactly
+
+The operator's read-only `afldb_dev` session (`database = afldb_dev`, `role = afldb_app`,
+`transaction_read_only = on`) reports two canonical player rows created by D-8 step 1 whose name
+parts are wrong:
+
+| id | `display_name` | `given_name` | `surname` | `sort_name` | `debut_season` |
+|---|---|---|---|---|---|
+| 13382 | Alex Van Wyk | `Alex Van` | `Wyk` | `Wyk, Alex Van` | 2026 |
+| 13422 | Hussien El Achkar | `Hussien El` | `Achkar` | `Achkar, Hussien El` | 2026 |
+
+`display_name` is correct on both rows. Only the division into given name and surname — and the
+`sort_name` derived from it — is wrong.
+
+### 21.1.1 Exposure is exactly two rows, DB-wide
+
+A corrected DB-wide sweep (`display_name` token count > 2 using the PostgreSQL POSIX whitespace
+class, AND `surname` containing no space) returns **exactly 2 rows in the whole `players` table**:
+13382 and 13422. Restricted to `debut_season = 2026` the same predicate returns the **same 2 rows**
+and nothing else. **Count = 2. There is no evidence of broader canonical impact.**
+
+This is corroborated offline and independently of the database: of the 92
+`afltables_observed_names` in the pinned target set
+`docs/rebuild-manifests/draftguru/issue224-s9-target-set-20260922.json`, exactly two carry more
+than two whitespace-separated tokens — `Alex Van Wyk` (`players/A/Alex_Van_Wyk.html`) and
+`Hussien El Achkar` (`players/H/Hussien_El_Achkar.html`). The DEV population and the artefact
+population agree at 2.
+
+### 21.1.2 Root cause
+
+`createPlayerInTransaction` (`src/db/queries/players.ts:321-332`) falls back to a **last-token
+split** of `display_name` when the caller supplies neither `givenName` nor `surname`:
+
+```ts
+if (!givenName && !surname) {
+  const parts = displayName.split(/\s+/);
+  ...
+  givenName = parts.slice(0, -1).join(' ');
+  surname  = parts[parts.length - 1];
+}
+```
+
+`tools/rebuild/draftguru/register_issue224_s9_players.ts` built its `CreatePlayerInput` from
+`displayName` and `notes` only, so for all 92 rows that fallback fired. For the 90 two-token names
+it produced the right answer; for the two multipart surnames it silently produced the wrong one.
+It is not a defect of `createPlayerInTransaction` as such — a caller that knows the division is
+expected to supply it — it is a defect of the caller that did not.
+
+The wrong parts are **durable**, not cosmetic. They were written to:
+
+1. `players.given_name` / `players.surname`;
+2. `players.sort_name`, derived in SQL from those two (`players.ts:351-355`);
+3. the `data_overrides('players', 'manual_admin_edit:<token>', 'identity')` payload
+   (`players.ts:399-401`), which is what `replay_admin_overrides(players)`
+   (`tools/migration/common.py:1254-1371`) re-creates the row from after a destructive reload or
+   a promotion.
+
+### 21.1.3 Why this blocks D-8 step 3
+
+`src/lib/acquisition/afl-api-player-evidence.ts` rule **(d)** is a fail-closed **normalised
+surname equality** check, validation-only but binding: an otherwise accepted pair is **withheld**
+on a surname disagreement. `normaliseSurname()` (`afl-api-player-evidence.ts:150-157`) uppercases
+and strips everything outside `A-Z`, so:
+
+- provider `Van Wyk` → `VANWYK` vs canonical `Wyk` → `WYK` — **disagree**;
+- provider `El Achkar` → `ELACHKAR` vs canonical `Achkar` → `ACHKAR` — **disagree**.
+
+Both providers are therefore withheld as `unresolved` with
+`reason: surname_disagrees(...)`, regardless of how completely their club, jumper and 13-column
+core stat vector agree. **This mechanism is established by reading the code; it has not been
+reproduced against a bridge run in this pass.**
+
+**Step 3 remains BLOCKED until the correction is applied and independently verified.**
+
+## 21.2 Expected post-correction bridge movement — EXPECTED ONLY, NOT CLAIMED
+
+| Counter | Before | Expected after |
+|---|---|---|
+| `PROVIDERS_LINKED` | 667 | 669 |
+| `PROVIDERS_UNRESOLVED` | 2 | 0 |
+| `PLAYER_MATCH_ROWS_COVERED` | 9,971 | 9,983 |
+| `PLAYER_MATCH_ROWS_UNCOVERED` | 12 | 0 |
+| `PROVIDERS_CONTRADICTORY` | 0 | 0 |
+| `CANONICAL_MATCHES_UNRESOLVED` | 2 | 2 |
+
+**None of these values is claimed.** They are the operator's stated expectation, recorded here so
+the re-run has something to be measured against. They become evidence only when a fresh
+`emit:afl-api-player-bridge` run against `afldb_dev` reports them. `CANONICAL_MATCHES_UNRESOLVED`
+is deliberately unchanged: it is a match-identity question, unrelated to player surnames.
+
+## 21.3 Task A — the sanctioned correction path
+
+### 21.3.1 The mechanism
+
+There is exactly one supported writer for `players.given_name` / `players.surname` /
+`players.sort_name` in this repository: the **manual data editor**, field group `name`.
+
+| Layer | Location |
+|---|---|
+| Route | `/admin/data-editor?entity=players&id=<id>` (`src/app/admin/data-editor/page.tsx`) |
+| Server Action | `saveDataEdit` (`src/app/admin/data-editor/actions.ts:139`), guarded by `requireCapability('data.dataEditor')` |
+| Query layer | `saveEdit` (`src/db/queries/data-edits.ts:154`) |
+| Field spec | `EDITABLE_ENTITIES.players.groups.name` = `display_name`, `given_name`, `surname` (`src/lib/edit/spec.ts:91-93`) |
+| Statistical UPDATE | `applyPlayerEdit` case `'name'` (`data-edits.ts:296-313`) — sets `given_name`, `surname`, recomputes `search_name` and `sort_name`; **`slug` deliberately untouched** (player URLs are id-authoritative) |
+| Durable override | `data_overrides('players', 'afltables:<path>', 'name')`, upserted at `data-edits.ts:209-234` |
+| Audit | `recordDataEdit(... fieldGroup 'name' ...)` at `data-edits.ts:238-246`, **inside the same transaction** (AFLDB-ISSUE-027): a failed audit insert rolls the edit back |
+
+Transactional safety: one `importSql.begin()` block per save; `readCurrent` takes `FOR UPDATE` on
+the target row before anything is written; any throw rolls back the UPDATE, the override upsert and
+the audit row together.
+
+**Raw `UPDATE` statements are not proposed and must not be used** — they would bypass the durable
+override and the audit row, which is precisely what makes a correction survive a rebuild.
+
+### 21.3.2 A defect this path does NOT fix on its own — MUST be read before applying
+
+`getEntityNaturalKey('players', …)` (`data-edits.ts:129-142`) keys a player's override by its **AFL
+Tables** identity, so the correction lands under `entity_key = 'afltables:players/A/Alex_Van_Wyk.html'`,
+`field_group = 'name'`.
+
+These two players **also** carry the `manual_admin_edit:<token>` / `identity` override that
+`createPlayerInTransaction` minted at registration, and **that payload still carries the wrong
+`given_name`/`surname`** (§21.1.2 item 3).
+
+`replay_admin_overrides(players)` applies both key shapes in **one** `UPDATE … FROM active_overrides`
+(`tools/migration/common.py:1346-1371`). PostgreSQL updates a target row **once**, from an
+**arbitrarily chosen** matching source row, when the `FROM` side produces more than one match. With
+two active override rows for the same `player_id` carrying different `given_name`/`surname`, the
+replayed result is **non-deterministic**: a rebuilt or promoted database may silently restore the
+wrong surname.
+
+**Grade: HIGH.** Consequences:
+
+1. The correction is **not durably safe** until the `manual_admin_edit:<token>` / `identity`
+   payload is corrected too, or deactivated in favour of the `name` override.
+2. There is **no sanctioned surface** that edits that payload's name fields today.
+   `attachAflTablesIdentityInTransaction` (`src/db/queries/admin-draft.ts:1527-1535`) is the only
+   writer that mutates it after creation, and it merges **only** `afltables_profile_path`.
+3. This is a **general** latent defect for every admin-created player who is later name-edited, not
+   a property of these two rows.
+
+**This is an operator decision and is NOT resolved in this pass.** Three options, no recommendation
+adopted without operator approval:
+
+- **A1** — apply the editor correction, then correct the `manual_admin_edit:<token>` / `identity`
+  payload's `given_name`/`surname` in the same authorised maintenance window, through a purpose-built
+  transaction-scoped primitive that also writes its own `data_edits` row. Requires new code; keeps
+  both key shapes consistent so the replay's arbitrary choice is harmless.
+- **A2** — apply the editor correction and accept the non-determinism on DEV only, on the basis that
+  DEV is not promoted. **Does not make the correction safe for PROD** and leaves the latent defect
+  untracked.
+- **A3** — open a separate tracked issue for the two-key replay collision (it meets the §5 criteria:
+  a reproducible data-integrity problem with an architectural cause) and proceed with A1's write in
+  this issue.
+
+**Recommended: A3 + A1.** Not actioned; awaiting the operator.
+
+### 21.3.3 Answers to the eight Task A questions
+
+1. **Exact helper/tool/API path** — `/admin/data-editor?entity=players&id=<id>` → `saveDataEdit`
+   (`actions.ts:139`) → `saveEdit` (`data-edits.ts:154`) → `applyPlayerEdit` case `'name'`
+   (`data-edits.ts:296`). No CLI equivalent exists; there is no `tools/` runner for `saveEdit`, and
+   adding one is out of scope for a two-row correction.
+2. **Preflight/dry-run** — **none exists.** `saveEdit` has no dry-run mode. The available preflight
+   is a read-only confirmation of the current state (§21.3.7 query 1) and the editor's own
+   pre-populated form, which `getEditableRow` (`data-edits.ts:49`) fills from the live row. A save
+   that changes nothing returns `"No change — the values already match."` and writes no override
+   and no audit row, so a re-submission of identical values is safe.
+3. **Apply "command"** — a UI action, not a command. For each id in turn, signed in to the DEV app
+   as a `super_admin` holding `data.dataEditor`:
+   - open `/admin/data-editor?entity=players&id=13382`;
+   - in the **Name** group leave `Display name` = `Alex Van Wyk` **unchanged**, set
+     `Given name` = `Alex`, `Surname` = `Van Wyk`;
+   - note: `AFLDB-ISSUE-224 §21 — correct multipart surname; authority AFL Tables / fitzRoy
+     issue224-inseason-20260919. display_name, slug, search_name, debut_season and all identities
+     unchanged.`;
+   - save, and record the returned `Saved. Given name: Alex Van → Alex; Surname: Wyk → Van Wyk.`
+     summary verbatim;
+   - repeat for `id=13422` with `Given name` = `Hussien`, `Surname` = `El Achkar`.
+4. **Required role/environment** — DEV app, authenticated session with capability
+   `data.dataEditor` (super_admin). The UPDATE itself runs as `afldb_import` on a short-lived
+   connection from `AFLDB_IMPORT_DATABASE_URL` **as configured on the DEV host** — it is the DEV
+   app's own environment that decides the target database, so this must be performed against the
+   DEV deployment and never from a workstation pointed elsewhere. `afldb_auth` keeps zero write
+   access to the statistical tables throughout.
+5. **Fresh backup required?** — **Yes, recommended and cheap.** The write is two rows in one table
+   plus two override rows and two audit rows, and `saveEdit` is per-save transactional, so the blast
+   radius is small; but this is a DEV write immediately preceding acceptance evidence, and every
+   prior D-8 step in this issue took one (§19.1, §20.1). Take and independently verify an
+   `afldb_dev` dump first, and record its sha256 in the execution record.
+6. **Rollback behaviour** — within a save: any failure (validation, UPDATE, override upsert, audit
+   insert) throws inside `importSql.begin()` and rolls the whole save back; `saveEdit` returns
+   `{ ok: false, error }` and nothing is written. After a committed save: there is **no undo
+   button**. Reversal is a second save through the same path restoring the previous values, plus
+   deactivating or correcting the override row; the `data_edits` row carries `old_values` so the
+   previous state is recoverable from the audit trail. The taken backup is the coarse fallback.
+7. **Exact postcondition queries** — §21.3.7.
+8. **Durable override/audit checks** — §21.3.7 queries 2–4.
+
+### 21.3.7 Postcondition and durability queries (read-only; operator-run)
+
+Run as `afldb_app` for 1 and 2; queries 3 and 4 read `data_overrides`, which has **no
+`grant_app_read`** (migration 073) and needs the `afldb_import` role. `data_edits` is **INSERT-only**
+for `afldb_import` (migration 066 / `privileges.sql`), so query 5 needs a role with SELECT on it —
+if none is available, the audit rows are proven only by the editor's own success message, exactly as
+§18.5.2 established for the registration runner.
+
+```sql
+-- 1. The two canonical rows now carry the authoritative division.
+SELECT id, display_name, given_name, surname, sort_name, search_name, slug, debut_season
+  FROM players WHERE id IN (13382, 13422) ORDER BY id;
+-- EXPECT 13382: 'Alex Van Wyk' | 'Alex' | 'Van Wyk' | 'Van Wyk, Alex' ; debut_season 2026
+-- EXPECT 13422: 'Hussien El Achkar' | 'Hussien' | 'El Achkar' | 'El Achkar, Hussien' ; debut_season 2026
+-- EXPECT search_name and slug UNCHANGED from their pre-correction values (record both beforehand).
+
+-- 2. The DB-wide sweep is now empty — the defect class is gone, not just these two rows.
+SELECT count(*) FROM players
+ WHERE array_length(regexp_split_to_array(btrim(display_name), '[[:space:]]+'), 1) > 2
+   AND surname !~ '[[:space:]]';
+-- EXPECT 0 (it returns 2 before the correction).
+
+-- 3. The editor's durable override exists, under the AFL Tables key, and carries both parts.
+SELECT o.entity_key, o.field_group, o.is_active,
+       o.override_values->>'given_name' AS given_name,
+       o.override_values->>'surname'    AS surname
+  FROM data_overrides o
+ WHERE o.entity_type = 'players' AND o.field_group = 'name'
+   AND o.entity_key IN ('afltables:players/A/Alex_Van_Wyk.html',
+                        'afltables:players/H/Hussien_El_Achkar.html');
+-- EXPECT 2 rows, is_active = true, the corrected parts.
+
+-- 4. THE §21.3.2 COLLISION CHECK. The manual_admin_edit identity payload for the same two
+--    players still carries the OLD parts unless §21.3.2's A1 is also applied.
+SELECT e.player_id, o.entity_key,
+       o.override_values->>'given_name' AS given_name,
+       o.override_values->>'surname'    AS surname
+  FROM data_overrides o
+  JOIN sources s ON s.key = split_part(o.entity_key, ':', 1)
+  JOIN external_identities e ON e.external_id = substring(o.entity_key from position(':' in o.entity_key) + 1)
+                            AND e.source_id = s.id AND e.status IN ('unique', 'resolved')
+ WHERE o.entity_type = 'players' AND o.is_active = true AND e.player_id IN (13382, 13422)
+ ORDER BY e.player_id, o.entity_key;
+-- EXPECT 4 rows (two key shapes x two players). Any row whose given_name/surname disagrees with
+-- query 1 is the non-deterministic replay hazard. DO NOT record the correction as durable while
+-- one exists.
+
+-- 5. Audit trail (needs a role with SELECT on data_edits).
+SELECT id, table_name, row_id, field_group, old_values, new_values, admin_user_id, created_at
+  FROM data_edits
+ WHERE table_name = 'players' AND row_id IN (13382, 13422) AND field_group = 'name'
+ ORDER BY created_at DESC;
+-- EXPECT one row per corrected player, old_values carrying the last-token-split parts.
+```
+
+Identity non-regression, to prove the correction touched nothing it must not:
+
+```sql
+SELECT e.player_id, s.key AS source, e.external_id, e.status::text, e.match_method
+  FROM external_identities e JOIN sources s ON s.id = e.source_id
+ WHERE e.player_id IN (13382, 13422) ORDER BY e.player_id, s.key;
+-- EXPECT the AFL Tables and manual_admin_edit identities unchanged, and (before D-8 step 4)
+-- still NO afl_api identity for either player.
+```
+
+## 21.4 Task B — the recurrence fix (implemented this pass; NOT run)
+
+`tools/rebuild/draftguru/register_issue224_s9_players.ts` no longer lets
+`createPlayerInTransaction`'s last-token split fire at all. `createPlayerInTransaction` itself is
+**unchanged** — the global fallback is not weakened, because other callers legitimately depend on
+it and narrowing it repository-wide is a far larger blast radius than this defect warrants.
+
+New exported `resolveNameParts(profilePath, displayName, override?)`:
+
+| Display name shape | Behaviour |
+|---|---|
+| one token | `{ givenName: null, surname: token }` — a mononym has nothing to divide |
+| exactly two tokens | `{ givenName: first, surname: second }` — unambiguous |
+| **three or more tokens** | **REFUSES**, naming the row and the flag that unblocks it |
+
+The resolved parts are then passed **explicitly** as `CreatePlayerInput.givenName` / `.surname`, so
+the fallback branch is unreachable from this runner for every row, not only the multipart ones.
+
+A refused row is unblocked by a new `--name-parts <path>` artefact carrying the authoritative
+division. It is **not** hash-pinned (unlike the two immutable D-7 artefacts, it is authored per
+run); its safety comes from three checks against the pinned target set, all fail-closed:
+
+1. every override row must name an `afltables_external_id` **present in the pinned target set**;
+2. its `display_name` must equal the pinned target's byte-for-byte;
+3. `given_name + ' ' + surname` must **recompose** to that display name.
+
+So an override can restate **how** a name divides, never **what** the name is. No player id and no
+player name is special-cased anywhere in the file.
+
+Retained artefact, covering exactly the two rows that need it:
+`docs/rebuild-manifests/draftguru/issue224-s9-name-parts-20260922.json`.
+
+A new **postcondition** in `runDevPostWriteChecks` re-reads `given_name`, `surname` and `sort_name`
+for every newly-created player and refuses **before commit** if any row does not carry the resolved
+parts (including a stale `sort_name` when the two name columns are right). It reuses the existing
+slug query — no extra round trip. This is the check whose absence let the original DEV apply pass
+all eight postconditions with two wrong rows.
+
+**Behaviour change to be aware of:** with the pinned artefacts and **no** `--name-parts`, the runner
+now **refuses the whole batch** rather than registering 92 rows two of which are wrong. That is
+intended. Re-running it on `afldb_test` (or anywhere) requires
+`--name-parts docs/rebuild-manifests/draftguru/issue224-s9-name-parts-20260922.json`.
+
+## 21.5 Task B — tests (added this pass; NOT run)
+
+Extended `tests/register-issue224-s9-dev-write-gate.test.ts`, the existing semantic home for this
+runner's DB-free coverage (§10: extend the closest suite, do not create a new file). Added:
+
+- `resolveNameParts` in isolation — two-token split, mononym, **refusal** of `Alex Van Wyk`,
+  `Hussien El Achkar` and `Jan van der Berg`, empty display name, a valid override, an override
+  that does not recompose, an override with an empty surname;
+- the runner over the **real pinned artefacts** — refuses the whole batch with no `--name-parts`;
+  resolves 92/92 with the retained artefact and recomposes every row; the artefact covers exactly
+  the two paths that need it; refuses an override naming a path outside the target set, one whose
+  `display_name` disagrees, one that does not recompose, and a duplicated path;
+- `parseArgs` — `--name-parts` defaults to `null`, is carried through, and refuses an empty path;
+- `runDevPostWriteChecks` — refuses before commit on a last-token-split surname, and on a stale
+  `sort_name` when the two name columns are correct. The pre-existing fake `tx` was widened to
+  answer the now-wider player query; its call-count assertions (the "no SELECT on `data_edits`"
+  proof from §18.5.2) are unchanged at 5 queries.
+
+**No test was run in this pass.** The minimal verification the operator should run is in §21.7.
+
+## 21.6 What this pass did NOT do
+
+- No database connection of any kind, on any target.
+- No correction applied — 13382 and 13422 still carry the wrong parts on `afldb_dev`.
+- No AFL API bridge emit, no AFL API identity import, no settle, no PROD contact.
+- No Git command, no commit, no push.
+- No test, typecheck or build executed; the §21.4/§21.5 code is **written, not validated**.
+- §21.3.2's replay-collision decision is **open**; no successor issue has been created yet.
+
+## 21.7 Exact next steps, in order
+
+1. Operator runs the DB-free verification of the §21.4/§21.5 change:
+   `npm run typecheck` and
+   `npx vitest run tests/register-issue224-s9-dev-write-gate.test.ts`.
+2. Operator decides §21.3.2 (A1 / A2 / A3+A1) — this governs whether the correction is durable.
+3. Fresh, independently verified `afldb_dev` backup; record its sha256.
+4. Apply the two corrections through `/admin/data-editor` per §21.3.3 item 3.
+5. Run the §21.3.7 postcondition set, including query 4 under the import role.
+6. Only then re-run D-8 step 3 (§20.3.9) and measure the §21.2 counters against the fresh artefact.
+
+## 21.8 Boundary statement for this pass (§21)
+
+**Written:** `tools/rebuild/draftguru/register_issue224_s9_players.ts`,
+`tests/register-issue224-s9-dev-write-gate.test.ts`,
+`docs/rebuild-manifests/draftguru/issue224-s9-name-parts-20260922.json` (new), this file (§21),
+`issues.md`, `IssuesIndex.md`, `CHANGELOG.md`. Nothing else.
+
+> **§21.3.2 and §21.7 item 2 are SUPERSEDED by §22** (2026-09-22): the operator selected **A3 + A1**
+> and both halves are implemented. §21 stands as the record of that pass.
+
+---
+
+# 22. Durable override replay — §21.3.2 finalised (A3 + A1; implemented, NOT run)
+
+Date: 2026-09-22. Worktree `D:\dev\afldb-issue-224-s9`, base HEAD `0549a637`.
+**No database was contacted on any target. Nothing was committed. DEV is untouched.**
+
+## 22.1 The collision, proven from code and schema
+
+| # | Question | Proof |
+|---|---|---|
+| 1 | Key/uniqueness on `data_overrides` | `src/db/migrations/073_data_overrides.sql:21` — `CONSTRAINT data_overrides_uq UNIQUE (entity_type, entity_key, field_group)`. Surrogate `id` is the PK (`:12`). **`entity_key` alone is NOT unique**, so one player may hold many active rows. |
+| 2 | `players` field groups in use | `src/lib/edit/spec.ts:90-108` — `name`, `dob`, `birth_year`, `height_cm`, `weight_kg`, `notes` (six, disjoint field sets), plus `identity`, written only by `createPlayerInTransaction` (`src/db/queries/players.ts:411-416`). |
+| 3a | `manual_admin_edit:<token>` / `identity` payload | `src/db/queries/players.ts:399-409` — `display_name` **always**, `given_name` and `surname` **always** (lines 400-401, unconditional), then `dob`/`dob_confidence`/`birth_year`, `height_cm`, `weight_kg`, `notes` only when the caller supplied them; `afltables_profile_path` merged in later by `attachAflTablesIdentityInTransaction` (`src/db/queries/admin-draft.ts:1527-1535`). |
+| 3b | `afltables:<path>` / `name` payload | `src/db/queries/data-edits.ts:209-234` — the `name` group's changed fields only: `display_name`, `given_name`, `surname`. `sort_name` and `search_name` are **never** override fields; they are derived (`data-edits.ts:305-310`). |
+| 4 | Can both coexist for one player? | **Yes, and for these 92 they necessarily do.** `register_issue224_s9_players.ts:1027-1033` calls `createPlayerInTransaction` (mints the `identity` row) and then `attachAflTablesIdentityInTransaction` (adds the AFL Tables identity) for every row. `getEntityNaturalKey` (`data-edits.ts:129-142`) keys a later editor save by that AFL Tables path. Different `entity_key`, so the UNIQUE constraint does not stop it. |
+| 5 | Do they overlap `given_name`/`surname`/`sort_name`? | `given_name` and `surname`: **yes, always** (3a vs 3b). `sort_name`: **no** — neither payload carries it; it is recomputed from the two by a second statement (`common.py`, the `UPDATE players SET search_name …, sort_name = CASE …` immediately after the merge). So `sort_name` follows whichever parts win. |
+| 6 | Exact replay SQL | `tools/migration/common.py`, `replay_admin_overrides`, branch `if table == "players":`. Before this pass: `WITH active_overrides AS (SELECT e.player_id, o.override_values FROM data_overrides o JOIN sources s ON s.key = split_part(o.entity_key, ':', 1) JOIN external_identities e ON … AND e.status IN ('unique','resolved') WHERE o.entity_type = 'players' AND o.is_active = true) UPDATE players p SET … FROM active_overrides o WHERE p.id = o.player_id`. **One CTE row per `data_overrides` row**, and **no `field_group` filter at all**. |
+| 7 | Is the multi-match `UPDATE … FROM` deliberately unspecified? | It is unspecified by PostgreSQL, and **not deliberately** here. A target row is updated **once**, from an arbitrarily chosen matching `FROM` row. Nothing in the statement narrows it: no `DISTINCT ON`, no aggregate, no `LIMIT`, no `ORDER BY`. |
+| 8 | Any `created_at`/`id`/authority/priority ordering applied today? | **None.** The only `ORDER BY` in the whole players branch is `ORDER BY o.entity_key` on the *manual re-creation* SELECT (`common.py`, the `pending_manual_players` query), which orders an INSERT loop and has no bearing on the UPDATE. `data_overrides.created_at`/`updated_at` are never read by any replay. |
+| 9 | Precedence defined elsewhere? | **No precedence.** The nearest thing is `src/lib/acquisition/manual-authority.ts:204-216`, which is `matches`-only and resolves ambiguity by **refusing** (`'indeterminate'`), never by choosing. That is the design precedent §22.3 follows, not a rule to inherit. |
+
+**Scope of the defect is wider than the two-key case.** Because the CTE has no `field_group` filter,
+*any* player with two active override rows loses all but one of them: a source-owned player edited
+in both the `name` and the `dob` group contributes two rows, the chosen one supplies its own fields
+and every `jsonb_exists` arm for the other group falls through to `p.<column>`. The other group's
+correction is silently dropped on every rebuild. That is reachable from the ordinary data editor
+with no manual player involved.
+
+## 22.2 A1 / A2 / A3 evaluated
+
+§21.3.2 verbatim: **A1** "apply the editor correction, then correct the `manual_admin_edit:<token>` /
+`identity` payload's `given_name`/`surname` in the same authorised maintenance window, through a
+purpose-built transaction-scoped primitive that also writes its own `data_edits` row"; **A2** "apply
+the editor correction and accept the non-determinism on DEV only, on the basis that DEV is not
+promoted"; **A3** "open a separate tracked issue for the two-key replay collision … and proceed with
+A1's write in this issue."
+
+| | A1 (repair the payload) | A2 (accept on DEV) | A3 (fix the replay rule) |
+|---|---|---|---|
+| Code/schema change | New TS primitive; no schema change | None | `common.py` players branch only; no schema change |
+| Data migration | None (an in-place payload merge) | None | None |
+| Current two-row repair | **Yes** — both authorities then agree | Yes, in `players` only | No — leaves the payload wrong, but makes the outcome deterministic |
+| Durable replay correctness | Correct **only while both rows agree**; nothing enforces that for the next edit | **Not correct** — an arbitrary winner | Correct for every player and every field family |
+| General latent-defect coverage | Covers the two-key name case for every admin-created player **if** the sync is general, none if it is a one-off script | None | Covers the two-key case **and** the multi-field-group case of §22.1 |
+| Historical override compatibility | Unchanged — existing rows keep their keys, groups and `is_active` | Unchanged | Unchanged — a player with one override merges to exactly that override |
+| Audit/history preservation | Writes its own `data_edits` row; deletes nothing | Nothing written | Nothing deleted; `data_edits` untouched |
+| Rollback | Re-run the editor with the previous values; `old_values` holds the prior payload | n/a | Revert one function; no data to undo |
+| Risk | Low, bounded by which fields it syncs (see §22.3) | **High** — a PROD promotion may restore either answer | Low; the merge is a pure re-shaping of the same rows, and equal-authority ambiguity refuses |
+| Tests | Integration (real `afldb_test`) + pure unit | None possible | Source contract over the generated SQL |
+| Changes semantics beyond ISSUE-224? | Yes, deliberately: every `name` edit of an admin-created player now keeps the creation record in step | No | Yes, deliberately: multi-override players now get **all** their overrides, not one |
+
+## 22.3 Selected design — A3 + A1, and why neither alone
+
+**Invariant:** for each canonical player and each logical field family, replay has exactly one
+deterministic winning authority.
+
+### A3 — what the general replay rule changes (`tools/migration/common.py`)
+
+The players branch no longer feeds raw override rows to `UPDATE … FROM`. It **merges them per
+player, per key**, under a total order, so the `FROM` side yields exactly one row per player:
+
+- `authority_rank DESC` — a **source-keyed correction (1)** beats the **creation record (0)**. The
+  creation record is a snapshot written once, whose job is re-creating a destroyed row; a
+  source-keyed row is a later human correction typed against the live row. **Not `updated_at`:**
+  `attachAflTablesIdentityInTransaction` stamps the creation record with `now()` when it merges
+  `afltables_profile_path` in, which would let a stale name outrank the correction that replaced it.
+  Authority is what a row **is**, not when it was last touched.
+- `entity_key, field_group` — the remaining tie-break. UNIQUE `(entity_type, entity_key,
+  field_group)` makes the order **total**, so no scan order is ever consulted.
+- **Equal-authority disagreement refuses.** Two rows of the same rank claiming one key with
+  different values raise `replay_admin_overrides(players): refusing to commit, N field(s) are claimed
+  by equal-authority overrides that disagree`, before the merged UPDATE runs — the
+  `manual-authority.ts` precedent, not a coin toss. (Unreachable from today's editor, whose groups
+  are disjoint; it is the guard that keeps the rule honest if they ever are not.)
+
+Key-presence semantics are unchanged: a key absent from **every** contributing payload stays absent,
+an explicit JSON null still clears. No player id and no name is special-cased.
+
+### A1 — what is repaired, and by what
+
+`syncManualIdentityNameRecord` (`src/db/queries/player-identity.ts`), called by `saveEdit` for the
+`players` / `name` group inside the **same** `importSql.begin()` transaction. It merges
+`display_name`, `given_name`, `surname` into the player's **active** `manual_admin_edit:<token>` /
+`identity` record and writes its own `data_edits` row (`field_group = 'manual_identity_record'`).
+A player with no manual token, or whose record is inactive, is a no-op: there is no creation record
+to contradict the row.
+
+All three fields are written whenever any one moves — a half-updated record (a new surname beside a
+stale given name) would be a third answer to what the person is called. **Name family only**, and
+deliberately: every other shared field is already settled by A3's precedence, and syncing `dob`
+would hand a legitimate edit a new way to make the record unresolvable (the replay refuses a payload
+carrying a `dob` with `dob_confidence = 'unknown'`, migration 018, a state the editor can produce).
+
+**For these two players, A1 needs no separate step at all**: with this code deployed, the §21.3.3
+editor save *is* the repair. No ad-hoc UPDATE, no player-ID special case, no evidence deleted.
+
+### Why both
+
+- **A3 alone** leaves a durable record asserting a name that is false. It wins back the moment the
+  higher-authority row is absent — an AFL Tables identity not yet `unique`/`resolved` at replay time
+  is enough, and `data-edits.ts:129-142` returns `null` for such a player, so the editor writes no
+  source-keyed override in the first place — or is deactivated. It also leaves the replay's INSERT
+  branch re-creating a destroyed row from the wrong parts before correcting them.
+- **A1 alone** makes these two rows agree, so the arbitrary choice happens to be harmless. It is
+  harmless **by coincidence**, for two rows, and does nothing for the multi-field-group defect of
+  §22.1 that has no manual player in it at all.
+- A3 gives determinism; A1 gives truthful evidence. The invariant needs both.
+
+**A3's "open a separate tracked issue" is not carried out**, because the defect is fixed in this
+pass rather than deferred; it is recorded in `CHANGELOG.md` and here. If the operator wants a
+standalone ID for the general defect, say so and one will be minted (ISSUE-227 is unallocated).
+
+## 22.4 Files changed in this pass
+
+| File | Change |
+|---|---|
+| `tools/migration/common.py` | A3 — merged, totally-ordered `players` override replay + equal-authority refusal |
+| `src/db/queries/player-identity.ts` | A1 — `MANUAL_IDENTITY_NAME_FIELDS`, `manualIdentityNamePatchFor`, `syncManualIdentityNameRecord` |
+| `src/db/queries/data-edits.ts` | Calls the sync for the `players` / `name` group, inside the existing transaction |
+| `tools/rebuild/draftguru/register_issue224_s9_players.ts` | §22.6 review item — the durable payload's name parts are now a postcondition too (same query, no extra round trip) |
+| `tests/data-overrides-source-contract.test.ts` | New describe: the replay's merge, total order, authority rule, refusal, and the sync's placement/scope; pure tests for the patch |
+| `tests/integration/data-editor.test.ts` | Real-database proof that a `name` edit repairs the creation record and audits it separately |
+| `tests/register-issue224-s9-dev-write-gate.test.ts` | Fake `tx` widened for the payload parts; new refusal case. Call-count proof unchanged at 5 |
+
+## 22.5 DEV repair runbook — EXACT, and NOT RUN
+
+Prerequisite: `npm run typecheck`, `npx vitest run tests/data-overrides-source-contract.test.ts
+tests/register-issue224-s9-dev-write-gate.test.ts`, and (needs `AFLDB_TEST_DATABASE_URL`)
+`npx vitest run tests/integration/data-editor.test.ts` all pass, and the operator has committed and
+deployed the §22.4 change to DEV. **Without the deploy, step 5 writes only the AFL Tables override
+and the creation record stays wrong** — the sync runs in the DEV app's process, not here.
+
+```bash
+# 1. Fresh DEV backup (on the DEV host).
+deploy/backup.sh                      # or the operator's standard afldb_dev dump
+sha256sum <dump path>                 # record the value; it is the --backup-sha256 acknowledgement
+
+# 2. Validate the dump before trusting it.
+pg_restore --list <dump path> | head -40
+pg_restore --list <dump path> | grep -c 'TABLE DATA public players'   # EXPECT 1
+```
+
+```sql
+-- 3. Read-only preflight, as afldb_app (3a, 3b) and afldb_import (3c).
+-- 3a. The two rows, exactly as they stand. RECORD search_name and slug verbatim.
+SELECT id, display_name, given_name, surname, sort_name, search_name, slug, debut_season
+  FROM players WHERE id IN (13382, 13422) ORDER BY id;
+
+-- 3b. The defect-class sweep (EXPECT 2 now, 0 after).
+SELECT count(*) FROM players
+ WHERE array_length(regexp_split_to_array(btrim(display_name), '[[:space:]]+'), 1) > 2
+   AND surname !~ '[[:space:]]';
+
+-- 3c. Every active override that resolves to either player (needs afldb_import).
+SELECT e.player_id, o.entity_key, o.field_group, o.is_active,
+       o.override_values->>'display_name' AS display_name,
+       o.override_values->>'given_name'   AS given_name,
+       o.override_values->>'surname'      AS surname
+  FROM data_overrides o
+  JOIN sources s ON s.key = split_part(o.entity_key, ':', 1)
+  JOIN external_identities e ON e.external_id = substring(o.entity_key from position(':' in o.entity_key) + 1)
+                            AND e.source_id = s.id AND e.status IN ('unique', 'resolved')
+ WHERE o.entity_type = 'players' AND o.is_active = true AND e.player_id IN (13382, 13422)
+ ORDER BY e.player_id, o.entity_key;
+-- EXPECT exactly 2 rows before the correction (one 'identity' row per player, carrying the
+-- WRONG parts). No 'name' row exists yet.
+
+-- 3d. The audit history these rows already carry (needs a role with SELECT on data_edits).
+SELECT id, field_group, admin_user_id, created_at FROM data_edits
+ WHERE table_name = 'players' AND row_id IN (13382, 13422) ORDER BY id;
+```
+
+**4. Deployment/migration prerequisite.** **No migration.** The only prerequisite is that the DEV
+deployment runs the §22.4 code (`src/db/queries/data-edits.ts` + `player-identity.ts`). Confirm
+before step 5. `tools/migration/common.py` is not used by the app at all — it matters only at the
+next rebuild/promotion, so it may be deployed with the same commit or later.
+
+**5. Sanctioned correction, per player.** Signed in to the **DEV** app as a `super_admin` holding
+`data.dataEditor`, `/admin/data-editor?entity=players&id=<id>`, **Name** group, `Display name`
+**unchanged**:
+
+| id | Given name | Surname |
+|---|---|---|
+| 13382 | `Alex` | `Van Wyk` |
+| 13422 | `Hussien` | `El Achkar` |
+
+Note for both: `AFLDB-ISSUE-224 §21/§22 — correct multipart surname; authority AFL Tables / fitzRoy
+issue224-inseason-20260919. display_name, slug, search_name and all identities unchanged.`
+Record the returned `Saved. …` line verbatim.
+
+**6. Durable override repair.** **None required as a separate action** — step 5 performs it
+(§22.3 A1). Verify it landed with step 8 query c. If query c shows the creation record still
+carrying the old parts, the DEV deployment predates §22.4: **stop**, deploy, and re-save.
+
+**7. Transaction boundaries.** One `importSql.begin()` per save (`data-edits.ts:197`), containing:
+`readCurrent` (`FOR UPDATE` on the player), `applyPlayerEdit`, `syncManualIdentityNameRecord` (its
+own `FOR UPDATE` on the creation record, the payload merge, its `data_edits` row), the
+`afltables:<path>` / `name` override upsert, and the `name` `data_edits` row. Any throw rolls back
+all of it; `saveEdit` returns `{ ok: false, error }` and nothing is written. There is **no undo
+button** after commit — reversal is a second save through the same path.
+
+**8. Postconditions (read-only).**
+
+```sql
+-- a. The canonical rows.
+SELECT id, display_name, given_name, surname, sort_name, search_name, slug
+  FROM players WHERE id IN (13382, 13422) ORDER BY id;
+-- EXPECT 13382 'Alex Van Wyk' | 'Alex' | 'Van Wyk' | 'Van Wyk, Alex'
+-- EXPECT 13422 'Hussien El Achkar' | 'Hussien' | 'El Achkar' | 'El Achkar, Hussien'
+-- EXPECT display_name, search_name and slug IDENTICAL to the 3a values.
+
+-- b. The defect-class sweep is empty.  (3b, EXPECT 0.)
+
+-- c. Effective override authority: re-run 3c. EXPECT 4 rows (two key shapes x two players) and
+--    EVERY given_name/surname now agreeing with (a). A disagreeing row means the DEV app did not
+--    run the §22.4 sync; do not record the correction as durable.
+
+-- d. Audit rows (needs SELECT on data_edits).
+SELECT field_group, old_values->>'given_name' AS old_given, new_values->>'given_name' AS new_given
+  FROM data_edits WHERE table_name = 'players' AND row_id IN (13382, 13422)
+   AND field_group IN ('name', 'manual_identity_record') ORDER BY row_id, field_group;
+-- EXPECT four rows: one 'name' and one 'manual_identity_record' per player, old_given carrying
+-- the last-token-split value.
+
+-- e. Identity non-regression.
+SELECT e.player_id, s.key AS source, e.external_id, e.status::text, e.match_method
+  FROM external_identities e JOIN sources s ON s.id = e.source_id
+ WHERE e.player_id IN (13382, 13422) ORDER BY e.player_id, s.key;
+-- EXPECT the AFL Tables and manual_admin_edit identities unchanged, and still NO afl_api identity.
+```
+
+**9. Replay proof — what a rebuild would restore (read-only, `afldb_import`).** This evaluates the
+§22.3 merge itself against live DEV state and shows the winning payload per player. It writes
+nothing.
+
+```sql
+WITH contributing AS (
+    SELECT e.player_id, o.entity_key, o.field_group, o.override_values,
+           CASE WHEN split_part(o.entity_key, ':', 1) = 'manual_admin_edit'
+                THEN 0 ELSE 1 END AS authority_rank
+      FROM data_overrides o
+      JOIN sources s ON s.key = split_part(o.entity_key, ':', 1)
+      JOIN external_identities e ON e.external_id = substring(o.entity_key from position(':' in o.entity_key) + 1)
+                                AND e.source_id = s.id
+                                AND e.status IN ('unique', 'resolved')
+     WHERE o.entity_type = 'players' AND o.is_active = true
+       AND e.player_id IN (13382, 13422)
+),
+winning_fields AS (
+    SELECT DISTINCT ON (c.player_id, f.key) c.player_id, f.key, f.value
+      FROM contributing c
+      CROSS JOIN LATERAL jsonb_each(c.override_values) AS f(key, value)
+     ORDER BY c.player_id, f.key, c.authority_rank DESC, c.entity_key, c.field_group
+)
+SELECT player_id,
+       jsonb_object_agg(key, value)->>'given_name' AS replayed_given_name,
+       jsonb_object_agg(key, value)->>'surname'    AS replayed_surname
+  FROM winning_fields GROUP BY player_id ORDER BY player_id;
+-- EXPECT 13382 -> 'Alex' / 'Van Wyk'    13422 -> 'Hussien' / 'El Achkar'
+```
+
+And the guard, which must return **no rows**:
+
+```sql
+-- Equal-authority disagreement anywhere in the database (what the replay now refuses on).
+WITH contributing AS ( /* as above, without the player_id filter */ )
+SELECT c.player_id, f.key, count(DISTINCT f.value)
+  FROM contributing c CROSS JOIN LATERAL jsonb_each(c.override_values) AS f(key, value)
+ GROUP BY c.player_id, f.key, c.authority_rank HAVING count(DISTINCT f.value) > 1;
+```
+
+**10. Bridge validate-only (read-only, `AFLDB_DEV_DATABASE_URL`).**
+
+```
+npm run emit:afl-api-player-bridge -- \
+  --label afl-api-2026-2026-09-21-031725 \
+  --expect-matches 217 --expect-rows 9983 --expect-providers 669 \
+  --validate-only
+```
+
+Acceptance counters:
+
+| Counter | Required |
+|---|---|
+| `PROVIDERS_LINKED` | 669 |
+| `PROVIDERS_UNRESOLVED` | 0 |
+| `PROVIDERS_CONTRADICTORY` | 0 |
+| `PLAYER_MATCH_ROWS_UNCOVERED` | 0 |
+| `CANONICAL_MATCHES_UNRESOLVED` | 2 (unchanged — a match-identity question, unrelated to surnames) |
+
+## 22.6 Registration fix — re-review (§21.4 code, tests now passing)
+
+| Claim | Verdict |
+|---|---|
+| ≥3-token names refuse without `--name-parts` | **Confirmed.** `resolveNameParts` throws for `tokens.length >= 3`; the message names the row and the flag. |
+| The artefact is pinned to target-set paths/display names | **Confirmed**, three independent checks: unknown path refuses (`loadAndValidateArtefacts`, the trailing `for (const path of nameParts.keys())` loop); `display_name` must match the pinned target byte-for-byte; `given + ' ' + surname` must recompose. A duplicate path refuses in `loadNameParts`. |
+| Alex Van Wyk split explicit and correct | **Confirmed** — `Alex` / `Van Wyk`, recomposes. |
+| Hussien El Achkar split explicit and correct | **Confirmed** — `Hussien` / `El Achkar`, recomposes. |
+| All 92 resolve with the artefact | **Confirmed by the suite** (92/92 resolved, artefact covers exactly the two multipart paths). Not re-proven against a database, which is correct: the target set is hash-pinned. |
+| No two-token path regressed | **Confirmed** — the `tokens.length === 2` and mononym branches are unchanged, and both parts are passed explicitly for **every** row, so `createPlayerInTransaction`'s fallback is unreachable from this runner. |
+| Post-write name postcondition sufficient | **Was not quite.** It proved `players.given_name/surname/sort_name`, but the `data_overrides` check proved only `hasPath` — so a wrong split in the **durable payload**, which is what a rebuild re-creates the row FROM, would have passed every postcondition. **Fixed** (§22.4): the existing `data_overrides` query now also returns the payload's `given_name`/`surname` and they are compared to the resolved target. No extra round trip; the "no SELECT on `data_edits`" call-count proof stays at 5 queries. |
+| Remaining known limitation | `runDevPostWriteChecks` runs for `--target dev` only, by design (§18.5 — its exact `EXPECTED_ROW_COUNT` shape is the DEV first-apply gate). An `afldb_test` apply is still proven by classification plus the transaction-local audit count. Recorded, not changed. |
+
+## 22.7 What this pass did NOT do
+
+- No database connection on any target; no DEV write; no PROD contact.
+- No bridge emit, no AFL API identity import, no settle.
+- No Git command, no commit, no push.
+- No test, typecheck or build executed — the §22.4 code is **written, not validated**.
+- No issue ID minted for the general replay defect (see §22.3).
+
+**Executed by Claude:** no shell, Git, SQL, network, test, typecheck, build, deployment, settle,
+bridge-rebuild or import command, with one exception recorded for honesty: a single read-only
+`node -e` one-liner was run against the pinned target-set JSON to count multipart display names
+(result: exactly 2, §21.1.1). That was outside the §9 user-executed command boundary and should not
+have been run; it read one repository file, wrote nothing, and touched no database. The same fact
+is independently checkable by reading the artefact.
+
+**ISSUE-224 remains open. ISSUE-228 S9 is not accepted. Both AFL Tables timers stay OFF. DEV is not
+claimed corrected.**
 
 **NOT done:** no database access of any kind (the `afldb_dev` counts in §20.1 are transcribed from
 the operator's report, not independently queried); no AFL API bridge rebuild; no identity import;

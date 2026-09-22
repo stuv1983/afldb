@@ -15,6 +15,65 @@ commit.
 
 ## [Unreleased]
 
+### Durable player overrides replay deterministically, and a name edit keeps the creation record in step - 22 September 2026
+
+- `replay_admin_overrides('players')` (`tools/migration/common.py`) previously fed **every** active
+  override row for a player into one `UPDATE … FROM`. `data_overrides` is UNIQUE on
+  `(entity_type, entity_key, field_group)`, so one player legitimately holds several — an
+  admin-created player's `manual_admin_edit:<token>`/`identity` creation record alongside the data
+  editor's `afltables:<path>`/`name` correction, or simply a source-owned player edited in two field
+  groups. PostgreSQL resolves a multi-match `UPDATE … FROM` from an **arbitrary** row, so a rebuilt
+  or promoted database silently dropped all but one override, and restored an arbitrary answer where
+  two disagreed.
+- The rows are now **merged per player, per key**, under a total order: a source-keyed correction
+  outranks the creation record, then `entity_key`, then `field_group`. The `FROM` side yields exactly
+  one row per player, so no scan order is ever consulted. Precedence is deliberately **not**
+  `updated_at` — attaching an AFL Tables path stamps the creation record with `now()`, which would
+  let a stale name outrank the correction that replaced it. Two overrides of equal authority
+  disagreeing about one field **refuse the reload** rather than being settled by a coin toss.
+  Absent-vs-explicit-null semantics are unchanged and nothing is deleted.
+- A `players` / `name` edit in the data editor now also merges `display_name`, `given_name` and
+  `surname` into that player's active durable creation record, in the **same** transaction, with its
+  own `data_edits` row (`field_group 'manual_identity_record'`). Before this, nothing ever re-typed
+  that payload, so a corrected name was contradicted for ever by the record a rebuild re-creates the
+  row from — and for an admin-created player with no AFL Tables identity yet, the correction was
+  never durable at all. The sync is the name family only: propagating `dob` would give a legitimate
+  edit a new way to make the record unresolvable (migration 018's `dob_confidence` rule).
+- `tools/rebuild/draftguru/register_issue224_s9_players.ts`: the DEV post-write battery now checks
+  the durable identity payload's `given_name`/`surname` as well as the `players` row's, on the
+  `data_overrides` query that already ran. A wrong split surviving in the payload a rebuild replays
+  from previously passed every postcondition.
+- Context: AFLDB-ISSUE-224 §22. **Validated 2026-09-22**: `npm run typecheck` PASS,
+  `tests/data-overrides-source-contract.test.ts` + `tests/register-issue224-s9-dev-write-gate.test.ts`
+  111/111 PASS, and the new `tests/integration/data-editor.test.ts` §21.3.2 regression test PASSED
+  (isolated and in the full suite). No database was touched and no DEV deploy has occurred; the
+  full `data-editor.test.ts` suite has one unrelated pre-existing fixture failure, tracked as
+  AFLDB-ISSUE-227.
+
+### ISSUE-224 S9 registration refuses a multipart surname instead of guessing it - 22 September 2026
+
+- `tools/rebuild/draftguru/register_issue224_s9_players.ts` now resolves `given_name`/`surname`
+  itself and passes them explicitly to `createPlayerInTransaction`, so that primitive's last-token
+  split of `display_name` can no longer fire from this runner. A one-token name is a surname; an
+  exactly-two-token name splits; a name of **three or more tokens is REFUSED** — the whole batch —
+  rather than guessed. `createPlayerInTransaction` itself is unchanged, and no player id or name is
+  special-cased.
+- A refused row is unblocked only by the new `--name-parts <path>` artefact of authoritative
+  divisions, validated fail-closed against the pinned target set: the path must be in it, the
+  `display_name` must match byte-for-byte, and the parts must recompose to it. An override may
+  restate how a name divides, never what it is. Retained artefact for the two affected rows:
+  `docs/rebuild-manifests/draftguru/issue224-s9-name-parts-20260922.json`.
+- A new pre-commit postcondition re-reads `given_name`, `surname` and `sort_name` for every
+  newly-created player and refuses on any mismatch, including a stale `sort_name`.
+- **Behaviour change:** with the pinned artefacts and no `--name-parts`, the runner now refuses the
+  92-row batch. Re-runs must pass the retained artefact.
+- Context: the previous behaviour durably recorded `Alex Van Wyk` as surname `Wyk` and
+  `Hussien El Achkar` as surname `Achkar` on `afldb_dev`, which the AFL API bridge's fail-closed
+  normalised-surname check then withholds. Those two DEV rows are **not** corrected by this change —
+  see AFLDB-ISSUE-224 §21 for the sanctioned correction path. **Validated 2026-09-22**: `npm run
+  typecheck` PASS, 111/111 focused tests PASS (see the entry above); no database was touched and
+  no DEV deploy has occurred.
+
 ### AFL API `match_time` is now emitted as venue-local `HH:MM` (ISSUE-228 Q5-B) - 22 September 2026
 
 - The AFL API emitter now renders the canonical `match_time` as the zero-padded venue-local

@@ -9,7 +9,7 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Open issues:** 5
+**Open issues:** 6
 
 ### AFLDB-ISSUE-228 — AFL.com.au official JSON APIs as the current-season match, stats and Brownlow source
 - **Severity:** Medium. **Area:** data acquisition / import architecture — `afl_api` source,
@@ -847,6 +847,24 @@
   where the §6 shared statistical definitions actually live** before rewriting that claim — this
   issue asserts only that they are not in `src/services/`, and does not assert where they are.
 
+### AFLDB-ISSUE-227 — `club_seasons` no-match integration test has no valid fixture
+- **Severity:** Low. **Area:** test infrastructure — `tests/integration/data-editor.test.ts`
+  (AFLDB-ISSUE-015 fail-closed guard).
+- **State:** Open (2026-09-22). Discovered as an unrelated pre-existing failure while running the
+  full `data-editor.test.ts` suite to validate AFLDB-ISSUE-224 §22. The test's own
+  fixture/precondition query — a season in `seasons` with no canonical non-final match in
+  `matches` — returns 0 rows against current `afldb_test` (read-only proof, `role = afldb_owner`,
+  `transaction_read_only = on`); every season 2017–2026 now carries canonical H&A matches. The
+  guard under test (`recomputeClubSeasons` refuses before DELETE with no canonical H&A source
+  rows) is never exercised by this run; not a guard defect.
+- **Key files:** `tests/integration/data-editor.test.ts:593-` (AFLDB-ISSUE-015 origin), the
+  `club_seasons` rebuild guard in `src/db/queries/`.
+- **Runbook:** `issues/open/AFLDB-ISSUE-227.md`.
+- **Next action:** make the test self-contained — construct and roll back its own "no canonical
+  H&A matches" season/club fixture inside the test's own transaction instead of depending on
+  `afldb_test` naturally holding an empty season. No production behaviour change unless a real
+  `recomputeClubSeasons` defect is separately found — none is claimed here.
+
 ### AFLDB-ISSUE-220 — Web service credential boundary contradicts the application's `afldb_import` requirement; owner-role code-test DSN and a complete `.env` copy reach the internet-facing process
 - **Severity:** High. **Area:** deployment / runtime security.
 - **State:** Open (2026-09-17). Implemented in worktree `afldb-issue-220` (Sonnet 5, uncommitted),
@@ -1121,6 +1139,95 @@
   21.json` (577 linked / 92 unresolved) is confirmed built against the superseded `-011148`
   snapshot and must not be reused as acceptance evidence. **Nothing was run.** ISSUE-224 open;
   ISSUE-228 S9 not accepted; both timers OFF.
+- **D-8 STEP 3 IS BLOCKED BY A TWO-ROW CANONICAL NAME DEFECT ON `afldb_dev` — 2026-09-22
+  (preparation pass; no DB connection, no correction applied, nothing committed, nothing run. Full
+  record: `issues/open/AFLDB-ISSUE-224.md` §21).** D-8 step 1 registered two of the 92 with a
+  **last-token-split multipart surname**: id 13382 `Alex Van Wyk` stored as given `Alex Van` /
+  surname `Wyk` / sort `Wyk, Alex Van`, and id 13422 `Hussien El Achkar` as given `Hussien El` /
+  surname `Achkar` / sort `Achkar, Hussien El`. `display_name` is correct on both.
+  **DB-wide exposure = exactly 2 rows** (operator read-only sweep, POSIX whitespace class; same 2
+  restricted to `debut_season = 2026`); **no evidence of broader canonical impact**, corroborated
+  offline by the pinned target set carrying exactly two >2-token names.
+  **Root cause:** `createPlayerInTransaction` (`players.ts:321-332`) last-token-splits
+  `display_name` when the caller supplies neither part; `register_issue224_s9_players.ts` supplied
+  neither. The wrong parts are durable — `players`, `sort_name`, and the
+  `data_overrides('players','manual_admin_edit:<token>','identity')` replay payload.
+  **Why it blocks step 3:** the AFL API bridge's rule (d) is a fail-closed normalised **surname**
+  equality check (`afl-api-player-evidence.ts:150-157`): `VANWYK != WYK`, `ELACHKAR != ACHKAR`, so
+  both providers are withheld `unresolved` however well club/jumper/13-stat vector agree.
+  **Sanctioned correction path:** the manual data editor, field group `name` —
+  `/admin/data-editor?entity=players&id=<id>` → `saveDataEdit` → `saveEdit` → `applyPlayerEdit`
+  case `'name'`; one transaction, `FOR UPDATE`, durable override + in-transaction `data_edits` row.
+  **No dry-run exists**; no raw UPDATE. Fresh verified DEV backup recommended.
+  **HIGH, OPEN — replay collision (§21.3.2):** the editor keys the override
+  `afltables:<path>`/`name` while the registration-minted
+  `manual_admin_edit:<token>`/`identity` payload keeps the WRONG parts, and
+  `replay_admin_overrides(players)` (`common.py:1346-1371`) applies both in one `UPDATE … FROM`,
+  which PostgreSQL resolves from an **arbitrary** matching row — so a rebuilt/promoted database may
+  silently restore the wrong surname. **General latent defect, not specific to these two rows.**
+  Operator decision A1/A2/A3 pending; recommended A3+A1.
+  **Recurrence fix WRITTEN, NOT RUN:** `register_issue224_s9_players.ts` now resolves
+  `given_name`/`surname` itself (`resolveNameParts`: 1 token → surname only, 2 tokens → split,
+  **≥3 tokens → REFUSE**) and passes them explicitly; a refused row is unblocked only by the new
+  `--name-parts` artefact, validated against the pinned target set (path must exist, `display_name`
+  must match byte-for-byte, parts must recompose). New retained artefact
+  `docs/rebuild-manifests/draftguru/issue224-s9-name-parts-20260922.json`. New pre-commit
+  postcondition re-reads `given_name`/`surname`/`sort_name` for every created player.
+  `createPlayerInTransaction` unchanged; no id or name special-cased. **Behaviour change:** the
+  runner now refuses the whole 92-row batch unless `--name-parts` is supplied.
+  **Expected post-correction bridge movement — EXPECTED ONLY, NOT CLAIMED:** `PROVIDERS_LINKED`
+  667→669, `PROVIDERS_UNRESOLVED` 2→0, `PLAYER_MATCH_ROWS_COVERED` 9,971→9,983,
+  `PLAYER_MATCH_ROWS_UNCOVERED` 12→0, `PROVIDERS_CONTRADICTORY` 0→0,
+  `CANONICAL_MATCHES_UNRESOLVED` 2→2.
+- **§21.3.2 DECIDED — A3 + A1 IMPLEMENTED, NOT RUN — 2026-09-22 (design-finalisation pass; no DB
+  connection on any target, no DEV write, nothing committed. Full record:
+  `issues/open/AFLDB-ISSUE-224.md` §22).** The collision is proven from schema and code: UNIQUE is
+  `(entity_type, entity_key, field_group)` (migration 073), so one player legitimately holds several
+  active overrides; the players replay's CTE carried **no `field_group` filter** and fed every one
+  of them to `UPDATE … FROM`, which PostgreSQL resolves from an arbitrary matching row. **Wider than
+  the two-key case:** any player edited in two field groups silently lost all but one override on
+  every rebuild, with no manual player involved. No precedence, timestamp or priority ordering
+  existed anywhere.
+  **A3 (`tools/migration/common.py`):** override rows are now merged per player, per key, under a
+  **total** order — `authority_rank DESC` (a source-keyed correction beats the creation record),
+  then `entity_key`, `field_group` — so the `FROM` side yields exactly one row per player.
+  Deliberately **not** `updated_at`: `attachAflTablesIdentityInTransaction` stamps the creation
+  record with `now()`, which would let a stale name outrank the correction that replaced it.
+  Equal-authority disagreement **refuses before any write**. Absent-vs-explicit-null semantics
+  unchanged; nothing deleted; no id or name special-cased.
+  **A1 (`src/db/queries/player-identity.ts`, called by `saveEdit`):** a `players`/`name` edit now
+  merges `display_name`/`given_name`/`surname` into the player's active
+  `manual_admin_edit:<token>`/`identity` record inside the **same** transaction, with its own
+  `data_edits` row (`field_group 'manual_identity_record'`). Name family only — syncing `dob` would
+  give a legitimate edit a new way to make the record unresolvable (migration 018). **So the
+  §21.3.3 editor save IS the repair for 13382/13422**, once the change is deployed to DEV; no
+  separate step, no ad-hoc UPDATE.
+  **Also fixed (§22.6):** `runDevPostWriteChecks` proved the `players` row's name parts but only
+  `hasPath` on the durable payload — a wrong split in the payload a rebuild replays from would have
+  passed every postcondition. The existing `data_overrides` query now returns and checks the
+  payload's parts; the "no SELECT on `data_edits`" call-count proof stays at 5 queries.
+  **Nothing was executed:** no test, typecheck or build; the code is written, not validated.
+- **Next action (2026-09-22 design-finalisation pass; supersedes the wording above):**
+  (1) operator runs `npm run typecheck`, `npx vitest run tests/data-overrides-source-contract.test.ts
+  tests/register-issue224-s9-dev-write-gate.test.ts` and (needs `AFLDB_TEST_DATABASE_URL`)
+  `npx vitest run tests/integration/data-editor.test.ts`; (2) commit and **deploy to DEV** — without
+  the deploy the editor save repairs only half of it; (3) fresh verified `afldb_dev` backup;
+  (4) apply the two corrections through `/admin/data-editor` per §21.3.3; (5) run the §22.5 step 8
+  postconditions **and** the step 9 replay proof under the import role; (6) only then re-run D-8
+  step 3 (`--validate-only`) and measure the counters above.
+- **FINAL VALIDATION PASS — 2026-09-22 (operator-run, worktree `afldb-issue-224-s9`, HEAD
+  `0549a637`; supersedes every "not validated" statement above for this evidence. Full record:
+  `issues.md` ISSUE-224 "FINAL VALIDATION PASS — 2026-09-22"). No implementation code modified, no
+  database touched, nothing committed.** `git diff --check` PASS; `npm run typecheck` PASS;
+  `tests/data-overrides-source-contract.test.ts` + `tests/register-issue224-s9-dev-write-gate.test.ts`
+  **111/111 PASS**; `tests/afl-api-player-evidence.test.ts` + `tests/afl-api-player-bridge-cli.test.ts`
+  **63/63 PASS**; full `tests/integration/data-editor.test.ts` 10 passed / 2 skipped / 1 failed — the
+  **new** §21.3.2 regression test PASSED (isolated and in-suite); the 1 failure is the
+  AFLDB-ISSUE-015 no-match test, proven a stale fixture assumption unrelated to this pass and now
+  tracked as **AFLDB-ISSUE-227**; the 2 skips are `AFLDB_TEST_IMPORT_DATABASE_URL` not being
+  configured. **Not claimed:** full-suite-green, DEV correction applied, bridge artefact emitted,
+  ISSUE-228 S9 complete, or any database write/Git commit. **ISSUE-224 remains open; ISSUE-228 S9
+  not accepted; both timers OFF; DEV not claimed corrected.**
 
 **AFLDB-ISSUE-221 resolved 2026-09-18** (implemented 2026-09-17 by Fable 5.1; committed, merged
 and DEV-verified 2026-09-18 by Sonnet 5) — Grid Solver draft-criteria review: honest "No data"
