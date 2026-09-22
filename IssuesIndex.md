@@ -1076,6 +1076,18 @@
   `tests/integration/admin-draft.test.ts` (mutates `afldb_test`) and was deliberately not run.
   **The AFLDB-ISSUE-160 D-2 name-collision sub-check stays MANDATORY under the DEV import role
   before any DEV apply — it is not waived by its `afldb_test` pass.**
+- **Privileged DEV import-role preflight executed for real (2026-09-22; §18.3), superseding the
+  `afldb_app` privilege-warning caveat above.** `--target dev --dev-import-role`, no `--apply`
+  (still refused outright for `--target dev`): `current_database()='afldb_dev'`,
+  `current_user='afldb_import'`, `CREATE=92 ALREADY_SATISFIED=0 CONFLICT=0`. The AFLDB-ISSUE-160
+  D-2 manual-shell name-collision guard ran for real under this role (SELECT on `data_overrides` is
+  granted, migration 073) and found 0 collisions — not degraded to a warning. The separate
+  multi-claimant "duplicate target identity" in-code guard also ran but was vacuous
+  (`ALREADY_SATISFIED=0`, so it had no existing-identity claims to check); the `afldb_test`-only
+  post-apply "duplicate slug" integrity check (§18.1.3) does not apply here — no players were
+  created on DEV. `afldb_dev` remains unwritten; no write was possible. Sole remaining gate before
+  D-8 step 1 can write DEV: operator authorisation to run `--apply` against `--target dev`, which
+  does not exist as a runnable path today (§18.1.5, §18.3.1).
 
 **AFLDB-ISSUE-221 resolved 2026-09-18** (implemented 2026-09-17 by Fable 5.1; committed, merged
 and DEV-verified 2026-09-18 by Sonnet 5) — Grid Solver draft-criteria review: honest "No data"

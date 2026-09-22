@@ -2331,3 +2331,64 @@ step: operator supplies `AFLDB_DEV_IMPORT_DATABASE_URL` (or confirms it should s
 then an explicitly authorised run of
 `npx tsx --conditions=react-server tools/rebuild/draftguru/register_issue224_s9_players.ts --admin-user-id <n> --target dev --dev-import-role` (no `--apply`) to obtain the real D-2 census.
 `afldb_dev` remains unwritten. ISSUE-224 remains BLOCKED per §18.1.6.
+
+## §18.3 — Privileged DEV import-role preflight executed (2026-09-22)
+
+Operator-run command (worktree `D:\dev\afldb-issue-224-s9`, branch `sonnet/issue-224-s9-unblock`,
+HEAD `517f058b` at run time):
+
+```
+npx tsx --conditions=react-server \
+  tools/rebuild/draftguru/register_issue224_s9_players.ts \
+  --admin-user-id 4 --target dev --dev-import-role
+```
+
+**Connection proof (operator-reported console output):** `current_database()='afldb_dev'`,
+`current_user='afldb_import'`, `mode=READ-ONLY PREFLIGHT`. No `--apply` was supplied, and
+`--apply` remains refused outright for `--target dev` regardless of `--dev-import-role`
+(`parseArgs`, §18.2.2) — a DEV write was not possible in this invocation, not merely unattempted.
+
+**Audit identity:** `auth_users.id = 4`, role `super_admin`, active `true` — operator-selected for
+this preflight's `--admin-user-id`; not independently re-queried in this pass (no DB access outside
+the runner's own connection, per this pass's boundaries).
+
+**Classification:** `CREATE=92 ALREADY_SATISFIED=0 CONFLICT=0 TOTAL=92`. No DEV write occurred.
+
+**Guard results — verified from `classify()`'s control flow at
+`register_issue224_s9_players.ts:223-334`, not inferred from the absence of console warnings:**
+
+- **AFLDB-ISSUE-160 D-2 manual-shell name-collision guard: ran for real and passed.**
+  `--dev-import-role` connects as `afldb_import`, which holds SELECT on `data_overrides`
+  (migration 073), so the guard's query (lines 250-257) does not hit the `42501
+  insufficient_privilege` catch (lines 263-270) that degraded it to a WARNING under the plain
+  `afldb_app` DEV connection in §18.1.4. All 92 CREATE targets' normalised names were compared
+  against pending manual-shell rows; 0 collisions found.
+- **Multi-claimant "duplicate target identity" guard (lines 318-331): executed, but vacuous.**
+  This is the in-code counterpart of §18.1.3's post-apply "player_id claimed by >1 AFL Tables
+  identity" integrity check. It only reclassifies `ALREADY_SATISFIED` rows, and this run has none
+  (`ALREADY_SATISFIED=0`), so the claimants map built at line 281 is empty and the loop at line 318
+  has nothing to act on. Accurate framing: **the guard ran and found nothing to flag because there
+  was nothing eligible for it to check**, not "checked N candidate identities and passed."
+- **"Duplicate slug" guard: does not apply to this pass; not run.** §18.1.3's "Duplicate `slug`
+  among the 92 new players | 0" is a post-`--apply` database query against real `players` rows on
+  `afldb_test`, not part of `classify()`. This DEV preflight created no players (`--apply` refused
+  for `--target dev` unconditionally), so there are no new rows for a slug-duplication check to run
+  against on DEV in this pass. The `afldb_test` §18.1.3 result does not stand in for a DEV result.
+
+**Existing DEV backup (as reported by the operator; not independently verified — no DB or shell
+access taken in this pass):**
+
+- `afldb_dev-pre-issue224-20260922-141700.dump`
+- sha256 `4458ed98d73de64ee28e5042aaf56ca5274a9e5b056499f844c290e65eee9e25` (64 hex chars, correct
+  length for SHA-256)
+- `pg_restore --list` exit 0
+
+### 18.3.1 Status
+
+**Not a DEV write and does not authorise one.** The real D-2 census under the privileged role is
+now on record: `CREATE=92/ALREADY_SATISFIED=0/CONFLICT=0`, D-2 guard passed for real. The remaining
+gate before D-8 step 1 can write `afldb_dev` is unchanged: **explicit operator authorisation to
+execute the `--apply` code path against DEV**, which does not exist today — `parseArgs` refuses
+`--apply` for `--target dev` unconditionally (§18.2.2) and enabling it is a deliberate, separate
+code change, not a flag on this command. ISSUE-224 remains BLOCKED per §18.1.6. `afldb_dev` remains
+unwritten.
