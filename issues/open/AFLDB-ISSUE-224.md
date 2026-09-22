@@ -2546,3 +2546,222 @@ DEV/PROD write, no git commit made in this pass.
 **Status:** D-8 step 1 remains incomplete. The verifier/role-contract defect that caused the first
 DEV apply attempt to refuse is fixed and DB-free-tested; the fix has not yet been exercised against
 a live database (`afldb_test` or `afldb_dev`). ISSUE-224 remains BLOCKED.
+
+---
+
+# 19. D-8 step 1 — COMPLETE on `afldb_dev` (operator-run retry, 2026-09-22); D-8 step 2 runbook established (this pass, offline repository inspection only)
+
+**Nothing in this section's §19.2 was executed. §19.1 transcribes an operator-run result.**
+
+## 19.1 D-8 step 1 — operator-reported successful DEV registration
+
+Using the §18.5.2 transaction-local-proof fix (worktree `D:\dev\afldb-issue-224-s9`, branch
+`sonnet/issue-224-s9-unblock`, HEAD `c20c3ae9`), the operator re-ran the §18.4.5 command against
+`afldb_dev` and it **committed**.
+
+**Backup acknowledged immediately before the successful retry:**
+`/home/arm/backups/afldb/issue224/afldb_dev-pre-issue224-retry-20260922-152111.dump`, sha256
+`28d3e759c47d31ca4831884eea3dc335a791c78339397cec9ffc53227a69c429`, `pg_restore --list` exit 0.
+
+**Connection:** `current_database()='afldb_dev'`, `current_user='afldb_import'`, audit identity
+`auth_users.id = 4`.
+
+**Result:** before-count 13,273 players; `CREATE=92 / ALREADY_SATISFIED=0 / CONFLICT=0 / TOTAL=92`;
+canonical player ids **13370–13461 inclusive** (92 ids). All eight post-write postconditions from
+§18.4.3 passed inside the same transaction before commit: 92/92 target identities resolve, 92
+distinct canonical player ids, no identity double-claimed, no duplicate slug, player count +92
+exactly, 92/92 `player_career_stats` rows, 92/92 `data_overrides` durability rows, 92/92
+`confirmedAuditWrites` (the §18.5.2 transaction-local `data_edits` proof, not a post-commit SELECT).
+Transaction committed; process exit 0.
+
+**Idempotence proof: NOT YET SUPPLIED.** If the operator runs the same command again with
+`--dev-import-role` and no `--apply` (or a second `--apply` run), a `CREATE=0 /
+ALREADY_SATISFIED=92 / CONFLICT=0` result is the idempotence proof and should be recorded here when
+available; it has not been requested or run in this pass.
+
+**What this DOES mean:** 92 canonical players are registered on `afldb_dev`, each with its AFL
+Tables profile identity (`external_identities`, source `afltables`) attached. D-8 step 1 is
+**COMPLETE**.
+
+**What this does NOT mean, stated explicitly per the operator's brief:**
+- No `afl_api`-source identity (`CD_I…` provider id) is attached to any of the 92. `attachAflTablesIdentityInTransaction` writes only the AFL Tables identity (§18.1.1); no ad-hoc write ever touched `afl_api` `external_identities`.
+- No `player_match_stats` row exists yet for any of the 92 — they were created as zero-game
+  `player_career_stats` shells (`createPlayerInTransaction`'s existing behaviour), and no AFL Tables
+  settle has run.
+- ISSUE-228 S9 is **not** unblocked by this alone: D-8 steps 2–5 remain unstarted.
+- The AFL Tables automatic settle timer (`deploy/afldb-settle-afltables.timer`) remains
+  **intentionally OFF** on both DEV and PROD; nothing in this pass or the operator's retry enabled
+  it.
+
+**ISSUE-224 status:** D-8 step 1 COMPLETE. ISSUE-224 remains **open** — D-8 steps 2–5 and D-2/D-3/
+D-4/D-5/D-6/D-10 (already tracked separately) are unaffected by this section.
+
+## 19.2 D-8 step 2 — exact runbook (established this pass by repository inspection; NOT run)
+
+**Boundaries held for this section: no DB connection, no SQL, no settle, no mutation, no AFL API
+bridge/import work, no PROD, no `systemctl`, no timer enabled, no Git commit.** Everything below is
+read from the tracked tooling as it exists on HEAD `c20c3ae9`.
+
+### 19.2.1 Finding: `import_fitzroy_core.py` cannot perform this settle at all
+
+`import_fitzroy_core.py --require-in-season` (the tool §17 validated) **refuses to write to
+PostgreSQL for an in-season snapshot outright** (`import_fitzroy_core.py:3489-3500`): its canonical
+writers upsert and delete without an ownership predicate, which is correct for a from-scratch
+historical rebuild and unreviewed/destructive in-season. Its own error message names the only path:
+`tools/current-season/settle-afltables.ts`. **D-8 step 2 is therefore a two-tool chain, not one
+command.**
+
+### 19.2.2 The two-tool chain (mirrors `deploy/afldb-settle-afltables.sh` steps 2–3; step 1
+"acquire" is skipped deliberately — D-8 step 2 settles the already-retained, hash-verified snapshot
+and must NOT acquire a new one over the network)
+
+**Sub-step A — emit the observation bundle (offline, no database, Python):**
+
+```
+python tools/migration/import_fitzroy_core.py \
+  --label issue224-inseason-20260919 \
+  --require-in-season \
+  --emit-observations data/sources/afltables/fitzroy_core/issue224-inseason-20260919/observations.json
+```
+
+Confirmed by this pass: `data/sources/afltables/fitzroy_core/issue224-inseason-20260919/` today
+holds only `player_stats_2026.csv` and `results.csv` — **no `observations.json` yet**, so this
+sub-step has not been run. `--on-record-error reject` (used by the scheduled production chain to
+survive one bad row unattended) is available but not required; for one deliberately supervised
+settle, the default (`abort` — refuse the whole pass on any unrepresentable record) surfaces a
+problem loudly rather than silently dropping a row, and is the recommended choice unless the
+operator already expects and accepts a specific bad record.
+
+**Sub-step B — dry-run the settle, full write path, rolled back (Node/tsx, opens PostgreSQL under
+read/write privileges then discards everything):**
+
+```
+node node_modules/tsx/dist/cli.mjs tools/current-season/settle-afltables.ts \
+  --label issue224-inseason-20260919 --dry-run --auto-apply --require-complete-source
+```
+
+Per the tool's own header (`tools/current-season/settle-afltables.ts:23-27`): `--dry-run
+--auto-apply` runs the FULL automatic canonical path — the same gates, writers and ledger a real
+apply would use — against real constraints and role privileges, then rolls the whole transaction
+back. It is the exact preview of what `--apply --auto-apply` would commit. `--auto-apply` must be
+included in the dry run, or the preview will not show what actually determines whether
+`player_match_stats` gets populated (§19.2.4).
+
+**Sub-step C — apply (the only step that commits):**
+
+```
+node node_modules/tsx/dist/cli.mjs tools/current-season/settle-afltables.ts \
+  --label issue224-inseason-20260919 --apply --auto-apply --require-complete-source
+```
+
+### 19.2.3 Database role required — and a gap this tool has that the registration tool does not
+
+Both sub-steps B and C read `AFLDB_IMPORT_DATABASE_URL` and nothing else
+(`settle-afltables.ts:184-186`; confirmed by reading `src/lib/acquisition/settle-afltables.ts` in
+full — it contains no `current_database()` / `current_user()` assertion anywhere). There is **no
+`--target dev`/`--target test` switch on this tool**, unlike
+`register_issue224_s9_players.ts` (§18.2–§18.4). The safety this pass can document is therefore
+weaker by construction: whichever database `AFLDB_IMPORT_DATABASE_URL` resolves to on the host that
+runs the command is the database that gets written, with no in-tool refusal if that turns out to be
+the wrong one. **The operator must independently verify `AFLDB_IMPORT_DATABASE_URL` resolves to
+`afldb_dev` on the executing host before sub-step C**, the same way `current_database()` was proven
+by hand for every DEV step in §18. Role required: `afldb_import` (the same import role D-8 step 1
+used).
+
+### 19.2.4 What this settle will and will not write — the load-bearing distinction for "will
+`player_match_stats` be populated"
+
+Read directly from `src/lib/acquisition/settle-afltables.ts:1310-1319`, the module's own stated
+write contract:
+
+- **`--apply` alone (no `--auto-apply`):** writes only `import_batches`, the migration-074 spine
+  (`source_payloads`, `source_record_versions`, `source_records`), the two migration-076 typed
+  projections, `promotion_candidates` and `import_rejections`. It **never** writes `matches`,
+  `match_period_scores`, `player_match_stats`, `brownlow_round_votes`, `players`, `clubs`, `venues`,
+  `venue_aliases`, `external_identities`, `club_seasons`, `brownlow_season_votes` or
+  `promotion_decisions`. If step 2 were run this way, **zero `player_match_stats` rows would be
+  created for the 92**, defeating D-8 step 2's stated purpose (§16.2).
+- **`--apply --auto-apply`:** additionally, for each unit whose gates **E1–E6 all pass**, re-checked
+  inside a savepoint against state re-read at write time (`canonical-apply.ts`), a canonical
+  mutation happens — this is the path that can write `player_match_stats` (and `matches`,
+  `brownlow_round_votes`, derived recompute) for the 92. A unit that does **not** pass E1–E6 is
+  **not** silently applied: it is recorded instead as a `promotion_candidate` and/or a `data_issues`
+  row, `canonicalApplyRefusals`/`canonicalApplyFailures` incremented, for later human review.
+  **`--auto-apply` is therefore REQUIRED to have any chance of meeting D-8 step 2's stated purpose,
+  and even then coverage of the 92 is not guaranteed to be complete** — `--require-complete-source`
+  turns an incomplete result into a non-zero exit code (evaluated after commit, so nothing already
+  written is rolled back by it) rather than silently reporting success.
+- **No truncation or deletion anywhere in this module.** Its own stated obligation O1: neither
+  ISSUE-099 projection is ever deleted or truncated, only upserted in place. A rerun over identical
+  source data is idempotent — 0 additional canonical/ledger rows.
+
+### 19.2.5 Pre-settle and post-settle counts to capture
+
+**Before (operator, read-only):** `player_match_stats` row count for player ids 13370–13461
+(expected 0); current max `import_batches.id`; `promotion_candidates` / `data_issues` row counts
+scoped to season 2026 (baseline, since this settle may add to either).
+
+**After:** the CLI's own printed `SettleCounters` block (all counters listed in
+`counterLines()`, `tools/current-season/settle-afltables.ts:189-229`) — in particular
+`canonicalRowsInserted`, `projectionRowsWritten`, `unresolvedIdentityPlayer`,
+`candidatesCreated`, `dataIssuesOpened`; `player_match_stats` row count for ids 13370–13461
+(compare against the number of 2026 games each of the 92 actually played, from
+`player_stats_2026.csv`); then **re-run sub-step C a second time immediately afterward** — a
+`canonicalRowsInserted: 0 / canonicalRowsUpdated: 0` (or the equivalent "nothing to do" idempotent
+result) is the idempotence proof, mirroring how D-8 step 1 was proven in §18.1.3.
+
+### 19.2.6 Destructive/reconciliation behaviour
+
+None beyond ordinary upsert-in-place (§19.2.4's O1 obligation) and the ISSUE-131 match-rekey path,
+which only fires on a retired match identity re-observed under a corrected key and is itself gated
+and audited (`canonicalMatchesRekeyed` / `canonicalRekeyRefusals` counters) — not expected to be
+exercised by this snapshot, but the counter should read 0 rekeys unless the operator has independent
+reason to expect one.
+
+### 19.2.7 Source label/snapshot pinning
+
+`--label issue224-inseason-20260919` pins the exact retained directory
+(`data/sources/afltables/fitzroy_core/issue224-inseason-20260919/`), and `settle-afltables.ts`
+re-hashes the manifest **from disk** at run time rather than trusting the bundle's own claim
+(`loadBundle()`, `settle-afltables.ts:146-181`) — so a snapshot altered after §17's validation would
+be caught, not silently settled.
+
+### 19.2.8 Preventing timer/service interaction
+
+Run sub-steps A–C directly as shown — **not** `deploy/afldb-settle-afltables.sh` (whose step 1 is a
+live network acquisition via `acquire_core.R`, which D-8 step 2 must not perform: the whole point is
+to settle the already-retained snapshot). Do not `systemctl start`/`enable` `afldb-settle-afltables
+.service`/`.timer`; do not edit either unit file. The operator's own read-only
+`systemctl list-timers` / `systemctl status afldb-settle-afltables.timer` before and after remains
+the way to confirm the timer stayed disabled — not reproduced here (§9).
+
+### 19.2.9 Fresh DEV backup before D-8 step 2 — recommended, YES
+
+Consistent with the backup taken immediately before the D-8 step 1 retry (§19.1), and because this
+settle's write surface is materially larger than step 1's single contained transaction (canonical
+`matches`, `player_match_stats`, `brownlow_round_votes`, possible match rekeys, plus derived
+recompute), a fresh `afldb_dev` backup taken and independently verified (`pg_restore --list` exit 0,
+sha256 recorded) immediately before sub-step C is recommended. Nothing in the repository suggests a
+reason to skip it.
+
+### 19.2.10 Status
+
+**D-8 step 1: COMPLETE on `afldb_dev`** (§19.1). **D-8 step 2: NOT started** — sub-step A
+(`--emit-observations`) has not been run; no `observations.json` exists for this label; no database
+connection for this step has been opened. ISSUE-224 remains **open**. ISSUE-228 S9 remains **not
+accepted**. Both AFL Tables timers remain **OFF**. No PROD action. No Git mutation in this pass.
+
+### 19.2.11 Boundary statement for this pass
+
+**Written:** this file (§19), `issues.md`, `IssuesIndex.md`. Nothing else.
+
+**Executed by Claude:** nothing — no shell, Git, SQL, network, test, typecheck, build, deployment,
+`systemctl` or settle command; no subagent; no timer enabled. §19.1 is a transcription of an
+operator-reported result, not independently reproduced. §19.2 is a runbook derived entirely from
+reading `tools/migration/import_fitzroy_core.py`, `tools/current-season/settle-afltables.ts`,
+`src/lib/acquisition/settle-afltables.ts`, `deploy/afldb-settle-afltables.sh`, `.env.example`, and
+the on-disk contents of `data/sources/afltables/fitzroy_core/issue224-inseason-20260919/`.
+
+**NOT done:** no database access of any kind; no observation-bundle emission; no settle, dry-run or
+apply; no AFL API bridge/import work; no timer/service change; no PROD action; no Git mutation
+(nothing staged, committed, reset or stashed).

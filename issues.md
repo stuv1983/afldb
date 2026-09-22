@@ -37886,6 +37886,60 @@ player registration has occurred; no settle has occurred;** both AFL Tables time
   remaining gate is (b), explicit operator authorisation to execute database writes on DEV (§9). No
   further operator decision is required.
 
+**D-8 STEP 1 — COMPLETE on `afldb_dev` (operator-run retry, 2026-09-22; supersedes every "not
+applied to `afldb_dev`" statement above. Full record: `issues/open/AFLDB-ISSUE-224.md` §19.1).**
+Using the §18.5.2 transaction-local-proof fix (HEAD `c20c3ae9`), the operator re-ran the DEV write
+command and it **committed**: backup
+`/home/arm/backups/afldb/issue224/afldb_dev-pre-issue224-retry-20260922-152111.dump` (sha256
+`28d3e759…a69c429`) acknowledged first; `current_database()='afldb_dev'`,
+`current_user='afldb_import'`; before-count 13,273 players; `CREATE=92 / ALREADY_SATISFIED=0 /
+CONFLICT=0 / TOTAL=92`; canonical player ids **13370–13461 inclusive**. All eight post-write
+postconditions passed inside the transaction before commit (identity resolution, distinct ids, no
+double-claim, no duplicate slug, +92 player count exactly, 92 `player_career_stats`, 92
+`data_overrides`, 92 `confirmedAuditWrites`). Transaction committed, exit 0. **Idempotence proof
+(a second run returning `CREATE=0/ALREADY_SATISFIED=92/CONFLICT=0`) has not been supplied and is
+not yet recorded.**
+**What this means: 92 canonical players are registered on `afldb_dev` with their AFL Tables profile
+identity attached. D-8 step 1 is COMPLETE.** **What it does NOT mean:** no `afl_api`-source
+identity is attached to any of the 92; no `player_match_stats` row exists for any of them yet (they
+are zero-game shells); ISSUE-228 S9 is not unblocked; the AFL Tables automatic settle timer remains
+intentionally **OFF** on both DEV and PROD. ISSUE-224 remains **open** — D-8 steps 2–5 and the
+unrelated D-2/D-3/D-4/D-5/D-6/D-10 items are unaffected.
+- **D-8 step 2 runbook established (this pass, offline repository inspection only; no DB, no SQL,
+  no settle, no mutation, no AFL API bridge/import, no PROD, no `systemctl`, no timer enabled, no
+  Git mutation. Full record: `issues/open/AFLDB-ISSUE-224.md` §19.2).**
+  **Finding: `import_fitzroy_core.py` cannot perform this settle at all** — it refuses outright to
+  write an in-season snapshot to PostgreSQL (its own error names the only path); D-8 step 2 is a
+  **two-tool chain**: (A) `import_fitzroy_core.py --label issue224-inseason-20260919
+  --require-in-season --emit-observations <bundle path>` (offline, Python, no database — confirmed
+  NOT yet run: the retained snapshot directory holds only the two source CSVs, no
+  `observations.json`); then (B) `tools/current-season/settle-afltables.ts --label
+  issue224-inseason-20260919 --dry-run --auto-apply --require-complete-source` (Node/tsx, opens
+  PostgreSQL under real constraints/privileges, previews the full automatic canonical path, then
+  rolls back); then (C) the same command with `--apply` in place of `--dry-run` to commit. Mirrors
+  `deploy/afldb-settle-afltables.sh` steps 2–3; its step 1 (live network acquisition) is
+  deliberately skipped — this settles the already-retained, hash-verified snapshot only.
+  **Role/environment:** both B and C read only `AFLDB_IMPORT_DATABASE_URL` (role `afldb_import`);
+  unlike the D-8 step 1 registration tool, **this tool has no `--target` switch and no in-code
+  `current_database()`/`current_user()` assertion** — whichever database that variable resolves to
+  on the executing host is written, with no in-tool refusal if it is the wrong one. The operator
+  must independently verify it resolves to `afldb_dev` before sub-step C.
+  **The load-bearing finding for "will `player_match_stats` be populated":** per the module's own
+  stated write contract (`src/lib/acquisition/settle-afltables.ts:1310-1319`), `--apply` alone
+  (no `--auto-apply`) writes only staging/ledger tables and **never** `player_match_stats`,
+  `matches`, `players` or six other canonical tables. **`--auto-apply` is required** for any
+  `player_match_stats` row to be written at all, and even then only for units whose gates E1-E6
+  pass, re-checked in a savepoint against live state; anything that does not pass becomes a
+  `promotion_candidate`/`data_issues` row for human review rather than being silently applied or
+  silently dropped. No truncation or deletion occurs anywhere in the module (upsert-in-place only);
+  a rerun over identical data is idempotent.
+  **A fresh, independently-verified `afldb_dev` backup immediately before sub-step C is
+  recommended**, consistent with the backup taken before the D-8 step 1 retry and because this
+  settle's write surface is materially larger than step 1's.
+  **Status: D-8 step 1 COMPLETE; D-8 step 2 NOT started** (no observation bundle emitted, no
+  database connection opened for this step). ISSUE-224 remains open; ISSUE-228 S9 remains not
+  accepted; both AFL Tables timers remain OFF; no PROD action; no Git mutation.
+
 ## AFLDB-ISSUE-225 — Gridley corpus: 37 pre-existing `incorrect known answer` cells on non-draft criteria, present on `afldb_test` before AFLDB-ISSUE-222 and untouched by it
 
 **Status: Open.** Opened 2026-09-19 (Fable 5.1) under AFLDB-ISSUE-222 operator decision **D3**:

@@ -1088,6 +1088,32 @@
   created on DEV. `afldb_dev` remains unwritten; no write was possible. Sole remaining gate before
   D-8 step 1 can write DEV: operator authorisation to run `--apply` against `--target dev`, which
   does not exist as a runnable path today (§18.1.5, §18.3.1).
+- **D-8 step 1 COMPLETE on `afldb_dev` — 2026-09-22 (operator-run retry using the §18.5.2 fix;
+  supersedes every "not applied to `afldb_dev`" statement above. Full record:
+  `issues/open/AFLDB-ISSUE-224.md` §19.1).** Backup acknowledged first
+  (`afldb_dev-pre-issue224-retry-20260922-152111.dump`, sha256 `28d3e759…a69c429`);
+  `current_database()='afldb_dev'`, `current_user='afldb_import'`; `CREATE=92 /
+  ALREADY_SATISFIED=0 / CONFLICT=0`; canonical player ids **13370–13461**; all eight post-write
+  postconditions passed pre-commit; transaction committed, exit 0. **Idempotence proof not yet
+  supplied.** **Means:** 92 canonical players + AFL Tables identities registered on `afldb_dev`.
+  **Does NOT mean:** no `afl_api` identity attached; no `player_match_stats` populated yet; ISSUE-228
+  S9 not unblocked; AFL Tables timer stays OFF on DEV and PROD.
+- **Next action (2026-09-22; D-8 step 2 runbook established this pass, offline inspection only —
+  no DB, no settle, no mutation, no Git. Full record: `issues/open/AFLDB-ISSUE-224.md` §19.2).**
+  `import_fitzroy_core.py` refuses to write an in-season snapshot at all; D-8 step 2 is a two-tool
+  chain: (A) `import_fitzroy_core.py --label issue224-inseason-20260919 --require-in-season
+  --emit-observations <path>` (offline; not yet run — no `observations.json` exists for this label);
+  (B) `settle-afltables.ts --label issue224-inseason-20260919 --dry-run --auto-apply
+  --require-complete-source` (previews the full write, rolls back); (C) the same with `--apply`.
+  Role: `afldb_import` via `AFLDB_IMPORT_DATABASE_URL` only — **this tool has no `--target` switch
+  and no `current_database()`/`current_user()` assertion**, unlike the step-1 tool; the operator
+  must independently verify the DSN resolves to `afldb_dev` before applying.
+  **`--auto-apply` is REQUIRED for any `player_match_stats` row to be written at all** — `--apply`
+  alone writes only staging/ledger tables, never `player_match_stats`/`matches`/`players`; even
+  with `--auto-apply`, only units whose gates E1-E6 pass at write time land canonically, the rest
+  go to `promotion_candidates`/`data_issues` for review. No truncation/deletion anywhere; idempotent
+  on rerun. A fresh, independently-verified DEV backup before applying is recommended.
+  **D-8 step 2 NOT started.** ISSUE-224 open; ISSUE-228 S9 not accepted; both timers OFF.
 
 **AFLDB-ISSUE-221 resolved 2026-09-18** (implemented 2026-09-17 by Fable 5.1; committed, merged
 and DEV-verified 2026-09-18 by Sonnet 5) — Grid Solver draft-criteria review: honest "No data"
