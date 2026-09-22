@@ -2275,3 +2275,59 @@ proof; `afldb_dev` remains read-only with no write attempted or possible; and th
 D-2 manual-shell name-collision sub-check remains **mandatory under the DEV import role before any
 DEV apply** — it is NOT waived by its `afldb_test` pass or by the `afldb_app` privilege warning in
 §18.1.4.
+
+## §18.2 — DEV import-role connection: blocker and code-level resolution (2026-09-22)
+
+### 18.2.1 Blocker
+
+An attempted privileged DEV preflight (to run the AFLDB-ISSUE-160 D-2 manual-shell
+name-collision guard under `afldb_import` against `afldb_dev`, as §18.1.4/§18.1.7 require before
+any DEV apply) found that **no DEV import-role DSN exists at all.** `AFLDB_DEV_DATABASE_URL` is
+the only DEV variable the runner reads (`resolveTarget('dev')` at the time), and its own
+documented contract (`.env.example`, then lines 75–84) explicitly forbids it from ever being
+`afldb_import`: "log in as afldb_app ... never as afldb_owner or afldb_import." No DEV connection
+was attempted with a guessed or substitute credential; nothing was read as a fallback. No database
+connection occurred at any point in this discovery.
+
+### 18.2.2 Resolution (code only — no DEV connection in this pass)
+
+Added a second, purpose-built environment variable, `AFLDB_DEV_IMPORT_DATABASE_URL`
+(`afldb_dev` / `afldb_import`, maintenance/import tooling only, never read by application/runtime
+code, never a PROD connection, no fallback either direction with `AFLDB_DEV_DATABASE_URL`) and a
+new `--dev-import-role` flag on
+`tools/rebuild/draftguru/register_issue224_s9_players.ts`:
+
+- `--target dev` (unchanged default): `AFLDB_DEV_DATABASE_URL`, now positively asserts
+  `current_user = afldb_app` (previously only `current_database` was checked).
+- `--target dev --dev-import-role`: `AFLDB_DEV_IMPORT_DATABASE_URL`, positively asserts
+  `current_user = afldb_import`. Refuses if the variable is unset — no substitution of
+  `AFLDB_DEV_DATABASE_URL`. Still read-only preflight only (`cfg.canApply = false`); the D-2 guard
+  (`register_issue224_s9_players.ts` `classify()`) now runs for real in this mode instead of
+  degrading to the `afldb_app` privilege warning.
+- The existing hard refusal of `--target dev` + `--apply` is untouched and applies regardless of
+  `--dev-import-role` (`parseArgs`'s check is on `target === 'dev'` alone) — proven in §18.2.3.
+- `--dev-import-role` with `--target test` refuses (`"only valid with --target dev"`).
+- No PROD target exists; unchanged.
+
+`.env.example` documents both variables' contracts side by side, with no real credential
+(`CHANGE_ME` placeholder, matching the existing convention).
+
+### 18.2.3 Validation (no database connection, per this pass's boundaries)
+
+| Check | Result |
+|---|---|
+| `npx tsc --noEmit -p tsconfig.json` | **PASS**, no diagnostics |
+| Isolated re-implementation of `resolveTarget`/`parseArgs`'s decision surface (7 cases: default DEV selects `AFLDB_DEV_DATABASE_URL`/`afldb_app`; `--dev-import-role` selects `AFLDB_DEV_IMPORT_DATABASE_URL`/`afldb_import`; missing privileged variable refuses with no fallback; `--target dev --dev-import-role --apply` refuses; `--target dev --apply` (no flag) still refuses; `--dev-import-role` + `--target test` refuses; no PROD target) | **7/7 PASS** |
+
+The real module was not executed for this proof: importing it eagerly constructs the shared
+`src/db/client.ts` singleton from `DATABASE_URL` (unrelated to `--target dev`), and running it
+would require setting that variable even to reach argument parsing — avoided entirely to keep this
+pass's "no DB connection" boundary literal rather than merely lazy-safe.
+
+### 18.2.4 Status
+
+Still **not** the D-2 preflight itself — this section is the connection path only. Next executable
+step: operator supplies `AFLDB_DEV_IMPORT_DATABASE_URL` (or confirms it should stay unset for now),
+then an explicitly authorised run of
+`npx tsx --conditions=react-server tools/rebuild/draftguru/register_issue224_s9_players.ts --admin-user-id <n> --target dev --dev-import-role` (no `--apply`) to obtain the real D-2 census.
+`afldb_dev` remains unwritten. ISSUE-224 remains BLOCKED per §18.1.6.

@@ -37,11 +37,19 @@
  * Usage
  * -----
  *   npx tsx --conditions=react-server tools/rebuild/draftguru/register_issue224_s9_players.ts \
- *     --admin-user-id <n> [--target test|dev] [--apply]
+ *     --admin-user-id <n> [--target test|dev] [--dev-import-role] [--apply]
  *
  * `--conditions=react-server` is required (matches `match:backtest` / `records:first-kick-goal`
  * in package.json): every canonical primitive this tool imports carries `import 'server-only'`,
  * which throws under the plain Node resolution condition.
+ *
+ * `--target dev` connects as the ordinary read-oriented `afldb_app` role via
+ * `AFLDB_DEV_DATABASE_URL` by default. `--dev-import-role` (only valid with `--target dev`)
+ * instead connects via the separate, purpose-built `AFLDB_DEV_IMPORT_DATABASE_URL` as the
+ * elevated `afldb_import` role, needed for the AFLDB-ISSUE-160 D-2 manual-shell collision guard
+ * (`data_overrides` SELECT is `afldb_import`-only, migration 073). There is no fallback between
+ * the two variables. Both DEV modes remain read-only preflight: `--apply` is refused for
+ * `--target dev` regardless of `--dev-import-role` (ISSUE-224 S9 boundary: no DEV writes yet).
  */
 
 import { createHash } from 'node:crypto';
@@ -232,10 +240,11 @@ async function classify(
   // these two artefacts to disambiguate a genuine namesake, so any name match fails closed.
   //
   // `data_overrides` carries no `grant_app_read` (migration 073: SELECT is granted to
-  // `afldb_import` only), so the read-only DEV preflight -- deliberately connected as the
-  // low-privilege `afldb_app` role, never the import role -- cannot run this guard. That is
-  // reported as a warning, not silently skipped, and this function is never used for a DEV
-  // write (DEV writes are refused before any connection is opened; see `parseArgs`).
+  // `afldb_import` only). The DEFAULT DEV preflight connects as the low-privilege `afldb_app`
+  // role and cannot run this guard; that is reported as a warning, not silently skipped. The
+  // `--dev-import-role` preflight connects as `afldb_import` (see `resolveTarget`) and DOES run
+  // it. Neither DEV mode is ever used for a DEV write (DEV writes are refused before any
+  // connection is opened; see `parseArgs`).
   const pendingManualBySearchName = new Map<string, string[]>();
   try {
     const pendingManual = await sql<{ displayName: string; searchName: string }[]>`
@@ -355,6 +364,8 @@ type TargetName = 'test' | 'dev';
 type TargetConfig = {
   dsn: string;
   requiredDatabase: string;
+  // null = not positively checked (unchanged pre-existing behaviour for --target test).
+  requiredUser: string | null;
   readOnly: boolean;
   canApply: boolean;
 };
@@ -365,22 +376,34 @@ function assertNotProdLike(databasePath: string): void {
   }
 }
 
-function resolveTarget(target: TargetName): TargetConfig {
+function resolveTarget(target: TargetName, devImportRole: boolean): TargetConfig {
   if (target === 'test') {
     const dsn = process.env.AFLDB_TEST_IMPORT_DATABASE_URL;
     if (!dsn) throw new Error('AFLDB_TEST_IMPORT_DATABASE_URL is not set.');
     const path = new URL(dsn).pathname.replace(/^\//, '');
     assertNotProdLike(path);
     if (path !== 'afldb_test') throw new Error(`AFLDB_TEST_IMPORT_DATABASE_URL does not target /afldb_test (observed /${path}).`);
-    return { dsn, requiredDatabase: 'afldb_test', readOnly: false, canApply: true };
+    return { dsn, requiredDatabase: 'afldb_test', requiredUser: null, readOnly: false, canApply: true };
   }
   if (target === 'dev') {
+    if (devImportRole) {
+      // Purpose-built, maintenance/import-only DSN (ISSUE-224 S9 unblock). Never the same
+      // variable as the ordinary DEV connection below, and no fallback between the two.
+      const dsn = process.env.AFLDB_DEV_IMPORT_DATABASE_URL;
+      if (!dsn) throw new Error('AFLDB_DEV_IMPORT_DATABASE_URL is not set.');
+      const path = new URL(dsn).pathname.replace(/^\//, '');
+      assertNotProdLike(path);
+      if (path !== 'afldb_dev') {
+        throw new Error(`AFLDB_DEV_IMPORT_DATABASE_URL does not target /afldb_dev (observed /${path}).`);
+      }
+      return { dsn, requiredDatabase: 'afldb_dev', requiredUser: 'afldb_import', readOnly: true, canApply: false };
+    }
     const dsn = process.env.AFLDB_DEV_DATABASE_URL;
     if (!dsn) throw new Error('AFLDB_DEV_DATABASE_URL is not set.');
     const path = new URL(dsn).pathname.replace(/^\//, '');
     assertNotProdLike(path);
     if (path !== 'afldb_dev') throw new Error(`AFLDB_DEV_DATABASE_URL does not target /afldb_dev (observed /${path}).`);
-    return { dsn, requiredDatabase: 'afldb_dev', readOnly: true, canApply: false };
+    return { dsn, requiredDatabase: 'afldb_dev', requiredUser: 'afldb_app', readOnly: true, canApply: false };
   }
   throw new Error(`unknown --target ${String(target)} — only 'test' and 'dev' exist (no PROD target).`);
 }
@@ -392,6 +415,7 @@ function resolveTarget(target: TargetName): TargetConfig {
 type Args = {
   target: TargetName;
   apply: boolean;
+  devImportRole: boolean;
   adminUserId: number;
   targetSetPath: string;
   decisionPath: string;
@@ -400,6 +424,7 @@ type Args = {
 function parseArgs(argv: string[]): Args {
   let target: TargetName = 'test';
   let apply = false;
+  let devImportRole = false;
   let adminUserId: number | null = null;
   let targetSetPath = DEFAULT_TARGET_SET_PATH;
   let decisionPath = DEFAULT_DECISION_PATH;
@@ -408,6 +433,7 @@ function parseArgs(argv: string[]): Args {
     const arg = argv[i];
     if (arg === '--target') { target = argv[++i] as TargetName; continue; }
     if (arg === '--apply') { apply = true; continue; }
+    if (arg === '--dev-import-role') { devImportRole = true; continue; }
     if (arg === '--admin-user-id') { adminUserId = Number(argv[++i]); continue; }
     if (arg === '--target-set') { targetSetPath = argv[++i]; continue; }
     if (arg === '--decision') { decisionPath = argv[++i]; continue; }
@@ -420,6 +446,11 @@ function parseArgs(argv: string[]): Args {
   if (adminUserId === null || !Number.isInteger(adminUserId) || adminUserId <= 0) {
     throw new Error('--admin-user-id <n> is required (a positive integer admin_users.id).');
   }
+  if (devImportRole && target !== 'dev') {
+    throw new Error("REFUSED: --dev-import-role is only valid with --target dev.");
+  }
+  // Applies regardless of --dev-import-role: --target dev --dev-import-role --apply still
+  // refuses (ISSUE-224 S9 boundary: no DEV writes in this pass, privileged or not).
   if (apply && target === 'dev') {
     throw new Error(
       'REFUSED: --apply is not permitted for --target dev in this pass (ISSUE-224 S9 boundary: '
@@ -427,7 +458,7 @@ function parseArgs(argv: string[]): Args {
     );
   }
 
-  return { target, apply, adminUserId, targetSetPath, decisionPath };
+  return { target, apply, devImportRole, adminUserId, targetSetPath, decisionPath };
 }
 
 // ---------------------------------------------------------------------------
@@ -443,7 +474,7 @@ async function main(): Promise<void> {
     + `D-7 sha256=${PINNED_DECISION_SHA256.slice(0, 12)}…).`,
   );
 
-  const cfg = resolveTarget(args.target);
+  const cfg = resolveTarget(args.target, args.devImportRole);
   const sql = postgres(cfg.dsn, {
     max: 1,
     onnotice: () => {},
@@ -464,12 +495,16 @@ async function main(): Promise<void> {
     if (row.database !== cfg.requiredDatabase) {
       throw new Error(`REFUSED: connected database is '${row.database}', expected '${cfg.requiredDatabase}'.`);
     }
+    if (cfg.requiredUser !== null && row.currentUser !== cfg.requiredUser) {
+      throw new Error(`REFUSED: connected user is '${row.currentUser}', expected '${cfg.requiredUser}'.`);
+    }
     if (cfg.readOnly && (row.txRo !== 'on' || row.defaultRo !== 'on')) {
       throw new Error('REFUSED: the DEV connection is not proven read-only.');
     }
     console.log(
       `Connected: current_database()='${row.database}', current_user='${row.currentUser}' `
-      + `(--target ${args.target}), mode=${args.apply ? 'APPLY' : cfg.readOnly ? 'READ-ONLY PREFLIGHT' : 'dry-run'}.`,
+      + `(--target ${args.target}${args.devImportRole ? ' --dev-import-role' : ''}), `
+      + `mode=${args.apply ? 'APPLY' : cfg.readOnly ? 'READ-ONLY PREFLIGHT' : 'dry-run'}.`,
     );
 
     if (!args.apply) {
