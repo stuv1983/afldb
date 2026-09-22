@@ -10,6 +10,7 @@ import {
   recomputeSeasonBrownlowStatus,
   recomputeSeasonMetadata,
 } from '@/db/queries/player-derived';
+import { syncManualIdentityNameRecord } from '@/db/queries/player-identity';
 import {
   EDITABLE_ENTITIES,
   type EditEntity,
@@ -202,6 +203,22 @@ export async function saveEdit(input: {
 
       if (input.entityKey === 'players') {
         await applyPlayerEdit(tx, input.rowId, input.groupKey, values);
+        if (input.groupKey === 'name') {
+          // AFLDB-ISSUE-224 §21.3.2 (A1). An admin-created player also carries a
+          // durable CREATION RECORD keyed by their manual token, and nothing else
+          // re-types its name fields. Left alone it contradicts this correction for
+          // ever -- and for a manual player with no AFL Tables identity yet,
+          // getEntityNaturalKey returns null below, so it would be the only durable
+          // record of the name and would still hold the OLD one. Same transaction,
+          // its own audit row; a player with no such record is a no-op.
+          await syncManualIdentityNameRecord(tx, {
+            playerId: input.rowId,
+            before,
+            after: values,
+            adminUserId: input.adminUserId,
+            note: input.note,
+          });
+        }
       } else {
         await applyMatchEdit(tx, input.rowId, input.groupKey, values);
       }

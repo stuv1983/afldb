@@ -4,6 +4,7 @@ import postgres from 'postgres';
 import { sql } from '@/db/client';
 import { saveEdit } from '@/db/queries/data-edits';
 import { saveMatchSheet } from '@/db/queries/match-sheet';
+import { createPlayerInTransaction } from '@/db/queries/players';
 import { recomputeClubSeasons } from '@/db/queries/player-derived';
 import { BROWNLOW_MATCH_SHEET_REFUSAL } from '@/lib/match-sheet';
 import { createImportRoleParityHarness } from './import-role-parity';
@@ -402,6 +403,96 @@ describe.skipIf(!importRole.isConfigured)(
     });
   },
 );
+
+describe('AFLDB-ISSUE-224 §21.3.2: a name edit repairs the durable creation record', () => {
+  const NOTE = 'issue-224 manual identity record sync';
+
+  it('rewrites the manual_admin_edit identity payload and audits it separately', async () => {
+    // A manually created player with a multipart surname split the WRONG way --
+    // exactly the state the ISSUE-224 registration produced -- and with NO AFL
+    // Tables identity, so getEntityNaturalKey() returns null and the editor writes
+    // no override under the source key. The creation record is then the ONLY
+    // durable record of this name, which is what makes the sync load-bearing.
+    let playerId = 0;
+    let token = '';
+    try {
+      await sql.begin(async (tx) => {
+        const created = await createPlayerInTransaction(tx, {
+          displayName: 'Testcase Van Fixture',
+          givenName: 'Testcase Van',
+          surname: 'Fixture',
+        }, { adminUserId });
+        playerId = created.id;
+        const [identity] = await tx<{ externalId: string }[]>`
+          SELECT e.external_id AS "externalId"
+            FROM external_identities e JOIN sources s ON s.id = e.source_id
+           WHERE e.player_id = ${playerId} AND s.key = 'manual_admin_edit'
+        `;
+        token = identity.externalId;
+      });
+      expect(token).not.toBe('');
+
+      const saved = await saveEdit({
+        entityKey: 'players',
+        rowId: playerId,
+        groupKey: 'name',
+        raw: {
+          display_name: 'Testcase Van Fixture',
+          given_name: 'Testcase',
+          surname: 'Van Fixture',
+        },
+        adminUserId,
+        note: NOTE,
+      });
+      expect(saved).toMatchObject({ ok: true });
+
+      const [row] = await sql<{
+        givenName: string | null; surname: string | null; sortName: string | null;
+      }[]>`
+        SELECT given_name AS "givenName", surname, sort_name AS "sortName"
+          FROM players WHERE id = ${playerId}
+      `;
+      expect(row).toEqual({
+        givenName: 'Testcase', surname: 'Van Fixture', sortName: 'Van Fixture, Testcase',
+      });
+
+      // The whole point: the durable record no longer contradicts the row, so a
+      // rebuild re-creates the corrected name rather than the split one.
+      const [record] = await sql<{ overrideValues: Record<string, unknown> }[]>`
+        SELECT override_values AS "overrideValues" FROM data_overrides
+         WHERE entity_type = 'players'
+           AND entity_key = ${`manual_admin_edit:${token}`}
+           AND field_group = 'identity'
+           AND is_active = true
+      `;
+      expect(record.overrideValues).toMatchObject({
+        display_name: 'Testcase Van Fixture',
+        given_name: 'Testcase',
+        surname: 'Van Fixture',
+      });
+
+      const audit = await sql<{ fieldGroup: string }[]>`
+        SELECT field_group AS "fieldGroup" FROM data_edits
+         WHERE table_name = 'players' AND row_id = ${playerId} AND note = ${NOTE}
+         ORDER BY field_group
+      `;
+      expect(audit.map((a) => a.fieldGroup)).toEqual(['manual_identity_record', 'name']);
+    } finally {
+      if (playerId > 0) {
+        await sql.begin(async (tx) => {
+          await tx`DELETE FROM data_edits WHERE table_name = 'players' AND row_id = ${playerId}`;
+          await tx`
+            DELETE FROM data_overrides
+             WHERE entity_type = 'players' AND entity_key = ${`manual_admin_edit:${token}`}
+          `;
+          await tx`DELETE FROM external_identities WHERE player_id = ${playerId}`;
+          await tx`DELETE FROM player_career_stats WHERE player_id = ${playerId}`;
+          await tx`DELETE FROM players WHERE id = ${playerId}`;
+        });
+      }
+    }
+  });
+});
 
 describe('Targeted club_seasons rebuild (AFLDB-ISSUE-015)', () => {
   const importSql = postgres(process.env.AFLDB_TEST_DATABASE_URL!, { max: 1, onnotice: () => {} });
