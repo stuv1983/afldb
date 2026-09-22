@@ -21,6 +21,33 @@
  * The AFL Tables profile identity is the sole registration authority (never the AFL API
  * provider id), matching `afltables_external_id` on both artefacts.
  *
+ * Name parts (AFLDB-ISSUE-224 S9, recurrence fix)
+ * -----------------------------------------------
+ * `createPlayerInTransaction` falls back to a LAST-TOKEN split when a caller supplies neither
+ * `givenName` nor `surname`: "Alex Van Wyk" becomes given "Alex Van" / surname "Wyk". For a
+ * multipart surname that is silently wrong, and it is durable — the wrong parts land in
+ * `players`, in `sort_name`, and in the `data_overrides` identity payload that
+ * `replay_admin_overrides(players)` re-creates the row from. It also breaks the AFL API player
+ * bridge, whose rule (d) is a fail-closed normalised SURNAME equality check
+ * (`src/lib/acquisition/afl-api-player-evidence.ts`): "VANWYK" != "WYK", so an otherwise
+ * accepted pair is withheld.
+ *
+ * This runner therefore NEVER lets that fallback fire. It resolves `given_name`/`surname` itself
+ * and passes them explicitly, by `resolveNameParts()`:
+ *
+ *   - one token            -> surname only (no given name) — unambiguous;
+ *   - exactly two tokens    -> given + surname — unambiguous;
+ *   - three or more tokens  -> REFUSED. The split is a human decision, not a guess.
+ *
+ * A refused row is unblocked by `--name-parts <path>`: an operator-authored JSON artefact naming
+ * the authoritative `given_name`/`surname` for that AFL Tables path, from the source that owns the
+ * name. It is not hash-pinned (it is authored per run, unlike the two D-7 artefacts) but it is
+ * checked against the pinned target set: every row must name a target path, must repeat that
+ * target's `display_name` byte-for-byte, and must recompose to it (`given + ' ' + surname`), so an
+ * override can restate how a name divides but can never change what the name is.
+ *
+ * No player id and no player name is special-cased anywhere in this file.
+ *
  * Safety
  * ------
  * DEFAULT is read-only classification (no `--apply`). `--apply` is required to write. For
@@ -50,7 +77,7 @@
  * -----
  *   npx tsx --conditions=react-server tools/rebuild/draftguru/register_issue224_s9_players.ts \
  *     --admin-user-id <n> [--target test|dev] [--dev-import-role] [--apply] \
- *     [--allow-dev-write] [--backup-sha256 <64-hex>]
+ *     [--allow-dev-write] [--backup-sha256 <64-hex>] [--name-parts <path>]
  *
  * `--conditions=react-server` is required (matches `match:backtest` / `records:first-kick-goal`
  * in package.json): every canonical primitive this tool imports carries `import 'server-only'`,
@@ -111,18 +138,126 @@ const NOTE = (providerId: string) =>
 // Artefacts
 // ---------------------------------------------------------------------------
 
-type Target = {
+export type Target = {
   profilePath: string;
   displayName: string;
+  /** null only for a single-token display name; never guessed from a multipart one. */
+  givenName: string | null;
+  surname: string;
   aflApiProviderId: string;
   draftguruPlayerUrl: string;
 };
+
+/** One operator-authored authoritative name division, keyed by AFL Tables profile path. */
+export type NameParts = { givenName: string | null; surname: string };
 
 function sha256(bytes: Buffer): string {
   return createHash('sha256').update(bytes).digest('hex');
 }
 
-function loadAndValidateArtefacts(targetSetPath: string, decisionPath: string): Target[] {
+/** Collapse runs of whitespace so a comparison is about the name, not about its spacing. */
+function collapseWhitespace(value: string): string {
+  return value.trim().replace(/\s+/g, ' ');
+}
+
+/**
+ * Resolve `given_name`/`surname` for one target WITHOUT ever falling through to
+ * `createPlayerInTransaction`'s last-token split (see the header). Throws — refusing the whole
+ * batch — rather than guessing where a multipart name divides.
+ *
+ * `override`, when present, is the authoritative division for this path and is verified to
+ * recompose to exactly `displayName`: an override restates how the name divides, never what it is.
+ */
+export function resolveNameParts(
+  profilePath: string, displayName: string, override?: NameParts,
+): NameParts {
+  const name = collapseWhitespace(displayName);
+  if (!name) {
+    throw new Error(`target-set row ${profilePath} carries an empty display name; refusing.`);
+  }
+
+  if (override) {
+    const givenName = override.givenName === null ? null : collapseWhitespace(override.givenName);
+    const surname = collapseWhitespace(override.surname);
+    if (!surname) {
+      throw new Error(
+        `--name-parts row ${profilePath} carries an empty surname; refusing (a surname is the one `
+        + 'part every canonical player row must have).',
+      );
+    }
+    const recomposed = collapseWhitespace([givenName ?? '', surname].join(' '));
+    if (recomposed !== name) {
+      throw new Error(
+        `--name-parts row ${profilePath} does not recompose to the pinned display name: `
+        + `'${recomposed}' != '${name}'. An override may restate how a name divides, never what `
+        + 'the name is.',
+      );
+    }
+    return { givenName: givenName || null, surname };
+  }
+
+  const tokens = name.split(' ');
+  if (tokens.length === 1) {
+    // Mononym: surname-only is what every other canonical writer produces, and there is nothing
+    // to divide, so there is nothing to guess.
+    return { givenName: null, surname: tokens[0] };
+  }
+  if (tokens.length === 2) {
+    return { givenName: tokens[0], surname: tokens[1] };
+  }
+  throw new Error(
+    `REFUSED: target-set row ${profilePath} carries the multipart display name '${name}' `
+    + `(${tokens.length} tokens). Where it divides into given name and surname is a human `
+    + 'decision this tool will not guess — a last-token split would durably record the wrong '
+    + 'surname in players, sort_name, the data_overrides identity payload and the AFL API bridge\'s '
+    + 'fail-closed surname check. Supply the authoritative division via '
+    + '--name-parts <path> and re-run. Nothing has been written.',
+  );
+}
+
+/**
+ * Load the optional operator-authored `--name-parts` artefact. Deliberately NOT hash-pinned: it is
+ * authored per run, unlike the two immutable D-7 artefacts. Its safety comes from being validated
+ * against the pinned target set by `loadAndValidateArtefacts` instead.
+ */
+export function loadNameParts(path: string): Map<string, NameParts & { displayName: string }> {
+  const parsed = JSON.parse(readFileSync(path, 'utf8')) as { rows?: unknown };
+  const rows = parsed.rows;
+  if (!Array.isArray(rows) || rows.length === 0) {
+    throw new Error(`--name-parts artefact ${path} carries no rows.`);
+  }
+  const out = new Map<string, NameParts & { displayName: string }>();
+  for (const raw of rows) {
+    const row = raw as Record<string, unknown>;
+    const profilePath = String(row.afltables_external_id ?? '');
+    if (!profilePath) {
+      throw new Error(`--name-parts artefact ${path} carries a row with no afltables_external_id.`);
+    }
+    if (out.has(profilePath)) {
+      throw new Error(`--name-parts artefact names AFL Tables path ${profilePath} more than once.`);
+    }
+    if (typeof row.display_name !== 'string' || typeof row.surname !== 'string') {
+      throw new Error(
+        `--name-parts row ${profilePath} must carry a string display_name and a string surname.`,
+      );
+    }
+    if (row.given_name !== null && typeof row.given_name !== 'string') {
+      throw new Error(`--name-parts row ${profilePath} given_name must be a string or null.`);
+    }
+    out.set(profilePath, {
+      displayName: row.display_name,
+      givenName: row.given_name === null ? null : row.given_name,
+      surname: row.surname,
+    });
+  }
+  return out;
+}
+
+export function loadAndValidateArtefacts(
+  targetSetPath: string,
+  decisionPath: string,
+  nameParts: Map<string, NameParts & { displayName: string }> = new Map(),
+): Target[] {
   const targetSetBytes = readFileSync(targetSetPath);
   const targetSetSha256 = sha256(targetSetBytes);
   if (targetSetSha256 !== PINNED_TARGET_SET_SHA256) {
@@ -215,12 +350,37 @@ function loadAndValidateArtefacts(targetSetPath: string, decisionPath: string): 
       );
     }
 
+    const displayName = distinctNames[0];
+
+    // An override may only ever restate a name the pinned target set already carries, for a path
+    // the pinned target set already names.
+    const override = nameParts.get(path);
+    if (override && override.displayName !== displayName) {
+      throw new Error(
+        `--name-parts row ${path} carries display_name '${override.displayName}', the pinned `
+        + `target set carries '${displayName}'; refusing.`,
+      );
+    }
+    const parts = resolveNameParts(path, displayName, override);
+
     targets.push({
       profilePath: path,
-      displayName: distinctNames[0],
+      displayName,
+      givenName: parts.givenName,
+      surname: parts.surname,
       aflApiProviderId: providerId,
       draftguruPlayerUrl: String(row.draftguru_player_url),
     });
+  }
+
+  // An override for a path this batch does not register is an operator error about WHICH rows are
+  // being corrected; it fails closed rather than being ignored.
+  for (const path of nameParts.keys()) {
+    if (!seenPaths.has(path)) {
+      throw new Error(
+        `--name-parts names AFL Tables path ${path}, which is not in the pinned target set; refusing.`,
+      );
+    }
   }
 
   if (decisionByPath.size !== targets.length) {
@@ -493,9 +653,13 @@ export async function runDevPostWriteChecks(
   }
   results.push(`${EXPECTED_ROW_COUNT} distinct canonical player_ids, no identity claimed twice: OK`);
 
-  // No duplicate slug among the 92 newly-created players.
-  const slugRows = await tx<{ slug: string }[]>`
-    SELECT slug FROM players WHERE id = ANY(${createdIds})
+  // No duplicate slug among the 92 newly-created players, and — same query — the persisted name
+  // parts are the ones this runner resolved, not a last-token split of the display name.
+  const slugRows = await tx<{
+    id: number; slug: string; givenName: string | null; surname: string | null; sortName: string | null;
+  }[]>`
+    SELECT id, slug, given_name AS "givenName", surname, sort_name AS "sortName"
+      FROM players WHERE id = ANY(${createdIds})
   `;
   const distinctSlugs = new Set(slugRows.map((r) => r.slug));
   if (slugRows.length !== EXPECTED_ROW_COUNT || distinctSlugs.size !== EXPECTED_ROW_COUNT) {
@@ -505,6 +669,43 @@ export async function runDevPostWriteChecks(
     );
   }
   results.push('no duplicate slug among the newly-created players: OK');
+
+  // Name-parts postcondition (ISSUE-224 S9 recurrence fix). A row whose surname is a suffix of a
+  // multipart name is exactly the defect this batch previously wrote to DEV, and it is invisible
+  // in every other check here.
+  const targetByPath = new Map(targets.map((t) => [t.profilePath, t]));
+  const playerRowById = new Map(slugRows.map((r) => [r.id, r]));
+  const nameMismatches: string[] = [];
+  for (const c of created) {
+    const target = targetByPath.get(c.profilePath);
+    const row = playerRowById.get(c.playerId);
+    if (!target || !row) {
+      nameMismatches.push(`${c.profilePath}: no row to verify name parts against`);
+      continue;
+    }
+    const expectedSortName = target.givenName === null
+      ? target.surname
+      : `${target.surname}, ${target.givenName}`;
+    if (row.givenName !== target.givenName || row.surname !== target.surname
+        || row.sortName !== expectedSortName) {
+      nameMismatches.push(
+        `${c.profilePath}: given_name=${JSON.stringify(row.givenName)}/`
+        + `surname=${JSON.stringify(row.surname)}/sort_name=${JSON.stringify(row.sortName)}, `
+        + `expected ${JSON.stringify(target.givenName)}/${JSON.stringify(target.surname)}/`
+        + JSON.stringify(expectedSortName),
+      );
+    }
+  }
+  if (nameMismatches.length > 0) {
+    throw new Error(
+      `postcondition failed: ${nameMismatches.length} newly-created player row(s) do not carry the `
+      + `resolved name parts: ${nameMismatches.slice(0, 5).join('; ')}`,
+    );
+  }
+  results.push(
+    `${EXPECTED_ROW_COUNT}/${EXPECTED_ROW_COUNT} newly-created players carry the resolved `
+    + 'given_name/surname/sort_name (no last-token split): OK',
+  );
 
   // Player count increased by exactly 92 — combined with createdIds.length === 92 above, this
   // also proves no non-target player was created by this batch: every row this batch inserted
@@ -532,10 +733,18 @@ export async function runDevPostWriteChecks(
   results.push(`${EXPECTED_ROW_COUNT}/${EXPECTED_ROW_COUNT} player_career_stats rows exist: OK`);
 
   // Expected data_overrides durability rows exist for all 92, and each carries the attached
-  // AFL Tables path (i.e. attachAflTablesIdentityInTransaction's UPDATE actually landed).
-  const overrideRows = await tx<{ playerId: number; hasPath: boolean }[]>`
+  // AFL Tables path (i.e. attachAflTablesIdentityInTransaction's UPDATE actually landed) AND
+  // the resolved name division. The payload is what `replay_admin_overrides(players)` re-creates
+  // a destroyed row FROM, so a last-token split surviving there would outlive the correct
+  // `players` row the check above proves -- the same defect, one layer down, and invisible to
+  // every other postcondition here.
+  const overrideRows = await tx<{
+    playerId: number; hasPath: boolean; givenName: string | null; surname: string | null;
+  }[]>`
     SELECT e.player_id AS "playerId",
-           (o.override_values ? 'afltables_profile_path') AS "hasPath"
+           (o.override_values ? 'afltables_profile_path') AS "hasPath",
+           o.override_values->>'given_name' AS "givenName",
+           o.override_values->>'surname' AS "surname"
       FROM external_identities e
       JOIN sources s ON s.id = e.source_id
       JOIN data_overrides o
@@ -554,6 +763,33 @@ export async function runDevPostWriteChecks(
     );
   }
   results.push(`${EXPECTED_ROW_COUNT}/${EXPECTED_ROW_COUNT} data_overrides durability rows carry the attached path: OK`);
+
+  const createdPathById = new Map(created.map((c) => [c.playerId, c.profilePath]));
+  const payloadMismatches: string[] = [];
+  for (const record of overrideRows) {
+    const target = targetByPath.get(createdPathById.get(record.playerId) ?? '');
+    if (!target) {
+      payloadMismatches.push(`player #${record.playerId}: durability row names no target`);
+      continue;
+    }
+    if (record.givenName !== target.givenName || record.surname !== target.surname) {
+      payloadMismatches.push(
+        `${target.profilePath}: payload given_name=${JSON.stringify(record.givenName)}/`
+        + `surname=${JSON.stringify(record.surname)}, expected `
+        + `${JSON.stringify(target.givenName)}/${JSON.stringify(target.surname)}`,
+      );
+    }
+  }
+  if (payloadMismatches.length > 0) {
+    throw new Error(
+      `postcondition failed: ${payloadMismatches.length} durable identity payload(s) do not carry `
+      + `the resolved name parts: ${payloadMismatches.slice(0, 5).join('; ')}`,
+    );
+  }
+  results.push(
+    `${EXPECTED_ROW_COUNT}/${EXPECTED_ROW_COUNT} durable identity payloads carry the resolved `
+    + 'given_name/surname (a rebuild replays the correct split): OK',
+  );
 
   // Expected data_edits/audit rows for all 92 (recordDataEdit inside
   // attachAflTablesIdentityInTransaction, field_group 'source_identity') — proven
@@ -598,6 +834,8 @@ export type Args = {
   adminUserId: number;
   targetSetPath: string;
   decisionPath: string;
+  /** Optional operator-authored authoritative name divisions; see `loadNameParts`. */
+  namePartsPath: string | null;
 };
 
 export function parseArgs(argv: string[]): Args {
@@ -609,6 +847,7 @@ export function parseArgs(argv: string[]): Args {
   let adminUserId: number | null = null;
   let targetSetPath = DEFAULT_TARGET_SET_PATH;
   let decisionPath = DEFAULT_DECISION_PATH;
+  let namePartsPath: string | null = null;
 
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -620,6 +859,7 @@ export function parseArgs(argv: string[]): Args {
     if (arg === '--admin-user-id') { adminUserId = Number(argv[++i]); continue; }
     if (arg === '--target-set') { targetSetPath = argv[++i]; continue; }
     if (arg === '--decision') { decisionPath = argv[++i]; continue; }
+    if (arg === '--name-parts') { namePartsPath = argv[++i] ?? null; continue; }
     throw new Error(`unrecognised argument: ${arg}`);
   }
 
@@ -628,6 +868,9 @@ export function parseArgs(argv: string[]): Args {
   }
   if (adminUserId === null || !Number.isInteger(adminUserId) || adminUserId <= 0) {
     throw new Error('--admin-user-id <n> is required (a positive integer admin_users.id).');
+  }
+  if (namePartsPath !== null && namePartsPath.trim() === '') {
+    throw new Error('--name-parts <path> requires a path.');
   }
   if (devImportRole && target !== 'dev') {
     throw new Error("REFUSED: --dev-import-role is only valid with --target dev.");
@@ -676,7 +919,8 @@ export function parseArgs(argv: string[]): Args {
   }
 
   return {
-    target, apply, devImportRole, allowDevWrite, backupSha256, adminUserId, targetSetPath, decisionPath,
+    target, apply, devImportRole, allowDevWrite, backupSha256, adminUserId, targetSetPath,
+    decisionPath, namePartsPath,
   };
 }
 
@@ -686,12 +930,21 @@ export function parseArgs(argv: string[]): Args {
 
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
-  const targets = loadAndValidateArtefacts(args.targetSetPath, args.decisionPath);
+  const nameParts: Map<string, NameParts & { displayName: string }> = args.namePartsPath === null
+    ? new Map()
+    : loadNameParts(args.namePartsPath);
+  const targets = loadAndValidateArtefacts(args.targetSetPath, args.decisionPath, nameParts);
   console.log(
     `Loaded ${targets.length} REGISTER target(s) from pinned artefacts `
     + `(target-set sha256=${PINNED_TARGET_SET_SHA256.slice(0, 12)}…, `
     + `D-7 sha256=${PINNED_DECISION_SHA256.slice(0, 12)}…).`,
   );
+  if (args.namePartsPath !== null) {
+    console.log(
+      `Applied ${nameParts.size} operator-authored name division(s) from ${args.namePartsPath} `
+      + '(each verified to recompose to the pinned display name).',
+    );
+  }
 
   const devWriteAuthorized = args.apply && args.target === 'dev';
   const cfg = resolveTarget(args.target, args.devImportRole, devWriteAuthorized);
@@ -800,6 +1053,10 @@ async function main(): Promise<void> {
         if (c.kind !== 'CREATE') continue;
         const input: CreatePlayerInput = {
           displayName: c.target.displayName,
+          // Explicit, always — never left undefined, which is what arms
+          // createPlayerInTransaction's last-token split (see the header).
+          givenName: c.target.givenName,
+          surname: c.target.surname,
           notes: NOTE(c.target.aflApiProviderId),
         };
         const player = await createPlayerInTransaction(tx, input, { adminUserId: args.adminUserId });

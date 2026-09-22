@@ -8,13 +8,21 @@
  * guards its own `main()` invocation behind an entrypoint check, so importing it here for its
  * exported functions never runs the CLI against this test process's real argv/environment.
  */
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import type postgres from 'postgres';
 import { describe, expect, it } from 'vitest';
 
 import {
   BACKUP_SHA256_RE,
   EXPECTED_ROW_COUNT,
+  loadAndValidateArtefacts,
+  loadNameParts,
   parseArgs,
+  resolveNameParts,
   resolveTarget,
   runDevPostWriteChecks,
   type TargetName,
@@ -100,6 +108,15 @@ describe('register_issue224_s9_players — parseArgs DEV write gate (ISSUE-224 S
   it('DEV read-only preflight (no --apply) is unaffected by the gate: no flags required', () => {
     expect(() => parseArgs([...ADMIN_ARGS, '--target', 'dev'])).not.toThrow();
     expect(() => parseArgs([...ADMIN_ARGS, '--target', 'dev', '--dev-import-role'])).not.toThrow();
+  });
+
+  it('--name-parts defaults to null and is carried through when supplied', () => {
+    expect(parseArgs(ADMIN_ARGS).namePartsPath).toBeNull();
+    expect(parseArgs([...ADMIN_ARGS, '--name-parts', 'a/b.json']).namePartsPath).toBe('a/b.json');
+  });
+
+  it('--name-parts with no path refuses', () => {
+    expect(() => parseArgs([...ADMIN_ARGS, '--name-parts', ''])).toThrow(/requires a path/);
   });
 });
 
@@ -187,25 +204,41 @@ describe('register_issue224_s9_players — resolveTarget DEV write gate (ISSUE-2
 describe('register_issue224_s9_players — runDevPostWriteChecks data_edits postcondition (ISSUE-224 S9)', () => {
   const targets = Array.from({ length: EXPECTED_ROW_COUNT }, (_, i) => ({
     profilePath: `players/T/Test_Player${i}.html`,
-    displayName: `Test Player ${i}`,
+    displayName: `Test Player${i}`,
+    givenName: 'Test',
+    surname: `Player${i}`,
     aflApiProviderId: `provider-${i}`,
     draftguruPlayerUrl: `https://draftguru.example/player/${i}`,
   }));
   const created = targets.map((t, i) => ({ profilePath: t.profilePath, playerId: i + 1 }));
   const beforePlayerCount = 1000;
 
-  function makeFakeTx(): { tx: postgres.TransactionSql; queryCount: () => number } {
+  function makeFakeTx(
+    playerRows: unknown[] = created.map((c, i) => ({
+      id: c.playerId,
+      slug: `slug-${c.playerId}`,
+      givenName: targets[i].givenName,
+      surname: targets[i].surname,
+      sortName: `${targets[i].surname}, ${targets[i].givenName}`,
+    })),
+    overrideRows: unknown[] = created.map((c, i) => ({
+      playerId: c.playerId,
+      hasPath: true,
+      givenName: targets[i].givenName,
+      surname: targets[i].surname,
+    })),
+  ): { tx: postgres.TransactionSql; queryCount: () => number } {
     const responses: unknown[][] = [
       // 1. external_identities resolution
       created.map((c) => ({ externalId: c.profilePath, playerId: c.playerId })),
-      // 2. slug rows — one distinct slug per created player
-      created.map((c) => ({ slug: `slug-${c.playerId}` })),
+      // 2. player rows — one distinct slug each, plus the persisted name parts
+      playerRows,
       // 3. player count (before + EXPECTED_ROW_COUNT)
       [{ count: String(beforePlayerCount + EXPECTED_ROW_COUNT) }],
       // 4. player_career_stats count
       [{ count: String(EXPECTED_ROW_COUNT) }],
-      // 5. data_overrides durability rows
-      created.map((c) => ({ playerId: c.playerId, hasPath: true })),
+      // 5. data_overrides durability rows — the attached path AND the payload name parts
+      overrideRows,
     ];
     let i = 0;
     const tag = (async () => {
@@ -244,5 +277,194 @@ describe('register_issue224_s9_players — runDevPostWriteChecks data_edits post
       runDevPostWriteChecks(tx, targets, created.slice(0, -1), beforePlayerCount, EXPECTED_ROW_COUNT),
     ).rejects.toThrow(/player\(s\) were created, expected exactly/);
     expect(queryCount()).toBe(0);
+  });
+
+  it('refuses before commit when a persisted row carries a last-token-split surname', async () => {
+    // Exactly the observed DEV defect, reproduced: "Alex Van Wyk" persisted as
+    // given_name "Alex Van" / surname "Wyk". No other postcondition notices it.
+    const rows = created.map((c, i) => ({
+      id: c.playerId,
+      slug: `slug-${c.playerId}`,
+      givenName: i === 7 ? 'Test Player' : targets[i].givenName,
+      surname: i === 7 ? '7' : targets[i].surname,
+      sortName: i === 7 ? '7, Test Player' : `${targets[i].surname}, ${targets[i].givenName}`,
+    }));
+    const { tx } = makeFakeTx(rows);
+    await expect(
+      runDevPostWriteChecks(tx, targets, created, beforePlayerCount, EXPECTED_ROW_COUNT),
+    ).rejects.toThrow(/do not carry the resolved name parts/);
+  });
+
+  it('refuses before commit on a stale sort_name even when given_name and surname are right', async () => {
+    const rows = created.map((c, i) => ({
+      id: c.playerId,
+      slug: `slug-${c.playerId}`,
+      givenName: targets[i].givenName,
+      surname: targets[i].surname,
+      sortName: i === 3 ? 'Stale, Value' : `${targets[i].surname}, ${targets[i].givenName}`,
+    }));
+    const { tx } = makeFakeTx(rows);
+    await expect(
+      runDevPostWriteChecks(tx, targets, created, beforePlayerCount, EXPECTED_ROW_COUNT),
+    ).rejects.toThrow(/do not carry the resolved name parts/);
+  });
+
+  it('refuses when the players row is right but the DURABLE payload carries the split', async () => {
+    // AFLDB-ISSUE-224 §21.3.2: the payload is what a rebuild re-creates the row FROM, so a
+    // last-token split surviving there outlives the correct `players` row. Every other
+    // postcondition passes on this state.
+    const overrides = created.map((c, i) => ({
+      playerId: c.playerId,
+      hasPath: true,
+      givenName: i === 11 ? 'Test Player' : targets[i].givenName,
+      surname: i === 11 ? '11' : targets[i].surname,
+    }));
+    const { tx, queryCount } = makeFakeTx(undefined, overrides);
+    await expect(
+      runDevPostWriteChecks(tx, targets, created, beforePlayerCount, EXPECTED_ROW_COUNT),
+    ).rejects.toThrow(/durable identity payload\(s\) do not carry the resolved name parts/);
+    // Still the same five queries: the payload parts come back on the data_overrides query
+    // that already ran, not on a sixth.
+    expect(queryCount()).toBe(5);
+  });
+});
+
+/**
+ * AFLDB-ISSUE-224 S9 recurrence fix. `createPlayerInTransaction` last-token-splits a display name
+ * when the caller supplies neither part; this runner never lets that fire. These cover the
+ * resolver in isolation, then end-to-end against the real pinned artefacts, which carry exactly
+ * two multipart names ("Alex Van Wyk", "Hussien El Achkar").
+ */
+describe('register_issue224_s9_players — resolveNameParts (ISSUE-224 S9)', () => {
+  const PATH = 'players/A/Alex_Van_Wyk.html';
+
+  it('splits an unambiguous two-token name', () => {
+    expect(resolveNameParts('players/T/T.html', 'Jane Smith'))
+      .toEqual({ givenName: 'Jane', surname: 'Smith' });
+  });
+
+  it('treats a mononym as surname-only, with no given name invented', () => {
+    expect(resolveNameParts('players/T/T.html', 'Ablett'))
+      .toEqual({ givenName: null, surname: 'Ablett' });
+  });
+
+  it.each([
+    'Alex Van Wyk',
+    'Hussien El Achkar',
+    'Jan van der Berg',
+  ])('REFUSES the multipart name %s rather than guessing where it divides', (name) => {
+    expect(() => resolveNameParts(PATH, name)).toThrow(/multipart display name/);
+    expect(() => resolveNameParts(PATH, name)).toThrow(/--name-parts/);
+  });
+
+  it('refuses an empty display name', () => {
+    expect(() => resolveNameParts(PATH, '   ')).toThrow(/empty display name/);
+  });
+
+  it('accepts an authoritative override that recomposes to the display name', () => {
+    expect(resolveNameParts(PATH, 'Alex Van Wyk', { givenName: 'Alex', surname: 'Van Wyk' }))
+      .toEqual({ givenName: 'Alex', surname: 'Van Wyk' });
+    expect(resolveNameParts(PATH, 'Hussien El Achkar', { givenName: 'Hussien', surname: 'El Achkar' }))
+      .toEqual({ givenName: 'Hussien', surname: 'El Achkar' });
+  });
+
+  it('refuses an override that does not recompose to the display name', () => {
+    expect(() => resolveNameParts(PATH, 'Alex Van Wyk', { givenName: 'Alexander', surname: 'Van Wyk' }))
+      .toThrow(/does not recompose/);
+    expect(() => resolveNameParts(PATH, 'Alex Van Wyk', { givenName: 'Alex', surname: 'Wyk' }))
+      .toThrow(/does not recompose/);
+  });
+
+  it('refuses an override with an empty surname', () => {
+    expect(() => resolveNameParts(PATH, 'Alex Van Wyk', { givenName: 'Alex Van Wyk', surname: '  ' }))
+      .toThrow(/empty surname/);
+  });
+});
+
+describe('register_issue224_s9_players — registration runner over the real pinned artefacts', () => {
+  const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+  const MANIFESTS = join(REPO_ROOT, 'docs', 'rebuild-manifests', 'draftguru');
+  const TARGET_SET = join(MANIFESTS, 'issue224-s9-target-set-20260922.json');
+  const DECISION = join(MANIFESTS, 'issue224-d7-registration-decision-20260922.json');
+  const NAME_PARTS = join(MANIFESTS, 'issue224-s9-name-parts-20260922.json');
+
+  it('refuses the whole batch when the two multipart rows have no authoritative division', () => {
+    expect(() => loadAndValidateArtefacts(TARGET_SET, DECISION))
+      .toThrow(/multipart display name/);
+  });
+
+  it('resolves all 92 rows with the retained --name-parts artefact, and no surname is a bare suffix', () => {
+    const targets = loadAndValidateArtefacts(TARGET_SET, DECISION, loadNameParts(NAME_PARTS));
+    expect(targets).toHaveLength(EXPECTED_ROW_COUNT);
+    for (const t of targets) {
+      expect(t.surname.length).toBeGreaterThan(0);
+      const recomposed = [t.givenName, t.surname].filter(Boolean).join(' ');
+      expect(recomposed).toBe(t.displayName);
+    }
+    const vanWyk = targets.find((t) => t.profilePath === 'players/A/Alex_Van_Wyk.html');
+    expect(vanWyk).toMatchObject({ givenName: 'Alex', surname: 'Van Wyk' });
+    const elAchkar = targets.find((t) => t.profilePath === 'players/H/Hussien_El_Achkar.html');
+    expect(elAchkar).toMatchObject({ givenName: 'Hussien', surname: 'El Achkar' });
+  });
+
+  it('the retained --name-parts artefact covers exactly the rows that need it', () => {
+    expect([...loadNameParts(NAME_PARTS).keys()].sort()).toEqual([
+      'players/A/Alex_Van_Wyk.html',
+      'players/H/Hussien_El_Achkar.html',
+    ]);
+  });
+
+  // The two genuinely-needed divisions, so each negative case below isolates ITS defect instead
+  // of tripping the multipart refusal first.
+  const VALID_ROWS = [
+    {
+      afltables_external_id: 'players/A/Alex_Van_Wyk.html',
+      display_name: 'Alex Van Wyk',
+      given_name: 'Alex',
+      surname: 'Van Wyk',
+    },
+    {
+      afltables_external_id: 'players/H/Hussien_El_Achkar.html',
+      display_name: 'Hussien El Achkar',
+      given_name: 'Hussien',
+      surname: 'El Achkar',
+    },
+  ];
+
+  function writeNameParts(rows: unknown[]): string {
+    const file = join(mkdtempSync(join(tmpdir(), 'afldb-i224-')), 'name-parts.json');
+    writeFileSync(file, JSON.stringify({ rows }));
+    return file;
+  }
+
+  it('refuses a --name-parts row naming a path outside the pinned target set', () => {
+    const file = writeNameParts([...VALID_ROWS, {
+      afltables_external_id: 'players/Z/Not_In_Set.html',
+      display_name: 'Not InSet',
+      given_name: 'Not',
+      surname: 'InSet',
+    }]);
+    expect(() => loadAndValidateArtefacts(TARGET_SET, DECISION, loadNameParts(file)))
+      .toThrow(/not in the pinned target set/);
+  });
+
+  it('refuses a --name-parts row whose display_name disagrees with the pinned target set', () => {
+    const file = writeNameParts([
+      { ...VALID_ROWS[0], display_name: 'Alexander Van Wyk', given_name: 'Alexander' },
+      VALID_ROWS[1],
+    ]);
+    expect(() => loadAndValidateArtefacts(TARGET_SET, DECISION, loadNameParts(file)))
+      .toThrow(/the pinned target set carries/);
+  });
+
+  it('refuses a --name-parts row that does not recompose to its own display_name', () => {
+    const file = writeNameParts([{ ...VALID_ROWS[0], surname: 'Wyk' }, VALID_ROWS[1]]);
+    expect(() => loadAndValidateArtefacts(TARGET_SET, DECISION, loadNameParts(file)))
+      .toThrow(/does not recompose/);
+  });
+
+  it('refuses a --name-parts artefact naming the same path twice', () => {
+    const file = writeNameParts([...VALID_ROWS, VALID_ROWS[0]]);
+    expect(() => loadNameParts(file)).toThrow(/more than once/);
   });
 });

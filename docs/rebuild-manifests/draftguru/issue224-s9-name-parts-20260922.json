@@ -1,0 +1,22 @@
+{
+  "artefact": "issue224-s9-name-parts",
+  "issue": "AFLDB-ISSUE-224",
+  "generated": "2026-09-22",
+  "purpose": "Authoritative given_name/surname divisions for the AFLDB-ISSUE-224 S9 target-set rows whose display name carries three or more tokens. tools/rebuild/draftguru/register_issue224_s9_players.ts refuses such a row outright rather than last-token-splitting it; this artefact is how the operator supplies the division, via --name-parts.",
+  "authority": "AFL Tables / fitzRoy source pinned as issue224-inseason-20260919.",
+  "contract": "Every row must name an afltables_external_id present in the pinned target set, must repeat that target's display_name byte-for-byte, and must recompose (given_name + ' ' + surname) to it. The runner enforces all three. This artefact is deliberately NOT hash-pinned: unlike issue224-s9-target-set-20260922.json and issue224-d7-registration-decision-20260922.json it is authored per run, and its safety comes from being validated against those pinned artefacts.",
+  "rows": [
+    {
+      "afltables_external_id": "players/A/Alex_Van_Wyk.html",
+      "display_name": "Alex Van Wyk",
+      "given_name": "Alex",
+      "surname": "Van Wyk"
+    },
+    {
+      "afltables_external_id": "players/H/Hussien_El_Achkar.html",
+      "display_name": "Hussien El Achkar",
+      "given_name": "Hussien",
+      "surname": "El Achkar"
+    }
+  ]
+}
