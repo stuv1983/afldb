@@ -2480,3 +2480,69 @@ npx tsx --conditions=react-server \
 against `afldb_dev` requires the operator to take a fresh pre-write backup, independently verify
 it, and supply its real sha256 — none of which happened in this pass. ISSUE-224 remains BLOCKED
 per §18.1.6/§18.3.1.
+
+## 18.5 First explicit DEV apply attempted and REFUSED (2026-09-22) — verifier/role-contract defect, fix implemented
+
+The operator supplied the full explicit DEV write authorisation (§18.4.5's command). The attempt
+**refused mid-transaction and rolled back**:
+
+- `current_database` = `afldb_dev`, `current_user` = `afldb_import`.
+- Classification inside the write transaction: `CREATE=92 / ALREADY_SATISFIED=0 / CONFLICT=0 /
+  TOTAL=92` — the exact required first-apply shape (§18.4's gate passed).
+- Failure: `permission denied for table data_edits`. Exit code 1.
+- A privileged read-only preflight run immediately afterward reported `CREATE=92 /
+  ALREADY_SATISFIED=0 / CONFLICT=0 / TOTAL=92` — i.e. **unchanged from before the attempt**,
+  proving the transaction rolled back and none of the 92 registrations survived. This was **not**
+  a partial registration; nothing was written.
+- The operator independently measured `afldb_dev` and `afldb_test` grants on `data_edits` as
+  `postgres` and found them **identical**: `afldb_import` has INSERT only (SELECT/UPDATE/DELETE
+  all false); `afldb_auth` has SELECT+INSERT; `afldb_owner` has owner privileges. **No DEV grant
+  drift.**
+
+### 18.5.1 Root cause: the verifier queried a table `afldb_import` cannot SELECT — by design
+
+`data_edits` is INSERT-only for `afldb_import`, intentionally: migration 066 (mirrored in
+`tools/maintenance/privileges.sql` lines ~292–297) grants `afldb_import` `INSERT` alone, explicitly
+"no SELECT, UPDATE, DELETE" so the mutation role can append its own required audit row inside the
+statistical-write transaction (AFLDB-ISSUE-027) without gaining any broader access to the audit
+ledger. `afldb_auth` separately holds `SELECT, INSERT` (migration 057) for the admin review
+surface. Both grants are intentional; neither needed to change.
+
+The failing statement was `runDevPostWriteChecks`'s data_edits postcondition
+(`register_issue224_s9_players.ts`, added for the DEV first-apply gate): `SELECT count(*) ... FROM
+data_edits WHERE table_name = 'players' AND field_group = 'source_identity' AND row_id = ANY(...)`.
+That SELECT requires a privilege `afldb_import` was never granted and, per the migration's own
+intent, never should be.
+
+The 91-registration `afldb_test` apply (§18.1) never exposed this because
+`runDevPostWriteChecks` only runs when `devWriteAuthorized` (i.e. `--target dev --apply` with the
+full gate) — it is explicitly skipped for `--target test`, which shares the same restricted
+`afldb_import` grant on `data_edits` but never exercised this code path.
+
+### 18.5.2 Fix: transaction-local proof, not a query
+
+No grant was added, no migration touched, no owner/auth credential used, no second connection
+opened. `attachAflTablesIdentityInTransaction`'s `recordDataEdit()` call
+(`src/db/queries/audit-log.ts`) is an unconditional `INSERT` with no `ON CONFLICT` and no
+`try/catch`, and it is the last statement run before that function returns `{ ok: true }`; a
+failed INSERT throws, which aborts the whole `sql.begin()` block before the registration loop can
+advance. So the loop's own `confirmedAuditWrites` counter — incremented once per successful
+`attach.ok` — already **is** the count of `data_edits` rows this transaction has inserted for
+`field_group = 'source_identity'` on the created rowIds, proven by control flow rather than
+queried back. `runDevPostWriteChecks` now takes `confirmedAuditWrites` as a parameter and asserts
+it equals `EXPECTED_ROW_COUNT` (92) instead of issuing the SELECT. Every other postcondition
+(identity resolution, distinct player ids, slug uniqueness, exact player-count delta,
+`player_career_stats` rows, `data_overrides` durability rows) is unchanged — those tables are all
+either import-writable (full DML incl. SELECT via `import_writable_tables`) or explicitly granted
+SELECT (`data_overrides`, migration 073), so those reads remain legal for `afldb_import`.
+
+Regression coverage added to `tests/register-issue224-s9-dev-write-gate.test.ts`
+(`runDevPostWriteChecks` now exported): passes with exactly 92 confirmed audit writes while
+issuing exactly 5 queries (no 6th query against `data_edits`); refuses on a confirmed-count
+mismatch without any additional query; and the pre-existing created-row-count postcondition still
+refuses before any query runs. DB-free; no DB connection, no SQL, no GRANT, no migration, no
+DEV/PROD write, no git commit made in this pass.
+
+**Status:** D-8 step 1 remains incomplete. The verifier/role-contract defect that caused the first
+DEV apply attempt to refuse is fixed and DB-free-tested; the fix has not yet been exercised against
+a live database (`afldb_test` or `afldb_dev`). ISSUE-224 remains BLOCKED.

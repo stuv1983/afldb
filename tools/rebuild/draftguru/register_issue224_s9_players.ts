@@ -447,11 +447,12 @@ export function resolveTarget(target: TargetName, devImportRole: boolean, writeA
 // deliberate DEV first-apply gate for this batch, not a general-purpose check.
 // ---------------------------------------------------------------------------
 
-async function runDevPostWriteChecks(
+export async function runDevPostWriteChecks(
   tx: postgres.TransactionSql,
   targets: Target[],
   created: { profilePath: string; playerId: number }[],
   beforePlayerCount: number,
+  confirmedAuditWrites: number,
 ): Promise<string[]> {
   const results: string[] = [];
   const paths = targets.map((t) => t.profilePath);
@@ -554,19 +555,29 @@ async function runDevPostWriteChecks(
   }
   results.push(`${EXPECTED_ROW_COUNT}/${EXPECTED_ROW_COUNT} data_overrides durability rows carry the attached path: OK`);
 
-  // Expected data_edits/audit rows exist for all 92 (recordDataEdit inside
-  // attachAflTablesIdentityInTransaction, field_group 'source_identity').
-  const [{ count: auditCountRaw }] = await tx<{ count: string }[]>`
-    SELECT count(*)::text AS count FROM data_edits
-     WHERE table_name = 'players' AND field_group = 'source_identity' AND row_id = ANY(${createdIds})
-  `;
-  if (Number(auditCountRaw) !== EXPECTED_ROW_COUNT) {
+  // Expected data_edits/audit rows for all 92 (recordDataEdit inside
+  // attachAflTablesIdentityInTransaction, field_group 'source_identity') — proven
+  // transaction-locally, not queried: afldb_import holds INSERT-only on data_edits (migration
+  // 066 / privileges.sql), by design (append-only audit, least privilege), so there is no SELECT
+  // grant to read it back with, and none should be added for this check (AFLDB-ISSUE-224 S9).
+  //
+  // recordDataEdit() (src/db/queries/audit-log.ts) is an unconditional INSERT with no ON
+  // CONFLICT and no try/catch, and it is the LAST statement attachAflTablesIdentityInTransaction
+  // runs before returning { ok: true }. A failed INSERT there throws, which aborts this whole
+  // sql.begin() block before the caller's write loop can advance past that row — so
+  // confirmedAuditWrites, incremented once per successful attach in that loop, IS the count of
+  // audit rows this transaction has inserted for field_group 'source_identity' on these rowIds.
+  if (confirmedAuditWrites !== EXPECTED_ROW_COUNT) {
     throw new Error(
-      `postcondition failed: ${auditCountRaw}/${EXPECTED_ROW_COUNT} data_edits audit row(s) exist `
-      + "for the newly-attached identities' source_identity field group.",
+      `postcondition failed: ${confirmedAuditWrites}/${EXPECTED_ROW_COUNT} data_edits audit `
+      + 'writes were confirmed during registration (transaction-local count; afldb_import has no '
+      + 'SELECT on data_edits by design, so this cannot be queried back).',
     );
   }
-  results.push(`${EXPECTED_ROW_COUNT}/${EXPECTED_ROW_COUNT} data_edits audit rows exist: OK`);
+  results.push(
+    `${EXPECTED_ROW_COUNT}/${EXPECTED_ROW_COUNT} data_edits audit writes confirmed `
+    + '(transaction-local, no SELECT required): OK',
+  );
 
   return results;
 }
@@ -779,6 +790,12 @@ async function main(): Promise<void> {
       }
 
       const created: { profilePath: string; playerId: number }[] = [];
+      // See runDevPostWriteChecks: incremented only after attach.ok, which is only reachable
+      // once attachAflTablesIdentityInTransaction's recordDataEdit() INSERT has itself
+      // succeeded (a failed INSERT throws before ok:true is returned) — this is
+      // transaction-local proof of the data_edits write, standing in for a SELECT afldb_import
+      // is not granted (AFLDB-ISSUE-224 S9).
+      let confirmedAuditWrites = 0;
       for (const c of classification) {
         if (c.kind !== 'CREATE') continue;
         const input: CreatePlayerInput = {
@@ -798,6 +815,7 @@ async function main(): Promise<void> {
             + `(player #${player.id}): ${attach.error}`,
           );
         }
+        confirmedAuditWrites += 1;
         created.push({ profilePath: c.target.profilePath, playerId: player.id });
       }
 
@@ -808,7 +826,9 @@ async function main(): Promise<void> {
 
       // Task 5: postconditions, still inside the transaction, before commit. Any failure throws
       // and rolls back all 92 writes.
-      const integrityResults = await runDevPostWriteChecks(tx, targets, created, beforePlayerCount);
+      const integrityResults = await runDevPostWriteChecks(
+        tx, targets, created, beforePlayerCount, confirmedAuditWrites,
+      );
       return { created, satisfied, integrityResults };
     });
 
