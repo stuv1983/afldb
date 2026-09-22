@@ -1035,7 +1035,24 @@ describe('afl-api-bundle (AFLDB-ISSUE-228 S3)', () => {
           () => {}, // utcStartTime 2026-09-19T07:15:00.000+0000, venue.timezone Australia/Melbourne (fixture as-is)
           (roster) => { roster.match = { ...roster.match, venueLocalStartTime: '2026-09-19T17:15:00' }; },
         );
-        expect(bundle.localMatchDateTime).toEqual({ matchDate: '2026-09-19', matchTime: '17:15:00' });
+        expect(bundle.localMatchDateTime).toEqual({ matchDate: '2026-09-19', matchTime: '17:15' });
+      });
+
+      it('Q5-B: emits the canonical match_time as HH:MM — leading zero preserved, seconds omitted', () => {
+        // 2026-09-19T21:05:00Z + Australia/Melbourne (AEST, UTC+10) = 2026-09-20T07:05:00 local.
+        const padded = build(
+          (fixture) => { fixture.utcStartTime = '2026-09-19T21:05:00.000+0000'; },
+          (roster) => { roster.match = { ...roster.match, venueLocalStartTime: '2026-09-20T07:05:00' }; },
+        );
+        expect(padded.localMatchDateTime).toEqual({ matchDate: '2026-09-20', matchTime: '07:05' });
+        expect(padded.localMatchDateTime?.matchTime).toMatch(/^\d{2}:\d{2}$/);
+
+        // Agreement at NON-zero seconds still passes the second-precision check; the emitted value drops them.
+        const withSeconds = build(
+          (fixture) => { fixture.utcStartTime = '2026-09-19T07:15:30.000+0000'; },
+          (roster) => { roster.match = { ...roster.match, venueLocalStartTime: '2026-09-19T17:15:30' }; },
+        );
+        expect(withSeconds.localMatchDateTime).toEqual({ matchDate: '2026-09-19', matchTime: '17:15' });
       });
 
       it('correctly derives across a UTC/local calendar-day boundary', () => {
@@ -1044,7 +1061,7 @@ describe('afl-api-bundle (AFLDB-ISSUE-228 S3)', () => {
           (fixture) => { fixture.utcStartTime = '2026-09-19T14:30:00.000+0000'; },
           (roster) => { roster.match = { ...roster.match, venueLocalStartTime: '2026-09-20T00:30:00' }; },
         );
-        expect(bundle.localMatchDateTime).toEqual({ matchDate: '2026-09-20', matchTime: '00:30:00' });
+        expect(bundle.localMatchDateTime).toEqual({ matchDate: '2026-09-20', matchTime: '00:30' });
       });
 
       it('fails closed on a contradiction between roster venueLocalStartTime and the UTC/timezone conversion', () => {
@@ -1052,6 +1069,16 @@ describe('afl-api-bundle (AFLDB-ISSUE-228 S3)', () => {
           () => {},
           (roster) => { roster.match = { ...roster.match, venueLocalStartTime: '2026-09-19T18:00:00' }; }, // expected 17:15:00
         )).toThrow(/local_time_contradiction|disagrees/);
+      });
+
+      it('Q5-B: the contradiction check stays at SECOND precision — a difference that would render to the same HH:MM is still refused', () => {
+        // UTC 07:15:00Z -> 17:15:00 local. 17:15:01 and 17:15:59 both render as `17:15`, yet neither agrees.
+        for (const roster_time of ['2026-09-19T17:15:01', '2026-09-19T17:15:59']) {
+          expect(() => build(
+            () => {},
+            (roster) => { roster.match = { ...roster.match, venueLocalStartTime: roster_time }; },
+          )).toThrow(/local_time_contradiction|disagrees/);
+        }
       });
 
       it('never falls back to the UTC calendar date when venueLocalStartTime is absent', () => {

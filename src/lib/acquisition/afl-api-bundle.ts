@@ -948,7 +948,11 @@ export function reconcileBrownlowLeaderboard(
 export type AflApiLocalMatchDateTime = {
   /** `YYYY-MM-DD`, the venue-local calendar date. */
   matchDate: string;
-  /** `HH:MM:SS`, the venue-local wall-clock time, second precision. */
+  /** The venue-local wall-clock time. Precision depends on the producer: the
+   * intermediate values `convertUtcInstantToVenueLocal()` and
+   * `parseNaiveLocalTimestamp()` carry `HH:MM:SS` (second precision, for the
+   * §11.1 agreement check); the CANONICAL value `deriveAflApiLocalMatchDateTime()`
+   * emits — the one persisted as `matches.match_time` — is `HH:MM` (Q5-B). */
   matchTime: string;
 };
 
@@ -1013,6 +1017,13 @@ export function convertUtcInstantToVenueLocal(utcInstant: Date, timeZone: string
  * An outright contradiction between the two independently-observed values
  * is a genuine cross-family fact and fails closed (`AflApiBundleError`),
  * never silently normalised toward one side.
+ *
+ * Q5-B (AFLDB-ISSUE-228, operator decision 2026-09-22): the agreement check
+ * above stays at second precision, but the value EMITTED as the canonical
+ * `match_time` is the venue-local `HH:MM` (zero-padded, seconds dropped) — the
+ * same vocabulary the `fixtures` writer and the admin editors use. Rendering
+ * happens strictly AFTER agreement is proved, so `19:40:01` vs `19:40:59` is
+ * still a contradiction even though both would render as `19:40`.
  */
 function deriveAflApiLocalMatchDateTime(
   match: AflApiMatchProjection, roster: AflApiMatchRosterProjection,
@@ -1039,7 +1050,9 @@ function deriveAflApiLocalMatchDateTime(
     );
   }
 
-  return derivedFromUtc;
+  // `derivedFromUtc.matchTime` equals the regex-validated `observedLocal.matchTime`
+  // here, so it is exactly `HH:MM:SS`: the first five characters are `HH:MM`.
+  return { matchDate: derivedFromUtc.matchDate, matchTime: derivedFromUtc.matchTime.slice(0, 5) };
 }
 
 // ---------------------------------------------------------------------------

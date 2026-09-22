@@ -14,22 +14,55 @@
 ### AFLDB-ISSUE-228 — AFL.com.au official JSON APIs as the current-season match, stats and Brownlow source
 - **Severity:** Medium. **Area:** data acquisition / import architecture — `afl_api` source,
   migration 074 spine, ISSUE-122 automatic path, `external_identities`, Brownlow round votes.
-- **State:** Open (2026-09-19; status updated 2026-09-21). **Merged to main and deployed to DEV**
+- **State:** Open (2026-09-19; status reconciled 2026-09-22).
+  **RECONCILED 2026-09-22 (supersedes every stale S9 statement in this entry; full record `issues.md`
+  "S9 — RECORD RECONCILIATION, ROUTE A, Q5-B"):**
+  **S9 IMPLEMENTED / NOT ACCEPTED — PARTIALLY EXECUTED.** Real 2026 acquisition occurred (snapshot
+  `afl-api-2026-2026-09-21-011148`, manifest sha256 `dcbd0626…`, 217 concluded matches, 9,983
+  player-match rows, 0 bundle build failures; a later acquisition `…-031725` exists as lineage/
+  evidence); full-season bridge artefact built, 577 links imported to DEV; a full DEV settle
+  **DRY-RUN** was INCOMPLETE (`unresolvedIdentityMatch 0`, `unresolvedIdentityPlayer 830`) — it
+  predates ISSUE-244 and is NOT current acceptance evidence. **No committed `afl_api` canonical
+  apply, no S9 DEV smoke, no timer installation/enablement. S9 is NOT accepted;** all committed S9
+  acceptance work must run on the post-ISSUE-244 lineage.
+  **DEV SHA:** `bbf87566` / `27d7e5aa` / `4e67ce38` below are historical evidence of the deploy each
+  represented, not the current DEV SHA. ISSUE-244 closed on main at `7f242ecc`; branch
+  `sonnet/issue-228-s9` starts from it; the DEV deployed SHA is UNMEASURED and must be measured in
+  the next read-only S9 preflight and equal the commit selected for acceptance before any write.
+  **ISSUE-244 handoff (RESOLVED / CLOSED, 2026-09-22):** returned to ISSUE-228 — S9 operational
+  acceptance stays open; Q5 (now resolved, below); ISSUE-224 registration/linkage is a prerequisite
+  of the full `--require-complete-source` path; closing ISSUE-244 does NOT make the timer
+  operational; F004 refuses an incomplete source before commit; timer installation/enablement is
+  separately authorised work.
+  **Route A (operator, 2026-09-22):** ISSUE-224 registration/linkage must let the SAME immutable
+  snapshot settle with `unresolvedIdentityPlayer = 0` and pass F004. Partial-player apply (removing
+  `--require-complete-source`) is **REJECTED FOR S9 ACCEPTANCE** (still technically possible and
+  documented; not the selected route).
+  **Q5 RESOLVED — Q5-B (2026-09-22):** canonical `afl_api` `match_time` = venue-local `HH:MM`;
+  agreement check still at second precision; NULL = not published; non-identity; no AFL Tables
+  rewrite/schema change/remediation. Implemented in `afl-api-bundle.ts`, DB-free validated
+  (`afl-api-match.test.ts` 123/123; 6-file safety set 277/277; `npm run typecheck` PASS); no
+  integration test run.
+  **Next S9 prerequisite:** ISSUE-224 registers the 92 unresolved AFL API providers' missing
+  canonical player rows → AFL API bridge rebuilt/re-resolved on the same snapshot → read-only S9
+  preflight → re-settle.
+  *Historical 2026-09-21 State (retained as lineage; the "paused"/"not resumed" statements are
+  superseded):* **Merged to main and deployed to DEV**
   (commit `bbf87566`; migration 103 applied; DEV health/smoke PASS; no AFL API timer enabled;
   Brownlow flag not enabled; PROD untouched). During DEV acceptance the operator found a missing
   operational capability — no super-admin UI control to enable/disable AFL API current-season or
-  Brownlow ingestion — and **paused S9 before any real-feed write** pending that control. This is
-  being added now (see `issues.md` "operational-control gap found during DEV acceptance" paragraph
+  Brownlow ingestion — and **paused S9 before any real-feed write** pending that control. This was
+  being added then (see `issues.md` "operational-control gap found during DEV acceptance" paragraph
   for the full architecture: two new fail-closed `site_settings` switches, enforced inside every
-  acquire/settle CLI itself, admin panel on `/admin/current-season`); **not yet enabled, S9 still
-  not resumed.** Plan approved (Q1/Q2/Q7 decided).
+  acquire/settle CLI itself, admin panel on `/admin/current-season`). Plan approved (Q1/Q2/Q7 decided).
   **S1–S6 COMPLETE. Historical Brownlow §9.10 CLOSED/PASS for 2022–2025. S8 (operations)
   operator-validated COMPLETE 2026-09-21** (`tsc --noEmit` PASS; `tests/admin-current-season-settle.test.ts`
   38/38 PASS; both `.sh` unit scripts PASS `sh -n`; systemd safety inspection PASS; the
   live-runbook write-target guard defect found in inspection is now fixed and re-verified via
   `SELECT current_database() = 'afldb_test'`; no DEV/PROD deployment). **S7 remains OPEN** — the
   sole remaining acceptance item is the real 2026 Brownlow live-count capture/replay evidence.
-  **S9 NOT STARTED** (needs a later DEV dry-run/apply, AFL Tables corroboration and Brownlow
+  **S9 NOT STARTED** *[historical 2026-09-21 morning; superseded by the RECONCILED block above]*
+  (needs a later DEV dry-run/apply, AFL Tables corroboration and Brownlow
   replay after S7/S8). **Assertion 9 (§9.9) remains SKIPPED/open**, explicitly separate from the
   Brownlow live-count replay — see the S8/§9.10 paragraphs below for full evidence.
   **S9 update, 2026-09-21 (same day):** first real 2026 acquisition PASS on DEV (snapshot
@@ -108,7 +141,7 @@
   See `issues.md` for full detail. All work is
   uncommitted, branch `sonnet/issue-228`.
   **S9 full-season evidence — ACCEPTED, 2026-09-21** (emitter commit `4e67ce38` deployed
-  successfully to DEV): `data/reference/afl-api-player-bridge-2026-full-2026-09-21.json` (SHA-256
+  successfully to DEV — historical evidence for that deploy only, not the current DEV SHA): `data/reference/afl-api-player-bridge-2026-full-2026-09-21.json` (SHA-256
   `845a78d2f4c75d0f8cc2efd3337f895d6c7c795440cc6c343d42bf46140b3f5c`, `match_method
   afl_api_stat_vector_season`, snapshot `afl-api-2026-2026-09-21-011148`) — **577 linked / 92
   unresolved / 0 contradictory**, 9,153 linked player-match rows covered / 830 uncovered, 396
@@ -561,7 +594,7 @@
   **S9 full-2026 player-identity evidence emitter, 2026-09-21 — implemented, UNEXECUTED
   (CLAUDE.md §9: the assistant ran no test/tsc/DB/network/Git/deployment command, and touched
   nothing under `data/sources/`).** Operator-supplied state this pass was built on: main clean at
-  `27d7e5aa`, DEV deployed at that exact commit; immutable DEV-only snapshot
+  `27d7e5aa`, DEV deployed at that exact commit *[historical 2026-09-21; not the current DEV SHA]*; immutable DEV-only snapshot
   `afl-api-2026-2026-09-21-011148` (manifest sha256 `dcbd0626…`) = **217 matches / 9,983 AFL API
   player-match rows / 669 distinct provider players / 0 missing provider ids**; **first real S9
   settle dry-run** = `unresolvedIdentityMatch 0`, **`unresolvedIdentityPlayer 9983`**,
@@ -714,7 +747,15 @@
   (evidence-gated); POSTGAME becomes a deferred record (bundle v2), not a rejection; round
   translation is one per-season table in `afl-api-rounds.ts` with typed HALTs. Acceptance
   criteria: runbook §19.
-- **Next action:** Operator validation of the S9 pre-commit correction pass — `npx tsc --noEmit`;
+- **Next action (2026-09-22, reconciled — supersedes everything below in this field):** (1) ISSUE-224
+  registers the missing canonical player rows for the 92 unresolved AFL API providers (Route A: S9
+  needs `unresolvedIdentityPlayer = 0` on the SAME snapshot `afl-api-2026-2026-09-21-011148`);
+  (2) AFL API bridge rebuilt/re-resolved against that snapshot; (3) read-only S9 preflight — measure
+  the DEV deployed SHA, which must equal the commit selected for acceptance (post-ISSUE-244) before
+  any write; (4) re-settle under `--require-complete-source`, S9 DEV smoke, then separately
+  authorised timer work. Operator commit/review of the Q5-B change (`afl-api-bundle.ts`,
+  `afl-api-match.test.ts`) precedes any deploy. *Historical next action (2026-09-21, pre-S9 execution;
+  retained as lineage):* Operator validation of the S9 pre-commit correction pass — `npx tsc --noEmit`;
   `npx vitest run tests/afl-api-player-evidence.test.ts tests/afl-api-player-bridge-cli.test.ts`;
   `npx vitest run tests/afl-api-match.test.ts tests/afl-api-settle-cli-gate.test.ts
   tests/reference-data.test.ts`; `git diff --check`. Then operator validation of the S7
@@ -753,7 +794,8 @@
   current_database() = 'afldb_test'`; real-feed/simulator overrides are explicitly cleared and
   positively checked; the 2026 `staging.afl_api_match` prerequisite is explicitly documented. No
   DEV or PROD deployment has occurred. Full detail: `issues.md` "S8 operator-validated" paragraph.
-  **S9 NOT STARTED** — requires a later DEV dry-run/apply, AFL Tables corroboration and Brownlow
+  **S9 NOT STARTED** *[historical 2026-09-21; superseded — S9 is IMPLEMENTED / NOT ACCEPTED —
+  PARTIALLY EXECUTED, see State]* — requires a later DEV dry-run/apply, AFL Tables corroboration and Brownlow
   replay, gated on the S7/S8 prerequisites above. S10 also not started.
   S5b is now complete and operator-validated (61/61 linked, applied to `afldb_test`, 188/188
   census — see the S5b paragraph above); no further S5b action is pending.
@@ -859,10 +901,22 @@
 - **Key files:** `tools/migration/import_fitzroy_core.py` (registration), `deploy/afldb-settle-afltables.sh`
   / current-season import, `data/reference/draftguru-person-bridge-20260918-v2.json` (the 94 identities),
   `docs/rebuild-manifests/draftguru/bridge-validation-verdicts-20260918-v2.csv` (`target_unregistered` rows).
-- **Next action:** after ISSUE-222's `afldb_test` import is verified, establish how the 2026
-  debutants (and the numbering/spelling cases) become registered identities on each target; then
-  re-resolve a new deployment child against that registration (`--resolve-against`, new hash,
-  §4.5) — never by editing the child or the importer's HALT.
+- **Ownership annotation (2026-09-22, ISSUE-228 reconciliation):** two distinct populations.
+  **A** = the DraftGuru registration problem above. **B** = the AFL API S9 affected population
+  (snapshot `afl-api-2026-2026-09-21-011148`: 577 providers linked, **92 unresolved**, **830
+  player-match rows uncovered**, 0 contradictory). B is **not** identity evidence for A (or vice
+  versa) merely because names/cohorts correlate. ISSUE-224 owns registering the missing canonical
+  player rows through its approved evidence path; afterwards the AFL API bridge must be
+  rebuilt/re-resolved on the same immutable snapshot; ISSUE-228 S9 requires
+  `unresolvedIdentityPlayer = 0`; **ISSUE-228 owns the later re-settle and S9 acceptance — ISSUE-224
+  does NOT own the settle.**
+- **Next action (2026-09-22; supersedes the 2026-09-18 wording):** establish the registration path
+  for post-baseline debutants on each target and register them — population A via a re-resolved
+  DraftGuru child (`--resolve-against`, new hash, §4.5; never by editing the child or the importer's
+  HALT), population B via ISSUE-224's approved evidence path; then hand back to ISSUE-228 for the
+  bridge rebuild/re-resolve and S9 re-settle. B is the blocking prerequisite of ISSUE-228 S9.
+  *(2026-09-18 original: after ISSUE-222's `afldb_test` import is verified, establish how the 2026
+  debutants (and the numbering/spelling cases) become registered identities on each target.)*
 
 **AFLDB-ISSUE-221 resolved 2026-09-18** (implemented 2026-09-17 by Fable 5.1; committed, merged
 and DEV-verified 2026-09-18 by Sonnet 5) — Grid Solver draft-criteria review: honest "No data"
