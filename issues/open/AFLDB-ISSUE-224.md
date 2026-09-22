@@ -2129,3 +2129,149 @@ reproduced.
 
 **NOT done:** no code change; no modification of any evidence artefact, manifest, decision artefact
 or target set; no registration; no settle; no timer change; no Git mutation of any kind.
+
+## 18.1 D-8 step 1 implemented and proven on `afldb_test` (this pass)
+
+Worktree `D:\dev\afldb-issue-224-s9`, branch `sonnet/issue-224-s9-unblock`, HEAD `81fd2bb7` at
+start. Uncommitted.
+
+### 18.1.1 Implementation
+
+- **`src/db/queries/admin-draft.ts`** — `attachAflTablesIdentity`'s transaction body extracted
+  unchanged into a new exported `attachAflTablesIdentityInTransaction(tx, input)`;
+  `attachAflTablesIdentity` is now a thin wrapper over it (opens its own connection exactly as
+  before). Byte-behaviour of every existing caller is unchanged; this is the ONE code change to
+  a production module.
+- **`tools/rebuild/draftguru/register_issue224_s9_players.ts`** (new) — the batch registration
+  runner. Reuses `createPlayerInTransaction` (`src/db/queries/players.ts`, unchanged) and the new
+  `attachAflTablesIdentityInTransaction` — the SAME primitives `/admin/draft`'s manual-player
+  route R-b uses (§17.8). No ad-hoc `INSERT` was written. The AFL API provider id is read from the
+  artefacts only for the audit note; nothing writes an AFL API `external_identities` row (D-8 step
+  2 remains untouched, per the §17.8 gate).
+
+### 18.1.2 Safety gates implemented
+
+- Both retained artefacts re-hashed and compared against the pinned SHA256 the operator supplied
+  before any content is trusted; refuses on any byte difference.
+- Row count == 92, all `disposition`/`decision` == `REGISTER`, no duplicate AFL API provider id, no
+  duplicate AFL Tables path, target-set/D-7 rows cross-checked 1:1 by `afltables_external_id`
+  (provider id and `draftguru_player_url` must agree), exactly one distinct
+  `afltables_observed_names` value per row (display-name source — AFL Tables is the registration
+  authority, never AFL API).
+- Classification (CREATE / ALREADY_SATISFIED / CONFLICT) computed from `external_identities`
+  inside the SAME transaction the writes run in; an AFLDB-ISSUE-160 D-2-style guard also refuses a
+  CREATE that collides by name with an existing manual player shell that has no AFL Tables identity
+  yet (translated from `import_fitzroy_core.load_manual_identity_candidates` /
+  `refuse_unsafe_manual_insert`).
+- One outer transaction for the whole batch: a single CONFLICT refuses all 92 writes before any of
+  them lands (Task 6 — no partial-batch cleanup path exists or is needed).
+- Closed two-entry target list (`test` -> `afldb_test`, `dev` -> `afldb_dev`; no PROD entry).
+  `--apply` combined with `--target dev` is refused at argument-parsing time, before any DSN is
+  even read. DEV connects with `default_transaction_read_only` as a STARTUP parameter (never a
+  post-connect `SET`) and the live session is re-proven read-only before any query runs.
+  `current_database()` (and, added during this pass, `current_user`) is asserted against the
+  expected value before the first statement on every connection.
+
+### 18.1.3 `afldb_test` results
+
+Reached via the operator-provided tunnel `127.0.0.1:55432`; `AFLDB_TEST_IMPORT_DATABASE_URL`
+derived by swapping the host/port of the existing `AFLDB_IMPORT_DATABASE_URL` (role
+`afldb_import`, unchanged password) onto database `afldb_test`, per the operator's explicit
+instruction. `--admin-user-id 79` (an existing `auth_users` `super_admin` row on `afldb_test`,
+looked up read-only; `data_overrides.admin_user_id` FK requires a real row).
+
+**BEFORE:** `players` = 13,338; AFL-Tables-resolved `external_identities` = 13,275.
+
+**Dry-run (no `--apply`):** `CREATE=92 ALREADY_SATISFIED=0 CONFLICT=0 TOTAL=92`.
+
+**First `--apply`:** `current_database()='afldb_test'`, `current_user='afldb_import'` proven before
+writing. 92 players created (ids 21875–21966) and attached to their AFL Tables identity; 0
+conflicts.
+
+**Post-apply integrity (afldb_test owner role, read-only queries):**
+
+| Check | Result |
+|---|---|
+| `players` count | 13,430 (13,338 + 92 ✓) |
+| AFL-Tables-resolved `external_identities` | 13,367 (13,275 + 92 ✓) |
+| A player_id claimed by >1 AFL Tables identity | 0 |
+| Duplicate `slug` among the 92 new players | 0 |
+| New player with no AFL Tables identity attached | 0 |
+| `player_career_stats` rows for the 92 | 92 (zero-game shells, as `createPlayerInTransaction` seeds) |
+| `data_overrides('players','identity')` rows carrying `afltables_profile_path`, `admin_user_id=79` | 92 |
+| `data_edits` rows, `table_name='players'`, `field_group='source_identity'`, `admin_user_id=79` | 92 |
+
+**Second `--apply` (idempotency):** `CREATE=0 ALREADY_SATISFIED=92 CONFLICT=0`; 0 players created;
+`players` count unchanged at 13,430 — proven zero writes.
+
+### 18.1.4 DEV read-only preflight (no write attempted or possible)
+
+`AFLDB_DEV_DATABASE_URL` derived from the existing `DATABASE_URL` (role `afldb_app`, already the
+low-privilege app/read role — no import-role DSN was used or considered for DEV) via the same
+tunnel. `current_database()='afldb_dev'`, `current_user='afldb_app'` proven.
+
+`CREATE=92 ALREADY_SATISFIED=0 CONFLICT=0 TOTAL=92` — operational goal (`CONFLICT=0`) met. One
+caveat: the D-2 manual-shell name-collision guard could not run under `afldb_app` (`data_overrides`
+has no `grant_app_read`, migration 073) and is reported as a WARNING rather than silently skipped;
+it DID run, and passed, in every `afldb_test` classification above.
+
+**No `--apply` was passed for `--target dev`; the tool refuses that combination before opening a
+connection. No write occurred or was possible against `afldb_dev` in this pass.**
+
+### 18.1.5 Exact next command that WOULD apply the batch to `afldb_dev` — NOT RUN
+
+```
+AFLDB_DEV_IMPORT_DATABASE_URL=<afldb_import role, /afldb_dev, via the operator's own tunnel/host> \
+npx tsx --conditions=react-server tools/rebuild/draftguru/register_issue224_s9_players.ts \
+  --admin-user-id <a real afldb_dev auth_users id> --target dev --apply
+```
+
+This command does not exist as a runnable path today: `resolveTarget('dev')` reads
+`AFLDB_DEV_DATABASE_URL` (the read-only app DSN) and `parseArgs` refuses `--apply` with
+`--target dev` unconditionally. Enabling a DEV write is a deliberate follow-up code change (a
+distinct import-role DEV target), not a flag — consistent with the boundary that DEV writes need
+their own explicit operator authorisation.
+
+### 18.1.6 Status
+
+**ISSUE-224 is still NOT complete. S9 acceptance claims are unchanged.** D-8 step 1 is proven safe
+and idempotent on `afldb_test` only. D-8 step 2 (AFL API identity attach + bridge rebuild) has not
+started. Nothing was committed to Git.
+
+### 18.1.7 Repository-level validation of the S9 implementation (2026-09-22)
+
+Static/DB-free validation of the uncommitted S9 change, run at the pre-DEV checkpoint. No database
+write, no network call, no deployment and no `systemctl` action was taken.
+
+| Check | Command | Result |
+|---|---|---|
+| TypeScript | `npm run typecheck` | **PASS** (`next typegen` + `tsc --noEmit`, no diagnostics) |
+| Targeted DB-free suites covering the modified module | `npx vitest run tests/admin-draft-actions.test.ts tests/data-overrides-source-contract.test.ts tests/player-link-mutations.test.ts tests/afl-api-match.test.ts` | **PASS** — 4 files, 274/274 assertions |
+| Whole DB-free gate | `npx vitest run --exclude "tests/integration/**"` | 152/158 files pass, 5,784 passed / 7 failed / 37 skipped |
+| Whitespace | `git diff --check` | clean |
+
+**The 6 failing DB-free files are pre-existing and unrelated to this change.** None of
+`special-records-replay-parity`, `draftguru-acquisition`, `finals-semantics-contract`,
+`fitzroy-core-import`, `honours-lifecycle-public-contract` or `site-settings` imports
+`src/db/queries/admin-draft.ts` (the only source file this pass modifies) or reads `issues.md` /
+`IssuesIndex.md`. Known causes on record: `finals-semantics-contract` is the Windows CRLF contract
+failure that passes on Linux; `draftguru-acquisition` fails on the absent
+`data/sources/draftguru/annual-html-20260826` snapshot directory (the known Stage A label
+mismatch); `site-settings` expects the `aflApiBrownlowEnabled` / `aflApiCurrentSeasonEnabled`
+defaults added by the already-committed AFL API work.
+
+**Coverage gap, stated rather than papered over.** The only automated coverage of
+`attachAflTablesIdentity` — and therefore of the extracted
+`attachAflTablesIdentityInTransaction` — is `tests/integration/admin-draft.test.ts`, which mutates
+the real `afldb_test`. It was deliberately NOT run at this checkpoint (the operator brief forbids a
+further `afldb_test` apply in this pass). No new test file was added: the extraction is a pure
+refactor with no behavioural delta, and the database-level proof for it is §18.1.3, which exercised
+the extracted function 92 times inside one transaction plus a second idempotent pass. Running
+`tests/integration/admin-draft.test.ts` against `afldb_test` remains a cheap, worthwhile check
+before any DEV apply.
+
+**Standing gates, unchanged by this section.** `afldb_test` (§18.1.3) remains the database-level
+proof; `afldb_dev` remains read-only with no write attempted or possible; and the AFLDB-ISSUE-160
+D-2 manual-shell name-collision sub-check remains **mandatory under the DEV import role before any
+DEV apply** — it is NOT waived by its `afldb_test` pass or by the `afldb_app` privilege warning in
+§18.1.4.

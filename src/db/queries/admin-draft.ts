@@ -1438,6 +1438,30 @@ export async function adoptLegacyPick(
 export async function attachAflTablesIdentity(input: {
   playerId: number; profilePath: string; adminUserId: number; note?: string | null;
 }): Promise<DraftMutationResult<object>> {
+  return withImportConnection(async (importSql) => {
+    try {
+      return await importSql.begin((tx) => attachAflTablesIdentityInTransaction(tx, input));
+    } catch (error) {
+      return rolledBackRefusal(error)
+        ?? refuse('failed', `The identity could not be attached: ${message(error)}`);
+    }
+  });
+}
+
+/**
+ * The transaction-scoped half of {@link attachAflTablesIdentity} (AFLDB-ISSUE-224 S9).
+ *
+ * Extracted unchanged so a caller that already holds an `AFLDB_IMPORT_DATABASE_URL`
+ * transaction -- for example a batch registration runner composing this with
+ * `createPlayerInTransaction` -- can attach the identity inside that SAME transaction
+ * instead of opening a second connection per row. `attachAflTablesIdentity` above is now
+ * a thin wrapper that opens its own connection and transaction exactly as before; no
+ * existing caller's behaviour changes.
+ */
+export async function attachAflTablesIdentityInTransaction(
+  tx: postgres.TransactionSql,
+  input: { playerId: number; profilePath: string; adminUserId: number; note?: string | null },
+): Promise<DraftMutationResult<object>> {
   const path = input.profilePath.trim();
   if (!AFLTABLES_PROFILE_PATH_RE.test(path)) {
     return refuse('validation',
@@ -1450,92 +1474,83 @@ export async function attachAflTablesIdentity(input: {
       + 'evidence-bound and is changed in the repository contract, never from the admin surface.');
   }
 
-  return withImportConnection(async (importSql) => {
-    try {
-      return await importSql.begin(async (tx) => {
-        const [player] = await tx<{ id: number; displayName: string }[]>`
-          SELECT id, display_name AS "displayName" FROM players WHERE id = ${input.playerId} FOR UPDATE
-        `;
-        if (!player) return refuse('not_found', 'No player with that id.');
+  const [player] = await tx<{ id: number; displayName: string }[]>`
+    SELECT id, display_name AS "displayName" FROM players WHERE id = ${input.playerId} FOR UPDATE
+  `;
+  if (!player) return refuse('not_found', 'No player with that id.');
 
-        const token = await readManualPlayerToken(tx, player.id);
-        if (!token) {
-          return refuse('forbidden',
-            'Only a manually created player can have an AFL Tables identity attached here. A '
-            + 'source-owned player already has one.');
-        }
+  const token = await readManualPlayerToken(tx, player.id);
+  if (!token) {
+    return refuse('forbidden',
+      'Only a manually created player can have an AFL Tables identity attached here. A '
+      + 'source-owned player already has one.');
+  }
 
-        const existing = await tx<{ playerId: number | null; externalId: string }[]>`
-          SELECT e.player_id AS "playerId", e.external_id AS "externalId"
-            FROM external_identities e
-            JOIN sources s ON s.id = e.source_id
-           WHERE s.key = 'afltables'
-             AND e.match_method = 'afltables_profile_url'
-             AND e.status IN ('unique', 'resolved')
-             AND (e.external_id = ${path} OR e.player_id = ${player.id})
-        `;
-        // J-15: the path already belongs to another player. That is a merge.
-        const claimedByOther = existing.find((e) => e.externalId === path && e.playerId !== player.id);
-        if (claimedByOther) {
-          return refuse('forbidden',
-            `${path} is already registered to player #${claimedByOther.playerId}. Merging two existing `
-            + 'players is out of scope here.');
-        }
-        // J-16: this player already holds an AFL Tables identity.
-        const alreadyAttached = existing.find((e) => e.playerId === player.id);
-        if (alreadyAttached) {
-          return refuse('duplicate',
-            `${player.displayName} already holds the AFL Tables identity `
-            + `"${alreadyAttached.externalId}".`);
-        }
+  const existing = await tx<{ playerId: number | null; externalId: string }[]>`
+    SELECT e.player_id AS "playerId", e.external_id AS "externalId"
+      FROM external_identities e
+      JOIN sources s ON s.id = e.source_id
+     WHERE s.key = 'afltables'
+       AND e.match_method = 'afltables_profile_url'
+       AND e.status IN ('unique', 'resolved')
+       AND (e.external_id = ${path} OR e.player_id = ${player.id})
+  `;
+  // J-15: the path already belongs to another player. That is a merge.
+  const claimedByOther = existing.find((e) => e.externalId === path && e.playerId !== player.id);
+  if (claimedByOther) {
+    return refuse('forbidden',
+      `${path} is already registered to player #${claimedByOther.playerId}. Merging two existing `
+      + 'players is out of scope here.');
+  }
+  // J-16: this player already holds an AFL Tables identity.
+  const alreadyAttached = existing.find((e) => e.playerId === player.id);
+  if (alreadyAttached) {
+    return refuse('duplicate',
+      `${player.displayName} already holds the AFL Tables identity `
+      + `"${alreadyAttached.externalId}".`);
+  }
 
-        await tx`
-          INSERT INTO external_identities
-                (source_id, external_id, external_name, external_url, player_id,
-                 status, candidate_count, match_method, notes)
-          VALUES ((SELECT id FROM sources WHERE key = 'afltables'),
-                  ${path}, ${player.displayName},
-                  ${`https://afltables.com/afl/stats/${path}`}, ${player.id},
-                  'resolved', 0, 'afltables_profile_url',
-                  'Attached by an administrator after the source published this person '
-                  || '(AFLDB-ISSUE-160 §6.5).')
-        `;
-        // The player's durable record gains the path, so a rebuilt candidate
-        // BINDS the token onto the path-player instead of creating a twin
-        // (§8.1 step 2).
-        const updated = await tx<{ id: number }[]>`
-          UPDATE data_overrides
-             SET override_values = override_values || ${tx.json({ afltables_profile_path: path } as postgres.JSONValue)},
-                 admin_user_id = ${input.adminUserId},
-                 updated_at = now()
-           WHERE entity_type = 'players' AND entity_key = ${manualEntityKey(token)}
-             AND field_group = 'identity'
-          RETURNING id
-        `;
-        if (updated.length === 0) {
-          // The `external_identities` INSERT above has already run, so returning
-          // here would attach the identity WITHOUT its audit row while reporting
-          // failure. Roll the whole attach back instead.
-          throw new RollbackRefusal('conflict',
-            'That player holds a manual identity but no durable record to attach the path to.');
-        }
+  await tx`
+    INSERT INTO external_identities
+          (source_id, external_id, external_name, external_url, player_id,
+           status, candidate_count, match_method, notes)
+    VALUES ((SELECT id FROM sources WHERE key = 'afltables'),
+            ${path}, ${player.displayName},
+            ${`https://afltables.com/afl/stats/${path}`}, ${player.id},
+            'resolved', 0, 'afltables_profile_url',
+            'Attached by an administrator after the source published this person '
+            || '(AFLDB-ISSUE-160 §6.5).')
+  `;
+  // The player's durable record gains the path, so a rebuilt candidate
+  // BINDS the token onto the path-player instead of creating a twin
+  // (§8.1 step 2).
+  const updated = await tx<{ id: number }[]>`
+    UPDATE data_overrides
+       SET override_values = override_values || ${tx.json({ afltables_profile_path: path } as postgres.JSONValue)},
+           admin_user_id = ${input.adminUserId},
+           updated_at = now()
+     WHERE entity_type = 'players' AND entity_key = ${manualEntityKey(token)}
+       AND field_group = 'identity'
+    RETURNING id
+  `;
+  if (updated.length === 0) {
+    // The `external_identities` INSERT above has already run, so returning
+    // here would attach the identity WITHOUT its audit row while reporting
+    // failure. Roll the whole attach back instead.
+    throw new RollbackRefusal('conflict',
+      'That player holds a manual identity but no durable record to attach the path to.');
+  }
 
-        await recordDataEdit(tx, {
-          tableName: 'players',
-          rowId: player.id,
-          fieldGroup: 'source_identity',
-          oldValues: {},
-          newValues: { afltables_profile_path: path, player_token: token },
-          adminUserId: input.adminUserId,
-          note: input.note,
-        });
-        return { ok: true as const };
-      });
-    } catch (error) {
-      return rolledBackRefusal(error)
-        ?? refuse('failed', `The identity could not be attached: ${message(error)}`);
-    }
+  await recordDataEdit(tx, {
+    tableName: 'players',
+    rowId: player.id,
+    fieldGroup: 'source_identity',
+    oldValues: {},
+    newValues: { afltables_profile_path: path, player_token: token },
+    adminUserId: input.adminUserId,
+    note: input.note,
   });
+  return { ok: true as const };
 }
 
 // --- 6.6 retireManualPick (D-4) -----------------------------------------

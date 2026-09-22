@@ -1051,6 +1051,31 @@
 - **Next action (2026-09-22 validation pass; supersedes the wording above):** **D-8 step 1 — register
   the 92 on DEV** per the §13.6.3 contract via route R-b. Prerequisite (a) is **satisfied**; the sole
   remaining gate is **(b) explicit operator authorisation to execute database writes on DEV (§9)**.
+- **D-8 step 1 IMPLEMENTED and PROVEN on `afldb_test`, NOT applied to `afldb_dev` — 2026-09-22
+  (registration-runner pass; supersedes the wording above except the remaining DEV-write gate. Full
+  record: `issues/open/AFLDB-ISSUE-224.md` §18.1).** New tool
+  `tools/rebuild/draftguru/register_issue224_s9_players.ts` reuses `createPlayerInTransaction`
+  (players.ts, unchanged) and a newly-extracted `attachAflTablesIdentityInTransaction`
+  (admin-draft.ts — the same `attachAflTablesIdentity` transaction body, now composable; every
+  existing caller's behaviour is unchanged) inside ONE outer transaction, SHA256-pinned to both
+  92-row artefacts, closed to `test`/`dev` only (no PROD entry), `--apply` refused outright for
+  `--target dev`. **`afldb_test`:** dry-run `CREATE=92/ALREADY_SATISFIED=0/CONFLICT=0`; first
+  `--apply` created 92 players (ids 21875–21966) + AFL Tables identities, all 8 post-apply integrity
+  checks passed (player/identity counts +92, 0 duplicate claims, 0 duplicate slugs, 92 career-stats
+  rows, 92 `data_overrides` records, 92 `data_edits` audit rows); second `--apply` proved idempotent
+  (`CREATE=0/ALREADY_SATISFIED=92/CONFLICT=0`, 0 writes, player count unchanged). **`afldb_dev`
+  (read-only preflight, `afldb_app` role, no import role used):** `CREATE=92/CONFLICT=0` — the
+  operational goal is met; the D-2 name-collision sub-check could not run under the read-only role
+  (`data_overrides` has no `grant_app_read`) and is reported as a WARNING, not silently skipped.
+  **No write occurred or was possible against `afldb_dev`.** ISSUE-224 remains open; S9 acceptance
+  claims unchanged; D-8 step 2 not started; nothing committed to Git.
+- **Repository validation of that implementation (2026-09-22; §18.1.7):** `npm run typecheck` PASS;
+  targeted DB-free suites over the modified module PASS (4 files, 274/274); whole DB-free gate
+  5,784 passed / 7 failed, all 6 failing files pre-existing and importing nothing this pass changed;
+  `git diff --check` clean. The only automated coverage of the extracted function is
+  `tests/integration/admin-draft.test.ts` (mutates `afldb_test`) and was deliberately not run.
+  **The AFLDB-ISSUE-160 D-2 name-collision sub-check stays MANDATORY under the DEV import role
+  before any DEV apply — it is not waived by its `afldb_test` pass.**
 
 **AFLDB-ISSUE-221 resolved 2026-09-18** (implemented 2026-09-17 by Fable 5.1; committed, merged
 and DEV-verified 2026-09-18 by Sonnet 5) — Grid Solver draft-criteria review: honest "No data"
