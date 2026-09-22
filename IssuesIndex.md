@@ -747,9 +747,17 @@
   (evidence-gated); POSTGAME becomes a deferred record (bundle v2), not a rejection; round
   translation is one per-season table in `afl-api-rounds.ts` with typed HALTs. Acceptance
   criteria: runbook §19.
-- **Next action (2026-09-22, reconciled — supersedes everything below in this field):** (1) ISSUE-224
-  registers the missing canonical player rows for the 92 unresolved AFL API providers (Route A: S9
-  needs `unresolvedIdentityPlayer = 0` on the SAME snapshot `afl-api-2026-2026-09-21-011148`);
+- **ACCEPTANCE SNAPSHOT — D-9b RESOLVED 2026-09-22, option B** (record: `issues/open/AFLDB-ISSUE-228.md`
+  §20). `afl-api-2026-2026-09-21-011148` is **formally SUPERSEDED** — its bytes are absent everywhere.
+  The authoritative S9 snapshot is the retained, hash-verified **`afl-api-2026-2026-09-21-031725`**
+  (manifest `5018a3d6…`, 652/652 files byte-exact, zero measurable drift against the `-011148`-built
+  bridge's retained 217-match / 669-provider / 9,983-row census). **All 669 providers must be
+  re-resolved as one coherent population**; the **577** links already on DEV are **lineage, NOT
+  acceptance evidence**, and must not be mixed with the 92. Every `-011148` mention below is historical.
+- **Next action (2026-09-22, reconciled — supersedes everything below in this field; snapshot label
+  corrected by D-9b):** (1) ISSUE-224 registers the missing canonical player rows for the 92
+  unresolved AFL API providers (Route A: S9 needs `unresolvedIdentityPlayer = 0` on the authoritative
+  snapshot **`afl-api-2026-2026-09-21-031725`**);
   (2) AFL API bridge rebuilt/re-resolved against that snapshot; (3) read-only S9 preflight — measure
   the DEV deployed SHA, which must equal the commit selected for acceptance (post-ISSUE-244) before
   any write; (4) re-settle under `--require-complete-source`, S9 DEV smoke, then separately
@@ -917,6 +925,132 @@
   bridge rebuild/re-resolve and S9 re-settle. B is the blocking prerequisite of ISSUE-228 S9.
   *(2026-09-18 original: after ISSUE-222's `afldb_test` import is verified, establish how the 2026
   debutants (and the numbering/spelling cases) become registered identities on each target.)*
+- **CONTINUATION 2026-09-22 (S9 unblock pass; documentation + offline analysis only — no DB, no
+  network, no Git mutation, no code edit, no test/typecheck, nothing registered. Supersedes the
+  runbook's §12 "NOT READY TO PROCEED TO PHASE 1" and every stale "cause not investigated" statement
+  above. Full record: `issues.md` ISSUE-224 "CONTINUATION — 2026-09-22" and
+  `issues/open/AFLDB-ISSUE-224.md` §13):**
+  **Phases 1, 2 and 3 are COMPLETE** (all three artefacts retained and hash-checked; Phase 1 =
+  `issue224-inseason-20260919`, finals-inclusive, rounds 1–27, 9,890 rows). **Category A is no longer
+  provisional: 92/92 classify `genuine_post_baseline_afl_debutant` with `first_2026_career_games =
+  1`** on the designed name-free discriminator.
+  **Populations A and B are the SAME 92 people, on STRONG name-free evidence** — the AFL API bridge's
+  own accepted join (club + jumper + exact 13-stat vector; `name_based_candidate_discovery: false`)
+  re-run source-to-source against the hash-verified AFL Tables 2026 snapshot: **92/92 providers
+  resolve to exactly one AFL Tables path, 92 distinct paths (bijection), all inside Category A, 0
+  Category A paths unclaimed, 87 unanimous, 5 single-candidate with zero competing candidates, 0 with
+  no hit**; the `(club, jumper, vector)` key is ambiguous on 0 of 9,890 rows; both sources
+  independently see 669 distinct 2026 players (577 + 92 = 669). The earlier "83/9 name overlap is
+  diagnostic only" caution is **discharged for all 92 by a stronger evidence class**, not withdrawn.
+  **BLOCKER — two dated operator decisions conflict (D-7):** Phase 3's verdict artefact totals
+  `register 0` / **`defer-to-rollover 92`**, which authorises **zero** registrations, while ISSUE-228
+  Route A (2026-09-22) requires the 92 registered. Recorded, not silently resolved.
+  **CORRECTION:** an AFL Tables identity does **NOT** satisfy the S9 end condition —
+  `resolveAflApiPlayer()` requires an **`afl_api`**-source `external_identities` row keyed by the
+  `CD_I…` provider id and never falls back to an AFL Tables profile URL.
+  **NEWLY IDENTIFIED, UNOWNED STEP (D-8):** the `afl_api` links are bridged on canonical
+  `player_match_stats`, which a freshly registered player has none of, so the terminating order is
+  register → **AFL Tables settle of 2026 to create canonical stat rows** → rebuild bridge → import 92
+  links → re-settle. Step 2 is absent from Route A's prerequisite list.
+  **Snapshot verdicts:** `issue224-inseason-20260919` **A — PRESENT AND MATCHES** (in the sibling
+  `D:\dev\afldb-issue-224` worktree, not the main checkout; both files byte-exact); `issue129-t7-20260903`
+  and `issue099-t8-20260829` **B — ABSENT** (inspected, not substituted). Its manifest is
+  `completeness: "unvalidated"` though Phase 2 used its bytes (D-10).
+  **ISSUE-228 obstacle, reported not adopted (D-9b):** the Route A acceptance snapshot
+  `afl-api-2026-2026-09-21-011148` has **no bytes anywhere on disk**; only `-031725` exists
+  (substantively equivalent — 217/669/9,983 — but a different hash, so not a substitute).
+  **Recommended route: R-b**, the reviewed Track 2 admin pair (`createPlayerAction` →
+  `attachAflTablesIdentityAction`), adding no new writer; Track 1 rollover stays the D-4 successor
+  issue's work.
+  **Verdict: BLOCKED ON OPERATOR IDENTITY ADJUDICATION — the authorising decision, not the evidence.
+  92 of 92 registrable on retained evidence; 0 withheld for want of identity evidence.**
+- **Next action (2026-09-22 continuation; supersedes the wording above):** answer **D-7** (re-decide
+  Phase 3 `defer-to-rollover` → `register` in a **new** verdict artefact — the 2026-09-19 one is
+  byte-bound) and **D-8** (who runs the 2026 AFL Tables settle that creates the canonical stat rows).
+  Smallest executable step meanwhile, fully offline: publish the target set as
+  `docs/rebuild-manifests/draftguru/issue224-s9-target-set-<date>.json` with per-provider evidence
+  counts and a `rows_sha256`, so D-7 is decided against a hash-pinned artefact.
+- **TARGET SET PUBLISHED — 2026-09-22 (offline artefact + tooling pass; supersedes the "smallest
+  executable step" above, which is now DONE).** The 92-provider identity conclusion is a tracked,
+  deterministic, independently re-derived artefact instead of a transcript:
+  `docs/rebuild-manifests/draftguru/issue224-s9-target-set-20260922.json` — 152,460 bytes, `sha256`
+  `e087baf706effdda8034a37cc184311687dee3c49f3e3e23a1e746beb347dcb0`, `rows_sha256`
+  `75bd9576ab3d33f19f2e148dffa22642c429a54b932f3e64ec87a9e6aa147f9c`. Built by
+  `tools/rebuild/draftguru/build_issue224_s9_target_set.py` v1.0.0 (offline, no DB, no network, no
+  `.env`, deterministic, immutable-on-write, fail-closed on duplicate/zero/multiple candidates, a
+  target outside Category A, either population ≠ 92, an ambiguous key, or drift in the byte-bound
+  evidence). Re-derived from source bytes and reproduced every count exactly: **92 rows / 92 unique
+  providers / 92 unique AFL Tables paths / 87 unanimous / 5 single-candidate non-unanimous / 0
+  ambiguous / 0 unmatched / 0 competing candidates / Category A coverage 92 of 92 / discriminator 92
+  of 92 / REGISTER 92 / WITHHOLD 0 / HALT 0**, with `name_based_candidate_discovery: false`.
+  **Registration is still NOT authorised** — the artefact records the Phase 3 disposition
+  (`register 0`, `defer_to_rollover 92`) as **not superseded** and
+  `registration_authorised: false`. **D-9b stays ISSUE-228's:** the artefact names the bridge-pinned
+  `-011148` (bytes absent) and the `-031725` it actually read, and states in-artefact that the latter
+  is not offered as proof of the former. Both byte-bound evidence files re-verified unchanged. Full
+  record: `issues/open/AFLDB-ISSUE-224.md` §14.
+- **Next action (2026-09-22 target-set pass; supersedes the wording above):** the operator answers
+  **D-7** (supersede the 2026-09-19 Phase 3 `defer-to-rollover 92` disposition for the ISSUE-228 S9
+  unblock, in a **new** verdict artefact — the 2026-09-19 one is byte-bound) and **D-8** (approve the
+  order: register 92 players + `afltables` identities → DEV AFL Tables 2026 settle → rebuild the AFL
+  API bridge → import the 92 `afl_api` links → AFL API settle with `--require-complete-source`).
+  Exact wording for both is in `issues/open/AFLDB-ISSUE-224.md` §14.7. **Nothing further is
+  executable until D-7 and D-8 are answered.**
+
+- **D-7 / D-8 APPROVED and D-9b RESOLVED — 2026-09-22 (decision-recording pass; supersedes every
+  "blocked on D-7/D-8" and "D-9b unresolved" statement above. Full record:
+  `issues/open/AFLDB-ISSUE-224.md` §16 and `issues/open/AFLDB-ISSUE-228.md` §20).**
+  **D-7 APPROVED** (operator Stu): the 2026-09-19 Phase 3 disposition (`register 0`,
+  `defer-to-rollover 92`) is superseded **for the ISSUE-228 S9 unblock and no other purpose**; the 92
+  are **authorised registration candidates**. New immutable artefact
+  `docs/rebuild-manifests/draftguru/issue224-d7-registration-decision-20260922.json` — `sha256`
+  `a795c987ca62cf879cb2ecc3bb61d9e1533eae84882956c442ff252de307be3d`, `rows_sha256`
+  `0a3d13387352c610782330058c889456c3f3ca57ab1143aee88766144711e083`, `register 92` /
+  `defer_to_rollover 0` / `identity_withheld 0` / `halt 0`; built by
+  `tools/rebuild/draftguru/build_issue224_d7_decision.py` (new, deterministic, `--check` mode,
+  fail-closed on hash drift or a non-`REGISTER` row). **The 2026-09-19 artefact was NOT modified** and
+  was re-verified unchanged. Surname validation corrected to the measured **89/92** and recorded as
+  **validation-only** — no identity consequence, since discovery is name-free. **D-7 authorises no
+  database write.**
+  **D-8 APPROVED — sequence only:** register 92 + `afltables` identities → **one deliberate** DEV AFL
+  Tables 2026 settle → rebuild the AFL API bridge → import the links → AFL API settle with
+  `--require-complete-source` (`unresolvedIdentityPlayer = 0`). **No step was executed or authorised
+  to run.** Both AFL Tables timers stay **OFF**; step 2 is a single controlled manual operation.
+  **D-9b RESOLVED, option B:** `-011148` is **formally superseded** by the retained, hash-verified
+  `-031725` (manifest `5018a3d6…`, 652/652 files byte-exact). Zero measurable drift: match set
+  217 = 217 set-identical, providers 669 = 669 set-identical, rows 9,983 = 9,983, per-provider row
+  counts and observed names 0/669 mismatches, per-`(provider, match)` membership exact for all 669,
+  the `extendedStats: null` anomaly at identical coordinates, and the `player_match_stats` column
+  contract 85 = 85 with 0 undeclared. **Stat VALUES were not verified** (needs the DB) — that is
+  precisely what the required rebuild recomputes. **All 669 providers must be re-resolved** and the
+  **577 imported links are lineage, NOT acceptance evidence**; mixing them with the 92 is forbidden.
+  The **92-row target set needs no rebuild** (already built against `-031725`).
+  **No database execution has occurred. ISSUE-224 is not complete; ISSUE-228 S9 is not accepted; DEV
+  is not claimed deployed.**
+- **Next action (2026-09-22 decision pass; supersedes the wording above):** **D-8 step 1 — register
+  the 92 on DEV** per the §13.6.3 contract. Two prerequisites, both still required: (a) run the AFL
+  Tables snapshot's own declared DB-free, network-free verdict authority
+  `tools/migration/import_fitzroy_core.py --label issue224-inseason-20260919 --validate-only
+  --require-in-season` (its manifest still says `completeness: "unvalidated"`; **not waived**, D-10);
+  (b) explicit operator authorisation to execute database writes on DEV (§9). **No further operator
+  decision is required before that.**
+- **PRE-REGISTRATION SNAPSHOT VALIDATION PASSED — 2026-09-22 (operator-run; supersedes "prerequisite
+  (a) still required" above. Full record: `issues/open/AFLDB-ISSUE-224.md` §17).**
+  `import_fitzroy_core.py --label issue224-inseason-20260919 --validate-only --require-in-season`
+  returned **exit 0**, `in-season gates PASSED — identity coverage`, **no database access**: 215
+  matches, 669 players, 9,890 player-match rows, 0 DOB conflicts, 0 renumbered profiles; gates
+  `missing_url 0`, `malformed_url 0`, `distinct_urls 669`, `missing_id 86` (**not** a failed gate —
+  the importer accepted the snapshot; URL coverage is complete). Snapshot first copied read-only from
+  the sibling `D:\dev\afldb-issue-224` worktree into this worktree's gitignored `data/sources` tree
+  and verified byte-identical (`player_stats_2026.csv` 4,452,274 / `D150D4BC…`; `results.csv`
+  21,405 / `EC767923…`). **D-10 answered by execution, not waived**; the byte-bound manifest still
+  says `completeness: "unvalidated"` and was deliberately not edited (contradiction recorded, §17.7).
+  **D-7/D-8 remain APPROVED, D-9b remains RESOLVED** (`-031725` authoritative). **No DB access, no
+  registration, no settle; timers OFF. ISSUE-224 not complete; ISSUE-228 S9 not accepted; DEV not
+  claimed deployed.**
+- **Next action (2026-09-22 validation pass; supersedes the wording above):** **D-8 step 1 — register
+  the 92 on DEV** per the §13.6.3 contract via route R-b. Prerequisite (a) is **satisfied**; the sole
+  remaining gate is **(b) explicit operator authorisation to execute database writes on DEV (§9)**.
 
 **AFLDB-ISSUE-221 resolved 2026-09-18** (implemented 2026-09-17 by Fable 5.1; committed, merged
 and DEV-verified 2026-09-18 by Sonnet 5) — Grid Solver draft-criteria review: honest "No data"

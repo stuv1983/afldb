@@ -5,11 +5,20 @@
 > DB dry-run" statement further down this document is a **dated historical snapshot**, retained as
 > lineage and superseded. Full record: `issues.md` "S9 — RECORD RECONCILIATION, ROUTE A, Q5-B (2026-09-22)".
 >
+> - **ACCEPTANCE SNAPSHOT — decision D-9b RESOLVED 2026-09-22, option B (see §20).**
+>   `afl-api-2026-2026-09-21-011148` is **formally SUPERSEDED**: its bytes are absent from every local
+>   root. The authoritative S9 acceptance snapshot is now the retained, immutable, hash-verified
+>   **`afl-api-2026-2026-09-21-031725`** (manifest sha256 `5018a3d6…`, 652/652 files byte-exact).
+>   `-011148` is retained as lineage and must not be rewritten, but **no acceptance claim may depend
+>   on its bytes**. Consequence: the accepted bridge must be **rebuilt as one coherent population —
+>   all 669 providers re-resolved — against `-031725`**; the **577** links already imported to DEV are
+>   **lineage, NOT acceptance evidence**, and must not be mixed with the 92 that ISSUE-224
+>   registration will resolve (§20.5.1). Every `-011148` reference below this line is historical.
 > - **S9: IMPLEMENTED / NOT ACCEPTED — PARTIALLY EXECUTED.** A real 2026 acquisition occurred
->   (immutable snapshot `afl-api-2026-2026-09-21-011148`, manifest sha256 `dcbd0626…`, 217 concluded
->   matches, 9,983 player-match rows, 0 bundle build failures; a later acquisition
->   `afl-api-2026-2026-09-21-031725` exists as lineage/evidence). A full-season player bridge artefact
->   was built and its 577 links imported to DEV. A full DEV settle **DRY-RUN** followed and was
+>   (snapshot `afl-api-2026-2026-09-21-011148` — **superseded per §20**; manifest sha256 `dcbd0626…`,
+>   217 concluded matches, 9,983 player-match rows, 0 bundle build failures; the later acquisition
+>   `afl-api-2026-2026-09-21-031725` is now the authoritative snapshot). A full-season player bridge
+>   artefact was built and its 577 links imported to DEV. A full DEV settle **DRY-RUN** followed and was
 >   **INCOMPLETE**: `unresolvedIdentityMatch 0`, `unresolvedIdentityPlayer 830`. **No committed
 >   canonical `afl_api` apply, no S9 DEV smoke, no timer installation/enablement has occurred.
 >   S9 is NOT accepted.** That dry-run predates the ISSUE-244 hardening and is **not** current
@@ -20,8 +29,10 @@
 >   and the fact that closing ISSUE-244 does **not** make the timer operational (F004 refuses an
 >   incomplete source before commit; timer installation/enablement is separately authorised work).
 > - **S9 completeness path — ROUTE A (operator decision 2026-09-22).** ISSUE-224 registration/linkage
->   must be completed enough that the **same immutable snapshot** settles with
->   `unresolvedIdentityPlayer = 0` and passes the F004 completeness gate. **A partial-player canonical
+>   must be completed enough that the **authoritative immutable snapshot — `-031725` per D-9b/§20**
+>   settles with `unresolvedIdentityPlayer = 0` and passes the F004 completeness gate. "Same
+>   snapshot" means *one* snapshot throughout acquisition, bridge and settle, not specifically
+>   `-011148`, whose bytes are gone. **A partial-player canonical
 >   apply by removing `--require-complete-source` is REJECTED FOR S9 ACCEPTANCE**: F004 makes source
 >   completeness a pre-commit gate and S9 must exercise the production-intended guarded path. The
 >   technical ability to run without the flag is unchanged and remains documented; it is simply not the
@@ -1254,3 +1265,158 @@ criteria is unproven.
   duplicate `api_round_number`, or a `mixed_finals` row without `finals_label_rules`.
 - (h) Backtest: all 14 sample matches translate to the folder's canonical round (with the
   documented 2022–2024 finals-label limitation asserted as a refusal, not a guess).
+
+---
+
+# 20. Decision D-9b — the S9 acceptance-snapshot contract (RESOLVED 2026-09-22, option **B**)
+
+> **Boundary.** Everything in this section was established by read-only, offline, hash-verified
+> inspection. No SQL, no network, no acquisition, no settle, no Git mutation. No historical
+> byte-bound evidence file was modified.
+
+## 20.1 The problem, stated exactly
+
+ISSUE-228 named `afl-api-2026-2026-09-21-011148` (manifest sha256 `dcbd0626…`) as the authoritative
+S9 acceptance snapshot. **Its bytes are absent from every local root.** The only 2026 AFL API match
+snapshot present anywhere is `afl-api-2026-2026-09-21-031725` (manifest sha256 `5018a3d6…`), which
+is also the snapshot the ISSUE-224 92-row target set was actually re-derived against.
+
+These are **not** the same snapshot and were never treated as such. `dcbd0626… ≠ 5018a3d6…`.
+
+## 20.2 What was measured about the retained snapshot
+
+`D:\dev\afldb\data\sources\afl_api\matches\afl-api-2026-2026-09-21-031725\` — read-only:
+
+| Check | Result |
+|---|---|
+| `manifest.json` sha256 | `5018a3d6e68329170836fb84520e6b4181124bf2807e1c2f0cb9708660de0b62` ✓ equals the recorded value |
+| Manifested files present and byte-exact | **652 / 652**, 0 missing, 0 hash mismatches |
+| Files on disk absent from the manifest | 1 — `token.meta.json` (acquisition auth metadata, not source evidence, outside the manifest's authority) |
+| `contract_version` / `source_key` / `acquisition_kind` | `1` / `afl_api` / `afl_api_match_snapshot` |
+| `selection` | `{status: CONCLUDED, since: null, match: null}` |
+| `season` / `comp_season_id` / `fixtures_only` | `2026` / `85` / `false` |
+| `counts` | `matches_in_feed 218`, `matches_selected 217` |
+| `acquired_at` | `2026-09-21T03:18:00.610Z` (≈2 h 07 m after `-011148`, same day, same selection contract) |
+
+## 20.3 Substantive equivalence, re-derived rather than assumed
+
+The accepted bridge artefact `data/reference/afl-api-player-bridge-2026-full-2026-09-21.json`
+(sha256 `845a78d2…`) was built **against `-011148`** and retains that snapshot's derived census at
+row grain: `matches_processed` (217 entries) and `providers` (669 entries, each carrying
+`snapshot_row_count`, `observed_name`, and its per-match `matches` / `unmatched` lists). That
+retained census is a usable fingerprint of the lost bytes. Every one of the following was recomputed
+from `-031725`'s hash-verified bytes and compared against it:
+
+| Axis | `-011148` (from the bridge artefact) | `-031725` (measured) | Result |
+|---|---|---|---|
+| Match set (`provider_match_id`) | 217 | 217 | **set-identical** — 0 only-in-bridge, 0 only-in-snapshot |
+| Distinct provider players | 669 | 669 | **set-identical** — 0 either way (`sha256(sorted) = e9f47dc9…`) |
+| Player-match rows | 9,983 | 9,983 | equal |
+| Per-provider `snapshot_row_count` | 669 values | 669 values | **0 mismatches** |
+| Per-provider `observed_name` | 669 values | 669 values | **0 mismatches** |
+| Per-`(provider, match)` pair membership | 9,983 pairs | 9,983 pairs | **all 669 providers' claimed set == retained appearance set EXACTLY**; 0 claimed ids absent |
+| The single `extendedStats: null` anomaly | `CD_M20260140305`, `homeTeamPlayerStats`, index 23, provider `CD_I993799` | **same match, same side, same index, same provider** | identical |
+| `player_match_stats` column contract, at the per-entry grain `afl-api-bundle.ts:478-492` uses | 85 declared | **85 observed** | **0 undeclared, 0 declared-but-unobserved, 0 required-not-observed** |
+| `match` (fixture) column contract | 70 declared | 67 observed | **0 undeclared** (3 declared-but-unobserved: `metadata.k2k_link`, `round.utcStartTime`, `round.utcEndTime`) |
+
+**Source drift between the two acquisitions is zero on every axis that can be measured offline.**
+
+### 20.3.1 What is NOT proven, stated plainly
+
+The **stat values** were not independently verified. Each `agreeing_stat_count` is a function of the
+snapshot *and* of canonical `player_match_stats` in `afldb_dev`, and no database was read (§9). So
+identity-surface equivalence is proven to row grain; **stat-vector value equivalence is not**. This
+is not a gap left open: re-deriving exactly those values against the authoritative snapshot is the
+bridge rebuild that option B requires, so the unproven axis is the one the chosen route recomputes.
+
+Two false leads were chased and discarded rather than recorded as findings, noted so a later pass
+does not re-raise them:
+
+- A `metadata` path appeared undeclared on the `match` family. It is **not**: `metadata: {}` on
+  `CD_M20260141206` is an **empty** object, and `flattenObservedColumns()`
+  (`src/lib/acquisition/afl-api-bundle.ts:86-105`) contributes **no path at all** for an empty
+  record — only a **`null`** object becomes a leaf at its own path. Confirmed against
+  `src/lib/acquisition/source-families.ts:772`. There is no undeclared-column exposure here.
+- The `match_roster` family appeared to carry ~180 undeclared paths. It does not: that family is
+  declared at the **inner `matchRoster` grain**, not the file-envelope grain, so an envelope-rooted
+  comparison is not tool-faithful. Its `known_columns_status` is in any case already declared
+  `incomplete`. **Not re-checked faithfully here** — it is not read by the bridge and is not part of
+  the D-9b question.
+
+## 20.4 The three options, each on its merits
+
+| | **A — block until `-011148` bytes are recovered** | **B — supersede with retained `-031725`** | **C — acquire a fresh snapshot** |
+|---|---|---|---|
+| **Reproducibility** | **Nil today.** Nothing local can reproduce it; a recovery would itself need verification against `dcbd0626…` | **Full.** 652/652 files byte-exact against a manifest whose own hash matches the record | Full once acquired, but the acceptance snapshot then changes again on every re-acquisition |
+| **Evidence already available** | The bridge's derived census only; **no bytes** | Bytes + manifest + the whole §20.3 equivalence table | **None** until the fetch runs |
+| **All 669 providers re-resolved?** | No, if the exact bytes return | **Yes** | **Yes** |
+| **Can the 577 imported links stand as acceptance evidence?** | Only if the exact bytes return | **No** | **No** |
+| **Does the 92-row target set stay directly applicable?** | Unclear — it was built on `-031725`, so under A it would need rebuilding on recovered bytes | **Yes, directly** — it was already built and hash-verified against `-031725` | **No** — it would need rebuilding against the new snapshot |
+| **Source drift risk** | None introduced, but the block is **indefinite** | **None measurable** (§20.3) | **Real and unbounded.** 2026 is complete, but a later fetch can carry corrected stats, revised statuses, renumbered providers or new columns — every one of which invalidates prior evidence |
+| **Additional work** | Locate bytes on the DEV host or elsewhere; verify; then rebuild anyway if not found | Rebuild the bridge on `-031725`; re-point the record | Network acquisition (**forbidden this pass**); full rebuild; re-derive the target set; re-validate the column contract |
+| **Effect on S9 acceptance** | **Indefinitely blocked** on a source that may not exist | S9 proceeds on a hash-verifiable, drift-free snapshot | S9 proceeds, but on bytes with no equivalence evidence and a fresh drift surface |
+
+**A is rejected** because it makes acceptance depend on bytes that a whole-drive read-only search
+could not find, with no evidence they exist anywhere and no bound on the wait.
+
+**C is rejected** because it is *strictly worse than B on the axis that matters*: it discards a
+retained snapshot already proven drift-free against the accepted evidence and replaces it with bytes
+carrying no equivalence evidence at all, while also invalidating the 92-row target set. C is more
+expensive **and** weaker. Cost is not why it loses.
+
+## 20.5 Decision
+
+> **D-9b — RESOLVED 2026-09-22, option B.** `afl-api-2026-2026-09-21-011148` is **formally
+> superseded** as the ISSUE-228 S9 acceptance snapshot by the retained, immutable, hash-verified
+> `afl-api-2026-2026-09-21-031725` (manifest sha256
+> `5018a3d6e68329170836fb84520e6b4181124bf2807e1c2f0cb9708660de0b62`). No acceptance claim may
+> depend on `-011148`'s unavailable bytes.
+
+The independent verification asked for was performed and **found no source-contract difference that
+makes B unsafe** (§20.2, §20.3). `-011148` is **not** deleted or rewritten: its label, manifest hash
+`dcbd0626…` and the 577-link bridge built on it are retained as lineage, and every statement above
+about it is sourced from the retained bridge artefact.
+
+### 20.5.1 The no-mixing rule this creates
+
+**S9's accepted bridge MUST be one coherent population built in a single run against `-031725`.**
+It is explicitly forbidden to combine:
+
+- the **577** links imported to DEV from the `-011148`-built bridge, with
+- the **92** links that ISSUE-224 registration will newly resolve.
+
+**All 669 providers must be re-resolved.** This is not merely bookkeeping — three independent
+reasons each force it on their own:
+
+1. **Snapshot coherence.** The accepted artefact must pin `-031725` in its own
+   `snapshot_label` / `snapshot_manifest_sha256`. The current one pins `-011148`.
+2. **Changed canonical substrate.** The bridge is built *from the database*
+   (`built_from_database: afldb_dev`). D-8 step 1 registers 92 players and step 2 settles AFL Tables
+   2026, creating new canonical `player_match_stats`. Every provider's resolution is computed against
+   that substrate, so the 577 must be re-derived on the post-registration state, not carried over.
+3. **Pre-ISSUE-244 lineage.** The 577 links and the `unresolvedIdentityPlayer 830` dry-run both
+   predate the ISSUE-244 hardening and were already recorded as **not** current acceptance evidence.
+
+Accordingly the **577 imported links are NOT acceptance evidence** and are retained as lineage only.
+The **92-row target set remains directly applicable and needs no rebuild**: it was built against
+`-031725` and hash-verifies (`e087baf7…`, `rows_sha256 75bd9576…`).
+
+## 20.6 What D-9b does and does not authorise
+
+D-9b settles **which snapshot is authoritative**. It authorises **no execution**: no acquisition, no
+bridge rebuild, no import, no settle, no database write. The AFL Tables timer remains **OFF on both
+DEV and PROD** and neither is to be enabled.
+
+**S9 is NOT accepted. DEV is NOT claimed deployed. ISSUE-224 is NOT complete.**
+
+## 20.7 Companion decisions recorded the same day (owned by ISSUE-224)
+
+- **D-7 — APPROVED 2026-09-22.** The 92 Category A players are authorised registration candidates.
+  New immutable artefact
+  `docs/rebuild-manifests/draftguru/issue224-d7-registration-decision-20260922.json`
+  (sha256 `a795c987ca62cf879cb2ecc3bb61d9e1533eae84882956c442ff252de307be3d`,
+  `rows_sha256 0a3d13387352c610782330058c889456c3f3ca57ab1143aee88766144711e083`). The 2026-09-19
+  Phase 3 verdict artefact is retained **unchanged**. D-7 authorises no database write.
+- **D-8 — APPROVED 2026-09-22, sequence only.** See ISSUE-224 §16.2. Steps 3–5 of that sequence
+  (bridge rebuild, link import, AFL API settle with `--require-complete-source`) are ISSUE-228's and
+  must run against `-031725` per §20.5.

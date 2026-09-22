@@ -1,0 +1,1344 @@
+{
+  "schema_version": 1,
+  "tool": "issue224_phase3_operator_decisions",
+  "issue": "AFLDB-ISSUE-224",
+  "label": "20260919-v1",
+  "operator_display_name": "Stu",
+  "review_started_utc": "2026-09-19T08:02:24Z",
+  "review_completed_utc": "2026-09-19T08:02:24Z",
+  "completion_status": "complete",
+  "source_adjudication_pack": {
+    "path": "docs/rebuild-manifests/draftguru/issue224-population-classification-20260919.json",
+    "sha256": "0765392a26624c54a2d2525c8fafd14f9521989b533fb773d3134a934ac74a6a",
+    "rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30"
+  },
+  "source_hash_links": {
+    "phase2_classification_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30"
+  },
+  "totals": {
+    "rows": 94,
+    "defer_to_rollover": 92,
+    "route_to_parent_evidence_correction": 2,
+    "register": 0,
+    "route_to_issue_136": 0,
+    "reject": 0,
+    "unresolved": 0
+  },
+  "rows_sha256": "1fc8ff220c2f655a5003f852e33c59c6ab8e7c6cfa8445ba01746fd57b912211",
+  "rows": [
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/aidan_schubert/1",
+      "afltables_external_id": "players/A/Aidan_Schubert.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-08-01",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/alex_van%20wyk/1",
+      "afltables_external_id": "players/A/Alex_Van_Wyk.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-08-08",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/angus_anderson/1",
+      "afltables_external_id": "players/A/Angus_Anderson.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-04-10",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/archie_ludowyke/1",
+      "afltables_external_id": "players/A/Archie_Ludowyke.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-08-02",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/balyn_o'brien/1",
+      "afltables_external_id": "players/B/Balyn_OBrien.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-07-18",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/beau_addinsall/1",
+      "afltables_external_id": "players/B/Beau_Addinsall.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-06-19",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/billy_cootee/1",
+      "afltables_external_id": "players/B/Billy_Cootee.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-04-23",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/bodie_ryan/1",
+      "afltables_external_id": "players/B/Bodie_Ryan.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-05-07",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/caleb_lewis/1",
+      "afltables_external_id": "players/C/Caleb_Lewis.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-07-19",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/cam_nairn/1",
+      "afltables_external_id": "players/C/Cameron_Nairn.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-05-21",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/campbell_lake/1",
+      "afltables_external_id": "players/C/Campbell_Lake.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-06-07",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/charlie_banfield/1",
+      "afltables_external_id": "players/C/Charlie_Banfield.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-05-17",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/charlie_edwards/1",
+      "afltables_external_id": "players/C/Charlie_Edwards.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-04-18",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/chris_scerri/1",
+      "afltables_external_id": "players/C/Chris_Scerri.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-03-21",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/cody_curtin/1",
+      "afltables_external_id": "players/C/Cody_Curtin.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-05-02",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/cooper_duff-tytler/1",
+      "afltables_external_id": "players/C/Cooper_Duff-Tytler.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-03-15",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/daniel_annable/1",
+      "afltables_external_id": "players/D/Daniel_Annable.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-03-14",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/dean_laidley/1",
+      "afltables_external_id": "players/D/Dean_Laidley.html",
+      "classification": "captured_href_differs_from_registered_path_same_person",
+      "operator_decision": "route-to-parent-evidence-correction",
+      "justification": "This is an already-registered AFLDB player whose DraftGuru-captured AFL Tables href differs from the registered AFL Tables path. Do not create or register a new player; route the source evidence through the reviewed parent-correction mechanism.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "registered_path_evidence": "players/D/Dani_Laidley.html",
+        "player_id_evidence": 3208
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/dylan_patterson/1",
+      "afltables_external_id": "players/D/Dylan_Patterson.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-07-04",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/dyson_sharp/1",
+      "afltables_external_id": "players/D/Dyson_Sharp.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-03-13",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/flynn_riley/1",
+      "afltables_external_id": "players/F/Flynn_Riley.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-07-11",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/harry_dean/1",
+      "afltables_external_id": "players/H/Harry_Dean.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-03-05",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/harry_kyle/1",
+      "afltables_external_id": "players/H/Harry_Kyle.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-05-30",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/harry_oliver/1",
+      "afltables_external_id": "players/H/Harrison_Oliver.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-05-17",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/hugo_hall-kahan/1",
+      "afltables_external_id": "players/H/Hugo_Hall-Kahan.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-06-04",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/hussien_el%20achkar/1",
+      "afltables_external_id": "players/H/Hussien_El_Achkar.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-03-13",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/jack_dalton/2",
+      "afltables_external_id": "players/J/Jack_Dalton1.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-04-06",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/jack_ison/1",
+      "afltables_external_id": "players/J/Jack_Ison.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-05-16",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/jack_ough/1",
+      "afltables_external_id": "players/J/Jack_Ough.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-07-04",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/jack_watkins/2",
+      "afltables_external_id": "players/J/Jack_Watkins.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-03-15",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/jacob_farrow/1",
+      "afltables_external_id": "players/J/Jacob_Farrow.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-03-28",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/jagga_smith/1",
+      "afltables_external_id": "players/J/Jagga_Smith.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-03-05",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/jai_murray/1",
+      "afltables_external_id": "players/J/Jai_Murray.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-06-06",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/jaxon_artemis/1",
+      "afltables_external_id": "players/J/Jaxon_Artemis.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-07-19",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/jay_polkinghorne/1",
+      "afltables_external_id": "players/J/Jay_Polkinghorne.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-07-16",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/joel_fitzgerald/1",
+      "afltables_external_id": "players/J/Joel_Fitzgerald.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-06-13",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/josh_lai/1",
+      "afltables_external_id": "players/J/Josh_Lai.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-03-29",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/josh_lindsay/1",
+      "afltables_external_id": "players/J/Josh_Lindsay.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-03-15",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/kye_annand/1",
+      "afltables_external_id": "players/K/Kye_Annand.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-06-14",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/lachie_jaques/1",
+      "afltables_external_id": "players/L/Lachie_Jaques.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-03-07",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/lachlan_carmichael/1",
+      "afltables_external_id": "players/L/Lachlan_Carmichael.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-08-16",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/lachlan_smith/4",
+      "afltables_external_id": "players/L/Lachlan_Smith.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-04-23",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/lachy_dovaston/1",
+      "afltables_external_id": "players/L/Lachy_Dovaston.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-03-15",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/latrelle_pickett/1",
+      "afltables_external_id": "players/L/Latrelle_Pickett.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-03-15",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/liam_puncher/1",
+      "afltables_external_id": "players/L/Liam_Puncher.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-07-04",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/louis_emmett/1",
+      "afltables_external_id": "players/L/Louis_Emmett.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-04-11",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/lukas_cooke/1",
+      "afltables_external_id": "players/L/Lukas_Cooke.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-06-13",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/luke_kennedy/2",
+      "afltables_external_id": "players/L/Luke_Kennedy.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-06-11",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/luker_kentfield/1",
+      "afltables_external_id": "players/L/Luker_Kentfield.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-06-08",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/marcus_herbert/1",
+      "afltables_external_id": "players/M/Marcus_Herbert.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-06-13",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/matt_hill/1",
+      "afltables_external_id": "players/M/Matt_Hill.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-07-04",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/matthew_capuano/1",
+      "afltables_external_id": "players/M/Matthew_Capuano.html",
+      "classification": "captured_href_differs_from_registered_path_same_person",
+      "operator_decision": "route-to-parent-evidence-correction",
+      "justification": "This is an already-registered AFLDB player whose DraftGuru-captured AFL Tables href differs from the registered AFL Tables path. Do not create or register a new player; route the source evidence through the reviewed parent-correction mechanism.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "registered_path_evidence": "players/M/Mathew_Capuano.html",
+        "player_id_evidence": 9198
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/max_beattie/1",
+      "afltables_external_id": "players/M/Max_Beattie.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-08-15",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/max_kondogiannis/1",
+      "afltables_external_id": "players/M/Max_Kondogiannis.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-03-13",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/michael_sellwood/1",
+      "afltables_external_id": "players/M/Michael_Sellwood.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-03-07",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/milan_murdock/1",
+      "afltables_external_id": "players/M/Milan_Murdock.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-03-15",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/mitch_edwards/1",
+      "afltables_external_id": "players/M/Mitchell_Edwards.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-03-14",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/mitch_podhajski/1",
+      "afltables_external_id": "players/M/Mitch_Podhajski.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-06-08",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/mitch_zadow/1",
+      "afltables_external_id": "players/M/Mitch_Zadow.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-04-04",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/noah_howes/1",
+      "afltables_external_id": "players/N/Noah_Howes.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-08-09",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/noah_mraz/1",
+      "afltables_external_id": "players/N/Noah_Mraz.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-07-04",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/noah_roberts-thomson/1",
+      "afltables_external_id": "players/N/Noah_Roberts-Thomson.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-05-17",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/oliver_francou/1",
+      "afltables_external_id": "players/O/Oliver_Francou.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-07-03",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/oliver_hayes-brown/1",
+      "afltables_external_id": "players/O/Oliver_Hayes-Brown.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-04-12",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/ollie_greeves/1",
+      "afltables_external_id": "players/O/Ollie_Greeves.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-07-11",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/ollie_hannaford/1",
+      "afltables_external_id": "players/O/Oliver_Hannaford.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-03-27",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/oscar_ryan/1",
+      "afltables_external_id": "players/O/Oscar_Ryan.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-08-02",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/oscar_steene/1",
+      "afltables_external_id": "players/O/Oscar_Steene.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-03-27",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/paddy_cross/1",
+      "afltables_external_id": "players/P/Paddy_Cross.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-03-29",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/patrick_retschko/1",
+      "afltables_external_id": "players/P/Patrick_Retschko.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-04-19",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/phoenix_gothard/1",
+      "afltables_external_id": "players/P/Phoenix_Gothard.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-03-07",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/riley_hamilton/1",
+      "afltables_external_id": "players/R/Riley_Hamilton.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-07-04",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/sam_cumming/1",
+      "afltables_external_id": "players/S/Sam_Cumming.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-04-24",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/sam_grlj/1",
+      "afltables_external_id": "players/S/Sam_Grlj.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-03-12",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/sam_swadling/1",
+      "afltables_external_id": "players/S/Sam_Swadling.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-06-20",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/sullivan_robey/1",
+      "afltables_external_id": "players/S/Sullivan_Robey.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-04-11",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/talor_byrne/1",
+      "afltables_external_id": "players/T/Talor_Byrne.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-03-29",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/taylor_goad/1",
+      "afltables_external_id": "players/T/Taylor_Goad.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-06-13",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/toby_murray/1",
+      "afltables_external_id": "players/T/Toby_Murray.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-03-14",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/tobyn_murray/1",
+      "afltables_external_id": "players/T/Tobyn_Murray.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-08-22",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/tom_anastasopoulos/1",
+      "afltables_external_id": "players/T/Tom_Anastasopoulos.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-05-15",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/tom_blamires/1",
+      "afltables_external_id": "players/T/Tom_Blamires.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-03-15",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/tom_burton/1",
+      "afltables_external_id": "players/T/Tom_Burton.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-04-24",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/wade_derksen/1",
+      "afltables_external_id": "players/W/Wade_Derksen.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-04-03",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/will_edwards/1",
+      "afltables_external_id": "players/W/Will_Edwards.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-04-23",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/will_green/1",
+      "afltables_external_id": "players/W/Will_Green.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-08-08",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/will_lewis/1",
+      "afltables_external_id": "players/W/Will_Lewis.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-03-14",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/will_mccabe/1",
+      "afltables_external_id": "players/W/Will_McCabe.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-04-18",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/willem_duursma/1",
+      "afltables_external_id": "players/W/Willem_Duursma.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-03-15",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/xavier_bamert/1",
+      "afltables_external_id": "players/X/Xavier_Bamert.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-06-13",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/xavier_taylor/1",
+      "afltables_external_id": "players/X/Xavier_Taylor.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-04-19",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/zane_peucker/1",
+      "afltables_external_id": "players/Z/Zane_Peucker.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-07-12",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/zane_zakostelsky/1",
+      "afltables_external_id": "players/Z/Zane_Zakostelsky.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-03-07",
+        "first_2026_career_games": 1
+      }
+    },
+    {
+      "decided_utc": "2026-09-19T08:02:24Z",
+      "player_url": "https://www.draftguru.com.au/players/zeke_uwland/1",
+      "afltables_external_id": "players/Z/Zeke_Uwland.html",
+      "classification": "genuine_post_baseline_afl_debutant",
+      "operator_decision": "defer-to-rollover",
+      "justification": "Phase 2 confirms this AFL Tables identity first appears chronologically in the validated 2026 in-season snapshot at Career.Games = 1. Use the canonical end-of-season rollover rather than in-season registration.",
+      "evidence_reference": {
+        "phase2_rows_sha256": "ef7f4ed04b15b9819fe0fb1646561f8e7b4c648b59b6914b80e95d8065b06b30",
+        "snapshot_label": "issue224-inseason-20260919",
+        "first_2026_match_date": "2026-03-06",
+        "first_2026_career_games": 1
+      }
+    }
+  ]
+}

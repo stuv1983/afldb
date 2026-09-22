@@ -1,0 +1,4375 @@
+{
+  "afl_api_bridge": {
+    "acceptance_rule": {
+      "all_zero_single_match_vector_withheld": true,
+      "duplicate_canonical_jumper_key_refuses_match": true,
+      "min_matches_for_link": 2,
+      "min_single_match_agreement": 10,
+      "name_based_candidate_discovery": false,
+      "surname_equality_is_validation_only": true
+    },
+    "built_from_database": "afldb_dev",
+    "generated_utc": "2026-09-21T02:36:27.574Z",
+    "path": "data/reference/afl-api-player-bridge-2026-full-2026-09-21.json",
+    "player_match_rows_uncovered": 830,
+    "providers_linked": 577,
+    "providers_total": 669,
+    "providers_unresolved": 92,
+    "sha256": "845a78d2f4c75d0f8cc2efd3337f895d6c7c795440cc6c343d42bf46140b3f5c",
+    "tool": "tools/current-season/emit-afl-api-player-bridge.ts"
+  },
+  "afl_api_source": {
+    "acceptance_snapshot_bytes_available": false,
+    "acceptance_snapshot_manifest_sha256_pinned_by_bridge": "dcbd0626e64a6fcf0ed9c73e910b8b83c10aae50a8552e69be172df184c33ecb",
+    "acceptance_snapshot_note": "This tool records the label this snapshot's own manifest declares and asserts NOTHING about which snapshot is the ISSUE-228 S9 acceptance snapshot. The accepted bridge artefact pins afl-api-2026-2026-09-21-011148 (manifest sha256 dcbd0626e64a6fcf0ed9c73e910b8b83c10aae50a8552e69be172df184c33ecb), whose raw bytes were NOT available on any local root at generation time. The snapshot actually read here is named above. Substantive equivalence is not byte identity; promoting or recovering a snapshot is ISSUE-228 decision D-9b and is NOT resolved by this artefact.",
+    "acceptance_snapshot_pinned_by_bridge": "afl-api-2026-2026-09-21-011148",
+    "per_file_hashes_verified_against_snapshot_manifest": true,
+    "snapshot_acquired_at": "2026-09-21T03:18:00.610Z",
+    "snapshot_dir": "D:\\dev\\afldb\\data\\sources\\afl_api\\matches\\afl-api-2026-2026-09-21-031725",
+    "snapshot_label": "afl-api-2026-2026-09-21-031725",
+    "snapshot_manifest_sha256": "5018a3d6e68329170836fb84520e6b4181124bf2807e1c2f0cb9708660de0b62",
+    "snapshot_matches_selected": 217
+  },
+  "afltables_source": {
+    "completeness": "unvalidated",
+    "match_count": 215,
+    "player_stat_row_count": 9890,
+    "player_stats_dir": "D:\\dev\\afldb-issue-224\\data\\sources\\afltables\\fitzroy_core\\issue224-inseason-20260919",
+    "player_stats_filename": "player_stats_2026.csv",
+    "player_stats_sha256": "d150d4bcc736c345f9e2d884eb3b57e25f1d6d0497ea1223cd8af3773ad08c36",
+    "snapshot_label": "issue224-inseason-20260919",
+    "tracked_manifest_path": "docs/rebuild-manifests/afltables_fitzroy_core/issue224-inseason-20260919.json",
+    "tracked_manifest_sha256": "9352814407a161db8a101ee3b8a10bab18eeadfec07383906ace735dc0c51b92",
+    "verdict_authority": "tools/migration/import_fitzroy_core.py --label issue224-inseason-20260919 --validate-only --require-in-season",
+    "verdict_authority_run": false
+  },
+  "authorisation": {
+    "blocking_decisions": [
+      "D-7",
+      "D-8"
+    ],
+    "identity_evidence": "ESTABLISHED for 92 of 92",
+    "not_owned_here": [
+      "D-9b (ISSUE-228)"
+    ],
+    "registration_authorised": false
+  },
+  "byte_bound_inputs": {
+    "classification": {
+      "bytes": 52845,
+      "path": "docs/rebuild-manifests/draftguru/issue224-population-classification-20260919.json",
+      "sha256": "0765392a26624c54a2d2525c8fafd14f9521989b533fb773d3134a934ac74a6a"
+    },
+    "phase3_verdicts": {
+      "bytes": 79486,
+      "path": "docs/rebuild-manifests/draftguru/bridge-operator-verdicts-issue224-20260919-v1.json",
+      "sha256": "3c7b5aff6649047ef0a727feffe4303ac7ea618a6cba3ca4f32b718636875038"
+    }
+  },
+  "counts": {
+    "afl_api_unresolved_providers_total": 92,
+    "ambiguous": 0,
+    "career_games_discriminator_pass": 92,
+    "competing_candidates_any_row": 0,
+    "halt": 0,
+    "population_a_category_a_covered": 92,
+    "population_a_category_a_total": 92,
+    "population_a_only": 0,
+    "population_b_only": 0,
+    "register": 92,
+    "single_candidate_non_unanimous": 5,
+    "target_rows": 92,
+    "unanimous": 87,
+    "unique_afl_api_providers": 92,
+    "unique_afltables_paths": 92,
+    "unmatched": 0,
+    "withhold": 0
+  },
+  "database_access": "NOT_PERFORMED",
+  "generated_at": "2026-09-22T00:00:00Z",
+  "generated_at_basis": "frozen argument, not a wall-clock time, so the artefact is byte-reproducible",
+  "issue": "AFLDB-ISSUE-224",
+  "kind": "issue224_s9_target_set",
+  "matching": {
+    "afltables_rows_scanned_for_key_uniqueness": 9890,
+    "algorithm": "The accepted AFL API bridge's own evidence class, run source-to-source with the AFL Tables 2026 snapshot in place of the canonical database. A provider match row and an AFL Tables player-match row are the same observation when club, jumper number and all 13 core statistics are equal. A provider's candidate set is every AFL Tables profile any of its rows keys to; exactly one candidate and zero competing candidates is required. Names never discover, propose or disambiguate a candidate.",
+    "ambiguous_candidate_key_rows": 0,
+    "ambiguous_candidate_keys": [],
+    "club_mapping": "afl-api-identities.json teams CD_T<id>.hist, compared to player_stats_2026.csv Playing.for; all 18 clubs map exactly, no alias normalisation applied",
+    "core_vector_field_names": [
+      "kicks",
+      "handballs",
+      "marks",
+      "tackles",
+      "goals",
+      "behinds",
+      "hitouts",
+      "frees_for",
+      "frees_against",
+      "inside_50s",
+      "clearances",
+      "rebounds",
+      "goal_assists"
+    ],
+    "core_vector_fields_afl_api": [
+      "stats.kicks",
+      "stats.handballs",
+      "stats.marks",
+      "stats.tackles",
+      "stats.goals",
+      "stats.behinds",
+      "stats.hitouts",
+      "stats.freesFor",
+      "stats.freesAgainst",
+      "stats.inside50s",
+      "stats.clearances.totalClearances",
+      "stats.rebound50s",
+      "stats.goalAssists"
+    ],
+    "core_vector_fields_afltables": [
+      "Kicks",
+      "Handballs",
+      "Marks",
+      "Tackles",
+      "Goals",
+      "Behinds",
+      "Hit.Outs",
+      "Frees.For",
+      "Frees.Against",
+      "Inside.50s",
+      "Clearances",
+      "Rebounds",
+      "Goal.Assists"
+    ],
+    "core_vector_source_of_truth": "src/lib/acquisition/afl-api-player-evidence.ts:107-111 (CORE_STAT_COLUMNS); AFL API field paths per src/lib/acquisition/afl-api-bundle.ts:517-534",
+    "key_fields": [
+      "club",
+      "jumper_number",
+      "core_stat_vector"
+    ],
+    "name_based_candidate_discovery": false,
+    "surname_equality_is_validation_only": true
+  },
+  "network_access": "NOT_PERFORMED",
+  "phase3_disposition_not_superseded": {
+    "artefact": "docs/rebuild-manifests/draftguru/bridge-operator-verdicts-issue224-20260919-v1.json",
+    "defer_to_rollover": 92,
+    "note": "The Phase 3 operator disposition is unchanged by this artefact. This target set establishes IDENTITY evidence only. Superseding the Phase 3 disposition is operator decision D-7; the registration sequencing is D-8. Nothing here authorises registration.",
+    "register": 0
+  },
+  "purpose": "ISSUE-228 S9 player-registration target set",
+  "read_only": true,
+  "rows": [
+    {
+      "afl_api_observed_name": "Mitch Podhajski",
+      "afl_api_provider_id": "CD_I1004882",
+      "afl_api_snapshot_observed_names": [
+        "Mitch Podhajski"
+      ],
+      "afltables_club_evidence": [
+        "Collingwood"
+      ],
+      "afltables_external_id": "players/M/Mitch_Podhajski.html",
+      "afltables_jumper_evidence": [
+        46
+      ],
+      "afltables_observed_names": [
+        "Mitch Podhajski"
+      ],
+      "afltables_rows_at_target": 2,
+      "agreeing_core_vector_observations": 2,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 2,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-06-08",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Collingwood"
+      ],
+      "comparable_match_observations": 2,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/mitch_podhajski/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        46
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T40"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Milan Murdock",
+      "afl_api_provider_id": "CD_I1005972",
+      "afl_api_snapshot_observed_names": [
+        "Milan Murdock"
+      ],
+      "afltables_club_evidence": [
+        "West Coast"
+      ],
+      "afltables_external_id": "players/M/Milan_Murdock.html",
+      "afltables_jumper_evidence": [
+        47
+      ],
+      "afltables_observed_names": [
+        "Milan Murdock"
+      ],
+      "afltables_rows_at_target": 20,
+      "agreeing_core_vector_observations": 20,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 20,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-03-15",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "West Coast"
+      ],
+      "comparable_match_observations": 20,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/milan_murdock/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        47
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T150"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Billy Cootee",
+      "afl_api_provider_id": "CD_I1007053",
+      "afl_api_snapshot_observed_names": [
+        "Billy Cootee"
+      ],
+      "afltables_club_evidence": [
+        "Sydney"
+      ],
+      "afltables_external_id": "players/B/Billy_Cootee.html",
+      "afltables_jumper_evidence": [
+        25
+      ],
+      "afltables_observed_names": [
+        "Billy Cootee"
+      ],
+      "afltables_rows_at_target": 10,
+      "agreeing_core_vector_observations": 10,
+      "agreement": "single_candidate_non_unanimous",
+      "bridge_snapshot_row_count": 11,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-04-23",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Sydney"
+      ],
+      "comparable_match_observations": 11,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/billy_cootee/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        25
+      ],
+      "non_agreeing_observations": 1,
+      "non_unanimous_explanation": [
+        {
+          "nature": "no_afltables_row_for_this_fixture",
+          "note": "absence, not contradiction: the AFL Tables extraction carries no row for this game at the target profile",
+          "provider_match_id": "CD_M20260142802"
+        }
+      ],
+      "provider_team_ids": [
+        "CD_T160"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Jack Watkins",
+      "afl_api_provider_id": "CD_I1012002",
+      "afl_api_snapshot_observed_names": [
+        "Jack Watkins"
+      ],
+      "afltables_club_evidence": [
+        "Port Adelaide"
+      ],
+      "afltables_external_id": "players/J/Jack_Watkins.html",
+      "afltables_jumper_evidence": [
+        37
+      ],
+      "afltables_observed_names": [
+        "Jack Watkins"
+      ],
+      "afltables_rows_at_target": 11,
+      "agreeing_core_vector_observations": 11,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 11,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-03-15",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Port Adelaide"
+      ],
+      "comparable_match_observations": 11,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/jack_watkins/2",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        37
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T110"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Lukas Cooke",
+      "afl_api_provider_id": "CD_I1015301",
+      "afl_api_snapshot_observed_names": [
+        "Lukas Cooke"
+      ],
+      "afltables_club_evidence": [
+        "Melbourne"
+      ],
+      "afltables_external_id": "players/L/Lukas_Cooke.html",
+      "afltables_jumper_evidence": [
+        46
+      ],
+      "afltables_observed_names": [
+        "Lukas Cooke"
+      ],
+      "afltables_rows_at_target": 2,
+      "agreeing_core_vector_observations": 2,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 2,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-06-13",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Melbourne"
+      ],
+      "comparable_match_observations": 2,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/lukas_cooke/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        46
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T90"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Marcus Herbert",
+      "afl_api_provider_id": "CD_I1015798",
+      "afl_api_snapshot_observed_names": [
+        "Marcus Herbert"
+      ],
+      "afltables_club_evidence": [
+        "West Coast"
+      ],
+      "afltables_external_id": "players/M/Marcus_Herbert.html",
+      "afltables_jumper_evidence": [
+        51
+      ],
+      "afltables_observed_names": [
+        "Marcus Herbert"
+      ],
+      "afltables_rows_at_target": 10,
+      "agreeing_core_vector_observations": 10,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 10,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-06-13",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "West Coast"
+      ],
+      "comparable_match_observations": 10,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/marcus_herbert/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        51
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T150"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Tom Blamires",
+      "afl_api_provider_id": "CD_I1015883",
+      "afl_api_snapshot_observed_names": [
+        "Tom Blamires"
+      ],
+      "afltables_club_evidence": [
+        "North Melbourne"
+      ],
+      "afltables_external_id": "players/T/Tom_Blamires.html",
+      "afltables_jumper_evidence": [
+        39
+      ],
+      "afltables_observed_names": [
+        "Tom Blamires"
+      ],
+      "afltables_rows_at_target": 17,
+      "agreeing_core_vector_observations": 17,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 17,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-03-15",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "North Melbourne"
+      ],
+      "comparable_match_observations": 17,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/tom_blamires/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        39
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T100"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Wade Derksen",
+      "afl_api_provider_id": "CD_I1016140",
+      "afl_api_snapshot_observed_names": [
+        "Wade Derksen"
+      ],
+      "afltables_club_evidence": [
+        "Carlton"
+      ],
+      "afltables_external_id": "players/W/Wade_Derksen.html",
+      "afltables_jumper_evidence": [
+        47
+      ],
+      "afltables_observed_names": [
+        "Wade Derksen"
+      ],
+      "afltables_rows_at_target": 15,
+      "agreeing_core_vector_observations": 15,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 15,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-04-03",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Carlton"
+      ],
+      "comparable_match_observations": 15,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/wade_derksen/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        47
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T30"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Joel Fitzgerald",
+      "afl_api_provider_id": "CD_I1017073",
+      "afl_api_snapshot_observed_names": [
+        "Joel Fitzgerald"
+      ],
+      "afltables_club_evidence": [
+        "Melbourne"
+      ],
+      "afltables_external_id": "players/J/Joel_Fitzgerald.html",
+      "afltables_jumper_evidence": [
+        47
+      ],
+      "afltables_observed_names": [
+        "Joel Fitzgerald"
+      ],
+      "afltables_rows_at_target": 11,
+      "agreeing_core_vector_observations": 11,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 11,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-06-13",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Melbourne"
+      ],
+      "comparable_match_observations": 11,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/joel_fitzgerald/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        47
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T90"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Caleb Lewis",
+      "afl_api_provider_id": "CD_I1017493",
+      "afl_api_snapshot_observed_names": [
+        "Caleb Lewis"
+      ],
+      "afltables_club_evidence": [
+        "Gold Coast"
+      ],
+      "afltables_external_id": "players/C/Caleb_Lewis.html",
+      "afltables_jumper_evidence": [
+        45
+      ],
+      "afltables_observed_names": [
+        "Caleb Lewis"
+      ],
+      "afltables_rows_at_target": 2,
+      "agreeing_core_vector_observations": 2,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 2,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-07-19",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Gold Coast"
+      ],
+      "comparable_match_observations": 2,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/caleb_lewis/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        45
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T1000"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Liam Puncher",
+      "afl_api_provider_id": "CD_I1017745",
+      "afl_api_snapshot_observed_names": [
+        "Liam Puncher"
+      ],
+      "afltables_club_evidence": [
+        "Collingwood"
+      ],
+      "afltables_external_id": "players/L/Liam_Puncher.html",
+      "afltables_jumper_evidence": [
+        47
+      ],
+      "afltables_observed_names": [
+        "Liam Puncher"
+      ],
+      "afltables_rows_at_target": 8,
+      "agreeing_core_vector_observations": 8,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 8,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-07-04",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Collingwood"
+      ],
+      "comparable_match_observations": 8,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/liam_puncher/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        47
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T40"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "William Edwards",
+      "afl_api_provider_id": "CD_I1017757",
+      "afl_api_snapshot_observed_names": [
+        "William Edwards"
+      ],
+      "afltables_club_evidence": [
+        "Sydney"
+      ],
+      "afltables_external_id": "players/W/Will_Edwards.html",
+      "afltables_jumper_evidence": [
+        28
+      ],
+      "afltables_observed_names": [
+        "Will Edwards"
+      ],
+      "afltables_rows_at_target": 14,
+      "agreeing_core_vector_observations": 14,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 14,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-04-23",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Sydney"
+      ],
+      "comparable_match_observations": 14,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/will_edwards/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        28
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T160"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Alex Van Wyk",
+      "afl_api_provider_id": "CD_I1019944",
+      "afl_api_snapshot_observed_names": [
+        "Alex Van Wyk"
+      ],
+      "afltables_club_evidence": [
+        "Port Adelaide"
+      ],
+      "afltables_external_id": "players/A/Alex_Van_Wyk.html",
+      "afltables_jumper_evidence": [
+        47
+      ],
+      "afltables_observed_names": [
+        "Alex Van Wyk"
+      ],
+      "afltables_rows_at_target": 3,
+      "agreeing_core_vector_observations": 3,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 3,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-08-08",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Port Adelaide"
+      ],
+      "comparable_match_observations": 3,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/alex_van%20wyk/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        47
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T110"
+      ],
+      "surname_agreement_validation_only": false
+    },
+    {
+      "afl_api_observed_name": "Michael Sellwood",
+      "afl_api_provider_id": "CD_I1020621",
+      "afl_api_snapshot_observed_names": [
+        "Michael Sellwood"
+      ],
+      "afltables_club_evidence": [
+        "Western Bulldogs"
+      ],
+      "afltables_external_id": "players/M/Michael_Sellwood.html",
+      "afltables_jumper_evidence": [
+        37
+      ],
+      "afltables_observed_names": [
+        "Michael Sellwood"
+      ],
+      "afltables_rows_at_target": 24,
+      "agreeing_core_vector_observations": 24,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 24,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-03-07",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Western Bulldogs"
+      ],
+      "comparable_match_observations": 24,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/michael_sellwood/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        37
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T140"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Paddy Cross",
+      "afl_api_provider_id": "CD_I1020887",
+      "afl_api_snapshot_observed_names": [
+        "Paddy Cross"
+      ],
+      "afltables_club_evidence": [
+        "Melbourne"
+      ],
+      "afltables_external_id": "players/P/Paddy_Cross.html",
+      "afltables_jumper_evidence": [
+        41
+      ],
+      "afltables_observed_names": [
+        "Paddy Cross"
+      ],
+      "afltables_rows_at_target": 11,
+      "agreeing_core_vector_observations": 11,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 11,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-03-29",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Melbourne"
+      ],
+      "comparable_match_observations": 11,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/paddy_cross/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        41
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T90"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Toby Murray",
+      "afl_api_provider_id": "CD_I1020950",
+      "afl_api_snapshot_observed_names": [
+        "Toby Murray"
+      ],
+      "afltables_club_evidence": [
+        "Adelaide"
+      ],
+      "afltables_external_id": "players/T/Toby_Murray.html",
+      "afltables_jumper_evidence": [
+        39
+      ],
+      "afltables_observed_names": [
+        "Toby Murray"
+      ],
+      "afltables_rows_at_target": 13,
+      "agreeing_core_vector_observations": 13,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 13,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-03-14",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Adelaide"
+      ],
+      "comparable_match_observations": 13,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/toby_murray/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        39
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T10"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "William McCabe",
+      "afl_api_provider_id": "CD_I1022410",
+      "afl_api_snapshot_observed_names": [
+        "William McCabe"
+      ],
+      "afltables_club_evidence": [
+        "Hawthorn"
+      ],
+      "afltables_external_id": "players/W/Will_McCabe.html",
+      "afltables_jumper_evidence": [
+        27
+      ],
+      "afltables_observed_names": [
+        "Will McCabe"
+      ],
+      "afltables_rows_at_target": 4,
+      "agreeing_core_vector_observations": 4,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 4,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-04-18",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Hawthorn"
+      ],
+      "comparable_match_observations": 4,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/will_mccabe/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        27
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T80"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Bodie Ryan",
+      "afl_api_provider_id": "CD_I1022473",
+      "afl_api_snapshot_observed_names": [
+        "Bodie Ryan"
+      ],
+      "afltables_club_evidence": [
+        "Hawthorn"
+      ],
+      "afltables_external_id": "players/B/Bodie_Ryan.html",
+      "afltables_jumper_evidence": [
+        26
+      ],
+      "afltables_observed_names": [
+        "Bodie Ryan"
+      ],
+      "afltables_rows_at_target": 5,
+      "agreeing_core_vector_observations": 5,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 5,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-05-07",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Hawthorn"
+      ],
+      "comparable_match_observations": 5,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/bodie_ryan/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        26
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T80"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Noah Howes",
+      "afl_api_provider_id": "CD_I1022614",
+      "afl_api_snapshot_observed_names": [
+        "Noah Howes"
+      ],
+      "afltables_club_evidence": [
+        "Collingwood"
+      ],
+      "afltables_external_id": "players/N/Noah_Howes.html",
+      "afltables_jumper_evidence": [
+        40
+      ],
+      "afltables_observed_names": [
+        "Noah Howes"
+      ],
+      "afltables_rows_at_target": 2,
+      "agreeing_core_vector_observations": 2,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 2,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-08-09",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Collingwood"
+      ],
+      "comparable_match_observations": 2,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/noah_howes/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        40
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T40"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Latrelle Pickett",
+      "afl_api_provider_id": "CD_I1022677",
+      "afl_api_snapshot_observed_names": [
+        "Latrelle Pickett"
+      ],
+      "afltables_club_evidence": [
+        "Melbourne"
+      ],
+      "afltables_external_id": "players/L/Latrelle_Pickett.html",
+      "afltables_jumper_evidence": [
+        33
+      ],
+      "afltables_observed_names": [
+        "Latrelle Pickett"
+      ],
+      "afltables_rows_at_target": 16,
+      "agreeing_core_vector_observations": 16,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 16,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-03-15",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Melbourne"
+      ],
+      "comparable_match_observations": 16,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/latrelle_pickett/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        33
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T90"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Oscar Steene",
+      "afl_api_provider_id": "CD_I1022844",
+      "afl_api_snapshot_observed_names": [
+        "Oscar Steene"
+      ],
+      "afltables_club_evidence": [
+        "Collingwood"
+      ],
+      "afltables_external_id": "players/O/Oscar_Steene.html",
+      "afltables_jumper_evidence": [
+        21
+      ],
+      "afltables_observed_names": [
+        "Oscar Steene"
+      ],
+      "afltables_rows_at_target": 8,
+      "agreeing_core_vector_observations": 8,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 8,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-03-27",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Collingwood"
+      ],
+      "comparable_match_observations": 8,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/oscar_steene/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        21
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T40"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Hugo Hall-Kahan",
+      "afl_api_provider_id": "CD_I1023273",
+      "afl_api_snapshot_observed_names": [
+        "Hugo Hall-Kahan"
+      ],
+      "afltables_club_evidence": [
+        "Adelaide"
+      ],
+      "afltables_external_id": "players/H/Hugo_Hall-Kahan.html",
+      "afltables_jumper_evidence": [
+        40
+      ],
+      "afltables_observed_names": [
+        "Hugo Hall-Kahan"
+      ],
+      "afltables_rows_at_target": 13,
+      "agreeing_core_vector_observations": 12,
+      "agreement": "single_candidate_non_unanimous",
+      "bridge_snapshot_row_count": 13,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-06-04",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Adelaide"
+      ],
+      "comparable_match_observations": 13,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/hugo_hall-kahan/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        40
+      ],
+      "non_agreeing_observations": 1,
+      "non_unanimous_explanation": [
+        {
+          "afltables_date": "2026-09-12",
+          "afltables_round": "SF",
+          "core_columns_identical": 11,
+          "core_columns_total": 13,
+          "differing_columns": [
+            {
+              "afl_api_value": 17,
+              "afltables_column": "Kicks",
+              "afltables_value": 16,
+              "core_column": "kicks"
+            },
+            {
+              "afl_api_value": 1,
+              "afltables_column": "Clearances",
+              "afltables_value": 0,
+              "core_column": "clearances"
+            }
+          ],
+          "nature": "core_vector_disagreement_same_fixture",
+          "provider_match_id": "CD_M20260142702"
+        }
+      ],
+      "provider_team_ids": [
+        "CD_T10"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Angus Anderson",
+      "afl_api_provider_id": "CD_I1023744",
+      "afl_api_snapshot_observed_names": [
+        "Angus Anderson"
+      ],
+      "afltables_club_evidence": [
+        "Collingwood"
+      ],
+      "afltables_external_id": "players/A/Angus_Anderson.html",
+      "afltables_jumper_evidence": [
+        41
+      ],
+      "afltables_observed_names": [
+        "Angus Anderson"
+      ],
+      "afltables_rows_at_target": 17,
+      "agreeing_core_vector_observations": 17,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 17,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-04-10",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Collingwood"
+      ],
+      "comparable_match_observations": 17,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/angus_anderson/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        41
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T40"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Campbell Lake",
+      "afl_api_provider_id": "CD_I1024047",
+      "afl_api_snapshot_observed_names": [
+        "Campbell Lake"
+      ],
+      "afltables_club_evidence": [
+        "St Kilda"
+      ],
+      "afltables_external_id": "players/C/Campbell_Lake.html",
+      "afltables_jumper_evidence": [
+        39
+      ],
+      "afltables_observed_names": [
+        "Campbell Lake"
+      ],
+      "afltables_rows_at_target": 10,
+      "agreeing_core_vector_observations": 10,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 10,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-06-07",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "St Kilda"
+      ],
+      "comparable_match_observations": 10,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/campbell_lake/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        39
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T130"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Mitchell Edwards",
+      "afl_api_provider_id": "CD_I1024304",
+      "afl_api_snapshot_observed_names": [
+        "Mitchell Edwards"
+      ],
+      "afltables_club_evidence": [
+        "Geelong"
+      ],
+      "afltables_external_id": "players/M/Mitchell_Edwards.html",
+      "afltables_jumper_evidence": [
+        11
+      ],
+      "afltables_observed_names": [
+        "Mitchell Edwards"
+      ],
+      "afltables_rows_at_target": 20,
+      "agreeing_core_vector_observations": 20,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 20,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-03-14",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Geelong"
+      ],
+      "comparable_match_observations": 20,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/mitch_edwards/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        11
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T70"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Luker Kentfield",
+      "afl_api_provider_id": "CD_I1024337",
+      "afl_api_snapshot_observed_names": [
+        "Luker Kentfield"
+      ],
+      "afltables_club_evidence": [
+        "Melbourne"
+      ],
+      "afltables_external_id": "players/L/Luker_Kentfield.html",
+      "afltables_jumper_evidence": [
+        44
+      ],
+      "afltables_observed_names": [
+        "Luker Kentfield"
+      ],
+      "afltables_rows_at_target": 3,
+      "agreeing_core_vector_observations": 3,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 3,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-06-08",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Melbourne"
+      ],
+      "comparable_match_observations": 3,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/luker_kentfield/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        44
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T90"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Noah Roberts-Thomson",
+      "afl_api_provider_id": "CD_I1026974",
+      "afl_api_snapshot_observed_names": [
+        "Noah Roberts-Thomson"
+      ],
+      "afltables_club_evidence": [
+        "Richmond"
+      ],
+      "afltables_external_id": "players/N/Noah_Roberts-Thomson.html",
+      "afltables_jumper_evidence": [
+        27
+      ],
+      "afltables_observed_names": [
+        "Noah Roberts-Thomson"
+      ],
+      "afltables_rows_at_target": 3,
+      "agreeing_core_vector_observations": 3,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 3,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-05-17",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Richmond"
+      ],
+      "comparable_match_observations": 3,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/noah_roberts-thomson/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        27
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T120"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Sam Cumming",
+      "afl_api_provider_id": "CD_I1027099",
+      "afl_api_snapshot_observed_names": [
+        "Sam Cumming"
+      ],
+      "afltables_club_evidence": [
+        "Richmond"
+      ],
+      "afltables_external_id": "players/S/Sam_Cumming.html",
+      "afltables_jumper_evidence": [
+        22
+      ],
+      "afltables_observed_names": [
+        "Sam Cumming"
+      ],
+      "afltables_rows_at_target": 14,
+      "agreeing_core_vector_observations": 14,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 14,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-04-24",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Richmond"
+      ],
+      "comparable_match_observations": 14,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/sam_cumming/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        22
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T120"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Oliver Francou",
+      "afl_api_provider_id": "CD_I1027101",
+      "afl_api_snapshot_observed_names": [
+        "Oliver Francou"
+      ],
+      "afltables_club_evidence": [
+        "West Coast"
+      ],
+      "afltables_external_id": "players/O/Oliver_Francou.html",
+      "afltables_jumper_evidence": [
+        50
+      ],
+      "afltables_observed_names": [
+        "Oliver Francou"
+      ],
+      "afltables_rows_at_target": 4,
+      "agreeing_core_vector_observations": 4,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 4,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-07-03",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "West Coast"
+      ],
+      "comparable_match_observations": 4,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/oliver_francou/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        50
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T150"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Dyson Sharp",
+      "afl_api_provider_id": "CD_I1027168",
+      "afl_api_snapshot_observed_names": [
+        "Dyson Sharp"
+      ],
+      "afltables_club_evidence": [
+        "Essendon"
+      ],
+      "afltables_external_id": "players/D/Dyson_Sharp.html",
+      "afltables_jumper_evidence": [
+        15
+      ],
+      "afltables_observed_names": [
+        "Dyson Sharp"
+      ],
+      "afltables_rows_at_target": 15,
+      "agreeing_core_vector_observations": 15,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 15,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-03-13",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Essendon"
+      ],
+      "comparable_match_observations": 15,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/dyson_sharp/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        15
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T50"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Zane Peucker",
+      "afl_api_provider_id": "CD_I1027367",
+      "afl_api_snapshot_observed_names": [
+        "Zane Peucker"
+      ],
+      "afltables_club_evidence": [
+        "Richmond"
+      ],
+      "afltables_external_id": "players/Z/Zane_Peucker.html",
+      "afltables_jumper_evidence": [
+        26
+      ],
+      "afltables_observed_names": [
+        "Zane Peucker"
+      ],
+      "afltables_rows_at_target": 2,
+      "agreeing_core_vector_observations": 2,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 2,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-07-12",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Richmond"
+      ],
+      "comparable_match_observations": 2,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/zane_peucker/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        26
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T120"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Jay Polkinghorne",
+      "afl_api_provider_id": "CD_I1027428",
+      "afl_api_snapshot_observed_names": [
+        "Jay Polkinghorne"
+      ],
+      "afltables_club_evidence": [
+        "Geelong"
+      ],
+      "afltables_external_id": "players/J/Jay_Polkinghorne.html",
+      "afltables_jumper_evidence": [
+        2
+      ],
+      "afltables_observed_names": [
+        "Jay Polkinghorne"
+      ],
+      "afltables_rows_at_target": 8,
+      "agreeing_core_vector_observations": 8,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 8,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-07-16",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Geelong"
+      ],
+      "comparable_match_observations": 8,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/jay_polkinghorne/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        2
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T70"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Lachlan Smith",
+      "afl_api_provider_id": "CD_I1027702",
+      "afl_api_snapshot_observed_names": [
+        "Lachlan Smith"
+      ],
+      "afltables_club_evidence": [
+        "Western Bulldogs"
+      ],
+      "afltables_external_id": "players/L/Lachlan_Smith.html",
+      "afltables_jumper_evidence": [
+        40
+      ],
+      "afltables_observed_names": [
+        "Lachlan Smith"
+      ],
+      "afltables_rows_at_target": 2,
+      "agreeing_core_vector_observations": 2,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 2,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-04-23",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Western Bulldogs"
+      ],
+      "comparable_match_observations": 2,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/lachlan_smith/4",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        40
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T140"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Tobyn Murray",
+      "afl_api_provider_id": "CD_I1027844",
+      "afl_api_snapshot_observed_names": [
+        "Tobyn Murray"
+      ],
+      "afltables_club_evidence": [
+        "Fremantle"
+      ],
+      "afltables_external_id": "players/T/Tobyn_Murray.html",
+      "afltables_jumper_evidence": [
+        11
+      ],
+      "afltables_observed_names": [
+        "Tobyn Murray"
+      ],
+      "afltables_rows_at_target": 1,
+      "agreeing_core_vector_observations": 1,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 1,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-08-22",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Fremantle"
+      ],
+      "comparable_match_observations": 1,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/tobyn_murray/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        11
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T60"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Tom Anastasopoulos",
+      "afl_api_provider_id": "CD_I1027870",
+      "afl_api_snapshot_observed_names": [
+        "Tom Anastasopoulos"
+      ],
+      "afltables_club_evidence": [
+        "Port Adelaide"
+      ],
+      "afltables_external_id": "players/T/Tom_Anastasopoulos.html",
+      "afltables_jumper_evidence": [
+        29
+      ],
+      "afltables_observed_names": [
+        "Tom Anastasopoulos"
+      ],
+      "afltables_rows_at_target": 5,
+      "agreeing_core_vector_observations": 5,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 5,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-05-15",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Port Adelaide"
+      ],
+      "comparable_match_observations": 5,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/tom_anastasopoulos/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        29
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T110"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Oscar Ryan",
+      "afl_api_provider_id": "CD_I1027893",
+      "afl_api_snapshot_observed_names": [
+        "Oscar Ryan"
+      ],
+      "afltables_club_evidence": [
+        "Adelaide"
+      ],
+      "afltables_external_id": "players/O/Oscar_Ryan.html",
+      "afltables_jumper_evidence": [
+        22
+      ],
+      "afltables_observed_names": [
+        "Oscar Ryan"
+      ],
+      "afltables_rows_at_target": 2,
+      "agreeing_core_vector_observations": 2,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 2,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-08-02",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Adelaide"
+      ],
+      "comparable_match_observations": 2,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/oscar_ryan/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        22
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T10"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "William Green",
+      "afl_api_provider_id": "CD_I1027901",
+      "afl_api_snapshot_observed_names": [
+        "William Green"
+      ],
+      "afltables_club_evidence": [
+        "Sydney"
+      ],
+      "afltables_external_id": "players/W/Will_Green.html",
+      "afltables_jumper_evidence": [
+        45
+      ],
+      "afltables_observed_names": [
+        "Will Green"
+      ],
+      "afltables_rows_at_target": 3,
+      "agreeing_core_vector_observations": 3,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 3,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-08-08",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Sydney"
+      ],
+      "comparable_match_observations": 3,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/will_green/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        45
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T160"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Flynn Riley",
+      "afl_api_provider_id": "CD_I1027903",
+      "afl_api_snapshot_observed_names": [
+        "Flynn Riley"
+      ],
+      "afltables_club_evidence": [
+        "Carlton"
+      ],
+      "afltables_external_id": "players/F/Flynn_Riley.html",
+      "afltables_jumper_evidence": [
+        38
+      ],
+      "afltables_observed_names": [
+        "Flynn Riley"
+      ],
+      "afltables_rows_at_target": 1,
+      "agreeing_core_vector_observations": 1,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 1,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-07-11",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Carlton"
+      ],
+      "comparable_match_observations": 1,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/flynn_riley/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        38
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T30"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Oliver Hannaford",
+      "afl_api_provider_id": "CD_I1028485",
+      "afl_api_snapshot_observed_names": [
+        "Oliver Hannaford"
+      ],
+      "afltables_club_evidence": [
+        "Greater Western Sydney"
+      ],
+      "afltables_external_id": "players/O/Oliver_Hannaford.html",
+      "afltables_jumper_evidence": [
+        13
+      ],
+      "afltables_observed_names": [
+        "Oliver Hannaford"
+      ],
+      "afltables_rows_at_target": 5,
+      "agreeing_core_vector_observations": 5,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 5,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-03-27",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Greater Western Sydney"
+      ],
+      "comparable_match_observations": 5,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/ollie_hannaford/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        13
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T1010"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Lachie Jaques",
+      "afl_api_provider_id": "CD_I1028493",
+      "afl_api_snapshot_observed_names": [
+        "Lachie Jaques"
+      ],
+      "afltables_club_evidence": [
+        "Western Bulldogs"
+      ],
+      "afltables_external_id": "players/L/Lachie_Jaques.html",
+      "afltables_jumper_evidence": [
+        11
+      ],
+      "afltables_observed_names": [
+        "Lachie Jaques"
+      ],
+      "afltables_rows_at_target": 10,
+      "agreeing_core_vector_observations": 10,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 10,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-03-07",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Western Bulldogs"
+      ],
+      "comparable_match_observations": 10,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/lachie_jaques/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        11
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T140"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Jagga Smith",
+      "afl_api_provider_id": "CD_I1028515",
+      "afl_api_snapshot_observed_names": [
+        "Jagga Smith"
+      ],
+      "afltables_club_evidence": [
+        "Carlton"
+      ],
+      "afltables_external_id": "players/J/Jagga_Smith.html",
+      "afltables_jumper_evidence": [
+        7
+      ],
+      "afltables_observed_names": [
+        "Jagga Smith"
+      ],
+      "afltables_rows_at_target": 25,
+      "agreeing_core_vector_observations": 25,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 25,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-03-05",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Carlton"
+      ],
+      "comparable_match_observations": 25,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/jagga_smith/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        7
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T30"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Jack Ough",
+      "afl_api_provider_id": "CD_I1028539",
+      "afl_api_snapshot_observed_names": [
+        "Jack Ough"
+      ],
+      "afltables_club_evidence": [
+        "Greater Western Sydney"
+      ],
+      "afltables_external_id": "players/J/Jack_Ough.html",
+      "afltables_jumper_evidence": [
+        28
+      ],
+      "afltables_observed_names": [
+        "Jack Ough"
+      ],
+      "afltables_rows_at_target": 5,
+      "agreeing_core_vector_observations": 5,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 5,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-07-04",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Greater Western Sydney"
+      ],
+      "comparable_match_observations": 5,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/jack_ough/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        28
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T1010"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Harrison Oliver",
+      "afl_api_provider_id": "CD_I1028562",
+      "afl_api_snapshot_observed_names": [
+        "Harrison Oliver"
+      ],
+      "afltables_club_evidence": [
+        "Greater Western Sydney"
+      ],
+      "afltables_external_id": "players/H/Harrison_Oliver.html",
+      "afltables_jumper_evidence": [
+        19
+      ],
+      "afltables_observed_names": [
+        "Harrison Oliver"
+      ],
+      "afltables_rows_at_target": 5,
+      "agreeing_core_vector_observations": 5,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 5,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-05-17",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Greater Western Sydney"
+      ],
+      "comparable_match_observations": 5,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/harry_oliver/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        19
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T1010"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Noah Mraz",
+      "afl_api_provider_id": "CD_I1028643",
+      "afl_api_snapshot_observed_names": [
+        "Noah Mraz"
+      ],
+      "afltables_club_evidence": [
+        "Hawthorn"
+      ],
+      "afltables_external_id": "players/N/Noah_Mraz.html",
+      "afltables_jumper_evidence": [
+        21
+      ],
+      "afltables_observed_names": [
+        "Noah Mraz"
+      ],
+      "afltables_rows_at_target": 4,
+      "agreeing_core_vector_observations": 4,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 4,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-07-04",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Hawthorn"
+      ],
+      "comparable_match_observations": 4,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/noah_mraz/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        21
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T80"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Charlie Edwards",
+      "afl_api_provider_id": "CD_I1028671",
+      "afl_api_snapshot_observed_names": [
+        "Charlie Edwards"
+      ],
+      "afltables_club_evidence": [
+        "Adelaide"
+      ],
+      "afltables_external_id": "players/C/Charlie_Edwards.html",
+      "afltables_jumper_evidence": [
+        11
+      ],
+      "afltables_observed_names": [
+        "Charlie Edwards"
+      ],
+      "afltables_rows_at_target": 2,
+      "agreeing_core_vector_observations": 2,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 2,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-04-18",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Adelaide"
+      ],
+      "comparable_match_observations": 2,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/charlie_edwards/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        11
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T10"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Cooper Duff-Tytler",
+      "afl_api_provider_id": "CD_I1028725",
+      "afl_api_snapshot_observed_names": [
+        "Cooper Duff-Tytler"
+      ],
+      "afltables_club_evidence": [
+        "West Coast"
+      ],
+      "afltables_external_id": "players/C/Cooper_Duff-Tytler.html",
+      "afltables_jumper_evidence": [
+        21
+      ],
+      "afltables_observed_names": [
+        "Cooper Duff-Tytler"
+      ],
+      "afltables_rows_at_target": 16,
+      "agreeing_core_vector_observations": 16,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 16,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-03-15",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "West Coast"
+      ],
+      "comparable_match_observations": 16,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/cooper_duff-tytler/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        21
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T150"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Riley Hamilton",
+      "afl_api_provider_id": "CD_I1029046",
+      "afl_api_snapshot_observed_names": [
+        "Riley Hamilton"
+      ],
+      "afltables_club_evidence": [
+        "Greater Western Sydney"
+      ],
+      "afltables_external_id": "players/R/Riley_Hamilton.html",
+      "afltables_jumper_evidence": [
+        43
+      ],
+      "afltables_observed_names": [
+        "Riley Hamilton"
+      ],
+      "afltables_rows_at_target": 8,
+      "agreeing_core_vector_observations": 8,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 8,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-07-04",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Greater Western Sydney"
+      ],
+      "comparable_match_observations": 8,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/riley_hamilton/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        43
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T1010"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Zeke Uwland",
+      "afl_api_provider_id": "CD_I1029297",
+      "afl_api_snapshot_observed_names": [
+        "Zeke Uwland"
+      ],
+      "afltables_club_evidence": [
+        "Gold Coast"
+      ],
+      "afltables_external_id": "players/Z/Zeke_Uwland.html",
+      "afltables_jumper_evidence": [
+        32
+      ],
+      "afltables_observed_names": [
+        "Zeke Uwland"
+      ],
+      "afltables_rows_at_target": 17,
+      "agreeing_core_vector_observations": 17,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 17,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-03-06",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Gold Coast"
+      ],
+      "comparable_match_observations": 17,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/zeke_uwland/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        32
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T1000"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Jai Murray",
+      "afl_api_provider_id": "CD_I1029307",
+      "afl_api_snapshot_observed_names": [
+        "Jai Murray"
+      ],
+      "afltables_club_evidence": [
+        "Gold Coast"
+      ],
+      "afltables_external_id": "players/J/Jai_Murray.html",
+      "afltables_jumper_evidence": [
+        35
+      ],
+      "afltables_observed_names": [
+        "Jai Murray"
+      ],
+      "afltables_rows_at_target": 9,
+      "agreeing_core_vector_observations": 9,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 9,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-06-06",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Gold Coast"
+      ],
+      "comparable_match_observations": 9,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/jai_murray/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        35
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T1000"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Daniel Annable",
+      "afl_api_provider_id": "CD_I1029326",
+      "afl_api_snapshot_observed_names": [
+        "Daniel Annable"
+      ],
+      "afltables_club_evidence": [
+        "Brisbane Lions"
+      ],
+      "afltables_external_id": "players/D/Daniel_Annable.html",
+      "afltables_jumper_evidence": [
+        14
+      ],
+      "afltables_observed_names": [
+        "Daniel Annable"
+      ],
+      "afltables_rows_at_target": 3,
+      "agreeing_core_vector_observations": 3,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 3,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-03-14",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Brisbane Lions"
+      ],
+      "comparable_match_observations": 3,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/daniel_annable/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        14
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T20"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Max Beattie",
+      "afl_api_provider_id": "CD_I1029417",
+      "afl_api_snapshot_observed_names": [
+        "Max Beattie"
+      ],
+      "afltables_club_evidence": [
+        "Hawthorn"
+      ],
+      "afltables_external_id": "players/M/Max_Beattie.html",
+      "afltables_jumper_evidence": [
+        40
+      ],
+      "afltables_observed_names": [
+        "Max Beattie"
+      ],
+      "afltables_rows_at_target": 3,
+      "agreeing_core_vector_observations": 3,
+      "agreement": "single_candidate_non_unanimous",
+      "bridge_snapshot_row_count": 4,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-08-15",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Hawthorn"
+      ],
+      "comparable_match_observations": 4,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/max_beattie/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        40
+      ],
+      "non_agreeing_observations": 1,
+      "non_unanimous_explanation": [
+        {
+          "nature": "no_afltables_row_for_this_fixture",
+          "note": "absence, not contradiction: the AFL Tables extraction carries no row for this game at the target profile",
+          "provider_match_id": "CD_M20260142801"
+        }
+      ],
+      "provider_team_ids": [
+        "CD_T80"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Mitch Zadow",
+      "afl_api_provider_id": "CD_I1029603",
+      "afl_api_snapshot_observed_names": [
+        "Mitch Zadow"
+      ],
+      "afltables_club_evidence": [
+        "Port Adelaide"
+      ],
+      "afltables_external_id": "players/M/Mitch_Zadow.html",
+      "afltables_jumper_evidence": [
+        39
+      ],
+      "afltables_observed_names": [
+        "Mitch Zadow"
+      ],
+      "afltables_rows_at_target": 9,
+      "agreeing_core_vector_observations": 9,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 9,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-04-04",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Port Adelaide"
+      ],
+      "comparable_match_observations": 9,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/mitch_zadow/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        39
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T110"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Hussien El Achkar",
+      "afl_api_provider_id": "CD_I1030308",
+      "afl_api_snapshot_observed_names": [
+        "Hussien El Achkar"
+      ],
+      "afltables_club_evidence": [
+        "Essendon"
+      ],
+      "afltables_external_id": "players/H/Hussien_El_Achkar.html",
+      "afltables_jumper_evidence": [
+        33
+      ],
+      "afltables_observed_names": [
+        "Hussien El Achkar"
+      ],
+      "afltables_rows_at_target": 9,
+      "agreeing_core_vector_observations": 9,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 9,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-03-13",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Essendon"
+      ],
+      "comparable_match_observations": 9,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/hussien_el%20achkar/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        33
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T50"
+      ],
+      "surname_agreement_validation_only": false
+    },
+    {
+      "afl_api_observed_name": "Aidan Schubert",
+      "afl_api_provider_id": "CD_I1031492",
+      "afl_api_snapshot_observed_names": [
+        "Aidan Schubert"
+      ],
+      "afltables_club_evidence": [
+        "Hawthorn"
+      ],
+      "afltables_external_id": "players/A/Aidan_Schubert.html",
+      "afltables_jumper_evidence": [
+        29
+      ],
+      "afltables_observed_names": [
+        "Aidan Schubert"
+      ],
+      "afltables_rows_at_target": 1,
+      "agreeing_core_vector_observations": 1,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 1,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-08-01",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Hawthorn"
+      ],
+      "comparable_match_observations": 1,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/aidan_schubert/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        29
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T80"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Taylor Goad",
+      "afl_api_provider_id": "CD_I1031506",
+      "afl_api_snapshot_observed_names": [
+        "Taylor Goad"
+      ],
+      "afltables_club_evidence": [
+        "North Melbourne"
+      ],
+      "afltables_external_id": "players/T/Taylor_Goad.html",
+      "afltables_jumper_evidence": [
+        22
+      ],
+      "afltables_observed_names": [
+        "Taylor Goad"
+      ],
+      "afltables_rows_at_target": 2,
+      "agreeing_core_vector_observations": 2,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 2,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-06-13",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "North Melbourne"
+      ],
+      "comparable_match_observations": 2,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/taylor_goad/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        22
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T100"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Phoenix Gothard",
+      "afl_api_provider_id": "CD_I1032042",
+      "afl_api_snapshot_observed_names": [
+        "Phoenix Gothard"
+      ],
+      "afltables_club_evidence": [
+        "Greater Western Sydney"
+      ],
+      "afltables_external_id": "players/P/Phoenix_Gothard.html",
+      "afltables_jumper_evidence": [
+        11
+      ],
+      "afltables_observed_names": [
+        "Phoenix Gothard"
+      ],
+      "afltables_rows_at_target": 16,
+      "agreeing_core_vector_observations": 16,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 16,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-03-07",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Greater Western Sydney"
+      ],
+      "comparable_match_observations": 16,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/phoenix_gothard/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        11
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T1010"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Patrick Retschko",
+      "afl_api_provider_id": "CD_I1032081",
+      "afl_api_snapshot_observed_names": [
+        "Patrick Retschko"
+      ],
+      "afltables_club_evidence": [
+        "Richmond"
+      ],
+      "afltables_external_id": "players/P/Patrick_Retschko.html",
+      "afltables_jumper_evidence": [
+        33
+      ],
+      "afltables_observed_names": [
+        "Patrick Retschko"
+      ],
+      "afltables_rows_at_target": 18,
+      "agreeing_core_vector_observations": 18,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 18,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-04-19",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Richmond"
+      ],
+      "comparable_match_observations": 18,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/patrick_retschko/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        33
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T120"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Luke Kennedy",
+      "afl_api_provider_id": "CD_I1032112",
+      "afl_api_snapshot_observed_names": [
+        "Luke Kennedy"
+      ],
+      "afltables_club_evidence": [
+        "Western Bulldogs"
+      ],
+      "afltables_external_id": "players/L/Luke_Kennedy.html",
+      "afltables_jumper_evidence": [
+        35
+      ],
+      "afltables_observed_names": [
+        "Luke Kennedy"
+      ],
+      "afltables_rows_at_target": 8,
+      "agreeing_core_vector_observations": 8,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 8,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-06-11",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Western Bulldogs"
+      ],
+      "comparable_match_observations": 8,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/luke_kennedy/2",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        35
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T140"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Balyn O'Brien",
+      "afl_api_provider_id": "CD_I1032329",
+      "afl_api_snapshot_observed_names": [
+        "Balyn O'Brien"
+      ],
+      "afltables_club_evidence": [
+        "Port Adelaide"
+      ],
+      "afltables_external_id": "players/B/Balyn_OBrien.html",
+      "afltables_jumper_evidence": [
+        41
+      ],
+      "afltables_observed_names": [
+        "Balyn OBrien"
+      ],
+      "afltables_rows_at_target": 6,
+      "agreeing_core_vector_observations": 6,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 6,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-07-18",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Port Adelaide"
+      ],
+      "comparable_match_observations": 6,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/balyn_o'brien/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        41
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T110"
+      ],
+      "surname_agreement_validation_only": false
+    },
+    {
+      "afl_api_observed_name": "Beau Addinsall",
+      "afl_api_provider_id": "CD_I1032398",
+      "afl_api_snapshot_observed_names": [
+        "Beau Addinsall"
+      ],
+      "afltables_club_evidence": [
+        "Gold Coast"
+      ],
+      "afltables_external_id": "players/B/Beau_Addinsall.html",
+      "afltables_jumper_evidence": [
+        38
+      ],
+      "afltables_observed_names": [
+        "Beau Addinsall"
+      ],
+      "afltables_rows_at_target": 9,
+      "agreeing_core_vector_observations": 9,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 9,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-06-19",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Gold Coast"
+      ],
+      "comparable_match_observations": 9,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/beau_addinsall/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        38
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T1000"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Cameron Nairn",
+      "afl_api_provider_id": "CD_I1032408",
+      "afl_api_snapshot_observed_names": [
+        "Cameron Nairn"
+      ],
+      "afltables_club_evidence": [
+        "Hawthorn"
+      ],
+      "afltables_external_id": "players/C/Cameron_Nairn.html",
+      "afltables_jumper_evidence": [
+        22
+      ],
+      "afltables_observed_names": [
+        "Cameron Nairn"
+      ],
+      "afltables_rows_at_target": 4,
+      "agreeing_core_vector_observations": 4,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 4,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-05-21",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Hawthorn"
+      ],
+      "comparable_match_observations": 4,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/cam_nairn/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        22
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T80"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Zane Zakostelsky",
+      "afl_api_provider_id": "CD_I1032650",
+      "afl_api_snapshot_observed_names": [
+        "Zane Zakostelsky"
+      ],
+      "afltables_club_evidence": [
+        "Brisbane Lions"
+      ],
+      "afltables_external_id": "players/Z/Zane_Zakostelsky.html",
+      "afltables_jumper_evidence": [
+        21
+      ],
+      "afltables_observed_names": [
+        "Zane Zakostelsky"
+      ],
+      "afltables_rows_at_target": 3,
+      "agreeing_core_vector_observations": 3,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 3,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-03-07",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Brisbane Lions"
+      ],
+      "comparable_match_observations": 3,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/zane_zakostelsky/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        21
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T20"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Jaxon Artemis",
+      "afl_api_provider_id": "CD_I1032777",
+      "afl_api_snapshot_observed_names": [
+        "Jaxon Artemis"
+      ],
+      "afltables_club_evidence": [
+        "Essendon"
+      ],
+      "afltables_external_id": "players/J/Jaxon_Artemis.html",
+      "afltables_jumper_evidence": [
+        34
+      ],
+      "afltables_observed_names": [
+        "Jaxon Artemis"
+      ],
+      "afltables_rows_at_target": 6,
+      "agreeing_core_vector_observations": 6,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 6,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-07-19",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Essendon"
+      ],
+      "comparable_match_observations": 6,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/jaxon_artemis/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        34
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T50"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Jack Dalton",
+      "afl_api_provider_id": "CD_I1033042",
+      "afl_api_snapshot_observed_names": [
+        "Jack Dalton"
+      ],
+      "afltables_club_evidence": [
+        "Hawthorn"
+      ],
+      "afltables_external_id": "players/J/Jack_Dalton1.html",
+      "afltables_jumper_evidence": [
+        34
+      ],
+      "afltables_observed_names": [
+        "Jack Dalton"
+      ],
+      "afltables_rows_at_target": 5,
+      "agreeing_core_vector_observations": 5,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 5,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-04-06",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Hawthorn"
+      ],
+      "comparable_match_observations": 5,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/jack_dalton/2",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        34
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T80"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Xavier Bamert",
+      "afl_api_provider_id": "CD_I1033049",
+      "afl_api_snapshot_observed_names": [
+        "Xavier Bamert"
+      ],
+      "afltables_club_evidence": [
+        "Port Adelaide"
+      ],
+      "afltables_external_id": "players/X/Xavier_Bamert.html",
+      "afltables_jumper_evidence": [
+        46
+      ],
+      "afltables_observed_names": [
+        "Xavier Bamert"
+      ],
+      "afltables_rows_at_target": 10,
+      "agreeing_core_vector_observations": 10,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 10,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-06-13",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Port Adelaide"
+      ],
+      "comparable_match_observations": 10,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/xavier_bamert/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        46
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T110"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Archie Ludowyke",
+      "afl_api_provider_id": "CD_I1033053",
+      "afl_api_snapshot_observed_names": [
+        "Archie Ludowyke"
+      ],
+      "afltables_club_evidence": [
+        "Adelaide"
+      ],
+      "afltables_external_id": "players/A/Archie_Ludowyke.html",
+      "afltables_jumper_evidence": [
+        34
+      ],
+      "afltables_observed_names": [
+        "Archie Ludowyke"
+      ],
+      "afltables_rows_at_target": 2,
+      "agreeing_core_vector_observations": 2,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 2,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-08-02",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Adelaide"
+      ],
+      "comparable_match_observations": 2,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/archie_ludowyke/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        34
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T10"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Tom Burton",
+      "afl_api_provider_id": "CD_I1033059",
+      "afl_api_snapshot_observed_names": [
+        "Tom Burton"
+      ],
+      "afltables_club_evidence": [
+        "Richmond"
+      ],
+      "afltables_external_id": "players/T/Tom_Burton.html",
+      "afltables_jumper_evidence": [
+        45
+      ],
+      "afltables_observed_names": [
+        "Tom Burton"
+      ],
+      "afltables_rows_at_target": 5,
+      "agreeing_core_vector_observations": 5,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 5,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-04-24",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Richmond"
+      ],
+      "comparable_match_observations": 5,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/tom_burton/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        45
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T120"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Lachy Dovaston",
+      "afl_api_provider_id": "CD_I1033060",
+      "afl_api_snapshot_observed_names": [
+        "Lachy Dovaston"
+      ],
+      "afltables_club_evidence": [
+        "North Melbourne"
+      ],
+      "afltables_external_id": "players/L/Lachy_Dovaston.html",
+      "afltables_jumper_evidence": [
+        1
+      ],
+      "afltables_observed_names": [
+        "Lachy Dovaston"
+      ],
+      "afltables_rows_at_target": 6,
+      "agreeing_core_vector_observations": 6,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 6,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-03-15",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "North Melbourne"
+      ],
+      "comparable_match_observations": 6,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/lachy_dovaston/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        1
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T100"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Jack Ison",
+      "afl_api_provider_id": "CD_I1033066",
+      "afl_api_snapshot_observed_names": [
+        "Jack Ison"
+      ],
+      "afltables_club_evidence": [
+        "Carlton"
+      ],
+      "afltables_external_id": "players/J/Jack_Ison.html",
+      "afltables_jumper_evidence": [
+        30
+      ],
+      "afltables_observed_names": [
+        "Jack Ison"
+      ],
+      "afltables_rows_at_target": 8,
+      "agreeing_core_vector_observations": 8,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 8,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-05-16",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Carlton"
+      ],
+      "comparable_match_observations": 8,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/jack_ison/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        30
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T30"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Oliver Greeves",
+      "afl_api_provider_id": "CD_I1033071",
+      "afl_api_snapshot_observed_names": [
+        "Oliver Greeves"
+      ],
+      "afltables_club_evidence": [
+        "Hawthorn"
+      ],
+      "afltables_external_id": "players/O/Ollie_Greeves.html",
+      "afltables_jumper_evidence": [
+        35
+      ],
+      "afltables_observed_names": [
+        "Ollie Greeves"
+      ],
+      "afltables_rows_at_target": 4,
+      "agreeing_core_vector_observations": 4,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 4,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-07-11",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Hawthorn"
+      ],
+      "comparable_match_observations": 4,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/ollie_greeves/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        35
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T80"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Xavier Taylor",
+      "afl_api_provider_id": "CD_I1033072",
+      "afl_api_snapshot_observed_names": [
+        "Xavier Taylor"
+      ],
+      "afltables_club_evidence": [
+        "Melbourne"
+      ],
+      "afltables_external_id": "players/X/Xavier_Taylor.html",
+      "afltables_jumper_evidence": [
+        19
+      ],
+      "afltables_observed_names": [
+        "Xavier Taylor"
+      ],
+      "afltables_rows_at_target": 3,
+      "agreeing_core_vector_observations": 3,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 3,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-04-19",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Melbourne"
+      ],
+      "comparable_match_observations": 3,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/xavier_taylor/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        19
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T90"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Louis Emmett",
+      "afl_api_provider_id": "CD_I1033076",
+      "afl_api_snapshot_observed_names": [
+        "Louis Emmett"
+      ],
+      "afltables_club_evidence": [
+        "Western Bulldogs"
+      ],
+      "afltables_external_id": "players/L/Louis_Emmett.html",
+      "afltables_jumper_evidence": [
+        25
+      ],
+      "afltables_observed_names": [
+        "Louis Emmett"
+      ],
+      "afltables_rows_at_target": 7,
+      "agreeing_core_vector_observations": 7,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 7,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-04-11",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Western Bulldogs"
+      ],
+      "comparable_match_observations": 7,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/louis_emmett/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        25
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T140"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Josh Lindsay",
+      "afl_api_provider_id": "CD_I1033078",
+      "afl_api_snapshot_observed_names": [
+        "Josh Lindsay"
+      ],
+      "afltables_club_evidence": [
+        "West Coast"
+      ],
+      "afltables_external_id": "players/J/Josh_Lindsay.html",
+      "afltables_jumper_evidence": [
+        5
+      ],
+      "afltables_observed_names": [
+        "Josh Lindsay"
+      ],
+      "afltables_rows_at_target": 15,
+      "agreeing_core_vector_observations": 15,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 15,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-03-15",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "West Coast"
+      ],
+      "comparable_match_observations": 15,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/josh_lindsay/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        5
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T150"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Harry Dean",
+      "afl_api_provider_id": "CD_I1033084",
+      "afl_api_snapshot_observed_names": [
+        "Harry Dean"
+      ],
+      "afltables_club_evidence": [
+        "Carlton"
+      ],
+      "afltables_external_id": "players/H/Harry_Dean.html",
+      "afltables_jumper_evidence": [
+        35
+      ],
+      "afltables_observed_names": [
+        "Harry Dean"
+      ],
+      "afltables_rows_at_target": 22,
+      "agreeing_core_vector_observations": 22,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 22,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-03-05",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Carlton"
+      ],
+      "comparable_match_observations": 22,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/harry_dean/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        35
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T30"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Willem Duursma",
+      "afl_api_provider_id": "CD_I1033115",
+      "afl_api_snapshot_observed_names": [
+        "Willem Duursma"
+      ],
+      "afltables_club_evidence": [
+        "West Coast"
+      ],
+      "afltables_external_id": "players/W/Willem_Duursma.html",
+      "afltables_jumper_evidence": [
+        1
+      ],
+      "afltables_observed_names": [
+        "Willem Duursma"
+      ],
+      "afltables_rows_at_target": 22,
+      "agreeing_core_vector_observations": 22,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 22,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-03-15",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "West Coast"
+      ],
+      "comparable_match_observations": 22,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/willem_duursma/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        1
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T150"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Kye Annand",
+      "afl_api_provider_id": "CD_I1033488",
+      "afl_api_snapshot_observed_names": [
+        "Kye Annand"
+      ],
+      "afltables_club_evidence": [
+        "Richmond"
+      ],
+      "afltables_external_id": "players/K/Kye_Annand.html",
+      "afltables_jumper_evidence": [
+        41
+      ],
+      "afltables_observed_names": [
+        "Kye Annand"
+      ],
+      "afltables_rows_at_target": 11,
+      "agreeing_core_vector_observations": 11,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 11,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-06-14",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Richmond"
+      ],
+      "comparable_match_observations": 11,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/kye_annand/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        41
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T120"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Dylan Patterson",
+      "afl_api_provider_id": "CD_I1033568",
+      "afl_api_snapshot_observed_names": [
+        "Dylan Patterson"
+      ],
+      "afltables_club_evidence": [
+        "Gold Coast"
+      ],
+      "afltables_external_id": "players/D/Dylan_Patterson.html",
+      "afltables_jumper_evidence": [
+        30
+      ],
+      "afltables_observed_names": [
+        "Dylan Patterson"
+      ],
+      "afltables_rows_at_target": 5,
+      "agreeing_core_vector_observations": 5,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 5,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-07-04",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Gold Coast"
+      ],
+      "comparable_match_observations": 5,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/dylan_patterson/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        30
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T1000"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Lachlan Carmichael",
+      "afl_api_provider_id": "CD_I1033626",
+      "afl_api_snapshot_observed_names": [
+        "Lachlan Carmichael"
+      ],
+      "afltables_club_evidence": [
+        "Western Bulldogs"
+      ],
+      "afltables_external_id": "players/L/Lachlan_Carmichael.html",
+      "afltables_jumper_evidence": [
+        2
+      ],
+      "afltables_observed_names": [
+        "Lachlan Carmichael"
+      ],
+      "afltables_rows_at_target": 2,
+      "agreeing_core_vector_observations": 2,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 2,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-08-16",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Western Bulldogs"
+      ],
+      "comparable_match_observations": 2,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/lachlan_carmichael/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        2
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T140"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Jacob Farrow",
+      "afl_api_provider_id": "CD_I1034305",
+      "afl_api_snapshot_observed_names": [
+        "Jacob Farrow"
+      ],
+      "afltables_club_evidence": [
+        "Essendon"
+      ],
+      "afltables_external_id": "players/J/Jacob_Farrow.html",
+      "afltables_jumper_evidence": [
+        2
+      ],
+      "afltables_observed_names": [
+        "Jacob Farrow"
+      ],
+      "afltables_rows_at_target": 21,
+      "agreeing_core_vector_observations": 21,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 21,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-03-28",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Essendon"
+      ],
+      "comparable_match_observations": 21,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/jacob_farrow/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        2
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T50"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Oliver Hayes-Brown",
+      "afl_api_provider_id": "CD_I1035199",
+      "afl_api_snapshot_observed_names": [
+        "Oliver Hayes-Brown"
+      ],
+      "afltables_club_evidence": [
+        "Richmond"
+      ],
+      "afltables_external_id": "players/O/Oliver_Hayes-Brown.html",
+      "afltables_jumper_evidence": [
+        47
+      ],
+      "afltables_observed_names": [
+        "Oliver Hayes-Brown"
+      ],
+      "afltables_rows_at_target": 7,
+      "agreeing_core_vector_observations": 7,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 7,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-04-12",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Richmond"
+      ],
+      "comparable_match_observations": 7,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/oliver_hayes-brown/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        47
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T120"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Will Lewis",
+      "afl_api_provider_id": "CD_I1036104",
+      "afl_api_snapshot_observed_names": [
+        "Will Lewis"
+      ],
+      "afltables_club_evidence": [
+        "Western Bulldogs"
+      ],
+      "afltables_external_id": "players/W/Will_Lewis.html",
+      "afltables_jumper_evidence": [
+        28
+      ],
+      "afltables_observed_names": [
+        "Will Lewis"
+      ],
+      "afltables_rows_at_target": 13,
+      "agreeing_core_vector_observations": 13,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 13,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-03-14",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Western Bulldogs"
+      ],
+      "comparable_match_observations": 13,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/will_lewis/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        28
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T140"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Talor Byrne",
+      "afl_api_provider_id": "CD_I1036426",
+      "afl_api_snapshot_observed_names": [
+        "Talor Byrne"
+      ],
+      "afltables_club_evidence": [
+        "Carlton"
+      ],
+      "afltables_external_id": "players/T/Talor_Byrne.html",
+      "afltables_jumper_evidence": [
+        39
+      ],
+      "afltables_observed_names": [
+        "Talor Byrne"
+      ],
+      "afltables_rows_at_target": 20,
+      "agreeing_core_vector_observations": 19,
+      "agreement": "single_candidate_non_unanimous",
+      "bridge_snapshot_row_count": 20,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-03-29",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Carlton"
+      ],
+      "comparable_match_observations": 20,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/talor_byrne/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        39
+      ],
+      "non_agreeing_observations": 1,
+      "non_unanimous_explanation": [
+        {
+          "afltables_date": "2026-05-23",
+          "afltables_round": "12",
+          "core_columns_identical": 12,
+          "core_columns_total": 13,
+          "differing_columns": [
+            {
+              "afl_api_value": 1,
+              "afltables_column": "Frees.Against",
+              "afltables_value": 0,
+              "core_column": "frees_against"
+            }
+          ],
+          "nature": "core_vector_disagreement_same_fixture",
+          "provider_match_id": "CD_M20260141107"
+        }
+      ],
+      "provider_team_ids": [
+        "CD_T30"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Sam Grlj",
+      "afl_api_provider_id": "CD_I1036579",
+      "afl_api_snapshot_observed_names": [
+        "Sam Grlj"
+      ],
+      "afltables_club_evidence": [
+        "Richmond"
+      ],
+      "afltables_external_id": "players/S/Sam_Grlj.html",
+      "afltables_jumper_evidence": [
+        24
+      ],
+      "afltables_observed_names": [
+        "Sam Grlj"
+      ],
+      "afltables_rows_at_target": 21,
+      "agreeing_core_vector_observations": 21,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 21,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-03-12",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Richmond"
+      ],
+      "comparable_match_observations": 21,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/sam_grlj/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        24
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T120"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Max Kondogiannis",
+      "afl_api_provider_id": "CD_I1036584",
+      "afl_api_snapshot_observed_names": [
+        "Max Kondogiannis"
+      ],
+      "afltables_club_evidence": [
+        "Essendon"
+      ],
+      "afltables_external_id": "players/M/Max_Kondogiannis.html",
+      "afltables_jumper_evidence": [
+        29
+      ],
+      "afltables_observed_names": [
+        "Max Kondogiannis"
+      ],
+      "afltables_rows_at_target": 12,
+      "agreeing_core_vector_observations": 12,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 12,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-03-13",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Essendon"
+      ],
+      "comparable_match_observations": 12,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/max_kondogiannis/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        29
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T50"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Charlie Banfield",
+      "afl_api_provider_id": "CD_I1036769",
+      "afl_api_snapshot_observed_names": [
+        "Charlie Banfield"
+      ],
+      "afltables_club_evidence": [
+        "St Kilda"
+      ],
+      "afltables_external_id": "players/C/Charlie_Banfield.html",
+      "afltables_jumper_evidence": [
+        36
+      ],
+      "afltables_observed_names": [
+        "Charlie Banfield"
+      ],
+      "afltables_rows_at_target": 3,
+      "agreeing_core_vector_observations": 3,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 3,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-05-17",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "St Kilda"
+      ],
+      "comparable_match_observations": 3,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/charlie_banfield/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        36
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T130"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Cody Curtin",
+      "afl_api_provider_id": "CD_I1036780",
+      "afl_api_snapshot_observed_names": [
+        "Cody Curtin"
+      ],
+      "afltables_club_evidence": [
+        "Brisbane Lions"
+      ],
+      "afltables_external_id": "players/C/Cody_Curtin.html",
+      "afltables_jumper_evidence": [
+        37
+      ],
+      "afltables_observed_names": [
+        "Cody Curtin"
+      ],
+      "afltables_rows_at_target": 4,
+      "agreeing_core_vector_observations": 4,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 4,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-05-02",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Brisbane Lions"
+      ],
+      "comparable_match_observations": 4,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/cody_curtin/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        37
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T20"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Sam Swadling",
+      "afl_api_provider_id": "CD_I1037021",
+      "afl_api_snapshot_observed_names": [
+        "Sam Swadling"
+      ],
+      "afltables_club_evidence": [
+        "Collingwood"
+      ],
+      "afltables_external_id": "players/S/Sam_Swadling.html",
+      "afltables_jumper_evidence": [
+        32
+      ],
+      "afltables_observed_names": [
+        "Sam Swadling"
+      ],
+      "afltables_rows_at_target": 9,
+      "agreeing_core_vector_observations": 9,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 9,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-06-20",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Collingwood"
+      ],
+      "comparable_match_observations": 9,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/sam_swadling/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        32
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T40"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Harry Kyle",
+      "afl_api_provider_id": "CD_I1037405",
+      "afl_api_snapshot_observed_names": [
+        "Harry Kyle"
+      ],
+      "afltables_club_evidence": [
+        "Sydney"
+      ],
+      "afltables_external_id": "players/H/Harry_Kyle.html",
+      "afltables_jumper_evidence": [
+        32
+      ],
+      "afltables_observed_names": [
+        "Harry Kyle"
+      ],
+      "afltables_rows_at_target": 11,
+      "agreeing_core_vector_observations": 11,
+      "agreement": "single_candidate_non_unanimous",
+      "bridge_snapshot_row_count": 12,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-05-30",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Sydney"
+      ],
+      "comparable_match_observations": 12,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/harry_kyle/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        32
+      ],
+      "non_agreeing_observations": 1,
+      "non_unanimous_explanation": [
+        {
+          "nature": "no_afltables_row_for_this_fixture",
+          "note": "absence, not contradiction: the AFL Tables extraction carries no row for this game at the target profile",
+          "provider_match_id": "CD_M20260142802"
+        }
+      ],
+      "provider_team_ids": [
+        "CD_T160"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Matt Hill",
+      "afl_api_provider_id": "CD_I1039500",
+      "afl_api_snapshot_observed_names": [
+        "Matt Hill"
+      ],
+      "afltables_club_evidence": [
+        "Hawthorn"
+      ],
+      "afltables_external_id": "players/M/Matt_Hill.html",
+      "afltables_jumper_evidence": [
+        41
+      ],
+      "afltables_observed_names": [
+        "Matt Hill"
+      ],
+      "afltables_rows_at_target": 2,
+      "agreeing_core_vector_observations": 2,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 2,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-07-04",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Hawthorn"
+      ],
+      "comparable_match_observations": 2,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/matt_hill/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        41
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T80"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Josh Lai",
+      "afl_api_provider_id": "CD_I1040300",
+      "afl_api_snapshot_observed_names": [
+        "Josh Lai"
+      ],
+      "afltables_club_evidence": [
+        "Port Adelaide"
+      ],
+      "afltables_external_id": "players/J/Josh_Lai.html",
+      "afltables_jumper_evidence": [
+        43
+      ],
+      "afltables_observed_names": [
+        "Josh Lai"
+      ],
+      "afltables_rows_at_target": 19,
+      "agreeing_core_vector_observations": 19,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 19,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-03-29",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Port Adelaide"
+      ],
+      "comparable_match_observations": 19,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/josh_lai/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        43
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T110"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Christopher Scerri",
+      "afl_api_provider_id": "CD_I1040573",
+      "afl_api_snapshot_observed_names": [
+        "Christopher Scerri"
+      ],
+      "afltables_club_evidence": [
+        "Fremantle"
+      ],
+      "afltables_external_id": "players/C/Chris_Scerri.html",
+      "afltables_jumper_evidence": [
+        45
+      ],
+      "afltables_observed_names": [
+        "Chris Scerri"
+      ],
+      "afltables_rows_at_target": 9,
+      "agreeing_core_vector_observations": 9,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 9,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-03-21",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Fremantle"
+      ],
+      "comparable_match_observations": 9,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/chris_scerri/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        45
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T60"
+      ],
+      "surname_agreement_validation_only": true
+    },
+    {
+      "afl_api_observed_name": "Sullivan Robey",
+      "afl_api_provider_id": "CD_I1043261",
+      "afl_api_snapshot_observed_names": [
+        "Sullivan Robey"
+      ],
+      "afltables_club_evidence": [
+        "Essendon"
+      ],
+      "afltables_external_id": "players/S/Sullivan_Robey.html",
+      "afltables_jumper_evidence": [
+        9
+      ],
+      "afltables_observed_names": [
+        "Sullivan Robey"
+      ],
+      "afltables_rows_at_target": 15,
+      "agreeing_core_vector_observations": 15,
+      "agreement": "unanimous",
+      "bridge_snapshot_row_count": 15,
+      "bridge_unresolved_reason": "no_matching_evidence",
+      "career_games_discriminator": "PASS_FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "career_games_first_2026_minimum": 1,
+      "category_a_classification": "genuine_post_baseline_afl_debutant",
+      "category_a_first_2026_career_games": 1,
+      "category_a_first_2026_match_date": "2026-04-11",
+      "category_a_reason": "FIRST_2026_APPEARANCE_CAREER_GAMES_1",
+      "club_evidence": [
+        "Essendon"
+      ],
+      "comparable_match_observations": 15,
+      "competing_candidate_count": 0,
+      "disposition": "REGISTER",
+      "draftguru_player_url": "https://www.draftguru.com.au/players/sullivan_robey/1",
+      "evidence_grade": "STRONG_IDENTITY_EVIDENCE",
+      "jumper_evidence": [
+        9
+      ],
+      "non_agreeing_observations": 0,
+      "non_unanimous_explanation": null,
+      "provider_team_ids": [
+        "CD_T50"
+      ],
+      "surname_agreement_validation_only": true
+    }
+  ],
+  "rows_sha256": "75bd9576ab3d33f19f2e148dffa22642c429a54b932f3e64ec87a9e6aa147f9c",
+  "schema_version": 1,
+  "supporting_inputs": [
+    {
+      "path": "data/reference/afl-api-identities.json",
+      "role": "AFL API CD_T<team> -> AFL Tables club name mapping",
+      "sha256": "13eba653380fd2f59a83d53601402f092031636c3a9da1d955b1158d9c64f326"
+    }
+  ],
+  "tool": {
+    "path": "tools/rebuild/draftguru/build_issue224_s9_target_set.py",
+    "version": "1.0.0"
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "issue": "AFLDB-ISSUE-224",
+  "label": "20260919-v1",
+  "tool": {
+    "path": "tools/rebuild/draftguru/build_person_bridge_v3_issue224.py",
+    "version": "1.0.0"
+  },
+  "generated_utc": "2026-09-19T08:02:24Z",
+  "generated_utc_basis": "frozen to the ISSUE-224 Phase 3 operator decision artefact's review_completed_utc; not a wall-clock generation time",
+  "parent_v2": {
+    "path": "data/reference/draftguru-person-bridge-20260918-v2.json",
+    "sha256": "ad25d965cba72b97be895451dc488bf03a1899421e902394baa52a620abe8e57",
+    "rows_sha256": "ce7816f7905f8a758761676ce50f2673055cc0be9c5174d004fdee7931327e7f"
+  },
+  "phase3_decisions": {
+    "path": "docs/rebuild-manifests/draftguru/bridge-operator-verdicts-issue224-20260919-v1.json",
+    "sha256": "3c7b5aff6649047ef0a727feffe4303ac7ea618a6cba3ca4f32b718636875038",
+    "rows_sha256": "1fc8ff220c2f655a5003f852e33c59c6ab8e7c6cfa8445ba01746fd57b912211"
+  },
+  "parent_v3": {
+    "path": "data/reference/draftguru-person-bridge-20260918-v3.json",
+    "sha256": "1f7413a2ad96e7d026cc521acfdeba3de9cab7066794de99002c9b5928e6e21b",
+    "rows_sha256": "2d0b36b8f41105a7d13a383af613158f40124fdf70a7405a04bc9db4da6fa249"
+  },
+  "diff_report": {
+    "path": "docs/rebuild-manifests/draftguru/bridge-v3-diff-issue224-20260919-v1.csv",
+    "sha256": "a311ba6ecfd884d2a41ce39347420aa4520a5a0f42fff7fc0e58327bb981d10a",
+    "changed_rows": 2
+  },
+  "counts": {
+    "bridges": 3562,
+    "withheld": 1495,
+    "population": 5057,
+    "changed_bridges": 2,
+    "unchanged_bridges": 3560,
+    "changed_withheld": 0
+  },
+  "changed_rows": [
+    {
+      "player_url": "https://www.draftguru.com.au/players/dean_laidley/1",
+      "v2_afltables_external_id": "players/D/Dean_Laidley.html",
+      "v3_afltables_external_id": "players/D/Dani_Laidley.html",
+      "operator_decision": "route-to-parent-evidence-correction",
+      "player_id_evidence": 3208
+    },
+    {
+      "player_url": "https://www.draftguru.com.au/players/matthew_capuano/1",
+      "v2_afltables_external_id": "players/M/Matthew_Capuano.html",
+      "v3_afltables_external_id": "players/M/Mathew_Capuano.html",
+      "operator_decision": "route-to-parent-evidence-correction",
+      "player_id_evidence": 9198
+    }
+  ],
+  "invariants": {
+    "only_phase3_named_bridges_changed": "PASS",
+    "withheld_content_unchanged": "PASS",
+    "bridge_count_unchanged": "PASS",
+    "withheld_count_unchanged": "PASS",
+    "population_partition_unchanged": "PASS",
+    "schema_validation": "PASS",
+    "database_access": "NOT_PERFORMED",
+    "network_access": "NOT_PERFORMED"
+  },
+  "rows_sha256": "7d6077607fbed63bdac8b7f4f487ddee60632687175adec951a79ad461bbd845"
+}
