@@ -1420,3 +1420,14 @@ DEV and PROD** and neither is to be enabled.
 - **D-8 — APPROVED 2026-09-22, sequence only.** See ISSUE-224 §16.2. Steps 3–5 of that sequence
   (bridge rebuild, link import, AFL API settle with `--require-complete-source`) are ISSUE-228's and
   must run against `-031725` per §20.5.
+
+## 21. D-8 step 2 complete; D-8 step 3 runbook established (2026-09-22, cross-referenced from
+ISSUE-224 — owned there, recorded here only as a pointer)
+
+**D-8 step 2 (DEV AFL Tables settle for the 92 registered players) is COMPLETE** — 827 canonical
+`player_match_stats` rows now exist for player ids 13370–13461. **D-8 step 3 (this issue's: rebuild
+the AFL API stat-vector bridge)** has an established, unrun runbook: tool
+`tools/current-season/emit-afl-api-player-bridge.ts`, `--label afl-api-2026-2026-09-21-031725`,
+read-only against `afldb_dev`. A HALT was found — the ISSUE-224 worktree lacks the `-031725`
+snapshot bytes locally and must run this step from the main checkout or via a junction. Full detail:
+`issues/open/AFLDB-ISSUE-224.md` §20. **Neither step 3, 4 nor 5 has run. S9 remains NOT accepted.**

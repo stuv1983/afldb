@@ -2765,3 +2765,244 @@ the on-disk contents of `data/sources/afltables/fitzroy_core/issue224-inseason-2
 **NOT done:** no database access of any kind; no observation-bundle emission; no settle, dry-run or
 apply; no AFL API bridge/import work; no timer/service change; no PROD action; no Git mutation
 (nothing staged, committed, reset or stashed).
+
+# 20. D-8 step 2 — COMPLETE on `afldb_dev` (operator-run, 2026-09-22); D-8 step 3 runbook established
+(this pass, repository inspection only; NOT run)
+
+## 20.1 D-8 step 2 — operator-reported successful DEV settle (transcribed, not independently
+reproduced)
+
+Source snapshot `issue224-inseason-20260919`; pinned source bytes `player_stats_2026.csv`
+(4,452,274 bytes, sha256 `d150d4bc…08c36`) and `results.csv` (21,405 bytes, sha256
+`ec767923…9d39cb`). Generated observation bundle `observations.json` (32,790,248 bytes, sha256
+`bd76b99e…2ad618`) via sub-step A, corrected per §20.2 below. Emission: 215 matches, 9,890
+player-match rows, 0 rejections, 0 unkeyed rejections, source completeness COMPLETE, no database
+access. Pre-settle dry run (sub-step B): all four `unresolvedIdentity*` counters 0,
+`canonicalRowsInserted 827`, 0 apply refusals/failures, `derivedRecomputePlayers 92`, exit 0,
+transaction rolled back. Fresh pre-settle backup taken and verified:
+`/home/arm/backups/afldb/issue224/afldb_dev-pre-d8-step2-settle-20260922-163545.dump`
+(sha256 `ddf07f89…4f03a28`), `pg_restore --list` exit 0. Successful apply (sub-step C): import
+batch 105, `canonicalRowsInserted 827`, `canonicalRowsUpdated 0`, `canonicalApplications 827`,
+`canonicalRetryApplied 827`, 0 apply refusals/failures, `derivedRecomputePlayers 92`, 0 unresolved
+identities, 0 active exceptions, source completeness COMPLETE, settle exit 0. Post-settle
+read-only verification against `afldb_dev` (role `afldb_import`, `transaction_read_only=on`):
+827 `player_match_stats` rows across all 92 player ids 13370–13461.
+
+**What this means: D-8 step 2 is COMPLETE.** 92 registered players now have canonical 2026
+`player_match_stats`. **What it does NOT mean:** no `afl_api`-source identity is attached to any
+of the 92 (that is D-8 step 4); ISSUE-228 S9 is **not** accepted; the AFL Tables automatic settle
+timer remains intentionally **OFF** on both DEV and PROD, and must stay disabled. The 827
+`unresolved_identity` promotion candidates this settle touches historically are moot/history, not
+active failures — no active exception was left open (0 active exceptions, above).
+
+**No idempotence re-run for step 2 has been reported.** Unlike step 1 (§18.1.3, §19.1), a second
+run of sub-step C proving `canonicalRowsInserted 0` has not been supplied. This does not change
+step 2's COMPLETE status — the single apply's own postconditions (0 refusals, 0 failures, 827/827
+verified) are sufficient — but it is recorded as a gap, not silently assumed.
+
+## 20.2 Correction to the D-8 step 2 command record
+
+§19.2.1's sub-step A command is correct as written (`--emit-observations
+data/sources/afltables/fitzroy_core/issue224-inseason-20260919/observations.json`, an explicit
+output path). The correction concerns how it must always be invoked going forward: **`--emit-observations`
+takes a required path argument — it is never a bare/boolean flag.** Every reference in this issue
+and in `IssuesIndex.md` already carries an explicit path; this note exists so no future shorthand
+transcription drops it.
+
+## 20.3 D-8 step 3 — exact runbook (established this pass by repository inspection; NOT run)
+
+**Boundaries held for this section: no DB connection, no SQL, no AFL API bridge write, no import,
+no settle, no mutation, no PROD, no Git commit.**
+
+### 20.3.1 Tool identification
+
+D-8 step 3 is **"rebuild the AFL API stat-vector bridge"** (§16.2/§14.7 D-8 sequencing). Two
+tools in the repository build an `afl_api_stat_vector*` evidence artefact; only one is the correct
+one for this step:
+
+- `tools/migration/build_afl_api_player_bridge.py` (Python, S5 bootstrap) — reads the tracked
+  **14-match sample corpus** under `data/sources/AFLWebsite/AFLGamesSamples/` against
+  **`afldb_test`** only (`REQUIRED_DATABASE = "afldb_test"`, hardcoded). It cannot read the
+  217-match/669-provider `-031725` snapshot and cannot target `afldb_dev`. **Not the tool for this
+  step.**
+- **`tools/current-season/emit-afl-api-player-bridge.ts`** (Node/tsx, S9 full-season emitter,
+  `npm run emit:afl-api-player-bridge`) — reads an acquired AFL API snapshot directory by
+  `--label` under `data/sources/afl_api/matches/`, resolves each match's canonical identity via
+  the same S6 modules the real settle path uses, reads canonical `player_match_stats` from
+  **`afldb_dev` READ-ONLY**, and classifies every observed provider id by the Sec 6.3 stat-vector
+  rule. This is the tool ISSUE-228 §20.5 itself names ("requires `emit-afl-api-player-bridge.ts` to
+  read those bytes"). **This is the tool for D-8 step 3.**
+
+`tools/migration/import_afl_api_player_bridge.py --target dev` (D-8 step 4, not this step) is
+built to consume exactly this emitter's output: it accepts the `afl_api_stat_vector_season`
+evidence class **only** under `--target dev` and only with intact provenance
+(`built_from_database == "afldb_dev"`, `read_only === true`, numeric `season`, non-empty
+`snapshot_label`, 64-hex `snapshot_manifest_sha256`, `existing_claim_comparison ==
+"unproved_cross_database_id_parity"`) — every one of which `emit-afl-api-player-bridge.ts`'s
+`buildEvidenceArtefact()` populates. This confirms the two tools are the intended pipeline pair.
+
+### 20.3.2 Snapshot / lineage
+
+`--label afl-api-2026-2026-09-21-031725`, the D-9b/§20.5-authoritative snapshot (ISSUE-228 §20),
+manifest sha256 `5018a3d6…`. Present at
+`D:\dev\afldb\data\sources\afl_api\matches\afl-api-2026-2026-09-21-031725\` (confirmed on disk,
+main repository checkout). Known census (ISSUE-224 §13.5, ISSUE-228 §20.3): 217 match directories,
+669 distinct provider players, 9,983 player-stat rows.
+
+**HALT — this worktree cannot run the command as written.** `D:\dev\afldb-issue-224-s9\data\sources\`
+contains only `afltables\`; there is **no `afl_api\` subtree in this worktree** (confirmed by
+directory listing this pass). `emit-afl-api-player-bridge.ts` resolves its snapshot root from its
+own `__dirname` (no `--project-root`/env override exists), so it will look for
+`<worktree>\data\sources\afl_api\matches\afl-api-2026-2026-09-21-031725\` and fail to find it.
+Before step 3 can run **from this worktree**, one of the following must happen (operator decision,
+not performed here): (a) create a junction from this worktree's `data\sources\afl_api` to the main
+checkout's, the same pattern already used for `node_modules` in other AFLDB worktrees; (b) run the
+command from `D:\dev\afldb` (main checkout) instead, against this worktree's registered/settled
+`afldb_dev` state (the tool reads only the database and the snapshot directory — it does not care
+which checkout invoked it); or (c) copy the snapshot directory into this worktree. Untracked
+`data/sources/` content is never committed either way, so none of these three touches Git state.
+
+### 20.3.3 Database / environment requirements
+
+- DSN: `AFLDB_DEV_DATABASE_URL` only (`AFL_API_EVIDENCE_DSN_ENV`); no DSN accepted on argv. Per
+  `.env.example`, this resolves to role **`afldb_app`** (the ordinary read-only application role —
+  not `afldb_import`, not the migration schema owner).
+- The tool opens the connection with `default_transaction_read_only=true` as a **startup**
+  parameter (so a pool reconnect cannot silently lose it), then proves on the live session that
+  `current_database() = 'afldb_dev'`, `transaction_read_only = 'on'` and
+  `default_transaction_read_only = 'on'` before any evidence statement runs
+  (`assertAflApiEvidenceSession`); any other database is refused. There is no PROD path, argument
+  or environment variable anywhere in the file.
+- **Read-only: yes, unconditionally.** The tool's own header states it never writes to any
+  database; write only happens later, in D-8 step 4's importer.
+
+### 20.3.4 Expected output artefact(s)
+
+One JSON file at the `--out` path given (never under `data/sources/`, which the tool refuses by
+construction). No default path exists — `--out` is mandatory unless `--validate-only` is used, and
+the two are mutually exclusive. Following the established naming convention
+(`afl-api-player-bridge-2026-09-20.json`, `afl-api-player-bridge-2026-full-2026-09-21.json`), the
+natural next name is `data/reference/afl-api-player-bridge-2026-full-2026-09-22.json` — not
+mandated by the tool, an operator choice. Like `build_afl_api_player_bridge.py`, a write to an
+existing path with different content is a hard refusal (no silent overwrite); identical content
+(modulo `generated_utc`) is a silent no-op.
+
+### 20.3.5 Expected provider population and the 92 formerly-unresolved providers
+
+The **existing** artefact already in this worktree,
+`data/reference/afl-api-player-bridge-2026-full-2026-09-21.json` (read this pass), was built
+against the **superseded** `-011148` snapshot and pins that label/hash (`snapshot_label
+afl-api-2026-2026-09-21-011148`, sha256 `dcbd0626…`) — confirming §20.5's "old 577-link lineage"
+is exactly this file. Its own counts: `providersLinked 577`, `providersUnresolved 92`,
+`providersContradictory 0`, `matchesEvaluated 217`, `canonicalMatchesResolved 215`,
+`canonicalMatchesUnresolved 2`, `snapshotDistinctProviderPlayers 669`,
+`snapshotPlayerMatchRows 9983`. **This file must not be reused or extended as S9 acceptance
+evidence** (§20.5.1's no-mixing rule) — it is cited here only as the measured baseline the fresh
+`-031725` run should be compared against via `--compare-artefact` (informational overlap
+reporting only; it does not feed the new artefact's own per-provider disposition, which is
+computed solely from live `afldb_dev` evidence against `-031725`).
+
+**Expected for the 92 formerly-unresolved providers:** before D-8 step 2, all 92 were
+`providersUnresolved` because their canonical `player_match_stats` rows did not exist yet
+(`reason: no_matching_evidence` or `no_canonical_match` for the 2 matches that were also
+canonically unresolved). Step 2 created exactly 827 `player_match_stats` rows for those 92
+players. The operator's stated target expectation (ISSUE-224 §14, DraftGuru side) is 92/92 unique
+AFL Tables candidates with 0 ambiguous/unmatched/competing — but that evidence was built by a
+**different tool** (`build_issue224_s9_target_set.py`, AFL Tables profile matching) against a
+**different acceptance rule** than this emitter's Sec 6.3 stat-vector rule. **Do not assume the
+92 will link 92/92 through this tool merely because the DraftGuru-side evidence did — measure it.**
+A plausible but unproven outcome is `providersLinked` rising from 577 toward up to 669 (577 + up to
+92), with the remainder, if any, reported as `unresolved` (insufficient stat-vector evidence, e.g.
+fewer than 2 matches and fewer than 10 agreeing stats in their one game) or `contradictory` (never
+silently dropped either way).
+
+### 20.3.6 The five known non-unanimous cases (CD_I1007053, CD_I1037405, CD_I1029417,
+CD_I1036426, CD_I1023273)
+
+`emit-afl-api-player-bridge.ts` has **no "unanimous"/"non-unanimous" concept anywhere in its
+classifier** — that vocabulary belongs to `build_issue224_s9_target_set.py`'s AFL Tables-side
+profile matching (87 unanimous + 5 single-candidate non-unanimous, from ISSUE-224 §14 evidence).
+This emitter's only dispositions are `linked` / `unresolved` / `contradictory`, decided purely by
+club + jumper number + exact 13-column core stat vector agreement across the provider's observed
+matches (§6.3 rules a–d). **The five cases receive no special handling and are not guaranteed to
+resolve identically between the two tools' evidence models** — they must be located by
+`CD_I` key in the fresh artefact's `providers` map and their disposition read directly, not
+inferred from the AFL Tables-side "non-unanimous" label. This is a validation item for whoever
+reviews the fresh artefact, not a known-good expectation.
+
+### 20.3.7 Validation required before any AFL API identity import (D-8 step 4)
+
+1. Re-verify `snapshot_manifest_sha256` in the written artefact equals `5018a3d6…` (the tool
+   re-hashes from disk at run time; this is a re-check, not a re-derivation of the tool's own
+   proof).
+2. Re-verify `snapshot_census` (`matches 217`, `player_match_rows 9983`,
+   `distinct_provider_players 669`) matches the values passed via `--expect-matches`/
+   `--expect-rows`/`--expect-providers` (the tool halts before opening any DB connection on a
+   mismatch — this is a re-check of that gate having fired correctly, not a substitute for it).
+3. `providersContradictory` must be 0, or every contradictory id individually reviewed — D-8 step 4
+   only ever imports `linked` rows; a non-zero `providersContradictory` is not itself a step-3
+   failure, but must not be silently carried into step 4.
+4. Locate all five §20.3.6 provider ids by key and record their disposition explicitly.
+5. Compare against `data/reference/afl-api-player-bridge-2026-full-2026-09-21.json` via
+   `--compare-artefact` (see §20.3.5) — informational only, per the no-mixing rule.
+6. `build_failures` must be empty (0 units failed to build from the snapshot) or every failure
+   individually reviewed before proceeding.
+7. Confirm `read_only: true`, `built_from_database: "afldb_dev"` and
+   `existing_claim_comparison: "unproved_cross_database_id_parity"` are present in the written
+   artefact exactly as step 4's importer requires (§20.3.1) — a missing/wrong value there is a
+   step-4 refusal, worth catching at step 3's own output instead.
+8. The existing regression test `tests/afl-api-player-bridge-cli.test.ts` covers this CLI's parsing
+   and artefact-building contract; re-running it (`npm test -- afl-api-player-bridge-cli`) after any
+   code change in this area — none is proposed here — would be the minimal targeted check per §10.
+
+### 20.3.8 Fresh DEV backup before step 3 — not required
+
+Step 3 is read-only end-to-end (no DB write of any kind — confirmed by the tool's own header and
+by `assertAflApiEvidenceSession`/`open` using a read-only startup parameter). Unlike D-8 steps 2,
+4 and 5, no backup is required **for this step**. A fresh, independently verified `afldb_dev`
+backup remains prudent immediately before D-8 step 4 (the first step in this chain that writes
+`external_identities`) and before step 5's settle — consistent with the backups already taken
+before steps 1 and 2.
+
+### 20.3.9 Exact proposed command — DO NOT RUN
+
+Validate first (no artefact written, full report printed), then persist:
+
+```
+npm run emit:afl-api-player-bridge -- \
+  --label afl-api-2026-2026-09-21-031725 \
+  --expect-matches 217 --expect-rows 9983 --expect-providers 669 \
+  --validate-only
+```
+
+```
+npm run emit:afl-api-player-bridge -- \
+  --label afl-api-2026-2026-09-21-031725 \
+  --expect-matches 217 --expect-rows 9983 --expect-providers 669 \
+  --compare-artefact data/reference/afl-api-player-bridge-2026-full-2026-09-21.json \
+  --compare-artefact data/reference/afl-api-player-bridge-2026-09-20.json \
+  --out data/reference/afl-api-player-bridge-2026-full-2026-09-22.json
+```
+
+Both require `AFLDB_DEV_DATABASE_URL` set in `.env` (role `afldb_app`) and, per §20.3.2, either a
+`data/sources/afl_api/matches/` junction/copy in this worktree or execution from the main
+`D:\dev\afldb` checkout. **Neither command has been run.**
+
+## 20.4 Boundary statement for this pass
+
+**Written:** this file (§20), `issues.md`, `IssuesIndex.md`, and a short cross-reference in
+`issues/open/AFLDB-ISSUE-228.md`. Nothing else.
+
+**Executed by Claude:** nothing — no shell, Git, SQL, network, test, typecheck, build, deployment,
+`systemctl`, settle, bridge-rebuild or import command; no subagent; no timer enabled; no junction
+created. §20.1 is a transcription of an operator-reported result, not independently reproduced.
+§20.3 is a runbook derived entirely from reading `tools/migration/build_afl_api_player_bridge.py`,
+`tools/current-season/emit-afl-api-player-bridge.ts`,
+`src/lib/acquisition/afl-api-player-evidence.ts`, `tools/migration/import_afl_api_player_bridge.py`,
+`.env.example`, `package.json`, and the on-disk contents of this worktree's and the main
+checkout's `data/sources/`.
+
+**NOT done:** no database access of any kind (the `afldb_dev` counts in §20.1 are transcribed from
+the operator's report, not independently queried); no AFL API bridge rebuild; no identity import;
+no settle; no timer/service change; no PROD action; no Git mutation (nothing staged, committed,
+reset or stashed); no junction or filesystem change under `data/sources/`.

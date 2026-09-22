@@ -37939,6 +37939,37 @@ unrelated D-2/D-3/D-4/D-5/D-6/D-10 items are unaffected.
   **Status: D-8 step 1 COMPLETE; D-8 step 2 NOT started** (no observation bundle emitted, no
   database connection opened for this step). ISSUE-224 remains open; ISSUE-228 S9 remains not
   accepted; both AFL Tables timers remain OFF; no PROD action; no Git mutation.
+- **D-8 STEP 2 — COMPLETE on `afldb_dev` (operator-run, 2026-09-22; transcribed, not
+  independently reproduced. Full record: `issues/open/AFLDB-ISSUE-224.md` §20.1).** Two-tool chain
+  run against the retained `issue224-inseason-20260919` snapshot: sub-step A emitted
+  `observations.json` (215 matches, 9,890 player-match rows, 0 rejections); a fresh pre-settle
+  backup was taken and verified (`pg_restore --list` exit 0); sub-step C applied under import
+  batch 105 — `canonicalRowsInserted 827`, 0 apply refusals/failures, `derivedRecomputePlayers 92`,
+  settle exit 0. Post-settle read-only verification confirmed 827 `player_match_stats` rows across
+  all 92 registered player ids (13370–13461). **D-8 step 2 is COMPLETE.** No `afl_api` identity is
+  attached to any of the 92 yet (D-8 step 4); ISSUE-228 S9 is **not** accepted; both AFL Tables
+  timers remain OFF.
+  **Command correction:** `--emit-observations` takes a required output path — it is never a bare
+  flag. Every command already recorded in this issue and in `IssuesIndex.md` carries one; recorded
+  here so no future shorthand drops it (full note: `issues/open/AFLDB-ISSUE-224.md` §20.2).
+- **D-8 step 3 runbook established (this pass, repository inspection only; no DB write, no bridge
+  rebuild, no import, no settle, no PROD, no Git mutation. Full record:
+  `issues/open/AFLDB-ISSUE-224.md` §20.3).** Tool identified: `tools/current-season/emit-afl-api-
+  player-bridge.ts` (`npm run emit:afl-api-player-bridge`), **not** the Python S5 bootstrap builder
+  (which is hardcoded to `afldb_test` and a 14-match sample corpus, not the full `-031725`
+  snapshot). Reads `afldb_dev` READ-ONLY via `AFLDB_DEV_DATABASE_URL` (role `afldb_app`); writes no
+  database; its only output is a JSON evidence artefact, which is exactly what D-8 step 4's
+  `import_afl_api_player_bridge.py --target dev` is built to consume. **HALT found:** this
+  worktree's `data/sources/` has no `afl_api/` subtree (only `afltables/`) — the snapshot exists
+  only under the main `D:\dev\afldb` checkout, so the command cannot run from this worktree
+  unmodified; a junction, a copy, or running from the main checkout is required first (operator
+  decision, not performed). The existing `data/reference/afl-api-player-bridge-2026-full-2026-09-
+  21.json` artefact (577 linked / 92 unresolved / 0 contradictory) is confirmed built against the
+  **superseded** `-011148` snapshot and must not be reused as acceptance evidence — cited only as
+  an informational `--compare-artefact` baseline for the fresh `-031725` run. Exact proposed
+  command, snapshot/env requirements, expected population, the five known non-unanimous providers'
+  representation, and required validation before any import are recorded in full at
+  `issues/open/AFLDB-ISSUE-224.md` §20.3. **Nothing was run.**
 
 ## AFLDB-ISSUE-225 — Gridley corpus: 37 pre-existing `incorrect known answer` cells on non-draft criteria, present on `afldb_test` before AFLDB-ISSUE-222 and untouched by it
 

@@ -1098,22 +1098,29 @@
   supplied.** **Means:** 92 canonical players + AFL Tables identities registered on `afldb_dev`.
   **Does NOT mean:** no `afl_api` identity attached; no `player_match_stats` populated yet; ISSUE-228
   S9 not unblocked; AFL Tables timer stays OFF on DEV and PROD.
-- **Next action (2026-09-22; D-8 step 2 runbook established this pass, offline inspection only —
-  no DB, no settle, no mutation, no Git. Full record: `issues/open/AFLDB-ISSUE-224.md` §19.2).**
-  `import_fitzroy_core.py` refuses to write an in-season snapshot at all; D-8 step 2 is a two-tool
-  chain: (A) `import_fitzroy_core.py --label issue224-inseason-20260919 --require-in-season
-  --emit-observations <path>` (offline; not yet run — no `observations.json` exists for this label);
-  (B) `settle-afltables.ts --label issue224-inseason-20260919 --dry-run --auto-apply
-  --require-complete-source` (previews the full write, rolls back); (C) the same with `--apply`.
-  Role: `afldb_import` via `AFLDB_IMPORT_DATABASE_URL` only — **this tool has no `--target` switch
-  and no `current_database()`/`current_user()` assertion**, unlike the step-1 tool; the operator
-  must independently verify the DSN resolves to `afldb_dev` before applying.
-  **`--auto-apply` is REQUIRED for any `player_match_stats` row to be written at all** — `--apply`
-  alone writes only staging/ledger tables, never `player_match_stats`/`matches`/`players`; even
-  with `--auto-apply`, only units whose gates E1-E6 pass at write time land canonically, the rest
-  go to `promotion_candidates`/`data_issues` for review. No truncation/deletion anywhere; idempotent
-  on rerun. A fresh, independently-verified DEV backup before applying is recommended.
-  **D-8 step 2 NOT started.** ISSUE-224 open; ISSUE-228 S9 not accepted; both timers OFF.
+- **D-8 STEP 2 — COMPLETE on `afldb_dev` (operator-run, 2026-09-22; transcribed, not
+  independently reproduced. Full record: `issues/open/AFLDB-ISSUE-224.md` §20.1).** Two-tool
+  chain run against retained snapshot `issue224-inseason-20260919`: import batch 105,
+  `canonicalRowsInserted 827`, 0 apply refusals/failures, `derivedRecomputePlayers 92`, settle
+  exit 0; fresh pre-settle backup taken and verified. Post-settle verification: 827
+  `player_match_stats` rows across all 92 registered player ids (13370–13461). **Means:** D-8 step
+  2 COMPLETE. **Does NOT mean:** any `afl_api` identity attached (D-8 step 4); ISSUE-228 S9
+  accepted; either AFL Tables timer enabled (both stay OFF). **Command correction:**
+  `--emit-observations` takes a required output path, never a bare flag.
+- **Next action — D-8 step 3 runbook established (2026-09-22, repository inspection only; no DB
+  write, no bridge rebuild, no import, no settle, no Git mutation. Full record:
+  `issues/open/AFLDB-ISSUE-224.md` §20.3).** Tool: `tools/current-season/emit-afl-api-player-
+  bridge.ts` (`npm run emit:afl-api-player-bridge --label afl-api-2026-2026-09-21-031725
+  --expect-matches 217 --expect-rows 9983 --expect-providers 669 --out <path>`) — reads `afldb_dev`
+  READ-ONLY via `AFLDB_DEV_DATABASE_URL` (role `afldb_app`), writes no database, output feeds
+  D-8 step 4's `import_afl_api_player_bridge.py --target dev` directly. **NOT** the Python S5
+  builder (hardcoded to `afldb_test` and a 14-match sample corpus). **HALT found:** this
+  worktree's `data/sources/` has no `afl_api/` subtree — the `-031725` snapshot exists only under
+  the main `D:\dev\afldb` checkout; a junction, copy, or running from the main checkout is
+  required first (operator decision). The existing `afl-api-player-bridge-2026-full-2026-09-
+  21.json` (577 linked / 92 unresolved) is confirmed built against the superseded `-011148`
+  snapshot and must not be reused as acceptance evidence. **Nothing was run.** ISSUE-224 open;
+  ISSUE-228 S9 not accepted; both timers OFF.
 
 **AFLDB-ISSUE-221 resolved 2026-09-18** (implemented 2026-09-17 by Fable 5.1; committed, merged
 and DEV-verified 2026-09-18 by Sonnet 5) — Grid Solver draft-criteria review: honest "No data"
