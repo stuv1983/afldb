@@ -1,5 +1,47 @@
 # AFLDB-ISSUE-228 — AFL.com.au official JSON APIs as the current-season match, stats and Brownlow source
 
+> **RECONCILED CURRENT STATE — 2026-09-22 (supersedes every stale S9 statement below).**
+> Every "S9 NOT STARTED", "S9 paused before any real-feed acquisition" and "S9 still stopped before any
+> DB dry-run" statement further down this document is a **dated historical snapshot**, retained as
+> lineage and superseded. Full record: `issues.md` "S9 — RECORD RECONCILIATION, ROUTE A, Q5-B (2026-09-22)".
+>
+> - **S9: IMPLEMENTED / NOT ACCEPTED — PARTIALLY EXECUTED.** A real 2026 acquisition occurred
+>   (immutable snapshot `afl-api-2026-2026-09-21-011148`, manifest sha256 `dcbd0626…`, 217 concluded
+>   matches, 9,983 player-match rows, 0 bundle build failures; a later acquisition
+>   `afl-api-2026-2026-09-21-031725` exists as lineage/evidence). A full-season player bridge artefact
+>   was built and its 577 links imported to DEV. A full DEV settle **DRY-RUN** followed and was
+>   **INCOMPLETE**: `unresolvedIdentityMatch 0`, `unresolvedIdentityPlayer 830`. **No committed
+>   canonical `afl_api` apply, no S9 DEV smoke, no timer installation/enablement has occurred.
+>   S9 is NOT accepted.** That dry-run predates the ISSUE-244 hardening and is **not** current
+>   acceptance evidence; all committed S9 acceptance work must run on the post-ISSUE-244 lineage.
+> - **ISSUE-244 is RESOLVED / CLOSED** (main `7f242ecc`; `sonnet/issue-228-s9` starts from it). It
+>   returned to this issue: S9 operational acceptance (open); Q5 (now decided, below);
+>   ISSUE-224 registration/linkage as the prerequisite of the full `--require-complete-source` path;
+>   and the fact that closing ISSUE-244 does **not** make the timer operational (F004 refuses an
+>   incomplete source before commit; timer installation/enablement is separately authorised work).
+> - **S9 completeness path — ROUTE A (operator decision 2026-09-22).** ISSUE-224 registration/linkage
+>   must be completed enough that the **same immutable snapshot** settles with
+>   `unresolvedIdentityPlayer = 0` and passes the F004 completeness gate. **A partial-player canonical
+>   apply by removing `--require-complete-source` is REJECTED FOR S9 ACCEPTANCE**: F004 makes source
+>   completeness a pre-commit gate and S9 must exercise the production-intended guarded path. The
+>   technical ability to run without the flag is unchanged and remains documented; it is simply not the
+>   selected S9 route.
+> - **Q5 (§15 item 5) — RESOLVED, Q5-B selected 2026-09-22:** canonical `afl_api` `match_time` is
+>   venue-local **`HH:MM`**; `NULL` still means "not published / unavailable"; the §11.1 agreement /
+>   contradiction check still compares the underlying timestamps at **second** precision; `match_time`
+>   stays NON-IDENTITY; no AFL Tables rewrite, no schema/type migration, no `afl_api` canonical
+>   remediation needed (ISSUE-244 F031 census: 0 `afl_api`-owned matches). Implemented in
+>   `src/lib/acquisition/afl-api-bundle.ts` (`deriveAflApiLocalMatchDateTime()`); DB-free validation
+>   recorded in `issues.md`.
+> - **DEV deployed SHA is UNMEASURED.** `bbf87566`, `27d7e5aa` and `4e67ce38` in this document are
+>   historical evidence of the deploy each one actually represented, not a statement of what DEV runs
+>   now. The exact DEV deployed SHA must be measured in the next read-only S9 preflight and must equal
+>   the commit selected for acceptance before any write/apply phase. DEV is **not** claimed to run
+>   `7f242ecc`.
+> - **Next S9 prerequisite:** ISSUE-224 registers the missing canonical player rows for the 92
+>   unresolved AFL API providers → the AFL API bridge is rebuilt/re-resolved against the same
+>   immutable snapshot → only then the read-only S9 preflight and re-settle.
+
 **Status:** Open — PLAN, amended 2026-09-19 with operator decisions Q1/Q2/Q7 and four
 tightening points (§0.1, §19). This document is the frozen implementation contract for S0–S10;
 **current per-stage execution status is tracked in `issues.md` (AFLDB-ISSUE-228), not here.**
@@ -29,7 +71,7 @@ correction (Q7), `.env.example`/`docs/deployment.md` variable documentation, and
 Brownlow live-count operator runbook — see `issues.md` "S8 operations implementation" for the full
 record, including the disclosed discrepancies against the original §17 sketch (`emit:afl-api`'s
 real scope, `bridge:afl-api` deliberately not added, no admin on-demand trigger for the two new
-units). S9–S10 not started. S5 (§6.3, this document) was operator-executed and
+units). S9–S10 not started *[2026-09-20/21 snapshot — S9 superseded, see the reconciled block at the top]*. S5 (§6.3, this document) was operator-executed and
 validated on `afldb_test` only (contract test, builder `--validate-only`/`--write`, importer
 `--validate-only`/`--dry-run`/`--apply`, post-apply idempotency dry-run) — see `issues.md` for the
 full evidence record. No database, Git, network or deployment command has been run by the
@@ -50,22 +92,25 @@ explicitly cleared and positively checked; the 2026 `staging.afl_api_match` prer
 explicitly documented in the runbook. **No DEV or PROD deployment has occurred.** **S1–S6 are
 COMPLETE. S7 remains OPEN** — the sole remaining acceptance item is the real 2026 live-count
 capture/replay evidence (do not mark S7 complete before that event evidence exists). **S9 is
-NOT STARTED**, requiring a later DEV dry-run/apply, AFL Tables corroboration and Brownlow replay
-after the S7/S8 prerequisites. **Assertion 9 (§9.9) stays explicitly separate from the Brownlow
+NOT STARTED** *[historical, 2026-09-21 morning — superseded: S9 is IMPLEMENTED / NOT ACCEPTED —
+PARTIALLY EXECUTED, see the reconciled block at the top]*, requiring a later DEV dry-run/apply, AFL
+Tables corroboration and Brownlow replay after the S7/S8 prerequisites. **Assertion 9 (§9.9) stays explicitly separate from the Brownlow
 live-count replay and remains SKIPPED/open** — only one formal monitor-capture pair
 (`CD_M20260142801`) exists; it is not PASS and is not closed by tonight's Brownlow snapshots; it
 must be explicitly dispositioned before final ISSUE-228 closeout (see `issues.md` "§9.10 —
 HISTORICAL CLOSEOUT" for the full Assertion 9 disposition options). Full evidence and file list:
 `issues.md` "S8 operator-validated" paragraph.
 
-**As of 2026-09-21 (later same day): merged to main and deployed to DEV** (commit `bbf87566`).
-During DEV acceptance the operator found no super-admin UI control existed to enable/disable AFL
-API current-season or Brownlow ingestion, and **paused S9 before any real-feed acquisition**
-pending one. Super-admin-controlled, fail-closed, server-side-enforced ingestion switches were
+**As of 2026-09-21 (later same day): merged to main and deployed to DEV** (commit `bbf87566` — the
+HISTORICAL merge deploy of migration 103; the admin ingestion control was added after it; not a
+statement of what DEV runs now). During DEV acceptance the operator found no super-admin UI control existed to
+enable/disable AFL API current-season or Brownlow ingestion, and **paused S9 before any real-feed
+acquisition** pending one *[historical — the real-feed acquisition subsequently occurred; see the
+reconciled block at the top]*. Super-admin-controlled, fail-closed, server-side-enforced ingestion switches were
 added this pass — see `issues.md` "operational-control gap found during DEV acceptance" paragraph
 for the full architecture and file list. **This does not change S7 (still OPEN), S9 (still NOT
-STARTED — the control exists but neither switch was enabled and S9 has not resumed) or Assertion 9
-(still SKIPPED/open).**
+STARTED — the control exists but neither switch was enabled and S9 has not resumed *[historical
+2026-09-21 statement, superseded]*) or Assertion 9 (still SKIPPED/open).**
 
 ## 0.1 Operator decisions recorded 2026-09-19 (binding on every stage below)
 
@@ -306,7 +351,7 @@ A successor issue may add a narrow extended-stats table if a product requirement
 | `matches.attendance` | **Optional enrichment.** Propose `NULL` + non-complete `attendance_status` + `attendance_source_id NULL`. Enrichable later by AFL Tables settle (field-group exception, §7.5) or Super Admin (`data_overrides` group `attendance`). Never blocks promotion. |
 | `player_match_stats.career_game_no` | `gamesPlayed` is null in every sample. Propose `NULL`; it is derivable and AFL Tables may enrich under the same field-group rule if approved (default: leave NULL, recompute-owned candidate). |
 | `player_match_stats.brownlow_votes` | Not in the stats feed; comes from the Brownlow family after the count. Propose `NULL` (NA), exactly as the AFL Tables path does in season. |
-| `matches.match_time` vocabulary | AFL Tables supplies free text (`Local.start.time`); AFL supplies ISO local time. Render `HH:MM` (the `fixtures` writer convention) — **operator to confirm** against an `afldb_test` sample so the two sources do not diff forever (§15 Q5). |
+| `matches.match_time` vocabulary | AFL Tables supplies free text (`Local.start.time`); AFL supplies ISO local time. Render `HH:MM` (the `fixtures` writer convention) — **operator confirmed 2026-09-22, Q5-B** (§15 Q5); implemented in `deriveAflApiLocalMatchDateTime()`. |
 | Player identity | No `external_identities` rows for `afl_api`. **Stage S5 bridge** (§6). |
 | `QF` vs `EF` for seasons without `finals_match_label` | Fail closed (`round_unresolvable`) — affects historical backtest only. |
 
@@ -811,7 +856,7 @@ backtest asserts `round_unresolvable` for them rather than guessing.
 | `source_record_id` | `providerId` | authoritative | identity |
 | `season` | declared from `compSeason.providerId` | authoritative | |
 | `round_code`, `round_number`, `round_type`, `is_final` | `round.abbreviation/roundNumber` + `metadata.finals_match_label` via `afl_api_<year>` mapping | authoritative | offset rule §2.1 |
-| `match_date`, `match_time` | roster `match.venueLocalStartTime` (cross-checked with fixture `utcStartTime` in `venue.timezone`) | authoritative | `HH:MM` rendering to confirm |
+| `match_date`, `match_time` | roster `match.venueLocalStartTime` (cross-checked with fixture `utcStartTime` in `venue.timezone`) | authoritative | `HH:MM` rendering (Q5-B, decided 2026-09-22) |
 | `venue_id`, `venue_raw` | `venue.providerId` via map; `venue.name` | authoritative / raw | unmapped → NULL id |
 | `home_club_id`, `away_club_id`, `winner_club_id` | `CD_T` via map | authoritative | |
 | `home/away goals, behinds, score`, `result`, `margin` | fixture `score` (== roster `matchScore`) | authoritative | |
@@ -975,7 +1020,7 @@ registry entry is approved.
 | R5 | Post-conclusion Champion Data corrections | Spine history + `corrected` candidates; auto-apply only for the owner; exclusion list measured (§9.9). |
 | R6 | API change / token mechanism change / rate limiting | Adapter fails closed (no manifest); `known_columns` contract refuses drift; token is public but unofficial — same risk class 077 records. |
 | R7 | Rollover doctrine ("fitzRoy full-history supersedes in-season provenance") would collide with `afl_api`-owned 2026 rows | **DECIDED (Q7):** amend `AFLDB-2026-API-ACQUISITION.md` §5 and ISSUE-101/F **before** the 2026 rollover: the completed-season re-acquisition corroborates independently sourced canonical rows (agreement recorded, disagreement → `data_issues`), enriches only through the §7.5 field-group rule, and never re-owns. Any ownership transfer is an explicit rule or operator decision with its own ledger rows. The Stage-9 gate `matches_after_accepted_last_season = 0` is unaffected (in-season rows are never in the historical core). Doc amendment is Stage S8; ISSUE-101/F's own runbook must be updated by that issue, not silently by this one. |
-| R8 | `match_time` vocabulary mismatch creates perpetual `corrected` diffs between sources | Exclude `match_time` from cross-source comparison (`CORROBORATED_MATCH_FIELDS` already excludes it); confirm rendering (Q5). |
+| R8 | `match_time` vocabulary mismatch creates perpetual `corrected` diffs between sources | Exclude `match_time` from cross-source comparison (`CORROBORATED_MATCH_FIELDS` already excludes it); rendering fixed as `HH:MM` by Q5-B (2026-09-22). |
 | R9 | Brownlow live-count polling creates version churn | Match-grain records; leaderboard family not promoted; `max-age=3` respected with a ≥ 60 s poll floor. |
 | R10 | Fixture successor rekeys a concluded match silently | §13.5 rule: historically significant fields on a started match are review-only. |
 
@@ -998,8 +1043,10 @@ provider id; bridge file hash mismatch; `data_overrides` CHECK unreadable (exist
    adding a group is a new decision.)
 4. The exact pre-match `status` strings (`SCHEDULED`? `UPCOMING`? `LIVE`?) — unobserved; must be
    measured live before the fixture successor and recorded as measurements, not enums.
-5. `matches.match_time` rendering on `afldb_test` for a 2026 AFL Tables row (e.g. `7:20 PM` vs
-   `19:20`) — one read-only query settles the vocabulary.
+5. ~~`matches.match_time` rendering~~ — **DECIDED 2026-09-22 (Q5-B): canonical `afl_api`
+   `match_time` = venue-local `HH:MM`** (NULL = not published; source agreement still compared at
+   second precision; non-identity; no historical AFL Tables rewrite, no column typing, no
+   cross-source vocabulary migration). Implemented in `afl-api-bundle.ts`; see `issues.md`.
 6. Confirm the AFL Tables numbering of 2024/2025 `brownlow_round_votes.round_number` on
    `afldb_test` (Opening Round votes under round 1?).
 7. ~~Rollover doctrine amendment~~ — **DECIDED 2026-09-19 (Q7): corroborate, never re-own;

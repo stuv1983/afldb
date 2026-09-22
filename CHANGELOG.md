@@ -15,6 +15,22 @@ commit.
 
 ## [Unreleased]
 
+### AFL API `match_time` is now emitted as venue-local `HH:MM` (ISSUE-228 Q5-B) - 22 September 2026
+
+- The AFL API emitter now renders the canonical `match_time` as the zero-padded venue-local
+  wall clock **`HH:MM`** (`19:40:00` → `19:40`, `07:05:00` → `07:05`), the same vocabulary the
+  `fixtures` writer and admin editors use, instead of `HH:MM:SS`. Operator decision Q5-B,
+  2026-09-22, applied before the first committed `afl_api` canonical match apply, so no existing
+  `afl_api`-owned row needed remediation (ISSUE-244 F031 census: none).
+- Unchanged by design: the roster-vs-UTC agreement check still compares at **second** precision
+  (`19:40:01` vs `19:40:59` is still a `local_time_contradiction`); `NULL` still means "not
+  published"; `match_time` stays non-identity; no AFL Tables data rewrite, no column typing, no
+  cross-source vocabulary migration.
+- Validated DB-free only (`tests/afl-api-match.test.ts` 123/123; six related AFL API suites 277/277;
+  `npm run typecheck` PASS). **Not** claimed: S9 accepted, ISSUE-224 complete, the timer ready, or
+  DEV deployed (ISSUE-228 S9 record reconciled the same day: implemented / not accepted; Route A —
+  ISSUE-224 registration → same-snapshot re-settle with `unresolvedIdentityPlayer = 0`).
+
 ### AFL API acceptance review: AFLDB-ISSUE-244 resolved / closed - 22 September 2026
 
 - **AFLDB-ISSUE-244 is RESOLVED / CLOSED — 2026-09-22.** All findings I244-F001 to

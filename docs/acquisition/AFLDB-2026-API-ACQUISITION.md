@@ -1192,12 +1192,18 @@ plan is the design contract, this section is what actually shipped.
 | S6 settle writer (match/roster/player-stats) | **COMPLETE**, operator-validated |
 | S7 Brownlow settle engine + typed projection | **Implemented and operator-validated for historical replay (2022–2025, see §14.10) and for the completed 2025 season backtest. The real 2026 live-count capture/replay requirement is the one item still open** — see §14.11. |
 | S8 operations (systemd units, docs, admin controls) | **COMPLETE**. Deploy files exist and are **NOT installed or enabled** on any host. |
-| S9 DEV validation (real-feed dry-run/apply) | **PAUSED before any real-feed acquisition**, pending operator resumption now that the super-admin ingestion switches (§14.6) exist. Neither switch has been enabled. |
+| S9 DEV validation (real-feed dry-run/apply) | **IMPLEMENTED / NOT ACCEPTED — PARTIALLY EXECUTED** *(reconciled 2026-09-22; supersedes "PAUSED before any real-feed acquisition")*. A real 2026 acquisition occurred (snapshot `afl-api-2026-2026-09-21-011148`, manifest sha256 `dcbd0626…`, 217 concluded matches, 9,983 player-match rows, 0 bundle build failures; a later acquisition `…-031725` exists as lineage). The full-season bridge's 577 links were imported to DEV and a full DEV settle **dry-run** was **INCOMPLETE** (`unresolvedIdentityMatch 0`, `unresolvedIdentityPlayer 830`); it predates ISSUE-244 and is **not** current acceptance evidence. **No committed canonical `afl_api` apply, no S9 DEV smoke, no timer installation/enablement.** All committed S9 acceptance work must run on the post-ISSUE-244 lineage. **Route A (operator, 2026-09-22):** ISSUE-224 registration/linkage must let the same snapshot settle with `unresolvedIdentityPlayer = 0` and pass the F004 completeness gate; a partial-player apply by removing `--require-complete-source` is **rejected for S9 acceptance** (the flag's absence stays technically possible, just not the selected route). |
 | S10 successors (fixture ingestion issue, season discovery, rekey/absence-sweep gaps) | **NOT STARTED** |
 | Assertion 9 (§14.15) | **SKIPPED**, explicitly, not silently — distinct from S7/S9 |
 
-**Deployment:** merged to `main` and deployed to DEV (commit `bbf87566`); migration 103 applied
-on DEV; no AFL API timer enabled; Brownlow deployment gate not enabled; PROD untouched.
+**Deployment:** merged to `main` and deployed to DEV (commit `bbf87566` — *historical evidence of the
+2026-09-21 merge deploy, not the current DEV SHA*); migration 103 applied on DEV; no AFL API timer
+enabled; Brownlow deployment gate not enabled; PROD untouched. `27d7e5aa` (schema-drift fix) and
+`4e67ce38` (full-season player-evidence emitter), cited in `issues.md`, are likewise historical
+evidence of those two deploys. **Reconciliation 2026-09-22:** ISSUE-244 closed on main at `7f242ecc`
+and the S9 branch starts from it; **which commit DEV currently runs is UNMEASURED** — the exact DEV
+deployed SHA must be measured in the next read-only S9 preflight and equal the commit selected for
+acceptance before any write/apply phase. DEV is not claimed to run `7f242ecc`.
 
 ## 14.1 Provider / API architecture
 
@@ -1290,7 +1296,12 @@ stat rows, and a derived, cross-checked local match date/time (§11.1: the roste
 `venueLocalStartTime` must agree, to the second, with the match feed's `utcStartTime` converted
 through the venue's own IANA timezone — a genuine disagreement between the two independently
 observed values is a HALT-class contract violation, `local_time_contradiction`, never silently
-resolved toward one side). Semantic hashing canonicalises the declared-column observation
+resolved toward one side). **Canonical `match_time` format (Q5-B, decided 2026-09-22):** once
+the two values are proved to agree, the emitted canonical `match_time` is the venue-local wall clock
+rendered as zero-padded **`HH:MM`** (`19:40:00` → `19:40`, `07:05:00` → `07:05`; seconds dropped);
+`NULL` still means "not published / unavailable"; the agreement check itself stays at **second**
+precision (`19:40:01` vs `19:40:59` is still a `local_time_contradiction`, not two equal `19:40`s);
+`match_time` is non-identity; no AFL Tables data was rewritten and no column was typed. Semantic hashing canonicalises the declared-column observation
 (sorted keys, stable array order) before hashing — never the raw HTTP bytes — with **every
 family's `hash_exclusions` empty** (§14.3's semantic-hashing rule: an exclusion needs ≥3
 evidenced pairs, a registry `evidence[]` entry and a fixture regression test before it may ever
@@ -2244,7 +2255,12 @@ investigated) once `CONCLUDED`.
   TO ISSUE-224): the nightly `afl_api` unit runs `--apply --auto-apply --require-complete-source`,
   and the F004 pre-commit refusal means an incomplete source refuses before commit. Until ISSUE-224
   registers the required 2026 debutants and the snapshot is re-settled under ISSUE-228 S9, the
-  scheduled `afl_api` chain may commit nothing.
+  scheduled `afl_api` chain may commit nothing. **Route A (operator, 2026-09-22):** S9 acceptance
+  goes through this guarded path — ISSUE-224 registers the 92 unresolved providers, the bridge is
+  rebuilt/re-resolved on the same immutable snapshot, and the re-settle must reach
+  `unresolvedIdentityPlayer = 0`. Removing `--require-complete-source` to force a partial-player
+  apply is **not** the S9 acceptance route (the ability itself is unchanged). Timer
+  installation/enablement is separately authorised work.
 - **Finals/round quirks**: the 2025 `metadata.prematch_label` vs. `metadata.finals_match_label`
   divergence (§14.2) leaves four 2025 fixture-only records refusing
   `finals_label_required`; not fixed by this documentation pass. 2022–2024 finals cannot be
@@ -2266,7 +2282,8 @@ investigated) once `CONCLUDED`.
   (§14.7).
 - **DEV vs. PROD**: deployed to DEV (migration 103 applied, health/smoke PASS); **no timer
   enabled, neither ingestion switch enabled**; PROD entirely untouched. S9 (real-feed DEV
-  validation) is paused pending operator resumption.
+  validation) is **implemented / not accepted — partially executed** (reconciled 2026-09-22; see
+  the §14.0 status table, "Status, as of 2026-09-21" — its S9 row carries the 2026-09-22 reconciliation), blocked on ISSUE-224 registration of the unresolved 2026 players.
 - **ISSUE-131 retired-identity rekey search**: disabled end-to-end for `afl_api`
   (`NO_MATCH_REKEY_SCOPE`) — provider-id-first and `match_key` resolution are unaffected; only
   the narrow case of an `afl_api` row whose own provider id was never linked and whose natural
