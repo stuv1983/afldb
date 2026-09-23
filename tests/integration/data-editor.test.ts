@@ -586,40 +586,84 @@ describe('Targeted club_seasons rebuild (AFLDB-ISSUE-015)', () => {
   // DELETE, so a season it cannot derive keeps whatever it already had rather than
   // being silently emptied by the surrounding mutation.
   //
-  // The trigger is now a season with no canonical home-and-away matches, which is
-  // exactly the in-progress season's state after a canonical rebuild — so this also
-  // pins the boundary that keeps 2026 with the current-season pipeline
-  // (AFLDB-ISSUE-098/-099) rather than this path.
+  // The trigger is a season with no canonical home-and-away matches. That used to be
+  // found in afldb_test (the in-progress season after a canonical rebuild), but once
+  // the current season carried H&A rows no such season existed and the test failed
+  // on its own precondition (AFLDB-ISSUE-236). So the test builds the season itself,
+  // inside the rolled-back transaction: a reserved year nothing else uses (2083 is
+  // outside every committed fixture range, and is never committed here), holding
+  // one Grand Final and no home-and-away match — so it also proves finals do not
+  // satisfy the guard.
   it('refuses to build a ladder for a season it has no matches for', async () => {
-    const [row] = await importSql<{ year: number }[]>`
-      SELECT s.year FROM seasons s
-       WHERE NOT EXISTS (SELECT 1 FROM matches m
-                          WHERE m.season = s.year AND NOT m.is_final)
-       ORDER BY s.year DESC LIMIT 1
-    `;
-    expect(row, 'a canonical rebuild leaves the in-progress season without matches')
-      .toBeDefined();
-
+    const season = 2083;
     await inRolledBackTransaction(async (tx) => {
+      const [{ seasons: existingSeasons, matches: existingMatches }] = await tx<
+        { seasons: number; matches: number }[]
+      >`
+        SELECT (SELECT count(*) FROM seasons WHERE year = ${season})::int   AS seasons,
+               (SELECT count(*) FROM matches WHERE season = ${season})::int AS matches
+      `;
+      expect(existingSeasons, `seasons(${season}) is reserved for this fixture`).toBe(0);
+      expect(existingMatches, `matches for ${season} are reserved for this fixture`).toBe(0);
+
+      const [home, away] = await tx<{ id: number }[]>`
+        SELECT id::int AS id FROM clubs ORDER BY id LIMIT 2
+      `;
+      await tx`
+        INSERT INTO seasons (year, league, status)
+        VALUES (${season}, 'AFL', 'complete'::season_status)
+      `;
+      await tx`
+        INSERT INTO matches (
+          match_key, season, round_code, round_number, round_type, is_final,
+          match_date, venue_raw, home_club_id, away_club_id,
+          home_score, away_score, result, winner_club_id, margin,
+          attendance, attendance_status, source_id
+        ) VALUES (
+          ${`issue236-${season}-gf`}, ${season}, 'GF', NULL, 'grand_final'::round_type, true,
+          ${`${season}-09-25`}, 'ISSUE-236 Fixture Oval', ${home.id}, ${away.id},
+          90, 70, 'home_win'::match_result, ${home.id}, 20,
+          NULL, 'not_collected'::coverage_status,
+          (SELECT id FROM sources WHERE key = 'afltables')
+        )
+      `;
       // Stand a row up so "throws before anything is deleted" is a real assertion
       // rather than a vacuous one over an already-empty season.
       await tx`
         INSERT INTO club_seasons
               (season, club_id, played, wins, draws, losses,
                points_for, points_against)
-        VALUES (${row.year}, (SELECT id FROM clubs ORDER BY id LIMIT 1),
-                0, 0, 0, 0, 0, 0)
+        VALUES (${season}, ${home.id}, 0, 0, 0, 0, 0, 0)
       `;
 
-      await expect(recomputeClubSeasons(tx, row.year)).rejects.toThrow(
-        /no canonical home-and-away matches for season/,
+      // The fixture is the shape the guard is about: canonical match rows exist,
+      // none of them home-and-away.
+      const [{ total, homeAndAway }] = await tx<{ total: number; homeAndAway: number }[]>`
+        SELECT count(*)::int                             AS total,
+               (count(*) FILTER (WHERE NOT is_final))::int AS "homeAndAway"
+          FROM matches WHERE season = ${season}
+      `;
+      expect(total).toBe(1);
+      expect(homeAndAway).toBe(0);
+
+      await expect(recomputeClubSeasons(tx, season)).rejects.toThrow(
+        `recomputeClubSeasons: no canonical home-and-away matches for season ${season}; `
+          + 'refusing to rebuild club_seasons from nothing',
       );
 
-      const [{ count: storedAfter }] = await tx<{ count: string }[]>`
-        SELECT count(*) AS count FROM club_seasons WHERE season = ${row.year}
+      const storedAfter = await tx<{ clubId: number; played: number }[]>`
+        SELECT club_id::int AS "clubId", played FROM club_seasons WHERE season = ${season}
       `;
-      expect(Number(storedAfter)).toBe(1);
+      expect(storedAfter).toEqual([{ clubId: home.id, played: 0 }]);
     });
+
+    // Nothing the fixture built outlives the transaction.
+    const [leftover] = await importSql<{ seasons: number; matches: number; clubSeasons: number }[]>`
+      SELECT (SELECT count(*) FROM seasons WHERE year = ${season})::int        AS seasons,
+             (SELECT count(*) FROM matches WHERE season = ${season})::int      AS matches,
+             (SELECT count(*) FROM club_seasons WHERE season = ${season})::int AS "clubSeasons"
+    `;
+    expect(leftover).toEqual({ seasons: 0, matches: 0, clubSeasons: 0 });
   });
 
   it('derives the ladder from match facts, following a score correction', async () => {
