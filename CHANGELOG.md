@@ -15,6 +15,17 @@ commit.
 
 ## [Unreleased]
 
+### Self-contained `club_seasons` fail-closed guard test (AFLDB-ISSUE-236) (Resolved) - 23 September 2026
+
+- **What changed.** The AFLDB-ISSUE-015 guard test in `tests/integration/data-editor.test.ts` no
+  longer looks for a season in `afldb_test` that happens to have no home-and-away matches. It builds
+  reserved season 2083 inside its own rolled-back transaction (one Grand Final, no H&A match) and
+  asserts the exact refusal, that the existing `club_seasons` row survives, and that nothing
+  persists after rollback. It now also proves that finals do not satisfy the guard.
+- **Why.** Once every season carried H&A matches, the old lookup found nothing and the test failed on
+  its own precondition before the guard ran. Test infrastructure only: `recomputeClubSeasons()` and
+  its guard are unchanged.
+
 ### 2026 debutant player registration and AFL API identity bridge (AFLDB-ISSUE-224) (Resolved) - 23 September 2026
 
 - **2026 debutant registration.** A 2026 debutant with no canonical `players` row — because the

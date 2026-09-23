@@ -4,11 +4,10 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 11
+**Open issues:** 10
 
 | ID | Title | Severity | Area | State | Next action |
 |---|---|---|---|---|---|
-| AFLDB-ISSUE-236 | `club_seasons` no-match integration test has no valid fixture | Low | Test infrastructure — `tests/integration/data-editor.test.ts` (AFLDB-ISSUE-015 fail-closed guard) | Open (2026-09-22) — discovered as an unrelated pre-existing failure while validating AFLDB-ISSUE-224; every season 2017–2026 now carries canonical H&A matches, so the test's own "empty season" precondition never holds; not a guard defect | Make the test construct and roll back its own empty-season fixture inside its own transaction, instead of depending on `afldb_test` naturally holding one |
 | AFLDB-ISSUE-235 | `afl_api` player-link adjudication in `/admin/player-links` | Medium | Admin / player identity — `/admin/player-links`, `external_identities` (`afl_api`) | Open (2026-09-23) — ISSUE-228 S10 successor; the bridge importer is the only `afl_api` link writer and no human path exists | Design adjudication semantics and precedence against importer links before any UI |
 | AFLDB-ISSUE-234 | Optional AFL API feed expansion (extended statistics, umpires, play-by-play) | Low | Data acquisition — investigation only | Open (2026-09-23) — ISSUE-228 S10 successor; optional, not required by the supported architecture | None scheduled; investigate when a product need arises |
 | AFLDB-ISSUE-233 | AFL API season discovery and season rollover ownership | Medium | Data acquisition / season lifecycle — `afl-api-identities.json`, rollover runbook | Open (2026-09-23) — ISSUE-228 S10 successor; replaces resolved ISSUE-101/F as owner of the rollover runbook change | Review the rollover runbook against ISSUE-228 §17/§19.3; plan proposal-only season discovery |
@@ -37608,7 +37607,10 @@ mislabelled ISSUE-227 (`club_seasons`) material were excluded. Full record:
 
 ## AFLDB-ISSUE-236 — `club_seasons` no-match integration test has no valid fixture
 
-**Status: Open.** Discovered 2026-09-22 on the (unmerged) `sonnet/issue-224-s9-unblock` branch as an
+**Status: Resolved (2026-09-23, Opus 5.5).** Test infrastructure only; no production defect and no
+production code changed. Full closure record: `issues/closed/AFLDB-ISSUE-236.md`.
+
+Discovered 2026-09-22 on the (unmerged) `sonnet/issue-224-s9-unblock` branch as an
 unrelated pre-existing failure while running the full `tests/integration/data-editor.test.ts` suite
 to validate AFLDB-ISSUE-224. Not caused by, and not evidence against, any ISSUE-224 fix. It was
 initially recorded there as `AFLDB-ISSUE-227`, which independently collided with the DraftGuru bridge
@@ -37633,12 +37635,42 @@ carries H&A rows, so this is a stale fixture assumption, not a guard defect.
 **Key files.** `tests/integration/data-editor.test.ts` (AFLDB-ISSUE-015 origin), the `club_seasons`
 rebuild guard in `src/db/queries/`.
 
-**Next action.** Make the test self-contained: construct and roll back its own "no canonical H&A
-matches" season/club fixture inside the test's own transaction, instead of depending on `afldb_test`
-naturally holding an empty season. Preserve the actual invariant under test —
-`recomputeClubSeasons` refuses before the DELETE when no canonical H&A source rows exist. No
-production behaviour change unless a real `recomputeClubSeasons` defect is separately found and
-proven; none is claimed here.
+**Next action (as recorded while open).** Make the test self-contained: construct and roll back its
+own "no canonical H&A matches" season/club fixture inside the test's own transaction, instead of
+depending on `afldb_test` naturally holding an empty season. Preserve the actual invariant under
+test — `recomputeClubSeasons` refuses before the DELETE when no canonical H&A source rows exist.
+
+**Reproduction (2026-09-23, `afldb_test`, base `61eb9e98`).** The single test fails at
+`data-editor.test.ts:601` — `AssertionError: a canonical rebuild leaves the in-progress season
+without matches: expected undefined to be defined` — before `recomputeClubSeasons()` is called. A
+read-only probe (`afldb_owner`, `transaction_read_only = on`) re-confirmed the candidate query
+returns 0 rows.
+
+**Root cause.** A stale natural-fixture assumption in the test. It selected a season with no
+non-final `matches` row, expecting the in-progress season to be empty after a canonical rebuild;
+once the current season carried H&A matches no such season existed in `afldb_test`.
+
+**Production guard review.** `recomputeClubSeasons()` (`src/db/queries/player-derived.ts:413`)
+counts `matches WHERE season = $1 AND NOT is_final`, throws `recomputeClubSeasons: no canonical
+home-and-away matches for season N; refusing to rebuild club_seasons from nothing` when the count is
+0, and only then runs the `DELETE`/`INSERT`. Finals are excluded. This matches the ISSUE-015 intent
+as re-pointed by ISSUE-095. Unchanged.
+
+**Fix (commit `6c55af0d`, test only).** The test now builds its own fixture inside the existing
+`inRolledBackTransaction()` harness (which always throws a `Rollback` marker, so the transaction
+can never commit): reserved season **2083** (outside every committed integration-fixture range;
+the test refuses if `seasons`/`matches` already hold it), one Grand Final (`is_final = true`) and no
+H&A match, plus one stood-up `club_seasons` row. It asserts the fixture shape (1 match, 0 H&A),
+the **exact** refusal message, that the stood-up `club_seasons` row survives unchanged, and — after
+the transaction — that no `seasons`/`matches`/`club_seasons` row for 2083 persists. The Grand Final
+makes the test also prove that finals do not satisfy the guard, which the old fixture did not.
+
+**Validation (2026-09-23, `afldb_test` over the 55432 tunnel, four explicit test DSNs, no `.env`).**
+Target test PASS. Full `tests/integration/data-editor.test.ts` **13/13 PASS**, 0 skipped (the
+import-role parity cases ran). `tests/admin-match-mutations.test.ts` (static guard-before-DELETE
+ordering check) 16/16 PASS. `npm run typecheck` PASS (`tsc` exit 0). Post-run read-only probe:
+2083 footprint `seasons 0 / matches 0 / club_seasons 0`, `issue236-%` match keys 0. No DEV or
+production system touched.
 
 ## AFLDB-ISSUE-227 — `validate_person_bridge_child.py` / `bridge_import_gate.py` pin their expected DraftGuru bridge lineage (parent hash, population counts, corrected-identity map) to v2, with no CLI override for a later parent
 

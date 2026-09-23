@@ -9,7 +9,7 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Open issues:** 11
+**Open issues:** 10
 
 ### AFLDB-ISSUE-235 — `afl_api` player-link adjudication in `/admin/player-links`
 - **Severity:** Medium. **Area:** admin / player identity — `/admin/player-links`,
@@ -127,18 +127,6 @@
 - **Next action:** targeted read-only queries on `afldb_test` (captaincies rows for 2489/12093;
   teammate recounts for the board-1024/993 players; lineage for 3581/4006), then classify each
   cell from canonical evidence — never by a blanket exception.
-
-### AFLDB-ISSUE-236 — `club_seasons` no-match integration test has no valid fixture
-- **Severity:** Low. **Area:** test infrastructure — `tests/integration/data-editor.test.ts`
-  (AFLDB-ISSUE-015 fail-closed guard).
-- **State:** Open (2026-09-22). Discovered as an unrelated pre-existing failure while validating
-  AFLDB-ISSUE-224. Every season 2017–2026 now carries canonical H&A matches, so the test's own
-  "empty season" precondition never holds; not a guard defect. Renumbered from a colliding
-  temporary `AFLDB-ISSUE-227` allocation during the 2026-09-23 ISSUE-224 closure — see `issues.md`
-  for the collision detail.
-- **Runbook:** none; tracked in `issues.md` only.
-- **Next action:** make the test construct and roll back its own empty-season fixture inside its own
-  transaction.
 
 **AFLDB-ISSUE-221 resolved 2026-09-18** (implemented 2026-09-17 by Fable 5.1; committed, merged
 and DEV-verified 2026-09-18 by Sonnet 5) — Grid Solver draft-criteria review: honest "No data"
