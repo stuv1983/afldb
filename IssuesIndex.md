@@ -9,7 +9,7 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Open issues:** 12
+**Open issues:** 11
 
 ### AFLDB-ISSUE-235 — `afl_api` player-link adjudication in `/admin/player-links`
 - **Severity:** Medium. **Area:** admin / player identity — `/admin/player-links`,
@@ -139,17 +139,6 @@
 - **Runbook:** none; tracked in `issues.md` only.
 - **Next action:** make the test construct and roll back its own empty-season fixture inside its own
   transaction.
-
-### AFLDB-ISSUE-227 — `validate_person_bridge_child.py` / `bridge_import_gate.py` pin their expected DraftGuru bridge lineage to v2, with no CLI override for a later parent
-- **Severity:** Low. **Area:** DraftGuru rebuild tooling —
-  `tools/rebuild/draftguru/validate_person_bridge_child.py`, `bridge_import_gate.py`.
-- **State:** Open (2026-09-19). Raised while executing AFLDB-ISSUE-224 Phase 5. Independent,
-  non-blocking. Implementation (additive `--lineage` selector + separate v3 validator module) lives
-  on branch `sonnet/issue-227`, not merged into `main`.
-- **Runbook:** on the `sonnet/issue-227` branch.
-- **Next action:** review and merge `sonnet/issue-227` independently of ISSUE-224.
-  *(2026-09-18 original: after ISSUE-222's `afldb_test` import is verified, establish how the 2026
-  debutants (and the numbering/spelling cases) become registered identities on each target.)*
 
 **AFLDB-ISSUE-221 resolved 2026-09-18** (implemented 2026-09-17 by Fable 5.1; committed, merged
 and DEV-verified 2026-09-18 by Sonnet 5) — Grid Solver draft-criteria review: honest "No data"

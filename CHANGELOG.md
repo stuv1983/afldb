@@ -33,6 +33,24 @@ commit.
 - **Validation.** Live read-only `afldb_dev` verification: 92/92 target players registered, 92/92
   with 2026 `player_match_stats`, 830 current rows, 0 duplicate player/match pairs.
 
+### DraftGuru bridge tooling: additive `--lineage` support for a later corrected parent (AFLDB-ISSUE-227) (Resolved) - 23 September 2026
+
+- **What changed.** `tools/rebuild/draftguru/bridge_import_gate.py` gained an additive
+  `--lineage {v2,v3}` CLI flag (default `v2`, unchanged behaviour when omitted) selecting which
+  pinned source-evidence parent/deployment-child artefact pair a plan/verify run is checked against,
+  orthogonal to `--target`. A new, wholly separate `tools/rebuild/draftguru/validate_person_bridge_child_v3.py`
+  validates the v3 (AFLDB-ISSUE-224) parent/child lineage end to end; the existing
+  `validate_person_bridge_child.py` (v1→v2) is unmodified.
+- **Why.** Both tools previously pinned their expected DraftGuru bridge lineage — parent hash,
+  population counts, corrected-identity map — to hard-coded v2 constants with no CLI override, so a
+  later source-evidence parent correction could not be validated or gate-planned without editing
+  tool source first. Both tools were already failing closed correctly against the unrecognised v3
+  lineage; this was a reusable-tooling maintenance gap, not a data-integrity defect.
+- **Compatibility.** Every pre-existing v2 constant, `TARGETS` entry and CLI default is
+  byte-unchanged; an omitted `--lineage` reproduces the tool's pre-existing behaviour exactly.
+  `refuse_test_child_under()` now refuses the pinned `afldb_test` child of every known lineage under
+  a non-test target, so adding a lineage only ever strengthens that DENY rule.
+
 ### AFL.com.au official APIs as the current-season match, player-stat and Brownlow source (AFLDB-ISSUE-228) (Resolved) - 23 September 2026
 
 - **Current-season game data.** AFLDB acquires completed matches, scores and player statistics

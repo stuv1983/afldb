@@ -4,12 +4,11 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 12
+**Open issues:** 11
 
 | ID | Title | Severity | Area | State | Next action |
 |---|---|---|---|---|---|
 | AFLDB-ISSUE-236 | `club_seasons` no-match integration test has no valid fixture | Low | Test infrastructure — `tests/integration/data-editor.test.ts` (AFLDB-ISSUE-015 fail-closed guard) | Open (2026-09-22) — discovered as an unrelated pre-existing failure while validating AFLDB-ISSUE-224; every season 2017–2026 now carries canonical H&A matches, so the test's own "empty season" precondition never holds; not a guard defect | Make the test construct and roll back its own empty-season fixture inside its own transaction, instead of depending on `afldb_test` naturally holding one |
-| AFLDB-ISSUE-227 | `validate_person_bridge_child.py` / `bridge_import_gate.py` pin their expected DraftGuru bridge lineage (parent hash, population counts, corrected-identity map) to v2, with no CLI override for a later parent | Low | DraftGuru rebuild tooling — `tools/rebuild/draftguru/validate_person_bridge_child.py`, `bridge_import_gate.py` | Open (2026-09-19) — independent, non-blocking; own branch `sonnet/issue-227`, not yet merged; a `--lineage` selector for the gate and a separate v3 validator module are implemented there, unreviewed on this branch | Review and merge `sonnet/issue-227` independently of ISSUE-224 |
 | AFLDB-ISSUE-235 | `afl_api` player-link adjudication in `/admin/player-links` | Medium | Admin / player identity — `/admin/player-links`, `external_identities` (`afl_api`) | Open (2026-09-23) — ISSUE-228 S10 successor; the bridge importer is the only `afl_api` link writer and no human path exists | Design adjudication semantics and precedence against importer links before any UI |
 | AFLDB-ISSUE-234 | Optional AFL API feed expansion (extended statistics, umpires, play-by-play) | Low | Data acquisition — investigation only | Open (2026-09-23) — ISSUE-228 S10 successor; optional, not required by the supported architecture | None scheduled; investigate when a product need arises |
 | AFLDB-ISSUE-233 | AFL API season discovery and season rollover ownership | Medium | Data acquisition / season lifecycle — `afl-api-identities.json`, rollover runbook | Open (2026-09-23) — ISSUE-228 S10 successor; replaces resolved ISSUE-101/F as owner of the rollover runbook change | Review the rollover runbook against ISSUE-228 §17/§19.3; plan proposal-only season discovery |
@@ -37589,8 +37588,9 @@ measurements. Exact row-level attribution of the additional three rows was not e
 not required for this acceptance — this section does not assert which three rows they were.
 
 **Follow-up, tracked separately, not reopening this issue:**
-- `AFLDB-ISSUE-227` — the DraftGuru bridge lineage/gate tooling's v2-pinned constants have no CLI
-  override for a later corrected parent. Independent, non-blocking, own branch.
+- `AFLDB-ISSUE-227` — the DraftGuru bridge lineage/gate tooling's v2-pinned constants had no CLI
+  override for a later corrected parent. Independent, non-blocking; resolved separately (see its own
+  record below).
 - `AFLDB-ISSUE-236` — `tests/integration/data-editor.test.ts`'s AFLDB-ISSUE-015 fail-closed guard
   test has a stale fixture precondition. Independent, non-blocking, test infrastructure only.
   Discovered during ISSUE-224 validation under a temporary allocation of `AFLDB-ISSUE-227`, which
@@ -37642,31 +37642,41 @@ proven; none is claimed here.
 
 ## AFLDB-ISSUE-227 — `validate_person_bridge_child.py` / `bridge_import_gate.py` pin their expected DraftGuru bridge lineage (parent hash, population counts, corrected-identity map) to v2, with no CLI override for a later parent
 
-**Status: Open.** Raised 2026-09-19 while executing AFLDB-ISSUE-224 Phase 5 read-only steps against a
-new v3 source-evidence parent correction (Dean Laidley / Matthew Capuano corrected out of
-`target_not_registered` into their already-registered identities). Implementation and its own
-independent plan review live on branch `sonnet/issue-227`, not merged into this branch or into
-`main`.
+**Status: Resolved (2026-09-23, Sonnet 5).** Raised 2026-09-19 while executing AFLDB-ISSUE-224
+Phase 5 read-only steps against a new v3 source-evidence parent correction (Dean Laidley / Matthew
+Capuano corrected out of `target_not_registered` into their already-registered identities). Full
+closure record: `issues/closed/AFLDB-ISSUE-227.md`.
 
-**Symptom.** `validate_person_bridge_child.py` and `bridge_import_gate.py` each hard-code the
+**Root cause.** `validate_person_bridge_child.py` and `bridge_import_gate.py` each hard-coded the
 expected DraftGuru bridge lineage (v2 parent hash, deployment-child hash, population counts, the
 v1→v2 corrected-identity map) as module constants with no CLI override, so a later, independently
-corrected source-evidence parent (v3) cannot be validated or gate-planned without editing tool source
-first. Both tools refuse closed (fail-closed on an unrecognised lineage) rather than producing wrong
-output — this is not a data-integrity or security defect, and it is not evidence against the v3
-parent correction itself.
+corrected source-evidence parent (v3) could not be validated or gate-planned without editing tool
+source first. Both tools refused closed (fail-closed on an unrecognised lineage) rather than
+producing wrong output — this was not a data-integrity or security defect, and was never evidence
+against the v3 parent correction itself.
 
-**Scope.** Reusable-tooling maintenance gap: it recurs at the next parent correction (v4, v5, …)
-regardless of how ISSUE-224's registration is resolved. Kept separate from ISSUE-224 (a registration
-root-cause and reconciliation issue) so a future reader can distinguish the two from the ledger alone.
+**Fix.** `bridge_import_gate.py` gained an additive `--lineage {v2,v3}` selector (default `v2`;
+`TARGETS`, `TOOL_VERSION` and every pre-existing constant byte-unchanged) whose per-invocation
+`effective_config()` substitutes the parent/child pins without mutating any module global, and whose
+widened `refuse_test_child_under()` covers the pinned `afldb_test` bytes of every known lineage.
+`validate_person_bridge_child.py` (v1→v2) is unmodified — a wholly separate, additive
+`validate_person_bridge_child_v3.py` validates the v2→v3 transition against the accepted
+AFLDB-ISSUE-224 v3 artefacts now on `main`, DB-free throughout.
 
-**Status of the fix.** `sonnet/issue-227` implements an additive `--lineage {v2,v3}` selector for
-`bridge_import_gate.py` (`TARGETS`, `TOOL_VERSION` and existing constants byte-unchanged, matching
-its own reviewed plan) and a separate, additive `validate_person_bridge_child_v3.py` module for the
-validator (zero edits to the v2 file). Not reviewed or merged on this branch.
+**Validation (2026-09-23, against current `main`).** v2 validator: PASS,
+`summary_sha256 5bc5336b…` (unchanged). v3 validator against the real committed `main` lineage:
+26/26 PASS, `summary_sha256 f58503bb…`. `draftguru_bridge_v2_contract.py`,
+`draftguru_child_validation_contract.py`, `draftguru_import_gate_contract.py`,
+`draftguru_child_validation_v3_contract.py` — all PASS. Manual cross-lineage checks (dummy,
+unreachable DSN): `--lineage v3` + the v2 child and `--lineage v2` (default) + the v3 child both
+`REFUSED` on a child-count mismatch before any database contact; `--lineage v4` rejected
+immediately by argparse. No database was connected to and no production system was touched.
 
-**Next action.** Review and merge `sonnet/issue-227` independently of ISSUE-224. Non-blocking for
-ISSUE-224, which is resolved above without it.
+**Scope.** A reusable-tooling maintenance gap that would have recurred at the next parent correction
+(v4, v5, …) regardless of how ISSUE-224's registration was resolved. Kept separate from ISSUE-224 (a
+registration root-cause and reconciliation issue, itself resolved above) so a future reader can
+distinguish the two from the ledger alone. Independent of, and unaffected by, AFLDB-ISSUE-236
+(`club_seasons` stale test fixture), which remains open.
 
 ## AFLDB-ISSUE-225 — Gridley corpus: 37 pre-existing `incorrect known answer` cells on non-draft criteria, present on `afldb_test` before AFLDB-ISSUE-222 and untouched by it
 
