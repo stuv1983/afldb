@@ -15,6 +15,24 @@ commit.
 
 ## [Unreleased]
 
+### 2026 debutant player registration and AFL API identity bridge (AFLDB-ISSUE-224) (Resolved) - 23 September 2026
+
+- **2026 debutant registration.** A 2026 debutant with no canonical `players` row — because the
+  accepted fitzRoy baseline ends at 2025 — previously had no registration path and could not be
+  linked by either the DraftGuru or AFL API identity bridge. A new transaction-scoped registration
+  tool now registers each debutant as a canonical `players` row, behind an explicit DEV import-role
+  preflight and a refusal on any given-name/surname split it cannot resolve unambiguously.
+- **Identity-override replay/name-edit consistency.** Replay now merges player overrides
+  deterministically, and a later sanctioned name edit now synchronizes the active
+  `manual_admin_edit` identity override in the same transaction, so a subsequent rebuild replays the
+  corrected name rather than a stale creation-time split. Corrected two DEV registrations under this
+  path (Alex Van Wyk, Hussien El Achkar).
+- **AFL API provider bridge.** Re-resolved as one coherent 669-provider population against the
+  accepted snapshot: 669/669 linked, 0 unresolved, 0 contradictory. This was the blocking
+  prerequisite for AFLDB-ISSUE-228 S9 acceptance, now resolved.
+- **Validation.** Live read-only `afldb_dev` verification: 92/92 target players registered, 92/92
+  with 2026 `player_match_stats`, 830 current rows, 0 duplicate player/match pairs.
+
 ### AFL.com.au official APIs as the current-season match, player-stat and Brownlow source (AFLDB-ISSUE-228) (Resolved) - 23 September 2026
 
 - **Current-season game data.** AFLDB acquires completed matches, scores and player statistics

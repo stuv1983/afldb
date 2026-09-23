@@ -9,7 +9,7 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Open issues:** 11
+**Open issues:** 12
 
 ### AFLDB-ISSUE-235 — `afl_api` player-link adjudication in `/admin/player-links`
 - **Severity:** Medium. **Area:** admin / player identity — `/admin/player-links`,
@@ -128,40 +128,26 @@
   teammate recounts for the board-1024/993 players; lineage for 3581/4006), then classify each
   cell from canonical evidence — never by a blanket exception.
 
-### AFLDB-ISSUE-224 — DraftGuru persons whose AFL Tables identity is not registered on the target (`target_not_registered`): post-baseline debutants and numbering/spelling cases cannot link until the identity is registered
-- **Severity:** Medium. **Area:** player registration / import — `external_identities`
-  (`afltables`, `afltables_profile_url`), fitzRoy core acquisition, current-season settle;
-  `tools/rebuild/draftguru/export_person_bridge.py --resolve-against`.
-- **State:** Open (2026-09-18, deferred from AFLDB-ISSUE-222 Phase F). 94 bridge-admissible v2
-  parent persons are withheld `target_not_registered` in the `afldb_test` child (16 of them in the
-  Phase F sample, all operator-verdict `agree`, terminally withheld; none may be added by the
-  ISSUE-222 import). Measured (handoff §10.3): 0 of the withheld paths appear in the accepted
-  fitzRoy `full-history-20260902` 13,275-URL set, i.e. no appearance in seasons 1897–2025;
-  15 of the 16 sampled are 2021–2025 draftees (10 from 2025), 1 is a 1992 spelling case
-  (Matthew Capuano). Strong example: Hussien El Achkar (`hussien_el%20achkar/1`, 2025 National
-  pick 53, Essendon) — DraftGuru and AFL Tables agree on name, DOB 02 Apr 2007, club, 9 games,
-  10 goals; AFLDB search returns no player; he remains withheld. Cause of the registration gap
-  (how a post-baseline debutant acquires an `afltables_profile_url` registration) NOT
-  investigated here. Confirmed shape (ISSUE-222 D4, read-only query 2026-09-19): `afldb_test`
-  holds 2026 matches (max season 2026) while its player register ends at 2025 (max debut 2025);
-  Jagga Smith and Willem Duursma have no player row and no AFL Tables identity; no NBSP names.
-- **Key files:** `tools/migration/import_fitzroy_core.py` (registration), `deploy/afldb-settle-afltables.sh`
-  / current-season import, `data/reference/draftguru-person-bridge-20260918-v2.json` (the 94 identities),
-  `docs/rebuild-manifests/draftguru/bridge-validation-verdicts-20260918-v2.csv` (`target_unregistered` rows).
-- **Ownership annotation (2026-09-22, ISSUE-228 reconciliation):** two distinct populations.
-  **A** = the DraftGuru registration problem above. **B** = the AFL API S9 affected population
-  (snapshot `afl-api-2026-2026-09-21-011148`: 577 providers linked, **92 unresolved**, **830
-  player-match rows uncovered**, 0 contradictory). B is **not** identity evidence for A (or vice
-  versa) merely because names/cohorts correlate. ISSUE-224 owns registering the missing canonical
-  player rows through its approved evidence path; afterwards the AFL API bridge must be
-  rebuilt/re-resolved on the same immutable snapshot; ISSUE-228 S9 requires
-  `unresolvedIdentityPlayer = 0`; **ISSUE-228 owns the later re-settle and S9 acceptance — ISSUE-224
-  does NOT own the settle.**
-- **Next action (2026-09-22; supersedes the 2026-09-18 wording):** establish the registration path
-  for post-baseline debutants on each target and register them — population A via a re-resolved
-  DraftGuru child (`--resolve-against`, new hash, §4.5; never by editing the child or the importer's
-  HALT), population B via ISSUE-224's approved evidence path; then hand back to ISSUE-228 for the
-  bridge rebuild/re-resolve and S9 re-settle. B is the blocking prerequisite of ISSUE-228 S9.
+### AFLDB-ISSUE-236 — `club_seasons` no-match integration test has no valid fixture
+- **Severity:** Low. **Area:** test infrastructure — `tests/integration/data-editor.test.ts`
+  (AFLDB-ISSUE-015 fail-closed guard).
+- **State:** Open (2026-09-22). Discovered as an unrelated pre-existing failure while validating
+  AFLDB-ISSUE-224. Every season 2017–2026 now carries canonical H&A matches, so the test's own
+  "empty season" precondition never holds; not a guard defect. Renumbered from a colliding
+  temporary `AFLDB-ISSUE-227` allocation during the 2026-09-23 ISSUE-224 closure — see `issues.md`
+  for the collision detail.
+- **Runbook:** none; tracked in `issues.md` only.
+- **Next action:** make the test construct and roll back its own empty-season fixture inside its own
+  transaction.
+
+### AFLDB-ISSUE-227 — `validate_person_bridge_child.py` / `bridge_import_gate.py` pin their expected DraftGuru bridge lineage to v2, with no CLI override for a later parent
+- **Severity:** Low. **Area:** DraftGuru rebuild tooling —
+  `tools/rebuild/draftguru/validate_person_bridge_child.py`, `bridge_import_gate.py`.
+- **State:** Open (2026-09-19). Raised while executing AFLDB-ISSUE-224 Phase 5. Independent,
+  non-blocking. Implementation (additive `--lineage` selector + separate v3 validator module) lives
+  on branch `sonnet/issue-227`, not merged into `main`.
+- **Runbook:** on the `sonnet/issue-227` branch.
+- **Next action:** review and merge `sonnet/issue-227` independently of ISSUE-224.
   *(2026-09-18 original: after ISSUE-222's `afldb_test` import is verified, establish how the 2026
   debutants (and the numbering/spelling cases) become registered identities on each target.)*
 
