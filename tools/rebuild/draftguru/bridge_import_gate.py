@@ -184,6 +184,68 @@ TARGETS: dict[str, dict[str, Any]] = {
 # only lose it.
 TEST_CHILD_SUFFIX = ".afldb_test.json"
 
+# ``LINEAGES`` (AFLDB-ISSUE-227): lineage is a property of the ARTEFACT PAIR -- a source-evidence
+# parent and its resolved deployment child -- deliberately NOT a target. Which database a run
+# reads (TARGETS) and which artefact vintage it reads (LINEAGES) are orthogonal; TARGETS must
+# never grow a lineage-shaped key, and a lineage is never a --target choice. "v2" stays
+# DEFAULT_LINEAGE, so an invocation with no --lineage resolves to exactly the same parent/child
+# pair every pre-existing invocation has always used: the v2 child is re-exported by reference
+# into a pinned Phase F evidence chain (AFLDB-ISSUE-222 Phase 4a/4b) that a silent default bump
+# would invalidate. The "v2" entry below is built BY REFERENCE to the pre-existing module
+# constants above (never retyped), so the two representations can never drift apart.
+V3_PARENT_REL = "data/reference/draftguru-person-bridge-20260918-v3.json"
+V3_EXPECTED_PARENT_SHA256 = "1f7413a2ad96e7d026cc521acfdeba3de9cab7066794de99002c9b5928e6e21b"
+V3_CHILD_REL = "data/reference/draftguru-person-bridge-20260918-v3.afldb_test.json"
+V3_EXPECTED_CHILD_SHA256 = "94aeac74422bea17dbb14913d480055991db4ac79546a2860383e669b5bbdac4"
+V3_EXPECTED_CHILD_COUNTS = {
+    "bridges": 3470, "withheld": 1587,
+    "U-no-href": 1493, "target_not_registered": 92, "different_person_wrong_href": 2,
+}
+
+LINEAGES: dict[str, dict[str, Any]] = {
+    "v2": {
+        "parent_rel": PARENT_REL, "expected_parent_sha256": EXPECTED_PARENT_SHA256,
+        "test_child_rel": CHILD_REL, "expected_test_child_sha256": EXPECTED_CHILD_SHA256,
+        "expected_test_child_counts": EXPECTED_CHILD_COUNTS,
+    },
+    "v3": {
+        "parent_rel": V3_PARENT_REL, "expected_parent_sha256": V3_EXPECTED_PARENT_SHA256,
+        "test_child_rel": V3_CHILD_REL, "expected_test_child_sha256": V3_EXPECTED_CHILD_SHA256,
+        "expected_test_child_counts": V3_EXPECTED_CHILD_COUNTS,
+    },
+}
+DEFAULT_LINEAGE = "v2"
+
+
+def effective_config(target: str, lineage: str) -> dict[str, Any]:
+    """A NEW per-invocation config: a copy of ``TARGETS[target]`` with its parent/child fields
+    substituted from ``LINEAGES[lineage]`` -- for the ``child_rel`` / ``expected_child_sha256`` /
+    ``expected_child_counts`` triple, substitution applies to the ``test`` target ONLY; ``dev``
+    keeps those three fields ``None`` regardless of lineage, because a DEV deployment child is
+    always a live per-target measurement (see TARGETS above), never a pinned artefact.
+
+    This returns a fresh dict on every call and never assigns into ``TARGETS``, ``CHILD_REL``,
+    ``EXPECTED_CHILD_SHA256``, ``EXPECTED_CHILD_COUNTS``, ``PARENT_REL`` or
+    ``EXPECTED_PARENT_SHA256`` -- so a ``--lineage v3`` invocation can never leak state into a
+    later, unrelated call within the same process (the contracts call ``main()`` repeatedly in
+    one process; module-level mutation here would leak v3 into every later call and into every
+    contract that reads ``TARGETS`` directly). Fails closed on an unknown target or an unknown
+    lineage, naming the closed set."""
+    if target not in TARGETS:
+        raise GateError(f"unknown --target {target!r} -- only {sorted(TARGETS)} exist (no PROD target)")
+    if lineage not in LINEAGES:
+        raise GateError(f"unknown --lineage {lineage!r} -- only {sorted(LINEAGES)} exist")
+    cfg = dict(TARGETS[target])
+    lin = LINEAGES[lineage]
+    cfg["parent_rel"] = lin["parent_rel"]
+    cfg["expected_parent_sha256"] = lin["expected_parent_sha256"]
+    if target == "test":
+        cfg["child_rel"] = lin["test_child_rel"]
+        cfg["expected_child_sha256"] = lin["expected_test_child_sha256"]
+        cfg["expected_child_counts"] = lin["expected_test_child_counts"]
+    return cfg
+
+
 _DG = "https://www.draftguru.com.au/players/"
 # The two Phase 3 rejections (AFLDB-ISSUE-222.md §11.13/§11.14): neither person may link and
 # neither AFL Tables identity may be reached by any DraftGuru person after the import.
@@ -414,25 +476,35 @@ def load_child(path: Path, expect_sha256: str | None, expect_counts: dict | None
 
 
 def refuse_test_child_under(target: str, child_path: Path) -> None:
-    """Refuse the pinned ``afldb_test`` child under any non-``test`` target -- by resolved path,
-    by the tracked ``.afldb_test.json`` naming convention, and by its pinned bytes under any
-    other name. All three are DENY rules: a name can never make a file trusted here, only
-    refused, and the bytes rule is what stops a rename from laundering the test child into a DEV
-    deployment child. This runs before any DSN is read and before any connection is opened."""
+    """Refuse EVERY lineage's pinned ``afldb_test`` child under any non-``test`` target -- by
+    resolved path, by the tracked ``.afldb_test.json`` naming convention, and by pinned bytes
+    under any other name. All three are DENY rules: a name can never make a file trusted here,
+    only refused, and the bytes rule is what stops a rename from laundering a test child into a
+    DEV deployment child. This deliberately does NOT resolve the caller's own ``--lineage`` and
+    check only that one -- it enumerates ``LINEAGES`` itself, so adding a lineage only ever ADDS
+    to this DENY set and the v2 rule stays exactly as strong as it was before lineages existed.
+    This runs before any DSN is read and before any connection is opened."""
     if target == "test":
         return
-    test_default_child = (REPO_ROOT / CHILD_REL).resolve()
-    try:
-        same_file = child_path.resolve() == test_default_child
-    except OSError:                                   # unresolvable path: treat as different
-        same_file = False
-    if same_file or child_path.name.endswith(TEST_CHILD_SUFFIX):
+    if child_path.name.endswith(TEST_CHILD_SUFFIX):
         raise GateError(f"REFUSED: --bridge for --target {target} must not be the afldb_test "
-                        f"child ({CHILD_REL})")
-    if child_path.is_file() and sha256_bytes(child_path.read_bytes()) == EXPECTED_CHILD_SHA256:
-        raise GateError(f"REFUSED: --bridge for --target {target} must not be the afldb_test "
-                        f"child -- these bytes are the pinned afldb_test child's (sha256 "
-                        f"{EXPECTED_CHILD_SHA256}), whatever the file is called")
+                        f"child (the {TEST_CHILD_SUFFIX!r} naming convention)")
+    child_bytes = child_path.read_bytes() if child_path.is_file() else None
+    for lineage_name, lin in LINEAGES.items():
+        pinned_rel = lin["test_child_rel"]
+        pinned_sha = lin["expected_test_child_sha256"]
+        try:
+            same_file = child_path.resolve() == (REPO_ROOT / pinned_rel).resolve()
+        except OSError:                                   # unresolvable path: treat as different
+            same_file = False
+        if same_file:
+            raise GateError(f"REFUSED: --bridge for --target {target} must not be the afldb_test "
+                            f"child (pinned lineage {lineage_name}: {pinned_rel})")
+        if child_bytes is not None and sha256_bytes(child_bytes) == pinned_sha:
+            raise GateError(f"REFUSED: --bridge for --target {target} must not be the afldb_test "
+                            f"child -- these bytes are the pinned lineage {lineage_name} "
+                            f"afldb_test child's (sha256 {pinned_sha}), whatever the file is "
+                            "called")
 
 
 def load_parent_map(path: Path, child: dict, expect_sha256: str | None) -> dict[str, str]:
@@ -442,7 +514,8 @@ def load_parent_map(path: Path, child: dict, expect_sha256: str | None) -> dict[
     data = path.read_bytes()
     digest = sha256_bytes(data)
     if expect_sha256 is not None and digest != expect_sha256:
-        raise GateError("REFUSED: the parent dataset's sha256 is not the pinned v2 parent hash")
+        raise GateError("REFUSED: the parent dataset's sha256 is not the pinned parent hash for "
+                        "this lineage")
     if child.get("parent_sha256") != digest:
         raise GateError("REFUSED: the child's parent_sha256 does not name this parent")
     doc = json.loads(data.decode("utf-8"))
@@ -1435,15 +1508,21 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--target", choices=sorted(TARGETS), default="test",
                     help="which database this gate reads (default test = afldb_test; "
                          "dev = afldb_dev; no PROD target exists)")
+    ap.add_argument("--lineage", choices=sorted(LINEAGES), default=DEFAULT_LINEAGE,
+                    help=f"which source-evidence parent/child artefact vintage to pin against "
+                         f"(default {DEFAULT_LINEAGE}); orthogonal to --target -- it is never a "
+                         "target choice and TARGETS is never extended with one")
     ap.add_argument("--bridge", default=None,
                     help="the target's deployment child; defaults to the pinned afldb_test "
                          "child for --target test, and is MANDATORY (no default) for any "
                          "other target")
-    ap.add_argument("--parent", default=PARENT_REL, help="the v2 source-evidence parent")
+    ap.add_argument("--parent", default=None,
+                    help="the source-evidence parent (defaults to the selected --lineage's "
+                         "pinned parent)")
     ap.add_argument("--expect-child-sha256", default=None,
                     help="defaults to the pinned afldb_test child hash for --target test; "
                          "no default for any other target (no DEV child is pinned yet)")
-    ap.add_argument("--expect-parent-sha256", default=EXPECTED_PARENT_SHA256)
+    ap.add_argument("--expect-parent-sha256", default=None)
     # Default None then substituted, exactly as the importer does: the effective default is
     # unchanged, and --link-only additionally learns whether the operator stated the label.
     ap.add_argument("--label", default=None,
@@ -1463,7 +1542,14 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--expect-baseline-sha256")
     ap.add_argument("--expect-batches-before", type=int)
     args = ap.parse_args(argv)
-    cfg = TARGETS[args.target]
+    # A NEW per-invocation dict every call (see effective_config): --lineage never mutates
+    # TARGETS or any module constant, so a --lineage v3 call cannot leak into a later,
+    # unrelated call within the same process.
+    cfg = effective_config(args.target, args.lineage)
+    if args.parent is None:
+        args.parent = cfg["parent_rel"]
+    if args.expect_parent_sha256 is None:
+        args.expect_parent_sha256 = cfg["expected_parent_sha256"]
     label_explicit = args.label is not None
     if args.label is None:
         args.label = imp.STAGE_A_LABEL
@@ -1471,6 +1557,11 @@ def main(argv: list[str] | None = None) -> int:
     scope = " --link-only" if args.link_only else ""
     print(f"AFLDB DraftGuru bridge import gate -- {args.mode}{scope} (read-only, "
           f"{cfg['database']} only) [target={args.target}]")
+    if args.lineage != DEFAULT_LINEAGE:
+        # Stdout only, never hashed: keeping this behind the non-default branch means a
+        # --lineage v2 (or omitted --lineage) run's stdout is byte-identical to before
+        # lineages existed.
+        print(f"  lineage  : {args.lineage}")
     if args.link_only and not label_explicit:
         print("\nERROR: --link-only requires an explicit --label: the mode proves the label "
               "against every stored external_identities(draftguru).notes value, and a default "

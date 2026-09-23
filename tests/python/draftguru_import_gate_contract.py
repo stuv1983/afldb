@@ -1081,6 +1081,282 @@ check("9.6 that run passed every offline guard -- the real DEV child's pinned by
       and "parent_sha256 chain verified" in dev_real_output,
       str(dev_real_output.strip().splitlines()[-5:]))
 
+section("10. --lineage: v2/v3 artefact-pair selection (AFLDB-ISSUE-227)")
+
+# Pinned as LITERALS here, deliberately never read from tool.LINEAGES/tool.V3_* -- so a future
+# silent edit to LINEAGES (a wrong hash, a swapped path, a drifted count) fails this contract
+# instead of quietly passing because the contract copied its expectation from the same place.
+V3_PARENT_REL = "data/reference/draftguru-person-bridge-20260918-v3.json"
+V3_EXPECTED_PARENT_SHA256 = "1f7413a2ad96e7d026cc521acfdeba3de9cab7066794de99002c9b5928e6e21b"
+V3_CHILD_REL = "data/reference/draftguru-person-bridge-20260918-v3.afldb_test.json"
+V3_EXPECTED_CHILD_SHA256 = "94aeac74422bea17dbb14913d480055991db4ac79546a2860383e669b5bbdac4"
+V3_EXPECTED_CHILD_COUNTS = {
+    "bridges": 3470, "withheld": 1587,
+    "U-no-href": 1493, "target_not_registered": 92, "different_person_wrong_href": 2,
+}
+
+cfg_default_test = tool.effective_config("test", tool.DEFAULT_LINEAGE)
+cfg_v2_test = tool.effective_config("test", "v2")
+cfg_default_dev = tool.effective_config("dev", tool.DEFAULT_LINEAGE)
+cfg_v2_dev = tool.effective_config("dev", "v2")
+check("10.1 omitted --lineage (DEFAULT_LINEAGE) resolves identically to explicit --lineage v2 "
+      "for both test and dev targets, including the resolved parent path/hash",
+      tool.DEFAULT_LINEAGE == "v2"
+      and cfg_default_test == cfg_v2_test and cfg_default_dev == cfg_v2_dev
+      and cfg_default_test["parent_rel"] == tool.PARENT_REL
+      and cfg_default_test["expected_parent_sha256"] == tool.EXPECTED_PARENT_SHA256,
+      str(cfg_default_test))
+
+check("10.2 --lineage v2 yields exactly the pre-existing historical child and parent values",
+      cfg_v2_test["child_rel"] == tool.CHILD_REL
+      and cfg_v2_test["expected_child_sha256"] == tool.EXPECTED_CHILD_SHA256
+      and cfg_v2_test["expected_child_counts"] == tool.EXPECTED_CHILD_COUNTS
+      and cfg_v2_test["parent_rel"] == tool.PARENT_REL
+      and cfg_v2_test["expected_parent_sha256"] == tool.EXPECTED_PARENT_SHA256)
+
+cfg_v3_test = tool.effective_config("test", "v3")
+check("10.3 --lineage v3 yields the v3 parent AND the v3 child together (asserted in one check "
+      "so they cannot drift apart)",
+      cfg_v3_test["parent_rel"] == V3_PARENT_REL
+      and cfg_v3_test["expected_parent_sha256"] == V3_EXPECTED_PARENT_SHA256
+      and cfg_v3_test["child_rel"] == V3_CHILD_REL
+      and cfg_v3_test["expected_child_sha256"] == V3_EXPECTED_CHILD_SHA256
+      and cfg_v3_test["expected_child_counts"] == V3_EXPECTED_CHILD_COUNTS,
+      str(cfg_v3_test))
+
+cfg_v3_dev = tool.effective_config("dev", "v3")
+check("10.3b --lineage v3 under --target dev still leaves the three child fields None (a DEV "
+      "deployment child is a live measurement, never a pinned artefact, in every lineage)",
+      cfg_v3_dev["child_rel"] is None and cfg_v3_dev["expected_child_sha256"] is None
+      and cfg_v3_dev["expected_child_counts"] is None
+      and cfg_v3_dev["parent_rel"] == V3_PARENT_REL
+      and cfg_v3_dev["expected_parent_sha256"] == V3_EXPECTED_PARENT_SHA256)
+
+try:
+    tool.effective_config("test", "v9")
+    lineage_fn_ok, lineage_fn_message = True, ""
+except tool.GateError as exc:
+    lineage_fn_ok, lineage_fn_message = False, str(exc)
+with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+    try:
+        tool.main(["plan", "--lineage", "v9"])
+        lineage_choice_refused = False
+    except SystemExit as exc:
+        lineage_choice_refused = exc.code not in (0, tool.EXIT_OK)
+check("10.4 an unsupported lineage is refused both by effective_config (GateError, fail closed) "
+      "and by argparse's own --lineage choices (exit 2)",
+      not lineage_fn_ok and "v9" in lineage_fn_message and lineage_choice_refused,
+      lineage_fn_message)
+
+_ = tool.effective_config("test", "v3")   # resolving v3 must not leak into TARGETS
+check("10.5 resolving --lineage v3 does not mutate TARGETS -- the v2 test child hash is still "
+      "pinned and DEV's three child fields are still None (F-101 regression guard against "
+      "in-process leakage across repeated main() calls)",
+      tool.TARGETS["test"]["expected_child_sha256"] == tool.EXPECTED_CHILD_SHA256
+      and tool.TARGETS["test"]["child_rel"] == tool.CHILD_REL
+      and tool.TARGETS["dev"]["child_rel"] is None
+      and tool.TARGETS["dev"]["expected_child_sha256"] is None
+      and tool.TARGETS["dev"]["expected_child_counts"] is None)
+
+check("10.6 the target set is unchanged by lineages -- exactly {'dev', 'test'}, no PROD, and the "
+      "literal string 'test-v3' appears in neither tool's source",
+      sorted(tool.TARGETS) == ["dev", "test"] and "prod" not in tool.TARGETS
+      and "test-v3" not in (TOOL_DIR / "bridge_import_gate.py").read_text(encoding="utf-8")
+      and "test-v3" not in (TOOL_DIR / "validate_person_bridge_child.py").read_text(encoding="utf-8"))
+
+prod_lineage_refusals = []
+for lineage_name in tool.LINEAGES:
+    try:
+        tool.effective_config("prod", lineage_name)
+        prod_lineage_refusals.append(False)
+    except tool.GateError:
+        prod_lineage_refusals.append(True)
+check("10.7 no lineage value can reach a PROD target through effective_config",
+      bool(prod_lineage_refusals) and all(prod_lineage_refusals))
+
+with tempfile.TemporaryDirectory() as tmp10:
+    v2_renamed = Path(tmp10) / "still-innocent-looking.json"
+    v2_renamed.write_bytes((ROOT / tool.CHILD_REL).read_bytes())
+    try:
+        tool.refuse_test_child_under("dev", v2_renamed)
+        v2_deny_ok, v2_deny_message = False, ""
+    except tool.GateError as exc:
+        v2_deny_ok, v2_deny_message = True, str(exc)
+check("10.8 the pre-existing v2 afldb_test child BYTES DENY rule still fires under --target dev "
+      "after lineages were added (adds alongside 8.5, does not weaken it)",
+      v2_deny_ok and "sha256" in v2_deny_message and "afldb_test" in v2_deny_message,
+      v2_deny_message)
+
+with tempfile.TemporaryDirectory() as tmp11:
+    v3_renamed = Path(tmp11) / "another-neutral-name.json"
+    v3_renamed.write_bytes((ROOT / V3_CHILD_REL).read_bytes())
+    try:
+        tool.refuse_test_child_under("dev", v3_renamed)
+        v3_deny_ok, v3_deny_message = False, ""
+    except tool.GateError as exc:
+        v3_deny_ok, v3_deny_message = True, str(exc)
+check("10.9 the v3 afldb_test child is likewise refused under --target dev by its BYTES under a "
+      "neutral filename (mirrors 8.5 for the new lineage)",
+      v3_deny_ok and "sha256" in v3_deny_message, v3_deny_message)
+
+real_v3_parent = ROOT / V3_PARENT_REL
+real_v3_child = ROOT / V3_CHILD_REL
+check("10.10 the real committed v3 parent exists and hashes to the pinned v3 parent sha256",
+      real_v3_parent.is_file()
+      and tool.sha256_bytes(real_v3_parent.read_bytes()) == V3_EXPECTED_PARENT_SHA256,
+      str(real_v3_parent))
+real_v3_child_doc = (json.loads(real_v3_child.read_bytes().decode("utf-8"))
+                    if real_v3_child.is_file() else {})
+check("10.11 the real committed v3 test child exists, hashes to the pinned v3 child sha256, "
+      "declares target='afldb_test', and names the pinned v3 parent by parent_sha256",
+      real_v3_child.is_file()
+      and tool.sha256_bytes(real_v3_child.read_bytes()) == V3_EXPECTED_CHILD_SHA256
+      and real_v3_child_doc.get("target") == "afldb_test"
+      and real_v3_child_doc.get("parent_sha256") == V3_EXPECTED_PARENT_SHA256,
+      str(real_v3_child))
+
+real_v3_loaded_doc, real_v3_loaded_sha = tool.load_child(
+    real_v3_child, V3_EXPECTED_CHILD_SHA256, V3_EXPECTED_CHILD_COUNTS,
+    expect_child_target=TEST_CHILD_TARGET)
+check("10.12 load_child() accepts the real committed v3 test child under its pinned sha256 AND "
+      "the full pinned v3 count set (3470 bridges, 1587 withheld, 1493 U-no-href, 92 "
+      "target_not_registered, 2 different_person_wrong_href)",
+      real_v3_loaded_sha == V3_EXPECTED_CHILD_SHA256
+      and real_v3_loaded_doc["target"] == "afldb_test")
+
+drifted_v3_counts = dict(V3_EXPECTED_CHILD_COUNTS)
+drifted_v3_counts["bridges"] = V3_EXPECTED_CHILD_COUNTS["bridges"] + 1
+try:
+    tool.load_child(real_v3_child, V3_EXPECTED_CHILD_SHA256, drifted_v3_counts,
+                    expect_child_target=TEST_CHILD_TARGET)
+    v3_drift_ok = True
+except tool.GateError as exc:
+    v3_drift_ok = False
+    v3_drift_message = str(exc)
+check("10.13 a v3 child count drift (bridges off by one from the pinned expectation) fails closed",
+      not v3_drift_ok and "child count bridges" in v3_drift_message)
+
+try:
+    tool.load_parent_map(ROOT / tool.PARENT_REL, real_v3_child_doc, tool.EXPECTED_PARENT_SHA256)
+    v3_wrong_parent_ok = True
+except tool.GateError as exc:
+    v3_wrong_parent_ok = False
+    v3_wrong_parent_message = str(exc)
+check("10.14 the real v3 test child paired with the real v2 parent fails the parent_sha256 chain "
+      "(the v3 child names the v3 parent, never the v2 one)",
+      not v3_wrong_parent_ok and "does not name this parent" in v3_wrong_parent_message)
+
+section("10b. --lineage v3: main() CLI resolution proofs (AFLDB-ISSUE-227)")
+
+
+def cheap_validate(_args: object) -> dict:
+    """Stands in for import_draftguru.validate's real Stage A snapshot parse for the CLI-level
+    lineage tests below. Those tests are about --lineage's effect on argument resolution
+    (--parent/--bridge/--expect-*-sha256 plumbing through main()), a question load_child and
+    load_parent_map -- both called BEFORE validate() -- already settle; the real Stage A parse
+    is exercised for real in section 9 (9.5/9.6). open_read_only is stubbed to refuse before any
+    of this dict is read, so its contents never matter beyond the 'year_count' the snapshot line
+    prints."""
+    return {"year_count": 0, "persons": {}, "picks": [], "ledger": {}, "bridges": {}}
+
+
+def run_main_capturing(argv: list[str], *, dsn_env: str, dsn_value: str | None,
+                       connect_stub) -> tuple[int, str]:
+    """tool.main(argv) with common.load_env neutralised, `dsn_env` set to `dsn_value` (or left
+    unset), open_read_only replaced by `connect_stub`, and import_draftguru.validate replaced by
+    `cheap_validate` -- section 9's harness, generalised so the lineage tests below reuse it
+    instead of re-deriving the same save/restore dance."""
+    import common as common_mod
+    saved_dsn = os.environ.pop(dsn_env, None)
+    saved_load = common_mod.load_env
+    saved_open = tool.open_read_only
+    saved_validate = imp.validate
+    common_mod.load_env = lambda *_a, **_k: None
+    tool.open_read_only = connect_stub
+    imp.validate = cheap_validate
+    try:
+        if dsn_value is not None:
+            os.environ[dsn_env] = dsn_value
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            rc = tool.main(argv)
+        return rc, out.getvalue()
+    finally:
+        tool.open_read_only = saved_open
+        imp.validate = saved_validate
+        common_mod.load_env = saved_load
+        if saved_dsn is None:
+            os.environ.pop(dsn_env, None)
+        else:
+            os.environ[dsn_env] = saved_dsn
+
+
+rc4, out4 = run_main_capturing(
+    ["plan", "--target", "test", "--lineage", "v3"],
+    dsn_env="AFLDB_TEST_DATABASE_URL", dsn_value="postgresql://u:pw@h:5432/afldb_test",
+    connect_stub=reached_connection)
+check("10.15 main() CLI: --target test --lineage v3 with no overrides resolves the committed v3 "
+      "child path/sha and v3 parent path/sha (via the real load_child/load_parent_map calls), "
+      "stopping only at the connection stub",
+      rc4 == tool.EXIT_ERROR and REACHED in out4
+      and V3_CHILD_REL in out4 and V3_EXPECTED_CHILD_SHA256[:16] in out4
+      and V3_PARENT_REL in out4 and "parent_sha256 chain verified" in out4
+      and "lineage  : v3" in out4,
+      str(out4.strip().splitlines()[-6:]))
+
+rc8, out8 = run_main_capturing(
+    ["plan", "--target", "test", "--lineage", "v3",
+     "--parent", tool.PARENT_REL, "--expect-parent-sha256", tool.EXPECTED_PARENT_SHA256],
+    dsn_env="AFLDB_TEST_DATABASE_URL", dsn_value="postgresql://u:pw@h:5432/afldb_test",
+    connect_stub=reached_connection)
+check("10.16 main() CLI: an explicit --parent/--expect-parent-sha256 pointed at the v2 parent "
+      "overrides the --lineage v3 default rather than being replaced after argument parsing -- "
+      "proven by the cross-lineage parent_sha256 refusal this produces, which the v3 default "
+      "parent would not have produced",
+      rc8 == tool.EXIT_ERROR and REACHED not in out8 and "does not name this parent" in out8,
+      str(out8.strip().splitlines()[-3:]))
+
+rc9, out9 = run_main_capturing(
+    ["plan", "--target", "test", "--lineage", "v3",
+     "--bridge", tool.CHILD_REL, "--expect-child-sha256", tool.EXPECTED_CHILD_SHA256],
+    dsn_env="AFLDB_TEST_DATABASE_URL", dsn_value="postgresql://u:pw@h:5432/afldb_test",
+    connect_stub=reached_connection)
+check("10.17 main() CLI: an explicit --bridge/--expect-child-sha256 pointed at the v2 test child "
+      "overrides the --lineage v3 default rather than being replaced after argument parsing -- "
+      "proven by the resulting v3-expected-count mismatch against the v2 child's real counts, "
+      "which loading the v3 child itself would not have produced",
+      rc9 == tool.EXIT_ERROR and REACHED not in out9 and "child count bridges" in out9,
+      str(out9.strip().splitlines()[-3:]))
+
+rc10, out10 = run_main_capturing(
+    ["plan", "--target", "dev", "--lineage", "v3"],
+    dsn_env="AFLDB_DEV_DATABASE_URL", dsn_value=None, connect_stub=never_connect)
+check("10.18 main() CLI: --target dev --lineage v3 with no --bridge still exits ERROR before any "
+      "DSN or file is read -- a DEV deployment child is never a pinned artefact in any lineage",
+      rc10 == tool.EXIT_ERROR and "--bridge is required" in out10)
+
+with tempfile.TemporaryDirectory(dir=ROOT) as tmp12:
+    # Created INSIDE the repo root (not the system temp dir) because main() prints the child
+    # path via child_path.relative_to(REPO_ROOT) -- a path outside the repo would raise ValueError
+    # there, which is a path-formatting detail of the CLI, not something this test is about.
+    dev_v3_child_path = Path(tmp12) / "dev-v3-synthetic-child.json"
+    dev_v3_child_doc = {
+        "kind": "deployment", "target": "dev", "schema_version": 1,
+        "parent_sha256": V3_EXPECTED_PARENT_SHA256, "bridges": [], "withheld": [],
+    }
+    dev_v3_child_path.write_text(json.dumps(dev_v3_child_doc), encoding="utf-8")
+    rc11, out11 = run_main_capturing(
+        ["plan", "--target", "dev", "--lineage", "v3", "--bridge", str(dev_v3_child_path)],
+        dsn_env="AFLDB_DEV_DATABASE_URL", dsn_value="postgresql://u:pw@h:5432/afldb_dev",
+        connect_stub=reached_connection)
+check("10.19 main() CLI: --target dev --lineage v3 resolves the v3 parent by default (not v2) -- "
+      "a synthetic DEV-shaped child naming the v3 parent's sha256 passes load_parent_map and the "
+      "run stops only at the connection stub, printing the v3 parent path",
+      rc11 == tool.EXIT_ERROR and REACHED in out11
+      and V3_PARENT_REL in out11 and "parent_sha256 chain verified" in out11
+      and "lineage  : v3" in out11,
+      str(out11.strip().splitlines()[-6:]))
+
 # ---------------------------------------------------------------------------
 
 print()
