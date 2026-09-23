@@ -2,6 +2,12 @@ import { expect, test, describe } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 
+import {
+  MANUAL_IDENTITY_NAME_FIELDS,
+  manualIdentityNamePatchFor,
+} from '@/db/queries/player-identity';
+import { EDITABLE_ENTITIES } from '@/lib/edit/spec';
+
 /**
  * ONE `replay_admin_overrides()` branch out of `tools/migration/common.py`,
  * isolated from its siblings: from its own `elif table == "<name>":` down to the
@@ -1494,5 +1500,118 @@ describe('AFLDB-ISSUE-167 source contract — two adapters, one authority', () =
     // the replay re-creates it, and the data_edits remap resolves through the
     // two identities.
     expect(promotion).toMatch(/before\*\* the `data_edits\.row_id` remap/);
+  });
+});
+
+describe('AFLDB-ISSUE-224 §21.3.2 — one deterministic winning authority per field', () => {
+  const root = process.cwd();
+  const readSource = (rel: string) => fs.readFileSync(path.join(root, rel), 'utf-8')
+    .replace(/\r\n/g, '\n');
+  const pyCommon = readSource('tools/migration/common.py');
+
+  /**
+   * The `players` branch alone. It opens `replay_admin_overrides` with `if` rather
+   * than `elif`, so `replayBranch()` above cannot slice it; the end is the first
+   * sibling branch at the same indentation.
+   */
+  const playersBranch = (() => {
+    const start = pyCommon.indexOf('if table == "players":');
+    expect(start, 'replay_admin_overrides has no "players" branch').toBeGreaterThan(-1);
+    const body = pyCommon.slice(start);
+    const next = /\n {8}elif table == "/.exec(body.slice(1));
+    return next ? body.slice(0, next.index + 1) : body;
+  })();
+  const playersCode = executablePython(playersBranch);
+
+  test('the FROM side is merged to exactly one row per player, so no scan order decides', () => {
+    // The defect: UNIQUE is (entity_type, entity_key, field_group), so one player
+    // legitimately carries several active overrides, and `UPDATE ... FROM` applies
+    // an ARBITRARY one of them when the FROM side matches more than once.
+    expect(playersCode).toContain('jsonb_object_agg(key, value) AS override_values');
+    expect(playersCode).toMatch(/active_overrides AS \(\s+SELECT player_id, jsonb_object_agg/);
+    expect(playersCode).toContain('FROM winning_fields');
+    expect(playersCode).toContain('GROUP BY player_id');
+    // The SET arms still read the merged payload, and the target join is unchanged.
+    expect(playersCode).toMatch(/FROM active_overrides o\s+WHERE p\.id = o\.player_id/);
+  });
+
+  test('the winner of a contested field is chosen by a TOTAL order', () => {
+    expect(playersCode).toContain('SELECT DISTINCT ON (c.player_id, f.key) c.player_id, f.key, f.value');
+    // (entity_key, field_group) is UNIQUE per entity_type (migration 073), so the
+    // tie-break can never run out and fall through to the heap.
+    expect(playersCode).toContain(
+      'ORDER BY c.player_id, f.key, c.authority_rank DESC, c.entity_key, c.field_group',
+    );
+  });
+
+  test('authority is what a row IS, never when it was last touched', () => {
+    // The creation record (0) loses to a source-keyed correction (1).
+    expect(playersCode).toMatch(
+      /CASE WHEN split_part\(o\.entity_key, ':', 1\) = 'manual_admin_edit'\s+THEN 0 ELSE 1 END AS authority_rank/,
+    );
+    // attachAflTablesIdentityInTransaction stamps the creation record with now()
+    // when it merges afltables_profile_path in, so an `updated_at` precedence would
+    // let a stale name outrank the correction that replaced it. It must not appear.
+    expect(playersCode).not.toContain('updated_at');
+  });
+
+  test('equal-authority disagreement refuses; it is never settled by picking one', () => {
+    expect(playersBranch).toContain(
+      'field(s) are claimed by equal-authority overrides that disagree',
+    );
+    expect(playersCode).toContain('HAVING count(DISTINCT f.value) > 1');
+    expect(playersCode).toContain('GROUP BY c.player_id, f.key, c.authority_rank');
+    // Refusal, not a warning, and raised BEFORE the merged UPDATE runs.
+    const refusal = playersCode.indexOf('if equal_authority_conflicts:');
+    expect(refusal).toBeGreaterThan(-1);
+    expect(refusal).toBeLessThan(playersCode.indexOf('jsonb_object_agg(key, value)'));
+  });
+
+  test('the creation record is kept in step by the editor, in the same transaction', () => {
+    const dataEdits = readSource('src/db/queries/data-edits.ts');
+    const code = executableTypeScript(dataEdits);
+    expect(code).toContain('await syncManualIdentityNameRecord(tx, {');
+    // Inside the ONE importSql.begin block that carries the canonical UPDATE, the
+    // override upsert and the required audit row (AFLDB-ISSUE-027).
+    const begin = code.indexOf('await importSql.begin(');
+    const sync = code.indexOf('syncManualIdentityNameRecord(tx');
+    const commit = code.indexOf('return before;');
+    expect(begin).toBeGreaterThan(-1);
+    expect(sync).toBeGreaterThan(begin);
+    expect(sync).toBeLessThan(commit);
+    // Its own audit row, so the repair is a distinct decision in the trail.
+    const identity = executableTypeScript(readSource('src/db/queries/player-identity.ts'));
+    expect(identity).toContain("fieldGroup: 'manual_identity_record'");
+    expect(identity).toContain('await recordDataEdit(tx, {');
+    // It edits the ACTIVE creation record only, and merges rather than replaces.
+    expect(identity).toContain("field_group = 'identity'");
+    expect(identity).toMatch(/SET override_values = override_values \|\|/);
+  });
+
+  test('the synced fields are exactly the editor name group, and nothing wider', () => {
+    // Widening this to `dob` would hand a legitimate edit a new way to make the
+    // creation record unresolvable: the replay refuses a payload carrying a dob with
+    // dob_confidence 'unknown' (migration 018), which the editor can produce.
+    expect([...MANUAL_IDENTITY_NAME_FIELDS]).toEqual(EDITABLE_ENTITIES.players.groups.name.fields);
+    expect([...MANUAL_IDENTITY_NAME_FIELDS]).not.toContain('dob');
+  });
+
+  test('the patch is all-or-nothing, so the record is never half a name', () => {
+    const before = { display_name: 'Alex Van Wyk', given_name: 'Alex Van', surname: 'Wyk' };
+    expect(manualIdentityNamePatchFor(before, { ...before })).toBeNull();
+    // One field moves; all three are restated, from the post-edit values.
+    expect(manualIdentityNamePatchFor(before, {
+      display_name: 'Alex Van Wyk', given_name: 'Alex', surname: 'Van Wyk',
+    })).toEqual({ display_name: 'Alex Van Wyk', given_name: 'Alex', surname: 'Van Wyk' });
+    // A mononym's absent given name stays an explicit null, not the string 'null'.
+    expect(manualIdentityNamePatchFor(
+      { display_name: 'Jerry', given_name: 'Jerry', surname: null },
+      { display_name: 'Jerry', given_name: null, surname: 'Jerry' },
+    )).toEqual({ display_name: 'Jerry', given_name: null, surname: 'Jerry' });
+    // undefined (a field the caller never supplied) reads as absent, not as a change.
+    expect(manualIdentityNamePatchFor(
+      { display_name: 'Jerry', given_name: null, surname: 'Jerry' },
+      { display_name: 'Jerry', given_name: undefined, surname: 'Jerry' },
+    )).toBeNull();
   });
 });

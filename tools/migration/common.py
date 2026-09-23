@@ -1340,18 +1340,107 @@ def replay_admin_overrides(conn: psycopg.Connection, table: str) -> None:
                     """, {"path": afl_path, "name": payload.get("display_name"),
                           "player_id": player_id})
 
-            # display_name is NOT NULL (explicit NULL forbidden), so COALESCE is safe.
-            # given_name, surname, dob, height_cm, weight_kg, notes are nullable (explicit NULL permitted),
-            # so they must use jsonb_exists to distinguish absent vs explicit JSON null.
+            # AFLDB-ISSUE-224 §21.3.2 (A3). ONE canonical player can carry SEVERAL active
+            # override rows: UNIQUE is (entity_type, entity_key, field_group), so the same
+            # person legitimately has
+            #
+            #   'manual_admin_edit:<token>' / 'identity'   the CREATION RECORD, written once
+            #                                              by createPlayerInTransaction and
+            #                                              never re-typed, whose job is to
+            #                                              re-create a destroyed row
+            #   'afltables:<path>' / 'name'                a LATER CORRECTION, typed by a
+            #   'afltables:<path>' / 'dob'                 human against the live row through
+            #   ...                                        the data editor, one row per field
+            #                                              group
+            #
+            # all resolving to the same player_id. Before this, every one of them was a
+            # separate row in `active_overrides` and `UPDATE ... FROM` chose ONE arbitrarily
+            # (PostgreSQL leaves the multi-match case unspecified), so a player with two
+            # active overrides silently lost all but one of them -- and where the two
+            # disagreed on a field, a rebuilt or promoted database restored an arbitrary
+            # answer. That is not a property of any particular player: it is reachable by any
+            # admin-created player who is later name-edited, and by any source-owned player
+            # edited in two field groups.
+            #
+            # The rows are therefore MERGED per player, per key, with a deterministic total
+            # order, so the FROM side produces exactly one row per player:
+            #
+            #   authority_rank DESC   a source-keyed correction (1) beats the creation record
+            #                         (0). NOT `updated_at`: attachAflTablesIdentityInTransaction
+            #                         stamps the creation record with now() when it merges
+            #                         afltables_profile_path into it, which would make a stale
+            #                         name in that record outrank the correction that replaced
+            #                         it. Authority here is what the row IS, not when it was
+            #                         last touched.
+            #   entity_key, field_group   the remaining tie-break. UNIQUE (entity_type,
+            #                         entity_key, field_group) makes the whole ORDER BY a total
+            #                         order, so no scan order is ever consulted.
+            #
+            # Key presence still carries the jsonb_exists semantics below: a key absent from
+            # EVERY contributing payload stays absent, and an explicit JSON null still clears.
             cur.execute("""
-                WITH active_overrides AS (
-                    SELECT e.player_id, o.override_values
+                WITH contributing AS (
+                    SELECT e.player_id, o.entity_key, o.field_group, o.override_values,
+                           CASE WHEN split_part(o.entity_key, ':', 1) = 'manual_admin_edit'
+                                THEN 0 ELSE 1 END AS authority_rank
                       FROM data_overrides o
                       JOIN sources s ON s.key = split_part(o.entity_key, ':', 1)
                       JOIN external_identities e ON e.external_id = substring(o.entity_key from position(':' in o.entity_key) + 1)
                                                 AND e.source_id = s.id
                                                 AND e.status IN ('unique', 'resolved')
                      WHERE o.entity_type = 'players' AND o.is_active = true
+                )
+                SELECT c.player_id, f.key, count(DISTINCT f.value) AS distinct_values,
+                       string_agg(DISTINCT c.entity_key || '/' || c.field_group, ', '
+                                  ORDER BY c.entity_key || '/' || c.field_group) AS rows_in_conflict
+                  FROM contributing c
+                  CROSS JOIN LATERAL jsonb_each(c.override_values) AS f(key, value)
+                 GROUP BY c.player_id, f.key, c.authority_rank
+                HAVING count(DISTINCT f.value) > 1
+                 ORDER BY c.player_id, f.key
+            """)
+            equal_authority_conflicts = cur.fetchall()
+            if equal_authority_conflicts:
+                # Two overrides of the SAME authority disagreeing about the same field is not
+                # something precedence can settle -- there is no honest winner, and picking one
+                # is the very behaviour this change removes. Refuse, exactly as the
+                # ManualAuthorityProvider refuses an override it cannot map
+                # (src/lib/acquisition/manual-authority.ts): unreadable authority is not absent
+                # authority.
+                raise RuntimeError(
+                    "replay_admin_overrides(players): refusing to commit, "
+                    + str(len(equal_authority_conflicts))
+                    + " field(s) are claimed by equal-authority overrides that disagree: "
+                    + "; ".join(
+                        f"player {player_id} field {key!r} -- {rows_in_conflict}"
+                        for player_id, key, _distinct, rows_in_conflict
+                        in equal_authority_conflicts[:10]))
+
+            # display_name is NOT NULL (explicit NULL forbidden), so COALESCE is safe.
+            # given_name, surname, dob, height_cm, weight_kg, notes are nullable (explicit NULL permitted),
+            # so they must use jsonb_exists to distinguish absent vs explicit JSON null.
+            cur.execute("""
+                WITH contributing AS (
+                    SELECT e.player_id, o.entity_key, o.field_group, o.override_values,
+                           CASE WHEN split_part(o.entity_key, ':', 1) = 'manual_admin_edit'
+                                THEN 0 ELSE 1 END AS authority_rank
+                      FROM data_overrides o
+                      JOIN sources s ON s.key = split_part(o.entity_key, ':', 1)
+                      JOIN external_identities e ON e.external_id = substring(o.entity_key from position(':' in o.entity_key) + 1)
+                                                AND e.source_id = s.id
+                                                AND e.status IN ('unique', 'resolved')
+                     WHERE o.entity_type = 'players' AND o.is_active = true
+                ),
+                winning_fields AS (
+                    SELECT DISTINCT ON (c.player_id, f.key) c.player_id, f.key, f.value
+                      FROM contributing c
+                      CROSS JOIN LATERAL jsonb_each(c.override_values) AS f(key, value)
+                     ORDER BY c.player_id, f.key, c.authority_rank DESC, c.entity_key, c.field_group
+                ),
+                active_overrides AS (
+                    SELECT player_id, jsonb_object_agg(key, value) AS override_values
+                      FROM winning_fields
+                     GROUP BY player_id
                 )
                 UPDATE players p
                    SET display_name = COALESCE(o.override_values->>'display_name', p.display_name),
