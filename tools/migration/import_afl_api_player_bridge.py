@@ -59,10 +59,18 @@ ONLY with intact declared provenance (``built_from_database == "afldb_dev"``,
 ``read_only is True``, a numeric ``season``, a non-empty ``snapshot_label``,
 a 64-lowercase-hex ``snapshot_manifest_sha256``, and
 ``existing_claim_comparison == "unproved_cross_database_id_parity"``) -- see
-``_season_evidence_provenance_problem()``. It is refused for ``--target
-afldb_test`` unconditionally: its ``candidate_player_id`` values are resolved
+``_season_evidence_provenance_problem()``. A DEV-built artefact is refused for
+``--target afldb_test``: its ``candidate_player_id`` values are resolved
 against ``afldb_dev``, and cross-database numeric ``player_id`` parity has
-never been proven. None of this touches write semantics: idempotency,
+never been proven.
+
+AFLDB-ISSUE-228 S9 tooling gap (2026-09-23): the provenance gate is now
+TARGET-BOUND (``SEASON_EVIDENCE_PROVENANCE_BY_TARGET``). ``--target
+afldb_test`` accepts season evidence only when ``built_from_database ==
+"afldb_test"`` and ``tool`` is the ``afldb_test``-pinned emitter
+(``emit-afl-api-player-bridge-test.ts``), whose ids are read from
+``afldb_test`` itself; ``--target dev`` still requires ``afldb_dev`` and the
+DEV emitter. Neither target accepts the other's artefact. None of this touches write semantics: idempotency,
 contradiction handling and the manual-adjudication identity check below are
 unchanged and apply identically to all four classes.
 
@@ -159,8 +167,23 @@ CONTRADICTION_ISSUE_TYPE = "afl_api_identity_contradiction"
 # afl_api_stat_vector_season provenance gate (AFLDB-ISSUE-228 S9). These are the ACCEPTANCE
 # CONTRACT values, not acceptance evidence for any one artefact -- the season/label/hash of a
 # particular run are read from the artefact itself and never hardcoded here.
-SEASON_EVIDENCE_REQUIRED_TARGET = "dev"
-SEASON_EVIDENCE_REQUIRED_BUILT_FROM_DATABASE = "afldb_dev"
+#
+# The gate is TARGET-BOUND: an artefact is accepted only by the target whose own database it was
+# built from, and only when its declared `tool` is that database's pinned emitter. A DEV-built
+# artefact (candidate_player_id = afldb_dev ids) is therefore still refused for --target
+# afldb_test, and an afldb_test-built one is refused for --target dev -- numeric player_id parity
+# between the two databases has never been proven, in either direction. The afldb_test entry is the
+# S9 tooling-gap remediation (2026-09-23): emit-afl-api-player-bridge-test.ts, pinned to afldb_test.
+SEASON_EVIDENCE_PROVENANCE_BY_TARGET: dict[str, dict[str, str]] = {
+    "dev": {
+        "built_from_database": "afldb_dev",
+        "tool": "tools/current-season/emit-afl-api-player-bridge.ts",
+    },
+    "afldb_test": {
+        "built_from_database": "afldb_test",
+        "tool": "tools/current-season/emit-afl-api-player-bridge-test.ts",
+    },
+}
 SEASON_EVIDENCE_REQUIRED_CLAIM_COMPARISON = "unproved_cross_database_id_parity"
 _SHA256_HEX_RE = re.compile(r"^[0-9a-f]{64}$")
 
@@ -253,17 +276,20 @@ def _season_evidence_provenance_problem(artefact: dict, target: str) -> str | No
     database query, so this runs before any connection is opened. Malformed or missing
     provenance is a refusal, never a best-effort pass.
     """
-    if target != SEASON_EVIDENCE_REQUIRED_TARGET:
+    required = SEASON_EVIDENCE_PROVENANCE_BY_TARGET.get(target)
+    if required is None:
+        return f"match_method={SEASON_EVIDENCE_MATCH_METHOD!r} has no provenance rule for --target {target!r}"
+    if artefact.get("built_from_database") != required["built_from_database"]:
         return (
-            f"match_method={SEASON_EVIDENCE_MATCH_METHOD!r} is only accepted under "
-            f"--target {SEASON_EVIDENCE_REQUIRED_TARGET!r}, got --target {target!r} -- its "
-            "candidate_player_id values are resolved against afldb_dev and cross-database "
+            f"built_from_database is {artefact.get('built_from_database')!r}, but --target {target!r} "
+            f"accepts only evidence built from {required['built_from_database']!r} -- its "
+            "candidate_player_id values must be ids of the target database itself; cross-database "
             "numeric player_id parity has never been proven"
         )
-    if artefact.get("built_from_database") != SEASON_EVIDENCE_REQUIRED_BUILT_FROM_DATABASE:
+    if artefact.get("tool") != required["tool"]:
         return (
-            f"built_from_database is {artefact.get('built_from_database')!r}, expected "
-            f"{SEASON_EVIDENCE_REQUIRED_BUILT_FROM_DATABASE!r}"
+            f"tool is {artefact.get('tool')!r}, but --target {target!r} accepts only evidence "
+            f"emitted by {required['tool']!r}"
         )
     if artefact.get("read_only") is not True:
         return f"read_only is {artefact.get('read_only')!r}, expected exactly true"

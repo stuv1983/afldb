@@ -47,6 +47,12 @@ import {
   runAcquisition,
 } from '../tools/current-season/acquire-afl-api';
 import {
+  ASSERTION_9_PAIR,
+  diffCanonicalPaths,
+  runSemanticPairAssertion,
+  type SemanticPair,
+} from '../tools/current-season/emit-afl-api-bundle';
+import {
   buildAflApiMatchBundle,
   buildAflApiSettleRecords,
   canonicalStringify,
@@ -1635,5 +1641,158 @@ describe('resolveAflApiPlayer (AFLDB-ISSUE-228 S6-D2, §6.3)', () => {
     const resolverModule = await import('@/lib/acquisition/afl-api-player-resolver');
     const exportNames = Object.keys(resolverModule);
     expect(exportNames).toEqual(['resolveAflApiPlayer']);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-228 §9.9 / §19.5 (c) — backtest assertion 9, the NAMED capture
+// pair. DB-free: builds a throwaway project root from the trimmed
+// tests/fixtures/afl_api/match capture (itself CD_M20260142801), laid out
+// exactly like the real 10:29 sample folder and 21:41 monitor snapshot.
+// ---------------------------------------------------------------------------
+
+describe('backtest assertion 9 — named semantic-hash pair (AFLDB-ISSUE-228 §9.9)', () => {
+  const projectRoot = join(__dirname, '..');
+  const registry = parseSourceFamilyRegistry(
+    JSON.parse(readFileSync(join(projectRoot, 'data', 'reference', 'source-families.json'), 'utf8')),
+  );
+  const identities = parseAflApiIdentities(
+    JSON.parse(readFileSync(join(projectRoot, 'data', 'reference', 'afl-api-identities.json'), 'utf8')),
+  );
+  const fixtureDir = join(projectRoot, 'tests', 'fixtures', 'afl_api', 'match');
+  const source = {
+    fixture: JSON.parse(readFileSync(join(fixtureDir, '01-fixture-result.json'), 'utf8')),
+    playerStats: JSON.parse(readFileSync(join(fixtureDir, '02-player-stats.raw.json'), 'utf8')),
+    matchRoster: JSON.parse(readFileSync(join(fixtureDir, '03-match-roster.raw.json'), 'utf8')),
+  };
+  const sha = (text: string) => createHash('sha256').update(Buffer.from(text, 'utf8')).digest('hex');
+  const roots: string[] = [];
+  afterEach(() => { for (const r of roots.splice(0)) rmSync(r, { recursive: true, force: true }); });
+
+  type Bodies = { fixture: unknown; playerStats: unknown; matchRoster: unknown };
+  /** Writes the earlier capture pretty-printed and the later one compact (as
+   * the real sample and monitor scripts did), pins each file's sha256 into
+   * the pair, and returns root + pair. `write: false` leaves a capture on disk
+   * absent while still naming it. */
+  function layout(earlier: Bodies, later: Bodies, options: { writeLater?: boolean } = {}): { root: string; pair: SemanticPair } {
+    const root = mkdtempSync(join(tmpdir(), 'afldb-a9-'));
+    roots.push(root);
+    const put = (dir: string, name: string, body: unknown, pretty: boolean, write = true) => {
+      const text = JSON.stringify(body, null, pretty ? 4 : undefined);
+      const path = `${dir}/${name}`;
+      if (write) {
+        mkdirSync(join(root, dir), { recursive: true });
+        writeFileSync(join(root, path), text, 'utf8');
+      }
+      return { path, sha256: sha(text) };
+    };
+    const e = 'data/sources/AFLWebsite/AFLGamesSamples/2026-09-19_HAW_v_BL_CD_M20260142801';
+    const l = 'data/sources/AFLWebsite/AFLGamesSamples/monitor-CD_M20260142801/20260919-214114';
+    const w = options.writeLater ?? true;
+    return {
+      root,
+      pair: {
+        matchId: 'CD_M20260142801',
+        earlier: {
+          label: '10:29',
+          fixture: put(e, '01-fixture-result.json', earlier.fixture, true),
+          playerStats: put(e, '02-player-stats.raw.json', earlier.playerStats, true),
+          matchRoster: put(e, '03-match-roster.raw.json', earlier.matchRoster, true),
+        },
+        later: {
+          label: '21:41',
+          fixture: put(l, '01-fixture.json', later.fixture, false, w),
+          playerStats: put(l, '02-player-stats.json', later.playerStats, false, w),
+          matchRoster: put(l, '03-match-roster.json', later.matchRoster, false, w),
+        },
+      },
+    };
+  }
+  const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
+
+  it('names the historical pair explicitly across the two folders, never by scanning', () => {
+    expect(ASSERTION_9_PAIR.matchId).toBe('CD_M20260142801');
+    expect(ASSERTION_9_PAIR.earlier.fixture.path).toContain('/2026-09-19_HAW_v_BL_CD_M20260142801/');
+    expect(ASSERTION_9_PAIR.later.fixture.path).toContain('/monitor-CD_M20260142801/20260919-214114/');
+  });
+
+  it('one capture => explicit skip, never a pass', () => {
+    const { root, pair } = layout(source, source, { writeLater: false });
+    const { outcome, report } = runSemanticPairAssertion(root, pair, registry, identities);
+    expect(outcome.outcome).toBe('skipped');
+    expect(outcome.detail).toContain('fixture absent');
+    expect(outcome.detail).toContain('21:41');
+    expect(report.families).toEqual([]);
+  });
+
+  it('identical canonical payloads in different serialisations => PASS, after a real per-record comparison', () => {
+    const { root, pair } = layout(source, source);
+    expect(pair.earlier.fixture.sha256).not.toBe(pair.later.fixture.sha256); // pretty vs compact bytes
+    const { outcome, report } = runSemanticPairAssertion(root, pair, registry, identities);
+    expect(outcome.outcome).toBe('pass');
+    expect(report.exclusionsApplied).toEqual([]);
+    expect(report.differences).toEqual([]);
+    expect(report.families.map((f) => f.family)).toEqual(['match', 'match_roster', 'player_match_stats']);
+    for (const f of report.families) {
+      expect(f.earlierRecords).toBeGreaterThan(0);
+      expect(f.earlierRecords).toBe(f.laterRecords);
+      expect(f.earlierHash).toMatch(/^[0-9a-f]{64}$/);
+      expect(f.earlierHash).toBe(f.laterHash);
+      expect(f.unchanged).toBe(true);
+    }
+  });
+
+  it('a changed canonical field => FAIL as evidence pair 1 of 3, naming the exact path', () => {
+    const later = clone(source);
+    later.playerStats.homeTeamPlayerStats[0].playerStats.stats.kicks = 10;
+    const { root, pair } = layout(source, later);
+    const { outcome, report } = runSemanticPairAssertion(root, pair, registry, identities);
+    expect(outcome.outcome).toBe('fail');
+    expect(outcome.detail).toContain('evidence pair 1 of 3');
+    expect(outcome.detail).toContain('playerStats.stats.kicks');
+    expect(report.families.find((f) => f.family === 'player_match_stats')?.unchanged).toBe(false);
+    expect(report.families.find((f) => f.family === 'match')?.unchanged).toBe(true);
+    expect(report.differences).toEqual([{
+      family: 'player_match_stats',
+      externalRecordId: expect.stringContaining('CD_M20260142801|'),
+      kind: 'changed',
+      paths: ['playerStats.stats.kicks'],
+    }]);
+  });
+
+  it('no silent exclusions: a classic volatile field (lastUpdated) still fails, and nothing is excluded', () => {
+    const later = clone(source);
+    later.playerStats.homeTeamPlayerStats[0].playerStats.stats.lastUpdated = '2026-09-19T11:41:00.000+0000';
+    const { root, pair } = layout(source, later);
+    const { outcome, report } = runSemanticPairAssertion(root, pair, registry, identities);
+    expect(outcome.outcome).toBe('fail');
+    expect(report.exclusionsApplied).toEqual([]);
+    expect(report.differences[0]?.paths).toEqual(['playerStats.stats.lastUpdated']);
+  });
+
+  it('an unrelated third capture is never substituted for a missing named one', () => {
+    const { root, pair } = layout(source, source, { writeLater: false });
+    const third = join(root, 'data/sources/AFLWebsite/AFLGamesSamples/monitor-CD_M20260142801/20260921-031800');
+    mkdirSync(third, { recursive: true });
+    writeFileSync(join(third, '01-fixture.json'), JSON.stringify(source.fixture), 'utf8');
+    writeFileSync(join(third, '02-player-stats.json'), JSON.stringify(source.playerStats), 'utf8');
+    writeFileSync(join(third, '03-match-roster.json'), JSON.stringify(source.matchRoster), 'utf8');
+    const { outcome } = runSemanticPairAssertion(root, pair, registry, identities);
+    expect(outcome.outcome).toBe('skipped');
+  });
+
+  it('different bytes at a named path are refused as not the historical capture', () => {
+    const { root, pair } = layout(source, source);
+    writeFileSync(join(root, pair.later.playerStats.path), JSON.stringify(source.playerStats, null, 2), 'utf8');
+    const { outcome } = runSemanticPairAssertion(root, pair, registry, identities);
+    expect(outcome.outcome).toBe('fail');
+    expect(outcome.detail).toContain('not the named historical capture');
+  });
+
+  it('diffCanonicalPaths reports array-index, missing-key and length differences', () => {
+    expect(diffCanonicalPaths({ a: [1, 2] }, { a: [1, 3] })).toEqual(['a[1]']);
+    expect(diffCanonicalPaths({ a: 1 }, { a: 1, b: 2 })).toEqual(['b']);
+    expect(diffCanonicalPaths({ a: [1] }, { a: [1, 2] })).toEqual(['a.length']);
+    expect(diffCanonicalPaths({ a: 9.0 }, { a: 9 })).toEqual([]);
   });
 });

@@ -61,7 +61,7 @@ not proposals.
 > `docs/acquisition/AFLDB-2026-BROWNLOW-LIVE-COUNT-RUNBOOK.md`, which §14.9 links to
 > rather than duplicates. For per-stage implementation history and evidence, see
 > `issues.md` under `AFLDB-ISSUE-228`; for the frozen design contract, see
-> `issues/open/AFLDB-ISSUE-228.md`.
+> `issues/closed/AFLDB-ISSUE-228.md`.
 
 ## Context
 
@@ -1177,10 +1177,19 @@ Brownlow Medal count, exactly as implemented. It supersedes nothing above — §
 work — and is the entry point a future maintainer should start from. Every fact below was
 verified by reading the current implementation (source files, the migration, the registry, the
 admin UI) and the operator-supplied validation evidence in `issues.md`; nothing here is inferred
-from the frozen plan document (`issues/open/AFLDB-ISSUE-228.md`) where the two disagree — the
+from the frozen plan document (`issues/closed/AFLDB-ISSUE-228.md`) where the two disagree — the
 plan is the design contract, this section is what actually shipped.
 
 ## 14.0 Status, as of 2026-09-21
+
+> **Resolved 2026-09-23 (supersedes the S7, S9, S10 and Assertion 9 rows below, which are retained
+> as the dated 2026-09-21/22 record).** AFLDB-ISSUE-228 is **RESOLVED** (commit `6eae820c`; record
+> `issues/closed/AFLDB-ISSUE-228.md`). S9 Brownlow completed-count acceptance: **PASS** on
+> `afldb_test` (207 vote sets / 621 rows / 1,242 votes; bridge 669/0/0). Assertion 9: **PASS**.
+> README gate: **PASS**. §19 validation: **PASS**. No ISSUE-228 technical blocker remains. The S10
+> successors are open as AFLDB-ISSUE-229 and AFLDB-ISSUE-231 to AFLDB-ISSUE-235 (see the dated notes
+> at the end of §14.15). Timers are still not installed or enabled on any host
+> (AFLDB-ISSUE-232).
 
 | Stage | State |
 |---|---|
@@ -2067,6 +2076,11 @@ actual live count, which is §14.11's remaining item.
 
 ## 14.11 2026 Brownlow live acceptance — what remains required
 
+> **Update 2026-09-23 (ISSUE-228 resolved).** S9 was accepted as the **Brownlow completed-count
+> acceptance** under the operator contract clarification (`issues/closed/AFLDB-ISSUE-228.md`
+> §22.11, §22.16): PASS on `afldb_test`. The status below is the 2026-09-21 record, retained as
+> lineage; it is not an open ISSUE-228 gate.
+
 **Status: OPEN.** The real 2026 live-count capture/replay requirement has not yet occurred.
 Nothing in §14.10's historical closeout substitutes for it.
 
@@ -2301,3 +2315,13 @@ investigated) once `CONCLUDED`.
 - **Fixture ingestion proper** (pre-match `SCHEDULED`/`LIVE` status → the `fixtures` table) is a
   **successor issue** (`AFLDB-ISSUE-229` recommended in the frozen plan, not yet created) —
   ISSUE-228 stops at "observe every status; promote `CONCLUDED`".
+
+> **Update 2026-09-23 (ISSUE-228 closure preparation).** The gaps above now have owners:
+> fixture ingestion → `AFLDB-ISSUE-229` (opened); the ISSUE-131 rekey search and the `match`-family
+> absence sweep → `AFLDB-ISSUE-231`; timer installation/enablement and the on-demand admin trigger
+> → `AFLDB-ISSUE-232`. The tracked-manifest gap has no successor issue.
+>
+> **Update 2026-09-23 (ISSUE-228 resolved, commit `6eae820c`).** The Assertion 9 and S9 statements
+> above are superseded: both PASSED on 2026-09-23 (record `issues/closed/AFLDB-ISSUE-228.md`
+> §22.16, §22.18). Season discovery and rollover → `AFLDB-ISSUE-233`; optional feeds →
+> `AFLDB-ISSUE-234`; `afl_api` player-link adjudication → `AFLDB-ISSUE-235`.

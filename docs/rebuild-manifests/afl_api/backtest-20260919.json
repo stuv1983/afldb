@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-19T20:53:57.220Z",
+  "generatedAt": "2026-09-23T06:39:23.321Z",
   "contractVersion": 1,
   "files": [
     {
@@ -336,8 +336,8 @@
     },
     {
       "assertion": "9: semantic hash evidence (10:29 vs 21:41 captures)",
-      "outcome": "skipped",
-      "detail": "fixture absent: 1 capture(s) found under monitor-CD_M20260142801 (need 2). Never a silent pass."
+      "outcome": "pass",
+      "detail": "10:29 vs 21:41 captures of CD_M20260142801 canonically unchanged with no exclusions: match 1/1 record(s) unchanged; match_roster 1/1 record(s) unchanged; player_match_stats 46/46 record(s) unchanged."
     },
     {
       "assertion": "10: Brownlow (vote-set integrity, leaderboard reconciliation, provider ids)",
@@ -636,5 +636,78 @@
   "counts": {
     "matchesChecked": 14,
     "brownlowSeasonsChecked": 4
+  },
+  "semanticPair": {
+    "matchId": "CD_M20260142801",
+    "exclusionsApplied": [],
+    "captures": [
+      {
+        "label": "10:29",
+        "files": [
+          {
+            "path": "data/sources/AFLWebsite/AFLGamesSamples/2026-09-19_HAW_v_BL_CD_M20260142801/01-fixture-result.json",
+            "expectedSha256": "be99a262877603dc25f0bdcedef4763edb2baff1f40e52ec85392681be854dc5",
+            "actualSha256": "be99a262877603dc25f0bdcedef4763edb2baff1f40e52ec85392681be854dc5"
+          },
+          {
+            "path": "data/sources/AFLWebsite/AFLGamesSamples/2026-09-19_HAW_v_BL_CD_M20260142801/02-player-stats.raw.json",
+            "expectedSha256": "bc27a2e2ad7df0150f9b960d51596a02e3e47fe07e6f0004e9c4df5acfddba9c",
+            "actualSha256": "bc27a2e2ad7df0150f9b960d51596a02e3e47fe07e6f0004e9c4df5acfddba9c"
+          },
+          {
+            "path": "data/sources/AFLWebsite/AFLGamesSamples/2026-09-19_HAW_v_BL_CD_M20260142801/03-match-roster.raw.json",
+            "expectedSha256": "9a29a7daa679b3ac0b878bc5d7b61b78b11433708be4e1d06378a504768c1088",
+            "actualSha256": "9a29a7daa679b3ac0b878bc5d7b61b78b11433708be4e1d06378a504768c1088"
+          }
+        ]
+      },
+      {
+        "label": "21:41",
+        "files": [
+          {
+            "path": "data/sources/AFLWebsite/AFLGamesSamples/monitor-CD_M20260142801/20260919-214114/01-fixture.json",
+            "expectedSha256": "b6fa1f3ab9d541fbdcc23f77d4d1c74a71ec8efec55beff9a2de58a82573ad14",
+            "actualSha256": "b6fa1f3ab9d541fbdcc23f77d4d1c74a71ec8efec55beff9a2de58a82573ad14"
+          },
+          {
+            "path": "data/sources/AFLWebsite/AFLGamesSamples/monitor-CD_M20260142801/20260919-214114/02-player-stats.json",
+            "expectedSha256": "bc27a2e2ad7df0150f9b960d51596a02e3e47fe07e6f0004e9c4df5acfddba9c",
+            "actualSha256": "bc27a2e2ad7df0150f9b960d51596a02e3e47fe07e6f0004e9c4df5acfddba9c"
+          },
+          {
+            "path": "data/sources/AFLWebsite/AFLGamesSamples/monitor-CD_M20260142801/20260919-214114/03-match-roster.json",
+            "expectedSha256": "9a29a7daa679b3ac0b878bc5d7b61b78b11433708be4e1d06378a504768c1088",
+            "actualSha256": "9a29a7daa679b3ac0b878bc5d7b61b78b11433708be4e1d06378a504768c1088"
+          }
+        ]
+      }
+    ],
+    "families": [
+      {
+        "family": "match",
+        "earlierRecords": 1,
+        "laterRecords": 1,
+        "earlierHash": "890d5ea17643ced19b89bed67c4993902a31300df2294f1d85b81576e5f90005",
+        "laterHash": "890d5ea17643ced19b89bed67c4993902a31300df2294f1d85b81576e5f90005",
+        "unchanged": true
+      },
+      {
+        "family": "match_roster",
+        "earlierRecords": 1,
+        "laterRecords": 1,
+        "earlierHash": "9c809a6d2eefe60d9ab521958dbc62f72f11e0a22b95f00062fb381f56c683b0",
+        "laterHash": "9c809a6d2eefe60d9ab521958dbc62f72f11e0a22b95f00062fb381f56c683b0",
+        "unchanged": true
+      },
+      {
+        "family": "player_match_stats",
+        "earlierRecords": 46,
+        "laterRecords": 46,
+        "earlierHash": "af0a3938391ce698912d493fbd8a905d34a05e92f1e80c9428e3044711211229",
+        "laterHash": "af0a3938391ce698912d493fbd8a905d34a05e92f1e80c9428e3044711211229",
+        "unchanged": true
+      }
+    ],
+    "differences": []
   }
 }

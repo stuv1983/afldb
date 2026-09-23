@@ -716,6 +716,7 @@ def _season_payload(**overrides) -> dict:
         "source_key": "afl_api",
         "match_method": loader.SEASON_EVIDENCE_MATCH_METHOD,
         "built_from_database": "afldb_dev",
+        "tool": "tools/current-season/emit-afl-api-player-bridge.ts",
         "read_only": True,
         "season": 2026,
         "snapshot_label": "afl-api-2026-fixture-label",
@@ -737,9 +738,36 @@ with tempfile.TemporaryDirectory() as tmp:
         _accepted["match_method"] == loader.SEASON_EVIDENCE_MATCH_METHOD,
     )
 
+    # S9 tooling gap (2026-09-23): the afldb_test-native artefact is accepted by --target
+    # afldb_test only, with the test emitter's own tool path.
+    _TEST_NATIVE = {
+        "built_from_database": "afldb_test",
+        "tool": "tools/current-season/emit-afl-api-player-bridge-test.ts",
+    }
+    _test_ok_path = _write_artefact(tmp_dir, _season_payload(**_TEST_NATIVE), name="season-test-ok.json")
+    _accepted_test = loader.load_artefact(_test_ok_path, "afldb_test")
+    check(
+        "afldb_test-native afl_api_stat_vector_season accepted under --target afldb_test",
+        _accepted_test["match_method"] == loader.SEASON_EVIDENCE_MATCH_METHOD
+        and _accepted_test["built_from_database"] == "afldb_test",
+    )
+
     _refuse_cases = [
-        ("refused for --target afldb_test", {}, "afldb_test"),
+        ("DEV-built artefact refused for --target afldb_test", {}, "afldb_test"),
         ("refused if built_from_database != afldb_dev", {"built_from_database": "afldb_test"}, "dev"),
+        ("afldb_test-native artefact refused for --target dev", _TEST_NATIVE, "dev"),
+        ("afldb_test-built evidence from the DEV emitter refused for --target afldb_test",
+         {"built_from_database": "afldb_test"}, "afldb_test"),
+        ("DEV-built evidence relabelled with the test tool refused for --target afldb_test",
+         {"tool": "tools/current-season/emit-afl-api-player-bridge-test.ts"}, "afldb_test"),
+        ("refused for --target afldb_test if tool is missing",
+         {**_TEST_NATIVE, "tool": None}, "afldb_test"),
+        ("refused for --target afldb_test if read_only is false",
+         {**_TEST_NATIVE, "read_only": False}, "afldb_test"),
+        ("refused for --target afldb_test if snapshot_manifest_sha256 is malformed",
+         {**_TEST_NATIVE, "snapshot_manifest_sha256": "abc"}, "afldb_test"),
+        ("refused if tool is the test emitter under --target dev",
+         {"tool": "tools/current-season/emit-afl-api-player-bridge-test.ts"}, "dev"),
         ("refused if read_only is false", {"read_only": False}, "dev"),
         ("refused if read_only is missing/null", {"read_only": None}, "dev"),
         ("refused if season is non-numeric", {"season": "2026"}, "dev"),

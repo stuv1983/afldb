@@ -15,9 +15,13 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import {
+  AFL_API_DEV_EVIDENCE_TARGET,
   AFL_API_EVIDENCE_DATABASE,
   AFL_API_EVIDENCE_DSN_ENV,
   AFL_API_SEASON_EVIDENCE_MATCH_METHOD,
+  AFL_API_TEST_EVIDENCE_TARGET,
+  assertAflApiEvidenceDsnFor,
+  assertAflApiEvidenceSessionFor,
   AGREEMENT_STAT_COLUMNS,
   AflApiEvidenceTargetError,
   CORE_STAT_COLUMNS,
@@ -717,6 +721,56 @@ describe('S9 read-only DEV target guards', () => {
       .toThrow(/default_transaction_read_only is 'off'/);
     expect(() => assertAflApiEvidenceSession({ ...ok, currentDatabase: undefined }))
       .toThrow(AflApiEvidenceTargetError);
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * S9 tooling gap (2026-09-23): the afldb_test-native evidence target
+ * ------------------------------------------------------------------ */
+
+describe('S9 read-only afldb_test target guards', () => {
+  it('is a separate closed-list target: afldb_test via AFLDB_TEST_DATABASE_URL', () => {
+    expect(AFL_API_TEST_EVIDENCE_TARGET).toEqual({
+      database: 'afldb_test', dsnEnv: 'AFLDB_TEST_DATABASE_URL',
+    });
+    expect(AFL_API_DEV_EVIDENCE_TARGET).toEqual({
+      database: AFL_API_EVIDENCE_DATABASE, dsnEnv: AFL_API_EVIDENCE_DSN_ENV,
+    });
+    expect(Object.isFrozen(AFL_API_TEST_EVIDENCE_TARGET)).toBe(true);
+    expect(Object.isFrozen(AFL_API_DEV_EVIDENCE_TARGET)).toBe(true);
+  });
+
+  it('the DEV guards are unchanged: they still refuse afldb_test', () => {
+    expect(() => assertAflApiEvidenceDsn('postgresql://u:p@h:5432/afldb_test'))
+      .toThrow(/does not target \/afldb_dev/);
+    expect(() => assertAflApiEvidenceSession({
+      currentDatabase: 'afldb_test', transactionReadOnly: 'on', defaultTransactionReadOnly: 'on',
+    })).toThrow(/connected database is 'afldb_test', not 'afldb_dev'/);
+  });
+
+  it('the TEST DSN guard refuses every database except afldb_test', () => {
+    const t = AFL_API_TEST_EVIDENCE_TARGET;
+    expect(() => assertAflApiEvidenceDsnFor(t, undefined)).toThrow(/AFLDB_TEST_DATABASE_URL is not set/);
+    for (const db of ['afldb_dev', 'afldb', 'afldb_prod', 'afldb_test_x', 'AFLDB_TEST', 'postgres']) {
+      expect(() => assertAflApiEvidenceDsnFor(t, `postgresql://u:p@h:5432/${db}`))
+        .toThrow(/does not target \/afldb_test/);
+    }
+    expect(assertAflApiEvidenceDsnFor(t, 'postgresql://u:p@h:5432/afldb_test'))
+      .toBe('postgresql://u:p@h:5432/afldb_test');
+  });
+
+  it('the TEST session guard refuses every live database except afldb_test, and a writable session', () => {
+    const t = AFL_API_TEST_EVIDENCE_TARGET;
+    const ok = { currentDatabase: 'afldb_test', transactionReadOnly: 'on', defaultTransactionReadOnly: 'on' };
+    expect(() => assertAflApiEvidenceSessionFor(t, ok)).not.toThrow();
+    for (const db of ['afldb_dev', 'afldb', 'afldb_prod', undefined]) {
+      expect(() => assertAflApiEvidenceSessionFor(t, { ...ok, currentDatabase: db }))
+        .toThrow(AflApiEvidenceTargetError);
+    }
+    expect(() => assertAflApiEvidenceSessionFor(t, { ...ok, transactionReadOnly: 'off' }))
+      .toThrow(/transaction_read_only is 'off'/);
+    expect(() => assertAflApiEvidenceSessionFor(t, { ...ok, defaultTransactionReadOnly: 'off' }))
+      .toThrow(/default_transaction_read_only is 'off'/);
   });
 });
 

@@ -26,6 +26,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   buildAflApiMatchBundle,
+  buildAflApiSettleRecords,
   emitAflApiBrownlowLeaderboard,
   emitAflApiBrownlowMatchVotes,
   flattenObservedColumns,
@@ -34,6 +35,7 @@ import {
   semanticHash,
   type AflApiIdentities,
 } from '../../src/lib/acquisition/afl-api-bundle';
+import { canonicalJson, type JsonValue } from '../../src/lib/acquisition/observations';
 import { parseSourceFamilyRegistry, type SourceFamilyRegistry } from '../../src/lib/acquisition/source-families';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -138,7 +140,232 @@ export type BacktestResult = {
   assertions: AssertionOutcome[];
   discoveredColumns: Record<string, string[]>;
   counts: { matchesChecked: number; brownlowSeasonsChecked: number };
+  /** Assertion 9's full comparison record (§9.9), so the manifest carries the
+   * proof rather than a bare verdict. */
+  semanticPair: SemanticPairReport;
 };
+
+// ---------------------------------------------------------------------------
+// Assertion 9 (§9.9, §19.5 c) — the NAMED capture pair
+// ---------------------------------------------------------------------------
+
+/** One capture's three files, by project-relative path, each pinned to the
+ * sha256 of the genuine historical bytes. A file whose bytes differ is not
+ * that capture, so it can never stand in for it. */
+export type SemanticPairFile = { path: string; sha256: string };
+export type SemanticPairCapture = {
+  label: string;
+  fixture: SemanticPairFile;
+  playerStats: SemanticPairFile;
+  matchRoster: SemanticPairFile;
+};
+export type SemanticPair = { matchId: string; earlier: SemanticPairCapture; later: SemanticPairCapture };
+
+const SAMPLE_1029 = 'data/sources/AFLWebsite/AFLGamesSamples/2026-09-19_HAW_v_BL_CD_M20260142801';
+const MONITOR_2141 = 'data/sources/AFLWebsite/AFLGamesSamples/monitor-CD_M20260142801/20260919-214114';
+
+/**
+ * The §9.9 pair, named explicitly: the 10:29 UTC match-sample capture and the
+ * 21:41 AEST (11:41 UTC) monitor capture of `CD_M20260142801`, 2026-09-19.
+ * They live in different folders; neither is found by scanning, and no other
+ * capture of the match (a later monitor poll, an acquisition snapshot) is
+ * ever substituted. Hashes are the bytes bound by the tracked
+ * `backtest-20260919.json` of 2026-09-19 (ISSUE-228 §22.17).
+ */
+export const ASSERTION_9_PAIR: SemanticPair = {
+  matchId: 'CD_M20260142801',
+  earlier: {
+    label: '10:29',
+    fixture: { path: `${SAMPLE_1029}/01-fixture-result.json`, sha256: 'be99a262877603dc25f0bdcedef4763edb2baff1f40e52ec85392681be854dc5' },
+    playerStats: { path: `${SAMPLE_1029}/02-player-stats.raw.json`, sha256: 'bc27a2e2ad7df0150f9b960d51596a02e3e47fe07e6f0004e9c4df5acfddba9c' },
+    matchRoster: { path: `${SAMPLE_1029}/03-match-roster.raw.json`, sha256: '9a29a7daa679b3ac0b878bc5d7b61b78b11433708be4e1d06378a504768c1088' },
+  },
+  later: {
+    label: '21:41',
+    fixture: { path: `${MONITOR_2141}/01-fixture.json`, sha256: 'b6fa1f3ab9d541fbdcc23f77d4d1c74a71ec8efec55beff9a2de58a82573ad14' },
+    playerStats: { path: `${MONITOR_2141}/02-player-stats.json`, sha256: 'bc27a2e2ad7df0150f9b960d51596a02e3e47fe07e6f0004e9c4df5acfddba9c' },
+    matchRoster: { path: `${MONITOR_2141}/03-match-roster.json`, sha256: '9a29a7daa679b3ac0b878bc5d7b61b78b11433708be4e1d06378a504768c1088' },
+  },
+};
+
+export const ASSERTION_9_NAME = '9: semantic hash evidence (10:29 vs 21:41 captures)';
+
+type PairFamily = 'match' | 'match_roster' | 'player_match_stats';
+const PAIR_FAMILIES: readonly PairFamily[] = ['match', 'match_roster', 'player_match_stats'];
+
+export type SemanticPairFamilyResult = {
+  family: PairFamily;
+  earlierRecords: number;
+  laterRecords: number;
+  /** sha256 over the sorted `externalRecordId=recordHash` lines of that side. */
+  earlierHash: string | null;
+  laterHash: string | null;
+  unchanged: boolean;
+};
+
+export type SemanticPairDifference = {
+  family: PairFamily;
+  externalRecordId: string;
+  kind: 'changed' | 'only_in_earlier' | 'only_in_later';
+  /** Canonical field paths that differ (`changed` only). */
+  paths: string[];
+};
+
+export type SemanticPairReport = {
+  matchId: string;
+  /** Always empty: §9.9 hashes with an empty exclusion list, whatever the
+   * registry declares. Recorded so the manifest proves it. */
+  exclusionsApplied: string[];
+  captures: { label: string; files: { path: string; expectedSha256: string; actualSha256: string | null }[] }[];
+  families: SemanticPairFamilyResult[];
+  differences: SemanticPairDifference[];
+};
+
+/** Canonical field paths at which `a` and `b` differ; array indices are kept,
+ * since array order is content (`observations.ts`). */
+export function diffCanonicalPaths(a: unknown, b: unknown, path = ''): string[] {
+  const at = path === '' ? '(root)' : path;
+  const isObject = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
+  if (Array.isArray(a) && Array.isArray(b)) {
+    const out: string[] = [];
+    if (a.length !== b.length) out.push(`${at}.length`);
+    for (let i = 0; i < Math.min(a.length, b.length); i += 1) out.push(...diffCanonicalPaths(a[i], b[i], `${path}[${i}]`));
+    return out;
+  }
+  if (isObject(a) && isObject(b)) {
+    const keys = [...new Set([...Object.keys(a), ...Object.keys(b)])].sort();
+    const out: string[] = [];
+    for (const key of keys) {
+      const child = path === '' ? key : `${path}.${key}`;
+      if (!(key in a) || !(key in b)) out.push(child);
+      else out.push(...diffCanonicalPaths(a[key], b[key], child));
+    }
+    return out;
+  }
+  return canonicalJson(a as JsonValue) === canonicalJson(b as JsonValue) ? [] : [at];
+}
+
+/**
+ * §9.9: parse both named captures through the production emitters
+ * (`buildAflApiMatchBundle` -> `buildAflApiSettleRecords`, i.e. the exact
+ * per-record payloads settle hashes), canonicalise each payload with NO
+ * exclusions, and compare record by record. Equal -> pass. Any difference ->
+ * fail, with the differing paths recorded as evidence pair 1 of 3; nothing is
+ * ever excluded to make it pass. A missing file -> explicit skip; bytes that
+ * are not the pinned historical capture -> fail.
+ */
+export function runSemanticPairAssertion(
+  projectRoot: string, pair: SemanticPair,
+  registry: SourceFamilyRegistry, identities: AflApiIdentities,
+  files: ManifestFileEntry[] = [],
+): { outcome: AssertionOutcome; report: SemanticPairReport } {
+  const report: SemanticPairReport = {
+    matchId: pair.matchId, exclusionsApplied: [], captures: [], families: [], differences: [],
+  };
+  const result = (verdict: AssertionOutcome['outcome'], detail: string) => (
+    { outcome: { assertion: ASSERTION_9_NAME, outcome: verdict, detail }, report }
+  );
+
+  const loaded: { capture: SemanticPairCapture; bytes: { fixture: string; playerStats: string; matchRoster: string } }[] = [];
+  const absent: string[] = [];
+  const foreign: string[] = [];
+  for (const capture of [pair.earlier, pair.later]) {
+    const fileRecords: SemanticPairReport['captures'][number]['files'] = [];
+    const bytes: Partial<Record<'fixture' | 'playerStats' | 'matchRoster', string>> = {};
+    for (const key of ['fixture', 'playerStats', 'matchRoster'] as const) {
+      const { path, sha256 } = capture[key];
+      const full = join(projectRoot, path);
+      if (!existsSync(full)) {
+        absent.push(`${capture.label} ${path}`);
+        fileRecords.push({ path, expectedSha256: sha256, actualSha256: null });
+        if (!files.some((f) => f.file === path)) files.push({ file: path, sha256: '', status: 'fixture_absent' });
+        continue;
+      }
+      const text = readFileSync(full, 'utf8');
+      const actual = sha256Of(text);
+      if (!files.some((f) => f.file === path)) files.push({ file: path, sha256: actual, status: 'present' });
+      fileRecords.push({ path, expectedSha256: sha256, actualSha256: actual });
+      if (actual !== sha256) foreign.push(`${capture.label} ${path} (sha256 ${actual}, expected ${sha256})`);
+      bytes[key] = text;
+    }
+    report.captures.push({ label: capture.label, files: fileRecords });
+    if (bytes.fixture !== undefined && bytes.playerStats !== undefined && bytes.matchRoster !== undefined) {
+      loaded.push({ capture, bytes: bytes as { fixture: string; playerStats: string; matchRoster: string } });
+    }
+  }
+
+  if (absent.length > 0) {
+    return result('skipped', `fixture absent: ${absent.join('; ')} — both named captures are required. Never a silent pass.`);
+  }
+  if (foreign.length > 0) {
+    return result('fail', `not the named historical capture: ${foreign.join('; ')}.`);
+  }
+
+  const sides: Map<string, string>[] = [];
+  const payloads: Map<string, unknown>[] = [];
+  for (const { capture, bytes } of loaded) {
+    let records;
+    try {
+      const fixtureRaw = JSON.parse(bytes.fixture);
+      const statsRaw = JSON.parse(bytes.playerStats);
+      const rosterRaw = JSON.parse(bytes.matchRoster);
+      const bundle = buildAflApiMatchBundle(fixtureRaw, rosterRaw, statsRaw, registry, identities);
+      if (bundle.match.sourceRecordId !== pair.matchId) {
+        return result('fail', `${capture.label} capture is match ${bundle.match.sourceRecordId}, not ${pair.matchId}.`);
+      }
+      records = buildAflApiSettleRecords(bundle, fixtureRaw, rosterRaw, statsRaw, registry);
+    } catch (error) {
+      return result('fail', `${capture.label} capture did not parse: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    const hashes = new Map<string, string>();
+    const bodies = new Map<string, unknown>();
+    for (const r of records) {
+      const key = `${r.family}|${r.externalRecordId}`;
+      hashes.set(key, sha256Of(canonicalJson(r.payload as JsonValue)));
+      bodies.set(key, r.payload);
+    }
+    sides.push(hashes);
+    payloads.push(bodies);
+  }
+
+  const [earlier, later] = sides;
+  for (const family of PAIR_FAMILIES) {
+    const aggregate = (side: Map<string, string>): { count: number; hash: string | null } => {
+      const lines = [...side].filter(([k]) => k.startsWith(`${family}|`)).map(([k, h]) => `${k.slice(family.length + 1)}=${h}`).sort();
+      return { count: lines.length, hash: lines.length > 0 ? sha256Of(lines.join('\n')) : null };
+    };
+    const a = aggregate(earlier);
+    const b = aggregate(later);
+    report.families.push({
+      family, earlierRecords: a.count, laterRecords: b.count, earlierHash: a.hash, laterHash: b.hash,
+      unchanged: a.hash !== null && a.hash === b.hash,
+    });
+  }
+  for (const key of [...new Set([...earlier.keys(), ...later.keys()])].sort()) {
+    const separator = key.indexOf('|');
+    const family = key.slice(0, separator) as PairFamily;
+    const externalRecordId = key.slice(separator + 1);
+    if (!later.has(key)) report.differences.push({ family, externalRecordId, kind: 'only_in_earlier', paths: [] });
+    else if (!earlier.has(key)) report.differences.push({ family, externalRecordId, kind: 'only_in_later', paths: [] });
+    else if (earlier.get(key) !== later.get(key)) {
+      report.differences.push({
+        family, externalRecordId, kind: 'changed', paths: diffCanonicalPaths(payloads[0].get(key), payloads[1].get(key)),
+      });
+    }
+  }
+
+  const summary = report.families
+    .map((f) => `${f.family} ${f.earlierRecords}/${f.laterRecords} record(s) ${f.unchanged ? 'unchanged' : 'CHANGED'}`)
+    .join('; ');
+  if (report.differences.length === 0 && report.families.every((f) => f.unchanged)) {
+    return result('pass', `${pair.earlier.label} vs ${pair.later.label} captures of ${pair.matchId} canonically unchanged with no exclusions: ${summary}.`);
+  }
+  const shown = report.differences.slice(0, 20).map((d) => (
+    d.kind === 'changed' ? `${d.family}|${d.externalRecordId}: ${d.paths.join(', ')}` : `${d.family}|${d.externalRecordId}: ${d.kind}`
+  ));
+  return result('fail', `evidence pair 1 of 3 (record in the registry evidence[], never hash_exclusions): ${summary}. `
+    + `${report.differences.length} differing record(s): ${shown.join(' / ')}${report.differences.length > 20 ? ' / …' : ''}.`);
+}
 
 export async function runBacktest(
   projectRoot: string, log: (line: string) => void = () => {},
@@ -262,31 +489,10 @@ export async function runBacktest(
   assertions.push(outcome('8: idempotency (re-parse same bytes -> identical semantic hash)', idempotencyChecked > 0 && idempotencyOk === idempotencyChecked,
     `${idempotencyOk}/${idempotencyChecked} matched.`));
 
-  // --- Assertion 9: 10:29 vs 21:41 monitor captures of CD_M20260142801 ---
-  const monitorRoot = join(projectRoot, 'data', 'sources', 'AFLWebsite', 'AFLGamesSamples');
-  const monitorDirs = existsSync(monitorRoot)
-    ? readdirSync(monitorRoot, { withFileTypes: true }).filter((e) => e.isDirectory() && e.name.startsWith('monitor-'))
-    : [];
-  let monitorCaptureCount = 0;
-  if (monitorDirs.length > 0) {
-    const captureRoot = join(monitorRoot, monitorDirs[0].name);
-    const captures = readdirSync(captureRoot, { withFileTypes: true }).filter((e) => e.isDirectory());
-    monitorCaptureCount = captures.length;
-    for (const capture of captures) {
-      const captureRelRoot = relative(projectRoot, join(captureRoot, capture.name)).split('\\').join('/');
-      for (const file of ['01-fixture.json', '02-player-stats.json', '03-match-roster.json', 'snapshot-meta.json']) {
-        hashBind(projectRoot, `${captureRelRoot}/${file}`, files);
-      }
-    }
-  }
-  if (monitorCaptureCount >= 2) {
-    assertions.push({ assertion: '9: semantic hash evidence (10:29 vs 21:41 captures)', outcome: 'pass', detail: 'two or more captures found — see files[] for their hashes; compare manually pending a named-pair harness.' });
-  } else {
-    assertions.push({
-      assertion: '9: semantic hash evidence (10:29 vs 21:41 captures)', outcome: 'skipped',
-      detail: `fixture absent: ${monitorCaptureCount} capture(s) found under monitor-CD_M20260142801 (need 2). Never a silent pass.`,
-    });
-  }
+  // --- Assertion 9: the named 10:29 / 21:41 pair of CD_M20260142801 (§9.9) ---
+  const semanticPair = runSemanticPairAssertion(projectRoot, ASSERTION_9_PAIR, registry, identities, files);
+  assertions.push(semanticPair.outcome);
+  hashBind(projectRoot, `${MONITOR_2141}/snapshot-meta.json`, files);
 
   // --- Brownlow: assertion 10 ---
   const brownlowDirs = listBrownlowSeasonDirs(projectRoot);
@@ -348,6 +554,7 @@ export async function runBacktest(
       Object.entries(discoveredColumns).map(([k, v]) => [k, [...v].sort()]),
     ),
     counts: { matchesChecked: matchDirs.length, brownlowSeasonsChecked: brownlowDirs.length },
+    semanticPair: semanticPair.report,
   };
 }
 

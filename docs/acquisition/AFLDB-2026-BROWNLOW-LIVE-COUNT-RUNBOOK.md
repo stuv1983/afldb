@@ -25,7 +25,7 @@ integration DSN.
   imminent (Grand Final week) and does not repeat. The purpose is to prove the
   already-implemented S7 pipeline against the real feed, and to capture raw
   timestamped snapshots for the still-open §9.9 assertion-9 evidence gap
-  (`issues/open/AFLDB-ISSUE-228.md` §9, §19.5) — see that runbook for what
+  (`issues/closed/AFLDB-ISSUE-228.md` §9, §19.5) — see that runbook for what
   "assertion 9" means; this document does not re-derive it. **Tonight's real
   Brownlow captures, however clean, do NOT close assertion 9 / the
   `monitor-CD_M20260142801` follow-up** — keep those two facts separate; this
@@ -447,7 +447,7 @@ label in §4's evidence record.
 **Keep every acquired snapshot.** These are exactly the "capture the raw
 season and leaderboard feeds every few minutes during the live count"
 timestamped files §10 asks for and the still-open assertion-9 evidence
-(`issues/open/AFLDB-ISSUE-228.md` §9.9/§19.5) needs a genuine second pair of.
+(`issues/closed/AFLDB-ISSUE-228.md` §9.9/§19.5) needs a genuine second pair of.
 Do not delete `data/sources/afl_api/brownlow/*` afterwards.
 
 Across tonight's captures, the evidence record should show:
@@ -475,7 +475,7 @@ Across tonight's captures, the evidence record should show:
   evidence ledger.
 - **Assertion 9 stays separate.** Tonight's real Brownlow captures — however
   clean — do NOT close assertion 9 / `monitor-CD_M20260142801`
-  (`issues/open/AFLDB-ISSUE-228.md` §9.9/§19.5). Record tonight's evidence on
+  (`issues/closed/AFLDB-ISSUE-228.md` §9.9/§19.5). Record tonight's evidence on
   its own terms; do not write it up as closing that follow-up.
 - Unset `AFLDB_AFL_API_BROWNLOW_ENABLED`, `DATABASE_URL` and `AFLDB_IMPORT_DATABASE_URL` in
   the shell before closing it, and confirm neither is present in the

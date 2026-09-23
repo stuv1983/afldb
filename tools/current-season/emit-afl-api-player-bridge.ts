@@ -23,6 +23,9 @@
  *     `current_database()` / `transaction_read_only` /
  *     `default_transaction_read_only` are proven before any evidence
  *     statement runs. Any database other than `afldb_dev` is refused.
+ *     (The `afldb_test`-native sibling, `emit-afl-api-player-bridge-test.ts`,
+ *     reuses this body with its OWN pinned target; neither entry point can
+ *     select the other's database.)
  *   - It never accepts a DSN on argv. The DSN comes from
  *     `AFLDB_DEV_DATABASE_URL` only — deliberately not the importer's
  *     elevated write role and not the migration schema owner.
@@ -54,15 +57,16 @@ import {
 } from '../../src/lib/acquisition/afl-api-match-identity';
 import { resolveAflApiMatch } from '../../src/lib/acquisition/afl-api-match-resolver';
 import {
-  AFL_API_EVIDENCE_DSN_ENV,
+  AFL_API_DEV_EVIDENCE_TARGET,
   AFL_API_SEASON_EVIDENCE_MATCH_METHOD,
   AGREEMENT_STAT_COLUMNS,
   CORE_STAT_COLUMNS,
   EXISTING_CLAIM_COMPARISON_UNPROVED,
   MIN_MATCHES_FOR_LINK,
   MIN_SINGLE_MATCH_AGREEMENT,
-  assertAflApiEvidenceDsn,
-  assertAflApiEvidenceSession,
+  assertAflApiEvidenceDsnFor,
+  assertAflApiEvidenceSessionFor,
+  type AflApiEvidenceTarget,
   buildAflApiPlayerEvidence,
   checkAflApiSnapshotCensus,
   compareAflApiExistingClaims,
@@ -93,6 +97,25 @@ const DEFAULT_PROJECT_ROOT = join(__dirname, '..', '..');
 
 export const TOOL = 'tools/current-season/emit-afl-api-player-bridge.ts';
 export const TOOL_VERSION = '1.0.0';
+
+/**
+ * One pinned emitter target: the evidence database (from the CLOSED list in
+ * `afl-api-player-evidence.ts`), the tool path recorded in the artefact, and
+ * the session's application_name. Each CLI entry point passes exactly one of
+ * these in code — the DEV one below, or the `afldb_test` one in
+ * `emit-afl-api-player-bridge-test.ts` — and none is selectable from argv.
+ */
+export type AflApiPlayerBridgeEmitterTarget = {
+  readonly evidence: AflApiEvidenceTarget;
+  readonly tool: string;
+  readonly applicationName: string;
+};
+
+export const DEV_EMITTER_TARGET: AflApiPlayerBridgeEmitterTarget = Object.freeze({
+  evidence: AFL_API_DEV_EVIDENCE_TARGET,
+  tool: TOOL,
+  applicationName: 'afldb-emit-afl-api-player-bridge',
+});
 
 /** Tracked repository inputs this evidence depends on, SHA-pinned into the
  * artefact. The acquired snapshot is NOT pinned file by file — it is hundreds
@@ -280,8 +303,8 @@ function loadSnapshot(projectRoot: string, label: string): LoadedSnapshot {
  * Read-only DEV evidence
  * ------------------------------------------------------------------ */
 
-function createReadOnlyDevClient(): postgres.Sql {
-  const dsn = assertAflApiEvidenceDsn(process.env[AFL_API_EVIDENCE_DSN_ENV]);
+function createReadOnlyEvidenceClient(target: AflApiPlayerBridgeEmitterTarget): postgres.Sql {
+  const dsn = assertAflApiEvidenceDsnFor(target.evidence, process.env[target.evidence.dsnEnv]);
   return postgres(dsn, {
     max: 1,
     idle_timeout: 0,
@@ -289,7 +312,7 @@ function createReadOnlyDevClient(): postgres.Sql {
     onnotice: () => {},
     transform: { undefined: null },
     connection: {
-      application_name: 'afldb-emit-afl-api-player-bridge',
+      application_name: target.applicationName,
       // STARTUP parameters, not a `SET` issued after connecting: a reconnect
       // inside the pool cannot silently come back writable. The live session
       // is still proven afterwards — this is the mechanism, not the proof.
@@ -299,7 +322,9 @@ function createReadOnlyDevClient(): postgres.Sql {
   });
 }
 
-async function proveReadOnlyDevSession(sql: postgres.Sql): Promise<{ database: string; role: string }> {
+async function proveReadOnlyEvidenceSession(
+  sql: postgres.Sql, target: AflApiPlayerBridgeEmitterTarget,
+): Promise<{ database: string; role: string }> {
   const [row] = await sql<{
     currentDatabase: string; currentRole: string;
     transactionReadOnly: string; defaultTransactionReadOnly: string;
@@ -309,7 +334,7 @@ async function proveReadOnlyDevSession(sql: postgres.Sql): Promise<{ database: s
            current_setting('transaction_read_only') AS "transactionReadOnly",
            current_setting('default_transaction_read_only') AS "defaultTransactionReadOnly"
   `;
-  assertAflApiEvidenceSession({
+  assertAflApiEvidenceSessionFor(target.evidence, {
     currentDatabase: row?.currentDatabase,
     transactionReadOnly: row?.transactionReadOnly,
     defaultTransactionReadOnly: row?.defaultTransactionReadOnly,
@@ -624,6 +649,8 @@ export function buildEvidenceArtefact(input: {
   result: AflApiPlayerEvidenceResult;
   existingArtefactOverlap: unknown;
   generatedUtc: string;
+  /** The emitting CLI's own path; the DEV emitter's when omitted. */
+  tool?: string;
 }): Record<string, unknown> {
   const providers: Record<string, unknown> = {};
   for (const provider of input.result.providers) {
@@ -657,7 +684,7 @@ export function buildEvidenceArtefact(input: {
   }
 
   return {
-    tool: TOOL,
+    tool: input.tool ?? TOOL,
     tool_version: TOOL_VERSION,
     generated_utc: input.generatedUtc,
     source_key: SETTLE_SOURCE_KEY,
@@ -806,7 +833,22 @@ export type EmitAflApiPlayerBridgeOutcome = {
   censusOk: boolean;
 };
 
+/** The DEV emitter: pinned to `afldb_dev` in code, exactly as before. */
 export async function runEmitAflApiPlayerBridgeCli(
+  argv: readonly string[], deps: EmitAflApiPlayerBridgeDeps = {},
+): Promise<EmitAflApiPlayerBridgeOutcome> {
+  return runEmitAflApiPlayerBridgeFor(DEV_EMITTER_TARGET, argv, deps);
+}
+
+/**
+ * The shared body behind every pinned entry point. The target is a code
+ * constant supplied by the entry point, never parsed from `argv`; the DSN is
+ * read only from that target's own environment variable, and the live
+ * session is proven against that target's own database before any evidence
+ * statement runs.
+ */
+export async function runEmitAflApiPlayerBridgeFor(
+  target: AflApiPlayerBridgeEmitterTarget,
   argv: readonly string[], deps: EmitAflApiPlayerBridgeDeps = {},
 ): Promise<EmitAflApiPlayerBridgeOutcome> {
   const projectRoot = deps.projectRoot ?? DEFAULT_PROJECT_ROOT;
@@ -839,14 +881,14 @@ export async function runEmitAflApiPlayerBridgeCli(
     );
   }
 
-  // ---- read-only DEV evidence.
+  // ---- read-only evidence from the pinned target.
   const ownsClient = deps.sql === undefined;
-  const sql = deps.sql ?? createReadOnlyDevClient();
+  const sql = deps.sql ?? createReadOnlyEvidenceClient(target);
   const evidence = await (async (): Promise<{
     result: AflApiPlayerEvidenceResult; builtFromDatabase: string;
   }> => {
     try {
-      const proof = await proveReadOnlyDevSession(sql);
+      const proof = await proveReadOnlyEvidenceSession(sql, target);
       log(
         `Read-only session proven: current_database()='${proof.database}', role='${proof.role}', `
         + 'transaction_read_only=on, default_transaction_read_only=on.',
@@ -868,7 +910,7 @@ export async function runEmitAflApiPlayerBridgeCli(
     { ...observedCensus, buildFailures: snapshot.bundle.buildFailures.length }, result,
   )) log(line);
 
-  // ---- overlap with the previously accepted (afldb_test-built) artefacts.
+  // ---- overlap with previously accepted artefacts (provider-id sets only).
   let existingArtefactOverlap: unknown = null;
   if (args.compareArtefacts.length > 0) {
     const existing = new Set<string>();
@@ -894,8 +936,8 @@ export async function runEmitAflApiPlayerBridgeCli(
     log(counterLine('  EXISTING_LINKED_NOW_CONTRADICTORY', comparison.existingLinkedNowContradictory.length));
     log(`  existing_claim_comparison = ${comparison.idParity}`);
     log(
-      '  (Numeric candidate_player_id equality across afldb_test and afldb_dev is NOT compared: '
-      + 'players.id parity between those databases has not been proven, so an equal id would not '
+      '  (Numeric candidate_player_id equality across databases is NOT compared: '
+      + 'players.id parity between afldb_test and afldb_dev has not been proven, so an equal id would not '
       + 'be corroboration and an unequal id would not be a contradiction.)',
     );
   }
@@ -915,6 +957,7 @@ export async function runEmitAflApiPlayerBridgeCli(
     result,
     existingArtefactOverlap,
     generatedUtc: (deps.now?.() ?? new Date()).toISOString(),
+    tool: target.tool,
   });
 
   if (args.out === null) {

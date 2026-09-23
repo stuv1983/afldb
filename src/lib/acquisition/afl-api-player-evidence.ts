@@ -94,6 +94,34 @@ export const AFL_API_EVIDENCE_DATABASE = 'afldb_dev';
  */
 export const AFL_API_EVIDENCE_DSN_ENV = 'AFLDB_DEV_DATABASE_URL';
 
+/**
+ * AFLDB-ISSUE-228 S9 tooling gap (2026-09-23): the `afldb_test`-native
+ * sibling of the DEV evidence target. A DEV-built artefact's
+ * `candidate_player_id` values are `afldb_dev` ids and can never be imported
+ * into `afldb_test` (numeric `players.id` parity is unproved), so the
+ * full-season evidence for `afldb_test` must be derived from `afldb_test`
+ * itself. Its own database name and DSN variable — the integration-test DSN
+ * the importer's `--target afldb_test` also reads through — and never a
+ * setting of the DEV target.
+ */
+export const AFL_API_TEST_EVIDENCE_DATABASE = 'afldb_test';
+export const AFL_API_TEST_EVIDENCE_DSN_ENV = 'AFLDB_TEST_DATABASE_URL';
+
+/**
+ * The CLOSED list of evidence targets. Each emitter entry point pins exactly
+ * one of these in code; neither accepts a target, database or DSN from argv.
+ */
+export type AflApiEvidenceTarget = {
+  readonly database: string;
+  readonly dsnEnv: string;
+};
+export const AFL_API_DEV_EVIDENCE_TARGET: AflApiEvidenceTarget = Object.freeze({
+  database: AFL_API_EVIDENCE_DATABASE, dsnEnv: AFL_API_EVIDENCE_DSN_ENV,
+});
+export const AFL_API_TEST_EVIDENCE_TARGET: AflApiEvidenceTarget = Object.freeze({
+  database: AFL_API_TEST_EVIDENCE_DATABASE, dsnEnv: AFL_API_TEST_EVIDENCE_DSN_ENV,
+});
+
 /* ------------------------------------------------------------------ *
  * The statistic vectors (S5 §6.3, unchanged)
  * ------------------------------------------------------------------ */
@@ -974,9 +1002,16 @@ export class AflApiEvidenceTargetError extends Error {
  * its value here. The DSN itself is never echoed in a refusal message.
  */
 export function assertAflApiEvidenceDsn(dsn: string | undefined | null): string {
+  return assertAflApiEvidenceDsnFor(AFL_API_DEV_EVIDENCE_TARGET, dsn);
+}
+
+/** {@link assertAflApiEvidenceDsn} for one pinned target of the closed list. */
+export function assertAflApiEvidenceDsnFor(
+  target: AflApiEvidenceTarget, dsn: string | undefined | null,
+): string {
   if (!dsn || dsn.trim() === '') {
     throw new AflApiEvidenceTargetError(
-      `${AFL_API_EVIDENCE_DSN_ENV} is not set — refusing to read evidence from an unknown target.`,
+      `${target.dsnEnv} is not set — refusing to read evidence from an unknown target.`,
     );
   }
   const trimmed = dsn.trim();
@@ -984,14 +1019,14 @@ export function assertAflApiEvidenceDsn(dsn: string | undefined | null): string 
   try {
     parsed = new URL(trimmed);
   } catch {
-    throw new AflApiEvidenceTargetError(`${AFL_API_EVIDENCE_DSN_ENV} is not a valid URL.`);
+    throw new AflApiEvidenceTargetError(`${target.dsnEnv} is not a valid URL.`);
   }
   if (parsed.protocol !== 'postgresql:' && parsed.protocol !== 'postgres:') {
-    throw new AflApiEvidenceTargetError(`${AFL_API_EVIDENCE_DSN_ENV} is not a postgresql:// DSN.`);
+    throw new AflApiEvidenceTargetError(`${target.dsnEnv} is not a postgresql:// DSN.`);
   }
-  if (parsed.pathname.replace(/^\//, '') !== AFL_API_EVIDENCE_DATABASE) {
+  if (parsed.pathname.replace(/^\//, '') !== target.database) {
     throw new AflApiEvidenceTargetError(
-      `${AFL_API_EVIDENCE_DSN_ENV} does not target /${AFL_API_EVIDENCE_DATABASE} — refusing.`,
+      `${target.dsnEnv} does not target /${target.database} — refusing.`,
     );
   }
   return trimmed;
@@ -1009,10 +1044,19 @@ export function assertAflApiEvidenceSession(identity: {
   transactionReadOnly: unknown;
   defaultTransactionReadOnly: unknown;
 }): void {
-  if (identity.currentDatabase !== AFL_API_EVIDENCE_DATABASE) {
+  assertAflApiEvidenceSessionFor(AFL_API_DEV_EVIDENCE_TARGET, identity);
+}
+
+/** {@link assertAflApiEvidenceSession} for one pinned target of the closed list. */
+export function assertAflApiEvidenceSessionFor(target: AflApiEvidenceTarget, identity: {
+  currentDatabase: unknown;
+  transactionReadOnly: unknown;
+  defaultTransactionReadOnly: unknown;
+}): void {
+  if (identity.currentDatabase !== target.database) {
     throw new AflApiEvidenceTargetError(
       `REFUSED: connected database is '${String(identity.currentDatabase)}', not `
-      + `'${AFL_API_EVIDENCE_DATABASE}'. No evidence statement was executed.`,
+      + `'${target.database}'. No evidence statement was executed.`,
     );
   }
   if (identity.transactionReadOnly !== 'on') {

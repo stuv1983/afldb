@@ -10,7 +10,8 @@
  * path passes a `sql` handle that THROWS on any property access, so a
  * regression that reached the database would fail rather than quietly connect.
  */
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, sep } from 'node:path';
 
@@ -21,17 +22,26 @@ import {
   buildAflApiPlayerEvidence,
   type AflApiMatchEvidenceInput,
 } from '@/lib/acquisition/afl-api-player-evidence';
+import { aflApiSnapshotRoot } from '@/lib/acquisition/afl-api-snapshot';
 import type { AflApiSettleBundle } from '@/lib/acquisition/settle-afl-api';
 import {
+  DEV_EMITTER_TARGET,
   PATH_COMPARISON_IS_CASE_INSENSITIVE,
+  TOOL,
   assertNotUnderDataSources,
   buildEvidenceArtefact,
   matchEvidenceInputFor,
   parseEmitAflApiPlayerBridgeArgs,
+  runEmitAflApiPlayerBridgeCli,
   sortKeysDeep,
   writeArtefact,
   type LoadedSnapshot,
 } from '../tools/current-season/emit-afl-api-player-bridge';
+import {
+  TEST_EMITTER_TARGET,
+  TEST_TOOL,
+  runEmitAflApiPlayerBridgeTestCli,
+} from '../tools/current-season/emit-afl-api-player-bridge-test';
 
 const tempRoots: string[] = [];
 
@@ -364,5 +374,178 @@ describe('S9 CLI deferral contract: a deferred unit contributes no identity evid
     }
     expect(result.counters.providersLinked).toBe(0);
     expect(result.counters.playerMatchRowsCoveredByLinkedProviders).toBe(0);
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * 5. S9 tooling gap (2026-09-23): the afldb_test-native entry point
+ * ------------------------------------------------------------------ */
+
+/**
+ * A minimal, hash-valid acquired snapshot under a temp project root, plus
+ * copies of the two tracked reference inputs the emitter pins. Nothing under
+ * the real `data/sources/` is read.
+ */
+function snapshotProject(label: string): string {
+  const projectRoot = tempRoot('afldb-issue-228-s9-target-');
+  mkdirSync(join(projectRoot, 'data', 'reference'), { recursive: true });
+  for (const file of ['source-families.json', 'afl-api-identities.json']) {
+    copyFileSync(join(process.cwd(), 'data', 'reference', file), join(projectRoot, 'data', 'reference', file));
+  }
+  const snapshotDir = join(aflApiSnapshotRoot(projectRoot), label);
+  mkdirSync(join(snapshotDir, 'CD_M20260100001'), { recursive: true });
+  const payloads: Record<string, unknown> = {
+    'CD_M20260100001/fixture.json': { providerId: 'CD_M20260100001' },
+    'CD_M20260100001/match-roster.json': { match: { venueLocalStartTime: '2026-03-12T19:40:00' } },
+    'CD_M20260100001/player-stats.json': { homeTeamPlayerStats: [], awayTeamPlayerStats: [] },
+  };
+  const files: { file: string; sha256: string }[] = [];
+  for (const [rel, body] of Object.entries(payloads)) {
+    const text = `${JSON.stringify(body)}\n`;
+    writeFileSync(join(snapshotDir, ...rel.split('/')), text, 'utf8');
+    files.push({ file: rel, sha256: createHash('sha256').update(text).digest('hex') });
+  }
+  writeFileSync(join(snapshotDir, 'manifest.json'),
+    JSON.stringify({ source_key: 'afl_api', season: 2026, files }, null, 2), 'utf8');
+  return projectRoot;
+}
+
+/**
+ * A fake read-only session that reports `currentDatabase` for the identity
+ * proof, answers the `afl_api` source lookup, and records every statement.
+ */
+function fakeSession(currentDatabase: string) {
+  const statements: string[] = [];
+  const sql = ((strings: TemplateStringsArray) => {
+    const text = strings.join('?');
+    statements.push(text);
+    if (text.includes('current_database()')) {
+      return Promise.resolve([{
+        currentDatabase, currentRole: 'afldb_reader',
+        transactionReadOnly: 'on', defaultTransactionReadOnly: 'on',
+      }]);
+    }
+    if (text.includes('FROM sources')) return Promise.resolve([{ id: 7 }]);
+    return Promise.reject(new Error(`unexpected statement: ${text}`));
+  }) as unknown as NonNullable<Parameters<typeof runEmitAflApiPlayerBridgeCli>[1]>['sql'];
+  return { sql, statements };
+}
+
+describe('S9 tooling gap: each entry point is pinned to its own database in code', () => {
+  it('pins DEV to afldb_dev and TEST to afldb_test, with distinct tool paths', () => {
+    expect(DEV_EMITTER_TARGET.evidence).toEqual({ database: 'afldb_dev', dsnEnv: 'AFLDB_DEV_DATABASE_URL' });
+    expect(TEST_EMITTER_TARGET.evidence).toEqual({ database: 'afldb_test', dsnEnv: 'AFLDB_TEST_DATABASE_URL' });
+    expect(DEV_EMITTER_TARGET.tool).toBe(TOOL);
+    expect(TEST_EMITTER_TARGET.tool).toBe(TEST_TOOL);
+    expect(TEST_TOOL).not.toBe(TOOL);
+  });
+
+  it('neither entry point accepts a target, database or DSN on argv', () => {
+    for (const flag of ['--target', '--database', '--dsn']) {
+      expect(() => parseEmitAflApiPlayerBridgeArgs(['--label', 'x', '--validate-only', flag, 'afldb_dev']))
+        .toThrow(`Unknown flag '${flag}'.`);
+    }
+  });
+
+  it('the DEV emitter still refuses a live afldb_test session before any evidence statement', async () => {
+    const label = 'afl-api-2026-target-dev';
+    const { sql, statements } = fakeSession('afldb_test');
+    await expect(runEmitAflApiPlayerBridgeCli(['--label', label, '--validate-only'], {
+      projectRoot: snapshotProject(label), sql, log: () => {},
+    })).rejects.toThrow(/connected database is 'afldb_test', not 'afldb_dev'/);
+    expect(statements).toHaveLength(1);
+  });
+
+  it('the TEST emitter refuses every live database except afldb_test', async () => {
+    for (const db of ['afldb_dev', 'afldb', 'afldb_prod']) {
+      const label = `afl-api-2026-target-${db}`;
+      const { sql, statements } = fakeSession(db);
+      await expect(runEmitAflApiPlayerBridgeTestCli(['--label', label, '--validate-only'], {
+        projectRoot: snapshotProject(label), sql, log: () => {},
+      })).rejects.toThrow(new RegExp(`connected database is '${db}', not 'afldb_test'`));
+      expect(statements).toHaveLength(1);
+    }
+  });
+
+  it('the TEST emitter refuses a missing or foreign DSN before connecting', async () => {
+    const label = 'afl-api-2026-target-dsn';
+    const projectRoot = snapshotProject(label);
+    const saved = process.env.AFLDB_TEST_DATABASE_URL;
+    try {
+      delete process.env.AFLDB_TEST_DATABASE_URL;
+      await expect(runEmitAflApiPlayerBridgeTestCli(['--label', label, '--validate-only'], {
+        projectRoot, log: () => {},
+      })).rejects.toThrow(/AFLDB_TEST_DATABASE_URL is not set/);
+      process.env.AFLDB_TEST_DATABASE_URL = 'postgresql://u:p@127.0.0.1:1/afldb_dev';
+      await expect(runEmitAflApiPlayerBridgeTestCli(['--label', label, '--validate-only'], {
+        projectRoot, log: () => {},
+      })).rejects.toThrow(/does not target \/afldb_test/);
+    } finally {
+      if (saved === undefined) delete process.env.AFLDB_TEST_DATABASE_URL;
+      else process.env.AFLDB_TEST_DATABASE_URL = saved;
+    }
+  });
+
+  it('a live afldb_test session yields an artefact that declares itself afldb_test-native', async () => {
+    const label = 'afl-api-2026-target-ok';
+    const { sql } = fakeSession('afldb_test');
+    const outcome = await runEmitAflApiPlayerBridgeTestCli(['--label', label, '--validate-only'], {
+      projectRoot: snapshotProject(label), sql, log: () => {},
+    });
+    expect(outcome.artefact.built_from_database).toBe('afldb_test');
+    expect(outcome.artefact.tool).toBe(TEST_TOOL);
+    expect(outcome.artefact.read_only).toBe(true);
+    expect(outcome.artefact.match_method).toBe('afl_api_stat_vector_season');
+    expect(outcome.artefact.snapshot_label).toBe(label);
+    expect(outcome.artefact.snapshot_manifest_sha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(outcome.artefact.existing_claim_comparison).toBe('unproved_cross_database_id_parity');
+  });
+
+  it('never copies candidate ids from a --compare-artefact (provider-id sets only)', async () => {
+    const label = 'afl-api-2026-target-compare';
+    const projectRoot = snapshotProject(label);
+    const devArtefact = join(projectRoot, 'dev-bridge.json');
+    writeFileSync(devArtefact, JSON.stringify({
+      built_from_database: 'afldb_dev',
+      providers: { CD_I424242: { disposition: 'linked', candidate_player_id: 987654 } },
+    }), 'utf8');
+    const { sql } = fakeSession('afldb_test');
+    const outcome = await runEmitAflApiPlayerBridgeTestCli(
+      ['--label', label, '--validate-only', '--compare-artefact', devArtefact],
+      { projectRoot, sql, log: () => {} },
+    );
+    expect(outcome.artefact.providers).not.toHaveProperty('CD_I424242');
+    expect(JSON.stringify(outcome.artefact)).not.toContain('987654');
+  });
+});
+
+describe('S9 tooling gap: candidate ids come from the selected database\'s own rows', () => {
+  it('the same provider evidence links to whichever canonical id the queried database holds', () => {
+    const providerRow = (providerMatchId: string) => ({
+      providerMatchId, providerPlayerId: 'CD_I1', clubId: 10, jumperNumber: 7,
+      observedGivenName: 'Test', observedSurname: 'Player',
+      stats: { kicks: 12, handballs: 9, marks: 4, tackles: 3, goals: 2, behinds: 1, hitouts: 0,
+        frees_for: 2, frees_against: 1, inside_50s: 5, clearances: 3, rebounds: 2, goal_assists: 1 },
+    });
+    const evidenceFrom = (canonicalPlayerId: number) => buildAflApiPlayerEvidence(['CD_M1', 'CD_M2'].map(
+      (id, i): AflApiMatchEvidenceInput => ({
+        providerMatchId: id, canonicalMatchId: i + 1, unresolvedReason: null,
+        providerRows: [providerRow(id)],
+        canonicalRows: [{ playerId: canonicalPlayerId, clubId: 10, jumperNumberRaw: '7', surname: 'Player',
+          stats: providerRow(id).stats }],
+      }),
+    ));
+    expect(evidenceFrom(100).providers[0].candidatePlayerId).toBe(100);
+    expect(evidenceFrom(555).providers[0].candidatePlayerId).toBe(555);
+  });
+
+  it('is not bounded by a fixed match corpus: every supplied match is classified', () => {
+    const inputs: AflApiMatchEvidenceInput[] = Array.from({ length: 217 }, (_, i) => ({
+      providerMatchId: `CD_M2026${String(i).padStart(5, '0')}`, canonicalMatchId: null,
+      unresolvedReason: 'no_canonical_match', providerRows: [], canonicalRows: [],
+    }));
+    const result = buildAflApiPlayerEvidence(inputs);
+    expect(result.matches).toHaveLength(217);
+    expect(result.counters.canonicalMatchesUnresolved).toBe(217);
   });
 });

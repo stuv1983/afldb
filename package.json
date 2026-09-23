@@ -30,6 +30,7 @@
     "settle:afl-api": "tsx tools/current-season/settle-afl-api.ts",
     "settle:afl-api-fixtures": "tsx tools/current-season/settle-afl-api-fixtures.ts",
     "emit:afl-api-player-bridge": "tsx tools/current-season/emit-afl-api-player-bridge.ts",
+    "emit:afl-api-player-bridge-test": "tsx tools/current-season/emit-afl-api-player-bridge-test.ts",
     "acquire:afl-api-brownlow": "tsx tools/current-season/acquire-afl-api-brownlow.ts",
     "settle:afl-api-brownlow": "tsx tools/current-season/settle-afl-api-brownlow.ts",
     "records:first-kick-goal": "tsx --conditions=react-server tools/records/import-first-kick-goal.ts",

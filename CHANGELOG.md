@@ -15,6 +15,87 @@ commit.
 
 ## [Unreleased]
 
+### AFL.com.au official APIs as the current-season match, player-stat and Brownlow source (AFLDB-ISSUE-228) (Resolved) - 23 September 2026
+
+- **Current-season game data.** AFLDB acquires completed matches, scores and player statistics
+  from the official AFL.com.au JSON APIs into retained, hash-pinned snapshots. It settles them into
+  canonical data through the guarded automatic path: two-key enablement, offline checks before any
+  connection, `--require-complete-source`, the season gate, source-ownership and identity safety,
+  persisted refusals, and idempotent replay. AFL Tables remains the corroborating co-source and the
+  owner of the matches it already holds.
+- **Player identity.** A full-season AFL API player bridge links every AFL API provider to a
+  canonical player on stat-vector evidence, never on names alone. Emitters are pinned per database:
+  `emit:afl-api-player-bridge` for DEV and `emit:afl-api-player-bridge-test` for `afldb_test`. The
+  importer is the only `afl_api` identity writer. It accepts season evidence only when it was built
+  from the target's own database by that database's emitter, so a DEV artefact can never be
+  imported into `afldb_test`, or the reverse.
+- **Brownlow votes.** Completed-count round votes are acquired and settled into canonical
+  `brownlow_round_votes` as all-or-none 3/2/1 vote sets. Match identity is provider-id first, with an
+  opt-in, SELECT-only, unique-or-refuse fixture-identity fallback. Recipients resolve through the
+  bridge. The leaderboard is reconciled against canonical totals, and an identical replay makes no
+  writes.
+- **Stability check.** Backtest assertion 9 compares two genuine captures of the same concluded
+  match through the production emitters with no exclusions, and proves that re-polling does not
+  create spurious versions.
+- **Documentation.** `README.md` documents the supported AFL API integration end to end: both
+  flows, their commands, guards, replay and provenance rules, and what is not yet enabled.
+- **Accepted 2026-09-23 on `afldb_test`:** 207 vote sets, 621 rows, 1,242 votes; leaderboard 183
+  compared with 0 missing, extra or mismatched; bridge 669 linked, 0 unresolved, 0 contradictory;
+  replay 0 mutations. Assertion 9 PASS. DB-free suites 728 passed / 4 standing skips; `tsc` clean;
+  Python bridge contract PASS.
+- **Not included:** installed timers and scheduled Brownlow wiring (AFLDB-ISSUE-232), fixture
+  ingestion (AFLDB-ISSUE-229), identity rekey and absence-sweep hardening (AFLDB-ISSUE-231), season
+  discovery and rollover (AFLDB-ISSUE-233), optional feeds (AFLDB-ISSUE-234), and `afl_api`
+  player-link adjudication (AFLDB-ISSUE-235).
+- Status: AFLDB-ISSUE-228 is RESOLVED — 23 September 2026. Implementation and acceptance commit
+  `6eae820c`. Record: `issues/closed/AFLDB-ISSUE-228.md`. Not merged, pushed or deployed by the
+  resolution.
+
+### AFL API backtest assertion 9 now compares the named 10:29 / 21:41 capture pair (ISSUE-228 §9.9) - 23 September 2026
+
+- `tools/current-season/emit-afl-api-bundle.ts` names the §9.9 pair explicitly:
+  - the 10:29 match-sample capture and the 21:41 monitor capture of `CD_M20260142801`;
+  - each file is pinned to the sha256 of its historical bytes.
+- It parses both through the production emitters (`buildAflApiMatchBundle` →
+  `buildAflApiSettleRecords`) and compares every record's canonical payload hash with **no
+  exclusions**. A difference fails as "evidence pair 1 of 3", with the exact canonical field paths.
+  A missing named file is an explicit skip. Bytes that are not the pinned capture fail. No other
+  capture is ever substituted.
+- Previously it only counted sub-folders inside `monitor-*`, so it could never see the 10:29 capture,
+  and its two-capture branch passed without comparing anything. The manifest now carries a
+  `semanticPair` record: source hashes, per-family canonical hashes and the differences.
+- Validation (2026-09-23):
+  - vitest `tests/afl-api-match.test.ts` 131/131, including 8 new assertion 9 cases;
+  - `tsc --noEmit` clean;
+  - the regenerated `docs/rebuild-manifests/afl_api/backtest-20260919.json` reports **assertion 9
+    PASS** on the hash-verified historical bytes: match 1/1, match_roster 1/1 and
+    player_match_stats 46/46 records canonically unchanged, 0 differences. All 58 file bindings
+    and every other assertion are unchanged.
+
+### Full-season AFL API player bridge can now be built natively against `afldb_test` (ISSUE-228 S9) - 23 September 2026
+
+- New `npm run emit:afl-api-player-bridge-test`
+  (`tools/current-season/emit-afl-api-player-bridge-test.ts`) is the full-season AFL API
+  player-identity evidence emitter, pinned in code to `afldb_test`. It reads
+  `AFLDB_TEST_DATABASE_URL` only and proves a live read-only `current_database()='afldb_test'`
+  session. Its artefact records `built_from_database: "afldb_test"` and its own `tool`. It shares the
+  DEV emitter's snapshot load, match resolution and evidence engine; that emitter is unchanged and
+  still refuses `afldb_test`.
+- `tools/migration/import_afl_api_player_bridge.py`: the `afl_api_stat_vector_season` provenance
+  gate is now **target-bound**. Each target accepts season evidence only when it was built from that
+  target's own database by that database's pinned emitter. A DEV-built bridge (with `afldb_dev`
+  `players.id` values) is still refused for `--target afldb_test`, and the reverse is refused too.
+- Context: AFLDB-ISSUE-228 §22.12. **Validated 2026-09-23**: vitest 76/76, the Python
+  `afl_api_bridge_contract.py` suite PASS, `tsc --noEmit` clean. A read-only build against
+  `afldb_test` linked 577 providers with 0 contradictions and passed the importer's read-only
+  validation. That first build was not imported, because 8 Brownlow providers then lacked canonical
+  stats in `afldb_test`.
+- The registrant stats were then populated, and the name splits were corrected through the audited
+  editor. The rebuilt bridge (`afl-api-player-bridge-2026-full-afldb-test-post-d8-2026-09-23.json`)
+  resolved 669/0/0 and was imported to `afldb_test` as batch 2423. This bridge supports the accepted
+  S9 Brownlow result: 207 vote sets, 621 rows, 1,242 votes, and a 183/183 leaderboard reconciliation
+  (ISSUE-228 §22.15–§22.16).
+
 ### AFL API `match_time` is now emitted as venue-local `HH:MM` (ISSUE-228 Q5-B) - 22 September 2026
 
 - The AFL API emitter now renders the canonical `match_time` as the zero-padded venue-local

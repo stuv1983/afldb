@@ -1020,7 +1020,7 @@ its own hour. Nothing is retried and nothing is rolled back.
 **NOT ENABLED OR INSTALLED by this pass.** The files below exist so a future
 DEV/production wiring pass has an approved artefact to install; nothing here
 has been copied into `/etc/systemd/system`, enabled or started. See
-`issues/open/AFLDB-ISSUE-228.md` §16/§17 for the frozen design this
+`issues/closed/AFLDB-ISSUE-228.md` §16/§17 for the frozen design this
 implements, and that runbook's S9 for the DEV validation still required
 before any of it runs against the real feed.
 
