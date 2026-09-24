@@ -4,11 +4,12 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 10
+**Open issues:** 11
 
 | ID | Title | Severity | Area | State | Next action |
 |---|---|---|---|---|---|
-| AFLDB-ISSUE-235 | `afl_api` player-link adjudication in `/admin/player-links` | Medium | Admin / player identity — `/admin/player-links`, `external_identities` (`afl_api`) | Open (2026-09-23) — ISSUE-228 S10 successor; the bridge importer is the only `afl_api` link writer and no human path exists | Design adjudication semantics and precedence against importer links before any UI |
+| AFLDB-ISSUE-237 | AFL API importer-created `unique` identities are not carried through database promotion or the `afldb_test` rebuild | Medium | Promotion / rebuild lifecycle — `external_identities` (`afl_api`), `docs/production-promotion.md`, `tools/db/rebuild-test.ts` | Open (2026-09-23) — split out of the ISSUE-235 plan review (R4); pre-existing gap, not an ISSUE-235 dependency | Decide replay-vs-rebuild ownership and ordering, then design the promotion and rebuild steps |
+| AFLDB-ISSUE-235 | `afl_api` player-link adjudication in `/admin/player-links` | Medium | Admin / player identity — `/admin/player-links`, `external_identities` (`afl_api`) | Open (2026-09-23) — S0 complete; OD-1..OD-5 approved; plan review found no CRIT/HIGH; R1–R8 folded into the plan; implementation incl. OD-5 in the worktree, uncommitted; S6 COMPLETE on `afldb_test` 2026-09-24 (69/69, no residue); I18 COMPLETE 2026-09-24 (destructive rebuild PASS, 199/200/201 reinstated, bijection OK, 85/85; `verify --phase post` PASS; two post-I18 harness defects fixed — teardown `server-only` import, I14 borrowed `auth_users` row; corrected teardown PASS, residue zero, I14 1/1 and I17 1/1 passed); S7 COMPLETE 2026-09-24 (acquisition doc corrected; loader validate-only on rebuilt `afldb_test` 669 `would_link` / 0 HALT; DB-free 520/520); S8 NOT STARTED; S9 NOT STARTED | S8 gate (operator): commit, clear root junk, `merge:ready`, push/merge, `sync-dev.ps1`, DEV `db:privileges`, §11 checks, V1–V4; then S9 closure |
 | AFLDB-ISSUE-234 | Optional AFL API feed expansion (extended statistics, umpires, play-by-play) | Low | Data acquisition — investigation only | Open (2026-09-23) — ISSUE-228 S10 successor; optional, not required by the supported architecture | None scheduled; investigate when a product need arises |
 | AFLDB-ISSUE-233 | AFL API season discovery and season rollover ownership | Medium | Data acquisition / season lifecycle — `afl-api-identities.json`, rollover runbook | Open (2026-09-23) — ISSUE-228 S10 successor; replaces resolved ISSUE-101/F as owner of the rollover runbook change | Review the rollover runbook against ISSUE-228 §17/§19.3; plan proposal-only season discovery |
 | AFLDB-ISSUE-232 | AFL API operational wiring: systemd timers, Brownlow scheduled settle and admin status | Medium | Deployment / operations — `deploy/afldb-settle-afl-api*`, `settle-status.ts`, `/admin/current-season` | Open (2026-09-23) — units ship, not installed on any host; the Brownlow wrapper omits `--use-fixture-identity` (fail-closed by ISSUE-244 §40) | Operator decides the wrapper flag (reversal of ISSUE-244 §40), then a DEV wiring pass with match chain before Brownlow |
@@ -41231,8 +41232,193 @@ Full record: `issues/closed/AFLDB-ISSUE-228.md` §22.22.
   and with a later bridge contradiction.
 - **Out of scope.** Registering new players (ISSUE-224's surface), and bridge-status display only
   (ISSUE-232).
-- **Next action.** Design the adjudication semantics and the precedence against importer links
-  before any UI work.
+- **S0 census (2026-09-23, operator-run, read-only).**
+  - `afldb_test`: 803 `afl_api` identities (803 providers, 803 players), all `unique`, 0 `resolved`.
+  - `afldb_dev`: 669/669/669, all `unique`.
+  - Both: 0 players holding more than one `afl_api` id, so the OD-1 gate passes. Migration 103 is
+    the latest applied on both.
+  - The closed ISSUE-228 record's "all `resolved`" wording (§22.15 H) is documentation drift. This is
+    recorded in the runbook (E37), and the closed record is not edited.
+- **Operator decisions (2026-09-23).** OD-1 to OD-4 are approved. OD-2 (revoke only on a proven
+  non-use) rewrites the runbook's D10. OD-3 (the adjudication ledger and its `resolved` outcome
+  survive promotion together) adds D15 and narrows F-2. OD-5 (whether OD-3 binds `db:test:rebuild`)
+  is open.
+- **Plan review (2026-09-23, runbook §17).** The operator narrowed the launch, so the review ran in
+  the main session. No CRIT/HIGH.
+  - R1: D10's use test would count independently attached `afl_api` rows, such as height evidence.
+  - R2: the staging schema is omitted.
+  - R3: D15's replay ordering is not enforceable.
+  - R4: no promotion step carries `afl_api` importer links. That gap is pre-existing and outside this
+    issue; the operator decides whether it gets its own issue.
+  The review was a direct current-tree review; it was **not** an `afldb-reviewer`/Fable review.
+- **Operator decisions on the review (2026-09-23).**
+  - R1–R3 and R5–R8 are accepted and folded into the plan's D10, D15, §7 and §13.2.
+  - R4 was opened as the separate **AFLDB-ISSUE-237**. It is not an ISSUE-235 dependency, as long as
+    D15 preserves human state independently and fails closed.
+  - OD-5 is approved: OD-3 binds the `afldb_test` rebuild too.
+  - Implementation is authorised within the runbook's scope.
+- **S6 cases written (2026-09-24, history; superseded, see the latest entries below).** The S6
+  integration cases were written but had not yet run at that point. That session found four
+  postgres.js serialisation defects in the implementation. Two were HIGH:
+  - every revoke failed: `SET LOCAL lock_timeout = $1` is a bind parameter that `SET` rejects;
+  - the OD-5 reinstate refused any non-empty ledger, because of jsonb double-encoding and
+    microsecond truncation. That would have broken I18 after the reset.
+
+  All four were fixed later on 2026-09-24 and validated DB-free only (typecheck clean; 501/501
+  across four suites). See the runbook's second 2026-09-24 update. Next, run the non-destructive
+  S6 matrix on `afldb_test`, and only then seek approval for I18. The implementation remains in
+  the worktree, uncommitted.
+- **First live S6 run (2026-09-24, operator-run on `afldb_test`).** Migration 104 and
+  `db:privileges:test` applied; I11–I13 1/1 and I1 3/3 passed. The first 15-test S6 functional
+  group passed 8 and failed 7. Both defects are fixed, validated DB-free only (typecheck clean;
+  503/503 across four suites):
+  - Six revokes refused safely as `T19_revoke_unprovable`, with a manifest/catalogue mismatch.
+    I17 named `public.player_club_season_stats(player_id)`. It is 007's `player_season_stats`
+    renamed by 015, which the A11b scanner never followed. It is now in the manifest as
+    `NOT_SOURCE_BEARING` (a derived table with no provenance column), and A11b follows renames.
+  - I7 got a code-less refusal. `linkAflApiProvider()` ran the input check's
+    `missing_surname_acknowledgement` (a duplicate of T9) before `decideAflApiLink()`, so a
+    pending candidate with a different surname pre-empted T2/T3. The pre-decision check now drops
+    that item; the pure rules are unchanged. The I4/T9 integration case now asserts the T9 code.
+
+  S6 is still live-unproven. Next, the operator reruns I17 and the 15-test group; then the
+  concurrency cases, replay/recovery and, with approval, I18.
+- **Second live S6 run (2026-09-24, operator-run on `afldb_test`).**
+  - Passed: I17; the functional group 15/15; concurrency I8–I10 4/4; I15/I16 7/7; OD-5 5/5.
+  - The two-suite run was 66 passed, 3 failed. Both causes were in the test harness, not the
+    product. Both are fixed, validated DB-free only (typecheck clean; 508/508 across four suites):
+    - **I14.** The fixture stored the dangling `player_id = 999999999`, and migration 104's FK
+      refused it before the replay ran. The row now stores a valid but reused id (player B)
+      alongside player A's stable identity. The replay must link player A.
+    - **Both leftover gates.** They reported `aflApiIdentities 6`, `dependentRows 57` and
+      `pendingCandidates 81`. These were false positives: the `LIKE 'CD_I999%'` selectors matched
+      real 2026 Champion Data providers. Six of those are the linked `CD_I999321/326/331/391/715/827`;
+      `CD_I999724` is unresolved. Nothing was deleted.
+      - Teardown, the gate and the ledger-isolation check now share one exact fixture-ownership
+        registry: anchored patterns plus I1/I14 literal ids.
+  - No production code changed. S6 remains incomplete until the operator reruns I14 and both
+    gates. I18 still needs approval.
+- **S6 COMPLETE (2026-09-24, operator-run on `afldb_test`).** The final two-suite run passed 69/69
+  (`settle-afl-api` 61/61, `player-link-concurrency` 8/8), with no fixture residue.
+- **I18 preparation (2026-09-24, later; non-destructive; I18 NOT RUN).** Full detail is in the
+  runbook's "I18 preparation" update.
+  - **Harness.** `npm run db:test:issue235-i18 -- seed | verify --phase pre|post | teardown`
+    (`tools/migration/afl_api_adjudication_i18_fixture.ts`).
+    - It seeds linked → revoked → linked through the real `linkAflApiProvider()`/`revokeAflApiLink()`.
+      The fixture is provider `CD_I9991800001` on the player `players/A/Alan_Martello.html`,
+      resolved by the D15 rule and never by a numeric id.
+    - It writes a hash-bound pre-rebuild baseline and verifies against it after the rebuild.
+    - `I18_FIXTURE` is in `ISSUE235_OWNERSHIP` and the residue gate, and never in S6 teardown.
+    - DB-free: typecheck clean, 518/518 across four suites. Nothing has run on a database.
+  - **Decisions recorded.**
+    - DraftGuru `annual-html-20260826`, the tracked default. The bytes for `annual-html-20260902`
+      are unrecoverable.
+    - No `--draftguru-bridge`. Losing the importer `afl_api` identities is ISSUE-237, not an I18
+      failure.
+    - The stage-18 archive timing is unchanged.
+  - **Still blocking the destructive run.** Four acquired snapshots are missing with no retained
+    copy found: `issue129-t7-20260903`, `rosters-20260905`, `club-lists-20260905` and
+    `ladder-20260828`. The fitzRoy and DraftGuru `annual-html-20260826` bytes are not staged in the
+    worktree. `AFLDB_TEST_IMPORT_DATABASE_URL` and `AFLDB_PYTHON` must be set in the process.
+- **I18 fixture seed + no-ack preflight (2026-09-24, operator-authorised; I18 NOT RUN).** Full
+  detail is in the runbook's matching update. All four blockers above are cleared.
+  - DSNs: owner `afldb_owner` and restricted `afldb_import`, both 127.0.0.1:55432/`afldb_test`
+    (the `.env` import DSN needed its port rewritten from 5432 as well as its database). No owner
+    override.
+  - Pre-seed: residue zero, ledger empty, human `resolved` 0, no capture, no baseline; the stable
+    identity resolves to exactly one player (144).
+  - Seed PASS: ledger **199 linked, 200 revoked (supersedes 199), 201 linked**; identity
+    `CD_I9991800001` → 144 `resolved`/`afl_api_admin_adjudication`; actor 560 `super_admin`
+    (disabled); baseline `backups/issue-235-i18/afldb_test.baseline.json` sha256 `f1a18fc5…a609a`.
+  - `verify --phase pre` PASS, before and after the preflight.
+  - No-ack `db:test:rebuild --draftguru-label annual-html-20260826`: all seven snapshots verified
+    offline, then refused at the acknowledgement; zero stages ran; no capture file; fixture and
+    baseline unchanged.
+  - Next: separate explicit operator approval of the destructive rebuild.
+- **I18 executed — COMPLETE (2026-09-24).** Full detail is in the runbook's "I18 executed" update.
+  - Destructive rebuild (operator-approved): **PASS**. Stage 2 captured 3 rows (sha256
+    `6b7b5446…`, payload `c15e80fb…`). Stage 18 reinstated 199/200/201 under their original ids
+    (next 202), created 1 attribution-only actor, replayed 1 insert, bijection OK, and archived the
+    capture. Stage 19 bijection OK. Final validation 85/85. `verify --phase post`: PASS.
+  - **Post-I18 harness defect 1.** `npx tsx … teardown` refused with the `server-only` Client
+    Component error. Its DELETEs had already committed in full. Read-only diagnosis showed zero I18
+    rows, with only the baseline archive missing. Cause: the proof step imported the seeding fixtures
+    module, which reaches `server-only`. Fix: the new server-neutral
+    `tests/integration/afl-api-fixture-ownership.ts` holds the ownership registry and residue gate.
+    Teardown also re-checks `current_database()` first.
+  - **Post-I18 harness defect 2.** I14/I17 never executed: I14 borrowed an arbitrary `auth_users`
+    row, and the rebuilt DB had none. Cleanup then hit `UNDEFINED_VALUE`. Fix: I14 now has its own
+    disabled, credential-less `issue235-i14-fixture@example.test` actor and a literal-only
+    `cleanupI14Fixtures()`. I17 is in its own setup-free block.
+  - Validation: typecheck clean; DB-free 72/72, 331/331, 109/109, 8/8. Corrected teardown PASS
+    (0 rows left to remove; residue zero; baseline archived). Both leftover gates pass. **I14 1
+    passed; I17 1 passed.** No ISSUE-235 production logic changed.
+- **S7 COMPLETE + post-I18 loader regression (2026-09-24).** Full detail is in the runbook's S7
+  update.
+  - **S7.** `docs/acquisition/AFLDB-2026-API-ACQUISITION.md` no longer says the
+    `db:test:rebuild` side of OD-5 is unwired, or that a rebuild discards the ledger. It now
+    documents the three stages:
+    - capture before `recreate`;
+    - reinstate after `draftguru`: original ids and `supersedes_id`, `player_id` from
+      `player_identity`, safe actor attribution, the sequence repaired, and readback, replay and
+      bijection before archival;
+    - the standalone bijection.
+
+    It also states what I18 did and did not prove.
+  - **Loader regression, option (b).** Validate-only, read DSN only, on the rebuilt `afldb_test`
+    (0 `afl_api` identities, the ISSUE-237 gap). The artefact was
+    `data/reference/afl-api-player-bridge-2026-full-afldb-test-post-d8-2026-09-23.json`, the
+    accepted TEST bridge, sha256 `b71ac61a…b715e9`. Result: `would_link` 669; `already_linked`
+    0; `already_linked_human` 0; `would_HALT_contradiction` 0; `would_HALT_player_collision` 0;
+    `would_HALT_identity_check_failed` 0. No writes. Nothing was re-imported and no links were
+    restored.
+  - **DB-free validation.** Typecheck clean; 72/72, 331/331, 109/109, 8/8 (520/520).
+- **Next action (S8 gate, operator-controlled).** S0–S7 and I18 are COMPLETE. S8 (DEV rollout)
+  and S9 (closure) are NOT STARTED.
+  1. The operator reviews and commits the ISSUE-235 files.
+  2. The operator clears the unrelated root junk files.
+  3. `merge:ready`, then push/merge, then `sync-dev.ps1`.
+  4. `db:privileges` on DEV.
+  5. The runbook §11 read-only checks and the DEV bijection check.
+  6. V1–V4.
+
+  After that, S9: `CHANGELOG.md`, resolution, and the move to `issues/closed/`.
+- **Runbook:** `issues/open/AFLDB-ISSUE-235.md` (S0–S7 and I18 complete; S8/S9 not started).
+
+## AFLDB-ISSUE-237 — AFL API importer-created `unique` identities are not carried through database promotion or the `afldb_test` rebuild
+
+- **Status:** Open (2026-09-23). **Severity:** Medium. **Area:** promotion / rebuild lifecycle —
+  `external_identities` (`afl_api`), `docs/production-promotion.md`, `tools/db/rebuild-test.ts`,
+  `tools/migration/import_afl_api_player_bridge.py`.
+- **Origin.** The AFLDB-ISSUE-235 plan review, finding R4 (runbook §17). The operator opened it as
+  a separate issue on 2026-09-23. It is pre-existing and was not introduced by ISSUE-235.
+- **Evidence.**
+  - `docs/production-promotion.md` has no `afl_api` identity step. Its post-promotion identity work
+    is `replay_admin_overrides()` (`:637-667`).
+  - `db:test:rebuild` has no bridge-import stage. `tools/db/rebuild-test.ts` references `afl_api`
+    only for height enrichment (`:209-213`, `:619-625`).
+  - `external_identities` is import-writable and rebuilt, not reinstated.
+  - So the importer-created `unique` `afl_api` identities (669 on DEV, 803 on `afldb_test`, S0
+    2026-09-23) survive a promotion or rebuild only if an operator re-runs
+    `import_afl_api_player_bridge.py`, and no runbook says so. After a promotion without that step,
+    every importer-linked provider would settle as `unresolved_identity`.
+  - Human `resolved` identities are different: ISSUE-235 D15 replays them from their durable ledger.
+- **Scope.**
+  - lifecycle and promotion ownership of importer-created `afl_api` `unique` identities;
+  - whether they are replayed directly or rebuilt deterministically by re-running the bridge from
+    accepted artefacts (a candidate's `player_id` lineage differs from the source database's);
+  - ordering against ISSUE-235's human replay, which runs right after the `players` override replay;
+  - idempotency;
+  - preserving human `resolved` identities;
+  - contradiction behaviour when rebuilt importer evidence disagrees with a human decision (the
+    ISSUE-235 D4 contract: withhold with a finding, never overwrite);
+  - the DEV, `afldb_test` and production promotion/rebuild runbooks, and their acceptance evidence.
+- **Out of scope.** Human adjudication and its replay (ISSUE-235). Bridge evidence classes and
+  settle behaviour (unchanged).
+- **Relation.** ISSUE-235 references this as a follow-up. It does **not** block ISSUE-235, provided
+  ISSUE-235's D15 preserves human identity and audit state independently and fails closed.
+- **Next action.** Decide replay-vs-rebuild ownership and ordering, then design and test the
+  promotion and rebuild steps.
 
 ## AFLDB-ISSUE-244 — ISSUE-228 AFL API end-to-end acceptance review
 

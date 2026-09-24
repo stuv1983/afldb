@@ -311,33 +311,79 @@ stage `id` is what `--plan` prints and what a failure names.
 | # | `id` | Stage | Credential |
 |---|---|---|---|
 | 1 | `precheck` | every required input, before anything is destroyed | none — no database contact |
-| 2 | `recreate` | database reset (clean slate, not a truncation) | `AFLDB_TEST_DATABASE_URL` (owner) |
-| 3 | `migrations` | migrations — the complete tracked set, `001` through the current terminal migration, no hard-coded count (`db:migrate:test`; `db:migrate:code-test` for the rehearsal) | `AFLDB_TEST_DATABASE_URL` |
-| 4 | `privileges` | privileges (`db:privileges:test`; `db:privileges:code-test` for the rehearsal) | `AFLDB_TEST_DATABASE_URL` |
-| 5 | `reference` | reference data | `AFLDB_TEST_IMPORT_DATABASE_URL` |
-| 6 | `fitzroy` | fitzRoy / AFL Tables core | `AFLDB_TEST_IMPORT_DATABASE_URL` |
-| 7 | `heights` | heights — AFL Tables player-details register | `AFLDB_TEST_IMPORT_DATABASE_URL` |
-| 8 | `heights-afl-api` | heights — AFL API season rosters (evidence only) | `AFLDB_TEST_IMPORT_DATABASE_URL` |
-| 9 | `heights-wikipedia` | heights — tracked adjudication set (evidence only) | `AFLDB_TEST_IMPORT_DATABASE_URL` |
-| 10 | `birth-dates` | birth dates — AFL Tables club player lists | `AFLDB_TEST_IMPORT_DATABASE_URL` |
-| 11 | `coaches` | coaches + match coaches — AFL Tables coach pages | `AFLDB_TEST_IMPORT_DATABASE_URL` |
-| 12 | `father-son` | father–son selections — tracked Wikipedia list | `AFLDB_TEST_IMPORT_DATABASE_URL` |
-| 13 | `siblings` | sibling relationships — tracked families export | `AFLDB_TEST_IMPORT_DATABASE_URL` |
-| 14 | `after-siren` | after-the-siren kicks — tracked exports | `AFLDB_TEST_IMPORT_DATABASE_URL` |
-| 15 | `after-siren-reconcile` | **validation** — loaded rows vs a fresh re-resolution | `AFLDB_TEST_IMPORT_DATABASE_URL` |
-| 16 | `draftguru` | **DraftGuru** | `AFLDB_TEST_IMPORT_DATABASE_URL` |
-| 17 | `awards-honours` | **awards & honours** (tracked manifests) | `AFLDB_TEST_IMPORT_DATABASE_URL` |
-| 18 | `brownlow-season` | Brownlow season totals — tracked artefact | `AFLDB_TEST_IMPORT_DATABASE_URL` |
-| 19 | `derived` | derived summaries | `AFLDB_TEST_IMPORT_DATABASE_URL` |
-| 20 | `coleman` | Coleman (derived) | `AFLDB_TEST_IMPORT_DATABASE_URL` |
-| 21 | `ladder-witness` | **validation** — cross-check `club_seasons` | `AFLDB_TEST_IMPORT_DATABASE_URL` |
-| 22 | `fingerprints` | **validation** — per-domain row counts vs the contracts | `AFLDB_TEST_DATABASE_URL` |
+| 2 | `afl-api-adjudications-capture` | **capture** the human `afl_api` adjudication ledger before anything is destroyed (AFLDB-ISSUE-235) | `AFLDB_TEST_DATABASE_URL` (owner, read-only transaction) |
+| 3 | `recreate` | database reset (clean slate, not a truncation) | `AFLDB_TEST_DATABASE_URL` (owner) |
+| 4 | `migrations` | migrations — the complete tracked set, `001` through the current terminal migration, no hard-coded count (`db:migrate:test`; `db:migrate:code-test` for the rehearsal) | `AFLDB_TEST_DATABASE_URL` |
+| 5 | `privileges` | privileges (`db:privileges:test`; `db:privileges:code-test` for the rehearsal) | `AFLDB_TEST_DATABASE_URL` |
+| 6 | `reference` | reference data | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 7 | `fitzroy` | fitzRoy / AFL Tables core | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 8 | `heights` | heights — AFL Tables player-details register | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 9 | `heights-afl-api` | heights — AFL API season rosters (evidence only) | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 10 | `heights-wikipedia` | heights — tracked adjudication set (evidence only) | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 11 | `birth-dates` | birth dates — AFL Tables club player lists | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 12 | `coaches` | coaches + match coaches — AFL Tables coach pages | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 13 | `father-son` | father–son selections — tracked Wikipedia list | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 14 | `siblings` | sibling relationships — tracked families export | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 15 | `after-siren` | after-the-siren kicks — tracked exports | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 16 | `after-siren-reconcile` | **validation** — loaded rows vs a fresh re-resolution | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 17 | `draftguru` | **DraftGuru** | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 18 | `afl-api-adjudications-reinstate` | **reinstate** the adjudication ledger and replay the human `resolved` identities, one transaction (AFLDB-ISSUE-235) | `AFLDB_TEST_DATABASE_URL` (owner) |
+| 19 | `afl-api-adjudications-bijection` | **validation** — ledger ↔ human identity bijection | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 20 | `awards-honours` | **awards & honours** (tracked manifests) | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 21 | `brownlow-season` | Brownlow season totals — tracked artefact | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 22 | `derived` | derived summaries | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 23 | `coleman` | Coleman (derived) | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 24 | `ladder-witness` | **validation** — cross-check `club_seasons` | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 25 | `fingerprints` | **validation** — per-domain row counts vs the contracts | `AFLDB_TEST_DATABASE_URL` |
 
-Stages 7–15 are the AFLDB-ISSUE-118 additions (§23.19, §23.24, §23.27, §23.29, §23.31,
+Stages 8–16 are the AFLDB-ISSUE-118 additions (§23.19, §23.24, §23.27, §23.29, §23.31,
 §23.33–§23.35). Every one reads a tracked, manifest-pinned artefact, contacts no network, and
 resolves people **only** through the AFL Tables profile-url identities `fitzroy` registers —
-which is why they all follow it and why nothing later reads them. `after-siren-reconcile` and
-`ladder-witness` are validation stages: they open one connection and write nothing.
+which is why they all follow it and why nothing later reads them. `after-siren-reconcile`,
+`afl-api-adjudications-bijection` and `ladder-witness` are validation stages: they open one
+connection and write nothing.
+
+**The `afl_api` adjudication ledger survives the rebuild (AFLDB-ISSUE-235 OD-5).** It is human
+state no tracked source can reproduce, so stages 2, 18 and 19
+(`tools/migration/rebuild_afl_api_adjudications.ts`) carry it across the reset:
+
+- **Capture** runs after every input is proven and before the reset. It writes every ledger row —
+  its original id and `supersedes_id`, its stored `player_identity`, every audit field and its
+  actor's email and role — to `backups/rebuild/<target>/afl-api-adjudications.capture.json`, which is
+  gitignored because it holds admin emails and notes. It prints the file's sha256. A capture
+  failure stops the rebuild with nothing destroyed. An empty ledger, or a database from before
+  migration 104, is captured as empty.
+- **Reinstate** runs after `draftguru`, the last stage that adds players. It is one transaction:
+  - the rows go back under their original ids (`OVERRIDING SYSTEM VALUE`), and the id sequence
+    is advanced past the maximum;
+  - `player_id` is remapped from `player_identity`. An identity that does not resolve to exactly
+    one rebuilt player **stops the rebuild**; this includes a `manual_admin_edit` player, because
+    `afldb_test` has no `data_overrides`;
+  - `admin_user_id` is remapped by email, case-insensitively. An existing account is reused
+    unchanged, whatever its current role. Otherwise an attribution-only `auth_users` row is
+    created with the **captured** role, no password, no TOTP secret, no session, and
+    `disabled_at` set, so it cannot sign in. A captured role outside `auth_users_role_check` is
+    refused, never converted. The row records who acted and the role they held at capture. It
+    does not prove they held that role throughout the ledger's history, and it is not a
+    restored account: do not reactivate it to give anyone access;
+  - the D15 replay then re-creates the human `resolved` identities, and the bijection is
+    asserted. Any failure rolls the whole transaction back.
+
+  On commit, the capture is renamed `…<timestamp>.<hash>.reinstated.json` and kept.
+- **A capture that was never archived is checked by the next rebuild.** The next capture compares
+  it with the live ledger:
+  - **The live ledger equals it.** This is what a run leaves if it died after the reinstate
+    committed but before the rename. The capture verifies, read-only, that the reinstatement is
+    complete: same ledger, sequence above the maximum id, a replay would insert nothing, and the
+    bijection holds. It then archives the old capture as `.reinstated.json` and captures the live
+    ledger for this run. Nothing is re-inserted. If any check fails it refuses with
+    `already_reinstated_unverified` and leaves the capture in place.
+  - **The live ledger is empty.** An earlier run failed after the reset. The capture refuses,
+    because capturing again would record the destroyed ledger as empty. Re-run with
+    `--recover-afl-api-adjudications` to reinstate from the pending capture.
+  - **The live ledger is non-empty and different.** Reconcile by hand.
+- Integration fixtures that write adjudications on `afldb_test` must delete them in teardown, as
+  the owner role. Otherwise the next rebuild carries them, or stops on them.
 
 **There is no Gridley stage.** The captured external grid corpus (migration 080,
 `external_grid_sources` / `external_grids` / `external_grid_axes`) is not produced by a

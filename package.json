@@ -19,6 +19,7 @@
     "db:test:rebuild": "tsx tools/db/rebuild-test.ts",
     "db:test:prove-reset": "tsx tools/db/prove-reset.ts",
     "db:test:fingerprint": "tsx tools/db/fingerprint-test.ts",
+    "db:test:issue235-i18": "tsx --conditions=react-server tools/migration/afl_api_adjudication_i18_fixture.ts",
     "db:promotion:check": "tsx tools/db/promotion-check.ts",
     "preflight": "tsx tools/dev/preflight.ts",
     "worktree:bootstrap": "tsx tools/dev/bootstrap-worktree.ts",

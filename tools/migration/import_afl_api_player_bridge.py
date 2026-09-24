@@ -5,7 +5,16 @@ identity bootstrap bridge (runbook Sec 6.3, Sec 17).
 Reads the evidence artefact ``build_afl_api_player_bridge.py`` produces
 (``data/reference/afl-api-player-bridge-<date>.json``) and turns its
 ``linked`` rows into durable ``external_identities`` rows on ``afldb_test``.
-This is the ONLY tool in ISSUE-228 that writes ``external_identities``.
+
+AFLDB-ISSUE-235 (2026-09-23): this loader is no longer the ONLY writer of
+``external_identities`` for ``afl_api``. A Super Admin can now write a human
+``status='resolved'``, ``match_method='afl_api_admin_adjudication'`` row
+through ``/admin/player-links/afl-api`` (``src/db/queries/afl-api-player-links.ts``).
+The two writers never race for real ownership of one row: ``UNIQUE
+(source_id, external_id)`` (migration 002) allows at most one row per
+provider, so precedence is first-trusted-writer-wins, and THIS loader still
+never UPDATEs or DELETEs a row belonging to EITHER writer -- that contract,
+restated below, now binds against both, not just against itself.
 
 Every provider id is decided against the LIVE database state at the moment
 this tool runs, never against the artefact's own record of what was linked
@@ -86,15 +95,29 @@ Modes:
     --apply           Same write path, tracked in one import_batches row
                        (source_key=afl_api, tool=this file), committed.
 
-Idempotency (Sec 6.3, Sec 19.4(a)):
-  * a provider id not yet in external_identities -> INSERT (status=unique,
+Idempotency (Sec 6.3, Sec 19.4(a); AFLDB-ISSUE-235 Sec 7.4/D4):
+  * a provider id not yet in external_identities, and its candidate player
+    holds no OTHER afl_api provider row -> INSERT (status=unique,
     match_method=<the artefact's own declared method>, append-only);
+  * a provider id not yet in external_identities, but its candidate player
+    ALREADY holds a DIFFERENT afl_api provider row -> withheld as
+    "player_collision": a data_issues row is opened
+    (issue_type=afl_api_identity_contradiction, details.kind=
+    'player_already_linked'), reported would_HALT_player_collision. Backstop
+    for AFLDB-ISSUE-235 OD-1's one-provider-per-player rule (migration 104's
+    partial unique index is the final arbiter for the race this check
+    cannot see);
   * a provider id already linked to the SAME player -> no-op, reported
-    "already_linked";
+    "already_linked" (or "already_linked (human)" when the existing row's
+    status is 'resolved' -- an AFLDB-ISSUE-235 admin adjudication, never a
+    bootstrap write);
   * a provider id already linked to a DIFFERENT player -> withheld, a
-    data_issues row is opened (issue_type=afl_api_identity_contradiction),
-    the existing link is never modified or deleted.
-No row is ever UPDATEd or DELETEd by this tool.
+    data_issues row is opened (issue_type=afl_api_identity_contradiction,
+    details gain existing_status/existing_match_method), the existing link
+    is never modified or deleted -- whether that existing link is an
+    importer 'unique' row or an AFLDB-ISSUE-235 human 'resolved' row makes
+    no difference to this rule.
+No row is ever UPDATEd or DELETEd by this tool, whichever writer owns it.
 
 Usage (--artefact is mandatory; --target defaults to afldb_test):
     python tools/migration/import_afl_api_player_bridge.py --validate-only --artefact <path>
@@ -348,7 +371,16 @@ def load_artefact(path: Path, target: str) -> dict:
 class RunStats:
     linked: int = 0
     already_linked: int = 0
+    # AFLDB-ISSUE-235: the same no-op, but the existing row is a human
+    # admin adjudication (status='resolved'), not an importer bootstrap
+    # write. Counted separately so a report can distinguish the two
+    # without reinterpreting `already_linked`.
+    already_linked_human: int = 0
     contradictions: list[str] = field(default_factory=list)
+    # AFLDB-ISSUE-235 D4/D6-4: the candidate player already holds a
+    # DIFFERENT afl_api provider row. Withheld like a contradiction, but
+    # distinct because no row exists yet for THIS provider id.
+    player_collisions: list[str] = field(default_factory=list)
     skipped_not_linked: int = 0
 
 
@@ -369,17 +401,49 @@ def fetch_source_id(cur) -> int:
 
 
 def classify_existing(cur, source_id: int, external_id: str, candidate_player_id: int):
+    """Classify (source_id, external_id) against the live external_identities row, if any.
+
+    Returns (status, existing_id, existing_status, existing_match_method). status is
+    'would_link' (existing_id/status/match_method all None -- no row for this provider id
+    yet), 'already_linked' or 'contradiction'. AFLDB-ISSUE-235 D4/D8: the existing row's
+    status/match_method travel with the classification so a caller can report
+    "already_linked (human)" vs "already_linked", and so a contradiction finding can name
+    existing_status/existing_match_method -- distinguishing a human AFLDB-ISSUE-235
+    adjudication from an importer bootstrap write is display/evidence only. Neither writer
+    is ever overwritten or deleted here.
+    """
     cur.execute(
-        "SELECT id, player_id FROM external_identities WHERE source_id = %s AND external_id = %s",
+        "SELECT id, player_id, status, match_method FROM external_identities "
+        "WHERE source_id = %s AND external_id = %s",
         (source_id, external_id),
     )
     row = cur.fetchone()
     if row is None:
-        return ("would_link", None)
-    existing_id, existing_player_id = row
+        return ("would_link", None, None, None)
+    existing_id, existing_player_id, existing_status, existing_match_method = row
     if existing_player_id == candidate_player_id:
-        return ("already_linked", existing_id)
-    return ("contradiction", existing_id)
+        return ("already_linked", existing_id, existing_status, existing_match_method)
+    return ("contradiction", existing_id, existing_status, existing_match_method)
+
+
+def find_player_collision(cur, source_id: int, candidate_player_id: int):
+    """AFLDB-ISSUE-235 D4/D6-4 backstop. Called only when classify_existing() has already
+    returned 'would_link' for THIS provider id (an existing row for the SAME provider id is
+    already_linked/contradiction, handled there, never here).
+
+    Does candidate_player_id already hold a DIFFERENT afl_api provider row, under any
+    status/match_method, importer or human alike? Returns (existing_id, existing_external_id,
+    existing_status, existing_match_method), or None. Migration 104's partial unique index
+    (one afl_api row per player) is the final arbiter for the race this read cannot see --
+    this check exists so the loader can withhold with a clear finding instead of aborting the
+    whole batch on a bare 23505.
+    """
+    cur.execute(
+        "SELECT id, external_id, status, match_method FROM external_identities "
+        "WHERE source_id = %s AND player_id = %s",
+        (source_id, candidate_player_id),
+    )
+    return cur.fetchone()
 
 
 def manual_adjudication_identity_problem(cur, candidate_player_id: int,
@@ -432,10 +496,19 @@ def apply_rows(cur, source_id: int, to_link: dict[str, dict], rep: "Reporter",
             if problem is not None:
                 raise ImportRefused(f"{external_id}: manual adjudication refused -- {problem}")
 
-        status, existing_id = classify_existing(cur, source_id, external_id, candidate_player_id)
+        status, existing_id, existing_status, existing_match_method = classify_existing(
+            cur, source_id, external_id, candidate_player_id,
+        )
 
         if status == "already_linked":
-            stats.already_linked += 1
+            # AFLDB-ISSUE-235 D1/D4 T11: a status='resolved' row is a human admin
+            # adjudication, never a bootstrap write -- report it distinctly, but it is
+            # exactly as much a no-op as an importer 'unique' agreement.
+            if existing_status == "resolved":
+                stats.already_linked_human += 1
+                rep.step(f"{external_id}: already_linked (human)")
+            else:
+                stats.already_linked += 1
             continue
 
         if status == "contradiction":
@@ -454,6 +527,10 @@ def apply_rows(cur, source_id: int, to_link: dict[str, dict], rep: "Reporter",
                         "source_key": SOURCE_KEY,
                         "external_id": external_id,
                         "proposed_player_id": candidate_player_id,
+                        # AFLDB-ISSUE-235 D4/D8: lets a reader tell an importer 'unique'
+                        # disagreement from a human 'resolved' one without a second query.
+                        "existing_status": existing_status,
+                        "existing_match_method": existing_match_method,
                         "evidence_summary": row.get("evidence_summary"),
                     }),
                 ),
@@ -461,10 +538,54 @@ def apply_rows(cur, source_id: int, to_link: dict[str, dict], rep: "Reporter",
             stats.contradictions.append(external_id)
             if batch is not None:
                 batch.reject(external_id, CONTRADICTION_ISSUE_TYPE, row)
-            rep.warn(f"{external_id}: HALTed on contradiction against external_identities.id={existing_id}")
+            rep.warn(
+                f"{external_id}: HALTed on contradiction against external_identities.id={existing_id} "
+                f"(existing status={existing_status}, match_method={existing_match_method})"
+            )
             continue
 
-        # status == "would_link" -> actually link.
+        # status == "would_link": the provider id itself is free. AFLDB-ISSUE-235 D4/D6-4 --
+        # before inserting, check whether the CANDIDATE PLAYER already holds a different
+        # afl_api provider row (importer or human). Migration 104's partial unique index is
+        # the final arbiter for the race this read cannot see; this check lets a genuine
+        # collision be withheld with a clear finding instead of aborting the whole batch on
+        # a bare 23505.
+        collision = find_player_collision(cur, source_id, candidate_player_id)
+        if collision is not None:
+            collision_id, collision_external_id, collision_status, collision_match_method = collision
+            cur.execute(
+                """INSERT INTO data_issues
+                     (entity_type, entity_id, issue_type, severity, description, details)
+                   VALUES ('external_identities', %s, %s, 'warning', %s, %s)""",
+                (
+                    collision_id,
+                    CONTRADICTION_ISSUE_TYPE,
+                    f"afl_api provider player {external_id} evidence proposes linking to "
+                    f"player_id={candidate_player_id}, but that player already holds afl_api "
+                    f"provider {collision_external_id} (external_identities.id={collision_id}). "
+                    "Withheld; the existing link was not modified.",
+                    json.dumps({
+                        "kind": "player_already_linked",
+                        "source_key": SOURCE_KEY,
+                        "external_id": external_id,
+                        "proposed_player_id": candidate_player_id,
+                        "existing_external_id": collision_external_id,
+                        "existing_status": collision_status,
+                        "existing_match_method": collision_match_method,
+                        "evidence_summary": row.get("evidence_summary"),
+                    }),
+                ),
+            )
+            stats.player_collisions.append(external_id)
+            if batch is not None:
+                batch.reject(external_id, CONTRADICTION_ISSUE_TYPE, row)
+            rep.warn(
+                f"{external_id}: HALTed on player_collision -- player_id={candidate_player_id} "
+                f"already linked to afl_api provider {collision_external_id} "
+                f"(existing status={collision_status}, match_method={collision_match_method})"
+            )
+            continue
+
         cur.execute(
             """INSERT INTO external_identities
                  (source_id, external_id, external_name, player_id, status,
@@ -507,8 +628,9 @@ def run_validate_only(artefact: dict, rep: Reporter, target: str) -> int:
         with conn.cursor() as cur:
             source_id = fetch_source_id(cur)
             counts = {
-                "would_link": 0, "already_linked": 0,
-                "would_HALT_contradiction": 0, "would_HALT_identity_check_failed": 0,
+                "would_link": 0, "already_linked": 0, "already_linked_human": 0,
+                "would_HALT_contradiction": 0, "would_HALT_player_collision": 0,
+                "would_HALT_identity_check_failed": 0,
             }
             for external_id, row in sorted(to_link.items()):
                 if match_method == MANUAL_ADJUDICATION_MATCH_METHOD:
@@ -520,15 +642,39 @@ def run_validate_only(artefact: dict, rep: Reporter, target: str) -> int:
                         rep.warn(f"{external_id}: would_HALT_identity_check_failed -- {problem}")
                         continue
 
-                status, existing_id = classify_existing(cur, source_id, external_id, row["candidate_player_id"])
-                label = {"would_link": "would_link", "already_linked": "already_linked",
-                          "contradiction": "would_HALT_contradiction"}[status]
-                counts[label] += 1
-                if label == "would_HALT_contradiction":
-                    rep.warn(
-                        f"{external_id}: existing external_identities.id={existing_id} links a "
-                        f"DIFFERENT player than the artefact's candidate {row['candidate_player_id']}"
-                    )
+                status, existing_id, existing_status, existing_match_method = classify_existing(
+                    cur, source_id, external_id, row["candidate_player_id"],
+                )
+
+                if status == "would_link":
+                    collision = find_player_collision(cur, source_id, row["candidate_player_id"])
+                    if collision is not None:
+                        collision_id, collision_external_id, collision_status, collision_match_method = collision
+                        counts["would_HALT_player_collision"] += 1
+                        rep.warn(
+                            f"{external_id}: candidate player_id={row['candidate_player_id']} already "
+                            f"holds afl_api provider {collision_external_id} "
+                            f"(external_identities.id={collision_id}, status={collision_status}, "
+                            f"match_method={collision_match_method}) -- withheld"
+                        )
+                        continue
+                    counts["would_link"] += 1
+                    continue
+
+                if status == "already_linked":
+                    # AFLDB-ISSUE-235 D1: a status='resolved' row is a human admin
+                    # adjudication, counted and reported distinctly from an importer
+                    # 'unique' agreement.
+                    counts["already_linked_human" if existing_status == "resolved" else "already_linked"] += 1
+                    continue
+
+                # status == "contradiction"
+                counts["would_HALT_contradiction"] += 1
+                rep.warn(
+                    f"{external_id}: existing external_identities.id={existing_id} "
+                    f"(status={existing_status}, match_method={existing_match_method}) links a "
+                    f"DIFFERENT player than the artefact's candidate {row['candidate_player_id']}"
+                )
         conn.rollback()
     finally:
         conn.close()
@@ -560,9 +706,13 @@ def run_write(artefact: dict, rep: Reporter, mode: str, target: str) -> int:
 
     rep.result("linked", stats.linked)
     rep.result("already_linked", stats.already_linked)
+    rep.result("already_linked_human", stats.already_linked_human)
     rep.result("contradictions_withheld", len(stats.contradictions))
+    rep.result("player_collisions_withheld", len(stats.player_collisions))
     if stats.contradictions:
         rep.step("contradictory provider ids: " + ", ".join(stats.contradictions))
+    if stats.player_collisions:
+        rep.step("player-collision provider ids: " + ", ".join(stats.player_collisions))
     return 0
 
 

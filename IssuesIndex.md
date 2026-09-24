@@ -9,15 +9,49 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Open issues:** 10
+**Open issues:** 11
+
+### AFLDB-ISSUE-237 — AFL API importer-created `unique` identities are not carried through database promotion or the `afldb_test` rebuild
+- **Severity:** Medium. **Area:** promotion / rebuild lifecycle — `external_identities`
+  (`afl_api`), `docs/production-promotion.md`, `tools/db/rebuild-test.ts`.
+- **State:** Open (2026-09-23), split out of the ISSUE-235 plan review (R4). Pre-existing. Neither
+  the promotion runbook nor `db:test:rebuild` has an `afl_api` identity step, so the importer's
+  `unique` links (669 on DEV) survive only through a manual bridge re-import. Not an ISSUE-235
+  dependency.
+- **Next action:** decide replay-vs-rebuild ownership and ordering, then design the promotion and
+  rebuild steps.
 
 ### AFLDB-ISSUE-235 — `afl_api` player-link adjudication in `/admin/player-links`
 - **Severity:** Medium. **Area:** admin / player identity — `/admin/player-links`,
   `external_identities` (`afl_api`).
 - **State:** Open (2026-09-23), ISSUE-228 S10 successor. The bridge importer is the only `afl_api`
   link writer (deterministic `unique` links only); no human `resolved` path exists.
-- **Next action:** design the adjudication semantics and their precedence against importer links
-  before any UI work.
+- **S0 (2026-09-23):** `afldb_test` has 803 `afl_api` identities and DEV has 669, all `unique` and
+  one-to-one. The OD-1 gate passes. The ISSUE-228 "all `resolved`" wording is drift.
+- **Next action:** S6 COMPLETE (69/69) and **I18 COMPLETE** on `afldb_test` (2026-09-24).
+  - Destructive rebuild PASS: 199/200/201 reinstated under their original ids, bijection OK, 85/85.
+    `verify --phase post` PASS.
+  - Two post-I18 harness defects were fixed. The teardown `server-only` import is now served by the
+    neutral `tests/integration/afl-api-fixture-ownership.ts`. I14 no longer needs a pre-existing
+    `auth_users` row; it owns a disabled actor.
+  - Corrected teardown PASS; residue zero. I14 1/1 and I17 1/1 executed and passed.
+  - **S7 COMPLETE (2026-09-24).** The stale "OD-5 rebuild side not wired" paragraph in the
+    acquisition doc was replaced. Loader regression, option (b), validate-only on the rebuilt
+    `afldb_test` with the accepted post-D-8 TEST bridge: `would_link` 669; `already_linked`,
+    `already_linked_human`, contradiction, player collision and identity-check HALT all 0. No
+    writes. DB-free 520/520; typecheck clean.
+  - **Stages.** S0–S7 and I18 COMPLETE. **S8 NOT STARTED:** the operator-controlled DEV
+    rollout. **S9 NOT STARTED:** closure. R4 became ISSUE-237, which is not a dependency.
+  - **Next (S8 gate, operator).**
+    1. Review and commit the ISSUE-235 files.
+    2. Clear the unrelated root junk files.
+    3. Run `npm run merge:ready -- --issue 235`.
+    4. Push/merge, run `sync-dev.ps1`, then `db:privileges` on DEV.
+    5. Run the §11 read-only checks and the DEV bijection check.
+    6. Capture V1–V4.
+
+    CHANGELOG and closure belong to S9.
+- **Runbook:** `issues/open/AFLDB-ISSUE-235.md` (S0–S7 + I18 complete; S8/S9 not started).
 
 ### AFLDB-ISSUE-234 — Optional AFL API feed expansion (extended statistics, umpires, play-by-play)
 - **Severity:** Low. **Area:** data acquisition, investigation only.

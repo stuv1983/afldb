@@ -27,6 +27,13 @@
  * constrains `(source_id, external_id)` to at most one row, so this branch
  * should never occur under correct writes. Fail-closed, not silently
  * picking either row.
+ *
+ * AFLDB-ISSUE-235 (2026-09-23): `status = 'resolved'` may now also be a
+ * human admin adjudication (`match_method = 'afl_api_admin_adjudication'`,
+ * written through `/admin/player-links/afl-api`), not only the pre-existing
+ * reserved-but-unused meaning this comment already described. No logic
+ * here changes: both statuses remain trusted identically, exactly as
+ * written above, and `match_method` is still deliberately unfiltered.
  */
 import type postgres from 'postgres';
 

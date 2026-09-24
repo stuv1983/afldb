@@ -1025,6 +1025,65 @@ describe('afldb_import is confined to the statistical tables', () => {
     expect(unchanged).toEqual({ dataEditsSelect: false, decisionsInsert: false });
   });
 
+  // AFLDB-ISSUE-235 (I11-I13). afl_api_identity_adjudications (migration 104) is the human
+  // afl_api identity ledger: written as afldb_import, in the same transaction as the
+  // external_identities row it audits (the migration-066/AFLDB-ISSUE-027 pattern), exactly
+  // like canonical_applications above. SELECT + INSERT + sequence USAGE only, deliberately
+  // NOT registered import-writable (that reconcile loop would hand back UPDATE/DELETE/
+  // TRUNCATE and destroy the append-only property). afldb_auth reads the admin history view
+  // only; afldb_app has nothing at all.
+  it('appends the afl_api human identity ledger and can never rewrite it (AFLDB-ISSUE-235)', async () => {
+    const [ledger] = await sql<{
+      inserts: boolean; selects: boolean; updates: boolean; deletes: boolean;
+      truncates: boolean; registered: boolean;
+    }[]>`
+      SELECT has_table_privilege(${IMPORT_ROLE}, 'afl_api_identity_adjudications', 'INSERT')   AS inserts,
+             has_table_privilege(${IMPORT_ROLE}, 'afl_api_identity_adjudications', 'SELECT')   AS selects,
+             has_table_privilege(${IMPORT_ROLE}, 'afl_api_identity_adjudications', 'UPDATE')   AS updates,
+             has_table_privilege(${IMPORT_ROLE}, 'afl_api_identity_adjudications', 'DELETE')   AS deletes,
+             has_table_privilege(${IMPORT_ROLE}, 'afl_api_identity_adjudications', 'TRUNCATE') AS truncates,
+             EXISTS (SELECT 1 FROM afldb_meta.import_writable_tables
+                      WHERE name = 'afl_api_identity_adjudications') AS registered
+    `;
+    // I11.
+    expect(ledger).toEqual({
+      inserts: true, selects: true, updates: false, deletes: false,
+      truncates: false, registered: false,
+    });
+
+    const [sequence] = await sql<{ usage: boolean; selects: boolean; updates: boolean }[]>`
+      SELECT has_sequence_privilege(${IMPORT_ROLE}, 'public.afl_api_identity_adjudications_id_seq', 'USAGE')  AS usage,
+             has_sequence_privilege(${IMPORT_ROLE}, 'public.afl_api_identity_adjudications_id_seq', 'SELECT') AS selects,
+             has_sequence_privilege(${IMPORT_ROLE}, 'public.afl_api_identity_adjudications_id_seq', 'UPDATE') AS updates
+    `;
+    expect(sequence).toEqual({ usage: true, selects: false, updates: false });
+
+    // I12, I13: the admin surface reads the ledger and writes nothing; the public app
+    // cannot see it at all -- it is not a public read surface and is not registered
+    // app-readable.
+    const [others] = await sql<{
+      authSelect: boolean; authWrites: boolean; appAny: boolean; appRegistered: boolean;
+    }[]>`
+      SELECT has_table_privilege(${AUTH_ROLE}, 'afl_api_identity_adjudications', 'SELECT') AS "authSelect",
+             (has_any_column_privilege(${AUTH_ROLE}, 'afl_api_identity_adjudications', 'INSERT')
+              OR has_any_column_privilege(${AUTH_ROLE}, 'afl_api_identity_adjudications', 'UPDATE')
+              OR has_table_privilege(${AUTH_ROLE}, 'afl_api_identity_adjudications', 'DELETE')
+              OR has_table_privilege(${AUTH_ROLE}, 'afl_api_identity_adjudications', 'TRUNCATE')) AS "authWrites",
+             (has_any_column_privilege(${APP_ROLE}, 'afl_api_identity_adjudications', 'SELECT')
+              OR has_any_column_privilege(${APP_ROLE}, 'afl_api_identity_adjudications', 'INSERT')
+              OR has_any_column_privilege(${APP_ROLE}, 'afl_api_identity_adjudications', 'UPDATE')
+              OR has_table_privilege(${APP_ROLE}, 'afl_api_identity_adjudications', 'DELETE')) AS "appAny",
+             EXISTS (SELECT 1 FROM afldb_meta.app_readable_tables
+                      WHERE name = 'afl_api_identity_adjudications') AS "appRegistered"
+    `;
+    // I12.
+    expect(others.authSelect).toBe(true);
+    expect(others.authWrites).toBe(false);
+    // I13.
+    expect(others.appAny).toBe(false);
+    expect(others.appRegistered).toBe(false);
+  });
+
   it('holds only the Data Editor upsert capability on human overrides (AFLDB-ISSUE-109)', async () => {
     const [table] = await sql<{
       selects: boolean; inserts: boolean; updates: boolean;

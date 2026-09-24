@@ -339,6 +339,12 @@ export default async function PlayerLinksPage(
           footballers with no VFL/AFL record. Link the ones you can verify; confirm the rest
           so they stop appearing here.
         </p>
+        <p className="subtitle">
+          {/* AFLDB-ISSUE-235: a separate surface for afl_api provider identity, with its
+              own vocabulary (no confirmed-unlinked, bulk or suggestion path, D9/D12) — a
+              link here, not a merge into LINK_TARGET_TABLES/this queue. */}
+          <Link href="/admin/player-links/afl-api">AFL API providers →</Link>
+        </p>
       </div>
 
       {/* Search box for player name / context */}

@@ -157,6 +157,19 @@ export type LineageRef = {
   targets: readonly LineageTarget[];
   /** Printed beside a refusal: what an operator does when a value cannot be remapped. */
   remediation: string;
+  /**
+   * AFLDB-ISSUE-235 (OD-3, plan-review R8). The name of a column on the SAME row that
+   * already stores the identity string an earlier writer read for this reference — for
+   * `afl_api_identity_adjudications.player_id`, the `player_identity` value the admin
+   * action captured, using the same `afltables_profile_url` rule this ref targets. When
+   * set, the remap does not merely trust the freshly re-derived `old id -> identity ->
+   * new id` chain: it also asserts the re-derived identity equals the row's own stored
+   * value. A mismatch is refused exactly like an unresolved id, never silently accepted —
+   * a resolvable-but-DIFFERENT identity would remap the reference to the wrong meaning
+   * just as surely as an unresolved one. This adds no new `LineageIdentityRule`: the
+   * comparison reuses whichever rule the ref already declares.
+   */
+  storedIdentityColumn?: string;
 };
 
 /**
@@ -642,6 +655,57 @@ export const PROMOTION_CONTRACT: readonly TableTreatment[] = [
     footballRefs: [{ column: 'player_id', references: 'players', nullable: false }],
     note: 'Regenerated wholesale by the admin refresh action from rebuilt players plus '
       + 'reinstated resolutions. Never reinstated: player_id is NOT NULL against players.',
+  },
+  // --- afl_api human identity adjudication (migration 104, AFLDB-ISSUE-235) -----------
+  {
+    schema: 'public', name: 'afl_api_identity_adjudications', subsystem: 'player links', category: 'operations',
+    productionOnly: true, treatment: 'reinstate', compare: 'equal', order: 20,
+    restoreAfter: ['auth_users'],
+    footballRefs: [{
+      column: 'player_id', references: 'players', nullable: false,
+      remediation: 'player_id is NOT NULL and players is import-writable/rebuilt, so a plain '
+        + 'restore refuses the moment the dumped integer is not a candidate player id. Exactly '
+        + 'the player_link_resolutions/brownlow_vote_entry_state shape (AFLDB-ISSUE-151): the '
+        + 'whole table restores into promotion_staging.afl_api_identity_adjudications (no FK '
+        + 'there), player_id is remapped old id -> afltables_profile_url -> candidate id (plus '
+        + "the stored-identity assertion below) at the plan's remap step, and only then is the "
+        + 'row promoted into public under the FK, id preserved.',
+    }],
+    lineageRefs: [{
+      column: 'player_id',
+      targets: [{ entity: 'players', identity: 'afltables_profile_url' }],
+      // AFLDB-ISSUE-235 OD-3, plan-review R8. This is the SAME lineage ref
+      // player_link_resolutions already uses — it already covers a manual_admin_edit
+      // token, so no new identity kind is introduced. storedIdentityColumn adds the
+      // extra fail-closed check D15 requires: the row's own player_identity (captured at
+      // adjudication time) must still agree with the freshly re-derived identity, or the
+      // remap refuses this row rather than trusting the chain alone.
+      storedIdentityColumn: 'player_identity',
+      remediation: 'Resolve player_id through the afltables_profile_url / manual_admin_edit '
+        + 'identity and apply the generated per-row UPDATEs after the reinstate. Unlike '
+        + 'player_link_resolutions there is no nullable fallback: player_id is NOT NULL here '
+        + '(a linked/revoked decision always names a person), so an unresolved or '
+        + 'stored-identity-mismatched row stops the promotion rather than reinstating a value '
+        + 'that may now denote someone else. AFLDB-ISSUE-235 D15 requires the same replay '
+        + '(tools/migration/replay_afl_api_adjudications.py or the common.py sibling) to '
+        + 're-create the matching resolved external_identities row from this ledger '
+        + "immediately after replay_admin_overrides('players'); it is never reinstated as a "
+        + 'bare table copy alone.',
+    }],
+    // AFLDB-ISSUE-235 OD-3 (approved 2026-09-23): NO historicalOnly entry, in ANY
+    // environment, including dev. Unlike player_link_resolutions (AFLDB-ISSUE-139 D1),
+    // every row here IS evidenced: player_identity is captured at write time from a
+    // stable afltables_profile_url/manual_admin_edit identity (D6-3 requires one to
+    // exist before a link can be written at all), so there is no six-of-seven-unkeyed
+    // problem to fall back on historical-only for. A row that still cannot remap
+    // (unresolvable identity, or a stored-identity mismatch) stops the promotion instead
+    // — this table is durable identity authority (D15) and dropping it silently would
+    // drop a human decision the ingestion pipeline goes on trusting forever.
+    note: 'Append-only human afl_api identity decisions (linked/revoked), AFLDB-ISSUE-235. '
+      + 'Durable identity authority (D15): reinstated together with, and replayed into, the '
+      + "resolved external_identities row it describes. player_id is this replaced database's "
+      + 'id — AFLDB-ISSUE-142 (B) — remapped through the same afltables_profile_url lineage '
+      + 'ref as player_link_resolutions, plus the D15 stored-identity assertion.',
   },
   // --- NL search telemetry and review (migrations 046–051, 055, 079, 081) -------------
   {
@@ -2034,6 +2098,12 @@ export type LineageColumnPlan = {
   /** The rows read from the replaced database, one per (row id, current value). */
   rows: { rowId: number; oldValue: number }[];
   remap: LineageRemap;
+  /**
+   * AFLDB-ISSUE-235 (OD-3, R8). Present only when `ref.storedIdentityColumn` is set: the
+   * row's own stored identity value, by row id, read from the SAME replaced-database pass
+   * that read `rows`. Absent for every other table's plan.
+   */
+  storedIdentities?: ReadonlyMap<number, string>;
 };
 
 export type LineageRemapInput = {
@@ -2106,6 +2176,19 @@ export function lineageRemapSql(input: LineageRemapInput): string {
     for (const row of plan.rows) {
       const m = byOld.get(row.oldValue);
       if (!m) continue;
+      // AFLDB-ISSUE-235 (OD-3, R8). The re-derived identity must equal what this row's own
+      // writer already stored, BEFORE the unchanged-id shortcut below: a same-id mapping
+      // proves nothing about whether the stored value still agrees, and a resolvable-but-
+      // different identity would remap the reference to the wrong meaning as surely as an
+      // unresolved one. Refused, not silently accepted.
+      const stored = plan.storedIdentities?.get(row.rowId);
+      if (stored !== undefined && stored !== m.identity) {
+        unresolvedTotal += 1;
+        lines.push(`-- STORED IDENTITY MISMATCH ${plan.table}.${plan.column} row ${row.rowId}: `
+          + `id ${m.oldId} re-derives as ${m.identity}, but the row's own stored identity is `
+          + `${stored} — refusing to remap this row (AFLDB-ISSUE-235 OD-3)`);
+        continue;
+      }
       if (m.newId === m.oldId) continue;
       const guard = plan.kindColumn
         ? ` AND ${quoteIdent(plan.kindColumn)} = ${quoteSqlLiteral(plan.kind ?? '')}`

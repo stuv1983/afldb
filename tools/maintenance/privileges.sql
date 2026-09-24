@@ -350,6 +350,19 @@ BEGIN
     GRANT SELECT ON player_link_suggestions TO afldb_import;
   END IF;
 
+  -- Migration 104 (AFLDB-ISSUE-235): the afl_api human identity
+  -- adjudication ledger. A link/revoke writes its required audit row in
+  -- the same afldb_import transaction as the external_identities write
+  -- it describes (the migration-066/AFLDB-ISSUE-027 pattern). SELECT,
+  -- INSERT and sequence USAGE only -- append-only from afldb_import's
+  -- side, and deliberately NOT registered in import_writable_tables,
+  -- whose loop above would grant full DML and destroy the append-only
+  -- property. The revoke loop strips these each run; re-grant them here.
+  IF to_regclass('public.afl_api_identity_adjudications') IS NOT NULL THEN
+    GRANT SELECT, INSERT ON afl_api_identity_adjudications TO afldb_import;
+    GRANT USAGE ON SEQUENCE afl_api_identity_adjudications_id_seq TO afldb_import;
+  END IF;
+
   -- Migration 094 (AFLDB-ISSUE-155 Phase C1): the Brownlow administration
   -- workflow. These two tables record administrative decisions -- who
   -- drafted, who finalised, who published a season and from which
@@ -474,6 +487,11 @@ DECLARE
     -- Read-only: the machine mutation ledger is written by afldb_import
     -- alone; the admin surface may only read it (see migration 083).
     ['canonical_applications', 'SELECT'],                            -- 083
+    -- Read-only: the afl_api human adjudication ledger is written by
+    -- afldb_import alone, in the same transaction as the
+    -- external_identities row it audits (see migration 104,
+    -- AFLDB-ISSUE-235 D8). The admin history view may only read it.
+    ['afl_api_identity_adjudications', 'SELECT'],                    -- 104
     -- Read-only: validation resolves submitted names against these.
     ['players',                'SELECT'],                           -- 023
     ['player_clubs',           'SELECT'],                           -- 023

@@ -483,16 +483,19 @@ with tempfile.TemporaryDirectory() as tmp:
 
 
 class _FakeManualAdjudicationCursor:
-    """DB-free cursor covering the three SELECTs the manual-adjudication path
-    issues (players existence, afltables profile resolution, classify_existing)
-    plus the two INSERTs (external_identities, data_issues). Every branch is
-    driven by constructor flags, never a live connection."""
+    """DB-free cursor covering the four SELECTs the manual-adjudication path
+    issues (players existence, afltables profile resolution, classify_existing,
+    the AFLDB-ISSUE-235 player-collision backstop) plus the two INSERTs
+    (external_identities, data_issues). Every branch is driven by constructor
+    flags, never a live connection."""
 
     def __init__(self, players_exists: bool = True, profile_owner: int | None = None,
-                 existing_link: tuple[int, int] | None = None) -> None:
+                 existing_link: tuple[int, int, str, str] | None = None,
+                 player_collision: tuple[int, str, str, str] | None = None) -> None:
         self.players_exists = players_exists
         self.profile_owner = profile_owner
         self.existing_link = existing_link
+        self.player_collision = player_collision
         self.inserted: list[tuple] = []
         self.data_issues: list[tuple] = []
         self._pending: str | None = None
@@ -503,8 +506,10 @@ class _FakeManualAdjudicationCursor:
             self._pending = "players"
         elif s.startswith("SELECT ei.player_id FROM external_identities"):
             self._pending = "profile"
-        elif s.startswith("SELECT id, player_id FROM external_identities"):
+        elif s.startswith("SELECT id, player_id, status, match_method FROM external_identities"):
             self._pending = "existing"
+        elif s.startswith("SELECT id, external_id, status, match_method FROM external_identities"):
+            self._pending = "collision"
         elif s.startswith("INSERT INTO external_identities"):
             self._pending = None
             self.inserted.append(params)
@@ -521,6 +526,8 @@ class _FakeManualAdjudicationCursor:
             return (self.profile_owner,) if self.profile_owner is not None else None
         if self._pending == "existing":
             return self.existing_link
+        if self._pending == "collision":
+            return self.player_collision
         return None
 
 
@@ -566,7 +573,10 @@ except loader.ImportRefused:
 check("no row inserted when the declared afltables profile disagrees", cur_bad_profile.inserted == [])
 
 # Conflicting provider -> player mapping: still refused/withheld, never overwritten.
-cur_conflict = _FakeManualAdjudicationCursor(players_exists=True, profile_owner=12205, existing_link=(999, 55555))
+cur_conflict = _FakeManualAdjudicationCursor(
+    players_exists=True, profile_owner=12205,
+    existing_link=(999, 55555, "unique", "afl_api_stat_vector_bootstrap"),
+)
 loader.apply_rows(cur_conflict, source_id=1, to_link=manual_to_link, rep=loader.Reporter(verbose=False),
                    batch=None, match_method=loader.MANUAL_ADJUDICATION_MATCH_METHOD)
 check("conflicting provider->player mapping is never overwritten by manual adjudication", cur_conflict.inserted == [])
@@ -574,7 +584,10 @@ check("conflicting mapping opens exactly one data_issues row instead", len(cur_c
 
 # Idempotent replay: an identical mapping already linked to the SAME player
 # is a no-op -- no re-insert, no data_issues row, no exception.
-cur_replay = _FakeManualAdjudicationCursor(players_exists=True, profile_owner=12205, existing_link=(42, 12205))
+cur_replay = _FakeManualAdjudicationCursor(
+    players_exists=True, profile_owner=12205,
+    existing_link=(42, 12205, "unique", "afl_api_manual_adjudication"),
+)
 replay_stats = loader.apply_rows(cur_replay, source_id=1, to_link=manual_to_link, rep=loader.Reporter(verbose=False),
                                   batch=None, match_method=loader.MANUAL_ADJUDICATION_MATCH_METHOD)
 check(
@@ -809,6 +822,140 @@ try:
 except loader.ImportRefused as exc:
     check("missing-artefact refusal names only the path, no secret",
           "does-not-exist-anywhere.json" in str(exc))
+
+
+# ---------------------------------------------------------------------------
+# AFLDB-ISSUE-235 (P1-P5): the loader alongside a human admin adjudication.
+# The two writers never race for the same row (UNIQUE (source_id, external_id)
+# admits at most one), so these check the loader's OWN read-then-classify
+# behaviour against a row a human wrote, plus the new D6-4 player-collision
+# backstop. Still DB-free: a fake cursor, no real connection.
+# ---------------------------------------------------------------------------
+
+section("AFLDB-ISSUE-235: loader alongside a human afl_api adjudication (P1-P5)")
+
+
+class _FakeClassifyCursor:
+    """DB-free cursor for classify_existing() / find_player_collision() plus the
+    two INSERTs. No players/profile queries: match_method is never
+    MANUAL_ADJUDICATION_MATCH_METHOD in these cases."""
+
+    def __init__(self, existing_link: tuple[int, int, str, str] | None = None,
+                 player_collision: tuple[int, str, str, str] | None = None) -> None:
+        self.existing_link = existing_link
+        self.player_collision = player_collision
+        self.inserted: list[tuple] = []
+        self.data_issues: list[tuple] = []
+        self._pending: str | None = None
+
+    def execute(self, sql: str, params: tuple | None = None) -> None:
+        s = sql.strip()
+        if s.startswith("SELECT id, player_id, status, match_method FROM external_identities"):
+            self._pending = "existing"
+        elif s.startswith("SELECT id, external_id, status, match_method FROM external_identities"):
+            self._pending = "collision"
+        elif s.startswith("INSERT INTO external_identities"):
+            self._pending = None
+            self.inserted.append(params)
+        elif s.startswith("INSERT INTO data_issues"):
+            self._pending = None
+            self.data_issues.append(params)
+        else:
+            raise AssertionError(f"unexpected query: {sql!r}")
+
+    def fetchone(self):
+        if self._pending == "existing":
+            return self.existing_link
+        if self._pending == "collision":
+            return self.player_collision
+        return None
+
+
+import json as _json  # matches the file convention: json is imported locally, never at module scope
+
+# P1: an existing 'resolved' row for the SAME player -> already_linked (human),
+# with no INSERT, UPDATE or DELETE issued.
+p1_to_link = {"CD_I700001": {
+    "candidate_player_id": 500, "observed_name": "P1 Player", "evidence_summary": "fixture",
+}}
+cur_p1 = _FakeClassifyCursor(existing_link=(77, 500, "resolved", "afl_api_admin_adjudication"))
+p1_stats = loader.apply_rows(cur_p1, source_id=1, to_link=p1_to_link, rep=loader.Reporter(verbose=False),
+                              batch=None, match_method=loader.MATCH_METHOD)
+check(
+    "P1: human resolved row for the same player is already_linked (human), no write issued",
+    cur_p1.inserted == [] and cur_p1.data_issues == []
+    and p1_stats.already_linked_human == 1 and p1_stats.already_linked == 0,
+)
+
+# P2: an existing row for a DIFFERENT player gives a contradiction data_issues row
+# whose details include existing_status/existing_match_method, and the existing
+# row is untouched (no INSERT/UPDATE/DELETE against external_identities).
+p2_to_link = {"CD_I700002": {
+    "candidate_player_id": 500, "observed_name": "P2 Player", "evidence_summary": "fixture",
+}}
+cur_p2 = _FakeClassifyCursor(existing_link=(88, 999, "unique", "afl_api_stat_vector_bootstrap"))
+p2_stats = loader.apply_rows(cur_p2, source_id=1, to_link=p2_to_link, rep=loader.Reporter(verbose=False),
+                              batch=None, match_method=loader.MATCH_METHOD)
+p2_details = _json.loads(cur_p2.data_issues[0][3]) if cur_p2.data_issues else {}
+check(
+    "P2: contradiction against a different player opens exactly one data_issues row, no external_identities write",
+    cur_p2.inserted == [] and len(cur_p2.data_issues) == 1 and p2_stats.contradictions == ["CD_I700002"],
+)
+check(
+    "P2: the contradiction details carry existing_status and existing_match_method",
+    p2_details.get("existing_status") == "unique"
+    and p2_details.get("existing_match_method") == "afl_api_stat_vector_bootstrap",
+)
+
+# P3: the candidate player is held by ANOTHER provider -> player_collision:
+# withheld, a data_issues row with details.kind = 'player_already_linked', and
+# no INSERT into external_identities.
+p3_to_link = {"CD_I700003": {
+    "candidate_player_id": 500, "observed_name": "P3 Player", "evidence_summary": "fixture",
+}}
+cur_p3 = _FakeClassifyCursor(
+    existing_link=None,  # CD_I700003 itself is free
+    player_collision=(55, "CD_I600000", "unique", "afl_api_stat_vector_bootstrap"),
+)
+p3_stats = loader.apply_rows(cur_p3, source_id=1, to_link=p3_to_link, rep=loader.Reporter(verbose=False),
+                              batch=None, match_method=loader.MATCH_METHOD)
+p3_details = _json.loads(cur_p3.data_issues[0][3]) if cur_p3.data_issues else {}
+check(
+    "P3: a player already linked to another provider withholds the new provider, no external_identities write",
+    cur_p3.inserted == [] and len(cur_p3.data_issues) == 1 and p3_stats.player_collisions == ["CD_I700003"],
+)
+check(
+    "P3: the player_collision details carry kind=player_already_linked and the existing provider id",
+    p3_details.get("kind") == "player_already_linked"
+    and p3_details.get("existing_external_id") == "CD_I600000",
+)
+
+# P4: static scan. The loader source contains no UPDATE or DELETE against
+# external_identities -- the no-UPDATE/no-DELETE contract binds regardless of
+# which writer (importer or AFLDB-ISSUE-235 human) owns the existing row.
+_loader_source = Path(loader.__file__).read_text(encoding="utf-8")
+check(
+    "P4: the loader source issues no UPDATE external_identities",
+    "UPDATE external_identities" not in _loader_source,
+)
+check(
+    "P4: the loader source issues no DELETE FROM external_identities",
+    "DELETE FROM external_identities" not in _loader_source,
+)
+
+# P5: --validate-only counts would_HALT_player_collision. run_validate_only()
+# itself opens a real connection (open_read_only()), so this is a DB-free
+# bytecode-level proxy: the counts dict literal carries the key, and the
+# function genuinely calls find_player_collision() rather than only
+# classify_existing().
+check(
+    "P5: run_validate_only() counts would_HALT_player_collision",
+    "would_HALT_player_collision" in loader.run_validate_only.__code__.co_consts,
+)
+check(
+    "P5: run_validate_only() calls find_player_collision()",
+    "find_player_collision" in loader.run_validate_only.__code__.co_names,
+)
 
 
 # ---------------------------------------------------------------------------

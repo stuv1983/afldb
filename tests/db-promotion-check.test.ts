@@ -86,6 +86,14 @@ import {
   type Snapshot,
 } from '../tools/db/promotion-inventory';
 import { DEFAULT_DSN_ENV, READ_ONLY_SQL, parseArgs, writePlan } from '../tools/db/promotion-check';
+import {
+  AFL_API_ADMIN_MATCH_METHOD,
+  checkAflApiAdjudicationBijection,
+  planAflApiAdjudicationReplay,
+  type AflApiAdjudicationLedgerRow,
+  type AflApiCandidateIdentityRow,
+  type AflApiPlayerRemapResult,
+} from '../src/lib/acquisition/afl-api-adjudication';
 
 const REPO = process.cwd();
 const MIGRATIONS = join(REPO, 'src', 'db', 'migrations');
@@ -351,6 +359,7 @@ describe('the production-only state contract', () => {
     // 094 brownlow_vote_entry_state.{match_id,three_player_id,two_player_id,one_player_id}.
     const refs = PROMOTION_CONTRACT.flatMap((t) => (t.footballRefs ?? []).map((r) => `${t.name}.${r.column}->${r.references}`)).sort();
     expect(refs).toEqual([
+      'afl_api_identity_adjudications.player_id->players',
       'brownlow_vote_entry_state.match_id->matches',
       'brownlow_vote_entry_state.one_player_id->players',
       'brownlow_vote_entry_state.three_player_id->players',
@@ -1047,7 +1056,10 @@ describe('lineage-safe reinstatement', () => {
     // carry four references into rebuilt data — three nullable player slots and match_id, which
     // is also the table's primary key — and a rebuild reassigns every one of those ids.
     expect(lineageBoundTables().map((t) => t.name).sort())
-      .toEqual(['brownlow_vote_entry_state', 'data_edits', 'external_grid_sources', 'player_link_resolutions']);
+      .toEqual([
+        'afl_api_identity_adjudications', 'brownlow_vote_entry_state', 'data_edits',
+        'external_grid_sources', 'player_link_resolutions',
+      ]);
 
     const resolutions = lineageTargetsOf(contractByName('player_link_resolutions')!);
     expect(resolutions.find((x) => x.ref.column === 'player_id')!.target)
@@ -1692,6 +1704,215 @@ describe('lineage-safe reinstatement', () => {
 });
 
 /**
+ * AFLDB-ISSUE-235 (OD-3, R8). `afl_api_identity_adjudications` is durable identity
+ * authority: unlike `player_link_resolutions`, it is reinstated in EVERY environment (no
+ * DEV historical-only carve-out), because every row's `player_identity` is captured at
+ * write time from a stable identity — there is no six-of-seven-unkeyed problem to fall
+ * back on. C1/C2/C3/C2b, §10.1.
+ */
+describe('AFLDB-ISSUE-235: afl_api_identity_adjudications', () => {
+  const PROFILE = 'afltables_profile_url';
+  const table = contractByName('afl_api_identity_adjudications');
+
+  it('C1 — is classified, so the contract-coverage check names no unclassified table for it', () => {
+    expect(table).toBeDefined();
+    expect(publicContractTables().map((t) => t.name)).toContain('afl_api_identity_adjudications');
+    expect(migrationPublicTables().has('afl_api_identity_adjudications')).toBe(true);
+  });
+
+  it('C2 — declares its lineage ref on player_id, through the existing afltables_profile_url rule', () => {
+    const refs = lineageTargetsOf(table!);
+    expect(refs).toHaveLength(1);
+    expect(refs[0].ref.column).toBe('player_id');
+    expect(refs[0].target).toMatchObject({ entity: 'players', identity: PROFILE });
+    expect(refs[0].ref.remediation.length).toBeGreaterThan(80);
+  });
+
+  it('C2b (R8) — reuses the existing identity rule (no new LineageIdentityRule) and carries the stored-identity assertion hook', () => {
+    // "No new identity kind": the ref's rule is exactly the one player_link_resolutions
+    // already uses, and LINEAGE_IDENTITY_SQL gains no new key for this table.
+    const refs = lineageTargetsOf(table!);
+    expect(refs[0].target.identity).toBe(PROFILE);
+    expect(Object.keys(LINEAGE_IDENTITY_SQL)).not.toContain('afl_api_identity');
+    expect(table!.lineageRefs![0].storedIdentityColumn).toBe('player_identity');
+
+    // The post-remap assertion: a row whose freshly re-derived identity agrees with its
+    // own stored player_identity remaps normally...
+    const agreeing = resolveLineageRemap({
+      entity: 'players', rule: PROFILE, referencedIds: [151],
+      replacedIdentities: [{ id: 151, identity: 'players/B/Craig_Bradley.html' }],
+      candidateIdentities: [{ id: 907, identity: 'players/B/Craig_Bradley.html' }],
+    });
+    const agreeingSql = lineageRemapSql({
+      candidate: 'afldb_prod_candidate_x', oldDatabase: 'afldb_prod', environment: 'prod',
+      plans: [{
+        table: 'afl_api_identity_adjudications', column: 'player_id', entity: 'players', rule: PROFILE,
+        remediation: table!.lineageRefs![0].remediation,
+        rows: [{ rowId: 5, oldValue: 151 }],
+        remap: agreeing,
+        storedIdentities: new Map([[5, 'players/B/Craig_Bradley.html']]),
+      }],
+    });
+    // Staged (AFLDB-ISSUE-151), same as brownlow_vote_entry_state: player_id is a NOT NULL
+    // reference into players (rebuilt), so the table restores into promotion_staging first.
+    expect(agreeingSql).toContain('UPDATE "promotion_staging"."afl_api_identity_adjudications" SET "player_id" = 907'
+      + ' WHERE "id" = 5 AND "player_id" = 151;');
+    expect(agreeingSql).not.toContain('STORED IDENTITY MISMATCH');
+
+    // ...but a row whose re-derived identity DISAGREES with its own stored value is refused
+    // outright, never silently remapped and never silently dropped — a resolvable-but-wrong
+    // identity is exactly as dangerous as an unresolved one (D15).
+    const mismatched = resolveLineageRemap({
+      entity: 'players', rule: PROFILE, referencedIds: [151],
+      replacedIdentities: [{ id: 151, identity: 'players/B/Craig_Bradley.html' }],
+      candidateIdentities: [{ id: 907, identity: 'players/B/Craig_Bradley.html' }],
+    });
+    const mismatchedSql = lineageRemapSql({
+      candidate: 'afldb_prod_candidate_x', oldDatabase: 'afldb_prod', environment: 'prod',
+      plans: [{
+        table: 'afl_api_identity_adjudications', column: 'player_id', entity: 'players', rule: PROFILE,
+        remediation: table!.lineageRefs![0].remediation,
+        rows: [{ rowId: 5, oldValue: 151 }],
+        remap: mismatched,
+        // A different stored identity than what the lineage rule re-derives for id 151 —
+        // e.g. the player's afltables identity changed between the adjudication and the
+        // promotion. The row must never remap on the strength of the id chain alone.
+        storedIdentities: new Map([[5, 'players/O/Someone_Else.html']]),
+      }],
+    });
+    expect(mismatchedSql).not.toMatch(/UPDATE\s+"[a-z_]+"\."afl_api_identity_adjudications"/);
+    expect(mismatchedSql).toContain(
+      '-- STORED IDENTITY MISMATCH afl_api_identity_adjudications.player_id row 5: '
+      + 'id 151 re-derives as players/B/Craig_Bradley.html, but the row\'s own stored identity is '
+      + 'players/O/Someone_Else.html — refusing to remap this row (AFLDB-ISSUE-235 OD-3)',
+    );
+    expect(mismatchedSql).not.toContain('Every referenced id was evidenced');
+  });
+
+  it('C3 (OD-3) — is reinstated in every environment; no historicalOnly disposition, unlike player_link_resolutions', () => {
+    expect(table!.historicalOnly).toBeUndefined();
+    for (const environment of ENVIRONMENTS) {
+      expect(historicalOnlyFor(table!, environment), environment).toBeUndefined();
+    }
+    expect(table!.treatment).toBe('reinstate');
+    expect(table!.productionOnly).toBe(true);
+  });
+
+  it('C4 (OD-3, R3) — the replay planner covers every row of the D15 decision table; every disagreement is a STOP, never a skip or an overwrite', () => {
+    const IDENTITY = 'players/A/Alpha_Able.html';
+    const linked = (id: number, externalId: string, playerIdentity = IDENTITY): AflApiAdjudicationLedgerRow => ({
+      id, externalId, action: 'linked', playerId: 1, playerIdentity, supersedesId: null,
+    });
+    const human = (externalId: string, playerId: number): AflApiCandidateIdentityRow => ({
+      externalId, status: 'resolved', matchMethod: AFL_API_ADMIN_MATCH_METHOD, playerId,
+    });
+    const importer = (externalId: string, playerId: number): AflApiCandidateIdentityRow => ({
+      externalId, status: 'unique', matchMethod: 'afl_api_stat_vector_season', playerId,
+    });
+    const remapTo = (newPlayerId: number, remappedIdentity = IDENTITY): AflApiPlayerRemapResult => (
+      { ok: true, newPlayerId, remappedIdentity });
+    const plan = (input: {
+      ledgerRows: AflApiAdjudicationLedgerRow[];
+      remap: Array<[string, AflApiPlayerRemapResult]>;
+      candidates?: AflApiCandidateIdentityRow[];
+    }) => planAflApiAdjudicationReplay({
+      ledgerRows: input.ledgerRows,
+      remapByExternalId: new Map(input.remap),
+      candidateByExternalId: new Map((input.candidates ?? []).map((c) => [c.externalId, c])),
+      candidatePlayerAflApiRow: new Map((input.candidates ?? [])
+        .filter((c) => c.playerId !== null).map((c) => [c.playerId!, c])),
+    });
+
+    // A net-linked entry: one INSERT, under the REMAPPED player.
+    expect(plan({ ledgerRows: [linked(1, 'CD_I1')], remap: [['CD_I1', remapTo(907)]] }))
+      .toEqual({ inserts: [{ externalId: 'CD_I1', playerId: 907 }], noops: [], stops: [] });
+    // A revoked entry (net state is the latest row): nothing, not even a remap is needed.
+    expect(plan({
+      ledgerRows: [linked(1, 'CD_I1'), { ...linked(2, 'CD_I1'), action: 'revoked', supersedesId: 1 }],
+      remap: [],
+    })).toEqual({ inserts: [], noops: [], stops: [] });
+    // linked -> revoked -> linked is net-linked again.
+    expect(plan({
+      ledgerRows: [linked(1, 'CD_I1'), { ...linked(2, 'CD_I1'), action: 'revoked', supersedesId: 1 }, linked(3, 'CD_I1')],
+      remap: [['CD_I1', remapTo(907)]],
+    }).inserts).toEqual([{ externalId: 'CD_I1', playerId: 907 }]);
+    // The identical human row already present: an idempotent no-op.
+    expect(plan({ ledgerRows: [linked(1, 'CD_I1')], remap: [['CD_I1', remapTo(907)]], candidates: [human('CD_I1', 907)] }))
+      .toEqual({ inserts: [], noops: [{ externalId: 'CD_I1' }], stops: [] });
+
+    const stopsOf = (input: Parameters<typeof plan>[0]) => {
+      const result = plan(input);
+      expect(result.inserts).toEqual([]);
+      expect(result.noops).toEqual([]);
+      return result.stops;
+    };
+    // An importer row for the CD_I naming another player, or the SAME player (not the identical
+    // human row), or a human row for another player: each a STOP.
+    for (const candidate of [importer('CD_I1', 555), importer('CD_I1', 907), human('CD_I1', 555)]) {
+      expect(stopsOf({ ledgerRows: [linked(1, 'CD_I1')], remap: [['CD_I1', remapTo(907)]], candidates: [candidate] }))
+        .toEqual([{ externalId: 'CD_I1', reason: 'a conflicting external_identities row already exists for this provider id' }]);
+    }
+    // The remapped player already holds another afl_api row (OD-1).
+    expect(stopsOf({ ledgerRows: [linked(1, 'CD_I1')], remap: [['CD_I1', remapTo(907)]], candidates: [importer('CD_I2', 907)] }))
+      .toEqual([{ externalId: 'CD_I1', reason: 'player 907 already holds a different afl_api provider (CD_I2)' }]);
+    // An unresolvable or ambiguous identity (and a row with no remap at all).
+    expect(stopsOf({ ledgerRows: [linked(1, 'CD_I1')], remap: [['CD_I1', { ok: false, reason: 'unresolvable' }]] }))
+      .toEqual([{ externalId: 'CD_I1', reason: 'the ledger row\'s player_identity does not resolve to any candidate player' }]);
+    expect(stopsOf({ ledgerRows: [linked(1, 'CD_I1')], remap: [['CD_I1', { ok: false, reason: 'ambiguous' }]] }))
+      .toEqual([{ externalId: 'CD_I1', reason: 'the ledger row\'s player_identity resolves to more than one candidate player' }]);
+    expect(stopsOf({ ledgerRows: [linked(1, 'CD_I1')], remap: [] }))
+      .toEqual([{ externalId: 'CD_I1', reason: 'the ledger row\'s player_identity does not resolve to any candidate player' }]);
+    // A remap whose identity differs from the stored player_identity. UNREACHABLE through the
+    // live adapter -- resolveAflApiPlayerIdentity() looks the player up BY the stored identity
+    // and returns that same string -- so it is pinned here, DB-free, and never made reachable
+    // by weakening the planner (settle-afl-api.test.ts I15 records why it has no live case).
+    expect(stopsOf({ ledgerRows: [linked(1, 'CD_I1')], remap: [['CD_I1', remapTo(907, 'players/O/Someone_Else.html')]] }))
+      .toEqual([{ externalId: 'CD_I1', reason: 'the remapped player\'s identity does not equal the ledger row\'s stored player_identity' }]);
+
+    // A stop is reported per provider and never hides another decision: the adapter throws on
+    // ANY stop, so nothing in `inserts` is ever written alongside one (asserted live by I15).
+    const mixed = plan({
+      ledgerRows: [linked(1, 'CD_I1'), linked(2, 'CD_I2')],
+      remap: [['CD_I1', remapTo(907)], ['CD_I2', { ok: false, reason: 'unresolvable' }]],
+    });
+    expect(mixed.inserts).toEqual([{ externalId: 'CD_I1', playerId: 907 }]);
+    expect(mixed.stops.map((s) => s.externalId)).toEqual(['CD_I2']);
+  });
+
+  it('C5 (OD-3) — the bijection checker reports both directions, and only human resolved rows count', () => {
+    const ledgerRows: AflApiAdjudicationLedgerRow[] = [
+      { id: 1, externalId: 'CD_I1', action: 'linked', playerId: 1, playerIdentity: 'a', supersedesId: null },
+      { id: 2, externalId: 'CD_I2', action: 'linked', playerId: 2, playerIdentity: 'b', supersedesId: null },
+      { id: 3, externalId: 'CD_I2', action: 'revoked', playerId: 2, playerIdentity: 'b', supersedesId: 2 },
+      { id: 4, externalId: 'CD_I3', action: 'linked', playerId: 3, playerIdentity: 'c', supersedesId: null },
+    ];
+    const row = (externalId: string, status = 'resolved', matchMethod: string | null = AFL_API_ADMIN_MATCH_METHOD) =>
+      ({ externalId, status, matchMethod });
+    expect(checkAflApiAdjudicationBijection({ ledgerRows, resolvedRows: [row('CD_I1'), row('CD_I3')] })).toEqual([]);
+    expect(checkAflApiAdjudicationBijection({ ledgerRows, resolvedRows: [row('CD_I1')] }))
+      .toEqual([{ kind: 'ledger_without_row', externalId: 'CD_I3' }]);
+    // A net-revoked provider with a human row, and a human row with no ledger at all.
+    expect(checkAflApiAdjudicationBijection({
+      ledgerRows, resolvedRows: [row('CD_I1'), row('CD_I2'), row('CD_I3'), row('CD_I9')],
+    })).toEqual([
+      { kind: 'row_without_ledger', externalId: 'CD_I2' },
+      { kind: 'row_without_ledger', externalId: 'CD_I9' },
+    ]);
+    // A resolved row under any other method is not a human identity, on either side.
+    expect(checkAflApiAdjudicationBijection({
+      ledgerRows, resolvedRows: [row('CD_I1'), row('CD_I3'), row('CD_I9', 'resolved', 'afl_api_stat_vector_season')],
+    })).toEqual([]);
+    expect(checkAflApiAdjudicationBijection({
+      ledgerRows, resolvedRows: [row('CD_I1'), row('CD_I3', 'resolved', 'afl_api_stat_vector_season')],
+    })).toEqual([{ kind: 'ledger_without_row', externalId: 'CD_I3' }]);
+  });
+
+  it('is contract-coherent alongside every other table', () => {
+    expect(promotionContractProblems()).toEqual([]);
+  });
+});
+
+/**
  * AFLDB-ISSUE-143. §7.4c of docs/production-promotion.md documents two answers for a
  * lineage-bound row that cannot be evidenced; until this issue the checker and the plan
  * could execute neither, so a DEV promotion could never pass `--phase restored`.
@@ -2016,7 +2237,7 @@ describe('staged reinstatement of NOT NULL lineage-bound references', () => {
       // Sorted (order, name): brownlow_vote_entry_state and external_grid_sources tie on
       // order 20, so name breaks the tie.
       expect(stagedReinstateTables(environment).map((t) => t.name))
-        .toEqual(['brownlow_vote_entry_state', 'external_grid_sources']);
+        .toEqual(['afl_api_identity_adjudications', 'brownlow_vote_entry_state', 'external_grid_sources']);
       expect(isStagedLineageColumn('external_grid_sources', 'ingest_source_id', environment)).toBe(true);
       // Neither another column of the same table nor a lineage-bound column elsewhere.
       expect(isStagedLineageColumn('external_grid_sources', 'code', environment)).toBe(false);
@@ -2082,7 +2303,7 @@ describe('staged reinstatement of NOT NULL lineage-bound references', () => {
   it('splits the restore into direct, staged and dependants, and the planned order is still FK-safe', () => {
     for (const environment of ENVIRONMENTS) {
       const groups = reinstateGroups(environment);
-      expect(groups.staged).toEqual(['brownlow_vote_entry_state', 'external_grid_sources']);
+      expect(groups.staged).toEqual(['afl_api_identity_adjudications', 'brownlow_vote_entry_state', 'external_grid_sources']);
       expect(groups.dependants).toEqual(['external_grids', 'external_grid_axes']);
       expect(groups.direct).not.toContain('brownlow_vote_entry_state');
       expect(groups.direct).not.toContain('external_grid_sources');
@@ -2243,7 +2464,7 @@ describe('staged reinstatement of NOT NULL lineage-bound references', () => {
     // and reassigns another's is caught, naming exactly the offender. (Asserted with both a
     // replaceAll and a single-occurrence replace so neither table can be covered by the other.)
     const staged = reinstateGroups('prod').staged;
-    expect(staged).toEqual(['brownlow_vote_entry_state', 'external_grid_sources']);
+    expect(staged).toEqual(['afl_api_identity_adjudications', 'brownlow_vote_entry_state', 'external_grid_sources']);
     const noOverride = { ...good, promoteStaged: good.promoteStaged.replaceAll(' OVERRIDING SYSTEM VALUE', '') };
     expect(stagedPlanProblems(noOverride))
       .toEqual(staged.map((t) => `promotion-promote-staged.sql does not promote ${t} with its ids preserved`));
@@ -2290,18 +2511,28 @@ describe('staged reinstatement of NOT NULL lineage-bound references', () => {
       const staged = stagedReinstateTables(environment).map((t) => t.name);
       // AFLDB-ISSUE-155: brownlow_vote_entry_state is staged too (match_id is a NOT NULL
       // primary-key reference into rebuilt matches), so the gate now judges two tables.
-      expect(staged).toEqual(['brownlow_vote_entry_state', 'external_grid_sources']);
+      expect(staged).toEqual(['afl_api_identity_adjudications', 'brownlow_vote_entry_state', 'external_grid_sources']);
       const ok = judgeStagedSourceRows(
-        { 'public.brownlow_vote_entry_state': 4, 'public.external_grid_sources': 1, 'public.external_grids': 0 },
+        {
+          'public.afl_api_identity_adjudications': 1, 'public.brownlow_vote_entry_state': 4,
+          'public.external_grid_sources': 1, 'public.external_grids': 0,
+        },
         environment);
       expect(ok).toEqual({
-        populated: [{ table: 'brownlow_vote_entry_state', rows: 4 }, { table: 'external_grid_sources', rows: 1 }],
+        populated: [
+          { table: 'afl_api_identity_adjudications', rows: 1 },
+          { table: 'brownlow_vote_entry_state', rows: 4 },
+          { table: 'external_grid_sources', rows: 1 },
+        ],
         empty: [], missing: [], verdict: 'PASS',
       });
       // Each staged table is judged on its own, and a populated sibling never covers for it:
       // one empty (counted at 0) or one absent (never counted) is enough to refuse.
       const empty = judgeStagedSourceRows(
-        { 'public.brownlow_vote_entry_state': 0, 'public.external_grid_sources': 0 }, environment);
+        {
+          'public.afl_api_identity_adjudications': 0, 'public.brownlow_vote_entry_state': 0,
+          'public.external_grid_sources': 0,
+        }, environment);
       expect(empty.verdict).toBe('FAIL');
       expect(empty.empty).toEqual(staged);
       for (const one of staged) {
@@ -2320,7 +2551,10 @@ describe('staged reinstatement of NOT NULL lineage-bound references', () => {
       expect(absent.missing).toEqual(staged);
       // Only a staged table is judged: a non-staged reinstated table at 0 is not this gate's business.
       expect(judgeStagedSourceRows(
-        { 'public.brownlow_vote_entry_state': 4, 'public.external_grid_sources': 2, 'public.auth_users': 0 },
+        {
+          'public.afl_api_identity_adjudications': 1, 'public.brownlow_vote_entry_state': 4,
+          'public.external_grid_sources': 2, 'public.auth_users': 0,
+        },
         environment).verdict).toBe('PASS');
     }
     // The checker applies it at exactly the pre-cutover phase, from the inventory it already took.

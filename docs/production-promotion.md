@@ -716,6 +716,56 @@ generator, with the hyphenated `afldb_*_pre_rebuild_20260906-112500` shape pinne
    Write it to a **file**: `npx tsx -e` evaluates as CommonJS, where the adapter's named
    exports arrive under `.default` and a copied one-liner silently reads `undefined`.
 
+   **AFLDB-ISSUE-235 (OD-3, D15): replay the `afl_api` human identity ledger, the same
+   window, the same TypeScript-adapter shape.** `afl_api_identity_adjudications` is
+   reinstated in every environment (no `historicalOnly` entry) and is durable identity
+   authority: the human `resolved` `external_identities` row a Super Admin wrote through
+   `/admin/player-links/afl-api` does not survive a rebuild on its own (`external_identities`
+   is import-writable and rebuilt), so this replay is what re-creates it. Depends on the
+   `players` replay above having already run (`manual_admin_edit` identities must exist),
+   and nothing else — it is independent of `matches`/`draft_picks`/`coaches`/the two
+   special-record branches, so it may run anywhere after `players`, in this same window:
+
+   ```bash
+   cd ~/projects/afldb && cat > replay-afl-api-adjudications.ts <<'TS'
+   import postgres from 'postgres';
+
+   import { replayAflApiAdjudications } from './tools/migration/replay_afl_api_adjudications';
+
+   const dsn = process.env.AFLDB_IMPORT_DATABASE_URL;
+   if (!dsn) throw new Error('AFLDB_IMPORT_DATABASE_URL is not set.');
+   const sql = postgres(dsn, { max: 1, onnotice: () => {} });
+   sql.begin((tx) => replayAflApiAdjudications(tx))
+     .then(async (counts) => { console.log(counts); await sql.end(); })
+     .catch(async (error) => { console.error(error); await sql.end(); process.exit(1); });
+   TS
+   npx tsx replay-afl-api-adjudications.ts && rm replay-afl-api-adjudications.ts
+   ```
+
+   Every net-`linked` ledger entry re-creates exactly one `resolved`/
+   `afl_api_admin_adjudication` row; an identical row already present is an idempotent
+   no-op; a conflicting importer or human row, an unresolvable or ambiguous identity, or
+   the target player already holding a different `afl_api` provider all **STOP the whole
+   replay** — nothing is partially written. Carrying importer-created `unique` `afl_api`
+   identities through this promotion is **AFLDB-ISSUE-237**, a separate, pre-existing gap;
+   this replay does not attempt it. Verify with the standalone bijection check:
+
+   ```bash
+   cd ~/projects/afldb && cat > verify-afl-api-adjudications.ts <<'TS'
+   import postgres from 'postgres';
+
+   import { assertAflApiAdjudicationBijection } from './tools/migration/replay_afl_api_adjudications';
+
+   const dsn = process.env.AFLDB_IMPORT_DATABASE_URL;
+   if (!dsn) throw new Error('AFLDB_IMPORT_DATABASE_URL is not set.');
+   const sql = postgres(dsn, { max: 1, onnotice: () => {} });
+   sql.begin((tx) => assertAflApiAdjudicationBijection(tx))
+     .then(async () => { console.log('afl_api adjudication bijection: OK'); await sql.end(); })
+     .catch(async (error) => { console.error(error); await sql.end(); process.exit(1); });
+   TS
+   npx tsx verify-afl-api-adjudications.ts && rm verify-afl-api-adjudications.ts
+   ```
+
    Neither special-record branch depends on another: an override payload for one of these rows
    carries the raw name fields only — every link (`player_id`, `club_id`, `match_id`) and every
    derived column is reconstructed by the importer and is deliberately not correctable

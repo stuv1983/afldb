@@ -38,15 +38,24 @@
  */
 import './guard';
 
-import { readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import postgres from 'postgres';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
+import {
+  linkAflApiProvider,
+  revokeAflApiLink,
+  type LinkAflApiProviderInput,
+  type LinkAflApiProviderResult,
+} from '@/db/queries/afl-api-player-links';
+import { adjudicationFingerprint } from '@/lib/acquisition/afl-api-adjudication';
 import {
   parseAflApiIdentities, type AflApiIdentities,
 } from '@/lib/acquisition/afl-api-bundle';
+import { classifyCandidate } from '@/lib/acquisition/settle-report';
 import {
   buildAflApiSettleBundle,
   runSettleAflApi,
@@ -62,6 +71,60 @@ import {
   type SourceFamilyRegistry,
 } from '@/lib/acquisition/source-families';
 import { recomputeClubSeasons, recomputeSeasonMetadata } from '@/db/queries/player-derived';
+
+import {
+  archivedCaptureName,
+  buildLedgerCapture,
+  decidePendingCapture,
+  nextIdentityValue,
+  observeLiveReinstatement,
+  PENDING_CAPTURE_FILE,
+  readLedger,
+  readPendingCapture,
+  reinstateAndReplay,
+  reinstatedCaptureProblems,
+  settleCapture,
+  writePendingCapture,
+  type CapturedLedgerRow,
+  type LedgerCapture,
+  type LiveReinstatementObservation,
+  type PendingCaptureDecision,
+  type ReinstateReport,
+} from '../../tools/migration/rebuild_afl_api_adjudications';
+import {
+  AflApiReplayAbort,
+  assertAflApiAdjudicationBijection,
+  replayAflApiAdjudications,
+} from '../../tools/migration/replay_afl_api_adjudications';
+
+import {
+  assertS6LedgerIsolated,
+  cleanupI14Fixtures,
+  cleanupS6Fixtures,
+  decodeS6Jsonb,
+  I1_FIXTURE,
+  I14_FIXTURE,
+  i14StaleLedgerRow,
+  insertS6BrownlowVote,
+  issue235FixtureResidue,
+  loadS6Refs,
+  renderS6Form,
+  routeS6ImportDsn,
+  S6_NOTE,
+  S6_SEASON,
+  s6LedgerRows,
+  s6MatchId,
+  s6ProviderId,
+  s6StateSnapshot,
+  seedI14Actor,
+  seedS6Actor,
+  seedS6ImporterLink,
+  seedS6PendingEvidence,
+  seedS6Player,
+  seedS6SpineVersion,
+  ZERO_ISSUE235_RESIDUE,
+  type S6Refs,
+} from './afl-api-adjudication-fixtures';
 
 const PROJECT_ROOT = join(__dirname, '..', '..');
 const FIXTURE_DIR = join(PROJECT_ROOT, 'tests', 'fixtures', 'afl_api', 'match');
@@ -227,6 +290,11 @@ const CASE_IDS = {
   possibleMultiple: `${NS}F30F`,
   raceAfterPlanning: `${NS}F30G`,
   swappedOrientation: `${NS}F30H`,
+  // AFLDB-ISSUE-235 S6 (I2/I5/I6): the one case that drives the real settle across a human
+  // link. Its unbridged away player is renamed into the ISSUE-235 provider namespace
+  // (`issue235LifecycleSource()`), so cleanup() owns its match and spine rows exactly as it owns
+  // every other case's.
+  issue235Lifecycle: `${NS}Z235`,
 } as const;
 const ALL_PROVIDER_IDS = Object.values(CASE_IDS);
 
@@ -302,6 +370,9 @@ const CASE_DATES: Readonly<Record<string, string>> = {
   [CASE_IDS.possibleMultiple]: '2026-08-04',
   [CASE_IDS.raceAfterPlanning]: '2026-08-10',
   [CASE_IDS.swappedOrientation]: '2026-08-17',
+  // AFLDB-ISSUE-235 S6: a June Monday (AEST, no daylight saving), used by no other case; no
+  // Preliminary Final is ever played then.
+  [CASE_IDS.issue235Lifecycle]: '2026-06-01',
   // I244-F001 H&A cases: deliberately the LATEST dates in the suite (every
   // other case is <= 2026-09-30) so seasons.last_match_date/
   // data_through_date/last_loaded_round can be proven to reflect THIS
@@ -3341,4 +3412,1388 @@ describe('AFLDB-ISSUE-244 I244-F030 — an unresolved record vs a canonical fixt
       await other.end({ timeout: 5 });
     }
   }, 90_000);
+});
+
+/**
+ * AFLDB-ISSUE-235 (I1). Migration 104's `uq_external_identities_afl_api_player` — one
+ * `afl_api` provider per player, across BOTH writers (loader `unique` and admin
+ * `resolved` alike, since the predicate binds on `source_id`, not `match_method`).
+ *
+ * Fully self-contained: its own synthetic player (a distinct legacy_player_id, never
+ * shared with the rest of this file) and its own cleanup, independent of the suite's
+ * match-settle fixtures and `cleanup()`/`seedBaseline()` above. Nothing here calls
+ * `runSettleAflApi()`.
+ */
+describe('AFLDB-ISSUE-235 (I1): migration 104 one-afl_api-provider-per-player index', () => {
+  // Literal ids from the shared ownership registry, so the leftover gate counts exactly these.
+  const I1_LEGACY_PLAYER_ID = I1_FIXTURE.legacyPlayerId;
+  const I1_PROVIDER_A = I1_FIXTURE.providerA;
+  const I1_PROVIDER_B = I1_FIXTURE.providerB;
+  const I1_AFLTABLES_EXTERNAL_ID = I1_FIXTURE.afltablesId;
+  let i1AflApiSourceId: number;
+  let i1AfltablesSourceId: number;
+  let i1PlayerId: number;
+
+  async function i1Cleanup(): Promise<void> {
+    await sql`
+      DELETE FROM external_identities
+       WHERE (source_id = ${i1AflApiSourceId} AND external_id IN (${I1_PROVIDER_A}, ${I1_PROVIDER_B}))
+          OR (source_id = ${i1AfltablesSourceId} AND external_id = ${I1_AFLTABLES_EXTERNAL_ID})
+    `;
+    await sql`DELETE FROM players WHERE legacy_player_id = ${I1_LEGACY_PLAYER_ID}`;
+  }
+
+  beforeAll(async () => {
+    const [afl] = await sql<{ id: number }[]>`SELECT id FROM sources WHERE key = 'afl_api'`;
+    const [aft] = await sql<{ id: number }[]>`SELECT id FROM sources WHERE key = 'afltables'`;
+    if (!afl || !aft) throw new Error("sources 'afl_api' and 'afltables' must both exist on afldb_test.");
+    i1AflApiSourceId = afl.id;
+    i1AfltablesSourceId = aft.id;
+
+    await i1Cleanup(); // idempotent: clears any residue from an interrupted prior run
+
+    const [player] = await sql<{ id: number }[]>`
+      INSERT INTO players (legacy_player_id, display_name, sort_name, search_name, slug, given_name, surname)
+      VALUES (
+        ${I1_LEGACY_PLAYER_ID},
+        'ISSUE-235 I1 Test Player', 'Test Player, ISSUE-235 I1', 'issue 235 i1 test player',
+        'issue-235-i1-test-player', 'Issue235I1', 'TestPlayer'
+      )
+      ON CONFLICT (legacy_player_id) DO UPDATE SET display_name = EXCLUDED.display_name
+      RETURNING id
+    `;
+    i1PlayerId = player.id;
+  });
+
+  afterAll(async () => {
+    // Do NOT close `sql` here: it is the file's shared module-level connection, and the
+    // root-level afterAll (above, outside any describe) still needs it open to run its
+    // own cleanup() before it calls sql.end() itself — nested-describe afterAll hooks run
+    // before the root's, so closing it here would break that teardown.
+    await i1Cleanup();
+  });
+
+  it('exists, with predicate source_id = <afl_api id> AND player_id IS NOT NULL', async () => {
+    const [index] = await sql<{ indexdef: string }[]>`
+      SELECT indexdef FROM pg_indexes
+       WHERE schemaname = 'public' AND tablename = 'external_identities'
+         AND indexname = 'uq_external_identities_afl_api_player'
+    `;
+    expect(index).toBeDefined();
+    expect(index.indexdef).toMatch(/UNIQUE INDEX uq_external_identities_afl_api_player/);
+    expect(index.indexdef).toContain('(player_id)');
+    expect(index.indexdef).toContain(`source_id = ${i1AflApiSourceId}`);
+    expect(index.indexdef).toContain('player_id IS NOT NULL');
+  });
+
+  it('raises 23505 on a second afl_api row for the same player', async () => {
+    await sql`
+      INSERT INTO external_identities (source_id, external_id, player_id, status, candidate_count, match_method)
+      VALUES (${i1AflApiSourceId}, ${I1_PROVIDER_A}, ${i1PlayerId}, 'unique', 1, 'afl_api_stat_vector_season')
+    `;
+    await expect(sql`
+      INSERT INTO external_identities (source_id, external_id, player_id, status, candidate_count, match_method)
+      VALUES (${i1AflApiSourceId}, ${I1_PROVIDER_B}, ${i1PlayerId}, 'unique', 1, 'afl_api_stat_vector_season')
+    `).rejects.toMatchObject({ code: '23505' });
+
+    // Exactly the first row survives; the rejected INSERT wrote nothing.
+    const rows = await sql<{ external_id: string }[]>`
+      SELECT external_id FROM external_identities
+       WHERE source_id = ${i1AflApiSourceId} AND player_id = ${i1PlayerId}
+    `;
+    expect(rows.map((r) => r.external_id)).toEqual([I1_PROVIDER_A]);
+  });
+
+  it('still allows two rows for the same player under another source (the predicate binds on source_id)', async () => {
+    // The afl_api row from the previous case is still in place; a DIFFERENT source's
+    // identity row for the SAME player is unaffected by the afl_api-scoped index.
+    await sql`
+      INSERT INTO external_identities (source_id, external_id, player_id, status, candidate_count, match_method)
+      VALUES (${i1AfltablesSourceId}, ${I1_AFLTABLES_EXTERNAL_ID}, ${i1PlayerId}, 'unique', 1, 'afltables_profile_url')
+    `;
+    const rows = await sql<{ source_id: number; external_id: string }[]>`
+      SELECT source_id, external_id FROM external_identities WHERE player_id = ${i1PlayerId} ORDER BY source_id
+    `;
+    expect(rows).toEqual(expect.arrayContaining([
+      { source_id: i1AflApiSourceId, external_id: I1_PROVIDER_A },
+      { source_id: i1AfltablesSourceId, external_id: I1_AFLTABLES_EXTERNAL_ID },
+    ]));
+  });
+});
+
+/**
+ * AFLDB-ISSUE-235 (I14). The OD-3/D15 replay (`tools/migration/replay_afl_api_adjudications.ts`).
+ * Fully self-contained: its own synthetic players, its own disabled credential-less actor
+ * (`I14_FIXTURE.actorEmail` — a freshly rebuilt afldb_test has zero `auth_users` rows, so no
+ * existing account is ever borrowed), its own ledger rows, and a teardown
+ * (`cleanupI14Fixtures()`) that selects by I14's literal ids only, so it is safe to run after a
+ * `beforeAll` that failed part-way. Independent of every other describe block in this file.
+ */
+describe('AFLDB-ISSUE-235 (I14): afl_api adjudication replay', () => {
+  // Literal ids from the shared ownership registry, so the leftover gate counts exactly these.
+  const I14_LEGACY_PLAYER_ID_A = I14_FIXTURE.legacyPlayerIdA;
+  const I14_LEGACY_PLAYER_ID_B = I14_FIXTURE.legacyPlayerIdB;
+  const I14_AFLTABLES_EXTERNAL_ID_A = I14_FIXTURE.afltablesIdA;
+  const I14_AFLTABLES_EXTERNAL_ID_B = I14_FIXTURE.afltablesIdB;
+  const I14_PROVIDER_LINKED = I14_FIXTURE.providerLinked;
+  const I14_PROVIDER_REVOKED = I14_FIXTURE.providerRevoked;
+  let i14AflApiSourceId: number;
+  let i14AfltablesSourceId: number;
+  let i14PlayerIdA: number;
+  let i14PlayerIdB: number;
+  let i14AdminUserId: number;
+
+  beforeAll(async () => {
+    await cleanupI14Fixtures(sql);
+    const refs = await loadS6Refs(sql);
+    i14AflApiSourceId = refs.aflApiSourceId;
+    i14AfltablesSourceId = refs.afltablesSourceId;
+    i14AdminUserId = await seedI14Actor(sql);
+
+    const [playerA] = await sql<{ id: number }[]>`
+      INSERT INTO players (legacy_player_id, display_name, sort_name, search_name, slug, given_name, surname)
+      VALUES (${I14_LEGACY_PLAYER_ID_A}, 'ISSUE-235 I14 Test Player A', 'Test Player A, ISSUE-235 I14',
+              'issue 235 i14 test player a', 'issue-235-i14-test-player-a', 'Issue235I14', 'TestPlayerA')
+      ON CONFLICT (legacy_player_id) DO UPDATE SET display_name = EXCLUDED.display_name
+      RETURNING id
+    `;
+    i14PlayerIdA = playerA.id;
+    const [playerB] = await sql<{ id: number }[]>`
+      INSERT INTO players (legacy_player_id, display_name, sort_name, search_name, slug, given_name, surname)
+      VALUES (${I14_LEGACY_PLAYER_ID_B}, 'ISSUE-235 I14 Test Player B', 'Test Player B, ISSUE-235 I14',
+              'issue 235 i14 test player b', 'issue-235-i14-test-player-b', 'Issue235I14', 'TestPlayerB')
+      ON CONFLICT (legacy_player_id) DO UPDATE SET display_name = EXCLUDED.display_name
+      RETURNING id
+    `;
+    i14PlayerIdB = playerB.id;
+
+    await sql`
+      INSERT INTO external_identities (source_id, external_id, player_id, status, candidate_count, match_method)
+      VALUES (${i14AfltablesSourceId}, ${I14_AFLTABLES_EXTERNAL_ID_A}, ${i14PlayerIdA}, 'unique', 1, 'afltables_profile_url')
+    `;
+    await sql`
+      INSERT INTO external_identities (source_id, external_id, player_id, status, candidate_count, match_method)
+      VALUES (${i14AfltablesSourceId}, ${I14_AFLTABLES_EXTERNAL_ID_B}, ${i14PlayerIdB}, 'unique', 1, 'afltables_profile_url')
+    `;
+  });
+
+  afterAll(async () => {
+    // Do NOT close `sql` here -- see the I1 describe block's own note above. Literal ids only:
+    // no setup value is interpolated, so a failed beforeAll cannot cascade into this.
+    await cleanupI14Fixtures(sql);
+  });
+
+  it('I14 — the replay re-derives the current player_id from player_identity (never trusts a stale stored value), is idempotent, and passes the bijection check', async () => {
+    const { replayAflApiAdjudications, assertAflApiAdjudicationBijection } =
+      await import('../../tools/migration/replay_afl_api_adjudications');
+
+    // Numeric-id reuse across a destructive rebuild: the ledger row's OWN player_id column is
+    // deliberately WRONG but FK-valid -- it names player B, a real, different player (as an
+    // old numeric id reassigned to someone else after a rebuild would), while its durable
+    // player_identity still names player A. Migration 104's REFERENCES players(id) forbids a
+    // dangling id, and a dangling id would prove less anyway: here a replay that trusted the
+    // column would silently link the provider to the WRONG existing player. It must re-derive
+    // playerIdA from player_identity alone.
+    const stale = i14StaleLedgerRow({ playerIdA: i14PlayerIdA, playerIdB: i14PlayerIdB });
+    expect(stale).toEqual({ playerId: i14PlayerIdB, playerIdentity: I14_AFLTABLES_EXTERNAL_ID_A });
+    await sql`
+      INSERT INTO afl_api_identity_adjudications
+            (source_key, external_id, action, player_id, player_identity, evidence, evidence_sha256,
+             surname_disagreement_acknowledged, admin_user_id, note)
+      VALUES ('afl_api', ${I14_PROVIDER_LINKED}, 'linked', ${stale.playerId}, ${stale.playerIdentity},
+              '{"fixture":"I14"}'::jsonb, ${'0'.repeat(64)}, false, ${i14AdminUserId},
+              'AFLDB-ISSUE-235 I14 fixture: linked, then re-derived by the replay')
+    `;
+    // A linked -> revoked pair: net-revoked, must NOT be replayed.
+    const [linkedRow] = await sql<{ id: number }[]>`
+      INSERT INTO afl_api_identity_adjudications
+            (source_key, external_id, action, player_id, player_identity, evidence, evidence_sha256,
+             surname_disagreement_acknowledged, admin_user_id, note)
+      VALUES ('afl_api', ${I14_PROVIDER_REVOKED}, 'linked', ${i14PlayerIdB}, ${I14_AFLTABLES_EXTERNAL_ID_B},
+              '{"fixture":"I14"}'::jsonb, ${'1'.repeat(64)}, false, ${i14AdminUserId},
+              'AFLDB-ISSUE-235 I14 fixture: linked then revoked, net-revoked')
+      RETURNING id
+    `;
+    await sql`
+      INSERT INTO afl_api_identity_adjudications
+            (source_key, external_id, action, player_id, player_identity, evidence, evidence_sha256,
+             surname_disagreement_acknowledged, supersedes_id, admin_user_id, note)
+      VALUES ('afl_api', ${I14_PROVIDER_REVOKED}, 'revoked', ${i14PlayerIdB}, ${I14_AFLTABLES_EXTERNAL_ID_B},
+              '{"fixture":"I14"}'::jsonb, ${'2'.repeat(64)}, false, ${linkedRow.id}, ${i14AdminUserId},
+              'AFLDB-ISSUE-235 I14 fixture: the revoke of the row above')
+    `;
+
+    const counts = await sql.begin((tx) => replayAflApiAdjudications(tx));
+    expect(counts).toEqual({ inserted: 1, noops: 0, stops: [] });
+
+    const [resolved] = await sql<{ playerId: number; status: string; matchMethod: string }[]>`
+      SELECT player_id AS "playerId", status::text AS status, match_method AS "matchMethod"
+        FROM external_identities WHERE source_id = ${i14AflApiSourceId} AND external_id = ${I14_PROVIDER_LINKED}
+    `;
+    expect(resolved).toMatchObject({
+      playerId: i14PlayerIdA, status: 'resolved', matchMethod: 'afl_api_admin_adjudication',
+    });
+    expect(resolved.playerId).not.toBe(stale.playerId); // the stored numeric id was not trusted
+    const playerBAflApiRows = await sql<{ id: number }[]>`
+      SELECT id FROM external_identities WHERE source_id = ${i14AflApiSourceId} AND player_id = ${i14PlayerIdB}
+    `;
+    expect(playerBAflApiRows).toHaveLength(0); // player B (the reused id) gained no afl_api link
+    const revokedProviderRow = await sql<{ id: number }[]>`
+      SELECT id FROM external_identities WHERE source_id = ${i14AflApiSourceId} AND external_id = ${I14_PROVIDER_REVOKED}
+    `;
+    expect(revokedProviderRow).toHaveLength(0); // net-revoked: never replayed
+
+    await sql.begin((tx) => assertAflApiAdjudicationBijection(tx));
+
+    // A second run is idempotent: the identical row already present is a no-op, not a
+    // duplicate or a stop.
+    const secondRun = await sql.begin((tx) => replayAflApiAdjudications(tx));
+    expect(secondRun).toEqual({ inserted: 0, noops: 1, stops: [] });
+  });
+});
+
+/**
+ * AFLDB-ISSUE-235 (I17). The D10 manifest's live-catalogue pin. A read-only catalogue query:
+ * no fixture, no setup, no application user — it runs on any migrated afldb_test.
+ */
+describe('AFLDB-ISSUE-235 (I17): the live D10 manifest pin', () => {
+  it('I17 (R1/R2 live pin) — the live afldb_test catalogue matches the D10 manifest exactly', async () => {
+    const { validateManifestAgainstCatalogue, AFL_API_PLAYER_REFERENCE_MANIFEST } =
+      await import('../../src/lib/acquisition/afl-api-adjudication');
+    const catalogueRows = await sql<{ schema: string; table: string; column: string }[]>`
+      SELECT n.nspname AS schema, c.relname AS table, a.attname AS column
+        FROM pg_attribute a
+        JOIN pg_constraint con ON con.conrelid = a.attrelid AND a.attnum = ANY(con.conkey)
+        JOIN pg_class c ON c.oid = a.attrelid
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+       WHERE con.contype = 'f' AND con.confrelid = 'public.players'::regclass
+         AND n.nspname NOT IN ('pg_catalog', 'information_schema', 'pg_toast')
+         AND n.nspname NOT LIKE 'pg_temp_%' AND n.nspname NOT LIKE 'pg_toast_temp_%'
+         AND array_length(con.conkey, 1) = 1
+    `;
+    const problems = validateManifestAgainstCatalogue(catalogueRows, AFL_API_PLAYER_REFERENCE_MANIFEST);
+    expect(problems).toEqual([]);
+  });
+});
+
+/* =================================================================== *
+ * AFLDB-ISSUE-235 S6 — the live §10.2 matrix: I2–I7 and I6b–I6d (functional adjudication),
+ * I15/I16 (the D15 replay), and the OD-5 recovery observation. I8–I10 (races) live in
+ * `player-link-concurrency.test.ts`. Namespace, seeding and teardown are shared with that
+ * file through `./afl-api-adjudication-fixtures.ts`.
+ *
+ * Every adjudication under test goes through the real `linkAflApiProvider()` /
+ * `revokeAflApiLink()`, on the import DSN `routeS6ImportDsn()` routes (the `afldb_import`
+ * role when `AFLDB_TEST_IMPORT_DATABASE_URL` is set), with the fingerprint the admin page
+ * itself would render (`renderS6Form()`). Direct INSERTs are fixture setup only.
+ *
+ * The root `beforeEach` above rebuilds this file's settle baseline before EVERY case,
+ * including these, so the one case that needs shared state across steps (the settle
+ * lifecycle) is a single ordered `it`.
+ * =================================================================== */
+
+/** The lifecycle case's provider: the golden fixture's unbridged away player, renamed. */
+const I235_LIFECYCLE_PROVIDER = s6ProviderId(1);
+
+/**
+ * The golden unit on the lifecycle case's own date, with its unbridged away player renamed
+ * into the ISSUE-235 namespace at every quoted occurrence (the roster and both stat entries),
+ * so the settle's `unresolved_identity` candidate names an S6 provider.
+ */
+function issue235LifecycleSource(): AflApiSettleUnitSource {
+  const text = JSON.stringify(unitSourceFor(CASE_IDS.issue235Lifecycle));
+  const quoted = `"${UNBRIDGED_PROVIDER_PLAYER_ID}"`;
+  if (!text.includes(quoted)) {
+    throw new Error(`The fixture no longer names ${UNBRIDGED_PROVIDER_PLAYER_ID}; the ISSUE-235 lifecycle cannot rename it.`);
+  }
+  return JSON.parse(text.split(quoted).join(`"${I235_LIFECYCLE_PROVIDER}"`)) as AflApiSettleUnitSource;
+}
+
+function errorOf(result: { ok: boolean; error?: string }): string {
+  return result.ok ? '' : (result.error ?? '');
+}
+
+type I235IdentityRow = {
+  id: number; status: string; playerId: number | null; matchMethod: string | null;
+  candidateCount: number; notes: string | null;
+};
+
+/** The `afl_api` rows naming a provider id or a player id. */
+async function i235AflApiRows(refs: S6Refs, where: { providerId?: string; playerId?: number }): Promise<I235IdentityRow[]> {
+  return sql<I235IdentityRow[]>`
+    SELECT id, status::text AS status, player_id AS "playerId", match_method AS "matchMethod",
+           candidate_count::int AS "candidateCount", notes
+      FROM external_identities
+     WHERE source_id = ${refs.aflApiSourceId}
+       AND (external_id = ${where.providerId ?? null} OR player_id = ${where.playerId ?? null})
+     ORDER BY id
+  `;
+}
+
+type I235Candidate = { id: number; externalRecordId: string; sourceVersionSeq: number; verb: string; status: string };
+
+/** Every candidate (any status) naming the provider — the page's own filter. */
+async function i235Candidates(refs: S6Refs, providerId: string): Promise<I235Candidate[]> {
+  return sql<I235Candidate[]>`
+    SELECT id::int AS id, external_record_id AS "externalRecordId", source_version_seq AS "sourceVersionSeq",
+           verb, status
+      FROM promotion_candidates
+     WHERE source_id = ${refs.aflApiSourceId} AND split_part(external_record_id, '|', 3) = ${providerId}
+     ORDER BY id
+  `;
+}
+
+describe('AFLDB-ISSUE-235 S6 (I2–I7, I6b–I6d): human afl_api adjudication against afldb_test', () => {
+  let refs: S6Refs;
+  let actorId: number;
+  let restoreImportDsn: (() => void) | undefined;
+
+  beforeAll(async () => {
+    refs = await loadS6Refs(sql);
+    restoreImportDsn = (await routeS6ImportDsn()).restore;
+    await cleanupS6Fixtures(sql, refs); // idempotent: clears an interrupted run's residue
+  });
+
+  beforeEach(async () => {
+    actorId = await seedS6Actor(sql);
+  });
+
+  // Before the root beforeEach's cleanup() of the NEXT case, which cannot delete its matches
+  // while player_clubs or any player FK still names an S6 player.
+  afterEach(async () => {
+    await cleanupS6Fixtures(sql, refs);
+  });
+
+  afterAll(async () => {
+    // Do NOT close `sql` here -- see the I1 describe block's own note above.
+    await cleanupS6Fixtures(sql, refs);
+    restoreImportDsn?.();
+  });
+
+  function link(
+    providerId: string, playerId: number, fingerprint: string | null,
+    overrides: Partial<LinkAflApiProviderInput> = {},
+  ): Promise<LinkAflApiProviderResult> {
+    if (fingerprint === null) throw new Error(`The admin page rendered no link fingerprint for ${providerId}.`);
+    return linkAflApiProvider({
+      providerId, playerId, adminUserId: actorId, note: S6_NOTE, surnameAcknowledged: false, fingerprint, ...overrides,
+    });
+  }
+
+  function revoke(providerId: string, fingerprint: string | null) {
+    if (fingerprint === null) throw new Error(`The admin page rendered no revoke fingerprint for ${providerId}.`);
+    return revokeAflApiLink({ providerId, adminUserId: actorId, note: S6_NOTE, fingerprint });
+  }
+
+  /** One U1 provider with a stable-identity player, then a real human link: the L-H start state. */
+  async function humanLinked(key: number): Promise<{ provider: string; playerId: number; identity: string }> {
+    const provider = s6ProviderId(key);
+    const player = await seedS6Player(sql, refs, { key });
+    await seedS6PendingEvidence(sql, refs, { providerId: provider, match: key });
+    const form = await renderS6Form(provider);
+    expect(form.evidence?.state).toBe('U1');
+    expect(await link(provider, player.id, form.linkFingerprint)).toEqual({ ok: true });
+    return { provider, playerId: player.id, identity: player.identity! };
+  }
+
+  it('I2 → I6 (revoke before I5) → re-link → I5 (re-settle) → I6 (revoke after I5) → I6c: one provider through the real settle, link, revoke and replay', async () => {
+    const provider = I235_LIFECYCLE_PROVIDER;
+    const chosen = await seedS6Player(sql, refs, { key: 1, givenName: 'Test', surname: 'Forward' });
+    const source = issue235LifecycleSource();
+
+    // The settle leaves the provider in U1: its stat line is refused as unresolved_identity.
+    const first = await runSettleAflApi(sql, {
+      bundle: buildBundle([source], registry, identities), registry, apply: true, autoApply: true,
+      inProgressSeasons: [SEASON],
+    });
+    expect(first.halt).toBeNull();
+    expect(first.applied).toBe(true);
+    expect(first.counters.canonicalApplyFailures).toBe(0);
+    expect(first.counters.unresolvedIdentityPlayer).toBe(1);
+    const [match] = await sql<{ id: number }[]>`
+      SELECT id FROM matches WHERE match_key = ${matchKeyFor(CASE_IDS.issue235Lifecycle)}
+    `;
+    expect(match).toBeDefined();
+    const candidatesBefore = await i235Candidates(refs, provider);
+    expect(candidatesBefore).toHaveLength(1);
+    expect(candidatesBefore[0]).toMatchObject({ verb: 'unresolved_identity', status: 'pending' });
+    expect(await i235AflApiRows(refs, { providerId: provider })).toEqual([]);
+    expect(chosen.identity).not.toBeNull();
+
+    // ---- I2: the human link --------------------------------------------------------------
+    const form = await renderS6Form(provider);
+    expect(form.evidence?.state).toBe('U1');
+    expect(form.evidence!.pendingCandidates.map((c) => [Number(c.id), c.sourceVersionSeq]))
+      .toEqual([[candidatesBefore[0].id, candidatesBefore[0].sourceVersionSeq]]);
+    expect(await link(provider, chosen.id, form.linkFingerprint)).toEqual({ ok: true });
+
+    const linkedRows = await i235AflApiRows(refs, { providerId: provider, playerId: chosen.id });
+    expect(linkedRows).toHaveLength(1); // one row for the provider, and the player's only afl_api row
+    const [linkedRow] = linkedRows;
+    expect(linkedRow).toMatchObject({
+      status: 'resolved', matchMethod: 'afl_api_admin_adjudication', playerId: chosen.id, candidateCount: 0,
+      notes: 'AFLDB-ISSUE-235 admin adjudication; see afl_api_identity_adjudications',
+    });
+    const ledgerAfterLink = await s6LedgerRows(sql, [provider]);
+    expect(ledgerAfterLink).toHaveLength(1);
+    const [linkedAudit] = ledgerAfterLink;
+    expect(linkedAudit).toMatchObject({
+      action: 'linked', playerId: chosen.id, playerIdentity: chosen.identity, previousState: null,
+      evidenceSha256: form.linkFingerprint, surnameAck: false, supersedesId: null, adminUserId: actorId,
+      note: S6_NOTE,
+    });
+    const linkedEvidence = decodeS6Jsonb(linkedAudit.evidence) as Record<string, unknown>;
+    expect(linkedEvidence).toMatchObject({
+      providerId: provider, chosenPlayerId: chosen.id, fingerprint: form.linkFingerprint,
+      latestAdjudicationId: null, classification: null,
+    });
+    expect((linkedEvidence.pendingCandidateIds as unknown[]).map(Number)).toEqual([candidatesBefore[0].id]);
+    // D14: adjudication never touches a promotion candidate.
+    expect(await i235Candidates(refs, provider)).toEqual(candidatesBefore);
+
+    // ---- T2 (the brief's I3): the same link again, against the new state -----------------
+    const again = await renderS6Form(provider);
+    expect(again.evidence?.state).toBe('L-H');
+    const beforeDuplicate = await s6StateSnapshot(sql, refs, { providerIds: [provider], playerIds: [chosen.id] });
+    expect(await link(provider, chosen.id, again.linkFingerprint))
+      .toMatchObject({ ok: false, code: 'T2_already_linked_same_player' });
+    expect(await s6StateSnapshot(sql, refs, { providerIds: [provider], playerIds: [chosen.id] })).toEqual(beforeDuplicate);
+
+    // ---- I6, revoke BEFORE I5 (the brief's I5): unused, so it revokes ---------------------
+    const revokeForm = await renderS6Form(provider);
+    expect(await revoke(provider, revokeForm.revokeFingerprint)).toEqual({ ok: true });
+    expect(await i235AflApiRows(refs, { providerId: provider, playerId: chosen.id })).toEqual([]);
+    const ledgerAfterRevoke = await s6LedgerRows(sql, [provider]);
+    expect(ledgerAfterRevoke).toHaveLength(2);
+    expect(ledgerAfterRevoke[0]).toEqual(linkedAudit); // append-only: the linked row is untouched
+    expect(ledgerAfterRevoke[1]).toMatchObject({
+      action: 'revoked', supersedesId: linkedAudit.id, playerId: chosen.id, playerIdentity: chosen.identity,
+      evidenceSha256: revokeForm.revokeFingerprint, surnameAck: false, adminUserId: actorId, note: S6_NOTE,
+    });
+    expect(decodeS6Jsonb(ledgerAfterRevoke[1].previousState)).toEqual({
+      id: linkedRow.id, status: 'resolved', playerId: chosen.id, matchMethod: 'afl_api_admin_adjudication',
+    });
+    expect(decodeS6Jsonb(ledgerAfterRevoke[1].evidence)).toMatchObject({ nonUseProof: { proven: true } });
+    expect(await i235Candidates(refs, provider)).toEqual(candidatesBefore);
+
+    // ---- The brief's I6: re-link after the revoke ----------------------------------------
+    const afterRevoke = await renderS6Form(provider);
+    expect(afterRevoke.evidence?.state).toBe('U1'); // back in the queue, evidence intact
+    expect(await link(provider, chosen.id, afterRevoke.linkFingerprint)).toEqual({ ok: true });
+    const [relinkedRow, ...extra] = await i235AflApiRows(refs, { providerId: provider, playerId: chosen.id });
+    expect(extra).toEqual([]);
+    expect(relinkedRow).toMatchObject({ status: 'resolved', matchMethod: 'afl_api_admin_adjudication', playerId: chosen.id });
+    expect(relinkedRow.id).not.toBe(linkedRow.id);
+    const ledgerAfterRelink = await s6LedgerRows(sql, [provider]);
+    expect(ledgerAfterRelink).toHaveLength(3);
+    expect(ledgerAfterRelink.slice(0, 2)).toEqual(ledgerAfterRevoke); // history intact, nothing updated
+    expect(ledgerAfterRelink[2]).toMatchObject({
+      action: 'linked', supersedesId: null, previousState: null, playerId: chosen.id,
+      evidenceSha256: afterRevoke.linkFingerprint,
+    });
+    const relinkEvidence = decodeS6Jsonb(ledgerAfterRelink[2].evidence) as Record<string, unknown>;
+    expect(String(relinkEvidence.latestAdjudicationId)).toBe(String(ledgerAfterRevoke[1].id));
+    // Replay semantics resolve linked -> revoked -> linked to the one current human row.
+    await assertS6LedgerIsolated(sql, refs);
+    expect(await sql.begin((tx) => replayAflApiAdjudications(tx))).toEqual({ inserted: 0, noops: 1, stops: [] });
+    await sql.begin((tx) => assertAflApiAdjudicationBijection(tx));
+
+    // ---- I5: re-run the settle; the stat line lands under the chosen player ---------------
+    const second = await runSettleAflApi(sql, {
+      bundle: buildBundle([source], registry, identities), registry, apply: true, autoApply: true,
+      inProgressSeasons: [SEASON],
+    });
+    expect(second.halt).toBeNull();
+    expect(second.applied).toBe(true);
+    expect(second.counters.canonicalApplyFailures).toBe(0);
+    expect(second.counters.unresolvedIdentityPlayer).toBe(0);
+    const [landed] = await sql<{ sourceId: number }[]>`
+      SELECT source_id AS "sourceId" FROM player_match_stats WHERE match_id = ${match.id} AND player_id = ${chosen.id}
+    `;
+    expect(landed?.sourceId).toBe(refs.aflApiSourceId);
+    // The earlier candidate is retained (never retired by the link) and now classifies moot.
+    const [candidate] = candidatesBefore;
+    expect((await i235Candidates(refs, provider)).map((c) => c.id)).toEqual([candidate.id]);
+    const [applied] = await sql<{ seq: number | null }[]>`
+      SELECT max(source_version_seq)::int AS seq FROM canonical_applications
+       WHERE source_id = ${refs.aflApiSourceId} AND target_table = 'player_match_stats'
+         AND external_record_id = ${candidate.externalRecordId}
+    `;
+    expect(applied.seq).not.toBeNull();
+    expect(classifyCandidate(candidate.sourceVersionSeq, applied.seq)).toBe('moot');
+
+    // ---- I6, revoke AFTER I5: used, so it is refused and nothing is written ---------------
+    const usedForm = await renderS6Form(provider);
+    const beforeUsedRefusal = await s6StateSnapshot(sql, refs, { providerIds: [provider], playerIds: [chosen.id] });
+    const refused = await revoke(provider, usedForm.revokeFingerprint);
+    expect(refused).toMatchObject({ ok: false, code: 'T19_revoke_unprovable' });
+    expect(errorOf(refused)).toMatch(/^used: /);
+    expect(errorOf(refused)).toContain('public.player_match_stats');
+    expect(errorOf(refused)).toContain('public.canonical_applications');
+    expect(await s6StateSnapshot(sql, refs, { providerIds: [provider], playerIds: [chosen.id] })).toEqual(beforeUsedRefusal);
+
+    // ---- I6c: the canonical row's provenance rewritten to another source, its projection
+    // gone -- the append-only canonical_applications ledger (D10 (b)) still proves use --------
+    await sql`
+      UPDATE player_match_stats SET source_id = ${afltablesSourceId}
+       WHERE match_id = ${match.id} AND player_id = ${chosen.id}
+    `;
+    await sql`DELETE FROM staging.afl_api_player_match WHERE source_id = ${refs.aflApiSourceId} AND player_id = ${chosen.id}`;
+    const rewrittenForm = await renderS6Form(provider);
+    const beforeRewrittenRefusal = await s6StateSnapshot(sql, refs, { providerIds: [provider], playerIds: [chosen.id] });
+    const stillRefused = await revoke(provider, rewrittenForm.revokeFingerprint);
+    expect(stillRefused).toMatchObject({ ok: false, code: 'T19_revoke_unprovable' });
+    expect(errorOf(stillRefused)).toContain('public.canonical_applications');
+    expect(errorOf(stillRefused)).not.toContain('public.player_match_stats');
+    expect(errorOf(stillRefused)).not.toContain('staging.afl_api_player_match');
+    expect(await s6StateSnapshot(sql, refs, { providerIds: [provider], playerIds: [chosen.id] }))
+      .toEqual(beforeRewrittenRefusal);
+  }, 300_000);
+
+  it('I2 (D8 audit shape) — the linked and revoked audit rows store evidence and previous_state as jsonb OBJECTS, not JSON text', async () => {
+    // D8: `evidence jsonb NOT NULL` is the evidence snapshot and `previous_state jsonb` the
+    // provider's prior row. A string handed to postgres.js for a jsonb parameter is serialised
+    // with JSON.stringify a second time (the driver maps 3802 to JSON.stringify), which stores
+    // a jsonb STRING scalar holding JSON text. This case pins the shape the schema declares.
+    const { provider } = await humanLinked(201);
+    const form = await renderS6Form(provider);
+    expect(await revoke(provider, form.revokeFingerprint)).toEqual({ ok: true });
+    const [linked, revoked] = await s6LedgerRows(sql, [provider]);
+    expect(linked.evidenceType).toBe('object');
+    expect(revoked.evidenceType).toBe('object');
+    expect(revoked.previousStateType).toBe('object');
+  });
+
+  it('I3 — atomicity: an audit INSERT refused by its CHECK after the identity INSERT leaves zero rows on both sides', async () => {
+    const [{ encoding }] = await sql<{ encoding: string }[]>`SELECT current_setting('server_encoding') AS encoding`;
+    expect(encoding, 'I3 relies on PostgreSQL counting characters, not bytes').toBe('UTF8');
+    const provider = s6ProviderId(301);
+    const chosen = await seedS6Player(sql, refs, { key: 301 });
+    await seedS6PendingEvidence(sql, refs, { providerId: provider, match: 301 });
+    const form = await renderS6Form(provider);
+
+    // Ten astral-plane characters: JavaScript's string.length is 20, so the note passes
+    // validateAdjudicationInput(); PostgreSQL's length() is 10, so migration 104's
+    // CHECK (length(note) BETWEEN 20 AND 2000) refuses the audit INSERT -- which runs AFTER the
+    // external_identities INSERT in the same transaction. That is the runbook's "force the audit
+    // insert to fail, bypassing validation", reached through the real API with no mock.
+    const note = '\u{1F3C9}'.repeat(10);
+    expect(note.length).toBe(20);
+    const before = await s6StateSnapshot(sql, refs, { providerIds: [provider], playerIds: [chosen.id] });
+    expect(before.identities).toEqual([]);
+    expect(before.ledger).toEqual([]);
+
+    const result = await link(provider, chosen.id, form.linkFingerprint, { note });
+    expect(result.ok).toBe(false);
+    expect(errorOf(result)).toMatch(/could not be applied: .*check constraint/);
+    expect(await s6StateSnapshot(sql, refs, { providerIds: [provider], playerIds: [chosen.id] })).toEqual(before);
+  });
+
+  it('I4/T2 (the brief\'s I3) — a second link of the same provider to the same player is refused as already linked; no duplicate row or audit', async () => {
+    const { provider, playerId } = await humanLinked(402);
+    const form = await renderS6Form(provider);
+    const before = await s6StateSnapshot(sql, refs, { providerIds: [provider], playerIds: [playerId] });
+    expect(await link(provider, playerId, form.linkFingerprint))
+      .toMatchObject({ ok: false, code: 'T2_already_linked_same_player' });
+    const after = await s6StateSnapshot(sql, refs, { providerIds: [provider], playerIds: [playerId] });
+    expect(after).toEqual(before);
+    expect(after.identities).toHaveLength(1);
+    expect(after.ledger).toHaveLength(1);
+  });
+
+  it('I4/T3 (the brief\'s I4) — a link of an already-linked provider to a DIFFERENT player is refused; no reassignment, no audit', async () => {
+    const { provider, playerId } = await humanLinked(403);
+    const other = await seedS6Player(sql, refs, { key: 413 });
+    const form = await renderS6Form(provider);
+    const before = await s6StateSnapshot(sql, refs, { providerIds: [provider], playerIds: [playerId, other.id] });
+    expect(await link(provider, other.id, form.linkFingerprint))
+      .toMatchObject({ ok: false, code: 'T3_already_linked_different_player' });
+    expect(await s6StateSnapshot(sql, refs, { providerIds: [provider], playerIds: [playerId, other.id] })).toEqual(before);
+    expect(await i235AflApiRows(refs, { providerId: provider })).toEqual([
+      expect.objectContaining({ playerId, status: 'resolved' }),
+    ]);
+  });
+
+  it('I4/T4 — a link to a player who already holds another afl_api provider is refused, naming that provider', async () => {
+    const provider = s6ProviderId(404);
+    const held = s6ProviderId(414);
+    const player = await seedS6Player(sql, refs, { key: 404 });
+    await seedS6PendingEvidence(sql, refs, { providerId: provider, match: 404 });
+    await seedS6ImporterLink(sql, refs, held, player.id);
+    const form = await renderS6Form(provider);
+    const before = await s6StateSnapshot(sql, refs, { providerIds: [provider, held], playerIds: [player.id] });
+    const result = await link(provider, player.id, form.linkFingerprint);
+    expect(result).toMatchObject({ ok: false, code: 'T4_player_holds_another_provider' });
+    expect(errorOf(result)).toContain(held);
+    expect(await s6StateSnapshot(sql, refs, { providerIds: [provider, held], playerIds: [player.id] })).toEqual(before);
+  });
+
+  it('I4/T5 — a link with no pending evidence (U0) is refused; nothing is written', async () => {
+    const provider = s6ProviderId(405);
+    const player = await seedS6Player(sql, refs, { key: 405 });
+    // U0 is not listed and the page has nothing to render…
+    expect((await renderS6Form(provider)).evidence).toBeNull();
+    // …so the only matching fingerprint is one computed over U0 itself (a hand-built POST).
+    const u0Fingerprint = adjudicationFingerprint({
+      providerId: provider, existing: null, pendingCandidates: [], latestAdjudicationId: null,
+      chosenPlayerId: 0, chosenPlayerExistingRows: [],
+    });
+    const before = await s6StateSnapshot(sql, refs, { providerIds: [provider], playerIds: [player.id] });
+    expect(await link(provider, player.id, u0Fingerprint)).toMatchObject({ ok: false, code: 'T5_no_evidence' });
+    expect(await s6StateSnapshot(sql, refs, { providerIds: [provider], playerIds: [player.id] })).toEqual(before);
+  });
+
+  it('I4/T6 (the brief\'s I7) — a stale fingerprint is refused for link and for revoke after a real database change; nothing is written', async () => {
+    // Link: the page is rendered, then a settle observes the provider in a further match.
+    const provider = s6ProviderId(406);
+    const player = await seedS6Player(sql, refs, { key: 406 });
+    await seedS6PendingEvidence(sql, refs, { providerId: provider, match: 406 });
+    const staleLink = await renderS6Form(provider);
+    await seedS6PendingEvidence(sql, refs, { providerId: provider, match: 416 });
+    const beforeLink = await s6StateSnapshot(sql, refs, { providerIds: [provider], playerIds: [player.id] });
+    expect(await link(provider, player.id, staleLink.linkFingerprint))
+      .toMatchObject({ ok: false, code: 'T6_stale_fingerprint' });
+    expect(await s6StateSnapshot(sql, refs, { providerIds: [provider], playerIds: [player.id] })).toEqual(beforeLink);
+
+    // Link: the page is rendered, then the importer links the provider to someone else. The
+    // stale fingerprint refuses first, and the importer's row is untouched.
+    const raced = s6ProviderId(426);
+    const importerPlayer = await seedS6Player(sql, refs, { key: 426 });
+    await seedS6PendingEvidence(sql, refs, { providerId: raced, match: 426 });
+    const staleRaced = await renderS6Form(raced);
+    await seedS6ImporterLink(sql, refs, raced, importerPlayer.id);
+    const beforeRaced = await s6StateSnapshot(sql, refs, { providerIds: [raced], playerIds: [player.id, importerPlayer.id] });
+    expect(await link(raced, player.id, staleRaced.linkFingerprint))
+      .toMatchObject({ ok: false, code: 'T6_stale_fingerprint' });
+    expect(await s6StateSnapshot(sql, refs, { providerIds: [raced], playerIds: [player.id, importerPlayer.id] }))
+      .toEqual(beforeRaced);
+
+    // Revoke: the page is rendered, then another admin revokes and re-links. The stale revoke
+    // must not delete the NEWER link.
+    const linked = await humanLinked(436);
+    const staleRevoke = await renderS6Form(linked.provider);
+    const intervening = await renderS6Form(linked.provider);
+    expect(await revoke(linked.provider, intervening.revokeFingerprint)).toEqual({ ok: true });
+    const relinkForm = await renderS6Form(linked.provider);
+    expect(await link(linked.provider, linked.playerId, relinkForm.linkFingerprint)).toEqual({ ok: true });
+    const beforeRevoke = await s6StateSnapshot(sql, refs, { providerIds: [linked.provider], playerIds: [linked.playerId] });
+    expect(await revoke(linked.provider, staleRevoke.revokeFingerprint))
+      .toMatchObject({ ok: false, code: 'T6_stale_fingerprint' });
+    const afterRevoke = await s6StateSnapshot(sql, refs, { providerIds: [linked.provider], playerIds: [linked.playerId] });
+    expect(afterRevoke).toEqual(beforeRevoke);
+    expect(afterRevoke.identities).toHaveLength(1); // the re-link survives
+    expect(afterRevoke.ledger).toHaveLength(3); // linked, revoked, linked -- no fourth row
+  });
+
+  it('I4/T7 — a link to a player with no stable identity is refused; nothing is written', async () => {
+    const provider = s6ProviderId(407);
+    const player = await seedS6Player(sql, refs, { key: 407, stable: false });
+    await seedS6PendingEvidence(sql, refs, { providerId: provider, match: 407 });
+    const form = await renderS6Form(provider);
+    const before = await s6StateSnapshot(sql, refs, { providerIds: [provider], playerIds: [player.id] });
+    expect(await link(provider, player.id, form.linkFingerprint)).toMatchObject({ ok: false, code: 'T7_player_not_stable' });
+    expect(await s6StateSnapshot(sql, refs, { providerIds: [provider], playerIds: [player.id] })).toEqual(before);
+  });
+
+  it('I4/T8 — every action on an anomalous (NULL-player) row is refused; the row is unchanged', async () => {
+    const provider = s6ProviderId(408);
+    const player = await seedS6Player(sql, refs, { key: 408 });
+    await seedS6PendingEvidence(sql, refs, { providerId: provider, match: 408 });
+    await sql`
+      INSERT INTO external_identities (source_id, external_id, player_id, status, candidate_count, match_method)
+      VALUES (${refs.aflApiSourceId}, ${provider}, NULL, 'unmatched', 0, NULL)
+    `;
+    const form = await renderS6Form(provider);
+    expect(form.evidence?.state).toBe('X');
+    const before = await s6StateSnapshot(sql, refs, { providerIds: [provider], playerIds: [player.id] });
+    expect(await link(provider, player.id, form.linkFingerprint)).toMatchObject({ ok: false, code: 'T8_anomalous_row' });
+    expect(await s6StateSnapshot(sql, refs, { providerIds: [provider], playerIds: [player.id] })).toEqual(before);
+
+    // Revoke with the fingerprint the page renders. For a NULL-player row the page computes
+    // chosenPlayerId 0 and [the row itself] while revokeAflApiLink() recomputes -1 and [] (a
+    // `player_id = NULL` read finds nothing), so the two can never agree and the refusal
+    // surfaces as T6 rather than T8 -- recorded as an S6 finding. Either code refuses and
+    // writes nothing, which is what this case pins.
+    const pageRevoke = await revoke(provider, form.revokeFingerprint);
+    expect(pageRevoke.ok).toBe(false);
+    expect(['T6_stale_fingerprint', 'T8_anomalous_row']).toContain(pageRevoke.ok ? '' : pageRevoke.code);
+    // With the server's own fingerprint the anomaly itself is what refuses.
+    const serverFingerprint = adjudicationFingerprint({
+      providerId: provider, existing: form.evidence!.existing,
+      pendingCandidates: form.evidence!.pendingCandidates, latestAdjudicationId: form.evidence!.latestAdjudicationId,
+      chosenPlayerId: -1, chosenPlayerExistingRows: [],
+    });
+    expect(await revoke(provider, serverFingerprint)).toMatchObject({ ok: false, code: 'T8_anomalous_row' });
+    expect(await s6StateSnapshot(sql, refs, { providerIds: [provider], playerIds: [player.id] })).toEqual(before);
+  });
+
+  it('I4/T9 — a surname disagreement is refused without the acknowledgement, and recorded when acknowledged', async () => {
+    const provider = s6ProviderId(409);
+    const player = await seedS6Player(sql, refs, { key: 409, surname: 'Otherwise' });
+    await seedS6PendingEvidence(sql, refs, { providerId: provider, match: 409, surname: 'Forward' });
+    const form = await renderS6Form(provider);
+    const before = await s6StateSnapshot(sql, refs, { providerIds: [provider], playerIds: [player.id] });
+    // decideAflApiLink's own coded T9 -- never the pre-decision input check, which would
+    // pre-empt T2/T3 on an already-linked row (I7).
+    expect(await link(provider, player.id, form.linkFingerprint))
+      .toMatchObject({ ok: false, code: 'T9_surname_ack_required' });
+    expect(await s6StateSnapshot(sql, refs, { providerIds: [provider], playerIds: [player.id] })).toEqual(before);
+
+    expect(await link(provider, player.id, form.linkFingerprint, { surnameAcknowledged: true })).toEqual({ ok: true });
+    const [audit] = await s6LedgerRows(sql, [provider]);
+    expect(audit).toMatchObject({ action: 'linked', surnameAck: true, playerId: player.id });
+  });
+
+  it('I6b (Brownlow, OD-2) — a human link used only by a Brownlow settle is refused as used through D10 (a) and (b), with no projection row', async () => {
+    const { provider, playerId } = await humanLinked(601);
+    // The AFL API Brownlow settle's footprint: a brownlow_round_votes row (source afl_api, a
+    // F002-demoted votes = 0) and its append-only canonical_applications row, keyed by the
+    // provider MATCH id -- never `…|CD_I` -- with a target_key naming the player
+    // (canonical-apply.ts brownlow target key). No staging.afl_api_brownlow_vote projection
+    // exists (the runbook's "projection row deleted").
+    const matchRecord = s6MatchId(601);
+    const round = 23;
+    const { batchId } = await seedS6SpineVersion(sql, refs, {
+      family: 'brownlow_match_votes', externalRecordId: matchRecord,
+      payload: { providerMatchId: matchRecord, votes: [{ playerId: provider, votes: 0 }] },
+    });
+    await insertS6BrownlowVote(sql, refs, { playerId, roundNumber: round, sourceRecordId: matchRecord });
+    await sql`
+      INSERT INTO canonical_applications
+            (import_batch_id, source_id, family, external_record_id, source_version_seq,
+             target_table, target_key, verb, previous_values, new_values)
+      VALUES (${batchId}, ${refs.aflApiSourceId}, 'brownlow_match_votes', ${matchRecord}, 1,
+              'brownlow_round_votes',
+              ${sql.json({ season: S6_SEASON, player_id: playerId, round_number: round } as never)},
+              'insert', NULL, ${sql.json({ votes: 0, played: true } as never)})
+    `;
+    const [{ n: projections }] = await sql<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM staging.afl_api_brownlow_vote
+       WHERE source_id = ${refs.aflApiSourceId} AND (player_id = ${playerId} OR provider_player_id = ${provider})
+    `;
+    expect(projections).toBe(0);
+
+    async function expectRefusedAsUsed(mustName: readonly string[], mustNotName: readonly string[]): Promise<void> {
+      const form = await renderS6Form(provider);
+      const before = await s6StateSnapshot(sql, refs, { providerIds: [provider], playerIds: [playerId] });
+      const result = await revoke(provider, form.revokeFingerprint);
+      expect(result).toMatchObject({ ok: false, code: 'T19_revoke_unprovable' });
+      for (const table of mustName) expect(errorOf(result)).toContain(table);
+      for (const table of mustNotName) expect(errorOf(result)).not.toContain(table);
+      expect(await s6StateSnapshot(sql, refs, { providerIds: [provider], playerIds: [playerId] })).toEqual(before);
+    }
+
+    // (a) and (b) together.
+    await expectRefusedAsUsed(['public.brownlow_round_votes', 'public.canonical_applications'], []);
+    // (b) alone: the vote row gone, the append-only ledger still proves use.
+    await sql`DELETE FROM brownlow_round_votes WHERE player_id = ${playerId} AND round_number = ${round}`;
+    await expectRefusedAsUsed(['public.canonical_applications'], ['public.brownlow_round_votes']);
+    // (a) alone: the vote row back, the ledger row removed (fixture manipulation, owner only).
+    await insertS6BrownlowVote(sql, refs, { playerId, roundNumber: round, sourceRecordId: matchRecord });
+    await sql`DELETE FROM canonical_applications WHERE external_record_id = ${matchRecord}`;
+    await expectRefusedAsUsed(['public.brownlow_round_votes'], ['public.canonical_applications']);
+  });
+
+  it('I6d (lock) — while another session holds a read of external_identities the revoke refuses on lock_timeout and writes nothing', async () => {
+    const { provider, playerId } = await humanLinked(602);
+    const form = await renderS6Form(provider);
+    const reader = postgres(process.env.AFLDB_TEST_DATABASE_URL as string, { max: 1, onnotice: () => {} });
+    let release!: () => void;
+    const released = new Promise<void>((resolve) => { release = resolve; });
+    let markHeld!: () => void;
+    const held = new Promise<void>((resolve) => { markHeld = resolve; });
+    // A settle-shaped reader: it has read the link and its transaction is still open, so it
+    // holds ACCESS SHARE on external_identities until it ends.
+    const readerTx = reader.begin(async (tx) => {
+      await tx`
+        SELECT player_id FROM external_identities
+         WHERE source_id = ${refs.aflApiSourceId} AND external_id = ${provider} AND status IN ('unique', 'resolved')
+      `;
+      markHeld();
+      await released;
+    });
+    try {
+      await Promise.race([held, readerTx]);
+      const before = await s6StateSnapshot(sql, refs, { providerIds: [provider], playerIds: [playerId] });
+      const result = await revoke(provider, form.revokeFingerprint);
+      expect(result).toMatchObject({ ok: false, code: 'T19_revoke_unprovable' });
+      expect(errorOf(result)).toMatch(/in progress; retry/);
+      expect(await s6StateSnapshot(sql, refs, { providerIds: [provider], playerIds: [playerId] })).toEqual(before);
+    } finally {
+      release();
+      await readerTx.catch(() => undefined);
+      await reader.end({ timeout: 5 });
+    }
+    // The reader gone, the SAME fingerprint revokes: the refusal was the lock and nothing else.
+    expect(await revoke(provider, form.revokeFingerprint)).toEqual({ ok: true });
+  }, 60_000);
+
+  it('I6-LI (LINK_INDEPENDENT; the brief\'s I6d) — an afl_api player_height_evidence row does not block a revoke and survives it', async () => {
+    const { provider, playerId } = await humanLinked(603);
+    // D10's R1 example: afl_api provenance, but attributed by name + club + season matching.
+    await sql`
+      INSERT INTO player_height_evidence (player_id, source_id, external_id, height_cm, evidence_type, notes)
+      VALUES (${playerId}, ${refs.aflApiSourceId}, ${provider}, 188, 'issue235_s6_fixture',
+              'AFLDB-ISSUE-235 S6 LINK_INDEPENDENT fixture')
+    `;
+    const heightBefore = await sql<{ row: unknown }[]>`
+      SELECT to_jsonb(h) AS row FROM player_height_evidence h WHERE player_id = ${playerId}
+    `;
+    const form = await renderS6Form(provider);
+    expect(await revoke(provider, form.revokeFingerprint)).toEqual({ ok: true });
+    expect(await i235AflApiRows(refs, { providerId: provider, playerId })).toEqual([]);
+    const ledger = await s6LedgerRows(sql, [provider]);
+    expect(ledger.map((r) => r.action)).toEqual(['linked', 'revoked']);
+    expect(ledger[1].supersedesId).toBe(ledger[0].id);
+    expect(await sql<{ row: unknown }[]>`
+      SELECT to_jsonb(h) AS row FROM player_height_evidence h WHERE player_id = ${playerId}
+    `).toEqual(heightBefore);
+  });
+
+  it('I7 — link and revoke against the BRIDGED importer (unique) provider are refused; its status, player_id and match_method are unchanged', async () => {
+    const other = await seedS6Player(sql, refs, { key: 701 });
+    const form = await renderS6Form(BRIDGED_PROVIDER_PLAYER_ID);
+    expect(form.evidence?.state).toBe('L-I');
+    const scope = { providerIds: [BRIDGED_PROVIDER_PLAYER_ID], playerIds: [bridgedPlayerId, other.id] };
+    const before = await s6StateSnapshot(sql, refs, scope);
+    expect(await link(BRIDGED_PROVIDER_PLAYER_ID, bridgedPlayerId, form.linkFingerprint))
+      .toMatchObject({ ok: false, code: 'T2_already_linked_same_player' });
+    expect(await link(BRIDGED_PROVIDER_PLAYER_ID, other.id, form.linkFingerprint))
+      .toMatchObject({ ok: false, code: 'T3_already_linked_different_player' });
+    expect(await revoke(BRIDGED_PROVIDER_PLAYER_ID, form.revokeFingerprint))
+      .toMatchObject({ ok: false, code: 'T20_revoke_importer_link' });
+    expect(await s6StateSnapshot(sql, refs, scope)).toEqual(before);
+    expect(await i235AflApiRows(refs, { providerId: BRIDGED_PROVIDER_PLAYER_ID })).toEqual([
+      expect.objectContaining({
+        status: 'unique', playerId: bridgedPlayerId, matchMethod: 'afl_api_stat_vector_bootstrap',
+      }),
+    ]);
+  });
+});
+
+describe('AFLDB-ISSUE-235 S6 (I15, I16): the D15 replay fails closed and is idempotent against afldb_test', () => {
+  let refs: S6Refs;
+  let actorId: number;
+  let restoreImportDsn: (() => void) | undefined;
+
+  beforeAll(async () => {
+    refs = await loadS6Refs(sql);
+    restoreImportDsn = (await routeS6ImportDsn()).restore;
+    await cleanupS6Fixtures(sql, refs);
+    // The replay and the bijection read the WHOLE ledger; their exact counts need it to
+    // hold only ISSUE-235 fixture rows. Refuses (never deletes) otherwise.
+    await assertS6LedgerIsolated(sql, refs);
+  });
+
+  beforeEach(async () => {
+    actorId = await seedS6Actor(sql);
+  });
+
+  afterEach(async () => {
+    await cleanupS6Fixtures(sql, refs);
+  });
+
+  afterAll(async () => {
+    await cleanupS6Fixtures(sql, refs);
+    restoreImportDsn?.();
+  });
+
+  /** A ledger row written directly (fixture setup, the I14 idiom): the ledger a promotion or
+   * rebuild reinstates, whose outcome the replay must re-derive. */
+  async function ledgerRow(input: {
+    providerId: string; action: 'linked' | 'revoked'; playerId: number; playerIdentity: string;
+    supersedesId?: number;
+  }): Promise<number> {
+    const [row] = await sql<{ id: string }[]>`
+      INSERT INTO afl_api_identity_adjudications
+            (source_key, external_id, action, player_id, player_identity, evidence, evidence_sha256,
+             surname_disagreement_acknowledged, supersedes_id, admin_user_id, note)
+      VALUES ('afl_api', ${input.providerId}, ${input.action}, ${input.playerId}, ${input.playerIdentity},
+              '{"fixture":"I15"}'::jsonb, ${'a'.repeat(64)}, false, ${input.supersedesId ?? null}, ${actorId},
+              ${S6_NOTE})
+      RETURNING id::text AS id
+    `;
+    return Number(row.id);
+  }
+
+  /**
+   * Seeds a GOOD net-linked ledger row that on its own would be inserted, then asserts that a
+   * replay over the whole ledger throws AflApiReplayAbort naming `bad`, and that the rollback
+   * left every afl_api row, every ledger row and every candidate exactly as they were -- so
+   * the good provider is NOT linked either (no partial replay).
+   */
+  async function expectReplayStops(input: {
+    bad: string; reason: RegExp; scope: { providerIds: string[]; playerIds: number[] };
+  }): Promise<void> {
+    const good = s6ProviderId(1599);
+    const goodPlayer = await seedS6Player(sql, refs, { key: 1599 });
+    await ledgerRow({ providerId: good, action: 'linked', playerId: goodPlayer.id, playerIdentity: goodPlayer.identity! });
+    const scope = {
+      providerIds: [...input.scope.providerIds, good], playerIds: [...input.scope.playerIds, goodPlayer.id],
+    };
+    const before = await s6StateSnapshot(sql, refs, scope);
+    const error = await sql.begin((tx) => replayAflApiAdjudications(tx)).then(() => null, (e: unknown) => e);
+    expect(error).toBeInstanceOf(AflApiReplayAbort);
+    expect((error as Error).message).toContain(input.bad);
+    expect((error as Error).message).toMatch(input.reason);
+    expect((error as Error).message).not.toContain(good); // the good row is not a stop…
+    expect(await s6StateSnapshot(sql, refs, scope)).toEqual(before); // …and was not written
+    expect(await i235AflApiRows(refs, { providerId: good })).toEqual([]);
+  }
+
+  // NOT A LIVE CASE: "a remap whose identity differs from the stored player_identity". The live
+  // adapter's remap is resolveAflApiPlayerIdentity(tx, storedIdentity), which looks the player up
+  // BY the stored identity and returns that same string as remappedIdentity, so PostgreSQL state
+  // cannot make them differ. The planner branch is pinned DB-free instead
+  // (db-promotion-check.test.ts, C4), and is not weakened to make it reachable here.
+  //
+  // Nor is there a live "malformed ledger sequence" stop: the replay planner reduces the ledger to
+  // the latest action per provider by id (netLedgerRowsByExternalId) and has no sequence-shape
+  // rule to trip. Ledger structure is checked where a ledger is MOVED, by the OD-5 capture
+  // (capturedRowProblems, DB-free in db-test-rebuild.test.ts C6).
+
+  it('I15 — an unresolvable player_identity stops the replay; nothing is written', async () => {
+    const bad = s6ProviderId(1501);
+    const player = await seedS6Player(sql, refs, { key: 1501 });
+    await ledgerRow({
+      providerId: bad, action: 'linked', playerId: player.id, playerIdentity: 'players/Z/Issue235-S6-nobody.html',
+    });
+    await expectReplayStops({ bad, reason: /does not resolve to any candidate player/, scope: { providerIds: [bad], playerIds: [player.id] } });
+  });
+
+  it('I15 — an ambiguous player_identity (an afltables and a manual_admin_edit identity naming two players) stops the replay', async () => {
+    if (refs.manualAdminEditSourceId === null) {
+      throw new Error("sources 'manual_admin_edit' (migration 057) must exist on afldb_test for the ambiguous-identity case.");
+    }
+    const bad = s6ProviderId(1502);
+    const playerB = await seedS6Player(sql, refs, { key: 1502, stable: false });
+    const playerC = await seedS6Player(sql, refs, { key: 1512, stable: false });
+    const identity = 'players/Z/Issue235-S6-ambiguous.html';
+    await sql`
+      INSERT INTO external_identities (source_id, external_id, player_id, status, candidate_count, match_method)
+      VALUES (${refs.afltablesSourceId}, ${identity}, ${playerB.id}, 'unique', 1, 'afltables_profile_url'),
+             (${refs.manualAdminEditSourceId}, ${identity}, ${playerC.id}, 'unique', 1, 'manual_admin_edit')
+    `;
+    await ledgerRow({ providerId: bad, action: 'linked', playerId: playerB.id, playerIdentity: identity });
+    await expectReplayStops({
+      bad, reason: /resolves to more than one candidate player/, scope: { providerIds: [bad], playerIds: [playerB.id, playerC.id] },
+    });
+  });
+
+  it('I15 — an importer unique row for the CD_I naming a DIFFERENT player stops the replay; the importer row is untouched', async () => {
+    const bad = s6ProviderId(1503);
+    const ledgerPlayer = await seedS6Player(sql, refs, { key: 1503 });
+    const importerPlayer = await seedS6Player(sql, refs, { key: 1513 });
+    await seedS6ImporterLink(sql, refs, bad, importerPlayer.id);
+    await ledgerRow({ providerId: bad, action: 'linked', playerId: ledgerPlayer.id, playerIdentity: ledgerPlayer.identity! });
+    await expectReplayStops({
+      bad, reason: /conflicting external_identities row already exists/,
+      scope: { providerIds: [bad], playerIds: [ledgerPlayer.id, importerPlayer.id] },
+    });
+  });
+
+  it('I15 — an importer unique row for the CD_I and the SAME player still stops the replay (it is not the identical human row)', async () => {
+    const bad = s6ProviderId(1504);
+    const player = await seedS6Player(sql, refs, { key: 1504 });
+    await seedS6ImporterLink(sql, refs, bad, player.id);
+    await ledgerRow({ providerId: bad, action: 'linked', playerId: player.id, playerIdentity: player.identity! });
+    await expectReplayStops({
+      bad, reason: /conflicting external_identities row already exists/, scope: { providerIds: [bad], playerIds: [player.id] },
+    });
+  });
+
+  it('I15 — a conflicting HUMAN row for the CD_I (another player) stops the replay', async () => {
+    const bad = s6ProviderId(1505);
+    const ledgerPlayer = await seedS6Player(sql, refs, { key: 1505 });
+    const otherPlayer = await seedS6Player(sql, refs, { key: 1515 });
+    await sql`
+      INSERT INTO external_identities (source_id, external_id, player_id, status, candidate_count, match_method, notes)
+      VALUES (${refs.aflApiSourceId}, ${bad}, ${otherPlayer.id}, 'resolved', 0, 'afl_api_admin_adjudication',
+              'AFLDB-ISSUE-235 S6 fixture: a human row the ledger does not describe')
+    `;
+    await ledgerRow({ providerId: bad, action: 'linked', playerId: ledgerPlayer.id, playerIdentity: ledgerPlayer.identity! });
+    await expectReplayStops({
+      bad, reason: /conflicting external_identities row already exists/,
+      scope: { providerIds: [bad], playerIds: [ledgerPlayer.id, otherPlayer.id] },
+    });
+  });
+
+  it('I15 — a remapped player already holding another afl_api row stops the replay', async () => {
+    const bad = s6ProviderId(1506);
+    const held = s6ProviderId(1516);
+    const player = await seedS6Player(sql, refs, { key: 1506 });
+    await seedS6ImporterLink(sql, refs, held, player.id);
+    await ledgerRow({ providerId: bad, action: 'linked', playerId: player.id, playerIdentity: player.identity! });
+    await expectReplayStops({
+      bad, reason: new RegExp(`already holds a different afl_api provider \\(${held}\\)`),
+      scope: { providerIds: [bad, held], playerIds: [player.id] },
+    });
+  });
+
+  // I16 here is the operator brief's replay-idempotence case. The runbook's own I16 -- the bridge
+  // loader's --dry-run reporting agreeing providers as `already_linked (human)` after a replay --
+  // is a Python loader run against an accepted artefact, operator-run (§10.2 "Bridge regression"),
+  // and is not a vitest case.
+  it('I16 (replay idempotence) — over a ledger written by the real link/revoke API, a first replay re-creates exactly the net-linked rows and a second is a pure no-op', async () => {
+    const [a, b, c] = [
+      await seedS6Player(sql, refs, { key: 1601 }),
+      await seedS6Player(sql, refs, { key: 1602 }),
+      await seedS6Player(sql, refs, { key: 1603 }),
+    ];
+    const [p1, p2, p3] = [s6ProviderId(1601), s6ProviderId(1602), s6ProviderId(1603)];
+    for (const [provider, match] of [[p1, 1601], [p2, 1602], [p3, 1603]] as const) {
+      await seedS6PendingEvidence(sql, refs, { providerId: provider, match });
+    }
+    async function realLink(provider: string, playerId: number): Promise<void> {
+      const form = await renderS6Form(provider);
+      expect(await linkAflApiProvider({
+        providerId: provider, playerId, adminUserId: actorId, note: S6_NOTE, surnameAcknowledged: false,
+        fingerprint: form.linkFingerprint!,
+      })).toEqual({ ok: true });
+    }
+    async function realRevoke(provider: string): Promise<void> {
+      const form = await renderS6Form(provider);
+      expect(await revokeAflApiLink({
+        providerId: provider, adminUserId: actorId, note: S6_NOTE, fingerprint: form.revokeFingerprint!,
+      })).toEqual({ ok: true });
+    }
+    // Net linked (P1), net revoked (P2), and linked -> revoked -> linked (P3).
+    await realLink(p1, a.id);
+    await realLink(p2, b.id);
+    await realRevoke(p2);
+    await realLink(p3, c.id);
+    await realRevoke(p3);
+    await realLink(p3, c.id);
+
+    const providers = [p1, p2, p3];
+    const ledgerBefore = await s6LedgerRows(sql, providers);
+    expect(ledgerBefore.map((r) => `${r.externalId}:${r.action}`)).toEqual([
+      `${p1}:linked`, `${p2}:linked`, `${p2}:revoked`, `${p3}:linked`, `${p3}:revoked`, `${p3}:linked`,
+    ]);
+    await sql.begin((tx) => assertAflApiAdjudicationBijection(tx));
+
+    // The post-promotion/post-rebuild state D15 replays into: the ledger survived, the human
+    // identities did not.
+    await sql`DELETE FROM external_identities WHERE source_id = ${refs.aflApiSourceId} AND external_id IN (${p1}, ${p3})`;
+    await expect(sql.begin((tx) => assertAflApiAdjudicationBijection(tx))).rejects.toThrow(/ledger_without_row/);
+
+    expect(await sql.begin((tx) => replayAflApiAdjudications(tx))).toEqual({ inserted: 2, noops: 0, stops: [] });
+    const afterFirst = await sql<{ externalId: string; playerId: number; status: string; matchMethod: string }[]>`
+      SELECT external_id AS "externalId", player_id AS "playerId", status::text AS status, match_method AS "matchMethod"
+        FROM external_identities
+       WHERE source_id = ${refs.aflApiSourceId} AND external_id IN (${p1}, ${p2}, ${p3})
+       ORDER BY external_id
+    `;
+    expect(afterFirst).toEqual([
+      { externalId: p1, playerId: a.id, status: 'resolved', matchMethod: 'afl_api_admin_adjudication' },
+      { externalId: p3, playerId: c.id, status: 'resolved', matchMethod: 'afl_api_admin_adjudication' },
+    ]);
+    await sql.begin((tx) => assertAflApiAdjudicationBijection(tx));
+
+    expect(await sql.begin((tx) => replayAflApiAdjudications(tx))).toEqual({ inserted: 0, noops: 2, stops: [] });
+    const afterSecond = await sql<{ externalId: string; playerId: number; status: string; matchMethod: string }[]>`
+      SELECT external_id AS "externalId", player_id AS "playerId", status::text AS status, match_method AS "matchMethod"
+        FROM external_identities
+       WHERE source_id = ${refs.aflApiSourceId} AND external_id IN (${p1}, ${p2}, ${p3})
+       ORDER BY external_id
+    `;
+    expect(afterSecond).toEqual(afterFirst); // no duplicate, no change
+    expect(await s6LedgerRows(sql, providers)).toEqual(ledgerBefore); // the ledger is never written by a replay
+    await sql.begin((tx) => assertAflApiAdjudicationBijection(tx));
+  }, 120_000);
+});
+
+/**
+ * AFLDB-ISSUE-235 OD-5 — `observeLiveReinstatement()` against real PostgreSQL, WITHOUT a rebuild.
+ *
+ * The state under test is what `db:test:rebuild` leaves when its reinstate transaction
+ * COMMITTED and the process died before the capture file was archived: a pending capture that
+ * equals the live ledger, the human identities replayed, the sequence advanced. This drives the
+ * capture step's own database half exactly as `runCapture()` does (one REPEATABLE READ READ ONLY
+ * snapshot: readLedger -> decidePendingCapture -> observeLiveReinstatement), then its file half
+ * (`settleCapture`) against a temporary capture directory. Nothing is destroyed or rebuilt.
+ *
+ * The refusal cases alter live state INSIDE the observing transaction, which is then switched to
+ * READ ONLY (PostgreSQL lets a read-write transaction become read-only at any point) and always
+ * rolled back, so no altered state is ever committed and there is nothing to restore. The
+ * "sequence behind the maximum id" refusal is NOT exercised live: setval() is non-transactional,
+ * so it would move the shared sequence outside any rollback; assertSequenceAboveLedger() is pinned
+ * DB-free (db-test-rebuild.test.ts C6).
+ */
+describe('AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreSQL (post-COMMIT, pre-archive recovery)', () => {
+  let refs: S6Refs;
+  let actorId: number;
+  let restoreImportDsn: (() => void) | undefined;
+  let database: string;
+  let dir: string;
+  const [p1, p2, p3, p4] = [s6ProviderId(1801), s6ProviderId(1802), s6ProviderId(1803), s6ProviderId(1804)];
+  let spare: { id: number; identity: string | null };
+
+  type ObservedState = {
+    live: { present: boolean; rows: CapturedLedgerRow[] };
+    decision: PendingCaptureDecision;
+    observed: LiveReinstatementObservation | null;
+  };
+
+  beforeAll(async () => {
+    refs = await loadS6Refs(sql);
+    restoreImportDsn = (await routeS6ImportDsn()).restore;
+    await cleanupS6Fixtures(sql, refs);
+    await assertS6LedgerIsolated(sql, refs);
+    [{ database }] = await sql<{ database: string }[]>`SELECT current_database() AS database`;
+    expect(database).toMatch(/_test$/);
+  });
+
+  // The committed reinstatement: a real ledger and its real human identities, written through
+  // the API (so the sequence is genuinely above every id): P1 linked, P2 linked then revoked,
+  // P3 linked -- two net-linked providers, four ledger rows.
+  beforeEach(async () => {
+    actorId = await seedS6Actor(sql);
+    const players = [
+      await seedS6Player(sql, refs, { key: 1801 }),
+      await seedS6Player(sql, refs, { key: 1802 }),
+      await seedS6Player(sql, refs, { key: 1803 }),
+    ];
+    spare = await seedS6Player(sql, refs, { key: 1804 });
+    for (const [i, provider] of [p1, p2, p3].entries()) {
+      await seedS6PendingEvidence(sql, refs, { providerId: provider, match: 1801 + i });
+      const form = await renderS6Form(provider);
+      expect(await linkAflApiProvider({
+        providerId: provider, playerId: players[i].id, adminUserId: actorId, note: S6_NOTE,
+        surnameAcknowledged: false, fingerprint: form.linkFingerprint!,
+      })).toEqual({ ok: true });
+    }
+    const revokeForm = await renderS6Form(p2);
+    expect(await revokeAflApiLink({
+      providerId: p2, adminUserId: actorId, note: S6_NOTE, fingerprint: revokeForm.revokeFingerprint!,
+    })).toEqual({ ok: true });
+    dir = mkdtempSync(join(tmpdir(), 'afldb-issue235-od5-'));
+  }, 60_000);
+
+  afterEach(async () => {
+    if (dir) rmSync(dir, { recursive: true, force: true });
+    await cleanupS6Fixtures(sql, refs);
+  });
+
+  afterAll(async () => {
+    await cleanupS6Fixtures(sql, refs);
+    restoreImportDsn?.();
+  });
+
+  /**
+   * The pending capture a run leaves behind: taken from the ledger BEFORE the reset, so its
+   * surrogates (`player_id`, `admin_user_id`) are the destroyed database's, and its actor email
+   * may differ in case. `sameLedger()` must see through both. Written and re-read through the
+   * real file functions, exactly as `runCapture()` reads it.
+   */
+  async function writePendingPreResetCapture(): Promise<LedgerCapture> {
+    const live = await sql.begin('read only', (tx) => readLedger(tx));
+    expect(live.rows).toHaveLength(4);
+    const capture = buildLedgerCapture({
+      database, capturedAt: '2026-09-24T00:00:00.000Z', ledgerTablePresent: live.present,
+      rows: live.rows.map((r) => ({
+        ...r, playerId: r.playerId + 7_000_000, adminUserId: r.adminUserId + 7_000_000, adminEmail: r.adminEmail.toUpperCase(),
+      })),
+    });
+    writePendingCapture(dir, capture);
+    const reRead = readPendingCapture(dir, database);
+    expect(reRead?.payloadSha256).toBe(capture.payloadSha256);
+    return reRead!;
+  }
+
+  async function observe(tx: postgres.TransactionSql, pending: LedgerCapture): Promise<ObservedState> {
+    const live = await readLedger(tx);
+    const decision = decidePendingCapture({ pending, liveRows: live.rows, recover: false });
+    const observed = decision.action === 'verify-reinstated' ? await observeLiveReinstatement(tx) : null;
+    return { live, decision, observed };
+  }
+
+  /** runCapture()'s own snapshot, committed state only. */
+  function observeCommitted(pending: LedgerCapture): Promise<ObservedState> {
+    return sql.begin('isolation level repeatable read read only', (tx) => observe(tx, pending));
+  }
+
+  /** The same observation over an altered state that is NEVER committed. */
+  async function observeAltered(
+    pending: LedgerCapture, alter: (tx: postgres.TransactionSql) => Promise<void>,
+  ): Promise<ObservedState> {
+    const rollback = new Error('ISSUE-235 OD-5: roll the altered state back');
+    let state: ObservedState | undefined;
+    await sql.begin('isolation level repeatable read', async (tx) => {
+      await alter(tx);
+      await tx`SET TRANSACTION READ ONLY`;
+      state = await observe(tx, pending);
+      throw rollback;
+    }).catch((error: unknown) => {
+      if (error !== rollback) throw error;
+    });
+    return state!;
+  }
+
+  async function databaseState() {
+    const [ledger, identities, sequence] = await Promise.all([
+      sql`SELECT to_jsonb(a) AS row FROM afl_api_identity_adjudications a WHERE external_id IN (${p1}, ${p2}, ${p3}, ${p4}) ORDER BY id`,
+      sql`SELECT to_jsonb(e) AS row FROM external_identities e WHERE source_id = ${refs.aflApiSourceId} AND external_id IN (${p1}, ${p2}, ${p3}, ${p4}) ORDER BY id`,
+      sql`SELECT last_value::text AS "lastValue", is_called AS "isCalled" FROM afl_api_identity_adjudications_id_seq`,
+    ]);
+    return { ledger: [...ledger], identities: [...identities], sequence: [...sequence] };
+  }
+
+  function pendingFileState(): { files: string[]; pending: string } {
+    return {
+      files: readdirSync(dir).sort(),
+      pending: readFileSync(join(dir, PENDING_CAPTURE_FILE), 'utf8'),
+    };
+  }
+
+  it('OD-5 recovery — a committed reinstatement whose capture was never archived is verified, archived and captured afresh; the database is not written', async () => {
+    const pending = await writePendingPreResetCapture();
+    const before = await databaseState();
+
+    // The observation refuses a read-write transaction outright.
+    await expect(sql.begin((tx) => observeLiveReinstatement(tx))).rejects.toThrow(/read-only transaction/);
+
+    const state = await observeCommitted(pending);
+    expect(state.decision).toEqual({ action: 'verify-reinstated' });
+    expect(state.observed).not.toBeNull();
+    const observed = state.observed!;
+    expect(observed.replay).toEqual({ inserted: 0, noops: 2, stops: [] }); // P1 and P3, already present
+    expect(observed.bijection).toBe('ok');
+    const maxId = Math.max(...state.live.rows.map((r) => r.id));
+    expect(nextIdentityValue(observed.sequence)).toBeGreaterThan(maxId);
+    expect(reinstatedCaptureProblems(pending, state.live.rows, observed)).toEqual([]);
+
+    const outcome = settleCapture({ dir, database, capturedAt: '2026-09-24T01:00:00.000Z', pending, ...state });
+    expect(outcome.adopted).toBeNull();
+    expect(outcome.archived).toBe(join(dir, archivedCaptureName(pending)));
+    expect(existsSync(outcome.archived!)).toBe(true);
+    expect(outcome.captured!.capture.rows).toEqual(state.live.rows); // this run's capture: the live ledger
+    expect(readPendingCapture(dir, database)?.payloadSha256).toBe(outcome.captured!.capture.payloadSha256);
+    expect(readdirSync(dir).sort()).toEqual([archivedCaptureName(pending), PENDING_CAPTURE_FILE].sort());
+
+    expect(await databaseState()).toEqual(before); // read-only: no ledger, identity or sequence change
+  });
+
+  it('OD-5 reinstate (rolled back, no rebuild) — reinstateAndReplay() puts a captured ledger back byte-for-byte under its original ids, replays it and passes the bijection', async () => {
+    // Not I18 and not a rebuild: the stage-(ii) function itself, against real PostgreSQL, inside
+    // ONE transaction that is always rolled back. It meets the state a reset leaves (players and
+    // their AFL Tables identities present, the ledger empty, no human afl_api identity) by
+    // deleting this case's own ledger rows and human rows inside that transaction.
+    const pending = await writePendingPreResetCapture();
+    const before = await databaseState();
+    const [sequenceBefore] = await sql<{ lastValue: string; isCalled: boolean }[]>`
+      SELECT last_value::text AS "lastValue", is_called AS "isCalled" FROM afl_api_identity_adjudications_id_seq
+    `;
+    const rollback = new Error('ISSUE-235 OD-5: roll the reinstatement back');
+    let report: ReinstateReport | undefined;
+    let readBack: CapturedLedgerRow[] = [];
+    try {
+      await sql.begin(async (tx) => {
+        await tx`
+          DELETE FROM external_identities
+           WHERE source_id = ${refs.aflApiSourceId} AND external_id IN (${p1}, ${p2}, ${p3})
+        `;
+        await tx`DELETE FROM afl_api_identity_adjudications WHERE external_id IN (${p1}, ${p2}, ${p3})`;
+        report = await reinstateAndReplay(tx, pending);
+        readBack = (await readLedger(tx)).rows;
+        throw rollback;
+      });
+    } catch (error) {
+      if (error !== rollback) throw error;
+    } finally {
+      // reinstateAndReplay() advances the identity sequence with setval(), which no rollback
+      // undoes: put it back exactly.
+      await sql`
+        SELECT setval('public.afl_api_identity_adjudications_id_seq'::regclass,
+                      ${sequenceBefore.lastValue}::bigint, ${sequenceBefore.isCalled})
+      `;
+    }
+
+    expect(report).toMatchObject({
+      ledgerRows: 4, actorsReused: 1, actorsCreated: 0, replay: { inserted: 2, noops: 0, stops: [] },
+    });
+    const ledgerFields = (r: CapturedLedgerRow) => [
+      r.id, r.externalId, r.action, r.playerIdentity, r.previousState, r.evidence, r.evidenceSha256,
+      r.surnameDisagreementAcknowledged, r.supersedesId, r.note, r.createdAt,
+    ];
+    expect(readBack.map(ledgerFields)).toEqual(pending.rows.map(ledgerFields));
+    expect(await databaseState()).toEqual(before); // rolled back, sequence restored
+  });
+
+  it('OD-5 recovery — a missing human identity is refused as already_reinstated_unverified; the pending capture is left in place', async () => {
+    const pending = await writePendingPreResetCapture();
+    const filesBefore = pendingFileState();
+    const state = await observeAltered(pending, async (tx) => {
+      await tx`DELETE FROM external_identities WHERE source_id = ${refs.aflApiSourceId} AND external_id = ${p3}`;
+    });
+    expect(state.decision).toEqual({ action: 'verify-reinstated' }); // the ledger itself still matches
+    const observed = state.observed!;
+    // The replay NEEDED an INSERT, which the read-only transaction refused inside its savepoint.
+    expect(observed.replay).toEqual({ error: expect.stringMatching(/read-only transaction/) });
+    expect(observed.bijection).toEqual({ error: expect.stringContaining(`ledger_without_row:${p3}`) });
+    const problems = reinstatedCaptureProblems(pending, state.live.rows, observed).join('\n');
+    expect(problems).toContain('a replay could not confirm the human identities');
+    expect(problems).toContain('the bijection does not hold');
+
+    expect(() => settleCapture({ dir, database, capturedAt: '2026-09-24T01:00:00.000Z', pending, ...state }))
+      .toThrow(/already_reinstated_unverified/);
+    expect(pendingFileState()).toEqual(filesBefore);
+    expect(await i235AflApiRows(refs, { providerId: p3 })).toHaveLength(1); // rolled back
+  });
+
+  it('OD-5 recovery — a human identity with no ledger entry is refused; the pending capture is left in place', async () => {
+    const pending = await writePendingPreResetCapture();
+    const filesBefore = pendingFileState();
+    const state = await observeAltered(pending, async (tx) => {
+      await tx`
+        INSERT INTO external_identities (source_id, external_id, player_id, status, candidate_count, match_method, notes)
+        VALUES (${refs.aflApiSourceId}, ${p4}, ${spare.id}, 'resolved', 0, 'afl_api_admin_adjudication',
+                'AFLDB-ISSUE-235 S6 fixture: a human row with no ledger entry')
+      `;
+    });
+    expect(state.decision).toEqual({ action: 'verify-reinstated' });
+    expect(state.observed!.replay).toEqual({ inserted: 0, noops: 2, stops: [] }); // the ledger's own rows are fine
+    expect(state.observed!.bijection).toEqual({ error: expect.stringContaining(`row_without_ledger:${p4}`) });
+    expect(() => settleCapture({ dir, database, capturedAt: '2026-09-24T01:00:00.000Z', pending, ...state }))
+      .toThrow(/already_reinstated_unverified/);
+    expect(pendingFileState()).toEqual(filesBefore);
+    expect(await i235AflApiRows(refs, { providerId: p4 })).toEqual([]); // rolled back
+  });
+
+  it('OD-5 recovery — ledger drift is refused before any observation; the pending capture is left in place', async () => {
+    const pending = await writePendingPreResetCapture();
+    const filesBefore = pendingFileState();
+    const state = await observeAltered(pending, async (tx) => {
+      await tx`
+        INSERT INTO afl_api_identity_adjudications
+              (source_key, external_id, action, player_id, player_identity, evidence, evidence_sha256,
+               surname_disagreement_acknowledged, admin_user_id, note)
+        VALUES ('afl_api', ${p4}, 'linked', ${spare.id}, ${spare.identity}, '{"fixture":"OD-5 drift"}'::jsonb,
+                ${'b'.repeat(64)}, false, ${actorId}, ${S6_NOTE})
+      `;
+    });
+    expect(state.live.rows).toHaveLength(5);
+    expect(state.decision).toMatchObject({ action: 'refuse' });
+    expect(state.observed).toBeNull();
+    expect(() => settleCapture({ dir, database, capturedAt: '2026-09-24T01:00:00.000Z', pending, ...state }))
+      .toThrow(/differs from it/);
+    expect(pendingFileState()).toEqual(filesBefore);
+    const [{ n }] = await sql<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM afl_api_identity_adjudications WHERE external_id = ${p4}
+    `;
+    expect(n).toBe(0); // rolled back
+  });
+});
+
+/**
+ * AFLDB-ISSUE-235 S6 — the fixture-leftover gate. Last in file order, so a full-file run reaches
+ * it after every ISSUE-235 describe's own teardown and after the root cleanup() of the settle
+ * lifecycle's namespace rows; run on its own (`-t "fixture-leftover gate"`) it proves an
+ * interrupted earlier run left nothing behind. It deletes nothing.
+ */
+describe('AFLDB-ISSUE-235 S6 fixture-leftover gate', () => {
+  it('S6 fixture-leftover gate — afldb_test holds zero ISSUE-235 fixture rows', async () => {
+    const refs = await loadS6Refs(sql);
+    expect(await issue235FixtureResidue(sql, refs)).toEqual(ZERO_ISSUE235_RESIDUE);
+  });
 });

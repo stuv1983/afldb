@@ -2328,3 +2328,114 @@ investigated) once `CONCLUDED`.
 > above are superseded: both PASSED on 2026-09-23 (record `issues/closed/AFLDB-ISSUE-228.md`
 > §22.16, §22.18). Season discovery and rollover → `AFLDB-ISSUE-233`; optional feeds →
 > `AFLDB-ISSUE-234`; `afl_api` player-link adjudication → `AFLDB-ISSUE-235`.
+
+> **Update 2026-09-23 (AFLDB-ISSUE-235, S7): `afl_api` now has TWO `external_identities`
+> writers.** `tools/migration/import_afl_api_player_bridge.py` (S5, above) remains the only
+> *importer*, and its no-`UPDATE`/no-`DELETE` contract is unchanged. A Super Admin can now
+> also write a human decision through `/admin/player-links/afl-api`
+> (`src/db/queries/afl-api-player-links.ts`).
+>
+> **Precedence: first trusted writer wins, neither ever changes the other's row.**
+> `external_identities_uq (source_id, external_id)` (migration 002) allows at most one row
+> per provider, so there is no ranking to define — the two writers can never race for the
+> same row's ownership, only for who writes it FIRST. `status = 'unique'` (importer) and
+> `status = 'resolved'` + `match_method = 'afl_api_admin_adjudication'` (human) are trusted
+> **identically** by every reader (`afl-api-player-resolver.ts`, unchanged) — `resolved` is
+> human *provenance*, not higher confidence. A later bridge run that disagrees with a human
+> row is withheld with a `data_issues` `afl_api_identity_contradiction` finding (existing
+> path, now labelled `existing_status`/`existing_match_method` so a reader can tell which
+> writer owns the disagreement); a later bridge run whose CANDIDATE PLAYER already holds a
+> different `afl_api` row (importer or human) is withheld as a new `player_collision`
+> finding (`details.kind = 'player_already_linked'`) instead of ever being written. Both
+> paths are backstopped by migration 104's partial unique index (one `afl_api` provider per
+> player, OD-1), which a bare `INSERT` can still violate under a race the application-level
+> checks cannot see.
+>
+> **Revoke exists, but only on a proven non-use (D10).** A human `resolved` link may be
+> reversed — DELETE the row, append a `revoked` audit row — only when database and code
+> evidence prove it was never consumed by a canonical or source-derived write. The proof
+> reads the catalogue across every non-system schema, validates it against a pinned
+> manifest (`AFL_API_PLAYER_REFERENCE_MANIFEST`, `src/lib/acquisition/afl-api-adjudication.ts`),
+> and runs each `LINK_DEPENDENT` table's use predicate plus two ledger checks
+> (`canonical_applications`, `promotion_candidates`). Any gap in that proof refuses, never
+> passes open. Before the proof runs, the revoke takes `LOCK TABLE external_identities IN
+> ACCESS EXCLUSIVE MODE` under a 2-second `lock_timeout`, so every settle transaction that
+> might have read the link has committed first — while that lock is pending (at most ~2s),
+> **any** reader of `external_identities` queues behind it, a documented, rare, Super
+> Admin-initiated stall. Only an importer `unique` link is refused outright (never
+> revocable from this surface); a *used* human link is refused too — correcting it belongs
+> to a follow-up (F-1), not this surface.
+>
+> **The human decision survives a promotion or the destructive `afldb_test` rebuild,
+> together with its identity outcome (OD-3).** `afl_api_identity_adjudications`
+> (migration 104) is an append-only, durable-identity-authority ledger, reinstated in
+> *every* environment (no DEV `historicalOnly` carve-out, unlike `player_link_resolutions`)
+> and remapped through the same `afltables_profile_url`/`manual_admin_edit` lineage rule
+> `promotion-inventory.ts` already uses for other human-authored tables — no new identity
+> mechanism. `tools/migration/replay_afl_api_adjudications.ts` re-derives each ledger row's
+> current player independently of whatever its own `player_id` column holds (so a skipped
+> or stale generic lineage remap is still caught), then re-creates exactly the net-`linked`
+> `resolved` rows: an identical row already present is an idempotent no-op, and every
+> conflict, ambiguity or unresolvable identity **stops the whole replay** rather than
+> partially applying it. Run at "Post-promotion state" step 1 in
+> `docs/production-promotion.md`, immediately after `replay_admin_overrides('players')` —
+> chosen as a TypeScript adapter (not a `common.py` addition) because the D15 decision logic
+> already lives in `afl-api-adjudication.ts`, the same module the admin surface depends on;
+> `tools/records/special-records-replay.ts`'s own two-adapters-one-authority precedent
+> (AFLDB-ISSUE-167 Decision D-3) is followed exactly. `assertAflApiAdjudicationBijection()`
+> is the standalone consistency proof (every net-linked ledger entry has its row; every such
+> row has its ledger entry), usable on its own or as a promotion/rebuild gate.
+>
+> **AFLDB-ISSUE-237 boundary.** Carrying **importer**-created `unique` `afl_api` identities
+> through a promotion or the `afldb_test` rebuild is a separate, pre-existing gap
+> (AFLDB-ISSUE-237, opened from this issue's plan review) that this issue does not attempt.
+> After a promotion or rebuild, an importer-linked provider settles as `unresolved_identity`
+> again until an operator re-runs the bridge import; a human-linked one does not, because
+> its ledger survives and replays. This asymmetry is disclosed, not fixed, here.
+>
+> **The `db:test:rebuild` (`tools/db/rebuild-test.ts`) side of OD-5 is implemented.** Three
+> stages run through `tools/migration/rebuild_afl_api_adjudications.ts`:
+>
+> - **`afl-api-adjudications-capture`** runs after `precheck` and before `recreate`. It
+>   writes the whole human ledger to a pending capture file before anything is destroyed:
+>   every row, with its original id, `supersedes_id`, stable `player_identity`, audit fields,
+>   and the actor's email and role.
+> - **`afl-api-adjudications-reinstate`** runs straight after `draftguru`, once player
+>   identities are loaded. It is one transaction, and any mismatch rolls all of it back:
+>   - it reinstates the rows under their original ids (`OVERRIDING SYSTEM VALUE`), so
+>     `supersedes_id` chains stay true;
+>   - it re-derives the current `player_id` from each row's stable `player_identity`
+>     through the replay adapter's own `resolveAflApiPlayerIdentity()`. The captured
+>     numeric id is never trusted;
+>   - it restores actor attribution by email. An existing account is reused unchanged.
+>     Otherwise it creates an attribution-only account with the captured role: disabled, no
+>     password hash, no TOTP secret, no session, no `can_manage_admins`;
+>   - it advances the id sequence past the maximum reinstated id;
+>   - it reads the rows back and requires them to equal the plan exactly;
+>   - it runs the D15 replay, which rebuilds the net-`linked` human `resolved` identities,
+>     then the bijection.
+>
+>   The capture file is archived as reinstated only after that readback, replay and
+>   bijection have passed. A capture that committed but was never archived is verified
+>   read-only before it is archived.
+> - **`afl-api-adjudications-bijection`** is a separate read-only validation stage after
+>   that, so a failure there is reported under its own stage name.
+>
+> The C6 tests in `tests/db-test-rebuild.test.ts` cover this wiring. **I18** proved it on
+> 2026-09-24 across a real destructive `afldb_test` rebuild:
+>
+> - 3 fixture ledger rows went through the rebuild: linked, revoked (superseding the first)
+>   and linked again.
+> - They were captured, then reinstated under their original ids. The next id was 202.
+> - The replay inserted the one net-linked identity.
+> - Both bijection checks passed, and the rebuild's final validation passed 85/85.
+>
+> What I18 did **not** prove:
+>
+> - **Stale numeric ids.** The fixture player's numeric id happened to stay 144 across that
+>   rebuild. Test I14 separately proves that a stale numeric `player_id` is not trusted.
+> - **Importer-owned `afl_api` rows.** This path does not preserve importer-created
+>   `unique` rows. The rebuilt `afldb_test` held 0 of them afterwards. That is the
+>   AFLDB-ISSUE-237 boundary above.
+>
+> The `docs/production-promotion.md` (real promotion) side is complete as well.

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join } from 'node:path';
 
@@ -133,6 +133,61 @@ import {
   IDENTITY_SQL as VERIFIER_IDENTITY_SQL,
   parseArgs,
 } from '../tools/db/fingerprint-test';
+import {
+  AFL_API_ADJUDICATION_DSN_ENV,
+  AFL_API_ADJUDICATION_TARGET_ENV,
+  AFL_API_ADJUDICATION_TOOL,
+  aflApiAdjudicationArgv,
+} from '../tools/db/rebuild-test';
+import {
+  AdjudicationRebuildRefused,
+  CAPTURE_VERSION,
+  PENDING_CAPTURE_FILE,
+  archivePendingCapture,
+  archivedCaptureName,
+  assertSequenceAboveLedger,
+  buildLedgerCapture,
+  captureDirectory,
+  capturePayloadSha256,
+  decidePendingCapture,
+  nextIdentityValue,
+  parseLedgerCapture,
+  planActorRemap,
+  planLedgerReinstatement,
+  readPendingCapture,
+  reinstateAndReplay,
+  reinstatedCaptureProblems,
+  reinstatedLedgerProblems,
+  remapActors,
+  resolveAdjudicationTarget,
+  sameLedger,
+  settleCapture,
+  writePendingCapture,
+  type CapturedLedgerRow,
+  type LedgerCapture,
+  type LiveReinstatementObservation,
+} from '../tools/migration/rebuild_afl_api_adjudications';
+import type { AflApiPlayerRemapResult } from '../src/lib/acquisition/afl-api-adjudication';
+import { isLifecycleRole } from '../src/lib/auth/admin-lifecycle';
+import {
+  I18_FIXTURE,
+  I18FixtureRefused,
+  buildI18Baseline,
+  captureMatchesBaseline,
+  i18BaselinePath,
+  i18LedgerShapeProblems,
+  i18SeedPreconditionProblems,
+  i18VerifyProblems,
+  parseI18Args,
+  parseI18Baseline,
+  readArchivedCaptures,
+  resolveI18Dsns,
+  type I18Baseline,
+  type I18LedgerRow,
+  type I18Observation,
+  type I18SeedObservation,
+} from '../tools/migration/afl_api_adjudication_i18_fixture';
+import type { TransactionSql } from 'postgres';
 
 /*
  * AFLDB-ISSUE-093 §10 — the clean test-rebuild orchestrator.
@@ -1000,11 +1055,14 @@ describe('stage graph', () => {
     // AFLDB-ISSUE-118 §23.33–§23.35 added 'after-siren' (data) and 'after-siren-reconcile'
     // (validation) directly after 'siblings': the canonical after_siren_kicks events from
     // the tracked normalised artefact, then a re-resolution check of the loaded table.
+    // AFLDB-ISSUE-235 OD-5 added the adjudication ledger's capture (before 'recreate') and
+    // its reinstate/replay + bijection pair (directly after 'draftguru'); see the C6 suite.
     expect(idsOf(stages)).toEqual([
-      'precheck', 'recreate', 'migrations', 'privileges',
+      'precheck', 'afl-api-adjudications-capture', 'recreate', 'migrations', 'privileges',
       'reference', 'fitzroy', 'heights', 'heights-afl-api', 'heights-wikipedia', 'birth-dates',
       'coaches', 'father-son', 'siblings', 'after-siren', 'after-siren-reconcile',
-      'draftguru', 'awards-honours', 'brownlow-season', 'derived', 'coleman',
+      'draftguru', 'afl-api-adjudications-reinstate', 'afl-api-adjudications-bijection',
+      'awards-honours', 'brownlow-season', 'derived', 'coleman',
       'ladder-witness', 'fingerprints',
     ]);
   });
@@ -3803,5 +3861,963 @@ describe('DraftGuru bridge wiring (AFLDB-ISSUE-222 Phase 1)', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-235 C6 (OD-5, runbook D15 (i)–(iii)) — the afl_api human identity
+// adjudication ledger survives the destructive rebuild: captured before the reset,
+// reinstated and replayed after the last player-population stage, bijection-checked
+// straight after. DB-free: the stage graph, the executor with fake deps, and the pure
+// capture/reinstatement helpers of tools/migration/rebuild_afl_api_adjudications.ts.
+// ---------------------------------------------------------------------------
+
+describe('AFL API adjudication survival through the rebuild (AFLDB-ISSUE-235 C6 / OD-5)', () => {
+  const CAPTURE = 'afl-api-adjudications-capture';
+  const REINSTATE = 'afl-api-adjudications-reinstate';
+  const BIJECTION = 'afl-api-adjudications-bijection';
+  const CODE_OWNER = 'postgres://afldb_owner:pw@localhost:5432/code_test_db';
+  const CODE_IMPORT = 'postgres://afldb_import:pw@localhost:5432/code_test_db';
+  const codeTarget = () => target({ database: 'code_test_db', adminDsn: CODE_OWNER, importDsn: CODE_IMPORT });
+
+  const stages = planStages(target(), fitzroy(), OPTS);
+  const ids = idsOf(stages);
+  const stage = (id: string, from: Stage[] = stages) => from.find((s) => s.id === id)!;
+
+  it('captures after PRECHECK and immediately before the reset', () => {
+    expect(ids.indexOf('precheck')).toBeLessThan(ids.indexOf(CAPTURE));
+    expect(ids.indexOf(CAPTURE)).toBe(ids.indexOf('recreate') - 1);
+    expect(stage(CAPTURE).kind).toBe('capture');
+    expect(stage(CAPTURE).run).toBe('command');
+    expect(stage(CAPTURE).argv).toEqual(['npx', 'tsx', AFL_API_ADJUDICATION_TOOL, 'capture']);
+    expect(existsSync(join(root, AFL_API_ADJUDICATION_TOOL))).toBe(true);
+    // still exactly one destructive stage, and it is the reset
+    expect(stages.filter((s) => s.kind === 'destructive').map((s) => s.id)).toEqual(['recreate']);
+  });
+
+  it('never runs the reset unless the capture succeeded', () => {
+    const failed = fakeDeps(`${AFL_API_ADJUDICATION_TOOL} capture`);
+    const report = executeRebuild(stages, target(), failed.deps);
+    expect(report.ok).toBe(false);
+    expect(report.failedStage).toBe(CAPTURE);
+    expect(report.executed).toEqual(['precheck', CAPTURE]);
+    expect(failed.sqlRuns).toEqual([]);        // RESET_SQL was never sent
+    expect(failed.commands).toHaveLength(1);   // nothing after the capture was spawned
+
+    const ok = fakeDeps();
+    const passed = executeRebuild(stages, target(), ok.deps);
+    expect(passed.executed.indexOf(CAPTURE)).toBeLessThan(passed.executed.indexOf('recreate'));
+    expect(ok.sqlRuns).toEqual([RESET_SQL]);
+  });
+
+  it('reinstates only after every player-population stage, draftguru included — never straight after fitzroy', () => {
+    const draftguru = ids.indexOf('draftguru');
+    expect(ids.indexOf(REINSTATE)).toBe(draftguru + 1);
+    expect(ids[ids.indexOf('fitzroy') + 1]).not.toBe(REINSTATE);
+    // every data stage up to and including draftguru precedes it (they build the players
+    // and the afltables identities player_identity remaps through) …
+    const upstream = stages.slice(0, draftguru + 1).filter((s) => s.kind === 'data').map((s) => s.id);
+    expect(upstream).toEqual(expect.arrayContaining(['reference', 'fitzroy', 'draftguru']));
+    for (const id of upstream) expect(ids.indexOf(id), id).toBeLessThan(ids.indexOf(REINSTATE));
+    // … and it precedes the stages that only READ the canonical players
+    for (const later of ['awards-honours', 'brownlow-season', 'derived', 'coleman', 'fingerprints']) {
+      expect(ids.indexOf(REINSTATE), later).toBeLessThan(ids.indexOf(later));
+    }
+    expect(stage(REINSTATE).kind).toBe('reinstate');
+    expect(stage(REINSTATE).argv).toEqual(['npx', 'tsx', AFL_API_ADJUDICATION_TOOL, 'reinstate']);
+  });
+
+  it('checks the bijection straight after the replay, as its own read-only validation stage', () => {
+    expect(ids.indexOf(BIJECTION)).toBe(ids.indexOf(REINSTATE) + 1);
+    expect(ids.indexOf(BIJECTION)).toBeLessThan(ids.indexOf('fingerprints'));
+    expect(stage(BIJECTION).kind).toBe('validation');
+    expect(stage(BIJECTION).argv).toEqual(['npx', 'tsx', AFL_API_ADJUDICATION_TOOL, 'bijection']);
+  });
+
+  it('a failed reinstate/replay stops the bijection and every later stage', () => {
+    const { deps, validationRuns } = fakeDeps(`${AFL_API_ADJUDICATION_TOOL} reinstate`);
+    const report = executeRebuild(stages, target(), deps);
+    expect(report.ok).toBe(false);
+    expect(report.failedStage).toBe(REINSTATE);
+    for (const later of [BIJECTION, 'awards-honours', 'brownlow-season', 'derived', 'coleman',
+                         'ladder-witness', 'fingerprints']) {
+      expect(report.executed, later).not.toContain(later);
+    }
+    expect(validationRuns).toEqual([]);
+  });
+
+  it('a failed bijection stops every later stage', () => {
+    const { deps, validationRuns } = fakeDeps(`${AFL_API_ADJUDICATION_TOOL} bijection`);
+    const report = executeRebuild(stages, target(), deps);
+    expect(report.failedStage).toBe(BIJECTION);
+    expect(report.executed.at(-1)).toBe(BIJECTION);
+    for (const later of ['awards-honours', 'derived', 'fingerprints']) {
+      expect(report.executed, later).not.toContain(later);
+    }
+    expect(validationRuns).toEqual([]);
+  });
+
+  it("binds every adjudication stage to the selected target's own DSNs, for both targets", () => {
+    const cases: Array<[ResolvedTarget, string, string, string]> = [
+      [target(), 'afldb_test', OWNER, IMPORT],
+      [codeTarget(), 'code_test_db', CODE_OWNER, CODE_IMPORT],
+    ];
+    for (const [t, database, owner, imp] of cases) {
+      const plan = planStages(t, fitzroy(), OPTS);
+      // exactly two variables: the target NAME and one DSN; owner only where it must be
+      expect(stage(CAPTURE, plan).envOverlay).toEqual(
+        { [AFL_API_ADJUDICATION_TARGET_ENV]: database, [AFL_API_ADJUDICATION_DSN_ENV]: owner });
+      expect(stage(REINSTATE, plan).envOverlay).toEqual(
+        { [AFL_API_ADJUDICATION_TARGET_ENV]: database, [AFL_API_ADJUDICATION_DSN_ENV]: owner });
+      expect(stage(BIJECTION, plan).envOverlay).toEqual(
+        { [AFL_API_ADJUDICATION_TARGET_ENV]: database, [AFL_API_ADJUDICATION_DSN_ENV]: imp });
+      // and the executor hands each child exactly that overlay
+      const { deps, commands, envs } = fakeDeps();
+      executeRebuild(plan, t, deps);
+      for (const step of ['capture', 'reinstate', 'bijection']) {
+        const i = commands.findIndex((c) => c.join(' ') === `npx tsx ${AFL_API_ADJUDICATION_TOOL} ${step}`);
+        expect(i, step).toBeGreaterThanOrEqual(0);
+        expect(envs[i][AFL_API_ADJUDICATION_TARGET_ENV]).toBe(database);
+        expect(envs[i][AFL_API_ADJUDICATION_DSN_ENV]).toBe(step === 'bijection' ? imp : owner);
+      }
+    }
+    // the argv is target-independent; nothing test-shaped leaks into the rehearsal graph
+    const forCode = planStages(codeTarget(), fitzroy(), OPTS);
+    for (const id of [CAPTURE, REINSTATE, BIJECTION]) {
+      expect(stage(id, forCode).argv).toEqual(stage(id).argv);
+      expect(JSON.stringify(stage(id, forCode))).not.toContain('afldb_test');
+    }
+    // the ordinary data stages are untouched: they never receive the adjudication variables
+    for (const s of stages.filter((x) => x.kind === 'data')) {
+      expect(s.envOverlay?.[AFL_API_ADJUDICATION_DSN_ENV], s.id).toBeUndefined();
+    }
+  });
+
+  it('refuses a DEV/PROD, mismatched or non-dedicated DSN inside the tool itself', () => {
+    const env = (name: string | undefined, dsn: string | undefined) => ({
+      [AFL_API_ADJUDICATION_TARGET_ENV]: name, [AFL_API_ADJUDICATION_DSN_ENV]: dsn,
+    });
+    expect(resolveAdjudicationTarget(env('afldb_test', OWNER))).toEqual({ database: 'afldb_test', dsn: OWNER });
+    expect(resolveAdjudicationTarget(env('code_test_db', CODE_OWNER)))
+      .toEqual({ database: 'code_test_db', dsn: CODE_OWNER });
+
+    const refusals: Array<[Record<string, string | undefined>, RegExp]> = [
+      [env('afldb_dev', 'postgres://u:pw@h:5432/afldb_dev'), /rejected by name/],
+      [env('afldb_test', 'postgres://u:pw@h:5432/afldb_dev'), /rejected by name/],
+      [env('afldb_test', 'postgres://u:pw@h:5432/afldb_prod'), /rejected by name|looks like production/],
+      [env('code_test_db', 'postgres://u:pw@h:5432/afldb_test'), /names database 'afldb_test', not the rebuild target 'code_test_db'/],
+      [env('afldb_test', CODE_OWNER), /names database 'code_test_db', not the rebuild target 'afldb_test'/],
+      [env('afldb_test', 'not a url'), /is not a valid connection URL/],
+      [env('afldb_test', undefined), new RegExp(`${AFL_API_ADJUDICATION_DSN_ENV} is not set`)],
+      [env(undefined, OWNER), new RegExp(`${AFL_API_ADJUDICATION_TARGET_ENV} is not set`)],
+      // the development variables are never read in place of the dedicated ones
+      [{ AFLDB_DATABASE_URL: OWNER, AFLDB_IMPORT_DATABASE_URL: IMPORT },
+        new RegExp(`${AFL_API_ADJUDICATION_TARGET_ENV} is not set`)],
+    ];
+    for (const [e, pattern] of refusals) {
+      let message = '';
+      try { resolveAdjudicationTarget(e); } catch (error) { message = (error as Error).message; }
+      expect(message, JSON.stringify(Object.keys(e))).toMatch(pattern);
+      expect(message).not.toContain('pw@');
+      expect(message).not.toContain('postgres://');
+    }
+  });
+
+  it('names the new lifecycle stages in the plan, and --recover only ever reaches the capture', () => {
+    expect(stage(CAPTURE).name).toMatch(/AFL API ADJUDICATIONS — capture .* before anything is destroyed/);
+    expect(stage(REINSTATE).name).toMatch(/AFL API ADJUDICATIONS — reinstate the ledger and replay/);
+    expect(stage(BIJECTION).name).toMatch(/AFL API ADJUDICATIONS — assert the ledger <-> human identity bijection/);
+    expect(stage(CAPTURE).argv).not.toContain('--recover');
+
+    const opts = parseRebuildArgs(['--recover-afl-api-adjudications', '--acknowledge-destroy', 'afldb_test']);
+    expect(opts.recoverAflApiAdjudications).toBe(true);
+    expect(parseRebuildArgs([]).recoverAflApiAdjudications).toBeUndefined();
+    const recovering = planStages(target(), fitzroy(), opts);
+    expect(stage(CAPTURE, recovering).argv).toEqual(aflApiAdjudicationArgv('capture', true));
+    expect(stage(CAPTURE, recovering).argv!.at(-1)).toBe('--recover');
+    expect(stage(CAPTURE, recovering).name).toContain('RECOVER');
+    expect(stage(REINSTATE, recovering).argv).not.toContain('--recover');
+    expect(stage(BIJECTION, recovering).argv).not.toContain('--recover');
+    expect(idsOf(recovering)).toEqual(ids);
+  });
+
+  // -------------------------------------------------------------------------
+  // The pure capture / reinstatement contract. The fixture ledger is deliberately NOT
+  // empty: a first link, a link+revoke pair (supersedes_id), gapped ids, and one actor
+  // recorded under two spellings of the same email.
+  // -------------------------------------------------------------------------
+
+  const EVIDENCE = '{"blocks": [1, 2], "providerId": "CD_I1001"}';
+  const ledger = (): CapturedLedgerRow[] => [
+    {
+      id: 7, sourceKey: 'afl_api', externalId: 'CD_I1001', action: 'linked', playerId: 500,
+      playerIdentity: 'players/A/Alpha_Able.html', previousState: null, evidence: EVIDENCE,
+      evidenceSha256: 'a'.repeat(64), surnameDisagreementAcknowledged: false, supersedesId: null,
+      adminUserId: 3, adminEmail: 'Admin.One@Example.org', adminRole: 'super_admin',
+      note: 'Linked on club list and DOB evidence.', createdAt: '2026-09-23T01:02:03.123456Z',
+    },
+    {
+      id: 9, sourceKey: 'afl_api', externalId: 'CD_I1002', action: 'linked', playerId: 501,
+      playerIdentity: 'players/B/Bravo_Baker.html', previousState: null, evidence: '{"b": true}',
+      evidenceSha256: 'b'.repeat(64), surnameDisagreementAcknowledged: true, supersedesId: null,
+      adminUserId: 4, adminEmail: 'two@example.org', adminRole: 'admin',
+      note: 'Surname differs by marriage; acknowledged.', createdAt: '2026-09-23T02:00:00.000001Z',
+    },
+    {
+      id: 12, sourceKey: 'afl_api', externalId: 'CD_I1002', action: 'revoked', playerId: 501,
+      playerIdentity: 'players/B/Bravo_Baker.html',
+      previousState: '{"id": 44, "status": "resolved", "player_id": 501}', evidence: '{"b": false}',
+      evidenceSha256: 'c'.repeat(64), surnameDisagreementAcknowledged: false, supersedesId: 9,
+      adminUserId: 3, adminEmail: 'admin.one@example.org', adminRole: 'super_admin',
+      note: 'Revoked: the provider is a different person.', createdAt: '2026-09-23T03:00:00.000000Z',
+    },
+  ];
+  const capture = (rows = ledger(), database = 'afldb_test') => buildLedgerCapture({
+    database, capturedAt: '2026-09-23T10:00:00.000Z', ledgerTablePresent: true, rows,
+  });
+  const REMAP = new Map([
+    ['players/A/Alpha_Able.html', { ok: true as const, newPlayerId: 9001, remappedIdentity: 'players/A/Alpha_Able.html' }],
+    ['players/B/Bravo_Baker.html', { ok: true as const, newPlayerId: 9002, remappedIdentity: 'players/B/Bravo_Baker.html' }],
+  ]);
+  /** Keyed by lower(email), as remapActors() builds it: both spellings of actor 71 find it. */
+  const ACTORS = new Map([['admin.one@example.org', 71], ['two@example.org', 72]]);
+
+  function withTempDir(body: (dir: string) => void): void {
+    const dir = mkdtempSync(join(tmpdir(), 'afldb-i235-od5-'));
+    try { body(dir); } finally { rmSync(dir, { recursive: true, force: true }); }
+  }
+
+  it('round-trips a non-empty capture through its hashed file, and refuses a tampered or foreign one', () => {
+    withTempDir((dir) => {
+      const c = capture();
+      const written = writePendingCapture(dir, c);
+      expect(written.path).toBe(join(dir, PENDING_CAPTURE_FILE));
+      expect(written.sha256).toBe(createHash('sha256').update(readFileSync(written.path, 'utf8')).digest('hex'));
+      const back = readPendingCapture(dir, 'afldb_test')!;
+      expect(back).toEqual(c);
+      expect(back.rows).toHaveLength(3);
+      expect(back.rows[2].supersedesId).toBe(9);
+
+      // reinstated into another rebuild target: refused
+      expect(() => readPendingCapture(dir, 'code_test_db')).toThrow(/taken from 'afldb_test', not 'code_test_db'/);
+      // altered after capture (one note byte): refused by the payload hash
+      writeFileSync(written.path, readFileSync(written.path, 'utf8').replace('Revoked:', 'Revoked;'));
+      expect(() => readPendingCapture(dir, 'afldb_test')).toThrow(/does not match its own payload hash/);
+    });
+    expect(captureDirectory('/r', 'afldb_test')).not.toBe(captureDirectory('/r', 'code_test_db'));
+    expect(captureDirectory('/r', 'afldb_test')).toBe(join('/r', 'backups', 'rebuild', 'afldb_test'));
+  });
+
+  it('refuses a ledger that cannot be reinstated in id order', () => {
+    const rows = ledger();
+    expect(() => capture([rows[0], rows[2], rows[1]])).toThrow(/not strictly ascending|not an earlier captured row/);
+    expect(() => capture([rows[0], { ...rows[2], supersedesId: 99 }])).toThrow(/supersedes_id 99 is not an earlier captured row/);
+    expect(() => capture([{ ...rows[2], id: 5 }, rows[1]])).toThrow(AdjudicationRebuildRefused);
+    expect(() => capture([{ ...rows[0], supersedesId: 1 }])).toThrow(/supersedes_id must be set exactly on a revoked row/);
+    expect(() => capture([{ ...rows[0], createdAt: '2026-09-23 01:02:03+00' }])).toThrow(/created_at/);
+    expect(() => capture([{ ...rows[0], adminEmail: ' ' }])).toThrow(/no email to remap by/);
+    expect(() => buildLedgerCapture({
+      database: 'afldb_test', capturedAt: 'x', ledgerTablePresent: false, rows: ledger(),
+    })).toThrow(/no ledger table cannot carry rows/);
+  });
+
+  it('reinstates the original ids, supersedes_id and audit fields, remapping ONLY player_id and admin_user_id', () => {
+    const plan = planLedgerReinstatement({ rows: ledger(), remapByIdentity: REMAP, actorIdByEmail: ACTORS });
+    expect(plan.maxId).toBe(12);
+    expect(plan.rows.map((r) => r.id)).toEqual([7, 9, 12]);
+    expect(plan.rows.map((r) => r.playerId)).toEqual([9001, 9002, 9002]);   // never 500/501
+    expect(plan.rows.map((r) => r.adminUserId)).toEqual([71, 72, 71]);      // one actor, two spellings
+    expect(plan.rows.map((r) => r.supersedesId)).toEqual([null, null, 9]);
+    for (const [i, original] of ledger().entries()) {
+      const { playerId: _p, adminUserId: _a, adminEmail: _e, adminRole: _r, ...kept } = original;
+      expect(plan.rows[i]).toMatchObject(kept);
+      expect(plan.rows[i]).not.toHaveProperty('adminEmail');
+      expect(plan.rows[i]).not.toHaveProperty('adminRole');
+    }
+  });
+
+  it('refuses the whole reinstatement on any identity that does not remap to exactly one player', () => {
+    const withEntry = (identity: string, result: AflApiPlayerRemapResult) =>
+      new Map<string, AflApiPlayerRemapResult>([...REMAP, [identity, result]]);
+    const cases: Array<[ReadonlyMap<string, AflApiPlayerRemapResult>, RegExp]> = [
+      [new Map([...REMAP].filter(([k]) => k !== 'players/B/Bravo_Baker.html')),
+        /ledger row 9 \(CD_I1002\).*names no rebuilt player/],
+      [withEntry('players/B/Bravo_Baker.html', { ok: false, reason: 'ambiguous' }),
+        /names more than one rebuilt player/],
+      [withEntry('players/A/Alpha_Able.html', { ok: true, newPlayerId: 9001, remappedIdentity: 'players/A/Other.html' }),
+        /remapped identity differs from the stored one/],
+    ];
+    for (const [remapByIdentity, pattern] of cases) {
+      expect(() => planLedgerReinstatement({ rows: ledger(), remapByIdentity, actorIdByEmail: ACTORS }))
+        .toThrow(pattern);
+    }
+    // a manual_admin_edit identity with no data_overrides on afldb_test is exactly this stop
+    expect(() => planLedgerReinstatement({
+      rows: [{ ...ledger()[0], playerIdentity: 'manual_admin_edit:token-1' }],
+      remapByIdentity: new Map(), actorIdByEmail: ACTORS,
+    })).toThrow(/nothing was written.*manual_admin_edit:token-1.*names no rebuilt player/);
+    // and an actor that was not remapped
+    expect(() => planLedgerReinstatement({
+      rows: ledger(), remapByIdentity: REMAP, actorIdByEmail: new Map([['two@example.org', 72]]),
+    })).toThrow(/ledger row 7 \(CD_I1001\): its actor was not remapped/);
+  });
+
+  it('proves the identity sequence hands out an id above the reinstated maximum', () => {
+    expect(nextIdentityValue({ lastValue: 12, isCalled: true })).toBe(13);
+    expect(nextIdentityValue({ lastValue: 1, isCalled: false })).toBe(1);
+    expect(() => assertSequenceAboveLedger({ lastValue: 12, isCalled: true }, 12)).not.toThrow();
+    // a setval that never happened: the fresh sequence would hand out 1 and collide
+    expect(() => assertSequenceAboveLedger({ lastValue: 1, isCalled: false }, 12)).toThrow(/does not exceed the reinstated maximum id 12/);
+    expect(() => assertSequenceAboveLedger({ lastValue: 12, isCalled: false }, 12)).toThrow(/would next hand out 12/);
+    // empty ledger: the fresh sequence is already above 0
+    expect(() => assertSequenceAboveLedger({ lastValue: 1, isCalled: false }, 0)).not.toThrow();
+  });
+
+  it('requires the read-back ledger to equal the plan byte-for-byte', () => {
+    const plan = planLedgerReinstatement({ rows: ledger(), remapByIdentity: REMAP, actorIdByEmail: ACTORS });
+    expect(reinstatedLedgerProblems(plan.rows, plan.rows.map((r) => ({ ...r })))).toEqual([]);
+    const drifted = plan.rows.map((r) => (r.id === 12 ? { ...r, createdAt: '2026-09-23T03:00:00.000001Z' } : r));
+    expect(reinstatedLedgerProblems(plan.rows, drifted)).toEqual(['ledger row 12 was not reinstated byte-for-byte']);
+    expect(reinstatedLedgerProblems(plan.rows, plan.rows.slice(0, 2))).toEqual(['3 row(s) planned but 2 read back']);
+  });
+
+  it('treats an empty ledger as valid — including one captured before migration 104', () => {
+    const empty = buildLedgerCapture({
+      database: 'afldb_test', capturedAt: '2026-09-23T10:00:00.000Z', ledgerTablePresent: false, rows: [],
+    });
+    expect(empty.rows).toEqual([]);
+    expect(planLedgerReinstatement({ rows: [], remapByIdentity: new Map(), actorIdByEmail: new Map() }))
+      .toEqual({ rows: [], maxId: 0 });
+    withTempDir((dir) => {
+      writePendingCapture(dir, empty);
+      expect(readPendingCapture(dir, 'afldb_test')).toEqual(empty);
+    });
+  });
+
+  it('never lets a re-run overwrite a capture an earlier failed run did not reinstate', () => {
+    const pending = capture();
+    const live = ledger();
+    expect(decidePendingCapture({ pending: null, liveRows: live, recover: false })).toEqual({ action: 'capture-live' });
+    expect(decidePendingCapture({ pending: null, liveRows: [], recover: true }).action).toBe('refuse');
+    // same ledger, different surrogates and email case (a reinstated database): nothing lost
+    const reinstated = live.map((r) => ({ ...r, playerId: r.playerId + 8000, adminUserId: 70,
+      adminEmail: r.adminEmail.toUpperCase() }));
+    expect(sameLedger(pending.rows, reinstated)).toBe(true);
+    // … but "nothing lost" is proven, not assumed: see the post-commit/pre-archive cases below
+    expect(decidePendingCapture({ pending, liveRows: reinstated, recover: false }))
+      .toEqual({ action: 'verify-reinstated' });
+    // an empty pending capture over an empty live ledger has nothing to lose or verify
+    const emptyPending = capture([]);
+    expect(decidePendingCapture({ pending: emptyPending, liveRows: [], recover: false }))
+      .toEqual({ action: 'capture-live' });
+    // the failed run's reset destroyed the ledger: refuse, and name the recovery flag
+    const lost = decidePendingCapture({ pending, liveRows: [], recover: false });
+    expect(lost.action).toBe('refuse');
+    expect(lost.action === 'refuse' && lost.reason).toMatch(/captured 3 adjudication row\(s\).*--recover-afl-api-adjudications/s);
+    expect(decidePendingCapture({ pending, liveRows: [], recover: true })).toEqual({ action: 'adopt-pending' });
+    // a live ledger that differs is never chosen over, or overwritten by, the pending one
+    const differs = decidePendingCapture({ pending, liveRows: live.slice(0, 2), recover: true });
+    expect(differs.action).toBe('refuse');
+    expect(sameLedger(pending.rows, live.map((r) => (r.id === 7 ? { ...r, note: `${r.note}!` } : r)))).toBe(false);
+  });
+
+  it('retires the pending capture only by archiving it, never by deleting it', () => {
+    withTempDir((dir) => {
+      const c = capture();
+      writePendingCapture(dir, c);
+      const archived = archivePendingCapture(dir, c);
+      expect(existsSync(join(dir, PENDING_CAPTURE_FILE))).toBe(false);
+      expect(archived).toMatch(/afl-api-adjudications\.20260923T100000000Z\.[0-9a-f]{12}\.reinstated\.json$/);
+      expect(parseLedgerCapture(readFileSync(archived, 'utf8'), 'afldb_test')).toEqual(c);
+      expect(readPendingCapture(dir, 'afldb_test')).toBeNull();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Actor attribution: the captured ROLE, never a hard-coded one; reuse before create.
+  // -------------------------------------------------------------------------
+
+  /**
+   * A TransactionSql stand-in that records every statement (text with $n placeholders, and
+   * its parameters) and answers from `respond`. Enough for the code paths below, which
+   * never reach the replay adapter.
+   */
+  function fakeTx(respond: (text: string, params: unknown[]) => unknown[] = () => []) {
+    const statements: Array<{ text: string; params: unknown[] }> = [];
+    const tx = (strings: unknown, ...params: unknown[]) => {
+      if (Array.isArray(strings) && 'raw' in strings) {
+        const text = (strings as string[]).reduce((acc, s, i) => `${acc}${i ? `$${i}` : ''}${s}`, '')
+          .replace(/\s+/g, ' ').trim();
+        statements.push({ text, params });
+        return Promise.resolve(respond(text, params));
+      }
+      return { identifier: strings };
+    };
+    return { tx: tx as unknown as TransactionSql, statements };
+  }
+  const WRITES = /\b(INSERT|UPDATE|DELETE|setval)\b/i;
+
+  it('pins the role contract to auth_users_role_check, and captures each actor role through the hashed file', () => {
+    // the contract isLifecycleRole() enforces is exactly the live CHECK (migration 033, never redefined since)
+    const migrations = join(root, 'src', 'db', 'migrations');
+    const redefining = readdirSync(migrations)
+      .filter((f) => readFileSync(join(migrations, f), 'utf8').includes('auth_users_role_check'));
+    expect(redefining).toEqual(['029_admin_roles.sql', '033_contributor_role.sql']);
+    const check = readFileSync(join(migrations, '033_contributor_role.sql'), 'utf8')
+      .match(/auth_users_role_check\s+CHECK \(role IN \(([^)]*)\)\)/)!;
+    const roles = check[1].split(',').map((s) => s.trim().replace(/'/g, ''));
+    expect([...roles].sort()).toEqual(['admin', 'contributor', 'super_admin']);
+    for (const role of roles) expect(isLifecycleRole(role), role).toBe(true);
+    for (const role of ['owner', 'Admin', 'SUPER_ADMIN', '', null]) expect(isLifecycleRole(role)).toBe(false);
+
+    expect(CAPTURE_VERSION).toBe(2);
+    withTempDir((dir) => {
+      writePendingCapture(dir, capture());
+      expect(readPendingCapture(dir, 'afldb_test')!.rows.map((r) => r.adminRole))
+        .toEqual(['super_admin', 'admin', 'super_admin']);
+    });
+  });
+
+  it('refuses an invalid or inconsistent captured role — never converting it — before anything is written', () => {
+    const rows = ledger();
+    const invalid = [{ ...rows[0], adminRole: 'owner' as never }, rows[1], rows[2]];
+    expect(() => capture(invalid)).toThrow(/ledger row 7: the actor's role 'owner' is not one auth_users.role allows/);
+    // one actor (two spellings of one email) captured with two roles
+    expect(() => capture([rows[0], rows[1], { ...rows[2], adminRole: 'admin' }]))
+      .toThrow(/ledger row 12: its actor is captured with a different role from ledger row 7's/);
+
+    withTempDir((dir) => {
+      // a file whose payload hash is VALID but whose role is not: the parse itself refuses,
+      // so the reinstate stage never opens its transaction
+      const body: Omit<LedgerCapture, 'payloadSha256'> = {
+        format: 'afldb.afl_api_identity_adjudications.rebuild_capture', version: CAPTURE_VERSION,
+        database: 'afldb_test', capturedAt: '2026-09-23T10:00:00.000Z', ledgerTablePresent: true, rows: invalid };
+      const path = join(dir, PENDING_CAPTURE_FILE);
+      writeFileSync(path, JSON.stringify({ ...body, payloadSha256: capturePayloadSha256(body) }));
+      expect(() => readPendingCapture(dir, 'afldb_test')).toThrow(/role 'owner' is not one auth_users.role allows/);
+      // a version-1 capture (no roles) is refused outright, never defaulted
+      writeFileSync(path, JSON.stringify({ ...capture(), version: 1 }));
+      expect(() => readPendingCapture(dir, 'afldb_test')).toThrow(/unknown format or version/);
+    });
+
+    // and inside the reinstate itself, a role that slipped past the parse issues NO statement
+    const { tx, statements } = fakeTx();
+    const smuggled = { ...capture(), rows: invalid } as LedgerCapture;
+    return expect(reinstateAndReplay(tx, smuggled)).rejects.toThrow(/nothing was written.*role 'owner'/)
+      .then(() => expect(statements).toEqual([]));
+  });
+
+  it('plans one actor per case-insensitive email: reuse the existing account unchanged, else create with the captured role', () => {
+    // no accounts on the rebuilt database: two actors, the FIRST spelling, the CAPTURED role
+    const fresh = planActorRemap(ledger(), []);
+    expect(fresh.reuse.size).toBe(0);
+    expect(fresh.create).toEqual([
+      { email: 'Admin.One@Example.org', role: 'super_admin' },
+      { email: 'two@example.org', role: 'admin' },
+    ]);
+    // nothing but email and role: no credential, TOTP, session or capability field exists to carry
+    for (const a of fresh.create) expect(Object.keys(a).sort()).toEqual(['email', 'role']);
+
+    // an existing account, differently cased and in a different CURRENT role, is reused as it is
+    const reused = planActorRemap(ledger(), [{ id: 71, email: 'ADMIN.ONE@example.ORG', role: 'contributor' }]);
+    expect([...reused.reuse]).toEqual([['admin.one@example.org', 71]]);
+    expect(reused.create).toEqual([{ email: 'two@example.org', role: 'admin' }]);
+    expect(reused.reusedWithDifferentRole).toBe(1);
+    expect(planActorRemap(ledger(), [{ id: 72, email: 'two@example.org', role: 'admin' }]).reusedWithDifferentRole).toBe(0);
+
+    // an email that matches two accounts is refused, not guessed
+    expect(() => planActorRemap(ledger(), [
+      { id: 71, email: 'admin.one@example.org', role: 'admin' },
+      { id: 81, email: 'Admin.One@example.org', role: 'admin' },
+    ])).toThrow(/actor of ledger row 7 matches 2 auth_users rows/);
+    expect(() => planActorRemap([{ ...ledger()[0], adminRole: 'root' as never }], []))
+      .toThrow(/nothing was written.*role 'root'/);
+  });
+
+  it('writes an attribution-only actor with the captured role, NULL credentials and disabled_at — and never touches a reused one', async () => {
+    const { tx, statements } = fakeTx((text) => {
+      if (text.startsWith('SELECT id, email, role FROM auth_users')) {
+        return [{ id: 71, email: 'admin.one@EXAMPLE.org', role: 'admin' }];
+      }
+      if (text.startsWith('INSERT INTO auth_users')) return [{ id: 900 }];
+      throw new Error(`unexpected statement: ${text}`);
+    });
+    const result = await remapActors(tx, ledger());
+
+    expect(statements).toHaveLength(2);
+    expect(statements[0].text).toBe('SELECT id, email, role FROM auth_users WHERE lower(email) = ANY($1::text[])');
+    expect(statements[0].params).toEqual([['admin.one@example.org', 'two@example.org']]);
+    // exactly one INSERT, for the actor with no account; credentials are SQL literals, not parameters
+    expect(statements[1].text).toBe('INSERT INTO auth_users (email, role, password_hash, totp_secret, disabled_at) '
+      + 'VALUES ($1, $2, NULL, NULL, now()) RETURNING id');
+    expect(statements[1].params).toEqual(['two@example.org', 'admin']);
+    expect(statements.map((s) => s.text).join('\n')).not.toMatch(/UPDATE|DELETE|auth_sessions|can_manage_admins/i);
+
+    expect([...result.actorIdByEmail]).toEqual([['admin.one@example.org', 71], ['two@example.org', 900]]);
+    expect(result).toMatchObject({ reused: 1, created: 1, reusedWithDifferentRole: 1 });
+    // both spellings of actor 71 land on the reused account; the created one takes row 9
+    const plan = planLedgerReinstatement({ rows: ledger(), remapByIdentity: REMAP, actorIdByEmail: result.actorIdByEmail });
+    expect(plan.rows.map((r) => r.adminUserId)).toEqual([71, 900, 71]);
+  });
+
+  // -------------------------------------------------------------------------
+  // The post-commit / pre-archive crash: reinstate COMMITTED, the process died before
+  // capture.json -> reinstated.json, and the operator re-runs (with or without --recover).
+  // -------------------------------------------------------------------------
+
+  /** The rebuilt database after the committed reinstate: new surrogates, a reused actor's role. */
+  const reinstatedLive = (): CapturedLedgerRow[] => ledger().map((r) => ({
+    ...r, playerId: r.playerId === 500 ? 9001 : 9002, adminUserId: r.adminRole === 'admin' ? 900 : 71,
+    adminEmail: r.adminEmail.toLowerCase(), adminRole: 'admin' as const,
+  }));
+  const VERIFIED: LiveReinstatementObservation = {
+    sequence: { lastValue: 12, isCalled: true }, replay: { inserted: 0, noops: 1, stops: [] }, bijection: 'ok',
+  };
+
+  it('recognises a committed-but-unarchived reinstatement, archives it and captures afresh — idempotently, with no re-insert', () => {
+    withTempDir((dir) => {
+      const pending = capture();
+      writePendingCapture(dir, pending);
+      const live = { present: true, rows: reinstatedLive() };
+      for (const recover of [true, false]) {
+        expect(decidePendingCapture({ pending, liveRows: live.rows, recover })).toEqual({ action: 'verify-reinstated' });
+      }
+      expect(reinstatedCaptureProblems(pending, live.rows, VERIFIED)).toEqual([]);
+
+      const first = settleCapture({
+        dir, database: 'afldb_test', capturedAt: '2026-09-23T11:00:00.000Z', pending, live,
+        decision: decidePendingCapture({ pending, liveRows: live.rows, recover: true }), observed: VERIFIED,
+      });
+      // never adopted: adopting would make the reinstate stage insert these ids a second time
+      expect(first.adopted).toBeNull();
+      // the pending capture is kept, byte-for-byte, as reinstated …
+      expect(first.archived).toBe(join(dir, archivedCaptureName(pending)));
+      expect(parseLedgerCapture(readFileSync(first.archived!, 'utf8'), 'afldb_test')).toEqual(pending);
+      // … and this run's capture is the live ledger: same decisions, same ids, same supersession
+      const fresh = readPendingCapture(dir, 'afldb_test')!;
+      expect(fresh).toEqual(first.captured!.capture);
+      expect(fresh.rows.map((r) => [r.id, r.action, r.supersedesId])).toEqual([[7, 'linked', null], [9, 'linked', null], [12, 'revoked', 9]]);
+      expect(fresh.rows.map((r) => r.playerId)).toEqual([9001, 9002, 9002]);
+      expect(sameLedger(fresh.rows, pending.rows)).toBe(true);
+
+      // the rerun dies AGAIN before the reset, and the operator re-runs once more: the same
+      // path, the same three rows, a second archive — never a duplicate and never a loss
+      const again = settleCapture({
+        dir, database: 'afldb_test', capturedAt: '2026-09-23T12:00:00.000Z', pending: fresh, live,
+        decision: decidePendingCapture({ pending: fresh, liveRows: live.rows, recover: true }), observed: VERIFIED,
+      });
+      expect(again.adopted).toBeNull();
+      expect(again.captured!.capture.rows).toHaveLength(3);
+      const files = readdirSync(dir).sort();
+      expect(files.filter((f) => f.endsWith('.reinstated.json'))).toHaveLength(2);
+      expect(files).toContain(PENDING_CAPTURE_FILE);
+      expect(files.filter((f) => f.endsWith('.tmp'))).toEqual([]);
+    });
+  });
+
+  it('refuses already_reinstated_unverified — pending capture untouched — unless sequence, replay and bijection all prove it', () => {
+    const live = { present: true, rows: reinstatedLive() };
+    const cases: Array<[LiveReinstatementObservation | null, RegExp]> = [
+      [{ ...VERIFIED, sequence: { lastValue: 11, isCalled: true } }, /would next hand out 12, which does not exceed the reinstated maximum id 12/],
+      [{ ...VERIFIED, sequence: { lastValue: 1, isCalled: false } }, /does not exceed the reinstated maximum id 12/],
+      [{ ...VERIFIED, replay: { inserted: 1, noops: 0, stops: [] } }, /a replay would still insert 1 human identity row/],
+      [{ ...VERIFIED, replay: { error: 'cannot execute INSERT in a read-only transaction' } },
+        /replay could not confirm the human identities: cannot execute INSERT in a read-only transaction/],
+      [{ ...VERIFIED, bijection: { error: 'afl_api adjudication bijection check failed (1 mismatch(es))' } },
+        /the bijection does not hold/],
+      [null, /the live database was not observed/],
+    ];
+    for (const [observed, pattern] of cases) {
+      withTempDir((dir) => {
+        const pending = capture();
+        const { path } = writePendingCapture(dir, pending);
+        const before = readFileSync(path, 'utf8');
+        expect(() => settleCapture({
+          dir, database: 'afldb_test', capturedAt: '2026-09-23T11:00:00.000Z', pending, live,
+          decision: { action: 'verify-reinstated' }, observed,
+        })).toThrow(new RegExp(`already_reinstated_unverified.*${pattern.source}`, 's'));
+        expect(readFileSync(path, 'utf8')).toBe(before);
+        expect(readdirSync(dir)).toEqual([PENDING_CAPTURE_FILE]);
+      });
+    }
+    // and a live ledger that is NOT the capture is never "verified", whatever was observed
+    expect(reinstatedCaptureProblems(capture(), reinstatedLive().slice(0, 2), VERIFIED))
+      .toContain('the live ledger differs from the pending capture');
+  });
+
+  it('never replaces a lost ledger with the rebuilt database\'s empty one', () => {
+    withTempDir((dir) => {
+      const pending = capture();
+      const { path } = writePendingCapture(dir, pending);
+      const before = readFileSync(path, 'utf8');
+      const empty = { present: true, rows: [] as CapturedLedgerRow[] };
+      // without --recover: refused, nothing written
+      expect(() => settleCapture({
+        dir, database: 'afldb_test', capturedAt: '2026-09-23T11:00:00.000Z', pending, live: empty,
+        decision: decidePendingCapture({ pending, liveRows: [], recover: false }), observed: null,
+      })).toThrow(/--recover-afl-api-adjudications/);
+      // with --recover: the pending capture IS this run's; no empty capture is written over it
+      const adopted = settleCapture({
+        dir, database: 'afldb_test', capturedAt: '2026-09-23T11:00:00.000Z', pending, live: empty,
+        decision: decidePendingCapture({ pending, liveRows: [], recover: true }), observed: null,
+      });
+      expect(adopted).toEqual({ adopted: pending, archived: null, captured: null });
+      expect(readFileSync(path, 'utf8')).toBe(before);
+      expect(readdirSync(dir)).toEqual([PENDING_CAPTURE_FILE]);
+    });
+  });
+
+  it('reinstate binds the captured jsonb/timestamptz text AS text, so PostgreSQL parses the captured bytes; the read-back stays exact', () => {
+    // postgres.js types each parameter by the server's inference: `${text}::jsonb` would be
+    // JSON.stringified a second time, `${text}::timestamptz` routed through a JS Date (ms only).
+    const tool = readFileSync(join(root, 'tools', 'migration', 'rebuild_afl_api_adjudications.ts'), 'utf8');
+    const start = tool.indexOf('export async function reinstateAndReplay(');
+    const fn = tool.slice(start, tool.indexOf('\n}', start));
+    const insert = fn.slice(fn.indexOf('INSERT INTO afl_api_identity_adjudications'), fn.indexOf('`;', fn.indexOf('OVERRIDING SYSTEM VALUE')));
+    expect(insert).toContain('${r.previousState}::text::jsonb');
+    expect(insert).toContain('${r.evidence}::text::jsonb');
+    expect(insert).toContain('${r.createdAt}::text::timestamptz');
+    expect(insert).not.toMatch(/\}::(jsonb|json|timestamptz|timestamp)\b/);
+    expect(insert).not.toMatch(/JSON\.stringify|tx\.json|new Date/);
+    // the capture keeps PostgreSQL's own text, with microseconds -- not lowered to fit the driver
+    expect(tool).toContain('a.previous_state::text AS "previousState", a.evidence::text AS evidence');
+    expect(tool).toContain(`to_char(a.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`);
+    // and the exact field-for-field read-back still runs after the INSERTs, before the replay
+    const inserted = fn.indexOf('INSERT INTO afl_api_identity_adjudications');
+    const readBack = fn.indexOf('reinstatedLedgerProblems(');
+    expect(readBack).toBeGreaterThan(inserted);
+    expect(fn.indexOf('replayAflApiAdjudications(tx)')).toBeGreaterThan(readBack);
+    expect(tool).toMatch(/JSON\.stringify\(ledgerTuple\(readBack\[i\]\)\) !== JSON\.stringify\(ledgerTuple\(p\)\)/);
+  });
+
+  it('the reinstate stage itself refuses a ledger that is already populated, before any write', async () => {
+    const raw = ledger().map((r) => ({ ...r, id: String(r.id), supersedesId: r.supersedesId === null ? null : String(r.supersedesId) }));
+    const { tx, statements } = fakeTx((text) => {
+      if (text.includes('to_regclass')) return [{ present: true }];
+      if (text.includes('FROM afl_api_identity_adjudications a')) return raw;
+      if (text.includes('count(*)')) return [{ total: raw.length }];
+      throw new Error(`unexpected statement: ${text}`);
+    });
+    await expect(reinstateAndReplay(tx, capture()))
+      .rejects.toThrow(/The rebuilt ledger already holds 3 row\(s\); reinstatement needs it empty/);
+    expect(statements).toHaveLength(3);
+    for (const s of statements) expect(s.text).not.toMatch(WRITES);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-235 I18 — the tracked fixture harness around the guarded rebuild
+// (tools/migration/afl_api_adjudication_i18_fixture.ts). DB-free: argument and DSN
+// refusals, seed preconditions, the baseline's shape and hash, and every verify rule.
+// ---------------------------------------------------------------------------
+
+describe('AFLDB-ISSUE-235 I18 fixture harness (DB-free)', () => {
+  const OWNER = 'postgres://afldb_owner:pw@127.0.0.1:55432/afldb_test';
+  const IMPORT = 'postgres://afldb_import:pw@127.0.0.1:55432/afldb_test';
+  const EMAIL = I18_FIXTURE.actorEmail;
+
+  function row(over: Partial<I18LedgerRow> & Pick<I18LedgerRow, 'id' | 'action'>): I18LedgerRow {
+    return {
+      externalId: I18_FIXTURE.providerId, playerId: 144, playerIdentity: I18_FIXTURE.stableIdentity,
+      previousState: null, previousStateType: null,
+      evidence: '{"fingerprint": "abc", "providerId": "CD_I9991800001"}', evidenceType: 'object',
+      evidenceSha256: 'a'.repeat(64), surnameAck: false, supersedesId: null, adminUserId: 900,
+      adminEmail: EMAIL, note: I18_FIXTURE.notes.firstLink, createdAt: '2026-09-25T01:02:03.123456Z',
+      ...over,
+    };
+  }
+  const LEDGER: I18LedgerRow[] = [
+    row({ id: 199, action: 'linked' }),
+    row({ id: 200, action: 'revoked', supersedesId: 199, previousState: '{"id": 5, "status": "resolved"}',
+      previousStateType: 'object', evidenceSha256: 'b'.repeat(64), note: I18_FIXTURE.notes.revoke,
+      createdAt: '2026-09-25T01:02:04.000001Z' }),
+    row({ id: 201, action: 'linked', evidenceSha256: 'c'.repeat(64), note: I18_FIXTURE.notes.secondLink,
+      createdAt: '2026-09-25T01:02:05.999999Z' }),
+  ];
+  const baseline = (): I18Baseline => buildI18Baseline({
+    database: 'afldb_test', seededAt: '2026-09-25T01:03:00.000Z', providerId: I18_FIXTURE.providerId,
+    stableIdentity: I18_FIXTURE.stableIdentity, playerId: 144,
+    actor: { id: 900, email: EMAIL, role: 'super_admin' },
+    ledger: LEDGER, identity: { id: 77, status: 'resolved', matchMethod: 'afl_api_admin_adjudication', playerId: 144 },
+    sequence: { lastValue: 201, isCalled: true, next: 202 },
+  });
+
+  /** The live state a correct run leaves; `post` renumbers the player and the actor. */
+  function observed(phase: 'pre' | 'post', over: Partial<I18Observation> = {}): I18Observation {
+    const playerId = phase === 'pre' ? 144 : 13001;
+    const actorId = phase === 'pre' ? 900 : 1;
+    return {
+      database: 'afldb_test',
+      resolvedPlayerIds: [playerId],
+      ledger: LEDGER.map((r) => ({ ...r, playerId, adminUserId: actorId })),
+      ledgerTotal: 3,
+      ledgerMaxId: 201,
+      providerIdentities: [{ id: phase === 'pre' ? 77 : 3, status: 'resolved', matchMethod: 'afl_api_admin_adjudication', playerId }],
+      playerAflApiProviders: [I18_FIXTURE.providerId],
+      humanResolvedTotal: 1,
+      actors: [{ id: actorId, email: EMAIL, role: 'super_admin', disabled: true, hasPasswordHash: false, hasTotpSecret: false }],
+      live: { sequence: { lastValue: 201, isCalled: true }, replay: { inserted: 0, noops: 1, stops: [] }, bijection: 'ok' },
+      pendingCaptureExists: false,
+      archivedCaptures: phase === 'pre' ? [] : [{ file: 'x.reinstated.json', fileSha256: 'f', payloadSha256: 'p', matchesBaseline: true }],
+      ...over,
+    };
+  }
+
+  it('parses exactly seed / verify --phase pre|post / teardown', () => {
+    expect(parseI18Args(['seed'])).toEqual({ step: 'seed', allowOwnerImportDsn: false });
+    expect(parseI18Args(['seed', '--allow-owner-import-dsn'])).toEqual({ step: 'seed', allowOwnerImportDsn: true });
+    expect(parseI18Args(['verify', '--phase', 'pre'])).toEqual({ step: 'verify', phase: 'pre' });
+    expect(parseI18Args(['verify', '--phase', 'post'])).toEqual({ step: 'verify', phase: 'post' });
+    expect(parseI18Args(['teardown'])).toEqual({ step: 'teardown' });
+    for (const argv of [[], ['verify'], ['verify', '--phase', 'during'], ['teardown', '--force'], ['seed', '--x'], ['rebuild']]) {
+      expect(() => parseI18Args(argv), argv.join(' ')).toThrow(I18FixtureRefused);
+    }
+  });
+
+  it('runs on afldb_test only, and never substitutes the owner for the import role silently', () => {
+    expect(resolveI18Dsns({ AFLDB_TEST_DATABASE_URL: OWNER, AFLDB_TEST_IMPORT_DATABASE_URL: IMPORT }, { allowOwnerImportDsn: false }))
+      .toEqual({ database: 'afldb_test', ownerDsn: OWNER, importDsn: IMPORT, importIsOwner: false });
+    expect(() => resolveI18Dsns({ AFLDB_TEST_DATABASE_URL: OWNER }, { allowOwnerImportDsn: false }))
+      .toThrow(/AFLDB_TEST_IMPORT_DATABASE_URL is not set/);
+    expect(resolveI18Dsns({ AFLDB_TEST_DATABASE_URL: OWNER }, { allowOwnerImportDsn: true }).importIsOwner).toBe(true);
+    expect(() => resolveI18Dsns({}, { allowOwnerImportDsn: true })).toThrow(/AFLDB_TEST_DATABASE_URL is not set/);
+    expect(() => resolveI18Dsns({ AFLDB_TEST_DATABASE_URL: OWNER.replace('afldb_test', 'afldb_dev') }, { allowOwnerImportDsn: true }))
+      .toThrow(/rejected by name/);
+    expect(() => resolveI18Dsns({ AFLDB_TEST_DATABASE_URL: OWNER.replace('afldb_test', 'code_test_db') }, { allowOwnerImportDsn: true }))
+      .toThrow(/afldb_test' only/);
+    expect(() => resolveI18Dsns({ AFLDB_TEST_DATABASE_URL: OWNER, AFLDB_TEST_IMPORT_DATABASE_URL: IMPORT.replace('afldb_test', 'afldb_dev') },
+      { allowOwnerImportDsn: true })).toThrow(/names 'afldb_dev'/);
+    // no refusal ever quotes a DSN or its password
+    expect(() => resolveI18Dsns({ AFLDB_TEST_DATABASE_URL: 'postgres://u:secretpw@h/afldb_dev' }, { allowOwnerImportDsn: true }))
+      .toThrow(/^(?!.*secretpw)/);
+  });
+
+  it('owns only exact literals, outside every real provider id and the S6 namespace', () => {
+    expect(I18_FIXTURE.providerId).toMatch(/^CD_I[0-9]{10}$/);
+    expect(I18_FIXTURE.providerId).not.toMatch(/^CD_I999235[0-9]{4}$/);
+    expect(I18_FIXTURE.actorEmail).toMatch(/@example\.test$/);
+    expect(I18_FIXTURE.externalRecordId).toBe(`${I18_FIXTURE.matchId}|${I18_FIXTURE.teamId}|${I18_FIXTURE.providerId}`);
+    for (const note of Object.values(I18_FIXTURE.notes)) expect(note.length).toBeGreaterThanOrEqual(20);
+    const tool = readFileSync(join(process.cwd(), 'tools', 'migration', 'afl_api_adjudication_i18_fixture.ts'), 'utf8');
+    expect(tool).not.toMatch(/\bLIKE\b/);
+    expect(tool).not.toMatch(/\b144\b/); // the player is resolved from its identity, never a numeric id
+  });
+
+  it('writes the human state ONLY through the real link/revoke APIs, and the rebuild never runs the fixture', () => {
+    const tool = readFileSync(join(process.cwd(), 'tools', 'migration', 'afl_api_adjudication_i18_fixture.ts'), 'utf8');
+    expect(tool).not.toMatch(/INSERT INTO afl_api_identity_adjudications/);
+    expect(tool).not.toMatch(/INSERT INTO external_identities/);
+    expect(tool).not.toMatch(/UPDATE (afl_api_identity_adjudications|external_identities)/);
+    expect(tool.match(/await linkAflApiProvider\(/g)).toHaveLength(1); // one helper, called twice
+    expect(tool).toMatch(/await link\('link #1'[\s\S]*revokeAflApiLink\(\{[\s\S]*await link\('link #2'/);
+    // no statistic or Brownlow use is seeded, so the revoke stays provable
+    expect(tool).not.toMatch(/INSERT INTO (player_match_stats|brownlow_round_votes|player_height_evidence)/);
+    const pkg = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf8')) as { scripts: Record<string, string> };
+    expect(pkg.scripts['db:test:issue235-i18'])
+      .toBe('tsx --conditions=react-server tools/migration/afl_api_adjudication_i18_fixture.ts');
+    const runner = readFileSync(join(process.cwd(), 'tools', 'db', 'rebuild-test.ts'), 'utf8');
+    expect(runner).not.toMatch(/i18|afl_api_adjudication_i18_fixture/i);
+  });
+
+  it('teardown and verify run under plain tsx: nothing they load reaches server-only (post-I18 teardown refusal, 2026-09-24)', () => {
+    // `npx tsx tools/migration/afl_api_adjudication_i18_fixture.ts teardown` (no
+    // --conditions=react-server) once committed its DELETEs and then REFUSED loading its proof
+    // module, which reached `import 'server-only'` through @/db/queries. Walk the static import
+    // graph of the tool and of the module teardown's proof loads; none may reach server-only.
+    const root = process.cwd();
+    const resolve = (from: string, spec: string): string | null => {
+      let base: string;
+      if (spec.startsWith('@/')) base = join(root, 'src', spec.slice(2));
+      else if (spec.startsWith('.')) base = join(from, '..', spec);
+      else return null; // a package: postgres/node:* are server-neutral
+      for (const candidate of [`${base}.ts`, `${base}.tsx`, join(base, 'index.ts')]) {
+        if (existsSync(candidate)) return candidate;
+      }
+      throw new Error(`unresolved import '${spec}' from ${from}`);
+    };
+    const staticImports = (text: string) => [...text.matchAll(/^(?:import|export)\s[^;]*?from\s+'([^']+)'|^import\s+'([^']+)'/gm)]
+      .map((m) => m[1] ?? m[2]);
+    const reachable = (entry: string): Map<string, string[]> => {
+      const seen = new Map<string, string[]>();
+      const stack = [entry];
+      while (stack.length > 0) {
+        const file = stack.pop()!;
+        if (seen.has(file)) continue;
+        const specs = staticImports(readFileSync(file, 'utf8'));
+        seen.set(file, specs);
+        for (const spec of specs) {
+          const next = resolve(file, spec);
+          if (next) stack.push(next);
+        }
+      }
+      return seen;
+    };
+    const tool = join(root, 'tools', 'migration', 'afl_api_adjudication_i18_fixture.ts');
+    const ownership = join(root, 'tests', 'integration', 'afl-api-fixture-ownership.ts');
+    for (const entry of [tool, ownership]) {
+      const graph = reachable(entry);
+      expect(graph.size, entry).toBeGreaterThan(1); // not vacuous
+      for (const [file, specs] of graph) {
+        expect(specs, file).not.toContain('server-only');
+        expect(specs.filter((s) => s.startsWith('@/db/')), file).toEqual([]);
+      }
+    }
+    // Not vacuous: the seeding fixtures module DOES reach server-only, which is why teardown must not load it.
+    const seeding = reachable(join(root, 'tests', 'integration', 'afl-api-adjudication-fixtures.ts'));
+    expect([...seeding.values()].some((specs) => specs.includes('server-only'))).toBe(true);
+
+    // Teardown's proof loads the neutral module; only seed loads the query module (under react-server).
+    const text = readFileSync(tool, 'utf8');
+    const teardown = text.slice(text.indexOf('async function runTeardown('), text.indexOf('async function main('));
+    expect(teardown).toContain("await import('../../tests/integration/afl-api-fixture-ownership')");
+    expect(teardown.match(/import\('[^']+'\)/g)).toEqual(["import('../../tests/integration/afl-api-fixture-ownership')"]);
+    const verify = text.slice(text.indexOf('async function runVerify('), text.indexOf('async function runTeardown('));
+    expect(verify).not.toMatch(/await import\(/);
+    // Teardown re-checks the live database before its first DELETE.
+    expect(teardown.indexOf('SELECT current_database()')).toBeGreaterThan(-1);
+    expect(teardown.indexOf('SELECT current_database()')).toBeLessThan(teardown.indexOf('DELETE FROM'));
+  });
+
+  it('refuses to seed unless the baseline player is exactly one clean, safely revocable player', () => {
+    const clean: I18SeedObservation = {
+      resolvedPlayerIds: [144], playerStableIdentities: [{ sourceKey: 'afltables', externalId: I18_FIXTURE.stableIdentity }],
+      playerAflApiRows: 0, playerAflApiUses: 0, playerLedgerRows: 0, fixtureRows: 0, ledgerRows: 0,
+      humanResolvedRows: 0, pendingCaptureExists: false, baselineExists: false,
+    };
+    expect(i18SeedPreconditionProblems(clean)).toEqual([]);
+    const refused: [Partial<I18SeedObservation>, RegExp][] = [
+      [{ resolvedPlayerIds: [] }, /resolves to 0 players/],
+      [{ resolvedPlayerIds: [144, 145] }, /resolves to 2 players/],
+      [{ playerStableIdentities: [...clean.playerStableIdentities, { sourceKey: 'manual_admin_edit', externalId: 'manual_admin_edit:x' }] }, /ambiguous/],
+      [{ playerStableIdentities: [{ sourceKey: 'afltables', externalId: 'players/A/Alan_Martello0.html' },
+        ...clean.playerStableIdentities] }, /ambiguous/],
+      [{ playerAflApiRows: 1 }, /already holds 1 afl_api/],
+      [{ playerAflApiUses: 2 }, /revoke could not be proven safe/],
+      [{ playerLedgerRows: 1 }, /ledger row/],
+      [{ fixtureRows: 3 }, /run teardown first/],
+      [{ ledgerRows: 1 }, /ledger is not empty/],
+      [{ humanResolvedRows: 1 }, /'resolved' row/],
+      [{ pendingCaptureExists: true }, /pending rebuild capture/],
+      [{ baselineExists: true }, /baseline file already exists/],
+    ];
+    for (const [over, message] of refused) {
+      expect(i18SeedPreconditionProblems({ ...clean, ...over }).join('; '), String(message)).toMatch(message);
+    }
+  });
+
+  it('the baseline is exactly linked / revoked (superseding the first link) / linked, and hash-bound', () => {
+    const b = baseline();
+    expect(i18LedgerShapeProblems(b.ledger)).toEqual([]);
+    expect(b.ledger.map((r) => [r.id, r.action, r.supersedesId])).toEqual([[199, 'linked', null], [200, 'revoked', 199], [201, 'linked', null]]);
+    expect(parseI18Baseline(JSON.stringify(b), 'afldb_test')).toEqual(b);
+    expect(() => parseI18Baseline(JSON.stringify({ ...b, playerId: 145 }), 'afldb_test')).toThrow(/payload hash/);
+    expect(() => parseI18Baseline(JSON.stringify(b), 'code_test_db')).toThrow(/not 'code_test_db'/);
+    expect(() => parseI18Baseline('{', 'afldb_test')).toThrow(/not valid JSON/);
+
+    const bad: [I18LedgerRow[], RegExp][] = [
+      [LEDGER.slice(0, 2), /not \[linked, revoked, linked\]/],
+      [[LEDGER[0], { ...LEDGER[1], supersedesId: 201 }, LEDGER[2]], /supersedes 201, not the first linked row 199/],
+      [[LEDGER[0], { ...LEDGER[1], supersedesId: null }, LEDGER[2]], /supersedes null/],
+      [[LEDGER[0], LEDGER[1], { ...LEDGER[2], supersedesId: 200 }], /second linked row has a supersedes_id/],
+      [[LEDGER[0], LEDGER[1], { ...LEDGER[2], evidenceType: 'string' }], /jsonb string, not an object/],
+      [[LEDGER[0], LEDGER[1], { ...LEDGER[2], playerId: 145 }], /different player ids/],
+      [[{ ...LEDGER[0], adminEmail: 'someone@afldb.example' }, LEDGER[1], LEDGER[2]], /not the I18 actor/],
+    ];
+    for (const [rows, message] of bad) {
+      expect(i18LedgerShapeProblems(rows).join('; '), String(message)).toMatch(message);
+      expect(() => buildI18Baseline({ ...b, ledger: rows })).toThrow(I18FixtureRefused);
+    }
+  });
+
+  it('verify passes before the rebuild and after it, with the player and actor renumbered', () => {
+    expect(i18VerifyProblems(baseline(), observed('pre'), 'pre')).toEqual([]);
+    expect(i18VerifyProblems(baseline(), observed('post'), 'post')).toEqual([]);
+    // an unchanged numeric id is also a pass: player_id is compared to the identity, not the number
+    expect(i18VerifyProblems(baseline(), observed('post', {
+      resolvedPlayerIds: [144], ledger: LEDGER.map((r) => ({ ...r, adminUserId: 1 })),
+      providerIdentities: [{ id: 3, status: 'resolved', matchMethod: 'afl_api_admin_adjudication', playerId: 144 }],
+    }), 'post')).toEqual([]);
+    // but the pre phase requires the seeded surrogates exactly
+    expect(i18VerifyProblems(baseline(), observed('post', { archivedCaptures: [] }), 'pre').join('; '))
+      .toMatch(/resolves to player 13001, not the seeded 144/);
+  });
+
+  it('verify post refuses every departure from the reinstate contract', () => {
+    const post = (over: Partial<I18Observation>) => i18VerifyProblems(baseline(), observed('post', over), 'post').join('; ');
+    const ledgerWith = (i: number, change: Partial<I18LedgerRow>) =>
+      observed('post').ledger.map((r, k) => (k === i ? { ...r, ...change } : r));
+    const cases: [Partial<I18Observation>, RegExp][] = [
+      [{ resolvedPlayerIds: [] }, /resolves to 0 players/],
+      [{ resolvedPlayerIds: [13001, 13002] }, /resolves to 2 players/],
+      [{ ledger: ledgerWith(1, { evidence: '{"fingerprint": "changed"}' }) }, /ledger row 200: evidence differ/],
+      [{ ledger: ledgerWith(1, { previousState: '{"id": 6}' }) }, /previous_state differ/],
+      [{ ledger: ledgerWith(1, { evidenceSha256: 'd'.repeat(64) }) }, /evidence_sha256 differ/],
+      [{ ledger: ledgerWith(1, { supersedesId: 201 }) }, /supersedes_id differ/],
+      [{ ledger: ledgerWith(2, { createdAt: '2026-09-25T01:02:05.999000Z' }) }, /ledger row 201: created_at differ/],
+      [{ ledger: ledgerWith(0, { id: 1 }) }, /ledger row 199: id differ/],
+      [{ ledger: ledgerWith(0, { note: 'x'.repeat(30) }) }, /note differ/],
+      [{ ledger: ledgerWith(0, { playerId: 144 }) }, /player_id 144 is not the player the identity resolves to[\s\S]*still names the pre-rebuild player id 144/],
+      [{ ledger: ledgerWith(0, { adminUserId: 900 }) }, /admin_user_id 900 is not the actor/],
+      [{ ledger: observed('post').ledger.slice(0, 2) }, /2 ledger row\(s\)/],
+      [{ ledgerTotal: 4 }, /whole ledger holds 4/],
+      [{ providerIdentities: [] }, /0 afl_api identity row/],
+      [{ providerIdentities: [{ id: 3, status: 'unique', matchMethod: 'afl_api_stat_vector_season', playerId: 13001 }] },
+        /'unique', not 'resolved'[\s\S]*match_method/],
+      [{ providerIdentities: [{ id: 3, status: 'resolved', matchMethod: 'afl_api_admin_adjudication', playerId: 144 }] },
+        /(?=[\s\S]*names player 144, not 13001)(?=[\s\S]*identity still names the pre-rebuild player id 144)/],
+      [{ playerAflApiProviders: [I18_FIXTURE.providerId, 'CD_I1002231'] }, /not only CD_I9991800001/],
+      [{ humanResolvedTotal: 2 }, /2 human afl_api 'resolved'/],
+      [{ actors: [] }, /0 auth_users row/],
+      [{ actors: [{ id: 1, email: EMAIL, role: 'super_admin', disabled: false, hasPasswordHash: true, hasTotpSecret: true }] },
+        /not disabled[\s\S]*password hash[\s\S]*TOTP secret/],
+      [{ actors: [{ id: 1, email: EMAIL, role: 'contributor', disabled: true, hasPasswordHash: false, hasTotpSecret: false }] },
+        /role is 'contributor', not the captured 'super_admin'/],
+      [{ live: { sequence: { lastValue: 201, isCalled: false }, replay: { inserted: 0, noops: 1, stops: [] }, bijection: 'ok' } },
+        /next hand out 201, not above max\(id\) 201/],
+      [{ live: { sequence: { lastValue: 201, isCalled: true }, replay: { inserted: 1, noops: 0, stops: [] }, bijection: 'ok' } },
+        /not a single no-op/],
+      [{ live: { sequence: { lastValue: 201, isCalled: true }, replay: { error: 'read-only' }, bijection: 'ok' } }, /could not run read-only/],
+      [{ live: { sequence: { lastValue: 201, isCalled: true }, replay: { inserted: 0, noops: 1, stops: [] }, bijection: { error: 'x' } } },
+        /bijection does not hold/],
+      [{ pendingCaptureExists: true }, /was not archived/],
+      [{ archivedCaptures: [] }, /no archived rebuild capture/],
+      [{ database: 'code_test_db' }, /connected to 'code_test_db'/],
+    ];
+    for (const [over, message] of cases) expect(post(over), String(message)).toMatch(message);
+  });
+
+  it('finds the archived rebuild capture that holds the I18 ledger, proven by its own hash', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'i18-capture-'));
+    try {
+      const b = baseline();
+      const rows: CapturedLedgerRow[] = b.ledger.map((r) => ({
+        id: r.id, sourceKey: 'afl_api', externalId: r.externalId, action: r.action, playerId: r.playerId,
+        playerIdentity: r.playerIdentity, previousState: r.previousState, evidence: r.evidence,
+        evidenceSha256: r.evidenceSha256, surnameDisagreementAcknowledged: r.surnameAck, supersedesId: r.supersedesId,
+        adminUserId: r.adminUserId, adminEmail: r.adminEmail, adminRole: 'super_admin', note: r.note, createdAt: r.createdAt,
+      }));
+      const capture = buildLedgerCapture({ database: 'afldb_test', capturedAt: '2026-09-25T02:00:00.000Z', ledgerTablePresent: true, rows });
+      expect(captureMatchesBaseline(capture.rows, b)).toBe(true);
+      expect(captureMatchesBaseline(capture.rows.slice(1), b)).toBe(false);
+      expect(captureMatchesBaseline(capture.rows.map((r) => ({ ...r, createdAt: '2026-09-25T01:02:03.123000Z' })), b)).toBe(false);
+
+      writePendingCapture(dir, capture);
+      const archived = archivePendingCapture(dir, capture);
+      writeFileSync(join(dir, 'afl-api-adjudications.unrelated.reinstated.json'), '{"format":"other"}');
+      const found = readArchivedCaptures(dir, 'afldb_test', b);
+      expect(found.find((c) => c.matchesBaseline)?.file).toBe(archived.split(/[\\/]/).pop());
+      expect(found.find((c) => c.matchesBaseline)?.payloadSha256).toBe(capture.payloadSha256);
+      // an unparseable or foreign archive is listed, never trusted
+      expect(found.find((c) => c.file.includes('unrelated'))).toMatchObject({ matchesBaseline: false, payloadSha256: 'unverifiable' });
+      expect(readArchivedCaptures(join(dir, 'missing'), 'afldb_test', b)).toEqual([]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps the baseline beside, never inside, the directory the rebuild capture stage owns', () => {
+    const repo = join('R:', 'repo');
+    expect(i18BaselinePath(repo, 'afldb_test')).toBe(join(repo, 'backups', 'issue-235-i18', 'afldb_test.baseline.json'));
+    expect(i18BaselinePath(repo, 'afldb_test').startsWith(captureDirectory(repo, 'afldb_test'))).toBe(false);
   });
 });

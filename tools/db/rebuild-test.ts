@@ -33,6 +33,11 @@
  *   8. per-domain fingerprints and row counts                      -> stage 9
  *   9. never reference AFLDB_LEGACY_SQLITE                         -> nothing here does
  *
+ * AFLDB-ISSUE-235 OD-5 adds the one piece of HUMAN state this rebuild carries across the
+ * reset: the `afl_api` identity adjudication ledger. It is captured after PRECHECK and before
+ * the reset, reinstated and replayed after `draftguru`, and bijection-checked straight after
+ * (see planStages() and tools/migration/rebuild_afl_api_adjudications.ts).
+ *
  * Two repository facts shape the destructive step, and neither was invented here:
  *
  *   * No DSN in the credential model can DROP/CREATE a database. `afldb_test` is created
@@ -65,8 +70,16 @@ import { runPsql, type SpawnSyncLike } from './psql';
 // Types
 // ---------------------------------------------------------------------------
 
+/**
+ * `capture` and `reinstate` are AFLDB-ISSUE-235 OD-5's: the only two stages that run with
+ * the OWNER DSN outside the schema/privilege/reset path. Capture reads `auth_users` and
+ * reinstate writes ledger ids, the sequence and attribution-only actors — none of which
+ * afldb_import may do — so they are their own kinds rather than `data` stages quietly
+ * holding more privilege than every other data stage.
+ */
 export type StageKind =
-  | 'precheck' | 'destructive' | 'schema' | 'privileges' | 'data' | 'validation';
+  | 'precheck' | 'capture' | 'destructive' | 'schema' | 'privileges' | 'data' | 'reinstate'
+  | 'validation';
 
 export type Stage = {
   /** Stable identifier used by tests and by the run report. */
@@ -127,6 +140,11 @@ export type Options = {
    * as before this option existed.
    */
   draftguruBridge?: string;
+  /**
+   * `--recover-afl-api-adjudications`. AFLDB-ISSUE-235 OD-5: reinstate from the pending
+   * capture an earlier, failed rebuild left behind, instead of refusing. Never implicit.
+   */
+  recoverAflApiAdjudications?: boolean;
   planOnly: boolean;
 };
 
@@ -250,6 +268,37 @@ export const AFTER_SIREN_CSV = join('data', 'records', 'after-siren-events.csv')
 export const AFTER_SIREN_ADJUDICATIONS = join('data', 'records', 'after-siren-adjudications.csv');
 export const AFTER_SIREN_PROVENANCE = join('data', 'records', 'after-siren-events.source.json');
 const AFLTABLES_CONTRACT = join('tools', 'rebuild', 'afltables', 'afltables-contract.json');
+/**
+ * AFLDB-ISSUE-235 OD-5. The adjudication ledger's capture / reinstate / bijection tool, and
+ * the two variables its stages hand it: the target NAME and exactly one DSN. Dedicated
+ * names, so the tool can never pick up AFLDB_DATABASE_URL or another target's variable.
+ */
+export const AFL_API_ADJUDICATION_TOOL = 'tools/migration/rebuild_afl_api_adjudications.ts';
+export const AFL_API_ADJUDICATION_TARGET_ENV = 'AFLDB_REBUILD_TARGET';
+export const AFL_API_ADJUDICATION_DSN_ENV = 'AFLDB_REBUILD_ADJUDICATION_DSN';
+export type AflApiAdjudicationStep = 'capture' | 'reinstate' | 'bijection';
+
+/** Target-independent argv: the target travels in the stage environment, never on argv. */
+export function aflApiAdjudicationArgv(step: AflApiAdjudicationStep, recover = false): string[] {
+  const argv = ['npx', 'tsx', AFL_API_ADJUDICATION_TOOL, step];
+  if (step === 'capture' && recover) argv.push('--recover');
+  return argv;
+}
+
+/**
+ * The stage environment. Capture and reinstate need the OWNER DSN (see StageKind); the
+ * read-only bijection check runs as the restricted import role, like every other
+ * validation command stage. Always the selected target's own DSNs.
+ */
+export function aflApiAdjudicationEnv(
+  target: ResolvedTarget, step: AflApiAdjudicationStep,
+): Record<string, string> {
+  return {
+    [AFL_API_ADJUDICATION_TARGET_ENV]: target.database,
+    [AFL_API_ADJUDICATION_DSN_ENV]: step === 'bijection' ? target.importDsn : target.adminDsn,
+  };
+}
+
 export const BROWNLOW_SEASON_PREFLIGHT_FILES = [
   'data/brownlow/season-votes.csv',
   'data/brownlow/season-votes.manifest.json',
@@ -563,6 +612,23 @@ export function planStages(target: ResolvedTarget, fitzroy: FitzroySource,
       run: 'internal',
     },
     {
+      // AFLDB-ISSUE-235 OD-5 (i). The human afl_api adjudication ledger is the one piece of
+      // state here that no tracked source can rebuild, so it is captured AFTER every input
+      // is proven and BEFORE the reset. A capture failure is a stage failure: the reset
+      // below never runs. An empty ledger (or a database before migration 104) is captured
+      // as empty; a pending capture an earlier failed run never reinstated is refused
+      // rather than overwritten (--recover-afl-api-adjudications adopts it instead), and
+      // one the live ledger already equals is verified as reinstated, read-only, before
+      // it is archived (the post-commit/pre-archive crash).
+      id: 'afl-api-adjudications-capture',
+      name: 'AFL API ADJUDICATIONS — capture the human identity ledger before anything is destroyed'
+        + (opts.recoverAflApiAdjudications ? ' (RECOVER: adopt the pending capture)' : ''),
+      kind: 'capture',
+      run: 'command',
+      argv: aflApiAdjudicationArgv('capture', opts.recoverAflApiAdjudications),
+      envOverlay: aflApiAdjudicationEnv(target, 'capture'),
+    },
+    {
       id: 'recreate',
       name: `DATABASE RESET — clear ${target.database}`,
       kind: 'destructive',
@@ -733,6 +799,30 @@ export function planStages(target: ResolvedTarget, fitzroy: FitzroySource,
       run: 'command',
       argv: draftguruImportArgv(opts.draftguruLabel, python, opts.draftguruBridge),
       envOverlay: dataEnv,
+    },
+    {
+      // AFLDB-ISSUE-235 OD-5 (ii). Not after fitzroy: a ledger row's player_identity may name
+      // any player the canonical population holds, and `draftguru` is the last stage that
+      // adds players (awards-honours below only links to existing ones). ONE transaction:
+      // the ledger under its original ids, player_id remapped from player_identity,
+      // admin_user_id remapped by email, the id sequence advanced, then the D15 replay of
+      // the human `resolved` identities and the bijection — any mismatch rolls back all of it.
+      id: 'afl-api-adjudications-reinstate',
+      name: 'AFL API ADJUDICATIONS — reinstate the ledger and replay the human identities (one transaction)',
+      kind: 'reinstate',
+      run: 'command',
+      argv: aflApiAdjudicationArgv('reinstate'),
+      envOverlay: aflApiAdjudicationEnv(target, 'reinstate'),
+    },
+    {
+      // AFLDB-ISSUE-235 OD-5 (iii). D15 point 3 as its own read-only stage, so a failure is
+      // named on its own and stops every later stage.
+      id: 'afl-api-adjudications-bijection',
+      name: 'AFL API ADJUDICATIONS — assert the ledger <-> human identity bijection',
+      kind: 'validation',
+      run: 'command',
+      argv: aflApiAdjudicationArgv('bijection'),
+      envOverlay: aflApiAdjudicationEnv(target, 'bijection'),
     },
     {
       // AFLDB-ISSUE-112 §7/§24. Awards and honours, every family from a tracked
@@ -2640,6 +2730,7 @@ export function parseArgs(argv: string[]): Options {
     else if (arg === '--acknowledge-destroy') opts.acknowledgeDestroy = argv[++i];
     else if (arg === '--acknowledge-partial-fitzroy') opts.acknowledgePartialFitzroy = true;
     else if (arg === '--allow-owner-import-dsn') opts.allowOwnerImportDsn = true;
+    else if (arg === '--recover-afl-api-adjudications') opts.recoverAflApiAdjudications = true;
     else if (arg === '--plan') opts.planOnly = true;
     else throw new RebuildRefused(`Unknown argument: ${arg}`);
   }
@@ -2737,6 +2828,8 @@ async function main(): Promise<number> {
       : ' (PARTIAL — explicitly acknowledged)'));
   console.log(`  draftguru     : ${opts.draftguruLabel}`
     + (opts.draftguruBridge ? ` + bridge ${opts.draftguruBridge}` : ' (no bridge dataset)'));
+  console.log(`  afl_api ledger: captured to backups/rebuild/${target.database}/, reinstated after draftguru`
+    + (opts.recoverAflApiAdjudications ? ' (RECOVER from the pending capture)' : ''));
   if (target.importIsOwnerSubstitution) {
     console.log('  WARNING: data stages run as OWNER (--allow-owner-import-dsn). '
       + 'A missing afldb_import grant will not be caught — see AFLDB-ISSUE-083.');
