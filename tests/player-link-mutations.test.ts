@@ -1646,6 +1646,25 @@ describe('AFLDB-ISSUE-235: afl-api-player-links.ts (order of operations, DB-free
     expect(revoke).toContain('readLatestAdjudicationId(tx, input.providerId)');
   });
 
+  it('S8 V3 regression — settled provider evidence uses current spine heads without weakening pending evidence', () => {
+    const detailStart = source.indexOf('export async function readAflApiProviderEvidence');
+    const historyStart = source.indexOf('export type AflApiAdjudicationHistoryRow');
+    const detail = source.slice(detailStart, historyStart);
+
+    expect(detail).toContain('const payloadRows = pendingCandidates.length > 0');
+
+    // Actionable U1 evidence remains tied to pending promotion-candidate versions.
+    expect(detail).toContain('FROM promotion_candidates c');
+    expect(detail).toContain("c.status = 'pending'");
+    expect(detail).toContain('v.version_seq = c.source_version_seq');
+
+    // Settled L-I/L-H display evidence uses only the durable current observation head.
+    expect(detail).toContain('FROM staging.source_records r');
+    expect(detail).toContain('v.version_seq = r.current_version_seq');
+    expect(detail).toContain('JOIN staging.afl_api_player_match pm');
+    expect(detail).toContain('pm.version_seq = r.current_version_seq');
+    expect(detail).toContain("r.family = 'player_match_stats'");
+  });
   it('A5 — linkAflApiProvider: locks, re-reads, INSERT external_identities (resolved/afl_api_admin_adjudication), then the audit INSERT', () => {
     const fn = source.slice(source.indexOf('export async function linkAflApiProvider'));
     const at = (needle: string, from = 0) => {

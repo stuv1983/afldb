@@ -244,6 +244,12 @@ export type AflApiProviderEvidence = {
   latestAdjudicationId: number | null;
 };
 
+type AflApiProviderPayloadRow = {
+  externalRecordId: string;
+  season: number;
+  rawPayload: RawPlayerStatsPayload;
+};
+
 /**
  * §6 blocks 1-6, server-side and read-only: provider facts, per-match
  * evidence, the bridge's own rule recomputed against this database's
@@ -261,22 +267,43 @@ export async function readAflApiProviderEvidence(providerId: string): Promise<Af
   const state = classifyAflApiIdentityState({ row: existing, hasPendingCandidate: pendingCandidates.length > 0 });
   if (pendingCandidates.length === 0 && existing === null) return null; // U0: not actionable, not listed
 
-  // Block 1/2: the provider's own spine payloads, one per (match, candidate).
-  const payloadRows = await sql<{
-    externalRecordId: string; season: number; rawPayload: RawPlayerStatsPayload;
-  }[]>`
-    SELECT v.external_record_id AS "externalRecordId", c.season, p.raw_payload AS "rawPayload"
-      FROM promotion_candidates c
-      JOIN staging.source_record_versions v
-        ON v.source_id = c.source_id AND v.family = c.family
-       AND v.external_record_id = c.external_record_id AND v.version_seq = c.source_version_seq
-      JOIN staging.source_payloads p
-        ON p.source_id = v.source_id AND p.family = v.family AND p.payload_hash = v.payload_hash
-     WHERE c.source_id = ${sourceId} AND c.verb = 'unresolved_identity' AND c.status = 'pending'
-       AND split_part(c.external_record_id, '|', 3) = ${providerId}
-     ORDER BY c.id
-  `;
-
+  // Block 1/2: the provider's own spine payloads.
+  //
+  // U1 stays bound to the exact pending candidate versions: those rows are also the
+  // link-time evidence/fingerprint authority. Once settle consumes those candidates,
+  // promotion_candidates deliberately retains nothing. A trusted L-I/L-H identity still
+  // needs a read-only evidence page (V3), so that case reads the durable CURRENT observation
+  // heads instead -- never every historical source_record_versions row.
+  const payloadRows = pendingCandidates.length > 0
+    ? await sql<AflApiProviderPayloadRow[]>`
+        SELECT v.external_record_id AS "externalRecordId", c.season, p.raw_payload AS "rawPayload"
+          FROM promotion_candidates c
+          JOIN staging.source_record_versions v
+            ON v.source_id = c.source_id AND v.family = c.family
+           AND v.external_record_id = c.external_record_id AND v.version_seq = c.source_version_seq
+          JOIN staging.source_payloads p
+            ON p.source_id = v.source_id AND p.family = v.family AND p.payload_hash = v.payload_hash
+         WHERE c.source_id = ${sourceId} AND c.verb = 'unresolved_identity' AND c.status = 'pending'
+           AND split_part(c.external_record_id, '|', 3) = ${providerId}
+         ORDER BY c.id
+      `
+    : await sql<AflApiProviderPayloadRow[]>`
+        SELECT r.external_record_id AS "externalRecordId", pm.season, p.raw_payload AS "rawPayload"
+          FROM staging.source_records r
+          JOIN staging.source_record_versions v
+            ON v.source_id = r.source_id AND v.family = r.family
+           AND v.external_record_id = r.external_record_id
+           AND v.version_seq = r.current_version_seq
+          JOIN staging.source_payloads p
+            ON p.source_id = v.source_id AND p.family = v.family AND p.payload_hash = v.payload_hash
+          JOIN staging.afl_api_player_match pm
+            ON pm.source_id = r.source_id AND pm.family = r.family
+           AND pm.external_record_id = r.external_record_id
+           AND pm.version_seq = r.current_version_seq
+         WHERE r.source_id = ${sourceId} AND r.family = 'player_match_stats'
+           AND split_part(r.external_record_id, '|', 3) = ${providerId}
+         ORDER BY r.external_record_id
+      `;
   const teamIds = new Set<string>();
   const seasons = new Set<number>();
   const jumperNumbers = new Set<number>();
