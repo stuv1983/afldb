@@ -256,7 +256,7 @@ export async function readAflApiProviderEvidence(providerId: string): Promise<Af
   const sourceId = await fetchAflApiSourceId(sql);
   const [existing, pendingCandidates] = await Promise.all([
     readExistingIdentity(sql, sourceId, providerId),
-    readPendingCandidates(sql, sourceId, providerId),
+    readPendingCandidates(authSql, sourceId, providerId),
   ]);
   const state = classifyAflApiIdentityState({ row: existing, hasPendingCandidate: pendingCandidates.length > 0 });
   if (pendingCandidates.length === 0 && existing === null) return null; // U0: not actionable, not listed
@@ -410,7 +410,7 @@ export async function readAflApiProviderEvidence(providerId: string): Promise<Af
      ORDER BY id
   `;
 
-  const latestAdjudicationId = await readLatestAdjudicationId(sql, providerId);
+  const latestAdjudicationId = await readLatestAdjudicationId(authSql, providerId);
 
   return {
     providerId, state, existing,
@@ -438,7 +438,7 @@ export type AflApiAdjudicationHistoryRow = {
 export async function readAflApiAdjudicationHistory(
   providerId: string,
 ): Promise<readonly AflApiAdjudicationHistoryRow[]> {
-  const rows = await sql<AflApiAdjudicationHistoryRow[]>`
+  const rows = await authSql<AflApiAdjudicationHistoryRow[]>`
     SELECT id, action, player_id AS "playerId", player_identity AS "playerIdentity",
            admin_user_id AS "adminUserId", note, created_at::text AS "createdAt",
            supersedes_id AS "supersedesId"

@@ -1615,6 +1615,37 @@ describe('AFLDB-ISSUE-235: afl-api-player-links.ts (order of operations, DB-free
     join(process.cwd(), 'src', 'db', 'queries', 'afl-api-player-links.ts'), 'utf8',
   );
 
+  it('S8 regression — admin-only detail reads use authSql while mutation reads stay on tx', () => {
+    const detailStart = source.indexOf('export async function readAflApiProviderEvidence');
+    const historyStart = source.indexOf('export type AflApiAdjudicationHistoryRow');
+    const writesStart = source.indexOf('export async function linkAflApiProvider');
+
+    expect(detailStart).toBeGreaterThanOrEqual(0);
+    expect(historyStart).toBeGreaterThan(detailStart);
+    expect(writesStart).toBeGreaterThan(historyStart);
+
+    const detail = source.slice(detailStart, historyStart);
+    expect(detail).toContain('readPendingCandidates(authSql, sourceId, providerId)');
+    expect(detail).toContain('readLatestAdjudicationId(authSql, providerId)');
+    expect(detail).not.toContain('readPendingCandidates(sql, sourceId, providerId)');
+    expect(detail).not.toContain('readLatestAdjudicationId(sql, providerId)');
+
+    const history = source.slice(historyStart, writesStart);
+    expect(history).toContain('const rows = await authSql<AflApiAdjudicationHistoryRow[]>`');
+    expect(history).not.toContain('const rows = await sql<AflApiAdjudicationHistoryRow[]>`');
+
+    const link = source.slice(
+      source.indexOf('export async function linkAflApiProvider'),
+      source.indexOf('export type RevokeAflApiLinkInput'),
+    );
+    expect(link).toContain('readPendingCandidates(tx, sourceId, input.providerId)');
+    expect(link).toContain('readLatestAdjudicationId(tx, input.providerId)');
+
+    const revoke = source.slice(source.indexOf('export async function revokeAflApiLink'));
+    expect(revoke).toContain('readPendingCandidates(tx, sourceId, input.providerId)');
+    expect(revoke).toContain('readLatestAdjudicationId(tx, input.providerId)');
+  });
+
   it('A5 — linkAflApiProvider: locks, re-reads, INSERT external_identities (resolved/afl_api_admin_adjudication), then the audit INSERT', () => {
     const fn = source.slice(source.indexOf('export async function linkAflApiProvider'));
     const at = (needle: string, from = 0) => {
