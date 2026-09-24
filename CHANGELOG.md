@@ -15,6 +15,31 @@ commit.
 
 ## [Unreleased]
 
+### AFL API human player-link adjudication (AFLDB-ISSUE-235) (Resolved) - 24 September 2026
+
+- **What changed.** A new Super Admin evidence/adjudication surface at
+  `/admin/player-links/afl-api` lets an operator resolve `afl_api` provider identities the bridge
+  importer could not link. A human link writes `status = 'resolved'` with source
+  `afl_api_admin_adjudication`, recorded in a new append-only audit ledger
+  (`afl_api_identity_adjudications`). One `afl_api` provider per player is now enforced in the
+  database. Revoke succeeds only on a proven non-use across every non-system schema and refuses
+  otherwise, with no operator-assertion override. The bridge importer's two-writer contract is
+  preserved: it never overwrites, deletes or downgrades a human `resolved` link, reporting
+  agreement as `already_linked (human)` and withholding disagreement or collisions as findings
+  instead. Both promotion and the `afldb_test` rebuild now capture, reinstate and replay human
+  adjudication decisions (D15), verified end-to-end by a guarded live rebuild (I18).
+- **Acceptance.** DEV deployed at `6c693b92`: migration 104/104, `db:privileges` PASS, 669/669/669
+  `afl_api` census unchanged, 0 pending/contradictory identities, D15 bijection PASS, bridge loader
+  validate-only against DEV `would_link` 0 / `already_linked` 669 / 0 HALT. Final independent
+  closure: typecheck, build and API-diff PASS; DB-free and filtered `afldb_test` integration tests
+  PASS; visual verification PASS (Playwright captures at desktop and phone viewports, 0 console/page
+  errors, 0px horizontal overflow).
+- **Deferred, not implemented here.** Correcting an already-consumed trusted `afl_api` link
+  (AFLDB-ISSUE-238); AFL API human-adjudication recovery outside D15's invariant
+  (AFLDB-ISSUE-239); deduplicating repeated `afl_api_identity_contradiction` findings
+  (AFLDB-ISSUE-240). Carrying importer-created `unique` `afl_api` identities through promotion and
+  the `afldb_test` rebuild remains AFLDB-ISSUE-237, unaffected by this change.
+
 ### Self-contained `club_seasons` fail-closed guard test (AFLDB-ISSUE-236) (Resolved) - 23 September 2026
 
 - **What changed.** The AFLDB-ISSUE-015 guard test in `tests/integration/data-editor.test.ts` no

@@ -1,7 +1,9 @@
 # AFLDB-ISSUE-235 — `afl_api` player-link adjudication in `/admin/player-links`
 
-Status: **Open — implemented and validated on `afldb_test`; awaiting the S8 operator gate
-(2026-09-24).** The work is uncommitted on `sonnet/issue-235`.
+Status: **RESOLVED — 2026-09-24.** Implemented, validated on `afldb_test`, deployed to DEV at
+`6c693b92`, and independently closed (typecheck/build/api-diff/doc-hygiene PASS, DB-free and
+`afldb_test` integration tests PASS, VISUAL: PASS). Follow-ups F-1/F-2/F-3 accepted and allocated
+to AFLDB-ISSUE-238/239/240. AFLDB-ISSUE-237 remains open and independent.
 
 | Stage | State |
 |---|---|
@@ -10,8 +12,8 @@ Status: **Open — implemented and validated on `afldb_test`; awaiting the S8 op
 | S6 | COMPLETE |
 | S7 | COMPLETE (documentation correction, 2026-09-24) |
 | I18 | COMPLETE |
-| S8 | NOT STARTED: operator-controlled DEV rollout |
-| S9 | NOT STARTED: closure |
+| S8 | COMPLETE (2026-09-24): committed, merged, deployed to DEV at `6c693b92` |
+| S9 | COMPLETE (2026-09-24): independent `afldb-closure` verification PASS, including visual-verification (VISUAL: PASS) |
 
 *(The planning-stage note below, "Open — planning runbook, 2026-09-23 … no product change", is
 history. The update blocks that follow it record the implementation.)*
@@ -828,6 +830,102 @@ and the Python bridge loader, and changes identity-adjudication semantics. The e
 §13 has more than four steps, so under CLAUDE.md §15 launching it engages `afldb-orchestrator`, whose
 first act is an `afldb-reviewer` review of this plan. That applies unless the operator narrows the
 launch.
+
+**Update 2026-09-24 (bookkeeping correction) — S8 COMPLETE; S9 in progress, NOT COMPLETE.**
+
+This update corrects the stale "S8 NOT STARTED" status above against the disposition of the revised
+`afldb-closure` S9 findings (F-235-S9-01 INFO accepted, no fix needed; F-235-S9-02 MED accepted, this
+correction; F-235-S9-03 VISUAL: UNVERIFIED retained, not resolved).
+
+- **S8 — DEV rollout, COMPLETE.**
+  - `main`/`origin/main` at `6c693b92` (`fix(issue-235): harden adjudication UI runtime and mobile
+    tables`, on top of `c2e6b1ac`, `7e433603`, `717f661d`, `659474db`).
+  - DEV deployed at `6c693b92`.
+  - Migration state 104/104 on DEV.
+  - `db:privileges` on DEV: PASS.
+  - The §11 DEV read-only checks: PASS.
+    - OD-1 index present.
+    - `afl_api_identity_adjudications` ledger: 0 rows (expected — no human adjudication has run on
+      DEV yet).
+    - The re-run S0 census: 669/669/669 `afl_api` identities, unchanged from S0.
+    - The D15 bijection check: PASS (empty, as expected — no promotion/rebuild replay has occurred
+      on DEV since deployment).
+  - DEV bridge loader validate-only (against the deployed 669-provider bridge state): 669
+    `already_linked`; `already_linked_human`, contradiction, player-collision, identity-check HALT
+    and `would_link` counters all 0.
+  - Final deployed UI smoke performed by the operator on DEV.
+- **S9 — Closure, IN PROGRESS, NOT COMPLETE.** Revised `afldb-closure` results:
+  - `npm run typecheck`: PASS.
+  - `npm run build`: PASS.
+  - API-diff: PASS/reconciled.
+  - `doc-index`/`doc-check`: PASS.
+  - 90 DB-free tests: PASS.
+  - 38 filtered `afldb_test` integration tests: PASS.
+  - Migration 104 unchanged across `c2e6b1ac..6c693b92`.
+  - **VISUAL: UNVERIFIED** — for the independent `afldb-closure` visual-verification capture only.
+    The S8 operator UI smoke above is a separate, already-satisfied duty and does not substitute for
+    it.
+  - **S9 is NOT COMPLETE**, solely because the independent closure visual-verification duty remains
+    unverified (F-235-S9-03). No other gap is open.
+- **Not done in this pass, deliberately:** `issues.md` resolution status, the `CHANGELOG.md` closure
+  entry, the move to `issues/closed/`, and allocation of F-1/F-2/F-3 at closure. These remain S9
+  closeout work, pending the visual-verification gate.
+- **ISSUE-237** remains open and independent of this issue, unchanged by this update.
+- **Next operator action:** the independent `afldb-closure` visual-verification capture (F-235-S9-03),
+  not merge or deploy — both are already done.
+
+**Update 2026-09-24 (final) — S9 COMPLETE; ISSUE-235 RESOLVED.**
+
+The independent `afldb-closure` visual-verification duty (F-235-S9-03) is now satisfied. S9 is
+COMPLETE and no gap remains open.
+
+- **Visual verification: VISUAL: PASS.** Captured with the repository's own Playwright via `npx`
+  (no browser MCP), at 1440x900 and 390x844, for:
+  1. `/admin/player-links`
+  2. `/admin/player-links/afl-api`
+  3. `/admin/player-links/afl-api/CD_I1002232`
+
+  All six captures: HTTP 200, no auth bounce, 0 console errors, 0 page errors, 0px document-level
+  horizontal overflow. AFL API link present; unresolved list correctly empty; Andrew Brayshaw /
+  CD_I1002232 renders importer-linked/read-only, with no adjudication/link/revoke controls for the
+  L-I state; evidence/recomputation renders; phone tables sit inside `.table-wrap`. Evidence
+  retained under `reports/ui-evidence/2026-09-24-issue-235/` (the six PNGs are present in the
+  worktree: `player-links-desktop.png`, `player-links-phone.png`, `afl-api-list-desktop.png`,
+  `afl-api-list-phone.png`, `provider-CD_I1002232-desktop.png`, `provider-CD_I1002232-phone.png`).
+  The cookie-consent banner visible in the captures is INFO only, caused by the manually created
+  Playwright storage state carrying no `afldb_consent` decision — not an ISSUE-235 defect.
+  Credential-bearing storage state and ephemeral capture scripts were deleted after capture.
+- **Independent `afldb-closure` verification (revised, unchanged from the prior update, now
+  final):** `regen-registry` performed; `api-diff c2e6b1ac..6c693b92` performed and reconciled;
+  typecheck PASS; build PASS; documentation hygiene PASS; 90 DB-free tests PASS; 38 filtered
+  `afldb_test` integration tests PASS; migration 104 history checked (one implementation commit, no
+  corrective-slice edit); no unresolved code defect; no MED/HIGH technical blocker.
+- **DEV re-confirmation at closure.** `main`/`origin/main` = DEV checkout = `6c693b92`; DEV branch
+  `main`; service `node deploy/server-cluster.mjs` from `/home/arm/projects/afldb`, started after
+  the current `BUILD_ID` (`GTVouxhTzkePDhSe6yXxw`); health `HTTP 200`, `status=ok`, `database=ok`;
+  migration 104/104; `db:privileges` PASS. DEV data acceptance unchanged from the S8 update: OD-1
+  index present, ledger 0 rows, census 669/669/669, 0 players with multiple `afl_api` identities, 0
+  pending unresolved, 0 open contradictions, D15 bijection PASS. Bridge loader validate-only
+  against DEV (`data/reference/afl-api-player-bridge-2026-full-2026-09-22.json`, snapshot
+  `afl-api-2026-2026-09-21-031725`): `would_link` 0, `already_linked` 669, `already_linked_human`
+  0, all HALT counters 0.
+- **F-1/F-2/F-3 accepted and allocated (§15).** The operator accepted all three follow-ups as
+  written in §15. They are recorded as separate tracked issues, not implemented here:
+  - F-1 → **AFLDB-ISSUE-238** (correcting a consumed trusted `afl_api` link with canonical
+    reattribution).
+  - Narrowed F-2 → **AFLDB-ISSUE-239** (AFL API human-adjudication recovery outside D15; D15
+    itself already implements promotion/rebuild preservation and is not reopened by this
+    successor).
+  - F-3 → **AFLDB-ISSUE-240** (dedup keys for repeated `afl_api_identity_contradiction`
+    findings).
+- **AFLDB-ISSUE-237 remains open and independent,** unchanged and not resolved or partially
+  implemented by this closure. It is the next development issue after ISSUE-235.
+- **I18 safety backup retained:**
+  `D:\backups\afldb\issue-235\afldb_test-pre-i18-20260924-094554.dump`, SHA256
+  `B6552DC4583AFCBE28C61EE605FC995146D112FDB3424FCE4A82144BBAE3C436`. Kept per operator
+  instruction; not deleted by this closure.
+- **Resolution.** ISSUE-235 is RESOLVED. See `issues.md` for the ledger's root-cause/resolution/
+  validation record.
 
 ---
 
@@ -2162,6 +2260,7 @@ D1–D15 are otherwise this plan's decisions. The reviewer may challenge them.
 
 - **F-1:** correcting a consumed trusted `afl_api` link (importer or human) with canonical
   reattribution of `player_match_stats` and derived tables.
+  **Allocated at closure (2026-09-24): AFLDB-ISSUE-238.**
 - **F-2 (narrowed by OD-3):** only the replay and recovery that fall **outside** D15's invariant. For
   example:
   - exporting adjudications to a tracked artefact, which a destructive `afldb_test` reset could
@@ -2170,10 +2269,12 @@ D1–D15 are otherwise this plan's decisions. The reviewer may challenge them.
 
   Carrying the ledger and its `resolved` outcome through promotion **and** the `afldb_test` rebuild
   is **in scope** (D15, OD-5) and is not deferred.
+  **Allocated at closure (2026-09-24): AFLDB-ISSUE-239.**
 - **AFLDB-ISSUE-237 (opened 2026-09-23, plan-review R4):** carrying importer-created `unique`
   `afl_api` identities through promotion and rebuild. It is a separate issue, and ISSUE-235 does not
   implement it.
 - **F-3:** dedup keys for the loader's repeated `afl_api_identity_contradiction` findings (G5).
+  **Allocated at closure (2026-09-24): AFLDB-ISSUE-240.**
 
 ---
 
