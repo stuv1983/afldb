@@ -1651,19 +1651,57 @@ describe('AFLDB-ISSUE-235: afl-api-player-links.ts (order of operations, DB-free
     const historyStart = source.indexOf('export type AflApiAdjudicationHistoryRow');
     const detail = source.slice(detailStart, historyStart);
 
-    expect(detail).toContain('const payloadRows = pendingCandidates.length > 0');
+    expect(detail).toContain('const hasPendingEvidence = pendingCandidates.length > 0;');
+    expect(detail).toContain('const payloadRows = hasPendingEvidence');
 
-    // Actionable U1 evidence remains tied to pending promotion-candidate versions.
-    expect(detail).toContain('FROM promotion_candidates c');
-    expect(detail).toContain("c.status = 'pending'");
-    expect(detail).toContain('v.version_seq = c.source_version_seq');
+    const pendingSqlStart = detail.indexOf('? await sql<AflApiProviderPayloadRow[]>`');
+    const settledSqlStart = detail.indexOf(': await sql<AflApiProviderPayloadRow[]>`');
+    const settledSqlEnd = detail.indexOf('`;', settledSqlStart);
+    expect(pendingSqlStart).toBeGreaterThanOrEqual(0);
+    expect(settledSqlStart).toBeGreaterThan(pendingSqlStart);
+    expect(settledSqlEnd).toBeGreaterThan(settledSqlStart);
+    const pendingSql = detail.slice(pendingSqlStart, settledSqlStart);
+    const settledSql = detail.slice(settledSqlStart, settledSqlEnd);
 
-    // Settled L-I/L-H display evidence uses only the durable current observation head.
-    expect(detail).toContain('FROM staging.source_records r');
-    expect(detail).toContain('v.version_seq = r.current_version_seq');
-    expect(detail).toContain('JOIN staging.afl_api_player_match pm');
-    expect(detail).toContain('pm.version_seq = r.current_version_seq');
-    expect(detail).toContain("r.family = 'player_match_stats'");
+    // Actionable U1 evidence remains tied to the exact pending promotion-candidate versions.
+    expect(pendingSql).toContain('FROM promotion_candidates c');
+    expect(pendingSql).toContain("c.status = 'pending'");
+    expect(pendingSql).toContain('v.version_seq = c.source_version_seq');
+    expect(pendingSql).toContain('NULL::text AS "projectedMatchKey"');
+    expect(pendingSql).toContain('NULL::integer AS "projectedClubId"');
+
+    // Settled L-I/L-H display evidence uses only the durable current observation head,
+    // joined to the projection row of that SAME current version.
+    expect(settledSql).toContain('FROM staging.source_records r');
+    expect(settledSql).toContain('v.version_seq = r.current_version_seq');
+    expect(settledSql).toContain('JOIN staging.afl_api_player_match pm');
+    expect(settledSql).toContain('pm.version_seq = r.current_version_seq');
+    expect(settledSql).toContain("r.family = 'player_match_stats'");
+    expect(settledSql).toContain('pm.match_key AS "projectedMatchKey"');
+    expect(settledSql).toContain('pm.club_id AS "projectedClubId"');
+    // The projection supplies match/club context only -- never the player identity
+    // the bridge rule must recompute. (The safety COMMENT naming pm.player_id sits
+    // outside this SQL slice, so this is checked against the SQL alone.)
+    expect(settledSql).not.toMatch(/pm\.player_id/);
+    expect(settledSql).not.toMatch(/\bplayer_id\b/);
+    expect(detail).not.toMatch(/pm\.player_id\s+AS\b/);
+
+    // Settled match resolution is by canonical matches.match_key, not staging.afl_api_match.
+    expect(detail).toContain('FROM matches');
+    expect(detail).toContain('WHERE match_key = ANY(${projectedMatchKeys})');
+    expect(detail).toContain('canonicalIdByMatchKey.get(row.projectedMatchKey) ?? null');
+
+    // Pending CD_T resolution follows ISSUE-228 §6.2: tracked identity map -> legacy_club_hist.
+    expect(source).toContain("import aflApiIdentitiesJson from '../../../data/reference/afl-api-identities.json';");
+    expect(source).toContain('const AFL_API_IDENTITIES = parseAflApiIdentities(aflApiIdentitiesJson);');
+    expect(detail).toContain('AFL_API_IDENTITIES.teams.get(providerTeamId)?.hist ?? null');
+    expect(detail).toContain('WHERE legacy_club_hist = ANY(${declaredHists})');
+
+    // Provider evidence rows: pending -> §6.2 map, settled -> projected club id.
+    expect(detail).toMatch(
+      /const clubId = hasPendingEvidence\s+\? \(providerTeamId \? pendingProviderTeamClubIds\.get\(providerTeamId\) \?\? null : null\)\s+: r\.projectedClubId;/,
+    );
+    expect(detail).not.toContain('clubId: null');
   });
   it('A5 — linkAflApiProvider: locks, re-reads, INSERT external_identities (resolved/afl_api_admin_adjudication), then the audit INSERT', () => {
     const fn = source.slice(source.indexOf('export async function linkAflApiProvider'));

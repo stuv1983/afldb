@@ -2,6 +2,8 @@ import 'server-only';
 
 import postgres from 'postgres';
 
+import aflApiIdentitiesJson from '../../../data/reference/afl-api-identities.json';
+
 import { authSql } from '@/db/authClient';
 import { sql } from '@/db/client';
 import {
@@ -23,6 +25,7 @@ import {
   type AflApiIdentityRow,
   type AflApiIdentityState,
 } from '@/lib/acquisition/afl-api-adjudication';
+import { parseAflApiIdentities } from '@/lib/acquisition/afl-api-bundle';
 import {
   buildAflApiPlayerEvidence,
   normaliseSurname,
@@ -44,6 +47,10 @@ type Sql = postgres.Sql;
 type Tx = postgres.TransactionSql;
 
 const AFL_API_SOURCE_KEY = 'afl_api';
+
+// ISSUE-235 §6 / ISSUE-228 §6.2: provider CD_T identity is resolved
+// only through the tracked identity map, then clubs.legacy_club_hist.
+const AFL_API_IDENTITIES = parseAflApiIdentities(aflApiIdentitiesJson);
 
 async function fetchAflApiSourceId(db: Sql | Tx): Promise<number> {
   const [row] = await db<{ id: number }[]>`SELECT id FROM sources WHERE key = ${AFL_API_SOURCE_KEY}`;
@@ -248,6 +255,9 @@ type AflApiProviderPayloadRow = {
   externalRecordId: string;
   season: number;
   rawPayload: RawPlayerStatsPayload;
+  /** Durable settled projection metadata; null on pending U1 evidence. */
+  projectedMatchKey: string | null;
+  projectedClubId: number | null;
 };
 
 /**
@@ -264,8 +274,9 @@ export async function readAflApiProviderEvidence(providerId: string): Promise<Af
     readExistingIdentity(sql, sourceId, providerId),
     readPendingCandidates(authSql, sourceId, providerId),
   ]);
-  const state = classifyAflApiIdentityState({ row: existing, hasPendingCandidate: pendingCandidates.length > 0 });
-  if (pendingCandidates.length === 0 && existing === null) return null; // U0: not actionable, not listed
+  const hasPendingEvidence = pendingCandidates.length > 0;
+  const state = classifyAflApiIdentityState({ row: existing, hasPendingCandidate: hasPendingEvidence });
+  if (!hasPendingEvidence && existing === null) return null; // U0: not actionable, not listed
 
   // Block 1/2: the provider's own spine payloads.
   //
@@ -274,9 +285,13 @@ export async function readAflApiProviderEvidence(providerId: string): Promise<Af
   // promotion_candidates deliberately retains nothing. A trusted L-I/L-H identity still
   // needs a read-only evidence page (V3), so that case reads the durable CURRENT observation
   // heads instead -- never every historical source_record_versions row.
-  const payloadRows = pendingCandidates.length > 0
+  const payloadRows = hasPendingEvidence
     ? await sql<AflApiProviderPayloadRow[]>`
-        SELECT v.external_record_id AS "externalRecordId", c.season, p.raw_payload AS "rawPayload"
+        SELECT v.external_record_id AS "externalRecordId",
+               c.season,
+               p.raw_payload AS "rawPayload",
+               NULL::text AS "projectedMatchKey",
+               NULL::integer AS "projectedClubId"
           FROM promotion_candidates c
           JOIN staging.source_record_versions v
             ON v.source_id = c.source_id AND v.family = c.family
@@ -288,7 +303,11 @@ export async function readAflApiProviderEvidence(providerId: string): Promise<Af
          ORDER BY c.id
       `
     : await sql<AflApiProviderPayloadRow[]>`
-        SELECT r.external_record_id AS "externalRecordId", pm.season, p.raw_payload AS "rawPayload"
+        SELECT r.external_record_id AS "externalRecordId",
+               pm.season,
+               p.raw_payload AS "rawPayload",
+               pm.match_key AS "projectedMatchKey",
+               pm.club_id AS "projectedClubId"
           FROM staging.source_records r
           JOIN staging.source_record_versions v
             ON v.source_id = r.source_id AND v.family = r.family
@@ -304,6 +323,40 @@ export async function readAflApiProviderEvidence(providerId: string): Promise<Af
            AND split_part(r.external_record_id, '|', 3) = ${providerId}
          ORDER BY r.external_record_id
       `;
+  // U1 has no settled player projection yet. Resolve its provider CD_T using
+  // the same §6.2 contract as the bridge emitter: CD_T -> tracked hist ->
+  // clubs.legacy_club_hist. Missing declarations remain unresolved; never guess.
+  const pendingProviderTeamClubIds = new Map<string, number>();
+  if (hasPendingEvidence) {
+    const providerTeamIds = [...new Set(payloadRows
+      .map((row) => row.externalRecordId.split('|')[1])
+      .filter((id): id is string => Boolean(id)))];
+
+    const providerTeamHists = providerTeamIds.map((providerTeamId) => ({
+      providerTeamId,
+      hist: AFL_API_IDENTITIES.teams.get(providerTeamId)?.hist ?? null,
+    }));
+    const declaredHists = [...new Set(providerTeamHists
+      .map((row) => row.hist)
+      .filter((hist): hist is string => hist !== null))];
+
+    const clubRows = declaredHists.length === 0 ? [] : await sql<{
+      legacyClubHist: string;
+      id: number;
+    }[]>`
+      SELECT legacy_club_hist AS "legacyClubHist", id
+        FROM clubs
+       WHERE legacy_club_hist = ANY(${declaredHists})
+    `;
+    const clubByHist = new Map(clubRows.map((row) => [row.legacyClubHist, row.id]));
+
+    for (const row of providerTeamHists) {
+      if (row.hist === null) continue;
+      const clubId = clubByHist.get(row.hist);
+      if (clubId !== undefined) pendingProviderTeamClubIds.set(row.providerTeamId, clubId);
+    }
+  }
+
   const teamIds = new Set<string>();
   const seasons = new Set<number>();
   const jumperNumbers = new Set<number>();
@@ -334,23 +387,61 @@ export async function readAflApiProviderEvidence(providerId: string): Promise<Af
     const [providerMatchId] = r.externalRecordId.split('|');
     return providerMatchId;
   }))];
-  // Provider match ids are CD_M...; the canonical match_key is a different rendered
-  // string, renderMatchKey()'s own format (settle-core.ts:174-182):
-  // season|round_code|match_date|home_club_name|away_club_name. staging.afl_api_match (if
-  // the match itself resolved) carries every component except the club NAMES, joined here.
-  const canonicalMatches = matchKeys.length === 0 ? [] : await sql<{
-    externalRecordId: string; canonicalMatchId: number | null; matchKey: string | null;
-  }[]>`
-    SELECT m.external_record_id AS "externalRecordId", mm.id AS "canonicalMatchId", mm.match_key AS "matchKey"
-      FROM staging.afl_api_match m
-      JOIN clubs hc ON hc.id = m.home_club_id
-      JOIN clubs ac ON ac.id = m.away_club_id
-      LEFT JOIN matches mm
-        ON mm.match_key = (m.season::text || '|' || m.round_code || '|' || m.match_date::text
-                            || '|' || hc.name || '|' || ac.name)
-     WHERE m.source_id = ${sourceId} AND m.external_record_id = ANY(${matchKeys})
-  `;
-  const canonicalByProviderMatch = new Map(canonicalMatches.map((m) => [m.externalRecordId, m]));
+  type CanonicalProviderMatch = {
+    externalRecordId: string;
+    canonicalMatchId: number | null;
+    matchKey: string | null;
+  };
+  const canonicalByProviderMatch = new Map<string, CanonicalProviderMatch>();
+
+  if (hasPendingEvidence) {
+    // U1 retains the original pre-settle match-resolution path.
+    const canonicalMatches = matchKeys.length === 0 ? [] : await sql<CanonicalProviderMatch[]>`
+      SELECT m.external_record_id AS "externalRecordId",
+             mm.id AS "canonicalMatchId",
+             mm.match_key AS "matchKey"
+        FROM staging.afl_api_match m
+        JOIN clubs hc ON hc.id = m.home_club_id
+        JOIN clubs ac ON ac.id = m.away_club_id
+        LEFT JOIN matches mm
+          ON mm.match_key = (m.season::text || '|' || m.round_code || '|' || m.match_date::text
+                              || '|' || hc.name || '|' || ac.name)
+       WHERE m.source_id = ${sourceId}
+         AND m.external_record_id = ANY(${matchKeys})
+    `;
+    for (const match of canonicalMatches) {
+      canonicalByProviderMatch.set(match.externalRecordId, match);
+    }
+  } else {
+    // Once settled, staging.afl_api_match is not guaranteed to retain enough
+    // provider-team detail. The CURRENT afl_api_player_match projection does retain
+    // its canonical match_key and club_id. Use only those non-player identity facts;
+    // pm.player_id is intentionally never selected or consulted here.
+    const projectedMatchKeys = [...new Set(payloadRows
+      .map((row) => row.projectedMatchKey)
+      .filter((matchKey): matchKey is string => matchKey !== null))];
+    const canonicalMatches = projectedMatchKeys.length === 0 ? [] : await sql<{
+      matchKey: string;
+      canonicalMatchId: number;
+    }[]>`
+      SELECT match_key AS "matchKey", id AS "canonicalMatchId"
+        FROM matches
+       WHERE match_key = ANY(${projectedMatchKeys})
+    `;
+    const canonicalIdByMatchKey = new Map(
+      canonicalMatches.map((match) => [match.matchKey, match.canonicalMatchId]),
+    );
+
+    for (const row of payloadRows) {
+      const [providerMatchId] = row.externalRecordId.split('|');
+      if (!providerMatchId || row.projectedMatchKey === null) continue;
+      canonicalByProviderMatch.set(providerMatchId, {
+        externalRecordId: providerMatchId,
+        canonicalMatchId: canonicalIdByMatchKey.get(row.projectedMatchKey) ?? null,
+        matchKey: row.projectedMatchKey,
+      });
+    }
+  }
 
   for (const providerMatchId of matchKeys) {
     const rowsForMatch = payloadRows.filter((r) => r.externalRecordId.startsWith(`${providerMatchId}|`));
@@ -387,17 +478,24 @@ export async function readAflApiProviderEvidence(providerId: string): Promise<Af
       providerMatchId,
       canonicalMatchId,
       unresolvedReason: canonicalMatchId === null ? 'match_not_resolved' : null,
-      providerRows: rowsForMatch.map((r) => ({
-        providerMatchId,
-        providerPlayerId: providerId,
-        clubId: null, // team-resolution (§6.2) is a display refinement, not required for the engine's own stat comparison
-        jumperNumber: numOrNull(r.rawPayload.playerStats?.player?.playerJumperNumber),
-        observedGivenName: typeof r.rawPayload.playerStats?.player?.playerName?.givenName === 'string'
-          ? (r.rawPayload.playerStats!.player!.playerName!.givenName as string) : null,
-        observedSurname: typeof r.rawPayload.playerStats?.player?.playerName?.surname === 'string'
-          ? (r.rawPayload.playerStats!.player!.playerName!.surname as string) : null,
-        stats: providerStatsFromRawPayload(r.rawPayload),
-      })),
+      providerRows: rowsForMatch.map((r) => {
+        const [, providerTeamId] = r.externalRecordId.split('|');
+        const clubId = hasPendingEvidence
+          ? (providerTeamId ? pendingProviderTeamClubIds.get(providerTeamId) ?? null : null)
+          : r.projectedClubId;
+
+        return {
+          providerMatchId,
+          providerPlayerId: providerId,
+          clubId,
+          jumperNumber: numOrNull(r.rawPayload.playerStats?.player?.playerJumperNumber),
+          observedGivenName: typeof r.rawPayload.playerStats?.player?.playerName?.givenName === 'string'
+            ? (r.rawPayload.playerStats!.player!.playerName!.givenName as string) : null,
+          observedSurname: typeof r.rawPayload.playerStats?.player?.playerName?.surname === 'string'
+            ? (r.rawPayload.playerStats!.player!.playerName!.surname as string) : null,
+          stats: providerStatsFromRawPayload(r.rawPayload),
+        };
+      }),
       canonicalRows: canonicalRows.map((r) => ({
         playerId: r.playerId, clubId: r.clubId, jumperNumberRaw: r.jumperNumberRaw, surname: r.surname,
         stats: {
