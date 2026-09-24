@@ -104,20 +104,22 @@ export default async function AflApiProviderDetailPage(
 
       <section className="section">
         <h2>Per observed match</h2>
-        <table className="table-wrap">
-          <thead>
-            <tr><th>Match</th><th>Season</th><th>Canonical match</th></tr>
-          </thead>
-          <tbody>
-            {evidence.matches.map((m) => (
-              <tr key={m.matchKey}>
-                <td>{m.matchKey}</td>
-                <td>{m.season}</td>
-                <td>{m.canonicalMatchId === null ? 'unresolved' : `#${m.canonicalMatchId}`}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Match</th><th>Season</th><th>Canonical match</th></tr>
+            </thead>
+            <tbody>
+              {evidence.matches.map((m) => (
+                <tr key={m.matchKey}>
+                  <td>{m.matchKey}</td>
+                  <td>{m.season}</td>
+                  <td>{m.canonicalMatchId === null ? 'unresolved' : `#${m.canonicalMatchId}`}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <section className="section">
@@ -132,18 +134,20 @@ export default async function AflApiProviderDetailPage(
               Disposition: <strong>{evidence.classification.disposition}</strong>
               {evidence.classification.reason && <> — {evidence.classification.reason}</>}
             </p>
-            <table className="table-wrap">
-              <thead><tr><th>Match</th><th>Candidate player</th><th>Agreeing stats</th></tr></thead>
-              <tbody>
-                {evidence.classification.matches.map((hit) => (
-                  <tr key={`${hit.providerMatchId}-${hit.canonicalPlayerId}`}>
-                    <td>{hit.providerMatchId}</td>
-                    <td>{hit.canonicalPlayerId}</td>
-                    <td>{hit.agreeingStatCount}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="table-wrap">
+              <table>
+                <thead><tr><th>Match</th><th>Candidate player</th><th>Agreeing stats</th></tr></thead>
+                <tbody>
+                  {evidence.classification.matches.map((hit) => (
+                    <tr key={`${hit.providerMatchId}-${hit.canonicalPlayerId}`}>
+                      <td>{hit.providerMatchId}</td>
+                      <td>{hit.canonicalPlayerId}</td>
+                      <td>{hit.agreeingStatCount}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </>
         ) : (
           <p>No classification could be computed for this provider yet.</p>
@@ -209,20 +213,22 @@ export default async function AflApiProviderDetailPage(
       {history.length > 0 && (
         <section className="section">
           <h2>Adjudication history</h2>
-          <table className="table-wrap">
-            <thead><tr><th>When</th><th>Action</th><th>Player</th><th>Admin</th><th>Note</th></tr></thead>
-            <tbody>
-              {history.map((h) => (
-                <tr key={h.id}>
-                  <td>{formatDate(h.createdAt)}</td>
-                  <td>{h.action}</td>
-                  <td>{h.playerId}</td>
-                  <td>{h.adminUserId}</td>
-                  <td>{h.note}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>When</th><th>Action</th><th>Player</th><th>Admin</th><th>Note</th></tr></thead>
+              <tbody>
+                {history.map((h) => (
+                  <tr key={h.id}>
+                    <td>{formatDate(h.createdAt)}</td>
+                    <td>{h.action}</td>
+                    <td>{h.playerId}</td>
+                    <td>{h.adminUserId}</td>
+                    <td>{h.note}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </section>
       )}
 

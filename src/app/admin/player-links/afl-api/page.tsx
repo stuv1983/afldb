@@ -51,32 +51,34 @@ export default async function AflApiPlayerLinksPage() {
         </section>
       ) : (
         <section className="section">
-          <table className="table-wrap">
-            <thead>
-              <tr>
-                <th>Provider</th>
-                <th>State</th>
-                <th>Pending rows</th>
-                <th>Seasons</th>
-              </tr>
-            </thead>
-            <tbody>
-              {providers.map((p) => (
-                <tr key={p.providerId}>
-                  <td>
-                    <Link href={`/admin/player-links/afl-api/${p.providerId}`}>{p.providerId}</Link>
-                  </td>
-                  <td>
-                    <span className={p.state === 'X' ? 'badge badge-warn' : 'badge'}>
-                      {STATE_LABEL[p.state] ?? p.state}
-                    </span>
-                  </td>
-                  <td>{p.pendingCount}</td>
-                  <td>{p.seasons.join(', ')}</td>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Provider</th>
+                  <th>State</th>
+                  <th>Pending rows</th>
+                  <th>Seasons</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {providers.map((p) => (
+                  <tr key={p.providerId}>
+                    <td>
+                      <Link href={`/admin/player-links/afl-api/${p.providerId}`}>{p.providerId}</Link>
+                    </td>
+                    <td>
+                      <span className={p.state === 'X' ? 'badge badge-warn' : 'badge'}>
+                        {STATE_LABEL[p.state] ?? p.state}
+                      </span>
+                    </td>
+                    <td>{p.pendingCount}</td>
+                    <td>{p.seasons.join(', ')}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </section>
       )}
     </>

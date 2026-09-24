@@ -19,10 +19,6 @@ import { audit, requireCapability } from '@/lib/auth/session';
 
 export type AflApiAdjudicationActionState = { error?: string; message?: string };
 
-const INITIAL: AflApiAdjudicationActionState = {};
-
-export { INITIAL as AFL_API_ADJUDICATION_INITIAL_STATE };
-
 function stringField(formData: FormData, name: string): string {
   return String(formData.get(name) ?? '').trim();
 }

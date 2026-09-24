@@ -6,11 +6,17 @@ import { useRouter } from 'next/navigation';
 import { PlayerPicker } from '@/components/PlayerPicker';
 
 import {
-  AFL_API_ADJUDICATION_INITIAL_STATE,
   linkAflApiPlayer,
   revokeAflApiPlayerLink,
   type AflApiAdjudicationActionState,
 } from './actions';
+
+/**
+ * Client-local, not exported from `./actions`: a `'use server'` module may only
+ * export async functions (and types, erased at compile time) as runtime values —
+ * a plain object export there 500s every Server Action call in this file.
+ */
+const AFL_API_ADJUDICATION_INITIAL_STATE: AflApiAdjudicationActionState = {};
 
 /**
  * AFLDB-ISSUE-235 (R7, D12). A DEDICATED component — it does NOT import or
