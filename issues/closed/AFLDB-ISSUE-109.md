@@ -511,3 +511,21 @@ gate remains.
 - The retained development fixture and active baseline override are intentional durable test
   state. Their unsupported full-removal lifecycle is documented above and is non-blocking for
   ISSUE-109's resolution.
+
+## Addendum (2026-09-25): the retained override is now orphaned; ISSUE-246 owns its retirement
+
+This addendum records a newly observed fact only. The acceptance evidence above is unchanged.
+
+- The retained active `matches` / `notes` override on `2026|R30|2026-12-31|104|103`, holding the
+  exact baseline marker, **survived** on `afldb_dev`.
+- The canonical fixture match is now **absent** from `afldb_dev`: no `matches` row carries that
+  `match_key`. This is observed at AFLDB-ISSUE-237 L4 A4.3, 2026-09-25.
+- This is the orphan state this runbook warned about under *Cleanup and restoration*: an active
+  natural-key override whose match no longer exists.
+  - The match was deleted on the old DEV lineage (AFLDB-ISSUE-139 Phase 4C′ observation).
+  - The 2026-09-06 DEV promotion reinstated `data_overrides` but withheld `data_edits` as
+    historical-only (AFLDB-ISSUE-139 D2), so the audit rows above are not in the current DEV
+    lineage.
+- **AFLDB-ISSUE-246** (`issues/open/AFLDB-ISSUE-246.md`) owns the separately approved, audited
+  retirement. The override is set inactive and preserved, and one `auth_audit_log` record is
+  appended. Nothing is deleted, and no audit row here is rewritten.

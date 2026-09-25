@@ -89,7 +89,7 @@ ISSUE-237 is not resolved.)*
 | ISSUE-245 blocker on L3 | CLEARED (§11a.5) |
 | ISSUE-245 `afldb_test` proof | PASS, through L3 (§11a.6) |
 | L3 | **PASS** (§11a.6) |
-| L4 DEV promotion | **NOT RUN.** Procedure rewritten after the L4 hardening (§11d; findings and fixes §11d.0, prerequisites §11d.2) |
+| L4 DEV promotion | **NOT RUN.** Procedure rewritten after the L4 hardening (§11d; findings and fixes §11d.0, prerequisites §11d.2). *(2026-09-25: the second real attempt STOPPED at A4.3, before the destructive boundary. A3 PASS; the blocker is the orphaned ISSUE-109 fixture override; prerequisite **AFLDB-ISSUE-246**, §11d.12.)* |
 | L5 PROD promotion | **NOT RUN** |
 
 **P-M state (2026-09-24).** Point 1 PROVEN (DB-free). Point 2 PROVEN (live, `afldb_test`,
@@ -3626,6 +3626,30 @@ database, SSH, DEV, PROD, L4 or Git write was involved. Defects found and fixed:
 | ESLint over all 19 changed or untracked `.ts` files | **0 errors on ISSUE-237 lines.** 47 errors remain, each on an untouched HEAD line, and they equal HEAD's own per-file counts (player-link-mutations 20, db-test-rebuild 7, settle-afl-api 19, rebuild-test 1). |
 | `git diff --check`, `git diff HEAD --check` | clean |
 
+### 11d.12 Second real L4 attempt (2026-09-25, operator-run): STOPPED at A4.3; L4 NOT RUN
+
+This result was reported by the operator and recorded here; Claude did not re-run it. The A2
+preflight results belong to AFLDB-ISSUE-243 and are recorded there.
+
+| Step | Result |
+|---|---|
+| A3 (G1 on `afldb_test`) | **PASS.** Importer rows **802**: 273 / 397 / 129 / 3, the L3 census; order not significant. Importer state sha256 `e04a57767c60479cdac13c054c69c519cc00a826d6f1670dad7bef32bc98783b`. Marker `<NULL>`. |
+| A4.1 (record) | DEV `afl_api` ledger rows **0**; net-linked **0**. |
+| A4.2 (record) | DEV active manual registrations **92**; source (`afldb_test`) registrations **92**. |
+| A4.3 (early STOP) | **STOP: `matches` = 1.** |
+
+- **The exact blocker** is one active override: `matches` / `2026|R30|2026-12-31|104|103` /
+  `notes` = `AFLDB-ISSUE-109 DEDICATED DEVELOPMENT VALIDATION FIXTURE — BASELINE — RETAIN`.
+  - It is the retained AFLDB-ISSUE-109 DEV validation fixture override.
+  - Its canonical match is absent from `afldb_dev`: it was deleted on the old DEV lineage and
+    carried as an orphan through the 2026-09-06 DEV promotion.
+  - A4.3 behaved as designed (F-L4-9) and is not weakened.
+- **Nothing past A4.3 ran:** no A5, backup, dump, candidate, `--plan` or swap.
+- **Prerequisite: AFLDB-ISSUE-246** (`issues/open/AFLDB-ISSUE-246.md`), the audited, fixture-bound
+  retirement of that override. After it, A4.3 must return no rows. Then resume L4 at §11d A under
+  its own authorisation.
+- **L4 remains NOT RUN**: it stopped before the destructive boundary.
+
 ## 12. Non-goals and successors
 
 - **ISSUE-238:** correcting a consumed link, including every G2/G3 FAIL resolution.
@@ -3782,6 +3806,10 @@ ISSUE-245 RESOLVED; **L4 NOT RUN; L5 NOT RUN**. The next actions:
 3. **L5** inside a scheduled production promotion.
 
 Boundaries are unchanged. ISSUE-237 is not resolved.)*
+*(2026-09-25: the second real L4 attempt STOPPED at A4.3 (§11d.12). A3 PASS, A4.1 0/0, A4.2
+92/92, A4.3 `matches` = 1: the orphaned, retained ISSUE-109 DEV fixture override. No A5, backup,
+dump, candidate, plan or swap ran. **L4 remains NOT RUN.** The next action is AFLDB-ISSUE-246, then
+L4 again from §11d A under its own authorisation. ISSUE-237 is not resolved.)*
 
 ---
 

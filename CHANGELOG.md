@@ -15,6 +15,22 @@ commit.
 
 ## [Unreleased]
 
+### Audited retirement of the orphaned ISSUE-109 DEV fixture override (AFLDB-ISSUE-246, open) - 25 September 2026
+
+- **What changed.** A new operator maintenance command,
+  `npm run db:issue246:retire-issue109-fixture -- --environment dev --actor-email <super admin>
+  [--apply]`, retires exactly one known override on `afldb_dev`. That override is the retained
+  AFLDB-ISSUE-109 fixture override (`matches` / `2026|R30|2026-12-31|104|103` / `notes`), whose
+  canonical match no longer exists. It blocks AFLDB-ISSUE-237 L4 at A4.3.
+- **How it retires the override.** One transaction sets `is_active = false`, preserving the row,
+  its payload and its author, and appends one `auth_audit_log` `data_override.retired` record. It
+  deletes nothing, and no `data_edits` row is written or rewritten.
+- **Guards.** It refuses any database but `afldb_dev`, has no production path and no force flag,
+  and is bound to the fixture in code. It proves the fixture's ISSUE-109 provenance, that the
+  canonical match is absent, and a DEV `database.promoted` marker that accounts for the missing
+  `data_edits` chain. Reruns are a verified no-op.
+- **Status.** DB-free validated. It has not been run on DEV.
+
 ### Promotion preflight distinguishes source and target credentials (AFLDB-ISSUE-243, open) - 25 September 2026
 
 - **What changed.** `npm run preflight -- --mode promotion` now requires
