@@ -15,6 +15,37 @@ commit.
 
 ## [Unreleased]
 
+### Promotion converges manual player registration tokens by AFL Tables path (AFLDB-ISSUE-242, open) - 25 September 2026
+
+- **What changed.** A `manual_admin_edit` token is minted per database, so ISSUE-237's A4.2 gate
+  STOPped every promotion where the candidate carried a registration under its own token. That
+  included the 92 ISSUE-224 registrations `afldb_test` carries. `npm run db:promotion:check
+  --phase restored` now plans a convergence for each candidate token that no target creation
+  record names, keyed by the accepted, unique AFL Tables profile path, and never by name or id:
+  - **rebind:** a target record names the path. The candidate token retires, and the target's
+    token binds to the same player.
+  - **retire:** the target holds the path source-owned, with no registration. The candidate token
+    retires.
+  - **STOP:** everything else.
+
+  A4.2 is predicted over the converged candidate. The convergence is written into the
+  `--lineage-remap-out` file's transaction (plan step 2c), closed by an assertion that rolls it
+  back unless every entry reached its planned state and every manual identity has exactly one
+  creation record. `--phase candidate` re-proves it unchanged. The candidate's creation records
+  are never carried into the target.
+- **Operator impact.** `docs/production-promotion.md` §6 documents the contract. With no
+  convergence, the remap file is byte-identical to before.
+- **Validation.** Typecheck, and `tests/db-promotion-check.test.ts` (22 new cases plus 3 for the
+  rehearsal harness). A `code_test_db` rehearsal (`tools/db/promotion-convergence-rehearsal.ts`,
+  103/103) executed the generated step-2c SQL in PostgreSQL:
+  - rebind, retire and every STOP case behaved as specified;
+  - a refused transaction left the state byte-identical, including after a completed
+    `DELETE … RETURNING … INSERT`;
+  - re-running the same file is a no-op;
+  - a 92-player mixture converged.
+
+  No live promotion has run.
+
 ### Promotion `afl_api` identity gates corrected before the first real run (AFLDB-ISSUE-237, open) - 25 September 2026
 
 - **What changed.** `npm run db:promotion:check`'s `afl_api` gates were found wrong by source

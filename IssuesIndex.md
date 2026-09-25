@@ -9,7 +9,26 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Open issues:** 14
+**Open issues:** 15
+
+### AFLDB-ISSUE-242 — Cross-database manual player registration token convergence blocks ISSUE-237 L4
+- **Severity:** High. **Area:** promotion lifecycle — `tools/db/promotion-inventory.ts`,
+  `tools/db/promotion-check.ts`, the step-2c lineage remap file, `docs/production-promotion.md` §6.
+- **State:** Open (2026-09-25), from ISSUE-237 FR-2 / A4.2. Implemented and DB-free validated, but
+  uncommitted. `--phase restored` plans the convergence by accepted AFL Tables path:
+  - **rebind:** the candidate token retires and DEV's token binds to the same player;
+  - **retire:** the candidate token retires and the player stays source-owned in DEV;
+  - **STOP:** anything else.
+
+  Step 2c applies it inside the remap transaction, with a final-state assertion. `--phase
+  candidate` re-proves it through the unchanged A4.2. The `code_test_db` rehearsal
+  (`tools/db/promotion-convergence-rehearsal.ts`, 103/103, 2026-09-25) executed the generated
+  step-2c SQL in PostgreSQL: rebind, retire, every STOP, rollback of a failed and of an
+  assertion-refused CTE, the idempotent re-run, and a 92-player mixture. Zero residue. No DEV,
+  PROD or `afldb_test` contact.
+- **Runbook:** `issues/open/AFLDB-ISSUE-242.md` (§8a is the rehearsal evidence).
+- **Next action:** the operator reviews and commits. Then ISSUE-237 L4 under separate DEV
+  authorisation.
 
 ### AFLDB-ISSUE-241 — AFL API bridge artefacts reuse stale database-local `candidate_player_id` values with no lineage binding
 - **Severity:** Medium. **Area:** AFL API bridge import. It covers
@@ -164,7 +183,9 @@
     - **F-L4-10:** `--lineage-remap-out` is published only by a fully passing run, and the file
       is bound to its candidate.
     - §11d now has no operator decision left. If DEV holds a different-token registration, L4
-      STOPs until a token-convergence follow-up (proposed, not allocated) exists.
+      STOPs until a token-convergence follow-up (proposed, not allocated) exists. *(2026-09-25:
+      allocated as **AFLDB-ISSUE-242**, the L4 prerequisite. B4 stays fail-closed until it is
+      merged, and L4 is still NOT RUN.)*
   - **Update (2026-09-25): final pre-commit review of the whole diff (runbook §11d.11); L4 NOT
     RUN.** FR-1..7 are fixed, DB-free:
     - A4.2 predicts every players-replay refusal: name, casts, equal-authority conflicts, and the

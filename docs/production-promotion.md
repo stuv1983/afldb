@@ -394,7 +394,33 @@ read the target's **active** overrides and the candidate's stable identities (AF
   target record names is FAIL too.** The target's `data_overrides` replaces the candidate's, so it
   would survive the swap as a manual token with no creation record. `AFLDB-ISSUE-245`'s capture
   refuses that state, and a manual-only player in it can never have its AFL Tables path attached.
-  Retiring such a token is a new promotion write class (token convergence, not implemented).
+- **Manual registration token convergence (`AFLDB-ISSUE-242`).** A `manual_admin_edit` token is
+  minted per database, so a candidate token is transport-local: never cross-database identity. The
+  lineage key is the accepted, unique AFL Tables profile path; where the target owns a
+  registration, its token and creation record are the authority. Before A4.2 is evaluated at this
+  phase, every candidate token that no target creation record names is planned from the target's
+  overrides, the candidate's identities and the **target's** identities for that player's path:
+  - **rebind** — exactly one target creation record names the path, and its token is held by no
+    candidate identity: the candidate token retires and the target token binds onto the same
+    candidate player (one statement), so the replay finds it *present*;
+  - **retire** — no target record names the path, and the target holds it as an accepted identity
+    on exactly one player that carries no manual token (the target owns the person by path): the
+    candidate token retires and the player stays source-owned. The candidate's creation record is
+    never carried into the target;
+  - **FAIL** — everything else: no accepted path (a manual-only candidate player; no name is ever
+    read), several paths, a path held elsewhere or not accepted on either side, the target token
+    already held elsewhere in the candidate, two tokens on one player, two target records on one
+    path, or a target that neither records nor holds the path.
+
+  A4.2 is then predicted over the candidate **as it will stand after the convergence**, so the
+  benign same-path / different-token case and the source-owned candidate-only case PASS, and every
+  other A4.2 refusal is unchanged. The convergence is written into the `--lineage-remap-out` file,
+  inside its transaction (§7 step 2c, after `data_overrides` is reinstated). Each statement is
+  guarded by the state this phase read, and the section ends in an assertion that each entry
+  reached its planned state, that every manual identity has exactly one active creation record,
+  and that no player carries two. Any disagreement rolls back the whole file. A re-run is a no-op.
+  §7.5 plans nothing: it reads the converged candidate, and a token step 2c did not converge is
+  the unchanged A4.2 FAIL.
 - **`matches` / `match_coaches` (A4.3).** Every active override must name a `match_key` the
   candidate holds. There is **no** supported deferred lifecycle for one that does not: this replay
   runs before §9 re-acquires the current season, it matches by `match_key` only, and after the

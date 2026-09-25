@@ -4,10 +4,11 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 14
+**Open issues:** 15
 
 | ID | Title | Severity | Area | State | Next action |
 |---|---|---|---|---|---|
+| AFLDB-ISSUE-242 | Cross-database manual player registration token convergence blocks ISSUE-237 L4 | High | Promotion lifecycle — `promotion-inventory.ts`, `promotion-check.ts`, step-2c lineage remap file | Open (2026-09-25), from ISSUE-237 FR-2 / A4.2. Implemented and DB-free validated, uncommitted: B4 plans rebind/retire convergence by accepted AFL Tables path, step 2c applies it in the remap transaction with a final-state assertion, and C2 re-proves it. `code_test_db` rehearsal 103/103 (2026-09-25): the generated step-2c SQL executed, rolled back atomically on refusal, and re-ran as a no-op; 92-player mixture PASS. No DEV/PROD contact. | Operator review and commit; then ISSUE-237 L4 |
 | AFLDB-ISSUE-241 | AFL API bridge artefacts reuse stale database-local `candidate_player_id` values with no lineage binding | Medium | AFL API bridge import — `import_afl_api_player_bridge.py`, bridge artefact contract | Open (2026-09-24), ISSUE-237 successor (OD-5, runbook F3). Three of four evidence classes carry a bare, database-local id with no lineage gate; a re-import after a renumbering lifecycle can mislink. No implementation started. | Design an artefact/importer contract that refuses a lineage-unbound artefact or proves per-row stable identity; no implementation now |
 | AFLDB-ISSUE-240 | Deduplicate repeated `afl_api_identity_contradiction` findings | Low | AFL API bridge validation/import — `afl_api_identity_contradiction`, adjudication evidence/provenance | Open (2026-09-24), ISSUE-235 follow-up F-3 (accepted, allocated at closure). No implementation started. | Define durable dedup/idempotency keys for repeated contradiction findings while preserving evidence/provenance; no adjudication behaviour change |
 | AFLDB-ISSUE-239 | AFL API human-adjudication recovery outside D15 | Medium | Admin / player identity — `afl_api_identity_adjudications`, promotion/rebuild recovery | Open (2026-09-24), ISSUE-235 follow-up narrowed F-2 (accepted, allocated at closure). D15 (ISSUE-235) already implements normal promotion and `db:test:rebuild` preservation of the ledger and its `resolved` outcome; this issue covers only recovery cases outside that invariant (e.g. restoring human decisions after loss of `afl_api_identity_adjudications` itself). No implementation started. | Evaluate whether a tracked/exported recovery artefact is appropriate; no implementation now |
@@ -41424,6 +41425,74 @@ Full record: `issues/closed/AFLDB-ISSUE-228.md` §22.22.
 - **Next action.** None. ISSUE-235 is resolved. AFLDB-ISSUE-237 is the next independent development
   issue in this area; follow-ups are tracked separately as AFLDB-ISSUE-238/239/240.
 - **Runbook:** `issues/closed/AFLDB-ISSUE-235.md` (S0–S9 and I18 complete; RESOLVED 2026-09-24).
+
+## AFLDB-ISSUE-242 — Cross-database manual player registration token convergence blocks ISSUE-237 L4
+
+- **Status:** Open (2026-09-25). **Severity:** High. **Area:** promotion lifecycle —
+  `tools/db/promotion-inventory.ts`, `tools/db/promotion-check.ts`, the step-2c lineage remap
+  file, `docs/production-promotion.md` §6. **Runbook:** `issues/open/AFLDB-ISSUE-242.md`.
+- **Origin.** The AFLDB-ISSUE-237 final L4 pre-commit review, FR-2 / A4.2 (runbook §11d.8 points 1
+  and 3). The number was chosen by the operator; 242 was unused anywhere in the repository.
+- **Problem.** `manual_admin_edit` tokens are minted per database, so the same person carries
+  different tokens on `afldb_test` and DEV. ISSUE-237's A4.2 gate correctly STOPs two cases at
+  B4: a DEV creation record whose AFL Tables path the candidate holds under a different token,
+  and a candidate token that no DEV record names. The 92 ISSUE-224 registrations that `afldb_test`
+  carries therefore made L4 unreachable. No supported mechanism converged tokens.
+- **Contract.** The cross-database key is the accepted, unique AFL Tables profile path. A
+  candidate token is transport-local. DEV's creation record and token are authoritative, and the
+  candidate's record is never carried into DEV. For each candidate token that no DEV record
+  names:
+  - **rebind:** exactly one DEV record names the player's path, and its token is held by no
+    candidate identity. The candidate token retires and the DEV token binds to the same player in
+    one statement.
+  - **retire:** no DEV record names the path, and DEV holds it as an accepted identity on exactly
+    one player with no manual token. The candidate token retires, and the player stays
+    source-owned.
+  - **STOP:** everything else. That includes a manual-only candidate player, an ambiguous or
+    unaccepted path on either side, two tokens on one player, two records on one path, a DEV token
+    already held elsewhere, and an orphan that DEV neither records nor holds.
+- **Implementation (uncommitted, 2026-09-25).**
+  - `--phase restored` plans the convergence from both databases before the lineage gate.
+  - A4.2 is predicted over the converged candidate.
+  - The entries are written into the `--lineage-remap-out` file's transaction (plan step 2c),
+    guarded per statement and closed by a `DO` block. The block asserts each entry's final state,
+    one active creation record per manual identity, and at most one token per player. Any
+    disagreement rolls back the whole file.
+  - `--phase candidate` plans nothing and re-proves the state through the unchanged A4.2
+    planner.
+  - Without convergence, the remap file is byte-identical to before.
+- **Validation (DB-free, Claude-run).**
+  - `tsc` is clean.
+  - `tests/db-promotion-check.test.ts` 186/186 (22 new ISSUE-242 cases);
+    `tests/player-link-mutations.test.ts` 112/112.
+  - `tests/db-test-rebuild.test.ts -t "AFLDB-ISSUE-245"` 29/29.
+  - `-t "AFLDB-ISSUE-237"` 111 passed and 1 failed. The failure is pre-existing, from the Windows
+    CRLF `'\n}\n'` slice in the recovery-actor source test, which reads a file ISSUE-242 does not
+    touch.
+  - ESLint is clean on the changed files, and `git diff --check` is clean.
+  - No database was contacted, and there was no SSH, DEV or PROD action, no L4, and no Git write.
+- **`code_test_db` rehearsal (2026-09-25, operator-authorised; runbook §8a).**
+  - Harness: new `tools/db/promotion-convergence-rehearsal.ts`. It drives the real
+    `gateOverrideReplayTargets`, `lineageRemapSql` and `psql -v ON_ERROR_STOP=1 -f`, with DEV
+    simulated by a dropped-afterwards schema inside `code_test_db`.
+  - Result: 103/103. Rebind and retire reached their contract state, with
+    `registrationsFromLive`, `readManualPlayerToken` and C2 all PASS.
+  - Every STOP case (collision, two records, two paths, same token/different path, ambiguous on
+    either side, orphan) FAILed B4 with no file.
+  - A unique-violation refusal and an assertion refusal after a completed `DELETE … RETURNING …
+    INSERT` both left a byte-identical census, with or without `ON_ERROR_STOP`.
+  - The same artefact run twice is a committed no-op, and the re-plan is empty.
+  - A 92-player mixture (62 rebind, 30 retire) PASSed.
+  - Residue is zero, independently verified. The first attempt (71/103) failed on a fixture
+    double-encoded jsonb payload, not on the convergence.
+  - Re-validation: `tsc` clean; `db-promotion-check` 189/189 (3 new harness cases);
+    `player-link-mutations` 112/112; `-t AFLDB-ISSUE-245` 29/29; `-t AFLDB-ISSUE-237` 111/1 (the
+    same CRLF baseline, proven unchanged against HEAD/main). ESLint and `git diff --check` clean.
+  - There was no `afldb_test`, `afldb_dev` or production contact, no SSH, no L4 and no Git write.
+- **Next action.**
+  - The operator reviews and commits.
+  - Then ISSUE-237 L4 under separate DEV authorisation. B4 still STOPs on contradictory,
+    orphan or unaccepted live states.
 
 ## AFLDB-ISSUE-245 — afldb_test destructive rebuild does not preserve/replay manual player registrations and data_overrides
 

@@ -2113,6 +2113,12 @@ export type LineageRemapInput = {
   oldDatabase: string;
   environment?: Environment;
   plans: readonly LineageColumnPlan[];
+  /**
+   * AFLDB-ISSUE-242: the manual identity convergence a passing --phase restored planned. It
+   * rides this file's transaction, so it is published, candidate-bound and committed exactly
+   * as the remap is -- or not at all.
+   */
+  convergence?: readonly ManualIdentityConvergenceEntry[];
 };
 
 /**
@@ -2228,6 +2234,7 @@ export function lineageRemapSql(input: LineageRemapInput): string {
       for (const line of plan.remediation.split('\n')) lines.push(`--   ${line}`);
     }
   }
+  lines.push(...manualIdentityConvergenceSql(input.convergence ?? []));
 
   lines.push('');
   const withheldColumns = input.plans.filter(withheld);
@@ -2257,6 +2264,12 @@ export function lineageRemapSql(input: LineageRemapInput): string {
     lines.push(`SELECT t.${quoteIdent(rowIdCol(plan))}, t.${quoteIdent(plan.column)} FROM ${relationOf(plan)} t`
       + ` WHERE t.${quoteIdent(plan.column)} IS NOT NULL${guard}`
       + ` AND t.${quoteIdent(plan.column)} NOT IN (SELECT id FROM (VALUES ${pairs}) v(id, identity));`);
+  }
+  if ((input.convergence ?? []).length > 0) {
+    lines.push('-- AFLDB-ISSUE-242: manual identities without exactly one active creation record: expect 0 rows');
+    lines.push("SELECT e.external_id, e.player_id FROM public.external_identities e JOIN public.sources s ON s.id = e.source_id"
+      + " WHERE s.key = 'manual_admin_edit' AND (SELECT count(*) FROM public.data_overrides o WHERE o.is_active"
+      + " AND o.entity_type = 'players' AND o.field_group = 'identity' AND o.entity_key = 'manual_admin_edit:' || e.external_id) <> 1;");
   }
   const sql = `${lines.join('\n')}\n`;
   const problems = lineageRemapProblems(sql, input.plans, names.environment);
@@ -3496,7 +3509,11 @@ function parseOverrideObject(text: string): Record<string, unknown> | null {
  * manual-only player in it cannot have an AFL Tables path attached (`attachAflTablesIdentity`
  * rolls back: no durable record) and its name edits are not durable, so it cannot converge with
  * its debut.
- * Retiring the token is a new promotion write class (§11d.8, token convergence), not done here.
+ * This planner never converges anything itself: it predicts the replay over whatever candidate
+ * state it is given. AFLDB-ISSUE-242's `planManualIdentityConvergence` decides, at --phase
+ * restored, which candidate tokens retire (and which target tokens bind in their place) at plan
+ * step 2c; the gate runs this planner over that PREDICTED converged state, and --phase candidate
+ * runs it again over the real one, where any token still unconverged is the same STOP as before.
  */
 export function planPromotionPlayersReplay(input: {
   overrides: readonly PromotionOverrideRow[];
@@ -3630,7 +3647,8 @@ export function planPromotionPlayersReplay(input: {
     if (tokens.length > 0) {
       plan.problems.push(`${r.key}: different token, same path -- candidate player ${playerId} holds ${r.path} `
         + `under ${tokens.map((t) => `manual_admin_edit:${t}`).join(', ')}; binding would give one person two `
-        + 'manual identities, and only one of them has a creation record');
+        + 'manual identities, and only one of them has a creation record (unless AFLDB-ISSUE-242 convergence '
+        + 'retired the candidate token at plan step 2c)');
       continue;
     }
     if (land(r, playerId)) {
@@ -3711,9 +3729,328 @@ export function planPromotionPlayersReplay(input: {
   for (const t of plan.candidateOnlyTokens) {
     plan.problems.push(`candidate manual_admin_edit:${t.token} (candidate player ${String(t.playerId)}) has no target `
       + 'creation record: the target data_overrides replaces the candidate\'s, so after the swap it would be a manual '
-      + 'identity with no creation record, which no lifecycle admits; retiring it is token convergence (§11d.8)');
+      + 'identity with no creation record, which no lifecycle admits; only AFLDB-ISSUE-242 convergence (plan step 2c, '
+      + 'from a passing --phase restored) may retire it');
   }
   return plan;
+}
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-242 — manual player registration token convergence at the promotion boundary
+// ---------------------------------------------------------------------------
+//
+// A `manual_admin_edit` token is minted per database (`randomUUID`), so the same person
+// registered on the candidate's source database and on the target carries two different
+// tokens. A token is therefore a TRANSPORT-LOCAL identity on the candidate and never a
+// cross-database one; the cross-database lineage key is the accepted, unique AFL Tables
+// profile path. The target's creation record survives the swap byte for byte (its
+// data_overrides replaces the candidate's), so where the target owns a registration its token
+// is the authority, and the candidate's token for the same person has to go.
+//
+// For every candidate token that no target creation record names (the only tokens that
+// can need converging -- a token the target DOES name is the replay planner's `present`
+// or a STOP), with P = the one accepted AFL Tables path its player holds:
+//
+//   rebind  exactly one target creation record names P, and its token A is held by no
+//           candidate identity -> retire the candidate token and bind A onto the same
+//           candidate player, in ONE statement. The replay then finds A `present`.
+//   retire  no target creation record names P, and the TARGET holds P as an accepted
+//           identity on exactly one player that carries no manual token -> P is
+//           source-owned in the target lineage; retire the candidate token and leave the
+//           player owned by P. Carrying the candidate's creation record into the target
+//           instead would promote a decision the target never took, under an actor it
+//           does not hold.
+//   STOP    everything else: no accepted path (a manual-only candidate player has no durable
+//           cross-database identity, and no name is ever read to invent one), several paths,
+//           a path held elsewhere or not accepted on either side, a target record whose token
+//           the candidate already holds elsewhere, a player with two tokens, a target that
+//           neither records nor holds P.
+//
+// Nothing here reads a name or carries a players.id across the boundary: candidate player ids
+// are used only inside the candidate, and the target's only inside the target read. The
+// write rides the lineage remap file (plan step 2c), which only a fully passing --phase
+// restored publishes and which refuses any database but its candidate; each statement is
+// guarded by the state it was planned against, and the section ends in an assertion of the
+// final state that rolls the whole transaction back on any disagreement.
+
+export type ManualIdentityConvergenceEntry = {
+  kind: 'rebind' | 'retire';
+  /** The accepted AFL Tables profile path that proves both sides denote one person. */
+  path: string;
+  /** The candidate's transport-local token, retired. */
+  candidateToken: string;
+  /** The target's authoritative token bound in its place (`rebind`), or null (`retire`). */
+  targetToken: string | null;
+  /** The CANDIDATE player holding `path`: used inside the candidate only. */
+  playerId: number;
+};
+
+export type ManualIdentityConvergencePlan = {
+  entries: ManualIdentityConvergenceEntry[];
+  problems: string[];
+};
+
+export const EMPTY_MANUAL_IDENTITY_CONVERGENCE: ManualIdentityConvergencePlan = { entries: [], problems: [] };
+
+const CONVERGENCE_NOTE = 'Bound at the promotion boundary by manual identity convergence (AFLDB-ISSUE-242).';
+
+/** An identity string that can be written into a SQL comment and literal without changing its lines. */
+function isPrintableIdentity(value: string): boolean {
+  return value.trim() !== '' && value === value.trim()
+    && [...value].every((c) => c.charCodeAt(0) >= 0x20 && c.charCodeAt(0) !== 0x7f);
+}
+
+/** The active target creation records, keyed by token, with the path each names (null: none or unusable). */
+function targetCreationRecords(overrides: readonly PromotionOverrideRow[]): Map<string, string | null> {
+  const records = new Map<string, string | null>();
+  for (const o of overrides) {
+    if (o.entityType !== 'players') continue;
+    const { namespace, rest } = splitOverrideKey(o.entityKey);
+    if (namespace !== PROMOTION_MANUAL_SOURCE_KEY || rest === '') continue;
+    // Any manual-namespace row names its token (the replay planner refuses a non-identity one).
+    const path = o.fieldGroup === PROMOTION_REGISTRATION_FIELD_GROUP ? registrationPayloadProblems(o.overrideValues).path : null;
+    records.set(rest, records.get(rest) ?? path);
+  }
+  return records;
+}
+
+/**
+ * The AFL Tables paths whose TARGET identities decide a `retire`: every path held by a
+ * candidate player that carries a token no target creation record names. Sorted, distinct.
+ */
+export function convergencePathsToRead(input: {
+  overrides: readonly PromotionOverrideRow[];
+  candidate: readonly PromotionIdentityRow[];
+}): string[] {
+  const recorded = targetCreationRecords(input.overrides);
+  const players = new Set(input.candidate
+    .filter((r) => r.sourceKey === PROMOTION_MANUAL_SOURCE_KEY && !recorded.has(r.externalId) && r.playerId !== null)
+    .map((r) => r.playerId!));
+  return [...new Set(input.candidate
+    .filter((r) => r.playerId !== null && players.has(r.playerId) && isBindableIdentity(r, 'afltables', 'afltables_profile_url'))
+    .map((r) => r.externalId))].sort();
+}
+
+/**
+ * Plan the convergence (see the section comment). Pure and deterministic: the same three
+ * readings give the same entries in the same order, so a retried candidate preparation
+ * publishes the same file. `target` is the target's identities for `convergencePathsToRead`.
+ */
+export function planManualIdentityConvergence(input: {
+  overrides: readonly PromotionOverrideRow[];
+  candidate: readonly PromotionIdentityRow[];
+  target: readonly PromotionIdentityRow[];
+}): ManualIdentityConvergencePlan {
+  const plan: ManualIdentityConvergencePlan = { entries: [], problems: [] };
+  const records = targetCreationRecords(input.overrides);
+  const recordsNaming = new Map<string, string[]>();
+  for (const [token, path] of [...records].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) {
+    if (path !== null) recordsNaming.set(path, [...(recordsNaming.get(path) ?? []), token]);
+  }
+  const manual = input.candidate.filter((r) => r.sourceKey === PROMOTION_MANUAL_SOURCE_KEY);
+  const afltables = input.candidate.filter((r) => r.sourceKey === 'afltables');
+  const unrecorded = [...new Set(manual.map((r) => r.externalId).filter((t) => !records.has(t)))].sort();
+
+  for (const token of unrecorded) {
+    const at = `convergence of candidate manual_admin_edit:${JSON.stringify(token)}`;
+    if (!isPrintableIdentity(token)) {
+      plan.problems.push(`${at}: the token is empty or carries a control character; it cannot be written into the remap file`);
+      continue;
+    }
+    const own = manual.filter((r) => r.externalId === token);
+    if (own.length !== 1 || !isBindableIdentity(own[0], PROMOTION_MANUAL_SOURCE_KEY, PROMOTION_MANUAL_SOURCE_KEY)) {
+      plan.problems.push(`${at}: the token is not one accepted, player-linked identity row; nothing proves who it denotes`);
+      continue;
+    }
+    const playerId = own[0].playerId!;
+    const others = [...new Set(manual.filter((r) => r.playerId === playerId && r.externalId !== token).map((r) => r.externalId))].sort();
+    if (others.length > 0) {
+      plan.problems.push(`${at}: candidate player ${playerId} also carries `
+        + `${others.map((t) => `manual_admin_edit:${t}`).join(', ')}; one person with two tokens has no single survivor`);
+      continue;
+    }
+    const paths = [...new Set(afltables
+      .filter((r) => r.playerId === playerId && isBindableIdentity(r, 'afltables', 'afltables_profile_url'))
+      .map((r) => r.externalId))].sort();
+    if (paths.length === 0) {
+      plan.problems.push(`${at}: candidate player ${playerId} holds no accepted AFL Tables profile path, so it has no `
+        + 'durable cross-database identity; a manual-only player is never matched by name');
+      continue;
+    }
+    if (paths.length > 1) {
+      plan.problems.push(`${at}: candidate player ${playerId} holds ${paths.length} AFL Tables profile paths `
+        + `(${paths.join(', ')}); the lineage key is ambiguous`);
+      continue;
+    }
+    const [path] = paths;
+    if (!isPrintableIdentity(path)) {
+      plan.problems.push(`${at}: the AFL Tables path ${JSON.stringify(path)} carries a control character`);
+      continue;
+    }
+    if (afltables.some((r) => r.externalId === path
+      && (r.playerId !== playerId || !isBindableIdentity(r, 'afltables', 'afltables_profile_url')))) {
+      plan.problems.push(`${at}: ${path} is also held elsewhere in the candidate, or by a row that is not an accepted `
+        + 'afltables_profile_url identity; the lineage key is not unique');
+      continue;
+    }
+    const naming = recordsNaming.get(path) ?? [];
+    if (naming.length > 1) {
+      plan.problems.push(`${at}: ${path} is named by ${naming.length} target creation records `
+        + `(${naming.map((t) => `manual_admin_edit:${t}`).join(', ')}); no explicit rule chooses one survivor`);
+      continue;
+    }
+    if (naming.length === 1) {
+      const [targetToken] = naming;
+      if (!isPrintableIdentity(targetToken)) {
+        plan.problems.push(`${at}: the target token for ${path} carries a control character`);
+        continue;
+      }
+      const holders = [...new Set(manual.filter((r) => r.externalId === targetToken).map((r) => String(r.playerId)))];
+      if (holders.length > 0) {
+        plan.problems.push(`${at}: the target token manual_admin_edit:${targetToken} for ${path} is already held by `
+          + `candidate player(s) ${holders.join(', ')}; same token, different person`);
+        continue;
+      }
+      plan.entries.push({ kind: 'rebind', path, candidateToken: token, targetToken, playerId });
+      continue;
+    }
+    // No target creation record names P: only the target's own identities can prove P is
+    // source-owned there. Target player ids are compared with each other, never exported.
+    const targetRows = input.target.filter((r) => r.sourceKey === 'afltables' && r.externalId === path);
+    if (targetRows.length === 0) {
+      plan.problems.push(`${at}: the target neither records a registration for ${path} nor holds it; the token is `
+        + 'candidate-only provenance the target never took, and retiring it would promote a person the target does not know');
+      continue;
+    }
+    const targetHolders = [...new Set(targetRows.map((r) => r.playerId))];
+    if (targetHolders.length !== 1 || targetRows.some((r) => !isBindableIdentity(r, 'afltables', 'afltables_profile_url'))) {
+      plan.problems.push(`${at}: the target holds ${path} ambiguously, or not as an accepted afltables_profile_url `
+        + 'identity; it does not prove the person source-owned');
+      continue;
+    }
+    const targetTokens = input.target.filter((r) => r.sourceKey === PROMOTION_MANUAL_SOURCE_KEY && r.playerId === targetHolders[0]);
+    if (targetTokens.length > 0) {
+      plan.problems.push(`${at}: the target's holder of ${path} carries a manual_admin_edit token that no active `
+        + 'creation record names with that path; the target registration state is itself unsupported');
+      continue;
+    }
+    plan.entries.push({ kind: 'retire', path, candidateToken: token, targetToken: null, playerId });
+  }
+  return plan;
+}
+
+/**
+ * The candidate identities as they will stand after the convergence: each retired token gone,
+ * each bound target token on the retired token's player (the row the file INSERTs). Applying it
+ * to an already-converged state changes nothing.
+ */
+export function applyManualIdentityConvergence(
+  candidate: readonly PromotionIdentityRow[],
+  entries: readonly ManualIdentityConvergenceEntry[],
+): PromotionIdentityRow[] {
+  const retired = new Set(entries.map((e) => e.candidateToken));
+  const rows = candidate.filter((r) => !(r.sourceKey === PROMOTION_MANUAL_SOURCE_KEY && retired.has(r.externalId)));
+  for (const e of entries) {
+    if (e.targetToken === null) continue;
+    if (rows.some((r) => r.sourceKey === PROMOTION_MANUAL_SOURCE_KEY && r.externalId === e.targetToken)) continue;
+    rows.push({
+      sourceKey: PROMOTION_MANUAL_SOURCE_KEY, externalId: e.targetToken, playerId: e.playerId,
+      status: 'resolved', matchMethod: PROMOTION_MANUAL_SOURCE_KEY,
+    });
+  }
+  return rows;
+}
+
+/**
+ * The convergence as SQL inside the lineage remap transaction (plan step 2c, after the target's
+ * data_overrides is reinstated). A `rebind` is ONE statement -- the retired row's DELETE feeds
+ * the bound row's INSERT -- so a re-run, where the candidate token is already gone, inserts
+ * nothing; the INSERT names no ON CONFLICT, so a target token already present anywhere raises.
+ * Then one assertion of every entry's final state and of the whole manual identity set: any
+ * disagreement raises inside the transaction and nothing of it commits.
+ */
+export function manualIdentityConvergenceSql(entries: readonly ManualIdentityConvergenceEntry[]): string[] {
+  if (entries.length === 0) return [];
+  const ei = `${quoteIdent('public')}.${quoteIdent('external_identities')}`;
+  const sources = `${quoteIdent('public')}.${quoteIdent('sources')}`;
+  const overrides = `${quoteIdent('public')}.${quoteIdent('data_overrides')}`;
+  const manualKey = quoteSqlLiteral(PROMOTION_MANUAL_SOURCE_KEY);
+  const holdsPath = (e: ManualIdentityConvergenceEntry): string =>
+    `EXISTS (SELECT 1 FROM ${ei} a JOIN ${sources} sa ON sa.id = a.source_id WHERE sa.key = 'afltables'`
+    + ` AND a.match_method = 'afltables_profile_url' AND a.status IN ('unique', 'resolved')`
+    + ` AND a.player_id = ${e.playerId} AND a.external_id = ${quoteSqlLiteral(e.path)})`;
+  const lines: string[] = [];
+  const rebinds = entries.filter((e) => e.kind === 'rebind').length;
+  lines.push('');
+  lines.push('-- AFLDB-ISSUE-242 — manual player registration token convergence.');
+  lines.push(`-- ${entries.length} candidate manual_admin_edit token(s) are transport-local: ${rebinds} rebind onto the`);
+  lines.push(`-- target's token for the same AFL Tables path, ${entries.length - rebinds} retire because the target owns the`);
+  lines.push('-- person by that path alone. Each statement is guarded by the state --phase restored read;');
+  lines.push('-- the assertion after them rolls the WHOLE transaction back unless the final state holds.');
+  for (const e of entries) {
+    const token = quoteSqlLiteral(e.candidateToken);
+    const retire = `DELETE FROM ${ei} e USING ${sources} s WHERE s.id = e.source_id AND s.key = ${manualKey}`
+      + ` AND e.external_id = ${token} AND e.player_id = ${e.playerId} AND ${holdsPath(e)}`;
+    if (e.kind === 'rebind') {
+      lines.push(`--   rebind ${e.path}: manual_admin_edit:${e.candidateToken} -> manual_admin_edit:${e.targetToken} (candidate player ${e.playerId})`);
+      lines.push(`WITH retired AS (${retire} RETURNING e.player_id, e.external_name)`);
+      lines.push(`INSERT INTO ${ei} (source_id, external_id, external_name, player_id, status, candidate_count, match_method, notes)`);
+      lines.push(`SELECT (SELECT id FROM ${sources} WHERE key = ${manualKey}), ${quoteSqlLiteral(e.targetToken!)}, r.external_name,`
+        + ` r.player_id, 'resolved', 0, ${manualKey}, ${quoteSqlLiteral(CONVERGENCE_NOTE)} FROM retired r;`);
+    } else {
+      lines.push(`--   retire ${e.path}: manual_admin_edit:${e.candidateToken} (candidate player ${e.playerId}); the target owns the person by path`);
+      lines.push(`${retire};`);
+    }
+  }
+  lines.push('DO $converge$ BEGIN');
+  for (const e of entries) {
+    const token = quoteSqlLiteral(e.candidateToken);
+    const path = quoteSqlLiteral(e.path);
+    const tokensOnPlayer = `(SELECT coalesce(array_agg(e.external_id ORDER BY e.external_id), '{}') FROM ${ei} e`
+      + ` JOIN ${sources} s ON s.id = e.source_id WHERE s.key = ${manualKey} AND e.player_id = ${e.playerId})`;
+    const conditions = [
+      `NOT EXISTS (SELECT 1 FROM ${ei} e JOIN ${sources} s ON s.id = e.source_id WHERE s.key = ${manualKey} AND e.external_id = ${token})`,
+      holdsPath(e),
+      `NOT EXISTS (SELECT 1 FROM ${ei} a JOIN ${sources} sa ON sa.id = a.source_id WHERE sa.key = 'afltables'`
+        + ` AND a.external_id = ${path} AND (a.player_id IS DISTINCT FROM ${e.playerId}`
+        + ` OR a.status NOT IN ('unique', 'resolved') OR a.match_method IS DISTINCT FROM 'afltables_profile_url'))`,
+    ];
+    if (e.kind === 'rebind') {
+      const target = quoteSqlLiteral(e.targetToken!);
+      conditions.push(`${tokensOnPlayer} = ARRAY[${target}]::text[]`);
+      conditions.push(`(SELECT count(*) FROM ${ei} e JOIN ${sources} s ON s.id = e.source_id WHERE s.key = ${manualKey}`
+        + ` AND e.external_id = ${target} AND e.player_id = ${e.playerId} AND e.status = 'resolved'`
+        + ` AND e.match_method = ${manualKey}) = 1`);
+      conditions.push(`(SELECT count(*) FROM ${overrides} o WHERE o.is_active AND o.entity_type = 'players'`
+        + ` AND o.field_group = ${quoteSqlLiteral(PROMOTION_REGISTRATION_FIELD_GROUP)}`
+        + ` AND o.entity_key = ${quoteSqlLiteral(`${PROMOTION_MANUAL_SOURCE_KEY}:${e.targetToken}`)}`
+        + ` AND o.override_values->>'afltables_profile_path' = ${path}) = 1`);
+    } else {
+      conditions.push(`${tokensOnPlayer} = '{}'::text[]`);
+      conditions.push(`NOT EXISTS (SELECT 1 FROM ${overrides} o WHERE o.is_active AND o.entity_type = 'players'`
+        + ` AND (o.entity_key = ${quoteSqlLiteral(`${PROMOTION_MANUAL_SOURCE_KEY}:${e.candidateToken}`)}`
+        + ` OR (split_part(o.entity_key, ':', 1) = ${manualKey} AND o.override_values->>'afltables_profile_path' = ${path})))`);
+    }
+    const message = quoteSqlLiteral(`AFLDB-ISSUE-242: ${e.kind} of manual_admin_edit:${e.candidateToken} for ${e.path} `
+      + 'did not reach its planned state; nothing of this transaction is committed');
+    lines.push(`  IF NOT (${conditions.join('\n      AND ')}) THEN`);
+    lines.push(`    RAISE EXCEPTION ${message};`);
+    lines.push('  END IF;');
+  }
+  // The whole manual identity set, as the swap will carry it: one token per player, and every
+  // token backed by exactly one active creation record of the (reinstated) target.
+  lines.push(`  IF EXISTS (SELECT 1 FROM ${ei} e JOIN ${sources} s ON s.id = e.source_id WHERE s.key = ${manualKey}`
+    + ` AND (SELECT count(*) FROM ${overrides} o WHERE o.is_active AND o.entity_type = 'players'`
+    + ` AND o.field_group = ${quoteSqlLiteral(PROMOTION_REGISTRATION_FIELD_GROUP)}`
+    + ` AND o.entity_key = ${manualKey} || ':' || e.external_id) <> 1) THEN`);
+  lines.push("    RAISE EXCEPTION 'AFLDB-ISSUE-242: a manual_admin_edit identity has no single active creation record after convergence';");
+  lines.push('  END IF;');
+  lines.push(`  IF EXISTS (SELECT e.player_id FROM ${ei} e JOIN ${sources} s ON s.id = e.source_id WHERE s.key = ${manualKey}`
+    + ' AND e.player_id IS NOT NULL GROUP BY e.player_id HAVING count(*) > 1) THEN');
+  lines.push("    RAISE EXCEPTION 'AFLDB-ISSUE-242: a player carries more than one manual_admin_edit identity after convergence';");
+  lines.push('  END IF;');
+  lines.push('END $converge$;');
+  return lines;
 }
 
 /**

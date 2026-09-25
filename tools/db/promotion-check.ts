@@ -139,6 +139,10 @@ import {
   lineageTargetsOf,
   isStagedLineageColumn,
   matchKeysOfOverrides,
+  applyManualIdentityConvergence,
+  convergencePathsToRead,
+  EMPTY_MANUAL_IDENTITY_CONVERGENCE,
+  planManualIdentityConvergence,
   planPromotionMatchReplay,
   planPromotionPlayersReplay,
   playerIdentityKeysOfOverrides,
@@ -169,6 +173,8 @@ import {
   type LineageRef,
   type LineageSample,
   type LineageTarget,
+  type ManualIdentityConvergenceEntry,
+  type ManualIdentityConvergencePlan,
   type Phase,
   type PromotionIdentityRow,
   type PromotionMatchReplayPlan,
@@ -937,12 +943,18 @@ async function identitiesByIdentity(
 async function gateLineageIdentity(
   candidate: Query, old: Query, present: readonly string[], remapOut: string | undefined,
   candidateName: string, oldName: string, environment: Environment, report: Report,
+  convergence: readonly ManualIdentityConvergenceEntry[] = [],
 ): Promise<string | undefined> {
   const tables = lineageBoundTables().filter((t) => present.includes(t.name));
   const lines: string[] = [];
   if (tables.length === 0) {
-    report.add('Lineage identity of reinstated id-keyed rows', 'INFO',
-      ['no reinstated table declares a lineage-bound column on this database']);
+    // AFLDB-ISSUE-242: the convergence rides the remap file; with no remap step it cannot run.
+    report.add('Lineage identity of reinstated id-keyed rows', convergence.length > 0 ? 'FAIL' : 'INFO', [
+      'no reinstated table declares a lineage-bound column on this database',
+      ...(convergence.length > 0
+        ? [`${convergence.length} AFLDB-ISSUE-242 convergence(s) need the plan's remap step, which this database does not have`]
+        : []),
+    ]);
     return undefined;
   }
 
@@ -1034,10 +1046,13 @@ async function gateLineageIdentity(
       lines.push('re-run with --lineage-remap-out <file> to write the evidenced per-row remap');
       return;
     }
-    remapSql = lineageRemapSql({ candidate: candidateName, oldDatabase: oldName, environment, plans });
-    lines.push(shared
+    remapSql = lineageRemapSql({ candidate: candidateName, oldDatabase: oldName, environment, plans, convergence });
+    lines.push(shared && convergence.length === 0
       ? `remap prepared for ${remapOut} — an explicit no-op (shared lineage, no UPDATE); the plan still runs it at step 2c`
       : `remap prepared for ${remapOut} — read it, then run it at the plan's remap step (promotion-reinstate.sh 2c)`);
+    if (convergence.length > 0) {
+      lines.push(`it carries ${convergence.length} AFLDB-ISSUE-242 manual identity convergence(s), in the same transaction`);
+    }
     lines.push('it is written only if every gate of this run passes, and it refuses to run on any database but '
       + `${candidateName}`);
   };
@@ -1835,27 +1850,73 @@ export const PROMOTION_REPLAY_MATCH_KEYS_SQL = `
 export const PROMOTION_REPLAY_MAX_SEASON_SQL = `SELECT max(season)::int AS "maxSeason" FROM matches`;
 
 /**
+ * AFLDB-ISSUE-242. The TARGET's identities for the AFL Tables paths a `retire` turns on: every
+ * row naming one of the paths, and every manual token held by a player holding one. Read at
+ * --phase restored only; its player ids are compared with each other and never leave the read.
+ */
+export const PROMOTION_CONVERGENCE_TARGET_IDENTITIES_SQL = `
+  SELECT s.key AS "sourceKey", e.external_id AS "externalId", e.player_id AS "playerId",
+         e.status::text AS status, e.match_method AS "matchMethod"
+    FROM external_identities e
+    JOIN sources s ON s.id = e.source_id
+   WHERE (s.key = 'afltables' AND e.external_id = ANY($1::text[]))
+      OR (s.key = 'manual_admin_edit' AND e.player_id IN (
+            SELECT a.player_id FROM external_identities a JOIN sources sa ON sa.id = a.source_id
+             WHERE sa.key = 'afltables' AND a.external_id = ANY($1::text[]) AND a.player_id IS NOT NULL))
+   ORDER BY 1, 2, 3`;
+
+function identityRowsOf(rows: Record<string, unknown>[]): PromotionIdentityRow[] {
+  return rows.map((r) => ({
+    sourceKey: String(r.sourceKey), externalId: String(r.externalId),
+    playerId: r.playerId === null || r.playerId === undefined ? null : asInt(r.playerId),
+    status: String(r.status), matchMethod: r.matchMethod === null || r.matchMethod === undefined ? null : String(r.matchMethod),
+  }));
+}
+
+/**
  * A4.2 and A4.3 as gates. `overrides` is whichever database holds the TARGET's data_overrides —
  * the target itself at `--phase restored`, the candidate after the plan reinstated them at
  * `--phase candidate` — and `candidate` is the rebuilt lineage the replay will run on. Every
  * refusal costs `dropdb` of the candidate and nothing else.
+ *
+ * AFLDB-ISSUE-242: `convergence` is given at --phase restored only, naming the target database
+ * whose identities decide a `retire`. The convergence is then planned, the players replay is
+ * predicted over the candidate AS IT WILL STAND after plan step 2c applies it, and the entries
+ * are returned for the remap file. At --phase candidate it is absent: the real, already-converged
+ * candidate is read, and a token step 2c did not converge is the unchanged A4.2 STOP.
  */
 export async function gateOverrideReplayTargets(
   sides: { overrides: Query; candidate: Query },
   roles: { overrides: string; candidate: string },
   report: Report,
-): Promise<{ players: PromotionPlayersReplayPlan; matches: PromotionMatchReplayPlan }> {
+  convergence?: { target: Query; role: string },
+): Promise<{ players: PromotionPlayersReplayPlan; matches: PromotionMatchReplayPlan; convergence: ManualIdentityConvergencePlan }> {
   const overrides: PromotionOverrideRow[] = (await sides.overrides(PROMOTION_REPLAY_OVERRIDES_SQL)).map((r) => ({
     entityType: String(r.entityType), entityKey: String(r.entityKey),
     fieldGroup: String(r.fieldGroup), overrideValues: String(r.overrideValues),
   }));
   const keys = playerIdentityKeysOfOverrides(overrides);
-  const candidate: PromotionIdentityRow[] = (await sides.candidate(
-    PROMOTION_REPLAY_IDENTITIES_SQL, [keys.sourceKeys, keys.externalIds])).map((r) => ({
-    sourceKey: String(r.sourceKey), externalId: String(r.externalId),
-    playerId: r.playerId === null || r.playerId === undefined ? null : asInt(r.playerId),
-    status: String(r.status), matchMethod: r.matchMethod === null || r.matchMethod === undefined ? null : String(r.matchMethod),
-  }));
+  const read = identityRowsOf(await sides.candidate(PROMOTION_REPLAY_IDENTITIES_SQL, [keys.sourceKeys, keys.externalIds]));
+  let converged: ManualIdentityConvergencePlan = EMPTY_MANUAL_IDENTITY_CONVERGENCE;
+  if (convergence) {
+    const paths = convergencePathsToRead({ overrides, candidate: read });
+    const target = paths.length === 0 ? []
+      : identityRowsOf(await convergence.target(PROMOTION_CONVERGENCE_TARGET_IDENTITIES_SQL, [paths]));
+    converged = planManualIdentityConvergence({ overrides, candidate: read, target });
+    const rebinds = converged.entries.filter((e) => e.kind === 'rebind').length;
+    report.add('manual player registration token convergence planned (AFLDB-ISSUE-242)',
+      converged.problems.length === 0 ? 'PASS' : 'FAIL', [
+        `candidate tokens no target creation record names, from ${roles.candidate}; target identities from ${convergence.role} `
+          + `for ${paths.length} AFL Tables path(s)`,
+        `converge at plan step 2c: ${converged.entries.length} (rebind onto the target token ${rebinds}, `
+          + `retire to the source-owned path ${converged.entries.length - rebinds})`,
+        ...converged.entries.map((e) => (e.kind === 'rebind'
+          ? `rebind ${e.path}: manual_admin_edit:${e.candidateToken} -> manual_admin_edit:${e.targetToken} (candidate player ${e.playerId})`
+          : `retire ${e.path}: manual_admin_edit:${e.candidateToken} (candidate player ${e.playerId}); the target owns the person by path`)),
+        ...converged.problems.map((p) => `STOP ${p}`),
+      ]);
+  }
+  const candidate = applyManualIdentityConvergence(read, converged.entries);
   const planned = planPromotionPlayersReplay({ overrides, candidate });
   const checkIds = [...new Set(planned.merges.map((m) => m.playerId).filter((id): id is number => id !== null))].sort((a, b) => a - b);
   const checkRows = new Map<number, PromotionPlayerCheckRow>((checkIds.length === 0 ? []
@@ -1869,7 +1930,9 @@ export async function gateOverrideReplayTargets(
   };
   const playerRecords = players.present.length + players.binds.length + players.creates.length;
   const playerLines = [
-    `target data_overrides read from ${roles.overrides}; identities and CHECK columns from ${roles.candidate}`,
+    `target data_overrides read from ${roles.overrides}; identities and CHECK columns from ${roles.candidate}`
+      + (converged.entries.length > 0
+        ? ` (as they will stand after the ${converged.entries.length} AFLDB-ISSUE-242 convergence(s) at plan step 2c)` : ''),
     `creation records replayable: ${playerRecords} (present ${players.present.length}, bind ${players.binds.length}, `
       + `create ${players.creates.length}); source-keyed corrections resolving: ${players.corrections.length}`,
     `players the merge UPDATE writes: ${players.merges.length} (candidate rows read by id: ${checkRows.size})`,
@@ -1900,7 +1963,7 @@ export async function gateOverrideReplayTargets(
   }
   report.add('data_overrides match-keyed replay targets exist in the candidate (AFLDB-ISSUE-237 A4.3)',
     matches.problems.length === 0 ? 'PASS' : 'FAIL', matchLines);
-  return { players, matches };
+  return { players, matches, convergence: converged };
 }
 
 /**
@@ -2155,7 +2218,9 @@ async function main(): Promise<number> {
       await gateAflApiCandidateAfterReinstate(conn.q, boundSupersede!, {
         environment: opts.environment, candidateDatabase: opts.database!, targetDatabase: names.live,
       }, report);
-      // A4.2/A4.3 again, over the target's data_overrides as the plan actually reinstated them.
+      // A4.2/A4.3 again, over the target's data_overrides as the plan actually reinstated them and
+      // the candidate identities as step 2c actually converged them (AFLDB-ISSUE-242): nothing is
+      // planned here, so a token 2c did not converge is the unchanged A4.2 STOP.
       await gateOverrideReplayTargets({ overrides: conn.q, candidate: conn.q }, {
         overrides: `candidate ${opts.database} (the target's reinstated data_overrides)`, candidate: `candidate ${opts.database}`,
       }, report);
@@ -2171,13 +2236,15 @@ async function main(): Promise<number> {
       const oldName = String((await old.q('SELECT current_database() AS d'))[0]?.d);
       if (oldName !== opts.oldDatabase) throw new PromotionRefused(`Old database connection landed on '${oldName}', not '${opts.oldDatabase}'.`);
       await gateDanglingReferences(conn.q, old.q, present, opts.environment, report);
+      // A4.2/A4.3: the target's data_overrides against the candidate the replay will run on,
+      // as it will stand after the AFLDB-ISSUE-242 convergence planned here from the target's
+      // identities. Planned BEFORE the lineage gate, whose remap file carries it (step 2c).
+      const replay = await gateOverrideReplayTargets({ overrides: old.q, candidate: conn.q }, {
+        overrides: `target ${opts.oldDatabase}`, candidate: `candidate ${opts.database}`,
+      }, report, { target: old.q, role: `target ${opts.oldDatabase}` });
       lineageRemap = await gateLineageIdentity(
         conn.q, old.q, present, opts.lineageRemapOut,
-        opts.database!, opts.oldDatabase!, opts.environment, report);
-      // A4.2/A4.3: the target's data_overrides against the candidate the replay will run on.
-      await gateOverrideReplayTargets({ overrides: old.q, candidate: conn.q }, {
-        overrides: `target ${opts.oldDatabase}`, candidate: `candidate ${opts.database}`,
-      }, report);
+        opts.database!, opts.oldDatabase!, opts.environment, report, replay.convergence.entries);
       await gateAflApiRebuildMarker([
         { role: `candidate ${opts.database}`, q: conn.q }, { role: `target ${opts.oldDatabase}`, q: old.q },
       ], report);

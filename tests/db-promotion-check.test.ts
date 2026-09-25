@@ -91,6 +91,11 @@ import {
   planPromotionPlayersReplay,
   playerIdentityKeysOfOverrides,
   promotionPlayerCheckProblems,
+  applyManualIdentityConvergence,
+  convergencePathsToRead,
+  manualIdentityConvergenceSql,
+  planManualIdentityConvergence,
+  type ManualIdentityConvergenceEntry,
   type PromotionIdentityRow,
   type PromotionOverrideRow,
   type PromotionPlayerCheckRow,
@@ -101,6 +106,7 @@ import {
   evaluateAflApiG2, gateAflApiCandidateAfterReinstate, gateAflApiG1, gateAflApiOverlap, gateAflApiRebuildMarker,
   PROMOTION_REPLAY_IDENTITIES_SQL, PROMOTION_REPLAY_MATCH_KEYS_SQL, PROMOTION_REPLAY_MAX_SEASON_SQL,
   PROMOTION_REPLAY_OVERRIDES_SQL, PROMOTION_REPLAY_PLAYER_CHECKS_SQL, gateOverrideReplayTargets, publishRestoredLineageRemap,
+  PROMOTION_CONVERGENCE_TARGET_IDENTITIES_SQL,
   publishRestoredAflApiFiles, readRebuildMarkerPresent, writeOperatorFileAtomically, type AflApiOverlapResult, type Query,
   DEFAULT_DSN_ENV, READ_ONLY_SQL, parseArgs, readAflApiForwardIdentities as readPromotionForwardIdentities,
   readAflApiReverseIdentities as readPromotionReverseIdentities, writePlan,
@@ -110,7 +116,18 @@ import {
   resolveAflApiPlayerIdentity,
 } from '../tools/migration/replay_afl_api_adjudications';
 import { loadFitzroyProfileContinuityRules } from '../src/lib/acquisition/fitzroy-profile-continuity';
+import { readManualPlayerToken } from '../src/db/queries/player-identity';
+import { registrationsFromLive, type LiveRegistrationState } from '../tools/migration/rebuild_manual_registrations';
 import type { TransactionSql } from 'postgres';
+import {
+  CONVERGENCE_REHEARSAL,
+  ConvergenceRehearsalRefused,
+  parseConvergenceRehearsalArgs,
+  rehearsalPath,
+  rehearsalToken,
+  scaleWorld,
+  worldNamespaceProblems,
+} from '../tools/db/promotion-convergence-rehearsal';
 import {
   AFL_API_ADMIN_MATCH_METHOD,
   AFL_API_G2_REFUSING_OUTCOMES,
@@ -4075,5 +4092,466 @@ describe('AFLDB-ISSUE-237 L4 — A4.2 / A4.3 replay gates and the lineage remap 
     expect(begin).toBeGreaterThan(-1);
     expect(lines.slice(begin + 1, begin + 1 + guard.length)).toEqual(guard);
     expect(lineageRemapBindingGuard("o'brien").join('\n')).toContain("'o''brien'");
+  });
+});
+
+/**
+ * AFLDB-ISSUE-242 — manual player registration token convergence at the promotion boundary. A
+ * `manual_admin_edit` token is minted per database, so the same person registered on the
+ * candidate's source and on the target carries two tokens; ISSUE-237 A4.2 (B4) correctly STOPs
+ * that state unchanged. These cases drive the convergence planner, the SQL it adds to the step-2c
+ * remap transaction, the restored and candidate gates, and the final state through the ISSUE-245
+ * capture rule (`registrationsFromLive`) and `readManualPlayerToken`. DB-free.
+ */
+describe('AFLDB-ISSUE-242 — manual registration token convergence (DB-free)', () => {
+  const P = 'players/P/P_Player.html';
+  const Q = 'players/Q/Q_Player.html';
+  const CAND = 'afldb_dev_candidate_20260925-120000';
+  const record = (token: string, path: string | null): PromotionOverrideRow => ({
+    entityType: 'players', entityKey: `manual_admin_edit:${token}`, fieldGroup: 'identity',
+    overrideValues: JSON.stringify({ display_name: 'Registered Player', ...(path === null ? {} : { afltables_profile_path: path }) }),
+  });
+  const manual = (token: string, playerId: number | null, status = 'resolved'): PromotionIdentityRow => ({
+    sourceKey: 'manual_admin_edit', externalId: token, playerId, status, matchMethod: 'manual_admin_edit',
+  });
+  const aft = (path: string, playerId: number | null, status = 'resolved'): PromotionIdentityRow => ({
+    sourceKey: 'afltables', externalId: path, playerId, status, matchMethod: 'afltables_profile_url',
+  });
+  const converge = (overrides: PromotionOverrideRow[], candidate: PromotionIdentityRow[], target: PromotionIdentityRow[] = []) =>
+    planManualIdentityConvergence({ overrides, candidate, target });
+  /** What --phase restored decides: the convergence, the candidate after 2c, and the replay predicted over it. */
+  const predict = (overrides: PromotionOverrideRow[], candidate: PromotionIdentityRow[], target: PromotionIdentityRow[] = []) => {
+    const c = converge(overrides, candidate, target);
+    const state = applyManualIdentityConvergence(candidate, c.entries);
+    return { c, state, replay: planPromotionPlayersReplay({ overrides, candidate: state }) };
+  };
+  /** The post-swap replay's identity writes (binds; creates as fresh ids): the promoted state. */
+  const afterReplay = (state: PromotionIdentityRow[], replay: ReturnType<typeof planPromotionPlayersReplay>) => {
+    const out = [...state, ...replay.binds.map((b) => manual(b.token, b.playerId))];
+    replay.creates.forEach((c, i) => {
+      out.push(manual(c.token, 5000 + i));
+      if (c.path !== null) out.push(aft(c.path, 5000 + i));
+    });
+    return out;
+  };
+  const live = (overrides: PromotionOverrideRow[], ids: PromotionIdentityRow[]): LiveRegistrationState => ({
+    overrides: overrides.filter((o) => o.entityType === 'players').map((o) => ({
+      entityKey: o.entityKey, fieldGroup: o.fieldGroup, isActive: true, overrideValues: o.overrideValues,
+      createdAt: '2026-09-25T00:00:00.000000Z', updatedAt: '2026-09-25T00:00:00.000000Z',
+      adminUserId: 7, adminEmail: 'owner@afldb.example', adminRole: 'super_admin',
+    })),
+    corrections: [],
+    manualIdentities: ids.filter((i) => i.sourceKey === 'manual_admin_edit')
+      .map(({ externalId, playerId, status, matchMethod }) => ({ externalId, playerId, status, matchMethod })),
+    afltablesIdentities: ids.filter((i) => i.sourceKey === 'afltables')
+      .map(({ externalId, playerId, status, matchMethod }) => ({ externalId, playerId, status, matchMethod })),
+  });
+  /** `readManualPlayerToken` over an identity set: the tagged template's one value is the player id. */
+  const tokenOf = (ids: PromotionIdentityRow[], playerId: number) => readManualPlayerToken((async (_: TemplateStringsArray, id: number) => ids
+    .filter((r) => r.sourceKey === 'manual_admin_edit' && r.playerId === id && ['unique', 'resolved'].includes(r.status))
+    .map((r) => ({ externalId: r.externalId }))
+    .sort((a, b) => (a.externalId < b.externalId ? -1 : 1))) as unknown as TransactionSql, playerId);
+
+  // --- the ten identity cases ----------------------------------------------------------------
+
+  it('(1) same path, same token: nothing to converge; the replay finds it present', () => {
+    const { c, replay } = predict([record('A', P)], [manual('A', 20), aft(P, 20)]);
+    expect(c).toEqual({ entries: [], problems: [] });
+    expect(replay.present).toEqual([{ token: 'A', path: P, playerId: 20 }]);
+    expect(replay.problems).toEqual([]);
+  });
+
+  it('(2) same path, different token: rebind -- the candidate token retires, the TARGET token binds to the same player', async () => {
+    const overrides = [record('A', P)];
+    const { c, state, replay } = predict(overrides, [manual('B', 20), aft(P, 20)]);
+    expect(c.problems).toEqual([]);
+    expect(c.entries).toEqual([{ kind: 'rebind', path: P, candidateToken: 'B', targetToken: 'A', playerId: 20 }]);
+    // no second player, no unbacked token: one manual identity, the target's, on the path's player
+    expect(state.filter((r) => r.sourceKey === 'manual_admin_edit')).toEqual([manual('A', 20)]);
+    expect(replay).toMatchObject({ present: [{ token: 'A', path: P, playerId: 20 }], binds: [], creates: [], candidateOnlyTokens: [], problems: [] });
+    const promoted = afterReplay(state, replay);
+    expect(registrationsFromLive(live(overrides, promoted))).toMatchObject({ problems: [], registrations: [{ token: 'A', playerId: 20 }] });
+    expect(await tokenOf(promoted, 20)).toBe('A');
+  });
+
+  it('(3) candidate P + token, target holds P with NO registration: retire -- the player stays owned by P, no token', async () => {
+    const { c, state, replay } = predict([], [manual('B', 20), aft(P, 20)], [aft(P, 900, 'unique')]);
+    expect(c.entries).toEqual([{ kind: 'retire', path: P, candidateToken: 'B', targetToken: null, playerId: 20 }]);
+    expect(state).toEqual([aft(P, 20)]);
+    expect(replay.problems).toEqual([]);
+    expect(replay.candidateOnlyTokens).toEqual([]);
+    const promoted = afterReplay(state, replay);
+    expect(registrationsFromLive(live([], promoted))).toEqual({ registrations: [], problems: [] });
+    expect(await tokenOf(promoted, 20)).toBeNull();
+  });
+
+  it('(3) retire needs the target to PROVE P source-owned: unaccepted, ambiguous or token-carrying holders STOP', () => {
+    const candidate = [manual('B', 20), aft(P, 20)];
+    expect(converge([], candidate, [aft(P, 900, 'ambiguous')]).problems[0]).toContain('does not prove the person source-owned');
+    expect(converge([], candidate, [aft(P, 900), aft(P, 901)]).problems[0]).toContain('does not prove the person source-owned');
+    // the target's holder carries a token that no active creation record names with P
+    expect(converge([], candidate, [aft(P, 900), manual('Z', 900)]).problems[0])
+      .toContain('the target registration state is itself unsupported');
+    for (const target of [[aft(P, 900, 'ambiguous')], [aft(P, 900), manual('Z', 900)]]) {
+      expect(converge([], candidate, target).entries).toEqual([]);
+    }
+  });
+
+  it('(4) target P + token, candidate P with no token: nothing to converge; the replay binds the TARGET token', async () => {
+    const overrides = [record('A', P)];
+    const { c, state, replay } = predict(overrides, [aft(P, 20)]);
+    expect(c).toEqual({ entries: [], problems: [] });
+    expect(replay.binds).toEqual([{ token: 'A', path: P, playerId: 20 }]);
+    const promoted = afterReplay(state, replay);
+    expect(registrationsFromLive(live(overrides, promoted)).problems).toEqual([]);
+    expect(await tokenOf(promoted, 20)).toBe('A');
+  });
+
+  it('(5) same token, different path: STOP -- never converged', () => {
+    const { c, replay } = predict([record('A', P)], [manual('A', 20), aft(Q, 20)]);
+    expect(c.entries).toEqual([]);
+    expect(replay.problems[0]).toContain('same token, different path');
+    // the target token for P is already held by ANOTHER candidate player than P's
+    const held = converge([record('A', P)], [manual('B', 20), aft(P, 20), manual('A', 21), aft(Q, 21)]);
+    expect(held.entries).toEqual([]);
+    expect(held.problems[0]).toContain('already held by candidate player(s) 21; same token, different person');
+  });
+
+  it('(6) two target tokens converging on one candidate player: STOP -- no rule proves one survivor', () => {
+    // the candidate-token player holds both paths the two records name
+    const r = predict([record('A1', P), record('A2', Q)], [manual('B', 20), aft(P, 20), aft(Q, 20)]);
+    expect(r.c.entries).toEqual([]);
+    expect(r.c.problems[0]).toContain('holds 2 AFL Tables profile paths');
+    expect(r.replay.problems.some((p) => p.includes('different token, same path'))).toBe(true);
+    // with no candidate token at all, the replay planner's own convergence STOP still holds
+    expect(predict([record('A1', P), record('A2', Q)], [aft(P, 20), aft(Q, 20)]).replay.problems
+      .some((p) => p.includes('converges on candidate player 20'))).toBe(true);
+    // two target records naming the same path
+    const twin = converge([record('A1', P), record('A2', P)], [manual('B', 20), aft(P, 20)]);
+    expect(twin.problems[0]).toContain('named by 2 target creation records');
+    // one candidate player carrying two candidate-only tokens
+    expect(converge([record('A', P)], [manual('B', 20), manual('C', 20), aft(P, 20)]).problems[0])
+      .toContain('one person with two tokens has no single survivor');
+  });
+
+  it('(7) ambiguous AFL Tables path in the candidate: STOP', () => {
+    const r = converge([record('A', P)], [manual('B', 20), aft(P, 20), aft(P, 21)]);
+    expect(r.entries).toEqual([]);
+    expect(r.problems[0]).toContain('also held elsewhere in the candidate');
+  });
+
+  it('(8) unaccepted / non-unique AFL Tables identity: STOP', () => {
+    // the candidate player's only path row is not accepted: no lineage key at all
+    expect(converge([record('A', P)], [manual('B', 20), aft(P, 20, 'ambiguous')]).problems[0])
+      .toContain('holds no accepted AFL Tables profile path');
+    // an accepted row on the player, but another row for the same path is unaccepted
+    expect(converge([record('A', P)], [manual('B', 20), aft(P, 20), aft(P, null, 'unmatched')]).problems[0])
+      .toContain('not an accepted afltables_profile_url identity');
+    // the candidate token row itself is not accepted and player-linked
+    expect(converge([], [manual('B', 20, 'ambiguous'), aft(P, 20)], [aft(P, 900)]).problems[0])
+      .toContain('not one accepted, player-linked identity row');
+  });
+
+  it('(9) manual-only players: a candidate one with no path STOPs; a target one keeps its own token contract', () => {
+    // candidate-only manual-only token: no durable cross-database identity, and no name is read
+    const r = predict([record('A', null)], [manual('B', 20)]);
+    expect(r.c.entries).toEqual([]);
+    expect(r.c.problems[0]).toContain('no durable cross-database identity; a manual-only player is never matched by name');
+    expect(r.replay.problems.some((p) => p.includes('candidate manual_admin_edit:B (candidate player 20) has no target creation record'))).toBe(true);
+    // a target manual-only registration is its own identity: present when the candidate holds it,
+    // re-created by the replay when it does not -- no cross-database match is made either way
+    expect(predict([record('A', null)], [manual('A', 20)]).replay).toMatchObject({ present: [{ token: 'A', path: null, playerId: 20 }], problems: [] });
+    expect(predict([record('A', null)], []).replay).toMatchObject({ creates: [{ token: 'A', path: null }], problems: [] });
+  });
+
+  it('(10) missing candidate player: the target registration re-creates it through the production replay contract', () => {
+    const { c, replay } = predict([record('A', P)], []);
+    expect(c).toEqual({ entries: [], problems: [] });
+    expect(replay).toMatchObject({ creates: [{ token: 'A', path: P }], problems: [] });
+    // still fail-closed when the path IS in the candidate but not bindable
+    expect(predict([record('A', P)], [aft(P, 20, 'ambiguous')]).replay.problems[0]).toContain('not an accepted afltables_profile_url row');
+  });
+
+  it('candidate-only orphan token: the target neither records nor holds P -- STOP, never retired', () => {
+    const { c, replay } = predict([], [manual('B', 20), aft(P, 20)], []);
+    expect(c.entries).toEqual([]);
+    expect(c.problems[0]).toContain('the target neither records a registration for players/P/P_Player.html nor holds it');
+    expect(replay.candidateOnlyTokens).toEqual([{ token: 'B', playerId: 20 }]);
+    // the planner never reads the target for a player it has no reason to converge
+    expect(convergencePathsToRead({ overrides: [record('B', P)], candidate: [manual('B', 20), aft(P, 20)] })).toEqual([]);
+    expect(convergencePathsToRead({ overrides: [], candidate: [manual('B', 20), aft(P, 20), aft(Q, 21)] })).toEqual([P]);
+  });
+
+  it('a token or path carrying a control character is refused before it can reach the remap file', () => {
+    expect(converge([], [manual('B\nDROP', 20), aft(P, 20)], [aft(P, 900)]).problems[0]).toContain('control character');
+    expect(converge([], [manual('B', 20), aft('players/P/P\n.html', 20)], [aft('players/P/P\n.html', 900)]).problems[0])
+      .toContain('control character');
+  });
+
+  // --- retry / idempotence -------------------------------------------------------------------
+
+  it('retry: planning, applying and generating are deterministic and idempotent; a converged state plans nothing', () => {
+    const overrides = [record('A', P)];
+    const candidate = [aft(Q, 21), manual('C', 21), aft(P, 20), manual('B', 20)];
+    const target = [aft(Q, 900, 'unique')];
+    const first = converge(overrides, candidate, target);
+    expect(first.problems).toEqual([]);
+    // same answer on a retried candidate preparation, whatever order the rows are read in
+    expect(converge(overrides, [...candidate].reverse(), target)).toEqual(first);
+    expect(first.entries.map((e) => e.candidateToken)).toEqual(['B', 'C']);
+    const once = applyManualIdentityConvergence(candidate, first.entries);
+    expect(applyManualIdentityConvergence(once, first.entries)).toEqual(once);
+    // no extra token on retry: exactly one manual identity, the target's
+    expect(once.filter((r) => r.sourceKey === 'manual_admin_edit')).toEqual([manual('A', 20)]);
+    // the converged state needs nothing further, and the next promotion from it plans nothing either
+    expect(converge(overrides, once, target)).toEqual({ entries: [], problems: [] });
+    expect(converge(overrides, once, once)).toEqual({ entries: [], problems: [] });
+    expect(manualIdentityConvergenceSql(first.entries)).toEqual(manualIdentityConvergenceSql(converge(overrides, candidate, target).entries));
+  });
+
+  it('the SQL: guarded writes, a rebind in ONE statement, no ON CONFLICT, a final-state assertion, inside the remap transaction', () => {
+    const entries: ManualIdentityConvergenceEntry[] = [
+      { kind: 'rebind', path: P, candidateToken: 'B', targetToken: 'A', playerId: 20 },
+      { kind: 'retire', path: "players/O/O'Brien.html", candidateToken: 'C', targetToken: null, playerId: 21 },
+    ];
+    const sql = lineageRemapSql({ candidate: CAND, oldDatabase: 'afldb_dev', environment: 'dev', plans: [], convergence: entries });
+    const lines = sql.split('\n');
+    const at = (needle: string) => lines.findIndex((l) => l.startsWith(needle));
+    const begin = at('BEGIN;');
+    const guard = at('DO $bind$ BEGIN');
+    const rebind = at('WITH retired AS (DELETE FROM "public"."external_identities"');
+    const retire = at('DELETE FROM "public"."external_identities"');
+    const assertAt = at('DO $converge$ BEGIN');
+    const commit = at('COMMIT;');
+    expect(begin).toBeGreaterThan(-1);
+    expect([begin, guard, rebind, retire, assertAt, commit]).toEqual([...[begin, guard, rebind, retire, assertAt, commit]].sort((a, b) => a - b));
+    expect(new Set([begin, guard, rebind, retire, assertAt, commit]).size).toBe(6);
+    const section = lines.slice(rebind, commit).join('\n');
+    // the rebind's INSERT reads ONLY the row its DELETE retired: a re-run inserts nothing
+    expect(lines[rebind]).toContain("e.external_id = 'B' AND e.player_id = 20");
+    expect(lines[rebind]).toContain("a.player_id = 20 AND a.external_id = 'players/P/P_Player.html'");
+    expect(lines[rebind]).toContain('RETURNING e.player_id, e.external_name)');
+    expect(lines[rebind + 2]).toMatch(/^SELECT .*'A', r\.external_name, r\.player_id, 'resolved', 0, 'manual_admin_edit', .* FROM retired r;$/);
+    expect(lines[retire]).toContain("e.external_id = 'C' AND e.player_id = 21");
+    expect(lines[retire]).toContain("'players/O/O''Brien.html'");
+    expect(section).not.toMatch(/ON CONFLICT/i);
+    // the final state is asserted per entry, and over the whole manual set, before COMMIT
+    expect(section.match(/RAISE EXCEPTION 'AFLDB-ISSUE-242: (rebind|retire) of/g)).toHaveLength(2);
+    expect(section).toContain("= ARRAY['A']::text[]");
+    expect(section).toContain("o.entity_key = 'manual_admin_edit:A' AND o.override_values->>'afltables_profile_path' = 'players/P/P_Player.html') = 1");
+    expect(section).toContain("= '{}'::text[]");
+    expect(section).toContain('a manual_admin_edit identity has no single active creation record after convergence');
+    expect(section).toContain('a player carries more than one manual_admin_edit identity after convergence');
+    // no name is read or written by the convergence, and the structural remap guard still holds
+    expect(section).not.toMatch(/display_name|search_name|given_name|surname/i);
+    expect(lineageRemapProblems(sql, [], 'dev')).toEqual([]);
+    // nothing converged: the file is byte-for-byte the ISSUE-237 file
+    expect(lineageRemapSql({ candidate: CAND, oldDatabase: 'afldb_dev', environment: 'dev', plans: [], convergence: [] }))
+      .toBe(lineageRemapSql({ candidate: CAND, oldDatabase: 'afldb_dev', environment: 'dev', plans: [] }));
+    expect(manualIdentityConvergenceSql([])).toEqual([]);
+  });
+
+  it('the remap step the convergence rides exists in the DEV plan, after the reinstated data_overrides', () => {
+    const plan = reinstatePlan({ candidate: CAND, oldDatabase: 'afldb_dev', environment: 'dev',
+      preCutoverDump: '/home/arm/backups/afldb/pre.dump', rebuiltDump: '/home/arm/afldb_test_rebuilt.dump' });
+    const remap = plan.indexOf('-f "$LINEAGE_REMAP_SQL"');
+    expect(remap).toBeGreaterThan(-1);
+    expect(plan.indexOf('--table=data_overrides ')).toBeGreaterThan(-1);
+    expect(plan.indexOf('--table=data_overrides ')).toBeLessThan(remap);
+    expect(plan.lastIndexOf('db:promotion:check -- --phase candidate')).toBeGreaterThan(remap);
+  });
+
+  // --- the gates -----------------------------------------------------------------------------
+
+  type Db = { overrides?: PromotionOverrideRow[]; identities?: PromotionIdentityRow[]; log: string[] };
+  const db = (s: Db): Query => async (text, params = []) => {
+    s.log.push(text);
+    const ids = s.identities ?? [];
+    const out = (rows: PromotionIdentityRow[]) => rows.map((i) => ({ ...i, playerId: i.playerId === null ? null : String(i.playerId) }));
+    if (text === PROMOTION_REPLAY_OVERRIDES_SQL) return (s.overrides ?? []).map((o) => ({ ...o }));
+    if (text === PROMOTION_REPLAY_IDENTITIES_SQL) {
+      const [keys, xs] = params as [string[], string[]];
+      return out(ids.filter((i) => i.sourceKey === 'manual_admin_edit'
+        || keys.some((k, n) => k === i.sourceKey && xs[n] === i.externalId)
+        || (i.sourceKey === 'afltables' && ids.some((m) => m.sourceKey === 'manual_admin_edit' && m.playerId === i.playerId))));
+    }
+    if (text === PROMOTION_CONVERGENCE_TARGET_IDENTITIES_SQL) {
+      const paths = params[0] as string[];
+      const holders = new Set(ids.filter((i) => i.sourceKey === 'afltables' && paths.includes(i.externalId) && i.playerId !== null)
+        .map((i) => i.playerId));
+      return out(ids.filter((i) => (i.sourceKey === 'afltables' && paths.includes(i.externalId))
+        || (i.sourceKey === 'manual_admin_edit' && holders.has(i.playerId))));
+    }
+    if (text === PROMOTION_REPLAY_MAX_SEASON_SQL) return [{ maxSeason: 2025 }];
+    if (text === PROMOTION_REPLAY_PLAYER_CHECKS_SQL) {
+      return (params[0] as number[]).map((playerId) => ({
+        playerId, hasDob: false, dobConfidence: 'unknown', birthYearMin: null, birthYearMax: null,
+      }));
+    }
+    throw new Error(`fake database: unexpected SQL ${text}`);
+  };
+  const restored = async (target: Db, candidate: Db) => {
+    const report = new Report();
+    const out = await gateOverrideReplayTargets({ overrides: db(target), candidate: db(candidate) },
+      { overrides: 'target afldb_dev', candidate: `candidate ${CAND}` }, report, { target: db(target), role: 'target afldb_dev' });
+    return { report, out };
+  };
+  const candidatePhase = async (both: Db) => {
+    const report = new Report();
+    const out = await gateOverrideReplayTargets({ overrides: db(both), candidate: db(both) },
+      { overrides: `candidate ${CAND} (reinstated)`, candidate: `candidate ${CAND}` }, report);
+    return { report, out };
+  };
+
+  let dir: string;
+  beforeEach(() => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    dir = mkdtempSync(join(tmpdir(), 'afldb-issue242-'));
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('B4 (restored): the benign same-path / different-token case now PASSES, and its convergence reaches the remap file', async () => {
+    const target: Db = { overrides: [record('A', P)], identities: [manual('A', 900), aft(P, 900)], log: [] };
+    const candidate: Db = { identities: [manual('B', 20), aft(P, 20)], log: [] };
+    const { report, out } = await restored(target, candidate);
+    expect(report.failed).toBe(false);
+    expect(report.results.map((r) => r.gate)).toEqual([
+      'manual player registration token convergence planned (AFLDB-ISSUE-242)',
+      'data_overrides players replay predicted on the candidate (AFLDB-ISSUE-237 A4.2)',
+      'data_overrides match-keyed replay targets exist in the candidate (AFLDB-ISSUE-237 A4.3)',
+    ]);
+    expect(out.convergence.entries).toEqual([{ kind: 'rebind', path: P, candidateToken: 'B', targetToken: 'A', playerId: 20 }]);
+    expect(out.players.present).toEqual([{ token: 'A', path: P, playerId: 20 }]);
+    // the candidate is never asked for the target's identities, nor the target for the candidate's
+    expect(candidate.log).not.toContain(PROMOTION_CONVERGENCE_TARGET_IDENTITIES_SQL);
+    expect(target.log).not.toContain(PROMOTION_REPLAY_IDENTITIES_SQL);
+    // published only because every gate passed, and it carries the convergence
+    const file = join(dir, 'remap.sql');
+    publishRestoredLineageRemap(file, lineageRemapSql({ candidate: CAND, oldDatabase: 'afldb_dev', environment: 'dev', plans: [],
+      convergence: out.convergence.entries }), report);
+    expect(readFileSync(file, 'utf8')).toContain('-- AFLDB-ISSUE-242 — manual player registration token convergence.');
+  });
+
+  it('B4 (restored): the retire case reads the target\'s identities for P only', async () => {
+    const target: Db = { identities: [aft(P, 900, 'unique'), aft(Q, 901)], log: [] };
+    const candidate: Db = { identities: [manual('B', 20), aft(P, 20)], log: [] };
+    const { report, out } = await restored(target, candidate);
+    expect(report.failed).toBe(false);
+    expect(out.convergence.entries).toEqual([{ kind: 'retire', path: P, candidateToken: 'B', targetToken: null, playerId: 20 }]);
+    expect(target.log).toContain(PROMOTION_CONVERGENCE_TARGET_IDENTITIES_SQL);
+  });
+
+  it('B4 (restored): contradictory and unsupported cases still STOP before the swap, and publish no remap file', async () => {
+    const cases: [PromotionOverrideRow[], PromotionIdentityRow[], PromotionIdentityRow[], string][] = [
+      [[record('A', P)], [manual('A', 20), aft(Q, 20)], [], 'same token, different path'],
+      [[record('A1', P), record('A2', Q)], [manual('B', 20), aft(P, 20), aft(Q, 20)], [], 'holds 2 AFL Tables profile paths'],
+      [[record('A', P)], [manual('B', 20), aft(P, 20), aft(P, 21)], [], 'also held elsewhere in the candidate'],
+      [[record('A', P)], [manual('B', 20), aft(P, 20, 'ambiguous')], [], 'holds no accepted AFL Tables profile path'],
+      [[], [manual('B', 20)], [], 'no durable cross-database identity'],
+      [[], [manual('B', 20), aft(P, 20)], [], 'the target neither records a registration'],
+    ];
+    for (const [overrides, candidateIds, targetIds, expected] of cases) {
+      const { report, out } = await restored({ overrides, identities: targetIds, log: [] }, { identities: candidateIds, log: [] });
+      expect(report.failed, expected).toBe(true);
+      expect([...out.convergence.problems, ...out.players.problems].some((p) => p.includes(expected)), expected).toBe(true);
+      const file = join(dir, `remap-${expected.length}.sql`);
+      publishRestoredLineageRemap(file, lineageRemapSql({ candidate: CAND, oldDatabase: 'afldb_dev', environment: 'dev', plans: [],
+        convergence: out.convergence.entries }), report);
+      expect(readdirSync(dir)).toEqual([]);
+    }
+  });
+
+  it('B4 (candidate): after step 2c the converged candidate PASSES; without it the token is the unchanged A4.2 STOP', async () => {
+    const overrides = [record('A', P)];
+    const before = [manual('B', 20), aft(P, 20)];
+    const entries = converge(overrides, before).entries;
+    const converged = await candidatePhase({ overrides, identities: applyManualIdentityConvergence(before, entries), log: [] });
+    expect(converged.report.failed).toBe(false);
+    expect(converged.out.players.present).toEqual([{ token: 'A', path: P, playerId: 20 }]);
+    // the candidate phase plans nothing: it never reads a target, and converges nothing itself
+    expect(converged.out.convergence).toEqual({ entries: [], problems: [] });
+    const skipped = await candidatePhase({ overrides, identities: before, log: [] });
+    expect(skipped.report.failed).toBe(true);
+    expect(skipped.out.players.problems[0]).toContain('different token, same path');
+    expect(skipped.out.players.problems[1]).toContain('candidate manual_admin_edit:B (candidate player 20) has no target creation record');
+    // a retired-but-not-applied token is the candidate-only STOP at this phase too
+    const retired = await candidatePhase({ overrides: [], identities: [manual('B', 20), aft(P, 20)], log: [] });
+    expect(retired.report.failed).toBe(true);
+  });
+
+  it('scales to a whole registration set with no per-player rule: every token converges, the final state is capturable', async () => {
+    const n = 92;
+    const path = (i: number) => `players/X/Player_${i}.html`;
+    const half = Math.floor(n / 2);
+    const overrides = Array.from({ length: half }, (_, i) => record(`dev-${i}`, path(i)));
+    const candidateIds = Array.from({ length: n }, (_, i) => [manual(`cand-${i}`, 100 + i), aft(path(i), 100 + i)]).flat();
+    const targetIds = Array.from({ length: n - half }, (_, i) => aft(path(half + i), 9000 + i, 'unique'));
+    const { report, out } = await restored({ overrides, identities: targetIds, log: [] }, { identities: candidateIds, log: [] });
+    expect(report.failed).toBe(false);
+    expect(out.convergence.entries.filter((e) => e.kind === 'rebind')).toHaveLength(half);
+    expect(out.convergence.entries.filter((e) => e.kind === 'retire')).toHaveLength(n - half);
+    const state = applyManualIdentityConvergence(candidateIds, out.convergence.entries);
+    const replay = planPromotionPlayersReplay({ overrides, candidate: state });
+    expect(replay.present).toHaveLength(half);
+    const promoted = afterReplay(state, replay);
+    const capture = registrationsFromLive(live(overrides, promoted));
+    expect(capture.problems).toEqual([]);
+    expect(capture.registrations.map((r) => r.token).sort()).toEqual(overrides.map((o) => o.entityKey.slice('manual_admin_edit:'.length)).sort());
+    expect(await tokenOf(promoted, 100)).toBe('dev-0');
+    expect(await tokenOf(promoted, 100 + n - 1)).toBeNull();
+    // idempotent: the next promotion from this state converges nothing
+    expect(converge(overrides, promoted, promoted)).toEqual({ entries: [], problems: [] });
+  });
+
+  it('the restored phase plans the convergence BEFORE the lineage gate that writes it; the candidate phase plans none', () => {
+    const source = readFileSync(join(REPO, 'tools', 'db', 'promotion-check.ts'), 'utf8');
+    const main = source.slice(source.indexOf('async function main('));
+    const restoredBranch = main.slice(main.indexOf("if (phase === 'restored') {"), main.indexOf('if (opts.compare)'));
+    const gateAt = restoredBranch.indexOf('gateOverrideReplayTargets({ overrides: old.q, candidate: conn.q }');
+    expect(gateAt).toBeGreaterThan(-1);
+    expect(restoredBranch).toContain("{ target: old.q, role: `target ${opts.oldDatabase}` }");
+    expect(restoredBranch.indexOf('gateLineageIdentity(')).toBeGreaterThan(gateAt);
+    expect(restoredBranch).toContain('replay.convergence.entries');
+    const candidateBranch = main.slice(main.indexOf("if (phase === 'candidate') {"), main.indexOf('let aflApiTargetCensus'));
+    expect(candidateBranch).toContain('gateOverrideReplayTargets({ overrides: conn.q, candidate: conn.q }');
+    expect(candidateBranch).not.toContain('target:');
+  });
+});
+
+describe('AFLDB-ISSUE-242 — code_test_db convergence rehearsal harness (DB-free)', () => {
+  it('writes only with --acknowledge code_test_db, and run needs an evidence directory', () => {
+    expect(() => parseConvergenceRehearsalArgs(['run', '--out', 'x'])).toThrow(ConvergenceRehearsalRefused);
+    expect(() => parseConvergenceRehearsalArgs(['run', '--acknowledge', 'afldb_test', '--out', 'x'])).toThrow(/--acknowledge code_test_db/);
+    expect(() => parseConvergenceRehearsalArgs(['teardown', '--acknowledge', 'afldb_dev'])).toThrow(ConvergenceRehearsalRefused);
+    expect(() => parseConvergenceRehearsalArgs(['run', '--acknowledge', 'code_test_db'])).toThrow(/--out/);
+    expect(() => parseConvergenceRehearsalArgs(['run', '--acknowledge', 'code_test_db', '--out', 'x', '--scale', '0'])).toThrow(/--scale/);
+    expect(() => parseConvergenceRehearsalArgs(['run', '--acknowledge', 'code_test_db', '--out', 'x', '--target', 'afldb_dev'])).toThrow(/Unknown flag/);
+    expect(parseConvergenceRehearsalArgs(['run', '--acknowledge', 'code_test_db', '--out', 'x'])).toEqual({ step: 'run', out: 'x', scale: 92 });
+    expect(parseConvergenceRehearsalArgs(['residue'])).toEqual({ step: 'residue' });
+    expect(parseConvergenceRehearsalArgs(['teardown', '--acknowledge', 'code_test_db'])).toEqual({ step: 'teardown' });
+  });
+
+  it('keeps every fixture identity in its own namespace: UUID-shaped tokens and valid AFL Tables paths', () => {
+    expect(CONVERGENCE_REHEARSAL.database).toBe('code_test_db');
+    expect(rehearsalToken('candidate', 1, 1)).toBe('2420cccc-0001-4000-8000-000000000001');
+    expect(rehearsalToken('target', 20, 92)).toBe('2420dddd-0020-4000-8000-000000000092');
+    expect(rehearsalPath('S', 1)).toBe('players/Z/Zz242_S_1.html');
+    expect(worldNamespaceProblems(scaleWorld(92))).toEqual([]);
+    expect(worldNamespaceProblems({
+      name: 'outside', target: [], records: [],
+      candidate: [{ key: 'x', paths: [{ path: 'players/A/Real_Player.html' }], token: 'not-a-fixture-token', record: true }],
+    })).toHaveLength(2);
+  });
+
+  it('builds the scale world as a deterministic rebind/retire mixture of any size', () => {
+    const w = scaleWorld(92);
+    expect([w.candidate.length, w.records.length, w.target.filter((t) => t.token === null).length]).toEqual([92, 62, 30]);
+    expect(scaleWorld(92)).toEqual(w);
+    expect(new Set(w.candidate.map((c) => c.paths[0].path)).size).toBe(92);
+    const small = scaleWorld(7);
+    expect([small.candidate.length, small.records.length]).toEqual([7, 5]);
   });
 });

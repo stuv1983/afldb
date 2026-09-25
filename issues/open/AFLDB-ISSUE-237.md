@@ -3408,6 +3408,17 @@ combined invariant. Both are last-line guards, not the plan.
 
 ### 11d.8 What L4 still cannot claim
 
+> **2026-09-25 — AFLDB-ISSUE-242 allocated (`issues/open/AFLDB-ISSUE-242.md`).**
+> - **L4 remains NOT RUN, and no L4 evidence has been produced.**
+> - ISSUE-242 is now the token-convergence prerequisite that points 1 and 3 below proposed.
+> - **B4 remains fail-closed until ISSUE-242 is merged.** Until then, the deployed checker STOPs on
+>   both cases exactly as described here.
+> - After the merge, B4 plans the convergence (rebind / retire by accepted AFL Tables path), and
+>   step 2c applies it. Every contradictory, orphan or unaccepted case still STOPs.
+> - **2026-09-25:** the ISSUE-242 step-2c SQL has `code_test_db` rehearsal evidence (ISSUE-242
+>   §8a, 103/103: executed, atomic on refusal, idempotent, 92-player mixture). This is **not** L4
+>   evidence. **L4 remains NOT RUN.**
+
 - L4 is **not** run, and nothing here is evidence of a live pass.
 - Case coverage is F-L4-7's. The non-empty `E_promotion` path is proven DB-free
   (`tests/db-promotion-check.test.ts`, the L4 hardening suite) and by construction. It is proven
