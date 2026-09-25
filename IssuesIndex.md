@@ -9,7 +9,7 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Open issues:** 17
+**Open issues:** 18
 
 ### AFLDB-ISSUE-248 — Reserved-domain DEV auth fixtures block promotion
 - **Severity:** High. **Area:** DEV auth operations — `auth_users`, `admin_invites`,
@@ -17,7 +17,7 @@
 - **State:** Open (2026-09-25), from the ISSUE-237 L4 A5 refusal (the test-fixture identity gate).
   The closure is `auth_users` 14/17/18 (disabled), invite 5, audit rows 807/808/811/812/889/890/912/913
   (user 18 login/logout, NULL detail) and revoked sessions 13/15/29/35. Every other FK count is 0.
-  Implemented and DB-free validated, uncommitted:
+  Implemented and DB-free validated, committed `a4f734af`:
   - `npm run db:issue248:cleanup-dev-auth-fixtures -- --environment dev --actor-email <super admin>
     [--apply]`, validate-only by default;
   - `afldb_dev` only, with exact closure guards and a dynamic catalogue FK census;
@@ -25,8 +25,26 @@
   - one real-actor `test_fixture.cleanup` audit, then FK-ordered exact-id deletes, in one
     transaction with postcondition totals; ALREADY_CLEAN on rerun.
 - **Runbook:** `issues/open/AFLDB-ISSUE-248.md` (§9 has the live procedure).
-- **Next action:** the operator reviews, commits and deploys to DEV. Then run runbook §9 under
-  explicit DEV authorisation, resolve on P1–P4, and rerun ISSUE-237 L4 A5.
+- **Next action:** finish combined ISSUE-247/248 integration and deploy to DEV. Then run runbook
+  §9 under explicit DEV authorisation, resolve on P1–P4, and rerun ISSUE-237 L4 A5.
+
+### AFLDB-ISSUE-247 — A legitimately empty staged reinstatement table blocks promotion
+- **Severity:** High. **Area:** promotion lifecycle — `tools/db/promotion-inventory.ts`
+  (`stageSql`, `promoteStagedSql`, `judgeStagedSourceRows`), `tools/db/promotion-check.ts`,
+  `docs/production-promotion.md` §7.2.
+- **State:** Open (2026-09-25), from ISSUE-237 L4 A5 on `afldb_dev`, REFUSED by the ISSUE-151
+  staged-rows gate: `afl_api_identity_adjudications` 0 (beside `brownlow_vote_entry_state` 3 and
+  `external_grid_sources` 1), while the AFL API census passed (669 / 0 / 0 / 0). The empty ledger
+  is legitimate. Implemented and DB-free validated, committed `86e0e2ba`:
+  - a contract-declared `stagedMayBeEmpty` (only on `afl_api_identity_adjudications`);
+  - per-table stage-completion evidence (`promotion_staging.promotion_stage_completion`) written by
+    a statement-level trigger on each staging copy inside the load's own transaction;
+  - 2d refuses missing evidence, a moved row count, and zero rows where the contract requires rows.
+
+  `code_test_db` rehearsal **PASS 7/7**, zero residue (2026-09-26).
+- **Runbook:** `issues/open/AFLDB-ISSUE-247.md` (§6 rehearsal, §7 live procedure).
+- **Next action:** finish combined ISSUE-247/248 integration and deploy to DEV; then ISSUE-237 L4
+  A5 with a fresh `$STAMP` and the live DEV R6 header check.
 
 ### AFLDB-ISSUE-243 — Promotion preflight cannot validate target credentials and rejects known DEV operational artefacts
 - **Severity:** High. **Area:** operator workflow tooling — `tools/dev/preflight-core.ts`,
@@ -248,14 +266,20 @@
     - A3 remains PASS, A4.1 remains 0/0, and A4.2 remains 92/92.
     - No A5, promotion dump, candidate, plan or swap ran as part of ISSUE-246. **L4 remains NOT
       RUN.**
-  - **Update (2026-09-25): L4 A5 REFUSED at the test-fixture identity gate; L4 NOT RUN** (runbook
-    §11d.14).
-    - Three disabled reserved-domain `auth_users` rows (14, 17, 18) and one used, expired
-      `admin_invites` row (5) are present.
-    - Their only FK references are 8 login/logout audit rows and 4 revoked sessions, all of user 18.
-    - Nothing past A5 ran. The prerequisite is **AFLDB-ISSUE-248**.
-  - **Next action:** AFLDB-ISSUE-248's audited DEV cleanup, then rerun L4 A5 by runbook §11d under
-    a separate DEV authorisation; L5 at a scheduled production promotion. The 2026 corpus stays
+  - **Update (2026-09-25): L4 A5 REFUSED on two independent gates; L4 NOT RUN** (runbook §11d.14).
+    - The AFL API census itself PASSED: 669 importer, 0 human resolved, 0 ledger, 0 net-linked.
+    - **Gate 1 (ISSUE-151 staged rows):** `afl_api_identity_adjudications` 0
+      (`brownlow_vote_entry_state` 3, `external_grid_sources` 1). The empty ledger is legitimate.
+      Prerequisite: **AFLDB-ISSUE-247** (committed `86e0e2ba`, rehearsal PASS 7/7).
+    - **Gate 2 (test-fixture identity):** three disabled reserved-domain `auth_users` rows
+      (14, 17, 18) and one used, expired `admin_invites` row (5), with FK references limited to 8
+      login/logout audit rows and 4 revoked sessions, all of user 18. Prerequisite:
+      **AFLDB-ISSUE-248** (committed `a4f734af`).
+    - Nothing past A5 ran: no backup, dump, candidate, plan or swap.
+  - **Next action:** finish combined ISSUE-247/248 integration; deploy the combined result to DEV;
+    run ISSUE-248's controlled validate/apply/idempotence/postchecks; run ISSUE-247's live DEV
+    empty-table/COPY-header proof; then rerun L4 A5 with a fresh `$STAMP` by runbook §11d, under a
+    separate DEV authorisation; L5 remains scheduled production work. The 2026 corpus stays
     ISSUE-224/228.
   - **Not authorised:** no destructive rebuild, promotion or DEV mutation, and no commit without
     separate authorisation.

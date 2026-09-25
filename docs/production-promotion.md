@@ -156,7 +156,7 @@ and refuses any other by name:
 | Phase | Database (`--environment prod`, the default) | Database (`--environment dev`) | Gates |
 |---|---|---|---|
 | `source` | `afldb_test` | `afldb_test` | identity, classification, no leftover `promotion_staging` schema (every phase, `AFLDB-ISSUE-151`), migration parity, fixtures (info), optional `--expect-fingerprint` |
-| `pre-cutover` | `afldb_prod` | `afldb_dev` | + fixtures must be absent, super admin present, every staged table holds rows (§7.2), `--snapshot <file>` of row counts |
+| `pre-cutover` | `afldb_prod` | `afldb_dev` | + fixtures must be absent, super admin present, every staged table holds rows unless its contract declares `stagedMayBeEmpty` (§7.2, `AFLDB-ISSUE-247`), `--snapshot <file>` of row counts |
 | `restored` | `afldb_prod_candidate_<stamp>` | `afldb_dev_candidate_<stamp>` | + `--old-database` dangling-reference probe, + lineage identity of reinstated id-keyed rows (§7.4c, §7.4d), optional `--lineage-remap-out <file>` |
 | `candidate` | `afldb_prod_candidate_<stamp>` | `afldb_dev_candidate_<stamp>` | full acceptance: fixtures absent, `--expect-super-admin`, `--compare <snapshot>`, privileges reconciled |
 | `production` | `afldb_prod` | `afldb_dev` | same as `candidate`, on the live name |
@@ -515,8 +515,10 @@ A single `--schema=staging_aflw` line was the original shape and failed on the f
 A failure names the table and leaves earlier tables committed and that table empty.
 
 **Staged tables (`AFLDB-ISSUE-151`).** A reinstated table whose **NOT NULL** reference into
-rebuilt data is lineage-bound with a stable identity — today exactly `external_grid_sources`,
-`ingest_source_id` → `sources` through `sources.key` — is never restored straight into `public`.
+rebuilt data is lineage-bound with a stable identity — first `external_grid_sources`,
+`ingest_source_id` → `sources` through `sources.key`; since then also `brownlow_vote_entry_state`
+(`AFLDB-ISSUE-155`) and `afl_api_identity_adjudications` (`AFLDB-ISSUE-235`) — is never restored
+straight into `public`.
 The first production promotion (stamp `20260907-234124`) proved why: the dumped row carried
 `ingest_source_id = 57` (old `sources` 57 = `gridley`), the candidate's gridley row is `sources`
 7 and its id 57 does not exist, so a plain restore meets the immediate FK before any `UPDATE`
@@ -527,21 +529,30 @@ around such tables:
    a staged table, in contract order, as above.
 2. **2b — stage.** `promotion-stage.sql` creates `promotion_staging` and one bare copy per staged
    table (`CREATE TABLE promotion_staging.<t> (LIKE public.<t>)` — columns only: no identity, no
-   key, no FK). Then, per staged table, `pg_restore --data-only --table=<t> -f -` writes the
-   dump's restore script through a `sed` that redirects its one `COPY public.<t> (` header to
+   key, no FK), plus the **stage-completion evidence** (`AFLDB-ISSUE-247`, below): the table
+   `promotion_staging.promotion_stage_completion`, the trigger function
+   `promotion_staging.record_stage_completion()`, and one statement-level `AFTER INSERT` trigger
+   on each staging copy. Then, per staged table, `pg_restore --data-only --table=<t> -f -` writes
+   the dump's restore script through a `sed` that redirects its one `COPY public.<t> (` header to
    `promotion_staging.<t>`, into `promotion-stage-<t>.sql`; a `grep` proves the redirect
    applied; `psql --single-transaction -f` loads it. The rows land with their **own ids and the
-   old reference integers**, and nothing checks them yet. Read the small file before loading it.
+   old reference integers**, and nothing checks them yet; the `COPY` fires that copy's trigger,
+   which records the table and its row count in the same transaction. Read the small file
+   before loading it, and never skip, split or hand-edit a load line.
 3. **2c — remap.** `psql -f "$LINEAGE_REMAP_SQL"` — the §6 `--lineage-remap-out` file, once. At
    this moment every directly restored lineage-bound table is in `public` and every staged table
    is in `promotion_staging`, which is where its guarded `UPDATE … WHERE id = <row> AND <col> =
    <old>` lands. On a shared lineage the file holds no `UPDATE` and the step is a no-op; it is
    still run, so it is never silently skipped.
 4. **2d — promote.** `promotion-promote-staged.sql`, one transaction: for each staged table it
-   refuses — before any `INSERT` — an empty staging copy or a row whose reference still points
-   at an id the candidate does not have, then `INSERT INTO public.<t> OVERRIDING SYSTEM VALUE
-   SELECT * FROM promotion_staging.<t> ORDER BY id` (ids preserved; the FK checks every row as it
-   is inserted), drops the staging table, and finally drops the schema without `CASCADE`.
+   refuses — before any `INSERT` — a copy with no stage-completion evidence, a copy whose row
+   count differs from what that evidence recorded, an empty copy the contract does not permit to
+   be empty, or a row whose reference still points at an id the candidate does not have, then
+   `INSERT INTO public.<t> OVERRIDING SYSTEM VALUE SELECT * FROM promotion_staging.<t> ORDER BY
+   id` (ids preserved; the FK checks every row as it is inserted) and drops the staging table
+   (its trigger goes with it). Last, it drops `promotion_stage_completion`,
+   `record_stage_completion()` and the schema, without `CASCADE`: anything left behind refuses
+   the file.
 5. **2e — dependants.** Tables whose `restoreAfter` chain reaches a staged table
    (`external_grids`, `external_grid_axes`), plain restores as in step 2, now that the rows they
    reference exist in `public`.
@@ -550,13 +561,48 @@ No constraint is dropped, deferred, disabled or validated later, no `sources` ro
 and the id of every staged row is the dumped id. The staging schema exists only between 2b and
 2d; if it is still there, an earlier attempt did not finish — inspect it, never reuse it.
 
-**A staged table must hold rows in the database being replaced.** A data-only restore of an
-empty table leaves no trace, so 2d cannot tell "restored zero rows" from "2b never ran" and
-refuses an empty `promotion_staging.<t>` either way. `--phase pre-cutover` therefore refuses
-when a staged table is empty (or absent) in the live database, before any plan exists: decide
-that table's disposition then (it is not a case the staged path promotes past), not
-mid-transcript. Today the one staged table is seeded by migration 080 and cannot be empty on a
-migrated database; the gate keeps that true for any table the contract's shape rule selects.
+**Stage-completion evidence, and legitimately empty staged tables (`AFLDB-ISSUE-247`).** A
+data-only restore of an empty table leaves no row behind, so emptiness alone can never tell
+"restored zero rows" from "2b never ran". Until `AFLDB-ISSUE-247` the staged path therefore
+presumed rows: 2d refused an empty `promotion_staging.<t>` and `--phase pre-cutover` refused an
+empty staged table in the live database. That conflated two different states, and it refused a
+real one: ISSUE-237 L4 A5 on `afldb_dev` (2026-09-25) was REFUSED by `Staged tables hold rows in
+the replaced database` with `brownlow_vote_entry_state` 3, `external_grid_sources` 1 and
+`afl_api_identity_adjudications` **0 — EMPTY**, while the AFL API census passed at the same moment
+(669 importer rows, 0 human-resolved rows, 0 ledger rows, 0 net-linked ledger entries). An empty
+human-adjudication ledger is a valid, evidenced state, and a row is never manufactured to satisfy
+the gate.
+
+The plan now proves the restore ran independently of the rows it brought. Each staging copy's
+statement-level `AFTER INSERT` trigger (created by `promotion-stage.sql`) fires when the table's
+`COPY` executes — **zero rows copied included** — and writes one row, `(staged_table,
+restored_rows)`, into `promotion_staging.promotion_stage_completion`, inside the load's own
+`--single-transaction`. So: a skipped load, a failed or rolled-back load, or a script with no
+`COPY` for the table (an empty `pg_restore` stream) leaves **no** evidence row; the primary key
+refuses a second load of the same table; the `CHECK` admits only the staged tables' names; and
+the recorder takes the name from its trigger's own table (`TG_TABLE_NAME`), never from a literal.
+Nothing else in the plan, the remap or the promotion may write that table or drop a trigger; the
+plan validator refuses it (`stageCompletionProblems`, `lineageRemapProblems`).
+
+2d then decides each staged table on its own evidence:
+
+| Evidence row | Staged rows | Contract | 2d |
+|---|---|---|---|
+| absent | any | any | **REFUSE** — the restore did not run or did not commit |
+| present, `restored_rows = n` | ≠ n | any | **REFUSE** — the copy changed outside the evidenced restore |
+| present | 0 | requires rows (default) | **REFUSE** — the `AFLDB-ISSUE-151` message, word for word |
+| present | 0 | `stagedMayBeEmpty` declared | **promote** zero rows, with a `NOTICE` naming the deciding issue |
+| present | n > 0 | any | promote as before (remap still checked row by row) |
+
+`stagedMayBeEmpty` is a contract declaration on the table (deciding issue + written reason),
+never a table-name special case, and the contract refuses it on a table that is not staged.
+Today only `afl_api_identity_adjudications` declares it (`AFLDB-ISSUE-247`: the ledger records only
+human adjudications). `external_grid_sources` (seeded by migration 080) and
+`brownlow_vote_entry_state` still **require rows**, at `--phase pre-cutover` and at 2d, exactly as
+before. `--phase pre-cutover` reports a permitted empty table as `EMPTY, permitted by contract`
+and still refuses a staged table that is **absent**. The candidate count comparison is unchanged:
+all three staged tables compare `equal`, so a permitted empty table must also read 0 in the
+candidate.
 
 **Interrupted staged reinstatement.** If anything stops between 2b and 2d — a refused
 `COPY`, a refused promotion, a lost session — `promotion_staging` remains, and everything
@@ -567,14 +613,18 @@ outside 2d). Before any cleanup or retry:
 
 1. Inspect it and write the findings into the promotion record: which step stopped and why
    (the psql error is the evidence), what `promotion_staging.<t>` holds (`SELECT count(*)`,
-   then the rows), whether the 2c `UPDATE` was applied (the reference column shows the
-   candidate's id, not the replaced database's), and whether `public.<t>` already holds the
-   rows (2d ran to its `INSERT` and failed on the FK — the transaction rolled back, so it
-   should not; prove it).
+   then the rows), which loads committed (`SELECT * FROM
+   promotion_staging.promotion_stage_completion` — one row per staged table whose `COPY`
+   committed, `AFLDB-ISSUE-247`), whether the 2c `UPDATE` was applied (the reference column
+   shows the candidate's id, not the replaced database's), and whether `public.<t>` already
+   holds the rows (2d ran to its `INSERT` and failed on the FK — the transaction rolled back,
+   so it should not; prove it).
 2. Only after the inspection is recorded, drop the schema by hand — an operator statement,
-   never a generated one — then regenerate the plan (the generator refuses to overwrite: move
-   the old files aside) and start again at its step 1. Never load rows into a leftover copy,
-   never run 2c or 2d against one, and never pass a `--phase` check that names it.
+   never a generated one; it now also holds `promotion_stage_completion` and
+   `record_stage_completion()` — then regenerate the plan (the generator refuses to overwrite:
+   move the old files aside) and start again at its step 1. Never load rows into a leftover
+   copy, never write or reuse its completion evidence, never run 2c or 2d against one, and
+   never pass a `--phase` check that names it.
 
 ### 7.3 Identity sequences, audit marker, privileges
 

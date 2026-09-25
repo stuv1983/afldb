@@ -43,7 +43,28 @@ commit.
   - Any other reserved-domain row is refused, never swept in.
   - A rerun is a verified ALREADY_CLEAN no-op.
   - The A5 gate itself is unchanged.
-- **Status.** DB-free validated; not yet run on DEV.
+- **Status.** Committed `a4f734af`. DB-free validated; not yet run on DEV.
+
+### Staged promotion accepts a contract-permitted empty table on stage-completion evidence (AFLDB-ISSUE-247) (Open) - 25 September 2026
+
+- **Problem.** AFLDB-ISSUE-237 L4 A5 on `afldb_dev` was refused by the AFLDB-ISSUE-151 staged-rows
+  gate because `afl_api_identity_adjudications` held 0 rows, which is a valid state (no human
+  `afl_api` adjudication yet; census 669 importer / 0 / 0 / 0). The staged mechanism could not tell
+  a legitimately empty table from a stage restore that never ran, so it refused both.
+- **What changed.** A staged table may now declare `stagedMayBeEmpty` in the promotion contract;
+  only `afl_api_identity_adjudications` does. `promotion-stage.sql` also creates
+  `promotion_staging.promotion_stage_completion` and a statement-level trigger on each staging copy,
+  so the staged `COPY` records its own completion (zero rows included) inside the load's own
+  transaction. `promotion-promote-staged.sql` refuses a table with no completion evidence or whose
+  row count moved after it, keeps the ISSUE-151 emptiness refusal for every table that requires rows
+  (`external_grid_sources`, `brownlow_vote_entry_state`), and drops the evidence with the schema.
+  `--phase pre-cutover` reports a permitted empty table instead of failing on it; an absent staged
+  table still fails.
+- **Unchanged.** Leftover-schema refusal at every phase, id preservation, no constraint bypass, and
+  the candidate count comparison (`equal`).
+- **Validation.** DB-free: typecheck clean, `tests/db-promotion-check.test.ts` 201/201, ESLint
+  clean. The `code_test_db` PostgreSQL rehearsal (`issues/open/AFLDB-ISSUE-247.md` §6) passed 7/7,
+  rollback-only, with zero residue, on 2026-09-26. Committed `86e0e2ba`. The A5 rerun is pending.
 
 ### Audited retirement of the orphaned ISSUE-109 DEV fixture override (AFLDB-ISSUE-246) (Resolved) - 25 September 2026
 

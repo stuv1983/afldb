@@ -89,7 +89,7 @@ ISSUE-237 is not resolved.)*
 | ISSUE-245 blocker on L3 | CLEARED (§11a.5) |
 | ISSUE-245 `afldb_test` proof | PASS, through L3 (§11a.6) |
 | L3 | **PASS** (§11a.6) |
-| L4 DEV promotion | **NOT RUN.** Procedure rewritten after the L4 hardening (§11d; findings and fixes §11d.0, prerequisites §11d.2). *(2026-09-25: the second real attempt STOPPED at A4.3, before the destructive boundary. A3 PASS; the blocker is the orphaned ISSUE-109 fixture override; prerequisite **AFLDB-ISSUE-246**, §11d.12.)* *(2026-09-25: ISSUE-246 RESOLVED, audit 983; the A4.3 rerun returned no rows, so A4.3 is PASS; A3/A4.1/A4.2 unchanged; next step **A5**, §11d.13.)* *(2026-09-25: A5 REFUSED at the test-fixture identity gate: reserved-domain `auth_users` 14/17/18 and `admin_invites` 5; nothing past A5 ran; prerequisite **AFLDB-ISSUE-248**, §11d.14.)* |
+| L4 DEV promotion | **NOT RUN.** Procedure rewritten after the L4 hardening (§11d; findings and fixes §11d.0, prerequisites §11d.2). *(2026-09-25: the second real attempt STOPPED at A4.3, before the destructive boundary. A3 PASS; the blocker is the orphaned ISSUE-109 fixture override; prerequisite **AFLDB-ISSUE-246**, §11d.12.)* *(2026-09-25: ISSUE-246 RESOLVED, audit 983; the A4.3 rerun returned no rows, so A4.3 is PASS; A3/A4.1/A4.2 unchanged; next step **A5**, §11d.13.)* *(2026-09-25: **A5 REFUSED on TWO independent gates**: the ISSUE-151 staged-rows gate on the legitimately empty `afl_api_identity_adjudications` ledger (0; census 669/0/0/0 PASS), prerequisite **AFLDB-ISSUE-247**; and the test-fixture identity gate on reserved-domain `auth_users` 14/17/18 and `admin_invites` 5, prerequisite **AFLDB-ISSUE-248**. Nothing past A5 ran. §11d.14.)* |
 | L5 PROD promotion | **NOT RUN** |
 
 **P-M state (2026-09-24).** Point 1 PROVEN (DB-free). Point 2 PROVEN (live, `afldb_test`,
@@ -3682,37 +3682,80 @@ in `issues/closed/AFLDB-ISSUE-246.md` §10.1.
   swap. The ISSUE-246 pre-mutation backup was that issue's own safety net and is not an L4
   artefact.
 - **L4 remains NOT RUN, and ISSUE-237 remains OPEN.**
-- **Next step: L4 A5**, under ISSUE-237 and its own separate DEV authorisation. *(2026-09-25: run;
-  REFUSED at the test-fixture identity gate, §11d.14.)*
+- **Next step: L4 A5**, under ISSUE-237 and its own separate DEV authorisation. *(2026-09-25: A5
+  ran and was REFUSED on two independent gates; see §11d.14.)*
 
-### 11d.14 L4 A5 (2026-09-25, operator-run): REFUSED at the test-fixture identity gate; L4 NOT RUN
+### 11d.14 L4 A5 REFUSED (2026-09-25, operator-run): two independent gates; L4 NOT RUN
 
-The operator reported this result; Claude recorded it and did not re-run it.
+The operator reported this result; it was recorded here and was not re-run.
 
 - **A5** (`db:promotion:check --environment dev --phase pre-cutover --database afldb_dev`, without
-  `--allow-fixture-identities`, as §11d A5 requires) **REFUSED** the test-fixture identity gate
-  (`gateFixtureIdentities`, reserved domains).
-- **The exact fixture closure on `afldb_dev`:**
+  `--allow-fixture-identities`, as §11d A5 requires) **REFUSED**, on two independent gates in the
+  same run.
+- **The AFL API census itself PASSED:** importer rows **669**, `afl_api_stat_vector_season` **669**,
+  human resolved rows **0**, adjudication ledger **0**, net-linked ledger **0**. L = 0 and K = 0
+  agree with A4.1 (0/0).
+  - importer SHA256: `ec7a5af7b0bb5711ad84a1f5968f27f7fb9a60f3751956dd6687e0781421661e`
+  - ledger SHA256: `4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945`
 
-  | Row | Facts |
-  |---|---|
-  | `auth_users` 14 | `e2e-plain-admin@afldb.test`: disabled, password and TOTP present |
-  | `auth_users` 17 | `e2e-super-admin@afldb.test`: disabled, password and TOTP present |
-  | `auth_users` 18 | `testcon@test.test`: disabled, password and TOTP present |
-  | `admin_invites` 5 | `testcon@test.test`, `contributor`, `invited_by` 4, `used_at` 2026-09-11 13:12:00.671379+10, expired, not revoked |
+**Independent blocker 1 — AFLDB-ISSUE-151 staged-rows gate.**
 
-- **The full FK census into 14/17/18:**
-  - `auth_audit_log.actor_user_id` **8**: 807, 811, 889 and 912 are `admin.login`; 808, 812, 890
-    and 913 are `admin.logout`. All are user 18, with NULL `detail`.
-  - `auth_sessions.user_id` **4**: 13, 15, 29 and 35, all user 18, all already revoked.
-  - **Every other FK is 0.** No durable football, admin or business provenance is owned by these
-    identities.
-- **The gate behaved as designed and is not weakened.** L4 never passes
-  `--allow-fixture-identities`, and renaming the emails is excluded.
-- **Nothing past A5 ran:** no backup, dump, candidate, `--plan` or swap.
-- **Prerequisite: AFLDB-ISSUE-248** (`issues/open/AFLDB-ISSUE-248.md`), the audited DEV cleanup
-  bound to exactly this closure. After it, P3 of that runbook must find no reserved-domain row.
-  Then rerun A5 under this issue's own DEV authorisation.
+`Staged tables hold rows in the replaced database` FAILed:
+
+```text
+[FAIL] Staged tables hold rows in the replaced database
+  brownlow_vote_entry_state      3
+  external_grid_sources          1
+  afl_api_identity_adjudications 0 — EMPTY
+```
+
+This is not an ISSUE-237 defect. An empty `afl_api_identity_adjudications` ledger is a valid,
+evidenced DEV state (no administrator has adjudicated an `afl_api` identity). The generic
+ISSUE-151 staged mechanism conflated a legitimate zero-row table with a stage restore that never
+ran, and refused both. No ledger row is to be manufactured. **Prerequisite: AFLDB-ISSUE-247**
+(`issues/open/AFLDB-ISSUE-247.md`): a contract-declared `stagedMayBeEmpty` permission on
+`afl_api_identity_adjudications`, accepted at step 2d only on per-table stage-completion evidence
+written by the staged `COPY`'s own trigger. Implemented and DB-free validated 2026-09-25, and
+committed `86e0e2ba` with the `code_test_db` PostgreSQL rehearsal PASS 7/7, rollback-only, zero
+residue, on 2026-09-26. `external_grid_sources` and `brownlow_vote_entry_state` still require
+rows. The live DEV empty-table/COPY-header proof and combined DEV deployment are still pending.
+
+**Independent blocker 2 — reserved-domain fixture identity gate.**
+
+The test-fixture identity gate (`gateFixtureIdentities`, reserved domains) also REFUSED. The
+exact fixture closure on `afldb_dev`:
+
+| Row | Facts |
+|---|---|
+| `auth_users` 14 | `e2e-plain-admin@afldb.test`: disabled, password and TOTP present |
+| `auth_users` 17 | `e2e-super-admin@afldb.test`: disabled, password and TOTP present |
+| `auth_users` 18 | `testcon@test.test`: disabled, password and TOTP present |
+| `admin_invites` 5 | `testcon@test.test`, `contributor`, `invited_by` 4, `used_at` 2026-09-11 13:12:00.671379+10, expired, not revoked |
+
+The full FK census into 14/17/18:
+- `auth_audit_log.actor_user_id` **8**: 807, 811, 889 and 912 are `admin.login`; 808, 812, 890 and
+  913 are `admin.logout`. All are user 18, with NULL `detail`.
+- `auth_sessions.user_id` **4**: 13, 15, 29 and 35, all user 18, all already revoked.
+- **Every other FK is 0.** No durable football, admin or business provenance is owned by these
+  identities.
+
+The gate behaved as designed and is not weakened. L4 never passes `--allow-fixture-identities`,
+and renaming the emails is excluded. **Prerequisite: AFLDB-ISSUE-248**
+(`issues/open/AFLDB-ISSUE-248.md`), the audited DEV cleanup bound to exactly this closure.
+Implemented and DB-free tested, committed `a4f734af`; live validate/apply/idempotence/postchecks
+are still pending. After it, P3 of that runbook must find no reserved-domain row.
+
+**Snapshot handling.** `--phase pre-cutover` writes `--snapshot` whatever its verdict, and this
+refused run left `/home/arm/backups/afldb/promotion-dev-20260925-203256.json`. That file is
+failure-run evidence only: it must not be reused for B/C and must not be overwritten or deleted.
+A future A5 uses a fresh `$STAMP` — the checker refuses to overwrite.
+
+- **Nothing past A5 ran:** no B1 promotion backup, no promotion source dump, no candidate, no
+  plan, no swap.
+- **Next:** finish combined ISSUE-247/248 integration; deploy the combined result to DEV; run
+  ISSUE-248's controlled validate/apply/idempotence/postchecks; run ISSUE-247's live DEV
+  empty-table/COPY-header proof; then rerun L4 A5 with a fresh `$STAMP` under a separate DEV
+  authorisation. L5 remains scheduled production work.
 
 **L4 gate state after A5:**
 
@@ -3722,7 +3765,7 @@ The operator reported this result; Claude recorded it and did not re-run it.
 | A4.1 | remains DEV `afl_api` ledger **0** / net-linked **0** |
 | A4.2 | remains DEV manual registrations **92** / source **92** |
 | A4.3 | remains **PASS** (§11d.13) |
-| A5 | **REFUSED**: test-fixture identities, prerequisite ISSUE-248 |
+| A5 | **REFUSED on TWO independent gates**: ISSUE-151 staged rows (prerequisite ISSUE-247) and test-fixture identities (prerequisite ISSUE-248) |
 | B onward | **NOT RUN** |
 
 - **L4 remains NOT RUN, and ISSUE-237 remains OPEN.**
@@ -3892,10 +3935,17 @@ is `auth_audit_log` 983, and the A4.3 rerun returned no rows, so **A4.3 is PASS*
 0/0 and A4.2 92/92 are unchanged. No A5, promotion dump, candidate, plan or swap ran as part of
 ISSUE-246. **L4 remains NOT RUN.** The next action is **L4 A5**, under a separate DEV
 authorisation. ISSUE-237 is not resolved.)*
-*(2026-09-25: **L4 A5 REFUSED** at the test-fixture identity gate (§11d.14): reserved-domain
-`auth_users` 14/17/18 and `admin_invites` 5. Their only FK references are 8 login/logout audit rows
-and 4 revoked sessions of user 18. Nothing past A5 ran. **L4 remains NOT RUN.** The next action is
-**AFLDB-ISSUE-248**, then A5 again under a separate DEV authorisation. ISSUE-237 is not resolved.)*
+*(2026-09-25: **L4 A5 REFUSED on TWO independent gates** (§11d.14). The AFL API census itself
+passed (669 importer, 0 human resolved, 0 ledger, 0 net-linked). **Blocker 1:** the ISSUE-151
+staged-rows gate on `afl_api_identity_adjudications` 0 — EMPTY (beside `brownlow_vote_entry_state`
+3 and `external_grid_sources` 1); the empty ledger is legitimate; prerequisite **AFLDB-ISSUE-247**
+(committed `86e0e2ba`, `code_test_db` rehearsal PASS 7/7). **Blocker 2:** the test-fixture identity
+gate on reserved-domain `auth_users` 14/17/18 and `admin_invites` 5, whose only FK references are 8
+login/logout audit rows and 4 revoked sessions of user 18; prerequisite **AFLDB-ISSUE-248**
+(committed `a4f734af`). Nothing past A5 ran. **L4 remains NOT RUN.** The next action is combined
+ISSUE-247/248 deployment to DEV, ISSUE-248's live validate/apply/idempotence/postchecks,
+ISSUE-247's live DEV empty-table/COPY-header proof, then A5 again with a fresh `$STAMP` under a
+separate DEV authorisation. ISSUE-237 is not resolved.)*
 
 ---
 
