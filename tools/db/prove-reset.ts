@@ -92,9 +92,22 @@ export const PROOF_MARKER = 'AFLDB-PROOF';
 /** The deliberate abort. Its presence in stderr is what a SUCCESSFUL proof looks like. */
 export const PROOF_ROLLBACK_SENTINEL = 'AFLDB-RESET-PROOF-ROLLBACK';
 
+/**
+ * AFLDB-ISSUE-237 prerequisite P-M, point 2 — a throwaway `COMMENT ON DATABASE` value used
+ * ONLY to prove the marker mechanism survives `RESET_SQL`. This is NOT the Stage 2 marker
+ * payload (D11b); that format is S3's concern and is not implemented while S3 stays gated.
+ * The comment lives in the shared catalog `pg_shdescription`, entirely separate from the
+ * schemas/relations `RESET_SQL` touches, and is ordinary transactional DDL — so the
+ * mandatory abort below restores whatever comment existed before this proof ran, exactly,
+ * with no separate restore step, and nothing is left behind even if the process is killed
+ * mid-stream (PostgreSQL rolls back an unfinished transaction on connection loss).
+ */
+export const PROOF_MARKER_COMMENT = 'AFLDB-RESET-PROOF-MARKER (ISSUE-237 P-M point 2 — safe to ignore; this proof always rolls back)';
+
 /** Every marker the stream must have emitted before the sentinel, or the proof failed. */
 export const PROOF_REQUIRED_MARKERS = [
-  'received', 'trap', 'identity', 'sessions', 'before', 'census', 'extensions',
+  'received', 'trap', 'identity', 'sessions', 'before', 'marker_set', 'census', 'marker_after',
+  'extensions',
 ];
 
 /** The first marker the stream emits. Its ABSENCE means psql never ran the stream at all. */
@@ -153,6 +166,16 @@ SELECT pid::text                       AS pid,
 FROM pg_stat_activity
 WHERE datname = current_database() AND pid <> pg_backend_pid()
 ORDER BY pid`;
+
+/**
+ * The database-level comment, read outside the reset transaction, both before psql runs and
+ * again afterwards from a fresh session. Read as free text over postgres.js rather than
+ * parsed out of a psql marker line, because an operator-set comment could contain spaces or
+ * punctuation the marker line format (`key=value`, whitespace-delimited) cannot carry.
+ */
+export const DATABASE_COMMENT_SQL = `
+SELECT shobj_description(oid, 'pg_database') AS comment
+FROM pg_database WHERE datname = current_database()`;
 
 
 // ---------------------------------------------------------------------------
@@ -281,6 +304,21 @@ BEGIN
   RAISE WARNING '${PROOF_MARKER} before schemas=% relations=% extensions=% extension_members=%', sc, rel, ext, mem;
 END $afldb_proof$;
 
+-- 4b. MARKER (AFLDB-ISSUE-237 P-M point 2) — set a throwaway COMMENT ON DATABASE and
+--     confirm it reads back exactly, INSIDE this same transaction, before the reset runs.
+COMMENT ON DATABASE ${PROOF_EXPECTED_DATABASE} IS '${PROOF_MARKER_COMMENT}';
+
+DO $afldb_proof$
+DECLARE marker text;
+BEGIN
+  SELECT shobj_description(oid, 'pg_database') INTO marker
+    FROM pg_database WHERE datname = current_database();
+  IF marker IS DISTINCT FROM '${PROOF_MARKER_COMMENT}' THEN
+    RAISE EXCEPTION '${PROOF_MARKER} marker_set: comment did not read back as set (got %)', coalesce(marker, '(null)');
+  END IF;
+  RAISE WARNING '${PROOF_MARKER} marker_set status=ok';
+END $afldb_proof$;
+
 -- 5. THE RESET — the exact RESET_SQL constant from tools/db/rebuild-test.ts.
 ${RESET_SQL.trim()}
 
@@ -343,6 +381,20 @@ BEGIN
   IF pub <> 1 THEN RAISE EXCEPTION '${PROOF_MARKER} census: the public schema was removed; the extensions live there and the migrations expect it'; END IF;
 
   RAISE WARNING '${PROOF_MARKER} census schemas=% tables=% views=% sequences=% foreign_tables=% routines=% types=% public_schemas=% migrations=%', sc, tb, vw, sq, ft, rt, ty, pub, mig;
+END $afldb_proof$;
+
+-- 6b. MARKER SURVIVAL (P-M point 2) — the comment must read back UNCHANGED after
+--     RESET_SQL. RESET_SQL drops only schema-owned application objects in this database;
+--     it must never touch the shared pg_shdescription catalog the comment lives in.
+DO $afldb_proof$
+DECLARE marker text;
+BEGIN
+  SELECT shobj_description(oid, 'pg_database') INTO marker
+    FROM pg_database WHERE datname = current_database();
+  IF marker IS DISTINCT FROM '${PROOF_MARKER_COMMENT}' THEN
+    RAISE EXCEPTION '${PROOF_MARKER} marker_after: comment did NOT survive RESET_SQL (got %)', coalesce(marker, '(null)');
+  END IF;
+  RAISE WARNING '${PROOF_MARKER} marker_after status=ok';
 END $afldb_proof$;
 
 -- 7. EXTENSION PRESERVATION, against the snapshot taken in this same transaction. Nothing
@@ -510,6 +562,7 @@ export function parseMarker(output: string, kind: string): Record<string, string
 export function assertProofOutcome(result: PsqlResult): {
   census: Census; migrationsPresent: boolean; extensions: Record<string, string>;
   before: Record<string, string>; identity: Record<string, string>;
+  markerSet: Record<string, string>; markerAfter: Record<string, string>;
 } {
   const output = `${result.stdout}\n${result.stderr}`;
   // Never discard psql's own words. The first live attempt refused on the exit status
@@ -569,12 +622,28 @@ export function assertProofOutcome(result: PsqlResult): {
     || markers.census.migrations === 't';
   assertPostResetState(census, migrationsPresent);
 
+  // Re-assert the marker statuses in Node, same reasoning as the census re-assert above:
+  // the stream already raised on a mismatch, so reaching here means both said 'ok' — this
+  // catches a stream whose own IF somehow did not act on a bad read-back.
+  if (markers.marker_set.status !== 'ok') {
+    throw new ProofRefused(
+      `The marker_set assertion did not report 'ok' (got '${markers.marker_set.status}'). `
+      + 'Treat the marker proof as UNPROVEN.');
+  }
+  if (markers.marker_after.status !== 'ok') {
+    throw new ProofRefused(
+      `The marker_after assertion did not report 'ok' (got '${markers.marker_after.status}'). `
+      + 'Treat the marker proof as UNPROVEN.');
+  }
+
   return {
     census,
     migrationsPresent,
     extensions: markers.extensions,
     before: markers.before,
     identity: markers.identity,
+    markerSet: markers.marker_set,
+    markerAfter: markers.marker_after,
   };
 }
 
@@ -641,6 +710,8 @@ export type ProofReport = {
   elapsedMs: number;
   rolledBack: true;
   committed: false;
+  /** P-M point 2: the marker survived RESET_SQL and the pre-existing comment was restored. */
+  commentMarkerProven: true;
 };
 
 /**
@@ -663,11 +734,13 @@ export async function runResetProof(deps: ProofDeps): Promise<ProofReport> {
     const tolerated = assertExclusiveAccess(sessions);
 
     const sections = await collectSections(query);
-    return { identity, tolerated, sections };
+    const commentRow = (await query(DATABASE_COMMENT_SQL))[0] as { comment: string | null } | undefined;
+    const preComment = commentRow?.comment ?? null;
+    return { identity, tolerated, sections, preComment };
   });
   // The observation session is closed from here on.
 
-  const { identity } = pre;
+  const { identity, preComment } = pre;
   const before = fingerprintOf(pre.sections);
   deps.log(`  database      : ${identity.database}`);
   deps.log(`  role          : current_user ${identity.role_name}, `
@@ -679,6 +752,8 @@ export async function runResetProof(deps: ProofDeps): Promise<ProofReport> {
     : `  other sessions: 0 client backends; ${pre.tolerated.length} tolerated `
       + `(${pre.tolerated.map((s) => s.backend_type).join(', ')}) — bounded by lock_timeout`);
   deps.log(`  fingerprint   : ${before.overall}`);
+  deps.log(`  db comment    : ${preComment === null ? '(none)' : 'present'} before this proof `
+    + '(content not logged; restored exactly by the mandatory rollback)');
   deps.log('  observer      : closed before psql starts (no session spans the reset)');
 
   // ---- PHASE 2: psql only. No postgres.js connection is open. --------------------------
@@ -695,10 +770,25 @@ export async function runResetProof(deps: ProofDeps): Promise<ProofReport> {
   deps.log(`  psql exit     : ${result.status} (the deliberate abort — this is success)`);
 
   // ---- PHASE 3: a FRESH observation session, after psql has gone. ----------------------
-  const post = await deps.withSession(async (query) => ({
-    sections: await collectSections(query),
-    health: (await query(HEALTH_SQL))[0],
-  }));
+  const post = await deps.withSession(async (query) => {
+    const commentRow = (await query(DATABASE_COMMENT_SQL))[0] as { comment: string | null } | undefined;
+    return {
+      sections: await collectSections(query),
+      health: (await query(HEALTH_SQL))[0],
+      postComment: commentRow?.comment ?? null,
+    };
+  });
+
+  // P-M point 2: the rollback must restore the EXACT pre-existing comment, whatever it was
+  // (including none). Compared as free text from a fresh session, never parsed out of a
+  // psql marker line, so arbitrary content (spaces, punctuation) cannot mask a mismatch.
+  if (post.postComment !== preComment) {
+    throw new ProofRefused(
+      'The rollback did NOT restore the pre-existing database comment exactly '
+      + `(was ${preComment === null ? '(none)' : 'present'}, now `
+      + `${post.postComment === null ? '(none)' : 'present'} and different). Do NOT run the `
+      + 'rebuild; investigate before anything else touches this database.');
+  }
 
   // Cross-check that the psql transaction saw the database the PRE-RESET fingerprint
   // describes. Compared against the sections already collected, never against a fresh
@@ -724,12 +814,14 @@ export async function runResetProof(deps: ProofDeps): Promise<ProofReport> {
     throw new ProofRefused('The post-rollback health query did not answer as expected.');
   }
   deps.log(`  post-rollback : ${after.overall} (identical)`);
+  deps.log('  db comment    : restored to the pre-existing value exactly (P-M point 2 proven)');
   deps.log(`  health        : ${String(post.health.relations)} relations, `
     + `${String(post.health.extensions)} extensions`);
 
   return {
     identity, before, after, census: outcome.census, extensions: outcome.extensions,
     psqlStatus: result.status, elapsedMs, rolledBack: true, committed: false,
+    commentMarkerProven: true,
   };
 }
 
@@ -823,9 +915,12 @@ async function main(): Promise<number> {
     console.log(`    extensions preserved ${report.extensions.preserved}, `
       + `extension-owned objects ${report.extensions.members}`);
     console.log(`    reset stream completed in ${report.elapsedMs} ms`);
+    console.log(`    comment marker survived RESET_SQL and the pre-existing comment was `
+      + `restored exactly: ${report.commentMarkerProven ? 'yes' : 'NO'} (P-M point 2)`);
     console.log('\nRESET_SQL PROVEN through the real psql path — clean slate inside the');
     console.log('transaction, extensions intact, rollback restored the database');
-    console.log('byte-identical by fingerprint.');
+    console.log('byte-identical by fingerprint, and the database-level comment marker');
+    console.log('survived the reset with the pre-existing comment restored exactly.');
     console.log('THIS WAS A ROLLBACK-ONLY PROOF. Nothing was committed. Nothing was rebuilt.');
     return 0;
   }

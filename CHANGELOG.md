@@ -15,6 +15,92 @@ commit.
 
 ## [Unreleased]
 
+### Promotion `afl_api` identity gates corrected before the first real run (AFLDB-ISSUE-237, open) - 25 September 2026
+
+- **What changed.** `npm run db:promotion:check`'s `afl_api` gates were found wrong by source
+  inspection before any live promotion used them, and are fixed:
+  - The rebuild marker is now read where a database comment actually lives
+    (`shobj_description`; the old `obj_description` read was always NULL). It is refused at
+    `source`, `pre-cutover`, `restored` (candidate and target) and `candidate`.
+  - **G2 reads each fact from the database that owns it.** Importer rows and the identity remap
+    come from the candidate; the durable human ledger comes from the live target. Previously G2
+    read the candidate's own (always empty) ledger, so `E_promotion` was always empty. A new
+    refusing grade, `UNRESOLVED`, stops, before the swap, a ledger identity the post-swap replay
+    could not resolve.
+  - **`--phase candidate` now requires `--afl-api-supersede-in <file>`.** It verifies that the
+    candidate's reinstated ledger is exactly the target ledger G2 graded, instead of refusing any
+    ledger row.
+  - **The `E_promotion` file (`--afl-api-supersede-out`)** is written only when the whole
+    `--phase restored` run passes, atomically, and never over a file. Format v2 is bound to the
+    environment, both databases, the candidate importer state and the target ledger state.
+    `--phase candidate` and the post-swap replay (`replayAflApiAdjudicationsFromSupersedeFile`)
+    refuse a stale, foreign, tampered, unbound v1 or mismatched file before any write.
+  - **DEV only:** `--afl-api-dev-regeneration-out` generates the G3 regeneration classification
+    from G3's own grades, for `afl_api_stat_vector_season` hard losses only. Format v2 is bound
+    to both compared importer states, hashes every field, and refuses v1. The classification is
+    no longer hand-authored.
+  - **The post-swap `data_overrides` replay is predicted before the swap.** A new gate runs at
+    `--phase restored` and again at `--phase candidate`. It refuses what `replay_admin_overrides`
+    would silently lose or break after the swap, using stable identity only:
+    - a DEV creation record whose AFL Tables path the candidate holds under a **different** manual
+      token (binding would give one person two tokens);
+    - the same token on a different path, an ambiguous or unbindable path, and converging records;
+    - a player correction that resolves to no candidate player or to several;
+    - any active `matches` / `match_coaches` override whose `match_key` the candidate lacks. That
+      includes every 2026-keyed override: there is no deferred replay after the current season is
+      re-acquired.
+  - **`--lineage-remap-out` is written only when the whole `--phase restored` run passes**, through
+    the same atomic no-clobber writer, with its sha256 printed. The SQL refuses to run on any
+    database but its candidate. Previously a refused run could leave a remap file behind for the
+    plan's step 2c.
+  - **Final pre-commit review (runbook §11d.11).** The players-replay gate now also refuses,
+    before the swap, everything `replay_admin_overrides(players)` itself would raise after it:
+    - a creation record with no usable name;
+    - a value it cannot cast;
+    - a non-object correction;
+    - two equal-authority overrides that disagree;
+    - a merged row that would violate `players_dob_confidence_ck` / `players_birth_range_ck`,
+      predicted from the candidate's CHECK columns, read by resolved id.
+
+    It shares the ISSUE-245 validator.
+    - **A candidate manual token that no target creation record names is now a STOP.** Before, it
+      was only listed.
+    - **G2 `COLLISION` is also decided by player**, matching the post-swap replay.
+    - **A G3 importer row with no single forward identity is a STOP.**
+    - The post-swap replay's exact-set check also runs on an empty ledger.
+    - `db:test:rebuild --recover-afl-api-adjudications` recovers a run that died between the
+      Stage 17 creation records and the registration replay.
+- **Operator impact.** `docs/production-promotion.md` §5–§8 and §13 are updated: the candidate
+  command gains `--afl-api-supersede-in`, and the §8 replay script calls the file-verifying
+  replay with `<prod|dev> <target database>`. The snapshot's `afl_api` census records counts
+  only; the documentation's per-row claim was wrong and is corrected.
+- **Validation.** DB-free only: typecheck; `tests/db-promotion-check.test.ts`,
+  `tests/player-link-mutations.test.ts`, `tests/db-test-rebuild.test.ts -t "AFLDB-ISSUE-237"`.
+  No live promotion has run (ISSUE-237 L4/L5 NOT RUN).
+
+### `afldb_test` rebuild carries manual player registrations (AFLDB-ISSUE-245) (Resolved) - 25 September 2026
+
+- **What changed.** `npm run db:test:rebuild` no longer destroys administrator-created or
+  post-baseline player registrations.
+  - **Capture.** Every `data_overrides` `players`/`manual_admin_edit`/`identity` creation record
+    is captured before the reset, as the third section of the one combined rebuild capture
+    (format v2, with the AFL API identities of AFLDB-ISSUE-237).
+  - **Replay.** Three new stages, 17–19, run before `draftguru`. They reinstate the records,
+    replay them with the production `replay_admin_overrides(players)`, and verify them exactly.
+  - **Early refusal.** Stage 2 refuses before destruction on anything the replay could not
+    reproduce.
+  - **Identity.** Identity travels as the `manual_admin_edit` token and the AFL Tables path, never
+    as `players.id`.
+- **Acceptance.**
+  - DB-free suite: 28/28 ISSUE-245 cases.
+  - The real `code_test_db` destructive rehearsal passed.
+  - The real `afldb_test` rebuild (AFLDB-ISSUE-237 L3, 2026-09-25) carried all 92 registrations,
+    together with 802 AFL API importer identities, across a renumbering of every affected
+    `players.id`. Final validation passed 85 checks.
+- **Not carried, by design.** `data_edits`, the surrogate-keyed audit log. A rebuilt `afldb_test`
+  starts a fresh audit history for re-created registrations. Promotion never carries
+  `afldb_test`'s `data_edits` in any case.
+
 ### AFL API human player-link adjudication (AFLDB-ISSUE-235) (Resolved) - 24 September 2026
 
 - **What changed.** A new Super Admin evidence/adjudication surface at

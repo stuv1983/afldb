@@ -9,7 +9,18 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Open issues:** 13
+**Open issues:** 14
+
+### AFLDB-ISSUE-241 — AFL API bridge artefacts reuse stale database-local `candidate_player_id` values with no lineage binding
+- **Severity:** Medium. **Area:** AFL API bridge import. It covers
+  `tools/migration/import_afl_api_player_bridge.py` and the bridge artefact contract
+  (`data/reference/afl-api-*bridge*.json`, `afl-api-player-adjudication-*.json`).
+- **State:** Open (2026-09-24), the ISSUE-237 successor (OD-5, runbook F3). Three of the four
+  evidence classes carry a bare, database-local `candidate_player_id` with no lineage gate. After
+  a renumbering rebuild or promotion, `--apply` could link a provider to the wrong player. A
+  re-import is not a supported recovery until this is fixed. No implementation started.
+- **Next action:** design an artefact/importer contract that refuses a lineage-unbound
+  artefact or proves per-row stable identity; no implementation now.
 
 ### AFLDB-ISSUE-240 — Deduplicate repeated `afl_api_identity_contradiction` findings
 - **Severity:** Low. **Area:** AFL API bridge validation/import — `afl_api_identity_contradiction`
@@ -42,10 +53,134 @@
   (`afl_api`), `docs/production-promotion.md`, `tools/db/rebuild-test.ts`.
 - **State:** Open (2026-09-23), split out of the ISSUE-235 plan review (R4). Pre-existing. Neither
   the promotion runbook nor `db:test:rebuild` has an `afl_api` identity step, so the importer's
-  `unique` links (669 on DEV) survive only through a manual bridge re-import. Not an ISSUE-235
+  `unique` links (669 on DEV) are lost. A bridge re-import is not a safe recovery (runbook F3). Not an ISSUE-235
   dependency. ISSUE-235 is now resolved; this remains the next independent development issue.
-- **Next action:** decide replay-vs-rebuild ownership and ordering, then design the promotion and
-  rebuild steps.
+  The plan was reviewed and revised on 2026-09-24 (`issues/open/AFLDB-ISSUE-237.md`), and
+  operator decisions OD-1…OD-5 were recorded the same day (runbook §15):
+  - **Rebuild.** It captures and replays these rows by stable identity, combined atomically with
+    the ISSUE-235 ledger capture. It fails closed (OD-1), and a database marker replaces the
+    cwd-relative recovery hazard (F5).
+  - **Promotion.** It carries the rows in the rebuilt dump and adds gates G1–G3. Production G3
+    hard loss is FAIL. DEV may WARN only for classified, re-acquired season-class identities,
+    with a mandatory census (OD-3).
+  - **D15.** It supersedes an agreeing importer row (OD-2).
+  - **Coverage.** `afldb_test` coverage is recovered through stable identity (OD-4) from the I18
+    dump, which is only the **candidate** authoritative pre-I18 backup until runbook §11a
+    R1.1–R1.5 prove it. Without that proof, L3–L5 are blocked.
+  - **Correction (same day).** Marker survival is prerequisite P-M, which gates S3.
+  - **OD-6 approved (same day).**
+    - **Rebuild:** an importer/human overlap is broken state. Stage 2 STOPs on it before
+      destruction, `E_rebuild = ∅` is an invariant that Stage 18 re-checks before mutation, and
+      any rebuild supersede is a hard STOP.
+    - **Promotion:** the post-swap replay supersedes exactly G2's AGREE list; a missing or extra
+      supersede is a hard STOP.
+  - **Authorisation.** S1–S7 are authorised (non-destructive).
+
+  **P-M point 2 PROVEN (2026-09-24)** by operator-run live evidence against `afldb_test`
+  (real `psql`/`RESET_SQL` path; runbook §11(d)2). S1, S2, S4–S7 implemented (uncommitted); **S3
+  implemented 2026-09-24** (the combined capture format, the `AFLDB_REBUILD_CAPTURE_ROOT` root,
+  the database marker, the generalised Stage 2 decision, the Stage 18 transaction order, and the
+  Stage 19 combined invariant). Typecheck clean; DB-free/fake-transaction suites green
+  (557/558 — the one failure is a pre-existing, unrelated gap in a DB-free import-reachability
+  test's resolver). Nothing has been run against a real database this session.
+- **Key files:** `tools/migration/rebuild_afl_api_adjudications.ts`,
+  `tools/migration/replay_afl_api_adjudications.ts`, `src/lib/acquisition/afl-api-adjudication.ts`,
+  `tools/db/promotion-check.ts`, `tools/db/rebuild-test.ts`.
+  P-M points 1, 2 and 4 are proven; **point 3 is NOT proven**. The L1/L2 testability gaps are
+  closed in code (2026-09-24, DB-free tested, NOT RUN):
+  - the `code_test_db`-only rehearsal fixture
+    (`npm run db:code-test:issue237-rehearsal -- seed|verify|teardown|residue`);
+  - the deterministic `--rehearsal-stop-after recreate` halt;
+  - a Stage 2 fix, so that `--recover` works on a reset database.
+
+  The prepared commands are in runbook §11b.
+- **Next action (2026-09-25):**
+  - **Done:** L1/L2, R1, R2 and S6 (9/9) PASS. **R3 PASS** on the rerun under the OD-7
+    continuity amendment: 802/802/802, 3/129/397/273 (hashes in runbook §11a.1).
+  - **Continuity, reverse direction:** a continuity identity now resolves on a target only when
+    both rule paths name the same single player; a split, missing or ambiguous path STOPs Stage 18,
+    D15, R4 and promotion G2 alike (one shared classifier). DB-free tested only.
+  - **R4 validate-only FAIL (correct):** 92 unresolved = exactly the ISSUE-224 cohort, dropped by
+    the I18 rebuild (runbook §11a.2.1). This is not an R4 defect.
+  - **Actor tool (DB-free tested, NOT live-run):** `npm run db:issue237:ensure-recovery-actor`
+    creates or finds a disabled, credential-free `super_admin` attribution actor on
+    `afldb_test` only (runbook §11a.2.2). `afldb_test` still has 0 `auth_users` rows.
+  - ~~**Next:** the operator runs the actor tool, then re-registers the 92-player ISSUE-224 cohort
+    with that `--admin-user-id`, then runs a fresh R4 validate-only.~~ *(Done 2026-09-25, below.)*
+  - **R4 COMPLETE and R5 PASS (2026-09-25, operator-run, runbook §11a.2.3).**
+    - The actor is id 144: `super_admin`, disabled, no credentials, recovery attribution only.
+    - The 92 ISSUE-224 players are re-registered (13857–13948: CREATE 92, then ALREADY_SATISFIED
+      92).
+    - R4 ran validate-only, then dry-run, then apply. All three PASS: 802 inserted and committed,
+      and post-commit parity and invariant PASS.
+    - The independent re-run found 802 identical, 0 to insert.
+    - **The 2026 matches and stats are NOT restored.** That is ISSUE-224/228 work, not an
+      ISSUE-237 prerequisite.
+  - **Remaining gates (runbook §11a.3) — historical; superseded by the 2026-09-25 L3 PASS update
+    below:**
+    - **L3** (the destructive `afldb_test` rebuild) — *(2026-09-25, before L3 ran: the ISSUE-245
+      blocker was CLEARED. Its `code_test_db` rehearsal was PASS, runbook §11a.5, and the
+      settle-afl-api integration rerun was PASS, 9/9, against the populated `afldb_test`. The
+      exact guarded L3 operator sequence was written, runbook §11c. At the time that sequence was
+      prepared, L3 had not yet run; it has since run and PASSED — see "Update (2026-09-25): L3
+      PASS" below.)*
+    - **L4 (DEV) and L5 (PROD)** follow L3, at scheduled promotions.
+    - **Also open:** the S5 `docs/deployment.md` §6a update, S9 closure and the operator commit.
+  - **Update (2026-09-25): L3 PASS (operator-run, runbook §11a.6).**
+    - The real `afldb_test` rebuild carried 802 importer identities (3/129/397/273) and 92
+      registrations across a real `players.id` renumbering (13857–13948 → 13272–13363).
+    - Final validation passed 85 checks. The post-L3 source gate PASSED, the settle-afl-api
+      filter was 9/9, and neither a marker nor a pending capture remains.
+    - AFLDB-ISSUE-245 is RESOLVED.
+    - §11c's DraftGuru label is corrected to `annual-html-20260826`.
+    - **Gate state:** R1–R5, P-M, L1, L2 and L3 PASS; **L4 and L5 NOT RUN**.
+  - **L4 is prepared, NOT run** (runbook §11d, source-derived). Three HIGH checker findings
+    (§11d.0):
+    - the G1 marker read is dead;
+    - G2 is vacuous in the documented order;
+    - `candidate`-phase G1 refuses a reinstated ledger.
+
+    *(Historical, superseded by the L4 hardening update below.)* When found, these three defects
+    confined L4 to a DEV `afl_api` ledger with zero rows. That temporary restriction ended when
+    F-L4-1..3 were fixed: L4 now supports a non-empty DEV human ledger, subject to the repaired
+    G2, `--phase candidate` and D15 contracts. L4 has still not run, and it is not currently
+    executable end-to-end: it is expected to STOP at B4 until the manual-registration
+    token-convergence prerequisite is resolved (see the final pre-commit review update below).
+    The S5 §6a gap appears closed by the ISSUE-245 rewrite.
+  - **Update (2026-09-25): L4 hardening, DB-free validated; L4 NOT RUN.**
+    - F-L4-1..3 are fixed: the marker is read with `shobj_description`; G2 reads the candidate's
+      importer rows against the TARGET ledger; `--phase candidate` verifies the reinstated
+      ledger.
+    - F-L4-4..6 are fixed: the `E_promotion` file is written only on PASS, is bound, and is
+      verified again after the swap; a DEV regeneration generator is added; a documentation error
+      is corrected.
+    - Runbook §11d is rewritten and works with an empty or non-empty DEV ledger.
+  - **Update (2026-09-25): L4 semantic blockers resolved in code, DB-free validated; L4 NOT RUN.**
+    - **F-L4-8 (A4.2):** a new pre-swap gate predicts the `players` override replay. A DEV
+      registration whose AFL Tables path the candidate holds under a **different** token is a
+      STOP, as is every other unfaithful case.
+    - **F-L4-9 (A4.3):** any active DEV `matches` / `match_coaches` override on a match the
+      candidate lacks is a STOP. That includes every 2026 key, because no deferred replay exists.
+    - **F-L4-10:** `--lineage-remap-out` is published only by a fully passing run, and the file
+      is bound to its candidate.
+    - §11d now has no operator decision left. If DEV holds a different-token registration, L4
+      STOPs until a token-convergence follow-up (proposed, not allocated) exists.
+  - **Update (2026-09-25): final pre-commit review of the whole diff (runbook §11d.11); L4 NOT
+    RUN.** FR-1..7 are fixed, DB-free:
+    - A4.2 predicts every players-replay refusal: name, casts, equal-authority conflicts, and the
+      `players` CHECKs from id-keyed candidate columns.
+    - **A candidate-only manual token is now a STOP. L4 therefore STOPs at B4 while `afldb_test`
+      carries registrations that DEV does not hold under the same token.**
+    - G2 collides by player as well as by identity.
+    - An ungraded G3 row STOPs.
+    - Rebuild `--recover` now covers a crash between Stage 17 and the registration replay.
+    - The D15 exact-set check runs on an empty ledger.
+    - There are zero ESLint errors on ISSUE-237 lines.
+  - **Next action:** the operator review and commit (including the L4 hardening and §11d.11),
+    `merge:ready`, the merge and the DEV checkout; then L4 by runbook §11d under a separate DEV
+    authorisation; L5 at a scheduled production promotion. The 2026 corpus stays ISSUE-224/228.
+  - **Not authorised:** no destructive rebuild, promotion or DEV mutation, and no commit without
+    separate authorisation.
 
 ### AFLDB-ISSUE-234 — Optional AFL API feed expansion (extended statistics, umpires, play-by-play)
 - **Severity:** Low. **Area:** data acquisition, investigation only.

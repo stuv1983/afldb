@@ -51,7 +51,7 @@ import {
   type LinkAflApiProviderInput,
   type LinkAflApiProviderResult,
 } from '@/db/queries/afl-api-player-links';
-import { adjudicationFingerprint } from '@/lib/acquisition/afl-api-adjudication';
+import { adjudicationFingerprint, type AflApiImporterMatchMethod } from '@/lib/acquisition/afl-api-adjudication';
 import {
   parseAflApiIdentities, type AflApiIdentities,
 } from '@/lib/acquisition/afl-api-bundle';
@@ -65,6 +65,7 @@ import {
   type AflApiSettleUnitSource,
 } from '@/lib/acquisition/settle-afl-api';
 import { renderMatchKey } from '@/lib/acquisition/settle-core';
+import { resolveAflApiPlayer } from '@/lib/acquisition/afl-api-player-resolver';
 import {
   getSourceFamily,
   parseSourceFamilyRegistry,
@@ -74,39 +75,52 @@ import { recomputeClubSeasons, recomputeSeasonMetadata } from '@/db/queries/play
 
 import {
   archivedCaptureName,
-  buildLedgerCapture,
+  buildCombinedCapture,
   decidePendingCapture,
   nextIdentityValue,
   observeLiveReinstatement,
   PENDING_CAPTURE_FILE,
   readLedger,
   readPendingCapture,
+  readPendingCaptureWithHash,
   reinstateAndReplay,
   reinstatedCaptureProblems,
+  setRebuildMarker,
   settleCapture,
   writePendingCapture,
   type CapturedLedgerRow,
-  type LedgerCapture,
+  type CombinedCapture,
   type LiveReinstatementObservation,
   type PendingCaptureDecision,
   type ReinstateReport,
 } from '../../tools/migration/rebuild_afl_api_adjudications';
+import { RESET_SQL } from '../../tools/db/rebuild-test';
 import {
   AflApiReplayAbort,
   assertAflApiAdjudicationBijection,
+  assertAflApiIdentityInvariant,
+  readAflApiForwardIdentities,
+  readAflApiImporterRows,
   replayAflApiAdjudications,
+  replayAflApiImporterRows,
+  resolveAflApiPlayerIdentity,
 } from '../../tools/migration/replay_afl_api_adjudications';
 
 import {
   assertS6LedgerIsolated,
   cleanupI14Fixtures,
+  cleanupI237Fixtures,
+  cleanupI237ProviderRows,
   cleanupS6Fixtures,
   decodeS6Jsonb,
   I1_FIXTURE,
   I14_FIXTURE,
+  I237_FIXTURE,
   i14StaleLedgerRow,
+  i237Issue235OwnershipOverlap,
   insertS6BrownlowVote,
   issue235FixtureResidue,
+  issue237FixtureResidue,
   loadS6Refs,
   renderS6Form,
   routeS6ImportDsn,
@@ -123,6 +137,7 @@ import {
   seedS6Player,
   seedS6SpineVersion,
   ZERO_ISSUE235_RESIDUE,
+  ZERO_ISSUE237_RESIDUE,
   type S6Refs,
 } from './afl-api-adjudication-fixtures';
 
@@ -145,6 +160,14 @@ const SEASON = 2026;
 const HOME_HIST = 'Hawthorn';
 const AWAY_HIST = 'Brisbane Lions';
 const BRIDGED_PROVIDER_PLAYER_ID = 'CD_I297354'; // Karl Amon, home side, in the fixture
+/**
+ * AFLDB-ISSUE-237: the bridged fixture player's own AFL Tables identity. A real importer row's
+ * player always holds exactly one (D7: Stage 2 refuses to capture one that does not), and
+ * `assertAflApiIdentityInvariant()` is whole-table, so the baseline bridged row must be a
+ * genuine D5 importer row, not merely one the settle resolver accepts. Synthetic, like the
+ * player itself; appears nowhere else in the repository.
+ */
+const BRIDGED_AFLTABLES_ID = 'players/Z/Issue228-bridged-test.html';
 const UNBRIDGED_PROVIDER_PLAYER_ID = 'CD_I500001'; // "Test Forward", away side — deliberately never bridged
 
 /**
@@ -721,6 +744,7 @@ async function cleanup(): Promise<void> {
   // (default RESTRICT, migration 002:184), so this must run before the
   // players delete below.
   await sql`DELETE FROM external_identities WHERE source_id = ${aflApiSourceId} AND external_id = ${BRIDGED_PROVIDER_PLAYER_ID}`;
+  await sql`DELETE FROM external_identities WHERE source_id = ${afltablesSourceId} AND external_id = ${BRIDGED_AFLTABLES_ID}`;
   await sql`DELETE FROM players WHERE legacy_player_id = ${SYNTHETIC_PLAYER_LEGACY_ID}`;
 }
 
@@ -854,9 +878,17 @@ async function seedBaseline(): Promise<void> {
     RETURNING id
   `;
   bridgedPlayerId = player.id;
+  // Exactly the row the real bridge loader writes (`import_afl_api_player_bridge.py`:
+  // 'unique', candidate_count 1, NULL external_url). Omitting candidate_count left the column
+  // default 0 -- a D5 census anomaly that AFLDB-ISSUE-237's whole-table invariant rightly flags.
   await sql`
-    INSERT INTO external_identities (source_id, external_id, status, match_method, player_id)
-    VALUES (${aflApiSourceId}, ${BRIDGED_PROVIDER_PLAYER_ID}, 'unique', 'afl_api_stat_vector_bootstrap', ${bridgedPlayerId})
+    INSERT INTO external_identities (source_id, external_id, status, candidate_count, match_method, player_id)
+    VALUES (${aflApiSourceId}, ${BRIDGED_PROVIDER_PLAYER_ID}, 'unique', 1, 'afl_api_stat_vector_bootstrap', ${bridgedPlayerId})
+    ON CONFLICT DO NOTHING
+  `;
+  await sql`
+    INSERT INTO external_identities (source_id, external_id, status, candidate_count, match_method, player_id)
+    VALUES (${afltablesSourceId}, ${BRIDGED_AFLTABLES_ID}, 'unique', 1, 'afltables_profile_url', ${bridgedPlayerId})
     ON CONFLICT DO NOTHING
   `;
 }
@@ -3624,7 +3656,7 @@ describe('AFLDB-ISSUE-235 (I14): afl_api adjudication replay', () => {
     `;
 
     const counts = await sql.begin((tx) => replayAflApiAdjudications(tx));
-    expect(counts).toEqual({ inserted: 1, noops: 0, stops: [] });
+    expect(counts).toEqual({ inserted: 1, noops: 0, stops: [], supersedes: [] });
 
     const [resolved] = await sql<{ playerId: number; status: string; matchMethod: string }[]>`
       SELECT player_id AS "playerId", status::text AS status, match_method AS "matchMethod"
@@ -3648,7 +3680,390 @@ describe('AFLDB-ISSUE-235 (I14): afl_api adjudication replay', () => {
     // A second run is idempotent: the identical row already present is a no-op, not a
     // duplicate or a stop.
     const secondRun = await sql.begin((tx) => replayAflApiAdjudications(tx));
-    expect(secondRun).toEqual({ inserted: 0, noops: 1, stops: [] });
+    expect(secondRun).toEqual({ inserted: 0, noops: 1, stops: [], supersedes: [] });
+  });
+});
+
+/**
+ * AFLDB-ISSUE-237 §10 (S6, this issue's own). The importer identity capture/replay adapter
+ * (`tools/migration/replay_afl_api_adjudications.ts`, S2) against the real schema, PLUS (this
+ * pass) the settle-resolver path (runbook §10/E13: `resolveAflApiPlayer()`,
+ * `src/lib/acquisition/afl-api-player-resolver.ts`, resolving a replayed importer row) and the
+ * whole-table isolation guard proving this namespace can neither leak into, nor absorb, the
+ * ISSUE-235 namespace's rows. A separate, self-contained namespace from every ISSUE-235 fixture
+ * (`I237_FIXTURE`, `cleanupI237Fixtures()`, `I237_OWNERSHIP`) — never folded into
+ * `ISSUE235_OWNERSHIP` or its leftover gate, so this issue's own exact-count assertions can
+ * never be confused with ISSUE-235's.
+ */
+describe('AFLDB-ISSUE-237 (I237): importer identity capture/replay against afldb_test', () => {
+  const f = I237_FIXTURE;
+  let i237AflApiSourceId: number;
+  let i237AfltablesSourceId: number;
+  let i237PlayerIdA: number;
+  let i237PlayerIdB: number;
+  let i237PlayerIdC: number;
+  let i237PlayerIdD: number;
+  let i237AdminUserId: number;
+
+  beforeAll(async () => {
+    await cleanupI237Fixtures(sql);
+    const refs = await loadS6Refs(sql);
+    i237AflApiSourceId = refs.aflApiSourceId;
+    i237AfltablesSourceId = refs.afltablesSourceId;
+
+    const [actor] = await sql<{ id: number }[]>`
+      INSERT INTO auth_users (email, role, password_hash, totp_secret, disabled_at)
+      VALUES (${f.actorEmail}, 'super_admin', NULL, NULL, now())
+      RETURNING id
+    `;
+    i237AdminUserId = actor.id;
+
+    const [playerA] = await sql<{ id: number }[]>`
+      INSERT INTO players (legacy_player_id, display_name, sort_name, search_name, slug, given_name, surname)
+      VALUES (${f.legacyPlayerIdA}, 'ISSUE-237 I237 Test Player A', 'Test Player A, ISSUE-237 I237',
+              'issue 237 i237 test player a', 'issue-237-i237-test-player-a', 'Issue237I237', 'TestPlayerA')
+      ON CONFLICT (legacy_player_id) DO UPDATE SET display_name = EXCLUDED.display_name
+      RETURNING id
+    `;
+    i237PlayerIdA = playerA.id;
+    const [playerB] = await sql<{ id: number }[]>`
+      INSERT INTO players (legacy_player_id, display_name, sort_name, search_name, slug, given_name, surname)
+      VALUES (${f.legacyPlayerIdB}, 'ISSUE-237 I237 Test Player B', 'Test Player B, ISSUE-237 I237',
+              'issue 237 i237 test player b', 'issue-237-i237-test-player-b', 'Issue237I237', 'TestPlayerB')
+      ON CONFLICT (legacy_player_id) DO UPDATE SET display_name = EXCLUDED.display_name
+      RETURNING id
+    `;
+    i237PlayerIdB = playerB.id;
+    const [playerC] = await sql<{ id: number }[]>`
+      INSERT INTO players (legacy_player_id, display_name, sort_name, search_name, slug, given_name, surname)
+      VALUES (${f.legacyPlayerIdC}, 'ISSUE-237 I237 Test Player C', 'Test Player C, ISSUE-237 I237',
+              'issue 237 i237 test player c', 'issue-237-i237-test-player-c', 'Issue237I237', 'TestPlayerC')
+      ON CONFLICT (legacy_player_id) DO UPDATE SET display_name = EXCLUDED.display_name
+      RETURNING id
+    `;
+    i237PlayerIdC = playerC.id;
+    const [playerD] = await sql<{ id: number }[]>`
+      INSERT INTO players (legacy_player_id, display_name, sort_name, search_name, slug, given_name, surname)
+      VALUES (${f.legacyPlayerIdD}, 'ISSUE-237 I237 Test Player D', 'Test Player D, ISSUE-237 I237',
+              'issue 237 i237 test player d', 'issue-237-i237-test-player-d', 'Issue237I237', 'TestPlayerD')
+      ON CONFLICT (legacy_player_id) DO UPDATE SET display_name = EXCLUDED.display_name
+      RETURNING id
+    `;
+    i237PlayerIdD = playerD.id;
+
+    // Player A's own stable identity, for the renumbering case.
+    await sql`
+      INSERT INTO external_identities (source_id, external_id, player_id, status, candidate_count, match_method)
+      VALUES (${i237AfltablesSourceId}, ${f.afltablesIdA}, ${i237PlayerIdA}, 'unique', 1, 'afltables_profile_url')
+    `;
+    // Player C holds TWO AFL Tables paths -- the D7 ambiguity case.
+    await sql`
+      INSERT INTO external_identities (source_id, external_id, player_id, status, candidate_count, match_method)
+      VALUES (${i237AfltablesSourceId}, ${f.afltablesIdC1}, ${i237PlayerIdC}, 'unique', 1, 'afltables_profile_url')
+    `;
+    await sql`
+      INSERT INTO external_identities (source_id, external_id, player_id, status, candidate_count, match_method)
+      VALUES (${i237AfltablesSourceId}, ${f.afltablesIdC2}, ${i237PlayerIdC}, 'unique', 1, 'afltables_profile_url')
+    `;
+    // Player D's own stable identity: the §10/E13 settle-resolver case's player only.
+    await sql`
+      INSERT INTO external_identities (source_id, external_id, player_id, status, candidate_count, match_method)
+      VALUES (${i237AfltablesSourceId}, ${f.afltablesIdD}, ${i237PlayerIdD}, 'unique', 1, 'afltables_profile_url')
+    `;
+  });
+
+  // Every case starts with no I237 provider or ledger row, whatever the case before it
+  // committed or left behind by throwing -- so each case is reproducible on its own.
+  afterEach(async () => {
+    await cleanupI237ProviderRows(sql);
+  });
+
+  afterAll(async () => {
+    await cleanupI237Fixtures(sql);
+  });
+
+  it('readAflApiImporterRows — returns the unprefixed identity, and excludes (never silently captures) a two-path player', async () => {
+    // Player C's own importer row: structurally a full D5 row, but its player is ambiguous.
+    await sql`
+      INSERT INTO external_identities
+            (source_id, external_id, player_id, status, candidate_count, match_method, external_name)
+      VALUES (${i237AflApiSourceId}, ${f.providerAmbiguous}, ${i237PlayerIdC}, 'unique', 1,
+              'afl_api_stat_vector_bootstrap', 'Ambiguous Player C')
+    `;
+    try {
+      const result = await sql.begin((tx) => readAflApiImporterRows(tx, i237AflApiSourceId));
+      const identity = result.identityByPlayerId.get(i237PlayerIdC);
+      expect(identity).toEqual({ ok: false, reason: 'ambiguous' });
+      expect(result.rows.some((r) => r.playerId === i237PlayerIdC)).toBe(false);
+
+      // A single-identity player DOES resolve, and the identity is the unprefixed path (no
+      // 'afltables:' prefix -- resolvePlayerIdentity()'s own prefixed form is never used here).
+      const aResult = await sql.begin((tx) => readAflApiForwardIdentities(tx, [i237PlayerIdA]));
+      expect(aResult.get(i237PlayerIdA)).toEqual({ ok: true, identity: f.afltablesIdA, via: 'afltables' });
+    } finally {
+      await sql`DELETE FROM external_identities WHERE source_id = ${i237AflApiSourceId} AND external_id = ${f.providerAmbiguous}`;
+    }
+  });
+
+  it('renumbering — the replay never trusts the captured playerId, only the re-derived identity', async () => {
+    const STALE_CAPTURED_PLAYER_ID = 999999999; // no real player anywhere near this id
+    const captured = {
+      externalId: f.providerRenumbered, playerIdentity: f.afltablesIdA,
+      matchMethod: 'afl_api_stat_vector_bootstrap' as const, status: 'unique' as const, candidateCount: 1 as const,
+      externalName: 'Renumbered Provider', externalUrl: null, notes: null, playerId: STALE_CAPTURED_PLAYER_ID,
+    };
+    const remap = await sql.begin((tx) => resolveAflApiPlayerIdentity(tx, f.afltablesIdA));
+    expect(remap).toEqual({ ok: true, newPlayerId: i237PlayerIdA, remappedIdentity: f.afltablesIdA });
+
+    const result = await sql.begin((tx) => replayAflApiImporterRows(tx, [captured]));
+    expect(result).toEqual({ inserted: 1, noops: 0 });
+
+    const [row] = await sql<{ playerId: number }[]>`
+      SELECT player_id AS "playerId" FROM external_identities
+       WHERE source_id = ${i237AflApiSourceId} AND external_id = ${f.providerRenumbered}
+    `;
+    expect(row.playerId).toBe(i237PlayerIdA);
+    expect(row.playerId).not.toBe(STALE_CAPTURED_PLAYER_ID);
+
+    // A second run of the SAME capture is an idempotent no-op, never a duplicate insert.
+    const second = await sql.begin((tx) => replayAflApiImporterRows(tx, [captured]));
+    expect(second).toEqual({ inserted: 0, noops: 1 });
+  });
+
+  it('D9 STOPs against the real UNIQUE constraint and the per-player index', async () => {
+    const capturedAt = (externalId: string, playerIdentity: string, matchMethod: AflApiImporterMatchMethod) => ({
+      externalId, playerIdentity, matchMethod, status: 'unique' as const,
+      candidateCount: 1 as const, externalName: null, externalUrl: null, notes: null, playerId: 1,
+    });
+    // The STOP must be the replay's own abort AND name the intended D9 reason -- a bare class
+    // check would also pass for a STOP raised for some other, unintended reason.
+    const expectReplayAbort = async (attempt: Promise<unknown>, reason: RegExp) => {
+      const error = await attempt.then(() => null, (e: unknown) => e);
+      expect(error).toBeInstanceOf(AflApiReplayAbort);
+      expect((error as Error).message).toMatch(reason);
+    };
+
+    // Every row this case seeds is a LEGAL live state under migration 104 (one row per
+    // provider, one afl_api provider per player): the per-case `afterEach` guarantees player A
+    // and player B hold no I237 provider on entry, so each STOP below is the planner's own
+    // refusal, never a constraint violation raised while seeding.
+
+    // A candidate row already exists for this provider, resolved to the SAME player the
+    // capture's own identity re-derives, but under a DIFFERENT importer method -> STOP
+    // (D9 row 3: "same player, different importer method").
+    await sql`
+      INSERT INTO external_identities (source_id, external_id, player_id, status, candidate_count, match_method)
+      VALUES (${i237AflApiSourceId}, ${f.providerMethodConflict}, ${i237PlayerIdA}, 'unique', 1, 'afl_api_manual_adjudication')
+    `;
+    try {
+      await expectReplayAbort(sql.begin((tx) => replayAflApiImporterRows(tx, [
+        capturedAt(f.providerMethodConflict, f.afltablesIdA, 'afl_api_stat_vector_bootstrap'),
+      ])), /CD_I9992370004 \(an importer row for this provider already exists under a different method or field\)/);
+    } finally {
+      await sql`DELETE FROM external_identities WHERE source_id = ${i237AflApiSourceId} AND external_id = ${f.providerMethodConflict}`;
+    }
+
+    // A human resolved row already exists for this provider -> STOP (cannot occur from a
+    // single consistent snapshot; proven anyway, defensively).
+    await sql`
+      INSERT INTO external_identities (source_id, external_id, player_id, status, candidate_count, match_method)
+      VALUES (${i237AflApiSourceId}, ${f.providerHumanConflict}, ${i237PlayerIdB}, 'resolved', 0, 'afl_api_admin_adjudication')
+    `;
+    try {
+      await expectReplayAbort(sql.begin((tx) => replayAflApiImporterRows(tx, [
+        capturedAt(f.providerHumanConflict, f.afltablesIdA, 'afl_api_stat_vector_bootstrap'),
+      ])), /CD_I9992370002 \(a human resolved row already exists for this provider id/);
+    } finally {
+      await sql`DELETE FROM external_identities WHERE source_id = ${i237AflApiSourceId} AND external_id = ${f.providerHumanConflict}`;
+    }
+
+    // Migration 104's per-player UNIQUE index, at BOTH layers. This case seeds its own
+    // occupant (never another case's leftover row): player A holds providerRenumbered.
+    await sql`
+      INSERT INTO external_identities (source_id, external_id, player_id, status, candidate_count, match_method)
+      VALUES (${i237AflApiSourceId}, ${f.providerRenumbered}, ${i237PlayerIdA}, 'unique', 1, 'afl_api_stat_vector_bootstrap')
+    `;
+    try {
+      // (a) The planner refuses a DIFFERENT provider for the SAME player before any write.
+      await expectReplayAbort(sql.begin((tx) => replayAflApiImporterRows(tx, [
+        capturedAt(f.providerSupersede, f.afltablesIdA, 'afl_api_stat_vector_bootstrap'),
+      ])), new RegExp(
+        `CD_I9992370003 \\(player ${i237PlayerIdA} already holds a different afl_api provider \\(CD_I9992370001\\)\\)`,
+      ));
+      // (b) The real index itself refuses the same state for any writer that bypassed the planner.
+      await expect(sql.begin((tx) => tx`
+        INSERT INTO external_identities (source_id, external_id, player_id, status, candidate_count, match_method)
+        VALUES (${i237AflApiSourceId}, ${f.providerSupersede}, ${i237PlayerIdA}, 'unique', 1, 'afl_api_stat_vector_bootstrap')
+      `)).rejects.toThrow(/uq_external_identities_afl_api_player/);
+      const [{ count }] = await sql<{ count: number }[]>`
+        SELECT count(*)::int AS count FROM external_identities
+         WHERE source_id = ${i237AflApiSourceId} AND external_id = ${f.providerSupersede}
+      `;
+      expect(count).toBe(0); // neither layer wrote anything
+    } finally {
+      await sql`DELETE FROM external_identities WHERE source_id = ${i237AflApiSourceId} AND external_id = ${f.providerRenumbered}`;
+    }
+  });
+
+  it('D15 supersede (OD-2) against the real table — the id is kept, the bijection passes, a second replay is a no-op', async () => {
+    // A full D5 importer row, resolved to player B's own identity.
+    await sql`
+      INSERT INTO external_identities (source_id, external_id, player_id, status, candidate_count, match_method)
+      VALUES (${i237AfltablesSourceId}, ${f.afltablesIdB}, ${i237PlayerIdB}, 'unique', 1, 'afltables_profile_url')
+    `;
+    // Reuses the bare `providerSupersede` id: the D9 STOPs test above only ATTEMPTED writes
+    // under it (both refused, nothing committed), and the per-case `afterEach` removes every
+    // I237 provider row regardless -- safe to use as this test's own real row.
+    const supersedeProvider = f.providerSupersede;
+    const [importerRow] = await sql<{ id: number }[]>`
+      INSERT INTO external_identities (source_id, external_id, player_id, status, candidate_count, match_method)
+      VALUES (${i237AflApiSourceId}, ${supersedeProvider}, ${i237PlayerIdB}, 'unique', 1, 'afl_api_stat_vector_bootstrap')
+      RETURNING id
+    `;
+
+    await sql`
+      INSERT INTO afl_api_identity_adjudications
+            (source_key, external_id, action, player_id, player_identity, evidence, evidence_sha256,
+             surname_disagreement_acknowledged, admin_user_id, note)
+      VALUES ('afl_api', ${supersedeProvider}, 'linked', ${i237PlayerIdB}, ${f.afltablesIdB},
+              '{"fixture":"I237"}'::jsonb, ${'3'.repeat(64)}, false, ${i237AdminUserId},
+              'AFLDB-ISSUE-237 I237 fixture: D15 supersede (OD-2)')
+    `;
+
+    const counts = await sql.begin((tx) => replayAflApiAdjudications(tx, new Set([supersedeProvider])));
+    expect(counts).toEqual({ inserted: 0, noops: 0, stops: [], supersedes: [{ externalId: supersedeProvider, playerId: i237PlayerIdB }] });
+
+    const [after] = await sql<{ id: number; status: string; matchMethod: string; candidateCount: number; externalName: string | null }[]>`
+      SELECT id, status::text AS status, match_method AS "matchMethod", candidate_count AS "candidateCount", external_name AS "externalName"
+        FROM external_identities WHERE source_id = ${i237AflApiSourceId} AND external_id = ${supersedeProvider}
+    `;
+    expect(after.id).toBe(importerRow.id); // UPDATEd in place, never replaced
+    expect(after).toMatchObject({ status: 'resolved', matchMethod: 'afl_api_admin_adjudication', candidateCount: 0, externalName: null });
+
+    await sql.begin((tx) => assertAflApiAdjudicationBijection(tx));
+
+    // A second run: the row is now identical to what an INSERT would create, so it is a no-op,
+    // never a repeated supersede. D13 fixes the expected set from the CURRENT state before any
+    // mutation, and the provider is now a human row (no longer a G2.AGREE importer row), so the
+    // re-run's expected set is empty. Re-passing the FIRST run's now-stale set must fail closed
+    // (D13: actual must equal expected exactly), writing nothing.
+    await expect(sql.begin((tx) => replayAflApiAdjudications(tx, new Set([supersedeProvider]))))
+      .rejects.toThrow(/supersede set did not match the expected set exactly -- nothing written \(missing: CD_I9992370003; extra: none\)/);
+    const second = await sql.begin((tx) => replayAflApiAdjudications(tx, new Set()));
+    expect(second).toEqual({ inserted: 0, noops: 1, stops: [], supersedes: [] });
+    const [afterSecond] = await sql<{ id: number; status: string; matchMethod: string }[]>`
+      SELECT id, status::text AS status, match_method AS "matchMethod"
+        FROM external_identities WHERE source_id = ${i237AflApiSourceId} AND external_id = ${supersedeProvider}
+    `;
+    expect(afterSecond).toEqual({ id: importerRow.id, status: 'resolved', matchMethod: 'afl_api_admin_adjudication' });
+  });
+
+  it('the combined invariant passes on this fixture set, and fails for an injected anomaly', async () => {
+    // Deliberately WHOLE-TABLE, exactly as production runs it: this also covers the file's root
+    // ISSUE-228 baseline row (`BRIDGED_PROVIDER_PLAYER_ID`), which is therefore seeded as a full
+    // D5 importer row with its player's AFL Tables identity -- never excluded from the check.
+    await sql.begin((tx) => assertAflApiIdentityInvariant(tx));
+
+    // Inject a D5 anomaly scoped to this issue's own reserved provider id: a `unique` row
+    // with candidate_count != 1. Cleaned up in the `finally` regardless of outcome.
+    await sql`
+      INSERT INTO external_identities (source_id, external_id, player_id, status, candidate_count, match_method)
+      VALUES (${i237AflApiSourceId}, ${f.providerAnomaly}, ${i237PlayerIdA}, 'unique', 2, 'afl_api_stat_vector_bootstrap')
+    `;
+    try {
+      await expect(sql.begin((tx) => assertAflApiIdentityInvariant(tx))).rejects.toThrow(AflApiReplayAbort);
+    } finally {
+      await sql`DELETE FROM external_identities WHERE source_id = ${i237AflApiSourceId} AND external_id = ${f.providerAnomaly}`;
+    }
+
+    // Clean again, so this test leaves the shared table exactly as it found it.
+    await sql.begin((tx) => assertAflApiIdentityInvariant(tx));
+  });
+
+  /**
+   * AFLDB-ISSUE-237 D11d — prerequisite P-M, point 2 ONLY (point 3 was PROVEN by the operator's
+   * real `code_test_db` L2 rehearsal, not here; this test is NOT a substitute for it).
+   *
+   * A database comment lives in the SHARED catalogue `pg_shdescription`, so it is read with
+   * `shobj_description()` -- `obj_description()` reads the per-database `pg_description` and
+   * always returns NULL for a `pg_database` oid (the L2 proof read it the same way).
+   *
+   * SAFETY: this test runs the real, destructive `RESET_SQL` constant against the live
+   * connection's own database -- but entirely INSIDE one transaction that is always rolled
+   * back (`finally`), never committed, exploiting PostgreSQL's fully transactional DDL (the
+   * same property `tools/db/prove-reset.ts` already depends on, per `RESET_SQL`'s own header
+   * comment). Read this test in full before ever running it outside CI: a mistake in the
+   * rollback discipline below would wipe every table `RESET_SQL` touches for real. The
+   * `sources` row-count check at the end is a second, independent tripwire -- if the rollback
+   * somehow did not undo the reset, this assertion fails loudly rather than the corruption
+   * passing silently.
+   */
+  it('P-M point 2 (D11d) — the database marker survives RESET_SQL, entirely inside one rolled-back transaction', async () => {
+    const [{ database, sourcesBefore }] = await sql<{ database: string; sourcesBefore: number }[]>`
+      SELECT current_database() AS database, (SELECT count(*)::int FROM sources) AS "sourcesBefore"
+    `;
+    const [{ before }] = await sql<{ before: string | null }[]>`
+      SELECT shobj_description(oid, 'pg_database') AS before FROM pg_database WHERE datname = ${database}
+    `;
+    const testMarker = `afldb.afl_api_identities.rebuild_capture:P-M-test:${Date.now()}`;
+
+    class RollbackSentinel extends Error {}
+    await sql.begin(async (tx) => {
+      // Identifiers cannot be bound parameters in DDL; `database` is `current_database()`'s
+      // own trusted value, never external input, and is quoted defensively regardless.
+      await tx.unsafe(`COMMENT ON DATABASE "${database.replace(/"/g, '""')}" IS '${testMarker.replace(/'/g, "''")}'`);
+      const [{ mid }] = await tx<{ mid: string | null }[]>`
+        SELECT shobj_description(oid, 'pg_database') AS mid FROM pg_database WHERE datname = ${database}
+      `;
+      expect(mid).toBe(testMarker);
+
+      // The exact constant `recreate` runs (P-M point 1 already proves it is the ONLY thing
+      // that stage does). Must not touch the database-level comment.
+      await tx.unsafe(RESET_SQL);
+      const [{ afterReset }] = await tx<{ afterReset: string | null }[]>`
+        SELECT shobj_description(oid, 'pg_database') AS "afterReset" FROM pg_database WHERE datname = ${database}
+      `;
+      expect(afterReset).toBe(testMarker);
+
+      throw new RollbackSentinel(); // force the rollback this whole test depends on
+    }).catch((error: unknown) => {
+      if (!(error instanceof RollbackSentinel)) throw error;
+    });
+
+    const [{ after, sourcesAfter }] = await sql<{ after: string | null; sourcesAfter: number }[]>`
+      SELECT shobj_description(oid, 'pg_database') AS after,
+             (SELECT count(*)::int FROM sources) AS "sourcesAfter"
+        FROM pg_database WHERE datname = ${database}
+    `;
+    expect(after).toBe(before); // the pre-test comment is unchanged after the rollback
+    expect(sourcesAfter).toBe(sourcesBefore); // tripwire: the schema was genuinely restored
+  });
+
+  it('whole-table isolation guarding — I237_OWNERSHIP never overlaps ISSUE235_OWNERSHIP (DB-free)', () => {
+    expect(i237Issue235OwnershipOverlap()).toEqual([]);
+  });
+
+  it('§10/E13 — the settle resolver (resolveAflApiPlayer) resolves a replayed importer row through the intended identity path, and refuses one it never replayed', async () => {
+    const captured = {
+      externalId: f.providerSettleResolver, playerIdentity: f.afltablesIdD, // player D: holds no other I237 provider
+      matchMethod: 'afl_api_stat_vector_bootstrap' as const, status: 'unique' as const, candidateCount: 1 as const,
+      externalName: 'Settle Resolver Test', externalUrl: null, notes: null,
+      playerId: 999999999, // a stale surrogate the resolver must never see or trust (D3)
+    };
+
+    // Before the replay, the provider is not linked at all: the resolver reports it unresolved
+    // through the SAME query the settle path uses, never a name/fallback guess.
+    const before = await resolveAflApiPlayer(sql, i237AflApiSourceId, f.providerSettleResolver);
+    expect(before).toEqual({ outcome: 'unresolved' });
+
+    const replay = await sql.begin((tx) => replayAflApiImporterRows(tx, [captured]));
+    expect(replay).toEqual({ inserted: 1, noops: 0 });
+
+    // After the replay, the settle resolver's OWN read path resolves it to the CURRENT
+    // afldb_test player id (never the captured row's stale playerId).
+    const after = await resolveAflApiPlayer(sql, i237AflApiSourceId, f.providerSettleResolver);
+    expect(after).toEqual({ outcome: 'resolved', playerId: i237PlayerIdD });
+    expect(after).not.toMatchObject({ playerId: captured.playerId });
   });
 });
 
@@ -3895,7 +4310,7 @@ describe('AFLDB-ISSUE-235 S6 (I2–I7, I6b–I6d): human afl_api adjudication ag
     expect(String(relinkEvidence.latestAdjudicationId)).toBe(String(ledgerAfterRevoke[1].id));
     // Replay semantics resolve linked -> revoked -> linked to the one current human row.
     await assertS6LedgerIsolated(sql, refs);
-    expect(await sql.begin((tx) => replayAflApiAdjudications(tx))).toEqual({ inserted: 0, noops: 1, stops: [] });
+    expect(await sql.begin((tx) => replayAflApiAdjudications(tx))).toEqual({ inserted: 0, noops: 1, stops: [], supersedes: [] });
     await sql.begin((tx) => assertAflApiAdjudicationBijection(tx));
 
     // ---- I5: re-run the settle; the stat line lands under the chosen player ---------------
@@ -4397,8 +4812,12 @@ describe('AFLDB-ISSUE-235 S6 (I15, I16): the D15 replay fails closed and is idem
     const player = await seedS6Player(sql, refs, { key: 1504 });
     await seedS6ImporterLink(sql, refs, bad, player.id);
     await ledgerRow({ providerId: bad, action: 'linked', playerId: player.id, playerIdentity: player.identity! });
+    // AFLDB-ISSUE-237 D9/OD-2: a full, AGREEING importer row is now named precisely -- it is a
+    // supersede candidate, and this call's expected set is empty (E_rebuild), so it still STOPs
+    // with nothing written. Only the reason is more specific; the refusal is unchanged.
     await expectReplayStops({
-      bad, reason: /conflicting external_identities row already exists/, scope: { providerIds: [bad], playerIds: [player.id] },
+      bad, reason: /an agreeing importer row exists for this provider but is not in the expected supersede set/,
+      scope: { providerIds: [bad], playerIds: [player.id] },
     });
   });
 
@@ -4477,7 +4896,7 @@ describe('AFLDB-ISSUE-235 S6 (I15, I16): the D15 replay fails closed and is idem
     await sql`DELETE FROM external_identities WHERE source_id = ${refs.aflApiSourceId} AND external_id IN (${p1}, ${p3})`;
     await expect(sql.begin((tx) => assertAflApiAdjudicationBijection(tx))).rejects.toThrow(/ledger_without_row/);
 
-    expect(await sql.begin((tx) => replayAflApiAdjudications(tx))).toEqual({ inserted: 2, noops: 0, stops: [] });
+    expect(await sql.begin((tx) => replayAflApiAdjudications(tx))).toEqual({ inserted: 2, noops: 0, stops: [], supersedes: [] });
     const afterFirst = await sql<{ externalId: string; playerId: number; status: string; matchMethod: string }[]>`
       SELECT external_id AS "externalId", player_id AS "playerId", status::text AS status, match_method AS "matchMethod"
         FROM external_identities
@@ -4490,7 +4909,7 @@ describe('AFLDB-ISSUE-235 S6 (I15, I16): the D15 replay fails closed and is idem
     ]);
     await sql.begin((tx) => assertAflApiAdjudicationBijection(tx));
 
-    expect(await sql.begin((tx) => replayAflApiAdjudications(tx))).toEqual({ inserted: 0, noops: 2, stops: [] });
+    expect(await sql.begin((tx) => replayAflApiAdjudications(tx))).toEqual({ inserted: 0, noops: 2, stops: [], supersedes: [] });
     const afterSecond = await sql<{ externalId: string; playerId: number; status: string; matchMethod: string }[]>`
       SELECT external_id AS "externalId", player_id AS "playerId", status::text AS status, match_method AS "matchMethod"
         FROM external_identities
@@ -4534,6 +4953,12 @@ describe('AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreS
     decision: PendingCaptureDecision;
     observed: LiveReinstatementObservation | null;
   };
+  /** This suite never exercises the marker mechanism itself (that is P-M: prove-reset.ts's real
+   * `COMMENT ON DATABASE` proof, and the DB-free Stage 18 tests in db-test-rebuild.test.ts).
+   * `markerPresent: false` here matches the "marker absent, pending equals/differs" rows of the
+   * D11c table, which yield the SAME decision as the marker-present rows for every scenario this
+   * suite exercises. */
+  const NO_MARKER = false;
 
   beforeAll(async () => {
     refs = await loadS6Refs(sql);
@@ -4586,14 +5011,15 @@ describe('AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreS
    * may differ in case. `sameLedger()` must see through both. Written and re-read through the
    * real file functions, exactly as `runCapture()` reads it.
    */
-  async function writePendingPreResetCapture(): Promise<LedgerCapture> {
+  async function writePendingPreResetCapture(): Promise<CombinedCapture> {
     const live = await sql.begin('read only', (tx) => readLedger(tx));
     expect(live.rows).toHaveLength(4);
-    const capture = buildLedgerCapture({
+    const capture = buildCombinedCapture({
       database, capturedAt: '2026-09-24T00:00:00.000Z', ledgerTablePresent: live.present,
-      rows: live.rows.map((r) => ({
+      ledgerRows: live.rows.map((r) => ({
         ...r, playerId: r.playerId + 7_000_000, adminUserId: r.adminUserId + 7_000_000, adminEmail: r.adminEmail.toUpperCase(),
       })),
+      importerRows: [],
     });
     writePendingCapture(dir, capture);
     const reRead = readPendingCapture(dir, database);
@@ -4601,21 +5027,23 @@ describe('AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreS
     return reRead!;
   }
 
-  async function observe(tx: postgres.TransactionSql, pending: LedgerCapture): Promise<ObservedState> {
+  async function observe(tx: postgres.TransactionSql, pending: CombinedCapture): Promise<ObservedState> {
     const live = await readLedger(tx);
-    const decision = decidePendingCapture({ pending, liveRows: live.rows, recover: false });
-    const observed = decision.action === 'verify-reinstated' ? await observeLiveReinstatement(tx) : null;
+    const decision = decidePendingCapture({
+      markerPresent: NO_MARKER, pending, liveLedgerRows: live.rows, liveImporterRows: [], recover: false,
+    });
+    const observed = decision.action === 'verify-reinstated' ? await observeLiveReinstatement(tx, []) : null;
     return { live, decision, observed };
   }
 
   /** runCapture()'s own snapshot, committed state only. */
-  function observeCommitted(pending: LedgerCapture): Promise<ObservedState> {
+  function observeCommitted(pending: CombinedCapture): Promise<ObservedState> {
     return sql.begin('isolation level repeatable read read only', (tx) => observe(tx, pending));
   }
 
   /** The same observation over an altered state that is NEVER committed. */
   async function observeAltered(
-    pending: LedgerCapture, alter: (tx: postgres.TransactionSql) => Promise<void>,
+    pending: CombinedCapture, alter: (tx: postgres.TransactionSql) => Promise<void>,
   ): Promise<ObservedState> {
     const rollback = new Error('ISSUE-235 OD-5: roll the altered state back');
     let state: ObservedState | undefined;
@@ -4646,28 +5074,45 @@ describe('AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreS
     };
   }
 
+  /** Wraps `settleCapture` for this suite's ObservedState shape, with an empty importer section. */
+  function settleObserved(pending: CombinedCapture, state: ObservedState) {
+    return settleCapture({
+      dir, database, capturedAt: '2026-09-24T01:00:00.000Z',
+      pending: { capture: pending, fileSha256: readPendingCaptureWithHash(dir, database)!.fileSha256 },
+      live: { ledgerPresent: state.live.present, ledgerRows: state.live.rows, importerRows: [] },
+      decision: state.decision, observed: state.observed,
+    });
+  }
+
   it('OD-5 recovery — a committed reinstatement whose capture was never archived is verified, archived and captured afresh; the database is not written', async () => {
     const pending = await writePendingPreResetCapture();
+    const pendingFileSha256 = readPendingCaptureWithHash(dir, database)!.fileSha256;
     const before = await databaseState();
 
     // The observation refuses a read-write transaction outright.
-    await expect(sql.begin((tx) => observeLiveReinstatement(tx))).rejects.toThrow(/read-only transaction/);
+    await expect(sql.begin((tx) => observeLiveReinstatement(tx, []))).rejects.toThrow(/read-only transaction/);
 
     const state = await observeCommitted(pending);
     expect(state.decision).toEqual({ action: 'verify-reinstated' });
     expect(state.observed).not.toBeNull();
     const observed = state.observed!;
-    expect(observed.replay).toEqual({ inserted: 0, noops: 2, stops: [] }); // P1 and P3, already present
+    expect(observed.replay).toEqual({ inserted: 0, noops: 2, stops: [], supersedes: [] }); // P1 and P3, already present
+    expect(observed.importerReplay).toEqual({ inserted: 0, noops: 0 }); // no importer rows in this fixture
     expect(observed.bijection).toBe('ok');
     const maxId = Math.max(...state.live.rows.map((r) => r.id));
     expect(nextIdentityValue(observed.sequence)).toBeGreaterThan(maxId);
-    expect(reinstatedCaptureProblems(pending, state.live.rows, observed)).toEqual([]);
+    expect(reinstatedCaptureProblems(pending, state.live.rows, [], observed)).toEqual([]);
 
-    const outcome = settleCapture({ dir, database, capturedAt: '2026-09-24T01:00:00.000Z', pending, ...state });
+    const outcome = settleCapture({
+      dir, database, capturedAt: '2026-09-24T01:00:00.000Z',
+      pending: { capture: pending, fileSha256: pendingFileSha256 },
+      live: { ledgerPresent: state.live.present, ledgerRows: state.live.rows, importerRows: [] },
+      decision: state.decision, observed: state.observed,
+    });
     expect(outcome.adopted).toBeNull();
     expect(outcome.archived).toBe(join(dir, archivedCaptureName(pending)));
     expect(existsSync(outcome.archived!)).toBe(true);
-    expect(outcome.captured!.capture.rows).toEqual(state.live.rows); // this run's capture: the live ledger
+    expect(outcome.captured!.capture.ledgerRows).toEqual(state.live.rows); // this run's capture: the live ledger
     expect(readPendingCapture(dir, database)?.payloadSha256).toBe(outcome.captured!.capture.payloadSha256);
     expect(readdirSync(dir).sort()).toEqual([archivedCaptureName(pending), PENDING_CAPTURE_FILE].sort());
 
@@ -4677,9 +5122,12 @@ describe('AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreS
   it('OD-5 reinstate (rolled back, no rebuild) — reinstateAndReplay() puts a captured ledger back byte-for-byte under its original ids, replays it and passes the bijection', async () => {
     // Not I18 and not a rebuild: the stage-(ii) function itself, against real PostgreSQL, inside
     // ONE transaction that is always rolled back. It meets the state a reset leaves (players and
-    // their AFL Tables identities present, the ledger empty, no human afl_api identity) by
-    // deleting this case's own ledger rows and human rows inside that transaction.
+    // their AFL Tables identities present, the ledger empty, no afl_api identity of either kind)
+    // by deleting this case's own ledger rows and human rows inside that transaction -- and the
+    // file's root baseline importer row too (`BRIDGED_PROVIDER_PLAYER_ID`), which a real reset
+    // would equally have removed and which `reinstateAndReplay()` rightly refuses to meet.
     const pending = await writePendingPreResetCapture();
+    const pendingFileSha256 = readPendingCaptureWithHash(dir, database)!.fileSha256;
     const before = await databaseState();
     const [sequenceBefore] = await sql<{ lastValue: string; isCalled: boolean }[]>`
       SELECT last_value::text AS "lastValue", is_called AS "isCalled" FROM afl_api_identity_adjudications_id_seq
@@ -4691,9 +5139,15 @@ describe('AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreS
       await sql.begin(async (tx) => {
         await tx`
           DELETE FROM external_identities
-           WHERE source_id = ${refs.aflApiSourceId} AND external_id IN (${p1}, ${p2}, ${p3})
+           WHERE source_id = ${refs.aflApiSourceId} AND external_id IN (${p1}, ${p2}, ${p3}, ${BRIDGED_PROVIDER_PLAYER_ID})
         `;
         await tx`DELETE FROM afl_api_identity_adjudications WHERE external_id IN (${p1}, ${p2}, ${p3})`;
+        // reinstateAndReplay()'s precondition (D11b): a rebuild marker matching this capture must
+        // be present. Real Stage 2 sets it before `recreate`; this test synthesises the same
+        // precondition here, inside the transaction it will roll back with everything else.
+        await setRebuildMarker(tx, database, {
+          capturedAt: pending.capturedAt, payloadSha256: pending.payloadSha256, fileSha256: pendingFileSha256,
+        });
         report = await reinstateAndReplay(tx, pending);
         readBack = (await readLedger(tx)).rows;
         throw rollback;
@@ -4710,14 +5164,15 @@ describe('AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreS
     }
 
     expect(report).toMatchObject({
-      ledgerRows: 4, actorsReused: 1, actorsCreated: 0, replay: { inserted: 2, noops: 0, stops: [] },
+      importerInserted: 0, importerNoops: 0,
+      ledgerRows: 4, actorsReused: 1, actorsCreated: 0, replay: { inserted: 2, noops: 0, stops: [], supersedes: [] },
     });
     const ledgerFields = (r: CapturedLedgerRow) => [
       r.id, r.externalId, r.action, r.playerIdentity, r.previousState, r.evidence, r.evidenceSha256,
       r.surnameDisagreementAcknowledged, r.supersedesId, r.note, r.createdAt,
     ];
-    expect(readBack.map(ledgerFields)).toEqual(pending.rows.map(ledgerFields));
-    expect(await databaseState()).toEqual(before); // rolled back, sequence restored
+    expect(readBack.map(ledgerFields)).toEqual(pending.ledgerRows.map(ledgerFields));
+    expect(await databaseState()).toEqual(before); // rolled back, sequence restored (marker rolled back too)
   });
 
   it('OD-5 recovery — a missing human identity is refused as already_reinstated_unverified; the pending capture is left in place', async () => {
@@ -4731,12 +5186,11 @@ describe('AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreS
     // The replay NEEDED an INSERT, which the read-only transaction refused inside its savepoint.
     expect(observed.replay).toEqual({ error: expect.stringMatching(/read-only transaction/) });
     expect(observed.bijection).toEqual({ error: expect.stringContaining(`ledger_without_row:${p3}`) });
-    const problems = reinstatedCaptureProblems(pending, state.live.rows, observed).join('\n');
+    const problems = reinstatedCaptureProblems(pending, state.live.rows, [], observed).join('\n');
     expect(problems).toContain('a replay could not confirm the human identities');
     expect(problems).toContain('the bijection does not hold');
 
-    expect(() => settleCapture({ dir, database, capturedAt: '2026-09-24T01:00:00.000Z', pending, ...state }))
-      .toThrow(/already_reinstated_unverified/);
+    expect(() => settleObserved(pending, state)).toThrow(/already_reinstated_unverified/);
     expect(pendingFileState()).toEqual(filesBefore);
     expect(await i235AflApiRows(refs, { providerId: p3 })).toHaveLength(1); // rolled back
   });
@@ -4752,10 +5206,9 @@ describe('AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreS
       `;
     });
     expect(state.decision).toEqual({ action: 'verify-reinstated' });
-    expect(state.observed!.replay).toEqual({ inserted: 0, noops: 2, stops: [] }); // the ledger's own rows are fine
+    expect(state.observed!.replay).toEqual({ inserted: 0, noops: 2, stops: [], supersedes: [] }); // the ledger's own rows are fine
     expect(state.observed!.bijection).toEqual({ error: expect.stringContaining(`row_without_ledger:${p4}`) });
-    expect(() => settleCapture({ dir, database, capturedAt: '2026-09-24T01:00:00.000Z', pending, ...state }))
-      .toThrow(/already_reinstated_unverified/);
+    expect(() => settleObserved(pending, state)).toThrow(/already_reinstated_unverified/);
     expect(pendingFileState()).toEqual(filesBefore);
     expect(await i235AflApiRows(refs, { providerId: p4 })).toEqual([]); // rolled back
   });
@@ -4775,8 +5228,7 @@ describe('AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreS
     expect(state.live.rows).toHaveLength(5);
     expect(state.decision).toMatchObject({ action: 'refuse' });
     expect(state.observed).toBeNull();
-    expect(() => settleCapture({ dir, database, capturedAt: '2026-09-24T01:00:00.000Z', pending, ...state }))
-      .toThrow(/differs from it/);
+    expect(() => settleObserved(pending, state)).toThrow(/differs from it/);
     expect(pendingFileState()).toEqual(filesBefore);
     const [{ n }] = await sql<{ n: number }[]>`
       SELECT count(*)::int AS n FROM afl_api_identity_adjudications WHERE external_id = ${p4}
@@ -4795,5 +5247,22 @@ describe('AFLDB-ISSUE-235 S6 fixture-leftover gate', () => {
   it('S6 fixture-leftover gate — afldb_test holds zero ISSUE-235 fixture rows', async () => {
     const refs = await loadS6Refs(sql);
     expect(await issue235FixtureResidue(sql, refs)).toEqual(ZERO_ISSUE235_RESIDUE);
+  });
+});
+
+/**
+ * AFLDB-ISSUE-237 — the I237 fixture-leftover gate, the exact counterpart to the ISSUE-235 gate
+ * above, over `I237_OWNERSHIP` instead. Last in file order for the same reason: a full-file run
+ * reaches it after the I237 describe's own `afterAll` teardown, so it proves that teardown left
+ * nothing behind on the WHOLE table (whole-table isolation guarding) — not merely that the I237
+ * describe's own within-suite assertions happened to pass. It deletes nothing.
+ */
+describe('AFLDB-ISSUE-237 I237 fixture-leftover gate', () => {
+  it('I237 fixture-leftover gate — afldb_test holds zero I237 fixture rows', async () => {
+    const refs = await loadS6Refs(sql);
+    expect(await issue237FixtureResidue(sql, refs)).toEqual(ZERO_ISSUE237_RESIDUE);
+    // The reverse direction -- that I237's ids are never, even coincidentally, counted by the
+    // ISSUE-235 gate's ownership definition (or vice versa) -- is proven exhaustively and
+    // DB-free by `i237Issue235OwnershipOverlap()` above; not repeated here as a live query.
   });
 });

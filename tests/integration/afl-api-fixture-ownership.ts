@@ -58,6 +58,130 @@ export function i14StaleLedgerRow(input: { playerIdA: number; playerIdB: number 
   return { playerId: input.playerIdB, playerIdentity: I14_FIXTURE.afltablesIdA };
 }
 
+/**
+ * I237 (`settle-afl-api.test.ts`, AFLDB-ISSUE-237 §10): the importer replay, D9 STOPs, the
+ * D15 supersede transition and the combined invariant. A separate, self-contained namespace
+ * from every ISSUE-235 fixture above -- not folded into `ISSUE235_OWNERSHIP` or the S6 leftover
+ * gate, so this issue's fixtures can never mask or be masked by ISSUE-235's exact-count
+ * ledger-global assertions. Its own teardown (`cleanupI237Fixtures`) is idempotent and selects
+ * by these literal ids only.
+ */
+export const I237_FIXTURE = {
+  legacyPlayerIdA: -237140001,
+  legacyPlayerIdB: -237140002,
+  legacyPlayerIdC: -237140003,
+  /** §10/E13's own player: never holds any other I237 provider, so the settle-resolver case
+   * cannot collide with migration 104's one-provider-per-player index whatever ran before it. */
+  legacyPlayerIdD: -237140004,
+  afltablesIdA: 'players/Z/Issue237-I1-test-a.html',
+  afltablesIdB: 'players/Z/Issue237-I1-test-b.html',
+  afltablesIdC1: 'players/Z/Issue237-I1-test-c1.html',
+  afltablesIdC2: 'players/Z/Issue237-I1-test-c2.html',
+  afltablesIdD: 'players/Z/Issue237-I1-test-d.html',
+  /** The importer provider re-derived to a NEW player after a simulated renumbering. */
+  providerRenumbered: 'CD_I9992370001',
+  /** The provider an existing human `resolved` row already occupies (D9: cannot occur from a
+   * single consistent snapshot, pinned DB-free here for the STOP path). */
+  providerHumanConflict: 'CD_I9992370002',
+  /** The provider used for the D15 supersede (OD-2) transition. */
+  providerSupersede: 'CD_I9992370003',
+  /** D9 row 3: a candidate row for this provider already exists under a DIFFERENT importer
+   * method than the captured row -- must STOP, never silently overwritten. */
+  providerMethodConflict: 'CD_I9992370004',
+  /** D7: the ambiguous (two-AFL-Tables-path) player's OWN importer row. */
+  providerAmbiguous: 'CD_I9992370005',
+  /** D5: a deliberately injected anomaly (candidate_count != 1), for the combined-invariant
+   * FAIL case. Removed within its own test regardless of outcome. */
+  providerAnomaly: 'CD_I9992370006',
+  /** §10/E13: the settle resolver (`resolveAflApiPlayer`) reading a replayed importer row. */
+  providerSettleResolver: 'CD_I9992370007',
+  actorEmail: 'issue237-fixture@example.test',
+} as const;
+
+/** What `cleanupI237Fixtures()` removes: the seven providers above, by literal id. */
+export const I237_PROVIDER_IDS = [
+  I237_FIXTURE.providerRenumbered, I237_FIXTURE.providerHumanConflict,
+  I237_FIXTURE.providerSupersede, I237_FIXTURE.providerMethodConflict,
+  I237_FIXTURE.providerAmbiguous, I237_FIXTURE.providerAnomaly,
+  I237_FIXTURE.providerSettleResolver,
+] as const;
+
+/**
+ * AFLDB-ISSUE-237 §10/whole-table isolation — a separate, self-contained ownership definition
+ * from `ISSUE235_OWNERSHIP` (below), never merged into it. `providerIdPattern`/`afltablesIdPattern`
+ * use `(?!)` (a regex that matches nothing) rather than an empty string: I237 owns ONLY the
+ * literal ids above, so a pattern hole here could silently absorb (or hide the loss of) an
+ * unrelated real `afldb_test` row that a whole-table residue count must never miscount either way.
+ */
+export const I237_OWNERSHIP: FixtureOwnership = {
+  providerIds: I237_PROVIDER_IDS,
+  providerIdPattern: '(?!)',
+  legacyPlayerIds: [
+    I237_FIXTURE.legacyPlayerIdA, I237_FIXTURE.legacyPlayerIdB, I237_FIXTURE.legacyPlayerIdC,
+    I237_FIXTURE.legacyPlayerIdD,
+  ],
+  legacyPlayerIdRange: { min: 0, max: -1 }, // deliberately empty: min > max matches no integer
+  afltablesIds: [
+    I237_FIXTURE.afltablesIdA, I237_FIXTURE.afltablesIdB, I237_FIXTURE.afltablesIdC1, I237_FIXTURE.afltablesIdC2,
+    I237_FIXTURE.afltablesIdD,
+  ],
+  afltablesIdPattern: '(?!)',
+};
+
+/**
+ * Remove every I237 fixture row, and nothing else, child-to-parent, as the owner. Selects by
+ * I237's literal ids ONLY, so it is safe after a `beforeAll` that failed part-way (or never
+ * ran), and is called before setup as well as after every case.
+ */
+export async function cleanupI237Fixtures(db: Db): Promise<void> {
+  const f = I237_FIXTURE;
+  const actor = db`SELECT id FROM auth_users WHERE lower(email) = ${f.actorEmail}`;
+  const players = db`
+    SELECT id FROM players
+     WHERE legacy_player_id IN (${f.legacyPlayerIdA}, ${f.legacyPlayerIdB}, ${f.legacyPlayerIdC}, ${f.legacyPlayerIdD})
+  `;
+  await db`
+    DELETE FROM afl_api_identity_adjudications
+     WHERE (source_key = 'afl_api' AND external_id = ANY (${[...I237_PROVIDER_IDS]}::text[]))
+        OR admin_user_id IN (${actor})
+        OR player_id IN (${players})
+  `;
+  await db`
+    DELETE FROM external_identities
+     WHERE (source_id = (SELECT id FROM sources WHERE key = 'afl_api')
+            AND external_id = ANY (${[...I237_PROVIDER_IDS]}::text[]))
+        OR (source_id = (SELECT id FROM sources WHERE key = 'afltables')
+            AND external_id IN (${f.afltablesIdA}, ${f.afltablesIdB}, ${f.afltablesIdC1}, ${f.afltablesIdC2},
+                                ${f.afltablesIdD}))
+        OR player_id IN (${players})
+  `;
+  await db`
+    DELETE FROM players
+     WHERE legacy_player_id IN (${f.legacyPlayerIdA}, ${f.legacyPlayerIdB}, ${f.legacyPlayerIdC}, ${f.legacyPlayerIdD})
+  `;
+  await db`DELETE FROM auth_users WHERE lower(email) = ${f.actorEmail}`;
+}
+
+/**
+ * Per-case isolation for the I237 describe block (its `afterEach`): remove every I237
+ * `afl_api` provider row and every I237 ledger row, by literal provider id only, and nothing
+ * else -- the fixture players and their AFL Tables identities (`beforeAll`'s) stay. Without
+ * it, one case's committed provider row (e.g. the renumbering case's `providerRenumbered` on
+ * player A) survives into the next case and trips migration 104's one-provider-per-player
+ * index there, so no case could be run, or fail, independently of the ones before it.
+ */
+export async function cleanupI237ProviderRows(db: Db): Promise<void> {
+  await db`
+    DELETE FROM afl_api_identity_adjudications
+     WHERE source_key = 'afl_api' AND external_id = ANY (${[...I237_PROVIDER_IDS]}::text[])
+  `;
+  await db`
+    DELETE FROM external_identities
+     WHERE source_id = (SELECT id FROM sources WHERE key = 'afl_api')
+       AND external_id = ANY (${[...I237_PROVIDER_IDS]}::text[])
+  `;
+}
+
 /** The S6 cases' own ids; `s6ProviderId()`/`s6MatchId()`/`seedS6Player()` build from these. */
 export const S6_PROVIDER_PREFIX = 'CD_I999235';
 export const S6_MATCH_PREFIX = 'CD_M999235';
@@ -394,4 +518,69 @@ export async function issue235FixtureResidue(db: Db, refs: S6Refs): Promise<Issu
       (SELECT count(*)::int FROM (${actors}) a) AS "actors"
   `;
   return row;
+}
+
+export type Issue237Residue = {
+  adjudications: number;
+  aflApiIdentities: number;
+  afltablesIdentities: number;
+  players: number;
+  actors: number;
+};
+
+export const ZERO_ISSUE237_RESIDUE: Issue237Residue = {
+  adjudications: 0, aflApiIdentities: 0, afltablesIdentities: 0, players: 0, actors: 0,
+};
+
+/**
+ * AFLDB-ISSUE-237 whole-table isolation guarding — the I237 leftover gate, the exact
+ * counterpart to `issue235FixtureResidue()` above, over `I237_OWNERSHIP` instead of
+ * `ISSUE235_OWNERSHIP`. All zero after `cleanupI237Fixtures()`. It counts ONLY rows
+ * `I237_OWNERSHIP` proves are I237's own (literal ids only — `I237_OWNERSHIP` holds no
+ * pattern, so this can never miscount an unrelated real `afldb_test` row as residue, and
+ * never silently absorb one either).
+ */
+export async function issue237FixtureResidue(db: Db, refs: S6Refs): Promise<Issue237Residue> {
+  const o = I237_OWNERSHIP;
+  const players = ownedPlayersSql(db, o);
+  const actors = db`SELECT id FROM auth_users WHERE lower(email) = ${I237_FIXTURE.actorEmail}`;
+  const [row] = await db<Issue237Residue[]>`
+    SELECT
+      (SELECT count(*)::int FROM afl_api_identity_adjudications
+        WHERE ${ownedProviderSql(db, o, db`external_id`)}
+           OR admin_user_id IN (${actors})) AS "adjudications",
+      (SELECT count(*)::int FROM external_identities
+        WHERE source_id = ${refs.aflApiSourceId} AND ${ownedProviderSql(db, o, db`external_id`)}) AS "aflApiIdentities",
+      (SELECT count(*)::int FROM external_identities
+        WHERE ${ownedAfltablesSql(db, o, db`external_id`)}) AS "afltablesIdentities",
+      (SELECT count(*)::int FROM players WHERE id IN (${players})) AS "players",
+      (SELECT count(*)::int FROM (${actors}) a) AS "actors"
+  `;
+  return row;
+}
+
+export type I237IsolationProblem =
+  | { kind: 'provider'; id: string }
+  | { kind: 'afltables'; id: string }
+  | { kind: 'legacy_player'; id: number };
+
+/**
+ * Whole-table isolation, provable DB-free: `I237_OWNERSHIP`'s literal ids must never intersect
+ * `ISSUE235_OWNERSHIP`'s, in either direction, for every id class this module tracks. A shared
+ * id would let one namespace's cleanup silently delete the other's fixture row, or let one
+ * suite's leftover gate silently absorb the other's residue as its own -- either way hiding a
+ * real cross-suite leak rather than failing loudly. Pure and total: empty means isolated.
+ */
+export function i237Issue235OwnershipOverlap(): readonly I237IsolationProblem[] {
+  const problems: I237IsolationProblem[] = [];
+  for (const id of I237_OWNERSHIP.providerIds) {
+    if (ownsProviderId(ISSUE235_OWNERSHIP, id)) problems.push({ kind: 'provider', id });
+  }
+  for (const id of I237_OWNERSHIP.afltablesIds) {
+    if (ownsAfltablesId(ISSUE235_OWNERSHIP, id)) problems.push({ kind: 'afltables', id });
+  }
+  for (const id of I237_OWNERSHIP.legacyPlayerIds) {
+    if (ownsLegacyPlayerId(ISSUE235_OWNERSHIP, id)) problems.push({ kind: 'legacy_player', id });
+  }
+  return problems;
 }

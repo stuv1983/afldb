@@ -1,4 +1,5 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -45,6 +46,13 @@ import {
   resolveLinkFromSuggestion,
 } from '@/db/queries/player-links';
 import { createPlayer } from '@/db/queries/players';
+import type {
+  AflApiCandidateIdentityRow,
+  AflApiForwardIdentityResult,
+  AflApiImporterMatchMethod,
+  AflApiPlayerRemapResult,
+  CapturedImporterRow,
+} from '@/lib/acquisition/afl-api-adjudication';
 
 import {
   assertS6LedgerIsolated,
@@ -1598,6 +1606,915 @@ describe('AFLDB-ISSUE-235: afl-api-adjudication (pure module)', () => {
     expect(validateManifestAgainstCatalogue([liveRow])).toEqual([]);
     expect(validateManifestAgainstCatalogue([liveRow, { ...liveRow, column: 'source_id' }]))
       .toContainEqual({ kind: 'not_source_bearing_gained_source_id', schema: 'public', table: 'player_club_season_stats' });
+  });
+});
+
+/**
+ * AFLDB-ISSUE-237 §9 — the importer identity capture/replay/promotion pure module, DB-free.
+ * Extends the ISSUE-235 pure-module block above with D5, D6, D9, D13, D14 and the G1/G2/G3
+ * classifiers. No postgres/authSql mock is exercised: every function here is a pure function
+ * of plain data.
+ */
+describe('AFLDB-ISSUE-237: afl-api-adjudication (pure module, importer identity)', () => {
+  it('AFL_API_IMPORTER_MATCH_METHODS equals the loader\'s ALLOWED_MATCH_METHODS (.py source)', async () => {
+    const { AFL_API_IMPORTER_MATCH_METHODS } = await import('@/lib/acquisition/afl-api-adjudication');
+    const pySource = readFileSync(
+      join(process.cwd(), 'tools', 'migration', 'import_afl_api_player_bridge.py'), 'utf8',
+    );
+    const constantValue = (name: string): string => {
+      const match = new RegExp(`${name}\\s*=\\s*"([^"]+)"`).exec(pySource);
+      if (!match) throw new Error(`constant ${name} not found in import_afl_api_player_bridge.py`);
+      return match[1];
+    };
+    const pyMethods = new Set([
+      constantValue('MATCH_METHOD'),
+      constantValue('NAME_TEAM_SEASON_MATCH_METHOD'),
+      constantValue('MANUAL_ADJUDICATION_MATCH_METHOD'),
+      constantValue('SEASON_EVIDENCE_MATCH_METHOD'),
+    ]);
+    expect(new Set(AFL_API_IMPORTER_MATCH_METHODS)).toEqual(pyMethods);
+    expect(AFL_API_IMPORTER_MATCH_METHODS).toHaveLength(4);
+  });
+
+  it('importerCaptureStructureProblems — D13 capture structure checks', async () => {
+    const { importerCaptureStructureProblems } = await import('@/lib/acquisition/afl-api-adjudication');
+    const base = {
+      status: 'unique' as const, candidateCount: 1 as const, externalName: null, externalUrl: null,
+      notes: null, playerId: 1,
+    };
+    // `overrides` deliberately breaks the D5 shape (bad method, count, url) -- the checks under
+    // test exist precisely for rows the static type forbids, so the widening cast is explicit.
+    const row = (
+      externalId: string, playerIdentity: string,
+      overrides: Partial<Record<keyof CapturedImporterRow, unknown>> = {},
+    ): CapturedImporterRow => ({
+      ...base, externalId, playerIdentity, matchMethod: 'afl_api_stat_vector_bootstrap', ...overrides,
+    } as unknown as CapturedImporterRow);
+
+    expect(importerCaptureStructureProblems([row('CD_I1', 'a')])).toEqual([]);
+    // duplicate provider
+    expect(importerCaptureStructureProblems([row('CD_I1', 'a'), row('CD_I1', 'b')]))
+      .toContainEqual({ kind: 'duplicate_provider', externalId: 'CD_I1' });
+    // duplicate identity (the migration 104 per-player index)
+    expect(importerCaptureStructureProblems([row('CD_I1', 'a'), row('CD_I2', 'a')]))
+      .toContainEqual({ kind: 'duplicate_identity', playerIdentity: 'a' });
+    // unsupported method
+    expect(importerCaptureStructureProblems([row('CD_I1', 'a', { matchMethod: 'not_a_real_method' })]))
+      .toContainEqual({ kind: 'unsupported_method', externalId: 'CD_I1', matchMethod: 'not_a_real_method' });
+    // candidate_count != 1
+    expect(importerCaptureStructureProblems([row('CD_I1', 'a', { candidateCount: 2 })]))
+      .toContainEqual({ kind: 'unexpected_candidate_count', externalId: 'CD_I1', candidateCount: 2 });
+    // non-NULL url
+    expect(importerCaptureStructureProblems([row('CD_I1', 'a', { externalUrl: 'https://example.com' })]))
+      .toContainEqual({ kind: 'non_null_external_url', externalId: 'CD_I1' });
+    // empty identity
+    expect(importerCaptureStructureProblems([row('CD_I1', '')]))
+      .toContainEqual({ kind: 'empty_identity', externalId: 'CD_I1' });
+  });
+
+  it('planAflApiImporterReplay — every D9 row of the importer replay table', async () => {
+    const { planAflApiImporterReplay } = await import('@/lib/acquisition/afl-api-adjudication');
+    const IDENTITY = 'players/A/Alpha_Able.html';
+    const captured = (
+      externalId: string, playerIdentity = IDENTITY, playerId = 1,
+      matchMethod: AflApiImporterMatchMethod = 'afl_api_stat_vector_bootstrap',
+    ): CapturedImporterRow => ({
+      externalId, playerIdentity, matchMethod, status: 'unique',
+      candidateCount: 1, externalName: null, externalUrl: null, notes: null, playerId,
+    });
+    const remapTo = (newPlayerId: number, remappedIdentity = IDENTITY) => ({ ok: true as const, newPlayerId, remappedIdentity });
+    const plan = (input: {
+      capturedRows: ReturnType<typeof captured>[];
+      remap: Array<[string, AflApiPlayerRemapResult]>;
+      candidates?: { externalId: string; status: string; matchMethod: string | null; playerId: number | null }[];
+    }) => planAflApiImporterReplay({
+      capturedRows: input.capturedRows,
+      remapByExternalId: new Map(input.remap),
+      candidateByExternalId: new Map((input.candidates ?? []).map((c) => [c.externalId, c])),
+      candidatePlayerAflApiRow: new Map((input.candidates ?? [])
+        .filter((c) => c.playerId !== null).map((c) => [c.playerId!, c])),
+    });
+
+    // insert
+    expect(plan({ capturedRows: [captured('CD_I1')], remap: [['CD_I1', remapTo(907)]] }))
+      .toEqual({ inserts: [{ externalId: 'CD_I1', playerId: 907, row: captured('CD_I1') }], noops: [], stops: [] });
+    // identical no-op (the recovery-verify path)
+    expect(plan({
+      capturedRows: [captured('CD_I1')], remap: [['CD_I1', remapTo(907)]],
+      candidates: [{ externalId: 'CD_I1', status: 'unique', matchMethod: 'afl_api_stat_vector_bootstrap', playerId: 907 }],
+    })).toMatchObject({ inserts: [], noops: [{ externalId: 'CD_I1' }], stops: [] });
+    // same player, different method -> STOP
+    expect(plan({
+      capturedRows: [captured('CD_I1')], remap: [['CD_I1', remapTo(907)]],
+      candidates: [{ externalId: 'CD_I1', status: 'unique', matchMethod: 'afl_api_manual_adjudication', playerId: 907 }],
+    }).stops).toEqual([{ externalId: 'CD_I1', reason: 'an importer row for this provider already exists under a different method or field' }]);
+    // different player under the same provider -> STOP
+    expect(plan({
+      capturedRows: [captured('CD_I1')], remap: [['CD_I1', remapTo(907)]],
+      candidates: [{ externalId: 'CD_I1', status: 'unique', matchMethod: 'afl_api_stat_vector_bootstrap', playerId: 555 }],
+    }).stops).toEqual([{ externalId: 'CD_I1', reason: 'an importer row for this provider already exists, resolved to a different player' }]);
+    // player collision (migration 104 per-player index)
+    expect(plan({
+      capturedRows: [captured('CD_I1')], remap: [['CD_I1', remapTo(907)]],
+      candidates: [{ externalId: 'CD_I2', status: 'unique', matchMethod: 'afl_api_stat_vector_bootstrap', playerId: 907 }],
+    }).stops).toEqual([{ externalId: 'CD_I1', reason: 'player 907 already holds a different afl_api provider (CD_I2)' }]);
+    // an existing human row for the same provider (same or different player) -> STOP
+    for (const playerId of [907, 555]) {
+      expect(plan({
+        capturedRows: [captured('CD_I1')], remap: [['CD_I1', remapTo(907)]],
+        candidates: [{ externalId: 'CD_I1', status: 'resolved', matchMethod: 'afl_api_admin_adjudication', playerId }],
+      }).stops[0].reason).toContain('human resolved row already exists');
+    }
+    // unresolvable
+    expect(plan({ capturedRows: [captured('CD_I1')], remap: [] }).stops)
+      .toEqual([{ externalId: 'CD_I1', reason: 'the captured row\'s player identity does not resolve to any candidate player' }]);
+    // ambiguous
+    expect(plan({ capturedRows: [captured('CD_I1')], remap: [['CD_I1', { ok: false, reason: 'ambiguous' }]] }).stops)
+      .toEqual([{ externalId: 'CD_I1', reason: 'the captured row\'s player identity resolves to more than one candidate player' }]);
+    // an old id remapped to a DIFFERENT new id through its identity -- an ordinary insert, not a stop
+    expect(plan({ capturedRows: [captured('CD_I1', IDENTITY, 42)], remap: [['CD_I1', remapTo(907)]] }).inserts)
+      .toEqual([{ externalId: 'CD_I1', playerId: 907, row: captured('CD_I1', IDENTITY, 42) }]);
+  });
+
+  it('importerParityProblems — D13 exact parity between a capture and the live projection', async () => {
+    const { importerParityProblems } = await import('@/lib/acquisition/afl-api-adjudication');
+    const proj = (externalId: string, overrides: Partial<Record<string, unknown>> = {}) => ({
+      externalId, playerIdentity: 'a', status: 'unique' as const, candidateCount: 1,
+      matchMethod: 'afl_api_stat_vector_bootstrap', externalName: null, externalUrl: null, notes: null,
+      ...overrides,
+    });
+    expect(importerParityProblems({ captured: [proj('CD_I1')], live: [proj('CD_I1')] })).toEqual([]);
+    // a missing row
+    expect(importerParityProblems({ captured: [proj('CD_I1')], live: [] }))
+      .toContainEqual({ kind: 'missing_row', externalId: 'CD_I1' });
+    // an extra row
+    expect(importerParityProblems({ captured: [], live: [proj('CD_I1')] }))
+      .toContainEqual({ kind: 'extra_row', externalId: 'CD_I1' });
+    // a retargeted identity
+    expect(importerParityProblems({ captured: [proj('CD_I1')], live: [proj('CD_I1', { playerIdentity: 'b' })] }))
+      .toContainEqual({ kind: 'retargeted_identity', externalId: 'CD_I1', captured: 'a', live: 'b' });
+    // a changed method
+    expect(importerParityProblems({ captured: [proj('CD_I1')], live: [proj('CD_I1', { matchMethod: 'afl_api_manual_adjudication' })] }))
+      .toContainEqual({ kind: 'changed_method', externalId: 'CD_I1', captured: 'afl_api_stat_vector_bootstrap', live: 'afl_api_manual_adjudication' });
+    // a changed notes value
+    expect(importerParityProblems({ captured: [proj('CD_I1', { notes: 'x' })], live: [proj('CD_I1', { notes: 'y' })] }))
+      .toContainEqual({ kind: 'changed_field', externalId: 'CD_I1', field: 'notes', captured: 'x', live: 'y' });
+  });
+
+  it('D15 supersede (OD-2) — the ONE new transition in planAflApiAdjudicationReplay', async () => {
+    const {
+      planAflApiAdjudicationReplay, AFL_API_ADMIN_MATCH_METHOD,
+    } = await import('@/lib/acquisition/afl-api-adjudication');
+    const IDENTITY = 'players/A/Alpha_Able.html';
+    const linked = (externalId: string, playerIdentity = IDENTITY) => ({
+      id: 1, externalId, action: 'linked' as const, playerId: 1, playerIdentity, supersedesId: null,
+    });
+    const remapTo = (newPlayerId: number, remappedIdentity = IDENTITY) => ({ ok: true as const, newPlayerId, remappedIdentity });
+    const fullImporterRow = (
+      externalId: string, playerId: number, overrides: Partial<AflApiCandidateIdentityRow> = {},
+    ): AflApiCandidateIdentityRow => ({
+      externalId, status: 'unique', matchMethod: 'afl_api_stat_vector_bootstrap', playerId,
+      candidateCount: 1, externalUrl: null, ...overrides,
+    });
+    const plan = (candidate: AflApiCandidateIdentityRow, expectedSupersedes: Set<string>) => planAflApiAdjudicationReplay({
+      ledgerRows: [linked('CD_I1')],
+      remapByExternalId: new Map([['CD_I1', remapTo(907)]]),
+      candidateByExternalId: new Map([[candidate.externalId, candidate]]),
+      candidatePlayerAflApiRow: candidate.playerId === null
+        ? new Map()
+        : new Map([[candidate.playerId, candidate]]),
+      expectedSupersedes,
+    });
+
+    // AGREE (same provider, same identity via the remap, same remapped player, full D5 row)
+    // -> a supersede, not a STOP, when the provider is in the expected set.
+    expect(plan(fullImporterRow('CD_I1', 907), new Set(['CD_I1'])))
+      .toEqual({ inserts: [], noops: [], stops: [], supersedes: [{ externalId: 'CD_I1', playerId: 907 }] });
+
+    // An otherwise-agreeing importer row is STILL a STOP when the caller's expected set does
+    // not name it -- the replay never decides its own supersedes (D9).
+    expect(plan(fullImporterRow('CD_I1', 907), new Set()).stops)
+      .toEqual([{
+        externalId: 'CD_I1',
+        reason: 'an agreeing importer row exists for this provider but is not in the expected supersede set',
+      }]);
+
+    // Same provider, same player_id, but not a full D5 row (unsupported method) -> STOP, never
+    // a supersede, even if named in the expected set.
+    expect(plan(fullImporterRow('CD_I1', 907, { matchMethod: 'not_approved' }), new Set(['CD_I1'])).stops)
+      .toEqual([{ externalId: 'CD_I1', reason: 'a conflicting external_identities row already exists for this provider id' }]);
+
+    // candidate_count != 1 -> STOP
+    expect(plan(fullImporterRow('CD_I1', 907, { candidateCount: 2 }), new Set(['CD_I1'])).stops)
+      .toEqual([{ externalId: 'CD_I1', reason: 'a conflicting external_identities row already exists for this provider id' }]);
+
+    // a non-NULL url -> STOP
+    expect(plan(fullImporterRow('CD_I1', 907, { externalUrl: 'https://example.com' }), new Set(['CD_I1'])).stops)
+      .toEqual([{ externalId: 'CD_I1', reason: 'a conflicting external_identities row already exists for this provider id' }]);
+
+    // an importer row for a DIFFERENT player -> STOP (never treated as agreeing)
+    expect(plan(fullImporterRow('CD_I1', 555), new Set(['CD_I1'])).stops)
+      .toEqual([{ externalId: 'CD_I1', reason: 'a conflicting external_identities row already exists for this provider id' }]);
+
+    // a non-identical human row -> STOP (unchanged ISSUE-235 behaviour)
+    expect(plan({ externalId: 'CD_I1', status: 'resolved', matchMethod: AFL_API_ADMIN_MATCH_METHOD, playerId: 555 }, new Set(['CD_I1'])).stops)
+      .toEqual([{ externalId: 'CD_I1', reason: 'a conflicting external_identities row already exists for this provider id' }]);
+
+    // a superseded row satisfies the bijection: the caller writes exactly the row an INSERT
+    // would create (resolved/afl_api_admin_adjudication under the SAME remapped player).
+    const superseded = plan(fullImporterRow('CD_I1', 907), new Set(['CD_I1'])).supersedes[0];
+    expect(superseded).toEqual({ externalId: 'CD_I1', playerId: 907 });
+
+    // supersede never applies to a resolved row: an identical human row is a no-op, not a
+    // supersede, even when the provider is named in the expected set.
+    expect(planAflApiAdjudicationReplay({
+      ledgerRows: [linked('CD_I1')],
+      remapByExternalId: new Map([['CD_I1', remapTo(907)]]),
+      candidateByExternalId: new Map([['CD_I1', { externalId: 'CD_I1', status: 'resolved', matchMethod: AFL_API_ADMIN_MATCH_METHOD, playerId: 907 }]]),
+      candidatePlayerAflApiRow: new Map(),
+      expectedSupersedes: new Set(['CD_I1']),
+    })).toEqual({ inserts: [], noops: [{ externalId: 'CD_I1' }], stops: [], supersedes: [] });
+  });
+
+  it('aflApiAgrees — the six-condition agreement predicate: only all six together hold', async () => {
+    const { aflApiAgrees } = await import('@/lib/acquisition/afl-api-adjudication');
+    const importerRow = {
+      status: 'unique', matchMethod: 'afl_api_stat_vector_bootstrap', candidateCount: 1,
+      externalUrl: null, playerId: 907, playerIdentity: 'a',
+    };
+    const ledgerEntry = { playerIdentity: 'a', effectiveState: 'LINKED' as const };
+    const ledgerRemap = { ok: true as const, newPlayerId: 907, remappedIdentity: 'a' };
+
+    expect(aflApiAgrees({ importerRow, ledgerEntry, ledgerRemap })).toBe(true);
+
+    // each condition, violated alone, makes it false
+    expect(aflApiAgrees({ importerRow: { ...importerRow, playerId: 555 }, ledgerEntry, ledgerRemap })).toBe(false); // different remapped player
+    expect(aflApiAgrees({ importerRow: { ...importerRow, playerIdentity: 'b' }, ledgerEntry, ledgerRemap })).toBe(false); // identity differs by one value
+    expect(aflApiAgrees({ importerRow: { ...importerRow, status: 'resolved' }, ledgerEntry, ledgerRemap })).toBe(false); // non-unique status
+    expect(aflApiAgrees({ importerRow: { ...importerRow, matchMethod: 'not_approved' }, ledgerEntry, ledgerRemap })).toBe(false); // unapproved method
+    expect(aflApiAgrees({ importerRow, ledgerEntry: { ...ledgerEntry, effectiveState: 'REVOKED' }, ledgerRemap })).toBe(false); // revoked latest action
+    expect(aflApiAgrees({ importerRow, ledgerEntry, ledgerRemap: { ok: false, reason: 'unresolvable' } })).toBe(false); // remap to another/no player
+    expect(aflApiAgrees({ importerRow: null, ledgerEntry, ledgerRemap })).toBe(false);
+    expect(aflApiAgrees({ importerRow, ledgerEntry: null, ledgerRemap })).toBe(false);
+  });
+
+  it('E_rebuild — the shared check for Stage 2 and Stage 18 (D9 rebuild semantics)', async () => {
+    const { computeAflApiAgreeingProviders } = await import('@/lib/acquisition/afl-api-adjudication');
+    const linked = (externalId: string, playerIdentity: string) => ({
+      id: 1, externalId, action: 'linked' as const, playerId: 1, playerIdentity, supersedesId: null,
+    });
+    const importerRow = (playerIdentity: string, playerId: number) => ({
+      status: 'unique', matchMethod: 'afl_api_stat_vector_bootstrap', candidateCount: 1,
+      externalUrl: null, playerId, playerIdentity,
+    });
+    const remap = { ok: true as const, newPlayerId: 907, remappedIdentity: 'a' };
+
+    // an accepted, non-overlapping capture -> E_rebuild = ∅
+    expect(computeAflApiAgreeingProviders({
+      ledgerRows: [linked('CD_I1', 'a')],
+      importerByExternalId: new Map(),
+      remapByExternalId: new Map([['CD_I1', remap]]),
+    }).size).toBe(0);
+
+    // a synthetic overlapping capture (an agreeing importer row plus a LINKED ledger entry for
+    // the same provider) -> non-empty, named
+    const agreeing = computeAflApiAgreeingProviders({
+      ledgerRows: [linked('CD_I1', 'a')],
+      importerByExternalId: new Map([['CD_I1', importerRow('a', 907)]]),
+      remapByExternalId: new Map([['CD_I1', remap]]),
+    });
+    expect([...agreeing]).toEqual(['CD_I1']);
+  });
+
+  it('capturedOverlapProviders — Stage 18\'s independent E_rebuild recheck over the capture file alone (conditions 1-5, no database)', async () => {
+    const { capturedOverlapProviders } = await import('@/lib/acquisition/afl-api-adjudication');
+    const linked = (externalId: string, playerIdentity: string, action: 'linked' | 'revoked' = 'linked') => ({
+      id: 1, externalId, action, playerId: 1, playerIdentity, supersedesId: action === 'revoked' ? 1 : null,
+    });
+    const importerRow = (externalId: string, playerIdentity: string) => ({
+      externalId, playerIdentity, matchMethod: 'afl_api_stat_vector_bootstrap' as const,
+      status: 'unique' as const, candidateCount: 1 as const, externalName: null, externalUrl: null,
+      notes: null, playerId: 501,
+    });
+
+    // no overlap: different providers or a non-matching identity -> empty
+    expect(capturedOverlapProviders({
+      ledgerRows: [linked('CD_I1', 'a')], importerRows: [importerRow('CD_I2', 'b')],
+    })).toEqual([]);
+    expect(capturedOverlapProviders({
+      ledgerRows: [linked('CD_I1', 'a')], importerRows: [importerRow('CD_I1', 'b')],
+    })).toEqual([]);
+    // a revoked (not net-linked) ledger row never overlaps, even with a matching importer row
+    expect(capturedOverlapProviders({
+      ledgerRows: [linked('CD_I1', 'a', 'revoked')], importerRows: [importerRow('CD_I1', 'a')],
+    })).toEqual([]);
+    // same provider, same identity, net-linked -> overlap, named, sorted
+    expect(capturedOverlapProviders({
+      ledgerRows: [linked('CD_I2', 'b'), linked('CD_I1', 'a')],
+      importerRows: [importerRow('CD_I1', 'a'), importerRow('CD_I2', 'b')],
+    })).toEqual(['CD_I1', 'CD_I2']);
+    // only the LATEST action per provider counts (net): linked then revoked -> no overlap
+    expect(capturedOverlapProviders({
+      ledgerRows: [linked('CD_I1', 'a'), { ...linked('CD_I1', 'a', 'revoked'), id: 2 }],
+      importerRows: [importerRow('CD_I1', 'a')],
+    })).toEqual([]);
+  });
+
+  it('E_promotion — G2.AGREE, the non-empty exact-set semantics (D9 promotion)', async () => {
+    const { aflApiSupersedeMismatch } = await import('@/lib/acquisition/afl-api-adjudication');
+    // E_promotion empty, zero actual supersedes -> pass (no mismatch)
+    expect(aflApiSupersedeMismatch({ expected: new Set(), actual: [] })).toEqual({ missing: [], extra: [] });
+    // E_promotion empty, one actual supersede -> STOP (extra)
+    expect(aflApiSupersedeMismatch({ expected: new Set(), actual: [{ externalId: 'CD_I1' }] }))
+      .toEqual({ missing: [], extra: ['CD_I1'] });
+    // E_promotion non-empty and equal to the actual set -> pass
+    expect(aflApiSupersedeMismatch({ expected: new Set(['CD_I1']), actual: [{ externalId: 'CD_I1' }] }))
+      .toEqual({ missing: [], extra: [] });
+    // a provider missing from the actual set -> STOP
+    expect(aflApiSupersedeMismatch({ expected: new Set(['CD_I1']), actual: [] }))
+      .toEqual({ missing: ['CD_I1'], extra: [] });
+    // an additional provider in the actual set -> STOP
+    expect(aflApiSupersedeMismatch({ expected: new Set(['CD_I1']), actual: [{ externalId: 'CD_I1' }, { externalId: 'CD_I2' }] }))
+      .toEqual({ missing: [], extra: ['CD_I2'] });
+  });
+
+  it('censusAflApiRows / classifyAflApiCensusRow — every D5 anomaly class', async () => {
+    const { censusAflApiRows } = await import('@/lib/acquisition/afl-api-adjudication');
+    const importerRow = { externalId: 'CD_I1', status: 'unique', matchMethod: 'afl_api_stat_vector_bootstrap', playerId: 1, candidateCount: 1, externalUrl: null };
+    const humanRow = { externalId: 'CD_I2', status: 'resolved', matchMethod: 'afl_api_admin_adjudication', playerId: 2, candidateCount: 0, externalUrl: null };
+    const clean = censusAflApiRows([importerRow, humanRow]);
+    expect(clean.anomalies).toEqual([]);
+    expect(clean.importerRows).toHaveLength(1);
+    expect(clean.humanRows).toHaveLength(1);
+
+    const anomalyCases = [
+      { ...importerRow, playerId: null }, // NULL player
+      { ...importerRow, matchMethod: 'not_approved' }, // unsupported method
+      { ...importerRow, candidateCount: 2 }, // unexpected candidate_count
+      { ...importerRow, externalUrl: 'https://example.com' }, // non-NULL url
+      { ...humanRow, matchMethod: 'afl_api_stat_vector_bootstrap' }, // resolved under another method
+      { externalId: 'CD_I3', status: 'pending', matchMethod: null, playerId: null, candidateCount: 0, externalUrl: null }, // unsupported status
+      { ...humanRow, playerId: null }, // resolved with NULL player
+    ];
+    for (const row of anomalyCases) {
+      expect(censusAflApiRows([row]).anomalies, JSON.stringify(row)).toHaveLength(1);
+    }
+  });
+
+  it('classifyAflApiG2 — AGREE, DISAGREE, COLLISION, UNSUPPORTED, manual-token FAIL, revoked INFO', async () => {
+    const { classifyAflApiG2 } = await import('@/lib/acquisition/afl-api-adjudication');
+    const fullRow = (playerId: number) => ({
+      status: 'unique', matchMethod: 'afl_api_stat_vector_bootstrap', candidateCount: 1,
+      externalUrl: null, playerId, playerIdentity: 'a',
+    });
+    const entry = (overrides: Partial<Parameters<typeof classifyAflApiG2>[0][number]>) => ({
+      externalId: 'CD_I1', ledgerNetAction: 'linked' as const, identityIsManualToken: false,
+      candidateRow: null, remappedCandidatePlayerId: null, collidingProviderId: null,
+      ...overrides,
+    });
+
+    expect(classifyAflApiG2([entry({ candidateRow: fullRow(907), remappedCandidatePlayerId: 907 })]))
+      .toEqual([{ externalId: 'CD_I1', outcome: 'AGREE' }]);
+    expect(classifyAflApiG2([entry({ candidateRow: fullRow(907), remappedCandidatePlayerId: 555 })]))
+      .toEqual([{ externalId: 'CD_I1', outcome: 'DISAGREE' }]);
+    expect(classifyAflApiG2([entry({ collidingProviderId: 'CD_I9' })]))
+      .toEqual([{ externalId: 'CD_I1', outcome: 'COLLISION', collidingProviderId: 'CD_I9' }]);
+    expect(classifyAflApiG2([entry({ candidateRow: { ...fullRow(907), matchMethod: 'not_approved' }, remappedCandidatePlayerId: 907 })]))
+      .toEqual([{ externalId: 'CD_I1', outcome: 'UNSUPPORTED' }]);
+    expect(classifyAflApiG2([entry({ identityIsManualToken: true, candidateRow: fullRow(907), remappedCandidatePlayerId: 907 })]))
+      .toEqual([{ externalId: 'CD_I1', outcome: 'UNEVALUABLE' }]);
+    expect(classifyAflApiG2([entry({ ledgerNetAction: 'revoked', candidateRow: fullRow(907) })]))
+      .toEqual([{ externalId: 'CD_I1', outcome: 'INFO_REVOKED_CANDIDATE' }]);
+    // a revoked entry with no candidate row: nothing to report
+    expect(classifyAflApiG2([entry({ ledgerNetAction: 'revoked', candidateRow: null })])).toEqual([]);
+    // a net-linked entry with no candidate row at all: outside the table (ordinary D15 insert)
+    expect(classifyAflApiG2([entry({ candidateRow: null })])).toEqual([]);
+  });
+
+  it('classifyAflApiG3 production — hard loss FAILs for every method, no WARN grade exists', async () => {
+    const { classifyAflApiG3 } = await import('@/lib/acquisition/afl-api-adjudication');
+    const target = (externalId: string, matchMethod: string) => ({ externalId, playerIdentity: 'a', matchMethod });
+
+    for (const method of ['afl_api_stat_vector_bootstrap', 'afl_api_name_team_season_bootstrap', 'afl_api_manual_adjudication', 'afl_api_stat_vector_season']) {
+      expect(classifyAflApiG3({ environment: 'production', targetRows: [target('CD_I1', method)], candidateRows: [] }))
+        .toEqual([{ externalId: 'CD_I1', outcome: 'FAIL', reason: 'hard_loss' }]);
+    }
+    // method change -> FAIL in production
+    expect(classifyAflApiG3({
+      environment: 'production',
+      targetRows: [target('CD_I1', 'afl_api_stat_vector_bootstrap')],
+      candidateRows: [{ externalId: 'CD_I1', playerIdentity: 'a', matchMethod: 'afl_api_manual_adjudication' }],
+    })).toEqual([{ externalId: 'CD_I1', outcome: 'FAIL', reason: 'method_changed' }]);
+    // disagreement -> FAIL
+    expect(classifyAflApiG3({
+      environment: 'production',
+      targetRows: [target('CD_I1', 'afl_api_stat_vector_bootstrap')],
+      candidateRows: [{ externalId: 'CD_I1', playerIdentity: 'b', matchMethod: 'afl_api_stat_vector_bootstrap' }],
+    })).toEqual([{ externalId: 'CD_I1', outcome: 'FAIL', reason: 'disagreement' }]);
+    // collision -> FAIL (plus the candidate's own provider is gained coverage, INFO)
+    expect(classifyAflApiG3({
+      environment: 'production',
+      targetRows: [target('CD_I1', 'afl_api_stat_vector_bootstrap')],
+      candidateRows: [{ externalId: 'CD_I9', playerIdentity: 'a', matchMethod: 'afl_api_stat_vector_bootstrap' }],
+    })).toEqual([
+      { externalId: 'CD_I1', outcome: 'FAIL', reason: 'collision' },
+      { externalId: 'CD_I9', outcome: 'INFO', reason: 'gained_coverage' },
+    ]);
+    // gain -> INFO
+    expect(classifyAflApiG3({
+      environment: 'production', targetRows: [],
+      candidateRows: [{ externalId: 'CD_I9', playerIdentity: 'a', matchMethod: 'afl_api_stat_vector_bootstrap' }],
+    })).toEqual([{ externalId: 'CD_I9', outcome: 'INFO', reason: 'gained_coverage' }]);
+    // same provider, same identity, same method -> PASS
+    expect(classifyAflApiG3({
+      environment: 'production',
+      targetRows: [target('CD_I1', 'afl_api_stat_vector_bootstrap')],
+      candidateRows: [{ externalId: 'CD_I1', playerIdentity: 'a', matchMethod: 'afl_api_stat_vector_bootstrap' }],
+    })).toEqual([{ externalId: 'CD_I1', outcome: 'PASS' }]);
+    // a classification file supplied under production is never consulted
+    expect(classifyAflApiG3({
+      environment: 'production', targetRows: [target('CD_I1', 'afl_api_stat_vector_season')], candidateRows: [],
+      devRegenerationEntries: [{ externalId: 'CD_I1', playerIdentity: 'a', matchMethod: 'afl_api_stat_vector_season' }],
+    })).toEqual([{ externalId: 'CD_I1', outcome: 'FAIL', reason: 'hard_loss' }]);
+  });
+
+  it('classifyAflApiG3 DEV — the narrow season-class regeneration exception, everything else as production', async () => {
+    const { classifyAflApiG3 } = await import('@/lib/acquisition/afl-api-adjudication');
+    const target = (externalId: string, matchMethod = 'afl_api_stat_vector_season') => ({ externalId, playerIdentity: 'a', matchMethod });
+
+    // an unlisted loss -> FAIL
+    expect(classifyAflApiG3({ environment: 'dev', targetRows: [target('CD_I1')], candidateRows: [] }))
+      .toEqual([{ externalId: 'CD_I1', outcome: 'FAIL', reason: 'hard_loss' }]);
+    // a listed season-class loss -> WARN
+    expect(classifyAflApiG3({
+      environment: 'dev', targetRows: [target('CD_I1')], candidateRows: [],
+      devRegenerationEntries: [{ externalId: 'CD_I1', playerIdentity: 'a', matchMethod: 'afl_api_stat_vector_season' }],
+    })).toEqual([{ externalId: 'CD_I1', outcome: 'WARN', reason: 'hard_loss_regeneration' }]);
+    // a listed loss of another (non-eligible) class -> FAIL
+    expect(classifyAflApiG3({
+      environment: 'dev', targetRows: [target('CD_I1', 'afl_api_stat_vector_bootstrap')], candidateRows: [],
+      devRegenerationEntries: [{ externalId: 'CD_I1', playerIdentity: 'a', matchMethod: 'afl_api_stat_vector_bootstrap' }],
+    })).toEqual([{ externalId: 'CD_I1', outcome: 'FAIL', reason: 'hard_loss' }]);
+    // a listed entry that does not match the target row -> not eligible, FAIL
+    expect(classifyAflApiG3({
+      environment: 'dev', targetRows: [target('CD_I1')], candidateRows: [],
+      devRegenerationEntries: [{ externalId: 'CD_I1', playerIdentity: 'DIFFERENT', matchMethod: 'afl_api_stat_vector_season' }],
+    })).toEqual([{ externalId: 'CD_I1', outcome: 'FAIL', reason: 'hard_loss' }]);
+    // a listed entry whose identity is actually held by ANOTHER candidate provider -- G3's own
+    // "identity held elsewhere" collision row applies (never eligible for the WARN exception,
+    // classification or no), and that same candidate row is also reported as gained coverage.
+    expect(classifyAflApiG3({
+      environment: 'dev', targetRows: [target('CD_I1')],
+      candidateRows: [{ externalId: 'CD_I9', playerIdentity: 'a', matchMethod: 'afl_api_stat_vector_season' }],
+      devRegenerationEntries: [{ externalId: 'CD_I1', playerIdentity: 'a', matchMethod: 'afl_api_stat_vector_season' }],
+    })).toEqual([
+      { externalId: 'CD_I1', outcome: 'FAIL', reason: 'collision' },
+      { externalId: 'CD_I9', outcome: 'INFO', reason: 'gained_coverage' },
+    ]);
+    // method change -> WARN on DEV (unlike production's FAIL)
+    expect(classifyAflApiG3({
+      environment: 'dev',
+      targetRows: [target('CD_I1', 'afl_api_stat_vector_bootstrap')],
+      candidateRows: [{ externalId: 'CD_I1', playerIdentity: 'a', matchMethod: 'afl_api_manual_adjudication' }],
+    })).toEqual([{ externalId: 'CD_I1', outcome: 'WARN', reason: 'method_changed' }]);
+  });
+
+  it('validateAflApiDevRegenerationClassification — a stale or wrong classification entry refuses', async () => {
+    const { validateAflApiDevRegenerationClassification } = await import('@/lib/acquisition/afl-api-adjudication');
+    const targetRows = [{ externalId: 'CD_I1', playerIdentity: 'a', matchMethod: 'afl_api_stat_vector_season' }];
+    // a matching, eligible, absent, non-colliding entry -> clean
+    expect(validateAflApiDevRegenerationClassification({
+      entries: [{ externalId: 'CD_I1', playerIdentity: 'a', matchMethod: 'afl_api_stat_vector_season' }],
+      targetRows, candidateRows: [],
+    })).toEqual([]);
+    // a tampered/stale entry that does not match the target row
+    expect(validateAflApiDevRegenerationClassification({
+      entries: [{ externalId: 'CD_I1', playerIdentity: 'WRONG', matchMethod: 'afl_api_stat_vector_season' }],
+      targetRows, candidateRows: [],
+    })).toEqual([{ kind: 'entry_does_not_match_target', externalId: 'CD_I1' }]);
+    // a listed entry still present in the candidate
+    expect(validateAflApiDevRegenerationClassification({
+      entries: [{ externalId: 'CD_I1', playerIdentity: 'a', matchMethod: 'afl_api_stat_vector_season' }],
+      targetRows, candidateRows: [{ externalId: 'CD_I1', playerIdentity: 'a', matchMethod: 'afl_api_stat_vector_season' }],
+    })).toEqual([{ kind: 'entry_not_absent_from_candidate', externalId: 'CD_I1' }]);
+  });
+
+  it('classifyAflApiDevRegenerationCensus — the mandatory post-re-acquisition verification', async () => {
+    const { classifyAflApiDevRegenerationCensus } = await import('@/lib/acquisition/afl-api-adjudication');
+    const entries = [{ externalId: 'CD_I1', playerIdentity: 'a', matchMethod: 'afl_api_stat_vector_season' }];
+    // all regenerated -> PASS
+    expect(classifyAflApiDevRegenerationCensus({
+      entries, afterRows: [{ externalId: 'CD_I1', playerIdentity: 'a', matchMethod: 'afl_api_stat_vector_season', status: 'unique' }],
+    })).toEqual([{ externalId: 'CD_I1', outcome: 'PASS' }]);
+    // one absent -> FAIL
+    expect(classifyAflApiDevRegenerationCensus({ entries, afterRows: [] }))
+      .toEqual([{ externalId: 'CD_I1', outcome: 'FAIL', reason: 'absent' }]);
+    // one under another identity -> FAIL
+    expect(classifyAflApiDevRegenerationCensus({
+      entries, afterRows: [{ externalId: 'CD_I1', playerIdentity: 'DIFFERENT', matchMethod: 'afl_api_stat_vector_season', status: 'unique' }],
+    })).toEqual([{ externalId: 'CD_I1', outcome: 'FAIL', reason: 'different_identity' }]);
+    // one under another method -> FAIL
+    expect(classifyAflApiDevRegenerationCensus({
+      entries, afterRows: [{ externalId: 'CD_I1', playerIdentity: 'a', matchMethod: 'afl_api_stat_vector_bootstrap', status: 'unique' }],
+    })).toEqual([{ externalId: 'CD_I1', outcome: 'FAIL', reason: 'different_method_or_status' }]);
+  });
+
+  it('classifyAflApiG1 — census anomaly, resolved row, ledger row, unresolved identity, multi-row player, marker present', async () => {
+    const { classifyAflApiG1 } = await import('@/lib/acquisition/afl-api-adjudication');
+    const importerRow = (externalId: string, playerId: number) => ({
+      externalId, status: 'unique', matchMethod: 'afl_api_stat_vector_bootstrap', playerId, candidateCount: 1, externalUrl: null,
+    });
+    const resolved: AflApiForwardIdentityResult = { ok: true, identity: 'a', via: 'afltables' };
+
+    expect(classifyAflApiG1({
+      rows: [importerRow('CD_I1', 1)], ledgerRowCount: 0,
+      identityByPlayerId: new Map([[1, resolved]]), rebuildMarkerPresent: false,
+    })).toEqual([]);
+    expect(classifyAflApiG1({ rows: [], ledgerRowCount: 0, identityByPlayerId: new Map(), rebuildMarkerPresent: true }))
+      .toContainEqual({ kind: 'rebuild_marker_present' });
+    expect(classifyAflApiG1({ rows: [], ledgerRowCount: 3, identityByPlayerId: new Map(), rebuildMarkerPresent: false }))
+      .toContainEqual({ kind: 'ledger_row_present', count: 3 });
+    expect(classifyAflApiG1({
+      rows: [{ externalId: 'CD_I1', status: 'resolved', matchMethod: 'afl_api_admin_adjudication', playerId: 1, candidateCount: 0, externalUrl: null }],
+      ledgerRowCount: 0, identityByPlayerId: new Map(), rebuildMarkerPresent: false,
+    })).toContainEqual({ kind: 'resolved_row_present', externalId: 'CD_I1' });
+    expect(classifyAflApiG1({
+      rows: [importerRow('CD_I1', 1)], ledgerRowCount: 0,
+      identityByPlayerId: new Map(), rebuildMarkerPresent: false,
+    })).toContainEqual({ kind: 'unresolved_identity', externalId: 'CD_I1', reason: 'no_identity' });
+    expect(classifyAflApiG1({
+      rows: [importerRow('CD_I1', 1), importerRow('CD_I2', 1)], ledgerRowCount: 0,
+      identityByPlayerId: new Map([[1, resolved]]), rebuildMarkerPresent: false,
+    })).toContainEqual({ kind: 'player_holds_multiple_rows', playerId: 1, externalIds: ['CD_I1', 'CD_I2'] });
+  });
+
+  it('AFLDB-ISSUE-237 F-L4-3 — classifyAflApiG1 boundLedger: the reinstated TARGET ledger passes only when it is exactly the bound one', async () => {
+    const { classifyAflApiG1 } = await import('@/lib/acquisition/afl-api-adjudication');
+    const base = { rows: [], identityByPlayerId: new Map(), rebuildMarkerPresent: false } as const;
+    const sha = 'a'.repeat(64);
+    // source (no boundLedger): any ledger row refuses, exactly as before
+    expect(classifyAflApiG1({ ...base, ledgerRowCount: 2 })).toEqual([{ kind: 'ledger_row_present', count: 2 }]);
+    // candidate (boundLedger): the bound ledger passes, any drift refuses
+    expect(classifyAflApiG1({ ...base, ledgerRowCount: 2, boundLedger: { boundRowCount: 2, boundSha256: sha, actualSha256: sha } })).toEqual([]);
+    for (const [ledgerRowCount, actualSha256] of [[1, sha], [3, sha], [2, 'b'.repeat(64)], [0, sha]] as const) {
+      expect(classifyAflApiG1({ ...base, ledgerRowCount, boundLedger: { boundRowCount: 2, boundSha256: sha, actualSha256 } }))
+        .toEqual([{ kind: 'ledger_not_bound_target_state', boundRowCount: 2, actualRowCount: ledgerRowCount, boundSha256: sha, actualSha256 }]);
+    }
+    // a bound EMPTY ledger is bound as strongly
+    expect(classifyAflApiG1({ ...base, ledgerRowCount: 1, boundLedger: { boundRowCount: 0, boundSha256: sha, actualSha256: 'c'.repeat(64) } }))
+      .toHaveLength(1);
+    // resolved rows still refuse with a bound ledger: D15 has not run yet
+    expect(classifyAflApiG1({
+      ...base, rows: [{ externalId: 'CD_I1', status: 'resolved', matchMethod: 'afl_api_admin_adjudication', playerId: 1, candidateCount: 0, externalUrl: null }],
+      ledgerRowCount: 0, boundLedger: { boundRowCount: 0, boundSha256: sha, actualSha256: sha },
+    })).toContainEqual({ kind: 'resolved_row_present', externalId: 'CD_I1' });
+  });
+
+  it('AFLDB-ISSUE-237 F-L4-2 — classifyAflApiG2 grades an unresolvable/ambiguous ledger identity UNRESOLVED (refusing), never AGREE', async () => {
+    const { classifyAflApiG2, aflApiG2AgreeSet, AFL_API_G2_REFUSING_OUTCOMES } = await import('@/lib/acquisition/afl-api-adjudication');
+    const entry = { externalId: 'CD_I1', ledgerNetAction: 'linked' as const, identityIsManualToken: false, candidateRow: null,
+      remappedCandidatePlayerId: null, collidingProviderId: null };
+    for (const remapFailure of ['unresolvable', 'ambiguous'] as const) {
+      const grades = classifyAflApiG2([{ ...entry, remapFailure }]);
+      expect(grades).toEqual([{ externalId: 'CD_I1', outcome: 'UNRESOLVED', reason: remapFailure }]);
+      expect(AFL_API_G2_REFUSING_OUTCOMES.has(grades[0].outcome)).toBe(true);
+      expect(aflApiG2AgreeSet(grades).size).toBe(0);
+    }
+    // omitted = the pre-fix caller: no grade for the INSERT case, unchanged
+    expect(classifyAflApiG2([entry])).toEqual([]);
+    // a revoked entry is never UNRESOLVED
+    expect(classifyAflApiG2([{ ...entry, ledgerNetAction: 'revoked', remapFailure: 'unresolvable' }])).toEqual([]);
+    for (const outcome of ['AGREE', 'INFO_REVOKED_CANDIDATE'] as const) expect(AFL_API_G2_REFUSING_OUTCOMES.has(outcome)).toBe(false);
+  });
+
+  it('AFLDB-ISSUE-237 F-L4-4 — state digests: stable fields only, order-independent, bigint-as-string safe', async () => {
+    const { aflApiImporterStateSha256, aflApiLedgerStateSha256 } = await import('@/lib/acquisition/afl-api-adjudication');
+    const rows = [
+      { externalId: 'CD_I2', status: 'unique', matchMethod: 'afl_api_stat_vector_season', playerIdentity: 'players/B/B.html' },
+      { externalId: 'CD_I1', status: 'unique', matchMethod: 'afl_api_stat_vector_bootstrap', playerIdentity: null },
+    ];
+    expect(aflApiImporterStateSha256(rows)).toBe(aflApiImporterStateSha256([...rows].reverse()));
+    expect(aflApiImporterStateSha256(rows)).not.toBe(aflApiImporterStateSha256([{ ...rows[0], playerIdentity: 'players/C/C.html' }, rows[1]]));
+    expect(() => aflApiImporterStateSha256([rows[0], rows[0]])).toThrow(/appears twice/);
+
+    const ledger = [
+      { id: 7, externalId: 'CD_I1', action: 'linked' as const, playerId: 900, playerIdentity: 'players/A/A.html', supersedesId: null },
+      { id: 9, externalId: 'CD_I1', action: 'revoked' as const, playerId: 900, playerIdentity: 'players/A/A.html', supersedesId: 7 },
+    ];
+    const sha = aflApiLedgerStateSha256(ledger);
+    // player_id is remapped by the promotion reinstatement, so it is not part of the digest
+    expect(aflApiLedgerStateSha256(ledger.map((r) => ({ ...r, playerId: 10 })))).toBe(sha);
+    // postgres.js returns bigint id/supersedes_id as strings: the same ledger hashes the same
+    expect(aflApiLedgerStateSha256(ledger.map((r) => ({ ...r, id: String(r.id), supersedesId: r.supersedesId === null ? null : String(r.supersedesId) })) as never)).toBe(sha);
+    expect(aflApiLedgerStateSha256([...ledger].reverse())).toBe(sha);
+    expect(aflApiLedgerStateSha256([ledger[0]])).not.toBe(sha);
+    expect(aflApiLedgerStateSha256([{ ...ledger[0], action: 'revoked' }, ledger[1]])).not.toBe(sha);
+    expect(() => aflApiLedgerStateSha256([ledger[0], ledger[0]])).toThrow(/appears twice/);
+  });
+
+  it('aflApiRebuildIdentityRefusalReason — D7\'s rebuild-only manual-token refusal', async () => {
+    const { aflApiRebuildIdentityRefusalReason } = await import('@/lib/acquisition/afl-api-adjudication');
+    expect(aflApiRebuildIdentityRefusalReason({ ok: true, identity: 'a', via: 'afltables' })).toBeNull();
+    expect(aflApiRebuildIdentityRefusalReason({ ok: true, identity: 'tok', via: 'manual_admin_edit' }))
+      .toContain('manual_admin_edit token');
+    expect(aflApiRebuildIdentityRefusalReason({ ok: false, reason: 'ambiguous' })).toContain('more than one');
+    expect(aflApiRebuildIdentityRefusalReason({ ok: false, reason: 'no_identity' })).toContain('no accepted stable identity');
+  });
+
+  /*
+   * Continuity amendment (operator-approved 2026-09-25): exactly one tracked
+   * profile_url_continuity pair resolves to the rule's continuing_url; every other multi-path
+   * case stays ambiguous. The rules come only from the validated fitzRoy contract.
+   */
+  describe('continuity amendment — classifyAflApiForwardIdentity and the fitzRoy contract parser', () => {
+    const ruleJson = (over: Record<string, unknown> = {}) => ({
+      id: 'test-renumbered-profile', dataset: 'player_stats', file: 'player_stats_2025.csv',
+      continuing_url: 'players/Q/Quinn_Test.html', renumbered_url: 'players/Q/Quinn_Test2.html',
+      expect: {
+        continuing_id: '99001', continuing_last_season: 2024, continuing_last_career_game: 10,
+        renumbered_first_season: 2025, renumbered_last_season: 2025, renumbered_first_career_game: 11,
+        renumbered_rows: 3,
+      },
+      authority: 'test authority', reason: 'test reason', ...over,
+    });
+    const contractOf = (...rules: unknown[]) => ({ profile_url_continuity: { rules } });
+    const load = async () => {
+      const adjudication = await import('@/lib/acquisition/afl-api-adjudication');
+      const continuity = await import('@/lib/acquisition/fitzroy-profile-continuity');
+      const rules = continuity.parseFitzroyProfileContinuityRules(contractOf(ruleJson()));
+      const classify = (afltablesPaths: string[], manualIdentities: string[] = [], continuityRules = rules) =>
+        adjudication.classifyAflApiForwardIdentity({ afltablesPaths, manualIdentities, continuityRules });
+      return { ...adjudication, ...continuity, rules, classify };
+    };
+    const CONT = 'players/Q/Quinn_Test.html';
+    const RENUM = 'players/Q/Quinn_Test2.html';
+    const OTHER = 'players/Z/Unrelated_Profile.html';
+
+    it('one path is unchanged; the exact pair resolves to continuing_url in either order', async () => {
+      const { classify } = await load();
+      expect(classify([OTHER])).toEqual({ ok: true, identity: OTHER, via: 'afltables' });
+      expect(classify([CONT, RENUM])).toEqual({ ok: true, identity: CONT, via: 'afltables' });
+      expect(classify([RENUM, CONT])).toEqual({ ok: true, identity: CONT, via: 'afltables' });
+      expect(classify([RENUM, CONT, RENUM])).toEqual({ ok: true, identity: CONT, via: 'afltables' }); // duplicates collapse
+    });
+
+    it('every non-exact multi-path case stays ambiguous', async () => {
+      const { classify } = await load();
+      const ambiguous = { ok: false, reason: 'ambiguous' };
+      expect(classify([CONT, OTHER])).toEqual(ambiguous);
+      expect(classify([RENUM, OTHER])).toEqual(ambiguous);
+      expect(classify([CONT, RENUM, OTHER])).toEqual(ambiguous);
+      expect(classify(['players/A/Alpha_One.html', 'players/A/Alpha_One2.html'])).toEqual(ambiguous); // no rule names them
+      expect(classify([CONT, RENUM], [], [] as never)).toEqual(ambiguous); // no rules loaded -> no exception
+    });
+
+    it('the continuing path is chosen by the rule, never by sort order', async () => {
+      const { parseFitzroyProfileContinuityRules, classify } = await load();
+      // continuing_url sorts AFTER renumbered_url, so a lexicographic pick would return the wrong one
+      const rules = parseFitzroyProfileContinuityRules(contractOf(ruleJson({
+        continuing_url: 'players/Z/Zed_Zulu9.html', renumbered_url: 'players/A/Zed_Zulu.html',
+      })));
+      expect(['players/A/Zed_Zulu.html', 'players/Z/Zed_Zulu9.html'].sort()[0]).toBe('players/A/Zed_Zulu.html');
+      for (const order of [['players/A/Zed_Zulu.html', 'players/Z/Zed_Zulu9.html'], ['players/Z/Zed_Zulu9.html', 'players/A/Zed_Zulu.html']]) {
+        expect(classify(order, [], rules)).toEqual({ ok: true, identity: 'players/Z/Zed_Zulu9.html', via: 'afltables' });
+      }
+    });
+
+    it('manual-admin semantics are unchanged, and an exact pair keeps AFL Tables precedence over a token', async () => {
+      const { classify } = await load();
+      expect(classify([CONT, RENUM], ['tok-1'])).toEqual({ ok: true, identity: CONT, via: 'afltables' });
+      expect(classify([OTHER], ['tok-1'])).toEqual({ ok: true, identity: OTHER, via: 'afltables' });
+      expect(classify([], ['tok-1'])).toEqual({ ok: true, identity: 'tok-1', via: 'manual_admin_edit' });
+      expect(classify([], ['tok-1', 'tok-2'])).toEqual({ ok: false, reason: 'ambiguous' });
+      expect(classify([], [])).toEqual({ ok: false, reason: 'no_identity' });
+      // a non-exact pair is NOT rescued by a manual token: AFL Tables ambiguity still wins
+      expect(classify([CONT, OTHER], ['tok-1'])).toEqual({ ok: false, reason: 'ambiguous' });
+    });
+
+    it('classifyAflApiForwardIdentityRows groups per player and reports a player with no row as no_identity', async () => {
+      const { classifyAflApiForwardIdentityRows, rules } = await load();
+      const result = classifyAflApiForwardIdentityRows({
+        playerIds: [1, 2, 3, 4],
+        rows: [
+          { playerId: 1, externalId: RENUM, sourceKey: 'afltables' },
+          { playerId: 1, externalId: CONT, sourceKey: 'afltables' },
+          { playerId: 2, externalId: CONT, sourceKey: 'afltables' },
+          { playerId: 2, externalId: OTHER, sourceKey: 'afltables' },
+          { playerId: 3, externalId: 'tok-3', sourceKey: 'manual_admin_edit' },
+        ],
+        continuityRules: rules,
+      });
+      expect([...result.entries()]).toEqual([
+        [1, { ok: true, identity: CONT, via: 'afltables' }],
+        [2, { ok: false, reason: 'ambiguous' }],
+        [3, { ok: true, identity: 'tok-3', via: 'manual_admin_edit' }],
+        [4, { ok: false, reason: 'no_identity' }],
+      ]);
+    });
+
+    it('the real tracked contract parses, and each of its rules folds to that rule\'s own continuing_url', async () => {
+      const { loadFitzroyProfileContinuityRules, classify } = await load();
+      const real = loadFitzroyProfileContinuityRules();
+      expect(real.length).toBeGreaterThan(0);
+      for (const rule of real) {
+        expect(classify([rule.renumberedUrl, rule.continuingUrl], [], real))
+          .toEqual({ ok: true, identity: rule.continuingUrl, via: 'afltables' });
+      }
+    });
+
+    it('an unreadable, non-JSON or non-object contract fails closed', async () => {
+      const { loadFitzroyProfileContinuityRules, parseFitzroyProfileContinuityRules, FitzroyProfileContinuityContractError } = await load();
+      const dir = mkdtempSync(join(tmpdir(), 'afldb-i237-continuity-'));
+      try {
+        expect(() => loadFitzroyProfileContinuityRules(join(dir, 'missing.json'))).toThrow(FitzroyProfileContinuityContractError);
+        expect(() => loadFitzroyProfileContinuityRules(join(dir, 'missing.json'))).toThrow(/could not be read/);
+        writeFileSync(join(dir, 'bad.json'), '{"profile_url_continuity": ');
+        expect(() => loadFitzroyProfileContinuityRules(join(dir, 'bad.json'))).toThrow(/not valid JSON/);
+        writeFileSync(join(dir, 'ok.json'), JSON.stringify(contractOf(ruleJson())));
+        expect(loadFitzroyProfileContinuityRules(join(dir, 'ok.json')).map((r) => r.continuingUrl)).toEqual([CONT]);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+      for (const bad of [null, [], 'x', { profile_url_continuity: [] }, { profile_url_continuity: { rules: {} } }]) {
+        expect(() => parseFitzroyProfileContinuityRules(bad), JSON.stringify(bad)).toThrow(FitzroyProfileContinuityContractError);
+      }
+    });
+
+    it('duplicate, self-mapping, chained or otherwise invalid rules refuse the WHOLE contract', async () => {
+      const { parseFitzroyProfileContinuityRules } = await load();
+      const expectOf = (over: Record<string, unknown>) => ({ ...ruleJson().expect, ...over });
+      const cases: [string, unknown[], RegExp][] = [
+        ['duplicate id', [ruleJson(), ruleJson({ renumbered_url: 'players/Q/Quinn_Test3.html' })], /id must be a unique/],
+        ['duplicate renumbered path', [ruleJson(), ruleJson({ id: 'b', continuing_url: 'players/Q/Quinn_Other.html' })], /named by more than one rule/],
+        ['self mapping', [ruleJson({ renumbered_url: CONT })], /are the same path/],
+        ['chain', [ruleJson(), ruleJson({ id: 'b', continuing_url: RENUM, renumbered_url: 'players/Q/Quinn_Test3.html' })], /chains are not inferred/],
+        ['un-normalised path', [ruleJson({ renumbered_url: 'https://afltables.com/afl/stats/players/Q/Quinn_Test2.html' })], /normalised profile path/],
+        ['wrong dataset', [ruleJson({ dataset: 'results' })], /dataset must be 'player_stats'/],
+        ['bad file', [ruleJson({ file: 'player_stats.csv' })], /file must name/],
+        ['file season mismatch', [ruleJson({ file: 'player_stats_2024.csv' })], /file must be the artefact/],
+        ['missing expect', [ruleJson({ expect: undefined })], /expect must be an object/],
+        ['missing expect key', [ruleJson({ expect: { continuing_id: '1' } })], /expect lacks/],
+        ['blank continuing id', [ruleJson({ expect: expectOf({ continuing_id: ' ' }) })], /continuing_id must be/],
+        ['non-integer fact', [ruleJson({ expect: expectOf({ renumbered_rows: '3' }) })], /non-negative integer/],
+        ['boolean fact', [ruleJson({ expect: expectOf({ renumbered_rows: true }) })], /non-negative integer/],
+        ['overlapping seasons', [ruleJson({ expect: expectOf({ continuing_last_season: 2025 }) })], /may never overlap/],
+        ['career game gap', [ruleJson({ expect: expectOf({ renumbered_first_career_game: 12 }) })], /exactly continuing_last_career_game \+ 1/],
+        ['zero rows', [ruleJson({ expect: expectOf({ renumbered_rows: 0 }) })], /at least 1/],
+        ['reversed renumbered seasons', [ruleJson({ expect: expectOf({ renumbered_last_season: 2024, continuing_last_season: 2023 }) })], /precedes renumbered_first_season/],
+        ['blank authority', [ruleJson({ authority: '' })], /authority must be a non-empty string/],
+        ['non-object rule', ['players/Q/Quinn_Test.html'], /a rule must be an object/],
+      ];
+      for (const [name, rules, message] of cases) {
+        expect(() => parseFitzroyProfileContinuityRules(contractOf(...rules)), name).toThrow(message);
+      }
+      // a valid rule alongside an invalid one does not survive: the contract refuses as a whole
+      expect(() => parseFitzroyProfileContinuityRules(contractOf(ruleJson(), ruleJson({ id: 'b', renumbered_url: 'bad' }))))
+        .toThrow(/normalised profile path/);
+    });
+
+    /*
+     * Reverse direction (identity -> target player): a tracked rule asserts its two paths are
+     * one footballer, so an identity the rule names resolves only when the target holds BOTH
+     * paths on the SAME single player. Every other target state refuses — never a fallback to
+     * the identity's own path alone.
+     */
+    describe('continuity amendment — classifyAflApiReverseIdentity (target must prove the pair)', () => {
+      const reverse = async (identity: string, byPath: Record<string, number[]>) => {
+        const { classifyAflApiReverseIdentity, rules } = await load();
+        return classifyAflApiReverseIdentity({
+          identity, playerIdsByPath: new Map(Object.entries(byPath)), continuityRules: rules,
+        });
+      };
+      const contradiction = (refusal: string, continuingPlayerIds: number[], renumberedPlayerIds: number[]) => ({
+        ok: false, reason: 'continuity_contradiction', ruleId: 'test-renumbered-profile', refusal,
+        continuingPlayerIds, renumberedPlayerIds,
+      });
+
+      it('(1) the exact pair folded onto one target player resolves, from either path of the rule', async () => {
+        expect(await reverse(CONT, { [CONT]: [7], [RENUM]: [7] }))
+          .toEqual({ ok: true, newPlayerId: 7, remappedIdentity: CONT });
+        expect(await reverse(RENUM, { [CONT]: [7], [RENUM]: [7] }))
+          .toEqual({ ok: true, newPlayerId: 7, remappedIdentity: RENUM });
+        // duplicate rows for one player collapse
+        expect(await reverse(CONT, { [CONT]: [7, 7], [RENUM]: [7] }))
+          .toEqual({ ok: true, newPlayerId: 7, remappedIdentity: CONT });
+      });
+
+      it('(2) continuing on player A and renumbered on player B is a split — STOP, never A alone', async () => {
+        expect(await reverse(CONT, { [CONT]: [7], [RENUM]: [8] })).toEqual(contradiction('split', [7], [8]));
+        expect(await reverse(RENUM, { [CONT]: [7], [RENUM]: [8] })).toEqual(contradiction('split', [7], [8]));
+      });
+
+      it('(3)/(4) a missing continuing or renumbered path — STOP', async () => {
+        expect(await reverse(CONT, { [RENUM]: [7] })).toEqual(contradiction('continuing_missing', [], [7]));
+        expect(await reverse(CONT, { [CONT]: [7] })).toEqual(contradiction('renumbered_missing', [7], []));
+        expect(await reverse(RENUM, { [RENUM]: [7] })).toEqual(contradiction('continuing_missing', [], [7]));
+        expect(await reverse(CONT, {})).toEqual(contradiction('continuing_missing', [], []));
+      });
+
+      it('(5)/(6) an ambiguous continuing or renumbered path — STOP', async () => {
+        expect(await reverse(CONT, { [CONT]: [8, 7], [RENUM]: [7] }))
+          .toEqual(contradiction('continuing_ambiguous', [7, 8], [7]));
+        expect(await reverse(CONT, { [CONT]: [7], [RENUM]: [7, 9] }))
+          .toEqual(contradiction('renumbered_ambiguous', [7], [7, 9]));
+      });
+
+      it('(7) an identity no tracked rule names is unchanged: one -> it, none -> unresolvable, several -> ambiguous', async () => {
+        expect(await reverse(OTHER, { [OTHER]: [3] })).toEqual({ ok: true, newPlayerId: 3, remappedIdentity: OTHER });
+        expect(await reverse(OTHER, {})).toEqual({ ok: false, reason: 'unresolvable' });
+        expect(await reverse(OTHER, { [OTHER]: [3, 4] })).toEqual({ ok: false, reason: 'ambiguous' });
+        // a split pair elsewhere on the target never touches an unrelated identity
+        expect(await reverse(OTHER, { [OTHER]: [3], [CONT]: [7], [RENUM]: [8] }))
+          .toEqual({ ok: true, newPlayerId: 3, remappedIdentity: OTHER });
+        // with no rules loaded, a would-be continuity path is an ordinary single path
+        const { classifyAflApiReverseIdentity } = await load();
+        expect(classifyAflApiReverseIdentity({
+          identity: CONT, playerIdsByPath: new Map([[CONT, [7]], [RENUM, [8]]]), continuityRules: [] as never,
+        })).toEqual({ ok: true, newPlayerId: 7, remappedIdentity: CONT });
+      });
+
+      it('(8) the exact SOURCE pair still normalises to continuing_url, and that identity round-trips to the folded target player', async () => {
+        const { classify, classifyAflApiReverseIdentity, rules } = await load();
+        const forward = classify([RENUM, CONT]);
+        expect(forward).toEqual({ ok: true, identity: CONT, via: 'afltables' });
+        expect(classifyAflApiReverseIdentity({
+          identity: (forward as { identity: string }).identity,
+          playerIdsByPath: new Map([[CONT, [42]], [RENUM, [42]]]), continuityRules: rules,
+        })).toEqual({ ok: true, newPlayerId: 42, remappedIdentity: CONT });
+      });
+
+      it('aflApiReverseIdentityPaths names exactly the identity plus both paths of each rule naming it', async () => {
+        const { aflApiReverseIdentityPaths, rules } = await load();
+        expect(aflApiReverseIdentityPaths(OTHER, rules)).toEqual([OTHER]);
+        expect(aflApiReverseIdentityPaths(CONT, rules)).toEqual([CONT, RENUM]);
+        expect(aflApiReverseIdentityPaths(RENUM, rules)).toEqual([RENUM, CONT]);
+      });
+
+      it('two rules sharing a continuing path must land on the same single player', async () => {
+        const { parseFitzroyProfileContinuityRules, classifyAflApiReverseIdentity } = await load();
+        const RENUM3 = 'players/Q/Quinn_Test3.html';
+        const two = parseFitzroyProfileContinuityRules(contractOf(ruleJson(), ruleJson({ id: 'b', renumbered_url: RENUM3 })));
+        const run = (byPath: [string, number[]][]) => classifyAflApiReverseIdentity({
+          identity: CONT, playerIdsByPath: new Map(byPath), continuityRules: two,
+        });
+        expect(run([[CONT, [7]], [RENUM, [7]], [RENUM3, [7]]])).toEqual({ ok: true, newPlayerId: 7, remappedIdentity: CONT });
+        expect(run([[CONT, [7]], [RENUM, [7]], [RENUM3, [8]]])).toMatchObject({ ok: false, ruleId: 'b', refusal: 'split' });
+      });
+
+      it('every real tracked rule: folded target resolves, split target refuses', async () => {
+        const { classifyAflApiReverseIdentity, loadFitzroyProfileContinuityRules } = await load();
+        const real = loadFitzroyProfileContinuityRules();
+        for (const rule of real) {
+          const folded = new Map([[rule.continuingUrl, [1]], [rule.renumberedUrl, [1]]]);
+          const split = new Map([[rule.continuingUrl, [1]], [rule.renumberedUrl, [2]]]);
+          expect(classifyAflApiReverseIdentity({ identity: rule.continuingUrl, playerIdsByPath: folded, continuityRules: real }))
+            .toEqual({ ok: true, newPlayerId: 1, remappedIdentity: rule.continuingUrl });
+          expect(classifyAflApiReverseIdentity({ identity: rule.continuingUrl, playerIdsByPath: split, continuityRules: real }))
+            .toMatchObject({ ok: false, reason: 'continuity_contradiction', ruleId: rule.id, refusal: 'split' });
+        }
+      });
+
+      it('both replay planners STOP a contradicted identity with the shared wording, and G2 grades it CONTINUITY_CONTRADICTION', async () => {
+        const {
+          classifyAflApiReverseIdentity, planAflApiImporterReplay, planAflApiAdjudicationReplay, classifyAflApiG2, rules,
+        } = await load();
+        const remap = classifyAflApiReverseIdentity({
+          identity: CONT, playerIdsByPath: new Map([[CONT, [7]], [RENUM, [8]]]), continuityRules: rules,
+        });
+        const importer = planAflApiImporterReplay({
+          capturedRows: [{
+            externalId: 'CD_I1', playerIdentity: CONT, matchMethod: 'afl_api_stat_vector_bootstrap', status: 'unique',
+            candidateCount: 1, externalName: null, externalUrl: null, notes: null, playerId: 1,
+          }],
+          remapByExternalId: new Map([['CD_I1', remap]]),
+          candidateByExternalId: new Map(), candidatePlayerAflApiRow: new Map(),
+        });
+        expect(importer.inserts).toEqual([]);
+        expect(importer.stops).toEqual([{
+          externalId: 'CD_I1',
+          reason: 'the captured row\'s player identity is named by tracked profile_url_continuity rule '
+            + 'test-renumbered-profile and the target contradicts it: its continuing_url and renumbered_url '
+            + 'resolve to different target players (continuing -> [7], renumbered -> [8])',
+        }]);
+        const ledger = planAflApiAdjudicationReplay({
+          ledgerRows: [{ id: 1, externalId: 'CD_I1', action: 'linked', playerId: 1, playerIdentity: CONT, supersedesId: null }],
+          remapByExternalId: new Map([['CD_I1', remap]]),
+          candidateByExternalId: new Map(), candidatePlayerAflApiRow: new Map(),
+        });
+        expect(ledger.inserts).toEqual([]);
+        expect(ledger.stops[0].reason).toMatch(/^the ledger row's player_identity is named by tracked profile_url_continuity rule test-renumbered-profile .*different target players/);
+        // G2 refuses even with NO candidate importer row for the provider (the D15 INSERT case)
+        const grades = classifyAflApiG2([{
+          externalId: 'CD_I1', ledgerNetAction: 'linked', identityIsManualToken: false, candidateRow: null,
+          remappedCandidatePlayerId: null, collidingProviderId: null,
+          continuityContradiction: remap as Extract<typeof remap, { reason: 'continuity_contradiction' }>,
+        }]);
+        expect(grades).toEqual([{
+          externalId: 'CD_I1', outcome: 'CONTINUITY_CONTRADICTION',
+          reason: expect.stringContaining('rule test-renumbered-profile and the target contradicts it'),
+        }]);
+      });
+    });
   });
 });
 

@@ -52,13 +52,13 @@ import {
   AFL_API_PLAYER_REFERENCE_MANIFEST,
   AFL_API_PROVIDER_ID_RE,
 } from '../../src/lib/acquisition/afl-api-adjudication';
-import { assertRebuildTargetName, databaseOf } from '../db/rebuild-test';
+import { assertRebuildTargetName, databaseOf, resolveCaptureRoot } from '../db/rebuild-test';
 import { redact } from '../db/psql';
 import {
   captureDirectory,
   nextIdentityValue,
   observeLiveReinstatement,
-  parseLedgerCapture,
+  parseCombinedCapture,
   PENDING_CAPTURE_FILE,
   type LiveReinstatementObservation,
 } from './rebuild_afl_api_adjudications';
@@ -679,7 +679,9 @@ export async function observeI18(tx: Tx, captureDir: string, baseline: I18Baseli
     playerAflApiProviders: playerProviders,
     humanResolvedTotal: totals.humanResolvedTotal,
     actors: await readActors(tx),
-    live: await observeLiveReinstatement(tx),
+    // AFLDB-ISSUE-237: this fixture carries no importer capture rows (header, WHAT IT PROVES)
+    // — an empty list only proves an importer replay of nothing is a trivial no-op here.
+    live: await observeLiveReinstatement(tx, []),
     pendingCaptureExists: existsSync(join(captureDir, PENDING_CAPTURE_FILE)),
     archivedCaptures: baseline === null ? [] : readArchivedCaptures(captureDir, database, baseline),
   };
@@ -689,21 +691,23 @@ export async function observeI18(tx: Tx, captureDir: string, baseline: I18Baseli
 export function readArchivedCaptures(dir: string, database: string, baseline: I18Baseline): I18ArchivedCapture[] {
   if (!existsSync(dir)) return [];
   return readdirSync(dir)
-    .filter((f) => /^afl-api-adjudications\..+\.reinstated\.json$/.test(f))
+    // AFLDB-ISSUE-237 D10/§7.1: the combined format's archive prefix. The ISSUE-235-era
+    // `afl-api-adjudications.*.reinstated.json` prefix is superseded, never produced again.
+    .filter((f) => /^afl-api-identities\..+\.reinstated\.json$/.test(f))
     .sort()
     .map((file) => {
       const text = readFileSync(join(dir, file), 'utf8');
       const fileSha256 = createHash('sha256').update(text, 'utf8').digest('hex');
       let capture;
       try {
-        capture = parseLedgerCapture(text, database);
+        capture = parseCombinedCapture(text, database);
       } catch {
         // An unrelated or altered archive is never evidence for I18; it is listed, not trusted.
         return { file, fileSha256, payloadSha256: 'unverifiable', matchesBaseline: false };
       }
       return {
         file, fileSha256, payloadSha256: capture.payloadSha256,
-        matchesBaseline: captureMatchesBaseline(capture.rows, baseline),
+        matchesBaseline: captureMatchesBaseline(capture.ledgerRows, baseline),
       };
     });
 }
@@ -746,7 +750,7 @@ async function readOnly<T>(dsn: string, fn: (tx: Tx) => Promise<T>): Promise<T> 
 }
 
 async function runSeed(dsns: I18Dsns): Promise<void> {
-  const captureDir = captureDirectory(REPO_ROOT, dsns.database);
+  const captureDir = captureDirectory(resolveCaptureRoot(process.env, REPO_ROOT), dsns.database);
   const baselinePath = i18BaselinePath(REPO_ROOT, dsns.database);
 
   // 1. Preconditions, read-only. Nothing is written unless every one holds.
@@ -908,7 +912,7 @@ async function runSeed(dsns: I18Dsns): Promise<void> {
 
 async function runVerify(dsns: I18Dsns, phase: 'pre' | 'post'): Promise<void> {
   const baseline = readBaseline(dsns.database);
-  const captureDir = captureDirectory(REPO_ROOT, dsns.database);
+  const captureDir = captureDirectory(resolveCaptureRoot(process.env, REPO_ROOT), dsns.database);
   const observed = await readOnly(dsns.ownerDsn, (tx) => observeI18(tx, captureDir, baseline));
   const problems = i18VerifyProblems(baseline, observed, phase);
   const playerId = observed.resolvedPlayerIds[0];

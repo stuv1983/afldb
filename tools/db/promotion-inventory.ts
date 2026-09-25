@@ -23,6 +23,8 @@
  * unit tests can pin every rule without a connection.
  */
 
+import { playerOverrideValueProblems, registrationPayloadProblems } from '../migration/rebuild_manual_registrations';
+
 // ---------------------------------------------------------------------------
 // Treatments
 // ---------------------------------------------------------------------------
@@ -687,10 +689,10 @@ export const PROMOTION_CONTRACT: readonly TableTreatment[] = [
         + '(a linked/revoked decision always names a person), so an unresolved or '
         + 'stored-identity-mismatched row stops the promotion rather than reinstating a value '
         + 'that may now denote someone else. AFLDB-ISSUE-235 D15 requires the same replay '
-        + '(tools/migration/replay_afl_api_adjudications.py or the common.py sibling) to '
-        + 're-create the matching resolved external_identities row from this ledger '
-        + "immediately after replay_admin_overrides('players'); it is never reinstated as a "
-        + 'bare table copy alone.',
+        + '(tools/migration/replay_afl_api_adjudications.ts, run from a small tsx script — the '
+        + 'adapter is TypeScript, not Python, F11) to re-create the matching resolved '
+        + "external_identities row from this ledger immediately after "
+        + "replay_admin_overrides('players'); it is never reinstated as a bare table copy alone.",
     }],
     // AFLDB-ISSUE-235 OD-3 (approved 2026-09-23): NO historicalOnly entry, in ANY
     // environment, including dev. Unlike player_link_resolutions (AFLDB-ISSUE-139 D1),
@@ -2121,6 +2123,18 @@ export type LineageRemapInput = {
  * evidenced: those become `-- UNRESOLVED` lines naming the reason, and the trailing
  * verification query fails until every one of them has been dealt with deliberately.
  */
+/** The remap file's first statement inside its transaction: refuse any database but `candidate`. */
+export function lineageRemapBindingGuard(candidate: string): string[] {
+  const literal = quoteSqlLiteral(candidate);
+  return [
+    'DO $bind$ BEGIN',
+    `  IF current_database() <> ${literal} THEN`,
+    `    RAISE EXCEPTION 'this lineage remap was evidenced against %, not %; refusing to run it', ${literal}, current_database();`,
+    '  END IF;',
+    'END $bind$;',
+  ];
+}
+
 export function lineageRemapSql(input: LineageRemapInput): string {
   const names = environmentNames(input.environment ?? DEFAULT_ENVIRONMENT);
   const withheld = (plan: LineageColumnPlan): boolean =>
@@ -2145,6 +2159,9 @@ export function lineageRemapSql(input: LineageRemapInput): string {
   lines.push(`-- foreign keys (AFLDB-ISSUE-151) — a staged column is updated in ${STAGING_SCHEMA}.`);
   lines.push('');
   lines.push('BEGIN;');
+  // AFLDB-ISSUE-237 L4: the file is evidence about ONE candidate. Run anywhere else it refuses
+  // before any UPDATE, and ON_ERROR_STOP ends the transcript there.
+  lines.push(...lineageRemapBindingGuard(input.candidate));
 
   let unresolvedTotal = 0;
   for (const plan of input.plans) {
@@ -2452,9 +2469,18 @@ export const SOURCE_DATABASE = ENVIRONMENT_NAMES.prod.source;
 export const CANDIDATE_PREFIX = ENVIRONMENT_NAMES.prod.candidatePrefix;
 export const PRE_REBUILD_PREFIX = ENVIRONMENT_NAMES.prod.preRebuildPrefix;
 
-export type Phase = 'source' | 'pre-cutover' | 'restored' | 'candidate' | 'production';
+/**
+ * AFLDB-ISSUE-237 §6.3 adds `dev-regeneration-census`: a narrow, DEV-only, read-only phase
+ * run AFTER `--phase production`'s DEV equivalent and after current-season re-acquisition,
+ * never part of the ordinary source/pre-cutover/restored/candidate/production sequence. It is
+ * handled as an early, separate branch in `promotion-check.ts`'s `main()`, not folded into
+ * the standard gate pipeline every other phase shares.
+ */
+export type Phase = 'source' | 'pre-cutover' | 'restored' | 'candidate' | 'production'
+  | 'dev-regeneration-census';
 
-export const PHASES: readonly Phase[] = ['source', 'pre-cutover', 'restored', 'candidate', 'production'];
+export const PHASES: readonly Phase[] =
+  ['source', 'pre-cutover', 'restored', 'candidate', 'production', 'dev-regeneration-census'];
 
 export class PromotionRefused extends Error {}
 
@@ -2491,6 +2517,19 @@ export function assertDatabaseForPhase(
           `Phase '${phase}' inspects a candidate database named '${names.candidatePrefix}<stamp>' `
           + `(--environment ${environment}), not '${database}'. The name is the safety: the live `
           + `'${names.live}' is never a candidate.`);
+      }
+      return;
+    case 'dev-regeneration-census':
+      // AFLDB-ISSUE-237 §6.3: the mandatory post-re-acquisition verification census. It runs
+      // on the now-live DEV database, after the swap and after re-acquisition -- never in
+      // production, which has no regeneration exception at all (D14).
+      if (environment !== 'dev') {
+        throw new PromotionRefused(
+          "Phase 'dev-regeneration-census' is DEV-only; pass --environment dev.");
+      }
+      if (database !== names.live) {
+        throw new PromotionRefused(
+          `Phase 'dev-regeneration-census' inspects '${names.live}' only, not '${database}'.`);
       }
       return;
   }
@@ -2547,6 +2586,17 @@ export type Snapshot = {
   counts: Record<string, number>;
   superAdmins: number;
   fixtureRows: number;
+  /**
+   * AFLDB-ISSUE-237 §6.2's pre-cutover target census, recorded for the audit trail. G3's own
+   * gate reads the live `--old-database` connection directly at `--phase restored` (it is
+   * still open, before cutover) rather than this file, so this field is a record, not a gate
+   * input.
+   */
+  aflApiTargetCensus?: {
+    importerRowsByMethod: Record<string, number>;
+    humanRows: number;
+    netLinkedLedgerEntries: number;
+  };
 };
 
 export type CompareFinding = {
@@ -3307,6 +3357,493 @@ export function assertPromotionPlanCoherent(
 }
 
 // ---------------------------------------------------------------------------
+// AFLDB-ISSUE-237 L4 A4.2 / A4.3 — what the post-swap data_overrides replay WILL do
+// ---------------------------------------------------------------------------
+//
+// The post-swap `replay_admin_overrides()` loop (docs/production-promotion.md §8 step 1) runs
+// AFTER the swap. Two of its branches can lose a target-owned human decision there without a
+// pre-swap gate having seen it:
+//
+//   players    (A4.2) a creation record binds its token onto whichever candidate player holds
+//              its AFL Tables path (the AFLDB-ISSUE-160 bind rule), even when that player
+//              already carries a DIFFERENT candidate token -- leaving one person with two
+//              manual identities, which `readManualPlayerToken` refuses to resolve and the
+//              AFLDB-ISSUE-245 planner refuses outright. A source-keyed correction whose
+//              identity the candidate does not hold matches nothing, silently.
+//   matches /  (A4.3) an override keyed to a match the candidate does not hold -- every
+//   match_coaches   current-season match, because the historical candidate ends before the
+//              season §9 re-acquires AFTER this replay -- matches nothing (matches, silently)
+//              or raises after the swap (match_coaches). Nothing re-applies it after the
+//              re-acquisition: the settle's ManualAuthorityProvider only answers `conflict`.
+//
+// These planners predict that replay from the same stable identities it reads -- AFL Tables
+// path, `manual_admin_edit` token, `match_key` -- never a name and never a surrogate id, and
+// every case whose outcome is not a faithful reinstatement is a pre-swap STOP. Pure; the
+// checker (`gateOverrideReplayTargets`) reads the rows.
+
+/** One ACTIVE `data_overrides` row, payload as PostgreSQL's own jsonb text. */
+export type PromotionOverrideRow = {
+  entityType: string; entityKey: string; fieldGroup: string; overrideValues: string;
+};
+
+/** One `external_identities` row of the candidate, with its source key. */
+export type PromotionIdentityRow = {
+  sourceKey: string; externalId: string; playerId: number | null; status: string; matchMethod: string | null;
+};
+
+export const PROMOTION_MANUAL_SOURCE_KEY = 'manual_admin_edit';
+export const PROMOTION_REGISTRATION_FIELD_GROUP = 'identity';
+
+export type PromotionPlayersReplayPlan = {
+  /** The candidate already holds the token, on a player holding exactly the record's path. */
+  present: { token: string; path: string | null; playerId: number }[];
+  /** No token; exactly one candidate player holds the path and carries NO manual token. */
+  binds: { token: string; path: string; playerId: number }[];
+  /** No token and no holder of the path (or no path): the replay creates the player. */
+  creates: { token: string; path: string | null }[];
+  /** Source-keyed corrections, and the candidate player (or created path) each resolves to. */
+  corrections: { entityKey: string; fieldGroup: string; resolvesTo: string }[];
+  /**
+   * Candidate manual identities no target creation record names. Each is a STOP (see
+   * `planPromotionPlayersReplay`): after the swap it would be a manual identity with no creation
+   * record, a state no lifecycle in this repository admits.
+   */
+  candidateOnlyTokens: { token: string; playerId: number | null }[];
+  /**
+   * What the replay's merge UPDATE will write, per player: the winning value of every key by the
+   * replay's own order (authority rank DESC, entity_key, field_group). `playerId` is the candidate
+   * player for present/bind/corrected rows; a created player has none yet and carries `insertBase`,
+   * the CHECK-relevant columns its INSERT writes.
+   */
+  merges: {
+    target: string; playerId: number | null; fields: Record<string, unknown>;
+    insertBase: PromotionPlayerCheckRow | null;
+  }[];
+  /** Every STOP, by record. Empty is the only acceptable answer. */
+  problems: string[];
+};
+
+/**
+ * The candidate columns the replay's merge UPDATE can drive into a `players` CHECK violation
+ * (`players_dob_confidence_ck`, migration 018; `players_birth_range_ck`, migration 002). No name
+ * and no identity: the row is read by the id a stable identity already resolved.
+ */
+export type PromotionPlayerCheckRow = {
+  hasDob: boolean; dobConfidence: string; birthYearMin: number | null; birthYearMax: number | null;
+};
+
+const ACCEPTED_IDENTITY_STATUSES = new Set(['unique', 'resolved']);
+
+function splitOverrideKey(entityKey: string): { namespace: string; rest: string } {
+  const at = entityKey.indexOf(':');
+  return at < 0 ? { namespace: entityKey, rest: '' } : { namespace: entityKey.slice(0, at), rest: entityKey.slice(at + 1) };
+}
+
+function isBindableIdentity(row: PromotionIdentityRow, sourceKey: string, matchMethod: string): boolean {
+  return row.sourceKey === sourceKey && row.playerId !== null
+    && ACCEPTED_IDENTITY_STATUSES.has(row.status) && row.matchMethod === matchMethod;
+}
+
+/** jsonb equality for the replay's `count(DISTINCT f.value)`: object keys unordered, numerics by value. */
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  if (value !== null && typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${canonicalJson(v)}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function parseOverrideObject(text: string): Record<string, unknown> | null {
+  try {
+    const parsed: unknown = JSON.parse(text);
+    return parsed === null || typeof parsed !== 'object' || Array.isArray(parsed) ? null : parsed as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A4.2. What `replay_admin_overrides(players)` WILL do with the target's ACTIVE `players`
+ * overrides on this candidate, and every case where it would not faithfully reinstate them.
+ *
+ * The authority contract, from the source: the target's creation record survives byte for byte
+ * (data_overrides is reinstated verbatim), so its token is the target's manual identity; the AFL
+ * Tables path is the lineage key, bound by the ISSUE-160 rule; and one player carries at most
+ * one manual token, each backed by one creation record (`readManualPlayerToken`,
+ * `planRegistrationReplay`, `registrationsFromLive`). So:
+ *
+ *   same token, same path        present   -- nothing inserted; the record's fields overlay it
+ *   token absent, path held once bind      -- only if that player carries NO manual token
+ *   token absent, path unheld    create    -- the replay re-creates the player with the path
+ *   different token, same path   STOP      -- binding would give one player two tokens
+ *   same token, different path   STOP      -- the record and the candidate name different people
+ *   path ambiguous / unbindable  STOP      -- the replay raises, or creates a twin without it
+ *   two records, one player      STOP      -- converging records cannot both be the creation record
+ *   a correction resolving to 0 or >1 players  STOP -- it would match nothing, or several
+ *   candidate token, no record   STOP      -- a manual identity with no creation record after the swap
+ *
+ * And every refusal the replay itself would raise AFTER the swap, predicted from the same rows:
+ * its fail-closed pre-check and every `::date` / `::smallint` / `::value_confidence` cast
+ * (`registrationPayloadProblems` / `playerOverrideValueProblems`, shared with the ISSUE-245
+ * capture), a non-object payload (`jsonb_each` raises), and two equal-authority overrides that
+ * disagree on one field of one player. The `players` CHECKs that depend on the candidate's own row
+ * are `promotionPlayerCheckProblems`, over `merges`.
+ *
+ * A candidate token with no target record is refused, not carried: the target's data_overrides
+ * replaces the candidate's, so the token would survive the swap as an `external_identities` row
+ * with no creation record. `registrationsFromLive` (ISSUE-245) refuses that state outright; a
+ * manual-only player in it cannot have an AFL Tables path attached (`attachAflTablesIdentity`
+ * rolls back: no durable record) and its name edits are not durable, so it cannot converge with
+ * its debut.
+ * Retiring the token is a new promotion write class (§11d.8, token convergence), not done here.
+ */
+export function planPromotionPlayersReplay(input: {
+  overrides: readonly PromotionOverrideRow[];
+  candidate: readonly PromotionIdentityRow[];
+}): PromotionPlayersReplayPlan {
+  const plan: PromotionPlayersReplayPlan = {
+    present: [], binds: [], creates: [], corrections: [], candidateOnlyTokens: [], merges: [], problems: [],
+  };
+  const manualRows = input.candidate.filter((r) => r.sourceKey === PROMOTION_MANUAL_SOURCE_KEY);
+  const afltables = input.candidate.filter((r) => r.sourceKey === 'afltables');
+  const bindablePathsOf = (playerId: number): string[] => [...new Set(afltables
+    .filter((r) => r.playerId === playerId && isBindableIdentity(r, 'afltables', 'afltables_profile_url'))
+    .map((r) => r.externalId))].sort();
+  const tokensOf = (playerId: number): string[] => [...new Set(manualRows
+    .filter((r) => r.playerId === playerId).map((r) => r.externalId))].sort();
+
+  const players = input.overrides.filter((o) => o.entityType === 'players');
+  const records: { key: string; token: string; path: string | null; row: PromotionOverrideRow; payload: Record<string, unknown> }[] = [];
+  const corrections: PromotionOverrideRow[] = [];
+  const recordedTokens = new Set<string>();
+  // Every payload the merge UPDATE will read, with the player it will land on (authority rank:
+  // creation record 0, source-keyed correction 1 -- the replay's own CASE).
+  const contributions: {
+    target: string; playerId: number | null; rank: 0 | 1; row: PromotionOverrideRow; payload: Record<string, unknown>;
+  }[] = [];
+  const insertBases = new Map<string, PromotionPlayerCheckRow>();
+  for (const o of players) {
+    const { namespace, rest } = splitOverrideKey(o.entityKey);
+    const at = `players override ${o.entityKey} (${o.fieldGroup})`;
+    if (namespace !== PROMOTION_MANUAL_SOURCE_KEY) { corrections.push(o); continue; }
+    if (rest === '') { plan.problems.push(`${at}: entity_key carries no token`); continue; }
+    recordedTokens.add(rest);
+    if (o.fieldGroup !== PROMOTION_REGISTRATION_FIELD_GROUP) {
+      plan.problems.push(`${at}: unsupported shape -- only field_group '${PROMOTION_REGISTRATION_FIELD_GROUP}' is a `
+        + 'creation record, and the replay would re-create a second player from any other');
+      continue;
+    }
+    // The replay's fail-closed pre-check and every cast it makes, through the ONE validator the
+    // ISSUE-245 capture uses (this module names no presentation field itself).
+    const checked = registrationPayloadProblems(o.overrideValues);
+    const payload = parseOverrideObject(o.overrideValues);
+    if (checked.problems.length > 0 || payload === null) {
+      for (const p of checked.problems) plan.problems.push(`${at}: ${p} (the replay raises or cannot reinstate it)`);
+      continue;
+    }
+    records.push({ key: at, token: rest, path: checked.path, row: o, payload });
+  }
+
+  const pathClaims = new Map<string, string>();
+  for (const r of records) {
+    if (r.path === null) continue;
+    const other = pathClaims.get(r.path);
+    if (other !== undefined) {
+      plan.problems.push(`${r.key}: AFL Tables path ${r.path} is also named by manual_admin_edit:${other}; `
+        + 'the replay would create a twin that carries neither path');
+    } else {
+      pathClaims.set(r.path, r.token);
+    }
+  }
+
+  const landsOn = new Map<number, string>();
+  const land = (r: { key: string; token: string }, playerId: number): boolean => {
+    const other = landsOn.get(playerId);
+    if (other !== undefined) {
+      plan.problems.push(`${r.key}: converges on candidate player ${playerId} with manual_admin_edit:${other}; `
+        + 'two creation records cannot both re-create one person');
+      return false;
+    }
+    landsOn.set(playerId, r.token);
+    return true;
+  };
+
+  for (const r of records) {
+    const own = manualRows.filter((m) => m.externalId === r.token);
+    const expected = r.path === null ? [] : [r.path];
+    if (own.length > 0) {
+      const bindable = own.filter((m) => isBindableIdentity(m, PROMOTION_MANUAL_SOURCE_KEY, PROMOTION_MANUAL_SOURCE_KEY));
+      if (bindable.length !== own.length || bindable.length !== 1) {
+        plan.problems.push(`${r.key}: the candidate's manual_admin_edit identity for the token is not one accepted, `
+          + 'player-linked row; the replay would skip or collide with it');
+        continue;
+      }
+      const playerId = bindable[0].playerId!;
+      const others = tokensOf(playerId).filter((t) => t !== r.token);
+      if (others.length > 0) {
+        plan.problems.push(`${r.key}: duplicate manual identity -- candidate player ${playerId} also carries `
+          + `${others.map((t) => `manual_admin_edit:${t}`).join(', ')}`);
+        continue;
+      }
+      const held = bindablePathsOf(playerId);
+      const holders = r.path === null ? [] : [...new Set(afltables
+        .filter((a) => a.externalId === r.path).map((a) => a.playerId))];
+      if (held.join('\n') !== expected.join('\n') || holders.some((h) => h !== playerId)) {
+        plan.problems.push(`${r.key}: same token, different path -- the record names `
+          + `${r.path ?? 'no AFL Tables path'}, but the candidate's player ${playerId} holds `
+          + `${held.length === 0 ? 'none' : held.join(', ')}${holders.some((h) => h !== playerId) ? ` and ${r.path} is held elsewhere` : ''}`);
+        continue;
+      }
+      if (land(r, playerId)) {
+        plan.present.push({ token: r.token, path: r.path, playerId });
+        contributions.push({ target: `player ${playerId}`, playerId, rank: 0, row: r.row, payload: r.payload });
+      }
+      continue;
+    }
+    const create = (): void => {
+      plan.creates.push({ token: r.token, path: r.path });
+      const target = `created ${r.token}`;
+      contributions.push({ target, playerId: null, rank: 0, row: r.row, payload: r.payload });
+      // The replay's INSERT: dob and dob_confidence (COALESCE 'unknown') from the record, no range.
+      insertBases.set(target, {
+        hasDob: r.payload.dob !== undefined && r.payload.dob !== null,
+        dobConfidence: typeof r.payload.dob_confidence === 'string' ? r.payload.dob_confidence : 'unknown',
+        birthYearMin: null, birthYearMax: null,
+      });
+    };
+    if (r.path === null) { create(); continue; }
+    const pathRows = afltables.filter((a) => a.externalId === r.path);
+    if (pathRows.length === 0) { create(); continue; }
+    if (pathRows.some((a) => !isBindableIdentity(a, 'afltables', 'afltables_profile_url'))) {
+      plan.problems.push(`${r.key}: ${r.path} is held by a candidate identity that is not an accepted `
+        + 'afltables_profile_url row; the replay would create a twin without the path');
+      continue;
+    }
+    const holders = [...new Set(pathRows.map((a) => a.playerId!))];
+    if (holders.length > 1) {
+      plan.problems.push(`${r.key}: ${r.path} resolves to ${holders.length} candidate players (the replay raises)`);
+      continue;
+    }
+    const [playerId] = holders;
+    const tokens = tokensOf(playerId);
+    if (tokens.length > 0) {
+      plan.problems.push(`${r.key}: different token, same path -- candidate player ${playerId} holds ${r.path} `
+        + `under ${tokens.map((t) => `manual_admin_edit:${t}`).join(', ')}; binding would give one person two `
+        + 'manual identities, and only one of them has a creation record');
+      continue;
+    }
+    if (land(r, playerId)) {
+      plan.binds.push({ token: r.token, path: r.path, playerId });
+      contributions.push({ target: `player ${playerId}`, playerId, rank: 0, row: r.row, payload: r.payload });
+    }
+  }
+
+  const createdByPath = new Map(plan.creates.filter((c) => c.path !== null).map((c) => [c.path!, c.token]));
+  for (const c of corrections) {
+    const { namespace, rest } = splitOverrideKey(c.entityKey);
+    const at = `players override ${c.entityKey} (${c.fieldGroup})`;
+    // The merge UPDATE's jsonb_each raises on a non-object, and its casts raise on a bad value.
+    const payload = parseOverrideObject(c.overrideValues);
+    if (payload === null) {
+      plan.problems.push(`${at}: the payload is not a JSON object (the replay raises)`);
+      continue;
+    }
+    const valueProblems = playerOverrideValueProblems(payload, c.overrideValues);
+    if (valueProblems.length > 0) {
+      for (const p of valueProblems) plan.problems.push(`${at}: ${p} (the replay raises)`);
+      continue;
+    }
+    const createdToken = namespace === 'afltables' ? createdByPath.get(rest) : undefined;
+    if (createdToken !== undefined) {
+      plan.corrections.push({ entityKey: c.entityKey, fieldGroup: c.fieldGroup, resolvesTo: `created ${rest}` });
+      contributions.push({ target: `created ${createdToken}`, playerId: null, rank: 1, row: c, payload });
+      continue;
+    }
+    const holders = [...new Set(input.candidate
+      .filter((i) => i.sourceKey === namespace && i.externalId === rest && i.playerId !== null
+        && ACCEPTED_IDENTITY_STATUSES.has(i.status))
+      .map((i) => i.playerId!))];
+    if (holders.length !== 1) {
+      plan.problems.push(`${at}: the correction's identity resolves to ${holders.length} candidate players; `
+        + `the replay would ${holders.length === 0 ? 'match nothing and silently drop it' : 'apply it to every one of them'}`);
+      continue;
+    }
+    plan.corrections.push({ entityKey: c.entityKey, fieldGroup: c.fieldGroup, resolvesTo: `player ${holders[0]}` });
+    contributions.push({ target: `player ${holders[0]}`, playerId: holders[0], rank: 1, row: c, payload });
+  }
+
+  // The replay's equal-authority refusal: per player, per key, per authority rank, more than one
+  // distinct jsonb value raises -- precedence settles only DIFFERENT ranks. Otherwise the winner
+  // of each key is the replay's own DISTINCT ON order, which is what `merges` records.
+  const byTarget = new Map<string, typeof contributions>();
+  for (const c of contributions) byTarget.set(c.target, [...(byTarget.get(c.target) ?? []), c]);
+  for (const [target, rows] of [...byTarget].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) {
+    const claims = new Map<string, { values: Set<string>; rows: string[] }>();
+    for (const c of rows) {
+      for (const [key, value] of Object.entries(c.payload)) {
+        const claim = claims.get(`${c.rank}\u0000${key}`) ?? { values: new Set<string>(), rows: [] };
+        claim.values.add(canonicalJson(value));
+        claim.rows.push(`${c.row.entityKey}/${c.row.fieldGroup}`);
+        claims.set(`${c.rank}\u0000${key}`, claim);
+      }
+    }
+    for (const [rankKey, claim] of [...claims].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) {
+      if (claim.values.size > 1) {
+        plan.problems.push(`${target}: field '${rankKey.split('\u0000')[1]}' is claimed by equal-authority overrides that `
+          + `disagree (${[...new Set(claim.rows)].sort().join(', ')}); the replay raises`);
+      }
+    }
+    const ordered = [...rows].sort((a, b) => b.rank - a.rank
+      || (a.row.entityKey < b.row.entityKey ? -1 : a.row.entityKey > b.row.entityKey ? 1 : 0)
+      || (a.row.fieldGroup < b.row.fieldGroup ? -1 : a.row.fieldGroup > b.row.fieldGroup ? 1 : 0));
+    const fields: Record<string, unknown> = {};
+    for (const c of ordered) {
+      for (const [key, value] of Object.entries(c.payload)) if (!(key in fields)) fields[key] = value;
+    }
+    plan.merges.push({ target, playerId: rows[0].playerId, fields, insertBase: insertBases.get(target) ?? null });
+  }
+
+  for (const m of manualRows) {
+    if (!recordedTokens.has(m.externalId)) plan.candidateOnlyTokens.push({ token: m.externalId, playerId: m.playerId });
+  }
+  plan.candidateOnlyTokens.sort((a, b) => (a.token < b.token ? -1 : a.token > b.token ? 1 : 0));
+  for (const t of plan.candidateOnlyTokens) {
+    plan.problems.push(`candidate manual_admin_edit:${t.token} (candidate player ${String(t.playerId)}) has no target `
+      + 'creation record: the target data_overrides replaces the candidate\'s, so after the swap it would be a manual '
+      + 'identity with no creation record, which no lifecycle admits; retiring it is token convergence (§11d.8)');
+  }
+  return plan;
+}
+
+/**
+ * The `players` CHECKs the replay's merge UPDATE can violate, predicted from `merges` and the
+ * candidate's own CHECK-relevant columns: `players_dob_confidence_ck` (a dob with confidence
+ * 'unknown') and `players_birth_range_ck` (min > max). The UPDATE's own semantics: a present key
+ * writes its value (JSON null clears) for dob / birth_year_min / birth_year_max, and
+ * `COALESCE(value, current)` for dob_confidence. A created player starts from its INSERT. A
+ * merge naming a candidate player the read did not return is itself a STOP.
+ */
+export function promotionPlayerCheckProblems(
+  merges: PromotionPlayersReplayPlan['merges'],
+  candidatePlayers: ReadonlyMap<number, PromotionPlayerCheckRow>,
+): string[] {
+  const problems: string[] = [];
+  for (const m of merges) {
+    const base = m.insertBase ?? (m.playerId === null ? undefined : candidatePlayers.get(m.playerId));
+    if (base === undefined) {
+      problems.push(`${m.target}: the candidate holds no players row for it; the replay would match nothing`);
+      continue;
+    }
+    const f = m.fields;
+    const hasDob = 'dob' in f ? f.dob !== null : base.hasDob;
+    const dobConfidence = typeof f.dob_confidence === 'string' ? f.dob_confidence : base.dobConfidence;
+    if (hasDob && dobConfidence === 'unknown') {
+      problems.push(`${m.target}: the merged row has a dob with dob_confidence 'unknown' `
+        + '(players_dob_confidence_ck, migration 018); the replay raises');
+    }
+    const min = 'birth_year_min' in f ? f.birth_year_min as number | null : base.birthYearMin;
+    const max = 'birth_year_max' in f ? f.birth_year_max as number | null : base.birthYearMax;
+    if (min !== null && max !== null && min > max) {
+      problems.push(`${m.target}: the merged row has birth_year_min ${min} > birth_year_max ${max} `
+        + '(players_birth_range_ck, migration 002); the replay raises');
+    }
+  }
+  return problems;
+}
+
+/**
+ * The (source key, external id) pairs the players replay will look up for these overrides:
+ * each creation record's AFL Tables path, and each correction's own identity. Parallel arrays,
+ * sorted and de-duplicated, for one `unnest($1, $2)` read.
+ */
+export function playerIdentityKeysOfOverrides(overrides: readonly PromotionOverrideRow[]): {
+  sourceKeys: string[]; externalIds: string[];
+} {
+  const pairs = new Set<string>();
+  for (const o of overrides) {
+    if (o.entityType !== 'players') continue;
+    const { namespace, rest } = splitOverrideKey(o.entityKey);
+    if (namespace !== PROMOTION_MANUAL_SOURCE_KEY) {
+      if (rest !== '') pairs.add(JSON.stringify([namespace, rest]));
+      continue;
+    }
+    try {
+      const path = (JSON.parse(o.overrideValues) as Record<string, unknown> | null)?.afltables_profile_path;
+      if (typeof path === 'string') pairs.add(JSON.stringify(['afltables', path]));
+    } catch { /* the planner refuses an unparseable payload */ }
+  }
+  const sorted = [...pairs].sort().map((p) => JSON.parse(p) as [string, string]);
+  return { sourceKeys: sorted.map(([k]) => k), externalIds: sorted.map(([, x]) => x) };
+}
+
+/** `'<match_key>|<club slug>'`, split at the LAST delimiter exactly as the replay does. */
+export function decodeMatchCoachKey(entityKey: string): { matchKey: string; clubSlug: string } | null {
+  const at = entityKey.lastIndexOf('|');
+  if (at < 0) return null;
+  const clubSlug = entityKey.slice(at + 1);
+  return clubSlug === '' ? null : { matchKey: entityKey.slice(0, at), clubSlug };
+}
+
+/** The season a `match_key` ('season|round|date|home|away', migration 003) names, or null. */
+export function seasonOfMatchKey(matchKey: string): number | null {
+  const head = matchKey.split('|', 1)[0];
+  return /^\d{4}$/.test(head) ? Number(head) : null;
+}
+
+/** Every `match_key` an active `matches` / `match_coaches` override names (undecodable keys omitted). */
+export function matchKeysOfOverrides(overrides: readonly PromotionOverrideRow[]): string[] {
+  const keys = new Set<string>();
+  for (const o of overrides) {
+    if (o.entityType === 'matches') keys.add(o.entityKey);
+    if (o.entityType === 'match_coaches') {
+      const decoded = decodeMatchCoachKey(o.entityKey);
+      if (decoded) keys.add(decoded.matchKey);
+    }
+  }
+  return [...keys].sort();
+}
+
+export type PromotionMatchReplayPlan = { resolved: number; problems: string[] };
+
+/**
+ * A4.3. Every ACTIVE `matches` / `match_coaches` override must name a match the CANDIDATE holds.
+ * There is no supported deferred lifecycle: §8 replays before §9 re-acquires the current season,
+ * the replay matches by `match_key` only, and after re-acquisition nothing re-applies the override
+ * (the settle's ManualAuthorityProvider answers `conflict` and proposes; it never replays). So an
+ * override whose match is absent -- every current-season override, since the historical candidate
+ * ends before that season -- is a pre-swap STOP, never a silent loss and never a post-swap raise.
+ */
+export function planPromotionMatchReplay(input: {
+  overrides: readonly PromotionOverrideRow[];
+  candidateMatchKeys: ReadonlySet<string>;
+  candidateMaxSeason: number | null;
+}): PromotionMatchReplayPlan {
+  const plan: PromotionMatchReplayPlan = { resolved: 0, problems: [] };
+  for (const o of input.overrides) {
+    if (o.entityType !== 'matches' && o.entityType !== 'match_coaches') continue;
+    const at = `${o.entityType} override ${o.entityKey} (${o.fieldGroup})`;
+    let matchKey = o.entityKey;
+    if (o.entityType === 'match_coaches') {
+      const decoded = decodeMatchCoachKey(o.entityKey);
+      if (!decoded) { plan.problems.push(`${at}: entity_key is not <match_key>|<club slug> (the replay raises)`); continue; }
+      matchKey = decoded.matchKey;
+    }
+    if (input.candidateMatchKeys.has(matchKey)) { plan.resolved += 1; continue; }
+    const season = seasonOfMatchKey(matchKey);
+    const beyond = season !== null && (input.candidateMaxSeason === null || season > input.candidateMaxSeason);
+    plan.problems.push(`${at}: no candidate match carries match_key ${matchKey}`
+      + (beyond
+        ? ` -- season ${season} is after the candidate's historical baseline (max season `
+          + `${input.candidateMaxSeason ?? 'none'}); it is re-acquired only after the swap (§9), and no `
+          + 'identity-safe replay of this override exists after re-acquisition'
+        : '')
+      + (o.entityType === 'matches' ? '; the matches replay would silently match nothing' : '; the match_coaches replay raises after the swap'));
+  }
+  return plan;
+}
+
+// ---------------------------------------------------------------------------
 // Acceptance checklist
 // ---------------------------------------------------------------------------
 
@@ -3324,6 +3861,7 @@ export const ACCEPTANCE_CHECKLIST: readonly string[] = [
   'Historical-only tables (AFLDB-ISSUE-143) confirmed: for each table the contract withholds in this environment, the generated plan had no pg_restore line, the candidate reads 0 rows, the rows are present in the pre-cutover dump and the retained pre-rebuild database, and the database.promoted marker names the table and the deciding issue. Nothing was deleted to achieve this and no column was remapped by name.',
   'Identity sequences re-synced; database.promoted audit marker written; privileges.sql run on the candidate.',
   '`--phase candidate` passed: no test-fixture identity anywhere, expected super admin present and enabled, counts match the snapshot per rule, grants reconciled, migrations at parity.',
+  'afl_api identity (AFLDB-ISSUE-237): `--phase restored` PASSED as a whole and only then wrote the bound E_promotion file (G2 = the candidate\'s importer rows vs the TARGET\'s human ledger); `--phase candidate --afl-api-supersede-in <that file>` proved the reinstated ledger is exactly the one G2 graded; after the swap the D15 replay ran through replayAflApiAdjudicationsFromSupersedeFile with that same file, and the combined invariant passed.',
   'Service stopped; afldb_prod renamed to afldb_prod_pre_rebuild_<stamp>; candidate renamed to afldb_prod; service started.',
   '`--phase production` passed on the live afldb_prod (same gates as candidate).',
   'Health: /api/health 200, a season page, a player page, an AFLW page, and /search all render.',

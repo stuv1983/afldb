@@ -8,6 +8,13 @@
  *
  *     npm run db:test:rebuild -- --target code_test_db --acknowledge-destroy code_test_db
  *
+ * AFLDB-ISSUE-237 L2 adds ONE rehearsal-only control, valid on `code_test_db` alone: stop
+ * deliberately after the real `recreate` succeeds, before `migrations`, leaving the marker and
+ * the pending capture for a separate `--recover-afl-api-adjudications` run (exit code 86):
+ *
+ *     npm run db:test:rebuild -- --target code_test_db --acknowledge-destroy code_test_db \
+ *       --rehearsal-stop-after recreate
+ *
  * This is the ONE supported rebuild entry point. It runs the fixed dependency order,
  * fails closed at the first problem, and never touches `afldb_dev` or production. The
  * destructive targets are an explicit allowlist (REBUILD_TARGETS); the default is still
@@ -36,7 +43,11 @@
  * AFLDB-ISSUE-235 OD-5 adds the one piece of HUMAN state this rebuild carries across the
  * reset: the `afl_api` identity adjudication ledger. It is captured after PRECHECK and before
  * the reset, reinstated and replayed after `draftguru`, and bijection-checked straight after
- * (see planStages() and tools/migration/rebuild_afl_api_adjudications.ts).
+ * (see planStages() and tools/migration/rebuild_afl_api_adjudications.ts). AFLDB-ISSUE-237
+ * adds the importer-created `afl_api` identities to that same capture, and AFLDB-ISSUE-245 the
+ * manual/post-baseline player REGISTRATIONS (`data_overrides` creation records): reinstated,
+ * replayed through the production `replay_admin_overrides(players)` and verified by three
+ * stages of their own, BEFORE `draftguru` and so before any player-dependent replay.
  *
  * Two repository facts shape the destructive step, and neither was invented here:
  *
@@ -61,8 +72,8 @@
  */
 
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
-import { isAbsolute, join } from 'node:path';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { isAbsolute, join, relative } from 'node:path';
 
 import { runPsql, type SpawnSyncLike } from './psql';
 
@@ -75,7 +86,11 @@ import { runPsql, type SpawnSyncLike } from './psql';
  * the OWNER DSN outside the schema/privilege/reset path. Capture reads `auth_users` and
  * reinstate writes ledger ids, the sequence and attribution-only actors — none of which
  * afldb_import may do — so they are their own kinds rather than `data` stages quietly
- * holding more privilege than every other data stage.
+ * holding more privilege than every other data stage. AFLDB-ISSUE-245's
+ * `manual-registrations-reinstate` is a `reinstate` stage for the same reason (it writes
+ * `data_overrides` and attribution-only actors), and `manual-registrations-verify` is the one
+ * `validation` stage on the owner DSN: it must read each creation record's actor email from
+ * `auth_users`, which afldb_import cannot, and it proves a READ ONLY transaction first.
  */
 export type StageKind =
   | 'precheck' | 'capture' | 'destructive' | 'schema' | 'privileges' | 'data' | 'reinstate'
@@ -145,8 +160,26 @@ export type Options = {
    * capture an earlier, failed rebuild left behind, instead of refusing. Never implicit.
    */
   recoverAflApiAdjudications?: boolean;
+  /**
+   * `--rehearsal-stop-after recreate`. AFLDB-ISSUE-237 L2 ONLY: on `code_test_db`, stop
+   * deliberately after the real `recreate` succeeds and before `migrations`, leaving the
+   * committed marker and the pending combined capture for the supported `--recover` run.
+   * Never valid on any other target (assertRehearsalStop). Not a fault-injection framework:
+   * the only boundary it accepts is `recreate`.
+   */
+  rehearsalStopAfter?: RehearsalStopBoundary;
   planOnly: boolean;
 };
+
+/**
+ * AFLDB-ISSUE-237 L2. The ONE boundary a rehearsal may stop at, and the ONE target it may stop
+ * on. A distinct exit code tells an intentional halt apart from both success (0) and a stage
+ * failure (1).
+ */
+export const REHEARSAL_STOP_BOUNDARIES = ['recreate'] as const;
+export type RehearsalStopBoundary = typeof REHEARSAL_STOP_BOUNDARIES[number];
+export const REHEARSAL_STOP_TARGET = 'code_test_db';
+export const REHEARSAL_HALT_EXIT_CODE = 86;
 
 export class RebuildRefused extends Error {}
 
@@ -276,7 +309,69 @@ const AFLTABLES_CONTRACT = join('tools', 'rebuild', 'afltables', 'afltables-cont
 export const AFL_API_ADJUDICATION_TOOL = 'tools/migration/rebuild_afl_api_adjudications.ts';
 export const AFL_API_ADJUDICATION_TARGET_ENV = 'AFLDB_REBUILD_TARGET';
 export const AFL_API_ADJUDICATION_DSN_ENV = 'AFLDB_REBUILD_ADJUDICATION_DSN';
-export type AflApiAdjudicationStep = 'capture' | 'reinstate' | 'bijection';
+export type AflApiAdjudicationStep =
+  | 'capture' | 'registrations-reinstate' | 'registrations-verify' | 'reinstate' | 'bijection';
+
+/**
+ * AFLDB-ISSUE-245. The data stage between the registration reinstate and verify stages: it
+ * runs the production `replay_admin_overrides(players)` and nothing else, as the import role.
+ */
+export const MANUAL_REGISTRATION_REPLAY = 'tools/migration/replay_manual_registrations.py';
+
+/**
+ * AFLDB-ISSUE-237 D11a/F5. `REPO_ROOT = process.cwd()` is no longer the root of the capture
+ * path in EITHER this runner or `rebuild_afl_api_adjudications.ts` — a retry from another
+ * worktree, after a run failed post-reset, must find the same pending capture. Both processes
+ * resolve the root with this ONE shared function, so no capture path is ever derived from the
+ * working directory.
+ */
+export const CAPTURE_ROOT_ENV = 'AFLDB_REBUILD_CAPTURE_ROOT';
+
+/**
+ * The root must be: set; an absolute path; usable/creatable; and OUTSIDE the invoking
+ * checkout, so removing a worktree can never delete a pending capture with it. There is no
+ * fallback to a checkout-relative location on any refusal here.
+ */
+export function resolveCaptureRoot(
+  env: Record<string, string | undefined>,
+  checkoutRoot: string,
+  fs: { exists: (p: string) => boolean; mkdir: (p: string) => void } = {
+    exists: existsSync,
+    mkdir: (p) => mkdirSync(p, { recursive: true }),
+  },
+): string {
+  const value = env[CAPTURE_ROOT_ENV];
+  if (!value || value.trim() === '') {
+    throw new RebuildRefused(
+      `${CAPTURE_ROOT_ENV} is not set. It must be an absolute path outside this checkout; `
+      + 'the rebuild will not derive a capture location from the working directory. '
+      + 'Nothing has been destroyed.');
+  }
+  if (!isAbsolute(value)) {
+    throw new RebuildRefused(
+      `${CAPTURE_ROOT_ENV} ('${value}') is not an absolute path. Nothing has been destroyed.`);
+  }
+  const rel = relative(checkoutRoot, value);
+  const insideCheckout = rel === '' || (!rel.startsWith('..') && !isAbsolute(rel));
+  if (insideCheckout) {
+    throw new RebuildRefused(
+      `${CAPTURE_ROOT_ENV} ('${value}') is inside the invoking checkout (${checkoutRoot}). `
+      + 'Removing this worktree would delete a pending capture with it; point it at a '
+      + 'location outside every checkout. Nothing has been destroyed.');
+  }
+  try {
+    fs.mkdir(value);
+  } catch (error) {
+    throw new RebuildRefused(
+      `${CAPTURE_ROOT_ENV} ('${value}') is not usable or creatable: `
+      + `${(error as Error).message}. Nothing has been destroyed.`);
+  }
+  if (!fs.exists(value)) {
+    throw new RebuildRefused(
+      `${CAPTURE_ROOT_ENV} ('${value}') could not be created. Nothing has been destroyed.`);
+  }
+  return value;
+}
 
 /** Target-independent argv: the target travels in the stage environment, never on argv. */
 export function aflApiAdjudicationArgv(step: AflApiAdjudicationStep, recover = false): string[] {
@@ -288,7 +383,8 @@ export function aflApiAdjudicationArgv(step: AflApiAdjudicationStep, recover = f
 /**
  * The stage environment. Capture and reinstate need the OWNER DSN (see StageKind); the
  * read-only bijection check runs as the restricted import role, like every other
- * validation command stage. Always the selected target's own DSNs.
+ * validation command stage. Always the selected target's own DSNs. AFLDB-ISSUE-245: both
+ * registration steps take the owner DSN (see StageKind for why verify does).
  */
 export function aflApiAdjudicationEnv(
   target: ResolvedTarget, step: AflApiAdjudicationStep,
@@ -418,6 +514,40 @@ export function resolveTarget(
   }
 
   return { database, adminDsn, importDsn, importIsOwnerSubstitution };
+}
+
+/**
+ * AFLDB-ISSUE-237 L2: `--rehearsal-stop-after` is valid ONLY with an explicit
+ * `--target code_test_db` whose resolved database is `code_test_db`, and never together with
+ * `--recover-afl-api-adjudications` (the halted run leaves a state only a SEPARATE, normal
+ * `--recover` run may resolve). Called on the options before any environment variable is read,
+ * again on the resolved target, and by executeRebuild() itself before any stage runs.
+ */
+export function assertRehearsalStop(
+  opts: Pick<Options, 'target' | 'rehearsalStopAfter' | 'recoverAflApiAdjudications'>,
+  resolvedDatabase?: string,
+): void {
+  if (opts.rehearsalStopAfter === undefined) return;
+  if (!(REHEARSAL_STOP_BOUNDARIES as readonly string[]).includes(opts.rehearsalStopAfter)) {
+    throw new RebuildRefused(
+      `--rehearsal-stop-after '${String(opts.rehearsalStopAfter)}' is not a rehearsal boundary; the only one is 'recreate'.`);
+  }
+  if (opts.target !== REHEARSAL_STOP_TARGET) {
+    throw new RebuildRefused(
+      `--rehearsal-stop-after is an AFLDB-ISSUE-237 rehearsal control, valid only with an explicit `
+      + `--target ${REHEARSAL_STOP_TARGET}; refusing it for '${opts.target ?? DEFAULT_TARGET}'`
+      + `${opts.target === undefined ? ' (the default target)' : ''}. Nothing has been destroyed.`);
+  }
+  if (resolvedDatabase !== undefined && resolvedDatabase !== REHEARSAL_STOP_TARGET) {
+    throw new RebuildRefused(
+      `--rehearsal-stop-after resolved to database '${resolvedDatabase}', not ${REHEARSAL_STOP_TARGET}. `
+      + 'Nothing has been destroyed.');
+  }
+  if (opts.recoverAflApiAdjudications) {
+    throw new RebuildRefused(
+      '--rehearsal-stop-after cannot be combined with --recover-afl-api-adjudications: the recovery '
+      + 'run is always a separate, normal run. Nothing has been destroyed.');
+  }
 }
 
 /** §10 point 5: destruction requires the operator to name the database explicitly. */
@@ -621,7 +751,8 @@ export function planStages(target: ResolvedTarget, fitzroy: FitzroySource,
       // one the live ledger already equals is verified as reinstated, read-only, before
       // it is archived (the post-commit/pre-archive crash).
       id: 'afl-api-adjudications-capture',
-      name: 'AFL API ADJUDICATIONS — capture the human identity ledger before anything is destroyed'
+      name: 'AFL API ADJUDICATIONS — capture the human identity ledger, the importer-created '
+        + 'identities AND the manual player registrations before anything is destroyed'
         + (opts.recoverAflApiAdjudications ? ' (RECOVER: adopt the pending capture)' : ''),
       kind: 'capture',
       run: 'command',
@@ -790,6 +921,47 @@ export function planStages(target: ResolvedTarget, fitzroy: FitzroySource,
       envOverlay: dataEnv,
     },
     {
+      // AFLDB-ISSUE-245 (i). The captured `data_overrides` creation records of every
+      // manual/post-baseline registered player, back under their stable tokens, with their
+      // attribution-only actors — ONE owner transaction, refused before any write on a
+      // duplicate manual identity, a path held by a non-bindable row, or two registrations on
+      // one player. After every source stage that creates players or enriches them by AFL
+      // Tables path (fitzroy … after-siren), so the source-owned convergence case can bind and
+      // no enrichment gate changes; BEFORE `draftguru`, whose explicit decisions and bridge
+      // resolve manual and AFL Tables targets that must already exist
+      // (import_draftguru.py: "replay the players admin overrides before this import"), and
+      // so before every AFL API replay stage below.
+      id: 'manual-registrations-reinstate',
+      name: 'MANUAL REGISTRATIONS — reinstate the captured data_overrides creation records '
+        + 'and their attribution actors',
+      kind: 'reinstate',
+      run: 'command',
+      argv: aflApiAdjudicationArgv('registrations-reinstate'),
+      envOverlay: aflApiAdjudicationEnv(target, 'registrations-reinstate'),
+    },
+    {
+      // AFLDB-ISSUE-245 (ii). THE production replay, `replay_admin_overrides(players)`, as the
+      // import role: re-create each player + manual identity + AFL Tables identity, or bind the
+      // token to the source-owned player already holding the path. No second implementation.
+      id: 'manual-registrations-replay',
+      name: 'MANUAL REGISTRATIONS — replay_admin_overrides(players), the production replay',
+      kind: 'data',
+      run: 'command',
+      argv: [python, MANUAL_REGISTRATION_REPLAY],
+      envOverlay: { ...dataEnv, [AFL_API_ADJUDICATION_TARGET_ENV]: target.database },
+    },
+    {
+      // AFLDB-ISSUE-245 (iii). Read-only: the live registrations re-capture EXACTLY — same
+      // tokens, same creation records, same AFL Tables paths on the same players — or every
+      // later stage is stopped before an AFL API replay can resolve against a wrong player.
+      id: 'manual-registrations-verify',
+      name: 'MANUAL REGISTRATIONS — assert every registered player is back under its stable identity',
+      kind: 'validation',
+      run: 'command',
+      argv: aflApiAdjudicationArgv('registrations-verify'),
+      envOverlay: aflApiAdjudicationEnv(target, 'registrations-verify'),
+    },
+    {
       // Must follow fitzroy: three tracked explicit decisions target canonical AFL Tables
       // identities and the importer HALTs rather than invent a replacement player.
       id: 'draftguru',
@@ -808,7 +980,8 @@ export function planStages(target: ResolvedTarget, fitzroy: FitzroySource,
       // admin_user_id remapped by email, the id sequence advanced, then the D15 replay of
       // the human `resolved` identities and the bijection — any mismatch rolls back all of it.
       id: 'afl-api-adjudications-reinstate',
-      name: 'AFL API ADJUDICATIONS — reinstate the ledger and replay the human identities (one transaction)',
+      name: 'AFL API ADJUDICATIONS — reinstate the ledger, replay the importer-created identities '
+        + 'and replay the human identities (one transaction)',
       kind: 'reinstate',
       run: 'command',
       argv: aflApiAdjudicationArgv('reinstate'),
@@ -818,7 +991,8 @@ export function planStages(target: ResolvedTarget, fitzroy: FitzroySource,
       // AFLDB-ISSUE-235 OD-5 (iii). D15 point 3 as its own read-only stage, so a failure is
       // named on its own and stops every later stage.
       id: 'afl-api-adjudications-bijection',
-      name: 'AFL API ADJUDICATIONS — assert the ledger <-> human identity bijection',
+      name: 'AFL API ADJUDICATIONS — assert the combined importer/human identity invariant '
+        + '(D13; no rebuild marker remains)',
       kind: 'validation',
       run: 'command',
       argv: aflApiAdjudicationArgv('bijection'),
@@ -1266,7 +1440,25 @@ export function assertDraftguruPreflight(stdout: string): void {
  * tracked `profile_url_continuity` rule); `players_with_renumbered_profile` gates exactly
  * how many do, so a rebuild that re-split them (identities 13,275, players 13,275) fails
  * here rather than passing on the identity row count alone.
+ *
+ * AFLDB-ISSUE-245: the baseline measures the SOURCE's players, so the AFL Tables identities
+ * the registration replay re-creates for administrator-registered players (post-baseline
+ * debutants such as the ISSUE-224 cohort) are not part of it. They are exactly the rows
+ * `replay_admin_overrides(players)` writes: status `resolved` (the source writes `unique`), on
+ * the player holding the registration's own `manual_admin_edit` token, under the path its
+ * creation record carries. A registration the replay BOUND to a source-owned player adds no
+ * row and stays counted — that player is the source's. Nothing else is excluded.
  */
+export const REGISTRATION_CREATED_AFLTABLES_IDENTITY_SQL =
+  "ei.status = 'resolved' AND EXISTS ("
+  + 'SELECT 1 FROM data_overrides o'
+  + ' JOIN external_identities m ON m.external_id = substring(o.entity_key from position(\':\' in o.entity_key) + 1)'
+  + ' JOIN sources ms ON ms.id = m.source_id'
+  + " WHERE ms.key = 'manual_admin_edit' AND m.player_id = ei.player_id"
+  + " AND o.entity_type = 'players' AND o.field_group = 'identity' AND o.is_active"
+  + " AND split_part(o.entity_key, ':', 1) = 'manual_admin_edit'"
+  + " AND o.override_values->>'afltables_profile_path' = ei.external_id)";
+
 const MEASURED_SQL: Record<string, string> = {
   matches: 'SELECT count(*) FROM matches',
   matches_with_player_rows: 'SELECT count(DISTINCT match_id) FROM player_match_stats',
@@ -1281,7 +1473,8 @@ const MEASURED_SQL: Record<string, string> = {
     'SELECT count(DISTINCT ei.player_id) FROM external_identities ei'
     + ' JOIN sources s ON s.id = ei.source_id'
     + " WHERE s.key = 'afltables' AND ei.match_method = 'afltables_profile_url'"
-    + ' AND ei.player_id IS NOT NULL',
+    + ' AND ei.player_id IS NOT NULL'
+    + ` AND NOT (${REGISTRATION_CREATED_AFLTABLES_IDENTITY_SQL})`,
   players_with_renumbered_profile:
     'SELECT count(*) FROM (SELECT ei.player_id FROM external_identities ei'
     + ' JOIN sources s ON s.id = ei.source_id'
@@ -1736,17 +1929,39 @@ export type Deps = {
 export type ExecutionReport = {
   executed: string[];
   failedStage?: string;
+  /** AFLDB-ISSUE-237 L2: set ONLY when the run stopped deliberately at this boundary. */
+  rehearsalHalt?: RehearsalStopBoundary;
   ok: boolean;
 };
+
+/** The stage prefix a rehearsal halt requires, in order: Stage 1 and Stage 2 cannot be skipped. */
+const REHEARSAL_REQUIRED_PREFIX = ['precheck', 'afl-api-adjudications-capture', 'recreate'];
 
 /**
  * Run the plan, stopping at the FIRST failure. There is no catch-and-continue: a failed
  * stage returns immediately, so every later stage is left unexecuted and visible as such.
+ *
+ * `control.rehearsalStopAfter` (AFLDB-ISSUE-237 L2, code_test_db only) additionally returns
+ * right after `recreate` SUCCEEDS — never after a failed one — so `migrations` and everything
+ * later (Stage 18's marker clear and archive included) never run. It is refused, before any
+ * stage runs, on any other target or on a plan whose first three stages are not PRECHECK,
+ * the capture and the reset.
  */
 export function executeRebuild(
   stages: Stage[], target: ResolvedTarget, deps: Deps,
+  control: { rehearsalStopAfter?: RehearsalStopBoundary } = {},
 ): ExecutionReport {
   const executed: string[] = [];
+
+  if (control.rehearsalStopAfter !== undefined) {
+    assertRehearsalStop({ target: target.database, rehearsalStopAfter: control.rehearsalStopAfter }, target.database);
+    const prefix = stages.slice(0, REHEARSAL_REQUIRED_PREFIX.length).map((s) => s.id);
+    if (JSON.stringify(prefix) !== JSON.stringify(REHEARSAL_REQUIRED_PREFIX)) {
+      throw new RebuildRefused(
+        `A rehearsal halt needs the plan to begin ${REHEARSAL_REQUIRED_PREFIX.join(' -> ')}; it begins `
+        + `${prefix.join(' -> ') || '(nothing)'}. Nothing has been run.`);
+    }
+  }
 
   for (const stage of stages) {
     deps.log(`==> ${stage.name}`);
@@ -1758,6 +1973,9 @@ export function executeRebuild(
       } catch (error) {
         deps.log(`    FAILED: ${(error as Error).message}`);
         return { executed, failedStage: stage.id, ok: false };
+      }
+      if (control.rehearsalStopAfter === stage.id) {
+        return { executed, rehearsalHalt: control.rehearsalStopAfter, ok: false };
       }
       continue;
     }
@@ -1813,6 +2031,11 @@ export function runPreflight(deps: Deps, opts: Options, source?: FitzroySource):
   // this presented as a fitzRoy preflight failure. Name the interpreter and where it came
   // from instead. The value is a path this repository chose; no credential or unrelated
   // environment value is printed.
+  // AFLDB-ISSUE-237 D11a/F5, stage 1 addition: the capture root is resolved and proven
+  // usable/creatable/outside-the-checkout before anything else, so a retry from another
+  // worktree is guaranteed to find whatever this run leaves pending.
+  resolveCaptureRoot(process.env, REPO_ROOT);
+
   const python = resolvePython();
   if (!deps.fileExists(python)) {
     const overridden = (process.env.AFLDB_PYTHON ?? '').trim() !== '';
@@ -2731,7 +2954,20 @@ export function parseArgs(argv: string[]): Options {
     else if (arg === '--acknowledge-partial-fitzroy') opts.acknowledgePartialFitzroy = true;
     else if (arg === '--allow-owner-import-dsn') opts.allowOwnerImportDsn = true;
     else if (arg === '--recover-afl-api-adjudications') opts.recoverAflApiAdjudications = true;
-    else if (arg === '--plan') opts.planOnly = true;
+    else if (arg === '--rehearsal-stop-after') {
+      // Exactly one closed value; an arbitrary stage name is never accepted.
+      const value = argv[i + 1];
+      if (opts.rehearsalStopAfter !== undefined) {
+        throw new RebuildRefused('--rehearsal-stop-after may be given only once.');
+      }
+      if (!(REHEARSAL_STOP_BOUNDARIES as readonly (string | undefined)[]).includes(value)) {
+        throw new RebuildRefused(
+          `--rehearsal-stop-after accepts exactly 'recreate' (got '${value ?? ''}'); no other stage `
+          + 'is a rehearsal boundary.');
+      }
+      opts.rehearsalStopAfter = value as RehearsalStopBoundary;
+      i += 1;
+    } else if (arg === '--plan') opts.planOnly = true;
     else throw new RebuildRefused(`Unknown argument: ${arg}`);
   }
   return opts;
@@ -2762,7 +2998,11 @@ async function main(): Promise<number> {
   } catch { /* CI supplies the variables directly */ }
 
   const opts = parseArgs(process.argv.slice(2));
+  // AFLDB-ISSUE-237 L2: the rehearsal control is checked on the NAME before any DSN is read,
+  // and again on the resolved database.
+  assertRehearsalStop(opts);
   const target = resolveTarget(process.env, opts);
+  assertRehearsalStop(opts, target.database);
   const fitzroy = resolveFitzroySource(opts);
 
   const deps: Deps = {
@@ -2828,8 +3068,13 @@ async function main(): Promise<number> {
       : ' (PARTIAL — explicitly acknowledged)'));
   console.log(`  draftguru     : ${opts.draftguruLabel}`
     + (opts.draftguruBridge ? ` + bridge ${opts.draftguruBridge}` : ' (no bridge dataset)'));
-  console.log(`  afl_api ledger: captured to backups/rebuild/${target.database}/, reinstated after draftguru`
+  console.log(`  afl_api ids   : captured to ${process.env[CAPTURE_ROOT_ENV] ?? '(unset — precheck will refuse)'}`
+    + `/${target.database}/, reinstated after draftguru`
     + (opts.recoverAflApiAdjudications ? ' (RECOVER from the pending capture)' : ''));
+  if (opts.rehearsalStopAfter) {
+    console.log(`  REHEARSAL     : AFLDB-ISSUE-237 L2 -- will STOP after '${opts.rehearsalStopAfter}' `
+      + 'succeeds, before migrations; recovery will be REQUIRED');
+  }
   if (target.importIsOwnerSubstitution) {
     console.log('  WARNING: data stages run as OWNER (--allow-owner-import-dsn). '
       + 'A missing afldb_import grant will not be caught — see AFLDB-ISSUE-083.');
@@ -2842,6 +3087,7 @@ async function main(): Promise<number> {
     stages.forEach((stage, i) => {
       console.log(`  ${i + 1}. [${stage.kind}] ${stage.id} — ${stage.name}`);
       if (stage.argv) console.log(`       ${stage.argv.join(' ')}`);
+      if (stage.id === opts.rehearsalStopAfter) console.log('     -- REHEARSAL HALT here; nothing below runs --');
     });
     return 0;
   }
@@ -2851,7 +3097,19 @@ async function main(): Promise<number> {
   runPreflight(deps, opts, fitzroy);
   assertDestructiveAcknowledgement(target, opts.acknowledgeDestroy);
 
-  const report = executeRebuild(stages, target, deps);
+  const report = executeRebuild(stages, target, deps, { rehearsalStopAfter: opts.rehearsalStopAfter });
+  if (report.rehearsalHalt) {
+    const remaining = stages.map((s) => s.id).filter((id) => !report.executed.includes(id));
+    console.error(`\nAFLDB-ISSUE-237 REHEARSAL HALT after '${report.rehearsalHalt}' on ${target.database} `
+      + `(exit ${REHEARSAL_HALT_EXIT_CODE}). This is an intentional stop, NOT a completed rebuild.`);
+    console.error('  Stage 2 captured the afl_api identities and set the rebuild marker; the real reset ran.');
+    console.error('  The database is now EMPTY. The marker and the pending combined capture were left in place:');
+    console.error('  nothing was archived, the marker was not cleared, and nothing was recaptured.');
+    console.error('  RECOVERY IS REQUIRED: re-run this rebuild WITHOUT --rehearsal-stop-after and WITH '
+      + '--recover-afl-api-adjudications.');
+    console.error(`Not run: ${remaining.join(', ')}`);
+    return REHEARSAL_HALT_EXIT_CODE;
+  }
   if (!report.ok) {
     const remaining = stages.map((s) => s.id).filter((id) => !report.executed.includes(id));
     console.error(`\nREBUILD FAILED at stage '${report.failedStage}'.`);

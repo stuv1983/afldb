@@ -310,8 +310,8 @@ stage `id` is what `--plan` prints and what a failure names.
 
 | # | `id` | Stage | Credential |
 |---|---|---|---|
-| 1 | `precheck` | every required input, before anything is destroyed | none — no database contact |
-| 2 | `afl-api-adjudications-capture` | **capture** the human `afl_api` adjudication ledger before anything is destroyed (AFLDB-ISSUE-235) | `AFLDB_TEST_DATABASE_URL` (owner, read-only transaction) |
+| 1 | `precheck` | every required input, and the capture root, before anything is destroyed | none — no database contact |
+| 2 | `afl-api-adjudications-capture` | **capture** the combined rebuild state — the human `afl_api` adjudication ledger (AFLDB-ISSUE-235), the importer-created `afl_api` identities (AFLDB-ISSUE-237) and the manual player registrations (AFLDB-ISSUE-245) — before anything is destroyed, then set the database marker | `AFLDB_TEST_DATABASE_URL` (owner; read-only snapshot, then the marker in its own transaction) |
 | 3 | `recreate` | database reset (clean slate, not a truncation) | `AFLDB_TEST_DATABASE_URL` (owner) |
 | 4 | `migrations` | migrations — the complete tracked set, `001` through the current terminal migration, no hard-coded count (`db:migrate:test`; `db:migrate:code-test` for the rehearsal) | `AFLDB_TEST_DATABASE_URL` |
 | 5 | `privileges` | privileges (`db:privileges:test`; `db:privileges:code-test` for the rehearsal) | `AFLDB_TEST_DATABASE_URL` |
@@ -326,64 +326,141 @@ stage `id` is what `--plan` prints and what a failure names.
 | 14 | `siblings` | sibling relationships — tracked families export | `AFLDB_TEST_IMPORT_DATABASE_URL` |
 | 15 | `after-siren` | after-the-siren kicks — tracked exports | `AFLDB_TEST_IMPORT_DATABASE_URL` |
 | 16 | `after-siren-reconcile` | **validation** — loaded rows vs a fresh re-resolution | `AFLDB_TEST_IMPORT_DATABASE_URL` |
-| 17 | `draftguru` | **DraftGuru** | `AFLDB_TEST_IMPORT_DATABASE_URL` |
-| 18 | `afl-api-adjudications-reinstate` | **reinstate** the adjudication ledger and replay the human `resolved` identities, one transaction (AFLDB-ISSUE-235) | `AFLDB_TEST_DATABASE_URL` (owner) |
-| 19 | `afl-api-adjudications-bijection` | **validation** — ledger ↔ human identity bijection | `AFLDB_TEST_IMPORT_DATABASE_URL` |
-| 20 | `awards-honours` | **awards & honours** (tracked manifests) | `AFLDB_TEST_IMPORT_DATABASE_URL` |
-| 21 | `brownlow-season` | Brownlow season totals — tracked artefact | `AFLDB_TEST_IMPORT_DATABASE_URL` |
-| 22 | `derived` | derived summaries | `AFLDB_TEST_IMPORT_DATABASE_URL` |
-| 23 | `coleman` | Coleman (derived) | `AFLDB_TEST_IMPORT_DATABASE_URL` |
-| 24 | `ladder-witness` | **validation** — cross-check `club_seasons` | `AFLDB_TEST_IMPORT_DATABASE_URL` |
-| 25 | `fingerprints` | **validation** — per-domain row counts vs the contracts | `AFLDB_TEST_DATABASE_URL` |
+| 17 | `manual-registrations-reinstate` | **reinstate** the captured `data_overrides` player creation records and their attribution actors, one transaction (AFLDB-ISSUE-245) | `AFLDB_TEST_DATABASE_URL` (owner) |
+| 18 | `manual-registrations-replay` | the production `replay_admin_overrides(players)` — re-create or bind every registered player (AFLDB-ISSUE-245) | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 19 | `manual-registrations-verify` | **validation** — every registration back under its stable identity (AFLDB-ISSUE-245) | `AFLDB_TEST_DATABASE_URL` (owner, read-only transaction) |
+| 20 | `draftguru` | **DraftGuru** | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 21 | `afl-api-adjudications-reinstate` | **reinstate** the importer-created `afl_api` identities, the adjudication ledger and the human `resolved` identities, clear the marker — one transaction (AFLDB-ISSUE-235/237) | `AFLDB_TEST_DATABASE_URL` (owner) |
+| 22 | `afl-api-adjudications-bijection` | **validation** — the combined importer/human identity invariant, and no marker remains | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 23 | `awards-honours` | **awards & honours** (tracked manifests) | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 24 | `brownlow-season` | Brownlow season totals — tracked artefact | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 25 | `derived` | derived summaries | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 26 | `coleman` | Coleman (derived) | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 27 | `ladder-witness` | **validation** — cross-check `club_seasons` | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 28 | `fingerprints` | **validation** — per-domain row counts vs the contracts | `AFLDB_TEST_DATABASE_URL` |
 
 Stages 8–16 are the AFLDB-ISSUE-118 additions (§23.19, §23.24, §23.27, §23.29, §23.31,
 §23.33–§23.35). Every one reads a tracked, manifest-pinned artefact, contacts no network, and
 resolves people **only** through the AFL Tables profile-url identities `fitzroy` registers —
 which is why they all follow it and why nothing later reads them. `after-siren-reconcile`,
-`afl-api-adjudications-bijection` and `ladder-witness` are validation stages: they open one
-connection and write nothing.
+`manual-registrations-verify`, `afl-api-adjudications-bijection` and `ladder-witness` are
+validation stages: they open one connection and write nothing.
 
-**The `afl_api` adjudication ledger survives the rebuild (AFLDB-ISSUE-235 OD-5).** It is human
-state no tracked source can reproduce, so stages 2, 18 and 19
-(`tools/migration/rebuild_afl_api_adjudications.ts`) carry it across the reset:
+### State the rebuild carries across the reset
 
-- **Capture** runs after every input is proven and before the reset. It writes every ledger row —
-  its original id and `supersedes_id`, its stored `player_identity`, every audit field and its
-  actor's email and role — to `backups/rebuild/<target>/afl-api-adjudications.capture.json`, which is
-  gitignored because it holds admin emails and notes. It prints the file's sha256. A capture
-  failure stops the rebuild with nothing destroyed. An empty ledger, or a database from before
-  migration 104, is captured as empty.
-- **Reinstate** runs after `draftguru`, the last stage that adds players. It is one transaction:
-  - the rows go back under their original ids (`OVERRIDING SYSTEM VALUE`), and the id sequence
-    is advanced past the maximum;
-  - `player_id` is remapped from `player_identity`. An identity that does not resolve to exactly
-    one rebuilt player **stops the rebuild**; this includes a `manual_admin_edit` player, because
-    `afldb_test` has no `data_overrides`;
-  - `admin_user_id` is remapped by email, case-insensitively. An existing account is reused
-    unchanged, whatever its current role. Otherwise an attribution-only `auth_users` row is
-    created with the **captured** role, no password, no TOTP secret, no session, and
-    `disabled_at` set, so it cannot sign in. A captured role outside `auth_users_role_check` is
-    refused, never converted. The row records who acted and the role they held at capture. It
-    does not prove they held that role throughout the ledger's history, and it is not a
-    restored account: do not reactivate it to give anyone access;
-  - the D15 replay then re-creates the human `resolved` identities, and the bijection is
-    asserted. Any failure rolls the whole transaction back.
+Three kinds of state exist on `afldb_test` that no tracked source can reproduce. The rebuild
+carries all three through **one combined capture** (`tools/migration/rebuild_afl_api_adjudications.ts`,
+format `afldb.afl_api_identities.rebuild_capture` **version 2**), taken in stage 2 and replayed
+after the source stages. The sections never travel apart: they are captured, verified, adopted
+or refused together, under one file, one payload hash and one database marker.
 
-  On commit, the capture is renamed `…<timestamp>.<hash>.reinstated.json` and kept.
-- **A capture that was never archived is checked by the next rebuild.** The next capture compares
-  it with the live ledger:
-  - **The live ledger equals it.** This is what a run leaves if it died after the reinstate
-    committed but before the rename. The capture verifies, read-only, that the reinstatement is
-    complete: same ledger, sequence above the maximum id, a replay would insert nothing, and the
-    bijection holds. It then archives the old capture as `.reinstated.json` and captures the live
-    ledger for this run. Nothing is re-inserted. If any check fails it refuses with
-    `already_reinstated_unverified` and leaves the capture in place.
-  - **The live ledger is empty.** An earlier run failed after the reset. The capture refuses,
-    because capturing again would record the destroyed ledger as empty. Re-run with
-    `--recover-afl-api-adjudications` to reinstate from the pending capture.
-  - **The live ledger is non-empty and different.** Reconcile by hand.
-- Integration fixtures that write adjudications on `afldb_test` must delete them in teardown, as
-  the owner role. Otherwise the next rebuild carries them, or stops on them.
+| Section | Durable authority captured | Replayed by | Issue |
+|---|---|---|---|
+| `registrations` | every `data_overrides('players', 'manual_admin_edit:<token>', 'identity')` creation record: the token, the payload as PostgreSQL's own jsonb text, both timestamps, the actor's email and role | stages 17–19 | AFLDB-ISSUE-245 |
+| `importerRows` | every importer-created `afl_api` identity, keyed by its player's forward stable identity (AFL Tables path) | stage 21 (a) | AFLDB-ISSUE-237 |
+| `ledgerRows` | every `afl_api_identity_adjudications` row: original id, `supersedes_id`, `player_identity`, audit fields, actor email and role | stage 21 (b)–(c) | AFLDB-ISSUE-235 |
+
+No section carries a `players.id` or an `auth_users.id` as identity. Both appear only as
+audit fields, outside the payload hash; every replay remaps through a stable identity (a
+`manual_admin_edit` token, an AFL Tables profile path, an actor email). `data_edits` is not
+carried: it is the audit log, keyed by surrogate `row_id`, and nothing on `afldb_test` resolves
+identity through it.
+
+**Where the capture lives.** `AFLDB_REBUILD_CAPTURE_ROOT` must be set to an absolute path
+outside every checkout; stage 1 refuses otherwise. The pending capture is
+`<root>/<target>/afl-api-identities.capture.json` (written to a temporary name and renamed).
+It holds admin emails and notes: keep the root out of every repository. After stage 21 commits
+it is renamed `afl-api-identities.<timestamp>.<hash>.reinstated.json` and kept. A version-1
+file (the pre-ISSUE-245 combined format, which cannot say what registrations the database
+held) and the ISSUE-235-era ledger-only file are both refused by name, never upgraded.
+
+**The database marker.** After the file is durably written, stage 2 sets a `COMMENT ON
+DATABASE` on the target (`{format, version, capturedAt, payloadSha256, fileSha256}`). It
+attaches to the database object, so the reset does not remove it. Only stage 21 clears it,
+inside its own transaction, as its last step. Every reinstate stage (17 and 21) refuses unless
+the marker is present and names exactly the pending capture.
+
+**Stage 2 — capture, before destruction.** One read-only snapshot. A capture failure stops the
+rebuild with nothing destroyed. It refuses on any state the replay could not reproduce exactly:
+
+- a creation record in any field group other than `identity`, or an inactive one;
+- a payload key outside the creation record's shape, no `display_name`, a `dob` with no
+  `dob_confidence`, or a malformed profile path;
+- a token that names no player, or more than one;
+- a registration's AFL Tables path attached to a different player, or a registered player
+  holding an AFL Tables path its creation record does not carry;
+- two registrations claiming one path or one player;
+- a `manual_admin_edit` identity with **no** creation record — the player the reset would
+  destroy and nothing would re-create, which is the AFLDB-ISSUE-245 loss itself;
+- a later source-keyed correction (`afltables:<path>`) of a registered player: player
+  corrections are not carried, and the creation record alone would not reproduce that player;
+- an actor with no email, a role outside `auth_users_role_check`, or one actor captured in two
+  roles across the registrations and the ledger;
+- the AFLDB-ISSUE-237 D5/D7/D13 and OD-6 importer refusals, and the ISSUE-235 ledger rules.
+
+**Stages 17–19 — registrations, before `draftguru`.** They run after every source stage that
+creates or enriches players by AFL Tables path, and before `draftguru` and every AFL API
+replay. `import_draftguru.py` resolves manual and AFL Tables targets that must already exist,
+and stage 21 reverse-resolves every importer identity to exactly one rebuilt player.
+
+- **17 `manual-registrations-reinstate`** (one owner transaction) plans against the rebuilt
+  database first. It refuses before any write if the database already holds a manual override
+  or a `manual_admin_edit` identity (a duplicate manual identity), if a captured path is held by
+  an identity row that is not a bindable `afltables_profile_url` identity, if a path is held by
+  two source players, or if two registrations would bind to one player. It then recreates each
+  actor and inserts every creation record exactly as captured: payload text re-cast by the
+  server, both timestamps to the microsecond. It reads them back byte for byte. **Actors:** one
+  per case-insensitive email. An existing account is reused untouched only when it already
+  holds the captured role. A different role is conflicting actor state and STOPs; a credentialed
+  account is never overwritten or downgraded. Two accounts on one email STOP. Otherwise an
+  attribution-only row is created with the captured role, no password, no TOTP, no session,
+  and `disabled_at` set; an open admin invite for that email STOPs. The marker is **not**
+  cleared here.
+- **18 `manual-registrations-replay`** runs `tools/migration/replay_manual_registrations.py`,
+  which calls the production `replay_admin_overrides(pg, "players")` and nothing else, as the
+  import role, on the named target only. Each registered player is re-created with its token
+  and its AFL Tables path. **Source-owned convergence:** when the accepted source now carries the
+  player (they debuted, and `fitzroy` created them under that path), the token is **bound** to
+  that existing player instead. There is no duplicate and no name-only linking.
+- **19 `manual-registrations-verify`** (owner, read-only) re-captures the live registrations
+  and requires them to equal the capture, surrogates aside, with none of stage 2's problems.
+
+**Stage 21 — AFL API identities, one transaction:** (a) the importer rows replayed by stable
+identity; (b) the ledger reinstated under its original ids, sequence advanced; (c) the D15
+human replay with an empty expected-supersede set; (d) exact importer parity and the combined
+invariant; (e) the marker cleared. Any failure rolls all of it back and keeps the marker.
+`admin_user_id` is remapped by email; an existing account (including one stage 17 recreated)
+is reused unchanged. **Stage 22** asserts the combined invariant and that no marker remains.
+
+**The `players` fingerprint.** The accepted baseline measures the source's players, so the
+final `players` gate excludes AFL Tables identities the registration replay created (`resolved`
+rows on a registered token's player under its creation record's path). A registration bound to a
+source player stays counted.
+
+**Recovery.** The capture is the recovery source; a re-run never captures a reset database as a
+new baseline. The next stage 2 compares the pending capture with the live database, all three
+sections:
+
+| Marker | Live database | Stage 2 does |
+|---|---|---|
+| present | no pending file (another worktree/host) | **refuse**; point `AFLDB_REBUILD_CAPTURE_ROOT` at the pending capture |
+| present | AFL API sections empty; registrations empty or exactly the capture's (a run that failed after the reset, including after stages 17–19 committed) | with `--recover-afl-api-adjudications`, **adopt** the original capture (the reset then replays every section again); otherwise refuse and name the flag |
+| present or absent | otherwise equal to the capture in every section (died before the reset, or after stage 21 committed but before the rename) | verify read-only — both replays and the registration verification insert nothing, the sequence and bijection hold — then archive and capture afresh; otherwise `already_reinstated_unverified`, capture left in place |
+| absent | empty | with `--recover-afl-api-adjudications`, adopt; otherwise refuse |
+| any | anything else | **refuse**; reconcile by hand |
+
+`--rehearsal-stop-after recreate` (`code_test_db` only, exit code 86) stops deliberately after a
+successful reset so the `--recover` path can be rehearsed.
+
+- Integration fixtures that write adjudications, `afl_api` identities or manual players on
+  `afldb_test` must delete them in teardown, as the owner role. Otherwise the next rebuild
+  carries them, or stops on them.
+
+**Rehearsals on `code_test_db`.** `npm run db:code-test:issue237-rehearsal` (AFL API identities)
+and `npm run db:code-test:issue245-rehearsal` (two ISSUE-224-style registrations, one with an AFL
+Tables path and an importer provider) each run `seed`, `verify --phase pre`, the rebuild,
+`verify --phase post`, `teardown`. Run them one at a time: each fixture treats the other's
+`afl_api` rows as foreign.
 
 **There is no Gridley stage.** The captured external grid corpus (migration 080,
 `external_grid_sources` / `external_grids` / `external_grid_axes`) is not produced by a

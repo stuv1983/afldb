@@ -89,6 +89,14 @@ promoted by accident.
 | `afldb_meta.*_tables` registries | grants | — | rebuilt | The dump carries them; `privileges.sql` rebuilds grants from them. |
 | everything in `import_writable_tables` | football | no | rebuilt | Canonical + derived (`player_clubs`, `player_club_season_stats`, `player_season_stats`, `player_career_stats`, `club_seasons`). |
 
+**`external_identities` and the `afl_api` importer rows (`AFLDB-ISSUE-237`).** The table is
+`import_writable_tables`, so it is `rebuilt` like every other football table above — the
+candidate's `afl_api` rows are exactly whatever the rebuilt `afldb_test` held, coherent with the
+candidate's own player ids by construction. There is **no** capture or replay of importer rows in
+promotion (unlike the human ledger below): production's own importer never writes there, and
+promoted rows already in production are protected by G3 (§6/§7 below), not by a capture. The
+authoritative source is `external_identities` itself, never a bridge artefact.
+
 Reinstatement order is foreign-key order and is generated, not typed: `auth_users`, then
 every table that references it and `external_grid_sources`, then `data_submission_rows`,
 `nl_search_review`, `nl_search_feedback`, `app_health_events` and `external_grids`, then
@@ -251,7 +259,13 @@ npm run db:promotion:check -- --phase pre-cutover --database afldb_prod \
 Refuses if production already holds a fixture identity or lacks an enabled, enrolled super
 admin — either is an existing problem to fix before promotion, not something to carry
 through it. The snapshot is row counts only (mode 600) and is what §7's acceptance compares
-against.
+against. **AFLDB-ISSUE-237:** also runs the target's `afl_api` census — the D5 census, the
+D15 bijection and the D7 identity check on production's own importer/human rows — refuses a
+pending `db:test:rebuild` marker on the target, and prints the importer-state and ledger-state
+digests. The snapshot records only **counts** (importer rows per method, human `resolved` rows,
+net-linked ledger entries), for the record. No later gate reads a per-row census back from the
+snapshot, so none is persisted: `--phase restored`'s G2/G3 (§6) read the live target directly,
+and the DEV regeneration classification (§13) is generated from that same live read.
 
 ## 6. Source validation and candidate restore
 
@@ -282,7 +296,8 @@ The two "must be owner of extension" messages are the only tolerated errors
 
 ```bash
 npm run db:promotion:check -- --phase restored --database "$CAND" --old-database afldb_prod \
-    --lineage-remap-out ~/backups/afldb/promotion-lineage-$STAMP.sql
+    --lineage-remap-out ~/backups/afldb/promotion-lineage-$STAMP.sql \
+    --afl-api-supersede-out ~/backups/afldb/promotion-afl-api-supersede-$STAMP.json
 ```
 
 This proves the candidate is the source (migration parity), reports the fixture rows the
@@ -297,6 +312,96 @@ target still exists in the candidate. A
 a `FAIL` means the contract itself must be revisited before continuing. Always pass
 `--lineage-remap-out`: the generated plan runs that file at a fixed step (§7.2, `AFLDB-ISSUE-151`),
 and the file is what settles a staged table before its rows meet the FK.
+
+**AFLDB-ISSUE-237 — the `afl_api` gates at this phase.** This phase runs **before** §7 reinstates
+anything, so the two databases have fixed roles, and the checker reads each fact from the side that
+owns it:
+
+| Role | Database | Owns | Read for |
+|---|---|---|---|
+| candidate | `$CAND` (the restored rebuild) | importer state | G2's importer rows and the remap of every ledger identity; G3's candidate rows |
+| target | `--old-database` (the live database) | durable human authority | G2's ledger (`afl_api_identity_adjudications`); G3's target rows |
+
+- **Source-lineage check.** The candidate must carry **zero** ledger rows and **zero** `resolved`
+  rows: it is the source's restore, and `--phase source` proved the source holds no human
+  authority. Neither database may carry a pending rebuild marker.
+- **G2 (human-vs-importer overlap).** For each **net** ledger entry of the **target** (latest row per
+  provider), its stored stable identity (AFL Tables path or `manual_admin_edit` token, never a name,
+  never the target's player id) is remapped against the candidate, and the candidate's importer row
+  for the SAME provider is graded: **AGREE** when all six D9 conditions hold (same provider,
+  byte-identical stable identity, `unique`/approved method, effective ledger state `LINKED`,
+  remapped player agrees) — this is `E_promotion`, the exact set §8 step 1's replay is permitted to
+  supersede. **DISAGREE**, **COLLISION**, **UNSUPPORTED**, **UNEVALUABLE** (a `manual_admin_edit`
+  identity on either side, unevaluable before the players replay), **CONTINUITY_CONTRADICTION** and
+  **UNRESOLVED** (the identity resolves to no candidate player, or to several — exactly what the D15
+  replay would STOP on after the swap) are all **FAIL**, here, before the swap. **COLLISION** is
+  decided by identity **and by player**, as the D15 replay decides it: another provider's importer
+  row on the remapped candidate player collides even when its forward identity is a different
+  string, which happens when the ledger stored the other path of a continuity pair. A revoked entry
+  meeting an importer row is **INFO** only — a revoke is an undo, never a negative assertion.
+- **G3 (cross-lineage importer comparison).** Every importer row of the live target against the
+  candidate: same provider/identity/method is `PASS`; a different identity or a collision is
+  `FAIL` in every environment, and a method change is `FAIL` in production (`WARN` on DEV, §13);
+  **a provider absent from the candidate (hard loss) is
+  `FAIL`, with no exception in production** (`AFLDB-ISSUE-238` owns correction of a
+  disagreement); a candidate provider the target never held is `INFO`. An importer row on either
+  side whose player has no single forward identity cannot be graded, and is `FAIL` (the live target
+  is re-read here, after `--phase pre-cutover`'s invariant). DEV has one narrow exception (§13),
+  which never covers such a row.
+- **`--afl-api-supersede-out` (the `E_promotion` handoff).** Written **only when every gate of the
+  run passes**, atomically (a temporary sibling published by `link()`, never over an existing
+  file). A refused run writes no file and says so. The file (`afldb.afl_api_supersede_expected`
+  v2) names the environment, the candidate and the target, and binds the candidate's importer
+  state and the target's ledger state by row count and SHA-256 (stable fields only; never a player
+  id), plus the sorted `expectedSupersedes` and a `payloadSha256` over all of it. An empty set is
+  bound exactly as strongly as a non-empty one. §7.5 and §8 step 1 both refuse a file that does not
+  match the state in front of them.
+- **`--lineage-remap-out` follows the same rule (`AFLDB-ISSUE-237` L4).** The lineage gate only
+  *prepares* the remap; the file is written after every gate of the run, **only if none failed**,
+  through the same atomic no-clobber writer, and its path is refused before any database is opened
+  if it already exists. A refused run leaves no remap for §7's step 2c to consume, and prints every
+  unresolved id of a refused column in full instead. Inside its transaction the file's first
+  statement refuses any database but the candidate it was evidenced against. Record the `sha256`
+  the checker prints.
+
+**AFLDB-ISSUE-237 L4 — the post-swap `data_overrides` replay, predicted here (A4.2, A4.3).** §8
+step 1 runs after the swap, and two of its branches could otherwise lose a decision there. Both are
+gates of this phase, and run again at §7.5 over the overrides the plan actually reinstated. Both
+read the target's **active** overrides and the candidate's stable identities (AFL Tables path,
+`manual_admin_edit` token, `match_key`), never a name and never a player id:
+
+- **`players` (A4.2).** For each creation record (`manual_admin_edit:<token>` / `identity`): the
+  candidate already holds the token on a player holding exactly the record's path → *present*; the
+  token is absent and exactly one candidate player holds the path **and carries no manual token** →
+  *bind* (the `AFLDB-ISSUE-160` rule); nobody holds the path, or there is none → *create*. Everything
+  else is **FAIL**: a different token already on the path's player (binding would give one person
+  two manual identities, which `readManualPlayerToken` refuses to resolve and only one of which has
+  a creation record); the same token on a different path; a path held by several players or by a
+  non-accepted identity; two records converging on one player or naming one path; a manual row
+  outside the `identity` field group. A source-keyed correction must resolve to exactly one
+  candidate player (or to a path a *create* registers), or it would silently match nothing.
+  **Every refusal the replay itself would raise after the swap is also FAIL here** (2026-09-25
+  final review): a creation record with no usable name or with any value the replay cannot cast
+  (`::date`, `::smallint` including range and scale, `::value_confidence`), checked by the same
+  validator the `AFLDB-ISSUE-245` rebuild capture uses (`registrationPayloadProblems` /
+  `playerOverrideValueProblems`, `tools/migration/rebuild_manual_registrations.ts`), so neither
+  promotion module names a presentation field; a correction whose payload is not an object or
+  carries such a value; two equal-authority overrides that disagree on one field of one player;
+  and a merged row that would violate `players_dob_confidence_ck` or `players_birth_range_ck`. The
+  last is predicted from the candidate's own `dob IS NOT NULL`, `dob_confidence`,
+  `birth_year_min` and `birth_year_max`, read by the player ids stable identities already resolved
+  (`PROMOTION_REPLAY_PLAYER_CHECKS_SQL`, never a name). **A candidate manual identity that no
+  target record names is FAIL too.** The target's `data_overrides` replaces the candidate's, so it
+  would survive the swap as a manual token with no creation record. `AFLDB-ISSUE-245`'s capture
+  refuses that state, and a manual-only player in it can never have its AFL Tables path attached.
+  Retiring such a token is a new promotion write class (token convergence, not implemented).
+- **`matches` / `match_coaches` (A4.3).** Every active override must name a `match_key` the
+  candidate holds. There is **no** supported deferred lifecycle for one that does not: this replay
+  runs before §9 re-acquires the current season, it matches by `match_key` only, and after the
+  re-acquisition nothing re-applies the override (the settle's `ManualAuthorityProvider` answers
+  `conflict` and proposes). So any active override keyed to a season the historical candidate
+  does not hold is **FAIL**, and the promotion waits until no such override is active or the
+  current-season lifecycle gains an identity-safe replay.
 
 ## 7. Reinstate production-owned state into the candidate
 
@@ -600,6 +705,7 @@ against the new lineage. That is the honest outcome of a lineage change, not a d
 ```bash
 npm run db:promotion:check -- --phase candidate --database "$CAND" \
     --compare ~/backups/afldb/promotion-$STAMP.json \
+    --afl-api-supersede-in ~/backups/afldb/promotion-afl-api-supersede-$STAMP.json \
     --expect-super-admin <the real production super admin's email>
 ```
 
@@ -608,6 +714,19 @@ present, enabled, with password and TOTP; reinstated counts equal to the snapsho
 (`auth_audit_log` ≥ snapshot, `auth_sessions`/`beta_login_tokens`/`promotion_decisions` = 0);
 migration parity; grants reconciled. **Nothing has touched `afldb_prod` yet.** A refusal here
 costs a `dropdb "$CAND"` and nothing else.
+
+**AFLDB-ISSUE-237.** `--afl-api-supersede-in` is **required** here: it is the file §6 wrote. The
+candidate now legitimately holds the target's reinstated human ledger, so the `afl_api` gate
+verifies that state instead of refusing it:
+
+- the reinstated ledger's row count and digest equal the file's `targetLedger*` — nothing dropped,
+  added, downgraded or altered by the reinstatement;
+- zero `resolved` rows (the D15 replay has not run), no D5 anomaly, every importer row resolving to
+  exactly one stable identity, one row per player, and no rebuild marker;
+- the candidate importer state still equals the file's `candidateImporter*`, and the file names
+  this candidate, this environment and this environment's live database;
+- G2, re-evaluated on the candidate over the reinstated ledger, refuses nothing and reproduces the
+  file's `expectedSupersedes` exactly.
 
 ## 8. Swap, post-promotion state, health, admin login
 
@@ -716,51 +835,67 @@ generator, with the hyphenated `afldb_*_pre_rebuild_20260906-112500` shape pinne
    Write it to a **file**: `npx tsx -e` evaluates as CommonJS, where the adapter's named
    exports arrive under `.default` and a copied one-liner silently reads `undefined`.
 
-   **AFLDB-ISSUE-235 (OD-3, D15): replay the `afl_api` human identity ledger, the same
-   window, the same TypeScript-adapter shape.** `afl_api_identity_adjudications` is
+   **AFLDB-ISSUE-235/237 (OD-2, OD-3, D9, D15): replay the `afl_api` human identity ledger,
+   the same window, the same TypeScript-adapter shape.** `afl_api_identity_adjudications` is
    reinstated in every environment (no `historicalOnly` entry) and is durable identity
    authority: the human `resolved` `external_identities` row a Super Admin wrote through
    `/admin/player-links/afl-api` does not survive a rebuild on its own (`external_identities`
    is import-writable and rebuilt), so this replay is what re-creates it. Depends on the
    `players` replay above having already run (`manual_admin_edit` identities must exist),
    and nothing else — it is independent of `matches`/`draft_picks`/`coaches`/the two
-   special-record branches, so it may run anywhere after `players`, in this same window:
+   special-record branches, so it may run anywhere after `players`, in this same window.
+   **`expectedSupersedes` is `E_promotion`, §6's G2 AGREE list, read from the bound
+   `--afl-api-supersede-out` file** — the replay never derives its own supersede set, and it never
+   trusts the file blindly. `replayAflApiAdjudicationsFromSupersedeFile` refuses, before any write,
+   a file that is malformed, foreign (another environment or target), of the unbound v1 format,
+   tampered, or stale/candidate-mismatched (the promoted database's importer state or reinstated
+   ledger no longer hashes to what G2 evaluated). The operator states the environment and the
+   target; the connection must actually be on that target:
 
    ```bash
    cd ~/projects/afldb && cat > replay-afl-api-adjudications.ts <<'TS'
+   import { readFileSync } from 'node:fs';
    import postgres from 'postgres';
 
-   import { replayAflApiAdjudications } from './tools/migration/replay_afl_api_adjudications';
+   import { replayAflApiAdjudicationsFromSupersedeFile } from './tools/migration/replay_afl_api_adjudications';
 
    const dsn = process.env.AFLDB_IMPORT_DATABASE_URL;
    if (!dsn) throw new Error('AFLDB_IMPORT_DATABASE_URL is not set.');
+   const [supersedeFile, environment, targetDatabase] = process.argv.slice(2);
+   if (!supersedeFile || (environment !== 'prod' && environment !== 'dev') || !targetDatabase) {
+     throw new Error('usage: replay-afl-api-adjudications.ts <supersede-out.json> <prod|dev> <target database>');
+   }
+   const fileText = readFileSync(supersedeFile, 'utf8');
    const sql = postgres(dsn, { max: 1, onnotice: () => {} });
-   sql.begin((tx) => replayAflApiAdjudications(tx))
+   sql.begin((tx) => replayAflApiAdjudicationsFromSupersedeFile(tx, fileText, { environment, targetDatabase }))
      .then(async (counts) => { console.log(counts); await sql.end(); })
      .catch(async (error) => { console.error(error); await sql.end(); process.exit(1); });
    TS
-   npx tsx replay-afl-api-adjudications.ts && rm replay-afl-api-adjudications.ts
+   npx tsx replay-afl-api-adjudications.ts ~/backups/afldb/promotion-afl-api-supersede-$STAMP.json prod afldb_prod \
+     && rm replay-afl-api-adjudications.ts
    ```
 
    Every net-`linked` ledger entry re-creates exactly one `resolved`/
    `afl_api_admin_adjudication` row; an identical row already present is an idempotent
-   no-op; a conflicting importer or human row, an unresolvable or ambiguous identity, or
-   the target player already holding a different `afl_api` provider all **STOP the whole
-   replay** — nothing is partially written. Carrying importer-created `unique` `afl_api`
-   identities through this promotion is **AFLDB-ISSUE-237**, a separate, pre-existing gap;
-   this replay does not attempt it. Verify with the standalone bijection check:
+   no-op; an agreeing importer row in `E_promotion` is **superseded in place** (D9/OD-2: the
+   one `unique`/&lt;approved method&gt; → `resolved`/`afl_api_admin_adjudication` transition,
+   `external_identities.id` kept). A conflicting importer or human row, an unresolvable or
+   ambiguous identity, the target player already holding a different `afl_api` provider, or the
+   **actual** superseded provider set disagreeing with `E_promotion` even by one provider, all
+   **STOP the whole replay** — nothing is partially written. Verify with the combined invariant,
+   which replaces the bijection-only check (D13):
 
    ```bash
    cd ~/projects/afldb && cat > verify-afl-api-adjudications.ts <<'TS'
    import postgres from 'postgres';
 
-   import { assertAflApiAdjudicationBijection } from './tools/migration/replay_afl_api_adjudications';
+   import { assertAflApiIdentityInvariant } from './tools/migration/replay_afl_api_adjudications';
 
    const dsn = process.env.AFLDB_IMPORT_DATABASE_URL;
    if (!dsn) throw new Error('AFLDB_IMPORT_DATABASE_URL is not set.');
    const sql = postgres(dsn, { max: 1, onnotice: () => {} });
-   sql.begin((tx) => assertAflApiAdjudicationBijection(tx))
-     .then(async () => { console.log('afl_api adjudication bijection: OK'); await sql.end(); })
+   sql.begin((tx) => assertAflApiIdentityInvariant(tx))
+     .then(async () => { console.log('afl_api identity invariant: OK'); await sql.end(); })
      .catch(async (error) => { console.error(error); await sql.end(); process.exit(1); });
    TS
    npx tsx verify-afl-api-adjudications.ts && rm verify-afl-api-adjudications.ts
@@ -918,6 +1053,7 @@ third is a tracked contract declaration with no flag at all.
 | Test-fixture identities | Refusal in `pre-cutover`, `candidate`, `production`. No override exists. | **Still a refusal by default.** `--allow-fixture-identities` accepts them consciously: the scan still runs, the verdict becomes WARN instead of FAIL, and the ten-row sample cap is **lifted** so every offending address is printed. Never silent, never partial. |
 | `--expect-super-admin` | Required in those phases: a database nobody can administer is not promoted. | Enforced exactly as on production **when the flag is given**. Omitted, the gate WARNs and says it is not enforced — optional, never silently dropped. |
 | Lineage-unresolvable ledgers (§7.4d) | Nothing is declared, so an unresolved id refuses in every case — unchanged by `AFLDB-ISSUE-143`. | `player_link_resolutions` and `data_edits` are declared **historical-only** in the contract: not reinstated, still truncated, expected empty at `candidate`, and named in the audit marker. Any *other* table or column still refuses. |
+| G3 importer hard loss (`AFLDB-ISSUE-237` D14, §6/§7) | **FAIL, no exception, ever.** A provider in the live target's importer set absent from the candidate is lost for good; production has no importer target to regenerate from. | **Still FAIL by default.** `--afl-api-dev-regeneration <file>` admits WARN, and ONLY for a provider explicitly listed, ONLY of the `afl_api_stat_vector_season` class (the one class DEV can honestly re-acquire), ONLY when the entry matches the live target row exactly and does not collide, and ONLY from a generated file bound to both compared importer states (below; never hand-authored). Every other loss, and every listed entry that does not match, is still FAIL. A method change is WARN (not FAIL) on every listed or unlisted row, agreeing or not, because DEV's own lineage can legitimately differ in evidence class. A used exception makes the DEV promotion **not accepted** until the `dev-regeneration-census` phase below passes. |
 
 `--allow-fixture-identities` is refused outright under `--environment prod`, including the
 implicit `prod` of no `--environment` at all, and including modes that never consult it. A
@@ -958,16 +1094,21 @@ database is still restored into a *new* candidate and swapped by rename, never r
   historical note, and never weaken parity checks to accommodate an obsolete ledger name.
 
 ```bash
-# DEV: streamanator — the same five phases, with the environment stated every time
+# DEV: streamanator — the same five phases, with the environment stated every time. Add
+# --afl-api-dev-regeneration <file> to --phase restored ONLY when a G3 exception is intended
+# (AFLDB-ISSUE-237 §6.3) — omit it and every importer hard loss is FAIL, exactly as on production.
 npm run db:promotion:check -- --environment dev --phase source      --database afldb_test
 npm run db:promotion:check -- --environment dev --phase pre-cutover --database afldb_dev \
     --snapshot ~/backups/afldb/promotion-dev-$STAMP.json
 npm run db:promotion:check -- --environment dev --plan --database "$CAND" \
     --old-database afldb_dev --pre-cutover-dump <file> --rebuilt-dump <file> --plan-dir <dir>
 npm run db:promotion:check -- --environment dev --phase restored    --database "$CAND" \
-    --old-database afldb_dev --lineage-remap-out ~/backups/afldb/promotion-dev-lineage-$STAMP.sql
+    --old-database afldb_dev --lineage-remap-out ~/backups/afldb/promotion-dev-lineage-$STAMP.sql \
+    --afl-api-supersede-out ~/backups/afldb/promotion-dev-afl-api-supersede-$STAMP.json \
+    [--afl-api-dev-regeneration ~/backups/afldb/afl-api-dev-regeneration-$STAMP.json]
 npm run db:promotion:check -- --environment dev --phase candidate   --database "$CAND" \
-    --compare ~/backups/afldb/promotion-dev-$STAMP.json
+    --compare ~/backups/afldb/promotion-dev-$STAMP.json \
+    --afl-api-supersede-in ~/backups/afldb/promotion-dev-afl-api-supersede-$STAMP.json
 npm run db:promotion:check -- --environment dev --phase production  --database afldb_dev \
     --compare ~/backups/afldb/promotion-dev-$STAMP.json
 ```
@@ -975,3 +1116,42 @@ npm run db:promotion:check -- --environment dev --phase production  --database a
 The generated plan names `DEV (streamanator)` as the host, carries `--environment dev` into its
 own acceptance command, and writes `'environment', 'dev'` into the `database.promoted` audit
 marker — so the audit trail records which environment was promoted, not merely that one was.
+
+**AFLDB-ISSUE-237 §6.3 — generating the DEV regeneration classification.** It is never
+hand-authored. When a DEV `--phase restored` run fails **only** on G3 hard losses of
+`afl_api_stat_vector_season` rows, re-run it (new output names; nothing is ever overwritten) with
+the generator, which writes the classification from G3's own grades:
+
+```bash
+npm run db:promotion:check -- --environment dev --phase restored --database "$CAND" --old-database afldb_dev \
+    --afl-api-dev-regeneration-out ~/backups/afldb/afl-api-dev-regeneration-$STAMP.json \
+    --afl-api-regeneration-season 2026 \
+    --afl-api-regeneration-reason "<why these providers are regenerated>" \
+    --afl-api-regeneration-plan "<the §9 re-acquisition that restores them>"
+```
+
+It still REFUSES (G3 has not passed), and it writes the file only when the run's failures are
+exactly those hard losses and every entry passes the §6.3 validator. A hard loss of
+`afl_api_stat_vector_bootstrap`, `afl_api_name_team_season_bootstrap` or
+`afl_api_manual_adjudication`, a collision, a disagreement, or any other failed gate: no file. The
+file (`afldb.afl_api_dev_regeneration_classification` v2) binds the target and candidate names and
+both compared importer-state digests, and its `payloadSha256` covers every field, `reason` and
+`reacquisitionPlan` included; the unbound v1 format is refused. It is a **proposal**: approval is a
+third `--phase restored` run that consumes it with `--afl-api-dev-regeneration` (and writes the
+`--afl-api-supersede-out` file, under a new name), which refuses the file if either compared state
+has moved.
+
+**AFLDB-ISSUE-237 §6.3 — the mandatory post-re-acquisition census.** If `restored` used the
+`--afl-api-dev-regeneration` exception, the DEV promotion is **not accepted** until, after §9's
+current-season re-acquisition (the DEV emitter, then `import --target dev` validate-only →
+dry-run → apply), this passes with the SAME classification file:
+
+```bash
+npm run db:promotion:check -- --environment dev --phase dev-regeneration-census \
+    --database afldb_dev --afl-api-dev-regeneration ~/backups/afldb/afl-api-dev-regeneration-$STAMP.json
+```
+
+The classification must name `afldb_dev` as its target database. Every listed provider must
+again be present under the same `external_id`, the same stable
+identity, `match_method='afl_api_stat_vector_season'` and `status='unique'`. A `FAIL` here means
+the promotion is recorded as not accepted, with the gap listed; there is no automatic repair.

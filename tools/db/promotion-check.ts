@@ -53,12 +53,58 @@
  * being refused, and the remap file carries row ids and AFL Tables profile paths only.
  */
 
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, linkSync, mkdirSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { createHash, randomBytes } from 'node:crypto';
+
 import { collectSections, fingerprintOf, type Row } from './catalog-fingerprint';
 import { computeChecksumRepresentations, matchesStoredChecksum } from './migration-checksum';
+import {
+  AFL_API_G2_REFUSING_OUTCOMES,
+  AFL_API_REBUILD_MARKER_FORMAT,
+  AflApiPromotionFileRefused,
+  aflApiDevRegenerationBindingProblems,
+  aflApiDevRegenerationEntriesFromG3,
+  aflApiG2AgreeSet,
+  aflApiImporterStateSha256,
+  aflApiLedgerStateSha256,
+  aflApiReverseIdentityPaths,
+  aflApiSupersedeBindingProblems,
+  aflApiSupersedeMismatch,
+  buildAflApiDevRegenerationClassification,
+  buildAflApiSupersedeFile,
+  censusAflApiRows,
+  checkAflApiIdentityInvariant,
+  classifyAflApiDevRegenerationCensus,
+  classifyAflApiForwardIdentityRows,
+  classifyAflApiG1,
+  classifyAflApiG2,
+  classifyAflApiG3,
+  classifyAflApiReverseIdentity,
+  isAflApiRebuildMarkerComment,
+  netLedgerRowsByExternalId,
+  parseAflApiDevRegenerationClassification,
+  parseAflApiSupersedeFile,
+  validateAflApiDevRegenerationClassification,
+  type AflApiAdjudicationLedgerRow,
+  type AflApiCensusResult,
+  type AflApiCensusRow,
+  type AflApiDevRegenerationClassification,
+  type AflApiDevRegenerationClassificationEntry,
+  type AflApiForwardIdentityResult,
+  type AflApiG2EntryInput,
+  type AflApiG2Grade,
+  type AflApiG3Grade,
+  type AflApiG3Row,
+  type AflApiPlayerRemapResult,
+  type AflApiSupersedeFile,
+} from '../../src/lib/acquisition/afl-api-adjudication';
+import {
+  loadFitzroyProfileContinuityRules,
+  type ValidatedFitzroyProfileContinuityRules,
+} from '../../src/lib/acquisition/fitzroy-profile-continuity';
 import {
   ACCEPTANCE_CHECKLIST,
   DEFAULT_ENVIRONMENT,
@@ -92,6 +138,11 @@ import {
   lineageRemapSql,
   lineageTargetsOf,
   isStagedLineageColumn,
+  matchKeysOfOverrides,
+  planPromotionMatchReplay,
+  planPromotionPlayersReplay,
+  playerIdentityKeysOfOverrides,
+  promotionPlayerCheckProblems,
   stableLineageTargetForFootballRef,
   promoteStagedSql,
   publicContractTables,
@@ -119,6 +170,11 @@ import {
   type LineageSample,
   type LineageTarget,
   type Phase,
+  type PromotionIdentityRow,
+  type PromotionMatchReplayPlan,
+  type PromotionOverrideRow,
+  type PromotionPlayerCheckRow,
+  type PromotionPlayersReplayPlan,
   type Snapshot,
 } from './promotion-inventory';
 
@@ -162,6 +218,38 @@ export type Options = {
    * both databases is the only way to compute it, so it belongs to a phase, not to `--plan`.
    */
   lineageRemapOut?: string;
+  /**
+   * AFLDB-ISSUE-237 §6.3 point 3. The operator-authored, hash-bound classification of target
+   * `afl_api_stat_vector_season` rows intentionally regenerated on DEV after re-acquisition.
+   * Consulted by G3 at `--phase restored` (DEV only) and by `--phase dev-regeneration-census`.
+   * Refused outright under `--environment prod` (D14: no general WARN in production).
+   */
+  aflApiDevRegeneration?: string;
+  /**
+   * AFLDB-ISSUE-237 D9. Where to write G2's AGREE list (`E_promotion`), the exact provider
+   * set the post-swap D15 replay is permitted to supersede. Written at `--phase restored`
+   * only, so the replay step never has to derive its own expected set — and (F-L4-4) only
+   * when that whole run PASSES, atomically, bound to the candidate importer state and the
+   * target ledger state it was derived from.
+   */
+  aflApiSupersedeOut?: string;
+  /**
+   * AFLDB-ISSUE-237 F-L4-3. The bound supersede file `--phase restored` wrote, re-read at
+   * `--phase candidate` (required there): the candidate's reinstated ledger must be exactly
+   * the target ledger G2 evaluated, and re-evaluating G2 on the candidate must reproduce the
+   * same `E_promotion`.
+   */
+  aflApiSupersedeIn?: string;
+  /**
+   * AFLDB-ISSUE-237 F-L4-5. DEV only, `--phase restored` only: write the regeneration
+   * classification from G3's own grades when G3's ONLY failures are hard losses of
+   * `afl_api_stat_vector_season` rows. It is a proposal, not an approval: approval is a
+   * second `--phase restored` run that consumes it through `--afl-api-dev-regeneration`.
+   */
+  aflApiDevRegenerationOut?: string;
+  aflApiRegenerationSeason?: number;
+  aflApiRegenerationReason?: string;
+  aflApiRegenerationPlan?: string;
 };
 
 export function parseArgs(argv: readonly string[]): Options {
@@ -205,6 +293,17 @@ export function parseArgs(argv: readonly string[]): Options {
         out.dsnEnv = value; i += 1; break;
       }
       case '--lineage-remap-out': out.lineageRemapOut = need(i, arg); i += 1; break;
+      case '--afl-api-dev-regeneration': out.aflApiDevRegeneration = need(i, arg); i += 1; break;
+      case '--afl-api-supersede-out': out.aflApiSupersedeOut = need(i, arg); i += 1; break;
+      case '--afl-api-supersede-in': out.aflApiSupersedeIn = need(i, arg); i += 1; break;
+      case '--afl-api-dev-regeneration-out': out.aflApiDevRegenerationOut = need(i, arg); i += 1; break;
+      case '--afl-api-regeneration-season': {
+        const value = need(i, arg);
+        if (!/^[12][0-9]{3}$/.test(value)) throw new PromotionRefused('--afl-api-regeneration-season needs a four-digit year.');
+        out.aflApiRegenerationSeason = Number(value); i += 1; break;
+      }
+      case '--afl-api-regeneration-reason': out.aflApiRegenerationReason = need(i, arg); i += 1; break;
+      case '--afl-api-regeneration-plan': out.aflApiRegenerationPlan = need(i, arg); i += 1; break;
       case '--snapshot': out.snapshot = need(i, arg); i += 1; break;
       case '--compare': out.compare = need(i, arg); i += 1; break;
       case '--expect-super-admin': out.expectSuperAdmin = need(i, arg); i += 1; break;
@@ -231,6 +330,20 @@ export function parseArgs(argv: readonly string[]): Options {
     throw new PromotionRefused(
       '--allow-fixture-identities is a DEV-only conscious acceptance and needs --environment dev. '
       + 'A reserved-domain identity can never be a production identity.');
+  }
+  if (out.aflApiDevRegeneration && out.environment !== 'dev') {
+    throw new PromotionRefused(
+      '--afl-api-dev-regeneration is a DEV-only regeneration classification (AFLDB-ISSUE-237 D14) '
+      + 'and needs --environment dev. Production has no general WARN for importer identity loss.');
+  }
+  const regenerationCompanions = [
+    out.aflApiRegenerationSeason !== undefined, out.aflApiRegenerationReason !== undefined,
+    out.aflApiRegenerationPlan !== undefined,
+  ];
+  if ((out.aflApiDevRegenerationOut || regenerationCompanions.some(Boolean)) && out.environment !== 'dev') {
+    throw new PromotionRefused(
+      '--afl-api-dev-regeneration-out and its --afl-api-regeneration-* inputs are DEV-only '
+      + '(AFLDB-ISSUE-237 D14) and need --environment dev.');
   }
 
   if (out.checklist) return out;
@@ -280,6 +393,48 @@ export function parseArgs(argv: readonly string[]): Options {
   if (out.expectSuperAdmin && !out.expectSuperAdmin.includes('@')) {
     throw new PromotionRefused('--expect-super-admin needs an email address.');
   }
+  if (out.aflApiDevRegeneration && out.phase !== 'restored' && out.phase !== 'dev-regeneration-census') {
+    throw new PromotionRefused(
+      '--afl-api-dev-regeneration is only meaningful with --phase restored or '
+      + '--phase dev-regeneration-census.');
+  }
+  if (out.phase === 'dev-regeneration-census' && !out.aflApiDevRegeneration) {
+    throw new PromotionRefused("Phase 'dev-regeneration-census' needs --afl-api-dev-regeneration <file>.");
+  }
+  if (out.aflApiSupersedeOut && out.phase !== 'restored') {
+    throw new PromotionRefused(
+      '--afl-api-supersede-out is only meaningful with --phase restored: E_promotion is '
+      + "G2's own AGREE list, computed there.");
+  }
+  if (out.aflApiSupersedeIn && out.phase !== 'candidate') {
+    throw new PromotionRefused(
+      '--afl-api-supersede-in is only meaningful with --phase candidate: it verifies the reinstated '
+      + 'target ledger against the E_promotion file --phase restored wrote.');
+  }
+  if (out.aflApiDevRegenerationOut || regenerationCompanions.some(Boolean)) {
+    if (out.phase !== 'restored') {
+      throw new PromotionRefused(
+        '--afl-api-dev-regeneration-out is only meaningful with --phase restored: it is generated '
+        + "from G3's own comparison of the candidate and the target.");
+    }
+    if (!out.aflApiDevRegenerationOut || !regenerationCompanions.every(Boolean)) {
+      throw new PromotionRefused(
+        '--afl-api-dev-regeneration-out needs all of --afl-api-regeneration-season <yyyy>, '
+        + '--afl-api-regeneration-reason <text> and --afl-api-regeneration-plan <text>, and they need it.');
+    }
+    if (out.aflApiDevRegeneration) {
+      throw new PromotionRefused(
+        '--afl-api-dev-regeneration-out cannot be combined with --afl-api-dev-regeneration: a run either '
+        + 'proposes a classification or consumes one, never both.');
+    }
+  }
+  // Last, so every narrower scoping message above wins. F-L4-3: a candidate may hold the
+  // target's reinstated human ledger only when that ledger is proven to be the one G2 graded.
+  if (out.phase === 'candidate' && !out.aflApiSupersedeIn) {
+    throw new PromotionRefused(
+      "Phase 'candidate' needs --afl-api-supersede-in <file>: the E_promotion file --phase restored wrote "
+      + '(AFLDB-ISSUE-237). It binds the reinstated human ledger and the candidate importer state.');
+  }
   return out;
 }
 
@@ -290,7 +445,7 @@ export function parseArgs(argv: readonly string[]): Options {
 type Verdict = 'PASS' | 'FAIL' | 'INFO' | 'WARN';
 type GateResult = { gate: string; verdict: Verdict; lines: string[] };
 
-class Report {
+export class Report {
   readonly results: GateResult[] = [];
   add(gate: string, verdict: Verdict, lines: string[] = []): void {
     this.results.push({ gate, verdict, lines });
@@ -300,7 +455,7 @@ class Report {
   get failed(): boolean { return this.results.some((r) => r.verdict === 'FAIL'); }
 }
 
-type Query = (text: string, params?: unknown[]) => Promise<Row[]>;
+export type Query = (text: string, params?: unknown[]) => Promise<Row[]>;
 
 /** postgres.js returns int8 as a string; every count here is cast in SQL, but be safe. */
 function asInt(value: unknown): number {
@@ -782,13 +937,13 @@ async function identitiesByIdentity(
 async function gateLineageIdentity(
   candidate: Query, old: Query, present: readonly string[], remapOut: string | undefined,
   candidateName: string, oldName: string, environment: Environment, report: Report,
-): Promise<void> {
+): Promise<string | undefined> {
   const tables = lineageBoundTables().filter((t) => present.includes(t.name));
   const lines: string[] = [];
   if (tables.length === 0) {
     report.add('Lineage identity of reinstated id-keyed rows', 'INFO',
       ['no reinstated table declares a lineage-bound column on this database']);
-    return;
+    return undefined;
   }
 
   // 1. Read the referenced ids and their rows from the database being replaced.
@@ -820,7 +975,7 @@ async function gateLineageIdentity(
           lines.push(`FAIL ${t.name}.${ref.column}: ${totalRows} rows exceed the ${LINEAGE_ROW_CAP}-row`
             + ' per-row remap cap — the contract needs a set-based treatment for this table');
           report.add('Lineage identity of reinstated id-keyed rows', 'FAIL', lines);
-          return;
+          return undefined;
         }
         slots.push({ table: t.name, ref, target, disposition, totalRows, enumerated: false, rows: [] });
         continue;
@@ -868,28 +1023,30 @@ async function gateLineageIdentity(
   for (const d of verdict.differed.slice(0, 5)) {
     lines.push(`  id ${d.id}: ${oldName} = ${d.replaced} vs ${candidateName} = ${d.candidate}`);
   }
-  // The one place the remap file is written. AFLDB-ISSUE-151: the plan applies it at a fixed
-  // step (2c) whenever a staged table exists, so on a shared lineage it is still written — as
+  // The one place the remap is generated. AFLDB-ISSUE-151: the plan applies it at a fixed
+  // step (2c) whenever a staged table exists, so on a shared lineage it is still generated — as
   // an explicit no-op holding no UPDATE — rather than leaving the step with nothing to run.
-  const writeRemap = (plans: readonly LineageColumnPlan[], shared: boolean): void => {
+  // AFLDB-ISSUE-237 L4: it is only PREPARED here. `publishRestoredLineageRemap` writes it after
+  // every gate of the run, and only if none failed, so a refused run leaves no remap to consume.
+  let remapSql: string | undefined;
+  const prepareRemap = (plans: readonly LineageColumnPlan[], shared: boolean): void => {
     if (!remapOut) {
       lines.push('re-run with --lineage-remap-out <file> to write the evidenced per-row remap');
       return;
     }
-    if (existsSync(remapOut)) throw new PromotionRefused(`${remapOut} already exists; refusing to overwrite a remap.`);
-    writeFileSync(remapOut, lineageRemapSql({
-      candidate: candidateName, oldDatabase: oldName, environment, plans,
-    }), { encoding: 'utf8', mode: 0o600 });
+    remapSql = lineageRemapSql({ candidate: candidateName, oldDatabase: oldName, environment, plans });
     lines.push(shared
-      ? `remap written: ${remapOut} — an explicit no-op (shared lineage, no UPDATE); the plan still runs it at step 2c`
-      : `remap written: ${remapOut} — read it, then run it at the plan's remap step (promotion-reinstate.sh 2c)`);
+      ? `remap prepared for ${remapOut} — an explicit no-op (shared lineage, no UPDATE); the plan still runs it at step 2c`
+      : `remap prepared for ${remapOut} — read it, then run it at the plan's remap step (promotion-reinstate.sh 2c)`);
+    lines.push('it is written only if every gate of this run passes, and it refuses to run on any database but '
+      + `${candidateName}`);
   };
   if (!verdict.changed) {
     lines.push(`${candidateName} shares the id lineage of ${oldName}: reinstating id-keyed rows `
       + 'unchanged is sound, and no remap is needed.');
-    writeRemap([], true);
+    prepareRemap([], true);
     report.add('Lineage identity of reinstated id-keyed rows', 'PASS', lines);
-    return;
+    return remapSql;
   }
   lines.push('LINEAGE CHANGE: the same id denotes a different row in the candidate. Every reinstated');
   lines.push('id-keyed column must be resolved through a stable identity — never by integer, never by name.');
@@ -929,14 +1086,17 @@ async function gateLineageIdentity(
       + `${remap.mapped.length} evidenced by ${rule}, ${remap.unresolved.length} unresolved`
       + `${remap.merges.length ? `, ${remap.merges.length} merge(s)` : ''}`
       + `${remap.unchanged ? `, ${remap.unchanged} unchanged` : ''}`);
-    // Every unresolved id is named. Past a readable number the transcript states how many
-    // more there are and where all of them are listed — a count, never a silent truncation.
-    for (const u of remap.unresolved.slice(0, LINEAGE_PRINT_LIMIT)) {
+    // Every unresolved id is named. A REFUSED column prints all of them: a refused run
+    // publishes no remap file to list them in. A historical-only column's accepted ids stop at
+    // a readable number, with how many more there are and where all of them are listed — a
+    // count, never a silent truncation.
+    const printLimit = slot.disposition ? LINEAGE_PRINT_LIMIT : remap.unresolved.length;
+    for (const u of remap.unresolved.slice(0, printLimit)) {
       lines.push(`       ${slot.table}.${slot.ref.column} = ${u.oldId}: ${u.reason}`
         + `${u.identity ? ` (${u.identity})` : ''} — row(s) `
         + `${slot.rows.filter((r) => r.oldValue === u.oldId).map((r) => r.rowId).join(', ')}`);
     }
-    if (remap.unresolved.length > LINEAGE_PRINT_LIMIT) {
+    if (remap.unresolved.length > printLimit) {
       lines.push(`       …and ${remap.unresolved.length - LINEAGE_PRINT_LIMIT} more, every one of them `
         + 'listed in the file written by --lineage-remap-out');
     }
@@ -977,10 +1137,645 @@ async function gateLineageIdentity(
     + `${judgement.refusedTotal} refused.`);
   const unresolvedTotal = judgement.refusedTotal;
 
-  writeRemap(plans, false);
+  if (unresolvedTotal === 0) {
+    prepareRemap(plans, false);
+  } else if (remapOut) {
+    lines.push(`no remap prepared for ${remapOut}: this gate refuses, and a refused run publishes no remap`);
+  }
 
   report.add('Lineage identity of reinstated id-keyed rows',
     unresolvedTotal === 0 ? 'WARN' : 'FAIL', lines);
+  return remapSql;
+}
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-237 — importer identity gates (G1, G2, G3)
+// ---------------------------------------------------------------------------
+
+async function readAflApiCensus(q: Query): Promise<AflApiCensusRow[]> {
+  const [source] = await q(`SELECT id FROM sources WHERE key = 'afl_api'`);
+  if (!source) return [];
+  const rows = await q(`
+    SELECT external_id AS "externalId", status::text AS status, match_method AS "matchMethod",
+           player_id AS "playerId", candidate_count AS "candidateCount", external_url AS "externalUrl"
+      FROM external_identities WHERE source_id = $1`, [asInt(source.id)]);
+  return rows.map((r) => ({
+    externalId: String(r.externalId), status: String(r.status), matchMethod: r.matchMethod === null ? null : String(r.matchMethod),
+    playerId: r.playerId === null ? null : asInt(r.playerId), candidateCount: asInt(r.candidateCount),
+    externalUrl: r.externalUrl === null ? null : String(r.externalUrl),
+  }));
+}
+
+/**
+ * D7's forward stable-identity lookup, strict where `LINEAGE_IDENTITY_SQL.afltables_profile_url`
+ * (F9) is lenient: reads every candidate row per player and classifies client-side, so a
+ * player with two AFL Tables paths is reported ambiguous rather than one being silently
+ * chosen — unless the two are exactly one tracked `profile_url_continuity` pair. The
+ * classification is the SAME `classifyAflApiForwardIdentityRows` the rebuild/recovery reader
+ * (`replay_afl_api_adjudications.ts`) uses, over the same validated fitzRoy contract, so a
+ * promotion gate can never resolve a player differently from the rebuild that captured it.
+ * Exported for that equivalence proof only (tests/db-promotion-check.test.ts).
+ */
+export async function readAflApiForwardIdentities(
+  q: Query, playerIds: readonly number[],
+  continuityRules: ValidatedFitzroyProfileContinuityRules = loadFitzroyProfileContinuityRules(),
+): Promise<Map<number, AflApiForwardIdentityResult>> {
+  if (playerIds.length === 0) return new Map();
+  const rows = await q(`
+    SELECT ei.player_id AS "playerId", ei.external_id AS "externalId", s.key AS "sourceKey"
+      FROM external_identities ei
+      JOIN sources s ON s.id = ei.source_id
+     WHERE ((s.key = 'afltables' AND ei.match_method = 'afltables_profile_url')
+            OR (s.key = 'manual_admin_edit' AND ei.match_method = 'manual_admin_edit'))
+       AND ei.status IN ('unique', 'resolved')
+       AND ei.player_id = ANY ($1::bigint[])`, [[...playerIds]]);
+  return classifyAflApiForwardIdentityRows({
+    playerIds,
+    rows: rows.map((r) => ({ playerId: asInt(r.playerId), externalId: String(r.externalId), sourceKey: String(r.sourceKey) })),
+    continuityRules,
+  });
+}
+
+async function readAflApiLedgerRowCount(q: Query): Promise<number> {
+  const [row] = await q(`SELECT count(*)::int AS n FROM afl_api_identity_adjudications WHERE source_key = 'afl_api'`);
+  return asInt(row?.n ?? 0);
+}
+
+/**
+ * AFLDB-ISSUE-237 F-L4-2 — the durable human ledger, read in full. Named so a test can prove
+ * WHICH database it is sent to: at `--phase restored` it goes to the TARGET, never the candidate.
+ */
+export const AFL_API_LEDGER_ROWS_SQL = `
+    SELECT id, external_id AS "externalId", action, player_id AS "playerId",
+           player_identity AS "playerIdentity", supersedes_id AS "supersedesId"
+      FROM afl_api_identity_adjudications WHERE source_key = 'afl_api' ORDER BY id`;
+
+export async function readAflApiLedgerRows(q: Query): Promise<AflApiAdjudicationLedgerRow[]> {
+  const rows = await q(AFL_API_LEDGER_ROWS_SQL);
+  return rows.map((r) => ({
+    id: asInt(r.id), externalId: String(r.externalId), action: r.action as 'linked' | 'revoked',
+    playerId: asInt(r.playerId), playerIdentity: String(r.playerIdentity),
+    supersedesId: r.supersedesId === null || r.supersedesId === undefined ? null : asInt(r.supersedesId),
+  }));
+}
+
+/** Which of `identities` are `manual_admin_edit` tokens on the database `q` reads (G2 UNEVALUABLE). */
+async function readAflApiManualIdentities(q: Query, identities: readonly string[]): Promise<Set<string>> {
+  if (identities.length === 0) return new Set();
+  const rows = await q(`
+    SELECT DISTINCT ei.external_id AS "manualIdentity" FROM external_identities ei
+      JOIN sources s ON s.id = ei.source_id
+     WHERE s.key = 'manual_admin_edit' AND ei.match_method = 'manual_admin_edit'
+       AND ei.status IN ('unique', 'resolved')
+       AND ei.external_id = ANY ($1::text[])`, [[...identities]]);
+  return new Set(rows.map((r) => String(r.manualIdentity)));
+}
+
+/**
+ * The reverse (stable identity -> candidate player) lookup G2 remaps each ledger identity
+ * through. Reads exactly the accepted-identity paths `aflApiReverseIdentityPaths` names (each
+ * identity, plus both paths of any tracked `profile_url_continuity` rule naming it) and
+ * classifies with the SAME `classifyAflApiReverseIdentity` the replay adapter's
+ * `resolveAflApiPlayerIdentity` uses — so the gate and the post-swap D15 replay cannot resolve
+ * an identity differently, and a candidate holding a rule's two paths on two players refuses
+ * here as it would there. Exported for that equivalence proof (tests/db-promotion-check.test.ts).
+ */
+export async function readAflApiReverseIdentities(
+  q: Query, identities: readonly string[],
+  continuityRules: ValidatedFitzroyProfileContinuityRules = loadFitzroyProfileContinuityRules(),
+): Promise<Map<string, AflApiPlayerRemapResult>> {
+  if (identities.length === 0) return new Map();
+  const paths = [...new Set(identities.flatMap((identity) => aflApiReverseIdentityPaths(identity, continuityRules)))];
+  const rows = await q(`
+    SELECT DISTINCT ei.external_id AS identity, ei.player_id AS "playerId"
+      FROM external_identities ei JOIN sources s ON s.id = ei.source_id
+     WHERE ((s.key = 'afltables' AND ei.match_method = 'afltables_profile_url')
+            OR (s.key = 'manual_admin_edit' AND ei.match_method = 'manual_admin_edit'))
+       AND ei.status IN ('unique', 'resolved')
+       AND ei.external_id = ANY ($1::text[])`, [paths]);
+  const playerIdsByPath = new Map<string, number[]>();
+  for (const r of rows) {
+    const path = String(r.identity);
+    if (!playerIdsByPath.has(path)) playerIdsByPath.set(path, []);
+    playerIdsByPath.get(path)!.push(asInt(r.playerId));
+  }
+  return new Map(identities.map((identity) => [
+    identity, classifyAflApiReverseIdentity({ identity, playerIdsByPath, continuityRules }),
+  ]));
+}
+
+/**
+ * AFLDB-ISSUE-237 F-L4-1 — the one correct read of a DATABASE comment, the statement the
+ * rebuild lifecycle's own `readRebuildMarker` (`rebuild_afl_api_adjudications.ts`) runs.
+ * `COMMENT ON DATABASE` writes the shared catalogue `pg_shdescription`, which only
+ * `shobj_description(oid, 'pg_database')` reads. The per-database `obj_description` read this
+ * checker used before never sees it (it is NULL for every `pg_database` oid), so G1's marker
+ * refusal could never fire; and a comment on some OTHER object, which lives in the
+ * per-database `pg_description`, must never be mistaken for the marker either.
+ */
+export const DATABASE_COMMENT_SQL =
+  "SELECT shobj_description(oid, 'pg_database') AS comment FROM pg_database WHERE datname = current_database()";
+
+export async function readRebuildMarkerPresent(q: Query): Promise<boolean> {
+  const [row] = await q(DATABASE_COMMENT_SQL);
+  return isAflApiRebuildMarkerComment(row?.comment);
+}
+
+/**
+ * One database's `afl_api` importer rows with each row's OWN forward stable identity
+ * (re-derived live, D9), and the stable-field digest of that state (`aflApiImporterStateSha256`).
+ * Used for both sides of the promotion — which side a view came from is the caller's
+ * `AflApiPromotionSides` role, never inferred.
+ */
+export type AflApiImporterView = {
+  census: readonly AflApiCensusRow[];
+  importerRows: AflApiCensusResult['importerRows'];
+  humanRowCount: number;
+  identityByPlayerId: ReadonlyMap<number, AflApiForwardIdentityResult>;
+  /** Provider id -> forward identity, for importer rows whose player resolves. */
+  identityByExternalId: ReadonlyMap<string, string>;
+  state: { rowCount: number; sha256: string };
+};
+
+export async function readAflApiImporterView(q: Query): Promise<AflApiImporterView> {
+  const census = await readAflApiCensus(q);
+  const { importerRows, humanRows } = censusAflApiRows(census);
+  const playerIds = [...new Set(importerRows.filter((r) => r.playerId !== null).map((r) => r.playerId as number))];
+  const identityByPlayerId = await readAflApiForwardIdentities(q, playerIds);
+  const identityByExternalId = new Map<string, string>();
+  for (const row of importerRows) {
+    if (row.playerId === null) continue;
+    const identity = identityByPlayerId.get(row.playerId);
+    if (identity && identity.ok) identityByExternalId.set(row.externalId, identity.identity);
+  }
+  const sha256 = aflApiImporterStateSha256(importerRows.map((r) => ({
+    externalId: r.externalId, status: r.status, matchMethod: r.matchMethod,
+    playerIdentity: identityByExternalId.get(r.externalId) ?? null,
+  })));
+  return {
+    census, importerRows, humanRowCount: humanRows.length, identityByPlayerId, identityByExternalId,
+    state: { rowCount: importerRows.length, sha256 },
+  };
+}
+
+function aflApiViewToG3(view: AflApiImporterView): AflApiG3Row[] {
+  const rows: AflApiG3Row[] = [];
+  for (const row of view.importerRows) {
+    const identity = view.identityByExternalId.get(row.externalId);
+    if (identity === undefined) continue; // an unresolved identity is a G1 anomaly, not a G3 input
+    rows.push({ externalId: row.externalId, playerIdentity: identity, matchMethod: row.matchMethod });
+  }
+  return rows;
+}
+
+function importerMethodLine(view: AflApiImporterView): string {
+  const byMethod = new Map<string, number>();
+  for (const row of view.importerRows) byMethod.set(row.matchMethod, (byMethod.get(row.matchMethod) ?? 0) + 1);
+  return `importer rows: ${view.importerRows.length} (${[...byMethod.entries()].map(([m, n]) => `${m}=${n}`).join(', ') || 'none'})`;
+}
+
+/**
+ * G1 (§6.2) at `--phase source`: `afldb_test` is SOURCE lineage and must carry no human
+ * authority at all — zero `resolved` rows, zero ledger rows — and no pending rebuild marker
+ * (F-L4-1: now read where a database comment actually lives). The candidate-phase G1 is
+ * `gateAflApiCandidateAfterReinstate` (F-L4-3): the candidate legitimately holds the TARGET's
+ * reinstated ledger by then.
+ */
+export async function gateAflApiG1(q: Query, report: Report): Promise<void> {
+  const view = await readAflApiImporterView(q);
+  const ledgerRowCount = await readAflApiLedgerRowCount(q);
+  const rebuildMarkerPresent = await readRebuildMarkerPresent(q);
+  const problems = classifyAflApiG1({
+    rows: view.census, ledgerRowCount, identityByPlayerId: view.identityByPlayerId, rebuildMarkerPresent,
+  });
+  const lines = [importerMethodLine(view), `importer state sha256: ${view.state.sha256}`];
+  if (problems.length === 0) { report.add('afl_api importer identity — source census (G1)', 'PASS', lines); return; }
+  for (const p of problems) lines.push(JSON.stringify(p));
+  report.add('afl_api importer identity — source census (G1)', 'FAIL', lines);
+}
+
+/**
+ * F-L4-1 at the phases whose database is not read by a G1 gate: the pre-cutover target and,
+ * at `--phase restored`, both the candidate and the target. None of them may carry a pending
+ * `db:test:rebuild` marker; an unrelated database comment is not a marker.
+ */
+export async function gateAflApiRebuildMarker(databases: readonly { role: string; q: Query }[], report: Report): Promise<void> {
+  const present: string[] = [];
+  for (const { role, q } of databases) if (await readRebuildMarkerPresent(q)) present.push(role);
+  report.add('afl_api rebuild marker absent (F-L4-1)', present.length === 0 ? 'PASS' : 'FAIL', present.length === 0
+    ? [`no pending rebuild marker on: ${databases.map((d) => d.role).join(', ')}`]
+    : present.map((role) => `${role} carries a pending db:test:rebuild marker (${AFL_API_REBUILD_MARKER_FORMAT}) — do not promote it`));
+}
+
+/**
+ * Target census (§6.2 `--phase pre-cutover`): D5 census + D15 bijection + D7 identity, WITHOUT
+ * the source's "zero human rows" expectation — the live target legitimately holds human
+ * decisions. Returns the census shape recorded into the snapshot: COUNTS for the record only.
+ * No gate reads it back: G3 re-reads the live target at `--phase restored`, and the DEV
+ * regeneration classification is generated from that same live read (F-L4-6).
+ */
+export async function gateAflApiPreCutoverCensus(q: Query, report: Report): Promise<{
+  importerRowsByMethod: Record<string, number>; humanRows: number; netLinkedLedgerEntries: number;
+}> {
+  const view = await readAflApiImporterView(q);
+  const ledgerRows = await readAflApiLedgerRows(q);
+  const problems = checkAflApiIdentityInvariant({ rows: view.census, ledgerRows, identityByPlayerId: view.identityByPlayerId });
+  const byMethod = new Map<string, number>();
+  for (const row of view.importerRows) byMethod.set(row.matchMethod, (byMethod.get(row.matchMethod) ?? 0) + 1);
+  const net = netLedgerRowsByExternalId(ledgerRows);
+  const netLinkedCount = [...net.values()].filter((r) => r.action === 'linked').length;
+
+  const importerRowsByMethod = Object.fromEntries(byMethod);
+  const lines = [
+    importerMethodLine(view),
+    `human resolved rows: ${view.humanRowCount}; ledger rows: ${ledgerRows.length}; net-linked ledger entries: ${netLinkedCount}`,
+    `importer state sha256: ${view.state.sha256}; ledger state sha256: ${aflApiLedgerStateSha256(ledgerRows)}`,
+  ];
+  if (problems.length === 0) {
+    report.add('afl_api importer identity — pre-cutover target census', 'PASS', lines);
+  } else {
+    for (const p of problems) lines.push(JSON.stringify(p));
+    report.add('afl_api importer identity — pre-cutover target census', 'FAIL', lines);
+  }
+  return { importerRowsByMethod, humanRows: view.humanRowCount, netLinkedLedgerEntries: netLinkedCount };
+}
+
+function refusedFile<T>(read: () => T): T {
+  try {
+    return read();
+  } catch (error) {
+    if (error instanceof AflApiPromotionFileRefused) throw new PromotionRefused(error.message);
+    throw error;
+  }
+}
+
+/**
+ * §6.3 point 3's classification file (v2, F-L4-5): strict parse, exact field set, eligible
+ * class only, payload hash over EVERY field. Binding to the compared states is checked by the
+ * caller, which knows them.
+ */
+function readAflApiDevRegenerationClassification(path: string): AflApiDevRegenerationClassification {
+  assertLinuxHostPath(path, '--afl-api-dev-regeneration');
+  return refusedFile(() => parseAflApiDevRegenerationClassification(readFileSync(path, 'utf8'), path));
+}
+
+/** The bound E_promotion file (F-L4-4), read back at `--phase candidate`. */
+function readAflApiSupersedeFile(path: string): AflApiSupersedeFile {
+  assertLinuxHostPath(path, '--afl-api-supersede-in');
+  return refusedFile(() => parseAflApiSupersedeFile(readFileSync(path, 'utf8'), path));
+}
+
+/**
+ * AFLDB-ISSUE-237 F-L4-2 — the database ROLES the promotion's `afl_api` gates read, explicit so
+ * a refactor cannot quietly read both sides from one database again:
+ *
+ * - `candidate` — the restored rebuilt candidate. It owns IMPORTER state: G2's importer rows,
+ *   G3's candidate rows, and the reverse remap of every ledger identity all come from here.
+ * - `target` — the live database being replaced (`--old-database`). It owns the durable HUMAN
+ *   ledger: G2's ledger rows come from here (the candidate's ledger at `--phase restored` is the
+ *   source's, which G1 proved empty), and so do G3's target rows.
+ */
+export type AflApiPromotionSides = { candidate: Query; target: Query };
+
+/**
+ * The roles one G2 evaluation reads. `humanLedger` is the TARGET at `--phase restored`; it is
+ * the candidate only at `--phase candidate`, and only after the candidate's reinstated ledger
+ * has been proven equal to the bound target ledger. `manualTokenSides` is every database that
+ * could have minted a ledger identity as a `manual_admin_edit` token.
+ */
+export type AflApiG2Sides = { candidate: Query; humanLedger: Query; manualTokenSides: readonly Query[] };
+
+export type AflApiG2Evaluation = {
+  grades: readonly AflApiG2Grade[];
+  ePromotion: ReadonlySet<string>;
+  failed: boolean;
+  candidate: AflApiImporterView;
+  ledgerRows: readonly AflApiAdjudicationLedgerRow[];
+  ledgerState: { rowCount: number; sha256: string };
+};
+
+/**
+ * G2 (§6.2): one entry per NET ledger entry (latest row per provider, `netLedgerRowsByExternalId`),
+ * graded by `classifyAflApiG2`. Identity is the stored stable identity (AFL Tables path or manual
+ * token) remapped against the candidate — never a name, never a player id from the other side.
+ */
+export async function evaluateAflApiG2(sides: AflApiG2Sides, candidateView?: AflApiImporterView): Promise<AflApiG2Evaluation> {
+  const candidate = candidateView ?? await readAflApiImporterView(sides.candidate);
+  const ledgerRows = await readAflApiLedgerRows(sides.humanLedger);
+  const net = netLedgerRowsByExternalId(ledgerRows);
+  const identities = [...new Set([...net.values()].map((row) => row.playerIdentity))];
+  const manualIdentities = new Set<string>();
+  for (const q of sides.manualTokenSides) for (const identity of await readAflApiManualIdentities(q, identities)) manualIdentities.add(identity);
+  const remapByIdentity = await readAflApiReverseIdentities(sides.candidate, identities);
+
+  const grades = classifyAflApiG2(aflApiG2Entries({ candidate, net, manualIdentities, remapByIdentity }));
+  const g2Failed = grades.some((g) => AFL_API_G2_REFUSING_OUTCOMES.has(g.outcome));
+  return {
+    grades, ePromotion: aflApiG2AgreeSet(grades), failed: g2Failed, candidate, ledgerRows,
+    ledgerState: { rowCount: ledgerRows.length, sha256: aflApiLedgerStateSha256(ledgerRows) },
+  };
+}
+
+/** G2's per-entry input, built from the candidate's importer view and the net human ledger. Pure. */
+export function aflApiG2Entries(input: {
+  candidate: Pick<AflApiImporterView, 'importerRows' | 'identityByExternalId'>;
+  net: ReadonlyMap<string, AflApiAdjudicationLedgerRow>;
+  manualIdentities: ReadonlySet<string>;
+  remapByIdentity: ReadonlyMap<string, AflApiPlayerRemapResult>;
+}): AflApiG2EntryInput[] {
+  const candidateByExternalId = new Map(input.candidate.importerRows.map((r) => [r.externalId, r]));
+  const externalIdByIdentity = new Map<string, string>();
+  for (const [externalId, identity] of input.candidate.identityByExternalId) {
+    if (!externalIdByIdentity.has(identity)) externalIdByIdentity.set(identity, externalId);
+  }
+  // The post-swap D15 planner refuses by PLAYER (`candidatePlayerAflApiRow.get(remap.newPlayerId)`),
+  // not by identity string. The two differ when the ledger stored one path of a continuity pair
+  // (ISSUE-235's link reads the first path in collation order) and the forward classifier gives the
+  // candidate's row the other: no string collision, same player. Both are checked, so G2 refuses
+  // every case D15 would refuse after the swap.
+  const externalIdByPlayerId = new Map<number, string>();
+  for (const r of input.candidate.importerRows) {
+    if (r.playerId !== null && !externalIdByPlayerId.has(r.playerId)) externalIdByPlayerId.set(r.playerId, r.externalId);
+  }
+  return [...input.net.entries()].map(([externalId, entry]) => {
+    const candidateRow = candidateByExternalId.get(externalId) ?? null;
+    const remap = input.remapByIdentity.get(entry.playerIdentity);
+    const collidingElsewhere = [
+      externalIdByIdentity.get(entry.playerIdentity),
+      remap?.ok ? externalIdByPlayerId.get(remap.newPlayerId) : undefined,
+    ].find((id) => id !== undefined && id !== externalId);
+    return {
+      externalId, ledgerNetAction: entry.action, identityIsManualToken: input.manualIdentities.has(entry.playerIdentity),
+      candidateRow: candidateRow === null ? null : {
+        status: candidateRow.status, matchMethod: candidateRow.matchMethod, candidateCount: candidateRow.candidateCount,
+        externalUrl: candidateRow.externalUrl, playerId: candidateRow.playerId,
+        playerIdentity: input.candidate.identityByExternalId.get(externalId) ?? '',
+      },
+      remappedCandidatePlayerId: remap?.ok ? remap.newPlayerId : null,
+      collidingProviderId: collidingElsewhere && collidingElsewhere !== externalId ? collidingElsewhere : null,
+      continuityContradiction: remap?.ok === false && remap.reason === 'continuity_contradiction' ? remap : null,
+      remapFailure: remap === undefined ? 'unresolvable'
+        : remap.ok === false && remap.reason !== 'continuity_contradiction' ? remap.reason : null,
+    };
+  });
+}
+
+function g2Lines(evaluation: AflApiG2Evaluation): string[] {
+  return [
+    `E_promotion (AGREE) = {${[...evaluation.ePromotion].sort().join(', ') || 'empty'}}`,
+    ...evaluation.grades.map((g) => `${g.externalId}: ${g.outcome}${'collidingProviderId' in g ? ` (vs ${g.collidingProviderId})` : ''}${'reason' in g ? ` (${g.reason})` : ''}`),
+  ];
+}
+
+export const AFL_API_G3_GATE = 'afl_api importer identity — G3 cross-lineage comparison';
+
+export type AflApiOverlapResult = {
+  ePromotion: ReadonlySet<string>;
+  candidate: AflApiImporterView;
+  target: AflApiImporterView;
+  ledgerState: { rowCount: number; sha256: string };
+  targetRows: readonly AflApiG3Row[];
+  candidateRows: readonly AflApiG3Row[];
+  g3Grades: readonly AflApiG3Grade[];
+};
+
+/**
+ * `--phase restored`, candidate + target, both read-only, BEFORE the plan reinstates anything:
+ *
+ * 1. the candidate carries no source-lineage human authority (zero ledger rows, zero `resolved`
+ *    rows) — the source G1 already proved this of `afldb_test`; this proves the restore;
+ * 2. G2 (F-L4-2): the CANDIDATE's importer rows vs the TARGET's effective human ledger, each
+ *    ledger identity remapped against the candidate. `E_promotion` is exactly the AGREE set;
+ *    every other refusing grade STOPs here, before the swap;
+ * 3. G3: the TARGET's importer rows vs the CANDIDATE's, optionally with a bound DEV
+ *    regeneration classification.
+ *
+ * Writes nothing: `main()` writes the bound `E_promotion` file only after EVERY gate of the run
+ * has passed (F-L4-4).
+ */
+export async function gateAflApiOverlap(
+  sides: AflApiPromotionSides, names: { candidateDatabase: string; targetDatabase: string },
+  environment: Environment, devRegenerationPath: string | undefined, report: Report,
+): Promise<AflApiOverlapResult> {
+  const candidate = await readAflApiImporterView(sides.candidate);
+  const candidateLedgerRowCount = await readAflApiLedgerRowCount(sides.candidate);
+  const sourceLineageFailed = candidateLedgerRowCount > 0 || candidate.humanRowCount > 0;
+  report.add('afl_api candidate carries no source-lineage human authority', sourceLineageFailed ? 'FAIL' : 'PASS', [
+    `candidate ledger rows: ${candidateLedgerRowCount}; candidate resolved rows: ${candidate.humanRowCount} (both must be 0 before reinstatement)`,
+  ]);
+
+  const g2 = await evaluateAflApiG2({
+    candidate: sides.candidate, humanLedger: sides.target, manualTokenSides: [sides.target, sides.candidate],
+  }, candidate);
+  report.add('afl_api importer identity — G2 human-vs-importer overlap', g2.failed ? 'FAIL' : 'PASS', [
+    `human ledger: TARGET ${names.targetDatabase}, ${g2.ledgerState.rowCount} row(s), sha256 ${g2.ledgerState.sha256}`,
+    `importer rows and identity remap: CANDIDATE ${names.candidateDatabase}, ${candidate.state.rowCount} row(s), sha256 ${candidate.state.sha256}`,
+    ...g2Lines(g2),
+  ]);
+
+  const target = await readAflApiImporterView(sides.target);
+  const targetRows = aflApiViewToG3(target);
+  const candidateRows = aflApiViewToG3(candidate);
+
+  let devRegenerationEntries: readonly AflApiDevRegenerationClassificationEntry[] | undefined;
+  if (environment === 'dev' && devRegenerationPath) {
+    const classification = readAflApiDevRegenerationClassification(devRegenerationPath);
+    const problems = [
+      ...aflApiDevRegenerationBindingProblems(classification, {
+        targetDatabase: names.targetDatabase, candidateDatabase: names.candidateDatabase,
+        targetImporterSha256: target.state.sha256, candidateImporterSha256: candidate.state.sha256,
+      }),
+      ...validateAflApiDevRegenerationClassification({ entries: classification.entries, targetRows, candidateRows }),
+    ];
+    if (problems.length > 0) {
+      report.add('afl_api importer identity — DEV regeneration classification', 'FAIL', problems.map((p) => JSON.stringify(p)));
+    } else {
+      report.add('afl_api importer identity — DEV regeneration classification', 'INFO',
+        [`${classification.entries.length} entries, bound to target ${classification.database} and candidate ${classification.candidateDatabase}: ${classification.reason}`]);
+    }
+    devRegenerationEntries = classification.entries;
+  }
+
+  const g3Grades = classifyAflApiG3({
+    environment: environment === 'dev' ? 'dev' : 'production', targetRows, candidateRows, devRegenerationEntries,
+  });
+  // `aflApiViewToG3` leaves out an importer row whose player has no single forward identity. The
+  // target is re-read live here, after `--phase pre-cutover`'s invariant, so such a row is not
+  // assumed away: G3 cannot grade it, and an ungraded row is a refusal, never a silent pass.
+  const ungraded = [
+    ...target.importerRows.filter((r) => !target.identityByExternalId.has(r.externalId)).map((r) => `target ${r.externalId}`),
+    ...candidate.importerRows.filter((r) => !candidate.identityByExternalId.has(r.externalId)).map((r) => `candidate ${r.externalId}`),
+  ];
+  const g3Failed = g3Grades.some((g) => g.outcome === 'FAIL') || ungraded.length > 0;
+  report.add(AFL_API_G3_GATE, g3Failed ? 'FAIL' : 'PASS', [
+    `${targetRows.length} target row(s) (sha256 ${target.state.sha256}), ${candidateRows.length} candidate row(s)`,
+    ...g3Grades.map((g) => `${g.externalId}: ${g.outcome}${'reason' in g ? ` (${g.reason})` : ''}`),
+    ...ungraded.map((u) => `STOP ${u}: importer row whose player has no single forward stable identity; G3 cannot grade it`),
+  ]);
+
+  return { ePromotion: g2.ePromotion, candidate, target, ledgerState: g2.ledgerState, targetRows, candidateRows, g3Grades };
+}
+
+/**
+ * The `E_promotion` handoff (F-L4-4): the bound file's content for this restored run. Pure, so
+ * the binding is testable without a database.
+ */
+export function aflApiSupersedeFileFor(
+  overlap: AflApiOverlapResult, names: { environment: Environment; candidateDatabase: string; targetDatabase: string },
+): AflApiSupersedeFile {
+  return buildAflApiSupersedeFile({
+    environment: names.environment, candidateDatabase: names.candidateDatabase, targetDatabase: names.targetDatabase,
+    candidateImporterRowCount: overlap.candidate.state.rowCount, candidateImporterSha256: overlap.candidate.state.sha256,
+    targetLedgerRowCount: overlap.ledgerState.rowCount, targetLedgerSha256: overlap.ledgerState.sha256,
+    expectedSupersedes: overlap.ePromotion,
+  });
+}
+
+/**
+ * F-L4-5's generator decision, pure: a classification is proposed only when the ONLY failed
+ * gate of the restored run is G3, and every G3 failure is a hard loss of an
+ * `afl_api_stat_vector_season` row that the §6.3 validator accepts. Anything else returns the
+ * reasons no file may be written.
+ */
+export function aflApiDevRegenerationProposal(input: {
+  failedGates: readonly string[];
+  overlap: AflApiOverlapResult;
+  names: { candidateDatabase: string; targetDatabase: string };
+  season: number; reason: string; reacquisitionPlan: string;
+}): { classification: AflApiDevRegenerationClassification } | { refusals: readonly string[] } {
+  const refusals: string[] = input.failedGates.filter((gate) => gate !== AFL_API_G3_GATE)
+    .map((gate) => `gate '${gate}' failed; only a G3-only failure may be classified`);
+  // A G3 FAIL from an ungraded row (no single forward identity) is not a hard loss and never classifiable.
+  for (const [side, view] of [['target', input.overlap.target], ['candidate', input.overlap.candidate]] as const) {
+    for (const r of view.importerRows) {
+      if (!view.identityByExternalId.has(r.externalId)) refusals.push(`${side} ${r.externalId}: no single forward stable identity; G3 cannot grade it`);
+    }
+  }
+  const { entries, refusals: g3Refusals } = aflApiDevRegenerationEntriesFromG3({
+    g3Grades: input.overlap.g3Grades, targetRows: input.overlap.targetRows,
+  });
+  refusals.push(...g3Refusals.map((r) => `${r.externalId}: ${r.reason}`));
+  if (entries.length === 0) refusals.push('G3 reports no afl_api_stat_vector_season hard loss: there is nothing to classify');
+  refusals.push(...validateAflApiDevRegenerationClassification({
+    entries, targetRows: input.overlap.targetRows, candidateRows: input.overlap.candidateRows,
+  }).map((p) => JSON.stringify(p)));
+  if (refusals.length > 0) return { refusals };
+  return {
+    classification: buildAflApiDevRegenerationClassification({
+      database: input.names.targetDatabase, candidateDatabase: input.names.candidateDatabase,
+      season: input.season, reason: input.reason, reacquisitionPlan: input.reacquisitionPlan,
+      targetImporterSha256: input.overlap.target.state.sha256,
+      candidateImporterSha256: input.overlap.candidate.state.sha256,
+      entries,
+    }),
+  };
+}
+
+/**
+ * G1 at `--phase candidate` (F-L4-3), AFTER the promotion plan has reinstated the target's
+ * state. The candidate now legitimately holds the TARGET's durable human ledger, so the rule is
+ * no longer "no ledger" but "exactly the ledger G2 graded":
+ *
+ * - the importer census holds no anomaly, every importer row resolves to exactly one identity,
+ *   one row per player, and no rebuild marker is present;
+ * - zero `resolved` rows (D15 has not run yet);
+ * - the reinstated ledger's row count and stable-field digest equal the bound file's
+ *   `targetLedger*` (nothing dropped, added or altered by the reinstatement);
+ * - the candidate importer state still equals the bound `candidateImporter*`, and the file names
+ *   this candidate, this environment and this environment's live target;
+ * - G2 re-evaluated on the candidate over the reinstated ledger refuses nothing and reproduces
+ *   exactly the bound `E_promotion`.
+ */
+export async function gateAflApiCandidateAfterReinstate(
+  q: Query, bound: AflApiSupersedeFile,
+  names: { environment: Environment; candidateDatabase: string; targetDatabase: string }, report: Report,
+): Promise<void> {
+  const g2 = await evaluateAflApiG2({ candidate: q, humanLedger: q, manualTokenSides: [q] });
+  const rebuildMarkerPresent = await readRebuildMarkerPresent(q);
+  const problems: unknown[] = [
+    ...classifyAflApiG1({
+      rows: g2.candidate.census, ledgerRowCount: g2.ledgerState.rowCount,
+      identityByPlayerId: g2.candidate.identityByPlayerId, rebuildMarkerPresent,
+      boundLedger: { boundRowCount: bound.targetLedgerRowCount, boundSha256: bound.targetLedgerSha256, actualSha256: g2.ledgerState.sha256 },
+    }),
+    ...aflApiSupersedeBindingProblems(bound, {
+      environment: names.environment, targetDatabase: names.targetDatabase, candidateDatabase: names.candidateDatabase,
+      importer: g2.candidate.state, ledger: g2.ledgerState,
+    }).filter((p) => p.kind !== 'ledger_state_mismatch'), // reported once, as G1's ledger_not_bound_target_state
+  ];
+  if (g2.failed) problems.push({ kind: 'g2_refuses_after_reinstatement' });
+  const expected = new Set(bound.expectedSupersedes);
+  const mismatch = aflApiSupersedeMismatch({ expected, actual: [...g2.ePromotion].map((externalId) => ({ externalId })) });
+  if (mismatch.missing.length > 0 || mismatch.extra.length > 0) {
+    problems.push({ kind: 'e_promotion_not_reproduced', missing: mismatch.missing, extra: mismatch.extra });
+  }
+  const lines = [
+    importerMethodLine(g2.candidate),
+    `reinstated human ledger: ${g2.ledgerState.rowCount} row(s), sha256 ${g2.ledgerState.sha256} (bound: ${bound.targetLedgerRowCount}, ${bound.targetLedgerSha256})`,
+    ...g2Lines(g2),
+  ];
+  const gate = 'afl_api importer identity — candidate census after target-ledger reinstatement (G1)';
+  if (problems.length === 0) { report.add(gate, 'PASS', lines); return; }
+  for (const p of problems) lines.push(JSON.stringify(p));
+  report.add(gate, 'FAIL', lines);
+}
+
+/**
+ * §6.3's mandatory post-re-acquisition verification census (`--phase dev-regeneration-census`).
+ * Read-only; needs the same classification file the `restored` phase consulted, which must name
+ * this database as its target.
+ */
+export async function runAflApiDevRegenerationCensus(q: Query, database: string, classificationPath: string, report: Report): Promise<void> {
+  const classification = readAflApiDevRegenerationClassification(classificationPath);
+  const binding = aflApiDevRegenerationBindingProblems(classification, { targetDatabase: database });
+  if (binding.length > 0) {
+    report.add('afl_api DEV regeneration — classification binding', 'FAIL', binding.map((p) => JSON.stringify(p)));
+    return;
+  }
+  const census = await readAflApiCensus(q);
+  const { importerRows } = censusAflApiRows(census);
+  const afterRows = importerRows
+    .filter((r) => r.playerId !== null)
+    .map((r) => ({ externalId: r.externalId, matchMethod: r.matchMethod, status: r.status, playerIdentity: '' }));
+  // The census compares by IDENTITY, so resolve it for exactly the listed rows' players.
+  const byExternalId = new Map(importerRows.map((r) => [r.externalId, r]));
+  const listedPlayerIds = [...new Set(
+    classification.entries.map((e) => byExternalId.get(e.externalId)?.playerId).filter((id): id is number => id !== null && id !== undefined),
+  )];
+  const identityByPlayerId = await readAflApiForwardIdentities(q, listedPlayerIds);
+  for (const row of afterRows) {
+    const source = byExternalId.get(row.externalId);
+    const identity = source?.playerId !== null && source?.playerId !== undefined ? identityByPlayerId.get(source.playerId) : undefined;
+    row.playerIdentity = identity && identity.ok ? identity.identity : '';
+  }
+
+  const outcomes = classifyAflApiDevRegenerationCensus({ entries: classification.entries, afterRows });
+  const failed = outcomes.some((o) => o.outcome === 'FAIL');
+  const lines = outcomes.map((o) => `${o.externalId}: ${o.outcome}${'reason' in o ? ` (${o.reason})` : ''}`);
+  report.add('afl_api DEV regeneration — post-re-acquisition census', failed ? 'FAIL' : 'PASS', lines);
+}
+
+/**
+ * Every operator file this checker writes that a later step TRUSTS (the E_promotion file, the
+ * DEV regeneration proposal) is written atomically and never over an existing file: the content
+ * goes to a private temporary sibling first, and `link()` publishes it under the final name in
+ * one step that fails with EEXIST rather than replacing anything. A crash therefore leaves at
+ * most a `.partial-*` file, never a truncated file under the name a later step reads.
+ */
+export function writeOperatorFileAtomically(path: string, content: string): void {
+  if (existsSync(path)) throw new PromotionRefused(`${path} already exists; refusing to overwrite.`);
+  const temp = `${path}.partial-${process.pid}-${randomBytes(6).toString('hex')}`;
+  writeFileSync(temp, content, { encoding: 'utf8', mode: 0o600, flag: 'wx' });
+  try {
+    linkSync(temp, path);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
+      throw new PromotionRefused(`${path} already exists; refusing to overwrite.`);
+    }
+    throw error;
+  } finally {
+    unlinkSync(temp);
+  }
 }
 
 async function gateFingerprint(q: Query, expected: string, report: Report): Promise<void> {
@@ -991,6 +1786,145 @@ async function gateFingerprint(q: Query, expected: string, report: Report): Prom
     `fingerprint : ${fp.overall}`,
     `expected    : ${expected}`,
     ok ? 'the source is byte-identical, by catalog, to the recorded rebuild' : 'the source catalog differs from the recorded rebuild — do not promote it',
+  ]);
+}
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-237 L4 A4.2 / A4.3 — the post-swap data_overrides replay, predicted pre-swap
+// ---------------------------------------------------------------------------
+
+/** The target's ACTIVE overrides of the two branches that can lose a decision after the swap. */
+export const PROMOTION_REPLAY_OVERRIDES_SQL = `
+  SELECT entity_type AS "entityType", entity_key AS "entityKey", field_group AS "fieldGroup",
+         override_values::text AS "overrideValues"
+    FROM data_overrides
+   WHERE is_active AND entity_type IN ('players', 'matches', 'match_coaches')
+   ORDER BY entity_type, entity_key, field_group`;
+
+/**
+ * The candidate identities the players replay reads: every `manual_admin_edit` row, every row
+ * whose (source key, external id) an override names, and every AFL Tables row of a player that
+ * carries a manual token. Any status and method: the planner decides what is bindable.
+ */
+export const PROMOTION_REPLAY_IDENTITIES_SQL = `
+  SELECT s.key AS "sourceKey", e.external_id AS "externalId", e.player_id AS "playerId",
+         e.status::text AS status, e.match_method AS "matchMethod"
+    FROM external_identities e
+    JOIN sources s ON s.id = e.source_id
+   WHERE s.key = 'manual_admin_edit'
+      OR (s.key, e.external_id) IN (SELECT u.k, u.x FROM unnest($1::text[], $2::text[]) AS u(k, x))
+      OR (s.key = 'afltables' AND e.player_id IN (
+            SELECT m.player_id FROM external_identities m JOIN sources ms ON ms.id = m.source_id
+             WHERE ms.key = 'manual_admin_edit' AND m.player_id IS NOT NULL))
+   ORDER BY 1, 2, 3`;
+
+/**
+ * The candidate columns the players replay's merge UPDATE can drive into a CHECK violation, for
+ * the players the plan already resolved through a stable identity. By id only; no name column.
+ */
+export const PROMOTION_REPLAY_PLAYER_CHECKS_SQL = `
+  SELECT id AS "playerId", (dob IS NOT NULL) AS "hasDob", dob_confidence::text AS "dobConfidence",
+         birth_year_min AS "birthYearMin", birth_year_max AS "birthYearMax"
+    FROM players
+   WHERE id = ANY($1::int[])
+   ORDER BY id`;
+
+export const PROMOTION_REPLAY_MATCH_KEYS_SQL = `
+  SELECT match_key AS "matchKey" FROM matches WHERE match_key = ANY($1::text[])`;
+
+export const PROMOTION_REPLAY_MAX_SEASON_SQL = `SELECT max(season)::int AS "maxSeason" FROM matches`;
+
+/**
+ * A4.2 and A4.3 as gates. `overrides` is whichever database holds the TARGET's data_overrides —
+ * the target itself at `--phase restored`, the candidate after the plan reinstated them at
+ * `--phase candidate` — and `candidate` is the rebuilt lineage the replay will run on. Every
+ * refusal costs `dropdb` of the candidate and nothing else.
+ */
+export async function gateOverrideReplayTargets(
+  sides: { overrides: Query; candidate: Query },
+  roles: { overrides: string; candidate: string },
+  report: Report,
+): Promise<{ players: PromotionPlayersReplayPlan; matches: PromotionMatchReplayPlan }> {
+  const overrides: PromotionOverrideRow[] = (await sides.overrides(PROMOTION_REPLAY_OVERRIDES_SQL)).map((r) => ({
+    entityType: String(r.entityType), entityKey: String(r.entityKey),
+    fieldGroup: String(r.fieldGroup), overrideValues: String(r.overrideValues),
+  }));
+  const keys = playerIdentityKeysOfOverrides(overrides);
+  const candidate: PromotionIdentityRow[] = (await sides.candidate(
+    PROMOTION_REPLAY_IDENTITIES_SQL, [keys.sourceKeys, keys.externalIds])).map((r) => ({
+    sourceKey: String(r.sourceKey), externalId: String(r.externalId),
+    playerId: r.playerId === null || r.playerId === undefined ? null : asInt(r.playerId),
+    status: String(r.status), matchMethod: r.matchMethod === null || r.matchMethod === undefined ? null : String(r.matchMethod),
+  }));
+  const planned = planPromotionPlayersReplay({ overrides, candidate });
+  const checkIds = [...new Set(planned.merges.map((m) => m.playerId).filter((id): id is number => id !== null))].sort((a, b) => a - b);
+  const checkRows = new Map<number, PromotionPlayerCheckRow>((checkIds.length === 0 ? []
+    : await sides.candidate(PROMOTION_REPLAY_PLAYER_CHECKS_SQL, [checkIds])).map((r) => [asInt(r.playerId), {
+    hasDob: r.hasDob === true, dobConfidence: String(r.dobConfidence),
+    birthYearMin: r.birthYearMin === null || r.birthYearMin === undefined ? null : asInt(r.birthYearMin),
+    birthYearMax: r.birthYearMax === null || r.birthYearMax === undefined ? null : asInt(r.birthYearMax),
+  }]));
+  const players: PromotionPlayersReplayPlan = {
+    ...planned, problems: [...planned.problems, ...promotionPlayerCheckProblems(planned.merges, checkRows)],
+  };
+  const playerRecords = players.present.length + players.binds.length + players.creates.length;
+  const playerLines = [
+    `target data_overrides read from ${roles.overrides}; identities and CHECK columns from ${roles.candidate}`,
+    `creation records replayable: ${playerRecords} (present ${players.present.length}, bind ${players.binds.length}, `
+      + `create ${players.creates.length}); source-keyed corrections resolving: ${players.corrections.length}`,
+    `players the merge UPDATE writes: ${players.merges.length} (candidate rows read by id: ${checkRows.size})`,
+    `candidate manual identities no target creation record names: ${players.candidateOnlyTokens.length} (each a STOP)`,
+    ...players.problems.map((p) => `STOP ${p}`),
+  ];
+  if (players.problems.length > 0) {
+    playerLines.push('A4.2: the post-swap players replay would not reinstate these decisions faithfully. STOP before '
+      + 'the swap; this is not an operator judgement, and nothing here is resolved by name or by players.id.');
+  }
+  report.add('data_overrides players replay predicted on the candidate (AFLDB-ISSUE-237 A4.2)',
+    players.problems.length === 0 ? 'PASS' : 'FAIL', playerLines);
+
+  const matchKeys = matchKeysOfOverrides(overrides);
+  const held = new Set((matchKeys.length === 0 ? [] : await sides.candidate(PROMOTION_REPLAY_MATCH_KEYS_SQL, [matchKeys]))
+    .map((r) => String(r.matchKey)));
+  const maxRow = (await sides.candidate(PROMOTION_REPLAY_MAX_SEASON_SQL))[0];
+  const maxSeason = maxRow?.maxSeason === null || maxRow?.maxSeason === undefined ? null : asInt(maxRow.maxSeason);
+  const matches = planPromotionMatchReplay({ overrides, candidateMatchKeys: held, candidateMaxSeason: maxSeason });
+  const matchLines = [
+    `target data_overrides read from ${roles.overrides}; matches from ${roles.candidate} (max season ${maxSeason ?? 'none'})`,
+    `active matches / match_coaches overrides resolving to a candidate match: ${matches.resolved}`,
+    ...matches.problems.map((p) => `STOP ${p}`),
+  ];
+  if (matches.problems.length > 0) {
+    matchLines.push('A4.3: there is no supported deferred lifecycle for these overrides. STOP before the swap; '
+      + 'L4 stays blocked while any of them is active.');
+  }
+  report.add('data_overrides match-keyed replay targets exist in the candidate (AFLDB-ISSUE-237 A4.3)',
+    matches.problems.length === 0 ? 'PASS' : 'FAIL', matchLines);
+  return { players, matches };
+}
+
+/**
+ * `--lineage-remap-out`, written after every gate of the run and only if none failed —
+ * the same fail-closed rule as the E_promotion file (F-L4-4). A refused run leaves no remap
+ * a later reinstatement could consume, and the file itself refuses any database but the
+ * candidate it was evidenced against (`lineageRemapSql`).
+ */
+export function publishRestoredLineageRemap(remapOut: string | undefined, remapSql: string | undefined, report: Report): void {
+  if (!remapOut) return;
+  const failedGates = report.results.filter((r) => r.verdict === 'FAIL').map((r) => r.gate);
+  if (failedGates.length > 0 || remapSql === undefined) {
+    report.add('Lineage remap file NOT written', 'INFO', [
+      `${remapOut} was not created: ${failedGates.length > 0
+        ? `${failedGates.length} gate(s) of this run failed, and only a fully passing --phase restored may hand a remap to the plan.`
+        : 'this run prepared no remap.'}`,
+    ]);
+    return;
+  }
+  writeOperatorFileAtomically(remapOut, remapSql);
+  report.add('Lineage remap file written', 'INFO', [
+    remapOut,
+    `sha256: ${createHash('sha256').update(remapSql, 'utf8').digest('hex')}`,
+    'Run it at the plan\'s remap step (promotion-reinstate.sh 2c) as LINEAGE_REMAP_SQL; record the sha256.',
   ]);
 }
 
@@ -1069,6 +2003,62 @@ async function openReadOnly(dsn: string, name: string): Promise<{ q: Query; end:
   return { q, end: () => sql.end({ timeout: 5 }) };
 }
 
+/**
+ * `--phase restored`'s two trusted outputs, written after every gate of the run (F-L4-4, F-L4-5):
+ *
+ * - `--afl-api-supersede-out`: written ONLY when no gate failed. A refused run leaves no file
+ *   that could be mistaken for an approved E_promotion — it says so instead.
+ * - `--afl-api-dev-regeneration-out` (DEV): written only when the run's failures are exactly
+ *   G3 hard losses of `afl_api_stat_vector_season` rows (`aflApiDevRegenerationProposal`).
+ */
+export function publishRestoredAflApiFiles(opts: Options, overlap: AflApiOverlapResult, report: Report): void {
+  const names = { environment: opts.environment, candidateDatabase: opts.database!, targetDatabase: opts.oldDatabase! };
+  const failedGates = report.results.filter((r) => r.verdict === 'FAIL').map((r) => r.gate);
+  if (opts.aflApiSupersedeOut) {
+    if (failedGates.length > 0) {
+      report.add('afl_api E_promotion file NOT written', 'INFO', [
+        `${opts.aflApiSupersedeOut} was not created: ${failedGates.length} gate(s) of this run failed, `
+        + 'and only a fully passing --phase restored may hand E_promotion to the post-swap replay.',
+      ]);
+    } else {
+      const file = aflApiSupersedeFileFor(overlap, names);
+      writeOperatorFileAtomically(opts.aflApiSupersedeOut, `${JSON.stringify(file, null, 2)}
+`);
+      report.add('afl_api E_promotion file written', 'INFO', [
+        opts.aflApiSupersedeOut,
+        `expectedSupersedes: {${file.expectedSupersedes.join(', ') || 'empty'}}`,
+        `bound to candidate ${file.candidateDatabase} (${file.candidateImporterRowCount} importer rows, ${file.candidateImporterSha256}) `
+        + `and target ${file.targetDatabase} ledger (${file.targetLedgerRowCount} rows, ${file.targetLedgerSha256})`,
+        `payloadSha256: ${file.payloadSha256}`,
+      ]);
+    }
+  }
+  if (opts.aflApiDevRegenerationOut) {
+    if (!overlap.g3Grades.some((g) => g.outcome === 'FAIL')) {
+      report.add('afl_api DEV regeneration classification NOT generated', 'INFO', [
+        `${opts.aflApiDevRegenerationOut} was not created: G3 reports no hard loss, so the exception is not needed.`,
+      ]);
+      return;
+    }
+    const proposal = aflApiDevRegenerationProposal({
+      failedGates, overlap, names, season: opts.aflApiRegenerationSeason!,
+      reason: opts.aflApiRegenerationReason!, reacquisitionPlan: opts.aflApiRegenerationPlan!,
+    });
+    if ('refusals' in proposal) {
+      report.add('afl_api DEV regeneration classification NOT generated', 'FAIL', [...proposal.refusals]);
+      return;
+    }
+    writeOperatorFileAtomically(opts.aflApiDevRegenerationOut, `${JSON.stringify(proposal.classification, null, 2)}
+`);
+    report.add('afl_api DEV regeneration classification proposed', 'INFO', [
+      opts.aflApiDevRegenerationOut,
+      `${proposal.classification.entries.length} afl_api_stat_vector_season hard loss(es): ${proposal.classification.entries.map((e) => e.externalId).join(', ')}`,
+      `payloadSha256: ${proposal.classification.payloadSha256}`,
+      'A PROPOSAL, not an approval: re-run --phase restored with --afl-api-dev-regeneration <this file>.',
+    ]);
+  }
+}
+
 async function main(): Promise<number> {
   const opts = parseArgs(process.argv.slice(2));
   // AFLDB-ISSUE-143. Refuse before anything else if the contract's own invariants do not
@@ -1108,9 +2098,42 @@ async function main(): Promise<number> {
   console.log(`  mode      : READ-ONLY (server-enforced), no DDL, no DML, no restore path`);
   console.log(`  target    : ${opts.database} via ${opts.dsnEnv} (database name replaced; DSN host/role unchanged: ${databaseOf(baseDsn)} -> ${opts.database})`);
 
+  // AFLDB-ISSUE-237 §6.3 — a narrow, standalone read-only phase, never folded into the
+  // standard gate pipeline every other phase shares below (identity/classification/staging/
+  // migration/fixtures/super-admin/inventory/privileges gates do not apply to it).
+  if (phase === 'dev-regeneration-census') {
+    // parseArgs already refuses this phase without --afl-api-dev-regeneration.
+    const report = new Report();
+    const conn = await openReadOnly(dsn, phase);
+    try {
+      await gateIdentity(conn.q, opts.database!, report);
+      await runAflApiDevRegenerationCensus(conn.q, opts.database!, opts.aflApiDevRegeneration!, report);
+    } finally {
+      await conn.end();
+    }
+    const failed = report.results.filter((r) => r.verdict === 'FAIL').map((r) => r.gate);
+    console.log(`\n${'='.repeat(78)}`);
+    if (failed.length === 0) {
+      console.log(`PROMOTION CHECK (${opts.environment}/${phase}): PASS — ${report.results.length} gate(s) evaluated, none failed.`);
+      return 0;
+    }
+    console.log(`PROMOTION CHECK (${opts.environment}/${phase}): REFUSED — ${failed.length} gate(s) failed:`);
+    for (const gate of failed) console.log(`  - ${gate}`);
+    return 1;
+  }
+
+  // AFLDB-ISSUE-237: refuse a bad operator file, or an output that already exists, before any
+  // database is opened.
+  const boundSupersede = phase === 'candidate' ? readAflApiSupersedeFile(opts.aflApiSupersedeIn!) : undefined;
+  for (const out of [opts.aflApiSupersedeOut, opts.aflApiDevRegenerationOut, opts.lineageRemapOut]) {
+    if (out && existsSync(out)) throw new PromotionRefused(`${out} already exists; refusing to overwrite.`);
+  }
+
   const report = new Report();
   const conn = await openReadOnly(dsn, phase);
   let old: { q: Query; end: () => Promise<void> } | undefined;
+  let aflApiOverlap: AflApiOverlapResult | undefined;
+  let lineageRemap: string | undefined;
   try {
     await gateIdentity(conn.q, opts.database!, report);
     const { present } = await gateClassification(conn.q, report);
@@ -1125,21 +2148,51 @@ async function main(): Promise<number> {
     if (phase === 'pre-cutover') gateStagedSourceRows(counts, opts.environment, report);
     await gatePrivileges(conn.q, present, phase === 'candidate' || phase === 'production', report);
 
+    // AFLDB-ISSUE-237: source = SOURCE lineage (no human authority); candidate = after the
+    // plan reinstated the TARGET's ledger, which must be exactly the one G2 graded (F-L4-3).
+    if (phase === 'source') await gateAflApiG1(conn.q, report);
+    if (phase === 'candidate') {
+      await gateAflApiCandidateAfterReinstate(conn.q, boundSupersede!, {
+        environment: opts.environment, candidateDatabase: opts.database!, targetDatabase: names.live,
+      }, report);
+      // A4.2/A4.3 again, over the target's data_overrides as the plan actually reinstated them.
+      await gateOverrideReplayTargets({ overrides: conn.q, candidate: conn.q }, {
+        overrides: `candidate ${opts.database} (the target's reinstated data_overrides)`, candidate: `candidate ${opts.database}`,
+      }, report);
+    }
+    let aflApiTargetCensus: Snapshot['aflApiTargetCensus'];
+    if (phase === 'pre-cutover') {
+      await gateAflApiRebuildMarker([{ role: `target ${opts.database}`, q: conn.q }], report);
+      aflApiTargetCensus = await gateAflApiPreCutoverCensus(conn.q, report);
+    }
+
     if (phase === 'restored') {
       old = await openReadOnly(withDatabase(baseDsn, opts.oldDatabase!), 'old');
       const oldName = String((await old.q('SELECT current_database() AS d'))[0]?.d);
       if (oldName !== opts.oldDatabase) throw new PromotionRefused(`Old database connection landed on '${oldName}', not '${opts.oldDatabase}'.`);
       await gateDanglingReferences(conn.q, old.q, present, opts.environment, report);
-      await gateLineageIdentity(
+      lineageRemap = await gateLineageIdentity(
         conn.q, old.q, present, opts.lineageRemapOut,
         opts.database!, opts.oldDatabase!, opts.environment, report);
+      // A4.2/A4.3: the target's data_overrides against the candidate the replay will run on.
+      await gateOverrideReplayTargets({ overrides: old.q, candidate: conn.q }, {
+        overrides: `target ${opts.oldDatabase}`, candidate: `candidate ${opts.database}`,
+      }, report);
+      await gateAflApiRebuildMarker([
+        { role: `candidate ${opts.database}`, q: conn.q }, { role: `target ${opts.oldDatabase}`, q: old.q },
+      ], report);
+      // F-L4-2: importer rows from the CANDIDATE, the human ledger from the TARGET.
+      aflApiOverlap = await gateAflApiOverlap(
+        { candidate: conn.q, target: old.q },
+        { candidateDatabase: opts.database!, targetDatabase: opts.oldDatabase! },
+        opts.environment, opts.aflApiDevRegeneration, report);
     }
     if (opts.compare) gateCompare(opts.compare, counts, opts.environment, report);
 
     if (opts.snapshot) {
       const snapshot: Snapshot = {
         issue: 'AFLDB-ISSUE-125', database: opts.database!, takenAt: new Date().toISOString(),
-        counts, superAdmins, fixtureRows: fixtures,
+        counts, superAdmins, fixtureRows: fixtures, aflApiTargetCensus,
       };
       if (existsSync(opts.snapshot)) throw new PromotionRefused(`${opts.snapshot} already exists; refusing to overwrite a snapshot.`);
       writeFileSync(opts.snapshot, `${JSON.stringify(snapshot, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
@@ -1149,6 +2202,9 @@ async function main(): Promise<number> {
     await conn.end();
     if (old) await old.end();
   }
+  // F-L4-4: only now, with every gate of this run evaluated, may a trusted file be written.
+  if (aflApiOverlap) publishRestoredAflApiFiles(opts, aflApiOverlap, report);
+  if (phase === 'restored') publishRestoredLineageRemap(opts.lineageRemapOut, lineageRemap, report);
 
   const failed = report.results.filter((r) => r.verdict === 'FAIL').map((r) => r.gate);
   console.log(`\n${'='.repeat(78)}`);

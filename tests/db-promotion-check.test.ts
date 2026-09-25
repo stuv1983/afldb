@@ -10,7 +10,7 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'n
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   ACCEPTANCE_CHECKLIST,
@@ -31,6 +31,7 @@ import {
   EMAIL_BEARING_TABLES,
   ENVIRONMENTS,
   LINEAGE_IDENTITY_SQL,
+  PHASES,
   PRE_REBUILD_PREFIX,
   PROMOTION_CONTRACT,
   PromotionRefused,
@@ -83,14 +84,54 @@ import {
   truncateSql,
   truncatedPublicTables,
   withDatabase,
+  decodeMatchCoachKey,
+  lineageRemapBindingGuard,
+  matchKeysOfOverrides,
+  planPromotionMatchReplay,
+  planPromotionPlayersReplay,
+  playerIdentityKeysOfOverrides,
+  promotionPlayerCheckProblems,
+  type PromotionIdentityRow,
+  type PromotionOverrideRow,
+  type PromotionPlayerCheckRow,
   type Snapshot,
 } from '../tools/db/promotion-inventory';
-import { DEFAULT_DSN_ENV, READ_ONLY_SQL, parseArgs, writePlan } from '../tools/db/promotion-check';
+import {
+  AFL_API_LEDGER_ROWS_SQL, DATABASE_COMMENT_SQL, Report, aflApiDevRegenerationProposal, aflApiG2Entries, aflApiSupersedeFileFor,
+  evaluateAflApiG2, gateAflApiCandidateAfterReinstate, gateAflApiG1, gateAflApiOverlap, gateAflApiRebuildMarker,
+  PROMOTION_REPLAY_IDENTITIES_SQL, PROMOTION_REPLAY_MATCH_KEYS_SQL, PROMOTION_REPLAY_MAX_SEASON_SQL,
+  PROMOTION_REPLAY_OVERRIDES_SQL, PROMOTION_REPLAY_PLAYER_CHECKS_SQL, gateOverrideReplayTargets, publishRestoredLineageRemap,
+  publishRestoredAflApiFiles, readRebuildMarkerPresent, writeOperatorFileAtomically, type AflApiOverlapResult, type Query,
+  DEFAULT_DSN_ENV, READ_ONLY_SQL, parseArgs, readAflApiForwardIdentities as readPromotionForwardIdentities,
+  readAflApiReverseIdentities as readPromotionReverseIdentities, writePlan,
+} from '../tools/db/promotion-check';
+import {
+  AflApiReplayAbort, readAflApiForwardIdentities as readRebuildForwardIdentities, replayAflApiAdjudicationsFromSupersedeFile,
+  resolveAflApiPlayerIdentity,
+} from '../tools/migration/replay_afl_api_adjudications';
+import { loadFitzroyProfileContinuityRules } from '../src/lib/acquisition/fitzroy-profile-continuity';
+import type { TransactionSql } from 'postgres';
 import {
   AFL_API_ADMIN_MATCH_METHOD,
+  AFL_API_G2_REFUSING_OUTCOMES,
+  AFL_API_REBUILD_MARKER_FORMAT,
+  AflApiPromotionFileRefused,
+  aflApiDevRegenerationBindingProblems,
+  aflApiDevRegenerationEntriesFromG3,
+  aflApiLedgerStateSha256,
+  aflApiSupersedeBindingProblems,
+  buildAflApiSupersedeFile,
+  classifyAflApiG3,
+  parseAflApiDevRegenerationClassification,
+  parseAflApiSupersedeFile,
+  validateAflApiDevRegenerationClassification,
+  type AflApiCensusRow,
+  aflApiG2AgreeSet,
   checkAflApiAdjudicationBijection,
+  classifyAflApiG2,
   planAflApiAdjudicationReplay,
   type AflApiAdjudicationLedgerRow,
+  type AflApiContinuityContradiction,
   type AflApiCandidateIdentityRow,
   type AflApiPlayerRemapResult,
 } from '../src/lib/acquisition/afl-api-adjudication';
@@ -813,6 +854,15 @@ describe('database-name contract', () => {
     expect(() => assertDatabaseForPhase('source', 'afldb_test; DROP')).toThrow(PromotionRefused);
   });
 
+  it('AFLDB-ISSUE-237 §6.3 — dev-regeneration-census is DEV-only and inspects the live DEV database', () => {
+    expect(() => assertDatabaseForPhase('dev-regeneration-census', 'afldb_dev', 'dev')).not.toThrow();
+    expect(() => assertDatabaseForPhase('dev-regeneration-census', 'afldb_dev', 'prod'))
+      .toThrow(/DEV-only/);
+    expect(() => assertDatabaseForPhase('dev-regeneration-census', 'afldb_prod', 'dev'))
+      .toThrow(PromotionRefused);
+    expect(PHASES).toContain('dev-regeneration-census');
+  });
+
   it('the old database is production or a kept pre-rebuild copy', () => {
     expect(() => assertOldDatabaseName('afldb_prod')).not.toThrow();
     expect(() => assertOldDatabaseName(`${PRE_REBUILD_PREFIX}20260905`)).not.toThrow();
@@ -961,6 +1011,34 @@ describe('checker arguments', () => {
       .toBe('remap.sql');
     const restored = parseArgs(['--phase', 'restored', '--database', `${CANDIDATE_PREFIX}1`, '--old-database', 'afldb_prod']);
     expect(restored.oldDatabase).toBe('afldb_prod');
+  });
+
+  it('AFLDB-ISSUE-237 — scopes --afl-api-dev-regeneration and --afl-api-supersede-out', () => {
+    // --afl-api-dev-regeneration needs --environment dev, in any phase.
+    expect(() => parseArgs(['--phase', 'restored', '--database', `${CANDIDATE_PREFIX}1`,
+      '--old-database', 'afldb_prod', '--afl-api-dev-regeneration', 'c.json']))
+      .toThrow(/DEV-only regeneration classification/);
+    // ...and only at --phase restored or --phase dev-regeneration-census.
+    const devCandidatePrefix = environmentNames('dev').candidatePrefix;
+    expect(() => parseArgs(['--environment', 'dev', '--phase', 'candidate', '--database', `${devCandidatePrefix}1`,
+      '--afl-api-dev-regeneration', 'c.json']))
+      .toThrow(/only meaningful with --phase restored or --phase dev-regeneration-census/);
+    expect(parseArgs(['--environment', 'dev', '--phase', 'restored', '--database', `${devCandidatePrefix}1`,
+      '--old-database', 'afldb_dev', '--afl-api-dev-regeneration', 'c.json']).aflApiDevRegeneration)
+      .toBe('c.json');
+    // dev-regeneration-census REQUIRES the classification file.
+    expect(() => parseArgs(['--environment', 'dev', '--phase', 'dev-regeneration-census', '--database', 'afldb_dev']))
+      .toThrow(/needs --afl-api-dev-regeneration/);
+    expect(parseArgs(['--environment', 'dev', '--phase', 'dev-regeneration-census', '--database', 'afldb_dev',
+      '--afl-api-dev-regeneration', 'c.json']).aflApiDevRegeneration).toBe('c.json');
+
+    // --afl-api-supersede-out is restored-only.
+    expect(() => parseArgs(['--phase', 'candidate', '--database', `${CANDIDATE_PREFIX}1`,
+      '--afl-api-supersede-out', 'e.json']))
+      .toThrow(/only meaningful with --phase restored/);
+    expect(parseArgs(['--phase', 'restored', '--database', `${CANDIDATE_PREFIX}1`,
+      '--old-database', 'afldb_prod', '--afl-api-supersede-out', 'e.json']).aflApiSupersedeOut)
+      .toBe('e.json');
   });
 
   // AFLDB-ISSUE-141.
@@ -1825,12 +1903,12 @@ describe('AFLDB-ISSUE-235: afl_api_identity_adjudications', () => {
 
     // A net-linked entry: one INSERT, under the REMAPPED player.
     expect(plan({ ledgerRows: [linked(1, 'CD_I1')], remap: [['CD_I1', remapTo(907)]] }))
-      .toEqual({ inserts: [{ externalId: 'CD_I1', playerId: 907 }], noops: [], stops: [] });
+      .toEqual({ inserts: [{ externalId: 'CD_I1', playerId: 907 }], noops: [], stops: [], supersedes: [] });
     // A revoked entry (net state is the latest row): nothing, not even a remap is needed.
     expect(plan({
       ledgerRows: [linked(1, 'CD_I1'), { ...linked(2, 'CD_I1'), action: 'revoked', supersedesId: 1 }],
       remap: [],
-    })).toEqual({ inserts: [], noops: [], stops: [] });
+    })).toEqual({ inserts: [], noops: [], stops: [], supersedes: [] });
     // linked -> revoked -> linked is net-linked again.
     expect(plan({
       ledgerRows: [linked(1, 'CD_I1'), { ...linked(2, 'CD_I1'), action: 'revoked', supersedesId: 1 }, linked(3, 'CD_I1')],
@@ -1838,7 +1916,7 @@ describe('AFLDB-ISSUE-235: afl_api_identity_adjudications', () => {
     }).inserts).toEqual([{ externalId: 'CD_I1', playerId: 907 }]);
     // The identical human row already present: an idempotent no-op.
     expect(plan({ ledgerRows: [linked(1, 'CD_I1')], remap: [['CD_I1', remapTo(907)]], candidates: [human('CD_I1', 907)] }))
-      .toEqual({ inserts: [], noops: [{ externalId: 'CD_I1' }], stops: [] });
+      .toEqual({ inserts: [], noops: [{ externalId: 'CD_I1' }], stops: [], supersedes: [] });
 
     const stopsOf = (input: Parameters<typeof plan>[0]) => {
       const result = plan(input);
@@ -2639,9 +2717,10 @@ describe('staged reinstatement of NOT NULL lineage-bound references', () => {
     expect(source).toContain("the plan STAGES ${t.name} (AFLDB-ISSUE-151)");
     expect(source).not.toMatch(/apply it after reinstate, before acceptance/);
     expect(source).not.toMatch(/run it on the candidate AFTER the reinstate/);
-    // A shared lineage still writes the remap file, as an explicit no-op, so the plan's fixed
-    // remap step always has its file — and still through the one write site.
-    expect(source).toContain('writeRemap([], true)');
+    // A shared lineage still generates the remap file, as an explicit no-op, so the plan's fixed
+    // remap step always has its file — prepared at the one generation site, published (only on a
+    // fully passing run, AFLDB-ISSUE-237 L4) by publishRestoredLineageRemap.
+    expect(source).toContain('prepareRemap([], true)');
     expect(source).toContain('an explicit no-op (shared lineage, no UPDATE)');
     const doc = readFileSync(join(REPO, 'docs', 'production-promotion.md'), 'utf8');
     for (const needle of ['AFLDB-ISSUE-151', 'promotion_staging', 'promotion-stage.sql', 'promotion-promote-staged.sql']) {
@@ -2663,14 +2742,231 @@ describe('the checker is read-only by construction', () => {
     expect(source).not.toMatch(/child_process/);
     expect(source).not.toMatch(/from '\.\/psql'/);
     expect(source).not.toMatch(/runPsql|RESET_SQL|spawnSync/);
-    // The only files it writes are the counts snapshot, the operator plan and the
-    // AFLDB-ISSUE-142 lineage remap — all read and run by hand, none of them a database write.
+    // The only files it writes are the counts snapshot, the operator plan, and — through the one
+    // atomic no-clobber writer — the AFLDB-ISSUE-142 lineage remap (AFLDB-ISSUE-237 L4: only on a
+    // fully passing run), the AFLDB-ISSUE-237 E_promotion file and the DEV regeneration proposal.
+    // All are read and run by hand; none is a database write.
     expect((source.match(/writeFileSync\(/g) ?? []).length).toBe(3);
   });
 
   it('never prints a DSN: the target line names the variable and the database only', () => {
     expect(source).toMatch(/via \$\{opts\.dsnEnv\}/);
     expect(source).not.toMatch(/console\.log\([^)]*\bdsn\b/);
+  });
+});
+
+/**
+ * AFLDB-ISSUE-237 §6.2/§6.3 — G1/G2/G3 wiring: which phase calls which gate, in what order,
+ * pinned from the source text the same way the read-only proof above pins the checker's own
+ * shape. `main()`'s body is not exported, so its CONTRACT ("this phase calls this gate") is
+ * proven the same way `gateLineageIdentity`'s own dispatch is: order of appearance in the file.
+ */
+describe('AFLDB-ISSUE-237 — G1/G2/G3 wiring order (source-pinned, DB-free)', () => {
+  const source = readFileSync(join(REPO, 'tools', 'db', 'promotion-check.ts'), 'utf8');
+  const main = source.slice(source.indexOf('async function main('));
+
+  it('G1 runs at --phase source; the candidate phase runs the bound after-reinstatement G1 (F-L4-3)', () => {
+    expect(main).toMatch(/if \(phase === 'source'\) await gateAflApiG1\(conn\.q, report\)/);
+    expect(main).toMatch(/if \(phase === 'candidate'\) \{\s*await gateAflApiCandidateAfterReinstate\(conn\.q, boundSupersede!/);
+    // the bound file is read (and refused if bad) before any database is opened
+    const readAt = main.indexOf('readAflApiSupersedeFile(opts.aflApiSupersedeIn!)');
+    expect(readAt).toBeGreaterThan(-1);
+    expect(readAt).toBeLessThan(main.indexOf('let aflApiOverlap'));
+  });
+
+  it('the pre-cutover target census runs only at --phase pre-cutover, before the snapshot is built', () => {
+    const censusAt = main.indexOf('aflApiTargetCensus = await gateAflApiPreCutoverCensus(conn.q, report)');
+    const markerAt = main.indexOf('await gateAflApiRebuildMarker([{ role: `target ${opts.database}`, q: conn.q }], report)');
+    expect(markerAt).toBeGreaterThan(main.indexOf("if (phase === 'pre-cutover') {"));
+    expect(markerAt).toBeLessThan(censusAt);
+    const snapshotAt = main.indexOf('const snapshot: Snapshot');
+    expect(censusAt).toBeGreaterThan(-1);
+    expect(snapshotAt).toBeGreaterThan(censusAt);
+    expect(main).toMatch(/counts, superAdmins, fixtureRows: fixtures, aflApiTargetCensus/);
+  });
+
+  it('G2/G3 (gateAflApiOverlap) run only inside the --phase restored branch, after the lineage-identity gate', () => {
+    const restoredBranch = main.slice(main.indexOf("if (phase === 'restored') {"), main.indexOf("if (opts.compare)"));
+    expect(restoredBranch).toContain('gateAflApiOverlap(');
+    expect(restoredBranch.indexOf('gateLineageIdentity(')).toBeLessThan(restoredBranch.indexOf('gateAflApiOverlap('));
+  });
+
+  it("dev-regeneration-census is a standalone early branch, never reaching the standard gate pipeline", () => {
+    const branchAt = main.indexOf("if (phase === 'dev-regeneration-census')");
+    const reportAt = main.indexOf('const report = new Report();');
+    expect(branchAt).toBeGreaterThan(-1);
+    // The branch's own `return` happens before the standard pipeline's `gateClassification`,
+    // `gateStagingLeftover`, `gateMigrationParity`, `gateFixtureIdentities` and `gateSuperAdmin`
+    // calls -- none of those names appear between the branch and its own early return.
+    const branchBody = main.slice(branchAt, main.indexOf('const report = new Report();', reportAt + 1));
+    for (const other of ['gateStagingLeftover', 'gateMigrationParity', 'gateFixtureIdentities', 'gateSuperAdmin', 'gateInventory']) {
+      expect(branchBody).not.toContain(other);
+    }
+  });
+
+  it('production never reads a DEV regeneration classification file (D14: no general WARN)', () => {
+    const overlapFn = source.slice(source.indexOf('async function gateAflApiOverlap'), source.indexOf('async function runAflApiDevRegenerationCensus'));
+    expect(overlapFn).toMatch(/environment === 'dev' && devRegenerationPath/);
+  });
+});
+
+/**
+ * AFLDB-ISSUE-237 continuity amendment (2026-09-25): the promotion checker's forward lookup
+ * and the rebuild/recovery reader must return exactly the same answer for the same rows — both
+ * delegate to the one shared classifier over the same validated fitzRoy contract.
+ */
+describe('AFLDB-ISSUE-237 continuity — promotion and rebuild forward identity agree (DB-free)', () => {
+  const source = readFileSync(join(REPO, 'tools', 'db', 'promotion-check.ts'), 'utf8');
+  const rule = loadFitzroyProfileContinuityRules()[0];
+  const OTHER = 'players/Z/Unrelated_Profile.html';
+  const rows = [
+    { playerId: 1, externalId: 'players/A/Alpha_Only.html', sourceKey: 'afltables' },
+    { playerId: 2, externalId: rule.renumberedUrl, sourceKey: 'afltables' },
+    { playerId: 2, externalId: rule.continuingUrl, sourceKey: 'afltables' },
+    { playerId: 3, externalId: rule.continuingUrl, sourceKey: 'afltables' },
+    { playerId: 3, externalId: OTHER, sourceKey: 'afltables' },
+    { playerId: 4, externalId: rule.renumberedUrl, sourceKey: 'afltables' },
+    { playerId: 4, externalId: OTHER, sourceKey: 'afltables' },
+    { playerId: 5, externalId: rule.continuingUrl, sourceKey: 'afltables' },
+    { playerId: 5, externalId: rule.renumberedUrl, sourceKey: 'afltables' },
+    { playerId: 5, externalId: OTHER, sourceKey: 'afltables' },
+    { playerId: 6, externalId: rule.continuingUrl, sourceKey: 'afltables' },
+    { playerId: 6, externalId: rule.renumberedUrl, sourceKey: 'afltables' },
+    { playerId: 6, externalId: 'manual-token-6', sourceKey: 'manual_admin_edit' },
+    { playerId: 7, externalId: 'manual-token-7', sourceKey: 'manual_admin_edit' },
+  ];
+  const playerIds = [1, 2, 3, 4, 5, 6, 7, 8];
+
+  it('both readers return the identical map, with the exact pair folded to continuing_url', async () => {
+    // postgres.js returns the promotion reader's bigint player ids as strings
+    const promotionQ = async () => rows.map((r) => ({ ...r, playerId: String(r.playerId) }));
+    const rebuildTx = Object.assign(async () => rows, { array: (values: unknown[]) => values }) as unknown as TransactionSql;
+    const promotion = await readPromotionForwardIdentities(promotionQ, playerIds);
+    const rebuild = await readRebuildForwardIdentities(rebuildTx, playerIds);
+    expect([...promotion.entries()]).toEqual([...rebuild.entries()]);
+    expect([...promotion.entries()]).toEqual([
+      [1, { ok: true, identity: 'players/A/Alpha_Only.html', via: 'afltables' }],
+      [2, { ok: true, identity: rule.continuingUrl, via: 'afltables' }],
+      [3, { ok: false, reason: 'ambiguous' }],
+      [4, { ok: false, reason: 'ambiguous' }],
+      [5, { ok: false, reason: 'ambiguous' }],
+      [6, { ok: true, identity: rule.continuingUrl, via: 'afltables' }],
+      [7, { ok: true, identity: 'manual-token-7', via: 'manual_admin_edit' }],
+      [8, { ok: false, reason: 'no_identity' }],
+    ]);
+  });
+
+  it('the promotion checker keeps no private classification: it delegates to the shared classifier and loader', () => {
+    const fn = source.slice(source.indexOf('export async function readAflApiForwardIdentities('),
+      source.indexOf('async function readAflApiLedgerRowCount('));
+    expect(fn).toContain('classifyAflApiForwardIdentityRows({');
+    expect(fn).toContain('= loadFitzroyProfileContinuityRules()');
+    expect(fn).not.toMatch(/afltables\.length|reason: 'ambiguous'/);
+  });
+});
+
+/**
+ * AFLDB-ISSUE-237 continuity amendment, REVERSE direction (2026-09-25 tightening): a tracked
+ * rule's identity resolves on a target only when both rule paths name the same single player.
+ * The promotion checker's G2 reader and the replay adapter's `resolveAflApiPlayerIdentity`
+ * (Stage 18, D15, R4) must classify every target state identically — both delegate to
+ * `classifyAflApiReverseIdentity` — and a split candidate must FAIL G2.
+ */
+describe('AFLDB-ISSUE-237 continuity — promotion and replay reverse identity agree; a split target refuses (DB-free)', () => {
+  const source = readFileSync(join(REPO, 'tools', 'db', 'promotion-check.ts'), 'utf8');
+  const rule = loadFitzroyProfileContinuityRules()[0];
+  const PLAIN = 'players/Z/Unrelated_Profile.html';
+  type Held = { identity: string; playerId: number }[];
+
+  /** The promotion reader's Query, answering its one ANY($1) statement from `held`. */
+  const promotionQ = (held: Held) => async (_text: string, params?: unknown[]) => {
+    const paths = (params?.[0] ?? []) as string[];
+    // DISTINCT (identity, player), and bigint player ids come back as strings
+    const seen = new Set<string>();
+    return held.filter((h) => paths.includes(h.identity))
+      .filter((h) => !seen.has(`${h.identity}|${h.playerId}`) && seen.add(`${h.identity}|${h.playerId}`))
+      .map((h) => ({ identity: h.identity, playerId: String(h.playerId) }));
+  };
+  /** The replay adapter's tx, answering its per-path statement from the SAME `held`. */
+  const replayTx = (held: Held) => Object.assign(
+    async (_strings: TemplateStringsArray, path: string) =>
+      [...new Set(held.filter((h) => h.identity === path).map((h) => h.playerId))].map((playerId) => ({ playerId })),
+    { array: (values: unknown[]) => values },
+  ) as unknown as TransactionSql;
+
+  const states: [string, Held][] = [
+    ['folded pair', [{ identity: rule.continuingUrl, playerId: 7 }, { identity: rule.renumberedUrl, playerId: 7 }]],
+    ['split pair', [{ identity: rule.continuingUrl, playerId: 7 }, { identity: rule.renumberedUrl, playerId: 8 }]],
+    ['continuing missing', [{ identity: rule.renumberedUrl, playerId: 7 }]],
+    ['renumbered missing', [{ identity: rule.continuingUrl, playerId: 7 }]],
+    ['continuing ambiguous', [
+      { identity: rule.continuingUrl, playerId: 7 }, { identity: rule.continuingUrl, playerId: 9 },
+      { identity: rule.renumberedUrl, playerId: 7 }]],
+    ['renumbered ambiguous', [
+      { identity: rule.continuingUrl, playerId: 7 }, { identity: rule.renumberedUrl, playerId: 7 },
+      { identity: rule.renumberedUrl, playerId: 9 }]],
+    ['plain single', [{ identity: PLAIN, playerId: 3 }, { identity: rule.continuingUrl, playerId: 7 }, { identity: rule.renumberedUrl, playerId: 8 }]],
+    ['plain ambiguous', [{ identity: PLAIN, playerId: 3 }, { identity: PLAIN, playerId: 4 }]],
+    ['nothing held', []],
+  ];
+
+  it('(12) both implementations return the identical classification for every target state', async () => {
+    const identities = [rule.continuingUrl, rule.renumberedUrl, PLAIN];
+    const outcomes: Record<string, unknown> = {};
+    for (const [name, held] of states) {
+      const promotion = await readPromotionReverseIdentities(promotionQ(held), identities);
+      for (const identity of identities) {
+        const replay = await resolveAflApiPlayerIdentity(replayTx(held), identity);
+        expect(promotion.get(identity), `${name}: ${identity}`).toEqual(replay);
+      }
+      outcomes[name] = promotion.get(rule.continuingUrl);
+    }
+    // and what they agree on is the required rule
+    expect(outcomes['folded pair']).toEqual({ ok: true, newPlayerId: 7, remappedIdentity: rule.continuingUrl });
+    for (const [name, refusal] of [
+      ['split pair', 'split'], ['continuing missing', 'continuing_missing'], ['renumbered missing', 'renumbered_missing'],
+      ['continuing ambiguous', 'continuing_ambiguous'], ['renumbered ambiguous', 'renumbered_ambiguous'],
+    ] as const) {
+      expect(outcomes[name], name).toMatchObject({ ok: false, reason: 'continuity_contradiction', ruleId: rule.id, refusal });
+    }
+    const plain = async (held: Held) => (await readPromotionReverseIdentities(promotionQ(held), [PLAIN])).get(PLAIN);
+    expect(await plain(states[6][1])).toEqual({ ok: true, newPlayerId: 3, remappedIdentity: PLAIN });
+    expect(await plain(states[7][1])).toEqual({ ok: false, reason: 'ambiguous' });
+    expect(await plain([])).toEqual({ ok: false, reason: 'unresolvable' });
+  });
+
+  it('(11) the promotion check refuses a split candidate: G2 grades the ledger entry CONTINUITY_CONTRADICTION, never AGREE', async () => {
+    const split = (await readPromotionReverseIdentities(promotionQ(states[1][1]), [rule.continuingUrl])).get(rule.continuingUrl)!;
+    expect(split.ok).toBe(false);
+    // the exact entry gateAflApiOverlap builds, with and without a candidate importer row
+    for (const candidateRow of [null, {
+      status: 'unique', matchMethod: 'afl_api_stat_vector_bootstrap', candidateCount: 1, externalUrl: null,
+      playerId: 7, playerIdentity: rule.continuingUrl,
+    }]) {
+      const grades = classifyAflApiG2([{
+        externalId: 'CD_I1', ledgerNetAction: 'linked', identityIsManualToken: false, candidateRow,
+        remappedCandidatePlayerId: null, collidingProviderId: null,
+        continuityContradiction: split as AflApiContinuityContradiction,
+      }]);
+      expect(grades).toEqual([{ externalId: 'CD_I1', outcome: 'CONTINUITY_CONTRADICTION', reason: expect.stringContaining(
+        `rule ${rule.id} and the target contradicts it: its continuing_url and renumbered_url resolve to different target players`) }]);
+      expect(aflApiG2AgreeSet(grades).size).toBe(0);
+    }
+  });
+
+  it('gateAflApiOverlap wires G2 through the shared reverse reader and FAILS on a contradiction', () => {
+    const overlap = source.slice(source.indexOf('export async function evaluateAflApiG2'), source.indexOf('async function runAflApiDevRegenerationCensus'));
+    expect(overlap).toContain('await readAflApiReverseIdentities(sides.candidate, identities)');
+    expect(overlap).toContain("continuityContradiction: remap?.ok === false && remap.reason === 'continuity_contradiction' ? remap : null");
+    expect(overlap).toMatch(/g2Failed = grades\.some\(\(g\) => AFL_API_G2_REFUSING_OUTCOMES\.has\(g\.outcome\)\)/);
+    expect(AFL_API_G2_REFUSING_OUTCOMES.has('CONTINUITY_CONTRADICTION')).toBe(true);
+    // no private reverse classification left in the gate
+    expect(overlap).not.toMatch(/remapped\.length === 1/);
+    const reader = source.slice(source.indexOf('export async function readAflApiReverseIdentities('),
+      source.indexOf('function aflApiRowsToG3('));
+    expect(reader).toContain('classifyAflApiReverseIdentity({');
+    expect(reader).toContain('aflApiReverseIdentityPaths(');
+    expect(reader).toContain('= loadFitzroyProfileContinuityRules()');
   });
 });
 
@@ -2746,5 +3042,1038 @@ describe('acceptance checklist', () => {
       'lineage', 'player_link_resolutions.player_id', 'data_edits.row_id']) {
       expect(text, needle).toContain(needle);
     }
+  });
+});
+
+/**
+ * AFLDB-ISSUE-237 L4 hardening (2026-09-25): F-L4-1 (marker read), F-L4-2 (G2 database roles),
+ * F-L4-3 (candidate-phase ledger), F-L4-4 (bound E_promotion file + post-swap D15 refusal),
+ * F-L4-5 (DEV regeneration generator) and F-L4-6 (documentation), each driven through the
+ * checker's real gate functions against in-memory databases. DB-free.
+ */
+describe('AFLDB-ISSUE-237 L4 hardening — promotion afl_api gates (DB-free)', () => {
+  type FakeIdentity = { playerId: number; externalId: string; sourceKey: 'afltables' | 'manual_admin_edit' };
+  type FakeDb = {
+    /** The DATABASE comment (pg_shdescription). */
+    comment: string | null;
+    /** A comment on some other object in the per-database pg_description. */
+    objectComment: string | null;
+    afl: AflApiCensusRow[];
+    ids: FakeIdentity[];
+    ledger: AflApiAdjudicationLedgerRow[];
+    log: string[];
+  };
+  const fakeDb = (over: Partial<FakeDb> = {}): FakeDb => ({
+    comment: null, objectComment: null, afl: [], ids: [], ledger: [], log: [], ...over,
+  });
+  /** Answers exactly the statements the checker's afl_api readers issue; anything else throws. */
+  const fakeQ = (db: FakeDb): Query => async (text, params = []) => {
+    db.log.push(text);
+    if (text.includes('shobj_description(')) return [{ comment: db.comment }];
+    if (text.includes('obj_description(')) return [{ comment: db.objectComment }];
+    if (text.includes("FROM sources WHERE key = 'afl_api'")) return [{ id: 1 }];
+    if (text.includes('FROM external_identities WHERE source_id = $1')) return db.afl.map((r) => ({ ...r }));
+    if (text.includes('count(*)::int AS n FROM afl_api_identity_adjudications')) return [{ n: db.ledger.length }];
+    if (text === AFL_API_LEDGER_ROWS_SQL) {
+      // bigint columns arrive as strings from postgres.js
+      return [...db.ledger].sort((a, b) => a.id - b.id).map((r) => ({
+        ...r, id: String(r.id), supersedesId: r.supersedesId === null ? null : String(r.supersedesId),
+      }));
+    }
+    if (text.includes('"manualIdentity"')) {
+      const wanted = params[0] as string[];
+      return [...new Set(db.ids.filter((i) => i.sourceKey === 'manual_admin_edit' && wanted.includes(i.externalId))
+        .map((i) => i.externalId))].map((manualIdentity) => ({ manualIdentity }));
+    }
+    if (text.includes('ei.player_id = ANY')) {
+      const wanted = (params[0] as unknown[]).map(Number);
+      return db.ids.filter((i) => wanted.includes(i.playerId))
+        .map((i) => ({ playerId: String(i.playerId), externalId: i.externalId, sourceKey: i.sourceKey }));
+    }
+    if (text.includes('ei.external_id = ANY')) {
+      const wanted = params[0] as string[];
+      const seen = new Set<string>();
+      return db.ids.filter((i) => wanted.includes(i.externalId))
+        .filter((i) => !seen.has(`${i.externalId}|${i.playerId}`) && seen.add(`${i.externalId}|${i.playerId}`))
+        .map((i) => ({ identity: i.externalId, playerId: String(i.playerId) }));
+    }
+    throw new Error(`fake database: unexpected SQL ${text}`);
+  };
+
+  const importer = (externalId: string, playerId: number, matchMethod = 'afl_api_stat_vector_season'): AflApiCensusRow => ({
+    externalId, status: 'unique', matchMethod, playerId, candidateCount: 1, externalUrl: null,
+  });
+  const human = (externalId: string, playerId: number): AflApiCensusRow => ({
+    externalId, status: 'resolved', matchMethod: AFL_API_ADMIN_MATCH_METHOD, playerId, candidateCount: 0, externalUrl: null,
+  });
+  const at = (playerId: number, externalId: string): FakeIdentity => ({ playerId, externalId, sourceKey: 'afltables' });
+  const linked = (id: number, externalId: string, playerId: number, playerIdentity: string): AflApiAdjudicationLedgerRow => ({
+    id, externalId, action: 'linked', playerId, playerIdentity, supersedesId: null,
+  });
+  const path = (key: string) => `players/${key}/${key}_Player.html`;
+  const [A, B, C, D, E, F, Z] = ['A', 'B', 'C', 'D', 'E', 'F', 'Z'].map(path);
+  const MARKER = JSON.stringify({ format: AFL_API_REBUILD_MARKER_FORMAT, version: 2, capturedAt: 'x', payloadSha256: 'a'.repeat(64), fileSha256: 'b'.repeat(64) });
+  const CAND = 'afldb_dev_candidate_20260925-120000';
+  const NAMES = { candidateDatabase: CAND, targetDatabase: 'afldb_dev' };
+
+  /** The rebuilt candidate at --phase restored: rebuilt player ids, importer rows, NO ledger (source lineage). */
+  const candidateAtRestored = (over: Partial<FakeDb> = {}) => fakeDb({
+    ids: [at(10, A), at(11, B), at(12, C), at(13, D), at(14, E)],
+    afl: [importer('CD_I1', 10), importer('CD_I2', 11, 'afl_api_stat_vector_bootstrap')],
+    ...over,
+  });
+  /** DEV (the target): its own player ids, one human adjudication over CD_I1, an importer row CD_I2. */
+  const devTarget = (over: Partial<FakeDb> = {}) => fakeDb({
+    ids: [at(900, A), at(901, B), at(902, C), { playerId: 903, externalId: 'manual-token-903', sourceKey: 'manual_admin_edit' }],
+    afl: [human('CD_I1', 900), importer('CD_I2', 901, 'afl_api_stat_vector_bootstrap')],
+    ledger: [linked(7, 'CD_I1', 900, A)],
+    ...over,
+  });
+  /** The candidate after the promotion plan reinstated DEV's ledger (player_id remapped 900 -> 10). */
+  const candidateAfterReinstate = (over: Partial<FakeDb> = {}) => candidateAtRestored({
+    ledger: [linked(7, 'CD_I1', 10, A)], ...over,
+  });
+
+  const restored = async (candidate: FakeDb, target: FakeDb, devRegenerationPath?: string) => {
+    const report = new Report();
+    const overlap = await gateAflApiOverlap(
+      { candidate: fakeQ(candidate), target: fakeQ(target) }, NAMES, 'dev', devRegenerationPath, report);
+    return { report, overlap };
+  };
+  const verdictOf = (report: Report, gate: string) => report.results.find((r) => r.gate.includes(gate))?.verdict;
+
+  let dir: string;
+  beforeEach(() => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    dir = mkdtempSync(join(tmpdir(), 'afldb-issue237-l4-'));
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  // --- F-L4-1 ----------------------------------------------------------------------------------
+
+  it('F-L4-1 — reads the DATABASE comment with shobj_description, the rebuild lifecycle\'s own statement', () => {
+    const checker = readFileSync(join(REPO, 'tools', 'db', 'promotion-check.ts'), 'utf8');
+    const rebuild = readFileSync(join(REPO, 'tools', 'migration', 'rebuild_afl_api_adjudications.ts'), 'utf8');
+    const squash = (text: string) => text.replace(/\s+/g, ' ').trim();
+    expect(squash(rebuild)).toContain(squash(DATABASE_COMMENT_SQL));
+    expect(DATABASE_COMMENT_SQL).toContain("shobj_description(oid, 'pg_database')");
+    // no per-database obj_description() read survives anywhere in the checker
+    expect(checker).not.toMatch(/(?<!sh)obj_description\(/);
+    // the tag the checker recognises is the rebuild's own CAPTURE_FORMAT
+    expect(rebuild).toContain(`export const CAPTURE_FORMAT = '${AFL_API_REBUILD_MARKER_FORMAT}';`);
+  });
+
+  it('F-L4-1 (a/b/c) — marker present FAILS, marker absent PASSES, an unrelated object comment is not the marker', async () => {
+    expect(await readRebuildMarkerPresent(fakeQ(fakeDb({ comment: MARKER })))).toBe(true);
+    expect(await readRebuildMarkerPresent(fakeQ(fakeDb()))).toBe(false);
+    expect(await readRebuildMarkerPresent(fakeQ(fakeDb({ objectComment: MARKER })))).toBe(false);
+    expect(await readRebuildMarkerPresent(fakeQ(fakeDb({ comment: 'a DBA note, not a marker' })))).toBe(false);
+
+    const source = (over: Partial<FakeDb>) => candidateAtRestored({ ids: [at(10, A), at(11, B)], ...over });
+    for (const [over, verdict] of [[{ comment: MARKER }, 'FAIL'], [{}, 'PASS'], [{ objectComment: MARKER }, 'PASS']] as const) {
+      const report = new Report();
+      await gateAflApiG1(fakeQ(source(over)), report);
+      expect(report.results[0].verdict, JSON.stringify(over)).toBe(verdict);
+      if (verdict === 'FAIL') expect(report.results[0].lines.join('\n')).toContain('rebuild_marker_present');
+    }
+
+    // pre-cutover (target) and restored (candidate + target) phases
+    for (const [dbs, verdict] of [
+      [[fakeDb({ comment: MARKER })], 'FAIL'],
+      [[fakeDb(), fakeDb({ comment: MARKER })], 'FAIL'],
+      [[fakeDb({ objectComment: MARKER }), fakeDb()], 'PASS'],
+    ] as const) {
+      const report = new Report();
+      await gateAflApiRebuildMarker(dbs.map((db, i) => ({ role: `db${i}`, q: fakeQ(db) })), report);
+      expect(report.results[0].verdict).toBe(verdict);
+    }
+
+    // candidate phase
+    const target = devTarget();
+    const { overlap } = await restored(candidateAtRestored(), target);
+    const bound = aflApiSupersedeFileFor(overlap, { environment: 'dev', ...NAMES });
+    for (const [over, verdict] of [[{ comment: MARKER }, 'FAIL'], [{ objectComment: MARKER }, 'PASS']] as const) {
+      const report = new Report();
+      await gateAflApiCandidateAfterReinstate(fakeQ(candidateAfterReinstate(over)), bound, { environment: 'dev', ...NAMES }, report);
+      expect(report.results[0].verdict).toBe(verdict);
+    }
+  });
+
+  // --- F-L4-2 ----------------------------------------------------------------------------------
+
+  it('F-L4-2 — importer rows from the CANDIDATE, the human ledger from the TARGET: E_promotion is the AGREE set', async () => {
+    const candidate = candidateAtRestored();
+    const target = devTarget();
+    const { report, overlap } = await restored(candidate, target);
+    expect(report.failed).toBe(false);
+    expect([...overlap.ePromotion]).toEqual(['CD_I1']);
+    expect(verdictOf(report, 'G2')).toBe('PASS');
+    expect(verdictOf(report, 'G3')).toBe('PASS');
+    // the roles, proven from what each database was actually asked
+    expect(target.log).toContain(AFL_API_LEDGER_ROWS_SQL);
+    expect(candidate.log).not.toContain(AFL_API_LEDGER_ROWS_SQL);
+    expect(candidate.log.some((t) => t.includes('ei.external_id = ANY') && !t.includes('"manualIdentity"'))).toBe(true);
+    expect(target.log.some((t) => t.includes('ei.external_id = ANY') && !t.includes('"manualIdentity"'))).toBe(false);
+
+    // the pre-fix wiring — both sides read from the candidate — is exactly the vacuous E = ∅
+    const wrong = await evaluateAflApiG2({ candidate: fakeQ(candidateAtRestored()), humanLedger: fakeQ(candidateAtRestored()), manualTokenSides: [] });
+    expect(wrong.ePromotion.size).toBe(0);
+  });
+
+  it('F-L4-2 — the restored gate is wired with explicit roles, and matches no name and no cross-lineage player id', () => {
+    const checker = readFileSync(join(REPO, 'tools', 'db', 'promotion-check.ts'), 'utf8');
+    const main = checker.slice(checker.indexOf('async function main('));
+    expect(main).toContain('{ candidate: conn.q, target: old.q }');
+    const overlap = checker.slice(checker.indexOf('export async function gateAflApiOverlap('), checker.indexOf('export function aflApiSupersedeFileFor('));
+    expect(overlap).toContain('candidate: sides.candidate, humanLedger: sides.target, manualTokenSides: [sides.target, sides.candidate]');
+    expect(overlap).not.toMatch(/humanLedger: sides\.candidate/);
+    const g2 = checker.slice(checker.indexOf('export async function evaluateAflApiG2('), checker.indexOf('function g2Lines('));
+    expect(g2).not.toMatch(/external_name|display_name|surname|given_name|\.name\b/);
+    // the only player id compared is the candidate's own remap against the candidate's own row
+    expect(g2).not.toMatch(/\bledger\w*\.playerId\b|\bentry\.playerId\b/);
+  });
+
+  it('F-L4-2 — every prohibited G2 classification STOPS before the swap, and leaves no E_promotion file', async () => {
+    const rule = loadFitzroyProfileContinuityRules()[0];
+    const cases: [string, Partial<FakeDb>, Partial<FakeDb>, string][] = [
+      ['DISAGREE', {}, { ledger: [linked(8, 'CD_I2', 902, C)] }, 'DISAGREE'],
+      ['COLLISION', {}, { ledger: [linked(9, 'CD_I9', 900, A)] }, 'COLLISION'],
+      ['UNEVALUABLE (a DEV manual token, known only to the TARGET)', {}, { ledger: [linked(10, 'CD_I8', 903, 'manual-token-903')] }, 'UNEVALUABLE'],
+      ['UNRESOLVED (unresolvable)', {}, { ledger: [linked(11, 'CD_I7', 900, Z)] }, 'UNRESOLVED'],
+      ['UNRESOLVED (ambiguous)', { ids: [at(10, A), at(11, B), at(12, C), at(15, C)] }, { ledger: [linked(12, 'CD_I6', 902, C)] }, 'UNRESOLVED'],
+      ['CONTINUITY_CONTRADICTION', { ids: [at(10, A), at(11, B), at(20, rule.continuingUrl), at(21, rule.renumberedUrl)] },
+        { ledger: [linked(13, 'CD_I5', 900, rule.continuingUrl)] }, 'CONTINUITY_CONTRADICTION'],
+    ];
+    for (const [name, candidateOver, targetOver, outcome] of cases) {
+      const { report, overlap } = await restored(candidateAtRestored(candidateOver), devTarget(targetOver));
+      expect(verdictOf(report, 'G2'), name).toBe('FAIL');
+      expect(report.results.find((r) => r.gate.includes('G2'))!.lines.join('\n'), name).toContain(`: ${outcome}`);
+      expect(AFL_API_G2_REFUSING_OUTCOMES.has(outcome as never), name).toBe(true);
+      const out = join(dir, `e-${outcome}-${Math.random()}.json`);
+      publishRestoredAflApiFiles(parseArgs(['--environment', 'dev', '--phase', 'restored', '--database', CAND,
+        '--old-database', 'afldb_dev', '--afl-api-supersede-out', out]), overlap, report);
+      expect(readdirSync(dir).filter((f) => f.startsWith('e-')), name).toEqual([]);
+      expect(verdictOf(report, 'E_promotion file NOT written'), name).toBe('INFO');
+    }
+    // a revoked net entry over an importer row stays INFO, never a refusal, never in E
+    const revoked = devTarget({ ledger: [linked(7, 'CD_I1', 900, A), { ...linked(14, 'CD_I1', 900, A), action: 'revoked', supersedesId: 7 }] });
+    const { report, overlap } = await restored(candidateAtRestored(), revoked);
+    expect(verdictOf(report, 'G2')).toBe('PASS');
+    expect(overlap.ePromotion.size).toBe(0);
+  });
+
+  it('G3 — an importer row whose player has no single forward identity is a STOP at restored, never silently ungraded', async () => {
+    // DEV player 901 gained a second, unrelated AFL Tables path after pre-cutover: CD_I2's identity is ambiguous
+    const target = devTarget({ ids: [at(900, A), at(901, B), at(901, F), at(902, C)] });
+    const { report, overlap } = await restored(candidateAtRestored(), target);
+    expect(verdictOf(report, 'G3')).toBe('FAIL');
+    expect(report.results.find((r) => r.gate.includes('G3'))!.lines.join('\n'))
+      .toContain('STOP target CD_I2: importer row whose player has no single forward stable identity');
+    // and nothing is published from the refused run
+    const out = join(dir, 'e-ungraded.json');
+    publishRestoredAflApiFiles(parseArgs(['--environment', 'dev', '--phase', 'restored', '--database', CAND,
+      '--old-database', 'afldb_dev', '--afl-api-supersede-out', out]), overlap, report);
+    expect(readdirSync(dir).filter((f) => f.startsWith('e-'))).toEqual([]);
+
+    // beside an otherwise eligible season hard loss, the ungraded row still makes the generator refuse
+    const withLoss = devTarget({
+      ids: [at(900, A), at(901, B), at(901, F), at(902, C), at(904, E)],
+      afl: [...devTarget().afl, importer('CD_I5', 904, 'afl_api_stat_vector_season')],
+    });
+    const second = await restored(candidateAtRestored(), withLoss);
+    const proposal = aflApiDevRegenerationProposal({
+      failedGates: second.report.results.filter((r) => r.verdict === 'FAIL').map((r) => r.gate),
+      overlap: second.overlap, names: NAMES, season: 2026, reason: 'x', reacquisitionPlan: 'y',
+    });
+    expect('refusals' in proposal && proposal.refusals).toContain(
+      'target CD_I2: no single forward stable identity; G3 cannot grade it');
+  });
+
+  // ISSUE-235's link stores the FIRST path of a continuity pair in collation order; ISSUE-237's
+  // forward classifier gives the pair's player the CONTINUING path. Same player, two strings: G2
+  // must refuse by player, exactly as the post-swap D15 planner does, or the refusal lands after
+  // the swap.
+  it('G2 — a ledger identity naming the same candidate player as another provider\'s importer row is a COLLISION, by player', () => {
+    const R = 'players/C/Charlie_Cameron3.html';
+    const C = 'players/C/Charlie_Cameron.html';
+    const ledger = { ...linked(1, 'CD_X', 700, R), playerIdentity: R };
+    const importerY = {
+      externalId: 'CD_Y', status: 'unique', matchMethod: 'afl_api_stat_vector_bootstrap' as const,
+      playerId: 55, candidateCount: 1, externalUrl: null,
+    };
+    const entries = aflApiG2Entries({
+      candidate: { importerRows: [importerY], identityByExternalId: new Map([['CD_Y', C]]) },
+      net: new Map([['CD_X', ledger]]),
+      manualIdentities: new Set(),
+      remapByIdentity: new Map([[R, { ok: true as const, newPlayerId: 55, remappedIdentity: R }]]),
+    });
+    expect(entries[0].collidingProviderId).toBe('CD_Y');
+    expect(classifyAflApiG2(entries)).toEqual([{ externalId: 'CD_X', outcome: 'COLLISION', collidingProviderId: 'CD_Y' }]);
+    // the same input is what D15 refuses after the swap
+    const d15 = planAflApiAdjudicationReplay({
+      ledgerRows: [ledger], remapByExternalId: new Map([['CD_X', { ok: true as const, newPlayerId: 55, remappedIdentity: R }]]),
+      candidateByExternalId: new Map([['CD_Y', importerY]]), candidatePlayerAflApiRow: new Map([[55, importerY]]),
+    });
+    expect(d15.stops).toEqual([{ externalId: 'CD_X', reason: 'player 55 already holds a different afl_api provider (CD_Y)' }]);
+    // the provider's OWN row on the remapped player is not a collision
+    const own = aflApiG2Entries({
+      candidate: { importerRows: [{ ...importerY, externalId: 'CD_X' }], identityByExternalId: new Map([['CD_X', C]]) },
+      net: new Map([['CD_X', ledger]]), manualIdentities: new Set(),
+      remapByIdentity: new Map([[R, { ok: true as const, newPlayerId: 55, remappedIdentity: R }]]),
+    });
+    expect(classifyAflApiG2(own)).toEqual([{ externalId: 'CD_X', outcome: 'AGREE' }]);
+  });
+
+  // --- F-L4-3 ----------------------------------------------------------------------------------
+
+  it('F-L4-3 — source lineage still refuses any human authority, at --phase source and in the restored candidate', async () => {
+    const report = new Report();
+    await gateAflApiG1(fakeQ(candidateAtRestored({ ledger: [linked(1, 'CD_I1', 10, A)] })), report);
+    expect(report.results[0].verdict).toBe('FAIL');
+    expect(report.results[0].lines.join('\n')).toContain('ledger_row_present');
+
+    const humanReport = new Report();
+    await gateAflApiG1(fakeQ(candidateAtRestored({ afl: [human('CD_I1', 10)] })), humanReport);
+    expect(humanReport.results[0].lines.join('\n')).toContain('resolved_row_present');
+
+    for (const over of [{ ledger: [linked(1, 'CD_I1', 10, A)] }, { afl: [importer('CD_I2', 11), human('CD_I1', 10)] }]) {
+      const { report: restoredReport } = await restored(candidateAtRestored(over), devTarget());
+      expect(verdictOf(restoredReport, 'source-lineage human authority')).toBe('FAIL');
+    }
+  });
+
+  it('F-L4-3 — the candidate phase ACCEPTS exactly the reinstated target ledger and refuses any drift from it', async () => {
+    const { overlap } = await restored(candidateAtRestored(), devTarget());
+    const bound = aflApiSupersedeFileFor(overlap, { environment: 'dev', ...NAMES });
+    const run = async (db: FakeDb, file = bound, names = { environment: 'dev' as const, ...NAMES }) => {
+      const report = new Report();
+      await gateAflApiCandidateAfterReinstate(fakeQ(db), file, names, report);
+      return report.results[0];
+    };
+    const ok = await run(candidateAfterReinstate());
+    expect(ok.verdict).toBe('PASS');
+    expect(ok.lines.join('\n')).toContain('E_promotion (AGREE) = {CD_I1}');
+
+    const refusals: [string, FakeDb, string][] = [
+      ['a human row dropped', candidateAfterReinstate({ ledger: [] }), 'ledger_not_bound_target_state'],
+      ['a human row added', candidateAfterReinstate({ ledger: [linked(7, 'CD_I1', 10, A), linked(8, 'CD_I9', 12, C)] }), 'ledger_not_bound_target_state'],
+      ['a decision downgraded to revoked', candidateAfterReinstate({ ledger: [{ ...linked(7, 'CD_I1', 10, A), action: 'revoked' }] }), 'ledger_not_bound_target_state'],
+      ['a stored identity altered', candidateAfterReinstate({ ledger: [linked(7, 'CD_I1', 10, B)] }), 'ledger_not_bound_target_state'],
+      ['a resolved row before D15', candidateAfterReinstate({ afl: [human('CD_I1', 10), importer('CD_I2', 11, 'afl_api_stat_vector_bootstrap')] }), 'resolved_row_present'],
+      ['importer state changed', candidateAfterReinstate({ afl: [importer('CD_I1', 10)] }), 'importer_state_mismatch'],
+    ];
+    for (const [name, db, kind] of refusals) {
+      const result = await run(db);
+      expect(result.verdict, name).toBe('FAIL');
+      expect(result.lines.join('\n'), name).toContain(kind);
+    }
+    const foreign = await run(candidateAfterReinstate(), bound, { environment: 'dev', candidateDatabase: `${CAND}x`, targetDatabase: 'afldb_dev' });
+    expect(foreign.lines.join('\n')).toContain('candidate_database_mismatch');
+
+    // parseArgs: the candidate phase cannot run without the bound file
+    expect(() => parseArgs(['--environment', 'dev', '--phase', 'candidate', '--database', CAND]))
+      .toThrow(/needs --afl-api-supersede-in/);
+    expect(parseArgs(['--environment', 'dev', '--phase', 'candidate', '--database', CAND,
+      '--afl-api-supersede-in', '/x/e.json']).aflApiSupersedeIn).toBe('/x/e.json');
+    expect(() => parseArgs(['--environment', 'dev', '--phase', 'restored', '--database', CAND, '--old-database', 'afldb_dev',
+      '--afl-api-supersede-in', '/x/e.json'])).toThrow(/only meaningful with --phase candidate/);
+  });
+
+  // --- F-L4-4 ----------------------------------------------------------------------------------
+
+  it('F-L4-4 — the E_promotion file is written only by a fully passing restored run, atomically, bound, deterministic', async () => {
+    const { report, overlap } = await restored(candidateAtRestored(), devTarget());
+    const out = join(dir, 'supersede.json');
+    const opts = parseArgs(['--environment', 'dev', '--phase', 'restored', '--database', CAND,
+      '--old-database', 'afldb_dev', '--afl-api-supersede-out', out]);
+    publishRestoredAflApiFiles(opts, overlap, report);
+    expect(readdirSync(dir)).toEqual(['supersede.json']); // no .partial-* left behind
+    const text = readFileSync(out, 'utf8');
+    const file = parseAflApiSupersedeFile(text);
+    expect(file).toMatchObject({
+      environment: 'dev', candidateDatabase: CAND, targetDatabase: 'afldb_dev', expectedSupersedes: ['CD_I1'],
+      candidateImporterRowCount: 2, candidateImporterSha256: overlap.candidate.state.sha256,
+      targetLedgerRowCount: 1, targetLedgerSha256: aflApiLedgerStateSha256([linked(7, 'CD_I1', 900, A)]),
+    });
+    // deterministic: the same state gives byte-identical content
+    const again = await restored(candidateAtRestored(), devTarget());
+    expect(`${JSON.stringify(aflApiSupersedeFileFor(again.overlap, { environment: 'dev', ...NAMES }), null, 2)}\n`).toBe(text);
+    // never overwritten
+    expect(() => writeOperatorFileAtomically(out, 'x')).toThrow(PromotionRefused);
+    expect(readFileSync(out, 'utf8')).toBe(text);
+
+    // any failed gate of the run (not only an afl_api one) suppresses the file
+    const failing = await restored(candidateAtRestored(), devTarget());
+    failing.report.add('Lineage identity', 'FAIL');
+    const refusedOut = join(dir, 'refused.json');
+    publishRestoredAflApiFiles({ ...opts, aflApiSupersedeOut: refusedOut }, failing.overlap, failing.report);
+    expect(readdirSync(dir)).toEqual(['supersede.json']);
+  });
+
+  it('F-L4-4 — a stale, foreign, tampered, unbound or candidate-mismatched file is refused; an empty set is bound as strongly', () => {
+    const base = {
+      environment: 'dev' as const, candidateDatabase: CAND, targetDatabase: 'afldb_dev',
+      candidateImporterRowCount: 2, candidateImporterSha256: 'c'.repeat(64),
+      targetLedgerRowCount: 1, targetLedgerSha256: 'd'.repeat(64),
+    };
+    const file = buildAflApiSupersedeFile({ ...base, expectedSupersedes: ['CD_I2', 'CD_I1', 'CD_I2'] });
+    expect(file.expectedSupersedes).toEqual(['CD_I1', 'CD_I2']);
+    const text = JSON.stringify(file);
+    expect(parseAflApiSupersedeFile(text)).toEqual(file);
+
+    const refuse = (mutate: (o: Record<string, unknown>) => void, why: RegExp) => {
+      const o = JSON.parse(text) as Record<string, unknown>;
+      mutate(o);
+      expect(() => parseAflApiSupersedeFile(JSON.stringify(o))).toThrow(AflApiPromotionFileRefused);
+      expect(() => parseAflApiSupersedeFile(JSON.stringify(o))).toThrow(why);
+    };
+    refuse((o) => { o.expectedSupersedes = ['CD_I1']; }, /tampered/);
+    refuse((o) => { o.targetLedgerSha256 = 'e'.repeat(64); }, /tampered/);
+    refuse((o) => { o.expectedSupersedes = ['CD_I2', 'CD_I1']; }, /sorted/);
+    refuse((o) => { o.version = 1; }, /stale/);
+    refuse((o) => { o.format = 'something.else'; }, /not an afldb\.afl_api_supersede_expected file/);
+    refuse((o) => { o.note = 'hand edit'; }, /unexpected field set/);
+    // the pre-fix v1 shape is refused outright
+    expect(() => parseAflApiSupersedeFile(JSON.stringify({
+      issue: 'AFLDB-ISSUE-125', format: 'afldb.afl_api_supersede_expected', version: 1, expectedSupersedes: [],
+    }))).toThrow(AflApiPromotionFileRefused);
+
+    const actual = { environment: 'dev', targetDatabase: 'afldb_dev', candidateDatabase: CAND,
+      importer: { rowCount: 2, sha256: 'c'.repeat(64) }, ledger: { rowCount: 1, sha256: 'd'.repeat(64) } };
+    expect(aflApiSupersedeBindingProblems(file, actual)).toEqual([]);
+    const empty = buildAflApiSupersedeFile({ ...base, targetLedgerRowCount: 0, targetLedgerSha256: aflApiLedgerStateSha256([]), expectedSupersedes: [] });
+    expect(empty.expectedSupersedes).toEqual([]);
+    expect(aflApiSupersedeBindingProblems(empty, { ...actual, ledger: { rowCount: 0, sha256: aflApiLedgerStateSha256([]) } })).toEqual([]);
+    for (const [name, over, kind] of [
+      ['stale ledger', { ledger: { rowCount: 1, sha256: 'f'.repeat(64) } }, 'ledger_state_mismatch'],
+      ['candidate-mismatched', { importer: { rowCount: 2, sha256: 'f'.repeat(64) } }, 'importer_state_mismatch'],
+      ['foreign environment', { environment: 'prod' }, 'environment_mismatch'],
+      ['foreign target', { targetDatabase: 'afldb_prod' }, 'target_database_mismatch'],
+      ['foreign candidate', { candidateDatabase: 'afldb_dev_candidate_other' }, 'candidate_database_mismatch'],
+    ] as const) {
+      expect(aflApiSupersedeBindingProblems(file, { ...actual, ...over }).map((p) => p.kind), name).toContain(kind);
+    }
+    // an empty set bound to an empty ledger still refuses a promoted DB that now holds a decision
+    expect(aflApiSupersedeBindingProblems(empty, actual).map((p) => p.kind)).toContain('ledger_state_mismatch');
+  });
+
+  it('F-L4-4 — post-swap D15 replay: supersedes exactly the bound set, and refuses every unbound file before any write', async () => {
+    type ReplayState = { database: string; afl: AflApiCensusRow[]; ids: FakeIdentity[]; ledger: AflApiAdjudicationLedgerRow[]; writes: string[] };
+    const replayTx = (state: ReplayState) => Object.assign(async (strings: TemplateStringsArray, ...values: unknown[]) => {
+      const text = strings.join('$');
+      if (/^\s*(UPDATE|INSERT INTO) external_identities/.test(text)) { state.writes.push(text.trim().split(/\s+/)[0]); return []; }
+      if (text.includes('current_database()')) return [{ currentDatabase: state.database }];
+      if (text.includes("FROM sources WHERE key = 'afl_api'")) return [{ id: 1 }];
+      if (text.includes('FROM afl_api_identity_adjudications')) {
+        return state.ledger.map((r) => ({ ...r, id: String(r.id), supersedesId: r.supersedesId === null ? null : String(r.supersedesId) }));
+      }
+      if (text.includes('ei.player_id = ANY')) {
+        const wanted = (values[0] as number[]).map(Number);
+        return state.ids.filter((i) => wanted.includes(i.playerId));
+      }
+      if (text.includes('ei.external_id = ')) {
+        return [...new Set(state.ids.filter((i) => i.externalId === values[0]).map((i) => i.playerId))].map((playerId) => ({ playerId }));
+      }
+      if (text.includes('FROM external_identities WHERE source_id =')) return state.afl.map((r) => ({ ...r }));
+      throw new Error(`fake tx: unexpected SQL ${text}`);
+    }, { array: (v: unknown[]) => v }) as unknown as TransactionSql;
+    // the promoted database = the accepted candidate, renamed, overrides replayed
+    const promoted = (over: Partial<ReplayState> = {}): ReplayState => {
+      const c = candidateAfterReinstate();
+      return { database: 'afldb_dev', afl: c.afl, ids: c.ids, ledger: c.ledger, writes: [], ...over };
+    };
+    const { overlap } = await restored(candidateAtRestored(), devTarget());
+    const text = JSON.stringify(aflApiSupersedeFileFor(overlap, { environment: 'dev', ...NAMES }));
+    const expected: { environment: 'prod' | 'dev'; targetDatabase: string } = { environment: 'dev', targetDatabase: 'afldb_dev' };
+
+    const good = promoted();
+    const counts = await replayAflApiAdjudicationsFromSupersedeFile(replayTx(good), text, expected);
+    expect(counts.supersedes).toEqual([{ externalId: 'CD_I1', playerId: 10 }]);
+    expect(good.writes).toEqual(['UPDATE']);
+
+    const refusals: [string, ReplayState, string, typeof expected][] = [
+      ['stale: DEV adjudicated after --phase restored', promoted({ ledger: [linked(7, 'CD_I1', 10, A), linked(8, 'CD_I9', 12, C)] }), text, expected],
+      ['candidate-mismatched importer state', promoted({ afl: [importer('CD_I1', 10)] }), text, expected],
+      ['foreign environment', promoted(), text, { environment: 'prod', targetDatabase: 'afldb_dev' }],
+      ['connected to the wrong database', promoted({ database: 'afldb_dev_pre_rebuild_20260925-120000' }), text, expected],
+      ['tampered', promoted(), text.replace('"CD_I1"]', '"CD_I1","CD_I2"]'), expected],
+      ['unbound v1', promoted(), JSON.stringify({ issue: 'AFLDB-ISSUE-125', format: 'afldb.afl_api_supersede_expected', version: 1, expectedSupersedes: ['CD_I1'] }), expected],
+    ];
+    for (const [name, state, fileText, exp] of refusals) {
+      await expect(replayAflApiAdjudicationsFromSupersedeFile(replayTx(state), fileText, exp), name).rejects.toThrow(AflApiReplayAbort);
+      expect(state.writes, name).toEqual([]);
+    }
+  });
+
+  // --- F-L4-5 ----------------------------------------------------------------------------------
+
+  it('F-L4-5 — the generator proposes only afl_api_stat_vector_season hard losses, bound to both compared states', async () => {
+    // DEV lost CD_I5 (season) in the candidate; everything else agrees.
+    const target = devTarget({
+      ids: [...devTarget().ids, at(904, E)],
+      afl: [...devTarget().afl, importer('CD_I5', 904, 'afl_api_stat_vector_season')],
+    });
+    const { report, overlap } = await restored(candidateAtRestored(), target);
+    expect(verdictOf(report, 'G3')).toBe('FAIL');
+    const failedGates = report.results.filter((r) => r.verdict === 'FAIL').map((r) => r.gate);
+    const proposal = aflApiDevRegenerationProposal({
+      failedGates, overlap, names: NAMES, season: 2026, reason: 'ISSUE-237 L4 hard losses', reacquisitionPlan: 'ISSUE-224/228 §9',
+    });
+    if (!('classification' in proposal)) throw new Error(JSON.stringify(proposal));
+    const c = proposal.classification;
+    expect(c.entries).toEqual([{ externalId: 'CD_I5', playerIdentity: E, matchMethod: 'afl_api_stat_vector_season' }]);
+    expect(c).toMatchObject({ database: 'afldb_dev', candidateDatabase: CAND,
+      targetImporterSha256: overlap.target.state.sha256, candidateImporterSha256: overlap.candidate.state.sha256 });
+    expect(parseAflApiDevRegenerationClassification(JSON.stringify(c))).toEqual(c);
+
+    // consumed exactly as --phase restored consumes it: bound, valid, and G3 then PASSES with one WARN
+    expect(aflApiDevRegenerationBindingProblems(c, { targetDatabase: 'afldb_dev', candidateDatabase: CAND,
+      targetImporterSha256: overlap.target.state.sha256, candidateImporterSha256: overlap.candidate.state.sha256 })).toEqual([]);
+    expect(validateAflApiDevRegenerationClassification({ entries: c.entries, targetRows: overlap.targetRows, candidateRows: overlap.candidateRows })).toEqual([]);
+    const g3 = classifyAflApiG3({ environment: 'dev', targetRows: overlap.targetRows, candidateRows: overlap.candidateRows, devRegenerationEntries: c.entries });
+    expect(g3.filter((g) => g.outcome === 'FAIL')).toEqual([]);
+    expect(g3).toContainEqual({ externalId: 'CD_I5', outcome: 'WARN', reason: 'hard_loss_regeneration' });
+    // ...but not against a different candidate state, nor after the post-swap census moves to another target
+    expect(aflApiDevRegenerationBindingProblems(c, { targetDatabase: 'afldb_dev', candidateImporterSha256: 'f'.repeat(64) })
+      .map((p) => p.kind)).toEqual(['importer_state_mismatch']);
+    expect(aflApiDevRegenerationBindingProblems(c, { targetDatabase: 'afldb_prod' }).map((p) => p.kind)).toEqual(['target_database_mismatch']);
+
+    // written through publishRestoredAflApiFiles: G3-only failure -> proposal; the E_promotion file is NOT written
+    const out = join(dir, 'regeneration.json');
+    const supersedeOut = join(dir, 'supersede.json');
+    publishRestoredAflApiFiles(parseArgs(['--environment', 'dev', '--phase', 'restored', '--database', CAND,
+      '--old-database', 'afldb_dev', '--afl-api-supersede-out', supersedeOut, '--afl-api-dev-regeneration-out', out,
+      '--afl-api-regeneration-season', '2026', '--afl-api-regeneration-reason', 'ISSUE-237 L4 hard losses',
+      '--afl-api-regeneration-plan', 'ISSUE-224/228 §9']), overlap, report);
+    expect(readdirSync(dir)).toEqual(['regeneration.json']);
+    expect(parseAflApiDevRegenerationClassification(readFileSync(out, 'utf8'))).toEqual(c);
+  });
+
+  it('F-L4-5 — never proposes a bootstrap, name/team or manual-adjudication loss, nor alongside any other failure', async () => {
+    for (const method of ['afl_api_stat_vector_bootstrap', 'afl_api_name_team_season_bootstrap', 'afl_api_manual_adjudication']) {
+      const target = devTarget({
+        ids: [...devTarget().ids, at(904, E), at(905, F)],
+        afl: [...devTarget().afl, importer('CD_I5', 904, 'afl_api_stat_vector_season'), importer('CD_I4', 905, method)],
+      });
+      const { report, overlap } = await restored(candidateAtRestored(), target);
+      const proposal = aflApiDevRegenerationProposal({
+        failedGates: report.results.filter((r) => r.verdict === 'FAIL').map((r) => r.gate), overlap, names: NAMES,
+        season: 2026, reason: 'r', reacquisitionPlan: 'p',
+      });
+      expect('refusals' in proposal && proposal.refusals.join('\n'), method).toContain(`hard loss of ${method} is never regenerable`);
+    }
+    // the pure selector agrees, straight from G3 grades
+    const selection = aflApiDevRegenerationEntriesFromG3({
+      g3Grades: [
+        { externalId: 'CD_I1', outcome: 'FAIL', reason: 'hard_loss' },
+        { externalId: 'CD_I2', outcome: 'FAIL', reason: 'hard_loss' },
+        { externalId: 'CD_I3', outcome: 'FAIL', reason: 'collision' },
+        { externalId: 'CD_I4', outcome: 'PASS' },
+      ],
+      targetRows: [
+        { externalId: 'CD_I1', playerIdentity: A, matchMethod: 'afl_api_stat_vector_season' },
+        { externalId: 'CD_I2', playerIdentity: B, matchMethod: 'afl_api_manual_adjudication' },
+        { externalId: 'CD_I3', playerIdentity: C, matchMethod: 'afl_api_stat_vector_season' },
+      ],
+    });
+    expect(selection.entries.map((e) => e.externalId)).toEqual(['CD_I1']);
+    expect(selection.refusals.map((r) => r.externalId)).toEqual(['CD_I2', 'CD_I3']);
+
+    // another failed gate: refused, and publish records a FAIL instead of writing
+    const target = devTarget({ ids: [...devTarget().ids, at(904, E)], afl: [...devTarget().afl, importer('CD_I5', 904)] });
+    const { report, overlap } = await restored(candidateAtRestored(), target);
+    report.add('Lineage identity', 'FAIL');
+    const out = join(dir, 'regeneration.json');
+    publishRestoredAflApiFiles(parseArgs(['--environment', 'dev', '--phase', 'restored', '--database', CAND,
+      '--old-database', 'afldb_dev', '--afl-api-dev-regeneration-out', out, '--afl-api-regeneration-season', '2026',
+      '--afl-api-regeneration-reason', 'r', '--afl-api-regeneration-plan', 'p']), overlap, report);
+    expect(readdirSync(dir)).toEqual([]);
+    expect(verdictOf(report, 'classification NOT generated')).toBe('FAIL');
+  });
+
+  it('F-L4-5 — the classification file is strict: v2 only, every field hashed, no hand-authored or edited file', () => {
+    const c = {
+      format: 'afldb.afl_api_dev_regeneration_classification', version: 2, database: 'afldb_dev', candidateDatabase: CAND,
+      season: 2026, reason: 'r', reacquisitionPlan: 'p', targetImporterSha256: 'a'.repeat(64), candidateImporterSha256: 'b'.repeat(64),
+      entries: [{ externalId: 'CD_I5', playerIdentity: E, matchMethod: 'afl_api_stat_vector_season' }],
+    };
+    const { entries } = c;
+    const built = parseAflApiDevRegenerationClassification(JSON.stringify(
+      // round-trip through the only writer
+      aflApiDevRegenerationProposalFor(entries)));
+    expect(built.entries).toEqual(entries);
+    const text = JSON.stringify(built);
+    for (const [name, mutate] of [
+      ['reason edited', (o: Record<string, unknown>) => { o.reason = 'something else'; }],
+      ['plan edited', (o: Record<string, unknown>) => { o.reacquisitionPlan = 'something else'; }],
+      ['entry swapped', (o: Record<string, unknown>) => { (o.entries as Record<string, unknown>[])[0].playerIdentity = A; }],
+      ['candidate rebound', (o: Record<string, unknown>) => { o.candidateImporterSha256 = 'f'.repeat(64); }],
+    ] as const) {
+      const o = JSON.parse(text) as Record<string, unknown>;
+      mutate(o);
+      expect(() => parseAflApiDevRegenerationClassification(JSON.stringify(o)), name).toThrow(/tampered/);
+    }
+    // the v1 hand-authored recipe (§11d.4 of the old runbook) is refused
+    const legacy = { format: c.format, version: 1, database: 'afldb_dev', season: 2026, reason: 'r', reacquisitionPlan: 'p', entries, payloadSha256: 'a'.repeat(64) };
+    expect(() => parseAflApiDevRegenerationClassification(JSON.stringify(legacy))).toThrow(AflApiPromotionFileRefused);
+    // an ineligible class can never even be parsed
+    const o = JSON.parse(text) as Record<string, unknown>;
+    (o.entries as Record<string, unknown>[])[0].matchMethod = 'afl_api_stat_vector_bootstrap';
+    expect(() => parseAflApiDevRegenerationClassification(JSON.stringify(o))).toThrow(/only afl_api_stat_vector_season/);
+  });
+
+  it('F-L4-5 — the generator flags are DEV-only, restored-only, complete, and never combined with consumption', () => {
+    const base = ['--phase', 'restored', '--database', CAND, '--old-database', 'afldb_dev'];
+    const gen = ['--afl-api-dev-regeneration-out', '/x/r.json', '--afl-api-regeneration-season', '2026',
+      '--afl-api-regeneration-reason', 'r', '--afl-api-regeneration-plan', 'p'];
+    expect(parseArgs(['--environment', 'dev', ...base, ...gen])).toMatchObject({
+      aflApiDevRegenerationOut: '/x/r.json', aflApiRegenerationSeason: 2026, aflApiRegenerationReason: 'r', aflApiRegenerationPlan: 'p',
+    });
+    expect(() => parseArgs(['--environment', 'prod', '--phase', 'restored', '--database', `${CANDIDATE_PREFIX}1`,
+      '--old-database', 'afldb_prod', ...gen])).toThrow(/DEV-only/);
+    expect(() => parseArgs(['--environment', 'dev', ...base, ...gen.slice(0, 4)])).toThrow(/needs all of/);
+    expect(() => parseArgs(['--environment', 'dev', ...base, ...gen.slice(2)])).toThrow(/needs all of/);
+    expect(() => parseArgs(['--environment', 'dev', ...base, ...gen, '--afl-api-dev-regeneration', '/x/c.json'])).toThrow(/never both/);
+    expect(() => parseArgs(['--environment', 'dev', '--phase', 'pre-cutover', '--database', 'afldb_dev', ...gen]))
+      .toThrow(/only meaningful with --phase restored/);
+    expect(() => parseArgs(['--environment', 'dev', ...base, '--afl-api-regeneration-season', '26'])).toThrow(/four-digit/);
+  });
+
+  // --- F-L4-6 ----------------------------------------------------------------------------------
+
+  it('F-L4-6 — the documentation no longer claims a per-row target census in the snapshot', () => {
+    const doc = readFileSync(join(REPO, 'docs', 'production-promotion.md'), 'utf8');
+    expect(doc).not.toMatch(/records\s+`\(external_id, stable identity, match_method\)` per importer row into the snapshot/);
+    expect(doc).toContain('--afl-api-supersede-in');
+    expect(doc).toContain('replayAflApiAdjudicationsFromSupersedeFile');
+  });
+
+  function aflApiDevRegenerationProposalFor(entries: { externalId: string; playerIdentity: string; matchMethod: string }[]) {
+    const overlap = {
+      ePromotion: new Set<string>(), ledgerState: { rowCount: 0, sha256: 'c'.repeat(64) },
+      candidate: { state: { rowCount: 0, sha256: 'b'.repeat(64) }, importerRows: [], identityByExternalId: new Map() },
+      target: { state: { rowCount: 1, sha256: 'a'.repeat(64) }, importerRows: [], identityByExternalId: new Map() },
+      targetRows: entries, candidateRows: [],
+      g3Grades: entries.map((e) => ({ externalId: e.externalId, outcome: 'FAIL' as const, reason: 'hard_loss' as const })),
+    } as unknown as AflApiOverlapResult;
+    const proposal = aflApiDevRegenerationProposal({ failedGates: ['afl_api importer identity — G3 cross-lineage comparison'],
+      overlap, names: NAMES, season: 2026, reason: 'r', reacquisitionPlan: 'p' });
+    if (!('classification' in proposal)) throw new Error(JSON.stringify(proposal));
+    return proposal.classification;
+  }
+});
+
+/**
+ * AFLDB-ISSUE-237 L4 semantic blockers (2026-09-25): A4.2 (the post-swap players replay when the
+ * target and the candidate carry DIFFERENT manual tokens for one AFL Tables path), A4.3 (target
+ * overrides keyed to a match the historical candidate does not hold) and the
+ * `--lineage-remap-out` refusal artefact. Each is a pre-swap checker gate now, driven here through
+ * the real planners, the real gate function and the real publisher. DB-free.
+ */
+describe('AFLDB-ISSUE-237 L4 — A4.2 / A4.3 replay gates and the lineage remap artefact (DB-free)', () => {
+  const P = 'players/P/P_Player.html';
+  const Q = 'players/Q/Q_Player.html';
+  const record = (token: string, path: string | null, extra: Record<string, unknown> = {}): PromotionOverrideRow => ({
+    entityType: 'players', entityKey: `manual_admin_edit:${token}`, fieldGroup: 'identity',
+    overrideValues: JSON.stringify({ display_name: 'Registered Player', ...(path === null ? {} : { afltables_profile_path: path }), ...extra }),
+  });
+  const manual = (token: string, playerId: number | null, status = 'resolved'): PromotionIdentityRow => ({
+    sourceKey: 'manual_admin_edit', externalId: token, playerId, status, matchMethod: 'manual_admin_edit',
+  });
+  const aft = (path: string, playerId: number | null, status = 'resolved', matchMethod = 'afltables_profile_url'): PromotionIdentityRow => ({
+    sourceKey: 'afltables', externalId: path, playerId, status, matchMethod,
+  });
+  const plan = (overrides: PromotionOverrideRow[], candidate: PromotionIdentityRow[]) =>
+    planPromotionPlayersReplay({ overrides, candidate });
+
+  // --- A4.2 ----------------------------------------------------------------------------------
+
+  it('A4.2 (1) same token + same path: present, nothing inserted, no STOP', () => {
+    const r = plan([record('A', P)], [manual('A', 20), aft(P, 20)]);
+    expect(r.problems).toEqual([]);
+    expect(r.present).toEqual([{ token: 'A', path: P, playerId: 20 }]);
+    expect(r.binds).toEqual([]);
+    expect(r.creates).toEqual([]);
+  });
+
+  it('A4.2 (2) different token + same path: STOP — binding would give one person two manual identities', () => {
+    const r = plan([record('A', P)], [manual('B', 20), aft(P, 20)]);
+    expect(r.binds).toEqual([]);
+    expect(r.problems).toHaveLength(2);
+    expect(r.problems[0]).toContain('different token, same path');
+    expect(r.problems[0]).toContain('manual_admin_edit:B');
+    // B is also a candidate token the target never recorded
+    expect(r.problems[1]).toContain('candidate manual_admin_edit:B (candidate player 20) has no target creation record');
+  });
+
+  it('A4.2 (2b) token absent, path held by a player with NO manual token: the ISSUE-160 bind, no STOP', () => {
+    const r = plan([record('A', P)], [aft(P, 20)]);
+    expect(r.problems).toEqual([]);
+    expect(r.binds).toEqual([{ token: 'A', path: P, playerId: 20 }]);
+  });
+
+  it('A4.2 (3) same token + different path: STOP, in every direction', () => {
+    expect(plan([record('A', P)], [manual('A', 20), aft(Q, 20)]).problems[0]).toContain('same token, different path');
+    // the record's path is ALSO held by another player
+    expect(plan([record('A', P)], [manual('A', 20), aft(P, 20), aft(P, 21)]).problems[0]).toContain('held elsewhere');
+    // the record names no path, but the token's candidate player holds one
+    expect(plan([record('A', null)], [manual('A', 20), aft(Q, 20)]).problems[0]).toContain('same token, different path');
+  });
+
+  it('A4.2 (4) two target tokens converging onto one candidate player: STOP', () => {
+    // Player 20 holds both paths (a continuity pair); neither token is in the candidate.
+    const r = plan([record('A1', P), record('A2', Q)], [aft(P, 20), aft(Q, 20)]);
+    expect(r.binds).toHaveLength(1);
+    expect(r.problems).toHaveLength(1);
+    expect(r.problems[0]).toContain('converges on candidate player 20');
+    // two records naming the SAME path would create a twin carrying neither
+    expect(plan([record('A1', P), record('A2', P)], []).problems[0]).toContain('also named by manual_admin_edit:A1');
+  });
+
+  it('A4.2 (5) candidate path ambiguous or not an accepted profile identity: STOP', () => {
+    expect(plan([record('A', P)], [aft(P, 20), aft(P, 21)]).problems[0]).toContain('resolves to 2 candidate players');
+    expect(plan([record('A', P)], [aft(P, 20, 'ambiguous')]).problems[0]).toContain('not an accepted afltables_profile_url row');
+    expect(plan([record('A', P)], [aft(P, null, 'unmatched')]).problems[0]).toContain('not an accepted afltables_profile_url row');
+  });
+
+  it('A4.2 (6) candidate path missing: the replay creates the player with its path; a correction on it resolves', () => {
+    const correction: PromotionOverrideRow = {
+      entityType: 'players', entityKey: `afltables:${P}`, fieldGroup: 'name', overrideValues: '{"display_name":"X"}',
+    };
+    const r = plan([record('A', P), correction], []);
+    expect(r.problems).toEqual([]);
+    expect(r.creates).toEqual([{ token: 'A', path: P }]);
+    expect(r.corrections).toEqual([{ entityKey: `afltables:${P}`, fieldGroup: 'name', resolvesTo: `created ${P}` }]);
+    // a manual-only record (no path) is created too: nothing to converge by, and no name is read
+    expect(plan([record('A', null)], []).creates).toEqual([{ token: 'A', path: null }]);
+  });
+
+  it('A4.2 (7) duplicate manual identities: STOP', () => {
+    // the token's candidate player carries a second token
+    expect(plan([record('A', P)], [manual('A', 20), manual('B', 20), aft(P, 20)]).problems[0])
+      .toContain('duplicate manual identity');
+    // the token row exists but is not accepted and player-linked
+    expect(plan([record('A', P)], [manual('A', 20, 'ambiguous'), aft(P, 20)]).problems[0])
+      .toContain('not one accepted, player-linked row');
+    expect(plan([record('A', null)], [manual('A', null)]).problems[0]).toContain('not one accepted, player-linked row');
+    // a manual-namespace row in a field group other than the creation record's
+    expect(plan([{ ...record('A', P), fieldGroup: 'name' }], []).problems[0]).toContain("only field_group 'identity'");
+  });
+
+  it('A4.2 — a source-keyed correction whose identity the candidate lacks, or holds twice, is a STOP, not a silent drop', () => {
+    const correction = (key: string): PromotionOverrideRow => ({
+      entityType: 'players', entityKey: key, fieldGroup: 'dob', overrideValues: '{"dob":null}',
+    });
+    expect(plan([correction(`afltables:${Q}`)], []).problems[0]).toContain('match nothing and silently drop it');
+    expect(plan([correction(`afltables:${Q}`)], [aft(Q, 20), aft(Q, 21)]).problems[0]).toContain('apply it to every one of them');
+    expect(plan([correction(`afltables:${Q}`)], [aft(Q, 20)]).corrections).toEqual([
+      { entityKey: `afltables:${Q}`, fieldGroup: 'dob', resolvesTo: 'player 20' },
+    ]);
+  });
+
+  it("A4.2 — the replay's own payload refusals are predicted before the swap", () => {
+    expect(plan([{ ...record('A', null), overrideValues: '[1]' }], []).problems[0]).toContain('not a JSON object');
+    expect(plan([record('A', null, { dob: '2001-01-01' })], []).problems[0]).toContain('dob is set with no dob_confidence');
+    expect(plan([record('A', null, { dob: '2001-01-01', dob_confidence: 'sourced' })], []).problems).toEqual([]);
+    // 'exact' is not a value_confidence (migration 001): the replay's INSERT cast raises.
+    expect(plan([record('A', null, { dob: '2001-01-01', dob_confidence: 'exact' })], []).problems[0])
+      .toContain('dob_confidence is not a value_confidence');
+  });
+
+  // The replay's pre-check refuses a creation record with no usable name (common.py), AFTER the
+  // swap. The gate predicts it through the shared ISSUE-245 validator, so neither promotion module
+  // names the field itself (the guard below still holds).
+  it('A4.2 — a creation record the replay cannot re-create a player from is a STOP: missing, null or blank name', () => {
+    const noName = (payload: Record<string, unknown>): PromotionOverrideRow => ({
+      entityType: 'players', entityKey: 'manual_admin_edit:A', fieldGroup: 'identity', overrideValues: JSON.stringify(payload),
+    });
+    for (const payload of [{}, { display_name: null }, { display_name: '  ' }, { display_name: 7 }]) {
+      const r = plan([noName(payload)], []);
+      expect(r.problems).toHaveLength(1);
+      expect(r.problems[0]).toContain('no display_name to re-create the player with');
+      expect(r.creates).toEqual([]);
+    }
+    // the same record against a candidate that already holds its token: still a STOP (the replay's
+    // pre-check runs over EVERY active manual record, present or not)
+    expect(plan([noName({})], [manual('A', 20)]).problems[0]).toContain('no display_name');
+  });
+
+  it('A4.2 — every cast the replay makes is predicted: smallint range and scale, calendar date, enum, key shape', () => {
+    const stop = (extra: Record<string, unknown>, raw?: string) => plan([raw === undefined
+      ? record('A', null, extra) : { ...record('A', null), overrideValues: raw }], []).problems;
+    expect(stop({ height_cm: 40000 })[0]).toContain('height_cm is not a smallint');
+    expect(stop({ weight_kg: '80' })[0]).toContain('weight_kg is not a smallint');
+    // jsonb keeps a numeric's scale: 1990.0 is an integer to JSON.parse, but '1990.0'::smallint raises
+    expect(stop({}, '{"display_name": "R", "birth_year": 1990.0}')[0]).toContain('birth_year is not a smallint');
+    expect(stop({}, '{"display_name": "R", "birth_year": 1990}')).toEqual([]);
+    expect(stop({ dob: '2001-02-30', dob_confidence: 'sourced' })[0]).toContain('not a YYYY-MM-DD calendar date');
+    expect(stop({ birth_year_confidence: 'likely' })[0]).toContain('birth_year_confidence is not a value_confidence');
+    expect(stop({ given_name: 3 })[0]).toContain('given_name is not text or null');
+    expect(stop({ afltables_profile_path: 'not/a/path' })[0]).toContain('not an AFL Tables profile path');
+  });
+
+  it('A4.2 — a source-keyed correction the merge UPDATE would raise on is a STOP', () => {
+    const corr = (overrideValues: string): PromotionOverrideRow => ({
+      entityType: 'players', entityKey: `afltables:${Q}`, fieldGroup: 'dob', overrideValues,
+    });
+    expect(plan([corr('"x"')], [aft(Q, 20)]).problems[0]).toContain('not a JSON object');
+    expect(plan([corr('{"dob":"2001-13-01"}')], [aft(Q, 20)]).problems[0]).toContain('calendar date');
+    expect(plan([corr('{"dob_confidence":"exact"}')], [aft(Q, 20)]).problems[0]).toContain('not a value_confidence');
+    expect(plan([corr('{"dob":"2001-01-01","dob_confidence":"sourced"}')], [aft(Q, 20)]).problems).toEqual([]);
+  });
+
+  it('A4.2 — equal-authority overrides that disagree on one field of one player are a STOP; different ranks are not', () => {
+    const corr = (entityKey: string, fieldGroup: string, payload: Record<string, unknown>): PromotionOverrideRow => ({
+      entityType: 'players', entityKey, fieldGroup, overrideValues: JSON.stringify(payload),
+    });
+    const draft = { sourceKey: 'draftguru', externalId: 'dg-1', playerId: 20, status: 'resolved', matchMethod: 'x' };
+    // two corrections (rank 1) on player 20, through two identities, disagreeing on 'notes'
+    const r = plan([corr(`afltables:${Q}`, 'notes', { notes: 'a' }), corr('draftguru:dg-1', 'notes', { notes: 'b' })],
+      [aft(Q, 20), draft]);
+    expect(r.problems).toHaveLength(1);
+    expect(r.problems[0]).toContain("player 20: field 'notes' is claimed by equal-authority overrides that disagree");
+    // agreeing values (jsonb equality: key order and numeric form do not matter) are not a conflict
+    expect(plan([corr(`afltables:${Q}`, 'notes', { notes: 'a' }), corr('draftguru:dg-1', 'notes', { notes: 'a' })],
+      [aft(Q, 20), draft]).problems).toEqual([]);
+    // a creation record (rank 0) and a correction (rank 1) disagreeing: precedence settles it
+    const settled = plan([record('A', P, { notes: 'old' }), corr(`afltables:${P}`, 'notes', { notes: 'new' })], [aft(P, 20)]);
+    expect(settled.problems).toEqual([]);
+    expect(settled.merges).toEqual([{ target: 'player 20', playerId: 20, insertBase: null,
+      fields: expect.objectContaining({ notes: 'new', afltables_profile_path: P }) }]);
+  });
+
+  it('A4.2 — the merge UPDATE cannot violate a players CHECK against the candidate row', () => {
+    const corr = (payload: Record<string, unknown>): PromotionOverrideRow => ({
+      entityType: 'players', entityKey: `afltables:${Q}`, fieldGroup: 'dob', overrideValues: JSON.stringify(payload),
+    });
+    const row = (over: Partial<PromotionPlayerCheckRow> = {}): PromotionPlayerCheckRow => ({
+      hasDob: false, dobConfidence: 'unknown', birthYearMin: null, birthYearMax: null, ...over,
+    });
+    const checks = (overrides: PromotionOverrideRow[], rows: [number, PromotionPlayerCheckRow][], candidate = [aft(Q, 20)]) =>
+      promotionPlayerCheckProblems(plan(overrides, candidate).merges, new Map(rows));
+    // a dob-only correction (the data editor records CHANGED fields only) meets a candidate row whose
+    // confidence is 'unknown': players_dob_confidence_ck raises after the swap
+    expect(checks([corr({ dob: '2001-01-01' })], [[20, row()]])[0]).toContain('players_dob_confidence_ck');
+    // ...but not when the candidate row already carries a confidence, or the payload carries one
+    expect(checks([corr({ dob: '2001-01-01' })], [[20, row({ dobConfidence: 'sourced' })]])).toEqual([]);
+    expect(checks([corr({ dob: '2001-01-01', dob_confidence: 'sourced' })], [[20, row()]])).toEqual([]);
+    // clearing the confidence of a row that keeps its dob
+    expect(checks([corr({ dob_confidence: 'unknown' })], [[20, row({ hasDob: true, dobConfidence: 'sourced' })]])[0])
+      .toContain('players_dob_confidence_ck');
+    // a partial birth-year correction against the candidate's other bound
+    expect(checks([corr({ birth_year_min: 1990 })], [[20, row({ birthYearMax: 1985 })]])[0]).toContain('players_birth_range_ck');
+    expect(checks([corr({ birth_year_min: 1990, birth_year_max: 1991 })], [[20, row({ birthYearMax: 1985 })]])).toEqual([]);
+    // a merge onto a player the read did not return
+    expect(checks([corr({ notes: null })], [])[0]).toContain('holds no players row');
+    // a created player starts from its INSERT (no range, the record's own dob/confidence)
+    const created = plan([record('A', P, { dob: '2001-01-01', dob_confidence: 'sourced' }),
+      { ...corr({ birth_year_min: 1990 }), entityKey: `afltables:${P}` }], []);
+    expect(created.merges[0]).toMatchObject({ target: 'created A', playerId: null,
+      insertBase: { hasDob: true, dobConfidence: 'sourced', birthYearMin: null, birthYearMax: null } });
+    expect(promotionPlayerCheckProblems(created.merges, new Map())).toEqual([]);
+  });
+
+  // A candidate token with no target creation record would be carried through the swap as a manual
+  // identity with no creation record (the target's data_overrides replaces the candidate's).
+  it('A4.2 — a candidate-only manual token is a STOP, with or without an AFL Tables path', () => {
+    for (const candidate of [[manual('B', 20), aft(P, 20)], [manual('B', 20)]]) {
+      const r = plan([], candidate);
+      expect(r.candidateOnlyTokens).toEqual([{ token: 'B', playerId: 20 }]);
+      expect(r.problems).toHaveLength(1);
+      expect(r.problems[0]).toContain('candidate manual_admin_edit:B (candidate player 20) has no target creation record');
+    }
+    // a token the target DOES record is never candidate-only, even when that record is refused
+    expect(plan([{ ...record('A', P), overrideValues: '{}' }], [manual('A', 20), aft(P, 20)]).candidateOnlyTokens).toEqual([]);
+  });
+
+  it('A4.2 — identity keys read for the planner: record paths and correction identities, never names', () => {
+    const keys = playerIdentityKeysOfOverrides([
+      record('A', P), record('B', null),
+      { entityType: 'players', entityKey: `afltables:${Q}`, fieldGroup: 'name', overrideValues: '{}' },
+      { entityType: 'matches', entityKey: '2026|1|x|a|b', fieldGroup: 'score', overrideValues: '{}' },
+    ]);
+    expect(keys).toEqual({ sourceKeys: ['afltables', 'afltables'], externalIds: [P, Q] });
+  });
+
+  // --- A4.3 ----------------------------------------------------------------------------------
+
+  const mk = (entityType: string, entityKey: string, fieldGroup = 'score'): PromotionOverrideRow => ({
+    entityType, entityKey, fieldGroup, overrideValues: '{}',
+  });
+  const K25 = '2025|1|2025-03-13|Richmond|Carlton';
+  const K26 = '2026|1|2026-03-12|Richmond|Carlton';
+
+  it('A4.3 — a 2026-keyed matches or match_coaches override is a STOP naming the lifecycle boundary', () => {
+    const r = planPromotionMatchReplay({
+      overrides: [mk('matches', K25), mk('matches', K26), mk('match_coaches', `${K26}|richmond`, 'coach')],
+      candidateMatchKeys: new Set([K25]), candidateMaxSeason: 2025,
+    });
+    expect(r.resolved).toBe(1);
+    expect(r.problems).toHaveLength(2);
+    expect(r.problems[0]).toContain("season 2026 is after the candidate's historical baseline (max season 2025)");
+    expect(r.problems[0]).toContain('silently match nothing');
+    expect(r.problems[1]).toContain('raises after the swap');
+  });
+
+  it('A4.3 — an absent historical key is a STOP too; an undecodable match_coaches key is a STOP; players are not read', () => {
+    const r = planPromotionMatchReplay({
+      overrides: [mk('matches', '1999|1|1999-03-01|A|B'), mk('match_coaches', 'no-delimiter', 'coach'),
+        mk('players', 'manual_admin_edit:A', 'identity')],
+      candidateMatchKeys: new Set(), candidateMaxSeason: 2025,
+    });
+    expect(r.problems).toHaveLength(2);
+    expect(r.problems[0]).not.toContain('historical baseline');
+    expect(r.problems[1]).toContain('not <match_key>|<club slug>');
+    // the replay's own decode: the club slug is after the LAST delimiter
+    expect(decodeMatchCoachKey(`${K26}|gold-coast`)).toEqual({ matchKey: K26, clubSlug: 'gold-coast' });
+    expect(decodeMatchCoachKey(`${K26}|`)).toBeNull();
+    expect(matchKeysOfOverrides([mk('matches', K25), mk('match_coaches', `${K26}|richmond`)])).toEqual([K25, K26]);
+  });
+
+  // --- the gate: which database answers which read -------------------------------------------
+
+  type Side = { overrides: PromotionOverrideRow[]; identities: PromotionIdentityRow[]; matchKeys: string[]; maxSeason: number | null; log: string[] };
+  const side = (over: Partial<Side> = {}): Side => ({ overrides: [], identities: [], matchKeys: [], maxSeason: 2025, log: [], ...over });
+  const sideQ = (s: Side): Query => async (text, params = []) => {
+    s.log.push(text);
+    if (text === PROMOTION_REPLAY_OVERRIDES_SQL) return s.overrides.map((o) => ({ ...o }));
+    if (text === PROMOTION_REPLAY_IDENTITIES_SQL) {
+      const [keys, ids] = params as [string[], string[]];
+      return s.identities.filter((i) => i.sourceKey === 'manual_admin_edit'
+        || keys.some((k, n) => k === i.sourceKey && ids[n] === i.externalId)
+        || (i.sourceKey === 'afltables' && s.identities.some((m) => m.sourceKey === 'manual_admin_edit' && m.playerId === i.playerId)))
+        .map((i) => ({ ...i, playerId: i.playerId === null ? null : String(i.playerId) }));
+    }
+    if (text === PROMOTION_REPLAY_MATCH_KEYS_SQL) {
+      const wanted = params[0] as string[];
+      return s.matchKeys.filter((k) => wanted.includes(k)).map((matchKey) => ({ matchKey }));
+    }
+    if (text === PROMOTION_REPLAY_MAX_SEASON_SQL) return [{ maxSeason: s.maxSeason }];
+    if (text === PROMOTION_REPLAY_PLAYER_CHECKS_SQL) {
+      // every requested player exists, with no dob and no birth range (postgres.js: int as number)
+      return (params[0] as number[]).map((playerId) => ({
+        playerId, hasDob: false, dobConfidence: 'unknown', birthYearMin: null, birthYearMax: null,
+      }));
+    }
+    throw new Error(`fake database: unexpected SQL ${text}`);
+  };
+
+  let dir: string;
+  beforeEach(() => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    dir = mkdtempSync(join(tmpdir(), 'afldb-issue237-remap-'));
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('restored phase: overrides from the TARGET, identities and matches from the CANDIDATE; STOPs fail the run', async () => {
+    const target = side({ overrides: [record('A', P), mk('matches', K26)], identities: [manual('A', 900), aft(P, 900)] });
+    const candidate = side({ identities: [manual('B', 20), aft(P, 20)], matchKeys: [K25] });
+    const report = new Report();
+    const out = await gateOverrideReplayTargets({ overrides: sideQ(target), candidate: sideQ(candidate) },
+      { overrides: 'target afldb_dev', candidate: 'candidate c' }, report);
+    expect(target.log).toEqual([PROMOTION_REPLAY_OVERRIDES_SQL]);
+    expect(candidate.log).toContain(PROMOTION_REPLAY_IDENTITIES_SQL);
+    expect(candidate.log).toContain(PROMOTION_REPLAY_MATCH_KEYS_SQL);
+    expect(candidate.log).not.toContain(PROMOTION_REPLAY_OVERRIDES_SQL);
+    expect(out.players.problems[0]).toContain('different token, same path');
+    expect(out.matches.problems[0]).toContain('season 2026');
+    expect(report.results.map((r) => r.verdict)).toEqual(['FAIL', 'FAIL']);
+    expect(report.results[0].gate).toContain('A4.2');
+    expect(report.results[1].gate).toContain('A4.3');
+  });
+
+  it('candidate phase: the reinstated target overrides and the candidate identities are one database; a clean state PASSES', async () => {
+    const both = side({ overrides: [record('A', P), mk('matches', K25)], identities: [aft(P, 20)], matchKeys: [K25] });
+    const report = new Report();
+    const out = await gateOverrideReplayTargets({ overrides: sideQ(both), candidate: sideQ(both) },
+      { overrides: 'candidate c (reinstated)', candidate: 'candidate c' }, report);
+    expect(out.players.binds).toEqual([{ token: 'A', path: P, playerId: 20 }]);
+    expect(out.matches.resolved).toBe(1);
+    expect(report.failed).toBe(false);
+    // the CHECK columns were read from the candidate, by the resolved id only
+    expect(both.log).toContain(PROMOTION_REPLAY_PLAYER_CHECKS_SQL);
+  });
+
+  it('the gate folds the candidate-row CHECK prediction into the A4.2 verdict', async () => {
+    const target = side({ overrides: [{
+      entityType: 'players', entityKey: `afltables:${P}`, fieldGroup: 'dob', overrideValues: '{"dob":"2001-01-01"}',
+    }] });
+    const candidate = side({ identities: [aft(P, 20)] });
+    const report = new Report();
+    const out = await gateOverrideReplayTargets({ overrides: sideQ(target), candidate: sideQ(candidate) },
+      { overrides: 'target afldb_dev', candidate: 'candidate c' }, report);
+    expect(candidate.log).toContain(PROMOTION_REPLAY_PLAYER_CHECKS_SQL);
+    expect(target.log).not.toContain(PROMOTION_REPLAY_PLAYER_CHECKS_SQL);
+    expect(out.players.problems).toEqual([expect.stringContaining('players_dob_confidence_ck')]);
+    expect(report.results[0].verdict).toBe('FAIL');
+  });
+
+  it('the gate is wired into --phase restored and --phase candidate, before any file is published', () => {
+    const source = readFileSync(join(REPO, 'tools', 'db', 'promotion-check.ts'), 'utf8');
+    const main = source.slice(source.indexOf('async function main('));
+    const restoredBranch = main.slice(main.indexOf("if (phase === 'restored') {"), main.indexOf('if (opts.compare)'));
+    expect(restoredBranch).toContain('gateOverrideReplayTargets({ overrides: old.q, candidate: conn.q }');
+    const candidateBranch = main.slice(main.indexOf("if (phase === 'candidate') {"), main.indexOf('let aflApiTargetCensus'));
+    expect(candidateBranch).toContain('gateOverrideReplayTargets({ overrides: conn.q, candidate: conn.q }');
+    // publication happens after the gates, and the remap is refused up front if it exists
+    expect(main.indexOf('publishRestoredLineageRemap(')).toBeGreaterThan(main.indexOf('await conn.end();'));
+    expect(main).toContain('[opts.aflApiSupersedeOut, opts.aflApiDevRegenerationOut, opts.lineageRemapOut]');
+    // the lineage gate generates, it never writes
+    const gate = source.slice(source.indexOf('async function gateLineageIdentity'), source.indexOf('async function readAflApiCensus'));
+    expect(gate).toContain('prepareRemap(plans, false)');
+    expect(gate).not.toMatch(/writeFileSync|writeOperatorFileAtomically/);
+    // No name is read by the new gate. Its ONE players read is the CHECK-column read, by the ids
+    // stable identities already resolved, from the candidate -- never a name, never a lookup.
+    const newGate = source.slice(source.indexOf('export const PROMOTION_REPLAY_OVERRIDES_SQL'),
+      source.indexOf('export function publishRestoredLineageRemap'));
+    expect(newGate).not.toMatch(/display_name|search_name|given_name|surname|full_name|ilike/i);
+    expect(newGate.match(/FROM players\b/gi)).toHaveLength(1);
+    expect(PROMOTION_REPLAY_PLAYER_CHECKS_SQL).toMatch(/FROM players\s+WHERE id = ANY\s*\(\$1::int\[\]\)/);
+    expect(PROMOTION_REPLAY_PLAYER_CHECKS_SQL).not.toMatch(/\bdob AS|name/i);
+    expect(newGate).toContain('sides.candidate(PROMOTION_REPLAY_PLAYER_CHECKS_SQL, [checkIds])');
+  });
+
+  // --- --lineage-remap-out -------------------------------------------------------------------
+
+  const REMAP = lineageRemapSql({ candidate: 'afldb_dev_candidate_20260925-120000', oldDatabase: 'afldb_dev', environment: 'dev', plans: [] });
+
+  it('remap: a refused run publishes NO file, and says so', () => {
+    const out = join(dir, 'remap.sql');
+    const report = new Report();
+    report.add('afl_api importer identity — G3 cross-lineage comparison', 'FAIL', []);
+    publishRestoredLineageRemap(out, REMAP, report);
+    expect(readdirSync(dir)).toEqual([]);
+    expect(report.results.at(-1)).toMatchObject({ gate: 'Lineage remap file NOT written', verdict: 'INFO' });
+    // nothing prepared (the lineage gate itself refused) is not written either
+    publishRestoredLineageRemap(out, undefined, new Report());
+    expect(readdirSync(dir)).toEqual([]);
+  });
+
+  it('remap: a fully passing run publishes exactly the prepared SQL, once, never over an existing file', () => {
+    const out = join(dir, 'remap.sql');
+    const report = new Report();
+    report.add('Lineage identity of reinstated id-keyed rows', 'PASS', []);
+    publishRestoredLineageRemap(out, REMAP, report);
+    expect(readFileSync(out, 'utf8')).toBe(REMAP);
+    expect(report.results.at(-1)?.gate).toBe('Lineage remap file written');
+    expect(() => publishRestoredLineageRemap(out, REMAP, new Report())).toThrow(PromotionRefused);
+    expect(readdirSync(dir)).toEqual(['remap.sql']);
+  });
+
+  it('remap: the file refuses any database but the candidate it was evidenced against, before any UPDATE', () => {
+    const guard = lineageRemapBindingGuard('afldb_dev_candidate_20260925-120000');
+    expect(guard.join('\n')).toContain("IF current_database() <> 'afldb_dev_candidate_20260925-120000' THEN");
+    expect(guard.join('\n')).toContain('RAISE EXCEPTION');
+    const lines = REMAP.split('\n');
+    const begin = lines.indexOf('BEGIN;');
+    expect(begin).toBeGreaterThan(-1);
+    expect(lines.slice(begin + 1, begin + 1 + guard.length)).toEqual(guard);
+    expect(lineageRemapBindingGuard("o'brien").join('\n')).toContain("'o''brien'");
   });
 });

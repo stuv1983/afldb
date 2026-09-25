@@ -2386,12 +2386,40 @@ investigated) once `CONCLUDED`.
 > is the standalone consistency proof (every net-linked ledger entry has its row; every such
 > row has its ledger entry), usable on its own or as a promotion/rebuild gate.
 >
-> **AFLDB-ISSUE-237 boundary.** Carrying **importer**-created `unique` `afl_api` identities
-> through a promotion or the `afldb_test` rebuild is a separate, pre-existing gap
-> (AFLDB-ISSUE-237, opened from this issue's plan review) that this issue does not attempt.
-> After a promotion or rebuild, an importer-linked provider settles as `unresolved_identity`
-> again until an operator re-runs the bridge import; a human-linked one does not, because
-> its ledger survives and replays. This asymmetry is disclosed, not fixed, here.
+> **AFLDB-ISSUE-237 (2026-09-24, revised): the importer-identity gap is scoped and its
+> promotion side is implemented; its `db:test:rebuild` side is not.** Carrying
+> **importer**-created `unique` `afl_api` identities through a promotion or the `afldb_test`
+> rebuild used to be a separate, pre-existing gap this issue disclosed but did not attempt.
+> The ISSUE-237 runbook (`issues/open/AFLDB-ISSUE-237.md`) now owns it in full:
+>
+> - **Promotion is implemented (S1, S2, S4).** `external_identities` is `import_writable_tables`,
+>   so importer rows already arrive with the rebuilt dump (D2) — there is no capture/replay for
+>   them in promotion, only gates. `tools/db/promotion-check.ts` now runs G1 (source/candidate
+>   census), the pre-cutover target census, and G2/G3 at `--phase restored`: G2 grades the
+>   candidate's importer rows against the TARGET's durable human ledger, lets a human decision
+>   supersede an AGREEING importer row (the one D15 transition OD-2 approves), and fixes the
+>   exact expected set BEFORE the swap in a file bound to both states, which `--phase candidate`
+>   and the post-swap replay both verify (2026-09-25 L4 hardening); G3 fails a production importer
+>   identity hard loss with no exception, and admits a narrow DEV-only regeneration WARN for the
+>   `afl_api_stat_vector_season` class only, verified by a mandatory post-re-acquisition census
+>   (`docs/production-promotion.md` §5–§8, §13).
+> - **`db:test:rebuild` is NOT yet implemented.** The runbook's Stage 2/18/19 importer capture
+>   and replay design (S3) is gated on prerequisite P-M: proof that the database marker survives
+>   the real reset path. Only P-M's DB-free point (the `recreate` stage runs `RESET_SQL` in
+>   place, never a `DROP`/`CREATE DATABASE`) is proven so far; the live rolled-back proof and
+>   rehearsal remain. Until S3 lands, `db:test:rebuild` still preserves **0** importer rows —
+>   the I18 finding below is still the current, accurate state of the rebuild tool itself.
+> - **Re-running the bridge import is still not a safe recovery** after a rebuild or promotion.
+>   Three of the four artefact classes (the stat-vector bootstrap, the name+team+season bootstrap
+>   and the manual adjudications) carry a bare, database-local `candidate_player_id` with no
+>   lineage binding. After a renumbering reset, `--apply` could link a provider to whichever
+>   player now holds that integer. `afldb_test`'s own importer coverage recovery (from a proven
+>   pre-I18 backup, by stable identity, never from these artefacts) is the ISSUE-237 runbook §11a
+>   OD-4 path, itself gated on that backup being proven authoritative.
+> - Hardening the bridge artefact/importer contract against this stale-id class of hazard is the
+>   successor **AFLDB-ISSUE-241**, not this issue.
+>
+> Nothing here is merged, run against a real database, or closed as resolved.
 >
 > **The `db:test:rebuild` (`tools/db/rebuild-test.ts`) side of OD-5 is implemented.** Three
 > stages run through `tools/migration/rebuild_afl_api_adjudications.ts`:

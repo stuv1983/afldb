@@ -1480,6 +1480,16 @@ promotion, importer `unique` rows exist only if an operator re-imports the bridg
 meets the replayed human rows through D4: an agreeing row is a no-op, and a disagreeing row or a
 player collision is withheld with a finding. ISSUE-235 does not implement that lifecycle.
 
+*[Correction 2026-09-24, AFLDB-ISSUE-237 F3. A bridge re-import is **not** a safe way to restore
+importer rows after a rebuild or promotion. Three of the four artefact classes
+(`afl_api_stat_vector_bootstrap`, `afl_api_name_team_season_bootstrap` and
+`afl_api_manual_adjudication`) carry a bare, database-local `candidate_player_id` with no lineage
+binding. The loader checks provenance only for `afl_api_stat_vector_season`. After a renumbering
+reset, `--apply` could link a provider to whichever player now holds that integer. The paragraph
+above describes the loader's D4 behaviour if a re-import happened; it is not a recovery procedure.
+ISSUE-237 owns lifecycle carry-through, by stable identity and never from old artefacts. The
+artefact hardening is AFLDB-ISSUE-241. The rest of this record is unchanged.]*
+
 ---
 
 ## 5. State model and transition table
