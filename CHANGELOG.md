@@ -15,6 +15,36 @@ commit.
 
 ## [Unreleased]
 
+### Audited cleanup of reserved-domain DEV auth fixtures (AFLDB-ISSUE-248, open) - 25 September 2026
+
+- **What changed.** A new operator maintenance command,
+  `npm run db:issue248:cleanup-dev-auth-fixtures -- --environment dev --actor-email <super admin>
+  [--apply]`, removes exactly one known closure of reserved-domain fixture identities from
+  `afldb_dev`. The closure is:
+  - `auth_users` 14/17/18;
+  - `admin_invites` 5;
+  - those accounts' 8 login/logout audit rows and 4 revoked sessions.
+
+  The closure blocks AFLDB-ISSUE-237 L4 at A5, the test-fixture identity gate.
+- **How it removes them.** One transaction:
+  1. Appends one `auth_audit_log` `test_fixture.cleanup` record, attributed to a verified real,
+     enabled super_admin. It records every deleted id and email and a zero business/provenance FK
+     census.
+  2. Deletes the sessions, audit rows, invite and accounts, in that order, by exact id.
+  3. Proves the postcondition.
+
+  Any mismatch rolls everything back, including the operator audit.
+- **Guards.**
+  - It accepts only `afldb_dev`. There is no production/test/candidate path, no force flag, and no
+    email, id or table argument.
+  - Validate-only is the default.
+  - It reads a dynamic catalogue census of every FK into `auth_users`, and refuses any reference
+    beyond the closure's own history.
+  - Any other reserved-domain row is refused, never swept in.
+  - A rerun is a verified ALREADY_CLEAN no-op.
+  - The A5 gate itself is unchanged.
+- **Status.** DB-free validated; not yet run on DEV.
+
 ### Audited retirement of the orphaned ISSUE-109 DEV fixture override (AFLDB-ISSUE-246) (Resolved) - 25 September 2026
 
 - **What changed.** A new operator maintenance command,

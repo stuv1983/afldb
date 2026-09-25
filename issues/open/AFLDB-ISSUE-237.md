@@ -89,7 +89,7 @@ ISSUE-237 is not resolved.)*
 | ISSUE-245 blocker on L3 | CLEARED (§11a.5) |
 | ISSUE-245 `afldb_test` proof | PASS, through L3 (§11a.6) |
 | L3 | **PASS** (§11a.6) |
-| L4 DEV promotion | **NOT RUN.** Procedure rewritten after the L4 hardening (§11d; findings and fixes §11d.0, prerequisites §11d.2). *(2026-09-25: the second real attempt STOPPED at A4.3, before the destructive boundary. A3 PASS; the blocker is the orphaned ISSUE-109 fixture override; prerequisite **AFLDB-ISSUE-246**, §11d.12.)* *(2026-09-25: ISSUE-246 RESOLVED, audit 983; the A4.3 rerun returned no rows, so A4.3 is PASS; A3/A4.1/A4.2 unchanged; next step **A5**, §11d.13.)* |
+| L4 DEV promotion | **NOT RUN.** Procedure rewritten after the L4 hardening (§11d; findings and fixes §11d.0, prerequisites §11d.2). *(2026-09-25: the second real attempt STOPPED at A4.3, before the destructive boundary. A3 PASS; the blocker is the orphaned ISSUE-109 fixture override; prerequisite **AFLDB-ISSUE-246**, §11d.12.)* *(2026-09-25: ISSUE-246 RESOLVED, audit 983; the A4.3 rerun returned no rows, so A4.3 is PASS; A3/A4.1/A4.2 unchanged; next step **A5**, §11d.13.)* *(2026-09-25: A5 REFUSED at the test-fixture identity gate: reserved-domain `auth_users` 14/17/18 and `admin_invites` 5; nothing past A5 ran; prerequisite **AFLDB-ISSUE-248**, §11d.14.)* |
 | L5 PROD promotion | **NOT RUN** |
 
 **P-M state (2026-09-24).** Point 1 PROVEN (DB-free). Point 2 PROVEN (live, `afldb_test`,
@@ -3682,7 +3682,50 @@ in `issues/closed/AFLDB-ISSUE-246.md` §10.1.
   swap. The ISSUE-246 pre-mutation backup was that issue's own safety net and is not an L4
   artefact.
 - **L4 remains NOT RUN, and ISSUE-237 remains OPEN.**
-- **Next step: L4 A5**, under ISSUE-237 and its own separate DEV authorisation.
+- **Next step: L4 A5**, under ISSUE-237 and its own separate DEV authorisation. *(2026-09-25: run;
+  REFUSED at the test-fixture identity gate, §11d.14.)*
+
+### 11d.14 L4 A5 (2026-09-25, operator-run): REFUSED at the test-fixture identity gate; L4 NOT RUN
+
+The operator reported this result; Claude recorded it and did not re-run it.
+
+- **A5** (`db:promotion:check --environment dev --phase pre-cutover --database afldb_dev`, without
+  `--allow-fixture-identities`, as §11d A5 requires) **REFUSED** the test-fixture identity gate
+  (`gateFixtureIdentities`, reserved domains).
+- **The exact fixture closure on `afldb_dev`:**
+
+  | Row | Facts |
+  |---|---|
+  | `auth_users` 14 | `e2e-plain-admin@afldb.test`: disabled, password and TOTP present |
+  | `auth_users` 17 | `e2e-super-admin@afldb.test`: disabled, password and TOTP present |
+  | `auth_users` 18 | `testcon@test.test`: disabled, password and TOTP present |
+  | `admin_invites` 5 | `testcon@test.test`, `contributor`, `invited_by` 4, `used_at` 2026-09-11 13:12:00.671379+10, expired, not revoked |
+
+- **The full FK census into 14/17/18:**
+  - `auth_audit_log.actor_user_id` **8**: 807, 811, 889 and 912 are `admin.login`; 808, 812, 890
+    and 913 are `admin.logout`. All are user 18, with NULL `detail`.
+  - `auth_sessions.user_id` **4**: 13, 15, 29 and 35, all user 18, all already revoked.
+  - **Every other FK is 0.** No durable football, admin or business provenance is owned by these
+    identities.
+- **The gate behaved as designed and is not weakened.** L4 never passes
+  `--allow-fixture-identities`, and renaming the emails is excluded.
+- **Nothing past A5 ran:** no backup, dump, candidate, `--plan` or swap.
+- **Prerequisite: AFLDB-ISSUE-248** (`issues/open/AFLDB-ISSUE-248.md`), the audited DEV cleanup
+  bound to exactly this closure. After it, P3 of that runbook must find no reserved-domain row.
+  Then rerun A5 under this issue's own DEV authorisation.
+
+**L4 gate state after A5:**
+
+| Step | State |
+|---|---|
+| A3 | remains **PASS** (§11d.12) |
+| A4.1 | remains DEV `afl_api` ledger **0** / net-linked **0** |
+| A4.2 | remains DEV manual registrations **92** / source **92** |
+| A4.3 | remains **PASS** (§11d.13) |
+| A5 | **REFUSED**: test-fixture identities, prerequisite ISSUE-248 |
+| B onward | **NOT RUN** |
+
+- **L4 remains NOT RUN, and ISSUE-237 remains OPEN.**
 
 ## 12. Non-goals and successors
 
@@ -3849,6 +3892,10 @@ is `auth_audit_log` 983, and the A4.3 rerun returned no rows, so **A4.3 is PASS*
 0/0 and A4.2 92/92 are unchanged. No A5, promotion dump, candidate, plan or swap ran as part of
 ISSUE-246. **L4 remains NOT RUN.** The next action is **L4 A5**, under a separate DEV
 authorisation. ISSUE-237 is not resolved.)*
+*(2026-09-25: **L4 A5 REFUSED** at the test-fixture identity gate (§11d.14): reserved-domain
+`auth_users` 14/17/18 and `admin_invites` 5. Their only FK references are 8 login/logout audit rows
+and 4 revoked sessions of user 18. Nothing past A5 ran. **L4 remains NOT RUN.** The next action is
+**AFLDB-ISSUE-248**, then A5 again under a separate DEV authorisation. ISSUE-237 is not resolved.)*
 
 ---
 

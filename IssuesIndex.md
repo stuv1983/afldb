@@ -9,7 +9,24 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Open issues:** 16
+**Open issues:** 17
+
+### AFLDB-ISSUE-248 — Reserved-domain DEV auth fixtures block promotion
+- **Severity:** High. **Area:** DEV auth operations — `auth_users`, `admin_invites`,
+  `auth_audit_log`, `auth_sessions`; `tools/maintenance/issue248-cleanup-dev-auth-fixtures.ts`.
+- **State:** Open (2026-09-25), from the ISSUE-237 L4 A5 refusal (the test-fixture identity gate).
+  The closure is `auth_users` 14/17/18 (disabled), invite 5, audit rows 807/808/811/812/889/890/912/913
+  (user 18 login/logout, NULL detail) and revoked sessions 13/15/29/35. Every other FK count is 0.
+  Implemented and DB-free validated, uncommitted:
+  - `npm run db:issue248:cleanup-dev-auth-fixtures -- --environment dev --actor-email <super admin>
+    [--apply]`, validate-only by default;
+  - `afldb_dev` only, with exact closure guards and a dynamic catalogue FK census;
+  - other reserved-domain rows are a STOP, never swept in;
+  - one real-actor `test_fixture.cleanup` audit, then FK-ordered exact-id deletes, in one
+    transaction with postcondition totals; ALREADY_CLEAN on rerun.
+- **Runbook:** `issues/open/AFLDB-ISSUE-248.md` (§9 has the live procedure).
+- **Next action:** the operator reviews, commits and deploys to DEV. Then run runbook §9 under
+  explicit DEV authorisation, resolve on P1–P4, and rerun ISSUE-237 L4 A5.
 
 ### AFLDB-ISSUE-243 — Promotion preflight cannot validate target credentials and rejects known DEV operational artefacts
 - **Severity:** High. **Area:** operator workflow tooling — `tools/dev/preflight-core.ts`,
@@ -231,8 +248,15 @@
     - A3 remains PASS, A4.1 remains 0/0, and A4.2 remains 92/92.
     - No A5, promotion dump, candidate, plan or swap ran as part of ISSUE-246. **L4 remains NOT
       RUN.**
-  - **Next action:** L4 A5 by runbook §11d, under a separate DEV authorisation; L5 at a scheduled
-    production promotion. The 2026 corpus stays ISSUE-224/228.
+  - **Update (2026-09-25): L4 A5 REFUSED at the test-fixture identity gate; L4 NOT RUN** (runbook
+    §11d.14).
+    - Three disabled reserved-domain `auth_users` rows (14, 17, 18) and one used, expired
+      `admin_invites` row (5) are present.
+    - Their only FK references are 8 login/logout audit rows and 4 revoked sessions, all of user 18.
+    - Nothing past A5 ran. The prerequisite is **AFLDB-ISSUE-248**.
+  - **Next action:** AFLDB-ISSUE-248's audited DEV cleanup, then rerun L4 A5 by runbook §11d under
+    a separate DEV authorisation; L5 at a scheduled production promotion. The 2026 corpus stays
+    ISSUE-224/228.
   - **Not authorised:** no destructive rebuild, promotion or DEV mutation, and no commit without
     separate authorisation.
 

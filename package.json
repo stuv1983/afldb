@@ -26,6 +26,7 @@
     "db:issue237:recover-importer-identities": "tsx tools/migration/recover_afl_api_importer_identities.ts r4",
     "db:issue237:ensure-recovery-actor": "tsx tools/migration/ensure_issue237_recovery_actor.ts",
     "db:issue246:retire-issue109-fixture": "tsx tools/maintenance/issue246-retire-issue109-fixture.ts",
+    "db:issue248:cleanup-dev-auth-fixtures": "tsx tools/maintenance/issue248-cleanup-dev-auth-fixtures.ts",
     "db:promotion:check": "tsx tools/db/promotion-check.ts",
     "preflight": "tsx tools/dev/preflight.ts",
     "worktree:bootstrap": "tsx tools/dev/bootstrap-worktree.ts",
