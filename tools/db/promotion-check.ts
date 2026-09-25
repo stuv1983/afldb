@@ -557,14 +557,19 @@ async function gateStagingLeftover(q: Query, report: Report): Promise<void> {
 }
 
 /**
- * AFLDB-ISSUE-151: a staged table must hold rows in the database being replaced — the
- * promotion cannot tell an empty restore from one that never ran, and refuses both. Judged
- * here, at pre-cutover, so the ambiguity never reaches a half-run transcript.
+ * AFLDB-ISSUE-151: a staged table must hold rows in the database being replaced, unless its
+ * contract declares `stagedMayBeEmpty` (AFLDB-ISSUE-247), in which case the promotion
+ * accepts its zero only on the stage-completion evidence the plan records. Judged here, at
+ * pre-cutover, so an undecided empty table never reaches a half-run transcript.
  */
 function gateStagedSourceRows(counts: Record<string, number>, environment: Environment, report: Report): void {
   const gate = 'Staged tables hold rows in the replaced database (AFLDB-ISSUE-151)';
   const judged = judgeStagedSourceRows(counts, environment);
   const lines = judged.populated.map((p) => `${p.table.padEnd(30)} ${String(p.rows).padStart(8)}  staged`);
+  for (const { table, decidedBy } of judged.emptyPermitted) {
+    lines.push(`${table.padEnd(30)} ${'0'.padStart(8)}  staged — EMPTY, permitted by contract (${decidedBy}); `
+      + 'promoted only on stage-completion evidence');
+  }
   for (const table of judged.empty) {
     lines.push(`${table.padEnd(30)} ${'0'.padStart(8)}  staged — EMPTY: the staged reinstatement presumes rows`);
   }
@@ -573,7 +578,9 @@ function gateStagedSourceRows(counts: Record<string, number>, environment: Envir
     lines.push('promotion-promote-staged.sql would refuse an empty staging copy mid-transcript; decide the');
     lines.push("table's disposition now (docs/production-promotion.md §7.2) rather than promote past it.");
   }
-  if (judged.populated.length + judged.empty.length + judged.missing.length === 0) lines.push('no staged table in this environment');
+  if (judged.populated.length + judged.emptyPermitted.length + judged.empty.length + judged.missing.length === 0) {
+    lines.push('no staged table in this environment');
+  }
   report.add(gate, judged.verdict, lines);
 }
 

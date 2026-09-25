@@ -68,6 +68,8 @@ import {
   rowIdColumnOf,
   swapSql,
   STAGING_SCHEMA,
+  STAGE_COMPLETION_FUNCTION,
+  STAGE_COMPLETION_TABLE,
   isStagedLineageColumn,
   isStagedReinstatement,
   plannedReinstateOrder,
@@ -75,8 +77,12 @@ import {
   reinstateGroups,
   stableLineageTargetForFootballRef,
   stageSql,
+  stageCompletionTriggerSql,
+  stageEvidenceMissingMessage,
   stagedCopyRedirect,
   stagedLineageColumns,
+  stagedMayBeEmpty,
+  stagedMayBeEmptyProblems,
   stagedPlanProblems,
   stagedReinstateTables,
   stagedReinstatementProblems,
@@ -2587,21 +2593,23 @@ describe('staged reinstatement of NOT NULL lineage-bound references', () => {
     expect(() => stagedCopyRedirect('Bad Name')).toThrow(PromotionRefused);
   });
 
-  it('encodes the invariant that a staged table holds rows: judged at pre-cutover, refused at promotion', () => {
-    // The promotion cannot tell "restored zero rows" from "the staged restore never ran", so
-    // an empty staging copy always refuses (detection of a failed staged restore is kept).
+  it('encodes the invariant that a staged table holds rows unless its contract permits zero: judged at pre-cutover, refused at promotion', () => {
+    // AFLDB-ISSUE-247: emptiness alone never proves the staged restore ran, so every table
+    // whose contract does NOT declare stagedMayBeEmpty keeps the AFLDB-ISSUE-151 refusal word
+    // for word, and the one that does is accepted only on stage-completion evidence.
     const promote = promoteStagedSql();
     expect(promote).toContain('IF staged_rows = 0 THEN');
     expect(promote).toContain('an empty copy is never a legitimate state');
-    // Every staged table carries its OWN emptiness refusal — one populated copy never vouches
+    const requiresRows = stagedReinstateTables('prod').filter((t) => !stagedMayBeEmpty(t)).map((t) => t.name);
+    expect(requiresRows).toEqual(['brownlow_vote_entry_state', 'external_grid_sources']);
+    // Every staged table carries its OWN emptiness decision — one populated copy never vouches
     // for a sibling that restored nothing.
-    for (const t of stagedReinstateTables('prod')) {
-      expect(promote, t.name).toContain(
-        `promotion_staging.${t.name} is empty: the staged restore (plan step 2b) did not run or restored nothing`);
+    for (const name of requiresRows) {
+      expect(promote, name).toContain(
+        `promotion_staging.${name} is empty: the staged restore (plan step 2b) did not run or restored nothing`);
     }
+    expect(promote).not.toContain('promotion_staging.afl_api_identity_adjudications is empty');
     expect((promote.match(/IF staged_rows = 0 THEN/g) ?? []).length).toBe(stagedReinstateTables('prod').length);
-    // ...and the ambiguity is settled BEFORE any plan exists: the pre-cutover inventory must
-    // show rows in every staged table of the environment, or the phase refuses.
     for (const environment of ENVIRONMENTS) {
       const staged = stagedReinstateTables(environment).map((t) => t.name);
       // AFLDB-ISSUE-155: brownlow_vote_entry_state is staged too (match_id is a NOT NULL
@@ -2619,23 +2627,26 @@ describe('staged reinstatement of NOT NULL lineage-bound references', () => {
           { table: 'brownlow_vote_entry_state', rows: 4 },
           { table: 'external_grid_sources', rows: 1 },
         ],
-        empty: [], missing: [], verdict: 'PASS',
+        empty: [], emptyPermitted: [], missing: [], verdict: 'PASS',
       });
-      // Each staged table is judged on its own, and a populated sibling never covers for it:
-      // one empty (counted at 0) or one absent (never counted) is enough to refuse.
+      // All three at zero: the two that require rows refuse; the permitted one is reported.
       const empty = judgeStagedSourceRows(
         {
           'public.afl_api_identity_adjudications': 0, 'public.brownlow_vote_entry_state': 0,
           'public.external_grid_sources': 0,
         }, environment);
       expect(empty.verdict).toBe('FAIL');
-      expect(empty.empty).toEqual(staged);
+      expect(empty.empty).toEqual(requiresRows);
+      expect(empty.emptyPermitted).toEqual([{ table: 'afl_api_identity_adjudications', decidedBy: 'AFLDB-ISSUE-247' }]);
       for (const one of staged) {
         const others = Object.fromEntries(staged.filter((t) => t !== one).map((t) => [`public.${t}`, 2]));
         const oneEmpty = judgeStagedSourceRows({ ...others, [`public.${one}`]: 0 }, environment);
-        expect(oneEmpty.verdict, one).toBe('FAIL');
-        expect(oneEmpty.empty, one).toEqual([one]);
+        const permitted = one === 'afl_api_identity_adjudications';
+        expect(oneEmpty.verdict, one).toBe(permitted ? 'PASS' : 'FAIL');
+        expect(oneEmpty.empty, one).toEqual(permitted ? [] : [one]);
+        expect(oneEmpty.emptyPermitted.map((e) => e.table), one).toEqual(permitted ? [one] : []);
         expect(oneEmpty.missing, one).toEqual([]);
+        // An ABSENT table refuses whatever its contract says about emptiness.
         const oneAbsent = judgeStagedSourceRows(others, environment);
         expect(oneAbsent.verdict, one).toBe('FAIL');
         expect(oneAbsent.missing, one).toEqual([one]);
@@ -2655,6 +2666,7 @@ describe('staged reinstatement of NOT NULL lineage-bound references', () => {
     // The checker applies it at exactly the pre-cutover phase, from the inventory it already took.
     const source = readFileSync(join(REPO, 'tools', 'db', 'promotion-check.ts'), 'utf8');
     expect(source).toContain("if (phase === 'pre-cutover') gateStagedSourceRows(counts, opts.environment, report);");
+    expect(source).toContain('EMPTY, permitted by contract');
     expect(isStagedReinstatement(gridSources)).toBe(true);
     expect(isStagedReinstatement(contractByName('brownlow_vote_entry_state')!)).toBe(true);
   });
@@ -2741,6 +2753,334 @@ describe('staged reinstatement of NOT NULL lineage-bound references', () => {
     expect(source).toContain('an explicit no-op (shared lineage, no UPDATE)');
     const doc = readFileSync(join(REPO, 'docs', 'production-promotion.md'), 'utf8');
     for (const needle of ['AFLDB-ISSUE-151', 'promotion_staging', 'promotion-stage.sql', 'promotion-promote-staged.sql']) {
+      expect(doc, needle).toContain(needle);
+    }
+  });
+});
+
+/**
+ * AFLDB-ISSUE-247 — a legitimately empty staged table (afl_api_identity_adjudications, 0 rows
+ * on afldb_dev at ISSUE-237 L4 A5) versus a staged restore that never ran.
+ *
+ * DB-free. No in-process PostgreSQL is available, so the generated promotion is exercised by
+ * walking each table's DO block guard by guard, in file order, exactly as PL/pgSQL would:
+ * an unknown guard fails the test, so a change to the SQL's control flow forces this suite to
+ * be revisited rather than silently passing. The live proof is the rehearsal in
+ * issues/open/AFLDB-ISSUE-247.md.
+ */
+describe('AFLDB-ISSUE-247 — stage-completion evidence for legitimately empty staged tables', () => {
+  const AFL = 'afl_api_identity_adjudications';
+  const GRID = 'external_grid_sources';
+  const BROWNLOW = 'brownlow_vote_entry_state';
+  const S = '"promotion_staging"';
+
+  type StagedState = {
+    /** The stage-completion row's restored_rows; undefined = no row (the restore never committed). */
+    evidence?: number;
+    stagedRows: number;
+    /** True when a lineage column still carries a replaced-database id. */
+    unsettled?: boolean;
+  };
+  type BlockOutcome = { outcome: 'PASS'; notices: string[] } | { outcome: 'REFUSE'; message: string };
+
+  function promoteBlockOf(promote: string, table: string): string {
+    const start = promote.indexOf(`-- ${table}\nDO $$`);
+    const end = promote.indexOf(`DROP TABLE ${S}."${table}";`, start);
+    expect(start, table).toBeGreaterThanOrEqual(0);
+    expect(end, table).toBeGreaterThan(start);
+    return promote.slice(start, end);
+  }
+
+  const GUARDS: Record<string, (s: StagedState) => boolean> = {
+    'NOT FOUND': (s) => s.evidence === undefined,
+    'staged_rows <> evidenced_rows': (s) => s.stagedRows !== s.evidence,
+    'staged_rows = 0': (s) => s.stagedRows === 0,
+    'unsettled IS NOT NULL': (s) => s.unsettled === true,
+  };
+
+  function runPromoteBlock(promote: string, table: string, state: StagedState): BlockOutcome {
+    const block = promoteBlockOf(promote, table);
+    const guards = [...block.matchAll(/^\s*IF (.+?) THEN\n\s*RAISE (EXCEPTION|NOTICE) '((?:[^']|'')*)'/gm)];
+    expect(guards.length, table).toBeGreaterThanOrEqual(3);
+    // Every RAISE in the block is one of the guards walked here, plus the closing NOTICE:
+    // nothing refuses unguarded.
+    expect((block.match(/RAISE (EXCEPTION|NOTICE)/g) ?? []).length, table).toBe(guards.length + 1);
+    // The promotion INSERT follows every guard.
+    expect(block.indexOf(`INSERT INTO "public"."${table}"`), table).toBeGreaterThan(guards.at(-1)!.index!);
+    const notices: string[] = [];
+    for (const [, condition, kind, message] of guards) {
+      const guard = GUARDS[condition];
+      if (!guard) throw new Error(`unknown guard in ${table}'s promotion block: IF ${condition} THEN`);
+      if (!guard(state)) continue;
+      if (kind === 'EXCEPTION') return { outcome: 'REFUSE', message: message.replaceAll("''", "'") };
+      notices.push(message);
+    }
+    return { outcome: 'PASS', notices };
+  }
+
+  it('the contract permits zero rows only where it says so, and only on a staged table', () => {
+    expect(stagedMayBeEmpty(contractByName(AFL)!)?.decidedBy).toBe('AFLDB-ISSUE-247');
+    expect(stagedMayBeEmpty(contractByName(GRID)!)).toBeUndefined();
+    expect(stagedMayBeEmpty(contractByName(BROWNLOW)!)).toBeUndefined();
+    expect(promotionContractProblems()).toEqual([]);
+    const authUsers = contractByName('auth_users')!;
+    const notStaged = { ...authUsers, stagedMayBeEmpty: { decidedBy: 'AFLDB-ISSUE-247', reason: 'x' } };
+    expect(stagedMayBeEmpty(notStaged)).toBeUndefined();
+    expect(stagedMayBeEmptyProblems(notStaged)).toEqual(['declares stagedMayBeEmpty but is not a staged reinstatement']);
+    const afl = contractByName(AFL)!;
+    expect(stagedMayBeEmptyProblems({ ...afl, stagedMayBeEmpty: { decidedBy: 'operator said so', reason: '' } })).toEqual([
+      'declares stagedMayBeEmpty without a deciding issue', 'declares stagedMayBeEmpty without a reason',
+    ]);
+    const swapped = PROMOTION_CONTRACT.map((t) => (t.name === 'auth_users' && t.schema === 'public' ? notStaged : t));
+    expect(promotionContractProblems(swapped)).toContain('public.auth_users declares stagedMayBeEmpty but is not a staged reinstatement');
+    // The evidence table can never shadow a contract table inside the staging schema.
+    const colliding = [...PROMOTION_CONTRACT, { ...authUsers, name: STAGE_COMPLETION_TABLE }];
+    expect(promotionContractProblems(colliding))
+      .toContain(`public.${STAGE_COMPLETION_TABLE} collides with the stage-completion evidence table in promotion_staging`);
+  });
+
+  it('0 rows with the restore completed PASSES for afl_api_identity_adjudications — the ISSUE-237 L4 A5 state', () => {
+    for (const environment of ENVIRONMENTS) {
+      // The exact afldb_dev census that REFUSED A5 now passes the pre-cutover gate.
+      const a5 = judgeStagedSourceRows({ [`public.${AFL}`]: 0, [`public.${BROWNLOW}`]: 3, [`public.${GRID}`]: 1 }, environment);
+      expect(a5.verdict).toBe('PASS');
+      expect(a5.emptyPermitted).toEqual([{ table: AFL, decidedBy: 'AFLDB-ISSUE-247' }]);
+      expect(a5.populated).toEqual([{ table: BROWNLOW, rows: 3 }, { table: GRID, rows: 1 }]);
+      const run = runPromoteBlock(promoteStagedSql(environment), AFL, { evidence: 0, stagedRows: 0 });
+      expect(run.outcome).toBe('PASS');
+      expect(run.outcome === 'PASS' && run.notices.join('\n')).toContain('permitted empty by contract (AFLDB-ISSUE-247)');
+    }
+  });
+
+  it('0 rows with the restore step skipped REFUSES the same table, at runtime and in the plan', () => {
+    for (const environment of ENVIRONMENTS) {
+      const promote = promoteStagedSql(environment);
+      expect(runPromoteBlock(promote, AFL, { stagedRows: 0 }))
+        .toEqual({ outcome: 'REFUSE', message: stageEvidenceMissingMessage(AFL) });
+      const good = generatedPlanArtifacts(environment);
+      const load = `psql "$CANDIDATE_DSN" -v ON_ERROR_STOP=1 --single-transaction -f promotion-stage-${AFL}.sql\n`;
+      expect(good.reinstate).toContain(load);
+      const notLoaded = `staged table ${AFL} is not loaded from promotion-stage-${AFL}.sql in one transaction`;
+      const skipped = { ...good, reinstate: good.reinstate.replace(load, '') };
+      expect(stagedPlanProblems(skipped, environment)).toContain(notLoaded);
+      // Splitting the load out of its single transaction is refused too: the trigger's row must
+      // commit with the COPY or not at all.
+      const split = { ...good, reinstate: good.reinstate.replace(load, load.replace(' --single-transaction', '')) };
+      expect(stagedPlanProblems(split, environment)).toContain(notLoaded);
+      expect(() => assertPromotionPlanCoherent(skipped, environment)).toThrow(PromotionRefused);
+    }
+  });
+
+  it('external_grid_sources and brownlow_vote_entry_state at 0 rows REFUSE even with completion evidence', () => {
+    for (const environment of ENVIRONMENTS) {
+      const promote = promoteStagedSql(environment);
+      for (const table of [GRID, BROWNLOW]) {
+        const run = runPromoteBlock(promote, table, { evidence: 0, stagedRows: 0 });
+        expect(run.outcome, table).toBe('REFUSE');
+        expect(run.outcome === 'REFUSE' && run.message, table).toContain(
+          `promotion_staging.${table} is empty: the staged restore (plan step 2b) did not run or restored nothing`);
+      }
+      // ...and a promotion that quietly downgrades that refusal is caught by the plan validator.
+      const good = generatedPlanArtifacts(environment);
+      const lenient = {
+        ...good,
+        promoteStaged: good.promoteStaged.replace(
+          `RAISE EXCEPTION 'promotion_staging.${GRID} is empty`, `RAISE NOTICE 'promotion_staging.${GRID} was empty`),
+      };
+      expect(lenient.promoteStaged).not.toBe(good.promoteStaged);
+      expect(stagedPlanProblems(lenient, environment))
+        .toEqual([`promotion-promote-staged.sql accepts an empty ${GRID}, whose contract requires rows`]);
+    }
+  });
+
+  it('a non-empty staged table with completion evidence PASSES unchanged, and an unsettled row still refuses', () => {
+    for (const environment of ENVIRONMENTS) {
+      const promote = promoteStagedSql(environment);
+      for (const table of [AFL, BROWNLOW, GRID]) {
+        expect(runPromoteBlock(promote, table, { evidence: 3, stagedRows: 3 })).toEqual({ outcome: 'PASS', notices: [] });
+        const unsettled = runPromoteBlock(promote, table, { evidence: 3, stagedRows: 3, unsettled: true });
+        expect(unsettled.outcome, table).toBe('REFUSE');
+        expect(unsettled.outcome === 'REFUSE' && unsettled.message, table).toContain("still carries the replaced database's id(s)");
+      }
+    }
+  });
+
+  it('a staging copy whose row count moved after its evidenced restore REFUSES', () => {
+    const promote = promoteStagedSql();
+    const cases: [string, StagedState][] = [[AFL, { evidence: 0, stagedRows: 1 }], [GRID, { evidence: 2, stagedRows: 1 }]];
+    for (const [table, state] of cases) {
+      const run = runPromoteBlock(promote, table, state);
+      expect(run.outcome, table).toBe('REFUSE');
+      expect(run.outcome === 'REFUSE' && run.message, table)
+        .toContain(`promotion_staging.${table} holds % row(s) but its evidenced restore copied %`);
+    }
+  });
+
+  it('an interrupted stage stays fail-closed: no evidence without a committed COPY, and the leftover is refused', () => {
+    // Evidence is written only by the trigger, created inside promotion-stage.sql's transaction.
+    const stage = stageSql();
+    expect(stage).toMatch(/^BEGIN;/m);
+    expect(stage.indexOf('CREATE TRIGGER')).toBeLessThan(stage.lastIndexOf('COMMIT;'));
+    expect(stage).not.toMatch(/IF\s+NOT\s+EXISTS|IF\s+EXISTS|DROP\s+SCHEMA|DROP\s+TABLE|DROP\s+FUNCTION/i);
+    // Stopped after afl_api's load but before the others: the first table with no evidence refuses.
+    const promote = promoteStagedSql();
+    expect(runPromoteBlock(promote, AFL, { evidence: 0, stagedRows: 0 }).outcome).toBe('PASS');
+    expect(runPromoteBlock(promote, BROWNLOW, { stagedRows: 0 }))
+      .toEqual({ outcome: 'REFUSE', message: stageEvidenceMissingMessage(BROWNLOW) });
+    // The checker refuses the residue at every phase, evidence table included.
+    const left = judgeStagingLeftover([{ table: AFL, rows: 0 }, { table: STAGE_COMPLETION_TABLE, rows: 1 }]);
+    expect(left.verdict).toBe('FAIL');
+    const text = left.lines.join('\n');
+    expect(text).toContain('did not finish');
+    expect(text).toContain(`${STAGE_COMPLETION_TABLE} holds one row per staged table whose COPY committed`);
+    expect(judgeStagingLeftover([{ table: STAGE_COMPLETION_TABLE, rows: 0 }]).verdict).toBe('FAIL');
+    expect(judgeStagingLeftover([{ table: GRID, rows: 1 }]).lines.join('\n')).not.toContain(STAGE_COMPLETION_TABLE);
+  });
+
+  it('evidence cannot be spoofed by an unrelated table', () => {
+    const stage = stageSql();
+    const staged = stagedReinstateTables().map((t) => t.name);
+    // The evidence table admits exactly the staged tables, once each.
+    expect(stage).toContain(`staged_table text PRIMARY KEY CHECK (staged_table IN (${staged.map((t) => `'${t}'`).join(', ')})),`);
+    // The recorder takes the name from the trigger's own table and refuses anything but a staged COPY.
+    expect(stage).toContain('SELECT TG_TABLE_NAME, count(*) FROM restored;');
+    expect(stage).toContain("IF TG_TABLE_SCHEMA <> 'promotion_staging' OR TG_OP <> 'INSERT' OR TG_LEVEL <> 'STATEMENT' THEN");
+    for (const table of staged) {
+      expect(stageCompletionTriggerSql(table))
+        .toContain(`AFTER INSERT ON ${S}."${table}" REFERENCING NEW TABLE AS restored FOR EACH STATEMENT`);
+    }
+    // One table's evidence never vouches for another: the lookup is keyed by the table's own name.
+    const promote = promoteStagedSql();
+    for (const table of staged) {
+      expect(runPromoteBlock(promote, table, { stagedRows: 0 }))
+        .toEqual({ outcome: 'REFUSE', message: stageEvidenceMissingMessage(table) });
+      expect(promoteBlockOf(promote, table)).toContain(`c.staged_table = '${table}';`);
+    }
+    const good = generatedPlanArtifacts('dev');
+    const problems = (bad: Partial<typeof good>) => stagedPlanProblems({ ...good, ...bad }, 'dev');
+    expect(problems({})).toEqual([]);
+    // A trigger retargeted onto a sibling leaves its own table without one.
+    expect(problems({ stage: good.stage.replace(`ON ${S}."${AFL}" REFERENCING`, `ON ${S}."${GRID}" REFERENCING`) }))
+      .toContain(`staged table ${AFL} carries no stage-completion trigger in promotion-stage.sql`);
+    // A promotion that reads a sibling's evidence for this table.
+    expect(problems({ promoteStaged: good.promoteStaged.replace(`c.staged_table = '${AFL}';`, `c.staged_table = '${GRID}';`) }))
+      .toContain(`promotion-promote-staged.sql does not demand stage-completion evidence for ${AFL}`);
+    // A CHECK widened to admit an unrelated table.
+    expect(problems({ stage: good.stage.replace(`IN ('${AFL}',`, `IN ('auth_users', '${AFL}',`) }))
+      .toContain('promotion-stage.sql does not create one stage-completion table admitting exactly the staged tables');
+    // A recorder that writes a literal name instead of its trigger's table.
+    expect(problems({ stage: good.stage.replace('SELECT TG_TABLE_NAME, count(*)', `SELECT '${AFL}', count(*)`) }))
+      .toContain("promotion-stage.sql does not create the stage-completion recorder from the trigger's own table");
+    // Nothing but the trigger writes evidence, and nothing removes a trigger.
+    const forged = `INSERT INTO ${S}."${STAGE_COMPLETION_TABLE}" (staged_table, restored_rows) VALUES ('${AFL}', 0);`;
+    expect(problems({ promoteStaged: good.promoteStaged.replace('BEGIN;', `BEGIN;\n${forged}`) }))
+      .toContain('promoteStaged writes stage-completion evidence directly');
+    expect(problems({ reinstate: `${good.reinstate}psql "$CANDIDATE_DSN" -c "INSERT INTO promotion_staging.${STAGE_COMPLETION_TABLE} VALUES ('${AFL}', 0)"\n` }))
+      .toContain('reinstate writes stage-completion evidence directly');
+    expect(problems({ reinstate: `${good.reinstate}psql "$CANDIDATE_DSN" -c 'DROP TRIGGER ${STAGE_COMPLETION_FUNCTION} ON promotion_staging.${AFL}'\n` }))
+      .toContain('reinstate removes or alters a stage-completion trigger');
+    expect(lineageRemapProblems(`BEGIN;\n${forged}\nCOMMIT;\n`, [], 'dev'))
+      .toEqual([`remap touches the stage-completion evidence promotion_staging.${STAGE_COMPLETION_TABLE}`]);
+  });
+
+  it('the generated transcript records stage evidence in the correct order', () => {
+    for (const environment of ENVIRONMENTS) {
+      const { stage, promoteStaged: promote, reinstate: plan } = generatedPlanArtifacts(environment);
+      const staged = stagedReinstateTables(environment).map((t) => t.name);
+      const at = (text: string, needle: string) => {
+        const i = text.indexOf(needle);
+        expect(i, needle).toBeGreaterThanOrEqual(0);
+        return i;
+      };
+      const ascending = (xs: number[]) => xs.slice().sort((a, b) => a - b);
+      // promotion-stage.sql: schema -> copies -> evidence table -> recorder -> one trigger per copy -> COMMIT.
+      const stageOrder = [
+        at(stage, `CREATE SCHEMA ${S};`),
+        ...staged.map((t) => at(stage, `CREATE TABLE ${S}."${t}" (LIKE "public"."${t}");`)),
+        at(stage, `CREATE TABLE ${S}."${STAGE_COMPLETION_TABLE}" (`),
+        at(stage, `CREATE FUNCTION ${S}."${STAGE_COMPLETION_FUNCTION}"() RETURNS trigger`),
+        ...staged.map((t) => at(stage, stageCompletionTriggerSql(t))),
+        at(stage, '\nCOMMIT;'),
+      ];
+      expect(stageOrder).toEqual(ascending(stageOrder));
+      // The transcript: stage -> (restore -> grep guard -> single-transaction load) per table -> remap -> promote.
+      const planOrder = [at(plan, '-f promotion-stage.sql')];
+      for (const t of staged) {
+        planOrder.push(
+          at(plan, `--table=${t} -f - `),
+          at(plan, `grep -q '^COPY promotion_staging.${t} (' promotion-stage-${t}.sql`),
+          at(plan, `psql "$CANDIDATE_DSN" -v ON_ERROR_STOP=1 --single-transaction -f promotion-stage-${t}.sql`),
+        );
+      }
+      planOrder.push(at(plan, '-f "$LINEAGE_REMAP_SQL"'), at(plan, '-f promotion-promote-staged.sql'));
+      expect(planOrder).toEqual(ascending(planOrder));
+      expect(plan).toContain('stage-completion trigger');
+      expect(plan).not.toContain(STAGE_COMPLETION_TABLE);
+      // promotion-promote-staged.sql, per table: evidence lookup -> missing refusal -> count
+      // check -> emptiness decision -> INSERT.
+      for (const t of staged) {
+        const block = promoteBlockOf(promote, t);
+        const order = [
+          at(block, `c.staged_table = '${t}';`), at(block, 'IF NOT FOUND THEN'), at(block, 'IF staged_rows <> evidenced_rows THEN'),
+          at(block, 'IF staged_rows = 0 THEN'), at(block, `INSERT INTO "public"."${t}"`),
+        ];
+        expect(order, t).toEqual(ascending(order));
+      }
+      expect(stagedPlanProblems({ stage, promoteStaged: promote, reinstate: plan }, environment)).toEqual([]);
+      // A trigger created after COMMIT is refused.
+      const late = stage.replace(`${stageCompletionTriggerSql(AFL)}\n`, '').replace('\nCOMMIT;', `\nCOMMIT;\n${stageCompletionTriggerSql(AFL)}`);
+      expect(late).not.toBe(stage);
+      expect(stagedPlanProblems({ stage: late, promoteStaged: promote, reinstate: plan }, environment))
+        .toContain(`staged table ${AFL} carries no stage-completion trigger in promotion-stage.sql`);
+    }
+  });
+
+  it('a completed promotion removes every staging and evidence object, and nothing cascades', () => {
+    for (const environment of ENVIRONMENTS) {
+      const { stage, promoteStaged: promote, reinstate } = generatedPlanArtifacts(environment);
+      const staged = stagedReinstateTables(environment).map((t) => t.name);
+      // Every relation and function promotion-stage.sql creates is dropped by the promotion;
+      // each trigger rides the staging copy it is ON, which is dropped with it.
+      const created = [...stage.matchAll(/CREATE (TABLE|FUNCTION) ("promotion_staging"\."[a-z_]+")/g)].map((m) => `${m[1]} ${m[2]}`);
+      expect(created).toEqual([
+        ...staged.map((t) => `TABLE ${S}."${t}"`), `TABLE ${S}."${STAGE_COMPLETION_TABLE}"`, `FUNCTION ${S}."${STAGE_COMPLETION_FUNCTION}"`,
+      ]);
+      const drops = created.map((c) => {
+        const [kind, name] = c.split(' ');
+        return promote.indexOf(kind === 'FUNCTION' ? `DROP FUNCTION ${name}();` : `DROP TABLE ${name};`);
+      });
+      for (const [i, d] of drops.entries()) expect(d, created[i]).toBeGreaterThan(0);
+      const tail = [...drops, promote.indexOf(`DROP SCHEMA ${S};`), promote.lastIndexOf('COMMIT;')];
+      expect(tail).toEqual(tail.slice().sort((a, b) => a - b));
+      for (const t of staged) expect(stageCompletionTriggerSql(t)).toContain(`ON ${S}."${t}" `);
+      expect(promote).not.toMatch(/\bCASCADE\b|IF\s+EXISTS/i);
+      // The validator refuses a promotion that leaves the evidence or its recorder behind.
+      for (const leftover of [`DROP TABLE ${S}."${STAGE_COMPLETION_TABLE}";\n`, `DROP FUNCTION ${S}."${STAGE_COMPLETION_FUNCTION}"();\n`]) {
+        expect(stagedPlanProblems({ stage, reinstate, promoteStaged: promote.replace(leftover, '') }, environment), leftover)
+          .toContain('promotion-promote-staged.sql does not drop the stage-completion evidence after the last promotion and before the schema');
+      }
+    }
+  });
+
+  it('candidate/production count comparisons are not weakened', () => {
+    for (const environment of ENVIRONMENTS) {
+      for (const t of stagedReinstateTables(environment)) expect(effectiveCompare(t, environment), t.name).toBe('equal');
+    }
+    const key = `public.${AFL}`;
+    const snapshot = (n: number): Snapshot => ({
+      issue: 'AFLDB-ISSUE-125', database: 'afldb_dev', takenAt: 't', counts: { [key]: n }, superAdmins: 1, fixtureRows: 0,
+    });
+    const judge = (before: number, after: Record<string, number>) =>
+      compareCounts(snapshot(before), [{ table: key, rule: 'equal' }], after)[0];
+    expect(judge(0, { [key]: 0 })).toMatchObject({ ok: true, detail: 'reinstated in full' });
+    expect(judge(0, { [key]: 1 }).ok).toBe(false);
+    expect(judge(3, { [key]: 0 }).ok).toBe(false);
+    expect(judge(0, {}).ok).toBe(false);
+  });
+
+  it('the operator documentation carries the mechanism', () => {
+    const doc = readFileSync(join(REPO, 'docs', 'production-promotion.md'), 'utf8');
+    for (const needle of ['AFLDB-ISSUE-247', 'stagedMayBeEmpty', STAGE_COMPLETION_TABLE, 'stage-completion evidence']) {
       expect(doc, needle).toContain(needle);
     }
   });

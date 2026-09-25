@@ -131,6 +131,18 @@ export type LineageIdentityRule =
  */
 export const STAGING_SCHEMA = 'promotion_staging';
 
+/**
+ * AFLDB-ISSUE-247. The stage-completion evidence table, created in `STAGING_SCHEMA` by
+ * `promotion-stage.sql` beside the staging copies and dropped by `promotion-promote-staged.sql`
+ * before the schema itself. One row per staged table, written ONLY by a statement-level
+ * trigger on that table's staging copy, so a row exists exactly when the staged COPY ran and
+ * committed — zero rows copied included. Never a contract table name (`promotionContractProblems`).
+ */
+export const STAGE_COMPLETION_TABLE = 'promotion_stage_completion';
+
+/** AFLDB-ISSUE-247: the trigger function that writes `STAGE_COMPLETION_TABLE`. */
+export const STAGE_COMPLETION_FUNCTION = 'record_stage_completion';
+
 export type RestoreDependency = {
   /** The table whose rows are restored after every table in `dependsOn`. */
   table: string;
@@ -288,7 +300,24 @@ export type TableTreatment = {
    * environments. Absent everywhere else, which is the default and the refusal.
    */
   historicalOnly?: HistoricalOnly;
+  /**
+   * AFLDB-ISSUE-247. Declared only on a STAGED table (`isStagedReinstatement`) whose replaced
+   * database may legitimately hold zero rows. Without it a staged table must hold rows, and
+   * both the pre-cutover gate and the promotion refuse an empty one, exactly as before. With
+   * it, zero rows are accepted — but only on the stage-completion evidence the generated plan
+   * records when the staged restore's COPY actually ran (`stageSql`), never on the emptiness
+   * alone: a skipped, failed or empty-script restore still refuses.
+   */
+  stagedMayBeEmpty?: StagedMayBeEmpty;
   note: string;
+};
+
+/** AFLDB-ISSUE-247: the written decision that a staged table may be legitimately empty. */
+export type StagedMayBeEmpty = {
+  /** The issue and operator decision that established it. */
+  decidedBy: string;
+  /** Why zero pre-cutover rows is a valid, evidenced state for this table. */
+  reason: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -703,7 +732,16 @@ export const PROMOTION_CONTRACT: readonly TableTreatment[] = [
     // (unresolvable identity, or a stored-identity mismatch) stops the promotion instead
     // — this table is durable identity authority (D15) and dropping it silently would
     // drop a human decision the ingestion pipeline goes on trusting forever.
-    note: 'Append-only human afl_api identity decisions (linked/revoked), AFLDB-ISSUE-235. '
+    stagedMayBeEmpty: {
+      decidedBy: 'AFLDB-ISSUE-247',
+      reason: 'The ledger records only HUMAN adjudications; the importer resolves the rest itself. '
+        + 'A database where no administrator has yet linked or revoked an afl_api identity holds '
+        + 'zero rows here, and that is the evidenced state: ISSUE-237 L4 A5 on afldb_dev found 0 '
+        + 'ledger rows beside a census of 669 importer rows, 0 human-resolved rows and 0 '
+        + 'net-linked ledger entries. A row is never manufactured to satisfy the staged gate; '
+        + 'the promotion instead requires the stage-completion evidence of the staged COPY.',
+    },
+    note:'Append-only human afl_api identity decisions (linked/revoked), AFLDB-ISSUE-235. '
       + 'Durable identity authority (D15): reinstated together with, and replayed into, the '
       + "resolved external_identities row it describes. player_id is this replaced database's "
       + 'id — AFLDB-ISSUE-142 (B) — remapped through the same afltables_profile_url lineage '
@@ -1221,6 +1259,10 @@ export function promotionContractProblems(
     const where = `${table.schema}.${table.name}`;
     for (const problem of historicalOnlyProblems(table)) problems.push(`${where} ${problem}`);
     for (const problem of stagedReinstatementProblems(table)) problems.push(`${where} ${problem}`);
+    for (const problem of stagedMayBeEmptyProblems(table)) problems.push(`${where} ${problem}`);
+    if (table.name === STAGE_COMPLETION_TABLE) {
+      problems.push(`${where} collides with the stage-completion evidence table in ${STAGING_SCHEMA}`);
+    }
     if (table.schema === 'public') {
       if (table.tables || table.tableDependencies) {
         problems.push(`${where} is public but declares schema-table restore metadata`);
@@ -1465,14 +1507,16 @@ export function stagedLineageColumns(table: TableTreatment): StagedLineageColumn
  * Nothing is bypassed: the FK never sees the old integer, and a row the remap did not settle
  * refuses the promotion.
  *
- * Invariant the mechanism relies on: a staged table HOLDS ROWS in the database being
- * replaced. A data-only restore of an empty table leaves no trace, so the promotion cannot
- * tell "restored zero rows" from "the staged restore never ran", and it refuses an empty
- * staging copy rather than guess. That ambiguity is settled before any plan exists:
- * `--phase pre-cutover` refuses (`judgeStagedSourceRows`) when a staged table is empty in the
- * live database, so an operator decides the table's disposition then, not mid-transcript.
- * Today the one staged table is seeded by its own migration (080) and cannot be empty on a
- * migrated database; the gate is what keeps that true for any table this predicate selects.
+ * Proof that the staged restore ran (AFLDB-ISSUE-247): a data-only restore of an empty table
+ * leaves no row behind, so emptiness alone can never tell "restored zero rows" from "the
+ * staged restore never ran". The generated plan therefore records it independently: every
+ * staging copy carries a statement-level AFTER INSERT trigger that writes one
+ * `STAGE_COMPLETION_TABLE` row for that table when its COPY executes — zero rows copied
+ * included — inside the load's own transaction, and the promotion refuses any staged table
+ * without that row, or whose row count moved after it. By default a staged table must ALSO
+ * hold rows (refused at `--phase pre-cutover` by `judgeStagedSourceRows` and again at the
+ * promotion); only a table whose contract declares `stagedMayBeEmpty` may promote zero rows,
+ * and then only on the completion evidence.
  */
 export function isStagedReinstatement(table: TableTreatment): boolean {
   return stagedLineageColumns(table).length > 0;
@@ -1483,11 +1527,33 @@ export function rowIdColumnOf(table: TableTreatment): string {
   return table.rowIdColumn ?? 'id';
 }
 
+/** AFLDB-ISSUE-247: the contract's written permission for this staged table to be empty. */
+export function stagedMayBeEmpty(table: TableTreatment): StagedMayBeEmpty | undefined {
+  return isStagedReinstatement(table) ? table.stagedMayBeEmpty : undefined;
+}
+
+/** Everything wrong with a `stagedMayBeEmpty` declaration, as plain sentences. */
+export function stagedMayBeEmptyProblems(table: TableTreatment): string[] {
+  const declared = table.stagedMayBeEmpty;
+  if (!declared) return [];
+  const problems: string[] = [];
+  if (!isStagedReinstatement(table)) problems.push('declares stagedMayBeEmpty but is not a staged reinstatement');
+  if (!/^AFLDB-ISSUE-\d+$/.test(declared.decidedBy)) problems.push('declares stagedMayBeEmpty without a deciding issue');
+  if (declared.reason.trim().length === 0) problems.push('declares stagedMayBeEmpty without a reason');
+  return problems;
+}
+
 export type StagedSourceRowsJudgement = {
   /** Staged tables with rows in the replaced database, with their counts. */
   populated: { table: string; rows: number }[];
-  /** Staged tables the replaced database has but which hold no rows. */
+  /** Staged tables the replaced database has but which hold no rows, and whose contract requires rows. */
   empty: string[];
+  /**
+   * AFLDB-ISSUE-247: staged tables that hold no rows and whose contract declares
+   * `stagedMayBeEmpty`. Not a refusal here; the promotion accepts them only on
+   * stage-completion evidence.
+   */
+  emptyPermitted: { table: string; decidedBy: string }[];
   /** Staged tables the inventory did not count (absent from the replaced database). */
   missing: string[];
   verdict: 'PASS' | 'FAIL';
@@ -1498,15 +1564,19 @@ export type StagedSourceRowsJudgement = {
  * `--phase pre-cutover` inventory counts (`public.<table>` keys). Every staged table must
  * hold at least one row in the database being replaced; an empty or absent one refuses,
  * because the generated promotion would refuse it later anyway, when the transcript is
- * half-run. Nothing here reads a database.
+ * half-run. AFLDB-ISSUE-247: the one exception is a table whose contract declares
+ * `stagedMayBeEmpty` — its zero is reported, not refused, and the promotion decides it on
+ * stage-completion evidence. An ABSENT table always refuses. Nothing here reads a database.
  */
 export function judgeStagedSourceRows(
   counts: Readonly<Record<string, number>>, environment: Environment = DEFAULT_ENVIRONMENT,
 ): StagedSourceRowsJudgement {
-  const out: StagedSourceRowsJudgement = { populated: [], empty: [], missing: [], verdict: 'PASS' };
+  const out: StagedSourceRowsJudgement = { populated: [], empty: [], emptyPermitted: [], missing: [], verdict: 'PASS' };
   for (const t of stagedReinstateTables(environment)) {
     const n = counts[`public.${t.name}`];
+    const permitted = stagedMayBeEmpty(t);
     if (n === undefined) out.missing.push(t.name);
+    else if (n <= 0 && permitted) out.emptyPermitted.push({ table: t.name, decidedBy: permitted.decidedBy });
     else if (n <= 0) out.empty.push(t.name);
     else out.populated.push({ table: t.name, rows: n });
   }
@@ -1532,6 +1602,9 @@ export function judgeStagingLeftover(
     ...(found.length === 0
       ? ['       it holds no tables']
       : found.map((f) => `       ${STAGING_SCHEMA}.${f.table.padEnd(30)} ${String(f.rows).padStart(8)} row(s)`)),
+    ...(found.some((f) => f.table === STAGE_COMPLETION_TABLE)
+      ? [`       (${STAGE_COMPLETION_TABLE} holds one row per staged table whose COPY committed — AFLDB-ISSUE-247)`]
+      : []),
     'Inspect it before anything else (docs/production-promotion.md §7.2): which step stopped, what',
     'the staged rows hold, whether the remap was applied, and whether public already has the rows.',
     'Never reuse it and never run a plan over it: promotion-stage.sql refuses CREATE SCHEMA while it',
@@ -2318,6 +2391,11 @@ export function lineageRemapProblems(
       problems.push(`staged table ${table} receives a generated remap write in public instead of ${STAGING_SCHEMA}`);
     }
   }
+  // AFLDB-ISSUE-247: the stage-completion evidence is written only by the staged COPY's own
+  // trigger. The remap settles values; it never vouches for, or erases, a restore.
+  if (executable.some((line) => line.includes(STAGE_COMPLETION_TABLE))) {
+    problems.push(`remap touches the stage-completion evidence ${STAGING_SCHEMA}.${STAGE_COMPLETION_TABLE}`);
+  }
   return problems;
 }
 
@@ -2863,6 +2941,10 @@ export function stageSql(environment: Environment = DEFAULT_ENVIRONMENT): string
     return `-- ${t.name}: ${columns}
 CREATE TABLE ${schema}.${quoteIdent(t.name)} (LIKE ${quoteIdent('public')}.${quoteIdent(t.name)});`;
   }).join('\n');
+  const completion = `${schema}.${quoteIdent(STAGE_COMPLETION_TABLE)}`;
+  const recorder = `${schema}.${quoteIdent(STAGE_COMPLETION_FUNCTION)}`;
+  const names = tables.map((t) => quoteSqlLiteral(t.name)).join(', ');
+  const triggers = tables.map((t) => stageCompletionTriggerSql(t.name)).join('\n');
   return `-- AFLDB-ISSUE-151: staging copies for the tables whose NOT NULL reference into rebuilt
 -- data is lineage-bound. Each is the public table's columns and nothing else — no identity,
 -- no key, no foreign key — so the pre-cutover rows can be restored here with their old
@@ -2873,14 +2955,56 @@ CREATE TABLE ${schema}.${quoteIdent(t.name)} (LIKE ${quoteIdent('public')}.${quo
 BEGIN;
 CREATE SCHEMA ${schema};
 ${creates}
+
+-- AFLDB-ISSUE-247: stage-completion evidence. A data-only restore of an empty table leaves
+-- no row, so emptiness can never prove the staged restore ran. Each staging copy instead
+-- carries a statement-level AFTER INSERT trigger that records ONE row here, naming that
+-- table and the rows its COPY brought, when the COPY executes — zero rows included. It runs
+-- inside the load's own --single-transaction, so a skipped, failed or rolled-back load
+-- leaves no row, and a script with no COPY for the table (an empty pg_restore stream) fires
+-- nothing. The primary key refuses a second load of the same table; the CHECK refuses a row
+-- for any table that is not staged. promotion-promote-staged.sql refuses a staged table with
+-- no row here, or whose row count moved after it, then drops all of it with the schema.
+CREATE TABLE ${completion} (
+  staged_table text PRIMARY KEY CHECK (staged_table IN (${names})),
+  restored_rows bigint NOT NULL CHECK (restored_rows >= 0),
+  completed_at timestamptz NOT NULL DEFAULT clock_timestamp()
+);
+CREATE FUNCTION ${recorder}() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF TG_TABLE_SCHEMA <> ${quoteSqlLiteral(STAGING_SCHEMA)} OR TG_OP <> 'INSERT' OR TG_LEVEL <> 'STATEMENT' THEN
+    RAISE EXCEPTION '${STAGE_COMPLETION_FUNCTION} fired for %.% (% %): it records only a staged COPY', TG_TABLE_SCHEMA, TG_TABLE_NAME, TG_LEVEL, TG_OP;
+  END IF;
+  INSERT INTO ${completion} (staged_table, restored_rows)
+  SELECT TG_TABLE_NAME, count(*) FROM restored;
+  RETURN NULL;
+END $$;
+${triggers}
 COMMIT;
 `;
 }
 
+/** AFLDB-ISSUE-247: the one trigger that records `table`'s staged COPY as completed. */
+export function stageCompletionTriggerSql(table: string): string {
+  stagedRestoreScript(table);
+  const schema = quoteIdent(STAGING_SCHEMA);
+  return `CREATE TRIGGER ${quoteIdent(STAGE_COMPLETION_FUNCTION)} AFTER INSERT ON ${schema}.${quoteIdent(table)}`
+    + ` REFERENCING NEW TABLE AS restored FOR EACH STATEMENT`
+    + ` EXECUTE FUNCTION ${schema}.${quoteIdent(STAGE_COMPLETION_FUNCTION)}();`;
+}
+
+/** AFLDB-ISSUE-247: the promotion's refusal when `table` carries no completion evidence. */
+export function stageEvidenceMissingMessage(table: string): string {
+  return `${STAGING_SCHEMA}.${table} has no stage-completion evidence: its staged restore `
+    + '(plan step 2b) did not run, did not commit, or loaded a script with no COPY for this table';
+}
+
 /**
  * SQL that moves the remapped rows from the staging schema into `public`, then removes the
- * staging schema. Refuses, before any INSERT, a staged table that is empty (the staged
- * restore did not run) or a staged row whose reference still points at an id the candidate
+ * staging schema. Refuses, before any INSERT, a staged table with no stage-completion
+ * evidence (its staged restore did not run — AFLDB-ISSUE-247), one whose row count differs
+ * from what that evidence recorded, one that is empty when its contract does not declare
+ * `stagedMayBeEmpty`, or a staged row whose reference still points at an id the candidate
  * does not have (the remap was not applied or did not settle it). The foreign key is the
  * final judge either way: `OVERRIDING SYSTEM VALUE` keeps the dumped ids, and nothing here
  * defers, disables or drops a constraint.
@@ -2888,6 +3012,7 @@ COMMIT;
 export function promoteStagedSql(environment: Environment = DEFAULT_ENVIRONMENT): string {
   const tables = stagedReinstateTables(environment);
   const schema = quoteIdent(STAGING_SCHEMA);
+  const completion = `${schema}.${quoteIdent(STAGE_COMPLETION_TABLE)}`;
   const blocks = tables.map((t) => {
     const staged = `${schema}.${quoteIdent(t.name)}`;
     const target = `${quoteIdent('public')}.${quoteIdent(t.name)}`;
@@ -2904,14 +3029,30 @@ export function promoteStagedSql(environment: Environment = DEFAULT_ENVIRONMENT)
     RAISE EXCEPTION '${t.name}.${c.column} still carries the replaced database''s id(s) [%]: apply the --lineage-remap-out file (plan step 2c) first; never insert a ${c.references} row to make it fit', unsettled;
   END IF;`;
     }).join('\n');
+    // AFLDB-ISSUE-247: a table the contract permits to be empty accepts zero rows, and only
+    // then — the completion evidence above has already proved its COPY ran. Every other
+    // staged table keeps the AFLDB-ISSUE-151 refusal word for word.
+    const permitted = stagedMayBeEmpty(t);
+    const emptiness = permitted
+      ? `  IF staged_rows = 0 THEN
+    RAISE NOTICE '${t.name}: 0 staged rows, and the evidenced restore copied none; permitted empty by contract (${permitted.decidedBy})';
+  END IF;`
+      : `  IF staged_rows = 0 THEN
+    RAISE EXCEPTION '${STAGING_SCHEMA}.${t.name} is empty: the staged restore (plan step 2b) did not run or restored nothing (--phase pre-cutover proved the replaced database holds rows here, so an empty copy is never a legitimate state)';
+  END IF;`;
     return `-- ${t.name}
 DO $$
-DECLARE staged_rows bigint; unsettled text;
+DECLARE staged_rows bigint; evidenced_rows bigint; unsettled text;
 BEGIN
-  SELECT count(*) INTO staged_rows FROM ${staged};
-  IF staged_rows = 0 THEN
-    RAISE EXCEPTION '${STAGING_SCHEMA}.${t.name} is empty: the staged restore (plan step 2b) did not run or restored nothing (--phase pre-cutover proved the replaced database holds rows here, so an empty copy is never a legitimate state)';
+  SELECT c.restored_rows INTO evidenced_rows FROM ${completion} c WHERE c.staged_table = ${quoteSqlLiteral(t.name)};
+  IF NOT FOUND THEN
+    RAISE EXCEPTION '${stageEvidenceMissingMessage(t.name)}';
   END IF;
+  SELECT count(*) INTO staged_rows FROM ${staged};
+  IF staged_rows <> evidenced_rows THEN
+    RAISE EXCEPTION '${STAGING_SCHEMA}.${t.name} holds % row(s) but its evidenced restore copied %: the staging copy changed outside the evidenced restore', staged_rows, evidenced_rows;
+  END IF;
+${emptiness}
 ${checks}
   RAISE NOTICE '${t.name}: % staged row(s) settled', staged_rows;
 END $$;
@@ -2923,10 +3064,15 @@ DROP TABLE ${staged};`;
 -- the dumped ids (OVERRIDING SYSTEM VALUE), and a row the remap did not settle refuses the
 -- whole file before any INSERT. No constraint is deferred, disabled or dropped: the FK
 -- checks every promoted row as it is inserted. One transaction.
+-- AFLDB-ISSUE-247: each table is promoted only on its own stage-completion evidence (the
+-- row its staged COPY's trigger wrote), and the evidence, its trigger function and the
+-- schema are all dropped here, last, never cascading: anything left behind refuses the file.
 BEGIN;
 
 ${blocks}
 
+DROP TABLE ${completion};
+DROP FUNCTION ${schema}.${quoteIdent(STAGE_COMPLETION_FUNCTION)}();
 DROP SCHEMA ${schema};
 
 COMMIT;
@@ -3093,6 +3239,10 @@ export function reinstatePlan(input: PlanInput): string {
     lines.push('#     dumped integer may not exist in the candidate, and an immediate FK would refuse');
     lines.push('#     the plain restore before any UPDATE could run. The COPY target is redirected');
     lines.push('#     in the generated restore script; read the small file before loading it.');
+    lines.push('#     Each load is ONE transaction: the COPY fires the stage-completion trigger');
+    lines.push('#     promotion-stage.sql put on the staging copy (AFLDB-ISSUE-247), which records the');
+    lines.push('#     table and its row count even when the COPY brings zero rows. 2d promotes no');
+    lines.push('#     table without that evidence, so never skip, split or hand-edit a load line.');
     for (const table of groups.staged) {
       const columns = stagedLineageColumns(contractByName(table)!)
         .map((c) => `${c.column} -> ${c.references} (identity: ${c.identity})`).join('; ');
@@ -3115,8 +3265,10 @@ export function reinstatePlan(input: PlanInput): string {
     lines.push(`psql "$CANDIDATE_DSN" -v ON_ERROR_STOP=1 -f "$LINEAGE_REMAP_SQL"`);
     lines.push('');
     lines.push('# 2d. PROMOTE the staged rows into public, ids preserved, under the foreign key. The');
-    lines.push('#     file refuses — before any INSERT — if a staged row still points at an id absent');
-    lines.push(`#     from the candidate, then drops ${STAGING_SCHEMA}. One transaction.`);
+    lines.push('#     file refuses — before any INSERT — a staged table with no stage-completion');
+    lines.push('#     evidence or whose row count moved after it, an empty table the contract does not');
+    lines.push('#     permit to be empty, or a staged row still pointing at an id absent from the');
+    lines.push(`#     candidate; then drops the evidence and ${STAGING_SCHEMA}. One transaction.`);
     lines.push(`psql "$CANDIDATE_DSN" -v ON_ERROR_STOP=1 -f promotion-promote-staged.sql`);
     lines.push('');
     lines.push('# 2e. Tables that reference a staged table, now that its rows exist in public.');
@@ -3347,14 +3499,90 @@ export function stagedPlanProblems(
       }
     }
   }
-  const stagedCreates = [...artifacts.stage.matchAll(/CREATE TABLE "promotion_staging"\."([a-z_]+)"/g)].map((m) => m[1]);
+  const stagedCreates = [...artifacts.stage.matchAll(/CREATE TABLE "promotion_staging"\."([a-z_]+)"/g)]
+    .map((m) => m[1])
+    .filter((name) => name !== STAGE_COMPLETION_TABLE);
   if (JSON.stringify(stagedCreates) !== JSON.stringify(groups.staged)) {
     problems.push('promotion-stage.sql does not create exactly the staged tables, in order');
   }
+  problems.push(...stageCompletionProblems(artifacts, groups.staged));
   if (!artifacts.stage.includes(`CREATE SCHEMA ${schemaIdent};`)) problems.push('promotion-stage.sql does not create the staging schema');
   if (!artifacts.promoteStaged.includes(`DROP SCHEMA ${schemaIdent};`)) problems.push('promotion-promote-staged.sql does not drop the staging schema');
   if (/\b(?:DELETE\s+FROM|TRUNCATE|UPDATE)\b/i.test(artifacts.promoteStaged)) {
     problems.push('promotion-promote-staged.sql writes something other than the promotion INSERT');
+  }
+  return problems;
+}
+
+/**
+ * AFLDB-ISSUE-247. The stage-completion evidence, checked on the generated text: one
+ * evidence table whose CHECK admits exactly the staged tables; one recorder function that
+ * takes the table name from the trigger (never a literal an operator could mistype or
+ * reuse); exactly one statement-level trigger per staged table, created after its copy and
+ * the function, before COMMIT; no generated file writing the evidence itself or removing a
+ * trigger; and a promotion that demands each table's own evidence and row count before
+ * that table's INSERT, keeps the emptiness refusal for every table the contract does not
+ * permit to be empty, and drops the evidence and the function after the last promotion and
+ * before the schema.
+ */
+export function stageCompletionProblems(
+  artifacts: Pick<PromotionPlanArtifacts, 'reinstate' | 'stage' | 'promoteStaged'>,
+  staged: readonly string[],
+): string[] {
+  const problems: string[] = [];
+  const schema = quoteIdent(STAGING_SCHEMA);
+  const completion = `${schema}.${quoteIdent(STAGE_COMPLETION_TABLE)}`;
+  const recorder = `${schema}.${quoteIdent(STAGE_COMPLETION_FUNCTION)}`;
+  const { stage, promoteStaged: promote, reinstate: plan } = artifacts;
+  const tableCreate = `CREATE TABLE ${completion} (`;
+  const check = `staged_table text PRIMARY KEY CHECK (staged_table IN (${staged.map(quoteSqlLiteral).join(', ')})),`;
+  const functionCreate = `CREATE FUNCTION ${recorder}() RETURNS trigger`;
+  if (occurrences(stage, tableCreate) !== 1 || !stage.includes(check)) {
+    problems.push('promotion-stage.sql does not create one stage-completion table admitting exactly the staged tables');
+  }
+  if (occurrences(stage, functionCreate) !== 1
+      || !stage.includes('SELECT TG_TABLE_NAME, count(*) FROM restored;')) {
+    problems.push('promotion-stage.sql does not create the stage-completion recorder from the trigger\'s own table');
+  }
+  if (occurrences(stage, 'CREATE TRIGGER') !== staged.length) {
+    problems.push('promotion-stage.sql does not create exactly one stage-completion trigger per staged table');
+  }
+  const stageCommit = stage.lastIndexOf('COMMIT;');
+  for (const table of staged) {
+    const trigger = stageCompletionTriggerSql(table);
+    const at = stage.indexOf(trigger);
+    const copy = stage.indexOf(`CREATE TABLE ${schema}.${quoteIdent(table)} (LIKE `);
+    if (at < 0 || occurrences(stage, trigger) !== 1
+        || !(copy >= 0 && copy < at && stage.indexOf(functionCreate) < at && at < stageCommit)) {
+      problems.push(`staged table ${table} carries no stage-completion trigger in promotion-stage.sql`);
+    }
+    const lookup = promote.indexOf(`FROM ${completion} c WHERE c.staged_table = ${quoteSqlLiteral(table)};`);
+    const insert = promote.indexOf(`INSERT INTO ${quoteIdent('public')}.${quoteIdent(table)} `);
+    if (lookup < 0 || !promote.includes(stageEvidenceMissingMessage(table)) || !(lookup < insert)) {
+      problems.push(`promotion-promote-staged.sql does not demand stage-completion evidence for ${table}`);
+    }
+    if (!promote.includes(`'${STAGING_SCHEMA}.${table} holds % row(s) but its evidenced restore copied %`)) {
+      problems.push(`promotion-promote-staged.sql does not compare ${table} with its evidenced row count`);
+    }
+    if (!stagedMayBeEmpty(contractByName(table)!)
+        && !promote.includes(`'${STAGING_SCHEMA}.${table} is empty: the staged restore (plan step 2b) did not run or restored nothing`)) {
+      problems.push(`promotion-promote-staged.sql accepts an empty ${table}, whose contract requires rows`);
+    }
+  }
+  for (const [name, text] of [['reinstate', plan], ['promoteStaged', promote]] as const) {
+    if (new RegExp(`INSERT\\s+INTO\\s+${regexLiteral(completion)}`, 'i').test(text) || (name === 'reinstate' && text.includes(STAGE_COMPLETION_TABLE))) {
+      problems.push(`${name} writes stage-completion evidence directly`);
+    }
+  }
+  for (const [name, text] of [['reinstate', plan], ['stage', stage], ['promoteStaged', promote]] as const) {
+    if (/\b(?:DROP|ALTER)\s+TRIGGER\b/i.test(text)) problems.push(`${name} removes or alters a stage-completion trigger`);
+  }
+  const dropCompletion = promote.indexOf(`DROP TABLE ${completion};`);
+  const dropRecorder = promote.indexOf(`DROP FUNCTION ${recorder}();`);
+  const dropSchema = promote.indexOf(`DROP SCHEMA ${schema};`);
+  const lastPromote = Math.max(-1, ...staged.map((t) => promote.indexOf(`DROP TABLE ${schema}.${quoteIdent(t)};`)));
+  if (!(lastPromote < dropCompletion && dropCompletion < dropRecorder && dropRecorder < dropSchema)) {
+    problems.push('promotion-promote-staged.sql does not drop the stage-completion evidence after the last promotion and before the schema');
   }
   return problems;
 }
@@ -4193,7 +4421,7 @@ export const ACCEPTANCE_CHECKLIST: readonly string[] = [
   'Rebuilt dump restored into a NEW candidate database (afldb_prod_candidate_<stamp>) — never over afldb_prod.',
   '`--phase restored` passed: candidate name, migration parity, dangling-reference probe against the old database resolved.',
   'Every production-owned/operational table truncated in the candidate, then reinstated per the printed plan, in order, each under --single-transaction.',
-  'Captured grid corpus (migration 080) reinstated, and its two NOT NULL references settled BEFORE the rows met their foreign keys: external_grid_sources STAGED per the plan (AFLDB-ISSUE-151 — restored into promotion_staging, ingest_source_id remapped there onto the candidate\'s gridley sources row through sources.key by the --lineage-remap-out file, then promoted into public with its id preserved and the staging schema dropped), and external_grids.import_batch_id per docs/production-promotion.md §7.4b, with the choice recorded. No sources row inserted, no constraint dropped or deferred, and rows are never dropped to make the FK pass. The promotion_staging schema is gone (the checker refuses it at every phase); a leftover one was inspected and recorded before it was dropped by hand, never reused.',
+  'Captured grid corpus (migration 080) reinstated, and its two NOT NULL references settled BEFORE the rows met their foreign keys: external_grid_sources STAGED per the plan (AFLDB-ISSUE-151 — restored into promotion_staging, ingest_source_id remapped there onto the candidate\'s gridley sources row through sources.key by the --lineage-remap-out file, then promoted into public with its id preserved and the staging schema dropped; every staged table promoted only on its own stage-completion evidence, and an empty one only where its contract declares stagedMayBeEmpty — AFLDB-ISSUE-247), and external_grids.import_batch_id per docs/production-promotion.md §7.4b, with the choice recorded. No sources row inserted, no constraint dropped or deferred, and rows are never dropped to make the FK pass. The promotion_staging schema is gone (the checker refuses it at every phase); a leftover one was inspected and recorded before it was dropped by hand, never reused.',
   'Lineage proved at `--phase restored`: the candidate either shares the replaced database\'s id lineage, or every reinstated id-keyed column (player_link_resolutions.player_id and .target_id, data_edits.row_id, external_grid_sources.ingest_source_id) was resolved through a stable external identity and the generated remap applied at the plan\'s remap step (after the direct restores, before the staged promotion) — with every unresolved id decided deliberately and recorded. Never remapped by name, never left on the old integer.',
   'Historical-only tables (AFLDB-ISSUE-143) confirmed: for each table the contract withholds in this environment, the generated plan had no pg_restore line, the candidate reads 0 rows, the rows are present in the pre-cutover dump and the retained pre-rebuild database, and the database.promoted marker names the table and the deciding issue. Nothing was deleted to achieve this and no column was remapped by name.',
   'Identity sequences re-synced; database.promoted audit marker written; privileges.sql run on the candidate.',

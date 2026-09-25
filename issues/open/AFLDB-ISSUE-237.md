@@ -89,7 +89,7 @@ ISSUE-237 is not resolved.)*
 | ISSUE-245 blocker on L3 | CLEARED (§11a.5) |
 | ISSUE-245 `afldb_test` proof | PASS, through L3 (§11a.6) |
 | L3 | **PASS** (§11a.6) |
-| L4 DEV promotion | **NOT RUN.** Procedure rewritten after the L4 hardening (§11d; findings and fixes §11d.0, prerequisites §11d.2). *(2026-09-25: the second real attempt STOPPED at A4.3, before the destructive boundary. A3 PASS; the blocker is the orphaned ISSUE-109 fixture override; prerequisite **AFLDB-ISSUE-246**, §11d.12.)* *(2026-09-25: ISSUE-246 RESOLVED, audit 983; the A4.3 rerun returned no rows, so A4.3 is PASS; A3/A4.1/A4.2 unchanged; next step **A5**, §11d.13.)* |
+| L4 DEV promotion | **NOT RUN.** Procedure rewritten after the L4 hardening (§11d; findings and fixes §11d.0, prerequisites §11d.2). *(2026-09-25: the second real attempt STOPPED at A4.3, before the destructive boundary. A3 PASS; the blocker is the orphaned ISSUE-109 fixture override; prerequisite **AFLDB-ISSUE-246**, §11d.12.)* *(2026-09-25: ISSUE-246 RESOLVED, audit 983; the A4.3 rerun returned no rows, so A4.3 is PASS; A3/A4.1/A4.2 unchanged; next step **A5**, §11d.13.)* *(2026-09-25: A5 REFUSED by the ISSUE-151 staged-rows gate on the legitimately empty `afl_api_identity_adjudications` ledger (0; census 669/0/0/0 PASS); prerequisite **AFLDB-ISSUE-247**, §11d.14.)* |
 | L5 PROD promotion | **NOT RUN** |
 
 **P-M state (2026-09-24).** Point 1 PROVEN (DB-free). Point 2 PROVEN (live, `afldb_test`,
@@ -3682,7 +3682,41 @@ in `issues/closed/AFLDB-ISSUE-246.md` §10.1.
   swap. The ISSUE-246 pre-mutation backup was that issue's own safety net and is not an L4
   artefact.
 - **L4 remains NOT RUN, and ISSUE-237 remains OPEN.**
-- **Next step: L4 A5**, under ISSUE-237 and its own separate DEV authorisation.
+- **Next step: L4 A5**, under ISSUE-237 and its own separate DEV authorisation. *(2026-09-25: A5
+  ran and was REFUSED; see §11d.14.)*
+
+### 11d.14 L4 A5 REFUSED (2026-09-25, operator-run): legitimately empty staged ledger; L4 NOT RUN
+
+The operator reported this result; Claude recorded it and did not re-run it.
+
+- **A5** (`--phase pre-cutover` against `afldb_dev`) was **REFUSED** by the AFLDB-ISSUE-151 gate
+  `Staged tables hold rows in the replaced database`:
+
+  ```text
+  [FAIL] Staged tables hold rows in the replaced database
+    brownlow_vote_entry_state      3
+    external_grid_sources          1
+    afl_api_identity_adjudications 0 — EMPTY
+  ```
+
+- **The AFL API census passed in the same run:** importer rows **669**, human resolved rows **0**,
+  ledger rows **0**, net-linked ledger entries **0**. L = 0 and K = 0 agree with A4.1 (0/0).
+- **This is not an ISSUE-237 defect.** An empty `afl_api_identity_adjudications` ledger is a
+  valid, evidenced DEV state (no administrator has adjudicated an `afl_api` identity). The generic
+  ISSUE-151 staged mechanism conflated a legitimate zero-row table with a stage restore that never
+  ran, and refused both. No ledger row is to be manufactured.
+- **Prerequisite: AFLDB-ISSUE-247** (`issues/open/AFLDB-ISSUE-247.md`): a contract-declared
+  `stagedMayBeEmpty` permission on `afl_api_identity_adjudications`, accepted at step 2d only on
+  per-table stage-completion evidence written by the staged `COPY`'s own trigger. Implemented and
+  DB-free validated 2026-09-25, uncommitted; it needs a rehearsal, the operator commit and DEV
+  deployment before A5 is rerun.
+- **Snapshot file.** `--phase pre-cutover` writes `--snapshot` whatever its verdict, so the refused
+  A5 may have left `promotion-dev-$STAMP.json`. It is FAIL-run evidence: keep it (move it aside,
+  do not delete it) and rerun A5 with a fresh `$STAMP` — the checker refuses to overwrite.
+- Fixture-account cleanup is tracked separately as AFLDB-ISSUE-248 and is not part of ISSUE-247.
+- **Nothing past A5 ran:** no B1 backup, dump, candidate, `--plan` or swap. **L4 remains NOT RUN,
+  and ISSUE-237 remains OPEN.** Next: ISSUE-247 rehearsal, commit and DEV deployment; then A5 again
+  under a separate DEV authorisation.
 
 ## 12. Non-goals and successors
 
@@ -3849,6 +3883,11 @@ is `auth_audit_log` 983, and the A4.3 rerun returned no rows, so **A4.3 is PASS*
 0/0 and A4.2 92/92 are unchanged. No A5, promotion dump, candidate, plan or swap ran as part of
 ISSUE-246. **L4 remains NOT RUN.** The next action is **L4 A5**, under a separate DEV
 authorisation. ISSUE-237 is not resolved.)*
+*(2026-09-25: **L4 A5 was REFUSED** (§11d.14) by the ISSUE-151 staged-rows gate:
+`afl_api_identity_adjudications` 0 — EMPTY, beside `brownlow_vote_entry_state` 3 and
+`external_grid_sources` 1, while the AFL API census passed (669 importer, 0 human resolved, 0
+ledger, 0 net-linked). The empty ledger is legitimate; the prerequisite is **AFLDB-ISSUE-247**.
+Nothing past A5 ran. **L4 remains NOT RUN.** ISSUE-237 is not resolved.)*
 
 ---
 
