@@ -26,11 +26,16 @@ import {
 } from '../tools/db/migration-safety';
 import {
   branchPolicyProblems,
+  classifyWorktreeStatus,
   databaseTargetProblems,
   defaultsFor,
   linuxHostPathProblems,
   msysEnvironmentProblem,
   parsePreflightArgs,
+  probeDatabase,
+  PROMOTION_OPERATIONAL_ARTIFACT_PATTERNS,
+  worktreeFinding,
+  type PreflightFinding,
 } from '../tools/dev/preflight-core';
 import { runBootstrap } from '../tools/dev/bootstrap-worktree';
 import { runMergeReadiness } from '../tools/dev/merge-readiness';
@@ -236,6 +241,195 @@ describe('operator preflight safety', () => {
     expect(msysEnvironmentProblem('promotion', {
       MSYSTEM: 'MINGW64', MSYS_NO_PATHCONV: '1',
     })).toBeUndefined();
+  });
+});
+
+describe('AFLDB-ISSUE-243 promotion source vs target preflight', () => {
+  const promotion = (...args: string[]) => defaultsFor(parsePreflightArgs(['--mode', 'promotion', ...args]));
+  const LOCAL = [migration('001_base.sql')];
+  const APPLIED = LOCAL.map((entry) => ({ name: entry.name, checksum: entry.checksum!.raw }));
+
+  function fakeProbe(database: string, role: string, ledger: () => Promise<{ name: string; checksum: string }[]>) {
+    return { identity: vi.fn(async () => ({ database, role })), appliedMigrations: vi.fn(ledger) };
+  }
+  const deniedLedger = () => Promise.reject(new Error('permission denied for schema afldb_meta'));
+
+  async function probeTarget(role: string, database = 'afldb_dev', env = 'dev') {
+    const options = promotion('--environment', env, '--promotion-side', 'target',
+      '--dsn-env', 'AFLDB_IMPORT_DATABASE_URL', '--expect-role', role);
+    const probe = fakeProbe(database, role, deniedLedger);
+    const findings: PreflightFinding[] = [];
+    await probeDatabase(probe, {
+      mode: options.mode, promotionSide: options.promotionSide, dsnEnv: options.dsnEnv!,
+      expectedDatabase: options.expectDatabase, expectedRole: options.expectRole, localMigrations: LOCAL,
+    }, (finding) => findings.push(finding));
+    return { probe, findings };
+  }
+
+  it('resolves source to afldb_test and target to the exact environment database', () => {
+    expect(promotion('--promotion-side', 'source')).toMatchObject({
+      promotionSide: 'source', dsnEnv: 'AFLDB_TEST_DATABASE_URL', expectDatabase: 'afldb_test',
+    });
+    expect(promotion('--promotion-side', 'target', '--dsn-env', 'AFLDB_OWNER_DATABASE_URL'))
+      .toMatchObject({ promotionSide: 'target', expectDatabase: 'afldb_dev' });
+    expect(promotion('--environment', 'prod', '--promotion-side', 'target', '--dsn-env', 'AFLDB_PROD_DATABASE_URL'))
+      .toMatchObject({ promotionSide: 'target', expectDatabase: 'afldb_prod' });
+  });
+
+  it('refuses invalid side combinations before any database contact', () => {
+    expect(() => promotion('--promotion-side', 'target', '--environment', 'dev',
+      '--dsn-env', 'AFLDB_OWNER_DATABASE_URL', '--expect-database', 'afldb_prod')).toThrow(/exactly 'afldb_dev'/);
+    expect(() => promotion('--promotion-side', 'target', '--environment', 'prod',
+      '--dsn-env', 'AFLDB_PROD_DATABASE_URL', '--expect-database', 'afldb_dev')).toThrow(/exactly 'afldb_prod'/);
+    expect(() => promotion('--promotion-side', 'target', '--expect-database', 'afldb_test',
+      '--dsn-env', 'AFLDB_TEST_DATABASE_URL')).toThrow(/exactly 'afldb_dev'/);
+    expect(() => promotion('--promotion-side', 'source', '--expect-database', 'afldb_dev'))
+      .toThrow(/must be a \*_test database/);
+    expect(() => promotion('--promotion-side', 'target')).toThrow(/needs --dsn-env/);
+    expect(() => promotion('--expect-database', 'afldb_test')).toThrow(/needs --promotion-side/);
+    expect(() => promotion('--promotion-side', 'both')).toThrow(/Unknown promotion side/);
+    for (const mode of ['implementation', 'merge', 'read-only', 'rebuild', 'deploy']) {
+      expect(() => parsePreflightArgs(['--mode', mode, '--promotion-side', 'source']))
+        .toThrow(/only valid with --mode promotion/);
+    }
+  });
+
+  it('judges the connected database by side', () => {
+    expect(databaseTargetProblems('promotion', 'afldb_test', 'afldb_test', undefined, undefined, 'source')).toEqual([]);
+    expect(databaseTargetProblems('promotion', 'afldb_test', 'afldb_dev', undefined, undefined, 'source')).toEqual([
+      "connected to 'afldb_dev', expected 'afldb_test'",
+      "mode 'promotion' requires a *_test source database, got 'afldb_dev'",
+    ]);
+    expect(databaseTargetProblems('promotion', 'afldb_dev', 'afldb_dev', 'afldb_import', 'afldb_import', 'target'))
+      .toEqual([]);
+    expect(databaseTargetProblems('promotion', 'afldb_dev', 'afldb_prod', undefined, undefined, 'target'))
+      .toEqual(["connected to 'afldb_prod', expected 'afldb_dev'"]);
+    expect(databaseTargetProblems('promotion', 'afldb_prod', 'afldb_prod', undefined, undefined, 'target')).toEqual([]);
+    expect(databaseTargetProblems('promotion', 'afldb_prod', 'afldb_dev', undefined, undefined, 'target'))
+      .toEqual(["connected to 'afldb_dev', expected 'afldb_prod'"]);
+    expect(databaseTargetProblems('promotion', 'afldb_dev', 'afldb_dev', 'afldb_backup', 'afldb_import', 'target'))
+      .toEqual(["connected as role 'afldb_import', expected 'afldb_backup'"]);
+    expect(databaseTargetProblems('promotion', undefined, 'afldb_dev', undefined, undefined, 'target'))
+      .toContain('promotion target check needs an exact expected database');
+    // Rebuild and deploy are unchanged; a side-less promotion keeps the strict source rule.
+    expect(databaseTargetProblems('promotion', undefined, 'afldb_dev')).toContain(
+      "mode 'promotion' requires a *_test source database, got 'afldb_dev'",
+    );
+    expect(databaseTargetProblems('rebuild', undefined, 'afldb_dev', undefined, undefined, 'target')).toContain(
+      "mode 'rebuild' requires a *_test source database, got 'afldb_dev'",
+    );
+  });
+
+  it('proves target import/backup identity without reading the migration ledger', async () => {
+    for (const role of ['afldb_import', 'afldb_backup']) {
+      const { probe, findings } = await probeTarget(role);
+      expect(probe.appliedMigrations).not.toHaveBeenCalled();
+      expect(findings[0]).toMatchObject({ status: 'PASS', label: 'database reachable via AFLDB_IMPORT_DATABASE_URL' });
+      expect(findings.map((finding) => finding.status)).not.toContain('FAIL');
+      expect(findings[1]).toMatchObject({ status: 'INFO', label: 'migration parity not read on a promotion target' });
+    }
+    const prod = await probeTarget('afldb_import', 'afldb_prod', 'prod');
+    expect(prod.findings[0].status).toBe('PASS');
+    const wrong = await probeTarget('afldb_import', 'afldb_prod', 'dev');
+    expect(wrong.findings[0]).toMatchObject({ status: 'FAIL' });
+    expect(wrong.findings[0].details).toContain("connected to 'afldb_prod', expected 'afldb_dev'");
+  });
+
+  it('still requires migration parity on the source', async () => {
+    const options = promotion('--promotion-side', 'source', '--expect-role', 'afldb_owner');
+    const context = {
+      mode: options.mode, promotionSide: options.promotionSide, dsnEnv: options.dsnEnv!,
+      expectedDatabase: options.expectDatabase, expectedRole: options.expectRole, localMigrations: LOCAL,
+    };
+    const findings: PreflightFinding[] = [];
+    const matching = fakeProbe('afldb_test', 'afldb_owner', async () => APPLIED);
+    await probeDatabase(matching, context, (finding) => findings.push(finding));
+    expect(matching.appliedMigrations).toHaveBeenCalledTimes(1);
+    expect(findings.map((finding) => [finding.status, finding.label])).toEqual([
+      ['PASS', 'database reachable via AFLDB_TEST_DATABASE_URL'],
+      ['PASS', 'migration parity (1/1)'],
+    ]);
+
+    const pending: PreflightFinding[] = [];
+    await probeDatabase(fakeProbe('afldb_test', 'afldb_owner', async () => []), context, (f) => pending.push(f));
+    expect(pending.slice(1).map((finding) => finding.status)).toContain('FAIL');
+
+    await expect(probeDatabase(fakeProbe('afldb_test', 'afldb_owner', deniedLedger), context, () => {}))
+      .rejects.toThrow(/permission denied/);
+
+    const wrongRole: PreflightFinding[] = [];
+    await probeDatabase(fakeProbe('afldb_test', 'afldb_import', async () => APPLIED), context, (f) => wrongRole.push(f));
+    expect(wrongRole[0]).toMatchObject({ status: 'FAIL' });
+    expect(wrongRole[0].details).toContain("connected as role 'afldb_import', expected 'afldb_owner'");
+  });
+});
+
+describe('AFLDB-ISSUE-243 promotion working-tree classification', () => {
+  const SETTLE = 'docs/rebuild-manifests/afltables_fitzroy_core/settle-2026-2026-09-15-2201.json';
+  const z = (...entries: string[]) => entries.map((entry) => `${entry}\0`).join('');
+
+  it('shares the exact settle-manifest pattern with the DEV deploy classifier', () => {
+    const deploy = readFileSync(join(process.cwd(), 'deploy', 'sync-dev-remote.sh'), 'utf8');
+    expect(PROMOTION_OPERATIONAL_ARTIFACT_PATTERNS).toHaveLength(1);
+    for (const pattern of PROMOTION_OPERATIONAL_ARTIFACT_PATTERNS) {
+      expect(deploy).toContain(`[[ "$path" =~ ${pattern} ]] && return 0`);
+    }
+  });
+
+  it('downgrades only untracked settle manifests to WARN in promotion mode', () => {
+    const both = z(`?? ${SETTLE}`,
+      '?? docs/rebuild-manifests/afltables_fitzroy_core/settle-2026-2026-09-15-2203.json');
+    expect(worktreeFinding('promotion', both)).toMatchObject({
+      status: 'WARN', label: 'working tree holds only known operational artefacts',
+    });
+    expect(worktreeFinding('promotion', '')).toMatchObject({ status: 'PASS' });
+  });
+
+  it('keeps every other dirty path a promotion blocker', () => {
+    const cases = [
+      z(` M ${SETTLE}`),                                        // tracked modification of an allowlisted path
+      z(`A  ${SETTLE}`),                                        // staged
+      z('M  src/lib/settings.ts'),                              // staged source change
+      z(' M tools/dev/preflight.ts'),                           // unstaged script change
+      z('?? src/db/migrations/999_new.sql'),                    // unknown untracked migration
+      z('?? notes.txt'),                                        // unknown untracked file
+      z('?? docs/rebuild-manifests/afltables_fitzroy_core/extra.json'), // JSON outside the pattern
+      z('?? docs/rebuild-manifests/afl_api/settle-2026.json'),  // another manifest root
+      z('?? afldb-ui-questions-2026.csv'),                      // deploy-only allowlist entry
+      z('?? .env.bak-20260925'),                                // deploy-only allowlist entry
+      z(`?? ${SETTLE}`, '?? scratch.json'),                     // known plus unknown
+      z('R  new.ts', 'old.ts'),                                 // rename
+    ];
+    for (const porcelain of cases) {
+      expect(worktreeFinding('promotion', porcelain).status, porcelain).toBe('FAIL');
+    }
+    expect(classifyWorktreeStatus(z('R  new.ts', 'old.ts', `?? ${SETTLE}`))).toEqual({
+      tracked: ['old.ts -> new.ts'], known: [SETTLE], unknown: [],
+    });
+  });
+
+  it('does not relax rebuild, deploy, implementation or merge', () => {
+    for (const mode of ['rebuild', 'deploy', 'implementation', 'merge'] as const) {
+      expect(worktreeFinding(mode, z(`?? ${SETTLE}`)).status).toBe('FAIL');
+    }
+    expect(worktreeFinding('read-only', z(' M README.md')).status).toBe('WARN');
+  });
+
+  it('classifies real git -z output from a checkout', () => {
+    const fixture = makeRepository();
+    const manifests = join(fixture.main, 'docs', 'rebuild-manifests', 'afltables_fitzroy_core');
+    mkdirSync(manifests, { recursive: true });
+    writeFileSync(join(manifests, 'settle-2026-2026-09-15-2201.json'), '{}\n');
+    writeFileSync(join(manifests, 'settle-2026-2026-09-15-2203.json'), '{}\n');
+    const status = () => spawnSync('git', ['status', '--porcelain=v1', '-z', '--untracked-files=all'], {
+      cwd: fixture.main, encoding: 'utf8', windowsHide: true,
+    }).stdout;
+    expect(worktreeFinding('promotion', status()).status).toBe('WARN');
+
+    writeFileSync(join(fixture.main, 'README.md'), 'changed\n');
+    const tracked = worktreeFinding('promotion', status());
+    expect(tracked.status).toBe('FAIL');
+    expect(tracked.details).toContain('blocker (tracked/staged): README.md');
   });
 });
 

@@ -10,7 +10,6 @@ import { fileURLToPath } from 'node:url';
 
 import {
   collectMigrationSources,
-  compareAppliedMigrations,
   compareMigrationSets,
   findMigrationConflicts,
   type AppliedMigration,
@@ -19,16 +18,20 @@ import {
 import { assertContractCoherent, historicalOnlyTables } from '../db/promotion-inventory';
 import {
   branchPolicyProblems,
-  databaseTargetProblems,
   defaultsFor,
+  migrationFindingStatus,
   msysEnvironmentProblem,
   parsePreflightArgs,
+  probeDatabase,
+  worktreeFinding,
   type PreflightMode,
+  type PreflightStatus,
+  type PromotionSide,
 } from './preflight-core';
 
 const PROJECT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
-type Status = 'PASS' | 'WARN' | 'FAIL' | 'INFO';
+type Status = PreflightStatus;
 
 class Report {
   failed = 0;
@@ -104,10 +107,7 @@ function toolCheck(report: Report, command: string, required: boolean): void {
 }
 
 function reportMigrationFinding(report: Report, finding: MigrationFinding, inspectionOnly = false): void {
-  const status = finding.severity === 'error' && !inspectionOnly
-    ? 'FAIL'
-    : finding.severity === 'warning' || inspectionOnly ? 'WARN' : 'INFO';
-  report.add(status, `migration ${finding.code}`, [finding.message]);
+  report.add(migrationFindingStatus(finding, inspectionOnly), `migration ${finding.code}`, [finding.message]);
 }
 
 function checkGit(report: Report, mode: PreflightMode): void {
@@ -126,11 +126,11 @@ function checkGit(report: Report, mode: PreflightMode): void {
   report.add(branchProblems.length ? 'FAIL' : 'PASS',
     branch ? `branch ${branch} is valid for ${mode}` : 'branch is attached', branchProblems);
 
-  const dirty = gitText(['status', '--porcelain=v1', '--untracked-files=all']);
-  const dirtyStatus = dirty ? (mode === 'read-only' ? 'WARN' : 'FAIL') : 'PASS';
-  report.add(dirtyStatus, mode === 'read-only' ? 'working tree state (inspection only)' : 'working tree is clean', dirty
-    ? [`${dirty.split(/\r?\n/).length} changed/untracked path(s); review and resolve them before the operation.`]
-    : []);
+  // Raw -z output: trimming would eat the leading space of an unstaged ' M' status.
+  const status = git(['status', '--porcelain=v1', '-z', '--untracked-files=all']);
+  if (status.status !== 0) throw new Error(status.stderr.trim() || 'git status failed');
+  const worktree = worktreeFinding(mode, status.stdout);
+  report.add(worktree.status, worktree.label, worktree.details);
 
   const gitDir = resolve(PROJECT_ROOT, gitText(['rev-parse', '--git-dir']));
   const commonDir = resolve(PROJECT_ROOT, gitText(['rev-parse', '--git-common-dir']));
@@ -177,6 +177,7 @@ function checkGit(report: Report, mode: PreflightMode): void {
 async function checkDatabase(
   report: Report,
   mode: PreflightMode,
+  promotionSide: PromotionSide | undefined,
   dsnEnv: string,
   dsn: string,
   expectedDatabase: string | undefined,
@@ -193,25 +194,15 @@ async function checkDatabase(
   });
   try {
     await sql.unsafe('SET default_transaction_read_only = on');
-    const identity = await sql<{ database: string; role: string }[]>`
-      SELECT current_database() AS database, current_user AS role
-    `;
-    const actual = identity[0];
-    const targetProblems = databaseTargetProblems(
-      mode, expectedDatabase, actual.database, expectedRole, actual.role,
-    );
-    report.add(targetProblems.length ? 'FAIL' : 'PASS', `database reachable via ${dsnEnv}`, [
-      `database: ${actual.database}`,
-      `role: ${actual.role}`,
-      ...targetProblems,
-    ]);
-
-    const applied = await sql<AppliedMigration[]>`
-      SELECT name, checksum FROM afldb_meta.schema_migrations ORDER BY name
-    `;
-    const parity = compareAppliedMigrations(localMigrations, applied);
-    if (parity.length === 0) report.add('PASS', `migration parity (${applied.length}/${localMigrations.length})`);
-    else for (const finding of parity) reportMigrationFinding(report, finding);
+    await probeDatabase({
+      identity: async () => (await sql<{ database: string; role: string }[]>`
+        SELECT current_database() AS database, current_user AS role
+      `)[0],
+      appliedMigrations: () => sql<AppliedMigration[]>`
+        SELECT name, checksum FROM afldb_meta.schema_migrations ORDER BY name
+      `,
+    }, { mode, promotionSide, dsnEnv, expectedDatabase, expectedRole, localMigrations },
+    (finding) => report.add(finding.status, finding.label, finding.details));
   } catch (error) {
     report.add('FAIL', `database preflight via ${dsnEnv}`, [
       error instanceof Error ? redactConnectionError(error.message, dsn) : 'connection/query failed',
@@ -228,11 +219,17 @@ function usage(): void {
   --mode implementation|merge|read-only|rebuild|promotion|deploy
                                                    default: implementation
   --environment dev|prod                           default: dev
+  --promotion-side source|target                   required with --mode promotion, refused otherwise
   --issue NNN                                      optional issue/workflow label
   --dsn-env NAME                                   DSN variable name; never pass the DSN
   --expect-database NAME                           exact database identity
   --expect-role NAME                               optional exact PostgreSQL role
   --ssh-host HOST                                  require a read-only BatchMode SSH probe
+
+Promotion sides:
+  source  a *_test database (default AFLDB_TEST_DATABASE_URL / afldb_test); migration parity required
+  target  exactly afldb_dev (dev) or afldb_prod (prod); --dsn-env required; identity, role and
+          connectivity only, so a restricted import/backup credential needs no afldb_meta access
 
 The command is read-only. It does not fetch refs, write plans, migrate, deploy, or mutate a database.`);
 }
@@ -251,6 +248,7 @@ async function main(): Promise<void> {
 
   const report = new Report();
   console.log(`AFLDB read-only preflight: ${options.mode} / ${options.environment}`
+    + (options.promotionSide ? ` / ${options.promotionSide}` : '')
     + (options.issue ? ` / ${options.issue.toUpperCase()}` : ''));
   console.log('No Git fetch, database write, migration, plan write, deploy, or service action will run.\n');
 
@@ -320,7 +318,7 @@ async function main(): Promise<void> {
       dsn ? ['value is set and intentionally not printed'] : ['Set it in the environment or untracked .env.']);
     if (dsn && collected) {
       await checkDatabase(
-        report, options.mode, options.dsnEnv, dsn, options.expectDatabase, options.expectRole,
+        report, options.mode, options.promotionSide, options.dsnEnv, dsn, options.expectDatabase, options.expectRole,
         collected.current.migrations,
       );
     }

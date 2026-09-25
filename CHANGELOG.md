@@ -15,6 +15,26 @@ commit.
 
 ## [Unreleased]
 
+### Promotion preflight distinguishes source and target credentials (AFLDB-ISSUE-243, open) - 25 September 2026
+
+- **What changed.** `npm run preflight -- --mode promotion` now requires
+  `--promotion-side source|target`.
+  - **source:** a `*_test` database, with migration parity required. This is unchanged.
+  - **target:** exactly `afldb_dev` (`--environment dev`) or `afldb_prod` (`--environment prod`),
+    through an explicit `--dsn-env`. It proves identity, role and connectivity **without** reading
+    `afldb_meta`, so the restricted `afldb_import` and `afldb_backup` credentials can be checked.
+  - Mismatched combinations are refused before any connection.
+  - In promotion mode, untracked nightly settle manifests
+    (`docs/rebuild-manifests/afltables_fitzroy_core/settle-*.json`, the exact
+    `deploy/sync-dev-remote.sh` pattern) are a WARN instead of a blocker. Every other dirty path
+    still FAILs.
+- **Operator impact.** A promotion preflight without `--promotion-side` now refuses.
+  `docs/production-promotion.md` §3 and ISSUE-237 §11d A2 carry the corrected commands. Before
+  this change, the first real ISSUE-237 L4 A2 run on DEV could not pass and stopped before A3.
+- **Validation.** Typecheck, plus `tests/workflow-preflight.test.ts` 34/34 (10 new DB-free
+  cases), `tests/db-promotion-check.test.ts` 189/189 and
+  `tests/data-overrides-source-contract.test.ts` 65/65. No database was contacted.
+
 ### Promotion converges manual player registration tokens by AFL Tables path (AFLDB-ISSUE-242, open) - 25 September 2026
 
 - **What changed.** A `manual_admin_edit` token is minted per database, so ISSUE-237's A4.2 gate

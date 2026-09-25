@@ -2842,15 +2842,33 @@ CAND="afldb_dev_candidate_$STAMP"
 EFILE=~/backups/afldb/promotion-dev-afl-api-supersede-$STAMP.json
 ```
 
-**A2. Preflight** (read-only, `tools/dev/preflight.ts`). Every `FAIL` is a stop.
+**A2. Preflight** (read-only, `tools/dev/preflight.ts`). Every `FAIL` is a stop. This needs the
+AFLDB-ISSUE-243 preflight on the DEV checkout.
 
 ```bash
-npm run preflight -- --mode promotion --environment dev --dsn-env AFLDB_TEST_DATABASE_URL --expect-database afldb_test
-npm run preflight -- --mode promotion --environment dev --dsn-env AFLDB_OWNER_DATABASE_URL --expect-role afldb_owner
-npm run preflight -- --mode promotion --environment dev --dsn-env AFLDB_IMPORT_DATABASE_URL --expect-database afldb_dev
-npm run preflight -- --mode promotion --environment dev --dsn-env AFLDB_BACKUP_DATABASE_URL --expect-database afldb_dev
+npm run preflight -- --mode promotion --environment dev --promotion-side source \
+  --dsn-env AFLDB_TEST_DATABASE_URL --expect-database afldb_test --expect-role afldb_owner
+npm run preflight -- --mode promotion --environment dev --promotion-side target \
+  --dsn-env AFLDB_OWNER_DATABASE_URL --expect-database afldb_dev --expect-role afldb_owner
+npm run preflight -- --mode promotion --environment dev --promotion-side target \
+  --dsn-env AFLDB_IMPORT_DATABASE_URL --expect-database afldb_dev --expect-role afldb_import
+npm run preflight -- --mode promotion --environment dev --promotion-side target \
+  --dsn-env AFLDB_BACKUP_DATABASE_URL --expect-database afldb_dev --expect-role afldb_backup
+# expect: each "Preflight result: READY". The source proves migration parity. The three target
+# runs print "INFO migration parity not read on a promotion target". The untracked nightly settle
+# manifests show as "WARN working tree holds only known operational artefacts".
 ```
 
+- **First real attempt (2026-09-25, DEV at `bfafed36`): STOPPED at A2, before A3.** It used the
+  superseded commands, which had no `--promotion-side`:
+  - A2.1 connected to `afldb_test` / `afldb_owner` with parity 104/104. It FAILed only on two
+    untracked `afltables_fitzroy_core/settle-2026-2026-09-15-*.json` manifests.
+  - A2.2, A2.3 and A2.4 connected to `afldb_dev` as `afldb_owner`, `afldb_import` and
+    `afldb_backup` respectively. Each FAILed on the source-only `*_test` rule. A2.3 also failed on
+    `permission denied for schema afldb_meta`.
+
+  No dump, candidate, swap or any later L4 step ran. The preflight prerequisite is
+  **AFLDB-ISSUE-243**. **L4 remains NOT RUN.**
 - **The import DSN must name `afldb_dev` itself.** The checker replaces the database name in
   whatever `--dsn-env` names, but the post-swap replays read `AFLDB_IMPORT_DATABASE_URL`
   **unreplaced**. E2 also re-checks `current_database()` against the file.

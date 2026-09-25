@@ -4,10 +4,11 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 15
+**Open issues:** 16
 
 | ID | Title | Severity | Area | State | Next action |
 |---|---|---|---|---|---|
+| AFLDB-ISSUE-243 | Promotion preflight cannot validate target credentials and rejects known DEV operational artefacts | High | Operator workflow — `tools/dev/preflight-core.ts`, `tools/dev/preflight.ts` | Open (2026-09-25), from the first real ISSUE-237 L4 A2 run on DEV (STOPPED at A2; no dump/candidate/swap). Implemented and DB-free validated, uncommitted: explicit `--promotion-side source\|target`; target = exact `afldb_dev`/`afldb_prod`, identity/role only, no `afldb_meta` read; untracked `afltables_fitzroy_core/settle-*.json` = WARN; all else still FAILs. | Operator review, commit and DEV deploy; rerun ISSUE-237 L4 A2 |
 | AFLDB-ISSUE-242 | Cross-database manual player registration token convergence blocks ISSUE-237 L4 | High | Promotion lifecycle — `promotion-inventory.ts`, `promotion-check.ts`, step-2c lineage remap file | Open (2026-09-25), from ISSUE-237 FR-2 / A4.2. Implemented and DB-free validated, uncommitted: B4 plans rebind/retire convergence by accepted AFL Tables path, step 2c applies it in the remap transaction with a final-state assertion, and C2 re-proves it. `code_test_db` rehearsal 103/103 (2026-09-25): the generated step-2c SQL executed, rolled back atomically on refusal, and re-ran as a no-op; 92-player mixture PASS. No DEV/PROD contact. | Operator review and commit; then ISSUE-237 L4 |
 | AFLDB-ISSUE-241 | AFL API bridge artefacts reuse stale database-local `candidate_player_id` values with no lineage binding | Medium | AFL API bridge import — `import_afl_api_player_bridge.py`, bridge artefact contract | Open (2026-09-24), ISSUE-237 successor (OD-5, runbook F3). Three of four evidence classes carry a bare, database-local id with no lineage gate; a re-import after a renumbering lifecycle can mislink. No implementation started. | Design an artefact/importer contract that refuses a lineage-unbound artefact or proves per-row stable identity; no implementation now |
 | AFLDB-ISSUE-240 | Deduplicate repeated `afl_api_identity_contradiction` findings | Low | AFL API bridge validation/import — `afl_api_identity_contradiction`, adjudication evidence/provenance | Open (2026-09-24), ISSUE-235 follow-up F-3 (accepted, allocated at closure). No implementation started. | Define durable dedup/idempotency keys for repeated contradiction findings while preserving evidence/provenance; no adjudication behaviour change |
@@ -41425,6 +41426,55 @@ Full record: `issues/closed/AFLDB-ISSUE-228.md` §22.22.
 - **Next action.** None. ISSUE-235 is resolved. AFLDB-ISSUE-237 is the next independent development
   issue in this area; follow-ups are tracked separately as AFLDB-ISSUE-238/239/240.
 - **Runbook:** `issues/closed/AFLDB-ISSUE-235.md` (S0–S9 and I18 complete; RESOLVED 2026-09-24).
+
+## AFLDB-ISSUE-243 — Promotion preflight cannot validate target credentials and rejects known DEV operational artefacts
+
+- **Status:** Open (2026-09-25). **Severity:** High. **Area:** operator workflow tooling —
+  `tools/dev/preflight-core.ts`, `tools/dev/preflight.ts`, `docs/production-promotion.md` §3,
+  ISSUE-237 §11d A2. **Runbook:** `issues/open/AFLDB-ISSUE-243.md`.
+- **Origin.** The first real ISSUE-237 L4 A2 run on DEV (2026-09-25, DEV at `bfafed36`). All four
+  preflights FAILed and L4 STOPPED at A2, with no dump, candidate or swap:
+  - **A2.1** reached `afldb_test` / `afldb_owner` with parity 104/104. It failed only on two
+    untracked `docs/rebuild-manifests/afltables_fitzroy_core/settle-2026-2026-09-15-{2201,2203}.json`.
+  - **A2.2–A2.4** reached `afldb_dev` as `afldb_owner`, `afldb_import` and `afldb_backup`. Each was
+    refused by `mode 'promotion' requires a *_test source database`. A2.3 then hit
+    `permission denied for schema afldb_meta`.
+- **Root cause.**
+  - `defaultsFor()` gave promotion rebuild's `afldb_test` defaults, and
+    `databaseTargetProblems()` refused every non-`*_test` promotion database. So no target check
+    could pass.
+  - `checkDatabase()` read `afldb_meta.schema_migrations` unconditionally, which `afldb_import` is
+    not granted.
+  - `checkGit()` failed promotion on any dirty path. It did not recognise the nightly settle
+    manifests, which `deploy/sync-dev-remote.sh` already treats as known operational artefacts.
+- **Fix (uncommitted, 2026-09-25).**
+  - `--mode promotion` requires an explicit `--promotion-side source|target`.
+  - **source:** a `*_test` database (default `afldb_test`), with migration parity required.
+  - **target:** exactly `afldb_dev` for dev or `afldb_prod` for prod, never `*_test`, with
+    `--dsn-env` required. It proves identity, role and connectivity only, and it **does not read
+    the migration ledger**.
+  - These refuse before DB contact:
+    - a side outside promotion;
+    - promotion without a side;
+    - source with a non-`*_test` database;
+    - target with any other database;
+    - target without `--dsn-env`.
+  - Promotion classifies `git status -z` entries. Only untracked paths matching the exact
+    deploy regex
+    `^docs/rebuild-manifests/afltables_fitzroy_core/settle-[A-Za-z0-9][A-Za-z0-9._-]*\.json$` are a
+    WARN. A test pins the pattern to the deploy script. Tracked, staged or renamed paths FAIL, and
+    so does any other untracked file, including the deploy-only allowlist entries.
+  - Rebuild, deploy, implementation and merge are unchanged.
+- **Validation (DB-free, Claude-run).**
+  - `tsc` is clean.
+  - `tests/workflow-preflight.test.ts` 34/34 (10 new), `tests/db-promotion-check.test.ts`
+    189/189 and `tests/data-overrides-source-contract.test.ts` 65/65.
+  - ESLint on the changed TypeScript is clean, and so is `git diff --check`.
+  - The CLI argument refusals were smoke-tested; they exit before any DB step.
+  - There was no DEV, PROD, `afldb_test` or SSH contact.
+- **Next action.** The operator reviews, commits and deploys to DEV. Then rerun ISSUE-237 L4 A2
+  with the runbook §8 commands under the separate L4 authorisation. Resolve on four READY
+  results.
 
 ## AFLDB-ISSUE-242 — Cross-database manual player registration token convergence blocks ISSUE-237 L4
 

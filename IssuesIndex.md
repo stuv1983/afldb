@@ -9,7 +9,24 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Open issues:** 15
+**Open issues:** 16
+
+### AFLDB-ISSUE-243 — Promotion preflight cannot validate target credentials and rejects known DEV operational artefacts
+- **Severity:** High. **Area:** operator workflow tooling — `tools/dev/preflight-core.ts`,
+  `tools/dev/preflight.ts`, `docs/production-promotion.md` §3, ISSUE-237 §11d A2.
+- **State:** Open (2026-09-25). It comes from the first real ISSUE-237 L4 A2 run on DEV, which
+  STOPPED at A2 with no dump, candidate or swap. Implemented and DB-free validated, but
+  uncommitted:
+  - `--mode promotion` now requires `--promotion-side source|target`.
+  - **source:** `*_test`, with migration parity.
+  - **target:** exactly `afldb_dev` or `afldb_prod`, identity/role/connectivity only, and no
+    `afldb_meta` read, so restricted import/backup credentials pass.
+  - Invalid combinations refuse before DB contact.
+  - Untracked `afltables_fitzroy_core/settle-*.json` manifests are WARN, using the same regex as
+    `deploy/sync-dev-remote.sh`. Every other dirty path still FAILs.
+- **Runbook:** `issues/open/AFLDB-ISSUE-243.md` (§8 has the corrected L4 A2 commands).
+- **Next action:** the operator reviews, commits and deploys to DEV. Then rerun ISSUE-237 L4 A2
+  under the separate L4 authorisation, and resolve this issue on four READY results.
 
 ### AFLDB-ISSUE-242 — Cross-database manual player registration token convergence blocks ISSUE-237 L4
 - **Severity:** High. **Area:** promotion lifecycle — `tools/db/promotion-inventory.ts`,
@@ -197,6 +214,10 @@
     - Rebuild `--recover` now covers a crash between Stage 17 and the registration replay.
     - The D15 exact-set check runs on an empty ledger.
     - There are zero ESLint errors on ISSUE-237 lines.
+  - **Update (2026-09-25): first real L4 attempt STOPPED at A2 (DEV at `bfafed36`); L4 NOT RUN.**
+    - All four promotion preflights FAILed, and nothing after A2 ran: no dump, candidate or swap.
+    - The preflight prerequisite is **AFLDB-ISSUE-243**. Runbook §11d A2 now carries its
+      `--promotion-side` commands.
   - **Next action:** the operator review and commit (including the L4 hardening and §11d.11),
     `merge:ready`, the merge and the DEV checkout; then L4 by runbook §11d under a separate DEV
     authorisation; L5 at a scheduled production promotion. The 2026 corpus stays ISSUE-224/228.

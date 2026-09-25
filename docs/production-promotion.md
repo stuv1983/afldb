@@ -195,15 +195,38 @@ worktree/branch/base, dirty state, migration reservations across relevant refs/w
 `.env`/tool availability, database identity/role/reachability and migration parity without
 printing a DSN or changing state:
 
+`--mode promotion` requires an explicit `--promotion-side` (AFLDB-ISSUE-243):
+
+- **`source`** is the rebuilt `*_test` database (default `AFLDB_TEST_DATABASE_URL` /
+  `afldb_test`). Identity, role and **migration parity** are all required.
+- **`target`** is one credential for the database being replaced: exactly `afldb_dev` for
+  `--environment dev`, or `afldb_prod` for `--environment prod`. `--dsn-env` is required. It proves
+  identity, role and connectivity only. It does **not** read `afldb_meta.schema_migrations`, so the
+  restricted `afldb_import` and `afldb_backup` credentials are checked without metadata grants. An
+  `--expect-database` that names another database is refused before any connection.
+
 ```bash
-# Workstation, DEV source example. Add --expect-role when the step requires an exact role.
-npm run preflight -- --mode promotion --environment dev \
-    --dsn-env AFLDB_TEST_DATABASE_URL --expect-database afldb_test \
-    --ssh-host streamanator
+# DEV source. On PROD, the source runs on DEV and the targets on afldb-prod with --environment prod.
+npm run preflight -- --mode promotion --environment dev --promotion-side source \
+    --dsn-env AFLDB_TEST_DATABASE_URL --expect-database afldb_test --expect-role afldb_owner
+# One run per target credential the phase uses (owner, import, backup):
+npm run preflight -- --mode promotion --environment dev --promotion-side target \
+    --dsn-env AFLDB_OWNER_DATABASE_URL --expect-database afldb_dev --expect-role afldb_owner
+npm run preflight -- --mode promotion --environment dev --promotion-side target \
+    --dsn-env AFLDB_IMPORT_DATABASE_URL --expect-database afldb_dev --expect-role afldb_import
+npm run preflight -- --mode promotion --environment dev --promotion-side target \
+    --dsn-env AFLDB_BACKUP_DATABASE_URL --expect-database afldb_dev --expect-role afldb_backup
+# Add --ssh-host <alias> when the operation crosses hosts.
 ```
 
 Every `FAIL` is a stop. `WARN` is evidence to read, not an automatic waiver. The command does
 not fetch, so an operator-required `git fetch` remains a separate explicit action.
+
+Promotion's dirty-tree check makes one exception. It lists the **untracked** nightly settle
+manifests (`docs/rebuild-manifests/afltables_fitzroy_core/settle-*.json`, the same pattern
+`deploy/sync-dev-remote.sh` preserves) as a `WARN`, not a blocker. Every other dirty path still
+FAILs, and that includes a tracked or staged manifest, any other untracked file, and any
+JSON or CSV outside that pattern.
 
 ```bash
 # DEV: streamanator — the rebuilt source must be exactly what the checkout expects
