@@ -526,6 +526,8 @@ This addendum records a newly observed fact only. The acceptance evidence above 
   - The 2026-09-06 DEV promotion reinstated `data_overrides` but withheld `data_edits` as
     historical-only (AFLDB-ISSUE-139 D2), so the audit rows above are not in the current DEV
     lineage.
-- **AFLDB-ISSUE-246** (`issues/open/AFLDB-ISSUE-246.md`) owns the separately approved, audited
+- **AFLDB-ISSUE-246** (`issues/closed/AFLDB-ISSUE-246.md`) owns the separately approved, audited
   retirement. The override is set inactive and preserved, and one `auth_audit_log` record is
-  appended. Nothing is deleted, and no audit row here is rewritten.
+  appended. Nothing is deleted, and no audit row here is rewritten. *(2026-09-25: done on DEV and
+  ISSUE-246 RESOLVED. The retirement audit is `auth_audit_log` 983, and override `id 1` is
+  inactive.)*

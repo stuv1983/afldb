@@ -89,7 +89,7 @@ ISSUE-237 is not resolved.)*
 | ISSUE-245 blocker on L3 | CLEARED (§11a.5) |
 | ISSUE-245 `afldb_test` proof | PASS, through L3 (§11a.6) |
 | L3 | **PASS** (§11a.6) |
-| L4 DEV promotion | **NOT RUN.** Procedure rewritten after the L4 hardening (§11d; findings and fixes §11d.0, prerequisites §11d.2). *(2026-09-25: the second real attempt STOPPED at A4.3, before the destructive boundary. A3 PASS; the blocker is the orphaned ISSUE-109 fixture override; prerequisite **AFLDB-ISSUE-246**, §11d.12.)* |
+| L4 DEV promotion | **NOT RUN.** Procedure rewritten after the L4 hardening (§11d; findings and fixes §11d.0, prerequisites §11d.2). *(2026-09-25: the second real attempt STOPPED at A4.3, before the destructive boundary. A3 PASS; the blocker is the orphaned ISSUE-109 fixture override; prerequisite **AFLDB-ISSUE-246**, §11d.12.)* *(2026-09-25: ISSUE-246 RESOLVED, audit 983; the A4.3 rerun returned no rows, so A4.3 is PASS; A3/A4.1/A4.2 unchanged; next step **A5**, §11d.13.)* |
 | L5 PROD promotion | **NOT RUN** |
 
 **P-M state (2026-09-24).** Point 1 PROVEN (DB-free). Point 2 PROVEN (live, `afldb_test`,
@@ -3645,10 +3645,44 @@ preflight results belong to AFLDB-ISSUE-243 and are recorded there.
     carried as an orphan through the 2026-09-06 DEV promotion.
   - A4.3 behaved as designed (F-L4-9) and is not weakened.
 - **Nothing past A4.3 ran:** no A5, backup, dump, candidate, `--plan` or swap.
-- **Prerequisite: AFLDB-ISSUE-246** (`issues/open/AFLDB-ISSUE-246.md`), the audited, fixture-bound
-  retirement of that override. After it, A4.3 must return no rows. Then resume L4 at §11d A under
-  its own authorisation.
+- **Prerequisite: AFLDB-ISSUE-246** (`issues/closed/AFLDB-ISSUE-246.md`), the audited,
+  fixture-bound retirement of that override. After it, A4.3 must return no rows. Then resume L4 at
+  §11d A under its own authorisation. *(2026-09-25: met; see §11d.13.)*
 - **L4 remains NOT RUN**: it stopped before the destructive boundary.
+
+### 11d.13 AFLDB-ISSUE-246 live repair (2026-09-25, operator-run): PASS; A4.3 cleared; L4 NOT RUN
+
+The operator reported this result; Claude recorded it and did not re-run it. The full evidence is
+in `issues/closed/AFLDB-ISSUE-246.md` §10.1.
+
+- **ISSUE-246 live repair: PASS**, on DEV at `4bb23a8f`, after a mandatory `afldb_dev` backup.
+  - Validate-only returned WOULD_RETIRE.
+  - `--apply` returned RETIRED, with retirement audit **`auth_audit_log` 983**, 2 writes,
+    COMMITTED.
+  - The rerun returned ALREADY_RETIRED on the same 983, with 0 writes.
+  - Override `id 1` (`matches` / `2026|R30|2026-12-31|104|103` / `notes`) is preserved and
+    inactive. The canonical fixture match is still absent.
+  - `data_edits` (153/245) and `data_overrides` (118) are unchanged, and `auth_audit_log` grew by
+    exactly one row (max 982 → 983).
+  - **ISSUE-246 is RESOLVED.**
+- **The A4.3 rerun** (ISSUE-246 P4, the §11d A4.3 query verbatim) returned **no rows**. **A4.3 is
+  now PASS, and L4 is unblocked at A4.3.**
+
+**L4 gate state after ISSUE-246:**
+
+| Step | State |
+|---|---|
+| A3 | remains **PASS** (§11d.12) |
+| A4.1 | remains DEV `afl_api` ledger **0** / net-linked **0** |
+| A4.2 | remains DEV manual registrations **92** / source **92** |
+| A4.3 | **PASS**: no rows |
+| A5 onward | **NOT RUN** |
+
+- **Nothing past A4 ran as part of ISSUE-246:** no A5, promotion dump, candidate, `--plan` or
+  swap. The ISSUE-246 pre-mutation backup was that issue's own safety net and is not an L4
+  artefact.
+- **L4 remains NOT RUN, and ISSUE-237 remains OPEN.**
+- **Next step: L4 A5**, under ISSUE-237 and its own separate DEV authorisation.
 
 ## 12. Non-goals and successors
 
@@ -3810,6 +3844,11 @@ Boundaries are unchanged. ISSUE-237 is not resolved.)*
 92/92, A4.3 `matches` = 1: the orphaned, retained ISSUE-109 DEV fixture override. No A5, backup,
 dump, candidate, plan or swap ran. **L4 remains NOT RUN.** The next action is AFLDB-ISSUE-246, then
 L4 again from §11d A under its own authorisation. ISSUE-237 is not resolved.)*
+*(2026-09-25: **AFLDB-ISSUE-246 is RESOLVED** on live DEV evidence (§11d.13). The retirement audit
+is `auth_audit_log` 983, and the A4.3 rerun returned no rows, so **A4.3 is PASS**. A3 PASS, A4.1
+0/0 and A4.2 92/92 are unchanged. No A5, promotion dump, candidate, plan or swap ran as part of
+ISSUE-246. **L4 remains NOT RUN.** The next action is **L4 A5**, under a separate DEV
+authorisation. ISSUE-237 is not resolved.)*
 
 ---
 

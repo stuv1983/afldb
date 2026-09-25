@@ -9,29 +9,7 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Open issues:** 17
-
-### AFLDB-ISSUE-246 — Orphaned ISSUE-109 DEV match override blocks promotion
-- **Severity:** High. **Area:** durable admin overrides / DEV operations —
-  `tools/maintenance/issue246-retire-issue109-fixture.ts`, `data_overrides`, `auth_audit_log`.
-- **State:** Open (2026-09-25), from ISSUE-237 L4 A4.3, which STOPPED correctly on one active
-  `matches`/`notes` override. That override is `2026|R30|2026-12-31|104|103`, the retained ISSUE-109
-  fixture baseline, and its canonical match is absent. The fixture match was deleted on the old DEV
-  lineage, and the 2026-09-06 DEV promotion carried the override while withholding `data_edits`
-  (ISSUE-139 D2). Implemented and DB-free validated (88/88), uncommitted:
-  - a fixture-bound CLI, `npm run db:issue246:retire-issue109-fixture`, for exactly `afldb_dev`,
-    with `--environment dev` and no force or prod path;
-  - it proves the exact override, its ISSUE-109 provenance, that the canonical match is absent,
-    that `data_edits` holds no chain, and a later DEV `database.promoted` marker naming `data_edits`
-    historical-only;
-  - then, in one transaction, it sets `is_active = false` and appends one `auth_audit_log`
-    `data_override.retired` row;
-  - reruns are a verified ALREADY_RETIRED no-op.
-
-  Nothing is deleted. NOT run on any database.
-- **Runbook:** `issues/open/AFLDB-ISSUE-246.md` (§10 has the live DEV commands and read-only checks).
-- **Next action:** operator review and commit; then the §10 validate-only and `--apply` run on DEV
-  under explicit authorisation; resolve on P1–P5; then resume ISSUE-237 L4.
+**Open issues:** 16
 
 ### AFLDB-ISSUE-243 — Promotion preflight cannot validate target credentials and rejects known DEV operational artefacts
 - **Severity:** High. **Area:** operator workflow tooling — `tools/dev/preflight-core.ts`,
@@ -246,10 +224,15 @@
     - A4.1 read 0/0 and A4.2 read 92/92.
     - **A4.3 STOP, `matches` = 1:** the orphaned, retained ISSUE-109 DEV fixture override.
     - No A5, backup, dump, candidate, plan or swap ran. The prerequisite is **AFLDB-ISSUE-246**.
-  - **Next action:** the operator review and commit (including the L4 hardening and §11d.11),
-    `merge:ready`, the merge and the DEV checkout; AFLDB-ISSUE-246's audited retirement on DEV; then
-    L4 again by runbook §11d under a separate DEV authorisation; L5 at a scheduled production
-    promotion. The 2026 corpus stays ISSUE-224/228.
+  - **Update (2026-09-25): AFLDB-ISSUE-246 RESOLVED on live DEV evidence; the A4.3 blocker is
+    cleared** (runbook §11d.13).
+    - The orphan override is retired: `auth_audit_log` 983, and the rerun of A4.3 returned no
+      rows. **A4.3 is now PASS.**
+    - A3 remains PASS, A4.1 remains 0/0, and A4.2 remains 92/92.
+    - No A5, promotion dump, candidate, plan or swap ran as part of ISSUE-246. **L4 remains NOT
+      RUN.**
+  - **Next action:** L4 A5 by runbook §11d, under a separate DEV authorisation; L5 at a scheduled
+    production promotion. The 2026 corpus stays ISSUE-224/228.
   - **Not authorised:** no destructive rebuild, promotion or DEV mutation, and no commit without
     separate authorisation.
 

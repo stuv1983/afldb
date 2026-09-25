@@ -2,14 +2,25 @@
 
 ## 0. Status
 
-**Open (2026-09-25).** **Severity:** High. It blocks ISSUE-237 L4, the next DEV promotion.
-**Area:** durable admin overrides and DEV operations: `data_overrides`, `auth_audit_log`, and
-`tools/maintenance/issue246-retire-issue109-fixture.ts`. **Tier:** T1 (one tool, one test file,
-one npm script, and tracking).
+**RESOLVED (2026-09-25).** **Severity:** High. It blocked ISSUE-237 L4, the next DEV promotion,
+at A4.3. **Area:** durable admin overrides and DEV operations: `data_overrides`, `auth_audit_log`,
+and `tools/maintenance/issue246-retire-issue109-fixture.ts`. **Tier:** T1 (one tool, one test
+file, one npm script, and tracking).
 
-**Implemented and DB-free validated (§9), uncommitted. NOT run against any database.** No DEV, PROD,
-`afldb_test`, `code_test_db` or SSH contact happened in the implementation pass. ISSUE-237 L4 is
-**not** continued by this issue.
+**Resolved on operator-run live DEV evidence (§10.1).** The fix was committed as `4bb23a8f`
+(`fix(maintenance): retire orphaned dev fixture override`) and deployed to DEV. Under explicit
+authorisation, the operator backed up `afldb_dev`, ran validate-only (WOULD_RETIRE), `--apply`
+(RETIRED, `auth_audit_log` 983, 2 writes, COMMITTED) and a rerun (ALREADY_RETIRED, the same 983, 0
+writes). P1–P5 all PASS. Override `id 1` is preserved and inactive, the canonical fixture match is
+still absent, `data_edits` and `data_overrides` did not move, and ISSUE-237 A4.3 now returns no
+rows.
+
+ISSUE-237 L4 is **not** continued by this issue. ISSUE-237 stays open, and its next step is L4
+A5 under its own authorisation.
+
+*(Historical, implementation pass 2026-09-25: implemented and DB-free validated (§9); NOT run
+against any database. No DEV, PROD, `afldb_test`, `code_test_db` or SSH contact happened in that
+pass.)*
 
 ## 1. Live evidence (ISSUE-237 L4, second attempt, 2026-09-25, operator-reported)
 
@@ -247,7 +258,7 @@ committed retired row and the audit, and returns ALREADY_RETIRED.
 The in-memory store stages writes and publishes them only when the callback resolves. That is the
 `begin()` rollback contract, but a real PostgreSQL proof is §11's optional rehearsal.
 
-## 10. Live DEV procedure (operator-run; NOT RUN)
+## 10. Live DEV procedure (operator-run; RUN 2026-09-25, PASS — evidence §10.1)
 
 **Prerequisites:**
 1. **This code on the DEV host.** The ISSUE-246 code is committed, merged and on the DEV checkout
@@ -312,6 +323,61 @@ dev_ro "SELECT format('db=%s data_edits=%s/%s audit=%s/%s overrides=%s', current
 
 Record steps 0–4 and P1–P5 here. Then resolve ISSUE-246 and resume ISSUE-237 L4 from §11d A under
 its own authorisation.
+
+### 10.1 Live DEV evidence (2026-09-25, operator-run): PASS
+
+The operator ran this and reported the results; Claude recorded them here and did not re-run
+anything. Claude had no database or SSH contact.
+
+**Deployed revision:** `4bb23a8f` `fix(maintenance): retire orphaned dev fixture override`.
+
+**Step 1: mandatory pre-mutation DEV backup.**
+
+| Item | Value |
+|---|---|
+| Dump | `/home/arm/backups/afldb/afldb_dev-20260925-211927.dump` |
+| SHA256 | `a269410ff68c87cd9cc6525e7d827f84c757f689f7fad87c0e06cfbb9c0f3676` |
+| `pg_restore` archive objects | 1544 |
+
+**Step 0: pre-state.** `db=afldb_dev data_edits=153/245 audit=964/982 overrides=118`.
+
+**Steps 2–4: the tool.**
+
+| Run | Verdict | Retirement audit | Writes | Transaction | Result |
+|---|---|---|---|---|---|
+| 2. Validate only | WOULD_RETIRE | — | 0 | READ ONLY | PASS |
+| 3. `--apply` | RETIRED | `auth_audit_log` 983 | 2 | COMMITTED | PASS |
+| 4. `--apply` rerun (idempotence) | ALREADY_RETIRED | `auth_audit_log` 983 (same) | 0 | COMMITTED (no writes) | PASS |
+
+The validate-only run also reported:
+- target database `afldb_dev`;
+- override `data_overrides` 1;
+- natural key `matches` / `2026|R30|2026-12-31|104|103` / `notes`;
+- canonical match absent;
+- promotion markers 644;
+- actor `auth_users` id 4.
+
+**Read-only post-repair checks.**
+
+| Check | Result |
+|---|---|
+| P1 | `db=afldb_dev id=1 type=matches group=notes active=false admin=4 payload_exact=true created=2026-08-30 10:22:26.717013+10 updated=2026-09-25 21:21:19.053548+10` |
+| P2 | `db=afldb_dev audit=983 actor=4 issue=AFLDB-ISSUE-246 override=1 key=2026\|R30\|2026-12-31\|104\|103 prev_active=true new_active=false payload_exact=true same_instant=true` |
+| P3 | `db=afldb_dev fixture_matches=0` |
+| P4 (ISSUE-237 A4.3, verbatim) | **no rows** |
+| P5 | `db=afldb_dev data_edits=153/245 audit=965/983 overrides=118` |
+
+**Reading P5 against step 0:**
+- `data_edits` count and max are unchanged (153/245).
+- The `data_overrides` count is unchanged (118).
+- `auth_audit_log` grew by exactly one row (964 → 965), and its max id advanced 982 → 983, the
+  retirement row. No unrelated audit row landed in the window.
+- The orphan override was preserved and made inactive. Its payload, author (4) and `created_at`
+  are unchanged, and its `updated_at` equals the audit's `at` (P2 `same_instant=true`).
+- The canonical fixture match is still absent (P3).
+- ISSUE-237 A4.3 is clear (P4).
+
+**Verdict: PASS.** Every §5 desired-final-state condition holds. ISSUE-246 is resolved.
 
 ## 11. Optional `code_test_db` rehearsal (proposed; awaiting operator authorisation)
 
