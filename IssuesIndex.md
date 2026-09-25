@@ -9,7 +9,32 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Open issues:** 18
+**Open issues:** 19
+
+### AFLDB-ISSUE-249 — Promotion/rebuild drops canonical first-kick-goal achievements
+- **Severity:** High. **Area:** rebuild stage graph (`tools/db/rebuild-test.ts`), first-kick-goal
+  importer (`tools/records/import-first-kick-goal.ts`, new `tools/records/first-kick-goal-source.ts`),
+  promotion checker (`tools/db/promotion-check.ts`).
+- **State:** Open (discovered 2026-09-26). The post-merge ISSUE-237 L4 DEV promotion carried
+  first-kick-goal **0** over DEV's 335 (334 `wikipedia_first_kick_goal` + 1 manual). The operator
+  rolled it back; the candidate `afldb_dev_candidate_20260926-033212` is retained as evidence.
+  - **Root cause:** no rebuild stage ever loaded the family (afldb_test held it only from a manual
+    `--apply`; L3 reset it to 0), and no promotion gate reads this import-writable table.
+  - **Fix (uncommitted):** a pinned `first-kick-goal` rebuild stage (PRECHECK + FINAL VALIDATION)
+    and a manifest-identity promotion gate (FAIL at source/restored/candidate/production).
+  - DB-free validated. The two `db-test-rebuild` failures reproduce identically on clean `main` @
+    `397f422d`, and ISSUE-249 adds none.
+  - `code_test_db` rehearsal **PASS 15/15**, including the real 334-row source.
+  - **Rebuild-runner rehearsal PASS 12/12:** the real `planStages()`/`executeRebuild()` executes
+    stage 27/29 `first-kick-goal`; the full FINAL VALIDATION reports `PASSED: 89 checks`; there is
+    zero residue.
+  - A manual first-kick-goal row stays outside the 334-id manifest set.
+  - E1b's exact refusal is inferred from code, not from a retained transcript.
+  - **ISSUE-237 L4 remains NOT COMPLETE.**
+- **Runbook:** `issues/open/AFLDB-ISSUE-249.md` (§7 is the operator path).
+- **Next action:** review, commit and deploy. Confirm the extract hash on the rebuild host. Reload
+  `afldb_test` (L3 rerun, or the stage command) and pass `--phase source`. Then rerun ISSUE-237 L4
+  with a fresh `$STAMP`.
 
 ### AFLDB-ISSUE-248 — Reserved-domain DEV auth fixtures block promotion
 - **Severity:** High. **Area:** DEV auth operations — `auth_users`, `admin_invites`,
@@ -276,7 +301,12 @@
       login/logout audit rows and 4 revoked sessions, all of user 18. Prerequisite:
       **AFLDB-ISSUE-248** (committed `a4f734af`).
     - Nothing past A5 ran: no backup, dump, candidate, plan or swap.
-  - **Next action:** finish combined ISSUE-247/248 integration; deploy the combined result to DEV;
+  - **Update (2026-09-26): the post-merge L4 (ISSUE-247/248 at `397f422d`) reached the post-swap
+    phase and was ROLLED BACK.** The promoted candidate held first-kick-goal 0 against DEV's 335 /
+    334 → **AFLDB-ISSUE-249** (rebuild never loaded the family; no gate read it). `afldb_dev` is
+    restored; `afldb_dev_candidate_20260926-033212` is retained. **L4 is NOT COMPLETE.** The next L4
+    needs ISSUE-249 deployed and `afldb_test` reloaded (ISSUE-249 runbook §7).
+  - **Next action (pre-2026-09-26; superseded by the update above):** finish combined ISSUE-247/248 integration; deploy the combined result to DEV;
     run ISSUE-248's controlled validate/apply/idempotence/postchecks; run ISSUE-247's live DEV
     empty-table/COPY-header proof; then rerun L4 A5 with a fresh `$STAMP` by runbook §11d, under a
     separate DEV authorisation; L5 remains scheduled production work. The 2026 corpus stays

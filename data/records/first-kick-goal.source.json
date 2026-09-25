@@ -1,0 +1,12 @@
+{
+  "issue": "AFLDB-ISSUE-249",
+  "note": "The accepted first-kick-goal source a rebuild reconstructs player_achievements from. The extract is gitignored and hand-curated (ISSUE-084 §9.2): place the accepted file at `extract` or point AFLDB_FIRST_KICK_GOAL_CSV at it; its bytes must hash to extract_sha256. Hashes are over CRLF-normalised bytes. A new extract or a manifest change (--assign-ids, a retirement, a rename) is a new source decision and is re-pinned here deliberately.",
+  "pinned_on": "2026-09-26",
+  "pinned_from": "D:\\dev\\afldb\\data\\records\\first-kick-goal.csv (the workstation copy ISSUE-084 §9.2 distributes)",
+  "extract": "data/records/first-kick-goal.csv",
+  "extract_sha256": "8f234f3b76ce78c18e6d0bc7f30ef8f64ec125b4b646f4cd15577a32f0e5a036",
+  "extract_rows": 334,
+  "manifest": "data/records/first-kick-goal-ids.csv",
+  "manifest_sha256": "72e348a24b53e29d97fb6ae9e86a110092ab7b51dcb4338ea805a15e7f35cda9",
+  "manifest_active": 334
+}

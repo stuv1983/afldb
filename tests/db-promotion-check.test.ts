@@ -116,7 +116,10 @@ import {
   publishRestoredAflApiFiles, readRebuildMarkerPresent, writeOperatorFileAtomically, type AflApiOverlapResult, type Query,
   DEFAULT_DSN_ENV, READ_ONLY_SQL, parseArgs, readAflApiForwardIdentities as readPromotionForwardIdentities,
   readAflApiReverseIdentities as readPromotionReverseIdentities, writePlan,
+  FIRST_KICK_GOAL_GATE, FIRST_KICK_GOAL_IDENTITIES_SQL, gateFirstKickGoalIdentities, judgeFirstKickGoalIdentities,
+  type FirstKickGoalObserved,
 } from '../tools/db/promotion-check';
+import { trackedExpectedIds } from '../tools/records/first-kick-goal-source';
 import {
   AflApiReplayAbort, readAflApiForwardIdentities as readRebuildForwardIdentities, replayAflApiAdjudicationsFromSupersedeFile,
   resolveAflApiPlayerIdentity,
@@ -4893,5 +4896,203 @@ describe('AFLDB-ISSUE-242 — code_test_db convergence rehearsal harness (DB-fre
     expect(new Set(w.candidate.map((c) => c.paths[0].path)).size).toBe(92);
     const small = scaleWorld(7);
     expect([small.candidate.length, small.records.length]).toEqual([7, 5]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-249 — the first-kick-goal source identity gate
+// ---------------------------------------------------------------------------
+
+describe('AFLDB-ISSUE-249 first-kick-goal source identities', () => {
+  beforeEach(() => { vi.spyOn(console, 'log').mockImplementation(() => {}); });
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  const EXPECTED = ['fkg-001', 'fkg-002', 'fkg-003'];
+  const held = (...ids: string[]): FirstKickGoalObserved[] => ids.map((recordId) => ({ recordId, n: 1 }));
+  /** A read-only fake: one answer per database, and it refuses any SQL but the gate's own. */
+  const fakeDb = (rows: FirstKickGoalObserved[]) => {
+    const calls: { text: string; params?: unknown[] }[] = [];
+    const q: Query = async (text, params) => {
+      calls.push({ text, params });
+      if (text !== FIRST_KICK_GOAL_IDENTITIES_SQL) throw new Error(`unexpected SQL: ${text}`);
+      return rows.map((r) => ({ recordId: r.recordId, n: String(r.n) }));
+    };
+    return { q, calls };
+  };
+
+  it('STOPs the observed transition: a non-empty target and an EMPTY candidate', () => {
+    const j = judgeFirstKickGoalIdentities({
+      expected: EXPECTED,
+      subject: { role: 'candidate afldb_dev_candidate_x', observed: [] },
+      target: { role: 'target afldb_dev', observed: held('fkg-001', 'fkg-002', 'fkg-003') },
+    });
+    expect(j.verdict).toBe('FAIL');
+    expect(j.missing).toEqual(EXPECTED);
+    expect(j.targetMissing).toEqual(EXPECTED);
+    expect(j.lines.join('\n')).toMatch(/STOP candidate afldb_dev_candidate_x holds NO first-kick-goal record while 3 are expected and target afldb_dev holds 3 — the AFLDB-ISSUE-249 loss/);
+  });
+
+  it('STOPs an empty source even without a target to compare with: the manifest is the expectation', () => {
+    const j = judgeFirstKickGoalIdentities({ expected: EXPECTED, subject: { role: 'source afldb_test', observed: [] } });
+    expect(j.verdict).toBe('FAIL');
+    expect(j.lines.join('\n')).toMatch(/holds NO first-kick-goal record while 3 are expected — the AFLDB-ISSUE-249 loss/);
+  });
+
+  it('PASSes exactly the manifest set, with or without a target holding the same set', () => {
+    const exact = judgeFirstKickGoalIdentities({ expected: EXPECTED, subject: { role: 'c', observed: held(...EXPECTED) } });
+    expect(exact.verdict).toBe('PASS');
+    expect([exact.missing, exact.unknown, exact.duplicated, exact.targetMissing]).toEqual([[], [], [], []]);
+    const withTarget = judgeFirstKickGoalIdentities({
+      expected: EXPECTED, subject: { role: 'c', observed: held('fkg-003', 'fkg-001', 'fkg-002') },
+      target: { role: 't', observed: held(...EXPECTED) },
+    });
+    expect(withTarget.verdict).toBe('PASS');
+  });
+
+  it('is semantic, not a count: a partial, an unknown, a NULL or a duplicated id each FAIL', () => {
+    // Three rows, but one id swapped for an id the manifest does not carry.
+    const swapped = judgeFirstKickGoalIdentities({ expected: EXPECTED, subject: { role: 'c', observed: held('fkg-001', 'fkg-002', 'fkg-999') } });
+    expect(swapped.verdict).toBe('FAIL');
+    expect(swapped.missing).toEqual(['fkg-003']);
+    expect(swapped.unknown).toEqual(['fkg-999']);
+    // Three rows, one id twice.
+    const dup = judgeFirstKickGoalIdentities({
+      expected: EXPECTED, subject: { role: 'c', observed: [{ recordId: 'fkg-001', n: 2 }, { recordId: 'fkg-002', n: 1 }] },
+    });
+    expect(dup.verdict).toBe('FAIL');
+    expect(dup.duplicated).toEqual(['fkg-001 ×2']);
+    expect(dup.missing).toEqual(['fkg-003']);
+    const nul = judgeFirstKickGoalIdentities({
+      expected: EXPECTED, subject: { role: 'c', observed: [...held(...EXPECTED), { recordId: null, n: 1 }] },
+    });
+    expect(nul.verdict).toBe('FAIL');
+    expect(nul.unknown).toEqual(['(null)']);
+    const partial = judgeFirstKickGoalIdentities({ expected: EXPECTED, subject: { role: 'c', observed: held('fkg-001') } });
+    expect(partial.verdict).toBe('FAIL');
+    expect(partial.lines.join('\n')).not.toMatch(/holds NO/); // a STOP, but not the empty-set message
+  });
+
+  it('reports a target id the manifest has since retired without refusing its absence', () => {
+    const j = judgeFirstKickGoalIdentities({
+      expected: EXPECTED, subject: { role: 'c', observed: held(...EXPECTED) },
+      target: { role: 't', observed: held(...EXPECTED, 'fkg-004') },
+    });
+    expect(j.verdict).toBe('PASS');
+    expect(j.targetRetired).toEqual(['fkg-004']);
+    expect(j.lines.join('\n')).toMatch(/retired in the manifest and correctly absent here: fkg-004/);
+  });
+
+  it("only reports, never refuses, the target's own read at pre-cutover", () => {
+    const j = judgeFirstKickGoalIdentities({ expected: EXPECTED, subject: { role: 'target afldb_dev', observed: [] }, informational: true });
+    expect(j.verdict).toBe('INFO');
+    expect(j.lines.join('\n')).not.toMatch(/STOP/);
+  });
+
+  it('gate: reads only its own read-only SQL, binds source key and type, and adds one result', async () => {
+    const candidate = fakeDb([]);
+    const target = fakeDb(held(...EXPECTED));
+    const report = new Report();
+    const j = await gateFirstKickGoalIdentities({ q: candidate.q, role: 'candidate x' }, ['player_achievements'], report,
+      { target: { q: target.q, role: 'target afldb_dev' }, expected: EXPECTED });
+    expect(j?.verdict).toBe('FAIL');
+    expect(report.results).toEqual([expect.objectContaining({ gate: FIRST_KICK_GOAL_GATE, verdict: 'FAIL' })]);
+    expect(candidate.calls).toHaveLength(1);
+    expect(target.calls).toHaveLength(1);
+    for (const call of [...candidate.calls, ...target.calls]) {
+      expect(call.params).toEqual(['wikipedia_first_kick_goal', 'first_kick_goal']);
+      expect(call.text).not.toMatch(/\b(INSERT|UPDATE|DELETE|TRUNCATE|ALTER|CREATE|DROP)\b/i);
+    }
+    const passReport = new Report();
+    await gateFirstKickGoalIdentities({ q: fakeDb(held(...EXPECTED)).q, role: 'candidate x' }, ['player_achievements'],
+      passReport, { expected: EXPECTED });
+    expect(passReport.results.map((r) => r.verdict)).toEqual(['PASS']);
+  });
+
+  it('gate: an absent player_achievements table FAILs (INFO when only informational), without querying', async () => {
+    const db = fakeDb([]);
+    const report = new Report();
+    await gateFirstKickGoalIdentities({ q: db.q, role: 'candidate x' }, [], report, { expected: EXPECTED });
+    await gateFirstKickGoalIdentities({ q: db.q, role: 'target x' }, [], report, { expected: EXPECTED, informational: true });
+    expect(report.results.map((r) => r.verdict)).toEqual(['FAIL', 'INFO']);
+    expect(db.calls).toEqual([]);
+  });
+
+  it('gate: defaults its expectation to the TRACKED manifest', async () => {
+    const tracked = trackedExpectedIds();
+    expect(tracked.length).toBeGreaterThan(0);
+    const j = await gateFirstKickGoalIdentities({ q: fakeDb(held(...tracked)).q, role: 'candidate x' },
+      ['player_achievements'], new Report());
+    expect(j?.verdict).toBe('PASS');
+    const short = await gateFirstKickGoalIdentities({ q: fakeDb(held(...tracked.slice(1))).q, role: 'candidate x' },
+      ['player_achievements'], new Report());
+    expect(short?.verdict).toBe('FAIL');
+    expect(short?.missing).toEqual([tracked[0]]);
+  });
+
+  it('owns the manifest-backed fkg set only: a manual first-kick-goal row is not a member (the DEV 334 + 1 shape)', async () => {
+    // A table, not a canned answer: every first-kick-goal row whatever its source, filtered and
+    // grouped exactly by the gate's bound parameters ($1 = source key, $2 = achievement type).
+    type AchievementRow = { sourceKey: string; type: string; recordId: string };
+    const tableDb = (rows: AchievementRow[]) => {
+      const q: Query = async (text, params) => {
+        if (text !== FIRST_KICK_GOAL_IDENTITIES_SQL) throw new Error(`unexpected SQL: ${text}`);
+        const [key, type] = params as [string, string];
+        const counts = new Map<string, number>();
+        for (const r of rows) if (r.sourceKey === key && r.type === type) counts.set(r.recordId, (counts.get(r.recordId) ?? 0) + 1);
+        return [...counts.entries()].sort(([a], [b]) => (a < b ? -1 : 1)).map(([recordId, n]) => ({ recordId, n: String(n) }));
+      };
+      return q;
+    };
+    const tracked = trackedExpectedIds();
+    const wiki = (ids: readonly string[]): AchievementRow[] => ids.map((recordId) => ({
+      sourceKey: 'wikipedia_first_kick_goal', type: 'first_kick_goal', recordId }));
+    // The ISSUE-167 acceptance row: manual_admin_edit provenance, a `first_kick_goal:<uuid>` key.
+    const manual: AchievementRow = {
+      sourceKey: 'manual_admin_edit', type: 'first_kick_goal', recordId: 'first_kick_goal:fdadd8a8-0000-4000-8000-000000000249' };
+    const full = [...wiki(tracked), manual];
+    expect(full).toHaveLength(tracked.length + 1);
+
+    const report = new Report();
+    const pass = await gateFirstKickGoalIdentities({ q: tableDb(full), role: 'candidate x' }, ['player_achievements'], report,
+      { target: { q: tableDb(full), role: 'target afldb_dev' } });
+    expect(pass?.verdict).toBe('PASS');
+    expect([pass?.missing, pass?.unknown, pass?.duplicated, pass?.targetMissing]).toEqual([[], [], [], []]);
+    expect(pass?.lines.join('\n')).toContain(`candidate x: ${tracked.length} wikipedia_first_kick_goal row(s), ${tracked.length} distinct id(s)`);
+    expect(pass?.lines.join('\n')).not.toMatch(/first_kick_goal:/);
+
+    // Remove one manifest-backed id, the manual row still present: STOP naming exactly that id.
+    const victim = tracked[Math.floor(tracked.length / 2)];
+    const lost = await gateFirstKickGoalIdentities(
+      { q: tableDb(full.filter((r) => r.recordId !== victim)), role: 'candidate x' }, ['player_achievements'], new Report(),
+      { target: { q: tableDb(full), role: 'target afldb_dev' } });
+    expect(lost?.verdict).toBe('FAIL');
+    expect(lost?.missing).toEqual([victim]);
+    expect(lost?.targetMissing).toEqual([victim]);
+    expect(lost?.unknown).toEqual([]);
+    expect(lost?.lines.join('\n')).toContain(`STOP missing 1: ${victim}`);
+
+    // Provenance and duplicate checks are not weakened by the scoping: a duplicated fkg id still FAILs.
+    const dup = await gateFirstKickGoalIdentities({ q: tableDb([...full, ...wiki([tracked[0]])]), role: 'candidate x' },
+      ['player_achievements'], new Report());
+    expect(dup?.verdict).toBe('FAIL');
+    expect(dup?.duplicated).toEqual([`${tracked[0]} ×2`]);
+
+    // The rebuild's FINAL VALIDATION checks scope the family the same way: type AND source.
+    const { firstKickGoalChecks } = await import('../tools/db/rebuild-test');
+    for (const check of firstKickGoalChecks()) {
+      expect(check.sql).toContain("s.key = 'wikipedia_first_kick_goal' AND a.achievement_type = 'first_kick_goal'");
+    }
+  });
+
+  it('is wired into source, candidate and production, the restored target comparison, and pre-cutover (INFO)', () => {
+    const src = readFileSync(join(process.cwd(), 'tools', 'db', 'promotion-check.ts'), 'utf8').replace(/\r\n/g, '\n');
+    const main = src.slice(src.indexOf('async function main('));
+    expect(main).toMatch(/phase === 'source' \|\| phase === 'candidate' \|\| phase === 'production'\) \{\n\s+await gateFirstKickGoalIdentities\(/);
+    expect(main).toMatch(/phase === 'pre-cutover'\) \{\n\s+await gateFirstKickGoalIdentities\([^;]*informational: true/);
+    // restored: the candidate against the target, inside the block that opened the target,
+    // before the lineage gate and so before any remap file can be published.
+    const restored = main.slice(main.indexOf("if (phase === 'restored') {"));
+    expect(restored.slice(0, restored.indexOf('gateLineageIdentity'))).toMatch(
+      /gateFirstKickGoalIdentities\(\{ q: conn\.q, role: `candidate \$\{opts\.database\}` \}, present, report,\n\s+\{ target: \{ q: old\.q/);
   });
 });

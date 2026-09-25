@@ -1,8 +1,15 @@
 import 'server-only';
 
-import type { Sql } from 'postgres';
+import type { Sql, TransactionSql } from 'postgres';
 
 import type { ImportBatchId } from '../import-batch-id';
+
+/**
+ * AFLDB-ISSUE-249: the two read-only resolvers accept a transaction handle as
+ * well as a pool, so the first-kick-goal rehearsal can resolve inside the
+ * transaction it rolls back. Type-only; the queries are unchanged.
+ */
+type ReadSql = Sql | TransactionSql;
 
 /**
  * The dataset registry: what an administrator may upload, what it must
@@ -87,7 +94,7 @@ export async function resolveSeason(sql: Sql, value: string | null): Promise<num
 
 /** Club by any recorded alias, resolved to the identity of the season. */
 export async function resolveClub(
-  sql: Sql,
+  sql: ReadSql,
   name: string | null,
   season: number | null,
 ): Promise<{ id: number; name: string } | null> {
@@ -124,7 +131,7 @@ export async function resolveClub(
  * The caller records the verdict; nothing here guesses.
  */
 export async function resolvePlayer(
-  sql: Sql,
+  sql: ReadSql,
   name: string | null,
   season: number | null,
   clubId: number | null,

@@ -75,6 +75,10 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { isAbsolute, join, relative } from 'node:path';
 
+import {
+  ACHIEVEMENT_TYPE as FIRST_KICK_GOAL_TYPE, FIRST_KICK_GOAL_MANIFEST, FIRST_KICK_GOAL_PROVENANCE,
+  SOURCE_KEY as FIRST_KICK_GOAL_SOURCE, trackedExpectedIds,
+} from '../records/first-kick-goal-source';
 import { runPsql, type SpawnSyncLike } from './psql';
 
 // ---------------------------------------------------------------------------
@@ -300,6 +304,13 @@ export const AFTER_SIREN_LOADER = 'tools/migration/after_siren.py';
 export const AFTER_SIREN_CSV = join('data', 'records', 'after-siren-events.csv');
 export const AFTER_SIREN_ADJUDICATIONS = join('data', 'records', 'after-siren-adjudications.csv');
 export const AFTER_SIREN_PROVENANCE = join('data', 'records', 'after-siren-events.source.json');
+/**
+ * AFLDB-ISSUE-249. The curated "goal with first kick" family (player_achievements,
+ * source `wikipedia_first_kick_goal`, one row per tracked `fkg-NNN` id). Loaded by its ONE
+ * importer, unchanged, against the pinned extract + manifest; the extract itself is
+ * gitignored, so PRECHECK proves its bytes before anything is destroyed.
+ */
+export const FIRST_KICK_GOAL_IMPORTER = 'tools/records/import-first-kick-goal.ts';
 const AFLTABLES_CONTRACT = join('tools', 'rebuild', 'afltables', 'afltables-contract.json');
 /**
  * AFLDB-ISSUE-235 OD-5. The adjudication ledger's capture / reinstate / bijection tool, and
@@ -1069,6 +1080,23 @@ export function planStages(target: ResolvedTarget, fitzroy: FitzroySource,
       envOverlay: dataEnv,
     },
     {
+      // AFLDB-ISSUE-249. Until this stage existed NOTHING in the graph loaded the family:
+      // afldb_test held it only after a manual `records:first-kick-goal -- --apply`, every
+      // reset dropped it to zero, and the ISSUE-237 L4 promotion carried that zero to DEV.
+      // The existing importer, unchanged, under --provenance: the extract and manifest must
+      // hash to the tracked pin and join exactly, or it refuses before touching the database.
+      // It must follow `derived`: player resolution reads players.debut_season/final_season
+      // and player_clubs, the debut-game tiebreak player_match_stats.career_game_no, and the
+      // legend cross-check player_career_stats — and `draftguru` has completed the player
+      // population by then. Nothing later reads it. Idempotent (keyed by fkg-NNN), no network.
+      id: 'first-kick-goal',
+      name: `FIRST-KICK GOAL — pinned curated extract + tracked manifest, ${trackedExpectedIds(join(REPO_ROOT, FIRST_KICK_GOAL_MANIFEST)).length} records`,
+      kind: 'data',
+      run: 'command',
+      argv: firstKickGoalArgv(),
+      envOverlay: dataEnv,
+    },
+    {
       // AFLDB-ISSUE-095 D7. The ladder witness cross-check. It must follow `derived`,
       // which is where club_seasons is built, and precede FINAL VALIDATION so a
       // disagreement is reported with its own per-row diagnostics rather than collapsed
@@ -1604,6 +1632,10 @@ export function finalValidationChecks(
   // are the tracked artefact's own link-independent counts; the linkage / canonical
   // invariants are the AFTER-SIREN RECONCILE stage's own 38 checks.
   for (const check of afterSirenChecks()) checks.push(check);
+
+  // AFLDB-ISSUE-249. Added together with the FIRST-KICK GOAL stage. The expected identity
+  // set is the tracked manifest's active ids — never a typed count.
+  for (const check of firstKickGoalChecks()) checks.push(check);
 
   return checks;
 }
@@ -2230,6 +2262,26 @@ export function runPreflight(deps: Deps, opts: Options, source?: FitzroySource):
       `After-siren preflight failed (${AFTER_SIREN_LOADER} load --validate-only): the tracked `
       + `artefact ${AFTER_SIREN_CSV} is malformed or disagrees with its provenance. `
       + `Nothing has been destroyed.\n${afterSiren.stdout}${afterSiren.stderr}`);
+  }
+  // AFLDB-ISSUE-249. The first-kick-goal stage reads a tracked manifest and pin plus a
+  // GITIGNORED curated extract: prove the tracked pair is in the checkout, then run the
+  // importer's own pinned --validate-only (extract present, both hashes, both counts, the
+  // exact manifest join), before destruction. A rebuild without the accepted extract stops
+  // here instead of promoting an empty family.
+  for (const path of [FIRST_KICK_GOAL_MANIFEST, FIRST_KICK_GOAL_PROVENANCE]) {
+    if (!deps.fileExists(path)) {
+      throw new RebuildRefused(
+        `First-kick-goal preflight: required tracked input is missing: ${path}. `
+        + 'Nothing has been destroyed.');
+    }
+  }
+  const firstKick = deps.runCommand(firstKickGoalValidateArgv(), {});
+  if (firstKick.status !== 0) {
+    throw new RebuildRefused(
+      `First-kick-goal preflight failed (${FIRST_KICK_GOAL_IMPORTER} --validate-only --provenance `
+      + `${FIRST_KICK_GOAL_PROVENANCE}): the curated extract is missing, or it or the manifest `
+      + 'no longer matches the tracked pin. Nothing has been destroyed.\n'
+      + `${firstKick.stdout}${firstKick.stderr}`);
   }
 }
 
@@ -2918,6 +2970,63 @@ export function afterSirenChecks(): FinalCheck[] {
   ];
 }
 
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-249 — the first-kick-goal stage
+// ---------------------------------------------------------------------------
+
+/**
+ * The importer's own CLI, as its package script runs it (`--conditions=react-server`: it
+ * resolves through the server-only ingest resolvers), bound to the tracked pin.
+ */
+export function firstKickGoalArgv(): string[] {
+  return ['npx', 'tsx', '--conditions=react-server', FIRST_KICK_GOAL_IMPORTER,
+          '--apply', '--provenance', FIRST_KICK_GOAL_PROVENANCE];
+}
+
+/** The same pin, `--validate-only`: hashes, counts and the exact join; no database. */
+export function firstKickGoalValidateArgv(): string[] {
+  return ['npx', 'tsx', '--conditions=react-server', FIRST_KICK_GOAL_IMPORTER,
+          '--validate-only', '--provenance', FIRST_KICK_GOAL_PROVENANCE];
+}
+
+/** The owned scope, exactly as the importer scopes it: type AND source. */
+const FIRST_KICK_GOAL_OWNED = `FROM player_achievements a JOIN sources s ON s.id = a.source_id `
+  + `WHERE s.key = '${FIRST_KICK_GOAL_SOURCE}' AND a.achievement_type = '${FIRST_KICK_GOAL_TYPE}'`;
+
+/**
+ * The first-kick-goal stage must survive a rebuild from scratch. Owned rows = active ids,
+ * the stored key set's digest equal to the manifest's (with the count and the duplicate
+ * check: the stored key set IS the manifest's), and every row carrying its provenance. Linkage is deliberately not gated: an
+ * unresolved or ambiguous source row is stored unlinked by the importer's own contract.
+ */
+export function firstKickGoalChecks(
+  readIds: () => string[] = () => trackedExpectedIds(join(REPO_ROOT, FIRST_KICK_GOAL_MANIFEST)),
+): FinalCheck[] {
+  const ids = readIds();
+  if (ids.length === 0 || ids.some((id) => !/^fkg-\d{3,}$/.test(id))) {
+    throw new RebuildRefused(`${FIRST_KICK_GOAL_MANIFEST} yields no usable active id set.`);
+  }
+  // The id set as one digest, byte-ordered on both sides (JS sort = COLLATE "C" for these
+  // ASCII keys), rather than 300-odd inlined literals.
+  const digest = createHash('md5').update([...ids].sort().join(','), 'utf8').digest('hex');
+  return [
+    { key: 'first_kick_goal_rows', sql: `SELECT count(*) ${FIRST_KICK_GOAL_OWNED}`, expected: ids.length },
+    { key: 'first_kick_goal_id_set_mismatch',
+      sql: 'SELECT CASE WHEN coalesce(md5(string_agg(a.source_record_id, \',\' '
+        + `ORDER BY a.source_record_id COLLATE "C")), '') = '${digest}' THEN 0 ELSE 1 END `
+        + FIRST_KICK_GOAL_OWNED,
+      expected: 0 },
+    { key: 'first_kick_goal_duplicate_ids',
+      sql: `SELECT count(*) FROM (SELECT 1 ${FIRST_KICK_GOAL_OWNED} `
+        + 'GROUP BY a.source_record_id HAVING count(*) > 1) d',
+      expected: 0 },
+    { key: 'first_kick_goal_rows_missing_provenance',
+      sql: `SELECT count(*) ${FIRST_KICK_GOAL_OWNED} `
+        + 'AND (a.source_record_id IS NULL OR a.import_batch_id IS NULL)',
+      expected: 0 },
+  ];
+}
+
 /** Offline witness validation — no --compare, so no database is contacted. */
 export function ladderWitnessValidateArgv(): string[] {
   return [resolvePython(), LADDER_WITNESS_VALIDATOR, '--label',
@@ -2978,34 +3087,14 @@ export function parseArgs(argv: string[]): Options {
 // finalValidationChecks()/buildFinalValidationSql() above, which are bound to the accepted
 // register and actually fail the run. Removed rather than left as a decorative export.
 
-export default { planStages, resolveTarget, resolveFitzroySource, executeRebuild };
-
-// ---------------------------------------------------------------------------
-// CLI
-// ---------------------------------------------------------------------------
-
-async function main(): Promise<number> {
-  const { spawnSync } = await import('node:child_process');
-
-  // .env without a dotenv dependency, matching tests/setup.ts.
-  try {
-    for (const line of readFileSync(join(REPO_ROOT, '.env'), 'utf8').split('\n')) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith('#') || !trimmed.includes('=')) continue;
-      const [key, ...rest] = trimmed.split('=');
-      if (!process.env[key.trim()]) process.env[key.trim()] = rest.join('=').trim();
-    }
-  } catch { /* CI supplies the variables directly */ }
-
-  const opts = parseArgs(process.argv.slice(2));
-  // AFLDB-ISSUE-237 L2: the rehearsal control is checked on the NAME before any DSN is read,
-  // and again on the resolved database.
-  assertRehearsalStop(opts);
-  const target = resolveTarget(process.env, opts);
-  assertRehearsalStop(opts, target.database);
-  const fitzroy = resolveFitzroySource(opts);
-
-  const deps: Deps = {
+/**
+ * The CLI's real dependencies: child processes from the repository root, the destructive
+ * reset and the read-only validation stream through the shared psql helper. Exported so the
+ * AFLDB-ISSUE-249 code_test_db rehearsal (tools/records/first-kick-goal-rehearsal.ts) can
+ * dispatch a planned stage through exactly this path rather than a copy of it.
+ */
+export function createCliDeps(spawnSync: typeof import('node:child_process').spawnSync): Deps {
+  return {
     runCommand: (argv, env) => {
       const [command, ...args] = argv;
       const result = spawnSync(command, args, {
@@ -3054,6 +3143,36 @@ async function main(): Promise<number> {
     fileExists: (path) => existsSync(isAbsolute(path) ? path : join(REPO_ROOT, path)),
     log: (line) => console.log(line),
   };
+}
+
+export default { planStages, resolveTarget, resolveFitzroySource, executeRebuild };
+
+// ---------------------------------------------------------------------------
+// CLI
+// ---------------------------------------------------------------------------
+
+async function main(): Promise<number> {
+  const { spawnSync } = await import('node:child_process');
+
+  // .env without a dotenv dependency, matching tests/setup.ts.
+  try {
+    for (const line of readFileSync(join(REPO_ROOT, '.env'), 'utf8').split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#') || !trimmed.includes('=')) continue;
+      const [key, ...rest] = trimmed.split('=');
+      if (!process.env[key.trim()]) process.env[key.trim()] = rest.join('=').trim();
+    }
+  } catch { /* CI supplies the variables directly */ }
+
+  const opts = parseArgs(process.argv.slice(2));
+  // AFLDB-ISSUE-237 L2: the rehearsal control is checked on the NAME before any DSN is read,
+  // and again on the resolved database.
+  assertRehearsalStop(opts);
+  const target = resolveTarget(process.env, opts);
+  assertRehearsalStop(opts, target.database);
+  const fitzroy = resolveFitzroySource(opts);
+
+  const deps = createCliDeps(spawnSync);
 
   console.log('AFLDB clean test rebuild (AFLDB-ISSUE-093 §10)');
   // Names only — never a DSN, host or credential.

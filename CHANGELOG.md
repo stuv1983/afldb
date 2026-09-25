@@ -15,6 +15,44 @@ commit.
 
 ## [Unreleased]
 
+### The rebuild reconstructs first-kick-goal records, and promotion refuses to lose them (AFLDB-ISSUE-249, open) - 26 September 2026
+
+- **Why.** No `db:test:rebuild` stage ever loaded the curated first-kick-goal family
+  (`player_achievements`, source `wikipedia_first_kick_goal`). A rebuilt `afldb_test` therefore held
+  none, and no promotion gate read that import-writable table. On 26 September the ISSUE-237 L4 DEV
+  promotion carried 0 records over DEV's 335. It was rolled back.
+- **Rebuild.** A new `first-kick-goal` data stage runs after `derived`/`coleman`. It uses the
+  existing importer, as the import role, with `--apply --provenance
+  data/records/first-kick-goal.source.json`.
+  - The new tracked pin records the curated extract's and the manifest's sha256, the extract row
+    count and the active id count.
+  - The extract stays gitignored. It may sit anywhere (`AFLDB_FIRST_KICK_GOAL_CSV`), but its bytes
+    must match the pin.
+  - PRECHECK runs the pinned `--validate-only`, so a rebuild without the accepted extract stops
+    before anything is destroyed.
+  - FINAL VALIDATION checks the row count, the exact id set, duplicates and provenance against the
+    tracked manifest.
+- **Importer.** `tools/records/import-first-kick-goal.ts` gains `--provenance <pin>` and
+  `--validate-only`. Its parsing and manifest rules moved unchanged to
+  `tools/records/first-kick-goal-source.ts`, and its resolve/write phases are exported. No resolution
+  rule, key or refusal changed.
+- **Promotion.** `npm run db:promotion:check` has a new gate, `first-kick-goal source identities`.
+  It compares the tracked manifest's active `fkg-NNN` ids with the database's `source_record_id`s:
+  - it refuses a missing, unknown or duplicated id at `source`, `candidate` and `production`;
+  - at `restored` it also compares the candidate with the target it replaces;
+  - at `pre-cutover` it only reports.
+- **Rehearsal.** `npm run db:code-test:issue249-rehearsal` has two `code_test_db` modes, both with
+  a zero-residue proof.
+  - `run` is rollback-only and exercises the importer in-process.
+  - `runner` enters through `tools/db/rebuild-test.ts` itself (`planStages()`/`executeRebuild()`).
+    It executes only the real `first-kick-goal` stage, then removes its rows exactly.
+  - The rebuild CLI's dependencies are now the exported `createCliDeps()`, which `main()` uses
+    unchanged.
+- **Validation (26 September).**
+  - The rehearsals pass 15/15 and 12/12; after the real stage, the full FINAL VALIDATION reports
+    `PASSED: 89 checks`.
+  - The two `db-test-rebuild` failures seen on Windows reproduce identically on clean `main`.
+
 ### Audited cleanup of reserved-domain DEV auth fixtures (AFLDB-ISSUE-248, open) - 25 September 2026
 
 - **What changed.** A new operator maintenance command,

@@ -106,6 +106,10 @@ import {
   type ValidatedFitzroyProfileContinuityRules,
 } from '../../src/lib/acquisition/fitzroy-profile-continuity';
 import {
+  ACHIEVEMENT_TYPE as FIRST_KICK_GOAL_TYPE, FIRST_KICK_GOAL_MANIFEST,
+  SOURCE_KEY as FIRST_KICK_GOAL_SOURCE, trackedExpectedIds,
+} from '../records/first-kick-goal-source';
+import {
   ACCEPTANCE_CHECKLIST,
   DEFAULT_ENVIRONMENT,
   DERIVED_FOOTBALL_TABLES,
@@ -790,6 +794,135 @@ function gateCompare(
     lines.push(`${f.ok ? 'ok  ' : 'FAIL'} ${f.table.padEnd(34)} ${f.rule.padEnd(8)} ${String(f.before ?? '-').padStart(8)} -> ${String(f.after ?? '-').padStart(8)}  ${f.detail}`);
   }
   report.add('Counts against the pre-cutover snapshot', findings.every((f) => f.ok) ? 'PASS' : 'FAIL', lines);
+}
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-249 — the first-kick-goal source identity set
+// ---------------------------------------------------------------------------
+//
+// player_achievements is import-writable, so the contract treats it as `rebuilt` and
+// gateCompare never looks at it: the 2026-09-26 L4 promotion carried a rebuilt zero over
+// DEV's 334 Wikipedia rows and only the post-swap special-record replay noticed. This gate
+// reads the family by its durable identity — the tracked manifest's active `fkg-NNN` ids,
+// never a typed count — and refuses any database that is not exactly that set.
+
+export const FIRST_KICK_GOAL_GATE = 'first-kick-goal source identities (AFLDB-ISSUE-249)';
+
+/** The owned scope, exactly as the importer scopes it: type AND source. Read-only. */
+export const FIRST_KICK_GOAL_IDENTITIES_SQL = `
+  SELECT a.source_record_id AS "recordId", count(*)::int AS n
+    FROM public.player_achievements a
+    JOIN public.sources s ON s.id = a.source_id
+   WHERE s.key = $1 AND a.achievement_type::text = $2
+   GROUP BY a.source_record_id
+   ORDER BY 1`;
+
+export type FirstKickGoalObserved = { recordId: string | null; n: number };
+
+export async function readFirstKickGoalIdentities(q: Query): Promise<FirstKickGoalObserved[]> {
+  return (await q(FIRST_KICK_GOAL_IDENTITIES_SQL, [FIRST_KICK_GOAL_SOURCE, FIRST_KICK_GOAL_TYPE])).map((r) => ({
+    recordId: r.recordId === null || r.recordId === undefined ? null : String(r.recordId),
+    n: asInt(r.n),
+  }));
+}
+
+export type FirstKickGoalJudgement = {
+  verdict: Verdict;
+  /** Active manifest ids the database lacks. */
+  missing: string[];
+  /** Stored ids the manifest does not carry as active (NULL shown as '(null)'). */
+  unknown: string[];
+  /** Ids stored more than once. */
+  duplicated: string[];
+  /** Target ids, still active in the manifest, the subject lacks. */
+  targetMissing: string[];
+  /** Target ids the manifest has since retired and the subject lacks: reported, not refused. */
+  targetRetired: string[];
+  lines: string[];
+};
+
+function sample(ids: readonly string[], max = 10): string {
+  return ids.slice(0, max).join(', ') + (ids.length > max ? `, … (+${ids.length - max})` : '');
+}
+
+/**
+ * Pure. `subject` is the database being judged; `target`, when given, is the database it
+ * replaces (`--phase restored`). `informational` is the target's own read at `pre-cutover`:
+ * a target that lacks records is not a defect of the candidate, so it is reported, not
+ * refused.
+ */
+export function judgeFirstKickGoalIdentities(input: {
+  expected: readonly string[];
+  /** Where the expectation came from; the tracked manifest unless a caller says otherwise. */
+  expectedFrom?: string;
+  subject: { role: string; observed: readonly FirstKickGoalObserved[] };
+  target?: { role: string; observed: readonly FirstKickGoalObserved[] };
+  informational?: boolean;
+}): FirstKickGoalJudgement {
+  const expected = new Set(input.expected);
+  const held = new Set<string>();
+  const unknown: string[] = [];
+  const duplicated: string[] = [];
+  let rows = 0;
+  for (const o of input.subject.observed) {
+    rows += o.n;
+    const id = o.recordId ?? '(null)';
+    if (o.recordId !== null) held.add(o.recordId);
+    if (o.recordId === null || !expected.has(o.recordId)) unknown.push(id);
+    if (o.n > 1) duplicated.push(`${id} ×${o.n}`);
+  }
+  const missing = [...expected].filter((id) => !held.has(id)).sort();
+  const targetIds = [...new Set((input.target?.observed ?? []).flatMap((o) => (o.recordId === null ? [] : [o.recordId])))].sort();
+  const targetMissing = targetIds.filter((id) => expected.has(id) && !held.has(id));
+  const targetRetired = targetIds.filter((id) => !expected.has(id) && !held.has(id));
+
+  const lines = [
+    `expected: ${expected.size} active id(s) in ${input.expectedFrom ?? `the tracked ${FIRST_KICK_GOAL_MANIFEST}`}`,
+    `${input.subject.role}: ${rows} ${FIRST_KICK_GOAL_SOURCE} row(s), ${held.size} distinct id(s)`,
+  ];
+  if (input.target) lines.push(`${input.target.role}: ${targetIds.length} distinct id(s)`);
+  const refused = !input.informational
+    && (missing.length + unknown.length + duplicated.length + targetMissing.length > 0);
+  if (!input.informational && rows === 0 && (expected.size > 0 || targetIds.length > 0)) {
+    lines.push(`STOP ${input.subject.role} holds NO first-kick-goal record while ${expected.size} are expected`
+      + (input.target ? ` and ${input.target.role} holds ${targetIds.length}` : '')
+      + ' — the AFLDB-ISSUE-249 loss. Rebuild the source with the first-kick-goal stage; do not promote this database.');
+  }
+  const tag = input.informational ? 'NOTE' : 'STOP';
+  if (missing.length > 0) lines.push(`${tag} missing ${missing.length}: ${sample(missing)}`);
+  if (unknown.length > 0) lines.push(`${tag} not active in the manifest ${unknown.length}: ${sample(unknown)}`);
+  if (duplicated.length > 0) lines.push(`${tag} duplicated ${duplicated.length}: ${sample(duplicated)}`);
+  if (targetMissing.length > 0) {
+    lines.push(`${tag} held by ${input.target!.role} but absent here ${targetMissing.length}: ${sample(targetMissing)}`);
+  }
+  if (targetRetired.length > 0) {
+    lines.push(`note ${targetRetired.length} id(s) held by ${input.target!.role} are retired in the manifest and `
+      + `correctly absent here: ${sample(targetRetired)}`);
+  }
+  const verdict: Verdict = input.informational ? 'INFO' : (refused ? 'FAIL' : 'PASS');
+  return { verdict, missing, unknown, duplicated, targetMissing, targetRetired, lines };
+}
+
+export async function gateFirstKickGoalIdentities(
+  subject: { q: Query; role: string }, present: readonly string[], report: Report,
+  options: { target?: { q: Query; role: string }; informational?: boolean; expected?: readonly string[] } = {},
+): Promise<FirstKickGoalJudgement | undefined> {
+  if (!present.includes('player_achievements')) {
+    report.add(FIRST_KICK_GOAL_GATE, options.informational ? 'INFO' : 'FAIL',
+      [`public.player_achievements is absent from ${subject.role}.`]);
+    return undefined;
+  }
+  const expected = options.expected ?? trackedExpectedIds();
+  const judgement = judgeFirstKickGoalIdentities({
+    expected,
+    subject: { role: subject.role, observed: await readFirstKickGoalIdentities(subject.q) },
+    target: options.target
+      ? { role: options.target.role, observed: await readFirstKickGoalIdentities(options.target.q) }
+      : undefined,
+    informational: options.informational,
+  });
+  report.add(FIRST_KICK_GOAL_GATE, judgement.verdict, judgement.lines);
+  return judgement;
 }
 
 async function gatePrivileges(q: Query, present: readonly string[], required: boolean, report: Report): Promise<void> {
@@ -2218,6 +2351,18 @@ async function main(): Promise<number> {
     if (phase === 'pre-cutover') gateStagedSourceRows(counts, opts.environment, report);
     await gatePrivileges(conn.q, present, phase === 'candidate' || phase === 'production', report);
 
+    // AFLDB-ISSUE-249: the rebuilt first-kick-goal family, by identity. The source (A3) and
+    // the candidate (C2) are refused unless they hold exactly the tracked manifest's set; the
+    // promoted database is re-read at `production`; `restored` (below) adds the target
+    // comparison. At `pre-cutover` the target's own set is reported, not judged.
+    if (phase === 'source' || phase === 'candidate' || phase === 'production') {
+      await gateFirstKickGoalIdentities({ q: conn.q, role: `${phase} ${opts.database}` }, present, report);
+    }
+    if (phase === 'pre-cutover') {
+      await gateFirstKickGoalIdentities({ q: conn.q, role: `target ${opts.database}` }, present, report,
+        { informational: true });
+    }
+
     // AFLDB-ISSUE-237: source = SOURCE lineage (no human authority); candidate = after the
     // plan reinstated the TARGET's ledger, which must be exactly the one G2 graded (F-L4-3).
     if (phase === 'source') await gateAflApiG1(conn.q, report);
@@ -2243,6 +2388,11 @@ async function main(): Promise<number> {
       const oldName = String((await old.q('SELECT current_database() AS d'))[0]?.d);
       if (oldName !== opts.oldDatabase) throw new PromotionRefused(`Old database connection landed on '${oldName}', not '${opts.oldDatabase}'.`);
       await gateDanglingReferences(conn.q, old.q, present, opts.environment, report);
+      // AFLDB-ISSUE-249 (B4): the candidate against the manifest AND against the target it
+      // replaces — a target that holds records and a candidate that does not is a STOP here,
+      // before any reinstatement, dump or swap.
+      await gateFirstKickGoalIdentities({ q: conn.q, role: `candidate ${opts.database}` }, present, report,
+        { target: { q: old.q, role: `target ${opts.oldDatabase}` } });
       // A4.2/A4.3: the target's data_overrides against the candidate the replay will run on,
       // as it will stand after the AFLDB-ISSUE-242 convergence planned here from the target's
       // identities. Planned BEFORE the lineage gate, whose remap file carries it (step 2c).

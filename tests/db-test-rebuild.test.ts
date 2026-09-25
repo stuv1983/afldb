@@ -58,6 +58,10 @@ import {
   AFTER_SIREN_CSV,
   AFTER_SIREN_LOADER,
   AFTER_SIREN_PROVENANCE,
+  FIRST_KICK_GOAL_IMPORTER,
+  firstKickGoalArgv,
+  firstKickGoalChecks,
+  firstKickGoalValidateArgv,
   afterSirenArgv,
   afterSirenChecks,
   afterSirenMeasures,
@@ -97,6 +101,9 @@ import {
   type RunResult,
   type Stage,
 } from '../tools/db/rebuild-test';
+import {
+  FIRST_KICK_GOAL_MANIFEST, FIRST_KICK_GOAL_PROVENANCE, trackedExpectedIds,
+} from '../tools/records/first-kick-goal-source';
 import {
   DATABASE_COMMENT_SQL,
   FINGERPRINT_SECTIONS,
@@ -1229,13 +1236,15 @@ describe('stage graph', () => {
     // its reinstate/replay + bijection pair (directly after 'draftguru'); see the C6 suite.
     // AFLDB-ISSUE-245 added the manual registration reinstate/replay/verify trio directly
     // before 'draftguru'; see the AFLDB-ISSUE-245 suite.
+    // AFLDB-ISSUE-249 added 'first-kick-goal' after 'coleman': nothing loaded that family
+    // before, so every reset dropped it to zero; see the AFLDB-ISSUE-249 suite.
     expect(idsOf(stages)).toEqual([
       'precheck', 'afl-api-adjudications-capture', 'recreate', 'migrations', 'privileges',
       'reference', 'fitzroy', 'heights', 'heights-afl-api', 'heights-wikipedia', 'birth-dates',
       'coaches', 'father-son', 'siblings', 'after-siren', 'after-siren-reconcile',
       'manual-registrations-reinstate', 'manual-registrations-replay', 'manual-registrations-verify',
       'draftguru', 'afl-api-adjudications-reinstate', 'afl-api-adjudications-bijection',
-      'awards-honours', 'brownlow-season', 'derived', 'coleman',
+      'awards-honours', 'brownlow-season', 'derived', 'coleman', 'first-kick-goal',
       'ladder-witness', 'fingerprints',
     ]);
   });
@@ -1260,11 +1269,13 @@ describe('stage graph', () => {
     // AFLDB-ISSUE-245. 'manual-registrations-replay' acquires nothing either: it runs the
     // production replay_admin_overrides(players) over creation records the rebuild itself
     // carried across the reset — no manifest, no legacy SQLite, no network.
+    // AFLDB-ISSUE-249. 'first-kick-goal' reads the pinned curated extract and the tracked
+    // manifest through its existing importer — no legacy SQLite, no network.
     expect(idsOf(stages.filter((s) => s.kind === 'data')))
       .toEqual(['reference', 'fitzroy', 'heights', 'heights-afl-api', 'heights-wikipedia',
                 'birth-dates', 'coaches', 'father-son', 'siblings', 'after-siren',
                 'manual-registrations-replay', 'draftguru',
-                'awards-honours', 'brownlow-season', 'derived', 'coleman']);
+                'awards-honours', 'brownlow-season', 'derived', 'coleman', 'first-kick-goal']);
     const coleman = stages.find((s) => s.id === 'coleman')!;
     expect(coleman.argv).toEqual([
       resolvePython(), 'tools/migration/import_awards.py', '--groups', 'coleman',
@@ -1820,6 +1831,106 @@ describe('stage graph', () => {
       expect(all).toEqual(expect.arrayContaining(checks.map((c) => c.key)));
       // Added after the sibling gates, in stage order.
       expect(all.indexOf('after_siren_kicks')).toBeGreaterThan(all.indexOf('player_relationships_sibling'));
+    });
+  });
+
+  describe('first-kick goal (AFLDB-ISSUE-249)', () => {
+    const ids = idsOf(stages);
+    const stage = stages.find((s) => s.id === 'first-kick-goal')!;
+    const manifestIds = trackedExpectedIds(join(root, FIRST_KICK_GOAL_MANIFEST));
+
+    it('is reachable: the graph carries exactly one first-kick-goal data stage', () => {
+      // The ISSUE-249 root cause was its ABSENCE: no stage loaded the family, so every reset
+      // reached zero and a promotion carried the zero to DEV.
+      expect(ids.filter((id) => id === 'first-kick-goal')).toHaveLength(1);
+      expect(stage.kind).toBe('data');
+      expect(stage.run).toBe('command');
+      expect(stage.envOverlay).toEqual({ AFLDB_IMPORT_DATABASE_URL: target().importDsn });
+    });
+
+    it('runs the ONE existing importer, --apply, bound to the tracked pin; the preflight is the same pin, --validate-only', () => {
+      expect(stage.argv).toEqual(['npx', 'tsx', '--conditions=react-server', FIRST_KICK_GOAL_IMPORTER,
+                                  '--apply', '--provenance', FIRST_KICK_GOAL_PROVENANCE]);
+      expect(firstKickGoalArgv()).toEqual(stage.argv);
+      expect(firstKickGoalValidateArgv()).toEqual([
+        'npx', 'tsx', '--conditions=react-server', FIRST_KICK_GOAL_IMPORTER,
+        '--validate-only', '--provenance', FIRST_KICK_GOAL_PROVENANCE]);
+      expect(stage.argv!.join(' ')).not.toMatch(/--allow-link-loss|--accept-|--assign-ids|--rekey|legacy|sqlite/);
+      expect(stage.name).toContain(`${manifestIds.length} records`);
+      for (const path of [FIRST_KICK_GOAL_IMPORTER, FIRST_KICK_GOAL_MANIFEST, FIRST_KICK_GOAL_PROVENANCE]) {
+        expect(existsSync(join(root, path))).toBe(true);
+      }
+    });
+
+    it('runs after derived (its resolution inputs) and draftguru (the full player population), before FINAL VALIDATION', () => {
+      expect(ids.indexOf('draftguru')).toBeLessThan(ids.indexOf('first-kick-goal'));
+      expect(ids.indexOf('derived')).toBeLessThan(ids.indexOf('first-kick-goal'));
+      expect(ids.indexOf('coleman')).toBeLessThan(ids.indexOf('first-kick-goal'));
+      expect(ids.indexOf('first-kick-goal')).toBeLessThan(ids.indexOf('ladder-witness'));
+      expect(ids.indexOf('first-kick-goal')).toBeLessThan(ids.indexOf('fingerprints'));
+    });
+
+    it('preflights the tracked pair and the pinned --validate-only before the destructive stage', () => {
+      const commands: string[][] = [];
+      const base = fakeDeps();
+      const withFailing = (failing?: string): Deps => ({
+        ...base.deps,
+        runCommand: (a: string[]) => {
+          commands.push(a);
+          if (failing && a.includes(failing) && a.includes('--validate-only')) {
+            return { status: 1, stdout: '', stderr: 'The curated first-kick-goal extract is missing' };
+          }
+          if (a.includes(BROWNLOW_SEASON_LOADER)) return { status: 0, stdout: '{"ok": true}', stderr: '' };
+          return { status: 0, stdout: 'snapshot : x (42 year pages, sha256 verified)\npersons    : 5057\npicks      : 6810\n', stderr: '' };
+        },
+      });
+      runPreflight(withFailing(), OPTS, fitzroy());
+      expect(commands).toContainEqual(firstKickGoalValidateArgv());
+      expect(() => runPreflight(withFailing(FIRST_KICK_GOAL_IMPORTER), OPTS, fitzroy()))
+        .toThrow(/First-kick-goal preflight failed[\s\S]*Nothing has been destroyed[\s\S]*extract is missing/);
+      const ok = withFailing();
+      for (const absent of [FIRST_KICK_GOAL_MANIFEST, FIRST_KICK_GOAL_PROVENANCE]) {
+        const missing: Deps = { ...ok, fileExists: (path: string) => path !== absent && ok.fileExists(path) };
+        expect(() => runPreflight(missing, OPTS, fitzroy()))
+          .toThrow(new RegExp(`First-kick-goal preflight: required tracked input is missing: ${absent.replace(/[.]/g, '\\.')}`));
+      }
+      // PRECHECK is read-only: every refusal above happened with no SQL sent anywhere.
+      expect(base.sqlRuns).toEqual([]);
+    });
+
+    it('gates the rebuilt rows on the tracked manifest: count, exact id set, no duplicate, provenance', () => {
+      const checks = firstKickGoalChecks();
+      expect(checks.map((c) => c.key)).toEqual([
+        'first_kick_goal_rows', 'first_kick_goal_id_set_mismatch',
+        'first_kick_goal_duplicate_ids', 'first_kick_goal_rows_missing_provenance',
+      ]);
+      const byKey = Object.fromEntries(checks.map((c) => [c.key, c]));
+      expect(byKey.first_kick_goal_rows.expected).toBe(manifestIds.length);
+      expect(byKey.first_kick_goal_id_set_mismatch.expected).toBe(0);
+      expect(byKey.first_kick_goal_duplicate_ids.expected).toBe(0);
+      expect(byKey.first_kick_goal_rows_missing_provenance.expected).toBe(0);
+      const digest = createHash('md5').update([...manifestIds].sort().join(','), 'utf8').digest('hex');
+      expect(byKey.first_kick_goal_id_set_mismatch.sql).toContain(`'${digest}'`);
+      expect(byKey.first_kick_goal_id_set_mismatch.sql).toContain('COLLATE "C"');
+      for (const c of checks) {
+        // Scoped exactly as the importer scopes its owned rows, and never by a name.
+        expect(c.sql).toContain("s.key = 'wikipedia_first_kick_goal' AND a.achievement_type = 'first_kick_goal'");
+        expect(c.sql).not.toMatch(/player_name|club_name_raw/);
+      }
+      const register = JSON.parse(readFileSync(
+        join(root, 'data', 'reference', 'fitzroy-accepted-baselines.json'), 'utf8'));
+      const all = finalValidationChecks(register).map((c) => c.key);
+      expect(all).toEqual(expect.arrayContaining(checks.map((c) => c.key)));
+      expect(all.indexOf('first_kick_goal_rows')).toBeGreaterThan(all.indexOf('after_siren_kicks'));
+    });
+
+    it('derives expectations from the manifest, never a typed count, and refuses an unusable id set', () => {
+      const three = firstKickGoalChecks(() => ['fkg-003', 'fkg-001', 'fkg-002']);
+      expect(three[0].expected).toBe(3);
+      const digest = createHash('md5').update('fkg-001,fkg-002,fkg-003', 'utf8').digest('hex');
+      expect(three[1].sql).toContain(`'${digest}'`);
+      expect(() => firstKickGoalChecks(() => [])).toThrow(RebuildRefused);
+      expect(() => firstKickGoalChecks(() => ["fkg-001'; DROP TABLE x; --"])).toThrow(RebuildRefused);
     });
   });
 

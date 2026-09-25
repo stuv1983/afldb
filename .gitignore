@@ -111,6 +111,8 @@ next-env.d.ts
 !/data/records/
 /data/records/*
 !/data/records/first-kick-goal-ids.csv
+# AFLDB-ISSUE-249: the pin of the (still gitignored) extract and the manifest the rebuild loads.
+!/data/records/first-kick-goal.source.json
 # AFLDB-ISSUE-118 §23.33: the normalised after-siren artefact, provenance and adjudications are tracked;
 # the raw table exports under data/records/after-siren/ stay untracked.
 !/data/records/after-siren-events.csv

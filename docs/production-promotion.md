@@ -181,6 +181,19 @@ generated from the same lists as the TypeScript predicate. In `pre-cutover`, `ca
 `production` a single such row is a refusal. It is not a list of historic fixture addresses,
 so a new fixture is caught without editing anything.
 
+**The first-kick-goal identity gate (`AFLDB-ISSUE-249`).** `player_achievements` is
+import-writable, so the contract treats it as `rebuilt` and `--compare` never counts it. The gate
+reads the family by identity instead: the expected set is the tracked
+`data/records/first-kick-goal-ids.csv`'s active `fkg-NNN` ids, the observed set is the database's
+`wikipedia_first_kick_goal` `source_record_id`s. A missing, unknown or duplicated id is a refusal
+at `source`, `candidate` and `production`; at `restored` the candidate is also compared with the
+`--old-database` target, so a target that holds records and a candidate that does not is a STOP
+before anything is reinstated. At `pre-cutover` the target's own set is reported (INFO). The
+rebuild loads the family in its `first-kick-goal` stage from the pinned
+`data/records/first-kick-goal.source.json`; its gitignored extract must be present on the rebuild
+host (at `data/records/first-kick-goal.csv` or via `AFLDB_FIRST_KICK_GOAL_CSV`) or PRECHECK
+refuses before anything is destroyed.
+
 ---
 
 ## 3. Preflight (DEV and PROD, nothing destructive)
