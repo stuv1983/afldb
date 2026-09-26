@@ -17,8 +17,10 @@ regressed, and its implementation is unchanged.)** **(Later 2026-09-26: ISSUE-25
 and DB-free validated; its rehearsal and acceptance remain, so L5 is still BLOCKED. L5 must use the
 freeze-bound procedure; see §14.)** **(Later again, 2026-09-26: ISSUE-250's DEV rehearsal
 PASSED — technically accepted for the L5 prerequisite (ISSUE-250 runbook §17). L5 is no longer
-blocked on an untested mechanism. It remains NOT RUN, and needs the ISSUE-250 work committed and
-merged, the code on the PROD checkout, and a separate operator authorisation.)**
+blocked on an untested mechanism. It remains NOT RUN.)** **(Later still, 2026-09-26: ISSUE-250 is
+committed locally at `26751ad6`, so its commit prerequisite is satisfied. Still outstanding: the
+ISSUE-250 merge, the merged code on the PROD checkout/deployment, and a separate operator
+authorisation for L5. L5 remains NOT RUN.)**
 
 **L1/L2 state (operator-run, reported 2026-09-25).** The §11b rehearsals on the real
 `code_test_db` have now been run by the operator. **L1 PASS:** non-empty importer + human state
@@ -3937,7 +3939,7 @@ the AFLDB-ISSUE-249 discovery record).
 | DEV bridge + loader (validate-only → dry-run → apply) | **PASS**: 669/669 linked, `CD_I297354` regenerated |
 | `dev-regeneration-census` | **PASS** |
 | **L4** | **PASS** |
-| L5 (PROD) | **NOT RUN.** Was BLOCKED on AFLDB-ISSUE-250 (2026-09-26). ISSUE-250's DEV rehearsal PASSED later on 2026-09-26 (ISSUE-250 §17). Now awaiting the ISSUE-250 commit/merge/PROD checkout and a separate authorisation. |
+| L5 (PROD) | **NOT RUN.** Was BLOCKED on AFLDB-ISSUE-250 (2026-09-26). ISSUE-250's DEV rehearsal PASSED later on 2026-09-26 (ISSUE-250 §17). ISSUE-250 is committed locally at `26751ad6`; now awaiting its merge, the PROD checkout/deployment and a separate L5 authorisation. |
 
 **Closure interpretation.** The narrow DEV G3 exception (§6.3, OD-3) was actually used, for exactly
 one classified `afl_api_stat_vector_season` hard loss. The required target-bound
@@ -4174,7 +4176,8 @@ freeze gates:
 The rollback restored the original `afldb_dev`. **L5 is still NOT RUN.** It is no longer blocked on
 an untested ISSUE-250 mechanism. Before it may run:
 1. the operator reviews and commits the ISSUE-250 work (including its §17 doc fixes, notably the
-   `sudo -u postgres psql … -f - < file` form), and merges it;
+   `sudo -u postgres psql … -f - < file` form), and merges it; *(2026-09-26: the commit is done,
+   locally at `26751ad6`; the merge remains outstanding.)*
 2. the code reaches the PROD checkout;
 3. the operator gives a **separate, explicit authorisation for L5**.
 

@@ -7,22 +7,30 @@
 - **2026-09-26 pass 1: design written** (§4–§13) from read-only repository inspection.
 - **2026-09-26: `afldb-reviewer` design review — PASS WITH MEDIUM/LOW NOTES** (no CRIT/HIGH;
   F-001…F-011, §14). All MED/LOW corrections are folded into this design.
-- **2026-09-26: IMPLEMENTED and DB-free validated, uncommitted** (§16). No SQL, database,
+- **2026-09-26: IMPLEMENTED and DB-free validated** (§16; uncommitted at that point). No SQL, database,
   deployment or Git command ran. **Not rehearsed, not accepted.**
 - ~~**It blocks AFLDB-ISSUE-237 L5 PROD.** L5 must not run until the §12 rehearsal has run and been
   recorded and the operator has accepted this issue (§13).~~ *(Superseded 2026-09-26, below.)*
 - **2026-09-26: DEV REHEARSAL PASS / technically accepted for the ISSUE-237 L5 prerequisite**
   (§17). Operator-authorised, DEV only (`afldb_dev` on `streamanator`), run from a scratch copy
-  holding exactly this worktree's uncommitted ISSUE-250 files. Every §12 case passed, including a
+  holding exactly this worktree's then-uncommitted ISSUE-250 files. Every §12 case passed, including a
   full freeze-enabled DEV promotion (stamp `20260926-195601`) and its guarded rollback. Three
   procedure-text defects were found and fixed in the docs (R-1..R-3); two LOW follow-ups stay open
   (R-4, R-5). PROD was never contacted.
-- **Still OPEN**: the code is uncommitted, and the production path itself has not run.
-- **ISSUE-237 L5 is no longer blocked on an untested ISSUE-250 mechanism.** It still requires, in
-  order: operator review and commit of the ISSUE-250 work (with the §17 doc fixes), merge, the
-  code on the PROD checkout, and a **separate operator authorisation for L5**. L5 runs the
-  freeze-bound procedure (`docs/production-promotion.md` §4.0–§10).
-- **Next action:** operator commit/merge of ISSUE-250; then the separately authorised ISSUE-237 L5.
+- **2026-09-26: implementation committed locally as `26751ad6`** (`fix(promotion): freeze
+  production state before cutover`), with the §17 doc fixes. Not merged, not pushed, not deployed.
+  The DEV REHEARSAL PASS above remains accepted.
+- **Still OPEN**: the implementation has not been merged or deployed, and the production path
+  itself has not run. Not resolved.
+- **ISSUE-237 L5 is no longer blocked on an untested ISSUE-250 mechanism, and no longer needs an
+  ISSUE-250 commit** (satisfied by `26751ad6`). The remaining prerequisites, in order:
+  1. merge ISSUE-250;
+  2. put that merged code on the PROD checkout;
+  3. a **separate operator authorisation for ISSUE-237 L5**.
+
+  L5 has NOT run. It runs the freeze-bound procedure (`docs/production-promotion.md` §4.0–§10).
+- **Next action:** merge ISSUE-250; the merged code on the PROD checkout; then the separately
+  authorised ISSUE-237 L5.
 
 ## 1. Symptom
 
@@ -526,7 +534,7 @@ application.
 | F-010 | INFO | Record why role-level NOLOGIN was rejected | folded (§7) |
 | F-011 | INFO | `--freeze-status`/recovery must not connect to the target | folded (§9) |
 
-## 16. Implementation (2026-09-26, uncommitted, DB-free validated)
+## 16. Implementation (2026-09-26, DB-free validated; committed locally as `26751ad6`)
 
 **Files (ISSUE-250 only):**
 
@@ -564,6 +572,12 @@ application.
   811/814; the 3 failures are outside this change's files and pre-date it (an unresolved
   `data/reference/afl-api-identities.json` import in a reachability test, an `INSERT INTO`
   assertion on rebuild tooling, and a post-045 table-list mismatch in `reference-data`).
+  *(Clarified 2026-09-26, after commit `26751ad6`: this 811/814 run was performed in the
+  **combined working tree**. `tests/afl-api-identity-correction.test.ts` belonged to concurrent,
+  still-uncommitted ISSUE-238 work, so that suite is **not part of the standalone ISSUE-250
+  commit** and is not ISSUE-250 evidence. The ISSUE-250-specific validation is the promotion suite,
+  the docs checks, typecheck, lint and the DEV rehearsal (§17, §17.7). The three failures remain
+  unrelated and pre-existing (§17.5); the run is **not** a fully green adjacent suite.)*
 
 **What the tests prove:** freeze absent → every production phase and plan refuses; a valid freeze
 is accepted; wrong database / non-live name / wrong environment refuse; a stale or foreign marker
@@ -711,7 +725,9 @@ No DSN or password was printed. Every psql and pg_* call passed the password thr
 ### 17.5 Unrelated test failures (the 811/814 run), re-checked
 
 Rerunning the adjacent DB-free suites plus the promotion suite on the workstation gives
-**1075/1078**. The three failures are the same three signatures as before:
+**1075/1078** (same combined working tree, so it too included the uncommitted ISSUE-238
+`afl-api-identity-correction` suite; see the §16 clarification). The three failures are the same
+three signatures as before:
 
 1. `tests/db-test-rebuild.test.ts` › *AFLDB-ISSUE-235 I18 fixture harness (DB-free)* › *teardown
    and verify run under plain tsx…*: `Error: unresolved import
@@ -770,7 +786,10 @@ Established before the ISSUE-250 local commit; nothing was re-run for the commit
 - DEV freeze rehearsal PASS; full freeze-enabled DEV promotion PASS; guarded rollback PASS; final
   DEV health 200 (§17.1–§17.3). PROD was never contacted.
 - The adjacent-suite run is **811/814, not a full green suite**: three reproduced, unrelated,
-  pre-existing failures (§17.5).
+  pre-existing failures (§17.5). It ran in the combined working tree and included the
+  `afl-api-identity-correction` suite from concurrent uncommitted ISSUE-238 work, which is not part
+  of `26751ad6` (§16 clarification). ISSUE-250's own evidence is the promotion suite, docs checks,
+  typecheck, lint and the DEV rehearsal above.
 
 ## 15. History
 
@@ -782,3 +801,7 @@ Established before the ISSUE-250 local commit; nothing was re-run for the commit
   freeze-enabled DEV promotion (`20260926-195601`) and its guarded rollback. R-1..R-3 fixed in the
   docs; R-4/R-5 open LOW follow-ups. **Technically accepted for the ISSUE-237 L5 prerequisite.**
   Uncommitted. PROD never contacted.
+- **2026-09-26: committed locally as `26751ad6`**, unmerged. Status text corrected in a
+  documentation-only follow-up commit; the 811/814 adjacent run annotated as combined-tree
+  evidence (§16). Still OPEN: merge, PROD checkout and the separately authorised ISSUE-237 L5
+  remain. L5 NOT RUN. PROD never contacted.
