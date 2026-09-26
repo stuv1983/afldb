@@ -15,7 +15,7 @@ commit.
 
 ## [Unreleased]
 
-### AFL API season enumeration, enumeration-scoped rekey search, acknowledged absence sweep, scheduled Brownlow fixture identity, season discovery, admin unit status (AFLDB-ISSUE-231, -232, -233; Open) - 26 September 2026
+### AFL API season enumeration, enumeration-scoped rekey search, acknowledged absence sweep, scheduled Brownlow fixture identity, season discovery, admin unit status (AFLDB-ISSUE-231, Resolved; -232, -233, Open) - 26 September 2026
 
 - **Season enumeration (ISSUE-231).** New `src/lib/acquisition/afl-api-season-enumeration.ts`
   reads the `00-season-matches.json` every AFL API acquisition already retains and hash-binds. It
@@ -82,6 +82,11 @@ commit.
   (`tools/db/afl-api-season-rekey-rehearsal.ts`, S1–S10) passed 62/62 on 2026-09-26, with residue
   0 before and after. Everything else is DB-free. The DEV check of the
   admin page has not been done.
+- **ISSUE-231 DEV acceptance (Resolved, 2026-09-26).** Deployed `dd7e28a6` on DEV. `--validate-only`
+  and `--dry-run` both PASS against the real 2026 season feed (218 matches, complete): no
+  disappearance from the feed was detected (`dataIssuesOpened` 0), so no `afl_api_match_absence`
+  acknowledgement was required or performed. `--apply` was not run. ISSUE-232 and ISSUE-233 remain
+  Open and unaffected.
 
 ### AFL API identity bulk pass: identity-bound bridge artefacts, contradiction dedup, adjudication recovery (AFLDB-ISSUE-241, -240, -239; Resolved) - 26 September 2026
 

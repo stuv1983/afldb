@@ -4,7 +4,7 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 15
+**Open issues:** 14
 
 | ID | Title | Severity | Area | State | Next action |
 |---|---|---|---|---|---|
@@ -17,7 +17,6 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-234 | Optional AFL API feed expansion (extended statistics, umpires, play-by-play) | Low | Data acquisition — investigation only | Open (2026-09-23); triaged 2026-09-26: REMAINS OPEN / DEFERRED — extended stats, umpires, weather, milestones and `scoreWorm` scoring events are already retained raw (host snapshots; spine payloads per ISSUE-228 §15 Q8), never projected; no product need, no model, terms-of-use (§15 Q8) open | None scheduled; investigate when a product need arises |
 | AFLDB-ISSUE-233 | AFL API season discovery and season rollover ownership | Medium | Data acquisition / season lifecycle — `afl-api-identities.json`, rollover runbook | Open (2026-09-23); 2026-09-26 pass 2: D-233-1/2/3 decided (proposal JSON; season-scoped AFL API Brownlow artefacts beside the master; preserve `afl_api` ownership or refuse); discovery IMPLEMENTED / DB-FREE VALIDATED against the authentic `compseasons` sample (sha256 `fe3f1641…d965`); D-233-2/3 planned, not implemented; runbook `issues/open/AFLDB-ISSUE-233.md` | Implement D-233-3 rebuild census refusal + D-233-2 season-scoped load (runbook §4.3); first `--fetch` discovery on DEV |
 | AFLDB-ISSUE-232 | AFL API operational wiring: systemd timers, Brownlow scheduled settle and admin status | Medium | Deployment / operations — `deploy/afldb-settle-afl-api*`, `settle-status.ts`, `/admin/current-season` | Open (2026-09-23); 2026-09-26: admin panel IMPLEMENTED (`VISUAL: UNVERIFIED`); pass 2: D-232-1 = B (reversal of ISSUE-244 §40), O1, D-232-3 = keep; Brownlow wrapper refreshes fixture identity then settles with `--use-fixture-identity`, IMPLEMENTED / DB-FREE VALIDATED; fixtures CLI moved to the shared F029 loader; units not installed on any host; runbook `issues/open/AFLDB-ISSUE-232.md` | DEV sync + panel eyeball; runbook §7 installation with an observed first Brownlow firing |
-| AFLDB-ISSUE-231 | AFL API source-integrity hardening: retired-identity rekey and match-family absence sweep | Low | Data acquisition / settle — `afl_api` resolver, `AflApiSettleBundle` | Open (2026-09-23); 2026-09-26: carrier + enumeration-scoped rekey IMPLEMENTED / DB-FREE VALIDATED; pass 2: envelope defect fixed (`meta.pagination`, proven on the authentic 2026 feed); D-231-1 = 0, D-231-2 = clear on presence recorded; pass 3: D-231-3 = A (CLI-only acknowledgement) IMPLEMENTED / DB-FREE VALIDATED — halt still rolls back in full, a separate transaction opens one keyed `afl_api_match_absence` finding per missing id, `acknowledge-afl-api-match-absence.ts` stamps `absent_since` and resolves it; actor decision (c): PostgreSQL role recorded as database actor (operational attribution, not authenticated human identity); `code_test_db` S1–S10 rehearsal RUN 62/62 PASS, residue 0 before/after; uncommitted; runbook `issues/open/AFLDB-ISSUE-231.md` | Operator commit + DEV sync, then DEV `--validate-only` and `--dry-run` acceptance (runbook §6c) |
 | AFLDB-ISSUE-229 | AFL API fixture ingestion | Medium | Data acquisition / fixtures — `afl_api` season feed → `fixtures` | Open (2026-09-23); 2026-09-26 pass 2: PARTIALLY EVIDENCED, STILL BLOCKED — one authentic `SCHEDULED` record (`CD_M20260142901`, no score block, refused by today's contract) hash-bound; every other status unobserved; no writer; runbook `issues/open/AFLDB-ISSUE-229.md` | Operator decides whether D-229-1/2 may proceed on the single `SCHEDULED` citation, or waits for more captures |
 | AFLDB-ISSUE-230 | `afldb_test` 2026 AFL Tables spine carries 2099 observation timestamps from the 2026-09-06 settle benchmark, so real-clock settles refuse on `source_records_seen_ck` | Low | Test database hygiene — `afldb_test` `staging.source_records` | Open — found 2026-09-23 (ISSUE-228 §22.13); lineage continued to 2099-01-06 on `afldb_test` only under operator authorisation (batches 2421/2422); not repaired; did not block ISSUE-228 S9 (accepted 2026-09-23) | Choose a repair (reviewed re-stamp tool on `afldb_test` only, or a real-clock rebuild of the 2026 lineage); S9 is now accepted, so it may be scheduled |
 | AFLDB-ISSUE-226 | Stale `docs/architecture.md` §5/§6: the documented application structure names `src/services/`, `src/db/schema/` (described as a Drizzle schema) and `src/types/`, none of which exist, and no Drizzle dependency is present — the project uses postgres.js directly | Low | Documentation — `docs/architecture.md` §5 "Application structure", §6 "Shared statistical definitions" | Open — found 2026-09-19 during the PhanesLight bootstrap closure review; verified three ways against the tracked tree; no code, data or runtime impact; not corrected under the bootstrap | Correct `docs/architecture.md` §5's directory tree and the Drizzle reference to the actual layout, and re-site §6's "defined once in `src/services`" claim on wherever the shared statistical definitions now live (establish that first — this issue does not assert where they are) |
@@ -41147,8 +41146,10 @@ Full record: `issues/closed/AFLDB-ISSUE-228.md` §22.22.
 
 ## AFLDB-ISSUE-231 — AFL API source-integrity hardening: retired-identity rekey and match-family absence sweep
 
-- **Status:** Open (2026-09-23). **Severity:** Low. **Area:** data acquisition / settle —
-  `afl_api` match resolver and `AflApiSettleBundle`.
+- **Status:** **Resolved (2026-09-26)** on operator-run DEV acceptance; see "Resolution" at the end
+  of this entry. Opened 2026-09-23. **Severity:** Low. **Area:** data acquisition / settle —
+  `afl_api` match resolver and `AflApiSettleBundle`. **Runbook:**
+  `issues/closed/AFLDB-ISSUE-231.md` (§8, DEV acceptance).
 - **Origin.** The two gaps S6 deliberately left open (ISSUE-228 runbook §22.18 E item 1,
   classified in §22.20 as rows 1a and 1b; acquisition doc §14.15).
 - **Scope.**
@@ -41271,8 +41272,42 @@ Full record: `issues/closed/AFLDB-ISSUE-228.md` §22.22.
     - In the harness, `now()` is frozen at the outer transaction's start, so `acknowledged_at`
       reads earlier than `first_detected_at`. This is an artefact of the rollback-only harness.
   - **State:** implemented and rehearsed; uncommitted. Not resolved: DEV acceptance is outstanding.
-  - **Next action:** operator commit, then DEV sync. Then on DEV: `--validate-only` on a real 2026
-    snapshot, then a `--dry-run` (runbook §6c "Readiness").
+  - *(Historical.)* **Next action:** operator commit, then DEV sync. Then on DEV: `--validate-only`
+    on a real 2026 snapshot, then a `--dry-run` (runbook §6c "Readiness").
+- **Resolution (2026-09-26, operator-run DEV acceptance; documentation-only closure pass recorded the operator-run evidence).**
+  - **Deployed revision:** `dd7e28a6` (`feat(afl-api): season-feed integrity, absence sweep and ops
+    wiring (229/231/232/233)`), branch `main`. Migrations 104/104 already applied, nothing to
+    apply. Next.js build, including TypeScript, passed. The service restarted successfully.
+    `/api/health`: `{"status":"ok","database":"ok",...}`.
+  - **Not acceptance evidence.** An earlier SSH invocation used malformed PowerShell backtick
+    syntax and did not execute correctly. It is excluded from the record below.
+  - **`--validate-only`** (snapshot `afl-api-2026-2026-09-25-235854`, revision `dd7e28a6`, Node
+    `v22.23.2`, exit 0): bundle 217 match units, 0 build failures; season feed `CD_S2026014` 218
+    matches, complete; status counts CONCLUDED 217, UNCONFIRMED_TEAMS 1; output confirms "manifest,
+    registry and bundle contract verified. No connection opened."
+  - **`--dry-run`** (same snapshot/revision, exit 0, control and writer database both
+    `afldb_dev`): snapshotMatches 217, snapshotPlayerMatchRows 9983, buildFailures 0;
+    seasonFeedMatches 218, seasonFeedComplete 1, seasonFeedStatusCounts
+    `{"CONCLUDED":217,"UNCONFIRMED_TEAMS":1}`; observationsSeen/payloadsCreated/versionsAppended
+    all 10417; unresolvedIdentityMatch 0, unresolvedIdentityPlayer 0; foreignOwnedCollision 0,
+    corroboratedForeignOwned 217, sourceDisagreement 0; manualAuthorityRefusals 0;
+    candidatesCreated 9983; dataIssuesOpened 0, dataIssuesRefreshed 0, dataIssuesResolved 0;
+    canonicalRowsInserted/Updated 0, canonicalApplicationsLogged/ApplyRefusals/ApplyFailures 0;
+    source completeness COMPLETE, all 10,200 acquired records represented, none dropped; the
+    dry-run ran the full write path under real DEV constraints/privileges and rolled the entire
+    transaction back, retaining nothing (including the `import_batches` row).
+  - **Reading.** `dataIssuesOpened = 0` and no HALT: the real 2026 DEV spine has no disappearance
+    relative to the complete feed, so no `afl_api_match_absence` finding exists to acknowledge and
+    none was acknowledged. `--apply` was explicitly not run.
+  - **Prior evidence retained, not re-run.** The `code_test_db` rehearsal (pass 3b, §6c) stays
+    62/62 PASS, residue 0 before and after. Actor decision (c) (§4b.6) is unchanged.
+  - **Verdict: PASS.** The required DEV acceptance sequence (`--validate-only`, then `--dry-run`)
+    is satisfied. **ISSUE-231 is RESOLVED.**
+  - **Not authorised / not performed:** `--apply`; any acknowledgement; any PROD action; any
+    change to ISSUE-229, ISSUE-232 or ISSUE-233 lifecycle state; no code or test change; the
+    PostgreSQL rehearsal was not rerun.
+- Removed from `IssuesIndex.md` and the Open Issues table above (15 → 14). ISSUE-229, ISSUE-232 and
+  ISSUE-233 stay Open and unchanged.
 
 ## AFLDB-ISSUE-232 — AFL API operational wiring: systemd timers, Brownlow scheduled settle and admin status
 

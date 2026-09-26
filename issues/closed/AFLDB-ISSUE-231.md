@@ -40,6 +40,10 @@
 - Residuals 1 and 2: **IMPLEMENTED / REHEARSED ON REAL POSTGRESQL**. DEV acceptance has not run
   (§6c, "Readiness").
 
+**State after DEV acceptance (2026-09-26): RESOLVED.** Deployed `dd7e28a6`; `--validate-only` and
+`--dry-run` both PASS on real DEV; no disappearance detected; no acknowledgement performed or
+required; `--apply` not run (§8).
+
 ---
 
 ## 1. The successor contract, reconstructed
@@ -585,3 +589,63 @@ Pass 3 (D-231-3):
   `tests/afl-api-match.test.ts`. Linting the HEAD blob shows the same three.
 - `sh -n` passes on both AFL API wrappers. `git diff --check` is clean.
 - **Not run:** code_test_db, `tests/integration/*`.
+
+## 8. DEV acceptance and resolution (2026-09-26, operator-run)
+
+**Deployed revision:** `dd7e28a6` (`feat(afl-api): season-feed integrity, absence sweep and ops
+wiring (229/231/232/233)`), branch `main`. Migrations 104/104 already applied, nothing to apply.
+Next.js build, including TypeScript, passed. The service restarted successfully. `/api/health`
+reported `{"status":"ok","database":"ok",...}`.
+
+**Not acceptance evidence.** An earlier SSH invocation used malformed PowerShell backtick syntax
+and did not execute correctly. It is excluded from the record below; only the successful
+`--validate-only` and `--dry-run` runs count.
+
+**`--validate-only`** (snapshot label `afl-api-2026-2026-09-25-235854`, revision `dd7e28a6`, Node
+`v22.23.2`, exit 0):
+- bundle: 217 match units, 0 build failures;
+- season feed `CD_S2026014`: 218 matches, complete;
+- status counts: CONCLUDED 217, UNCONFIRMED_TEAMS 1;
+- output states verbatim: "--validate-only: manifest, registry and bundle contract verified. No
+  connection opened."
+
+(The real DEV feed's non-`CONCLUDED` status is `UNCONFIRMED_TEAMS`, not the `SCHEDULED` used in the
+§2a fixture and the §6c rehearsal. The enumeration records both verbatim without interpreting
+either; this does not change any check.)
+
+**`--dry-run`** (same snapshot and revision, exit 0, control database `afldb_dev`, writer database
+`afldb_dev`):
+- snapshotMatches 217, snapshotPlayerMatchRows 9983, buildFailures 0;
+- seasonFeedMatches 218, seasonFeedComplete 1, seasonFeedStatusCounts
+  `{"CONCLUDED":217,"UNCONFIRMED_TEAMS":1}`;
+- observationsSeen 10417, payloadsCreated 10417, versionsAppended 10417;
+- unresolvedIdentityMatch 0, unresolvedIdentityPlayer 0;
+- foreignOwnedCollision 0, corroboratedForeignOwned 217, sourceDisagreement 0;
+- manualAuthorityRefusals 0;
+- candidatesCreated 9983;
+- dataIssuesOpened 0, dataIssuesRefreshed 0, dataIssuesResolved 0;
+- canonicalRowsInserted 0, canonicalRowsUpdated 0, canonicalApplicationsLogged 0,
+  canonicalApplyRefusals 0, canonicalApplyFailures 0;
+- source completeness: COMPLETE; all 10,200 acquired records were represented, none dropped, every
+  scope proven sweepable;
+- the dry-run executed the full write path against real DEV constraints/privileges and rolled the
+  entire transaction back; nothing was retained, including the `import_batches` row.
+
+**Reading against §4b/§6c.** `dataIssuesOpened = 0` and no HALT occurred:
+- the real 2026 DEV spine has no disappearance relative to the complete feed, so no
+  `afl_api_match_absence` finding exists and none was opened;
+- consequently no acknowledgement was required or performed, and
+  `acknowledge-afl-api-match-absence.ts` was not invoked;
+- residual 1 (retired-identity rekey) had no candidate case in this feed either, consistent with
+  the ISSUE-244 F031 census of 0 `afl_api`-owned matches;
+- `--apply` was explicitly **not** run as part of this acceptance.
+
+**Prior evidence retained, not re-run.** The `code_test_db` rehearsal (§6c) stays 62/62 PASS,
+residue 0 before and after. Actor decision (c) (§4b.6) is unchanged.
+
+**Verdict: PASS.** The required DEV acceptance sequence (`--validate-only`, then `--dry-run`) is
+satisfied. **ISSUE-231 is RESOLVED.**
+
+**Not authorised / not performed by this closure pass:** `--apply`; any acknowledgement; any PROD
+action; any change to ISSUE-229, ISSUE-232 or ISSUE-233 lifecycle state; no code or test change;
+the PostgreSQL rehearsal was not rerun.

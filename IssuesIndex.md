@@ -9,7 +9,7 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Open issues:** 15
+**Open issues:** 14
 
 ### AFLDB-ISSUE-248 — Reserved-domain DEV auth fixtures block promotion
 - **Severity:** High. **Area:** DEV auth operations — `auth_users`, `admin_invites`,
@@ -352,35 +352,6 @@
 - **Runbook:** `issues/open/AFLDB-ISSUE-232.md`.
 - **Next action:** DEV sync, eyeball the panel (`VISUAL: UNVERIFIED`), then the runbook §7
   installation pass with a first observed Brownlow firing.
-
-### AFLDB-ISSUE-231 — AFL API source-integrity hardening: retired-identity rekey and match-family absence sweep
-- **Severity:** Low. **Area:** settle — `afl_api` resolver, `AflApiSettleBundle`,
-  `src/lib/acquisition/afl-api-season-enumeration.ts`.
-- **State:** Open (2026-09-23), the two S6 residuals. Both fail safely; 0 `afl_api`-owned matches
-  exist.
-  - **2026-09-26:** the season-enumeration completeness carrier is implemented. It is read from
-    the retained `00-season-matches.json`, lists the whole feed and never the run's selection, and
-    records statuses verbatim.
-  - The rekey search is now scoped by it: **IMPLEMENTED / DB-FREE VALIDATED.** A rollback-only
-    `code_test_db` rehearsal was written (`tools/db/afl-api-season-rekey-rehearsal.ts`); it was
-    executed in pass 3 (below).
-  - **Pass 2:** carrier defect fixed. The real envelope is `meta.pagination`, so every real feed
-    used to read incomplete. It is now proven on the authentic 2026 feed.
-  - D-231-1 = 0 and D-231-2 = clear-on-presence recorded. The sweep decision is implemented
-    DB-free (`planAflApiAbsenceSweep()`).
-  - **Pass 3:** D-231-3 = A, with a CLI-only acknowledgement. **IMPLEMENTED / DB-FREE
-    VALIDATED.**
-    - The halt still rolls back in full.
-    - A separate transaction then opens one keyed `afl_api_match_absence` finding per missing id.
-    - `acknowledge-afl-api-match-absence.ts` stamps `absent_since` and resolves one finding.
-    - An id that reappears clears the stamp, or closes the finding `source_reappeared`.
-    - Actor decision (c): the PostgreSQL role is recorded as the database actor. That is
-      operational attribution, not authenticated human identity.
-    - **code_test_db rehearsal S1–S10 implemented and executed successfully: 62/62 PASS**, residue
-      0 before and after (runbook §6c). Uncommitted. **DEV acceptance outstanding.**
-- **Runbook:** `issues/open/AFLDB-ISSUE-231.md`.
-- **Next action:** operator commit and DEV sync, then DEV acceptance: `--validate-only` on a real
-  2026 snapshot, then `--dry-run` (runbook §6c "Readiness").
 
 ### AFLDB-ISSUE-229 — AFL API fixture ingestion
 - **Severity:** Medium. **Area:** acquisition / fixtures — `afl_api` season feed → `fixtures`,
