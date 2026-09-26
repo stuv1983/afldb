@@ -3426,7 +3426,7 @@ combined invariant. Both are last-line guards, not the plan.
 
 ### 11d.8 What L4 still cannot claim
 
-> **2026-09-25 — AFLDB-ISSUE-242 allocated (`issues/open/AFLDB-ISSUE-242.md`).**
+> **2026-09-25 — AFLDB-ISSUE-242 allocated (`issues/closed/AFLDB-ISSUE-242.md`).**
 > - **L4 remains NOT RUN, and no L4 evidence has been produced.**
 > - ISSUE-242 is now the token-convergence prerequisite that points 1 and 3 below proposed.
 > - **B4 remains fail-closed until ISSUE-242 is merged.** Until then, the deployed checker STOPs on
@@ -3714,7 +3714,7 @@ This is not an ISSUE-237 defect. An empty `afl_api_identity_adjudications` ledge
 evidenced DEV state (no administrator has adjudicated an `afl_api` identity). The generic
 ISSUE-151 staged mechanism conflated a legitimate zero-row table with a stage restore that never
 ran, and refused both. No ledger row is to be manufactured. **Prerequisite: AFLDB-ISSUE-247**
-(`issues/open/AFLDB-ISSUE-247.md`): a contract-declared `stagedMayBeEmpty` permission on
+(`issues/closed/AFLDB-ISSUE-247.md`): a contract-declared `stagedMayBeEmpty` permission on
 `afl_api_identity_adjudications`, accepted at step 2d only on per-table stage-completion evidence
 written by the staged `COPY`'s own trigger. Implemented and DB-free validated 2026-09-25, and
 committed `86e0e2ba` with the `code_test_db` PostgreSQL rehearsal PASS 7/7, rollback-only, zero
@@ -3742,7 +3742,7 @@ The full FK census into 14/17/18:
 
 The gate behaved as designed and is not weakened. L4 never passes `--allow-fixture-identities`,
 and renaming the emails is excluded. **Prerequisite: AFLDB-ISSUE-248**
-(`issues/open/AFLDB-ISSUE-248.md`), the audited DEV cleanup bound to exactly this closure.
+(`issues/closed/AFLDB-ISSUE-248.md`), the audited DEV cleanup bound to exactly this closure.
 Implemented and DB-free tested, committed `a4f734af`; live validate/apply/idempotence/postchecks
 are still pending. After it, P3 of that runbook must find no reserved-domain row.
 

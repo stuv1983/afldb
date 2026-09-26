@@ -62,7 +62,7 @@ const TOOL_PATH = 'tools/maintenance/issue248-cleanup-dev-auth-fixtures.ts';
 
 /**
  * The immutable specification of the closure, from the operator's live ISSUE-237 A5 evidence
- * (2026-09-25, issues/open/AFLDB-ISSUE-248.md §2). Nothing here is read from the database.
+ * (2026-09-25, issues/closed/AFLDB-ISSUE-248.md §2). Nothing here is read from the database.
  * Roles are the fixture accounts' purposes (plain admin, super admin, the contributor invited by
  * invite 5); the validate-only run proves them before anything can be written.
  */

@@ -2769,7 +2769,7 @@ describe('staged reinstatement of NOT NULL lineage-bound references', () => {
  * walking each table's DO block guard by guard, in file order, exactly as PL/pgSQL would:
  * an unknown guard fails the test, so a change to the SQL's control flow forces this suite to
  * be revisited rather than silently passing. The live proof is the rehearsal in
- * issues/open/AFLDB-ISSUE-247.md.
+ * issues/closed/AFLDB-ISSUE-247.md.
  */
 describe('AFLDB-ISSUE-247 — stage-completion evidence for legitimately empty staged tables', () => {
   const AFL = 'afl_api_identity_adjudications';
