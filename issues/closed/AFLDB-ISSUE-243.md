@@ -1,8 +1,9 @@
 # AFLDB-ISSUE-243 — Promotion preflight cannot validate target credentials and rejects known DEV operational artefacts
 
-- **Status:** Open (2026-09-25). Implemented and DB-free validated. *(2026-09-26: committed
-  `4df98d07` and deployed to DEV. L4 progressed past A2 on at least three later runs, but the four READY
-  results this issue resolves on were never recorded, so it stays open; see §10.)*
+- **Status:** **Resolved (2026-09-26)** on four fresh operator-run read-only §8 preflights on DEV,
+  all READY; see §11. Opened 2026-09-25. Implemented and DB-free validated. *(2026-09-26: committed
+  `4df98d07` and deployed to DEV. The §10 closure audit kept this issue open until the four READY
+  results were supplied.)*
 - **Severity:** High. It blocks ISSUE-237 L4 at step A2, before any dump, candidate or swap.
 - **Area:** operator workflow tooling. That is `tools/dev/preflight-core.ts` and
   `tools/dev/preflight.ts`, plus `docs/production-promotion.md` §3 and ISSUE-237 §11d A2.
@@ -208,6 +209,8 @@ Expected results:
 
 ## 10. Closure audit against ISSUE-237 L4 (2026-09-26, DB-free, Claude-run): REMAINS OPEN
 
+*(Historical. Superseded by the §11 resolution the same day.)*
+
 - **Implementation state.** Committed `4df98d07`, which is contained in every later DEV deployment
   (`4bb23a8f`, `397f422d`, `6ae70722`).
 - **Recorded progression.** After the fix, L4 went past A2 on at least three later runs:
@@ -233,3 +236,30 @@ Expected results:
   step is implied:
   - paste the four A2 outputs from any of those runs, if kept; or
   - rerun the four §8 commands on DEV now. They open read-only connections and write nothing.
+
+## 11. Resolution (2026-09-26): RESOLVED on four READY §8 preflights
+
+The operator reran the four read-only §8 preflights on DEV (`~/projects/afldb`) at revision
+`dd7e28a6` with Node v22.23.2. This record was written from that operator-supplied evidence; no
+command was run to write it. The earlier L4 A2 console output was not retained and is not claimed.
+
+| # | Side | `--dsn-env` | Expected database / role | Result |
+|---|---|---|---|---|
+| 1 | source | `AFLDB_TEST_DATABASE_URL` | `afldb_test` / `afldb_owner` | migration parity **104/104**; **READY**, 0 blockers, 2 warnings |
+| 2 | target | `AFLDB_OWNER_DATABASE_URL` | `afldb_dev` / `afldb_owner` | `INFO migration parity not read on a promotion target`; **READY**, 0 blockers, 2 warnings |
+| 3 | target | `AFLDB_IMPORT_DATABASE_URL` | `afldb_dev` / `afldb_import` | same target parity INFO; **READY**, 0 blockers, 2 warnings |
+| 4 | target | `AFLDB_BACKUP_DATABASE_URL` | `afldb_dev` / `afldb_backup` | same target parity INFO; **READY**, 0 blockers, 2 warnings |
+
+All four runs also:
+
+- recognised `main` as valid for promotion, contained current local `main`, and reported
+  `origin/main` ahead 0 / behind 0;
+- passed the migration-name collision check and the promotion plan/disposition contract;
+- kept exactly three known, untracked operational rebuild-manifest artefacts as warnings, not
+  blockers;
+- performed no write, migration, plan write, deploy or service action.
+
+**Closure basis.** §9.4's criterion (all four READY on DEV, with no other L4 step implied) is met,
+and so is §10's: the target INFO lines prove that the restricted `afldb_import` and `afldb_backup`
+credentials pass without an `afldb_meta` read, and the operational manifests are classified as
+warnings. AFLDB-ISSUE-237 remains OPEN. No PROD action is implied.

@@ -2,12 +2,14 @@
 
 ## 0. Status
 
-- **Open (2026-09-25).** **Severity:** High. It blocks ISSUE-237 L4 at A5. **Area:** DEV auth
+- **Resolved (2026-09-26)** on retrospective read-only verification of `afldb_dev`; see §12.
+- **Opened 2026-09-25.** **Severity:** High. It blocked ISSUE-237 L4 at A5. **Area:** DEV auth
   operations: `auth_users`, `admin_invites`, `auth_audit_log`, `auth_sessions`, and
   `tools/maintenance/issue248-cleanup-dev-auth-fixtures.ts`.
 - **Implemented and DB-free validated (2026-09-25).** *(2026-09-26: committed `a4f734af`, merged
-  `397f422d` and deployed to DEV. No §9 run is recorded anywhere, so it stays open; see §11.)*
-- **Next action:**
+  `397f422d` and deployed to DEV. The §11 closure audit kept this issue open until the §12 evidence
+  was supplied.)*
+- *(Historical.)* **Next action:**
   1. The operator reviews and commits, merges, and puts the code on the DEV checkout.
   2. Under an explicit DEV authorisation, the operator runs §9: backup, validate-only, `--apply`,
      rerun, P1–P4.
@@ -305,6 +307,8 @@ authorisation.
 
 ## 11. Closure audit against ISSUE-237 L4 (2026-09-26, DB-free, Claude-run): REMAINS OPEN
 
+*(Historical. Superseded by the §12 resolution the same day.)*
+
 - **Implementation state.** Committed `a4f734af`. It is contained in `397f422d` and `6ae70722`,
   the revisions that the two later L4 runs used.
 - **Recorded.** Only indirect progression evidence. L4 passed A5 at 033212 (the run reached the
@@ -337,3 +341,38 @@ authorisation.
   - The original backup, WOULD_CLEAN and CLEANED (17 writes) lines exist only in console output.
     Whether P1–P3 plus a validate-only ALREADY_CLEAN is enough without them is an operator
     decision. This audit does not make it.
+
+## 12. Resolution (2026-09-26): RESOLVED on retrospective read-only verification
+
+This record was written from operator-supplied evidence; no database, host or acceptance command
+was run to write it. Every check below was read-only on `afldb_dev`. No `--apply` was run during
+this verification.
+
+- **Snapshot transition.** The earlier refused L4 snapshot `20260925-203256` records
+  `fixtureRows = 4`; the accepted promotion snapshot `20260926-085511` records `fixtureRows = 0`.
+- **P1:** users 0, invites 0, audits 0, sessions 0.
+- **P2:** exactly one `auth_audit_log` `action = test_fixture.cleanup` row:
+  - audit id **984**; `actor_user_id` 4, role `super_admin`, enabled;
+  - issue `AFLDB-ISSUE-248`, `blocked_issue` `AFLDB-ISSUE-237`;
+  - deleted invite id 5;
+  - deleted audit ids `[807, 808, 811, 812, 889, 890, 912, 913]`;
+  - deleted session ids `[13, 15, 29, 35]`;
+  - `business_provenance_references = 0`.
+- **Audit ordering:** 983 = ISSUE-246 `data_override.retired`; 984 = ISSUE-248
+  `test_fixture.cleanup`; 985 = `database.promoted` for `afldb_dev_candidate_20260926-085511`. The
+  cleanup therefore sits after the ISSUE-246 retirement and before the accepted promotion.
+- **P3:** the complete A5 reserved-domain predicate across every email-bearing table returned no
+  rows.
+- **Fresh default-mode tool probe:** target `afldb_dev`; verdict **ALREADY_CLEAN**; cleanup audit
+  `auth_audit_log` 984; writes 0; transaction READ ONLY (validate only; nothing written); PASS;
+  exit 0.
+- **Not available.** The original §9 transcript is not retained and is **not** reconstructed: the
+  pre-state record, the backup file, the WOULD_CLEAN and CLEANED (17 writes) lines, the original
+  ALREADY_CLEAN rerun, and P4. P4's pre-state delta cannot be re-derived after the later promotion
+  (§11).
+- **Closure basis (operator decision).** The durable, coherent cleanup audit row (P2), the P1/P3
+  postconditions, the snapshot transition from `fixtureRows` 4 to 0, the audit ordering, and the
+  tool's own read-only ALREADY_CLEAN idempotence validation together provide sufficient
+  retrospective evidence that the authorised ISSUE-248 cleanup ran through this tool.
+- **Scope.** This resolves ISSUE-248 only. AFLDB-ISSUE-237 remains OPEN (L5 PROD not run). No PROD
+  action is implied.

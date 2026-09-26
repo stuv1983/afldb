@@ -1,9 +1,10 @@
 # AFLDB-ISSUE-247 — A legitimately empty staged reinstatement table blocks promotion
 
-- **Status:** Open (2026-09-25). Implemented and DB-free validated. `code_test_db` rehearsal **PASS
-  7/7** (2026-09-26, rollback-only, zero residue — §6). *(2026-09-26: committed `86e0e2ba`, merged
-  `397f422d` and deployed to DEV. Two L4 runs then passed A5 and the staged reinstatement. None of
-  the §7 live evidence was recorded, so it stays open; see §9.)*
+- **Status:** **Resolved (2026-09-26)** on retained L4 artefacts, gate-implied proof and current
+  DEV state; see §10. Opened 2026-09-25. Implemented and DB-free validated. `code_test_db`
+  rehearsal **PASS 7/7** (2026-09-26, rollback-only, zero residue — §6). *(2026-09-26: committed
+  `86e0e2ba`, merged `397f422d` and deployed to DEV. Two L4 runs then passed A5 and the staged
+  reinstatement. The §9 closure audit kept this issue open until the §10 evidence was supplied.)*
 - **Severity:** High — it blocks ISSUE-237 L4 at A5 on a valid DEV state.
 - **Area:** promotion lifecycle — `tools/db/promotion-inventory.ts` (contract, `stageSql`,
   `promoteStagedSql`, `judgeStagedSourceRows`, plan validator), `tools/db/promotion-check.ts`
@@ -278,6 +279,8 @@ open throughout.
 
 ## 9. Closure audit against ISSUE-237 L4 (2026-09-26, DB-free, Claude-run): REMAINS OPEN
 
+*(Historical. Superseded by the §10 resolution the same day.)*
+
 - **Implementation state.** Committed `86e0e2ba`. It is contained in `397f422d` (the rolled-back
   L4, `20260926-033212`) and in `6ae70722` (the accepted L4, `20260926-085511`).
 - **Recorded.** Both runs got past A5 and through the reinstatement: 033212 reached the post-swap
@@ -309,3 +312,55 @@ open throughout.
   - Record what the grid repair was, and whether it touched the staged path.
   - If the console output is gone, whether to accept the progression evidence is an operator
     decision. This audit does not weaken §7 to make it.
+
+## 10. Resolution (2026-09-26): RESOLVED on retained artefacts, gate-implied proof and DEV state
+
+The implementation and the §6 `code_test_db` rehearsal evidence remain valid and were not rerun.
+This record was written from operator-supplied evidence; no database, host or acceptance command
+was run to write it.
+
+- **Accepted L4 stamp:** `20260926-085511`.
+- **Retained source snapshot** `promotion-dev-20260926-085511.json`:
+  `public.afl_api_identity_adjudications` 0, `public.brownlow_vote_entry_state` 3,
+  `public.external_grid_sources` 1, `fixtureRows` 0.
+- **R6, proven directly (§9 item 2).** Direct inspection of the retained stage script
+  `promotion-stage-afl_api_identity_adjudications.sql`: `COPY_headers = 1`, `data_rows = 0`. This
+  was a real zero-row staged `COPY`, not an omitted table.
+- **Retained supersede artefact** `promotion-dev-afl-api-supersede-20260926-085511.json`. Its
+  SHA256 matched the recorded promotion manifest
+  (`37652b7cb38b2b8880f562f36346a3787717d11c67df94fcdb29c40c53f6594a`). It records
+  `targetDatabase = afldb_dev`, `targetLedgerRowCount = 0`, `targetLedgerSha256 =
+  4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945`.
+- **Gate-implied proof (§9 items 3 and 4).** The retained `promotion-promote-staged.sql` contract
+  proves that:
+  - `promotion_stage_completion` must hold evidence for `afl_api_identity_adjudications`, or the
+    promotion raises;
+  - `staged_rows` must equal `evidenced_rows`, or the promotion raises;
+  - `staged_rows = 0` emits the explicit ISSUE-247 permitted-empty `NOTICE`;
+  - the table is then promoted and its staging copy dropped;
+  - `promotion_stage_completion`, its trigger function and `promotion_staging` are dropped only
+    after the staged-table processing.
+
+  The accepted L4 subsequently completed this retained promotion path, so every one of those
+  conditions held on DEV.
+- **Grid provenance.** Retained `promotion-dev-20260926-085511-grid-import-batches.csv`; its SHA256
+  matched the recorded promotion manifest
+  (`e46ce87746d3a10b3adfead4954795b2d585d724dedc28bb73a8595b2e832023`). It holds import batches
+  82 (`import_external_grids.py`, completed, 1123 inserted) and 84 (`import_gridley_boards.py`,
+  completed, 1143 inserted). Current read-only DEV: `external_grids` total 2266; batch 82 = 1123
+  rows; batch 84 = 1143 rows; NULL `import_batch_id` = 0; dangling grid import batches = 0; live
+  `import_batches` 82 and 84 exist and match the retained records. The retained promotion audit
+  marker explicitly records the `external_grids.import_batch_id` promotion gap.
+- **The "targeted grid repair".** The exact operator command is **not** retained in the repository
+  and is not reconstructed here. What is recorded: the retained pre-cutover provenance, the
+  accepted promotion result and the current DEV state prove the repaired final state, in which all
+  2266 grids keep valid provenance through batches 82/84 with zero dangling references.
+- **Not available.** The live A5 `[PASS] Staged tables hold rows …` line (§9 item 1), the
+  `promotion_stage_completion` readback (item 3), the live 2d `NOTICE` (item 4) and the C2
+  `--compare` `equal 0/0` line (item 5) were not retained. They are **not** claimed as recovered;
+  items 3 and 4 are recorded as gate-implied from the exact retained SQL plus the accepted L4.
+- **Closure basis (operator decision).** The operator accepted the retained, hash-bound artefacts,
+  the direct R6 proof, the gate-implied 2b/2d proof and the current DEV state in place of the
+  unretained §7 console lines. §7 itself is unchanged.
+- **Scope.** This resolves ISSUE-247 only. AFLDB-ISSUE-237 remains OPEN (L5 PROD not run). No PROD
+  action is implied.

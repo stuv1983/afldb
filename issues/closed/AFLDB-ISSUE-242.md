@@ -1,9 +1,10 @@
 # AFLDB-ISSUE-242 — Cross-database manual player registration token convergence blocks ISSUE-237 L4
 
-- **Status:** Open (2026-09-25). Implemented, DB-free validated, and **rehearsed on `code_test_db`**
+- **Status:** **Resolved (2026-09-26)** on retrospective operator-run acceptance evidence; see §12.
+  Opened 2026-09-25. Implemented, DB-free validated, and **rehearsed on `code_test_db`**
   (§8a: 103/103 checks, generated step-2c SQL executed by PostgreSQL 16.15). *(2026-09-26:
-  committed `bfafed36` and deployed to DEV. ISSUE-237 L4 PASSED at stamp `20260926-085511`, but
-  this issue's live convergence evidence was not recorded, so it stays open; see §11.)*
+  committed `bfafed36` and deployed to DEV. ISSUE-237 L4 PASSED at stamp `20260926-085511`; the
+  §11 closure audit kept this issue open until the §12 evidence was supplied.)*
 - **Severity:** High. It blocks the only path to ISSUE-237 L4 while `afldb_test` carries the 92
   ISSUE-224 registrations.
 - **Area:** promotion lifecycle — `tools/db/promotion-inventory.ts`, `tools/db/promotion-check.ts`,
@@ -371,6 +372,8 @@ the swap, or the post-swap `replay_admin_overrides(players)`. The file header re
 
 ## 11. Closure audit against ISSUE-237 L4 (2026-09-26, DB-free, Claude-run): REMAINS OPEN
 
+*(Historical. Superseded by the §12 resolution the same day.)*
+
 The audit covered the accepted L4 record: ISSUE-237 runbook §11d.12–§11d.15, the `issues.md`
 ISSUE-237/249 entries, and `issues/closed/AFLDB-ISSUE-249.md` §9. No database was contacted, and
 there was no SSH.
@@ -401,3 +404,34 @@ there was no SSH.
   - the B4 and C2 console output, if kept.
 
   Resolve on the counts that those show. Do not resolve on "L4 passed" alone.
+
+## 12. Resolution (2026-09-26): RESOLVED on retrospective operator-run acceptance evidence
+
+The implementation was already committed and deployed. The DB-free (§8) and `code_test_db`
+rehearsal (§8a) evidence remains valid and was not rerun. This record was written from
+operator-supplied evidence; no database, host or acceptance command was run to write it.
+
+- **Accepted L4 stamp:** `20260926-085511`.
+- **Retained step-2c lineage file:** `~/backups/afldb/promotion-dev-lineage-20260926-085511.sql`.
+  - Recorded SHA256 `784e97594f810fe66cddc996d08a1654d7351e7f8a554571557b9e4bb7b2dbb9`. The
+    file's current SHA256 matched it.
+  - Its convergence entries: **92** candidate `manual_admin_edit` tokens are transport-local;
+    **92 rebind** onto the target token for the same AFL Tables path; **0 retire**.
+- **Read-only DEV verification** (deployed revision `dd7e28a6`):
+  - `database = afldb_dev`, role `afldb_import`, `transaction_read_only = on`;
+  - `manual_tokens = 92`, `distinct_players = 92`;
+  - ISSUE-242 convergence-note rows = **92**, with the exact note "Bound at the promotion boundary
+    by manual identity convergence (AFLDB-ISSUE-242).";
+  - `tokens_without_exactly_one_creation_record = 0`;
+  - `players_with_multiple_manual_tokens = 0`;
+  - the invariant exception query returned no rows.
+- **Closure basis.** The immutable retained step-2c plan proves 92 rebind / 0 retire, and the
+  promoted DEV state proves that all 92 planned convergences are present and satisfy the §5
+  final-state token invariants (one creation record per surviving manual token, at most one manual
+  token per player). This is the counts-based evidence §11 asked for, not "L4 passed" alone.
+- **Not available.** The original B4 A4.2 and C2 console lines (present/bind/create and
+  rebind/retire counts as printed), and the psql result of C1's 2c, were not retained. They are
+  **not** claimed as recovered; the counts above come from the retained plan file and the current
+  DEV state.
+- **Scope.** This resolves ISSUE-242 only. AFLDB-ISSUE-237 remains OPEN (L5 PROD not run). No PROD
+  action is implied.

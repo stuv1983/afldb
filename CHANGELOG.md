@@ -15,6 +15,36 @@ commit.
 
 ## [Unreleased]
 
+### Promotion prerequisites closed on DEV acceptance evidence (AFLDB-ISSUE-242, -243, -247, -248; Resolved) - 26 September 2026
+
+- **What this records.** The four ISSUE-237 L4 prerequisites are resolved on operator-run DEV
+  evidence gathered on 26 September. No implementation, test, migration or tooling changed. Where
+  original console output was not retained, the closure says so and does not claim it recovered.
+  AFLDB-ISSUE-237 remains open (L5 PROD not run), and nothing here implies a PROD action.
+- **ISSUE-242 (manual token convergence).** The retained step-2c plan from the accepted L4
+  (`promotion-dev-lineage-20260926-085511.sql`, SHA256 matched the recorded value) records 92
+  rebind and 0 retire. Read-only `afldb_dev` at `dd7e28a6` holds 92 manual tokens on 92 players,
+  92 ISSUE-242 convergence notes, 0 tokens without exactly one creation record, and 0 players with
+  more than one manual token. The original B4/C2 console lines were not retained.
+- **ISSUE-243 (promotion preflight sides).** Four fresh read-only preflights on DEV at `dd7e28a6`
+  all returned READY with 0 blockers: source `afldb_test` / `afldb_owner` (migration parity
+  104/104), and target `afldb_dev` as `afldb_owner`, `afldb_import` and `afldb_backup`, each
+  reporting that migration parity is not read on a promotion target. Three known operational
+  rebuild-manifest artefacts stayed warnings, not blockers.
+- **ISSUE-247 (permitted-empty staged table).** The retained L4 stage script for
+  `afl_api_identity_adjudications` holds one `COPY` header and 0 data rows: a real zero-row staged
+  load. The hash-bound supersede artefact records a 0-row DEV target ledger. The 2b/2d behaviour
+  is gate-implied from the retained `promotion-promote-staged.sql` plus the accepted L4; the live
+  NOTICE and readback were not retained. All 2266 `external_grids` rows keep valid provenance
+  through import batches 82/84, with 0 dangling references. The exact grid-repair command was not
+  retained.
+- **ISSUE-248 (reserved-domain DEV auth fixtures).** Read-only `afldb_dev` holds exactly one
+  `test_fixture.cleanup` audit (`auth_audit_log` 984, a real enabled super_admin, the exact
+  closure ids, 0 business/provenance references), ordered between ISSUE-246's 983 and the
+  promotion marker 985. P1 and the A5 reserved-domain predicate find nothing, the L4 snapshots move
+  from 4 fixture rows to 0, and the tool's validate-only probe returns ALREADY_CLEAN with 0 writes.
+  The original backup, WOULD_CLEAN, CLEANED and P4 output was not retained.
+
 ### AFL API season enumeration, enumeration-scoped rekey search, acknowledged absence sweep, scheduled Brownlow fixture identity, season discovery, admin unit status (AFLDB-ISSUE-231, Resolved; -232, -233, Open) - 26 September 2026
 
 - **Season enumeration (ISSUE-231).** New `src/lib/acquisition/afl-api-season-enumeration.ts`
@@ -181,7 +211,7 @@ commit.
   The new source identity promotion gate is what prevented a repeat of the earlier silent-loss
   candidate. AFLDB-ISSUE-237 itself remains open pending L5 (PROD), which is unaffected by this fix.
 
-### Audited cleanup of reserved-domain DEV auth fixtures (AFLDB-ISSUE-248, open) - 25 September 2026
+### Audited cleanup of reserved-domain DEV auth fixtures (AFLDB-ISSUE-248, Resolved 26 September) - 25 September 2026
 
 - **What changed.** A new operator maintenance command,
   `npm run db:issue248:cleanup-dev-auth-fixtures -- --environment dev --actor-email <super admin>
@@ -211,7 +241,7 @@ commit.
   - The A5 gate itself is unchanged.
 - **Status.** Committed `a4f734af`. DB-free validated; not yet run on DEV.
 
-### Staged promotion accepts a contract-permitted empty table on stage-completion evidence (AFLDB-ISSUE-247) (Open) - 25 September 2026
+### Staged promotion accepts a contract-permitted empty table on stage-completion evidence (AFLDB-ISSUE-247) (Resolved 26 September) - 25 September 2026
 
 - **Problem.** AFLDB-ISSUE-237 L4 A5 on `afldb_dev` was refused by the AFLDB-ISSUE-151 staged-rows
   gate because `afl_api_identity_adjudications` held 0 rows, which is a valid state (no human
@@ -229,7 +259,7 @@ commit.
 - **Unchanged.** Leftover-schema refusal at every phase, id preservation, no constraint bypass, and
   the candidate count comparison (`equal`).
 - **Validation.** DB-free: typecheck clean, `tests/db-promotion-check.test.ts` 201/201, ESLint
-  clean. The `code_test_db` PostgreSQL rehearsal (`issues/open/AFLDB-ISSUE-247.md` §6) passed 7/7,
+  clean. The `code_test_db` PostgreSQL rehearsal (`issues/closed/AFLDB-ISSUE-247.md` §6) passed 7/7,
   rollback-only, with zero residue, on 2026-09-26. Committed `86e0e2ba`. The A5 rerun is pending.
 
 ### Audited retirement of the orphaned ISSUE-109 DEV fixture override (AFLDB-ISSUE-246) (Resolved) - 25 September 2026
@@ -257,7 +287,7 @@ commit.
     exactly one row.
   - AFLDB-ISSUE-237 A4.3 now returns no rows.
 
-### Promotion preflight distinguishes source and target credentials (AFLDB-ISSUE-243, open) - 25 September 2026
+### Promotion preflight distinguishes source and target credentials (AFLDB-ISSUE-243, Resolved 26 September) - 25 September 2026
 
 - **What changed.** `npm run preflight -- --mode promotion` now requires
   `--promotion-side source|target`.
@@ -277,7 +307,7 @@ commit.
   cases), `tests/db-promotion-check.test.ts` 189/189 and
   `tests/data-overrides-source-contract.test.ts` 65/65. No database was contacted.
 
-### Promotion converges manual player registration tokens by AFL Tables path (AFLDB-ISSUE-242, open) - 25 September 2026
+### Promotion converges manual player registration tokens by AFL Tables path (AFLDB-ISSUE-242, Resolved 26 September) - 25 September 2026
 
 - **What changed.** A `manual_admin_edit` token is minted per database, so ISSUE-237's A4.2 gate
   STOPped every promotion where the candidate carried a registration under its own token. That
