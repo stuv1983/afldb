@@ -9,7 +9,7 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Open issues:** 18
+**Open issues:** 15
 
 ### AFLDB-ISSUE-248 — Reserved-domain DEV auth fixtures block promotion
 - **Severity:** High. **Area:** DEV auth operations — `auth_users`, `admin_invites`,
@@ -82,42 +82,18 @@
 - **Next action:** the operator reviews and commits. Then ISSUE-237 L4 under separate DEV
   authorisation.
 
-### AFLDB-ISSUE-241 — AFL API bridge artefacts reuse stale database-local `candidate_player_id` values with no lineage binding
-- **Severity:** Medium. **Area:** AFL API bridge import. It covers
-  `tools/migration/import_afl_api_player_bridge.py` and the bridge artefact contract
-  (`data/reference/afl-api-*bridge*.json`, `afl-api-player-adjudication-*.json`).
-- **State:** Open (2026-09-24), the ISSUE-237 successor (OD-5, runbook F3). Three of the four
-  evidence classes carry a bare, database-local `candidate_player_id` with no lineage gate. After
-  a renumbering rebuild or promotion, `--apply` could link a provider to the wrong player. A
-  re-import is not a supported recovery until this is fixed. No implementation started.
-- **Next action:** design an artefact/importer contract that refuses a lineage-unbound
-  artefact or proves per-row stable identity; no implementation now.
-
-### AFLDB-ISSUE-240 — Deduplicate repeated `afl_api_identity_contradiction` findings
-- **Severity:** Low. **Area:** AFL API bridge validation/import — `afl_api_identity_contradiction`
-  findings, adjudication evidence/provenance.
-- **State:** Open (2026-09-24), ISSUE-235 follow-up F-3, accepted and allocated at ISSUE-235's
-  closure. No implementation started.
-- **Next action:** define durable dedup/idempotency keys for repeated contradiction findings while
-  preserving evidence/provenance; no adjudication behaviour change.
-
-### AFLDB-ISSUE-239 — AFL API human-adjudication recovery outside D15
-- **Severity:** Medium. **Area:** admin / player identity — `afl_api_identity_adjudications`,
-  promotion/rebuild recovery.
-- **State:** Open (2026-09-24), ISSUE-235 follow-up narrowed F-2, accepted and allocated at
-  ISSUE-235's closure. D15 (ISSUE-235) already owns and implements normal promotion and
-  `db:test:rebuild` preservation of the ledger and its `resolved` outcome; this issue covers only
-  recovery cases outside that invariant. No implementation started.
-- **Next action:** evaluate whether a tracked/exported recovery artefact is appropriate; no
-  implementation now.
-
 ### AFLDB-ISSUE-238 — Correcting a consumed trusted `afl_api` player link with canonical reattribution
 - **Severity:** Medium. **Area:** admin / player identity — `external_identities` (`afl_api`),
-  `player_match_stats` and derived dependents.
-- **State:** Open (2026-09-24), ISSUE-235 follow-up F-1, accepted and allocated at ISSUE-235's
-  closure. No implementation started.
-- **Next action:** design a transactional/fail-closed correction path for reattributing
-  `player_match_stats` and every derived/canonical dependency; no implementation now.
+  `player_match_stats`, `brownlow_round_votes`, `canonical_applications` and derived dependents.
+- **State:** Open. Triaged 2026-09-26 and deliberately NOT folded into the bulk pass. It moves
+  canonical statistics, which needs:
+  - a collision/merge policy;
+  - superseding ledger entries;
+  - a new human-ledger correction action.
+
+  These are operator data-semantics decisions. The dependency closure is recorded.
+- **Runbook:** `issues/open/AFLDB-ISSUE-238.md`.
+- **Next action:** operator decisions §5 (a–c), then the plan and review.
 
 ### AFLDB-ISSUE-237 — AFL API importer-created `unique` identities are not carried through database promotion or the `afldb_test` rebuild
 - **Severity:** Medium. **Area:** promotion / rebuild lifecycle — `external_identities`

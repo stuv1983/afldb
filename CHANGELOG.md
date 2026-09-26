@@ -15,6 +15,50 @@ commit.
 
 ## [Unreleased]
 
+### AFL API identity bulk pass: identity-bound bridge artefacts, contradiction dedup, adjudication recovery (AFLDB-ISSUE-241, -240, -239; Resolved) - 26 September 2026
+
+- **Why.** A bridge artefact named each linked provider's player by a bare, database-local
+  `candidate_player_id`. After a rebuild or promotion renumbers players, `--apply` could link a
+  provider to the wrong person. The one provenance gate bound a database name, not a lineage. The
+  loader also opened a new `afl_api_identity_contradiction` finding on every replay. A live
+  database that lost its `afl_api_identity_adjudications` ledger outside a promotion or rebuild had
+  no way back.
+- **Bridge loader (ISSUE-241).** `tools/migration/import_afl_api_player_bridge.ts`
+  (`npm run import:afl-api-player-bridge`) replaces the Python loader, which now refuses and names
+  it. Every artefact must declare `player_identity_contract:
+  "afldb.afl_api_bridge.stable_identity.v1"`, and every linked row must carry
+  `candidate_player_identity`: the accepted AFL Tables path or `manual_admin_edit` token.
+  - Each identity is resolved on the target through the existing ISSUE-237 reverse lookup,
+    continuity rules included.
+  - `candidate_player_id` is only a reported hint and never chooses a player.
+  - An identity that resolves to no player, several, or contradicts a continuity rule refuses the
+    whole run. Every artefact built earlier is refused, never upgraded.
+  - Kept: the closed target list, role proofs, the season provenance gate, pinned-input hashes,
+    never UPDATE/DELETE, validate-only / dry-run / apply. The apply's import batch is now created
+    and completed inside the one write transaction.
+- **Consumers.** The TS season emitters write the identity and the contract. The Brownlow season
+  builder refuses unbound bridges and a stale id.
+- **Contradiction dedup (ISSUE-240).** Findings carry a semantic, lineage-stable `issue_key` over
+  migration 076's open-key index and are inserted with `ON CONFLICT DO NOTHING`.
+  - An identical replay neither duplicates nor rewrites the first finding.
+  - A materially different contradiction is recorded on its own.
+  - Every detection stays in the batch's `import_rejections`.
+  - No migration. Legacy unkeyed rows are untouched.
+- **Adjudication recovery (ISSUE-239).** `tools/migration/recover_afl_api_adjudications.ts`
+  (`npm run db:issue239:recover-adjudications`) has two subcommands:
+  - `export` writes a hash-bound, untracked copy of a ledger;
+  - `recover` takes that copy or an archived `db:test:rebuild` capture. It reinstates missing
+    decisions verbatim by stable identity, lets the D15 replay recreate the outcome, and checks the
+    bijection and identity invariant, all in one transaction. It refuses any conflict with current
+    state, is idempotent and audited, and PROD is excluded. D15 is unchanged.
+- **ISSUE-238** was triaged and kept separate. It moves canonical statistics, which needs operator
+  decisions; the dependency closure is recorded in its runbook.
+- **Validation.** DB-free: focused vitest suites, the Python contracts, `tsc`, lint and
+  `git diff --check`. Accepted on real PostgreSQL by the combined `code_test_db` rehearsal
+  (`npm run db:code-test:issue239-241-rehearsal`), operator-run: **26/26 checks PASS**, fixture
+  residue 0 before and after. Two earlier attempts failed on rehearsal fixture defects, fixed without
+  a production change. No DEV, PROD or `afldb_test` contact; no DEV step is required.
+
 ### The rebuild reconstructs first-kick-goal records, and promotion refuses to lose them (AFLDB-ISSUE-249, Resolved) - 26 September 2026
 
 - **Why.** No `db:test:rebuild` stage ever loaded the curated first-kick-goal family
