@@ -3,6 +3,15 @@
 candidate bridge over the 2025 Brownlow provider-player population that S5's
 stat-vector bridge (build_afl_api_player_bridge.py) could not reach.
 
+AFLDB-ISSUE-241 (2026-09-26): this builder writes a LINEAGE-UNBOUND artefact -- each linked
+row names its player only by the database-local ``candidate_player_id`` it read, and the
+artefact declares no ``player_identity_contract``. The loader
+(``tools/migration/import_afl_api_player_bridge.ts``, which replaced the ``.py`` loader) and
+``build_brownlow_season_artefact_from_afl_api.py`` both REFUSE such an artefact, because a
+rebuild or promotion may have given that integer to someone else. The populations this
+builder produced are carried through every lifecycle by stable identity (AFLDB-ISSUE-237), so
+re-running it is not a supported path to either consumer.
+
 Why this tool exists (operator request, 2026-09-20)
 ----------------------------------------------------
 S5's stat-vector bridge only ever observes a provider id that appears in the

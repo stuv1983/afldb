@@ -1748,7 +1748,8 @@ name. `CD_V…` → `venues.legacy_name`; an unmapped venue is a warning and `ve
 exactly one place, `external_identities WHERE source_id = afl_api AND external_id = <CD_I> AND
 status IN ('unique','resolved') AND player_id IS NOT NULL` (`resolveAflApiPlayer()`). This is a
 **read-only** lookup module — the bridge itself is written exclusively by
-`tools/migration/import_afl_api_player_bridge.py`, never by the settle. A miss is
+`tools/migration/import_afl_api_player_bridge.ts` (the `.py` loader was retired by AFLDB-ISSUE-241)
+and, for a human decision, the AFLDB-ISSUE-235 admin adjudication; never by the settle. A miss is
 `unresolved_identity` for that one player unit; the match still applies.
 
 **The bridge is a bootstrap/backfill mechanism, not an ingestion step.** It is run on demand by
@@ -1761,9 +1762,18 @@ the operator, not automatically:
   agreeing statistics; and normalised-surname agreement (a validation-only check — a failure
   withholds the pair, never resolves it). Reads `afldb_test` read-only; writes nothing to any
   database, only an evidence artefact (`data/reference/afl-api-player-bridge-<date>.json`).
-- `tools/migration/import_afl_api_player_bridge.py` — the **only** writer of `afl_api`
+- `tools/migration/import_afl_api_player_bridge.ts` (AFLDB-ISSUE-241; it replaced the retired
+  `.py` loader, which now only refuses) — the **only** importer of `afl_api`
   `external_identities` rows: `--validate-only`/`--dry-run`/`--apply`, re-checking **live**
-  database state at import time. A new provider id is INSERTed
+  database state at import time. **Since AFLDB-ISSUE-241 every artefact must declare
+  `player_identity_contract: "afldb.afl_api_bridge.stable_identity.v1"` and every linked row must
+  carry `candidate_player_identity`** (the accepted AFL Tables path or `manual_admin_edit` token);
+  the loader resolves that identity on the target and never chooses a player by
+  `candidate_player_id`, which is kept only as a reported, non-authoritative hint. Every artefact
+  built before ISSUE-241 (including the tracked ones named here) is lineage-unbound and refused. An
+  identity resolving to no player, several players or contradicting a tracked continuity rule
+  refuses the whole run. Contradiction findings carry a semantic `issue_key` (AFLDB-ISSUE-240), so
+  a replay never duplicates or rewrites an open one. A new provider id is INSERTed
   (`status='unique'`, `match_method='afl_api_stat_vector_bootstrap'`); an already-linked id to
   the same player is a no-op; an already-linked id to a **different** player is withheld and
   opens a `data_issues` contradiction row — the existing link is never modified. Append-only,
@@ -1919,7 +1929,7 @@ npm run settle:afl-api-brownlow -- --label <label> --observe-only --apply
 npm run settle:afl-api-brownlow -- --label <label> --dry-run --auto-apply
 npm run settle:afl-api-brownlow -- --label <label> --apply --auto-apply [--use-fixture-identity]
 python tools/migration/build_afl_api_player_bridge.py --validate-only | --write
-python tools/migration/import_afl_api_player_bridge.py --bridge <artefact.json> [--bridge <artefact2.json>] --validate-only | --dry-run | --apply
+npm run import:afl-api-player-bridge -- --artefact <artefact.json> [--target afldb_test|dev] --validate-only | --dry-run | --apply
 ```
 
 `--auto-apply` is the automatic-canonical-write switch throughout: `--apply` alone persists
@@ -2330,8 +2340,8 @@ investigated) once `CONCLUDED`.
 > `AFLDB-ISSUE-234`; `afl_api` player-link adjudication → `AFLDB-ISSUE-235`.
 
 > **Update 2026-09-23 (AFLDB-ISSUE-235, S7): `afl_api` now has TWO `external_identities`
-> writers.** `tools/migration/import_afl_api_player_bridge.py` (S5, above) remains the only
-> *importer*, and its no-`UPDATE`/no-`DELETE` contract is unchanged. A Super Admin can now
+> writers.** `tools/migration/import_afl_api_player_bridge.ts` (S5, above; the `.py` loader was
+> retired by AFLDB-ISSUE-241) remains the only *importer*, and its no-`UPDATE`/no-`DELETE` contract is unchanged. A Super Admin can now
 > also write a human decision through `/admin/player-links/afl-api`
 > (`src/db/queries/afl-api-player-links.ts`).
 >

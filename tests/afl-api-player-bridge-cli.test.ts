@@ -194,6 +194,7 @@ function artefactFixture(generatedUtc: string, overrides: Partial<ArtefactInput>
     result: linkedResult(),
     existingArtefactOverlap: null,
     generatedUtc,
+    identityByPlayerId: new Map([[100, { ok: true, identity: 'players/T/Test_Player.html', via: 'afltables' }]]),
     ...overrides,
   });
 }
@@ -276,6 +277,33 @@ describe('S9 CLI artefact write safety', () => {
     expect(parsed.providers.CD_I1.disposition).toBe('linked');
     expect(typeof parsed.providers.CD_I1.candidate_player_id).toBe('number');
     expect(parsed.providers.CD_I1.candidate_player_id).toBe(100);
+  });
+
+  it('AFLDB-ISSUE-241: declares the stable-identity contract and binds each linked row to its identity', () => {
+    const artefact = artefactFixture('2026-09-21T00:00:00.000Z');
+    expect(artefact.player_identity_contract).toBe('afldb.afl_api_bridge.stable_identity.v1');
+    expect(artefact.player_identity_binding).toEqual({ bound: 1, unbound: 0 });
+    const row = (artefact.providers as Record<string, Record<string, unknown>>).CD_I1;
+    expect(row.candidate_player_identity).toBe('players/T/Test_Player.html');
+    // The id is still written, as a hint only; the loader never chooses a player by it.
+    expect(row.candidate_player_id).toBe(100);
+    expect(row).not.toHaveProperty('candidate_player_identity_refusal');
+  });
+
+  it('AFLDB-ISSUE-241: a linked candidate with no accepted identity is written unbound, with the reason', () => {
+    for (const [identityByPlayerId, reason] of [
+      [new Map(), 'the candidate player was not found in the evidence database'],
+      [new Map([[100, { ok: false, reason: 'no_identity' }]]), 'the candidate player has no accepted stable identity'],
+      [new Map([[100, { ok: false, reason: 'ambiguous' }]]), 'the candidate player holds more than one accepted stable identity'],
+    ] as const) {
+      const artefact = artefactFixture('2026-09-21T00:00:00.000Z', {
+        identityByPlayerId: identityByPlayerId as ArtefactInput['identityByPlayerId'],
+      });
+      const row = (artefact.providers as Record<string, Record<string, unknown>>).CD_I1;
+      expect(row.candidate_player_identity).toBeNull();
+      expect(row.candidate_player_identity_refusal).toBe(reason);
+      expect(artefact.player_identity_binding).toEqual({ bound: 0, unbound: 1 });
+    }
   });
 });
 

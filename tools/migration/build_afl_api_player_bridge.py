@@ -2,6 +2,15 @@
 """AFLDB-ISSUE-228 Stage S5 -- offline builder for the afl_api player-identity
 bootstrap bridge (runbook Sec 6.3).
 
+AFLDB-ISSUE-241 (2026-09-26): this builder writes a LINEAGE-UNBOUND artefact -- each linked
+row names its player only by the database-local ``candidate_player_id`` it read, and the
+artefact declares no ``player_identity_contract``. The loader
+(``tools/migration/import_afl_api_player_bridge.ts``, which replaced the ``.py`` loader) and
+``build_brownlow_season_artefact_from_afl_api.py`` both REFUSE such an artefact, because a
+rebuild or promotion may have given that integer to someone else. The populations this
+builder produced are carried through every lifecycle by stable identity (AFLDB-ISSUE-237), so
+re-running it is not a supported path to either consumer.
+
 Turns stable AFL provider player ids (``CD_I...``) observed in the tracked
 AFL.com.au sample corpus into DETERMINISTIC candidate links to canonical
 ``players.id`` rows, by joining each provider player-stat row to the

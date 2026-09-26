@@ -878,7 +878,7 @@ async function seedBaseline(): Promise<void> {
     RETURNING id
   `;
   bridgedPlayerId = player.id;
-  // Exactly the row the real bridge loader writes (`import_afl_api_player_bridge.py`:
+  // Exactly the row the real bridge loader writes (`import_afl_api_player_bridge.ts`:
   // 'unique', candidate_count 1, NULL external_url). Omitting candidate_count left the column
   // default 0 -- a D5 census anomaly that AFLDB-ISSUE-237's whole-table invariant rightly flags.
   await sql`

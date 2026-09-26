@@ -124,6 +124,19 @@ contradiction and is deduplicated; the combined provenance records every
 artefact that supplied each mapping. Zero combined trusted mappings across
 every supplied ``--bridge`` artefact refuses the whole run.
 
+AFLDB-ISSUE-241 (2026-09-26): a bridge's ``candidate_player_id`` is a
+database-local surrogate that a rebuild or promotion may renumber, so it is no
+longer trusted on its own. Every ``--bridge`` must declare
+``player_identity_contract: "afldb.afl_api_bridge.stable_identity.v1"`` and
+every linked row must carry ``candidate_player_identity`` (its accepted stable
+identity); a lineage-unbound bridge -- every artefact built before ISSUE-241 --
+is refused, never upgraded. The id is still what this builder looks up, but
+``verify_bridge_identities()`` then requires the looked-up player's own AFL
+Tables profile path to EQUAL the row's identity: a stale id that now names
+someone else refuses the whole build. This builder does not re-resolve a
+renumbered player (the loader, ``import_afl_api_player_bridge.ts``, does); it
+only refuses, which is the fail-closed answer for an offline artefact builder.
+
 =============================================================================
 Completion gate (Sec 10, T3)
 =============================================================================
@@ -190,6 +203,12 @@ VALID_VOTE_VALUES = (3, 2, 1)
 MANIFEST_SCHEMA_VERSION = 2  # v2 (2026-09-20): "bridge" is a list of {file, sha256,
 # linked_providers_contributed} entries (one per --bridge artefact), not a single object --
 # the identity-union fix makes --bridge repeatable.
+
+# AFLDB-ISSUE-241: the stable-identity contract every --bridge must declare, and the per-row
+# field it binds (src/lib/acquisition/afl-api-bridge-identity.ts is the one definition).
+BRIDGE_IDENTITY_CONTRACT = "afldb.afl_api_bridge.stable_identity.v1"
+BRIDGE_CONTRACT_FIELD = "player_identity_contract"
+BRIDGE_IDENTITY_FIELD = "candidate_player_identity"
 
 
 class BrownlowArtefactSourceError(ValueError):
@@ -427,14 +446,22 @@ def reconcile_leaderboard(
 # ---------------------------------------------------------------------------
 
 
-def load_bridge(path: Path) -> dict[str, int]:
+def _linked_bridge_rows(path: Path) -> list[tuple[str, int, str]]:
+    """(provider id, candidate_player_id, candidate_player_identity) for every linked row, after
+    the AFLDB-ISSUE-241 contract check. A lineage-unbound bridge refuses outright."""
     data = json.loads(Path(path).read_text(encoding="utf-8"))
     if not isinstance(data, dict):
         raise BrownlowArtefactSourceError(f"{path}: not a JSON object")
+    if data.get(BRIDGE_CONTRACT_FIELD) != BRIDGE_IDENTITY_CONTRACT:
+        raise BrownlowArtefactSourceError(
+            f"{path}: declares {BRIDGE_CONTRACT_FIELD}={data.get(BRIDGE_CONTRACT_FIELD)!r}, not "
+            f"{BRIDGE_IDENTITY_CONTRACT!r}. It is lineage-unbound: its candidate_player_id values are "
+            "database-local surrogates a rebuild or promotion may have renumbered, so it is refused, "
+            "never upgraded (AFLDB-ISSUE-241)")
     providers = data.get("providers")
     if not isinstance(providers, dict) or not providers:
         raise BrownlowArtefactSourceError(f"{path}: no 'providers' in the bridge artefact")
-    linked: dict[str, int] = {}
+    rows: list[tuple[str, int, str]] = []
     for provider_player_id, entry in providers.items():
         if not isinstance(entry, dict) or entry.get("disposition") != "linked":
             continue
@@ -442,6 +469,17 @@ def load_bridge(path: Path) -> dict[str, int]:
         if not isinstance(candidate, int) or isinstance(candidate, bool):
             raise BrownlowArtefactSourceError(
                 f"{path}: {provider_player_id!r} is 'linked' but candidate_player_id is not an integer")
+        identity = entry.get(BRIDGE_IDENTITY_FIELD)
+        if not isinstance(identity, str) or not identity or identity != identity.strip():
+            raise BrownlowArtefactSourceError(
+                f"{path}: {provider_player_id!r} is 'linked' but carries no usable {BRIDGE_IDENTITY_FIELD}")
+        rows.append((provider_player_id, candidate, identity))
+    return rows
+
+
+def load_bridge(path: Path) -> dict[str, int]:
+    linked: dict[str, int] = {}
+    for provider_player_id, candidate, _identity in _linked_bridge_rows(path):
         linked[provider_player_id] = candidate
     if not linked:
         raise BrownlowArtefactSourceError(f"{path}: the bridge artefact has no 'linked' providers")
@@ -508,6 +546,44 @@ def load_bridges(paths: list[Path]) -> tuple[dict[str, int], dict[str, list[Path
         raise BrownlowArtefactSourceError("the combined bridge artefacts have no 'linked' providers")
 
     return combined, provenance
+
+
+def load_bridge_identities(paths: list[Path]) -> dict[str, str]:
+    """provider id -> candidate_player_identity over every --bridge (AFLDB-ISSUE-241). The same
+    provider carrying two different identities across files refuses, like two different ids."""
+    identities: dict[str, str] = {}
+    for path in paths:
+        for provider_player_id, _candidate, identity in _linked_bridge_rows(path):
+            earlier = identities.get(provider_player_id)
+            if earlier is not None and earlier != identity:
+                raise BrownlowArtefactSourceError(
+                    f"provider {provider_player_id!r} carries identity {earlier!r} in one bridge but "
+                    f"{identity!r} in {path} -- refusing to guess which bridge is correct")
+            identities[provider_player_id] = identity
+    return identities
+
+
+def verify_bridge_identities(
+    bridge: dict[str, int], identities_by_provider: dict[str, str],
+    db_identities: dict[int, "PlayerIdentity"],
+) -> None:
+    """AFLDB-ISSUE-241: every looked-up player's own AFL Tables profile path must equal the
+    identity its bridge row declares. A stale candidate_player_id -- one a rebuild or promotion
+    has since given to someone else -- therefore refuses rather than attributing votes to the
+    wrong profile. Only the players this build actually reads are checked; each is named by
+    exactly one provider (Sec 6.3 rule (b), re-checked by load_bridges())."""
+    provider_by_player = {player_id: provider for provider, player_id in bridge.items()}
+    stale = []
+    for player_id, identity in sorted(db_identities.items()):
+        provider = provider_by_player.get(player_id)
+        declared = identities_by_provider.get(provider) if provider is not None else None
+        if declared != identity.afltables_profile_url:
+            stale.append((provider, player_id, declared, identity.afltables_profile_url))
+    if stale:
+        raise BrownlowArtefactEvidenceError(
+            f"{len(stale)} bridge row(s) name a player whose AFL Tables identity is not the one the row "
+            "declares -- the candidate_player_id is stale for this database lineage (AFLDB-ISSUE-241); "
+            f"refusing: {stale[:10]}{' ...' if len(stale) > 10 else ''}")
 
 
 # ---------------------------------------------------------------------------
@@ -996,6 +1072,7 @@ def build(
             f"(blocking): {mismatches[:10]}{' ...' if len(mismatches) > 10 else ''}")
 
     bridge, bridge_provenance = load_bridges(bridge_paths)
+    bridge_identities = load_bridge_identities(bridge_paths)
     facts, refusals = resolve_season_facts(match_votes, bridge)
     if refusals:
         rep.warn(f"{len(refusals)} vote set(s) refused identity resolution:")
@@ -1017,6 +1094,7 @@ def build(
     finally:
         conn.rollback()
         conn.close()
+    verify_bridge_identities(bridge, bridge_identities, identities)
 
     derived = derive_season_rows(facts, ineligible_player_ids, games)
     rows = build_rows(season, derived, identities, bridge, label)

@@ -92,7 +92,8 @@ async function fetchAflApiSourceId(tx: TransactionSql): Promise<number> {
   return row.id;
 }
 
-async function readLedgerRows(tx: TransactionSql): Promise<readonly AflApiAdjudicationLedgerRow[]> {
+/** Exported for AFLDB-ISSUE-239's recovery validate-only (see `readCandidateAflApiState`). */
+export async function readLedgerRows(tx: TransactionSql): Promise<readonly AflApiAdjudicationLedgerRow[]> {
   const rows = await tx<{
     id: number; externalId: string; action: 'linked' | 'revoked'; playerId: number;
     playerIdentity: string; supersedesId: number | null;
@@ -144,6 +145,37 @@ export async function resolveAflApiPlayerIdentity(
 }
 
 /**
+ * `resolveAflApiPlayerIdentity` for a SET of identities in one statement (AFLDB-ISSUE-241: the
+ * bridge loader resolves every artefact row, and one round trip per row is ~40 s over the
+ * tunnel). The same accepted-identity predicate, the same `aflApiReverseIdentityPaths` and the
+ * same `classifyAflApiReverseIdentity`, so the batch cannot disagree with the single lookup; only
+ * the `external_id` filter is `= ANY` instead of `=`.
+ */
+export async function resolveAflApiPlayerIdentities(
+  tx: TransactionSql, identities: readonly string[],
+  continuityRules: ValidatedFitzroyProfileContinuityRules = loadFitzroyProfileContinuityRules(),
+): Promise<ReadonlyMap<string, AflApiPlayerRemapResult>> {
+  const unique = [...new Set(identities)];
+  const paths = [...new Set(unique.flatMap((identity) => aflApiReverseIdentityPaths(identity, continuityRules)))];
+  const playerIdsByPath = new Map<string, number[]>(paths.map((path) => [path, []]));
+  if (paths.length > 0) {
+    const matches = await tx<{ externalId: string; playerId: number }[]>`
+      SELECT DISTINCT ei.external_id AS "externalId", ei.player_id AS "playerId"
+        FROM external_identities ei
+        JOIN sources s ON s.id = ei.source_id
+       WHERE ((s.key = 'afltables' AND ei.match_method = 'afltables_profile_url')
+              OR (s.key = 'manual_admin_edit' AND ei.match_method = 'manual_admin_edit'))
+         AND ei.status IN ('unique', 'resolved')
+         AND ei.external_id = ANY (${tx.array(paths)}::text[])
+    `;
+    for (const m of matches) playerIdsByPath.get(m.externalId)?.push(m.playerId);
+  }
+  return new Map(unique.map((identity) => [
+    identity, classifyAflApiReverseIdentity({ identity, playerIdsByPath, continuityRules }),
+  ]));
+}
+
+/**
  * D15 point 1: for every ledger row, resolve its `player_identity` to a CURRENT
  * candidate-database player id, independently of whatever the row's own (possibly
  * unremapped, possibly stale) `player_id` column holds.
@@ -159,7 +191,9 @@ async function remapLedgerPlayerIds(
   return result;
 }
 
-async function readCandidateAflApiState(tx: TransactionSql, sourceId: number): Promise<{
+/** Exported for AFLDB-ISSUE-239's recovery validate-only, which plans the D15 replay without
+ * writing (the same maps `replayAflApiAdjudications` plans from). */
+export async function readCandidateAflApiState(tx: TransactionSql, sourceId: number): Promise<{
   candidateByExternalId: ReadonlyMap<string, AflApiCandidateIdentityRow>;
   candidatePlayerAflApiRow: ReadonlyMap<number, AflApiCandidateIdentityRow>;
 }> {

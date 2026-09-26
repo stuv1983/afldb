@@ -1616,24 +1616,19 @@ describe('AFLDB-ISSUE-235: afl-api-adjudication (pure module)', () => {
  * of plain data.
  */
 describe('AFLDB-ISSUE-237: afl-api-adjudication (pure module, importer identity)', () => {
-  it('AFL_API_IMPORTER_MATCH_METHODS equals the loader\'s ALLOWED_MATCH_METHODS (.py source)', async () => {
+  it('AFL_API_IMPORTER_MATCH_METHODS is the loader\'s own allowed set (AFLDB-ISSUE-241: the .ts loader)', async () => {
     const { AFL_API_IMPORTER_MATCH_METHODS } = await import('@/lib/acquisition/afl-api-adjudication');
-    const pySource = readFileSync(
-      join(process.cwd(), 'tools', 'migration', 'import_afl_api_player_bridge.py'), 'utf8',
-    );
-    const constantValue = (name: string): string => {
-      const match = new RegExp(`${name}\\s*=\\s*"([^"]+)"`).exec(pySource);
-      if (!match) throw new Error(`constant ${name} not found in import_afl_api_player_bridge.py`);
-      return match[1];
-    };
-    const pyMethods = new Set([
-      constantValue('MATCH_METHOD'),
-      constantValue('NAME_TEAM_SEASON_MATCH_METHOD'),
-      constantValue('MANUAL_ADJUDICATION_MATCH_METHOD'),
-      constantValue('SEASON_EVIDENCE_MATCH_METHOD'),
+    expect([...AFL_API_IMPORTER_MATCH_METHODS].sort()).toEqual([
+      'afl_api_manual_adjudication', 'afl_api_name_team_season_bootstrap',
+      'afl_api_stat_vector_bootstrap', 'afl_api_stat_vector_season',
     ]);
-    expect(new Set(AFL_API_IMPORTER_MATCH_METHODS)).toEqual(pyMethods);
-    expect(AFL_API_IMPORTER_MATCH_METHODS).toHaveLength(4);
+    // The loader no longer keeps a second copy of the set: it imports this one, and the retired
+    // Python stub carries no method list at all, so the two can no longer drift.
+    const tsSource = readFileSync(join(process.cwd(), 'tools', 'migration', 'import_afl_api_player_bridge.ts'), 'utf8');
+    expect(tsSource).toContain('AFL_API_IMPORTER_MATCH_METHODS');
+    expect(tsSource).toContain('isAflApiImporterMatchMethod(evidenceClass)');
+    const pySource = readFileSync(join(process.cwd(), 'tools', 'migration', 'import_afl_api_player_bridge.py'), 'utf8');
+    expect(pySource).not.toMatch(/ALLOWED_MATCH_METHODS|INSERT INTO|psycopg/);
   });
 
   it('importerCaptureStructureProblems — D13 capture structure checks', async () => {

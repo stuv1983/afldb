@@ -465,9 +465,15 @@ export function parseCombinedCapture(text: string, expectedDatabase: string): Co
  */
 export function sameLedger(a: readonly CapturedLedgerRow[], b: readonly CapturedLedgerRow[]): boolean {
   if (a.length !== b.length) return false;
+  return a.every((r, i) => sameLedgerRow(r, b[i]));
+}
+
+/** `sameLedger`'s per-row rule, exported for AFLDB-ISSUE-239's recovery, which compares a
+ * recovery source row with the target's row of the same id. */
+export function sameLedgerRow(a: CapturedLedgerRow, b: CapturedLedgerRow): boolean {
   const key = (r: CapturedLedgerRow) => JSON.stringify(
     [...ledgerTuple({ ...r, playerId: 0, adminUserId: 0 }), r.adminEmail.toLowerCase()]);
-  return a.every((r, i) => key(r) === key(b[i]));
+  return key(a) === key(b);
 }
 
 /** Two IMPORTER sections are the same, ignoring only the `playerId` surrogate (D11c: "Equal
@@ -1100,8 +1106,9 @@ export async function remapActors(
   };
 }
 
-/** The ledger's identity sequence, proven to be the one migration 104 created. */
-async function ledgerSequenceName(tx: TransactionSql): Promise<string> {
+/** The ledger's identity sequence, proven to be the one migration 104 created. Exported for
+ * AFLDB-ISSUE-239's recovery, which reinstates ids the same way. */
+export async function ledgerSequenceName(tx: TransactionSql): Promise<string> {
   const [seq] = await tx<{ name: string | null }[]>`
     SELECT pg_get_serial_sequence('afl_api_identity_adjudications', 'id') AS name
   `;
@@ -1112,7 +1119,7 @@ async function ledgerSequenceName(tx: TransactionSql): Promise<string> {
   return seq.name;
 }
 
-async function readSequenceState(tx: TransactionSql): Promise<{ lastValue: number; isCalled: boolean }> {
+export async function readSequenceState(tx: TransactionSql): Promise<{ lastValue: number; isCalled: boolean }> {
   const [state] = await tx<{ lastValue: string; isCalled: boolean }[]>`
     SELECT last_value::text AS "lastValue", is_called AS "isCalled" FROM ${tx(LEDGER_ID_SEQUENCE)}
   `;

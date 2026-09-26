@@ -10,7 +10,12 @@
  *     -> resolveAflApiMatch()                 afl-api-match-resolver.ts  (S6-D1, §6.1)
  *     -> canonical player_match_stats         READ-ONLY, afldb_dev
  *     -> buildAflApiPlayerEvidence()          afl-api-player-evidence.ts (S9, pure)
+ *     -> readAflApiForwardIdentities()        replay_afl_api_adjudications.ts (ISSUE-241, §5)
  *     -> report / evidence artefact
+ *
+ * AFLDB-ISSUE-241: every linked row carries `candidate_player_identity`, the candidate's
+ * accepted stable identity, and the artefact declares `player_identity_contract`. The loader
+ * resolves the identity on its target; `candidate_player_id` is only a diagnostic hint.
  *
  * NOTHING in this file re-derives a match date, a timezone, a round, a team
  * identity or a statistic: every one of those comes from the emitters above.
@@ -91,6 +96,14 @@ import {
   type AflApiSettleBundle,
 } from '../../src/lib/acquisition/settle-afl-api';
 import { parseSourceFamilyRegistry } from '../../src/lib/acquisition/source-families';
+import type { AflApiForwardIdentityResult } from '../../src/lib/acquisition/afl-api-adjudication';
+import {
+  AFL_API_BRIDGE_CONTRACT_FIELD,
+  AFL_API_BRIDGE_IDENTITY_CONTRACT,
+  AFL_API_BRIDGE_IDENTITY_FIELD,
+  AFL_API_BRIDGE_IDENTITY_REFUSAL_FIELD,
+} from '../../src/lib/acquisition/afl-api-bridge-identity';
+import { readAflApiForwardIdentities } from '../migration/replay_afl_api_adjudications';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PROJECT_ROOT = join(__dirname, '..', '..');
@@ -651,8 +664,17 @@ export function buildEvidenceArtefact(input: {
   generatedUtc: string;
   /** The emitting CLI's own path; the DEV emitter's when omitted. */
   tool?: string;
+  /**
+   * AFLDB-ISSUE-241: the §5 forward stable identity of every linked candidate, read from the
+   * same evidence database. It is what the loader resolves; `candidate_player_id` stays only as
+   * a non-authoritative hint. A candidate with no accepted identity is written with a `null`
+   * identity and the reason, and the loader then refuses the whole artefact.
+   */
+  identityByPlayerId: ReadonlyMap<number, AflApiForwardIdentityResult>;
 }): Record<string, unknown> {
   const providers: Record<string, unknown> = {};
+  let bound = 0;
+  let unbound = 0;
   for (const provider of input.result.providers) {
     const row: Record<string, unknown> = {
       disposition: provider.disposition,
@@ -672,6 +694,20 @@ export function buildEvidenceArtefact(input: {
       row.candidate_player_id = provider.candidatePlayerId;
       row.canonical_surname = provider.canonicalSurname;
       row.evidence_summary = provider.evidenceSummary;
+      const identity = provider.candidatePlayerId === null
+        ? undefined : input.identityByPlayerId.get(provider.candidatePlayerId);
+      if (identity?.ok) {
+        row[AFL_API_BRIDGE_IDENTITY_FIELD] = identity.identity;
+        bound += 1;
+      } else {
+        row[AFL_API_BRIDGE_IDENTITY_FIELD] = null;
+        row[AFL_API_BRIDGE_IDENTITY_REFUSAL_FIELD] = identity === undefined
+          ? 'the candidate player was not found in the evidence database'
+          : identity.reason === 'ambiguous'
+            ? 'the candidate player holds more than one accepted stable identity'
+            : 'the candidate player has no accepted stable identity';
+        unbound += 1;
+      }
     }
     if (provider.disposition === 'contradictory') {
       row.competing_candidates = provider.competingCandidates.map((candidate) => ({
@@ -695,6 +731,8 @@ export function buildEvidenceArtefact(input: {
     snapshot_label: input.snapshotLabel,
     snapshot_manifest_sha256: input.snapshotManifestSha256,
     existing_claim_comparison: EXISTING_CLAIM_COMPARISON_UNPROVED,
+    [AFL_API_BRIDGE_CONTRACT_FIELD]: AFL_API_BRIDGE_IDENTITY_CONTRACT,
+    player_identity_binding: { bound, unbound },
     core_stat_columns: [...CORE_STAT_COLUMNS],
     agreement_stat_columns: [...AGREEMENT_STAT_COLUMNS],
     acceptance_rule: {
@@ -886,6 +924,7 @@ export async function runEmitAflApiPlayerBridgeFor(
   const sql = deps.sql ?? createReadOnlyEvidenceClient(target);
   const evidence = await (async (): Promise<{
     result: AflApiPlayerEvidenceResult; builtFromDatabase: string;
+    identityByPlayerId: ReadonlyMap<number, AflApiForwardIdentityResult>;
   }> => {
     try {
       const proof = await proveReadOnlyEvidenceSession(sql, target);
@@ -899,12 +938,22 @@ export async function runEmitAflApiPlayerBridgeFor(
       for (const unit of snapshot.bundle.units) {
         matchInputs.push(await matchEvidenceInputFor(sql, sourceId, snapshot, unit));
       }
-      return { result: buildAflApiPlayerEvidence(matchInputs), builtFromDatabase: proof.database };
+      const result = buildAflApiPlayerEvidence(matchInputs);
+      // AFLDB-ISSUE-241: bind each linked candidate to its §5 stable identity, through the one
+      // forward lookup every AFL API lifecycle shares, on the same read-only evidence session.
+      const linkedIds = [...new Set(result.providers
+        .filter((p) => p.disposition === 'linked' && p.candidatePlayerId !== null)
+        .map((p) => p.candidatePlayerId as number))];
+      const identityByPlayerId: ReadonlyMap<number, AflApiForwardIdentityResult> = linkedIds.length === 0
+        ? new Map()
+        : await sql.begin('isolation level repeatable read read only',
+          (tx) => readAflApiForwardIdentities(tx, linkedIds)) as ReadonlyMap<number, AflApiForwardIdentityResult>;
+      return { result, builtFromDatabase: proof.database, identityByPlayerId };
     } finally {
       if (ownsClient) await sql.end({ timeout: 5 });
     }
   })();
-  const { result, builtFromDatabase } = evidence;
+  const { result, builtFromDatabase, identityByPlayerId } = evidence;
 
   for (const line of renderEvidenceReport(
     { ...observedCensus, buildFailures: snapshot.bundle.buildFailures.length }, result,
@@ -958,6 +1007,7 @@ export async function runEmitAflApiPlayerBridgeFor(
     existingArtefactOverlap,
     generatedUtc: (deps.now?.() ?? new Date()).toISOString(),
     tool: target.tool,
+    identityByPlayerId,
   });
 
   if (args.out === null) {

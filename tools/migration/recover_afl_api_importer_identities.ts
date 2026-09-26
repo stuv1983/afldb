@@ -610,7 +610,9 @@ export function assertR3ExportBinding(exported: Pick<AflApiImporterRecoveryExpor
 }
 
 /** Writes once: a `wx` temp file in the target directory, fsync, then a no-clobber hard link. */
-function writeNewFileAtomically(target: string, content: string): void {
+/** Exported for AFLDB-ISSUE-239's adjudication recovery export, which writes its file the same
+ * never-overwrite way. */
+export function writeNewFileAtomically(target: string, content: string): void {
   mkdirSync(dirname(target), { recursive: true });
   const temp = join(dirname(target), `.${basename(target)}.${process.pid}.${randomBytes(6).toString('hex')}.tmp`);
   const fd = openSync(temp, 'wx');

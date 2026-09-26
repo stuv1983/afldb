@@ -178,14 +178,18 @@ check("mismatched total is reported", mismatches == [("CD_I1", 3, 99)])
 
 section("load_bridge")
 
+# AFLDB-ISSUE-241: every bridge fixture declares the stable-identity contract.
+_CONTRACT = {"player_identity_contract": m.BRIDGE_IDENTITY_CONTRACT}
+
 with tempfile.TemporaryDirectory() as tmp:
     bridge_path = Path(tmp) / "bridge.json"
     bridge_path.write_text(json.dumps({
+        **_CONTRACT,
         "providers": {
-            "CD_I1": {"disposition": "linked", "candidate_player_id": 101},
+            "CD_I1": {"disposition": "linked", "candidate_player_id": 101, "candidate_player_identity": "players/T/Test_101.html"},
             "CD_I2": {"disposition": "unresolved"},
             "CD_I3": {"disposition": "contradictory"},
-            "CD_I4": {"disposition": "linked", "candidate_player_id": 104},
+            "CD_I4": {"disposition": "linked", "candidate_player_id": 104, "candidate_player_identity": "players/T/Test_104.html"},
         },
     }))
     linked = m.load_bridge(bridge_path)
@@ -194,16 +198,17 @@ with tempfile.TemporaryDirectory() as tmp:
 
     shared_path = Path(tmp) / "shared.json"
     shared_path.write_text(json.dumps({
+        **_CONTRACT,
         "providers": {
-            "CD_I5": {"disposition": "linked", "candidate_player_id": 500},
-            "CD_I6": {"disposition": "linked", "candidate_player_id": 500},
+            "CD_I5": {"disposition": "linked", "candidate_player_id": 500, "candidate_player_identity": "players/T/Test_500.html"},
+            "CD_I6": {"disposition": "linked", "candidate_player_id": 500, "candidate_player_identity": "players/T/Test_500.html"},
         },
     }))
     check("a player id claimed by two linked providers refuses",
           raises(m.BrownlowArtefactSourceError, m.load_bridge, shared_path))
 
     empty_path = Path(tmp) / "empty.json"
-    empty_path.write_text(json.dumps({"providers": {"CD_I9": {"disposition": "unresolved"}}}))
+    empty_path.write_text(json.dumps({**_CONTRACT, "providers": {"CD_I9": {"disposition": "unresolved"}}}))
     check("a bridge with zero linked providers refuses",
           raises(m.BrownlowArtefactSourceError, m.load_bridge, empty_path))
 
@@ -218,18 +223,20 @@ section("load_bridges -- combining trusted bridge artefacts")
 with tempfile.TemporaryDirectory() as tmp:
     bridge_a = Path(tmp) / "bridge-a.json"
     bridge_a.write_text(json.dumps({
+        **_CONTRACT,
         "match_method": "afl_api_stat_vector_bootstrap",
         "providers": {
-            "CD_I1": {"disposition": "linked", "candidate_player_id": 101},
+            "CD_I1": {"disposition": "linked", "candidate_player_id": 101, "candidate_player_identity": "players/T/Test_101.html"},
             "CD_I2": {"disposition": "unresolved"},
         },
     }))
     bridge_b = Path(tmp) / "bridge-b.json"
     bridge_b.write_text(json.dumps({
+        **_CONTRACT,
         "match_method": "afl_api_name_team_season_bootstrap",
         "providers": {
-            "CD_I3": {"disposition": "linked", "candidate_player_id": 103},
-            "CD_I1": {"disposition": "linked", "candidate_player_id": 101},  # identical to bridge_a
+            "CD_I3": {"disposition": "linked", "candidate_player_id": 103, "candidate_player_identity": "players/T/Test_103.html"},
+            "CD_I1": {"disposition": "linked", "candidate_player_id": 101, "candidate_player_identity": "players/T/Test_101.html"},  # identical to bridge_a
         },
     }))
 
@@ -256,7 +263,8 @@ with tempfile.TemporaryDirectory() as tmp:
     # 4. same provider mapped to different players refuses
     bridge_c = Path(tmp) / "bridge-c.json"
     bridge_c.write_text(json.dumps({
-        "providers": {"CD_I1": {"disposition": "linked", "candidate_player_id": 999}},
+        **_CONTRACT,
+        "providers": {"CD_I1": {"disposition": "linked", "candidate_player_id": 999, "candidate_player_identity": "players/T/Test_999.html"}},
     }))
     check("the same provider id linked to a DIFFERENT player by another file refuses",
           raises(m.BrownlowArtefactSourceError, m.load_bridges, [bridge_a, bridge_c]))
@@ -264,7 +272,8 @@ with tempfile.TemporaryDirectory() as tmp:
     # 5. player-uniqueness (Sec 6.3 rule (b)) is preserved ACROSS artefacts, not just within one
     bridge_d = Path(tmp) / "bridge-d.json"
     bridge_d.write_text(json.dumps({
-        "providers": {"CD_I9": {"disposition": "linked", "candidate_player_id": 101}},
+        **_CONTRACT,
+        "providers": {"CD_I9": {"disposition": "linked", "candidate_player_id": 101, "candidate_player_identity": "players/T/Test_101.html"}},
     }))
     check("a player id claimed by two DIFFERENT provider ids across two otherwise-consistent "
           "files refuses (rule (b), re-checked over the combined set)",
@@ -273,6 +282,83 @@ with tempfile.TemporaryDirectory() as tmp:
     # 7. zero trusted mappings still refuses
     check("no --bridge paths at all refuses",
           raises(m.BrownlowArtefactSourceError, m.load_bridges, []))
+
+
+# ---------------------------------------------------------------------------
+# AFLDB-ISSUE-241: lineage-unbound bridges refuse; a stale candidate_player_id refuses
+# ---------------------------------------------------------------------------
+
+section("AFLDB-ISSUE-241 -- bridge identity contract")
+
+with tempfile.TemporaryDirectory() as tmp:
+    legacy = Path(tmp) / "legacy.json"
+    legacy.write_text(json.dumps({
+        "providers": {"CD_I1": {"disposition": "linked", "candidate_player_id": 101}},
+    }))
+    check("a lineage-unbound bridge (no player_identity_contract) refuses",
+          raises(m.BrownlowArtefactSourceError, m.load_bridge, legacy))
+    check("... and refuses through load_bridges() too",
+          raises(m.BrownlowArtefactSourceError, m.load_bridges, [legacy]))
+
+    wrong_contract = Path(tmp) / "wrong-contract.json"
+    wrong_contract.write_text(json.dumps({
+        "player_identity_contract": "afldb.afl_api_bridge.stable_identity.v0",
+        "providers": {"CD_I1": {"disposition": "linked", "candidate_player_id": 101,
+                                "candidate_player_identity": "players/T/Test_101.html"}},
+    }))
+    check("an unknown contract version refuses",
+          raises(m.BrownlowArtefactSourceError, m.load_bridge, wrong_contract))
+
+    no_identity = Path(tmp) / "no-identity.json"
+    no_identity.write_text(json.dumps({
+        **_CONTRACT, "providers": {"CD_I1": {"disposition": "linked", "candidate_player_id": 101}},
+    }))
+    check("a linked row without candidate_player_identity refuses",
+          raises(m.BrownlowArtefactSourceError, m.load_bridge, no_identity))
+
+    null_identity = Path(tmp) / "null-identity.json"
+    null_identity.write_text(json.dumps({
+        **_CONTRACT, "providers": {"CD_I1": {"disposition": "linked", "candidate_player_id": 101,
+                                             "candidate_player_identity": None}},
+    }))
+    check("a linked row whose identity is null (emitter could not bind it) refuses",
+          raises(m.BrownlowArtefactSourceError, m.load_bridge, null_identity))
+
+    bound = Path(tmp) / "bound.json"
+    bound.write_text(json.dumps({
+        **_CONTRACT, "providers": {
+            "CD_I1": {"disposition": "linked", "candidate_player_id": 101,
+                      "candidate_player_identity": "players/B/Bravo1.html"},
+            "CD_I2": {"disposition": "linked", "candidate_player_id": 102,
+                      "candidate_player_identity": "players/A/Alpha1.html"},
+        },
+    }))
+    ids = m.load_bridge_identities([bound])
+    check("load_bridge_identities() maps provider -> identity",
+          ids == {"CD_I1": "players/B/Bravo1.html", "CD_I2": "players/A/Alpha1.html"})
+
+    other = Path(tmp) / "other.json"
+    other.write_text(json.dumps({
+        **_CONTRACT, "providers": {"CD_I1": {"disposition": "linked", "candidate_player_id": 101,
+                                             "candidate_player_identity": "players/Z/Someone_Else.html"}},
+    }))
+    check("the same provider with two different identities across bridges refuses",
+          raises(m.BrownlowArtefactSourceError, m.load_bridge_identities, [bound, other]))
+
+    bridge_map = m.load_bridge(bound)
+    same_lineage = {
+        101: m.PlayerIdentity("players/B/Bravo1.html", "Bravo Player"),
+        102: m.PlayerIdentity("players/A/Alpha1.html", "Alpha Player"),
+    }
+    m.verify_bridge_identities(bridge_map, ids, same_lineage)
+    check("same-lineage bridge: every looked-up identity equals the row's declared identity", True)
+
+    renumbered = {
+        101: m.PlayerIdentity("players/A/Alpha1.html", "Alpha Player"),  # id 101 now names Alpha
+        102: m.PlayerIdentity("players/B/Bravo1.html", "Bravo Player"),
+    }
+    check("a stale candidate_player_id (the id now names someone else) refuses the build",
+          raises(m.BrownlowArtefactEvidenceError, m.verify_bridge_identities, bridge_map, ids, renumbered))
 
 
 # ---------------------------------------------------------------------------

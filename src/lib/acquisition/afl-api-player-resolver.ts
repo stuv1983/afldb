@@ -2,7 +2,8 @@
  * AFLDB-ISSUE-228 S6-D2 — the `afl_api` provider-player -> canonical PLAYER
  * resolver (§6.3). Read-only: this module never inserts, updates or deletes
  * anything; the trusted bridge itself is written exclusively by
- * `tools/migration/import_afl_api_player_bridge.py` (S5).
+ * `tools/migration/import_afl_api_player_bridge.ts` (S5; the `.py` loader was retired by
+ * AFLDB-ISSUE-241) and, for a human decision, the ISSUE-235 admin adjudication.
  *
  * The lookup is exactly §6.3's normal-ingestion rule, generalised only to a
  * single on-demand call instead of the settle's one-time `loadRefs()` bulk
