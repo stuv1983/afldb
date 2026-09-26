@@ -1172,15 +1172,20 @@ transaction before commit: no canonical row, staging observation, projection or
 always rolls back. An operator who deliberately omits `--require-complete-source`
 retains the established partial-apply behaviour.
 
-The Brownlow wrapper invokes `--apply --auto-apply` **without**
-`--use-fixture-identity` (AFLDB-ISSUE-244 I244-F006). `staging.afl_api_match`
-holds only the matches the AFL API settle plans; a match that merely
-corroborates another source's canonical match (most 2026 home-and-away matches)
-has no typed row and resolves only through canonical fixture identity. When a
-snapshot contains such vote sets, the Brownlow CLI therefore **refuses before
-any write** and the unit fails visibly, naming the count and the flag. The
-wrapper does not enable the flag implicitly; whether the scheduled chain should
-pass it is an explicit operator decision, not made here.
+The Brownlow wrapper invokes `--apply --auto-apply --use-fixture-identity`
+(AFLDB-ISSUE-232 D-232-1 = B, operator decision 2026-09-26, the approved
+reversal of AFLDB-ISSUE-244 §40). `staging.afl_api_match` holds only the matches
+the AFL API settle plans; a match that merely corroborates another source's
+canonical match (every 2026 match) has no typed row and resolves only through
+its match-family fixture observation: SELECT-only, against existing `matches`
+rows, `unknown_match` or `fixture_identity_ambiguous` rather than a guess.
+So that those observations are fresh, the wrapper refreshes them itself first
+(ordering O1): `acquire-afl-api.ts --fixtures-only`, then
+`settle-afl-api-fixtures.ts --apply`, then the Brownlow acquisition and settle.
+It relies on neither the match timer nor systemd ordering. Steps 1–2 read the
+AFL API current-season ingestion switch too, so the Brownlow chain needs that
+switch enabled as well as its own two gates; with it off the unit fails visibly
+at step 1. Automatic `revalidateSeason()` is not wired (D-232-3).
 
 **Co-source safety.** These units may run concurrently with
 `afldb-settle-afltables.service` (§7b) without coordination: an `afltables`-

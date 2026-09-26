@@ -337,7 +337,10 @@ npx tsx tools/current-season/settle-afl-api-brownlow.ts --label $brownlowLabel -
 home-and-away count under the current data state — see §3.2: most 2026 matches
 corroborate an `afltables`-owned canonical match and have no typed
 `staging.afl_api_match` row, so canonical fixture identity is their only
-identity source. It is **never enabled automatically**. What each mode does
+identity source. The CLI **never enables it automatically**. The scheduled
+wrapper (`deploy/afldb-settle-afl-api-brownlow.sh`) passes it explicitly since
+AFLDB-ISSUE-232 D-232-1 = B (2026-09-26), after refreshing fixture identity in
+the same run (O1). What each mode does
 when the flag is omitted and some vote sets would need it (the CLI measures
 this from the snapshot's own vote sets, before any write):
 

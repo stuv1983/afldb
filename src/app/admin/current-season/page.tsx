@@ -1,11 +1,18 @@
 import type { Metadata } from 'next';
 
-import { readSettleRunStatus, type SettleRunStatus } from '@/lib/acquisition/settle-status';
+import {
+  readSettleRunStatus,
+  readSettleUnitTableStatus,
+  type SettleRunStatus,
+  type SettleUnitStatus,
+} from '@/lib/acquisition/settle-status';
+import type { SettleUnitKey } from '@/lib/acquisition/settle-trigger';
 import { requireCapability } from '@/lib/auth/session';
 import { getCurrentSeasonReport } from '@/lib/external-afl/current-season-import';
 
 import { readAflApiIngestionAdminView } from './actions';
 import { AflApiIngestionControls } from './AflApiIngestionControls';
+import { AflApiSettleUnitsPanel } from './AflApiSettleUnitsPanel';
 import {
   CurrentSeasonControls,
   CurrentSeasonReportTable,
@@ -32,6 +39,16 @@ export default async function CurrentSeasonPage() {
     settleStatus = await readSettleRunStatus();
   } catch {
     settleStatus = undefined;
+  }
+
+  // AFLDB-ISSUE-232. Same rule: each unit row already reports its own read
+  // failures, and anything that still throws is shown, never fatal.
+  let aflApiUnits: Record<SettleUnitKey, SettleUnitStatus> | null = null;
+  let aflApiUnitsError: string | null = null;
+  try {
+    aflApiUnits = await readSettleUnitTableStatus();
+  } catch (error) {
+    aflApiUnitsError = error instanceof Error ? error.message : String(error);
   }
 
   let report = null;
@@ -74,6 +91,8 @@ export default async function CurrentSeasonPage() {
       )}
 
       <SettleRunPanel initialStatus={settleStatus} />
+
+      <AflApiSettleUnitsPanel units={aflApiUnits} error={aflApiUnitsError} />
 
       <div className="page-header">
         <h2>Deprecated fallback diagnostics — Squiggle and Kali AFL Stats</h2>

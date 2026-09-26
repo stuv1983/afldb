@@ -32,6 +32,7 @@ import {
   fetchAflApiToken,
   type FetchLike,
   parseAflApiSeasonMatchesEnvelope,
+  planAflApiCompSeasonsRequest,
   planAflApiMatchRosterRequest,
   planAflApiPlayerStatsRequest,
   planAflApiSeasonMatchesRequest,
@@ -53,6 +54,34 @@ import {
   type SemanticPair,
 } from '../tools/current-season/emit-afl-api-bundle';
 import {
+  parseDiscoverAflApiSeasonsArgs,
+  runDiscoverAflApiSeasons,
+} from '../tools/current-season/discover-afl-api-seasons';
+import {
+  parseAcknowledgeAbsenceArgs,
+  runAcknowledgeAflApiMatchAbsence,
+} from '../tools/current-season/acknowledge-afl-api-match-absence';
+import {
+  REKEY_CASES,
+  rekeyRehearsalBundle,
+  rekeyRehearsalEnumeration,
+  rekeyRehearsalSeasonFeed,
+  rekeyRehearsalSeasonFeedText,
+  rekeyRehearsalUnitSource,
+  savepointSql,
+} from '../tools/db/afl-api-season-rekey-rehearsal';
+import {
+  AFL_API_MATCH_ABSENCE_ACTOR_NOTE,
+  AFL_API_MATCH_ABSENCE_HALT_REASON,
+  AflApiMatchAbsenceAckRefused,
+  acknowledgeAflApiMatchAbsence,
+  aflApiMatchAbsenceAcknowledgementRecord,
+  aflApiMatchAbsenceIssueKey,
+  proveAflApiMatchAbsenceFeed,
+  sweepAflApiMatchAbsence,
+  type AflApiMatchAbsenceDetection,
+} from '@/lib/acquisition/afl-api-match-absence';
+import {
   buildAflApiMatchBundle,
   buildAflApiSettleRecords,
   canonicalStringify,
@@ -72,7 +101,24 @@ import {
   resolveAflApiMatch,
 } from '@/lib/acquisition/afl-api-match-resolver';
 import { resolveAflApiPlayer } from '@/lib/acquisition/afl-api-player-resolver';
+import {
+  AFL_API_ABSENCE_TOLERANCE,
+  AFL_API_SEASON_FEED_FILE,
+  aflApiMatchRekeyScope,
+  assessAflApiSeasonEnumeration,
+  describeAflApiSeasonEnumeration,
+  missingAflApiSeasonEnumeration,
+  planAflApiAbsenceSweep,
+} from '@/lib/acquisition/afl-api-season-enumeration';
+import {
+  parseAflApiCompSeasons,
+  proposeAflApiSeasons,
+  serialiseAflApiSeasonDiscoveryProposal,
+  type RegisteredAflApiSeason,
+} from '@/lib/acquisition/afl-api-season-discovery';
+import { aflApiSeasonFeedTextFrom } from '@/lib/acquisition/afl-api-snapshot';
 import { NO_MATCH_REKEY_SCOPE } from '@/lib/acquisition/match-rekey';
+import { AflApiMatchAbsenceHalt, AflApiSettleHalt, buildAflApiSettleBundle } from '@/lib/acquisition/settle-afl-api';
 import { getSourceFamily, parseSourceFamilyRegistry } from '@/lib/acquisition/source-families';
 
 // ---------------------------------------------------------------------------
@@ -638,6 +684,41 @@ describe('acquire-afl-api CLI (AFLDB-ISSUE-228 §7.1, §5.4)', () => {
           { test: (u: string) => u.includes('/afl/v2/matches'), respond: () => jsonResponse(seasonFeed, { headers: { etag: '"season"' } }) },
         ];
       }
+
+      it('AFLDB-ISSUE-232 O1: the Brownlow wrapper\'s label parse recovers the exact --fixtures-only label, suffix included', async () => {
+        // The wrapper hands this label to settle-afl-api-fixtures.ts, which
+        // looks it up under data/sources/afl_api/fixtures/. Prove the handoff
+        // with the wrapper's OWN sed expression against this tool's OWN first
+        // log line, for a base label and a collision-suffixed one.
+        const wrapper = readFileSync(
+          join(__dirname, '..', 'deploy', 'afldb-settle-afl-api-brownlow.sh'), 'utf8',
+        ).replace(/\r\n/g, '\n');
+        const sedLine = wrapper.split('\n').find((line) => line.startsWith('fixtures_label=$('));
+        expect(sedLine).toBeDefined();
+        const sedExpr = /sed -n 's\/(.*?)\/\\1\/p'/.exec(sedLine ?? '')?.[1];
+        expect(sedExpr).toBe('.*, label \\([A-Za-z0-9_-]*\\).*');
+        // POSIX BRE -> JS: only the group parentheses are escaped in the BRE.
+        const parse = new RegExp(`^${(sedExpr ?? '').replace(/\\\(/g, '(').replace(/\\\)/g, ')')}$`);
+
+        const projectRoot = makeProjectRoot();
+        const now = new Date('2026-09-19T14:30:00Z');
+        for (const expectedSuffix of ['', '-2']) {
+          const lines: string[] = [];
+          const { fetchImpl } = stubFetch(fixturesOnlyHandlers());
+          const result = await runAcquisition(
+            { season: 2026, status: null, since: null, match: [], fixturesOnly: true },
+            {
+              fetchImpl, projectRoot, now, retryOpts: { sleep: noSleep },
+              ingestionControls: ENABLED_INGESTION_CONTROLS, log: (line) => lines.push(line),
+            },
+          );
+          expect(result.label.endsWith(`2026-09-19-143000${expectedSuffix}`)).toBe(true);
+          // `| head -n1` of the matching lines.
+          const parsed = lines.map((line) => parse.exec(line)?.[1]).find((value) => value !== undefined);
+          expect(parsed).toBe(result.label);
+          expect(result.snapshotDir).toBe(join(projectRoot, 'data', 'sources', 'afl_api', 'fixtures', parsed ?? ''));
+        }
+      });
 
       it('requests ONLY the season matches feed — no WMCTok, no playerStats, no matchRoster', async () => {
         const projectRoot = makeProjectRoot();
@@ -1794,5 +1875,810 @@ describe('backtest assertion 9 — named semantic-hash pair (AFLDB-ISSUE-228 §9
     expect(diffCanonicalPaths({ a: 1 }, { a: 1, b: 2 })).toEqual(['b']);
     expect(diffCanonicalPaths({ a: [1] }, { a: [1, 2] })).toEqual(['a.length']);
     expect(diffCanonicalPaths({ a: 9.0 }, { a: 9 })).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-231 — the season enumeration (completeness carrier). DB-free:
+// it reads only the retained 00-season-matches.json text.
+// ---------------------------------------------------------------------------
+
+describe('AFL API season enumeration (AFLDB-ISSUE-231)', () => {
+  const projectRoot = join(__dirname, '..');
+  const registry = parseSourceFamilyRegistry(
+    JSON.parse(readFileSync(join(projectRoot, 'data', 'reference', 'source-families.json'), 'utf8')),
+  );
+  const identities = parseAflApiIdentities(
+    JSON.parse(readFileSync(join(projectRoot, 'data', 'reference', 'afl-api-identities.json'), 'utf8')),
+  );
+  const fixtureDir = join(projectRoot, 'tests', 'fixtures', 'afl_api', 'match');
+  const readFixture = (name: string): unknown => JSON.parse(readFileSync(join(fixtureDir, name), 'utf8'));
+  const EXPECTED = { season: 2026, compSeasonProviderId: 'CD_S2026014' };
+
+  function entry(providerId: string, status: string, compSeason = 'CD_S2026014'): Record<string, unknown> {
+    return { providerId, status, utcStartTime: '2026-04-18T09:30:00.000+0000', compSeason: { id: 85, providerId: compSeason } };
+  }
+
+  function feed(matches: readonly unknown[], numEntries: unknown = matches.length): string {
+    // The MEASURED envelope (tests/fixtures/afl_api/seasons/00-season-matches-2026.raw.json).
+    return JSON.stringify({
+      meta: { code: 200, pagination: { page: 0, numPages: 1, pageSize: 1000, numEntries } }, matches,
+    });
+  }
+
+  const THREE = [entry('CD_M1', 'CONCLUDED'), entry('CD_M2', 'CONCLUDED'), entry('CD_M3', 'SCHEDULED')];
+
+  it('proves a whole, self-consistent feed complete and lists every match in feed order', () => {
+    const enumeration = assessAflApiSeasonEnumeration(feed(THREE), EXPECTED);
+    expect(enumeration.complete).toBe(true);
+    expect(enumeration.gaps).toEqual([]);
+    expect(enumeration.scopeKey).toBe('season=2026');
+    expect(enumeration.numEntries).toBe(3);
+    expect(enumeration.providerMatchIds).toEqual(['CD_M1', 'CD_M2', 'CD_M3']);
+  });
+
+  it('records each status string verbatim, including one it has never seen, without mapping it', () => {
+    const enumeration = assessAflApiSeasonEnumeration(
+      feed([...THREE, entry('CD_M4', 'SOME_UNMEASURED_STATE')]), EXPECTED,
+    );
+    expect(enumeration.statusCounts).toEqual({ CONCLUDED: 2, SCHEDULED: 1, SOME_UNMEASURED_STATE: 1 });
+    // Status never moves completeness: an unfamiliar value stays observable.
+    expect(enumeration.complete).toBe(true);
+  });
+
+  it('refuses the top-level pagination shape ISSUE-228 §2.1 described: only meta.pagination is measured', () => {
+    const legacy = assessAflApiSeasonEnumeration(
+      JSON.stringify({ meta: { code: 200 }, pagination: { numEntries: 3 }, matches: THREE }), EXPECTED,
+    );
+    expect(legacy.complete).toBe(false);
+    expect(legacy.gaps.map((gap) => gap.reason)).toEqual(['pagination_missing']);
+  });
+
+  it('refuses completeness when meta.pagination reports more than one page, or not page 0', () => {
+    const paged = (page: unknown, numPages: unknown) => JSON.stringify({
+      meta: { code: 200, pagination: { page, numPages, pageSize: 1000, numEntries: 3 } }, matches: THREE,
+    });
+    expect(assessAflApiSeasonEnumeration(paged(0, 2), EXPECTED).gaps.map((gap) => gap.reason))
+      .toEqual(['page_limit_reached']);
+    expect(assessAflApiSeasonEnumeration(paged(1, 2), EXPECTED).complete).toBe(false);
+    expect(assessAflApiSeasonEnumeration(paged(0, 1), EXPECTED).complete).toBe(true);
+  });
+
+  describe('against AUTHENTIC retained bytes (captured 2026-09-19T10:29:29Z, testAFLGrab AFLGamesSamples)', () => {
+    const FEED_PATH = join(__dirname, 'fixtures', 'afl_api', 'seasons', '00-season-matches-2026.raw.json');
+    const SLICE_PATH = join(__dirname, 'fixtures', 'afl_api', 'match', '04-season-feed-scheduled.raw-slice.json');
+    const sha256 = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
+
+    it('the fixtures are the recorded bytes (hash-bound)', () => {
+      // The committed feed is a sanitised derivative of the captured response (sha256 9c358984…75ee):
+      // one third-party ticket-queue token value is redacted (ISSUE-231 runbook §2a).
+      expect(sha256(readFileSync(FEED_PATH))).toBe('4f8235e08f438ee533b2d9c504b105b3bfce2449a807362dff10d074f7f1babb');
+      expect(sha256(readFileSync(SLICE_PATH))).toBe('4d22766d4755aeb1271829a4285cf040c7302ad3b49d3a2a9a732c3505bb5d7a');
+    });
+
+    it('the real 2026 feed is complete: 218 ids, statuses CONCLUDED 217 and SCHEDULED 1, verbatim', () => {
+      const enumeration = assessAflApiSeasonEnumeration(readFileSync(FEED_PATH, 'utf8'), EXPECTED);
+      expect(enumeration.gaps).toEqual([]);
+      expect(enumeration.complete).toBe(true);
+      expect(enumeration.numEntries).toBe(218);
+      expect(enumeration.providerMatchIds).toHaveLength(218);
+      expect(enumeration.statusCounts).toEqual({ CONCLUDED: 217, SCHEDULED: 1 });
+      expect(describeAflApiSeasonEnumeration(enumeration)).toBe(
+        'Season feed CD_S2026014: 218 match(es), complete; statuses observed: CONCLUDED 217, SCHEDULED 1.',
+      );
+      // The unselected SCHEDULED Grand Final is still published: never retired, never absent.
+      expect(aflApiMatchRekeyScope(enumeration).publishedRecordIds).toContain('CD_M20260142901');
+    });
+
+    it('AFLDB-ISSUE-229 evidence: the SCHEDULED record is a byte-exact slice of that feed, with no score block', () => {
+      const feedText = readFileSync(FEED_PATH, 'utf8');
+      const sliceText = readFileSync(SLICE_PATH, 'utf8');
+      // Offset in the committed sanitised feed: 317,211. The original captured response has the slice
+      // at 317,497; the 286-byte shift is the redacted ticket-queue token, which precedes the slice.
+      expect(feedText.indexOf(sliceText)).toBe(317211);
+      const scheduled = JSON.parse(sliceText) as Record<string, Record<string, unknown>>;
+      expect(scheduled.providerId).toBe('CD_M20260142901');
+      expect(scheduled.status).toBe('SCHEDULED');
+      expect(Object.keys(scheduled)).toEqual([
+        'id', 'providerId', 'compSeason', 'round', 'home', 'away', 'venue', 'utcStartTime', 'status', 'metadata',
+      ]);
+      expect(Object.keys(scheduled.home)).toEqual(['team']);
+      expect(Object.keys(scheduled.away)).toEqual(['team']);
+      // Every CONCLUDED entry in the same response carries a score block; this one alone does not.
+      const all = (JSON.parse(feedText) as { matches: Array<{ status: string; home: object; away: object }> }).matches;
+      expect(all.filter((m) => !('score' in m.home) || !('score' in m.away)).map((m) => m.status)).toEqual(['SCHEDULED']);
+    });
+
+    it('AFLDB-ISSUE-229: today\'s match contract refuses that real SCHEDULED record as a build failure', () => {
+      const { records, buildFailures } = buildAflApiFixtureRecords(
+        [JSON.parse(readFileSync(SLICE_PATH, 'utf8'))], registry, identities,
+      );
+      expect(records).toEqual([]);
+      expect(buildFailures).toHaveLength(1);
+      expect(buildFailures[0].providerMatchId).toBe('CD_M20260142901');
+      expect(buildFailures[0].error).toBe(
+        'afl_api/match is missing required column(s): home.score.goals, home.score.behinds, '
+        + 'home.score.totalScore, away.score.goals, away.score.behinds, away.score.totalScore.',
+      );
+    });
+  });
+
+  it('refuses completeness when meta.pagination.numEntries is absent or not an integer', () => {
+    const absent = assessAflApiSeasonEnumeration(JSON.stringify({ matches: THREE }), EXPECTED);
+    expect(absent.complete).toBe(false);
+    expect(absent.gaps.map((gap) => gap.reason)).toEqual(['pagination_missing']);
+    expect(absent.numEntries).toBeNull();
+    expect(assessAflApiSeasonEnumeration(feed(THREE, '3'), EXPECTED).gaps[0].reason).toBe('pagination_missing');
+    expect(assessAflApiSeasonEnumeration(feed(THREE, 2.5), EXPECTED).gaps[0].reason).toBe('pagination_missing');
+  });
+
+  it('refuses completeness when the response returned fewer matches than it declared (a partial feed)', () => {
+    const enumeration = assessAflApiSeasonEnumeration(feed(THREE, 216), EXPECTED);
+    expect(enumeration.complete).toBe(false);
+    expect(enumeration.gaps.map((gap) => gap.reason)).toEqual(['pagination_mismatch']);
+    // The ids it did see are still reported; they are simply not proof of the whole season.
+    expect(enumeration.providerMatchIds).toHaveLength(3);
+  });
+
+  it('refuses completeness when the response filled the requested page', () => {
+    const matches = Array.from({ length: 1000 }, (_, i) => entry(`CD_M${i}`, 'CONCLUDED'));
+    const enumeration = assessAflApiSeasonEnumeration(feed(matches), EXPECTED);
+    expect(enumeration.complete).toBe(false);
+    expect(enumeration.gaps.map((gap) => gap.reason)).toEqual(['page_limit_reached']);
+  });
+
+  it('never treats an empty feed as proof of an empty season', () => {
+    const enumeration = assessAflApiSeasonEnumeration(feed([], 0), EXPECTED);
+    expect(enumeration.complete).toBe(false);
+    expect(enumeration.gaps.map((gap) => gap.reason)).toEqual(['empty_season_feed']);
+  });
+
+  it('refuses completeness when an entry names another season, or none', () => {
+    const foreign = assessAflApiSeasonEnumeration(
+      feed([...THREE, entry('CD_M9', 'CONCLUDED', 'CD_S2025014')]), EXPECTED,
+    );
+    expect(foreign.complete).toBe(false);
+    expect(foreign.gaps.map((gap) => gap.reason)).toEqual(['foreign_comp_season']);
+    expect(foreign.gaps[0].detail).toContain('CD_S2025014');
+
+    const missing = assessAflApiSeasonEnumeration(
+      feed([...THREE, { providerId: 'CD_M9', status: 'CONCLUDED' }]), EXPECTED,
+    );
+    expect(missing.gaps.map((gap) => gap.reason)).toEqual(['foreign_comp_season']);
+  });
+
+  it('refuses completeness when one provider id is listed twice', () => {
+    const enumeration = assessAflApiSeasonEnumeration(feed([...THREE, entry('CD_M2', 'CONCLUDED')]), EXPECTED);
+    expect(enumeration.complete).toBe(false);
+    expect(enumeration.gaps.map((gap) => gap.reason)).toEqual(['duplicate_provider_id']);
+    expect(enumeration.gaps[0].detail).toContain('CD_M2');
+  });
+
+  it('throws on a malformed envelope rather than reading half of it', () => {
+    expect(() => assessAflApiSeasonEnumeration(JSON.stringify({ pagination: { numEntries: 0 } }), EXPECTED))
+      .toThrow(/no 'matches' array/);
+    expect(() => assessAflApiSeasonEnumeration(feed([{ status: 'CONCLUDED' }]), EXPECTED))
+      .toThrow(/no string providerId/);
+  });
+
+  it('a snapshot with no retained feed lists nothing and proves nothing', () => {
+    const enumeration = missingAflApiSeasonEnumeration(2026, 'CD_S2026014');
+    expect(enumeration.complete).toBe(false);
+    expect(enumeration.providerMatchIds).toEqual([]);
+    expect(enumeration.gaps.map((gap) => gap.reason)).toEqual(['season_feed_not_in_snapshot']);
+  });
+
+  describe('the retirement proof it supports (ISSUE-131 scope for afl_api)', () => {
+    it('a complete feed names its scope and publishes the WHOLE feed, not the run\'s selection', () => {
+      // CD_M3 is SCHEDULED: a nightly CONCLUDED-only acquisition never selects
+      // it, yet it is still published and must never read as retired.
+      const scope = aflApiMatchRekeyScope(assessAflApiSeasonEnumeration(feed(THREE), EXPECTED));
+      expect(scope).toEqual({
+        completeScopeKeys: ['season=2026'],
+        publishedRecordIds: ['CD_M1', 'CD_M2', 'CD_M3'],
+      });
+    });
+
+    it('an incomplete or missing feed yields exactly the scope that proves nothing', () => {
+      expect(aflApiMatchRekeyScope(assessAflApiSeasonEnumeration(feed(THREE, 216), EXPECTED)))
+        .toEqual(NO_MATCH_REKEY_SCOPE);
+      expect(aflApiMatchRekeyScope(missingAflApiSeasonEnumeration(2026, 'CD_S2026014')))
+        .toEqual(NO_MATCH_REKEY_SCOPE);
+    });
+  });
+
+  describe('the absence sweep decision (residual 2, D-231-1 / D-231-2), DB-free', () => {
+    const spine = (id: string, absentSince: string | null = null) => ({ externalRecordId: id, absentSince });
+    const complete = () => assessAflApiSeasonEnumeration(feed(THREE), EXPECTED);
+
+    it('D-231-1 is zero, with no positive tolerance', () => {
+      expect(AFL_API_ABSENCE_TOLERANCE).toBe(0);
+    });
+
+    it('id-list semantics: a published match the run did not SELECT is never absent', () => {
+      // CD_M3 is SCHEDULED, so a CONCLUDED-only run never re-observes it; batch
+      // semantics (last_batch_id <> this batch) would stamp it. The feed lists it.
+      const plan = planAflApiAbsenceSweep(complete(), [spine('CD_M1'), spine('CD_M2'), spine('CD_M3')]);
+      expect(plan).toEqual({
+        applicable: true, scopeKey: 'season=2026',
+        newlyAbsent: [], stillAbsent: [], reappeared: [], exceedsTolerance: false,
+      });
+    });
+
+    it('one spine record missing from a complete feed is newly absent and exceeds tolerance 0', () => {
+      const plan = planAflApiAbsenceSweep(complete(), [spine('CD_M1'), spine('CD_M_OLD')]);
+      expect(plan.newlyAbsent).toEqual(['CD_M_OLD']);
+      expect(plan.exceedsTolerance).toBe(true);
+    });
+
+    it('an already-stamped record still missing is not NEW, so it alone does not exceed', () => {
+      const plan = planAflApiAbsenceSweep(complete(), [spine('CD_M_OLD', '2026-09-20T00:00:00Z')]);
+      expect(plan.newlyAbsent).toEqual([]);
+      expect(plan.stillAbsent).toEqual(['CD_M_OLD']);
+      expect(plan.exceedsTolerance).toBe(false);
+    });
+
+    it('D-231-2: a stamped record listed again by the complete feed reappears, selected or not', () => {
+      const plan = planAflApiAbsenceSweep(complete(), [
+        spine('CD_M1', '2026-09-20T00:00:00Z'), // CONCLUDED, would be re-observed anyway
+        spine('CD_M3', '2026-09-20T00:00:00Z'), // SCHEDULED, never selected by the nightly run
+      ]);
+      expect(plan.reappeared).toEqual(['CD_M1', 'CD_M3']);
+      expect(plan.newlyAbsent).toEqual([]);
+    });
+
+    it('an incomplete feed decides nothing: no absence, no reappearance', () => {
+      const partial = assessAflApiSeasonEnumeration(feed(THREE, 216), EXPECTED);
+      const plan = planAflApiAbsenceSweep(partial, [spine('CD_M_OLD'), spine('CD_M1', '2026-09-20T00:00:00Z')]);
+      expect(plan).toEqual({
+        applicable: false, scopeKey: 'season=2026',
+        newlyAbsent: [], stillAbsent: [], reappeared: [], exceedsTolerance: false,
+      });
+      expect(planAflApiAbsenceSweep(missingAflApiSeasonEnumeration(2026, 'CD_S2026014'), [spine('X')]).applicable)
+        .toBe(false);
+    });
+
+    it('the rekey case IS a disappearance: old id absent, new id present, so tolerance 0 is exceeded', () => {
+      // Recorded for D-231-1: a retired-identity rekey (CD_M_OLD -> CD_M1 on
+      // the same fixture) always begins with the old id leaving a complete feed.
+      const plan = planAflApiAbsenceSweep(complete(), [spine('CD_M_OLD')]);
+      expect(plan.exceedsTolerance).toBe(true);
+      expect(aflApiMatchRekeyScope(complete()).publishedRecordIds).not.toContain('CD_M_OLD');
+    });
+  });
+
+  describe('the code_test_db rekey rehearsal fixtures (tools/db/afl-api-season-rekey-rehearsal.ts), DB-free', () => {
+    it('every rehearsal unit builds with no failure, on its own id, date and H&A round', () => {
+      for (const spec of Object.values(REKEY_CASES)) {
+        const bundle = rekeyRehearsalBundle('guard', [rekeyRehearsalUnitSource(spec)]);
+        expect(bundle.buildFailures).toEqual([]);
+        expect(bundle.units[0].bundle.match.sourceRecordId).toBe(spec.providerId);
+        expect(bundle.units[0].bundle.localMatchDateTime?.matchDate).toBe(spec.date);
+      }
+    });
+
+    it('the rehearsal feed is the authentic envelope made complete, listing the incoming id and never an old one', () => {
+      const feed = rekeyRehearsalSeasonFeed([rekeyRehearsalUnitSource(REKEY_CASES.new)]);
+      expect(feed.complete).toBe(true);
+      expect(feed.providerMatchIds).toHaveLength(219);
+      const scope = aflApiMatchRekeyScope(feed);
+      expect(scope.publishedRecordIds).toContain(REKEY_CASES.new.providerId);
+      expect(scope.publishedRecordIds).not.toContain(REKEY_CASES.old.providerId);
+      expect(scope.publishedRecordIds).not.toContain(REKEY_CASES.ambiguousA.providerId);
+      expect(scope.publishedRecordIds).not.toContain(REKEY_CASES.ambiguousB.providerId);
+      // And the bundle accepts it (every acquired unit is listed).
+      expect(() => rekeyRehearsalBundle('guard', [rekeyRehearsalUnitSource(REKEY_CASES.new)], feed)).not.toThrow();
+    });
+
+    it('S3 geometry: the incoming record differs from each candidate in exactly one of round/date, the candidates in both', () => {
+      const { ambiguousA: a, ambiguousB: b, ambiguousNew: n } = REKEY_CASES;
+      const differs = (x: { date: string; apiRound: number }, y: { date: string; apiRound: number }) =>
+        Number(x.date !== y.date) + Number(x.apiRound !== y.apiRound);
+      expect(differs(n, a)).toBe(1);
+      expect(differs(n, b)).toBe(1);
+      expect(differs(a, b)).toBe(2);
+      expect(differs(REKEY_CASES.new, REKEY_CASES.old)).toBe(1);
+    });
+
+    it('savepointSql routes the settle\'s begin() into a savepoint of the outer transaction', async () => {
+      const calls: string[] = [];
+      const outer = { savepoint: async (fn: (tx: unknown) => unknown) => { calls.push('savepoint'); return fn('tx'); } };
+      const result = await savepointSql(outer as never).begin(async (tx) => { calls.push(String(tx)); return 7; });
+      expect(result).toBe(7);
+      expect(calls).toEqual(['savepoint', 'tx']);
+    });
+  });
+
+  it('describes the feed in one operator line: size, verdict and the observed statuses', () => {
+    expect(describeAflApiSeasonEnumeration(assessAflApiSeasonEnumeration(feed(THREE), EXPECTED)))
+      .toBe('Season feed CD_S2026014: 3 match(es), complete; statuses observed: CONCLUDED 2, SCHEDULED 1.');
+    expect(describeAflApiSeasonEnumeration(assessAflApiSeasonEnumeration(feed(THREE, 9), EXPECTED)))
+      .toContain('INCOMPLETE (pagination_mismatch)');
+  });
+
+  describe('snapshot reading', () => {
+    let dir: string | null = null;
+    afterEach(() => {
+      if (dir !== null) rmSync(dir, { recursive: true, force: true });
+      dir = null;
+    });
+
+    it('reads the feed only when the manifest lists it', () => {
+      dir = mkdtempSync(join(tmpdir(), 'afldb-issue231-'));
+      writeFileSync(join(dir, AFL_API_SEASON_FEED_FILE), feed(THREE), 'utf8');
+      expect(aflApiSeasonFeedTextFrom(dir, [])).toBeNull();
+      expect(aflApiSeasonFeedTextFrom(dir, [{ file: AFL_API_SEASON_FEED_FILE, sha256: 'x' }])).toBe(feed(THREE));
+    });
+  });
+
+  describe('buildAflApiSettleBundle carries it', () => {
+    const source = {
+      fixtureRaw: readFixture('01-fixture-result.json'),
+      rosterRaw: readFixture('03-match-roster.raw.json'),
+      playerStatsRaw: readFixture('02-player-stats.raw.json'),
+    };
+    const base = { season: 2026, snapshotLabel: 'issue231', sources: [source], registry, identities };
+
+    it('defaults to an incomplete enumeration when the caller supplies no feed', () => {
+      const bundle = buildAflApiSettleBundle(base);
+      expect(bundle.units).toHaveLength(1);
+      expect(bundle.seasonFeed.complete).toBe(false);
+      expect(bundle.seasonFeed.compSeasonProviderId).toBe('CD_S2026014');
+      expect(bundle.seasonFeed.gaps.map((gap) => gap.reason)).toEqual(['season_feed_not_in_snapshot']);
+    });
+
+    it('carries a supplied feed that lists every acquired match', () => {
+      const seasonFeed = assessAflApiSeasonEnumeration(
+        feed([entry('CD_M20260142801', 'CONCLUDED'), entry('CD_M20260142901', 'SCHEDULED')]), EXPECTED,
+      );
+      const bundle = buildAflApiSettleBundle({ ...base, seasonFeed });
+      expect(bundle.seasonFeed).toBe(seasonFeed);
+    });
+
+    it('refuses a snapshot whose acquired match is missing from its own feed', () => {
+      const seasonFeed = assessAflApiSeasonEnumeration(feed([entry('CD_M_OTHER', 'CONCLUDED')]), EXPECTED);
+      expect(() => buildAflApiSettleBundle({ ...base, seasonFeed }))
+        .toThrow(/CD_M20260142801' was acquired but is not listed/);
+    });
+
+    it('refuses a feed that describes a different season', () => {
+      const seasonFeed = assessAflApiSeasonEnumeration(
+        feed([entry('CD_M20260142801', 'CONCLUDED', 'CD_S2025014')]),
+        { season: 2025, compSeasonProviderId: 'CD_S2025014' },
+      );
+      expect(() => buildAflApiSettleBundle({ ...base, seasonFeed })).toThrow(/describes season 2025/);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-231 D-231-3 — detect, refuse, durable finding, acknowledgement.
+// DB-free here; the database lifecycle (S1–S10) is the rollback-only
+// code_test_db rehearsal, tools/db/afl-api-season-rekey-rehearsal.ts.
+// ---------------------------------------------------------------------------
+
+describe('AFL API match absence, D-231-3 (AFLDB-ISSUE-231)', () => {
+  const FEED_PATH = join(__dirname, 'fixtures', 'afl_api', 'seasons', '00-season-matches-2026.raw.json');
+  const EXPECTED = { season: 2026, compSeasonProviderId: 'CD_S2026014' };
+  const OLD = REKEY_CASES.old.providerId;
+  const sha = (text: string) => createHash('sha256').update(text, 'utf8').digest('hex');
+  const untouchable = () => ({
+    begin: () => { throw new Error('the database was touched'); },
+    end: async () => {},
+  }) as unknown as postgres.Sql;
+  const omitting = rekeyRehearsalSeasonFeedText([rekeyRehearsalUnitSource(REKEY_CASES.new)]);
+  const listing = rekeyRehearsalSeasonFeedText([
+    rekeyRehearsalUnitSource(REKEY_CASES.old), rekeyRehearsalUnitSource(REKEY_CASES.new),
+  ]);
+  const incomplete = rekeyRehearsalSeasonFeedText([rekeyRehearsalUnitSource(REKEY_CASES.new)], { incomplete: true });
+
+  it('the enumeration binds the exact bytes it assessed: for the committed feed fixture, its recorded sha256', () => {
+    expect(assessAflApiSeasonEnumeration(readFileSync(FEED_PATH, 'utf8'), EXPECTED).sourceSha256)
+      .toBe('4f8235e08f438ee533b2d9c504b105b3bfce2449a807362dff10d074f7f1babb');
+    expect(missingAflApiSeasonEnumeration(2026, 'CD_S2026014').sourceSha256).toBeNull();
+  });
+
+  it('one finding key per provider id, naming source, family, scope and id', () => {
+    expect(aflApiMatchAbsenceIssueKey('season=2026', 'CD_M1')).toBe('afl_api|match|season=2026|CD_M1|absence');
+    expect(aflApiMatchAbsenceIssueKey('season=2026', 'CD_M1')).not.toBe(aflApiMatchAbsenceIssueKey('season=2026', 'CD_M2'));
+    expect(aflApiMatchAbsenceIssueKey('season=2026', 'CD_M1')).not.toBe(aflApiMatchAbsenceIssueKey('season=2025', 'CD_M1'));
+    // Never the identity-refusal key for the same record (`afl_api|match|<id>|matches`).
+    expect(aflApiMatchAbsenceIssueKey('season=2026', 'CD_M1')).not.toBe('afl_api|match|CD_M1|matches');
+    expect(() => aflApiMatchAbsenceIssueKey('', 'CD_M1')).toThrow();
+    expect(() => aflApiMatchAbsenceIssueKey('season=2026', '')).toThrow();
+  });
+
+  it('the absence HALT is an ordinary settle HALT that also carries what the sweep observed', () => {
+    const enumeration = rekeyRehearsalEnumeration(omitting);
+    const detection: AflApiMatchAbsenceDetection = {
+      sourceId: 7, season: 2026, scopeKey: 'season=2026', compSeasonProviderId: 'CD_S2026014',
+      snapshotLabel: 'label', seasonFeedSha256: enumeration.sourceSha256, seasonFeedMatches: 219,
+      observedAt: '2026-09-26T00:00:00.000Z',
+      plan: planAflApiAbsenceSweep(enumeration, [{ externalRecordId: OLD, absentSince: null }]),
+    };
+    const halt = new AflApiMatchAbsenceHalt(detection);
+    expect(halt).toBeInstanceOf(AflApiSettleHalt);
+    expect(halt.reason).toBe(AFL_API_MATCH_ABSENCE_HALT_REASON);
+    expect(halt.detail).toMatchObject({ scopeKey: 'season=2026', newlyAbsent: [OLD], stillAbsent: [], tolerance: 0 });
+    expect(halt.detection).toBe(detection);
+  });
+
+  it('actor decision (c): the acknowledgement names the PostgreSQL role as the database actor, never a person', () => {
+    const record = aflApiMatchAbsenceAcknowledgementRecord({
+      databaseActor: 'afldb_import', database: 'code_test_db', findingId: '41',
+      issueKey: aflApiMatchAbsenceIssueKey('season=2026', OLD), season: 2026, externalRecordId: OLD,
+      snapshotLabel: 'snap', seasonFeedSha256: 'f'.repeat(64), seasonFeedMatches: 219,
+      firstDetectedAt: '2026-09-26T00:00:00.000Z',
+    });
+    expect(record).toEqual({
+      database_actor: 'afldb_import',
+      database_actor_kind: 'postgresql_role',
+      actor_note: 'database actor is operational attribution, not authenticated human identity',
+      database: 'code_test_db',
+      tool: 'acknowledge-afl-api-match-absence.ts',
+      finding_id: '41',
+      issue_key: `afl_api|match|season=2026|${OLD}|absence`,
+      season: 2026,
+      external_record_id: OLD,
+      proved_by_snapshot_label: 'snap',
+      proved_by_season_feed_sha256: 'f'.repeat(64),
+      proved_by_season_feed_matches: 219,
+      first_detected_at: '2026-09-26T00:00:00.000Z',
+      absent_since: '2026-09-26T00:00:00.000Z',
+      resolution: 'source_absence_acknowledged',
+    });
+    expect(AFL_API_MATCH_ABSENCE_ACTOR_NOTE).toBe('database actor is operational attribution, not authenticated human identity');
+    // No human-name field of any spelling, and the CLI has no flag that could supply one.
+    expect(Object.keys(record).filter((key) => /operator|user|human|name/.test(key))).toEqual([]);
+    expect(() => parseAcknowledgeAbsenceArgs([
+      '--label', 'snap', '--season', '2026', '--external-record-id', OLD, '--finding-id', '41', '--operator', 'x',
+    ])).toThrow(/Unknown argument '--operator'/);
+  });
+
+  it('an incomplete enumeration sweeps nothing and never reaches the database', async () => {
+    const tx = (() => { throw new Error('the database was touched'); }) as unknown as postgres.TransactionSql;
+    for (const enumeration of [missingAflApiSeasonEnumeration(2026, 'CD_S2026014'), rekeyRehearsalEnumeration(incomplete)]) {
+      expect(enumeration.complete).toBe(false);
+      await expect(sweepAflApiMatchAbsence(tx, {
+        sourceId: 7, enumeration, snapshotLabel: 'label', observedAt: '2026-09-26T00:00:00.000Z',
+      })).resolves.toEqual({ kind: 'not_applicable' });
+    }
+  });
+
+  it('the rehearsal feed variants: complete-omitting, complete-listing and incomplete (pagination_mismatch)', () => {
+    expect(rekeyRehearsalEnumeration(omitting).complete).toBe(true);
+    expect(rekeyRehearsalEnumeration(omitting).providerMatchIds).not.toContain(OLD);
+    expect(rekeyRehearsalEnumeration(listing).complete).toBe(true);
+    expect(rekeyRehearsalEnumeration(listing).providerMatchIds).toContain(OLD);
+    expect(rekeyRehearsalEnumeration(incomplete).gaps.map((gap) => gap.reason)).toEqual(['pagination_mismatch']);
+    // The pass-2 helper is unchanged: the complete feed listing the incoming records.
+    expect(rekeyRehearsalSeasonFeed([rekeyRehearsalUnitSource(REKEY_CASES.new)]).providerMatchIds)
+      .toEqual(rekeyRehearsalEnumeration(omitting).providerMatchIds);
+  });
+
+  describe('the acknowledgement proof, before any connection', () => {
+    const base = { ...EXPECTED, externalRecordId: OLD };
+
+    it('accepts a complete, verified feed that still omits the id', () => {
+      const enumeration = proveAflApiMatchAbsenceFeed({ ...base, seasonFeedText: omitting, seasonFeedSha256: sha(omitting) });
+      expect(enumeration.complete).toBe(true);
+    });
+
+    it('refuses a complete feed that lists the id again: a stale finding is never enough', () => {
+      expect(() => proveAflApiMatchAbsenceFeed({ ...base, seasonFeedText: listing, seasonFeedSha256: sha(listing) }))
+        .toThrow(AflApiMatchAbsenceAckRefused);
+      expect(() => proveAflApiMatchAbsenceFeed({ ...base, seasonFeedText: listing, seasonFeedSha256: sha(listing) }))
+        .toThrow(/lists 'CD_M2026231ROLD' again/);
+    });
+
+    it('refuses an incomplete feed, which proves nothing about absence', () => {
+      expect(() => proveAflApiMatchAbsenceFeed({ ...base, seasonFeedText: incomplete, seasonFeedSha256: sha(incomplete) }))
+        .toThrow(/not complete \(pagination_mismatch\)/);
+    });
+
+    it('refuses text that is not the manifest-verified bytes', () => {
+      expect(() => proveAflApiMatchAbsenceFeed({ ...base, seasonFeedText: omitting, seasonFeedSha256: sha(listing) }))
+        .toThrow(/hashes to/);
+    });
+
+    it('validate-only proves the feed before touching the database; a valid proof then reaches it', async () => {
+      const input = {
+        ...base, findingId: '41', snapshotLabel: 'label', apply: false, acknowledgeDatabase: null,
+      };
+      await expect(acknowledgeAflApiMatchAbsence(untouchable(), {
+        ...input, seasonFeedText: listing, seasonFeedSha256: sha(listing),
+      })).rejects.toThrow(AflApiMatchAbsenceAckRefused);
+      await expect(acknowledgeAflApiMatchAbsence(untouchable(), {
+        ...input, findingId: 'all', seasonFeedText: omitting, seasonFeedSha256: sha(omitting),
+      })).rejects.toThrow(/is not a data_issues id/);
+      await expect(acknowledgeAflApiMatchAbsence(untouchable(), {
+        ...input, seasonFeedText: omitting, seasonFeedSha256: sha(omitting),
+      })).rejects.toThrow(/the database was touched/);
+    });
+  });
+
+  describe('the acknowledgement CLI (tools/current-season/acknowledge-afl-api-match-absence.ts)', () => {
+    const required = ['--label', 'snap', '--season', '2026', '--external-record-id', OLD, '--finding-id', '41'];
+
+    it('is validate-only by default', () => {
+      expect(parseAcknowledgeAbsenceArgs(required)).toEqual({
+        label: 'snap', season: 2026, externalRecordId: OLD, findingId: '41', apply: false, acknowledgeDatabase: null,
+      });
+      expect(parseAcknowledgeAbsenceArgs([...required, '--validate-only']).apply).toBe(false);
+    });
+
+    it('applies only with --acknowledge naming a database, and --acknowledge only with --apply', () => {
+      expect(() => parseAcknowledgeAbsenceArgs([...required, '--apply'])).toThrow(/--apply requires --acknowledge/);
+      expect(() => parseAcknowledgeAbsenceArgs([...required, '--acknowledge', 'afldb_dev'])).toThrow(/only accompanies --apply/);
+      expect(() => parseAcknowledgeAbsenceArgs([...required, '--apply', '--validate-only', '--acknowledge', 'x']))
+        .toThrow(/mutually exclusive/);
+      expect(parseAcknowledgeAbsenceArgs([...required, '--apply', '--acknowledge', 'afldb_dev']))
+        .toMatchObject({ apply: true, acknowledgeDatabase: 'afldb_dev' });
+    });
+
+    it('names exactly one finding: every identifying flag is required and there is no blanket mode', () => {
+      for (let i = 0; i < required.length; i += 2) {
+        const without = [...required.slice(0, i), ...required.slice(i + 2)];
+        expect(() => parseAcknowledgeAbsenceArgs(without)).toThrow();
+      }
+      expect(() => parseAcknowledgeAbsenceArgs([...required, '--all'])).toThrow(/Unknown argument '--all'/);
+      expect(() => parseAcknowledgeAbsenceArgs([...required, '--finding-id', '42'])).toThrow(/more than once/);
+      expect(() => parseAcknowledgeAbsenceArgs(['--label', 'snap', '--season', '2026', '--external-record-id', 'X1', '--finding-id', '41']))
+        .toThrow(/not an AFL API match provider id/);
+      expect(() => parseAcknowledgeAbsenceArgs(['--label', 'snap', '--season', '2026', '--external-record-id', OLD, '--finding-id', '0']))
+        .toThrow(/not a data_issues id/);
+    });
+
+    describe('against a retained snapshot', () => {
+      let root: string | null = null;
+      afterEach(() => {
+        if (root !== null) rmSync(root, { recursive: true, force: true });
+        root = null;
+      });
+
+      function snapshot(feedText: string | null, season = 2026): string {
+        root = mkdtempSync(join(tmpdir(), 'afldb-issue231-ack-'));
+        mkdirSync(join(root, 'data', 'reference'), { recursive: true });
+        writeFileSync(join(root, 'data', 'reference', 'afl-api-identities.json'),
+          readFileSync(join(__dirname, '..', 'data', 'reference', 'afl-api-identities.json')));
+        const dir = join(root, 'data', 'sources', 'afl_api', 'matches', 'snap');
+        mkdirSync(dir, { recursive: true });
+        const files: { file: string; sha256: string }[] = [];
+        if (feedText !== null) {
+          writeFileSync(join(dir, AFL_API_SEASON_FEED_FILE), feedText, 'utf8');
+          files.push({ file: AFL_API_SEASON_FEED_FILE, sha256: sha(feedText) });
+        }
+        writeFileSync(join(dir, 'manifest.json'), JSON.stringify({ source_key: 'afl_api', season, files }), 'utf8');
+        return root;
+      }
+      const run = (projectRoot: string, argv: readonly string[] = required) =>
+        runAcknowledgeAflApiMatchAbsence(argv, { projectRoot, sql: untouchable(), log: () => {} });
+
+      it('refuses, before any connection, a snapshot whose complete feed lists the id again', async () => {
+        await expect(run(snapshot(listing))).rejects.toThrow(/lists 'CD_M2026231ROLD' again/);
+      });
+
+      it('refuses a snapshot of another season, or one that retained no feed', async () => {
+        await expect(run(snapshot(omitting, 2025))).rejects.toThrow(/is season 2025, not 2026/);
+        await expect(run(snapshot(null))).rejects.toThrow(/retained no 00-season-matches.json/);
+      });
+
+      it('refuses a feed edited after acquisition (manifest re-hash)', async () => {
+        const projectRoot = snapshot(omitting);
+        writeFileSync(join(projectRoot, 'data', 'sources', 'afl_api', 'matches', 'snap', AFL_API_SEASON_FEED_FILE), listing, 'utf8');
+        await expect(run(projectRoot)).rejects.toThrow(/sha256 mismatch/);
+      });
+
+      it('a complete feed that still omits the id is proven offline and only then reaches the database', async () => {
+        await expect(run(snapshot(omitting))).rejects.toThrow(/the database was touched/);
+      });
+    });
+  });
+});
+
+describe('AFL API season discovery (AFLDB-ISSUE-233, D-233-1 proposal-only)', () => {
+  const projectRoot = join(__dirname, '..');
+  const RAW_PATH = join(projectRoot, 'tests', 'fixtures', 'afl_api', 'seasons', '00-compseasons.raw.json');
+  const RAW_SHA256 = 'fe3f164160e37e0ce5b70ff3f379dc41ce234f2efad6e7f481c1b7443111d965';
+  const rawText = () => readFileSync(RAW_PATH, 'utf8');
+  const registered = parseAflApiIdentities(
+    JSON.parse(readFileSync(join(projectRoot, 'data', 'reference', 'afl-api-identities.json'), 'utf8')),
+  ).seasons;
+  const source = { file: 'tests/fixtures/afl_api/seasons/00-compseasons.raw.json', sha256: RAW_SHA256 };
+  const REGISTERED = [2022, 2023, 2024, 2025, 2026];
+  const HISTORICAL = [2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021];
+
+  /** SYNTHETIC: the real response plus one fabricated future season. Test data only. */
+  function withFuture(entry: Record<string, unknown>, numEntries = 16): string {
+    const parsed = JSON.parse(rawText()) as { meta: { pagination: Record<string, unknown> }; compSeasons: unknown[] };
+    parsed.compSeasons.unshift(entry);
+    parsed.meta.pagination.numEntries = numEntries;
+    return JSON.stringify(parsed);
+  }
+  const FUTURE_2027 = {
+    id: 9999, providerId: 'CD_S2027014', name: '2027 Toyota AFL Premiership', shortName: 'Premiership', currentRoundNumber: 0,
+  };
+
+  it('the fixture is the recorded authentic bytes (hash-bound)', () => {
+    expect(createHash('sha256').update(readFileSync(RAW_PATH)).digest('hex')).toBe(RAW_SHA256);
+  });
+
+  it('requests exactly what the sample recorded: competitions/1/compseasons?pageSize=100 on the public base', () => {
+    const plan = planAflApiCompSeasonsRequest(DEFAULT_AFL_API_BASES, {});
+    expect(plan.url).toBe('https://aflapi.afl.com.au/afl/v2/competitions/1/compseasons?pageSize=100');
+    expect(plan.method).toBe('GET');
+    expect(plan.headers).not.toHaveProperty('x-media-mis-token');
+  });
+
+  it('reads the measured envelope: 15 seasons, complete from meta.pagination', () => {
+    const listing = parseAflApiCompSeasons(rawText());
+    expect(listing.complete).toBe(true);
+    expect(listing.gaps).toEqual([]);
+    expect(listing.numEntries).toBe(15);
+    expect(listing.entries[0]).toEqual({ id: 85, providerId: 'CD_S2026014', name: '2026 Toyota AFL Premiership', currentRoundNumber: 28 });
+  });
+
+  it('against today\'s registry the real response proposes nothing and confirms 2022–2026', () => {
+    const proposal = proposeAflApiSeasons({ listing: parseAflApiCompSeasons(rawText()), registered, source });
+    expect(proposal.verdict).toBe('no_change');
+    expect(proposal.proposals).toEqual([]);
+    expect(proposal.identitiesSeasonsAdditions).toEqual({});
+    expect(proposal.confirmedRegistered).toEqual(REGISTERED);
+    expect(proposal.historicalUnregistered).toEqual(HISTORICAL);
+    expect(proposal.findings).toEqual([]);
+  });
+
+  it('a newer unregistered season is proposed, with the exact identities entry a reviewer would add', () => {
+    const proposal = proposeAflApiSeasons({ listing: parseAflApiCompSeasons(withFuture(FUTURE_2027)), registered, source });
+    expect(proposal.verdict).toBe('proposals');
+    expect(proposal.proposals).toEqual([{
+      year: 2027, compSeasonId: 9999, providerId: 'CD_S2027014', name: '2027 Toyota AFL Premiership', currentRoundNumber: 0,
+    }]);
+    expect(proposal.identitiesSeasonsAdditions).toEqual({ 2027: { compSeasonId: 9999, providerId: 'CD_S2027014' } });
+  });
+
+  it('a registered season the provider disagrees with is a finding, never rewritten, and blocks every proposal', () => {
+    const drifted = new Map<number, RegisteredAflApiSeason>(registered);
+    drifted.set(2026, { compSeasonId: 86, providerId: 'CD_S2026014' });
+    const proposal = proposeAflApiSeasons({ listing: parseAflApiCompSeasons(withFuture(FUTURE_2027)), registered: drifted, source });
+    expect(proposal.verdict).toBe('refused');
+    expect(proposal.proposals).toEqual([]);
+    expect(proposal.identitiesSeasonsAdditions).toEqual({});
+    expect(proposal.findings.map((f) => [f.kind, f.year])).toEqual([['registered_mismatch', 2026]]);
+    expect(proposal.findings[0].detail).toContain('Not rewritten');
+  });
+
+  it('refuses an entry whose providerId and name disagree on the year, or that fits neither pattern', () => {
+    const disagree = proposeAflApiSeasons({
+      listing: parseAflApiCompSeasons(withFuture({ ...FUTURE_2027, name: '2028 Toyota AFL Premiership' })),
+      registered, source,
+    });
+    expect(disagree.verdict).toBe('refused');
+    expect(disagree.findings.map((f) => f.kind)).toEqual(['year_disagreement']);
+
+    const foreign = proposeAflApiSeasons({
+      listing: parseAflApiCompSeasons(withFuture({ ...FUTURE_2027, providerId: 'CD_S2027264', name: '2027 AFLW Season' })),
+      registered, source,
+    });
+    expect(foreign.findings.map((f) => f.kind)).toEqual(['unrecognised_entry']);
+  });
+
+  it('refuses a listing that does not prove itself complete', () => {
+    const proposal = proposeAflApiSeasons({
+      listing: parseAflApiCompSeasons(withFuture(FUTURE_2027, 40)), registered, source,
+    });
+    expect(proposal.listing.complete).toBe(false);
+    expect(proposal.verdict).toBe('refused');
+    expect(proposal.proposals).toEqual([]);
+    expect(proposal.findings.map((f) => f.kind)).toEqual(['listing_incomplete']);
+  });
+
+  it('reports a registered season missing from the listing, and an unregistered gap inside the registered range', () => {
+    const withGap = new Map<number, RegisteredAflApiSeason>(registered);
+    withGap.delete(2024);
+    withGap.set(2011, { compSeasonId: 1, providerId: 'CD_S2011014' });
+    const proposal = proposeAflApiSeasons({ listing: parseAflApiCompSeasons(rawText()), registered: withGap, source });
+    expect(proposal.verdict).toBe('refused');
+    expect(proposal.findings.map((f) => [f.kind, f.year])).toEqual([
+      ['registered_absent_from_listing', 2011],
+      ['unregistered_within_registered_range', 2012],
+      ['unregistered_within_registered_range', 2013],
+      ['unregistered_within_registered_range', 2014],
+      ['unregistered_within_registered_range', 2015],
+      ['unregistered_within_registered_range', 2016],
+      ['unregistered_within_registered_range', 2017],
+      ['unregistered_within_registered_range', 2018],
+      ['unregistered_within_registered_range', 2019],
+      ['unregistered_within_registered_range', 2020],
+      ['unregistered_within_registered_range', 2021],
+      ['unregistered_within_registered_range', 2024],
+    ]);
+  });
+
+  it('is deterministic: the same input serialises to the same bytes, with no clock in it', () => {
+    const once = serialiseAflApiSeasonDiscoveryProposal(
+      proposeAflApiSeasons({ listing: parseAflApiCompSeasons(withFuture(FUTURE_2027)), registered, source }),
+    );
+    const twice = serialiseAflApiSeasonDiscoveryProposal(
+      proposeAflApiSeasons({ listing: parseAflApiCompSeasons(withFuture(FUTURE_2027)), registered, source }),
+    );
+    expect(twice).toBe(once);
+    expect(once.endsWith('}\n')).toBe(true);
+    expect(once).not.toMatch(/generated|_at"|timestamp/i);
+  });
+
+  it('throws on a malformed envelope rather than reading half of it', () => {
+    expect(() => parseAflApiCompSeasons('{"meta":{}}')).toThrow(/no 'compSeasons' array/);
+    expect(() => parseAflApiCompSeasons('{"compSeasons":[{"id":"85","providerId":"x","name":"y"}]}')).toThrow(/integer id/);
+  });
+
+  describe('the CLI', () => {
+    let dir: string | null = null;
+    afterEach(() => {
+      if (dir !== null) rmSync(dir, { recursive: true, force: true });
+      dir = null;
+    });
+    const noFetch: FetchLike = async () => { throw new Error('network must not be touched'); };
+
+    it('parses exactly one source and requires --output (and --save-raw with --fetch)', () => {
+      expect(parseDiscoverAflApiSeasonsArgs(['--input', 'a.json', '--output', 'p.json']))
+        .toEqual({ source: 'input', input: 'a.json', output: 'p.json' });
+      expect(parseDiscoverAflApiSeasonsArgs(['--fetch', '--save-raw', 'r.json', '--output', 'p.json']))
+        .toEqual({ source: 'fetch', saveRaw: 'r.json', output: 'p.json' });
+      expect(() => parseDiscoverAflApiSeasonsArgs(['--input', 'a.json'])).toThrow(/--output/);
+      expect(() => parseDiscoverAflApiSeasonsArgs(['--output', 'p.json'])).toThrow(/Exactly one/);
+      expect(() => parseDiscoverAflApiSeasonsArgs(['--fetch', '--input', 'a', '--output', 'p'])).toThrow(/Exactly one/);
+      expect(() => parseDiscoverAflApiSeasonsArgs(['--fetch', '--output', 'p.json'])).toThrow(/--save-raw/);
+      expect(() => parseDiscoverAflApiSeasonsArgs(['--input', 'a', '--output', 'p', '--apply'])).toThrow(/Unknown/);
+    });
+
+    it('--input writes the proposal and a summary, touches no network and no reference data', async () => {
+      dir = mkdtempSync(join(tmpdir(), 'afldb-issue233-'));
+      const output = join(dir, 'proposal.json');
+      const identitiesBefore = readFileSync(join(projectRoot, 'data', 'reference', 'afl-api-identities.json'));
+      const lines: string[] = [];
+      const proposal = await runDiscoverAflApiSeasons(
+        ['--input', RAW_PATH, '--output', output],
+        { log: (line) => lines.push(line), fetchImpl: noFetch },
+      );
+      expect(proposal.verdict).toBe('no_change');
+      expect(proposal.input).toEqual(source);
+      expect(readFileSync(output, 'utf8')).toBe(serialiseAflApiSeasonDiscoveryProposal(proposal));
+      expect(lines.join('\n')).toContain('verdict: NO_CHANGE. Nothing was written to data/reference/.');
+      expect(readFileSync(join(projectRoot, 'data', 'reference', 'afl-api-identities.json'))).toEqual(identitiesBefore);
+      // Never overwrites a reviewed proposal.
+      await expect(runDiscoverAflApiSeasons(['--input', RAW_PATH, '--output', output], { log: () => {} }))
+        .rejects.toThrow(/already exists/);
+    });
+
+    it('--fetch refuses before any request when the ingestion switch is off', async () => {
+      dir = mkdtempSync(join(tmpdir(), 'afldb-issue233-'));
+      await expect(runDiscoverAflApiSeasons(
+        ['--fetch', '--save-raw', join(dir, 'raw.json'), '--output', join(dir, 'p.json')],
+        {
+          log: () => {}, fetchImpl: noFetch,
+          ingestionControls: { ...ENABLED_INGESTION_CONTROLS, currentSeasonEnabled: false },
+        },
+      )).rejects.toThrow(/ingestion is disabled/);
+      expect(existsSync(join(dir, 'raw.json'))).toBe(false);
+      expect(existsSync(join(dir, 'p.json'))).toBe(false);
+    });
+
+    it('--fetch retains the raw bytes verbatim and binds the proposal to their sha256', async () => {
+      dir = mkdtempSync(join(tmpdir(), 'afldb-issue233-'));
+      const body = rawText();
+      const fetchImpl: FetchLike = async (url) => {
+        expect(String(url)).toBe('https://aflapi.afl.com.au/afl/v2/competitions/1/compseasons?pageSize=100');
+        return new Response(body, { status: 200, headers: { 'content-type': 'application/json' } });
+      };
+      const rawPath = join(dir, 'seasons', '00-compseasons.raw.json');
+      const proposal = await runDiscoverAflApiSeasons(
+        ['--fetch', '--save-raw', rawPath, '--output', join(dir, 'p.json')],
+        { log: () => {}, fetchImpl, ingestionControls: ENABLED_INGESTION_CONTROLS },
+      );
+      expect(readFileSync(rawPath, 'utf8')).toBe(body);
+      expect(proposal.input.sha256).toBe(RAW_SHA256);
+      expect(proposal.verdict).toBe('no_change');
+    });
   });
 });

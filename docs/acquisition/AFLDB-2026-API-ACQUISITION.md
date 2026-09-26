@@ -1732,7 +1732,9 @@ ISSUE-244 F021) against existing `matches` rows: 0 candidates → `unknown_match
 1 → `fixture_identity_ambiguous` (never guessed). This path is **read-only** by construction —
 it cannot write `matches`, so it can never re-own a foreign-owned row or create a duplicate. It
 is opt-in only (`--use-fixture-identity` on the Brownlow settle CLI) and is **never enabled
-implicitly**. Since I244-F006 the Brownlow CLI measures, from the snapshot's own vote sets and
+implicitly**. The scheduled Brownlow wrapper opts in explicitly since AFLDB-ISSUE-232 D-232-1 = B
+(2026-09-26, the operator-approved reversal of ISSUE-244 §40), and refreshes fixture identity in
+the same run first (`--fixtures-only` acquire + `settle-afl-api-fixtures.ts`, ordering O1). Since I244-F006 the Brownlow CLI measures, from the snapshot's own vote sets and
 before any write, how many have no typed row but resolve through the fallback: `--dry-run` /
 `--apply` refuse (before any write) when that count is non-zero and the flag is absent;
 `--observe-only` logs an advisory; `--validate-only` opens no connection and does not assess it.
@@ -2338,6 +2340,18 @@ investigated) once `CONCLUDED`.
 > above are superseded: both PASSED on 2026-09-23 (record `issues/closed/AFLDB-ISSUE-228.md`
 > §22.16, §22.18). Season discovery and rollover → `AFLDB-ISSUE-233`; optional feeds →
 > `AFLDB-ISSUE-234`; `afl_api` player-link adjudication → `AFLDB-ISSUE-235`.
+>
+> **Update 2026-09-26 (AFLDB-ISSUE-231/232, uncommitted; the bullets above are unchanged
+> history).**
+> - The season-enumeration completeness concept now exists: `afl-api-season-enumeration.ts`,
+>   read from each snapshot's hash-bound `00-season-matches.json`. It is carried as
+>   `AflApiSettleBundle.seasonFeed`.
+> - The match settle's ISSUE-131 retired-identity search is scoped by it, and so is no longer
+>   disabled whenever the feed is proven complete. An incomplete or missing feed still passes the
+>   scope that proves nothing. Brownlow still passes `NO_MATCH_REKEY_SCOPE`.
+> - The `match`-family absence sweep is still not implemented, pending ISSUE-231 D-231-1/D-231-2.
+> - `/admin/current-season` now shows both AFL API units' systemd state and latest batch.
+> - The on-demand trigger for them is still not wired (ISSUE-232 runbook §5).
 
 > **Update 2026-09-23 (AFLDB-ISSUE-235, S7): `afl_api` now has TWO `external_identities`
 > writers.** `tools/migration/import_afl_api_player_bridge.ts` (S5, above; the `.py` loader was

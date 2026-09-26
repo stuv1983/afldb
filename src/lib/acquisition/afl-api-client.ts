@@ -104,6 +104,14 @@ export function planAflApiTokenRequest(
  */
 export const AFL_MENS_COMPETITION_ID = 1;
 
+/**
+ * The page size the season matches request asks for. AFLDB-ISSUE-231 reads it
+ * back: a response that fills the whole page cannot prove it was not cut off,
+ * so the season enumeration (`afl-api-season-enumeration.ts`) never calls one
+ * complete.
+ */
+export const AFL_API_SEASON_PAGE_SIZE = 1000;
+
 /** §7.1 step 2: one season's full match feed, `pageSize=1000` (§2.1: largest observed season is 218 entries). */
 export function planAflApiSeasonMatchesRequest(
   bases: AflApiEndpointBases, compSeasonId: number, env: EnvLike = process.env,
@@ -111,7 +119,20 @@ export function planAflApiSeasonMatchesRequest(
   const url = new URL(`${bases.public}/afl/v2/matches`);
   url.searchParams.set('competitionId', String(AFL_MENS_COMPETITION_ID));
   url.searchParams.set('compSeasonId', String(compSeasonId));
-  url.searchParams.set('pageSize', '1000');
+  url.searchParams.set('pageSize', String(AFL_API_SEASON_PAGE_SIZE));
+  return { url: url.toString(), method: 'GET', headers: { ...ACCEPT_JSON, 'User-Agent': userAgent(env) } };
+}
+
+/**
+ * AFLDB-ISSUE-233: the competition's season list, exactly as the retained
+ * sample requested it (`/afl/v2/competitions/1/compseasons?pageSize=100`,
+ * `tests/fixtures/afl_api/seasons/00-compseasons.raw.json`). Public base, no token.
+ */
+export function planAflApiCompSeasonsRequest(
+  bases: AflApiEndpointBases, env: EnvLike = process.env,
+): AflApiRequestPlan {
+  const url = new URL(`${bases.public}/afl/v2/competitions/${AFL_MENS_COMPETITION_ID}/compseasons`);
+  url.searchParams.set('pageSize', '100');
   return { url: url.toString(), method: 'GET', headers: { ...ACCEPT_JSON, 'User-Agent': userAgent(env) } };
 }
 

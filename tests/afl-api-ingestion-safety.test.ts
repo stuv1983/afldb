@@ -15,6 +15,7 @@ import {
   requireSameAflApiDatabase,
 } from '@/lib/acquisition/afl-api-ingestion-safety';
 import type { CanonicalApplyTargetInput } from '@/lib/acquisition/canonical-apply';
+import { missingAflApiSeasonEnumeration } from '@/lib/acquisition/afl-api-season-enumeration';
 import { POSSIBLE_EXISTING_MATCH } from '@/lib/acquisition/match-rekey';
 import type { JsonValue } from '@/lib/acquisition/observations';
 import { baselineCanonicalHash } from '@/lib/acquisition/promotion-review';
@@ -159,6 +160,9 @@ describe('AFLDB-ISSUE-244 F004 — full rollback counter truth', () => {
       snapshotPlayerMatchRows: 42,
       buildFailures: 3,
       venueProviderUnmapped: 2,
+      seasonFeedMatches: 218,
+      seasonFeedComplete: 1,
+      seasonFeedStatusCounts: { CONCLUDED: 218 },
     };
     Object.assign(counters, {
       payloadsCreated: 1,
@@ -209,6 +213,10 @@ describe('AFLDB-ISSUE-244 F004 — full rollback counter truth', () => {
       snapshotPlayerMatchRows: 42,
       buildFailures: 3,
       venueProviderUnmapped: 2,
+      // AFLDB-ISSUE-231: the season feed is an input fact, retained on a rollback.
+      seasonFeedMatches: 218,
+      seasonFeedComplete: 1,
+      seasonFeedStatusCounts: { CONCLUDED: 218 },
       observationsSeen: 19,
       payloadsReused: 20,
       observationsUnchanged: 21,
@@ -232,6 +240,7 @@ describe('AFLDB-ISSUE-244 F008 — terminal batch field mapping (pure)', () => {
   it('maps a committed run: completed, versions appended -> records_inserted, canonical counters kept in validation_result', () => {
     const counters: AflApiSettleCounters = {
       ...emptySettleCounters(), snapshotMatches: 4, snapshotPlayerMatchRows: 90, buildFailures: 0, venueProviderUnmapped: 0,
+      seasonFeedMatches: 0, seasonFeedComplete: 0, seasonFeedStatusCounts: {},
       observationsSeen: 7, versionsAppended: 5, observationsUnchanged: 2,
       canonicalRowsInserted: 3, canonicalRowsUpdated: 1, canonicalApplicationsLogged: 4,
     };
@@ -251,6 +260,7 @@ describe('AFLDB-ISSUE-244 F008 — terminal batch field mapping (pure)', () => {
     // (one refusal produced a data_issues row, not an import_rejections row).
     const counters: AflApiSettleCounters = {
       ...emptySettleCounters(), snapshotMatches: 1, snapshotPlayerMatchRows: 3, buildFailures: 0, venueProviderUnmapped: 0,
+      seasonFeedMatches: 0, seasonFeedComplete: 0, seasonFeedStatusCounts: {},
       unresolvedIdentityPlayer: 3, versionsAppended: 4,
     };
     expect(settleImportBatchTerminalFields(counters, 2).recordsRejected).toBe(2);
@@ -259,6 +269,7 @@ describe('AFLDB-ISSUE-244 F008 — terminal batch field mapping (pure)', () => {
   it('maps an idempotent replay to a terminal zero-change batch — no false inserts, updates or rejections', () => {
     const counters: AflApiSettleCounters = {
       ...emptySettleCounters(), snapshotMatches: 217, snapshotPlayerMatchRows: 9890, buildFailures: 0, venueProviderUnmapped: 0,
+      seasonFeedMatches: 0, seasonFeedComplete: 0, seasonFeedStatusCounts: {},
       observationsSeen: 434, versionsAppended: 0, observationsUnchanged: 434,
     };
     expect(settleImportBatchTerminalFields(counters, 0)).toMatchObject({
@@ -351,7 +362,10 @@ const SOURCE_FAMILIES = parseSourceFamilyRegistry(
 );
 
 function emptyBundle(buildFailures: AflApiSettleBundle['buildFailures'] = []): AflApiSettleBundle {
-  return { snapshotLabel: 'issue244-f008', season: 2026, bundleContractVersion: 2, units: [], buildFailures };
+  return {
+    snapshotLabel: 'issue244-f008', season: 2026, bundleContractVersion: 2, units: [], buildFailures,
+    seasonFeed: missingAflApiSeasonEnumeration(2026, 'CD_S2026014'),
+  };
 }
 
 describe('AFLDB-ISSUE-244 F008 — finalizeSettleImportBatch()', () => {
@@ -1546,6 +1560,8 @@ describe('AFLDB-ISSUE-244 F029 — the unit-invoked CLIs share one loader', () =
     'tools/current-season/acquire-afl-api.ts',
     'tools/current-season/acquire-afl-api-brownlow.ts',
     'tools/current-season/settle-afltables.ts',
+    // AFLDB-ISSUE-232 O1: now invoked by the systemd Brownlow wrapper.
+    'tools/current-season/settle-afl-api-fixtures.ts',
   ]) {
     it(`${cliPath} imports the shared loader and keeps no private copy`, () => {
       const cli = readSource(cliPath).replace(/\r\n/g, '\n');
@@ -1594,4 +1610,72 @@ describe('AFLDB-ISSUE-244 F029 — the AFL API systemd wrappers set the skip fla
       expect(source).not.toMatch(/^Environment=/m);
     });
   }
+});
+
+describe('AFLDB-ISSUE-232 D-232-1 = B + O1 — the scheduled Brownlow wrapper refreshes fixture identity itself', () => {
+  const shell = readSource('deploy/afldb-settle-afl-api-brownlow.sh').replace(/\r\n/g, '\n');
+  const unit = readSource('deploy/afldb-settle-afl-api-brownlow.service').replace(/\r\n/g, '\n');
+  // Executable lines only: the header comments name every command too.
+  const code = shell.split('\n').filter((line) => !line.trimStart().startsWith('#')).join('\n');
+
+  it('runs fixtures-only acquire -> fixtures settle -> Brownlow acquire -> Brownlow settle, in that order', () => {
+    const steps = [
+      'tools/current-season/acquire-afl-api.ts --season "$season" --fixtures-only',
+      'tools/current-season/settle-afl-api-fixtures.ts',
+      'tools/current-season/acquire-afl-api-brownlow.ts --season "$season"',
+      'tools/current-season/settle-afl-api-brownlow.ts',
+    ].map((needle) => code.indexOf(needle));
+    for (const index of steps) expect(index).toBeGreaterThan(-1);
+    expect([...steps].sort((a, b) => a - b)).toEqual(steps);
+    // Exactly four Node invocations: no fifth step (no revalidation, no match settle).
+    expect(code.match(/"\$NODE" "\$TSX"/g)).toHaveLength(4);
+  });
+
+  it('hands each settle the label ITS OWN acquisition printed, never the other one', () => {
+    expect(code).toContain('fixtures_label=$(printf \'%s\\n\' "$fixtures_output" | sed -n');
+    expect(code).toContain('label=$(printf \'%s\\n\' "$acquire_output" | sed -n');
+    expect(code).toMatch(/settle-afl-api-fixtures\.ts \\\n\s+--label "\$fixtures_label" --apply\n/);
+    expect(code).toMatch(
+      /settle-afl-api-brownlow\.ts \\\n\s+--label "\$label" --apply --auto-apply --use-fixture-identity\n/,
+    );
+    // Each label is checked non-empty before use.
+    expect(code).toContain('if [ -z "$fixtures_label" ]; then');
+    expect(code).toContain('if [ -z "$label" ]; then');
+  });
+
+  it('propagates every failure: set -eu, both acquisitions fail the run, the EXIT trap marks it', () => {
+    expect(code).toMatch(/^set -eu$/m);
+    expect(code).toMatch(/^trap report_failure EXIT$/m);
+    expect(code).toContain('|| { printf \'%s\\n\' "$fixtures_output"; exit 1; }');
+    expect(code).toContain('|| { printf \'%s\\n\' "$acquire_output"; exit 1; }');
+    // The two settles run as plain commands under `set -e`: never masked.
+    expect(code).not.toMatch(/settle-afl-api-(fixtures|brownlow)\.ts[^\n]*(\|\| true|; true)/);
+    // Success is printed only after the last step.
+    // (The monitoring block names the marker earlier; this is the echo.)
+    expect(code.indexOf('echo "AFLDB_SETTLE_SUCCESS')).toBeGreaterThan(code.indexOf('settle-afl-api-brownlow.ts'));
+  });
+
+  it('keeps D-232-3: no automatic revalidation, and the unit still strips the revalidation secret', () => {
+    expect(code).not.toMatch(/AFLDB_REVALIDATE_(URL|SECRET)|revalidateSeason|\/api\/revalidate|curl|wget/);
+    expect(unit).toMatch(/^UnsetEnvironment=.*\bAFLDB_REVALIDATE_SECRET\b/m);
+  });
+
+  it('orders by the wrapper, not systemd: no After=/Requires=/Wants= on the match unit', () => {
+    expect(unit).not.toMatch(/^(After|Requires|Wants|BindsTo)=.*afldb-settle-afl-api\.service/m);
+  });
+
+  it('its ReadWritePaths= covers both subtrees the run writes (fixtures and brownlow)', () => {
+    const grants = [...unit.matchAll(/^ReadWritePaths=(.+)$/gm)].map((match) => match[1].trim());
+    const covers = (path: string) => grants.some((grant) => path === grant || path.startsWith(`${grant}/`));
+    expect(covers('/home/arm/projects/afldb/data/sources/afl_api/fixtures/afl-api-2026-2026-09-26-050000')).toBe(true);
+    expect(covers('/home/arm/projects/afldb/data/sources/afl_api/brownlow/x')).toBe(true);
+    // And nothing wider than the afl_api subtree.
+    expect(covers('/home/arm/projects/afldb/data/sources/afltables/x')).toBe(false);
+  });
+
+  it('the unit still bounds a run below the 5-minute timer period', () => {
+    const timeout = Number(/^TimeoutStartSec=(\d+)$/m.exec(unit)?.[1]);
+    expect(timeout).toBeGreaterThan(0);
+    expect(timeout).toBeLessThan(300);
+  });
 });

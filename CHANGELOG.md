@@ -15,6 +15,74 @@ commit.
 
 ## [Unreleased]
 
+### AFL API season enumeration, enumeration-scoped rekey search, acknowledged absence sweep, scheduled Brownlow fixture identity, season discovery, admin unit status (AFLDB-ISSUE-231, -232, -233; Open) - 26 September 2026
+
+- **Season enumeration (ISSUE-231).** New `src/lib/acquisition/afl-api-season-enumeration.ts`
+  reads the `00-season-matches.json` every AFL API acquisition already retains and hash-binds. It
+  reports:
+  - every provider match id the feed published: the whole feed, never the run's `CONCLUDED`
+    selection;
+  - each provider `status` string verbatim, never mapped;
+  - whether the response is proven complete.
+
+  "Complete" requires all of these: integer `meta.pagination.numEntries` equal to the entries
+  returned; page 0 of 1 and below the 1000-entry page; not empty; one `compSeason`; no duplicate
+  id. The envelope is the one measured from authentic retained bytes
+  (`tests/fixtures/afl_api/seasons/00-season-matches-2026.raw.json`, 218 entries, complete,
+  `CONCLUDED 217, SCHEDULED 1`). The fixture is a sanitised derivative of the captured response:
+  one third-party ticket-queue token value is redacted. ISSUE-228 §2.1's top-level `pagination` was never measured and
+  is refused.
+  - `settle-afl-api.ts` and `settle-afl-api-fixtures.ts` print one line with the feed size, the
+    verdict and the observed statuses.
+  - The match settle persists `seasonFeedMatches`, `seasonFeedComplete` and
+    `seasonFeedStatusCounts` in `import_batches.validation_result`. They are informational: the
+    completeness verdict and `--require-complete-source` are unchanged.
+  - The bundle now refuses, before any connection, an acquired match its own feed does not list.
+- **Rekey search (ISSUE-231).** The `afl_api` match settle scopes the ISSUE-131 retired-identity
+  search with a complete season enumeration instead of `NO_MATCH_REKEY_SCOPE`.
+  - An `afl_api`-owned row whose provider id has left a complete feed can now be found for a
+    reissued id of the same fixture.
+  - Its identity fields stay withheld under ISSUE-244 F010, its provider link is not rewritten,
+    and nothing is re-owned.
+  - An incomplete or missing feed behaves exactly as before.
+  - Brownlow's own resolver is unchanged.
+- **Absence sweep (ISSUE-231, D-231-3 = A).** With a complete season feed, the match settle now
+  sweeps the `afl_api` `match` scope before settling any unit (`afl-api-match-absence.ts`):
+  - A provider id missing from the feed and not yet acknowledged HALTs the whole run, which rolls
+    back in full. The tolerance stays 0 (D-231-1).
+  - After the rollback, `--apply` opens one `afl_api_match_absence` finding per missing id, in its
+    own transaction. It writes nothing else. A repeat detection keeps the first finding.
+  - New `tools/current-season/acknowledge-afl-api-match-absence.ts` stamps `absent_since` and
+    resolves one finding.
+    - It is validate-only by default. `--apply` needs `--acknowledge <database>`.
+    - The finding records the PostgreSQL role as `database_actor`, which is operational
+      attribution, not authenticated human identity. First-detection evidence is kept unchanged.
+    - It works only against a complete, manifest-verified feed that still omits the id.
+    - After that, the next settle proceeds and the rekey search can reach the retired row.
+  - An id listed again clears `absent_since` (D-231-2), selected or not. A still-open finding for
+    it closes `source_reappeared`.
+  - An incomplete or missing feed does none of this.
+- **Scheduled Brownlow chain (ISSUE-232, D-232-1 = B, O1).** `deploy/afldb-settle-afl-api-brownlow.sh`
+  now refreshes fixture identity in the same run (`acquire-afl-api.ts --fixtures-only`, then
+  `settle-afl-api-fixtures.ts --apply`), then acquires and settles Brownlow with
+  `--use-fixture-identity`. This is the operator-approved reversal of ISSUE-244 §40. The chain
+  also needs the AFL API current-season ingestion switch now. There is no automatic
+  revalidation (D-232-3), and no unit was installed or enabled.
+  - `settle-afl-api-fixtures.ts` uses the shared `load-env.ts` (I244-F029). Its private loader
+    would have restored the unit's stripped credentials under systemd.
+- **Season discovery (ISSUE-233, D-233-1).** New `tools/current-season/discover-afl-api-seasons.ts`
+  and `src/lib/acquisition/afl-api-season-discovery.ts` write a deterministic proposal JSON plus
+  a summary from the measured `compseasons` response
+  (`tests/fixtures/afl_api/seasons/00-compseasons.raw.json`). They never edit reference data.
+  A registered season the provider disagrees with is a finding that blocks every proposal.
+- **Admin (ISSUE-232).** `/admin/current-season` shows the AFL API match and Brownlow settle
+  units: each one's systemd state and newest `import_batches` row, read-only
+  (`AflApiSettleUnitsPanel.tsx`).
+- **Validation.** The ISSUE-231 `code_test_db` rollback-only rehearsal
+  (`tools/db/afl-api-season-rekey-rehearsal.ts`, S1–S10) passed 62/62 on 2026-09-26, with residue
+  0 before and after. Everything else is DB-free. The DEV check of the
+  admin page has not been done.
+
 ### AFL API identity bulk pass: identity-bound bridge artefacts, contradiction dedup, adjudication recovery (AFLDB-ISSUE-241, -240, -239; Resolved) - 26 September 2026
 
 - **Why.** A bridge artefact named each linked provider's player by a bare, database-local

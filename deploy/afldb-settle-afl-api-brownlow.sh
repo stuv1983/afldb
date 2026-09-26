@@ -14,16 +14,48 @@
 # scheduled, enabled-by-default TIMER does not report a "failed" unit every
 # few minutes for most of the year; it is not a second, weaker gate.
 #
-# ONE run of the S7 chain, in order, failing closed:
+# ONE run of the chain, in order, failing closed (any non-zero step stops the
+# run; `set -e` plus the EXIT trap below emit AFLDB_SETTLE_FAILURE):
 #
-#   acquire-afl-api-brownlow.ts --season <S>        (network; writes files, manifest LAST)
-#     -> settle-afl-api-brownlow.ts --label <L> --apply
-#        --auto-apply                                (the only step that opens PostgreSQL)
+#   acquire-afl-api.ts --season <S> --fixtures-only (network; season feed only, manifest LAST)
+#     -> settle-afl-api-fixtures.ts --label <F> --apply
+#                                                    (match-family spine observations ONLY)
+#     -> acquire-afl-api-brownlow.ts --season <S>   (network; writes files, manifest LAST)
+#     -> settle-afl-api-brownlow.ts --label <L> --apply --auto-apply
+#        --use-fixture-identity
 #
-# Both steps are Node, like the match/stats chain; acquire-afl-api-brownlow.ts
-# self-cleans its own partial snapshot on failure
-# (`cleanupPartialBrownlowSnapshot()`), so no separate cleanup trap is needed
-# here.
+# AFLDB-ISSUE-232 D-232-1 = B (operator decision, 2026-09-26): the settle
+# passes --use-fixture-identity. This is the OPERATOR-APPROVED REVERSAL of
+# AFLDB-ISSUE-244 §40, which kept this wrapper fail-closed. A vote set whose
+# match is owned by another source (every 2026 match is AFL Tables-owned) has
+# no staging.afl_api_match row and resolves only through the match family's
+# fixture observation: SELECT-only, (season, home, away, exact venue-local
+# date) against EXISTING matches rows; 0 rows -> unknown_match, >1 ->
+# fixture_identity_ambiguous, never guessed, never a match write. A vote set
+# WITH a typed row keeps the provider-id-first path and its
+# provider_identity_contradiction HALT; the flag is not consulted for it.
+#
+# AFLDB-ISSUE-232 ordering O1 (operator decision, 2026-09-26): the fixture
+# observations that fallback reads are refreshed by THIS run, steps 1-2,
+# before the Brownlow acquisition. The chain does not rely on the daily match
+# timer (whose --require-complete-source rolls a whole night back on one
+# incomplete record, and which selects only CONCLUDED matches), nor on
+# systemd After=/Requires= (which cannot make a 5-minute timer wait for a
+# daily one). Step 2's only write is the match family's spine observation plus
+# its own import_batches row: no matches, no staging.afl_api_match, no
+# promotion candidate. It needs no CFS token.
+#
+# Consequence: steps 1-2 are gated by the AFL API current-season ingestion
+# switch (site_settings) as well, so the Brownlow chain now needs BOTH that
+# switch and the Brownlow switches. With the current-season switch off, step
+# 1 refuses and the unit fails visibly; it never falls through to a Brownlow
+# settle without fresh fixture identity.
+#
+# Every step is Node, like the match/stats chain; both acquisition tools
+# self-clean their own partial snapshot on failure (`cleanupPartialSnapshot()`,
+# `cleanupPartialBrownlowSnapshot()`), so no separate cleanup trap is needed
+# here. Revalidation is unchanged (D-232-3): nothing here calls
+# revalidateSeason().
 #
 # BEFORE pointing this at the live AFL endpoint, the S7/S8 implementation must
 # be exercised end to end against the local Brownlow simulator (§10;
@@ -113,8 +145,39 @@ echo "AFLDB afl_api Brownlow settle — season $season"
 
 print_monitoring_block
 
-# --- 1. acquire (network, files only; manifest last) ------------------------
-echo "[1/2] acquire (AFL.com.au bfawards, direct HTTP)"
+# --- 1. acquire the season fixture feed (network, files only; manifest last) --
+# AFLDB-ISSUE-232 O1. --fixtures-only writes the whole season feed
+# (00-season-matches.json) plus one fixture.json per selected match under
+# data/sources/afl_api/fixtures/<label>/, derived from that feed; no CFS token,
+# no playerStats/matchRoster. --status is not passed: it defaults to
+# CONCLUDED, which is every match a Brownlow vote can name.
+echo "[1/4] acquire fixture identity (AFL.com.au season feed, --fixtures-only)"
+fixtures_output=$("$NODE" "$TSX" tools/current-season/acquire-afl-api.ts --season "$season" --fixtures-only 2>&1) \
+  || { printf '%s\n' "$fixtures_output"; exit 1; }
+printf '%s\n' "$fixtures_output"
+
+# Same "..., label <value>" first line as the match/stats chain parses
+# (acquire-afl-api.ts runAcquisition()); the --fixtures-only suffix follows a
+# space, which ends the character class.
+fixtures_label=$(printf '%s\n' "$fixtures_output" | sed -n 's/.*, label \([A-Za-z0-9_-]*\).*/\1/p' | head -n1)
+if [ -z "$fixtures_label" ]; then
+  echo "could not determine the fixtures-only snapshot label from acquire-afl-api.ts output" >&2
+  exit 1
+fi
+echo "fixtures-only label: $fixtures_label"
+
+# --- 2. persist the fixture observations (opens PostgreSQL) ------------------
+# settle-afl-api-fixtures.ts reads data/sources/afl_api/fixtures/<label>/,
+# re-verifies the manifest hashes, and refuses a manifest that is not a
+# --fixtures-only acquisition. A non-zero exit stops the chain here, so the
+# Brownlow settle never runs against fixture identity this run failed to
+# refresh.
+echo "[2/4] settle fixture identity (apply; match-family spine observations only)"
+"$NODE" "$TSX" tools/current-season/settle-afl-api-fixtures.ts \
+  --label "$fixtures_label" --apply
+
+# --- 3. acquire the Brownlow feed (network, files only; manifest last) -------
+echo "[3/4] acquire (AFL.com.au bfawards, direct HTTP)"
 acquire_output=$("$NODE" "$TSX" tools/current-season/acquire-afl-api-brownlow.ts --season "$season" 2>&1) \
   || { printf '%s\n' "$acquire_output"; exit 1; }
 printf '%s\n' "$acquire_output"
@@ -126,14 +189,14 @@ if [ -z "$label" ]; then
 fi
 echo "acquired label: $label"
 
-# --- 2. settle (the only step that opens PostgreSQL) -------------------------
+# --- 4. settle Brownlow ------------------------------------------------------
 # No --require-complete-source here: settle-afl-api-brownlow.ts does not
 # accept that flag (§10 validation is per-vote-set all-or-none, not a
 # season-enumeration completeness gate — see settle-afl-api-brownlow.ts's own
-# KNOWN_FLAGS).
-echo "[2/2] settle (apply, automatic canonical path)"
+# KNOWN_FLAGS). --use-fixture-identity: D-232-1 = B, see the header.
+echo "[4/4] settle (apply, automatic canonical path, fixture identity fallback)"
 "$NODE" "$TSX" tools/current-season/settle-afl-api-brownlow.ts \
-  --label "$label" --apply --auto-apply
+  --label "$label" --apply --auto-apply --use-fixture-identity
 
-echo "AFLDB_SETTLE_SUCCESS label=$label"
-echo "afl_api Brownlow settle chain complete — label $label"
+echo "AFLDB_SETTLE_SUCCESS label=$label fixtures_label=$fixtures_label"
+echo "afl_api Brownlow settle chain complete — label $label (fixture identity $fixtures_label)"

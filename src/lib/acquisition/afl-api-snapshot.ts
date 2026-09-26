@@ -23,6 +23,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { AFL_API_SEASON_FEED_FILE } from './afl-api-season-enumeration';
 import type { AflApiSettleUnitSource } from './settle-afl-api';
 
 export type AflApiManifestFile = { file: string; sha256: string; status?: string };
@@ -98,6 +99,20 @@ export function aflApiUnitSourcesFrom(
     rosterRaw: readJson(join(snapshotDir, dir, 'match-roster.json')),
     playerStatsRaw: readJson(join(snapshotDir, dir, 'player-stats.json')),
   }));
+}
+
+/**
+ * AFLDB-ISSUE-231 — the retained season matches response, as text, when the
+ * manifest lists it. `verifyAflApiSnapshotManifest()` has already re-hashed
+ * every listed file, so these are the acquired bytes. `null` means the
+ * snapshot retained no feed, which the caller reads as "completeness not
+ * proven", never as an empty season.
+ */
+export function aflApiSeasonFeedTextFrom(
+  snapshotDir: string, files: readonly AflApiManifestFile[],
+): string | null {
+  if (!files.some((entry) => entry.file === AFL_API_SEASON_FEED_FILE)) return null;
+  return readFileSync(join(snapshotDir, AFL_API_SEASON_FEED_FILE), 'utf8');
 }
 
 /**

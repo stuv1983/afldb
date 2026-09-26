@@ -3,6 +3,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+
 /**
  * AFLDB-ISSUE-127 — DB-free Server Action and boundary tests for the Super
  * Admin on-demand AFL Tables refresh.
@@ -76,6 +79,10 @@ import {
   setAflApiCurrentSeasonIngestionAction,
   startSettleRunAction,
 } from '@/app/admin/current-season/actions';
+import {
+  AFL_API_SETTLE_UNIT_ROWS,
+  AflApiSettleUnitsPanel,
+} from '@/app/admin/current-season/AflApiSettleUnitsPanel';
 import { SETTING_KEYS } from '@/lib/site-settings';
 import {
   extractSettleCounters,
@@ -487,6 +494,88 @@ describe('AFLDB-ISSUE-228 S8 — settle unit and batch-tool tables', () => {
       afl_api: 'settle-afl-api.ts',
       afl_api_brownlow: 'settle-afl-api-brownlow.ts',
     });
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * AFLDB-ISSUE-232 — the AFL API unit rows on the page
+ * ------------------------------------------------------------------ */
+
+describe('AFLDB-ISSUE-232 — AFL API settle units panel', () => {
+  type PanelProps = Parameters<typeof AflApiSettleUnitsPanel>[0];
+  // RUN above is the minimal shape the Server Action tests need, not a full
+  // SettleRunRecord; the panel reads only the fields it carries.
+  type Units = NonNullable<PanelProps['units']>;
+  const UNREAD = {
+    unit: null,
+    unitError: 'On-demand refresh is not enabled on this host.',
+    latestRun: null,
+    latestRunError: null,
+  };
+  const UNITS = {
+    afltables: { unit: IDLE_UNIT, unitError: null, latestRun: RUN, latestRunError: null },
+    afl_api: {
+      unit: { ...IDLE_UNIT, phase: 'failed' as const, activeState: 'failed', result: 'exit-code' },
+      unitError: null,
+      latestRun: { ...RUN, batchId: '2501', snapshotLabel: 'afl-api-2026-0926T0500Z', counters: null },
+      latestRunError: null,
+    },
+    afl_api_brownlow: UNREAD,
+  } as unknown as Units;
+
+  const render = (props: PanelProps) => renderToStaticMarkup(createElement(AflApiSettleUnitsPanel, props));
+
+  it('shows both AFL API units by their systemd names, and not the AFL Tables row', () => {
+    const html = render({ units: UNITS, error: null });
+    expect(html).toContain('afldb-settle-afl-api.service');
+    expect(html).toContain('afldb-settle-afl-api-brownlow.service');
+    expect(html).not.toContain('afldb-settle-afltables.service');
+    expect(AFL_API_SETTLE_UNIT_ROWS.map((row) => row.key)).toEqual(['afl_api', 'afl_api_brownlow']);
+  });
+
+  it('reports the unit state and the latest batch as two separate facts', () => {
+    const html = render({ units: UNITS, error: null });
+    expect(html).toContain('Last run failed');
+    expect(html).toContain('exit-code');
+    expect(html).toContain('2501');
+    expect(html).toContain('afl-api-2026-0926T0500Z');
+    expect(html).toContain('the batch shown is the previous run');
+  });
+
+  it('passes an unreadable unit through as its own bounded reason and says no batch exists', () => {
+    const html = render({ units: UNITS, error: null });
+    expect(html).toContain('On-demand refresh is not enabled on this host.');
+    expect(html).toContain('No batch recorded yet.');
+  });
+
+  it('shows a failed batch read as an alert rather than as an empty row', () => {
+    const html = render({
+      units: { ...UNITS, afl_api: { ...UNITS.afl_api, latestRun: null, latestRunError: 'permission denied' } },
+      error: null,
+    });
+    expect(html).toContain('role="alert"');
+    expect(html).toContain('permission denied');
+  });
+
+  it('renders the page-level read failure instead of the table', () => {
+    const html = render({ units: null, error: 'systemd unavailable' });
+    expect(html).toContain('systemd unavailable');
+    expect(html).not.toContain('<table');
+  });
+
+  it('is read-only: no client code, no action, no control', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/app/admin/current-season/AflApiSettleUnitsPanel.tsx'), 'utf8',
+    );
+    expect(source).not.toContain("'use client'");
+    expect(source).not.toContain('./actions');
+    expect(source).not.toMatch(/<button|<form|onClick/);
+  });
+
+  it('is read on the page inside its own try, so a failure cannot take the page down', () => {
+    const page = readFileSync(resolve(process.cwd(), 'src/app/admin/current-season/page.tsx'), 'utf8');
+    expect(page).toMatch(/try \{\s*aflApiUnits = await readSettleUnitTableStatus\(\);/);
+    expect(page).toContain('<AflApiSettleUnitsPanel units={aflApiUnits} error={aflApiUnitsError} />');
   });
 });
 

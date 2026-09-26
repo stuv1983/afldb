@@ -17,8 +17,17 @@ WorkingDirectory=/home/arm/projects/afldb
 # unit is a safe no-op outside the live count even while its timer stays
 # permanently enabled.
 #
-#   acquire-afl-api-brownlow.ts --season <S>
-#     -> settle-afl-api-brownlow.ts --label <L> --apply --auto-apply
+#   acquire-afl-api.ts --season <S> --fixtures-only
+#     -> settle-afl-api-fixtures.ts --label <F> --apply
+#     -> acquire-afl-api-brownlow.ts --season <S>
+#     -> settle-afl-api-brownlow.ts --label <L> --apply --auto-apply --use-fixture-identity
+#
+# AFLDB-ISSUE-232 (operator decisions 2026-09-26): D-232-1 = B adds
+# --use-fixture-identity, reversing AFLDB-ISSUE-244 §40; O1 refreshes fixture
+# identity inside this run (steps 1-2) instead of relying on the match timer.
+# No After=/Requires= on afldb-settle-afl-api.service is added: ordering is
+# the wrapper's, and systemd cannot make this 5-minute timer wait for a daily
+# one. Steps 1-2 also need the AFL API current-season ingestion switch.
 #
 # Do NOT point this at the live AFL endpoint before it has been exercised
 # end-to-end against the local Brownlow simulator in both --observe-only and
@@ -46,9 +55,13 @@ StandardError=journal
 SyslogIdentifier=afldb-settle-afl-api-brownlow
 
 # --- Hardening -------------------------------------------------------
-# Modelled on afldb-settle-afl-api.service. Brownlow snapshots live under
-# their own subtree, separate from the match/stats snapshots, so this unit's
-# write grant does not overlap that unit's.
+# Modelled on afldb-settle-afl-api.service. The grant is the whole
+# data/sources/afl_api subtree, the same grant as that unit: this run writes
+# data/sources/afl_api/fixtures/<label>/ (steps 1-2, AFLDB-ISSUE-232 O1) and
+# data/sources/afl_api/brownlow/<label>/ (steps 3-4). Both sit under the one
+# path below, so O1 needs no second ReadWritePaths= line, and a narrower
+# per-subtree grant would make the unit fail to start until each directory
+# existed.
 NoNewPrivileges=true
 PrivateTmp=true
 PrivateDevices=true

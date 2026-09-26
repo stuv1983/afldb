@@ -45,3 +45,11 @@ docs/rebuild-manifests/draftguru/issue224-population-classification-20260919.jso
 # checkout rules, or every quoted hash becomes platform-dependent.
 docs/rebuild-manifests/draftguru/issue224-s9-target-set-20260922.json -text -diff !eol
 docs/rebuild-manifests/draftguru/issue224-d7-registration-decision-20260922.json -text -diff !eol
+
+# AFLDB-ISSUE-229 / 231 / 233 — authentic AFL API response bytes copied verbatim from the
+# 2026-09-19 captures, each pinned by sha256 in its issue record and asserted by
+# tests/afl-api-match.test.ts. Never converted, never diffed as text. Exception:
+# 00-season-matches-2026.raw.json is a sanitised derivative (one third-party ticket-queue token
+# value redacted); both hashes are in the ISSUE-231 runbook §2a.
+tests/fixtures/afl_api/seasons/*.raw.json -text -diff !eol
+tests/fixtures/afl_api/match/04-season-feed-scheduled.raw-slice.json -text -diff !eol

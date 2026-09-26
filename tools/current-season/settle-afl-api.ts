@@ -29,7 +29,13 @@ import { proveAflApiIngestionPreflight } from '../../src/lib/acquisition/afl-api
 import {
   parseAflApiIdentities, type AflApiIdentities,
 } from '../../src/lib/acquisition/afl-api-bundle';
+import { AFL_API_MATCH_ABSENCE_ISSUE_TYPE } from '../../src/lib/acquisition/afl-api-match-absence';
 import {
+  assessAflApiSeasonEnumeration,
+  describeAflApiSeasonEnumeration,
+} from '../../src/lib/acquisition/afl-api-season-enumeration';
+import {
+  aflApiSeasonFeedTextFrom,
   aflApiSnapshotRoot,
   aflApiUnitSourcesFrom,
   verifyAflApiSnapshotManifest,
@@ -134,7 +140,18 @@ function loadBundle(
     : [];
 
   const sources = aflApiUnitSourcesFrom(snapshotDir, files);
-  const bundle = buildAflApiSettleBundle({ season, snapshotLabel: label, sources, registry, identities });
+  // AFLDB-ISSUE-231: the whole retained feed, assessed. A snapshot without one
+  // gets the builder's incomplete default, which authorises nothing.
+  const seasonFeedText = aflApiSeasonFeedTextFrom(snapshotDir, files);
+  const seasonIdentity = identities.seasons.get(season);
+  const seasonFeed = seasonFeedText === null || seasonIdentity === undefined
+    ? undefined
+    : assessAflApiSeasonEnumeration(seasonFeedText, {
+      season, compSeasonProviderId: seasonIdentity.providerId,
+    });
+  const bundle = buildAflApiSettleBundle({
+    season, snapshotLabel: label, sources, registry, identities, seasonFeed,
+  });
   return { bundle, inProgressSeasons };
 }
 
@@ -154,6 +171,9 @@ function counterLines(counters: AflApiSettleCounters): string[] {
     }
   };
   group('Snapshot', ['snapshotMatches', 'snapshotPlayerMatchRows', 'buildFailures']);
+  group('Season feed (AFLDB-ISSUE-231 — informational, never a failure)', [
+    'seasonFeedMatches', 'seasonFeedComplete', 'seasonFeedStatusCounts',
+  ]);
   group('Observation', [
     'observationsSeen', 'payloadsCreated', 'versionsAppended', 'observationsUnchanged',
   ]);
@@ -214,6 +234,8 @@ export async function runAflApiSettleCli(
   for (const failure of bundle.buildFailures) {
     log(`  BUILD FAILURE ${failure.providerMatchId ?? '(unknown match)'}: ${failure.error}`);
   }
+  log(describeAflApiSeasonEnumeration(bundle.seasonFeed));
+  for (const gap of bundle.seasonFeed.gaps) log(`  SEASON FEED ${gap.reason}: ${gap.detail}`);
 
   if (args.validateOnly) {
     log('');
@@ -273,6 +295,22 @@ export async function runAflApiSettleCli(
       log('');
       log(`HALT: ${result.halt.reason} — ${JSON.stringify(result.halt.detail)}`);
       log('The whole run was rolled back, including the import_batches row. Nothing was written.');
+      if (result.absenceFindings !== null) {
+        // AFLDB-ISSUE-231 D-231-3: the one write that outlives an absence HALT.
+        const { opened, alreadyOpen, notRecorded } = result.absenceFindings;
+        log(
+          `Absence findings (${AFL_API_MATCH_ABSENCE_ISSUE_TYPE}, separate transaction): `
+          + `${opened.length} opened, ${alreadyOpen.length} already open (first detection kept), `
+          + `${notRecorded.length} not recorded (spine row moved).`,
+        );
+        for (const id of opened) log(`  OPENED ${id}`);
+        for (const id of alreadyOpen) log(`  STILL OPEN ${id}`);
+        for (const id of notRecorded) log(`  NOT RECORDED ${id}`);
+        log(
+          'The season stays halted until each disappearance is acknowledged with '
+          + 'tools/current-season/acknowledge-afl-api-match-absence.ts, or the provider lists the id again.',
+        );
+      }
       return { args, result, report: null, sourceCompleteness: null };
     }
 

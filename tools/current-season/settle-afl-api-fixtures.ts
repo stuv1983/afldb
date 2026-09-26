@@ -35,6 +35,11 @@ import {
 } from '../../src/lib/acquisition/afl-api-fixture-identity';
 import { resolveAflApiSourceId } from '../../src/lib/acquisition/afl-api-match-identity';
 import {
+  assessAflApiSeasonEnumeration,
+  describeAflApiSeasonEnumeration,
+} from '../../src/lib/acquisition/afl-api-season-enumeration';
+import { aflApiSeasonFeedTextFrom } from '../../src/lib/acquisition/afl-api-snapshot';
+import {
   readAflApiIngestionControls,
   type AflApiIngestionControls,
 } from '../../src/lib/acquisition/afl-api-ingestion-control';
@@ -42,6 +47,11 @@ import { asImportBatchId } from '../../src/lib/import-batch-id';
 import { finalizeSettleImportBatch } from '../../src/lib/acquisition/settle-core';
 import { parseSourceFamilyRegistry, type SourceFamilyRegistry } from '../../src/lib/acquisition/source-families';
 import { SETTING_KEYS } from '../../src/lib/site-settings';
+// I244-F029 / AFLDB-ISSUE-232: the shared loader, which honours
+// AFLDB_SKIP_DOTENV. This CLI now runs inside the systemd Brownlow wrapper
+// (the O1 fixture-identity refresh), so its old private loader would have
+// read the unit's `UnsetEnvironment=` credentials straight back in.
+import { loadEnv } from './load-env';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PROJECT_ROOT = join(__dirname, '..', '..');
@@ -56,22 +66,6 @@ export type AflApiFixturesSettleCliArgs = {
   dryRun: boolean;
   validateOnly: boolean;
 };
-
-function loadEnv(projectRoot: string): void {
-  let contents: string;
-  try {
-    contents = readFileSync(join(projectRoot, '.env'), 'utf8');
-  } catch {
-    return;
-  }
-  for (const line of contents.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#') || !trimmed.includes('=')) continue;
-    const [key, ...rest] = trimmed.split('=');
-    const name = key.trim();
-    if (!process.env[name]) process.env[name] = rest.join('=').trim();
-  }
-}
 
 function valueFor(argv: readonly string[], flag: string): string | null {
   const index = argv.indexOf(flag);
@@ -222,6 +216,17 @@ export async function runAflApiFixturesSettleCli(
   );
   for (const failure of buildFailures) {
     log(`  BUILD FAILURE ${failure.providerMatchId ?? '(unknown match)'}: ${failure.error}`);
+  }
+  // AFLDB-ISSUE-231 / 229: report the whole retained feed and the status
+  // strings it carried, verbatim. Informational only; nothing here gates.
+  const seasonFeedText = aflApiSeasonFeedTextFrom(snapshotDir, files);
+  const seasonIdentity = identities.seasons.get(season);
+  if (seasonFeedText !== null && seasonIdentity !== undefined) {
+    const seasonFeed = assessAflApiSeasonEnumeration(seasonFeedText, {
+      season, compSeasonProviderId: seasonIdentity.providerId,
+    });
+    log(describeAflApiSeasonEnumeration(seasonFeed));
+    for (const gap of seasonFeed.gaps) log(`  SEASON FEED ${gap.reason}: ${gap.detail}`);
   }
 
   if (args.validateOnly) {

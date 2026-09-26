@@ -22,13 +22,17 @@
  *     than sitting behind it. `reconcile()` never imports `areCoSources`, so
  *     routing a foreign-owned-by-co-source match through it would
  *     reintroduce exactly the veto §7.5 (Q1) exists to remove.
- *   - It does not implement the AFLDB-ISSUE-131 retired-identity SEARCH scope
- *     for afl_api (`MatchRekeyScope`): every call passes
- *     `NO_MATCH_REKEY_SCOPE`, so step 3 of §6.1 ("the retired-identity
- *     search") never finds a candidate. Steps 1 (provider id) and 2
- *     (`match_key`) are unaffected; only the narrow case of an `afl_api` row
- *     whose OWN provider id was never linked and whose natural key has since
- *     been retired is out of scope for this milestone.
+ *   - AFLDB-ISSUE-231: the AFLDB-ISSUE-131 retired-identity SEARCH (§6.1
+ *     step 3) is scoped by the bundle's season enumeration
+ *     (`afl-api-season-enumeration.ts`), never by the run's selection. Only a
+ *     PROVEN-complete season feed names a scope, and its published ids are
+ *     the whole feed, so a match this run did not select is never read as
+ *     retired. An incomplete or missing feed passes the scope that proves
+ *     nothing, which is the pre-ISSUE-231 `NO_MATCH_REKEY_SCOPE` behaviour. A
+ *     retired-identity hit is then handled by rules already in force: an
+ *     identity-bearing difference is withheld into the F010 finding, the
+ *     provider link (`matches.source_record_id`) is never rewritten, and
+ *     nothing is re-owned.
  *   - It never INSERTs a `matches` row for a fixture some canonical row of ANY
  *     owner may already be (AFLDB-ISSUE-244 I244-F030): an unresolved provider
  *     record whose season and oriented clubs match a canonical row that differs
@@ -36,7 +40,14 @@
  *     planner AND again inside the applier's savepoint. Nothing is linked,
  *     rekeyed or re-owned; a human decides. "Unresolved" here means no supported
  *     identity resolution succeeded, not that no canonical fixture exists.
- *   - It does not implement an absence sweep for `afl_api` records.
+ *   - It never stamps an `afl_api` record absent itself (AFLDB-ISSUE-231
+ *     D-231-3, `afl-api-match-absence.ts`). With a PROVEN-complete season
+ *     feed it sweeps the `match` family's scope first: any unacknowledged
+ *     disappearance (D-231-1 tolerance 0) HALTs the whole run, which rolls
+ *     back in full, and only then is one durable `afl_api_match_absence`
+ *     finding per missing id opened in a separate transaction. Only the
+ *     acknowledgement CLI stamps `absent_since`. Reappearance (D-231-2) clears
+ *     the stamp and closes an unacknowledged finding inside the run.
  *   - Promotion candidates are drafted with a direct INSERT rather than
  *     through `draftCandidate()`, which requires a full `ReconciliationOutcome`
  *     this module never constructs (see above). The row shape and the
@@ -97,10 +108,22 @@ import {
 import { asImportBatchId, type ImportBatchId } from '../import-batch-id';
 import { loadManualAuthority } from './manual-authority';
 import {
-  NO_MATCH_REKEY_SCOPE,
   POSSIBLE_EXISTING_MATCH,
+  type MatchRekeyScope,
   type PlausibleCanonicalFixture,
 } from './match-rekey';
+import {
+  AFL_API_MATCH_ABSENCE_HALT_REASON,
+  recordAflApiMatchAbsenceFindings,
+  sweepAflApiMatchAbsence,
+  type AflApiMatchAbsenceDetection,
+  type AflApiMatchAbsenceFindingsOutcome,
+} from './afl-api-match-absence';
+import {
+  aflApiMatchRekeyScope,
+  missingAflApiSeasonEnumeration,
+  type AflApiSeasonEnumeration,
+} from './afl-api-season-enumeration';
 import { canonicalJson, type JsonValue } from './observations';
 import { persistSourceObservation } from './observation-store';
 import { baselineCanonicalHash } from './promotion-review';
@@ -187,6 +210,9 @@ export type AflApiSettleBundle = {
    * violation caught DB-free, before any connection opens. Never silently
    * dropped: counted and reported by the CLI. */
   buildFailures: readonly AflApiBuildFailure[];
+  /** AFLDB-ISSUE-231: the whole season feed this snapshot retained, and
+   * whether it is proven complete. Incomplete when the caller supplied none. */
+  seasonFeed: AflApiSeasonEnumeration;
 };
 
 function providerIdOf(fixtureRaw: unknown): string | null {
@@ -207,7 +233,17 @@ export function buildAflApiSettleBundle(input: {
   sources: readonly AflApiSettleUnitSource[];
   registry: SourceFamilyRegistry;
   identities: AflApiIdentities;
+  /** AFLDB-ISSUE-231: the snapshot's own `00-season-matches.json`, assessed. Omitted = no feed retained. */
+  seasonFeed?: AflApiSeasonEnumeration;
 }): AflApiSettleBundle {
+  const seasonFeed = input.seasonFeed ?? missingAflApiSeasonEnumeration(
+    input.season, input.identities.seasons.get(input.season)?.providerId ?? 'undeclared',
+  );
+  if (seasonFeed.season !== input.season) {
+    throw new Error(
+      `The season feed describes season ${seasonFeed.season} but the snapshot is season ${input.season}.`,
+    );
+  }
   const units: AflApiSettleUnit[] = [];
   const buildFailures: AflApiBuildFailure[] = [];
   for (const source of input.sources) {
@@ -226,12 +262,27 @@ export function buildAflApiSettleBundle(input: {
       });
     }
   }
+  // Every acquired match was selected FROM the feed, so a unit the feed does
+  // not list means the snapshot contradicts itself. Refused before any
+  // connection opens, as AFL Tables refuses a record its enumeration omits.
+  if (input.seasonFeed !== undefined) {
+    const listed = new Set(seasonFeed.providerMatchIds);
+    for (const unit of units) {
+      if (!listed.has(unit.bundle.match.sourceRecordId)) {
+        throw new Error(
+          `Match '${unit.bundle.match.sourceRecordId}' was acquired but is not listed in the snapshot's `
+          + 'own season feed. Presence is enumerated from the feed, so every acquired match must appear in it.',
+        );
+      }
+    }
+  }
   return {
     snapshotLabel: input.snapshotLabel,
     season: input.season,
     bundleContractVersion: AFL_API_BUNDLE_CONTRACT_VERSION,
     units,
     buildFailures,
+    seasonFeed,
   };
 }
 
@@ -250,12 +301,21 @@ export type AflApiSettleCounters = SettleCounters & {
    * distinguishes "AFLDB has never heard of this venue" from "AFLDB knows
    * the venue but its `venues` row is missing/misspelled". */
   venueProviderUnmapped: number;
+  /** AFLDB-ISSUE-231: matches the retained season feed published (the whole
+   * feed, not the run's selection). Informational: it never moves the
+   * completeness verdict. */
+  seasonFeedMatches: number;
+  /** 1 when that feed was proven complete, so the retired-identity search ran
+   * with a scope; 0 when it did not and the search proved nothing. */
+  seasonFeedComplete: number;
+  /** AFLDB-ISSUE-229 evidence: each provider `status` string verbatim, with its count. */
+  seasonFeedStatusCounts: Record<string, number>;
 };
 
 function emptyAflApiCounters(): AflApiSettleCounters {
   return {
     ...emptySettleCounters(), snapshotMatches: 0, snapshotPlayerMatchRows: 0, buildFailures: 0,
-    venueProviderUnmapped: 0,
+    venueProviderUnmapped: 0, seasonFeedMatches: 0, seasonFeedComplete: 0, seasonFeedStatusCounts: {},
   };
 }
 
@@ -270,6 +330,24 @@ export class AflApiSettleHalt extends Error {
   ) {
     super(`AFL API settle HALT: ${reason} — ${JSON.stringify(detail)}`);
     this.name = 'AflApiSettleHalt';
+  }
+}
+
+/**
+ * AFLDB-ISSUE-231 D-231-3: the one HALT whose refusal must outlive the
+ * rollback. It carries what the sweep observed so `runSettleAflApi()` can open
+ * the durable findings AFTER the settle transaction has rolled back.
+ */
+export class AflApiMatchAbsenceHalt extends AflApiSettleHalt {
+  constructor(public readonly detection: AflApiMatchAbsenceDetection) {
+    super(AFL_API_MATCH_ABSENCE_HALT_REASON, {
+      scopeKey: detection.scopeKey,
+      newlyAbsent: detection.plan.newlyAbsent,
+      stillAbsent: detection.plan.stillAbsent,
+      tolerance: 0,
+      snapshotLabel: detection.snapshotLabel,
+    });
+    this.name = 'AflApiMatchAbsenceHalt';
   }
 }
 
@@ -308,6 +386,12 @@ export type AflApiSettleRunResult = {
   rollbackReason: 'dry_run' | 'require_complete_source' | null;
   /** The verdict evaluated inside the transaction when completeness was required. */
   sourceCompleteness: SourceCompletenessVerdict | null;
+  /**
+   * AFLDB-ISSUE-231 D-231-3: non-null exactly when an `--apply` run HALTed on
+   * an unacknowledged absence. The findings were written in their own
+   * transaction after the settle rolled back; nothing else survived.
+   */
+  absenceFindings: AflApiMatchAbsenceFindingsOutcome | null;
 };
 
 /* ------------------------------------------------------------------ *
@@ -1071,7 +1155,7 @@ async function settleMatchUnit(
   tx: Tx, refs: AflApiRefs, registry: SourceFamilyRegistry, batchId: ImportBatchId,
   observedAt: string, autoApply: boolean, inProgressSeasons: readonly number[],
   unit: AflApiSettleUnit, counters: AflApiSettleCounters, derived: DerivedScope,
-  ownedMatchKeys: string[],
+  ownedMatchKeys: string[], rekeyScope: MatchRekeyScope,
 ): Promise<void> {
   const { bundle, settleRecords } = unit;
   counters.snapshotMatches += 1;
@@ -1134,9 +1218,10 @@ async function settleMatchUnit(
   if (rosterRecord.deferral) recordDeferral(counters, rosterRecord.deferral.reason);
 
   // 3. Plan — identity, ownership, corroboration (S6-D, afl-api-settle-plan.ts).
+  //    AFLDB-ISSUE-231: the retirement proof is the run's season enumeration.
   const plan = await planAflApiMatchUnit(
     tx, registry, refs.sourceId, bundle, settleRecords,
-    { kind: 'run_enumeration', scope: NO_MATCH_REKEY_SCOPE },
+    { kind: 'run_enumeration', scope: rekeyScope },
   );
 
   if (plan.match.status === 'halt') {
@@ -1711,12 +1796,17 @@ export async function runSettleAflApi(
   const observedAt = options.observedAt ?? new Date().toISOString();
   const counters = emptyAflApiCounters();
   counters.buildFailures = bundle.buildFailures.length;
+  counters.seasonFeedMatches = bundle.seasonFeed.providerMatchIds.length;
+  counters.seasonFeedComplete = bundle.seasonFeed.complete ? 1 : 0;
+  counters.seasonFeedStatusCounts = { ...bundle.seasonFeed.statusCounts };
+  const rekeyScope = aflApiMatchRekeyScope(bundle.seasonFeed);
 
   let batchIdText: string | null = null;
   let applied = false;
   let halt: { reason: string; detail: Readonly<Record<string, unknown>> } | null = null;
   let rollbackReason: AflApiSettleRunResult['rollbackReason'] = null;
   let sourceCompleteness: SourceCompletenessVerdict | null = null;
+  let absenceFindings: AflApiMatchAbsenceFindingsOutcome | null = null;
 
   try {
     await sql.begin(async (tx) => {
@@ -1734,10 +1824,21 @@ export async function runSettleAflApi(
       const derived: DerivedScope = emptyDerivedScope();
       const ownedMatchKeys: string[] = [];
 
+      // AFLDB-ISSUE-231 D-231-3: before any unit. A HALT here writes nothing;
+      // the catch below records the durable finding after the rollback.
+      const absence = await sweepAflApiMatchAbsence(tx, {
+        sourceId: refs.sourceId, enumeration: bundle.seasonFeed, snapshotLabel: bundle.snapshotLabel, observedAt,
+      });
+      if (absence.kind === 'halt') throw new AflApiMatchAbsenceHalt(absence.detection);
+      if (absence.kind === 'swept') {
+        counters.observationsReappeared += absence.cleared;
+        counters.dataIssuesResolved += absence.findingsResolved;
+      }
+
       for (const unit of bundle.units) {
         await settleMatchUnit(
           tx, refs, options.registry, runBatchId, observedAt, options.autoApply, options.inProgressSeasons,
-          unit, counters, derived, ownedMatchKeys,
+          unit, counters, derived, ownedMatchKeys, rekeyScope,
         );
       }
 
@@ -1817,6 +1918,12 @@ export async function runSettleAflApi(
       halt = { reason: error.reason, detail: error.detail };
       batchIdText = null;
       applied = false;
+      // The settle transaction has rolled back by now. Only this HALT, and only
+      // on --apply, writes anything afterwards: the absence findings, in their
+      // own transaction. A dry run records nothing.
+      if (error instanceof AflApiMatchAbsenceHalt && options.apply) {
+        absenceFindings = await recordAflApiMatchAbsenceFindings(sql, error.detection);
+      }
     } else {
       throw error;
     }
@@ -1824,6 +1931,7 @@ export async function runSettleAflApi(
 
   return {
     applied, batchId: applied ? batchIdText : null, counters, halt, rollbackReason, sourceCompleteness,
+    absenceFindings,
   };
 }
 

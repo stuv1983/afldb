@@ -422,16 +422,18 @@ different serialisations. It runs them through the production emitters with no e
   `afldb_test`.
 - **Not yet enabled (AFLDB-ISSUE-232).** The systemd units (`deploy/afldb-settle-afl-api.*`,
   `deploy/afldb-settle-afl-api-brownlow.*`) ship but are not installed or enabled on any host.
-  The admin current-season panel does not yet show the AFL API units' last run.
-  - The Brownlow chain script does not pass `--use-fixture-identity`. This is deliberately
-    fail-closed: for a season whose matches are AFL Tables-owned, it refuses, safely, before writing.
-    Whether the scheduled chain should supply the flag is an open operator decision under
-    AFLDB-ISSUE-232. The match-data chain must also run before the Brownlow settle.
+  The admin current-season page shows each AFL API unit's systemd state and latest batch.
+  - The Brownlow chain script (`deploy/afldb-settle-afl-api-brownlow.sh`) runs a fixtures-only
+    acquire and fixtures settle itself, then the Brownlow acquire and settle. It passes
+    `--use-fixture-identity` explicitly (AFLDB-ISSUE-232 D-232-1 = B, ordering O1), so AFL Tables-owned
+    matches resolve through the fixture identity it has just refreshed. The CLI alone never
+    enables that flag.
   - The completed-count path is currently run by an operator.
 - **Tracked successors.**
   - AFLDB-ISSUE-229: fixture ingestion.
-  - AFLDB-ISSUE-231: the retired-identity rekey search for `afl_api` and the match-family absence
-    sweep. Both are hardening; today's code fails safely without them.
+  - AFLDB-ISSUE-231: the match-family absence sweep. The settle now checks the retained season
+    feed for completeness and scopes the retired-identity rekey search by it; an incomplete feed
+    authorises neither.
   - AFLDB-ISSUE-233: season discovery and the season-rollover runbook changes.
   - AFLDB-ISSUE-234: optional extra feeds (extended statistics, umpires, play-by-play).
   - AFLDB-ISSUE-235: `afl_api` player-link adjudication in `/admin/player-links`.
