@@ -16,6 +16,23 @@
  *         --plan-dir <dir>                                  (no database contact)
  *     npm run db:promotion:check -- --checklist             (no database contact)
  *
+ * AFLDB-ISSUE-250 — the promotion freeze (docs/production-promotion.md §4.0; required under prod):
+ *
+ *     npm run db:promotion:check -- --freeze-plan --database afldb_prod --freeze-dir <dir>
+ *     npm run db:promotion:check -- --phase frozen --database afldb_prod \
+ *         --freeze-manifest <dir>/promotion-freeze.json --freeze-record-out <record>
+ *     npm run db:promotion:check -- --phase freeze-dump --database afldb_restore_test \
+ *         --freeze-record <record> --pre-cutover-dump <file> --freeze-dump-proof-out <proof>
+ *     ... then --freeze-record <record> on pre-cutover, restored, candidate and production
+ *     (production also --old-database afldb_prod_pre_rebuild_<stamp>), and --freeze-record +
+ *     --freeze-dump-proof on --plan.
+ *     npm run db:promotion:check -- --freeze-status          (reads the postgres database)
+ *     npm run db:promotion:check -- --unfreeze-recovery --database afldb_prod \
+ *         --freeze-token <token> --freeze-dir <dir>          (no database contact)
+ *
+ * The freeze SQL itself is generated here and run by the operator as postgres; this checker
+ * never executes it.
+ *
  * Every form above is the PRODUCTION contract, which is the default. AFLDB-ISSUE-141 adds an
  * explicit `--environment prod|dev`, so the same supported path can converge `afldb_dev`
  * (AFLDB-ISSUE-139) instead of hand-written per-table dump/restore:
@@ -187,6 +204,37 @@ import {
   type PromotionPlayersReplayPlan,
   type Snapshot,
 } from './promotion-inventory';
+import {
+  FREEZE_CONNECT_ROLES_SQL,
+  FREEZE_DATABASE_STATE_SQL,
+  FREEZE_PREPARED_XACTS_SQL,
+  FREEZE_SESSIONS_SQL,
+  FREEZE_STATUS_SQL,
+  buildFreezeDumpProof,
+  buildFreezeRecord,
+  describeFreezeStatus,
+  freezeSql,
+  freezeTerminateSql,
+  frozenRollbackSql,
+  frozenSwapSql,
+  isFreezeMarkerComment,
+  judgeFreezeDigest,
+  judgeFreezeState,
+  newFreezeManifest,
+  parseFreezeDumpProof,
+  parseFreezeManifest,
+  parseFreezeRecord,
+  parseRestoreTestComment,
+  readFreezeDigest,
+  recoveryManifest,
+  sha256File,
+  unfreezeSql,
+  type FreezeBinding,
+  type FreezeDatabaseState,
+  type FreezeObservation,
+  type FreezeRecord,
+  type FreezeSession,
+} from './promotion-freeze';
 
 const PROJECT_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const MIGRATIONS_DIR = join(PROJECT_ROOT, 'src', 'db', 'migrations');
@@ -260,12 +308,36 @@ export type Options = {
   aflApiRegenerationSeason?: number;
   aflApiRegenerationReason?: string;
   aflApiRegenerationPlan?: string;
+  /**
+   * AFLDB-ISSUE-250 — the promotion freeze. `--freeze-plan` writes the freeze/terminate/release
+   * SQL and the token manifest into `--freeze-dir` (no database contact); `--phase frozen`
+   * proves the freeze from `--freeze-manifest` and writes `--freeze-record-out`; `--phase
+   * freeze-dump` proves the restored dump against `--freeze-record` and writes
+   * `--freeze-dump-proof-out`; `--freeze-record` is REQUIRED under `prod` for pre-cutover,
+   * restored, candidate, production and `--plan` (which also needs `--freeze-dump-proof`).
+   * `--freeze-status` reports every database's freeze state; `--unfreeze-recovery` rebuilds a
+   * token-bound release from `--freeze-token`.
+   */
+  freezePlan?: boolean;
+  freezeStatus?: boolean;
+  unfreezeRecovery?: boolean;
+  freezeDir?: string;
+  freezeToken?: string;
+  freezeManifest?: string;
+  freezeRecord?: string;
+  freezeRecordOut?: string;
+  freezeDumpProof?: string;
+  freezeDumpProofOut?: string;
 };
+
+/** AFLDB-ISSUE-250: the phases that read or replace the live target under a production freeze. */
+export const FREEZE_BOUND_PHASES: readonly Phase[] = ['pre-cutover', 'restored', 'candidate', 'production'];
 
 export function parseArgs(argv: readonly string[]): Options {
   const out: Options = {
     environment: DEFAULT_ENVIRONMENT, dsnEnv: DEFAULT_DSN_ENV,
     plan: false, checklist: false, allowFixtureIdentities: false,
+    freezePlan: false, freezeStatus: false, unfreezeRecovery: false,
   };
   const need = (i: number, flag: string): string => {
     const value = argv[i + 1];
@@ -329,6 +401,20 @@ export function parseArgs(argv: readonly string[]): Options {
       case '--pre-cutover-dump': out.preCutoverDump = need(i, arg); i += 1; break;
       case '--rebuilt-dump': out.rebuiltDump = need(i, arg); i += 1; break;
       case '--checklist': out.checklist = true; break;
+      case '--freeze-plan': out.freezePlan = true; break;
+      case '--freeze-status': out.freezeStatus = true; break;
+      case '--unfreeze-recovery': out.unfreezeRecovery = true; break;
+      case '--freeze-dir': out.freezeDir = need(i, arg); i += 1; break;
+      case '--freeze-token': {
+        const value = need(i, arg);
+        if (!/^[0-9a-f]{32}$/.test(value)) throw new PromotionRefused('--freeze-token needs the 32-character lowercase hex token.');
+        out.freezeToken = value; i += 1; break;
+      }
+      case '--freeze-manifest': out.freezeManifest = need(i, arg); i += 1; break;
+      case '--freeze-record': out.freezeRecord = need(i, arg); i += 1; break;
+      case '--freeze-record-out': out.freezeRecordOut = need(i, arg); i += 1; break;
+      case '--freeze-dump-proof': out.freezeDumpProof = need(i, arg); i += 1; break;
+      case '--freeze-dump-proof-out': out.freezeDumpProofOut = need(i, arg); i += 1; break;
       default:
         throw new PromotionRefused(`Unknown argument: ${arg}`);
     }
@@ -358,9 +444,46 @@ export function parseArgs(argv: readonly string[]): Options {
 
   if (out.checklist) return out;
 
+  // AFLDB-ISSUE-250: the freeze modes are standalone, and their flags are never silently ignored.
+  const freezeModes = [out.freezePlan, out.freezeStatus, out.unfreezeRecovery].filter(Boolean).length;
+  if (freezeModes > 1 || (freezeModes === 1 && (out.plan || out.phase))) {
+    throw new PromotionRefused('Choose exactly one of --plan, --phase, --freeze-plan, --freeze-status and --unfreeze-recovery.');
+  }
+  if (out.freezeDir && !out.freezePlan && !out.unfreezeRecovery) {
+    throw new PromotionRefused('--freeze-dir is only meaningful with --freeze-plan or --unfreeze-recovery.');
+  }
+  if (out.freezeToken && !out.unfreezeRecovery) {
+    throw new PromotionRefused('--freeze-token is only meaningful with --unfreeze-recovery.');
+  }
+  if (out.freezeStatus) return out;
+
   if (!out.database) throw new PromotionRefused('--database is required: name the database explicitly.');
 
   const names = environmentNames(out.environment);
+
+  if (out.freezePlan || out.unfreezeRecovery) {
+    const flag = out.freezePlan ? '--freeze-plan' : '--unfreeze-recovery';
+    if (out.database !== names.live) {
+      throw new PromotionRefused(`${flag} applies to '${names.live}' only (--environment ${out.environment}), not '${out.database}'.`);
+    }
+    if (!out.freezeDir) throw new PromotionRefused(`${flag} needs --freeze-dir <dir> to write the SQL into.`);
+    if (out.unfreezeRecovery && !out.freezeToken) {
+      throw new PromotionRefused('--unfreeze-recovery needs --freeze-token <the token --freeze-status printed for the live database>.');
+    }
+    return out;
+  }
+  if (out.freezeManifest && out.phase !== 'frozen') {
+    throw new PromotionRefused("--freeze-manifest is only meaningful with --phase frozen.");
+  }
+  if (out.freezeRecordOut && out.phase !== 'frozen') {
+    throw new PromotionRefused("--freeze-record-out is only meaningful with --phase frozen.");
+  }
+  if (out.freezeDumpProofOut && out.phase !== 'freeze-dump') {
+    throw new PromotionRefused("--freeze-dump-proof-out is only meaningful with --phase freeze-dump.");
+  }
+  if (out.freezeDumpProof && !out.plan) {
+    throw new PromotionRefused('--freeze-dump-proof is only meaningful with --plan.');
+  }
 
   if (out.plan) {
     if (!out.database.startsWith(names.candidatePrefix) || out.database.length === names.candidatePrefix.length) {
@@ -376,18 +499,51 @@ export function parseArgs(argv: readonly string[]): Options {
     assertLinuxHostPath(out.preCutoverDump, '--pre-cutover-dump');
     assertLinuxHostPath(out.rebuiltDump, '--rebuilt-dump');
     if (!out.planDir) throw new PromotionRefused('--plan needs --plan-dir <dir> to write the SQL files into.');
+    // AFLDB-ISSUE-250: a production plan reinstates only from a dump proven to be the frozen state.
+    if (Boolean(out.freezeRecord) !== Boolean(out.freezeDumpProof)) {
+      throw new PromotionRefused('--plan needs --freeze-record and --freeze-dump-proof together (AFLDB-ISSUE-250).');
+    }
+    if (out.environment === 'prod' && !out.freezeRecord) {
+      throw new PromotionRefused(
+        '--plan under --environment prod needs --freeze-record <file> and --freeze-dump-proof <file> '
+        + '(AFLDB-ISSUE-250): the reinstatement source must be proven to hold the frozen production state.');
+    }
     return out;
   }
-
   if (!out.phase) throw new PromotionRefused(`--phase is required. Valid phases: ${PHASES.join(', ')}.`);
+  if (out.freezeRecord && !FREEZE_BOUND_PHASES.includes(out.phase) && out.phase !== 'freeze-dump') {
+    throw new PromotionRefused(
+      `--freeze-record is only meaningful with --plan and the ${FREEZE_BOUND_PHASES.join(', ')} and freeze-dump phases.`);
+  }
+  if (out.preCutoverDump && out.phase !== 'freeze-dump') {
+    throw new PromotionRefused('--pre-cutover-dump is only meaningful with --plan and --phase freeze-dump.');
+  }
+  if (out.phase === 'frozen' && (!out.freezeManifest || !out.freezeRecordOut)) {
+    throw new PromotionRefused("Phase 'frozen' needs --freeze-manifest <promotion-freeze.json> and --freeze-record-out <file>.");
+  }
+  if (out.phase === 'freeze-dump' && (!out.freezeRecord || !out.preCutoverDump || !out.freezeDumpProofOut)) {
+    throw new PromotionRefused(
+      "Phase 'freeze-dump' needs --freeze-record <file>, --pre-cutover-dump <the dump restore-test.sh restored> "
+      + 'and --freeze-dump-proof-out <file>.');
+  }
+
   assertDatabaseForPhase(out.phase, out.database, out.environment);
   if (out.phase === 'restored') {
     if (!out.oldDatabase) {
       throw new PromotionRefused("Phase 'restored' needs --old-database so dangling references can be probed.");
     }
     assertOldDatabaseName(out.oldDatabase, out.environment);
+  } else if (out.phase === 'production' && out.freezeRecord) {
+    // AFLDB-ISSUE-250: the database the swap renamed aside, which must still hold F0.
+    if (!out.oldDatabase || out.oldDatabase === names.live) {
+      throw new PromotionRefused(
+        `Phase 'production' with --freeze-record needs --old-database ${names.preRebuildPrefix}<stamp>: the `
+        + 'database the swap renamed aside, which must still hold exactly the frozen state.');
+    }
+    assertOldDatabaseName(out.oldDatabase, out.environment);
   } else if (out.oldDatabase) {
-    throw new PromotionRefused("--old-database is only meaningful with --phase restored.");
+    throw new PromotionRefused(
+      '--old-database is only meaningful with --phase restored, or --phase production with --freeze-record.');
   }
   if (out.lineageRemapOut && out.phase !== 'restored') {
     throw new PromotionRefused(
@@ -444,6 +600,13 @@ export function parseArgs(argv: readonly string[]): Options {
     throw new PromotionRefused(
       "Phase 'candidate' needs --afl-api-supersede-in <file>: the E_promotion file --phase restored wrote "
       + '(AFLDB-ISSUE-237). It binds the reinstated human ledger and the candidate importer state.');
+  }
+  // AFLDB-ISSUE-250, last of all: no production phase that reads or replaces the live target runs
+  // without the proven freeze. DEV opts in by passing the record; without it DEV is unchanged.
+  if (out.environment === 'prod' && FREEZE_BOUND_PHASES.includes(out.phase) && !out.freezeRecord) {
+    throw new PromotionRefused(
+      `Phase '${out.phase}' under --environment prod needs --freeze-record <file> (AFLDB-ISSUE-250): the record `
+      + "--phase frozen wrote. Without the freeze a production write after the dump would be silently lost at the swap.");
   }
   return out;
 }
@@ -2135,11 +2298,13 @@ export function publishRestoredLineageRemap(remapOut: string | undefined, remapS
 // Plan and checklist (no database contact)
 // ---------------------------------------------------------------------------
 
-export function writePlan(opts: Options): string[] {
+export function writePlan(opts: Options, freeze?: FreezeBinding): string[] {
   const input = {
     candidate: opts.database!, oldDatabase: opts.oldDatabase!,
     preCutoverDump: opts.preCutoverDump!, rebuiltDump: opts.rebuiltDump!,
     environment: opts.environment,
+    // AFLDB-ISSUE-250: only a freeze-bound plan re-checks the dump; an unbound plan is unchanged.
+    ...(freeze ? { preCutoverDumpSha256: freeze.dumpSha256 } : {}),
   };
   const dir = opts.planDir!;
   const artifacts = {
@@ -2158,8 +2323,8 @@ export function writePlan(opts: Options): string[] {
     ['promotion-resync-identity.sql', artifacts.resyncIdentity],
     ['promotion-audit-marker.sql', artifacts.auditMarker],
     ['promotion-reinstate.sh', artifacts.reinstate],
-    ['promotion-swap.sql', swapSql(input)],
-    ['promotion-rollback.sql', rollbackSql(input)],
+    ['promotion-swap.sql', freeze ? frozenSwapSql(input, freeze) : swapSql(input)],
+    ['promotion-rollback.sql', freeze ? frozenRollbackSql(input, freeze) : rollbackSql(input)],
   ] as const;
   const paths = files.map(([name, content]) => ({ name, content, path: join(dir, name) }));
   const existing = paths.filter(({ path }) => existsSync(path));
@@ -2175,6 +2340,206 @@ export function writePlan(opts: Options): string[] {
     written.push(path);
   }
   return written;
+}
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-250 — the promotion freeze
+// ---------------------------------------------------------------------------
+
+/** A local operator file read here, never embedded in a plan (so no host-path shape rule). */
+function readOperatorFile(path: string, flag: string): string {
+  try {
+    return readFileSync(path, 'utf8');
+  } catch (error) {
+    throw new PromotionRefused(`${flag} ${path} cannot be read: ${(error as Error).message}`);
+  }
+}
+
+export function readFreezeRecordFile(path: string, environment: Environment): FreezeRecord {
+  return parseFreezeRecord(readOperatorFile(path, '--freeze-record'), environment);
+}
+
+/**
+ * `--freeze-plan`: the manifest and the three operator SQL files, written only when none of
+ * them exists yet (a second freeze plan in the same directory would mint a second token).
+ */
+export function writeFreezePlan(opts: Options, token?: string): string[] {
+  const manifest = newFreezeManifest(opts.environment, opts.database!, token);
+  const dir = opts.freezeDir!;
+  const files = [
+    ['promotion-freeze.json', `${JSON.stringify(manifest, null, 2)}\n`],
+    ['promotion-freeze.sql', freezeSql(manifest)],
+    ['promotion-terminate.sql', freezeTerminateSql(manifest)],
+    ['promotion-unfreeze.sql', unfreezeSql(manifest)],
+  ].map(([name, content]) => ({ path: join(dir, name), content }));
+  const existing = files.filter(({ path }) => existsSync(path));
+  if (existing.length > 0) {
+    throw new PromotionRefused(`${existing.map(({ path }) => path).join(', ')} already exists; refusing to write a second freeze plan.`);
+  }
+  mkdirSync(dir, { recursive: true });
+  for (const { path, content } of files) writeOperatorFileAtomically(path, content);
+  return files.map(({ path }) => path);
+}
+
+/** `--unfreeze-recovery`: a token-bound release when the freeze directory is lost. */
+export function writeUnfreezeRecovery(opts: Options): string {
+  const manifest = recoveryManifest(opts.environment, opts.database!, opts.freezeToken!);
+  const path = join(opts.freezeDir!, `promotion-unfreeze-recovery-${manifest.token.slice(0, 8)}.sql`);
+  mkdirSync(opts.freezeDir!, { recursive: true });
+  writeOperatorFileAtomically(path, unfreezeSql(manifest, 'promotion freeze — RECOVERY RELEASE'));
+  return path;
+}
+
+/**
+ * `--plan` under a freeze: the record, the dump proof bound to it, and `--pre-cutover-dump`
+ * re-hashed now. Any disagreement refuses before a plan file exists.
+ */
+export async function freezeBindingFor(opts: Options): Promise<FreezeBinding> {
+  const record = readFreezeRecordFile(opts.freezeRecord!, opts.environment);
+  const proof = parseFreezeDumpProof(readOperatorFile(opts.freezeDumpProof!, '--freeze-dump-proof'), record);
+  if (record.database !== opts.oldDatabase) {
+    throw new PromotionRefused(`The freeze record froze ${record.database}; this plan replaces ${opts.oldDatabase}.`);
+  }
+  const actual = await sha256File(opts.preCutoverDump!);
+  if (actual !== proof.dumpSha256) {
+    throw new PromotionRefused(
+      `--pre-cutover-dump ${opts.preCutoverDump} hashes to ${actual}, but --phase freeze-dump proved ${proof.dumpSha256}. `
+      + 'Reinstate only from the dump proven to hold the frozen state.');
+  }
+  return {
+    environment: record.environment, database: record.database, token: record.token,
+    comment: record.comment, dumpSha256: proof.dumpSha256,
+  };
+}
+
+async function observeFreeze(q: Query): Promise<FreezeObservation> {
+  const [db] = await q(FREEZE_DATABASE_STATE_SQL);
+  const database: FreezeDatabaseState | undefined = db ? {
+    oid: String(db.oid), name: String(db.name), owner: String(db.owner),
+    comment: db.comment === null || db.comment === undefined ? null : String(db.comment),
+    publicConnect: Boolean(db.publicConnect),
+  } : undefined;
+  const connectRoles = (await q(FREEZE_CONNECT_ROLES_SQL)).map((r) => String(r.role));
+  const sessions: FreezeSession[] = (await q(FREEZE_SESSIONS_SQL)).map((r) => ({
+    pid: asInt(r.pid), role: r.role === null || r.role === undefined ? null : String(r.role),
+    hasRole: Boolean(r.hasRole), superuser: Boolean(r.superuser),
+    application: r.application ? String(r.application) : null,
+  }));
+  const preparedXacts = (await q(FREEZE_PREPARED_XACTS_SQL)).map((r) => ({ gid: String(r.gid), owner: String(r.owner) }));
+  return { database, connectRoles, sessions, preparedXacts };
+}
+
+/** One freeze-state gate; returns the observed database state (for its OID). */
+async function gateFreezeState(
+  q: Query, role: string, expected: { database: string; comment: string; oid?: string },
+  quiescence: boolean, report: Report,
+): Promise<FreezeDatabaseState | undefined> {
+  const obs = await observeFreeze(q);
+  const judgement = judgeFreezeState(obs, expected, { quiescence });
+  const lines = [
+    ...(obs.database ? [`${obs.database.name} oid ${obs.database.oid}`] : []),
+    ...judgement.problems, ...judgement.warnings, ...judgement.info,
+  ];
+  const verdict = judgement.problems.length > 0 ? 'FAIL' : judgement.warnings.length > 0 ? 'WARN' : 'PASS';
+  report.add(`promotion freeze — ${role} frozen${quiescence ? ' and quiescent' : ''} (AFLDB-ISSUE-250)`, verdict, lines);
+  return obs.database;
+}
+
+async function gateFreezeDigest(q: Query, role: string, record: FreezeRecord, report: Report): Promise<void> {
+  const observed = await readFreezeDigest(q);
+  const problems = judgeFreezeDigest(record.tables, observed);
+  report.add(`promotion freeze — ${role} holds exactly the frozen state F0 (AFLDB-ISSUE-250)`,
+    problems.length === 0 ? 'PASS' : 'FAIL',
+    problems.length === 0
+      ? [`${record.tables.length} production-owned table(s) identical to the freeze record (digest ${record.digestSha256.slice(0, 16)}…)`]
+      : [`${problems.length} table(s) changed since the freeze — a write reached the frozen database:`, ...problems]);
+}
+
+/** The live target (or the kept database after the swap) is the frozen one and holds F0. */
+export async function gateFrozenTarget(
+  q: Query, role: string, database: string, record: FreezeRecord, quiescence: boolean, report: Report,
+): Promise<void> {
+  await gateFreezeState(q, role, { database, comment: record.comment, oid: record.databaseOid }, quiescence, report);
+  await gateFreezeDigest(q, role, record, report);
+}
+
+/** After the swap: the new live database is NOT the frozen one, carries no marker and is open. */
+export async function gatePromotedLiveUnfrozen(q: Query, record: FreezeRecord, report: Report): Promise<void> {
+  const obs = await observeFreeze(q);
+  const db = obs.database;
+  const problems: string[] = [];
+  if (!db) problems.push('live database not found');
+  else {
+    if (db.oid === record.databaseOid) problems.push(`live ${db.name} is still the frozen database (oid ${db.oid}): the swap did not happen`);
+    if (isFreezeMarkerComment(db.comment)) problems.push(`live ${db.name} carries a freeze marker`);
+    if (!db.publicConnect) problems.push(`live ${db.name} refuses PUBLIC connections: the application could not start`);
+  }
+  report.add('promotion freeze — the promoted live database is the candidate, unfrozen (AFLDB-ISSUE-250)',
+    problems.length === 0 ? 'PASS' : 'FAIL', problems.length === 0 ? [`${db!.name} oid ${db!.oid}`] : problems);
+}
+
+function concludeReport(report: Report, environment: Environment, phase: string): number {
+  const failed = report.results.filter((r) => r.verdict === 'FAIL').map((r) => r.gate);
+  console.log(`\n${'='.repeat(78)}`);
+  if (failed.length === 0) {
+    console.log(`PROMOTION CHECK (${environment}/${phase}): PASS — ${report.results.length} gate(s) evaluated, none failed.`);
+    return 0;
+  }
+  console.log(`PROMOTION CHECK (${environment}/${phase}): REFUSED — ${failed.length} gate(s) failed:`);
+  for (const gate of failed) console.log(`  - ${gate}`);
+  console.log('Do not proceed past this phase until every failed gate passes.');
+  return 1;
+}
+
+/**
+ * `--phase frozen`: the freeze is in place and nothing that could write is connected; then F0.
+ * Quiescence is re-proven AFTER the digest is read, so a session that connected during the read
+ * refuses the record. The record is written only when every gate passed.
+ */
+export async function runFrozenPhase(q: Query, opts: Options, report: Report): Promise<void> {
+  const manifest = parseFreezeManifest(readOperatorFile(opts.freezeManifest!, '--freeze-manifest'), opts.environment);
+  if (manifest.database !== opts.database) {
+    throw new PromotionRefused(`The freeze manifest froze ${manifest.database}, not ${opts.database}.`);
+  }
+  const expected = { database: manifest.database, comment: manifest.comment };
+  const state = await gateFreezeState(q, `target ${manifest.database}`, expected, true, report);
+  if (report.failed || !state) return;
+  const tables = await readFreezeDigest(q);
+  const missing = tables.filter((t) => t.rows < 0).map((t) => t.table);
+  if (missing.length > 0) {
+    report.add('promotion freeze — digest', 'FAIL', [`contract table(s) missing from ${manifest.database}: ${missing.join(', ')}`]);
+    return;
+  }
+  await gateFreezeState(q, `target ${manifest.database} (after the digest)`, { ...expected, oid: state.oid }, true, report);
+  if (report.failed) return;
+  const record = buildFreezeRecord({ manifest, databaseOid: state.oid, tables });
+  writeOperatorFileAtomically(opts.freezeRecordOut!, `${JSON.stringify(record, null, 2)}\n`);
+  report.add('Freeze record written', 'INFO', [
+    opts.freezeRecordOut!,
+    `database ${record.database} oid ${record.databaseOid}, token ${record.token}`,
+    `F0: ${record.tables.length} table(s), ${record.tables.reduce((n, t) => n + t.rows, 0)} row(s), digest ${record.digestSha256}`,
+    'Only now take the §4 backup.',
+  ]);
+}
+
+/**
+ * `--phase freeze-dump`: `afldb_restore_test` was restored by `restore-test.sh` from exactly
+ * `--pre-cutover-dump` (the sha256 it recorded as the database comment) and holds exactly F0.
+ */
+export async function runFreezeDumpPhase(q: Query, opts: Options, record: FreezeRecord, dumpSha256: string, report: Report): Promise<void> {
+  const [row] = await q(DATABASE_COMMENT_SQL);
+  const recorded = parseRestoreTestComment(row?.comment);
+  report.add('restore-test.sh restored exactly --pre-cutover-dump (AFLDB-ISSUE-250)',
+    recorded === dumpSha256 ? 'PASS' : 'FAIL',
+    recorded === null
+      ? ['afldb_restore_test carries no restore-test.sh proof comment: run tools/maintenance/restore-test.sh "$PRE" (and let it pass) first']
+      : [`restored dump sha256 ${recorded}`, `--pre-cutover-dump sha256 ${dumpSha256}`,
+        ...(recorded === dumpSha256 ? [] : ['a different dump was restored — re-run restore-test.sh "$PRE"'])]);
+  await gateFreezeDigest(q, `restored dump ${opts.database}`, record, report);
+  if (report.failed) return;
+  const proof = buildFreezeDumpProof({ record, dumpPath: opts.preCutoverDump!, dumpSha256 });
+  writeOperatorFileAtomically(opts.freezeDumpProofOut!, `${JSON.stringify(proof, null, 2)}\n`);
+  report.add('Freeze dump proof written', 'INFO', [opts.freezeDumpProofOut!, `${opts.preCutoverDump} sha256 ${dumpSha256} = F0`]);
 }
 
 export function printChecklist(): void {
@@ -2269,11 +2634,31 @@ async function main(): Promise<number> {
   assertContractCoherent();
 
   if (opts.checklist) { printChecklist(); return 0; }
+  if (opts.freezePlan) {
+    const written = writeFreezePlan(opts);
+    console.log(`AFLDB-ISSUE-250 promotion freeze plan written for ${opts.database} (--environment ${opts.environment}; `
+      + 'nothing executed, no database contacted):');
+    for (const path of written) console.log(`  ${path}`);
+    console.log('\nOrder: stop afldb and every afldb-settle-* timer/service -> promotion-freeze.sql -> promotion-terminate.sql '
+      + '-> --phase frozen. Run each .sql as postgres on the postgres database. Read every file first.');
+    return 0;
+  }
+  if (opts.unfreezeRecovery) {
+    const path = writeUnfreezeRecovery(opts);
+    console.log(`AFLDB-ISSUE-250 recovery release written (nothing executed): ${path}`);
+    console.log('It releases the freeze only if the live database still carries exactly this token\'s marker.');
+    return 0;
+  }
   if (opts.plan) {
-    const written = writePlan(opts);
+    const freeze = opts.freezeRecord ? await freezeBindingFor(opts) : undefined;
+    const written = writePlan(opts, freeze);
     console.log(`AFLDB-ISSUE-125 promotion plan written for --environment ${opts.environment} `
       + '(nothing executed, no database contacted):');
     for (const path of written) console.log(`  ${path}`);
+    if (freeze) {
+      console.log(`\nAFLDB-ISSUE-250 — freeze-bound (token ${freeze.token}): the swap and rollback refuse an unfrozen `
+        + `target, and the transcript re-checks the dump's sha256 ${freeze.dumpSha256} before restoring from it.`);
+    }
     const withheld = historicalOnlyTables(opts.environment);
     if (withheld.length > 0) {
       console.log(`\nAFLDB-ISSUE-143 — ${withheld.length} table(s) are INTENTIONALLY NOT reinstated `
@@ -2293,6 +2678,25 @@ async function main(): Promise<number> {
   loadEnv();
   const baseDsn = process.env[opts.dsnEnv];
   if (!baseDsn) throw new PromotionRefused(`${opts.dsnEnv} is not set.`);
+
+  // AFLDB-ISSUE-250: read from the postgres database — never from a target by name, which may be
+  // absent mid-recovery. pg_database and the database comments are shared catalogs.
+  if (opts.freezeStatus) {
+    const conn = await openReadOnly(withDatabase(baseDsn, 'postgres'), 'freeze-status');
+    try {
+      const rows = (await conn.q(FREEZE_STATUS_SQL)).map((r) => ({
+        oid: String(r.oid), name: String(r.name),
+        comment: r.comment === null || r.comment === undefined ? null : String(r.comment),
+        publicConnect: Boolean(r.publicConnect),
+      }));
+      console.log(`AFLDB-ISSUE-250 promotion freeze status — environment '${opts.environment}' (READ-ONLY)`);
+      for (const line of describeFreezeStatus(rows, opts.environment)) console.log(`  ${line}`);
+    } finally {
+      await conn.end();
+    }
+    return 0;
+  }
+
   const dsn = withDatabase(baseDsn, opts.database!);
   const phase = opts.phase!;
 
@@ -2325,9 +2729,30 @@ async function main(): Promise<number> {
     return 1;
   }
 
+  // AFLDB-ISSUE-250 — the two standalone freeze phases.
+  if (phase === 'frozen' || phase === 'freeze-dump') {
+    const out = phase === 'frozen' ? opts.freezeRecordOut! : opts.freezeDumpProofOut!;
+    if (existsSync(out)) throw new PromotionRefused(`${out} already exists; refusing to overwrite.`);
+    const record = phase === 'freeze-dump' ? readFreezeRecordFile(opts.freezeRecord!, opts.environment) : undefined;
+    // Hash before the database is read: the proof binds the file as it is now.
+    const dumpSha256 = phase === 'freeze-dump' ? await sha256File(opts.preCutoverDump!) : '';
+    const report = new Report();
+    const conn = await openReadOnly(dsn, phase);
+    try {
+      await gateIdentity(conn.q, opts.database!, report);
+      if (phase === 'frozen') await runFrozenPhase(conn.q, opts, report);
+      else await runFreezeDumpPhase(conn.q, opts, record!, dumpSha256, report);
+    } finally {
+      await conn.end();
+    }
+    return concludeReport(report, opts.environment, phase);
+  }
+
   // AFLDB-ISSUE-237: refuse a bad operator file, or an output that already exists, before any
   // database is opened.
   const boundSupersede = phase === 'candidate' ? readAflApiSupersedeFile(opts.aflApiSupersedeIn!) : undefined;
+  // AFLDB-ISSUE-250: under a freeze, the record every target read is judged against.
+  const freezeRecord = opts.freezeRecord ? readFreezeRecordFile(opts.freezeRecord, opts.environment) : undefined;
   for (const out of [opts.aflApiSupersedeOut, opts.aflApiDevRegenerationOut, opts.lineageRemapOut]) {
     if (out && existsSync(out)) throw new PromotionRefused(`${out} already exists; refusing to overwrite.`);
   }
@@ -2335,6 +2760,7 @@ async function main(): Promise<number> {
   const report = new Report();
   const conn = await openReadOnly(dsn, phase);
   let old: { q: Query; end: () => Promise<void> } | undefined;
+  let frozenSide: { q: Query; end: () => Promise<void> } | undefined;
   let aflApiOverlap: AflApiOverlapResult | undefined;
   let lineageRemap: string | undefined;
   try {
@@ -2381,12 +2807,18 @@ async function main(): Promise<number> {
     if (phase === 'pre-cutover') {
       await gateAflApiRebuildMarker([{ role: `target ${opts.database}`, q: conn.q }], report);
       aflApiTargetCensus = await gateAflApiPreCutoverCensus(conn.q, report);
+      if (freezeRecord) {
+        await gateFrozenTarget(conn.q, `target ${opts.database}`, opts.database!, freezeRecord, true, report);
+      }
     }
 
     if (phase === 'restored') {
       old = await openReadOnly(withDatabase(baseDsn, opts.oldDatabase!), 'old');
       const oldName = String((await old.q('SELECT current_database() AS d'))[0]?.d);
       if (oldName !== opts.oldDatabase) throw new PromotionRefused(`Old database connection landed on '${oldName}', not '${opts.oldDatabase}'.`);
+      if (freezeRecord) {
+        await gateFrozenTarget(old.q, `target ${opts.oldDatabase}`, opts.oldDatabase!, freezeRecord, true, report);
+      }
       await gateDanglingReferences(conn.q, old.q, present, opts.environment, report);
       // AFLDB-ISSUE-249 (B4): the candidate against the manifest AND against the target it
       // replaces — a target that holds records and a candidate that does not is a STOP here,
@@ -2413,6 +2845,21 @@ async function main(): Promise<number> {
     }
     if (opts.compare) gateCompare(opts.compare, counts, opts.environment, report);
 
+    // AFLDB-ISSUE-250. `candidate` is the last gate before the swap: the live target must still be
+    // frozen, quiescent and hold exactly F0. `production` runs after the swap and BEFORE the
+    // application starts: the database the swap renamed aside, found by OID, must still hold
+    // exactly F0 — any write that reached it after the freeze, the last-check-to-swap gap
+    // included, refuses acceptance — and the promoted live database must be the candidate.
+    if (freezeRecord && phase === 'candidate') {
+      frozenSide = await openReadOnly(withDatabase(baseDsn, names.live), 'live');
+      await gateFrozenTarget(frozenSide.q, `live target ${names.live}`, names.live, freezeRecord, true, report);
+    }
+    if (freezeRecord && phase === 'production') {
+      frozenSide = await openReadOnly(withDatabase(baseDsn, opts.oldDatabase!), 'kept');
+      await gateFrozenTarget(frozenSide.q, `kept ${opts.oldDatabase}`, opts.oldDatabase!, freezeRecord, false, report);
+      await gatePromotedLiveUnfrozen(conn.q, freezeRecord, report);
+    }
+
     if (opts.snapshot) {
       const snapshot: Snapshot = {
         issue: 'AFLDB-ISSUE-125', database: opts.database!, takenAt: new Date().toISOString(),
@@ -2425,6 +2872,7 @@ async function main(): Promise<number> {
   } finally {
     await conn.end();
     if (old) await old.end();
+    if (frozenSide) await frozenSide.end();
   }
   // F-L4-4: only now, with every gate of this run evaluated, may a trusted file be written.
   if (aflApiOverlap) publishRestoredAflApiFiles(opts, aflApiOverlap, report);

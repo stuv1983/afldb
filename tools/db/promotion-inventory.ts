@@ -2568,10 +2568,19 @@ export const PRE_REBUILD_PREFIX = ENVIRONMENT_NAMES.prod.preRebuildPrefix;
  * the standard gate pipeline every other phase shares.
  */
 export type Phase = 'source' | 'pre-cutover' | 'restored' | 'candidate' | 'production'
-  | 'dev-regeneration-census';
+  | 'dev-regeneration-census' | 'frozen' | 'freeze-dump';
 
+/**
+ * AFLDB-ISSUE-250 adds two standalone read-only phases, handled as early branches in
+ * `promotion-check.ts`'s `main()` like `dev-regeneration-census`: `frozen` proves the live
+ * database is frozen and quiescent and records its content digest; `freeze-dump` proves the
+ * restored pre-cutover dump (`afldb_restore_test`) holds exactly that digest.
+ */
 export const PHASES: readonly Phase[] =
-  ['source', 'pre-cutover', 'restored', 'candidate', 'production', 'dev-regeneration-census'];
+  ['source', 'pre-cutover', 'restored', 'candidate', 'production', 'dev-regeneration-census', 'frozen', 'freeze-dump'];
+
+/** `tools/maintenance/restore-test.sh` restores into this database, and only this one. */
+export const RESTORE_TEST_DATABASE = 'afldb_restore_test';
 
 export class PromotionRefused extends Error {}
 
@@ -2596,6 +2605,7 @@ export function assertDatabaseForPhase(
       return;
     case 'pre-cutover':
     case 'production':
+    case 'frozen':
       if (database !== names.live) {
         throw new PromotionRefused(
           `Phase '${phase}' inspects '${names.live}' only (--environment ${environment}), not '${database}'.`);
@@ -2608,6 +2618,12 @@ export function assertDatabaseForPhase(
           `Phase '${phase}' inspects a candidate database named '${names.candidatePrefix}<stamp>' `
           + `(--environment ${environment}), not '${database}'. The name is the safety: the live `
           + `'${names.live}' is never a candidate.`);
+      }
+      return;
+    case 'freeze-dump':
+      if (database !== RESTORE_TEST_DATABASE) {
+        throw new PromotionRefused(
+          `Phase 'freeze-dump' inspects '${RESTORE_TEST_DATABASE}' (the restored pre-cutover dump) only, not '${database}'.`);
       }
       return;
     case 'dev-regeneration-census':
@@ -2744,6 +2760,12 @@ export type PlanInput = {
   rebuiltDump: string;
   /** Defaults to `prod`, so every existing caller and every existing plan is unchanged. */
   environment?: Environment;
+  /**
+   * AFLDB-ISSUE-250. The sha256 `--phase freeze-dump` proved for `preCutoverDump`. When set, the
+   * transcript re-checks the file before anything is restored from it; absent, the transcript
+   * is unchanged.
+   */
+  preCutoverDumpSha256?: string;
 };
 
 /** PostgreSQL identifier quoting equivalent to format('%I', value). */
@@ -3193,6 +3215,15 @@ export function reinstatePlan(input: PlanInput): string {
     lines.push('# LINEAGE_REMAP_SQL is the file --phase restored wrote through --lineage-remap-out.');
   }
   lines.push('');
+  if (input.preCutoverDumpSha256 !== undefined) {
+    if (!/^[0-9a-f]{64}$/.test(input.preCutoverDumpSha256)) {
+      throw new PromotionRefused('The proven pre-cutover dump sha256 is malformed.');
+    }
+    lines.push('# 0. AFLDB-ISSUE-250: the pre-cutover dump must still be the file --phase freeze-dump proved');
+    lines.push('#    holds exactly the frozen production state. It must print OK. On FAILED, STOP.');
+    lines.push(`printf '%s  %s\\n' '${input.preCutoverDumpSha256}' ${shellQuote(input.preCutoverDump)} | sha256sum --check --strict`);
+    lines.push('');
+  }
   lines.push('# 1. Empty every production-owned/operational table the rebuilt dump carried.');
   lines.push(`psql "$CANDIDATE_DSN" -v ON_ERROR_STOP=1 -f promotion-truncate.sql`);
   lines.push('');
@@ -4414,8 +4445,9 @@ export function planPromotionMatchReplay(input: {
 
 export const ACCEPTANCE_CHECKLIST: readonly string[] = [
   'Host identity confirmed on every terminal: PROD is afldb-prod; DEV is streamanator. `hostname` printed before any destructive command.',
+  'Production FROZEN before anything is captured (AFLDB-ISSUE-250): afldb and every installed afldb-settle-* timer/service stopped; `--freeze-plan` written and read; promotion-freeze.sql then promotion-terminate.sql run as postgres on the postgres database; `--phase frozen` PASSED and wrote the freeze record naming the database OID and the F0 digest. From here until the swap no application, auth, admin, timer or import role can connect, and the only owner-DSN tools run against the target are the checker and restore-test.sh.',
   'Pre-cutover production backup taken with tools/maintenance/backup.sh, sha256 recorded, pg_restore --list read back, and an off-host copy made.',
-  'Backup proven: restore-test.sh (or a restore into a throwaway database) passed its parity checks.',
+  'Backup proven: restore-test.sh "$PRE" passed its parity checks and recorded the dump sha256, and `--phase freeze-dump` PASSED: the dump holds exactly the frozen state (AFLDB-ISSUE-250).',
   'Source validated: `--phase source` on afldb_test passed (name, migration parity with this checkout, optional catalog fingerprint) and the rebuilt dump\'s sha256 matched end to end.',
   'Production-owned state snapshot written by `--phase pre-cutover` and kept alongside the backup.',
   'Rebuilt dump restored into a NEW candidate database (afldb_prod_candidate_<stamp>) — never over afldb_prod.',
@@ -4427,13 +4459,14 @@ export const ACCEPTANCE_CHECKLIST: readonly string[] = [
   'Identity sequences re-synced; database.promoted audit marker written; privileges.sql run on the candidate.',
   '`--phase candidate` passed: no test-fixture identity anywhere, expected super admin present and enabled, counts match the snapshot per rule, grants reconciled, migrations at parity.',
   'afl_api identity (AFLDB-ISSUE-237): `--phase restored` PASSED as a whole and only then wrote the bound E_promotion file (G2 = the candidate\'s importer rows vs the TARGET\'s human ledger); `--phase candidate --afl-api-supersede-in <that file>` proved the reinstated ledger is exactly the one G2 graded; after the swap the D15 replay ran through replayAflApiAdjudicationsFromSupersedeFile with that same file, and the combined invariant passed.',
-  'Service stopped; afldb_prod renamed to afldb_prod_pre_rebuild_<stamp>; candidate renamed to afldb_prod; service started.',
-  '`--phase production` passed on the live afldb_prod (same gates as candidate).',
+  'Every freeze-bound phase (pre-cutover, restored, candidate) re-proved the live target frozen, quiescent and identical to F0; the plan was generated with --freeze-record and --freeze-dump-proof and its transcript\'s sha256sum --check of the dump printed OK (AFLDB-ISSUE-250).',
+  'Services still stopped; the freeze-bound promotion-swap.sql ran (its guards passed); afldb_prod renamed to afldb_prod_pre_rebuild_<stamp>; candidate renamed to afldb_prod.',
+  '`--phase production --freeze-record <record> --old-database afldb_prod_pre_rebuild_<stamp>` passed on the live afldb_prod (same gates as candidate) BEFORE afldb was started: the renamed-aside database, found by OID, still holds exactly F0 and the live database is the unfrozen candidate. Only then afldb started — the freeze release. On a refusal: promotion-rollback.sql, then promotion-unfreeze.sql, then the services.',
   'Health: /api/health 200, a season page, a player page, an AFLW page, and /search all render.',
   'Real production super admin logged in with password + TOTP (a new session — the old ones were reset by design).',
   'data_overrides replayed onto the promoted canonical rows for EVERY entity type the CHECK admits — players, matches, draft_picks, season_list_members, coaches, match_coaches, fixtures, player_achievements, after_siren_kicks — not just players and matches. The coaches replay is what re-creates every admin-created coach in the candidate (AFLDB-ISSUE-159 §7): until it runs, a manual coach does not exist there and its /coaches/<slug>-<id> URL 404s. The season_list_members replay (AFLDB-ISSUE-161 §19) is what re-creates every administered playing list, and it must run AFTER players, because a membership names its player by identity; it is also the only branch that acts on INACTIVE overrides, which are tombstones that must delete any row found for a deliberately removed membership. It must run BEFORE the data_edits row_id remap, which resolves coach edits through afltables_coach_path. The fixtures replay (AFLDB-ISSUE-162 §20) re-creates every administered fixture — cancelled and void rows included, because a fixture is never deleted and its data_edits rows must stay resolvable — and depends on no other branch, because a fixture names its clubs and venue by slug and names no player, match or selection; it too must run BEFORE the data_edits row_id remap, which resolves fixture edits through fixture_key. The club_leadership replay (AFLDB-ISSUE-163 §19) re-creates every administered captain and vice-captain appointment — ended and void rows included, because an appointment is never deleted and its data_edits rows must stay resolvable — and must run AFTER players, because an appointment names its player by identity; it depends on no other branch (it names its club by slug and deliberately does NOT re-check season-list membership, which is a precondition of making an appointment and not a property of a recorded one), and it too must run BEFORE the data_edits row_id remap, which resolves leadership edits through appointment_key. Until it runs, the promoted public club pages show no current leadership and their Captains history stops at the last pre-2027 season. The two special-record replays (AFLDB-ISSUE-167 §11, migration 102) are TWO ADAPTERS OVER THE ONE AUTHORITY and BOTH must run: after_siren_kicks replays through this same Python replay_admin_overrides, and player_achievements replays through replaySpecialRecordOverrides() in tools/records/special-records-replay.ts, because its importer is TypeScript and D-3 refused porting it to Python merely to share common.py. data_overrides is still the sole durable authority. Neither branch depends on another: a special-record override payload carries the raw name fields only — every link and derived column is reconstructed by the importer, never by an override — so both may run anywhere in the order, and both must run BEFORE the data_edits row_id remap, which resolves their audit rows through first_kick_goal_key and after_siren_key. Void rows are re-created and re-voided, never dropped, because the row must stay resolvable; and a record an administrator created does not exist in the candidate at all until its replay re-creates it. Skip either and the promoted site shows voided first-kick goals and after-siren kicks publicly again, on /records/first-kick-goal, /records/after-the-siren, the player pages, NL answers and the Grid Solver alike.',
   'player_link_match_candidates regenerated from /admin; derived tables recomputed if canonical rows changed.',
   'Current season re-acquired by a supervised settle (--dry-run first), then the timer left enabled.',
-  'Rollback rehearsed on paper: stop service, rename afldb_prod back to the candidate name, rename afldb_prod_pre_rebuild_<stamp> to afldb_prod, start service.',
+  'Rollback rehearsed on paper: stop service, run the freeze-bound promotion-rollback.sql (afldb_prod back to the candidate name, afldb_prod_pre_rebuild_<stamp> back to afldb_prod, still frozen), release with promotion-unfreeze.sql, start service. An abandoned promotion before the swap is released with promotion-unfreeze.sql (or `--freeze-status` then `--unfreeze-recovery`).',
   'Cleanup deferred: the pre-rebuild database and the dumps are kept until the operator closes the promotion record; nothing is dropped the same day.',
 ];

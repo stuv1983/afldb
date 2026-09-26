@@ -10,7 +10,15 @@ evidence, §11(d)2); S3 implementation is now in progress.** *(2026-09-24 status
 been rebuilt or promoted at that point.)* **Current state (2026-09-26): L0–L4 have since run and
 PASSED on real databases — `code_test_db` (L1/L2), `afldb_test` (L3) and `afldb_dev` (L4,
 promotion stamp `20260926-085511`, §11d.15). L5 PROD remains NOT RUN; see the current gate-state
-table below.**
+table below.** **(2026-09-26, operator decision D-P5-1: L5 PROD is BLOCKED pending resolution and
+acceptance of AFLDB-ISSUE-250, "Production promotion can silently lose writes committed after the
+target snapshot". This is a newly confirmed promotion safety prerequisite. ISSUE-237 itself has not
+regressed, and its implementation is unchanged.)** **(Later 2026-09-26: ISSUE-250 is implemented
+and DB-free validated; its rehearsal and acceptance remain, so L5 is still BLOCKED. L5 must use the
+freeze-bound procedure; see §14.)** **(Later again, 2026-09-26: ISSUE-250's DEV rehearsal
+PASSED — technically accepted for the L5 prerequisite (ISSUE-250 runbook §17). L5 is no longer
+blocked on an untested mechanism. It remains NOT RUN, and needs the ISSUE-250 work committed and
+merged, the code on the PROD checkout, and a separate operator authorisation.)**
 
 **L1/L2 state (operator-run, reported 2026-09-25).** The §11b rehearsals on the real
 `code_test_db` have now been run by the operator. **L1 PASS:** non-empty importer + human state
@@ -93,7 +101,7 @@ ISSUE-237 is not resolved.)*
 | ISSUE-245 `afldb_test` proof | PASS, through L3 (§11a.6) |
 | L3 | **PASS** (§11a.6) |
 | L4 DEV promotion | **PASS** (operator-run, promotion stamp `20260926-085511`, 2026-09-26; full record §11d.15). Procedure rewritten after the L4 hardening (§11d; findings and fixes §11d.0, prerequisites §11d.2). Historical chronology of the intervening attempts, preserved: *(2026-09-25: the second real attempt STOPPED at A4.3, before the destructive boundary. A3 PASS; the blocker is the orphaned ISSUE-109 fixture override; prerequisite **AFLDB-ISSUE-246**, §11d.12.)* *(2026-09-25: ISSUE-246 RESOLVED, audit 983; the A4.3 rerun returned no rows, so A4.3 is PASS; A3/A4.1/A4.2 unchanged; next step **A5**, §11d.13.)* *(2026-09-25: **A5 REFUSED on TWO independent gates**: the ISSUE-151 staged-rows gate on the legitimately empty `afl_api_identity_adjudications` ledger (0; census 669/0/0/0 PASS), prerequisite **AFLDB-ISSUE-247**; and the test-fixture identity gate on reserved-domain `auth_users` 14/17/18 and `admin_invites` 5, prerequisite **AFLDB-ISSUE-248**. Nothing past A5 ran. §11d.14.)* *(2026-09-26: a post-merge attempt reached the post-swap phase and was ROLLED BACK on discovering **AFLDB-ISSUE-249** — the promoted candidate held first-kick-goal 0 against DEV's 335/334. `afldb_dev` restored; failed candidate retained as `afldb_dev_candidate_20260926-033212`.)* *(2026-09-26: **L4 PASS** (operator-run, stamp `20260926-085511`), after AFLDB-ISSUE-249 was deployed at `6ae70722`. G3 found one classified DEV-regenerable hard loss, `CD_I297354`, resolved through the §6.3 exception (fresh re-acquisition, target-bound bridge 669/669, loader apply, `dev-regeneration-census` PASS). Post-swap first-kick-goal census 335/334/1. Full record: §11d.15.)* |
-| L5 PROD promotion | **NOT RUN.** Deferred to the next scheduled production promotion, under production's unmodified G3 hard-loss rule (FAIL, no DEV-style exception). |
+| L5 PROD promotion | **NOT RUN, and BLOCKED on AFLDB-ISSUE-250** (2026-09-26, D-P5-1): a write committed to production after the §4 snapshot can be silently lost at the swap, so L5 must not run until ISSUE-250 is resolved and accepted. *(Later 2026-09-26: ISSUE-250's freeze is implemented and DB-free validated; rehearsal and acceptance remain; L5 must then use the freeze-bound procedure, §14.)* *(Later again 2026-09-26: ISSUE-250 DEV REHEARSAL PASS, technically accepted for this prerequisite (ISSUE-250 runbook §17); L5 still needs the ISSUE-250 work committed/merged and on the PROD checkout, plus a separate authorisation.)* Then it runs inside the next scheduled production promotion, under production's unmodified G3 hard-loss rule (FAIL, no DEV-style exception). |
 
 **P-M state (2026-09-24).** Point 1 PROVEN (DB-free). Point 2 PROVEN (live, `afldb_test`,
 rolled back). Point 4 PROVEN by composition. **Point 3 is NOT PROVEN** *(superseded 2026-09-25:
@@ -3929,7 +3937,7 @@ the AFLDB-ISSUE-249 discovery record).
 | DEV bridge + loader (validate-only → dry-run → apply) | **PASS**: 669/669 linked, `CD_I297354` regenerated |
 | `dev-regeneration-census` | **PASS** |
 | **L4** | **PASS** |
-| L5 (PROD) | **NOT RUN** |
+| L5 (PROD) | **NOT RUN.** Was BLOCKED on AFLDB-ISSUE-250 (2026-09-26). ISSUE-250's DEV rehearsal PASSED later on 2026-09-26 (ISSUE-250 §17). Now awaiting the ISSUE-250 commit/merge/PROD checkout and a separate authorisation. |
 
 **Closure interpretation.** The narrow DEV G3 exception (§6.3, OD-3) was actually used, for exactly
 one classified `afl_api_stat_vector_season` hard loss. The required target-bound
@@ -3937,6 +3945,8 @@ re-acquisition/regeneration sequence completed, and the mandatory census passed.
 promotion is accepted under the ISSUE-237 §6.3 contract.** **ISSUE-237 remains OPEN**, because L5
 PROD is still NOT RUN. Production's G3 hard-loss rule is unmodified: FAIL, with no DEV-style
 exception. **Next action:** L5, inside a future scheduled production promotion.
+*(2026-09-26: superseded. L5 is BLOCKED until AFLDB-ISSUE-250 is resolved and accepted; see the
+note at the end of §14.)*
 
 ## 12. Non-goals and successors
 
@@ -4128,6 +4138,48 @@ first-kick-goal special replay recreated the manual row exactly: census 335/334/
 promotion is accepted under the ISSUE-237 §6.3 contract. L4 is PASS.** **ISSUE-237 remains OPEN:
 L5 PROD is NOT RUN.** The next action is L5, inside a future scheduled production promotion, under
 production's unmodified G3 hard-loss rule (FAIL, no DEV-style exception).)*
+*(2026-09-26, documentation only: **L5 PROD remains NOT RUN and is now BLOCKED pending resolution
+and acceptance of AFLDB-ISSUE-250** (operator decision D-P5-1, recorded in the ISSUE-238 pass-5
+design). The confirmed gap: the §4 production dump is taken while the web service and settle
+timers still run (`docs/production-promotion.md` §4, §8). §7 reinstates production-owned tables
+from that dump. The services are stopped only at the §8 swap. So a production write committed
+after the snapshot, for example a Super Admin AFL API `linked`/`revoked` adjudication, can be
+absent from the candidate and silently lost at the swap. ISSUE-250 owns the affected-state
+inventory, an enforced mutation freeze or an equally strong fail-closed drift check, the final
+pre-swap verification, the residual cutover race, and rehearsal. **Nobody may execute L5 from
+this runbook until ISSUE-250 is accepted.** ISSUE-237 has not regressed, and no ISSUE-237 code
+changed. Runbook: `issues/open/AFLDB-ISSUE-250.md`.)*
+*(2026-09-26, later: **ISSUE-250 is implemented and DB-free validated, NOT yet rehearsed or
+accepted, so L5 stays BLOCKED.** The mechanism is an enforced database-level promotion freeze
+(`docs/production-promotion.md` §4.0/§4.1). When L5 is unblocked it must follow the current
+procedure, which changes the L5 command shapes: freeze before the §4 backup; `--phase frozen`;
+`restore-test.sh "$PRE"` then `--phase freeze-dump`; `--freeze-record` on `pre-cutover`,
+`restored`, `candidate` and `production`; `--freeze-record` + `--freeze-dump-proof` on `--plan`;
+the freeze-bound swap; and `--phase production --old-database afldb_prod_pre_rebuild_<stamp>`
+**before** `systemctl start afldb`. The checker refuses the old production command shapes. No
+ISSUE-237 gate changed; ISSUE-250's gates run alongside G1–G3.)*
+*(2026-09-26, later again: **ISSUE-250 DEV REHEARSAL PASS — technically accepted for the L5
+prerequisite** (ISSUE-250 runbook §17). The rehearsal included a full freeze-enabled DEV promotion
+(stamp `20260926-195601`) and its guarded rollback. Every ISSUE-237 DEV gate PASSed alongside the
+freeze gates:
+- A3 (802 rows);
+- A4;
+- A5;
+- B4, after the §7.4b reinstatement of `import_batches` 82/84 and the §6.3 classification for
+  `CD_I297354`, exactly as L4 needed;
+- C2;
+- E1/E1b (recreated 1)/E2 (0/0/∅)/E3 invariant OK;
+- F1.
+
+The rollback restored the original `afldb_dev`. **L5 is still NOT RUN.** It is no longer blocked on
+an untested ISSUE-250 mechanism. Before it may run:
+1. the operator reviews and commits the ISSUE-250 work (including its §17 doc fixes, notably the
+   `sudo -u postgres psql … -f - < file` form), and merges it;
+2. the code reaches the PROD checkout;
+3. the operator gives a **separate, explicit authorisation for L5**.
+
+L5 then follows the freeze-bound `docs/production-promotion.md` §4.0–§10 under production's
+unmodified G3 rule.)*
 
 ---
 

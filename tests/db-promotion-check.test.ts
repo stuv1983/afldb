@@ -6,7 +6,7 @@
  * argument and database-name rules are pinned so no phase can be pointed at the wrong
  * database; and the checker's source is asserted to carry no write path.
  */
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -118,7 +118,16 @@ import {
   readAflApiReverseIdentities as readPromotionReverseIdentities, writePlan,
   FIRST_KICK_GOAL_GATE, FIRST_KICK_GOAL_IDENTITIES_SQL, gateFirstKickGoalIdentities, judgeFirstKickGoalIdentities,
   type FirstKickGoalObserved,
+  FREEZE_BOUND_PHASES, freezeBindingFor, gateFrozenTarget, gatePromotedLiveUnfrozen, runFreezeDumpPhase, runFrozenPhase,
+  writeFreezePlan, writeUnfreezeRecovery, type Options,
 } from '../tools/db/promotion-check';
+import {
+  DIGEST_SESSION_SETTINGS, FREEZE_CONNECT_ROLES_SQL, FREEZE_DATABASE_STATE_SQL, FREEZE_PREPARED_XACTS_SQL, FREEZE_SESSIONS_SQL,
+  assertFreezeMarkerDistinct, buildFreezeDumpProof, buildFreezeRecord, describeFreezeStatus, freezeComment, freezeDigestTables,
+  freezeSql, freezeTerminateSql, frozenRollbackSql, frozenSwapSql, isFreezeMarkerComment, judgeFreezeDigest, judgeFreezeState,
+  newFreezeManifest, newFreezeToken, parseFreezeComment, parseFreezeDumpProof, parseFreezeManifest, parseFreezeRecord,
+  parseRestoreTestComment, recoveryManifest, restoreTestComment, sha256File, tableDigestSql, unfreezeSql,
+} from '../tools/db/promotion-freeze';
 import { trackedExpectedIds } from '../tools/records/first-kick-goal-source';
 import {
   AflApiReplayAbort, readAflApiForwardIdentities as readRebuildForwardIdentities, replayAflApiAdjudicationsFromSupersedeFile,
@@ -141,6 +150,7 @@ import {
   AFL_API_ADMIN_MATCH_METHOD,
   AFL_API_G2_REFUSING_OUTCOMES,
   AFL_API_REBUILD_MARKER_FORMAT,
+  isAflApiRebuildMarkerComment,
   AflApiPromotionFileRefused,
   aflApiDevRegenerationBindingProblems,
   aflApiDevRegenerationEntriesFromG3,
@@ -1005,12 +1015,15 @@ describe('snapshot comparison', () => {
 });
 
 describe('checker arguments', () => {
+  // AFLDB-ISSUE-250: every production phase that reads or replaces the live target needs the freeze.
+  const FREEZE = ['--freeze-record', '/home/arm/freeze.json'];
+  const FREEZE_PROD = [...FREEZE, '--old-database', `${PRE_REBUILD_PREFIX}1`];
   it('requires a phase and a database, and binds them', () => {
     expect(() => parseArgs([])).toThrow(/--database is required/);
     expect(() => parseArgs(['--database', 'afldb_prod'])).toThrow(/--phase is required/);
     expect(() => parseArgs(['--phase', 'nope', '--database', 'x'])).toThrow(/Unknown phase/);
     expect(() => parseArgs(['--phase', 'production', '--database', 'afldb_dev'])).toThrow(PromotionRefused);
-    const ok = parseArgs(['--phase', 'production', '--database', 'afldb_prod', '--compare', 's.json', '--expect-super-admin', 'ops@afldb.com']);
+    const ok = parseArgs(['--phase', 'production', '--database', 'afldb_prod', '--compare', 's.json', '--expect-super-admin', 'ops@afldb.com', ...FREEZE_PROD]);
     expect(ok).toMatchObject({ phase: 'production', database: 'afldb_prod', compare: 's.json', dsnEnv: DEFAULT_DSN_ENV });
   });
 
@@ -1033,9 +1046,9 @@ describe('checker arguments', () => {
     expect(() => parseArgs(['--phase', 'candidate', '--database', `${CANDIDATE_PREFIX}1`,
       '--lineage-remap-out', 'remap.sql'])).toThrow(/only meaningful with --phase restored/);
     expect(parseArgs(['--phase', 'restored', '--database', `${CANDIDATE_PREFIX}1`,
-      '--old-database', 'afldb_prod', '--lineage-remap-out', 'remap.sql']).lineageRemapOut)
+      '--old-database', 'afldb_prod', '--lineage-remap-out', 'remap.sql', ...FREEZE]).lineageRemapOut)
       .toBe('remap.sql');
-    const restored = parseArgs(['--phase', 'restored', '--database', `${CANDIDATE_PREFIX}1`, '--old-database', 'afldb_prod']);
+    const restored = parseArgs(['--phase', 'restored', '--database', `${CANDIDATE_PREFIX}1`, '--old-database', 'afldb_prod', ...FREEZE]);
     expect(restored.oldDatabase).toBe('afldb_prod');
   });
 
@@ -1063,14 +1076,14 @@ describe('checker arguments', () => {
       '--afl-api-supersede-out', 'e.json']))
       .toThrow(/only meaningful with --phase restored/);
     expect(parseArgs(['--phase', 'restored', '--database', `${CANDIDATE_PREFIX}1`,
-      '--old-database', 'afldb_prod', '--afl-api-supersede-out', 'e.json']).aflApiSupersedeOut)
+      '--old-database', 'afldb_prod', '--afl-api-supersede-out', 'e.json', ...FREEZE]).aflApiSupersedeOut)
       .toBe('e.json');
   });
 
   // AFLDB-ISSUE-141.
   it('defaults --environment to prod and refuses anything but prod|dev', () => {
     expect(parseArgs(['--phase', 'source', '--database', 'afldb_test']).environment).toBe('prod');
-    expect(parseArgs(['--environment', 'prod', '--phase', 'production', '--database', 'afldb_prod']).environment).toBe('prod');
+    expect(parseArgs(['--environment', 'prod', '--phase', 'production', '--database', 'afldb_prod', ...FREEZE_PROD]).environment).toBe('prod');
     expect(parseArgs(['--environment', 'dev', '--phase', 'production', '--database', 'afldb_dev']).environment).toBe('dev');
     expect(() => parseArgs(['--environment', 'staging', '--phase', 'source', '--database', 'afldb_test']))
       .toThrow(/Unknown environment/);
@@ -1093,7 +1106,7 @@ describe('checker arguments', () => {
   });
 
   it('offers the fixture-identity acceptance on DEV only, and never by default', () => {
-    expect(parseArgs(['--phase', 'production', '--database', 'afldb_prod']).allowFixtureIdentities).toBe(false);
+    expect(parseArgs(['--phase', 'production', '--database', 'afldb_prod', ...FREEZE_PROD]).allowFixtureIdentities).toBe(false);
     expect(parseArgs(['--environment', 'dev', '--phase', 'production', '--database', 'afldb_dev']).allowFixtureIdentities)
       .toBe(false);
     const accepted = parseArgs(['--environment', 'dev', '--phase', 'production', '--database', 'afldb_dev',
@@ -1116,7 +1129,8 @@ describe('checker arguments', () => {
     expect(() => parseArgs(['--plan', '--database', `${CANDIDATE_PREFIX}1`])).toThrow(/--old-database/);
     expect(() => parseArgs(['--plan', '--database', `${CANDIDATE_PREFIX}1`, '--old-database', 'afldb_prod'])).toThrow(/--pre-cutover-dump/);
     const plan = parseArgs(['--plan', '--database', `${CANDIDATE_PREFIX}1`, '--old-database', 'afldb_prod',
-      '--pre-cutover-dump', '/home/arm/a.dump', '--rebuilt-dump', '/home/arm/b.dump', '--plan-dir', 'out']);
+      '--pre-cutover-dump', '/home/arm/a.dump', '--rebuilt-dump', '/home/arm/b.dump', '--plan-dir', 'out',
+      '--freeze-record', '/home/arm/f.json', '--freeze-dump-proof', '/home/arm/p.json']);
     expect(plan).toMatchObject({ plan: true, planDir: 'out', preCutoverDump: '/home/arm/a.dump', rebuiltDump: '/home/arm/b.dump' });
     expect(() => parseArgs(['--plan', '--database', `${CANDIDATE_PREFIX}1`, '--old-database', 'afldb_prod',
       '--pre-cutover-dump', 'C:/Program Files/Git/home/arm/example.dump',
@@ -5094,5 +5108,671 @@ describe('AFLDB-ISSUE-249 first-kick-goal source identities', () => {
     const restored = main.slice(main.indexOf("if (phase === 'restored') {"));
     expect(restored.slice(0, restored.indexOf('gateLineageIdentity'))).toMatch(
       /gateFirstKickGoalIdentities\(\{ q: conn\.q, role: `candidate \$\{opts\.database\}` \}, present, report,\n\s+\{ target: \{ q: old\.q/);
+  });
+});
+
+/**
+ * AFLDB-ISSUE-250 — the production promotion freeze. DB-free: the generated operator SQL is
+ * pinned as text, the judgements are pure, and the checker's freeze phases run against a fake
+ * read-only database that answers exactly the queries they issue.
+ */
+describe('AFLDB-ISSUE-250 — the promotion freeze', () => {
+  const TOKEN = '0123456789abcdef0123456789abcdef';
+  const OTHER_TOKEN = 'fedcba9876543210fedcba9876543210';
+  const manifest = newFreezeManifest('prod', 'afldb_prod', TOKEN, new Date('2026-09-26T00:00:00Z'));
+  const DIGEST_A = 'a'.repeat(32);
+  const DIGEST_B = 'b'.repeat(32);
+  const EMPTY_MD5 = 'd41d8cd98f00b204e9800998ecf8427e';
+
+  type FakeDb = {
+    name: string; oid: string; owner: string; comment: string | null; publicConnect: boolean;
+    connectRoles: string[];
+    sessions: { pid: number; role: string | null; hasRole: boolean; superuser: boolean; application: string | null }[];
+    prepared: { gid: string; owner: string }[];
+    tables: Map<string, { rows: number; digest: string }>;
+    /** Replaces `sessions` once the digest has been read (a session arriving mid-digest). */
+    sessionsAfterDigest?: FakeDb['sessions'];
+  };
+
+  function frozenTables(rows = 1, digest = DIGEST_A): Map<string, { rows: number; digest: string }> {
+    return new Map(freezeDigestTables().map((t) => [t.key, { rows, digest }]));
+  }
+
+  function frozenDb(overrides: Partial<FakeDb> = {}): FakeDb {
+    return {
+      name: 'afldb_prod', oid: '16384', owner: 'afldb_owner', comment: manifest.comment, publicConnect: false,
+      connectRoles: ['afldb_backup', 'afldb_owner'], sessions: [], prepared: [], tables: frozenTables(),
+      ...overrides,
+    };
+  }
+
+  function fakeQuery(db: FakeDb): Query {
+    let digestDone = false;
+    return async (text, params) => {
+      if (text === FREEZE_DATABASE_STATE_SQL) {
+        return [{ oid: db.oid, name: db.name, owner: db.owner, comment: db.comment, publicConnect: db.publicConnect }];
+      }
+      if (text === FREEZE_CONNECT_ROLES_SQL) return db.connectRoles.map((role) => ({ role }));
+      if (text === FREEZE_SESSIONS_SQL) return (digestDone && db.sessionsAfterDigest) ? db.sessionsAfterDigest : db.sessions;
+      if (text === FREEZE_PREPARED_XACTS_SQL) return db.prepared;
+      if (/^SET /.test(text)) return [];
+      if (/^RESET /.test(text)) { digestDone = true; return []; }
+      if (text.startsWith('SELECT to_regclass')) {
+        return [{ present: db.tables.has(String(params?.[0]).replace(/"/g, '')) }];
+      }
+      const table = /FROM ("[a-z_]+"\."[a-z_]+") t\)/.exec(text);
+      if (table && text.includes('md5(t::text)')) {
+        const entry = db.tables.get(table[1].replace(/"/g, ''))!;
+        return [{ rows: entry.rows, digest: entry.digest }];
+      }
+      if (text === DATABASE_COMMENT_SQL) return [{ comment: db.comment }];
+      if (text.startsWith('SELECT current_database() AS database')) {
+        return [{ database: db.name, role_name: 'afldb_owner', addr: null, version: 'PostgreSQL 16.4, x' }];
+      }
+      throw new Error(`unexpected SQL: ${text.slice(0, 80)}`);
+    };
+  }
+
+  let dir: string;
+  let logSpy: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'afldb-freeze-'));
+    logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+  });
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+    logSpy.mockRestore();
+  });
+
+  function baseOpts(extra: Partial<Options> = {}): Options {
+    return {
+      environment: 'prod', dsnEnv: 'AFLDB_OWNER_DATABASE_URL', plan: false, checklist: false,
+      allowFixtureIdentities: false, ...extra,
+    };
+  }
+
+  function recordFor(tables = frozenTables(), oid = '16384') {
+    return buildFreezeRecord({
+      manifest, databaseOid: oid, now: new Date('2026-09-26T00:01:00Z'),
+      tables: [...tables].map(([table, e]) => ({ table, rows: e.rows, digest: e.digest })),
+    });
+  }
+
+  describe('marker and manifest', () => {
+    it('binds a random token to the live database of one environment', () => {
+      expect(manifest.comment).toBe(`afldb.promotion_freeze.v1 token=${TOKEN} environment=prod database=afldb_prod`);
+      expect(parseFreezeComment(manifest.comment)).toEqual({ token: TOKEN, environment: 'prod', database: 'afldb_prod' });
+      expect(newFreezeToken()).toMatch(/^[0-9a-f]{32}$/);
+      expect(newFreezeToken()).not.toBe(newFreezeToken());
+      expect(() => newFreezeManifest('prod', 'afldb_prod_candidate_1', TOKEN)).toThrow(/afldb_prod' only/);
+      expect(() => newFreezeManifest('prod', 'afldb_prod_pre_rebuild_1', TOKEN)).toThrow(PromotionRefused);
+      expect(() => newFreezeManifest('prod', 'afldb_dev', TOKEN)).toThrow(PromotionRefused);
+      expect(newFreezeManifest('dev', 'afldb_dev', TOKEN).comment).toContain('environment=dev database=afldb_dev');
+    });
+
+    it('never collides with the db:test:rebuild marker in the same database comment', () => {
+      expect(() => assertFreezeMarkerDistinct(AFL_API_REBUILD_MARKER_FORMAT)).not.toThrow();
+      expect(isAflApiRebuildMarkerComment(manifest.comment)).toBe(false);
+      expect(isFreezeMarkerComment(`${AFL_API_REBUILD_MARKER_FORMAT} x`)).toBe(false);
+      expect(parseFreezeComment(`${AFL_API_REBUILD_MARKER_FORMAT} x`)).toBeNull();
+    });
+
+    it('refuses a manifest from another environment or with a tampered marker', () => {
+      const text = JSON.stringify(manifest);
+      expect(parseFreezeManifest(text, 'prod')).toMatchObject({ token: TOKEN, database: 'afldb_prod' });
+      expect(() => parseFreezeManifest(text, 'dev')).toThrow(/--environment prod, not dev/);
+      expect(() => parseFreezeManifest(JSON.stringify({ ...manifest, token: OTHER_TOKEN }), 'prod')).toThrow(/does not match/);
+      expect(() => parseFreezeManifest('{', 'prod')).toThrow(/not valid JSON/);
+    });
+  });
+
+  describe('generated operator SQL', () => {
+    it('freezes in one transaction: guards on the EFFECTIVE acl, then revoke, grant, mark — and terminates nothing', () => {
+      const sql = freezeSql(manifest);
+      const guard = sql.indexOf('DO $guard$');
+      const revoke = sql.indexOf('REVOKE CONNECT, TEMPORARY ON DATABASE "afldb_prod" FROM PUBLIC;');
+      const grant = sql.indexOf('GRANT CONNECT ON DATABASE "afldb_prod" TO "afldb_backup";');
+      const mark = sql.indexOf(`COMMENT ON DATABASE "afldb_prod" IS '${manifest.comment}';`);
+      expect(sql.indexOf('BEGIN;')).toBeLessThan(guard);
+      expect(guard).toBeLessThan(revoke);
+      expect(revoke).toBeLessThan(grant);
+      expect(grant).toBeLessThan(mark);
+      expect(mark).toBeLessThan(sql.lastIndexOf('COMMIT;'));
+      // A NULL datacl (createdb's defaults) is the expected pre-freeze state (reviewer F-001).
+      expect(sql).toContain("aclexplode(coalesce(d.datacl, acldefault('d', d.datdba)))");
+      expect(sql).toMatch(/already carries a database comment/);
+      expect(sql).toMatch(/PUBLIC holds no CONNECT/);
+      expect(sql).toMatch(/is owned by %, not afldb_owner/);
+      expect(sql).not.toMatch(/pg_terminate_backend/);
+    });
+
+    it('terminates only on a database frozen by THIS token, and is re-runnable', () => {
+      const sql = freezeTerminateSql(manifest);
+      expect(sql.indexOf('DO $guard$')).toBeLessThan(sql.indexOf('pg_terminate_backend'));
+      expect(sql).toContain(`IS DISTINCT FROM '${manifest.comment}'`);
+      expect(sql).toMatch(/PUBLIC can still connect/);
+      expect(sql).not.toMatch(/\b(REVOKE|GRANT|COMMENT ON)\b/);
+      expect(sql).not.toMatch(/BEGIN;/);
+    });
+
+    it('releases with the exact inverse of the freeze, only for this token (reviewer F-002)', () => {
+      const sql = unfreezeSql(manifest);
+      expect(sql.indexOf('DO $guard$')).toBeLessThan(sql.indexOf('GRANT CONNECT, TEMPORARY'));
+      expect(sql).toContain('GRANT CONNECT, TEMPORARY ON DATABASE "afldb_prod" TO PUBLIC;');
+      expect(sql).toContain('REVOKE CONNECT ON DATABASE "afldb_prod" FROM "afldb_backup";');
+      expect(sql).toContain('COMMENT ON DATABASE "afldb_prod" IS NULL;');
+      expect(sql).toContain(`IS DISTINCT FROM '${manifest.comment}'`);
+      expect(sql).not.toMatch(/pre_rebuild|candidate_/);
+      // After a release the next freeze's guard sees PUBLIC + owner only again: the only
+      // explicit grant the freeze adds (afldb_backup) is the one the release removes.
+      expect(freezeSql(manifest).match(/GRANT CONNECT ON DATABASE [^;]+/g)).toEqual(['GRANT CONNECT ON DATABASE "afldb_prod" TO "afldb_backup"']);
+    });
+
+    it('rebuilds a token-bound recovery release, for the live name only', () => {
+      const recovered = recoveryManifest('prod', 'afldb_prod', OTHER_TOKEN);
+      expect(unfreezeSql(recovered)).toContain(`token=${OTHER_TOKEN}`);
+      expect(() => recoveryManifest('prod', 'afldb_prod_pre_rebuild_1', OTHER_TOKEN)).toThrow(PromotionRefused);
+      expect(() => recoveryManifest('prod', 'afldb_prod', 'nope')).toThrow(/freeze-token/);
+    });
+  });
+
+  describe('the digest set', () => {
+    it('covers every table the candidate does not take from the rebuild, generated from the contract', () => {
+      const keys = freezeDigestTables().map((t) => t.key);
+      for (const t of PROMOTION_CONTRACT) {
+        if (t.schema === 'public' && t.treatment !== 'rebuilt') expect(keys, t.name).toContain(`public.${t.name}`);
+        if (t.schema === 'public' && t.treatment === 'rebuilt') expect(keys, t.name).not.toContain(`public.${t.name}`);
+        if (t.schema === 'staging_aflw') for (const table of t.tables!) expect(keys).toContain(`staging_aflw.${table}`);
+      }
+      expect(keys).toContain('public.afl_api_identity_adjudications');
+      expect(keys).toContain('public.site_settings');
+      expect(keys).toContain('public.auth_users');
+      expect(keys.some((k) => k.startsWith('staging.'))).toBe(false);
+      expect(keys).not.toContain('public.players');
+    });
+
+    it('pins the text rendering and hashes each row, order-independently', () => {
+      expect(DIGEST_SESSION_SETTINGS.map(([k]) => k)).toEqual(['TimeZone', 'DateStyle', 'IntervalStyle', 'extra_float_digits', 'bytea_output']);
+      const sql = tableDigestSql('public', 'site_settings');
+      expect(sql).toContain('md5(string_agg(h, \'\' ORDER BY h))');
+      expect(sql).toContain('FROM "public"."site_settings" t');
+    });
+  });
+
+  describe('freeze-state judgement', () => {
+    const expected = { database: 'afldb_prod', comment: manifest.comment, oid: '16384' };
+    function obs(db: FakeDb) {
+      return {
+        database: { oid: db.oid, name: db.name, owner: db.owner, comment: db.comment, publicConnect: db.publicConnect },
+        connectRoles: db.connectRoles, sessions: db.sessions, preparedXacts: db.prepared,
+      };
+    }
+
+    it('accepts a frozen, quiescent database', () => {
+      expect(judgeFreezeState(obs(frozenDb()), expected, { quiescence: true }))
+        .toEqual({ problems: [], warnings: [], info: [] });
+    });
+
+    it('refuses a database that is not frozen, frozen by another token, or carrying a foreign comment', () => {
+      expect(judgeFreezeState(obs(frozenDb({ comment: null, publicConnect: true, connectRoles: ['afldb_app', 'afldb_import', 'afldb_owner'] })), expected, { quiescence: true }).problems)
+        .toEqual(expect.arrayContaining([
+          expect.stringMatching(/NOT frozen/), expect.stringMatching(/PUBLIC can still connect/),
+          expect.stringMatching(/afldb_app, afldb_import/),
+        ]));
+      expect(judgeFreezeState(obs(frozenDb({ comment: freezeComment(OTHER_TOKEN, 'prod', 'afldb_prod') })), expected, { quiescence: true }).problems)
+        .toEqual([expect.stringMatching(new RegExp(`another token \\(${OTHER_TOKEN}\\)`))]);
+      expect(judgeFreezeState(obs(frozenDb({ comment: `${AFL_API_REBUILD_MARKER_FORMAT} pending` })), expected, { quiescence: true }).problems)
+        .toEqual([expect.stringMatching(/foreign database comment/)]);
+    });
+
+    it('refuses a different physical database (OID) and a wrong owner', () => {
+      expect(judgeFreezeState(obs(frozenDb({ oid: '99999', owner: 'postgres' })), expected, { quiescence: true }).problems)
+        .toEqual([expect.stringMatching(/OID 99999 is not the frozen database's OID 16384/), expect.stringMatching(/owned by postgres/)]);
+    });
+
+    it('refuses an in-flight writer session and a prepared transaction; reports operators and autovacuum only', () => {
+      const judgement = judgeFreezeState(obs(frozenDb({
+        sessions: [
+          { pid: 11, role: 'afldb_import', hasRole: true, superuser: false, application: 'settle' },
+          { pid: 12, role: 'postgres', hasRole: true, superuser: true, application: 'psql' },
+          { pid: 13, role: null, hasRole: false, superuser: false, application: null },
+        ],
+        prepared: [{ gid: 'tx1', owner: 'afldb_app' }],
+      })), expected, { quiescence: true });
+      expect(judgement.problems).toEqual([
+        expect.stringMatching(/1 other session\(s\) still connected — run promotion-terminate\.sql.*pid 11 afldb_import \(settle\)/),
+        expect.stringMatching(/prepared transaction\(s\) could still commit: tx1 \(afldb_app\)/),
+      ]);
+      expect(judgement.warnings).toEqual([expect.stringMatching(/superuser session\(s\).*pid 12 postgres/)]);
+      expect(judgement.info).toEqual([expect.stringMatching(/role-less background process\(es\).*pid 13/)]);
+      // An owner session that is not this checker is a non-superuser role: refused.
+      expect(judgeFreezeState(obs(frozenDb({ sessions: [{ pid: 14, role: 'afldb_owner', hasRole: true, superuser: false, application: 'psql' }] })),
+        expected, { quiescence: true }).problems).toHaveLength(1);
+    });
+
+    it('does not judge sessions when quiescence is not asked for (the kept database after the swap)', () => {
+      expect(judgeFreezeState(obs(frozenDb({ sessions: [{ pid: 11, role: 'afldb_owner', hasRole: true, superuser: false, application: null }] })),
+        expected, { quiescence: false }).problems).toEqual([]);
+    });
+  });
+
+  describe('digest judgement, freeze record and dump proof', () => {
+    it('detects any changed, missing or extra table', () => {
+      const record = recordFor();
+      const same = record.tables.map((t) => ({ ...t }));
+      expect(judgeFreezeDigest(record.tables, same)).toEqual([]);
+      const changed = same.map((t) => (t.table === 'public.site_settings' ? { ...t, digest: DIGEST_B } : t));
+      expect(judgeFreezeDigest(record.tables, changed)).toEqual([expect.stringMatching(/^public\.site_settings: 1 row\(s\) digest bbbb/)]);
+      const missing = same.map((t) => (t.table === 'public.auth_users' ? { ...t, rows: -1, digest: 'missing' } : t));
+      expect(judgeFreezeDigest(record.tables, missing)).toEqual(['public.auth_users: missing']);
+      expect(judgeFreezeDigest(record.tables, [...same, { table: 'public.x', rows: 0, digest: EMPTY_MD5 }])).toEqual(['public.x: not in the freeze record']);
+    });
+
+    it('round-trips a record and refuses a tampered, foreign or stale one', () => {
+      const record = recordFor();
+      const text = JSON.stringify(record);
+      expect(parseFreezeRecord(text, 'prod')).toEqual(record);
+      expect(() => parseFreezeRecord(text, 'dev')).toThrow(/--environment prod, not dev/);
+      const tampered = { ...record, tables: record.tables.map((t, i) => (i === 0 ? { ...t, digest: DIGEST_B } : t)) };
+      expect(() => parseFreezeRecord(JSON.stringify(tampered), 'prod')).toThrow(/tampered/);
+      expect(() => parseFreezeRecord(JSON.stringify({ ...record, databaseOid: '16385' }), 'prod')).toThrow(/payload sha256/);
+      expect(() => parseFreezeRecord(JSON.stringify({ ...record, databaseOid: 'x' }), 'prod')).toThrow(/OID is malformed/);
+      const fewer = recordFor(new Map([...frozenTables()].slice(1)));
+      expect(() => parseFreezeRecord(JSON.stringify(fewer), 'prod')).toThrow(/different table set/);
+      expect(() => buildFreezeRecord({ manifest, databaseOid: '1', tables: [{ table: 'public.auth_users', rows: -1, digest: 'missing' }] }))
+        .toThrow(/missing table/);
+    });
+
+    it('binds a dump proof to exactly one record', () => {
+      const record = recordFor();
+      const proof = buildFreezeDumpProof({ record, dumpPath: '/home/arm/pre.dump', dumpSha256: 'c'.repeat(64) });
+      expect(parseFreezeDumpProof(JSON.stringify(proof), record)).toEqual(proof);
+      const other = recordFor(frozenTables(2));
+      expect(() => parseFreezeDumpProof(JSON.stringify(proof), other)).toThrow(/different freeze record/);
+      expect(() => parseFreezeDumpProof(JSON.stringify({ ...proof, dumpSha256: 'd'.repeat(64) }), record)).toThrow(/tampered/);
+      expect(restoreTestComment('c'.repeat(64))).toBe(`afldb.restore_test.v1 sha256=${'c'.repeat(64)}`);
+      expect(parseRestoreTestComment(restoreTestComment('c'.repeat(64)))).toBe('c'.repeat(64));
+      expect(parseRestoreTestComment(null)).toBeNull();
+      expect(parseRestoreTestComment('afldb.restore_test.v1 sha256=zz')).toBeNull();
+    });
+  });
+
+  describe('arguments', () => {
+    const REC = ['--freeze-record', '/home/arm/f.json'];
+    it('refuses every production phase that reads or replaces the live target without the freeze', () => {
+      expect(FREEZE_BOUND_PHASES).toEqual(['pre-cutover', 'restored', 'candidate', 'production']);
+      for (const argv of [
+        ['--phase', 'pre-cutover', '--database', 'afldb_prod'],
+        ['--phase', 'restored', '--database', `${CANDIDATE_PREFIX}1`, '--old-database', 'afldb_prod'],
+        ['--phase', 'candidate', '--database', `${CANDIDATE_PREFIX}1`, '--afl-api-supersede-in', '/home/arm/e.json'],
+        ['--phase', 'production', '--database', 'afldb_prod'],
+      ]) {
+        expect(() => parseArgs(argv), argv.join(' ')).toThrow(/needs --freeze-record <file> \(AFLDB-ISSUE-250\)/);
+      }
+      expect(parseArgs(['--phase', 'pre-cutover', '--database', 'afldb_prod', ...REC]).freezeRecord).toBe('/home/arm/f.json');
+      // The source phase never touches the target.
+      expect(() => parseArgs(['--phase', 'source', '--database', 'afldb_test', ...REC])).toThrow(/only meaningful/);
+    });
+
+    it('leaves DEV unchanged unless the operator opts in', () => {
+      expect(parseArgs(['--environment', 'dev', '--phase', 'pre-cutover', '--database', 'afldb_dev']).freezeRecord).toBeUndefined();
+      expect(parseArgs(['--environment', 'dev', '--phase', 'production', '--database', 'afldb_dev']).oldDatabase).toBeUndefined();
+      expect(parseArgs(['--environment', 'dev', '--plan', '--database', 'afldb_dev_candidate_1', '--old-database', 'afldb_dev',
+        '--pre-cutover-dump', '/home/arm/a.dump', '--rebuilt-dump', '/home/arm/b.dump', '--plan-dir', 'out']).plan).toBe(true);
+      expect(parseArgs(['--environment', 'dev', '--phase', 'pre-cutover', '--database', 'afldb_dev', ...REC]).freezeRecord)
+        .toBe('/home/arm/f.json');
+    });
+
+    it('post-swap acceptance under a freeze reads the renamed-aside database', () => {
+      expect(() => parseArgs(['--phase', 'production', '--database', 'afldb_prod', ...REC])).toThrow(/needs --old-database afldb_prod_pre_rebuild_<stamp>/);
+      expect(() => parseArgs(['--phase', 'production', '--database', 'afldb_prod', ...REC, '--old-database', 'afldb_prod'])).toThrow(/renamed aside/);
+      expect(parseArgs(['--phase', 'production', '--database', 'afldb_prod', ...REC, '--old-database', `${PRE_REBUILD_PREFIX}1`]).oldDatabase)
+        .toBe(`${PRE_REBUILD_PREFIX}1`);
+      expect(() => parseArgs(['--phase', 'production', '--database', 'afldb_prod', ...REC, '--old-database', 'afldb_prod_candidate_1']))
+        .toThrow(PromotionRefused);
+    });
+
+    it('binds the freeze phases to their databases and their files', () => {
+      expect(() => parseArgs(['--phase', 'frozen', '--database', 'afldb_prod'])).toThrow(/needs --freeze-manifest/);
+      expect(() => parseArgs(['--phase', 'frozen', '--database', `${CANDIDATE_PREFIX}1`, '--freeze-manifest', 'm', '--freeze-record-out', 'r']))
+        .toThrow(PromotionRefused);
+      expect(parseArgs(['--phase', 'frozen', '--database', 'afldb_prod', '--freeze-manifest', 'm', '--freeze-record-out', 'r']).phase).toBe('frozen');
+      expect(() => parseArgs(['--phase', 'freeze-dump', '--database', 'afldb_prod', ...REC, '--pre-cutover-dump', '/d', '--freeze-dump-proof-out', 'p']))
+        .toThrow(/afldb_restore_test/);
+      expect(() => parseArgs(['--phase', 'freeze-dump', '--database', 'afldb_restore_test', ...REC])).toThrow(/needs --freeze-record/);
+      expect(parseArgs(['--phase', 'freeze-dump', '--database', 'afldb_restore_test', ...REC, '--pre-cutover-dump', '/d',
+        '--freeze-dump-proof-out', 'p']).phase).toBe('freeze-dump');
+      expect(() => parseArgs(['--phase', 'pre-cutover', '--database', 'afldb_prod', ...REC, '--freeze-manifest', 'm'])).toThrow(/only meaningful with --phase frozen/);
+      expect(() => parseArgs(['--phase', 'pre-cutover', '--database', 'afldb_prod', ...REC, '--freeze-dump-proof', 'p'])).toThrow(/only meaningful with --plan/);
+      expect(() => parseArgs(['--phase', 'pre-cutover', '--database', 'afldb_prod', ...REC, '--pre-cutover-dump', '/d'])).toThrow(/only meaningful with --plan and --phase freeze-dump/);
+    });
+
+    it('scopes the standalone freeze modes', () => {
+      expect(parseArgs(['--freeze-plan', '--database', 'afldb_prod', '--freeze-dir', 'd']).freezePlan).toBe(true);
+      expect(() => parseArgs(['--freeze-plan', '--database', 'afldb_prod'])).toThrow(/needs --freeze-dir/);
+      expect(() => parseArgs(['--freeze-plan', '--database', 'afldb_prod_pre_rebuild_1', '--freeze-dir', 'd'])).toThrow(/afldb_prod' only/);
+      expect(() => parseArgs(['--freeze-plan', '--phase', 'frozen', '--database', 'afldb_prod', '--freeze-dir', 'd'])).toThrow(/Choose exactly one/);
+      expect(() => parseArgs(['--unfreeze-recovery', '--database', 'afldb_prod', '--freeze-dir', 'd'])).toThrow(/needs --freeze-token/);
+      expect(() => parseArgs(['--unfreeze-recovery', '--database', 'afldb_prod', '--freeze-dir', 'd', '--freeze-token', 'XYZ'])).toThrow(/32-character/);
+      expect(parseArgs(['--unfreeze-recovery', '--database', 'afldb_prod', '--freeze-dir', 'd', '--freeze-token', TOKEN]).freezeToken).toBe(TOKEN);
+      expect(parseArgs(['--freeze-status']).freezeStatus).toBe(true);
+      expect(() => parseArgs(['--phase', 'pre-cutover', '--database', 'afldb_prod', ...REC, '--freeze-dir', 'd'])).toThrow(/only meaningful with --freeze-plan/);
+    });
+
+    it('a production plan needs the record and the dump proof, together', () => {
+      const plan = ['--plan', '--database', `${CANDIDATE_PREFIX}1`, '--old-database', 'afldb_prod',
+        '--pre-cutover-dump', '/home/arm/a.dump', '--rebuilt-dump', '/home/arm/b.dump', '--plan-dir', 'out'];
+      expect(() => parseArgs(plan)).toThrow(/--freeze-record <file> and --freeze-dump-proof/);
+      expect(() => parseArgs([...plan, ...REC])).toThrow(/together/);
+      expect(() => parseArgs(['--environment', 'dev', ...plan.map((a) => a.replace('afldb_prod', 'afldb_dev')), ...REC])).toThrow(/together/);
+    });
+  });
+
+  describe('--freeze-plan and --unfreeze-recovery files', () => {
+    it('writes the manifest and three SQL files once, never a second token', () => {
+      const opts = baseOpts({ freezePlan: true, database: 'afldb_prod', freezeDir: join(dir, 'freeze') });
+      const written = writeFreezePlan(opts, TOKEN);
+      expect(written.map((p) => p.split(/[\\/]/).at(-1))).toEqual([
+        'promotion-freeze.json', 'promotion-freeze.sql', 'promotion-terminate.sql', 'promotion-unfreeze.sql',
+      ]);
+      expect(parseFreezeManifest(readFileSync(written[0], 'utf8'), 'prod').token).toBe(TOKEN);
+      expect(readFileSync(written[1], 'utf8')).toBe(freezeSql(parseFreezeManifest(readFileSync(written[0], 'utf8'), 'prod')));
+      expect(() => writeFreezePlan(opts)).toThrow(/refusing to write a second freeze plan/);
+      expect(readdirSync(join(dir, 'freeze'))).toHaveLength(4);
+    });
+
+    it('writes a recovery release bound to the token read off the live marker', () => {
+      const path = writeUnfreezeRecovery(baseOpts({ unfreezeRecovery: true, database: 'afldb_prod', freezeDir: dir, freezeToken: OTHER_TOKEN }));
+      expect(readFileSync(path, 'utf8')).toContain(freezeComment(OTHER_TOKEN, 'prod', 'afldb_prod'));
+      expect(() => writeUnfreezeRecovery(baseOpts({ unfreezeRecovery: true, database: 'afldb_prod', freezeDir: dir, freezeToken: OTHER_TOKEN })))
+        .toThrow(/already exists/);
+    });
+  });
+
+  describe('--phase frozen', () => {
+    function frozenOpts() {
+      const manifestPath = join(dir, 'promotion-freeze.json');
+      writeFileSync(manifestPath, JSON.stringify(manifest), 'utf8');
+      return baseOpts({ phase: 'frozen', database: 'afldb_prod', freezeManifest: manifestPath, freezeRecordOut: join(dir, 'record.json') });
+    }
+
+    it('records F0 and the OID once the freeze and quiescence are proven', async () => {
+      const opts = frozenOpts();
+      const report = new Report();
+      await runFrozenPhase(fakeQuery(frozenDb()), opts, report);
+      expect(report.failed).toBe(false);
+      const record = parseFreezeRecord(readFileSync(opts.freezeRecordOut!, 'utf8'), 'prod');
+      expect(record).toMatchObject({ token: TOKEN, databaseOid: '16384', database: 'afldb_prod' });
+      expect(record.tables).toHaveLength(freezeDigestTables().length);
+    });
+
+    it('follows the same protocol when nothing was written (empty production-owned tables)', async () => {
+      const opts = frozenOpts();
+      const report = new Report();
+      await runFrozenPhase(fakeQuery(frozenDb({ tables: frozenTables(0, EMPTY_MD5) })), opts, report);
+      expect(report.failed).toBe(false);
+      expect(parseFreezeRecord(readFileSync(opts.freezeRecordOut!, 'utf8'), 'prod').tables.every((t) => t.rows === 0)).toBe(true);
+    });
+
+    const refusals: [string, Partial<FakeDb>][] = [
+      ['the freeze was never established', { comment: null, publicConnect: true, connectRoles: ['afldb_app', 'afldb_owner'] }],
+      ['another promotion froze it (wrong token)', { comment: freezeComment(OTHER_TOKEN, 'prod', 'afldb_prod') }],
+      ['an in-flight writer is still connected', { sessions: [{ pid: 7, role: 'afldb_app', hasRole: true, superuser: false, application: 'next' }] }],
+      ['a prepared transaction exists', { prepared: [{ gid: 'g', owner: 'afldb_import' }] }],
+      ['a writer connected while the digest was read', {
+        sessionsAfterDigest: [{ pid: 8, role: 'afldb_owner', hasRole: true, superuser: false, application: 'psql' }],
+      }],
+    ];
+    for (const [name, override] of refusals) {
+      it(`refuses, and writes no record, when ${name}`, async () => {
+        const opts = frozenOpts();
+        const report = new Report();
+        await runFrozenPhase(fakeQuery(frozenDb(override)), opts, report);
+        expect(report.failed).toBe(true);
+        expect(existsSync(opts.freezeRecordOut!)).toBe(false);
+      });
+    }
+
+    it('refuses a manifest for another database, and an existing record', async () => {
+      const opts = frozenOpts();
+      await expect(runFrozenPhase(fakeQuery(frozenDb()), { ...opts, database: 'afldb_dev' }, new Report()))
+        .rejects.toThrow(/froze afldb_prod, not afldb_dev/);
+      writeFileSync(opts.freezeRecordOut!, 'x', 'utf8');
+      await expect(runFrozenPhase(fakeQuery(frozenDb()), opts, new Report())).rejects.toThrow(/already exists/);
+    });
+  });
+
+  describe('--phase freeze-dump', () => {
+    const SHA = 'e'.repeat(64);
+    function dumpOpts() {
+      return baseOpts({ phase: 'freeze-dump', database: 'afldb_restore_test', preCutoverDump: '/home/arm/pre.dump',
+        freezeDumpProofOut: join(dir, 'proof.json') });
+    }
+    const restoreDb = (overrides: Partial<FakeDb> = {}) => frozenDb({ name: 'afldb_restore_test', comment: restoreTestComment(SHA), ...overrides });
+
+    it('proves the restored dump is the frozen state and writes the proof', async () => {
+      const opts = dumpOpts();
+      const report = new Report();
+      await runFreezeDumpPhase(fakeQuery(restoreDb()), opts, recordFor(), SHA, report);
+      expect(report.failed).toBe(false);
+      expect(parseFreezeDumpProof(readFileSync(opts.freezeDumpProofOut!, 'utf8'), recordFor()).dumpSha256).toBe(SHA);
+    });
+
+    const refusals: [string, Partial<FakeDb>, string?][] = [
+      ['restore-test.sh never recorded a dump', { comment: null }],
+      ['a different (older) dump was restored', {}, 'f'.repeat(64)],
+      ['the dump predates a write (digest differs)', { tables: frozenTables(1, DIGEST_B) }],
+    ];
+    for (const [name, override, sha] of refusals) {
+      it(`refuses, and writes no proof, when ${name}`, async () => {
+        const opts = dumpOpts();
+        const report = new Report();
+        await runFreezeDumpPhase(fakeQuery(restoreDb(override)), opts, recordFor(), sha ?? SHA, report);
+        expect(report.failed).toBe(true);
+        expect(existsSync(opts.freezeDumpProofOut!)).toBe(false);
+      });
+    }
+  });
+
+  describe('pre-swap and post-swap gates', () => {
+    it('pre-swap: the live target must still be frozen, quiescent and hold exactly F0', async () => {
+      const record = recordFor();
+      const ok = new Report();
+      await gateFrozenTarget(fakeQuery(frozenDb()), 'live target afldb_prod', 'afldb_prod', record, true, ok);
+      expect(ok.failed).toBe(false);
+      const drift = frozenTables();
+      drift.set('public.afl_api_identity_adjudications', { rows: 2, digest: DIGEST_B });
+      const drifted = new Report();
+      await gateFrozenTarget(fakeQuery(frozenDb({ tables: drift })), 'live target afldb_prod', 'afldb_prod', record, true, drifted);
+      expect(drifted.failed).toBe(true);
+      expect(drifted.results.find((r) => r.verdict === 'FAIL')!.lines.join('\n')).toMatch(/afl_api_identity_adjudications/);
+      const unfrozen = new Report();
+      await gateFrozenTarget(fakeQuery(frozenDb({ comment: null, publicConnect: true })), 'live', 'afldb_prod', record, true, unfrozen);
+      expect(unfrozen.failed).toBe(true);
+    });
+
+    it('post-swap: the kept database, by OID, must still hold F0 — a write in the last-check-to-swap gap refuses acceptance', async () => {
+      const record = recordFor();
+      const kept = (overrides: Partial<FakeDb> = {}) => frozenDb({ name: `${PRE_REBUILD_PREFIX}1`, ...overrides });
+      const accepted = new Report();
+      await gateFrozenTarget(fakeQuery(kept()), 'kept', `${PRE_REBUILD_PREFIX}1`, record, false, accepted);
+      expect(accepted.failed).toBe(false);
+      const gap = frozenTables();
+      gap.set('public.site_settings', { rows: 1, digest: DIGEST_B });
+      const refused = new Report();
+      await gateFrozenTarget(fakeQuery(kept({ tables: gap })), 'kept', `${PRE_REBUILD_PREFIX}1`, record, false, refused);
+      expect(refused.failed).toBe(true);
+      const otherDb = new Report();
+      await gateFrozenTarget(fakeQuery(kept({ oid: '20000' })), 'kept', `${PRE_REBUILD_PREFIX}1`, record, false, otherDb);
+      expect(otherDb.failed).toBe(true);
+    });
+
+    it('post-swap: the promoted live database is the candidate, unmarked and open', async () => {
+      const record = recordFor();
+      const live = (overrides: Partial<FakeDb>) => fakeQuery(frozenDb({ oid: '20001', comment: null, publicConnect: true, ...overrides }));
+      const ok = new Report();
+      await gatePromotedLiveUnfrozen(live({}), record, ok);
+      expect(ok.failed).toBe(false);
+      for (const bad of [{ oid: '16384' }, { comment: manifest.comment }, { publicConnect: false }]) {
+        const report = new Report();
+        await gatePromotedLiveUnfrozen(live(bad), record, report);
+        expect(report.failed, JSON.stringify(bad)).toBe(true);
+      }
+    });
+  });
+
+  describe('freeze-bound plan', () => {
+    const PLAN = {
+      candidate: `${CANDIDATE_PREFIX}20260926-120000`, oldDatabase: 'afldb_prod',
+      preCutoverDump: '/home/arm/pre.dump', rebuiltDump: '/home/arm/rebuilt.dump',
+    } as const;
+    const binding = {
+      environment: 'prod' as const, database: 'afldb_prod', token: TOKEN, comment: manifest.comment, dumpSha256: 'c'.repeat(64),
+    };
+
+    it('the swap renames nothing and terminates nothing unless the live target is frozen by this token', () => {
+      const sql = frozenSwapSql(PLAN, binding);
+      const guard = sql.indexOf('DO $guard$');
+      const candidateGuard = sql.indexOf('DO $candidate$');
+      expect(guard).toBeGreaterThan(0);
+      expect(guard).toBeLessThan(candidateGuard);
+      expect(candidateGuard).toBeLessThan(sql.indexOf('pg_terminate_backend'));
+      expect(sql.indexOf('pg_terminate_backend')).toBeLessThan(sql.indexOf('ALTER DATABASE'));
+      expect(sql).toContain(`IS DISTINCT FROM '${manifest.comment}'`);
+      expect(sql).toMatch(/pg_prepared_xacts WHERE database = 'afldb_prod'/);
+      expect(sql).toContain(swapSql(PLAN).replace('\\set ON_ERROR_STOP on\n', ''));
+      expect(sql).toMatch(/BEFORE starting afldb/);
+      expect(sql.match(/\\set ON_ERROR_STOP on/g)).toHaveLength(1);
+      expect(() => frozenSwapSql({ ...PLAN, environment: 'dev', candidate: 'afldb_dev_candidate_1', oldDatabase: 'afldb_dev' }, binding))
+        .toThrow(/freeze record is for afldb_prod/);
+    });
+
+    it('the rollback needs the kept database frozen by this token and leaves the original STILL FROZEN', () => {
+      const sql = frozenRollbackSql(PLAN, binding);
+      expect(sql).toContain("WHERE d.datname = 'afldb_prod_pre_rebuild_20260926-120000'");
+      expect(sql.indexOf('DO $live$')).toBeLessThan(sql.indexOf('ALTER DATABASE'));
+      expect(sql).toContain(rollbackSql(PLAN).replace('\\set ON_ERROR_STOP on\n', ''));
+      expect(sql).toMatch(/STILL FROZEN[\s\S]*promotion-unfreeze\.sql/);
+      expect(sql).not.toMatch(/GRANT|REVOKE|COMMENT ON/);
+    });
+
+    it('the transcript re-checks the proven dump before the first restore', () => {
+      const plan = reinstatePlan({ ...PLAN, preCutoverDumpSha256: 'c'.repeat(64) });
+      const check = plan.indexOf(`printf '%s  %s\\n' '${'c'.repeat(64)}' '/home/arm/pre.dump' | sha256sum --check --strict`);
+      expect(check).toBeGreaterThan(0);
+      expect(check).toBeLessThan(plan.indexOf('promotion-truncate.sql'));
+      expect(check).toBeLessThan(plan.indexOf('pg_restore'));
+      expect(() => reinstatePlan({ ...PLAN, preCutoverDumpSha256: 'zz' })).toThrow(/malformed/);
+    });
+
+    it('without a freeze, every plan file is byte-identical to today, in both environments', () => {
+      for (const environment of ['prod', 'dev'] as const) {
+        const names = environmentNames(environment);
+        const input = { ...PLAN, environment, candidate: `${names.candidatePrefix}20260926-120000`, oldDatabase: names.live };
+        const out = join(dir, environment);
+        writePlan(baseOpts({ environment, plan: true, database: input.candidate, oldDatabase: input.oldDatabase,
+          preCutoverDump: input.preCutoverDump, rebuiltDump: input.rebuiltDump, planDir: out }));
+        expect(readFileSync(join(out, 'promotion-swap.sql'), 'utf8')).toBe(swapSql(input));
+        expect(readFileSync(join(out, 'promotion-rollback.sql'), 'utf8')).toBe(rollbackSql(input));
+        expect(readFileSync(join(out, 'promotion-reinstate.sh'), 'utf8')).toBe(reinstatePlan(input));
+        expect(reinstatePlan(input)).not.toMatch(/sha256sum|AFLDB-ISSUE-250/);
+      }
+    });
+
+    it('with a freeze, the written swap, rollback and transcript are the freeze-bound ones', () => {
+      writePlan(baseOpts({ plan: true, database: PLAN.candidate, oldDatabase: 'afldb_prod', preCutoverDump: PLAN.preCutoverDump,
+        rebuiltDump: PLAN.rebuiltDump, planDir: dir }), binding);
+      expect(readFileSync(join(dir, 'promotion-swap.sql'), 'utf8')).toBe(frozenSwapSql(PLAN, binding));
+      expect(readFileSync(join(dir, 'promotion-rollback.sql'), 'utf8')).toBe(frozenRollbackSql(PLAN, binding));
+      expect(readFileSync(join(dir, 'promotion-reinstate.sh'), 'utf8')).toContain('sha256sum --check --strict');
+    });
+
+    it('binds the plan to the record, the proof and the dump file as it is now', async () => {
+      const dump = join(dir, 'pre.dump');
+      writeFileSync(dump, 'frozen production bytes', 'utf8');
+      const sha = await sha256File(dump);
+      const record = recordFor();
+      const recordPath = join(dir, 'record.json');
+      const proofPath = join(dir, 'proof.json');
+      writeFileSync(recordPath, JSON.stringify(record), 'utf8');
+      writeFileSync(proofPath, JSON.stringify(buildFreezeDumpProof({ record, dumpPath: dump, dumpSha256: sha })), 'utf8');
+      const opts = baseOpts({ plan: true, database: PLAN.candidate, oldDatabase: 'afldb_prod', preCutoverDump: dump,
+        rebuiltDump: PLAN.rebuiltDump, planDir: join(dir, 'plan'), freezeRecord: recordPath, freezeDumpProof: proofPath });
+      await expect(freezeBindingFor(opts)).resolves.toEqual({
+        environment: 'prod', database: 'afldb_prod', token: TOKEN, comment: manifest.comment, dumpSha256: sha,
+      });
+      writeFileSync(dump, 'an older nightly dump', 'utf8');
+      await expect(freezeBindingFor(opts)).rejects.toThrow(/but --phase freeze-dump proved/);
+      writeFileSync(proofPath, JSON.stringify(buildFreezeDumpProof({ record: recordFor(frozenTables(3)), dumpPath: dump, dumpSha256: sha })), 'utf8');
+      await expect(freezeBindingFor(opts)).rejects.toThrow(/different freeze record/);
+    });
+  });
+
+  describe('--freeze-status after a crash', () => {
+    const row = (name: string, comment: string | null, publicConnect: boolean, oid = '1') => ({ oid, name, comment, publicConnect });
+
+    it('names a frozen live database, how to continue or release it, and the kept database', () => {
+      const lines = describeFreezeStatus([
+        row('afldb_prod', manifest.comment, false),
+        row(`${PRE_REBUILD_PREFIX}20260901-000000`, freezeComment(OTHER_TOKEN, 'prod', 'afldb_prod'), false),
+        row('afldb_dev', null, true),
+      ], 'prod');
+      expect(lines).toHaveLength(2);
+      expect(lines[0]).toMatch(new RegExp(`LIVE DATABASE FROZEN.*--unfreeze-recovery --freeze-token ${TOKEN}`));
+      expect(lines[1]).toMatch(/kept database, frozen \(expected after a promotion/);
+    });
+
+    it('detects a swap that stopped between its renames, and inconsistent state', () => {
+      const lines = describeFreezeStatus([
+        row(`${PRE_REBUILD_PREFIX}20260926-120000`, manifest.comment, false),
+        row(`${CANDIDATE_PREFIX}20260926-120000`, null, true),
+      ], 'prod');
+      expect(lines[0]).toMatch(/NO LIVE DATABASE/);
+      expect(describeFreezeStatus([row('afldb_prod', manifest.comment, true)], 'prod')[0]).toMatch(/INCONSISTENT/);
+      expect(describeFreezeStatus([row('afldb_prod', null, false)], 'prod')[0]).toMatch(/INCONSISTENT/);
+      expect(describeFreezeStatus([row('afldb_prod', null, true)], 'prod')[0]).toMatch(/live, writable \(normal\)/);
+    });
+  });
+
+  describe('source shape', () => {
+    const freezeSource = readFileSync(join(REPO, 'tools', 'db', 'promotion-freeze.ts'), 'utf8');
+    const checker = readFileSync(join(REPO, 'tools', 'db', 'promotion-check.ts'), 'utf8');
+
+    it('the freeze module writes no file and runs nothing; the checker never executes the generated SQL', () => {
+      expect(freezeSource).not.toMatch(/writeFileSync|child_process|spawn/);
+      expect(checker).not.toMatch(/q\((freezeSql|freezeTerminateSql|unfreezeSql|frozenSwapSql|frozenRollbackSql)/);
+      expect(checker).not.toMatch(/pg_terminate_backend/);
+    });
+
+    it('restore-test.sh hashes before restoring, clears first, and binds only after parity passes', () => {
+      const script = readFileSync(join(REPO, 'tools', 'maintenance', 'restore-test.sh'), 'utf8');
+      const hash = script.indexOf('BACKUP_SHA256=$(sha256sum "$BACKUP"');
+      const clear = script.indexOf('COMMENT ON DATABASE ${RESTORE_DB} IS NULL');
+      const restore = script.indexOf('pg_restore \\');
+      const bind = script.indexOf("COMMENT ON DATABASE ${RESTORE_DB} IS 'afldb.restore_test.v1 sha256=${BACKUP_SHA256}'");
+      expect(hash).toBeGreaterThan(0);
+      expect(hash).toBeLessThan(clear);
+      expect(clear).toBeLessThan(restore);
+      expect(restore).toBeLessThan(bind);
+      expect(bind).toBeGreaterThan(script.indexOf('if [[ $FAILED -eq 0 ]]; then'));
+      expect(bind).toBeLessThan(script.indexOf('Restore verified: the backup is proven.'));
+      // The literal the script writes is exactly what the checker parses.
+      expect(parseRestoreTestComment(`afldb.restore_test.v1 sha256=${'a'.repeat(64)}`)).toBe('a'.repeat(64));
+      expect(restoreTestComment('a'.repeat(64))).toBe(`afldb.restore_test.v1 sha256=${'a'.repeat(64)}`);
+    });
+
+    it('freeze-status reads the postgres database, never a target by name', () => {
+      expect(checker).toMatch(/openReadOnly\(withDatabase\(baseDsn, 'postgres'\), 'freeze-status'\)/);
+    });
+
+    it('the checklist runs post-swap acceptance before the application starts', () => {
+      const text = ACCEPTANCE_CHECKLIST.join('\n');
+      const freeze = text.indexOf('promotion-freeze.sql');
+      const backup = text.indexOf('backup.sh');
+      expect(freeze).toBeGreaterThan(0);
+      expect(freeze).toBeLessThan(backup);
+      const production = ACCEPTANCE_CHECKLIST.findIndex((i) => i.includes('--phase production'));
+      expect(ACCEPTANCE_CHECKLIST[production]).toMatch(/BEFORE afldb was started/);
+    });
   });
 });

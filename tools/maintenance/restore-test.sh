@@ -94,6 +94,17 @@ if ! psql "$RESTORE_DSN" -c 'SELECT 1' > /dev/null 2>&1; then
   exit 1
 fi
 
+# AFLDB-ISSUE-250: bind the restored copy to the exact dump file. Hash it BEFORE restoring (a
+# file replaced mid-run cannot be bound), clear any earlier binding first (a failed run must
+# never leave a stale one), and record it as the database comment only after every parity check
+# passes. `db:promotion:check --phase freeze-dump` reads it back.
+BACKUP_SHA256=$(sha256sum "$BACKUP" | awk '{print $1}')
+if [[ ! "$BACKUP_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
+  echo "ERROR: could not hash ${BACKUP}." >&2
+  exit 1
+fi
+psql "$RESTORE_DSN" -v ON_ERROR_STOP=1 -q -c "COMMENT ON DATABASE ${RESTORE_DB} IS NULL"
+
 START=$(date +%s)
 
 # Empty the target BEFORE restoring. Without this a failed restore leaves
@@ -193,6 +204,10 @@ check "unrecorded disposals"     "SELECT count(*) FROM player_match_stats WHERE 
 check "stat_availability rows"   "SELECT count(*) FROM stat_availability"
 
 if [[ $FAILED -eq 0 ]]; then
+  # set -e: if the binding cannot be recorded the script fails here, never "proven" without it.
+  psql "$RESTORE_DSN" -v ON_ERROR_STOP=1 -q \
+    -c "COMMENT ON DATABASE ${RESTORE_DB} IS 'afldb.restore_test.v1 sha256=${BACKUP_SHA256}'"
+  echo "    recorded restored dump sha256 ${BACKUP_SHA256}"
   echo "==> Restore verified: the backup is proven."
 else
   echo "==> RESTORE VERIFICATION FAILED: ${FAILED} check(s) differ." >&2

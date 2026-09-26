@@ -43,6 +43,12 @@ afldb_restore_test          ← never afldb_dev
 9 parity checks against the source
 ```
 
+When every check passes, the script records the restored dump's sha256 (computed before the
+restore) as `afldb_restore_test`'s database comment, `afldb.restore_test.v1 sha256=<hex>`, after
+clearing any earlier one at the start of the run. `db:promotion:check --phase freeze-dump` reads it
+back to prove a production promotion reinstates from exactly the frozen dump
+(`AFLDB-ISSUE-250`, `docs/production-promotion.md` §4.1). The comment changes nothing else.
+
 Restoring into `afldb_restore_test` means a verification run can never damage development data. The database is created once by `tools/maintenance/01_setup_service.sh`, which has been run: the restore path is verified end to end, not merely written down.
 
 `pg_restore` emits "must be owner of extension" for `pg_trgm` and `unaccent` because the restoring role does not own them. Both messages are harmless — the extensions already exist in the target and must stay — and are filtered by exact message. Errors are never suppressed wholesale: the parity checks are what decide whether the restore worked, and they exit non-zero on any difference.

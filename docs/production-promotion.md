@@ -265,7 +265,66 @@ sudo systemctl status afldb afldb-settle-afltables.timer --no-pager
 
 Decide the stamp now and use it everywhere: `STAMP=$(date +%Y%m%d-%H%M%S)`.
 
-## 4. Mandatory production backup, proven
+## 4. Freeze production, then take the mandatory backup, proven
+
+**Why the freeze (`AFLDB-ISSUE-250`).** §7 reinstates every production-owned table from the
+dump taken here, and the swap is much later. Before this section existed every production writer
+— the application (NL telemetry on every search, logins, the Admin Centre), the settle timers,
+manual importers — stayed live until §8, so a write committed after the dump's snapshot was
+absent from the candidate and **silently lost** at the swap. The freeze makes that impossible and
+provable: from 4.0 until the swap, PostgreSQL itself refuses every connection except
+`afldb_owner`, `afldb_backup` and superusers, and the checker proves, by a per-table content
+digest (F0) and the database OID, that the dump, the live target right up to the swap, and the
+database the swap renames aside all hold exactly the same production-owned state. The
+application is down from 4.0 until §8 accepts the promotion; production serves only the gated
+beta host, and the apex is a static page.
+
+### 4.0 Stop every writer and freeze the target
+
+```bash
+# PROD: afldb-prod
+hostname
+FREEZE=~/backups/afldb/promotion-$STAMP-freeze
+# Every installed unit: afldb, the three settle timers and their services, email intake.
+systemctl list-units --all 'afldb*' --no-pager
+sudo systemctl stop afldb-settle-afltables.timer afldb-settle-afltables.service afldb
+# and, if installed: afldb-settle-afl-api.timer afldb-settle-afl-api.service
+#                    afldb-settle-afl-api-brownlow.timer afldb-settle-afl-api-brownlow.service
+#                    afldb-email-intake.timer afldb-email-intake.service
+systemctl is-active afldb-settle-afltables.service     # must print inactive
+npm run db:promotion:check -- --freeze-plan --database afldb_prod --freeze-dir "$FREEZE"
+# read promotion-freeze.sql, promotion-terminate.sql and promotion-unfreeze.sql first
+sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d postgres -f - < "$FREEZE/promotion-freeze.sql"      # never with -1
+sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d postgres -f - < "$FREEZE/promotion-terminate.sql"
+npm run db:promotion:check -- --phase frozen --database afldb_prod \
+    --freeze-manifest "$FREEZE/promotion-freeze.json" --freeze-record-out "$FREEZE/promotion-freeze-record.json"
+```
+
+**Feed every generated SQL file to `postgres` on stdin** (`-f - < file`), here and in §8/§10. The
+files are mode 600 in `~/backups/afldb` (mode 700) under a home directory the `postgres` user
+cannot traverse, so `sudo -u postgres psql -f <path>` fails with `Permission denied` and runs
+nothing (proven on DEV, `AFLDB-ISSUE-250` §17). The stdin form is opened by the operator's own
+shell and sends the same bytes; every generated file starts with `\set ON_ERROR_STOP on`.
+
+- `promotion-freeze.sql` is one transaction: guards (the database exists, is owned by
+  `afldb_owner`, carries **no** database comment — a leftover freeze or a `db:test:rebuild` marker
+  refuses — and holds today's default access, `PUBLIC` CONNECT and no other explicit grantee),
+  then `REVOKE CONNECT, TEMPORARY … FROM PUBLIC`, `GRANT CONNECT … TO afldb_backup`, and a
+  token-bound `COMMENT ON DATABASE` marker. From its `COMMIT`, `afldb_app`, `afldb_auth` and
+  `afldb_import` cannot connect. It terminates nothing.
+- `promotion-terminate.sql` (re-runnable; refuses unless this token's freeze is in place) ends
+  every session that was already connected. An open transaction is rolled back.
+- `--phase frozen` PASSes only when the marker and access are frozen, **no other non-superuser
+  session** is connected (autovacuum is reported, a superuser session is a WARN), and no prepared
+  transaction exists. It then reads F0, re-proves quiescence, and only then writes the freeze
+  record (database OID + F0). A reported session: run `promotion-terminate.sql` again and re-run.
+  Nothing here waits on a clock.
+
+**While frozen, the only owner-DSN tools run against `afldb_prod` are this checker and
+`restore-test.sh`.** A superuser or owner write to a production-owned table fails a later digest
+gate; a write to a rebuilt football table is replaced by the candidate anyway.
+
+### 4.1 Backup, restore test, dump proof
 
 ```bash
 # PROD: afldb-prod
@@ -274,8 +333,20 @@ bash tools/maintenance/backup.sh --keep 14            # ~/backups/afldb/afldb_pr
 PRE=$(ls -1t ~/backups/afldb/afldb_prod-*.dump | head -1); echo "$PRE"
 sha256sum "$PRE" | tee ~/backups/afldb/promotion-$STAMP.sha256
 pg_restore --list "$PRE" | grep -c '^[0-9]'           # objects, non-zero
-bash tools/maintenance/restore-test.sh "$PRE"        # parity checks into afldb_restore_test
+bash tools/maintenance/restore-test.sh "$PRE"        # parity checks into afldb_restore_test; records "$PRE"'s sha256
+npm run db:promotion:check -- --phase freeze-dump --database afldb_restore_test \
+    --freeze-record "$FREEZE/promotion-freeze-record.json" --pre-cutover-dump "$PRE" \
+    --freeze-dump-proof-out "$FREEZE/promotion-freeze-dump-proof.json"
 ```
+
+`--phase freeze-dump` is what makes `PRE=$(ls -1t … | head -1)` safe: it PASSes only when
+`restore-test.sh` recorded exactly `"$PRE"`'s sha256 on `afldb_restore_test` **and** the restored
+copy's digest equals F0. An older nightly dump, a failed `backup.sh` that left yesterday's dump
+newest, or a dump taken before the freeze is refused here, before anything is built from it —
+**whenever its production-owned content differs from F0**. The proof is by content, not by time:
+a dump taken before the freeze whose production-owned tables are byte-identical to F0 (no write
+happened in between) is accepted, and is safe, because reinstating it loses nothing (observed on
+DEV, `AFLDB-ISSUE-250` §17 P6.5).
 
 `restore-test.sh` needs `afldb_restore_test` (created by `01_setup_service.sh`). If the host
 lacks it, restore into a throwaway `afldb_restore_test` created with
@@ -289,8 +360,13 @@ before continuing (`docs/backup-restore.md` §4).
 # PROD: afldb-prod
 npm run db:promotion:check -- --phase pre-cutover --database afldb_prod \
     --snapshot ~/backups/afldb/promotion-$STAMP.json \
+    --freeze-record "$FREEZE/promotion-freeze-record.json" \
     --expect-super-admin <the real production super admin's email>
 ```
+
+**AFLDB-ISSUE-250.** `--freeze-record` is required under `--environment prod` here and in
+`restored`, `candidate` and `production`; each of those re-proves the live target frozen,
+quiescent and identical to F0, so the counts snapshot below is the frozen state.
 
 Refuses if production already holds a fixture identity or lacks an enabled, enrolled super
 admin — either is an existing problem to fix before promotion, not something to carry
@@ -333,7 +409,8 @@ The two "must be owner of extension" messages are the only tolerated errors
 ```bash
 npm run db:promotion:check -- --phase restored --database "$CAND" --old-database afldb_prod \
     --lineage-remap-out ~/backups/afldb/promotion-lineage-$STAMP.sql \
-    --afl-api-supersede-out ~/backups/afldb/promotion-afl-api-supersede-$STAMP.json
+    --afl-api-supersede-out ~/backups/afldb/promotion-afl-api-supersede-$STAMP.json \
+    --freeze-record "$FREEZE/promotion-freeze-record.json"
 ```
 
 This proves the candidate is the source (migration parity), reports the fixture rows the
@@ -473,8 +550,17 @@ Generate the plan (no database contact; refuses to overwrite):
 # PROD: afldb-prod
 npm run db:promotion:check -- --plan --database "$CAND" --old-database afldb_prod \
     --pre-cutover-dump "$PRE" --rebuilt-dump /home/arm/afldb_test_rebuilt_$STAMP.dump \
-    --plan-dir ~/backups/afldb/promotion-$STAMP
+    --plan-dir ~/backups/afldb/promotion-$STAMP \
+    --freeze-record "$FREEZE/promotion-freeze-record.json" \
+    --freeze-dump-proof "$FREEZE/promotion-freeze-dump-proof.json"
 ```
+
+**AFLDB-ISSUE-250.** Under `--environment prod` the plan requires the freeze record and the
+dump proof, re-hashes `"$PRE"` and refuses if it is not the proven dump. The plan is then
+**freeze-bound**: `promotion-reinstate.sh` starts with a `sha256sum --check` of `"$PRE"` (it must
+print `OK`; on `FAILED` stop), `promotion-swap.sql` refuses to terminate or rename anything unless
+`afldb_prod` still carries this freeze's marker with frozen access and no prepared transaction,
+and `promotion-rollback.sql` refuses unless the renamed-aside database is the frozen one.
 
 When this command is launched from Git Bash, set `MSYS_NO_PATHCONV=1` and
 `MSYS2_ARG_CONV_EXCL='*'` first. The checker also refuses any dump path that arrives as a
@@ -818,8 +904,12 @@ against the new lineage. That is the honest outcome of a lineage change, not a d
 npm run db:promotion:check -- --phase candidate --database "$CAND" \
     --compare ~/backups/afldb/promotion-$STAMP.json \
     --afl-api-supersede-in ~/backups/afldb/promotion-afl-api-supersede-$STAMP.json \
+    --freeze-record "$FREEZE/promotion-freeze-record.json" \
     --expect-super-admin <the real production super admin's email>
 ```
+
+This is the **last gate before the swap** (`AFLDB-ISSUE-250`): with `--freeze-record` it also opens
+the live `afldb_prod` and requires it still frozen, quiescent and identical to F0.
 
 Every gate must PASS: no fixture identity in any email-bearing table; the named super admin
 present, enabled, with password and TOTP; reinstated counts equal to the snapshot
@@ -845,13 +935,28 @@ verifies that state instead of refusing it:
 ```bash
 # PROD: afldb-prod
 hostname
-sudo systemctl stop afldb-settle-afltables.timer afldb-settle-afltables.service afldb
-sudo -u postgres psql -d postgres -f ~/backups/afldb/promotion-$STAMP/promotion-swap.sql
-sudo systemctl start afldb
+# The services have been stopped since §4.0; confirm nothing restarted them.
+systemctl is-active afldb afldb-settle-afltables.service            # both must print inactive
+sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d postgres -f - < ~/backups/afldb/promotion-$STAMP/promotion-swap.sql
 npm run db:promotion:check -- --phase production --database afldb_prod \
     --compare ~/backups/afldb/promotion-$STAMP.json \
+    --freeze-record "$FREEZE/promotion-freeze-record.json" \
+    --old-database afldb_prod_pre_rebuild_$STAMP \
     --expect-super-admin <the real production super admin's email>
+sudo systemctl start afldb                                            # only after the PASS above
 ```
+
+**AFLDB-ISSUE-250 — acceptance BEFORE the application starts.** `--phase production` now runs
+before `systemctl start afldb`, and it needs no running application. With `--freeze-record` it
+opens `afldb_prod_pre_rebuild_$STAMP` — the database the swap renamed aside, found by its OID —
+and requires it to still be frozen and to hold **exactly F0**. That closes the last gap: any write
+that reached the old target after the freeze, including one between `--phase candidate` and the
+swap, changes the digest, and the promotion is **not accepted**. It also requires the live
+`afldb_prod` to be the candidate (a different OID), with no freeze marker and open to the
+application. On a refusal nothing has written to the promoted database yet: run §10's rollback
+and release, and no write is lost. On a PASS, `systemctl start afldb` is the freeze release —
+writes resume, on the new database. The renamed-aside database stays frozen until cleanup drops
+it. The settle timers stay stopped until §9.
 
 The kept database is named `afldb_prod_pre_rebuild_<stamp>` on purpose: `tools/db/rebuild-test.ts`
 refuses to touch any `pre_rebuild` name, and the checker accepts it as `--old-database`. **Quote every
@@ -1091,13 +1196,35 @@ identities correctly, which is the point of promoting rather than repairing in p
 # PROD: afldb-prod
 hostname
 sudo systemctl stop afldb-settle-afltables.timer afldb-settle-afltables.service afldb
-sudo -u postgres psql -d postgres -f ~/backups/afldb/promotion-$STAMP/promotion-rollback.sql
+sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d postgres -f - < ~/backups/afldb/promotion-$STAMP/promotion-rollback.sql
+sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d postgres -f - < "$FREEZE/promotion-unfreeze.sql"   # AFLDB-ISSUE-250
 sudo systemctl start afldb
 ```
 
-Anything written to the promoted database between swap and rollback (a new audit row, a
-settle) is left in the candidate, not merged back; say so in the promotion record. If the
-cluster itself is lost, the pre-cutover dump plus `docs/backup-restore.md` §6 is the path.
+The freeze-bound rollback refuses unless `afldb_prod_pre_rebuild_$STAMP` carries this freeze's
+marker, and it brings the original back **still frozen**; only the token-guarded
+`promotion-unfreeze.sql` (the exact inverse of the freeze) lets writes in again. After a
+`--phase production` refusal nothing was written to the promoted database, so a rollback loses
+nothing. Anything written to the promoted database after `systemctl start afldb` and before a
+rollback (a new audit row, an admin edit) is left in the candidate, not merged back; say so in
+the promotion record. If the cluster itself is lost, the pre-cutover dump plus
+`docs/backup-restore.md` §6 is the path.
+
+**Abandoning a promotion before the swap, or recovering after a crash (`AFLDB-ISSUE-250`).**
+The freeze fails closed: an abandoned freeze keeps `afldb_prod` refusing the application, and
+nothing releases it automatically. To see where things stand, from any terminal:
+
+```bash
+npm run db:promotion:check -- --freeze-status          # reads the postgres database, never a target
+```
+
+It lists `afldb_prod`, every candidate and every kept database with its marker token, whether its
+access is frozen, and what that means (`LIVE DATABASE FROZEN`, `NO LIVE DATABASE` — a swap stopped
+between its renames: rename the frozen database back to `afldb_prod` by hand — or `INCONSISTENT`).
+To abandon: optionally `dropdb` the candidate, then run `promotion-unfreeze.sql` and start the
+services. If the freeze directory is lost, `--unfreeze-recovery --database afldb_prod --freeze-token
+<token --freeze-status printed> --freeze-dir <dir>` writes an equivalent token-bound release. A
+release never touches a `pre_rebuild` database and refuses a marker with any other token.
 
 **Cleanup** — not the same day. When the promotion record is closed:
 
@@ -1156,6 +1283,14 @@ more accepted **name shape** per phase, not a different procedure. §§0–12 ap
 with `afldb_dev` for `afldb_prod`, `afldb_dev_candidate_<stamp>` for the candidate,
 `afldb_dev_pre_rebuild_<stamp>` for the database renamed aside, and `DEV: streamanator` on
 every command line where §§3–10 say `PROD: afldb-prod`.
+
+**The freeze (§4.0, `AFLDB-ISSUE-250`) is required only under `prod`.** On DEV it is available,
+not automatic: pass `--environment dev` to `--freeze-plan`, `--phase frozen`, `--phase
+freeze-dump` and `--freeze-status`, then `--freeze-record` (and `--freeze-dump-proof` on `--plan`,
+`--old-database afldb_dev_pre_rebuild_<stamp>` on `--phase production`) exactly as §§4–8 show.
+Without `--freeze-record`, every DEV phase, plan file, swap and rollback is byte-identical to the
+pre-ISSUE-250 procedure. A DEV rehearsal of the freeze is the way to prove it before a
+production run (`issues/open/AFLDB-ISSUE-250.md` §12).
 
 **What differs — and only these three things.** The first two are command-line flags; the
 third is a tracked contract declaration with no flag at all.

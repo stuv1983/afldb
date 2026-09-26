@@ -9,7 +9,40 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Open issues:** 10
+**Open issues:** 11
+
+### AFLDB-ISSUE-250 — Production promotion can silently lose writes committed after the target snapshot
+- **Severity:** High. **Area:** production promotion / cutover state preservation —
+  `docs/production-promotion.md` §4–§8 and every production-owned table §7 reinstates.
+- **State:** Open (2026-09-26), opened under operator decision D-P5-1 (the ISSUE-238 pass 5).
+  **Implemented and DB-free validated, uncommitted. DEV REHEARSAL PASS (2026-09-26, runbook §17):
+  technically accepted for the ISSUE-237 L5 prerequisite.**
+  - Root cause: the §4 dump is taken while every writer still runs; §7 reinstates
+    production-owned tables from it; services stopped only at the §8 swap. A second path: `$PRE`
+    is "the newest dump", unbound to the promotion.
+  - Fix: an enforced database-level promotion freeze — REVOKE CONNECT from PUBLIC (only
+    `afldb_owner`/`afldb_backup`/superusers can connect), token-bound marker, terminate, proven
+    quiescence, per-table digest F0 + OID; the dump proven = F0; every production phase re-proves
+    it; guarded swap/rollback; post-swap acceptance of the kept DB by OID **before** the app
+    starts. `afldb-reviewer`: PASS WITH MEDIUM/LOW NOTES (F-001…F-011 folded).
+  - Tests: `tests/db-promotion-check.test.ts` 264/264 (workstation and Linux); typecheck and lint
+    clean.
+  - DEV rehearsal (operator-authorised, DEV only, PROD never contacted): the freeze, per-role
+    refusal, in-flight writer, stale-dump, drift, crash recovery, freeze/release cycles and
+    privileged sessions all behaved as designed. A full freeze-enabled DEV promotion
+    (`20260926-195601`) and its guarded rollback both PASSed, and DEV was restored to its original
+    database.
+  - Findings: R-1 (MED) — `sudo -u postgres psql -f <file>` cannot read the generated files —
+    fixed in the docs (stdin form). R-2/R-3 (LOW) doc text, fixed. R-4/R-5 (LOW) are open
+    follow-ups.
+- **Key files:** `tools/db/promotion-freeze.ts` (new), `tools/db/promotion-check.ts`,
+  `tools/db/promotion-inventory.ts`, `tools/maintenance/restore-test.sh`,
+  `docs/production-promotion.md` §4.0–§10.
+- **Blocks:** ~~ISSUE-237 L5 PROD (until rehearsal + acceptance)~~. L5 is no longer blocked on an
+  untested mechanism; it still needs this work committed and on the PROD checkout.
+- **Runbook:** `issues/open/AFLDB-ISSUE-250.md`.
+- **Next action:** operator review and commit/merge of the ISSUE-250 work (including the §17
+  doc fixes); then the separately authorised ISSUE-237 L5 by the freeze-bound procedure.
 
 ### AFLDB-ISSUE-238 — Correcting a consumed trusted `afl_api` player link with canonical reattribution
 - **Severity:** Medium. **Area:** admin / player identity — `external_identities` (`afl_api`),
@@ -28,9 +61,13 @@
 - **Severity:** Medium. **Area:** promotion / rebuild lifecycle — `external_identities`
   (`afl_api`), `docs/production-promotion.md`, `tools/db/rebuild-test.ts`.
 - **Current state (2026-09-26): L0–L4 accepted (PASS) on DEV**, promotion stamp
-  `20260926-085511` (runbook §11d.15). **L5 PROD is pending**, at the next scheduled production
-  promotion, under production's unmodified G3 hard-loss rule. The chronology below is retained for
-  history; later entries supersede earlier ones.
+  `20260926-085511` (runbook §11d.15). **L5 PROD is NOT RUN.** It was blocked on AFLDB-ISSUE-250
+  (D-P5-1). That is now lifted as a mechanism blocker: ISSUE-250's DEV rehearsal PASSed on
+  2026-09-26, including a full freeze-enabled DEV promotion and rollback in which every ISSUE-237
+  gate also passed. L5 still needs the ISSUE-250 work committed and merged, and on the PROD
+  checkout, plus a separate operator authorisation. It then runs by the freeze-bound procedure at
+  the next scheduled production promotion, under production's unmodified G3 hard-loss rule. ISSUE-237 has not regressed. The chronology
+  below is retained for history; later entries supersede earlier ones.
 - **State:** Open (2026-09-23), split out of the ISSUE-235 plan review (R4). Pre-existing. Neither
   the promotion runbook nor `db:test:rebuild` had an `afl_api` identity step, so the importer's
   `unique` links (669 on DEV at the time) were lost. A bridge re-import is not a safe recovery
@@ -218,9 +255,11 @@
       failed candidate).
     - **L4 is PASS.** ISSUE-237 remains OPEN: **L5 PROD is NOT RUN**, and this DEV-only exception
       does not apply to production, where G3 hard loss is FAIL with no exception.
-  - **Next action:** L5, inside a future scheduled production promotion, under production's
-    unmodified G3 hard-loss rule (FAIL, no DEV-style exception). Runbook §11d.15 has the full L4
-    record.
+  - **Next action:** *(2026-09-26: BLOCKED on AFLDB-ISSUE-250; later 2026-09-26 its DEV
+    rehearsal PASSed — technically accepted for this prerequisite, ISSUE-250 runbook §17. L5 now
+    needs the ISSUE-250 work committed/merged and on the PROD checkout, plus a separate
+    authorisation.)* Once that holds: L5 by the freeze-bound procedure, inside a future scheduled production promotion, under production's unmodified G3
+    hard-loss rule (FAIL, no DEV-style exception). Runbook §11d.15 has the full L4 record.
   - **Not authorised:** no production promotion or PROD mutation without separate, scheduled
     authorisation.
 

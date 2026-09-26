@@ -15,6 +15,43 @@ commit.
 
 ## [Unreleased]
 
+### Production promotion freeze: no write can be silently lost at the swap (AFLDB-ISSUE-250; Open, DEV rehearsal PASS) - 26 September 2026
+
+- **The defect.** A production promotion dumped `afldb_prod` (§4) while the application and the
+  settle timers kept running, reinstated production-owned tables from that dump (§7), and stopped
+  the services only at the swap (§8). Any write committed in between — an admin edit, an AFL API
+  adjudication, a login, NL telemetry — was absent from the candidate and silently lost. `$PRE`
+  was also just "the newest dump", so a failed backup could silently reinstate yesterday's state.
+- **The change.** Production promotions now run under an enforced database-level freeze
+  (`docs/production-promotion.md` §4.0/§4.1). `db:promotion:check --freeze-plan` generates
+  token-bound SQL that revokes CONNECT on the target from PUBLIC (only `afldb_owner`,
+  `afldb_backup` and superusers can connect), marks the database, and terminates existing
+  sessions; `--phase frozen` proves quiescence and records a per-table content digest with the
+  database OID; `restore-test.sh` records the restored dump's sha256 and `--phase freeze-dump`
+  proves the dump holds exactly the frozen state; every production phase and `--plan` require the
+  freeze record; the swap and rollback refuse an unfrozen target; and `--phase production` now runs
+  **before** the application starts and refuses acceptance if the renamed-aside database changed
+  after the freeze. Aborts and crashes are recovered with a token-guarded release,
+  `--freeze-status` and `--unfreeze-recovery`. The freeze fails closed. DEV is unchanged unless
+  `--freeze-record` is passed.
+- **Operator impact.** The production application is down from the freeze until the promotion is
+  accepted. The old production command shapes are refused. Every generated SQL file is fed to
+  `postgres` on stdin (`sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d postgres -f - < file`),
+  because `postgres` cannot read the mode-600 files under the operator's home directory.
+- **State.** Implemented and DB-free validated (264/264 promotion tests, typecheck and lint
+  clean). **DEV rehearsal PASS on 2026-09-26** (operator-authorised, DEV only). The rehearsal
+  covered:
+  - the freeze and per-role refusal;
+  - the in-flight writer;
+  - stale-dump and drift refusals;
+  - crash recovery;
+  - freeze/release cycles;
+  - a full freeze-enabled DEV promotion and its guarded rollback.
+
+  It is **technically accepted for the ISSUE-237 L5 prerequisite**. Still uncommitted. L5 needs this
+  work merged and on the PROD checkout, plus its own authorisation. Runbook:
+  `issues/open/AFLDB-ISSUE-250.md` §17.
+
 ### AFLDB-ISSUE-237 progress: L0–L4 accepted on DEV, L5 PROD pending (Open) - 26 September 2026
 
 - **Current state.** L0–L4 are accepted (PASS): the OD-4 recovery (R1–R5), the `code_test_db`
