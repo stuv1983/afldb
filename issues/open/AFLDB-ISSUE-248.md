@@ -5,8 +5,8 @@
 - **Open (2026-09-25).** **Severity:** High. It blocks ISSUE-237 L4 at A5. **Area:** DEV auth
   operations: `auth_users`, `admin_invites`, `auth_audit_log`, `auth_sessions`, and
   `tools/maintenance/issue248-cleanup-dev-auth-fixtures.ts`.
-- **Implemented and DB-free validated (2026-09-25), uncommitted.** Nothing has run against any
-  database, and there was no SSH contact.
+- **Implemented and DB-free validated (2026-09-25).** *(2026-09-26: committed `a4f734af`, merged
+  `397f422d` and deployed to DEV. No §9 run is recorded anywhere, so it stays open; see §11.)*
 - **Next action:**
   1. The operator reviews and commits, merges, and puts the code on the DEV checkout.
   2. Under an explicit DEV authorisation, the operator runs §9: backup, validate-only, `--apply`,
@@ -302,3 +302,38 @@ authorisation.
 - A production, `afldb_test`, `code_test_db` or candidate target.
 - Any Git write.
 - Renaming fixture emails, `--allow-fixture-identities` in L4, or a generic account purge.
+
+## 11. Closure audit against ISSUE-237 L4 (2026-09-26, DB-free, Claude-run): REMAINS OPEN
+
+- **Implementation state.** Committed `a4f734af`. It is contained in `397f422d` and `6ae70722`,
+  the revisions that the two later L4 runs used.
+- **Recorded.** Only indirect progression evidence. L4 passed A5 at 033212 (the run reached the
+  post-swap phase) and at 085511 ("A/B/C gates passed"). L4 never passes
+  `--allow-fixture-identities` (§11d A5), so the reserved-domain rows were probably gone from
+  `afldb_dev` by then.
+- **Missing (NOT RECORDED; whether §9 itself ran is unknown).** No repository record holds any §9
+  or P1–P4 output:
+  - the backup file;
+  - WOULD_CLEAN, CLEANED (cleanup audit id, 17 writes) and ALREADY_CLEAN;
+  - the actor;
+  - P1 closure counts, P2's single `test_fixture.cleanup` row, P3 no rows, and the P4 deltas.
+
+  A5 passing does not show *how* the rows left. The audited tool is the only authorised mechanism,
+  and this issue requires its evidence.
+- **Closure path (operator, read-only unless noted).**
+  - Promotion reinstates `auth_users`, `admin_invites` and `auth_audit_log` in full
+    (`promotion-inventory.ts:339-348, 779-784`). So on today's `afldb_dev`:
+    - P1 and P3 remain meaningful;
+    - P2 still returns the cleanup audit row, its id and its actor, if the tool ran.
+  - Run P1–P3 now.
+  - Pre-state, backup, validate-only, apply and rerun exist only in the operator's console. P4 is
+    no longer reproducible, because the promotion reset `auth_sessions` and appended its markers.
+  - If P2 returns no row, the cleanup did not run through this tool. Record how the closure left
+    DEV, and do not resolve this issue.
+  - The tool's default validate-only mode is itself a read-only idempotence probe. It returns
+    ALREADY_CLEAN with the audit id only for a coherent completed cleanup (tool lines 556-557). It
+    refuses an absent closure that has no audit.
+  - A rerun with `--apply` is not needed for that probe.
+  - The original backup, WOULD_CLEAN and CLEANED (17 writes) lines exist only in console output.
+    Whether P1–P3 plus a validate-only ALREADY_CLEAN is enough without them is an operator
+    decision. This audit does not make it.

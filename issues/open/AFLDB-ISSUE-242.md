@@ -1,8 +1,9 @@
 # AFLDB-ISSUE-242 — Cross-database manual player registration token convergence blocks ISSUE-237 L4
 
 - **Status:** Open (2026-09-25). Implemented, DB-free validated, and **rehearsed on `code_test_db`**
-  (§8a: 103/103 checks, generated step-2c SQL executed by PostgreSQL 16.15). **Uncommitted.** No
-  DEV, PROD or `afldb_test` contact, and no ISSUE-237 L4.
+  (§8a: 103/103 checks, generated step-2c SQL executed by PostgreSQL 16.15). *(2026-09-26:
+  committed `bfafed36` and deployed to DEV. ISSUE-237 L4 PASSED at stamp `20260926-085511`, but
+  this issue's live convergence evidence was not recorded, so it stays open; see §11.)*
 - **Severity:** High. It blocks the only path to ISSUE-237 L4 while `afldb_test` carries the 92
   ISSUE-224 registrations.
 - **Area:** promotion lifecycle — `tools/db/promotion-inventory.ts`, `tools/db/promotion-check.ts`,
@@ -367,3 +368,36 @@ the swap, or the post-swap `replay_admin_overrides(players)`. The file header re
   and ISSUE-237 L4 was not run. The only Git commands were read-only: `status`, `diff`,
   `ls-files --eol`, `hash-object`, `rev-parse`, `merge-base` and `diff --check`. No Git write,
   no commit.
+
+## 11. Closure audit against ISSUE-237 L4 (2026-09-26, DB-free, Claude-run): REMAINS OPEN
+
+The audit covered the accepted L4 record: ISSUE-237 runbook §11d.12–§11d.15, the `issues.md`
+ISSUE-237/249 entries, and `issues/closed/AFLDB-ISSUE-249.md` §9. No database was contacted, and
+there was no SSH.
+
+- **Implementation state.** Committed `bfafed36`, which is contained in every later DEV deployment
+  (`4bb23a8f`, `397f422d`, `6ae70722`). The first L4 A2 attempt already ran on DEV at `bfafed36`.
+- **Recorded L4 evidence** (stamp `20260926-085511`):
+  - "A/B/C gates (candidate, pre-swap, swap) passed after the documented targeted grid repair";
+  - E1, the admin-override replay, PASSED;
+  - A4.2 was recorded earlier as DEV 92 / source 92 (§11d.12–§11d.14).
+- **What that implies, not what it records.** Tokens are minted per database, and both sides carry
+  the 92 ISSUE-224 registrations. So a B4 PASS on this code is only reachable through a planned
+  convergence, and a C2 PASS re-proves it. **The L4 run therefore very probably exercised this
+  issue.** But the recorded evidence is a summary line, not the contract's evidence.
+- **Missing (NOT RECORDED; the step ran):**
+  1. the B4 `[PASS] data_overrides players replay predicted … (A4.2)` line with its
+     present/bind/create counts and its convergence (rebind/retire) counts, which §11d B4 says to
+     "Record all of it";
+  2. evidence that step 2c applied the convergence: the `$LFILE` convergence section and the psql
+     result of C1's 2c;
+  3. the C2 A4.2 PASS line, with the same counts as B4.
+
+  No record names a rebind or retire count. The "documented targeted grid repair" inside A–C is
+  not documented anywhere in the repository.
+- **Closure path (operator; the retained files are read-only material on the DEV host):**
+  - `~/backups/afldb/promotion-dev-lineage-20260926-085511.sql` (its convergence entries);
+  - `~/backups/afldb/promotion-dev-20260926-085511.sha256`;
+  - the B4 and C2 console output, if kept.
+
+  Resolve on the counts that those show. Do not resolve on "L4 passed" alone.

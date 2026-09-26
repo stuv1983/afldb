@@ -24,9 +24,14 @@
   - other reserved-domain rows are a STOP, never swept in;
   - one real-actor `test_fixture.cleanup` audit, then FK-ordered exact-id deletes, in one
     transaction with postcondition totals; ALREADY_CLEAN on rerun.
-- **Runbook:** `issues/open/AFLDB-ISSUE-248.md` (§9 has the live procedure).
-- **Next action:** finish combined ISSUE-247/248 integration and deploy to DEV. Then run runbook
-  §9 under explicit DEV authorisation, resolve on P1–P4, and rerun ISSUE-237 L4 A5.
+
+  Deployed at `397f422d`. L4 then passed A5 twice (033212, 085511).
+- **Closure audit (2026-09-26): REMAINS OPEN.** No §9 run is recorded anywhere: no backup, no
+  WOULD_CLEAN/CLEANED/ALREADY_CLEAN, no audit id or actor, and no P1–P4. A5 progression does not
+  prove the audited cleanup.
+- **Runbook:** `issues/open/AFLDB-ISSUE-248.md` (§9 procedure, §11 audit).
+- **Next action:** the operator runs P1–P3 read-only on `afldb_dev`, plus the tool's validate-only
+  mode (ALREADY_CLEAN names the audit), and supplies any retained §9 output. Resolve on it.
 
 ### AFLDB-ISSUE-247 — A legitimately empty staged reinstatement table blocks promotion
 - **Severity:** High. **Area:** promotion lifecycle — `tools/db/promotion-inventory.ts`
@@ -41,17 +46,26 @@
     a statement-level trigger on each staging copy inside the load's own transaction;
   - 2d refuses missing evidence, a moved row count, and zero rows where the contract requires rows.
 
-  `code_test_db` rehearsal **PASS 7/7**, zero residue (2026-09-26).
-- **Runbook:** `issues/open/AFLDB-ISSUE-247.md` (§6 rehearsal, §7 live procedure).
-- **Next action:** finish combined ISSUE-247/248 integration and deploy to DEV; then ISSUE-237 L4
-  A5 with a fresh `$STAMP` and the live DEV R6 header check.
+  `code_test_db` rehearsal **PASS 7/7**, zero residue (2026-09-26). Deployed at `397f422d`.
+- **Closure audit (2026-09-26): REMAINS OPEN.** L4 033212 and 085511 both passed A5 and the staged
+  reinstatement, but none of the five §7 live items is recorded:
+  - the A5 permitted-empty line;
+  - R6;
+  - the stage-completion readback;
+  - the 2d NOTICE;
+  - the C2 0/0 compare.
+
+  The A–C "targeted grid repair" is undocumented.
+- **Runbook:** `issues/open/AFLDB-ISSUE-247.md` (§6 rehearsal, §7 live procedure, §9 audit).
+- **Next action:** the operator supplies the retained L4 output and records the grid repair. Resolve
+  on §7.
 
 ### AFLDB-ISSUE-243 — Promotion preflight cannot validate target credentials and rejects known DEV operational artefacts
 - **Severity:** High. **Area:** operator workflow tooling — `tools/dev/preflight-core.ts`,
   `tools/dev/preflight.ts`, `docs/production-promotion.md` §3, ISSUE-237 §11d A2.
 - **State:** Open (2026-09-25). It comes from the first real ISSUE-237 L4 A2 run on DEV, which
-  STOPPED at A2 with no dump, candidate or swap. Implemented and DB-free validated, but
-  uncommitted:
+  STOPPED at A2 with no dump, candidate or swap. Implemented and DB-free validated, committed
+  `4df98d07` and deployed:
   - `--mode promotion` now requires `--promotion-side source|target`.
   - **source:** `*_test`, with migration parity.
   - **target:** exactly `afldb_dev` or `afldb_prod`, identity/role/connectivity only, and no
@@ -59,15 +73,18 @@
   - Invalid combinations refuse before DB contact.
   - Untracked `afltables_fitzroy_core/settle-*.json` manifests are WARN, using the same regex as
     `deploy/sync-dev-remote.sh`. Every other dirty path still FAILs.
-- **Runbook:** `issues/open/AFLDB-ISSUE-243.md` (§8 has the corrected L4 A2 commands).
-- **Next action:** the operator reviews, commits and deploys to DEV. Then rerun ISSUE-237 L4 A2
-  under the separate L4 authorisation, and resolve this issue on four READY results.
+- **Closure audit (2026-09-26): REMAINS OPEN.** L4 passed A2 on at least three later runs, but the four READY
+  results were never recorded. ISSUE-237 §11d.12 said they were.
+- **Runbook:** `issues/open/AFLDB-ISSUE-243.md` (§8 A2 commands, §10 audit).
+- **Next action:** the operator pastes retained A2 output, or reruns the four read-only §8
+  preflights on DEV. Resolve on four READY.
 
 ### AFLDB-ISSUE-242 — Cross-database manual player registration token convergence blocks ISSUE-237 L4
 - **Severity:** High. **Area:** promotion lifecycle — `tools/db/promotion-inventory.ts`,
   `tools/db/promotion-check.ts`, the step-2c lineage remap file, `docs/production-promotion.md` §6.
-- **State:** Open (2026-09-25), from ISSUE-237 FR-2 / A4.2. Implemented and DB-free validated, but
-  uncommitted. `--phase restored` plans the convergence by accepted AFL Tables path:
+- **State:** Open (2026-09-25), from ISSUE-237 FR-2 / A4.2. Implemented and DB-free validated,
+  committed `bfafed36` and deployed. `--phase restored` plans the convergence by accepted AFL
+  Tables path:
   - **rebind:** the candidate token retires and DEV's token binds to the same player;
   - **retire:** the candidate token retires and the player stays source-owned in DEV;
   - **STOP:** anything else.
@@ -78,9 +95,11 @@
   step-2c SQL in PostgreSQL: rebind, retire, every STOP, rollback of a failed and of an
   assertion-refused CTE, the idempotent re-run, and a 92-player mixture. Zero residue. No DEV,
   PROD or `afldb_test` contact.
-- **Runbook:** `issues/open/AFLDB-ISSUE-242.md` (§8a is the rehearsal evidence).
-- **Next action:** the operator reviews and commits. Then ISSUE-237 L4 under separate DEV
-  authorisation.
+- **Closure audit (2026-09-26): REMAINS OPEN.** L4 085511 records only "A/B/C gates passed". The
+  B4/2c/C2 convergence counts (rebind/retire, present/bind/create) are not recorded.
+- **Runbook:** `issues/open/AFLDB-ISSUE-242.md` (§8a rehearsal, §11 audit).
+- **Next action:** the operator supplies the convergence entries of the retained
+  `promotion-dev-lineage-20260926-085511.sql` and any B4/C2 output. Resolve on those counts.
 
 ### AFLDB-ISSUE-238 — Correcting a consumed trusted `afl_api` player link with canonical reattribution
 - **Severity:** Medium. **Area:** admin / player identity — `external_identities` (`afl_api`),

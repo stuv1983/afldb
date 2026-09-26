@@ -1,7 +1,8 @@
 # AFLDB-ISSUE-243 — Promotion preflight cannot validate target credentials and rejects known DEV operational artefacts
 
-- **Status:** Open (2026-09-25). Implemented and DB-free validated. **Uncommitted.** There was no
-  DEV, PROD, `afldb_test` or SSH contact, and no ISSUE-237 L4 step ran.
+- **Status:** Open (2026-09-25). Implemented and DB-free validated. *(2026-09-26: committed
+  `4df98d07` and deployed to DEV. L4 progressed past A2 on at least three later runs, but the four READY
+  results this issue resolves on were never recorded, so it stays open; see §10.)*
 - **Severity:** High. It blocks ISSUE-237 L4 at step A2, before any dump, candidate or swap.
 - **Area:** operator workflow tooling. That is `tools/dev/preflight-core.ts` and
   `tools/dev/preflight.ts`, plus `docs/production-promotion.md` §3 and ISSUE-237 §11d A2.
@@ -204,3 +205,31 @@ Expected results:
 2. Merge and deploy to DEV, so the DEV checkout carries this preflight.
 3. Rerun ISSUE-237 L4 A2 with the §8 commands, under the separate ISSUE-237 L4 DEV authorisation.
 4. Resolve this issue on that evidence: all four READY on DEV, with no other L4 step implied.
+
+## 10. Closure audit against ISSUE-237 L4 (2026-09-26, DB-free, Claude-run): REMAINS OPEN
+
+- **Implementation state.** Committed `4df98d07`, which is contained in every later DEV deployment
+  (`4bb23a8f`, `397f422d`, `6ae70722`).
+- **Recorded progression.** After the fix, L4 went past A2 on at least three later runs:
+  - the second attempt (ISSUE-237 §11d.12: A3 PASS, then STOP at A4.3);
+  - the rolled-back `20260926-033212` run;
+  - the accepted `20260926-085511` run (§11d.15).
+
+  The record does not say whether the A5 attempt (§11d.14) re-ran A2.
+
+  §11d A2 says "Every `FAIL` is a stop", so the operator saw no FAIL each time.
+- **Missing (NOT RECORDED; the step ran).** §11d.12 states that "the A2 preflight results belong to
+  AFLDB-ISSUE-243 and are recorded there", but this runbook holds none of them. No repository
+  record carries any of:
+  - the four `Preflight result: READY` lines;
+  - the source parity line;
+  - the three `INFO migration parity not read on a promotion target` lines (the proof that the
+    restricted `afldb_import`/`afldb_backup` roles need no `afldb_meta` read);
+  - the settle-manifest `WARN` classification.
+
+  §9.4 resolves on "all four READY on DEV". Progression without FAIL is not the same evidence,
+  because it does not show the WARN/INFO lines. The criterion is therefore not met on the record.
+- **Closure path (operator, read-only).** Either option closes this issue on its own wording; no L4
+  step is implied:
+  - paste the four A2 outputs from any of those runs, if kept; or
+  - rerun the four §8 commands on DEV now. They open read-only connections and write nothing.

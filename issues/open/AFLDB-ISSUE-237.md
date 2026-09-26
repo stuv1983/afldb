@@ -3629,7 +3629,8 @@ database, SSH, DEV, PROD, L4 or Git write was involved. Defects found and fixed:
 ### 11d.12 Second real L4 attempt (2026-09-25, operator-run): STOPPED at A4.3; L4 NOT RUN
 
 This result was reported by the operator and recorded here; Claude did not re-run it. The A2
-preflight results belong to AFLDB-ISSUE-243 and are recorded there.
+preflight results belong to AFLDB-ISSUE-243 and are recorded there. *(2026-09-26 closure audit:
+they never were. ISSUE-243 runbook §10 has the gap and the read-only closure path.)*
 
 | Step | Result |
 |---|---|
@@ -3776,6 +3777,21 @@ The prerequisite blockers on A5 (AFLDB-ISSUE-247, AFLDB-ISSUE-248) and the disco
 AFLDB-ISSUE-249 (first-kick-goal reconstruction) are all resolved and deployed at main/DEV
 `6ae70722`. This run is the first real DEV promotion this issue accepts. Promotion stamp:
 `20260926-085511`. Promoted live database: `afldb_dev`.
+
+*(2026-09-26 closure audit.)* "Resolved" above means that the blockers are deployed and no longer
+stopped L4. It does not mean ISSUE-247 and ISSUE-248 are resolved.
+
+- The same bulk audit also covered ISSUE-242 and ISSUE-243.
+- All four L4 prerequisites stay **open**, because this record does not preserve their own
+  closure evidence:
+  - ISSUE-242: the B4/2c/C2 convergence counts;
+  - ISSUE-243: the four A2 READY results;
+  - ISSUE-247: the A5 permitted-empty line, R6, stage-completion readback, the 2d NOTICE and the
+    C2 0/0 compare;
+  - ISSUE-248: the §9 cleanup and P1–P4.
+- The "documented targeted grid repair" below is not documented anywhere in the repository.
+- Each prerequisite runbook's closure-audit section names exactly what is missing. This L4 PASS
+  and ISSUE-237's state are unchanged.
 
 **A — source and prerequisite proof.**
 

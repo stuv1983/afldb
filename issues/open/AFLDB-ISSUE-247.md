@@ -1,8 +1,9 @@
 # AFLDB-ISSUE-247 — A legitimately empty staged reinstatement table blocks promotion
 
-- **Status:** Open (2026-09-25). Implemented and DB-free validated, **uncommitted**. `code_test_db`
-  rehearsal **PASS 7/7** (2026-09-26, rollback-only, zero residue — §6). Not deployed; the live DEV
-  `pg_restore` header check (R6) and the A5 rerun are pending.
+- **Status:** Open (2026-09-25). Implemented and DB-free validated. `code_test_db` rehearsal **PASS
+  7/7** (2026-09-26, rollback-only, zero residue — §6). *(2026-09-26: committed `86e0e2ba`, merged
+  `397f422d` and deployed to DEV. Two L4 runs then passed A5 and the staged reinstatement. None of
+  the §7 live evidence was recorded, so it stays open; see §9.)*
 - **Severity:** High — it blocks ISSUE-237 L4 at A5 on a valid DEV state.
 - **Area:** promotion lifecycle — `tools/db/promotion-inventory.ts` (contract, `stageSql`,
   `promoteStagedSql`, `judgeStagedSourceRows`, plan validator), `tools/db/promotion-check.ts`
@@ -274,3 +275,37 @@ open throughout.
   authorisation. It contacted no `afldb_dev`, `afldb_test` or production database; there was no
   SSH, no Git write, and no A5 rerun. The live DEV R6 check has not run.
 - No ledger row was created. No fixture-account work (ISSUE-248).
+
+## 9. Closure audit against ISSUE-237 L4 (2026-09-26, DB-free, Claude-run): REMAINS OPEN
+
+- **Implementation state.** Committed `86e0e2ba`. It is contained in `397f422d` (the rolled-back
+  L4, `20260926-033212`) and in `6ae70722` (the accepted L4, `20260926-085511`).
+- **Recorded.** Both runs got past A5 and through the reinstatement: 033212 reached the post-swap
+  phase (`issues/closed/AFLDB-ISSUE-249.md` §1), and 085511 reports "A/B/C gates … passed" (ISSUE-237
+  §11d.15). The ledger was still empty at 085511: the post-swap AFL API adjudication replay
+  "inserted 0, noops 0". So the permitted-empty path very probably ran live.
+- **Missing (NOT RECORDED; the steps ran, except R6, whose run is unknown).** §7 names five live
+  items, and none of them is in any repository record:
+  1. the A5 `[PASS] Staged tables hold rows …` line with `afl_api_identity_adjudications 0 staged
+     — EMPTY, permitted by contract (AFLDB-ISSUE-247)`;
+  2. the R6 `grep` of `promotion-stage-afl_api_identity_adjudications.sql` for the real zero-row
+     `COPY` header;
+  3. the `promotion_staging.promotion_stage_completion` readback (expected `afl_api… 0`,
+     `brownlow_vote_entry_state 3`, `external_grid_sources 1`);
+  4. the 2d `NOTICE … permitted empty by contract (AFLDB-ISSUE-247)`, and the absence of
+     `promotion_staging` afterwards;
+  5. the C2 `--compare` line `afl_api_identity_adjudications equal 0/0`.
+
+  In addition, the "documented targeted grid repair" that A–C needed is not documented anywhere in
+  the repository. `external_grid_sources` is one of the three staged tables on this same 2b/2d
+  path, so "clean 2b/2d" cannot be asserted until that repair is described.
+- **Closure path (operator).**
+  - Items 1, 3, 4 and 5 exist only in console output. Item 3 cannot be re-derived, because 2d drops
+    the evidence table.
+  - Item 2 needs no database. Re-check the host-generated
+    `promotion-stage-afl_api_identity_adjudications.sql` if it was retained. Otherwise run
+    `pg_restore --data-only --table=afl_api_identity_adjudications -f -` over the retained
+    085511 pre-cutover dump, which is a file-only read.
+  - Record what the grid repair was, and whether it touched the staged path.
+  - If the console output is gone, whether to accept the progression evidence is an operator
+    decision. This audit does not weaken §7 to make it.

@@ -8,10 +8,10 @@ This table indexes currently open issues. Detailed historical entries below rema
 
 | ID | Title | Severity | Area | State | Next action |
 |---|---|---|---|---|---|
-| AFLDB-ISSUE-248 | Reserved-domain DEV auth fixtures block promotion | High | DEV auth operations — `auth_users`, `admin_invites`, `auth_audit_log`, `auth_sessions`; `tools/maintenance/issue248-cleanup-dev-auth-fixtures.ts` | Open (2026-09-25), from the ISSUE-237 L4 A5 refusal (test-fixture identity gate): `auth_users` 14/17/18, invite 5, 8 fixture audit rows and 4 revoked sessions of user 18; every other FK 0. Implemented and DB-free validated, committed `a4f734af`: a dedicated `afldb_dev`-only, validate-by-default tool with exact closure guards, a dynamic catalogue FK census, one real-actor `test_fixture.cleanup` audit, FK-ordered exact-id deletes in one transaction, and ALREADY_CLEAN on rerun. Pending combined deployment/live cleanup. | Finish combined ISSUE-247/248 integration and DEV deploy; runbook §9 under explicit DEV authorisation; then rerun ISSUE-237 L4 A5 |
-| AFLDB-ISSUE-247 | A legitimately empty staged reinstatement table blocks promotion | High | Promotion lifecycle — `promotion-inventory.ts` (`stageSql`, `promoteStagedSql`, `judgeStagedSourceRows`), `promotion-check.ts` | Open (2026-09-25), from ISSUE-237 L4 A5 on `afldb_dev`: REFUSED by the ISSUE-151 staged-rows gate on `afl_api_identity_adjudications` 0 (beside `brownlow_vote_entry_state` 3, `external_grid_sources` 1) while the AFL API census passed (669 / 0 / 0 / 0). Implemented and DB-free validated, committed `86e0e2ba`: contract-declared `stagedMayBeEmpty`, plus per-table stage-completion evidence written by a statement-level trigger on each staging copy inside the load's own transaction; 2d refuses missing evidence, a moved row count, and zero rows where the contract requires rows. `code_test_db` rehearsal PASS 7/7, zero residue (2026-09-26, runbook §6). Pending combined deployment/live proof. | Finish combined ISSUE-247/248 integration and DEV deploy; then ISSUE-237 L4 A5 with a fresh `$STAMP` and the live DEV R6 header check (runbook §7). |
-| AFLDB-ISSUE-243 | Promotion preflight cannot validate target credentials and rejects known DEV operational artefacts | High | Operator workflow — `tools/dev/preflight-core.ts`, `tools/dev/preflight.ts` | Open (2026-09-25), from the first real ISSUE-237 L4 A2 run on DEV (STOPPED at A2; no dump/candidate/swap). Implemented and DB-free validated, uncommitted: explicit `--promotion-side source\|target`; target = exact `afldb_dev`/`afldb_prod`, identity/role only, no `afldb_meta` read; untracked `afltables_fitzroy_core/settle-*.json` = WARN; all else still FAILs. | Operator review, commit and DEV deploy; rerun ISSUE-237 L4 A2 |
-| AFLDB-ISSUE-242 | Cross-database manual player registration token convergence blocks ISSUE-237 L4 | High | Promotion lifecycle — `promotion-inventory.ts`, `promotion-check.ts`, step-2c lineage remap file | Open (2026-09-25), from ISSUE-237 FR-2 / A4.2. Implemented and DB-free validated, uncommitted: B4 plans rebind/retire convergence by accepted AFL Tables path, step 2c applies it in the remap transaction with a final-state assertion, and C2 re-proves it. `code_test_db` rehearsal 103/103 (2026-09-25): the generated step-2c SQL executed, rolled back atomically on refusal, and re-ran as a no-op; 92-player mixture PASS. No DEV/PROD contact. | Operator review and commit; then ISSUE-237 L4 |
+| AFLDB-ISSUE-248 | Reserved-domain DEV auth fixtures block promotion | High | DEV auth operations — `auth_users`, `admin_invites`, `auth_audit_log`, `auth_sessions`; `tools/maintenance/issue248-cleanup-dev-auth-fixtures.ts` | Open (2026-09-25), from the ISSUE-237 L4 A5 refusal (test-fixture identity gate): `auth_users` 14/17/18, invite 5, 8 fixture audit rows and 4 revoked sessions of user 18; every other FK 0. Implemented and DB-free validated, committed `a4f734af`: a dedicated `afldb_dev`-only, validate-by-default tool with exact closure guards, a dynamic catalogue FK census, one real-actor `test_fixture.cleanup` audit, FK-ordered exact-id deletes in one transaction, and ALREADY_CLEAN on rerun. Deployed (`397f422d`); L4 later passed A5 twice, but the 2026-09-26 closure audit found no recorded §9 run (backup, WOULD_CLEAN/CLEANED/ALREADY_CLEAN, audit id, P1–P4). | Operator: P1–P3 read-only and a validate-only run (ALREADY_CLEAN names the audit) on `afldb_dev`, plus any retained §9 output; resolve on it (runbook §11) |
+| AFLDB-ISSUE-247 | A legitimately empty staged reinstatement table blocks promotion | High | Promotion lifecycle — `promotion-inventory.ts` (`stageSql`, `promoteStagedSql`, `judgeStagedSourceRows`), `promotion-check.ts` | Open (2026-09-25), from ISSUE-237 L4 A5 on `afldb_dev`: REFUSED by the ISSUE-151 staged-rows gate on `afl_api_identity_adjudications` 0 (beside `brownlow_vote_entry_state` 3, `external_grid_sources` 1) while the AFL API census passed (669 / 0 / 0 / 0). Implemented and DB-free validated, committed `86e0e2ba`: contract-declared `stagedMayBeEmpty`, plus per-table stage-completion evidence written by a statement-level trigger on each staging copy inside the load's own transaction; 2d refuses missing evidence, a moved row count, and zero rows where the contract requires rows. `code_test_db` rehearsal PASS 7/7, zero residue (2026-09-26, runbook §6). Deployed (`397f422d`); L4 033212/085511 passed A5 and the staged reinstatement, but the 2026-09-26 closure audit found none of the §7 live items recorded (A5 permitted-empty line, R6, stage-completion readback, 2d NOTICE, C2 0/0), and the A–C "targeted grid repair" undocumented. | Operator: supply retained L4 output and record the grid repair; resolve on runbook §7 (runbook §9) |
+| AFLDB-ISSUE-243 | Promotion preflight cannot validate target credentials and rejects known DEV operational artefacts | High | Operator workflow — `tools/dev/preflight-core.ts`, `tools/dev/preflight.ts` | Open (2026-09-25), from the first real ISSUE-237 L4 A2 run on DEV (STOPPED at A2; no dump/candidate/swap). Implemented and DB-free validated, committed `4df98d07` and deployed: explicit `--promotion-side source\|target`; target = exact `afldb_dev`/`afldb_prod`, identity/role only, no `afldb_meta` read; untracked `afltables_fitzroy_core/settle-*.json` = WARN; all else still FAILs. L4 later passed A2 at least three times, but the 2026-09-26 closure audit found the four READY results never recorded. | Operator: paste retained A2 output or rerun the four read-only runbook §8 preflights on DEV; resolve on four READY (runbook §10) |
+| AFLDB-ISSUE-242 | Cross-database manual player registration token convergence blocks ISSUE-237 L4 | High | Promotion lifecycle — `promotion-inventory.ts`, `promotion-check.ts`, step-2c lineage remap file | Open (2026-09-25), from ISSUE-237 FR-2 / A4.2. Implemented and DB-free validated, committed `bfafed36` and deployed: B4 plans rebind/retire convergence by accepted AFL Tables path, step 2c applies it in the remap transaction with a final-state assertion, and C2 re-proves it. `code_test_db` rehearsal 103/103 (2026-09-25): the generated step-2c SQL executed, rolled back atomically on refusal, and re-ran as a no-op; 92-player mixture PASS. L4 085511 records "A/B/C gates passed", but the 2026-09-26 closure audit found no recorded B4/2c/C2 convergence counts. | Operator: supply the convergence entries of the retained 085511 lineage remap file and any B4/C2 output; resolve on those counts (runbook §11) |
 | AFLDB-ISSUE-238 | Correcting a consumed trusted `afl_api` player link with canonical reattribution | Medium | Admin / player identity — `external_identities` (`afl_api`), `player_match_stats`, `brownlow_round_votes`, `canonical_applications`, derived tables | Open. Triaged 2026-09-26 in the bulk pass and deliberately NOT folded in: moving canonical stats needs a collision/merge policy, superseding ledger entries and a new human-ledger correction action (operator data-semantics decisions). Dependency closure recorded in `issues/open/AFLDB-ISSUE-238.md`. | Operator decisions (runbook §5 a–c), then plan and review |
 | AFLDB-ISSUE-237 | AFL API importer-created `unique` identities are not carried through database promotion or the `afldb_test` rebuild | Medium | Promotion / rebuild lifecycle — `external_identities` (`afl_api`), `docs/production-promotion.md`, `tools/db/rebuild-test.ts` | Open (2026-09-23) — split out of the ISSUE-235 plan review (R4); pre-existing gap; ISSUE-235 is now resolved and this remains the next development issue, independent of it. Plan revised 2026-09-24. OD-1…OD-5 recorded 2026-09-24 (runbook §15): fail closed; OD-2 supersede only; production G3 hard loss = FAIL; pre-I18 recovery via stable identity; successor ISSUE-241. Corrected 2026-09-24: Stage 18 supersedes exactly the capture-derived expected set; marker survival is prerequisite P-M; the I18 dump is only a candidate backup. OD-6 approved: rebuild overlap refused, `E_rebuild = ∅`; promotion supersedes exactly G2.AGREE. S1–S7 authorised (non-destructive). P-M point 2 PROVEN 2026-09-24 (operator-run live evidence against `afldb_test`, runbook §11(d)2). S1, S2, S4–S7 implemented (uncommitted); S3 (the combined capture/marker/Stage 2/18/19 rewrite) implemented 2026-09-24, typecheck clean, DB-free/fake-tx suites green (557/558; 1 unrelated pre-existing failure, `afl-api-player-links.ts`'s `.json` import, a gap in a DB-free reachability test's resolver, not caused by this work). Nothing run against a real database this session. 2026-09-25: L1/L2, R1 and R2 PASS. The first R3 run FAILED, correctly under the literal D7 rule, on 4 exact `profile_url_continuity` pair players. The OD-7 continuity amendment is implemented in the shared forward-identity classifier and DB-free tested. R3 rerun PASS (802/802/802, 3/129/397/273) and S6 9/9 PASS. The reverse direction is now fail-closed: a continuity identity resolves only when both rule paths name the same single target player (DB-free tested). 2026-09-25: after the actor (id 144) and the re-registration of the 92 ISSUE-224 players (13857–13948), **R4 is COMPLETE** (validate-only, dry-run and apply PASS; 802 committed) and **R5 is PASS**; the post-commit idempotence re-run found 802 identical. The 2026 matches and stats are NOT restored (ISSUE-224/228). L3 was blocked by ISSUE-245 (runbook §11a.3). 2026-09-25: ISSUE-245's `code_test_db` rehearsal PASS; **L3 PASS** on the real `afldb_test` (802 importer identities 3/129/397/273 and 92 registrations carried across a real `players.id` renumbering; 85 validation checks; post-L3 source gate PASS; settle-afl-api filter 9/9; runbook §11a.6); ISSUE-245 resolved. L4 hardening 2026-09-25: the three HIGH checker findings (G1 marker read dead; G2 vacuous in the documented order; candidate-phase G1 refuses a reinstated ledger) and F-L4-4..6 are fixed in code and DB-free validated; runbook §11d rewritten, valid for an empty or non-empty DEV ledger. 2026-09-25 final pre-commit review (runbook §11d.11): FR-1..7 fixed DB-free (A4.2 predicts every players-replay refusal; a candidate-only manual token is a STOP, so L4 STOPs while `afldb_test` carries registrations DEV lacks; G2 collides by player; G3 ungraded row STOPs; rebuild recovery arm; D15 empty-ledger exact set; ESLint on ISSUE-237 lines). L4 and L5 NOT run. Gate state: A3 PASS (802 rows, importer sha256 `ec7a5af7b0bb5711ad84a1f5968f27f7fb9a60f3751956dd6687e0781421661e`, ledger sha256 `4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945`), A4.1 0/0, A4.2 92/92, A4.3 PASS, **A5 REFUSED on TWO independent gates** (below), B onward NOT RUN, L4 NOT RUN | Finish combined ISSUE-247/248 integration; deploy the combined result to DEV; run ISSUE-248's controlled validate/apply/idempotence/postchecks; run ISSUE-247's live DEV empty-table/COPY-header proof; then rerun L4 A5 with a fresh `$STAMP` under separate DEV authorisation by runbook §11d; L5 remains scheduled production work. *(2026-09-25: the second real L4 attempt STOPPED at A4.3 (A3 PASS; A4.1 0/0; A4.2 92/92; A4.3 `matches` = 1, the orphaned ISSUE-109 fixture override); nothing past A4.3 ran; prerequisite AFLDB-ISSUE-246; L4 NOT RUN.)* *(2026-09-25: AFLDB-ISSUE-246 RESOLVED on live DEV evidence, retirement audit `auth_audit_log` 983; the A4.3 rerun returned no rows, so A4.3 is PASS; A3 PASS, A4.1 0/0 and A4.2 92/92 stand; no A5, promotion dump, candidate, plan or swap ran; L4 NOT RUN. Next: L4 A5 under a separate DEV authorisation.)* *(2026-09-25: **L4 A5 REFUSED on two independent gates; L4 NOT RUN** (runbook §11d.14). The AFL API census itself PASSED (669 importer, 0 human resolved, 0 ledger, 0 net-linked). **Gate 1 (ISSUE-151 staged rows):** `afl_api_identity_adjudications` 0 (`brownlow_vote_entry_state` 3, `external_grid_sources` 1); the empty ledger is legitimate; prerequisite AFLDB-ISSUE-247 (committed `86e0e2ba`, `code_test_db` rehearsal PASS 7/7). **Gate 2 (test-fixture identity):** reserved-domain `auth_users` 14/17/18 and `admin_invites` 5, with FK references limited to 8 login/logout audit rows and 4 revoked sessions, all of user 18; prerequisite AFLDB-ISSUE-248 (committed `a4f734af`). Nothing past A5 ran: no B1 promotion backup, no promotion source dump, no candidate, no plan, no swap. The refused snapshot `/home/arm/backups/afldb/promotion-dev-20260925-203256.json` is failure-run evidence only; it must not be reused for B/C and must not be overwritten or deleted. A future A5 uses a fresh `$STAMP`. Next: finish combined ISSUE-247/248 integration, deploy to DEV, run ISSUE-248's controlled validate/apply/idempotence/postchecks and ISSUE-247's live DEV empty-table/COPY-header proof, then rerun L4 A5 with a fresh `$STAMP` under separate DEV authorisation; L5 remains scheduled production work.)* *(2026-09-26: the post-merge L4 reached the post-swap phase and was ROLLED BACK — the promoted candidate held first-kick-goal 0 against DEV's 335 / 334 (AFLDB-ISSUE-249); `afldb_dev` restored, `afldb_dev_candidate_20260926-033212` retained. L4 is NOT COMPLETE; the next attempt needs ISSUE-249 deployed and `afldb_test` reloaded, ISSUE-249 runbook §7.)* |
 | AFLDB-ISSUE-234 | Optional AFL API feed expansion (extended statistics, umpires, play-by-play) | Low | Data acquisition — investigation only | Open (2026-09-23) — ISSUE-228 S10 successor; optional, not required by the supported architecture | None scheduled; investigate when a product need arises |
@@ -41489,9 +41489,28 @@ Full record: `issues/closed/AFLDB-ISSUE-228.md` §22.22.
   `promotion_stage_completion_pkey`. The ordinary non-empty path was unchanged (the grid row was
   promoted byte-equal). After every scenario the fresh-session fingerprint equalled the baseline.
   No implementation change was needed.
-- **Next action.** Operator review; commit, `merge:ready`, merge, DEV deploy; then ISSUE-237 L4 A5
-  with a fresh `$STAMP` and the live DEV R6 header check (runbook §6/§7).
+- *(Historical.)* **Next action.** Operator review; commit, `merge:ready`, merge, DEV deploy; then
+  ISSUE-237 L4 A5 with a fresh `$STAMP` and the live DEV R6 header check (runbook §6/§7).
   ISSUE-237 stays open. Fixture-account cleanup is AFLDB-ISSUE-248, not this issue.
+- **Closure audit (2026-09-26, DB-free, Claude-run): REMAINS OPEN** (runbook §9).
+  - Committed `86e0e2ba`, merged `397f422d`, and deployed.
+  - The L4 runs `20260926-033212` (post-swap) and `20260926-085511` ("A/B/C gates passed") both
+    passed A5 and the staged reinstatement. At 085511 the ledger was still empty: the AFL API
+    adjudication replay inserted 0.
+  - **Not recorded (the steps ran; R6 unknown).** None of the five runbook §7 live items is in any
+    record:
+    - the A5 permitted-empty line;
+    - R6;
+    - the `promotion_stage_completion` readback;
+    - the 2d NOTICE;
+    - the C2 `equal 0/0` compare.
+  - The "documented targeted grid repair" is undocumented, and `external_grid_sources` is on the
+    same 2b/2d path.
+  - **Next action (operator):**
+    - supply the retained console output;
+    - record the grid repair;
+    - R6 can be re-derived file-only from the retained pre-cutover dump;
+    - resolve on that, or decide explicitly whether progression evidence suffices.
 
 ## AFLDB-ISSUE-246 — Orphaned ISSUE-109 DEV match override blocks promotion
 
@@ -41623,9 +41642,21 @@ Full record: `issues/closed/AFLDB-ISSUE-228.md` §22.22.
   - ESLint on the changed TypeScript is clean, and so is `git diff --check`.
   - The CLI argument refusals were smoke-tested; they exit before any DB step.
   - There was no DEV, PROD, `afldb_test` or SSH contact.
-- **Next action.** The operator reviews, commits and deploys to DEV. Then rerun ISSUE-237 L4 A2
-  with the runbook §8 commands under the separate L4 authorisation. Resolve on four READY
-  results.
+- *(Historical.)* **Next action.** The operator reviews, commits and deploys to DEV. Then rerun
+  ISSUE-237 L4 A2 with the runbook §8 commands under the separate L4 authorisation. Resolve on four
+  READY results.
+- **Closure audit (2026-09-26, DB-free, Claude-run): REMAINS OPEN** (runbook §10).
+  - Committed `4df98d07` and deployed.
+  - After the fix, L4 went past A2 on the second attempt, `20260926-033212` and
+    `20260926-085511`, and every A2 FAIL is a stop.
+  - **Not recorded (the step ran).** ISSUE-237 §11d.12 said the A2 results were recorded here; they
+    never were. No record carries:
+    - the four READY lines;
+    - the target `INFO migration parity not read` lines (the restricted-role proof);
+    - the settle-manifest WARN.
+  - Progression is not the four-READY evidence this issue resolves on.
+  - **Next action (operator):** paste retained A2 output, or rerun the four read-only runbook §8
+    preflights on DEV; they write nothing. Resolve on four READY.
 
 ## AFLDB-ISSUE-242 — Cross-database manual player registration token convergence blocks ISSUE-237 L4
 
@@ -41690,10 +41721,23 @@ Full record: `issues/closed/AFLDB-ISSUE-228.md` §22.22.
     `player-link-mutations` 112/112; `-t AFLDB-ISSUE-245` 29/29; `-t AFLDB-ISSUE-237` 111/1 (the
     same CRLF baseline, proven unchanged against HEAD/main). ESLint and `git diff --check` clean.
   - There was no `afldb_test`, `afldb_dev` or production contact, no SSH, no L4 and no Git write.
-- **Next action.**
+- *(Historical.)* **Next action.**
   - The operator reviews and commits.
   - Then ISSUE-237 L4 under separate DEV authorisation. B4 still STOPs on contradictory,
     orphan or unaccepted live states.
+- **Closure audit (2026-09-26, DB-free, Claude-run): REMAINS OPEN** (runbook §11).
+  - Committed `bfafed36` and deployed.
+  - ISSUE-237 L4 `20260926-085511` records "A/B/C gates passed" and E1 PASS, with A4.2 recorded
+    earlier as DEV 92 / source 92. Tokens are minted per database, so that B4/C2 PASS is only
+    reachable through convergence, and the issue very probably ran live.
+  - **Not recorded (the step ran):**
+    - the B4 A4.2 line with present/bind/create and rebind/retire counts;
+    - the step-2c application;
+    - the C2 re-proof.
+  - The A–C "documented targeted grid repair" is undocumented.
+  - **Next action (operator):** supply the convergence entries of the retained
+    `~/backups/afldb/promotion-dev-lineage-20260926-085511.sql` and any retained B4/C2 output.
+    Resolve on those counts.
 
 ## AFLDB-ISSUE-245 — afldb_test destructive rebuild does not preserve/replay manual player registrations and data_overrides
 
@@ -42771,9 +42815,23 @@ Full record: `issues/closed/AFLDB-ISSUE-228.md` §22.22.
     (415/415); `auth` and `admin-lifecycle-actions` 200/200.
   - `tsc` is clean, ESLint on the changed TypeScript is clean, and `git diff --check` is clean.
   - There was no database or SSH contact, no DEV mutation and no A5 rerun.
-- **Next action.** The operator reviews, commits and deploys to DEV. Then run runbook §9 on DEV
-  (backup, validate-only, `--apply`, rerun, P1–P4) under explicit authorisation, resolve on that
-  evidence, and rerun ISSUE-237 L4 A5.
+- *(Historical.)* **Next action.** The operator reviews, commits and deploys to DEV. Then run
+  runbook §9 on DEV (backup, validate-only, `--apply`, rerun, P1–P4) under explicit authorisation,
+  resolve on that evidence, and rerun ISSUE-237 L4 A5.
+- **Closure audit (2026-09-26, DB-free, Claude-run): REMAINS OPEN** (runbook §11).
+  - Committed `a4f734af`, merged `397f422d`, and deployed.
+  - ISSUE-237 L4 passed A5 at `20260926-033212` and at `20260926-085511`, without
+    `--allow-fixture-identities`. So the reserved-domain closure was probably gone from DEV.
+  - **Not recorded, and whether §9 ran is unknown.** No backup, WOULD_CLEAN, CLEANED, cleanup audit
+    id, actor, ALREADY_CLEAN or P1–P4 output exists in any record. A5 progression does not show that
+    the audited tool removed the rows.
+  - **Next action (operator):**
+    - run P1–P3 read-only on `afldb_dev` (the promotion reinstates the auth tables and the audit
+      log in full);
+    - run the tool validate-only (READ ONLY): ALREADY_CLEAN names the audit id; a refusal means the
+      closure left outside this lifecycle;
+    - supply any retained §9 console output;
+    - then resolve, or record how the closure left DEV.
 
 ## AFLDB-ISSUE-244 — ISSUE-228 AFL API end-to-end acceptance review
 
