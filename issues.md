@@ -42373,13 +42373,67 @@ Full record: `issues/closed/AFLDB-ISSUE-228.md` §22.22.
     candidate, `--plan` or swap.
   - **Prerequisite: AFLDB-ISSUE-248**, the audited, closure-bound DEV cleanup. Then rerun A5 under
     this issue's own DEV authorisation. **L4 NOT RUN; L5 NOT RUN.** This issue is not resolved.
+- **Update (2026-09-26): the post-merge L4 (ISSUE-247/248 at `397f422d`) reached the post-swap
+  phase and was ROLLED BACK.** The promoted candidate held first-kick-goal **0** against
+  pre-promotion DEV's **335** (334 `wikipedia_first_kick_goal` + 1 manual). `afldb_dev` is restored
+  to 335/334; the failed candidate is retained as `afldb_dev_candidate_20260926-033212`. Root cause
+  and fix: **AFLDB-ISSUE-249** (rebuild never loaded the first-kick-goal family; no promotion gate
+  read the import-writable table). **L4 remains NOT COMPLETE.** *(Superseded by the update below.)*
+- **Update (2026-09-26): L4 PASS (operator-run, real DEV promotion). ISSUE-237 remains OPEN — L5
+  PROD is NOT RUN.**
+  - **Prerequisite fix deployed.** AFLDB-ISSUE-249 is RESOLVED at `6ae70722`: the rebuild now owns
+    a pinned `first-kick-goal` stage reconstructing the 334 manifest-backed
+    `wikipedia_first_kick_goal` rows, and a promotion gate reads that identity set.
+  - **L3/source proof after the fix.** The first-kick-goal source gate PASSED (334/334 manifest
+    identities); the rebuild's FINAL VALIDATION reported 89 checks; the source promotion gate
+    PASSED.
+  - **Fresh L4 run.** Promotion stamp `20260926-085511`. A/B/C gates passed after the documented
+    targeted grid repair. **G3 found exactly one classified DEV-regenerable hard loss:**
+    `CD_I297354`, class `afl_api_stat_vector_season`, stable identity `players/K/Karl_Amon.html`,
+    recorded in the bound regeneration classification file
+    `afl-api-dev-regeneration-20260926-085511.json`. `E_promotion` was empty. The post-swap
+    production-phase promotion check PASSED, and the first-kick-goal promotion gate PASSED after
+    the swap.
+  - **Post-swap replay E1.** The normal admin-override replay PASSED. The first-kick-goal special
+    replay recreated exactly 1 row (`recreated: 1, restored: 0, corrected: 0, lifecycle: 0`),
+    leaving the census `total_first_kick_goal|335`, `wikipedia_first_kick_goal|334`,
+    `manual_first_kick_goal|1` — the ISSUE-249 regression proof. The AFL API adjudication replay
+    inserted/no-opped/stopped nothing, and the combined AFL API identity invariant was OK.
+  - **§9 current-season reacquisition** (snapshot `settle-2026-2026-09-26-0941`): a fresh AFL Tables
+    acquisition (217 matches, 9,982 player-stat rows, no rejections) was applied clean as batch 86
+    (10,199 observations, 21,457 canonical rows inserted, 0 canonical apply refusals/failures, 669
+    players recomputed, 0 active exceptions, 0 unresolved identities, source completeness COMPLETE).
+    Post-settle live census: `matches_2026|217`, `player_match_stats_2026|9982`,
+    `afl_api_stat_vector_season|273`, `CD_I297354|0`. Health `{"status":"ok"}`.
+  - **Fresh AFL API acquisition and DEV bridge** (label `afl-api-2026-2026-09-25-235854`, manifest
+    sha256 `afb2a754…907c7`; 218 matches in feed, 217 selected, 652 manifested files, selection
+    CONCLUDED). The target-bound DEV bridge emitter (bundle v2, artefact sha256
+    `75ee96ca…9318ad8fb3`) proved 217 match units, 0 build failures, 669 providers linked, 0
+    unresolved/contradictory, 0 uncovered player-match rows, and `CD_I297354` disposition `linked`
+    to candidate player 7974 (Karl Amon).
+  - **Loader.** validate-only (`would_link 1`, `already_linked 668`, 0 halts) → dry-run (`linked 1`,
+    exit 0, rollback proven: `CD_I297354_row_count=0`) → real apply (`linked 1`, `already_linked
+    668`, 0 withheld, exit 0). Post-apply identity proof:
+    `CD_I297354|unique|afl_api_stat_vector_season|1|players/K/Karl_Amon.html`.
+  - **Mandatory ISSUE-237 DEV regeneration census** (`--phase dev-regeneration-census --database
+    afldb_dev --afl-api-dev-regeneration afl-api-dev-regeneration-20260926-085511.json`):
+    `[PASS] Database identity`, `[PASS] afl_api DEV regeneration — post-re-acquisition census` (
+    `CD_I297354: PASS`). `PROMOTION CHECK (dev/dev-regeneration-census): PASS — 2 gate(s)
+    evaluated, none failed.` Final health `{"status":"ok","latencyMs":17}`.
+  - **Retained evidence (not touched):** `afldb_dev_pre_rebuild_20260926-085511`,
+    `afldb_dev_candidate_20260926-033212` (the earlier failed candidate).
+  - **Closure interpretation.** The DEV G3 exception under the ISSUE-237 §6.3 contract was actually
+    used for `CD_I297354`, the required target-bound re-acquisition/regeneration sequence
+    completed, and the mandatory census passed. **The DEV promotion is accepted.** **L4 is PASS.**
+    **ISSUE-237 remains OPEN** because **L5 PROD is NOT RUN**. Production's G3 hard-loss rule has no
+    DEV-style exception. **Next action:** L5 only inside a future scheduled production promotion.
 
 ## AFLDB-ISSUE-249 — Promotion/rebuild drops canonical first-kick-goal achievements
 
-- **Status:** Open (discovered 2026-09-26, local). **Severity:** High — data loss on promotion; it
-  blocks ISSUE-237 L4. **Area:** rebuild stage graph (`tools/db/rebuild-test.ts`), the first-kick-goal
-  importer (`tools/records/import-first-kick-goal.ts`), promotion checker
-  (`tools/db/promotion-check.ts`). **Runbook:** `issues/open/AFLDB-ISSUE-249.md`.
+- **Status:** Resolved 2026-09-26 (discovered 2026-09-26, local). **Severity:** High — data loss on
+  promotion; it blocked ISSUE-237 L4. **Area:** rebuild stage graph (`tools/db/rebuild-test.ts`), the
+  first-kick-goal importer (`tools/records/import-first-kick-goal.ts`), promotion checker
+  (`tools/db/promotion-check.ts`). **Runbook:** `issues/closed/AFLDB-ISSUE-249.md`.
 - **Live evidence (operator, 2026-09-26).** The post-merge ISSUE-237 L4 DEV promotion (ISSUE-247 +
   ISSUE-248 at `397f422d`) reached the post-swap phase with the promoted candidate at
   first-kick-goal **0** against pre-promotion DEV **335** (334 `wikipedia_first_kick_goal` + the
@@ -42472,9 +42526,36 @@ Full record: `issues/closed/AFLDB-ISSUE-228.md` §22.22.
 - **Not done.** No `afldb_test` or DEV run, no destructive end-to-end rebuild, and no L4 rerun. The
   real DEV promotion is **not** shown fixed by the `code_test_db` rehearsals. **ISSUE-237 L4 remains NOT COMPLETE** until a separately
   authorised real DEV promotion succeeds.
-- **Next action.** Operator review/commit/deploy. Confirm the extract hash on the rebuild host. Give
-  `afldb_test` the family (rerun L3, or the stage command once) and pass
-  `--phase source --database afldb_test`. Then rerun ISSUE-237 L4 with a fresh `$STAMP` (runbook §7).
+- **Next action (historical; superseded by the resolution below).** Operator review/commit/deploy.
+  Confirm the extract hash on the rebuild host. Give `afldb_test` the family (rerun L3, or the stage
+  command once) and pass `--phase source --database afldb_test`. Then rerun ISSUE-237 L4 with a
+  fresh `$STAMP` (runbook §7).
+- **Resolution (2026-09-26, operator-run on a real DEV promotion).** Deployed at
+  main/DEV `6ae70722` (`fix(db): preserve first-kick-goal records across rebuilds`). The rebuild now
+  owns 334 manifest-backed `wikipedia_first_kick_goal` identities; manual first-kick-goal rows stay
+  outside that source contract by design (§2.3, unchanged).
+  - **Source proof.** The first-kick-goal source gate PASSED: 334/334 manifest identities. The
+    rebuild's FINAL VALIDATION reported 89 checks. The source promotion gate PASSED.
+  - **Fresh ISSUE-237 L4 (promotion stamp `20260926-085511`).** A/B/C gates PASSED after the
+    documented targeted grid repair. G3 found exactly one classified DEV-regenerable hard loss,
+    `CD_I297354` (`afl_api_stat_vector_season`, `players/K/Karl_Amon.html`) — an unrelated,
+    pre-existing gap the §6.3 DEV exception covers, not a first-kick-goal recurrence. It was
+    regenerated by a fresh target-bound re-acquisition/bridge/loader sequence and confirmed by the
+    mandatory `dev-regeneration-census` PASS (full detail in the ISSUE-237 entry above).
+  - **Post-swap first-kick-goal proof (E1 special-record replay).** `recreated: 1, restored: 0,
+    corrected: 0, lifecycle: 0`. Resulting census: `total_first_kick_goal|335`,
+    `wikipedia_first_kick_goal|334`, `manual_first_kick_goal|1` — this is the promoted, real DEV
+    (`afldb_dev`) state at stamp `20260926-085511`.
+  - **Acceptance basis.** ISSUE-249's stated acceptance was source PASS plus a clean real ISSUE-237
+    L4 (§7). Both are proven. The new source identity promotion gate is what prevented the earlier
+    silent-loss class from recurring. The special-record replay adapter successfully recreated the
+    manual `fkg-001`-backed row exactly as §2.3 predicted it would, once the source rows it
+    corrects existed again.
+  - **Evidence retained, not cleaned up:** the earlier failed candidate
+    `afldb_dev_candidate_20260926-033212`, and the pre-rebuild snapshot
+    `afldb_dev_pre_rebuild_20260926-085511`.
+  - **Scope note.** This resolves ISSUE-249 only. **AFLDB-ISSUE-237 remains OPEN**: L5 PROD has not
+    run, and production's G3 hard-loss rule has no DEV-style exception.
 
 ## AFLDB-ISSUE-248 — Reserved-domain DEV auth fixtures block promotion
 

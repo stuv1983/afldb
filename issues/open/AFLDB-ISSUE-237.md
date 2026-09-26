@@ -89,7 +89,7 @@ ISSUE-237 is not resolved.)*
 | ISSUE-245 blocker on L3 | CLEARED (§11a.5) |
 | ISSUE-245 `afldb_test` proof | PASS, through L3 (§11a.6) |
 | L3 | **PASS** (§11a.6) |
-| L4 DEV promotion | **NOT RUN.** Procedure rewritten after the L4 hardening (§11d; findings and fixes §11d.0, prerequisites §11d.2). *(2026-09-25: the second real attempt STOPPED at A4.3, before the destructive boundary. A3 PASS; the blocker is the orphaned ISSUE-109 fixture override; prerequisite **AFLDB-ISSUE-246**, §11d.12.)* *(2026-09-25: ISSUE-246 RESOLVED, audit 983; the A4.3 rerun returned no rows, so A4.3 is PASS; A3/A4.1/A4.2 unchanged; next step **A5**, §11d.13.)* *(2026-09-25: **A5 REFUSED on TWO independent gates**: the ISSUE-151 staged-rows gate on the legitimately empty `afl_api_identity_adjudications` ledger (0; census 669/0/0/0 PASS), prerequisite **AFLDB-ISSUE-247**; and the test-fixture identity gate on reserved-domain `auth_users` 14/17/18 and `admin_invites` 5, prerequisite **AFLDB-ISSUE-248**. Nothing past A5 ran. §11d.14.)* |
+| L4 DEV promotion | **NOT RUN.** Procedure rewritten after the L4 hardening (§11d; findings and fixes §11d.0, prerequisites §11d.2). *(2026-09-25: the second real attempt STOPPED at A4.3, before the destructive boundary. A3 PASS; the blocker is the orphaned ISSUE-109 fixture override; prerequisite **AFLDB-ISSUE-246**, §11d.12.)* *(2026-09-25: ISSUE-246 RESOLVED, audit 983; the A4.3 rerun returned no rows, so A4.3 is PASS; A3/A4.1/A4.2 unchanged; next step **A5**, §11d.13.)* *(2026-09-25: **A5 REFUSED on TWO independent gates**: the ISSUE-151 staged-rows gate on the legitimately empty `afl_api_identity_adjudications` ledger (0; census 669/0/0/0 PASS), prerequisite **AFLDB-ISSUE-247**; and the test-fixture identity gate on reserved-domain `auth_users` 14/17/18 and `admin_invites` 5, prerequisite **AFLDB-ISSUE-248**. Nothing past A5 ran. §11d.14.)* *(2026-09-26: a post-merge attempt reached the post-swap phase and was ROLLED BACK on discovering **AFLDB-ISSUE-249** — the promoted candidate held first-kick-goal 0 against DEV's 335/334. `afldb_dev` restored; failed candidate retained as `afldb_dev_candidate_20260926-033212`.)* *(2026-09-26: **L4 PASS** (operator-run, stamp `20260926-085511`), after AFLDB-ISSUE-249 was deployed at `6ae70722`. G3 found one classified DEV-regenerable hard loss, `CD_I297354`, resolved through the §6.3 exception (fresh re-acquisition, target-bound bridge 669/669, loader apply, `dev-regeneration-census` PASS). Post-swap first-kick-goal census 335/334/1. Full record: §11d.15.)* |
 | L5 PROD promotion | **NOT RUN** |
 
 **P-M state (2026-09-24).** Point 1 PROVEN (DB-free). Point 2 PROVEN (live, `afldb_test`,
@@ -3770,6 +3770,123 @@ A future A5 uses a fresh `$STAMP` — the checker refuses to overwrite.
 
 - **L4 remains NOT RUN, and ISSUE-237 remains OPEN.**
 
+### 11d.15 L4 PASS (2026-09-26, operator-run): the first accepted real DEV promotion; L5 NOT RUN
+
+The prerequisite blockers on A5 (AFLDB-ISSUE-247, AFLDB-ISSUE-248) and the discovered
+AFLDB-ISSUE-249 (first-kick-goal reconstruction) are all resolved and deployed at main/DEV
+`6ae70722`. This run is the first real DEV promotion this issue accepts. Promotion stamp:
+`20260926-085511`. Promoted live database: `afldb_dev`.
+
+**A — source and prerequisite proof.**
+
+- ISSUE-249's fix is live: the rebuild owns a pinned `first-kick-goal` stage; `afldb_test` was
+  reloaded with it.
+- The first-kick-goal source promotion gate PASSED: 334/334 manifest-backed
+  `wikipedia_first_kick_goal` identities.
+- L3/source rebuild FINAL VALIDATION reported 89 checks; the source promotion gate PASSED overall.
+
+**B/C — candidate, pre-swap and swap.**
+
+- A/B/C gates passed after the documented targeted grid repair.
+- **G3 classified exactly one hard loss:** `CD_I297354`, class `afl_api_stat_vector_season`, stable
+  identity `players/K/Karl_Amon.html`. The DEV regeneration classification file is
+  `afl-api-dev-regeneration-20260926-085511.json` (per §11d.5, the classification proposes
+  `afl_api_stat_vector_season` hard losses only, format v2).
+- `E_promotion` (the G2 AGREE set) was empty.
+- Post-swap, the production-phase promotion check PASSED, and the first-kick-goal promotion gate
+  PASSED after the swap.
+
+**E — post-swap replay.**
+
+- **E1 (normal admin-override replay): PASS.**
+- **E1b (first-kick-goal special-record replay): recreated 1, restored 0, corrected 0, lifecycle 0.**
+  Resulting first-kick-goal census: `total_first_kick_goal|335`, `wikipedia_first_kick_goal|334`,
+  `manual_first_kick_goal|1` — the exact pre-failure DEV state, and the AFLDB-ISSUE-249 regression
+  proof.
+- AFL API adjudication replay: inserted 0, noops 0, stops none, supersedes none. Combined AFL API
+  identity invariant: OK.
+
+**§9 — current-season reacquisition (the DEV §6.3 regeneration path for the G3 hard loss).**
+
+- Snapshot label `settle-2026-2026-09-26-0941`.
+- Fresh AFL Tables acquisition: 217 matches, 9,982 player-stat rows, observation bundle complete, no
+  rejections; dry run clean; real apply clean.
+- Applied batch 86: observations 10,199; canonical rows inserted 21,457, updated 0; canonical
+  applications logged 19,938; canonical apply refusals 0; canonical apply failures 0; derived
+  recompute 669 players; ACTIVE exceptions 0; unresolved identities 0; source completeness COMPLETE.
+- Post-settle live census: `matches_2026|217`, `player_match_stats_2026|9982`,
+  `afl_api_stat_vector_season|273`, `CD_I297354|0`.
+- ISSUE-249 regression proof at this point (unchanged from E1b): `total_first_kick_goal|335`,
+  `wikipedia_first_kick_goal|334`, `manual_first_kick_goal|1`.
+- Health: `{"status":"ok","database":"ok","latencyMs":18}`.
+- Fresh AFL API acquisition label `afl-api-2026-2026-09-25-235854`, manifest sha256
+  `afb2a754943fba59a48eabf0bf01dbae7e64046e012318864dc84f68c96907c7`: season 2026, kind
+  `afl_api_match_snapshot`, 218 matches in feed, 217 selected, 652 manifested files, selection
+  CONCLUDED.
+- Fresh target-bound DEV bridge evidence: bundle v2, 217 match units, 0 build failures,
+  `current_database()='afldb_dev'`, role `afldb_app`, `transaction_read_only=on`; snapshot
+  matches 217, player-match rows 9983, distinct provider players 669; canonical matches resolved
+  217/unresolved 0; canonical PMS rows read 9982; providers linked 669, unresolved 0,
+  contradictory 0; player-match rows covered by linked providers 9983, uncovered 0; 0 duplicate
+  jumper keys, 0 nonstandard jumpers, 0 all-zero withheld. Overlap with the previously accepted
+  provider set: existing linked 669, both linked 669, newly linked 0, existing-only 0, newly
+  contradictory 0.
+- Fresh promotion-bound bridge artefact:
+  `/home/arm/backups/afldb/promotion-dev-20260926-085511-afl-api-player-bridge.json`, sha256
+  `75ee96ca79089ac5fe6212501ff9448b22ac24b722029058344b5d9318ad8fb3`. Contract:
+  `tool=tools/current-season/emit-afl-api-player-bridge.ts`,
+  `match_method=afl_api_stat_vector_season`, `built_from_database=afldb_dev`, `read_only=true`,
+  `snapshot_label=afl-api-2026-2026-09-25-235854`, census 217 matches / 9983 rows / 669 providers,
+  669 linked / 0 unresolved / 0 contradictory. `CD_I297354` disposition `linked`, candidate player
+  id 7974, observed name Karl Amon.
+- **Loader validate-only:** `would_link 1`, `already_linked 668`, `already_linked_human 0`,
+  0 HALTs (contradiction/collision/identity-check).
+- **Loader dry-run:** `linked 1`, `already_linked 668`, 0 withheld, exit 0. Rollback proof after
+  the dry run: `CD_I297354_row_count=0`.
+- **Real bridge apply:** `linked 1`, `already_linked 668`, 0 withheld, exit 0. Post-apply identity
+  proof: `CD_I297354|unique|afl_api_stat_vector_season|1|players/K/Karl_Amon.html`.
+
+**Mandatory ISSUE-237 DEV regeneration census.**
+
+Command phase `--environment dev --phase dev-regeneration-census --database afldb_dev
+--afl-api-dev-regeneration afl-api-dev-regeneration-20260926-085511.json`:
+
+```text
+[PASS] Database identity
+[PASS] afl_api DEV regeneration — post-re-acquisition census
+       CD_I297354: PASS
+
+PROMOTION CHECK (dev/dev-regeneration-census): PASS — 2 gate(s) evaluated, none failed.
+```
+
+Exit 0. Final health: `{"status":"ok","database":"ok","latencyMs":17}`.
+
+**Retained evidence, not touched:** `afldb_dev_pre_rebuild_20260926-085511`,
+`afldb_dev_candidate_20260926-033212` (the earlier failed L4 candidate, first-kick-goal 0; kept as
+the AFLDB-ISSUE-249 discovery record).
+
+**L4 gate state after this run:**
+
+| Step | State |
+|---|---|
+| Source/L3 (post-ISSUE-249 fix) | **PASS**, 334/334 |
+| A–C (candidate, pre-swap, swap) | **PASS**, after the targeted grid repair |
+| G3 | one classified hard loss, `CD_I297354` (`afl_api_stat_vector_season`); `E_promotion` empty |
+| E1 (admin override replay) | **PASS** |
+| E1b (first-kick-goal special replay) | **PASS**: recreated 1; census 335/334/1 |
+| §9 current-season reacquisition | **PASS**: batch 86, 0 refusals/failures |
+| DEV bridge + loader (validate-only → dry-run → apply) | **PASS**: 669/669 linked, `CD_I297354` regenerated |
+| `dev-regeneration-census` | **PASS** |
+| **L4** | **PASS** |
+| L5 (PROD) | **NOT RUN** |
+
+**Closure interpretation.** The narrow DEV G3 exception (§6.3, OD-3) was actually used, for exactly
+one classified `afl_api_stat_vector_season` hard loss. The required target-bound
+re-acquisition/regeneration sequence completed, and the mandatory census passed. **The DEV
+promotion is accepted under the ISSUE-237 §6.3 contract.** **ISSUE-237 remains OPEN**, because L5
+PROD is still NOT RUN. Production's G3 hard-loss rule is unmodified: FAIL, with no DEV-style
+exception. **Next action:** L5, inside a future scheduled production promotion.
+
 ## 12. Non-goals and successors
 
 - **ISSUE-238:** correcting a consumed link, including every G2/G3 FAIL resolution.
@@ -3946,6 +4063,20 @@ login/logout audit rows and 4 revoked sessions of user 18; prerequisite **AFLDB-
 ISSUE-247/248 deployment to DEV, ISSUE-248's live validate/apply/idempotence/postchecks,
 ISSUE-247's live DEV empty-table/COPY-header proof, then A5 again with a fresh `$STAMP` under a
 separate DEV authorisation. ISSUE-237 is not resolved.)*
+*(2026-09-26: a post-merge L4 attempt at `397f422d` reached the post-swap phase and was ROLLED
+BACK: the promoted candidate held first-kick-goal 0 against DEV's 335/334. This discovered
+**AFLDB-ISSUE-249**. `afldb_dev` was restored; the failed candidate is retained as
+`afldb_dev_candidate_20260926-033212`. The next action is the ISSUE-249 fix, then L4 again with a
+fresh `$STAMP`. ISSUE-237 is not resolved.)*
+*(2026-09-26: **L4 PASS** (operator-run, stamp `20260926-085511`), after AFLDB-ISSUE-249 was
+deployed at `6ae70722` (§11d.15). Source gate PASS 334/334. G3's one classified hard loss,
+`CD_I297354`, was resolved through the §6.3 DEV exception: a fresh §9 current-season
+re-acquisition, a target-bound DEV bridge emitter (669/669 linked), and the loader's
+validate-only → dry-run → apply, confirmed by a PASSing `dev-regeneration-census`. The post-swap
+first-kick-goal special replay recreated the manual row exactly: census 335/334/1. **The DEV
+promotion is accepted under the ISSUE-237 §6.3 contract. L4 is PASS.** **ISSUE-237 remains OPEN:
+L5 PROD is NOT RUN.** The next action is L5, inside a future scheduled production promotion, under
+production's unmodified G3 hard-loss rule (FAIL, no DEV-style exception).)*
 
 ---
 

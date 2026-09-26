@@ -15,7 +15,7 @@ commit.
 
 ## [Unreleased]
 
-### The rebuild reconstructs first-kick-goal records, and promotion refuses to lose them (AFLDB-ISSUE-249, open) - 26 September 2026
+### The rebuild reconstructs first-kick-goal records, and promotion refuses to lose them (AFLDB-ISSUE-249, Resolved) - 26 September 2026
 
 - **Why.** No `db:test:rebuild` stage ever loaded the curated first-kick-goal family
   (`player_achievements`, source `wikipedia_first_kick_goal`). A rebuilt `afldb_test` therefore held
@@ -52,6 +52,17 @@ commit.
   - The rehearsals pass 15/15 and 12/12; after the real stage, the full FINAL VALIDATION reports
     `PASSED: 89 checks`.
   - The two `db-test-rebuild` failures seen on Windows reproduce identically on clean `main`.
+- **Resolved (26 September), on a real DEV promotion.** Deployed at `6ae70722`. The fresh
+  AFLDB-ISSUE-237 L4 DEV promotion (stamp `20260926-085511`) reran with the fix live:
+  - the source promotion gate PASSED, 334/334 manifest identities, before the candidate was built;
+  - the promoted `afldb_dev` holds first-kick-goal **335** total: **334** manifest-backed
+    `wikipedia_first_kick_goal` rows (reconstructed by the new rebuild stage) and **1**
+    `manual_admin_edit` row (the ISSUE-167 acceptance record, recreated by the post-swap special-record
+    replay: `recreated: 1`);
+  - the mandatory `dev-regeneration-census` PASSED.
+
+  The new source identity promotion gate is what prevented a repeat of the earlier silent-loss
+  candidate. AFLDB-ISSUE-237 itself remains open pending L5 (PROD), which is unaffected by this fix.
 
 ### Audited cleanup of reserved-domain DEV auth fixtures (AFLDB-ISSUE-248, open) - 25 September 2026
 
