@@ -48,9 +48,9 @@ commit.
   - freeze/release cycles;
   - a full freeze-enabled DEV promotion and its guarded rollback.
 
-  It is **technically accepted for the ISSUE-237 L5 prerequisite**. Committed locally as
-  `26751ad6`; not yet merged. L5 needs this work merged and on the PROD checkout, plus its own
-  authorisation. Runbook:
+  It is **technically accepted for the ISSUE-237 L5 prerequisite**. Committed as `26751ad6` and
+  merged into `main`; not yet deployed. L5 needs this work on the PROD checkout with its deployed
+  revision/code identity verified, plus its own authorisation. Runbook:
   `issues/open/AFLDB-ISSUE-250.md` §17.
 
 ### AFLDB-ISSUE-237 progress: L0–L4 accepted on DEV, L5 PROD pending (Open) - 26 September 2026

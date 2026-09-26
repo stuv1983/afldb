@@ -20,17 +20,21 @@
 - **2026-09-26: implementation committed locally as `26751ad6`** (`fix(promotion): freeze
   production state before cutover`), with the §17 doc fixes. Not merged, not pushed, not deployed.
   The DEV REHEARSAL PASS above remains accepted.
-- **Still OPEN**: the implementation has not been merged or deployed, and the production path
-  itself has not run. Not resolved.
+- **2026-09-26: merged into local `main`** by fast-forward (implementation `26751ad6` and its
+  status commit `2e3f9223`). Not pushed, not deployed. The DEV REHEARSAL PASS / technical
+  acceptance is unchanged.
+- **Still OPEN**: the merged code is not yet on the PROD checkout, and the production path itself
+  has not run. Not resolved.
 - **ISSUE-237 L5 is no longer blocked on an untested ISSUE-250 mechanism, and no longer needs an
-  ISSUE-250 commit** (satisfied by `26751ad6`). The remaining prerequisites, in order:
-  1. merge ISSUE-250;
-  2. put that merged code on the PROD checkout;
+  ISSUE-250 commit or merge** (satisfied by `26751ad6`, merged into `main`). The remaining
+  prerequisites, in order:
+  1. put the merged ISSUE-250 code on the PROD checkout;
+  2. verify the deployed revision/code identity;
   3. a **separate operator authorisation for ISSUE-237 L5**.
 
   L5 has NOT run. It runs the freeze-bound procedure (`docs/production-promotion.md` §4.0–§10).
-- **Next action:** merge ISSUE-250; the merged code on the PROD checkout; then the separately
-  authorised ISSUE-237 L5.
+- **Next action:** the merged ISSUE-250 code on the PROD checkout; verify the deployed
+  revision/code identity; then the separately authorised ISSUE-237 L5.
 
 ## 1. Symptom
 
@@ -805,3 +809,7 @@ Established before the ISSUE-250 local commit; nothing was re-run for the commit
   documentation-only follow-up commit; the 811/814 adjacent run annotated as combined-tree
   evidence (§16). Still OPEN: merge, PROD checkout and the separately authorised ISSUE-237 L5
   remain. L5 NOT RUN. PROD never contacted.
+- **2026-09-26: merged into local `main`** (fast-forward to `2e3f9223`; `26751ad6` is an
+  ancestor). Not pushed, not deployed. Still OPEN: the PROD checkout, deployed revision/code
+  identity verification and the separately authorised ISSUE-237 L5 remain. L5 NOT RUN. PROD
+  never contacted.

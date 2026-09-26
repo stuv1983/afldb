@@ -15,7 +15,8 @@
 - **Severity:** High. **Area:** production promotion / cutover state preservation —
   `docs/production-promotion.md` §4–§8 and every production-owned table §7 reinstates.
 - **State:** Open (2026-09-26), opened under operator decision D-P5-1 (the ISSUE-238 pass 5).
-  **Implemented and DB-free validated; committed locally at `26751ad6`, unmerged. DEV REHEARSAL
+  **Implemented and DB-free validated; committed as `26751ad6`, merged into local `main` (not
+  pushed, not deployed). DEV REHEARSAL
   PASS (2026-09-26, runbook §17):
   technically accepted for the ISSUE-237 L5 prerequisite.**
   - Root cause: the §4 dump is taken while every writer still runs; §7 reinstates
@@ -40,12 +41,12 @@
   `tools/db/promotion-inventory.ts`, `tools/maintenance/restore-test.sh`,
   `docs/production-promotion.md` §4.0–§10.
 - **Blocks:** ~~ISSUE-237 L5 PROD (until rehearsal + acceptance)~~. L5 is no longer blocked on an
-  untested mechanism; the commit prerequisite is satisfied (`26751ad6`), and it still needs this
-  work merged and on the PROD checkout.
+  untested mechanism; the commit and merge prerequisites are satisfied (`26751ad6`, merged into
+  `main`), and it still needs this work on the PROD checkout with its revision verified.
 - **Runbook:** `issues/open/AFLDB-ISSUE-250.md`.
-- **Next action:** merge ISSUE-250 (committed locally at `26751ad6`); put the merged code on the
-  PROD checkout; then the separately authorised ISSUE-237 L5 by the freeze-bound procedure.
-  ISSUE-250 stays open until then; L5 has not run.
+- **Next action:** put the merged ISSUE-250 code on the PROD checkout; verify the deployed
+  revision/code identity; then the separately authorised ISSUE-237 L5 by the freeze-bound
+  procedure. ISSUE-250 stays open until then; L5 has not run.
 
 ### AFLDB-ISSUE-238 — Correcting a consumed trusted `afl_api` player link with canonical reattribution
 - **Severity:** Medium. **Area:** admin / player identity — `external_identities` (`afl_api`),
@@ -67,9 +68,9 @@
   `20260926-085511` (runbook §11d.15). **L5 PROD is NOT RUN.** It was blocked on AFLDB-ISSUE-250
   (D-P5-1). That is now lifted as a mechanism blocker: ISSUE-250's DEV rehearsal PASSed on
   2026-09-26, including a full freeze-enabled DEV promotion and rollback in which every ISSUE-237
-  gate also passed. The ISSUE-250 commit prerequisite is satisfied (committed locally at
-  `26751ad6`); L5 still needs ISSUE-250 merged and on the PROD checkout, plus a separate operator
-  authorisation. L5 remains NOT RUN. It then runs by the freeze-bound procedure at
+  gate also passed. The ISSUE-250 commit and merge prerequisites are satisfied (`26751ad6`,
+  merged into `main`); L5 still needs the merged ISSUE-250 code on the PROD checkout with its
+  deployed revision/code identity verified, plus a separate operator authorisation. L5 remains NOT RUN. It then runs by the freeze-bound procedure at
   the next scheduled production promotion, under production's unmodified G3 hard-loss rule. ISSUE-237 has not regressed. The chronology
   below is retained for history; later entries supersede earlier ones.
 - **State:** Open (2026-09-23), split out of the ISSUE-235 plan review (R4). Pre-existing. Neither
@@ -261,8 +262,8 @@
       does not apply to production, where G3 hard loss is FAIL with no exception.
   - **Next action:** *(2026-09-26: BLOCKED on AFLDB-ISSUE-250; later 2026-09-26 its DEV
     rehearsal PASSed — technically accepted for this prerequisite, ISSUE-250 runbook §17. L5 now
-    needs ISSUE-250 (committed locally at `26751ad6`) merged and on the PROD checkout, plus a
-    separate L5 authorisation.)* Once that holds: L5 by the freeze-bound procedure, inside a future scheduled production promotion, under production's unmodified G3
+    needs ISSUE-250 (`26751ad6`, merged into `main`) on the PROD checkout with its deployed
+    revision/code identity verified, plus a separate L5 authorisation.)* Once that holds: L5 by the freeze-bound procedure, inside a future scheduled production promotion, under production's unmodified G3
     hard-loss rule (FAIL, no DEV-style exception). Runbook §11d.15 has the full L4 record.
   - **Not authorised:** no production promotion or PROD mutation without separate, scheduled
     authorisation.
