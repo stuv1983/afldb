@@ -6,8 +6,11 @@
 corrected the same day (revision notes 3–4). OD-6 approved 2026-09-24 (§15). S1–S7 are
 authorised as the non-destructive implementation phase, within the §8 boundaries: S3 is gated by
 P-M, and L3–L5 are blocked until R1 passes. P-M point 2 is PROVEN (2026-09-24, operator-run live
-evidence, §11(d)2); S3 implementation is now in progress.** No database has been rebuilt or
-promoted.
+evidence, §11(d)2); S3 implementation is now in progress.** *(2026-09-24 status: no database had
+been rebuilt or promoted at that point.)* **Current state (2026-09-26): L0–L4 have since run and
+PASSED on real databases — `code_test_db` (L1/L2), `afldb_test` (L3) and `afldb_dev` (L4,
+promotion stamp `20260926-085511`, §11d.15). L5 PROD remains NOT RUN; see the current gate-state
+table below.**
 
 **L1/L2 state (operator-run, reported 2026-09-25).** The §11b rehearsals on the real
 `code_test_db` have now been run by the operator. **L1 PASS:** non-empty importer + human state
@@ -78,7 +81,7 @@ documentation error and is corrected. **§11d is rewritten** from the corrected 
 with an empty or non-empty DEV ledger. **L4 and L5 are NOT RUN.** All code is uncommitted.
 ISSUE-237 is not resolved.)*
 
-**Current gate state (2026-09-25):**
+**Current gate state (2026-09-26):**
 
 | Gate | State |
 |---|---|
@@ -89,8 +92,8 @@ ISSUE-237 is not resolved.)*
 | ISSUE-245 blocker on L3 | CLEARED (§11a.5) |
 | ISSUE-245 `afldb_test` proof | PASS, through L3 (§11a.6) |
 | L3 | **PASS** (§11a.6) |
-| L4 DEV promotion | **NOT RUN.** Procedure rewritten after the L4 hardening (§11d; findings and fixes §11d.0, prerequisites §11d.2). *(2026-09-25: the second real attempt STOPPED at A4.3, before the destructive boundary. A3 PASS; the blocker is the orphaned ISSUE-109 fixture override; prerequisite **AFLDB-ISSUE-246**, §11d.12.)* *(2026-09-25: ISSUE-246 RESOLVED, audit 983; the A4.3 rerun returned no rows, so A4.3 is PASS; A3/A4.1/A4.2 unchanged; next step **A5**, §11d.13.)* *(2026-09-25: **A5 REFUSED on TWO independent gates**: the ISSUE-151 staged-rows gate on the legitimately empty `afl_api_identity_adjudications` ledger (0; census 669/0/0/0 PASS), prerequisite **AFLDB-ISSUE-247**; and the test-fixture identity gate on reserved-domain `auth_users` 14/17/18 and `admin_invites` 5, prerequisite **AFLDB-ISSUE-248**. Nothing past A5 ran. §11d.14.)* *(2026-09-26: a post-merge attempt reached the post-swap phase and was ROLLED BACK on discovering **AFLDB-ISSUE-249** — the promoted candidate held first-kick-goal 0 against DEV's 335/334. `afldb_dev` restored; failed candidate retained as `afldb_dev_candidate_20260926-033212`.)* *(2026-09-26: **L4 PASS** (operator-run, stamp `20260926-085511`), after AFLDB-ISSUE-249 was deployed at `6ae70722`. G3 found one classified DEV-regenerable hard loss, `CD_I297354`, resolved through the §6.3 exception (fresh re-acquisition, target-bound bridge 669/669, loader apply, `dev-regeneration-census` PASS). Post-swap first-kick-goal census 335/334/1. Full record: §11d.15.)* |
-| L5 PROD promotion | **NOT RUN** |
+| L4 DEV promotion | **PASS** (operator-run, promotion stamp `20260926-085511`, 2026-09-26; full record §11d.15). Procedure rewritten after the L4 hardening (§11d; findings and fixes §11d.0, prerequisites §11d.2). Historical chronology of the intervening attempts, preserved: *(2026-09-25: the second real attempt STOPPED at A4.3, before the destructive boundary. A3 PASS; the blocker is the orphaned ISSUE-109 fixture override; prerequisite **AFLDB-ISSUE-246**, §11d.12.)* *(2026-09-25: ISSUE-246 RESOLVED, audit 983; the A4.3 rerun returned no rows, so A4.3 is PASS; A3/A4.1/A4.2 unchanged; next step **A5**, §11d.13.)* *(2026-09-25: **A5 REFUSED on TWO independent gates**: the ISSUE-151 staged-rows gate on the legitimately empty `afl_api_identity_adjudications` ledger (0; census 669/0/0/0 PASS), prerequisite **AFLDB-ISSUE-247**; and the test-fixture identity gate on reserved-domain `auth_users` 14/17/18 and `admin_invites` 5, prerequisite **AFLDB-ISSUE-248**. Nothing past A5 ran. §11d.14.)* *(2026-09-26: a post-merge attempt reached the post-swap phase and was ROLLED BACK on discovering **AFLDB-ISSUE-249** — the promoted candidate held first-kick-goal 0 against DEV's 335/334. `afldb_dev` restored; failed candidate retained as `afldb_dev_candidate_20260926-033212`.)* *(2026-09-26: **L4 PASS** (operator-run, stamp `20260926-085511`), after AFLDB-ISSUE-249 was deployed at `6ae70722`. G3 found one classified DEV-regenerable hard loss, `CD_I297354`, resolved through the §6.3 exception (fresh re-acquisition, target-bound bridge 669/669, loader apply, `dev-regeneration-census` PASS). Post-swap first-kick-goal census 335/334/1. Full record: §11d.15.)* |
+| L5 PROD promotion | **NOT RUN.** Deferred to the next scheduled production promotion, under production's unmodified G3 hard-loss rule (FAIL, no DEV-style exception). |
 
 **P-M state (2026-09-24).** Point 1 PROVEN (DB-free). Point 2 PROVEN (live, `afldb_test`,
 rolled back). Point 4 PROVEN by composition. **Point 3 is NOT PROVEN** *(superseded 2026-09-25:
@@ -1373,6 +1376,10 @@ that 92 of the 802 captured identities need, and nothing replays them, so Stage 
 `--recover` cannot complete (§11a.3). The rows above are unchanged.)*
 *(Annotation 2026-09-25: **L3 PASS** (§11a.6); the ISSUE-245 block is cleared and ISSUE-245 is
 resolved. **L4 is prepared, NOT RUN** (§11d). **L5 is NOT RUN.** The rows above are unchanged.)*
+*(Annotation 2026-09-26: **L4 PASS** (operator-run, promotion stamp `20260926-085511`; full record
+§11d.15). The preceding annotation is historical: L4 has since run end-to-end on DEV and been
+accepted under the ISSUE-237 §6.3 exception. **L5 is NOT RUN.** The rows above are otherwise
+unchanged.)*
 
 ## 11a. OD-4 recovery prerequisite — restoring `afldb_test`'s importer state
 
@@ -2757,15 +2764,19 @@ touch DEV or production (L4/L5, §11a.3); and it does not restore the 2026 curre
 (explicitly out of scope for L3, §11a.3: "Restoring the 2026 stats is not an ISSUE-237
 prerequisite").
 
-## 11d. L4 operator sequence — the next DEV promotion (rewritten 2026-09-25 after the L4 hardening; NOT RUN)
+## 11d. L4 operator sequence — the next DEV promotion (rewritten 2026-09-25 after the L4 hardening; RUN 2026-09-26, PASS — §11d.15)
 
-**Nothing in this section has been run.** It was first derived on 2026-09-25 by reading the
+*(2026-09-25 drafting note, preserved as history.)* At the time this section was written, nothing
+in it had been run. It was first derived on 2026-09-25 by reading the
 source, and that reading found three HIGH defects in the promotion checker's `afl_api` gates
 (F-L4-1..3, §11d.0). They are now **fixed in code and DB-free validated** (§11d.9). This section
 was then **rewritten from the corrected implementation**. It works whether DEV's `afl_api`
 ledger is empty or not, and it no longer needs "A4.1 must be 0" as a safety workaround. No
-database was contacted, and no command below has been run. Every command and flag is traced in
-§11d.10. Where a live value is needed, the step is a named **operator read**.
+database was contacted, and no command below had been run at that time.
+
+**Current state (2026-09-26): this sequence has since been run end-to-end on DEV and PASSED** —
+see §11d.15 for the full accepted record. Every command and flag is traced in §11d.10. Where a
+live value is needed, the step is a named **operator read**.
 
 **Revised again 2026-09-25 (the L4 semantic blockers).** The repaired §11d still left three
 things to the operator: A4.2 (a DEV and a candidate registration of one AFL Tables path under
@@ -2824,7 +2835,10 @@ decisions. Identity is compared only through stable identity (AFL Tables path or
      (`gateMigrationParity`).
    - The corrected gates, the bound file and the file-verifying replay exist only in that code.
 
-   **Today it is uncommitted, so L4 cannot start.**
+   *(2026-09-25 status: at that time it was uncommitted, so L4 could not start.)* *(2026-09-26:
+   this prerequisite was satisfied for the accepted run — the code was committed, merged and
+   deployed to the DEV checkout, and L4 has since run and PASSED, stamp `20260926-085511`;
+   §11d.15.)*
 2. **`afldb_test` has not changed since L3.** No rebuild, R4 or registration run has touched it.
    The L3 state (§11a.6) is the source.
 3. **An explicit, separate operator authorisation for L4**, in a chosen DEV window. Nothing in
@@ -3426,6 +3440,14 @@ combined invariant. Both are last-line guards, not the plan.
 
 ### 11d.8 What L4 still cannot claim
 
+> **Update 2026-09-26 (after the ISSUE-242 merge and the accepted L4 run, §11d.15).** The
+> token-convergence follow-up in point 1 below was implemented and merged as
+> **AFLDB-ISSUE-242**; B4 is no longer fail-closed on it. **L4 has since run end-to-end and
+> PASSED** (operator-run, promotion stamp `20260926-085511`), with a live DEV `afl_api` ledger of
+> zero rows (`E_promotion` empty) — see §11d.15 for the accepted record. The rest of this section,
+> including the block below, is retained as the 2026-09-25 pre-run analysis and is **historical**,
+> not current state.
+
 > **2026-09-25 — AFLDB-ISSUE-242 allocated (`issues/closed/AFLDB-ISSUE-242.md`).**
 > - **L4 remains NOT RUN, and no L4 evidence has been produced.**
 > - ISSUE-242 is now the token-convergence prerequisite that points 1 and 3 below proposed.
@@ -3778,20 +3800,30 @@ AFLDB-ISSUE-249 (first-kick-goal reconstruction) are all resolved and deployed a
 `6ae70722`. This run is the first real DEV promotion this issue accepts. Promotion stamp:
 `20260926-085511`. Promoted live database: `afldb_dev`.
 
-*(2026-09-26 closure audit.)* "Resolved" above means that the blockers are deployed and no longer
-stopped L4. It does not mean ISSUE-247 and ISSUE-248 are resolved.
+*(2026-09-26 closure audit, at the time this record was first written.)* "Resolved" above meant
+only that the blockers were deployed and no longer stopped L4; at that time it did not mean
+ISSUE-247 and ISSUE-248 were formally resolved. *(They have since been formally resolved — see the
+2026-09-26 update below.)*
 
 - The same bulk audit also covered ISSUE-242 and ISSUE-243.
-- All four L4 prerequisites stay **open**, because this record does not preserve their own
-  closure evidence:
+- *(At the time of this audit)* all four L4 prerequisites stayed **open**, because this record does
+  not preserve their own closure evidence:
   - ISSUE-242: the B4/2c/C2 convergence counts;
   - ISSUE-243: the four A2 READY results;
   - ISSUE-247: the A5 permitted-empty line, R6, stage-completion readback, the 2d NOTICE and the
     C2 0/0 compare;
   - ISSUE-248: the §9 cleanup and P1–P4.
-- The "documented targeted grid repair" below is not documented anywhere in the repository.
+- The "targeted grid repair" named below is not documented anywhere in the repository as an exact
+  operator command (see the corrected wording at that point, consistent with the ISSUE-247
+  closure record).
 - Each prerequisite runbook's closure-audit section names exactly what is missing. This L4 PASS
   and ISSUE-237's state are unchanged.
+
+*(Update 2026-09-26, after the prerequisite closures: **ISSUE-242, ISSUE-243, ISSUE-247 and
+ISSUE-248 are now RESOLVED** and moved to `issues/closed/`. Each closure runbook records the
+evidence this record itself did not preserve — see `issues/closed/AFLDB-ISSUE-242.md`, `-243.md`,
+`-247.md` and `-248.md`. This does not change the L4 PASS recorded here, nor ISSUE-237's own
+state: ISSUE-237 remains OPEN, L5 PROD NOT RUN.)*
 
 **A — source and prerequisite proof.**
 
@@ -3803,7 +3835,10 @@ stopped L4. It does not mean ISSUE-247 and ISSUE-248 are resolved.
 
 **B/C — candidate, pre-swap and swap.**
 
-- A/B/C gates passed after the documented targeted grid repair.
+- A/B/C gates passed after the "targeted grid repair" (ISSUE-247). The exact operator command is
+  not retained in the repository and is not reconstructed here. What is recorded: the retained
+  pre-cutover grid provenance, the accepted promotion result and the current DEV state prove the
+  repaired final state (see the ISSUE-247 closure record, `issues/closed/AFLDB-ISSUE-247.md`).
 - **G3 classified exactly one hard loss:** `CD_I297354`, class `afl_api_stat_vector_season`, stable
   identity `players/K/Karl_Amon.html`. The DEV regeneration classification file is
   `afl-api-dev-regeneration-20260926-085511.json` (per §11d.5, the classification proposes
@@ -3960,8 +3995,8 @@ exception. **Next action:** L5, inside a future scheduled production promotion.
    - `docs/deployment.md` §6a: the stage description and `AFLDB_REBUILD_CAPTURE_ROOT`.
    - The `promotion-inventory.ts` stale text (F11).
 6. **S6, integration tests** (§10) on `afldb_test`.
-7. **S7, the OD-4 recovery tool** (§11a, R3–R5) and its DB-free tests. It is implemented but
-   **not run**.
+7. **S7, the OD-4 recovery tool** (§11a, R3–R5) and its DB-free tests. **Implemented and RUN**:
+   R1–R5 are all PASS (operator-run, 2026-09-25; §11a.1, §11a.2.3).
 8. **S8, operator live validation** L0–L5, in the §11 order and with its blocks.
 9. **S9, closure.** `issues.md` resolution, `IssuesIndex.md`, `CHANGELOG.md`, and the move to
    `issues/closed/`.

@@ -27,9 +27,15 @@
 ### AFLDB-ISSUE-237 — AFL API importer-created `unique` identities are not carried through database promotion or the `afldb_test` rebuild
 - **Severity:** Medium. **Area:** promotion / rebuild lifecycle — `external_identities`
   (`afl_api`), `docs/production-promotion.md`, `tools/db/rebuild-test.ts`.
+- **Current state (2026-09-26): L0–L4 accepted (PASS) on DEV**, promotion stamp
+  `20260926-085511` (runbook §11d.15). **L5 PROD is pending**, at the next scheduled production
+  promotion, under production's unmodified G3 hard-loss rule. The chronology below is retained for
+  history; later entries supersede earlier ones.
 - **State:** Open (2026-09-23), split out of the ISSUE-235 plan review (R4). Pre-existing. Neither
-  the promotion runbook nor `db:test:rebuild` has an `afl_api` identity step, so the importer's
-  `unique` links (669 on DEV) are lost. A bridge re-import is not a safe recovery (runbook F3). Not an ISSUE-235
+  the promotion runbook nor `db:test:rebuild` had an `afl_api` identity step, so the importer's
+  `unique` links (669 on DEV at the time) were lost. A bridge re-import is not a safe recovery
+  (runbook F3). *(That gap is closed by the accepted L4 DEV promotion above; DEV's importer state
+  is now 803 rows, §11d.15.)* Not an ISSUE-235
   dependency. ISSUE-235 is now resolved; this remains the next independent development issue.
   The plan was reviewed and revised on 2026-09-24 (`issues/open/AFLDB-ISSUE-237.md`), and
   operator decisions OD-1…OD-5 were recorded the same day (runbook §15):
@@ -58,11 +64,15 @@
   the database marker, the generalised Stage 2 decision, the Stage 18 transaction order, and the
   Stage 19 combined invariant). Typecheck clean; DB-free/fake-transaction suites green
   (557/558 — the one failure is a pre-existing, unrelated gap in a DB-free import-reachability
-  test's resolver). Nothing has been run against a real database this session.
+  test's resolver). *(2026-09-24 status: nothing had been run against a real database yet.
+  L1–L4 have since run against real databases — `code_test_db`, `afldb_test` and `afldb_dev` — see
+  the updates below.)*
 - **Key files:** `tools/migration/rebuild_afl_api_adjudications.ts`,
   `tools/migration/replay_afl_api_adjudications.ts`, `src/lib/acquisition/afl-api-adjudication.ts`,
   `tools/db/promotion-check.ts`, `tools/db/rebuild-test.ts`.
-  P-M points 1, 2 and 4 are proven; **point 3 is NOT proven**. The L1/L2 testability gaps are
+  P-M points 1, 2 and 4 are proven; **point 3 is NOT proven** *(2026-09-24 status; superseded
+  2026-09-25 — point 3 is PROVEN by the L2 rehearsal, see the update below)*. The L1/L2
+  testability gaps are
   closed in code (2026-09-24, DB-free tested, NOT RUN):
   - the `code_test_db`-only rehearsal fixture
     (`npm run db:code-test:issue237-rehearsal -- seed|verify|teardown|residue`);

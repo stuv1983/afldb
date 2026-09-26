@@ -15,6 +15,15 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-237 progress: L0–L4 accepted on DEV, L5 PROD pending (Open) - 26 September 2026
+
+- **Current state.** L0–L4 are accepted (PASS): the OD-4 recovery (R1–R5), the `code_test_db`
+  rehearsals (L1/L2), the real `afldb_test` rebuild (L3) and the real DEV promotion (L4, stamp
+  `20260926-085511`). **L5 PROD has NOT run** and remains deferred to the next scheduled
+  production promotion, under production's unmodified G3 hard-loss rule (FAIL, no DEV-style
+  exception). **AFLDB-ISSUE-237 stays open.** Full evidence: `issues.md` and runbook
+  `issues/open/AFLDB-ISSUE-237.md` §11d.15.
+
 ### Promotion prerequisites closed on DEV acceptance evidence (AFLDB-ISSUE-242, -243, -247, -248; Resolved) - 26 September 2026
 
 - **What this records.** The four ISSUE-237 L4 prerequisites are resolved on operator-run DEV
