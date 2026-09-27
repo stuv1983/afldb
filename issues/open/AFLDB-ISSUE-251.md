@@ -1466,29 +1466,51 @@ they are assigned. They are lost on an SSH reconnect: restore them from the reco
 files, never retype them from memory. An empty value fails closed at every consumer.
 
 **CLI environment.** `register_issue224_s9_players.ts` does **not** read `.env` (unlike
-`tools/db/migrate.ts` and `tools/db/privileges.ts`, it has no `loadEnv`); both PROD DSNs must be in
-the process environment. Their values are PROD's own `afldb_import` and `afldb_auth` DSNs from
-PROD's `.env` (`docs/deployment.md` §9: each host's role DSNs name that host's database). Export
-them without printing them, then prove only their non-secret shape:
+`tools/db/migrate.ts` and `tools/db/privileges.ts`, it has no `loadEnv`); the two PROD DSNs
+`runProdMain()` itself connects with must be in the process environment. A **third** variable,
+plain `DATABASE_URL`, is also required — not because `runProdMain()` uses it (it never does; it
+only ever opens `AFLDB_PROD_IMPORT_DATABASE_URL` / `AFLDB_PROD_AUTH_DATABASE_URL`), but because the
+CLI's own static import chain (`register_issue224_s9_players.ts` → `src/db/queries/players.ts` →
+`src/db/client.ts`) eagerly evaluates `src/db/client.ts`'s module-level
+`export const sql = globalThis.__afldbSql ?? createClient();` on load, and `createClient()` throws
+`Error: DATABASE_URL is not set` immediately when that variable is absent — before `main()`,
+before `parseArgs`, before any PROD-specific gate runs at all. This is an import-time requirement
+of the module graph, not a PROD write-path requirement, and `DATABASE_URL` is never itself a
+writable connection: its value is PROD's existing ordinary `afldb_app` read-only DSN, the same one
+every other read path on this host already uses. Export all three without printing them, then
+prove only their non-secret shape:
 
 ```bash
 # PROD: afldb-prod — before Phase 6; re-run after any reconnect
 prod_guard && cd /home/arm/projects/afldb \
+  && export DATABASE_URL="$(sed -n 's/^DATABASE_URL=//p' .env | head -1)" \
   && export AFLDB_PROD_IMPORT_DATABASE_URL="$(sed -n 's/^AFLDB_IMPORT_DATABASE_URL=//p' .env | head -1)" \
   && export AFLDB_PROD_AUTH_DATABASE_URL="$(sed -n 's/^AFLDB_AUTH_DATABASE_URL=//p' .env | head -1)"
-node -e 'for (const v of ["AFLDB_PROD_IMPORT_DATABASE_URL", "AFLDB_PROD_AUTH_DATABASE_URL"]) { let u; try { u = new URL(process.env[v] || ""); } catch { console.log(v, "UNPARSEABLE"); continue; } console.log(v, u.username || "<none>", u.pathname || "<none>"); }'
+node -e 'for (const v of ["DATABASE_URL", "AFLDB_PROD_IMPORT_DATABASE_URL", "AFLDB_PROD_AUTH_DATABASE_URL"]) { let u; try { u = new URL(process.env[v] || ""); } catch { console.log(v, "UNPARSEABLE"); continue; } console.log(v, u.username || "<none>", u.pathname || "<none>"); }'
   # expect exactly:
+  #   DATABASE_URL afldb_app /afldb_prod
   #   AFLDB_PROD_IMPORT_DATABASE_URL afldb_import /afldb_prod
   #   AFLDB_PROD_AUTH_DATABASE_URL afldb_auth /afldb_prod
 ```
 
-Anything else is a STOP. If PROD's `.env` instead carries explicit `AFLDB_PROD_*` lines, export
-those names the same way — the CLI still never reads them from `.env`. The CLI independently
-re-refuses any DSN that is not `/afldb_prod` and any connection whose `current_user` is not
-`afldb_import` / `afldb_auth`. `AFLDB_PROD_DATABASE_URL` / `AFLDB_OWNER_DATABASE_URL` /
-`AFLDB_BACKUP_DATABASE_URL` are read from `.env` by `migrate.ts`, `backup.sh` and `restore-test.sh`
-themselves and are never exported by this procedure. At the end of the sitting:
-`unset AFLDB_PROD_IMPORT_DATABASE_URL AFLDB_PROD_AUTH_DATABASE_URL`.
+Anything else is a STOP. `DATABASE_URL` must resolve to PROD's ordinary `afldb_app` DSN — never a
+writable role, and never `AFLDB_PROD_DATABASE_URL`/`AFLDB_OWNER_DATABASE_URL` under another name.
+If PROD's `.env` instead carries explicit `AFLDB_PROD_*` lines, export those names the same way —
+the CLI still never reads them from `.env`. The CLI independently re-refuses any DSN passed to
+`resolveProdTarget`/`resolveProdAuthTarget` that is not `/afldb_prod` and any connection whose
+`current_user` is not `afldb_import` / `afldb_auth`; it has no equivalent guard over
+`DATABASE_URL` itself. `src/db/client.ts` only requires `DATABASE_URL` to be present — it does not
+validate the role or database encoded in it — and the PROD adoption CLI itself does not
+independently validate that DSN either. `assertProdBoundary()` / `assertProdCheckoutIntegrity()` in
+`runProdMain()` prove the production host, the expected revision, and checkout cleanliness; they do
+**not** validate the username/database encoded in `DATABASE_URL`, and must not be read as doing so.
+The operator-side §21.0a non-secret shape check above is therefore **mandatory** and must prove
+exactly `DATABASE_URL afldb_app /afldb_prod` before the CLI is invoked — there is no code-side
+backstop if it is skipped. `AFLDB_PROD_DATABASE_URL` / `AFLDB_OWNER_DATABASE_URL` /
+`AFLDB_BACKUP_DATABASE_URL` are
+read from `.env` by `migrate.ts`, `backup.sh` and `restore-test.sh` themselves and are never
+exported by this procedure. At the end of the sitting:
+`unset DATABASE_URL AFLDB_PROD_IMPORT_DATABASE_URL AFLDB_PROD_AUTH_DATABASE_URL`.
 
 Invoke the CLI as `npx --no-install tsx …`: if `tsx` is missing from PROD's `node_modules`, that
 refuses instead of fetching a package from the registry onto the production host.
@@ -2082,7 +2104,7 @@ none is required by the contract); the listener and `/api/health` unchanged from
 baseline; both settle units still inactive; `systemctl list-units --all 'afldb*' --no-pager`
 identical to Phase 2's record. Nothing in this procedure starts, stops, enables or restarts a
 settle unit, and a successful adoption is not a reason to enable settle automation. Finish the
-sitting with `unset AFLDB_PROD_IMPORT_DATABASE_URL AFLDB_PROD_AUTH_DATABASE_URL`.
+sitting with `unset DATABASE_URL AFLDB_PROD_IMPORT_DATABASE_URL AFLDB_PROD_AUTH_DATABASE_URL`.
 
 **STOP** if `afldb` is not active or `/api/health` reports anything other than
 `status=ok,database=ok` — this is now an application-health incident, handled through the normal
@@ -2205,7 +2227,8 @@ does not match, an unattributed row, an `afl_api` identity where none should exi
       `afldb_restore_test` sha binding; off-host copy and its matching `sha256sum`.
 - [ ] Phase 5: the `super_admin` catalog listing; the chosen `$ADMIN_USER_ID`; the optional direct
       function dry-test output.
-- [ ] Phase 6: the `AFLDB_PROD_*` shape check; `issue251-classify-pre-$ADOPT_STAMP.log` ending in
+- [ ] Phase 6: the `DATABASE_URL` / `AFLDB_PROD_*` three-variable shape check;
+      `issue251-classify-pre-$ADOPT_STAMP.log` ending in
       the exact `92/0/0` block with `exit=0`; `issue251-census-pre-$ADOPT_STAMP.txt`.
 - [ ] Phase 7: the checked boxes, dated, with the operator's name.
 - [ ] Phase 8: `issue251-apply-$ADOPT_STAMP.log` (only once actually authorised and run — not part
@@ -2483,3 +2506,77 @@ accurate only as of §18, before §20 ran, and is superseded.)
 
 No PROD mutation, PROD connection, Git operation, or issue-status change was performed by this pass.
 ISSUE-251 is not resolved. ISSUE-237 L5 remains blocked.
+
+## 23. Real PROD execution, §21 Phases 1–6 (2026-09-27)
+
+The §21 procedure was executed for real against `afldb-prod`, deployed revision
+`fb12c2bcc6d30e154b1668ebd770d2a37bdc5e7a`, up to and including Phase 6. **Phase 7 has not been
+authorised; no `--apply` was run at any point; no ISSUE-251 player adoption has occurred.**
+ISSUE-251 remains open and ISSUE-237 L5 remains blocked.
+
+### 23.1 Phase 1 — deployment
+
+Revision `fb12c2bcc6d30e154b1668ebd770d2a37bdc5e7a` was deployed to `/home/arm/projects/afldb`.
+Migration 105 (`105_prod_actor_lifecycle_assertion.sql`) applied cleanly and its live privilege
+proof passed. The production build completed. An immediate post-restart listener check false-
+STOPped because it ran before the service reached readiness; a follow-up check showed the service
+active with `NRestarts=0`, two Next.js 16.3.1 worker processes, the listener bound on port 3100,
+and a healthy `/api/health` response. Live production CSP/HSTS headers were correct. The settle
+timer/service remained inactive throughout, as required.
+
+### 23.2 Phase 4 — backup
+
+Fresh backup stamp `20260927-132829`, dump `/home/arm/backups/afldb/afldb_prod-20260927-132829.dump`,
+object count `1547`, SHA-256 `49dc09821940e93ad9caf50ba79c931342881bffab987ac59332160ab371db3e`.
+`restore-test.sh` passed and bound `afldb_restore_test` to that SHA. An off-host Windows copy was
+made at `D:\dev\afldb-evidence-archive\AFLDB-ISSUE-251`; local and remote byte counts both matched
+at `24010174`, and the off-host SHA-256 matched exactly. The historical failed-L5 evidence dump
+already present on the host remained present and matched
+`12b9d0e83ce796c3e789fb312652cab306e7ef8ec7b5fdb6432173ba98869329`.
+
+### 23.3 Phase 5 — actor selection
+
+Real PROD actor `ADMIN_USER_ID=1` was selected: `super_admin`, enabled, password present, TOTP
+present, non-fixture domain. Direct `assert_viable_super_admin_actor(1)` passed.
+
+### 23.4 Phase 6 — adoption dry-run / classification, including the environment defect
+
+The first read-only classifier attempt failed at module load, before `runProdMain()` ever ran:
+
+```text
+Error: DATABASE_URL is not set
+    at createClient (.../src/db/client.ts:19:11)
+```
+
+Only `AFLDB_PROD_IMPORT_DATABASE_URL` and `AFLDB_PROD_AUTH_DATABASE_URL` had been exported per the
+runbook's (then-incomplete) §21.0a. Source inspection confirmed the static import chain
+`register_issue224_s9_players.ts` → `src/db/queries/players.ts` → `src/db/client.ts`:
+`src/db/client.ts` eagerly creates and exports `sql` at module load, and `createClient()`
+immediately requires `process.env.DATABASE_URL`, independently of and before any PROD-specific
+gate in `runProdMain()`. No `--apply` was present on this attempt and no adoption occurred; §21.0a
+has been corrected in place (this pass) to export and document all three variables.
+
+After additionally exporting PROD's existing ordinary read-only `DATABASE_URL` (`afldb_app`
+against `afldb_prod`), the identical no-`--apply` Phase 6 invocation passed:
+
+```text
+DATABASE_URL|afldb_app|/afldb_prod
+AFLDB_PROD_IMPORT_DATABASE_URL|afldb_import|/afldb_prod
+AFLDB_PROD_AUTH_DATABASE_URL|afldb_auth|/afldb_prod
+
+Connected: current_database()='afldb_prod', current_user='afldb_import' (--target prod --prod-import-role), mode=READ-ONLY PREFLIGHT.
+
+CREATE            = 92
+ALREADY_SATISFIED = 0
+CONFLICT          = 0
+TOTAL             = 92
+
+CLASSIFY_EXIT=0
+```
+
+The independent Phase 6 cohort census also passed: rows 1–2 (`cohort_paths`,
+`cohort_paths_distinct`) = `92`; rows 3–16 = `0`; row 17 (`players_total`) = `13273`, recorded as
+`P0`.
+
+**Phase 6 passed.** Phase 7 has **not** been authorised. No ISSUE-251 player adoption has been
+run. ISSUE-251 remains open. ISSUE-237 L5 remains blocked.

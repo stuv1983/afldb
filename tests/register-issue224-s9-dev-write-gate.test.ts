@@ -1283,3 +1283,96 @@ describe('privileges.sql — reconciles assert_viable_super_admin_actor() (AFLDB
     expect(code).not.toMatch(/GRANT[^;]*afldb_import[^;]*auth_users/is);
   });
 });
+
+/**
+ * AFLDB-ISSUE-251 — real PROD Phase 6 execution (2026-09-27) hit
+ * `Error: DATABASE_URL is not set` at module load, before `runProdMain()` ever ran, because the
+ * §21.0a runbook exported only the two PROD-specific DSNs `runProdMain()` itself connects with and
+ * missed the plain `DATABASE_URL` the CLI's own static import chain requires just to load. This is
+ * a source/runbook contract test, not an executed-CLI test: it proves the import chain and the
+ * corrected runbook text stay in agreement, without ever letting the eager `sql` export run under
+ * an unset `DATABASE_URL` (which would take down this whole test file, since every suite above
+ * imports `register_issue224_s9_players.ts`, which reaches `src/db/client.ts` transitively).
+ */
+describe('register_issue224_s9_players — DATABASE_URL import-time requirement is source-true and runbook-documented (AFLDB-ISSUE-251)', () => {
+  const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+  const playersSource = readFileSync(join(REPO_ROOT, 'src', 'db', 'queries', 'players.ts'), 'utf8');
+  const clientSource = readFileSync(join(REPO_ROOT, 'src', 'db', 'client.ts'), 'utf8');
+  const runbook = readFileSync(join(REPO_ROOT, 'issues', 'open', 'AFLDB-ISSUE-251.md'), 'utf8');
+  const runbookSection = runbook.slice(runbook.indexOf(
+    '### 21.0a Shell, host guard, session variables and CLI environment',
+  ));
+
+  it('src/db/queries/players.ts imports sql from @/db/client', () => {
+    expect(playersSource).toMatch(/import\s*\{\s*sql\s*\}\s*from\s*'@\/db\/client';/);
+  });
+
+  it('src/db/client.ts reads process.env.DATABASE_URL', () => {
+    expect(clientSource).toMatch(/process\.env\.DATABASE_URL/);
+  });
+
+  it('the default exported sql eagerly reaches createClient() at module scope, not lazily', () => {
+    const exportAt = clientSource.indexOf('export const sql = globalThis.__afldbSql ?? createClient();');
+    expect(exportAt).toBeGreaterThan(-1);
+    // Not inside any function body: no unmatched-open-brace line precedes it back to module scope.
+    const before = clientSource.slice(0, exportAt);
+    const opens = (before.match(/\{/g) || []).length;
+    const closes = (before.match(/\}/g) || []).length;
+    expect(opens).toBe(closes);
+  });
+
+  it('§21.0a is found exactly once, ahead of Phase 6', () => {
+    const sectionAt = runbook.indexOf(
+      '### 21.0a Shell, host guard, session variables and CLI environment',
+    );
+    const phase6At = runbook.indexOf('### Phase 6 — adoption dry-run / classification');
+    expect(sectionAt).toBeGreaterThan(-1);
+    expect(phase6At).toBeGreaterThan(sectionAt);
+  });
+
+  it('§21.0a exports all three required variables from the PROD .env, none printed', () => {
+    expect(runbookSection).toMatch(/export DATABASE_URL="\$\(sed -n 's\/\^DATABASE_URL=\/\/p' \.env \| head -1\)"/);
+    expect(runbookSection).toMatch(
+      /export AFLDB_PROD_IMPORT_DATABASE_URL="\$\(sed -n 's\/\^AFLDB_IMPORT_DATABASE_URL=\/\/p' \.env \| head -1\)"/,
+    );
+    expect(runbookSection).toMatch(
+      /export AFLDB_PROD_AUTH_DATABASE_URL="\$\(sed -n 's\/\^AFLDB_AUTH_DATABASE_URL=\/\/p' \.env \| head -1\)"/,
+    );
+  });
+
+  it('§21.0a states the expected non-secret shape for all three variables', () => {
+    expect(runbookSection).toMatch(/DATABASE_URL afldb_app \/afldb_prod/);
+    expect(runbookSection).toMatch(/AFLDB_PROD_IMPORT_DATABASE_URL afldb_import \/afldb_prod/);
+    expect(runbookSection).toMatch(/AFLDB_PROD_AUTH_DATABASE_URL afldb_auth \/afldb_prod/);
+  });
+
+  it('§21.0a explains DATABASE_URL as an import-time requirement of the eager sql export, not a runProdMain() connection', () => {
+    expect(runbookSection).toMatch(/eagerly (?:creates\/export|evaluates)/);
+    expect(runbookSection).toMatch(/createClient\(\)/);
+    expect(runbookSection).toMatch(/import-time requirement/);
+  });
+
+  it('§21.0a cleanup unsets all three variables', () => {
+    expect(runbookSection).toMatch(
+      /unset DATABASE_URL AFLDB_PROD_IMPORT_DATABASE_URL AFLDB_PROD_AUTH_DATABASE_URL/,
+    );
+  });
+
+  it('the Phase 10 end-of-sitting cleanup also unsets all three (not left stale by the §21.0a fix)', () => {
+    const phase10At = runbook.indexOf('### Phase 10 — application/service health');
+    const phase11At = runbook.indexOf('### Phase 11 — ISSUE-251 evidence and closure decision');
+    expect(phase10At).toBeGreaterThan(-1);
+    expect(phase11At).toBeGreaterThan(phase10At);
+    const phase10 = runbook.slice(phase10At, phase11At);
+    expect(phase10).toMatch(
+      /unset DATABASE_URL AFLDB_PROD_IMPORT_DATABASE_URL AFLDB_PROD_AUTH_DATABASE_URL/,
+    );
+  });
+
+  it('the Phase 6 evidence checklist entry requires the three-variable shape proof, not only AFLDB_PROD_*', () => {
+    const checklistAt = runbook.indexOf('### Evidence checklist (attach to the Phase 11 record)');
+    expect(checklistAt).toBeGreaterThan(-1);
+    const phase6Entry = runbook.slice(checklistAt, runbook.indexOf('- [ ] Phase 7:', checklistAt));
+    expect(phase6Entry).toMatch(/DATABASE_URL.*AFLDB_PROD_\*.*three-variable shape check/s);
+  });
+});
