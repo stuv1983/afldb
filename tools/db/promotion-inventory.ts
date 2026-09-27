@@ -2568,16 +2568,21 @@ export const PRE_REBUILD_PREFIX = ENVIRONMENT_NAMES.prod.preRebuildPrefix;
  * the standard gate pipeline every other phase shares.
  */
 export type Phase = 'source' | 'pre-cutover' | 'restored' | 'candidate' | 'production'
-  | 'dev-regeneration-census' | 'frozen' | 'freeze-dump';
+  | 'dev-regeneration-census' | 'frozen' | 'freeze-dump' | 'dependencies';
 
 /**
  * AFLDB-ISSUE-250 adds two standalone read-only phases, handled as early branches in
  * `promotion-check.ts`'s `main()` like `dev-regeneration-census`: `frozen` proves the live
  * database is frozen and quiescent and records its content digest; `freeze-dump` proves the
  * restored pre-cutover dump (`afldb_restore_test`) holds exactly that digest.
+ *
+ * AFLDB-ISSUE-252 adds `dependencies`, another standalone read-only phase on the live target:
+ * it writes the target's current-season match dependency manifest (A before the freeze, B
+ * under it) and, given a source dependency proof, performs the frozen re-check.
  */
 export const PHASES: readonly Phase[] =
-  ['source', 'pre-cutover', 'restored', 'candidate', 'production', 'dev-regeneration-census', 'frozen', 'freeze-dump'];
+  ['source', 'pre-cutover', 'restored', 'candidate', 'production', 'dev-regeneration-census', 'frozen', 'freeze-dump',
+    'dependencies'];
 
 /** `tools/maintenance/restore-test.sh` restores into this database, and only this one. */
 export const RESTORE_TEST_DATABASE = 'afldb_restore_test';
@@ -2606,6 +2611,7 @@ export function assertDatabaseForPhase(
     case 'pre-cutover':
     case 'production':
     case 'frozen':
+    case 'dependencies':
       if (database !== names.live) {
         throw new PromotionRefused(
           `Phase '${phase}' inspects '${names.live}' only (--environment ${environment}), not '${database}'.`);
@@ -4445,10 +4451,12 @@ export function planPromotionMatchReplay(input: {
 
 export const ACCEPTANCE_CHECKLIST: readonly string[] = [
   'Host identity confirmed on every terminal: PROD is afldb-prod; DEV is streamanator. `hostname` printed before any destructive command.',
+  'Current-season promotion source prepared (AFLDB-ISSUE-252): BEFORE the freeze, `--phase dependencies` on the live target wrote dependency manifest A (sha256 recorded, copied to DEV and re-hashed); on DEV, after db:test:rebuild and with the AFL API switch explicitly enabled on afldb_test (prior value recorded, restored afterwards), `db:promotion:prepare-source --apply` settled the retained AFL Tables snapshot FIRST and the retained AFL API match/stat snapshot SECOND (no fixtures-only, no Brownlow settle) and wrote the preparation record; `--phase source` with manifest A and the preparation record PASSED every family (F1 brownlow_vote_entry_state, F2 active matches/match_coaches data_overrides, F3 data_edits on matches) by exact match_key AND owner source, and only then wrote the source dependency proof, whose sha256 was recorded and carried back to PROD.',
   'Production FROZEN before anything is captured (AFLDB-ISSUE-250): afldb and every installed afldb-settle-* timer/service stopped; `--freeze-plan` written and read; promotion-freeze.sql then promotion-terminate.sql run as postgres on the postgres database; `--phase frozen` PASSED and wrote the freeze record naming the database OID and the F0 digest. From here until the swap no application, auth, admin, timer or import role can connect, and the only owner-DSN tools run against the target are the checker and restore-test.sh.',
   'Pre-cutover production backup taken with tools/maintenance/backup.sh, sha256 recorded, pg_restore --list read back, and an off-host copy made.',
   'Backup proven: restore-test.sh "$PRE" passed its parity checks and recorded the dump sha256, and `--phase freeze-dump` PASSED: the dump holds exactly the frozen state (AFLDB-ISSUE-250).',
   'Source validated: `--phase source` on afldb_test passed (name, migration parity with this checkout, optional catalog fingerprint) and the rebuilt dump\'s sha256 matched end to end.',
+  'Frozen dependency re-check (AFLDB-ISSUE-252): under the freeze, `--phase dependencies --freeze-record <record> --source-dependency-proof <proof>` wrote manifest B and PASSED — B\'s dependency_set_sha256 is exactly the proven one. A different hash means the proof is STALE: stay frozen, carry B to DEV and rerun `--phase source` against B; nothing proceeds on the old proof. `--phase pre-cutover` re-derives the frozen set itself and refuses the same way.',
   'Production-owned state snapshot written by `--phase pre-cutover` and kept alongside the backup.',
   'Rebuilt dump restored into a NEW candidate database (afldb_prod_candidate_<stamp>) — never over afldb_prod.',
   '`--phase restored` passed: candidate name, migration parity, dangling-reference probe against the old database resolved.',

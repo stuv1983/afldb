@@ -33,6 +33,20 @@
  * The freeze SQL itself is generated here and run by the operator as postgres; this checker
  * never executes it.
  *
+ * AFLDB-ISSUE-252 — the current-season promotion source (docs/production-promotion.md §3a/§3b):
+ *
+ *     npm run db:promotion:check -- --phase dependencies --database afldb_prod \
+ *         --dependencies-out <manifest A>                     (live target, BEFORE the freeze)
+ *     npm run db:promotion:check -- --phase source --database afldb_test --dsn-env AFLDB_TEST_DATABASE_URL \
+ *         --target-dependencies <manifest A> --target-dependencies-sha256 <hex> \
+ *         --preparation-record <record> --preparation-record-sha256 <hex> \
+ *         --source-dependency-proof-out <proof>               (DEV, after db:promotion:prepare-source)
+ *     npm run db:promotion:check -- --phase dependencies --database afldb_prod \
+ *         --freeze-record <record> --dependencies-out <manifest B> \
+ *         --source-dependency-proof <proof> --source-dependency-proof-sha256 <hex>   (frozen re-check)
+ *     ... and --source-dependency-proof <proof> --source-dependency-proof-sha256 <hex> on
+ *     --phase pre-cutover (required under prod), which re-derives the frozen set itself.
+ *
  * Every form above is the PRODUCTION contract, which is the default. AFLDB-ISSUE-141 adds an
  * explicit `--environment prod|dev`, so the same supported path can converge `afldb_dev`
  * (AFLDB-ISSUE-139) instead of hand-written per-table dump/restore:
@@ -235,6 +249,36 @@ import {
   type FreezeRecord,
   type FreezeSession,
 } from './promotion-freeze';
+import {
+  DEPENDENCY_FAMILIES,
+  F2_COUNT_SQL,
+  F2_OVERRIDES_SQL,
+  MATCHES_BY_KEY_SQL,
+  buildDependencyManifest,
+  buildSourceDependencyProof,
+  contractFamilyReaders,
+  f2ReadingsOf,
+  familyCountProblems,
+  familyOutcomeCounts,
+  familyStatusesFor,
+  judgeSourceDependencies,
+  overrideMatchKeyOf,
+  parseDependencyManifest,
+  parsePreparationRecord,
+  parseSourceDependencyProof,
+  readingOfContractRow,
+  renderDependencyManifest,
+  renderSourceDependencyProof,
+  sha256Hex,
+  sourceProofBindingProblems,
+  type DependencyFamilyId,
+  type DependencyManifest,
+  type PreparationBinding,
+  type SourceDependencyJudgement,
+  type SourceDependencyProof,
+  type SourceMatchReading,
+  type TargetDependencyReading,
+} from './promotion-source-dependencies';
 
 const PROJECT_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const MIGRATIONS_DIR = join(PROJECT_ROOT, 'src', 'db', 'migrations');
@@ -328,10 +372,33 @@ export type Options = {
   freezeRecordOut?: string;
   freezeDumpProof?: string;
   freezeDumpProofOut?: string;
+  /**
+   * AFLDB-ISSUE-252 — the current-season promotion source. `--phase dependencies` (live target,
+   * read-only) writes the target dependency manifest to `--dependencies-out`: A before the
+   * freeze, B under it (`--freeze-record`). `--phase source` REQUIRES manifest A
+   * (`--target-dependencies` + its recorded `--target-dependencies-sha256`), the preparation
+   * record (`--preparation-record` + `--preparation-record-sha256`) and `--source-dependency-proof-out`,
+   * which it writes only when every gate of the run passed. `--source-dependency-proof` (+ its
+   * sha256) is the frozen re-check's input at `--phase dependencies` and `--phase pre-cutover`
+   * (required there under prod).
+   */
+  dependenciesOut?: string;
+  targetDependencies?: string;
+  targetDependenciesSha256?: string;
+  preparationRecord?: string;
+  preparationRecordSha256?: string;
+  sourceDependencyProof?: string;
+  sourceDependencyProofSha256?: string;
+  sourceDependencyProofOut?: string;
 };
 
 /** AFLDB-ISSUE-250: the phases that read or replace the live target under a production freeze. */
 export const FREEZE_BOUND_PHASES: readonly Phase[] = ['pre-cutover', 'restored', 'candidate', 'production'];
+
+function hex64(value: string, flag: string): string {
+  if (!/^[0-9a-f]{64}$/.test(value)) throw new PromotionRefused(`${flag} needs a 64-character lowercase sha256 digest.`);
+  return value;
+}
 
 export function parseArgs(argv: readonly string[]): Options {
   const out: Options = {
@@ -415,6 +482,14 @@ export function parseArgs(argv: readonly string[]): Options {
       case '--freeze-record-out': out.freezeRecordOut = need(i, arg); i += 1; break;
       case '--freeze-dump-proof': out.freezeDumpProof = need(i, arg); i += 1; break;
       case '--freeze-dump-proof-out': out.freezeDumpProofOut = need(i, arg); i += 1; break;
+      case '--dependencies-out': out.dependenciesOut = need(i, arg); i += 1; break;
+      case '--target-dependencies': out.targetDependencies = need(i, arg); i += 1; break;
+      case '--target-dependencies-sha256': out.targetDependenciesSha256 = hex64(need(i, arg), arg); i += 1; break;
+      case '--preparation-record': out.preparationRecord = need(i, arg); i += 1; break;
+      case '--preparation-record-sha256': out.preparationRecordSha256 = hex64(need(i, arg), arg); i += 1; break;
+      case '--source-dependency-proof': out.sourceDependencyProof = need(i, arg); i += 1; break;
+      case '--source-dependency-proof-sha256': out.sourceDependencyProofSha256 = hex64(need(i, arg), arg); i += 1; break;
+      case '--source-dependency-proof-out': out.sourceDependencyProofOut = need(i, arg); i += 1; break;
       default:
         throw new PromotionRefused(`Unknown argument: ${arg}`);
     }
@@ -454,6 +529,31 @@ export function parseArgs(argv: readonly string[]): Options {
   }
   if (out.freezeToken && !out.unfreezeRecovery) {
     throw new PromotionRefused('--freeze-token is only meaningful with --unfreeze-recovery.');
+  }
+  // AFLDB-ISSUE-252: its files belong to three phases, and are never silently ignored elsewhere.
+  const dependencyFlags: [keyof Options, string, readonly Phase[]][] = [
+    ['dependenciesOut', '--dependencies-out', ['dependencies']],
+    ['targetDependencies', '--target-dependencies', ['source']],
+    ['targetDependenciesSha256', '--target-dependencies-sha256', ['source']],
+    ['preparationRecord', '--preparation-record', ['source']],
+    ['preparationRecordSha256', '--preparation-record-sha256', ['source']],
+    ['sourceDependencyProofOut', '--source-dependency-proof-out', ['source']],
+    ['sourceDependencyProof', '--source-dependency-proof', ['dependencies', 'pre-cutover']],
+    ['sourceDependencyProofSha256', '--source-dependency-proof-sha256', ['dependencies', 'pre-cutover']],
+  ];
+  for (const [key, flag, phases] of dependencyFlags) {
+    if (out[key] !== undefined && (!out.phase || !phases.includes(out.phase))) {
+      throw new PromotionRefused(`${flag} is only meaningful with --phase ${phases.join(' or --phase ')} (AFLDB-ISSUE-252).`);
+    }
+  }
+  for (const [file, sha, flag] of [
+    [out.targetDependencies, out.targetDependenciesSha256, '--target-dependencies'],
+    [out.preparationRecord, out.preparationRecordSha256, '--preparation-record'],
+    [out.sourceDependencyProof, out.sourceDependencyProofSha256, '--source-dependency-proof'],
+  ] as const) {
+    if ((file === undefined) !== (sha === undefined)) {
+      throw new PromotionRefused(`${flag} and ${flag}-sha256 go together: the file is judged only against the sha256 recorded when it was written.`);
+    }
   }
   if (out.freezeStatus) return out;
 
@@ -511,9 +611,18 @@ export function parseArgs(argv: readonly string[]): Options {
     return out;
   }
   if (!out.phase) throw new PromotionRefused(`--phase is required. Valid phases: ${PHASES.join(', ')}.`);
-  if (out.freezeRecord && !FREEZE_BOUND_PHASES.includes(out.phase) && out.phase !== 'freeze-dump') {
+  if (out.freezeRecord && !FREEZE_BOUND_PHASES.includes(out.phase) && out.phase !== 'freeze-dump' && out.phase !== 'dependencies') {
     throw new PromotionRefused(
-      `--freeze-record is only meaningful with --plan and the ${FREEZE_BOUND_PHASES.join(', ')} and freeze-dump phases.`);
+      `--freeze-record is only meaningful with --plan and the ${FREEZE_BOUND_PHASES.join(', ')}, freeze-dump and dependencies phases.`);
+  }
+  // AFLDB-ISSUE-252: the target manifest, and the frozen re-check, which only a frozen target can answer.
+  if (out.phase === 'dependencies' && !out.dependenciesOut) {
+    throw new PromotionRefused("Phase 'dependencies' needs --dependencies-out <file> (AFLDB-ISSUE-252).");
+  }
+  if (out.phase === 'dependencies' && out.sourceDependencyProof && out.environment === 'prod' && !out.freezeRecord) {
+    throw new PromotionRefused(
+      "The frozen re-check (--phase dependencies --source-dependency-proof) under --environment prod needs --freeze-record <file>: "
+      + 'manifest B is the FROZEN target, captured under the freeze (AFLDB-ISSUE-252).');
   }
   if (out.preCutoverDump && out.phase !== 'freeze-dump') {
     throw new PromotionRefused('--pre-cutover-dump is only meaningful with --plan and --phase freeze-dump.');
@@ -607,6 +716,27 @@ export function parseArgs(argv: readonly string[]): Options {
     throw new PromotionRefused(
       `Phase '${out.phase}' under --environment prod needs --freeze-record <file> (AFLDB-ISSUE-250): the record `
       + "--phase frozen wrote. Without the freeze a production write after the dump would be silently lost at the swap.");
+  }
+  // AFLDB-ISSUE-252, after the freeze: the source gate is mandatory and has no opt-out flag, in
+  // both environments; production's first frozen phase re-proves the frozen dependency set.
+  if (out.phase === 'source') {
+    const missing = [
+      ['--target-dependencies <manifest A>', out.targetDependencies],
+      ['--target-dependencies-sha256 <hex>', out.targetDependenciesSha256],
+      ['--preparation-record <file>', out.preparationRecord],
+      ['--preparation-record-sha256 <hex>', out.preparationRecordSha256],
+      ['--source-dependency-proof-out <file>', out.sourceDependencyProofOut],
+    ].filter(([, v]) => v === undefined).map(([flag]) => flag);
+    if (missing.length > 0) {
+      throw new PromotionRefused(
+        `Phase 'source' needs ${missing.join(', ')} (AFLDB-ISSUE-252): the prepared source is judged against the `
+        + "target's dependency manifest, and there is no opt-out.");
+    }
+  }
+  if (out.phase === 'pre-cutover' && out.environment === 'prod' && !out.sourceDependencyProof) {
+    throw new PromotionRefused(
+      "Phase 'pre-cutover' under --environment prod needs --source-dependency-proof <file> --source-dependency-proof-sha256 <hex> "
+      + '(AFLDB-ISSUE-252): the frozen target\'s dependency set must be exactly the one the prepared source proved.');
   }
   return out;
 }
@@ -2295,6 +2425,267 @@ export function publishRestoredLineageRemap(remapOut: string | undefined, remapS
 }
 
 // ---------------------------------------------------------------------------
+// AFLDB-ISSUE-252 — the current-season promotion source dependency gate
+// ---------------------------------------------------------------------------
+
+export const DATABASE_OID_SQL = 'SELECT oid::bigint AS oid FROM pg_database WHERE datname = current_database()';
+
+function nullableString(value: unknown): string | null {
+  return value === null || value === undefined ? null : String(value);
+}
+
+/** `MATCHES_BY_KEY_SQL` rows. The id stays in the database it was read from. */
+export function sourceMatchesOf(rows: readonly Row[]): SourceMatchReading[] {
+  return rows.map((r) => ({
+    id: asInt(r.id), match_key: String(r.match_key),
+    owner_source_id_present: r.owner_present === true, owner_source_key: nullableString(r.owner_key),
+  }));
+}
+
+async function readDatabaseOid(q: Query): Promise<number | null> {
+  const [row] = await q(DATABASE_OID_SQL);
+  return row?.oid === null || row?.oid === undefined ? null : asInt(row.oid);
+}
+
+function refusedInput<T>(read: () => T): T {
+  try {
+    return read();
+  } catch (error) {
+    if (error instanceof PromotionRefused) throw error;
+    throw new PromotionRefused((error as Error).message);
+  }
+}
+
+/**
+ * The live target's dependency manifest, read-only. F1/F3 come from the contract's own match
+ * references, F2 from the A4.3 replay set; every family is also counted by a plain `count(*)`,
+ * and a manifest whose reader disagrees with that count is refused, not published.
+ */
+export async function captureTargetDependencyManifest(q: Query, input: {
+  environment: Environment; database: string; freezeToken?: string | null; capturedAt?: string;
+}): Promise<{ manifest: DependencyManifest; countProblems: string[] }> {
+  const statuses = familyStatusesFor(input.environment);
+  const readings: TargetDependencyReading[] = [];
+  const counted: Partial<Record<DependencyFamilyId, number>> = {};
+  for (const reader of contractFamilyReaders()) {
+    if (statuses[reader.family] !== 'judged') continue;
+    for (const r of await q(reader.rowsSql)) {
+      readings.push(readingOfContractRow(reader.family, {
+        target_row: String(r.target_row), match_key: nullableString(r.match_key), match_present: r.match_present === true,
+        owner_present: r.owner_present === true, owner_key: nullableString(r.owner_key),
+      }));
+    }
+    counted[reader.family] = (counted[reader.family] ?? 0) + asInt((await q(reader.countSql))[0]?.n);
+  }
+  if (statuses.F2 === 'judged') {
+    const overrides = (await q(F2_OVERRIDES_SQL)).map((r) => ({
+      target_row: String(r.target_row), entity_type: String(r.entity_type), entity_key: String(r.entity_key),
+    }));
+    const keys = [...new Set(overrides.map((o) => overrideMatchKeyOf(o.entity_type, o.entity_key))
+      .filter((k): k is string => k !== null))].sort();
+    const matches = keys.length === 0 ? [] : sourceMatchesOf(await q(MATCHES_BY_KEY_SQL, [keys]));
+    readings.push(...f2ReadingsOf(overrides, matches));
+    counted.F2 = asInt((await q(F2_COUNT_SQL))[0]?.n);
+  }
+  const manifest = buildDependencyManifest({
+    environment: input.environment, targetDatabase: input.database,
+    capturedAt: input.capturedAt ?? new Date().toISOString(), targetDatabaseOid: await readDatabaseOid(q),
+    freezeToken: input.freezeToken ?? null, familyStatuses: statuses, readings,
+  });
+  return { manifest, countProblems: familyCountProblems(manifest, counted) };
+}
+
+function manifestLines(m: DependencyManifest): string[] {
+  return DEPENDENCY_FAMILIES.map(({ id, description }) => {
+    const f = m.families[id];
+    if (f.status !== 'judged') return `${id} ${description}: withheld by contract in ${m.environment}; not read, not judged`;
+    const deps = m.dependencies.filter((d) => d.family === id);
+    const states = ['owned', 'unowned', 'indeterminate'].map((s) => `${s} ${deps.filter((d) => d.owner_state === s).length}`).join(', ');
+    return `${id} ${description}: ${f.rows} row(s); one identity ${deps.filter((d) => d.match_keys.length === 1).length}, `
+      + `none ${deps.filter((d) => d.match_keys.length === 0).length}, several ${deps.filter((d) => d.match_keys.length > 1).length}; `
+      + `target owner ${states}`;
+  });
+}
+
+/**
+ * The frozen re-check: the proof stands only for exactly the dependency set it proved. A
+ * different `dependency_set_sha256` means the proof is stale — the promotion stops, stays
+ * frozen, and `--phase source` is rerun on DEV against the frozen manifest B.
+ */
+export function gateFrozenDependencyBinding(
+  proof: SourceDependencyProof, frozen: DependencyManifest, report: Report, freezeRecord?: FreezeRecord,
+): void {
+  const problems = sourceProofBindingProblems(proof, frozen);
+  if (freezeRecord && frozen.freeze_token !== freezeRecord.token) {
+    problems.push(`the frozen manifest was not captured under freeze token ${freezeRecord.token}`);
+  }
+  const p = proof.preparation;
+  report.add('frozen dependency re-check — the source proof binds the frozen dependency set (AFLDB-ISSUE-252)',
+    problems.length === 0 ? 'PASS' : 'FAIL', [
+      `proven set  : ${proof.dependency_set_sha256} (manifest captured ${proof.manifest_captured_at}, judged ${proof.judged_at} on ${proof.source_database})`,
+      `frozen set  : ${frozen.dependency_set_sha256}${frozen.freeze_token ? ` (freeze token ${frozen.freeze_token})` : ''}`,
+      `prepared by : afltables '${p.afltables.label}' manifest ${p.afltables.manifest_sha256}, observations ${p.afltables.observations_sha256}; `
+        + `afl_api '${p.afl_api.label}' manifest ${p.afl_api.manifest_sha256}; record ${p.record_sha256}`,
+      ...problems.map((x) => `STOP ${x}`),
+      ...(problems.length === 0 ? [] : [
+        'The source proof is STALE for this frozen target. Stay frozen: carry the frozen manifest (B) to DEV, rerun '
+        + '--phase source against it, and re-check. Nothing proceeds on the old proof.',
+      ]),
+    ]);
+}
+
+/** `--phase dependencies`: capture A (pre-freeze) or B (under `--freeze-record`), then the optional frozen re-check. */
+export async function runDependenciesPhase(
+  q: Query, opts: Options, report: Report, freezeRecord?: FreezeRecord, proof?: SourceDependencyProof,
+): Promise<void> {
+  if (freezeRecord) {
+    await gateFrozenTarget(q, `target ${opts.database}`, opts.database!, freezeRecord, true, report);
+    if (report.failed) return;
+  }
+  const { manifest, countProblems } = await captureTargetDependencyManifest(q, {
+    environment: opts.environment, database: opts.database!, freezeToken: freezeRecord?.token ?? null,
+  });
+  report.add('target dependency manifest captured (AFLDB-ISSUE-252)', countProblems.length === 0 ? 'PASS' : 'FAIL', [
+    ...manifestLines(manifest), ...countProblems.map((p) => `STOP ${p}`),
+  ]);
+  if (report.failed) return;
+  const bytes = renderDependencyManifest(manifest);
+  writeOperatorFileAtomically(opts.dependenciesOut!, bytes);
+  report.add('Dependency manifest written', 'INFO', [
+    opts.dependenciesOut!,
+    `file sha256          : ${sha256Hex(bytes)}   (record it; --phase source takes it as --target-dependencies-sha256)`,
+    `dependency_set_sha256: ${manifest.dependency_set_sha256}`,
+    freezeRecord
+      ? `manifest B: captured under freeze token ${freezeRecord.token}`
+      : 'manifest A: captured BEFORE the freeze — copy it to DEV, re-hash it there, and pass it to --phase source',
+  ]);
+  if (proof) gateFrozenDependencyBinding(proof, manifest, report, freezeRecord);
+}
+
+/** `--phase pre-cutover`: the same frozen re-check, over the dependency set re-derived live (no file). */
+export async function gateFrozenDependencyRecheck(
+  q: Query, opts: Options, proof: SourceDependencyProof, report: Report, freezeRecord?: FreezeRecord,
+): Promise<void> {
+  const { manifest, countProblems } = await captureTargetDependencyManifest(q, {
+    environment: opts.environment, database: opts.database!, freezeToken: freezeRecord?.token ?? null,
+  });
+  if (countProblems.length > 0) {
+    report.add('frozen dependency re-check (AFLDB-ISSUE-252)', 'FAIL', countProblems.map((p) => `STOP ${p}`));
+    return;
+  }
+  gateFrozenDependencyBinding(proof, manifest, report, freezeRecord);
+}
+
+export type SourceDependencyInputs = {
+  manifest: DependencyManifest;
+  manifestFileSha256: string;
+  preparation: PreparationBinding;
+};
+
+/** `--phase source`'s two operator files, verified before any database is opened. */
+export function readSourceDependencyInputs(opts: Options): SourceDependencyInputs {
+  const manifestBytes = readOperatorFile(opts.targetDependencies!, '--target-dependencies');
+  const manifest = refusedInput(() => parseDependencyManifest({
+    bytes: manifestBytes, expectedFileSha256: opts.targetDependenciesSha256!, expectedEnvironment: opts.environment,
+  }));
+  const recordBytes = readOperatorFile(opts.preparationRecord!, '--preparation-record');
+  const preparation = refusedInput(() => parsePreparationRecord({
+    bytes: recordBytes, expectedFileSha256: opts.preparationRecordSha256!,
+    expectedSourceDatabase: environmentNames(opts.environment).source,
+  }));
+  return { manifest, manifestFileSha256: opts.targetDependenciesSha256!, preparation };
+}
+
+export function readSourceDependencyProofFile(opts: Options): SourceDependencyProof {
+  const bytes = readOperatorFile(opts.sourceDependencyProof!, '--source-dependency-proof');
+  return refusedInput(() => parseSourceDependencyProof({
+    bytes, expectedFileSha256: opts.sourceDependencyProofSha256!, expectedEnvironment: opts.environment,
+  }));
+}
+
+export const PREPARATION_BATCHES_SQL = 'SELECT id::bigint AS id FROM import_batches WHERE id = ANY ($1::bigint[]) ORDER BY id';
+
+export type SourceDependencyGateResult = { judgement: SourceDependencyJudgement; sourceDatabaseOid: number | null };
+
+/**
+ * `--phase source`: every judged dependency of manifest A must resolve exactly once in the
+ * prepared source by the SAME `match_key` string, owned by the SAME source as on the target.
+ * The source is read by `match_key` only. Each family is its own gate: one passing family
+ * never offsets another. The preparation record's batches must exist in this database.
+ */
+export async function gateSourceDependencies(
+  q: Query, inputs: SourceDependencyInputs, report: Report,
+): Promise<SourceDependencyGateResult> {
+  const { manifest, preparation } = inputs;
+  const keys = [...new Set(manifest.dependencies
+    .filter((d) => manifest.families[d.family].status === 'judged')
+    .flatMap((d) => d.match_keys))].sort();
+  const sourceMatches = keys.length === 0 ? [] : sourceMatchesOf(await q(MATCHES_BY_KEY_SQL, [keys]));
+  const judgement = judgeSourceDependencies({ manifest, sourceMatches });
+  report.add('target dependency manifest (AFLDB-ISSUE-252)', 'INFO', [
+    `${manifest.environment} target ${manifest.target_database}, captured ${manifest.captured_at}`
+      + (manifest.freeze_token ? ` under freeze token ${manifest.freeze_token} (B)` : ' before the freeze (A)'),
+    `file sha256 ${inputs.manifestFileSha256}; dependency_set_sha256 ${manifest.dependency_set_sha256}`,
+    `${keys.length} distinct match_key(s) read from the source by identity only`,
+  ]);
+  for (const f of judgement.families) {
+    const description = DEPENDENCY_FAMILIES.find((d) => d.id === f.family)!.description;
+    const gate = `source dependency gate ${f.family} — ${description} (AFLDB-ISSUE-252)`;
+    if (f.status !== 'judged') {
+      report.add(gate, 'INFO', [`withheld by contract in ${manifest.environment}: not read on the target, not judged`]);
+      continue;
+    }
+    const c = familyOutcomeCounts(f);
+    report.add(gate, f.refusals.length === 0 ? 'PASS' : 'FAIL', [
+      `rows inspected ${c.rows_inspected}; stable identities ${c.stable_identities}; resolved ${c.resolved}; `
+        + `owner parity ${c.ownership_matched}`,
+      `unresolved ${c.unresolved}; ambiguous ${c.ambiguous}; owner mismatch ${c.owner_mismatch}; other refusals ${c.other_refusals}`,
+      ...f.refusals.map((r) => `STOP ${r.target_row}: ${r.reason}${r.match_key ? ` match_key ${r.match_key}` : ''}`
+        + (r.reason === 'owner_mismatch' || r.reason.endsWith('_owner_not_owned')
+          ? ` (target owner ${r.target_owner ?? 'none'}, source owner ${r.source_owner ?? 'none'})` : '')),
+    ]);
+  }
+  const batchIds = [preparation.batches.afltables, preparation.batches.afl_api];
+  const present = batchIds.every((id) => id !== null)
+    ? new Set((await q(PREPARATION_BATCHES_SQL, [batchIds])).map((r) => asInt(r.id))) : new Set<number>();
+  const missing = batchIds.filter((id) => id === null || !present.has(id));
+  report.add('preparation record belongs to this source (AFLDB-ISSUE-252)', missing.length === 0 ? 'PASS' : 'FAIL', [
+    `record sha256 ${preparation.record_sha256}, prepared ${preparation.prepared_at}, season ${preparation.season}`,
+    `afltables '${preparation.afltables.label}' manifest ${preparation.afltables.manifest_sha256}, observations ${preparation.afltables.observations_sha256}; `
+      + `batch ${String(preparation.batches.afltables)}`,
+    `afl_api '${preparation.afl_api.label}' manifest ${preparation.afl_api.manifest_sha256}; batch ${String(preparation.batches.afl_api)}`,
+    ...(missing.length === 0 ? [] : [`STOP import batch(es) ${missing.map(String).join(', ')} named by the record are not in this database`]),
+  ]);
+  return { judgement, sourceDatabaseOid: await readDatabaseOid(q) };
+}
+
+/** Written after every gate of `--phase source`, and only if none failed (the F-L4-4 rule). Never overwrites. */
+export function publishSourceDependencyProof(
+  opts: Options, inputs: SourceDependencyInputs, gate: SourceDependencyGateResult, report: Report,
+  judgedAt: string = new Date().toISOString(),
+): void {
+  const out = opts.sourceDependencyProofOut!;
+  const failedGates = report.results.filter((r) => r.verdict === 'FAIL').map((r) => r.gate);
+  if (failedGates.length > 0) {
+    report.add('Source dependency proof NOT written', 'INFO', [
+      `${out} was not created: ${failedGates.length} gate(s) of this run failed, and only a fully passing --phase source may prove the source.`,
+    ]);
+    return;
+  }
+  const proof = buildSourceDependencyProof({
+    manifest: inputs.manifest, manifestFileSha256: inputs.manifestFileSha256, sourceDatabase: opts.database!,
+    sourceDatabaseOid: gate.sourceDatabaseOid, judgedAt, judgement: gate.judgement, preparation: inputs.preparation,
+  });
+  const bytes = renderSourceDependencyProof(proof);
+  writeOperatorFileAtomically(out, bytes);
+  report.add('Source dependency proof written', 'INFO', [
+    out,
+    `file sha256: ${sha256Hex(bytes)}   (record it; carry the file to the target for the frozen re-check)`,
+    `binds dependency_set_sha256 ${proof.dependency_set_sha256} and preparation record ${proof.preparation.record_sha256}`,
+  ]);
+}
+
+// ---------------------------------------------------------------------------
 // Plan and checklist (no database contact)
 // ---------------------------------------------------------------------------
 
@@ -2748,12 +3139,32 @@ async function main(): Promise<number> {
     return concludeReport(report, opts.environment, phase);
   }
 
+  // AFLDB-ISSUE-252 — the standalone target dependency phase: manifest A before the freeze, or
+  // B under it, with the frozen re-check when a source proof is given. Files are refused first.
+  if (phase === 'dependencies') {
+    if (existsSync(opts.dependenciesOut!)) throw new PromotionRefused(`${opts.dependenciesOut} already exists; refusing to overwrite.`);
+    const record = opts.freezeRecord ? readFreezeRecordFile(opts.freezeRecord, opts.environment) : undefined;
+    const proof = opts.sourceDependencyProof ? readSourceDependencyProofFile(opts) : undefined;
+    const report = new Report();
+    const conn = await openReadOnly(dsn, phase);
+    try {
+      await gateIdentity(conn.q, opts.database!, report);
+      await runDependenciesPhase(conn.q, opts, report, record, proof);
+    } finally {
+      await conn.end();
+    }
+    return concludeReport(report, opts.environment, phase);
+  }
+
   // AFLDB-ISSUE-237: refuse a bad operator file, or an output that already exists, before any
   // database is opened.
   const boundSupersede = phase === 'candidate' ? readAflApiSupersedeFile(opts.aflApiSupersedeIn!) : undefined;
   // AFLDB-ISSUE-250: under a freeze, the record every target read is judged against.
   const freezeRecord = opts.freezeRecord ? readFreezeRecordFile(opts.freezeRecord, opts.environment) : undefined;
-  for (const out of [opts.aflApiSupersedeOut, opts.aflApiDevRegenerationOut, opts.lineageRemapOut]) {
+  // AFLDB-ISSUE-252: the source gate's manifest and preparation record; the frozen re-check's proof.
+  const sourceInputs = phase === 'source' ? readSourceDependencyInputs(opts) : undefined;
+  const boundProof = phase === 'pre-cutover' && opts.sourceDependencyProof ? readSourceDependencyProofFile(opts) : undefined;
+  for (const out of [opts.aflApiSupersedeOut, opts.aflApiDevRegenerationOut, opts.lineageRemapOut, opts.sourceDependencyProofOut]) {
     if (out && existsSync(out)) throw new PromotionRefused(`${out} already exists; refusing to overwrite.`);
   }
 
@@ -2763,6 +3174,7 @@ async function main(): Promise<number> {
   let frozenSide: { q: Query; end: () => Promise<void> } | undefined;
   let aflApiOverlap: AflApiOverlapResult | undefined;
   let lineageRemap: string | undefined;
+  let sourceGate: SourceDependencyGateResult | undefined;
   try {
     await gateIdentity(conn.q, opts.database!, report);
     const { present } = await gateClassification(conn.q, report);
@@ -2792,6 +3204,8 @@ async function main(): Promise<number> {
     // AFLDB-ISSUE-237: source = SOURCE lineage (no human authority); candidate = after the
     // plan reinstated the TARGET's ledger, which must be exactly the one G2 graded (F-L4-3).
     if (phase === 'source') await gateAflApiG1(conn.q, report);
+    // AFLDB-ISSUE-252: the prepared source against the target's dependency manifest.
+    if (sourceInputs) sourceGate = await gateSourceDependencies(conn.q, sourceInputs, report);
     if (phase === 'candidate') {
       await gateAflApiCandidateAfterReinstate(conn.q, boundSupersede!, {
         environment: opts.environment, candidateDatabase: opts.database!, targetDatabase: names.live,
@@ -2810,6 +3224,8 @@ async function main(): Promise<number> {
       if (freezeRecord) {
         await gateFrozenTarget(conn.q, `target ${opts.database}`, opts.database!, freezeRecord, true, report);
       }
+      // AFLDB-ISSUE-252: the frozen dependency set, re-derived here, must be the one the source proved.
+      if (boundProof) await gateFrozenDependencyRecheck(conn.q, opts, boundProof, report, freezeRecord);
     }
 
     if (phase === 'restored') {
@@ -2877,6 +3293,7 @@ async function main(): Promise<number> {
   // F-L4-4: only now, with every gate of this run evaluated, may a trusted file be written.
   if (aflApiOverlap) publishRestoredAflApiFiles(opts, aflApiOverlap, report);
   if (phase === 'restored') publishRestoredLineageRemap(opts.lineageRemapOut, lineageRemap, report);
+  if (sourceInputs && sourceGate) publishSourceDependencyProof(opts, sourceInputs, sourceGate, report);
 
   const failed = report.results.filter((r) => r.verdict === 'FAIL').map((r) => r.gate);
   console.log(`\n${'='.repeat(78)}`);

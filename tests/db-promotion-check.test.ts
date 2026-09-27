@@ -6,9 +6,9 @@
  * argument and database-name rules are pinned so no phase can be pointed at the wrong
  * database; and the checker's source is asserted to carry no write path.
  */
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -120,6 +120,8 @@ import {
   type FirstKickGoalObserved,
   FREEZE_BOUND_PHASES, freezeBindingFor, gateFrozenTarget, gatePromotedLiveUnfrozen, runFreezeDumpPhase, runFrozenPhase,
   writeFreezePlan, writeUnfreezeRecovery, type Options,
+  DATABASE_OID_SQL, PREPARATION_BATCHES_SQL, captureTargetDependencyManifest, gateFrozenDependencyRecheck, gateSourceDependencies,
+  publishSourceDependencyProof, readSourceDependencyInputs, runDependenciesPhase,
 } from '../tools/db/promotion-check';
 import {
   DIGEST_SESSION_SETTINGS, FREEZE_CONNECT_ROLES_SQL, FREEZE_DATABASE_STATE_SQL, FREEZE_PREPARED_XACTS_SQL, FREEZE_SESSIONS_SQL,
@@ -136,6 +138,58 @@ import {
 import { loadFitzroyProfileContinuityRules } from '../src/lib/acquisition/fitzroy-profile-continuity';
 import { readManualPlayerToken } from '../src/db/queries/player-identity';
 import { registrationsFromLive, type LiveRegistrationState } from '../tools/migration/rebuild_manual_registrations';
+import {
+  buildDependencyManifest,
+  buildSourceDependencyProof,
+  compareDependencyManifests,
+  contractMatchDependencyRefs,
+  familyStatusesFor,
+  judgeSourceDependencies,
+  overrideMatchKeyOf,
+  parseDependencyManifest,
+  PREPARATION_ZERO_COUNTERS,
+  preexistingSeasonOwnershipProblems,
+  preparationDatabaseProblems,
+  renderDependencyManifest,
+  retainedSnapshotProblems,
+  settleStepProblems,
+  sha256Hex,
+  sourceProofBindingProblems,
+  F2_COUNT_SQL,
+  F2_OVERRIDES_SQL,
+  MATCHES_BY_KEY_SQL,
+  PREPARATION_RECORD_KIND,
+  PREPARATION_RECORD_SCHEMA_VERSION,
+  afltablesClosureDryRunProblems,
+  afltablesFirstApplyProblems,
+  afltablesPreviewDryRunProblems,
+  PREPARATION_PREVIEW_STATUS,
+  contractFamilyReaders,
+  f2ReadingsOf,
+  familyCountProblems,
+  parsePreparationRecord,
+  parseSourceDependencyProof,
+  renderSourceDependencyProof,
+  type PreparationBinding,
+  type SettleStepSummary,
+  type SourceMatchReading,
+  type TargetDependencyReading,
+} from '../tools/db/promotion-source-dependencies';
+import {
+  parsePrepareArgs,
+  runPreparePromotionSource,
+  verifyAflApiRetainedSnapshot,
+  verifyAflTablesRetainedSnapshot,
+  type PrepareDeps,
+} from '../tools/db/prepare-promotion-source';
+import {
+  REHEARSAL_CASES,
+  SOURCE_DEPENDENCY_REHEARSAL,
+  SourceDependencyRehearsalRefused,
+  oneComponentVariants,
+  parseSourceDependencyRehearsalArgs,
+  presentAsPreparedSource,
+} from '../tools/db/promotion-source-dependency-rehearsal';
 import type { TransactionSql } from 'postgres';
 import {
   CONVERGENCE_REHEARSAL,
@@ -1017,6 +1071,12 @@ describe('snapshot comparison', () => {
 describe('checker arguments', () => {
   // AFLDB-ISSUE-250: every production phase that reads or replaces the live target needs the freeze.
   const FREEZE = ['--freeze-record', '/home/arm/freeze.json'];
+  // AFLDB-ISSUE-252: the source phase judges the target's dependency manifest; no opt-out.
+  const SOURCE_GATE = [
+    '--target-dependencies', 'a.json', '--target-dependencies-sha256', 'a'.repeat(64),
+    '--preparation-record', 'prep.json', '--preparation-record-sha256', 'b'.repeat(64),
+    '--source-dependency-proof-out', 'proof.json',
+  ];
   const FREEZE_PROD = [...FREEZE, '--old-database', `${PRE_REBUILD_PREFIX}1`];
   it('requires a phase and a database, and binds them', () => {
     expect(() => parseArgs([])).toThrow(/--database is required/);
@@ -1030,7 +1090,7 @@ describe('checker arguments', () => {
   it('takes an environment variable NAME for the DSN, never a DSN', () => {
     expect(() => parseArgs(['--phase', 'source', '--database', 'afldb_test', '--dsn-env', 'postgresql://u:p@h/db']))
       .toThrow(/never a DSN/);
-    expect(parseArgs(['--phase', 'source', '--database', 'afldb_test', '--dsn-env', 'AFLDB_TEST_DATABASE_URL']).dsnEnv)
+    expect(parseArgs(['--phase', 'source', '--database', 'afldb_test', '--dsn-env', 'AFLDB_TEST_DATABASE_URL', ...SOURCE_GATE]).dsnEnv)
       .toBe('AFLDB_TEST_DATABASE_URL');
   });
 
@@ -1082,7 +1142,7 @@ describe('checker arguments', () => {
 
   // AFLDB-ISSUE-141.
   it('defaults --environment to prod and refuses anything but prod|dev', () => {
-    expect(parseArgs(['--phase', 'source', '--database', 'afldb_test']).environment).toBe('prod');
+    expect(parseArgs(['--phase', 'source', '--database', 'afldb_test', ...SOURCE_GATE]).environment).toBe('prod');
     expect(parseArgs(['--environment', 'prod', '--phase', 'production', '--database', 'afldb_prod', ...FREEZE_PROD]).environment).toBe('prod');
     expect(parseArgs(['--environment', 'dev', '--phase', 'production', '--database', 'afldb_dev']).environment).toBe('dev');
     expect(() => parseArgs(['--environment', 'staging', '--phase', 'source', '--database', 'afldb_test']))
@@ -4397,7 +4457,7 @@ describe('AFLDB-ISSUE-237 L4 — A4.2 / A4.3 replay gates and the lineage remap 
     expect(candidateBranch).toContain('gateOverrideReplayTargets({ overrides: conn.q, candidate: conn.q }');
     // publication happens after the gates, and the remap is refused up front if it exists
     expect(main.indexOf('publishRestoredLineageRemap(')).toBeGreaterThan(main.indexOf('await conn.end();'));
-    expect(main).toContain('[opts.aflApiSupersedeOut, opts.aflApiDevRegenerationOut, opts.lineageRemapOut]');
+    expect(main).toContain('[opts.aflApiSupersedeOut, opts.aflApiDevRegenerationOut, opts.lineageRemapOut, opts.sourceDependencyProofOut]');
     // the lineage gate generates, it never writes
     const gate = source.slice(source.indexOf('async function gateLineageIdentity'), source.indexOf('async function readAflApiCensus'));
     expect(gate).toContain('prepareRemap(plans, false)');
@@ -5409,7 +5469,8 @@ describe('AFLDB-ISSUE-250 — the promotion freeze', () => {
       ]) {
         expect(() => parseArgs(argv), argv.join(' ')).toThrow(/needs --freeze-record <file> \(AFLDB-ISSUE-250\)/);
       }
-      expect(parseArgs(['--phase', 'pre-cutover', '--database', 'afldb_prod', ...REC]).freezeRecord).toBe('/home/arm/f.json');
+      expect(parseArgs(['--phase', 'pre-cutover', '--database', 'afldb_prod', ...REC,
+        '--source-dependency-proof', 'p.json', '--source-dependency-proof-sha256', 'c'.repeat(64)]).freezeRecord).toBe('/home/arm/f.json');
       // The source phase never touches the target.
       expect(() => parseArgs(['--phase', 'source', '--database', 'afldb_test', ...REC])).toThrow(/only meaningful/);
     });
@@ -5773,6 +5834,1247 @@ describe('AFLDB-ISSUE-250 — the promotion freeze', () => {
       expect(freeze).toBeLessThan(backup);
       const production = ACCEPTANCE_CHECKLIST.findIndex((i) => i.includes('--phase production'));
       expect(ACCEPTANCE_CHECKLIST[production]).toMatch(/BEFORE afldb was started/);
+    });
+  });
+});
+
+describe('AFLDB-ISSUE-252 source dependency manifest and ownership-parity gate', () => {
+  const KEY = '2026|1|2026-03-05|Sydney|Carlton';
+  const KEY_R2 = '2026|2|2026-03-05|Sydney|Carlton';
+  const KEY_B = '2026|3|2026-03-19|Carlton|Richmond';
+  const ALL_JUDGED = { F1: 'judged', F2: 'judged', F3: 'judged' } as const;
+  const reading = (over: Partial<TargetDependencyReading> = {}): TargetDependencyReading => ({
+    family: 'F1', target_row: 'brownlow_vote_entry_state:match_id=17795', match_key: KEY,
+    owner_source_id_present: true, owner_source_key: 'afltables', ...over,
+  });
+  const manifestOf = (readings: TargetDependencyReading[], capturedAt = '2026-09-27T01:00:00Z', oid: number | null = 16385) =>
+    buildDependencyManifest({
+      environment: 'prod', targetDatabase: 'afldb_prod', capturedAt, targetDatabaseOid: oid,
+      familyStatuses: { ...ALL_JUDGED }, readings,
+    });
+  const src = (over: Partial<SourceMatchReading> = {}): SourceMatchReading => ({
+    id: 900001, match_key: KEY, owner_source_id_present: true, owner_source_key: 'afltables', ...over,
+  });
+  const family = (j: ReturnType<typeof judgeSourceDependencies>, id: 'F1' | 'F2' | 'F3') =>
+    j.families.find((f) => f.family === id)!;
+  const PREPARATION: PreparationBinding = {
+    record_sha256: 'd'.repeat(64), prepared_at: '2026-09-28T00:00:00.000Z', season: 2026, source_database: 'afldb_test',
+    batches: { afltables: 501, afl_api: 502 },
+    afltables: {
+      label: 'settle-2026-2026-09-22-0444',
+      manifest_sha256: '9ff2928f598ed64bc5fc21ebd84e4e5f6e50949555840877b87daa9008f26f7e',
+      observations_sha256: 'a62a566fc4fd1aefae5bfc9780a4d8ea3973c13b131e0289e93dd9b3f5eec1bd',
+    },
+    afl_api: { label: 'afl-api-2026-2026-09-25-235854', manifest_sha256: 'afb2a754943fba59a48eabf0bf01dbae7e64046e012318864dc84f68c96907c7' },
+    afltables_closure: {
+      initial_apply: { inserted: 9, updated: 0, unresolved_identity_match: 1 },
+      closure_dry_run: { inserted: 0, updated: 0, unresolved_identity_match: 0 },
+    },
+  };
+  /** Q-252-10: the two AFL Tables results a v2 preparation record carries, matching PREPARATION. */
+  const afltablesZeroCounters = () => Object.fromEntries([
+    ...PREPARATION_ZERO_COUNTERS.afltables, 'canonicalRowsInserted', 'canonicalRowsUpdated', 'canonicalApplicationsLogged',
+  ].map((k) => [k, 0]));
+  const recordAfltablesResults = (closureOver: Record<string, number> = {}) => ({
+    afltables_initial_apply: {
+      source: 'afltables', mode: 'apply', batch_id: '501', halt: null, rollback_reason: null, completeness: 'complete', applied: true,
+      counters: { ...afltablesZeroCounters(), unresolvedIdentityMatch: 1, canonicalRowsInserted: 9, canonicalApplicationsLogged: 3 },
+    },
+    afltables_closure_dry_run: {
+      source: 'afltables', mode: 'dry-run', batch_id: null, halt: null, rollback_reason: null, completeness: 'complete', applied: false,
+      counters: { ...afltablesZeroCounters(), ...closureOver },
+    },
+  });
+  const RECORD_STEPS = [
+    { source: 'afltables', mode: 'apply', completeness: 'complete', applied: true },
+    { source: 'afltables', mode: 'dry-run', completeness: 'complete', applied: false },
+    { source: 'afl_api', mode: 'dry-run', completeness: 'complete', applied: false },
+    { source: 'afl_api', mode: 'apply', completeness: 'complete', applied: true },
+  ];
+
+  describe('families come from the contract', () => {
+    it('maps the contract match references to exactly F1 and F3', () => {
+      const refs = contractMatchDependencyRefs();
+      expect(refs.map((r) => `${r.family}:${r.table}.${r.column}${r.kind ? `[${r.kind}]` : ''}`).sort())
+        .toEqual(['F1:brownlow_vote_entry_state.match_id', 'F3:data_edits.row_id[matches]']);
+    });
+
+    it('refuses a contract match reference no family covers', () => {
+      const synthetic = {
+        schema: 'public', name: 'new_match_notes',
+        lineageRefs: [{ column: 'match_id', targets: [{ entity: 'matches', identity: 'match_key' }], remediation: 'x' }],
+      } as unknown as NonNullable<Parameters<typeof contractMatchDependencyRefs>[0]>[number];
+      expect(() => contractMatchDependencyRefs([synthetic])).toThrow(/no ISSUE-252 dependency family covers: new_match_notes\.match_id/);
+    });
+
+    it('judges all three families on prod and withholds data_edits only where the contract does', () => {
+      expect(familyStatusesFor('prod')).toEqual(ALL_JUDGED);
+      expect(familyStatusesFor('dev').F3).toBe('withheld_by_contract');
+    });
+
+    it('derives an F2 identity from the override key and nothing else', () => {
+      expect(overrideMatchKeyOf('matches', KEY)).toBe(KEY);
+      expect(overrideMatchKeyOf('match_coaches', `${KEY}|sydney`)).toBe(KEY);
+      expect(overrideMatchKeyOf('match_coaches', 'no-delimiter')).toBeNull();
+      expect(overrideMatchKeyOf('match_coaches', `${KEY}|`)).toBeNull();
+      expect(overrideMatchKeyOf('match_coaches', '|sydney')).toBeNull();
+      expect(overrideMatchKeyOf('players', 'afltables|x')).toBeNull();
+    });
+  });
+
+  describe('manifest construction and hashing', () => {
+    it('refuses a manifest read from anything but the live target, or rows of a withheld family', () => {
+      expect(() => buildDependencyManifest({
+        environment: 'prod', targetDatabase: 'afldb_dev', capturedAt: 'x', targetDatabaseOid: null,
+        familyStatuses: { ...ALL_JUDGED }, readings: [],
+      })).toThrow(/read from 'afldb_prod' only/);
+      expect(() => buildDependencyManifest({
+        environment: 'prod', targetDatabase: 'afldb_prod', capturedAt: 'x', targetDatabaseOid: null,
+        familyStatuses: { ...ALL_JUDGED, F3: 'withheld_by_contract' },
+        readings: [reading({ family: 'F3', target_row: 'data_edits:id=1' })],
+      })).toThrow(/withheld by contract/);
+    });
+
+    it('keeps a target row with two identities as ONE ambiguous dependency, owner indeterminate', () => {
+      const m = manifestOf([reading(), reading({ match_key: KEY_B })]);
+      expect(m.dependencies).toEqual([{
+        family: 'F1', target_row: 'brownlow_vote_entry_state:match_id=17795', match_keys: [KEY, KEY_B].sort(),
+        owner_state: 'indeterminate', owner_source_key: null,
+      }]);
+    });
+
+    it('P: an unchanged dependency set hashes identically whatever captured_at and OID say', () => {
+      const a = manifestOf([reading()], '2026-09-27T01:00:00Z', 16385);
+      const b = manifestOf([reading()], '2026-09-28T09:30:00Z', 99999);
+      expect(a.dependency_set_sha256).toBe(b.dependency_set_sha256);
+      expect(sha256Hex(renderDependencyManifest(a))).not.toBe(sha256Hex(renderDependencyManifest(b)));
+      expect(compareDependencyManifests(a, b)).toEqual({ identical: true, added: [], removed: [], changed: [] });
+    });
+
+    it('Q: a dependency created between the manifests changes the set hash and is named', () => {
+      const a = manifestOf([reading()]);
+      const b = manifestOf([reading(), reading({ family: 'F3', target_row: 'data_edits:id=4401', match_key: KEY_B })]);
+      expect(b.dependency_set_sha256).not.toBe(a.dependency_set_sha256);
+      expect(compareDependencyManifests(a, b)).toEqual({
+        identical: false, added: ['F3 data_edits:id=4401'], removed: [], changed: [],
+      });
+    });
+
+    it('an ownership change on the target alone changes the set hash', () => {
+      const a = manifestOf([reading()]);
+      const b = manifestOf([reading({ owner_source_key: 'afl_api' })]);
+      expect(b.dependency_set_sha256).not.toBe(a.dependency_set_sha256);
+      expect(compareDependencyManifests(a, b).changed).toEqual(['F1 brownlow_vote_entry_state:match_id=17795']);
+    });
+  });
+
+  describe('S: parsing refuses tampering', () => {
+    const m = manifestOf([reading()]);
+    const bytes = renderDependencyManifest(m);
+    const sha = sha256Hex(bytes);
+
+    it('round-trips the exact bytes', () => {
+      expect(parseDependencyManifest({ bytes, expectedFileSha256: sha, expectedEnvironment: 'prod' })).toEqual(m);
+    });
+
+    it('refuses a transport sha mismatch', () => {
+      expect(() => parseDependencyManifest({ bytes: bytes.replace('17795', '17796'), expectedFileSha256: sha, expectedEnvironment: 'prod' }))
+        .toThrow(/file sha256 .* is not the recorded/);
+    });
+
+    it('refuses edited content even when the attacker re-hashes the file', () => {
+      const edited = bytes.replace(KEY, KEY_R2);
+      expect(() => parseDependencyManifest({ bytes: edited, expectedFileSha256: sha256Hex(edited), expectedEnvironment: 'prod' }))
+        .toThrow(/dependency_set_sha256 recomputes to/);
+    });
+
+    it('refuses another environment, a row-count lie and an owner without a key', () => {
+      expect(() => parseDependencyManifest({ bytes, expectedFileSha256: sha, expectedEnvironment: 'dev' }))
+        .toThrow(/environment 'prod' is not 'dev'/);
+      const lie = renderDependencyManifest({ ...m, families: { ...m.families, F1: { status: 'judged', rows: 2 } } });
+      expect(() => parseDependencyManifest({ bytes: lie, expectedFileSha256: sha256Hex(lie), expectedEnvironment: 'prod' }))
+        .toThrow(/declares 2 rows but carries 1/);
+      const ownerless = renderDependencyManifest({ ...m, dependencies: [{ ...m.dependencies[0], owner_source_key: null }] });
+      expect(() => parseDependencyManifest({ bytes: ownerless, expectedFileSha256: sha256Hex(ownerless), expectedEnvironment: 'prod' }))
+        .toThrow(/owner_source_key must be set exactly when/);
+    });
+  });
+
+  describe('ownership-parity judgement', () => {
+    it('M: an AFL Tables-owned target dependency prepared AFL Tables-first PASSes, ids disjoint', () => {
+      const j = judgeSourceDependencies({ manifest: manifestOf([reading()]), sourceMatches: [src()] });
+      expect(j.pass).toBe(true);
+      expect(family(j, 'F1')).toMatchObject({ rowsInspected: 1, identitiesDerived: 1, resolved: 1, ownershipMatched: 1, refusals: [] });
+    });
+
+    it('N: the same match prepared AFL API-first REFUSES although match_key resolves', () => {
+      const j = judgeSourceDependencies({ manifest: manifestOf([reading()]), sourceMatches: [src({ owner_source_key: 'afl_api' })] });
+      expect(j.pass).toBe(false);
+      expect(family(j, 'F1').resolved).toBe(1);
+      expect(family(j, 'F1').refusals).toEqual([{
+        target_row: 'brownlow_vote_entry_state:match_id=17795', reason: 'owner_mismatch', match_key: KEY,
+        target_owner: 'afltables', source_owner: 'afl_api',
+      }]);
+    });
+
+    it('O: a round/date/team component difference is a hard STOP naming the target key', () => {
+      for (const other of [KEY_R2, '2026|1|2026-03-06|Sydney|Carlton', '2026|1|2026-03-05|Carlton|Sydney']) {
+        const j = judgeSourceDependencies({ manifest: manifestOf([reading()]), sourceMatches: [src({ match_key: other })] });
+        expect(j.pass).toBe(false);
+        expect(family(j, 'F1').refusals).toEqual([{
+          target_row: 'brownlow_vote_entry_state:match_id=17795', reason: 'identity_absent_in_candidate', match_key: KEY,
+        }]);
+      }
+    });
+
+    it('R: a frozen manifest dependency absent from the prepared source is a hard STOP', () => {
+      const frozen = manifestOf([reading(), reading({ family: 'F3', target_row: 'data_edits:id=4401', match_key: KEY_B })]);
+      const j = judgeSourceDependencies({ manifest: frozen, sourceMatches: [src()] });
+      expect(j.pass).toBe(false);
+      expect(family(j, 'F1').refusals).toEqual([]);
+      expect(family(j, 'F3').refusals).toEqual([{ target_row: 'data_edits:id=4401', reason: 'identity_absent_in_candidate', match_key: KEY_B }]);
+    });
+
+    it('refuses ambiguity on either side, never picking one', () => {
+      const replaced = judgeSourceDependencies({
+        manifest: manifestOf([reading(), reading({ match_key: KEY_B })]), sourceMatches: [src(), src({ id: 900002, match_key: KEY_B })],
+      });
+      expect(family(replaced, 'F1').refusals.map((r) => r.reason)).toEqual(['ambiguous_in_replaced']);
+      const candidate = judgeSourceDependencies({ manifest: manifestOf([reading()]), sourceMatches: [src(), src({ id: 900002 })] });
+      expect(family(candidate, 'F1').refusals.map((r) => r.reason)).toEqual(['ambiguous_in_candidate']);
+    });
+
+    it('refuses a target row with no identity and an unowned or unreadable owner on either side', () => {
+      const none = judgeSourceDependencies({ manifest: manifestOf([reading({ family: 'F3', target_row: 'data_edits:id=9', match_key: null })]), sourceMatches: [] });
+      expect(family(none, 'F3').refusals.map((r) => r.reason)).toEqual(['no_identity_in_replaced']);
+      const targetUnowned = judgeSourceDependencies({
+        manifest: manifestOf([reading({ owner_source_id_present: false, owner_source_key: null })]), sourceMatches: [src()],
+      });
+      expect(family(targetUnowned, 'F1').refusals.map((r) => r.reason)).toEqual(['target_owner_not_owned']);
+      const sourceUnreadable = judgeSourceDependencies({ manifest: manifestOf([reading()]), sourceMatches: [src({ owner_source_key: null })] });
+      expect(family(sourceUnreadable, 'F1').refusals.map((r) => r.reason)).toEqual(['source_owner_not_owned']);
+    });
+
+    it('reports the families separately: one passing never closes another', () => {
+      const m = manifestOf([
+        reading(),
+        reading({ family: 'F2', target_row: 'data_overrides:id=12', match_key: KEY_B }),
+      ]);
+      const j = judgeSourceDependencies({ manifest: m, sourceMatches: [src()] });
+      expect(j.pass).toBe(false);
+      expect(family(j, 'F1')).toMatchObject({ resolved: 1, ownershipMatched: 1, refusals: [] });
+      expect(family(j, 'F2').refusals.map((r) => r.reason)).toEqual(['identity_absent_in_candidate']);
+      expect(family(j, 'F3')).toMatchObject({ rowsInspected: 0, refusals: [] });
+    });
+  });
+
+  describe('the source proof and the frozen re-check', () => {
+    const pre = manifestOf([reading()]);
+    const preSha = sha256Hex(renderDependencyManifest(pre));
+    const judgedPass = judgeSourceDependencies({ manifest: pre, sourceMatches: [src()] });
+    const proofInput = { manifest: pre, manifestFileSha256: preSha, sourceDatabase: 'afldb_test', sourceDatabaseOid: 20001,
+      judgedAt: 't', judgement: judgedPass, preparation: PREPARATION };
+
+    it('writes a proof only on PASS, for the prepared source only', () => {
+      const failing = judgeSourceDependencies({ manifest: pre, sourceMatches: [] });
+      expect(() => buildSourceDependencyProof({ ...proofInput, judgement: failing })).toThrow(/did not PASS/);
+      expect(() => buildSourceDependencyProof({ ...proofInput, sourceDatabase: 'afldb_dev' })).toThrow(/must be 'afldb_test'/);
+      expect(() => buildSourceDependencyProof({ ...proofInput, preparation: { ...PREPARATION, source_database: 'afldb_dev' } }))
+        .toThrow(/preparation record is for 'afldb_dev'/);
+    });
+
+    it('binds the preparation record, both retained inputs, the manifest and per-family counts', () => {
+      const proof = buildSourceDependencyProof(proofInput);
+      expect(proof).toMatchObject({
+        verdict: 'PASS', environment: 'prod', target_database: 'afldb_prod', dependency_set_sha256: pre.dependency_set_sha256,
+        manifest_file_sha256: preSha, manifest_captured_at: pre.captured_at, source_database: 'afldb_test', source_database_oid: 20001,
+        preparation: PREPARATION,
+      });
+      expect(proof.families.find((f) => f.family === 'F1')).toEqual({
+        family: 'F1', status: 'judged', rows_inspected: 1, stable_identities: 1, resolved: 1, unresolved: 0, ambiguous: 0,
+        owner_mismatch: 0, other_refusals: 0, ownership_matched: 1,
+      });
+      const bytes = renderSourceDependencyProof(proof);
+      expect(parseSourceDependencyProof({ bytes, expectedFileSha256: sha256Hex(bytes), expectedEnvironment: 'prod' })).toEqual(proof);
+    });
+
+    it('refuses a tampered, foreign or internally failing proof', () => {
+      const bytes = renderSourceDependencyProof(buildSourceDependencyProof(proofInput));
+      const sha = sha256Hex(bytes);
+      expect(() => parseSourceDependencyProof({ bytes: bytes.replace('20001', '20002'), expectedFileSha256: sha, expectedEnvironment: 'prod' }))
+        .toThrow(/proof sha256 .* is not the recorded/);
+      expect(() => parseSourceDependencyProof({ bytes, expectedFileSha256: sha, expectedEnvironment: 'dev' })).toThrow(/environment 'prod', not 'dev'/);
+      const failing = bytes.replace('"owner_mismatch": 0', '"owner_mismatch": 1');
+      expect(() => parseSourceDependencyProof({ bytes: failing, expectedFileSha256: sha256Hex(failing), expectedEnvironment: 'prod' }))
+        .toThrow(/reports refusals/);
+      const unbound = JSON.stringify({ ...JSON.parse(bytes), preparation: undefined });
+      expect(() => parseSourceDependencyProof({ bytes: unbound, expectedFileSha256: sha256Hex(unbound), expectedEnvironment: 'prod' }))
+        .toThrow(/does not bind a preparation record/);
+      const parsed = JSON.parse(bytes);
+      const unclean = JSON.stringify({ ...parsed, preparation: { ...parsed.preparation, afltables_closure: {
+        ...parsed.preparation.afltables_closure, closure_dry_run: { inserted: 0, updated: 0, unresolved_identity_match: 1 } } } });
+      expect(() => parseSourceDependencyProof({ bytes: unclean, expectedFileSha256: sha256Hex(unclean), expectedEnvironment: 'prod' }))
+        .toThrow(/clean AFL Tables closure dry run/);
+      const collapsed = JSON.stringify({ ...parsed, preparation: { ...parsed.preparation, afltables_closure: undefined } });
+      expect(() => parseSourceDependencyProof({ bytes: collapsed, expectedFileSha256: sha256Hex(collapsed), expectedEnvironment: 'prod' }))
+        .toThrow(/clean AFL Tables closure dry run/);
+    });
+
+    it('P: an identical frozen set lets the proof stand; Q: a changed set requires a fresh gate', () => {
+      const proof = buildSourceDependencyProof(proofInput);
+      expect(sourceProofBindingProblems(proof, manifestOf([reading()], '2026-09-28T10:00:00Z'))).toEqual([]);
+      const changed = manifestOf([reading(), reading({ family: 'F2', target_row: 'data_overrides:id=3', match_key: KEY_B })]);
+      expect(sourceProofBindingProblems(proof, changed).join('\n')).toMatch(/rerun the source gate against the frozen manifest/);
+      expect(sourceProofBindingProblems({ ...proof, source_database: 'afldb_dev' }, pre)).toContain('proof source database is not the prepared source');
+    });
+  });
+
+  describe('T: preparation guards (the tool never writes the switch)', () => {
+    it('refuses a disabled or unread switch, and any database disagreement', () => {
+      expect(preparationDatabaseProblems({ controlDatabase: 'afldb_test', importDatabase: 'afldb_test', aflApiCurrentSeasonEnabled: true })).toEqual([]);
+      expect(preparationDatabaseProblems({ controlDatabase: 'afldb_test', importDatabase: 'afldb_test', aflApiCurrentSeasonEnabled: false }).join())
+        .toMatch(/afl_api_current_season_enabled on afldb_test is false/);
+      expect(preparationDatabaseProblems({ controlDatabase: 'afldb_test', importDatabase: 'afldb_test', aflApiCurrentSeasonEnabled: null }).join())
+        .toMatch(/is null/);
+      expect(preparationDatabaseProblems({ controlDatabase: 'afldb_test', importDatabase: 'afldb_prod', aflApiCurrentSeasonEnabled: true }))
+        .toEqual([
+          "AFLDB_IMPORT_DATABASE_URL session is 'afldb_prod', not 'afldb_test'",
+          "the control and import sessions disagree on current_database() ('afldb_test' vs 'afldb_prod')",
+        ]);
+    });
+
+    it('binds every retained snapshot by manifest sha, season, and AFL Tables-first order', () => {
+      const shaA = 'a'.repeat(64);
+      const shaB = 'b'.repeat(64);
+      const shaC = 'c'.repeat(64);
+      const afltables = {
+        source: 'afltables' as const, label: 'settle-2026-2026-09-26-0941', expectedManifestSha256: shaA, actualManifestSha256: shaA,
+        expectedBundleSha256: shaC, actualBundleSha256: shaC, season: 2026,
+      };
+      const aflApi = { source: 'afl_api' as const, label: 'afl-api-2026-2026-09-25-235854', expectedManifestSha256: shaB, actualManifestSha256: shaB, season: 2026 };
+      expect(retainedSnapshotProblems([afltables, aflApi], [2026])).toEqual([]);
+      expect(retainedSnapshotProblems([aflApi, afltables], [2026]).join()).toMatch(/order must be afltables then afl_api/);
+      expect(retainedSnapshotProblems([aflApi], [2026]).join()).toMatch(/order must be/);
+      expect(retainedSnapshotProblems([{ ...afltables, actualManifestSha256: shaB }, aflApi], [2026]).join())
+        .toMatch(/afltables 'settle-2026-2026-09-26-0941': manifest sha256 b+ is not the recorded a+/);
+      expect(retainedSnapshotProblems([afltables, { ...aflApi, season: 2025 }], [2026]).join()).toMatch(/season 2025 is not the in-progress season 2026/);
+      expect(retainedSnapshotProblems([afltables, aflApi], []).join()).toMatch(/exactly one in-progress season/);
+      // The AFL Tables bundle is not in its manifest, so it carries its own binding.
+      expect(retainedSnapshotProblems([{ ...afltables, actualBundleSha256: shaA }, aflApi], [2026]).join())
+        .toMatch(/observations\.json sha256 a+ is not the recorded c+/);
+      expect(retainedSnapshotProblems([{ ...afltables, expectedBundleSha256: 'x' }, aflApi], [2026]).join())
+        .toMatch(/expected observations\.json sha256 is not 64 lowercase hex/);
+      expect(retainedSnapshotProblems([afltables, { ...aflApi, integrityProblems: ["'x.json' has changed"] }], [2026]))
+        .toEqual(["afl_api 'afl-api-2026-2026-09-25-235854': 'x.json' has changed"]);
+    });
+
+    it('refuses preparation over a season some other source already owns', () => {
+      expect(preexistingSeasonOwnershipProblems(2026, [])).toEqual([]);
+      expect(preexistingSeasonOwnershipProblems(2026, [{ owner_source_key: 'afltables', matches: 217 }])).toEqual([]);
+      const refused = preexistingSeasonOwnershipProblems(2026, [
+        { owner_source_key: 'afltables', matches: 200 }, { owner_source_key: 'afl_api', matches: 17 }, { owner_source_key: null, matches: 1 },
+      ]);
+      expect(refused).toHaveLength(2);
+      expect(refused.join('\n')).toMatch(/17 season-2026 match\(es\) are already 'afl_api'-owned.*rebuild afldb_test/);
+      expect(refused.join('\n')).toMatch(/1 season-2026 match\(es\) are already unowned/);
+    });
+  });
+
+  describe('preparation post-conditions (§21.2 step 5)', () => {
+    const zeros = (source: 'afltables' | 'afl_api') =>
+      Object.fromEntries(PREPARATION_ZERO_COUNTERS[source].map((k) => [k, 0]));
+    const step = (over: Partial<SettleStepSummary> = {}): SettleStepSummary => ({
+      source: 'afl_api', mode: 'apply', halt: null, rollbackReason: null, completeness: 'complete',
+      applied: true, counters: { ...zeros('afl_api'), corroboratedForeignOwned: 217 }, ...over,
+    });
+
+    it('passes a clean run and refuses every other shape', () => {
+      expect(settleStepProblems(step())).toEqual([]);
+      expect(settleStepProblems(step({ source: 'afltables', counters: zeros('afltables') }))).toEqual([]);
+      expect(settleStepProblems(step({ mode: 'dry-run', applied: false }))).toEqual([]);
+      expect(settleStepProblems(step({ halt: 'afl_api_match_absence' })).join()).toMatch(/halted \(afl_api_match_absence\)/);
+      expect(settleStepProblems(step({ rollbackReason: 'require_complete_source' })).join()).toMatch(/rolled back/);
+      // A dry run's own 'dry_run' rollback is expected; on an apply, or any other reason on a dry run, it is a STOP.
+      expect(settleStepProblems(step({ mode: 'dry-run', applied: false, rollbackReason: 'dry_run' }))).toEqual([]);
+      expect(settleStepProblems(step({ rollbackReason: 'dry_run' })).join()).toMatch(/apply: rolled back \(dry_run\)/);
+      expect(settleStepProblems(step({ mode: 'dry-run', applied: false, rollbackReason: 'require_complete_source' })).join())
+        .toMatch(/dry-run: rolled back \(require_complete_source\)/);
+      expect(settleStepProblems(step({ completeness: 'incomplete' })).join()).toMatch(/completeness is incomplete, not complete/);
+      expect(settleStepProblems(step({ completeness: null })).join()).toMatch(/completeness is null/);
+      expect(settleStepProblems(step({ applied: false })).join()).toMatch(/expected a committed apply, got applied=false/);
+      expect(settleStepProblems(step({ counters: null })).join()).toMatch(/no counters were reported/);
+    });
+
+    it('names an AFL API foreign_owned_collision as a STOP, and a missing counter as one too', () => {
+      expect(settleStepProblems(step({ counters: { ...zeros('afl_api'), foreignOwnedCollision: 2 } })))
+        .toEqual(['afl_api apply: foreignOwnedCollision = 2, must be 0']);
+      expect(settleStepProblems(step({ source: 'afltables', counters: { ...zeros('afltables'), venueUnmapped: undefined } })))
+        .toEqual(['afltables apply: counter venueUnmapped is missing']);
+    });
+
+    describe('Q-252-10: the AFL Tables initial apply and its closure dry run', () => {
+      const atCounters = (over: Record<string, number> = {}) => ({
+        ...zeros('afltables'), canonicalRowsInserted: 0, canonicalRowsUpdated: 0, canonicalApplicationsLogged: 0, ...over,
+      });
+      const initial = (over: Record<string, number> = {}, s: Partial<SettleStepSummary> = {}) => step({
+        source: 'afltables', counters: atCounters({ canonicalRowsInserted: 9, canonicalApplicationsLogged: 3, unresolvedIdentityMatch: 1, ...over }), ...s,
+      });
+      const closure = (over: Record<string, number> = {}, s: Partial<SettleStepSummary> = {}) => step({
+        source: 'afltables', mode: 'dry-run', applied: false, counters: atCounters(over), ...s,
+      });
+
+      it('the initial apply tolerates unresolvedIdentityMatch alone, bounded by the rows it inserted', () => {
+        expect(afltablesFirstApplyProblems(initial())).toEqual([]);
+        expect(afltablesFirstApplyProblems(initial({ unresolvedIdentityMatch: 0 }))).toEqual([]);
+        // The plain §21.2 guard still refuses the same apply: the tolerance is not general.
+        expect(settleStepProblems(initial())).toEqual(['afltables apply: unresolvedIdentityMatch = 1, must be 0']);
+        expect(afltablesFirstApplyProblems(initial({ unresolvedIdentityMatch: 4, canonicalRowsInserted: 0 })).join())
+          .toMatch(/unresolvedIdentityMatch = 4 exceeds the 0 canonical rows this apply inserted/);
+        expect(afltablesFirstApplyProblems(initial({ unresolvedIdentityMatch: -1 })).join()).toMatch(/not a count/);
+      });
+
+      it('any OTHER non-zero counter on the initial apply refuses immediately', () => {
+        expect(afltablesFirstApplyProblems(initial({ unresolvedIdentityPlayer: 1 })))
+          .toEqual(['afltables initial apply: unresolvedIdentityPlayer = 1, must be 0']);
+        expect(afltablesFirstApplyProblems(initial({ canonicalApplyFailures: 2 })))
+          .toEqual(['afltables initial apply: canonicalApplyFailures = 2, must be 0']);
+        expect(afltablesFirstApplyProblems(initial({}, { completeness: 'incomplete' })).join()).toMatch(/completeness is incomplete/);
+        expect(afltablesFirstApplyProblems(initial({}, { rollbackReason: 'dry_run' })).join()).toMatch(/initial apply: rolled back \(dry_run\)/);
+        expect(afltablesFirstApplyProblems(initial({}, { applied: false })).join()).toMatch(/expected a committed apply/);
+        // Only the AFL Tables apply carries the contract.
+        expect(afltablesFirstApplyProblems(step({ counters: { ...zeros('afl_api'), unresolvedIdentityMatch: 1 } })).join())
+          .toMatch(/covers the AFL Tables apply only/);
+        expect(afltablesFirstApplyProblems(closure()).join()).toMatch(/covers the AFL Tables apply only/);
+      });
+
+      it('the closure dry run must be all zero, write nothing, and treats rollbackReason dry_run as expected', () => {
+        expect(afltablesClosureDryRunProblems(closure())).toEqual([]);
+        expect(afltablesClosureDryRunProblems(closure({}, { rollbackReason: 'dry_run' }))).toEqual([]);
+        expect(afltablesClosureDryRunProblems(closure({ unresolvedIdentityMatch: 1 })))
+          .toEqual(['afltables closure dry-run: unresolvedIdentityMatch = 1, must be 0']);
+        expect(afltablesClosureDryRunProblems(closure({ canonicalRowsInserted: 1 })))
+          .toEqual(['afltables closure dry-run: canonicalRowsInserted = 1, must be 0 (no canonical mutation)']);
+        expect(afltablesClosureDryRunProblems(closure({ canonicalRowsUpdated: 1, canonicalApplicationsLogged: 1 }))).toHaveLength(2);
+        expect(afltablesClosureDryRunProblems(closure({}, { rollbackReason: 'require_complete_source' })).join()).toMatch(/rolled back/);
+        expect(afltablesClosureDryRunProblems(closure({}, { applied: true })).join()).toMatch(/expected a rolled-back dry run/);
+        expect(afltablesClosureDryRunProblems(closure({}, { halt: 'x' })).join()).toMatch(/halted \(x\)/);
+        expect(afltablesClosureDryRunProblems(closure({}, { counters: { ...atCounters(), canonicalRowsUpdated: undefined } })))
+          .toEqual(['afltables closure dry-run: counter canonicalRowsUpdated is missing']);
+        expect(afltablesClosureDryRunProblems(initial()).join()).toMatch(/closure pass is an AFL Tables dry run/);
+      });
+
+      it('Q-252-11: the preview dry run shares the bounded transient tolerance, and nothing else', () => {
+        const preview = (over: Record<string, number> = {}, s: Partial<SettleStepSummary> = {}) =>
+          closure({ canonicalRowsInserted: 9, canonicalApplicationsLogged: 3, unresolvedIdentityMatch: 1, ...over }, s);
+        expect(afltablesPreviewDryRunProblems(preview())).toEqual([]);
+        expect(afltablesPreviewDryRunProblems(preview({}, { rollbackReason: 'dry_run' }))).toEqual([]);
+        // The closure contract still refuses the same result: the preview proves nothing.
+        expect(afltablesClosureDryRunProblems(preview()).join()).toMatch(/unresolvedIdentityMatch = 1, must be 0/);
+        // Bound exceeded.
+        expect(afltablesPreviewDryRunProblems(preview({ unresolvedIdentityMatch: 10 })))
+          .toEqual(['afltables preview dry-run: unresolvedIdentityMatch = 10 exceeds the 9 canonical rows this dry-run inserted; '
+            + 'it cannot be the pending period scores of new matches']);
+        expect(afltablesPreviewDryRunProblems(preview({ unresolvedIdentityMatch: -1 })).join()).toMatch(/not a count/);
+        // Any other counter, incompleteness, a halt, or an unexpected rollback.
+        expect(afltablesPreviewDryRunProblems(preview({ foreignOwnedCollision: 1 })))
+          .toEqual(['afltables preview dry-run: foreignOwnedCollision = 1, must be 0']);
+        expect(afltablesPreviewDryRunProblems(preview({}, { completeness: 'incomplete' })).join()).toMatch(/completeness is incomplete/);
+        expect(afltablesPreviewDryRunProblems(preview({}, { halt: 'x' })).join()).toMatch(/halted \(x\)/);
+        expect(afltablesPreviewDryRunProblems(preview({}, { rollbackReason: 'require_complete_source' })).join())
+          .toMatch(/preview dry-run: rolled back \(require_complete_source\)/);
+        expect(afltablesPreviewDryRunProblems(preview({}, { applied: true })).join()).toMatch(/expected a rolled-back dry run/);
+        // Only the AFL Tables dry run carries it.
+        expect(afltablesPreviewDryRunProblems(initial()).join()).toMatch(/preview contract covers the AFL Tables dry run only/);
+        // An already-prepared source previews clean without any special case.
+        expect(afltablesPreviewDryRunProblems(closure())).toEqual([]);
+      });
+    });
+  });
+
+  describe('prepare-promotion-source: arguments', () => {
+    const sha = (c: string) => c.repeat(64);
+    const base = [
+      '--acknowledge', 'afldb_test',
+      '--afltables-label', 'settle-2026-2026-09-22-0444', '--expect-afltables-manifest-sha256', sha('a'),
+      '--expect-afltables-bundle-sha256', sha('b'),
+      '--afl-api-label', 'afl-api-2026-2026-09-25-235854', '--expect-afl-api-manifest-sha256', sha('c'),
+    ];
+
+    it('requires the acknowledgement, exactly one mode, and --record-out with --apply only', () => {
+      expect(parsePrepareArgs([...base, '--validate-only']).mode).toBe('validate-only');
+      expect(parsePrepareArgs([...base, '--apply', '--record-out', 'r.json']).recordOut).toBe('r.json');
+      expect(() => parsePrepareArgs([...base.slice(2), '--dry-run'])).toThrow(/--acknowledge afldb_test is required/);
+      expect(() => parsePrepareArgs(['--acknowledge', 'afldb_prod', ...base.slice(2), '--dry-run'])).toThrow(/--acknowledge afldb_test/);
+      expect(() => parsePrepareArgs(base)).toThrow(/Exactly one of/);
+      expect(() => parsePrepareArgs([...base, '--dry-run', '--apply'])).toThrow(/Exactly one of/);
+      expect(() => parsePrepareArgs([...base, '--apply'])).toThrow(/--apply requires --record-out/);
+      expect(() => parsePrepareArgs([...base, '--dry-run', '--record-out', 'r.json'])).toThrow(/written by --apply only/);
+      expect(() => parsePrepareArgs([...base, '--dry-run', '--fixtures-only'])).toThrow(/Unknown argument '--fixtures-only'/);
+      expect(() => parsePrepareArgs([...base.slice(0, 3), '../escape', ...base.slice(4), '--dry-run']))
+        .toThrow(/--afltables-label '\.\.\/escape' is not a snapshot label/);
+    });
+  });
+
+  describe('prepare-promotion-source: source-specific retained inputs', () => {
+    let root: string;
+    const LABEL_AT = 'settle-2026-2026-09-22-0444';
+    const LABEL_API = 'afl-api-2026-2026-09-25-235854';
+    const put = (rel: string, text: string) => {
+      const full = join(root, rel);
+      mkdirSync(dirname(full), { recursive: true });
+      writeFileSync(full, text);
+      return full;
+    };
+    const writeAfltables = (over: { manifestPath?: string; tamperCsv?: boolean } = {}) => {
+      const csv = 'Season,Round\n2026,1\n';
+      put(`data/sources/afltables/fitzroy_core/${LABEL_AT}/results.csv`, csv);
+      const manifestFile = put(`docs/rebuild-manifests/afltables_fitzroy_core/${LABEL_AT}.json`, JSON.stringify({
+        mode: 'acquire', snapshot_label: LABEL_AT, acquisition_kind: 'in_season_partial',
+        working_directory: `data/sources/afltables/fitzroy_core/${LABEL_AT}`,
+        in_season: { season: 2026 }, files: [{ dataset: 'results', filename: 'results.csv', sha256: sha256Hex(csv) }],
+      }));
+      if (over.tamperCsv) put(`data/sources/afltables/fitzroy_core/${LABEL_AT}/results.csv`, 'Season,Round\n2026,2\n');
+      const manifestSha = sha256Hex(readFileSync(manifestFile));
+      const bundleFile = put(`data/sources/afltables/fitzroy_core/${LABEL_AT}/observations.json`, JSON.stringify({
+        snapshot_label: LABEL_AT, manifest_sha256: manifestSha, season: 2026,
+        manifest_path: over.manifestPath ?? manifestFile.replace(/\\/g, '/'),
+      }));
+      return { manifestSha, bundleSha: sha256Hex(readFileSync(bundleFile)) };
+    };
+    const writeAflApi = (kind = 'afl_api_match_snapshot') => {
+      const fixture = '{"id":"CD_M20260140101"}';
+      put(`data/sources/afl_api/matches/${LABEL_API}/CD_M20260140101/fixture.json`, fixture);
+      const manifestFile = put(`data/sources/afl_api/matches/${LABEL_API}/manifest.json`, JSON.stringify({
+        source_key: 'afl_api', acquisition_kind: kind, season: 2026,
+        files: [{ file: 'CD_M20260140101/fixture.json', sha256: sha256Hex(fixture) }],
+      }));
+      return sha256Hex(readFileSync(manifestFile));
+    };
+    const noValidate = { validateBundle: () => undefined };
+
+    beforeEach(() => { root = mkdtempSync(join(tmpdir(), 'issue252-prep-')); });
+    afterEach(() => { rmSync(root, { recursive: true, force: true }); });
+
+    it('verifies the AFL Tables manifest, its CSVs and the separately bound observations.json', () => {
+      const { manifestSha, bundleSha } = writeAfltables();
+      const b = verifyAflTablesRetainedSnapshot(root, LABEL_AT, manifestSha, bundleSha, noValidate);
+      expect(b).toMatchObject({ source: 'afltables', season: 2026, actualManifestSha256: manifestSha, actualBundleSha256: bundleSha, integrityProblems: [] });
+    });
+
+    it('refuses a changed CSV, and a bundle naming another checkout\'s manifest', () => {
+      const tampered = writeAfltables({ tamperCsv: true });
+      expect(verifyAflTablesRetainedSnapshot(root, LABEL_AT, tampered.manifestSha, tampered.bundleSha, noValidate).integrityProblems)
+        .toEqual(["'results.csv' has changed since acquisition (sha256 mismatch)"]);
+      const elsewhere = writeAfltables({ manifestPath: '/home/arm/projects/afldb/docs/rebuild-manifests/afltables_fitzroy_core/x.json' });
+      expect(verifyAflTablesRetainedSnapshot(root, LABEL_AT, elsewhere.manifestSha, elsewhere.bundleSha, noValidate).integrityProblems.join())
+        .toMatch(/manifest_path .* is not this checkout's manifest/);
+    });
+
+    it('reports a missing AFL Tables snapshot instead of inventing one', () => {
+      const b = verifyAflTablesRetainedSnapshot(root, LABEL_AT, 'a'.repeat(64), 'b'.repeat(64), noValidate);
+      expect(b.actualManifestSha256).toBe('');
+      expect(b.integrityProblems.join('\n')).toMatch(/no manifest at .*settle-2026-2026-09-22-0444\.json[\s\S]*no observations\.json/);
+    });
+
+    it('verifies the AFL API manifest.json beside its payloads, and refuses fixtures-only and tampering', () => {
+      const sha = writeAflApi();
+      expect(verifyAflApiRetainedSnapshot(root, LABEL_API, sha)).toMatchObject({ season: 2026, actualManifestSha256: sha, integrityProblems: [] });
+      put(`data/sources/afl_api/matches/${LABEL_API}/CD_M20260140101/fixture.json`, '{"id":"changed"}');
+      expect(verifyAflApiRetainedSnapshot(root, LABEL_API, sha).integrityProblems.join()).toMatch(/has changed since acquisition/);
+      rmSync(join(root, 'data'), { recursive: true, force: true });
+      writeAflApi('afl_api_fixture_snapshot');
+      expect(verifyAflApiRetainedSnapshot(root, LABEL_API, sha).integrityProblems.join()).toMatch(/--fixtures-only acquisition/);
+    });
+  });
+
+  describe('prepare-promotion-source: the run (fake settles, no database)', () => {
+    let root: string;
+    const sha = (c: string) => c.repeat(64);
+    const argv = (mode: string[]) => [
+      '--acknowledge', 'afldb_test',
+      '--afltables-label', 'settle-2026-2026-09-22-0444', '--expect-afltables-manifest-sha256', sha('a'),
+      '--expect-afltables-bundle-sha256', sha('b'),
+      '--afl-api-label', 'afl-api-2026-2026-09-25-235854', '--expect-afl-api-manifest-sha256', sha('c'),
+      ...mode,
+    ];
+    const zeros = (source: 'afltables' | 'afl_api') => Object.fromEntries(PREPARATION_ZERO_COUNTERS[source].map((k) => [k, 0]));
+    // As the real settles return them: batch ids are decimal text, and an AFL API dry run reports
+    // its own deliberate rollback as 'dry_run'.
+    // Q-252-10: a first AFL Tables apply on a fresh source counts each new match's pending period
+    // scores as unresolvedIdentityMatch; the same-label dry run afterwards is all zero.
+    const atCounters = (over: Record<string, number> = {}) => ({
+      ...zeros('afltables'), canonicalRowsInserted: 0, canonicalRowsUpdated: 0, canonicalApplicationsLogged: 0, ...over,
+    });
+    const FIRST_APPLY = atCounters({ unresolvedIdentityMatch: 1, canonicalRowsInserted: 9, canonicalApplicationsLogged: 3 });
+    const afltablesOutcome = (applied: boolean, counters: Record<string, number> = applied ? FIRST_APPLY : atCounters()) => ({
+      result: { applied, batchId: applied ? '501' : null, counters },
+      sourceCompleteness: { status: 'complete' },
+    });
+    const afltablesFake = (h: { calls: string[] }, apply: Record<string, number>, closure: Record<string, number>): PrepareDeps['settleAfltables'] =>
+      async (a) => {
+        h.calls.push(`afltables ${a.includes('--apply') ? 'apply' : 'dry-run'}`);
+        return afltablesOutcome(a.includes('--apply'), a.includes('--apply') ? apply : closure) as unknown as
+          Awaited<ReturnType<NonNullable<PrepareDeps['settleAfltables']>>>;
+      };
+    const aflApiOutcome = (applied: boolean, counters = zeros('afl_api')) => ({
+      result: { applied, batchId: applied ? '502' : null, counters, halt: null, rollbackReason: applied ? null : 'dry_run' },
+      sourceCompleteness: { status: 'complete' },
+    });
+    const harness = (over: Partial<PrepareDeps> = {}) => {
+      const calls: string[] = [];
+      const written: { path: string; text: string }[] = [];
+      const deps: PrepareDeps = {
+        projectRoot: root,
+        sql: {} as unknown as NonNullable<PrepareDeps['sql']>,
+        env: {},
+        log: () => {},
+        now: () => new Date('2026-09-28T00:00:00Z'),
+        verifyAflTables: (_r, label, m, b) => ({
+          source: 'afltables', label, season: 2026, expectedManifestSha256: m, actualManifestSha256: m,
+          expectedBundleSha256: b, actualBundleSha256: b, integrityProblems: [],
+        }),
+        verifyAflApi: (_r, label, m) => ({ source: 'afl_api', label, season: 2026, expectedManifestSha256: m, actualManifestSha256: m, integrityProblems: [] }),
+        prove: async () => {
+          calls.push('prove');
+          return {
+            controls: { currentSeasonEnabled: true, brownlowEnabled: false },
+            control: { database: 'afldb_test', role: 'afldb_owner' },
+            writer: { database: 'afldb_test', role: 'afldb_import' },
+          } as unknown as Awaited<ReturnType<NonNullable<PrepareDeps['prove']>>>;
+        },
+        readSeasonOwnership: async () => { calls.push('ownership'); return []; },
+        settleAfltables: async (a, d) => {
+          calls.push(`afltables ${a.filter((x) => x.startsWith('--') && x !== '--label').join(' ')} env=${JSON.stringify(d?.env)}`);
+          return afltablesOutcome(a.includes('--apply')) as unknown as Awaited<ReturnType<NonNullable<PrepareDeps['settleAfltables']>>>;
+        },
+        settleAflApi: async (a) => {
+          calls.push(`afl_api ${a.filter((x) => x.startsWith('--') && x !== '--label').join(' ')}`);
+          return aflApiOutcome(a.includes('--apply')) as unknown as Awaited<ReturnType<NonNullable<PrepareDeps['settleAflApi']>>>;
+        },
+        writeRecord: (path, text) => { written.push({ path, text }); },
+        ...over,
+      };
+      return { deps, calls, written };
+    };
+
+    beforeEach(() => {
+      root = mkdtempSync(join(tmpdir(), 'issue252-run-'));
+      mkdirSync(join(root, 'data', 'reference'), { recursive: true });
+      writeFileSync(join(root, 'data', 'reference', 'seasons.json'), JSON.stringify({ in_progress_seasons: [2026] }));
+    });
+    afterEach(() => { rmSync(root, { recursive: true, force: true }); });
+
+    it('--validate-only opens no connection and runs no settle', async () => {
+      const h = harness();
+      const out = await runPreparePromotionSource(argv(['--validate-only']), h.deps);
+      expect(out).toMatchObject({ mode: 'validate-only', season: 2026, steps: [], record: null });
+      expect(h.calls).toEqual([]);
+    });
+
+    it('--dry-run proves the database, then dry-runs AFL Tables only, with revalidation off', async () => {
+      const h = harness();
+      await runPreparePromotionSource(argv(['--dry-run']), h.deps);
+      expect(h.calls).toEqual(['prove', 'ownership', 'afltables --dry-run --auto-apply --require-complete-source env={}']);
+    });
+
+    it('M: --apply runs AFL Tables apply, its closure dry run, then an AFL API dry run and apply, then the record', async () => {
+      const h = harness();
+      const out = await runPreparePromotionSource(argv(['--apply', '--record-out', 'prep.json']), h.deps);
+      expect(h.calls).toEqual([
+        'prove', 'ownership',
+        'afltables --apply --auto-apply --require-complete-source env={}',
+        'afltables --dry-run --auto-apply --require-complete-source env={}',
+        'afl_api --dry-run --auto-apply --require-complete-source',
+        'afl_api --apply --auto-apply --require-complete-source',
+      ]);
+      expect(h.written).toHaveLength(1);
+      const record = JSON.parse(h.written[0].text);
+      expect(record).toMatchObject({
+        kind: 'afldb_promotion_source_preparation_record', schema_version: 2, season: 2026, source_database: 'afldb_test',
+        order: ['afltables', 'afl_api'], batches: { afltables: '501', afl_api: '502' },
+        inputs: [
+          { source: 'afltables', label: 'settle-2026-2026-09-22-0444', manifest_sha256: sha('a'), observations_sha256: sha('b') },
+          { source: 'afl_api', label: 'afl-api-2026-2026-09-25-235854', manifest_sha256: sha('c') },
+        ],
+        // Q-252-10: two AFL Tables results, never collapsed.
+        afltables_initial_apply: {
+          mode: 'apply', batch_id: '501', applied: true, completeness: 'complete', inserted: 9, updated: 0,
+          unresolved_identity_match: 1, result: 'PASS (provisional: accepted by the closure dry run)',
+        },
+        afltables_closure_dry_run: {
+          mode: 'dry-run', batch_id: null, applied: false, completeness: 'complete', inserted: 0, updated: 0,
+          canonical_applications_logged: 0, unresolved_identity_match: 0, result: 'PASS',
+        },
+      });
+      expect(record.afltables_closure_dry_run.zero_list_counters).toEqual(zeros('afltables'));
+      expect(out.steps.map((s) => `${s.source}:${s.mode}`)).toEqual(['afltables:apply', 'afltables:dry-run', 'afl_api:dry-run', 'afl_api:apply']);
+      // The record the real CLI writes is the record --phase source accepts, text batch ids included.
+      const binding = parsePreparationRecord({
+        bytes: h.written[0].text, expectedFileSha256: sha256Hex(h.written[0].text), expectedSourceDatabase: 'afldb_test',
+      });
+      expect(binding.batches).toEqual({ afltables: 501, afl_api: 502 });
+      expect(binding.afltables_closure).toEqual({
+        initial_apply: { inserted: 9, updated: 0, unresolved_identity_match: 1 },
+        closure_dry_run: { inserted: 0, updated: 0, unresolved_identity_match: 0 },
+      });
+    });
+
+    it('Q-252-10 negative control: a closure dry run still showing unresolvedIdentityMatch refuses before the AFL API phase', async () => {
+      const h = harness();
+      h.deps.settleAfltables = afltablesFake(h, FIRST_APPLY, atCounters({ unresolvedIdentityMatch: 1 }));
+      await expect(runPreparePromotionSource(argv(['--apply', '--record-out', 'prep.json']), h.deps))
+        .rejects.toThrow(/afltables closure dry-run did not meet[\s\S]*unresolvedIdentityMatch = 1, must be 0/);
+      expect(h.calls.slice(2)).toEqual(['afltables apply', 'afltables dry-run']);
+      expect(h.written).toEqual([]);
+    });
+
+    it('Q-252-10: a closure dry run that would still write refuses before the AFL API phase', async () => {
+      const h = harness();
+      h.deps.settleAfltables = afltablesFake(h, FIRST_APPLY, atCounters({ canonicalRowsInserted: 4, canonicalApplicationsLogged: 1 }));
+      await expect(runPreparePromotionSource(argv(['--apply', '--record-out', 'prep.json']), h.deps))
+        .rejects.toThrow(/canonicalRowsInserted = 4, must be 0 \(no canonical mutation\)/);
+      expect(h.calls.some((c) => c.startsWith('afl_api'))).toBe(false);
+      expect(h.written).toEqual([]);
+    });
+
+    it('Q-252-10: any other non-zero counter on the initial apply refuses immediately, before the closure dry run', async () => {
+      const h = harness();
+      h.deps.settleAfltables = afltablesFake(h, { ...FIRST_APPLY, venueUnmapped: 1 }, atCounters());
+      await expect(runPreparePromotionSource(argv(['--apply', '--record-out', 'prep.json']), h.deps))
+        .rejects.toThrow(/afltables initial apply did not meet[\s\S]*venueUnmapped = 1, must be 0/);
+      expect(h.calls.slice(2)).toEqual(['afltables apply']);
+      expect(h.written).toEqual([]);
+    });
+
+    describe('Q-252-11: --dry-run is an unproven preview', () => {
+      const PREVIEW = atCounters({ unresolvedIdentityMatch: 1, canonicalRowsInserted: 9, canonicalApplicationsLogged: 3 });
+
+      it('a fresh-source preview accepts the transient unresolvedIdentityMatch within the bound, labelled unproven', async () => {
+        const lines: string[] = [];
+        const h = harness({ log: (l) => lines.push(l) });
+        h.deps.settleAfltables = afltablesFake(h, FIRST_APPLY, PREVIEW);
+        const out = await runPreparePromotionSource(argv(['--dry-run']), h.deps);
+        expect(out).toMatchObject({ mode: 'dry-run', status: 'preview-unproven', record: null });
+        expect(out.steps).toHaveLength(1);
+        expect(out.steps[0]).toMatchObject({ source: 'afltables', mode: 'dry-run', applied: false });
+        expect(h.calls.slice(2)).toEqual(['afltables dry-run']);
+        expect(lines).toContain('afltables preview dry-run: post-conditions PASS.');
+        expect(lines).toContain('afltables preview dry-run: unresolvedIdentityMatch = 1, inserted 9, updated 0 (rolled back).');
+        expect(lines.at(-1)).toBe(PREPARATION_PREVIEW_STATUS);
+        expect(PREPARATION_PREVIEW_STATUS).toMatch(/^PREVIEW ONLY — UNPROVEN: transient same-run match dependencies are not yet proven resolved/);
+      });
+
+      it('refuses unresolvedIdentityMatch greater than the rows it inserted', async () => {
+        const h = harness();
+        h.deps.settleAfltables = afltablesFake(h, FIRST_APPLY, atCounters({ unresolvedIdentityMatch: 4, canonicalRowsInserted: 3 }));
+        await expect(runPreparePromotionSource(argv(['--dry-run']), h.deps))
+          .rejects.toThrow(/afltables preview dry-run did not meet[\s\S]*unresolvedIdentityMatch = 4 exceeds the 3 canonical rows/);
+        expect(h.written).toEqual([]);
+      });
+
+      it('refuses any other non-zero counter, even beside the tolerated one', async () => {
+        const h = harness();
+        h.deps.settleAfltables = afltablesFake(h, FIRST_APPLY, { ...PREVIEW, venueUnmapped: 1 });
+        await expect(runPreparePromotionSource(argv(['--dry-run']), h.deps))
+          .rejects.toThrow(/afltables preview dry-run did not meet[\s\S]*venueUnmapped = 1, must be 0/);
+        expect(h.written).toEqual([]);
+      });
+
+      it('writes no preparation record and no proof, and leaves no file behind', async () => {
+        const h = harness({ writeRecord: undefined });
+        h.deps.settleAfltables = afltablesFake(h, FIRST_APPLY, PREVIEW);
+        const before = readdirSync(root, { recursive: true }).sort();
+        const out = await runPreparePromotionSource(argv(['--dry-run']), h.deps);
+        expect(out.record).toBeNull();
+        expect(readdirSync(root, { recursive: true }).sort()).toEqual(before);
+        // --record-out is refused on --dry-run, so a preview has nowhere to write one.
+        await expect(runPreparePromotionSource(argv(['--dry-run', '--record-out', join(root, 'r.json')]), h.deps))
+          .rejects.toThrow(/written by --apply only/);
+        expect(existsSync(join(root, 'r.json'))).toBe(false);
+        // The CLI never builds a proof: that is --phase source's alone, from an --apply record.
+        const text = readFileSync(join(process.cwd(), 'tools', 'db', 'prepare-promotion-source.ts'), 'utf8');
+        expect(text).not.toMatch(/buildSourceDependencyProof|publishSourceDependencyProof/);
+      });
+
+      it('an already-prepared source previews clean (0 / 0 / 0) with no special case', async () => {
+        const h = harness();
+        h.deps.settleAfltables = afltablesFake(h, FIRST_APPLY, atCounters());
+        const out = await runPreparePromotionSource(argv(['--dry-run']), h.deps);
+        expect(out.status).toBe('preview-unproven');
+        expect(out.steps[0].counters).toMatchObject({ unresolvedIdentityMatch: 0, canonicalRowsInserted: 0, canonicalRowsUpdated: 0 });
+      });
+
+      it('--apply stays strict through its closure pass: the preview tolerance never reaches the closure', async () => {
+        const h = harness();
+        // The closure returns exactly what an accepted preview returns.
+        h.deps.settleAfltables = afltablesFake(h, FIRST_APPLY, PREVIEW);
+        await expect(runPreparePromotionSource(argv(['--apply', '--record-out', 'prep.json']), h.deps))
+          .rejects.toThrow(/afltables closure dry-run did not meet[\s\S]*unresolvedIdentityMatch = 1, must be 0[\s\S]*canonicalRowsInserted = 9/);
+        expect(h.calls.slice(2)).toEqual(['afltables apply', 'afltables dry-run']);
+        expect(h.written).toEqual([]);
+        const ok = harness();
+        const out = await runPreparePromotionSource(argv(['--apply', '--record-out', 'prep.json']), ok.deps);
+        expect(out.status).toBe('prepared');
+      });
+    });
+
+    it('T: a disabled switch or a database disagreement refuses before any settle', async () => {
+      const disabled = harness({
+        prove: async () => ({
+          controls: { currentSeasonEnabled: false }, control: { database: 'afldb_test', role: 'o' }, writer: { database: 'afldb_test', role: 'i' },
+        }) as unknown as Awaited<ReturnType<NonNullable<PrepareDeps['prove']>>>,
+      });
+      await expect(runPreparePromotionSource(argv(['--dry-run']), disabled.deps)).rejects.toThrow(/afl_api_current_season_enabled on afldb_test is false/);
+      expect(disabled.calls).toEqual([]);
+      const wrongDb = harness({
+        prove: async () => ({
+          controls: { currentSeasonEnabled: true }, control: { database: 'afldb_dev', role: 'o' }, writer: { database: 'afldb_dev', role: 'i' },
+        }) as unknown as Awaited<ReturnType<NonNullable<PrepareDeps['prove']>>>,
+      });
+      await expect(runPreparePromotionSource(argv(['--dry-run']), wrongDb.deps)).rejects.toThrow(/session is 'afldb_dev', not 'afldb_test'/);
+      expect(wrongDb.calls).toEqual([]);
+    });
+
+    it('the tool source never writes the ingestion switch', () => {
+      const text = readFileSync(join(process.cwd(), 'tools', 'db', 'prepare-promotion-source.ts'), 'utf8');
+      expect(text).not.toMatch(/\b(INSERT|UPDATE|DELETE)\b[\s\S]{0,80}site_settings/i);
+      expect(text).not.toMatch(/writeSiteSetting|setSiteSetting/);
+    });
+
+    it('N-guard: an afl_api-owned season already in the source refuses before the AFL Tables settle', async () => {
+      const h = harness({ readSeasonOwnership: async () => [{ owner_source_key: 'afl_api', matches: 217 }] });
+      await expect(runPreparePromotionSource(argv(['--dry-run']), h.deps)).rejects.toThrow(/already 'afl_api'-owned/);
+      expect(h.calls).toEqual(['prove']);
+    });
+
+    it('an AFL API dry-run collision stops before the AFL API apply and writes no record', async () => {
+      const h = harness({
+        settleAflApi: async (a) => {
+          h.calls.push(`afl_api ${a.includes('--apply') ? 'apply' : 'dry-run'}`);
+          return aflApiOutcome(a.includes('--apply'), { ...zeros('afl_api'), foreignOwnedCollision: 1 }) as unknown as
+            Awaited<ReturnType<NonNullable<PrepareDeps['settleAflApi']>>>;
+        },
+      });
+      await expect(runPreparePromotionSource(argv(['--apply', '--record-out', 'prep.json']), h.deps))
+        .rejects.toThrow(/afl_api dry-run did not meet[\s\S]*foreignOwnedCollision = 1, must be 0/);
+      expect(h.calls.at(-1)).toBe('afl_api dry-run');
+      expect(h.written).toEqual([]);
+    });
+
+    it('refuses unverified inputs before any connection', async () => {
+      const h = harness({
+        verifyAflApi: (_r, label, m) => ({
+          source: 'afl_api', label, season: 2026, expectedManifestSha256: m, actualManifestSha256: sha('d'), integrityProblems: [],
+        }),
+      });
+      await expect(runPreparePromotionSource(argv(['--apply', '--record-out', 'prep.json']), h.deps))
+        .rejects.toThrow(/not the recorded, verified snapshots[\s\S]*manifest sha256 d+ is not the recorded c+/);
+      expect(h.calls).toEqual([]);
+    });
+  });
+
+  describe('checker arguments: --phase dependencies, the mandatory source gate, the pre-cutover re-check', () => {
+    const SHA = (c: string) => c.repeat(64);
+    const SOURCE = ['--phase', 'source', '--database', 'afldb_test'];
+    const GATE = ['--target-dependencies', 'a.json', '--target-dependencies-sha256', SHA('a'),
+      '--preparation-record', 'p.json', '--preparation-record-sha256', SHA('b'), '--source-dependency-proof-out', 'proof.json'];
+    const PROOF = ['--source-dependency-proof', 'proof.json', '--source-dependency-proof-sha256', SHA('c')];
+    const REC = ['--freeze-record', '/home/arm/f.json'];
+    const DEPS = ['--phase', 'dependencies', '--database', 'afldb_prod', '--dependencies-out', 'm.json'];
+
+    it('--phase dependencies reads the live target only and always names its manifest file', () => {
+      expect(parseArgs(DEPS).phase).toBe('dependencies');
+      expect(() => parseArgs(DEPS.slice(0, 4))).toThrow(/Phase 'dependencies' needs --dependencies-out/);
+      expect(() => parseArgs(['--phase', 'dependencies', '--database', 'afldb_test', '--dependencies-out', 'm.json']))
+        .toThrow(/inspects 'afldb_prod' only/);
+      expect(parseArgs(['--environment', 'dev', '--phase', 'dependencies', '--database', 'afldb_dev', '--dependencies-out', 'm.json']).environment)
+        .toBe('dev');
+      expect(parseArgs([...DEPS, ...REC]).freezeRecord).toBe('/home/arm/f.json');
+    });
+
+    it('the frozen re-check under prod needs the freeze record; DEV may re-check unfrozen', () => {
+      expect(() => parseArgs([...DEPS, ...PROOF])).toThrow(/under --environment prod needs --freeze-record/);
+      expect(parseArgs([...DEPS, ...PROOF, ...REC]).sourceDependencyProofSha256).toBe(SHA('c'));
+      expect(parseArgs(['--environment', 'dev', '--phase', 'dependencies', '--database', 'afldb_dev', '--dependencies-out', 'm.json', ...PROOF])
+        .sourceDependencyProof).toBe('proof.json');
+    });
+
+    it('--phase source has no opt-out, in either environment', () => {
+      expect(parseArgs([...SOURCE, ...GATE])).toMatchObject({ targetDependencies: 'a.json', preparationRecord: 'p.json', sourceDependencyProofOut: 'proof.json' });
+      expect(() => parseArgs(SOURCE)).toThrow(/Phase 'source' needs --target-dependencies <manifest A>, [\s\S]*--source-dependency-proof-out <file>/);
+      expect(() => parseArgs(['--environment', 'dev', ...SOURCE])).toThrow(/Phase 'source' needs/);
+      expect(() => parseArgs([...SOURCE, ...GATE.slice(0, 8)])).toThrow(/needs --source-dependency-proof-out <file> \(AFLDB-ISSUE-252\)/);
+      expect(() => parseArgs([...SOURCE, ...GATE.slice(2)])).toThrow(/--target-dependencies and --target-dependencies-sha256 go together/);
+    });
+
+    it('pre-cutover under prod must carry the source proof; DEV opts in', () => {
+      expect(() => parseArgs(['--phase', 'pre-cutover', '--database', 'afldb_prod', ...REC])).toThrow(/needs --source-dependency-proof <file>/);
+      // The freeze is still named first when both are missing.
+      expect(() => parseArgs(['--phase', 'pre-cutover', '--database', 'afldb_prod'])).toThrow(/needs --freeze-record/);
+      expect(parseArgs(['--environment', 'dev', '--phase', 'pre-cutover', '--database', 'afldb_dev']).sourceDependencyProof).toBeUndefined();
+      expect(parseArgs(['--environment', 'dev', '--phase', 'pre-cutover', '--database', 'afldb_dev', ...PROOF]).sourceDependencyProof).toBe('proof.json');
+    });
+
+    it('never silently ignores an ISSUE-252 flag, and validates every sha256', () => {
+      expect(() => parseArgs(['--phase', 'restored', '--database', `${CANDIDATE_PREFIX}1`, '--old-database', 'afldb_prod', ...REC, '--dependencies-out', 'x']))
+        .toThrow(/--dependencies-out is only meaningful with --phase dependencies/);
+      expect(() => parseArgs([...DEPS, ...GATE.slice(0, 4)])).toThrow(/--target-dependencies is only meaningful with --phase source/);
+      expect(() => parseArgs(['--phase', 'candidate', '--database', `${CANDIDATE_PREFIX}1`, ...PROOF]))
+        .toThrow(/only meaningful with --phase dependencies or --phase pre-cutover/);
+      expect(() => parseArgs(['--plan', '--database', `${CANDIDATE_PREFIX}1`, '--old-database', 'afldb_prod', '--pre-cutover-dump', '/home/arm/a.dump',
+        '--rebuilt-dump', '/home/arm/b.dump', '--plan-dir', 'out', ...REC, '--freeze-dump-proof', 'p', '--dependencies-out', 'x']))
+        .toThrow(/--dependencies-out is only meaningful/);
+      expect(() => parseArgs([...SOURCE, ...GATE.slice(0, 2), '--target-dependencies-sha256', 'ZZ'])).toThrow(/64-character lowercase sha256/);
+    });
+  });
+
+  describe('target readers (contract-derived, unqualified, read-only)', () => {
+    const readers = contractFamilyReaders();
+    const f1 = readers.find((r) => r.family === 'F1')!;
+    const f3 = readers.find((r) => r.family === 'F3')!;
+
+    it('F1 reads every brownlow_vote_entry_state row and F3 only data_edits on matches, dangling rows included', () => {
+      expect(readers.map((r) => `${r.family}:${r.table}`).sort()).toEqual(['F1:brownlow_vote_entry_state', 'F3:data_edits']);
+      expect(f1.rowsSql).toContain("'brownlow_vote_entry_state:match_id=' || t.\"match_id\"::text");
+      expect(f1.rowsSql).toMatch(/LEFT JOIN matches m ON m\.id = t\."match_id"/);
+      expect(f1.rowsSql).not.toMatch(/WHERE/);
+      expect(f3.rowsSql).toContain("'data_edits:id=' || t.\"id\"::text");
+      expect(f3.rowsSql).toMatch(/LEFT JOIN matches m ON m\.id = t\."row_id"[\s\S]*WHERE t\."table_name" = 'matches'/);
+      expect(f3.countSql).toMatch(/WHERE t\."table_name" = 'matches'/);
+    });
+
+    it('every reader statement is a SELECT over unqualified tables (the rehearsal reads a schema by search_path)', () => {
+      for (const text of [f1.rowsSql, f1.countSql, f3.rowsSql, f3.countSql, F2_OVERRIDES_SQL, F2_COUNT_SQL, MATCHES_BY_KEY_SQL]) {
+        expect(text.trim()).toMatch(/^SELECT /);
+        expect(text).not.toMatch(/\bpublic\.|\b(INSERT|UPDATE|DELETE|TRUNCATE)\b/);
+      }
+    });
+
+    it('F2 identities come from the override key; a key the target does not hold is indeterminate, never unowned', () => {
+      const readings = f2ReadingsOf([
+        { target_row: 'data_overrides:id=1', entity_type: 'matches', entity_key: KEY },
+        { target_row: 'data_overrides:id=2', entity_type: 'match_coaches', entity_key: `${KEY_B}|carlton` },
+        { target_row: 'data_overrides:id=3', entity_type: 'match_coaches', entity_key: 'undecodable' },
+      ], [{ id: 17795, match_key: KEY, owner_source_id_present: true, owner_source_key: 'afltables' }]);
+      const m = manifestOf(readings);
+      expect(m.dependencies.map((d) => [d.target_row, d.match_keys, d.owner_state])).toEqual([
+        ['data_overrides:id=1', [KEY], 'owned'],
+        ['data_overrides:id=2', [KEY_B], 'indeterminate'],
+        ['data_overrides:id=3', [], 'indeterminate'],
+      ]);
+      const j = judgeSourceDependencies({ manifest: m, sourceMatches: [src(), src({ id: 900002, match_key: KEY_B })] });
+      expect(family(j, 'F2').refusals.map((r) => `${r.target_row}:${r.reason}`)).toEqual([
+        'data_overrides:id=2:target_owner_not_owned', 'data_overrides:id=3:no_identity_in_replaced',
+      ]);
+    });
+
+    it('revalidates each judged family against an independent count(*)', () => {
+      const m = manifestOf([reading()]);
+      expect(familyCountProblems(m, { F1: 1, F2: 0, F3: 0 })).toEqual([]);
+      expect(familyCountProblems(m, { F1: 2, F2: 0, F3: 0 })).toEqual(['F1: 1 dependencies read but count(*) is 2']);
+      expect(familyCountProblems(m, { F1: 1, F2: 0 })).toEqual(['F3: no independent row count was taken']);
+    });
+  });
+
+  describe('the preparation record the proof binds', () => {
+    const record = {
+      kind: PREPARATION_RECORD_KIND, schema_version: PREPARATION_RECORD_SCHEMA_VERSION, prepared_at: '2026-09-28T00:00:00.000Z', season: 2026,
+      source_database: 'afldb_test', writer_role: 'afldb_import', order: ['afltables', 'afl_api'],
+      inputs: [
+        { source: 'afltables', label: PREPARATION.afltables.label, manifest_sha256: PREPARATION.afltables.manifest_sha256,
+          observations_sha256: PREPARATION.afltables.observations_sha256 },
+        { source: 'afl_api', label: PREPARATION.afl_api.label, manifest_sha256: PREPARATION.afl_api.manifest_sha256 },
+      ],
+      steps: RECORD_STEPS,
+      batches: { afltables: 501, afl_api: 502 }, counters: {},
+      ...recordAfltablesResults(),
+    };
+    const parse = (value: unknown) => {
+      const bytes = `${JSON.stringify(value, null, 2)}\n`;
+      return parsePreparationRecord({ bytes, expectedFileSha256: sha256Hex(bytes), expectedSourceDatabase: 'afldb_test' });
+    };
+
+    it('binds the record sha256, both labels and hashes, and both batches', () => {
+      const bytes = `${JSON.stringify(record, null, 2)}\n`;
+      expect(parse(record)).toEqual({ ...PREPARATION, record_sha256: sha256Hex(bytes) });
+    });
+
+    it('refuses a tampered, foreign, reordered or incomplete record', () => {
+      const bytes = JSON.stringify(record);
+      expect(() => parsePreparationRecord({ bytes, expectedFileSha256: 'e'.repeat(64), expectedSourceDatabase: 'afldb_test' }))
+        .toThrow(/Preparation record sha256 .* is not the recorded/);
+      expect(() => parse({ ...record, source_database: 'afldb_dev' })).toThrow(/is for 'afldb_dev', not 'afldb_test'/);
+      expect(() => parse({ ...record, order: ['afl_api', 'afltables'] })).toThrow(/order is/);
+      expect(() => parse({ ...record, steps: record.steps.slice(0, 2) })).toThrow(/committed, complete afl_api apply/);
+      expect(() => parse({ ...record, inputs: [record.inputs[0]] })).toThrow(/both retained inputs/);
+      expect(() => parse({ ...record, kind: 'other' })).toThrow(/Not a preparation record/);
+      expect(() => parse({ ...record, schema_version: 1 })).toThrow(/Unsupported preparation record schema_version 1/);
+    });
+
+    it('Q-252-10: refuses a record missing either AFL Tables result, skipping the closure, or with an unclean closure', () => {
+      expect(() => parse({ ...record, afltables_closure_dry_run: undefined })).toThrow(/does not carry both AFL Tables results/);
+      expect(() => parse({ ...record, afltables_initial_apply: undefined })).toThrow(/does not carry both AFL Tables results/);
+      expect(() => parse({ ...record, steps: [RECORD_STEPS[0], RECORD_STEPS[2], RECORD_STEPS[3]] })).toThrow(/steps are .* not /);
+      expect(() => parse({ ...record, ...recordAfltablesResults({ unresolvedIdentityMatch: 1 }) }))
+        .toThrow(/Q-252-10 contract[\s\S]*afltables closure dry-run: unresolvedIdentityMatch = 1, must be 0/);
+      expect(() => parse({ ...record, ...recordAfltablesResults({ canonicalRowsUpdated: 2 }) }))
+        .toThrow(/afltables closure dry-run: canonicalRowsUpdated = 2, must be 0 \(no canonical mutation\)/);
+      const initial = recordAfltablesResults().afltables_initial_apply;
+      expect(() => parse({ ...record, afltables_initial_apply: { ...initial, counters: { ...initial.counters, venueUnmapped: 1 } } }))
+        .toThrow(/afltables initial apply: venueUnmapped = 1, must be 0/);
+      expect(() => parse({ ...record, afltables_initial_apply: { ...initial, batch_id: '777' } })).toThrow(/initial apply batch is not/);
+    });
+  });
+
+  describe('the gates against in-memory databases (A/P/Q/R and the no-offset rule, DB-free)', () => {
+    type FakeRow = Record<string, unknown>;
+    const readers = contractFamilyReaders();
+    const f1 = readers.find((r) => r.family === 'F1')!;
+    const f3 = readers.find((r) => r.family === 'F3')!;
+    type FakeTarget = {
+      f1?: FakeRow[]; f3?: FakeRow[]; overrides?: FakeRow[]; matches?: FakeRow[];
+      counts?: Partial<Record<'F1' | 'F2' | 'F3', number>>; batches?: number[];
+    };
+    function fakeDb(db: FakeTarget): Query {
+      return async (text, params) => {
+        if (text === f1.rowsSql) return db.f1 ?? [];
+        if (text === f3.rowsSql) return db.f3 ?? [];
+        if (text === f1.countSql) return [{ n: db.counts?.F1 ?? (db.f1 ?? []).length }];
+        if (text === f3.countSql) return [{ n: db.counts?.F3 ?? (db.f3 ?? []).length }];
+        if (text === F2_OVERRIDES_SQL) return db.overrides ?? [];
+        if (text === F2_COUNT_SQL) return [{ n: db.counts?.F2 ?? (db.overrides ?? []).length }];
+        if (text === MATCHES_BY_KEY_SQL) {
+          const keys = params![0] as string[];
+          return (db.matches ?? []).filter((m) => keys.includes(String(m.match_key)));
+        }
+        if (text === DATABASE_OID_SQL) return [{ oid: '16385' }];
+        if (text === PREPARATION_BATCHES_SQL) {
+          const ids = params![0] as number[];
+          return (db.batches ?? []).filter((b) => ids.includes(b)).map((id) => ({ id: String(id) }));
+        }
+        throw new Error(`unexpected SQL: ${text.slice(0, 80)}`);
+      };
+    }
+    const f1Row = (id: number, key: string, owner: string | null = 'afltables') => ({
+      target_row: `brownlow_vote_entry_state:match_id=${id}`, match_key: key, match_present: true,
+      owner_present: owner !== null, owner_key: owner,
+    });
+    const match = (id: number, key: string, owner: string | null = 'afltables') => ({
+      id: String(id), match_key: key, owner_present: owner !== null, owner_key: owner,
+    });
+    // Target ids (17795...) and source ids (900001...) are disjoint: resolution is by match_key alone (I).
+    const TARGET: FakeTarget = {
+      f1: [f1Row(17795, KEY)],
+      f3: [{ target_row: 'data_edits:id=4401', match_key: KEY, match_present: true, owner_present: true, owner_key: 'afltables' }],
+      overrides: [{ target_row: 'data_overrides:id=12', entity_type: 'match_coaches', entity_key: `${KEY}|sydney` }],
+      matches: [match(17795, KEY)],
+    };
+    const SOURCE_DB: FakeTarget = { matches: [match(900001, KEY)], batches: [501, 502] };
+
+    let dir: string;
+    let logSpy: ReturnType<typeof vi.spyOn>;
+    beforeEach(() => {
+      dir = mkdtempSync(join(tmpdir(), 'issue252-gates-'));
+      logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    });
+    afterEach(() => {
+      rmSync(dir, { recursive: true, force: true });
+      logSpy.mockRestore();
+    });
+    const opts = (extra: Partial<Options>): Options => ({
+      environment: 'prod', dsnEnv: 'AFLDB_OWNER_DATABASE_URL', plan: false, checklist: false, allowFixtureIdentities: false, ...extra,
+    });
+
+    async function captureA(target: FakeTarget = TARGET) {
+      const out = join(dir, `a-${Math.random().toString(16).slice(2)}.json`);
+      const report = new Report();
+      await runDependenciesPhase(fakeDb(target), opts({ phase: 'dependencies', database: 'afldb_prod', dependenciesOut: out }), report);
+      return { report, path: out, bytes: existsSync(out) ? readFileSync(out, 'utf8') : '' };
+    }
+
+    async function judge(manifestPath: string, manifestSha: string, source: FakeTarget = SOURCE_DB) {
+      const recordBytes = `${JSON.stringify({
+        kind: PREPARATION_RECORD_KIND, schema_version: PREPARATION_RECORD_SCHEMA_VERSION, prepared_at: PREPARATION.prepared_at,
+        season: 2026, source_database: 'afldb_test',
+        order: ['afltables', 'afl_api'],
+        inputs: [{ source: 'afltables', ...PREPARATION.afltables }, { source: 'afl_api', ...PREPARATION.afl_api }],
+        steps: RECORD_STEPS,
+        batches: PREPARATION.batches,
+        ...recordAfltablesResults(),
+      })}\n`;
+      const recordPath = join(dir, 'prep.json');
+      if (!existsSync(recordPath)) writeFileSync(recordPath, recordBytes, 'utf8');
+      const o = opts({
+        phase: 'source', database: 'afldb_test', targetDependencies: manifestPath, targetDependenciesSha256: manifestSha,
+        preparationRecord: recordPath, preparationRecordSha256: sha256Hex(readFileSync(recordPath, 'utf8')),
+        sourceDependencyProofOut: join(dir, `proof-${Math.random().toString(16).slice(2)}.json`),
+      });
+      const inputs = readSourceDependencyInputs(o);
+      const report = new Report();
+      const gate = await gateSourceDependencies(fakeDb(source), inputs, report);
+      publishSourceDependencyProof(o, inputs, gate, report, '2026-09-28T01:00:00.000Z');
+      const proofBytes = existsSync(o.sourceDependencyProofOut!) ? readFileSync(o.sourceDependencyProofOut!, 'utf8') : null;
+      return { report, gate, proofBytes, proofPath: o.sourceDependencyProofOut! };
+    }
+
+    it('A: --phase dependencies writes a manifest the parser accepts, with every family counted', async () => {
+      const { report, bytes } = await captureA();
+      expect(report.failed).toBe(false);
+      const m = parseDependencyManifest({ bytes, expectedFileSha256: sha256Hex(bytes), expectedEnvironment: 'prod' });
+      expect(m.families).toEqual({ F1: { status: 'judged', rows: 1 }, F2: { status: 'judged', rows: 1 }, F3: { status: 'judged', rows: 1 } });
+      expect(m).toMatchObject({ target_database_oid: 16385, freeze_token: null });
+    });
+
+    it('refuses to publish a manifest whose reader disagrees with count(*), and never overwrites one', async () => {
+      const short = await captureA({ ...TARGET, counts: { F2: 2 } });
+      expect(short.report.failed).toBe(true);
+      expect(short.bytes).toBe('');
+      const out = join(dir, 'exists.json');
+      writeFileSync(out, 'x', 'utf8');
+      await expect(runDependenciesPhase(fakeDb(TARGET), opts({ phase: 'dependencies', database: 'afldb_prod', dependenciesOut: out }), new Report()))
+        .rejects.toThrow(/already exists/);
+    });
+
+    it('M/I: the source gate PASSes by match_key and owner, and only then writes the proof', async () => {
+      const a = await captureA();
+      const { report, proofBytes } = await judge(a.path, sha256Hex(a.bytes));
+      expect(report.failed).toBe(false);
+      expect(report.results.filter((r) => /source dependency gate F[123]/.test(r.gate)).map((r) => r.verdict)).toEqual(['PASS', 'PASS', 'PASS']);
+      const proof = parseSourceDependencyProof({ bytes: proofBytes!, expectedFileSha256: sha256Hex(proofBytes!), expectedEnvironment: 'prod' });
+      expect(proof.preparation.afltables).toEqual(PREPARATION.afltables);
+      expect(proof.families.map((f) => [f.family, f.resolved, f.ownership_matched])).toEqual([['F1', 1, 1], ['F2', 1, 1], ['F3', 1, 1]]);
+    });
+
+    it('N: an afl_api-owned source match refuses owner_mismatch, and no proof is written', async () => {
+      const a = await captureA();
+      const { report, proofBytes } = await judge(a.path, sha256Hex(a.bytes), { ...SOURCE_DB, matches: [match(900001, KEY, 'afl_api')] });
+      expect(report.failed).toBe(true);
+      expect(proofBytes).toBeNull();
+      const f1Gate = report.results.find((r) => /source dependency gate F1/.test(r.gate))!;
+      expect(f1Gate.lines.join('\n')).toMatch(/owner mismatch 1[\s\S]*STOP brownlow_vote_entry_state:match_id=17795: owner_mismatch .*target owner afltables, source owner afl_api/);
+      expect(report.results.find((r) => r.gate === 'Source dependency proof NOT written')).toBeDefined();
+    });
+
+    it('one passing family never offsets another; a missing preparation batch refuses the proof too', async () => {
+      const a = await captureA({ ...TARGET, f1: [f1Row(17796, KEY_B)], matches: [match(17795, KEY), match(17796, KEY_B)] });
+      const { report } = await judge(a.path, sha256Hex(a.bytes));
+      expect(report.results.filter((r) => /source dependency gate F[123]/.test(r.gate)).map((r) => r.verdict)).toEqual(['FAIL', 'PASS', 'PASS']);
+      const b = await captureA();
+      const missingBatch = await judge(b.path, sha256Hex(b.bytes), { ...SOURCE_DB, batches: [501] });
+      expect(missingBatch.report.results.find((r) => /preparation record belongs/.test(r.gate))!.verdict).toBe('FAIL');
+      expect(missingBatch.proofBytes).toBeNull();
+    });
+
+    it('S: --phase source refuses a manifest whose sha256 is not the recorded one, before any database', async () => {
+      const a = await captureA();
+      await expect(judge(a.path, 'f'.repeat(64))).rejects.toThrow(/Dependency manifest file sha256 .* is not the recorded/);
+    });
+
+    it('P: frozen re-check PASSes on an identical set; Q: a new dependency makes the proof stale; R: judging B then STOPs', async () => {
+      const a = await captureA();
+      const { proofBytes } = await judge(a.path, sha256Hex(a.bytes));
+      const proof = parseSourceDependencyProof({ bytes: proofBytes!, expectedFileSha256: sha256Hex(proofBytes!), expectedEnvironment: 'prod' });
+
+      const same = new Report();
+      const bSame = join(dir, 'b-same.json');
+      await runDependenciesPhase(fakeDb(TARGET), opts({ phase: 'dependencies', database: 'afldb_prod', dependenciesOut: bSame }), same, undefined, proof);
+      expect(same.failed).toBe(false);
+      expect(same.results.at(-1)!.gate).toMatch(/frozen dependency re-check/);
+
+      const grown: FakeTarget = { ...TARGET, f3: [...TARGET.f3!, { target_row: 'data_edits:id=4402', match_key: KEY_B, match_present: true, owner_present: true, owner_key: 'afltables' }] };
+      const stale = new Report();
+      const bGrown = join(dir, 'b-grown.json');
+      await runDependenciesPhase(fakeDb(grown), opts({ phase: 'dependencies', database: 'afldb_prod', dependenciesOut: bGrown }), stale, undefined, proof);
+      expect(stale.failed).toBe(true);
+      expect(stale.results.at(-1)!.lines.join('\n')).toMatch(/rerun the source gate against the frozen manifest[\s\S]*STALE/);
+      expect(existsSync(bGrown)).toBe(true); // B is kept: it is the input of the rerun.
+
+      const bBytes = readFileSync(bGrown, 'utf8');
+      const rerun = await judge(bGrown, sha256Hex(bBytes));
+      expect(rerun.report.results.find((r) => /source dependency gate F3/.test(r.gate))!.lines.join('\n'))
+        .toMatch(/STOP data_edits:id=4402: identity_absent_in_candidate match_key 2026\|3\|2026-03-19\|Carlton\|Richmond/);
+      expect(rerun.proofBytes).toBeNull();
+    });
+
+    it('pre-cutover re-derives the frozen set live and refuses a stale proof', async () => {
+      const a = await captureA();
+      const { proofBytes } = await judge(a.path, sha256Hex(a.bytes));
+      const proof = parseSourceDependencyProof({ bytes: proofBytes!, expectedFileSha256: sha256Hex(proofBytes!), expectedEnvironment: 'prod' });
+      const ok = new Report();
+      await gateFrozenDependencyRecheck(fakeDb(TARGET), opts({ phase: 'pre-cutover', database: 'afldb_prod' }), proof, ok);
+      expect(ok.failed).toBe(false);
+      const drift = new Report();
+      await gateFrozenDependencyRecheck(fakeDb({ ...TARGET, f1: [f1Row(17795, KEY, 'afl_api')] }), opts({ phase: 'pre-cutover', database: 'afldb_prod' }), proof, drift);
+      expect(drift.failed).toBe(true);
+    });
+
+    it('the capture is exactly the manifest the phase writes (same bytes up to captured_at)', async () => {
+      const { manifest } = await captureTargetDependencyManifest(fakeDb(TARGET), { environment: 'prod', database: 'afldb_prod', capturedAt: 'x' });
+      const a = await captureA();
+      expect(JSON.parse(a.bytes).dependency_set_sha256).toBe(manifest.dependency_set_sha256);
+    });
+  });
+
+  describe('code_test_db A–V rehearsal harness (DB-free; the rehearsal itself is not run here)', () => {
+    it('covers every case A..T once, plus U (a non-afltables season match refuses preparation) and V (the unproven preview), in order', () => {
+      expect(REHEARSAL_CASES.map((c) => c.id)).toEqual([...'ABCDEFGHIJKLMNOPQRSTUV']);
+      expect(REHEARSAL_CASES.find((c) => c.id === 'U')!.proves).toMatch(/afl_api|non-afltables|already/i);
+      expect(REHEARSAL_CASES.find((c) => c.id === 'V')!.proves).toMatch(/preview[\s\S]*unproven[\s\S]*no preparation record/i);
+      expect(REHEARSAL_CASES.every((c) => c.proves.length > 0)).toBe(true);
+    });
+
+    it('writes code_test_db only, and needs the acknowledgement for anything that writes', () => {
+      expect(SOURCE_DEPENDENCY_REHEARSAL).toMatchObject({ database: 'code_test_db', targetLabel: 'afldb_prod', sourceLabel: 'afldb_test' });
+      expect(parseSourceDependencyRehearsalArgs(['run', '--acknowledge', 'code_test_db', '--out', 'ev'])).toEqual({ step: 'run', out: 'ev' });
+      expect(parseSourceDependencyRehearsalArgs(['residue'])).toEqual({ step: 'residue' });
+      expect(parseSourceDependencyRehearsalArgs(['teardown', '--acknowledge', 'code_test_db'])).toEqual({ step: 'teardown', seasonAsFound: null });
+      expect(parseSourceDependencyRehearsalArgs(['teardown', '--acknowledge', 'code_test_db', '--season-as-found', 's.json']))
+        .toEqual({ step: 'teardown', seasonAsFound: 's.json' });
+      expect(() => parseSourceDependencyRehearsalArgs(['run', '--acknowledge', 'afldb_test', '--out', 'ev'])).toThrow(SourceDependencyRehearsalRefused);
+      expect(() => parseSourceDependencyRehearsalArgs(['run', '--acknowledge', 'code_test_db'])).toThrow(SourceDependencyRehearsalRefused);
+      expect(() => parseSourceDependencyRehearsalArgs(['teardown'])).toThrow(SourceDependencyRehearsalRefused);
+      expect(() => parseSourceDependencyRehearsalArgs(['run', '--acknowledge', 'code_test_db', '--out', 'ev', '--bogus', 'x']))
+        .toThrow(SourceDependencyRehearsalRefused);
+    });
+
+    it('O variants differ from the key in exactly one component each', () => {
+      const variants = oneComponentVariants(KEY);
+      expect(variants.map((v) => v.component)).toEqual(['round', 'date', 'team']);
+      for (const v of variants) {
+        const a = KEY.split('|');
+        const b = v.key.split('|');
+        expect(a.filter((x, i) => x !== b[i])).toHaveLength(1);
+      }
+    });
+
+    it('presents live sessions under the source name only after both answered code_test_db', () => {
+      const real = { control: { database: 'code_test_db', role: 'o' }, writer: { database: 'code_test_db', role: 'i' } } as unknown as
+        Parameters<typeof presentAsPreparedSource>[0];
+      expect(presentAsPreparedSource(real).writer.database).toBe('afldb_test');
+      expect(presentAsPreparedSource(real, 'control').writer.database).toBe('code_test_db');
+      expect(() => presentAsPreparedSource({ ...real, writer: { database: 'afldb_test', role: 'i' } } as typeof real))
+        .toThrow(SourceDependencyRehearsalRefused);
+    });
+  });
+
+  describe('checker wiring (source-pinned)', () => {
+    const checker = readFileSync(join(REPO, 'tools', 'db', 'promotion-check.ts'), 'utf8');
+    const main = checker.slice(checker.indexOf('async function main'));
+
+    it('judges the source only at --phase source, and publishes the proof after every gate and the finally', () => {
+      expect(main).toMatch(/const sourceInputs = phase === 'source' \? readSourceDependencyInputs\(opts\) : undefined;/);
+      const gate = main.indexOf('sourceGate = await gateSourceDependencies(');
+      const fin = main.indexOf('} finally {', gate);
+      const publish = main.indexOf('publishSourceDependencyProof(opts, sourceInputs, sourceGate, report)');
+      expect(gate).toBeGreaterThan(main.indexOf("if (phase === 'source') await gateAflApiG1(conn.q, report);"));
+      expect(fin).toBeGreaterThan(gate);
+      expect(publish).toBeGreaterThan(fin);
+    });
+
+    it('re-checks the frozen set at pre-cutover after the freeze gate, and handles dependencies as its own phase', () => {
+      const frozen = main.indexOf("await gateFrozenTarget(conn.q, `target ${opts.database}`");
+      expect(main.indexOf('if (boundProof) await gateFrozenDependencyRecheck(')).toBeGreaterThan(frozen);
+      expect(main.indexOf("if (phase === 'dependencies') {")).toBeLessThan(main.indexOf('const boundSupersede'));
     });
   });
 });
