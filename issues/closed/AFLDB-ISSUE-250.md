@@ -2,7 +2,7 @@
 
 ## 0. Status
 
-- **OPEN. Severity: High.** Opened 2026-09-26 under operator decision **D-P5-1**, recorded in the
+- **RESOLVED 2026-09-26. Severity: High.** Opened 2026-09-26 under operator decision **D-P5-1**, recorded in the
   AFLDB-ISSUE-238 pass-5 design (`issues/open/AFLDB-ISSUE-238.md` §13.1).
 - **2026-09-26 pass 1: design written** (§4–§13) from read-only repository inspection.
 - **2026-09-26: `afldb-reviewer` design review — PASS WITH MEDIUM/LOW NOTES** (no CRIT/HIGH;
@@ -33,8 +33,28 @@
   3. a **separate operator authorisation for ISSUE-237 L5**.
 
   L5 has NOT run. It runs the freeze-bound procedure (`docs/production-promotion.md` §4.0–§10).
-- **Next action:** the merged ISSUE-250 code on the PROD checkout; verify the deployed
-  revision/code identity; then the separately authorised ISSUE-237 L5.
+- **2026-09-26: RESOLVED.** The merged code (`26751ad6`) is deployed on the real PROD checkout at
+  revision `ce1bc1e1e5e0c3b577dd70cf1e73ba0cd31f35fe`. The first real ISSUE-237 L5 attempt
+  (promotion stamp `20260926-213225`) exercised the ISSUE-250 mechanism on PROD itself: writers
+  stopped; token-bound freeze succeeded (target OID `35594`); quiescence proved; F0 recorded over
+  36 production-owned tables / 61,732 rows, digest
+  `4255d4c243533293600cae415d62511ceb049c4cfbf0d32b92f67548f5cc2b70`; a fresh authoritative frozen
+  PROD dump was taken only after F0 (sha256
+  `12b9d0e83ce796c3e789fb312652cab306e7ef8ec7b5fdb6432173ba98869329`); restore-test passed; the
+  freeze-dump proof passed and proved the restored dump exactly equals F0; the off-host copy hash
+  matched; pre-cutover repeatedly proved the target still equal to F0; the later restored gate
+  again proved the live target frozen/quiescent/equal to F0. The promotion then stopped for the
+  unrelated AFLDB-ISSUE-251 defect before reinstatement or swap. Token-bound unfreeze succeeded:
+  `--freeze-status` showed the original PROD database open and writable with no marker,
+  `afldb.service` restarted active, health returned OK/database OK, and the settle timer/service
+  remained inactive throughout. No ISSUE-250 defect was observed in the real PROD execution.
+  The absence of a PROD swap is not an ISSUE-250 blocker: guarded swap, production acceptance and
+  rollback were already exercised end-to-end in the accepted §17 DEV rehearsal, and §13's
+  acceptance criteria do not require a successful unrelated L5 promotion as a resolution
+  condition. §13 is therefore satisfied by the DEV rehearsal plus this real PROD freeze/unfreeze
+  execution. See ISSUE-251 for the still-open blocker on a completed L5.
+- **Next action:** none for ISSUE-250. The follow-on work (a completely fresh, separately
+  authorised ISSUE-237 L5) is tracked under AFLDB-ISSUE-251.
 
 ## 1. Symptom
 
@@ -813,3 +833,12 @@ Established before the ISSUE-250 local commit; nothing was re-run for the commit
   ancestor). Not pushed, not deployed. Still OPEN: the PROD checkout, deployed revision/code
   identity verification and the separately authorised ISSUE-237 L5 remain. L5 NOT RUN. PROD
   never contacted.
+- **2026-09-26: RESOLVED.** The merged code is confirmed deployed on the real PROD checkout at
+  `ce1bc1e1e5e0c3b577dd70cf1e73ba0cd31f35fe`. The first real ISSUE-237 L5 attempt (stamp
+  `20260926-213225`) exercised the full freeze mechanism against real PROD — freeze, quiescence
+  proof, F0 digest, authoritative dump proof, restore-test, off-host copy verification, repeated
+  pre-cutover/restored re-proofs against F0, and a clean token-bound unfreeze with a healthy
+  restarted service — before stopping for the unrelated AFLDB-ISSUE-251 defect. §13's acceptance
+  criteria were met by the §17 DEV rehearsal together with this real PROD execution; no ISSUE-250
+  defect was observed on PROD. AFLDB-ISSUE-251 tracks the remaining work to complete a full L5
+  promotion.

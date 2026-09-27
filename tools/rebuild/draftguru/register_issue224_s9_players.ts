@@ -56,9 +56,58 @@
  * unless ALL of `--dev-import-role`, `--allow-dev-write` and `--backup-sha256 <64-hex>` are
  * also present (the explicit DEV write authorisation gate, ISSUE-224 S9 unblock) — see
  * `parseArgs`. Absent that full combination, DEV stays a read-only preflight census exactly as
- * before. There is no PROD target: `resolveTarget()` recognises exactly `test` -> afldb_test and
- * `dev` -> afldb_dev, and refuses a DSN whose path is not exactly that database name (and,
- * belt-and-braces, anything that looks like a prod name).
+ * before. `resolveTarget()` recognises exactly `test` -> afldb_test and `dev` -> afldb_dev, and
+ * refuses a DSN whose path is not exactly that database name (and, belt-and-braces, anything
+ * that looks like a prod name); it is never called with `prod` from `main()`.
+ *
+ * PROD (AFLDB-ISSUE-251)
+ * -----------------------
+ * PROD is a SEPARATE, more strongly guarded mode, not a third value bolted onto the DEV gate:
+ * `resolveProdTarget()`/`resolveProdAuthTarget()` are distinct functions from `resolveTarget()`,
+ * never call `assertNotProdLike()` (this connection is deliberately PROD), and open two
+ * PROD-only DSNs that exist for no other target: `AFLDB_PROD_IMPORT_DATABASE_URL` (`afldb_import`,
+ * the write transaction) and `AFLDB_PROD_AUTH_DATABASE_URL` (`afldb_auth`, a brief read-only
+ * connection used ONLY for an early, informational preflight of the selected attribution actor —
+ * `afldb_import` holds no general `SELECT` on `auth_users`, so this preflight cannot itself be the
+ * authoritative check; see the next paragraph for how the actor is actually re-verified inside the
+ * write transaction).
+ *
+ * `--target prod` always requires `--prod-import-role` (there is no reduced-privilege PROD
+ * connection in this tool). `--target prod --apply` additionally requires ALL of
+ * `--allow-prod-write`, `--backup-sha256 <64-hex>`, `--expected-host <hostname>` and
+ * `--expected-revision <40-hex git sha>` — checked, together with the running host and checkout
+ * revision, BEFORE any PROD database connection is opened (`assertProdBoundary`: the running host
+ * must be the pinned `PROD_HOSTNAME` literal AND `--expected-host` must independently name that
+ * same literal — an operator cannot satisfy this by pointing both at some other machine's own
+ * hostname). Immediately after `assertProdBoundary`, still before any PROD connection opens,
+ * `assertProdCheckoutIntegrity` closes a review finding against `--expected-revision` alone: it
+ * proves zero tracked drift against HEAD (`git diff HEAD --quiet --exit-code --`, covering
+ * unstaged/staged modifications and deletions/renames of tracked paths) and that every untracked
+ * file matches exactly `docs/rebuild-manifests/afltables_fitzroy_core/settle-*.json` — the
+ * operational settle manifests a real PROD checkout legitimately carries untracked — refusing on
+ * anything else untracked, on any git invocation failure, and when the checkout is not proven to
+ * be the repository containing the running tool itself. `--name-parts` is refused outright for
+ * `--target prod`: PROD always loads and
+ * hash-pins the SAME tracked `docs/rebuild-manifests/draftguru/issue224-s9-name-parts-20260922.json`
+ * artefact DEV/test may optionally override; no alternate file is ever accepted. The selected
+ * `--admin-user-id` must name a real, enabled, fully-enrolled `super_admin`
+ * (`isViableSuperAdmin`, `src/lib/auth/admin-lifecycle.ts`) checked twice: once as an
+ * informational preflight (`assertViableProdActor`, against a brief pre-transaction
+ * `AFLDB_PROD_AUTH_DATABASE_URL` read) and, authoritatively, again inside the write transaction
+ * itself as its first act (`assertViableActorInTransaction`, calling migration 105's
+ * `SECURITY DEFINER public.assert_viable_super_admin_actor()`, which also refuses a reserved
+ * fixture/example email domain and holds a `FOR SHARE` row lock on the actor until that same
+ * transaction commits) — this alone excludes every fixture/recovery actor this codebase creates,
+ * which is always disabled with no password/TOTP (`insertAttributionOnlyActor`,
+ * `tools/migration/rebuild_manual_registrations.ts`). PROD's first-adoption apply requires the
+ * exact classification shape CREATE=92/ALREADY_SATISFIED=0/CONFLICT=0
+ * (`assertExactFirstApplyShape`, shared with DEV) and, before COMMIT, both the shared
+ * `runDevPostWriteChecks` battery (now target-independent — DEV and PROD both run it) AND a
+ * PROD-only proof that adoption created no `afl_api` identity (`assertNoAflApiIdentityWritten`).
+ * The write itself is `runProdAdoptionWrite`, exported so an isolated rehearsal against a
+ * disposable database (never the retained PROD candidate, never `afldb_prod`) can exercise the
+ * exact same mutation code without going through `resolveProdTarget()`'s hard `afldb_prod` name
+ * check — see `tools/rebuild/draftguru/issue251_prod_rehearsal.ts`.
  *
  * A DEV apply additionally requires, inside the same write transaction and before any row is
  * written, that re-classification against live `afldb_dev` state come back exactly
@@ -76,8 +125,10 @@
  * Usage
  * -----
  *   npx tsx --conditions=react-server tools/rebuild/draftguru/register_issue224_s9_players.ts \
- *     --admin-user-id <n> [--target test|dev] [--dev-import-role] [--apply] \
- *     [--allow-dev-write] [--backup-sha256 <64-hex>] [--name-parts <path>]
+ *     --admin-user-id <n> [--target test|dev|prod] [--dev-import-role] [--apply] \
+ *     [--allow-dev-write] [--backup-sha256 <64-hex>] [--name-parts <path>] \
+ *     [--prod-import-role] [--allow-prod-write] [--expected-host <hostname>] \
+ *     [--expected-revision <40-hex-git-sha>]
  *
  * `--conditions=react-server` is required (matches `match:backtest` / `records:first-kick-goal`
  * in package.json): every canonical primitive this tool imports carries `import 'server-only'`,
@@ -101,8 +152,10 @@
  * full combination, `--target dev` remains a read-only preflight census exactly as before.
  */
 
+import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
+import { hostname } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -110,6 +163,9 @@ import postgres from 'postgres';
 
 import { attachAflTablesIdentityInTransaction } from '@/db/queries/admin-draft';
 import { createPlayerInTransaction, type CreatePlayerInput } from '@/db/queries/players';
+import {
+  isActive, isLifecycleRole, isViableSuperAdmin, type LifecycleAccountState,
+} from '@/lib/auth/admin-lifecycle';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(__dirname, '..', '..', '..');
@@ -120,6 +176,14 @@ const DEFAULT_TARGET_SET_PATH = join(
 const DEFAULT_DECISION_PATH = join(
   REPO_ROOT, 'docs', 'rebuild-manifests', 'draftguru', 'issue224-d7-registration-decision-20260922.json',
 );
+/**
+ * PROD's ONLY accepted `--name-parts` source (AFLDB-ISSUE-251 D-251-5). PROD never takes a
+ * `--name-parts` CLI argument (`parseArgs` refuses it outright for `--target prod`); this tracked
+ * path and its pinned hash are the sole input `loadPinnedProdNameParts` will ever read.
+ */
+const PROD_NAME_PARTS_PATH = join(
+  REPO_ROOT, 'docs', 'rebuild-manifests', 'draftguru', 'issue224-s9-name-parts-20260922.json',
+);
 
 // Pinned by the operator brief (ISSUE-224 D-7/D-8, 2026-09-22). A byte change in either
 // retained artefact refuses this tool before any database connection is opened.
@@ -127,6 +191,14 @@ const PINNED_TARGET_SET_SHA256 =
   'e087baf706effdda8034a37cc184311687dee3c49f3e3e23a1e746beb347dcb0';
 const PINNED_DECISION_SHA256 =
   'a795c987ca62cf879cb2ecc3bb61d9e1533eae84882956c442ff252de307be3d';
+/**
+ * Pinned by AFLDB-ISSUE-251 (D-251-5), calculated from the currently tracked
+ * `issue224-s9-name-parts-20260922.json` (`sha256sum` of the file as tracked at implementation
+ * time). A byte change refuses PROD mode before any database connection is opened; it never
+ * affects test/DEV, which may still pass an arbitrary `--name-parts` file.
+ */
+const PINNED_PROD_NAME_PARTS_SHA256 =
+  'f93d19b1e8cd7cb63917178f9576b5fc4a382b8acaed316d53305ff555db9f41';
 
 export const EXPECTED_ROW_COUNT = 92;
 
@@ -251,6 +323,24 @@ export function loadNameParts(path: string): Map<string, NameParts & { displayNa
     });
   }
   return out;
+}
+
+/**
+ * AFLDB-ISSUE-251 D-251-5. PROD's only accepted name-parts source: the SAME tracked artefact
+ * DEV/test may optionally pass by path, but here read from a fixed path and hash-pinned. There is
+ * no `path` parameter — an alternate file is not a shape this function can express, by design.
+ */
+export function loadPinnedProdNameParts(): Map<string, NameParts & { displayName: string }> {
+  const bytes = readFileSync(PROD_NAME_PARTS_PATH);
+  const observed = sha256(bytes);
+  if (observed !== PINNED_PROD_NAME_PARTS_SHA256) {
+    throw new Error(
+      `PROD name-parts sha256 mismatch (observed ${observed}, expected `
+      + `${PINNED_PROD_NAME_PARTS_SHA256}); the tracked artefact has changed since it was approved `
+      + 'for PROD adoption. Nothing has been read as authoritative.',
+    );
+  }
+  return loadNameParts(PROD_NAME_PARTS_PATH);
 }
 
 export function loadAndValidateArtefacts(
@@ -397,7 +487,7 @@ export function loadAndValidateArtefacts(
 // Classification (Task 3: CREATE / ALREADY_SATISFIED / CONFLICT)
 // ---------------------------------------------------------------------------
 
-type Classification =
+export type Classification =
   | { kind: 'CREATE'; target: Target }
   | { kind: 'ALREADY_SATISFIED'; target: Target; playerId: number }
   | { kind: 'CONFLICT'; target: Target; detail: string };
@@ -515,6 +605,30 @@ async function classify(
   return results;
 }
 
+/**
+ * The deliberate first-apply gate (Task 3 for DEV; AFLDB-ISSUE-251 §7 for PROD): re-classification
+ * inside the write transaction must come back exactly CREATE=92/ALREADY_SATISFIED=0/CONFLICT=0 or
+ * the whole batch refuses and rolls back. A plain "no CONFLICT" check is not sufficient for a
+ * first-adoption apply — any ALREADY_SATISFIED means live state has moved since the read-only
+ * preflight (or this is a retry that is not automatically accepted; ISSUE-251 §10 prefers refusal
+ * over heuristic recovery) and this exact batch is no longer safe to apply blind. Shared so DEV and
+ * PROD cannot drift onto two different first-apply shapes.
+ */
+export function assertExactFirstApplyShape(classification: Classification[], label: string): void {
+  const createCount = classification.filter((c) => c.kind === 'CREATE').length;
+  const satisfiedCount = classification.filter((c) => c.kind === 'ALREADY_SATISFIED').length;
+  const conflictCount = classification.filter((c) => c.kind === 'CONFLICT').length;
+  if (createCount !== EXPECTED_ROW_COUNT || satisfiedCount !== 0 || classification.length !== EXPECTED_ROW_COUNT) {
+    throw new Error(
+      `REFUSED: ${label} apply requires exactly CREATE=${EXPECTED_ROW_COUNT}, ALREADY_SATISFIED=0, `
+      + `CONFLICT=0 (observed CREATE=${createCount}, ALREADY_SATISFIED=${satisfiedCount}, `
+      + `CONFLICT=${conflictCount}, TOTAL=${classification.length}); state has drifted since the `
+      + 'read-only preflight, or this is a retry that is not automatically accepted. Nothing has '
+      + 'been written.',
+    );
+  }
+}
+
 function printReport(classification: Classification[], heading: string, warnings: string[] = []): void {
   const create = classification.filter((c) => c.kind === 'CREATE');
   const satisfied = classification.filter((c) => c.kind === 'ALREADY_SATISFIED');
@@ -541,7 +655,7 @@ function printReport(classification: Classification[], heading: string, warnings
 // Database targets — closed list, no PROD entry (Task boundaries)
 // ---------------------------------------------------------------------------
 
-export type TargetName = 'test' | 'dev';
+export type TargetName = 'test' | 'dev' | 'prod';
 
 type TargetConfig = {
   dsn: string;
@@ -600,11 +714,419 @@ export function resolveTarget(target: TargetName, devImportRole: boolean, writeA
 }
 
 // ---------------------------------------------------------------------------
-// DEV post-write integrity checks (Task 5) — run inside the write transaction,
+// PROD target resolution (AFLDB-ISSUE-251) — deliberately separate from
+// resolveTarget()/assertNotProdLike() above, not a third branch bolted onto it.
+// Two distinct PROD-only DSNs exist for no other target: the write role
+// (AFLDB_PROD_IMPORT_DATABASE_URL, afldb_import) and a brief read-only
+// attribution-actor check (AFLDB_PROD_AUTH_DATABASE_URL, afldb_auth — the only
+// role in this codebase granted SELECT on auth_users; see migration 023).
+// ---------------------------------------------------------------------------
+
+/** The write connection. Never routes through resolveTarget/assertNotProdLike: this IS prod. */
+export function resolveProdTarget(writeAuthorized: boolean): TargetConfig {
+  const dsn = process.env.AFLDB_PROD_IMPORT_DATABASE_URL;
+  if (!dsn) throw new Error('AFLDB_PROD_IMPORT_DATABASE_URL is not set.');
+  const path = new URL(dsn).pathname.replace(/^\//, '');
+  if (path !== 'afldb_prod') {
+    throw new Error(`AFLDB_PROD_IMPORT_DATABASE_URL does not target /afldb_prod (observed /${path}).`);
+  }
+  return writeAuthorized
+    ? { dsn, requiredDatabase: 'afldb_prod', requiredUser: 'afldb_import', readOnly: false, canApply: true }
+    : { dsn, requiredDatabase: 'afldb_prod', requiredUser: 'afldb_import', readOnly: true, canApply: false };
+}
+
+export type ProdAuthTargetConfig = { dsn: string; requiredDatabase: string; requiredUser: string };
+
+/**
+ * The brief, INFORMATIONAL pre-write attribution-actor read (AFLDB-ISSUE-251 finding).
+ * `afldb_import` (the write role above) holds no general SELECT on `auth_users` (migration 023
+ * grants that table only to `afldb_auth`), so this connection exists only to give an operator a
+ * fast, friendly refusal for an obviously-wrong actor before any write connection is even opened.
+ * It is NOT how the actor is authoritatively verified: the write transaction itself re-reads and
+ * re-asserts the SAME actor id as its first act, via `assertViableActorInTransaction`, which calls
+ * migration 105's `SECURITY DEFINER public.assert_viable_super_admin_actor()` — a function
+ * `afldb_import` IS granted `EXECUTE` on, without ever being granted `SELECT` on `auth_users`
+ * itself. That in-transaction call is what row-locks the actor (`FOR SHARE`) for the remaining
+ * lifetime of the write transaction, so this preflight's result is discarded rather than passed
+ * to the write (`runProdAdoptionWrite` takes only `adminUserId`, never a pre-fetched row).
+ */
+export function resolveProdAuthTarget(): ProdAuthTargetConfig {
+  const dsn = process.env.AFLDB_PROD_AUTH_DATABASE_URL;
+  if (!dsn) throw new Error('AFLDB_PROD_AUTH_DATABASE_URL is not set.');
+  const path = new URL(dsn).pathname.replace(/^\//, '');
+  if (path !== 'afldb_prod') {
+    throw new Error(`AFLDB_PROD_AUTH_DATABASE_URL does not target /afldb_prod (observed /${path}).`);
+  }
+  return { dsn, requiredDatabase: 'afldb_prod', requiredUser: 'afldb_auth' };
+}
+
+/** Exactly 40 lowercase hex characters: a git commit SHA-1 as `git rev-parse HEAD` prints it. */
+export const PROD_REVISION_RE = /^[0-9a-f]{40}$/;
+
+/**
+ * The repository/operator-defined PROD hostname (AFLDB-ISSUE-251 finding). Hard-pinned rather
+ * than merely compared against whatever `--expected-host` says: `actual.host === args.expectedHost`
+ * alone would let an operator running this tool on ANY other machine supply that same machine's
+ * own hostname as `--expected-host` and pass, since the two sides of that comparison can be set by
+ * the same person in the same command. Pinning one side to a literal closes that: a non-PROD
+ * machine is refused regardless of what `--expected-host` claims, and `--expected-host` itself must
+ * separately equal the same literal, so the two facts an operator could otherwise conflate are
+ * checked against a shared, unmovable reference rather than against each other.
+ */
+export const PROD_HOSTNAME = 'afldb-prod';
+
+/**
+ * Runs `git <args>` with `cwd` fixed to `repoRoot` (never the inherited process CWD) via a direct
+ * process invocation — an argv array, no shell, nothing interpolated into a command string
+ * (AFLDB-ISSUE-251 checkout-integrity finding). Fails closed: any non-zero exit or spawn failure
+ * (git missing, not a git repository, etc.) throws rather than returning a partial/empty result.
+ */
+function runGit(args: readonly string[], repoRoot: string): Buffer {
+  const result = spawnSync('git', args, { cwd: repoRoot, stdio: ['ignore', 'pipe', 'ignore'] });
+  if (result.error || result.status !== 0 || result.stdout === null) {
+    throw new Error(
+      `REFUSED: 'git ${args.join(' ')}' failed (status=${String(result.status)}). Nothing has `
+      + 'been written.',
+    );
+  }
+  return result.stdout;
+}
+
+function gitRevision(repoRoot: string): string {
+  return runGit(['rev-parse', 'HEAD'], repoRoot).toString('utf8').trim();
+}
+
+/**
+ * The PROD boundary checks that need no database connection (AFLDB-ISSUE-251 §6): the running
+ * host must be the exact PROD host, the operator's `--expected-host` must independently name that
+ * same exact PROD host, and the checked-out revision must equal exactly what the operator
+ * supplied. Deliberately DB-free and run BEFORE any PROD connection opens. `actual` is injectable
+ * so DB-free tests never depend on the real machine's hostname or this exact checkout's revision.
+ */
+export function assertProdBoundary(
+  args: Pick<Args, 'expectedHost' | 'expectedRevision'>,
+  actual: { host: string; revision: string } = { host: hostname(), revision: gitRevision(REPO_ROOT) },
+): void {
+  if (actual.host !== PROD_HOSTNAME) {
+    throw new Error(
+      `REFUSED: running host '${actual.host}' is not the production host '${PROD_HOSTNAME}'. A `
+      + 'user-supplied --expected-host can never make a non-production host sufficient. Nothing '
+      + 'has been written.',
+    );
+  }
+  if (args.expectedHost !== PROD_HOSTNAME) {
+    throw new Error(
+      `REFUSED: --expected-host '${String(args.expectedHost)}' does not equal the production host `
+      + `'${PROD_HOSTNAME}'. Nothing has been written.`,
+    );
+  }
+  if (actual.revision !== args.expectedRevision) {
+    throw new Error(
+      `REFUSED: checkout revision '${actual.revision}' does not match --expected-revision `
+      + `'${String(args.expectedRevision)}'. Nothing has been written.`,
+    );
+  }
+}
+
+/**
+ * The exact untracked-path family a PROD apply tolerates without treating the checkout as dirty
+ * (AFLDB-ISSUE-251 checkout-integrity finding): the operational settle manifests a real PROD
+ * checkout legitimately, deliberately leaves untracked. Narrow by construction — exactly this
+ * directory, a `settle-` prefix, a `.json` suffix, no further path segments — so nothing else
+ * under `docs/` (another JSON file, a script, a source file, an alternate manifest directory, a
+ * temporary or generated file, arbitrary evidence) can slip through as "an established exception".
+ */
+export const PROD_ALLOWED_UNTRACKED_RE =
+  /^docs\/rebuild-manifests\/afltables_fitzroy_core\/settle-[^/]+\.json$/;
+
+/**
+ * The raw git facts the checkout-integrity boundary judges. Injectable so DB-free tests never
+ * depend on this session's own (currently dirty) ISSUE-251 development worktree — see
+ * `judgeCheckoutIntegrity` (the pure judgment) vs `gatherCheckoutIntegrityFacts` (the real git
+ * invocations that produce this shape).
+ */
+export type CheckoutIntegrityFacts = {
+  /**
+   * True iff `git rev-parse --show-toplevel`, invoked with `cwd` fixed to the running tool's own
+   * `REPO_ROOT` (never the inherited process CWD), succeeded AND its answer resolves (via
+   * `realpathSync`, so symlinks/case/short-path differences never cause a false mismatch) to that
+   * same `REPO_ROOT` — i.e. this check is proven to run against the repository containing the tool
+   * that is running it, not whatever repository a stray inherited CWD happened to point at.
+   */
+  isOwnRepoToplevel: boolean;
+  /**
+   * True iff `git diff HEAD --quiet --exit-code --` reports zero differences. A diff against a
+   * commit (rather than against the index) covers unstaged modifications, staged modifications,
+   * deletions, and additions/renames of tracked paths in one single comparison against HEAD.
+   */
+  hasNoTrackedDrift: boolean;
+  /**
+   * Repo-root-relative, forward-slash untracked paths from
+   * `git ls-files --others --exclude-standard -z`, parsed as NUL-delimited data — never
+   * whitespace-split, so a path containing a space or other unusual character is never misparsed.
+   */
+  untrackedPaths: string[];
+};
+
+/**
+ * The pure checkout-integrity judgment (AFLDB-ISSUE-251 finding): `--expected-revision` alone
+ * pins HEAD but proves nothing about tracked drift or unexpected untracked files, so a PROD
+ * `--apply` could previously execute against a checkout that merely happened to share HEAD's
+ * commit hash while carrying uncommitted local changes. Takes no git action itself — every branch
+ * here is exercised by DB-free tests against hand-built facts, never this (or any) real worktree's
+ * actual state. Does not repeat `assertProdBoundary`'s host/revision checks; it runs immediately
+ * after that check and assumes it already passed.
+ */
+export function judgeCheckoutIntegrity(facts: CheckoutIntegrityFacts): void {
+  if (!facts.isOwnRepoToplevel) {
+    throw new Error(
+      "REFUSED: this checkout's git toplevel does not resolve to the directory containing the "
+      + 'running tool itself (or this is not a git repository at all). Nothing has been written.',
+    );
+  }
+  if (!facts.hasNoTrackedDrift) {
+    throw new Error(
+      'REFUSED: tracked working-tree drift detected relative to HEAD (an unstaged modification, a '
+      + 'staged modification, a deletion, or an addition/rename of a tracked path). A PROD apply '
+      + 'requires an exact, unmodified checkout of --expected-revision. Nothing has been written.',
+    );
+  }
+  const unexpected = facts.untrackedPaths.filter((p) => !PROD_ALLOWED_UNTRACKED_RE.test(p));
+  if (unexpected.length > 0) {
+    throw new Error(
+      'REFUSED: unexpected untracked file(s) present in the checkout: '
+      + `${unexpected.join(', ')}. The only untracked paths a PROD apply permits are the `
+      + 'operational settle manifests matching exactly '
+      + 'docs/rebuild-manifests/afltables_fitzroy_core/settle-*.json. Nothing has been written.',
+    );
+  }
+}
+
+function normalizeRealpathForComparison(p: string): string {
+  const trimmed = p.replace(/[\\/]+$/, '');
+  return process.platform === 'win32' ? trimmed.toLowerCase() : trimmed;
+}
+
+/**
+ * Gathers the real git facts `judgeCheckoutIntegrity` judges, entirely via direct `git` process
+ * invocation (`runGit`: argv arrays, no shell, nothing interpolated into a command string) with
+ * `cwd` always fixed to `repoRoot`. Any git invocation failure (not a git repository, git missing,
+ * an unexpected exit status) throws, which is fail-closed: the caller never receives a
+ * "successful" but meaningless facts object.
+ */
+export function gatherCheckoutIntegrityFacts(repoRoot: string): CheckoutIntegrityFacts {
+  const toplevel = runGit(['rev-parse', '--show-toplevel'], repoRoot).toString('utf8').trim();
+  const isOwnRepoToplevel = normalizeRealpathForComparison(realpathSync.native(toplevel))
+    === normalizeRealpathForComparison(realpathSync.native(repoRoot));
+
+  const diffResult = spawnSync('git', ['diff', 'HEAD', '--quiet', '--exit-code', '--'], {
+    cwd: repoRoot, stdio: ['ignore', 'ignore', 'ignore'],
+  });
+  if (diffResult.error || (diffResult.status !== 0 && diffResult.status !== 1)) {
+    throw new Error(
+      "REFUSED: 'git diff HEAD --quiet --exit-code --' failed "
+      + `(status=${String(diffResult.status)}). Nothing has been written.`,
+    );
+  }
+  const hasNoTrackedDrift = diffResult.status === 0;
+
+  const lsFilesOut = runGit(['ls-files', '--others', '--exclude-standard', '-z'], repoRoot);
+  const untrackedPaths = lsFilesOut.toString('utf8').split('\0').filter((p) => p.length > 0);
+
+  return { isOwnRepoToplevel, hasNoTrackedDrift, untrackedPaths };
+}
+
+/**
+ * The full checkout-integrity boundary (AFLDB-ISSUE-251 finding). DB-free, and run in `runProdMain`
+ * immediately after `assertProdBoundary`, BEFORE any PROD database connection opens. `repoRoot`
+ * defaults to this file's own `REPO_ROOT` so the real PROD CLI path never has to supply it;
+ * `facts` defaults to the real `gatherCheckoutIntegrityFacts(repoRoot)` — both are overridable so
+ * tests can inject hand-built facts instead of depending on this (or any) real worktree.
+ */
+export function assertProdCheckoutIntegrity(
+  repoRoot: string = REPO_ROOT,
+  facts: CheckoutIntegrityFacts = gatherCheckoutIntegrityFacts(repoRoot),
+): void {
+  judgeCheckoutIntegrity(facts);
+}
+
+/** The attribution-actor row read from `AFLDB_PROD_AUTH_DATABASE_URL`. Never carries a secret. */
+export type ProdActorRow = {
+  id: number; role: string; isActive: boolean; hasPassword: boolean; hasTotp: boolean;
+};
+
+/**
+ * The read-only, pre-transaction eligibility check against `isViableSuperAdmin`
+ * (`src/lib/auth/admin-lifecycle.ts`) — enabled, `super_admin`, both credentials enrolled. This
+ * alone excludes every fixture/recovery actor this codebase creates (`insertAttributionOnlyActor`,
+ * `tools/migration/rebuild_manual_registrations.ts`, always disabled with NULL password/TOTP), so
+ * there is no separate "is this a recovery actor" check to maintain in parallel.
+ *
+ * INFORMATIONAL ONLY (AFLDB-ISSUE-251 §6 finding). This runs once against the brief
+ * `AFLDB_PROD_AUTH_DATABASE_URL` read, before the write transaction opens, purely so an operator
+ * gets a fast, friendly refusal without a write connection ever being made. It is NOT the
+ * write-boundary authority and does not by itself satisfy AFLDB-ISSUE-251's requirement that the
+ * actor be re-read authoritatively inside the same transaction as the writes: that authority is
+ * `assertViableActorInTransaction` below, which calls the `SECURITY DEFINER`
+ * `public.assert_viable_super_admin_actor()` (migration 105) as the write transaction's first act.
+ * It also does not apply the fixture-domain refusal the database function does, since this JS
+ * predicate has no email to inspect — the auth DSN read never selects `email` — the exact
+ * asymmetry that made the old approximation insufficient.
+ */
+export function assertViableProdActor(actor: ProdActorRow | undefined): asserts actor is ProdActorRow {
+  if (!actor) {
+    throw new Error('REFUSED: --admin-user-id names no auth_users row. Nothing has been written.');
+  }
+  if (!isLifecycleRole(actor.role)) {
+    throw new Error(
+      `REFUSED: admin-user-id ${actor.id} carries role '${actor.role}', which is not a recognised `
+      + 'lifecycle role. Nothing has been written.',
+    );
+  }
+  const state: LifecycleAccountState = {
+    id: actor.id,
+    role: actor.role,
+    disabledAt: actor.isActive ? null : new Date(0),
+    hasPassword: actor.hasPassword,
+    hasTotp: actor.hasTotp,
+    canManageAdmins: false,
+  };
+  if (!isViableSuperAdmin(state)) {
+    throw new Error(
+      `REFUSED: admin-user-id ${actor.id} is not a viable PROD super_admin (role=${actor.role}, `
+      + `active=${isActive(state)}, hasPassword=${actor.hasPassword}, hasTotp=${actor.hasTotp}). PROD `
+      + 'adoption requires an enabled, fully-enrolled super_admin — never a disabled, unenrolled, '
+      + 'lower-privileged, fixture or recovery actor. Nothing has been written.',
+    );
+  }
+}
+
+/**
+ * THE write-boundary authority (AFLDB-ISSUE-251 finding). Calls `public.assert_viable_super_admin_actor`
+ * (migration 105) — a `SECURITY DEFINER` function owned by `afldb_owner`, granted `EXECUTE` to
+ * `afldb_import` alone — inside the caller's OWN transaction, on the same connection that will
+ * perform the 92 registration writes. That function re-reads `auth_users` for the given id
+ * (`afldb_import` itself has no `SELECT` there; migration 023), applies exactly
+ * `isViableSuperAdmin`'s four conditions plus the production fixture-domain refusal, and takes a
+ * `FOR SHARE` row lock held until the SAME transaction commits or rolls back — so nothing can
+ * disable, demote or un-enrol this actor between this call and the caller's COMMIT. It raises
+ * (rejecting this promise) and writes nothing on refusal; the exception message never leaves this
+ * function undisturbed, so a caller that does not catch it aborts the whole transaction before any
+ * of the 92 rows is written.
+ *
+ * This must be the very first statement `runProdAdoptionWrite` executes against `tx`, before
+ * `classify()` and before any `createPlayerInTransaction`/`attachAflTablesIdentityInTransaction`
+ * call — see that function below.
+ */
+export async function assertViableActorInTransaction(
+  tx: postgres.TransactionSql, actorId: number,
+): Promise<void> {
+  await tx`SELECT public.assert_viable_super_admin_actor(${actorId})`;
+}
+
+/**
+ * AFLDB-ISSUE-251 §5/§8: adoption must write no `afl_api` external identity. Structurally this
+ * code never touches the `afl_api` source at all, but this proves it for the exact 92 newly
+ * created players rather than resting on that alone.
+ */
+export async function assertNoAflApiIdentityWritten(
+  tx: postgres.TransactionSql, createdPlayerIds: number[],
+): Promise<void> {
+  const [{ count }] = await tx<{ count: string }[]>`
+    SELECT count(*)::text AS count
+      FROM external_identities e
+      JOIN sources s ON s.id = e.source_id
+     WHERE s.key = 'afl_api' AND e.player_id = ANY(${createdPlayerIds})
+  `;
+  if (Number(count) !== 0) {
+    throw new Error(
+      `postcondition failed: ${count} afl_api external_identities row(s) exist for the newly-created `
+      + 'PROD players; AFLDB-ISSUE-251 adoption must write no AFL API identity.',
+    );
+  }
+}
+
+/**
+ * The PROD write, inside the caller's transaction: the same canonical primitives and the same
+ * shared postcondition battery (`runDevPostWriteChecks`) DEV uses, plus PROD's own extra
+ * boundary proof. Exported so `issue251_prod_rehearsal.ts` can exercise the EXACT same mutation
+ * code against a disposable database, never through `resolveProdTarget()` (which hard-refuses any
+ * database name other than `afldb_prod`).
+ *
+ * The FIRST statement this function runs against `tx` is `assertViableActorInTransaction` —
+ * before `classify()`, before any row is written (AFLDB-ISSUE-251 finding). This is what makes the
+ * actor assertion authoritative rather than the old approximation (a separate `afldb_auth` read
+ * moments before the transaction opened): the `SECURITY DEFINER` function it calls row-locks
+ * `auth_users` `FOR SHARE` for the remaining lifetime of THIS transaction, so nothing can disable,
+ * demote or un-enrol `params.adminUserId` between this call and this transaction's own COMMIT. No
+ * pre-fetched `ProdActorRow` is accepted or trusted here — the only input is the id.
+ */
+export async function runProdAdoptionWrite(
+  tx: postgres.TransactionSql,
+  params: { targets: Target[]; adminUserId: number },
+): Promise<{ created: { profilePath: string; playerId: number }[]; integrityResults: string[] }> {
+  await assertViableActorInTransaction(tx, params.adminUserId);
+
+  const warnings: string[] = [];
+  const classification = await classify(tx, params.targets, warnings);
+  printReport(classification, 'PROD classification inside the write transaction:', warnings);
+  const conflicts = classification.filter((c) => c.kind === 'CONFLICT');
+  if (conflicts.length > 0) {
+    throw new Error(
+      `${conflicts.length} CONFLICT row(s) — refusing to write ANY of the ${params.targets.length} `
+      + 'rows. Nothing has been written.',
+    );
+  }
+  assertExactFirstApplyShape(classification, 'PROD');
+
+  const [{ count: beforeCountRaw }] = await tx<{ count: string }[]>`SELECT count(*)::text AS count FROM players`;
+  const beforePlayerCount = Number(beforeCountRaw);
+
+  const created: { profilePath: string; playerId: number }[] = [];
+  let confirmedAuditWrites = 0;
+  for (const c of classification) {
+    if (c.kind !== 'CREATE') continue;
+    const input: CreatePlayerInput = {
+      displayName: c.target.displayName,
+      givenName: c.target.givenName,
+      surname: c.target.surname,
+      notes: NOTE(c.target.aflApiProviderId),
+    };
+    const player = await createPlayerInTransaction(tx, input, { adminUserId: params.adminUserId });
+    const attach = await attachAflTablesIdentityInTransaction(tx, {
+      playerId: player.id,
+      profilePath: c.target.profilePath,
+      adminUserId: params.adminUserId,
+      note: NOTE(c.target.aflApiProviderId),
+    });
+    if (!attach.ok) {
+      throw new Error(
+        `attachAflTablesIdentityInTransaction refused for ${c.target.profilePath} `
+        + `(player #${player.id}): ${attach.error}`,
+      );
+    }
+    confirmedAuditWrites += 1;
+    created.push({ profilePath: c.target.profilePath, playerId: player.id });
+  }
+
+  const integrityResults = await runDevPostWriteChecks(
+    tx, params.targets, created, beforePlayerCount, confirmedAuditWrites,
+  );
+  await assertNoAflApiIdentityWritten(tx, created.map((c) => c.playerId));
+  integrityResults.push(
+    `0/${EXPECTED_ROW_COUNT} afl_api external_identities rows created for the newly-created PROD `
+    + 'players: OK',
+  );
+  return { created, integrityResults };
+}
+
+// ---------------------------------------------------------------------------
+// Shared post-write integrity checks (Task 5) — run inside the write transaction,
 // after all 92 writes and BEFORE commit. Any failure throws, which rolls the
 // whole transaction (all 92 rows) back. Not run for --target test: the exact
 // numeric shape here (EXPECTED_ROW_COUNT, not "however many CREATEd") is the
-// deliberate DEV first-apply gate for this batch, not a general-purpose check.
+// deliberate first-apply gate for this batch (DEV and, per AFLDB-ISSUE-251, PROD),
+// not a general-purpose check.
 // ---------------------------------------------------------------------------
 
 export async function runDevPostWriteChecks(
@@ -834,8 +1356,14 @@ export type Args = {
   adminUserId: number;
   targetSetPath: string;
   decisionPath: string;
-  /** Optional operator-authored authoritative name divisions; see `loadNameParts`. */
+  /** Optional operator-authored authoritative name divisions; see `loadNameParts`. Always null
+   *  for --target prod (refused by parseArgs; see loadPinnedProdNameParts). */
   namePartsPath: string | null;
+  /** AFLDB-ISSUE-251 PROD-only flags. All null/false for --target test|dev. */
+  prodImportRole: boolean;
+  allowProdWrite: boolean;
+  expectedHost: string | null;
+  expectedRevision: string | null;
 };
 
 export function parseArgs(argv: string[]): Args {
@@ -848,6 +1376,10 @@ export function parseArgs(argv: string[]): Args {
   let targetSetPath = DEFAULT_TARGET_SET_PATH;
   let decisionPath = DEFAULT_DECISION_PATH;
   let namePartsPath: string | null = null;
+  let prodImportRole = false;
+  let allowProdWrite = false;
+  let expectedHost: string | null = null;
+  let expectedRevision: string | null = null;
 
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -860,11 +1392,15 @@ export function parseArgs(argv: string[]): Args {
     if (arg === '--target-set') { targetSetPath = argv[++i]; continue; }
     if (arg === '--decision') { decisionPath = argv[++i]; continue; }
     if (arg === '--name-parts') { namePartsPath = argv[++i] ?? null; continue; }
+    if (arg === '--prod-import-role') { prodImportRole = true; continue; }
+    if (arg === '--allow-prod-write') { allowProdWrite = true; continue; }
+    if (arg === '--expected-host') { expectedHost = argv[++i] ?? null; continue; }
+    if (arg === '--expected-revision') { expectedRevision = argv[++i] ?? null; continue; }
     throw new Error(`unrecognised argument: ${arg}`);
   }
 
-  if (target !== 'test' && target !== 'dev') {
-    throw new Error(`--target must be 'test' or 'dev' (no PROD target), got '${String(target)}'.`);
+  if (target !== 'test' && target !== 'dev' && target !== 'prod') {
+    throw new Error(`--target must be 'test', 'dev' or 'prod', got '${String(target)}'.`);
   }
   if (adminUserId === null || !Number.isInteger(adminUserId) || adminUserId <= 0) {
     throw new Error('--admin-user-id <n> is required (a positive integer admin_users.id).');
@@ -875,19 +1411,39 @@ export function parseArgs(argv: string[]): Args {
   if (devImportRole && target !== 'dev') {
     throw new Error("REFUSED: --dev-import-role is only valid with --target dev.");
   }
-  // --allow-dev-write and --backup-sha256 are DEV-apply-only concepts: invalid/irrelevant for
-  // --target test, which keeps its existing unconditional-apply behaviour untouched.
+  // --allow-dev-write is a DEV-apply-only concept: invalid/irrelevant for --target test, which
+  // keeps its existing unconditional-apply behaviour untouched.
   if (allowDevWrite && target !== 'dev') {
     throw new Error("REFUSED: --allow-dev-write is only valid with --target dev.");
   }
-  if (backupSha256 !== null && target !== 'dev') {
-    throw new Error("REFUSED: --backup-sha256 is only valid with --target dev.");
+  // --backup-sha256 is a DEV/PROD-apply-only concept: invalid/irrelevant for --target test.
+  if (backupSha256 !== null && target !== 'dev' && target !== 'prod') {
+    throw new Error("REFUSED: --backup-sha256 is only valid with --target dev or --target prod.");
+  }
+  if (prodImportRole && target !== 'prod') {
+    throw new Error("REFUSED: --prod-import-role is only valid with --target prod.");
+  }
+  if (allowProdWrite && target !== 'prod') {
+    throw new Error("REFUSED: --allow-prod-write is only valid with --target prod.");
+  }
+  if (expectedHost !== null && target !== 'prod') {
+    throw new Error("REFUSED: --expected-host is only valid with --target prod.");
+  }
+  if (expectedRevision !== null && target !== 'prod') {
+    throw new Error("REFUSED: --expected-revision is only valid with --target prod.");
+  }
+  // AFLDB-ISSUE-251 D-251-5: PROD never accepts an operator-authored name-parts override. It
+  // always loads and hash-pins the one tracked artefact via loadPinnedProdNameParts.
+  if (namePartsPath !== null && target === 'prod') {
+    throw new Error(
+      'REFUSED: --name-parts is not accepted for --target prod. PROD always uses the pinned '
+      + 'tracked issue224-s9-name-parts-20260922.json artefact; no alternate file is ever accepted.',
+    );
   }
 
   // The explicit DEV write authorisation gate (ISSUE-224 S9 unblock). ALL FOUR of
   // --target dev, --dev-import-role, --apply and --allow-dev-write, plus a well-formed
-  // --backup-sha256, are required before a DEV --apply is permitted past this point. No PROD
-  // target exists at all (enforced above and in resolveTarget/assertNotProdLike), and every
+  // --backup-sha256, are required before a DEV --apply is permitted past this point. Every
   // other combination — including --target dev --apply alone, or with only some of the three
   // additional flags — is refused here, before any database connection is opened.
   if (apply && target === 'dev') {
@@ -918,10 +1474,187 @@ export function parseArgs(argv: string[]): Args {
     }
   }
 
+  // AFLDB-ISSUE-251: --target prod always requires --prod-import-role. There is no
+  // reduced-privilege PROD connection in this tool (unlike DEV's ordinary afldb_app path), so a
+  // PROD read-only preflight and a PROD --apply both require it.
+  if (target === 'prod' && !prodImportRole) {
+    throw new Error(
+      'REFUSED: --target prod requires --prod-import-role (no ordinary, reduced-privilege PROD '
+      + 'connection exists in this tool).',
+    );
+  }
+
+  // The explicit PROD write authorisation gate (AFLDB-ISSUE-251 §6). ALL of --allow-prod-write,
+  // --backup-sha256, --expected-host and --expected-revision are required before a PROD --apply
+  // is permitted past this point, checked here before any database connection is opened.
+  if (apply && target === 'prod') {
+    if (!allowProdWrite) {
+      throw new Error(
+        'REFUSED: --target prod --apply requires --allow-prod-write (the explicit, issue-specific '
+        + 'PROD write authorisation). PROD runs read-only preflight only without it.',
+      );
+    }
+    if (backupSha256 === null) {
+      throw new Error(
+        'REFUSED: --target prod --apply requires --backup-sha256 <64-hex> — the operator\'s '
+        + 'acknowledgement that a fresh, verified pre-write PROD backup exists. This runner cannot '
+        + 'itself prove the backup exists; the hash is an acknowledgement, not proof.',
+      );
+    }
+    if (!BACKUP_SHA256_RE.test(backupSha256)) {
+      throw new Error(
+        'REFUSED: --backup-sha256 must be exactly 64 hexadecimal characters (observed a '
+        + 'malformed value); refusing before any database connection is opened.',
+      );
+    }
+    if (expectedHost === null || expectedHost.trim() === '') {
+      throw new Error(
+        'REFUSED: --target prod --apply requires --expected-host <hostname> — the exact PROD host '
+        + 'the operator expects this to run on. Nothing has been written.',
+      );
+    }
+    if (expectedRevision === null) {
+      throw new Error(
+        'REFUSED: --target prod --apply requires --expected-revision <40-hex-git-sha> — the exact '
+        + 'checkout revision the operator approved. Nothing has been written.',
+      );
+    }
+    if (!PROD_REVISION_RE.test(expectedRevision)) {
+      throw new Error(
+        'REFUSED: --expected-revision must be exactly 40 hexadecimal characters (a git commit '
+        + 'SHA-1, lower-case as git prints it); refusing before any database connection is opened.',
+      );
+    }
+  }
+
   return {
     target, apply, devImportRole, allowDevWrite, backupSha256, adminUserId, targetSetPath,
-    decisionPath, namePartsPath,
+    decisionPath, namePartsPath, prodImportRole, allowProdWrite, expectedHost, expectedRevision,
   };
+}
+
+// ---------------------------------------------------------------------------
+// PROD main (AFLDB-ISSUE-251) — a separate function, not a branch threaded
+// through the test/dev body below: PROD's boundary checks, its two DSNs and
+// its write path (runProdAdoptionWrite) are all distinct from test/dev.
+// ---------------------------------------------------------------------------
+
+async function runProdMain(args: Args, targets: Target[]): Promise<void> {
+  const prodWriteAuthorized = args.apply;
+  if (prodWriteAuthorized) {
+    // DB-free, before any PROD connection opens (AFLDB-ISSUE-251 §6).
+    assertProdBoundary(args);
+    // DB-free, before any PROD connection opens (AFLDB-ISSUE-251 checkout-integrity finding):
+    // --expected-revision alone pins HEAD but proves nothing about local tracked drift or
+    // unexpected untracked files. Runs immediately after assertProdBoundary, still before
+    // resolveProdTarget() below opens the writable PROD connection.
+    assertProdCheckoutIntegrity();
+  }
+  const cfg = resolveProdTarget(prodWriteAuthorized);
+  const sql = postgres(cfg.dsn, {
+    max: 1,
+    onnotice: () => {},
+    connection: cfg.readOnly
+      ? { application_name: 'afldb-issue251-prod-register', default_transaction_read_only: true, TimeZone: 'UTC' }
+      : { application_name: 'afldb-issue251-prod-register', TimeZone: 'UTC' },
+  });
+
+  try {
+    const [row] = await sql<{
+      database: string; currentUser: string; txRo: string; defaultRo: string;
+    }[]>`
+      SELECT current_database() AS "database",
+             current_user AS "currentUser",
+             current_setting('transaction_read_only') AS "txRo",
+             current_setting('default_transaction_read_only') AS "defaultRo"
+    `;
+    if (row.database !== cfg.requiredDatabase) {
+      throw new Error(`REFUSED: connected database is '${row.database}', expected '${cfg.requiredDatabase}'.`);
+    }
+    if (cfg.requiredUser !== null && row.currentUser !== cfg.requiredUser) {
+      throw new Error(`REFUSED: connected user is '${row.currentUser}', expected '${cfg.requiredUser}'.`);
+    }
+    if (cfg.readOnly && (row.txRo !== 'on' || row.defaultRo !== 'on')) {
+      throw new Error('REFUSED: the PROD connection is not proven read-only.');
+    }
+    console.log(
+      `Connected: current_database()='${row.database}', current_user='${row.currentUser}' `
+      + `(--target prod --prod-import-role), mode=${args.apply ? 'APPLY' : 'READ-ONLY PREFLIGHT'}.`,
+    );
+
+    if (!args.apply) {
+      const warnings: string[] = [];
+      const classification = await classify(sql, targets, warnings);
+      printReport(classification, `Classification against '${row.database}' (no write attempted):`, warnings);
+      if (classification.some((c) => c.kind === 'CONFLICT')) {
+        process.exitCode = 1;
+      }
+      return;
+    }
+
+    console.log(
+      `Expected host/revision confirmed. PROD backup acknowledgement: `
+      + `sha256=${args.backupSha256!.slice(0, 12)}… (operator-verified, not proven by this runner).`,
+    );
+
+    // INFORMATIONAL preflight only (AFLDB-ISSUE-251 finding): a brief, separate afldb_auth
+    // connection, opened and closed BEFORE the write transaction, purely so an operator gets a
+    // fast, friendly refusal for an obviously-wrong actor without a write connection ever being
+    // made. It is NOT the write-boundary authority and its result is not passed to the write: the
+    // authoritative, in-transaction re-assertion happens inside `runProdAdoptionWrite` itself, as
+    // that transaction's first act, via `assertViableActorInTransaction` (migration 105's
+    // `SECURITY DEFINER` function). See `resolveProdAuthTarget`'s and `assertViableProdActor`'s doc
+    // comments for why this preflight cannot by itself satisfy that requirement.
+    const authCfg = resolveProdAuthTarget();
+    const authSql = postgres(authCfg.dsn, {
+      max: 1,
+      onnotice: () => {},
+      connection: { application_name: 'afldb-issue251-prod-actor-check', default_transaction_read_only: true, TimeZone: 'UTC' },
+    });
+    try {
+      const [authRow] = await authSql<{ database: string; currentUser: string }[]>`
+        SELECT current_database() AS "database", current_user AS "currentUser"
+      `;
+      if (authRow.database !== authCfg.requiredDatabase) {
+        throw new Error(`REFUSED: PROD actor-check connection database is '${authRow.database}', expected '${authCfg.requiredDatabase}'.`);
+      }
+      if (authRow.currentUser !== authCfg.requiredUser) {
+        throw new Error(`REFUSED: PROD actor-check connection user is '${authRow.currentUser}', expected '${authCfg.requiredUser}'.`);
+      }
+      const [fetched] = await authSql<ProdActorRow[]>`
+        SELECT id, role,
+               (disabled_at IS NULL) AS "isActive",
+               (password_hash IS NOT NULL) AS "hasPassword",
+               (totp_secret IS NOT NULL) AS "hasTotp"
+          FROM auth_users WHERE id = ${args.adminUserId}
+      `;
+      assertViableProdActor(fetched);
+      console.log(`PROD attribution actor preflight OK: admin_user_id=${fetched.id}, role=${fetched.role}.`);
+    } finally {
+      await authSql.end({ timeout: 5 });
+    }
+
+    const outcome = await sql.begin(async (tx) => runProdAdoptionWrite(tx, {
+      targets, adminUserId: args.adminUserId,
+    }));
+
+    console.log('');
+    console.log(
+      `APPLY complete against '${row.database}': ${outcome.created.length} player(s) created and `
+      + 'attached, 0 already satisfied, 0 conflicts.',
+    );
+    for (const c of outcome.created) {
+      console.log(`  player_id=${c.playerId}  ${c.profilePath}`);
+    }
+    console.log('');
+    console.log('Post-write integrity checks (before commit):');
+    for (const r of outcome.integrityResults) {
+      console.log(`  ${r}`);
+    }
+    console.log('Transaction committed = yes');
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -930,20 +1663,29 @@ export function parseArgs(argv: string[]): Args {
 
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
-  const nameParts: Map<string, NameParts & { displayName: string }> = args.namePartsPath === null
-    ? new Map()
-    : loadNameParts(args.namePartsPath);
+  const nameParts: Map<string, NameParts & { displayName: string }> = args.target === 'prod'
+    ? loadPinnedProdNameParts()
+    : (args.namePartsPath === null ? new Map() : loadNameParts(args.namePartsPath));
   const targets = loadAndValidateArtefacts(args.targetSetPath, args.decisionPath, nameParts);
   console.log(
     `Loaded ${targets.length} REGISTER target(s) from pinned artefacts `
     + `(target-set sha256=${PINNED_TARGET_SET_SHA256.slice(0, 12)}…, `
     + `D-7 sha256=${PINNED_DECISION_SHA256.slice(0, 12)}…).`,
   );
-  if (args.namePartsPath !== null) {
+  if (args.target === 'prod') {
+    console.log(
+      `Applied ${nameParts.size} pinned PROD name division(s) from the tracked `
+      + `issue224-s9-name-parts-20260922.json artefact (sha256=${PINNED_PROD_NAME_PARTS_SHA256.slice(0, 12)}…).`,
+    );
+  } else if (args.namePartsPath !== null) {
     console.log(
       `Applied ${nameParts.size} operator-authored name division(s) from ${args.namePartsPath} `
       + '(each verified to recompose to the pinned display name).',
     );
+  }
+
+  if (args.target === 'prod') {
+    return runProdMain(args, targets);
   }
 
   const devWriteAuthorized = args.apply && args.target === 'dev';
@@ -1026,20 +1768,7 @@ async function main(): Promise<void> {
         // not sufficient for DEV: any drift in CREATE/ALREADY_SATISFIED counts since the
         // read-only preflight means live state has moved and this exact batch is no longer safe
         // to apply blind.
-        const createCount = classification.filter((c) => c.kind === 'CREATE').length;
-        const satisfiedCount = classification.filter((c) => c.kind === 'ALREADY_SATISFIED').length;
-        if (
-          createCount !== EXPECTED_ROW_COUNT
-          || satisfiedCount !== 0
-          || classification.length !== EXPECTED_ROW_COUNT
-        ) {
-          throw new Error(
-            `REFUSED: DEV apply requires exactly CREATE=${EXPECTED_ROW_COUNT}, ALREADY_SATISFIED=0, `
-            + `CONFLICT=0 (observed CREATE=${createCount}, ALREADY_SATISFIED=${satisfiedCount}, `
-            + `CONFLICT=${conflicts.length}, TOTAL=${classification.length}); state has drifted `
-            + 'since the read-only DEV preflight. Nothing has been written.',
-          );
-        }
+        assertExactFirstApplyShape(classification, 'DEV');
       }
 
       const created: { profilePath: string; playerId: number }[] = [];

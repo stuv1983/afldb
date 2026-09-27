@@ -23,6 +23,7 @@
     "db:code-test:issue237-rehearsal": "tsx --conditions=react-server tools/migration/afl_api_identity_rebuild_rehearsal_fixture.ts",
     "db:code-test:issue245-rehearsal": "tsx --conditions=react-server tools/migration/manual_registration_rebuild_rehearsal_fixture.ts",
     "db:code-test:issue249-rehearsal": "tsx --conditions=react-server tools/records/first-kick-goal-rehearsal.ts",
+    "db:code-test:issue251-rehearsal": "tsx --conditions=react-server tools/rebuild/draftguru/issue251_prod_rehearsal.ts",
     "db:issue237:export-importer-recovery": "tsx tools/migration/recover_afl_api_importer_identities.ts export",
     "db:issue237:recover-importer-identities": "tsx tools/migration/recover_afl_api_importer_identities.ts r4",
     "db:issue239:recover-adjudications": "tsx tools/migration/recover_afl_api_adjudications.ts",

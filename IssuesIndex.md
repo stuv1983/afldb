@@ -11,42 +11,46 @@
 
 **Open issues:** 11
 
-### AFLDB-ISSUE-250 — Production promotion can silently lose writes committed after the target snapshot
-- **Severity:** High. **Area:** production promotion / cutover state preservation —
-  `docs/production-promotion.md` §4–§8 and every production-owned table §7 reinstates.
-- **State:** Open (2026-09-26), opened under operator decision D-P5-1 (the ISSUE-238 pass 5).
-  **Implemented and DB-free validated; committed as `26751ad6`, merged into local `main` (not
-  pushed, not deployed). DEV REHEARSAL
-  PASS (2026-09-26, runbook §17):
-  technically accepted for the ISSUE-237 L5 prerequisite.**
-  - Root cause: the §4 dump is taken while every writer still runs; §7 reinstates
-    production-owned tables from it; services stopped only at the §8 swap. A second path: `$PRE`
-    is "the newest dump", unbound to the promotion.
-  - Fix: an enforced database-level promotion freeze — REVOKE CONNECT from PUBLIC (only
-    `afldb_owner`/`afldb_backup`/superusers can connect), token-bound marker, terminate, proven
-    quiescence, per-table digest F0 + OID; the dump proven = F0; every production phase re-proves
-    it; guarded swap/rollback; post-swap acceptance of the kept DB by OID **before** the app
-    starts. `afldb-reviewer`: PASS WITH MEDIUM/LOW NOTES (F-001…F-011 folded).
-  - Tests: `tests/db-promotion-check.test.ts` 264/264 (workstation and Linux); typecheck and lint
-    clean.
-  - DEV rehearsal (operator-authorised, DEV only, PROD never contacted): the freeze, per-role
-    refusal, in-flight writer, stale-dump, drift, crash recovery, freeze/release cycles and
-    privileged sessions all behaved as designed. A full freeze-enabled DEV promotion
-    (`20260926-195601`) and its guarded rollback both PASSed, and DEV was restored to its original
-    database.
-  - Findings: R-1 (MED) — `sudo -u postgres psql -f <file>` cannot read the generated files —
-    fixed in the docs (stdin form). R-2/R-3 (LOW) doc text, fixed. R-4/R-5 (LOW) are open
-    follow-ups.
-- **Key files:** `tools/db/promotion-freeze.ts` (new), `tools/db/promotion-check.ts`,
-  `tools/db/promotion-inventory.ts`, `tools/maintenance/restore-test.sh`,
-  `docs/production-promotion.md` §4.0–§10.
-- **Blocks:** ~~ISSUE-237 L5 PROD (until rehearsal + acceptance)~~. L5 is no longer blocked on an
-  untested mechanism; the commit and merge prerequisites are satisfied (`26751ad6`, merged into
-  `main`), and it still needs this work on the PROD checkout with its revision verified.
-- **Runbook:** `issues/open/AFLDB-ISSUE-250.md`.
-- **Next action:** put the merged ISSUE-250 code on the PROD checkout; verify the deployed
-  revision/code identity; then the separately authorised ISSUE-237 L5 by the freeze-bound
-  procedure. ISSUE-250 stays open until then; L5 has not run.
+### AFLDB-ISSUE-251 — Production promotion cannot converge candidate-only manual player registrations when PROD has never held their AFL Tables paths
+- **Severity:** High. **Area:** production promotion / manual player registration lifecycle —
+  `tools/db/promotion-check.ts` (ISSUE-242 convergence, ISSUE-237 A4.2 gates),
+  `tools/rebuild/draftguru/register_issue224_s9_players.ts`.
+- **State:** Open (2026-09-26), from the first real ISSUE-237 L5 PROD attempt (promotion stamp
+  `20260926-213225`). **Blocks ISSUE-237 L5 PROD.**
+  - The L5 restored gate reached the retained candidate
+    (`afldb_prod_candidate_20260926-213225`, OID `49077`) and REFUSED on exactly the ISSUE-242
+    token-convergence gate and the ISSUE-237 A4.2 players-replay gate. G2 and G3 PASSed.
+  - 92 candidate-only `manual_admin_edit` registrations were refused: PROD neither held their AFL
+    Tables paths nor had PROD-local creation records for them.
+  - Retained-candidate census: all 92 have exactly one accepted AFL Tables path and one AFL API
+    identity; 3 of the 92 are referenced by `award_winners`; zero football statistics. The only
+    attribution actor is `afldb_test`'s disabled, credential-free recovery `super_admin`.
+  - Direction: an explicit, separately guarded PROD adoption mode for the pinned ISSUE-224
+    92-player set, minting PROD-local registration tokens under a real enabled + enrolled PROD
+    `super_admin`. No `afldb_test` token or actor is copied and no AFL API identity is written. A
+    completely fresh L5 should then plan the normal ISSUE-242 `rebind B → A`.
+  - ISSUE-242's candidate-only-orphan STOP is unchanged.
+  - PROD was released from the ISSUE-250 freeze (now RESOLVED) and is healthy. The retained
+    candidate is evidence and must not be mutated or dropped.
+  - `register_issue224_s9_players.ts` currently and deliberately refuses PROD. ISSUE-251 is an
+    authorised design change to that boundary, not a loosening of `assertNotProdLike()` or a bare
+    `prod` addition to the target enum: PROD support is its own separately guarded mode with
+    stronger requirements than test/DEV, and no PROD write is authorised yet.
+  - D-251-5: PROD adoption pins the exact tracked
+    `docs/rebuild-manifests/draftguru/issue224-s9-name-parts-20260922.json` name-parts artefact by
+    SHA-256, established during implementation/review; an arbitrary `--name-parts` file is refused
+    in PROD mode. Test/DEV keep the existing operator-authored, non-pinned artefact unchanged.
+  - The tool's post-write checks (currently DEV-only) are to be factored into shared
+    target-independent postconditions used by both DEV and PROD; PROD adds its own stronger
+    boundary checks (exact host/database/role/revision, verified backup acknowledgement, a real
+    enabled+enrolled PROD `super_admin`, no recovery/test actor, no AFL API identity written).
+- **Key files:** `tools/rebuild/draftguru/register_issue224_s9_players.ts` and its tests,
+  `docs/production-promotion.md`.
+- **Runbook:** `issues/open/AFLDB-ISSUE-251.md`.
+- **Next action:** (1) inspect the existing registration tool/tests and finalise the PROD-mode
+  design against current code; (2) implement the separately guarded PROD adoption mode; (3)
+  DB-free validation; (4) isolated real-DB rehearsal; (5) full diff/review and operator procedure;
+  (6) only then request separate live PROD adoption authorisation. **No PROD write is authorised.**
 
 ### AFLDB-ISSUE-238 — Correcting a consumed trusted `afl_api` player link with canonical reattribution
 - **Severity:** Medium. **Area:** admin / player identity — `external_identities` (`afl_api`),
@@ -73,6 +77,13 @@
   deployed revision/code identity verified, plus a separate operator authorisation. L5 remains NOT RUN. It then runs by the freeze-bound procedure at
   the next scheduled production promotion, under production's unmodified G3 hard-loss rule. ISSUE-237 has not regressed. The chronology
   below is retained for history; later entries supersede earlier ones.
+  **Update (2026-09-26): the first real L5 attempt (stamp `20260926-213225`) is NOT PASS.** It
+  reached `--phase restored`; G2 and G3 PASSed (802 candidate importer rows = gained coverage, 0
+  target importer rows); the restored gate REFUSED on the ISSUE-242 convergence and A4.2
+  players-replay gates (92 candidate-only registrations). No lineage-remap or supersede file, no
+  plan, no swap. PROD was token-bound unfrozen and is healthy; the settle timer/service stay
+  inactive. **L5 is BLOCKED on AFLDB-ISSUE-251**; the failed attempt is evidence only and must not
+  be resumed (runbook §11d.16).
 - **State:** Open (2026-09-23), split out of the ISSUE-235 plan review (R4). Pre-existing. Neither
   the promotion runbook nor `db:test:rebuild` had an `afl_api` identity step, so the importer's
   `unique` links (669 on DEV at the time) were lost. A bridge re-import is not a safe recovery
@@ -265,6 +276,9 @@
     needs ISSUE-250 (`26751ad6`, merged into `main`) on the PROD checkout with its deployed
     revision/code identity verified, plus a separate L5 authorisation.)* Once that holds: L5 by the freeze-bound procedure, inside a future scheduled production promotion, under production's unmodified G3
     hard-loss rule (FAIL, no DEV-style exception). Runbook §11d.15 has the full L4 record.
+    *(Superseded 2026-09-26: the first real L5 attempt, `20260926-213225`, was REFUSED at the
+    restored gate. **Current next action:** resolve AFLDB-ISSUE-251 (PROD adoption of the 92
+    ISSUE-224 registrations), then a completely fresh L5 under a separate authorisation.)*
   - **Not authorised:** no production promotion or PROD mutation without separate, scheduled
     authorisation.
 

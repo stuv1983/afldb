@@ -44,11 +44,12 @@
 -- so it is enumerated below with the migration that established each
 -- grant, and everything outside that list is revoked from it.
 --
--- One FUNCTION is reconciled too, after that section: migration 081's
--- public.nl_search_telemetry_clear(). A restore that drops a function's
--- ACL restores the PUBLIC EXECUTE default, so that one is a widening
--- rather than a gap -- see the section for why its owner matters as much
--- as its grant.
+-- Two FUNCTIONS are reconciled too, after that section: migration 081's
+-- public.nl_search_telemetry_clear() and migration 105's
+-- public.assert_viable_super_admin_actor(integer). A restore that drops a
+-- function's ACL restores the PUBLIC EXECUTE default, so both are a
+-- widening rather than a gap -- see each section for why its owner
+-- matters as much as its grant.
 -- =====================================================================
 
 -- ---------------------------------------------------------------------
@@ -672,6 +673,75 @@ BEGIN
       'nl_search_telemetry_clear(): ACL NOT reconciled -- owner is %, and this role may not grant on it. Rerun as afldb_owner or postgres',
       pg_get_userbyid(
         (SELECT proowner FROM pg_proc WHERE oid = 'public.nl_search_telemetry_clear()'::regprocedure)
+      );
+  END;
+END
+$$;
+
+-- ---------------------------------------------------------------------
+-- AFLDB-ISSUE-251 — the second function grant, assert_viable_super_admin_actor()
+-- ---------------------------------------------------------------------
+-- Migration 105 creates public.assert_viable_super_admin_actor(integer), the only way
+-- afldb_import's PROD adoption write transaction can re-verify its attribution actor
+-- in-transaction without afldb_import holding a general SELECT on auth_users: a SECURITY
+-- DEFINER function owned by afldb_owner, with EXECUTE revoked from PUBLIC and granted to
+-- afldb_import alone. Exactly the same three failures 081's section documents apply here, with
+-- one twist on failure 1: because afldb_import holds no direct SELECT on auth_users at all
+-- (migration 023), a restore that reverts this function's ACL to PUBLIC EXECUTE is not merely a
+-- widening beyond the intended grantee -- for every OTHER role in the cluster (afldb_app,
+-- afldb_backup, any human connecting as afldb_owner) it hands a table-read capability none of
+-- them had by any other path, since SECURITY DEFINER lets the caller learn pass/fail against
+-- rows it could never otherwise query.
+--
+--   1. `pg_restore --no-privileges` restores the function and none of its ACL: default EXECUTE
+--      to PUBLIC on a SECURITY DEFINER function, as above.
+--   2. A cluster where afldb_import is created AFTER this migration runs leaves the function
+--      with no EXECUTE grant, and AFLDB-ISSUE-251's PROD write fails closed (refused, not
+--      silently bypassed) until this script re-runs.
+--   3. A cluster migrated as postgres leaves the function owned by postgres, so SECURITY
+--      DEFINER would execute as a superuser rather than as the role that owns auth_users.
+--
+-- Restated in the order migration 105 states it, so the owner is also the grantor of the grants
+-- that follow. This section must NEVER also grant afldb_import direct SELECT on auth_users --
+-- doing so would defeat the entire point of routing the assertion through a narrow function, and
+-- tests/integration/privileges.test.ts pins that afldb_import has no such grant.
+DO $$
+BEGIN
+  IF to_regprocedure('public.assert_viable_super_admin_actor(integer)') IS NULL THEN
+    RAISE NOTICE 'assert_viable_super_admin_actor(): absent (pre-105); run npm run db:migrate, then this script';
+    RETURN;
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'afldb_owner') THEN
+    BEGIN
+      EXECUTE 'ALTER FUNCTION public.assert_viable_super_admin_actor(integer) OWNER TO afldb_owner';
+    EXCEPTION WHEN insufficient_privilege THEN
+      RAISE NOTICE
+        'assert_viable_super_admin_actor(): owner left as %, not afldb_owner -- rerun as a member of afldb_owner or as postgres',
+        pg_get_userbyid(
+          (SELECT proowner FROM pg_proc WHERE oid = 'public.assert_viable_super_admin_actor(integer)'::regprocedure)
+        );
+    END;
+  ELSE
+    RAISE NOTICE 'assert_viable_super_admin_actor(): afldb_owner absent, ownership left as found';
+  END IF;
+
+  BEGIN
+    -- Fail closed first: PUBLIC loses EXECUTE whether or not afldb_import exists yet to be
+    -- granted it.
+    EXECUTE 'REVOKE ALL ON FUNCTION public.assert_viable_super_admin_actor(integer) FROM PUBLIC';
+
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'afldb_import') THEN
+      EXECUTE 'GRANT EXECUTE ON FUNCTION public.assert_viable_super_admin_actor(integer) TO afldb_import';
+      RAISE NOTICE 'assert_viable_super_admin_actor(): PUBLIC revoked, afldb_import EXECUTE granted';
+    ELSE
+      RAISE NOTICE 'assert_viable_super_admin_actor(): afldb_import absent, EXECUTE revoked from PUBLIC only';
+    END IF;
+  EXCEPTION WHEN insufficient_privilege THEN
+    RAISE NOTICE
+      'assert_viable_super_admin_actor(): ACL NOT reconciled -- owner is %, and this role may not grant on it. Rerun as afldb_owner or postgres',
+      pg_get_userbyid(
+        (SELECT proowner FROM pg_proc WHERE oid = 'public.assert_viable_super_admin_actor(integer)'::regprocedure)
       );
   END;
 END

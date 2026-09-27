@@ -772,6 +772,13 @@ describe('afldb_import is confined to the statistical tables', () => {
     // INSERT, and (on external_grids only) UPDATE of the single is_current
     // column that supersedes a revision. Their exact narrow shape is
     // asserted in AFLDB-ISSUE-138's dedicated test below.
+    //
+    // afl_api_identity_adjudications (migration 104, AFLDB-ISSUE-235) is the
+    // ninth: the same append-only-ledger pattern as canonical_applications
+    // above -- SELECT + INSERT + sequence USAGE only, deliberately NOT
+    // registered import-writable, because the registry loop would hand back
+    // UPDATE/DELETE/TRUNCATE and destroy the append-only property. Its exact
+    // narrow shape is asserted in AFLDB-ISSUE-235's dedicated test below.
     const rows = await sql<{ name: string; registered: boolean; writable: boolean }[]>`
       SELECT c.relname AS name,
              (w.name IS NOT NULL) AS registered,
@@ -785,7 +792,8 @@ describe('afldb_import is confined to the statistical tables', () => {
                                'canonical_applications',
                                'brownlow_vote_entry_state',
                                'brownlow_season_authority',
-                               'external_grids', 'external_grid_axes')
+                               'external_grids', 'external_grid_axes',
+                               'afl_api_identity_adjudications')
        ORDER BY 1
     `;
     expect(rows.length).toBeGreaterThan(0);

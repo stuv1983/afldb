@@ -24,6 +24,11 @@ authorisation for L5. L5 remains NOT RUN.)** **(Later still, 2026-09-26: ISSUE-2
 into local `main` (`26751ad6`; not pushed, not deployed). Still outstanding: the merged ISSUE-250
 code on the PROD checkout, verification of the deployed revision/code identity, and a separate
 operator authorisation for L5. L5 remains NOT RUN.)**
+**(Later still, 2026-09-26: the first real L5 PROD attempt, stamp `20260926-213225`, was REFUSED at
+`--phase restored` on the ISSUE-242 convergence and A4.2 players-replay gates (92 candidate-only
+manual registrations PROD never held). No swap occurred and PROD returned healthy. **L5 is NOT PASS
+and is BLOCKED on AFLDB-ISSUE-251.** The failed attempt is evidence only and must not be resumed;
+see §11d.16.)**
 
 **L1/L2 state (operator-run, reported 2026-09-25).** The §11b rehearsals on the real
 `code_test_db` have now been run by the operator. **L1 PASS:** non-empty importer + human state
@@ -3942,7 +3947,7 @@ the AFLDB-ISSUE-249 discovery record).
 | DEV bridge + loader (validate-only → dry-run → apply) | **PASS**: 669/669 linked, `CD_I297354` regenerated |
 | `dev-regeneration-census` | **PASS** |
 | **L4** | **PASS** |
-| L5 (PROD) | **NOT RUN.** Was BLOCKED on AFLDB-ISSUE-250 (2026-09-26). ISSUE-250's DEV rehearsal PASSED later on 2026-09-26 (ISSUE-250 §17). ISSUE-250 is committed as `26751ad6` and merged into local `main` (not pushed, not deployed); now awaiting the PROD checkout, deployed revision/code identity verification and a separate L5 authorisation. |
+| L5 (PROD) | ~~**NOT RUN.** Was BLOCKED on AFLDB-ISSUE-250 (2026-09-26). ISSUE-250's DEV rehearsal PASSED later on 2026-09-26 (ISSUE-250 §17). ISSUE-250 is committed as `26751ad6` and merged into local `main` (not pushed, not deployed); now awaiting the PROD checkout, deployed revision/code identity verification and a separate L5 authorisation.~~ *(Superseded 2026-09-26:)* **NOT PASS.** First real attempt `20260926-213225` REFUSED at `--phase restored` (§11d.16); no swap. **BLOCKED on AFLDB-ISSUE-251.** The next L5 is a completely fresh attempt. |
 
 **Closure interpretation.** The narrow DEV G3 exception (§6.3, OD-3) was actually used, for exactly
 one classified `afl_api_stat_vector_season` hard loss. The required target-bound
@@ -3951,7 +3956,83 @@ promotion is accepted under the ISSUE-237 §6.3 contract.** **ISSUE-237 remains 
 PROD is still NOT RUN. Production's G3 hard-loss rule is unmodified: FAIL, with no DEV-style
 exception. **Next action:** L5, inside a future scheduled production promotion.
 *(2026-09-26: superseded. L5 is BLOCKED until AFLDB-ISSUE-250 is resolved and accepted; see the
-note at the end of §14.)*
+note at the end of §14.)* *(2026-09-26, later: superseded again. The first real L5 attempt was
+REFUSED at the restored gate and L5 is BLOCKED on AFLDB-ISSUE-251; see §11d.16.)*
+
+### 11d.16 First real L5 attempt (2026-09-26, operator-run, PROD): REFUSED at `--phase restored`; L5 NOT PASS
+
+Run on PROD by the freeze-bound ISSUE-250 procedure (`docs/production-promotion.md` §4.0–§10) under
+production's unmodified G3 rule. Full evidence and census: `issues/open/AFLDB-ISSUE-251.md` §1–§4.
+
+**Identities.**
+
+- Promotion stamp: `20260926-213225`.
+- Original PROD database: `afldb_prod`, OID `35594`.
+- Retained candidate: `afldb_prod_candidate_20260926-213225`, OID `49077`.
+
+**What ran and passed.**
+
+- Source/restored preparation reached `--phase restored`.
+- **G2 PASS.** Target human ledger 0.
+- **G3 PASS.** 802 candidate importer rows, all classified as gained coverage
+  (`INFO (gained_coverage)`); 0 target importer rows; no production hard loss.
+
+**What refused.** The restored gate REFUSED on exactly two gates:
+
+1. `manual player registration token convergence planned (AFLDB-ISSUE-242)`;
+2. `data_overrides players replay predicted on the candidate (AFLDB-ISSUE-237 A4.2)`.
+
+The checker reported 92 candidate-only `manual_admin_edit` tokens — the ISSUE-224 cohort carried
+through L3 (§11a.6). For each, the candidate held an accepted AFL Tables path, but PROD had no active
+registration creation record for it and did not hold the path. That is ISSUE-242's deliberate
+orphan STOP, which stays unchanged.
+
+**What did not happen.**
+
+- No lineage-remap file (`promotion-lineage-20260926-213225.sql`) was published.
+- No AFL API supersede file (`promotion-afl-api-supersede-20260926-213225.json`) was published.
+- No reinstatement plan was generated, and no swap occurred.
+
+**Abort state.**
+
+- PROD was token-bound unfrozen successfully (ISSUE-250 release): `afldb_prod` OID `35594`, no
+  marker, ACL open.
+- The application returned healthy: `afldb.service` active; `/api/health` `status=ok`,
+  `database=ok`.
+- The settle timer and settle service remain inactive.
+- The candidate is retained as evidence, not frozen; it must not be mutated or dropped until
+  ISSUE-251 resolves or deliberately supersedes its evidence.
+
+**Retained-candidate census (read-only, recorded as measured).**
+
+| Fact | Value |
+|---|---:|
+| `manual_admin_edit` identities | 92 |
+| distinct players | 92 |
+| exactly one accepted AFL Tables path | 92 |
+| multiple paths | 0 |
+| missing paths | 0 |
+| `afl_api` identities / players | 92 / 92 |
+| `afltables` identities / players | 92 / 92 |
+| `manual_admin_edit` identities / players | 92 / 92 |
+| active registration creation records | 92 |
+| registration records with AFL Tables path | 92 |
+| attribution actors | 1 (disabled, credential-free `super_admin` from the `afldb_test` recovery lifecycle) |
+| `player_match_stats` / `player_season_stats` / `player_career_stats` / `player_clubs` / `brownlow_round_votes` | 0 / 0 / 0 / 0 / 0 |
+| `award_winners` | 3 rows / 3 players |
+| other measured curated tables (`draft_picks`, `honour_team_members`, `player_achievements`, `club_leadership`, `season_list_members`) | 0 |
+| players with a debut/final season | 0 / 92 |
+
+**Disposition.**
+
+- **L5 is NOT PASS.** It is BLOCKED on **AFLDB-ISSUE-251**: an explicit, separately guarded PROD
+  adoption of the pinned ISSUE-224 92-player set, with PROD-local registration tokens under a real
+  PROD `super_admin`.
+- The failed `20260926-213225` attempt is **evidence only and must not be resumed** from the failed
+  restored gate. After ISSUE-251, L5 is a completely fresh attempt: a new freeze token, F0 record,
+  frozen dump and proof, a fresh source dump, then `--phase restored`, where ISSUE-242 is expected
+  to plan `rebind B → A` for the 92.
+- ISSUE-237's own code and gates have not regressed; they refused correctly.
 
 ## 12. Non-goals and successors
 
@@ -4187,6 +4268,13 @@ an untested ISSUE-250 mechanism. Before it may run:
 
 L5 then follows the freeze-bound `docs/production-promotion.md` §4.0–§10 under production's
 unmodified G3 rule.)*
+*(2026-09-26, later still: **the first real L5 attempt (stamp `20260926-213225`) ran and is NOT
+PASS** (§11d.16). It reached `--phase restored`; G2 and G3 PASSed; the restored gate REFUSED on the
+ISSUE-242 token-convergence and A4.2 players-replay gates for 92 candidate-only manual
+registrations. No lineage-remap or supersede file, no plan, no swap; PROD was token-bound unfrozen
+and returned healthy, with the settle timer/service inactive. **L5 is now BLOCKED on
+AFLDB-ISSUE-251.** Next: ISSUE-251's PROD adoption (separately authorised), then a completely fresh
+L5 under a separate authorisation. The `20260926-213225` attempt must not be resumed.)*
 
 ---
 
