@@ -101,6 +101,7 @@ import {
   applyAttendanceEnrichment,
   applyCanonicalUnit,
   areCoSources,
+  type CanonicalApplyRefusal,
   type CanonicalApplyTargetInput,
   type CanonicalApplyUnitInput,
   type CanonicalApplyUnitResult,
@@ -124,6 +125,7 @@ import {
   missingAflApiSeasonEnumeration,
   type AflApiSeasonEnumeration,
 } from './afl-api-season-enumeration';
+import { sortAflApiRefusalEvidence, type AflApiCanonicalRefusalEvidence } from './afl-api-refusal-evidence';
 import { canonicalJson, type JsonValue } from './observations';
 import { persistSourceObservation } from './observation-store';
 import { baselineCanonicalHash } from './promotion-review';
@@ -146,6 +148,7 @@ import {
   emptyDerivedScope,
   emptySettleCounters,
   finalizeSettleImportBatch,
+  MATCH_IDENTITY_REFUSAL,
   newApplyFindingLedger,
   recordApplyOutcomeFindings,
   recordDeferral,
@@ -392,6 +395,13 @@ export type AflApiSettleRunResult = {
    * transaction after the settle rolled back; nothing else survived.
    */
   absenceFindings: AflApiMatchAbsenceFindingsOutcome | null;
+  /**
+   * AFLDB-ISSUE-252 D-252-12: one entry per `canonicalApplyRefusals` increment, collected at the
+   * same sites, in the deterministic census order (`afl-api-refusal-evidence.ts`). Retained on a
+   * dry run and a rollback exactly as the counter is. Evidence only: the durable record of each
+   * refusal is still its `data_issues` finding.
+   */
+  refusalEvidence: readonly AflApiCanonicalRefusalEvidence[];
 };
 
 /* ------------------------------------------------------------------ *
@@ -405,9 +415,11 @@ type AflApiRefs = {
   /** I244-F009: per-run state for automatic-apply refusal findings. Holds no
    * database state until the first automatic-apply healing check reads it. */
   applyFindings: ApplyFindingLedger;
+  /** ISSUE-252 D-252-12: the run's refusal evidence, appended beside each `canonicalApplyRefusals` increment. */
+  refusalEvidence: AflApiCanonicalRefusalEvidence[];
 };
 
-async function loadRefs(tx: Tx): Promise<AflApiRefs> {
+async function loadRefs(tx: Tx, refusalEvidence: AflApiCanonicalRefusalEvidence[]): Promise<AflApiRefs> {
   const sources = await tx<{ id: number; key: string }[]>`SELECT id, key FROM sources`;
   const sourceId = await resolveAflApiSourceId(tx);
   const afltables = sources.find((row) => row.key === 'afltables');
@@ -416,6 +428,7 @@ async function loadRefs(tx: Tx): Promise<AflApiRefs> {
     afltablesSourceId: afltables?.id ?? null,
     sourceKeysById: new Map(sources.map((row) => [row.id, row.key])),
     applyFindings: newApplyFindingLedger(),
+    refusalEvidence,
   };
 }
 
@@ -1064,6 +1077,40 @@ async function sweepAttendanceEnrichment(
  * closes it the run the target applies or no longer needs applying. Same
  * transaction, no new counter, no `import_rejections` row, no canonical write.
  */
+/**
+ * AFLDB-ISSUE-252 D-252-12, the first `canonicalApplyRefusals` site: one refused target with the
+ * applier's own machine reason and the owner it read inside the savepoint. A result that is not
+ * applied always carries a refusal (`refused()` in `canonical-apply.ts`).
+ */
+export function unitRefusalEvidence(
+  unitInput: CanonicalApplyUnitInput, result: CanonicalApplyUnitResult['results'][number],
+): AflApiCanonicalRefusalEvidence {
+  return {
+    family: unitInput.family,
+    externalRecordId: unitInput.externalRecordId,
+    targetTable: result.targetTable,
+    refusal: result.refusal as CanonicalApplyRefusal,
+    matchKey: unitInput.matchKey,
+    renderedFields: unitInput.targets.find((target) => target.targetTable === result.targetTable)?.renderedFields ?? [],
+    ownerSourceKey: result.ownerSourceKey ?? null,
+  };
+}
+
+/** D-252-12, the second site: an I244-F010 identity change withheld. No applier ran, so no owner was read. */
+export function matchIdentityRefusalEvidence(
+  externalRecordId: string, matchKey: string, changedIdentityFields: readonly string[],
+): AflApiCanonicalRefusalEvidence {
+  return {
+    family: 'match',
+    externalRecordId,
+    targetTable: 'matches',
+    refusal: MATCH_IDENTITY_REFUSAL,
+    matchKey,
+    renderedFields: [...changedIdentityFields],
+    ownerSourceKey: null,
+  };
+}
+
 async function applyUnitOutcome(
   tx: Tx, refs: AflApiRefs, unitInput: CanonicalApplyUnitInput, outcome: CanonicalApplyUnitResult,
   counters: AflApiSettleCounters, derived: DerivedScope,
@@ -1076,6 +1123,7 @@ async function applyUnitOutcome(
       counters.canonicalApplicationsLogged += 1;
     } else if (outcome.failure === null) {
       counters.canonicalApplyRefusals += 1;
+      refs.refusalEvidence.push(unitRefusalEvidence(unitInput, result));
     }
   }
   if (outcome.insertedMatchId !== null) derived.matchIds.add(outcome.insertedMatchId);
@@ -1436,6 +1484,9 @@ async function settleMatchUnit(
     if (autoApply && identitySplit !== null) {
       if (identitySplit.changedIdentityFields.length > 0) {
         counters.canonicalApplyRefusals += 1;
+        refs.refusalEvidence.push(
+          matchIdentityRefusalEvidence(bundle.match.sourceRecordId, plan.match.matchKey, identitySplit.changedIdentityFields),
+        );
         await recordMatchIdentityFinding(tx, refs.applyFindings, {
           scope: APPLY_FINDING_SCOPE,
           family: 'match',
@@ -1807,10 +1858,11 @@ export async function runSettleAflApi(
   let rollbackReason: AflApiSettleRunResult['rollbackReason'] = null;
   let sourceCompleteness: SourceCompletenessVerdict | null = null;
   let absenceFindings: AflApiMatchAbsenceFindingsOutcome | null = null;
+  const refusalEvidence: AflApiCanonicalRefusalEvidence[] = [];
 
   try {
     await sql.begin(async (tx) => {
-      const refs = await loadRefs(tx);
+      const refs = await loadRefs(tx, refusalEvidence);
       const [batch] = await tx<{ id: string }[]>`
         INSERT INTO import_batches (source_id, tool, target_table, records_read, notes)
         VALUES (${refs.sourceId}, ${SETTLE_BATCH_TOOL}, 'staging.source_record_versions',
@@ -1931,7 +1983,7 @@ export async function runSettleAflApi(
 
   return {
     applied, batchId: applied ? batchIdText : null, counters, halt, rollbackReason, sourceCompleteness,
-    absenceFindings,
+    absenceFindings, refusalEvidence: sortAflApiRefusalEvidence(refusalEvidence),
   };
 }
 

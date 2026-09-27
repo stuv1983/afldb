@@ -89,7 +89,31 @@
   standalone `--dry-run` is an unproven preview with the same bounded tolerance; it writes no
   record or proof. `code_test_db` attempt 4: **A–V all PASS** (104 checks), residue 0, 2026 as
   found. Tests 346/346, `tsc` and ESLint clean.
-- **Next action:** operator reviews and commits. Then the real DEV preparation and the L5 retry.
+- **Eighth pass (2026-09-28, runbook §27, uncommitted, DB-free).** This pass fixes the two blockers
+  the real DEV preparation found.
+  - **D-252-12.** The 36 `foreign_source_owner` AFL API refusals against AFL Tables-owned
+    `player_match_stats` rows are expected disagreements. The settle now returns a structured
+    refusal census. Preparation accepts only that narrow class, with count = counter and dry-run =
+    apply digest. E3 is unchanged.
+  - **D-252-13.** The retained current-season player bridge (proves exact retained-snapshot provider
+    coverage even when replay is idempotent) is now a mandatory, hash-bound preparation input.
+  - Record and proof are schema 3. Tests 375/375 and 630/630; `tsc` and ESLint clean.
+- **Eighth pass acceptance (2026-09-28, later, runbook §27.7–§27.9, uncommitted).** The operator-run
+  fresh-rebuild DEV rehearsal PASSED: 89/89 rebuild checks, 803 identities captured/reinstated, and
+  the final fresh rebuild **did preserve `CD_I297354`** (bridge replay idempotent, 669/669 already
+  linked). D-252-12's 36-row refusal census PASSED with dry-run/apply digest parity. Real PROD
+  manifest A and the schema-3 source gate both PASSED (16/16 gates); the sole F1 dependency
+  (`brownlow_vote_entry_state.match_id=17795` → `2026|1|2026-03-05|Sydney|Carlton`) resolved. No
+  freeze, candidate, reinstatement or swap occurred. Not run: frozen manifest B. Not attempted:
+  ISSUE-237 L5. Implementation is acceptance-proven, still uncommitted.
+- **Operator acceptance (2026-09-28):** D-252-12 and D-252-13 are explicitly accepted by the operator
+  on this evidence — fresh DEV rebuild/preparation rehearsal PASS, D-252-12 36-row classified refusal
+  census PASS, D-252-13 669/669 bridge PASS, real PROD manifest A PASS, schema-3 source gate PASS
+  16/16 (runbook §27.10). **ISSUE-252 itself is not yet resolved** and ISSUE-237 L5 has not passed.
+- **Next action:** final diff/documentation review; commit/merge; deploy/synchronise through the
+  normal procedure; then a completely fresh ISSUE-237 L5 PROD attempt under separate authorisation
+  (its own manifest A/source proof/frozen manifest B). The retained failed candidate
+  `afldb_prod_candidate_20260927-142540` remains evidence-only.
 
 ### AFLDB-ISSUE-251 — Production promotion cannot converge candidate-only manual player registrations when PROD has never held their AFL Tables paths
 - **Severity:** High. **Area:** production promotion / manual player registration lifecycle —

@@ -15,7 +15,7 @@ commit.
 
 ## [Unreleased]
 
-### Current-season promotion source: preparation, dependency manifest and mandatory ownership-parity gate (AFLDB-ISSUE-252; Open, code_test_db rehearsal PASS) - 27 September 2026
+### Current-season promotion source: preparation, dependency manifest and mandatory ownership-parity gate (AFLDB-ISSUE-252; Open, uncommitted; code_test_db rehearsal PASS; fresh DEV rehearsal + real PROD manifest A + schema-3 source gate PASS) - 27–28 September 2026
 
 - **The defect.** `db:test:rebuild` stops at the last completed season, but production holds
   production-owned rows that reference current-season matches (Brownlow entry state, active match
@@ -39,8 +39,9 @@ commit.
   that one counter non-zero, provisionally, bounded by the rows it inserted. Every other zero
   counter must still be 0. A mandatory same-label AFL Tables `--dry-run` follows immediately and
   must be all zero, with 0 inserted, updated and logged applications. The AFL API phase never
-  starts without it. The preparation record (schema 2) and the source proof (schema 2) carry the
-  initial apply and the closure dry run as two separate results. The settle itself is unchanged.
+  starts without it. At this point in the pass the preparation record and the source proof were
+  schema 2 (superseded by schema 3 below); they carry the initial apply and the closure dry run as
+  two separate results. The settle itself is unchanged.
 - **`--dry-run` is an unproven preview (Q-252-11).** The standalone preparation `--dry-run` now
   accepts the same bounded, transient `unresolvedIdentityMatch` as the first apply, with every
   other post-condition strict. It says `PREVIEW ONLY — UNPROVEN`, writes no preparation record and
@@ -49,6 +50,40 @@ commit.
 - **Validation.** `tests/db-promotion-check.test.ts` 346/346. `code_test_db` rehearsal attempt 4:
   A–V all PASS (104 checks), final residue 0, 2026 restored exactly as found, only sequences
   advanced. No other database was contacted.
+- **AFL API refusals are judged by a classified census, not by zero (D-252-12, 28 September).** The
+  real DEV preparation correctly refused 36 AFL API `player_match_stats` updates at the canonical
+  writer's E3 gate (`foreign_source_owner`): AFL Tables owns those rows and the two sources disagree
+  on 53 stat values. The aggregate `canonicalApplyRefusals = 0` rule could not tell that from a real
+  failure. `runSettleAflApi()` now also returns `refusalEvidence` — one entry per counter increment
+  (family, external record, target table, the applier's own reason, `match_key`, rendered fields,
+  and the owner the canonical applier read inside its savepoint), in a deterministic order with a
+  canonical sha256 (`afl-api-refusal-evidence.ts`). Preparation accepts a non-zero census only when
+  every entry is `player_match_stats` + `foreign_source_owner` + owner `afltables`, the entry count
+  equals the counter, and the dry run and apply censuses are identical; everything else is still a
+  STOP. The canonical writer's ownership gate, the rows' values and `source_id`, and the durable
+  `data_issues` findings are unchanged.
+- **The current-season player bridge is a mandatory prerequisite (D-252-13).** A fresh historical
+  rebuild did not hold the AFL API identity `CD_I297354` the retained snapshot needs.
+  `db:promotion:prepare-source` now requires `--afl-api-player-bridge <file>
+  --expect-afl-api-player-bridge-sha256 <hex>`: a retained `afl_api_stat_vector_season` artefact
+  built for exactly the retained AFL API snapshot, covering exactly its provider census by stable
+  identity. It is validated, applied through the restricted loader and read back before any settle.
+- **Schemas.** Preparation record and source proof are now schema 3 (they carry the full refusal
+  census and the bridge binding, both re-judged on parse); schema 2 is refused.
+- **Validation (28 September).** `tests/db-promotion-check.test.ts` 375/375; the DB-free AFL API /
+  current-season suites 630/630; `tsc`, ESLint and `git diff --check` clean.
+- **Fresh-rebuild DEV rehearsal and real PROD schema-3 source gate PASS (28 September, later).** The
+  operator-run rehearsal against a fresh `db:test:rebuild` PASSED (89/89 validation checks, 803 AFL
+  API importer identities captured/reinstated); the final fresh rebuild **did preserve `CD_I297354`**
+  through the existing importer identity capture/reinstate mechanism (the D-252-13 bridge replay was
+  idempotent: 669/669 already linked). The D-252-12 refusal census PASSED at 36 with identical
+  dry-run/apply digests. A real PROD dependency manifest A (`--phase dependencies --database
+  afldb_prod`, read-only, pre-freeze) and the real schema-3 source gate both PASSED — 16 gate(s)
+  evaluated, none failed — resolving the sole F1 dependency
+  (`brownlow_vote_entry_state.match_id=17795` → `2026|1|2026-03-05|Sydney|Carlton`) by exact
+  `match_key` and owner. No freeze, candidate, reinstatement or swap occurred. The frozen manifest B
+  (`--phase pre-cutover`) has not been run, and AFLDB-ISSUE-237 L5 has not been reattempted.
+  Implementation is acceptance-proven by this rehearsal but remains uncommitted.
 
 ### Production promotion freeze: no write can be silently lost at the swap (AFLDB-ISSUE-250; Open, DEV rehearsal PASS) - 26 September 2026
 

@@ -17,21 +17,31 @@
  *       --afltables-label <label> --expect-afltables-manifest-sha256 <hex> \
  *       --expect-afltables-bundle-sha256 <hex> \
  *       --afl-api-label <label> --expect-afl-api-manifest-sha256 <hex> \
+ *       --afl-api-player-bridge <file> --expect-afl-api-player-bridge-sha256 <hex> \
  *       (--validate-only | --dry-run | --apply --record-out <new file>)
  *
- * --validate-only  offline only: both snapshots verified, no connection opened.
- * --dry-run        an UNPROVEN PREVIEW (Q-252-11): also proves the database and runs the AFL
- *                  Tables settle as a rolled-back dry run. On a fresh afldb_test it carries the
- *                  same transient `unresolvedIdentityMatch` as the first apply and is judged the
- *                  same way (bounded by `canonicalRowsInserted`; everything else strict). It
- *                  writes no record and no proof, and is never promotion-source evidence. The
- *                  AFL API step is not dry-run here: before the AFL Tables apply commits, its
- *                  result would describe first-writer inserts, not corroboration.
- * --apply          AFL Tables apply (Q-252-10: `unresolvedIdentityMatch` alone may be non-zero,
- *                  provisionally); then the mandatory same-label AFL Tables closure dry run, which
- *                  must be all zero with no write; then an AFL API dry run whose post-conditions
- *                  must pass before the AFL API apply; then the record, carrying both AFL Tables
- *                  results separately.
+ * D-252-13: the retained current-season AFL API player bridge is a mandatory, hash-bound
+ * prerequisite. A historical `db:test:rebuild` does not necessarily hold every provider identity
+ * the retained AFL API snapshot needs, so preparation applies the named bridge — built for exactly
+ * that snapshot, covering exactly its provider census — through the restricted loader
+ * (`import_afl_api_player_bridge.ts`, stable identity only) before any settle, and proves every
+ * required provider linked. It consumes a retained artefact rather than regenerating one: the
+ * emitter reads current-season canonical statistics a fresh rebuild does not hold, and a retained
+ * artefact is bound by its recorded sha256 exactly as the snapshots are (D-252-2).
+ *
+ * --validate-only  offline only: both snapshots and the bridge verified, no connection opened.
+ * --dry-run        an UNPROVEN PREVIEW (Q-252-11): also proves the database, validates the bridge
+ *                  read-only, and runs the AFL Tables settle as a rolled-back dry run. On a fresh
+ *                  afldb_test it carries the same transient `unresolvedIdentityMatch` as the first
+ *                  apply and is judged the same way (bounded by `canonicalRowsInserted`; everything
+ *                  else strict). It writes no record and no proof, and is never promotion-source
+ *                  evidence. The AFL API step is not dry-run here: before the AFL Tables apply
+ *                  commits, its result would describe first-writer inserts, not corroboration.
+ * --apply          the bridge (validate, apply, read-back); then the AFL Tables apply (Q-252-10:
+ *                  `unresolvedIdentityMatch` alone may be non-zero, provisionally); then the
+ *                  mandatory same-label AFL Tables closure dry run, which must be all zero with no
+ *                  write; then an AFL API dry run and apply, each judged by the D-252-12 refusal
+ *                  census, which must also be identical between the two; then the record.
  */
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
@@ -54,19 +64,34 @@ import {
   SETTLE_ACQUISITION_KIND,
   validateSettleBundle,
 } from '../../src/lib/acquisition/settle-afltables';
+import { canonicalAflApiRefusalCensus, aflApiRefusalCensusSha256 } from '../../src/lib/acquisition/afl-api-refusal-evidence';
 import { parseSourceFamilyRegistry } from '../../src/lib/acquisition/source-families';
 import { loadEnv } from '../current-season/load-env';
-import { runAflApiSettleCli, type AflApiSettleCliOutcome } from '../current-season/settle-afl-api';
+import { loadAflApiSettleBundle, runAflApiSettleCli, type AflApiSettleCliOutcome } from '../current-season/settle-afl-api';
 import { runSettleCli, type SettleCliOutcome } from '../current-season/settle-afltables';
+import {
+  importAflApiBridge,
+  loadBridgeArtefact,
+  type BridgeImportMode,
+  type BridgeImportReport,
+  type LoadedBridgeArtefact,
+} from '../migration/import_afl_api_player_bridge';
 import { environmentNames } from './promotion-inventory';
 import {
   PREPARATION_RECORD_KIND,
   PREPARATION_RECORD_SCHEMA_VERSION,
   AFLTABLES_FIRST_APPLY_TOLERATED_COUNTER,
+  aflApiPreparationStepProblems,
+  aflApiRefusalCensusEvidence,
+  aflApiRefusalCensusParityProblems,
   afltablesClosureDryRunProblems,
   afltablesFirstApplyProblems,
   afltablesPreviewDryRunProblems,
   aflTablesStepEvidence,
+  PLAYER_BRIDGE_PREREQUISITE_KIND,
+  playerBridgeArtefactProblems,
+  playerBridgeImportProblems,
+  playerBridgePostApplyProblems,
   PREPARATION_PREVIEW_STATUS,
   preexistingSeasonOwnershipProblems,
   preparationDatabaseProblems,
@@ -74,6 +99,7 @@ import {
   settleStepProblems,
   type AflApiSnapshotBinding,
   type AflTablesSnapshotBinding,
+  type PlayerBridgeIdentityRow,
   type SettleStepSummary,
 } from './promotion-source-dependencies';
 
@@ -102,6 +128,9 @@ export type PrepareArgs = {
   afltablesBundleSha256: string;
   aflApiLabel: string;
   aflApiManifestSha256: string;
+  /** D-252-13: the retained current-season player bridge, and the sha256 recorded when it was retained. */
+  aflApiPlayerBridge: string;
+  aflApiPlayerBridgeSha256: string;
   mode: PrepareMode;
   recordOut: string | null;
 };
@@ -109,7 +138,7 @@ export type PrepareArgs = {
 const VALUE_FLAGS = [
   '--acknowledge', '--afltables-label', '--expect-afltables-manifest-sha256',
   '--expect-afltables-bundle-sha256', '--afl-api-label', '--expect-afl-api-manifest-sha256',
-  '--record-out',
+  '--afl-api-player-bridge', '--expect-afl-api-player-bridge-sha256', '--record-out',
 ] as const;
 const MODE_FLAGS = ['--validate-only', '--dry-run', '--apply'] as const;
 
@@ -154,6 +183,8 @@ export function parsePrepareArgs(argv: readonly string[]): PrepareArgs {
     afltablesBundleSha256: required('--expect-afltables-bundle-sha256'),
     aflApiLabel,
     aflApiManifestSha256: required('--expect-afl-api-manifest-sha256'),
+    aflApiPlayerBridge: required('--afl-api-player-bridge'),
+    aflApiPlayerBridgeSha256: required('--expect-afl-api-player-bridge-sha256'),
     mode,
     recordOut,
   };
@@ -308,6 +339,71 @@ export function verifyAflApiRetainedSnapshot(
   return { source: 'afl_api', label, season, expectedManifestSha256, actualManifestSha256, integrityProblems: problems };
 }
 
+/**
+ * D-252-13: every provider player the retained AFL API snapshot carries, read from the settle's
+ * own bundle build — so the census the bridge must cover is the census the settle will resolve.
+ * A unit that failed to build hides its providers, so the census is then unprovable.
+ */
+export function requiredAflApiProviderIds(projectRoot: string, label: string): string[] {
+  const { bundle } = loadAflApiSettleBundle(projectRoot, label);
+  if (bundle.buildFailures.length > 0) {
+    throw new Error(`${bundle.buildFailures.length} AFL API match unit(s) failed to build; the provider census cannot be derived`);
+  }
+  const ids = new Set<string>();
+  for (const unit of bundle.units) for (const row of unit.bundle.playerStats) ids.add(row.providerPlayerId);
+  return [...ids].sort();
+}
+
+export type VerifiedPlayerBridge = {
+  path: string;
+  fileSha256: string;
+  requiredProviderIds: string[];
+  /** The artefact's own binding fields, as recorded. */
+  artefact: Record<string, unknown>;
+  /** The restricted loader's parse; null when anything refused. */
+  loaded: LoadedBridgeArtefact | null;
+  problems: string[];
+};
+
+/**
+ * Offline: the named bridge is the recorded bytes, built for exactly the verified AFL API snapshot
+ * and season, its provider census is exactly the snapshot's, and the restricted loader accepts it
+ * for `afldb_test` (provenance, pinned inputs, the ISSUE-241 stable-identity contract).
+ */
+export function verifyAflApiPlayerBridge(
+  projectRoot: string, path: string, expectedSha256: string,
+  aflApi: { label: string; manifestSha256: string; season: number },
+): VerifiedPlayerBridge {
+  const outcome: VerifiedPlayerBridge = { path, fileSha256: '', requiredProviderIds: [], artefact: {}, loaded: null, problems: [] };
+  if (!existsSync(path)) return { ...outcome, problems: [`no player bridge artefact at ${path}`] };
+  const bytes = readFileSync(path);
+  outcome.fileSha256 = createHash('sha256').update(bytes).digest('hex');
+  try {
+    const parsed = JSON.parse(bytes.toString('utf8')) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('not a JSON object');
+    outcome.artefact = parsed as Record<string, unknown>;
+    outcome.requiredProviderIds = requiredAflApiProviderIds(projectRoot, aflApi.label);
+  } catch (error) {
+    return { ...outcome, problems: [`player bridge refused: ${message(error)}`] };
+  }
+  outcome.problems.push(...playerBridgeArtefactProblems({
+    artefact: outcome.artefact, expectedFileSha256: expectedSha256, actualFileSha256: outcome.fileSha256,
+    aflApiLabel: aflApi.label, aflApiManifestSha256: aflApi.manifestSha256, season: aflApi.season,
+    requiredProviderIds: outcome.requiredProviderIds,
+  }));
+  if (outcome.problems.length > 0) return outcome;
+  try {
+    const loaded = loadBridgeArtefact(path, 'afldb_test', projectRoot);
+    if (loaded.fileSha256 !== outcome.fileSha256) outcome.problems.push('the bridge changed on disk while it was being verified');
+    else if (loaded.rows.length !== outcome.requiredProviderIds.length) {
+      outcome.problems.push(`the loader accepts ${loaded.rows.length} linked row(s), the snapshot requires ${outcome.requiredProviderIds.length}`);
+    } else outcome.loaded = loaded;
+  } catch (error) {
+    outcome.problems.push(`the restricted loader refuses the bridge: ${message(error)}`);
+  }
+  return outcome;
+}
+
 // ---------------------------------------------------------------------------
 // The run
 // ---------------------------------------------------------------------------
@@ -326,6 +422,10 @@ export type PrepareDeps = {
   settleAfltables?: (argv: readonly string[], deps: Parameters<typeof runSettleCli>[1]) => Promise<SettleCliOutcome>;
   settleAflApi?: (argv: readonly string[], deps: Parameters<typeof runAflApiSettleCli>[1]) => Promise<AflApiSettleCliOutcome>;
   writeRecord?: (path: string, text: string) => void;
+  verifyBridge?: typeof verifyAflApiPlayerBridge;
+  /** The restricted loader, on the proved import session. */
+  importBridge?: (mode: Exclude<BridgeImportMode, 'dry-run'>, loaded: LoadedBridgeArtefact, sql: postgres.Sql) => Promise<BridgeImportReport>;
+  readBridgeIdentities?: (sql: postgres.Sql, providerIds: readonly string[]) => Promise<PlayerBridgeIdentityRow[]>;
 };
 
 export type PrepareOutcome = {
@@ -373,6 +473,34 @@ function aflApiStep(mode: 'dry-run' | 'apply', outcome: AflApiSettleCliOutcome):
     completeness: outcome.sourceCompleteness?.status ?? null,
     applied: r?.applied ?? false,
     counters: (r?.counters ?? null) as Record<string, unknown> | null,
+    // D-252-12: absent evidence stays absent (null), which the census judge refuses.
+    refusalCensus: Array.isArray(r?.refusalEvidence) ? canonicalAflApiRefusalCensus(r.refusalEvidence) : null,
+  };
+}
+
+async function readBridgeIdentitiesLive(sql: postgres.Sql, providerIds: readonly string[]): Promise<PlayerBridgeIdentityRow[]> {
+  return sql<PlayerBridgeIdentityRow[]>`
+    SELECT ei.external_id AS "externalId", ei.status::text AS status, ei.player_id::int AS "playerId"
+      FROM external_identities ei
+      JOIN sources s ON s.id = ei.source_id
+     WHERE s.key = 'afl_api' AND ei.external_id = ANY (${sql.array([...providerIds])}::text[])
+  `;
+}
+
+/** A loader report as the record carries it; its hint mismatches are counted, never trusted. */
+function bridgeReportEvidence(report: BridgeImportReport) {
+  return {
+    outcome: report.outcome,
+    linked: report.linked,
+    already_linked: report.alreadyLinked,
+    already_linked_human: report.alreadyLinkedHuman,
+    contradictions_withheld: report.contradictionsWithheld,
+    player_collisions_withheld: report.playerCollisionsWithheld,
+    findings_recorded: report.findingsRecorded,
+    findings_already_open: report.findingsAlreadyOpen,
+    stops: report.stops,
+    candidate_player_id_hints_ignored: report.hintMismatches.length,
+    import_batch_id: report.importBatchId,
   };
 }
 
@@ -407,8 +535,20 @@ export async function runPreparePromotionSource(argv: readonly string[], deps: P
   const season = inProgress[0];
   for (const b of bindings) log(`${b.source} '${b.label}': manifest sha256 ${b.actualManifestSha256} verified, season ${b.season}.`);
   log(`afltables '${bindings[0].label}': observations.json sha256 ${bindings[0].actualBundleSha256} verified.`);
+  // D-252-13: the player bridge, bound to the verified AFL API snapshot, before any connection.
+  const bridge = (deps.verifyBridge ?? verifyAflApiPlayerBridge)(projectRoot, args.aflApiPlayerBridge, args.aflApiPlayerBridgeSha256, {
+    label: args.aflApiLabel, manifestSha256: bindings[1].actualManifestSha256, season,
+  });
+  if (bridge.problems.length > 0 || bridge.loaded === null) {
+    refuse('STOP: the AFL API player bridge is not the recorded prerequisite for this snapshot (D-252-13).',
+      bridge.problems.length > 0 ? bridge.problems : ['the restricted loader produced no artefact']);
+  }
+  const loadedBridge = bridge.loaded as LoadedBridgeArtefact;
+  const required = bridge.requiredProviderIds;
+  log(`afl_api player bridge ${bridge.path}: sha256 ${bridge.fileSha256} verified; covers exactly the ${required.length} `
+    + `provider(s) snapshot '${args.aflApiLabel}' requires, every one by stable identity.`);
   if (args.mode === 'validate-only') {
-    log('--validate-only: both retained snapshots verified offline. No connection opened.');
+    log('--validate-only: both retained snapshots and the player bridge verified offline. No connection opened.');
     return { mode: args.mode, status: 'offline-verified', season, steps: [], record: null };
   }
 
@@ -434,6 +574,33 @@ export async function runPreparePromotionSource(argv: readonly string[], deps: P
     const ownershipProblems = preexistingSeasonOwnershipProblems(
       season, await (deps.readSeasonOwnership ?? readSeasonOwnershipLive)(sql, season));
     if (ownershipProblems.length > 0) refuse('STOP: the prepared source already breaks the ownership order.', ownershipProblems);
+
+    // 3b. D-252-13: the player bridge — validated read-only against this database; on --apply,
+    //     applied by the restricted loader and read back. Nothing settles until it is clean.
+    const importBridge = deps.importBridge ?? ((mode, loaded, session) => importAflApiBridge({
+      mode, loaded,
+      connection: { begin: (options, fn) => session.begin(options, fn) as never },
+      expected: { database: SOURCE_DATABASE, role: null },
+    }));
+    const bridgeChecked = (report: BridgeImportReport, expected: 'READ_ONLY' | 'COMMITTED') => {
+      const problems = playerBridgeImportProblems(report, expected, required.length);
+      if (problems.length > 0) refuse('STOP: the AFL API player bridge did not close the provider census (D-252-13).', problems);
+      log(`player bridge ${expected === 'COMMITTED' ? 'apply' : 'validation'}: linked ${report.linked}, already linked `
+        + `${report.alreadyLinked} (+${report.alreadyLinkedHuman} human), 0 contradictions, 0 collisions, `
+        + `${report.hintMismatches.length} candidate_player_id hint(s) ignored.`);
+      return report;
+    };
+    const bridgeValidate = bridgeChecked(await importBridge('validate-only', loadedBridge, sql), 'READ_ONLY');
+    let bridgeApply: BridgeImportReport | null = null;
+    let bridgeHuman = 0;
+    if (args.mode === 'apply') {
+      bridgeApply = bridgeChecked(await importBridge('apply', loadedBridge, sql), 'COMMITTED');
+      const rows = await (deps.readBridgeIdentities ?? readBridgeIdentitiesLive)(sql, required);
+      const post = playerBridgePostApplyProblems(required, rows, bridgeApply.alreadyLinkedHuman);
+      if (post.length > 0) refuse('STOP: after the bridge apply, not every required provider is linked (D-252-13).', post);
+      bridgeHuman = bridgeApply.alreadyLinkedHuman;
+      log(`player bridge read-back: all ${required.length} required provider(s) linked (import batch ${bridgeApply.importBatchId}).`);
+    }
 
     // 4. AFL Tables first. `env: {}` keeps the settle's ISR revalidation off: this writes
     //    afldb_test, never the running site's database.
@@ -470,11 +637,24 @@ export async function runPreparePromotionSource(argv: readonly string[], deps: P
       ['--label', args.afltablesLabel, '--dry-run', ...common], { projectRoot, sql, log, env: {} });
     steps.push(checked(afltablesStep('dry-run', closureOutcome), log, afltablesClosureDryRunProblems, 'afltables closure dry-run'));
 
-    // 6. AFL API second: dry run, then apply only if the dry run is clean.
+    // 6. AFL API second: dry run, then apply only if the dry run is clean. D-252-12: each is judged
+    //    by its classified refusal census, and the two censuses must be identical.
     const aflApiDry = await settleAflApi(['--label', args.aflApiLabel, '--dry-run', ...common], { projectRoot, sql, log });
-    steps.push(checked(aflApiStep('dry-run', aflApiDry), log));
+    const dryStep = checked(aflApiStep('dry-run', aflApiDry), log, aflApiPreparationStepProblems);
+    steps.push(dryStep);
+    const dryCensus = dryStep.refusalCensus ?? [];
+    log(`afl_api dry-run refusal census: ${dryCensus.length} accepted player_match_stats foreign-owner disagreement(s) `
+      + `against afltables-owned rows, sha256 ${aflApiRefusalCensusSha256(dryCensus)}.`);
     const aflApiApply = await settleAflApi(['--label', args.aflApiLabel, '--apply', ...common], { projectRoot, sql, log });
-    steps.push(checked(aflApiStep('apply', aflApiApply), log));
+    const applyStep = checked(aflApiStep('apply', aflApiApply), log, aflApiPreparationStepProblems);
+    steps.push(applyStep);
+    const applyCensus = applyStep.refusalCensus ?? [];
+    const parity = aflApiRefusalCensusParityProblems(dryCensus, applyCensus);
+    if (parity.length > 0) {
+      refuse('STOP: the AFL API apply refused a different census from its dry run (D-252-12). The apply has committed to '
+        + `${SOURCE_DATABASE}, which is therefore NOT a prepared source: no record is written; rebuild it.`, parity);
+    }
+    log(`afl_api apply refusal census identical to the dry run: ${applyCensus.length}, sha256 ${aflApiRefusalCensusSha256(applyCensus)}.`);
 
     // 7. The record, never overwriting.
     const record = {
@@ -501,6 +681,28 @@ export async function runPreparePromotionSource(argv: readonly string[], deps: P
       counters: {
         afltables: afltablesOutcome.result?.counters ?? null,
         afl_api: aflApiApply.result?.counters ?? null,
+      },
+      // D-252-12: the full accepted census, re-judged by parsePreparationRecord().
+      afl_api_refusal_census: aflApiRefusalCensusEvidence(dryCensus, applyCensus),
+      // D-252-13: the bridge prerequisite, applied before any settle.
+      afl_api_player_bridge: {
+        kind: PLAYER_BRIDGE_PREREQUISITE_KIND,
+        artefact: {
+          path: bridge.path,
+          file_sha256: bridge.fileSha256,
+          match_method: bridge.artefact.match_method,
+          player_identity_contract: bridge.artefact.player_identity_contract ?? null,
+          built_from_database: bridge.artefact.built_from_database,
+          tool: bridge.artefact.tool,
+          season: bridge.artefact.season,
+          snapshot_label: bridge.artefact.snapshot_label,
+          snapshot_manifest_sha256: bridge.artefact.snapshot_manifest_sha256,
+        },
+        provider_census: { required: required.length, artefact_providers: required.length, artefact_linked: loadedBridge.rows.length },
+        validate: bridgeReportEvidence(bridgeValidate),
+        apply: bridgeReportEvidence(bridgeApply as BridgeImportReport),
+        post_apply: { required: required.length, linked: required.length, human_resolved: bridgeHuman, unlinked: 0 },
+        result: 'PASS',
       },
     };
     (deps.writeRecord ?? ((path, text) => writeFileSync(path, text, { flag: 'wx' })))(args.recordOut!, `${JSON.stringify(record, null, 2)}\n`);

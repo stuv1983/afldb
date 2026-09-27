@@ -327,13 +327,26 @@ operator recorded when they were retained; the AFL Tables input is also bound by
 reads. A PROD-origin AFL Tables snapshot is copied to DEV under `/home/arm/projects/afldb` exactly
 (its bundle carries that absolute `manifest_path`; any other checkout refuses).
 
+The retained **current-season AFL API player bridge** is a third mandatory, hash-bound input
+(D-252-13). A historical `db:test:rebuild` restores the captured historical AFL API identities but
+not necessarily every provider identity the retained AFL API snapshot needs (a fresh rebuild lacked
+`CD_I297354`). The bridge is the `afl_api_stat_vector_season` artefact built by
+`emit:afl-api-player-bridge-test` **for exactly that snapshot** (its `snapshot_label` and
+`snapshot_manifest_sha256` must be the retained ones), retained under `~/backups/afldb/` and named
+by the sha256 recorded when it was retained. Preparation consumes it; it never regenerates one (the
+emitter reads current-season canonical statistics a fresh rebuild does not hold). Its provider set
+must be **exactly** the snapshot's provider census, every provider `linked` through its stable
+identity (`candidate_player_identity`; a numeric `candidate_player_id` is only an ignored hint).
+
 ```bash
 # DEV: streamanator — after db:test:rebuild; the switch enabled (step 2)
 cd ~/projects/afldb && hostname
 AT=<afltables label>; AT_M=<its manifest sha256>; AT_O=<its observations.json sha256>
 API=<afl_api label>;  API_M=<its manifest.json sha256>
+BRIDGE=<retained player bridge file>; BRIDGE_S=<its sha256>
 P="--acknowledge afldb_test --afltables-label $AT --expect-afltables-manifest-sha256 $AT_M \
-   --expect-afltables-bundle-sha256 $AT_O --afl-api-label $API --expect-afl-api-manifest-sha256 $API_M"
+   --expect-afltables-bundle-sha256 $AT_O --afl-api-label $API --expect-afl-api-manifest-sha256 $API_M \
+   --afl-api-player-bridge $BRIDGE --expect-afl-api-player-bridge-sha256 $BRIDGE_S"
 export DATABASE_URL="$AFLDB_TEST_DATABASE_URL" AFLDB_IMPORT_DATABASE_URL="$AFLDB_TEST_IMPORT_DATABASE_URL"
 npm run db:promotion:prepare-source -- $P --validate-only        # offline: both snapshots re-hashed
 npm run db:promotion:prepare-source -- $P --dry-run              # PREVIEW ONLY, unproven (see below); writes nothing
@@ -342,21 +355,42 @@ npm run db:promotion:prepare-source -- $P --apply \
 sha256sum ~/backups/afldb/promotion-$STAMP-preparation.json      # record it
 ```
 
-Each is a STOP on refusal: a snapshot that does not re-hash, a season that is not the one
+Each is a STOP on refusal: a snapshot or bridge that does not re-hash, a bridge built for another
+snapshot or season or not covering exactly the snapshot's providers, a season that is not the one
 in-progress season, either session not on `afldb_test` (proved by `current_database()`, never
 from a DSN), the switch not `true`, any current-season match already owned by anything but
 `afltables` (rebuild `afldb_test`; the order cannot be repaired), and for **each** settle a halt,
 a rollback, a completeness other than `complete`, or any non-zero build failure, unresolved
-identity, `foreign_owned_collision`, venue unmapped, manual-authority or canonical-apply refusal
-or failure.
+identity, `foreign_owned_collision`, venue unmapped, manual-authority refusal or canonical-apply
+failure. AFL API canonical-apply **refusals** are judged by their classified census (below), never
+by a count.
 
 `--apply` runs in this order:
 
-1. The AFL Tables apply.
-2. A mandatory same-label AFL Tables **closure dry run**.
-3. An AFL API **dry run** whose post-conditions must pass.
-4. The AFL API apply.
-5. The record, which never overwrites an existing one.
+1. The **player bridge** (D-252-13): validated read-only, applied by the restricted loader
+   (`import_afl_api_player_bridge.ts`), then read back — every required provider exactly one
+   linked `afl_api` identity, no contradiction, collision, stop or finding, and no human
+   `resolved` link beyond those the loader found already there. Nothing settles otherwise.
+2. The AFL Tables apply.
+3. A mandatory same-label AFL Tables **closure dry run**.
+4. An AFL API **dry run** whose post-conditions, refusal census included, must pass.
+5. The AFL API apply, judged the same way; its refusal census must be **identical** to the dry
+   run's (same canonical digest). A difference is a STOP after the apply has committed: no record
+   is written and `afldb_test` must be rebuilt.
+6. The record (schema 3), which never overwrites an existing one.
+
+**D-252-12: the AFL API refusal census.** The AFL API settle returns one evidence entry per
+`canonicalApplyRefusals` increment — family, external record, target table, the applier's machine
+reason, `match_key`, rendered fields and, for an ownership refusal, the owner the canonical applier
+read inside its savepoint. The census must have exactly as many entries as the counter. Preparation
+accepts a non-zero census **only** when every entry is `player_match_stats` / `player_match_stats` /
+`foreign_source_owner` / owner `afltables`: the AFL API disagrees with a row AFL Tables owns. That
+row keeps AFL Tables' values and `source_id` (E3 is unchanged and never re-owns), and the
+disagreement stays a durable `data_issues` finding. Every other refusal — any match-family refusal,
+`identity_change_requires_review`, `ownership_indeterminate`, another or missing owner, any
+manual-authority, stale-target, rekey or `possible_existing_match` refusal, `nothing_to_write` —
+is a STOP. The record carries the full census (entries, count, canonical sha256, and the dry-run
+and apply digests); `--phase source` and the proof (schema 3) re-judge it from the entries.
 
 **Q-252-10: the first AFL Tables apply.** On a fresh `afldb_test` every current-season match is
 new. The AFL Tables settle counts each new match's period scores as `unresolvedIdentityMatch`
@@ -416,7 +450,8 @@ dependency passes only when its match resolves **exactly once by the identical `
 string** and is owned on both sides by the **same `sources.key`** (a round, date or team
 difference is `identity_absent_in_candidate`; an `afl_api`-owned source match for an
 `afltables`-owned target match is `owner_mismatch`). The record's two import batches must exist
-in this database.
+in this database. The record's AFL API refusal census and player-bridge prerequisite are re-judged
+from the record itself (schema 3); a schema 2 record or proof is refused.
 
 The proof is written **only** when every gate of the run passed, never over an existing file.
 It binds: the preparation record's sha256, `prepared_at`, season and batches; the AFL Tables

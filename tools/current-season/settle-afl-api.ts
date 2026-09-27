@@ -117,7 +117,8 @@ function readJson(path: string): unknown {
   return JSON.parse(readFileSync(path, 'utf8'));
 }
 
-function loadBundle(
+/** Also AFLDB-ISSUE-252's source for the provider census a player bridge must cover (D-252-13). */
+export function loadAflApiSettleBundle(
   projectRoot: string, label: string,
 ): { bundle: AflApiSettleBundle; inProgressSeasons: number[] } {
   const snapshotDir = join(aflApiSnapshotRoot(projectRoot), label);
@@ -226,7 +227,7 @@ export async function runAflApiSettleCli(
   const args = parseAflApiSettleArgs(argv);
 
   // Offline and fail-closed. No database has been opened yet.
-  const { bundle, inProgressSeasons } = loadBundle(projectRoot, args.label);
+  const { bundle, inProgressSeasons } = loadAflApiSettleBundle(projectRoot, args.label);
   log(
     `Bundle v${bundle.bundleContractVersion} '${bundle.snapshotLabel}' (season ${bundle.season}): `
     + `${bundle.units.length} match unit(s) built, ${bundle.buildFailures.length} build failure(s).`,

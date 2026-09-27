@@ -16,6 +16,18 @@ and the preparation input contract made source-specific (§22.2); B1 read-only h
 retained source located, semantic/key acceptance pending the gate (§22.3); preparation CLI
 `tools/db/prepare-promotion-source.ts` + `db:promotion:prepare-source` written with DB-free tests
 (§22.4). Still not written: `promotion-check.ts` wiring, docs, rehearsal. No database contacted.
+**2026-09-28 (eighth pass, §27):** the real DEV preparation's 36 AFL API `foreign_source_owner`
+refusals, classified by D-252-12, and D-252-13's mandatory retained player bridge. Both are
+implemented and DB-free validated (375/375), uncommitted. **2026-09-28 (later, eighth pass
+acceptance):** the operator-run fresh-rebuild DEV rehearsal (§27.7) PASSED — the final fresh rebuild
+preserved `CD_I297354` through the existing importer identity capture/reinstate mechanism, and the
+D-252-13 bridge replay was idempotent (669/669 already linked). The real PROD manifest A and the
+schema-3 source gate (§27.8) also PASSED, 16/16 gates. **2026-09-28 (operator acceptance):** the
+operator explicitly accepted D-252-12 and D-252-13 on this evidence — the fresh DEV rebuild/
+preparation rehearsal PASS, the D-252-12 36-row classified refusal census PASS, the D-252-13 669/669
+bridge PASS, the real PROD manifest A PASS, and the schema-3 source gate PASS 16/16 (§27.10).
+Implementation remains uncommitted; **ISSUE-252 itself is not yet resolved** and ISSUE-237 L5 PROD
+has not been attempted again. Next action: §27.9.
 
 ## 1. Origin
 
@@ -1591,3 +1603,287 @@ No other of the 62 sequences moved.
    `--dry-run` (preview) → `--apply`.
 3. Run the gate.
 4. Make a completely fresh ISSUE-237 L5 PROD attempt.
+
+*(Superseded by §27: steps 1–2 ran — commits `4bda2107`/`077f9ca8` and a real DEV preparation —
+and exposed the two blockers §27 fixes.)*
+
+## 27. Eighth pass (2026-09-28) — D-252-12 refusal census, D-252-13 mandatory player bridge
+
+### 27.1 What the real DEV preparation showed (operator evidence, `/home/arm/backups/afldb/`)
+
+- **The AFL API refused 36 updates.** Before the bridge, 35 AFL API `player_match_stats` updates
+  were refused. After the manual test bridge
+  `issue252-player-bridge-20260927-211024.json` (sha256 `47bfadbe…f41f`, 669 providers, 669 linked,
+  0 unresolved / contradictory / collisions, all 9,983 player-match rows covered), a supported AFL
+  API dry run showed:
+  - `canonicalApplyRefusals` 36, all ordinary: 0 identity refusals, reason `foreign_source_owner`
+    ×36, family and target `player_match_stats` ×36;
+  - `foreignOwnedCollision`, `sourceDisagreement`, `manualAuthorityRefusals`,
+    `canonicalApplyFailures` and both unresolved-identity counters all 0;
+  - `corroboratedForeignOwned` 217, 1 row inserted, completeness `COMPLETE`.
+- **Every one of the 36 rows is AFL Tables-owned.** Field-diff trace
+  `issue252-foreign-owner-field-diff-20260928-060322.log`: 36 rows, 53 differing values, owners
+  `afltables: 36`. The 36th is Karl Amon (`CD_M20260141101|CD_T80|CD_I297354`,
+  `2026|12|2026-05-21|Hawthorn|Adelaide`, `one_percenters` AFL Tables 3 vs AFL API 2). The 35→36
+  change came from resolving his identity, not from a new failure class.
+- **Root cause 1 (contract).** E3 (`autoApplyOwnership()`) is correct: a different owner is
+  refused, never adopted. The defect was preparation's aggregate `canonicalApplyRefusals = 0`
+  rule. It could not tell an expected cross-source disagreement from a real failure, because the
+  counter says neither which targets were refused nor why.
+- **Root cause 2 (reproducibility).** A fresh historical `db:test:rebuild` restores the captured
+  historical AFL API identities. It did not hold `CD_I297354`, which the retained snapshot needs.
+  Only a manual one-off bridge import repaired that, so the next fresh rebuild would regress.
+
+### 27.2 Decisions (implementation validated by the fresh rehearsal, §27.7–§27.8; operator-accepted 2026-09-28, §27.10; D-252-10/11 are left to the Q-252-10/11 outcomes)
+
+- **D-252-12.** An AFL API `player_match_stats` disagreement against an AFL Tables-owned row is an
+  expected corroborating-source condition. It qualifies only when proven row by row: the canonical
+  applier refused it as `foreign_source_owner`, against the owner `afltables` that it read inside
+  its savepoint.
+  - It remains a durable `data_issues` finding. It never changes canonical ownership or values.
+  - Preparation binds the exact refusal census and requires dry-run/apply parity.
+  - Every other canonical refusal remains fatal.
+  - This replaces an unsafe aggregate-zero rule with a stronger classified-evidence rule. It does
+    not "allow refusals".
+- **D-252-13.** After a historical rebuild, current-season provider bridge coverage is a mandatory,
+  hash-bound preparation prerequisite.
+  - **Consume, don't regenerate.** Preparation consumes a retained artefact. The emitter reads the
+    current season's canonical `player_match_stats`, which a fresh rebuild does not hold before the
+    AFL Tables settle. Its output also carries a generation timestamp. A retained file bound by its
+    recorded sha256 matches the retained-source model (D-252-2) exactly.
+  - **Bound to the snapshot.** The bridge must name the retained AFL API snapshot label and manifest
+    sha256, and its provider set must equal that snapshot's provider census exactly.
+  - **Stable identity only.** Every provider is `linked` through its stable identity; numeric
+    `candidate_player_id` values are ignored hints.
+  - **Before any settle.** It is validated, applied through the restricted loader and read back
+    before any settle. Settles never create players, so every identity it needs already exists
+    after the rebuild.
+
+### 27.3 Implementation (uncommitted)
+
+**Canonical writer and settle.**
+- `src/lib/acquisition/canonical-apply.ts`
+  - `CanonicalApplyTargetResult.ownerSourceKey?`: evidence only, set on an E3 refusal from the
+    identity E3 just judged (`judgedOwnerSourceKey()`).
+  - E3, every other gate and the write paths are unchanged.
+- `src/lib/acquisition/afl-api-refusal-evidence.ts` (new)
+  - Evidence type, canonical entry form, deterministic order and canonical sha256.
+- `src/lib/acquisition/settle-afl-api.ts`
+  - `refusalEvidence` on `AflApiSettleRunResult`, collected beside **both**
+    `canonicalApplyRefusals` increments: `unitRefusalEvidence()` for applier refusals (the actual
+    machine reason, `nothing_to_write` included) and `matchIdentityRefusalEvidence()` for the
+    I244-F010 identity withholding.
+  - Returned sorted. It survives a dry run exactly as the counter does.
+- `tools/current-season/settle-afl-api.ts`
+  - `loadBundle` is exported as `loadAflApiSettleBundle`, so preparation derives the required
+    provider census from the settle's own bundle build.
+
+**Preparation judges** (`tools/db/promotion-source-dependencies.ts`).
+- **Census.** `AFL_API_ACCEPTED_REFUSAL_CLASS` (`player_match_stats_foreign_source_owner_afltables`),
+  `aflApiRefusalEntryProblems()`, `aflApiRefusalCensusProblems()` (count = counter, canonical
+  order, no repeat), `aflApiPreparationStepProblems()` (every §21.2 post-condition, with only
+  `canonicalApplyRefusals` judged by census; `PREPARATION_ZERO_COUNTERS` unchanged),
+  `aflApiRefusalCensusParityProblems()` and `aflApiRefusalCensusBindingOf()`.
+- **Bridge.** `playerBridgeArtefactProblems()`, `playerBridgeImportProblems()`,
+  `playerBridgePostApplyProblems()` (human `resolved` links only up to the loader's own
+  pre-count) and `playerBridgeBindingOf()`.
+- **Schemas.** Record and proof are now schema 3. `parsePreparationRecord()` re-judges the census
+  (recomputed sha256, class, order, count = the apply counter, dry-run and apply digests = the
+  census) and the bridge (bound to the record's own AFL API label and manifest).
+  `parseSourceDependencyProof()` re-judges the census and requires a whole bridge binding. Schema 2
+  is refused.
+
+**Preparation CLI** (`tools/db/prepare-promotion-source.ts`).
+- New mandatory `--afl-api-player-bridge` and `--expect-afl-api-player-bridge-sha256`.
+- Offline: `verifyAflApiPlayerBridge()` checks the hash, snapshot, season and exact provider
+  census, then the restricted loader's own `loadBridgeArtefact(…, 'afldb_test')`.
+- `--dry-run`: the bridge is validated read-only.
+- `--apply` order: bridge validate → bridge apply → read-back → AFL Tables apply → closure dry run →
+  AFL API dry run (census judged) → AFL API apply (census judged, then parity) → record.
+- If the census changed between the two AFL API runs, it STOPs. The apply has already committed,
+  so no record is written and `afldb_test` must be rebuilt.
+
+**Everything else.**
+- `tools/db/promotion-source-dependency-rehearsal.ts`: its placeholder binding gains the two
+  fields; nothing else. **The `code_test_db` A–V harness predates the bridge argument and cannot
+  rerun unchanged** (it builds no bridge fixture). That is a follow-up, not a blocker: acceptance
+  is the fresh `afldb_test` rehearsal.
+- `docs/production-promotion.md` §3a/§3b, `CHANGELOG.md`, `issues.md`, `IssuesIndex.md`.
+- **Not changed, by decision.** `autoApplyOwnership()`, `applyCanonicalUnit()`'s gates, the 36 rows,
+  the loader and `promotion-check.ts`. An additional source-gate line binding the bridge's import
+  batch was attempted in `promotion-check.ts`, but the session's permission classifier refused the
+  edit. The record parse already re-judges both new sections, and the proof binds them, so this is
+  an optional follow-up.
+
+### 27.4 Validation (workstation, DB-free, 2026-09-28)
+
+- `npx tsc --noEmit`: clean.
+- `tests/db-promotion-check.test.ts`: **375/375**. The ISSUE-252 blocks hold 111 tests, 29 of them
+  new:
+  - D-252-12 mechanics, class, parity and CLI;
+  - D-252-13 judges and CLI;
+  - schema 3 record and proof, and the refusal of schema 2.
+- `tests/afl-api-ingestion-safety`, `afl-api-match`, `afl-api-player-bridge-cli`,
+  `current-season-import` and `afl-api-settle-cli-gate`: **630/630**.
+- ESLint on the eight TS files: 0 errors, 0 warnings. `git diff --check`: clean.
+- Not run: the DB-backed `tests/integration/settle-afl-api*.test.ts`. The fresh rehearsal exercises
+  the same path on real data, and its census judge enforces count = counter.
+
+### 27.5 Tests added (all DB-free)
+
+**Census, and the mechanics behind it.**
+- Evidence for an ordinary refusal and for an identity refusal, with the owner E3 judged.
+- A source-pinned test: every counter increment pushes evidence at the same site, and E3's table is
+  unchanged.
+- Order and field-order independence, and the digest.
+
+**The narrow class.**
+- PASS: 0, 1, many, and the 36-row shape.
+- FAIL on any single property:
+  - table `matches`; family `match`;
+  - owner `afl_api`, `manual_admin_edit` or null;
+  - `ownership_indeterminate`, `manual_authority_conflict`, `stale_canonical_target`,
+    `nothing_to_write` or `possible_existing_match`;
+  - empty or unsorted fields, or an identity refusal.
+- FAIL on the census as a whole: missing; counter above or below the evidence; extra keys;
+  reordered; repeated.
+- Every other counter stays strict.
+
+**Parity.** An added, removed or changed entry (reason, owner, fields, table, family, match or
+record) is refused, at both the judge and the CLI.
+
+**Record and proof.**
+- Schema 3 is accepted and schema 2 refused.
+- The census is refused when its hash mismatches, it is reordered, its count or class is wrong, an
+  entry is unapproved, the apply counter mismatches, or the dry-run digest mismatches.
+- An `accepted: true` claim with no entries is refused.
+- A zero census is accepted.
+- The bridge section is refused when absent, when built for another snapshot or manifest, with a
+  contradiction, when unlinked after apply, or with a census or outcome mismatch.
+- A proof is refused when it tampers with or lacks either section.
+
+**Bridge.**
+- A missing required provider, or another snapshot, STOPs before any connection.
+- A contradiction, collision or stop STOPs before any settle, as does an unlinked provider after
+  the apply or a new human link.
+- An idempotent replay passes.
+- A numeric-id-only link is refused, as are an extra, unresolved or contradictory provider.
+- Hints are counted and never bound; the record never carries a numeric player id.
+
+### 27.6 Stop conditions still in force
+
+Any of these STOPs the run, and none is weakened:
+- any of the census rows is not AFL Tables-owned on the applier's savepoint read;
+- the census is incomplete;
+- the dry-run and apply censuses differ;
+- the bridge needs name-only matching or introduces human authority;
+- a provider is still unresolved after the bridge;
+- a re-own would be needed;
+- the source is incomplete;
+- any other refusal, or any write failure;
+- a retained hash differs;
+- the DSNs are not both `afldb_test`;
+- the switch cannot be restored exactly.
+
+### 27.7 Fresh-rebuild DEV rehearsal (operator-run; PASSED)
+
+Run by the operator, because this session has no SSH access to DEV (`Permission denied
+(publickey,password)`), using `D:\tmp\issue252\issue252-fresh-rehearsal.sh` against the `077f9ca8`
+checkout. All steps PASSed.
+
+**Preparation record.** `/home/arm/backups/afldb/issue252-fresh-20260927-205159-preparation.json`,
+sha256 `50de2e93e46e878969bb367ee9a9eb470b0dfb2a0ca096071207cc61adba0fec`, prepared
+`2026-09-27T21:12:53.233Z`, season 2026.
+
+**Fresh `db:test:rebuild`.** 89/89 validation checks PASS; 803 AFL API importer identities
+captured/reinstated; baseline `season_2026_matches=0`; baseline `afl_api_player_identities=803`;
+baseline `CD_I297354_rows=1`.
+
+**Correction to §27.1's root cause 2.** The final fresh rebuild **did preserve `CD_I297354`**
+through the existing importer identity capture/reinstate mechanism. Earlier testing had shown that
+identity could be absent and the bridge could add it, but in this final acceptance rehearsal the
+bridge replay was idempotent: required providers 669, newly linked 0, already linked 669, all 669
+linked after read-back. `CD_I297354` was not missing after this fresh rebuild.
+
+**D-252-13 retained player bridge.** Bridge sha256
+`47bfadbe7d7f565c0aaea4c956be6d7825ec888a8bb780271548f17546f5e41f`; snapshot
+`afl-api-2026-2026-09-25-235854`; snapshot manifest sha256
+`afb2a754943fba59a48eabf0bf01dbae7e64046e012318864dc84f68c96907c7`; provider census 669/669; import
+batch 28. The bridge remains a mandatory, hash-bound prerequisite because it proves exact
+retained-snapshot provider coverage, even when replay is idempotent.
+
+**AFL Tables preparation.** First apply: inserted 11935, updated 0, provisional
+`unresolvedIdentityMatch` 217, batch 29. Mandatory same-label closure dry run immediately
+afterwards: inserted 0, updated 0, `unresolvedIdentityMatch` 0, no write.
+
+**D-252-12 AFL API refusal census.** Accepted class
+`player_match_stats_foreign_source_owner_afltables`, count 36, census sha256
+`53d09b41a709e2c4c200aecdd2441bfad955690ee37f22ab8c496ddcdcc7e435`, dry-run/apply census digest
+parity PASS. Every one of the 36 entries: family `player_match_stats`, target table
+`player_match_stats`, refusal `foreign_source_owner`, owner `afltables`. All other failure/refusal
+classes remained zero/fatal.
+
+Karl Amon census entry: external record `CD_M20260141101|CD_T80|CD_I297354`, match key
+`2026|12|2026-05-21|Hawthorn|Adelaide`, rendered field `one_percenters`, owner `afltables`.
+
+Independent static-import `parsePreparationRecord()` re-parse: PASS. (The original rehearsal step
+using a dynamic file-URL import under `tsx -e` failed because the export was not surfaced through
+that interop path — a rehearsal-script invocation issue, not an invalid preparation record.)
+
+**Post-preparation ownership verification.** PASS: refusal census entries 36; census rows resolved
+exactly once 36; census rows owned by AFL Tables 36; 2026 matches owned by AFL Tables 217; 2026
+`player_match_stats` owned by AFL Tables 9982; 2026 `player_match_stats` owned by AFL API 1. The
+current-season ingestion switch was restored exactly to its prior state: absent.
+
+**Code transport.** The operator's choice recorded above (patch applied to the `077f9ca8` checkout;
+the rehearsal's own step 1 file hashes prove which code ran).
+
+### 27.8 Real PROD manifest A and the schema-3 source gate (PASSED)
+
+Captured read-only on actual host `afldb-prod` against database `afldb_prod`, role `afldb_owner`.
+
+**Manifest.** `/home/arm/backups/afldb/issue252-prod-dependencies-A-20260927-232620.json`, sha256
+`3965df5391970d7ae7eaf6f7bba5dc4b21fcf8c4afcf1c5b2f0802d8e8ef8dca`; dependency-set sha256
+`f23da3d80f03bc2796b4381fc27b1bc70c4eec8a7a127381343fd7855e3ab704`. Properties: kind
+`afldb_promotion_target_dependency_manifest`, schema version 1, environment `prod`, target
+`afldb_prod`, pre-freeze, `freeze_token = null`, F1 rows 1, F2 rows 0, F3 rows 0. The sole F1
+dependency was `brownlow_vote_entry_state:match_id=17795`, stable match identity
+`2026|1|2026-03-05|Sydney|Carlton`, target owner `afltables`. The file was copied from PROD to DEV
+and re-hashed byte-identically.
+
+**Schema-3 source gate.** Source proof
+`/home/arm/backups/afldb/issue252-source-proof-20260927-232620.json`, sha256
+`6c15b3b656236c083da57bf5c1439a35c7434bd06386b49875b341d697fc8abd`. Properties: kind
+`afldb_promotion_source_dependency_proof`, schema version 3, verdict PASS, environment `prod`,
+target database `afldb_prod`, source database `afldb_test`, dependency-set sha256
+`f23da3d80f03bc2796b4381fc27b1bc70c4eec8a7a127381343fd7855e3ab704`, preparation record sha256
+`50de2e93e46e878969bb367ee9a9eb470b0dfb2a0ca096071207cc61adba0fec`. Family result: F1 1 inspected /
+1 stable identity / 1 resolved / 1 ownership parity; F2 0; F3 0. Overall:
+`PROMOTION CHECK (prod/source): PASS — 16 gate(s) evaluated, none failed.`
+
+No freeze, candidate creation, reinstatement, swap or other PROD mutation occurred in this
+acceptance run. This closes §27.7's prior source-gate dependency: the fresh rehearsal, the manifest-A
+capture and the source gate have all now PASSed.
+
+**Not run.** The frozen manifest B (§18.2 D-252-6's step (c), `--phase pre-cutover`). **Not
+attempted.** A fresh AFLDB-ISSUE-237 L5 PROD attempt.
+
+### 27.9 Next action
+
+1. Final diff/documentation review.
+2. Commit/merge ISSUE-252.
+3. Deploy/synchronise the committed schema-3 implementation through the normal procedure.
+4. A completely fresh ISSUE-237 L5 PROD attempt, under separate authorisation. That future real L5
+   must create its own attempt-scoped manifest A/source proof and frozen manifest B.
+
+The retained failed candidate `afldb_prod_candidate_20260927-142540` is evidence only and must not
+be mutated or resumed.
+
+### 27.10 Operator acceptance (2026-09-28)
+
+**D-252-12 and D-252-13 are explicitly accepted by the operator on 2026-09-28**, on the evidence
+assembled in §27.7–§27.8: the fresh DEV rebuild/preparation rehearsal PASS; the D-252-12 36-row
+classified refusal census PASS; the D-252-13 669/669 bridge PASS; the real PROD manifest A PASS; and
+the schema-3 source gate PASS 16/16. This closes the "operator acceptance remains to be recorded"
+step for D-252-12/D-252-13 specifically. **ISSUE-252 itself is not yet resolved** and AFLDB-ISSUE-237
+L5 PROD has not passed — both remain open pending commit/merge, deployment, and a fresh L5 attempt.

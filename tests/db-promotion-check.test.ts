@@ -170,6 +170,16 @@ import {
   parsePreparationRecord,
   parseSourceDependencyProof,
   renderSourceDependencyProof,
+  SOURCE_DEPENDENCY_PROOF_SCHEMA_VERSION,
+  AFL_API_ACCEPTED_REFUSAL_CLASS,
+  aflApiPreparationStepProblems,
+  aflApiRefusalCensusEvidence,
+  aflApiRefusalCensusParityProblems,
+  aflApiRefusalCensusProblems,
+  playerBridgeArtefactProblems,
+  playerBridgeImportProblems,
+  playerBridgePostApplyProblems,
+  type PlayerBridgeImportCounts,
   type PreparationBinding,
   type SettleStepSummary,
   type SourceMatchReading,
@@ -178,10 +188,21 @@ import {
 import {
   parsePrepareArgs,
   runPreparePromotionSource,
+  verifyAflApiPlayerBridge,
   verifyAflApiRetainedSnapshot,
   verifyAflTablesRetainedSnapshot,
   type PrepareDeps,
+  type VerifiedPlayerBridge,
 } from '../tools/db/prepare-promotion-source';
+import {
+  aflApiRefusalCensusSha256,
+  canonicalAflApiRefusalCensus,
+  type AflApiCanonicalRefusalEvidence,
+  type AflApiRefusalCensusEntry,
+} from '../src/lib/acquisition/afl-api-refusal-evidence';
+import { judgedOwnerSourceKey } from '../src/lib/acquisition/canonical-apply';
+import { matchIdentityRefusalEvidence, unitRefusalEvidence } from '../src/lib/acquisition/settle-afl-api';
+import type { BridgeImportReport, LoadedBridgeArtefact } from '../tools/migration/import_afl_api_player_bridge';
 import {
   REHEARSAL_CASES,
   SOURCE_DEPENDENCY_REHEARSAL,
@@ -5857,6 +5878,40 @@ describe('AFLDB-ISSUE-252 source dependency manifest and ownership-parity gate',
   });
   const family = (j: ReturnType<typeof judgeSourceDependencies>, id: 'F1' | 'F2' | 'F3') =>
     j.families.find((f) => f.family === id)!;
+  /** D-252-12: one accepted refusal — Karl Amon's, the 36th of the real census. */
+  const refusal = (over: Partial<AflApiCanonicalRefusalEvidence> = {}): AflApiCanonicalRefusalEvidence => ({
+    family: 'player_match_stats', externalRecordId: 'CD_M20260141101|CD_T80|CD_I297354', targetTable: 'player_match_stats',
+    refusal: 'foreign_source_owner', matchKey: '2026|12|2026-05-21|Hawthorn|Adelaide', renderedFields: ['one_percenters'],
+    ownerSourceKey: 'afltables', ...over,
+  });
+  const CENSUS: AflApiRefusalCensusEntry[] = canonicalAflApiRefusalCensus([
+    refusal(),
+    refusal({ externalRecordId: 'CD_M20260140101|CD_T160|CD_I1000001', matchKey: KEY, renderedFields: ['disposals', 'contested'] }),
+  ]);
+  const BRIDGE_REPORT = (outcome: string, batch: string | null) => ({
+    outcome, linked: 1, already_linked: 668, already_linked_human: 0, contradictions_withheld: [], player_collisions_withheld: [],
+    findings_recorded: 0, findings_already_open: 0, stops: [], candidate_player_id_hints_ignored: 1, import_batch_id: batch,
+  });
+  /** Schema 3: what every preparation record carries beside the AFL Tables results. */
+  const recordV3Extras = () => ({
+    counters: { afltables: {}, afl_api: { canonicalApplyRefusals: CENSUS.length } },
+    afl_api_refusal_census: aflApiRefusalCensusEvidence(CENSUS, CENSUS),
+    afl_api_player_bridge: {
+      kind: 'afl_api_player_bridge_prerequisite',
+      artefact: {
+        path: '/home/arm/backups/afldb/issue252-player-bridge.json', file_sha256: 'e'.repeat(64),
+        match_method: 'afl_api_stat_vector_season', player_identity_contract: 'afldb_player_identity_v1', built_from_database: 'afldb_test',
+        tool: 'tools/current-season/emit-afl-api-player-bridge-test.ts', season: 2026,
+        snapshot_label: 'afl-api-2026-2026-09-25-235854',
+        snapshot_manifest_sha256: 'afb2a754943fba59a48eabf0bf01dbae7e64046e012318864dc84f68c96907c7',
+      },
+      provider_census: { required: 669, artefact_providers: 669, artefact_linked: 669 },
+      validate: BRIDGE_REPORT('READ_ONLY', null),
+      apply: BRIDGE_REPORT('COMMITTED', '500'),
+      post_apply: { required: 669, linked: 669, human_resolved: 0, unlinked: 0 },
+      result: 'PASS',
+    },
+  });
   const PREPARATION: PreparationBinding = {
     record_sha256: 'd'.repeat(64), prepared_at: '2026-09-28T00:00:00.000Z', season: 2026, source_database: 'afldb_test',
     batches: { afltables: 501, afl_api: 502 },
@@ -5870,8 +5925,16 @@ describe('AFLDB-ISSUE-252 source dependency manifest and ownership-parity gate',
       initial_apply: { inserted: 9, updated: 0, unresolved_identity_match: 1 },
       closure_dry_run: { inserted: 0, updated: 0, unresolved_identity_match: 0 },
     },
+    afl_api_refusal_census: {
+      accepted_class: AFL_API_ACCEPTED_REFUSAL_CLASS, count: CENSUS.length, sha256: aflApiRefusalCensusSha256(CENSUS), entries: CENSUS,
+    },
+    afl_api_player_bridge: {
+      file_sha256: 'e'.repeat(64), match_method: 'afl_api_stat_vector_season', snapshot_label: 'afl-api-2026-2026-09-25-235854',
+      snapshot_manifest_sha256: 'afb2a754943fba59a48eabf0bf01dbae7e64046e012318864dc84f68c96907c7',
+      required_providers: 669, linked_providers: 669, import_batch_id: 500,
+    },
   };
-  /** Q-252-10: the two AFL Tables results a v2 preparation record carries, matching PREPARATION. */
+  /** Q-252-10: the two AFL Tables results a preparation record carries, matching PREPARATION. */
   const afltablesZeroCounters = () => Object.fromEntries([
     ...PREPARATION_ZERO_COUNTERS.afltables, 'canonicalRowsInserted', 'canonicalRowsUpdated', 'canonicalApplicationsLogged',
   ].map((k) => [k, 0]));
@@ -6120,6 +6183,31 @@ describe('AFLDB-ISSUE-252 source dependency manifest and ownership-parity gate',
         .toThrow(/clean AFL Tables closure dry run/);
     });
 
+    it('schema 3 binds the refusal census and the bridge; a schema 2 proof, or one missing or tampering either, is refused', () => {
+      expect(SOURCE_DEPENDENCY_PROOF_SCHEMA_VERSION).toBe(3);
+      const bytes = renderSourceDependencyProof(buildSourceDependencyProof(proofInput));
+      const parsed = JSON.parse(bytes);
+      expect(parsed.preparation.afl_api_refusal_census).toEqual(PREPARATION.afl_api_refusal_census);
+      expect(parsed.preparation.afl_api_player_bridge).toEqual(PREPARATION.afl_api_player_bridge);
+      const variant = (over: Record<string, unknown>, prep: Record<string, unknown> = {}) => {
+        const text = JSON.stringify({ ...parsed, ...over, preparation: { ...parsed.preparation, ...prep } });
+        return () => parseSourceDependencyProof({ bytes: text, expectedFileSha256: sha256Hex(text), expectedEnvironment: 'prod' });
+      };
+      expect(variant({ schema_version: 2 })).toThrow(/Not a source dependency proof of a supported schema/);
+      expect(variant({}, { afl_api_refusal_census: undefined })).toThrow(/carries no AFL API refusal census/);
+      const census = parsed.preparation.afl_api_refusal_census;
+      const tampered = census.entries.map((e: AflApiRefusalCensusEntry, i: number) => (i === 0 ? { ...e, owner_source_key: 'afl_api' } : e));
+      expect(variant({}, { afl_api_refusal_census: { ...census, entries: tampered } })).toThrow(/owner_source_key is "afl_api"/);
+      expect(variant({}, { afl_api_refusal_census: { ...census, sha256: 'f'.repeat(64) } })).toThrow(/is not the recomputed/);
+      expect(variant({}, { afl_api_player_bridge: undefined })).toThrow(/does not bind the AFL API player bridge prerequisite/);
+      expect(variant({}, { afl_api_player_bridge: { ...parsed.preparation.afl_api_player_bridge, linked_providers: 668 } }))
+        .toThrow(/every required provider linked/);
+      expect(variant({}, { afl_api_player_bridge: { ...parsed.preparation.afl_api_player_bridge, snapshot_label: 'other' } }))
+        .toThrow(/not bound to the preparation's AFL API snapshot/);
+      expect(sourceProofBindingProblems({ ...buildSourceDependencyProof(proofInput), schema_version: 2 }, pre))
+        .toContain('not a source dependency proof of a supported schema');
+    });
+
     it('P: an identical frozen set lets the proof stand; Q: a changed set requires a fresh gate', () => {
       const proof = buildSourceDependencyProof(proofInput);
       expect(sourceProofBindingProblems(proof, manifestOf([reading()], '2026-09-28T10:00:00Z'))).toEqual([]);
@@ -6291,6 +6379,203 @@ describe('AFLDB-ISSUE-252 source dependency manifest and ownership-parity gate',
     });
   });
 
+  describe('D-252-12: AFL API refusal evidence and the narrow preparation class', () => {
+    const unit = {
+      family: 'player_match_stats', externalRecordId: 'CD_M20260141101|CD_T80|CD_I297354', matchKey: '2026|12|2026-05-21|Hawthorn|Adelaide',
+      targets: [{ targetTable: 'player_match_stats', renderedFields: ['one_percenters'] }],
+    } as unknown as Parameters<typeof unitRefusalEvidence>[0];
+    const result = (over: Record<string, unknown>) => ({
+      targetTable: 'player_match_stats', applied: false, verb: null, rowsInserted: 0, rowsUpdated: 0, refusal: 'foreign_source_owner', ...over,
+    }) as Parameters<typeof unitRefusalEvidence>[1];
+    const zeros = Object.fromEntries(PREPARATION_ZERO_COUNTERS.afl_api.map((k) => [k, 0]));
+    const apiStep = (census: readonly unknown[] | null, over: Partial<SettleStepSummary> = {}, refusals = census?.length ?? 0): SettleStepSummary => ({
+      source: 'afl_api', mode: 'apply', halt: null, rollbackReason: null, completeness: 'complete', applied: true,
+      counters: { ...zeros, canonicalApplyRefusals: refusals, corroboratedForeignOwned: 217 },
+      refusalCensus: census as AflApiRefusalCensusEntry[] | null, ...over,
+    });
+    const entry = (over: Partial<AflApiCanonicalRefusalEvidence> = {}) => canonicalAflApiRefusalCensus([refusal(over)])[0];
+
+    it('an ordinary refusal carries the applier reason and the owner it read; an identity refusal is represented too', () => {
+      expect(unitRefusalEvidence(unit, result({ ownerSourceKey: 'afltables' }))).toEqual(refusal());
+      expect(unitRefusalEvidence(unit, result({ refusal: 'nothing_to_write' }))).toEqual(refusal({ refusal: 'nothing_to_write', ownerSourceKey: null }));
+      expect(matchIdentityRefusalEvidence('CD_M1', KEY, ['round_code', 'match_date'])).toEqual({
+        family: 'match', externalRecordId: 'CD_M1', targetTable: 'matches', refusal: 'identity_change_requires_review',
+        matchKey: KEY, renderedFields: ['round_code', 'match_date'], ownerSourceKey: null,
+      });
+    });
+
+    it('the owner reported is the one E3 judged: a key when owned, null when absent or unreadable', () => {
+      const targetKey = { player_id: 1, match_id: 2 };
+      expect(judgedOwnerSourceKey({ status: 'resolved', entity: 'player_match_stats', targetKey, ownership: { state: 'owned', sourceKey: 'afltables' } } as never)).toBe('afltables');
+      expect(judgedOwnerSourceKey({ status: 'resolved', entity: 'player_match_stats', targetKey, ownership: { state: 'unowned' } } as never)).toBeNull();
+      expect(judgedOwnerSourceKey({ status: 'resolved', entity: 'player_match_stats', targetKey, ownership: { state: 'indeterminate' } } as never)).toBeNull();
+      expect(judgedOwnerSourceKey({ status: 'new_target', entity: 'player_match_stats', targetKey } as never)).toBeNull();
+    });
+
+    it('every canonicalApplyRefusals increment in the settle pushes evidence at the same site, and E3 stays strict', () => {
+      const settle = readFileSync(join(process.cwd(), 'src', 'lib', 'acquisition', 'settle-afl-api.ts'), 'utf8');
+      const increments = settle.match(/counters\.canonicalApplyRefusals \+= 1;/g) ?? [];
+      const paired = settle.match(/counters\.canonicalApplyRefusals \+= 1;\s*(?:\/\/[^\n]*\n\s*)*refs\.refusalEvidence\.push\(/g) ?? [];
+      expect(increments).toHaveLength(2);
+      expect(paired).toHaveLength(increments.length);
+      const apply = readFileSync(join(process.cwd(), 'src', 'lib', 'acquisition', 'canonical-apply.ts'), 'utf8');
+      // The E3 table is unchanged: a different owner is refused, never adopted.
+      expect(apply).toMatch(/ownership\.sourceKey === promotingSourceKey\s*\? \{ verdict: 'updateable' \}\s*: \{ verdict: 'refused', detail: 'foreign_source_owner' \}/);
+      expect(apply).toMatch(/results\.push\(\{ \.\.\.refused\(target\.targetTable, ownership\.detail\), ownerSourceKey: judgedOwnerSourceKey\(fresh\.identity\) \}\)/);
+    });
+
+    it('the census is deterministic: input order and field order do not change it or its digest', () => {
+      const a = [refusal(), refusal({ externalRecordId: 'CD_M2|CD_T1|CD_I2', renderedFields: ['tackles', 'kicks'] })];
+      const b = [...a].reverse().map((e) => ({ ...e, renderedFields: [...e.renderedFields].reverse() }));
+      expect(canonicalAflApiRefusalCensus(b)).toEqual(canonicalAflApiRefusalCensus(a));
+      expect(aflApiRefusalCensusSha256(canonicalAflApiRefusalCensus(b))).toBe(aflApiRefusalCensusSha256(canonicalAflApiRefusalCensus(a)));
+      expect(canonicalAflApiRefusalCensus(a).map((e) => e.rendered_fields)).toContainEqual(['kicks', 'tackles']);
+      expect(aflApiRefusalCensusSha256([entry({ ownerSourceKey: 'afl_api' })])).not.toBe(aflApiRefusalCensusSha256([entry()]));
+      expect(aflApiRefusalCensusSha256([])).toMatch(/^[0-9a-f]{64}$/);
+    });
+
+    it('PASS: zero refusals, and one or many player_match_stats + foreign_source_owner + afltables', () => {
+      expect(aflApiPreparationStepProblems(apiStep([]))).toEqual([]);
+      expect(aflApiPreparationStepProblems(apiStep([entry()]))).toEqual([]);
+      expect(aflApiPreparationStepProblems(apiStep(CENSUS))).toEqual([]);
+      expect(aflApiPreparationStepProblems(apiStep(CENSUS, { mode: 'dry-run', applied: false, rollbackReason: 'dry_run' }))).toEqual([]);
+      // The aggregate-zero rule is unchanged everywhere else: the plain guard still refuses.
+      expect(settleStepProblems(apiStep(CENSUS))).toEqual([`afl_api apply: canonicalApplyRefusals = ${CENSUS.length}, must be 0`]);
+    });
+
+    it('FAIL: any single property outside the class', () => {
+      const fails: [Partial<AflApiCanonicalRefusalEvidence>, RegExp][] = [
+        [{ targetTable: 'matches' }, /target_table is "matches"/],
+        [{ family: 'match' }, /family is "match"/],
+        [{ ownerSourceKey: 'afl_api' }, /owner_source_key is "afl_api"/],
+        [{ ownerSourceKey: 'manual_admin_edit' }, /owner_source_key is "manual_admin_edit"/],
+        [{ ownerSourceKey: null }, /owner_source_key is null/],
+        [{ refusal: 'ownership_indeterminate' }, /refusal is "ownership_indeterminate"/],
+        [{ refusal: 'manual_authority_conflict' }, /refusal is "manual_authority_conflict"/],
+        [{ refusal: 'stale_canonical_target' }, /refusal is "stale_canonical_target"/],
+        [{ refusal: 'nothing_to_write' }, /refusal is "nothing_to_write"/],
+        [{ refusal: 'possible_existing_match' }, /refusal is "possible_existing_match"/],
+        [{ renderedFields: [] }, /rendered_fields must be a non-empty list/],
+      ];
+      for (const [over, pattern] of fails) {
+        expect(aflApiPreparationStepProblems(apiStep([entry(over)])).join('\n')).toMatch(pattern);
+      }
+      const identity = canonicalAflApiRefusalCensus([matchIdentityRefusalEvidence('CD_M1', KEY, ['match_date'])]);
+      expect(aflApiPreparationStepProblems(apiStep([...CENSUS, ...identity].sort((x, y) => (JSON.stringify(x) < JSON.stringify(y) ? -1 : 1))))
+        .join('\n')).toMatch(/refusal is "identity_change_requires_review"/);
+    });
+
+    it('FAIL: a missing census, a counter above or below it, malformed or reordered entries, and every other counter stays strict', () => {
+      expect(aflApiPreparationStepProblems(apiStep(null, {}, 36)).join()).toMatch(/no refusal census was reported/);
+      expect(aflApiPreparationStepProblems(apiStep(CENSUS, {}, CENSUS.length + 1)).join()).toMatch(/canonicalApplyRefusals = 3 but the refusal census has 2/);
+      expect(aflApiPreparationStepProblems(apiStep(CENSUS, {}, 1)).join()).toMatch(/canonicalApplyRefusals = 1 but the refusal census has 2/);
+      expect(aflApiPreparationStepProblems(apiStep([{ ...CENSUS[0], rendered_fields: ['b', 'a'] }])).join()).toMatch(/not sorted and unique/);
+      expect(aflApiPreparationStepProblems(apiStep([{ ...CENSUS[0], extra: 1 }])).join()).toMatch(/census entry fields are/);
+      expect(aflApiPreparationStepProblems(apiStep([...CENSUS].reverse())).join()).toMatch(/not in canonical order/);
+      expect(aflApiPreparationStepProblems(apiStep([CENSUS[0], CENSUS[0]])).join()).toMatch(/not in canonical order, or repeats/);
+      expect(aflApiPreparationStepProblems(apiStep(CENSUS, { counters: { ...zeros, canonicalApplyRefusals: 2, foreignOwnedCollision: 1 } })))
+        .toEqual(['afl_api apply: foreignOwnedCollision = 1, must be 0']);
+      for (const key of ['canonicalApplyFailures', 'unresolvedIdentityPlayer', 'unresolvedIdentityMatch', 'manualAuthorityRefusals']) {
+        expect(aflApiPreparationStepProblems(apiStep(CENSUS, { counters: { ...zeros, canonicalApplyRefusals: 2, [key]: 1 } })))
+          .toEqual([`afl_api apply: ${key} = 1, must be 0`]);
+      }
+      expect(aflApiPreparationStepProblems(apiStep(CENSUS, { completeness: 'incomplete' })).join()).toMatch(/completeness is incomplete/);
+      expect(aflApiPreparationStepProblems({ ...apiStep([]), source: 'afltables' }).join()).toMatch(/covers the AFL API settle only/);
+      expect(aflApiRefusalCensusProblems(CENSUS, 'x', 'w').join()).toMatch(/not a count/);
+    });
+
+    it('parity: identical censuses pass; an added, removed or changed entry is named', () => {
+      expect(aflApiRefusalCensusParityProblems(CENSUS, [...CENSUS])).toEqual([]);
+      expect(aflApiRefusalCensusParityProblems(CENSUS, CENSUS.slice(1)).join('\n')).toMatch(/only in the dry run: .*CD_I/);
+      expect(aflApiRefusalCensusParityProblems(CENSUS.slice(1), CENSUS).join('\n')).toMatch(/only in the apply: /);
+      for (const over of [{ refusal: 'ownership_indeterminate' as const }, { ownerSourceKey: 'afl_api' }, { renderedFields: ['kicks'] },
+        { targetTable: 'matches' as const }, { family: 'match' }, { matchKey: 'other' }]) {
+        const changed = aflApiRefusalCensusParityProblems([entry()], [entry(over)]);
+        expect(changed[0]).toMatch(/changed between the dry run \(1, [0-9a-f]{64}\) and the apply \(1, [0-9a-f]{64}\)/);
+        expect(changed).toHaveLength(3);
+      }
+    });
+  });
+
+  describe('D-252-13: the player bridge judges (DB-free)', () => {
+    const SNAP = 'afl-api-2026-2026-09-25-235854';
+    const M = 'afb2a754943fba59a48eabf0bf01dbae7e64046e012318864dc84f68c96907c7';
+    const linked = (identity: string | null = 'players/K/Karl_Amon.html') => ({ disposition: 'linked', candidate_player_id: 7974, candidate_player_identity: identity });
+    const artefact = (over: Record<string, unknown> = {}) => ({
+      match_method: 'afl_api_stat_vector_season', snapshot_label: SNAP, snapshot_manifest_sha256: M, season: 2026,
+      providers: { CD_I297354: linked(), CD_I1: linked('players/A/A.html') }, ...over,
+    });
+    const judge = (a: Record<string, unknown>, over: Record<string, unknown> = {}) => playerBridgeArtefactProblems({
+      artefact: a, expectedFileSha256: 'e'.repeat(64), actualFileSha256: 'e'.repeat(64), aflApiLabel: SNAP, aflApiManifestSha256: M,
+      season: 2026, requiredProviderIds: ['CD_I1', 'CD_I297354'], ...over,
+    });
+    const report = (over: Partial<PlayerBridgeImportCounts> = {}): PlayerBridgeImportCounts => ({
+      outcome: 'COMMITTED', linked: 1, alreadyLinked: 1, alreadyLinkedHuman: 0, contradictionsWithheld: [], playerCollisionsWithheld: [],
+      findingsRecorded: 0, findingsAlreadyOpen: 0, stops: [], hintMismatches: [], importBatchId: '500', ...over,
+    });
+
+    it('accepts exactly the bridge built for this snapshot, covering exactly its providers by stable identity', () => {
+      expect(judge(artefact())).toEqual([]);
+    });
+
+    it('refuses another snapshot, manifest, season, class or byte hash', () => {
+      expect(judge(artefact({ snapshot_label: 'afl-api-2026-2026-09-20-000000' })).join()).toMatch(/built for snapshot .* not the retained/);
+      expect(judge(artefact({ snapshot_manifest_sha256: 'f'.repeat(64) })).join()).toMatch(/names snapshot manifest/);
+      expect(judge(artefact({ season: 2025 })).join()).toMatch(/season 2025, not 2026/);
+      expect(judge(artefact({ match_method: 'afl_api_stat_vector' })).join()).toMatch(/accepts only 'afl_api_stat_vector_season'/);
+      expect(judge(artefact(), { actualFileSha256: 'd'.repeat(64) }).join()).toMatch(/player bridge artefact sha256 d+ is not the recorded e+/);
+    });
+
+    it('refuses a missing required provider, an extra one, an unresolved or contradictory one, and a numeric-id-only link', () => {
+      expect(judge(artefact({ providers: { CD_I1: linked() } })).join()).toMatch(/1 required provider\(s\) are absent from the bridge: CD_I297354/);
+      expect(judge(artefact({ providers: { ...artefact().providers as object, CD_I9: linked() } })).join()).toMatch(/not required by the snapshot: CD_I9/);
+      expect(judge(artefact({ providers: { CD_I1: linked(), CD_I297354: { disposition: 'unresolved' } } })).join()).toMatch(/CD_I297354: disposition "unresolved"/);
+      expect(judge(artefact({ providers: { CD_I1: linked(), CD_I297354: { disposition: 'contradictory' } } })).join()).toMatch(/disposition "contradictory"/);
+      expect(judge(artefact({ providers: { CD_I1: linked(), CD_I297354: linked(null) } })).join()).toMatch(/CD_I297354: no candidate_player_identity \(a numeric id alone/);
+      expect(judge(artefact(), { requiredProviderIds: [] }).join()).toMatch(/requires no provider player/);
+    });
+
+    it('the loader report must close the census with no contradiction, collision, stop or finding', () => {
+      expect(playerBridgeImportProblems(report(), 'COMMITTED', 2)).toEqual([]);
+      expect(playerBridgeImportProblems(report({ outcome: 'READ_ONLY', importBatchId: null }), 'READ_ONLY', 2)).toEqual([]);
+      expect(playerBridgeImportProblems(report({ linked: 0, alreadyLinked: 2 }), 'COMMITTED', 2)).toEqual([]); // idempotent replay
+      expect(playerBridgeImportProblems(report({ contradictionsWithheld: ['CD_I1'], alreadyLinked: 0 }), 'COMMITTED', 2).join())
+        .toMatch(/contradictions withheld: CD_I1[\s\S]*1 provider\(s\) linked or already linked, but the snapshot requires 2/);
+      expect(playerBridgeImportProblems(report({ playerCollisionsWithheld: ['CD_I1'] }), 'COMMITTED', 2).join()).toMatch(/player collisions withheld/);
+      expect(playerBridgeImportProblems(report({ stops: [{}] }), 'COMMITTED', 2).join()).toMatch(/do not resolve through their stable identity/);
+      expect(playerBridgeImportProblems(report({ findingsAlreadyOpen: 1 }), 'COMMITTED', 2).join()).toMatch(/1 bridge finding/);
+      expect(playerBridgeImportProblems(report({ outcome: 'ROLLED_BACK' }), 'COMMITTED', 2).join()).toMatch(/outcome ROLLED_BACK, expected COMMITTED/);
+      expect(playerBridgeImportProblems(report({ importBatchId: null }), 'COMMITTED', 2).join()).toMatch(/no import batch/);
+    });
+
+    it('the read-back needs every required provider linked once, and no new human authority', () => {
+      const row = (externalId: string, status = 'unique', playerId: number | null = 1) => ({ externalId, status, playerId });
+      expect(playerBridgePostApplyProblems(['A', 'B'], [row('A'), row('B')], 0)).toEqual([]);
+      expect(playerBridgePostApplyProblems(['A', 'B'], [row('A'), row('B', 'resolved')], 1)).toEqual([]);
+      expect(playerBridgePostApplyProblems(['A', 'B'], [row('A')], 0)).toEqual(['B: 0 afl_api identity row(s), expected exactly 1']);
+      expect(playerBridgePostApplyProblems(['A'], [row('A', 'unique', null)], 0)).toEqual(['A: not linked to a player (status unique)']);
+      expect(playerBridgePostApplyProblems(['A'], [row('A', 'ambiguous')], 0)).toEqual(['A: status ambiguous, not a link']);
+      expect(playerBridgePostApplyProblems(['A'], [row('A', 'resolved')], 0).join()).toMatch(/never introduces human authority/);
+    });
+
+    it('verifyAflApiPlayerBridge reports a missing or unreadable artefact instead of inventing one', () => {
+      const root = mkdtempSync(join(tmpdir(), 'issue252-bridge-'));
+      try {
+        const api = { label: SNAP, manifestSha256: M, season: 2026 };
+        expect(verifyAflApiPlayerBridge(root, join(root, 'absent.json'), 'e'.repeat(64), api).problems.join()).toMatch(/no player bridge artefact at/);
+        writeFileSync(join(root, 'b.json'), '[1]');
+        expect(verifyAflApiPlayerBridge(root, join(root, 'b.json'), 'e'.repeat(64), api)).toMatchObject({
+          loaded: null, problems: [expect.stringMatching(/player bridge refused: not a JSON object/)],
+        });
+        // An object bridge, but no retained snapshot to derive the required census from.
+        writeFileSync(join(root, 'c.json'), JSON.stringify(artefact()));
+        expect(verifyAflApiPlayerBridge(root, join(root, 'c.json'), 'e'.repeat(64), api).problems.join()).toMatch(/player bridge refused:/);
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    });
+  });
+
   describe('prepare-promotion-source: arguments', () => {
     const sha = (c: string) => c.repeat(64);
     const base = [
@@ -6298,7 +6583,18 @@ describe('AFLDB-ISSUE-252 source dependency manifest and ownership-parity gate',
       '--afltables-label', 'settle-2026-2026-09-22-0444', '--expect-afltables-manifest-sha256', sha('a'),
       '--expect-afltables-bundle-sha256', sha('b'),
       '--afl-api-label', 'afl-api-2026-2026-09-25-235854', '--expect-afl-api-manifest-sha256', sha('c'),
+      '--afl-api-player-bridge', '/home/arm/backups/afldb/b.json', '--expect-afl-api-player-bridge-sha256', sha('e'),
     ];
+
+    it('D-252-13: the player bridge and its recorded sha256 are mandatory in every mode', () => {
+      expect(parsePrepareArgs([...base, '--validate-only'])).toMatchObject({
+        aflApiPlayerBridge: '/home/arm/backups/afldb/b.json', aflApiPlayerBridgeSha256: sha('e'),
+      });
+      for (const mode of [['--validate-only'], ['--dry-run'], ['--apply', '--record-out', 'r.json']]) {
+        expect(() => parsePrepareArgs([...base.slice(0, -4), ...mode])).toThrow(/--afl-api-player-bridge is required/);
+        expect(() => parsePrepareArgs([...base.slice(0, -2), ...mode])).toThrow(/--expect-afl-api-player-bridge-sha256 is required/);
+      }
+    });
 
     it('requires the acknowledgement, exactly one mode, and --record-out with --apply only', () => {
       expect(parsePrepareArgs([...base, '--validate-only']).mode).toBe('validate-only');
@@ -6395,9 +6691,32 @@ describe('AFLDB-ISSUE-252 source dependency manifest and ownership-parity gate',
       '--afltables-label', 'settle-2026-2026-09-22-0444', '--expect-afltables-manifest-sha256', sha('a'),
       '--expect-afltables-bundle-sha256', sha('b'),
       '--afl-api-label', 'afl-api-2026-2026-09-25-235854', '--expect-afl-api-manifest-sha256', sha('c'),
+      '--afl-api-player-bridge', 'bridge.json', '--expect-afl-api-player-bridge-sha256', sha('e'),
       ...mode,
     ];
     const zeros = (source: 'afltables' | 'afl_api') => Object.fromEntries(PREPARATION_ZERO_COUNTERS[source].map((k) => [k, 0]));
+    // D-252-13: three required providers; one newly linked (the CD_I297354 shape), two already linked.
+    const REQUIRED = ['CD_I1000001', 'CD_I1000002', 'CD_I297354'];
+    const verifiedBridge = (over: Partial<VerifiedPlayerBridge> = {}): VerifiedPlayerBridge => ({
+      path: 'bridge.json', fileSha256: sha('e'), requiredProviderIds: REQUIRED,
+      artefact: {
+        match_method: 'afl_api_stat_vector_season', built_from_database: 'afldb_test', season: 2026,
+        tool: 'tools/current-season/emit-afl-api-player-bridge-test.ts', player_identity_contract: 'afldb_player_identity_v1',
+        snapshot_label: 'afl-api-2026-2026-09-25-235854', snapshot_manifest_sha256: sha('c'),
+      },
+      loaded: { path: 'bridge.json', fileSha256: sha('e'), evidenceClass: 'afl_api_stat_vector_season', rows: REQUIRED.map(() => ({})) } as unknown as LoadedBridgeArtefact,
+      problems: [],
+      ...over,
+    });
+    const bridgeReport = (mode: string, over: Partial<BridgeImportReport> = {}): BridgeImportReport => ({
+      mode: mode as BridgeImportReport['mode'],
+      artefact: { path: 'bridge.json', sha256: sha('e'), evidenceClass: 'afl_api_stat_vector_season', linkedRows: REQUIRED.length },
+      outcome: mode === 'apply' ? 'COMMITTED' : 'READ_ONLY', linked: 1, alreadyLinked: 2, alreadyLinkedHuman: 0,
+      contradictionsWithheld: [], playerCollisionsWithheld: [], findingsRecorded: 0, findingsAlreadyOpen: 0,
+      hintMismatches: [{ externalId: 'CD_I297354', hintPlayerId: 7974, resolvedPlayerId: 9001 }] as BridgeImportReport['hintMismatches'],
+      stops: [], importBatchId: mode === 'apply' ? '500' : null,
+      ...over,
+    });
     // As the real settles return them: batch ids are decimal text, and an AFL API dry run reports
     // its own deliberate rollback as 'dry_run'.
     // Q-252-10: a first AFL Tables apply on a fresh source counts each new match's pending period
@@ -6416,10 +6735,20 @@ describe('AFLDB-ISSUE-252 source dependency manifest and ownership-parity gate',
         return afltablesOutcome(a.includes('--apply'), a.includes('--apply') ? apply : closure) as unknown as
           Awaited<ReturnType<NonNullable<PrepareDeps['settleAfltables']>>>;
       };
-    const aflApiOutcome = (applied: boolean, counters = zeros('afl_api')) => ({
-      result: { applied, batchId: applied ? '502' : null, counters, halt: null, rollbackReason: applied ? null : 'dry_run' },
+    const aflApiOutcome = (applied: boolean, counters: Record<string, number> = zeros('afl_api'), refusalEvidence: AflApiCanonicalRefusalEvidence[] = []) => ({
+      result: { applied, batchId: applied ? '502' : null, counters, halt: null, rollbackReason: applied ? null : 'dry_run', refusalEvidence },
       sourceCompleteness: { status: 'complete' },
     });
+    /** An AFL API settle fake returning the given refusal evidence for each mode, counters in step. */
+    const aflApiFake = (h: { calls: string[] }, dry: AflApiCanonicalRefusalEvidence[], apply: AflApiCanonicalRefusalEvidence[] = dry,
+      counterOver: Partial<Record<'dry' | 'apply', number>> = {}): PrepareDeps['settleAflApi'] => async (a) => {
+      const isApply = a.includes('--apply');
+      h.calls.push(`afl_api ${isApply ? 'apply' : 'dry-run'}`);
+      const evidence = isApply ? apply : dry;
+      const refusals = (isApply ? counterOver.apply : counterOver.dry) ?? evidence.length;
+      return aflApiOutcome(isApply, { ...zeros('afl_api'), canonicalApplyRefusals: refusals }, evidence) as unknown as
+        Awaited<ReturnType<NonNullable<PrepareDeps['settleAflApi']>>>;
+    };
     const harness = (over: Partial<PrepareDeps> = {}) => {
       const calls: string[] = [];
       const written: { path: string; text: string }[] = [];
@@ -6452,6 +6781,12 @@ describe('AFLDB-ISSUE-252 source dependency manifest and ownership-parity gate',
           return aflApiOutcome(a.includes('--apply')) as unknown as Awaited<ReturnType<NonNullable<PrepareDeps['settleAflApi']>>>;
         },
         writeRecord: (path, text) => { written.push({ path, text }); },
+        verifyBridge: () => verifiedBridge(),
+        importBridge: async (mode) => { calls.push(`bridge ${mode}`); return bridgeReport(mode); },
+        readBridgeIdentities: async (_sql, ids) => {
+          calls.push('bridge read-back');
+          return ids.map((id) => ({ externalId: id, status: 'unique', playerId: 1 }));
+        },
         ...over,
       };
       return { deps, calls, written };
@@ -6471,17 +6806,17 @@ describe('AFLDB-ISSUE-252 source dependency manifest and ownership-parity gate',
       expect(h.calls).toEqual([]);
     });
 
-    it('--dry-run proves the database, then dry-runs AFL Tables only, with revalidation off', async () => {
+    it('--dry-run proves the database, validates the bridge read-only, then dry-runs AFL Tables only, with revalidation off', async () => {
       const h = harness();
       await runPreparePromotionSource(argv(['--dry-run']), h.deps);
-      expect(h.calls).toEqual(['prove', 'ownership', 'afltables --dry-run --auto-apply --require-complete-source env={}']);
+      expect(h.calls).toEqual(['prove', 'ownership', 'bridge validate-only', 'afltables --dry-run --auto-apply --require-complete-source env={}']);
     });
 
-    it('M: --apply runs AFL Tables apply, its closure dry run, then an AFL API dry run and apply, then the record', async () => {
+    it('M: --apply runs the bridge, AFL Tables apply, its closure dry run, then an AFL API dry run and apply, then the record', async () => {
       const h = harness();
       const out = await runPreparePromotionSource(argv(['--apply', '--record-out', 'prep.json']), h.deps);
       expect(h.calls).toEqual([
-        'prove', 'ownership',
+        'prove', 'ownership', 'bridge validate-only', 'bridge apply', 'bridge read-back',
         'afltables --apply --auto-apply --require-complete-source env={}',
         'afltables --dry-run --auto-apply --require-complete-source env={}',
         'afl_api --dry-run --auto-apply --require-complete-source',
@@ -6490,7 +6825,7 @@ describe('AFLDB-ISSUE-252 source dependency manifest and ownership-parity gate',
       expect(h.written).toHaveLength(1);
       const record = JSON.parse(h.written[0].text);
       expect(record).toMatchObject({
-        kind: 'afldb_promotion_source_preparation_record', schema_version: 2, season: 2026, source_database: 'afldb_test',
+        kind: 'afldb_promotion_source_preparation_record', schema_version: 3, season: 2026, source_database: 'afldb_test',
         order: ['afltables', 'afl_api'], batches: { afltables: '501', afl_api: '502' },
         inputs: [
           { source: 'afltables', label: 'settle-2026-2026-09-22-0444', manifest_sha256: sha('a'), observations_sha256: sha('b') },
@@ -6524,7 +6859,7 @@ describe('AFLDB-ISSUE-252 source dependency manifest and ownership-parity gate',
       h.deps.settleAfltables = afltablesFake(h, FIRST_APPLY, atCounters({ unresolvedIdentityMatch: 1 }));
       await expect(runPreparePromotionSource(argv(['--apply', '--record-out', 'prep.json']), h.deps))
         .rejects.toThrow(/afltables closure dry-run did not meet[\s\S]*unresolvedIdentityMatch = 1, must be 0/);
-      expect(h.calls.slice(2)).toEqual(['afltables apply', 'afltables dry-run']);
+      expect(h.calls.slice(5)).toEqual(['afltables apply', 'afltables dry-run']);
       expect(h.written).toEqual([]);
     });
 
@@ -6542,7 +6877,7 @@ describe('AFLDB-ISSUE-252 source dependency manifest and ownership-parity gate',
       h.deps.settleAfltables = afltablesFake(h, { ...FIRST_APPLY, venueUnmapped: 1 }, atCounters());
       await expect(runPreparePromotionSource(argv(['--apply', '--record-out', 'prep.json']), h.deps))
         .rejects.toThrow(/afltables initial apply did not meet[\s\S]*venueUnmapped = 1, must be 0/);
-      expect(h.calls.slice(2)).toEqual(['afltables apply']);
+      expect(h.calls.slice(5)).toEqual(['afltables apply']);
       expect(h.written).toEqual([]);
     });
 
@@ -6557,7 +6892,7 @@ describe('AFLDB-ISSUE-252 source dependency manifest and ownership-parity gate',
         expect(out).toMatchObject({ mode: 'dry-run', status: 'preview-unproven', record: null });
         expect(out.steps).toHaveLength(1);
         expect(out.steps[0]).toMatchObject({ source: 'afltables', mode: 'dry-run', applied: false });
-        expect(h.calls.slice(2)).toEqual(['afltables dry-run']);
+        expect(h.calls.slice(2)).toEqual(['bridge validate-only', 'afltables dry-run']);
         expect(lines).toContain('afltables preview dry-run: post-conditions PASS.');
         expect(lines).toContain('afltables preview dry-run: unresolvedIdentityMatch = 1, inserted 9, updated 0 (rolled back).');
         expect(lines.at(-1)).toBe(PREPARATION_PREVIEW_STATUS);
@@ -6610,7 +6945,7 @@ describe('AFLDB-ISSUE-252 source dependency manifest and ownership-parity gate',
         h.deps.settleAfltables = afltablesFake(h, FIRST_APPLY, PREVIEW);
         await expect(runPreparePromotionSource(argv(['--apply', '--record-out', 'prep.json']), h.deps))
           .rejects.toThrow(/afltables closure dry-run did not meet[\s\S]*unresolvedIdentityMatch = 1, must be 0[\s\S]*canonicalRowsInserted = 9/);
-        expect(h.calls.slice(2)).toEqual(['afltables apply', 'afltables dry-run']);
+        expect(h.calls.slice(5)).toEqual(['afltables apply', 'afltables dry-run']);
         expect(h.written).toEqual([]);
         const ok = harness();
         const out = await runPreparePromotionSource(argv(['--apply', '--record-out', 'prep.json']), ok.deps);
@@ -6670,6 +7005,150 @@ describe('AFLDB-ISSUE-252 source dependency manifest and ownership-parity gate',
       await expect(runPreparePromotionSource(argv(['--apply', '--record-out', 'prep.json']), h.deps))
         .rejects.toThrow(/not the recorded, verified snapshots[\s\S]*manifest sha256 d+ is not the recorded c+/);
       expect(h.calls).toEqual([]);
+    });
+
+    describe('D-252-13: the player bridge is a mandatory prerequisite', () => {
+      it('a bridge missing a required provider, or bound to another snapshot, stops before any connection', async () => {
+        for (const problems of [['1 required provider(s) are absent from the bridge: CD_I297354'], ['the bridge was built for snapshot "x"']]) {
+          const h = harness({ verifyBridge: () => verifiedBridge({ problems, loaded: null }) });
+          await expect(runPreparePromotionSource(argv(['--validate-only']), h.deps))
+            .rejects.toThrow(/player bridge is not the recorded prerequisite[\s\S]*/);
+          await expect(runPreparePromotionSource(argv(['--apply', '--record-out', 'prep.json']), h.deps)).rejects.toThrow(problems[0].slice(0, 20));
+          expect(h.calls).toEqual([]);
+        }
+      });
+
+      it('passes the verified AFL API snapshot binding to the bridge check', async () => {
+        const seen: unknown[] = [];
+        const h = harness({ verifyBridge: (_r, path, expected, api) => { seen.push({ path, expected, api }); return verifiedBridge(); } });
+        await runPreparePromotionSource(argv(['--validate-only']), h.deps);
+        expect(seen).toEqual([{ path: 'bridge.json', expected: sha('e'),
+          api: { label: 'afl-api-2026-2026-09-25-235854', manifestSha256: sha('c'), season: 2026 } }]);
+      });
+
+      it('a contradiction, collision or stop in the bridge validation stops before any settle', async () => {
+        for (const over of [
+          { contradictionsWithheld: ['CD_I297354'] }, { playerCollisionsWithheld: ['CD_I1000001'] },
+          { stops: [{ externalId: 'CD_I297354', reason: 'no_player' }] as unknown as BridgeImportReport['stops'] },
+        ]) {
+          const h = harness();
+          h.deps.importBridge = async (mode) => { h.calls.push(`bridge ${mode}`); return bridgeReport(mode, over); };
+          await expect(runPreparePromotionSource(argv(['--apply', '--record-out', 'prep.json']), h.deps))
+            .rejects.toThrow(/player bridge did not close the provider census/);
+          expect(h.calls).toEqual(['prove', 'ownership', 'bridge validate-only']);
+          expect(h.written).toEqual([]);
+        }
+      });
+
+      it('an apply that leaves a required provider unlinked, or adds human authority, stops before any settle', async () => {
+        const unlinked = harness({ readBridgeIdentities: async (_s, ids) => ids.slice(1).map((id) => ({ externalId: id, status: 'unique', playerId: 1 })) });
+        await expect(runPreparePromotionSource(argv(['--apply', '--record-out', 'prep.json']), unlinked.deps))
+          .rejects.toThrow(/not every required provider is linked[\s\S]*CD_I1000001: 0 afl_api identity row/);
+        expect(unlinked.calls.some((c) => c.startsWith('afltables'))).toBe(false);
+        const human = harness({ readBridgeIdentities: async (_s, ids) => ids.map((id) => ({ externalId: id, status: 'resolved', playerId: 1 })) });
+        await expect(runPreparePromotionSource(argv(['--apply', '--record-out', 'prep.json']), human.deps))
+          .rejects.toThrow(/never introduces human authority/);
+      });
+
+      it('an idempotent replay (everything already linked) passes and is recorded as such', async () => {
+        const h = harness();
+        h.deps.importBridge = async (mode) => bridgeReport(mode, { linked: 0, alreadyLinked: 3 });
+        const out = await runPreparePromotionSource(argv(['--apply', '--record-out', 'prep.json']), h.deps);
+        expect(out.status).toBe('prepared');
+        expect(out.record!.afl_api_player_bridge).toMatchObject({ apply: { linked: 0, already_linked: 3, outcome: 'COMMITTED' } });
+      });
+
+      it('the record binds the bridge bytes, snapshot, census and loader outcome — hints counted, never used', async () => {
+        const h = harness();
+        await runPreparePromotionSource(argv(['--apply', '--record-out', 'prep.json']), h.deps);
+        const record = JSON.parse(h.written[0].text);
+        expect(record.afl_api_player_bridge).toMatchObject({
+          kind: 'afl_api_player_bridge_prerequisite',
+          artefact: { path: 'bridge.json', file_sha256: sha('e'), match_method: 'afl_api_stat_vector_season',
+            snapshot_label: 'afl-api-2026-2026-09-25-235854', snapshot_manifest_sha256: sha('c'), season: 2026 },
+          provider_census: { required: 3, artefact_providers: 3, artefact_linked: 3 },
+          validate: { outcome: 'READ_ONLY', linked: 1, already_linked: 2, candidate_player_id_hints_ignored: 1, import_batch_id: null },
+          apply: { outcome: 'COMMITTED', import_batch_id: '500' },
+          post_apply: { required: 3, linked: 3, unlinked: 0 },
+        });
+        expect(JSON.stringify(record.afl_api_player_bridge)).not.toMatch(/7974/);
+      });
+    });
+
+    describe('D-252-12: the AFL API refusal census, classified and dry-run/apply identical', () => {
+      const MANY = Array.from({ length: 36 }, (_, i) => refusal(i === 35 ? {} : {
+        externalRecordId: `CD_M2026014${String(i).padStart(4, '0')}|CD_T10|CD_I${1000000 + i}`, matchKey: `2026|${1 + (i % 20)}|m${i}`,
+        renderedFields: ['one_percenters', 'contested', 'disposals'].slice(0, 1 + (i % 3)),
+      }));
+
+      it('the current 36-row shape passes, is recorded in full, and the record parses back', async () => {
+        const h = harness();
+        h.deps.settleAflApi = aflApiFake(h, [...MANY].reverse(), MANY);
+        const out = await runPreparePromotionSource(argv(['--apply', '--record-out', 'prep.json']), h.deps);
+        expect(out.status).toBe('prepared');
+        const census = canonicalAflApiRefusalCensus(MANY);
+        expect(out.record!.afl_api_refusal_census).toEqual({
+          accepted_class: AFL_API_ACCEPTED_REFUSAL_CLASS, count: 36, sha256: aflApiRefusalCensusSha256(census),
+          dry_run: { count: 36, sha256: aflApiRefusalCensusSha256(census) }, apply: { count: 36, sha256: aflApiRefusalCensusSha256(census) },
+          entries: census,
+        });
+        const binding = parsePreparationRecord({ bytes: h.written[0].text, expectedFileSha256: sha256Hex(h.written[0].text), expectedSourceDatabase: 'afldb_test' });
+        expect(binding.afl_api_refusal_census.count).toBe(36);
+        expect(binding.afl_api_refusal_census.entries.find((e) => e.external_record_id.endsWith('CD_I297354'))).toEqual({
+          family: 'player_match_stats', external_record_id: 'CD_M20260141101|CD_T80|CD_I297354', target_table: 'player_match_stats',
+          refusal: 'foreign_source_owner', match_key: '2026|12|2026-05-21|Hawthorn|Adelaide', rendered_fields: ['one_percenters'],
+          owner_source_key: 'afltables',
+        });
+        expect(binding.afl_api_player_bridge).toMatchObject({ required_providers: 3, linked_providers: 3, import_batch_id: 500 });
+      });
+
+      it('an unapproved refusal in the dry run stops before the AFL API apply', async () => {
+        for (const bad of [refusal({ targetTable: 'matches' }), refusal({ ownerSourceKey: 'manual_admin_edit' }),
+          refusal({ refusal: 'ownership_indeterminate', ownerSourceKey: null })]) {
+          const h = harness();
+          h.deps.settleAflApi = aflApiFake(h, [refusal(), bad]);
+          await expect(runPreparePromotionSource(argv(['--apply', '--record-out', 'prep.json']), h.deps))
+            .rejects.toThrow(/afl_api dry-run did not meet[\s\S]*accepted class requires/);
+          expect(h.calls.at(-1)).toBe('afl_api dry-run');
+          expect(h.written).toEqual([]);
+        }
+      });
+
+      it('a census that differs between dry run and apply stops, and writes no record', async () => {
+        const changes: AflApiCanonicalRefusalEvidence[][] = [
+          [refusal(), refusal({ externalRecordId: 'CD_M1|CD_T1|CD_I1' })], // added
+          [], // removed
+          [refusal({ renderedFields: ['one_percenters', 'tackles'] })], // changed fields
+          [refusal({ matchKey: '2026|12|2026-05-22|Hawthorn|Adelaide' })], // changed match
+          [refusal({ externalRecordId: 'CD_M20260141101|CD_T80|CD_I297355' })], // changed record
+        ];
+        for (const apply of changes) {
+          const h = harness();
+          h.deps.settleAflApi = aflApiFake(h, [refusal()], apply);
+          await expect(runPreparePromotionSource(argv(['--apply', '--record-out', 'prep.json']), h.deps))
+            .rejects.toThrow(/refused a different census from its dry run[\s\S]*changed between the dry run/);
+          expect(h.written).toEqual([]);
+        }
+      });
+
+      it('a counter that disagrees with its evidence, or evidence that is missing, stops', async () => {
+        const over = harness();
+        over.deps.settleAflApi = aflApiFake(over, [refusal()], [refusal()], { dry: 2 });
+        await expect(runPreparePromotionSource(argv(['--apply', '--record-out', 'prep.json']), over.deps))
+          .rejects.toThrow(/canonicalApplyRefusals = 2 but the refusal census has 1/);
+        const under = harness();
+        under.deps.settleAflApi = aflApiFake(under, [refusal(), refusal({ externalRecordId: 'CD_M1|CD_T1|CD_I1' })], undefined, { dry: 1 });
+        await expect(runPreparePromotionSource(argv(['--apply', '--record-out', 'prep.json']), under.deps))
+          .rejects.toThrow(/canonicalApplyRefusals = 1 but the refusal census has 2/);
+        const missing = harness({
+          settleAflApi: async (a) => ({
+            result: { applied: a.includes('--apply'), batchId: null, counters: zeros('afl_api'), halt: null, rollbackReason: 'dry_run' },
+            sourceCompleteness: { status: 'complete' },
+          }) as unknown as Awaited<ReturnType<NonNullable<PrepareDeps['settleAflApi']>>>,
+        });
+        await expect(runPreparePromotionSource(argv(['--apply', '--record-out', 'prep.json']), missing.deps))
+          .rejects.toThrow(/no refusal census was reported/);
+      });
     });
   });
 
@@ -6786,8 +7265,9 @@ describe('AFLDB-ISSUE-252 source dependency manifest and ownership-parity gate',
         { source: 'afl_api', label: PREPARATION.afl_api.label, manifest_sha256: PREPARATION.afl_api.manifest_sha256 },
       ],
       steps: RECORD_STEPS,
-      batches: { afltables: 501, afl_api: 502 }, counters: {},
+      batches: { afltables: 501, afl_api: 502 },
       ...recordAfltablesResults(),
+      ...recordV3Extras(),
     };
     const parse = (value: unknown) => {
       const bytes = `${JSON.stringify(value, null, 2)}\n`;
@@ -6823,6 +7303,50 @@ describe('AFLDB-ISSUE-252 source dependency manifest and ownership-parity gate',
       expect(() => parse({ ...record, afltables_initial_apply: { ...initial, counters: { ...initial.counters, venueUnmapped: 1 } } }))
         .toThrow(/afltables initial apply: venueUnmapped = 1, must be 0/);
       expect(() => parse({ ...record, afltables_initial_apply: { ...initial, batch_id: '777' } })).toThrow(/initial apply batch is not/);
+    });
+
+    it('schema 3 only: a schema 2 record is refused, however clean', () => {
+      expect(PREPARATION_RECORD_SCHEMA_VERSION).toBe(3);
+      expect(() => parse({ ...record, schema_version: 2 })).toThrow(/Unsupported preparation record schema_version 2/);
+    });
+
+    it('D-252-12: re-judges the census from its entries — hash, order, class, count and dry-run/apply parity', () => {
+      const census = record.afl_api_refusal_census;
+      expect(() => parse({ ...record, afl_api_refusal_census: undefined })).toThrow(/carries no AFL API refusal census/);
+      expect(() => parse({ ...record, afl_api_refusal_census: { ...census, sha256: 'f'.repeat(64) } })).toThrow(/sha256 f+ is not the recomputed/);
+      expect(() => parse({ ...record, afl_api_refusal_census: { ...census, entries: [...census.entries].reverse() } })).toThrow(/not in canonical order/);
+      expect(() => parse({ ...record, afl_api_refusal_census: { ...census, count: 3 } })).toThrow(/canonicalApplyRefusals = 3 but the refusal census has 2/);
+      expect(() => parse({ ...record, afl_api_refusal_census: { ...census, accepted_class: 'any' } })).toThrow(/names class "any"/);
+      // A string claim never stands in for entries.
+      expect(() => parse({ ...record, afl_api_refusal_census: { accepted_class: AFL_API_ACCEPTED_REFUSAL_CLASS, count: 2, sha256: census.sha256, accepted: true } }))
+        .toThrow(/no refusal census was reported/);
+      // An unapproved entry, re-hashed so only the classifier can catch it.
+      const bad = canonicalAflApiRefusalCensus([refusal({ ownerSourceKey: 'manual_admin_edit' })]);
+      expect(() => parse({ ...record, counters: { afl_api: { canonicalApplyRefusals: 1 } }, afl_api_refusal_census: aflApiRefusalCensusEvidence(bad, bad) }))
+        .toThrow(/owner_source_key is "manual_admin_edit"/);
+      expect(() => parse({ ...record, counters: { afl_api: { canonicalApplyRefusals: 5 } } })).toThrow(/canonicalApplyRefusals \(5\) is not its refusal census count 2/);
+      expect(() => parse({ ...record, afl_api_refusal_census: { ...census, dry_run: { count: 2, sha256: 'a'.repeat(64) } } }))
+        .toThrow(/dry run refusal census is not the bound census/);
+      // Zero refusals is a legitimate census.
+      expect(parse({ ...record, counters: { afl_api: { canonicalApplyRefusals: 0 } }, afl_api_refusal_census: aflApiRefusalCensusEvidence([], []) })
+        .afl_api_refusal_census.count).toBe(0);
+    });
+
+    it('D-252-13: re-judges the bridge prerequisite against the record\'s own AFL API input', () => {
+      const bridge = record.afl_api_player_bridge;
+      expect(() => parse({ ...record, afl_api_player_bridge: undefined })).toThrow(/carries no AFL API player bridge prerequisite/);
+      expect(() => parse({ ...record, afl_api_player_bridge: { ...bridge, artefact: { ...bridge.artefact, snapshot_label: 'other' } } }))
+        .toThrow(/built for snapshot "other"/);
+      expect(() => parse({ ...record, afl_api_player_bridge: { ...bridge, artefact: { ...bridge.artefact, snapshot_manifest_sha256: 'f'.repeat(64) } } }))
+        .toThrow(/another AFL API snapshot manifest/);
+      expect(() => parse({ ...record, afl_api_player_bridge: { ...bridge, apply: { ...bridge.apply, contradictions_withheld: ['CD_I297354'] } } }))
+        .toThrow(/contradictions withheld: CD_I297354/);
+      expect(() => parse({ ...record, afl_api_player_bridge: { ...bridge, post_apply: { ...bridge.post_apply, linked: 668, unlinked: 1 } } }))
+        .toThrow(/post-apply read-back does not show every required provider linked/);
+      expect(() => parse({ ...record, afl_api_player_bridge: { ...bridge, provider_census: { ...bridge.provider_census, artefact_providers: 670 } } }))
+        .toThrow(/not exactly the required census/);
+      expect(() => parse({ ...record, afl_api_player_bridge: { ...bridge, apply: { ...bridge.apply, outcome: 'ROLLED_BACK' } } }))
+        .toThrow(/outcome ROLLED_BACK, expected COMMITTED/);
     });
   });
 
@@ -6901,6 +7425,7 @@ describe('AFLDB-ISSUE-252 source dependency manifest and ownership-parity gate',
         steps: RECORD_STEPS,
         batches: PREPARATION.batches,
         ...recordAfltablesResults(),
+        ...recordV3Extras(),
       })}\n`;
       const recordPath = join(dir, 'prep.json');
       if (!existsSync(recordPath)) writeFileSync(recordPath, recordBytes, 'utf8');

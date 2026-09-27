@@ -23,6 +23,12 @@
 import { createHash } from 'node:crypto';
 
 import {
+  aflApiRefusalCensusSha256,
+  compareAflApiRefusalCensusEntries,
+  type AflApiRefusalCensusEntry,
+} from '../../src/lib/acquisition/afl-api-refusal-evidence';
+import { AFL_API_SEASON_EVIDENCE_MATCH_METHOD } from '../../src/lib/acquisition/afl-api-player-evidence';
+import {
   decodeMatchCoachKey,
   environmentNames,
   historicalOnlyFor,
@@ -42,12 +48,18 @@ import {
 export const DEPENDENCY_MANIFEST_KIND = 'afldb_promotion_target_dependency_manifest';
 export const DEPENDENCY_MANIFEST_SCHEMA_VERSION = 1;
 export const SOURCE_DEPENDENCY_PROOF_KIND = 'afldb_promotion_source_dependency_proof';
-/** 2: the bound preparation carries the AFL Tables initial apply and its closure dry run separately (Q-252-10). */
-export const SOURCE_DEPENDENCY_PROOF_SCHEMA_VERSION = 2;
+/**
+ * 2: the bound preparation carries the AFL Tables initial apply and its closure dry run separately (Q-252-10).
+ * 3: it also carries the AFL API refusal census and the player-bridge prerequisite (D-252-12/13).
+ */
+export const SOURCE_DEPENDENCY_PROOF_SCHEMA_VERSION = 3;
 /** Written by `prepare-promotion-source.ts --apply`; bound into the source proof. */
 export const PREPARATION_RECORD_KIND = 'afldb_promotion_source_preparation_record';
-/** 2: `afltables_initial_apply` and `afltables_closure_dry_run` are mandatory and never collapsed (Q-252-10). */
-export const PREPARATION_RECORD_SCHEMA_VERSION = 2;
+/**
+ * 2: `afltables_initial_apply` and `afltables_closure_dry_run` are mandatory and never collapsed (Q-252-10).
+ * 3: `afl_api_refusal_census` (D-252-12) and `afl_api_player_bridge` (D-252-13) are mandatory.
+ */
+export const PREPARATION_RECORD_SCHEMA_VERSION = 3;
 
 /** The three dependency families ISSUE-252 owns (D-252-4). Reported separately, always. */
 export type DependencyFamilyId = 'F1' | 'F2' | 'F3';
@@ -708,9 +720,33 @@ export type PreparationBinding = {
     initial_apply: AflTablesStepCounts;
     closure_dry_run: AflTablesStepCounts;
   };
+  /**
+   * D-252-12: every AFL API canonical refusal of the apply, in full, re-judged by the narrow
+   * class on every parse. The count is whatever the retained snapshot produced, never a constant.
+   */
+  afl_api_refusal_census: AflApiRefusalCensusBinding;
+  /** D-252-13: the retained current-season player bridge preparation applied before any settle. */
+  afl_api_player_bridge: PlayerBridgeBinding;
 };
 
 export type AflTablesStepCounts = { inserted: number; updated: number; unresolved_identity_match: number };
+
+export type AflApiRefusalCensusBinding = {
+  accepted_class: typeof AFL_API_ACCEPTED_REFUSAL_CLASS;
+  count: number;
+  sha256: string;
+  entries: AflApiRefusalCensusEntry[];
+};
+
+export type PlayerBridgeBinding = {
+  file_sha256: string;
+  match_method: typeof PLAYER_BRIDGE_MATCH_METHOD;
+  snapshot_label: string;
+  snapshot_manifest_sha256: string;
+  required_providers: number;
+  linked_providers: number;
+  import_batch_id: number;
+};
 
 /** The preparation step order a record must show (Q-252-10: the closure dry run sits between the sources). */
 export const PREPARATION_STEP_SEQUENCE = ['afltables:apply', 'afltables:dry-run', 'afl_api:dry-run', 'afl_api:apply'] as const;
@@ -809,6 +845,25 @@ export function parsePreparationRecord(input: {
   if (raw.afltables_closure_dry_run.batch_id !== null) {
     throw new Error('The AFL Tables closure dry run names a batch; a rolled-back dry run has none.');
   }
+  // D-252-12: the AFL API refusal census, re-judged from its entries; the apply's own counter must
+  // equal it, and the dry run the apply was checked against must have had the same digest.
+  const census = aflApiRefusalCensusBindingOf(raw.afl_api_refusal_census, 'The preparation record');
+  const censusRaw = raw.afl_api_refusal_census as Record<string, unknown>;
+  const apiCounters = isObject(raw.counters) && isObject(raw.counters.afl_api) ? raw.counters.afl_api : null;
+  if (apiCounters?.canonicalApplyRefusals !== census.count) {
+    throw new Error(`The preparation record's AFL API apply canonicalApplyRefusals (${String(apiCounters?.canonicalApplyRefusals)}) `
+      + `is not its refusal census count ${census.count}.`);
+  }
+  for (const phase of ['dry_run', 'apply'] as const) {
+    const p = censusRaw[phase];
+    if (!isObject(p) || p.sha256 !== census.sha256 || p.count !== census.count) {
+      throw new Error(`The preparation record's AFL API ${phase.replace('_', ' ')} refusal census is not the bound census (dry-run/apply parity).`);
+    }
+  }
+  // D-252-13: the player bridge prerequisite, bound to this record's own AFL API input.
+  const bridge = playerBridgeBindingOf(raw.afl_api_player_bridge, {
+    aflApiLabel: String(api.label), aflApiManifestSha256: String(api.manifest_sha256), season: raw.season,
+  });
   return {
     record_sha256: actual,
     prepared_at: raw.prepared_at,
@@ -818,6 +873,8 @@ export function parsePreparationRecord(input: {
     afltables: { label: String(at.label), manifest_sha256: String(at.manifest_sha256), observations_sha256: String(at.observations_sha256) },
     afl_api: { label: String(api.label), manifest_sha256: String(api.manifest_sha256) },
     afltables_closure: { initial_apply: stepCounts(initial), closure_dry_run: stepCounts(closure) },
+    afl_api_refusal_census: census,
+    afl_api_player_bridge: bridge,
   };
 }
 
@@ -921,6 +978,12 @@ export function parseSourceDependencyProof(input: {
   if (!closure || !initial || closure.inserted !== 0 || closure.updated !== 0 || closure.unresolved_identity_match !== 0
     || !Number.isInteger(initial.unresolved_identity_match) || initial.unresolved_identity_match < 0) {
     throw new Error('The source dependency proof does not bind a clean AFL Tables closure dry run beside the initial apply (Q-252-10).');
+  }
+  // D-252-12/13 (schema 3): the census is re-judged, never trusted, and the bridge must be whole.
+  aflApiRefusalCensusBindingOf(p.afl_api_refusal_census, 'The source dependency proof');
+  const bridgeProblems = proofBridgeProblems(p.afl_api_player_bridge, p.afl_api);
+  if (bridgeProblems.length > 0) {
+    throw new Error(`The source dependency proof does not bind the AFL API player bridge prerequisite (D-252-13): ${bridgeProblems.join('; ')}.`);
   }
   const families = Array.isArray(raw.families) ? raw.families : [];
   for (const id of FAMILY_IDS) {
@@ -1078,6 +1141,11 @@ export type SettleStepSummary = {
   completeness: string | null;
   applied: boolean;
   counters: Readonly<Record<string, unknown>> | null;
+  /**
+   * D-252-12, AFL API steps only: the run's canonical refusal census (`canonicalAflApiRefusalCensus()`
+   * of the settle's `refusalEvidence`). `null`/absent means none was reported, which is a STOP.
+   */
+  refusalCensus?: readonly AflApiRefusalCensusEntry[] | null;
 };
 
 /**
@@ -1240,5 +1308,331 @@ export function preparationDatabaseProblems(input: {
     problems.push(`acquisition.afl_api_current_season_enabled on ${source} is ${String(input.aflApiCurrentSeasonEnabled)}; `
       + 'the operator enables it explicitly (recording the prior value) before preparation — this tool never writes it');
   }
+  return problems;
+}
+
+// ---------------------------------------------------------------------------
+// D-252-12: the AFL API canonical refusal census (replaces the aggregate-zero rule)
+// ---------------------------------------------------------------------------
+
+/**
+ * The ONE refusal class an AFL API preparation settle may carry: the AFL API disagrees with an
+ * existing `player_match_stats` row that AFL Tables owns. The canonical applier refused it at E3
+ * (`foreign_source_owner`) against the owner it read in its savepoint; the row keeps AFL Tables'
+ * values and `source_id`, and the refusal stays a durable `data_issues` finding. Acceptance is by
+ * this exact class, row by row — never by a count, and never for any other reason, family, table
+ * or owner.
+ */
+export const AFL_API_ACCEPTED_REFUSAL_CLASS = 'player_match_stats_foreign_source_owner_afltables';
+
+const ACCEPTED_REFUSAL = {
+  family: 'player_match_stats',
+  target_table: 'player_match_stats',
+  refusal: 'foreign_source_owner',
+  owner_source_key: PREPARATION_SOURCE_ORDER[0],
+} as const;
+
+const nonEmptyString = (v: unknown): v is string => typeof v === 'string' && v.length > 0;
+
+/** Why one census entry is malformed or outside the accepted class; empty when it is accepted. */
+export function aflApiRefusalEntryProblems(entry: unknown): string[] {
+  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return ['a census entry is not an object'];
+  const e = entry as Record<string, unknown>;
+  const id = nonEmptyString(e.external_record_id) ? e.external_record_id : '(no external_record_id)';
+  const problems: string[] = [];
+  const keys = Object.keys(e).sort().join(',');
+  if (keys !== 'external_record_id,family,match_key,owner_source_key,refusal,rendered_fields,target_table') {
+    problems.push(`${id}: census entry fields are [${keys}]`);
+  }
+  for (const field of ['family', 'external_record_id', 'target_table', 'refusal', 'match_key'] as const) {
+    if (!nonEmptyString(e[field])) problems.push(`${id}: ${field} is missing or empty`);
+  }
+  const fields = e.rendered_fields;
+  if (!Array.isArray(fields) || fields.length === 0 || !fields.every(nonEmptyString)) {
+    problems.push(`${id}: rendered_fields must be a non-empty list of field names`);
+  } else if (fields.some((f, i) => i > 0 && !(fields[i - 1] < f))) {
+    problems.push(`${id}: rendered_fields are not sorted and unique`);
+  }
+  if (e.owner_source_key !== null && !nonEmptyString(e.owner_source_key)) problems.push(`${id}: owner_source_key is malformed`);
+  for (const [field, accepted] of Object.entries(ACCEPTED_REFUSAL)) {
+    if (e[field] !== accepted) {
+      problems.push(`${id}: ${field} is ${JSON.stringify(e[field] ?? null)}, the accepted class requires ${JSON.stringify(accepted)}`);
+    }
+  }
+  return problems;
+}
+
+/**
+ * The census against its counter: present, the same length as `canonicalApplyRefusals`, in the
+ * canonical order with no duplicate, and every entry in the accepted class. Any problem is a STOP;
+ * a census that cannot be shown complete is never assumed complete.
+ */
+export function aflApiRefusalCensusProblems(entries: unknown, canonicalApplyRefusals: unknown, where: string): string[] {
+  if (!Array.isArray(entries)) return [`${where}: no refusal census was reported; canonicalApplyRefusals cannot be judged`];
+  const problems: string[] = [];
+  if (typeof canonicalApplyRefusals !== 'number' || !Number.isInteger(canonicalApplyRefusals) || canonicalApplyRefusals < 0) {
+    problems.push(`${where}: counter canonicalApplyRefusals is missing or not a count`);
+  } else if (canonicalApplyRefusals !== entries.length) {
+    problems.push(`${where}: canonicalApplyRefusals = ${canonicalApplyRefusals} but the refusal census has ${entries.length} `
+      + 'entr(ies); the census is not proven complete');
+  }
+  for (const entry of entries) problems.push(...aflApiRefusalEntryProblems(entry).map((p) => `${where}: refusal ${p}`));
+  if (problems.length === 0) {
+    const typed = entries as AflApiRefusalCensusEntry[];
+    if (typed.some((e, i) => i > 0 && compareAflApiRefusalCensusEntries(typed[i - 1], e) >= 0)) {
+      problems.push(`${where}: the refusal census is not in canonical order, or repeats an entry`);
+    }
+  }
+  return problems;
+}
+
+/**
+ * Dry run and apply must refuse exactly the same targets for exactly the same reasons. Compared by
+ * canonical digest over stable identity; any added, removed or changed entry is a STOP.
+ */
+export function aflApiRefusalCensusParityProblems(
+  dryRun: readonly AflApiRefusalCensusEntry[], apply: readonly AflApiRefusalCensusEntry[],
+): string[] {
+  const dry = aflApiRefusalCensusSha256(dryRun);
+  const applied = aflApiRefusalCensusSha256(apply);
+  if (dry === applied) return [];
+  const text = (e: AflApiRefusalCensusEntry) => JSON.stringify(e);
+  const drySet = new Set(dryRun.map(text));
+  const applySet = new Set(apply.map(text));
+  return [
+    `afl_api refusal census changed between the dry run (${dryRun.length}, ${dry}) and the apply (${apply.length}, ${applied})`,
+    ...[...applySet].filter((e) => !drySet.has(e)).map((e) => `  only in the apply: ${e}`),
+    ...[...drySet].filter((e) => !applySet.has(e)).map((e) => `  only in the dry run: ${e}`),
+  ];
+}
+
+/**
+ * An AFL API preparation settle: every §21.2 post-condition, except that `canonicalApplyRefusals`
+ * is judged by its classified census instead of by zero. Nothing else moves: every other zero-list
+ * counter (collisions, unresolved identities, authority refusals, failures, ...) stays strict.
+ */
+export function aflApiPreparationStepProblems(step: SettleStepSummary): string[] {
+  const where = `${step.source} ${step.mode}`;
+  if (step.source !== 'afl_api') return [`${where}: the D-252-12 census judge covers the AFL API settle only`];
+  const problems = stepPostConditionProblems(step, where, 'canonicalApplyRefusals');
+  if (!step.counters) return problems;
+  return [...problems, ...aflApiRefusalCensusProblems(step.refusalCensus, step.counters.canonicalApplyRefusals, where)];
+}
+
+/** The record's census section, from the dry-run and apply censuses the CLI already judged equal. */
+export function aflApiRefusalCensusEvidence(
+  dryRun: readonly AflApiRefusalCensusEntry[], apply: readonly AflApiRefusalCensusEntry[],
+) {
+  const sha256 = aflApiRefusalCensusSha256(apply);
+  return {
+    accepted_class: AFL_API_ACCEPTED_REFUSAL_CLASS,
+    count: apply.length,
+    sha256,
+    dry_run: { count: dryRun.length, sha256: aflApiRefusalCensusSha256(dryRun) },
+    apply: { count: apply.length, sha256 },
+    entries: [...apply],
+  };
+}
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return !!v && typeof v === 'object' && !Array.isArray(v);
+}
+
+/**
+ * Re-judge a bound census from its entries alone: the class, the canonical order, the recomputed
+ * digest and the count. An `accepted`-style flag is never read; there is none.
+ */
+export function aflApiRefusalCensusBindingOf(value: unknown, where: string): AflApiRefusalCensusBinding {
+  if (!isRecord(value)) throw new Error(`${where} carries no AFL API refusal census (D-252-12).`);
+  if (value.accepted_class !== AFL_API_ACCEPTED_REFUSAL_CLASS) {
+    throw new Error(`${where}'s refusal census names class ${JSON.stringify(value.accepted_class ?? null)}, not '${AFL_API_ACCEPTED_REFUSAL_CLASS}'.`);
+  }
+  const problems = aflApiRefusalCensusProblems(value.entries, value.count, `${where}'s refusal census`);
+  if (problems.length > 0) throw new Error(`${where}'s AFL API refusal census fails the D-252-12 contract:\n${problems.map((p) => `  - ${p}`).join('\n')}`);
+  const entries = value.entries as AflApiRefusalCensusEntry[];
+  const sha256 = aflApiRefusalCensusSha256(entries);
+  if (value.sha256 !== sha256) throw new Error(`${where}'s refusal census sha256 ${String(value.sha256)} is not the recomputed ${sha256}.`);
+  return { accepted_class: AFL_API_ACCEPTED_REFUSAL_CLASS, count: entries.length, sha256, entries: entries.map((e) => ({ ...e, rendered_fields: [...e.rendered_fields] })) };
+}
+
+// ---------------------------------------------------------------------------
+// D-252-13: the current-season AFL API player bridge, a mandatory preparation prerequisite
+// ---------------------------------------------------------------------------
+
+/** The only bridge class preparation accepts: season evidence, bound to one retained snapshot. */
+export const PLAYER_BRIDGE_MATCH_METHOD = AFL_API_SEASON_EVIDENCE_MATCH_METHOD;
+export const PLAYER_BRIDGE_PREREQUISITE_KIND = 'afl_api_player_bridge_prerequisite';
+
+/**
+ * Offline: the named artefact is the recorded bytes, built for exactly this retained AFL API
+ * snapshot and season, and its provider census is EXACTLY what the snapshot requires — every
+ * required provider linked, none unresolved or contradictory, none extra. The loader
+ * (`import_afl_api_player_bridge.ts`) separately enforces provenance, pinned inputs and the
+ * stable-identity contract; this adds the binding to the retained input.
+ */
+export function playerBridgeArtefactProblems(input: {
+  artefact: Record<string, unknown>;
+  expectedFileSha256: string;
+  actualFileSha256: string;
+  aflApiLabel: string;
+  aflApiManifestSha256: string;
+  season: number;
+  requiredProviderIds: readonly string[];
+}): string[] {
+  const a = input.artefact;
+  const problems = hashBindingProblems('player bridge artefact', 'afl_api player bridge', input.expectedFileSha256, input.actualFileSha256);
+  if (a.match_method !== PLAYER_BRIDGE_MATCH_METHOD) {
+    problems.push(`match_method is ${JSON.stringify(a.match_method ?? null)}; preparation accepts only '${PLAYER_BRIDGE_MATCH_METHOD}' season evidence`);
+  }
+  if (a.snapshot_label !== input.aflApiLabel) {
+    problems.push(`the bridge was built for snapshot ${JSON.stringify(a.snapshot_label ?? null)}, not the retained '${input.aflApiLabel}'`);
+  }
+  if (a.snapshot_manifest_sha256 !== input.aflApiManifestSha256) {
+    problems.push(`the bridge names snapshot manifest ${JSON.stringify(a.snapshot_manifest_sha256 ?? null)}, not the verified ${input.aflApiManifestSha256}`);
+  }
+  if (a.season !== input.season) problems.push(`the bridge is for season ${JSON.stringify(a.season ?? null)}, not ${input.season}`);
+  if (input.requiredProviderIds.length === 0) problems.push('the retained AFL API snapshot requires no provider player; nothing can be proven');
+  const providers = isRecord(a.providers) ? a.providers : null;
+  if (!providers) return [...problems, 'the bridge carries no providers map'];
+  const required = new Set(input.requiredProviderIds);
+  const missing = input.requiredProviderIds.filter((id) => !Object.prototype.hasOwnProperty.call(providers, id));
+  const extra = Object.keys(providers).filter((id) => !required.has(id)).sort();
+  if (missing.length > 0) problems.push(`${missing.length} required provider(s) are absent from the bridge: ${missing.join(', ')}`);
+  if (extra.length > 0) problems.push(`${extra.length} provider(s) in the bridge are not required by the snapshot: ${extra.join(', ')}`);
+  for (const id of input.requiredProviderIds) {
+    const row = providers[id];
+    if (!isRecord(row)) continue;
+    if (row.disposition !== 'linked') problems.push(`${id}: disposition ${JSON.stringify(row.disposition ?? null)}, must be 'linked'`);
+    else if (!nonEmptyString(row.candidate_player_identity)) problems.push(`${id}: no candidate_player_identity (a numeric id alone is never accepted)`);
+  }
+  return problems;
+}
+
+/** What preparation reads from an import report (a subset of `BridgeImportReport`). */
+export type PlayerBridgeImportCounts = {
+  outcome: string;
+  linked: number;
+  alreadyLinked: number;
+  alreadyLinkedHuman: number;
+  contradictionsWithheld: readonly string[];
+  playerCollisionsWithheld: readonly string[];
+  findingsRecorded: number;
+  findingsAlreadyOpen: number;
+  stops: readonly unknown[];
+  hintMismatches: readonly unknown[];
+  importBatchId: string | null;
+};
+
+/** The loader's report: no stop, contradiction, collision or finding, and every required row accounted for. */
+export function playerBridgeImportProblems(report: PlayerBridgeImportCounts, expectedOutcome: 'READ_ONLY' | 'COMMITTED', required: number): string[] {
+  const where = `player bridge ${expectedOutcome === 'COMMITTED' ? 'apply' : 'validation'}`;
+  const problems: string[] = [];
+  if (report.outcome !== expectedOutcome) problems.push(`${where}: outcome ${report.outcome}, expected ${expectedOutcome}`);
+  if (report.stops.length > 0) problems.push(`${where}: ${report.stops.length} provider(s) do not resolve through their stable identity`);
+  if (report.contradictionsWithheld.length > 0) problems.push(`${where}: contradictions withheld: ${report.contradictionsWithheld.join(', ')}`);
+  if (report.playerCollisionsWithheld.length > 0) problems.push(`${where}: player collisions withheld: ${report.playerCollisionsWithheld.join(', ')}`);
+  if (report.findingsRecorded + report.findingsAlreadyOpen > 0) {
+    problems.push(`${where}: ${report.findingsRecorded + report.findingsAlreadyOpen} bridge finding(s); a clean prerequisite has none`);
+  }
+  const accounted = report.linked + report.alreadyLinked + report.alreadyLinkedHuman;
+  if (accounted !== required) problems.push(`${where}: ${accounted} provider(s) linked or already linked, but the snapshot requires ${required}`);
+  if (expectedOutcome === 'COMMITTED' && !(typeof report.importBatchId === 'string' && /^[1-9][0-9]*$/.test(report.importBatchId))) {
+    problems.push(`${where}: no import batch was recorded`);
+  }
+  return problems;
+}
+
+export type PlayerBridgeIdentityRow = { externalId: string; status: string; playerId: number | null };
+
+/**
+ * Immediately after the apply, read back: every required provider holds exactly one linked
+ * `afl_api` identity. Human `resolved` rows are accepted only in the number the loader already
+ * found (the rebuild's own ISSUE-235 state); the bridge never introduces human authority.
+ */
+export function playerBridgePostApplyProblems(
+  requiredProviderIds: readonly string[], rows: readonly PlayerBridgeIdentityRow[], humanAlreadyLinked: number,
+): string[] {
+  const byId = new Map<string, PlayerBridgeIdentityRow[]>();
+  for (const row of rows) byId.set(row.externalId, [...(byId.get(row.externalId) ?? []), row]);
+  const problems: string[] = [];
+  let human = 0;
+  for (const id of requiredProviderIds) {
+    const held = byId.get(id) ?? [];
+    if (held.length !== 1) { problems.push(`${id}: ${held.length} afl_api identity row(s), expected exactly 1`); continue; }
+    const [row] = held;
+    if (row.playerId === null) problems.push(`${id}: not linked to a player (status ${row.status})`);
+    else if (row.status === 'resolved') human += 1;
+    else if (row.status !== 'unique') problems.push(`${id}: status ${row.status}, not a link`);
+  }
+  if (human !== humanAlreadyLinked) {
+    problems.push(`${human} required provider(s) hold a human 'resolved' link, but the loader found ${humanAlreadyLinked} beforehand; `
+      + 'the bridge never introduces human authority');
+  }
+  return problems;
+}
+
+/** The record's bridge section, re-judged whole on every parse. */
+export function playerBridgeBindingOf(value: unknown, expected: {
+  aflApiLabel: string; aflApiManifestSha256: string; season: number;
+}): PlayerBridgeBinding {
+  const where = 'The preparation record\'s player bridge';
+  if (!isRecord(value) || value.kind !== PLAYER_BRIDGE_PREREQUISITE_KIND) {
+    throw new Error(`The preparation record carries no AFL API player bridge prerequisite (D-252-13).`);
+  }
+  const artefact = isRecord(value.artefact) ? value.artefact : {};
+  const census = isRecord(value.provider_census) ? value.provider_census : {};
+  const post = isRecord(value.post_apply) ? value.post_apply : {};
+  const count = (v: unknown) => (typeof v === 'number' && Number.isInteger(v) && v >= 0 ? v : null);
+  const required = count(census.required);
+  const problems: string[] = [];
+  if (!HEX64.test(String(artefact.file_sha256))) problems.push('artefact file_sha256 is not 64 lowercase hex');
+  if (artefact.match_method !== PLAYER_BRIDGE_MATCH_METHOD) problems.push(`match_method is ${JSON.stringify(artefact.match_method ?? null)}`);
+  if (artefact.snapshot_label !== expected.aflApiLabel) problems.push(`built for snapshot ${JSON.stringify(artefact.snapshot_label ?? null)}, not '${expected.aflApiLabel}'`);
+  if (artefact.snapshot_manifest_sha256 !== expected.aflApiManifestSha256) problems.push('built for another AFL API snapshot manifest');
+  if (artefact.season !== expected.season) problems.push(`built for season ${JSON.stringify(artefact.season ?? null)}`);
+  if (required === null || required === 0) problems.push('no required provider census');
+  if (count(census.artefact_providers) !== required || count(census.artefact_linked) !== required) {
+    problems.push('the artefact provider census is not exactly the required census');
+  }
+  for (const phase of ['validate', 'apply'] as const) {
+    const r = isRecord(value[phase]) ? value[phase] as Record<string, unknown> : null;
+    const list = (v: unknown) => (Array.isArray(v) ? v : ['(unreadable)']);
+    const report = r === null ? null : {
+      outcome: String(r.outcome), linked: Number(r.linked), alreadyLinked: Number(r.already_linked),
+      alreadyLinkedHuman: Number(r.already_linked_human), contradictionsWithheld: list(r.contradictions_withheld),
+      playerCollisionsWithheld: list(r.player_collisions_withheld), findingsRecorded: Number(r.findings_recorded),
+      findingsAlreadyOpen: Number(r.findings_already_open), stops: list(r.stops), hintMismatches: [],
+      importBatchId: typeof r.import_batch_id === 'string' ? r.import_batch_id : null,
+    };
+    if (report === null) problems.push(`no ${phase} report`);
+    else problems.push(...playerBridgeImportProblems(report, phase === 'apply' ? 'COMMITTED' : 'READ_ONLY', required ?? -1));
+  }
+  if (count(post.required) !== required || count(post.linked) !== required || post.unlinked !== 0) {
+    problems.push('the post-apply read-back does not show every required provider linked');
+  }
+  if (problems.length > 0) throw new Error(`${where} fails the D-252-13 contract:\n${problems.map((p) => `  - ${p}`).join('\n')}`);
+  const applyReport = value.apply as Record<string, unknown>;
+  return {
+    file_sha256: String(artefact.file_sha256),
+    match_method: PLAYER_BRIDGE_MATCH_METHOD,
+    snapshot_label: expected.aflApiLabel,
+    snapshot_manifest_sha256: expected.aflApiManifestSha256,
+    required_providers: required as number,
+    linked_providers: count(post.linked) as number,
+    import_batch_id: Number(applyReport.import_batch_id),
+  };
+}
+
+/** The proof's copy of the bridge binding: structurally whole and self-consistent. */
+function proofBridgeProblems(b: PlayerBridgeBinding | undefined, afl: PreparationBinding['afl_api'] | undefined): string[] {
+  if (!b || !afl) return ['no AFL API player bridge binding'];
+  const problems: string[] = [];
+  if (!HEX64.test(String(b.file_sha256))) problems.push('bridge file_sha256 is malformed');
+  if (b.match_method !== PLAYER_BRIDGE_MATCH_METHOD) problems.push('bridge match_method is not season evidence');
+  if (b.snapshot_label !== afl.label || b.snapshot_manifest_sha256 !== afl.manifest_sha256) problems.push('bridge is not bound to the preparation\'s AFL API snapshot');
+  if (!Number.isInteger(b.required_providers) || b.required_providers <= 0 || b.linked_providers !== b.required_providers) {
+    problems.push('bridge does not show every required provider linked');
+  }
+  if (!Number.isSafeInteger(b.import_batch_id) || b.import_batch_id <= 0) problems.push('bridge import batch is malformed');
   return problems;
 }

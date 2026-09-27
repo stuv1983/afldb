@@ -331,6 +331,13 @@ export type CanonicalApplyTargetResult = {
   rowsInserted: number;
   rowsUpdated: number;
   refusal: CanonicalApplyRefusal | null;
+  /**
+   * AFLDB-ISSUE-252 D-252-12 — evidence only. Present on an E3 ownership refusal alone: the
+   * owner source key read inside this unit's savepoint, the same read E3 judged (`null` when
+   * that row's owner was absent or unreadable). It authorises nothing and changes no gate; a
+   * caller reports it so a refusal census need not re-derive ownership from a second query.
+   */
+  ownerSourceKey?: string | null;
 };
 
 export type CanonicalApplyUnitResult = {
@@ -376,6 +383,12 @@ function refused(
   targetTable: CanonicalTargetTable, refusal: CanonicalApplyRefusal,
 ): CanonicalApplyTargetResult {
   return { targetTable, applied: false, verb: null, rowsInserted: 0, rowsUpdated: 0, refusal };
+}
+
+/** The owner key E3 read for a target, or null when it has no readable owner. Evidence only. */
+export function judgedOwnerSourceKey(identity: IdentityResolution): string | null {
+  if (identity.status === 'new_target' || identity.status === 'unresolved') return null;
+  return identity.ownership.state === 'owned' ? identity.ownership.sourceKey : null;
 }
 
 /* ------------------------------------------------------------------ *
@@ -1031,7 +1044,8 @@ export async function applyCanonicalUnit(
         // E3. Ownership, from state read in this savepoint.
         const ownership = autoApplyOwnership(fresh.identity, unit.sourceKey);
         if (ownership.verdict === 'refused') {
-          results.push(refused(target.targetTable, ownership.detail));
+          // ISSUE-252 D-252-12: the refusal carries the owner E3 just judged, as evidence.
+          results.push({ ...refused(target.targetTable, ownership.detail), ownerSourceKey: judgedOwnerSourceKey(fresh.identity) });
           continue;
         }
 

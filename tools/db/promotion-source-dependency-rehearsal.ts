@@ -128,6 +128,8 @@ import {
   AFLTABLES_FIRST_APPLY_TOLERATED_COUNTER,
   PREPARATION_PREVIEW_STATUS,
   PREPARATION_RECORD_SCHEMA_VERSION,
+  AFL_API_ACCEPTED_REFUSAL_CLASS,
+  PLAYER_BRIDGE_MATCH_METHOD,
   PREPARATION_ZERO_COUNTERS,
   buildDependencyManifest,
   buildSourceDependencyProof,
@@ -925,6 +927,11 @@ const NO_PREPARATION: PreparationBinding = {
   afltables_closure: {
     initial_apply: { inserted: 0, updated: 0, unresolved_identity_match: 0 },
     closure_dry_run: { inserted: 0, updated: 0, unresolved_identity_match: 0 },
+  },
+  afl_api_refusal_census: { accepted_class: AFL_API_ACCEPTED_REFUSAL_CLASS, count: 0, sha256: '0'.repeat(64), entries: [] },
+  afl_api_player_bridge: {
+    file_sha256: '0'.repeat(64), match_method: PLAYER_BRIDGE_MATCH_METHOD, snapshot_label: '(none)', snapshot_manifest_sha256: '0'.repeat(64),
+    required_providers: 0, linked_providers: 0, import_batch_id: 0,
   },
 };
 
