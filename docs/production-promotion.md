@@ -242,18 +242,19 @@ FAILs, and that includes a tracked or staged manifest, any other untracked file,
 JSON or CSV outside that pattern.
 
 ```bash
-# DEV: streamanator — the rebuilt source must be exactly what the checkout expects
+# DEV: streamanator — the revision PROD will run
 cd ~/projects/afldb && hostname
-git log -1 --oneline                                  # the revision PROD will run
-npm run db:promotion:check -- --phase source --database afldb_test \
-    --dsn-env AFLDB_TEST_DATABASE_URL [--expect-fingerprint <sha256 from db:test:fingerprint>]
+git log -1 --oneline
 ```
 
-Passes only when `afldb_test`'s migration ledger equals this checkout (no pending, no
-unknown, no drift). Fixture rows are reported as information here — they are expected on a
-test database and are removed in §7 — but a **PROD** checkout that is not at the same
-migration set as the source is a stop: promote the code first (`AFLDB-ISSUE-027` order:
-migration and `db:privileges` before the code) or rebuild from the matching revision.
+`--phase source` (the rebuilt source must be exactly what the checkout expects) now runs in
+**§3b**, after the current season has been prepared into it (§3a) — it requires the target's
+dependency manifest and the preparation record, and there is no opt-out (`AFLDB-ISSUE-252`). It
+passes only when `afldb_test`'s migration ledger equals this checkout (no pending, no unknown, no
+drift). Fixture rows are reported as information there — they are expected on a test database
+and are removed in §7 — but a **PROD** checkout that is not at the same migration set as the
+source is a stop: promote the code first (`AFLDB-ISSUE-027` order: migration and `db:privileges`
+before the code) or rebuild from the matching revision.
 
 ```bash
 # PROD: afldb-prod — same checkout, same migrations, state as it stands today
@@ -264,6 +265,164 @@ sudo systemctl status afldb afldb-settle-afltables.timer --no-pager
 ```
 
 Decide the stamp now and use it everywhere: `STAMP=$(date +%Y%m%d-%H%M%S)`.
+
+## 3a. Prepare the current season into the source (`AFLDB-ISSUE-252`)
+
+**Why.** `db:test:rebuild` stops at the last completed season (`rebuild-test.ts`'s pending-season
+invariant), but production holds production-owned rows that reference **current-season** matches:
+F1 `brownlow_vote_entry_state.match_id`, F2 active `data_overrides` of `matches` /
+`match_coaches`, F3 `data_edits` on `matches`. Reinstated into a candidate without those matches,
+they dangle, and `--phase restored`'s lineage gate refuses the promotion (L5 `20260927-142540`).
+Preparation settles the current season into `afldb_test` from **retained, hash-bound snapshots
+only** — no network acquisition — in the ownership-preserving order production itself used:
+
+1. the retained **AFL Tables** current-season snapshot first (first writer, `afltables`-owned);
+2. the retained **full AFL API match/stat** snapshot second (corroborates; never re-owns: equal
+   values are history only, a disagreement is `foreign_owned_collision` = STOP);
+3. the dependency + ownership-parity gate (§3b).
+
+Neither the AFL API fixtures-only settle nor the AFL API Brownlow settle is part of preparation
+(D-252-9a/9b): no dependency family reads their output.
+
+**Step 1 — the target's dependency manifest A, BEFORE the freeze (read-only).**
+
+```bash
+# PROD: afldb-prod
+hostname
+npm run db:promotion:check -- --phase dependencies --database afldb_prod \
+    --dependencies-out ~/backups/afldb/promotion-$STAMP-dependencies-A.json
+sha256sum ~/backups/afldb/promotion-$STAMP-dependencies-A.json    # record it; scp to DEV; re-hash there
+```
+
+The manifest lists every F1/F2/F3 row as `{family, target_row, match_keys[], owner_state,
+owner_source_key}` — `match_key` strings and target row labels only (a target id is an audit
+label, never a lookup key), no credentials. Its `dependency_set_sha256` is computed over the
+dependency content only (not `captured_at`, not the database OID), so an unchanged set captured
+again under the freeze hashes identically. Every family is also counted by a plain `count(*)`;
+a reader that disagrees refuses and writes nothing. Under `--environment dev` F3 is withheld by
+the contract (`data_edits` is historical-only there) and reported as such.
+
+**Step 2 — the ingestion switch on `afldb_test` (operator, recorded; the tool never writes it).**
+The unmodified AFL API settle refuses unless `acquisition.afl_api_current_season_enabled` reads
+`true` on the database it writes. On `afldb_test` only, as the owner role:
+
+```sql
+-- afldb_test, afldb_owner. Record V0 (or "absent") in the promotion record FIRST.
+SELECT value::text FROM site_settings WHERE key = 'acquisition.afl_api_current_season_enabled';
+INSERT INTO site_settings (key, value) VALUES ('acquisition.afl_api_current_season_enabled', 'true'::jsonb)
+    ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now();
+-- ... preparation (step 3) ...
+-- ALWAYS restore, even when preparation failed; then re-read and record the restored value:
+UPDATE site_settings SET value = '<V0>'::jsonb, updated_at = now()
+ WHERE key = 'acquisition.afl_api_current_season_enabled';          -- when V0 existed
+DELETE FROM site_settings WHERE key = 'acquisition.afl_api_current_season_enabled';   -- when V0 was absent
+```
+
+It cannot leak into production: `site_settings` is truncated in the candidate and reinstated from
+the target (§7).
+
+**Step 3 — preparation.** Both retained snapshots are named by label **and** by the sha256 the
+operator recorded when they were retained; the AFL Tables input is also bound by its
+`observations.json` sha256, because the AFL Tables manifest does not list the bundle the settle
+reads. A PROD-origin AFL Tables snapshot is copied to DEV under `/home/arm/projects/afldb` exactly
+(its bundle carries that absolute `manifest_path`; any other checkout refuses).
+
+```bash
+# DEV: streamanator — after db:test:rebuild; the switch enabled (step 2)
+cd ~/projects/afldb && hostname
+AT=<afltables label>; AT_M=<its manifest sha256>; AT_O=<its observations.json sha256>
+API=<afl_api label>;  API_M=<its manifest.json sha256>
+P="--acknowledge afldb_test --afltables-label $AT --expect-afltables-manifest-sha256 $AT_M \
+   --expect-afltables-bundle-sha256 $AT_O --afl-api-label $API --expect-afl-api-manifest-sha256 $API_M"
+export DATABASE_URL="$AFLDB_TEST_DATABASE_URL" AFLDB_IMPORT_DATABASE_URL="$AFLDB_TEST_IMPORT_DATABASE_URL"
+npm run db:promotion:prepare-source -- $P --validate-only        # offline: both snapshots re-hashed
+npm run db:promotion:prepare-source -- $P --dry-run              # PREVIEW ONLY, unproven (see below); writes nothing
+npm run db:promotion:prepare-source -- $P --apply \
+    --record-out ~/backups/afldb/promotion-$STAMP-preparation.json
+sha256sum ~/backups/afldb/promotion-$STAMP-preparation.json      # record it
+```
+
+Each is a STOP on refusal: a snapshot that does not re-hash, a season that is not the one
+in-progress season, either session not on `afldb_test` (proved by `current_database()`, never
+from a DSN), the switch not `true`, any current-season match already owned by anything but
+`afltables` (rebuild `afldb_test`; the order cannot be repaired), and for **each** settle a halt,
+a rollback, a completeness other than `complete`, or any non-zero build failure, unresolved
+identity, `foreign_owned_collision`, venue unmapped, manual-authority or canonical-apply refusal
+or failure.
+
+`--apply` runs in this order:
+
+1. The AFL Tables apply.
+2. A mandatory same-label AFL Tables **closure dry run**.
+3. An AFL API **dry run** whose post-conditions must pass.
+4. The AFL API apply.
+5. The record, which never overwrites an existing one.
+
+**Q-252-10: the first AFL Tables apply.** On a fresh `afldb_test` every current-season match is
+new. The AFL Tables settle counts each new match's period scores as `unresolvedIdentityMatch`
+before it applies them later in the same run. That one counter may therefore be non-zero on the
+first apply, but only provisionally and only up to the rows the apply inserted. Every other
+counter must still be 0.
+
+The closure dry run straight afterwards is the authoritative proof. It must show every counter at
+0, `unresolvedIdentityMatch` included, with 0 rows inserted, 0 updated and 0 applications logged.
+Otherwise preparation STOPs before the AFL API phase. The record keeps the two AFL Tables results
+separate (`afltables_initial_apply`, `afltables_closure_dry_run`), and `--phase source` re-judges
+both.
+
+**Q-252-11: `--dry-run` is an unproven preview.** The sequence is `--validate-only` → `--dry-run`
+(preview) → `--apply` (which includes the mandatory closure pass). The preview proves both
+databases and runs the AFL Tables settle as a rolled-back dry run. That dry run plans exactly what
+the first apply would, so on a freshly rebuilt `afldb_test` it carries the same transient
+`unresolvedIdentityMatch`, and it is judged the same way:
+
+- source completeness `complete`, the expected rolled-back dry run, no halt;
+- `unresolvedIdentityMatch` ≤ `canonicalRowsInserted`;
+- every other §21.2 counter 0.
+
+A larger `unresolvedIdentityMatch`, any other non-zero counter, an incomplete source, a halt or an
+unexpected rollback still STOPs the preview.
+
+The `≤ canonicalRowsInserted` bound is a sanity check only. It does **not** show that every
+unresolved identity was satisfied. A successful preview logs `PREVIEW ONLY — UNPROVEN: transient
+same-run match dependencies are not yet proven resolved`. It writes **no preparation record and no
+source proof**, cannot satisfy `--phase source`, and is **not** promotion-ready evidence.
+
+The promotion-source proof is `--apply`'s internal closure dry run, never the standalone preview.
+Against an already-prepared source, the preview reports 0 `unresolvedIdentityMatch`, 0 inserted
+and 0 updated. A re-run of `--apply` with the same labels is idempotent (0 inserted, 0 updated).
+
+## 3b. The source dependency gate (`AFLDB-ISSUE-252`, mandatory)
+
+```bash
+# DEV: streamanator
+npm run db:promotion:check -- --phase source --database afldb_test \
+    --dsn-env AFLDB_TEST_DATABASE_URL [--expect-fingerprint <sha256 from db:test:fingerprint>] \
+    --target-dependencies promotion-$STAMP-dependencies-A.json --target-dependencies-sha256 <A's sha256> \
+    --preparation-record ~/backups/afldb/promotion-$STAMP-preparation.json --preparation-record-sha256 <its sha256> \
+    --source-dependency-proof-out ~/backups/afldb/promotion-$STAMP-source-proof.json
+sha256sum ~/backups/afldb/promotion-$STAMP-source-proof.json     # record it; scp the proof to PROD
+```
+
+Before any connection the manifest is re-hashed against the recorded sha256 (transport), its
+`dependency_set_sha256` is recomputed from its content (an edited-then-re-hashed file refuses),
+its environment and target database are checked, and its family row counts revalidated; the
+preparation record is re-hashed and must name `afldb_test`, the AFL Tables-then-AFL API order,
+both inputs with their sha256s, and both applies committed and complete. Then, on `afldb_test`,
+the source is read **by `match_key` only** and each family is its own gate — one passing family
+never offsets another. Per family the report shows rows inspected, stable identities, resolved,
+unresolved, ambiguous, owner mismatch and other refusals, naming every refused `match_key`. A
+dependency passes only when its match resolves **exactly once by the identical `match_key`
+string** and is owned on both sides by the **same `sources.key`** (a round, date or team
+difference is `identity_absent_in_candidate`; an `afl_api`-owned source match for an
+`afltables`-owned target match is `owner_mismatch`). The record's two import batches must exist
+in this database.
+
+The proof is written **only** when every gate of the run passed, never over an existing file.
+It binds: the preparation record's sha256, `prepared_at`, season and batches; the AFL Tables
+label, manifest sha256 and `observations.json` sha256; the AFL API label and manifest sha256; the
+manifest's `dependency_set_sha256`, file sha256 and capture time; the per-family counts; the
+source database (and its OID); and `verdict: PASS`. A FAIL here is a STOP before any freeze.
 
 ## 4. Freeze production, then take the mandatory backup, proven
 
@@ -354,6 +513,31 @@ lacks it, restore into a throwaway `afldb_restore_test` created with
 "prove" the dump by restoring it anywhere else. Copy the dump and its `.sha256` off the host
 before continuing (`docs/backup-restore.md` §4).
 
+### 4.2 Frozen dependency re-check (`AFLDB-ISSUE-252`)
+
+Manifest A (§3a) was captured before the freeze; a dependency created between then and the freeze
+(an administrator's Brownlow entry, a match override, a match edit) is not in it. Re-capture the
+FROZEN target as manifest B and check it against the proof §3b wrote:
+
+```bash
+# PROD: afldb-prod — frozen
+sha256sum ~/backups/afldb/promotion-$STAMP-source-proof.json      # must equal the sha256 recorded on DEV
+npm run db:promotion:check -- --phase dependencies --database afldb_prod \
+    --freeze-record "$FREEZE/promotion-freeze-record.json" \
+    --dependencies-out ~/backups/afldb/promotion-$STAMP-dependencies-B.json \
+    --source-dependency-proof ~/backups/afldb/promotion-$STAMP-source-proof.json \
+    --source-dependency-proof-sha256 <the proof's recorded sha256>
+```
+
+It first re-proves the target frozen, quiescent and identical to F0, captures B (stamped with the
+freeze token), writes it, and PASSes only when B's `dependency_set_sha256` is **exactly** the one
+the proof proved (and the family statuses agree). **A different hash means the proof is stale:
+stop, stay frozen, carry B to DEV, rerun §3b with `--target-dependencies` B, carry the new proof
+back and re-check.** Nothing proceeds on the old proof; a dependency in B that the prepared source
+does not hold is then a hard STOP at §3b (prepare again from newer retained snapshots only if the
+operator decides so, which restarts §3a). `--phase pre-cutover` (§5) repeats the same check from a
+live re-derivation, so a stale proof cannot reach the snapshot, the candidate or the swap.
+
 ## 5. Production-owned state snapshot
 
 ```bash
@@ -361,12 +545,18 @@ before continuing (`docs/backup-restore.md` §4).
 npm run db:promotion:check -- --phase pre-cutover --database afldb_prod \
     --snapshot ~/backups/afldb/promotion-$STAMP.json \
     --freeze-record "$FREEZE/promotion-freeze-record.json" \
+    --source-dependency-proof ~/backups/afldb/promotion-$STAMP-source-proof.json \
+    --source-dependency-proof-sha256 <the proof's recorded sha256> \
     --expect-super-admin <the real production super admin's email>
 ```
 
 **AFLDB-ISSUE-250.** `--freeze-record` is required under `--environment prod` here and in
 `restored`, `candidate` and `production`; each of those re-proves the live target frozen,
 quiescent and identical to F0, so the counts snapshot below is the frozen state.
+
+**AFLDB-ISSUE-252.** `--source-dependency-proof` (with its recorded sha256) is required here under
+`--environment prod` (optional under `dev`): the frozen dependency set is re-derived live and must
+be exactly the one the prepared source proved (§4.2).
 
 Refuses if production already holds a fixture identity or lacks an enabled, enrolled super
 admin — either is an existing problem to fix before promotion, not something to carry
@@ -540,7 +730,10 @@ read the target's **active** overrides and the candidate's stable identities (AF
   re-acquisition nothing re-applies the override (the settle's `ManualAuthorityProvider` answers
   `conflict` and proposes). So any active override keyed to a season the historical candidate
   does not hold is **FAIL**, and the promotion waits until no such override is active or the
-  current-season lifecycle gains an identity-safe replay.
+  current-season lifecycle gains an identity-safe replay. *(`AFLDB-ISSUE-252`: with §3a the
+  candidate holds the prepared current season, so a current-season override whose match §3b
+  proved resolves here and PASSes. The rule itself is unchanged and stays the backstop; this
+  paragraph is rewritten only after the F2 rehearsal cases pass on `code_test_db`.)*
 
 ## 7. Reinstate production-owned state into the candidate
 
@@ -1181,10 +1374,15 @@ generator, with the hyphenated `afldb_*_pre_rebuild_20260906-112500` shape pinne
 
 ## 9. Current season
 
-The rebuild carries the seasons it was built from; production's in-season rows, settle
-ledger and acquisition history were replaced (§1). Re-acquire with the standard supervised
-ladder in `docs/deployment.md` §7b — `--dry-run --auto-apply` first, then `--apply` — and
-only then `sudo systemctl start afldb-settle-afltables.timer`. `AFLDB-ISSUE-137` applies:
+The rebuild carries the seasons it was built from, plus the current season §3a prepared from
+retained snapshots (`AFLDB-ISSUE-252`): the candidate's current-season matches are
+`afltables`-owned, corroborated by the AFL API snapshot, exactly as of those snapshots.
+Production's own settle ledger and acquisition history were still replaced (§1). This step is
+therefore a **refresh and corroboration**, not a repair: re-acquire with the standard supervised
+ladder in `docs/deployment.md` §7b — `--dry-run --auto-apply` first, then `--apply` — and only
+then `sudo systemctl start afldb-settle-afltables.timer`. The AFL Tables settle meets its own
+`afltables`-owned rows and updates or confirms them; any AFL API settle meeting them corroborates
+or refuses `foreign_owned_collision`, never re-owns. `AFLDB-ISSUE-137` applies:
 after a rebuild that carries the ISSUE-136 identity fix, the settle resolves the renumbered
 identities correctly, which is the point of promoting rather than repairing in place.
 
@@ -1344,7 +1542,13 @@ database is still restored into a *new* candidate and swapped by rename, never r
 # DEV: streamanator — the same five phases, with the environment stated every time. Add
 # --afl-api-dev-regeneration <file> to --phase restored ONLY when a G3 exception is intended
 # (AFLDB-ISSUE-237 §6.3) — omit it and every importer hard loss is FAIL, exactly as on production.
-npm run db:promotion:check -- --environment dev --phase source      --database afldb_test
+# AFLDB-ISSUE-252: §3a/§3b apply to DEV too — manifest A from afldb_dev (F3 is withheld by the
+# contract there), preparation, then the mandatory gate. The frozen re-check is opt-in on DEV.
+npm run db:promotion:check -- --environment dev --phase dependencies --database afldb_dev \
+    --dependencies-out ~/backups/afldb/promotion-dev-$STAMP-dependencies-A.json
+npm run db:promotion:check -- --environment dev --phase source      --database afldb_test \
+    --target-dependencies <A> --target-dependencies-sha256 <hex> \
+    --preparation-record <record> --preparation-record-sha256 <hex> --source-dependency-proof-out <proof>
 npm run db:promotion:check -- --environment dev --phase pre-cutover --database afldb_dev \
     --snapshot ~/backups/afldb/promotion-dev-$STAMP.json
 npm run db:promotion:check -- --environment dev --plan --database "$CAND" \

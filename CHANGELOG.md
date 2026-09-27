@@ -15,6 +15,41 @@ commit.
 
 ## [Unreleased]
 
+### Current-season promotion source: preparation, dependency manifest and mandatory ownership-parity gate (AFLDB-ISSUE-252; Open, code_test_db rehearsal PASS) - 27 September 2026
+
+- **The defect.** `db:test:rebuild` stops at the last completed season, but production holds
+  production-owned rows that reference current-season matches (Brownlow entry state, active match
+  / match-coach overrides, match edits). Reinstated into a candidate without those matches they
+  dangle, and the L5 promotion `20260927-142540` was refused at `--phase restored`.
+- **The change.** New `db:promotion:prepare-source` settles the current season into `afldb_test`
+  from retained, hash-bound snapshots only — AFL Tables first (ownership as on production), full
+  AFL API match/stat second (corroboration; never re-owns) — reading, never writing, the AFL API
+  ingestion switch, and writes a preparation record. `db:promotion:check` gains
+  `--phase dependencies` (read-only target manifest of F1 `brownlow_vote_entry_state`, F2 active
+  `matches`/`match_coaches` overrides, F3 `data_edits` on matches, with a content-only
+  `dependency_set_sha256` and a `count(*)` cross-check); `--phase source` now **requires** that
+  manifest and the preparation record and judges every family separately by exact `match_key` and
+  owner source, writing a source dependency proof only on a complete PASS; the frozen re-check
+  (`--phase dependencies --source-dependency-proof`, and `--phase pre-cutover`, where the proof is
+  required under prod) refuses a stale proof. `docs/production-promotion.md` §3a/§3b/§4.2/§5/§9
+  and the acceptance checklist describe the flow.
+- **First AFL Tables apply (Q-252-10).** On a fresh `afldb_test` every current-season match is new,
+  and the AFL Tables settle counts each new match's period scores as `unresolvedIdentityMatch`
+  before applying them later in the same run. The first AFL Tables `--apply` may therefore carry
+  that one counter non-zero, provisionally, bounded by the rows it inserted. Every other zero
+  counter must still be 0. A mandatory same-label AFL Tables `--dry-run` follows immediately and
+  must be all zero, with 0 inserted, updated and logged applications. The AFL API phase never
+  starts without it. The preparation record (schema 2) and the source proof (schema 2) carry the
+  initial apply and the closure dry run as two separate results. The settle itself is unchanged.
+- **`--dry-run` is an unproven preview (Q-252-11).** The standalone preparation `--dry-run` now
+  accepts the same bounded, transient `unresolvedIdentityMatch` as the first apply, with every
+  other post-condition strict. It says `PREVIEW ONLY — UNPROVEN`, writes no preparation record and
+  no source proof, and never satisfies `--phase source`. Only `--apply`'s internal closure dry run
+  proves the source.
+- **Validation.** `tests/db-promotion-check.test.ts` 346/346. `code_test_db` rehearsal attempt 4:
+  A–V all PASS (104 checks), final residue 0, 2026 restored exactly as found, only sequences
+  advanced. No other database was contacted.
+
 ### Production promotion freeze: no write can be silently lost at the swap (AFLDB-ISSUE-250; Open, DEV rehearsal PASS) - 26 September 2026
 
 - **The defect.** A production promotion dumped `afldb_prod` (§4) while the application and the
