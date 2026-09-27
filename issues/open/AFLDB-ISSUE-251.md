@@ -2580,3 +2580,147 @@ The independent Phase 6 cohort census also passed: rows 1–2 (`cohort_paths`,
 
 **Phase 6 passed.** Phase 7 has **not** been authorised. No ISSUE-251 player adoption has been
 run. ISSUE-251 remains open. ISSUE-237 L5 remains blocked.
+
+## 24. Real PROD execution, §21 Phases 8–10 — authorised adoption applied and verified (2026-09-27)
+
+Following §23, explicit operator authorisation was given for a one-time PROD adoption apply, at
+deployed revision `1dee06c00bdb54572d5faf27d2807a8a16b1b6cd`, actor `ADMIN_USER_ID=1`, backup
+SHA-256 `49dc09821940e93ad9caf50ba79c931342881bffab987ac59332160ab371db3e` (the same backup recorded
+at §23.2). Phases 8–10 were then executed for real against `afldb-prod`.
+
+### 24.1 Phase 8 — authorised one-time PROD adoption (executed, committed)
+
+Before apply, all three non-secret DSN shapes passed, matching §23.4's corrected `§21.0a` export
+set:
+
+```text
+DATABASE_URL|afldb_app|/afldb_prod
+AFLDB_PROD_IMPORT_DATABASE_URL|afldb_import|/afldb_prod
+AFLDB_PROD_AUTH_DATABASE_URL|afldb_auth|/afldb_prod
+```
+
+The CLI connected as:
+
+```text
+current_database()='afldb_prod'
+current_user='afldb_import'
+mode=APPLY
+```
+
+It confirmed the expected host/revision and acknowledged the operator-verified backup SHA above.
+Actor preflight passed for `admin_user_id=1`, role `super_admin`.
+
+In-transaction classification was exactly:
+
+```text
+CREATE            = 92
+ALREADY_SATISFIED = 0
+CONFLICT          = 0
+TOTAL             = 92
+```
+
+The tool reported:
+
+```text
+APPLY complete against 'afldb_prod':
+92 player(s) created and attached,
+0 already satisfied,
+0 conflicts.
+```
+
+All pre-commit integrity checks passed: 92/92 target AFL Tables identities resolve; 92 distinct
+canonical `player_id`s; no identity claimed twice; no duplicate slug among newly-created players;
+92/92 carry the resolved `given_name` / `surname` / `sort_name`; player count increased exactly 92;
+92/92 `player_career_stats` rows exist; 92/92 `data_overrides` durability rows carry the attached
+path; 92/92 durable identity payloads carry the resolved name parts; 92/92 `data_edits` audit
+writes confirmed; 0/92 AFL API external identities created.
+
+The decisive result was:
+
+```text
+Transaction committed = yes
+APPLY_EXIT=0
+```
+
+Apply log: `/home/arm/backups/afldb/issue251-apply-20260927-132829.log`.
+
+**This Phase 8 apply command was run exactly once against `afldb-prod` and must never be run
+again.** The classification shape (`CREATE=92 / ALREADY_SATISFIED=0 / CONFLICT=0`) is itself
+evidence that a second run would no longer see any target as creatable; see §24.2 for the
+independent post-adoption proof of that already-satisfied state.
+
+### 24.2 Phase 9 — independent post-adoption verification (executed)
+
+The independent cohort census, run separately from the apply above, returned exactly:
+
+```text
+1  cohort_paths                              92
+2  cohort_paths_distinct                     92
+3  afltables_rows_for_cohort_any_status      92
+4  afltables_rows_not_cleanly_accepted        0
+5  accepted_paths_distinct                   92
+6  cohort_players_distinct                   92
+7  cohort_players_with_non_cohort_afltables    0
+8  manual_tokens                             92
+9  manual_tokens_distinct                    92
+10 players_with_a_manual_token               92
+11 active_creation_records                   92
+12 players_with_exactly_one_creation_record   92
+13 creation_record_path_equals_player_path   92
+14 creation_records_by_selected_actor        92
+15 creation_records_by_any_other_actor        0
+16 afl_api_identities_on_cohort_players        0
+17 players_total                          13,365
+```
+
+Baseline was `P0=13,273` (§23.4); `13,365 = P0 + 92` exactly, with no unexplained delta.
+
+The independent no-write classifier then returned:
+
+```text
+CREATE            = 0
+ALREADY_SATISFIED = 92
+CONFLICT          = 0
+TOTAL             = 92
+CLASSIFY_EXIT=0
+```
+
+This proves deterministic already-satisfied state. **No second apply was run.** The second-run
+refusal is demonstrated by this classifier result together with the first-apply exact-shape gate
+in §24.1, not by attempting another write.
+
+### 24.3 Phase 10 — application/service health (executed)
+
+Observed:
+
+```text
+afldb.service = active
+listener = 127.0.0.1:3100
+/api/health = {"status":"ok","database":"ok","latencyMs":0}
+afldb-settle-afltables.timer = inactive
+afldb-settle-afltables.service = inactive
+HEAD = 1dee06c00bdb54572d5faf27d2807a8a16b1b6cd
+```
+
+Checkout had no tracked drift, and only the permitted settle-manifest untracked shape. No restart
+was performed. No second apply was performed. The shell cleanup successfully unset
+`DATABASE_URL`, `AFLDB_PROD_IMPORT_DATABASE_URL`, and `AFLDB_PROD_AUTH_DATABASE_URL`.
+
+### 24.4 Status / next action
+
+The ISSUE-251 PROD adoption itself — the 92-player registration set — is now **committed and
+verified** against `afldb-prod`. **ISSUE-251 remains Open; it is not resolved by this pass.** The
+known `replay_admin_overrides(players)` limitation (§21.13/§21.14) remains recorded and
+unaddressed.
+
+The next required step is a **completely fresh ISSUE-237 L5 promotion attempt**:
+
+- do **not** reuse `afldb_prod_candidate_20260926-213225`, or any of its freeze, dump, plan,
+  lineage, supersede, or reinstatement artefacts;
+- the fresh L5 must use a new stamp, a new freeze, a new source dump, and a new candidate;
+- the fresh `--phase restored` gate must independently show the 92 target registrations now
+  converge through AFLDB-ISSUE-242;
+- expected convergence is candidate token B / path P → existing PROD token A / path P rebind.
+
+Only after that fresh restored gate satisfies ISSUE-251's closure criterion should ISSUE-251 be
+closed. **The fresh ISSUE-237 L5 attempt has not been started by this pass.**
