@@ -42470,6 +42470,47 @@ Full record: `issues/closed/AFLDB-ISSUE-228.md` §22.22.
     findings.
 - **Next action.** Operator decisions §5 (a) collision policy, (b) human-correction recording,
   (c) re-settle vs move. Then the plan and review in the runbook (§4).
+- **Update 2026-09-26 (passes 2–5a): status superseded, above.** The runbook's own §0 now carries the
+  authoritative status. Summary: design accepted (`afldb-reviewer` pass-5a plan review, PASS WITH
+  MEDIUM/LOW NOTES); operator decisions D1–D10, O-1…O-6, D-P5-1…3 recorded; Slice 1 (read-only
+  confirmations) and Slice 2 (a standalone DB-free planner + tests) done; everything from Slice 3
+  (the M1/M2 migrations) onward held behind two hard barriers, AFLDB-ISSUE-250 then AFLDB-ISSUE-237
+  L5 PROD.
+- **Update 2026-09-28 (current-main reconciliation pass, base `cdd1b7cd`).** Both hard barriers are
+  now satisfied: AFLDB-ISSUE-250 is Resolved, and AFLDB-ISSUE-237's L5 PROD PASSED and ISSUE-237 is
+  Resolved (stamp `20260928-101642`). This does not itself authorise Slice 3+. The reconciliation
+  pass re-checked the accepted design and the Slice-2 planner against current main and found no
+  incompatibility and no accepted decision invalidated; the Slice-2 DB-free suite still passes
+  (72/72, `npm test -- tests/afl-api-identity-correction.test.ts`).
+- **Update 2026-09-28 (Slice-1 closure pass, base `cdd1b7cd`).** Closed the exhaustive
+  `afl_api_identity_adjudications` reader inventory beyond the core module (found five further floor
+  items, none contradicting the design) and the v2 rebuild-capture format's full consumer list
+  (confirmed it is a distinct, independently versioned artefact from the promotion supersede file,
+  and that a v3 of either is a valid additive successor). Re-confirmed the Slice-2 planner and test
+  file byte-identical to the pre-pass safety copy (SHA256) and still 72/72 passing; `npx tsc --noEmit
+  -p .` clean. **This pass also found that §12 slice 1's own list has always carried two further
+  confirmations the prior reconciliation bullet did not name** (the `club_season_participation`/
+  `brownlow_season_authority` SV-1 columns, and the §7 fingerprint-stability premise); neither was in
+  this pass's brief and neither is closed. **Status remains Open; Slice 1 is not yet complete.**
+  **Next action:** close the two remaining Slice-1 confirmations named above (runbook §12 slice 1),
+  then seek separate operator authorisation for Slice 3 onward (runbook §0, §12).
+- **Update 2026-09-28 (final Slice-1 closure pass, base `cdd1b7cd`).** Closed both remaining
+  Slice-1 confirmations named above. **SV-1 source contracts:** read `brownlow_season_votes`,
+  `brownlow_season_authority`, the admin publish path (`writeSeasonRows()`), the
+  `club_season_participation` resolution method (`tools/migration/after_siren.py`) and
+  `player_season_stats.games`'s derivation from current-main source; every element of the SV-1 rule
+  (§5.10) matched the code exactly, with no AFL API bridge participation in the admin-published
+  season derivation. **§5.1 fingerprint-stability premise:** re-read the fingerprint function, its
+  canonicalisation and every database-local id it carries; proved (not asserted) that no id is ever
+  compared across target and candidate databases, only within one database's own lifecycle. Neither
+  confirmation surfaced a contradiction; no accepted decision (D1–D10, O-1…O-6, D-P5-1…3) changed.
+  Added the one missing DB-free fingerprint test (STOP-order independence); the Slice-2 suite is now
+  73/73 (`npm test -- tests/afl-api-identity-correction.test.ts`), the planner/test files remain
+  byte-identical to the safety copy apart from that one new test (SHA256 re-checked), and
+  `npx tsc --noEmit -p .` is clean. **FINAL SLICE-1 VERDICT: COMPLETE. Slice 1 has no remaining
+  confirmation.** **Status: still Open — Slice 3 onward (M1/M2 migrations and beyond) is READY FOR
+  SEPARATE OPERATOR AUTHORISATION**, not itself authorised by this pass. Runbook §0, §12, §13.2,
+  §14.7.
 
 ## AFLDB-ISSUE-252 — Production promotion cannot reinstate production-owned state that references current-season rebuilt entities absent from `afldb_test`
 
