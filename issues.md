@@ -42511,6 +42511,40 @@ Full record: `issues/closed/AFLDB-ISSUE-228.md` §22.22.
   confirmation.** **Status: still Open — Slice 3 onward (M1/M2 migrations and beyond) is READY FOR
   SEPARATE OPERATOR AUTHORISATION**, not itself authorised by this pass. Runbook §0, §12, §13.2,
   §14.7.
+- **Update 2026-09-28 (Slice 3 M1/M2 pass, base `5c79c47e`, operator-authorised this pass).**
+  **M1** (migration `106_afl_api_identity_corrected_action.sql`, successor to 104): action
+  vocabulary gains `corrected`; the two-action biconditional
+  `afl_api_identity_adjudications_revoke_ck` is replaced by two one-directional implications
+  (`revoked` ⇒ `supersedes_id` NOT NULL; new `..._linked_ck`, `linked` ⇒ `supersedes_id` NULL);
+  new column `previous_player_identity text` with its own CHECK
+  (`(action = 'corrected') = (previous_player_identity IS NOT NULL)`); `corrected` additionally
+  requires `previous_state IS NOT NULL` and `previous_player_identity <> player_identity`, exactly
+  per runbook §10 M1. `surname_disagreement_acknowledged` needed no migration: it already exists
+  (NOT NULL) since 104. **M2** (migration `107_canonical_applications_delete_audit.sql`, successor
+  to 083): `verb` gains `delete`; new CHECK `verb <> 'delete' OR new_values = '{}'::jsonb`;
+  `previous_values` NOT NULL on delete was already implied, unchanged, by the existing
+  `..._previous_ck`; the 64-key protection and `target_table_ck` are untouched (both correction
+  targets were already members). **Privileges:** inspected `tools/maintenance/privileges.sql` and
+  the current grant set (`afldb_import` SELECT+INSERT+sequence USAGE, `afldb_auth` SELECT-only, on
+  both tables) already matches the extended schema exactly — neither migration changes what may be
+  granted, so **no `privileges.sql` edit was needed or made**; `npm run db:privileges:code-test`
+  reconciled cleanly both before and after, with identical NOTICE counts on both runs. **Rehearsal
+  on `code_test_db`** (target proven via `current_database()` before any write): baseline was 105
+  applied, 106/107 pending; `npm run db:migrate:code-test` applied both cleanly; re-running it
+  reported "Nothing to apply" (idempotent); `pg_get_constraintdef` inspection confirmed every new/
+  widened CHECK by name; 18 legal/illegal row-shape cases (11 for M1, 7 for M2 — every case listed
+  in the implementation brief) were exercised as real `INSERT`s inside transactions rolled back via
+  a forced exception, each firing exactly the named constraint or none; grant-boundary queries
+  confirmed `afldb_import` still holds no UPDATE/DELETE on the ledger and no DELETE on
+  `canonical_applications` itself. All scratch rehearsal scripts were deleted after use; row counts
+  (players, auth_users, sources, import_batches, adjudications, applications) were identical before
+  and after. **Validation:** `npx tsc --noEmit -p .` clean; the Slice-2 DB-free planner suite
+  unaffected, still 73/73 (`npm test -- tests/afl-api-identity-correction.test.ts`) — this pass
+  touched no shared ISSUE-237 file and started no Slice-4 work, per its brief. No accepted decision
+  (D1–D10, O-1…O-6, D-P5-1…3) changed. **Nothing was staged, committed or pushed; no DEV/PROD
+  database was touched.** **Status: Slice 3 COMPLETE, uncommitted. Next action:** operator commit
+  of migrations 106/107, then separate operator authorisation for Slice 4 (exhaustive
+  `corrected`-ledger reader semantics across the ~15 real readers §8.6 enumerates) — not begun.
 
 ## AFLDB-ISSUE-252 — Production promotion cannot reinstate production-owned state that references current-season rebuilt entities absent from `afldb_test`
 

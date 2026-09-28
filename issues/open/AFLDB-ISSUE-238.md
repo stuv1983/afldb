@@ -2,8 +2,26 @@
 
 ## 0. Status
 
-- **Open, Medium. Slice 1 COMPLETE; Slice 2 done. Slice 3 onward is READY FOR SEPARATE OPERATOR
-  AUTHORISATION** (final Slice-1 closure pass, 2026-09-28, base `cdd1b7cd`). Both former hard
+- **Open, Medium. Slice 1/2 COMPLETE. Operator authorised Slice 3 (2026-09-28), and Slice 3 is
+  now COMPLETE, uncommitted** (Slice 3 M1/M2 pass, 2026-09-28, base `5c79c47e`). Migration `106`
+  (M1, successor to 104) and migration `107` (M2, successor to 083) are written exactly per §10 and
+  rehearsed clean on `code_test_db`: target proven via `current_database()` before any write;
+  baseline 105 applied; both migrations applied cleanly; re-running the migration runner reported
+  "Nothing to apply" (idempotent); `pg_get_constraintdef` confirmed every new/widened CHECK by
+  name; 18 legal/illegal row-shape cases (11 M1 + 7 M2, matching the implementation brief exactly)
+  were exercised as real `INSERT`s inside transactions forced to roll back, each firing the exact
+  named constraint or none; grant-boundary queries confirmed `afldb_import` still holds no
+  UPDATE/DELETE on the ledger and no DELETE on `canonical_applications` itself.
+  `tools/maintenance/privileges.sql` needed **no edit**: the existing grant mirrors for both tables
+  (append-only SELECT+INSERT to `afldb_import`, SELECT-only to `afldb_auth`) already match the
+  extended schema exactly, confirmed by `npm run db:privileges:code-test` reconciling identically
+  before and after. `npx tsc --noEmit -p .` clean; the Slice-2 DB-free planner suite is unaffected
+  at 73/73 — no shared ISSUE-237 file was touched and no Slice-4 work began. No accepted decision
+  (D1–D10, O-1…O-6, D-P5-1…3) changed. Nothing was staged, committed or pushed; no DEV/PROD
+  database was touched. **Next: operator commit of migrations 106/107, then separate operator
+  authorisation for Slice 4** (§8.6's exhaustive `corrected`-ledger reader inventory). Details:
+  §12 slice 3, `issues.md`.
+- **Final Slice-1 closure pass (2026-09-28, base `cdd1b7cd`).** Slice 1 COMPLETE; Slice 2 done. Both former hard
   barriers (AFLDB-ISSUE-250, AFLDB-ISSUE-237 L5 PROD) are Resolved. This pass closed the two
   confirmations the same-day reconciliation pass had left open at §12 slice 1: the SV-1 source
   contracts (`brownlow_season_votes`, `brownlow_season_authority`, the `club_season_participation`
@@ -2639,9 +2657,14 @@ FOR SEPARATE OPERATOR AUTHORISATION.**
 
 **Post-L5**
 
-3. **M1 and M2**, with their `privileges.sql` mirrors, rehearsed on `code_test_db` (migrate +
-   privileges reconcile). The ISSUE-027 order applies: migrations and `db:privileges` before code.
-4. **Corrected ledger semantics and exhaustive readers** (§8.6):
+3. **M1 and M2 — DONE (2026-09-28, uncommitted).** `106_afl_api_identity_corrected_action.sql` and
+   `107_canonical_applications_delete_audit.sql`, rehearsed clean on `code_test_db` (migrate +
+   privileges reconcile; `privileges.sql` needed no edit, confirmed unchanged-grant-set by
+   inspection and by an identical reconcile before/after). The ISSUE-027 order still applies for
+   the eventual deploy: migrations and `db:privileges` before the Slice 4 code below, which has not
+   started.
+4. **Corrected ledger semantics and exhaustive readers** (§8.6) — NOT STARTED, needs its own
+   separate operator authorisation:
    - D15 (ALREADY_SATISFIED only);
    - the bijection and the combined invariant;
    - agreement and overlap;

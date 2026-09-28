@@ -14,14 +14,17 @@
 ### AFLDB-ISSUE-238 — Correcting a consumed trusted `afl_api` player link with canonical reattribution
 - **Severity:** Medium. **Area:** admin / player identity — `external_identities` (`afl_api`),
   `player_match_stats`, `brownlow_round_votes`, `canonical_applications` and derived dependents.
-- **State:** Open. Design accepted (pass 5a, `afldb-reviewer` PASS WITH MEDIUM/LOW NOTES); Slice 1
-  is now COMPLETE and Slice 2 (the standalone DB-free planner + tests, 73/73) is done. Both former
-  hard barriers — AFLDB-ISSUE-250 and AFLDB-ISSUE-237 L5 PROD — are satisfied (both RESOLVED). A
-  2026-09-28 final Slice-1 closure pass closed the last two confirmations (the SV-1 source
-  contracts and the §7/§5.1 fingerprint-stability premise); no accepted decision is invalidated.
+- **State:** Open. Slice 1/2 done. Operator authorised Slice 3 (2026-09-28); **M1**
+  (`106_afl_api_identity_corrected_action.sql`) and **M2**
+  (`107_canonical_applications_delete_audit.sql`) are written and rehearsed clean on `code_test_db`
+  (18/18 legal/illegal row-shape cases, idempotent re-apply, privilege reconciliation unchanged —
+  no `privileges.sql` edit needed). `npx tsc --noEmit -p .` clean; Slice-2 planner suite unaffected,
+  73/73. **Slice 3 COMPLETE, uncommitted** — migrations 106/107 are untracked files awaiting
+  operator commit.
 - **Runbook:** `issues/open/AFLDB-ISSUE-238.md`.
-- **Next action:** seek separate operator authorisation for Slice 3 (M1/M2 migrations) onward.
-  Slice 3+ is not authorised or implemented.
+- **Next action:** operator commit of migrations 106/107, then separate operator authorisation for
+  Slice 4 (exhaustive `corrected`-ledger reader semantics, runbook §8.6). Slice 4+ is not authorised
+  or implemented.
 
 ### AFLDB-ISSUE-234 — Optional AFL API feed expansion (extended statistics, umpires, play-by-play)
 - **Severity:** Low. **Area:** data acquisition, investigation only.
