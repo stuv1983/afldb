@@ -75,7 +75,7 @@ commit.
   their own evidence; AFLDB-ISSUE-238/239/240 remain separate and open. Full record: `issues.md`,
   `issues/closed/AFLDB-ISSUE-237.md` §16.
 
-### Current-season promotion source: preparation, dependency manifest and mandatory ownership-parity gate (AFLDB-ISSUE-252; Open, uncommitted; code_test_db rehearsal PASS; fresh DEV rehearsal + real PROD manifest A + schema-3 source gate PASS) - 27–28 September 2026
+### Current-season promotion source: preparation, dependency manifest and mandatory ownership-parity gate (AFLDB-ISSUE-252; Resolved) - 27–28 September 2026
 
 - **The defect.** `db:test:rebuild` stops at the last completed season, but production holds
   production-owned rows that reference current-season matches (Brownlow entry state, active match
@@ -141,9 +141,16 @@ commit.
   afldb_prod`, read-only, pre-freeze) and the real schema-3 source gate both PASSED — 16 gate(s)
   evaluated, none failed — resolving the sole F1 dependency
   (`brownlow_vote_entry_state.match_id=17795` → `2026|1|2026-03-05|Sydney|Carlton`) by exact
-  `match_key` and owner. No freeze, candidate, reinstatement or swap occurred. The frozen manifest B
-  (`--phase pre-cutover`) has not been run, and AFLDB-ISSUE-237 L5 has not been reattempted.
-  Implementation is acceptance-proven by this rehearsal but remains uncommitted.
+  `match_key` and owner. No freeze, candidate, reinstatement or swap occurred at this point.
+- **Resolved (28 September).** The implementation was committed (`4bda2107`, `8fc60404`), merged to
+  `main` and deployed to the PROD checkout. A completely fresh AFLDB-ISSUE-237 L5 PROD attempt
+  (promotion stamp `20260928-101642`), run after that deployment with a new freeze, new dump and new
+  candidate (not the retained failed `afldb_prod_candidate_20260927-142540`), passed the restored
+  lineage gate through to a clean guarded swap, production gate and post-promotion replay, with no
+  candidate-specific manual repair. All four `issues/closed/AFLDB-ISSUE-252.md` §8 acceptance
+  criteria are met (mapping and evidence: §28). Cleanup of the retained failed candidates and the
+  frozen rollback database remains deferred per `docs/production-promotion.md` §10. Full record:
+  `issues/closed/AFLDB-ISSUE-237.md` §16, `issues/closed/AFLDB-ISSUE-252.md` §28.
 
 ### Production promotion freeze: no write can be silently lost at the swap (AFLDB-ISSUE-250; Open, DEV rehearsal PASS) - 26 September 2026
 

@@ -2,6 +2,11 @@
 
 ## 0. Status
 
+**RESOLVED 2026-09-28.** All four §8 acceptance criteria are satisfied. The authoritative
+closure record is §28. Historical Open / blocked / uncommitted / not-attempted statements below
+are retained as point-in-time evidence and are superseded wherever they conflict with this status.
+
+The original point-in-time status follows unchanged for historical context:
 Open. Discovered 2026-09-27 by a fresh AFLDB-ISSUE-237 L5 PROD promotion attempt, stamp
 `20260927-142540`. Severity High. Area: production promotion / current-season lifecycle / lineage
 reinstatement. **Blocks AFLDB-ISSUE-237 L5 PROD.** Number verified free by read-only repository
@@ -28,6 +33,13 @@ preparation rehearsal PASS, the D-252-12 36-row classified refusal census PASS, 
 bridge PASS, the real PROD manifest A PASS, and the schema-3 source gate PASS 16/16 (§27.10).
 Implementation remains uncommitted; **ISSUE-252 itself is not yet resolved** and ISSUE-237 L5 PROD
 has not been attempted again. Next action: §27.9.
+**2026-09-28 (closure): RESOLVED — superseded by §28.** The implementation was committed
+(`4bda2107`, `8fc60404`), merged to `main` and deployed to the PROD checkout
+(`8fc60404d12c64d410e1f41c68bd8f0c7f5b6154`). A completely fresh AFLDB-ISSUE-237 L5 PROD attempt,
+promotion stamp `20260928-101642` — a new freeze, new dump, new candidate, **not**
+`afldb_prod_candidate_20260927-142540` — ran the full freeze-bound procedure end to end and PASSED
+the restored lineage gate with no candidate-specific manual repair. §28 maps all four §8 acceptance
+criteria to their evidence and records the closure. This runbook moves to `issues/closed/`.
 
 ## 1. Origin
 
@@ -1887,3 +1899,74 @@ classified refusal census PASS; the D-252-13 669/669 bridge PASS; the real PROD 
 the schema-3 source gate PASS 16/16. This closes the "operator acceptance remains to be recorded"
 step for D-252-12/D-252-13 specifically. **ISSUE-252 itself is not yet resolved** and AFLDB-ISSUE-237
 L5 PROD has not passed — both remain open pending commit/merge, deployment, and a fresh L5 attempt.
+
+---
+
+## 28. Resolution (2026-09-28) — AFLDB-ISSUE-252 RESOLVED
+
+This is the authoritative closure record. It supersedes every "not yet resolved" / "uncommitted" /
+"not attempted" statement elsewhere in this runbook wherever they conflict; those statements are
+retained as historical evidence of the point in time each pass was written and are not rewritten.
+
+### 28.1 What happened since §27.10
+
+- The implementation was committed in two changes already on `main`: `4bda2107`
+  (`feat(promotion): preserve current-season dependencies (ISSUE-252)`) and `8fc60404`
+  (`fix(promotion): prepare current-season source dependencies`), preceded by the acceptance record
+  `077f9ca8` (`docs(issues): record ISSUE-252 promotion-source acceptance`).
+- The `8fc60404` checkout was deployed to the PROD host and used for the next real L5 attempt
+  (`issues/closed/AFLDB-ISSUE-237.md` §16.1).
+- A third, completely fresh ISSUE-237 L5 PROD attempt, promotion stamp `20260928-101642`, ran the
+  full freeze-bound `docs/production-promotion.md` §4.0–§10 procedure end to end and **PASSED**:
+  freeze, frozen dump proof, restored gate, candidate gate, guarded swap, production gate,
+  post-promotion replay, current-season AFL Tables settle, SC3 idempotence and the scheduled
+  `afldb-settle-afltables.timer` path. It used a new freeze token, new dump, new candidate
+  (`afldb_prod_candidate_20260928-101642`) — it did **not** reuse, mutate or resume
+  `afldb_prod_candidate_20260927-142540`, which remains retained, untouched, evidence-only. Full
+  record: `issues/closed/AFLDB-ISSUE-237.md` §16; `issues/closed/AFLDB-ISSUE-251.md` §25.
+
+### 28.2 §8 acceptance criteria — final mapping
+
+| # | Criterion | Evidence | Result |
+|---|---|---|---|
+| 1 | The production promotion source lifecycle guarantees the required rebuilt dependencies before candidate restoration | `tools/db/prepare-promotion-source.ts` and `tools/db/promotion-source-dependencies.ts` (committed); `tools/db/promotion-check.ts` on `main` carries `--phase dependencies`, mandatory `--target-dependencies`/`--target-dependencies-sha256` at `--phase source` (no opt-out flag exists), and a mandatory `--source-dependency-proof`/`--source-dependency-proof-sha256` at prod `--phase pre-cutover`; `docs/production-promotion.md` §3a/§3b/§4.2/§5/§9 describe the flow. Deployed to the PROD checkout used by the L5 PASS (§28.1) | PASS |
+| 2 | The missing-current-season condition is covered by automated fail-closed tests | `tests/db-promotion-check.test.ts` (committed) carries the ISSUE-252 describe block and the D-252-10/12/13 and Q-252-11 blocks, including a fail-closed case reproducing the real `brownlow_vote_entry_state:match_id=17795` / `identity_absent_in_candidate` scenario verbatim; §27.4/§27.5 record 375/375 (111 ISSUE-252-block tests, 29 new) and the related AFL API/current-season DB-free suites 630/630 | PASS |
+| 3 | An isolated rehearsal demonstrates the dependency survives rebuild/promotion | Exceeded: the `code_test_db` isolated rehearsal (§24–§26, cases A–V, 22 cases / 104 checks, all PASS) **and** a real, fresh `afldb_test` `db:test:rebuild` + `db:promotion:prepare-source` rehearsal (§27.7) that proved the dependency survives an actual rebuild — 89/89 rebuild checks, `CD_I297354` preserved, D-252-13 bridge 669/669, D-252-12 refusal census 36/36 with dry-run/apply parity, real PROD manifest A PASS, real schema-3 source gate PASS 16/16 (§27.8) | PASS |
+| 4 | A completely fresh ISSUE-237 L5 PROD attempt passes the restored lineage gate without candidate-specific manual repair | `issues/closed/AFLDB-ISSUE-237.md` §16: fresh stamp `20260928-101642`, new freeze/dump/candidate, "Restored gate PASS, candidate gate PASS, production gate PASS" through to a clean guarded swap and post-promotion replay; `issues/closed/AFLDB-ISSUE-251.md` §25.2 row 13 independently confirms the same chronology. No candidate-specific repair, insertion, or lineage-gate exception is recorded anywhere in either closure record | PASS |
+
+**All four criteria are met. AFLDB-ISSUE-252 is RESOLVED.**
+
+### 28.3 A note on what is, and is not, independently recorded for stamp `20260928-101642`
+
+Neither `issues/closed/AFLDB-ISSUE-237.md` §16 nor `issues/closed/AFLDB-ISSUE-251.md` §25 itemises
+a per-run dependency manifest A/B pair or a candidate-side numeric `matches.id` for the
+`brownlow_vote_entry_state.match_id = 17795` dependency resolved during the `20260928-101642` L5
+itself; both records summarise it as "Restored gate PASS." This is not a gap against §8: the
+`--phase source` / prod `--phase pre-cutover` gates are mandatory with no opt-out in the deployed
+code (§28.2 row 1), so the dependency-manifest/proof mechanism was necessarily exercised for the
+promotion to reach "production gate PASS" and a completed guarded swap — and the contract's own
+design principle (§19.3, §21.4: "source-local ids are never printed as evidence and never compared
+with target ids," resolution is by `match_key` only) means a candidate-side numeric id is not
+expected to appear in tracked evidence at all. The only tracked artefact naming this specific
+dependency by stable identity and hash is the separate pre-attempt acceptance proof, stamp
+`20260927-232620` (§27.8) — an explicitly standalone, no-mutation proof run, not the live L5 itself.
+Nothing in this section asserts a specific candidate-side match id; none is claimed here that is not
+independently evidenced in the tracked repository.
+
+### 28.4 Historical chronology — preserved, not rewritten
+
+- `20260927-142540` — **failed**, evidence-only. REFUSED at `--phase restored` on the
+  `brownlow_vote_entry_state.match_id = 17795` / `identity_absent_in_candidate` gate that opened this
+  issue (§1–§7). Retained as `afldb_prod_candidate_20260927-142540`; must not be mutated or resumed.
+- `20260928-101642` — fresh, accepted L5. PASSED end to end (§28.1). This is the closure evidence for
+  §8 criterion 4.
+
+### 28.5 Deferred, not part of this closure
+
+- Cleanup of `afldb_prod_candidate_20260926-213225`, `afldb_prod_candidate_20260927-142540` and
+  `afldb_prod_pre_rebuild_20260928-101642` remains deferred under `docs/production-promotion.md` §10;
+  this closure authorises none of it.
+- The frozen manifest B / `--phase pre-cutover` re-check for stamp `20260928-101642` is implied by
+  the mandatory gate (§28.3) but its own artefact hashes are host-local evidence, not reproduced into
+  this runbook — consistent with how this runbook has always treated per-run promotion artefacts
+  (freeze dumps, source dumps, etc. — hashes recorded, bytes host-local under `/home/arm/backups/afldb/`).
