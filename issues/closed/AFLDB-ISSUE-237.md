@@ -2,7 +2,9 @@
 
 ## 0. Status
 
-**Open. Plan reviewed 2026-09-24. Operator decisions OD-1…OD-5 recorded 2026-09-24, and
+**RESOLVED 2026-09-28 (fresh accepted PROD L5 promotion, stamp `20260928-101642`; full record §16).
+The historical status narrative below (2026-09-24 through 2026-09-27) is retained for history and is
+superseded by §16 wherever it conflicts.** Plan reviewed 2026-09-24. Operator decisions OD-1…OD-5 recorded 2026-09-24, and
 corrected the same day (revision notes 3–4). OD-6 approved 2026-09-24 (§15). S1–S7 are
 authorised as the non-destructive implementation phase, within the §8 boundaries: S3 is gated by
 P-M, and L3–L5 are blocked until R1 passes. P-M point 2 is PROVEN (2026-09-24, operator-run live
@@ -29,6 +31,27 @@ operator authorisation for L5. L5 remains NOT RUN.)**
 manual registrations PROD never held). No swap occurred and PROD returned healthy. **L5 is NOT PASS
 and is BLOCKED on AFLDB-ISSUE-251.** The failed attempt is evidence only and must not be resumed;
 see §11d.16.)**
+
+**(Later still, 2026-09-27: a second, completely fresh L5 PROD attempt, stamp `20260927-142540`, run
+after AFLDB-ISSUE-251's registration lifecycle was implemented — that lifecycle, G2, G3 and the
+first-kick-goal lineage all PASSED — again REFUSED at `--phase restored`, this time on a previously
+unobserved lineage gate: PROD's `brownlow_vote_entry_state.match_id=17795` had no corresponding
+`matches.match_key` in the candidate, because `afldb_test` held no 2026 matches. No swap occurred and
+PROD returned healthy. **L5 was NOT PASS and was BLOCKED on the newly opened AFLDB-ISSUE-252**
+(current-season dependency closure for production-owned state). Full evidence for this attempt is in
+`issues.md` and `issues/open/AFLDB-ISSUE-252.md`; it is not duplicated in this runbook.)**
+
+**(Later still, 2026-09-28: AFLDB-ISSUE-252 was implemented, DEV-rehearsed, operator-accepted and
+committed/merged/deployed (PROD checkout `8fc60404`). A third, completely fresh L5 PROD attempt,
+stamp `20260928-101642`, then ran the full freeze-bound procedure end to end and PASSED: freeze,
+frozen dump, restored/candidate/production gates, the guarded swap, the post-promotion replay
+(including the 92 ISSUE-224/ISSUE-251 registrations and the AFL API invariant), the current-season
+AFL Tables settle, SC3 idempotence and the scheduled settle-timer path all PASSED, with zero
+canonical/ledger write counters on the idempotence and scheduled checks. **L5 is PASS. AFLDB-ISSUE-237
+is RESOLVED.** The full authoritative record is §16. The two failed attempts above
+(`20260926-213225`, `20260927-142540`) remain retained evidence and must not be resumed; their
+retained candidates and the frozen rollback database `afldb_prod_pre_rebuild_20260928-101642` are
+cleanup matters deferred under `docs/production-promotion.md` §10, not blockers to this closure.)**
 
 **L1/L2 state (operator-run, reported 2026-09-25).** The §11b rehearsals on the real
 `code_test_db` have now been run by the operator. **L1 PASS:** non-empty importer + human state
@@ -111,7 +134,7 @@ ISSUE-237 is not resolved.)*
 | ISSUE-245 `afldb_test` proof | PASS, through L3 (§11a.6) |
 | L3 | **PASS** (§11a.6) |
 | L4 DEV promotion | **PASS** (operator-run, promotion stamp `20260926-085511`, 2026-09-26; full record §11d.15). Procedure rewritten after the L4 hardening (§11d; findings and fixes §11d.0, prerequisites §11d.2). Historical chronology of the intervening attempts, preserved: *(2026-09-25: the second real attempt STOPPED at A4.3, before the destructive boundary. A3 PASS; the blocker is the orphaned ISSUE-109 fixture override; prerequisite **AFLDB-ISSUE-246**, §11d.12.)* *(2026-09-25: ISSUE-246 RESOLVED, audit 983; the A4.3 rerun returned no rows, so A4.3 is PASS; A3/A4.1/A4.2 unchanged; next step **A5**, §11d.13.)* *(2026-09-25: **A5 REFUSED on TWO independent gates**: the ISSUE-151 staged-rows gate on the legitimately empty `afl_api_identity_adjudications` ledger (0; census 669/0/0/0 PASS), prerequisite **AFLDB-ISSUE-247**; and the test-fixture identity gate on reserved-domain `auth_users` 14/17/18 and `admin_invites` 5, prerequisite **AFLDB-ISSUE-248**. Nothing past A5 ran. §11d.14.)* *(2026-09-26: a post-merge attempt reached the post-swap phase and was ROLLED BACK on discovering **AFLDB-ISSUE-249** — the promoted candidate held first-kick-goal 0 against DEV's 335/334. `afldb_dev` restored; failed candidate retained as `afldb_dev_candidate_20260926-033212`.)* *(2026-09-26: **L4 PASS** (operator-run, stamp `20260926-085511`), after AFLDB-ISSUE-249 was deployed at `6ae70722`. G3 found one classified DEV-regenerable hard loss, `CD_I297354`, resolved through the §6.3 exception (fresh re-acquisition, target-bound bridge 669/669, loader apply, `dev-regeneration-census` PASS). Post-swap first-kick-goal census 335/334/1. Full record: §11d.15.)* |
-| L5 PROD promotion | **NOT RUN, and BLOCKED on AFLDB-ISSUE-250** (2026-09-26, D-P5-1): a write committed to production after the §4 snapshot can be silently lost at the swap, so L5 must not run until ISSUE-250 is resolved and accepted. *(Later 2026-09-26: ISSUE-250's freeze is implemented and DB-free validated; rehearsal and acceptance remain; L5 must then use the freeze-bound procedure, §14.)* *(Later again 2026-09-26: ISSUE-250 DEV REHEARSAL PASS, technically accepted for this prerequisite (ISSUE-250 runbook §17); L5 still needs the ISSUE-250 work committed/merged and on the PROD checkout, plus a separate authorisation.)* Then it runs inside the next scheduled production promotion, under production's unmodified G3 hard-loss rule (FAIL, no DEV-style exception). |
+| L5 PROD promotion | ~~**NOT RUN, and BLOCKED on AFLDB-ISSUE-250** (2026-09-26, D-P5-1): a write committed to production after the §4 snapshot can be silently lost at the swap, so L5 must not run until ISSUE-250 is resolved and accepted. *(Later 2026-09-26: ISSUE-250's freeze is implemented and DB-free validated; rehearsal and acceptance remain; L5 must then use the freeze-bound procedure, §14.)* *(Later again 2026-09-26: ISSUE-250 DEV REHEARSAL PASS, technically accepted for this prerequisite (ISSUE-250 runbook §17); L5 still needs the ISSUE-250 work committed/merged and on the PROD checkout, plus a separate authorisation.)* Then it runs inside the next scheduled production promotion, under production's unmodified G3 hard-loss rule (FAIL, no DEV-style exception).~~ *(Superseded 2026-09-28: three real attempts ran. First, `20260926-213225`, REFUSED on the ISSUE-242/A4.2 92-registration gate (§11d.16), blocked on AFLDB-ISSUE-251. Second, `20260927-142540`, after ISSUE-251's lifecycle PASSED, REFUSED on a 2026 Brownlow lineage gate, blocked on AFLDB-ISSUE-252. Third, `20260928-101642`, after the ISSUE-252 fix was completed and deployed, ran the full freeze-bound procedure end to end and **PASSED** — swap, post-promotion replay, current-season settle, SC3 idempotence and the scheduled timer path all clean. **L5 is PASS.** Full record: §16.)* |
 
 **P-M state (2026-09-24).** Point 1 PROVEN (DB-free). Point 2 PROVEN (live, `afldb_test`,
 rolled back). Point 4 PROVEN by composition. **Point 3 is NOT PROVEN** *(superseded 2026-09-25:
@@ -4034,6 +4057,12 @@ orphan STOP, which stays unchanged.
   to plan `rebind B → A` for the 92.
 - ISSUE-237's own code and gates have not regressed; they refused correctly.
 
+*(Superseded 2026-09-28: a second fresh attempt, `20260927-142540`, ran after ISSUE-251's lifecycle
+was implemented and PASSED in full (92/92 planned `rebind B → A`), but the restored gate REFUSED on a
+different, previously unobserved gate — a 2026 Brownlow lineage dependency, AFLDB-ISSUE-252. A third
+fresh attempt, `20260928-101642`, ran after the ISSUE-252 fix was completed and PASSED end to end. **L5 is
+PASS. ISSUE-237 is RESOLVED.** See §16.)*
+
 ## 12. Non-goals and successors
 
 - **ISSUE-238:** correcting a consumed link, including every G2/G3 FAIL resolution.
@@ -4095,7 +4124,7 @@ orphan STOP, which stays unchanged.
    R1–R5 are all PASS (operator-run, 2026-09-25; §11a.1, §11a.2.3).
 8. **S8, operator live validation** L0–L5, in the §11 order and with its blocks.
 9. **S9, closure.** `issues.md` resolution, `IssuesIndex.md`, `CHANGELOG.md`, and the move to
-   `issues/closed/`.
+   `issues/closed/`. **Done 2026-09-28**, on the §16 L5 PASS evidence.
 
 ## 14. Next action
 
@@ -4275,6 +4304,16 @@ registrations. No lineage-remap or supersede file, no plan, no swap; PROD was to
 and returned healthy, with the settle timer/service inactive. **L5 is now BLOCKED on
 AFLDB-ISSUE-251.** Next: ISSUE-251's PROD adoption (separately authorised), then a completely fresh
 L5 under a separate authorisation. The `20260926-213225` attempt must not be resumed.)*
+*(2026-09-27: a second fresh L5 attempt, `20260927-142540`, run after ISSUE-251's registration
+lifecycle was implemented and PASSED in full, again REFUSED at `--phase restored` — this time on a
+2026 Brownlow lineage dependency gate, opened as **AFLDB-ISSUE-252**. No swap; PROD returned healthy.
+The `20260927-142540` attempt must not be resumed. Next: resolve AFLDB-ISSUE-252, then a completely
+fresh L5 under a separate authorisation. Full evidence: `issues.md`, `issues/open/AFLDB-ISSUE-252.md`.)*
+*(2026-09-28: AFLDB-ISSUE-252 fix completed, committed, merged and deployed (PROD checkout `8fc60404`). A
+third, completely fresh L5 attempt, `20260928-101642`, ran the full freeze-bound procedure end to end
+and **PASSED**. **L5 is PASS. AFLDB-ISSUE-237 is RESOLVED.** Full authoritative record: §16. No
+further ISSUE-237 action is outstanding beyond the deferred cleanup of retained evidence databases
+under `docs/production-promotion.md` §10.)*
 
 ---
 
@@ -4289,3 +4328,130 @@ L5 under a separate authorisation. The `20260926-213225` attempt must not be res
 | OD-5 | A successor for the artefact/importer contract. | **APPROVED.** Allocated as **AFLDB-ISSUE-241** (next available ID, checked against the index 2026-09-24). Not implemented under ISSUE-237. |
 | OD-6 (raised and approved 2026-09-24) | Should Stage 2 admit a rebuild capture whose importer/human supersede set is non-empty? That is a live `unique` importer row plus an effective `LINKED` ledger decision for the same provider/player, without its `resolved` row. | **APPROVED: keep the Stage 2 refusal.** ISSUE-235 creates the ledger decision and the `resolved` identity atomically, so the overlap is broken pre-existing state and the rebuild must not normalise it. Stage 2 keeps the bijection and disjointness checks and STOPs before destruction on a non-empty `E_rebuild`. `E_rebuild = ∅` is an invariant of every accepted capture, and Stage 18 re-checks it independently before mutation. Expected and actual rebuild supersedes are both `{}`, and anything else is a hard STOP and rollback. There is no supported rebuild carry path. **Promotion is not restricted:** `E_promotion = G2.AGREE` may be non-empty, and the post-swap replay must supersede exactly that set under the D9 conditions (D9 rebuild and promotion semantics). |
 | OD-7 (raised and approved 2026-09-25, after the first R3 FAIL) | May a player holding two accepted AFL Tables paths resolve to one stable identity when the two are a reviewed fitzRoy renumbering fold? | **APPROVED, narrowly.** It applies only when there are exactly two paths, they are exactly one valid tracked `profile_url_continuity` rule's `{continuing_url, renumbered_url}`, and there is no third path. The identity is then `continuing_url`. Every other multi-path case stays ambiguous and refuses. There is no name matching, heuristic, lexicographic fallback or per-provider exception, and no identity row, importer or contract changes. Implemented once, in the shared classifier used by rebuild, recovery and promotion (§4 D7, §11a.1). |
+
+---
+
+## 16. L5 PROD PASS (2026-09-28, operator-run) — third fresh attempt; ISSUE-237 RESOLVED
+
+This is the authoritative closure record. It supersedes the "NOT RUN" / "BLOCKED" / "NOT PASS"
+statements elsewhere in this runbook wherever they conflict; those statements are retained as
+historical evidence of the two earlier failed attempts and are not deleted.
+
+**Chronology of the three real L5 attempts:**
+
+1. `20260926-213225` — REFUSED at `--phase restored` on the ISSUE-242/A4.2 92-registration gate.
+   Blocked on AFLDB-ISSUE-251. Evidence: §11d.16.
+2. `20260927-142540` — after ISSUE-251's registration lifecycle was implemented and PASSED in full
+   (92/92 `rebind B → A`), REFUSED at `--phase restored` on a previously unobserved 2026 Brownlow
+   lineage-dependency gate. Blocked on the newly opened AFLDB-ISSUE-252. Evidence: `issues.md`,
+   `issues/open/AFLDB-ISSUE-252.md` (not duplicated here).
+3. `20260928-101642` — after the AFLDB-ISSUE-252 fix was completed, committed, merged and deployed to the
+   PROD checkout, this completely fresh attempt ran the full freeze-bound procedure
+   (`docs/production-promotion.md` §4.0–§10) end to end and **PASSED**. This section records it.
+
+### 16.1 Identity and checkout
+
+- PROD host: `afldb-prod`. Checkout: `8fc60404d12c64d410e1f41c68bd8f0c7f5b6154`.
+- Promotion stamp: `20260928-101642`.
+- Original PROD database OID `35594` → promoted live PROD OID `66668`.
+- Kept rollback database: `afldb_prod_pre_rebuild_20260928-101642`, OID `35594`, freeze token
+  `4edef055231179137680209113bc1844`. **Retained and frozen; not cleaned up** (§16.7).
+
+### 16.2 Freeze, authoritative snapshot and source
+
+- F0: 36 tables, 61,916 rows. F0 digest
+  `e9a5bc17cf1976de897da90f03a2e4c7a44cc7c3f2a0edacbbb8c01a016ef824`.
+- Authoritative frozen dump `/home/arm/backups/afldb/afldb_prod-20260928-102249.dump`, sha256
+  `0a5d1c9a614c0b3701b28b7ad8c3045eb44f460d240e1aca45e95675a26ab9b4`; freeze record sha256
+  `2b5540404e7b64d1d400b7f0f102ded66ba5ccea75cbd6121106a737529d7f95`. Freeze-dump proof PASSED; the
+  off-host authoritative dump copy was byte-identical.
+- Rebuilt source dump `/home/arm/afldb_test_rebuilt_20260928-101642.dump`, sha256
+  `a371a277d197876546a938b5d489b8656e8378c858adc899e7fd301702db5912`.
+- Candidate `afldb_prod_candidate_20260928-101642` (OID `66668` before swap). Restored gate PASS,
+  candidate gate PASS, production gate PASS. Production G3 had no hard loss: 803 candidate AFL API
+  importer rows, target ledger 0. `E_promotion` `expectedSupersedes = []`. `E_promotion` file sha256
+  `f02a7c5a167b5ff34ba129e0dce564f4c757fd97d3c60a8383152b1d4203ff21`; lineage SQL sha256
+  `536b1f...` (as recorded by the operator).
+
+### 16.3 Cutover and post-promotion replay
+
+- Freeze-bound guarded swap succeeded: `afldb_prod` became OID `66668`, open/unfrozen;
+  `afldb_prod_pre_rebuild_20260928-101642` stayed OID `35594`, token-bound frozen.
+- Mandatory `--phase production` PASSED 13 gates. Application started healthy under Node 22.23.2 /
+  Next 16.3.1; `/api/health` stayed green.
+- `data_overrides` replay COMMITTED: 92 player creation records resolved (the ISSUE-224/ISSUE-251
+  cohort, converged by ISSUE-242 `rebind B → A`).
+- `player_achievements` replay: recreated 0, restored 0, corrected 0, lifecycle 0.
+- D15 AFL API replay: inserted 0, noops 0, stops `[]`, supersedes `[]`. Combined AFL API invariant:
+  OK.
+- `rebuild_derived.py` completed: `season_metadata` 130, `player_clubs` 16,842,
+  `player_club_season_stats` 59,094, `player_season_stats` 58,845, `player_career_stats` 13,363,
+  `club_seasons` 1,640, `search_rank` 13,365.
+
+### 16.4 Player-link regeneration and UI validation
+
+- `player_link_match_candidates`: 10,472 rows, 6,282 distinct players, 0 orphan player refs.
+- Interactive real super-admin login on `https://beta.afldb.com` succeeded. `/admin/player-links`
+  persisted: last computed 2026-09-28 01:37; 5,376 unresolved (Very high 2,718, High 465,
+  Medium 350, Low 172, No suggestion 1,671; Bulk-ready 44). Audit events showed
+  `player_link.suggestions_refreshed` at 01:36 and 01:37; no extra recompute was performed.
+- `/admin/settings` loaded with reinstated non-default production settings.
+- Smoke PASS with zero console/page errors: `/seasons/2025`, `/aflw`, search "Dustin Martin",
+  `/players/dustin-martin-3994`.
+
+### 16.5 Current-season AFL Tables supervised validation and idempotence
+
+- First fresh snapshot `settle-2026-2026-09-28-1207`: 218 matches, 10,028 AFL Tables player-match
+  rows, source completeness COMPLETE, dry-run PASS. Real apply batch 34: 9,577 canonical rows
+  inserted, 0 updated, 9,570 applications logged, 0 refusals/failures.
+- Live final ownership after apply: `matches` afltables 218; `player_match_stats` afltables 10,028,
+  afl_api 1 (the single AFL API-owned row, `CD_M20260140305|CD_T50|CD_I993799`, is expected). The 36
+  existing AFL API `foreign_source_owner` findings are expected retained findings, not apply
+  failures.
+- SC3 idempotence: fresh snapshot `settle-2026-2026-09-28-1216` PASS with all-zero canonical/ledger
+  counters and 0 unresolved identities; a repeated fresh snapshot `settle-2026-2026-09-28-1217` also
+  PASSED with the same zero counters and unchanged ownership.
+- Scheduled path acceptance: `afldb-settle-afltables.timer` enabled; `Persistent=true` triggered an
+  immediate fresh run `settle-2026-2026-09-28-1220`, `Result=success`, `ExecMainStatus=0`, all
+  counters zero, ownership unchanged, application health green, timer active(waiting), next trigger
+  2026-09-29 04:44:58 AEST. No other optional writer timer is installed/active.
+
+### 16.6 Current freeze status (unchanged by this closure)
+
+- `afldb_prod` OID `66668`: open, no marker.
+- `afldb_prod_pre_rebuild_20260928-101642` OID `35594`: marker token
+  `4edef055231179137680209113bc1844`, ACL frozen — expected retained rollback database.
+- Historical failed candidates (`afldb_prod_candidate_20260926-213225`,
+  `afldb_prod_candidate_20260927-142540`) remain retained and untouched, evidence only.
+
+### 16.7 Cleanup — deliberately deferred
+
+Per `docs/production-promotion.md` §10, cleanup is not performed the same day and follows only after
+the promotion record is closed. This closure record does **not** authorise cleanup. The authoritative
+pre-cutover dump and its off-host copy are kept under normal retention; the frozen
+`afldb_prod_pre_rebuild_20260928-101642` database is not unfrozen or dropped manually — cleanup, when
+it happens, follows the documented procedure and is a separate, later, separately authorised action.
+The two earlier retained failed candidates are likewise untouched.
+
+### 16.8 Disposition
+
+**All ISSUE-237 acceptance criteria are met:**
+
+- **DB-free / code:** last explicitly tagged run §11a.4 (2026-09-25); the exact code has since been
+  continuously re-exercised without regression through every subsequent fix (F-L4 hardening,
+  ISSUE-246/247/248/249/250/251/252) and by two further live rebuild/promotion cycles (L4 DEV
+  2026-09-26; the ISSUE-252 DEV rehearsal 2026-09-28, 89/89 rebuild checks). No stale gap found.
+- **`afldb_test` live (L3):** PASS, §11a.6 (2026-09-25). Unaffected by this closure.
+- **DEV (L4):** PASS, §11d.15 (2026-09-26, stamp `20260926-085511`). Unaffected by this closure.
+- **Production / promotion (L5):** **PASS**, this section (2026-09-28, stamp `20260928-101642`).
+- **Documentation (S5):** `docs/deployment.md` §6a fully describes the combined capture, the three
+  sections (`registrations`/`importerRows`/`ledgerRows`), `AFLDB_REBUILD_CAPTURE_ROOT`, the database
+  marker and the exact stage table (verified against the current tree 2026-09-28). **Complete.**
+- **Closure (S9):** this section, plus the `issues.md`/`IssuesIndex.md`/`CHANGELOG.md` updates and
+  the move to `issues/closed/`, done 2026-09-28.
+
+**AFLDB-ISSUE-237 is RESOLVED.** No ISSUE-237 code, gate or contract changed to reach this PASS; the
+three attempts exercised the same implementation against successively resolved external
+prerequisites (AFLDB-ISSUE-251, then AFLDB-ISSUE-252). AFLDB-ISSUE-251 and AFLDB-ISSUE-252 are
+separate tracked issues; their own formal resolution status is theirs to record and is out of this
+issue's scope.

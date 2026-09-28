@@ -15,6 +15,38 @@ commit.
 
 ## [Unreleased]
 
+### AFL API importer identity lifecycle across rebuild and promotion is complete: PROD L5 accepted (AFLDB-ISSUE-237; Resolved) - 28 September 2026
+
+- **What this records.** AFLDB-ISSUE-237 is resolved. `db:test:rebuild` and database promotion now
+  carry importer-created `unique` `afl_api` identities by stable identity across a destructive
+  rebuild and a database promotion, fail-closed, with production gates unchanged (a live target
+  provider absent from the candidate is FAIL) and a narrow DEV-only regeneration exception for
+  classified, re-acquired season-class identities.
+- **Acceptance, in order.** `afldb_test` (L3, 2026-09-25); DEV (L4, 2026-09-26, promotion stamp
+  `20260926-085511`); production (L5), accepted 2026-09-28.
+- **L5 needed three real attempts.** `20260926-213225` was refused on 92 candidate-only manual
+  player registrations production had never held for their AFL Tables paths (this opened
+  AFLDB-ISSUE-251). `20260927-142540`, after ISSUE-251's registration lifecycle passed in full,
+  was refused on a 2026 Brownlow lineage-dependency gap in the promotion contract (this opened
+  AFLDB-ISSUE-252). `20260928-101642`, run after the AFLDB-ISSUE-252 fix was completed, committed, merged
+  and deployed to the PROD checkout (`8fc60404`), ran the full freeze-bound procedure
+  (`docs/production-promotion.md` §4.0–§10) end to end and **passed**: freeze, frozen dump proof,
+  restored/candidate/production gates, the guarded swap, the post-promotion replay (the 92
+  registrations resolved; the combined AFL API invariant OK), a current-season AFL Tables settle
+  (218 matches, batch 34, 9,577 rows inserted, 0 refusals/failures), SC3 idempotence (two fresh
+  snapshots, all-zero canonical/ledger counters) and the scheduled `afldb-settle-afltables.timer`
+  path (an immediate fresh run, `Result=success`, all-zero counters) all passed. Player-link
+  regeneration and DEV/PROD UI smoke checks passed with zero console/page errors.
+- **Documentation.** `docs/deployment.md` §6a was verified current against the tree: it fully
+  describes the combined rebuild capture (`registrations`/`importerRows`/`ledgerRows`),
+  `AFLDB_REBUILD_CAPTURE_ROOT`, the database marker and the exact stage table.
+- **Cleanup deferred.** Per `docs/production-promotion.md` §10, the retained rollback database
+  (`afldb_prod_pre_rebuild_20260928-101642`, frozen) and the two earlier failed candidates are not
+  cleaned up as part of this closure; that follows later, separately.
+- **Not affected.** AFLDB-ISSUE-251 and AFLDB-ISSUE-252 are separately tracked and remain open on
+  their own evidence; AFLDB-ISSUE-238/239/240 remain separate and open. Full record: `issues.md`,
+  `issues/closed/AFLDB-ISSUE-237.md` §16.
+
 ### Current-season promotion source: preparation, dependency manifest and mandatory ownership-parity gate (AFLDB-ISSUE-252; Open, uncommitted; code_test_db rehearsal PASS; fresh DEV rehearsal + real PROD manifest A + schema-3 source gate PASS) - 27–28 September 2026
 
 - **The defect.** `db:test:rebuild` stops at the last completed season, but production holds
