@@ -2709,6 +2709,8 @@ export type Snapshot = {
     importerRowsByMethod: Record<string, number>;
     humanRows: number;
     netLinkedLedgerEntries: number;
+    /** AFLDB-ISSUE-238 S6: present ONLY when > 0, so a zero-corrected snapshot stays byte-identical. */
+    netCorrectedLedgerEntries?: number;
   };
 };
 

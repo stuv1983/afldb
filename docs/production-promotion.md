@@ -604,6 +604,28 @@ net-linked ledger entries), for the record. No later gate reads a per-row census
 snapshot, so none is persisted: `--phase restored`'s G2/G3 (§6) read the live target directly,
 and the DEV regeneration classification (§13) is generated from that same live read.
 
+**AFLDB-ISSUE-238 (Slice 6; inert, and the report and snapshot byte-identical, when the target
+holds no net `corrected` ledger entry).**
+
+- **Corrected census.** Every net-`CORRECTED(A)` provider on the target is re-checked under
+  CORRECTION SATISFACTION (§5.12 Q2) in a separate read-only transaction: a missing or wrong
+  `resolved` P′ row, a broken extended bijection or any SAT-1…SAT-5 failure **FAILs the phase and
+  blocks the promotion** (remediation: runbook §9.1). Recognised `post_correction_edit` and
+  explained `correction_target_absent` states are reported, never failed. The snapshot's
+  `aflApiTargetCensus` gains `netCorrectedLedgerEntries` only when it is above zero.
+- **Freeze binding (S6-D2).** With a non-empty corrected set a valid `--freeze-record` is required
+  under **DEV as well as PROD**, at `pre-cutover`, `restored`, `candidate` and `production`
+  (`CORRECTED_PROMOTION_REQUIRES_FREEZE`). ISSUE-250's F0/candidate/post-swap kept-database proofs
+  cover `afl_api_identity_adjudications` and replace ISSUE-238's proposed pre-swap guard and
+  post-swap ledger gate; the ISSUE-238 semantic checks still run. This is the only case in which the
+  DEV freeze (§13) is mandatory. The corrected set is read, per phase, from the live target, the old
+  target, the reinstated candidate ledger (or the §6 file's `correctedReplays`), and the promoted
+  database.
+- **Temporary production gate (S6-D3, Slice 6 → Slice 11).** Until the Slice 10/11 corrected-
+  promotion rehearsal is accepted, `--environment prod` with a non-empty corrected set is refused
+  `CORRECTED_PROMOTION_REHEARSAL_REQUIRED`, first here at `pre-cutover`, so production learns before
+  a candidate is restored. Only an accepted rehearsal (Slice 11) removes this gate.
+
 ## 6. Source validation and candidate restore
 
 ```bash
@@ -689,11 +711,30 @@ owns it:
 - **`--afl-api-supersede-out` (the `E_promotion` handoff).** Written **only when every gate of the
   run passes**, atomically (a temporary sibling published by `link()`, never over an existing
   file). A refused run writes no file and says so. The file (`afldb.afl_api_supersede_expected`
-  v2) names the environment, the candidate and the target, and binds the candidate's importer
-  state and the target's ledger state by row count and SHA-256 (stable fields only; never a player
-  id), plus the sorted `expectedSupersedes` and a `payloadSha256` over all of it. An empty set is
-  bound exactly as strongly as a non-empty one. §7.5 and §8 step 1 both refuse a file that does not
-  match the state in front of them.
+  **v3** since `AFLDB-ISSUE-238` Slice 6; v1 and v2 files are refused as stale by name — generate and
+  consume the file with the same build) names the environment, the candidate and the target, and
+  binds the candidate's **pre-replay** importer state and the target's ledger state by row count and
+  SHA-256 (stable fields only; never a player id), plus the sorted `expectedSupersedes`
+  (`E_promotion`) and a `payloadSha256` over all of it. v3 adds the target's corrected-ledger subset
+  count/digest (diagnostic), the sorted `correctedReplays` (`C_promotion`, below), and the
+  **predicted post-replay** importer count/digest, resolved-row count (= |`C_promotion`|) and whole
+  `afl_api` identity-state digest. With no `corrected` ledger entry `correctedReplays` is empty and
+  every predicted value equals the pre-replay one, so every gate outcome is ISSUE-237's. An empty set
+  is bound exactly as strongly as a non-empty one. §7.5 and §8 step 1 both refuse a file that does
+  not match the state in front of them.
+- **CPC — corrected pre-classification (`AFLDB-ISSUE-238` §9.1; inert with no `corrected` entry).**
+  For every provider whose target net ledger state is `CORRECTED(A)`, the checker resolves Pc
+  (`A.previous_player_identity`) and P′c (`A.player_identity`) in the candidate (each exactly once;
+  a `manual_admin_edit` token, an unresolvable or an ambiguous identity is UNEVALUABLE), reads the
+  candidate's identity row, and PREDICTs the correction closure against the **candidate's own**
+  evidence in a read-only transaction (no lock, no write). Class 1 (importer row at Pc → update in
+  place), class 2 (importer row already at P′c → identity-only upgrade; the predicted MOVE/DELETE
+  closure must be empty) and class 3 (no row → insert; no candidate row may still implicate `CD_I`
+  at Pc) PASS; UNEVALUABLE, DISAGREE (row at a third player), COLLISION (another candidate importer
+  provider at P′c, or another target `linked`/`corrected` provider whose identity remaps to P′c),
+  any planner STOP, a non-empty class-2 closure, or `C_promotion ∩ E_promotion ≠ ∅` **FAIL** the
+  phase and no file is written. G2 grades an entry in the exact CPC set `CORRECTED_CPC_REPLAY`
+  (never AGREE) and any other `corrected` entry `CORRECTED_NOT_CPC_CLASSIFIED` (refusing).
 - **`--lineage-remap-out` follows the same rule (`AFLDB-ISSUE-237` L4).** The lineage gate only
   *prepares* the remap; the file is written after every gate of the run, **only if none failed**,
   through the same atomic no-clobber writer, and its path is refused before any database is opened
@@ -1126,6 +1167,42 @@ regenerated from rebuilt players **plus reinstated resolutions** (§8), so with 
 the admin link queue re-surfaces the previously-decided suggestions for a fresh decision
 against the new lineage. That is the honest outcome of a lineage change, not a defect.
 
+### 7.4e Corrected-identity REPLAY (`AFLDB-ISSUE-238` §8.3; only when §6 wrote `correctedReplays`)
+
+Skip this step when the §6 file's `correctedReplays` is empty: §7.5 then requires zero `resolved`
+rows exactly as before. Otherwise, after §7.3 privileges and every §7.4* step, and before §7.5, run
+the candidate REPLAY as the candidate **owner**. It is an operator step, not part of the generated
+plan; if it is skipped, §7.5's CRV refuses (the resolved set must equal `C_promotion`).
+
+```bash
+# PROD is refused until the Slice 10/11 corrected-promotion rehearsal is accepted (S6-D3, below).
+CANDIDATE_DSN="$CANDIDATE_DSN" npx tsx tools/migration/correct_afl_api_identity.ts --replay-promotion \
+    --supersede-in ~/backups/afldb/promotion-afl-api-supersede-$STAMP.json \
+    --environment <dev|prod> --expect-database "$CAND" --expect-role afldb_owner [--dry-run]
+```
+
+- **DSN and role contract (§8.8).** It reads `CANDIDATE_DSN` and nothing else (never
+  `AFLDB_IMPORT_DATABASE_URL`, never the repository `.env`); `current_database()` must equal
+  `--expect-database` and the file's `candidateDatabase`; `current_user` must be `afldb_owner`; it
+  refuses the environment's live database, the file's `targetDatabase`, any `pre_rebuild` name, and
+  a file whose environment differs from `--environment`.
+- **One transaction for the whole `C_promotion` set.** It takes the correction locks, reads the
+  reinstated ledger (its net `CORRECTED` set must equal `C_promotion` and its count/digest the file's
+  `targetLedger*`), re-classifies each provider and re-plans it under ADJUDICATION authority with
+  row locks (BG1–BG3 on the reinstated state included). The class, `plannerVersion` and closure
+  fingerprint must equal the file's prediction. It opens a replay batch R (`mode: 'replay'`,
+  `context: 'promotion'`, `predictedClosureFingerprint`) **only** when the closure has a MOVE or
+  DELETE, writes CD_I's identity in the D15 `resolved` shape, applies the shared ORIGINAL
+  mutation/recompute mechanics, then runs CORRECTION SATISFACTION (Q2) for every provider.
+- **Write allow-list.** `canonical_applications` INSERT; batch R INSERT/UPDATE; CD_I's
+  `external_identities` row; the planned closure rows and CD_I's typed projections; the recompute.
+  It **never** writes `afl_api_identity_adjudications`: the ledger count and digest are re-checked
+  unchanged, and no second `corrected` row may exist.
+- **Post-state.** The importer count/digest, resolved-row count and whole identity digest must equal
+  the file's predicted post-replay values, or the transaction rolls back.
+- **Idempotent.** A repeated run finds every provider already replayed (resolved at P′c and Q2
+  satisfied), opens no batch and writes nothing. A partially replayed state refuses.
+
 ### 7.5 Accept the candidate
 
 ```bash
@@ -1157,6 +1234,17 @@ verifies that state instead of refusing it:
   this candidate, this environment and this environment's live database;
 - G2, re-evaluated on the candidate over the reinstated ledger, refuses nothing and reproduces the
   file's `expectedSupersedes` exactly.
+
+**AFLDB-ISSUE-238 CRV (corrected replay verification; identical to the above when
+`correctedReplays` is empty).** With a non-empty `C_promotion`, "zero `resolved` rows" becomes
+"`resolved` rows equal `C_promotion` exactly", and "importer state equals `candidateImporter*`"
+becomes "importer state equals the **predicted post-replay** `predictedPostReplayImporter*`". In
+addition: the whole `afl_api` identity digest equals `predictedPostReplayIdentitySha256`; the
+reinstated net-`CORRECTED` providers, the `resolved` providers and `C_promotion` are the same set;
+each is `resolved` at P′c under `afl_api_admin_adjudication`; each has at most one replay batch,
+exactly one (completed, `mode: 'replay'`, `context: 'promotion'`, the predicted fingerprint,
+`plannerVersion` and move/delete counts) when its predicted closure is non-empty and none otherwise;
+and CORRECTION SATISFACTION (Q2) passes for every one.
 
 ## 8. Swap, post-promotion state, health, admin login
 
@@ -1294,7 +1382,14 @@ generator, with the hyphenated `afldb_*_pre_rebuild_20260906-112500` shape pinne
    trusts the file blindly. `replayAflApiAdjudicationsFromSupersedeFile` refuses, before any write,
    a file that is malformed, foreign (another environment or target), of the unbound v1 format,
    tampered, or stale/candidate-mismatched (the promoted database's importer state or reinstated
-   ledger no longer hashes to what G2 evaluated). The operator states the environment and the
+   ledger no longer hashes to what G2 evaluated). **v3 (`AFLDB-ISSUE-238` Slice 6):** v1/v2 files
+   are refused as stale; the promoted importer state is bound to the file's **predicted
+   post-replay** importer count/digest and the whole `afl_api` identity state to
+   `predictedPostReplayIdentitySha256` (both equal the pre-replay values when `correctedReplays` is
+   empty, so the ISSUE-237 behaviour is unchanged); every `C_promotion` provider must return
+   ALREADY_SATISFIED and the ALREADY_SATISFIED corrected set must equal `C_promotion` exactly
+   (missing or extra refuses before any write); a corrected provider never causes a ledger or
+   identity write; `C_promotion ∩ E_promotion = ∅`. The operator states the environment and the
    target; the connection must actually be on that target:
 
    ```bash
@@ -1523,7 +1618,10 @@ freeze-dump` and `--freeze-status`, then `--freeze-record` (and `--freeze-dump-p
 `--old-database afldb_dev_pre_rebuild_<stamp>` on `--phase production`) exactly as §§4–8 show.
 Without `--freeze-record`, every DEV phase, plan file, swap and rollback is byte-identical to the
 pre-ISSUE-250 procedure. A DEV rehearsal of the freeze is the way to prove it before a
-production run (`issues/open/AFLDB-ISSUE-250.md` §12).
+production run (`issues/open/AFLDB-ISSUE-250.md` §12). **One exception (`AFLDB-ISSUE-238` S6-D2):**
+when the target holds a net `corrected` AFL API ledger entry, `--freeze-record` is mandatory on DEV
+too (`CORRECTED_PROMOTION_REQUIRES_FREEZE`, §5), because the freeze is what protects the corrected
+ledger across the promotion window. With no `corrected` entry the DEV freeze stays opt-in.
 
 **What differs — and only these three things.** The first two are command-line flags; the
 third is a tracked contract declaration with no flag at all.

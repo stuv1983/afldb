@@ -2165,6 +2165,37 @@ describe('AFLDB-ISSUE-237: afl-api-adjudication (pure module, importer identity)
     })).toContainEqual({ kind: 'resolved_row_present', externalId: 'CD_I1' });
   });
 
+  it('AFLDB-ISSUE-238 §9.1 — classifyAflApiG1 expectedResolvedExternalIds: default unchanged, resolved set must equal C_promotion exactly', async () => {
+    const { classifyAflApiG1 } = await import('@/lib/acquisition/afl-api-adjudication');
+    const human = (externalId: string, playerId: number) => ({
+      externalId, status: 'resolved', matchMethod: 'afl_api_admin_adjudication', playerId, candidateCount: 0, externalUrl: null,
+    });
+    const base = { ledgerRowCount: 0, identityByPlayerId: new Map(), rebuildMarkerPresent: false } as const;
+    const rows = [human('CD_I1', 1), human('CD_I2', 2)];
+    // omitted and empty: the old rule, every resolved row refuses
+    for (const opts of [{}, { expectedResolvedExternalIds: new Set<string>() }]) {
+      expect(classifyAflApiG1({ ...base, rows, ...opts })).toEqual([
+        { kind: 'resolved_row_present', externalId: 'CD_I1' }, { kind: 'resolved_row_present', externalId: 'CD_I2' },
+      ]);
+    }
+    // exact equality passes
+    expect(classifyAflApiG1({ ...base, rows, expectedResolvedExternalIds: new Set(['CD_I2', 'CD_I1']) })).toEqual([]);
+    // an extra resolved row refuses under its own name
+    expect(classifyAflApiG1({ ...base, rows, expectedResolvedExternalIds: new Set(['CD_I1']) }))
+      .toEqual([{ kind: 'resolved_row_unexpected', externalId: 'CD_I2' }]);
+    // a missing one refuses under its own name, including when no resolved row exists at all
+    expect(classifyAflApiG1({ ...base, rows: [human('CD_I1', 1)], expectedResolvedExternalIds: new Set(['CD_I1', 'CD_I3']) }))
+      .toEqual([{ kind: 'resolved_row_missing', externalId: 'CD_I3' }]);
+    expect(classifyAflApiG1({ ...base, rows: [], expectedResolvedExternalIds: new Set(['CD_I1']) }))
+      .toEqual([{ kind: 'resolved_row_missing', externalId: 'CD_I1' }]);
+    // extra and missing together, and a non-resolved problem is still reported alongside
+    expect(classifyAflApiG1({ ...base, rebuildMarkerPresent: true, rows: [human('CD_I2', 2)], expectedResolvedExternalIds: new Set(['CD_I1']) }))
+      .toEqual(expect.arrayContaining([
+        { kind: 'rebuild_marker_present' },
+        { kind: 'resolved_row_unexpected', externalId: 'CD_I2' }, { kind: 'resolved_row_missing', externalId: 'CD_I1' },
+      ]));
+  });
+
   it('AFLDB-ISSUE-237 F-L4-2 — classifyAflApiG2 grades an unresolvable/ambiguous ledger identity UNRESOLVED (refusing), never AGREE', async () => {
     const { classifyAflApiG2, aflApiG2AgreeSet, AFL_API_G2_REFUSING_OUTCOMES } = await import('@/lib/acquisition/afl-api-adjudication');
     const entry = { externalId: 'CD_I1', ledgerNetAction: 'linked' as const, identityIsManualToken: false, candidateRow: null,
@@ -2669,16 +2700,24 @@ describe('AFLDB-ISSUE-238 Slice 4: corrected ledger semantics (pure module)', ()
     expect(capturedOverlapProviders({ ledgerRows: [corrected(1, null)], importerRows: [captured('CD_I2', P)] })).toEqual([]);
   });
 
-  it('G2 — a corrected entry is routed to CPC (neither AGREE nor revoked INFO) and refuses until slice 6', async () => {
+  it('G2 — a corrected entry is routed to CPC (neither AGREE nor revoked INFO): refuses unless CPC classified it', async () => {
     const { classifyAflApiG2, aflApiG2AgreeSet, AFL_API_G2_REFUSING_OUTCOMES } = await import('@/lib/acquisition/afl-api-adjudication');
     const fullRow = { status: 'unique', matchMethod: 'afl_api_stat_vector_bootstrap', candidateCount: 1, externalUrl: null, playerId: 907, playerIdentity: P2 };
     const entry = { externalId: 'CD_I1', ledgerNetAction: 'corrected' as const, identityIsManualToken: false,
       remappedCandidatePlayerId: 907, collidingProviderId: null };
     for (const candidateRow of [fullRow, null, { ...fullRow, playerId: 555, playerIdentity: P }]) {
+      // default (no opts) is fail-closed: every corrected entry refuses
       const grades = classifyAflApiG2([{ ...entry, candidateRow }]);
-      expect(grades).toEqual([{ externalId: 'CD_I1', outcome: 'CORRECTED_REQUIRES_CPC' }]);
+      expect(grades).toEqual([{ externalId: 'CD_I1', outcome: 'CORRECTED_NOT_CPC_CLASSIFIED' }]);
       expect(AFL_API_G2_REFUSING_OUTCOMES.has(grades[0].outcome)).toBe(true);
       expect(aflApiG2AgreeSet(grades).size).toBe(0);
+      // a set that omits the provider still refuses; one that names it routes to the non-refusing replay outcome
+      expect(classifyAflApiG2([{ ...entry, candidateRow }], { cpcCorrected: new Set(['CD_I9']) }))
+        .toEqual([{ externalId: 'CD_I1', outcome: 'CORRECTED_NOT_CPC_CLASSIFIED' }]);
+      const routed = classifyAflApiG2([{ ...entry, candidateRow }], { cpcCorrected: new Set(['CD_I1']) });
+      expect(routed).toEqual([{ externalId: 'CD_I1', outcome: 'CORRECTED_CPC_REPLAY' }]);
+      expect(AFL_API_G2_REFUSING_OUTCOMES.has(routed[0].outcome)).toBe(false);
+      expect(aflApiG2AgreeSet(routed).size).toBe(0);
     }
   });
 

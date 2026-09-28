@@ -12,11 +12,13 @@ import {
   PLAYER_MATCH_STATS_CONTRACT_FIELDS,
   classifyBrownlowChain,
   classifyBrownlowChainApplication,
+  classifyCorrectedCandidate,
   compareReconstruction,
   compareSubstantiveBrownlow,
   compareSubstantivePlayerMatchStats,
   decideBrownlowDisposition,
   decidePlayerMatchStatsDisposition,
+  deriveCorrectedPromotionSet,
   detectPostCorrectionReappearance,
   evaluateBrownlowAttribution,
   evaluateBrownlowGuards,
@@ -36,6 +38,9 @@ import {
   verifyBrownlowReleaseClaimPair,
   type Application,
   type BrownlowChainApplication,
+  type CpcInput,
+  type CpcPrediction,
+  type CpcProviderRow,
   type MutationPlan,
   type PlayerMatchStatsRowEvidence,
 } from '@/lib/acquisition/afl-api-identity-correction';
@@ -829,9 +834,61 @@ describe('fingerprint (§5.1, pass 5 P4-03)', () => {
     rows: [{
       table: 'player_match_stats', rowId: 1, naturalKey: { player_id: 502, match_id: 1 },
       disposition: 'MOVE', contractSha256: 'abc', provenance: { sourceKey: 'afl_api', sourceRecordId: 'M1|RICH|CD_I1', importBatchId: 100 },
+      evidence: {
+        applicationIds: [11, 12],
+        citedVersion: { sourceId: 7, family: 'player_stats', externalRecordId: 'M1|RICH|CD_I1', seq: 3 },
+        insertPayloadSha256: null,
+      },
+      collision: null,
     }],
     stops: [],
   };
+  const withRow = (patch: Partial<MutationPlan['rows'][number]>): MutationPlan => ({
+    ...basePlan, rows: [{ ...basePlan.rows[0], ...patch }],
+  });
+  const fp = mutationPlanFingerprint;
+  const collided = {
+    counterpartRowId: 900, counterpartContractSha256: 'ccc', outcome: 'C2' as const,
+  };
+
+  it('PLANNER_VERSION is 2 (S6-D1: evidence and collision are fingerprinted)', () => {
+    expect(PLANNER_VERSION).toBe(2);
+  });
+
+  it('is sensitive to each row contract/disposition/collision/evidence field independently (runbook §5.1)', () => {
+    const base = fp(basePlan);
+    const variants: MutationPlan[] = [
+      withRow({ contractSha256: 'abd' }),
+      withRow({ disposition: 'DELETE_AS_FOREIGN_COLLISION' }),
+      withRow({ collision: collided }),
+      withRow({ collision: { ...collided, counterpartRowId: 901 } }),
+      withRow({ collision: { ...collided, counterpartContractSha256: 'ddd' } }),
+      withRow({ collision: { ...collided, outcome: 'C4' } }),
+      withRow({ evidence: { ...basePlan.rows[0].evidence, applicationIds: [11, 12, 13] } }),
+      withRow({ evidence: { ...basePlan.rows[0].evidence, citedVersion: { ...basePlan.rows[0].evidence.citedVersion, sourceId: 8 } } }),
+      withRow({ evidence: { ...basePlan.rows[0].evidence, citedVersion: { ...basePlan.rows[0].evidence.citedVersion, family: 'other' } } }),
+      withRow({ evidence: { ...basePlan.rows[0].evidence, citedVersion: { ...basePlan.rows[0].evidence.citedVersion, externalRecordId: 'M2|RICH|CD_I1' } } }),
+      withRow({ evidence: { ...basePlan.rows[0].evidence, citedVersion: { ...basePlan.rows[0].evidence.citedVersion, seq: 4 } } }),
+      withRow({ evidence: { ...basePlan.rows[0].evidence, insertPayloadSha256: 'e'.repeat(64) } }),
+      { ...basePlan, stops: [{ table: 'player_match_stats', rowId: 1, step: 'C3', code: 'collision_values_disagree' }] },
+      { ...basePlan, plannerVersion: PLANNER_VERSION + 1 },
+      { ...basePlan, identityAction: 'upgrade_in_place' },
+    ];
+    const hashes = variants.map(fp);
+    for (const h of hashes) expect(h).not.toBe(base);
+    expect(new Set(hashes).size).toBe(hashes.length);
+  });
+
+  it('is insensitive to applicationIds order, to context, and to PREDICT vs ADJUDICATION mode (J-1)', () => {
+    expect(fp(withRow({ evidence: { ...basePlan.rows[0].evidence, applicationIds: [12, 11] } }))).toBe(fp(basePlan));
+    const withContext = { ...basePlan, context: { anything: 1 } } as unknown as MutationPlan;
+    expect(fp(withContext)).toBe(fp(basePlan));
+    const auth = { adjudicationId: 5, externalId: 'CD_I1', evidenceSha256: 'f'.repeat(64), previousPlayerIdentity: 'a', playerIdentity: 'b' };
+    const predict: MutationPlan = { ...basePlan, authority: { mode: 'PREDICT', ...auth } };
+    const replay: MutationPlan = { ...basePlan, authority: { mode: 'ADJUDICATION', ...auth } };
+    expect(fp(predict)).toBe(fp(replay));
+    expect(predict.authority.mode).toBe('PREDICT');
+  });
 
   it('is stable for the same logical plan (§6 prediction and §7.4e replay must hash identically)', () => {
     const again: MutationPlan = { ...basePlan, rows: [...basePlan.rows] };
@@ -872,6 +929,122 @@ describe('fingerprint (§5.1, pass 5 P4-03)', () => {
     const planA: MutationPlan = { ...basePlan, stops: [stopA, stopB] };
     const planB: MutationPlan = { ...basePlan, stops: [stopB, stopA] };
     expect(mutationPlanFingerprint(planA)).toBe(mutationPlanFingerprint(planB));
+  });
+});
+
+describe('CPC classifier classifyCorrectedCandidate / deriveCorrectedPromotionSet (§9.1, S6-D4)', () => {
+  const zero = { player_match_stats: 0, brownlow_round_votes: 0 };
+  const okPrediction: CpcPrediction = {
+    stops: [], moveOrDeleteRowCount: 2, fingerprint: 'fp1', plannerVersion: PLANNER_VERSION,
+    moved: { player_match_stats: 2, brownlow_round_votes: 0 }, deleted: zero,
+  };
+  const providerRow = (over: Partial<CpcProviderRow> = {}): CpcProviderRow => ({
+    id: 40, playerId: 100, status: 'resolved', matchMethod: 'importer', importerOwned: true, ...over,
+  });
+  const input = (over: Partial<CpcInput> = {}): CpcInput => ({
+    externalId: 'CD_I1', adjudicationId: 5,
+    pc: { kind: 'unique', playerId: 100 }, pPrime: { kind: 'unique', playerId: 200 },
+    providerRow: providerRow(),
+    collisions: { candidateImporterProvidersAtPPrime: [], targetHumanProvidersRemappingToPPrime: [] },
+    pcStillImplicated: { rowsImplicatingCdIAtPc: 0, unprovableCdILineage: false },
+    prediction: okPrediction,
+    ...over,
+  });
+
+  it('class 1: importer row at Pc -> update_in_place', () => {
+    const r = classifyCorrectedCandidate(input());
+    expect(r).toMatchObject({
+      outcome: 'PASS', candidateClass: 1, predictedIdentityAction: 'update_in_place', providerRowId: 40,
+      predictedClosureFingerprint: 'fp1', plannerVersion: PLANNER_VERSION,
+    });
+  });
+
+  it('class 2: importer row already at P\'c -> upgrade_in_place, only with an empty closure', () => {
+    const empty: CpcPrediction = { ...okPrediction, moveOrDeleteRowCount: 0, moved: zero };
+    expect(classifyCorrectedCandidate(input({ providerRow: providerRow({ playerId: 200 }), prediction: empty })))
+      .toMatchObject({ outcome: 'PASS', candidateClass: 2, predictedIdentityAction: 'upgrade_in_place' });
+    expect(classifyCorrectedCandidate(input({ providerRow: providerRow({ playerId: 200 }) })))
+      .toMatchObject({ outcome: 'FAIL', code: 'IDENTITY_ONLY_CLOSURE_NOT_EMPTY', candidateClass: 2 });
+  });
+
+  it('class 3: no row -> insert; PC_STILL_IMPLICATED on either half', () => {
+    expect(classifyCorrectedCandidate(input({ providerRow: null })))
+      .toMatchObject({ outcome: 'PASS', candidateClass: 3, predictedIdentityAction: 'insert', providerRowId: null });
+    expect(classifyCorrectedCandidate(input({ providerRow: null, pcStillImplicated: { rowsImplicatingCdIAtPc: 1, unprovableCdILineage: false } })))
+      .toMatchObject({ outcome: 'FAIL', code: 'PC_STILL_IMPLICATED', candidateClass: 3 });
+    expect(classifyCorrectedCandidate(input({ providerRow: null, pcStillImplicated: { rowsImplicatingCdIAtPc: 0, unprovableCdILineage: true } })))
+      .toMatchObject({ outcome: 'FAIL', code: 'PC_STILL_IMPLICATED', candidateClass: 3 });
+  });
+
+  it('class 4: row at a third identity -> DISAGREE', () => {
+    expect(classifyCorrectedCandidate(input({ providerRow: providerRow({ playerId: 300 }) })))
+      .toMatchObject({ outcome: 'FAIL', code: 'DISAGREE', candidateClass: 4 });
+  });
+
+  it('class 5: both collision sources -> COLLISION; CD_I itself is excluded', () => {
+    expect(classifyCorrectedCandidate(input({ collisions: { candidateImporterProvidersAtPPrime: ['CD_I2'], targetHumanProvidersRemappingToPPrime: [] } })))
+      .toMatchObject({ outcome: 'FAIL', code: 'COLLISION', candidateClass: 5 });
+    expect(classifyCorrectedCandidate(input({ collisions: { candidateImporterProvidersAtPPrime: [], targetHumanProvidersRemappingToPPrime: ['CD_I3'] } })))
+      .toMatchObject({ outcome: 'FAIL', code: 'COLLISION', candidateClass: 5 });
+    expect(classifyCorrectedCandidate(input({ collisions: { candidateImporterProvidersAtPPrime: ['CD_I1'], targetHumanProvidersRemappingToPPrime: ['CD_I1'] } })))
+      .toMatchObject({ outcome: 'PASS', candidateClass: 1 });
+  });
+
+  it('class 6: any PREDICT STOP (or no / stale-version prediction) -> PREDICT_STOP', () => {
+    const stopped: CpcPrediction = { ...okPrediction, stops: [{ code: 'brownlow_state_present', step: 'C1b' }] };
+    expect(classifyCorrectedCandidate(input({ prediction: stopped })))
+      .toMatchObject({ outcome: 'FAIL', code: 'PREDICT_STOP', candidateClass: 6, detail: 'brownlow_state_present' });
+    expect(classifyCorrectedCandidate(input({ prediction: null })))
+      .toMatchObject({ outcome: 'FAIL', code: 'PREDICT_STOP', candidateClass: 6 });
+    expect(classifyCorrectedCandidate(input({ prediction: { ...okPrediction, plannerVersion: PLANNER_VERSION - 1 } })))
+      .toMatchObject({ outcome: 'FAIL', code: 'PREDICT_STOP', candidateClass: 6 });
+  });
+
+  it('UNEVALUABLE: every reason, on either side, plus Pc = P\'c and a human provider row', () => {
+    for (const reason of ['manual_admin_token', 'unresolved', 'ambiguous'] as const) {
+      expect(classifyCorrectedCandidate(input({ pc: { kind: 'unevaluable', reason } })))
+        .toMatchObject({ outcome: 'FAIL', code: 'UNEVALUABLE', candidateClass: null });
+      const r = classifyCorrectedCandidate(input({ pPrime: { kind: 'unevaluable', reason } }));
+      expect(r).toMatchObject({ outcome: 'FAIL', code: 'UNEVALUABLE', candidateClass: null });
+      if (r.outcome === 'FAIL') expect(r.detail).toContain(reason);
+    }
+    expect(classifyCorrectedCandidate(input({ pPrime: { kind: 'unique', playerId: 100 } })))
+      .toMatchObject({ outcome: 'FAIL', code: 'UNEVALUABLE' });
+    expect(classifyCorrectedCandidate(input({ providerRow: providerRow({ importerOwned: false, status: 'linked' }) })))
+      .toMatchObject({ outcome: 'FAIL', code: 'UNEVALUABLE' });
+  });
+
+  it('precedence: UNEVALUABLE > COLLISION > DISAGREE > PREDICT_STOP > class-specific', () => {
+    const stopped: CpcPrediction = { ...okPrediction, stops: [{ code: 'p_equals_p_prime' }] };
+    const collisions = { candidateImporterProvidersAtPPrime: ['CD_I2'], targetHumanProvidersRemappingToPPrime: [] };
+    const third = providerRow({ playerId: 300 });
+    expect(classifyCorrectedCandidate(input({ pc: { kind: 'unevaluable', reason: 'unresolved' }, collisions, providerRow: third, prediction: stopped })))
+      .toMatchObject({ code: 'UNEVALUABLE' });
+    expect(classifyCorrectedCandidate(input({ collisions, providerRow: third, prediction: stopped }))).toMatchObject({ code: 'COLLISION' });
+    expect(classifyCorrectedCandidate(input({ providerRow: third, prediction: stopped }))).toMatchObject({ code: 'DISAGREE' });
+    expect(classifyCorrectedCandidate(input({ providerRow: providerRow({ playerId: 200 }), prediction: stopped })))
+      .toMatchObject({ code: 'PREDICT_STOP' });
+  });
+
+  it('deriveCorrectedPromotionSet: sorted class 1-3 set; FAIL, overlap and duplicates are problems', () => {
+    const empty: CpcPrediction = { ...okPrediction, moveOrDeleteRowCount: 0, moved: zero };
+    const a = classifyCorrectedCandidate(input({ externalId: 'CD_B' }));
+    const b = classifyCorrectedCandidate(input({ externalId: 'CD_A', providerRow: null, prediction: empty }));
+    expect(deriveCorrectedPromotionSet([a, b], new Set(['CD_Z']))).toEqual({ ok: true, cPromotion: ['CD_A', 'CD_B'] });
+    expect(deriveCorrectedPromotionSet([], new Set())).toEqual({ ok: true, cPromotion: [] });
+
+    const failed = classifyCorrectedCandidate(input({ externalId: 'CD_C', providerRow: providerRow({ playerId: 300 }) }));
+    const r1 = deriveCorrectedPromotionSet([a, failed], new Set());
+    expect(r1.ok).toBe(false);
+    if (!r1.ok) expect(r1.problems.join('\n')).toContain('CD_C: CPC FAIL DISAGREE');
+
+    const r2 = deriveCorrectedPromotionSet([a, b], new Set(['CD_A']));
+    expect(r2.ok).toBe(false);
+    if (!r2.ok) expect(r2.problems).toEqual(['CD_A: in both C_promotion and E_promotion (must be disjoint)']);
+
+    const r3 = deriveCorrectedPromotionSet([a, a], new Set());
+    expect(r3.ok).toBe(false);
+    if (!r3.ok) expect(r3.problems[0]).toContain('duplicate');
   });
 });
 

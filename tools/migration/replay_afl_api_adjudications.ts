@@ -43,6 +43,7 @@ import {
   AFL_API_ADMIN_MATCH_METHOD,
   AflApiPromotionFileRefused,
   aflApiAlreadySatisfiedCount,
+  aflApiIdentityStateSha256,
   aflApiImporterStateSha256,
   aflApiLedgerStateSha256,
   aflApiReverseIdentityPaths,
@@ -61,6 +62,7 @@ import {
   type AflApiCandidateIdentityRow,
   type AflApiCensusRow,
   type AflApiForwardIdentityResult,
+  type AflApiIdentityStateRow,
   type AflApiImporterCandidateRow,
   type AflApiImporterReplayPlan,
   type AflApiLedgerNetAction,
@@ -424,12 +426,19 @@ export async function replayAflApiAdjudications(
    * integration test) keeps its exact prior semantics.
    */
   expectedSupersedes: ReadonlySet<string> = new Set(),
+  /**
+   * AFLDB-ISSUE-238 D15 v3 (SAT-1): when given, the EXACT set of providers this call must report
+   * ALREADY_SATISFIED (`C_promotion`). A missing or extra one aborts before any write. Omitted
+   * (every rebuild / OD-4 / ISSUE-235-237 caller) means no such assertion, i.e. the prior behaviour.
+   */
+  options: { expectedAlreadySatisfied?: ReadonlySet<string> } = {},
 ): Promise<AflApiReplayCounts> {
   const sourceId = await fetchAflApiSourceId(tx);
   const ledgerRows = await readLedgerRows(tx);
   // An empty ledger can supersede nothing, so it may short-circuit ONLY when nothing was expected;
   // otherwise it falls through to the exact-set check below and aborts (D13).
-  if (ledgerRows.length === 0 && expectedSupersedes.size === 0) {
+  if (ledgerRows.length === 0 && expectedSupersedes.size === 0
+    && (options.expectedAlreadySatisfied?.size ?? 0) === 0) {
     return { inserted: 0, noops: 0, stops: [], supersedes: [] };
   }
 
@@ -455,6 +464,21 @@ export async function replayAflApiAdjudications(
       'afl_api D15 supersede set did not match the expected set exactly -- nothing written '
       + `(missing: ${mismatch.missing.join(', ') || 'none'}; extra: ${mismatch.extra.join(', ') || 'none'})`,
     );
+  }
+
+  // AFLDB-ISSUE-238 D15 v3 (SAT-1): the ALREADY_SATISFIED set must equal C_promotion exactly.
+  // Also before any statement runs. A corrected provider never reaches an insert/supersede
+  // (the planner only ever answers ALREADY_SATISFIED or STOP for it), and D15 writes no ledger row.
+  if (options.expectedAlreadySatisfied !== undefined) {
+    const actual = new Set(plan.noops.filter((n) => n.satisfied === 'already_satisfied').map((n) => n.externalId));
+    const missing = [...options.expectedAlreadySatisfied].filter((id) => !actual.has(id)).sort();
+    const extra = [...actual].filter((id) => !options.expectedAlreadySatisfied!.has(id)).sort();
+    if (missing.length > 0 || extra.length > 0) {
+      throw new AflApiReplayAbort(
+        'afl_api D15 ALREADY_SATISFIED set did not equal C_promotion exactly -- nothing written '
+        + `(missing: ${missing.join(', ') || 'none'}; extra: ${extra.join(', ') || 'none'})`,
+      );
+    }
   }
 
   for (const insert of plan.inserts) {
@@ -490,21 +514,46 @@ export async function replayAflApiAdjudications(
 }
 
 /**
- * AFLDB-ISSUE-237 F-L4-4 — the promoted database's own state, in the two digests an
- * `E_promotion` file is bound to: the importer rows (stable fields and forward identity) and
- * the reinstated human ledger (every field the reinstatement preserves; never `player_id`).
- * Read-only.
+ * AFLDB-ISSUE-238 D15 v3: the rows of the WHOLE `afl_api` identity state (importer, resolved and
+ * any anomalous row -- every `external_identities` row of the source), stable fields only: status,
+ * match method (`''` when NULL) and the player's forward stable identity (null when none). Never a
+ * player id or row id. Fed to `aflApiIdentityStateSha256`, the digest `predictedPostReplayIdentitySha256`
+ * is over.
+ */
+export function aflApiIdentityStateRowsFromCensus(
+  census: readonly AflApiCensusRow[], identityByPlayerId: ReadonlyMap<number, AflApiForwardIdentityResult>,
+): AflApiIdentityStateRow[] {
+  return census.map((r) => {
+    const identity = r.playerId === null ? undefined : identityByPlayerId.get(r.playerId);
+    return {
+      externalId: r.externalId, status: r.status, matchMethod: r.matchMethod ?? '',
+      playerIdentity: identity && identity.ok ? identity.identity : null,
+    };
+  });
+}
+
+/**
+ * AFLDB-ISSUE-237 F-L4-4, extended by AFLDB-ISSUE-238 D15 v3 — the promoted database's own
+ * state, in the three digests an `E_promotion` file is bound to: the importer rows (stable
+ * fields and forward identity), the reinstated human ledger (every field the reinstatement
+ * preserves; never `player_id`), and the whole `afl_api` identity state
+ * (`aflApiIdentityStateRowsFromCensus`). Read-only.
  */
 export async function readAflApiSupersedeBindingState(tx: TransactionSql): Promise<{
   currentDatabase: string;
   importer: { rowCount: number; sha256: string };
   ledger: { rowCount: number; sha256: string };
+  identity: { rowCount: number; sha256: string };
 }> {
   const [{ currentDatabase }] = await tx<{ currentDatabase: string }[]>`SELECT current_database() AS "currentDatabase"`;
   const sourceId = await fetchAflApiSourceId(tx);
-  const { importerRows } = censusAflApiRows(await readAflApiCensusRows(tx, sourceId));
+  const census = await readAflApiCensusRows(tx, sourceId);
+  const { importerRows } = censusAflApiRows(census);
+  // One forward-identity read over EVERY row's player (a superset of the importer players):
+  // the classification is per player, so the importer digest below is unchanged by the wider set.
   const identityByPlayerId = await readAflApiForwardIdentities(
-    tx, [...new Set(importerRows.filter((r) => r.playerId !== null).map((r) => r.playerId as number))]);
+    tx, [...new Set(census.filter((r) => r.playerId !== null).map((r) => r.playerId as number))]);
+  const identityRows = aflApiIdentityStateRowsFromCensus(census, identityByPlayerId);
   const importerState = importerRows.map((r) => {
     const identity = r.playerId === null ? undefined : identityByPlayerId.get(r.playerId);
     return {
@@ -517,6 +566,7 @@ export async function readAflApiSupersedeBindingState(tx: TransactionSql): Promi
     currentDatabase,
     importer: { rowCount: importerState.length, sha256: aflApiImporterStateSha256(importerState) },
     ledger: { rowCount: ledgerRows.length, sha256: aflApiLedgerStateSha256(ledgerRows) },
+    identity: { rowCount: identityRows.length, sha256: aflApiIdentityStateSha256(identityRows) },
   };
 }
 
@@ -545,22 +595,47 @@ export async function replayAflApiAdjudicationsFromSupersedeFile(
     if (error instanceof AflApiPromotionFileRefused) throw new AflApiReplayAbort(`refusing the E_promotion file: ${error.message}`);
     throw error;
   }
+  // C_promotion and E_promotion are disjoint by the parser; kept as a defensive, write-free check.
+  const cPromotion = new Set(file.correctedReplays.map((e) => e.externalId));
+  const overlapping = file.expectedSupersedes.filter((id) => cPromotion.has(id));
+  if (overlapping.length > 0) {
+    throw new AflApiReplayAbort(
+      `refusing the E_promotion file: C_promotion and E_promotion overlap (${overlapping.join(', ')}), nothing written`);
+  }
   const state = await readAflApiSupersedeBindingState(tx);
-  const problems = [
+  const problems: unknown[] = [
     ...(state.currentDatabase === expected.targetDatabase ? [] : [{
       kind: 'connected_database_mismatch', expected: expected.targetDatabase, actual: state.currentDatabase,
     }]),
+    // The library compares the importer against the file's PRE-replay `candidateImporter*`; a v3
+    // promoted database is compared against the PREDICTED post-replay state instead (below), so
+    // the library is handed the file's own pre-replay values here and reports only env/target/ledger.
     ...aflApiSupersedeBindingProblems(file, {
       environment: expected.environment, targetDatabase: state.currentDatabase,
-      importer: state.importer, ledger: state.ledger,
+      importer: { rowCount: file.candidateImporterRowCount, sha256: file.candidateImporterSha256 },
+      ledger: state.ledger,
     }),
+    ...(file.predictedPostReplayImporterRowCount === state.importer.rowCount
+      && file.predictedPostReplayImporterSha256 === state.importer.sha256 ? [] : [{
+        kind: 'post_replay_importer_state_mismatch',
+        boundRowCount: file.predictedPostReplayImporterRowCount, actualRowCount: state.importer.rowCount,
+        boundSha256: file.predictedPostReplayImporterSha256, actualSha256: state.importer.sha256,
+      }]),
+    // The whole identity state (importer AND resolved rows), before any D15 write.
+    ...(file.predictedPostReplayIdentitySha256 === state.identity.sha256 ? [] : [{
+      kind: 'post_replay_identity_state_mismatch',
+      boundSha256: file.predictedPostReplayIdentitySha256, actualSha256: state.identity.sha256,
+      actualRowCount: state.identity.rowCount,
+    }]),
   ];
   if (problems.length > 0) {
     throw new AflApiReplayAbort(
       'refusing the E_promotion file: it is not bound to this promoted database state, nothing written — '
       + problems.map((p) => JSON.stringify(p)).join('; '));
   }
-  return replayAflApiAdjudications(tx, new Set(file.expectedSupersedes));
+  // SAT-1: every C_promotion provider must return ALREADY_SATISFIED, and only those. D15 creates
+  // no correction and writes no ledger row.
+  return replayAflApiAdjudications(tx, new Set(file.expectedSupersedes), { expectedAlreadySatisfied: cPromotion });
 }
 
 /**

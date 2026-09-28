@@ -43,7 +43,7 @@ import { canonicalJson, type JsonValue } from './observations';
  * ==================================================================== */
 
 /** Bumped on any change to this module's §5 semantics (runbook §5.1). */
-export const PLANNER_VERSION = 1;
+export const PLANNER_VERSION = 2;
 
 export type CanonicalTable = 'player_match_stats' | 'brownlow_round_votes';
 
@@ -1053,6 +1053,24 @@ export type ClosureRowFingerprintInput = {
   readonly disposition: 'MOVE' | 'DELETE_AS_FOREIGN_COLLISION';
   readonly contractSha256: string;
   readonly provenance: { readonly sourceKey: string; readonly sourceRecordId: string; readonly importBatchId: number };
+  /** Runbook §5.1 (S6-D1): the link evidence the disposition rests on. */
+  readonly evidence: {
+    readonly applicationIds: readonly number[];
+    readonly citedVersion: {
+      readonly sourceId: number;
+      readonly family: string;
+      readonly externalRecordId: string;
+      readonly seq: number;
+    };
+    /** B3-I, Brownlow only; null otherwise. */
+    readonly insertPayloadSha256: string | null;
+  };
+  /** Runbook §5.1/§5.4 (S6-D1): the collision counterpart, or null when none. */
+  readonly collision: {
+    readonly counterpartRowId: number;
+    readonly counterpartContractSha256: string;
+    readonly outcome: 'C2' | 'C4';
+  } | null;
 };
 
 export type AuthorityBlock =
@@ -1096,12 +1114,21 @@ function sortedStops(stops: MutationPlan['stops']): MutationPlan['stops'] {
 
 /** sha256(canonicalJson(mutationPlan)) — the single fingerprinted object (§5.1). */
 export function mutationPlanFingerprint(plan: MutationPlan): string {
+  // Runbook §5.1 (J-1): the same planned mutation fingerprints identically at §6 PREDICT and
+  // §7.4e REPLAY (ADJUDICATION), so PREDICT is hashed as ADJUDICATION. The plan value keeps its mode.
+  const authority: AuthorityBlock = plan.authority.mode === 'PREDICT'
+    ? { ...plan.authority, mode: 'ADJUDICATION' }
+    : plan.authority;
+  const rows = sortedRows(plan.rows).map((row) => ({
+    ...row,
+    evidence: { ...row.evidence, applicationIds: [...row.evidence.applicationIds].sort((a, b) => a - b) },
+  }));
   const canonical = {
     plannerVersion: plan.plannerVersion,
     provider: plan.provider,
-    authority: plan.authority,
+    authority,
     identityAction: plan.identityAction,
-    rows: sortedRows(plan.rows),
+    rows,
     stops: sortedStops(plan.stops),
   } as unknown as JsonValue;
   return createHash('sha256').update(canonicalJson(canonical)).digest('hex');
@@ -1143,4 +1170,176 @@ export function evaluateWholePlanStops(evidence: WholePlanEvidence): readonly St
     stops.push(stop('§5.4', 'already_corrected_provider', 'the net ledger state is already CORRECTED; a correction of a correction is a chain (D8)'));
   }
   return stops;
+}
+
+/* ==================================================================== *
+ * §9.1 CPC: the corrected-candidate classifier (pure, no database)
+ * ==================================================================== */
+
+/** The resolution of `A.previous_player_identity` (Pc) or `A.player_identity` remapped (P'c) in the candidate. */
+export type CpcIdentityResolution =
+  | { readonly kind: 'unique'; readonly playerId: number }
+  | { readonly kind: 'unevaluable'; readonly reason: 'manual_admin_token' | 'unresolved' | 'ambiguous' };
+
+/** The candidate's `afl_api` identity row for CD_I. `importerOwned=false` (a human row) is UNEVALUABLE. */
+export type CpcProviderRow = {
+  readonly id: number;
+  readonly playerId: number;
+  readonly status: string;
+  readonly matchMethod: string | null;
+  readonly importerOwned: boolean;
+};
+
+export type CpcMutationCounts = { readonly player_match_stats: number; readonly brownlow_round_votes: number };
+
+/** The §5.1 closure PREDICTED on the candidate; null when nothing was planned. */
+export type CpcPrediction = {
+  readonly stops: readonly { readonly code: StopCode; readonly step?: string }[];
+  readonly moveOrDeleteRowCount: number;
+  readonly fingerprint: string;
+  readonly plannerVersion: number;
+  readonly moved: CpcMutationCounts;
+  readonly deleted: CpcMutationCounts;
+};
+
+export type CpcInput = {
+  readonly externalId: string;
+  readonly adjudicationId: number;
+  readonly pc: CpcIdentityResolution;
+  readonly pPrime: CpcIdentityResolution;
+  readonly providerRow: CpcProviderRow | null;
+  /** S6-D4 class 5 sources. `externalId` itself is excluded by the classifier. */
+  readonly collisions: {
+    readonly candidateImporterProvidersAtPPrime: readonly string[];
+    readonly targetHumanProvidersRemappingToPPrime: readonly string[];
+  };
+  /** Class 3 guard. */
+  readonly pcStillImplicated: { readonly rowsImplicatingCdIAtPc: number; readonly unprovableCdILineage: boolean };
+  readonly prediction: CpcPrediction | null;
+};
+
+export type CpcFailCode =
+  | 'UNEVALUABLE'
+  | 'DISAGREE'
+  | 'COLLISION'
+  | 'PREDICT_STOP'
+  | 'IDENTITY_ONLY_CLOSURE_NOT_EMPTY'
+  | 'PC_STILL_IMPLICATED';
+
+export type CpcResult =
+  | {
+    readonly outcome: 'PASS';
+    readonly externalId: string;
+    readonly adjudicationId: number;
+    readonly candidateClass: 1 | 2 | 3;
+    readonly predictedIdentityAction: 'update_in_place' | 'upgrade_in_place' | 'insert';
+    readonly providerRowId: number | null;
+    readonly plannerVersion: number;
+    readonly predictedClosureFingerprint: string;
+    readonly predictedMutations: { readonly moved: CpcMutationCounts; readonly deleted: CpcMutationCounts };
+  }
+  | {
+    readonly outcome: 'FAIL';
+    readonly externalId: string;
+    readonly adjudicationId: number;
+    /** 4/5/6 for DISAGREE/COLLISION/PREDICT_STOP; 1-3 for a class-specific check; null for UNEVALUABLE. */
+    readonly candidateClass: 1 | 2 | 3 | 4 | 5 | 6 | null;
+    readonly code: CpcFailCode;
+    readonly detail: string;
+  };
+
+function cpcFail(input: CpcInput, candidateClass: 1 | 2 | 3 | 4 | 5 | 6 | null, code: CpcFailCode, detail: string): CpcResult {
+  return { outcome: 'FAIL', externalId: input.externalId, adjudicationId: input.adjudicationId, candidateClass, code, detail };
+}
+
+/**
+ * Classify one CORRECTED provider against the candidate (runbook §9.1 CPC table, S6-D4).
+ * Deterministic precedence: UNEVALUABLE -> COLLISION (5) -> DISAGREE (4) -> PREDICT STOP (6) ->
+ * class-specific checks (class 2: identity-only closure must be empty; class 3: Pc no longer implicated).
+ */
+export function classifyCorrectedCandidate(input: CpcInput): CpcResult {
+  // 1. UNEVALUABLE
+  const unevaluable: string[] = [];
+  if (input.pc.kind === 'unevaluable') unevaluable.push(`Pc: ${input.pc.reason}`);
+  if (input.pPrime.kind === 'unevaluable') unevaluable.push(`P'c: ${input.pPrime.reason}`);
+  if (input.pc.kind === 'unique' && input.pPrime.kind === 'unique' && input.pc.playerId === input.pPrime.playerId) {
+    unevaluable.push("Pc equals P'c (not a correction)");
+  }
+  if (input.providerRow !== null && !input.providerRow.importerOwned) {
+    unevaluable.push(`provider row #${input.providerRow.id} is not importer-owned (${input.providerRow.status}/${input.providerRow.matchMethod ?? 'null'})`);
+  }
+  if (unevaluable.length > 0 || input.pc.kind !== 'unique' || input.pPrime.kind !== 'unique') {
+    return cpcFail(input, null, 'UNEVALUABLE', unevaluable.join('; '));
+  }
+  const pcId = input.pc.playerId;
+  const pPrimeId = input.pPrime.playerId;
+
+  // 2. COLLISION (class 5, D8/S6-D4): another provider holds or maps to P'c. CD_I itself is excluded.
+  const others = (ids: readonly string[]) => ids.filter((id) => id !== input.externalId);
+  const candidateHolders = others(input.collisions.candidateImporterProvidersAtPPrime);
+  const targetHolders = others(input.collisions.targetHumanProvidersRemappingToPPrime);
+  if (candidateHolders.length > 0 || targetHolders.length > 0) {
+    const parts: string[] = [];
+    if (candidateHolders.length > 0) parts.push(`candidate importer provider(s) at P'c: ${[...candidateHolders].sort().join(',')}`);
+    if (targetHolders.length > 0) parts.push(`target human provider(s) remapping to P'c: ${[...targetHolders].sort().join(',')}`);
+    return cpcFail(input, 5, 'COLLISION', parts.join('; '));
+  }
+
+  // 3. DISAGREE (class 4): the row is at a third identity.
+  const row = input.providerRow;
+  if (row !== null && row.playerId !== pcId && row.playerId !== pPrimeId) {
+    return cpcFail(input, 4, 'DISAGREE', `provider row #${row.id} is at player ${row.playerId}, neither Pc ${pcId} nor P'c ${pPrimeId}`);
+  }
+
+  // 4. PREDICT STOP (class 6)
+  const prediction = input.prediction;
+  if (prediction === null) return cpcFail(input, 6, 'PREDICT_STOP', 'no closure prediction was produced');
+  if (prediction.plannerVersion !== PLANNER_VERSION) {
+    return cpcFail(input, 6, 'PREDICT_STOP', `prediction plannerVersion ${prediction.plannerVersion} != ${PLANNER_VERSION}`);
+  }
+  if (prediction.stops.length > 0) {
+    return cpcFail(input, 6, 'PREDICT_STOP', [...new Set(prediction.stops.map((s) => s.code))].sort().join(','));
+  }
+
+  // 5. class-specific checks
+  const predictedMutations = { moved: prediction.moved, deleted: prediction.deleted };
+  const pass = (candidateClass: 1 | 2 | 3, predictedIdentityAction: 'update_in_place' | 'upgrade_in_place' | 'insert'): CpcResult => ({
+    outcome: 'PASS', externalId: input.externalId, adjudicationId: input.adjudicationId, candidateClass,
+    predictedIdentityAction, providerRowId: row?.id ?? null, plannerVersion: prediction.plannerVersion,
+    predictedClosureFingerprint: prediction.fingerprint, predictedMutations,
+  });
+  if (row !== null && row.playerId === pcId) return pass(1, 'update_in_place');
+  if (row !== null) {
+    // row.playerId === P'c: identity-only upgrade; there must be nothing left to MOVE/DELETE.
+    if (prediction.moveOrDeleteRowCount !== 0) {
+      return cpcFail(input, 2, 'IDENTITY_ONLY_CLOSURE_NOT_EMPTY', `${prediction.moveOrDeleteRowCount} row(s) would still MOVE/DELETE for an identity-only upgrade`);
+    }
+    return pass(2, 'upgrade_in_place');
+  }
+  if (input.pcStillImplicated.rowsImplicatingCdIAtPc > 0 || input.pcStillImplicated.unprovableCdILineage) {
+    return cpcFail(
+      input, 3, 'PC_STILL_IMPLICATED',
+      `${input.pcStillImplicated.rowsImplicatingCdIAtPc} candidate row(s) implicate CD_I at Pc; unprovable lineage=${input.pcStillImplicated.unprovableCdILineage}`,
+    );
+  }
+  return pass(3, 'insert');
+}
+
+/**
+ * C_promotion (§9.1): the sorted providers in classes 1-3, which must be disjoint from E_promotion.
+ * Any FAIL, any overlap with `ePromotion`, and any duplicate externalId is a problem.
+ */
+export function deriveCorrectedPromotionSet(
+  results: readonly CpcResult[], ePromotion: ReadonlySet<string>,
+): { readonly ok: true; readonly cPromotion: string[] } | { readonly ok: false; readonly problems: string[] } {
+  const problems: string[] = [];
+  const seen = new Set<string>();
+  for (const r of results) {
+    if (seen.has(r.externalId)) problems.push(`${r.externalId}: duplicate CPC result`);
+    seen.add(r.externalId);
+    if (r.outcome === 'FAIL') problems.push(`${r.externalId}: CPC FAIL ${r.code}${r.candidateClass === null ? '' : ` (class ${r.candidateClass})`}: ${r.detail}`);
+    if (ePromotion.has(r.externalId)) problems.push(`${r.externalId}: in both C_promotion and E_promotion (must be disjoint)`);
+  }
+  if (problems.length > 0) return { ok: false, problems };
+  return { ok: true, cPromotion: results.map((r) => r.externalId).sort() };
 }

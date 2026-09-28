@@ -93,13 +93,19 @@ import { createHash, randomBytes } from 'node:crypto';
 import { collectSections, fingerprintOf, type Row } from './catalog-fingerprint';
 import { computeChecksumRepresentations, matchesStoredChecksum } from './migration-checksum';
 import {
+  AFL_API_ADMIN_MATCH_METHOD,
   AFL_API_G2_REFUSING_OUTCOMES,
   AFL_API_REBUILD_MARKER_FORMAT,
   AflApiPromotionFileRefused,
+  CORRECTED_PROMOTION_REHEARSAL_REQUIRED,
+  CORRECTED_PROMOTION_REQUIRES_FREEZE,
   aflApiDevRegenerationBindingProblems,
+  aflApiCorrectedLedgerStateSha256,
   aflApiDevRegenerationEntriesFromG3,
   aflApiG2AgreeSet,
+  aflApiIdentityStateSha256,
   aflApiImporterStateSha256,
+  aflApiNetIsHumanLive,
   aflApiLedgerStateSha256,
   aflApiLedgerStructureProblems,
   aflApiReverseIdentityPaths,
@@ -119,10 +125,13 @@ import {
   netLedgerRowsByExternalId,
   parseAflApiDevRegenerationClassification,
   parseAflApiSupersedeFile,
+  predictAflApiPostReplayIdentityState,
+  predictAflApiPostReplayImporterState,
   validateAflApiDevRegenerationClassification,
   type AflApiAdjudicationLedgerRow,
   type AflApiCensusResult,
   type AflApiCensusRow,
+  type AflApiCorrectedReplayEntry,
   type AflApiDevRegenerationClassification,
   type AflApiDevRegenerationClassificationEntry,
   type AflApiForwardIdentityResult,
@@ -138,6 +147,22 @@ import {
   loadFitzroyProfileContinuityRules,
   type ValidatedFitzroyProfileContinuityRules,
 } from '../../src/lib/acquisition/fitzroy-profile-continuity';
+// AFLDB-ISSUE-238 S6: the ONE shared CORRECTION SATISFACTION (Q2) implementation. Importing this
+// module is side-effect free: its CLI runs only under its own `invokedDirectly` guard.
+import type { TransactionSql } from 'postgres';
+import { deriveCorrectedPromotionSet, type CpcResult } from '../../src/lib/acquisition/afl-api-identity-correction';
+import {
+  checkCorrectionSatisfaction,
+  classifyCorrectedProviderInDatabase,
+  dbCorrectionSatisfactionReader,
+  type CorrectedProviderEntry,
+  type CorrectionSatisfactionReader,
+  type CorrectionSatisfactionResult,
+  type Q2BatchRow,
+} from '../migration/correct_afl_api_identity';
+// AFLDB-ISSUE-238 §9.1/§7.5: the ONE identity-state row rule (every `afl_api` census row), shared
+// with REPLAY's post-state read and D15's binding. Pure and import-safe (no CLI, no side effect).
+import { aflApiIdentityStateRowsFromCensus } from '../migration/replay_afl_api_adjudications';
 import {
   ACHIEVEMENT_TYPE as FIRST_KICK_GOAL_TYPE, FIRST_KICK_GOAL_MANIFEST,
   SOURCE_KEY as FIRST_KICK_GOAL_SOURCE, trackedExpectedIds,
@@ -1844,6 +1869,8 @@ export async function gateAflApiRebuildMarker(databases: readonly { role: string
  */
 export async function gateAflApiPreCutoverCensus(q: Query, report: Report): Promise<{
   importerRowsByMethod: Record<string, number>; humanRows: number; netLinkedLedgerEntries: number;
+  /** AFLDB-ISSUE-238 S6: present ONLY when > 0 (a zero-corrected snapshot stays byte-identical). */
+  netCorrectedLedgerEntries?: number;
 }> {
   const view = await readAflApiImporterView(q);
   const ledgerRows = await readAflApiLedgerRows(q);
@@ -1852,8 +1879,8 @@ export async function gateAflApiPreCutoverCensus(q: Query, report: Report): Prom
   for (const row of view.importerRows) byMethod.set(row.matchMethod, (byMethod.get(row.matchMethod) ?? 0) + 1);
   const net = netLedgerRowsByExternalId(ledgerRows);
   const netLinkedCount = [...net.values()].filter((r) => r.action === 'linked').length;
-  // AFLDB-ISSUE-238 §8.6: diagnostic only -- not part of the returned/snapshotted shape (that
-  // extension is Slice 6); zero-corrected report text stays byte-identical.
+  // AFLDB-ISSUE-238 §8.6 / S6: reported in the text and, ONLY when > 0, recorded in the snapshot
+  // shape below; zero-corrected report text and snapshot stay byte-identical.
   const netCorrectedCount = [...net.values()].filter((r) => r.action === 'corrected').length;
 
   const importerRowsByMethod = Object.fromEntries(byMethod);
@@ -1869,7 +1896,106 @@ export async function gateAflApiPreCutoverCensus(q: Query, report: Report): Prom
     for (const p of problems) lines.push(JSON.stringify(p));
     report.add('afl_api importer identity — pre-cutover target census', 'FAIL', lines);
   }
-  return { importerRowsByMethod, humanRows: view.humanRowCount, netLinkedLedgerEntries: netLinkedCount };
+  return {
+    importerRowsByMethod, humanRows: view.humanRowCount, netLinkedLedgerEntries: netLinkedCount,
+    ...(netCorrectedCount > 0 ? { netCorrectedLedgerEntries: netCorrectedCount } : {}),
+  };
+}
+
+/** AFLDB-ISSUE-238 S6: the NET-CORRECTED providers of a ledger, code-unit sorted by provider id. */
+export function netCorrectedEntries(
+  ledgerRows: readonly AflApiAdjudicationLedgerRow[],
+): { externalId: string; adjudicationId: number }[] {
+  return [...netLedgerRowsByExternalId(ledgerRows).values()]
+    .filter((r) => r.action === 'corrected')
+    .map((r) => ({ externalId: r.externalId, adjudicationId: r.id }))
+    .sort((a, b) => (a.externalId < b.externalId ? -1 : a.externalId > b.externalId ? 1 : 0));
+}
+
+/**
+ * AFLDB-ISSUE-238 S6-D2/S6-D3: refuse, before any other ISSUE-238 work of the phase and before
+ * any file is written, a promotion that carries corrected identities without what it needs.
+ *
+ * - S6-D3 (TEMPORARY until the Slice 10/11 corrected-promotion rehearsal is accepted): `--environment
+ *   prod` with a non-empty corrected set is refused (`CORRECTED_PROMOTION_REHEARSAL_REQUIRED`). DEV
+ *   is never blocked by it. Evaluated first, so PROD learns at `pre-cutover`.
+ * - S6-D2: a non-empty corrected set REQUIRES `--freeze-record` under BOTH environments
+ *   (`CORRECTED_PROMOTION_REQUIRES_FREEZE`): ISSUE-250's F0/candidate/post-swap digest covers every
+ *   non-rebuilt table, `afl_api_identity_adjudications` included, and so binds the corrected set
+ *   across the swap. An empty set changes nothing: DEV's freeze stays opt-in.
+ *
+ * Throws `PromotionRefused` (nothing else has run or been written by then).
+ */
+export function assertCorrectedPromotionAllowed(input: {
+  environment: Environment; phase: Phase; correctedCount: number; freezeRecordSupplied: boolean; role: string;
+}): void {
+  const { environment, phase, correctedCount, freezeRecordSupplied, role } = input;
+  if (correctedCount <= 0) return;
+  const what = `${role} carries ${correctedCount} net-corrected afl_api identity ledger entr${correctedCount === 1 ? 'y' : 'ies'}`;
+  if (environment === 'prod') {
+    throw new PromotionRefused(
+      `${CORRECTED_PROMOTION_REHEARSAL_REQUIRED}: --phase ${phase} under --environment prod refused: ${what}. `
+      + 'This gate is TEMPORARY (AFLDB-ISSUE-238 S6-D3): it stays until the Slice 10/11 corrected-promotion '
+      + 'rehearsal is accepted. DEV is not blocked by it.');
+  }
+  if (!freezeRecordSupplied) {
+    throw new PromotionRefused(
+      `${CORRECTED_PROMOTION_REQUIRES_FREEZE}: --phase ${phase} refused: ${what}, so a valid `
+      + '--freeze-record <file> (AFLDB-ISSUE-250) is required in every environment: its F0/candidate/post-swap '
+      + 'digest of the kept database covers afl_api_identity_adjudications, which binds the corrected set '
+      + 'across the swap (AFLDB-ISSUE-238 S6-D2).');
+  }
+}
+
+/**
+ * AFLDB-ISSUE-238 §5 (`--phase pre-cutover`): the per-provider verdicts of CORRECTION SATISFACTION
+ * (Q2) over every net-CORRECTED provider of the live target, judged. A Q2 stop (missing/wrong
+ * resolved P′ row, extended bijection failure, any SAT failure) FAILS; the recognised
+ * `post_correction_edit` / `correction_target_absent` reports are shown and never fail.
+ */
+export function judgeCorrectedCensus(
+  entries: readonly { providerId: string; adjudicationId: number; result: CorrectionSatisfactionResult }[],
+): { verdict: 'PASS' | 'FAIL'; lines: string[] } {
+  const failed = entries.filter((e) => !e.result.satisfied);
+  const lines = [
+    `net-corrected providers on the live target: ${entries.length}; correction satisfied: ${entries.length - failed.length}; not satisfied: ${failed.length}`,
+  ];
+  for (const e of entries) {
+    for (const stop of e.result.stops) {
+      lines.push(`${e.providerId} (ledger row ${e.adjudicationId}): STOP [${stop.step}] ${stop.code}${stop.detail ? `: ${stop.detail}` : ''}`);
+    }
+    if (!e.result.satisfied && e.result.stops.length === 0) {
+      lines.push(`${e.providerId} (ledger row ${e.adjudicationId}): correction not satisfied (no stop detail)`);
+    }
+    for (const report of e.result.reports) {
+      if (report.startsWith('post_correction_edit') || report.includes('correction_target_absent')) {
+        lines.push(`${e.providerId}: recognised, not a failure — ${report}`);
+      }
+    }
+  }
+  return { verdict: failed.length === 0 ? 'PASS' : 'FAIL', lines };
+}
+
+/**
+ * The pre-cutover corrected census: Q2 (`checkCorrectionSatisfaction`, currentBatchId null — a
+ * re-run, no in-flight batch) for every net-CORRECTED provider, through the reader the correction
+ * CLI itself uses. Read-only by construction: the reader has no write method and the caller hands
+ * it a `read only` transaction.
+ */
+export async function gateAflApiCorrectedCensus(
+  reader: CorrectionSatisfactionReader,
+  corrected: readonly { externalId: string; adjudicationId: number }[],
+  report: Report,
+): Promise<void> {
+  const entries: { providerId: string; adjudicationId: number; result: CorrectionSatisfactionResult }[] = [];
+  for (const c of corrected) {
+    const result = await checkCorrectionSatisfaction(reader, {
+      providerId: c.externalId, adjudicationId: c.adjudicationId, currentBatchId: null,
+    });
+    entries.push({ providerId: c.externalId, adjudicationId: c.adjudicationId, result });
+  }
+  const judged = judgeCorrectedCensus(entries);
+  report.add('afl_api corrected identities — pre-cutover satisfaction census (Q2)', judged.verdict, judged.lines);
 }
 
 function refusedFile<T>(read: () => T): T {
@@ -1931,7 +2057,16 @@ export type AflApiG2Evaluation = {
  * graded by `classifyAflApiG2`. Identity is the stored stable identity (AFL Tables path or manual
  * token) remapped against the candidate — never a name, never a player id from the other side.
  */
-export async function evaluateAflApiG2(sides: AflApiG2Sides, candidateView?: AflApiImporterView): Promise<AflApiG2Evaluation> {
+export async function evaluateAflApiG2(
+  sides: AflApiG2Sides, candidateView?: AflApiImporterView,
+  /**
+   * AFLDB-ISSUE-238 §9.1: the providers CPC classified into candidate class 1-3 (`--phase restored`)
+   * or that the bound artefact names as `C_promotion` (`--phase candidate`). Their net-`corrected`
+   * ledger entries grade `CORRECTED_CPC_REPLAY` (non-refusing, never AGREE); any other net-corrected
+   * entry refuses. Empty (the default, and every zero-corrected run) is the pre-CPC behaviour.
+   */
+  cpcCorrected: ReadonlySet<string> = new Set<string>(),
+): Promise<AflApiG2Evaluation> {
   const candidate = candidateView ?? await readAflApiImporterView(sides.candidate);
   const ledgerRows = await readAflApiLedgerRows(sides.humanLedger);
   const net = netLedgerRowsByExternalId(ledgerRows);
@@ -1940,7 +2075,7 @@ export async function evaluateAflApiG2(sides: AflApiG2Sides, candidateView?: Afl
   for (const q of sides.manualTokenSides) for (const identity of await readAflApiManualIdentities(q, identities)) manualIdentities.add(identity);
   const remapByIdentity = await readAflApiReverseIdentities(sides.candidate, identities);
 
-  const grades = classifyAflApiG2(aflApiG2Entries({ candidate, net, manualIdentities, remapByIdentity }));
+  const grades = classifyAflApiG2(aflApiG2Entries({ candidate, net, manualIdentities, remapByIdentity }), { cpcCorrected });
   const g2Failed = grades.some((g) => AFL_API_G2_REFUSING_OUTCOMES.has(g.outcome));
   return {
     grades, ePromotion: aflApiG2AgreeSet(grades), failed: g2Failed, candidate, ledgerRows,
@@ -2028,6 +2163,8 @@ export type AflApiOverlapResult = {
 export async function gateAflApiOverlap(
   sides: AflApiPromotionSides, names: { candidateDatabase: string; targetDatabase: string },
   environment: Environment, devRegenerationPath: string | undefined, report: Report,
+  /** AFLDB-ISSUE-238 §9.1: CPC's PASS set (class 1-3) for the target's net-corrected providers; empty when none. */
+  cpcCorrected: ReadonlySet<string> = new Set<string>(),
 ): Promise<AflApiOverlapResult> {
   const candidate = await readAflApiImporterView(sides.candidate);
   const candidateLedgerRowCount = await readAflApiLedgerRowCount(sides.candidate);
@@ -2038,7 +2175,7 @@ export async function gateAflApiOverlap(
 
   const g2 = await evaluateAflApiG2({
     candidate: sides.candidate, humanLedger: sides.target, manualTokenSides: [sides.target, sides.candidate],
-  }, candidate);
+  }, candidate, cpcCorrected);
   report.add('afl_api importer identity — G2 human-vs-importer overlap', g2.failed ? 'FAIL' : 'PASS', [
     `human ledger: TARGET ${names.targetDatabase}, ${g2.ledgerState.rowCount} row(s), sha256 ${g2.ledgerState.sha256}`,
     `importer rows and identity remap: CANDIDATE ${names.candidateDatabase}, ${candidate.state.rowCount} row(s), sha256 ${candidate.state.sha256}`,
@@ -2094,12 +2231,49 @@ export async function gateAflApiOverlap(
  */
 export function aflApiSupersedeFileFor(
   overlap: AflApiOverlapResult, names: { environment: Environment; candidateDatabase: string; targetDatabase: string },
+  /**
+   * AFLDB-ISSUE-238 v3 inputs. Both default to the ZERO-corrected shape (no `C_promotion`; an
+   * empty corrected-subset digest), so an existing caller is unchanged. A later slice passes the
+   * target ledger's `aflApiCorrectedLedgerStateSha256` and the CPC-derived `correctedReplays`.
+   */
+  v3: {
+    targetCorrectedLedger?: { rowCount: number; sha256: string };
+    correctedReplays?: readonly AflApiCorrectedReplayEntry[];
+  } = {},
 ): AflApiSupersedeFile {
+  const correctedReplays = v3.correctedReplays ?? [];
+  const targetCorrectedLedger = v3.targetCorrectedLedger ?? aflApiCorrectedLedgerStateSha256([]);
+  // Predictions are over the candidate's PRE-replay state. A candidate holding a human row
+  // cannot be digested here (its identity is not in the view); the source-lineage gate already
+  // refuses it, so no file is ever written for such a candidate.
+  if (overlap.candidate.humanRowCount > 0) {
+    throw new Error('aflApiSupersedeFileFor: the candidate holds resolved afl_api rows; the post-replay identity state cannot be predicted.');
+  }
+  const preReplayRows = overlap.candidate.importerRows.map((r) => ({
+    externalId: r.externalId, status: r.status, matchMethod: r.matchMethod,
+    playerIdentity: overlap.candidate.identityByExternalId.get(r.externalId) ?? null,
+  }));
+  // Identity-state consistency (AFLDB-ISSUE-238 §9.1/§7.5): the predicted identity digest is compared
+  // later against REPLAY's `readAflApiPostReplayState` and D15's `readAflApiSupersedeBindingState`,
+  // both over EVERY `afl_api` census row through `aflApiIdentityStateRowsFromCensus`. So the
+  // pre-replay identity rows are built by that same function over the candidate's whole census,
+  // never from the importer subset. The candidate holds no `resolved` row here (the source-lineage
+  // gate of `gateAflApiOverlap` FAILS on one, and the guard above throws), so on an anomaly-free
+  // candidate (`--phase source`'s G1 and `--phase candidate`'s G1 refuse any anomaly) the census IS
+  // the importer rows and the rows equal the previous importer-derived construction exactly.
+  const preReplayIdentityRows = aflApiIdentityStateRowsFromCensus(overlap.candidate.census, overlap.candidate.identityByPlayerId);
+  const postImporter = predictAflApiPostReplayImporterState(preReplayRows, correctedReplays);
+  const postIdentity = predictAflApiPostReplayIdentityState(preReplayIdentityRows, correctedReplays);
   return buildAflApiSupersedeFile({
     environment: names.environment, candidateDatabase: names.candidateDatabase, targetDatabase: names.targetDatabase,
     candidateImporterRowCount: overlap.candidate.state.rowCount, candidateImporterSha256: overlap.candidate.state.sha256,
     targetLedgerRowCount: overlap.ledgerState.rowCount, targetLedgerSha256: overlap.ledgerState.sha256,
     expectedSupersedes: overlap.ePromotion,
+    targetCorrectedLedgerRowCount: targetCorrectedLedger.rowCount,
+    targetCorrectedLedgerSha256: targetCorrectedLedger.sha256,
+    correctedReplays,
+    predictedPostReplayImporterRowCount: postImporter.rowCount, predictedPostReplayImporterSha256: postImporter.sha256,
+    predictedPostReplayIdentitySha256: postIdentity.sha256,
   });
 }
 
@@ -2150,31 +2324,68 @@ export function aflApiDevRegenerationProposal(input: {
  *
  * - the importer census holds no anomaly, every importer row resolves to exactly one identity,
  *   one row per player, and no rebuild marker is present;
- * - zero `resolved` rows (D15 has not run yet);
+ * - zero `resolved` rows (D15 has not run yet) -- or, AFTER the AFLDB-ISSUE-238 §7.4e REPLAY, exactly
+ *   the `resolved` rows of `C_promotion` (the artefact's `correctedReplays`), no more, no fewer;
  * - the reinstated ledger's row count and stable-field digest equal the bound file's
  *   `targetLedger*` (nothing dropped, added or altered by the reinstatement);
- * - the candidate importer state still equals the bound `candidateImporter*`, and the file names
- *   this candidate, this environment and this environment's live target;
+ * - the candidate importer state equals the bound file's PREDICTED post-replay importer state
+ *   (`predictedPostReplayImporter*`, which equals `candidateImporter*` when `C_promotion` is empty),
+ *   and the file names this candidate, this environment and this environment's live target;
  * - G2 re-evaluated on the candidate over the reinstated ledger refuses nothing and reproduces
- *   exactly the bound `E_promotion`.
+ *   exactly the bound `E_promotion` (a net-corrected entry of `C_promotion` grades `CORRECTED_CPC_REPLAY`);
+ * - CRV (§7.5), only when `C_promotion` (or a net-corrected ledger entry) exists: the net-corrected,
+ *   `resolved` and `C_promotion` provider sets are one set, and the whole identity-state digest
+ *   equals `predictedPostReplayIdentitySha256`. The per-provider checks (identity row, replay batch,
+ *   Q2) are `gateAflApiCorrectedReplayVerification`, on a read-only transaction.
  */
 export async function gateAflApiCandidateAfterReinstate(
   q: Query, bound: AflApiSupersedeFile,
   names: { environment: Environment; candidateDatabase: string; targetDatabase: string }, report: Report,
 ): Promise<void> {
-  const g2 = await evaluateAflApiG2({ candidate: q, humanLedger: q, manualTokenSides: [q] });
+  const cPromotion = new Set(bound.correctedReplays.map((r) => r.externalId));
+  const g2 = await evaluateAflApiG2({ candidate: q, humanLedger: q, manualTokenSides: [q] }, undefined, cPromotion);
   const rebuildMarkerPresent = await readRebuildMarkerPresent(q);
+  // The importer state is judged against the PREDICTED post-replay state. With C_promotion empty the
+  // prediction equals the pre-replay state (`aflApiSupersedeFileFor`), so this is the old comparison.
+  const postReplayBinding: AflApiSupersedeFile = {
+    ...bound,
+    candidateImporterRowCount: bound.predictedPostReplayImporterRowCount,
+    candidateImporterSha256: bound.predictedPostReplayImporterSha256,
+  };
   const problems: unknown[] = [
     ...classifyAflApiG1({
       rows: g2.candidate.census, ledgerRowCount: g2.ledgerState.rowCount,
       identityByPlayerId: g2.candidate.identityByPlayerId, rebuildMarkerPresent,
       boundLedger: { boundRowCount: bound.targetLedgerRowCount, boundSha256: bound.targetLedgerSha256, actualSha256: g2.ledgerState.sha256 },
+      expectedResolvedExternalIds: cPromotion,
     }),
-    ...aflApiSupersedeBindingProblems(bound, {
+    ...aflApiSupersedeBindingProblems(postReplayBinding, {
       environment: names.environment, targetDatabase: names.targetDatabase, candidateDatabase: names.candidateDatabase,
       importer: g2.candidate.state, ledger: g2.ledgerState,
     }).filter((p) => p.kind !== 'ledger_state_mismatch'), // reported once, as G1's ledger_not_bound_target_state
   ];
+  const netCorrected = new Set(netCorrectedEntries(g2.ledgerRows).map((e) => e.externalId));
+  if (cPromotion.size > 0 || netCorrected.size > 0) {
+    // CRV exact-set equality: net-corrected == resolved == C_promotion. Zero-corrected runs skip it
+    // (their `resolved` rows are already G1's `resolved_row_present`), so their output is unchanged.
+    problems.push(...crvExactSetProblems({
+      netCorrected, resolved: new Set(censusAflApiRows(g2.candidate.census).humanRows.map((r) => r.externalId)),
+      cPromotion,
+    }));
+  }
+  if (cPromotion.size > 0) {
+    // The whole identity state (importer AND resolved rows), in the row rule REPLAY and D15 share. One
+    // more read on this same connection: the resolved rows' players are not in the importer view.
+    const playerIds = [...new Set(g2.candidate.census.filter((r) => r.playerId !== null).map((r) => r.playerId as number))];
+    const identities = await readAflApiForwardIdentities(q, playerIds);
+    const actual = aflApiIdentityStateSha256(aflApiIdentityStateRowsFromCensus(g2.candidate.census, identities));
+    if (actual !== bound.predictedPostReplayIdentitySha256) {
+      problems.push({
+        kind: 'post_replay_identity_state_mismatch',
+        boundSha256: bound.predictedPostReplayIdentitySha256, actualSha256: actual,
+      });
+    }
+  }
   if (g2.failed) problems.push({ kind: 'g2_refuses_after_reinstatement' });
   const expected = new Set(bound.expectedSupersedes);
   const mismatch = aflApiSupersedeMismatch({ expected, actual: [...g2.ePromotion].map((externalId) => ({ externalId })) });
@@ -2184,12 +2395,302 @@ export async function gateAflApiCandidateAfterReinstate(
   const lines = [
     importerMethodLine(g2.candidate),
     `reinstated human ledger: ${g2.ledgerState.rowCount} row(s), sha256 ${g2.ledgerState.sha256} (bound: ${bound.targetLedgerRowCount}, ${bound.targetLedgerSha256})`,
+    ...(cPromotion.size > 0
+      ? [`C_promotion (replayed, must be the resolved set) = {${[...cPromotion].sort().join(', ')}}; predicted post-replay importer sha256 ${bound.predictedPostReplayImporterSha256}`]
+      : []),
     ...g2Lines(g2),
   ];
   const gate = 'afl_api importer identity — candidate census after target-ledger reinstatement (G1)';
   if (problems.length === 0) { report.add(gate, 'PASS', lines); return; }
   for (const p of problems) lines.push(JSON.stringify(p));
   report.add(gate, 'FAIL', lines);
+}
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-238 — CPC (`--phase restored`, §9.1) and CRV (`--phase candidate`, §7.5)
+// ---------------------------------------------------------------------------
+
+/** Provider id -> stable identity of every NET linked/corrected provider: CPC's S6-D4 class-5 input. */
+export function targetHumanProvidersOf(ledgerRows: readonly AflApiAdjudicationLedgerRow[]): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const [externalId, row] of netLedgerRowsByExternalId(ledgerRows)) {
+    if (aflApiNetIsHumanLive(row.action)) out.set(externalId, row.playerIdentity);
+  }
+  return out;
+}
+
+/**
+ * The full correction authority of every NET-corrected provider (what CPC classifies), code-unit
+ * sorted by provider id. `netLedgerRowsByExternalId` validates the ledger first, so on a
+ * `corrected` row `evidenceSha256` and `previousPlayerIdentity` are well-formed strings.
+ */
+export function netCorrectedCorrectionEntries(ledgerRows: readonly AflApiAdjudicationLedgerRow[]): CorrectedProviderEntry[] {
+  return [...netLedgerRowsByExternalId(ledgerRows).values()]
+    .filter((r) => r.action === 'corrected')
+    .map((r) => ({
+      externalId: r.externalId, adjudicationId: r.id, evidenceSha256: r.evidenceSha256 as string,
+      previousPlayerIdentity: r.previousPlayerIdentity as string, playerIdentity: r.playerIdentity,
+    }))
+    .sort((a, b) => (a.externalId < b.externalId ? -1 : a.externalId > b.externalId ? 1 : 0));
+}
+
+/**
+ * CPC (§9.1) for every net-corrected provider, PREDICT authority and NO row locks, on the `tx` the
+ * caller opened `read only` on the CANDIDATE. Writes nothing; nothing is replayed here.
+ */
+export async function predictCorrectedProviders(
+  tx: TransactionSql, entries: readonly CorrectedProviderEntry[], targetHumanProviders: ReadonlyMap<string, string>,
+): Promise<CpcResult[]> {
+  const results: CpcResult[] = [];
+  const sorted = [...entries].sort((a, b) => (a.externalId < b.externalId ? -1 : a.externalId > b.externalId ? 1 : 0));
+  for (const entry of sorted) {
+    const classified = await classifyCorrectedProviderInDatabase(tx, {
+      entry, authorityMode: 'PREDICT', lockRows: false, targetHumanProviders,
+    });
+    results.push(classified.result);
+  }
+  return results;
+}
+
+/**
+ * `--phase restored`: open ONE postgres.js `read only` transaction on the candidate and run CPC in
+ * it. A classifier that throws (an internal contradiction) is reported as a named refusal from HERE,
+ * outside the transaction callback, so nothing is ever caught inside the transaction.
+ */
+export async function runAflApiCorrectedPredict(
+  dsn: string, name: string, entries: readonly CorrectedProviderEntry[], targetHumanProviders: ReadonlyMap<string, string>,
+): Promise<CpcResult[]> {
+  try {
+    return await withReadOnlyTransaction(dsn, name, (tx) => predictCorrectedProviders(tx, entries, targetHumanProviders));
+  } catch (error) {
+    if (error instanceof PromotionRefused) throw error;
+    throw new PromotionRefused(
+      `CPC (AFLDB-ISSUE-238 §9.1) could not classify the target's net-corrected providers on the candidate: `
+      + `${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/** The providers CPC classified into candidate class 1-3: G2's `cpcCorrected` set. */
+export function cpcPassSet(results: readonly CpcResult[]): ReadonlySet<string> {
+  return new Set(results.filter((r) => r.outcome === 'PASS').map((r) => r.externalId));
+}
+
+/**
+ * `C_promotion`'s `correctedReplays` (pure): one entry per net-corrected provider, from its ledger
+ * authority and its CPC PASS result. Refuses (problems, no entries) on a missing/foreign/duplicate
+ * result, any CPC FAIL, or `C_promotion ∩ E_promotion ≠ ∅` (`deriveCorrectedPromotionSet`).
+ */
+export function assembleCorrectedPromotion(
+  entries: readonly CorrectedProviderEntry[], results: readonly CpcResult[], ePromotion: ReadonlySet<string>,
+): { ok: true; replays: AflApiCorrectedReplayEntry[] } | { ok: false; problems: string[] } {
+  const problems: string[] = [];
+  const byId = new Map(results.map((r) => [r.externalId, r]));
+  const entryIds = new Set(entries.map((e) => e.externalId));
+  for (const entry of entries) {
+    const result = byId.get(entry.externalId);
+    if (result === undefined) problems.push(`${entry.externalId}: no CPC result for a net-corrected provider`);
+    else if (result.adjudicationId !== entry.adjudicationId) {
+      problems.push(`${entry.externalId}: CPC result names ledger row ${result.adjudicationId}, the net-corrected row is ${entry.adjudicationId}`);
+    }
+  }
+  for (const result of results) {
+    if (!entryIds.has(result.externalId)) problems.push(`${result.externalId}: CPC result for a provider that is not net-corrected`);
+  }
+  const derived = deriveCorrectedPromotionSet(results, ePromotion);
+  if (!derived.ok) problems.push(...derived.problems);
+  if (problems.length > 0) return { ok: false, problems };
+  const replays: AflApiCorrectedReplayEntry[] = [];
+  for (const entry of entries) {
+    const result = byId.get(entry.externalId)!;
+    if (result.outcome !== 'PASS') return { ok: false, problems: [`${entry.externalId}: CPC result is not a PASS`] };
+    replays.push({
+      externalId: entry.externalId, adjudicationId: entry.adjudicationId, adjudicationEvidenceSha256: entry.evidenceSha256,
+      previousPlayerIdentity: entry.previousPlayerIdentity, playerIdentity: entry.playerIdentity,
+      candidateClass: result.candidateClass, predictedIdentityAction: result.predictedIdentityAction,
+      plannerVersion: result.plannerVersion, predictedClosureFingerprint: result.predictedClosureFingerprint,
+      predictedMutations: {
+        moved: { ...result.predictedMutations.moved }, deleted: { ...result.predictedMutations.deleted },
+      },
+    });
+  }
+  return { ok: true, replays: replays.sort((a, b) => (a.externalId < b.externalId ? -1 : a.externalId > b.externalId ? 1 : 0)) };
+}
+
+/** What `--phase restored` hands the v3 artefact when the target carries corrected providers. */
+export type AflApiCorrectedInputs = {
+  targetCorrectedLedger: { rowCount: number; sha256: string };
+  correctedReplays: readonly AflApiCorrectedReplayEntry[];
+};
+
+/**
+ * The `--phase restored` CPC gate (§9.1): run AFTER G2 (it needs `E_promotion` for the disjointness
+ * rule). Any CPC FAIL or an overlap is a FAIL naming every problem, so no artefact is written. The
+ * ledger CPC classified from is the ledger G2 graded (`graded`), or the gate FAILS.
+ */
+export function gateAflApiCorrectedPredict(
+  input: {
+    entries: readonly CorrectedProviderEntry[]; results: readonly CpcResult[]; ePromotion: ReadonlySet<string>;
+    targetLedgerRows: readonly AflApiAdjudicationLedgerRow[]; graded: { rowCount: number; sha256: string };
+  },
+  report: Report,
+): AflApiCorrectedInputs | undefined {
+  const gate = 'afl_api corrected identities — CPC pre-classification (§9.1)';
+  const assembled = assembleCorrectedPromotion(input.entries, input.results, input.ePromotion);
+  const lines: string[] = [];
+  for (const r of input.results) {
+    if (r.outcome !== 'PASS') continue;
+    const m = r.predictedMutations;
+    lines.push(`${r.externalId}: PASS class ${r.candidateClass} (${r.predictedIdentityAction}); plannerVersion ${r.plannerVersion}; `
+      + `closure ${r.predictedClosureFingerprint}; moved ${m.moved.player_match_stats}/${m.moved.brownlow_round_votes} `
+      + `(player_match_stats/brownlow_round_votes), deleted ${m.deleted.player_match_stats}/${m.deleted.brownlow_round_votes}`);
+  }
+  const problems: string[] = assembled.ok ? [] : [...assembled.problems];
+  if (input.targetLedgerRows.length !== input.graded.rowCount
+    || aflApiLedgerStateSha256(input.targetLedgerRows) !== input.graded.sha256) {
+    problems.push('the target ledger read for CPC differs from the ledger G2 graded: a write reached the target between the two reads');
+  }
+  if (problems.length > 0 || !assembled.ok) {
+    report.add(gate, 'FAIL', [...lines, ...problems.map((p) => `STOP ${p}`)]);
+    return undefined;
+  }
+  report.add(gate, 'PASS', [
+    `C_promotion = {${assembled.replays.map((r) => r.externalId).join(', ')}} (${assembled.replays.length} provider(s); disjoint from E_promotion)`,
+    ...lines,
+  ]);
+  return { targetCorrectedLedger: aflApiCorrectedLedgerStateSha256(input.targetLedgerRows), correctedReplays: assembled.replays };
+}
+
+/**
+ * CRV exact-set equality (§7.5), pure: the providers with a net `CORRECTED` entry in the reinstated
+ * ledger, the providers holding `resolved` rows, and `C_promotion` are ONE set. One problem per
+ * unequal pair, naming what is missing from and what is extra to `C_promotion`.
+ */
+export function crvExactSetProblems(input: {
+  netCorrected: ReadonlySet<string>; resolved: ReadonlySet<string>; cPromotion: ReadonlySet<string>;
+}): { kind: 'crv_exact_set_mismatch'; sets: string; missing: string[]; extra: string[] }[] {
+  const out: { kind: 'crv_exact_set_mismatch'; sets: string; missing: string[]; extra: string[] }[] = [];
+  const compare = (sets: string, actual: ReadonlySet<string>) => {
+    const missing = [...input.cPromotion].filter((id) => !actual.has(id)).sort();
+    const extra = [...actual].filter((id) => !input.cPromotion.has(id)).sort();
+    if (missing.length > 0 || extra.length > 0) out.push({ kind: 'crv_exact_set_mismatch', sets, missing, extra });
+  };
+  compare('net_corrected_ledger_vs_c_promotion', input.netCorrected);
+  compare('resolved_rows_vs_c_promotion', input.resolved);
+  return out;
+}
+
+/** CRV per-provider identity check (§7.5), pure: `resolved` at P′c under `afl_api_admin_adjudication`. */
+export function crvIdentityProblems(
+  entry: Pick<AflApiCorrectedReplayEntry, 'externalId' | 'playerIdentity'>,
+  row: { status: string; playerId: number | null; matchMethod: string | null } | null,
+  expectedPlayerId: number | null,
+): string[] {
+  if (row === null) return [`${entry.externalId}: no afl_api identity row exists after the replay`];
+  const problems: string[] = [];
+  if (row.status !== 'resolved') problems.push(`${entry.externalId}: identity status is ${row.status}, expected resolved`);
+  if (row.matchMethod !== AFL_API_ADMIN_MATCH_METHOD) {
+    problems.push(`${entry.externalId}: identity match_method is ${String(row.matchMethod)}, expected ${AFL_API_ADMIN_MATCH_METHOD}`);
+  }
+  if (expectedPlayerId === null) {
+    problems.push(`${entry.externalId}: the corrected identity does not resolve to exactly one candidate player`);
+  } else if (row.playerId !== expectedPlayerId) {
+    problems.push(`${entry.externalId}: identity is at player ${String(row.playerId)}, expected the corrected player ${expectedPlayerId}`);
+  }
+  return problems;
+}
+
+const isPlainRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+
+function countsEqual(actual: unknown, expected: { player_match_stats: number; brownlow_round_votes: number }): boolean {
+  return isPlainRecord(actual) && actual.player_match_stats === expected.player_match_stats
+    && actual.brownlow_round_votes === expected.brownlow_round_votes;
+}
+
+/**
+ * CRV bound-replay-batch check (§7.5), pure. At most one `correct_afl_api_identity` batch names the
+ * adjudication. Predicted moved+deleted > 0: exactly one, `completed`, `mode` replay, `context`
+ * promotion, the entry's `plannerVersion`, and its `closureFingerprint` = `predictedClosureFingerprint`
+ * = the entry's predicted fingerprint, with `counts` equal to the predicted mutations. Predicted zero:
+ * no batch at all.
+ */
+export function crvBatchProblems(
+  entry: Pick<AflApiCorrectedReplayEntry,
+    'externalId' | 'adjudicationId' | 'plannerVersion' | 'predictedClosureFingerprint' | 'predictedMutations'>,
+  batches: readonly Pick<Q2BatchRow, 'id' | 'status' | 'validationResult'>[],
+): string[] {
+  const problems: string[] = [];
+  const m = entry.predictedMutations;
+  const predicted = m.moved.player_match_stats + m.moved.brownlow_round_votes
+    + m.deleted.player_match_stats + m.deleted.brownlow_round_votes;
+  const who = `${entry.externalId} (adjudication ${entry.adjudicationId})`;
+  if (batches.length > 1) {
+    problems.push(`${who}: ${batches.length} bound correct_afl_api_identity batches (${batches.map((b) => b.id).join(', ')}); at most one is allowed`);
+    return problems;
+  }
+  if (predicted === 0) {
+    if (batches.length > 0) problems.push(`${who}: predicted zero moved/deleted rows, but bound batch ${batches[0].id} exists`);
+    return problems;
+  }
+  if (batches.length === 0) {
+    problems.push(`${who}: predicted ${predicted} moved/deleted row(s), but no bound replay batch exists`);
+    return problems;
+  }
+  const batch = batches[0];
+  if (batch.status !== 'completed') problems.push(`${who}: bound batch ${batch.id} status is ${batch.status}, expected completed`);
+  const v = isPlainRecord(batch.validationResult) ? batch.validationResult : null;
+  if (v === null) {
+    problems.push(`${who}: bound batch ${batch.id} has no validation_result`);
+    return problems;
+  }
+  const expectField = (field: string, actual: unknown, expected: unknown) => {
+    if (actual !== expected) problems.push(`${who}: bound batch ${batch.id} ${field} is ${JSON.stringify(actual)}, expected ${JSON.stringify(expected)}`);
+  };
+  expectField('mode', v.mode, 'replay');
+  expectField('context', v.context, 'promotion');
+  expectField('externalId', v.externalId, entry.externalId);
+  expectField('adjudicationId', v.adjudicationId, entry.adjudicationId);
+  expectField('plannerVersion', v.plannerVersion, entry.plannerVersion);
+  expectField('closureFingerprint', v.closureFingerprint, entry.predictedClosureFingerprint);
+  expectField('predictedClosureFingerprint', v.predictedClosureFingerprint, entry.predictedClosureFingerprint);
+  const counts = isPlainRecord(v.counts) ? v.counts : null;
+  if (counts === null || !countsEqual(counts.moved, m.moved) || !countsEqual(counts.deleted, m.deleted)) {
+    problems.push(`${who}: bound batch ${batch.id} counts differ from the predicted mutations (moved ${JSON.stringify(m.moved)}, deleted ${JSON.stringify(m.deleted)})`);
+  }
+  return problems;
+}
+
+/**
+ * CRV per-provider verification (§7.5) over `C_promotion`, through the correction CLI's own
+ * read-only reader (the caller opened a `read only` transaction on the candidate): the identity row,
+ * the bound replay batch, and Q2 CORRECTION SATISFACTION (`currentBatchId: null`). One gate, FAIL on
+ * any provider problem. The ledger digest, the resolved/importer/identity states and the exact-set
+ * equality are `gateAflApiCandidateAfterReinstate`'s.
+ */
+export async function gateAflApiCorrectedReplayVerification(
+  reader: CorrectionSatisfactionReader, replays: readonly AflApiCorrectedReplayEntry[], report: Report,
+): Promise<void> {
+  const lines: string[] = [];
+  let failed = false;
+  const sorted = [...replays].sort((a, b) => (a.externalId < b.externalId ? -1 : a.externalId > b.externalId ? 1 : 0));
+  for (const entry of sorted) {
+    const problems: string[] = [];
+    const row = await reader.identityRow(entry.externalId);
+    const expectedPlayerId = await reader.resolvePlayerIdentity(entry.playerIdentity);
+    problems.push(...crvIdentityProblems(entry, row, expectedPlayerId));
+    problems.push(...crvBatchProblems(entry, await reader.batchesClaimingAdjudication(entry.adjudicationId)));
+    const q2 = await checkCorrectionSatisfaction(reader, {
+      providerId: entry.externalId, adjudicationId: entry.adjudicationId, currentBatchId: null,
+    });
+    if (!q2.satisfied) {
+      for (const stop of q2.stops) problems.push(`${entry.externalId}: Q2 STOP [${stop.step}] ${stop.code}${stop.detail ? `: ${stop.detail}` : ''}`);
+      if (q2.stops.length === 0) problems.push(`${entry.externalId}: correction not satisfied (no stop detail)`);
+    }
+    if (problems.length === 0) lines.push(`${entry.externalId} (adjudication ${entry.adjudicationId}): identity resolved, replay batch as predicted, correction satisfied`);
+    else { failed = true; lines.push(...problems.map((p) => `STOP ${p}`)); }
+  }
+  report.add('afl_api corrected identities — replay verification (CRV, §7.5)', failed ? 'FAIL' : 'PASS', [
+    `${replays.length} C_promotion provider(s) verified on the candidate`, ...lines,
+  ]);
 }
 
 /**
@@ -2987,6 +3488,43 @@ async function openReadOnly(dsn: string, name: string): Promise<{ q: Query; end:
 }
 
 /**
+ * AFLDB-ISSUE-238 §5: run `run` with the correction CLI's own Q2 reader over a postgres.js
+ * `read only` TRANSACTION on `dsn`, on a connection built exactly as `openReadOnly` builds its own
+ * (same options, same session read-only default). Opened only when the target holds a net-corrected
+ * provider; the callback must not catch inside the transaction.
+ */
+export async function withCorrectionSatisfactionReader<T>(
+  dsn: string, name: string, run: (reader: CorrectionSatisfactionReader) => Promise<T>,
+): Promise<T> {
+  const postgres = (await import('postgres')).default;
+  const sql = postgres(dsn, { max: 1, onnotice: () => {}, connection: { application_name: `afldb-promotion-check:${name}` } });
+  try {
+    await sql.unsafe(READ_ONLY_SQL);
+    return (await sql.begin('read only', (tx) => run(dbCorrectionSatisfactionReader(tx)))) as unknown as T;
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+}
+
+/**
+ * AFLDB-ISSUE-238 §9.1 (CPC at `--phase restored`): the same connection and `read only` transaction
+ * as `withCorrectionSatisfactionReader`, handed to `run` as the raw postgres.js transaction. Opened
+ * only when the target holds a net-corrected provider; `run` must not swallow an error inside it.
+ */
+export async function withReadOnlyTransaction<T>(
+  dsn: string, name: string, run: (tx: TransactionSql) => Promise<T>,
+): Promise<T> {
+  const postgres = (await import('postgres')).default;
+  const sql = postgres(dsn, { max: 1, onnotice: () => {}, connection: { application_name: `afldb-promotion-check:${name}` } });
+  try {
+    await sql.unsafe(READ_ONLY_SQL);
+    return (await sql.begin('read only', (tx) => run(tx))) as unknown as T;
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+}
+
+/**
  * `--phase restored`'s two trusted outputs, written after every gate of the run (F-L4-4, F-L4-5):
  *
  * - `--afl-api-supersede-out`: written ONLY when no gate failed. A refused run leaves no file
@@ -2994,7 +3532,11 @@ async function openReadOnly(dsn: string, name: string): Promise<{ q: Query; end:
  * - `--afl-api-dev-regeneration-out` (DEV): written only when the run's failures are exactly
  *   G3 hard losses of `afl_api_stat_vector_season` rows (`aflApiDevRegenerationProposal`).
  */
-export function publishRestoredAflApiFiles(opts: Options, overlap: AflApiOverlapResult, report: Report): void {
+export function publishRestoredAflApiFiles(
+  opts: Options, overlap: AflApiOverlapResult, report: Report,
+  /** AFLDB-ISSUE-238: CPC's `C_promotion` inputs; undefined for a zero-corrected target (the v3 file is then the zero shape). */
+  corrected?: AflApiCorrectedInputs,
+): void {
   const names = { environment: opts.environment, candidateDatabase: opts.database!, targetDatabase: opts.oldDatabase! };
   const failedGates = report.results.filter((r) => r.verdict === 'FAIL').map((r) => r.gate);
   if (opts.aflApiSupersedeOut) {
@@ -3004,12 +3546,15 @@ export function publishRestoredAflApiFiles(opts: Options, overlap: AflApiOverlap
         + 'and only a fully passing --phase restored may hand E_promotion to the post-swap replay.',
       ]);
     } else {
-      const file = aflApiSupersedeFileFor(overlap, names);
+      const file = aflApiSupersedeFileFor(overlap, names, corrected ?? {});
       writeOperatorFileAtomically(opts.aflApiSupersedeOut, `${JSON.stringify(file, null, 2)}
 `);
       report.add('afl_api E_promotion file written', 'INFO', [
         opts.aflApiSupersedeOut,
         `expectedSupersedes: {${file.expectedSupersedes.join(', ') || 'empty'}}`,
+        ...(file.correctedReplays.length > 0
+          ? [`correctedReplays (C_promotion): {${file.correctedReplays.map((r) => r.externalId).join(', ')}}`]
+          : []),
         `bound to candidate ${file.candidateDatabase} (${file.candidateImporterRowCount} importer rows, ${file.candidateImporterSha256}) `
         + `and target ${file.targetDatabase} ledger (${file.targetLedgerRowCount} rows, ${file.targetLedgerSha256})`,
         `payloadSha256: ${file.payloadSha256}`,
@@ -3197,6 +3742,7 @@ async function main(): Promise<number> {
   let old: { q: Query; end: () => Promise<void> } | undefined;
   let frozenSide: { q: Query; end: () => Promise<void> } | undefined;
   let aflApiOverlap: AflApiOverlapResult | undefined;
+  let aflApiCorrected: AflApiCorrectedInputs | undefined; // AFLDB-ISSUE-238 CPC output; undefined when zero-corrected or refused
   let lineageRemap: string | undefined;
   let sourceGate: SourceDependencyGateResult | undefined;
   try {
@@ -3225,6 +3771,25 @@ async function main(): Promise<number> {
         { informational: true });
     }
 
+    // AFLDB-ISSUE-238 S6-D2/S6-D3, before any other ISSUE-238 work of the phase (pre-cutover and
+    // restored evaluate theirs in their own blocks below, where their database is open):
+    // - candidate: the reinstated candidate ledger's net-corrected count, or the supplied E_promotion
+    //   artefact's correctedReplays when larger;
+    // - production: the promoted live database's net-corrected count.
+    if (phase === 'candidate') {
+      assertCorrectedPromotionAllowed({
+        environment: opts.environment, phase, freezeRecordSupplied: Boolean(freezeRecord), role: `candidate ${opts.database}`,
+        correctedCount: Math.max(
+          netCorrectedEntries(await readAflApiLedgerRows(conn.q)).length, boundSupersede!.correctedReplays.length),
+      });
+    }
+    if (phase === 'production') {
+      assertCorrectedPromotionAllowed({
+        environment: opts.environment, phase, freezeRecordSupplied: Boolean(freezeRecord), role: `promoted live ${opts.database}`,
+        correctedCount: netCorrectedEntries(await readAflApiLedgerRows(conn.q)).length,
+      });
+    }
+
     // AFLDB-ISSUE-237: source = SOURCE lineage (no human authority); candidate = after the
     // plan reinstated the TARGET's ledger, which must be exactly the one G2 graded (F-L4-3).
     if (phase === 'source') await gateAflApiG1(conn.q, report);
@@ -3234,6 +3799,12 @@ async function main(): Promise<number> {
       await gateAflApiCandidateAfterReinstate(conn.q, boundSupersede!, {
         environment: opts.environment, candidateDatabase: opts.database!, targetDatabase: names.live,
       }, report);
+      // AFLDB-ISSUE-238 §7.5 CRV, per provider (identity row, bound replay batch, Q2), on its own
+      // `read only` transaction; opened only when C_promotion is non-empty (zero-corrected: none).
+      if (boundSupersede!.correctedReplays.length > 0) {
+        await withCorrectionSatisfactionReader(dsn, `corrected-replay-verification:${opts.database}`,
+          (reader) => gateAflApiCorrectedReplayVerification(reader, boundSupersede!.correctedReplays, report));
+      }
       // A4.2/A4.3 again, over the target's data_overrides as the plan actually reinstated them and
       // the candidate identities as step 2c actually converged them (AFLDB-ISSUE-242): nothing is
       // planned here, so a token 2c did not converge is the unchanged A4.2 STOP.
@@ -3243,8 +3814,21 @@ async function main(): Promise<number> {
     }
     let aflApiTargetCensus: Snapshot['aflApiTargetCensus'];
     if (phase === 'pre-cutover') {
+      // AFLDB-ISSUE-238 S6-D3 then S6-D2: the live target's net-corrected set decides, first, whether
+      // this promotion may proceed at all (PROD learns here, before a candidate is restored).
+      const targetCorrected = netCorrectedEntries(await readAflApiLedgerRows(conn.q));
+      assertCorrectedPromotionAllowed({
+        environment: opts.environment, phase, freezeRecordSupplied: Boolean(freezeRecord),
+        role: `target ${opts.database}`, correctedCount: targetCorrected.length,
+      });
       await gateAflApiRebuildMarker([{ role: `target ${opts.database}`, q: conn.q }], report);
       aflApiTargetCensus = await gateAflApiPreCutoverCensus(conn.q, report);
+      // AFLDB-ISSUE-238 §5: CORRECTION SATISFACTION for every net-corrected provider, on its own
+      // read-only transaction; opened only when there is one (zero-corrected: no extra connection).
+      if (targetCorrected.length > 0) {
+        await withCorrectionSatisfactionReader(dsn, `corrected-census:${opts.database}`,
+          (reader) => gateAflApiCorrectedCensus(reader, targetCorrected, report));
+      }
       if (freezeRecord) {
         await gateFrozenTarget(conn.q, `target ${opts.database}`, opts.database!, freezeRecord, true, report);
       }
@@ -3256,6 +3840,12 @@ async function main(): Promise<number> {
       old = await openReadOnly(withDatabase(baseDsn, opts.oldDatabase!), 'old');
       const oldName = String((await old.q('SELECT current_database() AS d'))[0]?.d);
       if (oldName !== opts.oldDatabase) throw new PromotionRefused(`Old database connection landed on '${oldName}', not '${opts.oldDatabase}'.`);
+      // AFLDB-ISSUE-238 S6-D3/S6-D2: the target (old) ledger's net-corrected set, before any other
+      // ISSUE-238 work of this phase (G2/G3, the supersede artefact).
+      assertCorrectedPromotionAllowed({
+        environment: opts.environment, phase, freezeRecordSupplied: Boolean(freezeRecord),
+        role: `target ${opts.oldDatabase}`, correctedCount: netCorrectedEntries(await readAflApiLedgerRows(old.q)).length,
+      });
       if (freezeRecord) {
         await gateFrozenTarget(old.q, `target ${opts.oldDatabase}`, opts.oldDatabase!, freezeRecord, true, report);
       }
@@ -3277,11 +3867,25 @@ async function main(): Promise<number> {
       await gateAflApiRebuildMarker([
         { role: `candidate ${opts.database}`, q: conn.q }, { role: `target ${opts.oldDatabase}`, q: old.q },
       ], report);
+      // AFLDB-ISSUE-238 §9.1 CPC (predict; nothing is replayed or written): every net-corrected
+      // provider of the TARGET is classified against the CANDIDATE on its own `read only` transaction,
+      // opened only when there is one (zero-corrected: no extra connection, and the empty set below).
+      const cpcLedgerRows = await readAflApiLedgerRows(old.q);
+      const cpcEntries = netCorrectedCorrectionEntries(cpcLedgerRows);
+      const cpcResults = cpcEntries.length === 0 ? [] : await runAflApiCorrectedPredict(
+        dsn, `corrected-predict:${opts.database}`, cpcEntries, targetHumanProvidersOf(cpcLedgerRows));
       // F-L4-2: importer rows from the CANDIDATE, the human ledger from the TARGET.
       aflApiOverlap = await gateAflApiOverlap(
         { candidate: conn.q, target: old.q },
         { candidateDatabase: opts.database!, targetDatabase: opts.oldDatabase! },
-        opts.environment, opts.aflApiDevRegeneration, report);
+        opts.environment, opts.aflApiDevRegeneration, report, cpcPassSet(cpcResults));
+      // CPC's verdict needs E_promotion (C_promotion must be disjoint from it), so it follows G2.
+      if (cpcEntries.length > 0) {
+        aflApiCorrected = gateAflApiCorrectedPredict({
+          entries: cpcEntries, results: cpcResults, ePromotion: aflApiOverlap.ePromotion,
+          targetLedgerRows: cpcLedgerRows, graded: aflApiOverlap.ledgerState,
+        }, report);
+      }
     }
     if (opts.compare) gateCompare(opts.compare, counts, opts.environment, report);
 
@@ -3315,7 +3919,7 @@ async function main(): Promise<number> {
     if (frozenSide) await frozenSide.end();
   }
   // F-L4-4: only now, with every gate of this run evaluated, may a trusted file be written.
-  if (aflApiOverlap) publishRestoredAflApiFiles(opts, aflApiOverlap, report);
+  if (aflApiOverlap) publishRestoredAflApiFiles(opts, aflApiOverlap, report, aflApiCorrected);
   if (phase === 'restored') publishRestoredLineageRemap(opts.lineageRemapOut, lineageRemap, report);
   if (sourceInputs && sourceGate) publishSourceDependencyProof(opts, sourceInputs, sourceGate, report);
 

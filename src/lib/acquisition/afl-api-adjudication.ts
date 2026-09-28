@@ -1832,6 +1832,8 @@ export function checkAflApiIdentityInvariant(input: {
 export type AflApiG1Problem =
   | { kind: 'census_anomaly'; detail: string }
   | { kind: 'resolved_row_present'; externalId: string }
+  | { kind: 'resolved_row_unexpected'; externalId: string }
+  | { kind: 'resolved_row_missing'; externalId: string }
   | { kind: 'ledger_row_present'; count: number }
   | { kind: 'unresolved_identity'; externalId: string; reason: string }
   | { kind: 'player_holds_multiple_rows'; playerId: number; externalIds: readonly string[] }
@@ -1864,6 +1866,13 @@ export function classifyAflApiG1(input: {
   identityByPlayerId: ReadonlyMap<number, AflApiForwardIdentityResult>;
   rebuildMarkerPresent: boolean;
   boundLedger?: { boundRowCount: number; boundSha256: string; actualSha256: string };
+  /**
+   * AFLDB-ISSUE-238 §9.1 (`--phase candidate` after CPC): the provider ids of `C_promotion`, the
+   * ONLY `resolved` rows the candidate may legitimately hold. Omitted or empty = the old rule
+   * (any `resolved` row is `resolved_row_present`). Non-empty: the resolved set must equal this
+   * set EXACTLY -- an extra row is `resolved_row_unexpected`, an absent one `resolved_row_missing`.
+   */
+  expectedResolvedExternalIds?: ReadonlySet<string>;
 }): readonly AflApiG1Problem[] {
   const problems: AflApiG1Problem[] = [];
   if (input.rebuildMarkerPresent) problems.push({ kind: 'rebuild_marker_present' });
@@ -1880,7 +1889,18 @@ export function classifyAflApiG1(input: {
 
   const census = censusAflApiRows(input.rows);
   for (const anomaly of census.anomalies) problems.push({ kind: 'census_anomaly', detail: anomaly });
-  for (const row of census.humanRows) problems.push({ kind: 'resolved_row_present', externalId: row.externalId });
+  const expectedResolved = input.expectedResolvedExternalIds ?? new Set<string>();
+  if (expectedResolved.size === 0) {
+    for (const row of census.humanRows) problems.push({ kind: 'resolved_row_present', externalId: row.externalId });
+  } else {
+    const actualResolved = new Set(census.humanRows.map((r) => r.externalId));
+    for (const id of [...actualResolved].sort(compareCodeUnits)) {
+      if (!expectedResolved.has(id)) problems.push({ kind: 'resolved_row_unexpected', externalId: id });
+    }
+    for (const id of [...expectedResolved].sort(compareCodeUnits)) {
+      if (!actualResolved.has(id)) problems.push({ kind: 'resolved_row_missing', externalId: id });
+    }
+  }
 
   const byPlayer = new Map<number, string[]>();
   for (const row of census.importerRows) {
@@ -1944,16 +1964,19 @@ export type AflApiG2Grade =
   | { externalId: string; outcome: 'INFO_REVOKED_CANDIDATE' }
   /**
    * AFLDB-ISSUE-238 §8.6/§9.1: a net-`corrected` target entry is NOT graded by G2 (neither AGREE
-   * nor the revoked INFO); it belongs to CPC. CPC does not exist until §12 slice 6, so until then
-   * this routing outcome REFUSES the phase: a corrected provider can never reach the swap and a
-   * post-swap D15 uncorrected.
+   * nor the revoked INFO); it belongs to CPC. `CORRECTED_CPC_REPLAY`: CPC classified it into
+   * candidate class 1-3 (its provider is in `opts.cpcCorrected`); it is a `correctedReplays`
+   * entry, never a supersede, and does NOT refuse here. `CORRECTED_NOT_CPC_CLASSIFIED`: no CPC
+   * classification for it (the default when `cpcCorrected` is omitted) and it REFUSES -- a
+   * corrected provider can never reach the swap and a post-swap D15 uncorrected.
    */
-  | { externalId: string; outcome: 'CORRECTED_REQUIRES_CPC' };
+  | { externalId: string; outcome: 'CORRECTED_CPC_REPLAY' }
+  | { externalId: string; outcome: 'CORRECTED_NOT_CPC_CLASSIFIED' };
 
-/** Every G2 outcome that refuses the promotion before the swap. Only AGREE and the INFO grade pass. */
+/** Every G2 outcome that refuses the promotion before the swap. Only AGREE, CORRECTED_CPC_REPLAY and the INFO grade pass. */
 export const AFL_API_G2_REFUSING_OUTCOMES: ReadonlySet<AflApiG2Grade['outcome']> = new Set([
   'DISAGREE', 'COLLISION', 'UNSUPPORTED', 'UNEVALUABLE', 'CONTINUITY_CONTRADICTION', 'UNRESOLVED',
-  'CORRECTED_REQUIRES_CPC',
+  'CORRECTED_NOT_CPC_CLASSIFIED',
 ]);
 
 /**
@@ -1963,15 +1986,26 @@ export const AFL_API_G2_REFUSING_OUTCOMES: ReadonlySet<AflApiG2Grade['outcome']>
  * when the candidate still carries an importer row for that provider (a revoke is an undo,
  * never a negative assertion).
  */
-export function classifyAflApiG2(entries: readonly AflApiG2EntryInput[]): readonly AflApiG2Grade[] {
+export function classifyAflApiG2(
+  entries: readonly AflApiG2EntryInput[],
+  opts?: {
+    /** Providers CPC classified into candidate class 1-3 (AFLDB-ISSUE-238 §9.1). Omitted = none: every
+     * net-`corrected` entry refuses (fail-closed). */
+    cpcCorrected?: ReadonlySet<string>;
+  },
+): readonly AflApiG2Grade[] {
   const grades: AflApiG2Grade[] = [];
+  const cpcCorrected = opts?.cpcCorrected ?? new Set<string>();
   for (const entry of entries) {
     switch (entry.ledgerNetAction) {
       case 'revoked':
         if (entry.candidateRow) grades.push({ externalId: entry.externalId, outcome: 'INFO_REVOKED_CANDIDATE' });
         continue;
       case 'corrected':
-        grades.push({ externalId: entry.externalId, outcome: 'CORRECTED_REQUIRES_CPC' });
+        grades.push({
+          externalId: entry.externalId,
+          outcome: cpcCorrected.has(entry.externalId) ? 'CORRECTED_CPC_REPLAY' : 'CORRECTED_NOT_CPC_CLASSIFIED',
+        });
         continue;
       case 'linked': break;
       default: {
@@ -2353,8 +2387,129 @@ function requireCount(obj: Record<string, unknown>, key: string, label: string):
 /* --- E_promotion: the bound supersede file (F-L4-4) ----------------------------------------- */
 
 export const AFL_API_SUPERSEDE_FORMAT = 'afldb.afl_api_supersede_expected';
-/** Version 1 carried the provider list only and bound nothing; it is refused as stale. */
-export const AFL_API_SUPERSEDE_VERSION = 2;
+/**
+ * Version 1 carried the provider list only and bound nothing; version 2 bound the importer and
+ * ledger digests but not the ISSUE-238 corrected-replay prediction. Both are refused as stale.
+ * Version 3 (AFLDB-ISSUE-238 §9.1) is ALWAYS written, even with zero corrected providers.
+ */
+export const AFL_API_SUPERSEDE_VERSION = 3;
+
+// Temporary S6-D3 gates, owned by Slice 11 / the S6-D2 freeze binding: a prod promotion carrying corrected replays is refused until they are lifted.
+export const CORRECTED_PROMOTION_REHEARSAL_REQUIRED = 'CORRECTED_PROMOTION_REHEARSAL_REQUIRED';
+export const CORRECTED_PROMOTION_REQUIRES_FREEZE = 'CORRECTED_PROMOTION_REQUIRES_FREEZE';
+
+/** AFLDB-ISSUE-238 §9.1 candidate classes 1-3 (the CPC table) and the replay each predicts. */
+export type AflApiCorrectedReplayClass = 1 | 2 | 3;
+export type AflApiCorrectedReplayAction = 'update_in_place' | 'upgrade_in_place' | 'insert';
+
+const CORRECTED_REPLAY_ACTION_BY_CLASS: Readonly<Record<AflApiCorrectedReplayClass, AflApiCorrectedReplayAction>> = {
+  1: 'update_in_place', 2: 'upgrade_in_place', 3: 'insert',
+};
+
+export type AflApiPredictedMutationCounts = { player_match_stats: number; brownlow_round_votes: number };
+
+/** One C_promotion provider's predicted correction replay (AFLDB-ISSUE-238 §9.1). */
+export type AflApiCorrectedReplayEntry = {
+  externalId: string;
+  adjudicationId: number;
+  adjudicationEvidenceSha256: string;
+  previousPlayerIdentity: string;
+  playerIdentity: string;
+  candidateClass: AflApiCorrectedReplayClass;
+  predictedIdentityAction: AflApiCorrectedReplayAction;
+  plannerVersion: number;
+  predictedClosureFingerprint: string;
+  predictedMutations: { moved: AflApiPredictedMutationCounts; deleted: AflApiPredictedMutationCounts };
+};
+
+/** One row of the candidate's whole `afl_api` identity state: stable fields only, never a player id. */
+export type AflApiIdentityStateRow = {
+  externalId: string;
+  status: string;
+  matchMethod: string;
+  /** The row's player's forward stable identity, or null when it has none. */
+  playerIdentity: string | null;
+};
+
+/**
+ * AFLDB-ISSUE-238 §9.1 post-replay PREDICTION of the candidate importer state: the pre-replay
+ * rows minus every provider in C_promotion (class 1/2 rows leave the importer set by becoming
+ * `resolved`; a class-3 provider had no importer row). Count and sha256 use
+ * `aflApiImporterStateSha256`, the one importer canonicalisation. A class-1/2 entry with no
+ * pre-replay row, or a class-3 entry WITH one, is a contradiction and refuses.
+ */
+export function predictAflApiPostReplayImporterState(
+  preReplayImporterRows: readonly AflApiImporterStateRow[],
+  cPromotion: readonly Pick<AflApiCorrectedReplayEntry, 'externalId' | 'candidateClass'>[],
+): { rowCount: number; sha256: string } {
+  const byId = new Set(preReplayImporterRows.map((r) => r.externalId));
+  const promoted = new Set<string>();
+  for (const entry of cPromotion) {
+    if (promoted.has(entry.externalId)) {
+      throw new Error(`predictAflApiPostReplayImporterState: provider ${entry.externalId} appears twice in C_promotion.`);
+    }
+    promoted.add(entry.externalId);
+    const hasRow = byId.has(entry.externalId);
+    if (entry.candidateClass === 3 ? hasRow : !hasRow) {
+      throw new Error(`predictAflApiPostReplayImporterState: class ${entry.candidateClass} provider ${entry.externalId} `
+        + `${hasRow ? 'unexpectedly has a' : 'has no'} pre-replay importer row.`);
+    }
+  }
+  const remaining = preReplayImporterRows.filter((r) => !promoted.has(r.externalId));
+  return { rowCount: remaining.length, sha256: aflApiImporterStateSha256(remaining) };
+}
+
+/**
+ * SHA-256 over the candidate's WHOLE `afl_api` identity state: per row `(external_id, status,
+ * match_method, stable identity)` sorted by external_id (code-unit order). No player id, no row
+ * id. A repeated provider id refuses. It covers importer AND resolved rows, so a class-3 insert
+ * changes it while leaving `aflApiImporterStateSha256` of the importer subset untouched.
+ */
+export function aflApiIdentityStateSha256(rows: readonly AflApiIdentityStateRow[]): string {
+  const sorted = [...rows].sort((a, b) => compareCodeUnits(a.externalId, b.externalId));
+  for (let i = 1; i < sorted.length; i += 1) {
+    if (sorted[i].externalId === sorted[i - 1].externalId) {
+      throw new Error(`aflApiIdentityStateSha256: provider id ${sorted[i].externalId} appears twice.`);
+    }
+  }
+  return sha256Hex(canonicalJson(sorted.map((r) => [r.externalId, r.status, r.matchMethod, r.playerIdentity])));
+}
+
+/**
+ * The identity digest AFTER the D15 correction replay. Mirrors the write shape of
+ * `replayAflApiAdjudications` (`tools/migration/replay_afl_api_adjudications.ts:460-482`): an
+ * INSERT (class 3) and an in-place UPDATE (class 1/2) both leave `status = 'resolved'`,
+ * `match_method = afl_api_admin_adjudication`, the player being the entry's `playerIdentity`.
+ */
+export function predictAflApiPostReplayIdentityState(
+  preReplayIdentityRows: readonly AflApiIdentityStateRow[],
+  correctedReplays: readonly Pick<AflApiCorrectedReplayEntry, 'externalId' | 'candidateClass' | 'playerIdentity'>[],
+): { rowCount: number; sha256: string } {
+  const rows = new Map<string, AflApiIdentityStateRow>();
+  for (const r of preReplayIdentityRows) {
+    if (rows.has(r.externalId)) {
+      throw new Error(`predictAflApiPostReplayIdentityState: provider id ${r.externalId} appears twice.`);
+    }
+    rows.set(r.externalId, r);
+  }
+  const seen = new Set<string>();
+  for (const entry of correctedReplays) {
+    if (seen.has(entry.externalId)) {
+      throw new Error(`predictAflApiPostReplayIdentityState: provider ${entry.externalId} appears twice in C_promotion.`);
+    }
+    seen.add(entry.externalId);
+    const hasRow = rows.has(entry.externalId);
+    if (entry.candidateClass === 3 ? hasRow : !hasRow) {
+      throw new Error(`predictAflApiPostReplayIdentityState: class ${entry.candidateClass} provider ${entry.externalId} `
+        + `${hasRow ? 'unexpectedly has a' : 'has no'} pre-replay identity row.`);
+    }
+    rows.set(entry.externalId, {
+      externalId: entry.externalId, status: 'resolved', matchMethod: AFL_API_ADMIN_MATCH_METHOD,
+      playerIdentity: entry.playerIdentity,
+    });
+  }
+  return { rowCount: rows.size, sha256: aflApiIdentityStateSha256([...rows.values()]) };
+}
 
 /**
  * What E_promotion was derived FROM, at `--phase restored`: the candidate's importer state
@@ -2377,6 +2532,18 @@ export type AflApiSupersedeFile = AflApiSupersedeBinding & {
   version: typeof AFL_API_SUPERSEDE_VERSION;
   /** E_promotion = G2.AGREE, sorted in code-unit order, no duplicates. May be empty. */
   expectedSupersedes: readonly string[];
+  /** Corrected-subset digest of the target ledger at §6 (diagnostic; gates compare the whole ledger). */
+  targetCorrectedLedgerRowCount: number;
+  targetCorrectedLedgerSha256: string;
+  /** C_promotion's predicted replays, sorted by externalId, disjoint from `expectedSupersedes`. May be empty. */
+  correctedReplays: readonly AflApiCorrectedReplayEntry[];
+  /** Candidate importer state after replay (pre-replay minus the class-1/2 providers). */
+  predictedPostReplayImporterRowCount: number;
+  predictedPostReplayImporterSha256: string;
+  /** = correctedReplays.length (the candidate held zero `resolved` rows at §6). */
+  predictedPostReplayResolvedRowCount: number;
+  /** `aflApiIdentityStateSha256` of the candidate's whole `afl_api` identity state after replay. */
+  predictedPostReplayIdentitySha256: string;
   /** SHA-256 of the canonical JSON of every other field. */
   payloadSha256: string;
 };
@@ -2384,8 +2551,31 @@ export type AflApiSupersedeFile = AflApiSupersedeBinding & {
 const SUPERSEDE_FILE_KEYS = [
   'issue', 'format', 'version', 'environment', 'candidateDatabase', 'targetDatabase',
   'candidateImporterRowCount', 'candidateImporterSha256', 'targetLedgerRowCount', 'targetLedgerSha256',
-  'expectedSupersedes', 'payloadSha256',
+  'expectedSupersedes', 'targetCorrectedLedgerRowCount', 'targetCorrectedLedgerSha256', 'correctedReplays',
+  'predictedPostReplayImporterRowCount', 'predictedPostReplayImporterSha256',
+  'predictedPostReplayResolvedRowCount', 'predictedPostReplayIdentitySha256', 'payloadSha256',
 ] as const;
+
+const CORRECTED_REPLAY_ENTRY_KEYS = [
+  'externalId', 'adjudicationId', 'adjudicationEvidenceSha256', 'previousPlayerIdentity', 'playerIdentity',
+  'candidateClass', 'predictedIdentityAction', 'plannerVersion', 'predictedClosureFingerprint', 'predictedMutations',
+] as const;
+const PREDICTED_MUTATIONS_KEYS = ['moved', 'deleted'] as const;
+const PREDICTED_MUTATION_COUNT_KEYS = ['player_match_stats', 'brownlow_round_votes'] as const;
+
+function correctedReplayEntryJson(e: AflApiCorrectedReplayEntry): JsonValue {
+  const counts = (c: AflApiPredictedMutationCounts): JsonValue => ({
+    player_match_stats: c.player_match_stats, brownlow_round_votes: c.brownlow_round_votes,
+  });
+  return {
+    externalId: e.externalId, adjudicationId: e.adjudicationId,
+    adjudicationEvidenceSha256: e.adjudicationEvidenceSha256,
+    previousPlayerIdentity: e.previousPlayerIdentity, playerIdentity: e.playerIdentity,
+    candidateClass: e.candidateClass, predictedIdentityAction: e.predictedIdentityAction,
+    plannerVersion: e.plannerVersion, predictedClosureFingerprint: e.predictedClosureFingerprint,
+    predictedMutations: { moved: counts(e.predictedMutations.moved), deleted: counts(e.predictedMutations.deleted) },
+  };
+}
 
 function supersedePayloadSha256(file: Omit<AflApiSupersedeFile, 'payloadSha256'>): string {
   return sha256Hex(canonicalJson({
@@ -2394,7 +2584,108 @@ function supersedePayloadSha256(file: Omit<AflApiSupersedeFile, 'payloadSha256'>
     candidateImporterRowCount: file.candidateImporterRowCount, candidateImporterSha256: file.candidateImporterSha256,
     targetLedgerRowCount: file.targetLedgerRowCount, targetLedgerSha256: file.targetLedgerSha256,
     expectedSupersedes: [...file.expectedSupersedes],
+    targetCorrectedLedgerRowCount: file.targetCorrectedLedgerRowCount,
+    targetCorrectedLedgerSha256: file.targetCorrectedLedgerSha256,
+    correctedReplays: file.correctedReplays.map(correctedReplayEntryJson),
+    predictedPostReplayImporterRowCount: file.predictedPostReplayImporterRowCount,
+    predictedPostReplayImporterSha256: file.predictedPostReplayImporterSha256,
+    predictedPostReplayResolvedRowCount: file.predictedPostReplayResolvedRowCount,
+    predictedPostReplayIdentitySha256: file.predictedPostReplayIdentitySha256,
   }));
+}
+
+function requirePositiveInt(obj: Record<string, unknown>, key: string, label: string): number {
+  const value = obj[key];
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value <= 0) refuseFile(label, `${key} must be a positive integer.`);
+  return value;
+}
+
+function asRecord(value: unknown, label: string, what: string): Record<string, unknown> {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) refuseFile(label, `${what} must be an object.`);
+  return value as Record<string, unknown>;
+}
+
+function requireMutationCounts(value: unknown, label: string, what: string): AflApiPredictedMutationCounts {
+  const obj = asRecord(value, label, what);
+  requireExactKeys(obj, PREDICTED_MUTATION_COUNT_KEYS, `${label} ${what}`);
+  return {
+    player_match_stats: requireCount(obj, 'player_match_stats', `${label} ${what}`),
+    brownlow_round_votes: requireCount(obj, 'brownlow_round_votes', `${label} ${what}`),
+  };
+}
+
+function requireCorrectedReplays(value: unknown, label: string): AflApiCorrectedReplayEntry[] {
+  if (!Array.isArray(value)) refuseFile(label, 'correctedReplays must be an array.');
+  const entries = value.map((raw, i): AflApiCorrectedReplayEntry => {
+    const where = `${label} correctedReplays[${i}]`;
+    const obj = asRecord(raw, label, `correctedReplays[${i}]`);
+    requireExactKeys(obj, CORRECTED_REPLAY_ENTRY_KEYS, where);
+    const externalId = requireString(obj, 'externalId', where);
+    if (!AFL_API_PROVIDER_ID_RE.test(externalId)) refuseFile(where, 'externalId must be an afl_api provider id (CD_I<digits>).');
+    const candidateClass = obj.candidateClass;
+    if (candidateClass !== 1 && candidateClass !== 2 && candidateClass !== 3) refuseFile(where, 'candidateClass must be 1, 2 or 3.');
+    const action = obj.predictedIdentityAction;
+    if (action !== 'update_in_place' && action !== 'upgrade_in_place' && action !== 'insert') {
+      refuseFile(where, 'predictedIdentityAction must be update_in_place, upgrade_in_place or insert.');
+    }
+    if (CORRECTED_REPLAY_ACTION_BY_CLASS[candidateClass] !== action) {
+      refuseFile(where, `candidateClass ${candidateClass} requires predictedIdentityAction ${CORRECTED_REPLAY_ACTION_BY_CLASS[candidateClass]}, not ${action}.`);
+    }
+    const mutations = asRecord(obj.predictedMutations, label, `correctedReplays[${i}].predictedMutations`);
+    requireExactKeys(mutations, PREDICTED_MUTATIONS_KEYS, `${where} predictedMutations`);
+    const moved = requireMutationCounts(mutations.moved, where, 'predictedMutations.moved');
+    const deleted = requireMutationCounts(mutations.deleted, where, 'predictedMutations.deleted');
+    if (candidateClass === 2 && (moved.player_match_stats + moved.brownlow_round_votes
+      + deleted.player_match_stats + deleted.brownlow_round_votes) !== 0) {
+      refuseFile(where, 'a class 2 (identity-only upgrade) entry must predict zero moved and zero deleted rows.');
+    }
+    return {
+      externalId,
+      adjudicationId: requirePositiveInt(obj, 'adjudicationId', where),
+      adjudicationEvidenceSha256: requireSha256(obj, 'adjudicationEvidenceSha256', where),
+      previousPlayerIdentity: requireString(obj, 'previousPlayerIdentity', where),
+      playerIdentity: requireString(obj, 'playerIdentity', where),
+      candidateClass, predictedIdentityAction: action,
+      plannerVersion: requirePositiveInt(obj, 'plannerVersion', where),
+      predictedClosureFingerprint: requireSha256(obj, 'predictedClosureFingerprint', where),
+      predictedMutations: { moved, deleted },
+    };
+  });
+  for (let i = 1; i < entries.length; i += 1) {
+    if (compareCodeUnits(entries[i - 1].externalId, entries[i].externalId) >= 0) {
+      refuseFile(label, 'correctedReplays must be sorted by externalId and free of duplicates.');
+    }
+  }
+  return entries;
+}
+
+/**
+ * Cross-field contract shared by the builder (through the parser round-trip) and the reader:
+ * disjointness from E_promotion, the resolved-row count, and the zero-corrected parity rule.
+ */
+function assertSupersedeConsistency(file: AflApiSupersedeFile, label: string): void {
+  const supersedes = new Set(file.expectedSupersedes);
+  for (const entry of file.correctedReplays) {
+    if (supersedes.has(entry.externalId)) {
+      refuseFile(label, `correctedReplays provider ${entry.externalId} is also in expectedSupersedes; C_promotion must be disjoint from E_promotion.`);
+    }
+  }
+  if (file.predictedPostReplayResolvedRowCount !== file.correctedReplays.length) {
+    refuseFile(label, `predictedPostReplayResolvedRowCount ${file.predictedPostReplayResolvedRowCount} must equal the correctedReplays length ${file.correctedReplays.length}.`);
+  }
+  if (file.targetCorrectedLedgerRowCount < file.correctedReplays.length) {
+    refuseFile(label, `targetCorrectedLedgerRowCount ${file.targetCorrectedLedgerRowCount} is below the ${file.correctedReplays.length} corrected replays it must cover.`);
+  }
+  const leavingImporterSet = file.correctedReplays.filter((e) => e.candidateClass !== 3).length;
+  if (file.predictedPostReplayImporterRowCount !== file.candidateImporterRowCount - leavingImporterSet) {
+    refuseFile(label, `predictedPostReplayImporterRowCount ${file.predictedPostReplayImporterRowCount} must equal candidateImporterRowCount ${file.candidateImporterRowCount} minus the ${leavingImporterSet} class 1/2 replays.`);
+  }
+  if (leavingImporterSet === 0 && file.predictedPostReplayImporterSha256 !== file.candidateImporterSha256) {
+    refuseFile(label, 'with no class 1/2 replay the predicted post-replay importer sha256 must equal the pre-replay candidateImporterSha256.');
+  }
+  // Deliberately NOT forced to the empty-set digest when correctedReplays is empty: a target can hold
+  // corrected rows that a later revoke nets away, so the corrected-subset digest is diagnostic
+  // only (§9.1). The ledger-wide gates compare targetLedger*.
 }
 
 function requireProviderList(value: unknown, label: string, key: string): string[] {
@@ -2409,16 +2700,33 @@ function requireProviderList(value: unknown, label: string, key: string): string
 }
 
 /** The only writer of a supersede file's content: deterministic for a given binding and set. */
-export function buildAflApiSupersedeFile(
-  input: AflApiSupersedeBinding & { expectedSupersedes: Iterable<string> },
-): AflApiSupersedeFile {
+export type AflApiSupersedeBuildInput = AflApiSupersedeBinding & {
+  expectedSupersedes: Iterable<string>;
+  targetCorrectedLedgerRowCount: number;
+  targetCorrectedLedgerSha256: string;
+  /** Sorted by externalId here; duplicates are refused by the parser round-trip. Empty when no corrected provider. */
+  correctedReplays: Iterable<AflApiCorrectedReplayEntry>;
+  predictedPostReplayImporterRowCount: number;
+  predictedPostReplayImporterSha256: string;
+  predictedPostReplayIdentitySha256: string;
+};
+
+export function buildAflApiSupersedeFile(input: AflApiSupersedeBuildInput): AflApiSupersedeFile {
   const expectedSupersedes = [...new Set(input.expectedSupersedes)].sort(compareCodeUnits);
+  const correctedReplays = [...input.correctedReplays].sort((a, b) => compareCodeUnits(a.externalId, b.externalId));
   const draft: Omit<AflApiSupersedeFile, 'payloadSha256'> = {
     issue: 'AFLDB-ISSUE-237', format: AFL_API_SUPERSEDE_FORMAT, version: AFL_API_SUPERSEDE_VERSION,
     environment: input.environment, candidateDatabase: input.candidateDatabase, targetDatabase: input.targetDatabase,
     candidateImporterRowCount: input.candidateImporterRowCount, candidateImporterSha256: input.candidateImporterSha256,
     targetLedgerRowCount: input.targetLedgerRowCount, targetLedgerSha256: input.targetLedgerSha256,
     expectedSupersedes,
+    targetCorrectedLedgerRowCount: input.targetCorrectedLedgerRowCount,
+    targetCorrectedLedgerSha256: input.targetCorrectedLedgerSha256,
+    correctedReplays,
+    predictedPostReplayImporterRowCount: input.predictedPostReplayImporterRowCount,
+    predictedPostReplayImporterSha256: input.predictedPostReplayImporterSha256,
+    predictedPostReplayResolvedRowCount: correctedReplays.length,
+    predictedPostReplayIdentitySha256: input.predictedPostReplayIdentitySha256,
   };
   // Round-trip through the strict parser, so a writer can never emit what a reader refuses.
   const file: AflApiSupersedeFile = { ...draft, payloadSha256: supersedePayloadSha256(draft) };
@@ -2428,13 +2736,15 @@ export function buildAflApiSupersedeFile(
 /** Strict: exact field set, exact format/version, well-formed values, and an untampered payload. */
 export function parseAflApiSupersedeFile(text: string, label = 'afl_api supersede file'): AflApiSupersedeFile {
   const obj = parseJsonObject(text, label);
-  requireExactKeys(obj, SUPERSEDE_FILE_KEYS, label);
   if (obj.issue !== 'AFLDB-ISSUE-237' || obj.format !== AFL_API_SUPERSEDE_FORMAT) {
     refuseFile(label, `not an ${AFL_API_SUPERSEDE_FORMAT} file.`);
   }
+  // Version BEFORE the key set: a v1/v2 file lacks the v3 keys, and must be refused as STALE by name.
   if (obj.version !== AFL_API_SUPERSEDE_VERSION) {
-    refuseFile(label, `version ${String(obj.version)} is not ${AFL_API_SUPERSEDE_VERSION}; an unbound older file is stale.`);
+    refuseFile(label, `stale supersede file: version ${String(obj.version)} is not ${AFL_API_SUPERSEDE_VERSION}; `
+      + 'a v1 or v2 file (no corrected-replay binding) is refused — regenerate it with the current build.');
   }
+  requireExactKeys(obj, SUPERSEDE_FILE_KEYS, label);
   if (obj.environment !== 'prod' && obj.environment !== 'dev') refuseFile(label, 'environment must be prod or dev.');
   const file: AflApiSupersedeFile = {
     issue: 'AFLDB-ISSUE-237', format: AFL_API_SUPERSEDE_FORMAT, version: AFL_API_SUPERSEDE_VERSION,
@@ -2446,11 +2756,20 @@ export function parseAflApiSupersedeFile(text: string, label = 'afl_api supersed
     targetLedgerRowCount: requireCount(obj, 'targetLedgerRowCount', label),
     targetLedgerSha256: requireSha256(obj, 'targetLedgerSha256', label),
     expectedSupersedes: requireProviderList(obj.expectedSupersedes, label, 'expectedSupersedes'),
+    targetCorrectedLedgerRowCount: requireCount(obj, 'targetCorrectedLedgerRowCount', label),
+    targetCorrectedLedgerSha256: requireSha256(obj, 'targetCorrectedLedgerSha256', label),
+    correctedReplays: requireCorrectedReplays(obj.correctedReplays, label),
+    predictedPostReplayImporterRowCount: requireCount(obj, 'predictedPostReplayImporterRowCount', label),
+    predictedPostReplayImporterSha256: requireSha256(obj, 'predictedPostReplayImporterSha256', label),
+    predictedPostReplayResolvedRowCount: requireCount(obj, 'predictedPostReplayResolvedRowCount', label),
+    predictedPostReplayIdentitySha256: requireSha256(obj, 'predictedPostReplayIdentitySha256', label),
     payloadSha256: requireSha256(obj, 'payloadSha256', label),
   };
+  // Payload hash first: a tampered file is reported as tampered, not as a cross-field inconsistency.
   if (supersedePayloadSha256(file) !== file.payloadSha256) {
     refuseFile(label, 'payloadSha256 does not match the file content — refusing a tampered or hand-edited file.');
   }
+  assertSupersedeConsistency(file, label);
   return file;
 }
 

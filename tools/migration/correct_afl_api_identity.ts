@@ -21,9 +21,11 @@
  *   - the §8.4 post-write CORRECTION SATISFACTION re-plan;
  *   - the §8.5 ALREADY_SATISFIED re-run.
  *
- * OUT OF SCOPE for this slice (later slices, per §12): REPLAY (promotion/rebuild), the v3
- * artefact, PSG/CRV/D15-v3, and the `code_test_db` rehearsal. This file never runs the promotion
- * or rebuild lifecycle.
+ * Slice 6 (M3a) adds promotion REPLAY (§8.3, `--replay-promotion`, the REPLAY_SECTION near the end
+ * of this file) over the shared mechanics ORIGINAL uses, and exports the shared candidate
+ * classification (`predictCorrectionClosure`, `resolveCandidateIdentity`,
+ * `classifyCorrectedProviderInDatabase`). Rebuild REPLAY (Stage 21), PSG/CRV and the
+ * `code_test_db` rehearsal are later slices; this file never runs the promotion lifecycle itself.
  *
  * The planner (`src/lib/acquisition/afl-api-identity-correction.ts`) is pure: every decision in
  * this file is made by calling its exported evaluators with evidence read here. This file is the
@@ -70,13 +72,25 @@ import postgres, { type TransactionSql } from 'postgres';
 import {
   AFL_API_ADMIN_MATCH_METHOD,
   AFL_API_PLAYER_REFERENCE_MANIFEST,
+  AflApiPromotionFileRefused,
+  CORRECTED_PROMOTION_REHEARSAL_REQUIRED,
+  aflApiIdentityStateSha256,
+  aflApiImporterStateSha256,
+  aflApiLedgerStateSha256,
   aflApiNetIsHumanLive,
+  censusAflApiRows,
   checkAflApiIdentityInvariant,
+  classifyAflApiCensusRow,
   netLedgerRowsByExternalId,
+  parseAflApiSupersedeFile,
   validateManifestAgainstCatalogue,
   type AflApiAdjudicationLedgerRow,
   type AflApiCensusRow,
+  type AflApiCorrectedReplayEntry,
   type AflApiForwardIdentityResult,
+  type AflApiIdentityStateRow,
+  type AflApiImporterStateRow,
+  type AflApiSupersedeFile,
 } from '../../src/lib/acquisition/afl-api-adjudication';
 import { normaliseSurname } from '../../src/lib/acquisition/afl-api-player-evidence';
 import { canonicalJson, type JsonValue } from '../../src/lib/acquisition/observations';
@@ -90,6 +104,7 @@ import {
   PLANNER_VERSION,
   PLAYER_MATCH_STATS_CONTRACT_FIELDS,
   classifyBrownlowChain,
+  classifyCorrectedCandidate,
   compareReconstruction,
   compareSubstantiveBrownlow,
   compareSubstantivePlayerMatchStats,
@@ -122,6 +137,12 @@ import {
   type BrownlowRowEvidence,
   type CanonicalTable,
   type ClosureRowFingerprintInput,
+  type CpcIdentityResolution,
+  type CpcInput,
+  type CpcMutationCounts,
+  type CpcPrediction,
+  type CpcProviderRow,
+  type CpcResult,
   type DeleteLineageEvidence,
   type FieldDivergence,
   type L8Evidence,
@@ -139,6 +160,7 @@ import {
   readAflApiCensusRows,
   readAflApiForwardIdentities,
   readLedgerRows,
+  resolveAflApiPlayerIdentities,
   resolveAflApiPlayerIdentity,
 } from './replay_afl_api_adjudications';
 
@@ -281,16 +303,21 @@ export function resolveImportDsn(env: Record<string, string | undefined>, expect
   return dsn;
 }
 
-/** §8.2 step 1's opening assertion. */
-async function proveSession(tx: TransactionSql, expectDatabase: string): Promise<void> {
+/** The two roles a correction mode may run as (§8.8): ORIGINAL `afldb_import`, promotion REPLAY `afldb_owner`. */
+export type CorrectionSessionRole = 'afldb_import' | 'afldb_owner';
+
+/** §8.2 step 1's / §8.3 step 1's opening assertion (§8.8), role-aware. */
+export async function proveSession(
+  tx: TransactionSql, expectDatabase: string, expectRole: CorrectionSessionRole,
+): Promise<void> {
   const [row] = await tx<{ database: string; role: string }[]>`
     SELECT current_database() AS database, current_user AS role
   `;
   if (row?.database !== expectDatabase) {
     throw new CorrectionRefused(`REFUSED: connected database is '${String(row?.database)}', not '${expectDatabase}'`);
   }
-  if (row.role !== 'afldb_import') {
-    throw new CorrectionRefused(`REFUSED: session role is '${row.role}', not 'afldb_import'`);
+  if (row.role !== expectRole) {
+    throw new CorrectionRefused(`REFUSED: session role is '${row.role}', not '${expectRole}'`);
   }
 }
 
@@ -1603,6 +1630,16 @@ async function buildClosure(
         sourceRecordId: String(candidate.current.source_record_id ?? ''),
         importBatchId: Number(candidate.current.import_batch_id ?? -1),
       },
+      // S6-D1 (§5.1): the application history and cited version this disposition rests on, and the
+      // C2 counterpart (its id and full contract hash) when the row is deleted beside it.
+      evidence: closureEvidence(candidate.applications, latest, aflApiSourceId, null),
+      collision: dispositionResult.disposition === 'DELETE_AS_FOREIGN_COLLISION' && counterpartRow !== undefined
+        ? {
+          counterpartRowId: Number(counterpartRow.id),
+          counterpartContractSha256: rowContractHash(projectContract(counterpartRow, PLAYER_MATCH_STATS_CONTRACT_FIELDS)),
+          outcome: 'C2' as const,
+        }
+        : null,
     });
     built.push({
       table: 'player_match_stats', rowId: candidate.id, naturalKey: { player_id: pId, match_id: candidate.matchId },
@@ -1674,13 +1711,13 @@ async function buildClosure(
     if (candidate.current.played !== false) positiveBrownlowSeasons.add(candidate.season);
 
     const [counterpartRow] = lockRows
-      ? await tx<{ played: JsonValue; votes: JsonValue; matchId: JsonValue; sourceId: number }[]>`
-          SELECT played, votes, match_id AS "matchId", source_id AS "sourceId" FROM brownlow_round_votes
+      ? await tx<{ id: number; played: JsonValue; votes: JsonValue; matchId: JsonValue; sourceId: number }[]>`
+          SELECT id::int AS id, played, votes, match_id AS "matchId", source_id AS "sourceId" FROM brownlow_round_votes
            WHERE player_id = ${pPrimeId} AND season = ${candidate.season} AND round_number = ${candidate.roundNumber}
              FOR UPDATE
         `
-      : await tx<{ played: JsonValue; votes: JsonValue; matchId: JsonValue; sourceId: number }[]>`
-          SELECT played, votes, match_id AS "matchId", source_id AS "sourceId" FROM brownlow_round_votes
+      : await tx<{ id: number; played: JsonValue; votes: JsonValue; matchId: JsonValue; sourceId: number }[]>`
+          SELECT id::int AS id, played, votes, match_id AS "matchId", source_id AS "sourceId" FROM brownlow_round_votes
            WHERE player_id = ${pPrimeId} AND season = ${candidate.season} AND round_number = ${candidate.roundNumber}
         `;
     const counterpartOwnerKey = counterpartRow ? await ownerKeyOf(tx, counterpartRow.sourceId) : null;
@@ -1711,6 +1748,21 @@ async function buildClosure(
         sourceKey: AFL_API_SOURCE_KEY, sourceRecordId: String(candidate.currentRow.source_record_id ?? ''),
         importBatchId: Number(candidate.currentRow.import_batch_id ?? -1),
       },
+      // S6-D1 (§5.1): B3-I insert-payload evidence (the insert application's stored payload hash),
+      // and the C4 counterpart (id + contract hash) when the row is deleted beside it.
+      evidence: closureEvidence(
+        candidate.applications, latest, aflApiSourceId, await readCitedPayloadSha256(tx, candidate.applications[0]),
+      ),
+      collision: dispositionResult.disposition === 'DELETE_AS_FOREIGN_COLLISION' && counterpartRow !== undefined
+        ? {
+          counterpartRowId: counterpartRow.id,
+          counterpartContractSha256: rowContractHash(projectContract(
+            { played: counterpartRow.played, votes: counterpartRow.votes, match_id: counterpartRow.matchId },
+            BROWNLOW_ROUND_VOTES_CONTRACT_FIELDS,
+          )),
+          outcome: 'C4' as const,
+        }
+        : null,
     });
     built.push({
       table: 'brownlow_round_votes', rowId: candidate.id, naturalKey, disposition: dispositionResult.disposition,
@@ -1775,10 +1827,279 @@ async function ownerKeyOf(tx: TransactionSql, sourceId: number | null): Promise<
   return row?.key ?? null;
 }
 
+/** The stored `payload_hash` (sha256 hex) of the source version an application cites; null if absent. */
+async function readCitedPayloadSha256(tx: TransactionSql, app: CanonicalApplicationRow): Promise<string | null> {
+  const [row] = await tx<{ hash: string }[]>`
+    SELECT v.payload_hash AS hash
+      FROM staging.source_record_versions v
+     WHERE v.source_id = (SELECT id FROM sources WHERE key = ${app.sourceId})
+       AND v.family = ${app.family} AND v.external_record_id = ${app.externalRecordId}
+       AND v.version_seq = ${app.sourceVersionSeq}
+  `;
+  return row?.hash ?? null;
+}
+
+/** §5.1 fingerprint evidence: every application at the row's key, and the version the latest cites. */
+function closureEvidence(
+  applications: readonly CanonicalApplicationRow[], cited: CanonicalApplicationRow,
+  aflApiSourceId: number, insertPayloadSha256: string | null,
+): ClosureRowFingerprintInput['evidence'] {
+  return {
+    applicationIds: applications.map((a) => a.id),
+    citedVersion: {
+      sourceId: aflApiSourceId, family: cited.family, externalRecordId: cited.externalRecordId, seq: cited.sourceVersionSeq,
+    },
+    insertPayloadSha256,
+  };
+}
+
 function projectContract(row: Record<string, JsonValue>, fields: readonly string[]): Record<string, JsonValue> {
   const out: Record<string, JsonValue> = {};
   for (const f of fields) out[f] = row[f] ?? null;
   return out;
+}
+
+/* ==================================================================== *
+ * §5.1 / §9.1: planning and CPC classification in a database.
+ * Shared by REPLAY (§8.3 steps 3-4) and by the promotion checker's PREDICT (§6): one
+ * implementation, so a prediction and its replay cannot disagree.
+ * ==================================================================== */
+
+export type PredictClosureInput = {
+  readonly providerId: string;
+  /** P: the player the closure rows are read at (Pc in a candidate). */
+  readonly pId: number;
+  /** P′: the player they move to (P′c in a candidate). */
+  readonly pPrimeId: number;
+  /** `PREDICT` (read-only) or `ADJUDICATION` (REPLAY). ORIGINAL is planned by `runCorrection` itself. */
+  readonly authority: Extract<AuthorityBlock, { readonly mode: 'ADJUDICATION' | 'PREDICT' }>;
+  readonly identityAction: MutationPlan['identityAction'];
+  /** true takes `FOR UPDATE` row locks (REPLAY); false is read-only planning (PREDICT: no lock of any kind). */
+  readonly lockRows: boolean;
+};
+
+export type PredictedClosure = {
+  readonly plan: MutationPlan;
+  readonly closure: BuiltClosure;
+  readonly fingerprint: string;
+  readonly stops: MutationPlan['stops'];
+  readonly moveOrDeleteRowCount: number;
+  readonly moved: CpcMutationCounts;
+  readonly deleted: CpcMutationCounts;
+};
+
+function cpcMutationCounts(rows: readonly BuiltRow[], disposition: BuiltRow['disposition']): CpcMutationCounts {
+  const count = (table: CanonicalTable) => rows.filter((r) => r.disposition === disposition && r.table === table).length;
+  return { player_match_stats: count('player_match_stats'), brownlow_round_votes: count('brownlow_round_votes') };
+}
+
+/**
+ * Plan the §5.1 closure under PREDICT or ADJUDICATION authority. It never calls `proveSession`
+ * and takes no advisory or table lock; with `lockRows: false` it issues no `FOR UPDATE` either, so
+ * it runs on a read-only transaction. The D10 manifest check is evaluated non-throwing (a failure
+ * is a `provenance_unexplained` STOP in the plan, exactly as `buildClosure` records it).
+ */
+export async function predictCorrectionClosure(tx: TransactionSql, input: PredictClosureInput): Promise<PredictedClosure> {
+  const catalogue = await readReferenceCatalogue(tx);
+  const manifestOk = validateManifestAgainstCatalogue(catalogue, AFL_API_PLAYER_REFERENCE_MANIFEST).length === 0;
+  const closure = await buildClosure(tx, {
+    providerId: input.providerId, pId: input.pId, pPrimeId: input.pPrimeId, authority: input.authority,
+    identityAction: input.identityAction, manifestOk, lockRows: input.lockRows,
+  });
+  return {
+    plan: closure.plan,
+    closure,
+    fingerprint: mutationPlanFingerprint(closure.plan),
+    stops: closure.plan.stops,
+    moveOrDeleteRowCount: closure.rows.length,
+    moved: cpcMutationCounts(closure.rows, 'MOVE'),
+    deleted: cpcMutationCounts(closure.rows, 'DELETE_AS_FOREIGN_COLLISION'),
+  };
+}
+
+/**
+ * §9.1: an identity token (A.previous_player_identity, or A.player_identity remapped) resolved in
+ * THIS database by the existing lineage rule (`resolveAflApiPlayerIdentity`, the
+ * `afltables_profile_url` / `manual_admin_edit` lookup) and confirmed by the same strict forward
+ * lookup ORIGINAL uses. A `manual_admin_edit` token, an unresolvable or an ambiguous identity is
+ * UNEVALUABLE (O-2).
+ */
+export async function resolveCandidateIdentity(tx: TransactionSql, identityToken: string): Promise<CpcIdentityResolution> {
+  const resolved = await resolveAflApiPlayerIdentity(tx, identityToken);
+  if (!resolved.ok) {
+    return { kind: 'unevaluable', reason: resolved.reason === 'ambiguous' ? 'ambiguous' : 'unresolved' };
+  }
+  const forward = (await readAflApiForwardIdentities(tx, [resolved.newPlayerId])).get(resolved.newPlayerId);
+  if (forward === undefined) return { kind: 'unevaluable', reason: 'unresolved' };
+  if (!forward.ok) return { kind: 'unevaluable', reason: forward.reason === 'ambiguous' ? 'ambiguous' : 'unresolved' };
+  if (forward.via === 'manual_admin_edit') return { kind: 'unevaluable', reason: 'manual_admin_token' };
+  return { kind: 'unique', playerId: resolved.newPlayerId };
+}
+
+/** The A this classification is for (its ledger row's stable fields). */
+export type CorrectedProviderEntry = {
+  readonly externalId: string;
+  readonly adjudicationId: number;
+  readonly evidenceSha256: string;
+  readonly previousPlayerIdentity: string;
+  readonly playerIdentity: string;
+};
+
+export type ClassifiedCorrectedProvider = {
+  readonly input: CpcInput;
+  readonly result: CpcResult;
+  /** Null when CPC failed before planning (UNEVALUABLE, COLLISION, DISAGREE). */
+  readonly prediction: CpcPrediction | null;
+  /** The planned closure REPLAY applies; null exactly when `prediction` is null. */
+  readonly predicted: PredictedClosure | null;
+  readonly identityAction: MutationPlan['identityAction'] | null;
+  readonly pcId: number | null;
+  readonly pPrimeId: number | null;
+  /** The CD_I identity row as found, before any write. */
+  readonly identityRow: ExistingIdentityRow | null;
+};
+
+/** Stop codes that mean a candidate row's CD_I lineage cannot be proved (CPC class 3's second FAIL clause). */
+const UNPROVABLE_LINEAGE_STOP_CODES: ReadonlySet<string> = new Set([
+  'no_application_evidence', 'mixed_provider_application_history', 'row_stamp_names_another_provider',
+  'provenance_unexplained', 'brownlow_insert_unproven', 'brownlow_chain_inconsistent', 'reconstruction_inconsistent',
+]);
+
+/** The identity action the row's position implies (§9.1): at Pc update, at P′c upgrade, none insert. */
+function identityActionForRow(row: CpcProviderRow | null, pPrimeId: number): MutationPlan['identityAction'] {
+  if (row === null) return 'insert';
+  if (row.playerId === pPrimeId) return 'upgrade_in_place';
+  return 'update_in_place';
+}
+
+async function readCandidateProviderRow(
+  tx: TransactionSql, externalId: string,
+): Promise<{ row: ExistingIdentityRow; externalUrl: string | null } | null> {
+  const [row] = await tx<(ExistingIdentityRow & { externalUrl: string | null })[]>`
+    SELECT ei.id, ei.status::text AS status, ei.player_id AS "playerId",
+           ei.candidate_count AS "candidateCount", ei.match_method AS "matchMethod",
+           ei.external_url AS "externalUrl"
+      FROM external_identities ei
+      JOIN sources s ON s.id = ei.source_id
+     WHERE s.key = ${AFL_API_SOURCE_KEY} AND ei.external_id = ${externalId}
+  `;
+  if (!row) return null;
+  return {
+    row: { id: row.id, status: row.status, playerId: row.playerId, candidateCount: row.candidateCount, matchMethod: row.matchMethod },
+    externalUrl: row.externalUrl,
+  };
+}
+
+/**
+ * §9.1 CPC for ONE corrected provider, against the database `tx` is on. Reads only, except the
+ * advisory locks and `FOR UPDATE` row locks a caller asks for with `lockRows: true` (REPLAY).
+ *
+ * Both S6-D4 collision sources are gathered: (a) providers already at P′c in this database's
+ * `afl_api` identity table, (b) the caller's `targetHumanProviders` (net linked/corrected
+ * providers of the durable ledger, externalId -> stable identity) whose identity remaps to P′c.
+ * CD_I itself is excluded from both by the classifier.
+ */
+export async function classifyCorrectedProviderInDatabase(
+  tx: TransactionSql,
+  params: {
+    readonly entry: CorrectedProviderEntry;
+    readonly authorityMode: 'PREDICT' | 'ADJUDICATION';
+    readonly lockRows: boolean;
+    readonly targetHumanProviders: ReadonlyMap<string, string>;
+  },
+): Promise<ClassifiedCorrectedProvider> {
+  const { entry, authorityMode, lockRows, targetHumanProviders } = params;
+  const pc = await resolveCandidateIdentity(tx, entry.previousPlayerIdentity);
+  const pPrime = await resolveCandidateIdentity(tx, entry.playerIdentity);
+  const found = await readCandidateProviderRow(tx, entry.externalId);
+  const providerRow: CpcProviderRow | null = found === null ? null : {
+    id: found.row.id,
+    playerId: found.row.playerId ?? -1,
+    status: found.row.status,
+    matchMethod: found.row.matchMethod,
+    importerOwned: classifyAflApiCensusRow({
+      externalId: entry.externalId, status: found.row.status, matchMethod: found.row.matchMethod,
+      playerId: found.row.playerId, candidateCount: found.row.candidateCount, externalUrl: found.externalUrl,
+    }).kind === 'importer',
+  };
+
+  if (lockRows && pc.kind === 'unique' && pPrime.kind === 'unique') {
+    await takeCorrectionLocks(tx, entry.externalId, [pc.playerId, pPrime.playerId]);
+  }
+
+  let candidateHolders: string[] = [];
+  let targetHolders: string[] = [];
+  if (pPrime.kind === 'unique') {
+    const pPrimeId = pPrime.playerId;
+    const holders = await tx<{ externalId: string }[]>`
+      SELECT ei.external_id AS "externalId"
+        FROM external_identities ei JOIN sources s ON s.id = ei.source_id
+       WHERE s.key = ${AFL_API_SOURCE_KEY} AND ei.player_id = ${pPrimeId}
+         AND ei.external_id <> ${entry.externalId} AND ei.status IN ('unique', 'resolved')
+       ORDER BY ei.external_id
+    `;
+    candidateHolders = holders.map((h) => h.externalId);
+    const others = [...targetHumanProviders].filter(([externalId]) => externalId !== entry.externalId);
+    if (others.length > 0) {
+      const remaps = await resolveAflApiPlayerIdentities(tx, others.map(([, identity]) => identity));
+      targetHolders = others
+        .filter(([, identity]) => {
+          const remap = remaps.get(identity);
+          return remap !== undefined && remap.ok && remap.newPlayerId === pPrimeId;
+        })
+        .map(([externalId]) => externalId)
+        .sort();
+    }
+  }
+
+  const baseInput: CpcInput = {
+    externalId: entry.externalId, adjudicationId: entry.adjudicationId, pc, pPrime, providerRow,
+    collisions: { candidateImporterProvidersAtPPrime: candidateHolders, targetHumanProvidersRemappingToPPrime: targetHolders },
+    pcStillImplicated: { rowsImplicatingCdIAtPc: 0, unprovableCdILineage: false },
+    prediction: null,
+  };
+  // With no prediction the classifier stops at PREDICT_STOP exactly when UNEVALUABLE, COLLISION
+  // and DISAGREE all passed; any other FAIL is final and nothing is planned (or row-locked).
+  const pre = classifyCorrectedCandidate(baseInput);
+  if (pre.outcome === 'FAIL' && pre.code !== 'PREDICT_STOP') {
+    return {
+      input: baseInput, result: pre, prediction: null, predicted: null, identityAction: null,
+      pcId: pc.kind === 'unique' ? pc.playerId : null, pPrimeId: pPrime.kind === 'unique' ? pPrime.playerId : null,
+      identityRow: found === null ? null : found.row,
+    };
+  }
+  if (pc.kind !== 'unique' || pPrime.kind !== 'unique') {
+    throw new CorrectionRefused(`internal: CPC reached planning for ${entry.externalId} with an unevaluable identity`);
+  }
+
+  const identityAction = identityActionForRow(providerRow, pPrime.playerId);
+  const predicted = await predictCorrectionClosure(tx, {
+    providerId: entry.externalId, pId: pc.playerId, pPrimeId: pPrime.playerId,
+    authority: {
+      mode: authorityMode, adjudicationId: entry.adjudicationId, externalId: entry.externalId,
+      evidenceSha256: entry.evidenceSha256, previousPlayerIdentity: entry.previousPlayerIdentity,
+      playerIdentity: entry.playerIdentity,
+    },
+    identityAction, lockRows,
+  });
+  const prediction: CpcPrediction = {
+    stops: predicted.stops, moveOrDeleteRowCount: predicted.moveOrDeleteRowCount, fingerprint: predicted.fingerprint,
+    plannerVersion: predicted.plan.plannerVersion, moved: predicted.moved, deleted: predicted.deleted,
+  };
+  const input: CpcInput = {
+    ...baseInput,
+    prediction,
+    pcStillImplicated: providerRow === null
+      ? {
+        rowsImplicatingCdIAtPc: predicted.moveOrDeleteRowCount,
+        unprovableCdILineage: predicted.stops.some((s) => UNPROVABLE_LINEAGE_STOP_CODES.has(s.code)),
+      }
+      : baseInput.pcStillImplicated,
+  };
+  return {
+    input, result: classifyCorrectedCandidate(input), prediction, predicted, identityAction,
+    pcId: pc.playerId, pPrimeId: pPrime.playerId, identityRow: found === null ? null : found.row,
+  };
 }
 
 /* ==================================================================== *
@@ -1826,7 +2147,7 @@ async function runCorrection(
   // possibly-stale snapshot, exactly what "read-only planning" means.
   const takeLocks = args.mode !== 'validate-only';
 
-  await proveSession(tx, args.expectDatabase);
+  await proveSession(tx, args.expectDatabase, 'afldb_import');
   if (takeLocks) await takeIdentityTableLock(tx, LOCK_TIMEOUT);
 
   const existing = await readExternalIdentityRow(tx, args.providerId);
@@ -1907,7 +2228,9 @@ async function runCorrection(
 
   const closure = await buildClosure(tx, {
     providerId: args.providerId, pId, pPrimeId, authority,
-    identityAction: humanOrigin ? 'update_in_place' : 'upgrade_in_place', manifestOk, lockRows: takeLocks,
+    // Importer-origin and human-origin ORIGINAL P->P' are both an in-place update (D15 supersede
+    // write shape); `upgrade_in_place` is reserved for CPC class 2 (already at P', identity-only).
+    identityAction: 'update_in_place', manifestOk, lockRows: takeLocks,
   });
   const fingerprint = mutationPlanFingerprint(closure.plan);
 
@@ -1923,16 +2246,7 @@ async function runCorrection(
   }
 
   /* ---- §8.2 steps 3-10: write ---- */
-  const [batch] = await tx<{ id: string }[]>`
-    INSERT INTO import_batches (source_id, tool, target_table, status, records_read, notes)
-    VALUES (
-      (SELECT id FROM sources WHERE key = ${AFL_API_SOURCE_KEY}), ${TOOL}, 'canonical_applications',
-      'running', ${closure.rows.length},
-      ${`AFLDB-ISSUE-238 correction; authority afl_api_identity_adjudications id <pending>`}
-    )
-    RETURNING id::text AS id
-  `;
-  const batchId = batch.id;
+  const batchId = await openCorrectionBatch(tx, closure.rows.length, ORIGINAL_BATCH_CONTRACT.openNotes);
 
   const surnameAcknowledged = args.acknowledgeSurnameDisagreement;
   const evidencePayload = {
@@ -1957,36 +2271,13 @@ async function runCorrection(
   // §8.2 step 5: bind K to A BEFORE any canonical mutation, so the step-9 re-plan (which finds
   // the bound batch through exactly this `validation_result`) examines every row it wrote. The
   // rowProofs are fully determined by the plan; the counts are re-stated at finalisation.
-  const rowProofs: RowProof[] = closure.rows.map((row): RowProof => (row.disposition === 'MOVE'
-    ? { table: row.table, verb: 'update', oldKey: row.naturalKey, newKey: movedNaturalKey(row, pPrimeId), preCorrectionContractSha256: row.contractSha256 }
-    : { table: row.table, verb: 'delete', oldKey: row.naturalKey, newKey: null, preCorrectionContractSha256: row.contractSha256 }));
-  const validationResultFor = (counts: JsonValue): JsonValue => ({
-    kind: 'afl_api_identity_correction', mode: 'original', context: 'live_target',
-    plannerVersion: PLANNER_VERSION, adjudicationId, externalId: args.providerId,
-    adjudicationEvidenceSha256: evidenceFile.sha256, closureFingerprint: fingerprint,
-    mutationEligibility: 'PASS', rowProofs: rowProofs.map(rowProofJson), counts,
+  const validationResultFor = (counts: JsonValue): JsonValue => correctionBatchValidationResult(ORIGINAL_BATCH_CONTRACT, {
+    adjudicationId, externalId: args.providerId, adjudicationEvidenceSha256: evidenceFile.sha256,
+    closureFingerprint: fingerprint, rows: closure.rows, pPrimeId, counts,
   });
-  const countsFor = (rows: readonly BuiltRow[], projectionsMoved: number): JsonValue => {
-    const count = (disposition: BuiltRow['disposition'], table: CanonicalTable) => rows
-      .filter((r) => r.disposition === disposition && r.table === table).length;
-    return {
-      moved: { player_match_stats: count('MOVE', 'player_match_stats'), brownlow_round_votes: count('MOVE', 'brownlow_round_votes') },
-      deleted: {
-        player_match_stats: count('DELETE_AS_FOREIGN_COLLISION', 'player_match_stats'),
-        brownlow_round_votes: count('DELETE_AS_FOREIGN_COLLISION', 'brownlow_round_votes'),
-      },
-      projectionsMoved,
-    };
-  };
-  await tx`
-    UPDATE import_batches
-       SET validation_result = ${jsonbOf(tx, validationResultFor(countsFor(closure.rows, 0)))},
-           notes = ${`AFLDB-ISSUE-238 correction; authority afl_api_identity_adjudications id ${adjudicationId}`}
-     WHERE id = ${batchId}::bigint AND status = 'running'
-    RETURNING id
-  `.then((r) => {
-    if (r.length !== 1) throw new CorrectionRefused('REFUSED: binding the correction batch did not affect exactly one row');
-  });
+  await bindCorrectionBatch(
+    tx, batchId, validationResultFor(correctionCountsFor(closure.rows, 0)), ORIGINAL_BATCH_CONTRACT.boundNotes(adjudicationId),
+  );
 
   await tx`
     UPDATE external_identities
@@ -1996,9 +2287,161 @@ async function runCorrection(
      WHERE id = ${existing.id}
   `;
 
+  // §8.2 step 6: deletes, moves and the typed projections (shared with REPLAY, §8.3 step 5).
+  const { moved, deleted, projectionsMoved } = await applyClosureMutations(
+    tx, args, { pId, pPrimeId, batchId }, closure.rows,
+  );
+
+  // §8.2 step 7: resolve only the ISSUE-240 contradictions this correction adjudicates.
+  const resolvedFindings = await resolveAdjudicatedContradictions(tx, args.providerId, pPrimeIdentity!.identity);
+
+  // §8.2 step 8: targeted recompute + byte-identical stat_availability assertion.
+  await recomputeAfterClosureMutations(tx, closure.rows, pId, pPrimeId);
+
+  // §8.2 step 9 / §8.4: the post-write re-plan is CORRECTION SATISFACTION (Q2) -- the SAME
+  // evaluator a later re-run uses, with K as "the batch of the current transaction".
+  const postWriteReports = await assertPostWriteSatisfaction(tx, args.providerId, adjudicationId, Number(batchId));
+
+  // §8.2 step 10: finalise K. The binding fields are unchanged; the counts are the actual ones.
+  await finaliseCorrectionBatch(tx, batchId, moved + deleted, validationResultFor(correctionCountsFor(closure.rows, projectionsMoved)));
+
+  const reports = [
+    ...closure.reports,
+    ...postWriteReports,
+    ...(resolvedFindings > 0 ? [`resolved ${resolvedFindings} ISSUE-240 contradiction finding(s) this correction adjudicates`] : []),
+    ...postCommitReportLines(),
+  ];
+
+  // The caller (`main`) decides COMMITTED vs ROLLED_BACK by whether it lets `sql.begin()`
+  // return normally (apply) or throws to force a real SQL rollback (dry-run) -- this function
+  // only ever reports what it actually wrote inside the still-open transaction.
+  return { kind: 'COMMITTED', fingerprint, adjudicationId, batchId, moved, deleted, reports };
+}
+
+/* ==================================================================== *
+ * Shared mechanics: ONE implementation for ORIGINAL (§8.2) and REPLAY (§8.3)
+ * ==================================================================== */
+
+/** §8.7: the only columns in which batch K (ORIGINAL) and batch R (REPLAY) differ. */
+export type CorrectionBatchContract = {
+  readonly mode: 'original' | 'replay';
+  readonly context: 'live_target' | 'promotion';
+  /** REPLAY only: equals `closureFingerprint` (§8.7). */
+  readonly predictedClosureFingerprint: string | null;
+  readonly openNotes: string;
+  readonly boundNotes: (adjudicationId: number) => string;
+};
+
+export const ORIGINAL_BATCH_CONTRACT: CorrectionBatchContract = {
+  mode: 'original',
+  context: 'live_target',
+  predictedClosureFingerprint: null,
+  openNotes: 'AFLDB-ISSUE-238 correction; authority afl_api_identity_adjudications id <pending>',
+  boundNotes: (adjudicationId) => `AFLDB-ISSUE-238 correction; authority afl_api_identity_adjudications id ${adjudicationId}`,
+};
+
+export function replayBatchContract(closureFingerprint: string): CorrectionBatchContract {
+  return {
+    mode: 'replay',
+    context: 'promotion',
+    predictedClosureFingerprint: closureFingerprint,
+    openNotes: 'AFLDB-ISSUE-238 promotion replay; authority afl_api_identity_adjudications id <pending>',
+    boundNotes: (adjudicationId) => `AFLDB-ISSUE-238 promotion replay; authority afl_api_identity_adjudications id ${adjudicationId}`,
+  };
+}
+
+/** §8.2 step 3 / §8.7: open a `running` batch. Returns its id as text (int8 arrives as a string). */
+async function openCorrectionBatch(tx: TransactionSql, recordsRead: number, notes: string): Promise<string> {
+  const [batch] = await tx<{ id: string }[]>`
+    INSERT INTO import_batches (source_id, tool, target_table, status, records_read, notes)
+    VALUES (
+      (SELECT id FROM sources WHERE key = ${AFL_API_SOURCE_KEY}), ${TOOL}, 'canonical_applications',
+      'running', ${recordsRead},
+      ${notes}
+    )
+    RETURNING id::text AS id
+  `;
+  return batch.id;
+}
+
+/** §8.7 `validation_result`: the ORIGINAL keys, plus `predictedClosureFingerprint` for REPLAY. */
+function correctionBatchValidationResult(
+  contract: CorrectionBatchContract,
+  input: {
+    readonly adjudicationId: number; readonly externalId: string; readonly adjudicationEvidenceSha256: string;
+    readonly closureFingerprint: string; readonly rows: readonly BuiltRow[]; readonly pPrimeId: number;
+    readonly counts: JsonValue;
+  },
+): JsonValue {
+  const rowProofs: RowProof[] = input.rows.map((row): RowProof => (row.disposition === 'MOVE'
+    ? { table: row.table, verb: 'update', oldKey: row.naturalKey, newKey: movedNaturalKey(row, input.pPrimeId), preCorrectionContractSha256: row.contractSha256 }
+    : { table: row.table, verb: 'delete', oldKey: row.naturalKey, newKey: null, preCorrectionContractSha256: row.contractSha256 }));
+  return {
+    kind: 'afl_api_identity_correction', mode: contract.mode, context: contract.context,
+    plannerVersion: PLANNER_VERSION, adjudicationId: input.adjudicationId, externalId: input.externalId,
+    adjudicationEvidenceSha256: input.adjudicationEvidenceSha256, closureFingerprint: input.closureFingerprint,
+    ...(contract.predictedClosureFingerprint === null ? {} : { predictedClosureFingerprint: contract.predictedClosureFingerprint }),
+    mutationEligibility: 'PASS', rowProofs: rowProofs.map(rowProofJson), counts: input.counts,
+  };
+}
+
+function correctionCountsFor(rows: readonly BuiltRow[], projectionsMoved: number): JsonValue {
+  const count = (disposition: BuiltRow['disposition'], table: CanonicalTable) => rows
+    .filter((r) => r.disposition === disposition && r.table === table).length;
+  return {
+    moved: { player_match_stats: count('MOVE', 'player_match_stats'), brownlow_round_votes: count('MOVE', 'brownlow_round_votes') },
+    deleted: {
+      player_match_stats: count('DELETE_AS_FOREIGN_COLLISION', 'player_match_stats'),
+      brownlow_round_votes: count('DELETE_AS_FOREIGN_COLLISION', 'brownlow_round_votes'),
+    },
+    projectionsMoved,
+  };
+}
+
+/** §8.2 step 5: bind the batch to A BEFORE any canonical mutation. */
+async function bindCorrectionBatch(tx: TransactionSql, batchId: string, validationResult: JsonValue, notes: string): Promise<void> {
+  await tx`
+    UPDATE import_batches
+       SET validation_result = ${jsonbOf(tx, validationResult)},
+           notes = ${notes}
+     WHERE id = ${batchId}::bigint AND status = 'running'
+    RETURNING id
+  `.then((r) => {
+    if (r.length !== 1) throw new CorrectionRefused('REFUSED: binding the correction batch did not affect exactly one row');
+  });
+}
+
+/** §8.2 step 10: finalise the batch. The binding fields are unchanged; the counts are the actual ones. */
+async function finaliseCorrectionBatch(
+  tx: TransactionSql, batchId: string, recordsInserted: number, validationResult: JsonValue,
+): Promise<void> {
+  await tx`
+    UPDATE import_batches
+       SET status = 'completed', completed_at = now(), records_inserted = ${recordsInserted},
+           records_updated = 0, records_rejected = 0,
+           validation_result = ${jsonbOf(tx, validationResult)}
+     WHERE id = ${batchId}::bigint AND status = 'running'
+    RETURNING id
+  `.then((r) => {
+    if (r.length !== 1) throw new CorrectionRefused('REFUSED: batch finalisation did not affect exactly one row');
+  });
+}
+
+/**
+ * §8.2 step 6 (also §8.3 step 5): the canonical MOVE/DELETE mutations with their
+ * `canonical_applications` rows (`import_batch_id = batchId`), then EVERY typed projection row of
+ * CD_I still naming P. The only statements it issues are `canonical_applications` INSERTs,
+ * UPDATE/DELETE of the planned closure rows, and the two projection UPDATEs.
+ */
+async function applyClosureMutations(
+  tx: TransactionSql,
+  args: { readonly providerId: string },
+  ids: { readonly pId: number; readonly pPrimeId: number; readonly batchId: string },
+  closureRows: readonly BuiltRow[],
+): Promise<{ moved: number; deleted: number; projectionsMoved: number }> {
+  const { pId, pPrimeId, batchId } = ids;
   let moved = 0;
   let deleted = 0;
-  let projectionsMoved = 0;
 
   // Deletes first (§8.2 step 6: "deletes first so no UNIQUE is transiently violated"). Every
   // row here has been held under `FOR UPDATE` continuously since `buildClosure` computed its
@@ -2006,7 +2449,7 @@ async function runCorrection(
   // changed it since; the re-check below is the literal "conditional write" the runbook requires
   // (§8.2 step 6) and is defence in depth against a bug elsewhere in this same transaction, not
   // a race with another session.
-  for (const row of closure.rows.filter((r) => r.disposition === 'DELETE_AS_FOREIGN_COLLISION')) {
+  for (const row of closureRows.filter((r) => r.disposition === 'DELETE_AS_FOREIGN_COLLISION')) {
     await assertRowStillMatchesContract(tx, row);
     const deleteResult = await tx`DELETE FROM ${tx(row.table)} WHERE id = ${row.rowId}`;
     if (deleteResult.count !== 1) {
@@ -2026,7 +2469,7 @@ async function runCorrection(
     deleted += 1;
   }
 
-  for (const row of closure.rows.filter((r) => r.disposition === 'MOVE')) {
+  for (const row of closureRows.filter((r) => r.disposition === 'MOVE')) {
     const newKey = movedNaturalKey(row, pPrimeId);
     await assertRowStillMatchesContract(tx, row);
     const result = await tx`
@@ -2049,11 +2492,23 @@ async function runCorrection(
     moved += 1;
   }
 
-  // §8.2 step 6, "move the typed projection rows where present": EVERY typed projection row of
-  // CD_I that still names P, in both tables -- the MOVE rows' (P5 / L8-c), a C2/C4 DELETE's, and
-  // any stray one attached to no closure row. They are CD_I's own observations and CD_I is now
-  // P′; SAT-5 (§5.12, "no typed projection ... names P for CD_I") checks exactly this set in the
-  // post-write re-plan. A failure here is a real error and rolls the whole correction back.
+  const projectionsMoved = await moveProviderProjections(tx, args, pId, pPrimeId);
+
+  return { moved, deleted, projectionsMoved };
+}
+
+/**
+ * §8.2 step 6, "move the typed projection rows where present": EVERY typed projection row of
+ * CD_I that still names P, in both tables -- the MOVE rows' (P5 / L8-c), a C2/C4 DELETE's, and
+ * any stray one attached to no closure row. They are CD_I's own observations and CD_I is now
+ * P′; SAT-5 (§5.12, "no typed projection ... names P for CD_I") checks exactly this set in the
+ * post-write re-plan. A failure here is a real error and rolls the whole correction back.
+ * Returns how many projection rows moved.
+ */
+async function moveProviderProjections(
+  tx: TransactionSql, args: { readonly providerId: string }, pId: number, pPrimeId: number,
+): Promise<number> {
+  let projectionsMoved = 0;
   for (const projection of [
     await tx`
       UPDATE staging.afl_api_player_match SET player_id = ${pPrimeId}
@@ -2066,16 +2521,18 @@ async function runCorrection(
          AND provider_player_id = ${args.providerId} AND player_id = ${pId}
     `,
   ]) projectionsMoved += projection.count;
+  return projectionsMoved;
+}
 
-  // §8.2 step 7: resolve only the ISSUE-240 contradictions this correction adjudicates.
-  const resolvedFindings = await resolveAdjudicatedContradictions(tx, args.providerId, pPrimeIdentity!.identity);
-
-  // §8.2 step 8: targeted recompute + byte-identical stat_availability assertion.
-  const affectedSeasons = new Set(closure.rows.map((r) => (r.table === 'player_match_stats' ? Number(r.naturalKey.match_id) : null)).filter((x): x is number => x !== null));
+/** §8.2 step 8: targeted recompute + byte-identical `stat_availability` assertion (§4.D). */
+async function recomputeAfterClosureMutations(
+  tx: TransactionSql, closureRows: readonly BuiltRow[], pId: number, pPrimeId: number,
+): Promise<void> {
+  const affectedSeasons = new Set(closureRows.map((r) => (r.table === 'player_match_stats' ? Number(r.naturalKey.match_id) : null)).filter((x): x is number => x !== null));
   const seasonRows = await tx<{ season: number }[]>`
     SELECT DISTINCT season FROM matches WHERE id = ANY(${[...affectedSeasons]})
   `;
-  const brownlowSeasons = new Set(closure.rows.filter((r) => r.table === 'brownlow_round_votes').map((r) => Number(r.naturalKey.season)));
+  const brownlowSeasons = new Set(closureRows.filter((r) => r.table === 'brownlow_round_votes').map((r) => Number(r.naturalKey.season)));
   for (const s of seasonRows) {
     await recomputePlayerDerivedStats(tx, [pId, pPrimeId], s.season);
   }
@@ -2087,41 +2544,21 @@ async function runCorrection(
       throw new CorrectionRefused(`REFUSED: stat_availability changed for season ${season} (STOP, rollback) -- before=${JSON.stringify(before)} after=${JSON.stringify(after)}`);
     }
   }
+}
 
-  // §8.2 step 9 / §8.4: the post-write re-plan is CORRECTION SATISFACTION (Q2) -- the SAME
-  // evaluator a later re-run uses, with K as "the batch of the current transaction".
+/** §8.2 step 9 / §8.4: the post-write CORRECTION SATISFACTION re-plan; a failure rolls the transaction back. */
+async function assertPostWriteSatisfaction(
+  tx: TransactionSql, providerId: string, adjudicationId: number, currentBatchId: number | null,
+): Promise<readonly string[]> {
   const postWrite = await checkCorrectionSatisfaction(dbCorrectionSatisfactionReader(tx), {
-    providerId: args.providerId, adjudicationId, currentBatchId: Number(batchId),
+    providerId, adjudicationId, currentBatchId,
   });
   if (!postWrite.satisfied) {
     throw new CorrectionRefused(
       `REFUSED: post-write CORRECTION SATISFACTION re-plan failed -- STOP, rollback: ${postWrite.stops.map(describeStop).join('; ')}`,
     );
   }
-
-  // §8.2 step 10: finalise K. The binding fields are unchanged; the counts are the actual ones.
-  await tx`
-    UPDATE import_batches
-       SET status = 'completed', completed_at = now(), records_inserted = ${moved + deleted},
-           records_updated = 0, records_rejected = 0,
-           validation_result = ${jsonbOf(tx, validationResultFor(countsFor(closure.rows, projectionsMoved)))}
-     WHERE id = ${batchId}::bigint AND status = 'running'
-    RETURNING id
-  `.then((r) => {
-    if (r.length !== 1) throw new CorrectionRefused('REFUSED: batch finalisation did not affect exactly one row');
-  });
-
-  const reports = [
-    ...closure.reports,
-    ...postWrite.reports,
-    ...(resolvedFindings > 0 ? [`resolved ${resolvedFindings} ISSUE-240 contradiction finding(s) this correction adjudicates`] : []),
-    ...postCommitReportLines(),
-  ];
-
-  // The caller (`main`) decides COMMITTED vs ROLLED_BACK by whether it lets `sql.begin()`
-  // return normally (apply) or throws to force a real SQL rollback (dry-run) -- this function
-  // only ever reports what it actually wrote inside the still-open transaction.
-  return { kind: 'COMMITTED', fingerprint, adjudicationId, batchId, moved, deleted, reports };
+  return postWrite.reports;
 }
 
 /** §8.2 step 8's before/after read. A read failure propagates and rolls the correction back: an
@@ -3145,7 +3582,7 @@ export function brownlowRowIsCdIAttributed(
     && (insertProvenByPayload || projectionNamesThisPlayer);
 }
 
-function dbCorrectionSatisfactionReader(tx: TransactionSql): CorrectionSatisfactionReader {
+export function dbCorrectionSatisfactionReader(tx: TransactionSql): CorrectionSatisfactionReader {
   const annotate = async (
     rows: readonly (CanonicalApplicationRow & { targetTable: string })[], providerId: string,
   ): Promise<Q2Application[]> => {
@@ -3310,6 +3747,605 @@ export function formatOutcome(outcome: CorrectionOutcome, args: CorrectionArgs):
 }
 
 /* ==================================================================== *
+ * §8.3 promotion REPLAY (REPLAY_SECTION_BEGIN)
+ *
+ *     CANDIDATE_DSN=<owner DSN of the candidate> npx tsx tools/migration/correct_afl_api_identity.ts \
+ *       --replay-promotion --supersede-in <v3 file> --environment dev|prod \
+ *       --expect-database <candidate> --expect-role afldb_owner [--dry-run]
+ *
+ * §8.8: runs as the candidate OWNER on the candidate DSN the promotion plan already builds
+ * (`CANDIDATE_DSN`), and takes its DSN from that variable ALONE. One transaction over every
+ * provider of the v3 artefact's `correctedReplays`.
+ *
+ * REPLAY WRITE ALLOW-LIST (orchestrator decision F-005). It may only
+ *   - INSERT `canonical_applications` (import_batch_id = R);
+ *   - INSERT/UPDATE `import_batches` (batch R only);
+ *   - INSERT (class 3) / UPDATE (class 1/2) `external_identities` for CD_I only;
+ *   - UPDATE/DELETE the planned closure rows and UPDATE CD_I's typed projections;
+ *   - the §8.2 step-8 recompute writes.
+ * It never writes the adjudication ledger, and it does not resolve ISSUE-240 findings
+ * (`data_issues` is outside the allow-list; a promotion has its own finding lifecycle).
+ * ==================================================================== */
+
+export type ReplayPromotionArgs = {
+  readonly dryRun: boolean;
+  readonly supersedeIn: string;
+  readonly environment: 'dev' | 'prod';
+  readonly expectDatabase: string;
+  readonly expectRole: 'afldb_owner';
+};
+
+export const REPLAY_PROMOTION_USAGE =
+  'correct_afl_api_identity.ts --replay-promotion --supersede-in <v3 file> --environment dev|prod '
+  + '--expect-database <candidate> --expect-role afldb_owner [--dry-run]  (DSN from CANDIDATE_DSN)';
+
+export function parseReplayPromotionArgs(argv: readonly string[]): ReplayPromotionArgs {
+  let replay = false;
+  let dryRun = false;
+  let supersedeIn: string | null = null;
+  let environment: string | null = null;
+  let expectDatabase: string | null = null;
+  let expectRole: string | null = null;
+  for (let i = 0; i < argv.length; i += 1) {
+    const flag = argv[i];
+    switch (flag) {
+      case '--replay-promotion': replay = true; break;
+      case '--dry-run': dryRun = true; break;
+      case '--supersede-in': supersedeIn = requireValue(argv, i, flag); i += 1; break;
+      case '--environment': environment = requireValue(argv, i, flag); i += 1; break;
+      case '--expect-database': expectDatabase = requireValue(argv, i, flag); i += 1; break;
+      case '--expect-role': expectRole = requireValue(argv, i, flag); i += 1; break;
+      default:
+        throw new CorrectionRefused(`Unknown argument '${flag}' for --replay-promotion. Usage: ${REPLAY_PROMOTION_USAGE}`);
+    }
+  }
+  if (!replay) throw new CorrectionRefused('--replay-promotion is required.');
+  if (supersedeIn === null) throw new CorrectionRefused('--supersede-in is mandatory.');
+  if (environment !== 'dev' && environment !== 'prod') throw new CorrectionRefused('--environment must be dev or prod.');
+  if (expectDatabase === null) throw new CorrectionRefused('--expect-database is mandatory.');
+  if (expectRole !== 'afldb_owner') throw new CorrectionRefused("--expect-role is mandatory and must be 'afldb_owner' (§8.8).");
+  return { dryRun, supersedeIn, environment, expectDatabase, expectRole };
+}
+
+/** §8.8: the DSN is `CANDIDATE_DSN` and nothing else; it must name `--expect-database`. */
+export function resolveCandidateDsn(env: Record<string, string | undefined>, expectDatabase: string): string {
+  const raw = env.CANDIDATE_DSN;
+  if (!raw || raw.trim() === '') throw new CorrectionRefused('CANDIDATE_DSN is not set -- refusing');
+  const dsn = raw.trim();
+  let url: URL;
+  try {
+    url = new URL(dsn);
+  } catch {
+    throw new CorrectionRefused('CANDIDATE_DSN is not a valid postgresql:// DSN');
+  }
+  if (url.protocol !== 'postgresql:' && url.protocol !== 'postgres:') {
+    throw new CorrectionRefused('CANDIDATE_DSN is not a postgresql:// DSN');
+  }
+  if (decodeURIComponent(url.pathname.replace(/^\//, '')) !== expectDatabase) {
+    throw new CorrectionRefused(`CANDIDATE_DSN does not target /${expectDatabase} -- refusing`);
+  }
+  return dsn;
+}
+
+const LIVE_DATABASE_BY_ENVIRONMENT = { prod: 'afldb_prod', dev: 'afldb_dev' } as const;
+
+/** The promotion tooling's own rule (`<live>_pre_rebuild_<stamp>`; `tools/db/rebuild-test.ts` refuses `/pre_rebuild/i`). */
+export function isPreRebuildDatabaseName(name: string): boolean {
+  return /pre_rebuild/i.test(name);
+}
+
+/**
+ * §8.8's guards as a pure function of the arguments and the artefact (the connected database and
+ * role are proved separately by `proveSession`, which makes them equal `expectDatabase` and
+ * `afldb_owner`). Includes the temporary S6-D3 gate. An empty list means every guard passed.
+ */
+export function replayPromotionGuardProblems(input: {
+  readonly environment: 'dev' | 'prod';
+  readonly expectDatabase: string;
+  readonly expectRole: string;
+  readonly artefact: Pick<AflApiSupersedeFile, 'environment' | 'candidateDatabase' | 'targetDatabase' | 'correctedReplays'>;
+}): string[] {
+  const problems: string[] = [];
+  const { environment, expectDatabase, expectRole, artefact } = input;
+  if (expectRole !== 'afldb_owner') problems.push(`--expect-role is '${expectRole}', not 'afldb_owner'`);
+  if (artefact.environment !== environment) {
+    problems.push(`artefact environment '${artefact.environment}' does not match --environment '${environment}'`);
+  }
+  if (expectDatabase !== artefact.candidateDatabase) {
+    problems.push(`database '${expectDatabase}' is not the artefact candidateDatabase '${artefact.candidateDatabase}'`);
+  }
+  if (expectDatabase === artefact.targetDatabase) {
+    problems.push(`database '${expectDatabase}' is the artefact targetDatabase`);
+  }
+  if (expectDatabase === LIVE_DATABASE_BY_ENVIRONMENT[environment]
+    || expectDatabase === LIVE_DATABASE_BY_ENVIRONMENT.prod || expectDatabase === LIVE_DATABASE_BY_ENVIRONMENT.dev) {
+    problems.push(`database '${expectDatabase}' is a live database`);
+  }
+  if (isPreRebuildDatabaseName(expectDatabase)) {
+    problems.push(`database '${expectDatabase}' is a pre_rebuild database`);
+  }
+  if (artefact.environment === 'prod' && artefact.correctedReplays.length > 0) {
+    problems.push(`${CORRECTED_PROMOTION_REHEARSAL_REQUIRED}: a prod promotion carrying ${artefact.correctedReplays.length} corrected replay(s) is refused until Slice 11 lifts this S6-D3 gate`);
+  }
+  return problems;
+}
+
+export function assertReplayPromotionGuards(input: Parameters<typeof replayPromotionGuardProblems>[0]): void {
+  const problems = replayPromotionGuardProblems(input);
+  if (problems.length > 0) throw new CorrectionRefused(`REFUSED: ${problems.join('; ')}`);
+}
+
+/** Read and strictly parse the v3 artefact; a refusal is a `CorrectionRefused`. */
+export function loadReplaySupersedeFile(path: string): AflApiSupersedeFile {
+  if (!existsSync(path)) throw new CorrectionRefused(`supersede file not found: ${path}`);
+  try {
+    return parseAflApiSupersedeFile(readFileSync(path, 'utf8'), 'REPLAY supersede file');
+  } catch (error) {
+    if (error instanceof AflApiPromotionFileRefused) throw new CorrectionRefused(`REFUSED: ${error.message}`);
+    throw error;
+  }
+}
+
+function compareCodeUnits(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+/** §8.3 steps 2 and 8: the reinstated ledger against the artefact. Empty = consistent. */
+export function replayLedgerProblems(
+  ledgerRows: readonly AflApiAdjudicationLedgerRow[],
+  file: Pick<AflApiSupersedeFile, 'correctedReplays' | 'targetLedgerRowCount' | 'targetLedgerSha256'>,
+): string[] {
+  const problems: string[] = [];
+  const correctedNet = new Map<string, AflApiAdjudicationLedgerRow>();
+  for (const [externalId, row] of netLedgerRowsByExternalId(ledgerRows)) {
+    if (row.action === 'corrected') correctedNet.set(externalId, row);
+  }
+  const expected = new Map(file.correctedReplays.map((e) => [e.externalId, e] as const));
+  for (const externalId of correctedNet.keys()) {
+    if (!expected.has(externalId)) problems.push(`${externalId} is net CORRECTED in the reinstated ledger but not in correctedReplays`);
+  }
+  for (const [externalId, entry] of expected) {
+    const row = correctedNet.get(externalId);
+    if (row === undefined) {
+      problems.push(`${externalId} is in correctedReplays but is not net CORRECTED in the reinstated ledger`);
+      continue;
+    }
+    if (Number(row.id) !== entry.adjudicationId) problems.push(`${externalId}: ledger adjudication id ${String(row.id)} != artefact ${entry.adjudicationId}`);
+    if (row.evidenceSha256 !== entry.adjudicationEvidenceSha256) problems.push(`${externalId}: ledger evidence_sha256 differs from the artefact`);
+    if ((row.previousPlayerIdentity ?? null) !== entry.previousPlayerIdentity) problems.push(`${externalId}: ledger previous_player_identity differs from the artefact`);
+    if (row.playerIdentity !== entry.playerIdentity) problems.push(`${externalId}: ledger player_identity differs from the artefact`);
+  }
+  if (ledgerRows.length !== file.targetLedgerRowCount) {
+    problems.push(`ledger row count ${ledgerRows.length} != artefact targetLedgerRowCount ${file.targetLedgerRowCount}`);
+  }
+  if (aflApiLedgerStateSha256(ledgerRows) !== file.targetLedgerSha256) {
+    problems.push('ledger digest differs from the artefact targetLedgerSha256');
+  }
+  return problems;
+}
+
+/** §8.3 step 8: exactly one `corrected` row per replayed A, and it is A. Empty = consistent. */
+export function replayNoSecondCorrectedProblems(
+  ledgerRows: readonly AflApiAdjudicationLedgerRow[],
+  entries: readonly Pick<AflApiCorrectedReplayEntry, 'externalId' | 'adjudicationId'>[],
+): string[] {
+  const problems: string[] = [];
+  for (const entry of entries) {
+    const corrected = ledgerRows.filter((r) => r.externalId === entry.externalId && r.action === 'corrected');
+    if (corrected.length !== 1 || Number(corrected[0].id) !== entry.adjudicationId) {
+      problems.push(`${entry.externalId}: expected exactly one corrected ledger row (id ${entry.adjudicationId}), found ${corrected.length}`);
+    }
+  }
+  return problems;
+}
+
+/**
+ * §8.3 steps 3-4 at promotion: the database's own classification must be a PASS that equals the
+ * artefact entry (class, identity action, plannerVersion of both the running planner and the
+ * classification, fingerprint, mutation counts). Empty = the entry is reproduced exactly.
+ */
+export function replayEntryMismatches(
+  entry: AflApiCorrectedReplayEntry, result: CpcResult, runningPlannerVersion: number,
+): string[] {
+  if (result.outcome === 'FAIL') {
+    return [`CPC FAIL ${result.code}${result.candidateClass === null ? '' : ` (class ${result.candidateClass})`}: ${result.detail}`];
+  }
+  const problems: string[] = [];
+  if (runningPlannerVersion !== entry.plannerVersion) {
+    problems.push(`running plannerVersion ${runningPlannerVersion} != artefact plannerVersion ${entry.plannerVersion}`);
+  }
+  if (result.plannerVersion !== entry.plannerVersion) {
+    problems.push(`classification plannerVersion ${result.plannerVersion} != artefact plannerVersion ${entry.plannerVersion}`);
+  }
+  if (result.candidateClass !== entry.candidateClass) {
+    problems.push(`class ${result.candidateClass} != artefact class ${entry.candidateClass}`);
+  }
+  if (result.predictedIdentityAction !== entry.predictedIdentityAction) {
+    problems.push(`identity action ${result.predictedIdentityAction} != artefact ${entry.predictedIdentityAction}`);
+  }
+  if (result.predictedClosureFingerprint !== entry.predictedClosureFingerprint) {
+    problems.push(`closure fingerprint ${result.predictedClosureFingerprint} != artefact predictedClosureFingerprint ${entry.predictedClosureFingerprint}`);
+  }
+  const counts = (c: CpcMutationCounts) => `${c.player_match_stats}/${c.brownlow_round_votes}`;
+  if (counts(result.predictedMutations.moved) !== counts(entry.predictedMutations.moved)
+    || counts(result.predictedMutations.deleted) !== counts(entry.predictedMutations.deleted)) {
+    problems.push('mutation counts differ from the artefact predictedMutations');
+  }
+  return problems;
+}
+
+export type ReplayPostState = {
+  readonly importer: { readonly rowCount: number; readonly sha256: string };
+  readonly identity: { readonly rowCount: number; readonly sha256: string };
+  /** `resolved` rows carrying `afl_api_admin_adjudication`. */
+  readonly resolvedRowCount: number;
+};
+
+/**
+ * The candidate's `afl_api` state in the artefact's own digests. Importer rows are the D5 census's
+ * importer rows (stable fields + forward identity, exactly `readAflApiSupersedeBindingState`'s
+ * construction); the identity state is EVERY census row (`external_id`, `status`, `match_method`,
+ * forward stable identity), never a player id.
+ */
+export async function readAflApiPostReplayState(tx: TransactionSql): Promise<ReplayPostState> {
+  const sourceId = await fetchAflApiSourceId(tx);
+  const census = await readAflApiCensusRows(tx, sourceId);
+  const { importerRows } = censusAflApiRows(census);
+  const playerIds = [...new Set(census.filter((r) => r.playerId !== null).map((r) => r.playerId as number))];
+  const identityByPlayerId = await readAflApiForwardIdentities(tx, playerIds);
+  const identityOf = (playerId: number | null): string | null => {
+    if (playerId === null) return null;
+    const identity = identityByPlayerId.get(playerId);
+    return identity && identity.ok ? identity.identity : null;
+  };
+  const importerState: AflApiImporterStateRow[] = importerRows.map((r) => ({
+    externalId: r.externalId, status: r.status, matchMethod: r.matchMethod, playerIdentity: identityOf(r.playerId),
+  }));
+  const identityState: AflApiIdentityStateRow[] = census.map((r) => ({
+    externalId: r.externalId, status: r.status, matchMethod: r.matchMethod ?? '', playerIdentity: identityOf(r.playerId),
+  }));
+  return {
+    importer: { rowCount: importerState.length, sha256: aflApiImporterStateSha256(importerState) },
+    identity: { rowCount: identityState.length, sha256: aflApiIdentityStateSha256(identityState) },
+    resolvedRowCount: census.filter((r) => r.status === 'resolved' && r.matchMethod === AFL_API_ADMIN_MATCH_METHOD).length,
+  };
+}
+
+/** §8.3 step 8 at promotion: the actual post-replay state against the artefact's prediction. */
+export function replayPostStateProblems(
+  actual: ReplayPostState,
+  file: Pick<AflApiSupersedeFile,
+    'predictedPostReplayImporterRowCount' | 'predictedPostReplayImporterSha256'
+    | 'predictedPostReplayResolvedRowCount' | 'predictedPostReplayIdentitySha256'>,
+): string[] {
+  const problems: string[] = [];
+  if (actual.importer.rowCount !== file.predictedPostReplayImporterRowCount) {
+    problems.push(`importer row count ${actual.importer.rowCount} != predicted ${file.predictedPostReplayImporterRowCount}`);
+  }
+  if (actual.importer.sha256 !== file.predictedPostReplayImporterSha256) {
+    problems.push('importer state digest differs from predictedPostReplayImporterSha256');
+  }
+  if (actual.resolvedRowCount !== file.predictedPostReplayResolvedRowCount) {
+    problems.push(`resolved row count ${actual.resolvedRowCount} != predicted ${file.predictedPostReplayResolvedRowCount}`);
+  }
+  if (actual.identity.sha256 !== file.predictedPostReplayIdentitySha256) {
+    problems.push('identity state digest differs from predictedPostReplayIdentitySha256');
+  }
+  return problems;
+}
+
+type ReplayIdentityAction = 'update_in_place' | 'upgrade_in_place' | 'insert';
+
+export type ReplayProviderOutcome = {
+  readonly externalId: string;
+  readonly adjudicationId: number;
+  readonly result: 'ALREADY_REPLAYED' | 'REPLAYED';
+  readonly candidateClass: 1 | 2 | 3;
+  readonly identityAction: ReplayIdentityAction;
+  readonly moved: number;
+  readonly deleted: number;
+  /** R's id, or null when no MOVE/DELETE existed (no batch is opened, §8.3 step 5). */
+  readonly batchId: string | null;
+  readonly fingerprint: string;
+};
+
+export type ReplayOutcome = {
+  readonly kind: 'NOTHING_TO_REPLAY' | 'ALREADY_REPLAYED' | 'REPLAYED' | 'ROLLED_BACK';
+  readonly providers: readonly ReplayProviderOutcome[];
+  readonly ledger: { readonly rowCount: number; readonly sha256: string };
+  readonly post: ReplayPostState;
+  readonly reports: readonly string[];
+};
+
+const REPLAY_IDENTITY_NOTE = 'AFLDB-ISSUE-238 promotion replay; see afl_api_identity_adjudications';
+
+/**
+ * ALREADY_REPLAYED: CD_I's row is `resolved` at P′c with the D15 shape (`afl_api_admin_adjudication`,
+ * candidate_count 0) AND CORRECTION SATISFACTION (Q2) passes. A row in that shape whose Q2 fails is
+ * contradictory state and refuses; any other row is a candidate to classify.
+ */
+async function detectAlreadyReplayed(tx: TransactionSql, entry: CorrectedProviderEntry): Promise<boolean> {
+  const found = await readCandidateProviderRow(tx, entry.externalId);
+  if (found === null) return false;
+  const row = found.row;
+  if (row.status !== 'resolved' || row.matchMethod !== AFL_API_ADMIN_MATCH_METHOD || row.candidateCount !== 0 || row.playerId === null) {
+    return false;
+  }
+  const pPrime = await resolveCandidateIdentity(tx, entry.playerIdentity);
+  if (pPrime.kind !== 'unique' || pPrime.playerId !== row.playerId) return false;
+  const q2 = await checkCorrectionSatisfaction(dbCorrectionSatisfactionReader(tx), {
+    providerId: entry.externalId, adjudicationId: entry.adjudicationId, currentBatchId: null,
+  });
+  if (!q2.satisfied) {
+    throw new CorrectionRefused(
+      `REFUSED: ${entry.externalId} is already resolved at P′c but CORRECTION SATISFACTION fails -- STOP: ${q2.stops.map(describeStop).join('; ')}`,
+    );
+  }
+  return true;
+}
+
+/** §8.3 step 6 / D15: the identity is written ONLY as the classification requires. */
+async function writeReplayedIdentity(
+  tx: TransactionSql, action: ReplayIdentityAction,
+  row: ExistingIdentityRow | null, externalId: string, pPrimeId: number,
+): Promise<void> {
+  if (action === 'insert') {
+    if (row !== null) throw new CorrectionRefused(`REFUSED: class 3 insert for ${externalId} but an identity row exists`);
+    await tx`
+      INSERT INTO external_identities
+            (source_id, external_id, player_id, status, candidate_count, match_method, notes)
+      VALUES ((SELECT id FROM sources WHERE key = ${AFL_API_SOURCE_KEY}), ${externalId}, ${pPrimeId}, 'resolved', 0,
+              ${AFL_API_ADMIN_MATCH_METHOD}, ${REPLAY_IDENTITY_NOTE})
+    `;
+    return;
+  }
+  if (row === null) throw new CorrectionRefused(`REFUSED: ${action} for ${externalId} but no identity row exists`);
+  const result = await tx`
+    UPDATE external_identities
+       SET player_id = ${pPrimeId}, status = 'resolved', candidate_count = 0,
+           match_method = ${AFL_API_ADMIN_MATCH_METHOD}, external_name = NULL,
+           notes = ${REPLAY_IDENTITY_NOTE}
+     WHERE id = ${row.id}
+  `;
+  if (result.count !== 1) {
+    throw new CorrectionRefused(`REFUSED: identity update for ${externalId} affected ${result.count} rows, not 1 (STOP, rollback)`);
+  }
+}
+
+async function countBatchesBoundTo(tx: TransactionSql, adjudicationId: number): Promise<number> {
+  const [row] = await tx<{ n: number }[]>`
+    SELECT count(*)::int AS n FROM import_batches ib
+     WHERE ib.tool = ${TOOL} AND ib.validation_result->>'adjudicationId' = ${String(adjudicationId)}
+  `;
+  return row.n;
+}
+
+/** A provider written in phase 1 whose Q2 and batch finalisation wait for every identity to be written. */
+type PendingReplay = {
+  readonly entry: AflApiCorrectedReplayEntry;
+  readonly batchId: string | null;
+  readonly closureRows: readonly BuiltRow[];
+  readonly moved: number;
+  readonly deleted: number;
+  readonly projectionsMoved: number;
+  readonly finalValidationResult: JsonValue;
+  readonly outcome: ReplayProviderOutcome;
+  readonly reports: readonly string[];
+};
+
+/**
+ * §8.3: the whole promotion REPLAY in ONE transaction, on the candidate as its owner. Phases:
+ *   0. read-only: which providers are ALREADY_REPLAYED (Q2 passes);
+ *   1. per remaining provider, sorted: classify under ADJUDICATION authority with row locks,
+ *      require the artefact's class/version/fingerprint, open R only when a MOVE/DELETE exists,
+ *      write the identity, apply the shared mutations, recompute;
+ *   2. per written provider: the shared post-write Q2 (run after every identity exists, because
+ *      SAT-1's bijection is whole-ledger), then finalise R;
+ *   3. ledger unchanged (`n0`, `h0`), one corrected row per A, at most one bound batch per A, and
+ *      the importer/identity state equal to the artefact's prediction.
+ * A repeated REPLAY finds every provider ALREADY_REPLAYED, opens no batch and writes nothing.
+ * Nothing is caught: every failure propagates and rolls the transaction back.
+ */
+export async function runReplayPromotion(
+  tx: TransactionSql, args: ReplayPromotionArgs, file: AflApiSupersedeFile,
+): Promise<ReplayOutcome> {
+  assertReplayPromotionGuards({
+    environment: args.environment, expectDatabase: args.expectDatabase, expectRole: args.expectRole, artefact: file,
+  });
+  await proveSession(tx, args.expectDatabase, 'afldb_owner');
+
+  const entries = [...file.correctedReplays].sort((a, b) => compareCodeUnits(a.externalId, b.externalId));
+  if (entries.length > 0) await takeIdentityTableLock(tx, LOCK_TIMEOUT);
+
+  const ledgerRows = await readLedgerRows(tx);
+  const n0 = ledgerRows.length;
+  const h0 = aflApiLedgerStateSha256(ledgerRows);
+  const ledgerProblems = replayLedgerProblems(ledgerRows, file);
+  if (ledgerProblems.length > 0) {
+    throw new CorrectionRefused(`REFUSED: the reinstated ledger does not match the artefact: ${ledgerProblems.join('; ')}`);
+  }
+  const targetHumanProviders = new Map<string, string>();
+  for (const [externalId, row] of netLedgerRowsByExternalId(ledgerRows)) {
+    if (aflApiNetIsHumanLive(row.action)) targetHumanProviders.set(externalId, row.playerIdentity);
+  }
+  const asProviderEntry = (e: AflApiCorrectedReplayEntry): CorrectedProviderEntry => ({
+    externalId: e.externalId, adjudicationId: e.adjudicationId, evidenceSha256: e.adjudicationEvidenceSha256,
+    previousPlayerIdentity: e.previousPlayerIdentity, playerIdentity: e.playerIdentity,
+  });
+
+  // Phase 0.
+  const already = new Set<string>();
+  for (const entry of entries) {
+    if (await detectAlreadyReplayed(tx, asProviderEntry(entry))) already.add(entry.externalId);
+  }
+
+  // Phase 1.
+  const contractFor = (fingerprint: string) => replayBatchContract(fingerprint);
+  const pending: PendingReplay[] = [];
+  for (const entry of entries) {
+    if (already.has(entry.externalId)) continue;
+    const corrected = asProviderEntry(entry);
+    const classified = await classifyCorrectedProviderInDatabase(tx, {
+      entry: corrected, authorityMode: 'ADJUDICATION', lockRows: true, targetHumanProviders,
+    });
+    const mismatches = replayEntryMismatches(entry, classified.result, PLANNER_VERSION);
+    if (mismatches.length > 0) throw new CorrectionRefused(`REFUSED: ${entry.externalId}: ${mismatches.join('; ')}`);
+    const result = classified.result;
+    if (result.outcome !== 'PASS' || classified.predicted === null || classified.pcId === null || classified.pPrimeId === null) {
+      throw new CorrectionRefused(`internal: ${entry.externalId} passed CPC without a planned closure`);
+    }
+    // Explicit locals: TS does not carry the property narrowing above through destructuring of a
+    // non-union object type.
+    const predicted: PredictedClosure = classified.predicted;
+    const pcId: number = classified.pcId;
+    const pPrimeId: number = classified.pPrimeId;
+    const closureRows = predicted.closure.rows;
+    const contract = contractFor(predicted.fingerprint);
+    const validationResultFor = (counts: JsonValue): JsonValue => correctionBatchValidationResult(contract, {
+      adjudicationId: entry.adjudicationId, externalId: entry.externalId,
+      adjudicationEvidenceSha256: entry.adjudicationEvidenceSha256, closureFingerprint: predicted.fingerprint,
+      rows: closureRows, pPrimeId, counts,
+    });
+
+    // §8.3 step 5: a batch only when the closure has a MOVE or DELETE.
+    let batchId: string | null = null;
+    if (closureRows.length > 0) {
+      batchId = await openCorrectionBatch(tx, closureRows.length, contract.openNotes);
+      await bindCorrectionBatch(
+        tx, batchId, validationResultFor(correctionCountsFor(closureRows, 0)), contract.boundNotes(entry.adjudicationId),
+      );
+    }
+
+    await writeReplayedIdentity(tx, result.predictedIdentityAction, classified.identityRow, entry.externalId, pPrimeId);
+
+    let moved = 0;
+    let deleted = 0;
+    let projectionsMoved = 0;
+    if (batchId !== null) {
+      ({ moved, deleted, projectionsMoved } = await applyClosureMutations(
+        tx, { providerId: entry.externalId }, { pId: pcId, pPrimeId, batchId }, closureRows,
+      ));
+    } else {
+      projectionsMoved = await moveProviderProjections(tx, { providerId: entry.externalId }, pcId, pPrimeId);
+    }
+    // §8.3 step 7: recompute only when a canonical row changed.
+    if (closureRows.length > 0) await recomputeAfterClosureMutations(tx, closureRows, pcId, pPrimeId);
+
+    pending.push({
+      entry, batchId, closureRows, moved, deleted, projectionsMoved,
+      finalValidationResult: validationResultFor(correctionCountsFor(closureRows, projectionsMoved)),
+      outcome: {
+        externalId: entry.externalId, adjudicationId: entry.adjudicationId, result: 'REPLAYED',
+        candidateClass: result.candidateClass, identityAction: result.predictedIdentityAction,
+        moved, deleted, batchId, fingerprint: predicted.fingerprint,
+      },
+      reports: predicted.closure.reports,
+    });
+  }
+
+  // Phase 2.
+  for (const p of pending) {
+    await assertPostWriteSatisfaction(
+      tx, p.entry.externalId, p.entry.adjudicationId, p.batchId === null ? null : Number(p.batchId),
+    );
+    if (p.batchId !== null) await finaliseCorrectionBatch(tx, p.batchId, p.moved + p.deleted, p.finalValidationResult);
+  }
+
+  // Phase 3.
+  const ledgerAfter = await readLedgerRows(tx);
+  if (ledgerAfter.length !== n0 || aflApiLedgerStateSha256(ledgerAfter) !== h0) {
+    throw new CorrectionRefused('REFUSED: the adjudication ledger changed during REPLAY (it must never be written) -- STOP, rollback');
+  }
+  const secondCorrected = replayNoSecondCorrectedProblems(ledgerAfter, entries);
+  if (secondCorrected.length > 0) throw new CorrectionRefused(`REFUSED: ${secondCorrected.join('; ')}`);
+  for (const entry of entries) {
+    const bound = await countBatchesBoundTo(tx, entry.adjudicationId);
+    if (bound > 1) throw new CorrectionRefused(`REFUSED: ${bound} bound batches exist for adjudication ${entry.adjudicationId} (at most one) -- STOP, rollback`);
+  }
+  const post = await readAflApiPostReplayState(tx);
+  const postProblems = replayPostStateProblems(post, file);
+  if (postProblems.length > 0) {
+    throw new CorrectionRefused(`REFUSED: the post-replay state does not equal the artefact's prediction: ${postProblems.join('; ')}`);
+  }
+
+  const providers: ReplayProviderOutcome[] = entries.map((entry): ReplayProviderOutcome => {
+    const written = pending.find((p) => p.entry.externalId === entry.externalId);
+    if (written) return written.outcome;
+    return {
+      externalId: entry.externalId, adjudicationId: entry.adjudicationId, result: 'ALREADY_REPLAYED',
+      candidateClass: entry.candidateClass, identityAction: entry.predictedIdentityAction,
+      moved: 0, deleted: 0, batchId: null, fingerprint: entry.predictedClosureFingerprint,
+    };
+  });
+  const kind: ReplayOutcome['kind'] = entries.length === 0
+    ? 'NOTHING_TO_REPLAY'
+    : pending.length === 0 ? 'ALREADY_REPLAYED' : 'REPLAYED';
+  return {
+    kind, providers, ledger: { rowCount: n0, sha256: h0 }, post,
+    reports: pending.flatMap((p) => p.reports.map((r) => `${p.entry.externalId}: ${r}`)),
+  };
+}
+
+export function formatReplayOutcome(outcome: ReplayOutcome, args: ReplayPromotionArgs): string {
+  const lines = [`  mode replay-promotion${args.dryRun ? ' (dry-run)' : ''}, ${args.environment}, database ${args.expectDatabase}`];
+  if (outcome.kind === 'NOTHING_TO_REPLAY') {
+    lines.push('  NOTHING_TO_REPLAY: the artefact carries no corrected providers; nothing was written');
+  } else {
+    lines.push(`  ${outcome.kind}: ${outcome.providers.length} corrected provider(s)`);
+    for (const p of outcome.providers) {
+      lines.push(`    ${p.externalId} (A ${p.adjudicationId}): ${p.result}, class ${p.candidateClass}, ${p.identityAction}, `
+        + `moved ${p.moved}, deleted ${p.deleted}, batch ${p.batchId ?? 'none'}, fingerprint ${p.fingerprint}`);
+    }
+  }
+  lines.push(`  ledger ${outcome.ledger.rowCount} row(s), sha256 ${outcome.ledger.sha256} (unchanged)`);
+  lines.push(`  importer state ${outcome.post.importer.rowCount} row(s), identity state ${outcome.post.identity.rowCount} row(s), resolved ${outcome.post.resolvedRowCount}`);
+  for (const r of outcome.reports) lines.push(`    ${r}`);
+  return lines.join('\n');
+}
+
+/** Carries a dry-run's outcome out of a deliberately aborted transaction. */
+class ReplayForcedRollback extends Error {
+  constructor(readonly outcome: ReplayOutcome) { super('forced rollback'); }
+}
+
+export async function runReplayPromotionCli(argv: readonly string[]): Promise<number> {
+  const args = parseReplayPromotionArgs(argv);
+  const file = loadReplaySupersedeFile(args.supersedeIn);
+  // Every argument/artefact guard, S6-D3 included, is evaluated before any connection is opened.
+  assertReplayPromotionGuards({
+    environment: args.environment, expectDatabase: args.expectDatabase, expectRole: args.expectRole, artefact: file,
+  });
+  const dsn = resolveCandidateDsn(process.env, args.expectDatabase);
+  const sql = postgres(dsn, {
+    max: 1, onnotice: () => {},
+    connection: { application_name: `afldb-correct-afl-api-identity-replay${args.dryRun ? '-dry-run' : ''}`, TimeZone: 'UTC' },
+  });
+  try {
+    let outcome: ReplayOutcome;
+    if (!args.dryRun) {
+      outcome = await sql.begin('isolation level read committed', (tx) => runReplayPromotion(tx, args, file));
+    } else {
+      // --dry-run executes every step and always forces a real ROLLBACK.
+      try {
+        await sql.begin('isolation level read committed', async (tx) => {
+          const dryOutcome = await runReplayPromotion(tx, args, file);
+          throw new ReplayForcedRollback(dryOutcome);
+        });
+        throw new CorrectionRefused('internal: the dry-run transaction returned instead of rolling back');
+      } catch (error) {
+        if (!(error instanceof ReplayForcedRollback)) throw error;
+        outcome = error.outcome.kind === 'REPLAYED' ? { ...error.outcome, kind: 'ROLLED_BACK' } : error.outcome;
+      }
+    }
+    console.log(formatReplayOutcome(outcome, args));
+    return 0;
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+}
+/* REPLAY_SECTION_END */
+
+/* ==================================================================== *
  * CLI
  * ==================================================================== */
 
@@ -3321,6 +4357,8 @@ class ForcedRollback extends Error {
 }
 
 async function main(argv: readonly string[]): Promise<number> {
+  // Promotion REPLAY (§8.3) has its own DSN contract and never loads the repository .env.
+  if (argv.includes('--replay-promotion')) return runReplayPromotionCli(argv);
   const args = parseCorrectAflApiIdentityArgs(argv);
   loadEnv(REPO_ROOT);
   const evidenceFile = loadEvidenceFile(args.evidenceFile);

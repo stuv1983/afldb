@@ -18,13 +18,21 @@ import { afterAll, describe, expect, it } from 'vitest';
 
 import {
   AFL_API_ADMIN_MATCH_METHOD,
+  CORRECTED_PROMOTION_REHEARSAL_REQUIRED,
+  CORRECTED_PROMOTION_REQUIRES_FREEZE,
+  aflApiIdentityStateSha256,
+  aflApiImporterStateSha256,
+  aflApiLedgerStateSha256,
   classifyAflApiForwardIdentityRows,
   type AflApiAdjudicationLedgerRow,
   type AflApiCensusRow,
+  type AflApiCorrectedReplayEntry,
   type AflApiForwardIdentityResult,
+  type AflApiSupersedeFile,
 } from '../src/lib/acquisition/afl-api-adjudication';
 import {
   BROWNLOW_ROUND_VOTES_CONTRACT_FIELDS,
+  PLANNER_VERSION,
   PLAYER_MATCH_STATS_CONTRACT_FIELDS,
   classifyBrownlowChainApplication,
   evaluateBrownlowAttribution,
@@ -40,12 +48,26 @@ import {
   type AttributionResult,
   type BrownlowRowEvidence,
   type CanonicalTable,
+  type CpcResult,
 } from '../src/lib/acquisition/afl-api-identity-correction';
 import { loadFitzroyProfileContinuityRules } from '../src/lib/acquisition/fitzroy-profile-continuity';
 import { canonicalJson, type JsonValue } from '../src/lib/acquisition/observations';
 import {
   CorrectionRefused,
+  ORIGINAL_BATCH_CONTRACT,
   TOOL,
+  assertReplayPromotionGuards,
+  isPreRebuildDatabaseName,
+  parseReplayPromotionArgs,
+  proveSession,
+  replayBatchContract,
+  replayEntryMismatches,
+  replayLedgerProblems,
+  replayNoSecondCorrectedProblems,
+  replayPostStateProblems,
+  replayPromotionGuardProblems,
+  resolveCandidateDsn,
+  runReplayPromotion,
   brownlowAnotherProviderResolvedToPlayer,
   brownlowClosureOwnership,
   brownlowHistoryShowsAnotherVoter,
@@ -419,7 +441,7 @@ function correctionBatch(rowProofs: JsonValue[], status = 'completed'): Q2BatchR
   return {
     id: K, sourceKey: 'afl_api', tool: TOOL, targetTable: 'canonical_applications', status,
     validationResult: {
-      kind: 'afl_api_identity_correction', mode: 'original', context: 'live_target', plannerVersion: 1,
+      kind: 'afl_api_identity_correction', mode: 'original', context: 'live_target', plannerVersion: 2,
       adjudicationId: 2, externalId: CD_I, adjudicationEvidenceSha256: EVIDENCE_SHA,
       closureFingerprint: 'f'.repeat(64), mutationEligibility: 'PASS', rowProofs,
     },
@@ -1406,6 +1428,45 @@ describe('§5.10 season-total independence: classification and the executable SV
   });
 });
 
+describe('S6-D1/S6-D4 source contract: fingerprint evidence, collision and ORIGINAL identity label', () => {
+  const closureSource = () => {
+    const source = toolSource();
+    return source.slice(source.indexOf('async function buildClosure('), source.indexOf('async function ownerKeyOf('));
+  };
+
+  it('ORIGINAL P->P\' is update_in_place for importer-origin AND human-origin (upgrade_in_place is CPC class 2 only)', () => {
+    const source = toolSource();
+    expect(source).not.toContain('humanOrigin ? \'update_in_place\' : \'upgrade_in_place\'');
+    expect(source).not.toMatch(/identityAction: [^\n]*'upgrade_in_place'/);
+    expect(source).toMatch(/identityAction: 'update_in_place', manifestOk, lockRows: takeLocks/);
+  });
+
+  it('buildClosure populates evidence and collision on BOTH fingerprint row kinds', () => {
+    const closure = closureSource();
+    const pushes = closure.match(/rows\.push\(\{[\s\S]*?\n    \}\);/g) ?? [];
+    expect(pushes).toHaveLength(2);
+    for (const push of pushes) {
+      expect(push).toContain('evidence: closureEvidence(');
+      expect(push).toContain('collision:');
+      expect(push).toContain('counterpartRowId');
+      expect(push).toContain('counterpartContractSha256: rowContractHash(');
+    }
+    expect(pushes[0]).toContain("outcome: 'C2'");
+    expect(pushes[1]).toContain("outcome: 'C4'");
+    expect(pushes[1]).toContain('readCitedPayloadSha256(');
+    expect(pushes[0]).toContain('aflApiSourceId, null)');
+  });
+
+  it('closureEvidence carries every application id and the latest cited version with the numeric source id', () => {
+    const source = toolSource();
+    const helper = source.slice(source.indexOf('function closureEvidence('), source.indexOf('function projectContract('));
+    expect(helper).toContain('applicationIds: applications.map((a) => a.id)');
+    expect(helper).toContain('sourceId: aflApiSourceId');
+    expect(helper).toContain('seq: cited.sourceVersionSeq');
+    expect(helper).toContain('insertPayloadSha256');
+  });
+});
+
 describe('formatOutcome (report formatting)', () => {
   const args: CorrectionArgs = {
     mode: 'validate-only', providerId: 'CD_I1', toPlayerId: 42, adminUserId: 7, note: VALID_NOTE,
@@ -1434,9 +1495,9 @@ describe('formatOutcome (report formatting)', () => {
     const text = formatOutcome({
       kind: 'PLANNED', fingerprint: 'f'.repeat(64),
       plan: {
-        plannerVersion: 1, provider: { externalId: 'CD_I1', sourceKey: 'afl_api' },
+        plannerVersion: 2, provider: { externalId: 'CD_I1', sourceKey: 'afl_api' },
         authority: { mode: 'ORIGINAL', netState: 'NONE', ledgerId: null, liveIdentityRowId: 1, previousPlayerIdentity: 'p', playerIdentity: 'p2' },
-        identityAction: 'upgrade_in_place', rows: [], stops: [],
+        identityAction: 'update_in_place', rows: [], stops: [],
       },
       reports: ['season 2025: brownlow season-total artefact independence PASS'],
     }, args);
@@ -1452,5 +1513,377 @@ describe('formatOutcome (report formatting)', () => {
     expect(text).toContain('COMMITTED');
     expect(text).toContain('moved 2, deleted 1');
     expect(text).toContain('adjudication id 5, batch id 99');
+  });
+});
+
+/* ==================================================================== *
+ * Slice 6 M3a: promotion REPLAY (§8.3, §8.7, §8.8) over the shared mechanics
+ * ==================================================================== */
+
+describe('Slice 6 M3a: REPLAY guards, role model and batch contract (§8.7, §8.8)', () => {
+  const CANDIDATE = 'afldb_dev_candidate_20260929';
+  const HASH = (c: string) => c.repeat(64);
+
+  function replayEntry(overrides: Partial<AflApiCorrectedReplayEntry> = {}): AflApiCorrectedReplayEntry {
+    return {
+      externalId: 'CD_I1', adjudicationId: 7, adjudicationEvidenceSha256: HASH('a'),
+      previousPlayerIdentity: 'players/A/A.html', playerIdentity: 'players/B/B.html',
+      candidateClass: 1, predictedIdentityAction: 'update_in_place', plannerVersion: PLANNER_VERSION,
+      predictedClosureFingerprint: HASH('f'),
+      predictedMutations: {
+        moved: { player_match_stats: 2, brownlow_round_votes: 0 },
+        deleted: { player_match_stats: 0, brownlow_round_votes: 1 },
+      },
+      ...overrides,
+    };
+  }
+
+  type Artefact = Pick<AflApiSupersedeFile, 'environment' | 'candidateDatabase' | 'targetDatabase' | 'correctedReplays'>;
+  const artefact = (overrides: Partial<Artefact> = {}): Artefact => ({
+    environment: 'dev', candidateDatabase: CANDIDATE, targetDatabase: 'afldb_dev', correctedReplays: [replayEntry()], ...overrides,
+  });
+  const guards = (overrides: Partial<Parameters<typeof replayPromotionGuardProblems>[0]> = {}) => replayPromotionGuardProblems({
+    environment: 'dev', expectDatabase: CANDIDATE, expectRole: 'afldb_owner', artefact: artefact(), ...overrides,
+  });
+
+  /** A transaction whose tagged template records its SQL text and answers only the session proof. */
+  function fakeTx(database: string, role: string, log: string[]): TransactionSql {
+    const tag = (strings: TemplateStringsArray) => {
+      const text = strings.join('?');
+      log.push(text);
+      if (text.includes('current_database()')) return Promise.resolve([{ database, role }]);
+      if (text.includes('FROM sources WHERE key')) return Promise.resolve([{ id: 1 }]);
+      return Promise.resolve([]);
+    };
+    return tag as unknown as TransactionSql;
+  }
+
+  describe('proveSession is role-aware', () => {
+    it('ORIGINAL proves afldb_import and REPLAY proves afldb_owner, on the expected database', async () => {
+      await expect(proveSession(fakeTx('afldb_dev', 'afldb_import', []), 'afldb_dev', 'afldb_import')).resolves.toBeUndefined();
+      await expect(proveSession(fakeTx(CANDIDATE, 'afldb_owner', []), CANDIDATE, 'afldb_owner')).resolves.toBeUndefined();
+    });
+
+    it('refuses the wrong role for the mode and the wrong database', async () => {
+      await expect(proveSession(fakeTx(CANDIDATE, 'afldb_import', []), CANDIDATE, 'afldb_owner'))
+        .rejects.toThrow(/session role is 'afldb_import', not 'afldb_owner'/);
+      await expect(proveSession(fakeTx('afldb_dev', 'afldb_owner', []), 'afldb_dev', 'afldb_import'))
+        .rejects.toThrow(/session role is 'afldb_owner', not 'afldb_import'/);
+      await expect(proveSession(fakeTx('afldb_dev', 'afldb_owner', []), CANDIDATE, 'afldb_owner'))
+        .rejects.toThrow(/connected database is 'afldb_dev'/);
+    });
+  });
+
+  describe('parseReplayPromotionArgs and resolveCandidateDsn', () => {
+    const argv = (extra: string[] = []) => [
+      '--replay-promotion', '--supersede-in', 'e.json', '--environment', 'dev',
+      '--expect-database', CANDIDATE, '--expect-role', 'afldb_owner', ...extra,
+    ];
+
+    it('parses a valid invocation, with --dry-run optional', () => {
+      expect(parseReplayPromotionArgs(argv())).toEqual({
+        dryRun: false, supersedeIn: 'e.json', environment: 'dev', expectDatabase: CANDIDATE, expectRole: 'afldb_owner',
+      });
+      expect(parseReplayPromotionArgs(argv(['--dry-run'])).dryRun).toBe(true);
+    });
+
+    it('requires every flag, only afldb_owner, dev|prod, and refuses ORIGINAL flags and a generic DSN selector', () => {
+      expect(() => parseReplayPromotionArgs(argv().filter((a) => a !== '--supersede-in' && a !== 'e.json'))).toThrow(CorrectionRefused);
+      expect(() => parseReplayPromotionArgs(argv().map((a) => (a === 'afldb_owner' ? 'afldb_import' : a)))).toThrow(/afldb_owner/);
+      expect(() => parseReplayPromotionArgs(argv().map((a) => (a === 'dev' ? 'staging' : a)))).toThrow(/dev or prod/);
+      expect(() => parseReplayPromotionArgs(argv(['--apply']))).toThrow(/Unknown argument/);
+      expect(() => parseReplayPromotionArgs(argv(['--dsn-env', 'AFLDB_IMPORT_DATABASE_URL']))).toThrow(/Unknown argument/);
+    });
+
+    it('reads CANDIDATE_DSN only: the import DSN is never a fallback', () => {
+      const candidate = `postgresql://afldb_owner:pw@localhost:5432/${CANDIDATE}`;
+      expect(resolveCandidateDsn({ CANDIDATE_DSN: candidate }, CANDIDATE)).toBe(candidate);
+      expect(() => resolveCandidateDsn({ AFLDB_IMPORT_DATABASE_URL: candidate }, CANDIDATE)).toThrow(/CANDIDATE_DSN is not set/);
+      expect(() => resolveCandidateDsn({ CANDIDATE_DSN: candidate }, 'afldb_dev')).toThrow(/does not target \/afldb_dev/);
+      expect(() => resolveCandidateDsn({ CANDIDATE_DSN: 'mysql://x/y' }, 'y')).toThrow(/not a postgresql/);
+    });
+  });
+
+  describe('replayPromotionGuardProblems / assertReplayPromotionGuards', () => {
+    it('a candidate database, the owner role, a matching environment and a dev corrected replay pass', () => {
+      expect(guards()).toEqual([]);
+      expect(() => assertReplayPromotionGuards({ environment: 'dev', expectDatabase: CANDIDATE, expectRole: 'afldb_owner', artefact: artefact() })).not.toThrow();
+    });
+
+    it('refuses a database other than the artefact candidateDatabase', () => {
+      expect(guards({ expectDatabase: 'afldb_dev_candidate_other' }).join('|')).toMatch(/not the artefact candidateDatabase/);
+    });
+
+    it('refuses any role other than afldb_owner', () => {
+      expect(guards({ expectRole: 'afldb_import' }).join('|')).toMatch(/not 'afldb_owner'/);
+    });
+
+    it('refuses the environment\'s live database, both live names, and the artefact targetDatabase', () => {
+      const live = guards({ expectDatabase: 'afldb_dev', artefact: artefact({ candidateDatabase: 'afldb_dev' }) }).join('|');
+      expect(live).toMatch(/is a live database/);
+      expect(live).toMatch(/is the artefact targetDatabase/);
+      expect(guards({ expectDatabase: 'afldb_prod', artefact: artefact({ candidateDatabase: 'afldb_prod' }) }).join('|')).toMatch(/is a live database/);
+      const target = guards({ artefact: artefact({ targetDatabase: CANDIDATE }) }).join('|');
+      expect(target).toMatch(/is the artefact targetDatabase/);
+    });
+
+    it('refuses a pre_rebuild database', () => {
+      expect(isPreRebuildDatabaseName('afldb_prod_pre_rebuild_20260929')).toBe(true);
+      expect(isPreRebuildDatabaseName(CANDIDATE)).toBe(false);
+      const db = 'afldb_dev_pre_rebuild_20260929';
+      expect(guards({ expectDatabase: db, artefact: artefact({ candidateDatabase: db }) }).join('|')).toMatch(/pre_rebuild/);
+    });
+
+    it('refuses an artefact for the other environment', () => {
+      expect(guards({ environment: 'prod' }).join('|')).toMatch(/does not match --environment 'prod'/);
+    });
+
+    it('S6-D3: prod + non-empty correctedReplays is CORRECTED_PROMOTION_REHEARSAL_REQUIRED; prod with none, and dev with some, are not', () => {
+      const prod = guards({ environment: 'prod', artefact: artefact({ environment: 'prod' }) });
+      expect(prod.join('|')).toContain(CORRECTED_PROMOTION_REHEARSAL_REQUIRED);
+      expect(() => assertReplayPromotionGuards({
+        environment: 'prod', expectDatabase: CANDIDATE, expectRole: 'afldb_owner', artefact: artefact({ environment: 'prod' }),
+      })).toThrow(CORRECTED_PROMOTION_REHEARSAL_REQUIRED);
+      expect(guards({ environment: 'prod', artefact: artefact({ environment: 'prod', correctedReplays: [] }) })).toEqual([]);
+      expect(CORRECTED_PROMOTION_REQUIRES_FREEZE).toBe('CORRECTED_PROMOTION_REQUIRES_FREEZE');
+    });
+
+    it('S6-D3 and every guard fire BEFORE any SQL: a refused REPLAY issues no statement at all', async () => {
+      const log: string[] = [];
+      const file = { ...artefact({ environment: 'prod' }) } as unknown as AflApiSupersedeFile;
+      await expect(runReplayPromotion(fakeTx(CANDIDATE, 'afldb_owner', log), {
+        dryRun: false, supersedeIn: 'e.json', environment: 'prod', expectDatabase: CANDIDATE, expectRole: 'afldb_owner',
+      }, file)).rejects.toThrow(CORRECTED_PROMOTION_REHEARSAL_REQUIRED);
+      expect(log).toEqual([]);
+    });
+  });
+
+  describe('the artefact is reproduced exactly, or REPLAY refuses (§8.3 steps 2-4, 8)', () => {
+    const pass = (overrides: Partial<Extract<CpcResult, { outcome: 'PASS' }>> = {}): CpcResult => ({
+      outcome: 'PASS', externalId: 'CD_I1', adjudicationId: 7, candidateClass: 1,
+      predictedIdentityAction: 'update_in_place', providerRowId: 5, plannerVersion: PLANNER_VERSION,
+      predictedClosureFingerprint: HASH('f'),
+      predictedMutations: {
+        moved: { player_match_stats: 2, brownlow_round_votes: 0 },
+        deleted: { player_match_stats: 0, brownlow_round_votes: 1 },
+      },
+      ...overrides,
+    });
+
+    it('an identical PASS has no mismatch', () => {
+      expect(replayEntryMismatches(replayEntry(), pass(), PLANNER_VERSION)).toEqual([]);
+    });
+
+    it('class, identity action, fingerprint, counts and both plannerVersions each refuse', () => {
+      expect(replayEntryMismatches(replayEntry(), pass({ candidateClass: 2 }), PLANNER_VERSION).join('|')).toMatch(/class 2 != artefact class 1/);
+      expect(replayEntryMismatches(replayEntry(), pass({ predictedIdentityAction: 'insert' }), PLANNER_VERSION).join('|')).toMatch(/identity action insert/);
+      expect(replayEntryMismatches(replayEntry(), pass({ predictedClosureFingerprint: HASH('e') }), PLANNER_VERSION).join('|')).toMatch(/closure fingerprint/);
+      expect(replayEntryMismatches(replayEntry(), pass({
+        predictedMutations: { moved: { player_match_stats: 3, brownlow_round_votes: 0 }, deleted: { player_match_stats: 0, brownlow_round_votes: 1 } },
+      }), PLANNER_VERSION).join('|')).toMatch(/mutation counts differ/);
+      expect(replayEntryMismatches(replayEntry({ plannerVersion: PLANNER_VERSION + 1 }), pass(), PLANNER_VERSION).join('|')).toMatch(/running plannerVersion/);
+      expect(replayEntryMismatches(replayEntry(), pass({ plannerVersion: PLANNER_VERSION + 1 }), PLANNER_VERSION).join('|')).toMatch(/classification plannerVersion/);
+    });
+
+    it('a CPC FAIL (DISAGREE, COLLISION, PREDICT STOP, ...) is a refusal that names the code', () => {
+      const fail: CpcResult = {
+        outcome: 'FAIL', externalId: 'CD_I1', adjudicationId: 7, candidateClass: 5, code: 'COLLISION', detail: "candidate importer provider(s) at P'c: CD_X",
+      };
+      expect(replayEntryMismatches(replayEntry(), fail, PLANNER_VERSION)[0]).toMatch(/CPC FAIL COLLISION \(class 5\)/);
+    });
+
+    const corrected = (over: Partial<AflApiAdjudicationLedgerRow> = {}): AflApiAdjudicationLedgerRow => ({
+      id: 7, externalId: 'CD_I1', action: 'corrected', playerId: 900, playerIdentity: 'players/B/B.html',
+      supersedesId: null, previousPlayerIdentity: 'players/A/A.html', evidenceSha256: HASH('a'), ...over,
+    });
+    const fileFor = (rows: readonly AflApiAdjudicationLedgerRow[], entries = [replayEntry()]) => ({
+      correctedReplays: entries, targetLedgerRowCount: rows.length, targetLedgerSha256: aflApiLedgerStateSha256(rows),
+    });
+
+    it('the net CORRECTED set must equal correctedReplays exactly, and the ledger must be the artefact\'s', () => {
+      const rows = [corrected()];
+      expect(replayLedgerProblems(rows, fileFor(rows))).toEqual([]);
+      expect(replayLedgerProblems(rows, fileFor(rows, []) ).join('|')).toMatch(/not in correctedReplays/);
+      expect(replayLedgerProblems([], { ...fileFor(rows), targetLedgerRowCount: 0, targetLedgerSha256: aflApiLedgerStateSha256([]) }).join('|'))
+        .toMatch(/not net CORRECTED in the reinstated ledger/);
+      expect(replayLedgerProblems(rows, { ...fileFor(rows), targetLedgerSha256: HASH('0') }).join('|')).toMatch(/ledger digest differs/);
+      expect(replayLedgerProblems(rows, { ...fileFor(rows), targetLedgerRowCount: 2 }).join('|')).toMatch(/row count 1 != artefact/);
+      expect(replayLedgerProblems(rows, fileFor(rows, [replayEntry({ adjudicationId: 8 })])).join('|')).toMatch(/adjudication id 7 != artefact 8/);
+    });
+
+    it('a second (or replaced) corrected row for A is refused', () => {
+      expect(replayNoSecondCorrectedProblems([corrected()], [replayEntry()])).toEqual([]);
+      expect(replayNoSecondCorrectedProblems([corrected(), corrected({ id: 8 })], [replayEntry()]).join('|')).toMatch(/found 2/);
+      expect(replayNoSecondCorrectedProblems([corrected({ id: 9 })], [replayEntry()]).join('|')).toMatch(/expected exactly one/);
+    });
+
+    it('the post-replay importer, resolved and identity state must equal the prediction', () => {
+      const importer = { rowCount: 1, sha256: aflApiImporterStateSha256([{ externalId: 'CD_A', status: 'unique', matchMethod: 'afl_api_stat_vector_season', playerIdentity: 'players/A/A.html' }]) };
+      const identity = { rowCount: 2, sha256: aflApiIdentityStateSha256([{ externalId: 'CD_A', status: 'unique', matchMethod: 'afl_api_stat_vector_season', playerIdentity: null }]) };
+      const file = {
+        predictedPostReplayImporterRowCount: 1, predictedPostReplayImporterSha256: importer.sha256,
+        predictedPostReplayResolvedRowCount: 1, predictedPostReplayIdentitySha256: identity.sha256,
+      };
+      expect(replayPostStateProblems({ importer, identity, resolvedRowCount: 1 }, file)).toEqual([]);
+      expect(replayPostStateProblems({ importer, identity, resolvedRowCount: 2 }, file).join('|')).toMatch(/resolved row count 2 != predicted 1/);
+      expect(replayPostStateProblems({ importer: { ...importer, sha256: HASH('0') }, identity, resolvedRowCount: 1 }, file).join('|')).toMatch(/importer state digest/);
+      expect(replayPostStateProblems({ importer, identity: { ...identity, sha256: HASH('0') }, resolvedRowCount: 1 }, file).join('|')).toMatch(/identity state digest/);
+    });
+  });
+
+  describe('batch contract (§8.7): K and R differ only in mode, context, notes and predictedClosureFingerprint', () => {
+    it('ORIGINAL batch K is unchanged: original / live_target / no predicted fingerprint / the ISSUE-238 correction notes', () => {
+      expect(ORIGINAL_BATCH_CONTRACT.mode).toBe('original');
+      expect(ORIGINAL_BATCH_CONTRACT.context).toBe('live_target');
+      expect(ORIGINAL_BATCH_CONTRACT.predictedClosureFingerprint).toBeNull();
+      expect(ORIGINAL_BATCH_CONTRACT.openNotes).toBe('AFLDB-ISSUE-238 correction; authority afl_api_identity_adjudications id <pending>');
+      expect(ORIGINAL_BATCH_CONTRACT.boundNotes(9)).toBe('AFLDB-ISSUE-238 correction; authority afl_api_identity_adjudications id 9');
+    });
+
+    it('REPLAY batch R is replay / promotion, carries predictedClosureFingerprint, and the promotion replay notes', () => {
+      const contract = replayBatchContract(HASH('c'));
+      expect(contract.mode).toBe('replay');
+      expect(contract.context).toBe('promotion');
+      expect(contract.predictedClosureFingerprint).toBe(HASH('c'));
+      expect(contract.boundNotes(9)).toBe('AFLDB-ISSUE-238 promotion replay; authority afl_api_identity_adjudications id 9');
+    });
+
+    it('source contract: one validation_result builder serves both, and predictedClosureFingerprint is REPLAY-only', () => {
+      const source = toolSource();
+      const builder = source.slice(source.indexOf('function correctionBatchValidationResult('), source.indexOf('function correctionCountsFor('));
+      expect(builder).toContain("kind: 'afl_api_identity_correction', mode: contract.mode, context: contract.context");
+      expect(builder).toContain('closureFingerprint: input.closureFingerprint');
+      expect(builder).toContain("mutationEligibility: 'PASS'");
+      expect(builder).toContain('contract.predictedClosureFingerprint === null ? {} : { predictedClosureFingerprint: contract.predictedClosureFingerprint }');
+      const original = source.slice(source.indexOf('async function runCorrection('), source.indexOf('function correctionBatchValidationResult('));
+      expect(original).toContain('correctionBatchValidationResult(ORIGINAL_BATCH_CONTRACT');
+      expect(original).toContain('openCorrectionBatch(tx, closure.rows.length, ORIGINAL_BATCH_CONTRACT.openNotes)');
+      expect(original).toContain("proveSession(tx, args.expectDatabase, 'afldb_import')");
+    });
+  });
+
+  describe('REPLAY source contracts (§8.8 allow-list, F-005)', () => {
+    const source = toolSource();
+    const between = (start: string, end: string) => source.slice(source.indexOf(start), source.indexOf(end));
+    const replaySection = between('REPLAY_SECTION_BEGIN', 'REPLAY_SECTION_END');
+    const sharedMechanics = between('Shared mechanics: ONE implementation', 'export async function readStatAvailability(');
+    const cpcSection = between('§5.1 / §9.1: planning and CPC classification', '§8.2: the ORIGINAL transaction');
+    const replayReachable = [replaySection, sharedMechanics, cpcSection].join('\n');
+
+    it('the sections are found and non-trivial', () => {
+      expect(replaySection.length).toBeGreaterThan(5000);
+      expect(sharedMechanics.length).toBeGreaterThan(3000);
+      expect(cpcSection.length).toBeGreaterThan(3000);
+    });
+
+    it('REPLAY reads CANDIDATE_DSN and never references the import DSN, resolveImportDsn or the .env loader', () => {
+      expect(replaySection).toContain('env.CANDIDATE_DSN');
+      expect(replaySection).not.toContain('AFLDB_IMPORT_DATABASE_URL');
+      expect(replaySection).not.toContain('resolveImportDsn');
+      expect(replaySection).not.toMatch(/\bloadEnv\(/);
+      expect(replaySection).toContain("proveSession(tx, args.expectDatabase, 'afldb_owner')");
+      const main = source.slice(source.indexOf('async function main('));
+      expect(main.indexOf("argv.includes('--replay-promotion')")).toBeGreaterThan(0);
+      expect(main.indexOf("argv.includes('--replay-promotion')")).toBeLessThan(main.indexOf('loadEnv(REPO_ROOT)'));
+    });
+
+    it('ORIGINAL still resolves AFLDB_IMPORT_DATABASE_URL through resolveImportDsn', () => {
+      const original = source.slice(source.indexOf('async function main('));
+      expect(original).toContain('resolveImportDsn(process.env, args.expectDatabase)');
+      expect(source.slice(source.indexOf('export function resolveImportDsn('), source.indexOf('export type CorrectionSessionRole'))).toContain('env.AFLDB_IMPORT_DATABASE_URL');
+    });
+
+    it('nothing REPLAY can reach writes afl_api_identity_adjudications or resolves findings', () => {
+      expect(replayReachable).not.toMatch(/INSERT\s+INTO\s+afl_api_identity_adjudications/);
+      expect(replayReachable).not.toMatch(/UPDATE\s+afl_api_identity_adjudications/);
+      expect(replayReachable).not.toMatch(/DELETE\s+FROM\s+afl_api_identity_adjudications/);
+      expect(replaySection).not.toContain('resolveAdjudicatedContradictions');
+      expect(replaySection).not.toMatch(/\bdata_issues\b.*\bSET\b/);
+    });
+
+    it('every write statement REPLAY can reach targets an allow-listed table', () => {
+      const inserts = [...replayReachable.matchAll(/INSERT\s+INTO\s+([a-z_.]+)/g)].map((m) => m[1]);
+      expect(new Set(inserts)).toEqual(new Set(['canonical_applications', 'import_batches', 'external_identities']));
+      const updates = [...replayReachable.matchAll(/UPDATE\s+(\$\{tx\(row\.table\)\}|[a-z_.]+)\s+SET/g)].map((m) => m[1]);
+      expect(new Set(updates)).toEqual(new Set([
+        'import_batches', 'external_identities', '${tx(row.table)}', 'staging.afl_api_player_match', 'staging.afl_api_brownlow_vote',
+      ]));
+      const deletes = [...replayReachable.matchAll(/DELETE\s+FROM\s+(\$\{tx\(row\.table\)\}|[a-z_.]+)/g)].map((m) => m[1]);
+      expect(new Set(deletes)).toEqual(new Set(['${tx(row.table)}']));
+    });
+
+    it('a batch is opened only when the closure has a MOVE or DELETE, and only once in REPLAY', () => {
+      expect(replaySection.match(/openCorrectionBatch\(/g)).toHaveLength(1);
+      expect(replaySection).toMatch(
+        /if \(closureRows\.length > 0\) \{\s+batchId = await openCorrectionBatch\(tx, closureRows\.length, contract\.openNotes\);\s+await bindCorrectionBatch\(/,
+      );
+      expect(replaySection).toMatch(/\} else \{\s+projectionsMoved = await moveProviderProjections\(/);
+    });
+
+    it('ALREADY_REPLAYED: a resolved D15-shape row at P′c whose Q2 passes is skipped before classification and writes nothing', () => {
+      const detect = between('async function detectAlreadyReplayed(', 'async function writeReplayedIdentity(');
+      expect(detect).toContain("row.status !== 'resolved' || row.matchMethod !== AFL_API_ADMIN_MATCH_METHOD || row.candidateCount !== 0");
+      expect(detect).toContain('pPrime.playerId !== row.playerId');
+      expect(detect).toContain('checkCorrectionSatisfaction(dbCorrectionSatisfactionReader(tx)');
+      expect(detect).not.toMatch(/\b(INSERT|UPDATE|DELETE|LOCK)\b/);
+      const run = between('export async function runReplayPromotion(', 'export function formatReplayOutcome(');
+      expect(run.indexOf('if (already.has(entry.externalId)) continue;')).toBeGreaterThan(0);
+      expect(run.indexOf('if (already.has(entry.externalId)) continue;')).toBeLessThan(run.indexOf('classifyCorrectedProviderInDatabase('));
+    });
+
+    it('REPLAY classifies under ADJUDICATION authority with row locks, then requires class, version and fingerprint', () => {
+      const run = between('export async function runReplayPromotion(', 'export function formatReplayOutcome(');
+      expect(run).toContain("authorityMode: 'ADJUDICATION', lockRows: true");
+      expect(run).toContain('replayEntryMismatches(entry, classified.result, PLANNER_VERSION)');
+      expect(run).toContain('replayLedgerProblems(ledgerRows, file)');
+      expect(run).toContain('replayPostStateProblems(post, file)');
+      expect(run).toContain('replayNoSecondCorrectedProblems(ledgerAfter, entries)');
+      expect(run).toContain('aflApiLedgerStateSha256(ledgerAfter) !== h0');
+    });
+
+    it('no catch inside any REPLAY transaction callback, and the tool still has exactly one .catch(', () => {
+      const run = between('export async function runReplayPromotion(', 'export function formatReplayOutcome(');
+      expect(run).not.toMatch(/\bcatch\b/);
+      const cli = between('export async function runReplayPromotionCli(', 'REPLAY_SECTION_END');
+      const dryCallback = cli.slice(cli.indexOf('async (tx) => {'), cli.indexOf('});'));
+      expect(dryCallback).not.toMatch(/\bcatch\b/);
+      expect(source.match(/\.catch\(/g)).toHaveLength(1);
+    });
+
+    it('predictCorrectionClosure never proves the session or takes a table/advisory lock, and takes lockRows from the caller', () => {
+      const predict = between('export async function predictCorrectionClosure(', 'export async function resolveCandidateIdentity(');
+      expect(predict).not.toMatch(/proveSession|takeIdentityTableLock|takeCorrectionLocks|LOCK TABLE|pg_advisory|FOR UPDATE/);
+      expect(predict).toContain('lockRows: input.lockRows');
+      expect(predict).toContain('mutationPlanFingerprint(closure.plan)');
+    });
+  });
+
+  describe('REPLAY with an empty correctedReplays writes nothing (fake transaction)', () => {
+    it('validates role and database, reads the ledger, and issues no INSERT/UPDATE/DELETE/LOCK', async () => {
+      const log: string[] = [];
+      const importerSha = aflApiImporterStateSha256([]);
+      const file = {
+        environment: 'dev', candidateDatabase: CANDIDATE, targetDatabase: 'afldb_dev', correctedReplays: [],
+        targetLedgerRowCount: 0, targetLedgerSha256: aflApiLedgerStateSha256([]),
+        predictedPostReplayImporterRowCount: 0, predictedPostReplayImporterSha256: importerSha,
+        predictedPostReplayResolvedRowCount: 0, predictedPostReplayIdentitySha256: aflApiIdentityStateSha256([]),
+      } as unknown as AflApiSupersedeFile;
+      const outcome = await runReplayPromotion(fakeTx(CANDIDATE, 'afldb_owner', log), {
+        dryRun: false, supersedeIn: 'e.json', environment: 'dev', expectDatabase: CANDIDATE, expectRole: 'afldb_owner',
+      }, file);
+      expect(outcome.kind).toBe('NOTHING_TO_REPLAY');
+      expect(outcome.providers).toEqual([]);
+      expect(log.length).toBeGreaterThan(2);
+      expect(log.filter((text) => /\b(INSERT|UPDATE|DELETE|LOCK)\b/i.test(text))).toEqual([]);
+    });
+
+    it('refuses a wrong session role before reading anything else', async () => {
+      const log: string[] = [];
+      const file = { ...artefact({ correctedReplays: [] }) } as unknown as AflApiSupersedeFile;
+      await expect(runReplayPromotion(fakeTx(CANDIDATE, 'afldb_import', log), {
+        dryRun: false, supersedeIn: 'e.json', environment: 'dev', expectDatabase: CANDIDATE, expectRole: 'afldb_owner',
+      }, file)).rejects.toThrow(/session role is 'afldb_import', not 'afldb_owner'/);
+      expect(log).toHaveLength(1);
+    });
   });
 });

@@ -6,6 +6,7 @@
  * argument and database-name rules are pinned so no phase can be pointed at the wrong
  * database; and the checker's source is asserted to carry no write path.
  */
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -111,6 +112,9 @@ import {
   AFL_API_LEDGER_ROWS_SQL, DATABASE_COMMENT_SQL, Report, aflApiDevRegenerationProposal, aflApiG2Entries, aflApiSupersedeFileFor,
   evaluateAflApiG2, gateAflApiCandidateAfterReinstate, gateAflApiG1, gateAflApiOverlap, gateAflApiPreCutoverCensus,
   gateAflApiRebuildMarker, readAflApiLedgerRows,
+  assertCorrectedPromotionAllowed, gateAflApiCorrectedCensus, judgeCorrectedCensus, netCorrectedEntries,
+  assembleCorrectedPromotion, cpcPassSet, crvBatchProblems, crvExactSetProblems, crvIdentityProblems,
+  gateAflApiCorrectedPredict, gateAflApiCorrectedReplayVerification, netCorrectedCorrectionEntries, targetHumanProvidersOf,
   PROMOTION_REPLAY_IDENTITIES_SQL, PROMOTION_REPLAY_MATCH_KEYS_SQL, PROMOTION_REPLAY_MAX_SEASON_SQL,
   PROMOTION_REPLAY_OVERRIDES_SQL, PROMOTION_REPLAY_PLAYER_CHECKS_SQL, gateOverrideReplayTargets, publishRestoredLineageRemap,
   PROMOTION_CONVERGENCE_TARGET_IDENTITIES_SQL,
@@ -224,6 +228,8 @@ import {
 } from '../tools/db/promotion-convergence-rehearsal';
 import {
   AFL_API_ADMIN_MATCH_METHOD,
+  CORRECTED_PROMOTION_REHEARSAL_REQUIRED,
+  CORRECTED_PROMOTION_REQUIRES_FREEZE,
   AFL_API_G2_REFUSING_OUTCOMES,
   AFL_API_REBUILD_MARKER_FORMAT,
   isAflApiRebuildMarkerComment,
@@ -231,6 +237,15 @@ import {
   aflApiDevRegenerationBindingProblems,
   aflApiDevRegenerationEntriesFromG3,
   aflApiLedgerStateSha256,
+  aflApiCorrectedLedgerStateSha256,
+  aflApiImporterStateSha256,
+  aflApiIdentityStateSha256,
+  predictAflApiPostReplayImporterState,
+  predictAflApiPostReplayIdentityState,
+  AFL_API_SUPERSEDE_VERSION,
+  type AflApiCorrectedReplayEntry,
+  type AflApiImporterStateRow,
+  type AflApiIdentityStateRow,
   aflApiSupersedeBindingProblems,
   buildAflApiSupersedeFile,
   classifyAflApiG3,
@@ -246,7 +261,10 @@ import {
   type AflApiContinuityContradiction,
   type AflApiCandidateIdentityRow,
   type AflApiPlayerRemapResult,
+  type AflApiSupersedeFile,
 } from '../src/lib/acquisition/afl-api-adjudication';
+import type { CpcResult } from '../src/lib/acquisition/afl-api-identity-correction';
+import { canonicalJson } from '../src/lib/acquisition/observations';
 
 const REPO = process.cwd();
 const MIGRATIONS = join(REPO, 'src', 'db', 'migrations');
@@ -3829,7 +3847,7 @@ describe('AFLDB-ISSUE-237 L4 hardening — promotion afl_api gates (DB-free)', (
     expect(classifyAflApiG2(own)).toEqual([{ externalId: 'CD_X', outcome: 'AGREE' }]);
   });
 
-  it('AFLDB-ISSUE-238 §8.6/§9.1 — G2 grades a net-corrected entry CORRECTED_REQUIRES_CPC, a refusing outcome never in AGREE', () => {
+  it('AFLDB-ISSUE-238 §8.6/§9.1 — G2 routes a net-corrected entry: CPC-classified is non-refusing, otherwise refusing; never in AGREE', () => {
     const correctedRow: AflApiAdjudicationLedgerRow = {
       id: 1, externalId: 'CD_I1', action: 'corrected', playerId: 907, playerIdentity: 'players/C/Corrected.html',
       supersedesId: null, previousPlayerIdentity: 'players/P/Previous.html', evidenceSha256: 'e'.repeat(64),
@@ -3840,9 +3858,18 @@ describe('AFLDB-ISSUE-237 L4 hardening — promotion afl_api gates (DB-free)', (
       manualIdentities: new Set(),
       remapByIdentity: new Map(),
     });
-    const grades = classifyAflApiG2(entries);
-    expect(grades).toEqual([{ externalId: 'CD_I1', outcome: 'CORRECTED_REQUIRES_CPC' }]);
-    expect(AFL_API_G2_REFUSING_OUTCOMES.has('CORRECTED_REQUIRES_CPC')).toBe(true);
+    // no opts (fail-closed default), an empty set, and a set naming another provider all refuse
+    for (const opts of [undefined, { cpcCorrected: new Set<string>() }, { cpcCorrected: new Set(['CD_I2']) }]) {
+      const refused = classifyAflApiG2(entries, opts);
+      expect(refused).toEqual([{ externalId: 'CD_I1', outcome: 'CORRECTED_NOT_CPC_CLASSIFIED' }]);
+      expect(aflApiG2AgreeSet(refused).size).toBe(0);
+    }
+    expect(AFL_API_G2_REFUSING_OUTCOMES.has('CORRECTED_NOT_CPC_CLASSIFIED')).toBe(true);
+    expect(AFL_API_G2_REFUSING_OUTCOMES.has('CORRECTED_REQUIRES_CPC' as never)).toBe(false);
+    // in the CPC set it routes to the replay outcome: non-refusing, and still never AGREE / E_promotion
+    const grades = classifyAflApiG2(entries, { cpcCorrected: new Set(['CD_I1']) });
+    expect(grades).toEqual([{ externalId: 'CD_I1', outcome: 'CORRECTED_CPC_REPLAY' }]);
+    expect(AFL_API_G2_REFUSING_OUTCOMES.has('CORRECTED_CPC_REPLAY')).toBe(false);
     expect(aflApiG2AgreeSet(grades).size).toBe(0);
     // linked/revoked grading is unchanged by the corrected addition (F-L4-2's own cases cover
     // DISAGREE/COLLISION/UNEVALUABLE/UNRESOLVED/CONTINUITY_CONTRADICTION already).
@@ -3911,6 +3938,143 @@ describe('AFLDB-ISSUE-237 L4 hardening — promotion afl_api gates (DB-free)', (
     await gateAflApiPreCutoverCensus(fakeQ(corrected), correctedReport);
     expect(correctedReport.results[0].lines[1])
       .toBe('human resolved rows: 1; ledger rows: 1; net-linked ledger entries: 0; net-corrected ledger entries: 1');
+  });
+
+  // --- AFLDB-ISSUE-238 Slice 6 (M3b part 1): corrected-set gates and the pre-cutover census -------
+
+  const correctedRow = (id: number, externalId: string): AflApiAdjudicationLedgerRow => ({
+    id, externalId, action: 'corrected', playerId: 900, playerIdentity: A,
+    supersedesId: null, previousPlayerIdentity: 'players/X/Old.html', evidenceSha256: 'f'.repeat(64),
+  });
+
+  it('S6 — the census snapshot gains netCorrectedLedgerEntries ONLY when > 0 (zero-corrected JSON is unchanged)', async () => {
+    const zero = await gateAflApiPreCutoverCensus(fakeQ(devTarget()), new Report());
+    expect(Object.keys(zero).sort()).toEqual(['humanRows', 'importerRowsByMethod', 'netLinkedLedgerEntries']);
+    expect(JSON.stringify(zero)).not.toContain('netCorrected');
+
+    const corrected = fakeDb({ ids: [at(900, A)], afl: [human('CD_I1', 900)], ledger: [correctedRow(1, 'CD_I1')] });
+    const withCorrected = await gateAflApiPreCutoverCensus(fakeQ(corrected), new Report());
+    expect(withCorrected.netCorrectedLedgerEntries).toBe(1);
+    expect(withCorrected.netLinkedLedgerEntries).toBe(0);
+  });
+
+  it('S6 — netCorrectedEntries lists only NET-corrected providers, by provider id, with the ledger row id Q2 is given', () => {
+    expect(netCorrectedEntries([linked(7, 'CD_I1', 900, A)])).toEqual([]);
+    const rows = [
+      linked(1, 'CD_I2', 900, A),
+      { ...correctedRow(2, 'CD_I2'), playerId: 901, playerIdentity: B, supersedesId: 1, previousPlayerIdentity: A },
+      linked(3, 'CD_I1', 902, C),
+    ];
+    expect(netCorrectedEntries(rows)).toEqual([{ externalId: 'CD_I2', adjudicationId: 2 }]);
+  });
+
+  it('S6-D2/S6-D3 — assertCorrectedPromotionAllowed: empty set never blocks; DEV needs a freeze; PROD is refused (temporary)', () => {
+    const base = { correctedCount: 0, freezeRecordSupplied: false, role: 'target afldb_dev' };
+    for (const phase of ['pre-cutover', 'restored', 'candidate', 'production'] as const) {
+      // zero-corrected: DEV without a freeze record behaves exactly as before, PROD is not this gate's business
+      expect(() => assertCorrectedPromotionAllowed({ ...base, environment: 'dev', phase })).not.toThrow();
+      expect(() => assertCorrectedPromotionAllowed({ ...base, environment: 'prod', phase })).not.toThrow();
+      // corrected > 0: DEV without freeze refuses at every freeze-bound phase
+      expect(() => assertCorrectedPromotionAllowed({ ...base, correctedCount: 2, environment: 'dev', phase }))
+        .toThrow(new RegExp(`^${CORRECTED_PROMOTION_REQUIRES_FREEZE}: --phase ${phase} refused: target afldb_dev carries 2 net-corrected`));
+      // ... and with a valid freeze record proceeds to the ISSUE-238 checks
+      expect(() => assertCorrectedPromotionAllowed({ ...base, correctedCount: 2, freezeRecordSupplied: true, environment: 'dev', phase }))
+        .not.toThrow();
+      // PROD is refused by the temporary rehearsal gate even WITH the freeze record (the gate is not a freeze gate)
+      expect(() => assertCorrectedPromotionAllowed({ ...base, correctedCount: 1, freezeRecordSupplied: true, environment: 'prod', phase }))
+        .toThrow(new RegExp(`^${CORRECTED_PROMOTION_REHEARSAL_REQUIRED}: --phase ${phase} under --environment prod refused: .*TEMPORARY.*Slice 10/11`));
+    }
+    expect(() => assertCorrectedPromotionAllowed({ ...base, correctedCount: 1, environment: 'dev', phase: 'restored' }))
+      .toThrow(PromotionRefused);
+  });
+
+  it('S6 §5 — judgeCorrectedCensus: satisfied PASSES and post_correction_edit / correction_target_absent are reported, never failed', () => {
+    const satisfied = {
+      satisfied: true, stops: [], correctedPlayerId: 901,
+      reports: [
+        'post_correction_edit admin: player_match_stats (1,2) kicks 3 -> 4 (audit 9)',
+        'NOOP correction_target_absent: player_match_stats (1,3) (match 3 deleted after the correction, audited); lineage L1-L7 retained, never recreated',
+        'some other move report',
+      ],
+    } as never;
+    const ok = judgeCorrectedCensus([{ providerId: 'CD_I1', adjudicationId: 2, result: satisfied }]);
+    expect(ok.verdict).toBe('PASS');
+    expect(ok.lines[0]).toBe('net-corrected providers on the live target: 1; correction satisfied: 1; not satisfied: 0');
+    expect(ok.lines.filter((l) => l.includes('recognised, not a failure'))).toHaveLength(2);
+    expect(ok.lines.join('\n')).not.toContain('some other move report');
+
+    const stopped = {
+      satisfied: false, correctedPlayerId: null, reports: [],
+      stops: [{ table: 'player_match_stats', rowId: null, step: 'SAT-1', code: 'identity_contradicts', detail: 'extended bijection: x' }],
+    } as never;
+    const bad = judgeCorrectedCensus([
+      { providerId: 'CD_I1', adjudicationId: 2, result: satisfied }, { providerId: 'CD_I2', adjudicationId: 5, result: stopped },
+    ]);
+    expect(bad.verdict).toBe('FAIL');
+    expect(bad.lines[0]).toBe('net-corrected providers on the live target: 2; correction satisfied: 1; not satisfied: 1');
+    expect(bad.lines).toContain('CD_I2 (ledger row 5): STOP [SAT-1] identity_contradicts: extended bijection: x');
+  });
+
+  it('S6 §5 — gateAflApiCorrectedCensus drives the REAL Q2: a missing corrected authority/P-prime row FAILS the gate', async () => {
+    const reader = {
+      aflApiSourceId: async () => 1, identityRow: async () => null, ledgerRows: async () => [],
+      resolvePlayerIdentity: async () => null, batchesClaimingAdjudication: async () => [], batchApplications: async () => [],
+      applicationsAt: async () => [], currentRowAt: async () => null, projectionPlayer: async () => null,
+      matchExists: async () => true, auditsFor: async () => [], attributedKeysAtPlayer: async () => [],
+      identityInvariantFacts: async () => ({ censusRows: [], ledgerRows: [], identityByPlayerId: new Map() }),
+      providerProjections: async () => [],
+    };
+    const report = new Report();
+    await gateAflApiCorrectedCensus(reader as never, [{ externalId: 'CD_I1', adjudicationId: 2 }], report);
+    expect(report.results).toHaveLength(1);
+    expect(report.results[0].verdict).toBe('FAIL');
+    expect(report.results[0].gate).toContain('pre-cutover satisfaction census (Q2)');
+    expect(report.results[0].lines.join('\n')).toContain('CD_I1 (ledger row 2): STOP [SAT-1] authority_invalid');
+  });
+
+  it('S6 — wiring (source-pinned): each phase evaluates its own predicate before its other ISSUE-238 work; the census runs Q2 in a read-only transaction', () => {
+    const source = readFileSync(join(REPO, 'tools', 'db', 'promotion-check.ts'), 'utf8');
+    const main = source.slice(source.indexOf('async function main('));
+    const pos = (needle: string, from = 0) => {
+      const i = main.indexOf(needle, from);
+      expect(i, needle).toBeGreaterThan(-1);
+      return i;
+    };
+    // pre-cutover: the target ledger's net-corrected count, the refusal, THEN the marker/census gates; Q2 only when non-empty
+    const pre = pos('const targetCorrected = netCorrectedEntries(await readAflApiLedgerRows(conn.q))');
+    expect(pos('assertCorrectedPromotionAllowed(', pre)).toBeLessThan(pos('await gateAflApiRebuildMarker([{ role: `target', pre));
+    expect(pos('aflApiTargetCensus = await gateAflApiPreCutoverCensus(conn.q, report)', pre))
+      .toBeLessThan(pos('if (targetCorrected.length > 0) {', pre));
+    expect(main).toMatch(/if \(targetCorrected\.length > 0\) \{\s*await withCorrectionSatisfactionReader\(dsn,/);
+    // restored: the OLD (target) ledger, before the frozen/dangling/overlap/lineage work
+    const res = pos("if (phase === 'restored') {");
+    expect(pos('netCorrectedEntries(await readAflApiLedgerRows(old.q))', res)).toBeLessThan(pos('await gateDanglingReferences(', res));
+    expect(pos('assertCorrectedPromotionAllowed(', res)).toBeLessThan(pos('aflApiOverlap = await gateAflApiOverlap(', res));
+    // candidate: reinstated ledger OR the artefact's correctedReplays, before the G1-after-reinstate gate
+    const cand = pos("if (phase === 'candidate') {");
+    const candBlock = main.slice(cand, pos('await gateAflApiCandidateAfterReinstate(conn.q', cand));
+    expect(candBlock).toContain('assertCorrectedPromotionAllowed(');
+    expect(candBlock).toContain('readAflApiLedgerRows(conn.q)');
+    expect(candBlock).toContain('boundSupersede!.correctedReplays.length');
+    // production: the promoted live database
+    const prod = pos("if (phase === 'production') {");
+    expect(main.slice(prod, prod + 500)).toContain('assertCorrectedPromotionAllowed(');
+    expect(main.slice(prod, prod + 500)).toContain('readAflApiLedgerRows(conn.q)');
+
+    // the census: shared Q2 + the correction CLI's reader, inside a postgres.js 'read only' transaction, no catch inside
+    const opener = source.slice(source.indexOf('export async function withCorrectionSatisfactionReader'), source.indexOf('export function publishRestoredAflApiFiles'));
+    expect(opener).toContain("sql.begin('read only', (tx) => run(dbCorrectionSatisfactionReader(tx)))");
+    expect(opener).toContain('await sql.unsafe(READ_ONLY_SQL)');
+    expect(opener).toContain("application_name: `afldb-promotion-check:${name}`");
+    expect(opener).not.toMatch(/catch/);
+    const gate = source.slice(source.indexOf('export async function gateAflApiCorrectedCensus'), source.indexOf('function refusedFile'));
+    expect(gate).toContain('checkCorrectionSatisfaction(reader, {');
+    expect(gate).toContain('currentBatchId: null');
+
+    // the reader is the correction CLI's own, and importing that module runs nothing
+    const cli = readFileSync(join(REPO, 'tools', 'migration', 'correct_afl_api_identity.ts'), 'utf8');
+    expect(cli).toContain('export function dbCorrectionSatisfactionReader(tx: TransactionSql)');
+    expect(cli).toMatch(/if \(invokedDirectly\) \{\s*main\(process\.argv\.slice\(2\)\)/);
   });
 
   // --- F-L4-3 ----------------------------------------------------------------------------------
@@ -4004,6 +4168,11 @@ describe('AFLDB-ISSUE-237 L4 hardening — promotion afl_api gates (DB-free)', (
       environment: 'dev' as const, candidateDatabase: CAND, targetDatabase: 'afldb_dev',
       candidateImporterRowCount: 2, candidateImporterSha256: 'c'.repeat(64),
       targetLedgerRowCount: 1, targetLedgerSha256: 'd'.repeat(64),
+      // v3 zero-corrected shape: predicted post-replay importer state == pre-replay
+      targetCorrectedLedgerRowCount: 0, targetCorrectedLedgerSha256: aflApiCorrectedLedgerStateSha256([]).sha256,
+      correctedReplays: [] as AflApiCorrectedReplayEntry[],
+      predictedPostReplayImporterRowCount: 2, predictedPostReplayImporterSha256: 'c'.repeat(64),
+      predictedPostReplayIdentitySha256: 'a'.repeat(64),
     };
     const file = buildAflApiSupersedeFile({ ...base, expectedSupersedes: ['CD_I2', 'CD_I1', 'CD_I2'] });
     expect(file.expectedSupersedes).toEqual(['CD_I1', 'CD_I2']);
@@ -4046,7 +4215,221 @@ describe('AFLDB-ISSUE-237 L4 hardening — promotion afl_api gates (DB-free)', (
     expect(aflApiSupersedeBindingProblems(empty, actual).map((p) => p.kind)).toContain('ledger_state_mismatch');
   });
 
-  it('F-L4-4 — post-swap D15 replay: supersedes exactly the bound set, and refuses every unbound file before any write', async () => {
+  describe('AFLDB-ISSUE-238 §9.1 — the v3 supersede artefact, post-replay predictions (DB-free)', () => {
+    const hex = (c: string) => c.repeat(64);
+    const ACTION = { 1: 'update_in_place', 2: 'upgrade_in_place', 3: 'insert' } as const;
+    const entry = (
+      externalId: string, candidateClass: 1 | 2 | 3, over: Partial<AflApiCorrectedReplayEntry> = {},
+    ): AflApiCorrectedReplayEntry => ({
+      externalId, adjudicationId: 5, adjudicationEvidenceSha256: hex('e'),
+      previousPlayerIdentity: 'players/P/Prev.html', playerIdentity: 'players/N/New.html',
+      candidateClass, predictedIdentityAction: ACTION[candidateClass],
+      plannerVersion: 2, predictedClosureFingerprint: hex('f'),
+      predictedMutations: {
+        moved: { player_match_stats: candidateClass === 1 ? 3 : 0, brownlow_round_votes: 0 },
+        deleted: { player_match_stats: 0, brownlow_round_votes: candidateClass === 1 ? 1 : 0 },
+      },
+      ...over,
+    });
+    const importerRows: AflApiImporterStateRow[] = [
+      { externalId: 'CD_I1', status: 'unique', matchMethod: 'afl_api_stat_vector_bootstrap', playerIdentity: 'players/P/Prev.html' },
+      { externalId: 'CD_I2', status: 'unique', matchMethod: 'afl_api_stat_vector_bootstrap', playerIdentity: 'players/Q/Two.html' },
+      { externalId: 'CD_I4', status: 'unique', matchMethod: 'afl_api_stat_vector_bootstrap', playerIdentity: 'players/R/Four.html' },
+    ];
+    const identityRows: AflApiIdentityStateRow[] = importerRows;
+    const cReplays = [entry('CD_I3', 3), entry('CD_I1', 1), entry('CD_I2', 2)];
+    const v3 = (over: Partial<Parameters<typeof buildAflApiSupersedeFile>[0]> = {}, replays: AflApiCorrectedReplayEntry[] = cReplays) => {
+      const post = predictAflApiPostReplayImporterState(importerRows, replays);
+      return buildAflApiSupersedeFile({
+        environment: 'dev', candidateDatabase: CAND, targetDatabase: 'afldb_dev',
+        candidateImporterRowCount: importerRows.length, candidateImporterSha256: aflApiImporterStateSha256(importerRows),
+        targetLedgerRowCount: 5, targetLedgerSha256: hex('d'),
+        expectedSupersedes: ['CD_I4'],
+        targetCorrectedLedgerRowCount: replays.length, targetCorrectedLedgerSha256: hex('9'),
+        correctedReplays: replays,
+        predictedPostReplayImporterRowCount: post.rowCount, predictedPostReplayImporterSha256: post.sha256,
+        predictedPostReplayIdentitySha256: predictAflApiPostReplayIdentityState(identityRows, replays).sha256,
+        ...over,
+      });
+    };
+    /** Mutate a parsed file and RE-HASH it, so the refusal under test is the field rule, not the payload hash. */
+    const forged = (mutate: (o: Record<string, any>) => void): string => {
+      const o = JSON.parse(JSON.stringify(v3())) as Record<string, any>;
+      mutate(o);
+      const { payloadSha256: _dropped, ...rest } = o;
+      o.payloadSha256 = createHash('sha256').update(canonicalJson(rest as never), 'utf8').digest('hex');
+      return JSON.stringify(o);
+    };
+    const refusedForged = (mutate: (o: Record<string, any>) => void, why: RegExp) => {
+      const text = forged(mutate);
+      expect(() => parseAflApiSupersedeFile(text)).toThrow(AflApiPromotionFileRefused);
+      expect(() => parseAflApiSupersedeFile(text)).toThrow(why);
+    };
+
+    it('round-trips v3, sorts correctedReplays by externalId, and derives the resolved count', () => {
+      const file = v3();
+      expect(AFL_API_SUPERSEDE_VERSION).toBe(3);
+      expect(file.version).toBe(3);
+      expect(file.correctedReplays.map((e) => e.externalId)).toEqual(['CD_I1', 'CD_I2', 'CD_I3']);
+      expect(file.predictedPostReplayResolvedRowCount).toBe(3);
+      expect(file.predictedPostReplayImporterRowCount).toBe(1);
+      expect(parseAflApiSupersedeFile(JSON.stringify(file))).toEqual(file);
+      expect(v3()).toEqual(file); // deterministic
+    });
+
+    it('refuses a tamper of each new field by payload hash', () => {
+      const text = JSON.stringify(v3());
+      const tampers: [string, (o: Record<string, any>) => void][] = [
+        ['targetCorrectedLedgerRowCount', (o) => { o.targetCorrectedLedgerRowCount = 4; }],
+        ['targetCorrectedLedgerSha256', (o) => { o.targetCorrectedLedgerSha256 = hex('8'); }],
+        ['predictedPostReplayImporterRowCount', (o) => { o.predictedPostReplayImporterRowCount = 0; }],
+        ['predictedPostReplayImporterSha256', (o) => { o.predictedPostReplayImporterSha256 = hex('8'); }],
+        ['predictedPostReplayResolvedRowCount', (o) => { o.predictedPostReplayResolvedRowCount = 4; }],
+        ['predictedPostReplayIdentitySha256', (o) => { o.predictedPostReplayIdentitySha256 = hex('8'); }],
+        ['entry.adjudicationId', (o) => { o.correctedReplays[0].adjudicationId = 6; }],
+        ['entry.adjudicationEvidenceSha256', (o) => { o.correctedReplays[0].adjudicationEvidenceSha256 = hex('8'); }],
+        ['entry.previousPlayerIdentity', (o) => { o.correctedReplays[0].previousPlayerIdentity = 'players/X/Y.html'; }],
+        ['entry.playerIdentity', (o) => { o.correctedReplays[0].playerIdentity = 'players/X/Y.html'; }],
+        ['entry.plannerVersion', (o) => { o.correctedReplays[0].plannerVersion = 3; }],
+        ['entry.predictedClosureFingerprint', (o) => { o.correctedReplays[0].predictedClosureFingerprint = hex('8'); }],
+        ['entry.predictedMutations.moved', (o) => { o.correctedReplays[0].predictedMutations.moved.player_match_stats = 99; }],
+        ['entry.predictedMutations.deleted', (o) => { o.correctedReplays[0].predictedMutations.deleted.brownlow_round_votes = 99; }],
+      ];
+      for (const [name, mutate] of tampers) {
+        const o = JSON.parse(text) as Record<string, any>;
+        mutate(o);
+        expect(() => parseAflApiSupersedeFile(JSON.stringify(o)), name).toThrow(/tampered/);
+      }
+    });
+
+    it('refuses a missing or extra key at every level', () => {
+      const cases: [string, (o: Record<string, any>) => void][] = [
+        ['top-level missing', (o) => { delete o.correctedReplays; }],
+        ['top-level missing predicted hash', (o) => { delete o.predictedPostReplayIdentitySha256; }],
+        ['top-level extra', (o) => { o.note = 'x'; }],
+        ['entry extra', (o) => { o.correctedReplays[0].extra = 1; }],
+        ['entry missing', (o) => { delete o.correctedReplays[0].plannerVersion; }],
+        ['predictedMutations extra', (o) => { o.correctedReplays[0].predictedMutations.inserted = {}; }],
+        ['moved missing key', (o) => { delete o.correctedReplays[0].predictedMutations.moved.brownlow_round_votes; }],
+        ['deleted extra key', (o) => { o.correctedReplays[0].predictedMutations.deleted.other = 1; }],
+      ];
+      for (const [name, mutate] of cases) {
+        const o = JSON.parse(JSON.stringify(v3())) as Record<string, any>;
+        mutate(o);
+        expect(() => parseAflApiSupersedeFile(JSON.stringify(o)), name).toThrow(/unexpected field set/);
+      }
+    });
+
+    it('refuses v1 and v2 files as STALE by name, even though their key sets differ', () => {
+      const v2Shaped = JSON.parse(JSON.stringify(v3())) as Record<string, any>;
+      for (const k of ['targetCorrectedLedgerRowCount', 'targetCorrectedLedgerSha256', 'correctedReplays',
+        'predictedPostReplayImporterRowCount', 'predictedPostReplayImporterSha256',
+        'predictedPostReplayResolvedRowCount', 'predictedPostReplayIdentitySha256']) delete v2Shaped[k];
+      v2Shaped.version = 2;
+      expect(() => parseAflApiSupersedeFile(JSON.stringify(v2Shaped))).toThrow(AflApiPromotionFileRefused);
+      expect(() => parseAflApiSupersedeFile(JSON.stringify(v2Shaped))).toThrow(/stale supersede file: version 2/);
+      const v1 = { issue: 'AFLDB-ISSUE-237', format: 'afldb.afl_api_supersede_expected', version: 1, expectedSupersedes: [] };
+      expect(() => parseAflApiSupersedeFile(JSON.stringify(v1))).toThrow(/stale supersede file: version 1/);
+      // a v3-keyed file claiming version 2 is stale too
+      const claimsV2 = JSON.parse(JSON.stringify(v3())) as Record<string, any>;
+      claimsV2.version = 2;
+      expect(() => parseAflApiSupersedeFile(JSON.stringify(claimsV2))).toThrow(/stale supersede file/);
+    });
+
+    it('refuses unsorted or duplicate correctedReplays, class/action mismatches and a class-2 entry that moves rows', () => {
+      refusedForged((o) => { o.correctedReplays.reverse(); }, /sorted by externalId/);
+      refusedForged((o) => { o.correctedReplays[1] = JSON.parse(JSON.stringify(o.correctedReplays[0])); }, /sorted by externalId and free of duplicates/);
+      refusedForged((o) => { o.correctedReplays[0].predictedIdentityAction = 'insert'; }, /candidateClass 1 requires predictedIdentityAction update_in_place/);
+      refusedForged((o) => { o.correctedReplays[2].predictedIdentityAction = 'upgrade_in_place'; }, /candidateClass 3 requires predictedIdentityAction insert/);
+      refusedForged((o) => { o.correctedReplays[0].candidateClass = 4; }, /candidateClass must be 1, 2 or 3/);
+      refusedForged((o) => { o.correctedReplays[0].predictedIdentityAction = 'delete'; }, /predictedIdentityAction must be/);
+      refusedForged((o) => { o.correctedReplays[1].predictedMutations.moved.player_match_stats = 1; }, /class 2 .* zero moved and zero deleted/);
+      refusedForged((o) => { o.correctedReplays[1].predictedMutations.deleted.brownlow_round_votes = 1; }, /class 2 .* zero moved and zero deleted/);
+    });
+
+    it('refuses malformed scalars, an overlap with E_promotion, and every count inconsistency', () => {
+      refusedForged((o) => { o.correctedReplays[0].plannerVersion = 0; }, /plannerVersion must be a positive integer/);
+      refusedForged((o) => { o.correctedReplays[0].adjudicationId = 1.5; }, /adjudicationId must be a positive integer/);
+      refusedForged((o) => { o.correctedReplays[0].predictedMutations.moved.player_match_stats = -1; }, /non-negative integer/);
+      refusedForged((o) => { o.correctedReplays[0].predictedClosureFingerprint = 'F'.repeat(64); }, /64 lowercase hex/);
+      refusedForged((o) => { o.correctedReplays[0].externalId = 'not-a-provider'; }, /provider id/);
+      refusedForged((o) => { o.correctedReplays[0].playerIdentity = ''; }, /playerIdentity must be a non-empty string/);
+      refusedForged((o) => { o.expectedSupersedes = ['CD_I1']; }, /also in expectedSupersedes/);
+      refusedForged((o) => { o.predictedPostReplayResolvedRowCount = 2; }, /predictedPostReplayResolvedRowCount 2 must equal the correctedReplays length 3/);
+      refusedForged((o) => { o.predictedPostReplayImporterRowCount = 2; }, /predictedPostReplayImporterRowCount 2 must equal candidateImporterRowCount 3 minus the 2 class 1\/2/);
+      refusedForged((o) => { o.targetCorrectedLedgerRowCount = 2; }, /targetCorrectedLedgerRowCount 2 is below the 3/);
+      // the builder round-trips through the same parser, so it cannot emit an overlapping set
+      expect(() => v3({ expectedSupersedes: ['CD_I1'] })).toThrow(AflApiPromotionFileRefused);
+      expect(() => v3({ expectedSupersedes: ['CD_I1'] })).toThrow(/disjoint from E_promotion/);
+      expect(() => v3({}, [entry('CD_I1', 1), entry('CD_I1', 1)])).toThrow(/free of duplicates|appears twice/);
+    });
+
+    it('zero-corrected: the artefact is still v3, correctedReplays is empty and predicted == pre-replay', () => {
+      const file = v3({ targetCorrectedLedgerRowCount: 0, targetCorrectedLedgerSha256: aflApiCorrectedLedgerStateSha256([]).sha256 }, []);
+      expect(file.version).toBe(3);
+      expect(file.correctedReplays).toEqual([]);
+      expect(file.predictedPostReplayResolvedRowCount).toBe(0);
+      expect(file.predictedPostReplayImporterRowCount).toBe(file.candidateImporterRowCount);
+      expect(file.predictedPostReplayImporterSha256).toBe(file.candidateImporterSha256);
+      expect(file.predictedPostReplayIdentitySha256).toBe(aflApiIdentityStateSha256(identityRows));
+      expect(parseAflApiSupersedeFile(JSON.stringify(file))).toEqual(file);
+      // a predicted importer digest that differs from the pre-replay one, with no class 1/2 replay, refuses
+      const text = JSON.stringify(file);
+      const o = JSON.parse(text) as Record<string, any>;
+      o.predictedPostReplayImporterSha256 = hex('7');
+      const { payloadSha256: _dropped, ...rest } = o;
+      o.payloadSha256 = createHash('sha256').update(canonicalJson(rest as never), 'utf8').digest('hex');
+      expect(() => parseAflApiSupersedeFile(JSON.stringify(o))).toThrow(/must equal the pre-replay candidateImporterSha256/);
+      // a class-3-only artefact also leaves the importer set (and digest) untouched
+      const only3 = v3({}, [entry('CD_I3', 3)]);
+      expect(only3.predictedPostReplayImporterRowCount).toBe(3);
+      expect(only3.predictedPostReplayImporterSha256).toBe(only3.candidateImporterSha256);
+    });
+
+    it('predictAflApiPostReplayImporterState removes exactly the class 1/2 providers, with the shared importer digest', () => {
+      const post = predictAflApiPostReplayImporterState(importerRows, cReplays);
+      expect(post.rowCount).toBe(1);
+      expect(post.sha256).toBe(aflApiImporterStateSha256([importerRows[2]]));
+      expect(predictAflApiPostReplayImporterState(importerRows, [])).toEqual({
+        rowCount: 3, sha256: aflApiImporterStateSha256(importerRows),
+      });
+      // contradictions refuse: class 1/2 without a row, class 3 with one, duplicates
+      expect(() => predictAflApiPostReplayImporterState(importerRows, [entry('CD_I9', 1)])).toThrow(/has no pre-replay importer row/);
+      expect(() => predictAflApiPostReplayImporterState(importerRows, [entry('CD_I1', 3)])).toThrow(/unexpectedly has/);
+      expect(() => predictAflApiPostReplayImporterState(importerRows, [entry('CD_I3', 3), entry('CD_I3', 3)])).toThrow(/appears twice/);
+    });
+
+    it('aflApiIdentityStateSha256 is order-independent, refuses a repeated id, and a class-3 insert moves it but not the importer digest', () => {
+      expect(aflApiIdentityStateSha256([...identityRows].reverse())).toBe(aflApiIdentityStateSha256(identityRows));
+      expect(() => aflApiIdentityStateSha256([identityRows[0], identityRows[0]])).toThrow(/appears twice/);
+      expect(aflApiIdentityStateSha256([{ ...identityRows[0], playerIdentity: 'players/Z/Z.html' }, ...identityRows.slice(1)]))
+        .not.toBe(aflApiIdentityStateSha256(identityRows));
+
+      const insert = [entry('CD_I3', 3)];
+      const importerPost = predictAflApiPostReplayImporterState(importerRows, insert);
+      expect(importerPost).toEqual({ rowCount: 3, sha256: aflApiImporterStateSha256(importerRows) });
+      const identityPost = predictAflApiPostReplayIdentityState(identityRows, insert);
+      expect(identityPost.rowCount).toBe(4);
+      expect(identityPost.sha256).not.toBe(aflApiIdentityStateSha256(identityRows));
+      expect(identityPost.sha256).toBe(aflApiIdentityStateSha256([...identityRows, {
+        externalId: 'CD_I3', status: 'resolved', matchMethod: AFL_API_ADMIN_MATCH_METHOD, playerIdentity: 'players/N/New.html',
+      }]));
+
+      // class 1/2: the row becomes resolved / afl_api_admin_adjudication at the entry's identity, count unchanged
+      const upgraded = predictAflApiPostReplayIdentityState(identityRows, [entry('CD_I1', 1), entry('CD_I2', 2)]);
+      expect(upgraded.rowCount).toBe(3);
+      expect(upgraded.sha256).toBe(aflApiIdentityStateSha256([
+        { externalId: 'CD_I1', status: 'resolved', matchMethod: AFL_API_ADMIN_MATCH_METHOD, playerIdentity: 'players/N/New.html' },
+        { externalId: 'CD_I2', status: 'resolved', matchMethod: AFL_API_ADMIN_MATCH_METHOD, playerIdentity: 'players/N/New.html' },
+        identityRows[2],
+      ]));
+      expect(predictAflApiPostReplayIdentityState(identityRows, []).sha256).toBe(aflApiIdentityStateSha256(identityRows));
+      expect(() => predictAflApiPostReplayIdentityState(identityRows, [entry('CD_I9', 2)])).toThrow(/has no pre-replay identity row/);
+      expect(() => predictAflApiPostReplayIdentityState(identityRows, [entry('CD_I1', 3)])).toThrow(/unexpectedly has/);
+    });
+  });
+
+  // Post-swap D15 fake-tx fixtures, shared by the F-L4-4 test and the ISSUE-238 D15 v3 tests below.
     type ReplayState = { database: string; afl: AflApiCensusRow[]; ids: FakeIdentity[]; ledger: AflApiAdjudicationLedgerRow[]; writes: string[] };
     const replayTx = (state: ReplayState) => Object.assign(async (strings: TemplateStringsArray, ...values: unknown[]) => {
       const text = strings.join('$');
@@ -4071,6 +4454,7 @@ describe('AFLDB-ISSUE-237 L4 hardening — promotion afl_api gates (DB-free)', (
       const c = candidateAfterReinstate();
       return { database: 'afldb_dev', afl: c.afl, ids: c.ids, ledger: c.ledger, writes: [], ...over };
     };
+  it('F-L4-4 — post-swap D15 replay: supersedes exactly the bound set, and refuses every unbound file before any write', async () => {
     const { overlap } = await restored(candidateAtRestored(), devTarget());
     const text = JSON.stringify(aflApiSupersedeFileFor(overlap, { environment: 'dev', ...NAMES }));
     const expected: { environment: 'prod' | 'dev'; targetDatabase: string } = { environment: 'dev', targetDatabase: 'afldb_dev' };
@@ -4079,6 +4463,9 @@ describe('AFLDB-ISSUE-237 L4 hardening — promotion afl_api gates (DB-free)', (
     const counts = await replayAflApiAdjudicationsFromSupersedeFile(replayTx(good), text, expected);
     expect(counts.supersedes).toEqual([{ externalId: 'CD_I1', playerId: 10 }]);
     expect(good.writes).toEqual(['UPDATE']);
+    // AFLDB-ISSUE-238: a zero-corrected v3 file replays with exactly the ISSUE-237 result shape
+    expect(JSON.parse(text)).toMatchObject({ version: 3, correctedReplays: [] });
+    expect(counts).toEqual({ inserted: 0, noops: 0, stops: [], supersedes: [{ externalId: 'CD_I1', playerId: 10 }] });
 
     const refusals: [string, ReplayState, string, typeof expected][] = [
       ['stale: DEV adjudicated after --phase restored', promoted({ ledger: [linked(7, 'CD_I1', 10, A), linked(8, 'CD_I9', 12, C)] }), text, expected],
@@ -4092,6 +4479,491 @@ describe('AFLDB-ISSUE-237 L4 hardening — promotion afl_api gates (DB-free)', (
       await expect(replayAflApiAdjudicationsFromSupersedeFile(replayTx(state), fileText, exp), name).rejects.toThrow(AflApiReplayAbort);
       expect(state.writes, name).toEqual([]);
     }
+  });
+
+  describe('AFLDB-ISSUE-238 D15 v3 — the post-swap replay binds the predicted post-replay state (DB-free)', () => {
+    const expected: { environment: 'prod' | 'dev'; targetDatabase: string } = { environment: 'dev', targetDatabase: 'afldb_dev' };
+    const HEX_E = 'e'.repeat(64);
+    /** The candidate's importer rows at --phase restored (matches candidateAtRestored()). */
+    const preRows: AflApiIdentityStateRow[] = [
+      { externalId: 'CD_I1', status: 'unique', matchMethod: 'afl_api_stat_vector_season', playerIdentity: A },
+      { externalId: 'CD_I2', status: 'unique', matchMethod: 'afl_api_stat_vector_bootstrap', playerIdentity: B },
+    ];
+    const correctedRow = (
+      id: number, externalId: string, playerId: number, playerIdentity: string, previous: string,
+    ): AflApiAdjudicationLedgerRow => ({
+      id, externalId, action: 'corrected', playerId, playerIdentity, supersedesId: null,
+      previousPlayerIdentity: previous, evidenceSha256: HEX_E,
+    });
+    const replayEntry = (
+      externalId: string, candidateClass: 2 | 3, playerIdentity: string, previousPlayerIdentity: string,
+    ): AflApiCorrectedReplayEntry => ({
+      externalId, adjudicationId: 8, adjudicationEvidenceSha256: HEX_E, previousPlayerIdentity, playerIdentity,
+      candidateClass, predictedIdentityAction: candidateClass === 2 ? 'upgrade_in_place' : 'insert',
+      plannerVersion: 2, predictedClosureFingerprint: 'f'.repeat(64),
+      predictedMutations: {
+        moved: { player_match_stats: 0, brownlow_round_votes: 0 },
+        deleted: { player_match_stats: 0, brownlow_round_votes: 0 },
+      },
+    });
+    /** A v3 file bound to `ledger` and predicting exactly `replays` over the candidate's preRows. */
+    const fileFor = (
+      ledger: AflApiAdjudicationLedgerRow[], replays: AflApiCorrectedReplayEntry[],
+      extraIdentityRows: AflApiIdentityStateRow[] = [],
+    ): string => {
+      const post = predictAflApiPostReplayImporterState(preRows, replays);
+      const corrected = aflApiCorrectedLedgerStateSha256(ledger);
+      return JSON.stringify(buildAflApiSupersedeFile({
+        environment: 'dev', candidateDatabase: CAND, targetDatabase: 'afldb_dev',
+        candidateImporterRowCount: preRows.length, candidateImporterSha256: aflApiImporterStateSha256(preRows),
+        targetLedgerRowCount: ledger.length, targetLedgerSha256: aflApiLedgerStateSha256(ledger),
+        expectedSupersedes: ['CD_I1'],
+        targetCorrectedLedgerRowCount: Math.max(corrected.rowCount, replays.length),
+        targetCorrectedLedgerSha256: corrected.sha256,
+        correctedReplays: replays,
+        predictedPostReplayImporterRowCount: post.rowCount, predictedPostReplayImporterSha256: post.sha256,
+        predictedPostReplayIdentitySha256: predictAflApiPostReplayIdentityState([...preRows, ...extraIdentityRows], replays).sha256,
+      }));
+    };
+    const imp1 = () => importer('CD_I1', 10);
+    const imp2 = () => importer('CD_I2', 11, 'afl_api_stat_vector_bootstrap');
+
+    it('a corrected provider that is ALREADY_SATISFIED and equals C_promotion passes: E_promotion superseded, no ledger or corrected-identity write', async () => {
+      // class 3: the promoted database holds the resolved CD_I3 row the ISSUE-238 replay inserted
+      const ledger3 = [linked(7, 'CD_I1', 10, A), correctedRow(8, 'CD_I3', 12, C, D)];
+      const s3 = promoted({ afl: [imp1(), imp2(), human('CD_I3', 12)], ledger: ledger3 });
+      const c3 = await replayAflApiAdjudicationsFromSupersedeFile(
+        replayTx(s3), fileFor(ledger3, [replayEntry('CD_I3', 3, C, D)]), expected);
+      expect(c3).toEqual({
+        inserted: 0, noops: 1, alreadySatisfied: 1, stops: [], supersedes: [{ externalId: 'CD_I1', playerId: 10 }],
+      });
+      expect(s3.writes).toEqual(['UPDATE']); // the E_promotion UPDATE only
+
+      // class 2: CD_I2 left the importer set by becoming resolved at P'
+      const ledger2 = [linked(7, 'CD_I1', 10, A), correctedRow(8, 'CD_I2', 12, C, B)];
+      const s2 = promoted({ afl: [imp1(), human('CD_I2', 12)], ledger: ledger2 });
+      const c2 = await replayAflApiAdjudicationsFromSupersedeFile(
+        replayTx(s2), fileFor(ledger2, [replayEntry('CD_I2', 2, C, B)]), expected);
+      expect(c2.alreadySatisfied).toBe(1);
+      expect(c2.inserted).toBe(0);
+      expect(s2.writes).toEqual(['UPDATE']);
+    });
+
+    it('binds the PREDICTED post-replay importer state: a state equal to the pre-replay candidate but not the prediction refuses', async () => {
+      const ledger = [linked(7, 'CD_I1', 10, A), correctedRow(8, 'CD_I2', 12, C, B)];
+      // the replay never ran: CD_I2 is still the candidate's importer row
+      const state = promoted({ afl: [imp1(), imp2()], ledger });
+      await expect(replayAflApiAdjudicationsFromSupersedeFile(
+        replayTx(state), fileFor(ledger, [replayEntry('CD_I2', 2, C, B)]), expected,
+      )).rejects.toThrow(/post_replay_importer_state_mismatch/);
+      expect(state.writes).toEqual([]);
+    });
+
+    it('binds the whole identity state before any write: a digest mismatch refuses, importer digest untouched', async () => {
+      const { overlap } = await restored(candidateAtRestored(), devTarget());
+      const zero = JSON.stringify(aflApiSupersedeFileFor(overlap, { environment: 'dev', ...NAMES }));
+      // an extra resolved row leaves the importer subset (and the ledger) unchanged
+      const extraHuman = promoted({ afl: [imp1(), imp2(), human('CD_I9', 13)] });
+      const run = replayAflApiAdjudicationsFromSupersedeFile(replayTx(extraHuman), zero, expected);
+      await expect(run).rejects.toThrow(AflApiReplayAbort);
+      await expect(run).rejects.toThrow(/post_replay_identity_state_mismatch/);
+      await expect(run).rejects.not.toThrow(/post_replay_importer_state_mismatch/);
+      expect(extraHuman.writes).toEqual([]);
+      // ...and a corrected provider whose resolved row is missing is the same refusal
+      const ledger = [linked(7, 'CD_I1', 10, A), correctedRow(8, 'CD_I3', 12, C, D)];
+      const missingRow = promoted({ afl: [imp1(), imp2()], ledger });
+      await expect(replayAflApiAdjudicationsFromSupersedeFile(
+        replayTx(missingRow), fileFor(ledger, [replayEntry('CD_I3', 3, C, D)]), expected,
+      )).rejects.toThrow(/post_replay_identity_state_mismatch/);
+      expect(missingRow.writes).toEqual([]);
+    });
+
+    it('a C_promotion provider the replay does not report ALREADY_SATISFIED refuses before any write', async () => {
+      // the ledger holds NO correction for CD_I3, although the file predicts one (state and digests all agree)
+      const ledger = [linked(7, 'CD_I1', 10, A)];
+      const state = promoted({ afl: [imp1(), imp2(), human('CD_I3', 12)], ledger });
+      await expect(replayAflApiAdjudicationsFromSupersedeFile(
+        replayTx(state), fileFor(ledger, [replayEntry('CD_I3', 3, C, D)]), expected,
+      )).rejects.toThrow(/ALREADY_SATISFIED set did not equal C_promotion exactly.*missing: CD_I3/);
+      expect(state.writes).toEqual([]);
+    });
+
+    it('a corrected ledger provider that is not in C_promotion refuses before any write', async () => {
+      const X = path('X');
+      const ledger = [linked(7, 'CD_I1', 10, A), correctedRow(8, 'CD_I3', 12, C, D), correctedRow(9, 'CD_I4', 13, D, X)];
+      // CD_I4 already holds a resolved row before the replay (so the identity digest can bind it) but is not in C_promotion
+      const cd4: AflApiIdentityStateRow = {
+        externalId: 'CD_I4', status: 'resolved', matchMethod: AFL_API_ADMIN_MATCH_METHOD, playerIdentity: D,
+      };
+      const state = promoted({ afl: [imp1(), imp2(), human('CD_I3', 12), human('CD_I4', 13)], ledger });
+      await expect(replayAflApiAdjudicationsFromSupersedeFile(
+        replayTx(state), fileFor(ledger, [replayEntry('CD_I3', 3, C, D)], [cd4]), expected,
+      )).rejects.toThrow(/ALREADY_SATISFIED set did not equal C_promotion exactly.*extra: CD_I4/);
+      expect(state.writes).toEqual([]);
+    });
+
+    it('refuses a stale v2 file by name before any read of the database state', async () => {
+      const v3 = JSON.parse(fileFor([linked(7, 'CD_I1', 10, A)], [])) as Record<string, unknown>;
+      for (const k of ['targetCorrectedLedgerRowCount', 'targetCorrectedLedgerSha256', 'correctedReplays',
+        'predictedPostReplayImporterRowCount', 'predictedPostReplayImporterSha256',
+        'predictedPostReplayResolvedRowCount', 'predictedPostReplayIdentitySha256']) delete v3[k];
+      v3.version = 2;
+      const state = promoted();
+      await expect(replayAflApiAdjudicationsFromSupersedeFile(replayTx(state), JSON.stringify(v3), expected))
+        .rejects.toThrow(/stale supersede file: version 2/);
+      expect(state.writes).toEqual([]);
+    });
+  });
+
+  // --- AFLDB-ISSUE-238 Slice 6 (M3b part 2): CPC at --phase restored, CRV at --phase candidate -----
+
+  describe('AFLDB-ISSUE-238 §9.1 CPC (--phase restored) and §7.5 CRV (--phase candidate) — predict and verify (DB-free)', () => {
+    const HEX_E = 'e'.repeat(64);
+    const HEX_F = 'f'.repeat(64);
+    const correctedLedgerRow = (
+      id: number, externalId: string, playerId: number, playerIdentity: string, previous: string,
+    ): AflApiAdjudicationLedgerRow => ({
+      id, externalId, action: 'corrected', playerId, playerIdentity, supersedesId: null,
+      previousPlayerIdentity: previous, evidenceSha256: HEX_E,
+    });
+    /** CD_I1 stays an ordinary human link; CD_I2 (an importer row at B on the candidate) was corrected to C. */
+    const targetLedger = [linked(7, 'CD_I1', 900, A), correctedLedgerRow(8, 'CD_I2', 902, C, B)];
+    const correctedTarget = (over: Partial<FakeDb> = {}) => devTarget({
+      afl: [human('CD_I1', 900), human('CD_I2', 902)], ledger: targetLedger, ...over,
+    });
+    const MUTATIONS = {
+      moved: { player_match_stats: 3, brownlow_round_votes: 0 }, deleted: { player_match_stats: 0, brownlow_round_votes: 1 },
+    };
+    const pass = (externalId = 'CD_I2', over: Record<string, unknown> = {}): CpcResult => ({
+      outcome: 'PASS', externalId, adjudicationId: 8, candidateClass: 1, predictedIdentityAction: 'update_in_place',
+      providerRowId: 1, plannerVersion: 2, predictedClosureFingerprint: HEX_F, predictedMutations: MUTATIONS, ...over,
+    }) as CpcResult;
+    const collision = (externalId = 'CD_I2'): CpcResult => ({
+      outcome: 'FAIL', externalId, adjudicationId: 8, candidateClass: 5, code: 'COLLISION', detail: 'CD_I9 already holds the corrected player',
+    });
+    const entries = netCorrectedCorrectionEntries(targetLedger);
+    const restoredWithCpc = async (candidate: FakeDb, target: FakeDb, cpc: ReadonlySet<string>) => {
+      const report = new Report();
+      const overlap = await gateAflApiOverlap(
+        { candidate: fakeQ(candidate), target: fakeQ(target) }, NAMES, 'dev', undefined, report, cpc);
+      return { report, overlap };
+    };
+    /** The whole restored run for a corrected target: G2 with CPC's PASS set, then CPC's own gate. */
+    const correctedRestored = async (results: CpcResult[] = [pass()]) => {
+      const { report, overlap } = await restoredWithCpc(candidateAtRestored(), correctedTarget(), cpcPassSet(results));
+      const inputs = gateAflApiCorrectedPredict({
+        entries, results, ePromotion: overlap.ePromotion, targetLedgerRows: targetLedger, graded: overlap.ledgerState,
+      }, report);
+      return { report, overlap, inputs };
+    };
+    const restoredOpts = (out: string) => parseArgs(['--environment', 'dev', '--phase', 'restored', '--database', CAND,
+      '--old-database', 'afldb_dev', '--afl-api-supersede-out', out]);
+    const source = readFileSync(join(REPO, 'tools', 'db', 'promotion-check.ts'), 'utf8');
+
+    it('zero-corrected: no CPC input, and the restored artefact and the candidate outcome are unchanged (no extra read)', async () => {
+      const { report, overlap } = await restored(candidateAtRestored(), devTarget());
+      const explicit = await restoredWithCpc(candidateAtRestored(), devTarget(), new Set());
+      expect(explicit.report.results).toEqual(report.results);
+      expect(netCorrectedCorrectionEntries([linked(7, 'CD_I1', 900, A)])).toEqual([]);
+      expect(cpcPassSet([])).toEqual(new Set());
+
+      const file = aflApiSupersedeFileFor(overlap, { environment: 'dev', ...NAMES });
+      expect(aflApiSupersedeFileFor(overlap, { environment: 'dev', ...NAMES }, {})).toEqual(file);
+      expect(file.correctedReplays).toEqual([]);
+      expect(file.predictedPostReplayImporterSha256).toBe(file.candidateImporterSha256);
+      // the identity digest is the whole-census rule; on an anomaly-free candidate it IS the importer rows' digest
+      expect(file.predictedPostReplayIdentitySha256).toBe(aflApiIdentityStateSha256([
+        { externalId: 'CD_I1', status: 'unique', matchMethod: 'afl_api_stat_vector_season', playerIdentity: A },
+        { externalId: 'CD_I2', status: 'unique', matchMethod: 'afl_api_stat_vector_bootstrap', playerIdentity: B },
+      ]));
+      const out = join(dir, 'e-zero.json');
+      publishRestoredAflApiFiles(restoredOpts(out), overlap, report, undefined);
+      expect(readFileSync(out, 'utf8')).toBe(`${JSON.stringify(file, null, 2)}\n`);
+      expect(report.results.find((r) => r.gate.includes('E_promotion file written'))!.lines.join('\n')).not.toContain('correctedReplays');
+
+      // the candidate phase: the old outcome, with no C_promotion line and no extra forward-identity read
+      const db = candidateAfterReinstate();
+      const candidateReport = new Report();
+      await gateAflApiCandidateAfterReinstate(fakeQ(db), file, { environment: 'dev', ...NAMES }, candidateReport);
+      expect(candidateReport.results).toHaveLength(1);
+      expect(candidateReport.results[0].verdict).toBe('PASS');
+      expect(candidateReport.results[0].lines.join('\n')).not.toContain('C_promotion');
+      expect(db.log.filter((t) => t.includes('ei.player_id = ANY'))).toHaveLength(1);
+    });
+
+    it('G2 at restored: a net-corrected entry in CPC\'s PASS set is CORRECTED_CPC_REPLAY (non-refusing, never E_promotion); otherwise it refuses', async () => {
+      const inSet = await restoredWithCpc(candidateAtRestored(), correctedTarget(), new Set(['CD_I2']));
+      expect(verdictOf(inSet.report, 'G2')).toBe('PASS');
+      expect(inSet.report.results.find((r) => r.gate.includes('G2'))!.lines.join('\n')).toContain('CD_I2: CORRECTED_CPC_REPLAY');
+      expect([...inSet.overlap.ePromotion]).toEqual(['CD_I1']);
+      expect(cpcPassSet([pass(), collision('CD_I3')])).toEqual(new Set(['CD_I2']));
+      for (const cpc of [new Set<string>(), new Set(['CD_I9'])]) {
+        const refused = await restoredWithCpc(candidateAtRestored(), correctedTarget(), cpc);
+        expect(verdictOf(refused.report, 'G2')).toBe('FAIL');
+        expect(refused.report.results.find((r) => r.gate.includes('G2'))!.lines.join('\n')).toContain('CD_I2: CORRECTED_NOT_CPC_CLASSIFIED');
+      }
+    });
+
+    it('assembleCorrectedPromotion builds correctedReplays from the ledger authority and CPC PASS; a FAIL, overlap, gap or foreign result is a problem', () => {
+      expect(assembleCorrectedPromotion(entries, [pass()], new Set(['CD_I1']))).toEqual({
+        ok: true,
+        replays: [{
+          externalId: 'CD_I2', adjudicationId: 8, adjudicationEvidenceSha256: HEX_E, previousPlayerIdentity: B, playerIdentity: C,
+          candidateClass: 1, predictedIdentityAction: 'update_in_place', plannerVersion: 2, predictedClosureFingerprint: HEX_F,
+          predictedMutations: MUTATIONS,
+        }],
+      });
+      const problemsOf = (r: ReturnType<typeof assembleCorrectedPromotion>) => (r.ok ? [] : r.problems).join('\n');
+      expect(problemsOf(assembleCorrectedPromotion(entries, [collision()], new Set()))).toContain('CD_I2: CPC FAIL COLLISION (class 5): CD_I9');
+      expect(problemsOf(assembleCorrectedPromotion(entries, [pass()], new Set(['CD_I2'])))).toContain('CD_I2: in both C_promotion and E_promotion');
+      expect(problemsOf(assembleCorrectedPromotion(entries, [], new Set()))).toContain('CD_I2: no CPC result for a net-corrected provider');
+      expect(problemsOf(assembleCorrectedPromotion(entries, [pass(), pass('CD_I9')], new Set())))
+        .toContain('CD_I9: CPC result for a provider that is not net-corrected');
+      expect(problemsOf(assembleCorrectedPromotion(entries, [pass('CD_I2', { adjudicationId: 99 })], new Set())))
+        .toContain('CPC result names ledger row 99');
+      // CPC's class-5 input: every NET linked/corrected provider, and never a revoked one
+      const ledger = [...targetLedger, linked(9, 'CD_I3', 900, D), { ...linked(10, 'CD_I3', 900, D), action: 'revoked' as const, supersedesId: 9 }];
+      expect([...targetHumanProvidersOf(ledger)]).toEqual([['CD_I1', A], ['CD_I2', C]]);
+    });
+
+    it('a CPC FAIL, C_promotion overlapping E_promotion, or a ledger that moved between reads FAILS --phase restored and NO artefact is written', async () => {
+      const cases: [string, CpcResult[], (o: AflApiOverlapResult) => Parameters<typeof gateAflApiCorrectedPredict>[0], string][] = [
+        ['a CPC FAIL', [collision()], (o) => ({
+          entries, results: [collision()], ePromotion: o.ePromotion, targetLedgerRows: targetLedger, graded: o.ledgerState,
+        }), 'STOP CD_I2: CPC FAIL COLLISION (class 5)'],
+        ['C ∩ E ≠ ∅', [pass()], (o) => ({
+          entries, results: [pass()], ePromotion: new Set(['CD_I2']), targetLedgerRows: targetLedger, graded: o.ledgerState,
+        }), 'CD_I2: in both C_promotion and E_promotion'],
+        ['a ledger that moved between the reads', [pass()], (o) => ({
+          entries, results: [pass()], ePromotion: o.ePromotion, targetLedgerRows: targetLedger,
+          graded: { rowCount: o.ledgerState.rowCount, sha256: 'a'.repeat(64) },
+        }), 'differs from the ledger G2 graded'],
+      ];
+      for (const [name, cpcResults, build, expected] of cases) {
+        // G2 sees CD_I2 in its set, so CPC's own gate is the ONLY failed gate
+        const { report, overlap } = await restoredWithCpc(candidateAtRestored(), correctedTarget(), new Set(['CD_I2']));
+        const inputs = gateAflApiCorrectedPredict(build(overlap), report);
+        expect(inputs, name).toBeUndefined();
+        const gate = report.results.find((r) => r.gate.includes('CPC'))!;
+        expect(gate.verdict, name).toBe('FAIL');
+        expect(gate.lines.join('\n'), name).toContain(expected);
+        expect(report.results.filter((r) => r.verdict === 'FAIL').map((r) => r.gate), name).toEqual([gate.gate]);
+        expect(cpcResults.length, name).toBeGreaterThan(0);
+        publishRestoredAflApiFiles(restoredOpts(join(dir, `e-${Math.random()}.json`)), overlap, report, inputs);
+        expect(readdirSync(dir).filter((f) => f.startsWith('e-')), name).toEqual([]);
+        expect(verdictOf(report, 'E_promotion file NOT written'), name).toBe('INFO');
+      }
+    });
+
+    it('a CPC PASS writes a v3 artefact carrying CPC\'s correctedReplays, the corrected-ledger digest and the post-replay predictions', async () => {
+      const { report, overlap, inputs } = await correctedRestored();
+      expect(report.failed).toBe(false);
+      expect(verdictOf(report, 'CPC pre-classification')).toBe('PASS');
+      const out = join(dir, 'e-corrected.json');
+      publishRestoredAflApiFiles(restoredOpts(out), overlap, report, inputs);
+      const file = parseAflApiSupersedeFile(readFileSync(out, 'utf8'));
+      expect(file.expectedSupersedes).toEqual(['CD_I1']);
+      expect(file.correctedReplays).toHaveLength(1);
+      expect(file.correctedReplays[0]).toMatchObject({
+        externalId: 'CD_I2', adjudicationId: 8, adjudicationEvidenceSha256: HEX_E, previousPlayerIdentity: B, playerIdentity: C,
+        candidateClass: 1, predictedIdentityAction: 'update_in_place', plannerVersion: 2, predictedClosureFingerprint: HEX_F,
+        predictedMutations: MUTATIONS,
+      });
+      expect(file).toMatchObject({
+        targetCorrectedLedgerRowCount: 1, targetCorrectedLedgerSha256: aflApiCorrectedLedgerStateSha256(targetLedger).sha256,
+        candidateImporterRowCount: 2, predictedPostReplayImporterRowCount: 1, predictedPostReplayResolvedRowCount: 1,
+      });
+      expect(file.predictedPostReplayImporterSha256).toBe(aflApiImporterStateSha256([
+        { externalId: 'CD_I1', status: 'unique', matchMethod: 'afl_api_stat_vector_season', playerIdentity: A },
+      ]));
+      expect(file.predictedPostReplayIdentitySha256).toBe(aflApiIdentityStateSha256([
+        { externalId: 'CD_I1', status: 'unique', matchMethod: 'afl_api_stat_vector_season', playerIdentity: A },
+        { externalId: 'CD_I2', status: 'resolved', matchMethod: AFL_API_ADMIN_MATCH_METHOD, playerIdentity: C },
+      ]));
+      expect(report.results.find((r) => r.gate.includes('E_promotion file written'))!.lines.join('\n'))
+        .toContain('correctedReplays (C_promotion): {CD_I2}');
+    });
+
+    it('CRV at --phase candidate: the replayed candidate passes; resolved-set, importer, identity and exact-set drift each refuse', async () => {
+      const { overlap, inputs } = await correctedRestored();
+      const bound = aflApiSupersedeFileFor(overlap, { environment: 'dev', ...NAMES }, inputs!);
+      const ledgerAfter = [linked(7, 'CD_I1', 10, A), correctedLedgerRow(8, 'CD_I2', 12, C, B)];
+      /** The candidate AFTER REPLAY: CD_I2 left the importer set by becoming resolved at C's player (12). */
+      const replayed = (over: Partial<FakeDb> = {}) => candidateAtRestored({
+        afl: [importer('CD_I1', 10), human('CD_I2', 12)], ledger: ledgerAfter, ...over,
+      });
+      const run = async (db: FakeDb, file: AflApiSupersedeFile = bound) => {
+        const report = new Report();
+        await gateAflApiCandidateAfterReinstate(fakeQ(db), file, { environment: 'dev', ...NAMES }, report);
+        expect(report.results).toHaveLength(1);
+        return { verdict: report.results[0].verdict, text: report.results[0].lines.join('\n'), db };
+      };
+
+      const ok = await run(replayed());
+      expect(ok.verdict).toBe('PASS');
+      expect(ok.text).toContain('C_promotion (replayed, must be the resolved set) = {CD_I2}');
+      expect(ok.text).toContain('CD_I2: CORRECTED_CPC_REPLAY');
+      expect(ok.db.log.filter((t) => t.includes('ei.player_id = ANY'))).toHaveLength(2); // + the whole-census identity read
+
+      // the replay never ran: the candidate still holds the PRE-replay state, which is not the prediction
+      const preReplay = await run(candidateAtRestored({ ledger: ledgerAfter }));
+      expect(preReplay.verdict).toBe('FAIL');
+      for (const kind of ['resolved_row_missing', 'importer_state_mismatch', 'post_replay_identity_state_mismatch', 'crv_exact_set_mismatch']) {
+        expect(preReplay.text, kind).toContain(kind);
+      }
+
+      // an extra resolved row: G1's exact-set rule, the identity digest and CRV's exact-set equality
+      const extra = await run(replayed({ afl: [importer('CD_I1', 10), human('CD_I2', 12), human('CD_I9', 13)] }));
+      expect(extra.verdict).toBe('FAIL');
+      expect(extra.text).toContain('"kind":"resolved_row_unexpected","externalId":"CD_I9"');
+      expect(extra.text).toContain('"sets":"resolved_rows_vs_c_promotion","missing":[],"extra":["CD_I9"]');
+      expect(extra.text).toContain('post_replay_identity_state_mismatch');
+
+      // only the resolved row's player is wrong: the identity digest alone refuses
+      const wrongPlayer = await run(replayed({ afl: [importer('CD_I1', 10), human('CD_I2', 13)] }));
+      expect(wrongPlayer.verdict).toBe('FAIL');
+      expect(wrongPlayer.text).toContain('post_replay_identity_state_mismatch');
+      for (const other of ['resolved_row_', 'importer_state_mismatch', 'crv_exact_set_mismatch']) {
+        expect(wrongPlayer.text, other).not.toContain(other);
+      }
+
+      // a net-corrected ledger provider that is not in C_promotion
+      const extraCorrected = await run(replayed({ ledger: [...ledgerAfter, correctedLedgerRow(9, 'CD_I3', 13, D, E)] }));
+      expect(extraCorrected.verdict).toBe('FAIL');
+      expect(extraCorrected.text).toContain('"sets":"net_corrected_ledger_vs_c_promotion","missing":[],"extra":["CD_I3"]');
+      expect(extraCorrected.text).toContain('ledger_not_bound_target_state');
+      expect(extraCorrected.text).toContain('g2_refuses_after_reinstatement');
+    });
+
+    it('crvExactSetProblems: net-corrected, resolved and C_promotion must be one set', () => {
+      const ids = (...v: string[]) => new Set(v);
+      expect(crvExactSetProblems({ netCorrected: ids('CD_I2'), resolved: ids('CD_I2'), cPromotion: ids('CD_I2') })).toEqual([]);
+      expect(crvExactSetProblems({ netCorrected: ids('CD_I3', 'CD_I2'), resolved: ids(), cPromotion: ids('CD_I2') })).toEqual([
+        { kind: 'crv_exact_set_mismatch', sets: 'net_corrected_ledger_vs_c_promotion', missing: [], extra: ['CD_I3'] },
+        { kind: 'crv_exact_set_mismatch', sets: 'resolved_rows_vs_c_promotion', missing: ['CD_I2'], extra: [] },
+      ]);
+    });
+
+    it('crvIdentityProblems: resolved at the corrected player under afl_api_admin_adjudication, nothing else', () => {
+      const entry = { externalId: 'CD_I2', playerIdentity: C };
+      const row = { status: 'resolved', playerId: 12, matchMethod: AFL_API_ADMIN_MATCH_METHOD };
+      expect(crvIdentityProblems(entry, row, 12)).toEqual([]);
+      expect(crvIdentityProblems(entry, null, 12).join()).toContain('no afl_api identity row exists after the replay');
+      expect(crvIdentityProblems(entry, { ...row, status: 'unique' }, 12).join()).toContain('identity status is unique');
+      expect(crvIdentityProblems(entry, { ...row, matchMethod: 'afl_api_stat_vector_season' }, 12).join()).toContain('identity match_method is afl_api_stat_vector_season');
+      expect(crvIdentityProblems(entry, { ...row, playerId: 11 }, 12).join()).toContain('identity is at player 11, expected the corrected player 12');
+      expect(crvIdentityProblems(entry, row, null).join()).toContain('does not resolve to exactly one candidate player');
+    });
+
+    describe('crvBatchProblems (bound replay batch, §7.5)', () => {
+      const entry = {
+        externalId: 'CD_I2', adjudicationId: 8, plannerVersion: 2, predictedClosureFingerprint: HEX_F, predictedMutations: MUTATIONS,
+      };
+      const zeroEntry = {
+        ...entry, predictedMutations: { moved: { player_match_stats: 0, brownlow_round_votes: 0 }, deleted: { player_match_stats: 0, brownlow_round_votes: 0 } },
+      };
+      const batch = (over: Record<string, unknown> = {}, status = 'completed', id = 5) => ({
+        id, status,
+        validationResult: {
+          kind: 'afl_api_identity_correction', mode: 'replay', context: 'promotion', externalId: 'CD_I2', adjudicationId: 8,
+          plannerVersion: 2, closureFingerprint: HEX_F, predictedClosureFingerprint: HEX_F, counts: { ...MUTATIONS, projectionsMoved: 0 }, ...over,
+        },
+      });
+
+      it('predicted mutations: exactly one completed replay batch bound to the predicted fingerprint, version and counts', () => {
+        expect(crvBatchProblems(entry, [batch()])).toEqual([]);
+        const refusals: [string, Parameters<typeof crvBatchProblems>[1], RegExp][] = [
+          ['no batch although mutations were predicted', [], /predicted 4 moved\/deleted row\(s\), but no bound replay batch exists/],
+          ['a batch that is not completed', [batch({}, 'running')], /status is running, expected completed/],
+          ['the wrong mode', [batch({ mode: 'original' })], /mode is "original", expected "replay"/],
+          ['the wrong context', [batch({ context: 'live_target' })], /context is "live_target", expected "promotion"/],
+          ['the wrong planner version', [batch({ plannerVersion: 1 })], /plannerVersion is 1, expected 2/],
+          ['a closure fingerprint that is not the prediction', [batch({ closureFingerprint: 'a'.repeat(64) })], /closureFingerprint is/],
+          ['a predictedClosureFingerprint that is not the prediction', [batch({ predictedClosureFingerprint: 'a'.repeat(64) })], /predictedClosureFingerprint is/],
+          ['moved counts that differ', [batch({ counts: { ...MUTATIONS, moved: { player_match_stats: 2, brownlow_round_votes: 0 } } })], /counts differ from the predicted mutations/],
+          ['deleted counts that differ', [batch({ counts: { ...MUTATIONS, deleted: { player_match_stats: 0, brownlow_round_votes: 0 } } })], /counts differ from the predicted mutations/],
+          ['no counts at all', [batch({ counts: undefined })], /counts differ from the predicted mutations/],
+          ['a batch naming another adjudication', [batch({ adjudicationId: 9 })], /adjudicationId is 9, expected 8/],
+          ['a batch with no validation_result', [{ id: 5, status: 'completed', validationResult: null }], /has no validation_result/],
+          ['two bound batches', [batch(), batch({}, 'completed', 6)], /2 bound correct_afl_api_identity batches \(5, 6\); at most one is allowed/],
+        ];
+        for (const [name, batches, why] of refusals) {
+          expect(crvBatchProblems(entry, batches).join('\n'), name).toMatch(why);
+        }
+      });
+
+      it('predicted zero mutations: no bound batch at all (one is a problem, two too)', () => {
+        expect(crvBatchProblems(zeroEntry, [])).toEqual([]);
+        expect(crvBatchProblems(zeroEntry, [batch()]).join('\n')).toMatch(/predicted zero moved\/deleted rows, but bound batch 5 exists/);
+        expect(crvBatchProblems(zeroEntry, [batch(), batch({}, 'completed', 6)]).join('\n')).toMatch(/at most one is allowed/);
+      });
+    });
+
+    it('gateAflApiCorrectedReplayVerification routes the identity row, the bound batch and the REAL Q2 into one FAIL naming each problem', async () => {
+      const { inputs } = await correctedRestored();
+      const reader = {
+        aflApiSourceId: async () => 1, identityRow: async () => null, ledgerRows: async () => [],
+        resolvePlayerIdentity: async () => 12, batchesClaimingAdjudication: async () => [], batchApplications: async () => [],
+        applicationsAt: async () => [], currentRowAt: async () => null, projectionPlayer: async () => null,
+        matchExists: async () => true, auditsFor: async () => [], attributedKeysAtPlayer: async () => [],
+        identityInvariantFacts: async () => ({ censusRows: [], ledgerRows: [], identityByPlayerId: new Map() }),
+        providerProjections: async () => [],
+      };
+      const report = new Report();
+      await gateAflApiCorrectedReplayVerification(reader as never, inputs!.correctedReplays, report);
+      expect(report.results).toHaveLength(1);
+      expect(report.results[0].verdict).toBe('FAIL');
+      expect(report.results[0].gate).toContain('CRV');
+      const text = report.results[0].lines.join('\n');
+      expect(text).toContain('CD_I2: no afl_api identity row exists after the replay');
+      expect(text).toContain('predicted 4 moved/deleted row(s), but no bound replay batch exists');
+      expect(text).toContain('CD_I2: Q2 STOP [SAT-1] authority_invalid');
+    });
+
+    it('wiring (source-pinned): CPC predicts with PREDICT and no locks inside a read-only transaction, before G2, only when a corrected entry exists; CRV verifies only when C_promotion is non-empty', () => {
+      const between = (from: string, to: string) => {
+        const a = source.indexOf(from);
+        expect(a, from).toBeGreaterThan(-1);
+        const b = source.indexOf(to, a);
+        expect(b, to).toBeGreaterThan(a);
+        return source.slice(a, b);
+      };
+      const predict = between('export async function predictCorrectedProviders', 'export async function runAflApiCorrectedPredict');
+      expect(predict).toContain('classifyCorrectedProviderInDatabase(tx, {');
+      expect(predict).toContain("authorityMode: 'PREDICT', lockRows: false, targetHumanProviders");
+      expect(predict).not.toMatch(/catch|ADJUDICATION|lockRows: true/);
+      const runner = between('export async function runAflApiCorrectedPredict', 'export function cpcPassSet');
+      expect(runner).toContain('withReadOnlyTransaction(dsn, name, (tx) => predictCorrectedProviders(tx, entries, targetHumanProviders))');
+      const opener = between('export async function withReadOnlyTransaction', 'export function publishRestoredAflApiFiles');
+      expect(opener).toContain("sql.begin('read only', (tx) => run(tx))");
+      expect(opener).toContain('await sql.unsafe(READ_ONLY_SQL)');
+      expect(opener).not.toMatch(/catch/);
+
+      const main = source.slice(source.indexOf('async function main('));
+      const restoredBranch = main.slice(main.indexOf("if (phase === 'restored') {"), main.indexOf('if (opts.compare)'));
+      const at = (needle: string) => {
+        const i = restoredBranch.indexOf(needle);
+        expect(i, needle).toBeGreaterThan(-1);
+        return i;
+      };
+      expect(restoredBranch).toContain('const cpcResults = cpcEntries.length === 0 ? [] : await runAflApiCorrectedPredict(');
+      expect(at('runAflApiCorrectedPredict(')).toBeLessThan(at('aflApiOverlap = await gateAflApiOverlap('));
+      expect(restoredBranch).toContain('opts.aflApiDevRegeneration, report, cpcPassSet(cpcResults))');
+      expect(at('aflApiOverlap = await gateAflApiOverlap(')).toBeLessThan(at('aflApiCorrected = gateAflApiCorrectedPredict('));
+      expect(restoredBranch).toContain('if (cpcEntries.length > 0) {');
+      expect(main).toContain('publishRestoredAflApiFiles(opts, aflApiOverlap, report, aflApiCorrected)');
+
+      // candidate: per-provider CRV on the read-only Q2 reader, only for a non-empty C_promotion; G2 gets C_promotion as CPC's set
+      expect(main).toMatch(/if \(boundSupersede!\.correctedReplays\.length > 0\) \{\s*await withCorrectionSatisfactionReader\(dsn,[^;]*gateAflApiCorrectedReplayVerification\(reader, boundSupersede!\.correctedReplays, report\)/);
+      const crv = between('export async function gateAflApiCorrectedReplayVerification', 'export async function runAflApiDevRegenerationCensus');
+      expect(crv).toContain('checkCorrectionSatisfaction(reader, {');
+      expect(crv).toContain('currentBatchId: null');
+      expect(crv).toContain('reader.batchesClaimingAdjudication(entry.adjudicationId)');
+      const candidateGate = between('export async function gateAflApiCandidateAfterReinstate', 'export function targetHumanProvidersOf');
+      expect(candidateGate).toContain('undefined, cPromotion)');
+      expect(candidateGate).toContain('expectedResolvedExternalIds: cPromotion');
+      expect(candidateGate).toContain('candidateImporterSha256: bound.predictedPostReplayImporterSha256');
+    });
   });
 
   // --- F-L4-5 ----------------------------------------------------------------------------------

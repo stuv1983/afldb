@@ -2,13 +2,32 @@
 
 ## 0. Status
 
-- **CURRENT STATE (2026-09-29): Slice 5 implementation COMPLETE, second remediation COMPLETE,
-  operator validation COMPLETE (`tsc` PASS; 732/732 tests PASS; `.catch` audit PASS), final
-  semantic/diff review COMPLETE. Slice 5 is uncommitted (base `788bffa2`; Slice 4 is committed at
-  `788bffa2`) and ready for operator commit. No `code_test_db` rehearsal has been performed or
-  authorised. ISSUE-238 remains Open; Slice 6+ is not authorised by the Slice-5 commit. The
-  unrelated untracked repo-root file `second` is not part of Slice 5 and stays unstaged.** The
-  dated entries below are the chronology and are kept as written.
+- **CURRENT STATE (2026-09-29): Slice 6 (promotion v3 / CPC) implementation, DB-free validation
+  and final semantic review COMPLETE (base `b440b226`). ISSUE-238 remains Open. Next
+  implementation work requires separate Slice-7 authorisation; Slice-10/11 database rehearsal
+  remains deferred.** Operator validation: `npx tsc --noEmit -p .` PASS; planner + correction CLI
+  suites 257/257 PASS; promotion + mutation suites 535/535 PASS; adjudication recovery regression
+  23/23 PASS — **815/815 PASS**. Final Slice-6 semantic/diff review COMPLETE: no blocking code
+  defect; `git diff --check` PASS. The temporary PROD corrected-promotion gate
+  (`CORRECTED_PROMOTION_REHEARSAL_REQUIRED`, S6-D3) remains in place. Slice 5 is **committed** at `b440b226` (`feat(afl-api): add identity correction
+  transaction`); the Slice-5 "uncommitted / ready for operator commit" wording in the entries below
+  is historical. Slice 6 was operator-authorised with decisions **S6-D1…S6-D4** (§13.1): the
+  fingerprint remediation with `PLANNER_VERSION` 2 and the ORIGINAL `update_in_place` label; the
+  ISSUE-250 freeze binding in place of a custom PSG/post-swap gate (freeze mandatory on DEV too when
+  the corrected set is non-empty); the **temporary PROD gate `CORRECTED_PROMOTION_REHEARSAL_REQUIRED`,
+  owned by Slice 11**; the CPC class-5 and class-2 readings. Implemented: the pure CPC classifier;
+  the v3 supersede artefact; the §6 PREDICT/CPC; the §7.4e `--replay-promotion` REPLAY on shared
+  ORIGINAL mechanics; §7.5 CRV; the §5 corrected Q2 census; D15 v3. Details: §12 slice 6
+  "Slice-6 disposition". **No database rehearsal: no `code_test_db`, no DEV/PROD REPLAY; no
+  migration or privilege change.** Slice 7 (rebuild capture v3, Stage 21/22, `docs/deployment.md`)
+  is deferred and untouched: the v2 capture still refuses a live `corrected` row. The unrelated
+  untracked repo-root file `second` is not part of this work and stays unstaged.
+- **Slice 5 state as recorded before Slice 6 (historical; superseded above — Slice 5 was
+  subsequently committed at `b440b226`): Slice 5 implementation COMPLETE, second remediation
+  COMPLETE, operator validation COMPLETE (`tsc` PASS; 732/732 tests PASS; `.catch` audit PASS),
+  final semantic/diff review COMPLETE. Slice 5 was then uncommitted (base `788bffa2`; Slice 4 is
+  committed at `788bffa2`) and ready for operator commit. No `code_test_db` rehearsal has been
+  performed or authorised.** The dated entries below are the chronology and are kept as written.
 - **Slice 5 SECOND REMEDIATION (2026-09-28, uncommitted, base `788bffa2`) — OPERATOR VALIDATION
   COMPLETE, NOT for a `code_test_db` rehearsal.** After the first remediation the operator ran
   `tsc` (PASS) and the DB-free suites (173/173 and 524/524), then found by review that Slice 5 was
@@ -2134,7 +2153,10 @@ follows a correction" all fail closed); D15 (`corrected` = ALREADY_SATISFIED onl
 `noops` entry carrying `satisfied: 'already_satisfied'`, else STOP; never insert/supersede/ledger
 write); the bijection and combined invariant (net `linked` or `corrected` = live human authority);
 agreement (`corrected` never AGREE) and captured overlap (any importer row for a corrected provider);
-G2 (new refusing outcome `CORRECTED_REQUIRES_CPC` until slice 6's CPC exists); the ledger digest
+G2 (new refusing outcome `CORRECTED_REQUIRES_CPC` until slice 6's CPC exists — *Slice 6 replaced it:
+a corrected entry in the exact CPC set grades `CORRECTED_CPC_REPLAY` (non-refusing, never AGREE); any
+other corrected entry, or any call without the CPC set, grades `CORRECTED_NOT_CPC_CLASSIFIED`
+(refusing)*); the ledger digest
 (corrected-only tuple extension) and the new diagnostic `aflApiCorrectedLedgerStateSha256`; the
 promotion checker reader (malformed ⇒ named `PromotionRefused`; census reports the corrected count
 only when non-zero; snapshot structure unchanged for slice 6); the replay tool reader and its
@@ -2249,8 +2271,13 @@ zero STOPs. The residual trust boundary is unchanged: `import_batches` is import
   post-swap D15 uses it precisely because the candidate has become the live database by then
   (`docs/production-promotion.md:974-986`). A pre-swap replay through it would target the wrong
   database. The owner path removes that hazard.
-- The owner bypasses the `afldb_import` grant boundary, so REPLAY's code asserts it only INSERTs
-  into `canonical_applications`.
+- The owner bypasses the `afldb_import` grant boundary, so REPLAY's code is held to an explicit
+  **write allow-list** *(Slice 6, plan-review F-005: the earlier wording "only INSERTs into
+  `canonical_applications`" contradicted class 3's identity INSERT and batch R)*: INSERT
+  `canonical_applications`; INSERT/UPDATE `import_batches` for batch R only; UPDATE (classes 1/2) or
+  INSERT (class 3) of CD_I's `external_identities` row in the D15 `resolved` shape; UPDATE/DELETE of
+  the planned closure rows and CD_I's typed projections; the §8.2 step-8 recompute writes. It
+  **never** writes `afl_api_identity_adjudications` (ledger count and digest asserted unchanged).
 - The rejected alternative, `afldb_import` on a candidate-bound DSN, would need a new
   candidate-named import DSN that the promotion runbook does not define today.
 
@@ -2476,6 +2503,20 @@ production-owned table reinstated from the §4 dump. ISSUE-250 owns:
 If ISSUE-250's mechanism subsumes PSG or the post-swap gate, the ISSUE-238 implementation may
 reuse it, provided the same fail-closed outcome is proven. That decision is recorded at slice 6,
 not assumed here.
+
+**Slice-6 decision (2026-09-29, S6-D2, §13.1): ISSUE-250's freeze subsumes PSG and the post-swap
+gate, and no custom PSG digest is built.** Proof: the freeze F0 digest covers every non-`rebuilt`
+public contract table including `afl_api_identity_adjudications` (per-row `md5(t::text)`, a superset
+of the §8.6 tuple); `--phase restored` proves the old target equals F0, so the §6 CPC read is the F0
+state; `--phase candidate` proves the live target still equals F0 (PSG); `--phase production` proves
+the kept database equals F0 and the promoted live database is unfrozen (the post-swap gate). Each is
+fail-closed and environment-independent once a record is supplied. With a non-empty corrected set a
+freeze record is **mandatory under DEV as well as PROD** (`CORRECTED_PROMOTION_REQUIRES_FREEZE`),
+the per-phase predicate being: pre-cutover, the live target's net-CORRECTED count; restored, the old
+target ledger's; candidate, the reinstated ledger's or the artefact's `correctedReplays`; production,
+the promoted database's. **Temporary S6-D3 gate:** until the Slice 10/11 rehearsal is accepted,
+`--environment prod` with a non-empty corrected set refuses `CORRECTED_PROMOTION_REHEARSAL_REQUIRED`
+(from `--phase pre-cutover`); Slice 11 owns its removal.
 
 ### 9.2 `db:test:rebuild` (ISSUE-237 §6.1)
 
@@ -3009,6 +3050,64 @@ FOR SEPARATE OPERATOR AUTHORISATION.**
    §7.4e candidate REPLAY (owner role); CRV at §7.5; PSG over the whole ledger digest; the D15 v3
    binding and ALREADY_SATISFIED; the post-swap **gate**; the `docs/production-promotion.md`
    updates. It reuses ISSUE-250's mechanism where that mechanism provably subsumes PSG or the gate.
+   - **Slice-6 disposition (2026-09-29, base `b440b226`; as first recorded it was uncommitted and
+     not compiled or run — validation and final review are recorded under "Operator verification"
+     below).**
+     Launch plan review (`afldb-reviewer`): no CRIT/HIGH; MEDs folded in (milestone order; the
+     zero-corrected contract pinned to *gate outcomes* plus byte-identical report text, plan files,
+     ledger digest and snapshot, since a v3 file cannot be byte-identical to v2; PREDICT on its own
+     read-only postgres.js transaction; a per-phase freeze predicate; the §8.8 REPLAY write
+     **allow-list**). Returns: `.phaneslight/returns/issue238-slice6-20260929/`.
+     - **S6-D1** (`src/lib/acquisition/afl-api-identity-correction.ts`): `PLANNER_VERSION = 2`;
+       `ClosureRowFingerprintInput` gains `evidence` and `collision` (§5.1 shape), populated in
+       `buildClosure` (`tools/migration/correct_afl_api_identity.ts`) from the rows' application
+       history, the cited `afl_api` source version, the Brownlow insert payload hash and the
+       C2/C4 counterpart; `mutationPlanFingerprint` sorts `applicationIds` and hashes a `PREDICT`
+       authority as `ADJUDICATION` (J-1); ORIGINAL labels both origins `update_in_place`.
+     - **CPC** (same module): `classifyCorrectedCandidate` (precedence UNEVALUABLE → COLLISION →
+       DISAGREE → PREDICT_STOP → class checks; fail codes include `IDENTITY_ONLY_CLOSURE_NOT_EMPTY`
+       and `PC_STILL_IMPLICATED`) and `deriveCorrectedPromotionSet` (sorted classes 1–3, disjoint
+       from `E_promotion`). DB side (`correct_afl_api_identity.ts`): `resolveCandidateIdentity`,
+       `predictCorrectionClosure` (lock-free PREDICT) and `classifyCorrectedProviderInDatabase`.
+     - **v3 artefact** (`src/lib/acquisition/afl-api-adjudication.ts`): `AFL_API_SUPERSEDE_VERSION
+       = 3` with the §9.1 fields; strict parser (v1/v2 stale by name; exact keys; class/action
+       agreement; class 2 zero mutations; disjointness; resolved count; importer-count arithmetic;
+       payload hash); `predictAflApiPostReplayImporterState`, `aflApiIdentityStateSha256`,
+       `predictAflApiPostReplayIdentityState`; G1 `expectedResolvedExternalIds`; G2
+       `CORRECTED_CPC_REPLAY` / `CORRECTED_NOT_CPC_CLASSIFIED` replacing `CORRECTED_REQUIRES_CPC`.
+       One identity-row rule everywhere: every `afl_api` census row,
+       `aflApiIdentityStateRowsFromCensus` (`tools/migration/replay_afl_api_adjudications.ts`).
+     - **REPLAY** (`correct_afl_api_identity.ts --replay-promotion`, `runReplayPromotion`):
+       `CANDIDATE_DSN` only, `afldb_owner` (role-aware `proveSession`), database guards, the S6-D3
+       refusal for a prod artefact with corrected replays; one transaction; ORIGINAL's batch,
+       mutation, projection, recompute and Q2 steps extracted into shared helpers used by both
+       modes; batch R per §8.7; ledger n₀/h₀ re-checked; post-state equals the prediction;
+       idempotent re-run (`ALREADY_REPLAYED`).
+     - **Promotion checker** (`tools/db/promotion-check.ts`): §5 corrected Q2 census
+       (`gateAflApiCorrectedCensus`) and snapshot `aflApiTargetCensus.netCorrectedLedgerEntries`
+       (only when > 0); `assertCorrectedPromotionAllowed` (S6-D3 then S6-D2) at all four
+       freeze-bound phases; §6 CPC (`runAflApiCorrectedPredict`, `gateAflApiCorrectedPredict`) and
+       v3 emission; §7.5 CRV (`crvExactSetProblems`, `crvIdentityProblems`, `crvBatchProblems`,
+       `gateAflApiCorrectedReplayVerification`); `writePlan` untouched.
+     - **D15 v3** (`replay_afl_api_adjudications.ts`): predicted post-replay importer and identity
+       binding; ALREADY_SATISFIED corrected set must equal `C_promotion`.
+     - **Operator verification (2026-09-29, DB-free, COMPLETE):** `npx tsc --noEmit -p .` PASS;
+       `npx vitest run tests/afl-api-identity-correction.test.ts tests/correct-afl-api-identity-cli.test.ts`
+       257/257 PASS; `npx vitest run tests/player-link-mutations.test.ts tests/db-promotion-check.test.ts`
+       535/535 PASS; `tests/afl-api-adjudication-recovery.test.ts` 23/23 PASS — **815/815 PASS**.
+       Final Slice-6 semantic/diff review COMPLETE: no blocking code defect; `git diff --check`
+       PASS. Slice 6 was uncommitted at the time of this review. Review cleanup: the displaced
+       `readAflApiSupersedeBindingState` doc comment (`replay_afl_api_adjudications.ts`) was moved
+       onto that function and names its three digests (importer, ledger, identity) — comment-only,
+       no re-run required. No database rehearsal (no `code_test_db`, no DEV/PROD REPLAY); S6-D3's
+       temporary PROD gate remains in place.
+     - **Known limits:** no DB integration; the Q2-PASS routes of the census/CRV and the REPLAY
+       write path are first exercised by the slice 10/11 `code_test_db` rehearsal; a partially
+       replayed candidate refuses (whole-ledger SAT-1), so REPLAY must stay one transaction.
+       **LOW (review, not implemented):** optional manual-token hardening in CPC. It is
+       non-blocking and unreachable through the accepted ORIGINAL correction path, which already
+       refuses a correction whose P or P′ is identified via a manual token; kept for later
+       consideration, not a reason to reopen the validated planner/CPC behaviour.
 7. **Rebuild Stage 2/21/22 integration**: capture v3, the Stage 21 (b′) identity-only REPLAY, and
    the Stage 22 extension; the `docs/deployment.md` update.
 8. **Derived and dependent reporting and cache handling**:
@@ -3205,6 +3304,10 @@ wording (`R238-P5-02`, `player_match_stats` only) and the post-correction writer
 | **D-P5-1** | **The production promotion state gap is real and is tracked now, separately from ISSUE-238**, as **AFLDB-ISSUE-250**: "Production promotion can silently lose writes committed after the target snapshot" (High). It covers any target-local or production-owned state captured from the §4 snapshot and reinstated later, not only AFL API adjudications. ISSUE-250 owns the complete affected-state inventory; an **enforced** production mutation freeze from immediately before the authoritative §4 snapshot or dump through cutover verification, or an equivalently strong fail-closed drift or capture mechanism; the final pre-swap verification; the residual cutover race; and rehearsal before ISSUE-237 L5. An informal "please don't edit" convention is not sufficient. The mechanism is not decided here. **ISSUE-237 L5 PROD is BLOCKED on ISSUE-250.** | **DECIDED (binding)** |
 | **D-P5-2** | **A Brownlow-only MOVE without participation STOPs.** A `brownlow_round_votes` MOVE to P′ is allowed only if canonical P′ participation in that match is present and valid under the correction plan. Otherwise it is STOP `brownlow_move_without_participation`, never a continuing source disagreement. BG3 also applies to a Brownlow-only MOVE (§5.4 C1c, §5.9). | **DECIDED (binding)** |
 | **D-P5-3** | **No new match-sheet audit schema or behaviour for v1.** `match_deleted` may explain `correction_target_absent` only when the durable `data_edits` `match_deletion` audit proves it. `match_sheet_removal` is not durably provable, so a vanished row attributed only to a possible match-sheet removal is a STOP (§5.6). Improved removal auditing is an optional future capability, not an ISSUE-238 prerequisite. | **DECIDED (binding)** |
+| **S6-D1** | **(2026-09-29, Slice 6) Fingerprint remediation.** The Slice-2/Slice-5 `mutationPlan` fingerprint was incomplete. Each fingerprinted row now carries `evidence {applicationIds[], citedVersion {sourceId, family, externalRecordId, seq}, insertPayloadSha256 \| null}` and `collision {counterpartRowId, counterpartContractSha256, outcome 'C2' \| 'C4'} \| null` (§5.1). The authority block stays lineage-independent; the fingerprint stays over `mutationPlan` only. `PLANNER_VERSION` 1 → **2**. The ORIGINAL importer-origin identity action is `update_in_place` (P → P′); `upgrade_in_place` is reserved for CPC class 2 (candidate already at P′c, identity-only). No accepted persisted ORIGINAL correction batch exists to preserve. Orchestrator reading J-1: the fingerprint hashes a `PREDICT` authority as `ADJUDICATION`, so the §6 prediction and the §7.4e re-plan of the same mutation fingerprint identically (the plan value keeps its mode). | **APPROVED (operator)** |
+| **S6-D2** | **(2026-09-29) PSG and the post-swap gate bind to AFLDB-ISSUE-250's freeze; no custom PSG.** ISSUE-250's freeze F0 digest covers every non-`rebuilt` public contract table (`tools/db/promotion-freeze.ts` `freezeDigestTables()` = `truncatedPublicTables()`, `tools/db/promotion-inventory.ts` treatment `reinstate` for `afl_api_identity_adjudications`), a per-row `md5(t::text)` superset of the §8.6 ledger tuple. `--phase restored` proves old = F0, `--phase candidate` proves live = F0 (= PSG), `--phase production` proves kept = F0 and the promoted live database unfrozen (= the post-swap gate). With `C_promotion ≠ ∅` a valid `--freeze-record` is therefore **required under both PROD and DEV** (refusal `CORRECTED_PROMOTION_REQUIRES_FREEZE`); this is the corrected-state-only exception to ISSUE-250's rule that the DEV freeze is opt-in. With `C_promotion = ∅` DEV behaviour is unchanged. The census, CPC, REPLAY, CRV and D15 semantic checks still run independently; the freeze substitutes only for the race/drift PSG and the post-swap ledger gate. | **APPROVED (operator)** |
+| **S6-D3** | **(2026-09-29) Temporary PROD corrected-promotion gate, Slice 6 → Slice 11.** Until the Slice 10/11 corrected-promotion rehearsal is accepted, `--environment prod` with a non-empty corrected set refuses `CORRECTED_PROMOTION_REHEARSAL_REQUIRED` (promotion-check from `--phase pre-cutover` onward; REPLAY refuses a prod artefact carrying `correctedReplays`). DEV and `code_test_db` rehearsal stay exercisable. **Owned by Slice 11: only an accepted rehearsal may remove it.** | **APPROVED (operator), TEMPORARY** |
+| **S6-D4** | **(2026-09-29) CPC fail-closed readings.** Class 5 COLLISION covers both (1) another candidate importer provider holding P′c and (2) another target net-human (`linked` or `corrected`) provider whose stable identity remaps to P′c. Class 2 (candidate already at P′c) is the identity-only class: a non-empty predicted MOVE/DELETE closure is a FAIL (`IDENTITY_ONLY_CLOSURE_NOT_EMPTY`), never class-2 success. | **APPROVED (operator)** |
 
 No new operator decision is required by pass 4. The choices pass 4 made to resolve the review are
 **design choices for the reviewer**, not operator decisions. Where an alternative materially exists,
