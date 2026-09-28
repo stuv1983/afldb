@@ -80,7 +80,9 @@ export type AflApiRefusalCode =
   | 'T8_anomalous_row'
   | 'T9_surname_ack_required'
   | 'T19_revoke_unprovable'
-  | 'T20_revoke_importer_link';
+  | 'T20_revoke_importer_link'
+  /** AFLDB-ISSUE-238 §8.6: the provider's net ledger state is `corrected`; not revocable here. */
+  | 'T21_revoke_corrected';
 
 export type AflApiDecision =
   | { allow: true }
@@ -119,6 +121,10 @@ export function aflApiRefusalMessage(code: AflApiRefusalCode, detail?: string): 
     case 'T20_revoke_importer_link':
       return 'This provider was linked by the importer, not by a human decision, and cannot be '
         + 'revoked from this surface.';
+    case 'T21_revoke_corrected':
+      return 'This provider\'s link was corrected by a recorded human correction (AFLDB-ISSUE-238). '
+        + 'A correction cannot be revoked from this surface; undoing a correction is a separate '
+        + 'operation that does not exist yet.';
     default: {
       const exhaustive: never = code;
       throw new Error(`unhandled refusal code: ${exhaustive as string}`);
@@ -167,11 +173,22 @@ export type AflApiRevokeDecisionInput = {
   /** The D10 non-use proof's verdict (evaluated by `evaluateNonUseProof` below). */
   nonUseProven: boolean;
   nonUseRefusalReason?: string;
+  /**
+   * AFLDB-ISSUE-238 §8.6: the provider's NET ledger action (latest row), read under the revoke's
+   * locks. The identity row alone classifies a corrected provider as `L-H` (D7), so only the
+   * ledger can tell corrected from linked. Omitted/null = no ledger row, the pre-ISSUE-238 input.
+   */
+  ledgerNetAction?: AflApiLedgerNetAction | null;
 };
 
-/** D10/D6/D7's whole revoke-time decision. */
+/**
+ * D10/D6/D7's whole revoke-time decision. AFLDB-ISSUE-238: T21 (net ledger state `corrected`) is
+ * checked immediately after T6 and BEFORE every state rule and the non-use proof -- by decision,
+ * a corrected provider reports T21 even when its identity row is also anomalous (T8).
+ */
 export function decideAflApiRevoke(input: AflApiRevokeDecisionInput): AflApiDecision {
   if (!input.fingerprintMatches) return refuse('T6_stale_fingerprint'); // T6
+  if (input.ledgerNetAction === 'corrected') return refuse('T21_revoke_corrected'); // T21
   if (input.state === 'X') return refuse('T8_anomalous_row'); // T8
   if (input.state === 'L-I') return refuse('T20_revoke_importer_link'); // T20
   if (input.state !== 'L-H') return refuse('T8_anomalous_row'); // U0/U1: nothing to revoke
@@ -719,14 +736,130 @@ export function evaluateNonUseProof(input: NonUseProofInput): NonUseProofResult 
  * 4. D15 replay planner and bijection checker (OD-3, plan-review R3, R8)
  * ------------------------------------------------------------------ */
 
+/**
+ * AFLDB-ISSUE-238 (M1, migration 106): the ledger's complete action vocabulary. Every reader
+ * handles exactly these three; any other value throws or refuses (runbook §8.6).
+ */
+export const AFL_API_LEDGER_ACTIONS = ['linked', 'revoked', 'corrected'] as const;
+export type AflApiLedgerNetAction = typeof AFL_API_LEDGER_ACTIONS[number];
+
+/**
+ * One `afl_api_identity_adjudications` row as every ledger reader sees it. AFLDB-ISSUE-238 widens
+ * the ISSUE-235 two-member action union with `corrected` (D2): human authority, live at P′
+ * (`playerId`/`playerIdentity`), recording P in `previousPlayerIdentity` (never remapped: it has
+ * no FK, §10 M1) and binding its `evidenceSha256` into the ledger digest (§8.6).
+ *
+ * The two new fields are optional in the TYPE so every ISSUE-235/237 reader and fixture of a
+ * `linked`/`revoked` row stays valid unchanged; their per-action shape (required and well-formed
+ * on `corrected`, absent/NULL otherwise) is enforced at RUNTIME by `aflApiLedgerStructureProblems`,
+ * which every net-view reader and both digests run first -- a reader that forgot to select them
+ * fails closed on the first `corrected` row it meets.
+ */
 export type AflApiAdjudicationLedgerRow = {
   id: number;
   externalId: string;
-  action: 'linked' | 'revoked';
+  action: AflApiLedgerNetAction;
+  /** For a `corrected` row: P′, the corrected live player (M1, D2). */
   playerId: number;
+  /** For a `corrected` row: P′'s stable identity. */
   playerIdentity: string;
+  /** `revoked`: the `linked` row it undoes. `corrected`: the `linked` row it supersedes
+   * (human-origin) or NULL (importer-origin), D2. `linked`: always NULL. */
   supersedesId: number | null;
+  /** `corrected` only: P's stable identity (M1 `previous_player_identity`). NULL/absent otherwise. */
+  previousPlayerIdentity?: string | null;
+  /** The row's `evidence_sha256`; required (64 hex) on a `corrected` row, digested only there. */
+  evidenceSha256?: string;
 };
+
+/** Raised when a ledger read violates the ISSUE-238 structural contract (`aflApiLedgerStructureProblems`). */
+export class AflApiLedgerMalformed extends Error {}
+
+const LEDGER_SHA256_RE = /^[0-9a-f]{64}$/;
+
+/** bigint ids arrive as strings from postgres.js unless cast; compare them as numbers. */
+function ledgerIdNumber(value: unknown): number {
+  return typeof value === 'string' ? Number(value) : (value as number);
+}
+
+/**
+ * AFLDB-ISSUE-238 §8.6 / DD-2: the ledger's structural contract, checked centrally so no reader
+ * interprets a malformed ledger. Only `corrected`-related structure is new; `linked`/`revoked`
+ * supersede structure is deliberately NOT re-validated here (zero-`corrected` parity):
+ *
+ * 1. `action` is one of `linked`/`revoked`/`corrected`;
+ * 2. a `linked`/`revoked` row carries no `previousPlayerIdentity`;
+ * 3. a `corrected` row carries a non-blank `previousPlayerIdentity` distinct from its
+ *    `playerIdentity` (M1's string guard);
+ * 4. a `corrected` row carries a 64-hex `evidenceSha256`;
+ * 5. a human-origin `corrected` row (`supersedesId` set) supersedes the immediately preceding
+ *    row for its provider, which must be `linked` (D2);
+ * 6. an importer-origin `corrected` row (`supersedesId` NULL) follows no net-`linked` state
+ *    (D2: net state NONE -- no row, or net `revoked`);
+ * 7. at most one `corrected` row per provider (D8: v1 refuses correction chains);
+ * 8. nothing follows a `corrected` row for its provider (v1: the link path refuses an `L-H`
+ *    provider (T2/T3) and the revoke path refuses a corrected one (T21)).
+ */
+export function aflApiLedgerStructureProblems(rows: readonly AflApiAdjudicationLedgerRow[]): string[] {
+  const problems: string[] = [];
+  const byExternalId = new Map<string, AflApiAdjudicationLedgerRow[]>();
+  for (const row of [...rows].sort((a, b) => ledgerIdNumber(a.id) - ledgerIdNumber(b.id))) {
+    const at = `ledger row ${String(row.id)} (${String(row.externalId)})`;
+    const action = (row as { action: unknown }).action;
+    if (!(AFL_API_LEDGER_ACTIONS as readonly unknown[]).includes(action)) {
+      problems.push(`${at}: action ${JSON.stringify(action)} is not linked/revoked/corrected`);
+      continue;
+    }
+    const previous = (row as { previousPlayerIdentity?: unknown }).previousPlayerIdentity;
+    if (row.action === 'corrected') {
+      if (typeof previous !== 'string' || previous.trim() === '') {
+        problems.push(`${at}: a corrected row has no previous_player_identity`);
+      } else if (previous === row.playerIdentity) {
+        problems.push(`${at}: a corrected row's previous_player_identity equals its player_identity`);
+      }
+      const evidenceSha256 = (row as { evidenceSha256?: unknown }).evidenceSha256;
+      if (typeof evidenceSha256 !== 'string' || !LEDGER_SHA256_RE.test(evidenceSha256)) {
+        problems.push(`${at}: a corrected row has no 64-hex evidence_sha256`);
+      }
+    } else if (previous !== undefined && previous !== null) {
+      problems.push(`${at}: a ${row.action} row carries a previous_player_identity`);
+    }
+    if (!byExternalId.has(row.externalId)) byExternalId.set(row.externalId, []);
+    byExternalId.get(row.externalId)!.push(row);
+  }
+  for (const [externalId, history] of byExternalId) {
+    let correctedSeen = false;
+    for (let i = 0; i < history.length; i += 1) {
+      const row = history[i];
+      const at = `ledger row ${String(row.id)} (${externalId})`;
+      if (correctedSeen) {
+        problems.push(`${at}: follows a corrected row for the same provider (a corrected state is terminal in v1)`);
+      }
+      if (row.action !== 'corrected') continue;
+      if (correctedSeen) problems.push(`${at}: a second corrected row for the same provider (a correction chain, D8)`);
+      correctedSeen = true;
+      const preceding = i > 0 ? history[i - 1] : null;
+      if (row.supersedesId !== null && row.supersedesId !== undefined) {
+        if (!preceding || ledgerIdNumber(preceding.id) !== ledgerIdNumber(row.supersedesId)) {
+          problems.push(`${at}: a human-origin corrected row does not supersede the immediately preceding row for its provider`);
+        } else if (preceding.action !== 'linked') {
+          problems.push(`${at}: a human-origin corrected row supersedes a ${preceding.action} row, not a linked one`);
+        }
+      } else if (preceding?.action === 'linked') {
+        problems.push(`${at}: an importer-origin corrected row (no supersedes_id) follows a net-linked state`);
+      }
+    }
+  }
+  return problems;
+}
+
+/** Throws `AflApiLedgerMalformed` naming every structural problem; a no-op on a valid ledger. */
+export function assertAflApiLedgerStructure(rows: readonly AflApiAdjudicationLedgerRow[]): void {
+  const problems = aflApiLedgerStructureProblems(rows);
+  if (problems.length > 0) {
+    throw new AflApiLedgerMalformed(`the afl_api identity ledger is malformed: ${problems.join('; ')}`);
+  }
+}
 
 /**
  * Why a stable identity named by a tracked `profile_url_continuity` rule does not resolve on a
@@ -852,9 +985,22 @@ export type AflApiCandidateIdentityRow = {
   externalUrl?: string | null;
 };
 
+export type AflApiReplayNoop = { externalId: string; satisfied?: 'already_satisfied' };
+
+/** How many of a plan's no-ops are corrected ALREADY_SATISFIED entries (R238-S4-02). */
+export function aflApiAlreadySatisfiedCount(noops: readonly AflApiReplayNoop[]): number {
+  return noops.filter((n) => n.satisfied === 'already_satisfied').length;
+}
+
 export type AflApiReplayPlan = {
   inserts: readonly { externalId: string; playerId: number }[];
-  noops: readonly { externalId: string }[];
+  /**
+   * Nothing to write: the identical human row already exists. AFLDB-ISSUE-238 (§8.6, §9.1 D15,
+   * R238-S4-02): a net-`corrected` provider whose `resolved` P′ row is present is reported here
+   * as ALREADY_SATISFIED, discriminated by `satisfied: 'already_satisfied'`; the field is absent
+   * on every other no-op, so a zero-`corrected` plan is byte-identical to the ISSUE-237 one.
+   */
+  noops: readonly AflApiReplayNoop[];
   stops: readonly { externalId: string; reason: string }[];
   /** AFLDB-ISSUE-237 D9/OD-2: providers whose agreeing importer row was superseded. Always
    * empty unless the caller's `expectedSupersedes` names the provider (D9: the replay never
@@ -862,10 +1008,15 @@ export type AflApiReplayPlan = {
   supersedes: readonly { externalId: string; playerId: number }[];
 };
 
-/** The ledger reduced to one row per external_id: the LATEST action (highest id) wins. */
+/**
+ * The ledger reduced to one row per external_id: the LATEST action (highest id) wins.
+ * AFLDB-ISSUE-238: validates the whole ledger first (`assertAflApiLedgerStructure`), so every
+ * reader built on the net view fails closed on an unknown action or a malformed corrected row.
+ */
 export function netLedgerRowsByExternalId(
   ledgerRows: readonly AflApiAdjudicationLedgerRow[],
 ): ReadonlyMap<string, AflApiAdjudicationLedgerRow> {
+  assertAflApiLedgerStructure(ledgerRows);
   const byExternalId = new Map<string, AflApiAdjudicationLedgerRow>();
   for (const row of [...ledgerRows].sort((a, b) => a.id - b.id)) byExternalId.set(row.externalId, row);
   return byExternalId;
@@ -896,12 +1047,20 @@ export function planAflApiAdjudicationReplay(input: {
   const expectedSupersedes = input.expectedSupersedes ?? new Set<string>();
   const net = netLedgerRowsByExternalId(input.ledgerRows);
   const inserts: { externalId: string; playerId: number }[] = [];
-  const noops: { externalId: string }[] = [];
+  const noops: AflApiReplayNoop[] = [];
   const stops: { externalId: string; reason: string }[] = [];
   const supersedes: { externalId: string; playerId: number }[] = [];
 
   for (const [externalId, row] of net) {
-    if (row.action !== 'linked') continue; // net-revoked: nothing to replay
+    switch (row.action) {
+      case 'revoked': continue; // net-revoked: nothing to replay
+      case 'linked': break;
+      case 'corrected': break; // below: ALREADY_SATISFIED or STOP, never a write
+      default: {
+        const exhaustive: never = row.action;
+        throw new AflApiLedgerMalformed(`unhandled ledger action ${String(exhaustive)}`);
+      }
+    }
 
     const remap = input.remapByExternalId.get(externalId);
     if (!remap || !remap.ok) {
@@ -924,6 +1083,39 @@ export function planAflApiAdjudicationReplay(input: {
     }
 
     const candidate = input.candidateByExternalId.get(externalId);
+
+    // AFLDB-ISSUE-238 §8.6 / §9.1 D15 / §9.2 (c): a net-`corrected` provider is live human
+    // authority at P′. D15 only ever CONFIRMS it (ALREADY_SATISFIED when the `resolved` P′ row is
+    // present); it never inserts, supersedes or writes a ledger row -- the ISSUE-238 REPLAY is
+    // the only identity writer for a corrected provider. Anything else is a hard STOP; in
+    // particular a stale importer row at P never replaces (or is superseded into) the correction.
+    if (row.action === 'corrected') {
+      if (expectedSupersedes.has(externalId)) {
+        stops.push({
+          externalId,
+          reason: 'a corrected provider is named in the expected supersede set (C_promotion and '
+            + 'E_promotion must be disjoint)',
+        });
+        continue;
+      }
+      if (candidate
+        && candidate.status === 'resolved'
+        && candidate.matchMethod === AFL_API_ADMIN_MATCH_METHOD
+        && candidate.playerId === remap.newPlayerId) {
+        noops.push({ externalId, satisfied: 'already_satisfied' });
+        continue;
+      }
+      stops.push({
+        externalId,
+        reason: candidate
+          ? 'the ledger records a correction for this provider, but its external_identities row is '
+            + 'not the resolved corrected identity (a stale or conflicting row never replaces a correction)'
+          : 'the ledger records a correction for this provider, but no resolved external_identities row '
+            + 'exists for it (D15 never creates corrected authority)',
+      });
+      continue;
+    }
+
     if (candidate) {
       const identicalHuman = candidate.status === 'resolved'
         && candidate.matchMethod === AFL_API_ADMIN_MATCH_METHOD
@@ -975,14 +1167,30 @@ export function planAflApiAdjudicationReplay(input: {
   return { inserts, noops, stops, supersedes };
 }
 
+/**
+ * AFLDB-ISSUE-238: does this NET ledger action leave a live `resolved` human identity row?
+ * `linked` (at P) and `corrected` (at P′) do; `revoked` does not. Exhaustive by construction.
+ */
+export function aflApiNetIsHumanLive(action: AflApiLedgerNetAction): boolean {
+  switch (action) {
+    case 'linked': return true;
+    case 'corrected': return true;
+    case 'revoked': return false;
+    default: {
+      const exhaustive: never = action;
+      throw new AflApiLedgerMalformed(`unhandled ledger action ${String(exhaustive)}`);
+    }
+  }
+}
+
 export type AflApiBijectionMismatch =
   | { kind: 'ledger_without_row'; externalId: string }
   | { kind: 'row_without_ledger'; externalId: string };
 
 /**
- * D15's consistency proof, in both directions: every net-`linked` ledger entry must have
- * its matching `resolved`/`afl_api_admin_adjudication` row, and every such row must have
- * its net-`linked` ledger entry. Usable both as a promotion/rebuild gate and as a
+ * D15's consistency proof, in both directions: every net-`linked` (or, AFLDB-ISSUE-238,
+ * net-`corrected`) ledger entry must have its matching `resolved`/`afl_api_admin_adjudication`
+ * row, and every such row must have its net-`linked`/`corrected` ledger entry. Usable both as a promotion/rebuild gate and as a
  * standalone read-only invariant check (runbook §10.1 C5).
  */
 export function checkAflApiAdjudicationBijection(input: {
@@ -990,8 +1198,10 @@ export function checkAflApiAdjudicationBijection(input: {
   resolvedRows: readonly { externalId: string; status: string; matchMethod: string | null }[];
 }): readonly AflApiBijectionMismatch[] {
   const net = netLedgerRowsByExternalId(input.ledgerRows);
+  // AFLDB-ISSUE-238 §8.6: the live human-authority set is every net LINKED or CORRECTED entry --
+  // a corrected provider is `resolved` at P′ (D7), never a revoked one.
   const netLinkedIds = new Set(
-    [...net.entries()].filter(([, r]) => r.action === 'linked').map(([externalId]) => externalId),
+    [...net.entries()].filter(([, r]) => aflApiNetIsHumanLive(r.action)).map(([externalId]) => externalId),
   );
   const resolvedAdminIds = new Set(
     input.resolvedRows
@@ -1438,7 +1648,8 @@ export type AflApiAgreementImporterRow = {
 
 export type AflApiAgreementLedgerEntry = {
   playerIdentity: string;
-  effectiveState: 'LINKED' | 'REVOKED';
+  /** AFLDB-ISSUE-238: `CORRECTED` never agrees (condition 5 needs LINKED); it is routed to CPC. */
+  effectiveState: 'LINKED' | 'REVOKED' | 'CORRECTED';
 };
 
 /**
@@ -1482,7 +1693,18 @@ export function computeAflApiAgreeingProviders(input: {
   const net = netLedgerRowsByExternalId(input.ledgerRows);
   const agreeing = new Set<string>();
   for (const [externalId, ledgerRow] of net) {
-    if (ledgerRow.action !== 'linked') continue;
+    switch (ledgerRow.action) {
+      case 'linked': break;
+      case 'revoked': continue;
+      // AFLDB-ISSUE-238 §8.6: a correction is never AGREE -- never in E_rebuild/E_promotion,
+      // never superseded by an importer row; the promotion routes it to CPC (§9.1) and the
+      // rebuild capture refuses it outright (§9.2).
+      case 'corrected': continue;
+      default: {
+        const exhaustive: never = ledgerRow.action;
+        throw new AflApiLedgerMalformed(`unhandled ledger action ${String(exhaustive)}`);
+      }
+    }
     const importerRow = input.importerByExternalId.get(externalId) ?? null;
     const remap = input.remapByExternalId.get(externalId) ?? null;
     if (aflApiAgrees({
@@ -1514,10 +1736,22 @@ export function capturedOverlapProviders(input: {
   const net = netLedgerRowsByExternalId(input.ledgerRows);
   const overlapping: string[] = [];
   for (const [externalId, ledgerRow] of net) {
-    if (ledgerRow.action !== 'linked') continue;
     const importerRow = importerByExternalId.get(externalId);
-    if (importerRow && importerRow.playerIdentity === ledgerRow.playerIdentity) {
-      overlapping.push(externalId);
+    switch (ledgerRow.action) {
+      case 'revoked': continue;
+      case 'linked':
+        if (importerRow && importerRow.playerIdentity === ledgerRow.playerIdentity) overlapping.push(externalId);
+        continue;
+      // AFLDB-ISSUE-238 §8.6/§9.2: a corrected provider is `resolved` on the captured database,
+      // so the importer section cannot hold it at ALL -- any captured importer row for it (at
+      // P, P′ or a third identity) is an overlap, i.e. a capture refusal.
+      case 'corrected':
+        if (importerRow) overlapping.push(externalId);
+        continue;
+      default: {
+        const exhaustive: never = ledgerRow.action;
+        throw new AflApiLedgerMalformed(`unhandled ledger action ${String(exhaustive)}`);
+      }
     }
   }
   return overlapping.sort();
@@ -1675,7 +1909,7 @@ export function classifyAflApiG1(input: {
 
 export type AflApiG2EntryInput = {
   externalId: string;
-  ledgerNetAction: 'linked' | 'revoked';
+  ledgerNetAction: AflApiLedgerNetAction;
   /** True when the ledger entry's stored player_identity is a manual_admin_edit token. */
   identityIsManualToken: boolean;
   /** The candidate's own afl_api row for the SAME provider (external_id), if any. */
@@ -1707,11 +1941,19 @@ export type AflApiG2Grade =
   | { externalId: string; outcome: 'UNEVALUABLE' }
   | { externalId: string; outcome: 'CONTINUITY_CONTRADICTION'; reason: string }
   | { externalId: string; outcome: 'UNRESOLVED'; reason: 'unresolvable' | 'ambiguous' }
-  | { externalId: string; outcome: 'INFO_REVOKED_CANDIDATE' };
+  | { externalId: string; outcome: 'INFO_REVOKED_CANDIDATE' }
+  /**
+   * AFLDB-ISSUE-238 §8.6/§9.1: a net-`corrected` target entry is NOT graded by G2 (neither AGREE
+   * nor the revoked INFO); it belongs to CPC. CPC does not exist until §12 slice 6, so until then
+   * this routing outcome REFUSES the phase: a corrected provider can never reach the swap and a
+   * post-swap D15 uncorrected.
+   */
+  | { externalId: string; outcome: 'CORRECTED_REQUIRES_CPC' };
 
 /** Every G2 outcome that refuses the promotion before the swap. Only AGREE and the INFO grade pass. */
 export const AFL_API_G2_REFUSING_OUTCOMES: ReadonlySet<AflApiG2Grade['outcome']> = new Set([
   'DISAGREE', 'COLLISION', 'UNSUPPORTED', 'UNEVALUABLE', 'CONTINUITY_CONTRADICTION', 'UNRESOLVED',
+  'CORRECTED_REQUIRES_CPC',
 ]);
 
 /**
@@ -1724,9 +1966,18 @@ export const AFL_API_G2_REFUSING_OUTCOMES: ReadonlySet<AflApiG2Grade['outcome']>
 export function classifyAflApiG2(entries: readonly AflApiG2EntryInput[]): readonly AflApiG2Grade[] {
   const grades: AflApiG2Grade[] = [];
   for (const entry of entries) {
-    if (entry.ledgerNetAction === 'revoked') {
-      if (entry.candidateRow) grades.push({ externalId: entry.externalId, outcome: 'INFO_REVOKED_CANDIDATE' });
-      continue;
+    switch (entry.ledgerNetAction) {
+      case 'revoked':
+        if (entry.candidateRow) grades.push({ externalId: entry.externalId, outcome: 'INFO_REVOKED_CANDIDATE' });
+        continue;
+      case 'corrected':
+        grades.push({ externalId: entry.externalId, outcome: 'CORRECTED_REQUIRES_CPC' });
+        continue;
+      case 'linked': break;
+      default: {
+        const exhaustive: never = entry.ledgerNetAction;
+        throw new AflApiLedgerMalformed(`unhandled ledger action ${String(exhaustive)}`);
+      }
     }
     if (entry.identityIsManualToken) {
       grades.push({ externalId: entry.externalId, outcome: 'UNEVALUABLE' });
@@ -1999,21 +2250,59 @@ export function aflApiImporterStateSha256(rows: readonly AflApiImporterStateRow[
  * converts) and the replay adapter's (which does not) cannot hash one ledger two ways.
  */
 export function aflApiLedgerStateSha256(rows: readonly AflApiAdjudicationLedgerRow[]): string {
+  return sha256Hex(canonicalJson(ledgerDigestTuples(rows, 'aflApiLedgerStateSha256')));
+}
+
+/**
+ * The digest tuples, sorted by id. AFLDB-ISSUE-238 §8.6: a `corrected` row's tuple ALSO binds
+ * `previous_player_identity` and `evidence_sha256` -- the fields that define correction
+ * authority -- while a `linked`/`revoked` tuple is exactly ISSUE-237's five fields, so a ledger
+ * with zero `corrected` rows hashes byte-identically to the ISSUE-237 digest. The structural
+ * contract is asserted first (R238-S4-04): a reader that omitted the two new columns makes a
+ * corrected row malformed here and fails closed, never hashing `undefined`.
+ */
+function ledgerDigestTuples(
+  rows: readonly AflApiAdjudicationLedgerRow[], label: string,
+  /** The caller already validated the WHOLE ledger this subset came from (the corrected-subset
+   * digest): a subset alone lacks the superseded rows cross-row validation needs. */
+  alreadyValidated = false,
+): JsonValue[] {
+  if (!alreadyValidated) assertAflApiLedgerStructure(rows);
   const asId = (value: unknown, field: string): number => {
     const n = typeof value === 'string' && /^[0-9]+$/.test(value) ? Number(value) : value;
     if (typeof n !== 'number' || !Number.isSafeInteger(n) || n <= 0) {
-      throw new Error(`aflApiLedgerStateSha256: ${field} ${String(value)} is not a positive integer id.`);
+      throw new Error(`${label}: ${field} ${String(value)} is not a positive integer id.`);
     }
     return n;
   };
   const normalised = rows.map((r) => ({
-    id: asId(r.id, 'id'), externalId: r.externalId, action: r.action, playerIdentity: r.playerIdentity,
+    row: r, id: asId(r.id, 'id'),
     supersedesId: r.supersedesId === null || r.supersedesId === undefined ? null : asId(r.supersedesId, 'supersedes_id'),
   })).sort((a, b) => a.id - b.id);
   for (let i = 1; i < normalised.length; i += 1) {
-    if (normalised[i].id === normalised[i - 1].id) throw new Error(`aflApiLedgerStateSha256: ledger id ${normalised[i].id} appears twice.`);
+    if (normalised[i].id === normalised[i - 1].id) throw new Error(`${label}: ledger id ${normalised[i].id} appears twice.`);
   }
-  return sha256Hex(canonicalJson(normalised.map((r) => [r.id, r.externalId, r.action, r.playerIdentity, r.supersedesId])));
+  return normalised.map(({ row, id, supersedesId }): JsonValue => {
+    const base: JsonValue[] = [id, row.externalId, row.action, row.playerIdentity, supersedesId];
+    // Validated above: on a `corrected` row both are well-formed strings.
+    return row.action === 'corrected' ? [...base, row.previousPlayerIdentity as string, row.evidenceSha256 as string] : base;
+  });
+}
+
+/**
+ * AFLDB-ISSUE-238 §8.6 (pass 5, P4-08): the corrected-subset digest -- count and sha256 over the
+ * `corrected` rows' tuples only. DIAGNOSTIC: it shows which kind of ledger write changed; every
+ * gate compares the whole-ledger `aflApiLedgerStateSha256`. The whole ledger is validated first.
+ */
+export function aflApiCorrectedLedgerStateSha256(
+  rows: readonly AflApiAdjudicationLedgerRow[],
+): { rowCount: number; sha256: string } {
+  assertAflApiLedgerStructure(rows);
+  const corrected = rows.filter((r) => r.action === 'corrected');
+  return {
+    rowCount: corrected.length,
+    sha256: sha256Hex(canonicalJson(ledgerDigestTuples(corrected, 'aflApiCorrectedLedgerStateSha256', true))),
+  };
 }
 
 /** Raised when an operator file is malformed, foreign, stale or tampered. */

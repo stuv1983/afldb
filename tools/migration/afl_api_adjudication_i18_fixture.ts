@@ -51,6 +51,7 @@ import {
   AFL_API_ADMIN_MATCH_METHOD,
   AFL_API_PLAYER_REFERENCE_MANIFEST,
   AFL_API_PROVIDER_ID_RE,
+  type AflApiLedgerNetAction,
 } from '../../src/lib/acquisition/afl-api-adjudication';
 import { assertRebuildTargetName, databaseOf, resolveCaptureRoot } from '../db/rebuild-test';
 import { redact } from '../db/psql';
@@ -236,7 +237,12 @@ export function i18SeedPreconditionProblems(o: I18SeedObservation): string[] {
 export type I18LedgerRow = {
   id: number;
   externalId: string;
-  action: 'linked' | 'revoked';
+  /**
+   * AFLDB-ISSUE-238: type-widened to the 3-member ledger action union so this row shape stays
+   * assignable from a real ledger read; this fixture's OWN sequence is still fixed to exactly
+   * `I18_EXPECTED_ACTIONS` (linked, revoked, linked, never corrected) -- no behaviour change.
+   */
+  action: AflApiLedgerNetAction;
   playerId: number;
   playerIdentity: string;
   /** `previous_state::text`: PostgreSQL's canonical jsonb rendering, the reinstate contract's own. */

@@ -64,6 +64,7 @@ import {
   AFL_API_PROVIDER_ID_RE,
   isAflApiImporterMatchMethod,
   type AflApiForwardIdentityResult,
+  type AflApiLedgerNetAction,
 } from '../../src/lib/acquisition/afl-api-adjudication';
 import { assertRebuildTargetName, databaseOf, resolveCaptureRoot } from '../db/rebuild-test';
 import { redact } from '../db/psql';
@@ -272,7 +273,9 @@ export function rehearsalSeedPreconditionProblems(o: RehearsalSeedObservation): 
 export type RehearsalLedgerRow = {
   id: number;
   externalId: string;
-  action: 'linked' | 'revoked';
+  /** AFLDB-ISSUE-238: type-widened only -- `rehearsalLedgerShapeProblems` below still requires
+   * exactly one `linked` row (this rehearsal's own fixture shape; never `corrected`). */
+  action: AflApiLedgerNetAction;
   playerIdentity: string;
   evidenceSha256: string;
   supersedesId: number | null;

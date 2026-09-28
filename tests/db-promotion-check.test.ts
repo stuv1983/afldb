@@ -109,7 +109,8 @@ import {
 } from '../tools/db/promotion-inventory';
 import {
   AFL_API_LEDGER_ROWS_SQL, DATABASE_COMMENT_SQL, Report, aflApiDevRegenerationProposal, aflApiG2Entries, aflApiSupersedeFileFor,
-  evaluateAflApiG2, gateAflApiCandidateAfterReinstate, gateAflApiG1, gateAflApiOverlap, gateAflApiRebuildMarker,
+  evaluateAflApiG2, gateAflApiCandidateAfterReinstate, gateAflApiG1, gateAflApiOverlap, gateAflApiPreCutoverCensus,
+  gateAflApiRebuildMarker, readAflApiLedgerRows,
   PROMOTION_REPLAY_IDENTITIES_SQL, PROMOTION_REPLAY_MATCH_KEYS_SQL, PROMOTION_REPLAY_MAX_SEASON_SQL,
   PROMOTION_REPLAY_OVERRIDES_SQL, PROMOTION_REPLAY_PLAYER_CHECKS_SQL, gateOverrideReplayTargets, publishRestoredLineageRemap,
   PROMOTION_CONVERGENCE_TARGET_IDENTITIES_SQL,
@@ -2078,6 +2079,52 @@ describe('AFLDB-ISSUE-235: afl_api_identity_adjudications', () => {
     expect(mixed.stops.map((s) => s.externalId)).toEqual(['CD_I2']);
   });
 
+  it('C4c (AFLDB-ISSUE-238 §8.6/§9.1 D15) — a net-corrected provider is CONFIRMED (ALREADY_SATISFIED) or STOPped, never inserted', () => {
+    const IDENTITY = 'players/A/Alpha_Able.html';
+    const PREVIOUS = 'players/P/Previous.html';
+    const correctedRow = (): AflApiAdjudicationLedgerRow => ({
+      id: 1, externalId: 'CD_I1', action: 'corrected', playerId: 907, playerIdentity: IDENTITY,
+      supersedesId: null, previousPlayerIdentity: PREVIOUS, evidenceSha256: 'a'.repeat(64),
+    });
+    const human = (externalId: string, playerId: number): AflApiCandidateIdentityRow => ({
+      externalId, status: 'resolved', matchMethod: AFL_API_ADMIN_MATCH_METHOD, playerId,
+    });
+    const importer = (externalId: string, playerId: number): AflApiCandidateIdentityRow => ({
+      externalId, status: 'unique', matchMethod: 'afl_api_stat_vector_season', playerId,
+    });
+    const remapTo = (newPlayerId: number): AflApiPlayerRemapResult => (
+      { ok: true, newPlayerId, remappedIdentity: IDENTITY });
+    const plan = (candidates: AflApiCandidateIdentityRow[]) => planAflApiAdjudicationReplay({
+      ledgerRows: [correctedRow()],
+      remapByExternalId: new Map([['CD_I1', remapTo(907)]]),
+      candidateByExternalId: new Map(candidates.map((c) => [c.externalId, c])),
+      candidatePlayerAflApiRow: new Map(candidates.filter((c) => c.playerId !== null).map((c) => [c.playerId!, c])),
+    });
+
+    // The resolved admin candidate row already exists at remap(P'): CONFIRMED, never written.
+    expect(plan([human('CD_I1', 907)]))
+      .toEqual({ inserts: [], noops: [{ externalId: 'CD_I1', satisfied: 'already_satisfied' }], stops: [], supersedes: [] });
+
+    // A stale importer row at P (or any other row) never replaces a correction: STOP, never an insert.
+    const withImporter = plan([importer('CD_I1', 907)]);
+    expect(withImporter.inserts).toEqual([]);
+    expect(withImporter.stops).toEqual([{
+      externalId: 'CD_I1',
+      reason: 'the ledger records a correction for this provider, but its external_identities row is '
+        + 'not the resolved corrected identity (a stale or conflicting row never replaces a correction)',
+    }]);
+
+    // No external_identities row at all for this provider: STOP, never an insert (D15 never
+    // creates corrected authority).
+    const noRow = plan([]);
+    expect(noRow.inserts).toEqual([]);
+    expect(noRow.stops).toEqual([{
+      externalId: 'CD_I1',
+      reason: 'the ledger records a correction for this provider, but no resolved external_identities row '
+        + 'exists for it (D15 never creates corrected authority)',
+    }]);
+  });
+
   it('C5 (OD-3) — the bijection checker reports both directions, and only human resolved rows count', () => {
     const ledgerRows: AflApiAdjudicationLedgerRow[] = [
       { id: 1, externalId: 'CD_I1', action: 'linked', playerId: 1, playerIdentity: 'a', supersedesId: null },
@@ -3780,6 +3827,90 @@ describe('AFLDB-ISSUE-237 L4 hardening — promotion afl_api gates (DB-free)', (
       remapByIdentity: new Map([[R, { ok: true as const, newPlayerId: 55, remappedIdentity: R }]]),
     });
     expect(classifyAflApiG2(own)).toEqual([{ externalId: 'CD_X', outcome: 'AGREE' }]);
+  });
+
+  it('AFLDB-ISSUE-238 §8.6/§9.1 — G2 grades a net-corrected entry CORRECTED_REQUIRES_CPC, a refusing outcome never in AGREE', () => {
+    const correctedRow: AflApiAdjudicationLedgerRow = {
+      id: 1, externalId: 'CD_I1', action: 'corrected', playerId: 907, playerIdentity: 'players/C/Corrected.html',
+      supersedesId: null, previousPlayerIdentity: 'players/P/Previous.html', evidenceSha256: 'e'.repeat(64),
+    };
+    const entries = aflApiG2Entries({
+      candidate: { importerRows: [], identityByExternalId: new Map() },
+      net: new Map([['CD_I1', correctedRow]]),
+      manualIdentities: new Set(),
+      remapByIdentity: new Map(),
+    });
+    const grades = classifyAflApiG2(entries);
+    expect(grades).toEqual([{ externalId: 'CD_I1', outcome: 'CORRECTED_REQUIRES_CPC' }]);
+    expect(AFL_API_G2_REFUSING_OUTCOMES.has('CORRECTED_REQUIRES_CPC')).toBe(true);
+    expect(aflApiG2AgreeSet(grades).size).toBe(0);
+    // linked/revoked grading is unchanged by the corrected addition (F-L4-2's own cases cover
+    // DISAGREE/COLLISION/UNEVALUABLE/UNRESOLVED/CONTINUITY_CONTRADICTION already).
+    const revokedOnly = classifyAflApiG2(aflApiG2Entries({
+      candidate: { importerRows: [], identityByExternalId: new Map() },
+      net: new Map([['CD_I9', { ...linked(2, 'CD_I9', 1, 'x'), action: 'revoked', supersedesId: 1 }]]),
+      manualIdentities: new Set(), remapByIdentity: new Map(),
+    }));
+    expect(revokedOnly).toEqual([]);
+  });
+
+  it('AFLDB-ISSUE-238 §8.6 — readAflApiLedgerRows carries corrected-row fields through; zero-corrected parity holds', async () => {
+    // A plain linked ledger set maps exactly as before, plus previousPlayerIdentity: null
+    // (zero-corrected parity: evidenceSha256 stays absent, matching the pre-ISSUE-238 row shape).
+    const plain = fakeDb({ ledger: [linked(7, 'CD_I1', 900, A)] });
+    const rows = await readAflApiLedgerRows(fakeQ(plain));
+    expect(rows).toEqual([{
+      id: 7, externalId: 'CD_I1', action: 'linked', playerId: 900, playerIdentity: A,
+      supersedesId: null, previousPlayerIdentity: null,
+    }]);
+
+    // A corrected row: previousPlayerIdentity and evidenceSha256 both carried through, on top of
+    // a preceding linked row of the same provider (structurally required by D8/D2).
+    const correctedRow: AflApiAdjudicationLedgerRow = {
+      id: 8, externalId: 'CD_I2', action: 'corrected', playerId: 901, playerIdentity: B,
+      supersedesId: 7, previousPlayerIdentity: A, evidenceSha256: 'c'.repeat(64),
+    };
+    const correctedDb = fakeDb({ ledger: [linked(7, 'CD_I2', 900, A), correctedRow] });
+    const correctedRows = await readAflApiLedgerRows(fakeQ(correctedDb));
+    expect(correctedRows[1]).toEqual(correctedRow);
+  });
+
+  it('AFLDB-ISSUE-238 §8.6/R238-S4-03 — a malformed ledger surfaces as a named PromotionRefused, never a raw AflApiLedgerMalformed', async () => {
+    // An unknown action value.
+    const unknown = fakeDb({ ledger: [{ ...linked(7, 'CD_I1', 900, A), action: 'mystery' as never }] });
+    await expect(readAflApiLedgerRows(fakeQ(unknown))).rejects.toBeInstanceOf(PromotionRefused);
+    await expect(readAflApiLedgerRows(fakeQ(unknown))).rejects.toThrow(/is not linked\/revoked\/corrected/);
+
+    // A corrected row missing previous_player_identity.
+    const missingPrevious: AflApiAdjudicationLedgerRow = {
+      id: 8, externalId: 'CD_I2', action: 'corrected', playerId: 901, playerIdentity: B,
+      supersedesId: 7, previousPlayerIdentity: null, evidenceSha256: 'd'.repeat(64),
+    };
+    const badCorrected = fakeDb({ ledger: [linked(7, 'CD_I2', 900, A), missingPrevious] });
+    await expect(readAflApiLedgerRows(fakeQ(badCorrected))).rejects.toBeInstanceOf(PromotionRefused);
+    await expect(readAflApiLedgerRows(fakeQ(badCorrected))).rejects.toThrow(/has no previous_player_identity/);
+  });
+
+  it('AFLDB-ISSUE-238 §8.6 — pre-cutover census: zero-corrected report text is byte-identical, a corrected ledger appends its own clause', async () => {
+    const zero = devTarget();
+    const zeroReport = new Report();
+    await gateAflApiPreCutoverCensus(fakeQ(zero), zeroReport);
+    const zeroLine = zeroReport.results[0].lines[1];
+    expect(zeroLine).toBe('human resolved rows: 1; ledger rows: 1; net-linked ledger entries: 1');
+    expect(zeroLine).not.toContain('net-corrected');
+
+    const corrected = fakeDb({
+      ids: [at(900, A)],
+      afl: [human('CD_I1', 900)],
+      ledger: [{
+        id: 1, externalId: 'CD_I1', action: 'corrected', playerId: 900, playerIdentity: A,
+        supersedesId: null, previousPlayerIdentity: 'players/X/Old.html', evidenceSha256: 'f'.repeat(64),
+      }],
+    });
+    const correctedReport = new Report();
+    await gateAflApiPreCutoverCensus(fakeQ(corrected), correctedReport);
+    expect(correctedReport.results[0].lines[1])
+      .toBe('human resolved rows: 1; ledger rows: 1; net-linked ledger entries: 0; net-corrected ledger entries: 1');
   });
 
   // --- F-L4-3 ----------------------------------------------------------------------------------

@@ -72,25 +72,29 @@ import { fileURLToPath } from 'node:url';
 import postgres, { type TransactionSql } from 'postgres';
 
 import {
+  AFL_API_LEDGER_ACTIONS,
+  AFL_API_PROVIDER_ID_RE,
+  aflApiAlreadySatisfiedCount,
+  aflApiContinuityContradictionText,
+  aflApiLedgerStructureProblems,
   netLedgerRowsByExternalId,
   planAflApiAdjudicationReplay,
   type AflApiAdjudicationLedgerRow,
+  type AflApiLedgerNetAction,
   type AflApiPlayerRemapResult,
 } from '../../src/lib/acquisition/afl-api-adjudication';
+import { isLifecycleRole, type LifecycleRole } from '../../src/lib/auth/admin-lifecycle';
 import { redact } from '../db/psql';
 import {
   CAPTURE_FORMAT,
-  capturedRowProblems,
   insertAttributionOnlyActor,
-  ledgerPlayerRemapProblems,
   ledgerSequenceName,
   nextIdentityValue,
   parseCombinedCapture,
-  planActorRemap,
-  planLedgerReinstatement,
   readLedger,
   readSequenceState,
-  sameLedgerRow,
+  type ActorRemapPlan,
+  type AttributionActor,
   type CapturedLedgerRow,
   type ExistingActor,
 } from './rebuild_afl_api_adjudications';
@@ -106,7 +110,10 @@ import {
 export const TOOL = 'tools/migration/recover_afl_api_adjudications.ts';
 
 export const ADJUDICATION_RECOVERY_FORMAT = 'afldb.afl_api_identity_adjudications.recovery_export';
-export const ADJUDICATION_RECOVERY_VERSION = 1;
+/** AFLDB-ISSUE-238 (DD-11): v1 -> v2 adds `previousPlayerIdentity` (a `corrected` row's FROM
+ * identity, M1) to every exported/recovered row. A v1 export cannot represent that column, so
+ * it is refused BY NAME wherever it is met, never silently upgraded (`parseAdjudicationRecoverySource`). */
+export const ADJUDICATION_RECOVERY_VERSION = 2;
 
 /** The deployments whose ledger may be exported or recovered. No PROD entry exists. */
 export const RECOVERY_LEDGER_DATABASES = ['afldb_test', 'afldb_dev', 'code_test_db'] as const;
@@ -131,6 +138,206 @@ const isRecoveryDatabase = (name: unknown): name is RecoveryLedgerDatabase =>
  * The recovery source (pure)
  * ------------------------------------------------------------------ */
 
+/**
+ * AFLDB-ISSUE-238 (R238-S4-01, DD-11): recovery-owned. `CapturedLedgerRow` (rebuild, DD-10)
+ * stays the pinned two-action shape and is never edited or relaxed; the recovery export/target
+ * ledger can hold a `corrected` row, so it needs its OWN row type carrying the third action and
+ * `previousPlayerIdentity` (M1's FROM identity — never remapped, no FK, migration 106).
+ * Structurally identical to the rebuild's `LiveLedgerRow`, defined independently so recovery's
+ * three-action validation never depends on anything DD-10 pins.
+ */
+export type RecoveryLedgerRow = Omit<CapturedLedgerRow, 'action'> & {
+  action: AflApiLedgerNetAction;
+  previousPlayerIdentity: string | null;
+};
+
+const isPositiveId = (v: unknown): v is number =>
+  typeof v === 'number' && Number.isSafeInteger(v) && v > 0;
+const CREATED_AT_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/;
+
+/**
+ * AFLDB-ISSUE-238 (DD-11): the recovery-owned structural validator. Reproduces
+ * `capturedRowProblems`' (rebuild, pinned) v2 rules for `linked`/`revoked` rows byte-for-byte,
+ * PLUS the `corrected` rules (M1, DD-2) via the shared `aflApiLedgerStructureProblems` and the
+ * `previous_state IS NOT NULL` check migration 106's CHECK enforces on a real database. Used
+ * INSTEAD of `capturedRowProblems` everywhere on the recovery path — `capturedRowProblems` is
+ * never called here, because it refuses any `corrected` row outright (the exact HIGH finding,
+ * R238-S4-01, this validator exists to avoid).
+ */
+export function recoveryRowProblems(rows: readonly RecoveryLedgerRow[]): string[] {
+  const problems: string[] = [];
+  const seen = new Set<number>();
+  /** lower(email) -> the first row's id and role, so one actor never carries two roles. */
+  const actorRole = new Map<string, { id: number; role: unknown }>();
+  let previousId = 0;
+  for (const r of rows) {
+    const at = `ledger row ${String(r.id)}`;
+    if (!isPositiveId(r.id)) { problems.push(`${at}: id is not a positive integer`); continue; }
+    if (r.id <= previousId) problems.push(`${at}: ids are not strictly ascending`);
+    previousId = Math.max(previousId, r.id);
+    if (r.sourceKey !== 'afl_api') problems.push(`${at}: source_key is not 'afl_api'`);
+    if (typeof r.externalId !== 'string' || !AFL_API_PROVIDER_ID_RE.test(r.externalId)) {
+      problems.push(`${at}: external_id is not a CD_I provider id`);
+    }
+    if (!(AFL_API_LEDGER_ACTIONS as readonly string[]).includes(r.action)) {
+      problems.push(`${at}: action is not linked/revoked/corrected`);
+    }
+    if (r.action === 'revoked' && r.supersedesId === null) {
+      problems.push(`${at}: supersedes_id must be set on a revoked row`);
+    }
+    if (r.action === 'linked' && r.supersedesId !== null) {
+      problems.push(`${at}: supersedes_id must be null on a linked row`);
+    }
+    if (r.supersedesId !== null && !(isPositiveId(r.supersedesId) && seen.has(r.supersedesId))) {
+      problems.push(`${at}: supersedes_id ${String(r.supersedesId)} is not an earlier captured row`);
+    }
+    if (!isPositiveId(r.playerId)) problems.push(`${at}: player_id is not a positive integer`);
+    if (typeof r.playerIdentity !== 'string' || r.playerIdentity === '') {
+      problems.push(`${at}: player_identity is empty`);
+    }
+    if (r.previousState !== null && typeof r.previousState !== 'string') {
+      problems.push(`${at}: previous_state is not jsonb text or null`);
+    }
+    if (r.action === 'corrected' && r.previousState === null) {
+      problems.push(`${at}: a corrected row has no previous_state (M1, migration 106)`);
+    }
+    if (typeof r.evidence !== 'string' || r.evidence === '') problems.push(`${at}: evidence is empty`);
+    if (typeof r.evidenceSha256 !== 'string' || !SHA256_RE.test(r.evidenceSha256)) {
+      problems.push(`${at}: evidence_sha256 is not 64 lowercase hex`);
+    }
+    if (typeof r.surnameDisagreementAcknowledged !== 'boolean') {
+      problems.push(`${at}: surname_disagreement_acknowledged is not a boolean`);
+    }
+    if (!isPositiveId(r.adminUserId)) problems.push(`${at}: admin_user_id is not a positive integer`);
+    if (typeof r.adminEmail !== 'string' || r.adminEmail.trim() === '') {
+      problems.push(`${at}: the actor has no email to remap by`);
+    } else {
+      const first = actorRole.get(r.adminEmail.toLowerCase());
+      if (!first) actorRole.set(r.adminEmail.toLowerCase(), { id: r.id, role: r.adminRole });
+      else if (first.role !== r.adminRole) {
+        problems.push(`${at}: its actor is captured with a different role from ledger row ${first.id}'s`);
+      }
+    }
+    if (!isLifecycleRole(r.adminRole)) {
+      problems.push(`${at}: the actor's role '${String(r.adminRole)}' is not one auth_users.role allows`);
+    }
+    if (typeof r.note !== 'string') problems.push(`${at}: note is not text`);
+    if (typeof r.createdAt !== 'string' || !CREATED_AT_RE.test(r.createdAt)) {
+      problems.push(`${at}: created_at is not UTC microsecond ISO text`);
+    }
+    seen.add(r.id);
+  }
+  // DD-2's corrected-row structural rules (previous_player_identity shape, supersede/preceding
+  // row, at most one per provider, terminal in v1) — the same validator every OTHER ledger
+  // reader runs, so recovery never invents its own reading of the corrected contract.
+  problems.push(...aflApiLedgerStructureProblems(rows.map((r): AflApiAdjudicationLedgerRow => ({
+    id: r.id, externalId: r.externalId, action: r.action, playerId: r.playerId,
+    playerIdentity: r.playerIdentity, supersedesId: r.supersedesId,
+    previousPlayerIdentity: r.previousPlayerIdentity, evidenceSha256: r.evidenceSha256,
+  }))));
+  return problems;
+}
+
+/** The v2 `ledgerTuple` (rebuild, pinned) field order, mirrored rather than imported —
+ * `RecoveryLedgerRow`'s three-action union is not assignable to `ledgerTuple`'s pinned
+ * two-action `ReinstatementRow` parameter (DD-10) — plus `previousPlayerIdentity` (DD-11). */
+function recoveryLedgerTuple(r: RecoveryLedgerRow): unknown[] {
+  return [r.id, r.sourceKey, r.externalId, r.action, r.playerId, r.playerIdentity, r.previousState,
+    r.evidence, r.evidenceSha256, r.surnameDisagreementAcknowledged, r.supersedesId, r.adminUserId,
+    r.note, r.createdAt, r.previousPlayerIdentity];
+}
+
+/** `sameLedgerRow`'s (rebuild, pinned) rule, mirrored on `RecoveryLedgerRow` with
+ * `previousPlayerIdentity` in the compared tuple: a same-id target row differing ONLY in
+ * `previous_player_identity` is NOT identical (R238-S4-01 case (c)). */
+export function sameRecoveryLedgerRow(a: RecoveryLedgerRow, b: RecoveryLedgerRow): boolean {
+  const key = (r: RecoveryLedgerRow) => JSON.stringify(
+    [...recoveryLedgerTuple({ ...r, playerId: 0, adminUserId: 0 }), r.adminEmail.toLowerCase()]);
+  return key(a) === key(b);
+}
+
+/** `ledgerPlayerRemapProblems` (rebuild, pinned) checks only `playerIdentity`/`id`/`externalId`,
+ * never `action` — but its TYPE is pinned to the two-action `CapturedLedgerRow`, so
+ * `RecoveryLedgerRow`'s wider action union is not assignable to it. Mirrored here rather than
+ * cast through `unknown`. */
+function recoveryLedgerPlayerRemapProblems(
+  rows: readonly RecoveryLedgerRow[],
+  remapByIdentity: ReadonlyMap<string, AflApiPlayerRemapResult>,
+): string[] {
+  const problems: string[] = [];
+  for (const r of rows) {
+    const remap = remapByIdentity.get(r.playerIdentity);
+    if (remap?.ok === false && remap.reason === 'continuity_contradiction') {
+      problems.push(`ledger row ${r.id} (${r.externalId}): player_identity '${r.playerIdentity}' `
+        + aflApiContinuityContradictionText(remap));
+    } else if (!remap || !remap.ok) {
+      problems.push(`ledger row ${r.id} (${r.externalId}): player_identity '${r.playerIdentity}' `
+        + `${remap?.ok === false && remap.reason === 'ambiguous' ? 'names more than one' : 'names no'} rebuilt player`);
+    } else if (remap.remappedIdentity !== r.playerIdentity) {
+      problems.push(`ledger row ${r.id} (${r.externalId}): the remapped identity differs from the stored one`);
+    }
+  }
+  return problems;
+}
+
+/** `planActorRemap` (rebuild, pinned) calls `capturedRowProblems` internally, which refuses any
+ * `corrected` row outright — the same HIGH finding (R238-S4-01) `recoveryRowProblems` exists to
+ * avoid, just for actor remapping. Mirrored on `RecoveryLedgerRow`/`recoveryRowProblems`
+ * instead: "capturedRowProblems is not called on the recovery path" (DD-11) applies here too,
+ * since `planActorRemap` is not a mechanical wrapper around it. */
+function recoveryPlanActorRemap(
+  rows: readonly RecoveryLedgerRow[], existing: readonly ExistingActor[],
+): ActorRemapPlan {
+  const problems = recoveryRowProblems(rows);
+  const actors = new Map<string, AttributionActor>();
+  for (const r of rows) {
+    const key = r.adminEmail.toLowerCase();
+    if (!actors.has(key)) actors.set(key, { email: r.adminEmail, role: r.adminRole });
+  }
+  const plan: ActorRemapPlan = { reuse: new Map(), create: [], reusedWithDifferentRole: 0 };
+  for (const [key, actor] of actors) {
+    const matches = existing.filter((e) => e.email.toLowerCase() === key);
+    if (matches.length > 1) {
+      problems.push(`the actor of ledger row ${rows.find((r) => r.adminEmail.toLowerCase() === key)!.id} `
+        + `matches ${matches.length} auth_users rows`);
+    } else if (matches.length === 1) {
+      plan.reuse.set(key, matches[0].id);
+      if (matches[0].role !== actor.role) plan.reusedWithDifferentRole += 1;
+    } else {
+      plan.create.push({ email: actor.email, role: actor.role });
+    }
+  }
+  if (problems.length > 0) {
+    throw new AdjudicationRecoveryRefused(
+      `The afl_api adjudication actors cannot be remapped; nothing was written: ${problems.join('; ')}`);
+  }
+  return plan;
+}
+
+/**
+ * `planLedgerReinstatement` (rebuild, pinned) is typed on the two-action `CapturedLedgerRow` and
+ * calls `capturedRowProblems`, which refuses a `corrected` row outright — exactly the HIGH
+ * finding (R238-S4-01) this recovery-owned mirror avoids. Same two-surrogate remap (`player_id`
+ * from the row's OWN identity, `admin_user_id` from the actor email); `previousPlayerIdentity`
+ * is carried VERBATIM, never remapped (it has no FK, migration 106). The caller has already run
+ * `recoveryRowProblems` and the identity/actor checks above; this never re-validates.
+ */
+function planRecoveryReinstatement(input: {
+  rows: readonly RecoveryLedgerRow[];
+  remapByIdentity: ReadonlyMap<string, AflApiPlayerRemapResult>;
+  /** Keyed by lower(email). */
+  actorIdByEmail: ReadonlyMap<string, number>;
+}): RecoveryLedgerRow[] {
+  return input.rows.map((r): RecoveryLedgerRow => {
+    const remap = input.remapByIdentity.get(r.playerIdentity) as Extract<AflApiPlayerRemapResult, { ok: true }>;
+    const actorId = input.actorIdByEmail.get(r.adminEmail.toLowerCase());
+    if (actorId === undefined) {
+      throw new AdjudicationRecoveryRefused(`ledger row ${r.id} (${r.externalId}): its actor was not remapped`);
+    }
+    return { ...r, playerId: remap.newPlayerId, adminUserId: actorId };
+  });
+}
+
 export type AdjudicationRecoveryExport = {
   format: typeof ADJUDICATION_RECOVERY_FORMAT;
   version: typeof ADJUDICATION_RECOVERY_VERSION;
@@ -139,16 +346,18 @@ export type AdjudicationRecoveryExport = {
   /** The database actually read (the ledger database itself, or a restored scratch copy of it). */
   sourceDatabase: string;
   capturedAt: string;
-  ledgerRows: CapturedLedgerRow[];
+  ledgerRows: RecoveryLedgerRow[];
   payloadSha256: string;
 };
 
-/** Every field of every row in one fixed order, so the hash never depends on key order. */
+/** Every field of every row in one fixed order, so the hash never depends on key order. AFLDB-
+ * ISSUE-238 (DD-11): `previousPlayerIdentity` is appended last, so a zero-corrected export (every
+ * row's value `null`) still hashes deterministically and the v1 tuple prefix stays recognisable. */
 function exportPayloadSha256(body: Omit<AdjudicationRecoveryExport, 'payloadSha256'>): string {
   const rows = body.ledgerRows.map((r) => [
     r.id, r.sourceKey, r.externalId, r.action, r.playerId, r.playerIdentity, r.previousState, r.evidence,
     r.evidenceSha256, r.surnameDisagreementAcknowledged, r.supersedesId, r.adminUserId, r.adminEmail,
-    r.adminRole, r.note, r.createdAt,
+    r.adminRole, r.note, r.createdAt, r.previousPlayerIdentity,
   ]);
   return createHash('sha256').update(JSON.stringify([
     body.format, body.version, body.ledgerDatabase, body.sourceDatabase, body.capturedAt, rows,
@@ -157,9 +366,9 @@ function exportPayloadSha256(body: Omit<AdjudicationRecoveryExport, 'payloadSha2
 
 export function buildAdjudicationRecoveryExport(input: {
   ledgerDatabase: RecoveryLedgerDatabase; sourceDatabase: string; capturedAt: string;
-  ledgerRows: readonly CapturedLedgerRow[];
+  ledgerRows: readonly RecoveryLedgerRow[];
 }): AdjudicationRecoveryExport {
-  const problems = capturedRowProblems(input.ledgerRows);
+  const problems = recoveryRowProblems(input.ledgerRows);
   if (problems.length > 0) {
     throw new AdjudicationRecoveryRefused(`The ledger is not structurally recoverable: ${problems.join('; ')}`);
   }
@@ -176,7 +385,7 @@ export type AdjudicationRecoverySource = {
   ledgerDatabase: RecoveryLedgerDatabase;
   sourceDatabase: string;
   capturedAt: string;
-  ledgerRows: CapturedLedgerRow[];
+  ledgerRows: RecoveryLedgerRow[];
   payloadSha256: string;
   fileSha256: string;
 };
@@ -204,6 +413,14 @@ export function parseAdjudicationRecoverySource(text: string, expectedPayloadSha
 
   let source: Omit<AdjudicationRecoverySource, 'fileSha256'>;
   if (raw.format === ADJUDICATION_RECOVERY_FORMAT) {
+    // AFLDB-ISSUE-238 (DD-11): a v1 export cannot carry `previousPlayerIdentity` (there is no
+    // column to read it from); refused BY NAME, never silently upgraded to v2.
+    if (raw.version === 1) {
+      throw new AdjudicationRecoveryRefused(
+        'The recovery export is version 1, which carries no previous_player_identity column and '
+        + `cannot represent a corrected row; it is refused, never silently upgraded to v${ADJUDICATION_RECOVERY_VERSION}. `
+        + 'Re-export with the current tool.');
+    }
     if (raw.version !== ADJUDICATION_RECOVERY_VERSION) {
       throw new AdjudicationRecoveryRefused(`The recovery export version is ${String(raw.version)}, not ${ADJUDICATION_RECOVERY_VERSION}.`);
     }
@@ -213,7 +430,7 @@ export function parseAdjudicationRecoverySource(text: string, expectedPayloadSha
     }
     const rebuilt = buildAdjudicationRecoveryExport({
       ledgerDatabase: raw.ledgerDatabase, sourceDatabase: raw.sourceDatabase, capturedAt: raw.capturedAt,
-      ledgerRows: raw.ledgerRows as CapturedLedgerRow[],
+      ledgerRows: raw.ledgerRows as RecoveryLedgerRow[],
     });
     if (rebuilt.payloadSha256 !== raw.payloadSha256) {
       throw new AdjudicationRecoveryRefused('The recovery export does not match its own payload hash: it was altered after export.');
@@ -232,9 +449,14 @@ export function parseAdjudicationRecoverySource(text: string, expectedPayloadSha
     if (!capture.ledgerTablePresent) {
       throw new AdjudicationRecoveryRefused('The rebuild capture predates migration 104: it carries no ledger to recover.');
     }
+    // AFLDB-ISSUE-238 (DD-11): a rebuild capture (v2 combined format, DD-10) can never hold a
+    // corrected row (refused at capture time) or a previous_player_identity, so every row maps
+    // to `previousPlayerIdentity: null` -- always true here, never a guess.
     source = {
       kind: 'rebuild_capture', ledgerDatabase: raw.database, sourceDatabase: capture.database,
-      capturedAt: capture.capturedAt, ledgerRows: capture.ledgerRows, payloadSha256: capture.payloadSha256,
+      capturedAt: capture.capturedAt,
+      ledgerRows: capture.ledgerRows.map((r): RecoveryLedgerRow => ({ ...r, previousPlayerIdentity: null })),
+      payloadSha256: capture.payloadSha256,
     };
   } else {
     throw new AdjudicationRecoveryRefused(
@@ -253,7 +475,7 @@ export function parseAdjudicationRecoverySource(text: string, expectedPayloadSha
  * ------------------------------------------------------------------ */
 
 export type LedgerRecoveryPlan = {
-  toInsert: CapturedLedgerRow[];
+  toInsert: RecoveryLedgerRow[];
   identicalIds: number[];
   stops: string[];
 };
@@ -261,20 +483,22 @@ export type LedgerRecoveryPlan = {
 /**
  * Source ledger vs target ledger, row by id. Only ever ADDS source rows the target lacks; a target
  * row the source does not hold, or a same-id row that differs, is a stop (reconciled by hand).
+ * AFLDB-ISSUE-238 (DD-11): `recoveryRowProblems`/`sameRecoveryLedgerRow` instead of
+ * `capturedRowProblems`/`sameLedgerRow` — `capturedRowProblems` is not called on the recovery path.
  */
 export function planLedgerRecovery(input: {
-  source: readonly CapturedLedgerRow[];
-  target: readonly CapturedLedgerRow[];
+  source: readonly RecoveryLedgerRow[];
+  target: readonly RecoveryLedgerRow[];
 }): LedgerRecoveryPlan {
-  const stops = capturedRowProblems(input.source).map((p) => `recovery source: ${p}`);
+  const stops = recoveryRowProblems(input.source).map((p) => `recovery source: ${p}`);
   const targetById = new Map(input.target.map((r) => [r.id, r]));
   const sourceIds = new Set(input.source.map((r) => r.id));
-  const toInsert: CapturedLedgerRow[] = [];
+  const toInsert: RecoveryLedgerRow[] = [];
   const identicalIds: number[] = [];
   for (const row of input.source) {
     const existing = targetById.get(row.id);
     if (!existing) { toInsert.push(row); continue; }
-    if (sameLedgerRow(row, existing)) identicalIds.push(row.id);
+    if (sameRecoveryLedgerRow(row, existing)) identicalIds.push(row.id);
     else stops.push(`target ledger row ${row.id} (${existing.externalId}) differs from the recovery source's row ${row.id}`);
   }
   for (const row of input.target) {
@@ -305,6 +529,9 @@ export type AdjudicationRecoveryReport = {
   actorsToCreate: number;
   outcomeInserts: string[];
   outcomeNoops: number;
+  /** AFLDB-ISSUE-238 (R238-S4-02): how many of `outcomeNoops` are corrected ALREADY_SATISFIED
+   * providers, discriminated via `aflApiAlreadySatisfiedCount`. Zero on every zero-corrected run. */
+  outcomeAlreadySatisfied: number;
   importBatchId: string | null;
 };
 
@@ -322,7 +549,7 @@ async function assertTarget(tx: TransactionSql, database: string, readOnly: bool
 
 type Planned = {
   ledger: LedgerRecoveryPlan;
-  targetLedger: CapturedLedgerRow[];
+  targetLedger: RecoveryLedgerRow[];
   remapByIdentity: ReadonlyMap<string, AflApiPlayerRemapResult>;
   existingActors: ExistingActor[];
   outcome: ReturnType<typeof planAflApiAdjudicationReplay>;
@@ -346,14 +573,47 @@ async function planRecovery(tx: TransactionSql, source: AdjudicationRecoverySour
   }
   const ledger = planLedgerRecovery({ source: source.ledgerRows, target: target.rows });
 
-  const identities = [...new Set([...source.ledgerRows, ...target.rows].map((r) => r.playerIdentity))];
+  // AFLDB-ISSUE-238 (DD-11): every source/target identity, PLUS every corrected row's
+  // `previousPlayerIdentity` (the same namespace, resolved by the same reverse classifier) --
+  // one batched call, not a per-row round trip.
+  const previousIdentities = source.ledgerRows
+    .map((r) => r.previousPlayerIdentity)
+    .filter((v): v is string => v !== null);
+  const identities = [...new Set([
+    ...source.ledgerRows.map((r) => r.playerIdentity), ...previousIdentities,
+    ...target.rows.map((r) => r.playerIdentity),
+  ])];
   const remapByIdentity = await resolveAflApiPlayerIdentities(tx, identities);
-  const stops = [...ledger.stops, ...ledgerPlayerRemapProblems(source.ledgerRows, remapByIdentity)];
+  const stops = [...ledger.stops, ...recoveryLedgerPlayerRemapProblems(source.ledgerRows, remapByIdentity)];
   for (const row of target.rows) {
     const remap = remapByIdentity.get(row.playerIdentity);
     if (remap?.ok && remap.newPlayerId !== row.playerId) {
       stops.push(`target ledger row ${row.id} (${row.externalId}) holds player_id ${row.playerId}, but its identity `
         + `'${row.playerIdentity}' names player ${remap.newPlayerId}`);
+    }
+  }
+  // R238-S4-05: a corrected source row's `previousPlayerIdentity`, resolved on the TARGET with
+  // the same reverse classifier as `player_identity` -- unresolvable/ambiguous/a continuity
+  // contradiction, or resolving to the SAME player as the row's remapped `player_identity`
+  // (P === P′), is a STOP naming the row. The resolved P is validation only; never written.
+  for (const row of source.ledgerRows) {
+    if (row.action !== 'corrected' || row.previousPlayerIdentity === null) continue;
+    const previousRemap = remapByIdentity.get(row.previousPlayerIdentity);
+    if (!previousRemap || !previousRemap.ok) {
+      stops.push(`recovery source row ${row.id} (${row.externalId}): previous_player_identity `
+        + `'${row.previousPlayerIdentity}' `
+        + (previousRemap?.ok === false && previousRemap.reason === 'continuity_contradiction'
+          ? aflApiContinuityContradictionText(previousRemap)
+          : previousRemap?.ok === false && previousRemap.reason === 'ambiguous'
+            ? 'names more than one target player'
+            : 'names no target player'));
+      continue;
+    }
+    const currentRemap = remapByIdentity.get(row.playerIdentity);
+    if (currentRemap?.ok && previousRemap.newPlayerId === currentRemap.newPlayerId) {
+      stops.push(`recovery source row ${row.id} (${row.externalId}): previous_player_identity `
+        + `'${row.previousPlayerIdentity}' resolves to the same target player `
+        + `(${currentRemap.newPlayerId}) as its corrected player_identity '${row.playerIdentity}' (R238-S4-05)`);
     }
   }
   if (stops.length > 0) {
@@ -364,19 +624,21 @@ async function planRecovery(tx: TransactionSql, source: AdjudicationRecoverySour
   const existingActors = emails.length === 0 ? [] : await tx<ExistingActor[]>`
     SELECT id, email, role FROM auth_users WHERE lower(email) = ANY (${tx.array(emails)}::text[])
   `;
-  try {
-    planActorRemap(source.ledgerRows, existingActors);
-  } catch (error) {
-    throw new AdjudicationRecoveryRefused((error as Error).message);
-  }
+  // Throws its own AdjudicationRecoveryRefused directly (recoveryPlanActorRemap, DD-11); never
+  // planActorRemap (rebuild, pinned), which calls capturedRowProblems and refuses corrected rows.
+  recoveryPlanActorRemap(source.ledgerRows, existingActors);
 
   // The D15 replay's own planner over the ledger as it WILL be (target rows plus the rows to
-  // reinstate, each at its identity's current player), against the live outcome rows.
+  // reinstate, each at its identity's current player), against the live outcome rows. A
+  // corrected row's `previousPlayerIdentity`/`evidenceSha256` are carried through so the shared
+  // structural validator (inside `netLedgerRowsByExternalId`) sees the real M1 shape rather than
+  // hashing `undefined` (R238-S4-04's failure mode).
   const projected: AflApiAdjudicationLedgerRow[] = [...target.rows, ...ledger.toInsert].map((r) => {
     const remap = remapByIdentity.get(r.playerIdentity) as Extract<AflApiPlayerRemapResult, { ok: true }>;
     return {
       id: r.id, externalId: r.externalId, action: r.action, playerId: remap.newPlayerId,
       playerIdentity: r.playerIdentity, supersedesId: r.supersedesId,
+      previousPlayerIdentity: r.previousPlayerIdentity, evidenceSha256: r.evidenceSha256,
     };
   });
   const remapByExternalId = new Map<string, AflApiPlayerRemapResult>();
@@ -422,7 +684,7 @@ export async function recoverAflApiAdjudications(input: {
     return input.connection.begin('isolation level repeatable read read only', async (tx) => {
       await assertTarget(tx, targetDatabase, true);
       const planned = await planRecovery(tx, source);
-      const actorPlan = planActorRemap(source.ledgerRows, planned.existingActors);
+      const actorPlan = recoveryPlanActorRemap(source.ledgerRows, planned.existingActors);
       return {
         ...base, outcome: 'READ_ONLY',
         ledgerRowsReinstated: planned.ledger.toInsert.map((r) => r.id),
@@ -430,6 +692,7 @@ export async function recoverAflApiAdjudications(input: {
         actorsToCreate: actorPlan.create.length,
         outcomeInserts: planned.outcome.inserts.map((i) => i.externalId),
         outcomeNoops: planned.outcome.noops.length,
+        outcomeAlreadySatisfied: aflApiAlreadySatisfiedCount(planned.outcome.noops),
         importBatchId: null,
       };
     });
@@ -442,29 +705,32 @@ export async function recoverAflApiAdjudications(input: {
       const planned = await planRecovery(tx, source);
 
       // Actors, exactly as the D15 reinstatement remaps them.
-      const actorPlan = planActorRemap(source.ledgerRows, planned.existingActors);
+      const actorPlan = recoveryPlanActorRemap(source.ledgerRows, planned.existingActors);
       const actorIdByEmail = new Map(actorPlan.reuse);
       for (const actor of actorPlan.create) {
         actorIdByEmail.set(actor.email.toLowerCase(), await insertAttributionOnlyActor(tx, actor));
       }
 
-      // Ledger rows: the D15 reinstatement's own plan, restricted to the rows the target lacks.
-      const reinstatement = planLedgerReinstatement({
+      // Ledger rows: the recovery-owned reinstatement plan (DD-11), restricted to the rows the
+      // target lacks. `planLedgerReinstatement` (rebuild, pinned) is never called here: it is
+      // typed on the two-action `CapturedLedgerRow` and calls `capturedRowProblems`, which
+      // refuses any `corrected` row outright.
+      const reinstatement = planRecoveryReinstatement({
         rows: source.ledgerRows, remapByIdentity: planned.remapByIdentity, actorIdByEmail,
       });
       const missing = new Set(planned.ledger.toInsert.map((r) => r.id));
-      const inserts = reinstatement.rows.filter((r) => missing.has(r.id));
+      const inserts = reinstatement.filter((r) => missing.has(r.id));
       for (const r of inserts) {
         await tx`
           INSERT INTO afl_api_identity_adjudications
                 (id, source_key, external_id, action, player_id, player_identity, previous_state,
                  evidence, evidence_sha256, surname_disagreement_acknowledged, supersedes_id,
-                 admin_user_id, note, created_at)
+                 admin_user_id, note, created_at, previous_player_identity)
           OVERRIDING SYSTEM VALUE
           VALUES (${r.id}::bigint, ${r.sourceKey}, ${r.externalId}, ${r.action}, ${r.playerId},
                   ${r.playerIdentity}, ${r.previousState}::text::jsonb, ${r.evidence}::text::jsonb,
                   ${r.evidenceSha256}, ${r.surnameDisagreementAcknowledged}, ${r.supersedesId}::bigint,
-                  ${r.adminUserId}, ${r.note}, ${r.createdAt}::text::timestamptz)
+                  ${r.adminUserId}, ${r.note}, ${r.createdAt}::text::timestamptz, ${r.previousPlayerIdentity})
         `;
       }
 
@@ -486,7 +752,7 @@ export async function recoverAflApiAdjudications(input: {
       const byId = new Map(readBack.rows.map((r) => [r.id, r]));
       const missingAfter = source.ledgerRows.filter((r) => {
         const live = byId.get(r.id);
-        return !live || !sameLedgerRow(r, live);
+        return !live || !sameRecoveryLedgerRow(r, live);
       });
       if (missingAfter.length > 0 || readBack.rows.length !== source.ledgerRows.length) {
         throw new AdjudicationRecoveryRefused(
@@ -527,6 +793,8 @@ export async function recoverAflApiAdjudications(input: {
         importBatchId = batch.id;
       }
 
+      // AFLDB-ISSUE-238 (R238-S4-02): the EXECUTED side's own discriminant -- `AflApiReplayCounts`
+      // now carries `alreadySatisfied` directly (the replay tool's own D15 planner run for real).
       state.report = {
         ...base,
         outcome: wrote ? 'COMMITTED' : 'ALREADY_RECOVERED',
@@ -535,6 +803,7 @@ export async function recoverAflApiAdjudications(input: {
         actorsToCreate: actorPlan.create.length,
         outcomeInserts: planned.outcome.inserts.map((i) => i.externalId),
         outcomeNoops: replay.noops,
+        outcomeAlreadySatisfied: replay.alreadySatisfied ?? 0,
         importBatchId,
       };
       if (mode === 'dry-run') throw new DryRunRollback();
@@ -665,7 +934,8 @@ export function formatRecoveryReport(report: AdjudicationRecoveryReport): string
     `    attribution-only actors ${report.mode === 'validate-only' ? 'to create' : 'created'}: ${report.actorsToCreate}`,
     `    human outcome rows ${report.mode === 'validate-only' ? 'to replay' : 'replayed'}: ${report.outcomeInserts.length}`
       + (report.outcomeInserts.length > 0 ? ` (${report.outcomeInserts.join(', ')})` : ''),
-    `    human outcome rows already present: ${report.outcomeNoops}`,
+    `    human outcome rows already present: ${report.outcomeNoops}`
+      + ` (${report.outcomeAlreadySatisfied} already-satisfied correction(s))`,
     ...(report.importBatchId !== null ? [`    import_batches.id ${report.importBatchId}`] : []),
   ].join('\n');
 }

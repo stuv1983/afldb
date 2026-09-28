@@ -4498,6 +4498,14 @@ describe('AFL API adjudication survival through the rebuild (AFLDB-ISSUE-235 C6 
     })).toThrow(/no ledger table cannot carry ledger rows/);
   });
 
+  it('AFLDB-ISSUE-238 (DD-10): a corrected-action row in a v2 capture file is still refused by '
+     + 'capturedRowProblems, naming capture v3 (slice 7)', () => {
+    const rows = ledger();
+    const corrected = { ...rows[0], id: 20, action: 'corrected' } as unknown as CapturedLedgerRow;
+    expect(() => capture([...rows, corrected]))
+      .toThrow(/action is not linked\/revoked \(a corrected row needs capture v3, ISSUE-238 slice 7\)/);
+  });
+
   it('D13/D6: the importer section is structurally checked (duplicate provider/identity, unsupported method, shape)', () => {
     const a = importerRow();
     expect(() => capture(ledger(), [a, { ...a }]))
@@ -4792,7 +4800,8 @@ describe('AFL API adjudication survival through the rebuild (AFLDB-ISSUE-235 C6 
   const reinstatedImporterLive = (): CapturedImporterRow[] => [importerRow({ playerId: 9003 })];
   const VERIFIED: LiveReinstatementObservation = {
     sequence: { lastValue: 12, isCalled: true },
-    replay: { inserted: 0, noops: 1, stops: [], supersedes: [] },
+    // AFLDB-ISSUE-238: zero-corrected fixture -- alreadySatisfied stays 0 (R238-S4-02).
+    replay: { inserted: 0, noops: 1, alreadySatisfied: 0, stops: [], supersedes: [] },
     importerReplay: { inserted: 0, noops: 0 },
     bijection: 'ok',
   };
@@ -4858,7 +4867,7 @@ describe('AFL API adjudication survival through the rebuild (AFLDB-ISSUE-235 C6 
     const cases: Array<[LiveReinstatementObservation | null, RegExp]> = [
       [{ ...VERIFIED, sequence: { lastValue: 11, isCalled: true } }, /would next hand out 12, which does not exceed the reinstated maximum id 12/],
       [{ ...VERIFIED, sequence: { lastValue: 1, isCalled: false } }, /does not exceed the reinstated maximum id 12/],
-      [{ ...VERIFIED, replay: { inserted: 1, noops: 0, stops: [], supersedes: [] } }, /a replay would still insert 1 human identity row/],
+      [{ ...VERIFIED, replay: { inserted: 1, noops: 0, alreadySatisfied: 0, stops: [], supersedes: [] } }, /a replay would still insert 1 human identity row/],
       [{ ...VERIFIED, replay: { error: 'cannot execute INSERT in a read-only transaction' } },
         /replay could not confirm the human identities: cannot execute INSERT in a read-only transaction/],
       [{ ...VERIFIED, importerReplay: { inserted: 1, noops: 0 } }, /a replay would still insert 1 importer identity row/],
@@ -5107,6 +5116,10 @@ describe('AFL API adjudication survival through the rebuild (AFLDB-ISSUE-235 C6 
             supersedesId: r.supersedesId === null ? null : String(r.supersedesId),
             adminUserId: r.adminUserId, adminEmail: actor.email, adminRole: actor.role,
             note: r.note, createdAt: r.createdAt,
+            // AFLDB-ISSUE-238 (DD-10): readLedger's superset column. Stage 18 (this suite) never
+            // reinstates a corrected row (the pinned v2 INSERT above has no such column), so this
+            // is always null -- but the DD-10 narrow check needs the key PRESENT, not `undefined`.
+            previousPlayerIdentity: null,
           };
         });
       }
@@ -5573,7 +5586,7 @@ describe('AFLDB-ISSUE-235 I18 fixture harness (DB-free)', () => {
       playerAflApiProviders: [I18_FIXTURE.providerId],
       humanResolvedTotal: 1,
       actors: [{ id: actorId, email: EMAIL, role: 'super_admin', disabled: true, hasPasswordHash: false, hasTotpSecret: false }],
-      live: { sequence: { lastValue: 201, isCalled: true }, replay: { inserted: 0, noops: 1, stops: [], supersedes: [] },
+      live: { sequence: { lastValue: 201, isCalled: true }, replay: { inserted: 0, noops: 1, alreadySatisfied: 0, stops: [], supersedes: [] },
         importerReplay: { inserted: 0, noops: 0 }, bijection: 'ok' },
       pendingCaptureExists: false,
       archivedCaptures: phase === 'pre' ? [] : [{ file: 'x.reinstated.json', fileSha256: 'f', payloadSha256: 'p', matchesBaseline: true }],
@@ -5648,6 +5661,9 @@ describe('AFLDB-ISSUE-235 I18 fixture harness (DB-free)', () => {
       if (spec.startsWith('@/')) base = join(root, 'src', spec.slice(2));
       else if (spec.startsWith('.')) base = join(from, '..', spec);
       else return null; // a package: postgres/node:* are server-neutral
+      // A `.json` spec is data, not code: it can hold no `import`/`export` statement of its own,
+      // so it can never itself reach `server-only` or `@/db/*` and is resolved as a leaf.
+      if (base.endsWith('.json') && existsSync(base)) return base;
       for (const candidate of [`${base}.ts`, `${base}.tsx`, join(base, 'index.ts')]) {
         if (existsSync(candidate)) return candidate;
       }
@@ -5790,15 +5806,15 @@ describe('AFLDB-ISSUE-235 I18 fixture harness (DB-free)', () => {
         /not disabled[\s\S]*password hash[\s\S]*TOTP secret/],
       [{ actors: [{ id: 1, email: EMAIL, role: 'contributor', disabled: true, hasPasswordHash: false, hasTotpSecret: false }] },
         /role is 'contributor', not the captured 'super_admin'/],
-      [{ live: { sequence: { lastValue: 201, isCalled: false }, replay: { inserted: 0, noops: 1, stops: [], supersedes: [] },
+      [{ live: { sequence: { lastValue: 201, isCalled: false }, replay: { inserted: 0, noops: 1, alreadySatisfied: 0, stops: [], supersedes: [] },
           importerReplay: { inserted: 0, noops: 0 }, bijection: 'ok' } },
         /next hand out 201, not above max\(id\) 201/],
-      [{ live: { sequence: { lastValue: 201, isCalled: true }, replay: { inserted: 1, noops: 0, stops: [], supersedes: [] },
+      [{ live: { sequence: { lastValue: 201, isCalled: true }, replay: { inserted: 1, noops: 0, alreadySatisfied: 0, stops: [], supersedes: [] },
           importerReplay: { inserted: 0, noops: 0 }, bijection: 'ok' } },
         /not a single no-op/],
       [{ live: { sequence: { lastValue: 201, isCalled: true }, replay: { error: 'read-only' },
           importerReplay: { inserted: 0, noops: 0 }, bijection: 'ok' } }, /could not run read-only/],
-      [{ live: { sequence: { lastValue: 201, isCalled: true }, replay: { inserted: 0, noops: 1, stops: [], supersedes: [] },
+      [{ live: { sequence: { lastValue: 201, isCalled: true }, replay: { inserted: 0, noops: 1, alreadySatisfied: 0, stops: [], supersedes: [] },
           importerReplay: { inserted: 0, noops: 0 }, bijection: { error: 'x' } } },
         /bijection does not hold/],
       [{ pendingCaptureExists: true }, /was not archived/],
@@ -5812,8 +5828,11 @@ describe('AFLDB-ISSUE-235 I18 fixture harness (DB-free)', () => {
     const dir = mkdtempSync(join(tmpdir(), 'i18-capture-'));
     try {
       const b = baseline();
+      // AFLDB-ISSUE-238: RehearsalLedgerRow.action is now the 3-member AflApiLedgerNetAction
+      // (type-widened elsewhere, never corrected in THIS rehearsal fixture shape) -- narrowed
+      // back to the pinned v2 two-action CapturedLedgerRow here.
       const rows: CapturedLedgerRow[] = b.ledger.map((r) => ({
-        id: r.id, sourceKey: 'afl_api', externalId: r.externalId, action: r.action, playerId: r.playerId,
+        id: r.id, sourceKey: 'afl_api', externalId: r.externalId, action: r.action as 'linked' | 'revoked', playerId: r.playerId,
         playerIdentity: r.playerIdentity, previousState: r.previousState, evidence: r.evidence,
         evidenceSha256: r.evidenceSha256, surnameDisagreementAcknowledged: r.surnameAck, supersedesId: r.supersedesId,
         adminUserId: r.adminUserId, adminEmail: r.adminEmail, adminRole: 'super_admin', note: r.note, createdAt: r.createdAt,
@@ -5978,6 +5997,8 @@ describe('AFLDB-ISSUE-237 — recover_afl_api_importer_identities.ts (OD-4 recov
       { includes: ['FROM external_identities WHERE source_id'], respond: () => [] }];
     // nothing expected: the pre-ISSUE-237 short-circuit, no further statement
     const quiet = fakeRecoveryTx(rules);
+    // AFLDB-ISSUE-238 (R238-S4-02, defect-B remediation): alreadySatisfied is present only when
+    // non-zero -- an empty ledger keeps the exact pre-ISSUE-238 shape, this key absent.
     expect(await replayAflApiAdjudications(quiet.tx)).toEqual({ inserted: 0, noops: 0, stops: [], supersedes: [] });
     expect(quiet.statements.some((s) => s.text.includes('WHERE source_id'))).toBe(false);
     // something expected: fewer supersedes than expected is a D13 abort, never a silent pass
@@ -7496,9 +7517,14 @@ describe('AFLDB-ISSUE-237 bootstrap — Stage 2 capture before the adjudication 
   const relationMissing = () => Object.assign(
     new Error(`relation "${LEDGER_TABLE}" does not exist`), { code: '42P01' });
 
+  /** AFLDB-ISSUE-238 (DD-10): widens `CapturedLedgerRow`'s pinned two-action shape only for this
+   * fixture set, so a single describe block can model BOTH the ordinary v2 ledger and a live
+   * `corrected` row the DD-10 refusal must catch before any other before-destruction check. */
+  type Stage2LedgerRow = Omit<CapturedLedgerRow, 'action'> & { action: string; previousPlayerIdentity?: string | null };
+
   type Stage2Db = {
     ledgerTable: boolean;
-    ledgerRows?: CapturedLedgerRow[];
+    ledgerRows?: Stage2LedgerRow[];
     ledgerTotal?: number;
     census?: typeof importerCensus[];
     /** Thrown by the statement whose text contains the key. */
@@ -7524,7 +7550,13 @@ describe('AFLDB-ISSUE-237 bootstrap — Stage 2 capture before the adjudication 
       if (text.includes("to_regclass('public.sources')")) return [{ sources: true, identities: true }];
       if (text.includes("SELECT id FROM sources WHERE key = 'afl_api'")) return [{ id: 9 }];
       if (text.includes(`FROM ${LEDGER_TABLE} a`)) {
-        return ledgerRows.map((r) => ({ ...r, id: String(r.id), supersedesId: r.supersedesId === null ? null : String(r.supersedesId) }));
+        // AFLDB-ISSUE-238 (DD-10): readLedger's superset column; defaults to null so every
+        // existing linked/revoked fixture (no `previousPlayerIdentity` key at all) still reads
+        // as the v2 shape rather than `undefined` (which the DD-10 refusal would misread as set).
+        return ledgerRows.map((r) => ({
+          ...r, id: String(r.id), supersedesId: r.supersedesId === null ? null : String(r.supersedesId),
+          previousPlayerIdentity: r.previousPlayerIdentity ?? null,
+        }));
       }
       if (text.includes(`count(*)::int AS total FROM ${LEDGER_TABLE}`)) return [{ total: db.ledgerTotal ?? ledgerRows.length }];
       if (text.includes(`FROM ${LEDGER_TABLE} WHERE source_key = 'afl_api'`)) {
@@ -7713,6 +7745,31 @@ describe('AFLDB-ISSUE-237 bootstrap — Stage 2 capture before the adjudication 
       // a ledger decision with no resolved row behind it still fails the (strict) bijection
       const broken = stage2Tx({ ledgerTable: true, ledgerRows: [ledgerRow], census: [importerCensus] });
       await expect(observe(broken.tx, dir)).rejects.toThrow(/ledger_without_row:CD_I1001/);
+    });
+  });
+
+  it('AFLDB-ISSUE-238 (DD-10/R238-S4-01): a live corrected-action row (or a live row carrying '
+     + 'previous_player_identity at all) refuses the v2 capture immediately, before any other '
+     + 'before-destruction check runs, naming capture v3 (slice 7)', async () => {
+    await withDir(async (dir) => {
+      const corrected: Stage2LedgerRow = {
+        ...ledgerRow, id: 8, action: 'corrected', previousPlayerIdentity: 'players/Z/Zed_Zeta.html',
+      };
+      const db = stage2Tx({ ledgerTable: true, ledgerRows: [ledgerRow, corrected], census: [adminResolved, importerCensus] });
+      await expect(observe(db.tx, dir)).rejects.toThrow(
+        /carry action 'corrected' or a previous_player_identity.*capture v3.*slice 7.*Nothing has been destroyed/s);
+      // refused before the importer/census section (and everything after it) is ever reached
+      expect(db.statements.some((s) => s.includes("to_regclass('public.sources')"))).toBe(false);
+      expect(readdirSync(dir)).toEqual([]);
+    });
+
+    // The DD-10 boundary is the COLUMN, not just the action label: a `linked`/`revoked` row
+    // carrying a non-null previous_player_identity (never legitimate, migration 106's CHECK
+    // forbids it) is refused the same way, not silently accepted as ordinary v2 state.
+    await withDir(async (dir) => {
+      const tainted: Stage2LedgerRow = { ...ledgerRow, previousPlayerIdentity: 'players/Z/Zed_Zeta.html' };
+      const db = stage2Tx({ ledgerTable: true, ledgerRows: [tainted] });
+      await expect(observe(db.tx, dir)).rejects.toThrow(/capture v3/);
     });
   });
 
@@ -7948,7 +8005,7 @@ describe('AFLDB-ISSUE-237 — code_test_db rehearsal fixture (DB-free)', () => {
     invariant: 'ok',
     live: {
       sequence: { lastValue: 41, isCalled: true },
-      replay: { inserted: 0, noops: 1, stops: [], supersedes: [] },
+      replay: { inserted: 0, noops: 1, alreadySatisfied: 0, stops: [], supersedes: [] },
       importerReplay: { inserted: 0, noops: 1 },
       bijection: 'ok',
     },
@@ -7995,9 +8052,9 @@ describe('AFLDB-ISSUE-237 — code_test_db rehearsal fixture (DB-free)', () => {
       [{ importerResolvedPlayerIds: [] }, /resolves to 0 players/],
       [{ humanForward: { ok: false, reason: 'ambiguous' } }, /D7/],
       [{ invariant: { error: 'one-row-per-player' } }, /standalone invariant failed/],
-      [{ live: { ...observation(1, 2).live, replay: { inserted: 0, noops: 0, stops: [], supersedes: [{ externalId: F.importer.providerId, playerId: 9001 }] } } },
+      [{ live: { ...observation(1, 2).live, replay: { inserted: 0, noops: 0, alreadySatisfied: 0, stops: [], supersedes: [{ externalId: F.importer.providerId, playerId: 9001 }] } } },
         /supersedes 1 row\(s\); expected none/],
-      [{ live: { ...observation(1, 2).live, replay: { inserted: 1, noops: 0, stops: [], supersedes: [] } } }, /would still insert 1/],
+      [{ live: { ...observation(1, 2).live, replay: { inserted: 1, noops: 0, alreadySatisfied: 0, stops: [], supersedes: [] } } }, /would still insert 1/],
       [{ live: { ...observation(1, 2).live, importerReplay: { inserted: 1, noops: 0 } } }, /importer replay would still insert 1/],
       [{ live: { ...observation(1, 2).live, bijection: { error: 'missing_resolved:CD_I9992370002' } } }, /bijection does not hold/],
       [{ actors: [] }, /0 fixture actor/],
@@ -8347,8 +8404,11 @@ describe('AFLDB-ISSUE-237 recovery attribution actor — ensure_issue237_recover
     expect(helper).not.toMatch(/INSERT INTO auth_users/);
     // remapActors writes through the same helper, so the two cannot drift apart
     const remap = helper.slice(helper.indexOf('export async function remapActors('));
-    expect(remap.slice(0, remap.indexOf('\n}\n'))).toContain('await insertAttributionOnlyActor(tx, actor)');
-    expect(remap.slice(0, remap.indexOf('\n}\n'))).not.toContain('INSERT INTO');
+    // `\r?\n` (not a bare `\n`): this worktree checks out CRLF (core.autocrlf=true), so a literal
+    // '\n}\n' never matches here even though remapActors() is otherwise unchanged.
+    const remapBody = remap.slice(0, remap.search(/\r?\n\}\r?\n/));
+    expect(remapBody).toContain('await insertAttributionOnlyActor(tx, actor)');
+    expect(remapBody).not.toContain('INSERT INTO');
   });
 
   it('never prints the DSN or its password, on success or on any refusal', async () => {
@@ -8977,7 +9037,7 @@ describe('AFLDB-ISSUE-245 — manual player registrations survive the rebuild (D
   const withRegs = async (ids: number[]) => captureOf(preWorld(ids, { importer: true }),
     ids.map((i) => importerRowFor(i, 13_856 + i)));
   const VERIFIED_OBS: LiveReinstatementObservation = {
-    sequence: { lastValue: 1, isCalled: false }, replay: { inserted: 0, noops: 0, stops: [], supersedes: [] },
+    sequence: { lastValue: 1, isCalled: false }, replay: { inserted: 0, noops: 0, alreadySatisfied: 0, stops: [], supersedes: [] },
     importerReplay: { inserted: 0, noops: 1 }, bijection: 'ok', registrations: [],
   };
   const renumbered = (rs: readonly CapturedRegistration[]) => rs.map((r, n) => ({ ...r, playerId: 90_000 + n, adminUserId: 90_500 }));

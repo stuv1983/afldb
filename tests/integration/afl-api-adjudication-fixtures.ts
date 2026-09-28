@@ -41,7 +41,7 @@ import { createHash } from 'node:crypto';
 import type postgres from 'postgres';
 
 import { readAflApiProviderEvidence, type AflApiProviderEvidence } from '@/db/queries/afl-api-player-links';
-import { adjudicationFingerprint } from '@/lib/acquisition/afl-api-adjudication';
+import { adjudicationFingerprint, type AflApiLedgerNetAction } from '@/lib/acquisition/afl-api-adjudication';
 
 import {
   isS6MatchRecordId,
@@ -56,6 +56,18 @@ import {
   type S6Refs,
 } from './afl-api-fixture-ownership';
 import { createImportRoleParityHarness } from './import-role-parity';
+
+/*
+ * AFLDB-ISSUE-238 Slice 4 (Defect A): readAflApiProviderEvidence() below reads pending
+ * candidates and the latest adjudication through authSql (src/db/authClient.ts), lazily
+ * routed to afldb_auth on its first query -- the repository .env points it at afldb_dev.
+ * Both consuming suites (settle-afl-api.test.ts, player-link-concurrency.test.ts) import
+ * this module before rendering any S6 evidence, so routing it here once, at the shared
+ * boundary, keeps them from going split-brain on two different databases instead of each
+ * needing its own copy of the redirect. Same convention as
+ * tests/integration/join-request-approval.test.ts and tests/integration/admin-draft.test.ts.
+ */
+process.env.AFLDB_AUTH_DATABASE_URL = process.env.AFLDB_TEST_DATABASE_URL;
 
 // The namespace, ownership registry, teardown and leftover gate live in the server-neutral
 // `./afl-api-fixture-ownership` (the I18 CLI teardown loads it without `react-server`). This
@@ -326,7 +338,8 @@ export async function s6StateSnapshot(
 }
 
 export type S6LedgerRow = {
-  id: number; externalId: string; action: 'linked' | 'revoked'; playerId: number; playerIdentity: string;
+  /** AFLDB-ISSUE-238: type-widened only -- every S6 fixture still writes only linked/revoked rows. */
+  id: number; externalId: string; action: AflApiLedgerNetAction; playerId: number; playerIdentity: string;
   previousState: unknown; previousStateType: string | null; evidence: unknown; evidenceType: string;
   evidenceSha256: string; surnameAck: boolean; supersedesId: number | null; adminUserId: number; note: string;
 };

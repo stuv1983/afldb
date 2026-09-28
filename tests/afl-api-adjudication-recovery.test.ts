@@ -16,6 +16,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   ADJUDICATION_RECOVERY_FORMAT,
+  ADJUDICATION_RECOVERY_VERSION,
   AdjudicationRecoveryRefused,
   assertExportSourceDatabase,
   buildAdjudicationRecoveryExport,
@@ -25,9 +26,11 @@ import {
   planLedgerRecovery,
   recoverAflApiAdjudications,
   resolveRecoveryDsn,
+  sameRecoveryLedgerRow,
   type AdjudicationRecoverySource,
+  type RecoveryLedgerRow,
 } from '../tools/migration/recover_afl_api_adjudications';
-import { buildCombinedCapture, sameLedgerRow, type CapturedLedgerRow } from '../tools/migration/rebuild_afl_api_adjudications';
+import { buildCombinedCapture, type CapturedLedgerRow } from '../tools/migration/rebuild_afl_api_adjudications';
 import { recoveryFixtureLedgerRows } from '../tools/db/afl-api-identity-bulk-rehearsal';
 import {
   afltablesIdentity, aflApiRow, emptyWorld, fakeConnection, manualAdminIdentity, pgJsonbText, type FakeLedgerRow, type FakeWorld,
@@ -46,6 +49,25 @@ function ledgerRow(id: number, externalId: string, action: 'linked' | 'revoked',
     surnameDisagreementAcknowledged: false, supersedesId, adminUserId,
     note: `A human decision recorded for ${externalId} (row ${id}).`,
     createdAt: `2026-09-2${id}T01:02:03.456789Z`,
+    previousPlayerIdentity: null,
+  };
+}
+
+/** AFLDB-ISSUE-238 (DD-2/M1): a `corrected` row on top of an existing `linked` row for the same
+ * provider, human-origin (`supersedesId` names the linked row it supersedes). `previousState`
+ * must be non-null on a corrected row (M1); the fixture text is PostgreSQL's own jsonb rendering. */
+function correctedLedgerRow(
+  id: number, externalId: string, playerId: number, playerIdentity: string,
+  previousPlayerIdentity: string, supersedesId: number, adminUserId = 1,
+): FakeLedgerRow {
+  return {
+    id, sourceKey: 'afl_api', externalId, action: 'corrected', playerId, playerIdentity,
+    previousState: '{"status": "resolved"}',
+    evidence: `{"row": ${id}, "provider": "${externalId}"}`, evidenceSha256: sha(`evidence-${id}`),
+    surnameDisagreementAcknowledged: false, supersedesId, adminUserId,
+    note: `A human correction recorded for ${externalId} (row ${id}).`,
+    createdAt: `2026-09-2${id}T01:02:03.456789Z`,
+    previousPlayerIdentity,
   };
 }
 
@@ -77,6 +99,36 @@ function lostWorld(): FakeWorld {
   afltablesIdentity(world, 110, 'players/A/A.html');
   afltablesIdentity(world, 120, 'players/B/B.html');
   afltablesIdentity(world, 130, 'players/C/C.html');
+  return world;
+}
+
+/**
+ * AFLDB-ISSUE-238 (DD-11): players A=10, D=40; CD_I5 linked to A, then human-corrected to D
+ * (`previousPlayerIdentity` records A's path). The live outcome the correction produced is
+ * CD_I5 -> D, `resolved`/`afl_api_admin_adjudication` -- D15 only ever CONFIRMS a correction's
+ * outcome (never creates one), so every recovery fixture built on this world also needs that
+ * outcome row present on the target for the D15 replay to succeed (never a bare insert).
+ */
+function correctedWorld(): FakeWorld {
+  const world = emptyWorld('afldb_dev');
+  afltablesIdentity(world, 10, 'players/A/A.html');
+  afltablesIdentity(world, 40, 'players/D/D.html');
+  world.authUsers.push({ id: 1, ...ADMIN });
+  world.ledger.push(
+    ledgerRow(1, 'CD_I5', 'linked', 10, 'players/A/A.html'),
+    correctedLedgerRow(2, 'CD_I5', 40, 'players/D/D.html', 'players/A/A.html', 1),
+  );
+  world.identities.push({ id: 100, sourceKey: 'afl_api', externalId: 'CD_I5', playerId: 40, status: 'resolved',
+    matchMethod: 'afl_api_admin_adjudication', candidateCount: 0, externalUrl: null, externalName: null, notes: 'human' });
+  world.sequence = { lastValue: 2, isCalled: true };
+  return world;
+}
+
+/** `correctedWorld()` after the loss: players renumbered (A=110, D=140), no ledger. */
+function correctedLostWorld(): FakeWorld {
+  const world = emptyWorld('afldb_dev');
+  afltablesIdentity(world, 110, 'players/A/A.html');
+  afltablesIdentity(world, 140, 'players/D/D.html');
   return world;
 }
 
@@ -133,13 +185,23 @@ describe('AFLDB-ISSUE-239: the recovery source', () => {
     expect(() => parseAdjudicationRecoverySource('[]', exported.payloadSha256)).toThrow(/not a JSON object/);
   });
 
+  it('AFLDB-ISSUE-238 (DD-11): a version-1 recovery export is refused by name, never silently upgraded', async () => {
+    expect(ADJUDICATION_RECOVERY_VERSION).toBe(2);
+    const exported = await exportOf(originalWorld());
+    const v1 = { ...exported, version: 1 };
+    expect(() => parseAdjudicationRecoverySource(JSON.stringify(v1), exported.payloadSha256))
+      .toThrow(/version 1.*previous_player_identity.*never silently upgraded/s);
+  });
+
   it('accepts an archived v2 rebuild capture, reading only its ledger section; refuses the superseded formats', async () => {
     const testWorld = originalWorld();
     testWorld.database = 'afldb_test';
     const exported = await exportOf(testWorld, 'afldb_test');
     const capture = buildCombinedCapture({
       database: 'afldb_test', capturedAt: '2026-09-25T00:00:00.000000Z', ledgerTablePresent: true,
-      ledgerRows: exported.ledgerRows, importerRows: [], registrations: [],
+      // Zero-corrected fixture (originalWorld): every row is linked/revoked with
+      // previousPlayerIdentity null, so narrowing to the pinned v2 shape is exact, not a guess.
+      ledgerRows: exported.ledgerRows as unknown as CapturedLedgerRow[], importerRows: [], registrations: [],
     });
     const source = parseAdjudicationRecoverySource(JSON.stringify(capture), capture.payloadSha256);
     expect(source).toEqual(expect.objectContaining({ kind: 'rebuild_capture', ledgerDatabase: 'afldb_test' }));
@@ -167,12 +229,22 @@ describe('AFLDB-ISSUE-239: planLedgerRecovery (pure)', () => {
     expect(planLedgerRecovery({ source: rows, target: [] })).toEqual({ toInsert: rows, identicalIds: [], stops: [] });
     expect(planLedgerRecovery({ source: rows, target: [rows[0]] }).identicalIds).toEqual([1]);
     // The surrogates may differ; the e-mail is compared case-insensitively.
-    const renumbered: CapturedLedgerRow = { ...rows[0], playerId: 999, adminUserId: 77, adminEmail: rows[0].adminEmail.toUpperCase() };
+    const renumbered: RecoveryLedgerRow = { ...rows[0], playerId: 999, adminUserId: 77, adminEmail: rows[0].adminEmail.toUpperCase() };
     expect(planLedgerRecovery({ source: rows, target: [renumbered] }).identicalIds).toEqual([1]);
     expect(planLedgerRecovery({ source: rows, target: [{ ...rows[0], note: 'a different note entirely, twenty chars' }] }).stops[0])
       .toMatch(/target ledger row 1 \(CD_I1\) differs/);
-    const later: CapturedLedgerRow = { ...rows[0], id: 9, externalId: 'CD_I9' };
+    const later: RecoveryLedgerRow = { ...rows[0], id: 9, externalId: 'CD_I9' };
     expect(planLedgerRecovery({ source: rows, target: [later] }).stops[0]).toMatch(/row 9 \(CD_I9, linked\) is not in the recovery source/);
+    // AFLDB-ISSUE-238 (R238-S4-01 case (c)): a same-id target row differing ONLY in
+    // previous_player_identity is a STOP, never "identical" -- the exact HIGH finding fixed.
+    const p6: RecoveryLedgerRow = {
+      ...rows[0], id: 6, action: 'corrected', supersedesId: 1,
+      previousState: '{"status": "resolved"}', previousPlayerIdentity: 'players/X/X.html',
+    };
+    const p6TargetDiffers: RecoveryLedgerRow = { ...p6, previousPlayerIdentity: 'players/Y/Y.html' };
+    expect(sameRecoveryLedgerRow(p6, p6TargetDiffers)).toBe(false);
+    expect(planLedgerRecovery({ source: [...rows, p6], target: [rows[0], p6TargetDiffers] }).stops
+      .some((s) => s.includes('target ledger row 6') && s.includes('differs'))).toBe(true);
   });
 });
 
@@ -218,8 +290,8 @@ describe('AFLDB-ISSUE-239: recoverAflApiAdjudications (stateful fake)', () => {
     const source = parseAdjudicationRecoverySource(JSON.stringify(exported), exported.payloadSha256);
     // The source's row differs from what jsonb stores in the evidence text ALONE.
     for (const r of rows) {
-      expect(sameLedgerRow(r, { ...r, playerId: 999, adminUserId: 77, evidence: pgJsonbText(r.evidence) })).toBe(false);
-      expect(sameLedgerRow({ ...r, evidence: pgJsonbText(r.evidence) }, { ...r, playerId: 999, adminUserId: 77, evidence: pgJsonbText(r.evidence) })).toBe(true);
+      expect(sameRecoveryLedgerRow(r, { ...r, playerId: 999, adminUserId: 77, evidence: pgJsonbText(r.evidence) })).toBe(false);
+      expect(sameRecoveryLedgerRow({ ...r, evidence: pgJsonbText(r.evidence) }, { ...r, playerId: 999, adminUserId: 77, evidence: pgJsonbText(r.evidence) })).toBe(true);
     }
     const world = lostWorld();
     const before = JSON.stringify({ ...world, sequence: null });
@@ -244,7 +316,7 @@ describe('AFLDB-ISSUE-239: recoverAflApiAdjudications (stateful fake)', () => {
       expect(r.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/);
     }
     const exported = buildAdjudicationRecoveryExport({ ledgerDatabase: 'code_test_db', sourceDatabase: 'code_test_db',
-      capturedAt: '2026-09-26T00:00:00.000Z', ledgerRows: rows });
+      capturedAt: '2026-09-26T00:00:00.000Z', ledgerRows: rows.map((r) => ({ ...r, previousPlayerIdentity: null })) });
     const source = parseAdjudicationRecoverySource(JSON.stringify(exported), exported.payloadSha256);
     const world = emptyWorld('code_test_db');
     for (const p of players) afltablesIdentity(world, p.playerId, p.path);
@@ -295,6 +367,55 @@ describe('AFLDB-ISSUE-239: recoverAflApiAdjudications (stateful fake)', () => {
     expect(report).toEqual(expect.objectContaining({ outcome: 'COMMITTED', actorsToCreate: 0, outcomeInserts: [], outcomeNoops: 1 }));
     expect(world.authUsers).toEqual([{ id: 5, email: ADMIN.email.toLowerCase(), role: 'admin' }]);
     expect(world.ledger.every((r) => r.adminUserId === 5)).toBe(true);
+  });
+
+  it('AFLDB-ISSUE-238 (DD-11): a corrected row round-trips exactly through export v2 -> parse -> '
+     + 'apply when its resolved outcome survived, previousPlayerIdentity carried VERBATIM (never '
+     + 'remapped), and reports alreadySatisfied (R238-S4-02) beside the plain noop count', async () => {
+    const original = correctedWorld();
+    const source = await sourceOf(original);
+    expect(source.ledgerRows.map((r) => [r.id, r.action, r.previousPlayerIdentity]))
+      .toEqual([[1, 'linked', null], [2, 'corrected', 'players/A/A.html']]);
+
+    const world = correctedLostWorld();
+    world.authUsers.push({ id: 5, email: ADMIN.email.toLowerCase(), role: 'admin' }); // reused as it is
+    // D15 only ever CONFIRMS a correction's outcome, never creates one: the outcome row (at the
+    // renumbered player) must already be on the target for the replay to succeed at all.
+    world.identities.push({ id: 900, sourceKey: 'afl_api', externalId: 'CD_I5', playerId: 140, status: 'resolved',
+      matchMethod: 'afl_api_admin_adjudication', candidateCount: 0, externalUrl: null, externalName: null, notes: 'human' });
+
+    const validate = await recoverAflApiAdjudications({ mode: 'validate-only', connection: fakeConnection(world).connection, targetDatabase: 'afldb_dev', source });
+    expect(validate).toEqual(expect.objectContaining({ outcome: 'READ_ONLY', outcomeNoops: 1, outcomeAlreadySatisfied: 1 }));
+
+    const report = await recoverAflApiAdjudications({ mode: 'apply', connection: fakeConnection(world).connection, targetDatabase: 'afldb_dev', source });
+    expect(report).toEqual(expect.objectContaining({ outcome: 'COMMITTED', outcomeNoops: 1, outcomeAlreadySatisfied: 1 }));
+    // previousPlayerIdentity is a stable identity STRING, not a surrogate -- carried verbatim;
+    // only player_id/admin_user_id (the two surrogates) are ever remapped.
+    expect(world.ledger.map((r) => [r.id, r.action, r.playerId, r.previousPlayerIdentity])).toEqual([
+      [1, 'linked', 110, null], [2, 'corrected', 140, 'players/A/A.html'],
+    ]);
+    expect(world.ledger.every((r) => r.adminUserId === 5)).toBe(true);
+    // A linked-only outcome (the pre-existing suite above) reports alreadySatisfied: 0 -- proven
+    // there already (zero-corrected parity: that assertion is unchanged by this slice).
+  });
+
+  it('AFLDB-ISSUE-238 (R238-S4-05): previous_player_identity unresolvable/ambiguous, or resolving to '
+     + 'the same target player as the corrected player_identity, is a STOP', async () => {
+    const source = await sourceOf(correctedWorld());
+
+    // unresolvable: the target has no accepted identity for A's path at all.
+    const noPreviousIdentity = emptyWorld('afldb_dev');
+    afltablesIdentity(noPreviousIdentity, 140, 'players/D/D.html');
+    await expect(recoverAflApiAdjudications({ mode: 'validate-only', connection: fakeConnection(noPreviousIdentity).connection,
+      targetDatabase: 'afldb_dev', source })).rejects.toThrow(/previous_player_identity 'players\/A\/A\.html' names no target player/);
+
+    // resolves to the SAME target player as the corrected player_identity: never silently
+    // accepted as a no-op correction (R238-S4-05).
+    const samePlayer = emptyWorld('afldb_dev');
+    afltablesIdentity(samePlayer, 140, 'players/D/D.html');
+    manualAdminIdentity(samePlayer, 140, 'players/A/A.html'); // both paths now resolve to player 140
+    await expect(recoverAflApiAdjudications({ mode: 'validate-only', connection: fakeConnection(samePlayer).connection,
+      targetDatabase: 'afldb_dev', source })).rejects.toThrow(/resolves to the same target player.*R238-S4-05/);
   });
 
   it('refuses, writing nothing, on every conflict with current state', async () => {

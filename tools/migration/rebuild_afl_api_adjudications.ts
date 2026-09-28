@@ -102,6 +102,7 @@ import {
   type AflApiAdjudicationLedgerRow,
   type AflApiForwardIdentityResult,
   type AflApiImporterProjection,
+  type AflApiLedgerNetAction,
   type AflApiPlayerRemapResult,
   type CapturedImporterRow,
   type CapturedImporterRowProblem,
@@ -195,6 +196,21 @@ export type CapturedLedgerRow = {
 };
 
 /**
+ * AFLDB-ISSUE-238 (R238-S4-01, DD-10): `readLedger`'s actual superset. The LIVE ledger can hold
+ * a `corrected` row and a `previous_player_identity` the v2 capture format cannot carry. Every
+ * OTHER v2 export (`CapturedLedgerRow`, `capturedRowProblems`, `ledgerTuple`, `sameLedgerRow`,
+ * `planLedgerReinstatement`) stays the exact two-action shape, unedited: a `corrected` row or a
+ * non-null `previousPlayerIdentity` is refused (DD-10, `observeCaptureState`) before this is
+ * ever narrowed to `CapturedLedgerRow` for the capture file, the marker or the payload hash. The
+ * recovery tool (AFLDB-ISSUE-239/DD-11) defines its own structurally-identical `RecoveryLedgerRow`
+ * rather than importing this one, so its three-action validation stays entirely on its own path.
+ */
+export type LiveLedgerRow = Omit<CapturedLedgerRow, 'action'> & {
+  action: AflApiLedgerNetAction;
+  previousPlayerIdentity: string | null;
+};
+
+/**
  * D10's one combined file: ISSUE-235's ledger section, unchanged in shape, plus ISSUE-237's
  * importer section (D6). The sections never travel apart — no importer-only file, marker or
  * decision exists anywhere.
@@ -268,7 +284,9 @@ export function capturedRowProblems(rows: readonly CapturedLedgerRow[]): string[
     if (typeof r.externalId !== 'string' || !AFL_API_PROVIDER_ID_RE.test(r.externalId)) {
       problems.push(`${at}: external_id is not a CD_I provider id`);
     }
-    if (r.action !== 'linked' && r.action !== 'revoked') problems.push(`${at}: action is not linked/revoked`);
+    if (r.action !== 'linked' && r.action !== 'revoked') {
+      problems.push(`${at}: action is not linked/revoked (a corrected row needs capture v3, ISSUE-238 slice 7)`);
+    }
     if ((r.action === 'revoked') !== (r.supersedesId !== null)) {
       problems.push(`${at}: supersedes_id must be set exactly on a revoked row`);
     }
@@ -1046,15 +1064,18 @@ function parseId(value: string | null, what: string): number | null {
   return Number(value);
 }
 
-/** The whole ledger with each actor's email, in id order; `present: false` before migration 104. */
+/** The whole ledger with each actor's email, in id order; `present: false` before migration 104.
+ * AFLDB-ISSUE-238 (DD-10): returns the `LiveLedgerRow` superset (three actions,
+ * `previousPlayerIdentity`) — the callers that must stay on the pinned v2 shape narrow it
+ * themselves, right after the DD-10 refusal check. */
 export async function readLedger(
   tx: TransactionSql,
-): Promise<{ present: boolean; rows: CapturedLedgerRow[] }> {
+): Promise<{ present: boolean; rows: LiveLedgerRow[] }> {
   const [{ present }] = await tx<{ present: boolean }[]>`
     SELECT to_regclass('public.afl_api_identity_adjudications') IS NOT NULL AS present
   `;
   if (!present) return { present: false, rows: [] };
-  const raw = await tx<(Omit<CapturedLedgerRow, 'id' | 'supersedesId'> & { id: string; supersedesId: string | null })[]>`
+  const raw = await tx<(Omit<LiveLedgerRow, 'id' | 'supersedesId'> & { id: string; supersedesId: string | null })[]>`
     SELECT a.id::text AS id, a.source_key AS "sourceKey", a.external_id AS "externalId", a.action,
            a.player_id AS "playerId", a.player_identity AS "playerIdentity",
            a.previous_state::text AS "previousState", a.evidence::text AS evidence,
@@ -1062,6 +1083,7 @@ export async function readLedger(
            a.surname_disagreement_acknowledged AS "surnameDisagreementAcknowledged",
            a.supersedes_id::text AS "supersedesId", a.admin_user_id AS "adminUserId",
            u.email AS "adminEmail", u.role AS "adminRole", a.note,
+           a.previous_player_identity AS "previousPlayerIdentity",
            to_char(a.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS "createdAt"
       FROM afl_api_identity_adjudications a
       JOIN auth_users u ON u.id = a.admin_user_id
@@ -1082,6 +1104,41 @@ export async function readLedger(
       supersedesId: parseId(r.supersedesId, 'supersedes_id'),
     })),
   };
+}
+
+/**
+ * AFLDB-ISSUE-238 (DD-10): every `LiveLedgerRow` that is NOT the pinned v2 two-action shape —
+ * action `corrected`, or a non-null `previousPlayerIdentity`. Shared by every v2 narrow site so
+ * a stray corrected row anywhere in the rebuild pipeline is found the same way; each caller
+ * throws its own `AdjudicationRebuildRefused` naming why (before vs after destruction reads
+ * differently), so the message stays accurate to where it fired.
+ */
+function nonCapturableLedgerRows(rows: readonly LiveLedgerRow[]): readonly LiveLedgerRow[] {
+  return rows.filter((r) => r.action === 'corrected' || r.previousPlayerIdentity !== null);
+}
+
+/** Strips `previousPlayerIdentity` and narrows `action` to the pinned v2 union. Callers MUST
+ * have already proven (via `nonCapturableLedgerRows`) that no row needs the wider shape. */
+function narrowToCapturedLedgerRows(rows: readonly LiveLedgerRow[]): CapturedLedgerRow[] {
+  return rows.map((r): CapturedLedgerRow => {
+    const { previousPlayerIdentity: _previousPlayerIdentity, action, ...rest } = r;
+    return { ...rest, action: action as 'linked' | 'revoked' };
+  });
+}
+
+/**
+ * The checked narrow, for callers outside the capture/reinstate pipeline (the integration
+ * suites that feed a live `readLedger` read into the v2 capture functions): refuses any row the
+ * v2 capture cannot carry, exactly as `observeCaptureState` does, then narrows.
+ */
+export function requireCapturableLedgerRows(rows: readonly LiveLedgerRow[]): CapturedLedgerRow[] {
+  const nonCapturable = nonCapturableLedgerRows(rows);
+  if (nonCapturable.length > 0) {
+    throw new AdjudicationRebuildRefused(
+      `ledger row(s) ${nonCapturable.map((r) => r.id).join(', ')} cannot be carried by the v2 rebuild capture `
+      + '(a corrected row needs capture v3, AFLDB-ISSUE-238 §12 slice 7).');
+  }
+  return narrowToCapturedLedgerRows(rows);
 }
 
 /**
@@ -1303,7 +1360,19 @@ export async function reinstateAndReplay(
   const sequenceState = await readSequenceState(tx);
   assertSequenceAboveLedger(sequenceState, plan.maxId);
 
-  const readBack = await readLedger(tx);
+  const readBackRaw = await readLedger(tx);
+  // AFLDB-ISSUE-238 (DD-10): the v2 reinstate path never writes a `corrected` row or a
+  // `previous_player_identity` (the INSERT above carries only the capture's pinned two-action
+  // rows) -- impossible by construction. Guarded here anyway, exhaustively, rather than trusting
+  // that construction rather than re-proving it against what was actually read back.
+  const uncapturableReadBack = nonCapturableLedgerRows(readBackRaw.rows);
+  if (uncapturableReadBack.length > 0) {
+    throw new AdjudicationRebuildRefused(
+      `The reinstated ledger holds ${uncapturableReadBack.length} row(s) carrying action 'corrected' `
+      + "or a previous_player_identity; the v2 reinstate path never writes one (impossible by "
+      + 'construction). Resolve by hand.');
+  }
+  const readBack = { present: readBackRaw.present, rows: narrowToCapturedLedgerRows(readBackRaw.rows) };
   const readBackProblems = reinstatedLedgerProblems(
     plan.rows, readBack.rows.map(({ adminEmail: _email, ...rest }) => rest));
   if (readBackProblems.length > 0) {
@@ -1484,7 +1553,22 @@ export async function observeCaptureState(
   // `present: false` only when `to_regclass` finds no ledger table (a database older than
   // migration 104, e.g. a pre-ISSUE-235 bootstrap): the human section is then exactly `[]`.
   // An existing table is read strictly; any failure reading it propagates.
-  const ledgerLive = await readLedger(tx);
+  const ledgerLiveRaw = await readLedger(tx);
+  // AFLDB-ISSUE-238 (R238-S4-01, DD-10): the v2 combined capture cannot carry a `corrected`
+  // row or a `previous_player_identity` -- refused HERE, immediately after the read and before
+  // every other before-destruction check below (the source/census/identity/bijection checks,
+  // and the `netLedgerRowsByExternalId` cast), so a live corrected row is named plainly instead
+  // of failing later on a misleading structural/bijection message. Only past this point is the
+  // ledger narrowed to the pinned v2 `CapturedLedgerRow` shape for everything downstream.
+  const uncapturable = nonCapturableLedgerRows(ledgerLiveRaw.rows);
+  if (uncapturable.length > 0) {
+    throw new AdjudicationRebuildRefused(
+      `${uncapturable.length} live ledger row(s) (${uncapturable.map((r) => r.id).join(', ')}) `
+      + "carry action 'corrected' or a previous_player_identity, which the v2 rebuild capture "
+      + 'cannot carry: a corrected ledger needs capture v3 (AFLDB-ISSUE-238 §12 slice 7). '
+      + 'Nothing has been destroyed.');
+  }
+  const ledgerLive = { present: ledgerLiveRaw.present, rows: narrowToCapturedLedgerRows(ledgerLiveRaw.rows) };
   // A database the real RESET_SQL has emptied (a run halted or crashed between `recreate`
   // and `reference`) has no `sources`/`external_identities`, or no afl_api source yet. That
   // is the exact state `--recover` must adopt from, so it reads as an empty importer section
@@ -1532,7 +1616,21 @@ export async function observeCaptureState(
   const net = netLedgerRowsByExternalId(ledgerLive.rows as unknown as AflApiAdjudicationLedgerRow[]);
   const remapByExternalId = new Map<string, AflApiPlayerRemapResult>();
   for (const [externalId, row] of net) {
-    if (row.action !== 'linked') continue;
+    // AFLDB-ISSUE-238 (DD-10): exhaustive by construction. `ledgerLive.rows` was already narrowed
+    // to the pinned v2 two-action shape above, so `corrected` is impossible here -- reaching it
+    // would mean the DD-10 refusal above was bypassed, which is itself a bug worth failing loudly on.
+    switch (row.action) {
+      case 'revoked': continue;
+      case 'linked': break;
+      case 'corrected':
+        throw new AdjudicationRebuildRefused(
+          `ledger row for provider ${externalId} is 'corrected', impossible here: the v2 capture `
+          + 'path refuses any corrected row before this point (DD-10). Resolve by hand.');
+      default: {
+        const exhaustive: never = row.action;
+        throw new AdjudicationRebuildRefused(`unhandled ledger action ${String(exhaustive)}`);
+      }
+    }
     remapByExternalId.set(externalId, await resolveAflApiPlayerIdentity(tx, row.playerIdentity));
   }
   const importerByExternalId = new Map(importerLive.map((r) => [r.externalId, {

@@ -30,7 +30,9 @@ export type FakeLedgerRow = {
   id: number;
   sourceKey: string;
   externalId: string;
-  action: 'linked' | 'revoked';
+  /** AFLDB-ISSUE-238 widens the ledger action to three; `previousPlayerIdentity` is `corrected`
+   * only (M1, migration 106), `null` on `linked`/`revoked`. */
+  action: 'linked' | 'revoked' | 'corrected';
   playerId: number;
   playerIdentity: string;
   previousState: string | null;
@@ -41,6 +43,7 @@ export type FakeLedgerRow = {
   adminUserId: number;
   note: string;
   createdAt: string;
+  previousPlayerIdentity: string | null;
 };
 
 export type FakeDataIssue = {
@@ -315,27 +318,38 @@ function answer(world: FakeWorld, text: string, params: unknown[], readOnly: boo
         evidenceSha256: r.evidenceSha256, surnameDisagreementAcknowledged: r.surnameDisagreementAcknowledged,
         supersedesId: r.supersedesId === null ? null : String(r.supersedesId), adminUserId: r.adminUserId,
         adminEmail: actor?.email, adminRole: actor?.role, note: r.note, createdAt: r.createdAt,
+        // AFLDB-ISSUE-238 (DD-10/DD-11): readLedger's superset column.
+        previousPlayerIdentity: r.previousPlayerIdentity,
       };
     }).filter((r) => r.adminEmail !== undefined).sort((a, b) => Number(a.id) - Number(b.id));
   }
   if (has('SELECT count(*)::int AS total FROM afl_api_identity_adjudications')) return [{ total: world.ledger.length }];
   if (has('SELECT id, external_id AS "externalId", action, player_id AS "playerId"', 'FROM afl_api_identity_adjudications')) {
+    // AFLDB-ISSUE-238: the replay tool's readLedgerRows() also selects previous_player_identity
+    // and evidence_sha256, so the shared structural validator can see a corrected row's real shape.
     return [...world.ledger].sort((a, b) => a.id - b.id).map((r) => ({
       id: r.id, externalId: r.externalId, action: r.action, playerId: r.playerId,
       playerIdentity: r.playerIdentity, supersedesId: r.supersedesId,
+      previousPlayerIdentity: r.previousPlayerIdentity, evidenceSha256: r.evidenceSha256,
     }));
   }
   if (has('INSERT INTO afl_api_identity_adjudications', 'OVERRIDING SYSTEM VALUE')) {
+    // AFLDB-ISSUE-238: the rebuild's own reinstate INSERT is still exactly 14 positional params
+    // (it only ever writes the pinned v2 linked/revoked rows); the recovery's INSERT (DD-11)
+    // appends previous_player_identity as a 15th. `previousPlayerIdentity` is `undefined` on the
+    // 14-param call, defaulted to `null` below -- exactly the column's default on a real INSERT
+    // that never mentions it.
     const [id, sourceKey, externalId, action, playerId, playerIdentity, previousState, evidence, evidenceSha256,
-      surnameDisagreementAcknowledged, supersedesId, adminUserId, note, createdAt] = params as [
-      number, string, string, 'linked' | 'revoked', number, string, string | null, string, string, boolean,
-      number | null, number, string, string];
+      surnameDisagreementAcknowledged, supersedesId, adminUserId, note, createdAt, previousPlayerIdentity] = params as [
+      number, string, string, 'linked' | 'revoked' | 'corrected', number, string, string | null, string, string, boolean,
+      number | null, number, string, string, (string | null)?];
     if (world.ledger.some((r) => r.id === id)) throw new FakeDbError('duplicate key value violates unique constraint (ledger pkey)', '23505');
     if (!world.authUsers.some((u) => u.id === adminUserId)) throw new FakeDbError('ledger admin_user_id FK violation', '23503');
     // `${text}::text::jsonb`: stored as jsonb, so the text form is PostgreSQL's, not the caller's.
     world.ledger.push({ id, sourceKey, externalId, action, playerId, playerIdentity,
       previousState: previousState === null ? null : pgJsonbText(previousState), evidence: pgJsonbText(evidence),
-      evidenceSha256, surnameDisagreementAcknowledged, supersedesId, adminUserId, note, createdAt });
+      evidenceSha256, surnameDisagreementAcknowledged, supersedesId, adminUserId, note, createdAt,
+      previousPlayerIdentity: previousPlayerIdentity ?? null });
     return [];
   }
   if (has("pg_get_serial_sequence('afl_api_identity_adjudications', 'id')")) {

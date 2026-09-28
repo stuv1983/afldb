@@ -15,6 +15,23 @@ commit.
 
 ## [Unreleased]
 
+### AFL API identity ledger readers understand `corrected` adjudications (AFLDB-ISSUE-238 slice 4; issue open) - 28 September 2026
+
+- **What changed.** Every reader of `afl_api_identity_adjudications` now handles exactly `linked`,
+  `revoked` and `corrected` (migration 106), and fails closed on anything else or on a malformed
+  correction. A `corrected` row is live human authority at the corrected player. D15 only confirms it
+  (ALREADY_SATISFIED) and never writes one. The promotion checker's G2 refuses a corrected target
+  entry until the planned corrected pre-classification (slice 6) exists. The ledger digest is
+  unchanged for ledgers with no `corrected` row.
+- **Admin.** `/admin/player-links/afl-api` refuses to revoke a provider whose latest ledger action is
+  `corrected` (refusal `T21_revoke_corrected`), before the non-use proof and with no write.
+- **Tooling formats.** The ISSUE-239 recovery export is now version 2 (it carries
+  `previous_player_identity`); version-1 exports are refused by name. The `db:test:rebuild` capture
+  stays version 2 and refuses a ledger containing a `corrected` row before anything is destroyed.
+- **Deploy order.** Migration 106 and `db:privileges` must be applied before this code: the readers
+  select `previous_player_identity`. No correction command exists yet (slice 5). Full record:
+  `issues/open/AFLDB-ISSUE-238.md` §8.6, §12.
+
 ### Production adoption of the pinned ISSUE-224 manual player registration cohort is complete (AFLDB-ISSUE-251; Resolved) - 28 September 2026
 
 - **What this records.** AFLDB-ISSUE-251 is resolved. A separately guarded, fail-closed PROD

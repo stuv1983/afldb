@@ -51,7 +51,9 @@ import {
   type LinkAflApiProviderInput,
   type LinkAflApiProviderResult,
 } from '@/db/queries/afl-api-player-links';
-import { adjudicationFingerprint, type AflApiImporterMatchMethod } from '@/lib/acquisition/afl-api-adjudication';
+import {
+  adjudicationFingerprint, type AflApiImporterMatchMethod, type AflApiLedgerNetAction,
+} from '@/lib/acquisition/afl-api-adjudication';
 import {
   parseAflApiIdentities, type AflApiIdentities,
 } from '@/lib/acquisition/afl-api-bundle';
@@ -81,6 +83,7 @@ import {
   observeLiveReinstatement,
   PENDING_CAPTURE_FILE,
   readLedger,
+  requireCapturableLedgerRows,
   readPendingCapture,
   readPendingCaptureWithHash,
   reinstateAndReplay,
@@ -4716,7 +4719,8 @@ describe('AFLDB-ISSUE-235 S6 (I15, I16): the D15 replay fails closed and is idem
   /** A ledger row written directly (fixture setup, the I14 idiom): the ledger a promotion or
    * rebuild reinstates, whose outcome the replay must re-derive. */
   async function ledgerRow(input: {
-    providerId: string; action: 'linked' | 'revoked'; playerId: number; playerIdentity: string;
+    // AFLDB-ISSUE-238: type-widened only -- every existing call here still writes linked/revoked.
+    providerId: string; action: AflApiLedgerNetAction; playerId: number; playerIdentity: string;
     supersedesId?: number;
   }): Promise<number> {
     const [row] = await sql<{ id: string }[]>`
@@ -5016,7 +5020,7 @@ describe('AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreS
     expect(live.rows).toHaveLength(4);
     const capture = buildCombinedCapture({
       database, capturedAt: '2026-09-24T00:00:00.000Z', ledgerTablePresent: live.present,
-      ledgerRows: live.rows.map((r) => ({
+      ledgerRows: requireCapturableLedgerRows(live.rows).map((r) => ({
         ...r, playerId: r.playerId + 7_000_000, adminUserId: r.adminUserId + 7_000_000, adminEmail: r.adminEmail.toUpperCase(),
       })),
       importerRows: [],
@@ -5028,7 +5032,8 @@ describe('AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreS
   }
 
   async function observe(tx: postgres.TransactionSql, pending: CombinedCapture): Promise<ObservedState> {
-    const live = await readLedger(tx);
+    const raw = await readLedger(tx);
+    const live = { present: raw.present, rows: requireCapturableLedgerRows(raw.rows) };
     const decision = decidePendingCapture({
       markerPresent: NO_MARKER, pending, liveLedgerRows: live.rows, liveImporterRows: [], recover: false,
     });
@@ -5120,12 +5125,12 @@ describe('AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreS
   });
 
   it('OD-5 reinstate (rolled back, no rebuild) — reinstateAndReplay() puts a captured ledger back byte-for-byte under its original ids, replays it and passes the bijection', async () => {
-    // Not I18 and not a rebuild: the stage-(ii) function itself, against real PostgreSQL, inside
-    // ONE transaction that is always rolled back. It meets the state a reset leaves (players and
-    // their AFL Tables identities present, the ledger empty, no afl_api identity of either kind)
-    // by deleting this case's own ledger rows and human rows inside that transaction -- and the
-    // file's root baseline importer row too (`BRIDGED_PROVIDER_PLAYER_ID`), which a real reset
-    // would equally have removed and which `reinstateAndReplay()` rightly refuses to meet.
+    // Not I18 and not a rebuild: exercise the stage-(ii) function itself against
+    // real PostgreSQL inside ONE transaction that is always rolled back. A real
+    // recreate removes every afl_api external_identity, so clear that source
+    // wholesale here rather than deleting only this fixture's providers. This
+    // includes any baseline importer population already present in afldb_test.
+    // The rollback restores the database exactly afterwards.
     const pending = await writePendingPreResetCapture();
     const pendingFileSha256 = readPendingCaptureWithHash(dir, database)!.fileSha256;
     const before = await databaseState();
@@ -5139,7 +5144,7 @@ describe('AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreS
       await sql.begin(async (tx) => {
         await tx`
           DELETE FROM external_identities
-           WHERE source_id = ${refs.aflApiSourceId} AND external_id IN (${p1}, ${p2}, ${p3}, ${BRIDGED_PROVIDER_PLAYER_ID})
+           WHERE source_id = ${refs.aflApiSourceId}
         `;
         await tx`DELETE FROM afl_api_identity_adjudications WHERE external_id IN (${p1}, ${p2}, ${p3})`;
         // reinstateAndReplay()'s precondition (D11b): a rebuild marker matching this capture must
@@ -5149,7 +5154,7 @@ describe('AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreS
           capturedAt: pending.capturedAt, payloadSha256: pending.payloadSha256, fileSha256: pendingFileSha256,
         });
         report = await reinstateAndReplay(tx, pending);
-        readBack = (await readLedger(tx)).rows;
+        readBack = requireCapturableLedgerRows((await readLedger(tx)).rows);
         throw rollback;
       });
     } catch (error) {

@@ -9,6 +9,7 @@ import { sql } from '@/db/client';
 import {
   adjudicationFingerprint,
   AFL_API_ADMIN_MATCH_METHOD,
+  AFL_API_LEDGER_ACTIONS,
   AFL_API_LEDGER_CHECKS,
   AFL_API_PLAYER_REFERENCE_MANIFEST,
   aflApiRefusalMessage,
@@ -24,6 +25,7 @@ import {
   type AflApiRefusalCode,
   type AflApiIdentityRow,
   type AflApiIdentityState,
+  type AflApiLedgerNetAction,
 } from '@/lib/acquisition/afl-api-adjudication';
 import { parseAflApiIdentities } from '@/lib/acquisition/afl-api-bundle';
 import {
@@ -118,6 +120,24 @@ async function readLatestAdjudicationId(db: Sql | Tx, providerId: string): Promi
      ORDER BY id DESC LIMIT 1
   `;
   return row?.id ?? null;
+}
+
+/**
+ * AFLDB-ISSUE-238 §8.6: the provider's NET ledger action (its latest row), or null with no row.
+ * The revoke needs it because the identity row alone classifies a corrected provider as `L-H`.
+ * Kept separate from `readLatestAdjudicationId`, which feeds the fingerprint unchanged.
+ */
+async function readLatestAdjudicationAction(db: Sql | Tx, providerId: string): Promise<AflApiLedgerNetAction | null> {
+  const [row] = await db<{ action: string }[]>`
+    SELECT action FROM afl_api_identity_adjudications
+     WHERE source_key = ${AFL_API_SOURCE_KEY} AND external_id = ${providerId}
+     ORDER BY id DESC LIMIT 1
+  `;
+  if (!row) return null;
+  if (!(AFL_API_LEDGER_ACTIONS as readonly string[]).includes(row.action)) {
+    throw new Error(`afl_api_identity_adjudications holds an unknown action ${JSON.stringify(row.action)} for ${providerId}.`);
+  }
+  return row.action as AflApiLedgerNetAction;
 }
 
 /* ------------------------------------------------------------------ *
@@ -551,9 +571,13 @@ export async function readAflApiProviderEvidence(providerId: string): Promise<Af
 
 export type AflApiAdjudicationHistoryRow = {
   id: number;
-  action: 'linked' | 'revoked';
+  /** AFLDB-ISSUE-238: the full three-member ledger vocabulary. The detail page renders it verbatim. */
+  action: AflApiLedgerNetAction;
+  /** For a `corrected` row: P′. */
   playerId: number;
   playerIdentity: string;
+  /** AFLDB-ISSUE-238 M1: a `corrected` row's FROM identity (P); NULL for linked/revoked. */
+  previousPlayerIdentity: string | null;
   adminUserId: number;
   note: string;
   createdAt: string;
@@ -565,6 +589,7 @@ export async function readAflApiAdjudicationHistory(
 ): Promise<readonly AflApiAdjudicationHistoryRow[]> {
   const rows = await authSql<AflApiAdjudicationHistoryRow[]>`
     SELECT id, action, player_id AS "playerId", player_identity AS "playerIdentity",
+           previous_player_identity AS "previousPlayerIdentity",
            admin_user_id AS "adminUserId", note, created_at::text AS "createdAt",
            supersedes_id AS "supersedesId"
       FROM afl_api_identity_adjudications
@@ -821,6 +846,14 @@ export async function revokeAflApiLink(input: RevokeAflApiLinkInput): Promise<Re
       if (recomputedFingerprint !== input.fingerprint) {
         return { ok: false, error: 'The evidence changed after this page was loaded; reload and review again.', code: 'T6_stale_fingerprint' };
       }
+      // AFLDB-ISSUE-238 §8.6 (T21): a corrected provider is `L-H` by its identity row alone, so
+      // only the ledger's net action tells it from a linked one. Read under the locks above and
+      // refused BEFORE the state rules and the non-use proof, with no write: revoking a link and
+      // undoing a consumed correction are different operations, and the latter does not exist.
+      const ledgerNetAction = await readLatestAdjudicationAction(tx, input.providerId);
+      if (ledgerNetAction === 'corrected') {
+        return { ok: false, error: aflApiRefusalMessage('T21_revoke_corrected'), code: 'T21_revoke_corrected' };
+      }
       if (state === 'L-I') {
         return {
           ok: false,
@@ -836,6 +869,7 @@ export async function revokeAflApiLink(input: RevokeAflApiLinkInput): Promise<Re
       const decision = decideAflApiRevoke({
         state, fingerprintMatches: true, nonUseProven: nonUse.proven,
         nonUseRefusalReason: nonUse.proven ? undefined : nonUse.reason,
+        ledgerNetAction,
       });
       if (!decision.allow) return { ok: false, error: decision.message, code: decision.code };
 

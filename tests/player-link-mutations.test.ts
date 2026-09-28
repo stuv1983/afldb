@@ -2514,6 +2514,254 @@ describe('AFLDB-ISSUE-237: afl-api-adjudication (pure module, importer identity)
 });
 
 /**
+ * AFLDB-ISSUE-238 Slice 4 — `corrected` ledger semantics in the shared pure module (runbook §8.6,
+ * §9.1, §9.2; §12.1 cases 27, 32, 33, 59, 62, 68). A `corrected` row is live human authority at
+ * P′ (its `playerId`/`playerIdentity`), recording P in `previousPlayerIdentity`; human-origin
+ * supersedes the prior `linked` row, importer-origin has `supersedesId` NULL (D2, D7, D8).
+ */
+describe('AFLDB-ISSUE-238 Slice 4: corrected ledger semantics (pure module)', () => {
+  const P = 'players/P/Pat_Prior.html';
+  const P2 = 'players/Q/Quin_Corrected.html';
+  const SHA = 'e'.repeat(64);
+  const linked = (id: number, externalId = 'CD_I1', playerIdentity = P) => ({
+    id, externalId, action: 'linked' as const, playerId: 10, playerIdentity, supersedesId: null,
+  });
+  const revoked = (id: number, supersedesId: number, externalId = 'CD_I1', playerIdentity = P) => ({
+    id, externalId, action: 'revoked' as const, playerId: 10, playerIdentity, supersedesId,
+  });
+  /** P -> P′. `supersedesId` set = human-origin, NULL = importer-origin. */
+  const corrected = (id: number, supersedesId: number | null, externalId = 'CD_I1') => ({
+    id, externalId, action: 'corrected' as const, playerId: 20, playerIdentity: P2,
+    previousPlayerIdentity: P, evidenceSha256: SHA, supersedesId,
+  });
+  const remapTo = (newPlayerId: number, remappedIdentity = P2) => ({ ok: true as const, newPlayerId, remappedIdentity });
+
+  it('aflApiLedgerStructureProblems — accepts every legal shape; zero-corrected ledgers never trip it', async () => {
+    const { aflApiLedgerStructureProblems, netLedgerRowsByExternalId } = await import('@/lib/acquisition/afl-api-adjudication');
+    // zero-corrected ledgers of every ISSUE-235/237 shape (including the loose fixture shapes
+    // the older suites use: repeated ids across providers, a lone revoked row)
+    expect(aflApiLedgerStructureProblems([linked(1), revoked(2, 1), linked(3, 'CD_I2')])).toEqual([]);
+    expect(aflApiLedgerStructureProblems([linked(1, 'CD_I1'), linked(1, 'CD_I2'), revoked(1, 1, 'CD_I3')])).toEqual([]);
+    // human-origin: linked(P) then corrected superseding it
+    expect(aflApiLedgerStructureProblems([linked(1), corrected(2, 1)])).toEqual([]);
+    // importer-origin: no prior row, or a prior link that was revoked (net NONE)
+    expect(aflApiLedgerStructureProblems([corrected(5, null)])).toEqual([]);
+    expect(aflApiLedgerStructureProblems([linked(1), revoked(2, 1), corrected(3, null)])).toEqual([]);
+    // postgres.js bigint-as-string ids are compared as numbers
+    expect(aflApiLedgerStructureProblems([
+      { ...linked(1), id: '1' as never }, { ...corrected(2, 1), id: '2' as never, supersedesId: '1' as never },
+    ])).toEqual([]);
+    expect(netLedgerRowsByExternalId([linked(1), corrected(2, 1)]).get('CD_I1')?.action).toBe('corrected');
+  });
+
+  it('aflApiLedgerStructureProblems — every malformed shape fails closed, and netLedgerRowsByExternalId throws (case 59)', async () => {
+    const { aflApiLedgerStructureProblems, netLedgerRowsByExternalId, AflApiLedgerMalformed } = await import('@/lib/acquisition/afl-api-adjudication');
+    const cases: Array<[string, unknown[], RegExp]> = [
+      ['unknown action', [{ ...linked(1), action: 'undone' }], /action "undone" is not linked\/revoked\/corrected/],
+      ['linked with a from-identity', [{ ...linked(1), previousPlayerIdentity: P2 }], /a linked row carries a previous_player_identity/],
+      ['corrected without a from-identity', [{ ...corrected(1, null), previousPlayerIdentity: undefined }], /has no previous_player_identity/],
+      ['corrected with a blank from-identity', [{ ...corrected(1, null), previousPlayerIdentity: ' ' }], /has no previous_player_identity/],
+      ['corrected P = P′ (string)', [{ ...corrected(1, null), previousPlayerIdentity: P2 }], /equals its player_identity/],
+      ['corrected without evidence_sha256', [{ ...corrected(1, null), evidenceSha256: undefined }], /no 64-hex evidence_sha256/],
+      ['human-origin superseding a non-adjacent row', [linked(1), linked(2, 'CD_I2'), linked(3), corrected(4, 1)], /does not supersede the immediately preceding row/],
+      ['human-origin superseding a revoked row', [linked(1), revoked(2, 1), corrected(3, 2)], /supersedes a revoked row, not a linked one/],
+      ['importer-origin after a net-linked state', [linked(1), corrected(2, null)], /importer-origin corrected row .* follows a net-linked state/],
+      ['a correction chain (D8)', [corrected(1, null), corrected(2, null)], /second corrected row .* correction chain, D8/],
+      ['a row after a correction (terminal in v1)', [linked(1), corrected(2, 1), revoked(3, 2)], /follows a corrected row/],
+    ];
+    for (const [name, rows, pattern] of cases) {
+      const problems = aflApiLedgerStructureProblems(rows as never);
+      expect(problems.join('; '), name).toMatch(pattern);
+      expect(() => netLedgerRowsByExternalId(rows as never), name).toThrow(AflApiLedgerMalformed);
+    }
+  });
+
+  it('D15 — a corrected provider is ALREADY_SATISFIED only when its resolved P′ row is present; everything else STOPs, nothing is ever written (cases 27, 62)', async () => {
+    const { planAflApiAdjudicationReplay, aflApiAlreadySatisfiedCount, AFL_API_ADMIN_MATCH_METHOD } = await import('@/lib/acquisition/afl-api-adjudication');
+    const plan = (candidate: AflApiCandidateIdentityRow | null, expectedSupersedes = new Set<string>(), ledgerRows: unknown[] = [linked(1), corrected(2, 1)]) =>
+      planAflApiAdjudicationReplay({
+        ledgerRows: ledgerRows as never,
+        remapByExternalId: new Map([['CD_I1', remapTo(907)]]),
+        candidateByExternalId: candidate ? new Map([['CD_I1', candidate]]) : new Map(),
+        candidatePlayerAflApiRow: candidate?.playerId ? new Map([[candidate.playerId, candidate]]) : new Map(),
+        expectedSupersedes,
+      });
+    const resolvedAt = (playerId: number): AflApiCandidateIdentityRow => ({
+      externalId: 'CD_I1', status: 'resolved', matchMethod: AFL_API_ADMIN_MATCH_METHOD, playerId,
+    });
+    const importerAt = (playerId: number): AflApiCandidateIdentityRow => ({
+      externalId: 'CD_I1', status: 'unique', matchMethod: 'afl_api_stat_vector_bootstrap', playerId, candidateCount: 1, externalUrl: null,
+    });
+
+    // the corrected state already established -> ALREADY_SATISFIED, a discriminated no-op
+    const satisfied = plan(resolvedAt(907));
+    expect(satisfied).toEqual({ inserts: [], noops: [{ externalId: 'CD_I1', satisfied: 'already_satisfied' }], stops: [], supersedes: [] });
+    expect(aflApiAlreadySatisfiedCount(satisfied.noops)).toBe(1);
+    // importer-origin correction, same outcome
+    expect(plan(resolvedAt(907), new Set(), [corrected(3, null)]).noops).toEqual([{ externalId: 'CD_I1', satisfied: 'already_satisfied' }]);
+
+    for (const [name, candidate, supersedeSet] of [
+      ['no identity row: D15 never manufactures corrected authority', null, new Set<string>()],
+      ['a stale importer row at P never replaces the correction', importerAt(555), new Set<string>()],
+      ['an agreeing importer row at P′ is still not superseded', importerAt(907), new Set<string>()],
+      ['an importer row at P′ named in the expected set: C ∩ E must be empty', importerAt(907), new Set(['CD_I1'])],
+      ['a resolved row at a third player', resolvedAt(555), new Set<string>()],
+      ['a resolved P′ row, but the provider is in the expected supersede set', resolvedAt(907), new Set(['CD_I1'])],
+    ] as const) {
+      const result = plan(candidate, supersedeSet as Set<string>);
+      expect(result.stops, name).toHaveLength(1);
+      expect(result.inserts, name).toEqual([]);
+      expect(result.supersedes, name).toEqual([]);
+      expect(result.noops, name).toEqual([]);
+    }
+    // the stored P′ identity must itself resolve, exactly as for a linked row
+    expect(planAflApiAdjudicationReplay({
+      ledgerRows: [corrected(3, null)], remapByExternalId: new Map([['CD_I1', { ok: false, reason: 'unresolvable' }]]),
+      candidateByExternalId: new Map([['CD_I1', resolvedAt(907)]]), candidatePlayerAflApiRow: new Map(),
+    }).stops).toHaveLength(1);
+
+    // linked and revoked semantics are unchanged, and a linked no-op carries NO discriminant
+    const linkedNoop = plan(resolvedAt(907), new Set(), [{ ...linked(1), playerIdentity: P2 }]);
+    expect(linkedNoop).toEqual({ inserts: [], noops: [{ externalId: 'CD_I1' }], stops: [], supersedes: [] });
+    expect('satisfied' in linkedNoop.noops[0]).toBe(false);
+    expect(aflApiAlreadySatisfiedCount(linkedNoop.noops)).toBe(0);
+    expect(plan(null, new Set(), [linked(1), revoked(2, 1)])).toEqual({ inserts: [], noops: [], stops: [], supersedes: [] });
+  });
+
+  it('bijection and combined invariant — net CORRECTED is live human authority, never revoked', async () => {
+    const { checkAflApiAdjudicationBijection, checkAflApiIdentityInvariant, AFL_API_ADMIN_MATCH_METHOD } = await import('@/lib/acquisition/afl-api-adjudication');
+    const resolvedRow = { externalId: 'CD_I1', status: 'resolved', matchMethod: AFL_API_ADMIN_MATCH_METHOD };
+    expect(checkAflApiAdjudicationBijection({ ledgerRows: [linked(1), corrected(2, 1)], resolvedRows: [resolvedRow] })).toEqual([]);
+    expect(checkAflApiAdjudicationBijection({ ledgerRows: [corrected(2, null)], resolvedRows: [] }))
+      .toEqual([{ kind: 'ledger_without_row', externalId: 'CD_I1' }]);
+    // a resolved row whose only ledger authority is revoked still has no ledger (unchanged)
+    expect(checkAflApiAdjudicationBijection({ ledgerRows: [linked(1), revoked(2, 1)], resolvedRows: [resolvedRow] }))
+      .toEqual([{ kind: 'row_without_ledger', externalId: 'CD_I1' }]);
+    expect(checkAflApiIdentityInvariant({
+      rows: [{ ...resolvedRow, playerId: 20, candidateCount: 0, externalUrl: null }],
+      ledgerRows: [linked(1), corrected(2, 1)], identityByPlayerId: new Map(),
+    })).toEqual([]);
+    expect(() => checkAflApiIdentityInvariant({
+      rows: [], ledgerRows: [corrected(1, null), corrected(2, null)] as never, identityByPlayerId: new Map(),
+    })).toThrow(/correction chain/);
+  });
+
+  it('agreement and captured overlap — CORRECTED never agrees; any captured importer row for it is an overlap', async () => {
+    const { aflApiAgrees, computeAflApiAgreeingProviders, capturedOverlapProviders } = await import('@/lib/acquisition/afl-api-adjudication');
+    const importer = (playerIdentity: string, playerId: number) => ({
+      status: 'unique', matchMethod: 'afl_api_stat_vector_bootstrap', candidateCount: 1, externalUrl: null, playerId, playerIdentity,
+    });
+    expect(aflApiAgrees({ importerRow: importer(P2, 907), ledgerEntry: { playerIdentity: P2, effectiveState: 'CORRECTED' }, ledgerRemap: remapTo(907) })).toBe(false);
+    for (const row of [importer(P2, 907), importer(P, 555)]) {
+      expect(computeAflApiAgreeingProviders({
+        ledgerRows: [linked(1), corrected(2, 1)], importerByExternalId: new Map([['CD_I1', row]]),
+        remapByExternalId: new Map([['CD_I1', remapTo(907)]]),
+      }).size).toBe(0);
+    }
+    const captured = (externalId: string, playerIdentity: string) => ({
+      externalId, playerIdentity, matchMethod: 'afl_api_stat_vector_bootstrap' as const, status: 'unique' as const,
+      candidateCount: 1 as const, externalName: null, externalUrl: null, notes: null, playerId: 501,
+    });
+    // at P (stale), at P′, or at a third identity: all are overlap (capture refusal)
+    for (const identity of [P, P2, 'players/T/Third.html']) {
+      expect(capturedOverlapProviders({ ledgerRows: [corrected(1, null)], importerRows: [captured('CD_I1', identity)] })).toEqual(['CD_I1']);
+    }
+    expect(capturedOverlapProviders({ ledgerRows: [corrected(1, null)], importerRows: [captured('CD_I2', P)] })).toEqual([]);
+  });
+
+  it('G2 — a corrected entry is routed to CPC (neither AGREE nor revoked INFO) and refuses until slice 6', async () => {
+    const { classifyAflApiG2, aflApiG2AgreeSet, AFL_API_G2_REFUSING_OUTCOMES } = await import('@/lib/acquisition/afl-api-adjudication');
+    const fullRow = { status: 'unique', matchMethod: 'afl_api_stat_vector_bootstrap', candidateCount: 1, externalUrl: null, playerId: 907, playerIdentity: P2 };
+    const entry = { externalId: 'CD_I1', ledgerNetAction: 'corrected' as const, identityIsManualToken: false,
+      remappedCandidatePlayerId: 907, collidingProviderId: null };
+    for (const candidateRow of [fullRow, null, { ...fullRow, playerId: 555, playerIdentity: P }]) {
+      const grades = classifyAflApiG2([{ ...entry, candidateRow }]);
+      expect(grades).toEqual([{ externalId: 'CD_I1', outcome: 'CORRECTED_REQUIRES_CPC' }]);
+      expect(AFL_API_G2_REFUSING_OUTCOMES.has(grades[0].outcome)).toBe(true);
+      expect(aflApiG2AgreeSet(grades).size).toBe(0);
+    }
+  });
+
+  it('ledger digest — zero-corrected is byte-identical to the ISSUE-237 digest; corrected binds P and evidence (case 68, R238-S4-04)', async () => {
+    const { aflApiLedgerStateSha256, aflApiCorrectedLedgerStateSha256, AflApiLedgerMalformed } = await import('@/lib/acquisition/afl-api-adjudication');
+    const { canonicalJson } = await import('@/lib/acquisition/observations');
+    const { createHash } = await import('node:crypto');
+    const sha = (value: unknown) => createHash('sha256').update(canonicalJson(value as never)).digest('hex');
+
+    // The ISSUE-237 formula, recomputed independently of the module: sha256(canonicalJson(
+    // [[id, externalId, action, playerIdentity, supersedesId], ...] sorted by id)).
+    const zero = [linked(7), revoked(9, 7), linked(8, 'CD_I2', P2)];
+    expect(aflApiLedgerStateSha256(zero)).toBe(sha([
+      [7, 'CD_I1', 'linked', P, null], [8, 'CD_I2', 'linked', P2, null], [9, 'CD_I1', 'revoked', P, 7],
+    ]));
+    // a reader that selected the new columns for linked/revoked rows (NULL) hashes the same
+    expect(aflApiLedgerStateSha256(zero.map((r) => ({ ...r, previousPlayerIdentity: null, evidenceSha256: 'f'.repeat(64) })))).toBe(aflApiLedgerStateSha256(zero));
+
+    const withCorrection = [linked(1), corrected(2, 1)];
+    const digest = aflApiLedgerStateSha256(withCorrection);
+    expect(digest).toBe(sha([[1, 'CD_I1', 'linked', P, null], [2, 'CD_I1', 'corrected', P2, 1, P, SHA]]));
+    expect(aflApiLedgerStateSha256([linked(1), { ...corrected(2, 1), previousPlayerIdentity: 'players/O/Other.html' }])).not.toBe(digest);
+    expect(aflApiLedgerStateSha256([linked(1), { ...corrected(2, 1), evidenceSha256: 'd'.repeat(64) }])).not.toBe(digest);
+    // audit-only fields stay outside it
+    expect(aflApiLedgerStateSha256([linked(1), { ...corrected(2, 1), playerId: 99 }])).toBe(digest);
+    // a reader that forgot the new columns fails closed instead of hashing undefined
+    expect(() => aflApiLedgerStateSha256([linked(1), { ...corrected(2, 1), previousPlayerIdentity: undefined }] as never)).toThrow(AflApiLedgerMalformed);
+    expect(() => aflApiLedgerStateSha256([linked(1), { ...corrected(2, 1), evidenceSha256: undefined }] as never)).toThrow(AflApiLedgerMalformed);
+
+    // the corrected-subset (diagnostic) digest
+    expect(aflApiCorrectedLedgerStateSha256(zero)).toEqual({ rowCount: 0, sha256: sha([]) });
+    const subset = aflApiCorrectedLedgerStateSha256(withCorrection);
+    expect(subset).toEqual({ rowCount: 1, sha256: sha([[2, 'CD_I1', 'corrected', P2, 1, P, SHA]]) });
+    expect(aflApiCorrectedLedgerStateSha256([...withCorrection, linked(3, 'CD_I2', 'players/Z/Z.html')])).toEqual(subset);
+  });
+
+  it('admin revoke decision — T21 refuses a corrected provider after T6 and before T8/T20/T19 (case 32, R238-S4-07)', async () => {
+    const { decideAflApiRevoke, aflApiRefusalMessage } = await import('@/lib/acquisition/afl-api-adjudication');
+    const base = { fingerprintMatches: true, nonUseProven: true } as const;
+    // a stale page still reports T6 first
+    expect(decideAflApiRevoke({ ...base, state: 'L-H', fingerprintMatches: false, ledgerNetAction: 'corrected' }))
+      .toMatchObject({ allow: false, code: 'T6_stale_fingerprint' });
+    // by decision, T21 outranks every state rule: L-H, L-I and the anomalous X alike
+    for (const state of ['L-H', 'L-I', 'X', 'U0'] as const) {
+      expect(decideAflApiRevoke({ ...base, state, ledgerNetAction: 'corrected' }), state)
+        .toMatchObject({ allow: false, code: 'T21_revoke_corrected' });
+    }
+    // ... and the non-use proof: even a proven non-use never lets a correction be revoked
+    expect(decideAflApiRevoke({ ...base, state: 'L-H', nonUseProven: false, ledgerNetAction: 'corrected' }))
+      .toMatchObject({ code: 'T21_revoke_corrected' });
+    // linked / no ledger input: exactly the ISSUE-235 decisions
+    expect(decideAflApiRevoke({ ...base, state: 'L-H', ledgerNetAction: 'linked' })).toEqual({ allow: true });
+    expect(decideAflApiRevoke({ ...base, state: 'L-H' })).toEqual({ allow: true });
+    expect(decideAflApiRevoke({ ...base, state: 'X', ledgerNetAction: 'linked' })).toMatchObject({ code: 'T8_anomalous_row' });
+    expect(aflApiRefusalMessage('T21_revoke_corrected')).toMatch(/cannot be revoked from this surface/);
+  });
+
+  it('admin query source — the revoke reads the net ledger action under its locks and refuses T21 before the non-use proof; history carries the from-identity', () => {
+    const source = readFileSync(join(process.cwd(), 'src', 'db', 'queries', 'afl-api-player-links.ts'), 'utf8');
+    const fn = source.slice(source.indexOf('export async function revokeAflApiLink'));
+    const lockTable = fn.indexOf('LOCK TABLE external_identities IN ACCESS EXCLUSIVE MODE');
+    const fingerprintCheck = fn.indexOf('if (recomputedFingerprint !== input.fingerprint)');
+    const readAction = fn.indexOf('await readLatestAdjudicationAction(tx, input.providerId)');
+    const t21 = fn.indexOf("code: 'T21_revoke_corrected'");
+    const proof = fn.indexOf('await proveNonUse(');
+    const write = fn.indexOf('DELETE FROM external_identities');
+    for (const [name, at] of Object.entries({ lockTable, fingerprintCheck, readAction, t21, proof, write })) {
+      expect(at, name).toBeGreaterThanOrEqual(0);
+    }
+    expect(readAction).toBeGreaterThan(lockTable);
+    expect(readAction).toBeGreaterThan(fingerprintCheck);
+    expect(t21).toBeGreaterThan(readAction);
+    expect(proof).toBeGreaterThan(t21);
+    expect(write).toBeGreaterThan(proof);
+    expect(fn.slice(fn.indexOf('decideAflApiRevoke('), fn.indexOf('decideAflApiRevoke(') + 300)).toContain('ledgerNetAction');
+
+    const history = source.slice(source.indexOf('export async function readAflApiAdjudicationHistory'));
+    expect(history.slice(0, history.indexOf('`;'))).toContain('previous_player_identity AS "previousPlayerIdentity"');
+    expect(source).toMatch(/action: AflApiLedgerNetAction;/);
+  });
+});
+
+/**
  * AFLDB-ISSUE-235 §10.1 A5, A10, A12 — order-of-operations and premise pins against the
  * query module's own source, the same style `tests/player-link-mutations.test.ts` already
  * uses for `players.ts`/`common.py` (line ~547). Preferred here over a hand-built fake `tx`

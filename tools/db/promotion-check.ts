@@ -101,6 +101,7 @@ import {
   aflApiG2AgreeSet,
   aflApiImporterStateSha256,
   aflApiLedgerStateSha256,
+  aflApiLedgerStructureProblems,
   aflApiReverseIdentityPaths,
   aflApiSupersedeBindingProblems,
   aflApiSupersedeMismatch,
@@ -129,6 +130,7 @@ import {
   type AflApiG2Grade,
   type AflApiG3Grade,
   type AflApiG3Row,
+  type AflApiLedgerNetAction,
   type AflApiPlayerRemapResult,
   type AflApiSupersedeFile,
 } from '../../src/lib/acquisition/afl-api-adjudication';
@@ -1655,16 +1657,34 @@ async function readAflApiLedgerRowCount(q: Query): Promise<number> {
  */
 export const AFL_API_LEDGER_ROWS_SQL = `
     SELECT id, external_id AS "externalId", action, player_id AS "playerId",
-           player_identity AS "playerIdentity", supersedes_id AS "supersedesId"
+           player_identity AS "playerIdentity", supersedes_id AS "supersedesId",
+           previous_player_identity AS "previousPlayerIdentity", evidence_sha256 AS "evidenceSha256"
       FROM afl_api_identity_adjudications WHERE source_key = 'afl_api' ORDER BY id`;
 
+/**
+ * AFLDB-ISSUE-238 §8.6/R238-S4-03: the raw `action` column is untrusted input -- it is NOT
+ * narrowed to `AflApiLedgerNetAction` here (an unknown value is carried through unchanged so
+ * `aflApiLedgerStructureProblems` below can name it precisely); this widens only the TYPE so
+ * every reader downstream sees the ISSUE-238 3-member union instead of the ISSUE-235 pair.
+ */
 export async function readAflApiLedgerRows(q: Query): Promise<AflApiAdjudicationLedgerRow[]> {
   const rows = await q(AFL_API_LEDGER_ROWS_SQL);
-  return rows.map((r) => ({
-    id: asInt(r.id), externalId: String(r.externalId), action: r.action as 'linked' | 'revoked',
+  const mapped = rows.map((r) => ({
+    id: asInt(r.id), externalId: String(r.externalId), action: r.action as AflApiLedgerNetAction,
     playerId: asInt(r.playerId), playerIdentity: String(r.playerIdentity),
     supersedesId: r.supersedesId === null || r.supersedesId === undefined ? null : asInt(r.supersedesId),
+    previousPlayerIdentity: r.previousPlayerIdentity === null || r.previousPlayerIdentity === undefined
+      ? null : String(r.previousPlayerIdentity),
+    evidenceSha256: r.evidenceSha256 === null || r.evidenceSha256 === undefined
+      ? undefined : String(r.evidenceSha256),
   }));
+  // A malformed ledger (including an unknown action, R238-S4-03) must surface as a named
+  // PromotionRefused, never a raw AflApiLedgerMalformed a caller here does not catch.
+  const problems = aflApiLedgerStructureProblems(mapped);
+  if (problems.length > 0) {
+    throw new PromotionRefused(`the afl_api identity ledger is malformed: ${problems.join('; ')}`);
+  }
+  return mapped;
 }
 
 /** Which of `identities` are `manual_admin_edit` tokens on the database `q` reads (G2 UNEVALUABLE). */
@@ -1832,11 +1852,15 @@ export async function gateAflApiPreCutoverCensus(q: Query, report: Report): Prom
   for (const row of view.importerRows) byMethod.set(row.matchMethod, (byMethod.get(row.matchMethod) ?? 0) + 1);
   const net = netLedgerRowsByExternalId(ledgerRows);
   const netLinkedCount = [...net.values()].filter((r) => r.action === 'linked').length;
+  // AFLDB-ISSUE-238 §8.6: diagnostic only -- not part of the returned/snapshotted shape (that
+  // extension is Slice 6); zero-corrected report text stays byte-identical.
+  const netCorrectedCount = [...net.values()].filter((r) => r.action === 'corrected').length;
 
   const importerRowsByMethod = Object.fromEntries(byMethod);
   const lines = [
     importerMethodLine(view),
-    `human resolved rows: ${view.humanRowCount}; ledger rows: ${ledgerRows.length}; net-linked ledger entries: ${netLinkedCount}`,
+    `human resolved rows: ${view.humanRowCount}; ledger rows: ${ledgerRows.length}; net-linked ledger entries: ${netLinkedCount}`
+      + (netCorrectedCount > 0 ? `; net-corrected ledger entries: ${netCorrectedCount}` : ''),
     `importer state sha256: ${view.state.sha256}; ledger state sha256: ${aflApiLedgerStateSha256(ledgerRows)}`,
   ];
   if (problems.length === 0) {

@@ -319,8 +319,12 @@ async function run(): Promise<number> {
     const canonical = rendered.length === jsonbTexts.length && rendered.every((r, i) => r.t === jsonbTexts[i]);
     check('239 fixture: every jsonb text is exactly what PostgreSQL renders', canonical, JSON.stringify(rendered.map((r) => r.t)));
     if (!canonical) throw new RehearsalRefused('The ISSUE-239 fixture carries jsonb text PostgreSQL would re-render; fix the fixture.');
+    // AFLDB-ISSUE-238 (DD-11): the export builder now takes the three-action `RecoveryLedgerRow`;
+    // this fixture is deliberately not widened to a corrected row (deferred to slices 10/11,
+    // R238-S4-06/D-13), so every row just carries `previousPlayerIdentity: null`.
     const exported = buildAdjudicationRecoveryExport({
-      ledgerDatabase: 'code_test_db', sourceDatabase: 'code_test_db', capturedAt: new Date().toISOString(), ledgerRows,
+      ledgerDatabase: 'code_test_db', sourceDatabase: 'code_test_db', capturedAt: new Date().toISOString(),
+      ledgerRows: ledgerRows.map((r) => ({ ...r, previousPlayerIdentity: null })),
     });
     const source = parseAdjudicationRecoverySource(JSON.stringify(exported), exported.payloadSha256);
     const beforeRecovery = await census(owner, batchIds, issueIds);

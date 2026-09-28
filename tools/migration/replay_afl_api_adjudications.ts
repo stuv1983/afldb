@@ -42,6 +42,7 @@ import type { TransactionSql } from 'postgres';
 import {
   AFL_API_ADMIN_MATCH_METHOD,
   AflApiPromotionFileRefused,
+  aflApiAlreadySatisfiedCount,
   aflApiImporterStateSha256,
   aflApiLedgerStateSha256,
   aflApiReverseIdentityPaths,
@@ -62,6 +63,7 @@ import {
   type AflApiForwardIdentityResult,
   type AflApiImporterCandidateRow,
   type AflApiImporterReplayPlan,
+  type AflApiLedgerNetAction,
   type AflApiPlayerRemapResult,
   type AflApiSupersedeFile,
   type CapturedImporterRow,
@@ -79,6 +81,14 @@ export class AflApiReplayAbort extends Error {}
 export type AflApiReplayCounts = {
   inserted: number;
   noops: number;
+  /**
+   * AFLDB-ISSUE-238 §8.6/R238-S4-02: how many of `noops` are net-`corrected` providers reported
+   * ALREADY_SATISFIED (a subset of `noops`, never separate from it -- `noops` keeps its
+   * ISSUE-237 meaning unchanged). Present only when non-zero: a zero-corrected or empty-ledger
+   * ledger returns the exact pre-ISSUE-238 shape (this key absent), so every existing
+   * ISSUE-235/237 deep-equality assertion keeps passing unchanged.
+   */
+  alreadySatisfied?: number;
   /** Empty on success; a non-empty result is never partially applied (see below). */
   stops: readonly { externalId: string; reason: string }[];
   /** AFLDB-ISSUE-237 D9/OD-2: providers whose agreeing importer row was superseded -- always
@@ -92,19 +102,30 @@ async function fetchAflApiSourceId(tx: TransactionSql): Promise<number> {
   return row.id;
 }
 
-/** Exported for AFLDB-ISSUE-239's recovery validate-only (see `readCandidateAflApiState`). */
+/**
+ * Exported for AFLDB-ISSUE-239's recovery validate-only (see `readCandidateAflApiState`).
+ * AFLDB-ISSUE-238 §8.6: widened to the 3-member ledger action union and the two `corrected`-only
+ * columns; `previousPlayerIdentity`/`evidenceSha256` normalise NULL to the row type's own
+ * "absent" representation (`null`/`undefined`) so a `linked`/`revoked` row is unchanged.
+ */
 export async function readLedgerRows(tx: TransactionSql): Promise<readonly AflApiAdjudicationLedgerRow[]> {
   const rows = await tx<{
-    id: number; externalId: string; action: 'linked' | 'revoked'; playerId: number;
+    id: number; externalId: string; action: AflApiLedgerNetAction; playerId: number;
     playerIdentity: string; supersedesId: number | null;
+    previousPlayerIdentity: string | null; evidenceSha256: string | null;
   }[]>`
     SELECT id, external_id AS "externalId", action, player_id AS "playerId",
-           player_identity AS "playerIdentity", supersedes_id AS "supersedesId"
+           player_identity AS "playerIdentity", supersedes_id AS "supersedesId",
+           previous_player_identity AS "previousPlayerIdentity", evidence_sha256 AS "evidenceSha256"
       FROM afl_api_identity_adjudications
      WHERE source_key = 'afl_api'
      ORDER BY id
   `;
-  return rows;
+  return rows.map((r) => ({
+    ...r,
+    previousPlayerIdentity: r.previousPlayerIdentity ?? null,
+    evidenceSha256: r.evidenceSha256 ?? undefined,
+  }));
 }
 
 /**
@@ -408,7 +429,9 @@ export async function replayAflApiAdjudications(
   const ledgerRows = await readLedgerRows(tx);
   // An empty ledger can supersede nothing, so it may short-circuit ONLY when nothing was expected;
   // otherwise it falls through to the exact-set check below and aborts (D13).
-  if (ledgerRows.length === 0 && expectedSupersedes.size === 0) return { inserted: 0, noops: 0, stops: [], supersedes: [] };
+  if (ledgerRows.length === 0 && expectedSupersedes.size === 0) {
+    return { inserted: 0, noops: 0, stops: [], supersedes: [] };
+  }
 
   const remapByExternalId = await remapLedgerPlayerIds(tx, ledgerRows);
   const { candidateByExternalId, candidatePlayerAflApiRow } = await readCandidateAflApiState(tx, sourceId);
@@ -458,8 +481,11 @@ export async function replayAflApiAdjudications(
     `;
   }
 
+  const alreadySatisfied = aflApiAlreadySatisfiedCount(plan.noops);
   return {
-    inserted: plan.inserts.length, noops: plan.noops.length, stops: [], supersedes: plan.supersedes,
+    inserted: plan.inserts.length, noops: plan.noops.length,
+    ...(alreadySatisfied > 0 ? { alreadySatisfied } : {}),
+    stops: [], supersedes: plan.supersedes,
   };
 }
 

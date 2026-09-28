@@ -2,7 +2,20 @@
 
 ## 0. Status
 
-- **Open, Medium. Slice 1/2 COMPLETE. Operator authorised Slice 3 (2026-09-28), and Slice 3 is
+- **Open, Medium. Slice 4 implementation and DB-free validation COMPLETE (remediated
+  2026-09-28), uncommitted, base `e55a554d`. Integration acceptance PENDING** on a clean,
+  migration-current `afldb_test` (see the remediation note at §12 slice 4 disposition). Corrected
+  ledger semantics and every §8.6 reader are implemented and DB-free validated (§8.6 "Slice 4
+  disposition", §12 slice 4): D15 confirms a correction (ALREADY_SATISFIED) and never writes one;
+  the bijection, invariant, agreement, overlap and G2 treat `corrected` as live human authority at
+  P′ (G2 refuses it until slice 6's CPC exists); the ledger digest extends only for `corrected`
+  rows; the admin revoke refuses a corrected provider (T21) before the non-use proof; the recovery
+  export is v2; the rebuild capture stays v2 and refuses a live `corrected` row before destruction.
+  No DEV/PROD database, SQL, migration, promotion, rebuild or deployment step ran. **Next: operator
+  review and commit; then the operator-run integration acceptance (§12 slice 4); then separate
+  operator authorisation for slice 5 (the ORIGINAL CLI and transaction).** Deploy order: migration
+  106 + `db:privileges` before this code on any database.
+- **Slice 1/2 COMPLETE. Operator authorised Slice 3 (2026-09-28), and Slice 3 is
   now COMPLETE, uncommitted** (Slice 3 M1/M2 pass, 2026-09-28, base `5c79c47e`). Migration `106`
   (M1, successor to 104) and migration `107` (M2, successor to 083) are written exactly per §10 and
   rehearsed clean on `code_test_db`: target proven via `current_database()` before any write;
@@ -21,6 +34,44 @@
   database was touched. **Next: operator commit of migrations 106/107, then separate operator
   authorisation for Slice 4** (§8.6's exhaustive `corrected`-ledger reader inventory). Details:
   §12 slice 3, `issues.md`.
+- **Slice 4 launch plan review (2026-09-28, base `e55a554d`): `afldb-reviewer` RETURN TO DESIGN,
+  narrow; amended plan AUTHORISED by the operator the same day.** The orchestrator's Slice-4 plan
+  (DD-1…DD-13) passed with notes except DD-10 (rebuild capture) and DD-11 (recovery tool), where
+  the reviewer raised **`R238-S4-01` HIGH**:
+  - *The finding.* The plan said the rebuild capture stays exactly v2 (`CapturedLedgerRow` keeps its
+    two-action union and `capturedRowProblems` keeps refusing `corrected`) **and** that the
+    recovery export gains `corrected` rows with `previous_player_identity`. On disk the recovery
+    tool owns no ledger row type: `recover_afl_api_adjudications.ts` reuses the rebuild's
+    `CapturedLedgerRow`, `capturedRowProblems` (:162, :269), `sameLedgerRow` (:277, :489) and
+    `readLedger`. So (a) a corrected recovery round-trip could not pass `capturedRowProblems`;
+    (b) the obvious fix, relaxing `capturedRowProblems`, would let a v2 rebuild capture accept a
+    corrected row (case 61); (c) `sameLedgerRow` hashes `ledgerTuple`, which has no
+    `previous_player_identity`, so a same-id target row with a divergent from-identity would be
+    filed as identical and the recovery would report success with the divergence invisible;
+    (d) the recovery INSERT had no `previous_player_identity` column, so migration 106's CHECK
+    would be the only (database-side) guard.
+  - *The corrected design (binding for Slice 4).* **DD-10:** the v2 capture shapes
+    (`CapturedLedgerRow`, `capturedRowProblems`, `ledgerTuple`, `sameLedgerRow`,
+    `planLedgerReinstatement`) are not edited or relaxed. `readLedger` returns a superset row
+    carrying the three-member action and `previousPlayerIdentity`; the capture refuses any
+    `corrected` row (or non-NULL `previous_player_identity`) immediately after reading the live
+    ledger in `observeCaptureState`, before the bijection check and before any destruction, naming
+    capture v3 / §12 slice 7, and only then narrows to the v2 row. **DD-11:** the recovery tool gets
+    its own `RecoveryLedgerRow` (the v2 row plus `previousPlayerIdentity: string | null`, three
+    actions), its own structural validator (the v2 rules for `linked`/`revoked` plus the shared
+    corrected-row rules), its own `sameRecoveryLedgerRow` comparator including
+    `previousPlayerIdentity`, and the `previous_player_identity` INSERT column and reinstatement
+    projection. Only the recovery export format bumps (v1 → v2, v1 refused by name); a
+    rebuild-capture source maps to `previousPlayerIdentity: null`. `previous_player_identity` is
+    carried verbatim and **resolved** on the target: unresolvable, ambiguous, continuity-contradicted,
+    or resolving to the same player as P′ (`R238-S4-05`) is a STOP.
+  - *Folded MED/LOW notes.* `R238-S4-02`: a corrected ALREADY_SATISFIED D15 entry is reported as a
+    `noops` entry carrying `satisfied: 'already_satisfied'` (absent on every other no-op, so every
+    zero-`corrected` assertion stays exact). `R238-S4-03`: a malformed ledger surfaces from the
+    promotion checker as a named `PromotionRefused`. `R238-S4-04`: the ledger digests validate
+    corrected rows, so a reader that omits the new columns fails closed. `R238-S4-06`: the
+    bulk-rehearsal corrected fixture is deferred to slices 10/11 (§8.6). `R238-S4-07`: T21 outranks
+    T8 by decision, pinned in a test. No accepted decision (D1–D10, O-1…O-6, D-P5-1…3) changed.
 - **Final Slice-1 closure pass (2026-09-28, base `cdd1b7cd`).** Slice 1 COMPLETE; Slice 2 done. Both former hard
   barriers (AFLDB-ISSUE-250, AFLDB-ISSUE-237 L5 PROD) are Resolved. This pass closed the two
   confirmations the same-day reconciliation pass had left open at §12 slice 1: the SV-1 source
@@ -1941,7 +1992,7 @@ exactly one bound batch. The adjudication is the only human decision.
 | Rehearsal fixture | `afl_api_identity_rebuild_rehearsal_fixture.ts:315` | test tooling | exhaustive |
 | **The ledger row type** `AflApiAdjudicationLedgerRow` *(pass 5, P4-09)* | `afl-api-adjudication.ts:722-725` (`action: 'linked' \| 'revoked'`), with `netLedgerRowsByExternalId` `:867-869` | a two-member union | a three-member union, plus `previousPlayerIdentity` and `evidenceSha256` for `corrected`. Widening it makes every `switch` over `action` a compile-time exhaustiveness check. |
 | **Promotion checker** *(pass 5, P4-09)* | `promotion-check.ts:91` (imports the type), `readAflApiLedgerRows` `:1368-1371` (casts `action` to `'linked' \| 'revoked'`), net counts `:1541`, the G2 inputs `:1608`, `:1637` | casts and counts linked only | reads `corrected` without a cast. An unknown value refuses. The counts report `corrected` separately. G2 routes `corrected` to CPC. |
-| **Bulk-identity rehearsal** *(pass 5, P4-09)* | `tools/db/afl-api-identity-bulk-rehearsal.ts:91-94` | builds `'linked' \| 'revoked'` rows | exhaustive; gains a `corrected` fixture where it asserts ledger semantics |
+| **Bulk-identity rehearsal** *(pass 5, P4-09)* | `tools/db/afl-api-identity-bulk-rehearsal.ts:91-94` | builds `'linked' \| 'revoked'` rows | exhaustive; gains a `corrected` fixture where it asserts ledger semantics. *(Slice 4, `R238-S4-06`: exhaustive by type only — its recovery export maps the existing zero-`corrected` fixture rows to `previousPlayerIdentity: null`. The **DB-side `corrected` rehearsal fixture is DEFERRED to slices 10/11**: it changes a `code_test_db` rehearsal Slice 4 may not run. DB-free `corrected` recovery round-trip coverage lives in `tests/afl-api-adjudication-recovery.test.ts`.)* |
 | **Adjudication replay tool** *(pass 5, P4-09)* | `tools/migration/replay_afl_api_adjudications.ts:59`, `readLedgerRows` `:96-98`, replay `:184` | reads and types `'linked' \| 'revoked'` | reads `corrected` and `previous_player_identity`. The replay treats `corrected` as ALREADY_SATISFIED-only (as D15) or refuses. |
 | **DB-free fake database** *(pass 5, P4-09)* | `tests/afl-api-identity-fake-db.ts:33`, `:331` | typed `'linked' \| 'revoked'` | exhaustive, with a `corrected` row shape |
 | Further typed test and fixture shapes found by pass 5 (floor, not ceiling) | `afl_api_adjudication_i18_fixture.ts:239`; `tests/integration/afl-api-adjudication-fixtures.ts:329`; `tests/db-test-rebuild.test.ts:5050`, `:5159`, `:6007`; `tests/db-promotion-check.test.ts:159` and its ledger fixtures; `tests/afl-api-adjudication-recovery.test.ts:39` | typed two-member unions | follow the widened type; the zero-`corrected` parity cases live here |
@@ -1986,6 +2037,49 @@ tests) plus **6 documentation-contract files** (`docs/deployment.md`, `docs/prod
 `docs/acquisition/AFLDB-2026-API-ACQUISITION.md`, `CHANGELOG.md`, `issues.md`, `IssuesIndex.md`) that
 describe the table in prose but execute nothing. This is a floor, not a ceiling, exactly as the
 pass-5 inventory already stated; nothing found here narrows or overrides that caveat.
+
+**Slice 4 disposition (2026-09-28, uncommitted; every row above).** *Updated for `corrected`:*
+the ledger row type and `AFL_API_LEDGER_ACTIONS` (`afl-api-adjudication.ts`); the central
+structural validator `aflApiLedgerStructureProblems` (run by `netLedgerRowsByExternalId` and both
+digests; unknown action, malformed `corrected` shape, D2 supersede origin, D8 chain and "nothing
+follows a correction" all fail closed); D15 (`corrected` = ALREADY_SATISFIED only, reported as a
+`noops` entry carrying `satisfied: 'already_satisfied'`, else STOP; never insert/supersede/ledger
+write); the bijection and combined invariant (net `linked` or `corrected` = live human authority);
+agreement (`corrected` never AGREE) and captured overlap (any importer row for a corrected provider);
+G2 (new refusing outcome `CORRECTED_REQUIRES_CPC` until slice 6's CPC exists); the ledger digest
+(corrected-only tuple extension) and the new diagnostic `aflApiCorrectedLedgerStateSha256`; the
+promotion checker reader (malformed ⇒ named `PromotionRefused`; census reports the corrected count
+only when non-zero; snapshot structure unchanged for slice 6); the replay tool reader and its
+`alreadySatisfied` count; the recovery tool (export v2, own `RecoveryLedgerRow`, validator,
+comparator and INSERT column, from-identity resolved and STOPped on unresolvable/ambiguous/same
+player); the admin revoke (T21) and history row type. *Format-bounded refusal:* the rebuild capture
+stays v2 and refuses a live `corrected` row before destruction; `capturedRowProblems` still
+refuses one in a v2 file. *Type-only / fixture expectation:* the I18 and rebuild-rehearsal
+fixtures, the S6 integration fixture, `settle-afl-api.test.ts`, the fake DB, the bulk rehearsal.
+*Inherit automatically:* the two indirect invariant callers. *Unrelated / action-agnostic:*
+`promotion-inventory.ts`, `privileges.sql`/`privileges.test.ts`, migration 104. The admin detail
+page is unchanged: it renders `action` verbatim, and the revoke form it still offers for a
+corrected provider is refused server-side by T21 (hiding it is a later UI change). **Deploy order
+(ISSUE-027):** every Slice-4 reader now SELECTs `previous_player_identity`, so migration 106 (and
+`db:privileges`) must be applied before this code on any database.
+
+**Slice 4 remediation pass (2026-09-28, DB-free, uncommitted).** Operator-run verification found
+`tests/db-test-rebuild.test.ts` at 488/490. Both failures were pre-existing test-harness defects,
+unrelated to the Slice-4 diff, not new regressions in it: (1) the plain-tsx reachability check's
+`resolve()` helper never had a branch for a `.json` static import, so it threw the first time the
+"not vacuous" seeding-graph check (added with the test itself, `659474db`) walked into
+`afl-api-player-links.ts`'s pre-existing `../../../data/reference/afl-api-identities.json` import
+(added the same day by `c2e6b1ac`, before Slice 4 began) — fixed by resolving a `.json` spec as a
+leaf (it can hold no `import`/`export` of its own, so it can never itself reach `server-only` or
+`@/db/*`); (2) the `remapActors()` credential-write assertion sliced the function body on a literal
+`'\n}\n'`, which never matches in this worktree's CRLF checkout (`core.autocrlf=true`, confirmed
+uniform across the whole tree, not a Slice-4 edit) — fixed with a newline-agnostic
+`/\r?\n\}\r?\n/` boundary. Neither production file's line endings or dependencies were changed.
+Re-run: `tests/db-test-rebuild.test.ts` 490/490, `tests/afl-api-identity-correction.test.ts` 73/73,
+`tests/afl-api-adjudication-recovery.test.ts` + `tests/db-promotion-check.test.ts` +
+`tests/player-link-mutations.test.ts` 524/524 combined, `npx tsc --noEmit -p .` clean. Integration
+acceptance on `settle-afl-api.test.ts` remains pending a clean, migration-106/107-current
+`afldb_test` rehearsal, as before this pass.
 
 **All action handling becomes exhaustive after HARD BARRIER B (§12).** An unknown `action` value
 throws or refuses everywhere. The admin revoke of a `CORRECTED` provider stays refused (below).
@@ -2489,7 +2583,7 @@ It is not. The existing chain is unique and durable:
 | Migration only "if §5-b chooses a new ledger action" | **Superseded.** M1 is required (D2), and M2 is required by D1's delete. |
 | (missing) | Lifecycle/promotion replay (§9) and the recurrence analysis (§4.G) were absent. They are added. |
 
-## 12. Implementation slices, in dependency order (Slice 1/2 authorised)
+## 12. Implementation slices, in dependency order (Slices 1–4 authorised and done)
 
 **Slices 1 and 2 only are authorised**, following the pass-5 plan review and pass-5a documentation
 corrections (§0, §14.6). Every later slice still needs separate operator authorisation. The pure
@@ -2661,10 +2755,31 @@ FOR SEPARATE OPERATOR AUTHORISATION.**
    `107_canonical_applications_delete_audit.sql`, rehearsed clean on `code_test_db` (migrate +
    privileges reconcile; `privileges.sql` needed no edit, confirmed unchanged-grant-set by
    inspection and by an identical reconcile before/after). The ISSUE-027 order still applies for
-   the eventual deploy: migrations and `db:privileges` before the Slice 4 code below, which has not
-   started.
-4. **Corrected ledger semantics and exhaustive readers** (§8.6) — NOT STARTED, needs its own
-   separate operator authorisation:
+   the eventual deploy: migrations and `db:privileges` before the Slice 4 code below (now
+   implemented; its readers SELECT `previous_player_identity`).
+4. **Corrected ledger semantics and exhaustive readers** (§8.6) — **DONE (2026-09-28,
+   uncommitted, DB-free).** Operator-authorised with the `R238-S4-01` amendment (§0). The
+   per-reader disposition is recorded under §8.6's table. Deviation from the reviewed plan's DD-1,
+   recorded: the ledger row type is one flat type (`action` over the three-member union,
+   `previousPlayerIdentity`/`evidenceSha256` optional) rather than a discriminated union, because
+   the union broke existing ISSUE-237 fixture spreads; the per-action shape is enforced at runtime
+   by `aflApiLedgerStructureProblems`, which every net-view reader and both digests run first.
+   Validation (Windows workstation, DB-free, run under the task's test/typecheck authorisation):
+   `npx tsc --noEmit -p .` clean; `tests/afl-api-identity-correction.test.ts` 73/73 (Slice-2 planner
+   byte-unchanged); `tests/player-link-mutations.test.ts` 121/121; `tests/db-promotion-check.test.ts`
+   380/380; `tests/afl-api-adjudication-recovery.test.ts` 23/23; `tests/afl-api-player-bridge-import.test.ts`
+   36/36; `tests/player-links-page.test.ts` + `tests/first-kick-goal-source.test.ts` 28/28;
+   `tests/db-test-rebuild.test.ts` 488/490, the 2 failures being pre-existing Windows artefacts that
+   failed identically before any rebuild-tool edit (an unresolved `data/reference/afl-api-identities.json`
+   import in this worktree, and a CRLF `\n}\n` source-slice). **Zero-`corrected` parity:** every
+   pre-existing ISSUE-235/237 assertion in those suites passes unmodified (only type annotations and
+   the `alreadySatisfied: 0` count field were added to zero-corrected fixtures), and the digest test
+   pins the zero-`corrected` ledger against the ISSUE-237 tuple formula recomputed independently of
+   the module. **Operator-run post-slice acceptance (not run here; they need a `*_test` database):**
+   `tests/integration/settle-afl-api.test.ts` (type widening at the ledger helper and the checked
+   `requireCapturableLedgerRows` narrow at its three `readLedger` sites),
+   `tests/integration/afl-api-adjudication-fixtures.ts` (type widening) and
+   `tests/integration/privileges.test.ts` (unchanged grant set). Originally scoped as:
    - D15 (ALREADY_SATISFIED only);
    - the bijection and the combined invariant;
    - agreement and overlap;

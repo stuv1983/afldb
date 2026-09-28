@@ -14,17 +14,20 @@
 ### AFLDB-ISSUE-238 — Correcting a consumed trusted `afl_api` player link with canonical reattribution
 - **Severity:** Medium. **Area:** admin / player identity — `external_identities` (`afl_api`),
   `player_match_stats`, `brownlow_round_votes`, `canonical_applications` and derived dependents.
-- **State:** Open. Slice 1/2 done. Operator authorised Slice 3 (2026-09-28); **M1**
-  (`106_afl_api_identity_corrected_action.sql`) and **M2**
-  (`107_canonical_applications_delete_audit.sql`) are written and rehearsed clean on `code_test_db`
-  (18/18 legal/illegal row-shape cases, idempotent re-apply, privilege reconciliation unchanged —
-  no `privileges.sql` edit needed). `npx tsc --noEmit -p .` clean; Slice-2 planner suite unaffected,
-  73/73. **Slice 3 COMPLETE, uncommitted** — migrations 106/107 are untracked files awaiting
-  operator commit.
+- **State:** Open. Slices 1–3 done (migrations 106/107 committed at `e55a554d`). **Slice 4 COMPLETE,
+  uncommitted (2026-09-28):** every §8.6 ledger reader handles `corrected`. D15 only confirms a
+  correction (ALREADY_SATISFIED). Bijection, agreement, overlap and G2 treat it as live authority at
+  P′, and G2 refuses it until slice 6's CPC exists. The digest extends only for `corrected` rows. The
+  admin revoke refuses a corrected provider (T21). The recovery export is v2. The rebuild capture
+  stays v2 and refuses a live `corrected` row. `tsc` is clean; the DB-free suites pass (planner
+  73/73); zero-`corrected` parity is pinned.
+- **Key files:** `src/lib/acquisition/afl-api-adjudication.ts`, `src/db/queries/afl-api-player-links.ts`,
+  `tools/db/promotion-check.ts`, `tools/migration/{replay,rebuild,recover}_afl_api_adjudications.ts`.
 - **Runbook:** `issues/open/AFLDB-ISSUE-238.md`.
-- **Next action:** operator commit of migrations 106/107, then separate operator authorisation for
-  Slice 4 (exhaustive `corrected`-ledger reader semantics, runbook §8.6). Slice 4+ is not authorised
-  or implemented.
+- **Next action:** operator review/commit of the Slice-4 change and the operator-run integration
+  acceptance (`settle-afl-api`, `afl-api-adjudication-fixtures`, `privileges`); then separate
+  operator authorisation for slice 5 (the ORIGINAL CLI, `correct_afl_api_identity.ts`). Deploy
+  migration 106 + `db:privileges` before this code.
 
 ### AFLDB-ISSUE-234 — Optional AFL API feed expansion (extended statistics, umpires, play-by-play)
 - **Severity:** Low. **Area:** data acquisition, investigation only.

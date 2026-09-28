@@ -8,7 +8,7 @@ This table indexes currently open issues. Detailed historical entries below rema
 
 | ID | Title | Severity | Area | State | Next action |
 |---|---|---|---|---|---|
-| AFLDB-ISSUE-238 | Correcting a consumed trusted `afl_api` player link with canonical reattribution | Medium | Admin / player identity — `external_identities` (`afl_api`), `player_match_stats`, `brownlow_round_votes`, `canonical_applications`, derived tables | Open. Triaged 2026-09-26 in the bulk pass and deliberately NOT folded in: moving canonical stats needs a collision/merge policy, superseding ledger entries and a new human-ledger correction action (operator data-semantics decisions). Dependency closure recorded in `issues/open/AFLDB-ISSUE-238.md`. | Operator decisions (runbook §5 a–c), then plan and review |
+| AFLDB-ISSUE-238 | Correcting a consumed trusted `afl_api` player link with canonical reattribution | Medium | Admin / player identity — `external_identities` (`afl_api`), `player_match_stats`, `brownlow_round_votes`, `canonical_applications`, derived tables | Open. Design accepted; slices 1–3 done (migrations 106/107 committed). Slice 4 (corrected ledger semantics, every §8.6 reader, admin revoke T21, recovery export v2) COMPLETE 2026-09-28, uncommitted, DB-free validated. Runbook `issues/open/AFLDB-ISSUE-238.md`. | Operator review/commit + integration acceptance; then separate authorisation for slice 5 (ORIGINAL CLI) |
 | AFLDB-ISSUE-234 | Optional AFL API feed expansion (extended statistics, umpires, play-by-play) | Low | Data acquisition — investigation only | Open (2026-09-23); triaged 2026-09-26: REMAINS OPEN / DEFERRED — extended stats, umpires, weather, milestones and `scoreWorm` scoring events are already retained raw (host snapshots; spine payloads per ISSUE-228 §15 Q8), never projected; no product need, no model, terms-of-use (§15 Q8) open | None scheduled; investigate when a product need arises |
 | AFLDB-ISSUE-233 | AFL API season discovery and season rollover ownership | Medium | Data acquisition / season lifecycle — `afl-api-identities.json`, rollover runbook | Open (2026-09-23); 2026-09-26 pass 2: D-233-1/2/3 decided (proposal JSON; season-scoped AFL API Brownlow artefacts beside the master; preserve `afl_api` ownership or refuse); discovery IMPLEMENTED / DB-FREE VALIDATED against the authentic `compseasons` sample (sha256 `fe3f1641…d965`); D-233-2/3 planned, not implemented; runbook `issues/open/AFLDB-ISSUE-233.md` | Implement D-233-3 rebuild census refusal + D-233-2 season-scoped load (runbook §4.3); first `--fetch` discovery on DEV |
 | AFLDB-ISSUE-232 | AFL API operational wiring: systemd timers, Brownlow scheduled settle and admin status | Medium | Deployment / operations — `deploy/afldb-settle-afl-api*`, `settle-status.ts`, `/admin/current-season` | Open (2026-09-23); 2026-09-26: admin panel IMPLEMENTED (`VISUAL: UNVERIFIED`); pass 2: D-232-1 = B (reversal of ISSUE-244 §40), O1, D-232-3 = keep; Brownlow wrapper refreshes fixture identity then settles with `--use-fixture-identity`, IMPLEMENTED / DB-FREE VALIDATED; fixtures CLI moved to the shared F029 loader; units not installed on any host; runbook `issues/open/AFLDB-ISSUE-232.md` | DEV sync + panel eyeball; runbook §7 installation with an observed first Brownlow firing |
@@ -42545,6 +42545,48 @@ Full record: `issues/closed/AFLDB-ISSUE-228.md` §22.22.
   database was touched.** **Status: Slice 3 COMPLETE, uncommitted. Next action:** operator commit
   of migrations 106/107, then separate operator authorisation for Slice 4 (exhaustive
   `corrected`-ledger reader semantics across the ~15 real readers §8.6 enumerates) — not begun.
+- **Update 2026-09-28 (Slice 4, base `e55a554d`, operator-authorised).** The launch plan review
+  (`afldb-reviewer`) returned RETURN TO DESIGN on one HIGH, `R238-S4-01`: the plan kept the rebuild
+  capture at v2 while bumping the recovery export, but the recovery tool reused the capture's row
+  type, validator and row comparator, so a corrected recovery could not round-trip and a same-id
+  target row with a divergent `previous_player_identity` would have been accepted as identical. The
+  amended design (recovery-owned `RecoveryLedgerRow`, validator, comparator and INSERT column; the v2
+  capture untouched and refusing a live `corrected` row before destruction) was recorded in the
+  runbook §0 and authorised by the operator before implementation. **Implemented (uncommitted,
+  DB-free):**
+  - **Effective authority:** a `corrected` row is live human authority at P′ (`player_identity`),
+    recording P in `previous_player_identity`; a central validator (`aflApiLedgerStructureProblems`)
+    fails closed on an unknown action, a malformed corrected row, a wrong supersede origin (D2), a
+    correction chain (D8) or any row after a correction.
+  - **Replay/D15:** a corrected provider is ALREADY_SATISFIED (a `noops` entry carrying
+    `satisfied: 'already_satisfied'`) when its resolved P′ row is present; otherwise STOP. D15 never
+    inserts, supersedes or writes a ledger row for it; a stale importer row at P never replaces it.
+  - **Bijection / agreement / overlap / G2:** net `corrected` counts as live human authority; it is
+    never AGREE; any captured importer row for it is an overlap; G2 grades it `CORRECTED_REQUIRES_CPC`,
+    which refuses until slice 6's CPC exists.
+  - **Digest:** the tuple extends only for `corrected` rows (`previous_player_identity`,
+    `evidence_sha256`), so a zero-`corrected` ledger hashes byte-identically to ISSUE-237's; a
+    diagnostic corrected-subset digest was added.
+  - **Admin:** the revoke refuses a corrected provider with new code `T21_revoke_corrected`, after T6
+    and before the state rules and the non-use proof, with no write. The history row type carries
+    all three actions; the detail page is unchanged (it renders `action` verbatim).
+  - **Tools:** promotion checker (malformed ledger ⇒ named `PromotionRefused`; corrected count in the
+    census text only when non-zero), replay tool (`alreadySatisfied` count), recovery export v2 (v1
+    refused by name; from-identity carried verbatim and resolved, STOP on unresolvable/ambiguous/same
+    player), rebuild capture v2 refusing `corrected` before destruction (v3 is slice 7).
+  - **Validation:** `npx tsc --noEmit -p .` clean; DB-free suites: planner 73/73,
+    `player-link-mutations` 121/121, `db-promotion-check` 380/380, recovery 23/23, bridge import 36/36,
+    `player-links-page` + `first-kick-goal-source` 28/28, `db-test-rebuild` 488/490 (the two failures
+    are pre-existing Windows artefacts that failed identically before any rebuild-tool edit).
+    Zero-`corrected` parity: every pre-existing ISSUE-235/237 assertion passes unmodified, and the
+    digest is pinned against the ISSUE-237 formula. Integration suites (`settle-afl-api`,
+    `afl-api-adjudication-fixtures`, `privileges`) are operator-run acceptance (they need a `*_test`
+    database). The bulk-rehearsal DB-side `corrected` fixture is deferred to slices 10/11.
+  - No accepted decision (D1–D10, O-1…O-6, D-P5-1…3) changed. **Status: Slice 4 COMPLETE,
+    uncommitted; ISSUE-238 stays Open. Next action:** operator review/commit and the operator-run
+    integration acceptance, then separate operator authorisation for slice 5 (the ORIGINAL CLI and
+    transaction, `tools/migration/correct_afl_api_identity.ts`). Deploy order: migration 106 and
+    `db:privileges` before this code (every Slice-4 reader selects `previous_player_identity`).
 
 ## AFLDB-ISSUE-252 — Production promotion cannot reinstate production-owned state that references current-season rebuilt entities absent from `afldb_test`
 
