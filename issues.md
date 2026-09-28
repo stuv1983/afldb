@@ -4,12 +4,11 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 11
+**Open issues:** 10
 
 | ID | Title | Severity | Area | State | Next action |
 |---|---|---|---|---|---|
 | AFLDB-ISSUE-252 | Production promotion cannot reinstate production-owned state that references current-season rebuilt entities absent from `afldb_test` | High | Production promotion / current-season lifecycle / lineage reinstatement — `docs/production-promotion.md`, `brownlow_vote_entry_state`, `matches.match_key` | Open (2026-09-27), discovered by a fresh ISSUE-237 L5 PROD attempt (stamp `20260927-142540`). **Blocks ISSUE-237 L5 PROD.** PROD's `brownlow_vote_entry_state.match_id = 17795` (stable identity `2026\|1\|2026-03-05\|Sydney\|Carlton`) had no corresponding `matches.match_key` in the candidate (`afldb_test` holds no 2026 matches); the `--phase restored` lineage gate correctly REFUSED with `identity_absent_in_candidate`. No lineage-remap or supersede file published; no reinstatement; no swap. ISSUE-251 and ISSUE-237 G2/G3 and first-kick-goal lineage all PASSED in the same run. The failed candidate `afldb_prod_candidate_20260927-142540` is retained as evidence and must not be mutated. PROD was token-bound unfrozen and returned healthy. Runbook: `issues/open/AFLDB-ISSUE-252.md`. | D-252-1..5 decided 2026-09-27 (runbook §18.1); D-252-6..8 decided and D-252-2 amended later the same day (§18.2: two-phase hash-bound PROD dependency manifest, operator-managed `afldb_test` AFL API switch, ownership parity with AFL Tables-first preparation); revised plan §21; pure DB-free core implemented. Third pass 2026-09-27 (§22, uncommitted): Q-252-9 decided (no AFL API fixtures-only/Brownlow settle in preparation); AFL Tables input bound by manifest + `observations.json` sha256; B1 retained source located, key/ownership acceptance pending the gate (primary PROD `settle-2026-2026-09-22-0444`, fallback DEV `settle-2026-2026-09-26-0941`); `prepare-promotion-source.ts` written; tests 40/40. Fourth pass 2026-09-27 (§23, uncommitted): PROD primary snapshot copied to DEV and re-hashed byte-identical; `promotion-check.ts` wired (`--phase dependencies` A/B + frozen re-check, mandatory manifest + preparation record at `--phase source`, proof required at prod `pre-cutover`); docs/CHANGELOG/npm; A–T(+U) rehearsal script written, not run; two real-run defects fixed; tests 332/332. Fifth pass 2026-09-27 (§24): `code_test_db` rehearsal attempts 1–2; two harness defects fixed; C/F/G/H/J/M/N/O/R/S/T/U PASS; STOPPED at A — the AFL Tables settle counts a new match's same-run `pending_match` period scores as `unresolvedIdentityMatch`, so §21.2's zero post-condition cannot pass on a fresh `afldb_test`; residue 0. Sixth pass 2026-09-27 (§25): Q-252-10 option 1 implemented (first AFL Tables apply may carry `unresolvedIdentityMatch` alone, bounded by rows inserted; mandatory same-label AFL Tables closure `--dry-run` all-zero with no write before AFL API; record/proof schema 2 keep both results); `code_test_db` attempt 3 A–U all PASS, residue 0, 2026 as found. Seventh pass (§26): Q-252-11 implemented (standalone `--dry-run` = unproven preview, same bounded tolerance, no record/proof); attempt 4 A–V all PASS (104 checks), residue 0, 2026 as found; tests 346/346. Eighth pass 2026-09-28 (§27, uncommitted, DB-free): the real DEV preparation's 36 AFL API `foreign_source_owner` refusals against AFL Tables-owned `player_match_stats` rows are now judged by a classified refusal census (D-252-12; only that class passes, count = counter, dry-run = apply digest; E3 unchanged), and the retained current-season player bridge is a mandatory hash-bound preparation input (D-252-13; `CD_I297354` was missing after a fresh rebuild); record/proof schema 3; tests 375/375. Next: operator review → code to DEV → fresh-rebuild rehearsal (§27.7) → source gate → commit → a completely fresh ISSUE-237 L5 PROD attempt |
-| AFLDB-ISSUE-251 | Production promotion cannot converge candidate-only manual player registrations when PROD has never held their AFL Tables paths | High | Production promotion / manual player registration lifecycle — `tools/db/promotion-check.ts` (ISSUE-242 convergence, ISSUE-237 A4.2), `tools/rebuild/draftguru/register_issue224_s9_players.ts` | Open (2026-09-26), from the first real ISSUE-237 L5 PROD attempt (stamp `20260926-213225`). **Blocks ISSUE-237 L5 PROD.** The restored gate reached the retained candidate (`afldb_prod_candidate_20260926-213225`, OID `49077`) and refused 92 candidate-only `manual_admin_edit` registrations: PROD neither held their AFL Tables paths nor had PROD-local creation records. All 92 have exactly one accepted AFL Tables path and one AFL API identity; 3 are referenced by `award_winners`. Direction: an explicit, separately guarded PROD adoption path for the pinned ISSUE-224 92-player set, with PROD-local registration tokens and a real enabled + enrolled PROD super-admin; no `afldb_test` token/actor copied, no AFL API identity written. ISSUE-242's candidate-only-orphan STOP is unchanged. `register_issue224_s9_players.ts` currently and deliberately refuses PROD; ISSUE-251 authorises a separately guarded PROD mode, not a loosened `assertNotProdLike()`. Runbook: `issues/open/AFLDB-ISSUE-251.md`. | (1) finalise the PROD-mode design against current code; (2) implement it; (3) DB-free validation; (4) isolated real-DB rehearsal; (5) diff/review + operator procedure; (6) request separate live PROD adoption authorisation. No PROD write is authorised |
 | AFLDB-ISSUE-238 | Correcting a consumed trusted `afl_api` player link with canonical reattribution | Medium | Admin / player identity — `external_identities` (`afl_api`), `player_match_stats`, `brownlow_round_votes`, `canonical_applications`, derived tables | Open. Triaged 2026-09-26 in the bulk pass and deliberately NOT folded in: moving canonical stats needs a collision/merge policy, superseding ledger entries and a new human-ledger correction action (operator data-semantics decisions). Dependency closure recorded in `issues/open/AFLDB-ISSUE-238.md`. | Operator decisions (runbook §5 a–c), then plan and review |
 | AFLDB-ISSUE-234 | Optional AFL API feed expansion (extended statistics, umpires, play-by-play) | Low | Data acquisition — investigation only | Open (2026-09-23); triaged 2026-09-26: REMAINS OPEN / DEFERRED — extended stats, umpires, weather, milestones and `scoreWorm` scoring events are already retained raw (host snapshots; spine payloads per ISSUE-228 §15 Q8), never projected; no product need, no model, terms-of-use (§15 Q8) open | None scheduled; investigate when a product need arises |
 | AFLDB-ISSUE-233 | AFL API season discovery and season rollover ownership | Medium | Data acquisition / season lifecycle — `afl-api-identities.json`, rollover runbook | Open (2026-09-23); 2026-09-26 pass 2: D-233-1/2/3 decided (proposal JSON; season-scoped AFL API Brownlow artefacts beside the master; preserve `afl_api` ownership or refuse); discovery IMPLEMENTED / DB-FREE VALIDATED against the authentic `compseasons` sample (sha256 `fe3f1641…d965`); D-233-2/3 planned, not implemented; runbook `issues/open/AFLDB-ISSUE-233.md` | Implement D-233-3 rebuild census refusal + D-233-2 season-scoped load (runbook §4.3); first `--fetch` discovery on DEV |
@@ -42753,9 +42752,11 @@ Full record: `issues/closed/AFLDB-ISSUE-228.md` §22.22.
 
 ## AFLDB-ISSUE-251 — Production promotion cannot converge candidate-only manual player registrations when PROD has never held their AFL Tables paths
 
-- **Status:** Open (2026-09-26). **Severity:** High. **Area:** production promotion / manual player
-  registration lifecycle. **Runbook:** `issues/open/AFLDB-ISSUE-251.md`. **Blocks:** ISSUE-237 L5
-  PROD.
+- **Status:** **Resolved (2026-09-28)** on a real, separately guarded PROD adoption apply plus the
+  confirming fresh ISSUE-237 L5 promotions; see "Resolution" at the end of this entry. Opened
+  2026-09-26. **Severity:** High. **Area:** production promotion / manual player registration
+  lifecycle. **Runbook:** `issues/closed/AFLDB-ISSUE-251.md`. **Blocked:** ISSUE-237 L5 PROD (no
+  longer — see Resolution).
 - **Origin.** The first real ISSUE-237 L5 PROD attempt, 2026-09-26, run by the freeze-bound
   ISSUE-250 procedure. Number verified free by read-only repository search before allocation.
   - PROD checkout `ce1bc1e1e5e0c3b577dd70cf1e73ba0cd31f35fe`; promotion stamp `20260926-213225`.
@@ -42816,9 +42817,31 @@ Full record: `issues/closed/AFLDB-ISSUE-228.md` §22.22.
 - **Out of scope.** Weakening ISSUE-242; copying `afldb_test` tokens or the recovery actor; writing
   AFL API identities; restoring 2026 match/stat rows; ISSUE-238; mutating or dropping the retained
   candidate; enabling the settle timer; authorising a new L5.
-- **Next action.** Implementation of the guarded PROD mode, DB-free validation, and an isolated
-  real-DB rehearsal (runbook §9–§10); then review and a separate authorisation for the PROD
-  adoption; then a completely fresh ISSUE-237 L5. **No PROD write is authorised.**
+- **Next action (superseded 2026-09-28, below).** Implementation of the guarded PROD mode, DB-free
+  validation, and an isolated real-DB rehearsal (runbook §9–§10); then review and a separate
+  authorisation for the PROD adoption; then a completely fresh ISSUE-237 L5.
+- **Resolution (2026-09-28).** The guarded PROD adoption mode was implemented, DB-free validated
+  (144/144, plus 38/38 for the live privilege suite), rehearsed for real against `code_test_db`
+  (full first-adoption apply, second-apply refusal, atomic-rollback proof, three retry/conflict
+  cases, and a positive-shape Phase-9 census against real committed rehearsal data), reviewed (one
+  MEDIUM checkout-integrity finding closed), and then run for real against `afldb-prod`: a fresh
+  backup (SHA-256 `49dc09821940e93ad9caf50ba79c931342881bffab987ac59332160ab371db3e`), a real
+  enabled+enrolled PROD `super_admin` actor (`ADMIN_USER_ID=1`), and an operator-authorised one-time
+  apply that classified `CREATE=92 / ALREADY_SATISFIED=0 / CONFLICT=0`, committed, and created zero
+  AFL API identities. An independent post-adoption census confirmed exactly 92/92 registrations by
+  the selected actor, 0 by any other actor, and total players at baseline + 92. A subsequent
+  completely fresh ISSUE-237 L5 attempt (stamp `20260927-142540`) then independently proved the
+  intended AFLDB-ISSUE-242 convergence — 92/92 planned `rebind B → A`, ISSUE-251's own gates all
+  passing — and correctly stopped instead on a different, unrelated defect (a 2026 Brownlow/
+  current-season lineage gap), opened separately as **AFLDB-ISSUE-252**, proving ISSUE-251 never
+  masked a different failure. After the AFLDB-ISSUE-252 fix was completed and deployed, a third
+  fresh L5 attempt (stamp `20260928-101642`) passed the full independent gate set end to end. All
+  thirteen runbook §13 acceptance criteria are met (full mapping: runbook §25.2). The retained failed
+  candidates (`afldb_prod_candidate_20260926-213225`, `afldb_prod_candidate_20260927-142540`), the
+  frozen rollback database (`afldb_prod_pre_rebuild_20260928-101642`) and the adoption backup remain
+  retained, untouched evidence; their cleanup stays deferred under `docs/production-promotion.md`
+  §10. **AFLDB-ISSUE-252 remains independently open and is not affected by this closure.** Full
+  record: `issues/closed/AFLDB-ISSUE-251.md` §25; `issues/closed/AFLDB-ISSUE-237.md` §16.
 
 ## AFLDB-ISSUE-250 — Production promotion can silently lose writes committed after the target snapshot
 

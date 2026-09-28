@@ -9,7 +9,7 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Open issues:** 11
+**Open issues:** 10
 
 ### AFLDB-ISSUE-252 — Production promotion cannot reinstate production-owned state that references current-season rebuilt entities absent from `afldb_test`
 - **Severity:** High. **Area:** production promotion / current-season lifecycle / lineage
@@ -114,47 +114,6 @@
   normal procedure; then a completely fresh ISSUE-237 L5 PROD attempt under separate authorisation
   (its own manifest A/source proof/frozen manifest B). The retained failed candidate
   `afldb_prod_candidate_20260927-142540` remains evidence-only.
-
-### AFLDB-ISSUE-251 — Production promotion cannot converge candidate-only manual player registrations when PROD has never held their AFL Tables paths
-- **Severity:** High. **Area:** production promotion / manual player registration lifecycle —
-  `tools/db/promotion-check.ts` (ISSUE-242 convergence, ISSUE-237 A4.2 gates),
-  `tools/rebuild/draftguru/register_issue224_s9_players.ts`.
-- **State:** Open (2026-09-26), from the first real ISSUE-237 L5 PROD attempt (promotion stamp
-  `20260926-213225`). **Blocks ISSUE-237 L5 PROD.**
-  - The L5 restored gate reached the retained candidate
-    (`afldb_prod_candidate_20260926-213225`, OID `49077`) and REFUSED on exactly the ISSUE-242
-    token-convergence gate and the ISSUE-237 A4.2 players-replay gate. G2 and G3 PASSed.
-  - 92 candidate-only `manual_admin_edit` registrations were refused: PROD neither held their AFL
-    Tables paths nor had PROD-local creation records for them.
-  - Retained-candidate census: all 92 have exactly one accepted AFL Tables path and one AFL API
-    identity; 3 of the 92 are referenced by `award_winners`; zero football statistics. The only
-    attribution actor is `afldb_test`'s disabled, credential-free recovery `super_admin`.
-  - Direction: an explicit, separately guarded PROD adoption mode for the pinned ISSUE-224
-    92-player set, minting PROD-local registration tokens under a real enabled + enrolled PROD
-    `super_admin`. No `afldb_test` token or actor is copied and no AFL API identity is written. A
-    completely fresh L5 should then plan the normal ISSUE-242 `rebind B → A`.
-  - ISSUE-242's candidate-only-orphan STOP is unchanged.
-  - PROD was released from the ISSUE-250 freeze (now RESOLVED) and is healthy. The retained
-    candidate is evidence and must not be mutated or dropped.
-  - `register_issue224_s9_players.ts` currently and deliberately refuses PROD. ISSUE-251 is an
-    authorised design change to that boundary, not a loosening of `assertNotProdLike()` or a bare
-    `prod` addition to the target enum: PROD support is its own separately guarded mode with
-    stronger requirements than test/DEV, and no PROD write is authorised yet.
-  - D-251-5: PROD adoption pins the exact tracked
-    `docs/rebuild-manifests/draftguru/issue224-s9-name-parts-20260922.json` name-parts artefact by
-    SHA-256, established during implementation/review; an arbitrary `--name-parts` file is refused
-    in PROD mode. Test/DEV keep the existing operator-authored, non-pinned artefact unchanged.
-  - The tool's post-write checks (currently DEV-only) are to be factored into shared
-    target-independent postconditions used by both DEV and PROD; PROD adds its own stronger
-    boundary checks (exact host/database/role/revision, verified backup acknowledgement, a real
-    enabled+enrolled PROD `super_admin`, no recovery/test actor, no AFL API identity written).
-- **Key files:** `tools/rebuild/draftguru/register_issue224_s9_players.ts` and its tests,
-  `docs/production-promotion.md`.
-- **Runbook:** `issues/open/AFLDB-ISSUE-251.md`.
-- **Next action:** (1) inspect the existing registration tool/tests and finalise the PROD-mode
-  design against current code; (2) implement the separately guarded PROD adoption mode; (3)
-  DB-free validation; (4) isolated real-DB rehearsal; (5) full diff/review and operator procedure;
-  (6) only then request separate live PROD adoption authorisation. **No PROD write is authorised.**
 
 ### AFLDB-ISSUE-238 — Correcting a consumed trusted `afl_api` player link with canonical reattribution
 - **Severity:** Medium. **Area:** admin / player identity — `external_identities` (`afl_api`),
@@ -312,8 +271,27 @@ replay (92 registrations resolved, AFL API invariant OK), current-season AFL Tab
 idempotence and the scheduled settle-timer path all clean. `docs/deployment.md` §6a documentation
 (S5) was verified current. Cleanup of the retained rollback database and the two failed candidates is
 deliberately deferred per `docs/production-promotion.md` §10 and is not a resolution blocker.
-AFLDB-ISSUE-251 and AFLDB-ISSUE-252 remain separately tracked and open; their own resolution is
+AFLDB-ISSUE-251 was subsequently resolved on 2026-09-28; AFLDB-ISSUE-252 remains separately tracked and open; its resolution is
 unaffected by this closure. Full record: `issues.md`, `issues/closed/AFLDB-ISSUE-237.md` §16.
+
+**AFLDB-ISSUE-251 resolved 2026-09-28** (implementation, DB-free/rehearsal validation and
+operator-run PROD execution) — a separately guarded, fail-closed PROD adoption mode was
+added to the pinned ISSUE-224 registration tool, minting PROD-local `manual_admin_edit` tokens for
+the exact approved 92-player set under a real enabled+enrolled PROD `super_admin`, with no
+`afldb_test` token/actor crossing into PROD and no AFL API identity written. After DB-free (144/144)
+and live `code_test_db` rehearsal (first-adoption apply, second-apply refusal, atomic-rollback
+proof, retry/conflict cases, positive-shape census) validation and a closed MEDIUM review finding,
+an operator-authorised one-time apply against real `afldb-prod` committed exactly 92 registrations
+with zero conflict and zero AFL API identities, independently confirmed by census. A subsequent
+fresh ISSUE-237 L5 attempt (stamp `20260927-142540`) then proved the intended AFLDB-ISSUE-242
+convergence in full (92/92 planned `rebind B → A`) and correctly stopped instead on the unrelated,
+separately opened AFLDB-ISSUE-252 — proving ISSUE-251 never masked a different failure. A third
+fresh L5 (stamp `20260928-101642`), run after the ISSUE-252 fix deployed, passed end to end. All 13
+runbook acceptance criteria are met. The retained failed candidates, the frozen rollback database
+and the adoption backup remain retained evidence, cleanup deferred per
+`docs/production-promotion.md` §10. AFLDB-ISSUE-252 remains separately tracked and open; its own
+resolution is unaffected by this closure. Full record: `issues.md`,
+`issues/closed/AFLDB-ISSUE-251.md` §25.
 
 **AFLDB-ISSUE-221 resolved 2026-09-18** (implemented 2026-09-17 by Fable 5.1; committed, merged
 and DEV-verified 2026-09-18 by Sonnet 5) — Grid Solver draft-criteria review: honest "No data"

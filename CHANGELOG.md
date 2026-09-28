@@ -15,6 +15,34 @@ commit.
 
 ## [Unreleased]
 
+### Production adoption of the pinned ISSUE-224 manual player registration cohort is complete (AFLDB-ISSUE-251; Resolved) - 28 September 2026
+
+- **What this records.** AFLDB-ISSUE-251 is resolved. A separately guarded, fail-closed PROD
+  adoption mode in `tools/rebuild/draftguru/register_issue224_s9_players.ts` now lets production
+  explicitly adopt the pinned ISSUE-224 92-player registration set it had never held, minting
+  PROD-local `manual_admin_edit` tokens under a real enabled+enrolled PROD `super_admin`. No
+  `afldb_test` token or recovery actor crosses into PROD, and adoption writes no AFL API identity.
+- **Validated in order.** DB-free contract tests (144/144) and the live `tests/integration/
+  privileges.test.ts` suite (38/38); a real `code_test_db` rehearsal (first-adoption apply,
+  deterministic second-apply refusal, an atomic-rollback proof under injected failure, three
+  retry/conflict cases, and a positive-shape post-adoption census); one MEDIUM checkout-integrity
+  review finding, closed in code.
+- **Real PROD execution.** An operator-authorised one-time apply against `afldb-prod`, backed by a
+  fresh verified backup, committed exactly 92 registrations (`CREATE=92 / ALREADY_SATISFIED=0 /
+  CONFLICT=0`) with zero AFL API identities created, independently reconfirmed by a post-adoption
+  census (92/92, 0 by any other actor).
+- **Convergence proved twice.** A fresh ISSUE-237 L5 attempt (stamp `20260927-142540`) planned the
+  intended AFLDB-ISSUE-242 convergence in full (92/92 `rebind B → A`) and then correctly stopped on
+  an unrelated defect, opened separately as AFLDB-ISSUE-252 — proving this adoption never masked a
+  different failure. A later fresh L5 (stamp `20260928-101642`), run after the ISSUE-252 fix
+  deployed, passed the full independent gate set end to end (`issues/closed/AFLDB-ISSUE-237.md`
+  §16).
+- **Cleanup deferred.** The retained failed candidates, the frozen rollback database and the
+  adoption backup are not cleaned up as part of this closure; that follows later, separately, per
+  `docs/production-promotion.md` §10.
+- **Not affected.** AFLDB-ISSUE-252 is separately tracked and remains open on its own evidence. Full
+  record: `issues.md`, `issues/closed/AFLDB-ISSUE-251.md` §25.
+
 ### AFL API importer identity lifecycle across rebuild and promotion is complete: PROD L5 accepted (AFLDB-ISSUE-237; Resolved) - 28 September 2026
 
 - **What this records.** AFLDB-ISSUE-237 is resolved. `db:test:rebuild` and database promotion now

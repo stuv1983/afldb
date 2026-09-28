@@ -2,7 +2,15 @@
 
 ## 0. Status
 
-**Open (2026-09-26). High severity. Blocks AFLDB-ISSUE-237 L5 PROD.**
+**RESOLVED 2026-09-28 (full record §25). All thirteen §13 acceptance criteria are met: the
+authorised PROD adoption (§24) committed exactly 92 valid registrations with zero conflict under a
+real, separately guarded fail-closed mode, and the intended AFLDB-ISSUE-242 convergence was then
+independently proved twice — a fresh ISSUE-237 L5 attempt (stamp `20260927-142540`) planned 92/92
+`rebind B → A` in full and only then correctly stopped on the unrelated AFLDB-ISSUE-252 lineage gate
+(proving ISSUE-251 never masked a different failure), and a later fresh L5 (stamp `20260928-101642`)
+passed the full independent gate set end to end. The historical status narrative below (recorded
+2026-09-26 through 2026-09-27) is retained for history and is superseded by §25 wherever it
+conflicts.**
 
 Opened from the first real ISSUE-237 L5 production attempt, promotion stamp
 `20260926-213225`. The promotion correctly stopped at `--phase restored`; no reinstatement
@@ -629,6 +637,11 @@ has not been requested.
 6. Only then request separate live PROD adoption authorisation.
 
 **No live PROD mutation is authorised.**
+
+**(Superseded 2026-09-28: step 5's diff/review pass concluded (§19.6, §20.6) and step 6's
+authorisation was requested and given — see §23–§24 for the real PROD execution and §25 for the
+resulting resolution. This section's numbered steps are retained as an accurate historical record of
+how the work actually proceeded.)**
 
 ---
 
@@ -2724,3 +2737,93 @@ The next required step is a **completely fresh ISSUE-237 L5 promotion attempt**:
 
 Only after that fresh restored gate satisfies ISSUE-251's closure criterion should ISSUE-251 be
 closed. **The fresh ISSUE-237 L5 attempt has not been started by this pass.**
+
+---
+
+## 25. Resolution (2026-09-28) — AFLDB-ISSUE-251 RESOLVED
+
+This section is the authoritative closure record. It supersedes every "not resolved" / "L5 remains
+blocked" / "no live PROD mutation authorised" statement elsewhere in this runbook wherever they
+conflict; those statements are retained as historical evidence of the point in time each pass was
+written and are not rewritten.
+
+**AFLDB-ISSUE-252 remains an independently tracked, separately Open issue.** Nothing in this section
+claims AFLDB-ISSUE-252 is resolved. This section closes only AFLDB-ISSUE-251, and records that the
+AFLDB-ISSUE-252 technical fix was completed and deployed as the external event that allowed the
+final confirming L5 to pass — not as part of ISSUE-251's own scope.
+
+### 25.1 Chronology since §24
+
+- `20260927-142540` — a completely fresh ISSUE-237 L5 `--phase restored` attempt, run after §24's
+  PROD adoption, independently proved the intended AFLDB-ISSUE-242 convergence: the ISSUE-251
+  registration lifecycle PASSED in full, with all 92 planned normal `rebind B → A` conversions
+  passing and neither of the two prior 92-registration restored-gate failures recurring; G2/G3 also
+  PASSED. That same attempt then correctly REFUSED at `--phase restored` for a different, unrelated
+  reason — a 2026 Brownlow/current-season lineage dependency absent from the candidate — which was
+  opened as **AFLDB-ISSUE-252** (`issues/open/AFLDB-ISSUE-252.md`). The retained failed candidate
+  `afldb_prod_candidate_20260927-142540` was never reused. Full record: `issues/closed/
+  AFLDB-ISSUE-237.md` §0, §15's chronology note, `issues.md`.
+- The AFLDB-ISSUE-252 technical fix was subsequently completed, committed, merged and deployed to
+  the PROD checkout (`8fc60404`). AFLDB-ISSUE-252 itself remains independently Open; only its
+  technical fix reached PROD.
+- `20260928-101642` — a third, completely fresh L5 attempt, run after the AFLDB-ISSUE-252 fix was
+  deployed, ran the full freeze-bound `docs/production-promotion.md` §4.0–§10 procedure end to end
+  and PASSED: restored gate PASS, candidate gate PASS, guarded swap PASS, production gate PASS,
+  post-promotion replay PASS (the 92 ISSUE-224/ISSUE-251 registrations resolved, converged by
+  AFLDB-ISSUE-242 `rebind B → A`), the combined AFL API invariant OK, current-season AFL Tables
+  settle PASS, SC3 idempotence PASS, and the first scheduled AFL Tables timer run PASS. This is now
+  the authoritative record that AFLDB-ISSUE-237 L5 fully passed. Full record: `issues/closed/
+  AFLDB-ISSUE-237.md` §16.
+
+### 25.2 §13 acceptance criteria — final mapping
+
+| # | Criterion | Evidence | Result |
+|---|---|---|---|
+| 1 | Explicit, separate, fail-closed PROD adoption path | §16.2 (`resolveProdTarget`/`resolveProdAuthTarget`/`runProdMain` wholly separate from test/DEV; `--target prod` never resolved by the existing `assertNotProdLike()`); §17 (in-transaction `SECURITY DEFINER` actor assertion); §19 (checkout-integrity boundary) | PASS |
+| 2 | Exact pinned ISSUE-224 92-player set is the only accepted bulk set | §16.3 (pinned target-set/D-7 hashes; calculated and pinned name-parts SHA-256, mismatch refuses before any DB connection) | PASS |
+| 3 | Real existing PROD enabled+enrolled super-admin for attribution | §23.3 (real actor `ADMIN_USER_ID=1`, `super_admin`, enabled, password+TOTP present, direct `assert_viable_super_admin_actor(1)` PASS); §24.1 (actor preflight passed at apply) | PASS |
+| 4 | No `afldb_test` token or recovery actor crosses into PROD | §16.2/§17.4 (no pre-fetched actor row accepted; PROD-local token minted via unmodified `createPlayerInTransaction()`/`attachAflTablesIdentityInTransaction()`); §24.1 real apply used real PROD actor id 1, not the `afldb_test` recovery actor | PASS |
+| 5 | No AFL API identity written by adoption | §18.5/§18.6/§22.6 rehearsal (0/92); §24.1/§24.2 real PROD apply and independent census (0/92) | PASS |
+| 6 | Atomic write | §16.2/§17.3 (one transaction, `SECURITY DEFINER` first statement, `FOR SHARE` row lock); §18.8 (real rollback-under-fault proof, zero residue); §24.1 (`Transaction committed = yes`) | PASS |
+| 7 | DB-free safety/contract tests pass | §19.5 (144/144); §20.4 (`tests/integration/privileges.test.ts` 38/38); `tests/db-promotion-check.test.ts` 264/264 unmodified throughout | PASS |
+| 8 | Real isolated rehearsal of the PROD branch passes | §18 (full `code_test_db` rehearsal: first-adoption apply, second-apply refusal, rollback proof, three retry/conflict cases, teardown/residue); §20 (live privilege suite against `issue251_privileges_test`, 38/38); §22 (positive-shape Phase-9 census proved against real committed rehearsal data) | PASS |
+| 9 | Operator reviews the generated PROD commands before any live write | §21 Phase 7 (explicit, checklist-gated human authorisation boundary defined in the reviewed procedure); §23 (Phase 6 dry-run passed, Phase 7 not yet cleared); §24 ("Following §23, explicit operator authorisation was given for a one-time PROD adoption apply", matching REV/ADMIN_USER_ID/BACKUP_SHA256 recorded and reconfirmed at Phase 8) | PASS |
+| 10 | Fresh verified PROD backup exists immediately before the authorised apply | §23.2 (stamp `20260927-132829`, SHA-256 `49dc09821940e93ad9caf50ba79c931342881bffab987ac59332160ab371db3e`, `restore-test.sh` PASS, off-host copy byte-identical); §24.1 (the apply acknowledged this exact SHA-256) | PASS |
+| 11 | Live PROD apply results in exactly 92 valid registrations, zero conflict | §24.1 (`CREATE=92 / ALREADY_SATISFIED=0 / CONFLICT=0`, all pre-commit integrity checks passed, `Transaction committed = yes`, `APPLY_EXIT=0`); §24.2 independent census confirms 92/92 exactly, 0 by any other actor | PASS |
+| 12 | A subsequent fresh L5 `--phase restored` no longer fails the two 92-registration gates and plans the expected rebinds | `20260927-142540`: registration lifecycle PASSED in full, 92/92 planned `rebind B → A` (§25.1); reconfirmed by `20260928-101642`'s full post-promotion replay (92 registrations resolved) | PASS |
+| 13 | The full L5 still passes every independent ISSUE-237/250 gate; ISSUE-251 success never overrides a different failure | `20260927-142540` proves the second clause directly: ISSUE-251's own gates passed but the L5 still correctly stopped on the unrelated AFLDB-ISSUE-252 gate; `20260928-101642` proves the first clause: the full independent L5 ultimately passed end to end (§25.1) | PASS |
+
+**All 13 criteria are met. AFLDB-ISSUE-251 is RESOLVED.**
+
+### 25.3 Retained evidence — not deleted, not mutated
+
+The following remain retained exactly as recorded, per §12's "out of scope" boundary and
+`docs/production-promotion.md` §10's deferred-cleanup policy; this resolution authorises none of
+their cleanup:
+
+- `afldb_prod_candidate_20260926-213225` — the original failed ISSUE-251 restored-gate candidate.
+- `afldb_prod_candidate_20260927-142540` — the failed ISSUE-252 restored-gate candidate from the
+  second fresh L5 attempt.
+- `afldb_prod_pre_rebuild_20260928-101642` — the frozen rollback database from the accepted third
+  fresh L5.
+- The PROD adoption backup (`/home/arm/backups/afldb/afldb_prod-20260927-132829.dump`, SHA-256
+  `49dc09821940e93ad9caf50ba79c931342881bffab987ac59332160ab371db3e`) and its off-host copy.
+- The PROD apply log `/home/arm/backups/afldb/issue251-apply-20260927-132829.log`.
+
+### 25.4 Known limitation carried forward, not a resolution blocker
+
+The production `replay_admin_overrides(players)` oracle itself was never separately invoked as a
+standalone run against the real PROD adoption (§18.6, §21.13 item 2); only the postcondition it
+depends on was independently proven, both in the rehearsal (§18.5/§18.6) and in the real PROD apply
+(§24.1). D-251-7 (§6) already recorded this as an accepted clarification, not an outstanding gate,
+and the subsequent fresh ISSUE-237 L5 attempts (§25.1) exercised the full production
+`replay_admin_overrides` path as part of their own A4.2 gate, which passed in both `20260927-142540`
+and `20260928-101642`. This is recorded for completeness; it does not reopen any §13 criterion.
+
+### 25.5 Follow-up recorded separately
+
+- **AFLDB-ISSUE-252** remains independently Open and is not affected by this closure.
+- Destructive cleanup of the retained candidates/rollback database (§25.3) remains deferred under
+  `docs/production-promotion.md` §10 and is not part of this resolution.
+
+**AFLDB-ISSUE-251 is RESOLVED as of 2026-09-28.**
