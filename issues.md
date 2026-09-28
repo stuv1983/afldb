@@ -8,7 +8,7 @@ This table indexes currently open issues. Detailed historical entries below rema
 
 | ID | Title | Severity | Area | State | Next action |
 |---|---|---|---|---|---|
-| AFLDB-ISSUE-238 | Correcting a consumed trusted `afl_api` player link with canonical reattribution | Medium | Admin / player identity — `external_identities` (`afl_api`), `player_match_stats`, `brownlow_round_votes`, `canonical_applications`, derived tables | Open. Design accepted; slices 1–3 done (migrations 106/107 committed). Slice 4 (corrected ledger semantics, every §8.6 reader, admin revoke T21, recovery export v2) COMPLETE 2026-09-28, uncommitted, DB-free validated. Runbook `issues/open/AFLDB-ISSUE-238.md`. | Operator review/commit + integration acceptance; then separate authorisation for slice 5 (ORIGINAL CLI) |
+| AFLDB-ISSUE-238 | Correcting a consumed trusted `afl_api` player link with canonical reattribution | Medium | Admin / player identity — `external_identities` (`afl_api`), `player_match_stats`, `brownlow_round_votes`, `canonical_applications`, derived tables | Open. Design accepted; slices 1–4 done (migrations 106/107 committed; Slice 4 — corrected ledger semantics, every §8.6 reader, admin revoke T21, recovery export v2 — committed at `788bffa2`). Slice 5 (ORIGINAL CLI, `tools/migration/correct_afl_api_identity.ts`) implemented, remediated, then SECOND-remediated after operator review found the passing first remediation semantically incomplete (BG2 paired/season-only binding, three fail-open catches, C11 foreign NOOP, SAT-1 extended bijection, SAT-5 global projections, B4 gathered). Operator validation COMPLETE 2026-09-29: `tsc` PASS; 732/732 tests PASS; `.catch` audit PASS; final Slice-5 semantic/diff review COMPLETE (three §13.2 readings accepted). Slice 5 remains uncommitted, ready for operator commit; no `code_test_db` rehearsal performed or authorised. Unrelated untracked `second` stays unstaged. Runbook `issues/open/AFLDB-ISSUE-238.md`. | Operator commit of Slice 5; Slice 6+ needs separate authorisation; no Slice 10/11 rehearsal yet |
 | AFLDB-ISSUE-234 | Optional AFL API feed expansion (extended statistics, umpires, play-by-play) | Low | Data acquisition — investigation only | Open (2026-09-23); triaged 2026-09-26: REMAINS OPEN / DEFERRED — extended stats, umpires, weather, milestones and `scoreWorm` scoring events are already retained raw (host snapshots; spine payloads per ISSUE-228 §15 Q8), never projected; no product need, no model, terms-of-use (§15 Q8) open | None scheduled; investigate when a product need arises |
 | AFLDB-ISSUE-233 | AFL API season discovery and season rollover ownership | Medium | Data acquisition / season lifecycle — `afl-api-identities.json`, rollover runbook | Open (2026-09-23); 2026-09-26 pass 2: D-233-1/2/3 decided (proposal JSON; season-scoped AFL API Brownlow artefacts beside the master; preserve `afl_api` ownership or refuse); discovery IMPLEMENTED / DB-FREE VALIDATED against the authentic `compseasons` sample (sha256 `fe3f1641…d965`); D-233-2/3 planned, not implemented; runbook `issues/open/AFLDB-ISSUE-233.md` | Implement D-233-3 rebuild census refusal + D-233-2 season-scoped load (runbook §4.3); first `--fetch` discovery on DEV |
 | AFLDB-ISSUE-232 | AFL API operational wiring: systemd timers, Brownlow scheduled settle and admin status | Medium | Deployment / operations — `deploy/afldb-settle-afl-api*`, `settle-status.ts`, `/admin/current-season` | Open (2026-09-23); 2026-09-26: admin panel IMPLEMENTED (`VISUAL: UNVERIFIED`); pass 2: D-232-1 = B (reversal of ISSUE-244 §40), O1, D-232-3 = keep; Brownlow wrapper refreshes fixture identity then settles with `--use-fixture-identity`, IMPLEMENTED / DB-FREE VALIDATED; fixtures CLI moved to the shared F029 loader; units not installed on any host; runbook `issues/open/AFLDB-ISSUE-232.md` | DEV sync + panel eyeball; runbook §7 installation with an observed first Brownlow firing |
@@ -42587,6 +42587,137 @@ Full record: `issues/closed/AFLDB-ISSUE-228.md` §22.22.
     integration acceptance, then separate operator authorisation for slice 5 (the ORIGINAL CLI and
     transaction, `tools/migration/correct_afl_api_identity.ts`). Deploy order: migration 106 and
     `db:privileges` before this code (every Slice-4 reader selects `previous_player_identity`).
+- **Update 2026-09-28: Slice 5 (the ORIGINAL CLI and transaction) implemented, uncommitted, base
+  `788bffa2`. NOT YET TYPECHECKED OR TEST-RUN by this pass** (operator authorisation for
+  test/typecheck execution was not part of this pass's scope; see Validation below).
+  `tools/migration/correct_afl_api_identity.ts` implements the §8.2 ORIGINAL transaction end to
+  end: argument parsing and the D9 evidence-file/surname-acknowledgement contract, the §8.8 role
+  guard, the D10 identity-table lock plus D7 provider/player advisory locks, row-level `FOR
+  UPDATE` locking of every candidate/counterpart/matches row (dry-run/apply only, never
+  validate-only), live evidence-gathering for P1–P7/B1–B5 (including B3-I/B3-C payload parsing)
+  wired into the existing Slice-2 pure planner, BG1–BG3/C1c/C1–C14 disposition, DP-1–DP-3
+  dependents and SV-0/SV-1 season-total independence, the conditional MOVE/DELETE write with its
+  `rowProofs`, the targeted recompute plus byte-identical `stat_availability` assertion, batch
+  open/finalise, the fingerprint (`--expect-fingerprint`) gate, and a §8.5 ALREADY_SATISFIED
+  re-run path. DB-free tests added:
+  `tests/correct-afl-api-identity-cli.test.ts` (args parsing, DSN guard, evidence-file hashing,
+  the B3-I raw-payload voter extractor, report formatting).
+  - **Disclosed scope gaps, not hidden:** §5.10 SV-2a (the schema-1 CSV parity proof) is not
+    implemented — an artefact-loaded affected season safely STOPs `season_artefact_unprovable`
+    (SV-3) instead. §5.11 DP-4's exact participation query is approximated with canonical
+    `player_match_stats` existence rather than the loader's `search_name`-matching SQL
+    (conservative: can only over-report, never mask, a stale dependent). Most significantly, the
+    §5.6 **L8 current-row classification and the `correction_target_absent` (C14) branch are not
+    implemented in the §8.5 re-run/CORRECTION SATISFACTION path** — only L1–L7/D-1…D-6
+    (immutable-history) checks run there, so a re-run of an already-corrected provider can return
+    ALREADY_SATISFIED without verifying ownership/stamp stability or classifying a post-correction
+    divergence as explained vs. unexplained (matrix cases 14/15/71/97/98 are not covered by this
+    re-run path). The in-transaction post-write check immediately after a fresh write is unaffected
+    (nothing else can have touched the row in that window). This must be closed before the re-run
+    contract is trusted, and before slice 10/11 rehearsal.
+  - **Validation:** none run by this pass (CLAUDE.md §9: operator-executed). Operator commands:
+    `npx tsc --noEmit -p .` and `npx vitest run tests/correct-afl-api-identity-cli.test.ts
+    tests/afl-api-identity-correction.test.ts`.
+  - No DEV/PROD database, SQL, migration, promotion, rebuild or Git command ran. No accepted
+    decision changed. **Next:** operator typecheck/test run, review, and a decision on closing the
+    disclosed L8/SV-2a/DP-4 gaps before slice 10/11 authorisation.
+- **Update 2026-09-28: Slice 5 remediation (uncommitted, base `788bffa2`).** Operator-run
+  validation of the first pass: 98/98 DB-free tests passed, `tsc` failed with 13 errors, all in
+  `correct_afl_api_identity.ts`. Remediated, and the disclosed gaps closed rather than carried:
+  - **TypeScript (13):** 11 × `push` on the readonly `MutationPlan['stops']` → the closure builder
+    accumulates into a genuinely mutable `PlanStop[]` (`MutationPlan['stops'][number]`), exposed as
+    the readonly plan field unchanged; 2 × the `newKey` union → `movedNaturalKey()` returns a
+    `Record<string, JsonValue>` built per table (no `undefined`-member union, no casts).
+  - **§8.5/§8.4 CORRECTION SATISFACTION (the Slice-5 blocker):** one pure
+    `evaluateCorrectionSatisfactionQ2` over evidence one read-only `CorrectionSatisfactionReader`
+    gathers; the post-write re-plan and every re-run on a `CORRECTED(A)` provider call the same
+    `checkCorrectionSatisfaction`. It composes the planner's `evaluateMoveLineage`,
+    `evaluateDeleteLineage`, `evaluateL8`, `evaluateCorrectionTargetAbsent`,
+    `evaluateCorrectionSatisfaction`, P/B attribution and `classifyBrownlowChain`: L1–L7 over
+    immutable history (earliest-at-k′ binding, L3 key components, L4 citation, L5 attribution +
+    row proof, L6 uniqueness, L7 through `CD_I`), L8-b/L8-b′/L8-c on the current row, L8-d with
+    §5.12's recognised writers and `data_edits` audit timing (`draft` explains nothing; a
+    Brownlow-admin explanation on a still-`afl_api` round row covers `match_id` NULL→m only), C14
+    for an absent target, D-1…D-6, SAT-1 (including `identity_unresolvable` and the §10 M1 chain
+    rule), SAT-2 (full batch binding + `rowProofs` coverage) and SAT-5 (unmoved `CD_I` row at P,
+    later `CD_I` application at a vacated key). A re-run never evaluates Q1 guards or the D10
+    manifest, opens no batch, appends no ledger row and writes nothing; a different
+    `--to-player-id` is STOP `already_corrected_provider`.
+  - **Defects found and fixed while wiring the shared path:** K's `validation_result` was written
+    only at finalisation, after the post-write check, so that check found no bound batch and
+    examined no row — K is now bound before any mutation (§8.2 step 5); `to_jsonb(row).source_id`
+    (the numeric `sources.id`) was compared with `'afl_api'`, so P1/B1 never passed (Q1 could not
+    plan a MOVE, and SAT-5's unmoved-row check was vacuous); P2's expected stamp was the latest
+    application's own id (a `…|CD_J` history would have passed) and P3's `|CD_I` suffix was
+    unchecked; bigint ids (`canonical_applications`, `player_match_stats`, `brownlow_round_votes`,
+    `import_batch_id`, the ledger) came back as strings and are now cast; the typed-projection move
+    was keyed on a column the projection does not hold and its failure was swallowed.
+  - **§5.10 SV-2a implemented** (schema-1 manifest, `artefact.csv_sha256` and `identity.csv_sha256`,
+    strict loader-rule CSV parse, `ProfileResolver`-exact mapping, row-for-row equality with NULL ≠
+    0); SV-1 now binds the current `published_revision`. Falling back to SV-3 is not permitted by
+    slice 5 (§8.2 step 2 runs §5.10 inside Q1), and would have STOPped every correction touching an
+    artefact-loaded season.
+  - **§5.11 DP-4** was not implemented at all (hard-coded `false`); it now applies the loader's
+    `club_season_participation` rule literally over P's rows minus every MOVE/DELETE, with a
+    no-club dependent or participation row never justifying a resolution (stricter, never looser).
+  - **B3-I/B3-C parser:** the stored `brownlow_match_votes` payload is the per-match
+    `AflApiBrownlowMatchVoteRecord`, not the raw `brownlowSeason` envelope the first pass parsed
+    (so it returned `[]` for every real payload); a missing/malformed/contradictory payload is now
+    "unproven" (count −1), never "CD_I absent" (which B3-C case 2 accepts as a demotion).
+  - **Not changed, recorded:** a foreign row at P (P1/B1 false) is still a Q1 STOP rather than C11
+    NOOP `foreign`; BG2 still counts a paired Brownlow closure row at the same event as foreign;
+    SAT-5's "no typed projection names P for `CD_I`" clause and SAT-1's extended bijection are not
+    separately evaluated (the planner's `SatisfactionEvidence` has no field for them; L8-c covers
+    the projection of each corrected row). All are fail-closed or already-covered; none is silently
+    permissive. **(Withdrawn by the second remediation below: operator review found these, and
+    three more, to be real safety defects. This pass did not reach semantic completion.)**
+  - **Validation:** DB-free tests extended in `tests/correct-afl-api-identity-cli.test.ts`
+    (cases 12, 14, 15, 22, 49, 69–72, 85, 86, 88, 93–99, 101, the post-write/re-run parity, the
+    no-write structure, DP-4 exhaustive differential, SV-2a/case 82, B3-I fixtures). Operator-run
+    afterwards: `tsc` PASS; the CLI + planner suites 173/173; recovery + promotion-check +
+    player-link-mutations 524/524. Passing tests did not prove the slice complete (below).
+- **Update 2026-09-28: Slice 5 second remediation (uncommitted, base `788bffa2`). Ready for
+  operator validation, not for a `code_test_db` rehearsal.** Operator review of the passing first
+  remediation found six safety defects in `tools/migration/correct_afl_api_identity.ts`; all fixed
+  (runbook §0 and §12 slice 5, "second remediation disposition"; the pure planner module is
+  unchanged):
+  - **BG2** counted this correction's own paired Brownlow closure row as foreign and bound an
+    unresolved round row by season alone. It now exempts exactly the round rows proven C11-claimed
+    and B1–B5-passing, binds an unresolved row by (S(M), R(M)) from `matches` (the admin resolve
+    step's mapping), and still blocks every foreign, NULL-owned, indeterminate or unproven row.
+  - **Three fail-open `.catch` defaults** (BG3 entry-state, `stat_availability`, ISSUE-240
+    findings) removed; failures propagate and roll back. Only the top-level CLI `.catch` remains.
+  - **C11:** a non-`afl_api` row at P is a reported NOOP `foreign` whatever its key's AFL API
+    history; one carrying `CD_I`'s own stamp or application batch without its owner is an
+    indeterminate STOP; `afl_api`-owned rows keep every P/B check.
+  - **SAT-1** evaluates the shared `checkAflApiIdentityInvariant` (whole-table) plus §8.6's "at its
+    `player_identity`" for P′. **SAT-5** checks every typed projection row of `CD_I` in both tables;
+    the ORIGINAL write therefore moves every `CD_I` projection still naming P, not only a MOVE row's.
+  - **B4** (was hard-coded `false`) is gathered: another provider's `CD_M` projection at P, a live
+    identity at P for another voter in the insert payload, or another voter's positive vote in the
+    key's history. Q2's L5 re-run uses the immutable-history half.
+  - **Adjacent:** readers no longer drop a row with no application history (an `afl_api`-owned one
+    is now a P3/B2 STOP); a match-less Brownlow row's BG3 and C1c now cover every match of its
+    (S, R) (both were skipped).
+  - **Validation:** DB-free tests extended in `tests/correct-afl-api-identity-cli.test.ts`, named
+    by clause (BG2 cases 1–5, C1c, C11, B4, SAT-1, SAT-5, fail-closed reads, source contracts);
+    in-memory/source-contract only, no DB integration claimed. **Not run by this pass** (CLAUDE.md
+    §9). Operator: `npx tsc --noEmit -p .`; `npx vitest run
+    tests/correct-afl-api-identity-cli.test.ts tests/afl-api-identity-correction.test.ts`; then
+    `tests/afl-api-adjudication-recovery.test.ts tests/db-promotion-check.test.ts
+    tests/player-link-mutations.test.ts`. Open for operator review: whole-table SAT-1 and the
+    projection-move scope (runbook §13.2). No DEV/PROD/`code_test_db` or Git command ran.
+- **Update 2026-09-29: Slice 5 second remediation, operator validation COMPLETE (uncommitted, base
+  `788bffa2`).** `npx tsc --noEmit -p .` PASS; `correct-afl-api-identity` CLI + planner 208/208;
+  adjudication recovery + promotion-check + player-link-mutations 524/524 (current Slice-5 total
+  732/732); a fail-open `.catch` audit confirmed only the top-level CLI error handler remains.
+  **Operator accepted the three runbook §13.2 readings as final:** whole-table SAT-1 fail-closed
+  invariant, the global `CD_I` projection-move scope, and history-only B4 evidence on
+  Q2/ALREADY_SATISFIED — none is open for further review. No DEV, PROD or `code_test_db`
+  correction/rehearsal was run; slice 10/11 rehearsal remains deferred. An unrelated untracked
+  file (`second`, repo root) sits alongside this pass's changes; it is not part of Slice 5 and
+  remains unstaged. **Final Slice-5 semantic/diff review COMPLETE.** **Next action:** operator
+  commit of Slice 5. ISSUE-238 remains Open; Slice 6+ is not authorised by this commit.
 
 ## AFLDB-ISSUE-252 — Production promotion cannot reinstate production-owned state that references current-season rebuilt entities absent from `afldb_test`
 

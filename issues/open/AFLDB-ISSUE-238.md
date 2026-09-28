@@ -2,8 +2,96 @@
 
 ## 0. Status
 
-- **Open, Medium. Slice 4 implementation and DB-free validation COMPLETE (remediated
-  2026-09-28), uncommitted, base `e55a554d`. Integration acceptance PENDING** on a clean,
+- **CURRENT STATE (2026-09-29): Slice 5 implementation COMPLETE, second remediation COMPLETE,
+  operator validation COMPLETE (`tsc` PASS; 732/732 tests PASS; `.catch` audit PASS), final
+  semantic/diff review COMPLETE. Slice 5 is uncommitted (base `788bffa2`; Slice 4 is committed at
+  `788bffa2`) and ready for operator commit. No `code_test_db` rehearsal has been performed or
+  authorised. ISSUE-238 remains Open; Slice 6+ is not authorised by the Slice-5 commit. The
+  unrelated untracked repo-root file `second` is not part of Slice 5 and stays unstaged.** The
+  dated entries below are the chronology and are kept as written.
+- **Slice 5 SECOND REMEDIATION (2026-09-28, uncommitted, base `788bffa2`) — OPERATOR VALIDATION
+  COMPLETE, NOT for a `code_test_db` rehearsal.** After the first remediation the operator ran
+  `tsc` (PASS) and the DB-free suites (173/173 and 524/524), then found by review that Slice 5 was
+  **not** semantically complete: the first remediation's "recorded, fail-closed" items and three
+  further defects were real safety gaps. Green tests did not prove the slice. This pass fixes six
+  areas in `tools/migration/correct_afl_api_identity.ts` (details: §12 slice 5, "second remediation
+  disposition"):
+  1. **BG2 (§5.9)** counted this correction's own paired Brownlow closure row as foreign, and bound
+     an unresolved round row to an event by season alone. BG2 now exempts exactly the round rows
+     proven (C11-claimed and B1–B5) to be closure rows, binds an unresolved row by
+     (S(M), R(M)) as the admin resolve step does, and still blocks every foreign, NULL-owned,
+     indeterminate or unproven row at the event.
+  2. **Three fail-open SQL catches** (BG3 entry-state read, `stat_availability`, ISSUE-240 findings)
+     are removed; a read failure now propagates and rolls the transaction back. Only the top-level
+     CLI `main(...).catch(...)` remains.
+  3. **C11 (§5.4)**: a row at P is classified by its CURRENT owner. A non-`afl_api` row is a
+     reported NOOP `foreign` (historical AFL API applications at its key do not make it
+     correction-owned); one that nevertheless carries `CD_I`'s own stamp or batch is an
+     indeterminate STOP; an `afl_api`-owned row keeps every P/B check.
+  4. **SAT-1** now evaluates the shared ISSUE-235/237 invariant (`checkAflApiIdentityInvariant`)
+     plus §8.6's "at its `player_identity`" clause for P′.
+  5. **SAT-5** now checks every typed projection row of `CD_I` in both projection tables, not only
+     the one attached to a bound MOVE; so the ORIGINAL write now moves every `CD_I` projection row
+     still naming P (§8.2 step 6).
+  6. **B4 (§5.3)** was hard-coded `false`; it is now gathered (typed projection, live identities of
+     the insert payload's other voters, the key's own history). Q2's L5 re-runs the immutable half.
+
+  Adjacent fixes in the same paths: the candidate readers no longer drop a row with no application
+  history (an `afl_api`-owned one is now a P3/B2 STOP, per §5.2/§5.6); a match-less Brownlow row's
+  BG3 and C1c now cover every match of its (S, R) (both were skipped). DB-free tests extended.
+  **Operator validation (2026-09-29):** `npx tsc --noEmit -p .` PASS; the CLI + planner suite
+  208/208; recovery + promotion-check + player-link-mutations 524/524 (current Slice-5 total
+  732/732); a fail-open `.catch` audit confirmed only the top-level CLI error handler remains.
+  **Operator accepted the three §13.2 readings as final** (whole-table SAT-1 fail-closed invariant;
+  global `CD_I` projection-move scope; history-only B4 evidence on Q2/ALREADY_SATISFIED) — see
+  §13.2. No DEV, PROD or `code_test_db` correction/rehearsal was run; slice 10/11 rehearsal remains
+  deferred. **Final Slice-5 semantic/diff review: COMPLETE (2026-09-29). Next: operator commit of
+  Slice 5. ISSUE-238 stays Open; Slice 6+ is not authorised by this commit.**
+- **Slice 5 REMEDIATION (2026-09-28, uncommitted, base `788bffa2`) — supersedes the gap list in
+  the entry below; itself superseded by the second remediation above. It did NOT reach semantic
+  completion: the items it "recorded, fail-closed" were defects.** The first pass's operator run gave 98/98 DB-free tests and 13 `tsc` errors.
+  This pass fixes the 13 errors (a mutable `PlanStop[]` accumulator behind the readonly plan
+  field; a per-table `Record<string, JsonValue>` new key) and closes the Slice-5 blocker: CORRECTION
+  SATISFACTION (§5.12 Q2) is now ONE pure evaluator, `evaluateCorrectionSatisfactionQ2`, over
+  evidence one read-only reader gathers, called unchanged by the §8.4 post-write re-plan and by
+  every §8.5 re-run on a `CORRECTED(A)` provider. It composes the planner's own lineage, L8, C14
+  and SAT evaluators (details: §12 slice 5). A re-run never evaluates Q1 guards or the D10
+  manifest and writes nothing. Also fixed, because the shared path depends on them: K is bound
+  (§8.2 step 5) before the mutations instead of after the post-write check (which therefore
+  examined no row); P1/B1 compared the numeric `source_id` with `'afl_api'` and never passed; P2's
+  expected stamp was circular and P3's `|CD_I` suffix unchecked; bigint ids returned as strings;
+  the projection move was mis-keyed and its error swallowed. SV-2a, the exact DP-4 rule and the
+  stored-payload B3-I parser are implemented. Recorded, not changed (fail-closed): a foreign row at
+  P STOPs instead of C11 NOOP; BG2 counts a paired Brownlow closure row. **Not yet re-typechecked
+  or re-tested after remediation (CLAUDE.md §9).** *(Historical: the operator subsequently ran `tsc`
+  and the suites, then found the semantic gaps fixed by the second remediation above.)*
+- **HISTORICAL (original implementation pass; superseded by the CURRENT STATE and second
+  remediation above): Slice 5 (the ORIGINAL CLI and transaction) implemented, uncommitted, base
+  `788bffa2` (2026-09-28). NOT YET TYPECHECKED OR TEST-RUN by this pass.** `tools/migration/correct_afl_api_identity.ts`
+  implements the §8.2 ORIGINAL transaction, §8.7 batch contract and §8.8 role model:
+  argument parsing and the D9 evidence-file/surname-acknowledgement contract; the D10 identity
+  lock plus D7 advisory locks; row-level `FOR UPDATE` locking of every candidate/counterpart/
+  matches row for dry-run/apply (never validate-only, per §8.2's "takes no write lock"); live
+  evidence-gathering for P1–P7 and B1–B5 (B3-I/B3-C payload parsing included) wired into the
+  Slice-2 pure planner; BG1–BG3/C1c/C1–C14; DP-1–DP-3; SV-0/SV-1; the conditional MOVE/DELETE
+  write with `rowProofs`; the targeted recompute and byte-identical `stat_availability`
+  assertion; batch open/finalise; `--expect-fingerprint`; and a §8.5 ALREADY_SATISFIED re-run
+  path. DB-free tests: `tests/correct-afl-api-identity-cli.test.ts`.
+  - **Disclosed gaps (not hidden; see §12 slice 5 disposition below for the full list):** §5.10
+    SV-2a is not implemented (safely falls back to the SV-3 STOP); §5.11 DP-4's participation
+    check is a conservative approximation; and, most significantly, **the §5.6 L8 current-row
+    classification and the C14 `correction_target_absent` branch are not implemented in the §8.5
+    re-run/CORRECTION SATISFACTION path** (only L1–L7/D-1…D-6 immutable-history checks run
+    there), so a re-run can report ALREADY_SATISFIED without catching an unexplained
+    post-correction divergence or a stamp contradiction (matrix cases 14/15/71/97/98 uncovered by
+    that path). The in-transaction post-write check right after a fresh write is unaffected.
+  - No DEV/PROD database, SQL, migration, promotion, rebuild or Git command ran. No accepted
+    decision (D1–D10, O-1…O-6, D-P5-1…3) changed. **Then-next (historical, done):** operator runs
+    `npx tsc --noEmit -p .` and the new/existing DB-free suites, reviews the disclosed gaps above,
+    and decides whether to close them before any slice 10/11 rehearsal.
+- **HISTORICAL — Slice 4 has since been committed at `788bffa2`.** **Open, Medium. Slice 4
+  implementation and DB-free validation COMPLETE (remediated 2026-09-28), then uncommitted, base
+  `e55a554d`. Integration acceptance PENDING** on a clean,
   migration-current `afldb_test` (see the remediation note at §12 slice 4 disposition). Corrected
   ledger semantics and every §8.6 reader are implemented and DB-free validated (§8.6 "Slice 4
   disposition", §12 slice 4): D15 confirms a correction (ALREADY_SATISFIED) and never writes one;
@@ -2791,13 +2879,132 @@ FOR SEPARATE OPERATOR AUTHORISATION.**
    - the widened `AflApiAdjudicationLedgerRow` type and every pass-5 reader (§8.6).
 
    **Zero-`corrected` parity tests** extend the existing ISSUE-235/237 suites.
-5. **The ORIGINAL CLI and transaction**: `tools/migration/correct_afl_api_identity.ts`,
+5. **The ORIGINAL CLI and transaction** — **CURRENT STATUS (2026-09-29): implementation complete;
+   second remediation complete; operator validation COMPLETE (`tsc` PASS; 732/732 tests PASS;
+   `.catch` audit PASS); final semantic/diff review COMPLETE. Still uncommitted (base `788bffa2`);
+   no `code_test_db` rehearsal performed. Next: operator commit. Slice 6+ remains separate future
+   work.** *Original pass text follows (historical: IMPLEMENTED 2026-09-28, uncommitted, NOT YET
+   TYPECHECKED OR TEST-RUN at that time; the remediation dispositions below record what followed).*
+   `tools/migration/correct_afl_api_identity.ts`,
    `--validate-only | --dry-run | --apply`, per §8.2, §8.7 and §8.8. It includes:
    - the surname acknowledgement;
    - the row locks, conditional writes and `rowProofs`;
    - the targeted recompute (§4.D) with the `stat_availability` assertion;
-   - the §8.4 CORRECTION SATISFACTION re-plan;
-   - the §8.5 ALREADY_SATISFIED re-run.
+   - the §8.4 CORRECTION SATISFACTION re-plan (the in-transaction post-write check only; see the
+     disposition below for what the §8.5 re-run path does not yet cover);
+   - the §8.5 ALREADY_SATISFIED re-run, **with known gaps**: it re-derives L1–L7/D-1…D-6 from
+     immutable `canonical_applications` history and SAT-1/SAT-2/SAT-5 (SAT-5 via a real
+     re-attribution check at P), but it does **not** call the pure planner's `evaluateL8` or
+     `evaluateCorrectionTargetAbsent` — so an already-corrected row's current-row ownership/stamp
+     stability and its post-correction-edit classification (explained vs. unexplained) are not
+     verified on a re-run, and an absent target is not distinguished from an unexplained one.
+     §5.10 SV-2a (schema-1 CSV parity) is not implemented (falls back to the safe SV-3 STOP), and
+     §5.11 DP-4's participation predicate is a conservative approximation of the loader's exact
+     query. DB-free tests: `tests/correct-afl-api-identity-cli.test.ts` (CLI-level: args, DSN
+     guard, evidence-file hashing, the B3-I payload extractor, report formatting). Not run by this
+     pass: `npx tsc --noEmit -p .`, `npx vitest`, or any `code_test_db` rehearsal.
+
+   **Slice 5 remediation disposition (2026-09-28, uncommitted; supersedes the gap list above).**
+   - **Q2 shared path.** `checkCorrectionSatisfaction(reader, {providerId, adjudicationId,
+     currentBatchId})` = `gatherCorrectionSatisfactionEvidence` + `evaluateCorrectionSatisfactionQ2`.
+     The post-write re-plan passes K as `currentBatchId`; the §8.5 re-run
+     (`runAlreadyCorrectedRerun`) passes null and receives only the read-only reader. Per bound
+     MOVE: L1 (the earliest application at k′ is A's bound afl_api update, exactly one at k′), L2,
+     L3 (target key, derived old key, current row's key components), L4 (H's latest citation;
+     `|CD_I`), L5 (P3/P4/P2-stamp or B2/B3-I/B3-C/B4 over H, chain consistency, row proof), L6
+     (one bound application per cited version and non-player key), L7 (through `CD_I`; Brownlow via
+     `classifyBrownlowChain`); then C14 for an absent row (`player_match_stats` + audited
+     `match_deletion` after `c.applied_at` only), else L8-b/L8-b′/L8-c and L8-d with the §5.12
+     writer table (`match_sheet` fields; `brownlow_votes` via finalise/correct/void; Brownlow
+     `match_id` NULL→m on a still-`afl_api` row; `match_id`→NULL via `match_deletion`; audited
+     re-ownership with revision n; `draft` explains nothing; L7 re-seeding). Per bound DELETE:
+     D-1…D-6 from immutable history, `source_id` compared as the numeric afl_api id. SAT-1 adds
+     `identity_unresolvable` and the §10 M1 chain rule; SAT-2 checks every binding field and
+     `rowProofs` coverage both ways; SAT-5 detects an unmoved `CD_I`-created row at P (P1/P3/P4 or
+     B1/B2 plus insert proof — stamps and projections cannot hide it) and a later `CD_I` application
+     at a vacated key. `post_correction_reappearance` is reported. Every failed condition is named.
+   - **SV-2a: implemented, not deferred.** §8.2 step 2 runs §5.10 in Q1, and slice 5 names no
+     exemption; SV-3 for every artefact-loaded season would STOP every correction in such a season.
+     Steps (0)–(4) as §5.10; the CSV hash is over the committed file's bytes, so a CRLF checkout
+     (Windows `autocrlf`) STOPs, which is fail-closed. SV-1 now also binds `published_revision`.
+   - **DP-4: the literal rule.** STOP iff, after removing every `player_match_stats` MOVE/DELETE,
+     P has no `player_match_stats` row in a match of the dependent's season whose club shares the
+     dependent club's `organization_id` (`after_siren.py:834-843`). A dependent or participation row
+     with no club never justifies (stricter). Applied to `after_siren_kicks` and
+     `player_achievements` match-less rows in every affected season; P′ rows reported.
+   - **B3-I parser:** the stored `AflApiBrownlowMatchVoteRecord` shape only; missing, malformed,
+     wrong-match or unrelated payloads are unproven (−1), never "CD_I absent".
+   - **Recorded, unchanged (fail-closed):** P1/B1-false rows at P STOP instead of C11 NOOP
+     `foreign`; BG2 counts a paired Brownlow closure row at the same event; SAT-5's
+     projection/identity clause and SAT-1's extended bijection have no planner field (L8-c covers
+     each corrected row's projection); B4 remains `false` as in the first pass. **Withdrawn by the
+     second remediation below: these were defects, not acceptable fail-closed limits.**
+   - **DB-free tests added** (`tests/correct-afl-api-identity-cli.test.ts`): cases 12, 14, 15, 22,
+     49, 69, 70, 71, 72, 82, 85, 86, 88, 93, 94, 95, 96, 97, 98, 99, 101; post-write/re-run parity;
+     re-run writes nothing (state byte-identical, no batch/adjudication in the outcome, no write SQL
+     in the Q2 section, re-run branch precedes every write and the D10 manifest); DP-4 exhaustive
+     never-looser differential; B3-I fixtures. Operator-run afterwards: `tsc` PASS, 173/173 and
+     524/524 — which did not prove the slice complete (below).
+
+   **Slice 5 second remediation disposition (2026-09-28, uncommitted, base `788bffa2`).** Operator
+   review of the passing first remediation found six safety defects; all are fixed in
+   `correct_afl_api_identity.ts`. Nothing in the pure planner module changed.
+   - **BG2 (§5.9).** A Brownlow pre-pass classifies every round row of P (C11, then B1–B5 through
+     `evaluateBrownlowMutationEligibility` with gathered B4) before any guard runs.
+     `provenBrownlowClosureRowIdsOf` is exactly the C11-claimed rows whose B1–B5 pass; such a row is
+     MOVEd/DELETEd by this plan or its own STOP stops the plan, so exempting it never lets a
+     surviving dependency through. `foreignBrownlowRowsAtEvent` blocks every other row of P at the
+     event: `b.match_id = M`, or `b.match_id IS NULL` with `(b.season, b.round_number) = (S(M),
+     R(M))` from `matches` (the admin resolve step's mapping, `admin-brownlow.ts:798-808`; R(M)
+     NULL — a final — binds no unresolved row, as `round_number = NULL` matches nothing there). A
+     match-less Brownlow closure row's event is its (S, R) with every match of (S, R). Ownership
+     alone never exempts a row: an `afl_api` row failing B3-I or any other B-check still blocks.
+   - **Fail-open catches.** `readEntryStateNamesPlayer` (BG3), `readStatAvailability` (§8.2 step 8)
+     and `resolveAdjudicatedContradictions` (§8.2 step 7) have no `.catch`; a failure propagates out
+     of `sql.begin` and rolls back. The top-level CLI handler is the file's only `.catch(`.
+   - **C11 (§5.4, §5.2 "P1 false is foreign").** `classifyClosureOwnership`: `afl_api`-owned →
+     `claimed` (every P1–P7/B1–B5 check, failures STOP); any other owner or NULL → `foreign`
+     (reported NOOP, preserved untouched; a foreign round row stays a BG2 blocker) unless the row
+     carries `CD_I`'s own lineage — a `…|CD_I` stamp (Brownlow: an AFL API `CD_M` record id at the
+     key) or the batch of an AFL API application at its key — which only the applier writes, so it
+     cannot be told from corrupted `CD_I` lineage: `indeterminate`, STOP `C11 provenance_unexplained`.
+     A NULL-owned row with no provenance (the match-sheet INSERT shape) is foreign, consistent with
+     `post_correction_reappearance`.
+   - **SAT-1.** New reader fact `identityInvariantFacts` (the same census, whole ledger and D7
+     identities `assertAflApiIdentityInvariant` reads); the pure `sat1ExtendedBijectionProblems`
+     runs the shared `checkAflApiIdentityInvariant` unchanged (so the tracked `profile_url_continuity`
+     alias stays permitted) and adds §8.6's "at its `player_identity`" for P′: no other net
+     `linked`/`corrected` provider may name P′. **Whole-table, as the shared invariant is**: an
+     unrelated invariant breach also STOPs SAT-1 (fail-closed; see §13.2).
+   - **SAT-5.** New reader fact `providerProjections` (every `staging.afl_api_player_match` and
+     `staging.afl_api_brownlow_vote` row of `CD_I`); `sat5ProjectionContradictions` STOPs on a row
+     naming P, a row naming a third player, or one `(table, CD_M)` with disagreeing players. A NULL
+     Brownlow `player_id` names no one. L8-c's per-row check is unchanged. **Consequence for the
+     ORIGINAL write (§8.2 step 6, read as "every `CD_I` projection row"):** the projection move is
+     now one UPDATE per table over every `CD_I` row still naming P — the MOVE rows', a C2/C4
+     DELETE's and any stray one — instead of per MOVE row; otherwise a DELETE or a stray projection
+     would fail the post-write Q2 every time.
+   - **B4 (§5.3).** Not structurally impossible: `uq_external_identities_afl_api_player` and the
+     applier's `duplicate_player_canonical_identity` refusal (`afl-api-brownlow.ts:724-727`) bind
+     one settle's instant, not the key's history or an earlier projection. Q1 gathers three halves
+     (`brownlowAnotherProviderResolvedToPlayer`): another provider's `CD_M` projection naming P; a
+     live `afl_api` identity at P for another voter in the insert payload; the key's history showing
+     a positive vote that is not `CD_I`'s entry (`brownlowHistoryShowsAnotherVoter`). Q2's L5 re-run
+     uses only the immutable history half (the other two are current state that a later legitimate
+     link of another provider to P may change).
+   - **Adjacent, same paths.** Readers return every row at P (an `afl_api`-owned row with no
+     application history was silently skipped; it is now the §5.2 P3 / §5.3 B2 STOP). A match-less
+     Brownlow row's BG3 covers every match of (S, R) (it checked none) and its C1c requires P′
+     participation in exactly one match of (S, R) after the plan (it was skipped); those matches
+     are locked `FOR UPDATE` in a locking run (§8.2 step 1, `R238-P5-03`).
+   - **DB-free tests added** (named by clause): BG2 cases 1–5 plus the (S, R) event and C1c;
+     C11 foreign/NULL/indeterminate/claimed for both tables; B4 halves, planner PASS/STOP and the Q2
+     L5 STOP; SAT-1 normal/second provider at P′ (human and importer)/ledger collision/missing row/
+     continuity alias permitted and an untracked pair refused; SAT-5 stray (both tables)/corrected-
+     only/NULL/conflicting/third player; the three fail-closed reads against a failing transaction;
+     source contracts (one `.catch(`, no hard-coded B4, Q2 evaluator awaits nothing, projection move
+     scope). In-memory and source-contract only: **no DB integration is claimed.** Not run by this
+     pass.
 6. **Promotion v3.** CPC pre-classification and the v3 artefact (with `plannerVersion`) at §6; the
    §7.4e candidate REPLAY (owner role); CRV at §7.5; PSG over the whole ledger digest; the D15 v3
    binding and ALREADY_SATISFIED; the post-swap **gate**; the `docs/production-promotion.md`
@@ -3069,6 +3276,18 @@ it is named:
 - **Optional future capability (D-P5-3), recorded only.** A match-sheet removal audit that records
   the removed player ids would let `match_sheet_removal` explain `correction_target_absent`. It is
   not an ISSUE-238 prerequisite, and no issue is allocated for it.
+- **Resolved by operator decision (Slice 5 second remediation, accepted 2026-09-29).** Three
+  implementation readings the runbook text left to judgement, each taken in the fail-closed
+  direction, were put to the operator alongside the validation results above and **accepted as
+  final** — none is open for further review:
+  - SAT-1's extended bijection is evaluated **whole-table**, exactly as the shared
+    `checkAflApiIdentityInvariant` is. An unrelated invariant breach (another provider's census
+    anomaly or unresolved D7 identity) therefore STOPs every correction's post-write Q2 and every
+    re-run until it is repaired. Scoping it to `CD_I`/P′ would have been a narrowing; not taken.
+  - §8.2 step 6's "move the typed projection rows where present" is read as **every** `CD_I`
+    projection row still naming P (both tables), which SAT-5 requires to be satisfiable.
+  - Q2's L5 re-runs only B4's immutable-history half; the typed-projection and live-identity halves
+    are Q1 (current-state) evidence.
 
 ## 14. History
 

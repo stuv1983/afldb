@@ -14,20 +14,28 @@
 ### AFLDB-ISSUE-238 — Correcting a consumed trusted `afl_api` player link with canonical reattribution
 - **Severity:** Medium. **Area:** admin / player identity — `external_identities` (`afl_api`),
   `player_match_stats`, `brownlow_round_votes`, `canonical_applications` and derived dependents.
-- **State:** Open. Slices 1–3 done (migrations 106/107 committed at `e55a554d`). **Slice 4 COMPLETE,
-  uncommitted (2026-09-28):** every §8.6 ledger reader handles `corrected`. D15 only confirms a
-  correction (ALREADY_SATISFIED). Bijection, agreement, overlap and G2 treat it as live authority at
-  P′, and G2 refuses it until slice 6's CPC exists. The digest extends only for `corrected` rows. The
-  admin revoke refuses a corrected provider (T21). The recovery export is v2. The rebuild capture
-  stays v2 and refuses a live `corrected` row. `tsc` is clean; the DB-free suites pass (planner
-  73/73); zero-`corrected` parity is pinned.
-- **Key files:** `src/lib/acquisition/afl-api-adjudication.ts`, `src/db/queries/afl-api-player-links.ts`,
-  `tools/db/promotion-check.ts`, `tools/migration/{replay,rebuild,recover}_afl_api_adjudications.ts`.
+- **State:** Open. Slices 1–4 done (migrations 106/107 committed at `e55a554d`; Slice 4
+  committed at `788bffa2`). **Slice 5 (the ORIGINAL CLI/transaction) is implemented, SECOND
+  remediation COMPLETE, operator validation COMPLETE 2026-09-29, final Slice-5 diff review
+  COMPLETE; still uncommitted, ready for operator commit. No `code_test_db` rehearsal has been
+  performed or authorised.** The first remediation passed `tsc` and the
+  DB-free suites but was not semantically complete; operator review found six safety defects, now
+  fixed: BG2 (paired closure row counted foreign; season-only event binding), three fail-open SQL
+  catches, C11 foreign NOOP, SAT-1 extended bijection, SAT-5 global projections (the write now
+  moves every `CD_I` projection naming P), B4 gathered instead of hard-coded `false`. Adjacent:
+  zero-history rows no longer skipped; match-less Brownlow BG3/C1c now cover (S, R). `tsc` PASS;
+  732/732 current Slice-5 tests PASS; fail-open `.catch` audit PASS. Operator accepted the three
+  §13.2 readings (whole-table SAT-1, global projection-move scope, history-only B4 on Q2) as final.
+- **Key files:** `tools/migration/correct_afl_api_identity.ts`,
+  `src/lib/acquisition/afl-api-identity-correction.ts`, `src/lib/acquisition/afl-api-adjudication.ts`,
+  `src/db/queries/afl-api-player-links.ts`, `tools/db/promotion-check.ts`,
+  `tools/migration/{replay,rebuild,recover}_afl_api_adjudications.ts`.
 - **Runbook:** `issues/open/AFLDB-ISSUE-238.md`.
-- **Next action:** operator review/commit of the Slice-4 change and the operator-run integration
-  acceptance (`settle-afl-api`, `afl-api-adjudication-fixtures`, `privileges`); then separate
-  operator authorisation for slice 5 (the ORIGINAL CLI, `correct_afl_api_identity.ts`). Deploy
-  migration 106 + `db:privileges` before this code.
+- **Unrelated:** the repo-root untracked file `second` is not part of Slice 5 and must remain
+  unstaged.
+- **Next action:** operator commit of Slice 5. ISSUE-238 stays Open; Slice 6+ is not authorised by
+  that commit and needs separate authorisation. No slice 10/11 rehearsal yet. Deploy migration 106
+  + `db:privileges` before this code.
 
 ### AFLDB-ISSUE-234 — Optional AFL API feed expansion (extended statistics, umpires, play-by-play)
 - **Severity:** Low. **Area:** data acquisition, investigation only.
