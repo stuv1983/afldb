@@ -14,9 +14,29 @@
 ### AFLDB-ISSUE-238 — Correcting a consumed trusted `afl_api` player link with canonical reattribution
 - **Severity:** Medium. **Area:** admin / player identity — `external_identities` (`afl_api`),
   `player_match_stats`, `brownlow_round_votes`, `canonical_applications` and derived dependents.
-- **State:** Open. **Slice 7 implementation, DB-free validation and final semantic review
-  COMPLETE. ISSUE-238 remains Open. Next implementation work requires separate Slice-8
-  authorisation; Slice-10/11 database rehearsal remains deferred.** Slice 7 = rebuild capture v3;
+- **State:** Open. **Slice 8 implementation, DB-free validation and final semantic review
+  COMPLETE. ISSUE-238 remains Open. Next implementation work requires separate Slice-9
+  authorisation; Slice-10/11 database rehearsal remains deferred; the PROD gate
+  `CORRECTED_PROMOTION_REHEARSAL_REQUIRED` stays.** Base `9facb9cc` (Slice 7 committed there).
+  Operator validation (2026-09-29, final tree): `npx tsc --noEmit -p .` PASS; Slice-8 focused
+  **319/319 PASS** (`afl-api-identity-correction` 115, `correct-afl-api-identity-cli` 204);
+  regression **1,072/1,072 PASS** (`db-test-rebuild` 511, `db-promotion-check` 413,
+  `player-link-mutations` 122, `afl-api-adjudication-recovery` 26); total **1,391/1,391 PASS**;
+  `git diff --check` PASS. Final semantic review: no CRIT/HIGH, no blocking code defect; MED-1
+  tracking-only; LOW-1 (close-after-COMMIT test) and LOW-2 (DP-5 DateStyle hardening) deferred,
+  non-blocking. No database rehearsal (no `code_test_db`, no DEV/PROD database execution, no
+  migration/rebuild/promotion/deployment execution); no cache invalidation/revalidation; no
+  migration or privilege change; mutation fingerprint unchanged; promotion/rebuild write
+  allow-lists unchanged. Slice 8 (S8-D1…S8-D4) = a report-only §5.1
+  context (per-season §5.10 verdicts, DP-3/DP-4 with refresh paths, §4.G artefact risk) built
+  pre-commit, plus a post-transaction read-only, best-effort impact report (exact cache paths and
+  the manual O-4 season revalidation command — printed, never run; Coleman seasons; open findings;
+  pending candidates; the new DP-5 detector); Q2 target-absent / post-correction-edit outcomes
+  exposed structurally. Fingerprint, STOP objects and `PLANNER_VERSION` (2) unchanged; REPLAY never
+  calls the reporter; a report failure after COMMIT stays COMMITTED. *(Historical, 2026-09-29
+  Slice-8 implementation pass: it ran no command and awaited operator DB-free validation, since
+  completed above.)* *(Historical, Slice 7:)* **Slice 7 implementation, DB-free validation and final semantic
+  review COMPLETE.** Slice 7 = rebuild capture v3;
   Stage 21 (b′) identity-only rebuild REPLAY straddling D15 — (b) → (b′ write) → (c) → (b′ verify) →
   (d) → (e); Stage 22 SAT-1; recovery v3 plus the recovery-only archived-v2 reader;
   `docs/deployment.md`. Operator validation (2026-09-29, base `76d70e38`): `npx tsc --noEmit -p .`
@@ -32,8 +52,9 @@
   typechecked or test-run at the time.)* Decisions OD-S7-1 (v2 file and marker refused by name; archived v2
   readable by recovery only), OD-S7-2 (P and P′ resolve to one distinct live player before
   destruction), OD-S7-3 (P4-10 out), C1 (the Stage 21 order). No migration or privilege change.
-  Slices 1–6 committed (migrations 106/107 at `e55a554d`; Slice 4 at
-  `788bffa2`; Slice 5, the ORIGINAL CLI/transaction, at `b440b226`; Slice 6 at `76d70e38`).
+  Slices 1–7 committed (migrations 106/107 at `e55a554d`; Slice 4 at
+  `788bffa2`; Slice 5, the ORIGINAL CLI/transaction, at `b440b226`; Slice 6 at `76d70e38`; Slice 7
+  at `9facb9cc`).
   *(Historical, Slice 6:)* **Slice 6 (promotion v3 /
   CPC) implementation, DB-free validation and final semantic review COMPLETE**: operator ran
   `npx tsc --noEmit -p .` PASS; planner + correction CLI 257/257; promotion + mutation 535/535;
@@ -53,7 +74,7 @@
 - **Runbook:** `issues/open/AFLDB-ISSUE-238.md`.
 - **Unrelated:** the repo-root untracked file `second` is not part of this work and must remain
   unstaged.
-- **Next action:** next implementation work requires separate Slice-8 authorisation. ISSUE-238
+- **Next action:** next implementation work requires separate Slice-9 authorisation. ISSUE-238
   remains Open; Slice-10/11 database rehearsal remains deferred. A pending v2 rebuild must be finished with the old tooling before this is used. Deploy
   migration 106 + `db:privileges` before this code.
 

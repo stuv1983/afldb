@@ -2,9 +2,28 @@
 
 ## 0. Status
 
-- **CURRENT STATE (2026-09-29, final Slice-7 review): Slice 7 implementation, DB-free validation
-  and final semantic review COMPLETE. ISSUE-238 remains Open. Next implementation work requires
-  separate Slice-8 authorisation; Slice-10/11 database rehearsal remains deferred.** Operator
+- **CURRENT STATE (2026-09-29, Slice 8): Slice 8 implementation, DB-free validation and final
+  semantic review COMPLETE. ISSUE-238 remains Open. Next implementation work requires separate
+  Slice-9 authorisation; Slice-10/11 database rehearsal remains deferred; the temporary PROD gate
+  `CORRECTED_PROMOTION_REHEARSAL_REQUIRED` stays.** Base `9facb9cc` (Slices 1–7 committed; Slice 7
+  at `9facb9cc`). Operator validation (final tree): `npx tsc --noEmit -p .` PASS; Slice-8 focused
+  **319/319 PASS** (`tests/afl-api-identity-correction.test.ts` 115,
+  `tests/correct-afl-api-identity-cli.test.ts` 204); regression **1,072/1,072 PASS**
+  (`tests/db-test-rebuild.test.ts` 511, `tests/db-promotion-check.test.ts` 413,
+  `tests/player-link-mutations.test.ts` 122, `tests/afl-api-adjudication-recovery.test.ts` 26);
+  total **1,391/1,391 PASS**; `git diff --check` PASS. Final semantic review: no CRIT, no HIGH, no
+  blocking code defect; MED-1 was tracking-only (this update); LOW-1/LOW-2 deferred, non-blocking
+  (§12 slice 8). Operator decisions S8-D1…S8-D4 (§13.1): report-only cache handling; reporting
+  reads after the transaction, read-only and best-effort; promotion/Coleman deferred to Slice 11;
+  STOP reporting pre-commit. No database rehearsal (no `code_test_db`, no DEV/PROD database
+  execution, no migration/rebuild/promotion/deployment execution); no cache invalidation or
+  revalidation; no migration or privilege change; `PLANNER_VERSION` remains 2; mutation fingerprint
+  unchanged; promotion/rebuild write allow-lists unchanged. `CHANGELOG.md` not edited. The untracked
+  repo-root file `second` is untouched. Details: §12 slice 8 "Slice-8 disposition".
+- **Slice 7 final state (historical; Slice 7 was then committed at `9facb9cc`): Slice 7
+  implementation, DB-free validation and final semantic review COMPLETE. ISSUE-238 remains Open.
+  Next implementation work requires separate Slice-8 authorisation; Slice-10/11 database rehearsal
+  remains deferred.** Operator
   validation (base `76d70e38`, final tree): `npx tsc --noEmit -p .` PASS; final combined DB-free
   suite **1,342/1,342 PASS** — `tests/db-test-rebuild.test.ts` 511,
   `tests/db-promotion-check.test.ts` 413, `tests/player-link-mutations.test.ts` 122,
@@ -3241,6 +3260,112 @@ FOR SEPARATE OPERATOR AUTHORISATION.**
    - the §5.10 verdicts;
    - the §5.11 DP-3…DP-5 reports and refresh paths;
    - `correction_target_absent` and `post_correction_edit` reports.
+   - **Slice-8 disposition (2026-09-29, base `9facb9cc`, Slice 7 committed there): implementation,
+     DB-free validation and final semantic review COMPLETE. ISSUE-238 remains Open. Next
+     implementation work requires separate Slice-9 authorisation; Slice-10/11 database rehearsal
+     remains deferred.** Operator decisions S8-D1…S8-D4 (§13.1). *(Historical, implementation pass
+     2026-09-29: the pass edited files only — no shell, Git, test, typecheck, database or deployment
+     command — and was then awaiting operator DB-free validation; superseded by the validation and
+     final review recorded at the end of this disposition.)*
+     - **Report model** (`src/lib/acquisition/afl-api-identity-correction.ts`, pure, report-only):
+       `CorrectionReportContext` = §5.1 `context` — `closureRows` (every MOVE/DELETE row: table,
+       row id, disposition, match, season, club, goals), `seasonVerdicts` (one
+       `SeasonVerdictReport` per affected season: class, `INDEPENDENT`/`STOP`, rule SV-0/1/2a/3,
+       proof, the plan's own STOP step/code, each failed condition — `describeSeasonVerdict` only
+       describes `evaluateSeasonTotalIndependence`'s verdict), `dependents` (DP-3/DP-4
+       `DependentReportEntry` with `dependentRefreshPath`), `artefactRisk` (§4.G,
+       `artefactRecurrenceRisk`). `buildClosure` returns it beside `plan`; it is never part of
+       `MutationPlan`, so the fingerprint, STOP object shape and `PLANNER_VERSION` (2) are unchanged.
+       The adjudication `evidence` payload and the promotion/rebuild `closure.reports` strings are
+       unchanged.
+     - **Post-transaction impact** (`tools/migration/correct_afl_api_identity.ts`,
+       `gatherImpactReport` over `ImpactReportReader`; `dbImpactReportReader` runs each read in its
+       own `READ ONLY` transaction, SELECT only; each section best-effort, a failed one listed as
+       REPORT INCOMPLETE): exact cache paths (`affectedCachePaths`: `/players/<slug>-<id>` for P and
+       P′, every touched `/matches/<id>`, `/seasons/<year>`, `/brownlow/<year>` only for a season with
+       a Brownlow MOVE/DELETE row, `/clubs/<slug>` of the moved `player_match_stats` rows,
+       `/records`, `/records/[category]` (every category page, as `admin/brownlow/actions.ts`
+       revalidates it), `/`; deterministic and deduplicated; no route claimed when no canonical row
+       moved) with the manual O-4 season revalidation command printed per affected season and never
+       run; Coleman (`evaluateColemanImpact`, the `coleman-derivation.json` contract:
+       home-and-away, `seasons.status = 'complete'`, `>= first_season`; `goals > 0` → totals change;
+       a 0/NULL-goal row only when P or P′ is a current Coleman winner of that season → club
+       attribution; award_winners never recomputed; refresh command printed); open findings
+       (`selectOpenFindings`: unresolved `afl_api` `canonical_apply_failed` on `…|CD_I`; unresolved
+       ISSUE-240 contradictions for CD_I or naming P/P′ by id or stable identity, flagging the one
+       §8.2 step 7 adjudicates) and pending candidates (`selectPendingCandidates`: `…|CD_I` or
+       proposing P; non-pending never); DP-5.
+     - **DP-5** (`evaluateFirstKickGoalDebutChanges`, pure, report-only, never a STOP, never in the
+       plan): for P and P′, a `first_kick_goal` row is reported when the debut match (first by
+       `(match_date, match_id)`, `player-derived.ts`) or the debut season (minimum season) changes;
+       P loses every `player_match_stats` MOVE and DELETE, P′ gains MOVE rows only (a DELETE adds
+       nothing to P′). A committed report reconstructs the pre-correction careers in memory
+       (`careersBeforeCorrection`); a prospective one reads them as they stand.
+     - **DP-3 / DP-4**: DP-3's existing read now returns the exact unresolved row ids (detection is
+       still "non-empty"); DP-4 reports the unchanged loader verdict per row with its refresh path.
+     - **Q2 outcomes**: `correction_target_absent`, recognised `post_correction_edit` (incl.
+       `brownlow_admin_reowned`) and `post_correction_reappearance` are exposed as
+       `SatisfactionReportEntry` beside Q2's unchanged `reports`; unexplained edits and unexplained
+       absences still STOP exactly as before.
+     - **Lifecycle** (`reportAfterTransaction`, `main`): `--apply` COMMITs, then reports; a
+       reporter failure after COMMIT keeps COMMITTED, prints REPORT INCOMPLETE and exits 0; `main`'s
+       post-commit catch and connection close never reach the top-level "nothing was written"
+       handler, which still serves every pre-commit failure. `--dry-run` (ROLLED_BACK) and
+       `--validate-only` (PLANNED) render the same report as "would affect" after their forced
+       ROLLBACK. A STOP renders from the pre-commit context only; an ALREADY_SATISFIED re-run calls no
+       reporter and claims no cache/Coleman/dependent impact. The generic cache/Coleman lines are
+       removed.
+     - **Boundaries**: no revalidation call, HTTP client or `revalidatePath`; promotion and rebuild
+       REPLAY never reach the reporter (S8-D3); no migration, privilege, role, allow-list or
+       `PLANNER_VERSION` change; `CORRECTED_PROMOTION_REHEARSAL_REQUIRED` stays; P4-10 untouched;
+       `CHANGELOG.md` not edited.
+     - **Recorded limits**: the promotion-replay Coleman/DP-5 effect is Slice 11 evidence (S8-D3);
+       Q2 still reads no foreign Brownlow rows for the partial case-73 scenario (not widened by
+       Slice 8); the cache paths are the §4.H set only (the `/records/first-kick-goal` and
+       `/records/after-the-siren` special-record pages follow their own admin lifecycle).
+     - **Tests** *(added by the implementation pass; run by the operator below)*:
+       `tests/afl-api-identity-correction.test.ts` (§5.10 verdict
+       description, artefact risk, fingerprint stability under differing contexts, cache paths,
+       Coleman, DP-3/DP-4 reports, DP-5, findings/candidate selectors);
+       `tests/correct-afl-api-identity-cli.test.ts` (committed/prospective/STOP/ALREADY_SATISFIED
+       lifecycle, report-incomplete after COMMIT, per-section failure, read-only DB reader, zero
+       canonical rows, structured Q2 outcomes, source pins for the report-only boundaries).
+     - **Slice-8 validation and final review (2026-09-29).** Operator validation on base
+       `9facb9cc` (Slice 8 uncommitted at the time of the final review), final tree:
+       `npx tsc --noEmit -p .` PASS; Slice-8 focused **319/319 PASS**
+       (`tests/afl-api-identity-correction.test.ts` 115, `tests/correct-afl-api-identity-cli.test.ts`
+       204); regression **1,072/1,072 PASS** (`tests/db-test-rebuild.test.ts` 511,
+       `tests/db-promotion-check.test.ts` 413, `tests/player-link-mutations.test.ts` 122,
+       `tests/afl-api-adjudication-recovery.test.ts` 26); total **1,391/1,391 PASS**;
+       `git diff --check` PASS (LF→CRLF warnings only). Final semantic review: no CRIT, no HIGH, no
+       blocking code defect. Slice 8 delivered: a structured report-only correction impact context;
+       exact cache-path reporting with no invalidation; Coleman stale-season reporting; open-finding
+       and pending-candidate reporting; complete §5.10 verdict reporting and the artefact recurrence
+       risk; DP-3/DP-4 report detail; DP-5 report-only debut-dependency detection; structured Q2
+       report outcomes; and post-COMMIT reporting whose failure cannot reverse or misreport a
+       successful correction. Mutation fingerprint unchanged; `PLANNER_VERSION` remains 2;
+       promotion/rebuild write allow-lists unchanged; `CORRECTED_PROMOTION_REHEARSAL_REQUIRED`
+       remains.
+       **MED-1** — live tracking still read "awaiting validation"; fixed by this update
+       (tracking only, no code change).
+       **Not implemented (deferred, non-blocking):** LOW-1 no test for the close-after-COMMIT
+       branch (`closeCorrectionConnection`; `main`'s post-commit catch is source-pinned only) —
+       Slice-10 real-connection evidence or a later pin; LOW-2 DP-5 career dates use
+       `match_date::text`, which assumes ISO DateStyle output (`to_char(…, 'YYYY-MM-DD')` would
+       harden it). INFO: `/brownlow/<year>` renders only `brownlow_season_votes`, so listing it for a
+       Brownlow MOVE/DELETE is a harmless over-report consistent with §4.H; a 0/NULL-goal Coleman
+       DELETE is flagged when only P′ is the winner (harmless over-report); a slug-read failure marks
+       the whole cache section unavailable (never empty); the SV-1 failed-check text says
+       "votes > 0" while the pre-existing adapter flag is `played !== false` (wording only); an
+       in-doubt COMMIT (connection lost after COMMIT sent) still reports "nothing was written"
+       (pre-existing, not Slice 8). No database rehearsal (no `code_test_db`, no DEV/PROD database
+       execution, no migration/rebuild/promotion/deployment execution); no cache invalidation or
+       revalidation; no migration or privilege change. Deferred to Slice 10/11: the reporter's real
+       SELECT permissions under `afldb_import`; real findings/candidate/Coleman/slug results; a
+       post-COMMIT report failure on a real PostgreSQL connection; case-47 derived-table parity;
+       the promotion DP-5/Coleman interaction. **Slice 8 implementation, DB-free validation and
+       final semantic review COMPLETE. ISSUE-238 remains Open. Next implementation work requires
+       separate Slice-9 authorisation; Slice-10/11 database rehearsal remains deferred.**
 9. **DB-free and full static regression suite**: typecheck, lint and every DB-free suite touched by
    slices 2–8.
 10. **`code_test_db` correction rehearsal** covering every §12.1 case marked **R**.
@@ -3437,6 +3562,10 @@ wording (`R238-P5-02`, `player_match_stats` only) and the post-correction writer
 | **OD-S7-2** | **(2026-09-29, Slice 7) Pre-destruction identity resolution: YES.** Before any destructive rebuild step, each net-corrected row's `previous_player_identity` must resolve to exactly one live player, distinct from the player `player_identity` (P′) resolves to; otherwise a pre-destruction STOP. Narrow by decision: no Q2/SAT census at capture time. | **APPROVED (operator)** |
 | **OD-S7-3** | **(2026-09-29, Slice 7) P4-10 (the first-kick-goal `docs/deployment.md` omission): NO.** Not folded into Slice 7; it stays outside this slice (§13.2). | **DECIDED (operator)** |
 | **C1** | **(2026-09-29, Slice 7) Stage 21 ordering: ACCEPTED.** SAT-1 is whole-table and D15 inserts the ordinary net-linked rows, so the corrected Q2 cannot run before D15: (a) → (b) → (b′ write) → (c) D15 (corrected set = its exact expected ALREADY_SATISFIED set) → (b′ verify) → (d) → (e), all in one transaction (§9.2). Rebuild REPLAY accepts CPC class 3 exactly, moves no typed projection, introduces no role, and uses Stage 21's own owner DSN with its target/database/marker assertions; Stage 22 builds SAT-1 from the accepted primitives; no new capture digest field. | **ACCEPTED (operator)** |
+| **S8-D1** | **(2026-09-29, Slice 8) Cache handling is report-only.** The CLI invokes no revalidation endpoint (not even `/api/internal/revalidate-season`) and adds no revalidation framework or client. It reports the exact potentially stale routes/entities and prints the existing manual season-revalidation command (O-4) for each affected season. Actual cache expiry/revalidation stays outside the transaction and outside this slice. | **DECIDED (operator)** |
+| **S8-D2** | **(2026-09-29) Reporting reads occur after the transaction.** Reads needed only for the operator report (player/club slugs, findings, candidates, Coleman season/status context, DP-5 careers) run after the mutation transaction has finished, read-only and best-effort. A report failure after COMMIT keeps the COMMITTED result, says the report is incomplete, exits successfully, and never claims "nothing was written" or a rollback. No distributed transaction between PostgreSQL and reporting/cache work. | **DECIDED (operator)** |
+| **S8-D3** | **(2026-09-29) Promotion/Coleman interaction deferred.** Promotion-replay Coleman staleness (and any promotion DP-5 effect) is not solved in Slice 8; it is recorded for the Slice 11 rehearsal/evidence. No cache invalidation is added to promotion or rebuild REPLAY. | **DEFERRED to Slice 11** |
+| **S8-D4** | **(2026-09-29) STOP reporting is pre-commit.** The post-transaction reporter is never needed to explain a STOP: every Q1/validation STOP satisfies §5.7 from evidence collected before rollback/exit. Every affected season gets a structured §5.10 verdict (a failing one names the season, class, rule and failing step/code); STOP detail lives in the unfingerprinted report context, never in the plan's STOP objects (whose shape is unchanged). | **DECIDED (operator)** |
 
 No new operator decision is required by pass 4. The choices pass 4 made to resolve the review are
 **design choices for the reviewer**, not operator decisions. Where an alternative materially exists,

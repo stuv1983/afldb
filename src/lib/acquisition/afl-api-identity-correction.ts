@@ -26,6 +26,8 @@
  *   §5.12 MUTATION ELIGIBILITY vs CORRECTION SATISFACTION (Q1/Q2), and
  *         `post_correction_edit` / `post_correction_reappearance` (pass 5,
  *         pass 5a `R238-P5-01`, `R238-P5-05`)
+ *   §8.2 step 11 the Slice-8 structured operator report (§4.F-§4.H, §5.10
+ *         verdicts, §5.11 DP-3...DP-5): report-only, never fingerprinted
  *
  * Two questions, never mixed for one row (§5.12):
  *   - MUTATION ELIGIBILITY (Q1): may this row be mutated now? Runs every
@@ -36,6 +38,7 @@
  */
 import { createHash } from 'node:crypto';
 
+import { clubPath, matchPath, playerPath, seasonPath } from '../format';
 import { canonicalJson, type JsonValue } from './observations';
 
 /* ==================================================================== *
@@ -1041,6 +1044,556 @@ export function evaluateDependents(evidence: DependentEvidence): DependentResult
   if (evidence.firstKickGoalTieBreakChanges) reports.push('DP-5: the first-kick-goal tie-break evidence changes');
   return { stops, reports };
 }
+
+/* ==================================================================== *
+ * §8.2 step 11 / §5.1 `context.reports`: the Slice-8 structured operator report
+ *
+ * Everything below is REPORT-ONLY. None of it is part of `MutationPlan`, so none of it can change
+ * the fingerprint (§5.1, P4-03), and none of it decides a disposition or a STOP: the §5.10 and
+ * §5.11 decisions stay with `evaluateSeasonTotalIndependence` / `evaluateDependents`, and these
+ * functions only describe their outcome, or compute report-only facts (cache paths, Coleman,
+ * DP-5, findings, candidates) from evidence the adapter reads after the transaction (S8-D2).
+ * ==================================================================== */
+
+/** A committed ORIGINAL correction, or a prospective one (`--dry-run` / `--validate-only`). */
+export type ImpactPhase = 'committed' | 'prospective';
+
+/** One MOVE/DELETE closure row, as the report needs it. */
+export type ClosureImpactRow = {
+  readonly table: CanonicalTable;
+  readonly rowId: number;
+  readonly disposition: 'MOVE' | 'DELETE_AS_FOREIGN_COLLISION';
+  /** The row's match; null only for a match-less Brownlow row. */
+  readonly matchId: number | null;
+  readonly season: number;
+  /** `player_match_stats.club_id`; always null for a Brownlow row. */
+  readonly clubId: number | null;
+  /** `player_match_stats.goals` (NULL = not recorded, never 0); always null for a Brownlow row. */
+  readonly goals: number | null;
+};
+
+/* ---- §5.10 per-season verdicts ---- */
+
+/** The adapter's SV class of V (`classifySeasonTotals`). */
+export type SeasonTotalsClassName = 'empty' | 'admin_published' | 'artefact' | 'unprovable';
+
+export type SeasonVerdictReport = {
+  readonly season: number;
+  readonly seasonClass: SeasonTotalsClassName;
+  readonly verdict: 'INDEPENDENT' | 'STOP';
+  readonly rule: 'SV-0' | 'SV-1' | 'SV-2a' | 'SV-3';
+  /** How independence was proved, or why it could not be. */
+  readonly proof: string;
+  /** Exactly the plan's STOP for this season (step and code), or null. */
+  readonly stop: { readonly step: string; readonly code: StopCode } | null;
+  /** §5.7: every failing condition, named. Empty for an INDEPENDENT season. */
+  readonly failedChecks: readonly string[];
+};
+
+/**
+ * Describe one §5.10 verdict for the report. It never re-decides: `verdict` is exactly what
+ * `evaluateSeasonTotalIndependence(evidence)` returned, and the STOP (when any) is its own.
+ */
+export function describeSeasonVerdict(input: {
+  readonly season: number;
+  readonly seasonClass: SeasonTotalsClassName;
+  readonly evidence: SeasonIndependenceEvidence;
+  readonly verdict: SeasonIndependenceVerdict;
+}): SeasonVerdictReport {
+  const { season, seasonClass, evidence, verdict } = input;
+  const failedChecks: string[] = [];
+  switch (evidence.kind) {
+    case 'admin_published':
+      if (evidence.closureMovesOrDeletesPositiveBrownlowRowInSeason) {
+        failedChecks.push('SV-1: the closure moves or deletes a Brownlow round row with votes > 0 in this season');
+      }
+      if (evidence.pOrPPrimeHasRowInSeasonTotals) {
+        failedChecks.push('SV-1: P or P′ has a brownlow_season_votes row in this season (its games input changes)');
+      }
+      break;
+    case 'artefact_schema_1':
+      if (!evidence.identityCsvSha256Matches) {
+        failedChecks.push('SV-2a(0): manifest identity.csv_sha256 is missing or differs from sha256(data/brownlow/player-identity.csv)');
+      }
+      if (!evidence.artefactCsvSha256Matches) {
+        failedChecks.push('SV-2a(1): manifest artefact.csv_sha256 differs from sha256(data/brownlow/season-votes.csv), or the CSV is missing');
+      }
+      if (!evidence.profilePathResolvesToExactlyOnePlayer) {
+        failedChecks.push('SV-2a(3): a season profile path resolves to zero or several players, or the CSV is unparseable');
+      }
+      if (!evidence.rowForRowMatch) {
+        failedChecks.push('SV-2a(4): the live season rows are not equal row-for-row to the mapped schema-1 CSV rows');
+      }
+      break;
+    case 'unprovable':
+      failedChecks.push(seasonClass === 'artefact'
+        ? 'SV-3: the season-votes manifest is missing, unparseable or not schema 1'
+        : 'SV-3: mixed classes, an unknown source or stamp, or a stale published revision');
+      break;
+    case 'empty':
+      break;
+  }
+  if (!verdict.independent) {
+    const rule: SeasonVerdictReport['rule'] = verdict.stop.step === 'SV-1' ? 'SV-1' : verdict.stop.step === 'SV-2a' ? 'SV-2a' : 'SV-3';
+    return {
+      season, seasonClass, verdict: 'STOP', rule,
+      proof: `not proven independent: ${verdict.stop.detail}`,
+      stop: { step: verdict.stop.step, code: verdict.stop.code },
+      failedChecks,
+    };
+  }
+  const passed = {
+    empty: { rule: 'SV-0', proof: 'no brownlow_season_votes rows exist for this season' },
+    admin_published: {
+      rule: 'SV-1',
+      proof: 'every row is admin-published at the current revision; no positive Brownlow closure row, and neither P nor P′ holds a row',
+    },
+    artefact_schema_1: {
+      rule: 'SV-2a',
+      proof: 'schema-1 master: identity.csv_sha256 and artefact.csv_sha256 match, every profile path resolves to exactly one player, and the live rows equal the mapped CSV row-for-row',
+    },
+  } as const;
+  const matched = evidence.kind === 'unprovable' ? null : passed[evidence.kind];
+  if (matched === null) {
+    // evaluateSeasonTotalIndependence never returns independent for SV-3; fail closed if it ever did.
+    return { season, seasonClass, verdict: 'STOP', rule: 'SV-3', proof: 'unprovable', stop: { step: 'SV-3', code: 'season_artefact_unprovable' }, failedChecks };
+  }
+  return { season, seasonClass, verdict: 'INDEPENDENT', rule: matched.rule, proof: matched.proof, stop: null, failedChecks: [] };
+}
+
+/** §4.G / O-3: the artefact recurrence risk, reported on every correction (report only). */
+export function artefactRecurrenceRisk(input: {
+  readonly providerId: string;
+  readonly seasonVerdicts: readonly SeasonVerdictReport[];
+}): readonly string[] {
+  const stopped = input.seasonVerdicts.filter((v) => v.verdict === 'STOP').map((v) => v.season);
+  const seasons = input.seasonVerdicts.length === 0
+    ? 'no affected season'
+    : stopped.length === 0
+      ? `every affected season proved independent (${input.seasonVerdicts.map((v) => v.season).join(', ')})`
+      : `NOT proven independent: season(s) ${stopped.join(', ')} (whole-plan STOP)`;
+  return [
+    `bridge artefacts (data/reference/afl-api-player-bridge-*.json, the S5b name-bridge) are not rewritten and may still map ${input.providerId} to P`,
+    'live target: the loader cannot re-apply that mapping (first trusted writer wins, migration 104); a replay records an ISSUE-240 contradiction finding instead',
+    `season-total Brownlow artefacts (§4.E): fail-closed by §5.10 -- ${seasons}`,
+    'promotion source lineage (afldb_test) and its promotion candidate: governed by the corrected-promotion replay (§9); CORRECTED_PROMOTION_REHEARSAL_REQUIRED remains',
+    'correction-aware bridge and artefact handling is deferred (O-3)',
+  ];
+}
+
+/* ---- §5.11 dependent reports (DP-3, DP-4, DP-5) ---- */
+
+export type DependentTable = 'after_siren_kicks' | 'player_achievements';
+
+export type DependentReportEntry = {
+  readonly rule: 'DP-3' | 'DP-4' | 'DP-5';
+  /** DP-4 alone can be a STOP here (the plan already carries it); DP-3 and DP-5 are report-only. */
+  readonly outcome: 'REPORT' | 'STOP';
+  readonly table: DependentTable;
+  readonly rowId: number;
+  readonly playerId: number | null;
+  readonly matchId: number | null;
+  readonly season: number | null;
+  readonly detail: string;
+  /** §5.11: the operator refresh path. Reported, never run. */
+  readonly refreshPath: readonly string[];
+};
+
+/** §5.11 "the operator refresh path is reported, never run". */
+export function dependentRefreshPath(table: DependentTable, rowId: number, outcome: 'REPORT' | 'STOP'): readonly string[] {
+  const family = table === 'after_siren_kicks' ? 'after-the-siren' : 'first-kick-goal';
+  const stages = table === 'after_siren_kicks' ? 'stages after-siren, after-siren-reconcile' : 'stage first-kick-goal';
+  return [
+    `live target: correct ${table}#${rowId} through its special-records admin surface /admin/records/${family}/${rowId}`
+      + (outcome === 'STOP' ? ', then re-run the correction' : ''),
+    `afldb_test: the next db:test:rebuild re-resolves it (${stages})`,
+  ];
+}
+
+/** DP-3 (report only): the unresolved (`player_id IS NULL`) dependents at a closure row's match. */
+export function unresolvedDependentReports(input: {
+  readonly closureRowId: number;
+  readonly matchId: number;
+  readonly rows: readonly { readonly table: DependentTable; readonly id: number }[];
+}): DependentReportEntry[] {
+  return [...input.rows]
+    .sort((a, b) => (a.table === b.table ? a.id - b.id : a.table.localeCompare(b.table)))
+    .map((row) => ({
+      rule: 'DP-3', outcome: 'REPORT', table: row.table, rowId: row.id, playerId: null, matchId: input.matchId, season: null,
+      detail: `unresolved ${row.table}#${row.id} at match ${input.matchId} (closure row player_match_stats#${input.closureRowId}): its resolution evidence changes`,
+      refreshPath: dependentRefreshPath(row.table, row.id, 'REPORT'),
+    }));
+}
+
+/** DP-4: the exact loader-participation verdict (unchanged), described per row with its refresh path. */
+export function matchLessDependentReports(verdict: {
+  readonly losesParticipation: readonly MatchLessDependentRef[];
+  readonly participationRemains: readonly MatchLessDependentRef[];
+  readonly pPrimeReported: readonly MatchLessDependentRef[];
+}): DependentReportEntry[] {
+  const entry = (d: MatchLessDependentRef, outcome: 'REPORT' | 'STOP', detail: string): DependentReportEntry => ({
+    rule: 'DP-4', outcome, table: d.table, rowId: d.id, playerId: d.playerId, matchId: null, season: d.season, detail,
+    refreshPath: dependentRefreshPath(d.table, d.id, outcome),
+  });
+  return [
+    ...verdict.losesParticipation.map((d) => entry(d, 'STOP',
+      `match-less ${d.table}#${d.id} (player ${d.playerId}, season ${d.season}) loses its justifying club-season participation`)),
+    ...verdict.participationRemains.map((d) => entry(d, 'REPORT',
+      `match-less ${d.table}#${d.id} (player ${d.playerId}, season ${d.season}) keeps its justifying participation; affected, still valid`)),
+    ...verdict.pPrimeReported.map((d) => entry(d, 'REPORT',
+      `match-less ${d.table}#${d.id} (P′ player ${d.playerId}, season ${d.season}) only gains participation; affected`)),
+  ];
+}
+
+/** The fields of a match-less dependent the DP-4 report needs (the adapter's `MatchLessDependent`). */
+export type MatchLessDependentRef = {
+  readonly table: DependentTable;
+  readonly id: number;
+  readonly playerId: number;
+  readonly season: number;
+};
+
+/** One `player_match_stats` participation of a player, in career order terms (§4.D). */
+export type CareerMatch = {
+  readonly matchId: number;
+  /** `matches.match_date` as ISO `YYYY-MM-DD` text, so string order is date order. */
+  readonly matchDate: string;
+  readonly season: number;
+};
+
+/** A `player_achievements` `first_kick_goal` row naming P or P′. */
+export type FirstKickGoalRow = {
+  readonly id: number;
+  readonly playerId: number;
+  readonly matchId: number | null;
+  readonly season: number;
+};
+
+/**
+ * The debut under the repository's own derived contract (`player-derived.ts`): `career_game_no = 1`
+ * is the first match by `(match_date, match_id)`, and `debut_season` is the minimum season.
+ */
+export function careerDebut(career: readonly CareerMatch[]): { readonly matchId: number | null; readonly season: number | null } {
+  let first: CareerMatch | null = null;
+  let season: number | null = null;
+  for (const m of career) {
+    if (first === null || m.matchDate < first.matchDate || (m.matchDate === first.matchDate && m.matchId < first.matchId)) first = m;
+    if (season === null || m.season < season) season = m.season;
+  }
+  return { matchId: first?.matchId ?? null, season };
+}
+
+/**
+ * The pre-correction careers of P and P′. A prospective report reads them before any write (the
+ * dry-run rolled back), so they are the current state. A committed report reads after COMMIT, so
+ * the correction is undone in memory: P regains every MOVE and DELETE row, P′ loses the MOVE rows.
+ */
+export function careersBeforeCorrection(input: {
+  readonly phase: ImpactPhase;
+  readonly pCurrent: readonly CareerMatch[];
+  readonly pPrimeCurrent: readonly CareerMatch[];
+  readonly moved: readonly CareerMatch[];
+  readonly deleted: readonly CareerMatch[];
+}): { readonly pBefore: readonly CareerMatch[]; readonly pPrimeBefore: readonly CareerMatch[] } {
+  if (input.phase === 'prospective') return { pBefore: input.pCurrent, pPrimeBefore: input.pPrimeCurrent };
+  const movedIds = new Set(input.moved.map((m) => m.matchId));
+  return {
+    pBefore: uniqueCareer([...input.pCurrent, ...input.moved, ...input.deleted]),
+    pPrimeBefore: input.pPrimeCurrent.filter((m) => !movedIds.has(m.matchId)),
+  };
+}
+
+function uniqueCareer(rows: readonly CareerMatch[]): CareerMatch[] {
+  const byMatch = new Map<number, CareerMatch>();
+  for (const row of rows) if (!byMatch.has(row.matchId)) byMatch.set(row.matchId, row);
+  return [...byMatch.values()];
+}
+
+/**
+ * §5.11 DP-5 (report only; never a STOP, never in the plan): a `first_kick_goal` row for P or P′
+ * whose player's debut match (`career_game_no = 1`) or `debut_season` the correction changes. P
+ * loses every `player_match_stats` MOVE and DELETE row; P′ gains the MOVE rows only (a DELETE adds
+ * nothing to P′).
+ */
+export function evaluateFirstKickGoalDebutChanges(input: {
+  readonly pId: number;
+  readonly pPrimeId: number;
+  readonly pBefore: readonly CareerMatch[];
+  readonly pPrimeBefore: readonly CareerMatch[];
+  readonly moved: readonly CareerMatch[];
+  readonly deleted: readonly CareerMatch[];
+  readonly firstKickGoals: readonly FirstKickGoalRow[];
+}): DependentReportEntry[] {
+  const removed = new Set([...input.moved, ...input.deleted].map((m) => m.matchId));
+  const after = new Map<number, readonly CareerMatch[]>([
+    [input.pId, input.pBefore.filter((m) => !removed.has(m.matchId))],
+    [input.pPrimeId, uniqueCareer([...input.pPrimeBefore, ...input.moved])],
+  ]);
+  const before = new Map<number, readonly CareerMatch[]>([[input.pId, input.pBefore], [input.pPrimeId, input.pPrimeBefore]]);
+  const out: DependentReportEntry[] = [];
+  for (const playerId of [input.pId, input.pPrimeId]) {
+    const rows = input.firstKickGoals.filter((r) => r.playerId === playerId).sort((a, b) => a.id - b.id);
+    if (rows.length === 0) continue;
+    const was = careerDebut(before.get(playerId)!);
+    const now = careerDebut(after.get(playerId)!);
+    if (was.matchId === now.matchId && was.season === now.season) continue;
+    const role = playerId === input.pId ? 'P' : 'P′';
+    const changes = [
+      ...(was.matchId !== now.matchId ? [`debut match ${String(was.matchId)} -> ${String(now.matchId)}`] : []),
+      ...(was.season !== now.season ? [`debut season ${String(was.season)} -> ${String(now.season)}`] : []),
+    ].join(', ');
+    for (const row of rows) {
+      out.push({
+        rule: 'DP-5', outcome: 'REPORT', table: 'player_achievements', rowId: row.id, playerId,
+        matchId: row.matchId, season: row.season,
+        detail: `first_kick_goal player_achievements#${row.id} for ${role} (player ${playerId}): ${changes}; the importer's tie-break evidence changes (import-first-kick-goal.ts:446-457)`,
+        refreshPath: dependentRefreshPath('player_achievements', row.id, 'REPORT'),
+      });
+    }
+  }
+  return out;
+}
+
+/* ---- §4.F Coleman ---- */
+
+/** A `player_match_stats` closure row with the Coleman derivation's inputs (coleman-derivation.json). */
+export type ColemanRowFacts = {
+  readonly rowId: number;
+  readonly season: number;
+  readonly matchId: number;
+  /** `matches.is_final` (= round_type <> 'home_and_away', migration 003). */
+  readonly isFinal: boolean;
+  /** `seasons.status = 'complete'`. */
+  readonly seasonComplete: boolean;
+  readonly goals: number | null;
+};
+
+export type ColemanStaleReason = 'goal_totals_change' | 'winner_club_attribution';
+
+export type ColemanSeasonImpact = {
+  readonly season: number;
+  readonly reasons: readonly ColemanStaleReason[];
+  readonly rowIds: readonly number[];
+};
+
+/**
+ * §4.F (report only): the completed seasons whose derived Coleman `award_winners` the correction
+ * can make stale. A row counts only in the derivation's own scope: home-and-away (`NOT is_final`),
+ * `seasons.status = 'complete'`, `season >= first_season`. Then:
+ *   - `goals > 0`: P's (and, for a MOVE, P′'s) home-and-away total changes;
+ *   - otherwise (0 or NULL goals): only the winner's club attribution (the derivation's DISTINCT
+ *     club count over the winner's home-and-away rows) can change, and only when P or P′ is a
+ *     current Coleman winner of that season.
+ * Seasons are sorted and deduplicated. Nothing is recomputed or written.
+ */
+export function evaluateColemanImpact(input: {
+  readonly rows: readonly ColemanRowFacts[];
+  readonly firstSeason: number;
+  readonly winnerSeasonsForPOrPPrime: ReadonlySet<number>;
+}): ColemanSeasonImpact[] {
+  const bySeason = new Map<number, { reasons: Set<ColemanStaleReason>; rowIds: Set<number> }>();
+  for (const row of input.rows) {
+    if (row.isFinal || !row.seasonComplete || row.season < input.firstSeason) continue;
+    let reason: ColemanStaleReason | null = null;
+    if (row.goals !== null && row.goals > 0) reason = 'goal_totals_change';
+    else if (input.winnerSeasonsForPOrPPrime.has(row.season)) reason = 'winner_club_attribution';
+    if (reason === null) continue;
+    const entry = bySeason.get(row.season) ?? { reasons: new Set<ColemanStaleReason>(), rowIds: new Set<number>() };
+    entry.reasons.add(reason);
+    entry.rowIds.add(row.rowId);
+    bySeason.set(row.season, entry);
+  }
+  const order: readonly ColemanStaleReason[] = ['goal_totals_change', 'winner_club_attribution'];
+  return [...bySeason.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([season, e]) => ({
+      season,
+      reasons: order.filter((r) => e.reasons.has(r)),
+      rowIds: [...e.rowIds].sort((a, b) => a - b),
+    }));
+}
+
+/* ---- §4.H caches (D10, O-4: report only, never invalidated here) ---- */
+
+export type CacheImpact = {
+  readonly canonicalRowsChanged: boolean;
+  /** Exact, deterministic, deduplicated. */
+  readonly paths: readonly string[];
+  /** The seasons whose `/seasons/<year>` the existing CLI-reachable revalidation can refresh (O-4). */
+  readonly seasonRevalidations: readonly number[];
+  /** Entities whose exact path could not be composed (a slug that was not found). */
+  readonly unresolved: readonly string[];
+};
+
+/**
+ * The exact ISR routes (§4.H) the MOVE/DELETE closure can make stale, in a fixed group order:
+ * P, P′, matches, seasons, Brownlow seasons, clubs, then `/records`, `/records/[category]` (the
+ * existing contract revalidates every category page, `admin/brownlow/actions.ts`) and `/`.
+ * `/brownlow/<year>` only for a season with a Brownlow closure row. With no canonical row moved
+ * or deleted, no route is claimed.
+ */
+export function affectedCachePaths(input: {
+  readonly rows: readonly ClosureImpactRow[];
+  /** P then P′; `slug` null when the player could not be read. */
+  readonly players: readonly { readonly id: number; readonly slug: string | null }[];
+  readonly clubSlugs: ReadonlyMap<number, string>;
+}): CacheImpact {
+  if (input.rows.length === 0) return { canonicalRowsChanged: false, paths: [], seasonRevalidations: [], unresolved: [] };
+  const sortedNumbers = (values: Iterable<number>) => [...new Set(values)].sort((a, b) => a - b);
+  const paths: string[] = [];
+  const unresolved: string[] = [];
+  for (const player of input.players) {
+    if (player.slug === null) unresolved.push(`player ${player.id}: slug unavailable (/players/<slug>-${player.id})`);
+    else paths.push(playerPath(player.slug, player.id));
+  }
+  for (const id of sortedNumbers(input.rows.flatMap((r) => (r.matchId === null ? [] : [r.matchId])))) paths.push(matchPath(id));
+  const seasons = sortedNumbers(input.rows.map((r) => r.season));
+  for (const season of seasons) paths.push(seasonPath(season));
+  for (const season of sortedNumbers(input.rows.filter((r) => r.table === 'brownlow_round_votes').map((r) => r.season))) {
+    paths.push(`/brownlow/${season}`);
+  }
+  const clubPaths: string[] = [];
+  for (const clubId of sortedNumbers(input.rows.flatMap((r) => (r.clubId === null ? [] : [r.clubId])))) {
+    const slug = input.clubSlugs.get(clubId);
+    if (slug === undefined) unresolved.push(`club ${clubId}: slug unavailable (/clubs/<slug>)`);
+    else clubPaths.push(clubPath(slug));
+  }
+  paths.push(...clubPaths.sort(), '/records', '/records/[category]', '/');
+  return { canonicalRowsChanged: true, paths: [...new Set(paths)], seasonRevalidations: seasons, unresolved };
+}
+
+/* ---- §4.B open findings and pending candidates (report only; never resolved here) ---- */
+
+export type FindingScope = {
+  readonly providerId: string;
+  readonly pId: number;
+  readonly pPrimeId: number;
+  readonly pIdentity: string;
+  readonly pPrimeIdentity: string;
+};
+
+/** One `data_issues` row as the reporter reads it. */
+export type OpenFindingRow = {
+  readonly id: string;
+  readonly issueType: string;
+  readonly issueKey: string;
+  readonly resolved: boolean;
+  readonly details: Readonly<Record<string, JsonValue>> | null;
+};
+
+export type FindingReport = {
+  readonly id: string;
+  readonly issueType: string;
+  readonly issueKey: string;
+  readonly selector: 'canonical_apply_failed_for_provider' | 'contradiction_for_provider' | 'contradiction_names_player';
+  /** §8.2 step 7's own predicate: a contradiction this correction adjudicates (resolved in its transaction). */
+  readonly adjudicatedByThisCorrection: boolean;
+};
+
+/**
+ * §4.B: the OPEN findings the correction reports and does not resolve:
+ *   - `canonical_apply_failed` of `afl_api` keyed on a `…|CD_I` record;
+ *   - ISSUE-240 `afl_api_identity_contradiction` for CD_I, or naming P or P′ (by player id or
+ *     stable identity).
+ * A resolved row is never reported as open.
+ */
+export function selectOpenFindings(rows: readonly OpenFindingRow[], scope: FindingScope): FindingReport[] {
+  const players = new Set([String(scope.pId), String(scope.pPrimeId)]);
+  const identities = new Set([scope.pIdentity, scope.pPrimeIdentity]);
+  const text = (v: JsonValue | undefined) => (typeof v === 'string' ? v : typeof v === 'number' ? String(v) : null);
+  const out: FindingReport[] = [];
+  for (const row of rows) {
+    if (row.resolved) continue;
+    const d: Readonly<Record<string, JsonValue>> = row.details ?? {};
+    if (row.issueType === 'canonical_apply_failed') {
+      const record = text(d.external_record_id);
+      if (text(d.source_key) === 'afl_api' && record !== null && record.endsWith(`|${scope.providerId}`)) {
+        out.push({ id: row.id, issueType: row.issueType, issueKey: row.issueKey, selector: 'canonical_apply_failed_for_provider', adjudicatedByThisCorrection: false });
+      }
+      continue;
+    }
+    if (row.issueType !== 'afl_api_identity_contradiction') continue;
+    const adjudicated = text(d.external_id) === scope.providerId && text(d.proposed_player_identity) === scope.pPrimeIdentity;
+    if (text(d.external_id) === scope.providerId || text(d.existing_external_id) === scope.providerId) {
+      out.push({ id: row.id, issueType: row.issueType, issueKey: row.issueKey, selector: 'contradiction_for_provider', adjudicatedByThisCorrection: adjudicated });
+    } else if (
+      [d.proposed_player_id, d.existing_player_id].some((v) => players.has(text(v) ?? ''))
+      || [d.proposed_player_identity, d.existing_player_ref].some((v) => identities.has(text(v) ?? ''))
+    ) {
+      out.push({ id: row.id, issueType: row.issueType, issueKey: row.issueKey, selector: 'contradiction_names_player', adjudicatedByThisCorrection: false });
+    }
+  }
+  return out.sort((a, b) => (a.id.length === b.id.length ? a.id.localeCompare(b.id) : a.id.length - b.id.length));
+}
+
+/** One `promotion_candidates` row as the reporter reads it. */
+export type PendingCandidateRow = {
+  readonly id: string;
+  readonly family: string;
+  readonly externalRecordId: string;
+  readonly targetTable: string;
+  readonly verb: string;
+  readonly season: number;
+  readonly status: string;
+  /** `proposed_fields->>'player_id'`. */
+  readonly proposedPlayerId: string | null;
+};
+
+export type PendingCandidateReport = Omit<PendingCandidateRow, 'status'> & {
+  readonly selector: 'provider_record' | 'proposes_p';
+};
+
+/**
+ * §4.B: the PENDING candidates the correction reports (it cannot resolve one): `external_record_id`
+ * ending `|CD_I`, or `proposed_fields->>'player_id'` = P. Accepted, rejected and superseded rows
+ * are never reported.
+ */
+export function selectPendingCandidates(
+  rows: readonly PendingCandidateRow[], scope: { readonly providerId: string; readonly pId: number },
+): PendingCandidateReport[] {
+  const out: PendingCandidateReport[] = [];
+  for (const { status, ...row } of rows) {
+    if (status !== 'pending') continue;
+    if (row.externalRecordId.endsWith(`|${scope.providerId}`)) out.push({ ...row, selector: 'provider_record' });
+    else if (row.proposedPlayerId === String(scope.pId)) out.push({ ...row, selector: 'proposes_p' });
+  }
+  return out.sort((a, b) => (a.id.length === b.id.length ? a.id.localeCompare(b.id) : a.id.length - b.id.length));
+}
+
+/* ---- §5.12 Q2 report outcomes (already decided by Q2; exposed, never re-decided) ---- */
+
+export type SatisfactionReportEntry =
+  | {
+    readonly kind: 'correction_target_absent';
+    readonly table: CanonicalTable;
+    readonly key: string;
+    readonly matchId: number | null;
+    readonly auditId: string | null;
+  }
+  | {
+    readonly kind: 'post_correction_edit';
+    readonly table: CanonicalTable;
+    readonly key: string;
+    readonly writer: PostCorrectionExplanation['writer'];
+    /** Null for a Brownlow-admin re-ownership (no single field). */
+    readonly field: string | null;
+    readonly from: JsonValue;
+    readonly to: JsonValue;
+    readonly auditId: string | null;
+  }
+  | { readonly kind: 'post_correction_reappearance'; readonly table: CanonicalTable; readonly key: string };
+
+/**
+ * The report-only context of one planned closure (§5.1 `context`): built pre-commit from evidence
+ * the plan already read, so a STOP is explained without any post-transaction read (S8-D4).
+ */
+export type CorrectionReportContext = {
+  readonly closureRows: readonly ClosureImpactRow[];
+  readonly seasonVerdicts: readonly SeasonVerdictReport[];
+  /** DP-3 and DP-4; DP-5 is gathered after the transaction. */
+  readonly dependents: readonly DependentReportEntry[];
+  readonly artefactRisk: readonly string[];
+};
 
 /* ==================================================================== *
  * §5.1 Fingerprint

@@ -10,6 +10,18 @@ import { describe, expect, it } from 'vitest';
 import {
   PLANNER_VERSION,
   PLAYER_MATCH_STATS_CONTRACT_FIELDS,
+  affectedCachePaths,
+  artefactRecurrenceRisk,
+  careerDebut,
+  careersBeforeCorrection,
+  dependentRefreshPath,
+  describeSeasonVerdict,
+  evaluateColemanImpact,
+  evaluateFirstKickGoalDebutChanges,
+  matchLessDependentReports,
+  selectOpenFindings,
+  selectPendingCandidates,
+  unresolvedDependentReports,
   classifyBrownlowChain,
   classifyBrownlowChainApplication,
   classifyCorrectedCandidate,
@@ -38,7 +50,14 @@ import {
   verifyBrownlowReleaseClaimPair,
   type Application,
   type BrownlowChainApplication,
+  type CareerMatch,
+  type ClosureImpactRow,
+  type ColemanRowFacts,
+  type CorrectionReportContext,
   type CpcInput,
+  type FindingScope,
+  type OpenFindingRow,
+  type PendingCandidateRow,
   type CpcPrediction,
   type CpcProviderRow,
   type MutationPlan,
@@ -1064,5 +1083,378 @@ describe('cross-cutting: substantive comparison helpers used by both disposition
       { votes: 0, played: true, matchId: 1 },
     );
     expect(comparison.equal).toBe(true);
+  });
+});
+
+/* ==================================================================== *
+ * Slice 8: the structured operator report (§8.2 step 11, §5.1 `context`). Report-only: nothing
+ * here may change a disposition, a STOP or the fingerprint.
+ * ==================================================================== */
+
+describe('Slice 8 §5.10: every affected season gets a structured verdict; the decision is unchanged', () => {
+  it('PASS verdicts name their rule and proof (SV-0, SV-1, SV-2a) and carry no STOP', () => {
+    const sv0 = describeSeasonVerdict({ season: 2024, seasonClass: 'empty', evidence: { kind: 'empty' }, verdict: { independent: true } });
+    expect(sv0).toMatchObject({ season: 2024, verdict: 'INDEPENDENT', rule: 'SV-0', stop: null, failedChecks: [] });
+    const sv1Evidence = { kind: 'admin_published' as const, closureMovesOrDeletesPositiveBrownlowRowInSeason: false, pOrPPrimeHasRowInSeasonTotals: false };
+    const sv1 = describeSeasonVerdict({ season: 2023, seasonClass: 'admin_published', evidence: sv1Evidence, verdict: evaluateSeasonTotalIndependence(sv1Evidence) });
+    expect(sv1).toMatchObject({ verdict: 'INDEPENDENT', rule: 'SV-1', stop: null });
+    const sv2aEvidence = {
+      kind: 'artefact_schema_1' as const,
+      artefactCsvSha256Matches: true, identityCsvSha256Matches: true, rowForRowMatch: true, profilePathResolvesToExactlyOnePlayer: true,
+    };
+    const sv2a = describeSeasonVerdict({ season: 2022, seasonClass: 'artefact', evidence: sv2aEvidence, verdict: evaluateSeasonTotalIndependence(sv2aEvidence) });
+    expect(sv2a).toMatchObject({ verdict: 'INDEPENDENT', rule: 'SV-2a', stop: null });
+    expect(sv2a.proof).toContain('row-for-row');
+  });
+
+  it('a STOP verdict names the season, the class, the failing step/code and every failed condition', () => {
+    const evidence = { kind: 'admin_published' as const, closureMovesOrDeletesPositiveBrownlowRowInSeason: true, pOrPPrimeHasRowInSeasonTotals: true };
+    const verdict = evaluateSeasonTotalIndependence(evidence);
+    const report = describeSeasonVerdict({ season: 2025, seasonClass: 'admin_published', evidence, verdict });
+    expect(report).toMatchObject({
+      season: 2025, seasonClass: 'admin_published', verdict: 'STOP', rule: 'SV-1',
+      stop: { step: 'SV-1', code: 'season_total_depends_on_correction' },
+    });
+    expect(report.failedChecks).toHaveLength(2);
+    // the STOP itself is exactly the planner's: describing it never re-decides it
+    expect(verdict.independent).toBe(false);
+    if (!verdict.independent) expect(report.stop).toEqual({ step: verdict.stop.step, code: verdict.stop.code });
+  });
+
+  it('an SV-2a STOP names each failing executable step, and never falls back to a PASS', () => {
+    const evidence = {
+      kind: 'artefact_schema_1' as const,
+      artefactCsvSha256Matches: true, identityCsvSha256Matches: false, rowForRowMatch: false, profilePathResolvesToExactlyOnePlayer: true,
+    };
+    const report = describeSeasonVerdict({ season: 2021, seasonClass: 'artefact', evidence, verdict: evaluateSeasonTotalIndependence(evidence) });
+    expect(report).toMatchObject({ verdict: 'STOP', rule: 'SV-2a', stop: { step: 'SV-2a', code: 'season_artefact_unprovable' } });
+    expect(report.failedChecks.map((c) => c.slice(0, 8))).toEqual(['SV-2a(0)', 'SV-2a(4)']);
+  });
+
+  it('SV-3 (including a non-schema-1 artefact manifest) is a STOP naming SV-3', () => {
+    const report = describeSeasonVerdict({ season: 2020, seasonClass: 'artefact', evidence: { kind: 'unprovable' }, verdict: evaluateSeasonTotalIndependence({ kind: 'unprovable' }) });
+    expect(report).toMatchObject({ verdict: 'STOP', rule: 'SV-3', stop: { step: 'SV-3', code: 'season_artefact_unprovable' } });
+    expect(report.failedChecks[0]).toContain('not schema 1');
+  });
+
+  it('the §4.G artefact recurrence-risk section names the provider, the deferred O-3 follow-up and the §5.10 outcome', () => {
+    const pass = describeSeasonVerdict({ season: 2024, seasonClass: 'empty', evidence: { kind: 'empty' }, verdict: { independent: true } });
+    const lines = artefactRecurrenceRisk({ providerId: 'CD_I1', seasonVerdicts: [pass] });
+    expect(lines.join('\n')).toContain('CD_I1');
+    expect(lines.join('\n')).toContain('O-3');
+    expect(lines.join('\n')).toContain('every affected season proved independent (2024)');
+    const stopped = describeSeasonVerdict({
+      season: 2025, seasonClass: 'unprovable', evidence: { kind: 'unprovable' }, verdict: evaluateSeasonTotalIndependence({ kind: 'unprovable' }),
+    });
+    expect(artefactRecurrenceRisk({ providerId: 'CD_I1', seasonVerdicts: [pass, stopped] }).join('\n')).toContain('season(s) 2025');
+    expect(artefactRecurrenceRisk({ providerId: 'CD_I1', seasonVerdicts: [] }).join('\n')).toContain('no affected season');
+  });
+});
+
+describe('Slice 8 fingerprint stability: report-only context never reaches the hash', () => {
+  const plan: MutationPlan = {
+    plannerVersion: PLANNER_VERSION,
+    provider: { externalId: 'CD_I1', sourceKey: 'afl_api' },
+    authority: {
+      mode: 'ORIGINAL', netState: 'NONE', ledgerId: null, liveIdentityRowId: 20,
+      previousPlayerIdentity: 'afltables:players/A/A_One.html', playerIdentity: 'afltables:players/B/B_Two.html',
+    },
+    identityAction: 'update_in_place',
+    rows: [{
+      table: 'player_match_stats', rowId: 1, naturalKey: { player_id: 502, match_id: 1 },
+      disposition: 'MOVE', contractSha256: 'abc', provenance: { sourceKey: 'afl_api', sourceRecordId: 'M1|RICH|CD_I1', importBatchId: 100 },
+      evidence: { applicationIds: [11], citedVersion: { sourceId: 7, family: 'player_stats', externalRecordId: 'M1|RICH|CD_I1', seq: 3 }, insertPayloadSha256: null },
+      collision: null,
+    }],
+    stops: [{ table: 'player_match_stats', rowId: null, step: 'SV-1', code: 'season_total_depends_on_correction' }],
+  };
+  const verdict = (season: number) => describeSeasonVerdict({
+    season, seasonClass: 'admin_published',
+    evidence: { kind: 'admin_published', closureMovesOrDeletesPositiveBrownlowRowInSeason: true, pOrPPrimeHasRowInSeasonTotals: false },
+    verdict: evaluateSeasonTotalIndependence({ kind: 'admin_published', closureMovesOrDeletesPositiveBrownlowRowInSeason: true, pOrPPrimeHasRowInSeasonTotals: false }),
+  });
+  const contextA: CorrectionReportContext = {
+    closureRows: [{ table: 'player_match_stats', rowId: 1, disposition: 'MOVE', matchId: 1, season: 2025, clubId: 3, goals: 2 }],
+    seasonVerdicts: [verdict(2025)],
+    dependents: unresolvedDependentReports({ closureRowId: 1, matchId: 1, rows: [{ table: 'after_siren_kicks', id: 9 }] }),
+    artefactRisk: artefactRecurrenceRisk({ providerId: 'CD_I1', seasonVerdicts: [verdict(2025)] }),
+  };
+  const contextB: CorrectionReportContext = {
+    closureRows: [], seasonVerdicts: [verdict(2019)], dependents: [], artefactRisk: ['different'],
+  };
+
+  it('the same plan with different report contexts (closure, verdict detail, dependents, risk) fingerprints identically', () => {
+    const a = { plan, context: contextA };
+    const b = { plan, context: contextB };
+    expect(mutationPlanFingerprint(a.plan)).toBe(mutationPlanFingerprint(b.plan));
+    // even a context accidentally spread into the plan object is ignored by the hash
+    expect(mutationPlanFingerprint({ ...plan, context: contextA, report: 'x' } as unknown as MutationPlan)).toBe(mutationPlanFingerprint(plan));
+  });
+
+  it('the STOP object shape stays {table,rowId,step,code}: verdict detail lives only in the context', () => {
+    expect(Object.keys(plan.stops[0]).sort()).toEqual(['code', 'rowId', 'step', 'table']);
+    expect(contextA.seasonVerdicts[0].season).toBe(2025);
+    expect(contextA.seasonVerdicts[0].failedChecks.length).toBeGreaterThan(0);
+  });
+
+  it('PLANNER_VERSION is unchanged by Slice 8', () => {
+    expect(PLANNER_VERSION).toBe(2);
+  });
+});
+
+describe('Slice 8 §4.H cache paths: exact, deterministic, deduplicated, report-only', () => {
+  const pms = (over: Partial<ClosureImpactRow>): ClosureImpactRow => ({
+    table: 'player_match_stats', rowId: 1, disposition: 'MOVE', matchId: 500, season: 2025, clubId: 3, goals: 1, ...over,
+  });
+  const brownlow = (over: Partial<ClosureImpactRow>): ClosureImpactRow => ({
+    table: 'brownlow_round_votes', rowId: 7, disposition: 'MOVE', matchId: 500, season: 2025, clubId: null, goals: null, ...over,
+  });
+  const players = [{ id: 10, slug: 'alpha-one' }, { id: 20, slug: 'bravo-two' }];
+  const clubSlugs = new Map([[3, 'carlton'], [4, 'adelaide']]);
+
+  it('reports P, P′, every touched match, every season, the clubs and the generic record/root pages, in a fixed order', () => {
+    const impact = affectedCachePaths({
+      rows: [pms({ rowId: 2, matchId: 600, season: 2024, clubId: 4 }), pms({}), pms({ rowId: 3, disposition: 'DELETE_AS_FOREIGN_COLLISION', matchId: 500 })],
+      players, clubSlugs,
+    });
+    expect(impact.canonicalRowsChanged).toBe(true);
+    expect(impact.paths).toEqual([
+      '/players/alpha-one-10', '/players/bravo-two-20',
+      '/matches/500', '/matches/600',
+      '/seasons/2024', '/seasons/2025',
+      '/clubs/adelaide', '/clubs/carlton',
+      '/records', '/records/[category]', '/',
+    ]);
+    expect(impact.seasonRevalidations).toEqual([2024, 2025]);
+    expect(impact.unresolved).toEqual([]);
+  });
+
+  it('/brownlow/<year> appears only when a Brownlow closure row exists for that season', () => {
+    expect(affectedCachePaths({ rows: [pms({})], players, clubSlugs }).paths.some((p) => p.startsWith('/brownlow/'))).toBe(false);
+    const withBrownlow = affectedCachePaths({ rows: [pms({}), brownlow({ season: 2023, matchId: null })], players, clubSlugs });
+    expect(withBrownlow.paths.filter((p) => p.startsWith('/brownlow/'))).toEqual(['/brownlow/2023']);
+    // a match-less Brownlow row adds no /matches path, but its season is affected
+    expect(withBrownlow.paths.filter((p) => p.startsWith('/matches/'))).toEqual(['/matches/500']);
+    expect(withBrownlow.seasonRevalidations).toEqual([2023, 2025]);
+  });
+
+  it('is deterministic whatever the row order, and never duplicates a path', () => {
+    const rows = [pms({}), pms({ rowId: 2 }), brownlow({}), pms({ rowId: 4, matchId: 501, clubId: 4 })];
+    const a = affectedCachePaths({ rows, players, clubSlugs });
+    const b = affectedCachePaths({ rows: [...rows].reverse(), players, clubSlugs });
+    expect(a.paths).toEqual(b.paths);
+    expect(new Set(a.paths).size).toBe(a.paths.length);
+  });
+
+  it('no canonical row moved or deleted: no route is claimed', () => {
+    expect(affectedCachePaths({ rows: [], players, clubSlugs })).toEqual({
+      canonicalRowsChanged: false, paths: [], seasonRevalidations: [], unresolved: [],
+    });
+  });
+
+  it('a slug that could not be read is named as unresolved, never invented', () => {
+    const impact = affectedCachePaths({ rows: [pms({ clubId: 99 })], players: [{ id: 10, slug: null }, players[1]], clubSlugs });
+    expect(impact.paths).not.toContain('/players/null-10');
+    expect(impact.unresolved).toEqual([
+      'player 10: slug unavailable (/players/<slug>-10)',
+      'club 99: slug unavailable (/clubs/<slug>)',
+    ]);
+  });
+});
+
+describe('Slice 8 §4.F Coleman: report-only stale-season detection under the live derivation contract', () => {
+  const row = (over: Partial<ColemanRowFacts>): ColemanRowFacts => ({
+    rowId: 1, season: 2024, matchId: 500, isFinal: false, seasonComplete: true, goals: 3, ...over,
+  });
+  const run = (rows: ColemanRowFacts[], winners: number[] = []) => evaluateColemanImpact({
+    rows, firstSeason: 1980, winnerSeasonsForPOrPPrime: new Set(winners),
+  });
+
+  it('a complete home-and-away season with goals > 0 moved (or deleted) is potentially stale', () => {
+    expect(run([row({})])).toEqual([{ season: 2024, reasons: ['goal_totals_change'], rowIds: [1] }]);
+  });
+
+  it('an in-progress season, a final, and a pre-contract season are never reported', () => {
+    expect(run([row({ seasonComplete: false })])).toEqual([]);
+    expect(run([row({ isFinal: true })])).toEqual([]);
+    expect(run([row({ season: 1979 })])).toEqual([]);
+  });
+
+  it('goals = 0 or NULL changes no total: reported only when P or P′ is a current winner of that season (club attribution)', () => {
+    expect(run([row({ goals: 0 })])).toEqual([]);
+    expect(run([row({ goals: null })])).toEqual([]);
+    expect(run([row({ goals: 0 })], [2024])).toEqual([{ season: 2024, reasons: ['winner_club_attribution'], rowIds: [1] }]);
+  });
+
+  it('MOVE and DELETE are treated alike (the input has no disposition: both change the derivation), and the season set is exact, sorted and deduplicated', () => {
+    const result = run([
+      row({ rowId: 5, season: 2025 }), row({ rowId: 2 }), row({ rowId: 3, goals: 0 }), row({ rowId: 4, isFinal: true, season: 2023 }),
+    ], [2024]);
+    expect(result).toEqual([
+      { season: 2024, reasons: ['goal_totals_change', 'winner_club_attribution'], rowIds: [2, 3] },
+      { season: 2025, reasons: ['goal_totals_change'], rowIds: [5] },
+    ]);
+  });
+});
+
+describe('Slice 8 §5.11 DP-3/DP-4 reports: exact rows and the refresh path', () => {
+  it('case 18 (reporting half): DP-3 names each unresolved row id, its match, and the refresh path; never a STOP', () => {
+    const entries = unresolvedDependentReports({
+      closureRowId: 1, matchId: 500, rows: [{ table: 'player_achievements', id: 8 }, { table: 'after_siren_kicks', id: 4 }],
+    });
+    expect(entries.map((e) => `${e.rule}:${e.outcome}:${e.table}#${e.rowId}:${String(e.matchId)}`)).toEqual([
+      'DP-3:REPORT:after_siren_kicks#4:500', 'DP-3:REPORT:player_achievements#8:500',
+    ]);
+    expect(entries[0].refreshPath).toEqual(dependentRefreshPath('after_siren_kicks', 4, 'REPORT'));
+    expect(entries[0].refreshPath.join('\n')).toContain('/admin/records/after-the-siren/4');
+    expect(entries[0].refreshPath.join('\n')).toContain('after-siren-reconcile');
+    expect(entries[1].refreshPath.join('\n')).toContain('/admin/records/first-kick-goal/8');
+  });
+
+  it('DP-4 describes the unchanged loader verdict: STOP rows say "re-run the correction", reported rows do not', () => {
+    const dep = (id: number, playerId: number) => ({ table: 'after_siren_kicks' as const, id, playerId, season: 2025, clubOrganizationId: 3 });
+    const entries = matchLessDependentReports({
+      losesParticipation: [dep(1, 10)], participationRemains: [dep(2, 10)], pPrimeReported: [dep(3, 20)],
+    });
+    expect(entries.map((e) => `${e.rule}:${e.outcome}:${e.rowId}`)).toEqual(['DP-4:STOP:1', 'DP-4:REPORT:2', 'DP-4:REPORT:3']);
+    expect(entries[0].refreshPath[0]).toContain('then re-run the correction');
+    expect(entries[1].refreshPath[0]).not.toContain('re-run');
+    expect(entries.every((e) => e.refreshPath.some((p) => p.includes('db:test:rebuild')))).toBe(true);
+  });
+});
+
+describe('Slice 8 §5.11 DP-5: first-kick-goal debut changes (report only, never a STOP)', () => {
+  const m = (matchId: number, matchDate: string, season: number): CareerMatch => ({ matchId, matchDate, season });
+  const fkg = (id: number, playerId: number) => ({ id, playerId, matchId: null, season: 2020 });
+  const P = 10;
+  const PP = 20;
+  const run = (over: Partial<Parameters<typeof evaluateFirstKickGoalDebutChanges>[0]>) => evaluateFirstKickGoalDebutChanges({
+    pId: P, pPrimeId: PP, pBefore: [], pPrimeBefore: [], moved: [], deleted: [], firstKickGoals: [], ...over,
+  });
+
+  it('careerDebut follows (match_date, match_id), and debut season is the minimum season', () => {
+    expect(careerDebut([m(9, '2020-04-01', 2020), m(3, '2020-04-01', 2020), m(1, '2021-01-01', 2021)])).toEqual({ matchId: 3, season: 2020 });
+    expect(careerDebut([])).toEqual({ matchId: null, season: null });
+  });
+
+  it('P loses its debut match -> reported for P\'s first_kick_goal row', () => {
+    const entries = run({
+      pBefore: [m(1, '2020-03-20', 2020), m(2, '2020-03-27', 2020)], moved: [m(1, '2020-03-20', 2020)], firstKickGoals: [fkg(70, P)],
+    });
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ rule: 'DP-5', outcome: 'REPORT', table: 'player_achievements', rowId: 70, playerId: P });
+    expect(entries[0].detail).toContain('debut match 1 -> 2');
+    expect(entries[0].refreshPath.join('\n')).toContain('first-kick-goal');
+  });
+
+  it('P′ gains an earlier match -> reported for P′', () => {
+    const entries = run({
+      pBefore: [m(1, '2019-03-20', 2019)], pPrimeBefore: [m(5, '2020-03-20', 2020)], moved: [m(1, '2019-03-20', 2019)], firstKickGoals: [fkg(71, PP)],
+    });
+    expect(entries.map((e) => e.playerId)).toEqual([PP]);
+    expect(entries[0].detail).toContain('debut match 5 -> 1');
+    expect(entries[0].detail).toContain('debut season 2020 -> 2019');
+  });
+
+  it('a debut-season change is reported (P keeps no 2019 match after the move)', () => {
+    const entries = run({
+      pBefore: [m(1, '2019-09-01', 2019), m(2, '2020-03-20', 2020)], moved: [m(1, '2019-09-01', 2019)], firstKickGoals: [fkg(72, P)],
+    });
+    expect(entries[0].detail).toContain('debut season 2019 -> 2020');
+  });
+
+  it('an unchanged debut, or no first_kick_goal dependent, reports nothing', () => {
+    expect(run({
+      pBefore: [m(1, '2020-03-20', 2020), m(2, '2020-03-27', 2020)], moved: [m(2, '2020-03-27', 2020)], firstKickGoals: [fkg(70, P)],
+    })).toEqual([]);
+    expect(run({ pBefore: [m(1, '2020-03-20', 2020)], moved: [m(1, '2020-03-20', 2020)], firstKickGoals: [] })).toEqual([]);
+  });
+
+  it('a DELETE-only closure adds nothing to P′: P′ is unaffected, P may still change', () => {
+    const entries = run({
+      pBefore: [m(1, '2019-03-20', 2019), m(2, '2020-03-20', 2020)], pPrimeBefore: [m(1, '2019-03-20', 2019)],
+      deleted: [m(1, '2019-03-20', 2019)], firstKickGoals: [fkg(70, P), fkg(71, PP)],
+    });
+    expect(entries.map((e) => e.playerId)).toEqual([P]);
+  });
+
+  it('never STOPs: every entry is a REPORT', () => {
+    const entries = run({
+      pBefore: [m(1, '2019-03-20', 2019)], pPrimeBefore: [m(5, '2020-03-20', 2020)], moved: [m(1, '2019-03-20', 2019)],
+      firstKickGoals: [fkg(70, P), fkg(71, PP)],
+    });
+    expect(entries).toHaveLength(2);
+    expect(entries.every((e) => e.outcome === 'REPORT')).toBe(true);
+  });
+
+  it('careersBeforeCorrection: a committed report reconstructs exactly the prospective (pre-correction) careers', () => {
+    const moved = [m(1, '2019-03-20', 2019)];
+    const deleted = [m(3, '2019-04-01', 2019)];
+    const pBefore = [m(1, '2019-03-20', 2019), m(2, '2020-03-20', 2020), m(3, '2019-04-01', 2019)];
+    const pPrimeBefore = [m(3, '2019-04-01', 2019), m(5, '2020-03-20', 2020)];
+    const prospective = careersBeforeCorrection({ phase: 'prospective', pCurrent: pBefore, pPrimeCurrent: pPrimeBefore, moved, deleted });
+    expect(prospective).toEqual({ pBefore, pPrimeBefore });
+    const committed = careersBeforeCorrection({
+      phase: 'committed',
+      pCurrent: [m(2, '2020-03-20', 2020)], // P after: lost MOVE 1 and DELETE 3
+      pPrimeCurrent: [m(3, '2019-04-01', 2019), m(5, '2020-03-20', 2020), m(1, '2019-03-20', 2019)], // P′ after: gained MOVE 1
+      moved, deleted,
+    });
+    const byId = (rows: readonly CareerMatch[]) => [...rows].sort((a, b) => a.matchId - b.matchId);
+    expect(byId(committed.pBefore)).toEqual(byId(pBefore));
+    expect(byId(committed.pPrimeBefore)).toEqual(byId(pPrimeBefore));
+  });
+});
+
+describe('Slice 8 §4.B open findings and pending candidates: selectors, and resolved rows are never open', () => {
+  const scope: FindingScope = { providerId: 'CD_I1', pId: 10, pPrimeId: 20, pIdentity: 'id:P', pPrimeIdentity: 'id:P2' };
+  const finding = (id: string, issueType: string, details: Record<string, string | number>, resolved = false): OpenFindingRow => ({
+    id, issueType, issueKey: `key-${id}`, resolved, details,
+  });
+
+  it('selects each runbook category and excludes resolved/unrelated rows', () => {
+    const rows = [
+      finding('1', 'canonical_apply_failed', { source_key: 'afl_api', external_record_id: 'CD_M1|T1|CD_I1' }),
+      finding('2', 'canonical_apply_failed', { source_key: 'afltables', external_record_id: 'x|CD_I1' }),
+      finding('3', 'canonical_apply_failed', { source_key: 'afl_api', external_record_id: 'CD_M1|T1|CD_I10' }),
+      finding('4', 'afl_api_identity_contradiction', { external_id: 'CD_I1', proposed_player_identity: 'id:P2' }),
+      finding('5', 'afl_api_identity_contradiction', { external_id: 'CD_OTHER', proposed_player_id: 10 }),
+      finding('6', 'afl_api_identity_contradiction', { external_id: 'CD_OTHER', existing_player_ref: 'id:P2' }),
+      finding('7', 'afl_api_identity_contradiction', { external_id: 'CD_I1', proposed_player_identity: 'id:X' }, true),
+      finding('8', 'afl_api_identity_contradiction', { external_id: 'CD_OTHER', proposed_player_id: 99 }),
+      finding('9', 'settle_disagreement', { external_record_id: 'x|CD_I1' }),
+      finding('10', 'afl_api_identity_contradiction', { external_id: 'CD_OTHER', existing_external_id: 'CD_I1' }),
+    ];
+    const selected = selectOpenFindings(rows, scope);
+    expect(selected.map((f) => `${f.id}:${f.selector}:${String(f.adjudicatedByThisCorrection)}`)).toEqual([
+      '1:canonical_apply_failed_for_provider:false',
+      '4:contradiction_for_provider:true',
+      '5:contradiction_names_player:false',
+      '6:contradiction_names_player:false',
+      '10:contradiction_for_provider:false',
+    ]);
+  });
+
+  it('pending candidates: |CD_I records and proposals of P only; accepted/rejected/superseded never', () => {
+    const cand = (id: string, externalRecordId: string, status: string, proposedPlayerId: string | null = null): PendingCandidateRow => ({
+      id, family: 'player_stats', externalRecordId, targetTable: 'player_match_stats', verb: 'corrected', season: 2025, status, proposedPlayerId,
+    });
+    const selected = selectPendingCandidates([
+      cand('1', 'CD_M1|T1|CD_I1', 'pending'),
+      cand('2', 'CD_M1|T1|CD_I1', 'accepted'),
+      cand('3', 'CD_M1|T1|CD_OTHER', 'pending', '10'),
+      cand('4', 'CD_M1|T1|CD_OTHER', 'pending', '20'),
+      cand('5', 'CD_M1|T1|CD_I1', 'superseded'),
+      cand('6', 'CD_M1|T1|CD_I1', 'rejected'),
+    ], { providerId: 'CD_I1', pId: 10 });
+    expect(selected.map((c) => `${c.id}:${c.selector}`)).toEqual(['1:provider_record', '3:proposes_p']);
+    expect(selected[0]).not.toHaveProperty('status');
+  });
+
+  it('the selectors are pure: inputs are not mutated', () => {
+    const rows = [finding('1', 'canonical_apply_failed', { source_key: 'afl_api', external_record_id: 'a|CD_I1' })];
+    const before = structuredClone(rows);
+    selectOpenFindings(rows, scope);
+    expect(rows).toEqual(before);
   });
 });

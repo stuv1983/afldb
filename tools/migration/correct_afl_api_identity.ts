@@ -29,6 +29,13 @@
  * Stage 22 SAT-1 check; the `code_test_db` rehearsal is a later slice. This file never runs the
  * promotion or rebuild lifecycle itself.
  *
+ * Slice 8 adds the ORIGINAL operator report (§8.2 step 11): a pre-commit report CONTEXT (§5.10
+ * per-season verdicts, DP-3/DP-4 with refresh paths, the §4.G artefact risk) carried outside the
+ * fingerprinted plan, and a post-transaction IMPACT report (exact cache paths, Coleman seasons,
+ * open findings, pending candidates, DP-5) gathered read-only and best-effort AFTER the
+ * transaction (`reportAfterTransaction`). It invalidates no cache, recomputes nothing and writes
+ * nothing; a report failure after COMMIT leaves the correction COMMITTED. REPLAY never calls it.
+ *
  * The planner (`src/lib/acquisition/afl-api-identity-correction.ts`) is pure: every decision in
  * this file is made by calling its exported evaluators with evidence read here. This file is the
  * "future adapter" that module's own header names.
@@ -105,9 +112,19 @@ import {
   BROWNLOW_ROUND_VOTES_CONTRACT_FIELDS,
   PLANNER_VERSION,
   PLAYER_MATCH_STATS_CONTRACT_FIELDS,
+  affectedCachePaths,
+  artefactRecurrenceRisk,
+  careersBeforeCorrection,
   classifyBrownlowChain,
   classifyCorrectedCandidate,
   compareReconstruction,
+  describeSeasonVerdict,
+  evaluateColemanImpact,
+  evaluateFirstKickGoalDebutChanges,
+  matchLessDependentReports,
+  selectOpenFindings,
+  selectPendingCandidates,
+  unresolvedDependentReports,
   compareSubstantiveBrownlow,
   compareSubstantivePlayerMatchStats,
   decideBrownlowDisposition,
@@ -137,8 +154,14 @@ import {
   type BrownlowChainApplication,
   type BrownlowGuardEvidence,
   type BrownlowRowEvidence,
+  type CacheImpact,
   type CanonicalTable,
+  type CareerMatch,
+  type ClosureImpactRow,
   type ClosureRowFingerprintInput,
+  type ColemanRowFacts,
+  type ColemanSeasonImpact,
+  type CorrectionReportContext,
   type CpcIdentityResolution,
   type CpcInput,
   type CpcMutationCounts,
@@ -146,15 +169,26 @@ import {
   type CpcProviderRow,
   type CpcResult,
   type DeleteLineageEvidence,
+  type DependentReportEntry,
+  type DependentTable,
   type FieldDivergence,
+  type FindingReport,
+  type FindingScope,
+  type FirstKickGoalRow,
+  type ImpactPhase,
   type L8Evidence,
   type MoveLineageEvidence,
   type MoveLineageResult,
   type MutationPlan,
+  type OpenFindingRow,
+  type PendingCandidateReport,
+  type PendingCandidateRow,
   type PlayerMatchStatsRowEvidence,
   type PostCorrectionExplanation,
   type SatisfactionEvidence,
+  type SatisfactionReportEntry,
   type SeasonIndependenceEvidence,
+  type SeasonVerdictReport,
   type Stop,
   type StopCode,
 } from '../../src/lib/acquisition/afl-api-identity-correction';
@@ -1058,18 +1092,24 @@ export function participationMatchIdsAfterPlan(input: {
 
 async function readDependentsForRow(
   tx: TransactionSql, playerId: number, matchId: number,
-): Promise<{ afterSirenKicksRowForP: boolean; achievementRowForP: boolean; unresolvedRowAtMatch: boolean }> {
-  const [[siren], [achievement], [unresolved]] = await Promise.all([
+): Promise<{
+  afterSirenKicksRowForP: boolean; achievementRowForP: boolean; unresolvedRowAtMatch: boolean;
+  /** DP-3's exact rows (Slice 8 reports their ids); `unresolvedRowAtMatch` is exactly "non-empty". */
+  unresolvedRows: readonly { table: DependentTable; id: number }[];
+}> {
+  const [[siren], [achievement], unresolved] = await Promise.all([
     tx<{ n: number }[]>`SELECT count(*)::int AS n FROM after_siren_kicks WHERE player_id = ${playerId} AND match_id = ${matchId}`,
     tx<{ n: number }[]>`SELECT count(*)::int AS n FROM player_achievements WHERE player_id = ${playerId} AND match_id = ${matchId}`,
-    tx<{ n: number }[]>`
-      SELECT (
-        (SELECT count(*) FROM after_siren_kicks WHERE player_id IS NULL AND match_id = ${matchId})
-        + (SELECT count(*) FROM player_achievements WHERE player_id IS NULL AND match_id = ${matchId})
-      )::int AS n
+    tx<{ table: DependentTable; id: number }[]>`
+      SELECT 'after_siren_kicks' AS "table", id FROM after_siren_kicks WHERE player_id IS NULL AND match_id = ${matchId}
+      UNION ALL
+      SELECT 'player_achievements' AS "table", id FROM player_achievements WHERE player_id IS NULL AND match_id = ${matchId}
     `,
   ]);
-  return { afterSirenKicksRowForP: siren.n > 0, achievementRowForP: achievement.n > 0, unresolvedRowAtMatch: unresolved.n > 0 };
+  return {
+    afterSirenKicksRowForP: siren.n > 0, achievementRowForP: achievement.n > 0,
+    unresolvedRowAtMatch: unresolved.length > 0, unresolvedRows: unresolved,
+  };
 }
 
 /** A match-less (`match_id IS NULL`) `after_siren_kicks` / `player_achievements` row (§5.11 DP-4). */
@@ -1389,7 +1429,7 @@ function readSeasonArtefactFiles(): SeasonArtefactFiles {
 async function evaluateSeasonForCorrection(
   tx: TransactionSql, season: number, pId: number, pPrimeId: number,
   closureMovesOrDeletesPositiveBrownlowRowInSeason: boolean,
-): Promise<{ independent: boolean; stop: Stop | null; seasonClass: SeasonTotalsClass }> {
+): Promise<{ independent: boolean; stop: Stop | null; seasonClass: SeasonTotalsClass; report: SeasonVerdictReport }> {
   const rows = await tx<SeasonTotalLiveRow[]>`
     SELECT s.key AS "sourceKey", bsv.source_record_id AS "sourceRecordId", bsv.player_id AS "playerId",
            bsv.votes::int AS votes, bsv.vote_rank::int AS "voteRank", bsv.eligible_rank::int AS "eligibleRank",
@@ -1453,9 +1493,12 @@ async function evaluateSeasonForCorrection(
       break;
   }
   const verdict = evaluateSeasonTotalIndependence(evidence);
+  // Slice 8 (S8-D4): the structured verdict is described from the SAME evidence and verdict; it
+  // decides nothing and never reaches the fingerprinted plan.
+  const report = describeSeasonVerdict({ season, seasonClass, evidence, verdict });
   return verdict.independent
-    ? { independent: true, stop: null, seasonClass }
-    : { independent: false, stop: verdict.stop, seasonClass };
+    ? { independent: true, stop: null, seasonClass, report }
+    : { independent: false, stop: verdict.stop, seasonClass, report };
 }
 
 /** The profile paths of season `season`'s artefact rows (a lenient pre-read used only to decide
@@ -1492,6 +1535,8 @@ export type BuiltClosure = {
   readonly plan: MutationPlan;
   readonly rows: readonly BuiltRow[];
   readonly reports: string[];
+  /** Slice 8 (§5.1 `context`, S8-D4): report-only, NEVER part of `plan` or the fingerprint. */
+  readonly context: CorrectionReportContext;
 };
 
 /** One entry of `MutationPlan.stops`. The plan exposes a readonly array; the adapter accumulates
@@ -1510,6 +1555,11 @@ async function buildClosure(
   const rows: ClosureRowFingerprintInput[] = [];
   const built: BuiltRow[] = [];
   const reports: string[] = [];
+  // Slice 8 report context (§5.1 `context`): built from evidence this function already reads; it
+  // is never part of `plan`, so it can never move the fingerprint.
+  const closureImpact: ClosureImpactRow[] = [];
+  const seasonVerdicts: SeasonVerdictReport[] = [];
+  const dependentReports: DependentReportEntry[] = [];
 
   if (!input.manifestOk) {
     stops.push({ table: 'player_match_stats', rowId: null, step: 'D10', code: 'provenance_unexplained' });
@@ -1593,6 +1643,9 @@ async function buildClosure(
       continue;
     }
     reports.push(...dependentResult.reports.map((r) => `player_match_stats#${candidate.id}: ${r}`));
+    const unresolvedDependents = unresolvedDependentReports({
+      closureRowId: candidate.id, matchId: candidate.matchId, rows: dependents.unresolvedRows,
+    });
 
     const [counterpartRow] = lockRows
       ? await tx<Record<string, JsonValue>[]>`
@@ -1622,6 +1675,12 @@ async function buildClosure(
     }
 
     affectedSeasons.add(candidate.season);
+    dependentReports.push(...unresolvedDependents); // DP-3, for a row this plan really moves/deletes
+    closureImpact.push({
+      table: 'player_match_stats', rowId: candidate.id, disposition: dispositionResult.disposition,
+      matchId: candidate.matchId, season: candidate.season,
+      clubId: toInt(candidate.current.club_id ?? null), goals: toInt(candidate.current.goals ?? null),
+    });
     const latest = latestNonCorrectionApplication(candidate.applications)!;
     const contractHash = rowContractHash(projectContract(candidate.current, PLAYER_MATCH_STATS_CONTRACT_FIELDS));
     rows.push({
@@ -1737,6 +1796,10 @@ async function buildClosure(
     }
 
     affectedSeasons.add(candidate.season);
+    closureImpact.push({
+      table: 'brownlow_round_votes', rowId: candidate.id, disposition: dispositionResult.disposition,
+      matchId: candidate.matchId, season: candidate.season, clubId: null, goals: null,
+    });
     const latest = candidate.applications[candidate.applications.length - 1];
     const contractHash = rowContractHash(projectContract(
       { played: candidate.current.played, votes: candidate.current.votes, match_id: candidate.current.matchId },
@@ -1782,6 +1845,7 @@ async function buildClosure(
   /* ---- §5.10, per affected season ---- */
   for (const season of affectedSeasons) {
     const verdict = await evaluateSeasonForCorrection(tx, season, pId, pPrimeId, positiveBrownlowSeasons.has(season));
+    seasonVerdicts.push(verdict.report); // every affected season, PASS and STOP alike (S8-D4)
     if (!verdict.independent && verdict.stop) {
       stops.push({ table: 'player_match_stats', rowId: null, step: verdict.stop.step, code: verdict.stop.code });
     } else {
@@ -1811,6 +1875,7 @@ async function buildClosure(
   for (const d of [...dp4.participationRemains, ...dp4.pPrimeReported]) {
     reports.push(`DP-4 affected dependent (reported): ${d.table}#${d.id} (player ${d.playerId}, season ${d.season})`);
   }
+  dependentReports.push(...matchLessDependentReports(dp4)); // the SAME verdict, with its refresh path
 
   const plan: MutationPlan = {
     plannerVersion: PLANNER_VERSION,
@@ -1820,7 +1885,14 @@ async function buildClosure(
     rows,
     stops,
   };
-  return { plan, rows: built, reports };
+  seasonVerdicts.sort((a, b) => a.season - b.season);
+  const context: CorrectionReportContext = {
+    closureRows: closureImpact,
+    seasonVerdicts,
+    dependents: dependentReports,
+    artefactRisk: artefactRecurrenceRisk({ providerId, seasonVerdicts }),
+  };
+  return { plan, rows: built, reports, context };
 }
 
 async function ownerKeyOf(tx: TransactionSql, sourceId: number | null): Promise<string | null> {
@@ -2111,15 +2183,44 @@ export async function classifyCorrectedProviderInDatabase(
 /** A reported STOP: the plan's stop shape, plus the planner's detail text when one exists. */
 export type OutcomeStop = PlanStop & { readonly detail?: string };
 
+/**
+ * Slice 8: what the post-transaction reporter needs from a planned ORIGINAL closure. All of it is
+ * in memory before COMMIT (the plan's own evidence); the reporter only adds read-only reads.
+ */
+export type OriginalImpactInput = {
+  readonly providerId: string;
+  readonly pId: number;
+  readonly pPrimeId: number;
+  readonly pIdentity: string;
+  readonly pPrimeIdentity: string;
+  readonly context: CorrectionReportContext;
+};
+
 export type CorrectionOutcome =
-  | { readonly kind: 'STOP'; readonly stops: readonly OutcomeStop[]; readonly fingerprint: string }
-  | { readonly kind: 'ALREADY_SATISFIED'; readonly reports: readonly string[] }
-  | { readonly kind: 'PLANNED'; readonly fingerprint: string; readonly plan: MutationPlan; readonly reports: readonly string[] }
+  | {
+    readonly kind: 'STOP'; readonly stops: readonly OutcomeStop[]; readonly fingerprint: string;
+    /** S8-D4: the pre-commit report context explaining the STOP (never needs a post-transaction read). */
+    readonly report?: CorrectionReportContext;
+  }
+  | {
+    readonly kind: 'ALREADY_SATISFIED'; readonly reports: readonly string[];
+    /** Q2's own structured outcomes (target absent, recognised post-correction edits, reappearances). */
+    readonly satisfaction?: readonly SatisfactionReportEntry[];
+  }
+  | {
+    readonly kind: 'PLANNED'; readonly fingerprint: string; readonly plan: MutationPlan; readonly reports: readonly string[];
+    readonly impact?: OriginalImpactInput;
+  }
   | {
     readonly kind: 'COMMITTED' | 'ROLLED_BACK';
     readonly fingerprint: string; readonly adjudicationId: number; readonly batchId: string;
     readonly moved: number; readonly deleted: number; readonly reports: readonly string[];
+    readonly impact?: OriginalImpactInput;
+    readonly satisfaction?: readonly SatisfactionReportEntry[];
   };
+
+/** The written-outcome member (its `kind` is COMMITTED after --apply, ROLLED_BACK after --dry-run). */
+export type WrittenOutcome = Extract<CorrectionOutcome, { kind: 'COMMITTED' | 'ROLLED_BACK' }>;
 
 const LOCK_TIMEOUT = '5s';
 
@@ -2235,13 +2336,18 @@ async function runCorrection(
     identityAction: 'update_in_place', manifestOk, lockRows: takeLocks,
   });
   const fingerprint = mutationPlanFingerprint(closure.plan);
+  // Slice 8: the post-transaction reporter's input; `closure.context` is outside the fingerprint.
+  const impact: OriginalImpactInput = {
+    providerId: args.providerId, pId, pPrimeId,
+    pIdentity: pIdentity!.identity, pPrimeIdentity: pPrimeIdentity!.identity, context: closure.context,
+  };
 
   if (args.mode === 'validate-only') {
-    if (closure.plan.stops.length > 0) return { kind: 'STOP', stops: closure.plan.stops, fingerprint };
-    return { kind: 'PLANNED', fingerprint, plan: closure.plan, reports: closure.reports };
+    if (closure.plan.stops.length > 0) return { kind: 'STOP', stops: closure.plan.stops, fingerprint, report: closure.context };
+    return { kind: 'PLANNED', fingerprint, plan: closure.plan, reports: closure.reports, impact };
   }
 
-  if (closure.plan.stops.length > 0) return { kind: 'STOP', stops: closure.plan.stops, fingerprint };
+  if (closure.plan.stops.length > 0) return { kind: 'STOP', stops: closure.plan.stops, fingerprint, report: closure.context };
 
   if (args.mode === 'apply' && fingerprint !== args.expectFingerprint) {
     throw new CorrectionRefused(`REFUSED: recomputed fingerprint ${fingerprint} does not match --expect-fingerprint ${args.expectFingerprint}`);
@@ -2302,22 +2408,26 @@ async function runCorrection(
 
   // §8.2 step 9 / §8.4: the post-write re-plan is CORRECTION SATISFACTION (Q2) -- the SAME
   // evaluator a later re-run uses, with K as "the batch of the current transaction".
-  const postWriteReports = await assertPostWriteSatisfaction(tx, args.providerId, adjudicationId, Number(batchId));
+  const postWrite = await assertPostWriteSatisfactionResult(tx, args.providerId, adjudicationId, Number(batchId));
 
   // §8.2 step 10: finalise K. The binding fields are unchanged; the counts are the actual ones.
   await finaliseCorrectionBatch(tx, batchId, moved + deleted, validationResultFor(correctionCountsFor(closure.rows, projectionsMoved)));
 
+  // §8.2 step 11 (cache paths, Coleman, findings, candidates, DP-5) is NOT done here: it runs
+  // after COMMIT, read-only and best-effort, from `impact` (S8-D1/S8-D2; `main`).
   const reports = [
     ...closure.reports,
-    ...postWriteReports,
+    ...postWrite.reports,
     ...(resolvedFindings > 0 ? [`resolved ${resolvedFindings} ISSUE-240 contradiction finding(s) this correction adjudicates`] : []),
-    ...postCommitReportLines(),
   ];
 
   // The caller (`main`) decides COMMITTED vs ROLLED_BACK by whether it lets `sql.begin()`
   // return normally (apply) or throws to force a real SQL rollback (dry-run) -- this function
   // only ever reports what it actually wrote inside the still-open transaction.
-  return { kind: 'COMMITTED', fingerprint, adjudicationId, batchId, moved, deleted, reports };
+  return {
+    kind: 'COMMITTED', fingerprint, adjudicationId, batchId, moved, deleted, reports, impact,
+    satisfaction: postWrite.satisfactionReport ?? [],
+  };
 }
 
 /* ==================================================================== *
@@ -2552,6 +2662,13 @@ async function recomputeAfterClosureMutations(
 async function assertPostWriteSatisfaction(
   tx: TransactionSql, providerId: string, adjudicationId: number, currentBatchId: number | null,
 ): Promise<readonly string[]> {
+  return (await assertPostWriteSatisfactionResult(tx, providerId, adjudicationId, currentBatchId)).reports;
+}
+
+/** The same re-plan, returning Q2's whole result (ORIGINAL reports its structured outcomes). */
+async function assertPostWriteSatisfactionResult(
+  tx: TransactionSql, providerId: string, adjudicationId: number, currentBatchId: number | null,
+): Promise<CorrectionSatisfactionResult> {
   const postWrite = await checkCorrectionSatisfaction(dbCorrectionSatisfactionReader(tx), {
     providerId, adjudicationId, currentBatchId,
   });
@@ -2560,7 +2677,7 @@ async function assertPostWriteSatisfaction(
       `REFUSED: post-write CORRECTION SATISFACTION re-plan failed -- STOP, rollback: ${postWrite.stops.map(describeStop).join('; ')}`,
     );
   }
-  return postWrite.reports;
+  return postWrite;
 }
 
 /** §8.2 step 8's before/after read. A read failure propagates and rolls the correction back: an
@@ -2569,13 +2686,6 @@ export async function readStatAvailability(tx: TransactionSql, season: number): 
   return tx<Record<string, JsonValue>[]>`
     SELECT * FROM stat_availability WHERE season = ${season}
   `;
-}
-
-function postCommitReportLines(): string[] {
-  return [
-    'caches: /players/[slug], /matches/[id], /seasons/[year], /brownlow/[year], /records, /records/[category], / (3600s ISR); /clubs/[slug] (86400s); no cluster-wide invalidation beyond /api/internal/revalidate-season (O-4)',
-    'Coleman: any completed-season goal move should be checked and refreshed via import_awards.py --groups coleman if applicable (§4.F, out of transaction)',
-  ];
 }
 
 /** §8.2 step 7. A read failure propagates and rolls the correction back; it never reads as
@@ -2792,6 +2902,8 @@ export type CorrectionSatisfactionResult = {
   readonly stops: readonly OutcomeStop[];
   readonly reports: readonly string[];
   readonly correctedPlayerId: number | null;
+  /** Slice 8: the same outcomes as `reports`, structured (report-only; decides nothing). */
+  readonly satisfactionReport?: readonly SatisfactionReportEntry[];
 };
 
 /** Parse a bound batch's `rowProofs` (§8.7). Null when missing or malformed. */
@@ -3048,6 +3160,8 @@ type RowVerdict = {
   readonly stopRef: { readonly table: CanonicalTable; readonly rowId: number | null };
   readonly reports: readonly string[];
   readonly laterOldKeyApplicationThroughCdI: boolean;
+  /** Slice 8: `reports`' reportable outcomes, structured. Absent = none. */
+  readonly entries?: readonly SatisfactionReportEntry[];
 };
 
 /** SAT-3 for one bound MOVE application: L1-L7, then L8 on the current row, or C14 (§5.6). */
@@ -3062,8 +3176,9 @@ function evaluateBoundMove(
   const fields = contractFieldsOf(table);
   const stopRef = { table, rowId: move.current ? toInt(move.current.row.id) : null };
   const keyLabel = canonicalJson(proof.newKey ?? {});
+  const entries: SatisfactionReportEntry[] = []; // Slice 8: structured copies of the report lines below
   const fail = (stop: Stop, reports: string[] = [], laterThroughCdI = false): RowVerdict => ({
-    result: { ok: false, stop }, stopRef, reports, laterOldKeyApplicationThroughCdI: laterThroughCdI,
+    result: { ok: false, stop }, stopRef, reports, laterOldKeyApplicationThroughCdI: laterThroughCdI, entries,
   });
 
   // L1: the EARLIEST application at k′ is c, an afl_api update in the bound batch.
@@ -3121,6 +3236,7 @@ function evaluateBoundMove(
   });
   if (reappearance.reappeared) {
     reports.push(`post_correction_reappearance: a new row not attributed through ${context.providerId} occupies the vacated ${table} key ${canonicalJson(move.derivedOldKey)}; not touched`);
+    entries.push({ kind: 'post_correction_reappearance', table, key: canonicalJson(move.derivedOldKey) });
   }
 
   // L8-a absent -> C14 (§5.6): satisfied only for player_match_stats with the match-deletion audit.
@@ -3135,7 +3251,11 @@ function evaluateBoundMove(
     });
     if (!absent.satisfied) return fail(absent.stop!, reports, laterAtOldKey);
     reports.push(`NOOP correction_target_absent: ${table} ${keyLabel} (match ${String(matchId)} deleted after the correction, audited); lineage L1-L7 retained, never recreated`);
-    return { result: { ok: true }, stopRef, reports, laterOldKeyApplicationThroughCdI: laterAtOldKey };
+    // The audit the (unchanged) predicate above accepted, named for the report.
+    const deletionAudit = move.audits.find((a) => (
+      a.afterCorrection && a.tableName === 'matches' && a.rowId === matchId && a.fieldGroup === 'match_deletion'));
+    entries.push({ kind: 'correction_target_absent', table, key: keyLabel, matchId, auditId: deletionAudit?.id ?? null });
+    return { result: { ok: true }, stopRef, reports, laterOldKeyApplicationThroughCdI: laterAtOldKey, entries };
   }
 
   // L8-b / L8-b′: ownership and stamps against the latest non-correction application (H then L7).
@@ -3192,13 +3312,23 @@ function evaluateBoundMove(
   };
   const l8 = evaluateL8(l8Evidence);
   if (!l8.ok) return fail(l8.stop, reports, laterAtOldKey);
-  if (reownedByBrownlowAdmin) reports.push(`post_correction_edit brownlow_admin_reowned: ${table} ${keyLabel} (audit ${String(reownershipAuditId)})`);
+  if (reownedByBrownlowAdmin) {
+    reports.push(`post_correction_edit brownlow_admin_reowned: ${table} ${keyLabel} (audit ${String(reownershipAuditId)})`);
+    entries.push({
+      kind: 'post_correction_edit', table, key: keyLabel, writer: 'brownlow_admin_reowned', field: null,
+      from: null, to: null, auditId: reownershipAuditId,
+    });
+  }
   for (const edit of l8.postCorrectionEdits) {
     const divergence = divergences.find((d) => d.field === edit.field);
     reports.push(`post_correction_edit ${edit.writer}: ${table} ${keyLabel} ${edit.field} ${canonicalJson(divergence?.reconstructed ?? null)} -> ${canonicalJson(divergence?.current ?? null)} (audit ${edit.auditId})`);
+    entries.push({
+      kind: 'post_correction_edit', table, key: keyLabel, writer: edit.writer, field: edit.field,
+      from: divergence?.reconstructed ?? null, to: divergence?.current ?? null, auditId: edit.auditId,
+    });
   }
   reports.push(`NOOP already_corrected_moved: ${table} ${keyLabel}`);
-  return { result: { ok: true }, stopRef, reports, laterOldKeyApplicationThroughCdI: laterAtOldKey };
+  return { result: { ok: true }, stopRef, reports, laterOldKeyApplicationThroughCdI: laterAtOldKey, entries };
 }
 
 /** The columns D-2 requires of a correction delete's `previous_values`: the full row as the
@@ -3333,8 +3463,11 @@ export function sat5ProjectionContradictions(
  */
 export function evaluateCorrectionSatisfactionQ2(evidence: CorrectionSatisfactionEvidence): CorrectionSatisfactionResult {
   const reports: string[] = [];
+  const satisfactionReport: SatisfactionReportEntry[] = [];
   const satStop = (step: string, code: StopCode, detail: string): OutcomeStop => ({ table: 'player_match_stats', rowId: null, step, code, detail });
-  const failed = (stops: OutcomeStop[]): CorrectionSatisfactionResult => ({ satisfied: false, stops, reports, correctedPlayerId: evidence.correctedPlayerId });
+  const failed = (stops: OutcomeStop[]): CorrectionSatisfactionResult => ({
+    satisfied: false, stops, reports, correctedPlayerId: evidence.correctedPlayerId, satisfactionReport,
+  });
 
   // SAT-1: the authority A and its two identities.
   const adjudication = evidence.ledgerRows.find((r) => r.id === evidence.adjudicationId) ?? null;
@@ -3389,6 +3522,7 @@ export function evaluateCorrectionSatisfactionQ2(evidence: CorrectionSatisfactio
     });
     moveResults.push(verdict.result);
     reports.push(...verdict.reports);
+    satisfactionReport.push(...(verdict.entries ?? []));
     laterApplicationAtOldKeyThroughCdI ||= verdict.laterOldKeyApplicationThroughCdI;
     if (!verdict.result.ok) rowStops.push({ ...verdict.stopRef, ...verdict.result.stop });
   }
@@ -3431,7 +3565,7 @@ export function evaluateCorrectionSatisfactionQ2(evidence: CorrectionSatisfactio
   if (stops.length > 0) return failed(stops);
 
   reports.push('CORRECTION SATISFACTION: SAT-1..SAT-5 PASS');
-  return { satisfied: true, stops: [], reports, correctedPlayerId: pPrimeId };
+  return { satisfied: true, stops: [], reports, correctedPlayerId: pPrimeId, satisfactionReport };
 }
 
 /** The match ids whose `data_edits` audits can explain a post-correction divergence at k′. */
@@ -3562,7 +3696,9 @@ export function decideAlreadyCorrectedRerun(args: CorrectionArgs, q2: Correction
     };
   }
   if (!q2.satisfied) return { kind: 'STOP', stops: q2.stops, fingerprint: '' };
-  return { kind: 'ALREADY_SATISFIED', reports: q2.reports };
+  // §8.5: no batch, no ledger row, no mutation -- so no cache/Coleman/dependent impact is carried;
+  // only Q2's own reportable outcomes (target absent, recognised post-correction edits).
+  return { kind: 'ALREADY_SATISFIED', reports: q2.reports, satisfaction: q2.satisfactionReport ?? [] };
 }
 
 /** A CD_I-created row still at P (SAT-5, "attribution predicates only"). Deliberately wider than
@@ -3721,22 +3857,400 @@ export function dbCorrectionSatisfactionReader(tx: TransactionSql): CorrectionSa
  * Reporting
  * ==================================================================== */
 
-export function formatOutcome(outcome: CorrectionOutcome, args: CorrectionArgs): string {
+/*
+ * §8.2 step 11 (Slice 8). The ORIGINAL report has two halves:
+ *   - the pre-commit CONTEXT (`CorrectionReportContext`): §5.10 verdicts, DP-3/DP-4, the artefact
+ *     recurrence risk. It is built inside the transaction from evidence the plan already read, so a
+ *     STOP is fully explained without any later read (S8-D4);
+ *   - the post-transaction IMPACT (`ImpactReport`): cache paths, Coleman, open findings, pending
+ *     candidates, DP-5. It is read AFTER the transaction has finished (COMMIT for --apply, the
+ *     forced ROLLBACK for --dry-run / --validate-only), in separate READ ONLY transactions, one per
+ *     section, best-effort (S8-D2). A failed section makes the report incomplete; it never touches
+ *     the correction's own outcome.
+ * Nothing here invalidates a cache, recomputes Coleman, resolves a finding or writes anything
+ * (S8-D1). Promotion and rebuild REPLAY never call it (S8-D3).
+ */
+
+/** O-4: the one CLI-reachable cache refresh (`docs/deployment.md`, ISSUE-134). Printed, never run. */
+export function seasonRevalidationCommand(season: number): string {
+  return 'curl -s -X POST http://127.0.0.1:3100/api/internal/revalidate-season'
+    + ' -H "x-afldb-revalidate-secret: $(grep \'^AFLDB_REVALIDATE_SECRET=\' .env | cut -d= -f2-)"'
+    + ` -H 'content-type: application/json' -d '{"season":${season}}'`;
+}
+
+/** §4.F: the operator command that refreshes the derived Coleman winners. Printed, never run. */
+export const COLEMAN_REFRESH_COMMAND = 'python tools/migration/import_awards.py --groups coleman';
+
+export type ImpactReport = {
+  readonly phase: ImpactPhase;
+  /** Each section is null when it could not be gathered (named in `incomplete`). */
+  readonly cache: CacheImpact | null;
+  readonly coleman: readonly ColemanSeasonImpact[] | null;
+  readonly findings: readonly FindingReport[] | null;
+  readonly pendingCandidates: readonly PendingCandidateReport[] | null;
+  /** §5.11 DP-5 (report only). */
+  readonly debutChanges: readonly DependentReportEntry[] | null;
+  readonly incomplete: readonly { readonly section: string; readonly error: string }[];
+};
+
+/** The read-only facts the post-transaction report needs. `dbImpactReportReader` is the only DB one. */
+export type ImpactReportReader = {
+  readonly playerSlugs: (ids: readonly number[]) => Promise<ReadonlyMap<number, string>>;
+  readonly clubSlugs: (ids: readonly number[]) => Promise<ReadonlyMap<number, string>>;
+  /** `first_season` of `data/reference/coleman-derivation.json`; throws when the contract is unusable. */
+  readonly colemanFirstSeason: () => number;
+  readonly colemanMatchFacts: (matchIds: readonly number[]) => Promise<readonly {
+    readonly matchId: number; readonly season: number; readonly isFinal: boolean; readonly seasonComplete: boolean;
+  }[]>;
+  /** Seasons in which one of `playerIds` is a current Coleman `award_winners` row. */
+  readonly colemanWinnerSeasons: (playerIds: readonly number[], seasons: readonly number[]) => Promise<ReadonlySet<number>>;
+  readonly findingRows: (scope: FindingScope) => Promise<readonly OpenFindingRow[]>;
+  readonly candidateRows: (scope: { readonly providerId: string; readonly pId: number }) => Promise<readonly PendingCandidateRow[]>;
+  readonly firstKickGoals: (playerIds: readonly number[]) => Promise<readonly FirstKickGoalRow[]>;
+  /** Every current `player_match_stats` participation of each player, keyed by player id. */
+  readonly careers: (playerIds: readonly number[]) => Promise<ReadonlyMap<number, readonly CareerMatch[]>>;
+  readonly matchCareerFacts: (matchIds: readonly number[]) => Promise<readonly CareerMatch[]>;
+};
+
+function describeError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * Gather the post-transaction impact, one section at a time. It never throws: a section that fails
+ * is recorded in `incomplete` and the rest are still gathered.
+ */
+export async function gatherImpactReport(
+  reader: ImpactReportReader, input: OriginalImpactInput, phase: ImpactPhase,
+): Promise<ImpactReport> {
+  const incomplete: { section: string; error: string }[] = [];
+  const section = async <T>(name: string, gather: () => Promise<T>): Promise<T | null> => {
+    try {
+      return await gather();
+    } catch (error) {
+      incomplete.push({ section: name, error: describeError(error) });
+      return null;
+    }
+  };
+  const { pId, pPrimeId } = input;
+  const rows = input.context.closureRows;
+  const pmsRows = rows.filter((r): r is ClosureImpactRow & { matchId: number } => r.table === 'player_match_stats' && r.matchId !== null);
+  const pmsMatchIds = [...new Set(pmsRows.map((r) => r.matchId))].sort((a, b) => a - b);
+
+  const cache = await section('cache paths', async () => {
+    if (rows.length === 0) return affectedCachePaths({ rows, players: [], clubSlugs: new Map() });
+    const slugs = await reader.playerSlugs([pId, pPrimeId]);
+    const clubIds = [...new Set(pmsRows.flatMap((r) => (r.clubId === null ? [] : [r.clubId])))];
+    return affectedCachePaths({
+      rows,
+      players: [pId, pPrimeId].map((id) => ({ id, slug: slugs.get(id) ?? null })),
+      clubSlugs: clubIds.length === 0 ? new Map() : await reader.clubSlugs(clubIds),
+    });
+  });
+
+  const coleman = await section('Coleman', async () => {
+    if (pmsRows.length === 0) return [];
+    const firstSeason = reader.colemanFirstSeason();
+    const facts = new Map((await reader.colemanMatchFacts(pmsMatchIds)).map((f) => [f.matchId, f]));
+    const colemanRows: ColemanRowFacts[] = pmsRows.map((r) => {
+      const f = facts.get(r.matchId);
+      if (f === undefined) throw new Error(`match ${r.matchId} of player_match_stats#${r.rowId} was not found`);
+      return { rowId: r.rowId, season: f.season, matchId: r.matchId, isFinal: f.isFinal, seasonComplete: f.seasonComplete, goals: r.goals };
+    });
+    const seasons = [...new Set(colemanRows.map((r) => r.season))];
+    return evaluateColemanImpact({
+      rows: colemanRows, firstSeason, winnerSeasonsForPOrPPrime: await reader.colemanWinnerSeasons([pId, pPrimeId], seasons),
+    });
+  });
+
+  const scope: FindingScope = {
+    providerId: input.providerId, pId, pPrimeId, pIdentity: input.pIdentity, pPrimeIdentity: input.pPrimeIdentity,
+  };
+  const findings = await section('open findings', async () => selectOpenFindings(await reader.findingRows(scope), scope));
+  const pendingCandidates = await section('pending promotion candidates', async () => selectPendingCandidates(
+    await reader.candidateRows({ providerId: input.providerId, pId }), { providerId: input.providerId, pId },
+  ));
+
+  const debutChanges = await section('DP-5 first-kick-goal debut', async () => {
+    if (pmsRows.length === 0) return [];
+    const firstKickGoals = await reader.firstKickGoals([pId, pPrimeId]);
+    if (firstKickGoals.length === 0) return [];
+    const careers = await reader.careers([pId, pPrimeId]);
+    const closureMatches = new Map((await reader.matchCareerFacts(pmsMatchIds)).map((m) => [m.matchId, m]));
+    const pick = (disposition: ClosureImpactRow['disposition']): CareerMatch[] => pmsRows
+      .filter((r) => r.disposition === disposition)
+      .map((r) => {
+        const m = closureMatches.get(r.matchId);
+        if (m === undefined) throw new Error(`match ${r.matchId} of player_match_stats#${r.rowId} was not found`);
+        return m;
+      });
+    const moved = pick('MOVE');
+    const deleted = pick('DELETE_AS_FOREIGN_COLLISION');
+    const { pBefore, pPrimeBefore } = careersBeforeCorrection({
+      phase, pCurrent: careers.get(pId) ?? [], pPrimeCurrent: careers.get(pPrimeId) ?? [], moved, deleted,
+    });
+    return evaluateFirstKickGoalDebutChanges({ pId, pPrimeId, pBefore, pPrimeBefore, moved, deleted, firstKickGoals });
+  });
+
+  return { phase, cache, coleman, findings, pendingCandidates, debutChanges, incomplete };
+}
+
+type Db = ReturnType<typeof postgres>;
+
+/** One reporting read, in its own READ ONLY transaction (PostgreSQL itself refuses any write). */
+async function readOnlyReport<T>(sql: Db, read: (tx: TransactionSql) => Promise<T>): Promise<T> {
+  return (await sql.begin('isolation level read committed read only', read)) as unknown as T;
+}
+
+function readColemanFirstSeason(): number {
+  const contract = JSON.parse(readFileSync(join(REPO_ROOT, 'data', 'reference', 'coleman-derivation.json'), 'utf8')) as unknown;
+  if (!isPlainObject(contract) || !Number.isInteger(contract.first_season) || contract.completed_seasons_only !== true) {
+    throw new Error('data/reference/coleman-derivation.json lacks an integer first_season or completed_seasons_only: true');
+  }
+  return contract.first_season as number;
+}
+
+/** The post-transaction reads. SELECT only, each in a READ ONLY transaction, never inside the correction's. */
+export function dbImpactReportReader(sql: Db): ImpactReportReader {
+  return {
+    playerSlugs: (ids) => readOnlyReport(sql, async (tx) => new Map((await tx<{ id: number; slug: string }[]>`
+      SELECT id, slug FROM players WHERE id = ANY(${tx.array([...ids])}::int[])
+    `).map((r) => [r.id, r.slug]))),
+    clubSlugs: (ids) => readOnlyReport(sql, async (tx) => new Map((await tx<{ id: number; slug: string }[]>`
+      SELECT id, slug FROM clubs WHERE id = ANY(${tx.array([...ids])}::int[])
+    `).map((r) => [r.id, r.slug]))),
+    colemanFirstSeason: readColemanFirstSeason,
+    colemanMatchFacts: (matchIds) => readOnlyReport(sql, (tx) => tx<{ matchId: number; season: number; isFinal: boolean; seasonComplete: boolean }[]>`
+      SELECT m.id AS "matchId", m.season::int AS season, m.is_final AS "isFinal",
+             (s.status::text = 'complete') AS "seasonComplete"
+        FROM matches m JOIN seasons s ON s.year = m.season
+       WHERE m.id = ANY(${tx.array([...matchIds])}::int[])
+    `),
+    colemanWinnerSeasons: (playerIds, seasons) => readOnlyReport(sql, async (tx) => new Set((await tx<{ season: number }[]>`
+      SELECT DISTINCT aw.season::int AS season
+        FROM award_winners aw JOIN awards a ON a.id = aw.award_id
+       WHERE a.slug = 'coleman' AND aw.player_id = ANY(${tx.array([...playerIds])}::int[])
+         AND aw.season = ANY(${tx.array([...seasons])}::int[])
+    `).map((r) => r.season))),
+    findingRows: (scope) => readOnlyReport(sql, (tx) => {
+      const suffix = `|${scope.providerId}`;
+      const players = [String(scope.pId), String(scope.pPrimeId)];
+      const identities = [scope.pIdentity, scope.pPrimeIdentity];
+      return tx<OpenFindingRow[]>`
+        SELECT id::text AS id, issue_type AS "issueType", issue_key AS "issueKey",
+               (resolved_at IS NOT NULL) AS resolved, details
+          FROM data_issues
+         WHERE resolved_at IS NULL
+           AND ((issue_type = 'canonical_apply_failed' AND details->>'source_key' = ${AFL_API_SOURCE_KEY}
+                  AND right(details->>'external_record_id', ${suffix.length}::int) = ${suffix})
+             OR (issue_type = 'afl_api_identity_contradiction' AND (
+                  details->>'external_id' = ${scope.providerId} OR details->>'existing_external_id' = ${scope.providerId}
+                  OR details->>'proposed_player_id' = ANY(${tx.array(players)}::text[])
+                  OR details->>'existing_player_id' = ANY(${tx.array(players)}::text[])
+                  OR details->>'proposed_player_identity' = ANY(${tx.array(identities)}::text[])
+                  OR details->>'existing_player_ref' = ANY(${tx.array(identities)}::text[]))))
+         ORDER BY id
+      `;
+    }),
+    candidateRows: (scope) => readOnlyReport(sql, (tx) => {
+      const suffix = `|${scope.providerId}`;
+      return tx<PendingCandidateRow[]>`
+        SELECT id::text AS id, family, external_record_id AS "externalRecordId", target_table AS "targetTable",
+               verb, season::int AS season, status, proposed_fields->>'player_id' AS "proposedPlayerId"
+          FROM promotion_candidates
+         WHERE status = 'pending'
+           AND (right(external_record_id, ${suffix.length}::int) = ${suffix}
+                OR proposed_fields->>'player_id' = ${String(scope.pId)})
+         ORDER BY id
+      `;
+    }),
+    firstKickGoals: (playerIds) => readOnlyReport(sql, (tx) => tx<FirstKickGoalRow[]>`
+      SELECT id, player_id AS "playerId", match_id AS "matchId", season::int AS season
+        FROM player_achievements
+       WHERE achievement_type = 'first_kick_goal' AND player_id = ANY(${tx.array([...playerIds])}::int[])
+    `),
+    // `(match_date, match_id)` is the derived career order (player-derived.ts); a NULL date sorts
+    // last there (ASC NULLS LAST), which the '9999-12-31' stand-in reproduces for string order.
+    careers: (playerIds) => readOnlyReport(sql, async (tx) => {
+      const rows = await tx<(CareerMatch & { playerId: number })[]>`
+        SELECT pms.player_id AS "playerId", pms.match_id AS "matchId",
+               COALESCE(m.match_date::text, '9999-12-31') AS "matchDate", m.season::int AS season
+          FROM player_match_stats pms JOIN matches m ON m.id = pms.match_id
+         WHERE pms.player_id = ANY(${tx.array([...playerIds])}::int[])
+      `;
+      const out = new Map<number, CareerMatch[]>();
+      for (const { playerId, ...m } of rows) out.set(playerId, [...(out.get(playerId) ?? []), m]);
+      return out;
+    }),
+    matchCareerFacts: (matchIds) => readOnlyReport(sql, (tx) => tx<CareerMatch[]>`
+      SELECT id AS "matchId", COALESCE(match_date::text, '9999-12-31') AS "matchDate", season::int AS season
+        FROM matches WHERE id = ANY(${tx.array([...matchIds])}::int[])
+    `),
+  };
+}
+
+/**
+ * §8.2 step 11's lifecycle: gather (best-effort) and render. It never throws for a COMMITTED
+ * outcome: a failed report is "report incomplete" and the correction stays COMMITTED (exit 0).
+ * STOP and ALREADY_SATISFIED are rendered from what the transaction already holds, with no read.
+ */
+export async function reportAfterTransaction(
+  outcome: CorrectionOutcome, args: CorrectionArgs,
+  gather: (input: OriginalImpactInput, phase: ImpactPhase) => Promise<ImpactReport>,
+): Promise<{ readonly text: string; readonly exitCode: number }> {
+  const exitCode = outcome.kind === 'STOP' ? 1 : 0;
+  let impact: ImpactReport | null = null;
+  if ((outcome.kind === 'PLANNED' || outcome.kind === 'COMMITTED' || outcome.kind === 'ROLLED_BACK') && outcome.impact) {
+    const phase: ImpactPhase = outcome.kind === 'COMMITTED' ? 'committed' : 'prospective';
+    try {
+      impact = await gather(outcome.impact, phase);
+    } catch (error) {
+      impact = {
+        phase, cache: null, coleman: null, findings: null, pendingCandidates: null, debutChanges: null,
+        incomplete: [{ section: 'report', error: describeError(error) }],
+      };
+    }
+  }
+  try {
+    return { text: formatOutcome(outcome, args, impact), exitCode };
+  } catch (error) {
+    if (outcome.kind !== 'COMMITTED') throw error;
+    return { text: formatCommittedReportIncomplete(outcome, error), exitCode: 0 };
+  }
+}
+
+/** A COMMITTED correction whose report could not be produced at all: never "nothing was written". */
+export function formatCommittedReportIncomplete(outcome: WrittenOutcome, error: unknown): string {
+  return [
+    `  COMMITTED: fingerprint ${outcome.fingerprint}`,
+    `    adjudication id ${outcome.adjudicationId}, batch id ${outcome.batchId}`,
+    `    moved ${outcome.moved}, deleted ${outcome.deleted}`,
+    `  REPORT INCOMPLETE: ${describeError(error)}`,
+    '    the correction IS COMMITTED and was not rolled back; only the post-commit report is missing',
+  ].join('\n');
+}
+
+function formatDependentEntry(d: DependentReportEntry): string[] {
+  return [`      ${d.rule} ${d.outcome}: ${d.detail}`, ...d.refreshPath.map((p) => `        refresh (report only): ${p}`)];
+}
+
+/** The pre-commit context: §5.10 verdicts, artefact risk, DP-3/DP-4 (every phase, STOP included). */
+function formatReportContext(context: CorrectionReportContext): string[] {
+  const lines = ['    §5.10 season-total verdicts:'];
+  if (context.seasonVerdicts.length === 0) lines.push('      no affected season');
+  for (const v of context.seasonVerdicts) {
+    lines.push(`      season ${v.season}: ${v.verdict} ${v.rule} (${v.seasonClass})`
+      + (v.stop ? ` [${v.stop.step}] ${v.stop.code}` : '') + `: ${v.proof}`);
+    for (const check of v.failedChecks) lines.push(`        failed: ${check}`);
+  }
+  lines.push('    artefact recurrence risk (§4.G, O-3; report only):');
+  for (const risk of context.artefactRisk) lines.push(`      - ${risk}`);
+  lines.push('    dependents (§5.11 DP-3/DP-4):');
+  if (context.dependents.length === 0) lines.push('      none');
+  for (const d of context.dependents) lines.push(...formatDependentEntry(d));
+  return lines;
+}
+
+function formatSatisfactionEntries(entries: readonly SatisfactionReportEntry[]): string[] {
+  if (entries.length === 0) return [];
+  const lines = ['    correction satisfaction outcomes (§5.12; already decided by Q2):'];
+  for (const e of entries) {
+    if (e.kind === 'correction_target_absent') {
+      lines.push(`      correction_target_absent (satisfied): ${e.table} ${e.key}, match ${String(e.matchId)} deleted after the correction (audit ${String(e.auditId)})`);
+    } else if (e.kind === 'post_correction_edit') {
+      lines.push(`      post_correction_edit ${e.writer} (PASS): ${e.table} ${e.key}`
+        + (e.field === null ? '' : ` ${e.field} ${canonicalJson(e.from)} -> ${canonicalJson(e.to)}`)
+        + ` (audit ${String(e.auditId)})`);
+    } else {
+      lines.push(`      post_correction_reappearance: ${e.table} ${e.key} (a new row not attributed through the provider; not touched)`);
+    }
+  }
+  return lines;
+}
+
+/** The post-transaction impact; `impact` null = not gathered. */
+function formatImpact(impact: ImpactReport | null): string[] {
+  if (impact === null) return ['    post-transaction report: not gathered'];
+  const committed = impact.phase === 'committed';
+  const verb = committed ? 'affected' : 'would affect';
+  const lines = [committed
+    ? '    POST-COMMIT REPORT (read-only reads after COMMIT; nothing invalidated, recomputed or resolved):'
+    : '    PROSPECTIVE REPORT (would affect -- nothing was committed; read-only; nothing invalidated):'];
+
+  lines.push('    cache (§4.H, D10/O-4):');
+  if (impact.cache === null) lines.push('      unavailable (see REPORT INCOMPLETE)');
+  else if (!impact.cache.canonicalRowsChanged) {
+    lines.push(`      no canonical row ${committed ? 'was' : 'would be'} moved or deleted: no ISR route is claimed as affected`);
+  } else {
+    for (const path of impact.cache.paths) {
+      lines.push(`      ${verb}: ${path}${path === '/records/[category]' ? ' (every category page)' : ''}`);
+    }
+    for (const u of impact.cache.unresolved) lines.push(`      ${verb} (path not composed): ${u}`);
+    for (const season of impact.cache.seasonRevalidations) {
+      lines.push(`      manual season revalidation available (O-4; NOT run; one POST refreshes one worker, repeat until every worker answers): ${seasonRevalidationCommand(season)}`);
+    }
+    lines.push('      every other route expires within its ISR window (3600 s; /clubs 86400 s)');
+  }
+
+  lines.push('    Coleman (§4.F; award_winners is never recomputed here):');
+  if (impact.coleman === null) lines.push('      unavailable (see REPORT INCOMPLETE)');
+  else if (impact.coleman.length === 0) lines.push('      none: no completed home-and-away season\'s derivation can change');
+  else {
+    for (const c of impact.coleman) {
+      lines.push(`      season ${c.season}: potentially stale (${c.reasons.join(', ')}; player_match_stats ${c.rowIds.map((id) => `#${id}`).join(', ')})`);
+    }
+    lines.push(`      refresh (report only): ${COLEMAN_REFRESH_COMMAND}`);
+  }
+
+  lines.push('    DP-5 first-kick-goal debut (§5.11; report only):');
+  if (impact.debutChanges === null) lines.push('      unavailable (see REPORT INCOMPLETE)');
+  else if (impact.debutChanges.length === 0) lines.push('      none');
+  else for (const d of impact.debutChanges) lines.push(...formatDependentEntry(d));
+
+  lines.push('    open findings (§4.B; reported, never resolved by this report):');
+  if (impact.findings === null) lines.push('      unavailable (see REPORT INCOMPLETE)');
+  else if (impact.findings.length === 0) lines.push('      none');
+  for (const f of impact.findings ?? []) {
+    lines.push(`      data_issues#${f.id} ${f.issueType} (${f.selector}) ${f.issueKey}`
+      + (f.adjudicatedByThisCorrection ? ` -- ${committed ? 'should have been' : 'would be'} resolved by this correction's §8.2 step 7` : ''));
+  }
+
+  lines.push('    pending promotion candidates (§4.B; reported, never resolved):');
+  if (impact.pendingCandidates === null) lines.push('      unavailable (see REPORT INCOMPLETE)');
+  else if (impact.pendingCandidates.length === 0) lines.push('      none');
+  for (const c of impact.pendingCandidates ?? []) {
+    lines.push(`      promotion_candidates#${c.id} ${c.family} ${c.externalRecordId} -> ${c.targetTable} (${c.verb}, season ${c.season}; ${c.selector})`);
+  }
+
+  if (impact.incomplete.length > 0) {
+    lines.push(committed
+      ? '  REPORT INCOMPLETE: the correction IS COMMITTED and was not rolled back; these report sections could not be read:'
+      : '  REPORT INCOMPLETE: these report sections could not be read (nothing was committed):');
+    for (const i of impact.incomplete) lines.push(`    ${i.section}: ${i.error}`);
+  }
+  return lines;
+}
+
+export function formatOutcome(outcome: CorrectionOutcome, args: CorrectionArgs, impact: ImpactReport | null = null): string {
   const lines = [`  mode ${args.mode}, provider ${args.providerId} -> player ${args.toPlayerId}`];
   switch (outcome.kind) {
     case 'STOP':
       lines.push(`  STOP: ${outcome.stops.length} stop(s); nothing written`);
       for (const s of outcome.stops) lines.push(`    ${describeStop(s)}`);
       if (outcome.fingerprint) lines.push(`    fingerprint (for reference only, do not apply): ${outcome.fingerprint}`);
+      if (outcome.report) lines.push(...formatReportContext(outcome.report));
       return lines.join('\n');
     case 'ALREADY_SATISFIED':
       lines.push('  ALREADY_SATISFIED: this provider is already corrected and the correction remains satisfied');
       for (const r of outcome.reports) lines.push(`    ${r}`);
+      lines.push(...formatSatisfactionEntries(outcome.satisfaction ?? []));
+      lines.push('    no new mutation: no batch opened, no ledger row appended, no canonical row changed -- no cache, Coleman or dependent impact to report');
       return lines.join('\n');
     case 'PLANNED':
       lines.push(`  PLAN OK (validate-only): fingerprint ${outcome.fingerprint}`);
       lines.push(`    rows planned: ${outcome.plan.rows.length}`);
       for (const r of outcome.reports) lines.push(`    ${r}`);
+      if (outcome.impact) lines.push(...formatReportContext(outcome.impact.context), ...formatImpact(impact));
       return lines.join('\n');
     case 'ROLLED_BACK':
     case 'COMMITTED':
@@ -3744,6 +4258,8 @@ export function formatOutcome(outcome: CorrectionOutcome, args: CorrectionArgs):
       lines.push(`    adjudication id ${outcome.adjudicationId}, batch id ${outcome.batchId}`);
       lines.push(`    moved ${outcome.moved}, deleted ${outcome.deleted}`);
       for (const r of outcome.reports) lines.push(`    ${r}`);
+      lines.push(...formatSatisfactionEntries(outcome.satisfaction ?? []));
+      if (outcome.impact) lines.push(...formatReportContext(outcome.impact.context), ...formatImpact(impact));
       return lines.join('\n');
   }
 }
@@ -4680,10 +5196,14 @@ async function main(argv: readonly string[]): Promise<number> {
     max: 1, onnotice: () => {},
     connection: { application_name: `afldb-correct-afl-api-identity-${args.mode}`, TimeZone: 'UTC' },
   });
+  // Set once `sql.begin()` has returned a COMMITTED outcome: from then on no failure may be
+  // reported as "nothing was written" or as a rollback (S8-D2).
+  let committed: WrittenOutcome | null = null;
   try {
     let result: CorrectionOutcome;
     if (args.mode === 'apply') {
       result = await sql.begin('isolation level read committed', (tx) => runCorrection(tx, args, evidenceFile));
+      if (result.kind === 'COMMITTED') committed = result;
     } else {
       // validate-only and dry-run: always force a real ROLLBACK, whatever `runCorrection` did
       // inside the transaction (validate-only never reaches a write; dry-run executes every
@@ -4701,10 +5221,34 @@ async function main(argv: readonly string[]): Promise<number> {
           : error.outcome;
       }
     }
-    console.log(formatOutcome(result, args));
-    return result.kind === 'STOP' ? 1 : 0;
+    // §8.2 step 11: the transaction has finished (committed, or really rolled back). Only now may
+    // the read-only, best-effort report run, on its own READ ONLY transactions.
+    const rendered = await reportAfterTransaction(
+      result, args, (input, phase) => gatherImpactReport(dbImpactReportReader(sql), input, phase),
+    );
+    console.log(rendered.text);
+    return rendered.exitCode;
+  } catch (error) {
+    // A failure BEFORE the commit keeps the top-level "nothing was written" handler. After it, the
+    // correction is durable: report the commit and the missing report, and succeed.
+    if (committed === null) throw error;
+    console.log(formatCommittedReportIncomplete(committed, error));
+    return 0;
   } finally {
+    await closeCorrectionConnection(sql, committed !== null);
+  }
+}
+
+/** Close the pool. After a COMMIT a close failure is a warning, never "nothing was written". */
+async function closeCorrectionConnection(sql: Db, afterCommit: boolean): Promise<void> {
+  if (!afterCommit) {
     await sql.end({ timeout: 5 });
+    return;
+  }
+  try {
+    await sql.end({ timeout: 5 });
+  } catch (error) {
+    console.error(`WARNING: closing the connection after COMMIT failed (${describeError(error)}); the correction IS COMMITTED`);
   }
 }
 

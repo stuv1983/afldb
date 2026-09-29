@@ -34,7 +34,11 @@ import {
   BROWNLOW_ROUND_VOTES_CONTRACT_FIELDS,
   PLANNER_VERSION,
   PLAYER_MATCH_STATS_CONTRACT_FIELDS,
+  artefactRecurrenceRisk,
   classifyBrownlowChainApplication,
+  describeSeasonVerdict,
+  unresolvedDependentReports,
+  type CorrectionReportContext,
   evaluateBrownlowAttribution,
   evaluateBrownlowGuards,
   evaluateBrownlowMutationEligibility,
@@ -53,6 +57,15 @@ import {
 import { loadFitzroyProfileContinuityRules } from '../src/lib/acquisition/fitzroy-profile-continuity';
 import { canonicalJson, type JsonValue } from '../src/lib/acquisition/observations';
 import {
+  COLEMAN_REFRESH_COMMAND,
+  dbImpactReportReader,
+  formatCommittedReportIncomplete,
+  gatherImpactReport,
+  reportAfterTransaction,
+  seasonRevalidationCommand,
+  type ImpactReportReader,
+  type OriginalImpactInput,
+  type WrittenOutcome,
   CorrectionRefused,
   ORIGINAL_BATCH_CONTRACT,
   REBUILD_REPLAY_IDENTITY_NOTE,
@@ -1520,6 +1533,347 @@ describe('formatOutcome (report formatting)', () => {
     expect(text).toContain('COMMITTED');
     expect(text).toContain('moved 2, deleted 1');
     expect(text).toContain('adjudication id 5, batch id 99');
+  });
+
+  it('Slice 8: the generic cache/Coleman text is gone (exact paths come from the post-transaction report)', () => {
+    const source = toolSource();
+    expect(source).not.toContain('function postCommitReportLines(');
+    expect(source).not.toContain('any completed-season goal move should be checked');
+  });
+});
+
+/* ==================================================================== *
+ * Slice 8: the ORIGINAL operator report (§8.2 step 11; S8-D1...S8-D4)
+ * ==================================================================== */
+
+describe('Slice 8: the post-transaction report lifecycle and content', () => {
+  const ARGS: CorrectionArgs = {
+    mode: 'apply', providerId: CD_I, toPlayerId: P2, adminUserId: 7, note: VALID_NOTE,
+    evidenceFile: 'evidence.txt', expectDatabase: 'afldb_dev', expectFingerprint: 'a'.repeat(64),
+    acknowledgeSurnameDisagreement: false,
+  };
+  const emptyVerdict = describeSeasonVerdict({ season: 2024, seasonClass: 'empty', evidence: { kind: 'empty' }, verdict: { independent: true } });
+  const context: CorrectionReportContext = {
+    closureRows: [
+      { table: 'player_match_stats', rowId: 900, disposition: 'MOVE', matchId: M, season: 2024, clubId: 3, goals: 2 },
+      { table: 'brownlow_round_votes', rowId: 901, disposition: 'MOVE', matchId: M, season: 2024, clubId: null, goals: null },
+    ],
+    seasonVerdicts: [emptyVerdict],
+    dependents: unresolvedDependentReports({ closureRowId: 900, matchId: M, rows: [{ table: 'after_siren_kicks', id: 4 }] }),
+    artefactRisk: artefactRecurrenceRisk({ providerId: CD_I, seasonVerdicts: [emptyVerdict] }),
+  };
+  const impactInput: OriginalImpactInput = {
+    providerId: CD_I, pId: P, pPrimeId: P2, pIdentity: 'id:P', pPrimeIdentity: 'id:P2', context,
+  };
+
+  /** A read-only fake: every member only returns data; `calls` records what was read. */
+  function fakeImpactReader(over: Partial<ImpactReportReader> = {}, calls: string[] = []): ImpactReportReader {
+    const read = <T>(name: string, value: T) => async (): Promise<T> => {
+      calls.push(name);
+      return value;
+    };
+    return {
+      playerSlugs: read('playerSlugs', new Map([[P, 'alpha-one'], [P2, 'bravo-two']])),
+      clubSlugs: read('clubSlugs', new Map([[3, 'carlton']])),
+      colemanFirstSeason: () => 1980,
+      colemanMatchFacts: read('colemanMatchFacts', [{ matchId: M, season: 2024, isFinal: false, seasonComplete: true }]),
+      colemanWinnerSeasons: read('colemanWinnerSeasons', new Set<number>()),
+      findingRows: read('findingRows', [{
+        id: '5', issueType: 'canonical_apply_failed', issueKey: `afl_api|apply|player_stats|CD_M1|T1|${CD_I}|player_match_stats`,
+        resolved: false, details: { source_key: 'afl_api', external_record_id: `CD_M1|T1|${CD_I}` },
+      }]),
+      candidateRows: read('candidateRows', [{
+        id: '8', family: 'player_stats', externalRecordId: `CD_M1|T1|${CD_I}`, targetTable: 'player_match_stats',
+        verb: 'corrected', season: 2024, status: 'pending', proposedPlayerId: null,
+      }]),
+      firstKickGoals: read('firstKickGoals', [{ id: 70, playerId: P, matchId: null, season: 2024 }]),
+      // After COMMIT: P has lost M (its debut), P′ holds it.
+      careers: read('careers', new Map([
+        [P, [{ matchId: 501, matchDate: '2024-04-01', season: 2024 }]],
+        [P2, [{ matchId: M, matchDate: '2024-03-20', season: 2024 }, { matchId: 502, matchDate: '2023-03-20', season: 2023 }]],
+      ])),
+      matchCareerFacts: read('matchCareerFacts', [{ matchId: M, matchDate: '2024-03-20', season: 2024 }]),
+      ...over,
+    };
+  }
+
+  const committed: WrittenOutcome = {
+    kind: 'COMMITTED', fingerprint: 'g'.repeat(64), adjudicationId: 5, batchId: '99', moved: 2, deleted: 0,
+    reports: [], impact: impactInput, satisfaction: [],
+  };
+
+  it('apply: COMMITTED, then the read-only reporter; exact paths, Coleman, DP-3/DP-5, findings, candidates, §5.10 and artefact risk', async () => {
+    const phases: string[] = [];
+    const rendered = await reportAfterTransaction(committed, ARGS, (input, phase) => {
+      phases.push(phase);
+      return gatherImpactReport(fakeImpactReader(), input, phase);
+    });
+    const { text } = rendered;
+    expect(rendered.exitCode).toBe(0);
+    expect(phases).toEqual(['committed']);
+    expect(text).toContain(`COMMITTED: fingerprint ${'g'.repeat(64)}`);
+    expect(text).toContain('POST-COMMIT REPORT');
+    for (const path of ['/players/alpha-one-10', '/players/bravo-two-20', `/matches/${M}`, '/seasons/2024', '/brownlow/2024', '/clubs/carlton', '/records', '/']) {
+      expect(text).toContain(`affected: ${path}`);
+    }
+    expect(text).toContain('affected: /records/[category] (every category page)');
+    expect(text).toContain(seasonRevalidationCommand(2024));
+    expect(text).toContain('NOT run');
+    expect(text).toContain('season 2024: potentially stale (goal_totals_change; player_match_stats #900)');
+    expect(text).toContain(COLEMAN_REFRESH_COMMAND);
+    expect(text).toContain('DP-3 REPORT: unresolved after_siren_kicks#4');
+    expect(text).toContain('DP-5 REPORT: first_kick_goal player_achievements#70 for P (player 10)');
+    expect(text).toContain(`data_issues#5 canonical_apply_failed (canonical_apply_failed_for_provider)`);
+    expect(text).toContain(`promotion_candidates#8 player_stats CD_M1|T1|${CD_I}`);
+    expect(text).toContain('season 2024: INDEPENDENT SV-0 (empty)');
+    expect(text).toContain('artefact recurrence risk (§4.G, O-3; report only)');
+    expect(text).not.toContain('would affect');
+    expect(text).not.toContain('REPORT INCOMPLETE');
+    expect(text).not.toMatch(/nothing (was )?written/);
+  });
+
+  it('a reporter failure after COMMIT keeps COMMITTED, says report incomplete, and exits 0 -- never "nothing was written"', async () => {
+    const rendered = await reportAfterTransaction(committed, ARGS, async () => {
+      throw new Error('connection reset by peer');
+    });
+    expect(rendered.exitCode).toBe(0);
+    expect(rendered.text).toContain('COMMITTED: fingerprint');
+    expect(rendered.text).toContain('REPORT INCOMPLETE');
+    expect(rendered.text).toContain('connection reset by peer');
+    expect(rendered.text).toContain('the correction IS COMMITTED');
+    expect(rendered.text).not.toMatch(/nothing (was )?written/);
+    expect(rendered.text).not.toContain('ROLLED_BACK');
+  });
+
+  it('one failing section is incomplete; every other section is still reported', async () => {
+    const report = await gatherImpactReport(fakeImpactReader({
+      colemanMatchFacts: async () => {
+        throw new Error('permission denied for table matches');
+      },
+    }), impactInput, 'committed');
+    expect(report.coleman).toBeNull();
+    expect(report.incomplete).toEqual([{ section: 'Coleman', error: 'permission denied for table matches' }]);
+    expect(report.cache?.paths).toContain('/players/alpha-one-10');
+    expect(report.findings).toHaveLength(1);
+    const text = formatOutcome(committed, ARGS, report);
+    expect(text).toContain('Coleman (§4.F; award_winners is never recomputed here):\n      unavailable');
+    expect(text).toContain('REPORT INCOMPLETE: the correction IS COMMITTED and was not rolled back');
+  });
+
+  it('formatCommittedReportIncomplete (main\'s post-commit catch) states the commit, never a rollback', () => {
+    const text = formatCommittedReportIncomplete(committed, new Error('stdout closed'));
+    expect(text).toContain('COMMITTED: fingerprint');
+    expect(text).toContain('adjudication id 5, batch id 99');
+    expect(text).toContain('REPORT INCOMPLETE: stdout closed');
+    expect(text).not.toMatch(/nothing (was )?written/);
+  });
+
+  it('the reporter mutates nothing: its input context is unchanged and the fake reader was only read', async () => {
+    const before = structuredClone(impactInput);
+    const calls: string[] = [];
+    await gatherImpactReport(fakeImpactReader({}, calls), impactInput, 'committed');
+    expect(impactInput).toEqual(before);
+    expect(calls).toEqual([
+      'playerSlugs', 'clubSlugs', 'colemanMatchFacts', 'colemanWinnerSeasons', 'findingRows', 'candidateRows',
+      'firstKickGoals', 'careers', 'matchCareerFacts',
+    ]);
+  });
+
+  it('the DB reader runs every read in a READ ONLY transaction and issues no write statement', async () => {
+    const log: { options: string; text: string }[] = [];
+    let options = '';
+    const tx = Object.assign(
+      (strings: TemplateStringsArray) => {
+        log.push({ options, text: strings.join('?') });
+        return Promise.resolve([]);
+      },
+      { array: (values: unknown[]) => values },
+    );
+    const fakeDb = {
+      begin: async (opts: string, read: (t: unknown) => Promise<unknown>) => {
+        options = opts;
+        return read(tx);
+      },
+    } as unknown as Parameters<typeof dbImpactReportReader>[0];
+    const report = await gatherImpactReport(dbImpactReportReader(fakeDb), impactInput, 'committed');
+    expect(log.length).toBeGreaterThanOrEqual(5);
+    for (const entry of log) {
+      expect(entry.options).toBe('isolation level read committed read only');
+      expect(entry.text).not.toMatch(/\b(INSERT|UPDATE|DELETE|LOCK|TRUNCATE)\b/i);
+      expect(entry.text).toMatch(/^\s*SELECT\b/);
+    }
+    // empty fake answers never become invented paths: the slugs are named as unresolved
+    expect(report.cache?.unresolved).toContain('player 10: slug unavailable (/players/<slug>-10)');
+  });
+
+  it('dry-run (ROLLED_BACK) and validate-only (PLANNED) render a prospective "would affect" report, never "affected"', async () => {
+    const planned: CorrectionOutcome = {
+      kind: 'PLANNED', fingerprint: 'f'.repeat(64), reports: [], impact: impactInput,
+      plan: {
+        plannerVersion: 2, provider: { externalId: CD_I, sourceKey: 'afl_api' },
+        authority: { mode: 'ORIGINAL', netState: 'NONE', ledgerId: null, liveIdentityRowId: 1, previousPlayerIdentity: 'id:P', playerIdentity: 'id:P2' },
+        identityAction: 'update_in_place', rows: [], stops: [],
+      },
+    };
+    const rolledBack: WrittenOutcome = { ...committed, kind: 'ROLLED_BACK' };
+    for (const outcome of [planned, rolledBack]) {
+      const phases: string[] = [];
+      const { text, exitCode } = await reportAfterTransaction(outcome, { ...ARGS, mode: 'dry-run', expectFingerprint: null }, (input, phase) => {
+        phases.push(phase);
+        return gatherImpactReport(fakeImpactReader(), input, phase);
+      });
+      expect(exitCode).toBe(0);
+      expect(phases).toEqual(['prospective']);
+      expect(text).toContain('PROSPECTIVE REPORT (would affect -- nothing was committed');
+      expect(text).toContain('would affect: /players/alpha-one-10');
+      expect(text).not.toContain('POST-COMMIT REPORT');
+      expect(text).not.toMatch(/ {6}affected: /);
+    }
+  });
+
+  it('zero canonical rows: the report says so and claims no route', async () => {
+    const identityOnly: OriginalImpactInput = { ...impactInput, context: { ...context, closureRows: [], dependents: [] } };
+    const calls: string[] = [];
+    const report = await gatherImpactReport(fakeImpactReader({}, calls), identityOnly, 'committed');
+    expect(report.cache).toEqual({ canonicalRowsChanged: false, paths: [], seasonRevalidations: [], unresolved: [] });
+    expect(report.coleman).toEqual([]);
+    expect(report.debutChanges).toEqual([]);
+    expect(calls).not.toContain('playerSlugs');
+    const text = formatOutcome({ ...committed, moved: 0, impact: identityOnly }, ARGS, report);
+    expect(text).toContain('no canonical row was moved or deleted: no ISR route is claimed as affected');
+    expect(text).not.toContain('affected: /');
+  });
+
+  it('a STOP is explained from the pre-commit context alone: nothing written, exit 1, no reporter call; the §5.10 STOP names its season and failing step', async () => {
+    const evidence = { kind: 'admin_published' as const, closureMovesOrDeletesPositiveBrownlowRowInSeason: true, pOrPPrimeHasRowInSeasonTotals: false };
+    const stopVerdict = describeSeasonVerdict({ season: 2025, seasonClass: 'admin_published', evidence, verdict: evaluateSeasonTotalIndependence(evidence) });
+    const outcome: CorrectionOutcome = {
+      kind: 'STOP', fingerprint: 'f'.repeat(64),
+      stops: [{ table: 'player_match_stats', rowId: null, step: 'SV-1', code: 'season_total_depends_on_correction' }],
+      report: { ...context, seasonVerdicts: [emptyVerdict, stopVerdict] },
+    };
+    let called = false;
+    const { text, exitCode } = await reportAfterTransaction(outcome, ARGS, async () => {
+      called = true;
+      throw new Error('must not be called');
+    });
+    expect(called).toBe(false);
+    expect(exitCode).toBe(1);
+    expect(text).toContain('STOP: 1 stop(s); nothing written');
+    expect(text).toContain('season 2024: INDEPENDENT SV-0 (empty)');
+    expect(text).toContain('season 2025: STOP SV-1 (admin_published) [SV-1] season_total_depends_on_correction');
+    expect(text).toContain('failed: SV-1: the closure moves or deletes a Brownlow round row with votes > 0');
+    expect(text).not.toContain('POST-COMMIT REPORT');
+  });
+
+  it('an already-satisfied re-run calls no reporter and claims no cache/Coleman/dependent impact; Q2 outcomes are structured', async () => {
+    const world = pmsWorld();
+    world.rows = [];
+    world.matches = [600];
+    world.audits = [audit('matches', M, 'match_deletion')];
+    const outcome = await rerun(world);
+    expect(outcome.kind).toBe('ALREADY_SATISFIED');
+    if (outcome.kind !== 'ALREADY_SATISFIED') return;
+    expect(outcome.satisfaction).toEqual([{
+      kind: 'correction_target_absent', table: 'player_match_stats', key: canonicalJson(PMS_NEW_KEY), matchId: M,
+      auditId: `de-matches-${M}-match_deletion-true`,
+    }]);
+    let called = false;
+    const { text, exitCode } = await reportAfterTransaction(outcome, RERUN_ARGS, async () => {
+      called = true;
+      throw new Error('must not be called');
+    });
+    expect(called).toBe(false);
+    expect(exitCode).toBe(0);
+    expect(text).toContain('correction_target_absent (satisfied)');
+    expect(text).toContain('no new mutation');
+    expect(text).not.toContain('affected: /');
+    expect(text).not.toContain('potentially stale');
+  });
+
+  it('a recognised post_correction_edit is exposed structurally (PASS); an unexplained one still STOPs unchanged', async () => {
+    const world = pmsWorld();
+    setPmsRow(world, { goals: 99 });
+    world.audits = [audit('matches', M, 'match_sheet')];
+    const outcome = await rerun(world);
+    expect(outcome.kind).toBe('ALREADY_SATISFIED');
+    if (outcome.kind !== 'ALREADY_SATISFIED') return;
+    expect(outcome.satisfaction).toContainEqual({
+      kind: 'post_correction_edit', table: 'player_match_stats', key: canonicalJson(PMS_NEW_KEY), writer: 'match_sheet',
+      field: 'goals', from: PMS_INSERT_VALUES.goals ?? null, to: 99, auditId: `de-matches-${M}-match_sheet-true`,
+    });
+    expect(formatOutcome(outcome, RERUN_ARGS)).toContain('post_correction_edit match_sheet (PASS)');
+    world.audits = [];
+    expectStop(await rerun(world), 'L8-d', 'post_correction_edit_unexplained');
+  });
+});
+
+describe('Slice 8 source/structure pins (report-only boundaries)', () => {
+  const source = toolSource();
+  const between = (start: string, end: string) => source.slice(source.indexOf(start), source.indexOf(end));
+
+  it('no cache revalidation is invoked or wired: no revalidation module, no HTTP client, no revalidatePath', () => {
+    expect(source).not.toMatch(/from '[^']*season-revalidation'/);
+    expect(source).not.toMatch(/from 'node:https?'/);
+    expect(source).not.toContain('revalidatePath(');
+    expect(source).not.toMatch(/\bfetch\(/);
+  });
+
+  it('promotion and rebuild REPLAY never call the ORIGINAL post-transaction reporter', () => {
+    const promotion = between('REPLAY_SECTION_BEGIN', 'REPLAY_SECTION_END');
+    const rebuild = between('REBUILD_REPLAY_SECTION_BEGIN', 'REBUILD_REPLAY_SECTION_END');
+    expect(promotion.length).toBeGreaterThan(5000);
+    expect(rebuild.length).toBeGreaterThan(2000);
+    for (const section of [promotion, rebuild]) {
+      expect(section).not.toMatch(/reportAfterTransaction|gatherImpactReport|dbImpactReportReader|seasonRevalidationCommand|COLEMAN_REFRESH_COMMAND/);
+    }
+  });
+
+  it('the ORIGINAL transaction itself never runs the reporter; main runs it only after sql.begin() has returned', () => {
+    const original = between('async function runCorrection(', 'export type CorrectionBatchContract');
+    expect(original).not.toMatch(/gatherImpactReport|dbImpactReportReader|reportAfterTransaction/);
+    const main = between('async function main(', 'const invokedDirectly');
+    const commit = main.indexOf("result = await sql.begin('isolation level read committed', (tx) => runCorrection(tx, args, evidenceFile));");
+    const forced = main.indexOf('if (!(error instanceof ForcedRollback)) throw error;');
+    const report = main.indexOf('reportAfterTransaction(');
+    expect(commit).toBeGreaterThan(0);
+    expect(main.indexOf("if (result.kind === 'COMMITTED') committed = result;")).toBeGreaterThan(commit);
+    expect(report).toBeGreaterThan(forced);
+    expect(report).toBeGreaterThan(commit);
+  });
+
+  it('a pre-commit exception still reaches the top-level "nothing was written" handler; only a committed one is caught', () => {
+    const main = between('async function main(', 'const invokedDirectly');
+    expect(main).toContain('if (committed === null) throw error;');
+    expect(main).toContain('console.log(formatCommittedReportIncomplete(committed, error));');
+    expect(source.slice(source.indexOf('if (invokedDirectly) {'))).toContain("console.error('  nothing was written (the transaction rolled back or was never opened)');");
+    expect(source.match(/\.catch\(/g)).toHaveLength(1);
+  });
+
+  it('the reporter section issues no write SQL and reads through READ ONLY transactions only', () => {
+    const reporter = between('export function dbImpactReportReader(', 'export async function reportAfterTransaction(');
+    expect(reporter.length).toBeGreaterThan(1000);
+    expect(reporter).not.toMatch(/\b(INSERT\s+INTO|DELETE\s+FROM|UPDATE\s+[a-z_.]+\s+SET|LOCK\s+TABLE)\b/);
+    expect(reporter).not.toContain('sql.begin(');
+    expect(source).toContain("sql.begin('isolation level read committed read only', read)");
+  });
+
+  it('buildClosure keeps the plan and its STOP objects unchanged: report context sits beside, never inside, the plan', () => {
+    const closure = between('async function buildClosure(', 'async function ownerKeyOf(');
+    const planStart = closure.indexOf('const plan: MutationPlan = {');
+    const planLiteral = closure.slice(planStart, closure.indexOf('};', planStart));
+    expect(planLiteral.replace(/\s+/g, ' ')).toBe(
+      'const plan: MutationPlan = { plannerVersion: PLANNER_VERSION, provider: { externalId: providerId, sourceKey: AFL_API_SOURCE_KEY }, authority, identityAction, rows, stops, ',
+    );
+    const stopPushes = closure.match(/stops\.push\(\{[^}]*\}\)/g) ?? [];
+    expect(stopPushes.length).toBeGreaterThanOrEqual(10);
+    for (const push of stopPushes) expect(push).not.toContain('detail');
+    expect(closure).toContain('return { plan, rows: built, reports, context };');
+  });
+
+  it('the adjudication evidence payload is unchanged by Slice 8 (fingerprint, evidence file, closure reports)', () => {
+    const run = between('async function runCorrection(', 'export type CorrectionBatchContract');
+    expect(run).toMatch(/const evidencePayload = \{\s+closureFingerprint: fingerprint,\s+evidenceFile: \{ path: evidenceFile\.path, sha256: evidenceFile\.sha256, summary: evidenceFile\.summary \},\s+reports: closure\.reports,\s+\};/);
   });
 });
 
