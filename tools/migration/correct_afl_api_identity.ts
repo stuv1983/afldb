@@ -24,8 +24,10 @@
  * Slice 6 (M3a) adds promotion REPLAY (§8.3, `--replay-promotion`, the REPLAY_SECTION near the end
  * of this file) over the shared mechanics ORIGINAL uses, and exports the shared candidate
  * classification (`predictCorrectionClosure`, `resolveCandidateIdentity`,
- * `classifyCorrectedProviderInDatabase`). Rebuild REPLAY (Stage 21), PSG/CRV and the
- * `code_test_db` rehearsal are later slices; this file never runs the promotion lifecycle itself.
+ * `classifyCorrectedProviderInDatabase`). Slice 7 adds the rebuild REPLAY halves Stage 21 calls
+ * (§9.2 (b′ write) / (b′ verify), the REBUILD_REPLAY_SECTION after the REPLAY section) and the
+ * Stage 22 SAT-1 check; the `code_test_db` rehearsal is a later slice. This file never runs the
+ * promotion or rebuild lifecycle itself.
  *
  * The planner (`src/lib/acquisition/afl-api-identity-correction.ts`) is pure: every decision in
  * this file is made by calling its exported evaluators with evidence read here. This file is the
@@ -4084,10 +4086,12 @@ async function detectAlreadyReplayed(tx: TransactionSql, entry: CorrectedProvide
   return true;
 }
 
-/** §8.3 step 6 / D15: the identity is written ONLY as the classification requires. */
+/** §8.3 step 6 / D15: the identity is written ONLY as the classification requires. `note` is the
+ * row's audit text only; the rebuild REPLAY (Stage 21 (b′)) passes its own, promotion the default. */
 async function writeReplayedIdentity(
   tx: TransactionSql, action: ReplayIdentityAction,
   row: ExistingIdentityRow | null, externalId: string, pPrimeId: number,
+  note: string = REPLAY_IDENTITY_NOTE,
 ): Promise<void> {
   if (action === 'insert') {
     if (row !== null) throw new CorrectionRefused(`REFUSED: class 3 insert for ${externalId} but an identity row exists`);
@@ -4095,7 +4099,7 @@ async function writeReplayedIdentity(
       INSERT INTO external_identities
             (source_id, external_id, player_id, status, candidate_count, match_method, notes)
       VALUES ((SELECT id FROM sources WHERE key = ${AFL_API_SOURCE_KEY}), ${externalId}, ${pPrimeId}, 'resolved', 0,
-              ${AFL_API_ADMIN_MATCH_METHOD}, ${REPLAY_IDENTITY_NOTE})
+              ${AFL_API_ADMIN_MATCH_METHOD}, ${note})
     `;
     return;
   }
@@ -4104,7 +4108,7 @@ async function writeReplayedIdentity(
     UPDATE external_identities
        SET player_id = ${pPrimeId}, status = 'resolved', candidate_count = 0,
            match_method = ${AFL_API_ADMIN_MATCH_METHOD}, external_name = NULL,
-           notes = ${REPLAY_IDENTITY_NOTE}
+           notes = ${note}
      WHERE id = ${row.id}
   `;
   if (result.count !== 1) {
@@ -4344,6 +4348,315 @@ export async function runReplayPromotionCli(argv: readonly string[]): Promise<nu
   }
 }
 /* REPLAY_SECTION_END */
+
+/* ==================================================================== *
+ * §8.3 / §9.2 rebuild REPLAY: Stage 21 (b′) and the Stage 22 SAT-1 check
+ * (REBUILD_REPLAY_SECTION_BEGIN)
+ *
+ * Called ONLY by `tools/migration/rebuild_afl_api_adjudications.ts`, inside the Stage 21
+ * transaction it has already opened on the rebuild target's own owner/admin DSN
+ * (`AFLDB_REBUILD_ADJUDICATION_DSN`) and already proven: the allowlisted target name, the
+ * connected database, and a rebuild marker naming exactly the pending v3 capture (§8.8: "Stage
+ * 21's role ... No new role"). No DSN, `.env` or session-role proof of its own; the connected
+ * database is re-asserted only as a cheap guard.
+ *
+ * WHY TWO HALVES AROUND D15 (C1, binding). SAT-1 is the WHOLE-TABLE combined invariant (§13.2):
+ * every net-`linked` provider must already hold its `resolved` row. D15 (Stage 21 (c)) is what
+ * inserts those rows, so the corrected Q2 cannot run before it. The single Stage 21 transaction
+ * is therefore: (a) importer replay; (b) ledger reinstatement and read-back; (b′ write) this
+ * identity-only INSERT; (c) D15 with the corrected set as its exact expected ALREADY_SATISFIED
+ * set; (b′ verify) the corrected Q2 and ledger checks; (d) parity and the combined invariant;
+ * (e) the marker clear. Never split across transactions.
+ *
+ * WRITE ALLOW-LIST (§8.8, rebuild). (b′ write) writes exactly one `external_identities` row per
+ * corrected provider, in the D15 `resolved` shape at P′ (O-1). It never writes the adjudication
+ * ledger, `import_batches`, `canonical_applications`, `data_issues`, a typed projection or a
+ * canonical row, and never recomputes derived state. It accepts CPC class 3 with an EMPTY closure
+ * only (§9.2: the rebuild has no canonical replay path, so a non-empty closure is a hard STOP);
+ * a stray projection or closure row surfaces through the planner and Q2 and STOPs. With zero
+ * corrected providers neither half issues any SQL at all (§8.5).
+ * ==================================================================== */
+
+export const REBUILD_REPLAY_IDENTITY_NOTE = 'AFLDB-ISSUE-238 rebuild replay; see afl_api_identity_adjudications';
+
+export type RebuildCorrectedReplayInput = {
+  /** The rebuild target Stage 21 is connected to (already proven by Stage 21's marker check). */
+  readonly expectDatabase: string;
+  /** Exactly the capture's net-CORRECTED providers (A's stable fields). */
+  readonly entries: readonly CorrectedProviderEntry[];
+  /** Net linked/corrected providers of the capture ledger -> stable identity (S6-D4 collision source (b)). */
+  readonly targetHumanProviders: ReadonlyMap<string, string>;
+};
+
+export type RebuildReplayProviderOutcome = {
+  readonly externalId: string;
+  readonly adjudicationId: number;
+  /** P′ on the rebuilt database: the `resolved` row's player. */
+  readonly pPrimeId: number;
+  /** The (identity-only) closure fingerprint the gate accepted. */
+  readonly fingerprint: string;
+};
+
+export type RebuildCorrectedReplayWriteResult = {
+  readonly providers: readonly RebuildReplayProviderOutcome[];
+  /** §8.3 step 2's n₀/h₀, read under the identity-table lock before the first INSERT. */
+  readonly ledger: { readonly rowCount: number; readonly sha256: string };
+};
+
+/**
+ * §8.3 step 2 at rebuild: the reinstated ledger's net-CORRECTED set must equal the capture's
+ * corrected set exactly, each A carried verbatim (id, evidence hash, both stable identities).
+ * Empty = consistent. A malformed ledger throws (`netLedgerRowsByExternalId`), never "no problem".
+ */
+export function rebuildCorrectedSetProblems(
+  ledgerRows: readonly AflApiAdjudicationLedgerRow[], entries: readonly CorrectedProviderEntry[],
+): string[] {
+  const problems: string[] = [];
+  const correctedNet = new Map<string, AflApiAdjudicationLedgerRow>();
+  for (const [externalId, row] of netLedgerRowsByExternalId(ledgerRows)) {
+    if (row.action === 'corrected') correctedNet.set(externalId, row);
+  }
+  const expected = new Map<string, CorrectedProviderEntry>();
+  for (const entry of entries) {
+    if (expected.has(entry.externalId)) problems.push(`${entry.externalId} appears twice in the capture's corrected set`);
+    expected.set(entry.externalId, entry);
+  }
+  for (const externalId of correctedNet.keys()) {
+    if (!expected.has(externalId)) problems.push(`${externalId} is net CORRECTED in the reinstated ledger but not in the capture's corrected set`);
+  }
+  for (const [externalId, entry] of expected) {
+    const row = correctedNet.get(externalId);
+    if (row === undefined) {
+      problems.push(`${externalId} is in the capture's corrected set but is not net CORRECTED in the reinstated ledger`);
+      continue;
+    }
+    if (Number(row.id) !== entry.adjudicationId) problems.push(`${externalId}: ledger adjudication id ${String(row.id)} != capture ${entry.adjudicationId}`);
+    if (row.evidenceSha256 !== entry.evidenceSha256) problems.push(`${externalId}: ledger evidence_sha256 differs from the capture`);
+    if ((row.previousPlayerIdentity ?? null) !== entry.previousPlayerIdentity) problems.push(`${externalId}: ledger previous_player_identity differs from the capture`);
+    if (row.playerIdentity !== entry.playerIdentity) problems.push(`${externalId}: ledger player_identity differs from the capture`);
+  }
+  return problems;
+}
+
+/**
+ * The rebuild REPLAY gate (§8.3 step 4 at rebuild, §9.2 (b′)): CPC class 3 EXACTLY — a PASS whose
+ * identity action is `insert`, with no provider row, planned by the running `PLANNER_VERSION`, with
+ * zero STOP, zero MOVE and zero DELETE. Class 1, 2, 4, 5, UNEVALUABLE, COLLISION, DISAGREE, a
+ * PREDICT STOP, a Pc still implicated, or any non-empty closure is a hard STOP. Empty = PASS.
+ */
+export function rebuildReplayGateProblems(
+  classified: {
+    readonly result: CpcResult;
+    /** The planned closure (a `PredictedClosure`, or the CPC's own `CpcPrediction`). */
+    readonly predicted: {
+      readonly stops: readonly { readonly code: StopCode }[];
+      readonly moveOrDeleteRowCount: number;
+      readonly moved: CpcMutationCounts;
+      readonly deleted: CpcMutationCounts;
+    } | null;
+    readonly identityRow: ExistingIdentityRow | null;
+  },
+  runningPlannerVersion: number = PLANNER_VERSION,
+): string[] {
+  const { result, predicted, identityRow } = classified;
+  if (result.outcome === 'FAIL') {
+    return [`CPC FAIL ${result.code}${result.candidateClass === null ? '' : ` (class ${result.candidateClass})`}: `
+      + `${result.detail} (rebuild REPLAY accepts CPC class 3 only)`];
+  }
+  const problems: string[] = [];
+  if (result.candidateClass !== 3) {
+    problems.push(`class ${result.candidateClass}: rebuild REPLAY accepts CPC class 3 (no provider row) only`);
+  }
+  if (result.predictedIdentityAction !== 'insert') {
+    problems.push(`identity action ${result.predictedIdentityAction}: rebuild REPLAY only inserts the resolved P′ row`);
+  }
+  if (result.plannerVersion !== runningPlannerVersion) {
+    problems.push(`classification plannerVersion ${result.plannerVersion} != running plannerVersion ${runningPlannerVersion}`);
+  }
+  const isZero = (c: CpcMutationCounts) => c.player_match_stats === 0 && c.brownlow_round_votes === 0;
+  if (!isZero(result.predictedMutations.moved) || !isZero(result.predictedMutations.deleted)) {
+    problems.push('the classification predicts a MOVE or DELETE: a rebuild has no canonical replay path (§9.2)');
+  }
+  if (predicted === null) {
+    problems.push('no closure was planned');
+  } else {
+    if (predicted.stops.length > 0) {
+      problems.push(`the closure carries ${predicted.stops.length} STOP(s): ${[...new Set(predicted.stops.map((s) => s.code))].sort().join(',')}`);
+    }
+    if (predicted.moveOrDeleteRowCount !== 0 || !isZero(predicted.moved) || !isZero(predicted.deleted)) {
+      problems.push(`the closure holds ${predicted.moveOrDeleteRowCount} MOVE/DELETE row(s): a rebuild has no canonical replay path (§9.2)`);
+    }
+  }
+  if (identityRow !== null) {
+    problems.push(`an external_identities row (#${identityRow.id}) already exists for the provider`);
+  }
+  return problems;
+}
+
+async function assertRebuildReplayDatabase(tx: TransactionSql, expectDatabase: string): Promise<void> {
+  const [row] = await tx<{ database: string }[]>`SELECT current_database() AS database`;
+  if (row?.database !== expectDatabase) {
+    throw new CorrectionRefused(`REFUSED: rebuild REPLAY is connected to '${String(row?.database)}', not the rebuild target '${expectDatabase}'`);
+  }
+}
+
+/**
+ * Stage 21 (b′ write), inside Stage 21's transaction, after (b) and BEFORE D15 (c). Per corrected
+ * provider, deterministically ordered: classify under ADJUDICATION authority with the rebuilt
+ * database's own evidence and row locks, require the class-3 gate, then INSERT the `resolved` P′
+ * row. Returns null, issuing no SQL, when the capture holds no corrected provider. Nothing is
+ * caught: any failure propagates and rolls Stage 21 back with the marker kept.
+ */
+export async function runRebuildCorrectedReplayWrite(
+  tx: TransactionSql, input: RebuildCorrectedReplayInput,
+): Promise<RebuildCorrectedReplayWriteResult | null> {
+  if (input.entries.length === 0) return null;
+  await assertRebuildReplayDatabase(tx, input.expectDatabase);
+  await takeIdentityTableLock(tx, LOCK_TIMEOUT);
+
+  const ledgerRows = await readLedgerRows(tx);
+  const setProblems = rebuildCorrectedSetProblems(ledgerRows, input.entries);
+  if (setProblems.length > 0) {
+    throw new CorrectionRefused(`REFUSED: rebuild REPLAY (b′): the reinstated ledger's corrected set is not the capture's: ${setProblems.join('; ')}`);
+  }
+  const ledger = { rowCount: ledgerRows.length, sha256: aflApiLedgerStateSha256(ledgerRows) };
+
+  const providers: RebuildReplayProviderOutcome[] = [];
+  for (const entry of [...input.entries].sort((a, b) => compareCodeUnits(a.externalId, b.externalId))) {
+    const classified = await classifyCorrectedProviderInDatabase(tx, {
+      entry, authorityMode: 'ADJUDICATION', lockRows: true, targetHumanProviders: input.targetHumanProviders,
+    });
+    const problems = rebuildReplayGateProblems(classified);
+    if (problems.length > 0) {
+      throw new CorrectionRefused(`REFUSED: rebuild REPLAY (b′) ${entry.externalId}: ${problems.join('; ')} -- STOP, Stage 21 rolls back`);
+    }
+    if (classified.pPrimeId === null || classified.predicted === null) {
+      throw new CorrectionRefused(`internal: ${entry.externalId} passed the rebuild gate without a resolved P′`);
+    }
+    await writeReplayedIdentity(tx, 'insert', classified.identityRow, entry.externalId, classified.pPrimeId, REBUILD_REPLAY_IDENTITY_NOTE);
+    providers.push({
+      externalId: entry.externalId, adjudicationId: entry.adjudicationId, pPrimeId: classified.pPrimeId,
+      fingerprint: classified.predicted.fingerprint,
+    });
+  }
+  return { providers, ledger };
+}
+
+/**
+ * Stage 21 (b′ verify), inside Stage 21's transaction, AFTER D15 (c) — only then does every
+ * expected identity exist for SAT-1's whole-table invariant. Requires: the ledger still n₀/h₀; the
+ * exact corrected set; no second `corrected` row; zero batches bound to any A (the rebuild opens
+ * none); and, per provider, the shared post-write CORRECTION SATISFACTION (Q2, SAT-1…SAT-5).
+ * Returns Q2's reports. Issues no SQL when the capture holds no corrected provider.
+ */
+export async function verifyRebuildCorrectedReplay(
+  tx: TransactionSql,
+  input: {
+    readonly expectDatabase: string;
+    readonly entries: readonly CorrectedProviderEntry[];
+    readonly written: RebuildCorrectedReplayWriteResult | null;
+  },
+): Promise<readonly string[]> {
+  if (input.entries.length === 0) return [];
+  if (input.written === null) {
+    throw new CorrectionRefused('internal: rebuild REPLAY (b′ verify) reached with corrected providers but no (b′ write) result');
+  }
+  await assertRebuildReplayDatabase(tx, input.expectDatabase);
+  const writtenIds = input.written.providers.map((p) => p.externalId).sort(compareCodeUnits);
+  const entryIds = input.entries.map((e) => e.externalId).sort(compareCodeUnits);
+  if (JSON.stringify(writtenIds) !== JSON.stringify(entryIds)) {
+    throw new CorrectionRefused(`REFUSED: rebuild REPLAY wrote [${writtenIds.join(', ')}] but the capture's corrected set is [${entryIds.join(', ')}] -- STOP, rollback`);
+  }
+
+  const ledgerAfter = await readLedgerRows(tx);
+  if (ledgerAfter.length !== input.written.ledger.rowCount || aflApiLedgerStateSha256(ledgerAfter) !== input.written.ledger.sha256) {
+    throw new CorrectionRefused('REFUSED: the adjudication ledger changed during the rebuild REPLAY (it must never be written) -- STOP, rollback');
+  }
+  const setProblems = rebuildCorrectedSetProblems(ledgerAfter, input.entries);
+  if (setProblems.length > 0) throw new CorrectionRefused(`REFUSED: ${setProblems.join('; ')} -- STOP, rollback`);
+  const secondCorrected = replayNoSecondCorrectedProblems(ledgerAfter, input.entries);
+  if (secondCorrected.length > 0) throw new CorrectionRefused(`REFUSED: ${secondCorrected.join('; ')} -- STOP, rollback`);
+  for (const entry of input.entries) {
+    const bound = await countBatchesBoundTo(tx, entry.adjudicationId);
+    if (bound !== 0) {
+      throw new CorrectionRefused(`REFUSED: ${bound} batch(es) are bound to adjudication ${entry.adjudicationId} on the rebuilt database (a rebuild REPLAY opens none) -- STOP, rollback`);
+    }
+  }
+
+  const reports: string[] = [];
+  for (const entry of [...input.entries].sort((a, b) => compareCodeUnits(a.externalId, b.externalId))) {
+    const q2Reports = await assertPostWriteSatisfaction(tx, entry.externalId, entry.adjudicationId, null);
+    reports.push(...q2Reports.map((r) => `${entry.externalId}: ${r}`));
+  }
+  return reports;
+}
+
+/** Exactly the facts Stage 22's SAT-1 needs, read through the accepted read-only Q2 reader. */
+export type RebuildSat1Evidence = Pick<CorrectionSatisfactionEvidence,
+  'providerId' | 'adjudicationId' | 'identityRow' | 'ledgerRows' | 'previousPlayerId' | 'correctedPlayerId' | 'identityInvariant'>;
+
+export async function gatherRebuildSat1Evidence(
+  reader: CorrectionSatisfactionReader, input: { readonly providerId: string; readonly adjudicationId: number },
+): Promise<RebuildSat1Evidence> {
+  const identityRow = await reader.identityRow(input.providerId);
+  const ledgerRows = await reader.ledgerRows(input.providerId);
+  const adjudication = ledgerRows.find((r) => r.id === input.adjudicationId) ?? null;
+  const previousPlayerId = adjudication?.previousPlayerIdentity
+    ? await reader.resolvePlayerIdentity(adjudication.previousPlayerIdentity) : null;
+  const correctedPlayerId = adjudication ? await reader.resolvePlayerIdentity(adjudication.playerIdentity) : null;
+  const identityInvariant = await reader.identityInvariantFacts();
+  return {
+    providerId: input.providerId, adjudicationId: input.adjudicationId, identityRow, ledgerRows,
+    previousPlayerId, correctedPlayerId, identityInvariant,
+  };
+}
+
+/**
+ * Stage 22 (§5.12 call-path table: "Rebuild Stage 22 — SAT-1"): SAT-1 for one corrected provider,
+ * composed from the same exported primitives Q2's SAT-1 uses — never a second invariant. Proves:
+ * A is a `corrected` row and the provider's net state; its chain is valid (§10 M1); P and P′ each
+ * resolve to exactly one, distinct, player; CD_I is `resolved`/`afl_api_admin_adjudication` at P′
+ * and A's own `player_id` is P′ (Q2's conjunct: the census and ledger player ids agree); the whole-table extended bijection (`sat1ExtendedBijectionProblems`) holds. A malformed ledger
+ * throws from the shared net-state reader. Empty = PASS.
+ */
+export function evaluateRebuildSat1(evidence: RebuildSat1Evidence): string[] {
+  const adjudication = evidence.ledgerRows.find((r) => r.id === evidence.adjudicationId) ?? null;
+  if (adjudication === null || adjudication.action !== 'corrected') {
+    return [`authority_invalid: ledger row ${evidence.adjudicationId} is not a corrected adjudication for ${evidence.providerId}`];
+  }
+  const problems: string[] = [];
+  const net = netLedgerAction(evidence.ledgerRows);
+  if (net === null || net.id !== adjudication.id) problems.push(`authority_invalid: the net ledger state of ${evidence.providerId} is not adjudication ${adjudication.id}`);
+  if (!correctionLedgerChainValid(evidence.ledgerRows, adjudication)) problems.push(`authority_invalid: adjudication ${adjudication.id}'s supersede chain is invalid (§10 M1)`);
+  const pId = evidence.previousPlayerId;
+  const pPrimeId = evidence.correctedPlayerId;
+  if (pId === null) problems.push(`identity_unresolvable: previous_player_identity '${String(adjudication.previousPlayerIdentity)}' does not resolve to exactly one player`);
+  if (pPrimeId === null) problems.push(`identity_unresolvable: player_identity '${adjudication.playerIdentity}' does not resolve to exactly one player`);
+  if (pId !== null && pId === pPrimeId) problems.push(`identity_unresolvable: P and P′ resolve to the same player ${pId}`);
+  if (pPrimeId !== null) {
+    const row = evidence.identityRow;
+    if (row === null || row.status !== 'resolved' || row.matchMethod !== AFL_API_ADMIN_MATCH_METHOD || row.playerId !== pPrimeId
+      || adjudication.playerId !== pPrimeId) {
+      problems.push(`identity_contradicts: ${evidence.providerId}'s external_identities row is not resolved/${AFL_API_ADMIN_MATCH_METHOD} at P′ (player ${pPrimeId})`
+        + (row === null ? ': no row' : `: ${row.status}/${row.matchMethod ?? 'null'} at player ${String(row.playerId)}`)
+        + `; adjudication ${adjudication.id} names player ${String(adjudication.playerId)}`);
+    }
+    for (const problem of sat1ExtendedBijectionProblems({
+      facts: evidence.identityInvariant, providerId: evidence.providerId, pPrimeId, pPrimeIdentity: adjudication.playerIdentity,
+    })) {
+      problems.push(`identity_contradicts: extended bijection: ${problem}`);
+    }
+  }
+  return problems;
+}
+
+/** Stage 22's database half: read-only, on Stage 22's own connection. Empty = SAT-1 PASS. */
+export async function checkRebuildCorrectedSat1(
+  tx: TransactionSql, input: { readonly providerId: string; readonly adjudicationId: number },
+): Promise<string[]> {
+  return evaluateRebuildSat1(await gatherRebuildSat1Evidence(dbCorrectionSatisfactionReader(tx), input));
+}
+/* REBUILD_REPLAY_SECTION_END */
 
 /* ==================================================================== *
  * CLI

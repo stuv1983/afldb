@@ -83,7 +83,6 @@ import {
   observeLiveReinstatement,
   PENDING_CAPTURE_FILE,
   readLedger,
-  requireCapturableLedgerRows,
   readPendingCapture,
   readPendingCaptureWithHash,
   reinstateAndReplay,
@@ -5020,7 +5019,7 @@ describe('AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreS
     expect(live.rows).toHaveLength(4);
     const capture = buildCombinedCapture({
       database, capturedAt: '2026-09-24T00:00:00.000Z', ledgerTablePresent: live.present,
-      ledgerRows: requireCapturableLedgerRows(live.rows).map((r) => ({
+      ledgerRows: live.rows.map((r) => ({
         ...r, playerId: r.playerId + 7_000_000, adminUserId: r.adminUserId + 7_000_000, adminEmail: r.adminEmail.toUpperCase(),
       })),
       importerRows: [],
@@ -5033,7 +5032,7 @@ describe('AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreS
 
   async function observe(tx: postgres.TransactionSql, pending: CombinedCapture): Promise<ObservedState> {
     const raw = await readLedger(tx);
-    const live = { present: raw.present, rows: requireCapturableLedgerRows(raw.rows) };
+    const live = { present: raw.present, rows: raw.rows };
     const decision = decidePendingCapture({
       markerPresent: NO_MARKER, pending, liveLedgerRows: live.rows, liveImporterRows: [], recover: false,
     });
@@ -5154,7 +5153,7 @@ describe('AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreS
           capturedAt: pending.capturedAt, payloadSha256: pending.payloadSha256, fileSha256: pendingFileSha256,
         });
         report = await reinstateAndReplay(tx, pending);
-        readBack = requireCapturableLedgerRows((await readLedger(tx)).rows);
+        readBack = (await readLedger(tx)).rows;
         throw rollback;
       });
     } catch (error) {

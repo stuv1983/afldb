@@ -350,7 +350,7 @@ validation stages: they open one connection and write nothing.
 
 Three kinds of state exist on `afldb_test` that no tracked source can reproduce. The rebuild
 carries all three through **one combined capture** (`tools/migration/rebuild_afl_api_adjudications.ts`,
-format `afldb.afl_api_identities.rebuild_capture` **version 2**), taken in stage 2 and replayed
+format `afldb.afl_api_identities.rebuild_capture` **version 3**), taken in stage 2 and replayed
 after the source stages. The sections never travel apart: they are captured, verified, adopted
 or refused together, under one file, one payload hash and one database marker.
 
@@ -358,11 +358,14 @@ or refused together, under one file, one payload hash and one database marker.
 |---|---|---|---|
 | `registrations` | every `data_overrides('players', 'manual_admin_edit:<token>', 'identity')` creation record: the token, the payload as PostgreSQL's own jsonb text, both timestamps, the actor's email and role | stages 17–19 | AFLDB-ISSUE-245 |
 | `importerRows` | every importer-created `afl_api` identity, keyed by its player's forward stable identity (AFL Tables path) | stage 21 (a) | AFLDB-ISSUE-237 |
-| `ledgerRows` | every `afl_api_identity_adjudications` row: original id, `supersedes_id`, `player_identity`, audit fields, actor email and role | stage 21 (b)–(c) | AFLDB-ISSUE-235 |
+| `ledgerRows` | every `afl_api_identity_adjudications` row: original id, action (`linked`, `revoked` or `corrected`), `supersedes_id`, `player_identity`, `previous_player_identity` (verbatim), audit fields, actor email and role | stage 21 (b)–(b′ verify) | AFLDB-ISSUE-235, AFLDB-ISSUE-238 |
 
 No section carries a `players.id` or an `auth_users.id` as identity. Both appear only as
 audit fields, outside the payload hash; every replay remaps through a stable identity (a
-`manual_admin_edit` token, an AFL Tables profile path, an actor email). `data_edits` is not
+`manual_admin_edit` token, an AFL Tables profile path, an actor email). A `corrected` row's
+`previous_player_identity` (AFLDB-ISSUE-238) is a stable identity with no foreign key: it is carried
+and reinstated verbatim, never remapped, and only resolved. Its `previous_state` is lineage-local
+audit, also copied verbatim. `data_edits` is not
 carried: it is the audit log, keyed by surrogate `row_id`, and nothing on `afldb_test` resolves
 identity through it.
 
@@ -370,9 +373,19 @@ identity through it.
 outside every checkout; stage 1 refuses otherwise. The pending capture is
 `<root>/<target>/afl-api-identities.capture.json` (written to a temporary name and renamed).
 It holds admin emails and notes: keep the root out of every repository. After stage 21 commits
-it is renamed `afl-api-identities.<timestamp>.<hash>.reinstated.json` and kept. A version-1
-file (the pre-ISSUE-245 combined format, which cannot say what registrations the database
-held) and the ISSUE-235-era ledger-only file are both refused by name, never upgraded.
+it is renamed `afl-api-identities.<timestamp>.<hash>.reinstated.json` and kept. A version-2
+file (the pre-ISSUE-238 combined format, which cannot carry a `corrected` row or
+`previous_player_identity`), a version-1 file (the pre-ISSUE-245 combined format, which cannot say
+what registrations the database held) and the ISSUE-235-era ledger-only file are all refused by
+name, never upgraded. An **archived** version-2 capture stays readable only by
+`recover_afl_api_adjudications.ts` (a recovery-only reader of its ledger section); the rebuild
+itself never reads one.
+
+**Do not upgrade tooling mid-rebuild.** A rebuild that is pending under the version-2 tooling (a
+version-2 marker is set, or a version-2 pending capture exists) must be completed, or recovered
+with `--recover-afl-api-adjudications`, using that same older tooling. The version-3 tooling refuses
+a version-2 file and a version-2 marker by name and leaves both untouched. Only after that rebuild
+has finished (marker cleared, capture archived) take a fresh version-3 capture.
 
 **The database marker.** After the file is durably written, stage 2 sets a `COMMENT ON
 DATABASE` on the target (`{format, version, capturedAt, payloadSha256, fileSha256}`). It
@@ -396,7 +409,18 @@ rebuild with nothing destroyed. It refuses on any state the replay could not rep
   corrections are not carried, and the creation record alone would not reproduce that player;
 - an actor with no email, a role outside `auth_users_role_check`, or one actor captured in two
   roles across the registrations and the ledger;
-- the AFLDB-ISSUE-237 D5/D7/D13 and OD-6 importer refusals, and the ISSUE-235 ledger rules.
+- the AFLDB-ISSUE-237 D5/D7/D13 and OD-6 importer refusals, and the ISSUE-235 ledger rules;
+- (AFLDB-ISSUE-238) a ledger that breaks the correction contract, checked straight after the
+  ledger read: a `corrected` row with no `previous_state` or `previous_player_identity`, or with
+  one equal to its `player_identity`; a human-origin correction that does not supersede the
+  preceding `linked` row of its provider; an importer-origin correction after a net-linked state;
+  a second correction, or any row after one; a `linked`/`revoked` row carrying
+  `previous_player_identity`;
+- (AFLDB-ISSUE-238) an importer-created `afl_api` row for a corrected provider;
+- (AFLDB-ISSUE-238) for any net-corrected provider, `previous_player_identity` (P) or
+  `player_identity` (P′) that does not resolve to exactly one live player, or P and P′ resolving to
+  the same player. This check is deliberately narrow: stage 2 does not run a full correction
+  census.
 
 **Stages 17–19 — registrations, before `draftguru`.** They run after every source stage that
 creates or enriches players by AFL Tables path, and before `draftguru` and every AFL API
@@ -425,12 +449,41 @@ and stage 21 reverse-resolves every importer identity to exactly one rebuilt pla
 - **19 `manual-registrations-verify`** (owner, read-only) re-captures the live registrations
   and requires them to equal the capture, surrogates aside, with none of stage 2's problems.
 
-**Stage 21 — AFL API identities, one transaction:** (a) the importer rows replayed by stable
-identity; (b) the ledger reinstated under its original ids, sequence advanced; (c) the D15
-human replay with an empty expected-supersede set; (d) exact importer parity and the combined
-invariant; (e) the marker cleared. Any failure rolls all of it back and keeps the marker.
+**Stage 21 — AFL API identities, one transaction:**
+
+1. **(a)** the importer rows replayed by stable identity;
+2. **(b)** the ledger reinstated under its original ids, sequence advanced, and read back
+   byte for byte (`previous_player_identity` included);
+3. **(b′ write)** (AFLDB-ISSUE-238 rebuild REPLAY) for each corrected provider: classify it
+   against the rebuilt database and require CPC class 3 (no provider row) with an empty
+   closure, then insert its `resolved` `afl_api_admin_adjudication` row at P′. Any other class, a
+   MOVE or DELETE, or any STOP is a hard STOP. It writes nothing else: no ledger row, no import
+   batch, no canonical row or application, no finding, no typed projection;
+4. **(c)** the D15 human replay with an empty expected-supersede set. Every corrected provider,
+   and only those, must come back ALREADY_SATISFIED;
+5. **(b′ verify)** for each corrected provider: the correction-satisfaction check, the ledger row
+   count and digest unchanged, no second `corrected` row, and no batch bound to the correction;
+6. **(d)** exact importer parity and the combined invariant;
+7. **(e)** the marker cleared.
+
+(b′) straddles (c) on purpose, and the order must not change. The correction-satisfaction check
+includes the whole-table identity invariant, which holds only once D15 has inserted every ordinary
+`linked` row, so it cannot run before (c). D15 only confirms a correction and never inserts it, so
+the corrected row must already exist when (c) runs. With no corrected row, neither (b′) half issues
+any SQL and the stage runs exactly as before. Any failure rolls all of it back and keeps the marker.
+(b′) runs on the stage's own owner DSN, `AFLDB_REBUILD_ADJUDICATION_DSN`, behind the same target,
+database and marker checks. It adds no role and no privilege.
 `admin_user_id` is remapped by email; an existing account (including one stage 17 recreated)
-is reused unchanged. **Stage 22** asserts the combined invariant and that no marker remains.
+is reused unchanged. **Stage 22** is read-only, on the import DSN. It asserts the combined
+invariant and that no marker remains. For each corrected provider it also proves SAT-1:
+
+- the ledger is structurally valid and its net state is the correction;
+- P and P′ each resolve to exactly one player, and they are different players;
+- the provider is `resolved`/`afl_api_admin_adjudication` at P′;
+- the corrected adjudication ledger row itself also names P′ (`A.player_id = P′`);
+- the extended provider/player bijection holds.
+
+With no corrected row, Stage 22 behaves and reports exactly as before.
 
 **The `players` fingerprint.** The accepted baseline measures the source's players, so the
 final `players` gate excludes AFL Tables identities the registration replay created (`resolved`

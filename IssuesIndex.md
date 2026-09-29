@@ -14,8 +14,27 @@
 ### AFLDB-ISSUE-238 — Correcting a consumed trusted `afl_api` player link with canonical reattribution
 - **Severity:** Medium. **Area:** admin / player identity — `external_identities` (`afl_api`),
   `player_match_stats`, `brownlow_round_votes`, `canonical_applications` and derived dependents.
-- **State:** Open. Slices 1–5 committed (migrations 106/107 at `e55a554d`; Slice 4 at
-  `788bffa2`; Slice 5, the ORIGINAL CLI/transaction, at `b440b226`). **Slice 6 (promotion v3 /
+- **State:** Open. **Slice 7 implementation, DB-free validation and final semantic review
+  COMPLETE. ISSUE-238 remains Open. Next implementation work requires separate Slice-8
+  authorisation; Slice-10/11 database rehearsal remains deferred.** Slice 7 = rebuild capture v3;
+  Stage 21 (b′) identity-only rebuild REPLAY straddling D15 — (b) → (b′ write) → (c) → (b′ verify) →
+  (d) → (e); Stage 22 SAT-1; recovery v3 plus the recovery-only archived-v2 reader;
+  `docs/deployment.md`. Operator validation (2026-09-29, base `76d70e38`): `npx tsc --noEmit -p .`
+  PASS; final combined DB-free suite **1,342/1,342 PASS** (`db-test-rebuild` 511,
+  `db-promotion-check` 413, `player-link-mutations` 122, `correct-afl-api-identity-cli` 185,
+  `afl-api-adjudication-recovery` 26, `afl-api-identity-correction` 85); `git diff --check` PASS.
+  Final semantic review: no CRIT/HIGH; MED-1 and MED-2 resolved — MED-2 (Stage-22 SAT-1 lacked Q2's
+  `A.player_id = P′` conjunct) was the only code fix required, applied with a behavioural regression
+  test. No database rehearsal (no `code_test_db`, no DEV/PROD database execution, no
+  rebuild/promotion/migration/deployment execution); `CORRECTED_PROMOTION_REHEARSAL_REQUIRED` stays
+  in place. *(Historical, 2026-09-29 implementation pass: Slice 7 was implemented uncommitted on base
+  `76d70e38` and awaited operator DB-free validation — that pass ran no command, so nothing was
+  typechecked or test-run at the time.)* Decisions OD-S7-1 (v2 file and marker refused by name; archived v2
+  readable by recovery only), OD-S7-2 (P and P′ resolve to one distinct live player before
+  destruction), OD-S7-3 (P4-10 out), C1 (the Stage 21 order). No migration or privilege change.
+  Slices 1–6 committed (migrations 106/107 at `e55a554d`; Slice 4 at
+  `788bffa2`; Slice 5, the ORIGINAL CLI/transaction, at `b440b226`; Slice 6 at `76d70e38`).
+  *(Historical, Slice 6:)* **Slice 6 (promotion v3 /
   CPC) implementation, DB-free validation and final semantic review COMPLETE**: operator ran
   `npx tsc --noEmit -p .` PASS; planner + correction CLI 257/257; promotion + mutation 535/535;
   adjudication recovery 23/23 (total **815/815 PASS**); `git diff --check` PASS; final
@@ -26,8 +45,7 @@
   rehearsal (owned by Slice 11)**; CPC class-5/class-2 readings. Implemented: CPC, strict v3
   supersede artefact, §6 PREDICT, §7.4e `--replay-promotion` REPLAY (candidate owner), §7.5 CRV,
   §5 corrected census, D15 v3, `docs/production-promotion.md`. The temporary PROD gate stays in
-  place. Slice 7 (rebuild capture v3) deferred and untouched. CHANGELOG entry owed at Slice-6
-  acceptance.
+  place. CHANGELOG entry owed at Slice-6 acceptance (not edited by the Slice-7 pass).
 - **Key files:** `tools/migration/correct_afl_api_identity.ts`,
   `src/lib/acquisition/afl-api-identity-correction.ts`, `src/lib/acquisition/afl-api-adjudication.ts`,
   `src/db/queries/afl-api-player-links.ts`, `tools/db/promotion-check.ts`,
@@ -35,9 +53,9 @@
 - **Runbook:** `issues/open/AFLDB-ISSUE-238.md`.
 - **Unrelated:** the repo-root untracked file `second` is not part of this work and must remain
   unstaged.
-- **Next action:** ISSUE-238 remains Open. Next implementation work requires separate Slice-7
-  authorisation; Slice-10/11 database rehearsal remains deferred. Deploy migration 106 +
-  `db:privileges` before this code.
+- **Next action:** next implementation work requires separate Slice-8 authorisation. ISSUE-238
+  remains Open; Slice-10/11 database rehearsal remains deferred. A pending v2 rebuild must be finished with the old tooling before this is used. Deploy
+  migration 106 + `db:privileges` before this code.
 
 ### AFLDB-ISSUE-234 — Optional AFL API feed expansion (extended statistics, umpires, play-by-play)
 - **Severity:** Low. **Area:** data acquisition, investigation only.

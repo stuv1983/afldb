@@ -2,7 +2,40 @@
 
 ## 0. Status
 
-- **CURRENT STATE (2026-09-29): Slice 6 (promotion v3 / CPC) implementation, DB-free validation
+- **CURRENT STATE (2026-09-29, final Slice-7 review): Slice 7 implementation, DB-free validation
+  and final semantic review COMPLETE. ISSUE-238 remains Open. Next implementation work requires
+  separate Slice-8 authorisation; Slice-10/11 database rehearsal remains deferred.** Operator
+  validation (base `76d70e38`, final tree): `npx tsc --noEmit -p .` PASS; final combined DB-free
+  suite **1,342/1,342 PASS** — `tests/db-test-rebuild.test.ts` 511,
+  `tests/db-promotion-check.test.ts` 413, `tests/player-link-mutations.test.ts` 122,
+  `tests/correct-afl-api-identity-cli.test.ts` 185, `tests/afl-api-adjudication-recovery.test.ts` 26,
+  `tests/afl-api-identity-correction.test.ts` 85; `git diff --check` PASS. Final semantic review
+  COMPLETE: no CRIT or HIGH findings; MED-1 and MED-2 resolved. **MED-2** was the only code fix it
+  required: Stage 22's `evaluateRebuildSat1` now also requires the corrected ledger row's own
+  `player_id` to be P′ (Q2 SAT-1's conjunct), with behavioural regressions in
+  `tests/correct-afl-api-identity-cli.test.ts` and `tests/db-test-rebuild.test.ts`, covered by the
+  final-tree run above. `docs/deployment.md`'s Stage-22 SAT-1 list now states the conjunct
+  explicitly. **MED-1** was this tracking update. *(Historical: the pre-MED-2 validation was
+  1,341/1,341 — Slice-7 focused 806/806 plus Slice-6 regression 535/535.)* LOW-1…LOW-3 and the INFO
+  notes are recorded in §12 slice 7 and deliberately not implemented. No database rehearsal: no
+  `code_test_db`, no DEV/PROD database execution, no rebuild/promotion/migration/deployment
+  execution. The temporary PROD gate `CORRECTED_PROMOTION_REHEARSAL_REQUIRED` remains in place,
+  owned by Slice 11. `CHANGELOG.md` not edited. The untracked repo-root file `second` is untouched.
+- **Slice 7 state as recorded at implementation (historical, 2026-09-29): Slice 7 (rebuild Stage
+  2/21/22) IMPLEMENTED, uncommitted, base `76d70e38` (Slice 6 committed there) — then awaiting
+  operator DB-free validation.** The implementation pass ran no shell, Git, typecheck, test,
+  database or deployment command (CLAUDE.md §9), so at that time nothing was typechecked or
+  test-run. ISSUE-238 remains Open. Operator decisions
+  (§13.1): **OD-S7-1** strict capture v3 in the rebuild pipeline (v2 file and v2 marker refused by
+  name) plus a narrow recovery-only reader for ARCHIVED v2 captures; **OD-S7-2** a pre-destruction
+  check that each net-corrected row's P and P′ resolve to exactly one distinct live player;
+  **OD-S7-3** P4-10 stays out of this slice; **C1** the Stage 21 order (a) → (b) → (b′ write) → (c)
+  D15 → (b′ verify) → (d) → (e) in one transaction (§9.2). Details: §12 slice 7 "Slice-7
+  disposition". No migration, privilege change, new role or DSN; the temporary PROD gate
+  `CORRECTED_PROMOTION_REHEARSAL_REQUIRED` remains; `CHANGELOG.md` not edited. Real-database proof
+  stays with the Slice 10/11 rehearsal. The untracked repo-root file `second` is untouched.
+- **Slice 6 state as recorded before Slice 7 (historical; Slice 6 was then committed at
+  `76d70e38`): Slice 6 (promotion v3 / CPC) implementation, DB-free validation
   and final semantic review COMPLETE (base `b440b226`). ISSUE-238 remains Open. Next
   implementation work requires separate Slice-7 authorisation; Slice-10/11 database rehearsal
   remains deferred.** Operator validation: `npx tsc --noEmit -p .` PASS; planner + correction CLI
@@ -2556,6 +2589,17 @@ pass-2/pass-3 text and ISSUE-237's D12 wording. ISSUE-237's runbook is not edite
   4. **(c)** D15 with `expectedSupersedes = {}`. A `corrected` entry returns ALREADY_SATISFIED;
   5. **(d)** exact importer parity and the combined invariant, extended for `corrected`;
   6. **(e)** marker cleared.
+
+  **Slice-7 decision C1 (2026-09-29, binding): (b′) is split around (c).** SAT-1 is a whole-table
+  invariant (§13.2), and (c) D15 is what inserts every ordinary net-linked `resolved` row, so the
+  corrected Q2 cannot run inside (b′) before (c). The single-transaction order is therefore
+  (a) → (b) → **(b′ write)** (classify under ADJUDICATION, require CPC class 3 with an empty
+  closure, insert `resolved` P′) → **(c)** D15, whose ALREADY_SATISFIED set must equal the
+  capture's corrected set exactly → **(b′ verify)** (Q2 SAT-1…SAT-5, ledger n₀/h₀ unchanged, no
+  second `corrected` row, zero batches bound to A, exact corrected-set equality) → (d) → (e). It is
+  never split across transactions. The same reason is recorded where the order lives
+  (`reinstateAndReplay`, `rebuild_afl_api_adjudications.ts`; the REBUILD_REPLAY section of
+  `correct_afl_api_identity.ts`) and pinned by a DB-free source/ordering test.
 - **Stage 22** asserts the combined invariant, now extended for `corrected`, and that no marker
   remains.
 - **Later settles** attribute through the corrected identity. Their rows are C13.
@@ -3110,6 +3154,87 @@ FOR SEPARATE OPERATOR AUTHORISATION.**
        consideration, not a reason to reopen the validated planner/CPC behaviour.
 7. **Rebuild Stage 2/21/22 integration**: capture v3, the Stage 21 (b′) identity-only REPLAY, and
    the Stage 22 extension; the `docs/deployment.md` update.
+   - **Slice-7 disposition (2026-09-29, base `76d70e38`; implementation, DB-free validation and
+     final semantic review COMPLETE — see "Slice-7 validation and final review" below).** As first
+     recorded by the implementation pass (historical): IMPLEMENTED, uncommitted, not yet
+     typechecked or test-run, awaiting operator DB-free validation. Operator decisions OD-S7-1…3
+     and C1 (§13.1, §9.2).
+     - **Capture v3** (`tools/migration/rebuild_afl_api_adjudications.ts`): `CAPTURE_VERSION = 3`,
+       same format name. `CapturedLedgerRow` is three-action and carries `previousPlayerIdentity`
+       (verbatim; NULL on `linked`/`revoked`); `ledgerTuple` appends it last (the recovery tool's
+       order), so it is in the payload hash, `sameLedgerRow`/`sameLedger`, the pending-capture
+       comparison and the read-back. `capturedLedgerContractProblems` = migration 106's rules
+       (`revoked` needs `supersedes_id`, `linked` forbids it, `corrected` needs `previous_state`,
+       text-or-null `previous_player_identity`) plus the shared `aflApiLedgerStructureProblems`; it
+       runs straight after the Stage 2 ledger read and inside `capturedRowProblems`. A v2 file and a
+       v2 (or v1) database marker are refused by name; `LiveLedgerRow`, the DD-10 narrowing and
+       `requireCapturableLedgerRows` are removed (v3 replaces them). `E_rebuild = ∅` unchanged.
+     - **Before destruction:** an importer row for a net-corrected provider refuses (the shared
+       `capturedOverlapProviders`, restricted to corrected providers so the linked E_rebuild check
+       keeps its ISSUE-237 semantics); **OD-S7-2** `correctedCaptureIdentityProblems`: P and P′ each
+       resolve on the live database to exactly one player, and differ. No Q2/SAT census at capture.
+     - **Stage 21:** the reinstatement INSERT carries `previous_player_identity` verbatim (only
+       `player_id` is remapped); the read-back proves the v3 ledger exactly; `correctedRebuildReplaySet`
+       derives the corrected entries and target-human providers from the capture alone; (b′ write)
+       and (b′ verify) wrap D15, whose `expectedAlreadySatisfied` is the corrected set (empty when
+       none). `ReinstateReport.corrected` appears only when non-empty.
+     - **(b′) helpers** (`tools/migration/correct_afl_api_identity.ts`, REBUILD_REPLAY section after
+       the promotion REPLAY section): `runRebuildCorrectedReplayWrite` (database guard, D10 lock,
+       n₀/h₀, exact corrected set, `classifyCorrectedProviderInDatabase` under ADJUDICATION with row
+       locks, `rebuildReplayGateProblems` — CPC class 3 exactly, action `insert`, running
+       `PLANNER_VERSION`, zero STOP/MOVE/DELETE, no existing row — then the D15-shape `resolved` P′
+       INSERT through the shared `writeReplayedIdentity`); `verifyRebuildCorrectedReplay`
+       (written set, ledger n₀/h₀, exact set, no second corrected row, zero bound batches, then the
+       shared post-write Q2 per provider). Allow-list: one `external_identities` INSERT per corrected
+       provider; nothing else. With zero corrected providers neither half issues SQL. No new role:
+       Stage 21's own owner DSN `AFLDB_REBUILD_ADJUDICATION_DSN`; `proveSession` is not called.
+     - **Stage 22:** `verifyBijectionStage` = the combined invariant, no marker, then per
+       net-corrected provider `checkRebuildCorrectedSat1` (`gatherRebuildSat1Evidence` over the
+       accepted Q2 reader + `evaluateRebuildSat1`: A is the net corrected authority with a valid
+       chain; P and P′ resolve to one distinct player each; CD_I `resolved`/admin at P′ and A's own
+       `player_id` = P′ (added by MED-2, below); `sat1ExtendedBijectionProblems`). Zero corrected:
+       unchanged output.
+     - **Recovery** (`recover_afl_api_adjudications.ts`): a v3 capture carries corrected rows and
+       `previousPlayerIdentity` verbatim; **OD-S7-1** `parseArchivedV2RebuildCaptureLedger` (frozen
+       v2 hash, v2 actions only, no `previousPlayerIdentity` key, `recoveryRowProblems`, then
+       `previousPlayerIdentity: null`). The rebuild pipeline itself stays v3-only.
+     - **Docs/tests:** `docs/deployment.md` (v3, v2 file/marker refusal, the interrupted-rebuild
+       rule, Stage 2 refusals, Stage 21 order and reason, Stage 22 SAT-1). DB-free tests added in
+       `tests/db-test-rebuild.test.ts`, `tests/correct-afl-api-identity-cli.test.ts`,
+       `tests/afl-api-adjudication-recovery.test.ts`. Type follow-through only:
+       `tools/db/afl-api-identity-bulk-rehearsal.ts`, `tests/integration/settle-afl-api.test.ts`.
+       `tools/db/rebuild-test.ts` stage names left unchanged (still accurate). P4-10 untouched.
+     - **Deferred to Slice 10/11 (not provable DB-free):** real (b′) SQL, locks and CPC against a
+       rebuilt database; real Q2 after D15; Stage 22 against a rebuilt database; capture of a
+       database holding a corrected row; rollback/marker behaviour on PostgreSQL; `--recover adopt`;
+       corrected `verify-reinstated`; R238 cases 33/45/46/60/86 P-side; the rebuild catalogue/
+       manifest whole-plan interaction.
+     - **Slice-7 validation and final review (2026-09-29).** Operator validation on base
+       `76d70e38` (Slice 7 uncommitted at the time of the final review): `npx tsc --noEmit -p .`
+       PASS; final combined DB-free suite on the final tree **1,342/1,342 PASS**
+       (`tests/db-test-rebuild.test.ts` 511, `tests/db-promotion-check.test.ts` 413,
+       `tests/player-link-mutations.test.ts` 122, `tests/correct-afl-api-identity-cli.test.ts` 185,
+       `tests/afl-api-adjudication-recovery.test.ts` 26, `tests/afl-api-identity-correction.test.ts`
+       85); `git diff --check` PASS. *(Historical: the pre-MED-2 run was 1,341/1,341 — Slice-7
+       focused 806/806 plus Slice-6 regression 535/535.)* Final semantic review: no CRIT or HIGH;
+       MED-1 and MED-2 resolved.
+       **MED-1** — live tracking state still read "awaiting validation"; fixed by this update.
+       **MED-2** — the only code fix required: Stage 22's `evaluateRebuildSat1` lacked Q2 SAT-1's
+       `adjudication.playerId === pPrimeId` conjunct. The shared bijection compares ledger and
+       census by status/method, not player id, so a corrected ledger row naming another player
+       passed Stage 22 while CD_I was resolved at P′. The resolved/admin/P′ condition now also
+       requires A's own `player_id` to be P′; regressions: `tests/correct-afl-api-identity-cli.test.ts`
+       ("CD_I correctly resolved at P′ but A.player_id not P′ FAILs") and the stateful Stage-22 case
+       in `tests/db-test-rebuild.test.ts`; covered by the final-tree 1,342/1,342 run above, and
+       `docs/deployment.md`'s Stage-22 SAT-1 list now states `A.player_id = P′` explicitly.
+       **Not implemented (non-blocking):** LOW-1 frozen-v2 literal-hash hardening; LOW-2 the
+       unreachable corrected-importer-overlap refusal; LOW-3 v1 marker wording; INFO manual-admin
+       OD-S7-2 note; INFO transaction-local `lock_timeout` note. No database rehearsal (no
+       `code_test_db`, no DEV/PROD database execution, no rebuild/promotion/migration/deployment
+       execution); `CORRECTED_PROMOTION_REHEARSAL_REQUIRED` stays. **Slice 7 implementation, DB-free
+       validation and final semantic review COMPLETE. ISSUE-238 remains Open. Next implementation
+       work requires separate Slice-8 authorisation; Slice-10/11 database rehearsal remains
+       deferred.**
 8. **Derived and dependent reporting and cache handling**:
    - caches (§4.H, O-4) and Coleman;
    - findings, candidates and artefact risk (O-3);
@@ -3308,6 +3433,10 @@ wording (`R238-P5-02`, `player_match_stats` only) and the post-correction writer
 | **S6-D2** | **(2026-09-29) PSG and the post-swap gate bind to AFLDB-ISSUE-250's freeze; no custom PSG.** ISSUE-250's freeze F0 digest covers every non-`rebuilt` public contract table (`tools/db/promotion-freeze.ts` `freezeDigestTables()` = `truncatedPublicTables()`, `tools/db/promotion-inventory.ts` treatment `reinstate` for `afl_api_identity_adjudications`), a per-row `md5(t::text)` superset of the §8.6 ledger tuple. `--phase restored` proves old = F0, `--phase candidate` proves live = F0 (= PSG), `--phase production` proves kept = F0 and the promoted live database unfrozen (= the post-swap gate). With `C_promotion ≠ ∅` a valid `--freeze-record` is therefore **required under both PROD and DEV** (refusal `CORRECTED_PROMOTION_REQUIRES_FREEZE`); this is the corrected-state-only exception to ISSUE-250's rule that the DEV freeze is opt-in. With `C_promotion = ∅` DEV behaviour is unchanged. The census, CPC, REPLAY, CRV and D15 semantic checks still run independently; the freeze substitutes only for the race/drift PSG and the post-swap ledger gate. | **APPROVED (operator)** |
 | **S6-D3** | **(2026-09-29) Temporary PROD corrected-promotion gate, Slice 6 → Slice 11.** Until the Slice 10/11 corrected-promotion rehearsal is accepted, `--environment prod` with a non-empty corrected set refuses `CORRECTED_PROMOTION_REHEARSAL_REQUIRED` (promotion-check from `--phase pre-cutover` onward; REPLAY refuses a prod artefact carrying `correctedReplays`). DEV and `code_test_db` rehearsal stay exercisable. **Owned by Slice 11: only an accepted rehearsal may remove it.** | **APPROVED (operator), TEMPORARY** |
 | **S6-D4** | **(2026-09-29) CPC fail-closed readings.** Class 5 COLLISION covers both (1) another candidate importer provider holding P′c and (2) another target net-human (`linked` or `corrected`) provider whose stable identity remaps to P′c. Class 2 (candidate already at P′c) is the identity-only class: a non-empty predicted MOVE/DELETE closure is a FAIL (`IDENTITY_ONLY_CLOSURE_NOT_EMPTY`), never class-2 success. | **APPROVED (operator)** |
+| **OD-S7-1** | **(2026-09-29, Slice 7) Archived v2 recovery support: YES.** The rebuild pipeline is strictly capture v3 and refuses a v2 capture file and a v2 pending database marker by name. `recover_afl_api_adjudications.ts` keeps a narrow recovery-only reader for ARCHIVED v2 captures: it validates the historical v2 format (never upgrades it), reads only the ledger section, and maps `previousPlayerIdentity` to `null` (exact: v2 could not hold a corrected row). A v3 recovery source carries `previousPlayerIdentity` verbatim. `parseCombinedCapture` is not weakened. | **APPROVED (operator)** |
+| **OD-S7-2** | **(2026-09-29, Slice 7) Pre-destruction identity resolution: YES.** Before any destructive rebuild step, each net-corrected row's `previous_player_identity` must resolve to exactly one live player, distinct from the player `player_identity` (P′) resolves to; otherwise a pre-destruction STOP. Narrow by decision: no Q2/SAT census at capture time. | **APPROVED (operator)** |
+| **OD-S7-3** | **(2026-09-29, Slice 7) P4-10 (the first-kick-goal `docs/deployment.md` omission): NO.** Not folded into Slice 7; it stays outside this slice (§13.2). | **DECIDED (operator)** |
+| **C1** | **(2026-09-29, Slice 7) Stage 21 ordering: ACCEPTED.** SAT-1 is whole-table and D15 inserts the ordinary net-linked rows, so the corrected Q2 cannot run before D15: (a) → (b) → (b′ write) → (c) D15 (corrected set = its exact expected ALREADY_SATISFIED set) → (b′ verify) → (d) → (e), all in one transaction (§9.2). Rebuild REPLAY accepts CPC class 3 exactly, moves no typed projection, introduces no role, and uses Stage 21's own owner DSN with its target/database/marker assertions; Stage 22 builds SAT-1 from the accepted primitives; no new capture digest field. | **ACCEPTED (operator)** |
 
 No new operator decision is required by pass 4. The choices pass 4 made to resolve the review are
 **design choices for the reviewer**, not operator decisions. Where an alternative materially exists,

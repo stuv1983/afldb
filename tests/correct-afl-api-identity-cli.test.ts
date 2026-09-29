@@ -55,7 +55,14 @@ import { canonicalJson, type JsonValue } from '../src/lib/acquisition/observatio
 import {
   CorrectionRefused,
   ORIGINAL_BATCH_CONTRACT,
+  REBUILD_REPLAY_IDENTITY_NOTE,
   TOOL,
+  evaluateRebuildSat1,
+  gatherRebuildSat1Evidence,
+  rebuildCorrectedSetProblems,
+  runRebuildCorrectedReplayWrite,
+  verifyRebuildCorrectedReplay,
+  type CorrectedProviderEntry,
   assertReplayPromotionGuards,
   isPreRebuildDatabaseName,
   parseReplayPromotionArgs,
@@ -1884,6 +1891,200 @@ describe('Slice 6 M3a: REPLAY guards, role model and batch contract (§8.7, §8.
         dryRun: false, supersedeIn: 'e.json', environment: 'dev', expectDatabase: CANDIDATE, expectRole: 'afldb_owner',
       }, file)).rejects.toThrow(/session role is 'afldb_import', not 'afldb_owner'/);
       expect(log).toHaveLength(1);
+    });
+  });
+});
+
+/* ==================================================================== *
+ * Slice 7: rebuild REPLAY (Stage 21 (b′)) and the Stage 22 SAT-1 (§8.3, §9.2)
+ * ==================================================================== */
+
+describe('Slice 7: the rebuild REPLAY halves and the Stage 22 SAT-1 contract', () => {
+  const HASH = (c: string) => c.repeat(64);
+  const entry = (over: Partial<CorrectedProviderEntry> = {}): CorrectedProviderEntry => ({
+    externalId: 'CD_I1', adjudicationId: 7, evidenceSha256: HASH('a'),
+    previousPlayerIdentity: 'players/A/A.html', playerIdentity: 'players/B/B.html', ...over,
+  });
+  const linkedRow = (over: Partial<AflApiAdjudicationLedgerRow> = {}): AflApiAdjudicationLedgerRow => ({
+    id: 3, externalId: 'CD_I1', action: 'linked', playerId: 800, playerIdentity: 'players/A/A.html',
+    supersedesId: null, previousPlayerIdentity: null, ...over,
+  });
+  const correctedRow = (over: Partial<AflApiAdjudicationLedgerRow> = {}): AflApiAdjudicationLedgerRow => ({
+    id: 7, externalId: 'CD_I1', action: 'corrected', playerId: 900, playerIdentity: 'players/B/B.html',
+    supersedesId: 3, previousPlayerIdentity: 'players/A/A.html', evidenceSha256: HASH('a'), ...over,
+  });
+  const LEDGER = [linkedRow(), correctedRow()];
+
+  /** Records every statement; answers the database proof, the whole-ledger read and the bound-batch count. */
+  function recordingTx(answers: { database?: string; ledger?: AflApiAdjudicationLedgerRow[]; boundBatches?: number }, log: string[]): TransactionSql {
+    const tag = (strings: TemplateStringsArray) => {
+      const text = strings.join('?');
+      log.push(text);
+      if (text.includes('current_database()')) return Promise.resolve([{ database: answers.database ?? 'afldb_test' }]);
+      if (text.includes('FROM afl_api_identity_adjudications') && text.includes("WHERE source_key = 'afl_api'")) {
+        return Promise.resolve(answers.ledger ?? LEDGER);
+      }
+      if (text.includes('FROM import_batches ib')) return Promise.resolve([{ n: answers.boundBatches ?? 0 }]);
+      return Promise.resolve([]);
+    };
+    return tag as unknown as TransactionSql;
+  }
+  const writeInput = (over: Partial<Parameters<typeof runRebuildCorrectedReplayWrite>[1]> = {}) => ({
+    expectDatabase: 'afldb_test', entries: [entry()], targetHumanProviders: new Map([['CD_I1', 'players/B/B.html']]), ...over,
+  });
+  const written = (over: { rowCount?: number; sha256?: string; providers?: string[] } = {}) => ({
+    providers: (over.providers ?? ['CD_I1']).map((externalId) => ({ externalId, adjudicationId: 7, pPrimeId: 900, fingerprint: HASH('f') })),
+    ledger: { rowCount: over.rowCount ?? LEDGER.length, sha256: over.sha256 ?? aflApiLedgerStateSha256(LEDGER) },
+  });
+
+  describe('rebuildCorrectedSetProblems: the reinstated corrected set is exactly the capture\'s', () => {
+    it('an exact match has no problem; every divergence is named', () => {
+      expect(rebuildCorrectedSetProblems(LEDGER, [entry()])).toEqual([]);
+      expect(rebuildCorrectedSetProblems([linkedRow()], [entry()]).join('|')).toMatch(/in the capture's corrected set but is not net CORRECTED/);
+      expect(rebuildCorrectedSetProblems(LEDGER, []).join('|')).toMatch(/net CORRECTED in the reinstated ledger but not in the capture's corrected set/);
+      expect(rebuildCorrectedSetProblems(LEDGER, [entry({ adjudicationId: 8 })]).join('|')).toMatch(/adjudication id 7 != capture 8/);
+      expect(rebuildCorrectedSetProblems(LEDGER, [entry({ evidenceSha256: HASH('b') })]).join('|')).toMatch(/evidence_sha256 differs/);
+      expect(rebuildCorrectedSetProblems(LEDGER, [entry({ previousPlayerIdentity: 'players/C/C.html' })]).join('|'))
+        .toMatch(/previous_player_identity differs from the capture/);
+      expect(rebuildCorrectedSetProblems(LEDGER, [entry({ playerIdentity: 'players/C/C.html' })]).join('|')).toMatch(/player_identity differs/);
+      expect(rebuildCorrectedSetProblems(LEDGER, [entry(), entry()]).join('|')).toMatch(/appears twice/);
+    });
+  });
+
+  describe('runRebuildCorrectedReplayWrite (b′ write)', () => {
+    it('with no corrected provider it issues no SQL and returns null', async () => {
+      const log: string[] = [];
+      expect(await runRebuildCorrectedReplayWrite(recordingTx({}, log), writeInput({ entries: [] }))).toBeNull();
+      expect(log).toEqual([]);
+    });
+
+    it('refuses a connection to another database before any lock or read', async () => {
+      const log: string[] = [];
+      await expect(runRebuildCorrectedReplayWrite(recordingTx({ database: 'afldb_dev' }, log), writeInput()))
+        .rejects.toThrow(/connected to 'afldb_dev', not the rebuild target 'afldb_test'/);
+      expect(log).toHaveLength(1);
+    });
+
+    it('takes the identity-table lock, then refuses a reinstated corrected set that is not the capture\'s — before any classification or write', async () => {
+      const log: string[] = [];
+      await expect(runRebuildCorrectedReplayWrite(recordingTx({ ledger: [linkedRow()] }, log), writeInput()))
+        .rejects.toThrow(/rebuild REPLAY \(b′\): the reinstated ledger's corrected set is not the capture's/);
+      expect(log.some((t) => t.includes('LOCK TABLE external_identities IN ACCESS EXCLUSIVE MODE'))).toBe(true);
+      expect(log.findIndex((t) => t.includes('LOCK TABLE'))).toBeLessThan(log.findIndex((t) => t.includes('FROM afl_api_identity_adjudications')));
+      expect(log.filter((t) => /\b(INSERT|UPDATE|DELETE)\b/.test(t) || t.includes('pg_advisory'))).toEqual([]);
+    });
+  });
+
+  describe('verifyRebuildCorrectedReplay (b′ verify)', () => {
+    it('with no corrected provider it issues no SQL', async () => {
+      const log: string[] = [];
+      expect(await verifyRebuildCorrectedReplay(recordingTx({}, log), { expectDatabase: 'afldb_test', entries: [], written: null })).toEqual([]);
+      expect(log).toEqual([]);
+    });
+
+    it('refuses, before Q2, a missing (b′ write) result, a written set that is not the capture\'s, a changed ledger, or a bound batch', async () => {
+      const cases: Array<[Parameters<typeof verifyRebuildCorrectedReplay>[1], { ledger?: AflApiAdjudicationLedgerRow[]; boundBatches?: number }, RegExp]> = [
+        [{ expectDatabase: 'afldb_test', entries: [entry()], written: null }, {}, /no \(b′ write\) result/],
+        [{ expectDatabase: 'afldb_test', entries: [entry()], written: written({ providers: [] }) }, {}, /wrote \[\] but the capture's corrected set is \[CD_I1\]/],
+        [{ expectDatabase: 'afldb_test', entries: [entry()], written: written({ sha256: HASH('0') }) }, {}, /ledger changed during the rebuild REPLAY/],
+        [{ expectDatabase: 'afldb_test', entries: [entry()], written: written({ rowCount: 3 }) }, {}, /ledger changed during the rebuild REPLAY/],
+        [{ expectDatabase: 'afldb_test', entries: [entry()], written: written() }, { boundBatches: 1 }, /1 batch\(es\) are bound to adjudication 7 .* opens none/],
+      ];
+      for (const [input, answers, pattern] of cases) {
+        const log: string[] = [];
+        await expect(verifyRebuildCorrectedReplay(recordingTx(answers, log), input), String(pattern)).rejects.toThrow(pattern);
+        // Q2's reads (the source lookup the reader starts with) never ran; nothing was written
+        expect(log.some((t) => t.includes('FROM sources WHERE key')), String(pattern)).toBe(false);
+        expect(log.filter((t) => /\b(INSERT|UPDATE|DELETE)\b/.test(t)), String(pattern)).toEqual([]);
+      }
+    });
+  });
+
+  describe('Stage 22 SAT-1 (evaluateRebuildSat1 over the accepted Q2 reader)', () => {
+    /** The rebuilt database after Stage 21: A reinstated, CD_I resolved at P′, and no correction batch or bound row. */
+    const rebuiltWorld = (): World => ({ ...baseWorld(), batches: [], applications: [], rows: [], projections: [] });
+    const sat1 = async (world: World) => evaluateRebuildSat1(await gatherRebuildSat1Evidence(fakeReader(world), { providerId: CD_I, adjudicationId: 2 }));
+
+    it('a valid corrected provider PASSes, reading only SAT-1 facts (no batch, application, row or projection read)', async () => {
+      expect(await sat1(rebuiltWorld())).toEqual([]);
+      const reader = fakeReader(rebuiltWorld());
+      const refuse = async () => { throw new Error('not a SAT-1 read'); };
+      const narrow: CorrectionSatisfactionReader = {
+        ...reader, batchesClaimingAdjudication: refuse, batchApplications: refuse, applicationsAt: refuse, currentRowAt: refuse,
+        projectionPlayer: refuse, matchExists: refuse, auditsFor: refuse, attributedKeysAtPlayer: refuse, providerProjections: refuse,
+      };
+      expect(evaluateRebuildSat1(await gatherRebuildSat1Evidence(narrow, { providerId: CD_I, adjudicationId: 2 }))).toEqual([]);
+    });
+
+    it('a missing resolved row, or one at the wrong player or in the wrong shape, FAILs', async () => {
+      const missing = rebuiltWorld();
+      missing.identityRow = null;
+      missing.census = [];
+      expect((await sat1(missing)).join('|')).toMatch(/identity_contradicts: CD_I's external_identities row is not resolved.*no row/);
+      const wrongPlayer = rebuiltWorld();
+      wrongPlayer.identityRow = { ...wrongPlayer.identityRow!, playerId: P };
+      expect((await sat1(wrongPlayer)).join('|')).toMatch(/is not resolved\/afl_api_admin_adjudication at P′/);
+      const importerShape = rebuiltWorld();
+      importerShape.identityRow = { ...importerShape.identityRow!, status: 'unique', matchMethod: 'afl_api_stat_vector_season', candidateCount: 1 };
+      expect((await sat1(importerShape)).join('|')).toMatch(/is not resolved\/afl_api_admin_adjudication at P′/);
+    });
+
+    it('CD_I correctly resolved at P′ but A.player_id not P′ FAILs (the Q2 SAT-1 ledger-player conjunct)', async () => {
+      const ledgerElsewhere = rebuiltWorld();
+      ledgerElsewhere.ledger = ledgerElsewhere.ledger.map((r) => (r.id === 2 ? { ...r, playerId: 777 } : r));
+      // every other SAT-1 input is intact: the census row, both identities and the bijection still agree
+      expect(ledgerElsewhere.identityRow).toMatchObject({ status: 'resolved', matchMethod: AFL_API_ADMIN_MATCH_METHOD, playerId: P2 });
+      const problems = await sat1(ledgerElsewhere);
+      expect(problems).toHaveLength(1);
+      expect(problems[0]).toMatch(/identity_contradicts: CD_I's external_identities row is not resolved\/afl_api_admin_adjudication at P′.*adjudication 2 names player 777/);
+    });
+
+    it('an orphan resolved row (no ledger decision behind it) or another provider at P′ FAILs the extended bijection', async () => {
+      const orphan = rebuiltWorld();
+      orphan.census.push({ externalId: 'CD_X', status: 'resolved', matchMethod: AFL_API_ADMIN_MATCH_METHOD, playerId: 30, candidateCount: 0, externalUrl: null });
+      expect((await sat1(orphan)).join('|')).toMatch(/extended bijection: .*row_without_ledger.*CD_X/);
+      const collision = rebuiltWorld();
+      collision.census.push({ externalId: 'CD_J', status: 'resolved', matchMethod: AFL_API_ADMIN_MATCH_METHOD, playerId: 30, candidateCount: 0, externalUrl: null });
+      collision.otherLedger.push({ id: 5, externalId: 'CD_J', action: 'linked', playerId: 30, playerIdentity: 'id:P2', supersedesId: null, previousPlayerIdentity: null });
+      expect((await sat1(collision)).join('|')).toMatch(/CD_J is net linked to P′/);
+    });
+
+    it('P or P′ unresolvable, P = P′, or A not the net corrected authority FAILs; a malformed chain throws (fail closed)', async () => {
+      const noP = rebuiltWorld();
+      noP.identities = { 'id:P2': P2 };
+      expect((await sat1(noP)).join('|')).toMatch(/identity_unresolvable: previous_player_identity 'id:P'/);
+      const same = rebuiltWorld();
+      same.identities = { 'id:P': P2, 'id:P2': P2 };
+      expect((await sat1(same)).join('|')).toMatch(/P and P′ resolve to the same player/);
+      expect(evaluateRebuildSat1(await gatherRebuildSat1Evidence(fakeReader(rebuiltWorld()), { providerId: CD_I, adjudicationId: 1 })).join('|'))
+        .toMatch(/authority_invalid: ledger row 1 is not a corrected adjudication/);
+      const importerOrigin = rebuiltWorld();
+      importerOrigin.ledger = importerOrigin.ledger.map((r) => (r.action === 'corrected' ? { ...r, supersedesId: null } : r));
+      await expect(sat1(importerOrigin)).rejects.toThrow(/malformed/);
+    });
+  });
+
+  describe('no regression to ORIGINAL or promotion from the Slice 7 extraction', () => {
+    const source = toolSource();
+    const between = (start: string, end: string) => source.slice(source.indexOf(start), source.indexOf(end));
+
+    it('promotion REPLAY still writes its identity with its own note; the rebuild note is distinct', () => {
+      const run = between('export async function runReplayPromotion(', 'export function formatReplayOutcome(');
+      expect(run).toContain('await writeReplayedIdentity(tx, result.predictedIdentityAction, classified.identityRow, entry.externalId, pPrimeId);');
+      expect(source).toContain("const REPLAY_IDENTITY_NOTE = 'AFLDB-ISSUE-238 promotion replay; see afl_api_identity_adjudications';");
+      expect(source).toContain('note: string = REPLAY_IDENTITY_NOTE,');
+      expect(REBUILD_REPLAY_IDENTITY_NOTE).toBe('AFLDB-ISSUE-238 rebuild replay; see afl_api_identity_adjudications');
+    });
+
+    it('neither ORIGINAL nor promotion REPLAY reaches a rebuild helper', () => {
+      const original = between('async function runCorrection(', 'export type CorrectionBatchContract');
+      const promotion = between('REPLAY_SECTION_BEGIN', 'REPLAY_SECTION_END');
+      for (const section of [original, promotion]) {
+        expect(section).not.toMatch(/runRebuildCorrectedReplayWrite|verifyRebuildCorrectedReplay|rebuildReplayGateProblems|evaluateRebuildSat1/);
+      }
+      // the rebuild section sits after the promotion one, outside its source contracts
+      expect(source.indexOf('REBUILD_REPLAY_SECTION_BEGIN')).toBeGreaterThan(source.indexOf('/* REPLAY_SECTION_END */'));
+      expect(source.match(/\.catch\(/g)).toHaveLength(1);
     });
   });
 });

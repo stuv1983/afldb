@@ -21,10 +21,14 @@
  * WHY NO NEW TRACKED ARTEFACT. The ledger holds admin e-mail addresses and free-text notes, and
  * it grows continuously in the live database; a tracked copy would expose both and always lag.
  * The durable, hash-bound record already exists: every `db:test:rebuild` Stage 2 writes a
- * combined capture (`afldb.afl_api_identities.rebuild_capture` v2) and archives it after the
- * reinstate, and `export` below writes the ledger section of any readable database (a restored
- * backup included) in the same shape, UNTRACKED (outside every checkout, never overwritten). The
- * recovery accepts either, and reads only the ledger section.
+ * combined capture (`afldb.afl_api_identities.rebuild_capture`, v3 since AFLDB-ISSUE-238 slice 7)
+ * and archives it after the reinstate, and `export` below writes the ledger section of any
+ * readable database (a restored backup included) in the same shape, UNTRACKED (outside every
+ * checkout, never overwritten). The recovery accepts either, and reads only the ledger section.
+ * A v3 capture can hold `corrected` rows; their `previous_player_identity` is carried verbatim and
+ * resolved, never remapped. An ARCHIVED v2 capture (written before slice 7, so it could never hold
+ * a corrected row) stays readable through a narrow recovery-only reader
+ * (`parseArchivedV2RebuildCaptureLedger`); the rebuild pipeline itself refuses v2.
  *
  * WHAT IT PRESERVES. Every recovered ledger row is the source row verbatim — id, provider,
  * action, `player_identity`, previous state, evidence and its hash, the surname acknowledgement,
@@ -38,7 +42,7 @@
  * invariant.
  *
  * FAIL-CLOSED. The recovery refuses, writing nothing, when:
- *   - the source is not a recovery export or a v2 combined capture, fails its own hash, or is not
+ *   - the source is not a recovery export or a v3 (or archived v2) combined capture, fails its own hash, or is not
  *     the payload the operator named (`--expected-payload-sha256`);
  *   - the source's ledger database is not the target (a decision is recovered only into the
  *     deployment that made it), or the target is not on the closed list (no PROD entry);
@@ -139,12 +143,11 @@ const isRecoveryDatabase = (name: unknown): name is RecoveryLedgerDatabase =>
  * ------------------------------------------------------------------ */
 
 /**
- * AFLDB-ISSUE-238 (R238-S4-01, DD-11): recovery-owned. `CapturedLedgerRow` (rebuild, DD-10)
- * stays the pinned two-action shape and is never edited or relaxed; the recovery export/target
- * ledger can hold a `corrected` row, so it needs its OWN row type carrying the third action and
- * `previousPlayerIdentity` (M1's FROM identity — never remapped, no FK, migration 106).
- * Structurally identical to the rebuild's `LiveLedgerRow`, defined independently so recovery's
- * three-action validation never depends on anything DD-10 pins.
+ * AFLDB-ISSUE-238 (R238-S4-01, DD-11): recovery-owned. It carries the third action and
+ * `previousPlayerIdentity` (M1's FROM identity — never remapped, no FK, migration 106). Since
+ * slice 7 the rebuild's own capture-v3 `CapturedLedgerRow` has the same shape; the recovery keeps
+ * this type, its validator, comparator and plan as its own (DD-11) so its behaviour never moves
+ * with the rebuild pipeline's, and so an ARCHIVED v2 capture maps into it too (OD-S7-1).
  */
 export type RecoveryLedgerRow = Omit<CapturedLedgerRow, 'action'> & {
   action: AflApiLedgerNetAction;
@@ -160,9 +163,9 @@ const CREATED_AT_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/;
  * `capturedRowProblems`' (rebuild, pinned) v2 rules for `linked`/`revoked` rows byte-for-byte,
  * PLUS the `corrected` rules (M1, DD-2) via the shared `aflApiLedgerStructureProblems` and the
  * `previous_state IS NOT NULL` check migration 106's CHECK enforces on a real database. Used
- * INSTEAD of `capturedRowProblems` everywhere on the recovery path — `capturedRowProblems` is
- * never called here, because it refuses any `corrected` row outright (the exact HIGH finding,
- * R238-S4-01, this validator exists to avoid).
+ * INSTEAD of `capturedRowProblems` everywhere on the recovery path (DD-11: the v2-era
+ * `capturedRowProblems` refused any `corrected` row outright, the HIGH finding R238-S4-01; the
+ * recovery keeps its own validator rather than following the rebuild's).
  */
 export function recoveryRowProblems(rows: readonly RecoveryLedgerRow[]): string[] {
   const problems: string[] = [];
@@ -237,6 +240,12 @@ export function recoveryRowProblems(rows: readonly RecoveryLedgerRow[]): string[
   }))));
   return problems;
 }
+
+/* HISTORY NOTE (AFLDB-ISSUE-238 slice 7). The "(rebuild, pinned)" notes on the mirrors below
+ * describe the v2-era rebuild shapes they were written against (slice 4, DD-10/DD-11): then
+ * two-action and refusing `corrected`. Since slice 7 the rebuild's own shapes are capture v3,
+ * three-action, and `ledgerTuple` also appends `previousPlayerIdentity` last. The recovery keeps
+ * its own mirrors by decision (DD-11), so its behaviour does not move with the rebuild's. */
 
 /** The v2 `ledgerTuple` (rebuild, pinned) field order, mirrored rather than imported —
  * `RecoveryLedgerRow`'s three-action union is not assignable to `ledgerTuple`'s pinned
@@ -390,11 +399,121 @@ export type AdjudicationRecoverySource = {
   fileSha256: string;
 };
 
+/* ------------------------------------------------------------------ *
+ * AFLDB-ISSUE-238 OD-S7-1: the ARCHIVED v2 rebuild capture, recovery-only
+ * ------------------------------------------------------------------ */
+
+/** The combined rebuild capture's pre-ISSUE-238 version. The rebuild pipeline refuses it by name
+ * (`parseCombinedCapture`, v3 only); only this recovery tool still reads an archived one. */
+export const ARCHIVED_V2_CAPTURE_VERSION = 2;
+
 /**
- * Parse and PROVE a recovery source: a recovery export, or a v2 combined rebuild capture of which
- * only the ledger section is used. Either must match its own hash and the payload hash the
- * operator names. Anything else — including the superseded ledger-only and pre-ISSUE-245
- * captures, which `parseCombinedCapture` itself names and refuses — is refused.
+ * The v2 combined capture's payload hash, exactly as the v2 tooling computed it — FROZEN here,
+ * mirrored field for field rather than imported, so a later change to the live (v3) tuples can
+ * never make a genuine v2 archive verify differently: `[format, 2, database, capturedAt,
+ * ledgerTablePresent, ledger tuples, importer tuples (by externalId), registration tuples (by
+ * token)]`, the v2 ledger tuple having no `previousPlayerIdentity`. Exported for the DB-free suite.
+ */
+export function archivedV2RebuildCapturePayloadSha256(body: {
+  format: unknown; database: unknown; capturedAt: unknown; ledgerTablePresent: unknown;
+  ledgerRows: readonly Record<string, unknown>[];
+  importerRows: readonly Record<string, unknown>[];
+  registrations: readonly Record<string, unknown>[];
+}): string {
+  const byKey = (key: string) => (a: Record<string, unknown>, b: Record<string, unknown>) =>
+    String(a[key]).localeCompare(String(b[key]));
+  const byCodeUnits = (key: string) => (a: Record<string, unknown>, b: Record<string, unknown>) =>
+    (String(a[key]) < String(b[key]) ? -1 : String(a[key]) > String(b[key]) ? 1 : 0);
+  const canonical = JSON.stringify([
+    body.format, ARCHIVED_V2_CAPTURE_VERSION, body.database, body.capturedAt, body.ledgerTablePresent,
+    body.ledgerRows.map((r) => [r.id, r.sourceKey, r.externalId, r.action, r.playerId, r.playerIdentity,
+      r.previousState, r.evidence, r.evidenceSha256, r.surnameDisagreementAcknowledged, r.supersedesId,
+      r.adminUserId, r.note, r.createdAt, r.adminEmail, r.adminRole]),
+    [...body.importerRows].sort(byKey('externalId')).map((r) => [r.externalId, r.playerIdentity, r.matchMethod,
+      r.status, r.candidateCount, r.externalName, r.externalUrl, r.notes]),
+    [...body.registrations].sort(byCodeUnits('token')).map((r) => [r.token, r.overrideValues,
+      r.afltablesProfilePath, r.createdAt, r.updatedAt, r.adminEmail, r.adminRole]),
+  ]);
+  return createHash('sha256').update(canonical, 'utf8').digest('hex');
+}
+
+/**
+ * AFLDB-ISSUE-238 OD-S7-1: the narrow, recovery-only reader for an ARCHIVED v2 combined rebuild
+ * capture. It validates the HISTORICAL v2 format — never upgrading it to v3 and never routing it
+ * through the rebuild pipeline — and returns only the ledger material recovery needs:
+ *
+ *   - format, `version: 2`, the named database, every section present, a ledger table;
+ *   - the v2 payload hash (`archivedV2RebuildCapturePayloadSha256`) over all three sections;
+ *   - ledger rows in the v2 shape only: `linked`/`revoked`, and NO `previousPlayerIdentity` key
+ *     (a v2 row could not carry one), each then held to `recoveryRowProblems`.
+ *
+ * `previousPlayerIdentity: null` is then EXACT, not a guess: v2 refused every corrected row before
+ * destruction (DD-10), so no v2 capture can hold one. The importer and registration sections are
+ * hashed, never read.
+ */
+export function parseArchivedV2RebuildCaptureLedger(text: string, database: RecoveryLedgerDatabase): {
+  sourceDatabase: string; capturedAt: string; ledgerRows: RecoveryLedgerRow[]; payloadSha256: string;
+} {
+  let raw: Record<string, unknown>;
+  try {
+    raw = JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    throw new AdjudicationRecoveryRefused('The archived v2 rebuild capture is not valid JSON.');
+  }
+  if (raw.format !== CAPTURE_FORMAT || raw.version !== ARCHIVED_V2_CAPTURE_VERSION) {
+    throw new AdjudicationRecoveryRefused('The archived rebuild capture is not the v2 combined format.');
+  }
+  if (raw.database !== database) {
+    throw new AdjudicationRecoveryRefused(`The archived v2 rebuild capture names '${String(raw.database)}', not '${database}'.`);
+  }
+  const isObjectArray = (v: unknown): v is Record<string, unknown>[] =>
+    Array.isArray(v) && v.every((e) => e !== null && typeof e === 'object' && !Array.isArray(e));
+  if (typeof raw.capturedAt !== 'string' || typeof raw.ledgerTablePresent !== 'boolean'
+      || !isObjectArray(raw.ledgerRows) || !isObjectArray(raw.importerRows) || !isObjectArray(raw.registrations)
+      || typeof raw.payloadSha256 !== 'string') {
+    throw new AdjudicationRecoveryRefused('The archived v2 rebuild capture is missing a required field.');
+  }
+  const ledgerRowsRaw = raw.ledgerRows;
+  if (archivedV2RebuildCapturePayloadSha256({
+    format: raw.format, database: raw.database, capturedAt: raw.capturedAt, ledgerTablePresent: raw.ledgerTablePresent,
+    ledgerRows: ledgerRowsRaw, importerRows: raw.importerRows, registrations: raw.registrations,
+  }) !== raw.payloadSha256) {
+    throw new AdjudicationRecoveryRefused(
+      'The archived v2 rebuild capture does not match its own (v2) payload hash: it was altered after capture.');
+  }
+  if (!raw.ledgerTablePresent) {
+    throw new AdjudicationRecoveryRefused('The rebuild capture predates migration 104: it carries no ledger to recover.');
+  }
+  const shapeProblems: string[] = [];
+  for (const r of ledgerRowsRaw) {
+    if (r.action !== 'linked' && r.action !== 'revoked') {
+      shapeProblems.push(`ledger row ${String(r.id)}: action ${JSON.stringify(r.action)} is not a v2 action (linked/revoked)`);
+    }
+    if ('previousPlayerIdentity' in r) {
+      shapeProblems.push(`ledger row ${String(r.id)}: carries previousPlayerIdentity, which no v2 capture could hold`);
+    }
+  }
+  const ledgerRows = ledgerRowsRaw.map((r) => ({
+    id: r.id, sourceKey: r.sourceKey, externalId: r.externalId, action: r.action,
+    playerId: r.playerId, playerIdentity: r.playerIdentity, previousState: r.previousState,
+    evidence: r.evidence, evidenceSha256: r.evidenceSha256,
+    surnameDisagreementAcknowledged: r.surnameDisagreementAcknowledged, supersedesId: r.supersedesId,
+    adminUserId: r.adminUserId, adminEmail: r.adminEmail, adminRole: r.adminRole, note: r.note,
+    createdAt: r.createdAt, previousPlayerIdentity: null,
+  }) as RecoveryLedgerRow);
+  const problems = [...shapeProblems, ...(shapeProblems.length > 0 ? [] : recoveryRowProblems(ledgerRows))];
+  if (problems.length > 0) {
+    throw new AdjudicationRecoveryRefused(`The archived v2 rebuild capture's ledger is not a valid v2 ledger: ${problems.join('; ')}`);
+  }
+  return { sourceDatabase: database, capturedAt: raw.capturedAt, ledgerRows, payloadSha256: raw.payloadSha256 };
+}
+
+/**
+ * Parse and PROVE a recovery source: a recovery export, a v3 combined rebuild capture, or
+ * (AFLDB-ISSUE-238 OD-S7-1) an ARCHIVED v2 one, of which only the ledger section is used. Each
+ * must match its own hash and the payload hash the operator names. Anything else — including the
+ * superseded ledger-only and pre-ISSUE-245 captures, which `parseCombinedCapture` itself names and
+ * refuses — is refused.
  */
 export function parseAdjudicationRecoverySource(text: string, expectedPayloadSha256: string): AdjudicationRecoverySource {
   const expected = expectedPayloadSha256.trim().toLowerCase();
@@ -440,24 +559,31 @@ export function parseAdjudicationRecoverySource(text: string, expectedPayloadSha
     if (!isRecoveryDatabase(raw.database)) {
       throw new AdjudicationRecoveryRefused(`The rebuild capture names '${String(raw.database)}', which is not a recoverable ledger database.`);
     }
-    let capture;
-    try {
-      capture = parseCombinedCapture(text, raw.database);
-    } catch (error) {
-      throw new AdjudicationRecoveryRefused(`The rebuild capture is refused: ${(error as Error).message}`);
+    if (raw.version === ARCHIVED_V2_CAPTURE_VERSION) {
+      // AFLDB-ISSUE-238 OD-S7-1: an ARCHIVED v2 capture, through the recovery-only reader below.
+      // The rebuild pipeline itself (`parseCombinedCapture`) refuses v2 by name; nothing here
+      // relaxes it.
+      const archived = parseArchivedV2RebuildCaptureLedger(text, raw.database);
+      source = { kind: 'rebuild_capture', ledgerDatabase: raw.database, ...archived };
+    } else {
+      let capture;
+      try {
+        capture = parseCombinedCapture(text, raw.database);
+      } catch (error) {
+        throw new AdjudicationRecoveryRefused(`The rebuild capture is refused: ${(error as Error).message}`);
+      }
+      if (!capture.ledgerTablePresent) {
+        throw new AdjudicationRecoveryRefused('The rebuild capture predates migration 104: it carries no ledger to recover.');
+      }
+      // AFLDB-ISSUE-238 capture v3: a corrected row and every row's `previousPlayerIdentity` are
+      // carried VERBATIM (never remapped; the plan below RESOLVES it on the target, R238-S4-05).
+      source = {
+        kind: 'rebuild_capture', ledgerDatabase: raw.database, sourceDatabase: capture.database,
+        capturedAt: capture.capturedAt,
+        ledgerRows: capture.ledgerRows.map((r): RecoveryLedgerRow => ({ ...r })),
+        payloadSha256: capture.payloadSha256,
+      };
     }
-    if (!capture.ledgerTablePresent) {
-      throw new AdjudicationRecoveryRefused('The rebuild capture predates migration 104: it carries no ledger to recover.');
-    }
-    // AFLDB-ISSUE-238 (DD-11): a rebuild capture (v2 combined format, DD-10) can never hold a
-    // corrected row (refused at capture time) or a previous_player_identity, so every row maps
-    // to `previousPlayerIdentity: null` -- always true here, never a guess.
-    source = {
-      kind: 'rebuild_capture', ledgerDatabase: raw.database, sourceDatabase: capture.database,
-      capturedAt: capture.capturedAt,
-      ledgerRows: capture.ledgerRows.map((r): RecoveryLedgerRow => ({ ...r, previousPlayerIdentity: null })),
-      payloadSha256: capture.payloadSha256,
-    };
   } else {
     throw new AdjudicationRecoveryRefused(
       `The recovery source format ${JSON.stringify(raw.format ?? null)} is neither ${ADJUDICATION_RECOVERY_FORMAT} `

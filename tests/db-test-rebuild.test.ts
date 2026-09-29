@@ -162,7 +162,10 @@ import {
   buildCombinedCapture,
   captureDirectory,
   capturePayloadSha256,
+  capturedLedgerContractProblems,
   combinedCaptureStructureProblems,
+  correctedCaptureIdentityProblems,
+  correctedRebuildReplaySet,
   decidePendingCapture,
   fetchAflApiSourceIdIfPresent,
   nextIdentityValue,
@@ -233,9 +236,23 @@ import {
   REGISTRATION_CREATED_AFLTABLES_IDENTITY_SQL,
 } from '../tools/db/rebuild-test';
 import {
+  CORRECTED_REBUILD_REPLAY,
   reinstateRegistrationsStage,
+  verifyBijectionStage,
   verifyRegistrationsStage,
+  type CorrectedRebuildReplay,
 } from '../tools/migration/rebuild_afl_api_adjudications';
+import {
+  REBUILD_REPLAY_IDENTITY_NOTE,
+  rebuildReplayGateProblems,
+  runRebuildCorrectedReplayWrite,
+  verifyRebuildCorrectedReplay,
+} from '../tools/migration/correct_afl_api_identity';
+import {
+  PLANNER_VERSION,
+  classifyCorrectedCandidate,
+  type CpcInput,
+} from '../src/lib/acquisition/afl-api-identity-correction';
 import {
   EMPTY_LIVE_REGISTRATION_STATE,
   REGISTRATION_PROFILE_PATH_RE,
@@ -4405,21 +4422,21 @@ describe('AFL API adjudication survival through the rebuild (AFLDB-ISSUE-235 C6 
   const ledger = (): CapturedLedgerRow[] => [
     {
       id: 7, sourceKey: 'afl_api', externalId: 'CD_I1001', action: 'linked', playerId: 500,
-      playerIdentity: 'players/A/Alpha_Able.html', previousState: null, evidence: EVIDENCE,
+      playerIdentity: 'players/A/Alpha_Able.html', previousPlayerIdentity: null, previousState: null, evidence: EVIDENCE,
       evidenceSha256: 'a'.repeat(64), surnameDisagreementAcknowledged: false, supersedesId: null,
       adminUserId: 3, adminEmail: 'Admin.One@Example.org', adminRole: 'super_admin',
       note: 'Linked on club list and DOB evidence.', createdAt: '2026-09-23T01:02:03.123456Z',
     },
     {
       id: 9, sourceKey: 'afl_api', externalId: 'CD_I1002', action: 'linked', playerId: 501,
-      playerIdentity: 'players/B/Bravo_Baker.html', previousState: null, evidence: '{"b": true}',
+      playerIdentity: 'players/B/Bravo_Baker.html', previousPlayerIdentity: null, previousState: null, evidence: '{"b": true}',
       evidenceSha256: 'b'.repeat(64), surnameDisagreementAcknowledged: true, supersedesId: null,
       adminUserId: 4, adminEmail: 'two@example.org', adminRole: 'admin',
       note: 'Surname differs by marriage; acknowledged.', createdAt: '2026-09-23T02:00:00.000001Z',
     },
     {
       id: 12, sourceKey: 'afl_api', externalId: 'CD_I1002', action: 'revoked', playerId: 501,
-      playerIdentity: 'players/B/Bravo_Baker.html',
+      playerIdentity: 'players/B/Bravo_Baker.html', previousPlayerIdentity: null,
       previousState: '{"id": 44, "status": "resolved", "player_id": 501}', evidence: '{"b": false}',
       evidenceSha256: 'c'.repeat(64), surnameDisagreementAcknowledged: false, supersedesId: 9,
       adminUserId: 3, adminEmail: 'admin.one@example.org', adminRole: 'super_admin',
@@ -4498,12 +4515,182 @@ describe('AFL API adjudication survival through the rebuild (AFLDB-ISSUE-235 C6 
     })).toThrow(/no ledger table cannot carry ledger rows/);
   });
 
-  it('AFLDB-ISSUE-238 (DD-10): a corrected-action row in a v2 capture file is still refused by '
-     + 'capturedRowProblems, naming capture v3 (slice 7)', () => {
-    const rows = ledger();
-    const corrected = { ...rows[0], id: 20, action: 'corrected' } as unknown as CapturedLedgerRow;
-    expect(() => capture([...rows, corrected]))
-      .toThrow(/action is not linked\/revoked \(a corrected row needs capture v3, ISSUE-238 slice 7\)/);
+  // -------------------------------------------------------------------------
+  // AFLDB-ISSUE-238 slice 7 — capture v3 (§9.2). `correctedRow()` is a HUMAN-origin correction of
+  // CD_I1001 (linked at row 7 to Alpha, P) to Delta (P′), superseding row 7.
+  // -------------------------------------------------------------------------
+
+  const correctedRow = (over: Partial<CapturedLedgerRow> = {}): CapturedLedgerRow => ({
+    id: 14, sourceKey: 'afl_api', externalId: 'CD_I1001', action: 'corrected', playerId: 503,
+    playerIdentity: 'players/D/Delta_Dog.html', previousPlayerIdentity: 'players/A/Alpha_Able.html',
+    previousState: '{"id": 44, "status": "resolved", "player_id": 500}', evidence: '{"c": true}',
+    evidenceSha256: 'd'.repeat(64), surnameDisagreementAcknowledged: false, supersedesId: 7,
+    adminUserId: 3, adminEmail: 'admin.one@example.org', adminRole: 'super_admin',
+    note: 'Corrected: the provider is Delta, not Alpha.', createdAt: '2026-09-23T04:00:00.000000Z', ...over,
+  });
+  const correctedLedger = (over: Partial<CapturedLedgerRow> = {}): CapturedLedgerRow[] => [...ledger(), correctedRow(over)];
+
+  it('AFLDB-ISSUE-238 capture v3: CAPTURE_VERSION is 3 and a valid corrected row is captured, '
+     + 'round-tripping its previous_player_identity and previous_state verbatim', () => {
+    expect(CAPTURE_VERSION).toBe(3);
+    withTempDir((dir) => {
+      const c = capture(correctedLedger());
+      expect(c.version).toBe(3);
+      writePendingCapture(dir, c);
+      const back = readPendingCapture(dir, 'afldb_test')!;
+      expect(back).toEqual(c);
+      const corrected = back.ledgerRows.find((r) => r.action === 'corrected')!;
+      expect(corrected).toMatchObject({
+        id: 14, supersedesId: 7, playerIdentity: 'players/D/Delta_Dog.html',
+        previousPlayerIdentity: 'players/A/Alpha_Able.html',
+        previousState: '{"id": 44, "status": "resolved", "player_id": 500}',
+      });
+      // every linked/revoked row carries an explicit null, never an absent key
+      expect(back.ledgerRows.filter((r) => r.action !== 'corrected').map((r) => r.previousPlayerIdentity)).toEqual([null, null, null]);
+      // an importer-origin correction (no supersedes_id, net state NONE) is equally capturable
+      expect(() => capture([...ledger().slice(1), correctedRow({ supersedesId: null, externalId: 'CD_I1003' })])).not.toThrow();
+    });
+  });
+
+  it('AFLDB-ISSUE-238 capture v3: a v2 capture file is refused BY NAME by the rebuild pipeline, never upgraded', () => {
+    withTempDir((dir) => {
+      const v3 = capture();
+      const { payloadSha256: _payload, ...body } = v3;
+      const v2Rows = body.ledgerRows.map(({ previousPlayerIdentity: _p, ...rest }) => rest);
+      writeFileSync(join(dir, PENDING_CAPTURE_FILE), JSON.stringify({ ...body, version: 2, ledgerRows: v2Rows, payloadSha256: 'e'.repeat(64) }));
+      expect(() => readPendingCapture(dir, 'afldb_test'))
+        .toThrow(/pre-AFLDB-ISSUE-238 combined format \(v2\).*refused by the v3 rebuild pipeline, never upgraded.*straddle/s);
+      expect(() => parseCombinedCapture(readFileSync(join(dir, PENDING_CAPTURE_FILE), 'utf8'), 'afldb_test'))
+        .toThrow(AdjudicationRebuildRefused);
+      // a v3 row that lacks the previousPlayerIdentity key is refused, never defaulted to null
+      const missingKey = { ...body, ledgerRows: v2Rows };
+      writeFileSync(join(dir, PENDING_CAPTURE_FILE), JSON.stringify({ ...missingKey, payloadSha256: v3.payloadSha256 }));
+      expect(() => readPendingCapture(dir, 'afldb_test')).toThrow(/previous_player_identity is not text or null/);
+    });
+  });
+
+  it('AFLDB-ISSUE-238 capture v3: a v2 (or v1) database marker is refused BY NAME, and left untouched', async () => {
+    for (const version of [2, 1]) {
+      const comment = JSON.stringify({ format: CAPTURE_FORMAT, version, capturedAt: 'x', payloadSha256: 'f'.repeat(64), fileSha256: 'f'.repeat(64) });
+      const { tx, statements } = fakeTx((text) => {
+        if (text === 'SELECT current_database() AS actual') return [{ actual: 'afldb_test' }];
+        if (text.includes('shobj_description')) return [{ comment }];
+        throw new Error(`unexpected statement: ${text}`);
+      });
+      await expect(readRebuildMarker(tx, 'afldb_test')).rejects.toThrow(
+        new RegExp(`v${version} rebuild marker.*Do not upgrade tooling mid-rebuild.*left untouched`, 's'));
+      expect(statements.some((s) => WRITES.test(s.text) || s.text.includes('COMMENT'))).toBe(false);
+    }
+  });
+
+  it('AFLDB-ISSUE-238 capture v3: malformed corrected rows and broken ledger contracts are refused', () => {
+    const cases: Array<[CapturedLedgerRow[], RegExp]> = [
+      [correctedLedger({ previousState: null }), /ledger row 14: a corrected row has no previous_state/],
+      [correctedLedger({ previousPlayerIdentity: null }), /a corrected row has no previous_player_identity/],
+      [correctedLedger({ previousPlayerIdentity: 'players/D/Delta_Dog.html' }), /previous_player_identity equals its player_identity/],
+      [correctedLedger({ evidenceSha256: 'not-hex' }), /evidence_sha256 is not 64 lowercase hex/],
+      // a human-origin correction must supersede the immediately preceding LINKED row of its provider
+      [correctedLedger({ supersedesId: 9 }), /does not supersede the immediately preceding row for its provider/],
+      [[...ledger(), correctedRow({ externalId: 'CD_I1002', supersedesId: 12, playerIdentity: 'players/D/Delta_Dog.html' })],
+        /supersedes a revoked row, not a linked one/],
+      // an importer-origin correction may not follow a net-linked state
+      [correctedLedger({ supersedesId: null }), /importer-origin corrected row \(no supersedes_id\) follows a net-linked state/],
+      // a correction is terminal: nothing follows it, and no chain
+      [[...correctedLedger(), { ...ledger()[1], id: 15, externalId: 'CD_I1001' }], /follows a corrected row for the same provider/],
+      [[...correctedLedger(), correctedRow({ id: 16, supersedesId: null })], /a second corrected row for the same provider|follows a corrected row/],
+      // a linked/revoked row never carries previous_player_identity
+      [[{ ...ledger()[0], previousPlayerIdentity: 'players/Z/Zed.html' }], /a linked row carries a previous_player_identity/],
+      // migration 106: revoked needs supersedes_id, linked forbids it
+      [[{ ...ledger()[0], supersedesId: 1 }], /supersedes_id must be set exactly on a revoked row/],
+      [[{ ...ledger()[2], supersedesId: null }, ...ledger().slice(0, 2)].sort((a, b) => a.id - b.id), /supersedes_id must be set exactly on a revoked row/],
+      // an unknown action is named
+      [[{ ...ledger()[0], action: 'unlinked' as never }], /is not linked\/revoked\/corrected/],
+    ];
+    for (const [rows, pattern] of cases) {
+      expect(() => capture(rows), String(pattern)).toThrow(pattern);
+      expect(capturedLedgerContractProblems(rows).length + combinedCaptureStructureProblems(rows, []).length, String(pattern))
+        .toBeGreaterThan(0);
+    }
+    // the zero-corrected v2-era ledger passes the v3 contract unchanged
+    expect(capturedLedgerContractProblems(ledger())).toEqual([]);
+  });
+
+  it('AFLDB-ISSUE-238 capture v3: previousPlayerIdentity participates in the payload hash, sameLedger and the read-back', () => {
+    const a = capture(correctedLedger());
+    const b = capture(correctedLedger({ previousPlayerIdentity: 'players/E/Echo_Easy.html' }));
+    expect(b.payloadSha256).not.toBe(a.payloadSha256);
+    expect(sameLedger(a.ledgerRows, b.ledgerRows)).toBe(false);
+    // … and a pending capture differing from the live ledger ONLY there is never "equal"
+    expect(decidePendingCapture({
+      markerPresent: true, pending: a, liveLedgerRows: b.ledgerRows, liveImporterRows: a.importerRows, recover: false,
+    })).toMatchObject({ action: 'refuse' });
+    expect(decidePendingCapture({
+      markerPresent: true, pending: a, liveLedgerRows: a.ledgerRows, liveImporterRows: a.importerRows, recover: false,
+    })).toEqual({ action: 'verify-reinstated' });
+    // the read-back compares it byte for byte
+    const remap = new Map([...REMAP, ['players/D/Delta_Dog.html', { ok: true as const, newPlayerId: 9005, remappedIdentity: 'players/D/Delta_Dog.html' }]]);
+    const plan = planLedgerReinstatement({ rows: a.ledgerRows, remapByIdentity: remap, actorIdByEmail: ACTORS });
+    const drifted = plan.rows.map((r) => (r.id === 14 ? { ...r, previousPlayerIdentity: 'players/E/Echo_Easy.html' } : r));
+    expect(reinstatedLedgerProblems(plan.rows, drifted)).toEqual(['ledger row 14 was not reinstated byte-for-byte']);
+  });
+
+  it('AFLDB-ISSUE-238 capture v3: the reinstatement keeps previous_player_identity and previous_state '
+     + 'VERBATIM and remaps only player_id (from player_identity, P′)', () => {
+    const remap = new Map([...REMAP, ['players/D/Delta_Dog.html', { ok: true as const, newPlayerId: 9005, remappedIdentity: 'players/D/Delta_Dog.html' }]]);
+    const plan = planLedgerReinstatement({ rows: correctedLedger(), remapByIdentity: remap, actorIdByEmail: ACTORS });
+    const row = plan.rows.find((r) => r.id === 14)!;
+    expect(row.playerId).toBe(9005); // P′ on the rebuilt database, never the captured 503
+    expect(row.previousPlayerIdentity).toBe('players/A/Alpha_Able.html'); // never remapped
+    expect(row.previousState).toBe('{"id": 44, "status": "resolved", "player_id": 500}'); // lineage-local audit, verbatim
+    expect(row.supersedesId).toBe(7);
+    const { playerId: _p, adminUserId: _a, adminEmail: _e, adminRole: _r, ...kept } = correctedRow();
+    expect(row).toMatchObject(kept);
+    // P's identity is never looked up for the remap: only player_identity must resolve
+    expect(() => planLedgerReinstatement({
+      rows: correctedLedger(), remapByIdentity: REMAP, actorIdByEmail: ACTORS,
+    })).toThrow(/ledger row 14 \(CD_I1001\): player_identity 'players\/D\/Delta_Dog.html' names no rebuilt player/);
+  });
+
+  it('AFLDB-ISSUE-238 OD-S7-2 (pure): P and P′ must each resolve to exactly one, distinct, live player', () => {
+    const row = correctedRow();
+    const ok = (id: number, identity: string) => ({ ok: true as const, newPlayerId: id, remappedIdentity: identity });
+    const map = (p: AflApiPlayerRemapResult | undefined, pPrime: AflApiPlayerRemapResult | undefined) => {
+      const m = new Map<string, AflApiPlayerRemapResult>();
+      if (p) m.set('players/A/Alpha_Able.html', p);
+      if (pPrime) m.set('players/D/Delta_Dog.html', pPrime);
+      return m;
+    };
+    expect(correctedCaptureIdentityProblems([row], map(ok(500, 'players/A/Alpha_Able.html'), ok(503, 'players/D/Delta_Dog.html')))).toEqual([]);
+    expect(correctedCaptureIdentityProblems([row], map(undefined, ok(503, 'x'))).join('|'))
+      .toMatch(/previous_player_identity 'players\/A\/Alpha_Able.html' names no live player/);
+    expect(correctedCaptureIdentityProblems([row], map({ ok: false, reason: 'unresolvable' }, ok(503, 'x'))).join('|'))
+      .toMatch(/names no live player/);
+    expect(correctedCaptureIdentityProblems([row], map({ ok: false, reason: 'ambiguous' }, ok(503, 'x'))).join('|'))
+      .toMatch(/previous_player_identity .* names more than one live player/);
+    expect(correctedCaptureIdentityProblems([row], map(ok(500, 'x'), { ok: false, reason: 'unresolvable' })).join('|'))
+      .toMatch(/player_identity 'players\/D\/Delta_Dog.html' names no live player/);
+    expect(correctedCaptureIdentityProblems([row], map(ok(503, 'x'), ok(503, 'y'))).join('|'))
+      .toMatch(/resolve to the same live player 503 \(P = P′\)/);
+  });
+
+  it('AFLDB-ISSUE-238: the capture file\'s corrected set and target-human providers (pure), empty with no correction', () => {
+    expect(correctedRebuildReplaySet(ledger())).toEqual({
+      entries: [], targetHumanProviders: new Map([['CD_I1001', 'players/A/Alpha_Able.html']]),
+    });
+    const set = correctedRebuildReplaySet(correctedLedger());
+    expect(set.entries).toEqual([{
+      externalId: 'CD_I1001', adjudicationId: 14, evidenceSha256: 'd'.repeat(64),
+      previousPlayerIdentity: 'players/A/Alpha_Able.html', playerIdentity: 'players/D/Delta_Dog.html',
+    }]);
+    // revoked providers are not human-live; the corrected one is, at P′
+    expect([...set.targetHumanProviders]).toEqual([['CD_I1001', 'players/D/Delta_Dog.html']]);
+  });
+
+  it('AFLDB-ISSUE-238: an importer row for a corrected provider is refused before any statement (capture-file E_rebuild)', async () => {
+    const overlapping = capture(correctedLedger(), [importerRow({ externalId: 'CD_I1001', playerIdentity: 'players/Q/Quite_Other.html', playerId: 777 })]);
+    const { tx, statements } = fakeTx();
+    await expect(reinstateAndReplay(tx, overlapping)).rejects.toThrow(/E_rebuild is not empty in the capture file \(OD-6\).*CD_I1001/);
+    expect(statements).toEqual([]);
   });
 
   it('D13/D6: the importer section is structurally checked (duplicate provider/identity, unsupported method, shape)', () => {
@@ -4694,8 +4881,9 @@ describe('AFL API adjudication survival through the rebuild (AFLDB-ISSUE-235 C6 
     for (const role of roles) expect(isLifecycleRole(role), role).toBe(true);
     for (const role of ['owner', 'Admin', 'SUPER_ADMIN', '', null]) expect(isLifecycleRole(role)).toBe(false);
 
-    // AFLDB-ISSUE-245: version 2 carries the registration section
-    expect(CAPTURE_VERSION).toBe(2);
+    // AFLDB-ISSUE-245: version 2 carries the registration section; AFLDB-ISSUE-238 slice 7:
+    // version 3 carries corrected ledger rows and previous_player_identity
+    expect(CAPTURE_VERSION).toBe(3);
     expect(CAPTURE_FORMAT).toBe('afldb.afl_api_identities.rebuild_capture');
     withTempDir((dir) => {
       writePendingCapture(dir, capture());
@@ -4938,26 +5126,40 @@ describe('AFL API adjudication survival through the rebuild (AFLDB-ISSUE-235 C6 
     expect(insert).toContain('${r.createdAt}::text::timestamptz');
     expect(insert).not.toMatch(/\}::(jsonb|json|timestamptz|timestamp)\b/);
     expect(insert).not.toMatch(/JSON\.stringify|tx\.json|new Date/);
+    // AFLDB-ISSUE-238 capture v3: previous_player_identity is reinstated, verbatim (never remapped)
+    expect(insert).toContain('created_at, previous_player_identity)');
+    expect(insert).toContain('${r.createdAt}::text::timestamptz, ${r.previousPlayerIdentity})');
     // the capture keeps PostgreSQL's own text, with microseconds -- not lowered to fit the driver
     expect(tool).toContain('a.previous_state::text AS "previousState", a.evidence::text AS evidence');
     expect(tool).toContain(`to_char(a.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`);
+    expect(tool).toContain('a.previous_player_identity AS "previousPlayerIdentity"');
     // and the exact field-for-field read-back still runs after the INSERTs, before the replay
+    const d15Call = 'replayAflApiAdjudications(tx, new Set(), { expectedAlreadySatisfied: correctedIds })';
     const inserted = fn.indexOf('INSERT INTO afl_api_identity_adjudications');
     const readBack = fn.indexOf('reinstatedLedgerProblems(');
     expect(readBack).toBeGreaterThan(inserted);
-    expect(fn.indexOf('replayAflApiAdjudications(tx, new Set())')).toBeGreaterThan(readBack);
+    expect(fn.indexOf(d15Call)).toBeGreaterThan(readBack);
     expect(tool).toMatch(/JSON\.stringify\(ledgerTuple\(readBack\[i\]\)\) !== JSON\.stringify\(ledgerTuple\(p\)\)/);
-    // AFLDB-ISSUE-237 Stage 18 order (a)-(e): importer replay, then the ledger INSERTs, then the
-    // D15 replay, then parity + the combined invariant, then the marker clear -- LAST.
+    // AFLDB-ISSUE-237 Stage 18 order (a)-(e), with AFLDB-ISSUE-238's (b′) straddling (c) (C1):
+    // importer replay, the ledger INSERTs and read-back, (b′ write), the D15 replay, (b′ verify),
+    // then parity + the combined invariant, then the marker clear -- LAST.
     const importerReplay = fn.indexOf('replayAflApiImporterRows(tx, capture.importerRows)');
-    const d15Replay = fn.indexOf('replayAflApiAdjudications(tx, new Set())');
+    const bPrimeWrite = fn.indexOf('await correctedReplay.write(tx,');
+    const d15Replay = fn.indexOf(d15Call);
+    const bPrimeVerify = fn.indexOf('await correctedReplay.verify(tx,');
     const parity = fn.indexOf('importerParityProblems(');
     const invariant = fn.indexOf('assertAflApiIdentityInvariant(tx)');
     const markerClear = fn.indexOf('clearRebuildMarker(tx, capture.database)');
     expect(importerReplay).toBeGreaterThan(-1);
     expect(inserted).toBeGreaterThan(importerReplay);
-    expect(d15Replay).toBeGreaterThan(readBack);
-    expect(parity).toBeGreaterThan(d15Replay);
+    expect(bPrimeWrite).toBeGreaterThan(readBack);
+    expect(d15Replay).toBeGreaterThan(bPrimeWrite);
+    expect(bPrimeVerify).toBeGreaterThan(d15Replay);
+    expect(parity).toBeGreaterThan(bPrimeVerify);
+    expect(fn.match(/correctedReplay\.write\(/g)).toHaveLength(1);
+    expect(fn.match(/correctedReplay\.verify\(/g)).toHaveLength(1);
+    // one transaction, fail closed: no catch anywhere in Stage 21's body
+    expect(fn).not.toMatch(/\bcatch\b/);
     expect(invariant).toBeGreaterThan(parity);
     expect(markerClear).toBeGreaterThan(invariant);
     // and the marker clear is the LAST statement before the function returns its report
@@ -5056,10 +5258,12 @@ describe('AFL API adjudication survival through the rebuild (AFLDB-ISSUE-235 C6 
     candidateCount: number; externalUrl: string | null; externalName: string | null; notes: string | null;
   };
   type FakeLedgerRow = {
-    id: number; sourceKey: string; externalId: string; action: 'linked' | 'revoked'; playerId: number;
+    id: number; sourceKey: string; externalId: string; action: 'linked' | 'revoked' | 'corrected'; playerId: number;
     playerIdentity: string; previousState: string | null; evidence: string; evidenceSha256: string;
     surnameDisagreementAcknowledged: boolean; supersedesId: number | null; adminUserId: number;
     note: string; createdAt: string;
+    /** AFLDB-ISSUE-238 capture v3: reinstated verbatim (the INSERT's last parameter). */
+    previousPlayerIdentity: string | null;
   };
   type RebuildStore = {
     marker: string | null;
@@ -5084,6 +5288,8 @@ describe('AFL API adjudication survival through the rebuild (AFLDB-ISSUE-235 C6 
         { externalId: 'players/A/Alpha_Able.html', playerId: 9001 },
         { externalId: 'players/B/Bravo_Baker.html', playerId: 9002 },
         { externalId: 'players/C/Charlie_Cooper.html', playerId: 9003 },
+        // AFLDB-ISSUE-238: P′ of the corrected fixture row (Alpha, P, is 9001 above)
+        { externalId: 'players/D/Delta_Dog.html', playerId: 9005 },
       ],
     };
   }
@@ -5116,10 +5322,8 @@ describe('AFL API adjudication survival through the rebuild (AFLDB-ISSUE-235 C6 
             supersedesId: r.supersedesId === null ? null : String(r.supersedesId),
             adminUserId: r.adminUserId, adminEmail: actor.email, adminRole: actor.role,
             note: r.note, createdAt: r.createdAt,
-            // AFLDB-ISSUE-238 (DD-10): readLedger's superset column. Stage 18 (this suite) never
-            // reinstates a corrected row (the pinned v2 INSERT above has no such column), so this
-            // is always null -- but the DD-10 narrow check needs the key PRESENT, not `undefined`.
-            previousPlayerIdentity: null,
+            // AFLDB-ISSUE-238 capture v3: read back exactly as reinstated.
+            previousPlayerIdentity: r.previousPlayerIdentity,
           };
         });
       }
@@ -5127,10 +5331,26 @@ describe('AFL API adjudication survival through the rebuild (AFLDB-ISSUE-235 C6 
         return [{ total: store.ledgerRows.length }];
       }
       if (text === "SELECT id FROM sources WHERE key = 'afl_api'") return [{ id: 1 }];
+      if (text === 'SELECT id FROM sources WHERE key = $1' && params[0] === 'afl_api') return [{ id: 1 }];
       if (text.includes("FROM afl_api_identity_adjudications WHERE source_key = 'afl_api'")) {
         return [...store.ledgerRows].sort((a, b) => a.id - b.id).map((r) => ({
           id: r.id, externalId: r.externalId, action: r.action, playerId: r.playerId,
           playerIdentity: r.playerIdentity, supersedesId: r.supersedesId,
+          previousPlayerIdentity: r.previousPlayerIdentity, evidenceSha256: r.evidenceSha256,
+        }));
+      }
+      // AFLDB-ISSUE-238 Stage 22 SAT-1 (the Q2 reader's per-provider reads, correct_afl_api_identity.ts)
+      if (text.startsWith('SELECT id::int AS id, action, player_id AS "playerId"')) {
+        const providerId = params[1] as string;
+        return [...store.ledgerRows].filter((r) => r.externalId === providerId).sort((a, b) => a.id - b.id).map((r) => ({
+          id: r.id, action: r.action, playerId: r.playerId, playerIdentity: r.playerIdentity, supersedesId: r.supersedesId,
+          previousPlayerIdentity: r.previousPlayerIdentity, evidenceSha256: r.evidenceSha256,
+        }));
+      }
+      if (text.startsWith('SELECT ei.id, ei.status::text AS status') && !text.includes('external_url')) {
+        const providerId = params[1] as string;
+        return store.afApiRows.map((r, i) => ({ r, id: i + 1 })).filter(({ r }) => r.externalId === providerId).map(({ r, id }) => ({
+          id, status: r.status, playerId: r.playerId, candidateCount: r.candidateCount, matchMethod: r.matchMethod,
         }));
       }
       if (text.includes('AS "playerId" FROM external_identities WHERE source_id')) {
@@ -5168,12 +5388,14 @@ describe('AFL API adjudication survival through the rebuild (AFLDB-ISSUE-235 C6 
       }
       if (text.startsWith('INSERT INTO afl_api_identity_adjudications')) {
         const [id, sourceKey, externalId, action, playerId, playerIdentity, previousState, evidence,
-          evidenceSha256, surnameDisagreementAcknowledged, supersedesId, adminUserId, note, createdAt] =
-          params as [number, string, string, 'linked' | 'revoked', number, string, string | null, string,
-            string, boolean, number | null, number, string, string];
+          evidenceSha256, surnameDisagreementAcknowledged, supersedesId, adminUserId, note, createdAt,
+          previousPlayerIdentity] =
+          params as [number, string, string, 'linked' | 'revoked' | 'corrected', number, string, string | null, string,
+            string, boolean, number | null, number, string, string, string | null];
         store.ledgerRows.push({
           id, sourceKey, externalId, action, playerId, playerIdentity, previousState, evidence,
           evidenceSha256, surnameDisagreementAcknowledged, supersedesId, adminUserId, note, createdAt,
+          previousPlayerIdentity,
         });
         return [];
       }
@@ -5297,6 +5519,303 @@ describe('AFL API adjudication survival through the rebuild (AFLDB-ISSUE-235 C6 
     // the error propagates: no catch exists between the try and its finally, so a rejected
     // sql.begin() is never swallowed -- it reaches main()'s own top-level .catch instead
     expect(runReinstateBody.slice(runReinstateBody.indexOf('try {'), finallyIdx)).not.toMatch(/catch/);
+  });
+
+  // -------------------------------------------------------------------------
+  // AFLDB-ISSUE-238 slice 7 — Stage 21 (b′) and Stage 22 SAT-1, DB-free. The whole Stage 21 body
+  // runs for real against the stateful store; only the two (b′) halves are stood in for (their
+  // CPC/Q2 SQL is the slice 10/11 rehearsal's), so the ORDER and the failure semantics are proven
+  // here, and the halves' own contract in tests/correct-afl-api-identity-cli.test.ts.
+  // -------------------------------------------------------------------------
+
+  const correctedCapture = () => capture(correctedLedger());
+  const markedStore = (c: CombinedCapture): RebuildStore => createRebuildStore({
+    format: CAPTURE_FORMAT, version: CAPTURE_VERSION, capturedAt: '2026-09-23T09:00:00.000Z',
+    payloadSha256: c.payloadSha256, fileSha256: 'e'.repeat(64),
+  });
+
+  /** Stands in for the (b′) halves: records WHEN each ran (the statement index) and what it was
+   * handed; the write INSERTs the D15-shape `resolved` P′ row (Delta, 9005) exactly as the real one. */
+  function spyReplay(options: { insert?: boolean; failWrite?: boolean; failVerify?: boolean } = {}) {
+    const calls: { half: 'write' | 'verify'; at: number; entries: readonly { externalId: string }[] }[] = [];
+    let seen: { length: number } = [];
+    const replay: CorrectedRebuildReplay = {
+      write: async (tx, input) => {
+        calls.push({ half: 'write', at: seen.length, entries: input.entries });
+        if (input.entries.length === 0) return null;
+        if (options.failWrite) throw new AdjudicationRebuildRefused('(b′ write) STOP: CPC class 1');
+        if (options.insert !== false) {
+          for (const e of input.entries) {
+            await tx`
+              INSERT INTO external_identities
+                    (source_id, external_id, player_id, status, candidate_count, match_method, notes)
+              VALUES (${1}, ${e.externalId}, ${9005}, 'resolved', 0, ${AFL_API_ADMIN_MATCH_METHOD}, ${REBUILD_REPLAY_IDENTITY_NOTE})
+            `;
+          }
+        }
+        return {
+          providers: input.entries.map((e) => ({ externalId: e.externalId, adjudicationId: e.adjudicationId, pPrimeId: 9005, fingerprint: 'f'.repeat(64) })),
+          ledger: { rowCount: 4, sha256: 'a'.repeat(64) },
+        };
+      },
+      verify: async (_tx, input) => {
+        calls.push({ half: 'verify', at: seen.length, entries: input.entries });
+        if (options.failVerify) throw new AdjudicationRebuildRefused('(b′ verify) STOP: SAT-1 identity_contradicts');
+        return input.entries.length === 0 ? [] : ['CD_I1001: CORRECTION SATISFACTION: SAT-1..SAT-5 PASS'];
+      },
+    };
+    return { replay, calls, bind: (statements: { length: number }) => { seen = statements; } };
+  }
+
+  it('AFLDB-ISSUE-238 Stage 21 (DB-free, full execution): (b) → (b′ write) → (c) D15 → (b′ verify) → (d) → (e) '
+     + 'in ONE transaction; the corrected ledger row is reinstated verbatim and D15 reports it ALREADY_SATISFIED', async () => {
+    const c = correctedCapture();
+    const store = markedStore(c);
+    const { tx, statements } = statefulTx(store);
+    const spy = spyReplay();
+    spy.bind(statements);
+    const report = await reinstateAndReplay(tx, c, spy.replay);
+
+    // (b): the corrected row verbatim; only player_id follows P′'s identity on the rebuilt database
+    expect(store.ledgerRows.find((r) => r.id === 14)).toMatchObject({
+      action: 'corrected', playerId: 9005, playerIdentity: 'players/D/Delta_Dog.html', supersedesId: 7,
+      previousPlayerIdentity: 'players/A/Alpha_Able.html', previousState: '{"id": 44, "status": "resolved", "player_id": 500}',
+    });
+    // (c): D15 wrote nothing for the corrected provider and confirmed it, exactly
+    expect(report.replay).toEqual({ inserted: 0, noops: 1, alreadySatisfied: 1, stops: [], supersedes: [] });
+    expect(report.corrected).toEqual({ replayed: ['CD_I1001'], reports: ['CD_I1001: CORRECTION SATISFACTION: SAT-1..SAT-5 PASS'] });
+    expect(store.afApiRows.filter((r) => r.status === 'resolved').map((r) => [r.externalId, r.playerId])).toEqual([['CD_I1001', 9005]]);
+    expect(store.marker).toBeNull();
+
+    // the order, by statement index
+    const texts = statements.map((s) => s.text);
+    expect(spy.calls.map((x) => x.half)).toEqual(['write', 'verify']);
+    const [write, verify] = spy.calls;
+    const lastLedgerWrite = texts.reduce((max, t, i) => (t.startsWith('INSERT INTO afl_api_identity_adjudications') ? i : max), -1);
+    const readBack = texts.reduce((max, t, i) => (t.includes('JOIN auth_users u') ? i : max), -1);
+    const identityInsert = texts.findIndex((t) => t.startsWith('INSERT INTO external_identities') && t.includes("'resolved', 0"));
+    const d15 = texts.findIndex((t, i) => i > identityInsert && t.includes("FROM afl_api_identity_adjudications WHERE source_key = 'afl_api'"));
+    const parityAfterVerify = texts.findIndex((t, i) => i >= verify.at && t.includes('external_url AS "externalUrl" FROM external_identities'));
+    expect(lastLedgerWrite).toBeGreaterThan(-1);
+    expect(readBack).toBeGreaterThan(lastLedgerWrite);
+    expect(write.at).toBeGreaterThan(readBack);        // (b′ write) after (b) and its read-back …
+    expect(identityInsert).toBe(write.at);             // … its INSERT is the next statement …
+    expect(d15).toBeGreaterThan(identityInsert);       // … then D15 (c) …
+    expect(verify.at).toBeGreaterThan(d15);            // … (b′ verify) only after D15 …
+    expect(parityAfterVerify).toBeGreaterThanOrEqual(verify.at); // … then (d) …
+    expect(texts.at(-1)).toBe('COMMENT ON DATABASE "afldb_test" IS NULL'); // … and (e) last
+    // (b′) was handed exactly the capture's corrected set
+    expect(write.entries).toEqual(correctedRebuildReplaySet(c.ledgerRows).entries);
+    expect(verify.entries).toEqual(write.entries);
+  });
+
+  it('AFLDB-ISSUE-238 zero-corrected parity: the real (b′) halves issue NO SQL, so Stage 21 runs the '
+     + 'exact statement sequence it would with no (b′) at all, and reports the pre-ISSUE-238 shape', async () => {
+    const c = capture();
+    const real = statefulTx(markedStore(c));
+    const report = await reinstateAndReplay(real.tx, c); // CORRECTED_REBUILD_REPLAY
+    const spy = spyReplay();
+    const stood = statefulTx(markedStore(c));
+    spy.bind(stood.statements);
+    const spied = await reinstateAndReplay(stood.tx, c, spy.replay);
+    expect(real.statements).toEqual(stood.statements);
+    expect(report).toEqual(spied);
+    expect(report).not.toHaveProperty('corrected');
+    expect(report.replay).not.toHaveProperty('alreadySatisfied');
+    expect(real.statements.map((s) => s.text).join('\n')).not.toMatch(/LOCK TABLE|pg_advisory|current_database\(\) AS database/);
+    expect(spy.calls.map((x) => [x.half, x.entries.length])).toEqual([['write', 0], ['verify', 0]]);
+    // the real halves, called directly with nothing to replay, issue nothing at all
+    const idle = fakeTx(() => { throw new Error('no SQL expected with zero corrected providers'); });
+    expect(await runRebuildCorrectedReplayWrite(idle.tx, { expectDatabase: 'afldb_test', entries: [], targetHumanProviders: new Map() })).toBeNull();
+    expect(await verifyRebuildCorrectedReplay(idle.tx, { expectDatabase: 'afldb_test', entries: [], written: null })).toEqual([]);
+    expect(idle.statements).toEqual([]);
+    expect(CORRECTED_REBUILD_REPLAY.write).toBe(runRebuildCorrectedReplayWrite);
+    expect(CORRECTED_REBUILD_REPLAY.verify).toBe(verifyRebuildCorrectedReplay);
+  });
+
+  it('AFLDB-ISSUE-238: a (b′ write) or (b′ verify) failure aborts Stage 21 before the marker clear; the '
+     + 'rollback restores the marker exactly', async () => {
+    for (const fail of ['write', 'verify'] as const) {
+      const c = correctedCapture();
+      const store = markedStore(c);
+      const before = structuredClone(store);
+      const { tx, statements } = statefulTx(store);
+      const spy = spyReplay(fail === 'write' ? { failWrite: true } : { failVerify: true });
+      spy.bind(statements);
+      await expect(reinstateAndReplay(tx, c, spy.replay), fail)
+        .rejects.toThrow(fail === 'write' ? /\(b′ write\) STOP/ : /\(b′ verify\) STOP/);
+      expect(store.marker, fail).toBe(before.marker);
+      expect(statements.some((s) => s.text.startsWith('COMMENT ON DATABASE')), fail).toBe(false);
+      if (fail === 'write') {
+        // D15 never ran, and the verify half was never reached
+        expect(statements.some((s) => s.text.includes("FROM afl_api_identity_adjudications WHERE source_key = 'afl_api'"))).toBe(false);
+        expect(spy.calls.map((x) => x.half)).toEqual(['write']);
+      }
+      Object.assign(store, structuredClone(before)); // the transaction's rollback
+      expect(await readRebuildMarker(statefulTx(store).tx, 'afldb_test'), fail).not.toBeNull();
+    }
+  });
+
+  it('AFLDB-ISSUE-238: D15 returns ALREADY_SATISFIED for exactly the corrected set — a (b′) that wrote '
+     + 'nothing STOPs (D15 never creates corrected authority), and a mismatched expected set refuses', async () => {
+    const c = correctedCapture();
+    const store = markedStore(c);
+    const { tx, statements } = statefulTx(store);
+    const spy = spyReplay({ insert: false });
+    spy.bind(statements);
+    await expect(reinstateAndReplay(tx, c, spy.replay)).rejects.toThrow(
+      /CD_I1001 \(the ledger records a correction for this provider, but no resolved external_identities row exists for it/);
+    expect(spy.calls.map((x) => x.half)).toEqual(['write']);
+    expect(store.marker).not.toBeNull();
+
+    const done = markedStore(c);
+    const run = statefulTx(done);
+    const ok = spyReplay();
+    ok.bind(run.statements);
+    await reinstateAndReplay(run.tx, c, ok.replay);
+    await expect(replayAflApiAdjudications(statefulTx(done).tx, new Set(), { expectedAlreadySatisfied: new Set() }))
+      .rejects.toThrow(/ALREADY_SATISFIED set did not equal C_promotion exactly.*extra: CD_I1001/);
+    await expect(replayAflApiAdjudications(statefulTx(done).tx, new Set(), { expectedAlreadySatisfied: new Set(['CD_I1001', 'CD_I1002']) }))
+      .rejects.toThrow(/missing: CD_I1002/);
+    expect(await replayAflApiAdjudications(statefulTx(done).tx, new Set(), { expectedAlreadySatisfied: new Set(['CD_I1001']) }))
+      .toMatchObject({ inserted: 0, alreadySatisfied: 1, stops: [], supersedes: [] });
+  });
+
+  it('AFLDB-ISSUE-238 Stage 22 (DB-free): SAT-1 PASSes for the corrected provider; a wrong or missing '
+     + 'resolved row, or an orphan, FAILs; a remaining marker still FAILs; zero-corrected never runs SAT-1', async () => {
+    const c = correctedCapture();
+    const store = markedStore(c);
+    const s21 = statefulTx(store);
+    const spy = spyReplay();
+    spy.bind(s21.statements);
+    await reinstateAndReplay(s21.tx, c, spy.replay);
+    // the REAL SAT-1 (checkRebuildCorrectedSat1 over the Q2 reader) against the reinstated store
+    expect(await verifyBijectionStage(statefulTx(store).tx, 'afldb_test')).toEqual(['CD_I1001']);
+
+    const wrong = structuredClone(store);
+    wrong.afApiRows = wrong.afApiRows.map((r) => (r.externalId === 'CD_I1001' ? { ...r, playerId: 9002 } : r));
+    await expect(verifyBijectionStage(statefulTx(wrong).tx, 'afldb_test')).rejects.toThrow(
+      /SAT-1 failed.*CD_I1001: identity_contradicts: CD_I1001's external_identities row is not resolved\/afl_api_admin_adjudication at P′ \(player 9005\)/s);
+
+    // CD_I1001 correctly resolved at P′, but the corrected ledger row itself names another player (Q2's A.player_id conjunct)
+    const ledgerElsewhere = structuredClone(store);
+    ledgerElsewhere.ledgerRows = ledgerElsewhere.ledgerRows.map((r) => (
+      r.externalId === 'CD_I1001' && r.action === 'corrected' ? { ...r, playerId: 9002 } : r));
+    expect(ledgerElsewhere.afApiRows.find((r) => r.externalId === 'CD_I1001')).toMatchObject({ status: 'resolved', playerId: 9005 });
+    await expect(verifyBijectionStage(statefulTx(ledgerElsewhere).tx, 'afldb_test')).rejects.toThrow(
+      /SAT-1 failed.*CD_I1001: identity_contradicts: .*at P′ \(player 9005\): resolved\/afl_api_admin_adjudication at player 9005; adjudication \d+ names player 9002/s);
+
+    const missing = structuredClone(store);
+    missing.afApiRows = missing.afApiRows.filter((r) => r.externalId !== 'CD_I1001');
+    await expect(verifyBijectionStage(statefulTx(missing).tx, 'afldb_test')).rejects.toThrow(/ledger_without_row.*CD_I1001/);
+
+    const orphan = structuredClone(store);
+    orphan.afApiRows.push({
+      externalId: 'CD_I1009', playerId: 9003, status: 'resolved', matchMethod: AFL_API_ADMIN_MATCH_METHOD,
+      candidateCount: 0, externalUrl: null, externalName: null, notes: null,
+    });
+    await expect(verifyBijectionStage(statefulTx(orphan).tx, 'afldb_test')).rejects.toThrow(/row_without_ledger.*CD_I1009/);
+
+    const stillMarked = structuredClone(store);
+    stillMarked.marker = JSON.stringify({ format: CAPTURE_FORMAT, version: CAPTURE_VERSION, capturedAt: 'x', payloadSha256: 'f'.repeat(64), fileSha256: 'f'.repeat(64) });
+    await expect(verifyBijectionStage(statefulTx(stillMarked).tx, 'afldb_test')).rejects.toThrow(/rebuild marker is still present/);
+
+    // zero corrected: exactly the pre-ISSUE-238 stage (invariant + no marker); SAT-1 never called
+    const plain = markedStore(capture());
+    await reinstateAndReplay(statefulTx(plain).tx, capture());
+    let sat1Calls = 0;
+    expect(await verifyBijectionStage(statefulTx(plain).tx, 'afldb_test', async () => { sat1Calls += 1; return []; })).toEqual([]);
+    expect(sat1Calls).toBe(0);
+  });
+
+  describe('AFLDB-ISSUE-238 rebuild REPLAY gate (§8.3 step 4, §9.2 (b′)): CPC class 3 exactly, an empty closure, the running planner', () => {
+    const none = { player_match_stats: 0, brownlow_round_votes: 0 };
+    const prediction = (over: Partial<NonNullable<CpcInput['prediction']>> = {}): NonNullable<CpcInput['prediction']> => ({
+      stops: [], moveOrDeleteRowCount: 0, fingerprint: 'f'.repeat(64), plannerVersion: PLANNER_VERSION,
+      moved: none, deleted: none, ...over,
+    });
+    const input = (over: Partial<CpcInput> = {}): CpcInput => ({
+      externalId: 'CD_I1001', adjudicationId: 14,
+      pc: { kind: 'unique', playerId: 9001 }, pPrime: { kind: 'unique', playerId: 9005 }, providerRow: null,
+      collisions: { candidateImporterProvidersAtPPrime: [], targetHumanProvidersRemappingToPPrime: [] },
+      pcStillImplicated: { rowsImplicatingCdIAtPc: 0, unprovableCdILineage: false },
+      prediction: prediction(), ...over,
+    });
+    const importerRowAt = (playerId: number) => ({
+      id: 5, playerId, status: 'unique', matchMethod: 'afl_api_stat_vector_bootstrap', importerOwned: true,
+    });
+    const gate = (i: CpcInput, identityRow: { id: number; status: string; playerId: number | null; candidateCount: number; matchMethod: string | null } | null = null) =>
+      rebuildReplayGateProblems({ result: classifyCorrectedCandidate(i), predicted: i.prediction, identityRow });
+
+    it('class 3 (no provider row) with an empty closure and no STOP: PASS', () => {
+      expect(classifyCorrectedCandidate(input())).toMatchObject({ outcome: 'PASS', candidateClass: 3, predictedIdentityAction: 'insert' });
+      expect(gate(input())).toEqual([]);
+    });
+
+    it('class 1 (importer row at P) and class 2 (importer row at P′) STOP: the rebuild never updates in place', () => {
+      expect(gate(input({ providerRow: importerRowAt(9001) }), { id: 5, status: 'unique', playerId: 9001, candidateCount: 1, matchMethod: 'afl_api_stat_vector_bootstrap' }).join('|'))
+        .toMatch(/class 1: rebuild REPLAY accepts CPC class 3.*identity action update_in_place.*already exists/s);
+      expect(gate(input({ providerRow: importerRowAt(9005) })).join('|'))
+        .toMatch(/class 2: rebuild REPLAY accepts CPC class 3.*identity action upgrade_in_place/s);
+    });
+
+    it('class 4 (DISAGREE), class 5 (COLLISION), UNEVALUABLE and a PREDICT STOP each STOP, naming the CPC code', () => {
+      expect(gate(input({ providerRow: importerRowAt(9002) }))[0]).toMatch(/^CPC FAIL DISAGREE \(class 4\)/);
+      expect(gate(input({ collisions: { candidateImporterProvidersAtPPrime: ['CD_I2001'], targetHumanProvidersRemappingToPPrime: [] } }))[0])
+        .toMatch(/^CPC FAIL COLLISION \(class 5\)/);
+      expect(gate(input({ collisions: { candidateImporterProvidersAtPPrime: [], targetHumanProvidersRemappingToPPrime: ['CD_I1002'] } }))[0])
+        .toMatch(/^CPC FAIL COLLISION \(class 5\)/);
+      expect(gate(input({ pc: { kind: 'unevaluable', reason: 'ambiguous' } }))[0]).toMatch(/^CPC FAIL UNEVALUABLE: Pc: ambiguous/);
+      expect(gate(input({ pPrime: { kind: 'unevaluable', reason: 'manual_admin_token' } }))[0]).toMatch(/^CPC FAIL UNEVALUABLE/);
+      expect(gate(input({ prediction: prediction({ stops: [{ code: 'no_application_evidence' }] }) }))[0])
+        .toMatch(/^CPC FAIL PREDICT_STOP \(class 6\): no_application_evidence/);
+      expect(gate(input({ prediction: null }))[0]).toMatch(/^CPC FAIL PREDICT_STOP/);
+    });
+
+    it('any MOVE or DELETE STOPs: Pc still implicated (class 3 FAIL), or a non-empty closure reaching the gate', () => {
+      expect(gate(input({ pcStillImplicated: { rowsImplicatingCdIAtPc: 2, unprovableCdILineage: false } }))[0])
+        .toMatch(/^CPC FAIL PC_STILL_IMPLICATED \(class 3\)/);
+      const moved = gate(input({ prediction: prediction({ moveOrDeleteRowCount: 1, moved: { player_match_stats: 1, brownlow_round_votes: 0 } }) })).join('|');
+      expect(moved).toMatch(/predicts a MOVE or DELETE/);
+      expect(moved).toMatch(/closure holds 1 MOVE\/DELETE row\(s\)/);
+      const deleted = gate(input({ prediction: prediction({ moveOrDeleteRowCount: 1, deleted: { player_match_stats: 0, brownlow_round_votes: 1 } }) })).join('|');
+      expect(deleted).toMatch(/closure holds 1 MOVE\/DELETE row\(s\)/);
+    });
+
+    it('a plannerVersion other than the running one, or an existing identity row, STOPs', () => {
+      const result = classifyCorrectedCandidate(input());
+      expect(rebuildReplayGateProblems({ result, predicted: prediction(), identityRow: null }, PLANNER_VERSION + 1).join('|'))
+        .toMatch(new RegExp(`classification plannerVersion ${PLANNER_VERSION} != running plannerVersion ${PLANNER_VERSION + 1}`));
+      expect(gate(input({ prediction: prediction({ plannerVersion: PLANNER_VERSION + 1 }) }))[0]).toMatch(/^CPC FAIL PREDICT_STOP/);
+      expect(gate(input(), { id: 8, status: 'resolved', playerId: 9005, candidateCount: 0, matchMethod: AFL_API_ADMIN_MATCH_METHOD }).join('|'))
+        .toMatch(/external_identities row \(#8\) already exists/);
+      expect(rebuildReplayGateProblems({ result, predicted: null, identityRow: null }).join('|')).toMatch(/no closure was planned/);
+    });
+  });
+
+  it('AFLDB-ISSUE-238 (b′) source contract: identity-only allow-list, no ledger/batch/canonical/finding write, '
+     + 'no projection move or recompute, no catch; Stage 21 carries the C1 ordering reason', () => {
+    const correct = readFileSync(join(root, 'tools', 'migration', 'correct_afl_api_identity.ts'), 'utf8');
+    const section = correct.slice(correct.indexOf('REBUILD_REPLAY_SECTION_BEGIN'), correct.indexOf('REBUILD_REPLAY_SECTION_END'));
+    expect(section.length).toBeGreaterThan(3000);
+    expect(section).not.toMatch(/INSERT\s+INTO\s+afl_api_identity_adjudications|UPDATE\s+afl_api_identity_adjudications/);
+    expect(section).not.toMatch(/INSERT\s+INTO\s+(import_batches|canonical_applications)|UPDATE\s+(import_batches|data_issues)/);
+    expect(section).not.toMatch(/openCorrectionBatch\(|bindCorrectionBatch\(|finaliseCorrectionBatch\(|applyClosureMutations\(/);
+    expect(section).not.toMatch(/moveProviderProjections\(|recomputeAfterClosureMutations\(|resolveAdjudicatedContradictions\(/);
+    expect(section).not.toMatch(/\bcatch\b|proveSession\(|AFLDB_IMPORT_DATABASE_URL|CANDIDATE_DSN|resolveImportDsn/);
+    // its ONLY write is the D15-shape identity INSERT, through the shared writer
+    expect(section.match(/writeReplayedIdentity\(/g)).toHaveLength(1);
+    expect(section).toContain("writeReplayedIdentity(tx, 'insert', classified.identityRow, entry.externalId, classified.pPrimeId, REBUILD_REPLAY_IDENTITY_NOTE)");
+    expect(section).toContain("authorityMode: 'ADJUDICATION', lockRows: true");
+    expect(section).toContain('rebuildReplayGateProblems(classified)');
+    expect(section).toContain('takeIdentityTableLock(tx, LOCK_TIMEOUT)');
+    // (b′ verify) runs the shared post-write Q2 and never opens a batch
+    expect(section).toContain('assertPostWriteSatisfaction(tx, entry.externalId, entry.adjudicationId, null)');
+    expect(section).toContain('countBatchesBoundTo(tx, entry.adjudicationId)');
+    // the rebuild tool documents C1 where the order lives
+    const tool = readFileSync(join(root, 'tools', 'migration', 'rebuild_afl_api_adjudications.ts'), 'utf8');
+    expect(tool).toContain('WHY (b′) STRADDLES (c) (AFLDB-ISSUE-238 C1, binding — do not reorder)');
+    expect(tool).not.toContain('requireCapturableLedgerRows');
   });
 
   // -------------------------------------------------------------------------
@@ -5828,12 +6347,11 @@ describe('AFLDB-ISSUE-235 I18 fixture harness (DB-free)', () => {
     const dir = mkdtempSync(join(tmpdir(), 'i18-capture-'));
     try {
       const b = baseline();
-      // AFLDB-ISSUE-238: RehearsalLedgerRow.action is now the 3-member AflApiLedgerNetAction
-      // (type-widened elsewhere, never corrected in THIS rehearsal fixture shape) -- narrowed
-      // back to the pinned v2 two-action CapturedLedgerRow here.
+      // AFLDB-ISSUE-238: the I18 fixture is never corrected; capture v3 carries its
+      // previous_player_identity as an explicit null.
       const rows: CapturedLedgerRow[] = b.ledger.map((r) => ({
-        id: r.id, sourceKey: 'afl_api', externalId: r.externalId, action: r.action as 'linked' | 'revoked', playerId: r.playerId,
-        playerIdentity: r.playerIdentity, previousState: r.previousState, evidence: r.evidence,
+        id: r.id, sourceKey: 'afl_api', externalId: r.externalId, action: r.action, playerId: r.playerId,
+        playerIdentity: r.playerIdentity, previousPlayerIdentity: null, previousState: r.previousState, evidence: r.evidence,
         evidenceSha256: r.evidenceSha256, surnameDisagreementAcknowledged: r.surnameAck, supersedesId: r.supersedesId,
         adminUserId: r.adminUserId, adminEmail: r.adminEmail, adminRole: 'super_admin', note: r.note, createdAt: r.createdAt,
       }));
@@ -7501,7 +8019,7 @@ describe('AFLDB-ISSUE-237 bootstrap — Stage 2 capture before the adjudication 
   const LEDGER_TABLE = 'afl_api_identity_adjudications';
   const ledgerRow: CapturedLedgerRow = {
     id: 7, sourceKey: 'afl_api', externalId: 'CD_I1001', action: 'linked', playerId: 500,
-    playerIdentity: 'players/A/Alpha_Able.html', previousState: null, evidence: '{"b": true}',
+    playerIdentity: 'players/A/Alpha_Able.html', previousPlayerIdentity: null, previousState: null, evidence: '{"b": true}',
     evidenceSha256: 'a'.repeat(64), surnameDisagreementAcknowledged: false, supersedesId: null,
     adminUserId: 3, adminEmail: 'Admin.One@Example.org', adminRole: 'super_admin',
     note: 'Linked on club list and DOB evidence.', createdAt: '2026-09-23T01:02:03.123456Z',
@@ -7517,10 +8035,9 @@ describe('AFLDB-ISSUE-237 bootstrap — Stage 2 capture before the adjudication 
   const relationMissing = () => Object.assign(
     new Error(`relation "${LEDGER_TABLE}" does not exist`), { code: '42P01' });
 
-  /** AFLDB-ISSUE-238 (DD-10): widens `CapturedLedgerRow`'s pinned two-action shape only for this
-   * fixture set, so a single describe block can model BOTH the ordinary v2 ledger and a live
-   * `corrected` row the DD-10 refusal must catch before any other before-destruction check. */
-  type Stage2LedgerRow = Omit<CapturedLedgerRow, 'action'> & { action: string; previousPlayerIdentity?: string | null };
+  /** AFLDB-ISSUE-238 capture v3: the live ledger row as Stage 2 reads it (a `corrected` row and
+   * `previous_player_identity` included), with `action` widened so a malformed value can be modelled. */
+  type Stage2LedgerRow = Omit<CapturedLedgerRow, 'action'> & { action: string };
 
   type Stage2Db = {
     ledgerTable: boolean;
@@ -7531,6 +8048,8 @@ describe('AFLDB-ISSUE-237 bootstrap — Stage 2 capture before the adjudication 
     failOn?: Record<string, () => Error>;
     /** The forward-lookup rows (default: one Charlie_Cooper path per `unique` census row). */
     forwardRows?: { playerId: number; externalId: string; sourceKey: string }[];
+    /** AFLDB-ISSUE-238 OD-S7-2: the live players each stable identity names (default: player 500). */
+    playersByIdentity?: Record<string, number[]>;
   };
 
   /** Answers each Stage 2 statement the way the modelled database would. Any statement that
@@ -7539,7 +8058,7 @@ describe('AFLDB-ISSUE-237 bootstrap — Stage 2 capture before the adjudication 
     const statements: string[] = [];
     const census = db.census ?? [];
     const ledgerRows = db.ledgerRows ?? [];
-    const respond = (text: string): unknown[] => {
+    const respond = (text: string, params: unknown[]): unknown[] => {
       for (const [needle, error] of Object.entries(db.failOn ?? {})) {
         if (text.includes(needle)) throw error();
       }
@@ -7550,12 +8069,8 @@ describe('AFLDB-ISSUE-237 bootstrap — Stage 2 capture before the adjudication 
       if (text.includes("to_regclass('public.sources')")) return [{ sources: true, identities: true }];
       if (text.includes("SELECT id FROM sources WHERE key = 'afl_api'")) return [{ id: 9 }];
       if (text.includes(`FROM ${LEDGER_TABLE} a`)) {
-        // AFLDB-ISSUE-238 (DD-10): readLedger's superset column; defaults to null so every
-        // existing linked/revoked fixture (no `previousPlayerIdentity` key at all) still reads
-        // as the v2 shape rather than `undefined` (which the DD-10 refusal would misread as set).
         return ledgerRows.map((r) => ({
           ...r, id: String(r.id), supersedesId: r.supersedesId === null ? null : String(r.supersedesId),
-          previousPlayerIdentity: r.previousPlayerIdentity ?? null,
         }));
       }
       if (text.includes(`count(*)::int AS total FROM ${LEDGER_TABLE}`)) return [{ total: db.ledgerTotal ?? ledgerRows.length }];
@@ -7563,6 +8078,7 @@ describe('AFLDB-ISSUE-237 bootstrap — Stage 2 capture before the adjudication 
         return ledgerRows.map((r) => ({
           id: r.id, externalId: r.externalId, action: r.action, playerId: r.playerId,
           playerIdentity: r.playerIdentity, supersedesId: r.supersedesId,
+          previousPlayerIdentity: r.previousPlayerIdentity, evidenceSha256: r.evidenceSha256,
         }));
       }
       if (text.includes("AND status = 'resolved'")) {
@@ -7578,14 +8094,17 @@ describe('AFLDB-ISSUE-237 bootstrap — Stage 2 capture before the adjudication 
       if (text.includes('external_name AS "externalName"')) {
         return census.map((r) => ({ externalId: r.externalId, externalName: 'C Cooper', notes: null }));
       }
-      if (text.includes('SELECT DISTINCT ei.player_id')) return [{ playerId: 500 }];
+      if (text.includes('SELECT DISTINCT ei.player_id')) {
+        const identity = params[0] as string;
+        const players = db.playersByIdentity?.[identity] ?? (db.playersByIdentity ? [] : [500]);
+        return players.map((playerId) => ({ playerId }));
+      }
       throw new Error(`unmodelled statement: ${text}`);
     };
     const tx = (strings: unknown, ...params: unknown[]) => {
       const text = (strings as string[]).reduce((acc, s, i) => `${acc}${i ? `$${i}` : ''}${s}`, '').replace(/\s+/g, ' ').trim();
       statements.push(text);
-      void params;
-      return new Promise((resolve) => resolve(respond(text)));
+      return new Promise((resolve) => resolve(respond(text, params)));
     };
     Object.assign(tx, { array: (values: unknown[]) => values });
     return { tx: tx as unknown as TransactionSql, statements };
@@ -7748,28 +8267,90 @@ describe('AFLDB-ISSUE-237 bootstrap — Stage 2 capture before the adjudication 
     });
   });
 
-  it('AFLDB-ISSUE-238 (DD-10/R238-S4-01): a live corrected-action row (or a live row carrying '
-     + 'previous_player_identity at all) refuses the v2 capture immediately, before any other '
-     + 'before-destruction check runs, naming capture v3 (slice 7)', async () => {
-    await withDir(async (dir) => {
-      const corrected: Stage2LedgerRow = {
-        ...ledgerRow, id: 8, action: 'corrected', previousPlayerIdentity: 'players/Z/Zed_Zeta.html',
-      };
-      const db = stage2Tx({ ledgerTable: true, ledgerRows: [ledgerRow, corrected], census: [adminResolved, importerCensus] });
-      await expect(observe(db.tx, dir)).rejects.toThrow(
-        /carry action 'corrected' or a previous_player_identity.*capture v3.*slice 7.*Nothing has been destroyed/s);
-      // refused before the importer/census section (and everything after it) is ever reached
-      expect(db.statements.some((s) => s.includes("to_regclass('public.sources')"))).toBe(false);
-      expect(readdirSync(dir)).toEqual([]);
-    });
+  // AFLDB-ISSUE-238 capture v3: CD_I1001 linked to Alpha (P, player 500) at row 7, then corrected
+  // to Zed (P′, player 501) at row 8; the live resolved row is at P′.
+  const correctedStage2 = (over: Partial<Stage2LedgerRow> = {}): Stage2LedgerRow => ({
+    ...ledgerRow, id: 8, action: 'corrected', playerId: 501, playerIdentity: 'players/Z/Zed_Zeta.html',
+    previousPlayerIdentity: 'players/A/Alpha_Able.html', previousState: '{"id": 44, "status": "resolved", "player_id": 500}',
+    evidenceSha256: 'b'.repeat(64), supersedesId: 7, ...over,
+  });
+  const resolvedAtPPrime = { ...adminResolved, playerId: 501 };
+  const LIVE = { 'players/A/Alpha_Able.html': [500], 'players/Z/Zed_Zeta.html': [501] };
 
-    // The DD-10 boundary is the COLUMN, not just the action label: a `linked`/`revoked` row
-    // carrying a non-null previous_player_identity (never legitimate, migration 106's CHECK
-    // forbids it) is refused the same way, not silently accepted as ordinary v2 state.
+  it('AFLDB-ISSUE-238 capture v3: a live corrected row is captured (P and P′ each one distinct live player), '
+     + 'verbatim, and the capture reinstates as v3', async () => {
     await withDir(async (dir) => {
-      const tainted: Stage2LedgerRow = { ...ledgerRow, previousPlayerIdentity: 'players/Z/Zed_Zeta.html' };
-      const db = stage2Tx({ ledgerTable: true, ledgerRows: [tainted] });
-      await expect(observe(db.tx, dir)).rejects.toThrow(/capture v3/);
+      const db = stage2Tx({
+        ledgerTable: true, ledgerRows: [ledgerRow, correctedStage2()], census: [resolvedAtPPrime, importerCensus],
+        playersByIdentity: LIVE,
+      });
+      const state = await observe(db.tx, dir);
+      expect(state.decision).toEqual({ action: 'capture-live' });
+      expect(state.ledgerLive.rows.map((r) => [r.id, r.action, r.previousPlayerIdentity])).toEqual([
+        [7, 'linked', null], [8, 'corrected', 'players/A/Alpha_Able.html'],
+      ]);
+      // OD-S7-2 resolved BOTH identities on the live database, before destruction
+      const lookups = db.statements.filter((s) => s.includes('SELECT DISTINCT ei.player_id'));
+      expect(lookups.length).toBeGreaterThanOrEqual(2);
+      const outcome = settleCapture({
+        dir, database: 'code_test_db', capturedAt: '2026-09-24T12:00:00.000Z', pending: null,
+        live: { ledgerPresent: true, ledgerRows: state.ledgerLive.rows, importerRows: state.importerLive },
+        decision: state.decision, observed: state.observed,
+      });
+      const back = readPendingCaptureWithHash(dir, 'code_test_db')!;
+      expect(back.capture).toEqual(outcome.captured!.capture);
+      expect(back.capture.version).toBe(3);
+      expect(back.capture.ledgerRows[1]).toMatchObject({ action: 'corrected', previousPlayerIdentity: 'players/A/Alpha_Able.html', supersedesId: 7 });
+      expect(db.statements.some((s) => /\b(CREATE|INSERT|UPDATE|DELETE|COMMENT)\b/.test(s))).toBe(false);
+    });
+  });
+
+  it('AFLDB-ISSUE-238 OD-S7-2: P missing, P ambiguous, P′ missing, or P = P′ on the live database is a STOP '
+     + 'before destruction', async () => {
+    const cases: Array<[Record<string, number[]>, RegExp]> = [
+      [{ 'players/Z/Zed_Zeta.html': [501] }, /previous_player_identity 'players\/A\/Alpha_Able.html' names no live player/],
+      [{ 'players/A/Alpha_Able.html': [500, 510], 'players/Z/Zed_Zeta.html': [501] }, /previous_player_identity .* names more than one live player/],
+      [{ 'players/A/Alpha_Able.html': [500] }, /player_identity 'players\/Z\/Zed_Zeta.html' names no live player/],
+      [{ 'players/A/Alpha_Able.html': [501], 'players/Z/Zed_Zeta.html': [501] }, /resolve to the same live player 501 \(P = P′\)/],
+    ];
+    for (const [playersByIdentity, pattern] of cases) {
+      await withDir(async (dir) => {
+        const db = stage2Tx({
+          ledgerTable: true, ledgerRows: [ledgerRow, correctedStage2()], census: [resolvedAtPPrime, importerCensus], playersByIdentity,
+        });
+        await expect(observe(db.tx, dir), String(pattern)).rejects.toThrow(
+          new RegExp(`OD-S7-2: before-destruction corrected identity check failed.*nothing has been destroyed.*${pattern.source}`, 's'));
+        expect(readdirSync(dir)).toEqual([]);
+        expect(db.statements.some((s) => /\b(INSERT|UPDATE|DELETE|COMMENT)\b/.test(s))).toBe(false);
+      });
+    }
+  });
+
+  it('AFLDB-ISSUE-238 capture v3: a malformed live corrected row refuses immediately after the read, before '
+     + 'any other before-destruction check; an importer row for a corrected provider refuses before destruction', async () => {
+    const malformed: Array<[Stage2LedgerRow[], RegExp]> = [
+      [[ledgerRow, correctedStage2({ previousState: null })], /a corrected row has no previous_state/],
+      [[ledgerRow, correctedStage2({ supersedesId: null })], /importer-origin corrected row \(no supersedes_id\) follows a net-linked state/],
+      [[ledgerRow, correctedStage2({ previousPlayerIdentity: 'players/Z/Zed_Zeta.html' })], /previous_player_identity equals its player_identity/],
+      [[{ ...ledgerRow, previousPlayerIdentity: 'players/Z/Zed_Zeta.html' }], /a linked row carries a previous_player_identity/],
+      [[ledgerRow, correctedStage2({ action: 'reassigned' })], /is not linked\/revoked\/corrected/],
+    ];
+    for (const [ledgerRows, pattern] of malformed) {
+      await withDir(async (dir) => {
+        const db = stage2Tx({ ledgerTable: true, ledgerRows, census: [resolvedAtPPrime, importerCensus], playersByIdentity: LIVE });
+        await expect(observe(db.tx, dir), String(pattern)).rejects.toThrow(
+          new RegExp(`not capturable \\(AFLDB-ISSUE-238 capture v3\\); nothing has been destroyed.*${pattern.source}`, 's'));
+        // refused before the importer/census section (and everything after it) is ever reached
+        expect(db.statements.some((s) => s.includes("to_regclass('public.sources')"))).toBe(false);
+        expect(readdirSync(dir)).toEqual([]);
+      });
+    }
+    // an importer row (and no resolved row) for the corrected provider: refused before destruction
+    await withDir(async (dir) => {
+      const importerForCorrected = { ...importerCensus, externalId: 'CD_I1001', playerId: 501 };
+      const db = stage2Tx({ ledgerTable: true, ledgerRows: [ledgerRow, correctedStage2()], census: [importerForCorrected], playersByIdentity: LIVE });
+      await expect(observe(db.tx, dir)).rejects.toThrow(/ledger_without_row:CD_I1001/);
+      expect(readdirSync(dir)).toEqual([]);
     });
   });
 
@@ -8067,7 +8648,7 @@ describe('AFLDB-ISSUE-237 — code_test_db rehearsal fixture (DB-free)', () => {
 
   const capturedLedger = (over: Partial<CapturedLedgerRow> = {}): CapturedLedgerRow => ({
     id: 41, sourceKey: 'afl_api', externalId: F.human.providerId, action: 'linked', playerId: 102,
-    playerIdentity: F.human.stableIdentity, previousState: null, evidence: '{"k": 1}', evidenceSha256: 'e'.repeat(64),
+    playerIdentity: F.human.stableIdentity, previousPlayerIdentity: null, previousState: null, evidence: '{"k": 1}', evidenceSha256: 'e'.repeat(64),
     surnameDisagreementAcknowledged: false, supersedesId: null, adminUserId: 5, adminEmail: F.actorEmail,
     adminRole: 'super_admin', note: F.human.note, createdAt: '2026-09-24T01:02:03.123456Z', ...over,
   });
@@ -8895,6 +9476,7 @@ describe('AFLDB-ISSUE-245 — manual player registrations survive the rebuild (D
     // a ledger actor and a registration actor with one email but two roles is refused in the capture
     const ledgerActor: CapturedLedgerRow = {
       id: 1, sourceKey: 'afl_api', externalId: 'CD_I1001', action: 'linked', playerId: 9, playerIdentity: 'players/A/A.html',
+      previousPlayerIdentity: null,
       previousState: null, evidence: '{}', evidenceSha256: 'a'.repeat(64), surnameDisagreementAcknowledged: false,
       supersedesId: null, adminUserId: 3, adminEmail: ACTOR.email.toLowerCase(), adminRole: 'admin', note: '', createdAt: CREATED,
     };

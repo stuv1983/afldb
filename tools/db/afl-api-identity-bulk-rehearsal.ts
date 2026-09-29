@@ -91,7 +91,9 @@ export function recoveryFixtureLedgerRows(
   const row = (offset: number, externalId: string, action: 'linked' | 'revoked', p: { playerId: number; path: string },
     supersedes: number | null): CapturedLedgerRow => ({
     id: BULK_REHEARSAL.ledgerIdBase + offset, sourceKey: 'afl_api', externalId, action, playerId: p.playerId,
-    playerIdentity: p.path, previousState: action === 'revoked' ? '{"status": "resolved"}' : null,
+    // AFLDB-ISSUE-238 capture v3 (type follow-through only): these rows are never corrected.
+    playerIdentity: p.path, previousPlayerIdentity: null,
+    previousState: action === 'revoked' ? '{"status": "resolved"}' : null,
     evidence: `{"row": ${offset}, "rehearsal": "AFLDB-ISSUE-239"}`, evidenceSha256: String(offset).repeat(64),
     surnameDisagreementAcknowledged: offset === 2, supersedesId: supersedes === null ? null : BULK_REHEARSAL.ledgerIdBase + supersedes,
     adminUserId: 1, adminEmail: BULK_REHEARSAL.actorEmail, adminRole: 'super_admin',

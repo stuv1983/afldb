@@ -17,11 +17,14 @@ import { describe, expect, it } from 'vitest';
 import {
   ADJUDICATION_RECOVERY_FORMAT,
   ADJUDICATION_RECOVERY_VERSION,
+  ARCHIVED_V2_CAPTURE_VERSION,
   AdjudicationRecoveryRefused,
+  archivedV2RebuildCapturePayloadSha256,
   assertExportSourceDatabase,
   buildAdjudicationRecoveryExport,
   exportAdjudicationLedger,
   parseAdjudicationRecoverySource,
+  parseArchivedV2RebuildCaptureLedger,
   parseRecoveryArgs,
   planLedgerRecovery,
   recoverAflApiAdjudications,
@@ -30,7 +33,13 @@ import {
   type AdjudicationRecoverySource,
   type RecoveryLedgerRow,
 } from '../tools/migration/recover_afl_api_adjudications';
-import { buildCombinedCapture, type CapturedLedgerRow } from '../tools/migration/rebuild_afl_api_adjudications';
+import {
+  CAPTURE_FORMAT,
+  CAPTURE_VERSION,
+  buildCombinedCapture,
+  parseCombinedCapture,
+  type CapturedLedgerRow,
+} from '../tools/migration/rebuild_afl_api_adjudications';
 import { recoveryFixtureLedgerRows } from '../tools/db/afl-api-identity-bulk-rehearsal';
 import {
   afltablesIdentity, aflApiRow, emptyWorld, fakeConnection, manualAdminIdentity, pgJsonbText, type FakeLedgerRow, type FakeWorld,
@@ -193,15 +202,14 @@ describe('AFLDB-ISSUE-239: the recovery source', () => {
       .toThrow(/version 1.*previous_player_identity.*never silently upgraded/s);
   });
 
-  it('accepts an archived v2 rebuild capture, reading only its ledger section; refuses the superseded formats', async () => {
+  it('accepts a v3 rebuild capture, reading only its ledger section; refuses the superseded formats', async () => {
     const testWorld = originalWorld();
     testWorld.database = 'afldb_test';
     const exported = await exportOf(testWorld, 'afldb_test');
+    expect(CAPTURE_VERSION).toBe(3);
     const capture = buildCombinedCapture({
       database: 'afldb_test', capturedAt: '2026-09-25T00:00:00.000000Z', ledgerTablePresent: true,
-      // Zero-corrected fixture (originalWorld): every row is linked/revoked with
-      // previousPlayerIdentity null, so narrowing to the pinned v2 shape is exact, not a guess.
-      ledgerRows: exported.ledgerRows as unknown as CapturedLedgerRow[], importerRows: [], registrations: [],
+      ledgerRows: exported.ledgerRows satisfies CapturedLedgerRow[], importerRows: [], registrations: [],
     });
     const source = parseAdjudicationRecoverySource(JSON.stringify(capture), capture.payloadSha256);
     expect(source).toEqual(expect.objectContaining({ kind: 'rebuild_capture', ledgerDatabase: 'afldb_test' }));
@@ -211,6 +219,104 @@ describe('AFLDB-ISSUE-239: the recovery source', () => {
     const noLedger = buildCombinedCapture({ database: 'afldb_test', capturedAt: '2026-09-25T00:00:00.000000Z',
       ledgerTablePresent: false, ledgerRows: [], importerRows: [], registrations: [] });
     expect(() => parseAdjudicationRecoverySource(JSON.stringify(noLedger), noLedger.payloadSha256)).toThrow(/predates migration 104/);
+  });
+
+  /** An ARCHIVED v2 combined capture exactly as the pre-slice-7 tooling wrote it: no
+   * `previousPlayerIdentity` key on any ledger row, hashed with the frozen v2 algorithm. */
+  function archivedV2Capture(ledgerRows: readonly Record<string, unknown>[], database = 'afldb_test') {
+    const body = {
+      format: CAPTURE_FORMAT, version: ARCHIVED_V2_CAPTURE_VERSION, database,
+      capturedAt: '2026-09-20T00:00:00.000Z', ledgerTablePresent: true,
+      ledgerRows: [...ledgerRows], importerRows: [], registrations: [],
+    };
+    return { ...body, payloadSha256: archivedV2RebuildCapturePayloadSha256(body) };
+  }
+  const v2RowsOf = (rows: readonly RecoveryLedgerRow[]) => rows.map(({ previousPlayerIdentity: _p, ...v2 }) => v2);
+
+  it('AFLDB-ISSUE-238 OD-S7-1: an ARCHIVED v2 rebuild capture stays readable through the recovery-only reader '
+     + '(previousPlayerIdentity: null, exact) and recovers; the rebuild pipeline itself still refuses it', async () => {
+    const testWorld = originalWorld();
+    testWorld.database = 'afldb_test';
+    const exported = await exportOf(testWorld, 'afldb_test');
+    const archived = archivedV2Capture(v2RowsOf(exported.ledgerRows));
+    const text = JSON.stringify(archived, null, 2);
+
+    const source = parseAdjudicationRecoverySource(text, archived.payloadSha256);
+    expect(source).toEqual(expect.objectContaining({ kind: 'rebuild_capture', ledgerDatabase: 'afldb_test', sourceDatabase: 'afldb_test' }));
+    expect(source.ledgerRows).toEqual(exported.ledgerRows); // same rows; every previousPlayerIdentity null
+    expect(source.ledgerRows.every((r) => r.previousPlayerIdentity === null)).toBe(true);
+    expect(parseArchivedV2RebuildCaptureLedger(text, 'afldb_test').ledgerRows).toEqual(source.ledgerRows);
+
+    // it recovers end to end on a renumbered lineage
+    const world = lostWorld();
+    world.database = 'afldb_test';
+    const report = await recoverAflApiAdjudications({ mode: 'apply', connection: fakeConnection(world).connection, targetDatabase: 'afldb_test', source });
+    expect(report.outcome).toBe('COMMITTED');
+    expect(world.ledger.map((r) => [r.id, r.action, r.playerId, r.previousPlayerIdentity]))
+      .toEqual([[1, 'linked', 110, null], [2, 'linked', 120, null], [3, 'revoked', 120, null]]);
+
+    // the live rebuild pipeline refuses the very same file, by name
+    expect(() => parseCombinedCapture(text, 'afldb_test')).toThrow(/pre-AFLDB-ISSUE-238 combined format \(v2\)/);
+  });
+
+  it('AFLDB-ISSUE-238 OD-S7-1: the v2 reader validates the historical format and never upgrades it', async () => {
+    const exported = await exportOf(originalWorld(), 'afldb_dev');
+    const v2 = v2RowsOf(exported.ledgerRows);
+    const good = archivedV2Capture(v2, 'afldb_dev');
+    // tampered after capture: the frozen v2 hash refuses it
+    const tampered = { ...good, ledgerRows: [{ ...v2[0], note: 'altered after the archive was written' }, ...v2.slice(1)] };
+    expect(() => parseAdjudicationRecoverySource(JSON.stringify(tampered), good.payloadSha256)).toThrow(/does not match its own \(v2\) payload hash/);
+    // a v2 file can never hold a corrected row, nor a previousPlayerIdentity key
+    const withCorrected = archivedV2Capture([...v2, {
+      ...v2[0], id: 4, action: 'corrected', supersedesId: 1, previousState: '{"status": "resolved"}',
+    }], 'afldb_dev');
+    expect(() => parseAdjudicationRecoverySource(JSON.stringify(withCorrected), withCorrected.payloadSha256))
+      .toThrow(/ledger row 4: action "corrected" is not a v2 action/);
+    const withKey = archivedV2Capture(exported.ledgerRows, 'afldb_dev');
+    expect(() => parseAdjudicationRecoverySource(JSON.stringify(withKey), withKey.payloadSha256))
+      .toThrow(/carries previousPlayerIdentity, which no v2 capture could hold/);
+    // a structurally broken v2 ledger is refused by the recovery's own validator
+    const broken = archivedV2Capture([{ ...v2[0], supersedesId: 99 }], 'afldb_dev');
+    expect(() => parseAdjudicationRecoverySource(JSON.stringify(broken), broken.payloadSha256)).toThrow(/not a valid v2 ledger/);
+    // missing sections, another database, or no ledger table
+    const { registrations: _r, ...noRegistrations } = good;
+    expect(() => parseAdjudicationRecoverySource(JSON.stringify(noRegistrations), good.payloadSha256)).toThrow(/missing a required field/);
+    expect(() => parseArchivedV2RebuildCaptureLedger(JSON.stringify(good), 'afldb_test')).toThrow(/names 'afldb_dev', not 'afldb_test'/);
+    const noTable = { ...good, ledgerTablePresent: false, ledgerRows: [] };
+    const noTableHashed = { ...noTable, payloadSha256: archivedV2RebuildCapturePayloadSha256(noTable) };
+    expect(() => parseAdjudicationRecoverySource(JSON.stringify(noTableHashed), noTableHashed.payloadSha256)).toThrow(/predates migration 104/);
+  });
+
+  it('AFLDB-ISSUE-238 capture v3: a rebuild capture holding a corrected row round-trips exactly through the '
+     + 'recovery — previousPlayerIdentity carried VERBATIM, never remapped, and the resolved outcome ALREADY_SATISFIED', async () => {
+    const exported = await exportOf(correctedWorld());
+    const capture = buildCombinedCapture({
+      database: 'afldb_dev', capturedAt: '2026-09-26T00:00:00.000000Z', ledgerTablePresent: true,
+      ledgerRows: exported.ledgerRows, importerRows: [], registrations: [],
+    });
+    expect(capture.version).toBe(3);
+    const source = parseAdjudicationRecoverySource(JSON.stringify(capture), capture.payloadSha256);
+    expect(source.kind).toBe('rebuild_capture');
+    expect(source.ledgerRows).toEqual(exported.ledgerRows); // exact round trip, the corrected row included
+    expect(source.ledgerRows.map((r) => [r.id, r.action, r.previousPlayerIdentity]))
+      .toEqual([[1, 'linked', null], [2, 'corrected', 'players/A/A.html']]);
+
+    const world = correctedLostWorld();
+    world.identities.push({ id: 900, sourceKey: 'afl_api', externalId: 'CD_I5', playerId: 140, status: 'resolved',
+      matchMethod: 'afl_api_admin_adjudication', candidateCount: 0, externalUrl: null, externalName: null, notes: 'human' });
+    const report = await recoverAflApiAdjudications({ mode: 'apply', connection: fakeConnection(world).connection, targetDatabase: 'afldb_dev', source });
+    expect(report).toEqual(expect.objectContaining({ outcome: 'COMMITTED', outcomeAlreadySatisfied: 1 }));
+    // A was player 10 on the source and is 110 here: player_id follows the identity, the FROM identity never does
+    expect(world.ledger.map((r) => [r.id, r.action, r.playerId, r.previousPlayerIdentity])).toEqual([
+      [1, 'linked', 110, null], [2, 'corrected', 140, 'players/A/A.html'],
+    ]);
+    // a capture differing ONLY in previousPlayerIdentity is a different payload
+    const other = buildCombinedCapture({
+      database: 'afldb_dev', capturedAt: '2026-09-26T00:00:00.000000Z', ledgerTablePresent: true,
+      ledgerRows: exported.ledgerRows.map((r) => (r.action === 'corrected' ? { ...r, previousPlayerIdentity: 'players/B/B.html' } : r)),
+      importerRows: [], registrations: [],
+    });
+    expect(other.payloadSha256).not.toBe(capture.payloadSha256);
   });
 });
 
