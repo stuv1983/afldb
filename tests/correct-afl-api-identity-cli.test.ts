@@ -2442,3 +2442,203 @@ describe('Slice 7: the rebuild REPLAY halves and the Stage 22 SAT-1 contract', (
     });
   });
 });
+
+/* ==================================================================== *
+ * Slice 9 acceptance (D-S9-1, D-S9-5). The behavioural cases run the public Q2 re-run path over
+ * the in-memory reader above, so the adapter derives the lineage evidence and the planner
+ * classifies it. The source pins are deliberately narrow: each names private ORIGINAL helpers a
+ * DB-free behavioural test could reach only through a large fake transaction. A source pin proves
+ * an ordering or a statement shape. It never proves concurrency or real SQL behaviour: that is the
+ * Slice-10 `code_test_db` rehearsal's (cases 87, 91, 100).
+ * ==================================================================== */
+
+describe('Slice 9 cases 13/50 through the public Q2 re-run: adapter-derived lineage evidence, planner-classified', () => {
+  const deleteSnapshot: Record<string, JsonValue> = {
+    id: 900, player_id: P, match_id: M, source_id: AFL_API_SOURCE_ID, source_record_id: STAMP,
+    import_batch_id: SETTLE_BATCH, ...PMS_INSERT_VALUES, brownlow_votes: null,
+  };
+  const boundDelete = (id: number, previousValues: Record<string, JsonValue>): Q2Application => app({
+    id, verb: 'delete', targetTable: 'player_match_stats', targetKey: PMS_OLD_KEY, importBatchId: K, previousValues, newValues: {},
+  });
+  const deleteWorld = (deletes: Q2Application[]): World => ({
+    ...baseWorld(),
+    batches: [correctionBatch([{ table: 'player_match_stats', verb: 'delete', oldKey: PMS_OLD_KEY, newKey: null, preCorrectionContractSha256: PMS_PRE_HASH }])],
+    applications: [pmsInsert, ...deletes],
+    rows: [],
+    projections: [],
+  });
+
+  it('case 13 D-4: two bound delete applications at k -> STOP D-4 ambiguous_correction (one alone is satisfied)', async () => {
+    expectSatisfied(await rerun(deleteWorld([boundDelete(205, deleteSnapshot)])));
+    expectStop(await rerun(deleteWorld([boundDelete(205, deleteSnapshot), boundDelete(206, deleteSnapshot)])), 'D-4', 'ambiguous_correction');
+  });
+
+  it('case 13 D-5: previous_values that disagree with the H reconstruction -> STOP D-5 row_proof_mismatch', async () => {
+    expectStop(await rerun(deleteWorld([boundDelete(205, { ...deleteSnapshot, goals: 999 })])), 'D-5', 'row_proof_mismatch');
+  });
+
+  it('case 50 L1: the earliest application at k′ is not an update -> STOP L1 correction_not_bound', async () => {
+    const world = pmsWorld();
+    world.applications = [pmsInsert, { ...pmsCorrection, verb: 'insert' }];
+    expectStop(await rerun(world), 'L1', 'correction_not_bound');
+  });
+
+  it('case 50 L2: c records a move from a third player, not P -> STOP L2 correction_values_contradict', async () => {
+    const world = pmsWorld();
+    world.applications = [pmsInsert, { ...pmsCorrection, previousValues: { player_id: 31 } }];
+    expectStop(await rerun(world), 'L2', 'correction_values_contradict');
+  });
+
+  it('case 50 L3: the recorded old key is not k′ with player_id := P -> STOP L3 key_components_contradict', async () => {
+    const world = pmsWorld();
+    world.batches = [correctionBatch([{
+      table: 'player_match_stats', verb: 'update', oldKey: { player_id: P, match_id: 600 }, newKey: PMS_NEW_KEY,
+      preCorrectionContractSha256: PMS_PRE_HASH,
+    }])];
+    expectStop(await rerun(world), 'L3', 'key_components_contradict');
+  });
+
+  it('case 50 L4: c cites a source version other than the old-key history\'s latest -> STOP L4 correction_not_joinable', async () => {
+    const world = pmsWorld();
+    world.applications = [pmsInsert, { ...pmsCorrection, sourceVersionSeq: 2 }];
+    expectStop(await rerun(world), 'L4', 'correction_not_joinable');
+  });
+});
+
+describe('Slice 9 source-contract pins (ORIGINAL; narrow, no concurrency or real-SQL claim)', () => {
+  const source = toolSource();
+  const between = (start: string, end: string) => source.slice(source.indexOf(start), source.indexOf(end));
+  const run = between('async function runCorrection(', 'Shared mechanics: ONE implementation');
+  const transaction = between('§8.2: the ORIGINAL transaction', '§8.4 / §8.5 / §5.12 Q2: CORRECTION SATISFACTION');
+  const WRITE_SQL = /\b(INSERT\s+INTO|DELETE\s+FROM|UPDATE\s+[a-z_.]+\s+SET)\b/;
+  const MUTATION_HELPERS = /openCorrectionBatch\(|bindCorrectionBatch\(|applyClosureMutations\(|moveProviderProjections\(|recomputeAfterClosureMutations\(|resolveAdjudicatedContradictions\(|finaliseCorrectionBatch\(/;
+  const openBatch = run.indexOf('await openCorrectionBatch(');
+
+  it('the pinned sections are found and non-trivial', () => {
+    expect(run.length).toBeGreaterThan(5000);
+    expect(transaction.length).toBeGreaterThan(run.length);
+    expect(openBatch).toBeGreaterThan(0);
+  });
+
+  it('case 52 (adapter half): a NULL counterpart owner reaches the planner as null_owned, never afl_api, in both closure tables', () => {
+    const closure = between('async function buildClosure(', 'async function ownerKeyOf(');
+    const mapping = "ownership: counterpartOwnerKey === AFL_API_SOURCE_KEY ? 'afl_api' : counterpartOwnerKey === null ? 'null_owned' : 'foreign',";
+    expect(closure.split(mapping)).toHaveLength(3);
+  });
+
+  it('case 91: each conditional DELETE/UPDATE in applyClosureMutations re-validates the row contract, then refuses unless exactly one row was affected', () => {
+    const apply = between('async function applyClosureMutations(', 'async function moveProviderProjections(');
+    expect(apply.match(/(DELETE FROM|UPDATE) \$\{tx\(row\.table\)\}/g)).toHaveLength(2);
+    const deletes = apply.slice(apply.indexOf("r.disposition === 'DELETE_AS_FOREIGN_COLLISION'"), apply.indexOf("r.disposition === 'MOVE'"));
+    const moves = apply.slice(apply.indexOf("r.disposition === 'MOVE'"), apply.indexOf('const projectionsMoved = await moveProviderProjections('));
+    const paths: [string, RegExp, RegExp][] = [
+      [deletes, /DELETE FROM \$\{tx\(row\.table\)\} WHERE id = \$\{row\.rowId\}/, /if \(deleteResult\.count !== 1\) \{\s+throw new CorrectionRefused\(/],
+      [moves, /UPDATE \$\{tx\(row\.table\)\} SET player_id = \$\{pPrimeId\} WHERE id = \$\{row\.rowId\}/, /if \(result\.count !== 1\) \{\s+throw new CorrectionRefused\(/],
+    ];
+    for (const [path, statement, refusal] of paths) {
+      const guard = path.indexOf('await assertRowStillMatchesContract(tx, row);');
+      expect(guard).toBeGreaterThan(0);
+      expect(path.search(statement)).toBeGreaterThan(guard);
+      expect(path.search(refusal)).toBeGreaterThan(path.search(statement));
+      expect(path.indexOf('INSERT INTO canonical_applications')).toBeGreaterThan(path.search(refusal));
+    }
+    const guardFn = between('async function assertRowStillMatchesContract(', 'async function runCorrection(');
+    expect(guardFn).toContain('if (!current) throw new CorrectionRefused(');
+    expect(guardFn).toContain('const currentHash = rowContractHash(projectContract(current.row, fields));');
+    expect(guardFn).toMatch(/if \(currentHash !== row\.contractSha256\) \{\s+throw new CorrectionRefused\(/);
+  });
+
+  it('P1 / case 28: the --expect-fingerprint comparison refuses before openCorrectionBatch and before any mutation', () => {
+    const computed = run.indexOf('const fingerprint = mutationPlanFingerprint(closure.plan);');
+    const check = run.search(/if \(args\.mode === 'apply' && fingerprint !== args\.expectFingerprint\) \{\s+throw new CorrectionRefused\(`REFUSED: recomputed fingerprint/);
+    expect(computed).toBeGreaterThan(0);
+    expect(check).toBeGreaterThan(computed);
+    expect(openBatch).toBeGreaterThan(check);
+    expect(run.slice(0, check)).not.toMatch(WRITE_SQL);
+    expect(run.slice(0, check)).not.toMatch(MUTATION_HELPERS);
+    for (const mutation of ['INSERT INTO afl_api_identity_adjudications', 'UPDATE external_identities', 'await applyClosureMutations(']) {
+      expect(run.indexOf(mutation)).toBeGreaterThan(openBatch);
+    }
+  });
+
+  it('P2 / case 58: the surname gate runs before the closure and any mutation; the acknowledgement neither bypasses nor fakes it', () => {
+    const disagrees = run.search(/const surnameDisagrees = observedSurname !== null\s+&& normaliseSurname\(observedSurname\) !== ''\s+&& normaliseSurname\(pPrimeSurname\) !== ''\s+&& normaliseSurname\(observedSurname\) !== normaliseSurname\(pPrimeSurname\);/);
+    const stopGate = run.search(/if \(surnameDisagrees && !args\.acknowledgeSurnameDisagreement\) \{\s+return \{\s+kind: 'STOP',\s+stops: \[\{ table: 'player_match_stats', rowId: null, step: 'M1', code: 'identity_unresolvable' \}\],\s+fingerprint: '',\s+\};\s+\}/);
+    const refusal = run.search(/if \(!surnameDisagrees && args\.acknowledgeSurnameDisagreement\) \{\s+throw new CorrectionRefused\('REFUSED: --acknowledge-surname-disagreement was given but the observed surname does not disagree'\);\s+\}/);
+    const closure = run.indexOf('await buildClosure(tx, {');
+    expect(disagrees).toBeGreaterThan(0);
+    expect(stopGate).toBeGreaterThan(disagrees);
+    expect(refusal).toBeGreaterThan(stopGate);
+    expect(closure).toBeGreaterThan(refusal);
+    expect(openBatch).toBeGreaterThan(closure);
+    // The stored flag is the argument itself, which the refusal above allows only with a real disagreement.
+    expect(run.indexOf('const surnameAcknowledged = args.acknowledgeSurnameDisagreement;')).toBeGreaterThan(openBatch);
+    expect(run).toContain('${surnameAcknowledged}, ${args.adminUserId}, ${args.note},');
+    expect(run.match(/args\.acknowledgeSurnameDisagreement/g)).toHaveLength(3);
+  });
+
+  it('P4 / case 100: with lockRows the planning reads lock the matches rows (and the closure rows); only validate-only plans unlocked', () => {
+    const pmsReader = between('async function readPlayerMatchStatsCandidatesForPlayer(', 'const out: PlayerMatchStatsCandidate[] = [];');
+    const [pmsLocked, pmsUnlocked] = pmsReader.split(': await tx<Raw[]>`');
+    expect(pmsLocked).toMatch(/JOIN matches m ON m\.id = pms\.match_id\s+WHERE pms\.player_id = \$\{playerId\}\s+FOR UPDATE OF pms, m/);
+    expect(pmsUnlocked).not.toContain('FOR UPDATE');
+    const brownlowReader = between('async function readBrownlowCandidatesForPlayer(', 'const out: BrownlowCandidate[] = [];');
+    expect(brownlowReader).toContain('FOR UPDATE OF b');
+    expect(brownlowReader).toMatch(/if \(lockRows\) \{\s+const matchIds = [^;]+;\s+if \(matchIds\.length > 0\) await tx`SELECT 1 FROM matches WHERE id = ANY\(\$\{matchIds\}\) FOR UPDATE`;\s+\}/);
+    expect(source).toContain('? await tx<{ id: number }[]>`SELECT id FROM matches WHERE season = ${season} AND round_number = ${roundNumber} ORDER BY id FOR UPDATE`');
+    const closure = between('async function buildClosure(', 'async function ownerKeyOf(');
+    for (const call of [
+      'readPlayerMatchStatsCandidatesForPlayer(tx, providerId, pId, lockRows)',
+      'readBrownlowCandidatesForPlayer(tx, providerId, pId, lockRows)',
+      'readRoundMatchIds(tx, candidate.season, candidate.roundNumber, lockRows)',
+    ]) expect(closure).toContain(call);
+    expect(run).toContain("const takeLocks = args.mode !== 'validate-only';");
+  });
+
+  it('P5: validate-only returns (STOP or PLANNED) before openCorrectionBatch and never reaches a write helper', () => {
+    const validate = run.search(/if \(args\.mode === 'validate-only'\) \{\s+if \(closure\.plan\.stops\.length > 0\) return \{ kind: 'STOP', [^\n]*\s+return \{ kind: 'PLANNED', fingerprint, plan: closure\.plan, reports: closure\.reports, impact \};\s+\}/);
+    expect(validate).toBeGreaterThan(0);
+    expect(openBatch).toBeGreaterThan(validate);
+    expect(run.slice(0, validate)).not.toMatch(WRITE_SQL);
+    expect(run.slice(0, validate)).not.toMatch(MUTATION_HELPERS);
+  });
+
+  it('P5: the ORIGINAL transaction (runCorrection and the shared write mechanics) holds no try/catch, so no failure can be swallowed there', () => {
+    expect(transaction).not.toMatch(/\bcatch\b|\btry\s*\{/);
+  });
+
+  it('P5 / case 29 (S half): a stat_availability change throws inside the correction transaction, before the post-write re-plan, finalisation and COMMITTED', () => {
+    const recompute = between('async function recomputeAfterClosureMutations(', 'async function assertPostWriteSatisfaction(');
+    expect(recompute).toMatch(/const before = await readStatAvailability\(tx, season\);\s+await recomputeBrownlowCoverage\(tx, season\);\s+const after = await readStatAvailability\(tx, season\);\s+if \(canonicalJson\(before as unknown as JsonValue\) !== canonicalJson\(after as unknown as JsonValue\)\) \{\s+throw new CorrectionRefused\(`REFUSED: stat_availability changed for season/);
+    const order = [
+      'await applyClosureMutations(',
+      'await recomputeAfterClosureMutations(tx, closure.rows, pId, pPrimeId);',
+      'await assertPostWriteSatisfactionResult(',
+      'await finaliseCorrectionBatch(',
+      "kind: 'COMMITTED'",
+    ].map((marker) => run.indexOf(marker));
+    expect(order[0]).toBeGreaterThan(0);
+    for (let i = 1; i < order.length; i += 1) expect(order[i]).toBeGreaterThan(order[i - 1]);
+    // runCorrection runs only as main's sql.begin() callbacks (pinned above); both call sites are there.
+    const main = between('async function main(', 'const invokedDirectly');
+    expect(source.match(/runCorrection\(tx, args, evidenceFile\)/g)).toHaveLength(2);
+    expect(main.match(/runCorrection\(tx, args, evidenceFile\)/g)).toHaveLength(2);
+  });
+
+  it('ORIGINAL write targets are exactly the accepted allow-list (promotion/rebuild REPLAY keep their own, pinned separately)', () => {
+    // Planning (buildClosure and its readers) writes nothing; every ORIGINAL write statement lives in
+    // the §8.2 transaction section: runCorrection, the shared write mechanics and §8.2 step 7. The
+    // imported §4.D derived recompute is its own module's contract, not this file's.
+    const planning = source.slice(0, source.indexOf('§5.1 / §9.1: planning and CPC classification'));
+    expect(planning.length).toBeGreaterThan(20000);
+    expect(planning).not.toMatch(WRITE_SQL);
+    const inserts = [...transaction.matchAll(/INSERT\s+INTO\s+([a-z_.]+)/g)].map((m) => m[1]);
+    expect(new Set(inserts)).toEqual(new Set(['afl_api_identity_adjudications', 'import_batches', 'canonical_applications']));
+    const updates = [...transaction.matchAll(/UPDATE\s+(\$\{tx\(row\.table\)\}|[a-z_.]+)\s+SET/g)].map((m) => m[1]);
+    expect(new Set(updates)).toEqual(new Set([
+      'external_identities', 'import_batches', '${tx(row.table)}', 'staging.afl_api_player_match', 'staging.afl_api_brownlow_vote', 'data_issues',
+    ]));
+    const deletes = [...transaction.matchAll(/DELETE\s+FROM\s+(\$\{tx\(row\.table\)\}|[a-z_.]+)/g)].map((m) => m[1]);
+    expect(deletes).toEqual(['${tx(row.table)}']);
+  });
+});

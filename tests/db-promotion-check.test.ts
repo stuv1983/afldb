@@ -4252,15 +4252,22 @@ describe('AFLDB-ISSUE-237 L4 hardening — promotion afl_api gates (DB-free)', (
         ...over,
       });
     };
+    /** A loose view of a parsed v3 file, typed only as deep as the forgeries below reach. */
+    type ForgedEntry = Record<string, unknown> & {
+      predictedMutations: Record<string, Record<string, unknown>>;
+    };
+    type ForgedFile = Record<string, unknown> & {
+      correctedReplays: ForgedEntry[];
+    };
     /** Mutate a parsed file and RE-HASH it, so the refusal under test is the field rule, not the payload hash. */
-    const forged = (mutate: (o: Record<string, any>) => void): string => {
-      const o = JSON.parse(JSON.stringify(v3())) as Record<string, any>;
+    const forged = (mutate: (o: ForgedFile) => void): string => {
+      const o = JSON.parse(JSON.stringify(v3())) as ForgedFile;
       mutate(o);
       const { payloadSha256: _dropped, ...rest } = o;
       o.payloadSha256 = createHash('sha256').update(canonicalJson(rest as never), 'utf8').digest('hex');
       return JSON.stringify(o);
     };
-    const refusedForged = (mutate: (o: Record<string, any>) => void, why: RegExp) => {
+    const refusedForged = (mutate: (o: ForgedFile) => void, why: RegExp) => {
       const text = forged(mutate);
       expect(() => parseAflApiSupersedeFile(text)).toThrow(AflApiPromotionFileRefused);
       expect(() => parseAflApiSupersedeFile(text)).toThrow(why);
@@ -4279,7 +4286,7 @@ describe('AFLDB-ISSUE-237 L4 hardening — promotion afl_api gates (DB-free)', (
 
     it('refuses a tamper of each new field by payload hash', () => {
       const text = JSON.stringify(v3());
-      const tampers: [string, (o: Record<string, any>) => void][] = [
+      const tampers: [string, (o: ForgedFile) => void][] = [
         ['targetCorrectedLedgerRowCount', (o) => { o.targetCorrectedLedgerRowCount = 4; }],
         ['targetCorrectedLedgerSha256', (o) => { o.targetCorrectedLedgerSha256 = hex('8'); }],
         ['predictedPostReplayImporterRowCount', (o) => { o.predictedPostReplayImporterRowCount = 0; }],
@@ -4296,15 +4303,15 @@ describe('AFLDB-ISSUE-237 L4 hardening — promotion afl_api gates (DB-free)', (
         ['entry.predictedMutations.deleted', (o) => { o.correctedReplays[0].predictedMutations.deleted.brownlow_round_votes = 99; }],
       ];
       for (const [name, mutate] of tampers) {
-        const o = JSON.parse(text) as Record<string, any>;
+        const o = JSON.parse(text) as ForgedFile;
         mutate(o);
         expect(() => parseAflApiSupersedeFile(JSON.stringify(o)), name).toThrow(/tampered/);
       }
     });
 
     it('refuses a missing or extra key at every level', () => {
-      const cases: [string, (o: Record<string, any>) => void][] = [
-        ['top-level missing', (o) => { delete o.correctedReplays; }],
+      const cases: [string, (o: ForgedFile) => void][] = [
+        ['top-level missing', (o) => { delete (o as Record<string, unknown>).correctedReplays; }],
         ['top-level missing predicted hash', (o) => { delete o.predictedPostReplayIdentitySha256; }],
         ['top-level extra', (o) => { o.note = 'x'; }],
         ['entry extra', (o) => { o.correctedReplays[0].extra = 1; }],
@@ -4314,14 +4321,14 @@ describe('AFLDB-ISSUE-237 L4 hardening — promotion afl_api gates (DB-free)', (
         ['deleted extra key', (o) => { o.correctedReplays[0].predictedMutations.deleted.other = 1; }],
       ];
       for (const [name, mutate] of cases) {
-        const o = JSON.parse(JSON.stringify(v3())) as Record<string, any>;
+        const o = JSON.parse(JSON.stringify(v3())) as ForgedFile;
         mutate(o);
         expect(() => parseAflApiSupersedeFile(JSON.stringify(o)), name).toThrow(/unexpected field set/);
       }
     });
 
     it('refuses v1 and v2 files as STALE by name, even though their key sets differ', () => {
-      const v2Shaped = JSON.parse(JSON.stringify(v3())) as Record<string, any>;
+      const v2Shaped = JSON.parse(JSON.stringify(v3())) as Record<string, unknown>;
       for (const k of ['targetCorrectedLedgerRowCount', 'targetCorrectedLedgerSha256', 'correctedReplays',
         'predictedPostReplayImporterRowCount', 'predictedPostReplayImporterSha256',
         'predictedPostReplayResolvedRowCount', 'predictedPostReplayIdentitySha256']) delete v2Shaped[k];
@@ -4331,7 +4338,7 @@ describe('AFLDB-ISSUE-237 L4 hardening — promotion afl_api gates (DB-free)', (
       const v1 = { issue: 'AFLDB-ISSUE-237', format: 'afldb.afl_api_supersede_expected', version: 1, expectedSupersedes: [] };
       expect(() => parseAflApiSupersedeFile(JSON.stringify(v1))).toThrow(/stale supersede file: version 1/);
       // a v3-keyed file claiming version 2 is stale too
-      const claimsV2 = JSON.parse(JSON.stringify(v3())) as Record<string, any>;
+      const claimsV2 = JSON.parse(JSON.stringify(v3())) as Record<string, unknown>;
       claimsV2.version = 2;
       expect(() => parseAflApiSupersedeFile(JSON.stringify(claimsV2))).toThrow(/stale supersede file/);
     });
@@ -4375,7 +4382,7 @@ describe('AFLDB-ISSUE-237 L4 hardening — promotion afl_api gates (DB-free)', (
       expect(parseAflApiSupersedeFile(JSON.stringify(file))).toEqual(file);
       // a predicted importer digest that differs from the pre-replay one, with no class 1/2 replay, refuses
       const text = JSON.stringify(file);
-      const o = JSON.parse(text) as Record<string, any>;
+      const o = JSON.parse(text) as Record<string, unknown>;
       o.predictedPostReplayImporterSha256 = hex('7');
       const { payloadSha256: _dropped, ...rest } = o;
       o.payloadSha256 = createHash('sha256').update(canonicalJson(rest as never), 'utf8').digest('hex');

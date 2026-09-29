@@ -38,6 +38,7 @@ import {
   evaluateBrownlowParticipation,
   evaluateCorrectionSatisfaction,
   evaluateCorrectionTargetAbsent,
+  evaluateDeleteLineage,
   evaluateDependents,
   evaluateL8,
   evaluateMoveLineage,
@@ -50,6 +51,7 @@ import {
   verifyBrownlowReleaseClaimPair,
   type Application,
   type BrownlowChainApplication,
+  type BrownlowRowEvidence,
   type CareerMatch,
   type ClosureImpactRow,
   type ColemanRowFacts,
@@ -60,6 +62,8 @@ import {
   type PendingCandidateRow,
   type CpcPrediction,
   type CpcProviderRow,
+  type DeleteLineageEvidence,
+  type MoveLineageEvidence,
   type MutationPlan,
   type PlayerMatchStatsRowEvidence,
 } from '@/lib/acquisition/afl-api-identity-correction';
@@ -1456,5 +1460,262 @@ describe('Slice 8 §4.B open findings and pending candidates: selectors, and res
     const before = structuredClone(rows);
     selectOpenFindings(rows, scope);
     expect(rows).toEqual(before);
+  });
+});
+
+/* ==================================================================== *
+ * Slice 9: DB-free acceptance for the §12.1 U-level cases that have no later backstop (D-S9-1),
+ * plus the cheap partials 10/52/54 (D-S9-5). Behavioural only, through the planner's exported
+ * pure evaluators: nothing here changes a disposition, a STOP code, the plan or the fingerprint.
+ * ==================================================================== */
+
+const B3C_CHAIN_STOP = { ok: false, stop: { step: 'B3-C', code: 'brownlow_chain_inconsistent' } };
+
+function brownlowEvidence(overrides: Partial<BrownlowRowEvidence> = {}): BrownlowRowEvidence {
+  return {
+    sourceId: 'afl_api',
+    sourceRecordId: 'CD_M1',
+    expectedSourceRecordId: 'CD_M1',
+    importBatchId: 100,
+    expectedImportBatchId: 100,
+    insertApplication: app({ id: 1, verb: 'insert', newValues: { played: true, votes: 3, match_id: 1 } }),
+    insertProvenByPayload: true,
+    projectionPlayerId: null,
+    currentPlayerId: 501,
+    chain: [],
+    anotherProviderAlsoResolved: false,
+    current: { played: true, votes: 3, matchId: 1 },
+    ...overrides,
+  };
+}
+
+describe('Slice 9 case 13: DELETE lineage ambiguity STOPs (§5.6 D-4, D-5; D-6 is case 12 in the CLI suite)', () => {
+  const goodDelete: DeleteLineageEvidence = {
+    deleteApplication: app({ id: 7, verb: 'delete', previousValues: { player_id: 501 }, newValues: {} }),
+    boundBatchCount: 1,
+    previousPlayerId: 501,
+    keyComponentsMatch: true,
+    previousValuesContractComplete: true,
+    previousValuesSourceIdIsAflApi: true,
+    previousValuesBrownlowVotesIsNull: true,
+    preCorrectionHistoryNonEmpty: true,
+    reconstructionMatchesPreviousValues: true,
+    noConflictingLaterHistory: true,
+  };
+
+  it('D-4: two bound delete applications at k -> STOP ambiguous_correction (the well-formed DELETE passes)', () => {
+    expect(evaluateDeleteLineage(goodDelete)).toEqual({ ok: true });
+    expect(evaluateDeleteLineage({ ...goodDelete, boundBatchCount: 2 }))
+      .toMatchObject({ ok: false, stop: { step: 'D-4', code: 'ambiguous_correction' } });
+  });
+
+  it('D-5: previous_values that disagree with the immutable-history reconstruction (or an empty H) -> STOP row_proof_mismatch', () => {
+    const patches: Partial<DeleteLineageEvidence>[] = [
+      { reconstructionMatchesPreviousValues: false },
+      { preCorrectionHistoryNonEmpty: false },
+    ];
+    for (const patch of patches) {
+      expect(evaluateDeleteLineage({ ...goodDelete, ...patch }))
+        .toMatchObject({ ok: false, stop: { step: 'D-5', code: 'row_proof_mismatch' } });
+    }
+  });
+});
+
+describe('Slice 9 case 50: correction joinability L1-L4 (§5.6)', () => {
+  const lineage: MoveLineageEvidence = {
+    correctionApplication: {
+      id: 5, verb: 'update', previousValues: { player_id: 501 }, newValues: { player_id: 502 },
+      sourceId: 'afl_api', externalRecordId: 'M1|RICH|CD_I1', sourceVersionSeq: 1, importBatchId: 300,
+      targetKey: { player_id: 502, match_id: 1 },
+    },
+    boundBatchCount: 1,
+    previousPlayerId: 501,
+    nextPlayerId: 502,
+    keyComponentsMatch: true,
+    bindsToOldHistory: true,
+    preCorrectionHistoryNonEmpty: true,
+    preCorrectionAttributionOk: true,
+    preCorrectionChainConsistent: true,
+    rowProofMatches: true,
+    joinIsUnique: true,
+    postCorrectionHistoryAllThroughCdI: true,
+  };
+  type CorrectionApplicationPatch = Partial<MoveLineageEvidence['correctionApplication']>;
+  const withApplication = (patch: CorrectionApplicationPatch): MoveLineageEvidence => ({
+    ...lineage, correctionApplication: { ...lineage.correctionApplication, ...patch },
+  });
+
+  it('L1: the earliest application at k′ is not an update -> correction_not_bound; two bound -> ambiguous_correction', () => {
+    expect(evaluateMoveLineage(lineage)).toEqual({ ok: true });
+    for (const verb of ['insert', 'delete'] as const) {
+      expect(evaluateMoveLineage(withApplication({ verb })))
+        .toMatchObject({ ok: false, stop: { step: 'L1', code: 'correction_not_bound' } });
+    }
+    expect(evaluateMoveLineage({ ...lineage, boundBatchCount: 2 }))
+      .toMatchObject({ ok: false, stop: { step: 'L1', code: 'ambiguous_correction' } });
+  });
+
+  it('L2: previous/new values that are not exactly {player_id: P} -> {player_id: P′} -> correction_values_contradict', () => {
+    const patches: CorrectionApplicationPatch[] = [
+      { previousValues: { player_id: 999 } },
+      { previousValues: null },
+      { previousValues: { player_id: 501, goals: 1 } },
+      { newValues: { player_id: 777 } },
+      { newValues: { player_id: 502, goals: 1 } },
+    ];
+    for (const patch of patches) {
+      expect(evaluateMoveLineage(withApplication(patch)))
+        .toMatchObject({ ok: false, stop: { step: 'L2', code: 'correction_values_contradict' } });
+    }
+  });
+
+  it('L3: a non-player_id key component that does not match -> key_components_contradict', () => {
+    expect(evaluateMoveLineage({ ...lineage, keyComponentsMatch: false }))
+      .toMatchObject({ ok: false, stop: { step: 'L3', code: 'key_components_contradict' } });
+  });
+
+  it('L4: c does not cite the old-key history\'s latest source version -> correction_not_joinable, ahead of any L5-L7 failure', () => {
+    expect(evaluateMoveLineage({ ...lineage, bindsToOldHistory: false }))
+      .toMatchObject({ ok: false, stop: { step: 'L4', code: 'correction_not_joinable' } });
+    expect(evaluateMoveLineage({ ...lineage, bindsToOldHistory: false, rowProofMatches: false, joinIsUnique: false }))
+      .toMatchObject({ ok: false, stop: { step: 'L4', code: 'correction_not_joinable' } });
+  });
+});
+
+describe('Slice 9 case 55: an intermediate out-of-ledger edit later overwritten by a settle STOPs reconstruction_inconsistent (§5.8)', () => {
+  it('player_match_stats P7: the chain break is the STOP, not the adjacent out_of_ledger_edit, though the current row equals the latest write', () => {
+    // kicks: 10 (insert) -> 99 (an out-of-ledger edit) -> 11 (a settle citing previous 99).
+    const current = { ...PMS_CURRENT_BASE, kicks: 11, brownlow_votes: null };
+    const overwritten = baselinePmsEvidence({
+      applications: [pmsInsertApplication(), app({ id: 2, verb: 'update', previousValues: { kicks: 99 }, newValues: { kicks: 11 } })],
+      current,
+    });
+    expect(evaluatePlayerMatchStatsAttribution(overwritten)).toEqual({ ok: true });
+    expect(evaluatePlayerMatchStatsMutationEligibility(overwritten))
+      .toMatchObject({ ok: false, stop: { step: 'P7', code: 'reconstruction_inconsistent' } });
+
+    // Control: the same settle citing the true prior value is eligible -- only the break differs.
+    const honest = baselinePmsEvidence({
+      applications: [pmsInsertApplication(), app({ id: 2, verb: 'update', previousValues: { kicks: 10 }, newValues: { kicks: 11 } })],
+      current,
+    });
+    expect(evaluatePlayerMatchStatsMutationEligibility(honest)).toEqual({ ok: true });
+    // The adjacent failure: a consistent chain whose current row differs is out_of_ledger_edit instead.
+    expect(evaluatePlayerMatchStatsMutationEligibility({ ...honest, current: { ...current, kicks: 12 } }))
+      .toMatchObject({ ok: false, stop: { step: 'P7', code: 'out_of_ledger_edit' } });
+  });
+
+  it('brownlow_round_votes B5: played edited out of ledger, then re-set by a settle -> reconstruction_inconsistent', () => {
+    const resettle: BrownlowChainApplication = {
+      ...app({ id: 2, verb: 'update', previousValues: { played: false }, newValues: { played: true } }),
+      citedPayloadVoterCountForCdI: 1,
+      citedPayloadVoteForCdI: 3,
+    };
+    const evidence = brownlowEvidence({ chain: [resettle] });
+    expect(evaluateBrownlowAttribution(evidence)).toEqual({ ok: true });
+    expect(evaluateBrownlowMutationEligibility(evidence))
+      .toMatchObject({ ok: false, stop: { step: 'B5', code: 'reconstruction_inconsistent' } });
+    const honest = brownlowEvidence({ chain: [{ ...resettle, previousValues: { played: true } }] });
+    expect(evaluateBrownlowMutationEligibility(honest)).toEqual({ ok: true });
+  });
+});
+
+describe('Slice 9 case 77: a malformed I244-F007 release/claim STOPs brownlow_chain_inconsistent (§5.3 B3-C case 3)', () => {
+  function chainStep(
+    partial: Partial<BrownlowChainApplication> & Pick<BrownlowChainApplication, 'id' | 'previousValues' | 'newValues'>,
+  ): BrownlowChainApplication {
+    return {
+      verb: 'update', sourceId: 'afl_api', externalRecordId: 'CD_M2', sourceVersionSeq: 1, importBatchId: 200,
+      citedPayloadVoterCountForCdI: 1, citedPayloadVoteForCdI: 3, ...partial,
+    };
+  }
+  const release = chainStep({ id: 20, previousValues: { votes: 2 }, newValues: { votes: 0 } });
+  const claim = chainStep({ id: 21, previousValues: { votes: 0 }, newValues: { votes: 3 } });
+
+  it('a release with no adjacent claim STOPs (the well-formed pair is case 3)', () => {
+    expect(verifyBrownlowReleaseClaimPair(release, claim, 2)).toEqual({ ok: true, case: 3 });
+    expect(classifyBrownlowChain([release], 2)).toMatchObject(B3C_CHAIN_STOP);
+    const notAClaim = chainStep({
+      id: 22, previousValues: { votes: 0 }, newValues: { votes: 0 }, citedPayloadVoterCountForCdI: 0, citedPayloadVoteForCdI: null,
+    });
+    expect(classifyBrownlowChain([release, notAClaim], 2)).toMatchObject(B3C_CHAIN_STOP);
+  });
+
+  it.each<[string, Partial<BrownlowChainApplication>]>([
+    ['another batch', { importBatchId: 999 }],
+    ['another source version', { sourceVersionSeq: 2 }],
+  ])('a claim from %s STOPs', (_label, patch) => {
+    const foreignClaim: BrownlowChainApplication = { ...claim, ...patch };
+    expect(verifyBrownlowReleaseClaimPair(release, foreignClaim, 2)).toMatchObject({
+      ok: false,
+      stop: { step: 'B3-C', code: 'brownlow_chain_inconsistent', detail: expect.stringContaining('same source version') },
+    });
+    expect(classifyBrownlowChain([release, foreignClaim], 2)).toMatchObject(B3C_CHAIN_STOP);
+  });
+
+  it('a claim whose value is not CD_I\'s own payload entry STOPs', () => {
+    const wrongClaim = chainStep({ id: 21, previousValues: { votes: 0 }, newValues: { votes: 2 } });
+    expect(verifyBrownlowReleaseClaimPair(release, wrongClaim, 2)).toMatchObject({
+      ok: false,
+      stop: { step: 'B3-C', code: 'brownlow_chain_inconsistent', detail: expect.stringContaining('does not raise 0 to the cited value') },
+    });
+    expect(classifyBrownlowChain([release, wrongClaim], 2)).toMatchObject(B3C_CHAIN_STOP);
+  });
+});
+
+describe('Slice 9 case 10: a jumper_number whitespace-only difference is a substantive collision difference (§5.4 C3, §5.5)', () => {
+  it.each(['7 ', ' 7'])('counterpart jumper_number %j vs the closure row\'s "7" -> STOP C3 naming jumper_number only', (jumper) => {
+    const result = decidePlayerMatchStatsDisposition({
+      counterpart: { exists: true, ownership: 'foreign', row: { ...PMS_CURRENT_BASE, jumper_number: jumper } },
+      closureRow: { ...PMS_CURRENT_BASE, brownlow_votes: null },
+      wouldViolateUniqueConstraint: false,
+    });
+    expect(result).toEqual({
+      disposition: 'STOP',
+      stop: { step: 'C3', code: 'collision_values_disagree', detail: 'field(s) differ: jumper_number' },
+    });
+  });
+});
+
+describe('Slice 9 case 52: a NULL-owned P′ counterpart receives exactly the foreign-counterpart policy of cases 9/10', () => {
+  it('player_match_stats: identical -> DELETE_AS_FOREIGN_COLLISION (C2); differing -> STOP C3; the same verdicts as a foreign owner', () => {
+    const closureRow = { ...PMS_CURRENT_BASE, brownlow_votes: null };
+    const identical = { ...PMS_CURRENT_BASE };
+    const differing = { ...PMS_CURRENT_BASE, kicks: 20 };
+    const decide = (ownership: 'null_owned' | 'foreign', row: typeof PMS_CURRENT_BASE) => decidePlayerMatchStatsDisposition({
+      counterpart: { exists: true, ownership, row }, closureRow, wouldViolateUniqueConstraint: false,
+    });
+    expect(decide('null_owned', identical)).toEqual({ disposition: 'DELETE_AS_FOREIGN_COLLISION' });
+    expect(decide('null_owned', differing))
+      .toMatchObject({ disposition: 'STOP', stop: { step: 'C3', code: 'collision_values_disagree' } });
+    for (const row of [identical, differing]) expect(decide('null_owned', row)).toEqual(decide('foreign', row));
+  });
+
+  it('brownlow_round_votes: zero-vote identical -> DELETE_AS_FOREIGN_COLLISION (C4); a positive vote -> STOP C5; the same verdicts as a foreign owner', () => {
+    const closureRow = { votes: 0, played: true, matchId: 5 };
+    const identical = { votes: 0, played: true, matchId: 5 };
+    const positive = { votes: 2, played: true, matchId: 5 };
+    const decide = (ownership: 'null_owned' | 'foreign', row: typeof identical) => decideBrownlowDisposition({
+      counterpart: { exists: true, ownership, row }, closureRow,
+    });
+    expect(decide('null_owned', identical)).toEqual({ disposition: 'DELETE_AS_FOREIGN_COLLISION' });
+    expect(decide('null_owned', positive))
+      .toMatchObject({ disposition: 'STOP', stop: { step: 'C5', code: 'collision_values_disagree' } });
+    for (const row of [identical, positive]) expect(decide('null_owned', row)).toEqual(decide('foreign', row));
+  });
+});
+
+describe('Slice 9 case 54: the admin resolve step setting match_id on an AFL API-owned round row is an out-of-ledger edit (§5.3 B5)', () => {
+  it('match_id NULL as inserted, M today, provenance untouched -> STOP B5 out_of_ledger_edit naming match_id only', () => {
+    const evidence = brownlowEvidence({
+      insertApplication: app({ id: 1, verb: 'insert', newValues: { played: true, votes: 3, match_id: null } }),
+      current: { played: true, votes: 3, matchId: 55 },
+    });
+    expect(evaluateBrownlowAttribution(evidence)).toEqual({ ok: true });
+    expect(evaluateBrownlowMutationEligibility(evidence)).toEqual({
+      ok: false,
+      stop: { step: 'B5', code: 'out_of_ledger_edit', detail: 'field(s) differ from reconstruction: match_id' },
+    });
+    expect(evaluateBrownlowMutationEligibility({ ...evidence, current: { ...evidence.current, matchId: null } })).toEqual({ ok: true });
   });
 });

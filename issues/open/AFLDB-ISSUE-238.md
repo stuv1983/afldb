@@ -2,7 +2,33 @@
 
 ## 0. Status
 
-- **CURRENT STATE (2026-09-29, Slice 8): Slice 8 implementation, DB-free validation and final
+- **CURRENT STATE (2026-09-29, Slice 9): Slice 9 DB-free/static acceptance COMPLETE. Typecheck
+  PASS; 1,516/1,516 DB-free tests PASS; ISSUE-238-introduced lint errors are 0, with 27
+  pre-existing lint errors and 28 warnings recorded as baseline. ISSUE-238 remains Open. Slice 10
+  database rehearsal requires separate authorisation; Slice 11 promotion/rebuild rehearsal remains
+  deferred and the PROD gate `CORRECTED_PROMOTION_REHEARSAL_REQUIRED` remains in place.** Base
+  `3f9fc1fe` (Slices 1–8 committed; Slice 8 at `3f9fc1fe`); Slice 9 is test/tracking only. Operator
+  validation: `npx tsc --noEmit -p .` PASS; core DB-free gate **1,424/1,424 PASS**
+  (`tests/afl-api-identity-correction.test.ts` 132, `tests/correct-afl-api-identity-cli.test.ts`
+  220, `tests/db-test-rebuild.test.ts` 511, `tests/db-promotion-check.test.ts` 413,
+  `tests/player-link-mutations.test.ts` 122, `tests/afl-api-adjudication-recovery.test.ts` 26);
+  secondary affected suites **92/92 PASS** (D-S9-3); combined **1,516/1,516 PASS**; `git diff
+  --check` PASS (LF→CRLF messages are warnings only). Lint (D-S9-2): the 10 Slice-6 (`76d70e38`)
+  `no-explicit-any` errors in `tests/db-promotion-check.test.ts` were remediated with test-only type
+  annotations (no runtime/semantic change); the remaining 27 scoped errors are pre-existing
+  baseline. No production-code change, no migration, no privilege change, no `PLANNER_VERSION`
+  change (still 2), no mutation-plan or fingerprint change, no promotion/rebuild write allow-list
+  change, no PROD-gate change. No database rehearsal (no `code_test_db`, no DEV/PROD database
+  execution, no rebuild/promotion/deployment execution). The pending `afldb_test` integration
+  acceptance is a **Slice-10 prerequisite** (D-S9-4). Case 91 is **U, R** (final-review MED-1):
+  Slice 9's source pin satisfies its **U** half; its real concurrent-writer / row-lock-wait half
+  (**R**) is owned by Slice 10. `CHANGELOG.md` not edited. The untracked
+  repo-root file `second` is untouched. Details, the lint baseline and the Slice-10 entry
+  conditions: §12 slice 9 "Slice-9 disposition". *(Historical, Slice-9 implementation pass: it
+  edited files only and ran no command, so the tests were then added but not yet run — since
+  validated above.)*
+- **Slice 8 final state (historical; Slice 8 was then committed at `3f9fc1fe`): Slice 8
+  implementation, DB-free validation and final
   semantic review COMPLETE. ISSUE-238 remains Open. Next implementation work requires separate
   Slice-9 authorisation; Slice-10/11 database rehearsal remains deferred; the temporary PROD gate
   `CORRECTED_PROMOTION_REHEARSAL_REQUIRED` stays.** Base `9facb9cc` (Slices 1–7 committed; Slice 7
@@ -3368,7 +3394,111 @@ FOR SEPARATE OPERATOR AUTHORISATION.**
        separate Slice-9 authorisation; Slice-10/11 database rehearsal remains deferred.**
 9. **DB-free and full static regression suite**: typecheck, lint and every DB-free suite touched by
    slices 2–8.
-10. **`code_test_db` correction rehearsal** covering every §12.1 case marked **R**.
+   - **Slice-9 disposition (2026-09-29, base `3f9fc1fe`, Slice 8 committed there): Slice 9
+     DB-free/static acceptance COMPLETE. ISSUE-238 remains Open.** Operator decisions D-S9-1…D-S9-5
+     (§13.1). Test-only: the two primary suites, the lint-remediated
+     `tests/db-promotion-check.test.ts` and this runbook/tracking changed; no production file,
+     migration, privilege, role, DSN, allow-list, mutation plan, fingerprint or `PLANNER_VERSION` (2)
+     change; no PROD-gate change (`CORRECTED_PROMOTION_REHEARSAL_REQUIRED` remains). No production
+     code change was required. *(Historical: the implementation and lint-remediation passes edited
+     files only and ran no shell, Git, test, typecheck, lint, database or deployment command; the
+     operator ran the validation below.)*
+     - **Operator validation (final tree):** `npx tsc --noEmit -p .` PASS. Core DB-free gate
+       **1,424/1,424 PASS**: `tests/afl-api-identity-correction.test.ts` 132,
+       `tests/correct-afl-api-identity-cli.test.ts` 220, `tests/db-test-rebuild.test.ts` 511,
+       `tests/db-promotion-check.test.ts` 413, `tests/player-link-mutations.test.ts` 122,
+       `tests/afl-api-adjudication-recovery.test.ts` 26. Secondary affected suites (D-S9-3)
+       **92/92 PASS**: `tests/afl-api-player-bridge-import.test.ts` 36,
+       `tests/afl-api-player-bridge-cli.test.ts` 28, `tests/player-links-page.test.ts` 8,
+       `tests/first-kick-goal-source.test.ts` 20. Combined DB-free Slice-9 gate **1,516/1,516
+       PASS**. `git diff --check` PASS (LF→CRLF messages are warnings only).
+     - **Lint (D-S9-2).** The initial scoped ESLint run (the ISSUE-238 touched surface) found 37
+       errors and 28 warnings. A read-only provenance review (`git blame` against the pre-ISSUE-238
+       base `cdd1b7cd`) attributed 10 errors to ISSUE-238 Slice 6 (`76d70e38`) and 27 to code that
+       predates ISSUE-238; none was uncertain or from a concurrent issue. The 10 Slice-6 errors
+       (`@typescript-eslint/no-explicit-any`, `Record<string, any>` in the §9.1 v3-supersede forgery
+       helpers of `tests/db-promotion-check.test.ts`) were remediated in a separate pass with
+       test-only type annotations — local `ForgedEntry`/`ForgedFile` types for nested forgeries,
+       `Record<string, unknown>` for top-level ones, one narrow cast for the `correctedReplays`
+       delete; no ESLint suppression, no fixture/assertion/test-name change, no runtime change.
+       Post-remediation: `npx eslint tests/db-promotion-check.test.ts` **0 errors**, 2 warnings (the
+       Slice-6 `_dropped` destructures, left as is); `npx tsc --noEmit -p .` PASS;
+       `tests/db-promotion-check.test.ts` 413/413 PASS within the core run. **Final scoped baseline:
+       27 errors, 28 warnings, 0 lint errors attributable to ISSUE-238.** The 27 pre-existing
+       errors — 7 in `tests/db-test-rebuild.test.ts` (`d44e59bb`, `19de5017`, `fd6295fe`) and 20 in
+       `tests/player-link-mutations.test.ts` (`efe328a4`, `e3944db2`, ISSUE-235 `659474db`; the same
+       20 already recorded by ISSUE-237) — are, under D-S9-2, the documented pre-existing baseline,
+       not Slice-9 remediation scope. Warnings are non-blocking under the current lint contract
+       (`eslint .`, no `--max-warnings`) and were not cleaned.
+     - **Acceptance coverage added:** cases 13, 50, 55, 77 and 91 (its **U** half only; see "Case 91
+       ownership" below); case 28 (P1), case 58 (P2) and
+       case 100 (P4) source acceptance; validate-only / case-29 S-half acceptance (P5); cases 10, 52
+       and 54; ORIGINAL write-target allow-list acceptance. Case 73 remains deliberately partial:
+       Q2 was not widened to foreign Brownlow rows.
+     - **Behavioural, planner** (`tests/afl-api-identity-correction.test.ts`, +17): case 13 D-4 two
+       bound deletes → `ambiguous_correction`, D-5 `previous_values` ≠ H (or empty H) →
+       `row_proof_mismatch` (D-6 stays case 12); case 50 L1 verb → `correction_not_bound`, two bound
+       → `ambiguous_correction`, L2 → `correction_values_contradict`, L3 → `key_components_contradict`,
+       L4 → `correction_not_joinable` (ahead of L5–L7); case 55 P7 and B5 → `reconstruction_inconsistent`,
+       with an honest-chain control and the adjacent `out_of_ledger_edit` distinguished; case 77 release
+       without claim, claim from another batch or source version, claim ≠ CD_I's entry →
+       `brownlow_chain_inconsistent` (B3-C); case 10 `jumper_number` whitespace (`'7 '`, `' 7'`) → C3
+       naming `jumper_number` only; case 52 `null_owned` counterpart → exactly the foreign policy (C2/C3,
+       C4/C5); case 54 `match_id` NULL → M on an `afl_api` round row → B5 `out_of_ledger_edit`
+       (`match_id`).
+     - **Behavioural, adapter** (`tests/correct-afl-api-identity-cli.test.ts`, public Q2 re-run over
+       the in-memory reader): case 13 D-4/D-5 and case 50 L1/L2/L3/L4 from durable rows.
+     - **Source pins** (same file, narrow; a pin proves ordering/shape, never concurrency or real
+       SQL): case 91 — both conditional writes in `applyClosureMutations` re-validate the row contract
+       (`assertRowStillMatchesContract`), then refuse unless `count === 1`, before their
+       `canonical_applications` row; P1/case 28 — the `--expect-fingerprint` refusal precedes
+       `openCorrectionBatch` and every mutation; P2/case 58 — the surname STOP (M1
+       `identity_unresolvable`) and the acknowledgement-without-disagreement refusal precede
+       `buildClosure` and any write, and the stored flag is the argument; P4/case 100 — with
+       `lockRows` the planning reads take `FOR UPDATE OF pms, m`, the Brownlow `matches … FOR UPDATE`
+       and the round-match lock, and only `--validate-only` plans unlocked; P5 — validate-only returns
+       before `openCorrectionBatch` and any write helper, the ORIGINAL transaction section holds no
+       `try`/`catch`, and the case-29 `stat_availability` throw sits inside the transaction before the
+       post-write re-plan, finalisation and COMMITTED; case 52 adapter half — a NULL owner reaches
+       the planner as `null_owned`; the ORIGINAL write-target allow-list (planning writes nothing;
+       INSERT `afl_api_identity_adjudications`/`import_batches`/`canonical_applications`; UPDATE
+       `external_identities`/`import_batches`/the closure row/the two typed projections/`data_issues`;
+       DELETE the closure row only). Promotion/rebuild REPLAY keep their own allow-lists.
+     - **Deliberately not added** (existing coverage suffices): the `.catch(` count, fail-closed
+       reads, reporter isolation, no revalidation, `PLANNER_VERSION`,
+       `CORRECTED_PROMOTION_REHEARSAL_REQUIRED`, rebuild v3 strictness, archived-v2 isolation,
+       promotion/rebuild allow-lists, role/DSN contracts, Slice-8 fingerprint exclusion.
+     - **Known items intentionally NOT fixed** (unchanged): case 73 partial (Q2 not widened to
+       foreign Brownlow rows); S6 manual-token CPC LOW; S7 archived-v2 literal SHA hardening, the
+       unreachable corrected-importer diagnostic, the v1 marker wording and INFO notes; S8
+       close-after-COMMIT LOW (Slice-10 real-connection evidence) and DP-5 DateStyle; the Brownlow
+       cache and Coleman DELETE harmless over-reports; cache-section granularity; SV-1 wording;
+       in-doubt COMMIT behaviour.
+     - **Expected counts (historical, implementation pass; since confirmed by the operator run
+       above):** `tests/afl-api-identity-correction.test.ts` 115 → 132,
+       `tests/correct-afl-api-identity-cli.test.ts` 204 → 220; the four regression suites unchanged
+       (1,072), so the core DB-free gate is 1,424.
+     - **Case 91 ownership (final-review MED-1, 2026-09-29).** §12.1 case 91 is reclassified
+       **U → U, R**. **U** is satisfied by the Slice-9 source pin above: static ordering, row-contract
+       re-check and `count === 1` refusal only, with no concurrency or real-SQL claim. **R** is owned
+       by Slice 10 and needs the real `code_test_db` concurrency rehearsal. While the ORIGINAL
+       correction transaction holds the closure row's lock, a match-sheet or Brownlow-admin writer
+       on that row must wait. Once the correction commits, that writer's eventual edit must be
+       treated as post-correction state: explained (L8-d) if its audit is after `c`, otherwise a
+       STOP. The Slice-9 test header's Slice-10 attribution for cases 87, 91 and 100 is therefore
+       accurate and stays as validated.
+     - **Slice-10 entry conditions (none performed now; Slice 10 requires separate
+       authorisation):** Slice 9 committed; the DB-free/static gate passes (met above); the worktree
+       is clean except the protected `second`; `code_test_db` verified at
+       migration 107; privileges reconciled; the pending `afldb_test` integration acceptance
+       (`settle-afl-api.test.ts`, privileges, concurrency) run or explicitly dispositioned; an
+       ISSUE-238 real correction fixture/harness prepared, including a second concurrent session
+       able to hold a match-sheet or Brownlow-admin write against a locked closure row (case 91
+       **R**); the explicit import DSN points to `code_test_db`; the reporter's SELECT permissions
+       checked; no DEV/PROD mutation.
+10. **`code_test_db` correction rehearsal** covering every §12.1 case marked **R**. This explicitly
+    includes case 91's real concurrent-writer / row-lock-wait half (reclassified **U → U, R** at the
+    Slice-9 final review; its **U** half is Slice 9's source pin).
 11. **Promotion and rebuild rehearsal** on `code_test_db` covering every §12.1 case marked **P**,
     including zero-`corrected` parity and the v3 artefact checks. It must prove that no second
     human `corrected` adjudication appears, and that a repeated replay performs no mutation.
@@ -3479,7 +3609,7 @@ also **revises cases 14, 15, 29, 33, 44, 57 and 67 in place** rather than duplic
 | 88 | **A hypothesised `match_sheet_removal`**: the corrected row vanished, M still exists, and a `match_sheet` audit for M exists after c | STOP `correction_target_absent_unexplained` | U, R |
 | 89 | **Post-swap gate FAIL, remediation by re-applying ORIGINAL** on the new live target | full Q1 with a fresh fingerprint; then the census (Q2), the bijection and D15 pass; only then is the promotion accepted | P |
 | 90 | **Post-swap gate FAIL, remediation by rollback** to the retained old target | the old target is live with the late write and its correction intact; the promotion is not accepted | P |
-| 91 | A concurrent writer (match sheet or Brownlow admin) commits between planning and the MOVE | the conditional write affects 0 rows; STOP; rollback. An edit that waits on the row lock is post-correction state: explained if its audit is after c, otherwise STOP | U |
+| 91 | A concurrent writer (match sheet or Brownlow admin) commits between planning and the MOVE | the conditional write affects 0 rows; STOP; rollback. An edit that waits on the row lock is post-correction state: explained if its audit is after c, otherwise STOP. *(Slice-9 final review, MED-1: **U** = Slice 9's source pin, which covers ordering, the re-check and `count === 1` only; **R** = Slice 10, the real concurrent-writer / row-lock-wait rehearsal.)* | U, R |
 | 92 | **PSG whole ledger**: an ordinary `linked`/`revoked` write on the target after §6, including with zero `corrected` rows | PSG STOPs the promotion | U, P |
 | 93 | Row proof: the recorded `preCorrectionContractSha256` ≠ the H reconstruction, or `rowProofs` omits a bound application | STOP `row_proof_mismatch` / `correction_not_bound` | U |
 | 94 | Post-correction admin re-own of a corrected round row: with the matching `brownlow_vote_entry_state` audit (revision n, after c); separately, without it | Q2 PASS `brownlow_admin_reowned`; separately, STOP `ownership_or_stamp_contradicts` | U, R |
@@ -3566,6 +3696,11 @@ wording (`R238-P5-02`, `player_match_stats` only) and the post-correction writer
 | **S8-D2** | **(2026-09-29) Reporting reads occur after the transaction.** Reads needed only for the operator report (player/club slugs, findings, candidates, Coleman season/status context, DP-5 careers) run after the mutation transaction has finished, read-only and best-effort. A report failure after COMMIT keeps the COMMITTED result, says the report is incomplete, exits successfully, and never claims "nothing was written" or a rollback. No distributed transaction between PostgreSQL and reporting/cache work. | **DECIDED (operator)** |
 | **S8-D3** | **(2026-09-29) Promotion/Coleman interaction deferred.** Promotion-replay Coleman staleness (and any promotion DP-5 effect) is not solved in Slice 8; it is recorded for the Slice 11 rehearsal/evidence. No cache invalidation is added to promotion or rebuild REPLAY. | **DEFERRED to Slice 11** |
 | **S8-D4** | **(2026-09-29) STOP reporting is pre-commit.** The post-transaction reporter is never needed to explain a STOP: every Q1/validation STOP satisfies §5.7 from evidence collected before rollback/exit. Every affected season gets a structured §5.10 verdict (a failing one names the season, class, rule and failing step/code); STOP detail lives in the unfingerprinted report context, never in the plan's STOP objects (whose shape is unchanged). | **DECIDED (operator)** |
+| **D-S9-1** | **(2026-09-29, Slice 9) Close the DB-free/U gaps now.** Add tests for cases 13, 50, 55 and 77 and the P1–P5 static/source items, which have no later backstop. Also add case 91's **U** half, a static source pin. Its **R** half, the real concurrent-writer / row-lock-wait behaviour, is backstopped by Slice 10: the Slice-9 final review (MED-1) reclassified the case **U → U, R**. Add the cheap partials 10, 52 and 54 too. Case 73 stays partial exactly as recorded: Q2 is not widened to foreign Brownlow rows to close it. No production-code change; a gap that could only be closed by one is a STOP and a report instead. | **DECIDED (operator)** |
+| **D-S9-2** | **(2026-09-29) Scoped lint.** The operator runs ESLint on the ISSUE-238 touched surface only. No pre-emptive formatting or refactoring; a genuine lint finding in Slice-2–8 code is addressed alone, in a separate remediation pass. **Outcome (2026-09-29):** the 10 Slice-6 errors were remediated test-only; the 27 pre-existing errors and 28 warnings are the recorded baseline (§12 slice 9). | **DECIDED (operator)** |
+| **D-S9-3** | **(2026-09-29) Affected secondary suites** join the Slice-9 gate: `tests/afl-api-player-bridge-import.test.ts`, `tests/afl-api-player-bridge-cli.test.ts`, `tests/player-links-page.test.ts`, `tests/first-kick-goal-source.test.ts`. They are not altered unless a genuine acceptance gap requires it. | **DECIDED (operator)** |
+| **D-S9-4** | **(2026-09-29) Pending `afldb_test` integration acceptance** (`settle-afl-api.test.ts`, privileges, concurrency) is a **Slice-10 prerequisite**, not Slice 9. Slice 9 neither runs nor modifies DB-backed integration acceptance. | **DEFERRED to Slice 10** |
+| **D-S9-5** | **(2026-09-29) Optional extras accepted:** an ORIGINAL write-target allow-list source pin, and cases 10, 52 and 54. Nothing further is added for coverage numbers. | **DECIDED (operator)** |
 
 No new operator decision is required by pass 4. The choices pass 4 made to resolve the review are
 **design choices for the reviewer**, not operator decisions. Where an alternative materially exists,

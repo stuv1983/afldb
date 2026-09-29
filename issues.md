@@ -8,7 +8,7 @@ This table indexes currently open issues. Detailed historical entries below rema
 
 | ID | Title | Severity | Area | State | Next action |
 |---|---|---|---|---|---|
-| AFLDB-ISSUE-238 | Correcting a consumed trusted `afl_api` player link with canonical reattribution | Medium | Admin / player identity — `external_identities` (`afl_api`), `player_match_stats`, `brownlow_round_votes`, `canonical_applications`, derived tables | Open. Design accepted; slices 1–4 done (migrations 106/107 committed; Slice 4 — corrected ledger semantics, every §8.6 reader, admin revoke T21, recovery export v2 — committed at `788bffa2`). Slice 5 (ORIGINAL CLI, `tools/migration/correct_afl_api_identity.ts`) implemented, remediated, then SECOND-remediated after operator review found the passing first remediation semantically incomplete (BG2 paired/season-only binding, three fail-open catches, C11 foreign NOOP, SAT-1 extended bijection, SAT-5 global projections, B4 gathered). Operator validation COMPLETE 2026-09-29: `tsc` PASS; 732/732 tests PASS; `.catch` audit PASS; final Slice-5 semantic/diff review COMPLETE (three §13.2 readings accepted). Slice 5 committed at `b440b226`. Slice 6 (promotion v3 / CPC: CPC, strict v3 artefact, §7.4e `--replay-promotion` REPLAY, CRV, corrected census, D15 v3, ISSUE-250 freeze binding S6-D2, temporary PROD gate `CORRECTED_PROMOTION_REHEARSAL_REQUIRED` S6-D3, still in place): implementation, DB-free validation and final semantic review COMPLETE 2026-09-29 — `tsc` PASS; 815/815 tests PASS (257 planner + correction CLI, 535 promotion + mutation, 23 adjudication recovery); `git diff --check` PASS; no blocking code defect. No database rehearsal (no `code_test_db`, no DEV/PROD REPLAY). Unrelated untracked `second` stays unstaged. Slice 7 (rebuild capture v3; Stage 21 (b′) identity-only rebuild REPLAY straddling D15; Stage 22 SAT-1; recovery v3 + archived-v2 reader; `docs/deployment.md`): implementation, DB-free validation and final semantic review COMPLETE 2026-09-29 (base `76d70e38`) — `tsc` PASS; final combined DB-free suite 1,342/1,342 PASS; `git diff --check` PASS; no CRIT/HIGH; MED-2 (Stage-22 SAT-1 `A.player_id = P′` conjunct) the only code fix required, applied with regression tests. No database rehearsal (no `code_test_db`, no DEV/PROD database, rebuild, promotion, migration or deployment execution); `CORRECTED_PROMOTION_REHEARSAL_REQUIRED` stays. (Historical: the 2026-09-29 implementation pass left Slice 7 uncommitted and awaiting operator DB-free validation, not typechecked or test-run at that time.) Slice 7 committed at `9facb9cc`. Slice 8 (structured ORIGINAL operator report, §8.2 step 11: pre-commit report context — §5.10 per-season verdicts, DP-3/DP-4 with refresh paths, §4.G artefact risk — and a post-transaction read-only, best-effort impact report — exact cache paths, Coleman seasons, open findings, pending candidates, DP-5; Q2 target-absent/post-correction-edit outcomes exposed structurally; report-only, outside the fingerprint, no cache invalidation) implemented 2026-09-29 on base `9facb9cc`; DB-free validation COMPLETE (`npx tsc --noEmit -p .` PASS; focused 319/319 + regression 1,072/1,072 = **1,391/1,391 PASS**; `git diff --check` PASS) and final semantic review COMPLETE (no CRIT/HIGH, no blocking code defect; MED-1 tracking-only; LOW-1/LOW-2 deferred). Fingerprint unchanged, `PLANNER_VERSION` 2, no migration/privilege change. No database rehearsal. Runbook `issues/open/AFLDB-ISSUE-238.md`. | Slice 8 implementation, DB-free validation and final semantic review COMPLETE; ISSUE-238 remains Open; next implementation work requires separate Slice-9 authorisation; Slice-10/11 database rehearsal remains deferred; PROD gate `CORRECTED_PROMOTION_REHEARSAL_REQUIRED` stays |
+| AFLDB-ISSUE-238 | Correcting a consumed trusted `afl_api` player link with canonical reattribution | Medium | Admin / player identity — `external_identities` (`afl_api`), `player_match_stats`, `brownlow_round_votes`, `canonical_applications`, derived tables | Open. Design accepted; slices 1–4 done (migrations 106/107 committed; Slice 4 — corrected ledger semantics, every §8.6 reader, admin revoke T21, recovery export v2 — committed at `788bffa2`). Slice 5 (ORIGINAL CLI, `tools/migration/correct_afl_api_identity.ts`) implemented, remediated, then SECOND-remediated after operator review found the passing first remediation semantically incomplete (BG2 paired/season-only binding, three fail-open catches, C11 foreign NOOP, SAT-1 extended bijection, SAT-5 global projections, B4 gathered). Operator validation COMPLETE 2026-09-29: `tsc` PASS; 732/732 tests PASS; `.catch` audit PASS; final Slice-5 semantic/diff review COMPLETE (three §13.2 readings accepted). Slice 5 committed at `b440b226`. Slice 6 (promotion v3 / CPC: CPC, strict v3 artefact, §7.4e `--replay-promotion` REPLAY, CRV, corrected census, D15 v3, ISSUE-250 freeze binding S6-D2, temporary PROD gate `CORRECTED_PROMOTION_REHEARSAL_REQUIRED` S6-D3, still in place): implementation, DB-free validation and final semantic review COMPLETE 2026-09-29 — `tsc` PASS; 815/815 tests PASS (257 planner + correction CLI, 535 promotion + mutation, 23 adjudication recovery); `git diff --check` PASS; no blocking code defect. No database rehearsal (no `code_test_db`, no DEV/PROD REPLAY). Unrelated untracked `second` stays unstaged. Slice 7 (rebuild capture v3; Stage 21 (b′) identity-only rebuild REPLAY straddling D15; Stage 22 SAT-1; recovery v3 + archived-v2 reader; `docs/deployment.md`): implementation, DB-free validation and final semantic review COMPLETE 2026-09-29 (base `76d70e38`) — `tsc` PASS; final combined DB-free suite 1,342/1,342 PASS; `git diff --check` PASS; no CRIT/HIGH; MED-2 (Stage-22 SAT-1 `A.player_id = P′` conjunct) the only code fix required, applied with regression tests. No database rehearsal (no `code_test_db`, no DEV/PROD database, rebuild, promotion, migration or deployment execution); `CORRECTED_PROMOTION_REHEARSAL_REQUIRED` stays. (Historical: the 2026-09-29 implementation pass left Slice 7 uncommitted and awaiting operator DB-free validation, not typechecked or test-run at that time.) Slice 7 committed at `9facb9cc`. Slice 8 (structured ORIGINAL operator report, §8.2 step 11: pre-commit report context — §5.10 per-season verdicts, DP-3/DP-4 with refresh paths, §4.G artefact risk — and a post-transaction read-only, best-effort impact report — exact cache paths, Coleman seasons, open findings, pending candidates, DP-5; Q2 target-absent/post-correction-edit outcomes exposed structurally; report-only, outside the fingerprint, no cache invalidation) implemented 2026-09-29 on base `9facb9cc`; DB-free validation COMPLETE (`npx tsc --noEmit -p .` PASS; focused 319/319 + regression 1,072/1,072 = **1,391/1,391 PASS**; `git diff --check` PASS) and final semantic review COMPLETE (no CRIT/HIGH, no blocking code defect; MED-1 tracking-only; LOW-1/LOW-2 deferred). Fingerprint unchanged, `PLANNER_VERSION` 2, no migration/privilege change. No database rehearsal. Slice 8 committed at `3f9fc1fe`. Slice 9 (DB-free acceptance/static regression, D-S9-1…D-S9-5; test/tracking only — cases 13/50/55/77/91, case 28/58/100 source acceptance, validate-only / case-29 S half, cases 10/52/54, ORIGINAL write-target allow-list; case 73 stays partial; case 91 reclassified U → U, R at final review, U = Slice-9 source pin, R = Slice-10 real concurrent-writer/row-lock-wait rehearsal) DB-free/static acceptance COMPLETE 2026-09-29 on base `3f9fc1fe`: `npx tsc --noEmit -p .` PASS; core 1,424/1,424 + secondary 92/92 = **1,516/1,516 PASS**; `git diff --check` PASS; lint: the 10 Slice-6 `no-explicit-any` errors remediated test-only, final scoped baseline 27 pre-existing errors + 28 warnings, 0 attributable to ISSUE-238 (D-S9-2). No production-code change, no migration/privilege/`PLANNER_VERSION`/fingerprint/allow-list/PROD-gate change; no database rehearsal. Runbook `issues/open/AFLDB-ISSUE-238.md`. | Slice 9 DB-free/static acceptance COMPLETE; ISSUE-238 remains Open; Slice 10 database rehearsal requires separate authorisation (pending `afldb_test` integration acceptance is a Slice-10 prerequisite; Slice 10 explicitly owns case 91's real concurrent-writer/row-lock-wait R half); Slice 11 deferred; PROD gate `CORRECTED_PROMOTION_REHEARSAL_REQUIRED` stays |
 | AFLDB-ISSUE-234 | Optional AFL API feed expansion (extended statistics, umpires, play-by-play) | Low | Data acquisition — investigation only | Open (2026-09-23); triaged 2026-09-26: REMAINS OPEN / DEFERRED — extended stats, umpires, weather, milestones and `scoreWorm` scoring events are already retained raw (host snapshots; spine payloads per ISSUE-228 §15 Q8), never projected; no product need, no model, terms-of-use (§15 Q8) open | None scheduled; investigate when a product need arises |
 | AFLDB-ISSUE-233 | AFL API season discovery and season rollover ownership | Medium | Data acquisition / season lifecycle — `afl-api-identities.json`, rollover runbook | Open (2026-09-23); 2026-09-26 pass 2: D-233-1/2/3 decided (proposal JSON; season-scoped AFL API Brownlow artefacts beside the master; preserve `afl_api` ownership or refuse); discovery IMPLEMENTED / DB-FREE VALIDATED against the authentic `compseasons` sample (sha256 `fe3f1641…d965`); D-233-2/3 planned, not implemented; runbook `issues/open/AFLDB-ISSUE-233.md` | Implement D-233-3 rebuild census refusal + D-233-2 season-scoped load (runbook §4.3); first `--fetch` discovery on DEV |
 | AFLDB-ISSUE-232 | AFL API operational wiring: systemd timers, Brownlow scheduled settle and admin status | Medium | Deployment / operations — `deploy/afldb-settle-afl-api*`, `settle-status.ts`, `/admin/current-season` | Open (2026-09-23); 2026-09-26: admin panel IMPLEMENTED (`VISUAL: UNVERIFIED`); pass 2: D-232-1 = B (reversal of ISSUE-244 §40), O1, D-232-3 = keep; Brownlow wrapper refreshes fixture identity then settles with `--use-fixture-identity`, IMPLEMENTED / DB-FREE VALIDATED; fixtures CLI moved to the shared F029 loader; units not installed on any host; runbook `issues/open/AFLDB-ISSUE-232.md` | DEV sync + panel eyeball; runbook §7 installation with an observed first Brownlow firing |
@@ -42871,6 +42871,76 @@ Full record: `issues/closed/AFLDB-ISSUE-228.md` §22.22.
   migration or privilege change; `PLANNER_VERSION` remains 2; mutation fingerprint unchanged;
   promotion/rebuild write allow-lists unchanged; `CORRECTED_PROMOTION_REHEARSAL_REQUIRED` remains.
   `CHANGELOG.md` not edited.
+- **Update 2026-09-29 (historical implementation-pass state; superseded by the next update): Slice 8
+  committed at `3f9fc1fe`; Slice 9 (DB-free acceptance and static
+  regression) acceptance tests IMPLEMENTED, uncommitted — awaiting operator DB-free/static
+  validation. ISSUE-238 remains Open.** Operator decisions D-S9-1…D-S9-5 (runbook §13.1). Test and
+  tracking changes only: `tests/afl-api-identity-correction.test.ts` (behavioural: cases 13, 50, 55,
+  77, and the partials 10, 52, 54) and `tests/correct-afl-api-identity-cli.test.ts` (behavioural Q2
+  re-run cases 13/50; narrow source pins for case 91, P1/case 28, P2/case 58, P4/case 100, P5
+  including the case-29 S half, the case-52 adapter mapping, and the ORIGINAL write-target
+  allow-list). **No production-code change**, no migration, no privilege change, no
+  `PLANNER_VERSION` change (2), no mutation-plan/fingerprint/allow-list change, no PROD-gate change.
+  No database rehearsal. The implementation pass ran no shell, Git, test, typecheck, lint, database
+  or deployment command, so nothing has been test-run. Expected counts (static): planner suite 115 →
+  132, CLI suite 204 → 220, core DB-free gate 1,424 with the four regression suites unchanged.
+  Case 73 stays partial as recorded. The pending `afldb_test` integration acceptance is a
+  **Slice-10 prerequisite** (D-S9-4). Slice 10 cannot start until: Slice 9 is committed; the
+  DB-free/static gate passes; the worktree is clean except the protected `second`; `code_test_db`
+  is verified at migration 107; privileges are reconciled; the pending `afldb_test` integration
+  acceptance is run or explicitly dispositioned; an ISSUE-238 real correction fixture/harness is
+  prepared; the explicit import DSN points to `code_test_db`; the reporter's SELECT permissions are
+  checked; and no DEV/PROD mutation occurs. Slice 10/11 remain deferred;
+  `CORRECTED_PROMOTION_REHEARSAL_REQUIRED` remains. `CHANGELOG.md` not edited. Details: runbook §12
+  slice 9 "Slice-9 disposition".
+- **Update 2026-09-29: Slice 9 DB-free/static acceptance COMPLETE. Typecheck PASS; 1,516/1,516
+  DB-free tests PASS; ISSUE-238-introduced lint errors are 0, with 27 pre-existing lint errors and
+  28 warnings recorded as baseline. ISSUE-238 remains Open. Slice 10 database rehearsal requires
+  separate authorisation; Slice 11 promotion/rebuild rehearsal remains deferred and the PROD gate
+  remains in place.** Base `3f9fc1fe`; Slice 9 is test/tracking only.
+  - **Validation (operator, final tree):** `npx tsc --noEmit -p .` PASS. Core DB-free gate
+    **1,424/1,424 PASS**: `tests/afl-api-identity-correction.test.ts` 132,
+    `tests/correct-afl-api-identity-cli.test.ts` 220, `tests/db-test-rebuild.test.ts` 511,
+    `tests/db-promotion-check.test.ts` 413, `tests/player-link-mutations.test.ts` 122,
+    `tests/afl-api-adjudication-recovery.test.ts` 26. Secondary affected suites (D-S9-3)
+    **92/92 PASS**: `tests/afl-api-player-bridge-import.test.ts` 36,
+    `tests/afl-api-player-bridge-cli.test.ts` 28, `tests/player-links-page.test.ts` 8,
+    `tests/first-kick-goal-source.test.ts` 20. Combined DB-free Slice-9 gate **1,516/1,516 PASS**.
+    `git diff --check` PASS (LF→CRLF messages are warnings only).
+  - **Lint (D-S9-2):** the initial scoped ESLint run found 37 errors and 28 warnings. A read-only
+    provenance review attributed 10 errors to ISSUE-238 Slice 6 (`76d70e38`) and 27 to code
+    predating ISSUE-238; none uncertain or concurrent. The 10 Slice-6 `no-explicit-any` errors in
+    `tests/db-promotion-check.test.ts` were remediated with test-only type annotations (no
+    runtime/semantic change, no ESLint suppression). Post-remediation: `npx eslint
+    tests/db-promotion-check.test.ts` 0 errors, 2 warnings; `npx tsc --noEmit -p .` PASS;
+    `tests/db-promotion-check.test.ts` 413/413 PASS within the core run. Final scoped baseline:
+    **27 errors, 28 warnings, 0 lint errors attributable to ISSUE-238**. The 27 pre-existing
+    errors (7 in `tests/db-test-rebuild.test.ts`, 20 in `tests/player-link-mutations.test.ts`)
+    are, under D-S9-2, the documented pre-existing baseline, not Slice-9 remediation scope.
+    Warnings are non-blocking under the current lint contract and were not cleaned.
+  - **Acceptance coverage added:** cases 13, 50, 55, 77 and 91 (its U half only); case 28, case 58 and case 100
+    source acceptance; validate-only / case-29 S-half acceptance; cases 10, 52 and 54; ORIGINAL
+    write-target allow-list acceptance. Case 73 remains deliberately partial as documented (Q2 not
+    widened to foreign Brownlow rows). No production-code change was required.
+  - **Boundaries:** no production-code change; no migration; no privilege change; no
+    `PLANNER_VERSION` change (2); no mutation-fingerprint change; no promotion/rebuild write
+    allow-list change; no PROD-gate change — `CORRECTED_PROMOTION_REHEARSAL_REQUIRED` remains. No
+    database rehearsal: no `code_test_db`, no DEV/PROD database execution, no
+    rebuild/promotion/deployment execution. `CHANGELOG.md` not edited.
+  - **Case 91 ownership (final-review MED-1):** runbook §12.1 case 91 is reclassified **U → U, R**.
+    **U** is satisfied by the Slice-9 source pin (static ordering, row-contract re-check and
+    `count === 1` refusal; no concurrency or real-SQL claim). **R** is owned by Slice 10, which
+    must prove on `code_test_db` that while the correction transaction holds the closure row's
+    lock, a match-sheet or Brownlow-admin writer waits. The writer's eventual edit must then be
+    treated as post-correction state: explained if its audit is after `c`, otherwise a STOP.
+    D-S9-1 and runbook §12 item 10 were updated to match. The validated tests are unchanged.
+  - **Slice-10 prerequisites:** Slice 9 committed; the worktree clean except the
+    protected `second`; `code_test_db` verified at migration 107; privileges reconciled; the
+    pending `afldb_test` integration acceptance (`settle-afl-api.test.ts`, privileges,
+    concurrency) run or explicitly dispositioned (D-S9-4); an ISSUE-238 correction
+    fixture/harness prepared, including a second concurrent session for case 91 **R**; the
+    explicit import DSN naming `code_test_db`; the reporter's SELECT permissions checked; no
+    DEV/PROD mutation.
 
 ## AFLDB-ISSUE-252 — Production promotion cannot reinstate production-owned state that references current-season rebuilt entities absent from `afldb_test`
 
