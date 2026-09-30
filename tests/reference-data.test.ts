@@ -374,9 +374,15 @@ describe('load_reference_data.py', () => {
     it('needs no new grant: privileges.sql is untouched by this repair', () => {
       const privileges = readFileSync(
         join(root, 'tools', 'maintenance', 'privileges.sql'), 'utf8');
-      // The two relations in the closure that afldb_import cannot read stay that way.
+      // The relation in the closure that afldb_import cannot read stays that way.
       expect(privileges).not.toContain('GRANT SELECT ON player_link_match_candidates');
-      expect(privileges).not.toContain('GRANT SELECT ON player_match_period_stats');
+      // AFLDB-ISSUE-253 (migration 109) later granted SELECT on
+      // player_match_period_stats for the Data Editor's deleteMatch, not for
+      // this loader. The guard is unchanged: it now counts that dependent
+      // instead of refusing because it cannot read it, and still refuses when
+      // it is populated. SELECT only -- never a write.
+      expect(privileges).toContain('GRANT SELECT ON player_match_period_stats TO afldb_import');
+      expect(privileges).not.toMatch(/GRANT[^;]*\b(INSERT|UPDATE|DELETE|TRUNCATE)\b[^;]*ON player_match_period_stats\b/);
     });
   });
 
@@ -482,12 +488,18 @@ describe('load_reference_data.py', () => {
       // only, and a clean rebuild's roots are empty, so it is never adjudicated.
       // If seasons is ever truncated while populated, the guard refuses — which is
       // the fail-closed behaviour working, not a privilege to widen here.
+      //
+      // AFLDB-ISSUE-253 (migration 109): player_match_period_stats is still
+      // unregistered, but privileges.sql now grants it SELECT (deleteMatch's
+      // AFLDB-ISSUE-180 pre-check), so of this pair only
+      // player_link_match_candidates remains unreadable to afldb_import.
       for (const t of ['player_link_match_candidates', 'player_match_period_stats']) {
         expect(registered.has(t)).toBe(false);
       }
       const privileges = readFileSync(
         join(root, 'tools', 'maintenance', 'privileges.sql'), 'utf8');
       expect(privileges).toContain('GRANT SELECT ON player_link_resolutions TO afldb_import');
+      expect(privileges).toContain('GRANT SELECT ON player_match_period_stats TO afldb_import');
     });
   });
 

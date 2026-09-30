@@ -18,12 +18,14 @@ import { afterAll, describe, expect, it } from 'vitest';
 
 import {
   AFL_API_ADMIN_MATCH_METHOD,
+  AFL_API_PLAYER_REFERENCE_MANIFEST,
   CORRECTED_PROMOTION_REHEARSAL_REQUIRED,
   CORRECTED_PROMOTION_REQUIRES_FREEZE,
   aflApiIdentityStateSha256,
   aflApiImporterStateSha256,
   aflApiLedgerStateSha256,
   classifyAflApiForwardIdentityRows,
+  validateManifestAgainstCatalogue,
   type AflApiAdjudicationLedgerRow,
   type AflApiCensusRow,
   type AflApiCorrectedReplayEntry,
@@ -47,9 +49,11 @@ import {
   evaluatePlayerMatchStatsAttribution,
   evaluatePlayerMatchStatsMutationEligibility,
   evaluateSeasonTotalIndependence,
+  mutationPlanFingerprint,
   reconstructContract,
   rowContractHash,
   type AttributionResult,
+  type MutationPlan,
   type BrownlowRowEvidence,
   type CanonicalTable,
   type CpcResult,
@@ -103,6 +107,7 @@ import {
   expectedPlayerMatchStatsStamp,
   extractBrownlowVoterEntries,
   foreignBrownlowRowsAtEvent,
+  formatManifestProblems,
   formatOutcome,
   loadEvidenceFile,
   naturalKeyString,
@@ -119,6 +124,7 @@ import {
   runAlreadyCorrectedRerun,
   sat1ExtendedBijectionProblems,
   sat5ProjectionContradictions,
+  withStopDetails,
   type BrownlowEvent,
   type BrownlowEventRow,
   type CanonicalApplicationRow,
@@ -135,8 +141,10 @@ import {
   type Q2Application,
   type Q2BatchRow,
   type Q2CurrentRow,
+  type ReferenceCatalogueRow,
   type SeasonTotalLiveRow,
 } from '../tools/migration/correct_afl_api_identity';
+import { parseCorrectionCliOutput, type CorrectionCliExpectation } from '../tools/db/afl-api-identity-correction-rehearsal';
 
 const scratchDir = mkdtempSync(join(tmpdir(), 'afldb-issue-238-s5-'));
 afterAll(() => rmSync(scratchDir, { recursive: true, force: true }));
@@ -862,6 +870,60 @@ describe('§8.5 re-run on an already-CORRECTED provider is Q2, never "CORRECTED 
     world.applications.push(app({ id: 301, verb: 'update', targetTable: 'player_match_stats', targetKey: PMS_OLD_KEY, importBatchId: 91, sourceVersionSeq: 4, previousValues: { goals: 1 }, newValues: { goals: 2 } }));
     expectStop(await rerun(world), 'D-6', 'mixed_provider_after_correction');
   });
+
+  describe('Slice 10 D12: a Brownlow C4 DELETE verifies its projection against P′ (the correction moved it there)', () => {
+    // CD_I's row inserted with 3 votes, demoted to 0 by I244-F002 (a version without CD_I), then
+    // deleted beside P′'s identical zero-vote row (C4). The correction moved CD_I's projection to P′.
+    const demotion = app({
+      id: 150, verb: 'update', targetTable: 'brownlow_round_votes', targetKey: BRW_OLD_KEY, importBatchId: 52,
+      family: 'brownlow_match_votes', externalRecordId: 'CD_M1', sourceVersionSeq: 2,
+      previousValues: { votes: 3 }, newValues: { votes: 0 }, voterProof: { count: 0, vote: null },
+    });
+    const insert = { ...brwInsert, newValues: { played: true, votes: 3, match_id: 600 } };
+    const snapshot = {
+      id: 901, season: 2025, player_id: P, round_number: 5, played: true, votes: 0, match_id: 600,
+      source_id: AFL_API_SOURCE_ID, source_record_id: 'CD_M1', import_batch_id: 52,
+    };
+    const c4World = (projectionPlayerId: number | null): World => ({
+      ...baseWorld(),
+      batches: [correctionBatch([{
+        table: 'brownlow_round_votes', verb: 'delete', oldKey: BRW_OLD_KEY, newKey: null,
+        preCorrectionContractSha256: rowContractHash(reconstructContract(BROWNLOW_ROUND_VOTES_CONTRACT_FIELDS, [insert, demotion]).fields),
+      }])],
+      applications: [insert, demotion, app({
+        id: 215, verb: 'delete', targetTable: 'brownlow_round_votes', targetKey: BRW_OLD_KEY, importBatchId: K,
+        family: 'brownlow_match_votes', externalRecordId: 'CD_M1', sourceVersionSeq: 2, previousValues: snapshot, newValues: {},
+        voterProof: { count: 0, vote: null },
+      })],
+      rows: [],
+      projections: projectionPlayerId === null ? [] : [{ table: 'brownlow_round_votes', providerMatchId: 'CD_M1', playerId: projectionPlayerId }],
+    });
+
+    it('the projection moved to P′ -> satisfied: NOOP already_corrected_deleted (the post-write re-plan of a real C4 correction)', async () => {
+      const reports = expectSatisfied(await rerun(c4World(P2)));
+      expect(reports).toContain(`NOOP already_corrected_deleted: brownlow_round_votes ${canonicalJson(BRW_OLD_KEY)}`);
+      const postWrite = await checkCorrectionSatisfaction(fakeReader(c4World(P2)), { providerId: CD_I, adjudicationId: 2, currentBatchId: K });
+      expect(postWrite.satisfied).toBe(true);
+    });
+
+    it('projection verification stays mandatory: still naming P, or naming a third player, is a STOP', async () => {
+      expectStop(await rerun(c4World(P)), 'B3-I', 'projection_disagrees');
+      expectStop(await rerun(c4World(31)), 'B3-I', 'projection_disagrees');
+    });
+
+    it('with no projection row the insert payload alone proves B3-I, exactly as before', async () => {
+      expectSatisfied(await rerun(c4World(null)));
+    });
+
+    it('source contract: evaluateBoundDelete attributes H against P′, like evaluateBoundMove, and receives P′ from Q2', () => {
+      const source = toolSource();
+      const del = source.slice(source.indexOf('function evaluateBoundDelete('), source.indexOf('export function evaluateCorrectionSatisfactionQ2('));
+      expect(del).toContain('attributionOverHistory(table, preCorrection, context.providerId, context.pPrimeId, del.projectionPlayerId)');
+      expect(del).not.toContain('context.pId, del.projectionPlayerId');
+      expect(source).toContain('attributionOverHistory(table, preCorrection, context.providerId, context.pPrimeId, move.projectionPlayerId)');
+      expect(source).toContain('evaluateBoundDelete(del, { providerId: evidence.providerId, pId, pPrimeId, aflApiSourceId: evidence.aflApiSourceId })');
+    });
+  });
 });
 
 describe('§8.4: the post-write re-plan runs the SAME Q2 evaluator, with K as the current batch', () => {
@@ -1282,6 +1344,16 @@ describe('fail-closed reads: no in-transaction SQL failure becomes a default val
     await expect(readStatAvailability(failingTx, 2025)).rejects.toThrow('relation does not exist');
   });
 
+  it('the stat_availability read is ordered by stat_key, so the before/after comparison never depends on physical row order (D13)', async () => {
+    const queries: string[] = [];
+    const recordingTx = ((strings: TemplateStringsArray) => {
+      queries.push(strings.join('$').replace(/\s+/g, ' ').trim());
+      return Promise.resolve([]);
+    }) as unknown as TransactionSql;
+    await readStatAvailability(recordingTx, 2025);
+    expect(queries).toEqual(['SELECT * FROM stat_availability WHERE season = $ ORDER BY stat_key']);
+  });
+
   it('an ISSUE-240 finding read error propagates; it never becomes "zero findings"', async () => {
     await expect(resolveAdjudicatedContradictions(failingTx, CD_I, 'id:P2')).rejects.toThrow('relation does not exist');
   });
@@ -1374,6 +1446,26 @@ describe('§5.11 DP-4: match-less dependents keep their loader-justifying partic
       }
     }
     expect(checked).toBeGreaterThan(1000);
+  });
+
+  it('D14: readParticipation casts the bigint row id to int, the representation the candidate reader already uses', () => {
+    const source = toolSource();
+    const reader = source.slice(source.indexOf('async function readParticipation('), source.indexOf('/* ===', source.indexOf('async function readParticipation(')));
+    expect(reader.length).toBeGreaterThan(100);
+    expect(reader).toContain('SELECT pms.id::int AS "pmsRowId"');
+    expect(reader).not.toMatch(/pms\.id AS "pmsRowId"/);
+    // The removed set is built from candidate row ids; every pms.id the tool selects is cast alike.
+    expect(source).not.toMatch(/pms\.id AS /);
+  });
+
+  it('D14: membership is by value AND type, so a string row id never matches the numeric removed set (why the cast matters)', () => {
+    // Numeric id N removed, participation row N -> it no longer justifies the dependent: STOP.
+    expect(run([dependent()], [participation(85, 2025, 3)], [85]).losesParticipation).toHaveLength(1);
+    // An uncast bigint arrives as "85": it would survive its own removal and fail open.
+    const uncast = { pmsRowId: '85', season: 2025, clubOrganizationId: 3 } as unknown as ParticipationRow;
+    expect(run([dependent()], [uncast], [85]).participationRemains).toHaveLength(1);
+    // Control: a genuinely different surviving row still justifies it.
+    expect(run([dependent()], [participation(85, 2025, 3), participation(86, 2025, 3)], [85]).participationRemains).toHaveLength(1);
   });
 });
 
@@ -2640,5 +2732,209 @@ describe('Slice 9 source-contract pins (ORIGINAL; narrow, no concurrency or real
     ]));
     const deletes = [...transaction.matchAll(/DELETE\s+FROM\s+(\$\{tx\(row\.table\)\}|[a-z_.]+)/g)].map((m) => m[1]);
     expect(deletes).toEqual(['${tx(row.table)}']);
+  });
+});
+
+/* ==================================================================== *
+ * Slice 10: the code_test_db rehearsal harness reads the CLI only through its markers
+ * ==================================================================== */
+
+describe('Slice 10 rehearsal: parseCorrectionCliOutput over the CLI\'s own formatOutcome text (fails closed)', () => {
+  const FP = 'a'.repeat(64);
+  const expectFor = (mode: CorrectionArgs['mode']): CorrectionCliExpectation => ({ mode, providerId: 'CD_I9', toPlayerId: 42 });
+  const argsFor = (mode: CorrectionArgs['mode']): CorrectionArgs => ({
+    mode, providerId: 'CD_I9', toPlayerId: 42, adminUserId: 7, note: VALID_NOTE, evidenceFile: 'evidence.txt',
+    expectDatabase: 'code_test_db', expectFingerprint: mode === 'apply' ? FP : null, acknowledgeSurnameDisagreement: false,
+  });
+  const planned: CorrectionOutcome = {
+    kind: 'PLANNED', fingerprint: FP,
+    plan: {
+      plannerVersion: 2, provider: { externalId: 'CD_I9', sourceKey: 'afl_api' },
+      authority: { mode: 'ORIGINAL', netState: 'NONE', ledgerId: null, liveIdentityRowId: 1, previousPlayerIdentity: 'p', playerIdentity: 'p2' },
+      identityAction: 'update_in_place', rows: [], stops: [],
+    },
+    reports: ['NOOP foreign (C11): player_match_stats#3 ... COMMITTED: not a marker at this indent'],
+  };
+  const committed: CorrectionOutcome = {
+    kind: 'COMMITTED', fingerprint: FP, adjudicationId: 5, batchId: '99', moved: 1, deleted: 0, reports: [],
+  };
+  const out = (mode: CorrectionArgs['mode'], outcome: CorrectionOutcome, status: number) =>
+    ({ status, stdout: `${formatOutcome(outcome, argsFor(mode))}\n`, stderr: '' });
+
+  it('PLAN OK: fingerprint and rows planned; COMMITTED: ids and counts; ROLLED_BACK only in dry-run', () => {
+    expect(parseCorrectionCliOutput(out('validate-only', planned, 0), expectFor('validate-only')))
+      .toEqual({ kind: 'PLANNED', fingerprint: FP, rowsPlanned: 0 });
+    expect(parseCorrectionCliOutput(out('apply', committed, 0), expectFor('apply'))).toEqual({
+      kind: 'COMMITTED', fingerprint: FP, adjudicationId: 5, batchId: 99, moved: 1, deleted: 0, reportIncomplete: false });
+    expect(parseCorrectionCliOutput(out('dry-run', { ...committed, kind: 'ROLLED_BACK' } as CorrectionOutcome, 0), expectFor('dry-run')).kind)
+      .toBe('ROLLED_BACK');
+    expect(() => parseCorrectionCliOutput(out('validate-only', committed, 0), expectFor('validate-only'))).toThrow(/COMMITTED in mode/);
+  });
+
+  it('main\'s header-less post-COMMIT text is still COMMITTED, flagged report-incomplete', () => {
+    const text = formatCommittedReportIncomplete(committed as WrittenOutcome, new Error('stdout closed'));
+    const parsed = parseCorrectionCliOutput({ status: 0, stdout: text, stderr: '' }, expectFor('apply'));
+    expect(parsed).toMatchObject({ kind: 'COMMITTED', adjudicationId: 5, reportIncomplete: true });
+  });
+
+  it('STOP: every stop line, its row id and detail, the reference fingerprint; exit 1 required', () => {
+    const stop: CorrectionOutcome = {
+      kind: 'STOP', fingerprint: FP, stops: [
+        { table: 'player_match_stats', rowId: 12, step: 'P6', code: 'brownlow_state_present' },
+        { table: 'player_match_stats', rowId: null, step: 'SV-3', code: 'season_total_depends_on_correction', detail: 'season 2024' },
+      ],
+    };
+    expect(parseCorrectionCliOutput(out('validate-only', stop, 1), expectFor('validate-only'))).toEqual({
+      kind: 'STOP', referenceFingerprint: FP, stops: [
+        { table: 'player_match_stats', rowId: 12, step: 'P6', code: 'brownlow_state_present', detail: null },
+        { table: 'player_match_stats', rowId: null, step: 'SV-3', code: 'season_total_depends_on_correction', detail: 'season 2024' },
+      ] });
+    expect(() => parseCorrectionCliOutput(out('validate-only', stop, 0), expectFor('validate-only'))).toThrow(/exit 0, expected 1/);
+  });
+
+  it('ALREADY_SATISFIED and REFUSED (stderr, exit 1) are classified', () => {
+    expect(parseCorrectionCliOutput(out('apply', { kind: 'ALREADY_SATISFIED', reports: [] }, 0), expectFor('apply')))
+      .toEqual({ kind: 'ALREADY_SATISFIED' });
+    expect(parseCorrectionCliOutput({ status: 1, stdout: '', stderr: 'REFUSED: lock_timeout\n  nothing was written\n' }, expectFor('apply')))
+      .toEqual({ kind: 'REFUSED', message: 'lock_timeout' });
+  });
+
+  it('fails closed: no marker, two markers, a malformed fingerprint, a foreign header, a REFUSED beside a marker', () => {
+    const planText = out('validate-only', planned, 0);
+    expect(() => parseCorrectionCliOutput({ status: 0, stdout: 'done\n', stderr: '' }, expectFor('apply'))).toThrow(/no terminal marker/);
+    expect(() => parseCorrectionCliOutput({ ...planText, stdout: `${planText.stdout}  ALREADY_SATISFIED: x\n` }, expectFor('validate-only')))
+      .toThrow(/2 terminal markers/);
+    expect(() => parseCorrectionCliOutput(out('validate-only', { ...planned, fingerprint: 'F'.repeat(64) } as CorrectionOutcome, 0),
+      expectFor('validate-only'))).toThrow(/not 64 lowercase hex/);
+    expect(() => parseCorrectionCliOutput(planText, { ...expectFor('validate-only'), toPlayerId: 43 })).toThrow(/header .* absent/);
+    expect(() => parseCorrectionCliOutput({ ...planText, stderr: 'REFUSED: x' }, expectFor('validate-only'))).toThrow(/REFUSED together/);
+    expect(() => parseCorrectionCliOutput({ status: 0, stdout: '', stderr: 'REFUSED: x' }, expectFor('apply'))).toThrow(/exit 0, expected 1/);
+  });
+});
+
+/* ==================================================================== *
+ * Slice 10 blocker: the D10 live catalogue is the manifest's own definition (player FKs only)
+ * ==================================================================== */
+
+describe('Slice 10 D10 catalogue: single-column foreign keys to players only, still fail-closed', () => {
+  const readerSql = (): string => {
+    const source = toolSource();
+    const start = source.indexOf('export async function readReferenceCatalogue(');
+    expect(start).toBeGreaterThan(0);
+    return source.slice(start, source.indexOf('\n}\n', start));
+  };
+  /** Exactly what the live reader returns when the schema matches the manifest. */
+  const manifestCatalogue: ReferenceCatalogueRow[] = AFL_API_PLAYER_REFERENCE_MANIFEST.flatMap((e) =>
+    e.playerColumns.map((column) => ({ schema: e.schema, table: e.table, column, constraint: `${e.table}_${column}_fkey` })));
+
+  it('the reader is driven by pg_constraint foreign keys to players, never by a column-name scan', () => {
+    const sql = readerSql();
+    expect(sql).toMatch(/FROM pg_constraint con/);
+    expect(sql).toMatch(/con\.contype = 'f'/);
+    expect(sql).toMatch(/con\.confrelid = 'public\.players'::regclass/);
+    expect(sql).toMatch(/array_length\(con\.conkey, 1\) = 1/);
+    expect(sql).toMatch(/a\.attrelid = con\.conrelid AND a\.attnum = ANY\(con\.conkey\)/);
+    // The defect: every attname = 'player_id' in any relation, indexes and FK-less staging columns included.
+    expect(sql).not.toMatch(/attname\s*=\s*'player_id'/);
+    expect(sql).not.toMatch(/information_schema\.columns|pg_index|FROM pg_attribute/);
+  });
+
+  it('a genuine single-column player FK that the manifest classifies validates clean', () => {
+    expect(manifestCatalogue.some((r) => r.schema === 'public' && r.table === 'player_match_stats' && r.column === 'player_id')).toBe(true);
+    expect(validateManifestAgainstCatalogue(manifestCatalogue, AFL_API_PLAYER_REFERENCE_MANIFEST)).toEqual([]);
+  });
+
+  it('an unrecognised player FK still refuses (D10 stays fail-closed), and renders readably', () => {
+    const catalogue = [...manifestCatalogue,
+      { schema: 'public', table: 'fixture_new_player_ref', column: 'player_id', constraint: 'fixture_new_player_ref_player_id_fkey' }];
+    const problems = validateManifestAgainstCatalogue(catalogue, AFL_API_PLAYER_REFERENCE_MANIFEST);
+    expect(problems).toEqual([{ kind: 'unclassified_table', schema: 'public', table: 'fixture_new_player_ref', columns: ['player_id'] }]);
+    expect(problems.join('; ')).toContain('[object Object]'); // the pre-fix rendering
+    const text = formatManifestProblems(problems, catalogue);
+    expect(text).not.toContain('[object Object]');
+    expect(text).toBe('unclassified_table public.fixture_new_player_ref(player_id) -- player FK not in the manifest'
+      + ' [fixture_new_player_ref_player_id_fkey]');
+  });
+
+  it('every problem kind names its relation and column; problems are joined one per clause', () => {
+    const withoutOne = manifestCatalogue.filter((r) => !(r.table === 'brownlow_vote_entry_state' && r.column === 'two_player_id'));
+    const missing = validateManifestAgainstCatalogue(withoutOne, AFL_API_PLAYER_REFERENCE_MANIFEST);
+    expect(missing).toEqual([{ kind: 'missing_column', schema: 'public', table: 'brownlow_vote_entry_state', column: 'two_player_id' }]);
+    const text = formatManifestProblems([
+      ...missing,
+      { kind: 'not_source_bearing_gained_source_id', schema: 'public', table: 'brownlow_vote_entry_state' },
+    ], withoutOne);
+    expect(text).toBe('missing_column public.brownlow_vote_entry_state.two_player_id -- manifest column has no live player FK; '
+      + 'not_source_bearing_gained_source_id public.brownlow_vote_entry_state -- NOT_SOURCE_BEARING table now has a provenance column');
+    expect(text).not.toContain('[object Object]');
+  });
+
+  it('the refusal path renders through formatManifestProblems, never a raw join of problem objects', () => {
+    const source = toolSource();
+    const assert = source.slice(source.indexOf('async function assertManifestValidatesAgainstCatalogue('));
+    const body = assert.slice(0, assert.indexOf('\n}\n'));
+    expect(body).toContain('${formatManifestProblems(problems, catalogue)}');
+    expect(body).not.toMatch(/problems\.join/);
+  });
+});
+
+describe('Slice 10 D11: a Q1 row STOP prints its named evidence (§5.7; §12.1 cases 10, 16, 52) with the plan and fingerprint unchanged', () => {
+  const plan: MutationPlan = {
+    plannerVersion: PLANNER_VERSION, provider: { externalId: 'CD_I1', sourceKey: 'afl_api' },
+    authority: { mode: 'ORIGINAL', netState: 'NONE', ledgerId: null, liveIdentityRowId: 1, previousPlayerIdentity: 'p', playerIdentity: 'p2' },
+    identityAction: 'update_in_place', rows: [],
+    stops: [
+      { table: 'player_match_stats', rowId: null, step: 'D10', code: 'provenance_unexplained' },
+      { table: 'player_match_stats', rowId: 11, step: 'P7', code: 'out_of_ledger_edit' },
+      { table: 'player_match_stats', rowId: 12, step: 'C3', code: 'collision_values_disagree' },
+    ],
+  };
+  const context = { stopDetails: [
+    { index: 1, detail: 'field(s) differ from reconstruction: goals' },
+    { index: 2, detail: 'field(s) differ: jumper_number' },
+  ] };
+  const args: CorrectionArgs = {
+    mode: 'validate-only', providerId: 'CD_I1', toPlayerId: 42, adminUserId: 7, note: VALID_NOTE,
+    evidenceFile: 'evidence.txt', expectDatabase: 'code_test_db', expectFingerprint: null, acknowledgeSurnameDisagreement: false,
+  };
+
+  it('withStopDetails copies each recorded detail onto the printed STOP by index; a STOP with none prints as before', () => {
+    expect(withStopDetails(plan.stops, context)).toEqual([
+      plan.stops[0],
+      { ...plan.stops[1], detail: 'field(s) differ from reconstruction: goals' },
+      { ...plan.stops[2], detail: 'field(s) differ: jumper_number' },
+    ]);
+    expect(withStopDetails(plan.stops, {})).toEqual(plan.stops);
+  });
+
+  it('attaching the details changes neither the plan, its STOP objects, nor its fingerprint', () => {
+    const before = canonicalJson(plan as unknown as JsonValue);
+    const fingerprint = mutationPlanFingerprint(plan);
+    const printed = withStopDetails(plan.stops, context);
+    expect(canonicalJson(plan as unknown as JsonValue)).toBe(before);
+    expect(plan.stops.some((s) => 'detail' in s)).toBe(false);
+    expect(printed[1]).not.toBe(plan.stops[1]);
+    expect(mutationPlanFingerprint(plan)).toBe(fingerprint);
+  });
+
+  it('formatOutcome prints the named field on each detailed STOP line and leaves a detail-less one unchanged', () => {
+    const text = formatOutcome({ kind: 'STOP', stops: withStopDetails(plan.stops, context), fingerprint: 'f'.repeat(64) }, args);
+    const lines = text.split('\n');
+    expect(lines).toContain('    player_match_stats [D10] provenance_unexplained');
+    expect(lines).toContain('    player_match_stats#11 [P7] out_of_ledger_edit: field(s) differ from reconstruction: goals');
+    expect(lines).toContain('    player_match_stats#12 [C3] collision_values_disagree: field(s) differ: jumper_number');
+  });
+
+  it('source contract: every planner-evaluated row STOP records its detail right after its push, into the report context only; both Q1 STOP returns print through withStopDetails', () => {
+    const source = toolSource();
+    const closure = source.slice(source.indexOf('async function buildClosure('), source.indexOf('async function ownerKeyOf('));
+    expect(closure.match(/stops\.push\(\{[^}]*\}\);\s+detailLastStop\((eligibility|guards|dispositionResult|verdict|participation)\.stop\);/g)).toHaveLength(7);
+    expect(closure).toMatch(/stops\.push\(\{ table: 'player_match_stats', rowId: candidate\.id, step: s\.step, code: s\.code \}\);\s+detailLastStop\(s\);/);
+    expect(closure).toMatch(/artefactRisk: artefactRecurrenceRisk\(\{ providerId, seasonVerdicts \}\),\s+stopDetails,\s+\};/);
+    const run = source.slice(source.indexOf('async function runCorrection('), source.indexOf('export type CorrectionBatchContract'));
+    expect(run.match(/return \{ kind: 'STOP', stops: withStopDetails\(closure\.plan\.stops, closure\.context\), fingerprint, report: closure\.context \};/g))
+      .toHaveLength(2);
+    expect(run).not.toContain('stops: closure.plan.stops,');
+    expect(run.indexOf('const fingerprint = mutationPlanFingerprint(closure.plan);')).toBeLessThan(run.indexOf('withStopDetails('));
   });
 });

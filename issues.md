@@ -8,7 +8,7 @@ This table indexes currently open issues. Detailed historical entries below rema
 
 | ID | Title | Severity | Area | State | Next action |
 |---|---|---|---|---|---|
-| AFLDB-ISSUE-238 | Correcting a consumed trusted `afl_api` player link with canonical reattribution | Medium | Admin / player identity — `external_identities` (`afl_api`), `player_match_stats`, `brownlow_round_votes`, `canonical_applications`, derived tables | Open. Design accepted; slices 1–4 done (migrations 106/107 committed; Slice 4 — corrected ledger semantics, every §8.6 reader, admin revoke T21, recovery export v2 — committed at `788bffa2`). Slice 5 (ORIGINAL CLI, `tools/migration/correct_afl_api_identity.ts`) implemented, remediated, then SECOND-remediated after operator review found the passing first remediation semantically incomplete (BG2 paired/season-only binding, three fail-open catches, C11 foreign NOOP, SAT-1 extended bijection, SAT-5 global projections, B4 gathered). Operator validation COMPLETE 2026-09-29: `tsc` PASS; 732/732 tests PASS; `.catch` audit PASS; final Slice-5 semantic/diff review COMPLETE (three §13.2 readings accepted). Slice 5 committed at `b440b226`. Slice 6 (promotion v3 / CPC: CPC, strict v3 artefact, §7.4e `--replay-promotion` REPLAY, CRV, corrected census, D15 v3, ISSUE-250 freeze binding S6-D2, temporary PROD gate `CORRECTED_PROMOTION_REHEARSAL_REQUIRED` S6-D3, still in place): implementation, DB-free validation and final semantic review COMPLETE 2026-09-29 — `tsc` PASS; 815/815 tests PASS (257 planner + correction CLI, 535 promotion + mutation, 23 adjudication recovery); `git diff --check` PASS; no blocking code defect. No database rehearsal (no `code_test_db`, no DEV/PROD REPLAY). Unrelated untracked `second` stays unstaged. Slice 7 (rebuild capture v3; Stage 21 (b′) identity-only rebuild REPLAY straddling D15; Stage 22 SAT-1; recovery v3 + archived-v2 reader; `docs/deployment.md`): implementation, DB-free validation and final semantic review COMPLETE 2026-09-29 (base `76d70e38`) — `tsc` PASS; final combined DB-free suite 1,342/1,342 PASS; `git diff --check` PASS; no CRIT/HIGH; MED-2 (Stage-22 SAT-1 `A.player_id = P′` conjunct) the only code fix required, applied with regression tests. No database rehearsal (no `code_test_db`, no DEV/PROD database, rebuild, promotion, migration or deployment execution); `CORRECTED_PROMOTION_REHEARSAL_REQUIRED` stays. (Historical: the 2026-09-29 implementation pass left Slice 7 uncommitted and awaiting operator DB-free validation, not typechecked or test-run at that time.) Slice 7 committed at `9facb9cc`. Slice 8 (structured ORIGINAL operator report, §8.2 step 11: pre-commit report context — §5.10 per-season verdicts, DP-3/DP-4 with refresh paths, §4.G artefact risk — and a post-transaction read-only, best-effort impact report — exact cache paths, Coleman seasons, open findings, pending candidates, DP-5; Q2 target-absent/post-correction-edit outcomes exposed structurally; report-only, outside the fingerprint, no cache invalidation) implemented 2026-09-29 on base `9facb9cc`; DB-free validation COMPLETE (`npx tsc --noEmit -p .` PASS; focused 319/319 + regression 1,072/1,072 = **1,391/1,391 PASS**; `git diff --check` PASS) and final semantic review COMPLETE (no CRIT/HIGH, no blocking code defect; MED-1 tracking-only; LOW-1/LOW-2 deferred). Fingerprint unchanged, `PLANNER_VERSION` 2, no migration/privilege change. No database rehearsal. Slice 8 committed at `3f9fc1fe`. Slice 9 (DB-free acceptance/static regression, D-S9-1…D-S9-5; test/tracking only — cases 13/50/55/77/91, case 28/58/100 source acceptance, validate-only / case-29 S half, cases 10/52/54, ORIGINAL write-target allow-list; case 73 stays partial; case 91 reclassified U → U, R at final review, U = Slice-9 source pin, R = Slice-10 real concurrent-writer/row-lock-wait rehearsal) DB-free/static acceptance COMPLETE 2026-09-29 on base `3f9fc1fe`: `npx tsc --noEmit -p .` PASS; core 1,424/1,424 + secondary 92/92 = **1,516/1,516 PASS**; `git diff --check` PASS; lint: the 10 Slice-6 `no-explicit-any` errors remediated test-only, final scoped baseline 27 pre-existing errors + 28 warnings, 0 attributable to ISSUE-238 (D-S9-2). No production-code change, no migration/privilege/`PLANNER_VERSION`/fingerprint/allow-list/PROD-gate change; no database rehearsal. Runbook `issues/open/AFLDB-ISSUE-238.md`. | Slice 9 DB-free/static acceptance COMPLETE; ISSUE-238 remains Open; Slice 10 database rehearsal requires separate authorisation (pending `afldb_test` integration acceptance is a Slice-10 prerequisite; Slice 10 explicitly owns case 91's real concurrent-writer/row-lock-wait R half); Slice 11 deferred; PROD gate `CORRECTED_PROMOTION_REHEARSAL_REQUIRED` stays |
+| AFLDB-ISSUE-238 | Correcting a consumed trusted `afl_api` player link with canonical reattribution | Medium | Admin / player identity — `external_identities` (`afl_api`), `player_match_stats`, `brownlow_round_votes`, `canonical_applications`, derived tables | Open. Design accepted; slices 1–4 done (migrations 106/107 committed; Slice 4 — corrected ledger semantics, every §8.6 reader, admin revoke T21, recovery export v2 — committed at `788bffa2`). Slice 5 (ORIGINAL CLI, `tools/migration/correct_afl_api_identity.ts`) implemented, remediated, then SECOND-remediated after operator review found the passing first remediation semantically incomplete (BG2 paired/season-only binding, three fail-open catches, C11 foreign NOOP, SAT-1 extended bijection, SAT-5 global projections, B4 gathered). Operator validation COMPLETE 2026-09-29: `tsc` PASS; 732/732 tests PASS; `.catch` audit PASS; final Slice-5 semantic/diff review COMPLETE (three §13.2 readings accepted). Slice 5 committed at `b440b226`. Slice 6 (promotion v3 / CPC: CPC, strict v3 artefact, §7.4e `--replay-promotion` REPLAY, CRV, corrected census, D15 v3, ISSUE-250 freeze binding S6-D2, temporary PROD gate `CORRECTED_PROMOTION_REHEARSAL_REQUIRED` S6-D3, still in place): implementation, DB-free validation and final semantic review COMPLETE 2026-09-29 — `tsc` PASS; 815/815 tests PASS (257 planner + correction CLI, 535 promotion + mutation, 23 adjudication recovery); `git diff --check` PASS; no blocking code defect. No database rehearsal (no `code_test_db`, no DEV/PROD REPLAY). Unrelated untracked `second` stays unstaged. Slice 7 (rebuild capture v3; Stage 21 (b′) identity-only rebuild REPLAY straddling D15; Stage 22 SAT-1; recovery v3 + archived-v2 reader; `docs/deployment.md`): implementation, DB-free validation and final semantic review COMPLETE 2026-09-29 (base `76d70e38`) — `tsc` PASS; final combined DB-free suite 1,342/1,342 PASS; `git diff --check` PASS; no CRIT/HIGH; MED-2 (Stage-22 SAT-1 `A.player_id = P′` conjunct) the only code fix required, applied with regression tests. No database rehearsal (no `code_test_db`, no DEV/PROD database, rebuild, promotion, migration or deployment execution); `CORRECTED_PROMOTION_REHEARSAL_REQUIRED` stays. (Historical: the 2026-09-29 implementation pass left Slice 7 uncommitted and awaiting operator DB-free validation, not typechecked or test-run at that time.) Slice 7 committed at `9facb9cc`. Slice 8 (structured ORIGINAL operator report, §8.2 step 11: pre-commit report context — §5.10 per-season verdicts, DP-3/DP-4 with refresh paths, §4.G artefact risk — and a post-transaction read-only, best-effort impact report — exact cache paths, Coleman seasons, open findings, pending candidates, DP-5; Q2 target-absent/post-correction-edit outcomes exposed structurally; report-only, outside the fingerprint, no cache invalidation) implemented 2026-09-29 on base `9facb9cc`; DB-free validation COMPLETE (`npx tsc --noEmit -p .` PASS; focused 319/319 + regression 1,072/1,072 = **1,391/1,391 PASS**; `git diff --check` PASS) and final semantic review COMPLETE (no CRIT/HIGH, no blocking code defect; MED-1 tracking-only; LOW-1/LOW-2 deferred). Fingerprint unchanged, `PLANNER_VERSION` 2, no migration/privilege change. No database rehearsal. Slice 8 committed at `3f9fc1fe`. Slice 9 (DB-free acceptance/static regression, D-S9-1…D-S9-5; test/tracking only — cases 13/50/55/77/91, case 28/58/100 source acceptance, validate-only / case-29 S half, cases 10/52/54, ORIGINAL write-target allow-list; case 73 stays partial; case 91 reclassified U → U, R at final review, U = Slice-9 source pin, R = Slice-10 real concurrent-writer/row-lock-wait rehearsal) DB-free/static acceptance COMPLETE 2026-09-29 on base `3f9fc1fe`: `npx tsc --noEmit -p .` PASS; core 1,424/1,424 + secondary 92/92 = **1,516/1,516 PASS**; `git diff --check` PASS; lint: the 10 Slice-6 `no-explicit-any` errors remediated test-only, final scoped baseline 27 pre-existing errors + 28 warnings, 0 attributable to ISSUE-238 (D-S9-2). No production-code change, no migration/privilege/`PLANNER_VERSION`/fingerprint/allow-list/PROD-gate change; no database rehearsal. Runbook `issues/open/AFLDB-ISSUE-238.md`. | **Slice 11 COMPLETE 2026-09-30: 19/19 `code_test_db` P cases accepted** (45, 46, 60 by the rebuild/recovery paths; 33 promotion portion, 34–43, 63, 64, 65, 80, 86 by `tools/db/afl-api-identity-promotion-rehearsal.ts`; final authoritative streamanator `--all`: 18/18 variants, 245/245 checks, `ACCEPTANCE_EXIT=0`, residue 0 and `issue238_s11_target` absent before and after; no production-code change). Next: DEV promotion rehearsal of the re-levelled 44, 66, 67, 89, 90, 92 and case 33's PSG/post-swap sub-clause; item 12 (DEV read-only acceptance); S6-D3 decided 2026-09-30: `CORRECTED_PROMOTION_REHEARSAL_REQUIRED` stays until both pass, then is removed as a separate narrow production-code change with tests; no evidence cleanup until then. **DEV promotion rehearsal design APPROVED 2026-09-30 (D-1…D-7, handoff Part K.1):** D-1 = an intermediate implementation commit/merge to `main` through migration 109 (with ISSUE-253/254) plus the normal DEV deploy, not closing ISSUE-238, gate unchanged; D-2/D-6 conditionally authorise the FX1/FX2 seed, exactly one real DEV `--apply` (FX1) and the bounded DEV rehearsal; `afldb_prod` out of scope. Phase 0 `MODE=pre` ran once 2026-09-30 (read-only; STOP on script defects, corrected as P0-A…P0-J): `afldb_dev` OID 202860 at 1–104 with 105–109 pending (DEV reaches 109 by applying every pending migration, currently 105–109); test DBs at 109/109; players pinned; D-1 = bundle → temp ref → `--ff-only` onto deployed `main` `8fc60404`. OPEN (handoff K.4): K4-1 the three DEV F1 `brownlow_vote_entry_state` dependencies are on 2025 matches, which ISSUE-252 `prepare-source` (2026-only) cannot resolve (their absence is itself unverified, P0-J); K4-2 GitHub vs host-local `main`; K4-3 `db:privileges` placement. Next = corrected `MODE=pre` rerun. **Update 2026-09-30: the corrected rerun PASSED (`pre-20260930-223306`, `CLEAN_FOR_REVIEW`, 1 non-blocking NOTE); dependency probe CLEAN, so K4-1 is closed with no action; K4-2 = push to GitHub before DEV runs it; K4-3 = migrate + privileges from the primary checkout, then `sync-dev.ps1`. Next = D-1 (handoff K.5): one 26-path intermediate commit in the host ISSUE repo → bundle → `--ff-only` → push → migrate/privileges/deploy → `MODE=post`.** *(Superseded: "Execution not started; next = Phase 0 read-only".)* *(Superseded below: the Slice 10 status.)* Slice 10 COMPLETE 2026-09-30 (55/55 R cases; *superseded: "IN PROGRESS (NOT complete)"*): prerequisites done; Checkpoint B COMPLETE 2026-09-29 — case 1 proven twice on `code_test_db` after two fixes (D10 catalogue FK-driven; `afldb_import` SELECT on `data_edits`); privilege verification on `afldb_test` + migration 108 (that SELECT grant, migration-backed) COMPLETE 2026-09-29, both test DBs at 108/108, terminal migration now 108. Brownlow fixture foundation + case 29 (R half) COMPLETE 2026-09-29: Run A/B 32/32 each, COMMITTED, 2092 `stat_availability` byte-identical, zero residue. Concurrency foundation + cases 87, 91 (R half) and 100 COMPLETE 2026-09-29: real PostgreSQL blocking observed (`pg_blocking_pids`/`pg_locks`); 87 REFUSED on lock_timeout against a live settle-resolver holder, nothing written; 91 real match-sheet writer blocked by the correction, Q2 `ALREADY_SATISFIED` via L8-d; 100 real match-sheet insert and Brownlow draft both blocked on `matches … FOR UPDATE`. pms-closure families pass 2026-09-29: Family A (2, 16, 23, 48, 51) COMPLETE; defect D11 (Q1 row STOPs did not name the field) FIXED output-only under operator authorisation (plan/fingerprint unchanged); defect D12 (every Brownlow C4 DELETE refused by its own post-write Q2) FIXED under operator authorisation (`evaluateBoundDelete` verifies the projection against P′); Families B (9, 10, 11, 12, 52) and E match-sheet (70, 88, 101) COMPLETE; Brownlow Family C (5–8, 53, 54, 76, 78, 79, 83; 15 scenarios) COMPLETE after D13 (`readStatAvailability` unordered read spuriously refused Brownlow corrections) FIXED under operator authorisation (`ORDER BY stat_key`); Brownlow/dependent Family D (3, 4, 17–19, 56, 84, 85; 16 scenarios) COMPLETE 2026-09-29 after D14 (`readParticipation` uncast `bigint` row id arrived as a JS string, so DP-4 could never STOP, fail-open) FIXED under operator authorisation (`pms.id::int`); corrected-state / Q2 cases 20, 21, 27 (×2) and 69 PASS 2026-09-29, then STOPPED at case 72 on a production finding outside the correction code (the real `deleteMatch` throws `42501 permission denied for table player_match_period_stats`: its AFLDB-ISSUE-180 pre-check runs as `afldb_import`, which holds no grant on that table per AFLDB-ISSUE-141 Decision A; not fixed); 40/55 R cases complete, 15 remain. The `deleteMatch` finding was resolved as AFLDB-ISSUE-253 and integrated into this working tree 2026-09-30 (migrations 108 → 109; combined privileges reconciled idempotently on both test DBs); 2026-09-30 the corrected-state / Q2 group COMPLETED: 72 (real `deleteMatch` → `post_correction_edit match_deleted`; staging Brownlow observations detached, not deleted), 73 (documented partial: Q2 not widened to foreign Brownlow rows), 94 audited PASS `brownlow_admin_reowned` / no-audit STOP `ownership_or_stamp_contradicts`, 98 draft-audit STOP `post_correction_edit_unexplained`, 99 finalise `match_id` NULL → M PASS; no production defect; 2026-09-30 the target-absence / admin-revoke group COMPLETED: 14 (real `deleteMatch` + `match_deletion` audit after c → NOOP `correction_target_absent`, ALREADY_SATISFIED), 15 match-exists / match-gone (out-of-band absence, no audit → STOP `correction_target_absent_unexplained`), 32 (real `revokeAflApiLink` with the page-loader fingerprint → refused `T21_revoke_corrected`, no write); no production defect; 2026-09-30 Family F (authority / CLI) COMPLETED: 24 importer-unique / admin-linked (another live provider at P′ → STOP `[D8] p_prime_holds_another_provider`), 28 (wrong `--expect-fingerprint` → REFUSED before batch K, sequences untouched; control apply commits), 30 (importer origin → `supersedes_id` NULL), 31 (real admin link H → `supersedes_id` = H, not a newer decoy `linked` row), 58 ×4 (no flag → STOP `[M1] identity_unresolvable`; flag → COMMITTED, stored `true`; flag against an agreeing / absent observation → REFUSED); no production defect; case 82 real manifest-season SV-2a PASS 2026-09-30 (committed manifest, season 2025 = `artefact.last_season`, real 16,120-row corpus byte-identical through teardown: `independent` ×2 → INDEPENDENT SV-2a, COMMITTED; `extra-row` ×2 → one namespaced artefact row → STOP `[SV-2a] season_artefact_unprovable`, nothing written); case 47 (2026-09-30: first run STOPPED on a pre-existing full-rebuild divergence, fixed as AFLDB-ISSUE-254 `09737a8a` and integrated into this working tree; rerun from a fresh fixture 29/29: real correction COMMITTED, real committed `rebuild_derived.py` on `code_test_db`, B == C with frees and the zero-games career row now matching, zero non-fixture drift, footprint unchanged, residue 0); **55/55 R cases complete — SLICE 10 COMPLETE.** Next: Slice 11 (promotion/rebuild rehearsal, §12.1 P cases) under its own authorisation; *(superseded: "54/55, 1 remains (47); 47 next"; "53/55, 2 remain (47, 82); 82 next"; "48/55, 7 remain; Family F next"; "45/55, 10 remain")*; Slice 11 deferred; PROD gate `CORRECTED_PROMOTION_REHEARSAL_REQUIRED` stays. *(Superseded: "Slice 9 DB-free/static acceptance COMPLETE; Slice 10 requires separate authorisation".)* |
 | AFLDB-ISSUE-234 | Optional AFL API feed expansion (extended statistics, umpires, play-by-play) | Low | Data acquisition — investigation only | Open (2026-09-23); triaged 2026-09-26: REMAINS OPEN / DEFERRED — extended stats, umpires, weather, milestones and `scoreWorm` scoring events are already retained raw (host snapshots; spine payloads per ISSUE-228 §15 Q8), never projected; no product need, no model, terms-of-use (§15 Q8) open | None scheduled; investigate when a product need arises |
 | AFLDB-ISSUE-233 | AFL API season discovery and season rollover ownership | Medium | Data acquisition / season lifecycle — `afl-api-identities.json`, rollover runbook | Open (2026-09-23); 2026-09-26 pass 2: D-233-1/2/3 decided (proposal JSON; season-scoped AFL API Brownlow artefacts beside the master; preserve `afl_api` ownership or refuse); discovery IMPLEMENTED / DB-FREE VALIDATED against the authentic `compseasons` sample (sha256 `fe3f1641…d965`); D-233-2/3 planned, not implemented; runbook `issues/open/AFLDB-ISSUE-233.md` | Implement D-233-3 rebuild census refusal + D-233-2 season-scoped load (runbook §4.3); first `--fetch` discovery on DEV |
 | AFLDB-ISSUE-232 | AFL API operational wiring: systemd timers, Brownlow scheduled settle and admin status | Medium | Deployment / operations — `deploy/afldb-settle-afl-api*`, `settle-status.ts`, `/admin/current-season` | Open (2026-09-23); 2026-09-26: admin panel IMPLEMENTED (`VISUAL: UNVERIFIED`); pass 2: D-232-1 = B (reversal of ISSUE-244 §40), O1, D-232-3 = keep; Brownlow wrapper refreshes fixture identity then settles with `--use-fixture-identity`, IMPLEMENTED / DB-FREE VALIDATED; fixtures CLI moved to the shared F029 loader; units not installed on any host; runbook `issues/open/AFLDB-ISSUE-232.md` | DEV sync + panel eyeball; runbook §7 installation with an observed first Brownlow firing |
@@ -42441,6 +42441,95 @@ Full record: `issues/closed/AFLDB-ISSUE-228.md` §22.22.
   - **Follow-up.** None. Runbook §5 is the operator procedure if the uncovered case happens; a PROD
     target needs a separate operator decision.
 
+## AFLDB-ISSUE-253 — Data Editor `deleteMatch` fails on a reconciled database (period-stats read privilege; AFL API Brownlow staging link)
+
+- **Severity:** High. Every Data Editor match deletion failed on any database whose privileges had
+  been reconciled.
+- **Area:** Admin / match deletion. Key files:
+  - `src/db/queries/match-admin.ts` (`deleteMatch`);
+  - `tools/maintenance/privileges.sql`;
+  - `src/db/migrations/109_import_reads_player_match_period_stats.sql`.
+- **Status:** Resolved 2026-09-30 on `afldb_test` / `code_test_db` evidence. **Uncommitted**, and
+  awaiting operator review and integration into the ISSUE-238 line.
+  - Worktree `D:\dev\afldb-issue-253`, branch `issue/253-delete-match-runtime-contract`, based on
+    ISSUE-238 HEAD `d279c8e0` (migrations 106–108 are the ISSUE-238 line's).
+  - Runbook and full evidence: `issues/closed/AFLDB-ISSUE-253.md`.
+- **Found:** 2026-09-30, by AFLDB-ISSUE-238 Slice 10 case 72, **but not caused by ISSUE-238**.
+  Both blockers reproduce through the real writer with no ISSUE-238 code involved.
+
+### Symptom
+- **Defect A.** `deleteMatch` runs as `afldb_import`. Its AFLDB-ISSUE-180 pre-check reads
+  `player_match_period_stats` and threw `42501 permission denied for table
+  player_match_period_stats` before anything was deleted.
+- **Defect B.** Once A was fixed, a match carrying a settled AFL API Brownlow vote set hit `23503`
+  on `afl_api_brownlow_vote_match_id_fkey`. The generic fallback turned that into a misleading
+  "Retry the deletion" refusal.
+
+### Root cause
+- **Defect A.**
+  - Migration 062 never granted the table.
+  - AFLDB-ISSUE-142 Decision A kept it out of `import_writable_tables`, rightly, since registration
+    means full DML. It never assessed a read-only grant.
+  - `privileges.sql` therefore reconciled it to `REVOKE ALL`, while ISSUE-180's read assumed
+    otherwise.
+- **Defect B.**
+  - `staging.afl_api_brownlow_vote.match_id` (migration 103, nullable, NO ACTION) post-dates the
+    AFLDB-ISSUE-181 FK inventory. A live census of the 13 FKs into `matches(id)` found it the only
+    one `deleteMatch` did not handle.
+
+### Fix
+- **Defect A.**
+  - `GRANT SELECT ON player_match_period_stats TO afldb_import` in `privileges.sql`, after the
+    revoke loop.
+  - Migration 109 carries the same role-guarded grant.
+  - SELECT only; still unregistered; no write, no sequence.
+- **Defect B: detach, not refuse.** Decision D-253-B, runbook §4.
+  - `deleteMatch` now runs `UPDATE staging.afl_api_brownlow_vote SET match_id = NULL WHERE
+    match_id = $M`. It sits after every refusal pre-check and before the deletes, in the same
+    transaction.
+  - It is Option-B resolution enrichment:
+    - no reader consumes it;
+    - its only writer re-points it on every re-projection;
+    - the canonical row it proposes, `brownlow_round_votes.match_id`, is itself `ON DELETE SET NULL`.
+  - The provider observation (row, votes, players, spine version, batch) is kept.
+  - The ISSUE-181 lineup refusal rests on lineup-specific facts (`lineup-store.ts`'s never-relink
+    invariant) that do not hold here.
+  - Deletion audit semantics are unchanged.
+
+### Validation
+Operator-authorised execution on `afldb_test` / `code_test_db` only, via `D:\tmp\issue253\pin-env.mjs`.
+
+- **Migrations and reconcile:** both test DBs at 109/109.
+  - The migrate ACL diff is exactly one line, `afldb_import=r` on the table.
+  - The reconcile is idempotent: a second run is byte-identical.
+- **`match-admin-delete`: 7/7, twice**, with 0 residue. Real writer; new cases:
+  - detach-and-delete (M deleted; observation kept, only `match_id` nulled; one unchanged
+    `match_deletion` audit; unrelated vote set untouched);
+  - refused deletion leaves the link intact;
+  - rollback on a genuine 23503.
+- **`privileges`: 39/39.** Related integration suites PASS. `admin-brownlow` 43/44; its one
+  failure is **pre-existing** data state: 320,861 historical round votes unlinked on the rebuilt
+  `afldb_test`.
+- **DB-free:**
+  - `awards-admin` + `reference-data` + `admin-match-mutations`: 106/107. The one failure is the
+    **pre-existing** §H12 `afl_api_identity_adjudications` list assertion, which fails identically
+    on the base file.
+  - Python cascade contract: PASS.
+- **Static gates:**
+  - `tsc`: PASS.
+  - ESLint: 0 new; 29 pre-existing, all in `reference-data.test.ts`.
+  - `git diff --check`: PASS.
+- **Test-fixture consequence:** the ISSUE-181 race-window trap function is now `SECURITY DEFINER`
+  (test-only). As invoker it cannot write the period-stats table as `afldb_import`.
+
+### Follow-up
+- **Shared test DBs.** The reconciles from this branch dropped ISSUE-238's uncommitted `data_edits`
+  SELECT (`ar` → `a`) on both test DBs. After integration, run `db:privileges:test` and
+  `db:privileges:code-test` from the merged tree.
+- **ISSUE-238.** Case 72 then reruns from a fresh corrected Brownlow fixture, followed by 73, 94, 98
+  and 99. ISSUE-238 stays 40/55 until case 72 passes.
+- **DEV/PROD.** Migration 109 plus `npm run db:privileges` ship with the ISSUE-238 line.
+
 ## AFLDB-ISSUE-238 — Correcting a consumed trusted `afl_api` player link with canonical reattribution
 
 - **Status:** Open (2026-09-24). **Severity:** Medium. **Area:** admin / player identity —
@@ -42941,6 +43030,832 @@ Full record: `issues/closed/AFLDB-ISSUE-228.md` §22.22.
     fixture/harness prepared, including a second concurrent session for case 91 **R**; the
     explicit import DSN naming `code_test_db`; the reporter's SELECT permissions checked; no
     DEV/PROD mutation.
+- **Update 2026-09-29: Slice 10 STARTED (operator-authorised); entry prerequisites partly met;
+  the rehearsal harness is NOT yet built and no §12.1 R case has been rehearsed. Slice 10 is NOT
+  complete.** Base `d279c8e0` (Slice 9 committed), worktree clean except `second`. Workstation run
+  through the `127.0.0.1:55432` SSH tunnel to streamanator, every DSN pinned explicitly (the
+  worktree `.env` names `afldb_dev` and was overridden, never used).
+  - **Migrations:** `tsx tools/db/migrate.ts --target test --status` and `--target code-test
+    --status`: `afldb_test` and `code_test_db` both **107/107 applied, 0 pending**, no checksum
+    drift.
+  - **D-S9-4 integration acceptance on `afldb_test` (run):** `npx vitest run
+    tests/integration/settle-afl-api.test.ts tests/integration/player-link-concurrency.test.ts
+    tests/integration/privileges.test.ts` → **115/116** (612 s): `settle-afl-api` **70/70**,
+    `privileges` **38/38**, `player-link-concurrency` 7/8. The one failure (Interleaving C) was a
+    fixture key collision, not an ISSUE-238 defect: `player-link-concurrency.test.ts:115` inserts
+    `draft_persons.dg_person_id = floor(random() * 1000000)`, which drew the existing key 4843
+    (`23505 draft_persons_source_id_dg_person_id_key`). Re-run alone: **8/8 PASS**. Disposition:
+    prerequisite met; the flaky random key is pre-existing test debt outside ISSUE-238.
+  - **`code_test_db` census (read-only, as `afldb_import`):** 0 `afl_api` identities, 0 `afl_api`
+    `player_match_stats`/`brownlow_round_votes` rows, 0 ledger rows, 0 `canonical_applications`;
+    13,273 players; max season 2025. Every correction lineage must be built by the harness.
+  - **Prerequisites completed (2026-09-29, second session, tracking edits only):**
+    `npm run db:privileges:code-test` (`afldb_owner`@`code_test_db`, via the 55432 tunnel) exit 0;
+    ACL snapshot byte-identical before/after (663 rows) — already at policy, nothing granted or
+    revoked, no policy change. Reporter SELECT check as `afldb_import` on `code_test_db` over the
+    exact `dbImpactReportReader` column sets in READ ONLY transactions: all 8 reads PASS, a write
+    refused `25006`.
+  - **Still outstanding:** fixture-family design, then the ISSUE-238 correction rehearsal harness
+    (55 R cases, including case 91's two-session lock-wait and cases 87/100) — runbook §12 item 10
+    "Slice-10 progress".
+- **Update 2026-09-29: Slice 10 Checkpoint B COMPLETE — case 1 proven twice on `code_test_db`.
+  Slice 10 is NOT complete.** The new harness `tools/db/afl-api-identity-correction-rehearsal.ts`
+  (untracked) guards `code_test_db` and drives the real CLI as a subprocess under `afldb_import`.
+  Two production defects, each blocking every real ORIGINAL correction, were found and fixed under
+  operator authorisation.
+  - **D10 live-catalogue defect:**
+    - Root cause: `readReferenceCatalogue` (`tools/migration/correct_afl_api_identity.ts`) read
+      every `attname = 'player_id'`, including 47 indexes and the FK-less
+      `staging_aflw.player_match_stats`/`scoring_events`. That was 80 rows and 49
+      `unclassified_table` problems, so every mode REFUSED, and the message rendered
+      `[object Object]`.
+    - Fix: the reader is now FK-driven (`pg_constraint`, `contype = 'f'`, `confrelid = players`,
+      single column), the ISSUE-235 `proveNonUse` semantics. It is still fail-closed for an
+      unmanifested player FK. The new `formatManifestProblems` names the relation, column(s) and FK
+      constraint.
+    - Live on `code_test_db`: 38 FK columns, 34 relations, 0 problems.
+  - **`data_edits` runtime privilege defect:**
+    - Symptom: `--apply` rolled back with `permission denied for table data_edits`.
+    - Root cause: the §8.4 post-write Q2 re-plan (`dbCorrectionSatisfactionReader.auditsFor`,
+      which also backs Q2 re-run, promotion replay and rebuild SAT-1) reads `data_edits` as
+      `afldb_import`, which held INSERT only (066).
+    - Fix: `tools/maintenance/privileges.sql` changed from `GRANT INSERT` to
+      `GRANT SELECT, INSERT ON data_edits TO afldb_import`. Nothing else changed: no
+      UPDATE/DELETE/TRUNCATE, sequence USAGE only, not import-writable.
+    - No migration was added; schema stays at 107. Grant widenings 066/068/104 were also
+      migration-backed, so a mirroring migration is an operator decision before DEV/PROD.
+    - A probe of all 26 relations the CLI reads found no other SELECT gap.
+  - **Tests:**
+    - `tests/integration/privileges.test.ts`: `data_edits` `selects: true`, and UPDATE/DELETE/
+      TRUNCATE stay false. It was typechecked; it runs against `afldb_test` only, so re-run it
+      after `db:privileges:test`.
+    - `tests/awards-admin.test.ts`: the reconciler pin updated.
+    - Five D10 tests appended to `tests/correct-afl-api-identity-cli.test.ts`, which is now
+      **230/230**.
+    - Combined DB-free runs: 379/379 (+1 skipped) and 484/484.
+    - `tsc` PASS, `eslint` 0 errors, `git diff --check` PASS.
+  - **`code_test_db` reconcile:** `db:privileges:code-test` exit 0. The 663-row ACL snapshot
+    changed in exactly one line: `public.data_edits` went from `afldb_import=a` to `ar`.
+  - **Runtime proof** as `afldb_import`, rolled back:
+    - SELECT succeeds.
+    - INSERT passes the privilege check and was refused only by the `auth_users` FK (`23503`), as
+      there is no actor row.
+    - UPDATE, DELETE and TRUNCATE are denied with `42501`.
+    - 0 rows were left.
+  - **Case 1 Run A: 23/23 PASS.** `PLAN OK` with fingerprint `a0b5eb55…`, then `COMMITTED` (moved
+    1, deleted 0). All post-state checks passed, the non-fixture fingerprint was unchanged, and
+    teardown left zero residue.
+  - **Case 1 Run B: 23/23 PASS**, from a fresh zero-residue state with fresh ids. `PLAN OK` with
+    fingerprint `24dc70dc…`, then `COMMITTED` (moved 1, deleted 0). The checks and outcomes were
+    identical to Run A, and residue was 0 after.
+  - **Unchanged:** planner, Q2, fingerprint and lock semantics; `PLANNER_VERSION` 2; DEV/PROD
+    untouched; `CORRECTED_PROMOTION_REHEARSAL_REQUIRED` stays.
+  - **Next:** the Brownlow fixture foundation and case 29, then the concurrency cases 87/91/100,
+    then the remaining R cases. Full evidence: runbook §12 item 10, "Checkpoint B".
+- **Update 2026-09-29: privilege verification on `afldb_test` + migration 108 COMPLETE. Slice 10
+  is NOT complete.** Scope was only the `data_edits` grant; no R case ran.
+  - **`afldb_test` reconcile:** `npm run db:privileges:test` as
+    `afldb_owner@127.0.0.1:55432/afldb_test`, with owner/backup DSNs poisoned. Exit 0. The
+    663-row ACL snapshot changed in exactly one line: `public.data_edits` went from
+    `afldb_import=a` to `ar`.
+  - **`tests/integration/privileges.test.ts` on `afldb_test`: 38/38 PASS**, both before and
+    after migration 108. The runtime probe as `afldb_import`, rolled back, found SELECT OK, a
+    real INSERT OK, and UPDATE/DELETE/TRUNCATE each denied with `42501`. 0 rows were left.
+  - **Migration 108 (`src/db/migrations/108_import_reads_data_edits.sql`):** the operator decision
+    left open at Checkpoint B, taken on the 066/068/104 precedent. Each of those import-role grant
+    widenings is migration-backed, role-guarded and mirrored in `privileges.sql`, and 068 is the
+    same SELECT-only widening of an INSERT-only append-only audit table. 108 contains exactly one
+    grant, inside the `pg_roles` guard: `GRANT SELECT ON TABLE public.data_edits TO afldb_import;`.
+    It does not restate the 066 INSERT or sequence USAGE, and grants no UPDATE, DELETE, TRUNCATE
+    or `grant_import_write`.
+  - **Applied, test targets only:** both `afldb_test` and `code_test_db` went from 107/107 to
+    **108/108, 0 pending**, with no checksum drift.
+    - On `code_test_db`, the SELECT was first revoked on purpose, so that 108's own effect could be
+      seen. 108 alone restored `afldb_import=ar`, and the ACL snapshot matched the pre-revoke
+      baseline byte for byte.
+    - On `afldb_test`, 108 was a no-op, because the reconcile had already granted it.
+  - **Idempotence:** `db:privileges:test` and `db:privileges:code-test` after 108 both exited 0,
+    and both ACL snapshots were byte-identical.
+  - **Static tests:** `tests/awards-admin.test.ts` now pins 108 to that single grant, role-guarded
+    and without `grant_import_write`.
+    - Across 9 migration/privilege/CLI suites, 1,076 passed and 1 failed: the known pre-existing
+      `tests/reference-data.test.ts` §H12 omission of the ISSUE-235 table
+      `afl_api_identity_adjudications`, recorded under ISSUE-237. 108 creates no table, so it is
+      unrelated.
+    - `tsc` PASS, targeted `eslint` clean, `git diff --check` PASS.
+  - **Terminal migration is now 108.** Deploy order for ISSUE-238 is migrations 106–108, then
+    `db:privileges`, then the code. Planner, Q2, fingerprint and `PLANNER_VERSION` are unchanged,
+    and so is `CORRECTED_PROMOTION_REHEARSAL_REQUIRED`. Nothing ran on DEV or PROD.
+  - **Next:** the Brownlow fixture foundation and case 29.
+- **Update 2026-09-29: Brownlow fixture foundation + case 29 (R half) COMPLETE. Slice 10 is NOT
+  complete.** Scope was Family C's base and case 29 only; no other case was implemented or run.
+  - **Harness** (untracked `tools/db/afl-api-identity-correction-rehearsal.ts`): `run --case 29`
+    was added.
+    - `brownlowClosureRow` builds CD_M's settled 3/2/1 vote set. That is one stored
+      `brownlow_match_votes` observation, in the real per-match payload shape, and, per voter, an
+      `insert` application, an `afl_api`-owned `brownlow_round_votes` row stamped CD_M, and its
+      typed projection. CD_I's row (3 votes) is at P; two companion voters hold their own rows.
+    - `participation` gives P′ a foreign `afltables` row at M (C1c).
+    - `settleDerived` now also runs the real `recomputeBrownlowCoverage`, as the AFL API Brownlow
+      settle does.
+    - The CLI step and the ledger/identity checks are now shared with case 1.
+    - Teardown, residue and the foreign fingerprint now also cover `brownlow_round_votes`,
+      `staging.afl_api_brownlow_vote` and Brownlow payloads.
+  - **Baseline:** the three 2092 Brownlow `stat_availability` rows are:
+    - round votes: complete;
+    - match votes: not_applicable, 0/1;
+    - season total: not_applicable.
+    - SHA-256 `120c6be0…`.
+    - They were proven a fixed point of the real recompute, in an always-rolled-back transaction.
+  - **Run A: 32/32 PASS.**
+    - Validate: `PLAN OK`, 1 row, with §5.10 `season 2092 … PASS (empty)`.
+    - Apply: `COMMITTED`, moved 1, deleted 0. Batch counts: brownlow_round_votes moved 1,
+      projections moved 1.
+    - The same row id is now at P′, and every other column is byte-identical. The companions, P′'s
+      participation row and P/P′'s derived rows are all unchanged.
+    - 2092 `stat_availability` is byte-identical: `120c6be0…` → `120c6be0…`.
+    - The fixture census delta was exactly +1 application, +1 ledger row, +1 batch. The foreign
+      fingerprint was equal. Teardown left residue 0.
+  - **Run B: 32/32 PASS**, with fresh ids and the same outcomes and SHA. Residue 0.
+  - **Case 1** was re-run once as a harness regression after the shared-helper refactor: 23/23.
+  - **Validation:** CLI + planner DB-free suites 362/362; `tsc` PASS; harness `eslint` clean;
+    `git diff --check` PASS.
+  - **Findings:** no production defect. Noted, not changed: the CLI's `readStatAvailability`
+    compares an unordered `SELECT *`, so it relies on heap order. It held in both runs.
+  - **Unchanged:** planner, Q2, fingerprint, D10, `PLANNER_VERSION` 2, migrations (terminal 108),
+    privileges, and `CORRECTED_PROMOTION_REHEARSAL_REQUIRED`. Nothing ran on DEV or PROD.
+  - **Next:** concurrency infrastructure + cases 87, 91 and 100. Full evidence: runbook §12 item
+    10, "Brownlow fixture foundation + case 29".
+- **Update 2026-09-29: concurrency foundation + cases 87, 91, 100 COMPLETE. Slice 10 is NOT
+  complete.** Only these three R cases were implemented. Everything ran on `code_test_db` via
+  `pin-env.mjs`.
+  - **Harness** (untracked `tools/db/afl-api-identity-correction-rehearsal.ts`):
+    - Sessions are identified by `application_name`: the correction's own
+      `afldb-correct-afl-api-identity-apply` (exactly one backend required), named holder/gate
+      sessions, and each REAL writer's connection, named by adding `application_name` to
+      `AFLDB_IMPORT_DATABASE_URL` for that one call. No production change.
+    - The observer is the harness's `afldb_import` session. No monitoring grant.
+    - `awaitLockWait` polls `pg_stat_activity` + `pg_blocking_pids` + `pg_locks`, bounded, until
+      the backend is waiting on a lock. The case then proves the exact blocker and the lock.
+    - Cleanup is bounded and releases every holder. It cancels only the harness's own backends.
+      `run()` refuses before teardown if any harness or correction backend lingers.
+    - Teardown now has a `lock_timeout` and covers `data_edits` and `brownlow_vote_entry_state`.
+    - Cases 91/100 load the `server-only` writers in-process under
+      `npx tsx --conditions=react-server`.
+  - **Case 87: PASS.**
+    - Holder H is an `afldb_import` transaction that ran the real `resolveAflApiPlayer` and holds
+      `AccessShareLock` on `external_identities`: the settle's lock mode.
+    - The correction's `LOCK TABLE external_identities IN ACCESS EXCLUSIVE MODE` waited with
+      `pg_blocking_pids = {H}`, then exited 1 with `REFUSED: lock_timeout waiting for
+      external_identities …` and "nothing was written", after about 5.1 s.
+    - Census, closure row and identity are byte-identical; no ledger row or batch; residue 0.
+    - Runs B and C: 23/23. Run A failed one harness assertion only ("no xid while waiting": an
+      ACCESS EXCLUSIVE request assigns one); that check was removed.
+  - **Case 91 (R half): PASS.**
+    - Gate G (owner) holds `players` P′ `FOR UPDATE`. The correction takes its closure locks
+      (the `xmax` of M and of the closure row = its xid), then waits on G at its adjudication
+      INSERT.
+    - The real `saveMatchSheet` editing the closure row (P′ line, goals 2 → 3) waits with
+      `pg_blocking_pids = {correction}` exactly, on the correction's xid, holding the tuple lock at
+      M's `ctid`.
+    - G is released after about 0.5 s. The correction COMMITS (moved 1), then the writer succeeds
+      on the moved row.
+    - The writer's audit is about 3 s after `c`. Q2 is observed `ALREADY_SATISFIED` with L8-d
+      `post_correction_edit match_sheet (PASS) … goals 2 -> 3`.
+    - 29/29 on 4 runs.
+  - **Case 100: PASS, both writer forms**, each as its own run on the same topology:
+    - the real match-sheet insert for P at M is blocked by the correction alone, then inserts a
+      new unattributed row at the freed (P, M); the moved row is untouched (27/27 ×4);
+    - the real Brownlow draft naming P is blocked the same way, then refuses `not_participant`, and
+      no entry state or audit is created (26/26 ×3).
+    - brownlow-draft run A failed one harness assertion only (the probe cut query text at 200
+      characters). It now captures 2,000 characters and checks the tuple lock against M's exact
+      `ctid`.
+  - **Regression:** cases 1 (24/24) and 29 (33/33); residue 0. Suites: correction CLI +
+    `match-sheet` + `admin-brownlow-actions` 278/278; `tsc` PASS; harness `eslint` clean;
+    `git diff --check` PASS.
+  - **Findings:** no production defect. INFO (cosmetic, not changed): the lock-timeout refusal
+    prints `REFUSED: REFUSED: …`. The latent `readStatAvailability` ordering note is unchanged.
+  - **Unchanged:** production code, planner, Q2, fingerprint, D10, `PLANNER_VERSION`, migrations
+    (terminal 108), privileges, and `CORRECTED_PROMOTION_REHEARSAL_REQUIRED`. Nothing ran on DEV or
+    PROD.
+  - **Next:** 50 R cases remain. Start with the pms-closure families on case 1's base (A: 2, 16,
+    23, 48, 51; B: 9–12, 52; E: 70, 88, 101), then the Brownlow Family C/D mutations. Full
+    evidence: runbook §12 item 10, "Concurrency foundation".
+- **Slice 10, pms-closure families pass (2026-09-29, eleventh session): Family A COMPLETE; STOPPED
+  on production defect D12; Slice 10 still NOT complete.** Scope: 13 R cases (A: 2, 16, 23, 48,
+  51; B: 9, 10, 11, 12, 52; E: 70, 88, 101) on case 1's base, same pinned `code_test_db`.
+  - **Family A PASS:**
+    - case 2: `votes-0` and `votes-3`, 14/14 each, STOP `[P6] brownlow_state_present`;
+    - case 16: real `saveMatchSheet` edit before the correction, 19/19, STOP `[P7]
+      out_of_ledger_edit: field(s) differ from reconstruction: goals`;
+    - case 23: history inserted through another provider, 17/17, STOP `[P3]
+      mixed_provider_application_history`;
+    - case 48: evidence file present, insert application absent, 15/15, still STOP `[P3]
+      no_application_evidence`;
+    - case 51: a foreign row at P is `NOOP foreign (C11)`; the closure row still MOVEs; 25/25.
+    Every STOP case also proved that the locking `--apply` STOPs identically and writes nothing.
+  - **Defect D11 (FIXED under operator authorisation, output only):** Q1 row STOPs dropped the
+    planner's `detail`, so the differing field was never named (§5.7; §12.1 cases 10/16/52).
+    - The detail is now recorded in the report context (`CorrectionReportContext.stopDetails`) and
+      attached only to the printed STOP (`withStopDetails`).
+    - Unchanged: the plan, the STOP objects, the fingerprint and `PLANNER_VERSION`.
+    - 4 CLI tests were added. Case 1 (24/24) and case 2 (×2) were re-proven after the fix.
+  - **Family B:** case 9's `player_match_stats` C2 half PASSES, 26/26: deleted 1, the P′
+    counterpart is untouched, and there is one `delete` application at the old key.
+  - **Defect D12 (OPEN, awaiting operator authorisation): every Brownlow C4 DELETE correction is
+    refused by its own post-write Q2** (`brownlow_round_votes [B3-I] projection_disagrees`),
+    fail-closed and rolled back. Found on case 9's Brownlow half.
+    - Cause: `evaluateBoundDelete` checks Brownlow B3-I over H against CD_I's CURRENT projection
+      with the player P. The same correction has already moved that projection to P′ (SAT-5).
+    - Proposed fix: compare against P′, as `evaluateBoundMove` does, plus a DB-free test.
+    - Blocks cases 9 (Brownlow half), 12 (Brownlow variant) and 52 (Brownlow-zero).
+  - **Not run:** 10, 11, 12, 52, 70, 88 and 101 (operator stop rule). Their harness scenarios
+    are written and typechecked.
+  - **Harness-only fixes:** the timestamptz epoch, the jsonb text binding, and case 51's
+    recompute-owned `career_game_no`.
+  - **Validation:** `tsc` PASS; CLI + planner + `match-sheet` 382/382; targeted `eslint` 0 errors;
+    `git diff --check` PASS.
+  - **Unchanged:** migrations (108), privileges, lock infrastructure, and
+    `CORRECTED_PROMOTION_REHEARSAL_REQUIRED`. No DEV or PROD.
+  - **R census: 10/55 complete, 45 remain.** Full evidence: runbook §12 item 10,
+    "pms-closure families pass".
+- **Slice 10, D12 resumption (2026-09-29, same session, operator-authorised): pms-closure Families
+  A, B and E COMPLETE; Slice 10 still NOT complete.** *(Supersedes the D12, Family B, "not run" and
+  census items directly above.)*
+  - **D12 FIXED:** `evaluateBoundDelete` now attributes the old-key history against P′ (the same
+    call as `evaluateBoundMove`). A present projection must still name P′: P or a third player
+    STOPs `[B3-I] projection_disagrees`. The pms path is unaffected. No other production change.
+  - **Tests:** 4 DB-free tests added (C4 DELETE satisfied with the projection at P′; STOP at P or a
+    third player; payload-only; source pin). CLI + planner + `match-sheet` 386/386,
+    `db-promotion-check` 413/413, `tsc` PASS, `eslint` 0 errors.
+  - **Family B PASS:**
+    - 9: pms C2 26/26 and Brownlow C4 26/26 (deleted 1, `stat_availability` byte-identical);
+    - 10: kicks, NULL vs 0 (hitouts) and jumper whitespace, 16/16 each, each STOP naming exactly
+      its field;
+    - 11: 15/15, `[P6]`, not C2;
+    - 12: pms and Brownlow, 33/33 each, Q2 `NOOP already_corrected_deleted` in validate-only and
+      apply;
+    - 52: NULL-owned identical 26/26, differing 16/16, Brownlow zero 26/26.
+  - **Family E PASS** (real `saveMatchSheet` after a real correction, each audit about 6.5 s after
+    `c`):
+    - 70: `post_correction_edit match_sheet goals 2 -> 3`, never overwritten by a re-apply, 27/27;
+    - 88: the removal gives STOP `[C14] correction_target_absent_unexplained`, not recreated, 27/27;
+    - 101: `post_correction_reappearance`, both rows untouched, 28/28.
+  - Zero residue after every scenario.
+  - **R census: 18/55 complete, 37 remain.** Next: Brownlow Family C (5–8, 53, 54, 76, 78, 79, 83),
+    then D (3, 4, 17–19, 56, 84, 85). Full evidence: runbook §12 item 10, "D12 resumption".
+- **Slice 10, Brownlow Family C (2026-09-29, twelfth session): COMPLETE; Slice 10 still NOT
+  complete.**
+  - **Defect D13 (FIXED under operator authorisation).**
+    - **Symptom:** case 5's first `--apply` REFUSED `stat_availability changed for season 2092`.
+      The before and after payloads held the same three rows, in a different order.
+    - **Cause:** `readStatAvailability` (`tools/migration/correct_afl_api_identity.ts`) had no
+      `ORDER BY`, while §8.2 step 8 compares an order-sensitive `canonicalJson` array. The rows
+      `recomputeBrownlowCoverage` rewrites change their physical order. The refusal failed safe
+      (rolled back), but it was nondeterministic: case 29's earlier passes were luck.
+    - **Fix:** `ORDER BY stat_key` (the PK is (stat_key, season)), plus one focused CLI test pinning
+      the query text. No other production change.
+  - **Regressions:** case 29 33/33 and case 1 24/24. Family C then ran on a fresh case 5.
+  - **Every case PASS** (15 scenarios, all on their first run after D13; no harness-only defect):
+    - 5: safe MOVE, 33/33;
+    - 6: F002 `{3 -> 0}` accepted, final vote 0, 29/29;
+    - 7: no projection, B3-I proven by the payload, 28/28;
+    - 8: `malformed-entry` and `other-record`, STOP `[B3-I] brownlow_insert_unproven`, 21/21 each;
+    - 53: `source-positive` and `counterpart-positive`, STOP `[C5]`, 18/18 each;
+    - 54: STOP `[B5] out_of_ledger_edit`, naming only `match_id`, 21/21;
+    - 76: F007 release -> claim accepted, final vote = the claim (2), not a second provider, 32/32;
+    - 78: `{votes: 0, match_id: M}` heal accepted, 29/29;
+    - 79: `{votes: 0, played: true}` accepted, 28/28;
+    - 83: STOP `[C1c]` for `no-participation`, `null-match-zero` and `null-match-two` (18/18
+      each); `paired-pms-move` COMMITTED, moved 2, 28/28.
+  - **stat_availability:** 2092 byte-identical in every scenario, against a settled baseline
+    proven a fixed point.
+  - **Cleanup:** zero residue and an equal foreign fingerprint after every scenario.
+  - **Validation (DB-free):** CLI and planner suites 371/371, `tsc` PASS, ESLint 0 errors.
+  - **Schema facts:** an absent insert payload is FK-impossible, so case 8 is unparseable-only.
+    Case 54 runs the non-exported admin resolve step's statement verbatim.
+  - **R census: 28/55 complete, 27 remain.** Next: Family D (3, 4, 17, 18, 19, 56, 84, 85). Full
+    evidence: runbook §12 item 10, "Brownlow Family C".
+- **Slice 10, Brownlow / dependent Family D (2026-09-29): COMPLETE; Slice 10 still NOT complete.**
+  - **Defect D14 (FIXED under operator authorisation).**
+    - **Symptom:** case 85 `loses-participation` planned `PLAN OK`, and its report said the
+      match-less `after_siren_kicks` row "keeps its justifying participation". §12.1 requires STOP
+      `dependent_record_would_be_stale`.
+    - **Cause:** `readParticipation` (`tools/migration/correct_afl_api_identity.ts`) selected
+      `pms.id AS "pmsRowId"` uncast. The `bigint` arrives from postgres.js as a JS string, while the
+      removed-row set comes from the candidate reader's `::int` ids, which are JS numbers.
+      `Set.has("N")` never matched N, so the moved closure row always counted as surviving
+      participation. DP-4 could never STOP: this was fail-open.
+    - **Fix:** `pms.id::int AS "pmsRowId"`, which aligns with the candidate reader's existing
+      `bigint → int` contract. No planner, Q2, fingerprint, report, `PLANNER_VERSION`, locking,
+      migration or privilege change. The `int` narrowing is that existing contract; it is noted,
+      not redesigned.
+    - **Tests:** two CLI tests were added. One pins the query source. The other is a
+      representation regression: numeric N removed means no survival, a string `"N"` would fail
+      open, and a distinct surviving row is still justified. The existing DP-4 tests are
+      unchanged.
+  - **Every case PASS** (16 scenarios). Every STOP was proven on validate-only and on the locking
+    apply, with nothing written:
+    - 3: `demote` and `claim`, STOP `[BG2] foreign_brownlow_dependency`, 19/19 each;
+    - 4: `draft` (real writer) 20/20 and `final` 18/18, STOP `[BG3] brownlow_entry_names_player`;
+    - 17: `votes-written` (real finalise), STOP `[P6] brownlow_state_present`, 22/22;
+      `round-reowned` (real void), STOP `[BG2]`, 24/24;
+    - 18: `after-siren`, STOP `[DP-1]`, 17/17; `unresolved`, COMMITTED with the DP-3 report, 24/24;
+    - 19: `achievement`, STOP `[DP-2]`, 16/16; `debut-change`, COMMITTED, 24/24;
+    - 56: `round-vote` and `games` (real publish), STOP `[SV-1] season_total_depends_on_correction`,
+      22/22 each. The first runs failed 20/22 on a harness assertion only: the first publication
+      is revision 2;
+    - 84: `draft` and `final`, STOP `brownlow_round_votes` `[BG3]`, 20/20 each;
+    - 85 after D14, both variants from zero residue:
+      - `loses-participation`: STOP `[DP-4] dependent_record_would_be_stale`, identical under
+        apply, with no "keeps" report. Ledger 0 and batches 0. The kick, guard and stat rows are
+        byte-identical. 18/18.
+      - `keeps-participation`: a distinct M2 row survives. COMMITTED, moved 1, with the DP-4
+        "keeps … still valid" report. The kick row is byte-identical, and the M2 row is still P's.
+        25/25.
+  - **Cleanup:** zero residue and an equal foreign fingerprint after every scenario.
+  - **Validation (DB-free):** CLI and planner suites 373/373, `tsc` PASS, ESLint 0 errors,
+    `git diff --check` clean.
+  - **R census: 36/55 complete, 19 remain** (reconciled against §12.1): 14, 15, 20, 21, 24, 27,
+    28, 30, 31, 32, 47, 58, 69, 72, 73, 82, 94, 98, 99. Next: the corrected-state / Q2 group (20,
+    21, 27, 69, 72, 73, 94, 98, 99). Full evidence: runbook §12 item 10, "Family D".
+- **Slice 10, corrected-state / Q2 group (2026-09-29): STOPPED at case 72 on a production finding.**
+  Every scenario starts from a real committed correction (validate-only, then apply with that
+  fingerprint), then applies its later state, then re-runs the CLI (`--validate-only` and the
+  locking `--apply`). Production code unchanged this pass.
+  - **20:** re-run with no later activity: ALREADY_SATISFIED, `NOOP already_corrected_moved`, SAT
+    PASS; ledger, correction batches, applications, identity and projections byte-identical. 31/31,
+    twice.
+  - **21:** a later settle through CD_I at P′, written by the production `applyCanonicalUnit()`
+    with the unit `settlePlayerUnit()` builds (resolver CD_I → P′; goals 2 → 3, version 2, batch
+    B2). The L7 application is at or after c by DB timestamp. Q2 ALREADY_SATISFIED, NOOP, no
+    classification line. 35/35.
+  - **27:** `same-target` ALREADY_SATISFIED, 30/30; `other-target` (P″, created after c): STOP
+    `player_match_stats [§5.4] already_corrected_provider … (A corrected CD_I to player P′;
+    --to-player-id is P″)` in both modes, nothing written, P″ untouched, one `corrected` ledger
+    row. 25/25.
+  - **69:** a real `finaliseBrownlowMatch` names P′ for 3 votes; its `finalise` audit is after c.
+    Q2 ALREADY_SATISFIED with `post_correction_edit brownlow_admin: player_match_stats … brownlow_votes
+    null -> 3`. The §5 census (`gateAflApiCorrectedCensus`) PASSes (1 provider, 1 satisfied). D15
+    (`replayAflApiAdjudications`, read only) gives ALREADY_SATISFIED 1, inserted 0. The Brownlow
+    state is byte-identical. 42/42 (run A failed 40/42 on a harness line-up count only, since fixed).
+  - **72 STOP (production finding, not fixed):** the real `deleteMatch` throws `42501 permission
+    denied for table player_match_period_stats`. Its AFLDB-ISSUE-180 pre-check reads that table as
+    `afldb_import`, and by AFLDB-ISSUE-141 Decision A that role holds no grant on it (migration 062
+    never registered it; `privileges.sql` reconciles it to REVOKE ALL). Confirmed on
+    `code_test_db`: `has_table_privilege` false, the registry lacks it, and a direct SELECT raises
+    42501. So every Data Editor match deletion on a reconciled database fails. A second, latent
+    blocker was not reached: `staging.afl_api_brownlow_vote.match_id` (migration 103, no ON
+    DELETE) names M for every settled AFL API vote set, and `deleteMatch` does not pre-check it.
+  - **73, 94, 98, 99 not started** (stop rule).
+  - Regressions: 20 re-run and 70 27/27 after the `correctedPmsBase` change. Residue is 0 after
+    every scenario, and the foreign fingerprint is equal.
+  - **R census: 40/55 complete, 15 remain** (reconciled against §12.1): 14, 15, 24, 28, 30, 31, 32,
+    47, 58, 72, 73, 82, 94, 98, 99. Full evidence: runbook §12 item 10, "Corrected-state / Q2
+    group".
+- **AFLDB-ISSUE-253 integration (2026-09-30).** The case-72 finding was resolved independently as
+  AFLDB-ISSUE-253, and its fix is now integrated into this working tree (uncommitted).
+  - **Migration lineage:** 107 → 108 (ISSUE-238) → 109 (ISSUE-253). Both test DBs report 109/109,
+    with 0 pending and no drift.
+  - **Combined privileges:** `privileges.sql` keeps `data_edits` SELECT, INSERT and adds
+    `player_match_period_stats` SELECT. Reconciled from the combined tree on `afldb_test` and
+    `code_test_db`: the only ACL change is `data_edits` `afldb_import=a` → `ar`, and a second run
+    is byte-identical. The runtime denial matrix PASSes on both.
+  - **Validation:** `match-admin-delete` 7/7, `privileges` 39/39, CLI 241, planner 132; `tsc`
+    PASS.
+  - *(Superseded below)* Case 72 had not been rerun at this point. Details: runbook §12 item 10,
+    "AFLDB-ISSUE-253 integration".
+- **Slice 10, corrected-state / Q2 group COMPLETE (2026-09-30).** Cases 72, 73 (documented
+  partial), 94 (both branches), 98 and 99 PASS on `code_test_db`, each from a real committed
+  correction, with Q2 run in `--validate-only` and the locking `--apply`. No production defect was
+  found. No production, planner, Q2, fingerprint, `PLANNER_VERSION`, locking, migration or
+  privilege change was made; only the untracked harness was extended.
+  - **72 (51/51):** the real `deleteMatch` now succeeds after ISSUE-253.
+    - M is deleted. The corrected round row survives with `match_id` NULL, every other column
+      unchanged.
+    - The three staging Brownlow observations at M survive with `match_id` NULL. The unrelated one
+      (resolved to a sibling match) is byte-identical. No FK to `matches(id)` holds M.
+    - Exactly one `matches/match_deletion` audit exists, after c.
+    - Q2 ALREADY_SATISFIED with `post_correction_edit match_deleted … match_id M -> null`. There is
+      no `correction_target_absent_unexplained` and nothing is recreated.
+    - Harness-only fixes on the way:
+      - a sibling 2092 match, because `recomputeClubSeasons` by design refuses to empty a season;
+      - `club_seasons` added to the teardown set.
+  - **73 (41/41), PARTIAL:** later `afltables` round rows (round 2) for P′ and P, with no stamp,
+    batch or application, and `imported_at` after c. Q2 is ALREADY_SATISFIED, and every row is
+    byte-identical. **Limitation kept:** Q2 prints no line about the foreign rows (no
+    `NOOP foreign`), so it does not validate them (D-S9-1).
+  - **94:** both branches leave the corrected row in the identical re-owned state
+    (`manual_admin_edit`, `entry:<M>:r1`, batch NULL, votes 3). They differ only in provenance.
+    - `audited` (46/46): the real finalise wrote the `finalise` audit, revision 1, after c. PASS
+      `post_correction_edit brownlow_admin_reowned`.
+    - `no-audit` (41/41): no audit and no entry state. STOP `brownlow_round_votes#<id> [L8-b]
+      ownership_or_stamp_contradicts` in both modes; nothing committed.
+  - **98 (42/42):** the real `saveDraftBrownlowMatch` left only a `draft` audit after c, and the row
+    stayed byte-identical. Then `votes` 3 → 0 changed out of band. STOP `[L8-d]
+    post_correction_edit_unexplained: field votes diverges with no recognised writer's audit` in
+    both modes; the draft audit explains nothing.
+  - **99 (47/47):**
+    - Base: an `afl_api` round row {votes 0, `match_id` NULL}, left by a pre-F007 settle plus a
+      later demotion with M still unresolved, then corrected.
+    - After c, the real finalise (three line-up fillers) sets only `match_id` NULL → M; the row
+      stays `afl_api`/`CD_M`.
+    - Q2 ALREADY_SATISFIED with `post_correction_edit brownlow_admin … match_id null -> M`, and the
+      rerun mutates nothing.
+    - Only finalise with the row at 0 and not selected can reach this state.
+  - Regressions 72, 78, 6, 29 and 20 PASS after the shared-helper changes. Residue is 0 after every
+    run, the foreign fingerprint is equal, and there is no lingering backend.
+  - **Validation:**
+    - DB-free: 909/909 (CLI 241, planner 132, `db-promotion-check` 413, `admin-brownlow-actions`
+      32, `brownlow-entry` 91).
+    - `afldb_test`: `match-admin-delete` 7/7; `admin-brownlow` 43/44 (the one failure is the
+      pre-existing preflight P2, 320,861 unlinked rows).
+    - `tsc` PASS; ESLint 0; `git diff --check` clean.
+  - **R census: 45/55 complete, 10 remain** (reconciled against §12.1): 14, 15, 24, 28, 30, 31, 32,
+    47, 58, 82. Slice 10 stays incomplete, and `CORRECTED_PROMOTION_REHEARSAL_REQUIRED` stays.
+    Full evidence: runbook §12 item 10, "Corrected-state / Q2 group completion".
+- **Slice 10, target-absence / admin-revoke group (2026-09-30): 14, 15 ×2 and 32 PASS.** Base `d279c8e0`
+  plus the uncommitted ISSUE-253 integration, on `code_test_db` only. Every scenario began from a real
+  committed correction on a fresh fixture. No production defect was found. Production, planner, Q2,
+  fingerprint, locking, migrations and privileges are unchanged. The harness changes are additions
+  only.
+  - **14 (43/43, twice):** after c, the real `deleteMatch` removed M and the moved (P′, M) row. It
+    wrote exactly one `data_edits` row naming M: `matches/match_deletion` #313, created after c. Q2
+    in both modes was ALREADY_SATISFIED with `NOOP correction_target_absent … (match M deleted after
+    the correction, audited)` and its `(satisfied)` entry citing #313. Nothing was recreated, and the
+    footprint was byte-identical.
+  - **15 (38/38 per variant):** the same corrected base. The moved row disappears out of band, by
+    owner SQL with no writer and no audit.
+    - `match-exists`: the row only.
+    - `match-gone`: also M. P′'s derived `player_clubs` first/last reference to M, the only other FK
+      reference to M, is set to NULL.
+    - No `data_edits` row names M. Q2 in both modes: STOP `player_match_stats [C14]
+      correction_target_absent_unexplained: no durable match_deletion audit explains the absence`.
+      Nothing was recreated or committed.
+    - The pair differs only in provenance, and C14 is satisfied only by M absent PLUS a
+      `match_deletion` audit after c.
+  - **32 (40/40):** the real `readAflApiProviderEvidence` classifies the corrected CD_I `L-H`. The
+    real `revokeAflApiLink`, given the page's own revoke fingerprint, returns `T21_revoke_corrected`
+    with the exact message. It is not T6, and not T19, although the link is used.
+    - No write: identity, ledger (one `corrected` row, no `revoked`), footprint and row are
+      byte-identical, with no `data_edits`. Q2 afterwards: ALREADY_SATISFIED.
+    - INFO: `readLatestAdjudicationId` returns the int8 as a string despite its `number` type. The
+      page and the revoke share the reader, so the fingerprints agree. Not changed.
+  - Two runs hit harness-only faults: case 15 `match-gone` run A (wrong expected `player_clubs`
+    owner) and case 32 run A (a string/number compare). Both were corrected and rerun from zero
+    residue.
+  - **Validation:** DB-free, 7 files, 946/946 (CLI, planner, `db-promotion-check`,
+    `player-link-mutations`, the two adjudication suites, `player-links-page`). `afldb_test`:
+    `match-admin-delete` plus `player-link-concurrency`, 15/15. `tsc` PASS; ESLint 0; `git diff
+    --check` clean. Residue 0, and no backend lingered.
+  - *(Superseded census: 48/55, 7 remain: 24, 28, 30, 31, 47, 58, 82.)* Evidence: runbook §12
+    item 10, "Target-absence / admin-revoke group".
+- **Slice 10, Family F — authority / CLI (2026-09-30): 24 ×2, 28, 30, 31 and 58 ×4 PASS**, on
+  `code_test_db` through `pin-env`, each variant on a fresh fixture from zero residue. No production
+  defect was found and no production, planner, Q2, fingerprint, `PLANNER_VERSION`, locking,
+  promotion-gate, migration or privilege change was made. Harness changes only (untracked
+  `tools/db/afl-api-identity-correction-rehearsal.ts`; case 1 regression 24/24 after the
+  default-preserving shared-helper changes).
+  - **24 (D8), `importer-unique` 21/21 and `admin-linked` 24/24.** Case 1's base plans (PLAN OK)
+    first. Then a second provider CD_K (its own unresolved observation, publishing P′'s surname,
+    candidate retained) becomes the live authority at P′: an importer `unique` row, or the real
+    `linkAflApiProvider` with the page-loader fingerprint (`resolved` + a `linked` row). The CLI's
+    D8 query then finds exactly CD_K. `--validate-only` and the locking `--apply` (given the base's
+    real fingerprint) both STOP with exactly `player_match_stats [D8]
+    p_prime_holds_another_provider`, printing no reference fingerprint (whole-plan STOP). Nothing
+    was written: identities (CD_K's too), ledger, batches, applications, row, projections,
+    candidates, derived rows, census and id sequences are byte-identical.
+  - **28, 23/23.** Validate-only gave F; `--apply --expect-fingerprint F′` (F with its last digit
+    changed) was REFUSED, exit 1, exactly `recomputed fingerprint F does not match
+    --expect-fingerprint F′`, "nothing was written". The batch, ledger and application id
+    sequences did not move, so no INSERT was even attempted (the refusal precedes
+    `openCorrectionBatch`). A re-validate gave the same F; a control apply with F committed
+    (adjudication and batch ids exactly last + 1).
+  - **30, 21/21, and 31, 33/33: the predecessor rule.** Both share everything except the
+    authority lineage: P and P′ share a surname, CD_I's observation publishes it, and its
+    `unresolved_identity` candidate is retained (nothing in the product resolves one), so the
+    surname gate runs and agrees.
+    - 30: CD_I is an importer bootstrap row at P, with no ledger row, so net NONE →
+      `supersedes_id` NULL.
+    - 31: CD_I starts unresolved (U1). The real admin link (page-loader fingerprint) writes H
+      `linked` to P, and the later settle settles the row. A real decoy link of another provider
+      to a third player then makes the newest `linked` row in the ledger NOT H. The correction
+      wrote C with `supersedes_id` = H; H and the decoy are byte-identical.
+    - The rule, confirmed by the writer (`correct_afl_api_identity.ts` `humanOrigin = net.action
+      === 'linked'`) and by `correctionLedgerChainValid` on both ledgers: C supersedes the
+      provider's own NET ledger row when that row is `linked`, else nothing. No importer writes
+      the ledger.
+  - **58 ×4 (§10 M1).** The observed surname is the retained candidate's payload (the CLI's only
+    source), compared with P′ by the production `normaliseSurname`.
+    - `disagreement-no-ack` (17/17): observed `ZZP` vs P′ `ZZPPRIME`. With the flag it plans. Without
+      it, both modes STOP `player_match_stats [M1] identity_unresolvable`; nothing written.
+    - `disagreement-ack` (22/22): COMMITTED; `surname_disagreement_acknowledged` is boolean `true`,
+      written by the CLI's INSERT. The fingerprint is unchanged in kind: validate = apply = batch K
+      = the ledger evidence's `closureFingerprint`.
+    - `ack-no-disagreement` (observed = P′'s exact surname) and `ack-no-observation` (no
+      candidate; an extra variant), 17/17 each: without the flag it plans. With it, both modes are
+      REFUSED `--acknowledge-surname-disagreement was given but the observed surname does not
+      disagree`; nothing written.
+  - Every run: no lingering backend, zero residue, equal foreign fingerprint.
+  - **Validation:** DB-free, 8 files, 996/996 (CLI 241, planner 132, `db-promotion-check` 413,
+    `player-link-mutations` 122, `afl-api-player-evidence` 50, the adjudication suites 26 + 4,
+    `player-links-page` 8). `tsc` PASS; ESLint on the harness 0; `git diff --check` clean.
+  - **R census: 53/55 complete, 2 remain** (re-derived from §12.1): 47, 82. Slice 10 stays
+    incomplete; the PROD gate stays. Next: 82 (real manifest-season rehearsal). Evidence: runbook
+    §12 item 10, "Family F — authority / CLI". *(Superseded by case 82 below.)*
+- **Slice 10 case 82 — real manifest-season rehearsal, SV-2a (2026-09-30): `independent` ×2 and
+  `extra-row` ×2 PASS.** Same base and target as Family F (`code_test_db` only; no migration or
+  privilege change). No production defect was found; the only change was to the harness
+  (`tools/db/afl-api-identity-correction-rehearsal.ts`, untracked).
+  - **Authoritative source:** the committed `data/brownlow/season-votes.manifest.json`, read by the
+    harness rather than hard-coded.
+    - `schema_version` 1. `artefact.csv_sha256` and `identity.csv_sha256` equal the committed
+      CSVs.
+    - 16,120 rows over 98 seasons, 1924–2025, with coverage [1924–1941] and [1946–2025].
+    - The target season is `artefact.last_season`, 2025.
+  - **Real corpus (existing data):** `code_test_db` `brownlow_season_votes` holds exactly those
+    16,120 rows / 98 seasons, all artefact-class, with no authority row. Season 2025 has 188 rows,
+    each resolving to one AFL Tables profile identity.
+    - Before any fixture existed, the product's own `evaluateSv2aEvidence` proved the season
+      independent.
+    - The `manifestBaseline` hashes are in natural-key order: whole table `4b5de9d4…`, season
+      `737c3674…`.
+  - **Fixture (namespaced, removed by teardown):** case 1's P, P′, CD_I, match
+    `issue238-rehearsal:082:1` and one pms closure row, placed IN season 2025 through a new opt-in
+    `world(…, { realSeason })`. That option never inserts a `seasons` row and only reads the
+    season's clubs. `extra-row` adds only a third fixture player plus one `brownlow_season_votes`
+    row (`afltables`, `brownlow-season:2025:players/Z/Zz238_082_Extra.html`).
+  - **`independent` (28/28 ×2):** the real CLI printed `season 2025: INDEPENDENT SV-2a
+    (artefact)` in validate-only and apply. It COMMITTED with the exact fingerprint and moved 1:
+    Run A `2e1c0fe8…` (adjudication 9239146, batch 341), Run B `e2925fa9…`. Case 1's post-state
+    footprint was proved.
+  - **`extra-row` (28/28 ×2):** the product SV-2a fails only step (4), with V at 189 rows against
+    the CSV's 188.
+    - Validate-only and the locking apply both STOP with exactly `player_match_stats [SV-2a]
+      season_artefact_unprovable`.
+    - The report context carries `failed: SV-2a(4)`, and none of (0)/(1)/(3).
+    - Nothing was written: no ledger row, batch or correction application, and the closure and
+      fixture rows are byte-identical.
+  - **Not rehearsed** (they would need a real row or a committed file changed; an ambiguous path is
+    impossible under `external_identities_uq`): the differing-value, missing-row, unresolvable-path
+    and hash-mismatch STOPs. The U tests keep them.
+  - **Preservation and cleanup:**
+    - The historical corpus was byte-identical after setup, after the correction or STOP, and after
+      teardown (a new post-teardown hook in `run()`).
+    - 0 namespaced rows, max(id) back to 16,120, and `data/brownlow/` unchanged.
+    - The evidence file was removed, the foreign fingerprint was equal, no backend lingered and
+      residue was 0.
+    - The `brownlow_season_votes` id sequence advanced once per `extra-row` run (16134 → 16136),
+      with no semantic residue.
+  - **Regression:** case 1 24/24, re-run because `world()` and `run()` changed.
+  - **Validation:** 373/373 (CLI 241 + planner 132). `tsc` PASS; ESLint on the harness 0; `git
+    diff --check` clean.
+  - **R census: 54/55 complete, 1 remains** (re-derived from §12.1): 47. Slice 10 stays
+    incomplete; the PROD gate stays. Next: 47 (full derived-rebuild parity rehearsal). Evidence:
+    runbook §12 item 10, "Case 82 — real manifest-season rehearsal". *(Superseded by case 47
+    below.)*
+- **Slice 10 case 47 — full derived-rebuild parity after a real correction (2026-09-30): PASS,
+  29/29. SLICE 10 COMPLETE.**
+  - **First run (run A): STOPPED; not a correction defect.** The real correction COMMITTED
+    cleanly. The real committed `rebuild_derived.py` then produced B → C = 4 fixture differences:
+    - P′'s `frees_for` / `frees_against` / `frees_recorded_games` went 1 → NULL / NULL / 0 in
+      `player_club_season_stats`, `player_season_stats` and `player_career_stats`;
+    - P's zero-games `player_career_stats` row was REMOVED.
+
+    Non-fixture drift was 0 and the footprint was unchanged. Both components already existed in
+    state A, so the divergence predates the correction. The census stayed 54/55, and tracking was
+    deliberately not updated.
+  - **AFLDB-ISSUE-254** (found by this case, not caused by ISSUE-238) fixed the full rebuild:
+    - frees are now aggregated with the targeted recompute's rules;
+    - an existing zero-games career row is preserved, but none is invented.
+
+    Committed as `09737a8a` on `issue/254-derived-rebuild-parity`.
+  - **Integration (2026-09-30, worktree only, nothing staged).**
+    - Five files had no ISSUE-238 change and were restored from `09737a8a`, blob-identical:
+      `tools/migration/rebuild_derived.py`, `tests/integration/derived-rebuild-parity.test.ts`,
+      `tests/data-overrides-source-contract.test.ts`, `tests/integration/draftguru-import.test.ts`
+      and `issues/closed/AFLDB-ISSUE-254.md`.
+    - The ISSUE-254 blocks of `issues.md` and `CHANGELOG.md` were ported hunk-level. The diff
+      against `09737a8a` equals the prior ISSUE-238 diff against `d279c8e0`.
+    - The index stayed empty.
+  - **Pre-rerun validation (combined tree).**
+    - `derived-rebuild-parity` 1/1 on `afldb_test`, with no 2082 residue. It asserts frees parity,
+      that the existing zero row is kept and that no shell row appears.
+    - DB-free: `data-overrides-source-contract` 66, CLI 241 and planner 132 = 439/439.
+    - `py_compile`, `tsc` and `git diff --check` are clean. ESLint shows 0 errors and 4
+      pre-existing warnings (identical at `d279c8e0`).
+    - Read-only `code_test_db` preflight: frees mismatches against `player_match_stats` were 0 at
+      all three grains, fixture residue 0, no other session.
+  - **Rerun from a fresh fixture (`case047-runB-post254.log`).**
+    - Fixture: P=14451, P′=14452, `CD_I999238000471`, M=17028, closure row pms#685974.
+    - The real correction: validate-only `PLANNED` `948e1d5d…` (1 row), then `--apply
+      --expect-fingerprint` COMMITTED (adjudication 9239151, batch 353, moved 1).
+    - The real committed `python tools/migration/rebuild_derived.py` ran against target
+      `afldb_import@127.0.0.1:55432/code_test_db`. That target was proven first through the
+      script's own `load_env` / `require_env` / `connect_pg`.
+    - It exited 0 in 44.1 s. It wrote `derived_rebuilds` 36–42: the 7 targets in ORDER, scope
+      full, all completed.
+  - **B == C:** 0 fixture differences across `seasons`, `player_clubs`, the three player grains,
+    `club_seasons`, `players` and `player_match_stats` (business key plus every column, excluding
+    only the proven rebuild-local `club_seasons.id` and `player_career_stats.rebuilt_at`).
+    - P′'s frees are 1/1/1 at all three grains in both B and C.
+    - P's zero-games career row is present in C.
+  - **Non-fixture drift: 0** in all 7 relations the rebuild writes (per business key). The
+    semantic foreign fingerprint is equal B → C.
+  - **Correction footprint** (ledger, batch K, applications, CD_I at P′, projections):
+    byte-identical B → C.
+  - **Sequences** advance and are never rewound: `club_seasons_id_seq` 8188 → 9812, and
+    `derived_rebuilds` max id 35 → 42.
+  - **Teardown:** residue 0, no lingering backend. The post-teardown corpus equals the verified
+    post-rebuild state, and frees mismatches are still 0.
+  - **Additional DB-free check:** `db-test-rebuild`, `admin-fixture-actions` and
+    `finals-semantics-contract` = 591/592. The one failure is the pre-existing Windows CRLF
+    `finals-semantics-contract` "enum value" case.
+  - **No production code changed in this pass** beyond the integrated ISSUE-254 commit. There was
+    no migration or privilege change, and no planner / Q2 / fingerprint / identity change.
+  - **R census: 55/55 complete. SLICE 10 COMPLETE.** ISSUE-238 stays open, and
+    `CORRECTED_PROMOTION_REHEARSAL_REQUIRED` stays. Next: Slice 11 (promotion / rebuild
+    rehearsal, the §12.1 P cases), which needs its own authorisation. Evidence: runbook §12
+    item 10, "Case 47 — full derived-rebuild parity".
+- **Slice 11 COMPLETE (2026-09-30): 19/19 `code_test_db` P cases accepted.** Runbook §12 item 11,
+  "Slice-11 progress".
+  - **Scope (S11-D1):** 19 cases on `code_test_db`. The freeze, swap and rollback cases were
+    re-levelled to the DEV promotion rehearsal: 44, 66, 67, 89, 90, 92, and case 33's PSG /
+    post-swap sub-clause.
+  - **Rebuild and recovery (host):**
+    - 45: the real Stage-21 REPLAY hard-STOPs on a non-empty closure, with CPC class 3
+      `PC_STILL_IMPLICATED`, then rolls back.
+    - 46: the real Stage-22 bijection PASSes; it FAILs on a missing `resolved` row and on an orphan.
+    - 60: recovery export and `--validate-only` round-trip the `corrected` row with
+      `previous_player_identity`, both from a fresh export and from the Run-2 v3 capture.
+  - **Run-2 authority retired (Option A):** after the case-60 evidence, the 3 `CD_I9992370002`
+    rows went in one bounded owner transaction, gated by the real Stage-22 check.
+  - **Promotion:** a new harness, `tools/db/afl-api-identity-promotion-rehearsal.ts`, in the
+    ISSUE-242 pattern.
+    - The candidate is `public`; the target is the shadow schema `issue238_s11_target`.
+    - It drives the real restored-phase gates (CPC, G2/G3, the v3 artefact through the strict
+      parser), the plan's ledger reinstatement, the real `--replay-promotion` CLI, and the
+      candidate-phase G1 + CRV. Cases 65 and 86 use D15 and the Q2 census gate.
+    - The Slice-10 fixture builders and namespace are reused, a documented and accepted exception.
+    - Workstation tunnel iteration (S11-D3 relaxed for this harness only) found three harness or
+      fixture defects, fixed narrowly. None was in production code.
+  - **Acceptance:** the final authoritative streamanator `--all` run.
+    - Harness `b8a5073c…4b91f39`, Slice-10 dependency `3a28887d…54fa37`, runbook `87ddbf4e…95ea9e`,
+      tracked patch `b5f315f3…3911cd`.
+    - 18 of 18 variants, 245 of 245 checks, `ACCEPTANCE_EXIT=0`.
+    - Residue 0 and the target schema absent, both before and after.
+  - **ISSUE-238 stays open.** Still to do: the DEV promotion rehearsal of the re-levelled cases,
+    then item 12 (DEV read-only acceptance).
+  - **S6-D3 decided (operator, 2026-09-30).** `CORRECTED_PROMOTION_REHEARSAL_REQUIRED` stays until
+    both pass. Its removal is then a separate, narrow production-code change with tests. There is
+    no commit or evidence cleanup until then. *(The "no commit" part is superseded for one
+    intermediate implementation commit by D-1 below.)*
+- **DEV promotion rehearsal design APPROVED (2026-09-30).** Handoff
+  `issues/open/AFLDB-ISSUE-238-DEV-PROMOTION-HANDOFF.md`, Part K.1 (decisions, ordering) and K.2.
+  - **D-1 (a):** an intermediate commit/merge to `main` of the implementation through migration 109,
+    including the ISSUE-253/254 integration, then the normal DEV deploy/migration. It does not
+    close ISSUE-238; `CORRECTED_PROMOTION_REHEARSAL_REQUIRED` stays unchanged.
+  - **D-2 / D-6 (conditional, in advance):** the FX1 `CD_I9992386001` / FX2 `CD_I9992386002` seed,
+    exactly one real DEV `--apply` (FX1), and the bounded rehearsal (four candidates, three
+    swaps/rollbacks, the owner-injected late writes, retirement, sequence restore, R1 = R0).
+    `afldb_prod` is out of scope. Hard stops as listed in K.1.
+  - **D-3:** the `code_test_db` seed / correction / retirement dry proof first, exact restore.
+  - **D-4:** prevention plus detection accepted. **D-5:** case 89 passes without the contaminated
+    kept database becoming promotion-eligible. **D-7:** cleanup deferred until after item 12, the
+    gate-removal testing, the final commit and provenance verification.
+  - **Script-writing notes (K.2):** P0-1 the read-only source/plan probe is replaced by migration
+    parity plus a dependency probe; P0-2 ISSUE-252 §3a/§3b is optional under `dev`, and Phase 0
+    measures whether DEV's F1/F2 dependencies are held by `afldb_test`; P0-3 `afldb_test` and
+    `code_test_db` must also be at 109.
+  - **Execution: not started.** Next: ordering step 1, Phase 0 read-only
+    (`~/i238dev/p0-phase0.sh`, `MODE=pre`). *(Superseded by the entry below.)*
+- **DEV rehearsal Phase 0 `MODE=pre`, first run (2026-09-30), read-only: `PHASE0_RESULT=STOP` on
+  script defects.** Evidence `/home/arm/i238dev/phase0/pre-20260930-220356` (`phase0.log`
+  `c2afc75b…3a97fff`). Handoff K.3 holds the full baseline.
+  - **Measured:** `afldb_dev` OID 202860, migrations 1–104 applied, **105–109 pending**. DEV reaches
+    109 by applying every pending migration, currently 105–109, not "106–109". `afldb_test` and
+    `code_test_db` are both at 109/109 with the full ISSUE-238 schema and grants.
+  - **DEV census:** 803 AFL API identities (3 / 129 / 397 / 274 by method); an empty ledger; 0 AFL
+    API-owned canonical rows; the reserved `CD_I999238600*` range empty. `code_test_db`
+    `CD_I9992370001` is the retained Slice-11 baseline importer, not residue.
+  - **Pinned:** P1 `Abe_McDougall`, P1′ `Abe_Watson`, P2 `Adam_Garton`, P2′ `Adam_Inglis`
+    (`~/i238dev/state.env`).
+  - **SERVICE0:** `afldb` active and enabled, health 200, no timers. sudo is interactive, with no
+    drop-in.
+  - **Git:** the ISSUE repository and the deployed primary are independent. Deployed `main`
+    `8fc60404` is an ancestor of the ISSUE base `d279c8e0`, so D-1 is a bundle → temporary ref →
+    verify → `--ff-only`.
+  - **Script corrections P0-A…P0-J:**
+    - both env files are loaded;
+    - a missing `AFLDB_TEST_IMPORT_DATABASE_URL` is non-blocking;
+    - the DEV pre-state is exactly 105–109 pending;
+    - the known `code_test_db` baseline is accepted;
+    - `--environment dev --freeze-status` replaces the first run's `prod` invocation, whose output is
+      disregarded;
+    - a real PROD IP is read without echo;
+    - the primary `main` is inspected;
+    - the census wording is corrected;
+    - **P0-J:** the first run's dependency probe split `match_key` on `|`, so its "all absent"
+      result is not established.
+  - **Open (handoff K.4):**
+    - **K4-1:** DEV manifest A lists three F1 `brownlow_vote_entry_state` rows on 2025 matches.
+      ISSUE-252 `prepare-source` is bound to the in-progress season (2026:
+      `promotion-source-dependencies.ts:1079-1096`), and `brownlow_vote_entry_state` has no DEV
+      disposition. So the standard mechanism cannot resolve them, and the route is an operator
+      decision after the rerun's classification.
+    - **K4-2:** GitHub vs host-local `main` for D-1.
+    - **K4-3:** where `db:privileges` runs in D-1.
+  - Next: the corrected `MODE=pre` rerun. *(Superseded by the entry below.)*
+- **Phase 0 `MODE=pre` PASSED on the corrected rerun (2026-09-30).**
+  - Evidence `/home/arm/i238dev/phase0/pre-20260930-223306`: `PHASE0_RESULT=CLEAN_FOR_REVIEW`,
+    exit 0, `STOPS=0`, `NOTES=1` (the absent `AFLDB_TEST_IMPORT_DATABASE_URL`, non-blocking).
+  - Dependency probe with the fixed parser: F1 3 rows, held with the same owner 3, absent 0 —
+    `DEPENDENCY_PROBE CLEAN`. The earlier "gaps" were entirely the P0-J defect.
+  - **K4-1 closed with no action.** No ISSUE-252 preparation is required.
+  - **K4-2 decided:** push the fast-forwarded `main` to GitHub, with `main == origin/main` before
+    DEV runs it. **K4-3 decided:** `db:migrate` + `db:privileges` from the primary checkout, then
+    `sync-dev.ps1`.
+  - Baseline unchanged: `afldb_dev` OID 202860, 104 applied / 105–109 pending, no marker; test DBs
+    at 109/109; `afldb` active, health 200; primary `main` `8fc60404…` still an ancestor.
+  - **Next: D-1** (handoff K.5). One intermediate commit of 26 explicit paths in the host ISSUE
+    repository (parent `d279c8e0`; strays excluded), then bundle → `refs/i238/d1` → `--ff-only`
+    onto primary `main` → push → `db:migrate` + `db:privileges` → `sync-dev.ps1` → `MODE=post`.
+  - The ISSUE-254 content is blob-identical to its unmerged commit `09737a8a`; D-1 lands it on
+    `main` in its place, so that branch must not be merged later.
+
+## AFLDB-ISSUE-254 — Full derived rebuild diverges from the targeted player-derived recompute
+
+- **Severity:** Medium. Derived statistics were wrong on every rebuilt database: frees totals were
+  empty corpus-wide, and zero-games career rows the product had created were erased. No source fact
+  was lost.
+- **Area:** Derived statistics. Key files:
+  - `tools/migration/rebuild_derived.py` (the full rebuild);
+  - `src/db/queries/player-derived.ts` (`recomputePlayerDerivedStats`, the targeted recompute,
+    unchanged).
+- **Status:** Resolved 2026-09-30 on `code_test_db` / `afldb_test` evidence. Committed on its own
+  branch after final review. **Integrated into the ISSUE-238 working tree 2026-09-30**
+  (uncommitted there). ISSUE-238 case 47 then passed from a fresh fixture: B == C, zero
+  non-fixture drift (see ISSUE-238 "Slice 10 case 47").
+  - Worktree `D:\dev\afldb-issue-254`, branch `issue/254-derived-rebuild-parity`, based on
+    ISSUE-238 HEAD `d279c8e0`. No migration.
+  - Runbook and full evidence: `issues/closed/AFLDB-ISSUE-254.md`.
+- **Found:** 2026-09-30, by AFLDB-ISSUE-238 Slice 10 case 47, **but not caused by ISSUE-238**.
+  Both components reproduce through the real targeted recompute and the real committed
+  `rebuild_derived.py`, with no ISSUE-238 code involved.
+
+### Symptom
+After a targeted recompute, a real committed full rebuild changed the derived state:
+- the frees columns of all three player grains went from their values to NULL / NULL / 0;
+- the zero-games `player_career_stats` row of a player whose last match row was deleted was removed.
+
+### Root cause
+- **Frees.**
+  - Migration 065 (`c53e6a3c`) added `frees_for`, `frees_against` and `frees_recorded_games` to
+    `player_club_season_stats`, `player_season_stats` and `player_career_stats`.
+  - Only `player-derived.ts` was taught to fill them. The full rebuild never aggregated them.
+  - On `code_test_db`, 5,950 career, 33,082 season and 33,167 club-season rows disagreed with their
+    own `player_match_stats` frees.
+- **Zero-games row.**
+  - AFLDB-ISSUE-018 gives a created or match-less player a zero-games career row. Three live writers
+    implement it: `createPlayerInTransaction`, the targeted recompute, and the
+    `replay_admin_overrides(players)` replay, which expects the row to survive the rebuild.
+  - The full rebuild's `TRUNCATE` + aggregate erased it. `afldb_test`'s 92 ISSUE-224 S9 registered
+    players have lost theirs.
+
+### Fix
+- **Frees.** The targeted definitions are ported exactly into the three rebuild statements:
+  `sum(frees_for)`, `sum(frees_against)`, and `count(frees_for)` as the recorded-game count.
+- **Zero-games row: preserve, never invent** (runbook §4).
+  - Before its TRUNCATE, the rebuild records every match-less player that already holds a career
+    row, and re-derives each to the targeted zero row.
+  - An AFLDB-ISSUE-108 DraftGuru shell, which never had a row, still has none.
+  - The targeted behaviour is canonical, so no live writer changed.
+
+### Validation
+- **Reproduction:** the unfixed committed rebuild reproduced both components, with zero non-fixture
+  drift.
+- **Fixed committed rebuild, run 1:** fixture B == C.
+  - Non-fixture drift was confined to the three frees columns, on exactly the 33,167 / 33,082 /
+    5,950 previously mismatched rows. With the frees columns left out, drift is 0.
+  - Frees mismatches afterwards: 0.
+- **Fixed committed rebuild, run 2:** 9/9, zero drift of any kind; the corpus digest is unchanged.
+- **Regression test:** new `tests/integration/derived-rebuild-parity.test.ts`. It runs the rebuild's
+  real SQL in a rolled-back transaction: 1/1 on the fix, and it fails on the unfixed script. It
+  asserts both halves of the zero-games rule outright: the existing row survives and the shell
+  gains none.
+- **DB-free suites:** `data-overrides-source-contract` 66/66. The wider DB-free set is 602/603; the
+  one failure is the pre-existing Windows CRLF `finals-semantics-contract` case.
+- **Checks:** `py_compile`, `tsc`, ESLint and `git diff --check` are clean.
+
+### Follow-up
+- **ISSUE-238.** Integrate into the ISSUE-238 line, then re-run ISSUE-238 case 47 from a fresh
+  fixture.
+- **Existing databases.** The next full rebuild of any database fills frees corpus-wide. It does not
+  restore zero-games rows a previous rebuild erased; a targeted recompute or a fresh
+  `db:test:rebuild` does.
+- **INFO, not fixed** (runbook §11). Columns the targeted helpers write but the full rebuild does
+  not re-derive, and a stale "nightly settle runs the rebuild" test comment.
 
 ## AFLDB-ISSUE-252 — Production promotion cannot reinstate production-owned state that references current-season rebuilt entities absent from `afldb_test`
 

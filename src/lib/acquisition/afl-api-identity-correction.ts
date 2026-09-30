@@ -1593,6 +1593,12 @@ export type CorrectionReportContext = {
   /** DP-3 and DP-4; DP-5 is gathered after the transaction. */
   readonly dependents: readonly DependentReportEntry[];
   readonly artefactRisk: readonly string[];
+  /**
+   * §5.7: the named evidence of each row STOP (the planner's `detail`, for example the differing
+   * fields), keyed by the STOP's index in the plan's `stops`. The plan's STOP objects never carry
+   * it, so neither the plan nor its fingerprint changes; it is attached only to the printed STOP.
+   */
+  readonly stopDetails?: readonly { readonly index: number; readonly detail: string }[];
 };
 
 /* ==================================================================== *

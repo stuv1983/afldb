@@ -427,6 +427,25 @@ describe('AFLDB-ISSUE-160 source contract', () => {
     expect(pyCommon).toContain('INSERT INTO player_career_stats');
   });
 
+  test('AFLDB-ISSUE-254: the full derived rebuild keeps that zero row and never invents one', () => {
+    // The replay above, createPlayerInTransaction() and the targeted recompute all give a
+    // match-less player a zero-games career row (AFLDB-ISSUE-018). The full rebuild used to
+    // TRUNCATE it away. It now carries forward exactly the match-less players that already
+    // hold a row, and none is created for a player that never had one (AFLDB-ISSUE-108).
+    // The behaviour is proven against PostgreSQL in tests/integration/derived-rebuild-parity.test.ts.
+    const rebuild = readSource('tools/migration/rebuild_derived.py');
+    const career = rebuild.slice(rebuild.indexOf('REBUILDS["player_career_stats"]'), rebuild.indexOf('REBUILDS["club_seasons"]'));
+    expect(career.indexOf('CREATE TEMPORARY TABLE matchless_career ON COMMIT DROP AS'))
+      .toBeLessThan(career.indexOf('TRUNCATE player_career_stats;'));
+    expect(career).toMatch(/FROM matchless_career z\s/);
+    expect(career).not.toMatch(/FROM players/);
+    // The migration-065 frees columns, with the targeted recompute's recorded-game rule.
+    expect(career).toContain('count(frees_for) AS frees_rec');
+    expect(rebuild).toContain('count(c.frees_for) AS frees_rec');
+    expect(rebuild).toContain('count(c.disposals), count(c.tackles), count(c.hitouts), count(c.frees_for),');
+    expect(readSource('src/db/queries/player-derived.ts').match(/count\(c\.frees_for\)/g)).toHaveLength(3);
+  });
+
   test('the draft_picks replay re-creates a manual selection and fails closed first (§8.2)', () => {
     expect(pyCommon).toContain('replay_admin_overrides(draft_picks): refusing to commit');
     expect(pyCommon).toContain('player_identity does not resolve to exactly one player');

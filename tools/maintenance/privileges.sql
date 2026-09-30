@@ -293,8 +293,12 @@ BEGIN
   -- append-only from afldb_import's side, and deliberately NOT
   -- registered in import_writable_tables, whose loop above would grant
   -- full DML. The revoke loop strips these each run; re-grant them here.
+  -- AFLDB-ISSUE-238: SELECT as well. An AFL API identity correction
+  -- re-plans after its own write (§8.4 Q2) and must read the data_edits
+  -- audits that can explain a divergence; without it every apply rolls
+  -- back. Still no UPDATE, DELETE or TRUNCATE: the table stays append-only.
   IF to_regclass('public.data_edits') IS NOT NULL THEN
-    GRANT INSERT ON data_edits TO afldb_import;
+    GRANT SELECT, INSERT ON data_edits TO afldb_import;
     GRANT USAGE ON SEQUENCE data_edits_id_seq TO afldb_import;
   END IF;
 
@@ -349,6 +353,17 @@ BEGIN
     -- This read is what lets it see them. Read only: no INSERT, UPDATE,
     -- DELETE or TRUNCATE for the import role.
     GRANT SELECT ON player_link_suggestions TO afldb_import;
+  END IF;
+
+  -- Migration 109 (AFLDB-ISSUE-253): the Data Editor's deleteMatch runs
+  -- as afldb_import and refuses a match that still carries quarter-by-
+  -- quarter player statistics (AFLDB-ISSUE-180), which needs this read.
+  -- SELECT only. The table stays OUT of import_writable_tables
+  -- (AFLDB-ISSUE-142 Decision A: no writer exists, and registering it
+  -- would hand the loop's UPDATE, DELETE and TRUNCATE to nothing). The
+  -- revoke loop strips this each run; re-grant it here.
+  IF to_regclass('public.player_match_period_stats') IS NOT NULL THEN
+    GRANT SELECT ON player_match_period_stats TO afldb_import;
   END IF;
 
   -- Migration 104 (AFLDB-ISSUE-235): the afl_api human identity

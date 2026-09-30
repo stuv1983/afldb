@@ -930,7 +930,9 @@ describe('afldb_import is confined to the statistical tables', () => {
     // player_link_resolutions alone: a repeatable honours reload has to
     // read the human decisions it must not overwrite, and the honours row
     // itself cannot distinguish a manual link from an import-derived one.
-    // data_edits stays unreadable -- nothing in the import path needs it.
+    // AFLDB-ISSUE-238 adds SELECT on data_edits the same way: an AFL API
+    // identity correction re-plans after its own write (§8.4 Q2) and reads
+    // the data_edits audits that can explain a post-correction divergence.
     //
     // The append-only property is unchanged and is what this test still
     // guards: no UPDATE, no DELETE, no TRUNCATE on either table, and no
@@ -949,7 +951,7 @@ describe('afldb_import is confined to the statistical tables', () => {
        ORDER BY 1
     `;
     expect(tables).toEqual([
-      { name: 'data_edits', inserts: true, selects: false, updates: false, deletes: false, truncates: false },
+      { name: 'data_edits', inserts: true, selects: true, updates: false, deletes: false, truncates: false },
       { name: 'player_link_resolutions', inserts: true, selects: true, updates: false, deletes: false, truncates: false },
     ]);
 
@@ -1023,14 +1025,15 @@ describe('afldb_import is confined to the statistical tables', () => {
       authSelect: true, authWrites: false, appAny: false, appRegistered: false,
     });
 
-    // No grant was widened alongside it: afldb_import still cannot read
-    // data_edits (066 -- nothing in the import path needs it), and the
-    // human decision ledger is still not import-writable (074).
-    const [unchanged] = await sql<{ dataEditsSelect: boolean; decisionsInsert: boolean }[]>`
-      SELECT has_table_privilege(${IMPORT_ROLE}, 'data_edits', 'SELECT')          AS "dataEditsSelect",
+    // No grant was widened alongside it: data_edits is still append-only
+    // for afldb_import (066; its SELECT is AFLDB-ISSUE-238's, asserted
+    // above), and the human decision ledger is still not import-writable (074).
+    const [unchanged] = await sql<{ dataEditsRewrite: boolean; decisionsInsert: boolean }[]>`
+      SELECT (has_table_privilege(${IMPORT_ROLE}, 'data_edits', 'UPDATE')
+              OR has_table_privilege(${IMPORT_ROLE}, 'data_edits', 'DELETE')) AS "dataEditsRewrite",
              has_table_privilege(${IMPORT_ROLE}, 'promotion_decisions', 'INSERT') AS "decisionsInsert"
     `;
-    expect(unchanged).toEqual({ dataEditsSelect: false, decisionsInsert: false });
+    expect(unchanged).toEqual({ dataEditsRewrite: false, decisionsInsert: false });
   });
 
   // AFLDB-ISSUE-235 (I11-I13). afl_api_identity_adjudications (migration 104) is the human
@@ -1157,6 +1160,43 @@ describe('afldb_import is confined to the statistical tables', () => {
       ) AS registered
     `;
     expect(registered.registered).toBe(false);
+  });
+
+  it('reads player period statistics for match deletion but can never write them (AFLDB-ISSUE-253)', async () => {
+    // Migration 109: deleteMatch runs as afldb_import and its AFLDB-ISSUE-180
+    // pre-check reads player_match_period_stats to refuse a match that still
+    // carries them. SELECT alone; the table stays unregistered
+    // (AFLDB-ISSUE-142 Decision A), so no write privilege exists.
+    const [table] = await sql<{
+      selects: boolean; inserts: boolean; updates: boolean;
+      deletes: boolean; truncates: boolean; registered: boolean;
+    }[]>`
+      SELECT has_table_privilege(${IMPORT_ROLE}, 'player_match_period_stats', 'SELECT')   AS selects,
+             has_table_privilege(${IMPORT_ROLE}, 'player_match_period_stats', 'INSERT')   AS inserts,
+             has_table_privilege(${IMPORT_ROLE}, 'player_match_period_stats', 'UPDATE')   AS updates,
+             has_table_privilege(${IMPORT_ROLE}, 'player_match_period_stats', 'DELETE')   AS deletes,
+             has_table_privilege(${IMPORT_ROLE}, 'player_match_period_stats', 'TRUNCATE') AS truncates,
+             EXISTS (
+               SELECT 1 FROM afldb_meta.import_writable_tables
+                WHERE name = 'player_match_period_stats'
+             ) AS registered
+    `;
+    expect(
+      table,
+      'run npm run db:migrate and npm run db:privileges: migration 109 and its '
+      + 'privileges.sql mirror grant the read after the registry revoke loop',
+    ).toEqual({
+      selects: true, inserts: false, updates: false,
+      deletes: false, truncates: false, registered: false,
+    });
+
+    const sequences = await sql<{ name: string; usage: boolean; updates: boolean }[]>`
+      SELECT s.name,
+             has_sequence_privilege(${IMPORT_ROLE}, s.name, 'USAGE')  AS usage,
+             has_sequence_privilege(${IMPORT_ROLE}, s.name, 'UPDATE') AS updates
+        FROM afldb_meta.owned_sequences('player_match_period_stats') AS s(name)
+    `;
+    expect(sequences.filter((s) => s.usage || s.updates)).toEqual([]);
   });
 
   it('cannot reset the sequence behind an operational table', async () => {

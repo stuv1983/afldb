@@ -564,16 +564,67 @@ describe('atomic audit grant migration contract (AFLDB-ISSUE-027)', () => {
     expect(migration).not.toContain('grant_import_write');
   });
 
+  it('widens data_edits by SELECT alone in 108 (AFLDB-ISSUE-238), guarded on the role', () => {
+    const migration = readFileSync(
+      join(process.cwd(), 'src', 'db', 'migrations', '108_import_reads_data_edits.sql'),
+      'utf8',
+    );
+    const grants = migration
+      .split('\n').map((l) => l.replace(/--.*$/, '')).join('\n')
+      .match(/\bGRANT\b[^;]*;/g);
+
+    expect(migration).toContain("pg_roles WHERE rolname = 'afldb_import'");
+    // Exactly one grant: INSERT and the sequence stay 066's, nothing else widens.
+    expect(grants).toEqual(['GRANT SELECT ON TABLE public.data_edits TO afldb_import;']);
+    expect(migration).not.toContain('grant_import_write');
+  });
+
   it('is mirrored by the privileges reconciler after the import revoke loop', () => {
     const privileges = readFileSync(
       join(process.cwd(), 'tools', 'maintenance', 'privileges.sql'),
       'utf8',
     );
 
-    expect(privileges).toContain('GRANT INSERT ON data_edits TO afldb_import');
+    // AFLDB-ISSUE-238 adds SELECT (the correction's §8.4 re-plan reads the audits); still append-only.
+    expect(privileges).toContain('GRANT SELECT, INSERT ON data_edits TO afldb_import');
+    expect(privileges).not.toMatch(/GRANT[^;]*\b(UPDATE|DELETE|TRUNCATE)\b[^;]*ON data_edits TO afldb_import/);
     expect(privileges).toContain('GRANT USAGE ON SEQUENCE data_edits_id_seq TO afldb_import');
     expect(privileges).toContain('GRANT INSERT ON player_link_resolutions TO afldb_import');
     expect(privileges).toContain('GRANT USAGE ON SEQUENCE player_link_resolutions_id_seq TO afldb_import');
+  });
+});
+
+describe('match-deletion period-stats read grant contract (AFLDB-ISSUE-253)', () => {
+  const grantsIn = (sqlText: string) => sqlText
+    .split('\n').map((l) => l.replace(/--.*$/, '')).join('\n')
+    .match(/\bGRANT\b[^;]*;/g);
+
+  it('widens player_match_period_stats by SELECT alone in 109, guarded on the role', () => {
+    const migration = readFileSync(
+      join(process.cwd(), 'src', 'db', 'migrations', '109_import_reads_player_match_period_stats.sql'),
+      'utf8',
+    );
+
+    expect(migration).toContain("pg_roles WHERE rolname = 'afldb_import'");
+    // Exactly one grant, read-only, to the import role alone.
+    expect(grantsIn(migration)).toEqual([
+      'GRANT SELECT ON TABLE public.player_match_period_stats TO afldb_import;',
+    ]);
+    // AFLDB-ISSUE-142 Decision A: never registered import-writable.
+    expect(migration).not.toContain('grant_import_write');
+    expect(migration).not.toContain('grant_app_read');
+  });
+
+  it('is mirrored by the privileges reconciler as a read, never a write', () => {
+    const privileges = readFileSync(
+      join(process.cwd(), 'tools', 'maintenance', 'privileges.sql'),
+      'utf8',
+    );
+
+    expect(privileges).toContain('GRANT SELECT ON player_match_period_stats TO afldb_import');
+    expect(grantsIn(privileges)!.filter((g) => /\bplayer_match_period_stats\b/.test(g))).toEqual([
+      'GRANT SELECT ON player_match_period_stats TO afldb_import;',
+    ]);
   });
 });
 

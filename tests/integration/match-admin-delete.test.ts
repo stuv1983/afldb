@@ -51,6 +51,15 @@
  *      or fabricated; the trigger and its function are dropped in a
  *      `finally` block so no test-only schema object survives a failed run.
  *
+ * AFLDB-ISSUE-253 adds the one foreign key into `matches(id)` that is
+ * DETACHED rather than refused: `staging.afl_api_brownlow_vote.match_id`
+ * (migration 103). A settled-shape AFL API Brownlow vote set is seeded the
+ * same bypassing way as the lineup fixture; the real deleteMatch deletes the
+ * match, keeps the provider observation and clears only its link, writes the
+ * normal deletion audit, and leaves an unrelated vote set alone. A refused
+ * deletion leaves the link intact, and the race-window test below proves a
+ * failed deletion rolls the detachment back.
+ *
  * None of these tests touch player_match_stats/match_period_scores content:
  * the fixture match has none, so "no partial dependent deletion" is proven
  * by the match row itself surviving intact, same as the ISSUE-167 Stage 6
@@ -80,6 +89,7 @@ let fixtureSourceId: number;
 let clubHomeId: number;
 let clubAwayId: number;
 let fixturePlayerId: number;
+let voterPlayerIds: number[];
 let fixtureSeason: number;
 let seeded = 0;
 
@@ -99,6 +109,63 @@ async function createFixtureMatch(matchKey: string, venueRaw: string = MARKER): 
   return match.id;
 }
 
+type BrownlowVoteRow = {
+  providerPlayerId: string; votes: number; playerId: number | null;
+  matchId: number | null; versionSeq: number; projectedByBatchId: number;
+};
+
+/**
+ * AFLDB-ISSUE-253: one settled-shape `staging.afl_api_brownlow_vote` set for
+ * `matchId` -- payload, spine version and the three exploded 3/2/1 vote rows,
+ * written the way `projectAflApiBrownlowVoteSet()` leaves them (match and
+ * players resolved, club NULL), bypassing the settle entirely.
+ */
+async function seedBrownlowVoteSet(matchId: number): Promise<string> {
+  const providerMatchId = nextKey('cd-m');
+  const payloadHash = createHash('sha256').update(providerMatchId).digest('hex');
+  const [batch] = await owner<{ id: number }[]>`
+    INSERT INTO import_batches (source_id, tool, target_table)
+    VALUES (${fixtureSourceId}, 'tests/integration/match-admin-delete', 'staging.afl_api_brownlow_vote')
+    RETURNING id`;
+  await owner`
+    INSERT INTO staging.source_payloads (source_id, family, payload_hash, hash_recipe, raw_payload)
+    VALUES (${fixtureSourceId}, 'brownlow_match_votes', ${payloadHash}, 'issue-253-fixture',
+            ${owner.json({ marker: MARKER } as never)})`;
+  await owner`
+    INSERT INTO staging.source_record_versions (
+      source_id, family, external_record_id, version_seq, payload_hash,
+      observed_from, opened_by_batch_id
+    ) VALUES (
+      ${fixtureSourceId}, 'brownlow_match_votes', ${providerMatchId}, 1, ${payloadHash},
+      now(), ${batch.id}
+    )`;
+  for (const [i, votes] of [3, 2, 1].entries()) {
+    await owner`
+      INSERT INTO staging.afl_api_brownlow_vote (
+        source_id, family, external_record_id, version_seq,
+        provider_match_id, provider_player_id, provider_team_id,
+        season, api_round_number, canonical_round_number, votes, eligible,
+        match_id, player_id, club_id, projected_by_batch_id
+      ) VALUES (
+        ${fixtureSourceId}, 'brownlow_match_votes', ${providerMatchId}, 1,
+        ${providerMatchId}, ${`${providerMatchId}-cd-i-${votes}`}, ${`${providerMatchId}-cd-t`},
+        ${fixtureSeason}::smallint, 1, 1, ${votes}, true,
+        ${matchId}, ${voterPlayerIds[i]}, ${null}, ${batch.id}
+      )`;
+  }
+  return providerMatchId;
+}
+
+async function brownlowVoteRows(providerMatchId: string): Promise<BrownlowVoteRow[]> {
+  return owner<BrownlowVoteRow[]>`
+    SELECT provider_player_id AS "providerPlayerId", votes::int AS votes, player_id AS "playerId",
+           match_id AS "matchId", version_seq AS "versionSeq",
+           projected_by_batch_id::int AS "projectedByBatchId"
+      FROM staging.afl_api_brownlow_vote
+     WHERE source_id = ${fixtureSourceId} AND external_record_id = ${providerMatchId}
+     ORDER BY votes DESC`;
+}
+
 beforeAll(async () => {
   const [source] = await owner<{ id: number }[]>`
     INSERT INTO sources (key, name, kind, url)
@@ -113,8 +180,9 @@ beforeAll(async () => {
   clubHomeId = clubs.home;
   clubAwayId = clubs.away;
 
-  const [player] = await owner<{ id: number }[]>`SELECT id::int AS id FROM players ORDER BY id LIMIT 1`;
-  fixturePlayerId = player.id;
+  const players = await owner<{ id: number }[]>`SELECT id::int AS id FROM players ORDER BY id LIMIT 3`;
+  fixturePlayerId = players[0].id;
+  voterPlayerIds = players.map((p) => p.id);
 
   const [season] = await owner<{ year: number }[]>`SELECT max(year)::int AS year FROM seasons`;
   fixtureSeason = season.year;
@@ -138,6 +206,7 @@ afterAll(async () => {
   // source_payloads row; sources is deleted last since everything above
   // references source_id.
   await owner`DELETE FROM staging.afl_api_lineup WHERE source_id = ${fixtureSourceId}`;
+  await owner`DELETE FROM staging.afl_api_brownlow_vote WHERE source_id = ${fixtureSourceId}`;
   await owner`DELETE FROM staging.source_record_versions WHERE source_id = ${fixtureSourceId}`;
   await owner`DELETE FROM staging.source_payloads WHERE source_id = ${fixtureSourceId}`;
   await owner`DELETE FROM staging.external_current_matches WHERE source_id = ${fixtureSourceId}`;
@@ -299,6 +368,83 @@ describe('AFLDB-ISSUE-177 -- a match still linked by current-season staging cann
     await owner`DELETE FROM import_batches WHERE id = ${batch.id}`;
   });
 
+  it('AFLDB-ISSUE-253: deletes a match carrying an AFL API Brownlow vote set, keeping the observation and clearing only its link', async () => {
+    const matchId = await createFixtureMatch(nextKey('match-f'));
+    const providerMatchId = await seedBrownlowVoteSet(matchId);
+    // An unrelated settled vote set on another match must not move.
+    const otherMatchId = await createFixtureMatch(nextKey('match-g'));
+    const otherProviderMatchId = await seedBrownlowVoteSet(otherMatchId);
+    const otherBefore = await brownlowVoteRows(otherProviderMatchId);
+
+    // 1-2. The match exists and three staging vote rows name it.
+    const before = await brownlowVoteRows(providerMatchId);
+    expect(before.map((r) => r.matchId)).toEqual([matchId, matchId, matchId]);
+
+    // 3. The real writer, as afldb_import.
+    const result = await deleteMatch({ matchId, adminUserId: actorId, reason: `${MARKER}-253 detach proof` });
+
+    // 4. The deletion succeeds and the match is gone.
+    expect(result.ok, result.ok ? '' : result.error).toBe(true);
+    const [gone] = await owner<{ n: number }[]>`SELECT count(*)::int AS n FROM matches WHERE id = ${matchId}`;
+    expect(gone.n).toBe(0);
+
+    // 5-6. The provider observation survives unchanged except for its link:
+    // same rows, votes, resolved players, spine version and projecting batch.
+    const after = await brownlowVoteRows(providerMatchId);
+    expect(after).toEqual(before.map((r) => ({ ...r, matchId: null })));
+
+    // 7. Nothing still names the deleted match.
+    const [orphans] = await owner<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM staging.afl_api_brownlow_vote WHERE match_id = ${matchId}`;
+    expect(orphans.n).toBe(0);
+
+    // The spine version and payload the rows cite are untouched.
+    const [spine] = await owner<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM staging.source_record_versions
+       WHERE source_id = ${fixtureSourceId} AND external_record_id = ${providerMatchId}`;
+    expect(spine.n).toBe(1);
+
+    // 8. The normal deletion audit, unchanged in shape.
+    const audits = await owner<{ oldValues: unknown; newValues: unknown; note: string | null }[]>`
+      SELECT old_values AS "oldValues", new_values AS "newValues", note
+        FROM data_edits
+       WHERE table_name = 'matches' AND row_id = ${matchId} AND field_group = 'match_deletion'`;
+    expect(audits).toHaveLength(1);
+    expect(audits[0].oldValues).toEqual({ deletedMatchId: matchId, season: fixtureSeason });
+    expect(audits[0].newValues).toEqual({});
+    expect(audits[0].note).toBe(`${MARKER}-253 detach proof`);
+
+    // 9. The unrelated vote set is byte-for-byte what it was.
+    expect(await brownlowVoteRows(otherProviderMatchId)).toEqual(otherBefore);
+    expect(otherBefore.map((r) => r.matchId)).toEqual([otherMatchId, otherMatchId, otherMatchId]);
+  });
+
+  it('AFLDB-ISSUE-253: a refused deletion leaves the AFL API Brownlow link intact', async () => {
+    // The ISSUE-177 staging refusal fires first; the detachment runs only
+    // after every refusal, so nothing is changed.
+    const matchId = await createFixtureMatch(nextKey('match-h'));
+    const providerMatchId = await seedBrownlowVoteSet(matchId);
+    await owner`
+      INSERT INTO staging.external_current_matches (
+        source_id, external_game_id, season, home_club_id, away_club_id,
+        local_match_id, raw_payload
+      ) VALUES (
+        ${fixtureSourceId}, ${nextKey('game')}, ${fixtureSeason}::smallint,
+        ${clubHomeId}, ${clubAwayId}, ${matchId}, ${owner.json({ marker: MARKER } as never)}
+      )`;
+
+    const result = await deleteMatch({ matchId, adminUserId: actorId, reason: `${MARKER}-253 refusal proof` });
+
+    expect(result.ok, result.ok ? '' : result.error).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/current-season staging/);
+    const [stillMatch] = await owner<{ n: number }[]>`SELECT count(*)::int AS n FROM matches WHERE id = ${matchId}`;
+    expect(stillMatch.n).toBe(1);
+    expect((await brownlowVoteRows(providerMatchId)).map((r) => r.matchId))
+      .toEqual([matchId, matchId, matchId]);
+
+    await owner`DELETE FROM staging.external_current_matches WHERE local_match_id = ${matchId}`;
+  });
+
   it('maps a genuine race-window FK violation (23503) to a refusal instead of throwing', async () => {
     // AFLDB-ISSUE-181's FK inventory (see the issue entry) found that every
     // static foreign key into matches(id) is now pre-checked, actively
@@ -326,12 +472,24 @@ describe('AFLDB-ISSUE-177 -- a match still linked by current-season staging cann
     // so nothing (not even the trigger-injected row) survives.
     const trapVenue = `${MARKER}-181-23503-trap-${Date.now().toString(36)}-${seeded += 1}`;
     const matchId = await createFixtureMatch(nextKey('match-c'), trapVenue);
+    // AFLDB-ISSUE-253: the trap fires after the Brownlow staging link is
+    // detached, so this also proves the detachment rolls back with a failed
+    // deletion.
+    const providerMatchId = await seedBrownlowVoteSet(matchId);
     const fnName = `fn_issue_181_trap_${matchId}`;
     const trgName = `trg_issue_181_trap_${matchId}`;
 
     try {
+      // SECURITY DEFINER (AFLDB-ISSUE-253): the trigger fires inside
+      // deleteMatch's afldb_import transaction, and that role may READ
+      // player_match_period_stats (migration 109) but never write it. As
+      // SECURITY INVOKER the injected INSERT raised 42501 instead of the race
+      // this test simulates; run as the fixture owner it inserts, and the
+      // NO ACTION FK then raises the genuine 23503.
       await owner.unsafe(`
-        CREATE OR REPLACE FUNCTION ${fnName}() RETURNS trigger AS $trap$
+        CREATE OR REPLACE FUNCTION ${fnName}() RETURNS trigger
+        SECURITY DEFINER SET search_path = public, pg_temp
+        AS $trap$
         BEGIN
           INSERT INTO player_match_period_stats (player_id, match_id, club_id, period)
           VALUES ((SELECT id FROM players ORDER BY id LIMIT 1), OLD.id, OLD.home_club_id, 9);
@@ -367,12 +525,17 @@ describe('AFLDB-ISSUE-177 -- a match still linked by current-season staging cann
       const [leaked] = await owner<{ n: number }[]>`
         SELECT count(*)::int AS n FROM player_match_period_stats WHERE match_id = ${matchId}`;
       expect(leaked.n).toBe(0);
+
+      // The detachment rolled back too: every vote row still names the match.
+      expect((await brownlowVoteRows(providerMatchId)).map((r) => r.matchId))
+        .toEqual([matchId, matchId, matchId]);
     } finally {
       // Trigger/function/fixture cleanup runs even if an assertion above
       // throws, so a failed run never leaves test-only schema objects
       // behind for the next one.
       await owner.unsafe(`DROP TRIGGER IF EXISTS ${trgName} ON matches`);
       await owner.unsafe(`DROP FUNCTION IF EXISTS ${fnName}()`);
+      await owner`DELETE FROM staging.afl_api_brownlow_vote WHERE match_id = ${matchId}`;
       await owner`DELETE FROM matches WHERE id = ${matchId}`;
     }
   });

@@ -337,8 +337,8 @@ describe.skipIf(!canRun)(
           expect(seed.height).toBeNull();
           expect(seed.slug).not.toBe('');
 
-          // a zero-game player gets no career-stats row: rebuild_derived.py regenerates
-          // that table from player_match_stats and would drop one anyway
+          // a zero-game shell gets no career-stats row (AFLDB-ISSUE-108), and
+          // rebuild_derived.py never invents one (AFLDB-ISSUE-254)
           const [career] = await sql<{ n: number }[]>`
             SELECT count(*)::int AS n FROM player_career_stats WHERE player_id = ${seed.id}`;
           expect(career.n).toBe(0);

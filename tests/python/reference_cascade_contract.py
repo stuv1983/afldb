@@ -120,9 +120,11 @@ REAL_GRAPH = {
     "players": ["player_link_match_candidates"],
     "stat_definitions": ["stat_availability"],
 }
-# Everything except the two relations migration 062/067 left unregistered.
+# Everything except player_link_match_candidates, which migration 067 left
+# unregistered. player_match_period_stats (062) is also unregistered, but
+# AFLDB-ISSUE-253 (migration 109) grants afldb_import SELECT on it.
 REAL_READABLE = ["matches", "player_clubs", "club_seasons", "players",
-                 "player_match_stats", "stat_availability"]
+                 "player_match_stats", "player_match_period_stats", "stat_availability"]
 
 failures: list[str] = []
 
@@ -195,10 +197,10 @@ except SystemExit as exc:
     refused = str(exc)
 
 check("B1 the loader refuses", refused is not None)
-check("B2 it names the relations it could not prove empty",
+check("B2 it names the relation it could not prove empty, and only that one",
       refused is not None and "player_link_match_candidates" in refused
-      and "player_match_period_stats" in refused, str(refused))
-check("B3 it never tried to read them",
+      and "player_match_period_stats" not in refused, str(refused))
+check("B3 it never tried to read the unreadable one",
       "SELECT EXISTS (SELECT 1 FROM player_link_match_candidates)" not in conn.sql)
 
 # ---------------------------------------------------------------------------

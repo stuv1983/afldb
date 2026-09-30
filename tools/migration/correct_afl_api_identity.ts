@@ -100,6 +100,8 @@ import {
   type AflApiIdentityStateRow,
   type AflApiImporterStateRow,
   type AflApiSupersedeFile,
+  type CatalogueColumn,
+  type ManifestValidationProblem,
 } from '../../src/lib/acquisition/afl-api-adjudication';
 import { normaliseSurname } from '../../src/lib/acquisition/afl-api-player-evidence';
 import { canonicalJson, type JsonValue } from '../../src/lib/acquisition/observations';
@@ -415,34 +417,56 @@ async function takeIdentityTableLock(tx: TransactionSql, lockTimeout: string): P
  * D10 manifest / live-catalogue check, reused from the ISSUE-235 revoke
  * ==================================================================== */
 
-async function readReferenceCatalogue(tx: TransactionSql): Promise<{
-  schema: string; table: string; column: string; hasFk: boolean; fkReferencesPlayers: boolean;
-}[]> {
-  return tx<{ schema: string; table: string; column: string; hasFk: boolean; fkReferencesPlayers: boolean }[]>`
-    SELECT n.nspname AS schema, cl.relname AS table, a.attname AS column,
-           EXISTS (
-             SELECT 1 FROM pg_constraint con
-              WHERE con.conrelid = cl.oid AND con.contype = 'f' AND a.attnum = ANY(con.conkey)
-           ) AS "hasFk",
-           EXISTS (
-             SELECT 1 FROM pg_constraint con
-              WHERE con.conrelid = cl.oid AND con.contype = 'f' AND a.attnum = ANY(con.conkey)
-                AND con.confrelid = 'players'::regclass
-           ) AS "fkReferencesPlayers"
-      FROM pg_attribute a
-      JOIN pg_class cl ON cl.oid = a.attrelid
+export type ReferenceCatalogueRow = CatalogueColumn & { constraint: string };
+
+/**
+ * The manifest's own definition: every single-column foreign key to `players`, whatever the
+ * referencing column is called (`three_player_id`, ...). The same semantics as the ISSUE-235
+ * revoke's `proveNonUse` reader. An index, or a `player_id` column with no FK (the
+ * `staging_aflw` resolution targets), is not a player reference and never appears here.
+ */
+export async function readReferenceCatalogue(tx: TransactionSql): Promise<ReferenceCatalogueRow[]> {
+  return tx<ReferenceCatalogueRow[]>`
+    SELECT n.nspname AS schema, cl.relname AS table, a.attname AS column, con.conname AS constraint
+      FROM pg_constraint con
+      JOIN pg_class cl ON cl.oid = con.conrelid
       JOIN pg_namespace n ON n.oid = cl.relnamespace
-     WHERE a.attname = 'player_id' AND a.attnum > 0 AND NOT a.attisdropped
-       AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+      JOIN pg_attribute a ON a.attrelid = con.conrelid AND a.attnum = ANY(con.conkey)
+     WHERE con.contype = 'f' AND con.confrelid = 'public.players'::regclass
+       AND array_length(con.conkey, 1) = 1
+       AND n.nspname NOT IN ('pg_catalog', 'information_schema', 'pg_toast')
        AND n.nspname NOT LIKE 'pg_temp_%' AND n.nspname NOT LIKE 'pg_toast_temp_%'
   `;
+}
+
+/** One line per D10 problem, naming the relation, column(s) and (where known) the FK constraint. */
+export function formatManifestProblems(
+  problems: readonly ManifestValidationProblem[],
+  catalogue: readonly ReferenceCatalogueRow[],
+): string {
+  return problems.map((p) => {
+    const relation = `${p.schema}.${p.table}`;
+    switch (p.kind) {
+      case 'unclassified_table': {
+        const constraints = [...new Set(catalogue
+          .filter((r) => r.schema === p.schema && r.table === p.table)
+          .map((r) => r.constraint))].sort();
+        return `unclassified_table ${relation}(${p.columns.join(', ')})`
+          + ` -- player FK not in the manifest${constraints.length > 0 ? ` [${constraints.join(', ')}]` : ''}`;
+      }
+      case 'missing_column':
+        return `missing_column ${relation}.${p.column} -- manifest column has no live player FK`;
+      case 'not_source_bearing_gained_source_id':
+        return `not_source_bearing_gained_source_id ${relation} -- NOT_SOURCE_BEARING table now has a provenance column`;
+    }
+  }).join('; ');
 }
 
 async function assertManifestValidatesAgainstCatalogue(tx: TransactionSql): Promise<void> {
   const catalogue = await readReferenceCatalogue(tx);
   const problems = validateManifestAgainstCatalogue(catalogue, AFL_API_PLAYER_REFERENCE_MANIFEST);
   if (problems.length > 0) {
-    throw new CorrectionRefused(`REFUSED: the D10 player-reference manifest no longer validates against the live catalogue: ${problems.join('; ')}`);
+    throw new CorrectionRefused(`REFUSED: the D10 player-reference manifest no longer validates against the live catalogue: ${formatManifestProblems(problems, catalogue)}`);
   }
 }
 
@@ -1202,7 +1226,7 @@ async function readParticipation(
 ): Promise<readonly ParticipationRow[]> {
   if (seasons.length === 0) return [];
   return tx<ParticipationRow[]>`
-    SELECT pms.id AS "pmsRowId", m.season::int AS season, c.organization_id AS "clubOrganizationId"
+    SELECT pms.id::int AS "pmsRowId", m.season::int AS season, c.organization_id AS "clubOrganizationId"
       FROM player_match_stats pms
       JOIN matches m ON m.id = pms.match_id
       LEFT JOIN clubs c ON c.id = pms.club_id
@@ -1560,6 +1584,10 @@ async function buildClosure(
   const closureImpact: ClosureImpactRow[] = [];
   const seasonVerdicts: SeasonVerdictReport[] = [];
   const dependentReports: DependentReportEntry[] = [];
+  // §5.7: a row STOP's named evidence (the planner's `detail`), recorded against the STOP just
+  // pushed. It goes to the report context, never into the STOP objects of `plan`.
+  const stopDetails: { index: number; detail: string }[] = [];
+  const detailLastStop = (stop: Stop) => { stopDetails.push({ index: stops.length - 1, detail: stop.detail }); };
 
   if (!input.manifestOk) {
     stops.push({ table: 'player_match_stats', rowId: null, step: 'D10', code: 'provenance_unexplained' });
@@ -1606,6 +1634,7 @@ async function buildClosure(
     const eligibility = evaluatePlayerMatchStatsMutationEligibility(evidence);
     if (!eligibility.ok) {
       stops.push({ table: 'player_match_stats', rowId: candidate.id, step: eligibility.stop.step, code: eligibility.stop.code });
+      detailLastStop(eligibility.stop);
       continue;
     }
     if (!playerMatchStatsHistoryThroughProvider(candidate.applications, providerId)) {
@@ -1626,6 +1655,7 @@ async function buildClosure(
     const guards = evaluateBrownlowGuards(guardEvidence);
     if (!guards.ok) {
       stops.push({ table: 'player_match_stats', rowId: candidate.id, step: guards.stop.step, code: guards.stop.code });
+      detailLastStop(guards.stop);
       continue;
     }
 
@@ -1639,7 +1669,10 @@ async function buildClosure(
       firstKickGoalTieBreakChanges: false,
     });
     if (dependentResult.stops.length > 0) {
-      for (const s of dependentResult.stops) stops.push({ table: 'player_match_stats', rowId: candidate.id, step: s.step, code: s.code });
+      for (const s of dependentResult.stops) {
+        stops.push({ table: 'player_match_stats', rowId: candidate.id, step: s.step, code: s.code });
+        detailLastStop(s);
+      }
       continue;
     }
     reports.push(...dependentResult.reports.map((r) => `player_match_stats#${candidate.id}: ${r}`));
@@ -1671,6 +1704,7 @@ async function buildClosure(
     });
     if (dispositionResult.disposition === 'STOP') {
       stops.push({ table: 'player_match_stats', rowId: candidate.id, step: dispositionResult.stop.step, code: dispositionResult.stop.code });
+      detailLastStop(dispositionResult.stop);
       continue;
     }
 
@@ -1729,6 +1763,7 @@ async function buildClosure(
     }
     if (!verdict.ok) {
       stops.push({ table: 'brownlow_round_votes', rowId: candidate.id, step: verdict.stop.step, code: verdict.stop.code });
+      detailLastStop(verdict.stop);
       continue;
     }
 
@@ -1751,6 +1786,7 @@ async function buildClosure(
     });
     if (!guards.ok) {
       stops.push({ table: 'brownlow_round_votes', rowId: candidate.id, step: guards.stop.step, code: guards.stop.code });
+      detailLastStop(guards.stop);
       continue;
     }
 
@@ -1767,6 +1803,7 @@ async function buildClosure(
     const participation = evaluateBrownlowParticipation(candidate.current.played, participationMatchIds.length === 1);
     if (!participation.ok) {
       stops.push({ table: 'brownlow_round_votes', rowId: candidate.id, step: participation.stop.step, code: participation.stop.code });
+      detailLastStop(participation.stop);
       continue;
     }
     if (candidate.current.played !== false) positiveBrownlowSeasons.add(candidate.season);
@@ -1792,6 +1829,7 @@ async function buildClosure(
     });
     if (dispositionResult.disposition === 'STOP') {
       stops.push({ table: 'brownlow_round_votes', rowId: candidate.id, step: dispositionResult.stop.step, code: dispositionResult.stop.code });
+      detailLastStop(dispositionResult.stop);
       continue;
     }
 
@@ -1891,6 +1929,7 @@ async function buildClosure(
     seasonVerdicts,
     dependents: dependentReports,
     artefactRisk: artefactRecurrenceRisk({ providerId, seasonVerdicts }),
+    stopDetails,
   };
   return { plan, rows: built, reports, context };
 }
@@ -2343,11 +2382,11 @@ async function runCorrection(
   };
 
   if (args.mode === 'validate-only') {
-    if (closure.plan.stops.length > 0) return { kind: 'STOP', stops: closure.plan.stops, fingerprint, report: closure.context };
+    if (closure.plan.stops.length > 0) return { kind: 'STOP', stops: withStopDetails(closure.plan.stops, closure.context), fingerprint, report: closure.context };
     return { kind: 'PLANNED', fingerprint, plan: closure.plan, reports: closure.reports, impact };
   }
 
-  if (closure.plan.stops.length > 0) return { kind: 'STOP', stops: closure.plan.stops, fingerprint, report: closure.context };
+  if (closure.plan.stops.length > 0) return { kind: 'STOP', stops: withStopDetails(closure.plan.stops, closure.context), fingerprint, report: closure.context };
 
   if (args.mode === 'apply' && fingerprint !== args.expectFingerprint) {
     throw new CorrectionRefused(`REFUSED: recomputed fingerprint ${fingerprint} does not match --expect-fingerprint ${args.expectFingerprint}`);
@@ -2681,10 +2720,13 @@ async function assertPostWriteSatisfactionResult(
 }
 
 /** §8.2 step 8's before/after read. A read failure propagates and rolls the correction back: an
- * empty default on both sides would compare byte-identical and fake the assertion's PASS. */
+ * empty default on both sides would compare byte-identical and fake the assertion's PASS. The rows
+ * are ordered by `stat_key` (the PK is (stat_key, season)): the comparison is an order-sensitive
+ * `canonicalJson` array, and `recomputeBrownlowCoverage` rewrites the rows, so an unordered scan can
+ * return the same set in a different physical order and refuse spuriously (ISSUE-238 D13). */
 export async function readStatAvailability(tx: TransactionSql, season: number): Promise<unknown> {
   return tx<Record<string, JsonValue>[]>`
-    SELECT * FROM stat_availability WHERE season = ${season}
+    SELECT * FROM stat_availability WHERE season = ${season} ORDER BY stat_key
   `;
 }
 
@@ -2750,6 +2792,17 @@ export function providerMatchIdOf(table: CanonicalTable, externalRecordId: strin
 
 function describeStop(s: OutcomeStop): string {
   return `${s.table}${s.rowId !== null ? `#${s.rowId}` : ''} [${s.step}] ${s.code}${s.detail ? `: ${s.detail}` : ''}`;
+}
+
+/** §5.7, S8-D4: the STOPs as printed -- the plan's own STOP objects (fingerprinted, never
+ * modified), each copied with the named evidence the report context recorded for its index. */
+export function withStopDetails(
+  stops: readonly PlanStop[], context: Pick<CorrectionReportContext, 'stopDetails'>,
+): OutcomeStop[] {
+  return stops.map((s, index) => {
+    const detail = context.stopDetails?.find((d) => d.index === index)?.detail;
+    return detail === undefined ? s : { ...s, detail };
+  });
 }
 
 function toInt(value: JsonValue | undefined): number | null {
@@ -3343,7 +3396,8 @@ function requiredDeleteSnapshotKeys(table: CanonicalTable): readonly string[] {
 
 /** SAT-4 for one bound DELETE application: D-1...D-6, from immutable history only (§5.6). */
 function evaluateBoundDelete(
-  del: Q2DeleteEvidence, context: { readonly providerId: string; readonly pId: number; readonly aflApiSourceId: number },
+  del: Q2DeleteEvidence,
+  context: { readonly providerId: string; readonly pId: number; readonly pPrimeId: number; readonly aflApiSourceId: number },
 ): RowVerdict {
   const { proof } = del;
   const table = proof.table;
@@ -3359,8 +3413,11 @@ function evaluateBoundDelete(
   const latestH = preCorrection.length > 0 ? preCorrection[preCorrection.length - 1] : null;
   const previous: Record<string, JsonValue> = d.previousValues ?? {};
 
-  const attribution = attributionOverHistory(table, preCorrection, context.providerId, context.pId, del.projectionPlayerId);
-  if (!attribution.ok) return fail(attribution.stop); // D-5 "satisfies L5"
+  // D-5 "satisfies L5". The typed projection is still verified, but against P′: the correction
+  // moved every CD_I projection naming P to P′ in the same transaction (§8.2 step 6, SAT-5), so
+  // after it the projection must name P′ -- exactly as `evaluateBoundMove` checks it (D12).
+  const attribution = attributionOverHistory(table, preCorrection, context.providerId, context.pPrimeId, del.projectionPlayerId);
+  if (!attribution.ok) return fail(attribution.stop);
   // D-3's stamp half, which the planner's evidence has no field for; its D-3 code is row_proof_mismatch.
   if (latestH !== null && (previous.source_record_id !== latestH.externalRecordId || toInt(previous.import_batch_id) !== latestH.importBatchId)) {
     return fail({ step: 'D-3', code: 'row_proof_mismatch', detail: 'previous_values stamps are not the P2 stamp of H\'s latest application' });
@@ -3527,7 +3584,7 @@ export function evaluateCorrectionSatisfactionQ2(evidence: CorrectionSatisfactio
     if (!verdict.result.ok) rowStops.push({ ...verdict.stopRef, ...verdict.result.stop });
   }
   for (const del of evidence.deletes) {
-    const verdict = evaluateBoundDelete(del, { providerId: evidence.providerId, pId, aflApiSourceId: evidence.aflApiSourceId });
+    const verdict = evaluateBoundDelete(del, { providerId: evidence.providerId, pId, pPrimeId, aflApiSourceId: evidence.aflApiSourceId });
     deleteResults.push(verdict.result);
     reports.push(...verdict.reports);
     if (!verdict.result.ok) rowStops.push({ ...verdict.stopRef, ...verdict.result.stop });

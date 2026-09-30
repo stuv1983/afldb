@@ -15,6 +15,55 @@ commit.
 
 ## [Unreleased]
 
+### Corrected-identity promotion rehearsal accepted on `code_test_db` (AFLDB-ISSUE-238 slices 10–11; issue open) - 30 September 2026
+
+- **What was proven.** The corrected-identity machinery passed a real-PostgreSQL rehearsal on
+  `code_test_db`:
+  - Slice 10: 55 of 55 ORIGINAL-correction cases.
+  - Slice 11: 19 of 19 promotion, rebuild and recovery cases. These cover CPC classes 1–3 and its
+    DISAGREE / COLLISION / UNEVALUABLE refusals; the v3 artefact binding against divergence and
+    tampering; the promotion REPLAY, including a canonical collision DELETE through one bound batch,
+    ledger immutability and an idempotent re-run; the REPLAY guards; the BG3 pre-swap STOP; D15's
+    hard STOP; the Stage-21/22 rebuild gates; and the recovery round-trip of a `corrected` row.
+- **New tooling.** `tools/db/afl-api-identity-promotion-rehearsal.ts` drives the real promotion
+  gates, the plan's ledger reinstatement and the real `--replay-promotion` CLI. The candidate is
+  `code_test_db` and the target is a shadow schema. Every case tears itself down and restores
+  sequences.
+- **Unchanged.** No production code changed in Slice 11. The temporary PROD gate
+  `CORRECTED_PROMOTION_REHEARSAL_REQUIRED` stays until an operator decision. The freeze, swap and
+  rollback cases remain for the DEV promotion rehearsal. Full record:
+  `issues/open/AFLDB-ISSUE-238.md` §12 items 10–11.
+
+### The full derived rebuild agrees with the targeted recompute (AFLDB-ISSUE-254; Resolved) - 30 September 2026
+
+- **Frees totals.** `tools/migration/rebuild_derived.py` now aggregates `frees_for`, `frees_against`
+  and `frees_recorded_games` into player club-season, season and career statistics. It uses exactly
+  the definitions the targeted recompute has used since migration 065. Before this, every full
+  rebuild left them empty, so a rebuilt database had no frees totals. The next full rebuild fills
+  them corpus-wide, and only on rows whose own match rows record frees.
+- **Zero-games career rows.** A player with no match history keeps the career row the product gave
+  them: at creation, after their last match was deleted (AFLDB-ISSUE-018), or on the admin-override
+  replay. The full rebuild used to erase that row; it now re-derives it as the same zero row.
+  - No row is invented for a player that never had one, such as a DraftGuru shell
+    (AFLDB-ISSUE-108).
+  - A row an earlier rebuild already erased is not restored by the rebuild.
+- **No schema change and no migration.** The targeted recompute is unchanged.
+- **Found by** AFLDB-ISSUE-238 case 47; **not caused by** it.
+
+### Data Editor match deletion works again on reconciled databases (AFLDB-ISSUE-253; Resolved, uncommitted) - 30 September 2026
+
+- **Privilege.** `afldb_import` now has `SELECT` on `player_match_period_stats` (migration 109,
+  mirrored in `privileges.sql`). `deleteMatch`'s AFLDB-ISSUE-180 pre-check reads that table, so
+  every deletion previously failed with `permission denied`. The grant is read-only: the table
+  stays out of `import_writable_tables` (AFLDB-ISSUE-142 Decision A).
+- **AFL API Brownlow staging.** Deleting a match that carries a settled AFL API Brownlow vote set
+  now keeps the provider observation in `staging.afl_api_brownlow_vote` and clears only its
+  `match_id`. That link is Option-B enrichment that nothing reads, mirroring
+  `brownlow_round_votes.match_id`'s `ON DELETE SET NULL`. The detachment happens after every
+  refusal check and in the same transaction. The deletion audit is unchanged.
+- **Deploy order.** Run migration 109 and then `npm run db:privileges`.
+- **Found by** AFLDB-ISSUE-238 case 72; **not caused by** it.
+
 ### AFL API identity ledger readers understand `corrected` adjudications (AFLDB-ISSUE-238 slice 4; issue open) - 28 September 2026
 
 - **What changed.** Every reader of `afl_api_identity_adjudications` now handles exactly `linked`,

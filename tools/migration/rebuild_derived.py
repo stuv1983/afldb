@@ -75,7 +75,7 @@ SELECT
       ELSE 'L'
     END AS outcome,
     pms.goals, pms.behinds, pms.kicks, pms.handballs, pms.disposals,
-    pms.marks, pms.tackles, pms.hitouts
+    pms.marks, pms.tackles, pms.hitouts, pms.frees_for, pms.frees_against
 FROM player_match_stats pms
 JOIN matches m  ON m.id  = pms.match_id
 JOIN clubs   cl ON cl.id = pms.club_id;
@@ -154,7 +154,9 @@ TRUNCATE player_club_season_stats;
 INSERT INTO player_club_season_stats
       (player_id, season, club_id, games, finals, wins, draws, losses,
        goals, behinds, kicks, handballs, disposals, marks, tackles, hitouts,
+       frees_for, frees_against,
        disposals_recorded_games, tackles_recorded_games, hitouts_recorded_games,
+       frees_recorded_games,
        is_premier)
 SELECT
     c.player_id,
@@ -167,8 +169,10 @@ SELECT
     count(*) FILTER (WHERE c.outcome = 'L')         AS losses,
     sum(c.goals), sum(c.behinds), sum(c.kicks), sum(c.handballs),
     sum(c.disposals), sum(c.marks), sum(c.tackles), sum(c.hitouts),
-    -- Games in which each era-limited statistic was actually recorded.
-    count(c.disposals), count(c.tackles), count(c.hitouts),
+    sum(c.frees_for), sum(c.frees_against),
+    -- Games in which each era-limited statistic was actually recorded. Frees
+    -- count on frees_for, exactly as recomputePlayerDerivedStats() does.
+    count(c.disposals), count(c.tackles), count(c.hitouts), count(c.frees_for),
     bool_or(c.round_type = 'grand_final' AND c.outcome = 'W') AS is_premier
 FROM pg_ctx c
 GROUP BY c.player_id, c.season, c.club_id;
@@ -189,7 +193,9 @@ INSERT INTO player_season_stats
       (player_id, season, primary_club_id, club_count,
        games, finals, wins, draws, losses,
        goals, behinds, kicks, handballs, disposals, marks, tackles, hitouts,
+       frees_for, frees_against,
        disposals_recorded_games, tackles_recorded_games, hitouts_recorded_games,
+       frees_recorded_games,
        brownlow_votes, brownlow_status, is_premier)
 WITH season_brownlow AS (
     SELECT s.year AS season,
@@ -214,9 +220,11 @@ agg AS (
         sum(c.kicks) AS kicks, sum(c.handballs) AS handballs,
         sum(c.disposals) AS disposals, sum(c.marks) AS marks,
         sum(c.tackles) AS tackles, sum(c.hitouts) AS hitouts,
+        sum(c.frees_for) AS frees_for, sum(c.frees_against) AS frees_against,
         count(c.disposals) AS disposals_rec,
         count(c.tackles)   AS tackles_rec,
         count(c.hitouts)   AS hitouts_rec,
+        count(c.frees_for) AS frees_rec,
         count(DISTINCT c.club_id) AS club_count,
         (array_agg(c.club_id ORDER BY cnt DESC, c.club_id))[1] AS primary_club_id,
         bool_or(c.round_type = 'grand_final' AND c.outcome = 'W') AS is_premier
@@ -231,7 +239,8 @@ SELECT
     a.games, a.finals, a.wins, a.draws, a.losses,
     a.goals, a.behinds, a.kicks, a.handballs,
     a.disposals, a.marks, a.tackles, a.hitouts,
-    a.disposals_rec, a.tackles_rec, a.hitouts_rec,
+    a.frees_for, a.frees_against,
+    a.disposals_rec, a.tackles_rec, a.hitouts_rec, a.frees_rec,
     -- 0, not NULL, when the medal was decided and the player did not poll.
     CASE WHEN sb.status = 'complete' THEN COALESCE(bsv.votes, 0) END,
     sb.status,
@@ -244,14 +253,27 @@ LEFT JOIN brownlow_season_votes bsv
 
 # --- player_career_stats ---------------------------------------------------
 # Brownlow totals come from brownlow_season_votes, never from per-game votes.
+#
+# A player with no match history keeps the career row the product gave them
+# (AFLDB-ISSUE-254): createPlayerInTransaction() seeds one, the last-match
+# deletion in recomputePlayerDerivedStats() leaves one (AFLDB-ISSUE-018), and
+# replay_admin_overrides(players) re-creates one. It is re-derived here to the
+# same zero row the targeted recompute writes. None is invented: a player who
+# never had one, such as a DraftGuru shell (AFLDB-ISSUE-108), still has none.
 REBUILDS["player_career_stats"] = """
+CREATE TEMPORARY TABLE matchless_career ON COMMIT DROP AS
+SELECT c.player_id
+FROM player_career_stats c
+WHERE NOT EXISTS (SELECT 1 FROM player_match_stats pms WHERE pms.player_id = c.player_id);
+
 TRUNCATE player_career_stats;
 INSERT INTO player_career_stats
       (player_id, games, finals, premierships, wins, draws, losses,
        goals, behinds, kicks, handballs, disposals, marks, tackles, hitouts,
+       frees_for, frees_against,
        behinds_recorded_games, kicks_recorded_games, handballs_recorded_games,
        disposals_recorded_games, marks_recorded_games, tackles_recorded_games,
-       hitouts_recorded_games,
+       hitouts_recorded_games, frees_recorded_games,
        brownlow_votes, brownlow_medals,
        clubs_played, seasons_played, debut_season, final_season,
        debut_date, last_match_date, best_goals_game, best_disposals_game)
@@ -260,8 +282,9 @@ SELECT
     g.games, g.finals, g.premierships, g.wins, g.draws, g.losses,
     g.goals, g.behinds, g.kicks, g.handballs, g.disposals, g.marks,
     g.tackles, g.hitouts,
+    g.frees_for, g.frees_against,
     g.behinds_rec, g.kicks_rec, g.handballs_rec, g.disposals_rec,
-    g.marks_rec, g.tackles_rec, g.hitouts_rec,
+    g.marks_rec, g.tackles_rec, g.hitouts_rec, g.frees_rec,
     COALESCE(b.votes, 0),
     COALESCE(b.medals, 0),
     g.clubs_played, g.seasons_played, g.debut_season, g.final_season,
@@ -280,10 +303,11 @@ FROM (
         sum(behinds) AS behinds, sum(kicks) AS kicks,
         sum(handballs) AS handballs, sum(disposals) AS disposals,
         sum(marks) AS marks, sum(tackles) AS tackles, sum(hitouts) AS hitouts,
+        sum(frees_for) AS frees_for, sum(frees_against) AS frees_against,
         count(behinds) AS behinds_rec, count(kicks) AS kicks_rec,
         count(handballs) AS handballs_rec, count(disposals) AS disposals_rec,
         count(marks) AS marks_rec, count(tackles) AS tackles_rec,
-        count(hitouts) AS hitouts_rec,
+        count(hitouts) AS hitouts_rec, count(frees_for) AS frees_rec,
         count(DISTINCT modern_club_id)              AS clubs_played,
         count(DISTINCT season)                      AS seasons_played,
         min(season) AS debut_season, max(season) AS final_season,
@@ -299,6 +323,33 @@ LEFT JOIN (
     FROM brownlow_season_votes
     GROUP BY player_id
 ) b ON b.player_id = g.player_id;
+
+-- Additive totals zero, era-limited totals NULL with zero recorded games:
+-- "not recorded", never zero (AFLDB-ISSUE-018).
+INSERT INTO player_career_stats
+      (player_id, games, finals, premierships, wins, draws, losses,
+       goals, behinds, kicks, handballs, disposals, marks, tackles, hitouts,
+       frees_for, frees_against,
+       behinds_recorded_games, kicks_recorded_games, handballs_recorded_games,
+       disposals_recorded_games, marks_recorded_games, tackles_recorded_games,
+       hitouts_recorded_games, frees_recorded_games, brownlow_votes, brownlow_medals,
+       clubs_played, seasons_played)
+SELECT
+    z.player_id, 0, 0, 0, 0, 0, 0,
+    0, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+    NULL, NULL,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    COALESCE(b.votes, 0), COALESCE(b.medals, 0),
+    0, 0
+FROM matchless_career z
+LEFT JOIN (
+    SELECT player_id,
+           sum(votes)                        AS votes,
+           count(*) FILTER (WHERE is_winner) AS medals
+    FROM brownlow_season_votes
+    GROUP BY player_id
+) b ON b.player_id = z.player_id
+WHERE NOT EXISTS (SELECT 1 FROM player_match_stats pms WHERE pms.player_id = z.player_id);
 """
 
 # --- club_seasons ----------------------------------------------------------

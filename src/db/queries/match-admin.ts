@@ -609,6 +609,25 @@ export async function deleteMatch(input: {
       // the same transaction rebuilds them from what remains below.
       await clearPlayerClubMatchReferences(tx, affectedIds);
 
+      // AFLDB-ISSUE-253: `staging.afl_api_brownlow_vote.match_id` (migration
+      // 103) is nullable with no `ON DELETE` clause, and the AFL API Brownlow
+      // settle writes it for every settled vote set. Unlike the lineup link
+      // refused above, it is detached rather than refused: it is Option-B
+      // resolution enrichment that no reader consumes (every reader keys on
+      // provider_match_id/provider_player_id), its only writer re-points it
+      // on every re-projection, and the canonical row it proposes,
+      // `brownlow_round_votes.match_id`, is itself `ON DELETE SET NULL`
+      // (migration 094). The provider observation -- the row, its votes and
+      // its spine version -- is kept; only the link to this match is
+      // cleared. It runs after every refusal above, so a refused deletion
+      // changes nothing, and in this transaction, so it rolls back with a
+      // failed one. The `FOR UPDATE` lock on the match blocks any new
+      // reference to it until this transaction ends.
+      await tx`
+        UPDATE staging.afl_api_brownlow_vote SET match_id = NULL
+         WHERE match_id = ${input.matchId}
+      `;
+
       // 3. Delete dependent rows. `player_achievements` is deliberately ABSENT
       // from this list since AFLDB-ISSUE-167 Stage 6: a match carrying one is
       // refused above rather than having its curated record destroyed here.
@@ -660,8 +679,9 @@ export async function deleteMatch(input: {
     // `NO ACTION` that this function's own statements can violate is
     // pre-checked above (or, for `player_clubs.first_match_id`/
     // `last_match_id`, actively cleared before the delete by
-    // `clearPlayerClubMatchReferences`) -- see the AFLDB-ISSUE-181 issue
-    // entry for the full inventory. This catch therefore now guards only
+    // `clearPlayerClubMatchReferences`, and, since AFLDB-ISSUE-253, for
+    // `staging.afl_api_brownlow_vote.match_id`, detached before it) -- see
+    // the AFLDB-ISSUE-181 issue entry for the full inventory. This catch therefore now guards only
     // that race window and any future dependency this function has not yet
     // learned about. Whatever FK actually fires, it raises a raw 23503
     // (foreign_key_violation) -- exactly the opaque database exception this
