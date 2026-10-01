@@ -309,6 +309,25 @@ Import semantics are append-only:
 
 `--validate-only` writes nothing. `--dry-run` runs the full write path and rolls back.
 
+### Correcting a consumed identity (AFLDB-ISSUE-238)
+
+If a trusted `afl_api` link (provider P) is later proven to belong to a different player (P′) after
+canonical rows have already consumed it, `tools/migration/correct_afl_api_identity.ts` corrects it
+(`--validate-only`, `--dry-run`, `--apply --expect-fingerprint`). It moves or deletes only the
+canonical rows proven through that provider, supersedes the ledger with a `corrected` row, recomputes
+the derived tables in the same transaction and fails closed on any unproven case. It is an
+operator-run tool: there is no admin screen, timer or scheduled use.
+
+Promotion and rebuild preserve a correction (supersede artefact v4, candidate prediction and
+verification, a stage-aware pre-swap identity contract with exact pending-D15 binding, and the full
+identity invariant after the swap). A promotion that carries a corrected identity requires an ISSUE-250
+freeze record in every environment. That freeze digest (F0, 37 tables) includes the live
+`external_identities`, which stays `rebuilt` for promotion. The corrected path passed a DEV promotion
+rehearsal and a read-only DEV acceptance on 2026-10-01 (operator-run) and has not been run against
+production. Correction-aware bridge and artefact handling is deferred: a corrected link can still be
+re-proposed by an old bridge artefact, which the importer withholds rather than applies. Detail:
+`issues/closed/AFLDB-ISSUE-238.md` and `docs/production-promotion.md`.
+
 ### Guards on the settle path
 
 - **Two-key enablement.**

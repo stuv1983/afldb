@@ -1,5 +1,10 @@
 # AFLDB-ISSUE-238 — DEV promotion rehearsal: design and operator handoff (DESIGN ONLY)
 
+> **CLOSED 2026-10-01.** The rehearsal this document designed has been executed and PASSED (operator-run;
+> see `AFLDB-ISSUE-238.md` §0). Statements below that `CORRECTED_PROMOTION_REHEARSAL_REQUIRED` "stays" are
+> historical: the gate was retired after the rehearsal and item 12 passed. The F0 statement in Part F was
+> clarified by S6-D5 (live `external_identities` is freeze-protected; F0 is 37 tables from `d0aa03b6`).
+
 **Status: design APPROVED 2026-09-30 (D-1…D-7, Part K.1). Phase 0 `MODE=pre` PASSED on the
 corrected rerun (`pre-20260930-223306`, `PHASE0_RESULT=CLEAN_FOR_REVIEW`, Part K.3). K.4 is CLOSED:
 the dependency probe is clean and no ISSUE-252 preparation is needed. Next: D-1, the intermediate

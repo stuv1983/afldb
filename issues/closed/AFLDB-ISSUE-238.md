@@ -2,6 +2,68 @@
 
 ## 0. Status
 
+- **RESOLVED (2026-10-01): the DEV promotion rehearsal PASSED, item 12 PASSED, the temporary
+  `CORRECTED_PROMOTION_REHEARSAL_REQUIRED` gate is retired, and ISSUE-238 is closed.** This runbook
+  and its `-HANDOFF.md` companions moved from `issues/open/` to `issues/closed/`. Production-code
+  commits that came out of the rehearsal: `8518f81d` (stage-aware pending-D15 contract, supersede v4),
+  `34b2b16d` (canonical ledger ids at the replay reader) and `d0aa03b6` (live `external_identities`
+  freeze-protected, S6-D5); the gate removal and this closure are the next commit(s).
+  - **Evidence classes.** *Operator-run* items were executed by the operator on streamanator and are
+    recorded here as reported; they were not independently reproduced by the assistant. *Repository
+    evidence* is code and DB-free tests run in the clean lineage worktree.
+  - **Operator-run: Stage 2 PASS.** Run Z (zero-corrected: cases 92, 66, 33 PSG/post-swap); the one
+    real FX1 correction (adjudication 7, batch 90, fingerprint `e59a80fd…7eef`); Run C (cases 44,
+    92 corrected, 66 one-corrected); Run 67A (cases 67 + 90); Run 67B (cases 67 + 89, D-5
+    acceptance recorded). Every run returned the fixture DB to 88 tables / 62 sequences, `DIFF:
+    identical`.
+    - Case 44: a late ORIGINAL changed both `afl_api_identity_adjudications` and `external_identities`;
+      the candidate PSG refused and named exactly those two tables; exact cleanup; PSG passed.
+      A fresh F0 held **37 tables**.
+    - Corrected replay (7.4e) passed the earlier bigint/string `pending_d15_unbound` point.
+    - Case 92: a corrected late revoke was detected as ledger-only drift.
+    - Case 67: the post-swap kept-database gate named both tables. Case 90: the guarded rollback
+      refused acceptance while the late-write state remained.
+    - Case 89: D15 E2 executed; the real FX2 ORIGINAL correction committed on the promoted DB; Q2
+      `ALREADY_SATISFIED` for FX1 and FX2; E3 OK; the stale E2 re-run refused on
+      `ledger_state_mismatch` and wrote nothing; the fresh-live freeze-bound pre-cutover PASSED;
+      guarded rollback and exact cleanup succeeded.
+  - **Operator-run: Stage 3 PASS.** Candidates `afldb_dev_candidate_i238z/c/a/b` dropped (the Sep-26
+    historical candidates and kept databases untouched). Fixture retirement complete (FX1/FX2
+    identities, adjudication ledger rows, the fixture actor and the correction batch removed;
+    sequences restored exactly). Zero residue: ledger 0, identities 0, actor 0, batches 0, `Zz238` 0,
+    temp schema 0; `code_test_db` `issue238_s11_target` absent. **R1 vs R0:** 88 tables, 62
+    sequences, byte-equal, lineage equal under the accepted equivalences (R0 sha256
+    `f48450b7…e43ea`).
+  - **Operator-run: item 12 PASS.** Real provider `CD_I1000072`, target player 24: `--validate-only`
+    PLAN, `--dry-run` PLAN, no `--apply`; SAT-1..SAT-5 PASS; dry-run sequence consumption restored;
+    R1b == R1 == R0 under the accepted equivalences.
+  - **Operator-run: SERVICE0 and privileges.** `afldb.service` active, enabled, listener 3100, health
+    200; `afldb_dev` OID 202860, no marker. The temporary sudoers drop-in is removed (verified
+    `dropin=ABSENT`); it must not be recreated.
+  - **Evidence locations (streamanator, preserved, not deleted):** `~/i238dev/evidence/dev/`
+    (`stage2.log`, `stage3.log`, `R0*.json`, `R1*.json`, `R1-vs-R0.txt`, `R1b-vs-R0.txt`,
+    `R1b-vs-R1.txt`, `item12-*`, `c89-*`, `after-*`, the `i238{z,c,a,b}-*` files and the three
+    `i238c.abandoned-*-evidence` folders), `~/i238dev/runs/` (including the three
+    `i238c.abandoned-*` archives) and `~/i238dev/dumps/` (the R0 safety dump
+    `afldb_dev-20261001-062618.dump`).
+  - **Repository evidence.** `tsc --noEmit` clean; `tests/db-promotion-check.test.ts` 426/426;
+    `tests/correct-afl-api-identity-cli.test.ts` 273/273; `afl-api-adjudication-actions-contract` 4/4,
+    `afl-api-adjudication-recovery` 26/26, `afl-api-identity-correction` 132/132, `db-test-rebuild`
+    511/511, `data-overrides-source-contract` 66/66; the DEV rehearsal pack's static suite 241/241.
+  - **What the rehearsal found (production defects, all fixed):** (1) the pre-swap SAT-1 contract could
+    not be satisfied with an unrelated net-`linked` provider (stage-aware pending-D15, supersede v4);
+    (2) postgres.js returns `bigint` ledger ids as strings, so the v4 binding compared `"2" !== 2`;
+    (3) F0 omitted the live `external_identities` (S6-D5). The rehearsal pack's own script defects were
+    fixed separately and are not production code.
+  - **S6-D3 retired.** `CORRECTED_PROMOTION_REHEARSAL_REQUIRED` and its `replayPromotionGuardProblems`
+    clause are removed. Every permanent check still applies to PROD: the freeze requirement
+    (`CORRECTED_PROMOTION_REQUIRES_FREEZE`, S6-D2, both environments), CPC, `C_promotion`, the v4 payload
+    binding, `pendingD15Providers`, CRV, SAT-1, D15 exactness, E3, G3, F0 (37 tables) and the
+    database/OID/PROD guards.
+  - **Deferred, no successor issue allocated (reported to the operator):** correction-aware bridge and
+    artefact handling (O-3, §13); making the AFL API the automated primary source and retiring AFL Tables
+    (not implemented by this issue). ISSUE-240 (contradiction-finding dedupe) was a dependency and is
+    Resolved (2026-09-26).
 - **CURRENT STATE (2026-09-30): DEV PROMOTION REHEARSAL DESIGN APPROVED — D-1…D-7 decided;
   execution not started.** Record: `issues/open/AFLDB-ISSUE-238-DEV-PROMOTION-HANDOFF.md` Part K.1
   (decisions and the 14-step ordering) and K.2 (script-writing notes P0-1…P0-3).
@@ -5725,6 +5787,7 @@ wording (`R238-P5-02`, `player_match_stats` only) and the post-correction writer
 | **S6-D1** | **(2026-09-29, Slice 6) Fingerprint remediation.** The Slice-2/Slice-5 `mutationPlan` fingerprint was incomplete. Each fingerprinted row now carries `evidence {applicationIds[], citedVersion {sourceId, family, externalRecordId, seq}, insertPayloadSha256 \| null}` and `collision {counterpartRowId, counterpartContractSha256, outcome 'C2' \| 'C4'} \| null` (§5.1). The authority block stays lineage-independent; the fingerprint stays over `mutationPlan` only. `PLANNER_VERSION` 1 → **2**. The ORIGINAL importer-origin identity action is `update_in_place` (P → P′); `upgrade_in_place` is reserved for CPC class 2 (candidate already at P′c, identity-only). No accepted persisted ORIGINAL correction batch exists to preserve. Orchestrator reading J-1: the fingerprint hashes a `PREDICT` authority as `ADJUDICATION`, so the §6 prediction and the §7.4e re-plan of the same mutation fingerprint identically (the plan value keeps its mode). | **APPROVED (operator)** |
 | **S6-D2** | **(2026-09-29) PSG and the post-swap gate bind to AFLDB-ISSUE-250's freeze; no custom PSG.** ISSUE-250's freeze F0 digest covers every non-`rebuilt` public contract table (`tools/db/promotion-freeze.ts` `freezeDigestTables()` = `truncatedPublicTables()`, `tools/db/promotion-inventory.ts` treatment `reinstate` for `afl_api_identity_adjudications`), a per-row `md5(t::text)` superset of the §8.6 ledger tuple. `--phase restored` proves old = F0, `--phase candidate` proves live = F0 (= PSG), `--phase production` proves kept = F0 and the promoted live database unfrozen (= the post-swap gate). With `C_promotion ≠ ∅` a valid `--freeze-record` is therefore **required under both PROD and DEV** (refusal `CORRECTED_PROMOTION_REQUIRES_FREEZE`); this is the corrected-state-only exception to ISSUE-250's rule that the DEV freeze is opt-in. With `C_promotion = ∅` DEV behaviour is unchanged. The census, CPC, REPLAY, CRV and D15 semantic checks still run independently; the freeze substitutes only for the race/drift PSG and the post-swap ledger gate. | **APPROVED (operator)** |
 | **S6-D3** | **(2026-09-29) Temporary PROD corrected-promotion gate, Slice 6 → Slice 11.** Until the Slice 10/11 corrected-promotion rehearsal is accepted, `--environment prod` with a non-empty corrected set refuses `CORRECTED_PROMOTION_REHEARSAL_REQUIRED` (promotion-check from `--phase pre-cutover` onward; REPLAY refuses a prod artefact carrying `correctedReplays`). DEV and `code_test_db` rehearsal stay exercisable. **Owned by Slice 11: only an accepted rehearsal may remove it.** | **APPROVED (operator), TEMPORARY** |
+| **S6-D3 (retired)** | **(2026-10-01) The temporary PROD corrected-promotion gate `CORRECTED_PROMOTION_REHEARSAL_REQUIRED` is retired.** Both conditions were met: the DEV promotion rehearsal and item 12 passed. Removed: the `assertCorrectedPromotionAllowed` prod branch (`tools/db/promotion-check.ts`), the `replayPromotionGuardProblems` clause (`tools/migration/correct_afl_api_identity.ts`) and the exported constant. Kept: `CORRECTED_PROMOTION_REQUIRES_FREEZE` (S6-D2) in both environments and every other check. | **RETIRED (operator-run evidence)** |
 | **S6-D4** | **(2026-09-29) CPC fail-closed readings.** Class 5 COLLISION covers both (1) another candidate importer provider holding P′c and (2) another target net-human (`linked` or `corrected`) provider whose stable identity remaps to P′c. Class 2 (candidate already at P′c) is the identity-only class: a non-empty predicted MOVE/DELETE closure is a FAIL (`IDENTITY_ONLY_CLOSURE_NOT_EMPTY`), never class-2 success. | **APPROVED (operator)** |
 | **S6-D5** | **(2026-10-01, DEV rehearsal Run C case 44) The LIVE `external_identities` is freeze-protected; amends S6-D2's table set.** The case-44 late ORIGINAL changed both `afl_api_identity_adjudications` and `external_identities` (same row count, one player binding), but F0 named only the ledger, because `external_identities` is `rebuilt` and F0 was "every non-`rebuilt` public contract table"; the two-table expectation in the DEV handoff contradicted ISSUE-250 §7.6/§8 and the code. An identity-only late write reached `--phase candidate` undetected. **Approved (operator): option 1.** `freezeDigestTables()` now adds `FREEZE_PROTECTED_REBUILT_TABLES = ['external_identities']` (`tools/db/promotion-freeze.ts`); F0 is 37 tables. The promotion treatment is unchanged (`rebuilt`: not truncated, reinstated, remapped or carried forward), the comparison is against the frozen live database only (never the candidate), and `C_promotion`, `E_promotion`, `pendingD15Providers`, CPC, CRV, D15 and E3 are untouched. A 36-table record is refused by a current checkout (fail closed); Run Z (36-table contract, accepted) is historical evidence and is not re-run. Cases 44, 67 and 90 keep expecting both tables. | **APPROVED (operator)** |
 | **OD-S7-1** | **(2026-09-29, Slice 7) Archived v2 recovery support: YES.** The rebuild pipeline is strictly capture v3 and refuses a v2 capture file and a v2 pending database marker by name. `recover_afl_api_adjudications.ts` keeps a narrow recovery-only reader for ARCHIVED v2 captures: it validates the historical v2 format (never upgrades it), reads only the ledger section, and maps `previousPlayerIdentity` to `null` (exact: v2 could not hold a corrected row). A v3 recovery source carries `previousPlayerIdentity` verbatim. `parseCombinedCapture` is not weakened. | **APPROVED (operator)** |

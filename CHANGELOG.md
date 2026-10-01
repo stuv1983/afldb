@@ -15,6 +15,19 @@ commit.
 
 ## [Unreleased]
 
+### Corrected-identity promotion: DEV rehearsal passed, temporary PROD gate retired, AFLDB-ISSUE-238 resolved - 1 October 2026
+
+- **Evidence (operator-run on DEV, recorded as reported).** Stage 2 (Run Z, the one real FX1 correction, Run C,
+  Runs 67A and 67B; cases 33, 44, 66, 67, 89, 90, 92), Stage 3 (candidates dropped, fixtures retired, zero
+  residue, R1 == R0) and item 12 (a real provider's `--validate-only` and `--dry-run` PLAN, no `--apply`) all
+  passed; `afldb.service` was restored and the temporary sudoers drop-in removed.
+- **Gate retired.** The temporary `CORRECTED_PROMOTION_REHEARSAL_REQUIRED` refusal (a PROD promotion with a
+  corrected identity) is removed. A corrected promotion is still bound by every permanent check, including the
+  freeze requirement in both environments, CPC, the v4 artefact binding, CRV, SAT-1, D15 exactness, E3 and the
+  37-table F0.
+- `README.md` gains a short section on identity correction; the AFL API remains a guarded co-source and AFL
+  Tables the scheduled primary. The runbook moved to `issues/closed/AFLDB-ISSUE-238.md`.
+
 ### Promotion freeze: live `external_identities` is freeze-protected (AFLDB-ISSUE-238; issue open) - 1 October 2026
 
 - **Found by the DEV promotion rehearsal (Run C, case 44).** A late ORIGINAL changed the ledger and

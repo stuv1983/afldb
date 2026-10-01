@@ -635,10 +635,12 @@ holds no net `corrected` ledger entry).**
   DEV freeze (§13) is mandatory. The corrected set is read, per phase, from the live target, the old
   target, the reinstated candidate ledger (or the §6 file's `correctedReplays`), and the promoted
   database.
-- **Temporary production gate (S6-D3, Slice 6 → Slice 11).** Until the Slice 10/11 corrected-
-  promotion rehearsal is accepted, `--environment prod` with a non-empty corrected set is refused
-  `CORRECTED_PROMOTION_REHEARSAL_REQUIRED`, first here at `pre-cutover`, so production learns before
-  a candidate is restored. Only an accepted rehearsal (Slice 11) removes this gate.
+- **Retired: the temporary production gate (S6-D3).** `CORRECTED_PROMOTION_REHEARSAL_REQUIRED`
+  refused `--environment prod` with a non-empty corrected set until the corrected-promotion
+  rehearsal was accepted. It was removed on 2026-10-01 after the DEV promotion rehearsal and item 12
+  passed (`issues/closed/AFLDB-ISSUE-238.md`). A corrected promotion under PROD is now bound by every
+  permanent check: the freeze record above, CPC, the v4 artefact binding, CRV, SAT-1, D15 exactness,
+  E3 and F0.
 
 ## 6. Source validation and candidate restore
 
@@ -1192,7 +1194,7 @@ the candidate REPLAY as the candidate **owner**. It is an operator step, not par
 plan; if it is skipped, §7.5's CRV refuses (the resolved set must equal `C_promotion`).
 
 ```bash
-# PROD is refused until the Slice 10/11 corrected-promotion rehearsal is accepted (S6-D3, below).
+# Under PROD this needs the freeze record and every permanent check (the S6-D3 gate is retired, below).
 CANDIDATE_DSN="$CANDIDATE_DSN" npx tsx tools/migration/correct_afl_api_identity.ts --replay-promotion \
     --supersede-in ~/backups/afldb/promotion-afl-api-supersede-$STAMP.json \
     --environment <dev|prod> --expect-database "$CAND" --expect-role afldb_owner [--dry-run]

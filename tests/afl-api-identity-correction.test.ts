@@ -3,7 +3,7 @@
  * correction planner (`src/lib/acquisition/afl-api-identity-correction.ts`).
  * No database, filesystem, network or process-environment access. Case
  * numbers in comments refer to the runbook's §12.1 planned-case matrix
- * (`issues/open/AFLDB-ISSUE-238.md`).
+ * (`issues/closed/AFLDB-ISSUE-238.md`).
  */
 import { describe, expect, it } from 'vitest';
 
