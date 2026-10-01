@@ -151,6 +151,8 @@ import {
 } from '../tools/migration/correct_afl_api_identity';
 import { parseCorrectionCliOutput, type CorrectionCliExpectation } from '../tools/db/afl-api-identity-correction-rehearsal';
 import { Report, crvExactSetProblems, gateAflApiCorrectedReplayVerification, pendingD15ReproductionProblems } from '../tools/db/promotion-check';
+import { readLedgerRows } from '../tools/migration/replay_afl_api_adjudications';
+import { applyAflApiPendingD15, canonicalAflApiLedgerId } from '../src/lib/acquisition/afl-api-adjudication';
 
 const scratchDir = mkdtempSync(join(tmpdir(), 'afldb-issue-238-s5-'));
 afterAll(() => rmSync(scratchDir, { recursive: true, force: true }));
@@ -1453,6 +1455,47 @@ describe('AFLDB-ISSUE-238 stage-aware PRE-SWAP SAT-1 / CRV: exactly the declared
     expect(pendingD15BindingProblems(facts, contractOf([pend(J, 5, 30)]))).toEqual([]);
     expect(pendingD15BindingProblems(facts, contractOf([pend(J, 6, 30)])).join('|')).toMatch(/pending_d15_unbound/);
     expect(pendingD15BindingProblems(facts, contractOf([pend(J, 5, 30), pend('CD_Q', 8, 38)])).join('|')).toMatch(/CD_Q/);
+  });
+
+  // --- the live Run-C defect: postgres.js hands a bigint ledger id back as a STRING ------------------------------------
+  describe('ledger id representation (Run C: "its net ledger row is 2, the artefact binds 2")', () => {
+    /** The raw shape postgres.js returns: bigint `id` / `supersedes_id` as strings. */
+    const rawRow = (id: string, externalId: string, action: string, playerId: number, identity: string, supersedes: string | null) => ({
+      id, externalId, action, playerId, playerIdentity: identity, supersedesId: supersedes,
+      previousPlayerIdentity: null, evidenceSha256: null,
+    });
+    const fakeTx = (rows: unknown[]) => ((() => Promise.resolve(rows)) as unknown as TransactionSql);
+    const bindProblems = (rows: Awaited<ReturnType<typeof readLedgerRows>>, entries: AflApiPendingD15Entry[]) => applyAflApiPendingD15({
+      ledgerRows: rows, resolvedRows: [], mismatches: [{ kind: 'ledger_without_row', externalId: J } as never],
+      contract: { cPromotion: new Set([CD_I]), pendingD15: entries },
+    }).contractProblems;
+
+    it('readLedgerRows yields number ids, so the exact real Run-C pending entry (adjudicationId 2) binds', async () => {
+      const rows = await readLedgerRows(fakeTx([rawRow('2', J, 'linked', 30, 'id:30', null)]));
+      expect(rows[0].id).toBe(2);
+      expect(typeof rows[0].id).toBe('number');
+      expect(bindProblems(rows, [pend(J, 2, 30)])).toEqual([]);
+    });
+    it('the pre-fix representation (a string id) is exactly what made the strict binding refuse', () => {
+      const stringId = { ...linkedRow(2, J, 30), id: '2' as unknown as number };
+      expect(JSON.stringify(bindProblems([stringId], [pend(J, 2, 30)]))).toContain('its net ledger row is 2, the artefact binds 2');
+    });
+    it('supersedes_id is normalised too; a wrong id still refuses; ids beyond the safe range are rejected, never rounded', async () => {
+      const rows = await readLedgerRows(fakeTx([
+        rawRow('1', CD_I, 'linked', 20, 'id:20', null), rawRow('3', CD_I, 'revoked', 20, 'id:20', '1'),
+      ]));
+      expect(rows.map((r) => [r.id, r.supersedesId])).toEqual([[1, null], [3, 1]]);
+      expect(JSON.stringify(bindProblems(await readLedgerRows(fakeTx([rawRow('2', J, 'linked', 30, 'id:30', null)])), [pend(J, 3, 30)])))
+        .toContain('its net ledger row is 2, the artefact binds 3');
+      await expect(readLedgerRows(fakeTx([rawRow('9007199254740993', J, 'linked', 30, 'id:30', null)]))).rejects.toThrow(/not a positive integer id/);
+    });
+    it('canonicalAflApiLedgerId accepts only canonical positive ids', () => {
+      expect(canonicalAflApiLedgerId('2', 't', 'id')).toBe(2);
+      expect(canonicalAflApiLedgerId(2, 't', 'id')).toBe(2);
+      for (const bad of ['0', 0, -1, '-1', 1.5, '1.5', '2e0', ' 2', '2 ', '', null, undefined, '9007199254740993', Number.MAX_SAFE_INTEGER + 1]) {
+        expect(() => canonicalAflApiLedgerId(bad, 't', 'id'), String(bad)).toThrow(/not a positive integer id/);
+      }
+    });
   });
 
   // --- CRV (promotion-check) uses the SAME contract -----------------------------------------------------------------

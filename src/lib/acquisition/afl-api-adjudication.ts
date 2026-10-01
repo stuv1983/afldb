@@ -777,6 +777,20 @@ export class AflApiLedgerMalformed extends Error {}
 
 const LEDGER_SHA256_RE = /^[0-9a-f]{64}$/;
 
+/**
+ * The ONE canonical in-memory form of a ledger id (`id` / `supersedes_id`, both `bigint`): a positive safe
+ * integer `number`, the form the supersede artefact stores and `readAflApiLedgerRows` produces. A decimal
+ * string (what postgres.js returns for an uncast `bigint`) is accepted and converted; anything else,
+ * including a value beyond `Number.MAX_SAFE_INTEGER`, throws rather than rounding.
+ */
+export function canonicalAflApiLedgerId(value: unknown, label: string, field: string): number {
+  const n = typeof value === 'string' && /^[0-9]+$/.test(value) ? Number(value) : value;
+  if (typeof n !== 'number' || !Number.isSafeInteger(n) || n <= 0) {
+    throw new Error(`${label}: ${field} ${String(value)} is not a positive integer id.`);
+  }
+  return n;
+}
+
 /** bigint ids arrive as strings from postgres.js unless cast; compare them as numbers. */
 function ledgerIdNumber(value: unknown): number {
   return typeof value === 'string' ? Number(value) : (value as number);
@@ -2450,13 +2464,7 @@ function ledgerDigestTuples(
   alreadyValidated = false,
 ): JsonValue[] {
   if (!alreadyValidated) assertAflApiLedgerStructure(rows);
-  const asId = (value: unknown, field: string): number => {
-    const n = typeof value === 'string' && /^[0-9]+$/.test(value) ? Number(value) : value;
-    if (typeof n !== 'number' || !Number.isSafeInteger(n) || n <= 0) {
-      throw new Error(`${label}: ${field} ${String(value)} is not a positive integer id.`);
-    }
-    return n;
-  };
+  const asId = (value: unknown, field: string): number => canonicalAflApiLedgerId(value, label, field);
   const normalised = rows.map((r) => ({
     row: r, id: asId(r.id, 'id'),
     supersedesId: r.supersedesId === null || r.supersedesId === undefined ? null : asId(r.supersedesId, 'supersedes_id'),

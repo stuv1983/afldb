@@ -50,6 +50,7 @@ import {
   aflApiSupersedeBindingProblems,
   aflApiPendingD15PlanProblems,
   aflApiSupersedeMismatch,
+  canonicalAflApiLedgerId,
   censusAflApiRows,
   checkAflApiAdjudicationBijection,
   checkAflApiIdentityInvariant,
@@ -125,8 +126,13 @@ export async function readLedgerRows(tx: TransactionSql): Promise<readonly AflAp
      WHERE source_key = 'afl_api'
      ORDER BY id
   `;
+  // `id` and `supersedes_id` are bigint, which postgres.js returns as a STRING: normalise them to the one canonical
+  // in-memory form here so every downstream comparison (pending-D15 binding, corrected replay) sees the number the
+  // supersede artefact stores.
   return rows.map((r) => ({
     ...r,
+    id: canonicalAflApiLedgerId(r.id, 'readLedgerRows', 'id'),
+    supersedesId: r.supersedesId === null ? null : canonicalAflApiLedgerId(r.supersedesId, 'readLedgerRows', 'supersedes_id'),
     previousPlayerIdentity: r.previousPlayerIdentity ?? null,
     evidenceSha256: r.evidenceSha256 ?? undefined,
   }));
