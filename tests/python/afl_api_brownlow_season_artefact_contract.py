@@ -13,10 +13,11 @@ afldb_test connection, no network request, no Git command.
 
 from __future__ import annotations
 
+import inspect
 import json
 import sys
 import tempfile
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 ROOT = Path(__file__).resolve().parents[2]
 TOOL_DIR = ROOT / "tools" / "migration"
@@ -766,6 +767,263 @@ with tempfile.TemporaryDirectory() as tmp:
                               "--stat-availability", str(complete_2026)])
     check("D-233-2 CLI: --validate-only reports the loaded artefact as JSON evidence",
           status == 0 and json.loads(captured.getvalue())["afl_api_artefacts"][0]["season"] == 2026)
+
+
+# ---------------------------------------------------------------------------
+# AFLDB-ISSUE-233: stable AFL Tables identity. One accepted path, or exactly one
+# tracked profile_url_continuity pair -> its continuing_url; everything else
+# refuses. Rules come only through the fitzRoy importer's own validator.
+# ---------------------------------------------------------------------------
+
+section("ISSUE-233: stable AFL Tables identity under the fitzRoy continuity contract")
+
+
+def continuity_rule(**over) -> dict:
+    """One well-formed profile_url_continuity rule (synthetic paths; mirrors the TS fixture)."""
+    rule = {
+        "id": "test-renumbered-profile", "dataset": "player_stats", "file": "player_stats_2025.csv",
+        "continuing_url": "players/Q/Quinn_Test.html", "renumbered_url": "players/Q/Quinn_Test2.html",
+        "expect": {
+            "continuing_id": "99001", "continuing_last_season": 2024, "continuing_last_career_game": 10,
+            "renumbered_first_season": 2025, "renumbered_last_season": 2025,
+            "renumbered_first_career_game": 11, "renumbered_rows": 3,
+        },
+        "authority": "test authority", "reason": "test reason",
+    }
+    rule.update(over)
+    return rule
+
+
+def contract_file(directory: Path, name: str, document) -> Path:
+    path = directory / name
+    path.write_text(document if isinstance(document, str) else json.dumps(document), encoding="utf-8")
+    return path
+
+
+def stable(paths, rules):
+    result = m.stable_afltables_identity(paths, rules)
+    return None if result is None else result[0]
+
+
+CONT, RENUM = "players/Q/Quinn_Test.html", "players/Q/Quinn_Test2.html"
+OTHER = "players/Z/Unrelated_Profile.html"
+
+with tempfile.TemporaryDirectory() as tmp:
+    tmp_dir = Path(tmp)
+    rules = m.load_continuity_rules(contract_file(
+        tmp_dir, "one.json", {"profile_url_continuity": {"rules": [continuity_rule()]}}))
+
+    check("1. one path -> that path", m.stable_afltables_identity([OTHER], rules) == (OTHER, None))
+    check("1. a repeated single path is still one path", stable([OTHER, OTHER], rules) == OTHER)
+    check("2. the exact tracked pair -> continuing_url, naming the rule",
+          m.stable_afltables_identity([CONT, RENUM], rules) == (CONT, "test-renumbered-profile"))
+    check("3. input order reversed -> still continuing_url", stable([RENUM, CONT], rules) == CONT)
+    check("3. a set input (no order at all) -> still continuing_url", stable({RENUM, CONT}, rules) == CONT)
+
+    zed_cont, zed_renum = "players/Z/Zed_Zulu9.html", "players/A/Zed_Zulu.html"
+    zed_rules = m.load_continuity_rules(contract_file(tmp_dir, "zed.json", {"profile_url_continuity": {
+        "rules": [continuity_rule(continuing_url=zed_cont, renumbered_url=zed_renum)]}}))
+    check("4. (fixture) continuing_url sorts AFTER renumbered_url", min(zed_cont, zed_renum) == zed_renum)
+    check("4. ... and the rule, not sort order, still picks continuing_url (both orders)",
+          stable([zed_cont, zed_renum], zed_rules) == zed_cont
+          and stable([zed_renum, zed_cont], zed_rules) == zed_cont)
+
+    check("5. two paths no rule names -> REFUSE",
+          stable(["players/A/Alpha_One.html", "players/A/Alpha_One2.html"], rules) is None)
+    check("5. continuing_url + an unrelated path -> REFUSE", stable([CONT, OTHER], rules) is None)
+    check("5. renumbered_url + an unrelated path -> REFUSE", stable([RENUM, OTHER], rules) is None)
+    check("5. no suffix stripping: Quinn_Test.html + Quinn_Test3.html is not inferred",
+          stable([CONT, "players/Q/Quinn_Test3.html"], rules) is None)
+
+    # ISSUE-237 semantics: a lone path is the player's one accepted identity, whichever it is.
+    check("6. only renumbered_url present -> it is the single accepted path (ISSUE-237 semantics)",
+          m.stable_afltables_identity([RENUM], rules) == (RENUM, None))
+
+    check("7. three paths (pair + another) -> REFUSE", stable([CONT, RENUM, OTHER], rules) is None)
+    check("7. no path at all -> REFUSE", stable([], rules) is None)
+
+    malformed = {
+        "a rule missing its expect block": {"profile_url_continuity": {"rules": [
+            {k: v for k, v in continuity_rule().items() if k != "expect"}]}},
+        "a non-normalised renumbered_url": {"profile_url_continuity": {"rules": [
+            continuity_rule(renumbered_url="https://afltables.com/afl/stats/players/Q/Quinn_Test2.html")]}},
+        "continuing_url == renumbered_url": {"profile_url_continuity": {"rules": [
+            continuity_rule(renumbered_url=CONT)]}},
+        "an expect that breaks career-game continuity": {"profile_url_continuity": {"rules": [
+            continuity_rule(expect={**continuity_rule()["expect"], "renumbered_first_career_game": 12})]}},
+        "an empty authority": {"profile_url_continuity": {"rules": [continuity_rule(authority=" ")]}},
+        "a non-object rule": {"profile_url_continuity": {"rules": ["players/Q/Quinn_Test.html"]}},
+        "a non-object contract": [continuity_rule()],
+        "invalid JSON": "{ not json",
+    }
+    for index, (label, document) in enumerate(malformed.items()):
+        path = contract_file(tmp_dir, f"malformed-{index}.json", document)
+        check(f"8. malformed contract ({label}) -> REFUSE",
+              raises(m.BrownlowArtefactSourceError, m.load_continuity_rules, path))
+    check("8. an unreadable contract -> REFUSE",
+          raises(m.BrownlowArtefactSourceError, m.load_continuity_rules, tmp_dir / "absent.json"))
+    check("8. a hand-built rule list that skipped the validator is refused",
+          raises(TypeError, m.stable_afltables_identity, [CONT, RENUM],
+                 (m.ProfileContinuityRule("hand-built", CONT, RENUM),)))
+    no_section = m.load_continuity_rules(contract_file(tmp_dir, "no-section.json", {"source_row_corrections": {}}))
+    check("8. a contract with no continuity section has no rules, so the pair REFUSES",
+          no_section.rules == () and stable([CONT, RENUM], no_section) is None)
+
+    second = continuity_rule(id="second-rule", continuing_url="players/R/Rory_Test.html",
+                             renumbered_url="players/R/Rory_Test2.html")
+    duplicate_renum = continuity_rule(id="dup-renum", continuing_url="players/S/Sam_Test.html")
+    check("9. the same renumbered_url named by two rules -> REFUSE (existing validator)",
+          raises(m.BrownlowArtefactSourceError, m.load_continuity_rules, contract_file(
+              tmp_dir, "dup-renum.json", {"profile_url_continuity": {"rules": [continuity_rule(), duplicate_renum]}})))
+    chained = continuity_rule(id="chain", continuing_url=RENUM, renumbered_url="players/Q/Quinn_Test4.html")
+    check("9. a chain (continuing_url is another rule's renumbered_url) -> REFUSE (existing validator)",
+          raises(m.BrownlowArtefactSourceError, m.load_continuity_rules, contract_file(
+              tmp_dir, "chain.json", {"profile_url_continuity": {"rules": [continuity_rule(), chained]}})))
+    check("9. a duplicate rule id -> REFUSE (existing validator)",
+          raises(m.BrownlowArtefactSourceError, m.load_continuity_rules, contract_file(
+              tmp_dir, "dup-id.json", {"profile_url_continuity": {"rules": [
+                  continuity_rule(), continuity_rule(continuing_url="players/S/Sam_Test.html",
+                                                     renumbered_url="players/S/Sam_Test2.html")]}})))
+    two_rules = m.load_continuity_rules(contract_file(
+        tmp_dir, "two.json", {"profile_url_continuity": {"rules": [continuity_rule(), second]}}))
+    check("9. a pair spanning two different rules -> REFUSE",
+          stable([CONT, "players/R/Rory_Test2.html"], two_rules) is None
+          and stable(["players/R/Rory_Test.html", RENUM], two_rules) is None)
+    check("9. ... while each rule's own exact pair still folds",
+          stable([CONT, RENUM], two_rules) == CONT
+          and stable(["players/R/Rory_Test2.html", "players/R/Rory_Test.html"], two_rules) == "players/R/Rory_Test.html")
+    check("9. both pairs on one player (four paths) -> REFUSE",
+          stable([CONT, RENUM, "players/R/Rory_Test.html", "players/R/Rory_Test2.html"], two_rules) is None)
+
+    # resolve_player_identities(): the builder's per-player reduction, refusing with every offender named.
+    resolved = m.resolve_player_identities(
+        [1, 2], {1: {RENUM, CONT}, 2: {OTHER}}, {1: "Quinn Test", 2: "Other Player"}, rules)
+    check("resolve_player_identities(): a folded pair and a single path both resolve",
+          resolved == {1: m.PlayerIdentity(CONT, "Quinn Test", "test-renumbered-profile"),
+                       2: m.PlayerIdentity(OTHER, "Other Player", None)})
+    check("resolve_player_identities(): an untracked pair refuses the build",
+          raises(m.BrownlowArtefactEvidenceError, m.resolve_player_identities,
+                 [1], {1: {CONT, OTHER}}, {1: "Quinn Test"}, rules))
+    check("resolve_player_identities(): a player with no accepted path refuses the build",
+          raises(m.BrownlowArtefactEvidenceError, m.resolve_player_identities, [1], {}, {1: "Quinn Test"}, rules))
+    folds = m.continuity_folds(resolved, rules)
+    check("continuity_folds(): manifest provenance names the contract, its hash and the one fold",
+          folds["folds"] == [{"rule_id": "test-renumbered-profile", "continuing_url": CONT, "renumbered_url": RENUM}]
+          and folds["sha256"] == m.sha256_file(tmp_dir / "one.json"))
+
+    # verify_continuity_provenance(): the manifest's continuity provenance is validated, never
+    # carried as silently ignored metadata (the loader does not read identity_evidence).
+    def with_provenance(block):
+        return {"identity_evidence": {"database": "afldb_test", "profile_url_continuity": block}}
+
+    def provenance_refuses(block, the_rules=rules):
+        return raises(m.BrownlowArtefactSourceError, m.verify_continuity_provenance,
+                      with_provenance(block), the_rules)
+
+    check("provenance: the builder's own continuity_folds() block verifies",
+          m.verify_continuity_provenance(with_provenance(folds), rules) == folds)
+    check("provenance: a Windows-separator contract path is the same contract",
+          m.verify_continuity_provenance(
+              with_provenance({**folds, "contract": folds["contract"].replace("/", "\\")}), rules)["sha256"]
+          == folds["sha256"])
+    check("provenance: a block with no folds (no multi-path player) verifies",
+          m.verify_continuity_provenance(with_provenance({**folds, "folds": []}), rules)["folds"] == [])
+    check("provenance: a missing block refuses",
+          raises(m.BrownlowArtefactSourceError, m.verify_continuity_provenance, {"identity_evidence": {}}, rules)
+          and raises(m.BrownlowArtefactSourceError, m.verify_continuity_provenance, {}, rules))
+    check("provenance: an extra or missing key refuses",
+          provenance_refuses({**folds, "note": "x"})
+          and provenance_refuses({k: v for k, v in folds.items() if k != "sha256"}))
+    check("provenance: another contract path refuses", provenance_refuses({**folds, "contract": "other.json"}))
+    check("provenance: another contract hash refuses (built with different rules)",
+          provenance_refuses({**folds, "sha256": "0" * 64}))
+    check("provenance: a fold that is not exactly a validated rule refuses",
+          provenance_refuses({**folds, "folds": [{**folds["folds"][0], "continuing_url": OTHER}]})
+          and provenance_refuses({**folds, "folds": [{**folds["folds"][0], "extra": 1}]})
+          and provenance_refuses({**folds, "folds": "not a list"}))
+    check("provenance: a duplicated fold refuses",
+          provenance_refuses({**folds, "folds": folds["folds"] * 2}))
+    two_folds = m.continuity_folds(
+        {1: m.PlayerIdentity(CONT, "Quinn Test", "test-renumbered-profile"),
+         2: m.PlayerIdentity("players/R/Rory_Test.html", "Rory Test", "second-rule")}, two_rules)
+    check("provenance: two folds in continuing_url order verify; reversed order refuses",
+          m.verify_continuity_provenance(with_provenance(two_folds), two_rules) == two_folds
+          and provenance_refuses({**two_folds, "folds": list(reversed(two_folds["folds"]))}, two_rules))
+    check("provenance: an unvalidated rule container is refused",
+          raises(TypeError, m.verify_continuity_provenance, with_provenance(folds), list(rules.rules)))
+    pair_dir = tmp_dir / "provenance-pair"
+    pair_dir.mkdir()
+    pair_csv, pair_manifest = write_afl_api_artefact(pair_dir, 2031)
+    document = json.loads(pair_manifest.read_text(encoding="utf-8"))
+    check("portability: manifest paths are POSIX on every host, so a Linux loader's "
+          "Path(artefact.file).name names the CSV",
+          "\\" not in document["artefact"]["file"] and "\\" not in folds["contract"]
+          and PurePosixPath(document["artefact"]["file"]).name == pair_csv.name)
+    check("portability: an in-repo path is repo-relative POSIX",
+          m._rel(m.REPO_ROOT / "data" / "brownlow" / "season-votes-afl_api-2026.csv")
+          == "data/brownlow/season-votes-afl_api-2026.csv")
+    document["identity_evidence"]["profile_url_continuity"] = folds
+    pair_manifest.write_text(json.dumps(document), encoding="utf-8")
+    accepted = loader.load_afl_api_artefact(2031, pair_csv, pair_manifest, {2031})
+    check("provenance: the loader's schema-2 check permits the provenance block (extension field)",
+          accepted.manifest["identity_evidence"]["profile_url_continuity"] == folds)
+    check("provenance: ... and the loaded manifest's provenance verifies against the rules",
+          m.verify_continuity_provenance(accepted.manifest, rules) == folds)
+    check("provenance: build() validates its own manifest's provenance before reporting success",
+          "verify_continuity_provenance(manifest, continuity_rules)" in inspect.getsource(m.build))
+
+    # load_identity_and_games(): the DB read wired through the same reduction (fake cursor).
+    class FakeCursor:
+        def __init__(self, results):
+            self._results = list(results)
+            self._current = None
+
+        def execute(self, sql, params=None):
+            self._current = self._results.pop(0)
+
+        def fetchall(self):
+            return self._current
+
+    cursor = FakeCursor([
+        [(1, "Quinn Test")],
+        [(1, RENUM), (1, CONT)],
+        [(1, 21)],
+    ])
+    identities_read, games_read = m.load_identity_and_games(cursor, {1}, 2026, rules)
+    check("load_identity_and_games(): the two accepted DB paths fold to continuing_url",
+          identities_read[1].afltables_profile_url == CONT and games_read == {1: 21})
+
+    # 10. bridge verification compares the bridge's identity to the FOLDED stable path.
+    folded = {7: m.PlayerIdentity(CONT, "Quinn Test", "test-renumbered-profile")}
+    m.verify_bridge_identities({"CD_I7": 7}, {"CD_I7": CONT}, folded)
+    check("10. bridge identity == folded continuing_url -> accepted", True)
+    check("10. bridge identity == the renumbered member of the pair -> REFUSE (not the stable identity)",
+          raises(m.BrownlowArtefactEvidenceError, m.verify_bridge_identities, {"CD_I7": 7}, {"CD_I7": RENUM}, folded))
+    lone_renum = {7: m.PlayerIdentity(RENUM, "Quinn Test", None)}
+    check("10. a bridge declaring continuing_url for a player holding only renumbered_url -> REFUSE",
+          raises(m.BrownlowArtefactEvidenceError, m.verify_bridge_identities, {"CD_I7": 7}, {"CD_I7": CONT}, lone_renum))
+
+# 11/12. The REAL tracked contract (tools/rebuild/fitzroy/fitzroy-contract.json).
+real_rules = m.load_continuity_rules()
+real_pairs = {
+    "2025-charlie-cameron-renumbered-profile": ("players/C/Charlie_Cameron.html", "players/C/Charlie_Cameron3.html"),
+    "2025-jack-graham-renumbered-profile": ("players/J/Jack_Graham.html", "players/J/Jack_Graham2.html"),
+    "2025-jack-ross-renumbered-profile": ("players/J/Jack_Ross.html", "players/J/Jack_Ross3.html"),
+    "2025-jack-williams-renumbered-profile": ("players/J/Jack_Williams.html", "players/J/Jack_Williams3.html"),
+}
+check("11/12. the tracked contract carries exactly the four measured renumberings",
+      {rule.rule_id: (rule.continuing_url, rule.renumbered_url) for rule in real_rules.rules} == real_pairs)
+check("11. real witness: player 6519's DB set {Jack_Ross.html, Jack_Ross3.html} -> players/J/Jack_Ross.html",
+      m.stable_afltables_identity(["players/J/Jack_Ross.html", "players/J/Jack_Ross3.html"], real_rules)
+      == ("players/J/Jack_Ross.html", "2025-jack-ross-renumbered-profile")
+      and stable(["players/J/Jack_Ross3.html", "players/J/Jack_Ross.html"], real_rules) == "players/J/Jack_Ross.html")
+for rule_id, (cont_url, renum_url) in real_pairs.items():
+    check(f"12. {rule_id}: both orders fold to {cont_url}",
+          stable([cont_url, renum_url], real_rules) == cont_url and stable([renum_url, cont_url], real_rules) == cont_url)
+check("12. no suffix inference on the real contract: Jack_Ross.html + Jack_Ross2.html (1919) -> REFUSE",
+      stable(["players/J/Jack_Ross.html", "players/J/Jack_Ross2.html"], real_rules) is None)
+check("12. cross-rule real pair (Jack_Ross.html + Jack_Williams3.html) -> REFUSE",
+      stable(["players/J/Jack_Ross.html", "players/J/Jack_Williams3.html"], real_rules) is None)
 
 
 # ---------------------------------------------------------------------------

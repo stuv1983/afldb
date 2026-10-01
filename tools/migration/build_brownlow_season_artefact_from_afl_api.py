@@ -98,7 +98,8 @@ Identity resolution (Sec 6.3, T1) -- fail closed, no fuzzy matching
 Every provider player id appearing in a vote set must resolve through the
 COMBINED union of the supplied ``--bridge`` artefact(s)' ``disposition:
 "linked"`` rows ONLY (``load_bridges()``, 2026-09-20 identity-union fix --
-see below), then through a DB-verified, unambiguous ``afltables_profile_url``.
+see below), then through a DB-verified stable ``afltables_profile_url`` (see
+"Stable AFL Tables identity" below).
 A single unresolved or ambiguous identity anywhere refuses THE WHOLE MATCH'S
 3-row vote set (Sec 10: "a match's vote set is one unit, all-or-none"), and
 one or more refused vote sets refuses THE WHOLE ARTEFACT BUILD -- nothing is
@@ -136,6 +137,36 @@ Tables profile path to EQUAL the row's identity: a stale id that now names
 someone else refuses the whole build. This builder does not re-resolve a
 renumbered player (the loader, ``import_afl_api_player_bridge.ts``, does); it
 only refuses, which is the fail-closed answer for an offline artefact builder.
+
+Stable AFL Tables identity (AFLDB-ISSUE-233, 2026-10-01). A looked-up player's
+accepted (``unique``/``resolved``) ``afltables``/``afltables_profile_url`` rows
+give one or more profile paths; ``stable_afltables_identity()`` reduces them
+exactly as ``classifyAflApiForwardIdentity()`` (``src/lib/acquisition/
+afl-api-adjudication.ts``, AFLDB-ISSUE-237 continuity amendment) does for the
+AFL Tables namespace, so the path written here is the same identity the bridge
+emitter bound into ``candidate_player_identity``:
+
+* exactly ONE path is directly unambiguous: that path;
+* exactly TWO paths that are EXACTLY the ``{continuing_url, renumbered_url}``
+  pair of ONE tracked ``profile_url_continuity`` rule in
+  ``tools/rebuild/fitzroy/fitzroy-contract.json`` are one accepted footballer
+  (AFLDB-ISSUE-136: the fitzRoy importer registers both paths on the one folded
+  player): the rule's ``continuing_url``. The rule picks the path -- never sort
+  order, never "first", never a stripped numeric suffix;
+* every other multi-path state -- two paths no single rule names exactly, a
+  pair spanning two rules, three or more paths -- REFUSES, as does no path.
+
+The rules are validated by the fitzRoy importer's own
+``load_profile_continuity_rules()`` (imported, not re-implemented), so a
+contract the importer would refuse refuses this build too, before any DB read.
+Names and player ids are never identity evidence. Every fold applied is recorded
+in the manifest's ``identity_evidence.profile_url_continuity`` (the contract path,
+its sha256, and each fold's rule id and two paths). ``import_brownlow_season.py``
+verifies only a schema-2 manifest's artefact block, schema, source and season;
+``identity_evidence`` is builder-owned provenance that the loader permits and does
+not read. ``verify_continuity_provenance()`` is its validator: the builder runs it
+on its own manifest before reporting success, and a consumer of a built artefact
+runs it to bind the artefact to the exact contract it was built with.
 
 =============================================================================
 Completion gate (Sec 10, T3)
@@ -187,6 +218,12 @@ from import_brownlow_season import (  # noqa: E402
     load_artefact as load_artefact_via_loader,
 )
 
+# AFLDB-ISSUE-233: the ONE Python validator of the tracked profile_url_continuity rules. The
+# importer module is import-safe (stdlib only at module level; its DB helpers import lazily).
+from import_fitzroy_core import CONTRACT_PATH as FITZROY_CONTRACT_PATH
+from import_fitzroy_core import SnapshotValidationError as ContinuityContractError
+from import_fitzroy_core import load_profile_continuity_rules
+
 TOOL = "tools/migration/build_brownlow_season_artefact_from_afl_api.py"
 TOOL_VERSION = "1.0.0"
 
@@ -237,11 +274,15 @@ def sha256_text(text: str) -> str:
 
 def _rel(path: Path) -> str:
     """A repo-relative string for a manifest provenance field when possible, the plain path
-    otherwise (e.g. a --snapshot-root/--bridge/--out override outside REPO_ROOT, test-only)."""
+    otherwise (e.g. a --snapshot-root/--bridge/--out override outside REPO_ROOT, test-only).
+
+    Always POSIX separators (AFLDB-ISSUE-233): the loader checks ``artefact.file`` with
+    ``Path(...).name``, which on Linux does not split a Windows ``\\`` path, so a manifest built
+    on Windows with host separators would be refused by a Linux rebuild."""
     try:
-        return str(path.resolve().relative_to(REPO_ROOT))
+        return path.resolve().relative_to(REPO_ROOT).as_posix()
     except ValueError:
-        return str(path)
+        return Path(path).as_posix()
 
 
 # ---------------------------------------------------------------------------
@@ -567,8 +608,9 @@ def verify_bridge_identities(
     bridge: dict[str, int], identities_by_provider: dict[str, str],
     db_identities: dict[int, "PlayerIdentity"],
 ) -> None:
-    """AFLDB-ISSUE-241: every looked-up player's own AFL Tables profile path must equal the
-    identity its bridge row declares. A stale candidate_player_id -- one a rebuild or promotion
+    """AFLDB-ISSUE-241: every looked-up player's own stable AFL Tables profile path (after any
+    tracked continuity fold, stable_afltables_identity()) must equal the identity its bridge
+    row declares. A stale candidate_player_id -- one a rebuild or promotion
     has since given to someone else -- therefore refuses rather than attributing votes to the
     wrong profile. Only the players this build actually reads are checked; each is named by
     exactly one provider (Sec 6.3 rule (b), re-checked by load_bridges())."""
@@ -788,15 +830,174 @@ def open_read_only(dsn: str, required_database: str) -> psycopg.Connection:
 class PlayerIdentity:
     afltables_profile_url: str
     display_name: str
+    # The tracked profile_url_continuity rule that folded two accepted paths into
+    # afltables_profile_url (its continuing_url); None for a single-path player.
+    continuity_rule_id: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# Stable AFL Tables identity (AFLDB-ISSUE-233): one path, or exactly one tracked
+# profile_url_continuity pair -> its continuing_url; everything else refuses.
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ProfileContinuityRule:
+    rule_id: str
+    continuing_url: str
+    renumbered_url: str
+
+
+@dataclass(frozen=True)
+class ValidatedContinuityRules:
+    """Profile continuity rules that passed the fitzRoy importer's own validator. Construct it
+    ONLY through load_continuity_rules(); stable_afltables_identity() refuses anything else, so
+    a hand-built or unvalidated rule list can never collapse two identities into one."""
+    contract_file: str
+    contract_sha256: str
+    rules: tuple[ProfileContinuityRule, ...]
+
+
+def load_continuity_rules(contract_path: Path | None = None) -> ValidatedContinuityRules:
+    """The tracked profile_url_continuity rules, validated by import_fitzroy_core's
+    load_profile_continuity_rules(). An unreadable, non-JSON or malformed contract refuses the
+    whole build -- one bad rule is never skipped. A contract with no profile_url_continuity
+    section yields no rules (the importer's own behaviour), which leaves every multi-path
+    player refused."""
+    path = contract_path or FITZROY_CONTRACT_PATH
+    try:
+        raw_rules = load_profile_continuity_rules(path)
+        rules = tuple(
+            ProfileContinuityRule(rule["id"], rule["continuing_url"], rule["renumbered_url"])
+            for rule in raw_rules)
+        digest = sha256_file(path)
+    except (ContinuityContractError, OSError, ValueError, TypeError, AttributeError, KeyError) as exc:
+        raise BrownlowArtefactSourceError(
+            f"the fitzRoy profile_url_continuity contract {path} is unusable -- refusing: {exc}") from exc
+    return ValidatedContinuityRules(contract_file=_rel(path), contract_sha256=digest, rules=rules)
+
+
+def stable_afltables_identity(
+    paths, continuity_rules: ValidatedContinuityRules,
+) -> tuple[str, str | None] | None:
+    """(stable path, folding rule id or None) for one player's accepted AFL Tables paths, or None
+    to refuse. The AFL Tables branch of classifyAflApiForwardIdentity() (afl-api-adjudication.ts):
+
+    * exactly one distinct path -> it;
+    * exactly two, and they are EXACTLY one validated rule's {continuing_url, renumbered_url}
+      -> that rule's continuing_url (the comparison is a set equality, so input order and sort
+      order are never read);
+    * anything else (no path, two paths no single rule names exactly, three or more) -> None.
+    """
+    if not isinstance(continuity_rules, ValidatedContinuityRules):
+        raise TypeError("continuity_rules must come from load_continuity_rules()")
+    distinct = set(paths)
+    if len(distinct) == 1:
+        return next(iter(distinct)), None
+    if len(distinct) == 2:
+        matching = [rule for rule in continuity_rules.rules
+                    if {rule.continuing_url, rule.renumbered_url} == distinct]
+        if len(matching) == 1:
+            return matching[0].continuing_url, matching[0].rule_id
+    return None
+
+
+def resolve_player_identities(
+    player_ids, urls_by_player: dict[int, set[str]], display_names: dict[int, str],
+    continuity_rules: ValidatedContinuityRules,
+) -> dict[int, PlayerIdentity]:
+    """player_id -> stable PlayerIdentity for exactly `player_ids`. Refuses (raises), naming every
+    offender, on a player with no accepted path or a path set stable_afltables_identity() does
+    not resolve."""
+    identities: dict[int, PlayerIdentity] = {}
+    ambiguous: dict[int, list[str]] = {}
+    missing_url: list[int] = []
+    for pid in sorted(player_ids):
+        urls = urls_by_player.get(pid) or set()
+        if not urls:
+            missing_url.append(pid)
+            continue
+        stable = stable_afltables_identity(urls, continuity_rules)
+        if stable is None:
+            ambiguous[pid] = sorted(urls)
+            continue
+        identities[pid] = PlayerIdentity(
+            afltables_profile_url=stable[0], display_name=display_names[pid], continuity_rule_id=stable[1])
+    if ambiguous:
+        raise BrownlowArtefactEvidenceError(
+            "player id(s) carry more than one afltables_profile_url and the set is not exactly one "
+            f"tracked profile_url_continuity pair: {ambiguous}")
+    if missing_url:
+        raise BrownlowArtefactEvidenceError(
+            f"player id(s) have no afltables_profile_url external identity: {missing_url}")
+    return identities
+
+
+def continuity_folds(identities: dict[int, PlayerIdentity],
+                     continuity_rules: ValidatedContinuityRules) -> dict[str, Any]:
+    """Manifest provenance: the contract the rules came from and every fold this build applied."""
+    by_id = {rule.rule_id: rule for rule in continuity_rules.rules}
+    folds = sorted(
+        ({"rule_id": rule.rule_id, "continuing_url": rule.continuing_url,
+          "renumbered_url": rule.renumbered_url}
+         for rule in (by_id[i.continuity_rule_id] for i in identities.values()
+                      if i.continuity_rule_id is not None)),
+        key=lambda fold: fold["continuing_url"])
+    return {"contract": continuity_rules.contract_file, "sha256": continuity_rules.contract_sha256,
+            "folds": folds}
+
+
+def verify_continuity_provenance(manifest: dict[str, Any],
+                                 continuity_rules: ValidatedContinuityRules) -> dict[str, Any]:
+    """Validate a manifest's ``identity_evidence.profile_url_continuity`` against the validated
+    tracked rules, and return it. ``import_brownlow_season.py`` verifies only the artefact block
+    of a schema-2 manifest and ignores this key, so this is where the provenance is checked: the
+    builder runs it on its own manifest before reporting success, and a consumer of a built
+    artefact (the ISSUE-233 rehearsal) runs it to bind the artefact to the contract it was built
+    with. Exact shape only: the contract path (separator-normalised: manifests built on Windows
+    before ``_rel()`` emitted POSIX paths carry ``\\``), its sha256, and folds that are each exactly one validated rule,
+    unique, in ``continuing_url`` order. Anything else refuses."""
+    if not isinstance(continuity_rules, ValidatedContinuityRules):
+        raise TypeError("continuity_rules must come from load_continuity_rules()")
+    evidence = manifest.get("identity_evidence")
+    block = evidence.get("profile_url_continuity") if isinstance(evidence, dict) else None
+    if not isinstance(block, dict) or set(block) != {"contract", "sha256", "folds"}:
+        raise BrownlowArtefactSourceError(
+            "manifest identity_evidence.profile_url_continuity is missing or not exactly "
+            "{contract, sha256, folds}")
+    contract = block["contract"]
+    if (not isinstance(contract, str)
+            or contract.replace("\\", "/") != continuity_rules.contract_file.replace("\\", "/")):
+        raise BrownlowArtefactSourceError(
+            f"profile_url_continuity.contract {contract!r} is not {continuity_rules.contract_file!r}")
+    if block["sha256"] != continuity_rules.contract_sha256:
+        raise BrownlowArtefactSourceError(
+            f"profile_url_continuity.sha256 {block['sha256']!r} is not the validated contract's "
+            f"{continuity_rules.contract_sha256!r}: the artefact was built with different rules")
+    folds = block["folds"]
+    triples = {(rule.rule_id, rule.continuing_url, rule.renumbered_url) for rule in continuity_rules.rules}
+    if not isinstance(folds, list) or not all(
+            isinstance(fold, dict) and set(fold) == {"rule_id", "continuing_url", "renumbered_url"}
+            and (fold["rule_id"], fold["continuing_url"], fold["renumbered_url"]) in triples
+            for fold in folds):
+        raise BrownlowArtefactSourceError(
+            "profile_url_continuity.folds must each be exactly one validated rule "
+            "{rule_id, continuing_url, renumbered_url}")
+    if len({fold["rule_id"] for fold in folds}) != len(folds) or folds != sorted(
+            folds, key=lambda fold: fold["continuing_url"]):
+        raise BrownlowArtefactSourceError(
+            "profile_url_continuity.folds must be unique and in continuing_url order")
+    return block
 
 
 def load_identity_and_games(
-    cur, player_ids: set[int], season: int,
+    cur, player_ids: set[int], season: int, continuity_rules: ValidatedContinuityRules,
 ) -> tuple[dict[int, PlayerIdentity], dict[int, int]]:
     """(player_id -> identity, player_id -> home-and-away games) for exactly `player_ids`.
 
-    Refuses (raises) rather than guessing on any ambiguity: more than one
-    afltables_profile_url for a player, or a player with none at all.
+    Refuses (raises) rather than guessing: a player whose accepted afltables_profile_url
+    set is neither one path nor exactly one tracked continuity pair, or a player with none
+    at all (resolve_player_identities()).
     """
     if not player_ids:
         return {}, {}
@@ -820,18 +1021,7 @@ def load_identity_and_games(
     urls_by_player: dict[int, set[str]] = {}
     for player_id, url in cur.fetchall():
         urls_by_player.setdefault(player_id, set()).add(url)
-    ambiguous = {pid: sorted(urls) for pid, urls in urls_by_player.items() if len(urls) > 1}
-    if ambiguous:
-        raise BrownlowArtefactEvidenceError(
-            f"player id(s) resolve to more than one afltables_profile_url: {ambiguous}")
-    missing_url = sorted(set(ids) - set(urls_by_player))
-    if missing_url:
-        raise BrownlowArtefactEvidenceError(
-            f"player id(s) have no afltables_profile_url external identity: {missing_url}")
-    identities = {
-        pid: PlayerIdentity(afltables_profile_url=next(iter(urls)), display_name=display_names[pid])
-        for pid, urls in urls_by_player.items()
-    }
+    identities = resolve_player_identities(ids, urls_by_player, display_names, continuity_rules)
 
     # SUM(...) rather than the admin-brownlow.ts Map-overwrite reading: a player traded
     # mid-season carries more than one player_season_stats row (one per club), and every
@@ -926,6 +1116,7 @@ def build_manifest(
     *, season: int, label: str, snapshot_manifest: dict[str, Any], snapshot_dir: Path,
     bridge_paths: list[Path], bridge_provenance: dict[str, list[Path]], measured: dict[str, Any],
     csv_path: Path, csv_text: str, db_database: str, reconciliation_compared: int,
+    profile_url_continuity: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     bridge_entries = [
         {
@@ -963,6 +1154,8 @@ def build_manifest(
             "database": db_database,
             "read_only": True,
             "tables": ["players", "external_identities", "player_season_stats"],
+            **({"profile_url_continuity": profile_url_continuity}
+               if profile_url_continuity is not None else {}),
         },
         "reconciliation": {
             "leaderboard_players_compared": reconciliation_compared,
@@ -1048,6 +1241,7 @@ def read_json(path: Path) -> Any:
 def build(
     *, label: str, bridge_paths: list[Path], dsn_env: str, required_database: str,
     snapshot_root: Path = SNAPSHOT_ROOT, rep: Reporter | None = None,
+    continuity_contract_path: Path | None = None,
 ) -> dict[str, Any]:
     """The full offline-then-read-only-evidence pipeline. Raises on any refusal; returns a
     summary dict on success (whether or not the caller goes on to write)."""
@@ -1086,15 +1280,20 @@ def build(
     tallied_player_ids = {pid for pid, _ in facts}
     ineligible_player_ids = resolve_ineligible_player_ids(tallied_player_ids, bridge, leaderboard)
 
+    continuity_rules = load_continuity_rules(continuity_contract_path)
     dsn = resolve_dsn(dsn_env, required_database)
     conn = open_read_only(dsn, required_database)
     try:
         with conn.cursor() as cur:
-            identities, games = load_identity_and_games(cur, tallied_player_ids, season)
+            identities, games = load_identity_and_games(cur, tallied_player_ids, season, continuity_rules)
     finally:
         conn.rollback()
         conn.close()
     verify_bridge_identities(bridge, bridge_identities, identities)
+    folds = continuity_folds(identities, continuity_rules)
+    for fold in folds["folds"]:
+        rep.step(f"continuity    : {fold['renumbered_url']} + {fold['continuing_url']} -> "
+                 f"{fold['continuing_url']} ({fold['rule_id']})")
 
     derived = derive_season_rows(facts, ineligible_player_ids, games)
     rows = build_rows(season, derived, identities, bridge, label)
@@ -1106,8 +1305,10 @@ def build(
         season=season, label=label, snapshot_manifest=snapshot_manifest, snapshot_dir=snapshot_dir,
         bridge_paths=bridge_paths, bridge_provenance=bridge_provenance, measured=measured,
         csv_path=out_csv, csv_text=csv_text, db_database=required_database,
-        reconciliation_compared=len(leaderboard),
+        reconciliation_compared=len(leaderboard), profile_url_continuity=folds,
     )
+    # The loader ignores identity_evidence; prove the continuity provenance here instead.
+    verify_continuity_provenance(manifest, continuity_rules)
 
     # Prove this builder's own row contract against the loader's own reader before
     # reporting success -- a round-trip self-check, not a duplicate of it.

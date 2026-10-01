@@ -44,9 +44,10 @@ commit.
   `matches.source_id` absent: the owner of its rows cannot be determined). Only a database with no `matches`
   table at all reads as `schema_absent`; the rollover refuses such evidence and the promotion gate refuses such a
   target.
-- **Discovery `--fetch` retains the HTTP entity bytes.** `--save-raw` now writes the response body's bytes
-  exactly (a cloned response's `arrayBuffer()`), and decodes them only after retention (UTF-8; a BOM is dropped,
-  an invalid sequence refuses). Before this it wrote back the decoded text, which would have dropped a BOM or
+- **Discovery `--fetch` retains the response-body bytes.** `--save-raw` now writes the response body's bytes
+  exactly (a cloned response's `arrayBuffer()`: the body after HTTP content decoding, not necessarily the
+  compressed wire bytes), and decodes them as text only after retention (UTF-8; a BOM is dropped, an invalid
+  sequence refuses). Before this it wrote back the decoded text, which would have dropped a BOM or
   replaced an invalid sequence. The shared AFL API client is unchanged. The ASCII fixture is byte-identical
   either way.
 - **D-233-2 — season-scoped AFL API Brownlow artefacts beside the master.** `import_brownlow_season.py` loads
@@ -56,6 +57,17 @@ commit.
   own import batch. The rebuild binds each artefact into its preflight inputs, stage name and Stage-9 gates. With
   no such artefact (today) the load, the preflight and the gates are unchanged. `docs/deployment.md`'s rebuild
   stage table lists the census stage and the season-scoped artefacts.
+- **The AFL API Brownlow season builder honours tracked profile continuity.**
+  `build_brownlow_season_artefact_from_afl_api.py` used to refuse any player carrying two accepted AFL Tables
+  profile paths. A player whose two paths are exactly one tracked `profile_url_continuity` pair
+  (`tools/rebuild/fitzroy/fitzroy-contract.json`, ISSUE-136) is one footballer, so the builder now resolves that
+  pair to the rule's `continuing_url`. This is the same rule as `classifyAflApiForwardIdentity()`
+  (ISSUE-237), and a vitest parity case holds the two implementations together. The rules are validated by the
+  fitzRoy importer's own `load_profile_continuity_rules()`, so a malformed contract refuses the build. Every
+  other multi-path state still refuses: an untracked pair, a pair spanning two rules, three or more paths.
+  Sort order and suffixes are never read. The manifest records each fold under
+  `identity_evidence.profile_url_continuity`. Real witness: DEV player 6519 (`Jack_Ross.html` +
+  `Jack_Ross3.html`) now resolves to `players/J/Jack_Ross.html`.
 - **Validation.**
   - The DB-free suite shows no new failure.
   - The rollback-only census proof (`tests/integration/afl-api-ownership-census.test.ts`) passed 5/5 on
@@ -63,7 +75,47 @@ commit.
   - Read-only censuses of `afldb_test` and `afldb_dev` both PASS: zero `afl_api`-owned matches, and DEV was not
     mutated.
 
-  Not yet exercised: the first DEV discovery `--fetch` and the D-233-2 Brownlow write path. PROD is untouched.
+  - **First real DEV discovery passed** at `f0abbb4c` (stamp `20261001T034039Z`).
+    - One live fetch, HTTP 200. The retained 1,959-byte body has sha256 `2aeed4e9…b33e`.
+    - 15/15 seasons listed (2012–2026); 2022–2026 confirmed. Verdict `no_change`.
+    - The offline replay gave a byte-identical proposal. DEV and the registry are unchanged.
+
+  - **2026 artefact built read-only from DEV evidence** (outside the repository, untracked). Inputs: the fresh
+    CONCLUDED snapshot `afl-api-brownlow-2026-2026-10-01-041609` and a DEV-emitted stable-identity bridge
+    (669/669). Result: 183/183 identities, 207 vote sets, 1,242 votes, 1 winner, 14 ineligible rows, 0
+    leaderboard mismatches. A second `--write` returned `unchanged`.
+  - **`code_test_db` coverage preflight (read-only): incomplete.** 175/183 paths resolve uniquely through the
+    loader's own `ProfileResolver`. Eight paths have no carrier there, and no `players` row by those names exists
+    either. `code_test_db` holds no 2026 matches, so these are presumably 2026 debutants (not verified on DEV).
+    The rehearsal harness was therefore not written.
+
+  - **`code_test_db` write-path rehearsal harness written, not run.**
+    `tools/migration/brownlow_afl_api_season_rehearsal.py` drives the real loader over the pinned 2026 artefact.
+    Its prerequisite fixture seeds exactly eight canonical players and AFL Tables profile identities for the
+    eight 2026 vote-getters a historical rebuild cannot contain (operator decision D-233-R). They are keyed
+    only by their exact artefact profile paths; no DEV id and no name is used. The harness stops unless the
+    target still has exactly that eight-path gap. The fixture is rehearsal-only and is removed by the
+    harness's exact, journaled restore. DB-free contract checks:
+    `tests/python/brownlow_afl_api_season_rehearsal_contract.py`.
+
+  - **The D-233-2 Brownlow write path passed its `code_test_db` rehearsal**, run once, with an exact restore.
+    - With the eight-player fixture in place, the real loader's first load wrote the genuine 2026 slice: 183
+      rows, 1,242 votes, 1 winner, 14 ineligible rows. Every row is `source_id = afl_api`, sits in its own
+      import batch, and equals its CSV row. The AFL Tables rows and `brownlow_round_votes` were unchanged.
+    - A second load was content-identical. It replaced the rows and opened two new batches.
+    - The pending-availability and in-progress-season refusals wrote nothing. The changed-CSV and
+      changed-manifest refusals held offline.
+    - The duplicate-season refusal was not run against the database; no genuine input exists for it.
+    - After the restore, a fresh-session fingerprint matched the pre-state exactly, with zero residue.
+  - **The builder's continuity provenance is validated.** The manifest's
+    `identity_evidence.profile_url_continuity` (the contract path, its sha256 and every fold) is now checked
+    by `verify_continuity_provenance()`: each fold must be exactly one validated tracked rule. The builder
+    runs it on its own manifest before reporting success. The loader verifies only the artefact block and
+    never reads this provenance.
+  - **AFL API Brownlow manifests use POSIX paths on every host.** A manifest built on Windows used to name
+    `artefact.file` with backslashes, which the loader's file-name check would refuse on a Linux rebuild.
+
+  PROD is untouched.
 
 ### Corrected-identity promotion: DEV rehearsal passed, temporary PROD gate retired, AFLDB-ISSUE-238 resolved - 1 October 2026
 

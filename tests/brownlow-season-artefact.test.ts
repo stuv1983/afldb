@@ -534,3 +534,125 @@ describe('brownlow season loader: unadjudicated recovery paths are rejected', ()
     }
   });
 });
+
+/**
+ * AFLDB-ISSUE-233: the AFL API Brownlow season builder reduces a player's accepted AFL Tables
+ * paths with `stable_afltables_identity()` (Python). It must agree, case for case, with the
+ * AFL Tables branch of `classifyAflApiForwardIdentity()` — the rule the bridge emitter used to
+ * bind `candidate_player_identity` — over both the REAL tracked continuity contract and a
+ * synthetic one whose continuing path sorts after its renumbered path. Both sides load the
+ * same contract file through their own validator; malformed contracts must refuse on both.
+ */
+describe('AFL API Brownlow builder: stable identity parity with classifyAflApiForwardIdentity', () => {
+  const pythonClassify = (contract: string, cases: string[][]): (string | null)[] | 'REFUSED' => {
+    const script = [
+      'import json, sys',
+      'from pathlib import Path',
+      "sys.path.insert(0, 'tools/migration')",
+      'import build_brownlow_season_artefact_from_afl_api as m',
+      'doc = json.load(sys.stdin)',
+      'try:',
+      "    rules = m.load_continuity_rules(Path(doc['contract']))",
+      'except m.BrownlowArtefactSourceError:',
+      "    print(json.dumps('REFUSED')); raise SystemExit(0)",
+      "out = [m.stable_afltables_identity(paths, rules) for paths in doc['cases']]",
+      'print(json.dumps([None if r is None else r[0] for r in out]))',
+    ].join('\n');
+    const result = spawnSync(python, ['-c', script], {
+      cwd: root, encoding: 'utf8', input: JSON.stringify({ contract, cases }),
+    });
+    if (result.error) throw result.error;
+    expect(result.status, result.stderr).toBe(0);
+    return JSON.parse(result.stdout);
+  };
+
+  const tsClassify = async (contract: string, cases: string[][]): Promise<(string | null)[] | 'REFUSED'> => {
+    const { classifyAflApiForwardIdentity } = await import('@/lib/acquisition/afl-api-adjudication');
+    const { loadFitzroyProfileContinuityRules, FitzroyProfileContinuityContractError } =
+      await import('@/lib/acquisition/fitzroy-profile-continuity');
+    let continuityRules;
+    try {
+      continuityRules = loadFitzroyProfileContinuityRules(contract);
+    } catch (error) {
+      if (error instanceof FitzroyProfileContinuityContractError) return 'REFUSED';
+      throw error;
+    }
+    return cases.map((afltablesPaths) => {
+      const r = classifyAflApiForwardIdentity({ afltablesPaths, manualIdentities: [], continuityRules });
+      return r.ok ? r.identity : null;
+    });
+  };
+
+  const realContract = resolve(root, 'tools/rebuild/fitzroy/fitzroy-contract.json');
+  const REAL_CASES: string[][] = [
+    ['players/J/Jack_Ross.html'],
+    ['players/J/Jack_Ross3.html'],
+    ['players/J/Jack_Ross.html', 'players/J/Jack_Ross3.html'],
+    ['players/J/Jack_Ross3.html', 'players/J/Jack_Ross.html'],
+    ['players/C/Charlie_Cameron3.html', 'players/C/Charlie_Cameron.html'],
+    ['players/J/Jack_Graham.html', 'players/J/Jack_Graham2.html'],
+    ['players/J/Jack_Williams3.html', 'players/J/Jack_Williams.html'],
+    ['players/J/Jack_Ross.html', 'players/J/Jack_Ross2.html'],
+    ['players/J/Jack_Ross.html', 'players/J/Jack_Williams3.html'],
+    ['players/J/Jack_Ross.html', 'players/J/Jack_Ross3.html', 'players/J/Jack_Ross2.html'],
+    [],
+  ];
+
+  it('agrees on the real tracked contract, and folds Jack Ross to players/J/Jack_Ross.html', async () => {
+    const ts = await tsClassify(realContract, REAL_CASES);
+    expect(pythonClassify(realContract, REAL_CASES)).toEqual(ts);
+    expect(ts).toEqual([
+      'players/J/Jack_Ross.html', 'players/J/Jack_Ross3.html',
+      'players/J/Jack_Ross.html', 'players/J/Jack_Ross.html',
+      'players/C/Charlie_Cameron.html', 'players/J/Jack_Graham.html', 'players/J/Jack_Williams.html',
+      null, null, null, null,
+    ]);
+  });
+
+  const rule = (over: Record<string, unknown> = {}) => ({
+    id: 'parity-rule', dataset: 'player_stats', file: 'player_stats_2025.csv',
+    continuing_url: 'players/Z/Zed_Zulu9.html', renumbered_url: 'players/A/Zed_Zulu.html',
+    expect: {
+      continuing_id: '99002', continuing_last_season: 2024, continuing_last_career_game: 10,
+      renumbered_first_season: 2025, renumbered_last_season: 2025, renumbered_first_career_game: 11,
+      renumbered_rows: 3,
+    },
+    authority: 'parity authority', reason: 'parity reason', ...over,
+  });
+
+  it('agrees on a synthetic contract where continuing_url sorts after renumbered_url', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'afldb-continuity-parity-'));
+    try {
+      const contract = join(dir, 'contract.json');
+      writeFileSync(contract, JSON.stringify({ profile_url_continuity: { rules: [rule()] } }));
+      const cases = [
+        ['players/A/Zed_Zulu.html', 'players/Z/Zed_Zulu9.html'],
+        ['players/Z/Zed_Zulu9.html', 'players/A/Zed_Zulu.html'],
+        ['players/A/Zed_Zulu.html'],
+        ['players/A/Zed_Zulu.html', 'players/Z/Zed_Zulu8.html'],
+      ];
+      const ts = await tsClassify(contract, cases);
+      expect(ts).toEqual(['players/Z/Zed_Zulu9.html', 'players/Z/Zed_Zulu9.html', 'players/A/Zed_Zulu.html', null]);
+      expect(pythonClassify(contract, cases)).toEqual(ts);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it.each([
+    ['a duplicated renumbered_url', [rule(), rule({ id: 'second', continuing_url: 'players/S/Sam_Test.html' })]],
+    ['a chain', [rule(), rule({ id: 'chain', continuing_url: 'players/A/Zed_Zulu.html', renumbered_url: 'players/A/Zed_Zulu4.html' })]],
+    ['a broken career-game continuity', [rule({ expect: { ...rule().expect, renumbered_first_career_game: 12 } })]],
+    ['a non-normalised path', [rule({ renumbered_url: 'Zed_Zulu.html' })]],
+  ])('both sides refuse a contract with %s', async (_label, rules) => {
+    const dir = mkdtempSync(join(tmpdir(), 'afldb-continuity-parity-'));
+    try {
+      const contract = join(dir, 'contract.json');
+      writeFileSync(contract, JSON.stringify({ profile_url_continuity: { rules } }));
+      expect(await tsClassify(contract, [])).toBe('REFUSED');
+      expect(pythonClassify(contract, [])).toBe('REFUSED');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
