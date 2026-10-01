@@ -92,6 +92,19 @@ function refuseExisting(path: string, what: string): void {
   if (existsSync(path)) throw new Error(`${what} '${path}' already exists; refusing to overwrite it.`);
 }
 
+/**
+ * The retained bytes as text, only AFTER retention: UTF-8, a leading BOM dropped (as a
+ * response's own text() would), and an invalid sequence refused rather than replaced. The same
+ * decoding for --input and --fetch, so one file always yields one proposal.
+ */
+function decodeRetained(bytes: Buffer, file: string): string {
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch {
+    throw new Error(`'${file}' is not valid UTF-8; it was retained as received, and no proposal was made.`);
+  }
+}
+
 export async function runDiscoverAflApiSeasons(
   argv: readonly string[], deps: DiscoverAflApiSeasonsDeps = {},
 ): Promise<AflApiSeasonDiscoveryProposal> {
@@ -114,12 +127,24 @@ export async function runDiscoverAflApiSeasons(
         + 'A super admin must enable it from /admin/current-season before this tool will make a network request.',
       );
     }
-    const response = await requestAflApi(
-      deps.fetchImpl ?? fetch, planAflApiCompSeasonsRequest(resolveAflApiEndpointBases(process.env)),
-    );
+    // The entity body as BYTES. The shared client (unchanged) returns only decoded text, which
+    // would drop a BOM and replace an invalid sequence, so the response it accepts is cloned
+    // here and its bytes are what --save-raw retains, before anything decodes them.
+    const fetchImpl = deps.fetchImpl ?? fetch;
+    let entityBytes = null as Buffer | null;
+    const capturing: FetchLike = async (url, init) => {
+      const response = await fetchImpl(url, init);
+      if (response.ok) entityBytes = Buffer.from(await response.clone().arrayBuffer());
+      return response;
+    };
+    await requestAflApi(capturing, planAflApiCompSeasonsRequest(resolveAflApiEndpointBases(process.env)));
+    if (entityBytes === null) throw new Error('The compseasons response body was not captured; nothing was retained.');
     mkdirSync(dirname(args.saveRaw), { recursive: true });
-    writeFileSync(args.saveRaw, response.bodyText, 'utf8');
+    writeFileSync(args.saveRaw, entityBytes);
     bytes = readFileSync(args.saveRaw);
+    if (!bytes.equals(entityBytes)) {
+      throw new Error(`'${args.saveRaw}' does not hold the response bytes it was written with; refusing to read it.`);
+    }
     sourceFile = args.saveRaw;
   }
 
@@ -127,7 +152,7 @@ export async function runDiscoverAflApiSeasons(
     JSON.parse(readFileSync(join(projectRoot, 'data', 'reference', 'afl-api-identities.json'), 'utf8')),
   );
   const proposal = proposeAflApiSeasons({
-    listing: parseAflApiCompSeasons(bytes.toString('utf8')),
+    listing: parseAflApiCompSeasons(decodeRetained(bytes, sourceFile)),
     registered: identities.seasons,
     source: {
       file: relative(projectRoot, resolve(sourceFile)).split('\\').join('/'),

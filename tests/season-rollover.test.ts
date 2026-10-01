@@ -44,6 +44,7 @@ import {
   selectAccepted,
   type RolloverRequest,
 } from '../src/lib/rollover/season-rollover';
+import { censusRecord, type CensusScope } from '../src/lib/rollover/afl-api-ownership-census';
 import { finalValidationChecks } from '../tools/db/rebuild-test';
 
 const root = process.cwd();
@@ -461,7 +462,33 @@ type Overrides = {
   ladderManifestPath?: string;
   rebuildSource?: string;
   clubSeasonsExpectedRows?: number;
+  aflApiOwnershipCensuses?: Array<{ path: string; sha256: string; record: unknown }>;
 };
+
+/**
+ * AFLDB-ISSUE-233 D-233-3. A census evidence record exactly as the census CLI writes it, for
+ * the successor rebuild scope (1897..2026) by default, with no afl_api-owned match.
+ */
+function censusEvidence(over: {
+  database?: string;
+  inScope?: Array<[number, number]>;
+  outsideScope?: Array<[number, number]>;
+  scope?: CensusScope;
+  schemaPresent?: boolean;
+} = {}): { path: string; sha256: string; record: Record<string, unknown> } {
+  const database = over.database ?? 'afldb_test';
+  return {
+    path: `artifacts/rollover/afl-api-ownership-census-${database}.json`,
+    sha256: 'a'.repeat(64),
+    record: censusRecord({
+      database,
+      scope: over.scope ?? { firstSeason: FIRST_SEASON, lastSeason: COMPLETING, excludedSeasons: [] },
+      schemaPresent: over.schemaPresent ?? true,
+      inScope: (over.inScope ?? []).map(([season, aflApiMatches]) => ({ season, aflApiMatches })),
+      outsideScope: (over.outsideScope ?? []).map(([season, aflApiMatches]) => ({ season, aflApiMatches })),
+    }, { capturedAtUtc: '2026-11-03T00:00:00Z', sqlSha256: 'b'.repeat(64) }),
+  };
+}
 
 const serialiseJson = (d: unknown) => `${JSON.stringify(d, null, 2)}\n`;
 
@@ -507,6 +534,7 @@ function stageOneInput(over: Overrides = {}) {
       acceptedCorrections: 'acceptedCorrections' in over
         ? (over.acceptedCorrections as never)
         : reviewedCorrections(),
+      aflApiOwnershipCensuses: over.aflApiOwnershipCensuses ?? [censusEvidence()],
     },
   };
 }
@@ -768,7 +796,10 @@ describe('the validator is the authority — a transcript is not', () => {
       '--ladder-manifest', 'c.json',
       '--ladder-coverage', 'd.json', '--stat-availability', 'e.json',
       '--accepted-corrections', 'f.json',
+      // AFLDB-ISSUE-233: required since D-233-3, so the refusal below is the banned flag's alone.
+      '--afl-api-ownership-census', 'g.json',
     ];
+    expect(() => parseRolloverArgv(base)).not.toThrow();
     for (const banned of ['--skip-validation', '--no-validate', '--force',
       '--core-validator-output', '--assume-validated']) {
       expect(() => parseRolloverArgv([...base, banned]))
@@ -1100,6 +1131,7 @@ describe('argument parsing', () => {
     '--season', '2026', '--rollover-date', DATE, '--retire-status', 'retired',
     '--expected-club-season-rows', String(ROWS_2026), '--core-manifest', 'a.json',
     '--ladder-manifest', 'c.json',
+    '--afl-api-ownership-census', 'g.json',
     '--ladder-coverage', 'd.json', '--stat-availability', 'e.json',
     '--accepted-corrections', 'f.json',
   ];
@@ -1154,6 +1186,102 @@ describe('argument parsing', () => {
     const swallowed = complete.slice();
     swallowed[1] = '--retire-status';        // --season would swallow a flag
     expect(() => parseRolloverArgv(swallowed)).toThrow(/--season needs a value/);
+  });
+
+  it('AFLDB-ISSUE-233: requires the afl_api ownership census, repeatable, one per database', () => {
+    const without = complete.filter((a, i) =>
+      a !== '--afl-api-ownership-census' && complete[i - 1] !== '--afl-api-ownership-census');
+    expect(() => parseRolloverArgv(without)).toThrow(/--afl-api-ownership-census is required/);
+    expect(parseRolloverArgv(complete).aflApiOwnershipCensus).toEqual(['g.json']);
+    expect(parseRolloverArgv([...complete, '--afl-api-ownership-census', 'h.json'])
+      .aflApiOwnershipCensus).toEqual(['g.json', 'h.json']);
+    expect(() => parseRolloverArgv([...complete, '--afl-api-ownership-census']))
+      .toThrow(/--afl-api-ownership-census needs a value/);
+  });
+});
+
+describe('AFLDB-ISSUE-233 D-233-3 — afl_api ownership across the successor rebuild', () => {
+  it('passes a zero census of the successor scope and records it in the plan notes', () => {
+    const plan = run();
+    const note = plan.notes.find((n) => n.startsWith('afl_api ownership census'));
+    expect(note).toContain('afldb_test');
+    expect(note).toContain('0 afl_api-owned canonical matches in 1897..2026');
+    expect(note).toContain('artifacts/rollover/afl-api-ownership-census-afldb_test.json');
+    expect(plan.notes.some((n) => n.includes('stage afl-api-ownership-census'))).toBe(true);
+  });
+
+  it('refuses one afl_api-owned match in the completing season, naming season and count', () => {
+    expect(() => run({ aflApiOwnershipCensuses: [censusEvidence({ inScope: [[2026, 1]] })] }))
+      .toThrow(/REFUSED on afldb_test: .*1897\.\.2026.*source afl_api: 2026 \(1\)\./);
+  });
+
+  it('names every affected season with its exact count', () => {
+    let message = '';
+    try {
+      run({ aflApiOwnershipCensuses: [censusEvidence({ inScope: [[1999, 2], [2024, 3], [2026, 1]] })] });
+    } catch (error) {
+      message = (error as Error).message;
+    }
+    expect(message).toContain('1999 (2), 2024 (3), 2026 (1)');
+    expect(message).toContain('There is no override');
+    expect(message).toContain('Nothing was written');
+  });
+
+  it('refuses before any validator evidence is needed (stage one), so nothing is spawned', () => {
+    expect(() => planSuccessorContract(stageOneInput({
+      aflApiOwnershipCensuses: [censusEvidence({ inScope: [[2026, 4]] })],
+    }))).toThrow(RolloverRefused);
+  });
+
+  it('reports, but does not refuse on, an afl_api-owned season outside the successor scope', () => {
+    const plan = run({ aflApiOwnershipCensuses: [censusEvidence({ outsideScope: [[2027, 5]] })] });
+    expect(plan.notes.find((n) => n.startsWith('afl_api ownership census')))
+      .toContain('outside that scope (reported only): 2027 (5)');
+  });
+
+  it('refuses a census of the CURRENT rebuild scope: the completing season must be inside it', () => {
+    const current = censusEvidence({
+      scope: { firstSeason: FIRST_SEASON, lastSeason: 2025, excludedSeasons: [2026] },
+    });
+    expect(() => run({ aflApiOwnershipCensuses: [current] }))
+      .toThrow(/covers 1897\.\.2025 excluding in-progress 2026, but the rebuild after completing 2026 covers 1897\.\.2026.*--through-season 2026/);
+  });
+
+  it('refuses edited evidence whose verdict disagrees with its own counts', () => {
+    const edited = censusEvidence({ inScope: [[2026, 2]] });
+    Object.assign(edited.record, { verdict: 'pass', total_in_scope: 0 });
+    expect(() => run({ aflApiOwnershipCensuses: [edited] })).toThrow(/disagree with its own counts/);
+  });
+
+  it('refuses evidence that lists an in-scope season as outside the scope', () => {
+    const hidden = censusEvidence({});
+    Object.assign(hidden.record, { outside_scope: [{ season: 2026, afl_api_matches: 3 }] });
+    expect(() => run({ aflApiOwnershipCensuses: [hidden] })).toThrow(/listed outside scope but is not/);
+  });
+
+  it('refuses a census of an empty database, a repeated database, and no census at all', () => {
+    expect(() => run({ aflApiOwnershipCensuses: [censusEvidence({ schemaPresent: false })] }))
+      .toThrow(/found no canonical schema/);
+    expect(() => run({ aflApiOwnershipCensuses: [censusEvidence(), censusEvidence()] }))
+      .toThrow(/name the same database/);
+    expect(() => run({ aflApiOwnershipCensuses: [] })).toThrow(/No afl_api ownership census was supplied/);
+  });
+
+  it('judges every supplied census: a clean one never offsets a refusing one', () => {
+    expect(() => run({ aflApiOwnershipCensuses: [
+      censusEvidence({ database: 'afldb_test' }),
+      censusEvidence({ database: 'afldb_dev', inScope: [[2026, 1]] }),
+    ] })).toThrow(/REFUSED on afldb_dev/);
+    const plan = run({ aflApiOwnershipCensuses: [
+      censusEvidence({ database: 'afldb_test' }), censusEvidence({ database: 'afldb_dev' }),
+    ] });
+    expect(plan.notes.filter((n) => n.startsWith('afl_api ownership census'))).toHaveLength(2);
+  });
+
+  it('keeps the library free of database and filesystem access', () => {
+    const source = readFileSync(
+      join(root, 'src', 'lib', 'rollover', 'afl-api-ownership-census.ts'), 'utf8');
+    expect(source).not.toMatch(/from 'node:fs'|from 'postgres'|readFileSync|writeFileSync|Date\.now|new Date\(/);
   });
 });
 

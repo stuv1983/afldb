@@ -2677,8 +2677,40 @@ describe('AFL API season discovery (AFLDB-ISSUE-233, D-233-1 proposal-only)', ()
         { log: () => {}, fetchImpl, ingestionControls: ENABLED_INGESTION_CONTROLS },
       );
       expect(readFileSync(rawPath, 'utf8')).toBe(body);
+      // the ASCII fixture's bytes, exactly: same bytes, same sha256 as the retained fixture
+      expect(readFileSync(rawPath)).toEqual(readFileSync(RAW_PATH));
       expect(proposal.input.sha256).toBe(RAW_SHA256);
       expect(proposal.verdict).toBe('no_change');
+    });
+
+    it('--fetch retains the HTTP entity bytes, not a decode/re-encode of them (BOM, CRLF, invalid UTF-8)', async () => {
+      const fetchBytes = async (entity: Buffer) => {
+        dir = mkdtempSync(join(tmpdir(), 'afldb-issue233-'));
+        const fetchImpl: FetchLike = async () => new Response(new Uint8Array(entity),
+          { status: 200, headers: { 'content-type': 'application/json' } });
+        const rawPath = join(dir, 'raw.json');
+        const output = join(dir, 'p.json');
+        const run = runDiscoverAflApiSeasons(['--fetch', '--save-raw', rawPath, '--output', output],
+          { log: () => {}, fetchImpl, ingestionControls: ENABLED_INGESTION_CONTROLS });
+        return { run, rawPath, output };
+      };
+      const fixture = readFileSync(RAW_PATH);
+      // A UTF-8 BOM and a trailing CRLF: text() drops the BOM, so a decode/re-encode differs.
+      const withBom = Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), fixture, Buffer.from('\r\n')]);
+      const bom = await fetchBytes(withBom);
+      const proposal = await bom.run;
+      expect(readFileSync(bom.rawPath).equals(withBom)).toBe(true);
+      expect(proposal.input.sha256).toBe(createHash('sha256').update(withBom).digest('hex'));
+      expect(proposal.input.sha256).not.toBe(RAW_SHA256);
+      expect(proposal.verdict).toBe('no_change'); // parsed only after retention, from the same bytes
+      rmSync(dir!, { recursive: true, force: true });
+
+      // An invalid UTF-8 byte: retained verbatim, then refused rather than silently replaced.
+      const invalid = Buffer.concat([fixture.subarray(0, 20), Buffer.from([0xff]), fixture.subarray(20)]);
+      const bad = await fetchBytes(invalid);
+      await expect(bad.run).rejects.toThrow(/not valid UTF-8; it was retained as received/);
+      expect(readFileSync(bad.rawPath).equals(invalid)).toBe(true);
+      expect(existsSync(bad.output)).toBe(false);
     });
   });
 });

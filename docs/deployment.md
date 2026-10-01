@@ -311,6 +311,7 @@ stage `id` is what `--plan` prints and what a failure names.
 | # | `id` | Stage | Credential |
 |---|---|---|---|
 | 1 | `precheck` | every required input, and the capture root, before anything is destroyed | none — no database contact |
+| 1a | `afl-api-ownership-census` | **validation** — refuse if any completed season in the rebuild scope holds a canonical match owned by source `afl_api`, naming every season and count; runs before the capture marker and the reset, with no override (AFLDB-ISSUE-233 D-233-3) | `AFLDB_TEST_DATABASE_URL` (owner; one read-only transaction) |
 | 2 | `afl-api-adjudications-capture` | **capture** the combined rebuild state — the human `afl_api` adjudication ledger (AFLDB-ISSUE-235), the importer-created `afl_api` identities (AFLDB-ISSUE-237) and the manual player registrations (AFLDB-ISSUE-245) — before anything is destroyed, then set the database marker | `AFLDB_TEST_DATABASE_URL` (owner; read-only snapshot, then the marker in its own transaction) |
 | 3 | `recreate` | database reset (clean slate, not a truncation) | `AFLDB_TEST_DATABASE_URL` (owner) |
 | 4 | `migrations` | migrations — the complete tracked set, `001` through the current terminal migration, no hard-coded count (`db:migrate:test`; `db:migrate:code-test` for the rehearsal) | `AFLDB_TEST_DATABASE_URL` |
@@ -333,7 +334,7 @@ stage `id` is what `--plan` prints and what a failure names.
 | 21 | `afl-api-adjudications-reinstate` | **reinstate** the importer-created `afl_api` identities, the adjudication ledger and the human `resolved` identities, clear the marker — one transaction (AFLDB-ISSUE-235/237) | `AFLDB_TEST_DATABASE_URL` (owner) |
 | 22 | `afl-api-adjudications-bijection` | **validation** — the combined importer/human identity invariant, and no marker remains | `AFLDB_TEST_IMPORT_DATABASE_URL` |
 | 23 | `awards-honours` | **awards & honours** (tracked manifests) | `AFLDB_TEST_IMPORT_DATABASE_URL` |
-| 24 | `brownlow-season` | Brownlow season totals — tracked artefact | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 24 | `brownlow-season` | Brownlow season totals — tracked artefact, plus any season-scoped AFL API artefact `data/brownlow/season-votes-afl_api-<season>.csv` for a season `stat-availability.json` marks complete (AFLDB-ISSUE-233 D-233-2) | `AFLDB_TEST_IMPORT_DATABASE_URL` |
 | 25 | `derived` | derived summaries | `AFLDB_TEST_IMPORT_DATABASE_URL` |
 | 26 | `coleman` | Coleman (derived) | `AFLDB_TEST_IMPORT_DATABASE_URL` |
 | 27 | `ladder-witness` | **validation** — cross-check `club_seasons` | `AFLDB_TEST_IMPORT_DATABASE_URL` |

@@ -152,6 +152,21 @@ import {
 // module is side-effect free: its CLI runs only under its own `invokedDirectly` guard.
 import type { TransactionSql } from 'postgres';
 import { deriveCorrectedPromotionSet, type CpcResult } from '../../src/lib/acquisition/afl-api-identity-correction';
+// AFLDB-ISSUE-233 D-233-3: the ONE ownership census (queries, scope and judgement), shared with
+// the rebuild, the census CLI and the rollover. Pure: no filesystem, no database, no clock.
+import {
+  AFL_API_OWNERSHIP_COUNTS_SQL,
+  AFL_API_OWNERSHIP_SCHEMA_SQL,
+  AflApiOwnershipCensusError,
+  censusTotal,
+  describeAffected,
+  describeScope,
+  judgeCensusRows,
+  rebuildCensusScope,
+  refusalMessage as aflApiOwnershipRefusalMessage,
+  type CensusResult,
+  type CensusScope,
+} from '../../src/lib/rollover/afl-api-ownership-census';
 import {
   checkCorrectionSatisfaction,
   classifyCorrectedProviderInDatabase,
@@ -1901,6 +1916,108 @@ export async function gateAflApiPreCutoverCensus(q: Query, report: Report): Prom
     importerRowsByMethod, humanRows: view.humanRowCount, netLinkedLedgerEntries: netLinkedCount,
     ...(netCorrectedCount > 0 ? { netCorrectedLedgerEntries: netCorrectedCount } : {}),
   };
+}
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-233 D-233-3 — completed-season afl_api ownership on the LIVE target
+// ---------------------------------------------------------------------------
+
+/**
+ * A promotion replaces every canonical `matches` row of the live target with the rebuilt
+ * candidate's. The rebuild recreates every completed season from the fitzRoy baseline as AFL
+ * Tables rows (and refuses to run over a database holding completed-season `afl_api`
+ * ownership), and the §3a preparation acquires only the in-progress season, so no candidate
+ * can carry a completed-season `afl_api`-owned match today. A live target holding one would
+ * therefore be silently re-owned by the swap. Until an ownership-replay design exists the
+ * promotion refuses: preserve AFL API ownership or refuse.
+ *
+ * This gate reads the LIVE target, never the source or the candidate, so a source or
+ * candidate with zero such rows cannot mask the target's. It runs unconditionally (no flag,
+ * no evidence file) at every phase that reads the target: `dependencies` (manifest A, before
+ * the freeze, and B), `pre-cutover` (frozen under PROD), `restored` (the `--old-database`
+ * target), `candidate` (the live target, the last gate before the swap) and, under a freeze,
+ * `production` (the kept database the swap renamed aside, so a write in the last-check-to-swap
+ * gap still refuses acceptance and the §10 rollback returns the untouched database). There is
+ * no override.
+ */
+export const AFL_API_OWNERSHIP_GATE = 'afl_api completed-season ownership on the live target (AFLDB-ISSUE-233 D-233-3)';
+
+/** Every phase that reads the live target (or, at `production`, the kept one) runs the gate. */
+export const AFL_API_OWNERSHIP_PHASES: readonly Phase[] = ['dependencies', 'pre-cutover', 'restored', 'candidate', 'production'];
+
+const FITZROY_CONTRACT_PATH = join('tools', 'rebuild', 'fitzroy', 'fitzroy-contract.json');
+const SEASONS_REFERENCE_PATH = join('data', 'reference', 'seasons.json');
+
+/**
+ * The completed seasons a promotion would replace: the same scope the rebuild judges, from the
+ * same tracked documents (the fitzRoy contract's `full_history.season_range` minus every
+ * in-progress season). An in-progress season is never blocked by this rule. Read before any
+ * database is opened; a missing or malformed document refuses.
+ */
+export function promotionOwnershipCensusScope(
+  readJson: (path: string) => Record<string, unknown> = (path) =>
+    JSON.parse(readFileSync(join(PROJECT_ROOT, path), 'utf8')) as Record<string, unknown>,
+): CensusScope {
+  try {
+    return rebuildCensusScope(readJson(FITZROY_CONTRACT_PATH), readJson(SEASONS_REFERENCE_PATH));
+  } catch (error) {
+    if (error instanceof AflApiOwnershipCensusError) {
+      throw new PromotionRefused(`AFL API ownership census (AFLDB-ISSUE-233): ${error.message}`);
+    }
+    throw error;
+  }
+}
+
+/** The shared schema probe and per-season counts, judged by the shared `judgeCensusRows()`. */
+export async function readAflApiOwnershipCensus(q: Query, database: string, scope: CensusScope): Promise<CensusResult> {
+  const probeRow = (await q(AFL_API_OWNERSHIP_SCHEMA_SQL))[0] ?? {};
+  const probe = {
+    currentDatabase: String(probeRow.current_database),
+    matches: probeRow.matches === true,
+    sources: probeRow.sources === true,
+    sourceId: probeRow.source_id === true,
+  };
+  const readable = probe.matches && probe.sources && probe.sourceId;
+  const rows = readable
+    ? (await q(AFL_API_OWNERSHIP_COUNTS_SQL)).map((r) => ({ season: asInt(r.season), n: asInt(r.n) }))
+    : [];
+  return judgeCensusRows({ expectedDatabase: database, scope, probe, rows });
+}
+
+/**
+ * FAIL when the live target holds any `afl_api`-owned canonical match in a completed season,
+ * naming every such season with its exact count; FAIL when the census cannot be taken (wrong
+ * database, no `matches` table, a damaged schema): absence is never evidence of no ownership on
+ * a database a promotion is about to replace. PASS otherwise, reporting in-progress ownership.
+ */
+export async function gateAflApiOwnership(
+  q: Query, role: string, database: string, scope: CensusScope, report: Report,
+): Promise<CensusResult | undefined> {
+  let result: CensusResult;
+  try {
+    result = await readAflApiOwnershipCensus(q, database, scope);
+  } catch (error) {
+    if (!(error instanceof AflApiOwnershipCensusError)) throw error;
+    report.add(AFL_API_OWNERSHIP_GATE, 'FAIL', [`${role}: ${error.message}`, 'STOP: the census could not be taken; this promotion does not proceed.']);
+    return undefined;
+  }
+  const lines = [
+    `${role}: completed-season scope ${describeScope(result.scope)}`,
+    `in scope      : ${result.inScope.length > 0 ? describeAffected(result.inScope) : 'none'}`,
+    `outside scope : ${result.outsideScope.length > 0 ? describeAffected(result.outsideScope) : 'none'} (in progress or later; reported, never blocked here)`,
+  ];
+  if (!result.schemaPresent) {
+    report.add(AFL_API_OWNERSHIP_GATE, 'FAIL', [...lines,
+      `STOP ${role} has no public.matches. A promotion target is an existing AFLDB database: an absent table `
+      + 'is not evidence that nothing is owned, so the census cannot pass.']);
+    return result;
+  }
+  if (censusTotal(result) > 0) {
+    report.add(AFL_API_OWNERSHIP_GATE, 'FAIL', [...lines, `STOP ${aflApiOwnershipRefusalMessage(result, 'promotion')}`]);
+    return result;
+  }
+  report.add(AFL_API_OWNERSHIP_GATE, 'PASS', lines);
+  return result;
 }
 
 /** AFLDB-ISSUE-238 S6: the NET-CORRECTED providers of a ledger, code-unit sorted by provider id. */
@@ -3743,6 +3860,10 @@ async function main(): Promise<number> {
     return concludeReport(report, opts.environment, phase);
   }
 
+  // AFLDB-ISSUE-233 D-233-3: the completed-season scope every phase that reads the live target
+  // judges, from the tracked documents, before any database is opened.
+  const ownershipScope = AFL_API_OWNERSHIP_PHASES.includes(phase) ? promotionOwnershipCensusScope() : undefined;
+
   // AFLDB-ISSUE-252 — the standalone target dependency phase: manifest A before the freeze, or
   // B under it, with the frozen re-check when a source proof is given. Files are refused first.
   if (phase === 'dependencies') {
@@ -3753,6 +3874,11 @@ async function main(): Promise<number> {
     const conn = await openReadOnly(dsn, phase);
     try {
       await gateIdentity(conn.q, opts.database!, report);
+      // AFLDB-ISSUE-233 D-233-3, the earliest refusal: manifest A is the first read of the live
+      // target, before the preparation, the freeze and the backup. A FAIL here means no manifest
+      // is written (runDependenciesPhase writes only on a report with no failure), so --phase
+      // source, which requires it, cannot run either.
+      await gateAflApiOwnership(conn.q, `target ${opts.database}`, opts.database!, ownershipScope!, report);
       await runDependenciesPhase(conn.q, opts, report, record, proof);
     } finally {
       await conn.end();
@@ -3867,6 +3993,9 @@ async function main(): Promise<number> {
       if (freezeRecord) {
         await gateFrozenTarget(conn.q, `target ${opts.database}`, opts.database!, freezeRecord, true, report);
       }
+      // AFLDB-ISSUE-233 D-233-3, the definitive freeze-bound check (frozen under PROD): read here,
+      // not from manifest A, so ownership that appeared after any earlier phase is caught.
+      await gateAflApiOwnership(conn.q, `target ${opts.database}`, opts.database!, ownershipScope!, report);
       // AFLDB-ISSUE-252: the frozen dependency set, re-derived here, must be the one the source proved.
       if (boundProof) await gateFrozenDependencyRecheck(conn.q, opts, boundProof, report, freezeRecord);
     }
@@ -3884,6 +4013,8 @@ async function main(): Promise<number> {
       if (freezeRecord) {
         await gateFrozenTarget(old.q, `target ${opts.oldDatabase}`, opts.oldDatabase!, freezeRecord, true, report);
       }
+      // AFLDB-ISSUE-233 D-233-3: the TARGET (old.q), never the candidate, before any reinstatement.
+      await gateAflApiOwnership(old.q, `target ${opts.oldDatabase}`, opts.oldDatabase!, ownershipScope!, report);
       await gateDanglingReferences(conn.q, old.q, present, opts.environment, report);
       // AFLDB-ISSUE-249 (B4): the candidate against the manifest AND against the target it
       // replaces — a target that holds records and a candidate that does not is a STOP here,
@@ -3929,13 +4060,21 @@ async function main(): Promise<number> {
     // application starts: the database the swap renamed aside, found by OID, must still hold
     // exactly F0 — any write that reached it after the freeze, the last-check-to-swap gap
     // included, refuses acceptance — and the promoted live database must be the candidate.
-    if (freezeRecord && phase === 'candidate') {
+    // AFLDB-ISSUE-233 D-233-3: `candidate` always reads the live target (frozen or not), the last
+    // read before the swap; `production` re-reads the kept database, which closes the
+    // last-check-to-swap gap exactly as F0 does: a refusal there is the §10 rollback, which
+    // returns that untouched database to the live name.
+    if (phase === 'candidate') {
       frozenSide = await openReadOnly(withDatabase(baseDsn, names.live), 'live');
-      await gateFrozenTarget(frozenSide.q, `live target ${names.live}`, names.live, freezeRecord, true, report);
+      if (freezeRecord) {
+        await gateFrozenTarget(frozenSide.q, `live target ${names.live}`, names.live, freezeRecord, true, report);
+      }
+      await gateAflApiOwnership(frozenSide.q, `live target ${names.live}`, names.live, ownershipScope!, report);
     }
     if (freezeRecord && phase === 'production') {
       frozenSide = await openReadOnly(withDatabase(baseDsn, opts.oldDatabase!), 'kept');
       await gateFrozenTarget(frozenSide.q, `kept ${opts.oldDatabase}`, opts.oldDatabase!, freezeRecord, false, report);
+      await gateAflApiOwnership(frozenSide.q, `kept ${opts.oldDatabase}`, opts.oldDatabase!, ownershipScope!, report);
       await gatePromotedLiveUnfrozen(conn.q, freezeRecord, report);
     }
 

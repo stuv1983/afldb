@@ -9,7 +9,7 @@ This table indexes currently open issues. Detailed historical entries below rema
 | ID | Title | Severity | Area | State | Next action |
 |---|---|---|---|---|---|
 | AFLDB-ISSUE-234 | Optional AFL API feed expansion (extended statistics, umpires, play-by-play) | Low | Data acquisition — investigation only | Open (2026-09-23); triaged 2026-09-26: REMAINS OPEN / DEFERRED — extended stats, umpires, weather, milestones and `scoreWorm` scoring events are already retained raw (host snapshots; spine payloads per ISSUE-228 §15 Q8), never projected; no product need, no model, terms-of-use (§15 Q8) open | None scheduled; investigate when a product need arises |
-| AFLDB-ISSUE-233 | AFL API season discovery and season rollover ownership | Medium | Data acquisition / season lifecycle — `afl-api-identities.json`, rollover runbook | Open (2026-09-23); 2026-09-26 pass 2: D-233-1/2/3 decided (proposal JSON; season-scoped AFL API Brownlow artefacts beside the master; preserve `afl_api` ownership or refuse); discovery IMPLEMENTED / DB-FREE VALIDATED against the authentic `compseasons` sample (sha256 `fe3f1641…d965`); D-233-2/3 planned, not implemented; runbook `issues/open/AFLDB-ISSUE-233.md` | Implement D-233-3 rebuild census refusal + D-233-2 season-scoped load (runbook §4.3); first `--fetch` discovery on DEV |
+| AFLDB-ISSUE-233 | AFL API season discovery and season rollover ownership | Medium | Data acquisition / season lifecycle — `afl-api-identities.json`, rollover runbook | Open (2026-09-23); 2026-09-26 pass 2: D-233-1/2/3 decided (proposal JSON; season-scoped AFL API Brownlow artefacts beside the master; preserve `afl_api` ownership or refuse); discovery IMPLEMENTED / DB-FREE VALIDATED against the authentic `compseasons` sample (sha256 `fe3f1641…d965`); 2026-10-01 pass 3 (uncommitted): D-233-3 rebuild/rollover `afl_api` ownership census and D-233-2 season-scoped AFL API Brownlow load IMPLEMENTED / DB-FREE VALIDATED; 2026-10-01 pass 4 (uncommitted): D-233-3 also enforced on the LIVE promotion target (`promotion-check.ts`, `dependencies`/`pre-cutover`/`restored`/`candidate`/frozen `production`, no override); damaged-schema census refuses; discovery `--fetch` retains entity bytes verbatim; ownership replay intentionally unimplemented; 2026-10-01 pass 5 (uncommitted): integration census test 5/5 on `afldb_test` (no residue), read-only censuses PASS on `afldb_test` and `afldb_dev` (zero `afl_api`-owned matches, DEV not mutated), final review no CRIT/HIGH/MED; DEV discovery `--fetch` and the D-233-2 Brownlow write path not yet exercised; PROD untouched; runbook `issues/open/AFLDB-ISSUE-233.md` | Operator (runbook §4.6): commit the reviewed pass; first DEV `--fetch` discovery (§3b.2) |
 | AFLDB-ISSUE-232 | AFL API operational wiring: systemd timers, Brownlow scheduled settle and admin status | Medium | Deployment / operations — `deploy/afldb-settle-afl-api*`, `settle-status.ts`, `/admin/current-season` | Open (2026-09-23); 2026-09-26: admin panel IMPLEMENTED (`VISUAL: UNVERIFIED`); pass 2: D-232-1 = B (reversal of ISSUE-244 §40), O1, D-232-3 = keep; Brownlow wrapper refreshes fixture identity then settles with `--use-fixture-identity`, IMPLEMENTED / DB-FREE VALIDATED; fixtures CLI moved to the shared F029 loader; units not installed on any host; runbook `issues/open/AFLDB-ISSUE-232.md` | DEV sync + panel eyeball; runbook §7 installation with an observed first Brownlow firing |
 | AFLDB-ISSUE-229 | AFL API fixture ingestion | Medium | Data acquisition / fixtures — `afl_api` season feed → `fixtures` | Open (2026-09-23); 2026-09-26 pass 2: PARTIALLY EVIDENCED, STILL BLOCKED — one authentic `SCHEDULED` record (`CD_M20260142901`, no score block, refused by today's contract) hash-bound; every other status unobserved; no writer; runbook `issues/open/AFLDB-ISSUE-229.md` | Operator decides whether D-229-1/2 may proceed on the single `SCHEDULED` citation, or waits for more captures |
 | AFLDB-ISSUE-230 | `afldb_test` 2026 AFL Tables spine carries 2099 observation timestamps from the 2026-09-06 settle benchmark, so real-clock settles refuse on `source_records_seen_ck` | Low | Test database hygiene — `afldb_test` `staging.source_records` | Open — found 2026-09-23 (ISSUE-228 §22.13); lineage continued to 2099-01-06 on `afldb_test` only under operator authorisation (batches 2421/2422); not repaired; did not block ISSUE-228 S9 (accepted 2026-09-23) | Choose a repair (reviewed re-stamp tool on `afldb_test` only, or a real-clock rebuild of the 2026 lineage); S9 is now accepted, so it may be scheduled |
@@ -41460,6 +41460,120 @@ Full record: `issues/closed/AFLDB-ISSUE-228.md` §22.22.
     registered year are proposed. The real sample gives `no_change`. 15 DB-free tests.
   - D-233-2/D-233-3 are planned (runbook §4.3), not implemented.
   - **Next action:** implement §4.3; first `--fetch` discovery on DEV.
+- **2026-10-01 (pass 3, branch `sonnet/issue-233`, base `74d63602`; uncommitted).** Runbook §3b,
+  §4.4–§4.6.
+  - **D-233-3: IMPLEMENTED / DB-FREE VALIDATED.**
+    - The rebuild has a new read-only stage, `afl-api-ownership-census`, after PRECHECK and before
+      the capture and the reset. It counts canonical `matches` owned by source `afl_api` per
+      completed season of the rebuild scope: the fitzRoy contract range minus the in-progress
+      seasons, today 1897..2025 excluding 2026.
+    - Any non-zero season refuses, naming each season and its count. Nothing is captured, marked
+      or destroyed, and there is no override.
+    - The shared definition is `src/lib/rollover/afl-api-ownership-census.ts`. The new read-only
+      `tools/db/afl-api-ownership-census.ts` writes census evidence.
+    - `rollover-season.ts` now requires that evidence (`--afl-api-ownership-census`, repeatable)
+      for the post-rollover scope, and refuses on the same rule before any gate or write.
+  - **D-233-2: IMPLEMENTED / DB-FREE VALIDATED.**
+    - `import_brownlow_season.py` loads `season-votes-afl_api-<season>.csv` beside the master,
+      never merged into it. Each file is verified against its own manifest (schema 2, `afl_api`,
+      hash and counts), and loads only when the reviewed `stat-availability.json` marks
+      `brownlow_season_total` complete for its season.
+    - A season present in both the master and an AFL API artefact refuses.
+    - Rows are written with `source_id = afl_api` and their own import batch.
+    - The rebuild binds each artefact into PRECHECK, the stage name and Stage 9.
+    - None is tracked today, so the load is unchanged. The DB phase is unexercised.
+  - **Discovery:** audited against §3a, unchanged. All criteria met. One LOW note: `--save-raw`
+    re-encodes `bodyText`, which is verbatim for the measured ASCII responses.
+  - **Validation (DB-free):**
+    - narrow suites `db-test-rebuild`, `season-rollover`, `first-kick-goal-source`,
+      `brownlow-season-artefact` and `afl-api-match`: 918/918;
+    - Python Brownlow contract: passed;
+    - `tsc --noEmit`: clean.
+    - The rollback-only SQL proof `tests/integration/afl-api-ownership-census.test.ts` is written
+      but **not run**.
+  - **Observation (operator decision, no issue opened):** the census reads the database the rebuild
+    resets. `afl_api` ownership in `afldb_dev` / `afldb_prod` is superseded by the later promotion,
+    whose dependency gate checks owner parity for F1–F3 rows only (runbook §4.4.5).
+  - **Next action (operator):**
+    1. Review and commit.
+    2. Run the integration proof and read-only censuses on `afldb_test` and `afldb_dev`.
+    3. Run the first DEV `--fetch` discovery (runbook §3b.2).
+    4. Decide §4.4.5.
+- **2026-10-01 (pass 4, same branch and base; uncommitted).** Runbook §4.7. Closes the pass-3
+  §4.4.5 gap.
+  - **D-233-3 now protects promotion over a live target.** `tools/db/promotion-check.ts`
+    `gateAflApiOwnership()` runs the shared census against the **live target**, never the source or
+    the candidate. It runs unconditionally, with no flag, evidence file or override, at:
+    - `dependencies`: before manifest A or B is written, so `--phase source` cannot follow;
+    - `pre-cutover`: frozen under PROD;
+    - `restored`: on `--old-database`;
+    - `candidate`: always on the live name, as the last read before the swap;
+    - `production` under a freeze record: on the kept database, closing the last-check-to-swap gap
+      as F0 does.
+
+    It FAILs on any completed-season `afl_api`-owned match, naming each season and its exact count.
+    In-progress ownership is reported only. It also FAILs a target with no `matches`, a damaged
+    schema or the wrong `current_database()`. The ISSUE-252 dependency manifest was not extended:
+    it is an owner-parity set for F1–F3 rows, its frozen re-check is opt-in on DEV, and D-233-3 is
+    a refusal, not a parity check.
+  - **Shared definition.** `AFL_API_OWNERSHIP_SCHEMA_SQL` / `AFL_API_OWNERSHIP_COUNTS_SQL` are
+    EXECUTEd verbatim by the rebuild/CLI stream and run directly by the checker. `judgeCensusRows()`
+    judges them in TypeScript.
+  - **No-schema conclusion.** `schema_absent` now means only "no `public.matches` table", and only
+    the rebuild accepts it, for the database its own DSN names and is about to reset (nothing in it
+    can be re-owned). A `matches` table without `sources` or `matches.source_id` used to pass as
+    absent. It now refuses in every form. The rollover already refuses absent evidence; the
+    promotion gate refuses an absent table.
+  - **Discovery raw bytes.** `--fetch` now retains the HTTP entity bytes (a cloned response's
+    `arrayBuffer()`), proven equal on disk, and decodes them only afterwards (UTF-8, a BOM dropped,
+    an invalid sequence refused). The shared client is unchanged. A new test fails on the previous
+    implementation.
+  - **Rollover callers.** No npm script, deploy unit, workflow or `docs/` page invokes
+    `rollover-season.ts`. One test base gained the required flag; runbook §4.1 step 2 names the
+    census step.
+  - **Validation (DB-free):**
+    - suites `db-test-rebuild`, `season-rollover`, `db-promotion-check`, `afl-api-match` and
+      `brownlow-season-artefact`: 1,338/1,338;
+    - Python Brownlow contract: 110/110;
+    - `tsc --noEmit`: clean;
+    - ESLint: every touched-file error is pre-existing at HEAD (11), none new;
+    - full DB-free suite: 7,282 passed, 13 failed in 10 files. The failing set is identical on an
+      exported HEAD tree.
+  - Ownership replay remains intentionally unimplemented. No DB, DEV or PROD contact.
+- **2026-10-01 (pass 5, same branch and base; uncommitted). Live-safe validation and final
+  review.** Runbook §4.8.
+  - **DB-free baseline accepted.** The 13 failures reproduce identically at exact HEAD `74d63602`
+    (13 failed, 593 passed, 3 skipped on the same files; identical lists). None is new to
+    ISSUE-233.
+  - **Integration (operator-authorised, workstation → `127.0.0.1:55432` tunnel):**
+    - The target was proven first: `current_database=afldb_test`, `transaction_read_only=on`.
+    - `tests/integration/afl-api-ownership-census.test.ts` passed **5/5** on `afldb_test`.
+    - Read-only snapshots before and after the run are byte-identical: 16,838 matches; 2023–2025
+      `id:source_id` md5 `c4ab7b7c…dadfc`; `afl_api` total 0. **No residue.**
+  - **Read-only censuses**, scope 1897..2025 excluding 2026, census SQL sha256 `f13e5b73…bebf`:
+    - `afldb_test`: read-only proven; **PASS**, no in-scope or outside-scope ownership; evidence
+      sha256 `c49dca22…f71b`.
+    - `afldb_dev`: read-only proven, app role; **PASS**, same result; evidence sha256
+      `a588d6e6…5171`. Before/after snapshots are identical (17,055 matches; 2026 = 217
+      `afltables`; `afl_api` total 0), so **DEV was not mutated**.
+    - Both databases hold zero `afl_api`-owned matches in any season.
+    - The evidence files hold no secrets. They stay untracked, per the inline-evidence convention
+      of recent issues, and their results and hashes are recorded in runbook §4.8.3.
+  - **Final pre-merge review:** every changed and new file was read. No CRIT, HIGH or MED finding,
+    and no code changed.
+    - R1 (LOW, fixed, doc only): `docs/deployment.md`'s stage table gained the census stage (row
+      `1a`) and the D-233-2 note on `brownlow-season`.
+    - R2/R3 (LOW, accepted): the CLI prints PASS for a schema-absent database; rollover evidence is
+      not database- or freshness-bound. Both are backed by the rebuild and promotion re-reads.
+    - R4 (LOW follow-up): ISSUE-238's `classifySeasonTotals()` will refuse (SV-3, fail-closed) an
+      identity correction touching a season loaded from an AFL API season artefact.
+    - R5/R6 (INFO): a stale manifest reason text; the unfrozen-DEV promotion residual of ISSUE-250.
+  - No PROD or `code_test_db` contact. No discovery fetch, rollover, registry, `in_progress_seasons`,
+    timer, rebuild or promotion action.
+  - **Still open:** the first DEV discovery `--fetch` (runbook §3b.2), and the D-233-2 Brownlow
+    write path, which has never run against a database.
+  - **Next action:** the operator commits the reviewed pass, then runs the first DEV `--fetch`
+    discovery.
 
 ## AFLDB-ISSUE-234 — Optional AFL API feed expansion (extended statistics, umpires, play-by-play)
 

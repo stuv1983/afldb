@@ -15,6 +15,56 @@ commit.
 
 ## [Unreleased]
 
+### Season rollover: AFL API ownership census and season-scoped AFL API Brownlow artefacts (AFLDB-ISSUE-233; issue open) - 1 October 2026
+
+- **D-233-3 — a rebuild preserves `afl_api` ownership or refuses.** `npm run db:test:rebuild` gains a read-only
+  stage, `afl-api-ownership-census`, straight after PRECHECK and before the adjudication capture and the reset.
+  It counts canonical `matches` owned by source `afl_api` in every completed season of the rebuild scope (the
+  fitzRoy contract's `full_history.season_range`, in-progress seasons excluded) and refuses on any non-zero
+  season, naming each season and its count. A refusal leaves nothing captured, marked or destroyed. There is no
+  override. Today's scope (1897–2025) is expected to pass (ISSUE-244 F031: 0 `afl_api`-owned matches).
+- `tools/db/afl-api-ownership-census.ts` runs the same census as a read-only operator command and writes
+  evidence. `tools/db/rollover-season.ts` now **requires** that evidence (`--afl-api-ownership-census`,
+  repeatable, taken with `--through-season <completing season>`) and refuses, before any gate or write, when the
+  post-rollover rebuild scope holds an `afl_api`-owned match.
+- **D-233-3 — a promotion preserves `afl_api` ownership or refuses.** `npm run db:promotion:check` gains a
+  gate, with no flag, file or override, that runs the same census (same shared queries, same completed-season
+  scope) against the **live target**, never the source or the candidate. It runs at:
+  - `dependencies`: before manifest A or B is written;
+  - `pre-cutover`: frozen under PROD;
+  - `restored`: on `--old-database`;
+  - `candidate`: on the live name, frozen or not, as the last read before the swap;
+  - `production` under a freeze record: on the kept database, so a write in the last-check-to-swap gap refuses
+    acceptance and leads to the §10 rollback.
+
+  It refuses on any completed-season `afl_api`-owned match, naming every season with its exact count.
+  In-progress ownership is reported, never blocked. It also refuses a target without `matches`, a damaged
+  schema, or the wrong `current_database()`. With zero affected rows nothing else changes.
+- The census now refuses a **damaged** schema in every form (`matches` present but `sources` or
+  `matches.source_id` absent: the owner of its rows cannot be determined). Only a database with no `matches`
+  table at all reads as `schema_absent`; the rollover refuses such evidence and the promotion gate refuses such a
+  target.
+- **Discovery `--fetch` retains the HTTP entity bytes.** `--save-raw` now writes the response body's bytes
+  exactly (a cloned response's `arrayBuffer()`), and decodes them only after retention (UTF-8; a BOM is dropped,
+  an invalid sequence refuses). Before this it wrote back the decoded text, which would have dropped a BOM or
+  replaced an invalid sequence. The shared AFL API client is unchanged. The ASCII fixture is byte-identical
+  either way.
+- **D-233-2 — season-scoped AFL API Brownlow artefacts beside the master.** `import_brownlow_season.py` loads
+  `data/brownlow/season-votes-afl_api-<season>.csv` (each verified against its own manifest) beside the master
+  `season-votes.csv`, never merged into it, only for a season the reviewed `stat-availability.json` marks
+  `complete` for `brownlow_season_total`. A season in both refuses; the rows carry `source_id = afl_api` and their
+  own import batch. The rebuild binds each artefact into its preflight inputs, stage name and Stage-9 gates. With
+  no such artefact (today) the load, the preflight and the gates are unchanged. `docs/deployment.md`'s rebuild
+  stage table lists the census stage and the season-scoped artefacts.
+- **Validation.**
+  - The DB-free suite shows no new failure.
+  - The rollback-only census proof (`tests/integration/afl-api-ownership-census.test.ts`) passed 5/5 on
+    `afldb_test`, leaving no residue.
+  - Read-only censuses of `afldb_test` and `afldb_dev` both PASS: zero `afl_api`-owned matches, and DEV was not
+    mutated.
+
+  Not yet exercised: the first DEV discovery `--fetch` and the D-233-2 Brownlow write path. PROD is untouched.
+
 ### Corrected-identity promotion: DEV rehearsal passed, temporary PROD gate retired, AFLDB-ISSUE-238 resolved - 1 October 2026
 
 - **Evidence (operator-run on DEV, recorded as reported).** Stage 2 (Run Z, the one real FX1 correction, Run C,

@@ -195,6 +195,27 @@ rebuild loads the family in its `first-kick-goal` stage from the pinned
 host (at `data/records/first-kick-goal.csv` or via `AFLDB_FIRST_KICK_GOAL_CSV`) or PRECHECK
 refuses before anything is destroyed.
 
+**The completed-season `afl_api` ownership gate (`AFLDB-ISSUE-233` D-233-3).** The rebuild
+recreates every completed season as AFL Tables rows, and §3a prepares only the in-progress season,
+so no candidate can carry a completed-season match owned by source `afl_api`. A live target that
+holds one would be silently re-owned by the swap. There is no ownership replay yet, so the checker
+refuses. It runs the census the rebuild runs (`src/lib/rollover/afl-api-ownership-census.ts`: the
+same queries, the same scope = the fitzRoy contract's season range minus every in-progress season)
+against the **live target**, never the source or the candidate. It runs automatically, with no
+flag, file or override, at:
+- `dependencies`: before manifest A or B is written;
+- `pre-cutover`: frozen under PROD;
+- `restored`: on `--old-database`;
+- `candidate`: on the live name, frozen or not, as the last read before the swap;
+- `production` under a freeze record: on the kept database, so a write in the last-check-to-swap
+  gap still refuses acceptance and §10's rollback restores the untouched database.
+
+A refusal names every affected completed season with its exact count. Ownership in an in-progress
+season is reported, never blocked. A target with no `matches` table, a damaged schema
+(`matches` without `sources` or `matches.source_id`), or a different `current_database()` is also
+a FAIL: absence is never evidence that nothing is owned. With zero affected rows the gate is one
+PASS line and nothing else changes.
+
 ---
 
 ## 3. Preflight (DEV and PROD, nothing destructive)

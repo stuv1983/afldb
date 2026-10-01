@@ -146,11 +146,27 @@ import {
   AFL_API_ADJUDICATION_DSN_ENV,
   AFL_API_ADJUDICATION_TARGET_ENV,
   AFL_API_ADJUDICATION_TOOL,
+  AFL_API_OWNERSHIP_CENSUS_STAGE,
   REHEARSAL_HALT_EXIT_CODE,
   REHEARSAL_STOP_BOUNDARIES,
   aflApiAdjudicationArgv,
+  aflApiOwnershipCensusScope,
+  aflApiOwnershipCensusSql,
   assertRehearsalStop,
+  brownlowAflApiSeasonArtefacts,
+  brownlowAflApiStageSuffix,
+  brownlowSeasonPreflightFiles,
+  createCliDeps,
 } from '../tools/db/rebuild-test';
+import {
+  AFL_API_OWNERSHIP_COUNTS_SQL, AFL_API_OWNERSHIP_SCHEMA_SQL, AflApiOwnershipCensusError, CENSUS_MARKER,
+  buildAflApiOwnershipCensusSql, judgeCensusRows, parseCensusOutput, refusalMessage, rebuildCensusScope,
+  type CensusSchemaProbe,
+} from '../src/lib/rollover/afl-api-ownership-census';
+import { parseCensusArgs } from '../tools/db/afl-api-ownership-census';
+
+/** A SQL string literal, quotes doubled: how the census stream embeds the shared queries. */
+const sqlLit = (text: string) => `'${text.replace(/'/g, "''")}'`;
 import {
   AdjudicationRebuildRefused,
   CAPTURE_FORMAT,
@@ -403,13 +419,23 @@ function fakeDeps(failAt?: string) {
     runSql: (_dsn, sql) => { sqlRuns.push(sql); },
     runValidation: (_dsn, sql) => {
       validationRuns.push(sql);
-      if (failAt === 'FINAL VALIDATION') throw new Error('final validation failed');
+      // Each failure is scoped to its own stream (AFLDB-ISSUE-233 added the pre-reset census).
+      if (failAt === 'FINAL VALIDATION' && sql.includes(FINAL_VALIDATION_MARKER)) {
+        throw new Error('final validation failed');
+      }
+      if (failAt === AFL_API_OWNERSHIP_CENSUS_STAGE && sql.includes(CENSUS_MARKER)) {
+        throw new Error('AFL API OWNERSHIP CENSUS refused');
+      }
     },
     fileExists: () => true,
     log: () => {},
   };
   return { deps, commands, envs, sqlRuns, validationRuns };
 }
+
+/** Which read-only stream a recorded validation run was. */
+const streamOf = (sql: string): string => (sql.includes(CENSUS_MARKER) ? 'census'
+  : sql.includes(FINAL_VALIDATION_MARKER) ? 'final' : 'other');
 
 function idsOf(stages: Stage[]) { return stages.map((s) => s.id); }
 
@@ -1255,8 +1281,11 @@ describe('stage graph', () => {
     // before 'draftguru'; see the AFLDB-ISSUE-245 suite.
     // AFLDB-ISSUE-249 added 'first-kick-goal' after 'coleman': nothing loaded that family
     // before, so every reset dropped it to zero; see the AFLDB-ISSUE-249 suite.
+    // AFLDB-ISSUE-233 D-233-3 added the read-only 'afl-api-ownership-census' straight after
+    // 'precheck', before the capture and the reset; see the AFLDB-ISSUE-233 suite.
     expect(idsOf(stages)).toEqual([
-      'precheck', 'afl-api-adjudications-capture', 'recreate', 'migrations', 'privileges',
+      'precheck', 'afl-api-ownership-census', 'afl-api-adjudications-capture', 'recreate',
+      'migrations', 'privileges',
       'reference', 'fitzroy', 'heights', 'heights-afl-api', 'heights-wikipedia', 'birth-dates',
       'coaches', 'father-son', 'siblings', 'after-siren', 'after-siren-reconcile',
       'manual-registrations-reinstate', 'manual-registrations-replay', 'manual-registrations-verify',
@@ -2362,7 +2391,9 @@ describe('final validation', () => {
     const { deps, validationRuns } = fakeDeps();
     const report = executeRebuild(planStages(target(), fitzroy(), OPTS), target(), deps);
     expect(report.ok).toBe(true);
-    expect(validationRuns).toHaveLength(1);
+    // Exactly one final validation, last; the only other read-only stream through the same
+    // path is the AFLDB-ISSUE-233 pre-reset ownership census, first.
+    expect(validationRuns.map(streamOf)).toEqual(['census', 'final']);
     expect(report.executed.at(-1)).toBe('fingerprints');
   });
 
@@ -4271,7 +4302,7 @@ describe('AFL API adjudication survival through the rebuild (AFLDB-ISSUE-235 C6 
     const report = executeRebuild(stages, target(), failed.deps);
     expect(report.ok).toBe(false);
     expect(report.failedStage).toBe(CAPTURE);
-    expect(report.executed).toEqual(['precheck', CAPTURE]);
+    expect(report.executed).toEqual(['precheck', AFL_API_OWNERSHIP_CENSUS_STAGE, CAPTURE]);
     expect(failed.sqlRuns).toEqual([]);        // RESET_SQL was never sent
     expect(failed.commands).toHaveLength(1);   // nothing after the capture was spawned
 
@@ -4314,7 +4345,8 @@ describe('AFL API adjudication survival through the rebuild (AFLDB-ISSUE-235 C6 
                          'ladder-witness', 'fingerprints']) {
       expect(report.executed, later).not.toContain(later);
     }
-    expect(validationRuns).toEqual([]);
+    // only the pre-reset census ran; the final validation never did
+    expect(validationRuns.map(streamOf)).toEqual(['census']);
   });
 
   it('a failed bijection stops every later stage', () => {
@@ -4325,7 +4357,8 @@ describe('AFL API adjudication survival through the rebuild (AFLDB-ISSUE-235 C6 
     for (const later of ['awards-honours', 'derived', 'fingerprints']) {
       expect(report.executed, later).not.toContain(later);
     }
-    expect(validationRuns).toEqual([]);
+    // only the pre-reset census ran; the final validation never did
+    expect(validationRuns.map(streamOf)).toEqual(['census']);
   });
 
   it("binds every adjudication stage to the selected target's own DSNs, for both targets", () => {
@@ -7723,7 +7756,7 @@ describe('AFLDB-ISSUE-237 L2 — deterministic rehearsal halt (--rehearsal-stop-
         events.push(sql === RESET_SQL ? 'sql:RESET_SQL' : 'sql:OTHER');
         if (failAt === 'recreate') throw new Error('reset failed');
       },
-      runValidation: () => { events.push('validation'); },
+      runValidation: (_dsn, sql) => { events.push(`validation:${streamOf(sql)}`); },
       fileExists: () => true,
       log: () => {},
     };
@@ -7816,13 +7849,15 @@ describe('AFLDB-ISSUE-237 L2 — deterministic rehearsal halt (--rehearsal-stop-
     const report = executeRebuild(stages, codeTarget(), deps, HALT);
 
     expect(report).toEqual({
-      executed: ['precheck', 'afl-api-adjudications-capture', 'recreate'],
+      executed: ['precheck', AFL_API_OWNERSHIP_CENSUS_STAGE, 'afl-api-adjudications-capture', 'recreate'],
       rehearsalHalt: 'recreate',
       ok: false,
     });
     expect(report.failedStage).toBeUndefined();
-    // Stage 2 is the normal capture (no --recover), then the reset is the exact RESET_SQL constant
-    expect(events).toEqual([`command:${aflApiAdjudicationArgv('capture').join(' ')}`, 'sql:RESET_SQL']);
+    // The AFLDB-ISSUE-233 census reads first; Stage 2 is the normal capture (no --recover),
+    // then the reset is the exact RESET_SQL constant
+    expect(events).toEqual(['validation:census',
+      `command:${aflApiAdjudicationArgv('capture').join(' ')}`, 'sql:RESET_SQL']);
     expect(commands).toEqual([['npx', 'tsx', AFL_API_ADJUDICATION_TOOL, 'capture']]);
   });
 
@@ -7836,11 +7871,11 @@ describe('AFLDB-ISSUE-237 L2 — deterministic rehearsal halt (--rehearsal-stop-
       'afl-api-adjudications-reinstate', 'afl-api-adjudications-bijection']) {
       expect(notRun, id).toContain(id);
     }
-    expect(notRun).toHaveLength(stages.length - 3);
+    expect(notRun).toHaveLength(stages.length - 4);
     expect(events.some((e) => /db:migrate|db:privileges/.test(e))).toBe(false);
     expect(events.some((e) => e.includes(`${AFL_API_ADJUDICATION_TOOL} reinstate`))).toBe(false);
     expect(events.some((e) => e.includes(`${AFL_API_ADJUDICATION_TOOL} bijection`))).toBe(false);
-    expect(events).not.toContain('validation');
+    expect(events).not.toContain('validation:final');
 
     // Where the marker is cleared and the capture archived: only the reinstate step (Stage 18)
     // and the capture step's verify-reinstated branch — never the capture-live path Stage 2
@@ -7858,21 +7893,23 @@ describe('AFLDB-ISSUE-237 L2 — deterministic rehearsal halt (--rehearsal-stop-
     const stages = planStages(codeTarget(), fitzroy(), haltOpts);
     const capture = orderedDeps('capture');
     const capReport = executeRebuild(stages, codeTarget(), capture.deps, HALT);
-    expect(capReport).toEqual({ executed: ['precheck', 'afl-api-adjudications-capture'], failedStage: 'afl-api-adjudications-capture', ok: false });
+    expect(capReport).toEqual({ executed: ['precheck', AFL_API_OWNERSHIP_CENSUS_STAGE, 'afl-api-adjudications-capture'], failedStage: 'afl-api-adjudications-capture', ok: false });
     expect(capture.events).not.toContain('sql:RESET_SQL');
 
     const reset = orderedDeps('recreate');
     const resetReport = executeRebuild(stages, codeTarget(), reset.deps, HALT);
-    expect(resetReport).toEqual({ executed: ['precheck', 'afl-api-adjudications-capture', 'recreate'], failedStage: 'recreate', ok: false });
+    expect(resetReport).toEqual({ executed: ['precheck', AFL_API_OWNERSHIP_CENSUS_STAGE, 'afl-api-adjudications-capture', 'recreate'], failedStage: 'recreate', ok: false });
     expect(resetReport.rehearsalHalt).toBeUndefined();
   });
 
-  it('refuses, before running anything, a plan that does not begin PRECHECK -> capture -> recreate', () => {
+  it('refuses, before running anything, a plan that does not begin PRECHECK -> census -> capture -> recreate', () => {
     const stages = planStages(codeTarget(), fitzroy(), haltOpts);
     for (const broken of [
       stages.filter((s) => s.id !== 'afl-api-adjudications-capture'),
       stages.filter((s) => s.id !== 'precheck'),
+      stages.filter((s) => s.id !== AFL_API_OWNERSHIP_CENSUS_STAGE),
       [stages[0], stages[2], stages[1], ...stages.slice(3)],
+      [stages[0], stages[1], stages[3], stages[2], ...stages.slice(4)],
       [],
     ]) {
       const { deps, events } = orderedDeps();
@@ -7942,8 +7979,9 @@ describe('AFLDB-ISSUE-237 L2 — deterministic rehearsal halt (--rehearsal-stop-
       .toMatch(/cannot be combined/);
     // and the rerun's Stage 2 carries --recover only when asked
     const recovering = planStages(codeTarget(), fitzroy(), { ...codeOpts, recoverAflApiAdjudications: true });
-    expect(recovering[1].argv).toEqual([...aflApiAdjudicationArgv('capture'), '--recover']);
-    expect(planStages(codeTarget(), fitzroy(), codeOpts)[1].argv).toEqual(aflApiAdjudicationArgv('capture'));
+    const captureOf = (plan: Stage[]) => plan.find((s) => s.id === 'afl-api-adjudications-capture')!;
+    expect(captureOf(recovering).argv).toEqual([...aflApiAdjudicationArgv('capture'), '--recover']);
+    expect(captureOf(planStages(codeTarget(), fitzroy(), codeOpts)).argv).toEqual(aflApiAdjudicationArgv('capture'));
   });
 
   it('adopting leaves the pending file byte-for-byte, archives nothing and recaptures nothing', () => {
@@ -9987,5 +10025,281 @@ describe('AFLDB-ISSUE-245 — manual player registrations survive the rebuild (D
       for (const d of deletes) expect(d, d).not.toMatch(/\bLIKE\b|\s~\s|NAMESPACE/);
       expect(teardown.indexOf('await runResidue(dsns);')).toBeGreaterThan(teardown.lastIndexOf('DELETE FROM'));
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-233 D-233-3: the rebuild preserves afl_api ownership or refuses. DB-free: the
+// stage graph, the executor with fake deps, the census SQL text and the shared parser. The
+// SQL's own counting is proven against PostgreSQL, rollback-only, by
+// tests/integration/afl-api-ownership-census.test.ts.
+// ---------------------------------------------------------------------------
+
+describe('AFLDB-ISSUE-233 D-233-3 — afl_api ownership census before the reset', () => {
+  const CAPTURE = 'afl-api-adjudications-capture';
+  const CODE_OWNER = 'postgres://afldb_owner:pw@localhost:5432/code_test_db';
+  const CODE_IMPORT = 'postgres://afldb_import:pw@localhost:5432/code_test_db';
+  const codeTarget = () => target({ database: 'code_test_db', adminDsn: CODE_OWNER, importDsn: CODE_IMPORT });
+  const codeOpts = { ...OPTS, target: 'code_test_db' };
+  const readJson = (path: string) => JSON.parse(readFileSync(join(root, path), 'utf8')) as Record<string, unknown>;
+
+  it('runs straight after PRECHECK, before the capture and the reset, as a read-only validate stage', () => {
+    const ids = idsOf(planStages(target(), fitzroy(), OPTS));
+    expect(ids.slice(0, 4)).toEqual(['precheck', AFL_API_OWNERSHIP_CENSUS_STAGE, CAPTURE, 'recreate']);
+    const census = planStages(target(), fitzroy(), OPTS)[1];
+    expect(census).toMatchObject({ kind: 'validation', run: 'validate' });
+    expect(census.argv).toBeUndefined();
+    expect(census.sql).toBe(aflApiOwnershipCensusSql());
+  });
+
+  it('is in every plan, whatever the options: there is no way to leave it out', () => {
+    const variants: Array<[ResolvedTarget, Parameters<typeof planStages>[2]]> = [
+      [target(), OPTS],
+      [codeTarget(), codeOpts],
+      [codeTarget(), { ...codeOpts, recoverAflApiAdjudications: true }],
+      [codeTarget(), { ...codeOpts, rehearsalStopAfter: 'recreate' as const }],
+      [target(), { ...OPTS, acknowledgePartialFitzroy: true, fitzroyLabel: 'trial-2024' }],
+    ];
+    for (const [t, opts] of variants) {
+      const plan = planStages(t, fitzroy(), opts);
+      expect(plan.filter((s) => s.id === AFL_API_OWNERSHIP_CENSUS_STAGE)).toHaveLength(1);
+      expect(plan[1].id).toBe(AFL_API_OWNERSHIP_CENSUS_STAGE);
+    }
+  });
+
+  it('has no override: no flag skips it, forces past it or allows ownership loss', () => {
+    for (const flag of ['--skip-afl-api-ownership-census', '--allow-afl-api-ownership-loss',
+      '--force', '--no-census', '--transfer-afl-api-ownership']) {
+      expect(() => parseRebuildArgs([flag]), flag).toThrow(/Unknown argument/);
+    }
+    for (const flag of ['--force', '--allow-loss', '--skip']) {
+      expect(() => parseCensusArgs(['--database', 'afldb_test', '--dsn-env', 'X', flag, 'y']), flag)
+        .toThrow(/no override or skip flag/);
+    }
+    const code = runnerSource.replace(/\/\*[\s\S]*?\*\/|^\s*\/\/.*$/gm, '');
+    expect(code).not.toMatch(/opts\.\w*[Cc]ensus|skipCensus|allowAflApiOwnership/);
+  });
+
+  it('judges the tracked rebuild scope: completed seasons only, the in-progress season excluded', () => {
+    const scope = aflApiOwnershipCensusScope();
+    expect(scope).toEqual(rebuildCensusScope(
+      readJson('tools/rebuild/fitzroy/fitzroy-contract.json'), readJson('data/reference/seasons.json')));
+    expect(scope).toEqual({ firstSeason: 1897, lastSeason: 2025, excludedSeasons: [2026] });
+    const sql = aflApiOwnershipCensusSql(scope);
+    expect(sql).toContain('first_season int := 1897;');
+    expect(sql).toContain('last_season  int := 2025;');
+    expect(sql).toContain('excluded     int[] := ARRAY[2026]::int[];');
+  });
+
+  it('never treats an in-progress season as completed, even if the documents disagree', () => {
+    // An incoherent contract claiming 2026 completed while seasons.json says in progress:
+    // the in-progress declaration still excludes it.
+    const contract = { full_history: { season_range: { first_season: 1897, last_season: 2026 },
+      current_season_excluded: { seasons: [] } } };
+    const scope = rebuildCensusScope(contract, { in_progress_seasons: [2026] });
+    expect(scope.excludedSeasons).toEqual([2026]);
+    expect(buildAflApiOwnershipCensusSql(scope, 'enforce')).toContain('ARRAY[2026]::int[]');
+    expect(() => aflApiOwnershipCensusScope(() => ({}))).toThrow(RebuildRefused);
+  });
+
+  it('counts only canonical matches owned by source afl_api, read-only, and writes nothing', () => {
+    const sql = aflApiOwnershipCensusSql();
+    expect(sql.startsWith('SET TRANSACTION READ ONLY;')).toBe(true);
+    expect(sql).toContain("FROM public.matches m");
+    expect(sql).toContain("JOIN public.sources s ON s.id = m.source_id");
+    expect(sql).toContain("WHERE s.key = ''afl_api''");
+    expect(sql).not.toMatch(/\b(INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER|CREATE|GRANT)\b/i);
+    // the enforcing form refuses through psql's ON_ERROR_STOP, naming seasons and counts
+    expect(sql).toContain(`RAISE EXCEPTION '${CENSUS_MARKER} REFUSED`);
+    expect(sql).toContain("format('%s (%s)', r.season, r.n)");
+    expect(sql).toContain('There is no override');
+    // the two shared queries, EXECUTEd verbatim (one definition for rebuild, CLI and promotion)
+    expect(sql).toContain(`EXECUTE ${sqlLit(AFL_API_OWNERSHIP_SCHEMA_SQL)} INTO probe;`);
+    expect(sql).toContain(`FOR r IN EXECUTE ${sqlLit(AFL_API_OWNERSHIP_COUNTS_SQL)}`);
+    // a database with no matches table owns nothing and passes the rebuild, saying so ...
+    expect(sql).toMatch(/IF NOT probe\.matches THEN\s+RAISE WARNING 'AFLDB-AFL-API-OWNERSHIP-CENSUS schema_absent';/);
+    // ... but a matches table without its ownership columns is damaged, and refuses in BOTH forms
+    for (const form of [sql, buildAflApiOwnershipCensusSql(aflApiOwnershipCensusScope(), 'report')]) {
+      expect(form).toMatch(/ELSIF NOT \(probe\.sources AND probe\.source_id\) THEN\s+RAISE EXCEPTION 'AFLDB-AFL-API-OWNERSHIP-CENSUS REFUSED on %: public\.matches exists but public\.sources or matches\.source_id does not/);
+    }
+  });
+
+  it('no-schema census: only a database with NO matches table is schema_absent; a damaged one never passes', () => {
+    const scope = { firstSeason: 1897, lastSeason: 2025, excludedSeasons: [2026] };
+    const probe = (over: Partial<CensusSchemaProbe> = {}): CensusSchemaProbe => ({
+      currentDatabase: 'afldb_test', matches: true, sources: true, sourceId: true, ...over });
+    const judge = (p: CensusSchemaProbe, rows: Array<{ season: number; n: number }> = []) =>
+      judgeCensusRows({ expectedDatabase: 'afldb_test', scope, probe: p, rows });
+    // genuinely empty (never migrated, or reset by a halted run): nothing in it can be re-owned
+    expect(judge(probe({ matches: false, sources: false, sourceId: false }))).toMatchObject({ schemaPresent: false, inScope: [] });
+    expect(judge(probe({ matches: false, sources: true, sourceId: false }))).toMatchObject({ schemaPresent: false });
+    // matches present, ownership unresolvable: refused, never a pass
+    expect(() => judge(probe({ sources: false }))).toThrow(/public\.matches exists but public\.sources or matches\.source_id does not/);
+    expect(() => judge(probe({ sourceId: false }))).toThrow(AflApiOwnershipCensusError);
+    // the database actually read must be the one named
+    expect(() => judge(probe({ currentDatabase: 'afldb_dev' }))).toThrow(/read database 'afldb_dev', not 'afldb_test'/);
+    // the TypeScript judgement classifies exactly as the stream does
+    const result = judge(probe(), [{ season: 2019, n: 2 }, { season: 2025, n: 1 }, { season: 2026, n: 7 }]);
+    expect(result.inScope).toEqual([{ season: 2019, aflApiMatches: 2 }, { season: 2025, aflApiMatches: 1 }]);
+    expect(result.outsideScope).toEqual([{ season: 2026, aflApiMatches: 7 }]);
+    expect(refusalMessage(result)).toContain('completed season(s) in rebuild scope 1897..2025 excluding in-progress 2026');
+    expect(refusalMessage(result, 'promotion')).toContain('completed season(s) in promotion scope');
+    // the rollover never accepts schema_absent evidence (season-rollover.test.ts), and the promotion
+    // checker FAILs a live target without the table (db-promotion-check.test.ts): only the rebuild,
+    // over the database its own DSN names and is about to reset, treats absence as a pass.
+  });
+
+  it('a refusing census stops the run before the capture and the reset: nothing spawned, nothing reset', () => {
+    const { deps, commands, sqlRuns, validationRuns } = fakeDeps(AFL_API_OWNERSHIP_CENSUS_STAGE);
+    const report = executeRebuild(planStages(target(), fitzroy(), OPTS), target(), deps);
+    expect(report).toEqual({ executed: ['precheck', AFL_API_OWNERSHIP_CENSUS_STAGE],
+      failedStage: AFL_API_OWNERSHIP_CENSUS_STAGE, ok: false });
+    expect(commands).toEqual([]);
+    expect(sqlRuns).toEqual([]);
+    expect(validationRuns.map(streamOf)).toEqual(['census']);
+  });
+
+  it('a passing census leaves the rest of the run exactly as it was before the stage existed', () => {
+    const plan = planStages(target(), fitzroy(), OPTS);
+    const withCensus = fakeDeps();
+    const without = fakeDeps();
+    const a = executeRebuild(plan, target(), withCensus.deps);
+    const b = executeRebuild(plan.filter((s) => s.id !== AFL_API_OWNERSHIP_CENSUS_STAGE), target(), without.deps);
+    expect(a.ok).toBe(true);
+    expect(b.ok).toBe(true);
+    expect(a.executed.filter((id) => id !== AFL_API_OWNERSHIP_CENSUS_STAGE)).toEqual(b.executed);
+    expect(withCensus.commands).toEqual(without.commands);
+    expect(withCensus.envs).toEqual(without.envs);
+    expect(withCensus.sqlRuns).toEqual(without.sqlRuns);
+    expect(withCensus.validationRuns.slice(1)).toEqual(without.validationRuns);
+  });
+
+  it('the CLI reports a census refusal as a refusal of an untouched database, not a bad rebuild', () => {
+    const spawn = (() => ({ status: 3, stdout: '', stderr: `ERROR:  ${CENSUS_MARKER} REFUSED: …` })) as unknown as
+      typeof import('node:child_process').spawnSync;
+    const deps = createCliDeps(spawn);
+    const writes = { out: process.stdout.write, err: process.stderr.write };
+    process.stdout.write = (() => true) as typeof process.stdout.write;
+    process.stderr.write = (() => true) as typeof process.stderr.write;
+    try {
+      expect(() => deps.runValidation(OWNER, aflApiOwnershipCensusSql()))
+        .toThrow(/AFL API OWNERSHIP CENSUS refused .*Nothing has been captured or destroyed/);
+      expect(() => deps.runValidation(OWNER, 'SELECT 1; -- AFLDB-FINAL-VALIDATION'))
+        .toThrow(/FINAL VALIDATION did not pass/);
+    } finally {
+      process.stdout.write = writes.out;
+      process.stderr.write = writes.err;
+    }
+  });
+
+  it('names every affected season with its exact count; outside-scope seasons are reported only', () => {
+    const scope = { firstSeason: 1897, lastSeason: 2025, excludedSeasons: [2026] };
+    const line = (rest: string) => `WARNING:  ${CENSUS_MARKER} ${rest}`;
+    const output = [
+      line('database=afldb_test'),
+      line('scope first_season=1897 last_season=2025 excluded=2026'),
+      line('schema_present'),
+      line('in_scope season=2019 afl_api_matches=2'),
+      line('in_scope season=2024 afl_api_matches=3'),
+      line('in_scope season=2025 afl_api_matches=1'),
+      line('outside_scope season=2026 afl_api_matches=7'),
+      line('verdict=refuse total=6'),
+    ].join('\r\n');
+    const result = parseCensusOutput(output, scope);
+    const message = refusalMessage(result);
+    expect(message).toContain('2019 (2), 2024 (3), 2025 (1).');
+    expect(message).toContain('1897..2025 excluding in-progress 2026');
+    expect(message).not.toContain('2026 (');
+    expect(result.outsideScope).toEqual([{ season: 2026, aflApiMatches: 7 }]);
+
+    const zero = [line('database=afldb_test'), line('scope first_season=1897 last_season=2025 excluded=2026'),
+      line('schema_present'), line('verdict=pass total=0')].join('\n');
+    expect(parseCensusOutput(zero, scope).inScope).toEqual([]);
+    // a verdict that disagrees with its own counts, or a scope echo that is not the one asked for, refuses
+    expect(() => parseCensusOutput(output.replace('verdict=refuse total=6', 'verdict=pass total=0'), scope))
+      .toThrow(/disagrees with its own counts/);
+    expect(() => parseCensusOutput(zero, { ...scope, lastSeason: 2024 })).toThrow(/not the requested scope/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-233 D-233-2: season-scoped AFL API Brownlow artefacts beside the master. The
+// loader's own contract is tests/python/afl_api_brownlow_season_artefact_contract.py; this
+// suite proves the rebuild binds whatever the loader will load into its preflight inputs,
+// its stage name and its Stage-9 expectations, and changes nothing when there is none.
+// ---------------------------------------------------------------------------
+
+describe('AFLDB-ISSUE-233 D-233-2 — season-scoped AFL API Brownlow artefacts in the rebuild', () => {
+  const RANGE = { first: 1897, last: 2027 };
+  const present = (...paths: string[]) => (path: string) => paths.includes(path);
+  const pair = (season: number) => [`data/brownlow/season-votes-afl_api-${season}.csv`,
+    `data/brownlow/season-votes-afl_api-${season}.manifest.json`];
+  const apiManifest = (season: number, rows: number, votes: number) => ({
+    path: pair(season)[1],
+    manifest: { source_key: 'afl_api', season, artefact: {
+      rows, votes_total: votes, winners: 1, seasons: 1, first_season: season, last_season: season } },
+  });
+
+  it('finds none in today\'s repository, so the master-only stage, preflight and gates are unchanged', () => {
+    expect(brownlowAflApiSeasonArtefacts()).toEqual([]);
+    expect(brownlowSeasonPreflightFiles()).toEqual(BROWNLOW_SEASON_PREFLIGHT_FILES);
+    expect(brownlowAflApiStageSuffix()).toBe('');
+    expect(planStages(target(), fitzroy(), OPTS).find((s) => s.id === 'brownlow-season')!.name)
+      .toBe('BROWNLOW SEASON — authoritative season totals from the tracked artefact');
+    expect(brownlowSeasonExpected().aflApi).toBeUndefined();
+    const keys = brownlowSeasonChecks(2025).map((c) => c.key);
+    expect(keys).not.toContain('brownlow_season_rows_sourced_from_afl_api');
+    expect(brownlowSeasonChecks(2025).find((c) => c.key === 'brownlow_season_rows_not_sourced_from_afltables')!
+      .expected).toBe(0);
+  });
+
+  it('discovers exact pairs in ascending season order, by name, never by listing a directory', () => {
+    const found = brownlowAflApiSeasonArtefacts(present(...pair(2027), ...pair(2026)), RANGE);
+    expect(found.map((a) => a.season)).toEqual([2026, 2027]);
+    expect(brownlowSeasonPreflightFiles(found)).toEqual([
+      ...BROWNLOW_SEASON_PREFLIGHT_FILES, ...pair(2026), ...pair(2027)]);
+    expect(brownlowAflApiStageSuffix(found)).toBe(
+      ' + season-scoped AFL API artefact(s) data/brownlow/season-votes-afl_api-2026.csv, '
+      + 'data/brownlow/season-votes-afl_api-2027.csv');
+  });
+
+  it('refuses half a pair before anything is destroyed', () => {
+    expect(() => brownlowAflApiSeasonArtefacts(present(pair(2026)[0]), RANGE))
+      .toThrow(/2026 lack their CSV or manifest/);
+    expect(() => brownlowAflApiSeasonArtefacts(present(pair(2026)[1]), RANGE))
+      .toThrow(/2026 lack their CSV or manifest/);
+  });
+
+  it('adds each loaded artefact to the Stage-9 expectations and pins its provenance to its seasons', () => {
+    const master = () => JSON.parse(readFileSync(join(root, 'data', 'brownlow', 'season-votes.manifest.json'), 'utf8'));
+    const expected = brownlowSeasonExpected(master, () => [apiManifest(2026, 180, 1300)]);
+    expect(expected).toMatchObject({ rows: 16_120 + 180, votesTotal: 79_113 + 1300, winners: 113,
+      seasons: 99, lastSeason: 2026, aflApi: { rows: 180, seasons: [2026] } });
+    const checks = brownlowSeasonChecks(2026, expected);
+    const byKey = (key: string) => checks.find((c) => c.key === key)!;
+    expect(byKey('brownlow_season_rows_not_sourced_from_afltables').expected).toBe(180);
+    expect(byKey('brownlow_season_rows_sourced_from_afl_api').expected).toBe(180);
+    expect(byKey('brownlow_season_afl_api_rows_outside_artefact_seasons')).toMatchObject({
+      expected: 0, sql: expect.stringContaining('AND b.season NOT IN (2026)') });
+    expect(byKey('brownlow_season_after_accepted_last_season').expected).toBe(0);
+  });
+
+  it('refuses an artefact manifest that is not an afl_api single-season manifest', () => {
+    const master = () => JSON.parse(readFileSync(join(root, 'data', 'brownlow', 'season-votes.manifest.json'), 'utf8'));
+    const wrongSource = apiManifest(2026, 1, 1);
+    (wrongSource.manifest as Record<string, unknown>).source_key = 'afltables';
+    expect(() => brownlowSeasonExpected(master, () => [wrongSource])).toThrow(/not an afl_api season artefact manifest/);
+    const twoSeasons = apiManifest(2026, 1, 1);
+    twoSeasons.manifest.artefact.seasons = 2;
+    expect(() => brownlowSeasonExpected(master, () => [twoSeasons])).toThrow(/exactly one season/);
+  });
+
+  it('the preflight still proves the master, and the loader validates every artefact it binds', () => {
+    expect(BROWNLOW_SEASON_PREFLIGHT_FILES).toEqual([
+      'data/brownlow/season-votes.csv', 'data/brownlow/season-votes.manifest.json',
+      'data/brownlow/player-identity.csv']);
+    const preflight = runnerSource.slice(runnerSource.indexOf('export function runPreflight('));
+    expect(preflight).toContain('for (const path of brownlowSeasonPreflightFiles())');
+    expect(brownlowSeasonValidateArgv()).toEqual([resolvePython(), BROWNLOW_SEASON_LOADER, '--validate-only']);
   });
 });

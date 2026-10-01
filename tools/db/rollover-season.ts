@@ -75,7 +75,14 @@
  *     --ladder-coverage artifacts/rollover/ladder-coverage.json \
  *     --stat-availability artifacts/rollover/stat-availability.json \
  *     --accepted-corrections artifacts/rollover/accepted-corrections.json \
+ *     --afl-api-ownership-census artifacts/rollover/afl-api-ownership-census-afldb_test.json \
  *     --expected-club-season-rows <n>
+ *
+ * `--afl-api-ownership-census` (AFLDB-ISSUE-233 D-233-3, required, repeatable: one per
+ * database censused) is the evidence `tools/db/afl-api-ownership-census.ts --through-season
+ * <season>` wrote. The planner refuses, before any gate runs or anything is written, when a
+ * season of the successor rebuild scope holds an `afl_api`-owned canonical match, because the
+ * post-rollover rebuild would re-own it. This tool still opens no database connection.
  *
  * `--retire-status` must name a value the acceptance register declares in
  * `selection_policy.retired_statuses` (today: `retired`). `--accepted-corrections`
@@ -247,6 +254,11 @@ function main(argv: string[]): number {
     'the reviewed stat-availability document');
   const acceptedCorrections = parseJsonFile(args.acceptedCorrections,
     'the reviewed accepted_corrections state');
+  // AFLDB-ISSUE-233 D-233-3: read here, judged by the planner from its counts.
+  const aflApiOwnershipCensuses = args.aflApiOwnershipCensus.map((path) => {
+    const census = parseJsonFile(path, 'the afl_api ownership census evidence');
+    return { path: census.relative, sha256: sha256Of(census.text), record: census.parsed };
+  });
 
   const candidateLabel = String(core.parsed.snapshot_label ?? '');
   if (!candidateLabel) {
@@ -289,6 +301,7 @@ function main(argv: string[]): number {
     // also the document the gates below are pointed at.
     statAvailabilityText: statAvailability.text,
     acceptedCorrections: acceptedCorrections.parsed,
+    aflApiOwnershipCensuses,
   };
 
   // STAGE 1. Every refusal that needs no validator evidence happens here: an

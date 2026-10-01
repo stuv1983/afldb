@@ -278,6 +278,23 @@ describe('brownlow season artefact: manifest and loader validation', () => {
     expect(payload.identity_override_players).toBe(5);
     expect(payload.identity_override_rows).toBe(14);
     expect(payload.source_key).toBe('afltables');
+    // AFLDB-ISSUE-233 D-233-2: no season-scoped AFL API artefact is tracked today, so the
+    // load is the master-only load it always was.
+    expect(payload.afl_api_artefacts).toEqual([]);
+  });
+
+  // AFLDB-ISSUE-233 D-233-2. The season-scoped AFL API artefacts loaded beside the master:
+  // discovery, per-artefact manifest/hash verification, the reviewed stat-availability gate,
+  // the master/AFL API overlap refusal and deterministic ordering, all against genuine
+  // builder output in a temporary directory. The contract script is the existing Python
+  // Brownlow artefact contract, run here so the normal suite carries it.
+  it('passes the AFL API Brownlow season artefact contract (builder + D-233-2 loader)', () => {
+    const result = spawnSync(python, ['tests/python/afl_api_brownlow_season_artefact_contract.py'],
+                             { cwd: root, encoding: 'utf8' });
+    if (result.error) throw result.error;
+    expect(result.stdout).toContain('D-233-2: season-scoped AFL API artefacts beside the master');
+    expect(result.stdout).not.toMatch(/^\s*FAIL\s/m);
+    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
   });
 
   // AFLDB-ISSUE-155 §27.11: this loader replaces the whole table, so an

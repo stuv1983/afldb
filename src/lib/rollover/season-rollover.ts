@@ -29,6 +29,11 @@
  *   * It does not define `club_seasons` ownership. AFLDB-ISSUE-095 owns the
  *     derivation and is resolved; this module only advances the accepted
  *     ladder WITNESS that stage 8.5 cross-checks the derivation against.
+ *   * It does not take the AFLDB-ISSUE-233 D-233-3 `afl_api` ownership census
+ *     itself. It REQUIRES the census evidence the read-only census command
+ *     wrote for the successor rebuild scope, re-judges it from its counts, and
+ *     refuses on the same condition the rebuild enforces before its reset: a
+ *     completed season in scope holding any `afl_api`-owned canonical match.
  *
  * REFUSE, NEVER REPAIR. A starting state whose artefacts already disagree is a
  * refusal naming the artefacts, not something to quietly normalise: a
@@ -40,6 +45,11 @@
  * read. The CLI (`tools/db/rollover-season.ts`) owns all filesystem access.
  */
 import { createHash } from 'node:crypto';
+
+import {
+  AflApiOwnershipCensusError, censusTotal, describeAffected, describeScope, readCensusRecord,
+  refusalMessage, rolloverCensusScope,
+} from './afl-api-ownership-census';
 
 /** A refusal. Never carries a DSN, a secret or a path outside the repository. */
 export class RolloverRefused extends Error {
@@ -998,6 +1008,75 @@ export function readClubSeasonsExpectedRows(source: string): number {
 // ---------------------------------------------------------------------------
 
 /**
+ * AFLDB-ISSUE-233 D-233-3. A rollover makes `completedSeason` a completed season inside the
+ * rebuild scope, and the next `npm run db:test:rebuild` recreates it as AFL Tables rows. If
+ * any season in that successor scope holds a canonical match owned by `afl_api`, the rebuild
+ * would re-own it, so the rebuild refuses before its reset, and this rollover refuses too,
+ * with the same wording, before anything tracked is written.
+ *
+ * Every supplied census must be the reporting census for EXACTLY the successor scope
+ * (`firstSeason..completedSeason`, the completing in-progress season deliberately included),
+ * of a database that holds the canonical schema, with no database censused twice. Its counts
+ * are re-validated and its verdict recomputed. The rebuild's own stage re-runs the census
+ * against its target before the reset: this evidence is the review, that stage is the
+ * enforcement. Returns the plan notes.
+ */
+export function assertAflApiOwnershipCensuses(input: {
+  censuses: Array<{ path: string; sha256: string; record: unknown }> | undefined;
+  firstSeason: number;
+  completedSeason: number;
+  inProgressSeasons: number[];
+}): string[] {
+  const { censuses, firstSeason, completedSeason } = input;
+  if (!Array.isArray(censuses) || censuses.length === 0) {
+    refuse('No afl_api ownership census was supplied (AFLDB-ISSUE-233 D-233-3). Run the read-only '
+      + '`tools/db/afl-api-ownership-census.ts --through-season '
+      + `${completedSeason} --out <file>` + '` against the database the post-rollover rebuild '
+      + 'will reset and pass it with --afl-api-ownership-census.');
+  }
+  const want = rolloverCensusScope(firstSeason, completedSeason, input.inProgressSeasons);
+  const notes: string[] = [];
+  const databases = new Set<string>();
+  for (const census of censuses) {
+    let result: ReturnType<typeof readCensusRecord>;
+    try {
+      result = readCensusRecord(census.record);
+    } catch (error) {
+      if (error instanceof AflApiOwnershipCensusError) {
+        refuse(`The afl_api ownership census ${census.path} is not valid evidence: ${error.message}`);
+      }
+      throw error;
+    }
+    if (databases.has(result.database)) {
+      refuse(`Two afl_api ownership censuses name the same database (${result.database}).`);
+    }
+    databases.add(result.database);
+    if (!jsonEqual(result.scope, want)) {
+      refuse(`The afl_api ownership census ${census.path} covers ${describeScope(result.scope)}, `
+        + `but the rebuild after completing ${completedSeason} covers ${describeScope(want)}. `
+        + `Re-run the census with --through-season ${completedSeason}.`);
+    }
+    if (!result.schemaPresent) {
+      refuse(`The afl_api ownership census ${census.path} found no canonical schema in `
+        + `${result.database}, so it evidences nothing about ownership. Census the database `
+        + 'the post-rollover rebuild will reset.');
+    }
+    if (censusTotal(result) > 0) {
+      refuse(`${refusalMessage(result)} Completing ${completedSeason} puts it inside that scope, `
+        + `so the post-rollover rebuild could not run. Evidence: ${census.path}. Nothing was written.`);
+    }
+    notes.push(`afl_api ownership census (AFLDB-ISSUE-233 D-233-3): ${result.database}, captured `
+      + `${result.capturedAtUtc}, ${census.path} (sha256 ${census.sha256}): 0 afl_api-owned `
+      + `canonical matches in ${describeScope(want)}`
+      + (result.outsideScope.length > 0
+        ? `; outside that scope (reported only): ${describeAffected(result.outsideScope)}.` : '.'));
+  }
+  notes.push('The post-rollover rebuild re-runs this census against its own target before the '
+    + 'capture and the reset (stage afl-api-ownership-census) and refuses on any non-zero season.');
+  return notes;
+}
+
+/**
  * Command-line shape, parsed and validated WITHOUT touching the filesystem.
  *
  * It lives here rather than in the CLI so that "the operator forgot a flag" is
@@ -1017,6 +1096,12 @@ export type RolloverArgs = {
   ladderCoverage: string;
   statAvailability: string;
   acceptedCorrections: string;
+  /**
+   * AFLDB-ISSUE-233 D-233-3. One or more census evidence files written by
+   * `tools/db/afl-api-ownership-census.ts --through-season <season>`, one per
+   * database censused. At least one is required.
+   */
+  aflApiOwnershipCensus: string[];
 };
 
 export function parseRolloverArgv(argv: string[]): RolloverArgs {
@@ -1066,7 +1151,7 @@ export function parseRolloverArgv(argv: string[]): RolloverArgs {
     refuse('--identity-scan no longer exists. ' + IDENTITY_SCAN_SOURCE_NOTE);
   }
 
-  return {
+  const parsed = {
     season: needInt('--season'),
     acknowledgeSeasonComplete,
     apply,
@@ -1079,6 +1164,24 @@ export function parseRolloverArgv(argv: string[]): RolloverArgs {
     statAvailability: need('--stat-availability'),
     acceptedCorrections: need('--accepted-corrections'),
   };
+
+  // AFLDB-ISSUE-233 D-233-3: repeatable, one evidence file per database censused.
+  const censuses: string[] = [];
+  argv.forEach((arg, index) => {
+    if (arg !== '--afl-api-ownership-census') return;
+    const value = argv[index + 1];
+    if (value === undefined || value.startsWith('--')) {
+      refuse('--afl-api-ownership-census needs a value.');
+    }
+    censuses.push(value);
+  });
+  if (censuses.length === 0) {
+    refuse('--afl-api-ownership-census is required: the evidence written by '
+      + '`npx tsx tools/db/afl-api-ownership-census.ts --through-season <season> --out <file>` '
+      + 'for the database the post-rollover rebuild will reset (AFLDB-ISSUE-233 D-233-3).');
+  }
+
+  return { ...parsed, aflApiOwnershipCensus: censuses };
 }
 
 export type RolloverRequest = {
@@ -1129,6 +1232,12 @@ export type SuccessorEvidence = {
    * Never defaulted and never inherited from the outgoing baseline.
    */
   acceptedCorrections: Json;
+  /**
+   * AFLDB-ISSUE-233 D-233-3. Every census evidence file the operator supplied, parsed by the
+   * CLI, with its repository-relative path and the SHA-256 of its bytes. Re-judged here from
+   * its counts; nothing in it is trusted as a verdict.
+   */
+  aflApiOwnershipCensuses: Array<{ path: string; sha256: string; record: unknown }>;
 };
 
 export type RolloverEvidence = SuccessorEvidence & {
@@ -1344,6 +1453,14 @@ export function planSuccessorContract(input: {
     'full_history');
   const range = obj(fullHistory.season_range ?? {}, 'season_range');
   const firstSeason = int(range.first_season, 'season_range.first_season');
+
+  // --- AFLDB-ISSUE-233 D-233-3: afl_api ownership across the successor rebuild ---
+  notes.push(...assertAflApiOwnershipCensuses({
+    censuses: evidence.aflApiOwnershipCensuses,
+    firstSeason,
+    completedSeason: Y,
+    inProgressSeasons: inProgress,
+  }));
 
   const coreRange = obj(coreManifest.requested_range ?? {}, 'core manifest requested_range');
   if (int(coreRange.from, 'core manifest requested_range.from') !== firstSeason

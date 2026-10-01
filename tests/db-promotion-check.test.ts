@@ -127,7 +127,11 @@ import {
   writeFreezePlan, writeUnfreezeRecovery, type Options,
   DATABASE_OID_SQL, PREPARATION_BATCHES_SQL, captureTargetDependencyManifest, gateFrozenDependencyRecheck, gateSourceDependencies,
   publishSourceDependencyProof, readSourceDependencyInputs, runDependenciesPhase,
+  AFL_API_OWNERSHIP_GATE, AFL_API_OWNERSHIP_PHASES, gateAflApiOwnership, promotionOwnershipCensusScope,
 } from '../tools/db/promotion-check';
+import {
+  AFL_API_OWNERSHIP_COUNTS_SQL, AFL_API_OWNERSHIP_SCHEMA_SQL, buildAflApiOwnershipCensusSql, rebuildCensusScope,
+} from '../src/lib/rollover/afl-api-ownership-census';
 import {
   DIGEST_SESSION_SETTINGS, FREEZE_CONNECT_ROLES_SQL, FREEZE_DATABASE_STATE_SQL, FREEZE_PREPARED_XACTS_SQL, FREEZE_SESSIONS_SQL,
   FREEZE_PROTECTED_REBUILT_TABLES, assertFreezeMarkerDistinct, buildFreezeDumpProof, buildFreezeRecord, describeFreezeStatus, freezeComment, freezeDigestTables,
@@ -8705,6 +8709,42 @@ describe('AFLDB-ISSUE-252 source dependency manifest and ownership-parity gate',
       expect(m).toMatchObject({ target_database_oid: 16385, freeze_token: null });
     });
 
+    it('AFLDB-ISSUE-233: a census refusal on the live target writes NO manifest A; a zero census leaves it as before', async () => {
+      const SCOPE = { firstSeason: 1897, lastSeason: 2025, excludedSeasons: [2026] };
+      const withCensus = (owned: Record<number, number>): Query => {
+        const inner = fakeDb(TARGET);
+        return async (text, params) => {
+          if (text === AFL_API_OWNERSHIP_SCHEMA_SQL) return [{ current_database: 'afldb_prod', matches: true, sources: true, source_id: true }];
+          if (text === AFL_API_OWNERSHIP_COUNTS_SQL) return Object.entries(owned).map(([season, n]) => ({ season, n: String(n) }));
+          return inner(text, params);
+        };
+      };
+      // main()'s order: the census, then runDependenciesPhase on the same report.
+      const phase = async (owned: Record<number, number>) => {
+        const out = join(dir, `a-${Math.random().toString(16).slice(2)}.json`);
+        const report = new Report();
+        const q = withCensus(owned);
+        await gateAflApiOwnership(q, 'target afldb_prod', 'afldb_prod', SCOPE, report);
+        await runDependenciesPhase(q, opts({ phase: 'dependencies', database: 'afldb_prod', dependenciesOut: out }), report);
+        return { report, written: existsSync(out), bytes: existsSync(out) ? readFileSync(out, 'utf8') : '' };
+      };
+      const refused = await phase({ 2025: 1 });
+      expect(refused.report.failed).toBe(true);
+      expect(refused.written).toBe(false);
+      expect(refused.report.results.map((r) => r.gate)).not.toContain('Dependency manifest written');
+
+      const zero = await phase({ 2026: 3 });
+      const before = await captureA();
+      expect(zero.report.failed).toBe(false);
+      expect(zero.report.results.slice(1).map((r) => [r.gate, r.verdict]))
+        .toEqual(before.report.results.map((r) => [r.gate, r.verdict]));
+      const strip = (bytes: string) => {
+        const m = parseDependencyManifest({ bytes, expectedFileSha256: sha256Hex(bytes), expectedEnvironment: 'prod' });
+        return { ...m, captured_at: 'x' };
+      };
+      expect(strip(zero.bytes)).toEqual(strip(before.bytes));
+    });
+
     it('refuses to publish a manifest whose reader disagrees with count(*), and never overwrites one', async () => {
       const short = await captureA({ ...TARGET, counts: { F2: 2 } });
       expect(short.report.failed).toBe(true);
@@ -8856,5 +8896,171 @@ describe('AFLDB-ISSUE-252 source dependency manifest and ownership-parity gate',
       expect(main.indexOf('if (boundProof) await gateFrozenDependencyRecheck(')).toBeGreaterThan(frozen);
       expect(main.indexOf("if (phase === 'dependencies') {")).toBeLessThan(main.indexOf('const boundSupersede'));
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-233 D-233-3: a promotion never silently re-owns a completed-season afl_api
+// match of the LIVE target. The gate reads the shared census queries on the target (never the
+// source or the candidate), at every phase that reads it, with no override.
+// ---------------------------------------------------------------------------
+
+describe('AFLDB-ISSUE-233 D-233-3 — completed-season afl_api ownership on the live promotion target (DB-free)', () => {
+  const SCOPE = { firstSeason: 1897, lastSeason: 2025, excludedSeasons: [2026] };
+  type Live = { database?: string; matches?: boolean; sources?: boolean; sourceId?: boolean; owned?: Record<number, number> };
+  /** The live target as the two shared queries see it; int8 counts arrive as strings, as from postgres.js. */
+  const liveDb = (db: Live): Query => async (text) => {
+    if (text === AFL_API_OWNERSHIP_SCHEMA_SQL) {
+      return [{ current_database: db.database ?? 'afldb_prod', matches: db.matches ?? true,
+        sources: db.sources ?? true, source_id: db.sourceId ?? true }];
+    }
+    if (text === AFL_API_OWNERSHIP_COUNTS_SQL) {
+      return Object.entries(db.owned ?? {}).map(([season, n]) => ({ season: Number(season), n: String(n) }))
+        .sort((a, b) => a.season - b.season);
+    }
+    throw new Error(`unexpected SQL: ${text.slice(0, 60)}`);
+  };
+  const gate = async (db: Live, database = 'afldb_prod', role = `target ${database}`) => {
+    const report = new Report();
+    await gateAflApiOwnership(liveDb(db), role, database, SCOPE, report);
+    expect(report.results).toHaveLength(1);
+    expect(report.results[0].gate).toBe(AFL_API_OWNERSHIP_GATE);
+    return { ...report.results[0], text: report.results[0].lines.join('\n') };
+  };
+
+  const source = readFileSync(join(REPO, 'tools', 'db', 'promotion-check.ts'), 'utf8').replace(/\r\n/g, '\n');
+  const main = source.slice(source.indexOf('async function main('));
+  const code = main.replace(/\/\*[\s\S]*?\*\/|^\s*\/\/.*$/gm, '');
+  const pos = (needle: string, from = 0) => {
+    const i = main.indexOf(needle, from);
+    expect(i, needle).toBeGreaterThan(-1);
+    return i;
+  };
+
+  it('live target with zero afl_api-owned matches: PASS', async () => {
+    const r = await gate({});
+    expect(r.verdict).toBe('PASS');
+    expect(r.text).toContain('target afldb_prod: completed-season scope 1897..2025 excluding in-progress 2026');
+    expect(r.text).toContain('in scope      : none');
+  });
+
+  it('one afl_api-owned match in a completed season: FAIL, naming the season and its count', async () => {
+    const r = await gate({ owned: { 2025: 1 } });
+    expect(r.verdict).toBe('FAIL');
+    expect(r.text).toContain('in scope      : 2025 (1)');
+    expect(r.text).toContain('REFUSED on afldb_prod: completed season(s) in promotion scope 1897..2025 excluding in-progress 2026 '
+      + 'hold canonical matches owned by source afl_api: 2025 (1).');
+    expect(r.text).toContain('There is no override');
+  });
+
+  it('several completed seasons: every one named with its exact count; the in-progress season never', async () => {
+    const r = await gate({ owned: { 1990: 2, 2019: 5, 2025: 1, 2026: 40 } });
+    expect(r.verdict).toBe('FAIL');
+    expect(r.text).toContain('owned by source afl_api: 1990 (2), 2019 (5), 2025 (1).');
+    expect(r.text).toContain('outside scope : 2026 (40)');
+    expect(r.text.split('STOP')[1]).not.toContain('2026 (');
+  });
+
+  it('in-progress-only ownership is not blocked by this completed-season rule', async () => {
+    const r = await gate({ owned: { 2026: 207 } });
+    expect(r.verdict).toBe('PASS');
+    expect(r.text).toContain('in scope      : none');
+    expect(r.text).toContain('outside scope : 2026 (207) (in progress or later; reported, never blocked here)');
+  });
+
+  it('a census that cannot be taken never passes: no matches table, a damaged schema, the wrong database', async () => {
+    const absent = await gate({ matches: false, sources: false, sourceId: false });
+    expect(absent.verdict).toBe('FAIL');
+    expect(absent.text).toContain('has no public.matches');
+    for (const damaged of [{ sources: false }, { sourceId: false }]) {
+      const r = await gate(damaged);
+      expect(r.verdict).toBe('FAIL');
+      expect(r.text).toContain('public.matches exists but public.sources or matches.source_id does not');
+    }
+    const wrong = await gate({ database: 'afldb_test' });
+    expect(wrong.verdict).toBe('FAIL');
+    expect(wrong.text).toContain("the census read database 'afldb_test', not 'afldb_prod'");
+  });
+
+  it('a source or candidate with zero cannot mask the live target: the gate reads only the target connection', async () => {
+    // The candidate (or the prepared source) owns nothing; the target it would replace owns 2024.
+    expect((await gate({ database: 'afldb_prod_candidate_20261001' }, 'afldb_prod_candidate_20261001', 'candidate')).verdict).toBe('PASS');
+    expect((await gate({ owned: { 2024: 3 } })).verdict).toBe('FAIL');
+    // Wiring: every call passes the TARGET's connection; conn.q only where --database IS the live target.
+    const calls = [...code.matchAll(/gateAflApiOwnership\((\w+)\.q, `([^`]+)`/g)].map((m) => [m[1], m[2]]);
+    expect(calls).toEqual([
+      ['conn', 'target ${opts.database}'], // dependencies: --database is the live target
+      ['conn', 'target ${opts.database}'], // pre-cutover: --database is the live target
+      ['old', 'target ${opts.oldDatabase}'], // restored: never the candidate
+      ['frozenSide', 'live target ${names.live}'], // candidate: the live name, never the candidate
+      ['frozenSide', 'kept ${opts.oldDatabase}'], // production: the database the swap renamed aside
+    ]);
+    expect(AFL_API_OWNERSHIP_PHASES).toEqual(['dependencies', 'pre-cutover', 'restored', 'candidate', 'production']);
+    expect(code).not.toMatch(/phase === 'source'[^\n]*gateAflApiOwnership/);
+  });
+
+  it('late ownership appearing after an earlier phase is caught by the frozen pre-cutover, candidate and kept-database reads', async () => {
+    const live: Live = { owned: { 2026: 12 } };
+    // manifest A (pre-freeze) passes ...
+    expect((await gate(live)).verdict).toBe('PASS');
+    // ... then a completed-season row is re-owned before the cutover.
+    live.owned = { ...live.owned, 2025: 1 };
+    // Each later phase re-reads the live state (no manifest, no file), so each one refuses.
+    expect((await gate(live)).verdict).toBe('FAIL'); // pre-cutover, frozen
+    expect((await gate(live, 'afldb_prod', 'live target afldb_prod')).verdict).toBe('FAIL'); // candidate
+    expect((await gate({ ...live, database: 'afldb_prod_pre_rebuild_20261001' }, 'afldb_prod_pre_rebuild_20261001',
+      'kept afldb_prod_pre_rebuild_20261001')).verdict).toBe('FAIL'); // production: the swap's gap
+    // Wiring: pre-cutover reads the live connection inside its own branch, after the freeze gate.
+    const pre = pos("if (phase === 'pre-cutover') {", pos('let aflApiTargetCensus'));
+    const census = pos('await gateAflApiOwnership(conn.q, `target ${opts.database}`', pre);
+    expect(census).toBeGreaterThan(pos('await gateFrozenTarget(conn.q, `target ${opts.database}`', pre));
+    expect(census).toBeLessThan(pos("if (phase === 'restored') {", pre));
+    // production: the kept-database read sits beside F0's, under the freeze record PROD requires.
+    const prod = pos("if (freezeRecord && phase === 'production') {");
+    expect(pos('await gateAflApiOwnership(frozenSide.q, `kept ${opts.oldDatabase}`', prod))
+      .toBeLessThan(pos('await gatePromotedLiveUnfrozen(', prod));
+  });
+
+  it('every refusal precedes the swap and every destructive step', () => {
+    // dependencies: before manifest A is captured (so --phase source, the preparation and the freeze cannot follow)
+    const deps = pos("if (phase === 'dependencies') {");
+    expect(pos('await gateAflApiOwnership(conn.q', deps)).toBeLessThan(pos('await runDependenciesPhase(', deps));
+    // candidate: always opens the live target, frozen or not, the last read before the swap
+    const cand = pos("    if (phase === 'candidate') {\n      frozenSide = await openReadOnly(withDatabase(baseDsn, names.live), 'live');");
+    const candBlock = main.slice(cand, main.indexOf("if (freezeRecord && phase === 'production')", cand));
+    expect(candBlock).toContain('await gateAflApiOwnership(frozenSide.q, `live target ${names.live}`');
+    expect(candBlock).not.toMatch(/if \(freezeRecord\) \{\s*await gateFrozenTarget[^}]*gateAflApiOwnership/);
+    // the snapshot and every published file follow the gates of the run
+    expect(pos('const snapshot: Snapshot')).toBeGreaterThan(pos('await gateAflApiOwnership(frozenSide.q, `live target'));
+    // the scope is read before any database is opened
+    expect(pos('const ownershipScope = AFL_API_OWNERSHIP_PHASES.includes(phase)')).toBeLessThan(pos("if (phase === 'dependencies') {"));
+  });
+
+  it('has no override: no flag skips it, forces past it or allows ownership loss; every call is unconditional', () => {
+    const base = ['--environment', 'dev', '--phase', 'pre-cutover', '--database', 'afldb_dev'];
+    for (const flag of ['--skip-afl-api-ownership-census', '--allow-afl-api-ownership-loss', '--force', '--no-census',
+      '--transfer-afl-api-ownership', '--afl-api-ownership-census']) {
+      expect(() => parseArgs([...base, flag]), flag).toThrow(/Unknown argument/);
+    }
+    const optionsType = source.slice(source.indexOf('export type Options = {'), source.indexOf('export const FREEZE_BOUND_PHASES'));
+    const optionKeys = [...optionsType.matchAll(/^ {2}(\w+)\??:/gm)].map((m) => m[1]);
+    expect(optionKeys).toContain('freezeRecord');
+    expect(optionKeys.filter((k) => /ownership|census/i.test(k))).toEqual([]);
+    for (const line of code.split('\n').filter((l) => l.includes('gateAflApiOwnership('))) {
+      expect(line, line).not.toMatch(/\bif \(|opts\.\w+ &&|\? await/);
+    }
+  });
+
+  it('judges the same completed-season scope as the rebuild, from the same tracked documents, with the same SQL', () => {
+    const readJson = (p: string) => JSON.parse(readFileSync(join(REPO, p), 'utf8')) as Record<string, unknown>;
+    expect(promotionOwnershipCensusScope()).toEqual(rebuildCensusScope(
+      readJson('tools/rebuild/fitzroy/fitzroy-contract.json'), readJson('data/reference/seasons.json')));
+    expect(promotionOwnershipCensusScope()).toEqual(SCOPE);
+    expect(() => promotionOwnershipCensusScope(() => ({}))).toThrow(PromotionRefused);
+    // ONE SQL definition: the rebuild/CLI stream EXECUTEs the very text the checker runs.
+    const stream = buildAflApiOwnershipCensusSql(SCOPE, 'enforce');
+    expect(stream).toContain(AFL_API_OWNERSHIP_COUNTS_SQL.replace(/'/g, "''"));
+    expect(stream).toContain(AFL_API_OWNERSHIP_SCHEMA_SQL.replace(/'/g, "''"));
+    expect(source).not.toContain('JOIN public.sources s ON s.id = m.source_id');
   });
 });

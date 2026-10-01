@@ -36,10 +36,33 @@
   - Discovery is **IMPLEMENTED / DB-FREE VALIDATED** against the authentic `compseasons` sample
     (`tests/fixtures/afl_api/seasons/00-compseasons.raw.json`, sha256 `fe3f1641…d965`):
     `discover-afl-api-seasons.ts`, proposal-only; a registered mismatch is a refusing finding.
-  - D-233-2/D-233-3 are planned (runbook §4.3), not implemented.
+  - **2026-10-01 (pass 3, uncommitted):** D-233-3 and D-233-2 are **IMPLEMENTED / DB-FREE
+    VALIDATED**.
+    - D-233-3: the rebuild's `afl-api-ownership-census` stage refuses, before the capture and the
+      reset, any completed season holding `afl_api`-owned matches. The rollover requires census
+      evidence (`tools/db/afl-api-ownership-census.ts`) and refuses on the same rule.
+    - D-233-2: `import_brownlow_season.py` loads `season-votes-afl_api-<season>.csv` beside the
+      master, gated by `brownlow_season_total` complete; a season in both refuses.
+    - Discovery was audited and is unchanged.
+  - **2026-10-01 (pass 4, uncommitted, DB-free validated):**
+    - D-233-3 now also protects **promotion over a live target**. `promotion-check.ts` refuses
+      completed-season `afl_api` ownership on the live target at `dependencies`, `pre-cutover`,
+      `restored`, `candidate` and (frozen) `production`. There is no override.
+    - The census refuses a damaged schema.
+    - Discovery `--fetch` retains the HTTP entity bytes verbatim.
+    - Ownership replay remains intentionally unimplemented.
+  - **2026-10-01 (pass 5, uncommitted): live-safe validation PASSED** (runbook §4.8).
+    - The DB-free suite shows no new failure.
+    - Integration census test: 5/5 on `afldb_test`, no residue.
+    - Read-only censuses: PASS on `afldb_test` and `afldb_dev`. Both hold zero `afl_api`-owned
+      matches. DEV was not mutated.
+    - Final review: no CRIT/HIGH/MED finding, no code change.
+  - Still open: the first DEV discovery `--fetch` has not run; the D-233-2 Brownlow write path has
+    never run against a database; PROD is untouched.
 - **Runbook:** `issues/open/AFLDB-ISSUE-233.md`.
-- **Next action:** implement D-233-3's rebuild census refusal and D-233-2's season-scoped
-  Brownlow load (runbook §4.3); first real `--fetch` discovery on DEV.
+- **Next action (operator, runbook §4.6):**
+  1. Commit the reviewed pass.
+  2. Run the first DEV `--fetch` discovery (§3b.2).
 
 ### AFLDB-ISSUE-232 — AFL API operational wiring: systemd timers, Brownlow scheduled settle and admin status
 - **Severity:** Medium. **Area:** deployment / operations — `deploy/afldb-settle-afl-api*`,

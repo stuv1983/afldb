@@ -76,6 +76,10 @@ import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { isAbsolute, join, relative } from 'node:path';
 
 import {
+  AflApiOwnershipCensusError, CENSUS_MARKER as AFL_API_OWNERSHIP_CENSUS_MARKER,
+  buildAflApiOwnershipCensusSql, describeScope, rebuildCensusScope, type CensusScope,
+} from './afl-api-ownership-census';
+import {
   ACHIEVEMENT_TYPE as FIRST_KICK_GOAL_TYPE, FIRST_KICK_GOAL_MANIFEST, FIRST_KICK_GOAL_PROVENANCE,
   SOURCE_KEY as FIRST_KICK_GOAL_SOURCE, trackedExpectedIds,
 } from '../records/first-kick-goal-source';
@@ -404,6 +408,42 @@ export function aflApiAdjudicationEnv(
     [AFL_API_ADJUDICATION_TARGET_ENV]: target.database,
     [AFL_API_ADJUDICATION_DSN_ENV]: step === 'bijection' ? target.importDsn : target.adminDsn,
   };
+}
+
+/**
+ * AFLDB-ISSUE-233 D-233-3. The rebuild recreates every completed season in its scope as AFL
+ * Tables rows, so it must preserve `afl_api` ownership or refuse. Until an ownership-replay
+ * design exists it refuses: this read-only stage counts, on the database about to be reset,
+ * the canonical `matches` owned by source `afl_api` in each completed season of the rebuild
+ * scope, and fails the run on any non-zero season, naming every season and count. It runs
+ * after PRECHECK and BEFORE the adjudication capture (which sets the rebuild marker) and the
+ * reset, so a refusal leaves nothing captured, marked or destroyed. There is no override.
+ */
+export const AFL_API_OWNERSHIP_CENSUS_STAGE = 'afl-api-ownership-census';
+const SEASONS_REFERENCE = join('data', 'reference', 'seasons.json');
+
+/**
+ * The census scope, from the tracked documents the rebuild is bound to: the fitzRoy
+ * contract's `full_history.season_range` minus every in-progress season. Read at plan time,
+ * like every other tracked pin; a missing or malformed document refuses.
+ */
+export function aflApiOwnershipCensusScope(
+  readJson: (path: string) => Record<string, unknown> = (path) =>
+    JSON.parse(readFileSync(join(REPO_ROOT, path), 'utf8')) as Record<string, unknown>,
+): CensusScope {
+  try {
+    return rebuildCensusScope(readJson(FITZROY_CONTRACT), readJson(SEASONS_REFERENCE));
+  } catch (error) {
+    if (error instanceof AflApiOwnershipCensusError) {
+      throw new RebuildRefused(`AFL API ownership census: ${error.message} Nothing has been destroyed.`);
+    }
+    throw error;
+  }
+}
+
+/** The ENFORCING census stream the stage runs: any in-scope `afl_api` match is a psql error. */
+export function aflApiOwnershipCensusSql(scope: CensusScope = aflApiOwnershipCensusScope()): string {
+  return buildAflApiOwnershipCensusSql(scope, 'enforce');
 }
 
 export const BROWNLOW_SEASON_PREFLIGHT_FILES = [
@@ -744,6 +784,7 @@ export function planStages(target: ResolvedTarget, fitzroy: FitzroySource,
       `No stage graph for '${target.database}': it is not an explicit rebuild target.`);
   }
   const spec = REBUILD_TARGETS[target.database];
+  const censusScope = aflApiOwnershipCensusScope();
 
   return [
     {
@@ -751,6 +792,17 @@ export function planStages(target: ResolvedTarget, fitzroy: FitzroySource,
       name: 'PRECHECK — every required input, before anything is destroyed',
       kind: 'precheck',
       run: 'internal',
+    },
+    {
+      // AFLDB-ISSUE-233 D-233-3. Read-only, on the database about to be reset, before the
+      // capture writes its marker and before the reset. Unconditional: no option skips it.
+      id: AFL_API_OWNERSHIP_CENSUS_STAGE,
+      name: `AFL API OWNERSHIP CENSUS — refuse if any completed season in `
+        + `${describeScope(censusScope)} holds an afl_api-owned canonical match `
+        + '(read-only, before anything is captured or destroyed)',
+      kind: 'validation',
+      run: 'validate',
+      sql: aflApiOwnershipCensusSql(censusScope),
     },
     {
       // AFLDB-ISSUE-235 OD-5 (i). The human afl_api adjudication ledger is the one piece of
@@ -1050,8 +1102,11 @@ export function planStages(target: ResolvedTarget, fitzroy: FitzroySource,
       // player_season_stats.brownlow_votes / brownlow_status and the career totals.
       // Without it the derived pass asserts "no medal that season" for 98 decided seasons
       // (§8.1). It never touches brownlow_round_votes, which fitzroy/settle own.
+      // AFLDB-ISSUE-233 D-233-2: season-scoped AFL API artefacts, when present, load in the
+      // same stage and transaction, beside the master; the name binds them into the plan.
       id: 'brownlow-season',
-      name: 'BROWNLOW SEASON — authoritative season totals from the tracked artefact',
+      name: 'BROWNLOW SEASON — authoritative season totals from the tracked artefact'
+        + brownlowAflApiStageSuffix(),
       kind: 'data',
       run: 'command',
       argv: brownlowSeasonImportArgv(python),
@@ -1240,7 +1295,83 @@ export type BrownlowSeasonExpected = {
   seasons: number;
   firstSeason: number;
   lastSeason: number;
+  /**
+   * AFLDB-ISSUE-233 D-233-2: present only when season-scoped AFL API artefacts are loaded
+   * beside the master; their rows and seasons, already included in the totals above.
+   */
+  aflApi?: { rows: number; seasons: number[] };
 };
+
+/**
+ * AFLDB-ISSUE-233 D-233-2. A season-scoped AFL API Brownlow artefact, loaded beside the
+ * master by the BROWNLOW SEASON stage. The filename contract is the builder's
+ * (`build_brownlow_season_artefact_from_afl_api.py` default_out_paths) and the loader's
+ * (`import_brownlow_season.py` discover_afl_api_artefacts): exact names, both halves.
+ */
+export type BrownlowAflApiArtefact = { season: number; csv: string; manifest: string };
+
+const BROWNLOW_DIR = 'data/brownlow';
+
+/** `data/reference/seasons.json` first_season..last_season: every season an artefact could name. */
+function trackedSeasonRange(): { first: number; last: number } {
+  const seasons = JSON.parse(readFileSync(join(REPO_ROOT, SEASONS_REFERENCE), 'utf8')) as Record<string, unknown>;
+  const first = seasons.first_season;
+  const last = seasons.last_season;
+  if (!Number.isInteger(first) || !Number.isInteger(last) || (last as number) < (first as number)) {
+    throw new RebuildRefused(`${SEASONS_REFERENCE} declares no season range. Nothing has been destroyed.`);
+  }
+  return { first: first as number, last: last as number };
+}
+
+/**
+ * Discover the season-scoped AFL API artefacts, in ascending season order, by probing the
+ * EXACT filename of every tracked season — never by listing a directory, which this runner
+ * does nowhere (see the no-"latest label" guard). Half a pair refuses. Anything else under
+ * the prefix (a stray or misnamed file, a season outside the tracked range) is refused by the
+ * loader's own `--validate-only`, which does list the directory, in PRECHECK before anything
+ * is destroyed. Empty in today's repository, which leaves the master-only stage, preflight
+ * and gates exactly as they were.
+ */
+export function brownlowAflApiSeasonArtefacts(
+  exists: (path: string) => boolean = (path) => existsSync(join(REPO_ROOT, path)),
+  range: { first: number; last: number } = trackedSeasonRange(),
+): BrownlowAflApiArtefact[] {
+  const found: BrownlowAflApiArtefact[] = [];
+  const unpaired: number[] = [];
+  for (let season = range.first; season <= range.last; season += 1) {
+    const csv = `${BROWNLOW_DIR}/season-votes-afl_api-${season}.csv`;
+    const manifest = `${BROWNLOW_DIR}/season-votes-afl_api-${season}.manifest.json`;
+    const hasCsv = exists(csv);
+    const hasManifest = exists(manifest);
+    if (hasCsv && hasManifest) found.push({ season, csv, manifest });
+    else if (hasCsv || hasManifest) unpaired.push(season);
+  }
+  if (unpaired.length > 0) {
+    throw new RebuildRefused(
+      `Brownlow season: the season-scoped AFL API artefact(s) for ${unpaired.join(', ')} lack their `
+      + 'CSV or manifest. Nothing has been destroyed.');
+  }
+  return found;
+}
+
+/** `''` with no AFL API artefact, so the master-only stage name is unchanged. */
+export function brownlowAflApiStageSuffix(
+  artefacts: BrownlowAflApiArtefact[] = brownlowAflApiSeasonArtefacts(),
+): string {
+  return artefacts.length === 0 ? ''
+    : ` + season-scoped AFL API artefact(s) ${artefacts.map((a) => a.csv).join(', ')}`;
+}
+
+/**
+ * Every tracked Brownlow input the preflight proves present: the master trio, then each
+ * discovered AFL API artefact and its manifest, in season order. The loader's
+ * `--validate-only` then verifies each against its own manifest and the reviewed coverage.
+ */
+export function brownlowSeasonPreflightFiles(
+  artefacts: BrownlowAflApiArtefact[] = brownlowAflApiSeasonArtefacts(),
+): string[] {
+  return [...BROWNLOW_SEASON_PREFLIGHT_FILES, ...artefacts.flatMap((a) => [a.csv, a.manifest])];
+}
 
 /**
  * AFLDB-ISSUE-113. Read the artefact manifest's measured counts at plan time.
@@ -1258,6 +1389,12 @@ export function brownlowSeasonExpected(
       ? JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>
       : null;
   },
+  // AFLDB-ISSUE-233 D-233-2: each loaded season-scoped AFL API artefact's own manifest.
+  aflApiManifests: () => Array<{ path: string; manifest: Record<string, unknown> }> = () =>
+    brownlowAflApiSeasonArtefacts().map((a) => ({
+      path: a.manifest,
+      manifest: JSON.parse(readFileSync(join(REPO_ROOT, a.manifest), 'utf8')) as Record<string, unknown>,
+    })),
 ): BrownlowSeasonExpected {
   const manifest = readManifest();
   const artefact = manifest?.artefact as Record<string, unknown> | undefined;
@@ -1267,15 +1404,16 @@ export function brownlowSeasonExpected(
       + 'BROWNLOW SEASON stage has no declared contract to validate against, and the '
       + 'rebuild will not invent one.');
   }
-  const integer = (key: string): number => {
-    const value = artefact[key];
+  const integerOf = (block: Record<string, unknown>, where: string) => (key: string): number => {
+    const value = block[key];
     if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
       throw new RebuildRefused(
-        `${BROWNLOW_SEASON_MANIFEST}: artefact.${key} is not a non-negative integer.`);
+        `${where}: artefact.${key} is not a non-negative integer.`);
     }
     return value;
   };
-  return {
+  const integer = integerOf(artefact, BROWNLOW_SEASON_MANIFEST);
+  const expected: BrownlowSeasonExpected = {
     rows: integer('rows'),
     votesTotal: integer('votes_total'),
     winners: integer('winners'),
@@ -1283,6 +1421,30 @@ export function brownlowSeasonExpected(
     firstSeason: integer('first_season'),
     lastSeason: integer('last_season'),
   };
+  const extras = aflApiManifests();
+  if (extras.length === 0) return expected;
+
+  // Disjoint seasons (the loader refuses an overlap), so the season-grain facts add.
+  const aflApi = { rows: 0, seasons: [] as number[] };
+  for (const { path, manifest: extra } of extras) {
+    const block = extra.artefact as Record<string, unknown> | undefined;
+    if (!block || extra.source_key !== 'afl_api') {
+      throw new RebuildRefused(`${path} is not an afl_api season artefact manifest. Nothing has been destroyed.`);
+    }
+    const count = integerOf(block, path);
+    if (count('seasons') !== 1 || count('first_season') !== count('last_season')) {
+      throw new RebuildRefused(`${path} does not declare exactly one season. Nothing has been destroyed.`);
+    }
+    expected.rows += count('rows');
+    expected.votesTotal += count('votes_total');
+    expected.winners += count('winners');
+    expected.seasons += 1;
+    expected.firstSeason = Math.min(expected.firstSeason, count('first_season'));
+    expected.lastSeason = Math.max(expected.lastSeason, count('last_season'));
+    aflApi.rows += count('rows');
+    aflApi.seasons.push(count('first_season'));
+  }
+  return { ...expected, aflApi };
 }
 
 /**
@@ -1297,6 +1459,19 @@ export function brownlowSeasonChecks(
   expected: BrownlowSeasonExpected = brownlowSeasonExpected(),
 ): FinalCheck[] {
   const from = 'FROM brownlow_season_votes';
+  // AFLDB-ISSUE-233 D-233-2: with season-scoped AFL API artefacts loaded, exactly their rows
+  // are afl_api-sourced, and only in their seasons. Without them every check below is the
+  // master-only check it always was.
+  const aflApiRows = expected.aflApi?.rows ?? 0;
+  const aflApiChecks: FinalCheck[] = expected.aflApi ? [
+    { key: 'brownlow_season_rows_sourced_from_afl_api',
+      sql: `SELECT count(*) ${from} b JOIN sources s ON s.id = b.source_id WHERE s.key = 'afl_api'`,
+      expected: aflApiRows },
+    { key: 'brownlow_season_afl_api_rows_outside_artefact_seasons',
+      sql: `SELECT count(*) ${from} b JOIN sources s ON s.id = b.source_id WHERE s.key = 'afl_api'`
+         + ` AND b.season NOT IN (${expected.aflApi.seasons.map((s) => String(Math.trunc(s))).join(', ')})`,
+      expected: 0 },
+  ] : [];
   return [
     { key: 'brownlow_season_rows', sql: `SELECT count(*) ${from}`, expected: expected.rows },
 
@@ -1315,12 +1490,14 @@ export function brownlowSeasonChecks(
     { key: 'brownlow_season_last_season',
       sql: `SELECT coalesce(max(season), 0) ${from}`, expected: expected.lastSeason },
 
-    // Every row is acquired from AFL Tables facts and keyed by the profile path the
-    // rebuild preserves; a row with other provenance did not come from this loader.
+    // Every master row is acquired from AFL Tables facts and keyed by the profile path the
+    // rebuild preserves; a row with other provenance did not come from this loader. The
+    // only other provenance the loader writes is a loaded AFL API season artefact's.
     { key: 'brownlow_season_rows_not_sourced_from_afltables',
       sql: `SELECT count(*) ${from} b LEFT JOIN sources s ON s.id = b.source_id`
          + " WHERE s.key IS DISTINCT FROM 'afltables'",
-      expected: 0 },
+      expected: aflApiRows },
+    ...aflApiChecks,
 
     { key: 'brownlow_season_rows_not_keyed_by_profile_path',
       sql: `SELECT count(*) ${from} WHERE source_record_id !~ `
@@ -1966,8 +2143,13 @@ export type ExecutionReport = {
   ok: boolean;
 };
 
-/** The stage prefix a rehearsal halt requires, in order: Stage 1 and Stage 2 cannot be skipped. */
-const REHEARSAL_REQUIRED_PREFIX = ['precheck', 'afl-api-adjudications-capture', 'recreate'];
+/**
+ * The stage prefix a rehearsal halt requires, in order: Stage 1, the AFLDB-ISSUE-233 ownership
+ * census and Stage 2 cannot be skipped.
+ */
+const REHEARSAL_REQUIRED_PREFIX = [
+  'precheck', AFL_API_OWNERSHIP_CENSUS_STAGE, 'afl-api-adjudications-capture', 'recreate',
+];
 
 /**
  * Run the plan, stopping at the FIRST failure. There is no catch-and-continue: a failed
@@ -2132,7 +2314,10 @@ export function runPreflight(deps: Deps, opts: Options, source?: FitzroySource):
   // AFLDB-ISSUE-113. The season-grain Brownlow artefact is TRACKED (unlike the acquired
   // snapshots above), so the failure modes are a checkout missing the files or bytes
   // that no longer hash to the manifest. Prove both offline, before destruction.
-  for (const path of BROWNLOW_SEASON_PREFLIGHT_FILES) {
+  // AFLDB-ISSUE-233 D-233-2: every season-scoped AFL API artefact the loader will load is
+  // bound here too, and its --validate-only verifies each against its own manifest, the
+  // reviewed stat-availability coverage and the no-overlap rule.
+  for (const path of brownlowSeasonPreflightFiles()) {
     if (!deps.fileExists(path)) {
       throw new RebuildRefused(
         `Brownlow season preflight: required tracked input is missing: ${path}. `
@@ -2143,7 +2328,8 @@ export function runPreflight(deps: Deps, opts: Options, source?: FitzroySource):
   if (brownlow.status !== 0) {
     throw new RebuildRefused(
       `Brownlow season preflight failed (${BROWNLOW_SEASON_LOADER} --validate-only): `
-      + 'the artefact, its manifest and the identity adjudication file do not agree. '
+      + 'the artefact, its manifest and the identity adjudication file do not agree, or a '
+      + 'season-scoped AFL API artefact failed its own manifest, coverage or overlap check. '
       + `Nothing has been destroyed.\n${brownlow.stdout}${brownlow.stderr}`);
   }
 
@@ -3132,6 +3318,13 @@ export function createCliDeps(spawnSync: typeof import('node:child_process').spa
       if (result.stdout) process.stdout.write(result.stdout);
       if (result.stderr) process.stderr.write(result.stderr);
       if (result.status !== 0) {
+        // AFLDB-ISSUE-233: the same read-only path carries the pre-reset ownership census,
+        // whose failure is a refusal of an UNTOUCHED database, not a bad rebuild.
+        if (sql.includes(AFL_API_OWNERSHIP_CENSUS_MARKER)) {
+          throw new Error(
+            `AFL API OWNERSHIP CENSUS refused (psql exited ${result.status}). The ${AFL_API_OWNERSHIP_CENSUS_MARKER} `
+            + 'lines above name every affected season and its count. Nothing has been captured or destroyed.');
+        }
         throw new Error(
           `FINAL VALIDATION did not pass (psql exited ${result.status}). The rebuilt `
           + 'database does not match the accepted contracts; treat the rebuild as FAILED.');
@@ -3187,6 +3380,8 @@ async function main(): Promise<number> {
       : ' (PARTIAL — explicitly acknowledged)'));
   console.log(`  draftguru     : ${opts.draftguruLabel}`
     + (opts.draftguruBridge ? ` + bridge ${opts.draftguruBridge}` : ' (no bridge dataset)'));
+  console.log(`  afl_api owner : census of ${describeScope(aflApiOwnershipCensusScope())} before the capture; `
+    + 'any afl_api-owned completed-season match refuses the rebuild (AFLDB-ISSUE-233 D-233-3)');
   console.log(`  afl_api ids   : captured to ${process.env[CAPTURE_ROOT_ENV] ?? '(unset — precheck will refuse)'}`
     + `/${target.database}/, reinstated after draftguru`
     + (opts.recoverAflApiAdjudications ? ' (RECOVER from the pending capture)' : ''));

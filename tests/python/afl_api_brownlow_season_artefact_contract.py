@@ -564,6 +564,211 @@ with tempfile.TemporaryDirectory() as tmp:
 
 
 # ---------------------------------------------------------------------------
+# AFLDB-ISSUE-233 D-233-2: the loader (import_brownlow_season.py) reads the
+# season-scoped artefacts THIS builder writes, beside the tracked master,
+# gated by the reviewed stat-availability document. Every artefact below is a
+# real builder output (build_rows / render_csv / build_manifest /
+# write_artefact) in a temporary directory; the master is the tracked one.
+# ---------------------------------------------------------------------------
+
+import import_brownlow_season as loader  # noqa: E402
+
+section("D-233-2: season-scoped AFL API artefacts beside the master")
+
+
+def write_afl_api_artefact(directory: Path, season: int, label: str | None = None) -> tuple[Path, Path]:
+    """One genuine builder artefact pair for ``season`` (synthetic players, test data)."""
+    label = label or f"afl-api-brownlow-{season}-test"
+    derived = m.derive_season_rows(
+        [(101, 3), (102, 2), (104, 3), (101, 1)], ineligible_player_ids=set(),
+        home_and_away_games={101: 20, 102: 18, 104: 21},
+    )
+    rows = m.build_rows(season, derived, identities, bridge_for_rows, label)
+    csv_text = m.render_csv(rows)
+    csv_path = directory / f"season-votes-afl_api-{season}.csv"
+    manifest_path = directory / f"season-votes-afl_api-{season}.manifest.json"
+    manifest = m.build_manifest(
+        season=season, label=label,
+        snapshot_manifest={"season_provider_id": f"CD_S{season}014", "acquired_at": "test", "files": []},
+        snapshot_dir=directory / "snapshot", bridge_paths=[], bridge_provenance={},
+        measured=m.measure(season, derived), csv_path=csv_path, csv_text=csv_text,
+        db_database="afldb_test", reconciliation_compared=len(derived),
+    )
+    m.write_artefact(csv_text, manifest, csv_path, manifest_path)
+    return csv_path, manifest_path
+
+
+def availability(directory: Path, complete: set[int], pending: set[int] = frozenset()) -> Path:
+    """A READY stat-availability document: the tracked one, with brownlow_season_total edited."""
+    tracked = json.loads(loader.AVAILABILITY_PATH.read_text(encoding="utf-8"))
+    ranges = [r for r in tracked["coverage_ranges"] if r["stat_key"] != loader.STAT_KEY
+              or r["last_season"] < 2026]
+    for season in sorted(complete):
+        ranges.append({"stat_key": loader.STAT_KEY, "coverage": "complete",
+                       "first_season": season, "last_season": season})
+    for season in sorted(pending):
+        ranges.append({"stat_key": loader.STAT_KEY, "coverage": "pending",
+                       "first_season": season, "last_season": season})
+    tag = "-".join([f"c{s}" for s in sorted(complete)] + [f"p{s}" for s in sorted(pending)])
+    path = directory / f"stat-availability-{tag or 'none'}.json"
+    path.write_text(json.dumps({**tracked, "coverage_ranges": ranges}), encoding="utf-8")
+    return path
+
+
+def refusal(fn, *args, **kwargs) -> str:
+    try:
+        fn(*args, **kwargs)
+    except loader.BrownlowSeasonSourceError as exc:
+        return str(exc)
+    return ""
+
+
+baseline = loader.validate_offline()
+check("D-233-2: today's repository carries no season-scoped AFL API artefact",
+      baseline["afl_api_artefacts"] == [])
+check("D-233-2: master-only summary is unchanged (16,120 / 79,113 / 112 / 98)",
+      (baseline["rows"], baseline["votes_total"], baseline["winners"], baseline["seasons"])
+      == (16120, 79113, 112, 98))
+
+with tempfile.TemporaryDirectory() as tmp:
+    tmp_dir = Path(tmp)
+    empty = tmp_dir / "empty"
+    empty.mkdir()
+    master_only = loader.validate_offline(afl_api_dir=empty, availability_path=tmp_dir / "absent.json")
+    check("D-233-2 master-only: no artefact -> the availability document is never even read",
+          master_only["afl_api_artefacts"] == [])
+    check("D-233-2 master-only: identical summary to the default run",
+          {k: v for k, v in master_only.items() if k != "afl_api_artefacts"}
+          == {k: v for k, v in baseline.items() if k != "afl_api_artefacts"})
+
+    # AFL API season only (2026 is in no master row) + reviewed availability complete.
+    one = tmp_dir / "one"
+    one.mkdir()
+    csv_2026, manifest_2026 = write_afl_api_artefact(one, 2026)
+    complete_2026 = availability(tmp_dir, {2026})
+    summary = loader.validate_offline(afl_api_dir=one, availability_path=complete_2026)
+    entries = summary["afl_api_artefacts"]
+    check("D-233-2 complete: the 2026 artefact is loaded beside the master",
+          [e["season"] for e in entries] == [2026])
+    check("D-233-2 complete: it is bound by its own csv and manifest sha256",
+          entries[0]["csv_sha256"] == loader.sha256_file(csv_2026)
+          and entries[0]["manifest_sha256"] == loader.sha256_file(manifest_2026))
+    check("D-233-2 complete: provenance is afl_api, the master summary is untouched",
+          entries[0]["source_key"] == "afl_api" and summary["rows"] == baseline["rows"])
+    master_manifest = loader.load_manifest()
+    loaded = loader.load_afl_api_artefacts(loader.expected_seasons(master_manifest), one, complete_2026)
+    expected = loader.expected_after_load(master_manifest, loaded, loader.load_artefact())
+    check("D-233-2 complete: the post-write expectation adds the artefact's rows and season",
+          expected["rows"] == 16120 + len(loaded[0].rows) and expected["seasons"] == 99
+          and expected["afl_api_rows"] == len(loaded[0].rows))
+    master_expected = loader.expected_after_load(master_manifest)
+    check("D-233-2 master-only: the post-write expectation is the master manifest's own",
+          {k: master_expected[k] for k in ("rows", "votes_total", "winners", "seasons", "players")}
+          == {k: master_manifest["artefact"][k]
+              for k in ("rows", "votes_total", "winners", "seasons", "players")}
+          and master_expected["afl_api_rows"] == 0)
+
+    # Present, but the reviewed availability still says pending (today's real document).
+    check("D-233-2 pending: an artefact whose season is not 'complete' is refused, never skipped",
+          "is not 'complete' for brownlow_season_total" in refusal(
+              loader.validate_offline, afl_api_dir=one, availability_path=loader.AVAILABILITY_PATH))
+    pending_doc = availability(tmp_dir, set(), {2026})
+    check("D-233-2 pending: an explicitly pending season is refused the same way",
+          "is not 'complete'" in refusal(
+              loader.validate_offline, afl_api_dir=one, availability_path=pending_doc))
+
+    # The same season in BOTH the master and an AFL API artefact.
+    dup = tmp_dir / "dup"
+    dup.mkdir()
+    write_afl_api_artefact(dup, 2025)
+    message = refusal(loader.validate_offline, afl_api_dir=dup,
+                      availability_path=availability(tmp_dir, {2025}))
+    check("D-233-2 duplicate: a season in the master AND an AFL API artefact refuses",
+          "[2025] appear in BOTH the master artefact" in message and "no implicit precedence" in message,
+          message)
+
+    # Bad manifest / hash.
+    def tampered(name: str, mutate) -> str:
+        directory = tmp_dir / name
+        directory.mkdir()
+        csv_path, manifest_path = write_afl_api_artefact(directory, 2026)
+        mutate(csv_path, manifest_path)
+        return refusal(loader.validate_offline, afl_api_dir=directory, availability_path=complete_2026)
+
+    def flip_bytes(csv_path: Path, _manifest: Path) -> None:
+        text = csv_path.read_text(encoding="utf-8")
+        assert "Alpha Player" in text
+        csv_path.write_text(text.replace("Alpha Player", "Alphb Player", 1), encoding="utf-8", newline="")
+
+    def edit_manifest(**changes):
+        def apply(_csv: Path, manifest_path: Path) -> None:
+            doc = json.loads(manifest_path.read_text(encoding="utf-8"))
+            for dotted, value in changes.items():
+                target = doc
+                *parents, leaf = dotted.split(".")
+                for parent in parents:
+                    target = target[parent]
+                target[leaf] = value
+            manifest_path.write_text(json.dumps(doc), encoding="utf-8")
+        return apply
+
+    for name, mutate, expected_text in (
+        ("bytes", flip_bytes, "does not match season-votes-afl_api-2026.csv"),
+        ("rows", edit_manifest(**{"artefact.rows": 99}), "artefact.rows"),
+        ("source", edit_manifest(source_key="afltables"), "source_key 'afltables'"),
+        ("season", edit_manifest(season=2027), "its filename names 2026"),
+        ("schema", edit_manifest(schema_version=1), "schema_version 1"),
+    ):
+        message = tampered(name, mutate)
+        check(f"D-233-2 bad manifest/hash ({name}) refuses", expected_text in message, message)
+
+    # Multiple artefacts: deterministic ascending order whatever the creation order.
+    many = tmp_dir / "many"
+    many.mkdir()
+    write_afl_api_artefact(many, 2028)
+    write_afl_api_artefact(many, 2026)
+    write_afl_api_artefact(many, 2027)
+    complete_many = availability(tmp_dir, {2026, 2027, 2028})
+    first = loader.validate_offline(afl_api_dir=many, availability_path=complete_many)
+    second = loader.validate_offline(afl_api_dir=many, availability_path=complete_many)
+    check("D-233-2 multiple: discovered in ascending season order",
+          [e["season"] for e in first["afl_api_artefacts"]] == [2026, 2027, 2028])
+    check("D-233-2 multiple: two runs give identical evidence", first == second)
+    check("D-233-2 multiple: discovery is by season, not by filesystem order",
+          [s for s, _, _ in loader.discover_afl_api_artefacts(many)] == [2026, 2027, 2028])
+
+    # Half a pair, or an unrecognised name under the prefix, refuses rather than being skipped.
+    orphan = tmp_dir / "orphan"
+    orphan.mkdir()
+    csv_path, manifest_path = write_afl_api_artefact(orphan, 2026)
+    manifest_path.unlink()
+    check("D-233-2 discovery: a CSV without its manifest refuses",
+          "lack their CSV or manifest" in refusal(loader.discover_afl_api_artefacts, orphan))
+    stray = tmp_dir / "stray"
+    stray.mkdir()
+    write_afl_api_artefact(stray, 2026)
+    (stray / "season-votes-afl_api-2026.csv.bak").write_text("x", encoding="utf-8")
+    check("D-233-2 discovery: an unrecognised name under the prefix refuses",
+          "not a season-scoped AFL API Brownlow artefact name" in refusal(
+              loader.discover_afl_api_artefacts, stray))
+
+    # The test seams cannot reach a database.
+    import contextlib
+    import io
+    captured = io.StringIO()
+    with contextlib.redirect_stdout(captured):
+        status = loader.main(["--afl-api-dir", str(one)])
+    check("D-233-2 CLI: --afl-api-dir without --validate-only refuses before any database contact",
+          status == 1 and "offline-validation only" in captured.getvalue())
+    captured = io.StringIO()
+    with contextlib.redirect_stdout(captured):
+        status = loader.main(["--validate-only", "--afl-api-dir", str(one),
+                              "--stat-availability", str(complete_2026)])
+    check("D-233-2 CLI: --validate-only reports the loaded artefact as JSON evidence",
+          status == 0 and json.loads(captured.getvalue())["afl_api_artefacts"][0]["season"] == 2026)
+
+
+# ---------------------------------------------------------------------------
 
 print()
 if failures:

@@ -50,6 +50,33 @@ Contract (§8.6)
    ``club_id`` left NULL as the legacy writer left it.
 6. Runs as ``afldb_import`` through ``AFLDB_IMPORT_DATABASE_URL`` only.
 
+Season-scoped AFL API artefacts (AFLDB-ISSUE-233 D-233-2)
+---------------------------------------------------------
+A completed season's totals may instead come from the AFL API Brownlow
+evidence, as ``data/brownlow/season-votes-afl_api-<season>.csv`` plus its own
+``season-votes-afl_api-<season>.manifest.json`` (both written by
+``build_brownlow_season_artefact_from_afl_api.py``). They are loaded BESIDE the
+master artefact and never merged into it:
+
+* discovered by exact filename, in ascending season order; any other file
+  carrying the ``season-votes-afl_api-`` prefix, or a CSV without its manifest
+  (or the reverse), refuses;
+* each verified against its OWN manifest (schema, ``source_key = afl_api``,
+  season, columns, coverage, ``csv_sha256`` and every measured count) and
+  parsed by the same strict ``load_artefact()`` as the master;
+* loaded only for a season the reviewed
+  ``data/reference/stat-availability.json`` marks ``complete`` for
+  ``brownlow_season_total``; an artefact for any other season refuses (an
+  in-progress season never reads as decided);
+* a season present in BOTH the master and an AFL API artefact refuses: there
+  is no implicit precedence;
+* written in the same transaction as the master rows, with
+  ``source_id = afl_api`` and their own import batch, so their provenance stays
+  distinct from the AFL Tables-sourced master rows.
+
+With no such file present, nothing above runs and the load is exactly the
+master-only load it always was.
+
 Rerunnable: an identical rerun yields identical rows and counts.
 """
 
@@ -63,6 +90,7 @@ import re
 import sys
 import time
 import unicodedata
+from contextlib import nullcontext
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Sequence
@@ -123,6 +151,15 @@ PROFILE_URL = re.compile(r"^players/[A-Z]/[^/]+\.html$")
 SMALLINT_MAX = 32767
 
 MANIFEST_SCHEMA_VERSION = 1
+
+# AFLDB-ISSUE-233 D-233-2: the season-scoped AFL API artefacts loaded beside the master.
+# The filename contract is build_brownlow_season_artefact_from_afl_api.default_out_paths().
+AVAILABILITY_PATH = REPO_ROOT / "data" / "reference" / "stat-availability.json"
+AFL_API_SOURCE_KEY = "afl_api"
+AFL_API_PREFIX = "season-votes-afl_api-"
+AFL_API_CSV_NAME = re.compile(r"^season-votes-afl_api-([0-9]{4})\.csv$")
+AFL_API_MANIFEST_NAME = re.compile(r"^season-votes-afl_api-([0-9]{4})\.manifest\.json$")
+AFL_API_MANIFEST_SCHEMA_VERSION = 2
 
 
 class BrownlowSeasonSourceError(ValueError):
@@ -433,10 +470,196 @@ def expected_seasons(manifest: dict) -> set[int]:
     return _seasons_from_ranges(coverage)
 
 
+@dataclass(frozen=True)
+class AflApiSeasonArtefact:
+    """One season-scoped AFL API artefact, verified against its own manifest."""
+    season: int
+    csv_path: Path
+    manifest_path: Path
+    rows: tuple[SeasonVoteRow, ...]
+    manifest: dict
+    csv_sha256: str
+    manifest_sha256: str
+
+
+def discover_afl_api_artefacts(directory: str | Path = DATA_DIR) -> list[tuple[int, Path, Path]]:
+    """``(season, csv, manifest)`` for every season-scoped AFL API artefact, by season.
+
+    Exact filenames only. Any other name carrying the prefix, or half of a pair, refuses
+    rather than being skipped: a file an operator meant to load must never be ignored.
+    """
+    directory = Path(directory)
+    csvs: dict[int, Path] = {}
+    manifests: dict[int, Path] = {}
+    try:
+        names = sorted(entry.name for entry in directory.iterdir()
+                       if entry.name.startswith(AFL_API_PREFIX))
+    except OSError as exc:
+        raise BrownlowSeasonSourceError(f"cannot list {directory}: {exc}") from exc
+    for name in names:
+        csv_match = AFL_API_CSV_NAME.fullmatch(name)
+        manifest_match = AFL_API_MANIFEST_NAME.fullmatch(name)
+        if csv_match:
+            csvs[int(csv_match.group(1))] = directory / name
+        elif manifest_match:
+            manifests[int(manifest_match.group(1))] = directory / name
+        else:
+            raise BrownlowSeasonSourceError(
+                f"{name}: not a season-scoped AFL API Brownlow artefact name "
+                f"({AFL_API_PREFIX}<season>.csv / {AFL_API_PREFIX}<season>.manifest.json)")
+    unpaired = sorted(set(csvs) ^ set(manifests))
+    if unpaired:
+        raise BrownlowSeasonSourceError(
+            f"season-scoped AFL API artefact(s) for {unpaired} lack their CSV or manifest; "
+            "each season needs both")
+    return [(season, csvs[season], manifests[season]) for season in sorted(csvs)]
+
+
+def load_reviewed_complete_seasons(path: str | Path = AVAILABILITY_PATH,
+                                   stat_key: str = STAT_KEY) -> set[int]:
+    """The seasons the reviewed availability document marks ``complete`` for ``stat_key``."""
+    try:
+        with Path(path).open("r", encoding="utf-8") as handle:
+            document = json.load(handle)
+    except (OSError, UnicodeError, ValueError) as exc:
+        raise BrownlowSeasonSourceError(f"cannot read {path}: {exc}") from exc
+    if not isinstance(document, dict) or document.get("status") != "READY":
+        raise BrownlowSeasonSourceError(f"{Path(path).name} is not a READY stat-availability document")
+    ranges = document.get("coverage_ranges")
+    if not isinstance(ranges, list):
+        raise BrownlowSeasonSourceError(f"{Path(path).name}: coverage_ranges is not a list")
+    coverage: dict[int, str] = {}
+    for entry in ranges:
+        if not isinstance(entry, dict) or entry.get("stat_key") != stat_key:
+            continue
+        first, last = entry.get("first_season"), entry.get("last_season")
+        if not isinstance(first, int) or not isinstance(last, int) or last < first:
+            raise BrownlowSeasonSourceError(f"{Path(path).name}: malformed {stat_key} range {entry!r}")
+        for season in range(first, last + 1):
+            if season in coverage:
+                raise BrownlowSeasonSourceError(
+                    f"{Path(path).name}: {stat_key} declares season {season} twice")
+            coverage[season] = str(entry.get("coverage"))
+    return {season for season, value in coverage.items() if value == "complete"}
+
+
+def load_afl_api_artefact(season: int, csv_path: Path, manifest_path: Path,
+                          complete_seasons: set[int]) -> AflApiSeasonArtefact:
+    """Verify one season-scoped artefact against its own manifest and the reviewed coverage."""
+    name = Path(csv_path).name
+    try:
+        with Path(manifest_path).open("r", encoding="utf-8") as handle:
+            manifest = json.load(handle)
+    except (OSError, UnicodeError, ValueError) as exc:
+        raise BrownlowSeasonSourceError(f"cannot read {manifest_path}: {exc}") from exc
+    if not isinstance(manifest, dict):
+        raise BrownlowSeasonSourceError(f"{Path(manifest_path).name}: not a JSON object")
+    if manifest.get("schema_version") != AFL_API_MANIFEST_SCHEMA_VERSION:
+        raise BrownlowSeasonSourceError(
+            f"{Path(manifest_path).name}: schema_version {manifest.get('schema_version')!r} "
+            f"is not {AFL_API_MANIFEST_SCHEMA_VERSION}")
+    if manifest.get("source_key") != AFL_API_SOURCE_KEY:
+        raise BrownlowSeasonSourceError(
+            f"{Path(manifest_path).name}: source_key {manifest.get('source_key')!r} is not "
+            f"{AFL_API_SOURCE_KEY!r}")
+    if manifest.get("season") != season:
+        raise BrownlowSeasonSourceError(
+            f"{Path(manifest_path).name}: declares season {manifest.get('season')!r}, but its "
+            f"filename names {season}")
+    block = manifest.get("artefact")
+    if not isinstance(block, dict):
+        raise BrownlowSeasonSourceError(f"{Path(manifest_path).name}: missing 'artefact'")
+    if Path(str(block.get("file", ""))).name != name:
+        raise BrownlowSeasonSourceError(
+            f"{Path(manifest_path).name}: artefact.file {block.get('file')!r} does not name {name}")
+    if block.get("columns") != list(HEADER):
+        raise BrownlowSeasonSourceError(f"{Path(manifest_path).name}: artefact.columns is not the loader HEADER")
+    if block.get("season_coverage") != [[season, season]]:
+        raise BrownlowSeasonSourceError(
+            f"{Path(manifest_path).name}: artefact.season_coverage {block.get('season_coverage')!r} "
+            f"is not [[{season}, {season}]]")
+
+    csv_sha = sha256_file(Path(csv_path))
+    if block.get("csv_sha256") != csv_sha:
+        raise BrownlowSeasonSourceError(
+            f"manifest csv_sha256 {block.get('csv_sha256')!r} does not match {name} ({csv_sha})")
+    rows = load_artefact(csv_path)
+    off_season = sorted({row.season for row in rows if row.season != season})
+    if off_season:
+        raise BrownlowSeasonSourceError(f"{name}: carries rows for season(s) {off_season}")
+    measured = measure(rows)
+    for key in ("rows", "votes_total", "winners", "seasons", "players",
+                "first_season", "last_season", "null_counts"):
+        if block.get(key) != measured[key]:
+            raise BrownlowSeasonSourceError(
+                f"{Path(manifest_path).name}: artefact.{key} = {block.get(key)!r} but {name} "
+                f"measures {measured[key]!r}")
+    if measured["winners"] < 1:
+        raise BrownlowSeasonSourceError(f"{name}: season {season} has no winner row")
+    path_by_bootstrap: dict[int, str] = {}
+    for row in rows:
+        previous = path_by_bootstrap.setdefault(row.bootstrap_player_id, row.afltables_profile_url)
+        if previous != row.afltables_profile_url:
+            raise BrownlowSeasonSourceError(
+                f"{name}: bootstrap_player_id {row.bootstrap_player_id} carries two profile "
+                f"paths: {previous!r} and {row.afltables_profile_url!r}")
+
+    if season not in complete_seasons:
+        raise BrownlowSeasonSourceError(
+            f"{name}: season {season} is not 'complete' for {STAT_KEY} in the reviewed "
+            "stat-availability document. A season-scoped AFL API artefact loads only once the "
+            "rollover's reviewed availability marks its season complete; a pending season never "
+            "reads as decided")
+    return AflApiSeasonArtefact(
+        season=season, csv_path=Path(csv_path), manifest_path=Path(manifest_path),
+        rows=tuple(rows), manifest=manifest, csv_sha256=csv_sha,
+        manifest_sha256=sha256_file(Path(manifest_path)))
+
+
+def load_afl_api_artefacts(
+    master_seasons: set[int],
+    directory: str | Path = DATA_DIR,
+    availability_path: str | Path = AVAILABILITY_PATH,
+) -> list[AflApiSeasonArtefact]:
+    """Every season-scoped AFL API artefact, verified, in ascending season order.
+
+    Empty when none exists, and then nothing else is read: the master-only path is unchanged.
+    """
+    found = discover_afl_api_artefacts(directory)
+    if not found:
+        return []
+    duplicated = sorted({season for season, _, _ in found} & master_seasons)
+    if duplicated:
+        raise BrownlowSeasonSourceError(
+            f"season(s) {duplicated} appear in BOTH the master artefact and a season-scoped AFL "
+            "API artefact. There is no implicit precedence: remove one deliberately")
+    complete = load_reviewed_complete_seasons(availability_path)
+    return [load_afl_api_artefact(season, csv_path, manifest_path, complete)
+            for season, csv_path, manifest_path in found]
+
+
+def afl_api_summary(artefact: AflApiSeasonArtefact) -> dict:
+    """The evidence one loaded artefact contributes to the validation summary."""
+    snapshot = artefact.manifest.get("snapshot")
+    return {
+        "season": artefact.season,
+        "artefact": str(artefact.csv_path.resolve()),
+        "manifest": str(artefact.manifest_path.resolve()),
+        "csv_sha256": artefact.csv_sha256,
+        "manifest_sha256": artefact.manifest_sha256,
+        "snapshot_label": snapshot.get("label") if isinstance(snapshot, dict) else None,
+        "source_key": AFL_API_SOURCE_KEY,
+        **{key: artefact.manifest["artefact"][key]
+           for key in ("rows", "votes_total", "winners", "players")},
+    }
+
+
 def validate_offline(
     artefact_path: str | Path = ARTEFACT_PATH,
     manifest_path: str | Path = MANIFEST_PATH,
     identity_path: str | Path = IDENTITY_PATH,
+    afl_api_dir: str | Path = DATA_DIR,
+    availability_path: str | Path = AVAILABILITY_PATH,
 ) -> dict:
     """Everything provable without a database. Raises on the first violation."""
     manifest = load_manifest(manifest_path)
@@ -558,7 +781,11 @@ def validate_offline(
                 f"bootstrap_player_id {row.bootstrap_player_id} carries two profile "
                 f"paths: {previous!r} and {row.afltables_profile_url!r}")
 
+    # AFLDB-ISSUE-233 D-233-2: the season-scoped AFL API artefacts beside the master.
+    afl_api = load_afl_api_artefacts(declared, afl_api_dir, availability_path)
+
     return {
+        "afl_api_artefacts": [afl_api_summary(artefact) for artefact in afl_api],
         "ok": True,
         "artefact": str(Path(artefact_path).resolve()),
         "manifest": str(Path(manifest_path).resolve()),
@@ -681,49 +908,98 @@ class ProfileResolver:
         return next(iter(candidates)), None
 
 
-def load(pg, rep: Reporter, rows: Sequence[SeasonVoteRow], manifest: dict) -> dict:
-    """Resolve, refuse on any rejection, then truncate-and-copy in one transaction."""
-    declared = expected_seasons(manifest)
+def expected_after_load(manifest: dict, afl_api: Sequence[AflApiSeasonArtefact] = (),
+                        master_rows: Sequence[SeasonVoteRow] = ()) -> dict:
+    """What the table must measure after the load: the master plus every AFL API artefact.
+
+    The AFL API seasons are disjoint from the master's (load_afl_api_artefacts refuses an
+    overlap), so rows, votes, winners, seasons and NULL counts simply add. A player recurs
+    across seasons, so ``players`` is the distinct profile paths over every artefact's rows;
+    with no AFL API artefact it is the master manifest's own count, exactly as before.
+    """
+    master = manifest["artefact"]
+    expected = {key: master[key] for key in ("rows", "votes_total", "winners", "seasons", "players")}
+    expected["null_counts"] = {key: master["null_counts"][key]
+                               for key in ("eligible_rank", "polling_games")}
+    if afl_api:
+        expected["players"] = len({row.afltables_profile_url for row in master_rows}
+                                  | {row.afltables_profile_url
+                                     for artefact in afl_api for row in artefact.rows})
+    for artefact in afl_api:
+        block = artefact.manifest["artefact"]
+        for key in ("rows", "votes_total", "winners", "seasons"):
+            expected[key] += block[key]
+        for key in ("eligible_rank", "polling_games"):
+            expected["null_counts"][key] += block["null_counts"][key]
+    expected["afl_api_rows"] = sum(len(artefact.rows) for artefact in afl_api)
+    return expected
+
+
+def load(pg, rep: Reporter, rows: Sequence[SeasonVoteRow], manifest: dict,
+         afl_api: Sequence[AflApiSeasonArtefact] = ()) -> dict:
+    """Resolve, refuse on any rejection, then truncate-and-copy in one transaction.
+
+    ``afl_api`` (AFLDB-ISSUE-233 D-233-2) are the verified season-scoped AFL API artefacts,
+    written beside the master rows with their own source and import batch. Empty, the load
+    is exactly the master-only load.
+    """
+    declared = expected_seasons(manifest) | {artefact.season for artefact in afl_api}
     check_database_coverage(pg, declared)
 
     source_id = scalar(pg, "SELECT id FROM sources WHERE key = %s", (SOURCE_KEY,))
     if source_id is None:
         raise BrownlowSeasonLoadRefused(f"source {SOURCE_KEY!r} is not registered")
+    afl_api_source_id = None
+    if afl_api:
+        afl_api_source_id = scalar(pg, "SELECT id FROM sources WHERE key = %s", (AFL_API_SOURCE_KEY,))
+        if afl_api_source_id is None:
+            raise BrownlowSeasonLoadRefused(f"source {AFL_API_SOURCE_KEY!r} is not registered")
     round_rows_before = scalar(pg, "SELECT count(*) FROM brownlow_round_votes")
 
     resolver = ProfileResolver(pg)
     resolved: list[tuple] = []
     rejections: list[tuple[str, str]] = []
     seen_target: dict[tuple[int, int], str] = {}
-    with import_batch(pg, SOURCE_KEY, TOOL_NAME, TARGET_TABLE) as batch:
-        for row in rows:
-            batch.records_read += 1
-            player_id, reason = resolver.resolve(row.afltables_profile_url)
-            if player_id is None:
-                batch.reject(row.source_record_id, reason,
-                             {"season": row.season, "afltables_profile_url": row.afltables_profile_url})
-                rejections.append((row.source_record_id, reason))
-                continue
-            key = (row.season, player_id)
-            if key in seen_target:
-                reason = (f"two profile paths resolve to player {player_id} in "
-                          f"{row.season}: {seen_target[key]!r} and {row.afltables_profile_url!r}")
-                batch.reject(row.source_record_id, reason, {"season": row.season})
-                rejections.append((row.source_record_id, reason))
-                continue
-            seen_target[key] = row.afltables_profile_url
-            resolved.append((
-                row.season, player_id, row.votes, row.vote_rank, row.eligible_rank,
-                row.is_ineligible, row.is_winner, row.games, row.three_vote_games,
-                row.two_vote_games, row.one_vote_games, row.polling_games,
-                row.link_status_value, source_id, row.source_record_id, batch.id,
-            ))
+    total_rows = len(rows) + sum(len(artefact.rows) for artefact in afl_api)
+    api_context = (import_batch(pg, AFL_API_SOURCE_KEY, TOOL_NAME, TARGET_TABLE,
+                                notes="AFLDB-ISSUE-233 D-233-2 season-scoped AFL API artefacts: "
+                                      + ", ".join(artefact.csv_path.name for artefact in afl_api))
+                   if afl_api else nullcontext())
+    with import_batch(pg, SOURCE_KEY, TOOL_NAME, TARGET_TABLE) as batch, api_context as api_batch:
+        origins = [(rows, batch, source_id)]
+        if afl_api:
+            origins.append(([row for artefact in afl_api for row in artefact.rows],
+                            api_batch, afl_api_source_id))
+        for origin_rows, origin_batch, origin_source_id in origins:
+            for row in origin_rows:
+                origin_batch.records_read += 1
+                player_id, reason = resolver.resolve(row.afltables_profile_url)
+                if player_id is None:
+                    origin_batch.reject(row.source_record_id, reason,
+                                        {"season": row.season,
+                                         "afltables_profile_url": row.afltables_profile_url})
+                    rejections.append((row.source_record_id, reason))
+                    continue
+                key = (row.season, player_id)
+                if key in seen_target:
+                    reason = (f"two profile paths resolve to player {player_id} in "
+                              f"{row.season}: {seen_target[key]!r} and {row.afltables_profile_url!r}")
+                    origin_batch.reject(row.source_record_id, reason, {"season": row.season})
+                    rejections.append((row.source_record_id, reason))
+                    continue
+                seen_target[key] = row.afltables_profile_url
+                resolved.append((
+                    row.season, player_id, row.votes, row.vote_rank, row.eligible_rank,
+                    row.is_ineligible, row.is_winner, row.games, row.three_vote_games,
+                    row.two_vote_games, row.one_vote_games, row.polling_games,
+                    row.link_status_value, origin_source_id, row.source_record_id, origin_batch.id,
+                ))
 
         if rejections:
             for record, reason in rejections[:20]:
                 rep.warn(f"rejected {record}: {reason}")
             raise BrownlowSeasonLoadRefused(
-                f"{len(rejections)} of {len(rows)} artefact rows did not resolve to exactly "
+                f"{len(rejections)} of {total_rows} artefact rows did not resolve to exactly "
                 "one canonical player; the load is accepted only at zero rejections, so "
                 "nothing was written (rejections are recorded in import_rejections)")
 
@@ -740,12 +1016,16 @@ def load(pg, rep: Reporter, rows: Sequence[SeasonVoteRow], manifest: dict) -> di
              "is_ineligible", "is_winner", "games", "three_vote_games",
              "two_vote_games", "one_vote_games", "polling_games",
              "link_status_value", "source_id", "source_record_id", "import_batch_id"],
-            resolved, batch,
+            resolved, None if afl_api else batch,
         )
+        if afl_api:
+            # One COPY in global order; each batch is credited with its own rows.
+            batch.records_inserted += sum(1 for r in resolved if r[15] == batch.id)
+            api_batch.records_inserted += sum(1 for r in resolved if r[15] == api_batch.id)
 
         # Prove the write before it is committed: the table must now measure exactly
-        # what the manifest declares, and the round table must be untouched.
-        expected = manifest["artefact"]
+        # what the manifest(s) declare, and the round table must be untouched.
+        expected = expected_after_load(manifest, afl_api, rows)
         with pg.cursor() as cur:
             cur.execute(
                 """SELECT count(*), coalesce(sum(votes), 0),
@@ -768,6 +1048,20 @@ def load(pg, rep: Reporter, rows: Sequence[SeasonVoteRow], manifest: dict) -> di
                 or int(null_pg) != expected["null_counts"]["polling_games"]):
             raise BrownlowSeasonLoadRefused(
                 "post-write NULL counts differ from the manifest (NULL was coerced); rolled back")
+        if afl_api:
+            # The AFL API rows carry their own provenance, and only in their own seasons.
+            with pg.cursor() as cur:
+                cur.execute(
+                    """SELECT count(*), coalesce(array_agg(DISTINCT b.season ORDER BY b.season), '{}')
+                         FROM brownlow_season_votes b
+                        WHERE b.source_id = %s""",
+                    (afl_api_source_id,))
+                api_rows, api_seasons = cur.fetchone()
+            want_seasons = sorted(artefact.season for artefact in afl_api)
+            if int(api_rows) != expected["afl_api_rows"] or list(api_seasons) != want_seasons:
+                raise BrownlowSeasonLoadRefused(
+                    f"post-write afl_api rows {int(api_rows)} in {list(api_seasons)} differ from "
+                    f"the artefacts' {expected['afl_api_rows']} in {want_seasons}; rolled back")
         round_rows_after = scalar(pg, "SELECT count(*) FROM brownlow_round_votes")
         if round_rows_after != round_rows_before:
             raise BrownlowSeasonLoadRefused(
@@ -780,8 +1074,14 @@ def load(pg, rep: Reporter, rows: Sequence[SeasonVoteRow], manifest: dict) -> di
                f"({actual['votes_total']:,} votes, {actual['winners']} winners, "
                f"{actual['seasons']} seasons, {actual['players']} players)")
     rep.result("brownlow_round_votes", int(round_rows_after), "(untouched)")
-    return {**actual, "batch_id": batch.id, "round_rows": int(round_rows_after),
-            "rejections": 0}
+    result = {**actual, "batch_id": batch.id, "round_rows": int(round_rows_after),
+              "rejections": 0}
+    if afl_api:
+        rep.result("  of which afl_api", expected["afl_api_rows"],
+                   f"(seasons {', '.join(str(a.season) for a in afl_api)}; batch {api_batch.id})")
+        result.update({"afl_api_rows": expected["afl_api_rows"], "afl_api_batch_id": api_batch.id,
+                       "afl_api_seasons": [artefact.season for artefact in afl_api]})
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -798,10 +1098,26 @@ def main(argv: Sequence[str] | None = None) -> int:
                         help="validate the artefact, manifest and adjudication file offline "
                              "and print a JSON summary; no database contact")
     parser.add_argument("--quiet", action="store_true")
+    # AFLDB-ISSUE-233 D-233-2: test seams for the season-scoped AFL API discovery. Like the
+    # fitzRoy importer's document overrides they are offline-validation only: a run that can
+    # reach a database always reads the tracked directory and the tracked availability.
+    parser.add_argument("--afl-api-dir", type=Path, default=None,
+                        help="directory searched for season-votes-afl_api-<season>.csv "
+                             "(default data/brownlow; --validate-only only)")
+    parser.add_argument("--stat-availability", type=Path, default=None,
+                        help="reviewed stat-availability document (default "
+                             "data/reference/stat-availability.json; --validate-only only)")
     args = parser.parse_args(argv)
+    if (args.afl_api_dir is not None or args.stat_availability is not None) and not args.validate_only:
+        print(json.dumps({"ok": False, "error": "--afl-api-dir / --stat-availability are "
+                          "offline-validation only: pass --validate-only"}, sort_keys=True))
+        return 1
+    afl_api_dir = args.afl_api_dir if args.afl_api_dir is not None else DATA_DIR
+    availability = args.stat_availability if args.stat_availability is not None else AVAILABILITY_PATH
 
     try:
-        summary = validate_offline(args.artefact, args.manifest, args.identity)
+        summary = validate_offline(args.artefact, args.manifest, args.identity,
+                                   afl_api_dir, availability)
     except BrownlowSeasonSourceError as exc:
         print(json.dumps({"ok": False, "artefact": str(Path(args.artefact).resolve()),
                           "error": str(exc)}, sort_keys=True))
@@ -815,6 +1131,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     rep.step(f"artefact      : {args.artefact} (sha256 {summary['csv_sha256'][:16]}…)")
     rep.step(f"manifest      : {summary['rows']:,} rows, {summary['votes_total']:,} votes, "
              f"{summary['winners']} winners, {summary['seasons']} seasons")
+    for entry in summary["afl_api_artefacts"]:
+        rep.step(f"afl_api       : {Path(entry['artefact']).name} (season {entry['season']}, "
+                 f"{entry['rows']:,} rows, sha256 {entry['csv_sha256'][:16]}…)")
     dsn = require_env("AFLDB_IMPORT_DATABASE_URL")
     rep.step(f"target        : {safe_dsn(dsn)}")
     started = time.time()
@@ -822,8 +1141,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         rows = load_artefact(args.artefact)
         manifest = load_manifest(args.manifest)
-        load(pg, rep, rows, manifest)
-    except BrownlowSeasonLoadRefused as exc:
+        afl_api = load_afl_api_artefacts(expected_seasons(manifest), afl_api_dir, availability)
+        load(pg, rep, rows, manifest, afl_api)
+    except (BrownlowSeasonLoadRefused, BrownlowSeasonSourceError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
     finally:
