@@ -228,7 +228,6 @@ import {
 } from '../tools/db/promotion-convergence-rehearsal';
 import {
   AFL_API_ADMIN_MATCH_METHOD,
-  CORRECTED_PROMOTION_REHEARSAL_REQUIRED,
   CORRECTED_PROMOTION_REQUIRES_FREEZE,
   AFL_API_G2_REFUSING_OUTCOMES,
   AFL_API_REBUILD_MARKER_FORMAT,
@@ -3970,7 +3969,7 @@ describe('AFLDB-ISSUE-237 L4 hardening — promotion afl_api gates (DB-free)', (
     expect(netCorrectedEntries(rows)).toEqual([{ externalId: 'CD_I2', adjudicationId: 2 }]);
   });
 
-  it('S6-D2/S6-D3 — assertCorrectedPromotionAllowed: empty set never blocks; DEV needs a freeze; PROD is refused (temporary)', () => {
+  it('S6-D2 — assertCorrectedPromotionAllowed: empty set never blocks; a corrected set needs a freeze record under DEV and PROD alike (the temporary S6-D3 PROD refusal is retired)', () => {
     const base = { correctedCount: 0, freezeRecordSupplied: false, role: 'target afldb_dev' };
     for (const phase of ['pre-cutover', 'restored', 'candidate', 'production'] as const) {
       // zero-corrected: DEV without a freeze record behaves exactly as before, PROD is not this gate's business
@@ -3982,9 +3981,11 @@ describe('AFLDB-ISSUE-237 L4 hardening — promotion afl_api gates (DB-free)', (
       // ... and with a valid freeze record proceeds to the ISSUE-238 checks
       expect(() => assertCorrectedPromotionAllowed({ ...base, correctedCount: 2, freezeRecordSupplied: true, environment: 'dev', phase }))
         .not.toThrow();
-      // PROD is refused by the temporary rehearsal gate even WITH the freeze record (the gate is not a freeze gate)
+      // PROD is bound exactly like DEV: refused without a freeze record, allowed with one
+      expect(() => assertCorrectedPromotionAllowed({ ...base, correctedCount: 1, environment: 'prod', phase }))
+        .toThrow(new RegExp(`^${CORRECTED_PROMOTION_REQUIRES_FREEZE}: --phase ${phase} refused: target afldb_dev carries 1 net-corrected`));
       expect(() => assertCorrectedPromotionAllowed({ ...base, correctedCount: 1, freezeRecordSupplied: true, environment: 'prod', phase }))
-        .toThrow(new RegExp(`^${CORRECTED_PROMOTION_REHEARSAL_REQUIRED}: --phase ${phase} under --environment prod refused: .*TEMPORARY.*Slice 10/11`));
+        .not.toThrow();
     }
     expect(() => assertCorrectedPromotionAllowed({ ...base, correctedCount: 1, environment: 'dev', phase: 'restored' }))
       .toThrow(PromotionRefused);
@@ -4219,6 +4220,42 @@ describe('AFLDB-ISSUE-237 L4 hardening — promotion afl_api gates (DB-free)', (
     }
     // an empty set bound to an empty ledger still refuses a promoted DB that now holds a decision
     expect(aflApiSupersedeBindingProblems(empty, actual).map((p) => p.kind)).toContain('ledger_state_mismatch');
+  });
+
+  it('S6-D3 retired — no refusal text mentions the rehearsal gate, and the permanent artefact/freeze protections still refuse', async () => {
+    const mod = await import('../src/lib/acquisition/afl-api-adjudication');
+    expect('CORRECTED_PROMOTION_REHEARSAL_REQUIRED' in mod).toBe(false);
+    const messages: string[] = [];
+    for (const environment of ['dev', 'prod'] as const) {
+      for (const phase of ['pre-cutover', 'restored', 'candidate', 'production'] as const) {
+        for (const freezeRecordSupplied of [false, true]) {
+          try { assertCorrectedPromotionAllowed({ environment, phase, correctedCount: 2, freezeRecordSupplied, role: 'target afldb_x' }); } catch (e) { messages.push((e as Error).message); }
+        }
+      }
+    }
+    expect(messages).toHaveLength(8);                                   // exactly the no-freeze refusals; with a freeze record nothing refuses
+    for (const m of messages) { expect(m).toContain(CORRECTED_PROMOTION_REQUIRES_FREEZE); expect(m).not.toMatch(/REHEARSAL|TEMPORARY|Slice 10\/11/); }
+
+    // stale / tampered / mismatched artefacts and the F0 contract are untouched by the removal
+    const base = {
+      environment: 'prod' as const, candidateDatabase: 'afldb_prod_candidate_20261001-000000', targetDatabase: 'afldb_prod',
+      candidateImporterRowCount: 2, candidateImporterSha256: 'c'.repeat(64), targetLedgerRowCount: 1, targetLedgerSha256: 'd'.repeat(64),
+      targetCorrectedLedgerRowCount: 0, targetCorrectedLedgerSha256: aflApiCorrectedLedgerStateSha256([]).sha256,
+      correctedReplays: [] as AflApiCorrectedReplayEntry[], predictedPostReplayImporterRowCount: 2,
+      predictedPostReplayImporterSha256: 'c'.repeat(64), predictedPostReplayIdentitySha256: 'a'.repeat(64),
+    };
+    const pending = [{ externalId: 'CD_I2', adjudicationId: 2, playerIdentity: 'players/X/CD_I2.html', d15Action: 'insert' as const }];
+    const file = buildAflApiSupersedeFile({ ...base, pendingD15Providers: pending, expectedSupersedes: [] });
+    const text = JSON.stringify(file);
+    const mutate = (f: (o: Record<string, unknown>) => void) => { const o = JSON.parse(text) as Record<string, unknown>; f(o); return JSON.stringify(o); };
+    expect(() => parseAflApiSupersedeFile(mutate((o) => { o.version = 3; }))).toThrow(/stale/);
+    expect(() => parseAflApiSupersedeFile(mutate((o) => { o.pendingD15Providers = []; }))).toThrow(/tampered/);
+    expect(() => parseAflApiSupersedeFile(mutate((o) => { (o.pendingD15Providers as Record<string, unknown>[])[0].adjudicationId = 9; }))).toThrow(/tampered/);
+    expect(aflApiSupersedeBindingProblems(file, {
+      environment: 'prod', targetDatabase: 'afldb_prod', candidateDatabase: base.candidateDatabase,
+      importer: { rowCount: 2, sha256: 'c'.repeat(64) }, ledger: { rowCount: 1, sha256: 'f'.repeat(64) },
+    }).map((p) => p.kind)).toContain('ledger_state_mismatch');
+    expect(freezeDigestTables().map((t) => t.key)).toEqual(expect.arrayContaining(['public.afl_api_identity_adjudications', 'public.external_identities']));
   });
 
   describe('AFLDB-ISSUE-238 §9.1 — the v3 supersede artefact, post-replay predictions (DB-free)', () => {

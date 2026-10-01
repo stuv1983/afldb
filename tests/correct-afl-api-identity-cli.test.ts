@@ -19,7 +19,6 @@ import { afterAll, describe, expect, it } from 'vitest';
 import {
   AFL_API_ADMIN_MATCH_METHOD,
   AFL_API_PLAYER_REFERENCE_MANIFEST,
-  CORRECTED_PROMOTION_REHEARSAL_REQUIRED,
   CORRECTED_PROMOTION_REQUIRES_FREEZE,
   aflApiIdentityStateSha256,
   aflApiImporterStateSha256,
@@ -2382,22 +2381,31 @@ describe('Slice 6 M3a: REPLAY guards, role model and batch contract (§8.7, §8.
       expect(guards({ environment: 'prod' }).join('|')).toMatch(/does not match --environment 'prod'/);
     });
 
-    it('S6-D3: prod + non-empty correctedReplays is CORRECTED_PROMOTION_REHEARSAL_REQUIRED; prod with none, and dev with some, are not', () => {
-      const prod = guards({ environment: 'prod', artefact: artefact({ environment: 'prod' }) });
-      expect(prod.join('|')).toContain(CORRECTED_PROMOTION_REHEARSAL_REQUIRED);
+    it('S6-D3 is retired: a valid prod artefact with corrected replays passes the guards, and every permanent guard still refuses prod', async () => {
+      const adjudication = await import('../src/lib/acquisition/afl-api-adjudication');
+      expect('CORRECTED_PROMOTION_REHEARSAL_REQUIRED' in adjudication).toBe(false);
+      const prod = artefact({ environment: 'prod' });
+      expect(prod.correctedReplays.length).toBeGreaterThan(0);
+      expect(guards({ environment: 'prod', artefact: prod })).toEqual([]);
       expect(() => assertReplayPromotionGuards({
-        environment: 'prod', expectDatabase: CANDIDATE, expectRole: 'afldb_owner', artefact: artefact({ environment: 'prod' }),
-      })).toThrow(CORRECTED_PROMOTION_REHEARSAL_REQUIRED);
+        environment: 'prod', expectDatabase: CANDIDATE, expectRole: 'afldb_owner', artefact: prod,
+      })).not.toThrow();
+      // the permanent guards are unchanged under prod
+      expect(guards({ environment: 'prod', artefact: prod, expectRole: 'afldb_import' }).join('|')).toMatch(/not 'afldb_owner'/);
+      expect(guards({ environment: 'prod', artefact: artefact({ environment: 'prod', candidateDatabase: 'afldb_prod' }), expectDatabase: 'afldb_prod' }).join('|')).toMatch(/is a live database/);
+      expect(guards({ environment: 'prod', artefact: prod, expectDatabase: 'afldb_prod_pre_rebuild_20260929' }).join('|')).toMatch(/pre_rebuild/);
+      expect(guards({ environment: 'dev', artefact: prod }).join('|')).toMatch(/does not match --environment 'dev'/);
+      // zero-corrected prod is unchanged, and the freeze requirement is the permanent S6-D2 one
       expect(guards({ environment: 'prod', artefact: artefact({ environment: 'prod', correctedReplays: [] }) })).toEqual([]);
       expect(CORRECTED_PROMOTION_REQUIRES_FREEZE).toBe('CORRECTED_PROMOTION_REQUIRES_FREEZE');
     });
 
-    it('S6-D3 and every guard fire BEFORE any SQL: a refused REPLAY issues no statement at all', async () => {
+    it('every guard fires BEFORE any SQL, prod included: a refused REPLAY issues no statement at all', async () => {
       const log: string[] = [];
       const file = { ...artefact({ environment: 'prod' }) } as unknown as AflApiSupersedeFile;
       await expect(runReplayPromotion(fakeTx(CANDIDATE, 'afldb_owner', log), {
-        dryRun: false, supersedeIn: 'e.json', environment: 'prod', expectDatabase: CANDIDATE, expectRole: 'afldb_owner',
-      }, file)).rejects.toThrow(CORRECTED_PROMOTION_REHEARSAL_REQUIRED);
+        dryRun: false, supersedeIn: 'e.json', environment: 'prod', expectDatabase: 'afldb_prod', expectRole: 'afldb_owner',
+      }, file)).rejects.toThrow(/is a live database/);
       expect(log).toEqual([]);
     });
   });

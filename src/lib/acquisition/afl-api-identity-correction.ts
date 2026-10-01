@@ -1176,7 +1176,7 @@ export function artefactRecurrenceRisk(input: {
     `bridge artefacts (data/reference/afl-api-player-bridge-*.json, the S5b name-bridge) are not rewritten and may still map ${input.providerId} to P`,
     'live target: the loader cannot re-apply that mapping (first trusted writer wins, migration 104); a replay records an ISSUE-240 contradiction finding instead',
     `season-total Brownlow artefacts (§4.E): fail-closed by §5.10 -- ${seasons}`,
-    'promotion source lineage (afldb_test) and its promotion candidate: governed by the corrected-promotion replay (§9); CORRECTED_PROMOTION_REHEARSAL_REQUIRED remains',
+    'promotion source lineage (afldb_test) and its promotion candidate: governed by the corrected-promotion replay (§9) and the freeze requirement (S6-D2)',
     'correction-aware bridge and artefact handling is deferred (O-3)',
   ];
 }

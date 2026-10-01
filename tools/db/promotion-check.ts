@@ -97,7 +97,6 @@ import {
   AFL_API_G2_REFUSING_OUTCOMES,
   AFL_API_REBUILD_MARKER_FORMAT,
   AflApiPromotionFileRefused,
-  CORRECTED_PROMOTION_REHEARSAL_REQUIRED,
   CORRECTED_PROMOTION_REQUIRES_FREEZE,
   aflApiDevRegenerationBindingProblems,
   aflApiCorrectedLedgerStateSha256,
@@ -1915,31 +1914,24 @@ export function netCorrectedEntries(
 }
 
 /**
- * AFLDB-ISSUE-238 S6-D2/S6-D3: refuse, before any other ISSUE-238 work of the phase and before
+ * AFLDB-ISSUE-238 S6-D2: refuse, before any other ISSUE-238 work of the phase and before
  * any file is written, a promotion that carries corrected identities without what it needs.
  *
- * - S6-D3 (TEMPORARY until the Slice 10/11 corrected-promotion rehearsal is accepted): `--environment
- *   prod` with a non-empty corrected set is refused (`CORRECTED_PROMOTION_REHEARSAL_REQUIRED`). DEV
- *   is never blocked by it. Evaluated first, so PROD learns at `pre-cutover`.
  * - S6-D2: a non-empty corrected set REQUIRES `--freeze-record` under BOTH environments
  *   (`CORRECTED_PROMOTION_REQUIRES_FREEZE`): ISSUE-250's F0/candidate/post-swap digest covers every
  *   non-rebuilt table, `afl_api_identity_adjudications` included, and so binds the corrected set
  *   across the swap. An empty set changes nothing: DEV's freeze stays opt-in.
+ * - The temporary S6-D3 PROD refusal that used to precede this was retired when the DEV rehearsal and
+ *   Item 12 passed (AFLDB-ISSUE-238, 2026-10-01); every permanent check still applies to PROD.
  *
  * Throws `PromotionRefused` (nothing else has run or been written by then).
  */
 export function assertCorrectedPromotionAllowed(input: {
   environment: Environment; phase: Phase; correctedCount: number; freezeRecordSupplied: boolean; role: string;
 }): void {
-  const { environment, phase, correctedCount, freezeRecordSupplied, role } = input;
+  const { phase, correctedCount, freezeRecordSupplied, role } = input;
   if (correctedCount <= 0) return;
   const what = `${role} carries ${correctedCount} net-corrected afl_api identity ledger entr${correctedCount === 1 ? 'y' : 'ies'}`;
-  if (environment === 'prod') {
-    throw new PromotionRefused(
-      `${CORRECTED_PROMOTION_REHEARSAL_REQUIRED}: --phase ${phase} under --environment prod refused: ${what}. `
-      + 'This gate is TEMPORARY (AFLDB-ISSUE-238 S6-D3): it stays until the Slice 10/11 corrected-promotion '
-      + 'rehearsal is accepted. DEV is not blocked by it.');
-  }
   if (!freezeRecordSupplied) {
     throw new PromotionRefused(
       `${CORRECTED_PROMOTION_REQUIRES_FREEZE}: --phase ${phase} refused: ${what}, so a valid `
@@ -3814,7 +3806,7 @@ async function main(): Promise<number> {
         { informational: true });
     }
 
-    // AFLDB-ISSUE-238 S6-D2/S6-D3, before any other ISSUE-238 work of the phase (pre-cutover and
+    // AFLDB-ISSUE-238 S6-D2, before any other ISSUE-238 work of the phase (pre-cutover and
     // restored evaluate theirs in their own blocks below, where their database is open):
     // - candidate: the reinstated candidate ledger's net-corrected count, or the supplied E_promotion
     //   artefact's correctedReplays when larger;
@@ -3857,8 +3849,8 @@ async function main(): Promise<number> {
     }
     let aflApiTargetCensus: Snapshot['aflApiTargetCensus'];
     if (phase === 'pre-cutover') {
-      // AFLDB-ISSUE-238 S6-D3 then S6-D2: the live target's net-corrected set decides, first, whether
-      // this promotion may proceed at all (PROD learns here, before a candidate is restored).
+      // AFLDB-ISSUE-238 S6-D2: the live target's net-corrected set decides, first, whether this
+      // promotion may proceed at all (a missing freeze record is learned here, before a candidate is restored).
       const targetCorrected = netCorrectedEntries(await readAflApiLedgerRows(conn.q));
       assertCorrectedPromotionAllowed({
         environment: opts.environment, phase, freezeRecordSupplied: Boolean(freezeRecord),
@@ -3883,7 +3875,7 @@ async function main(): Promise<number> {
       old = await openReadOnly(withDatabase(baseDsn, opts.oldDatabase!), 'old');
       const oldName = String((await old.q('SELECT current_database() AS d'))[0]?.d);
       if (oldName !== opts.oldDatabase) throw new PromotionRefused(`Old database connection landed on '${oldName}', not '${opts.oldDatabase}'.`);
-      // AFLDB-ISSUE-238 S6-D3/S6-D2: the target (old) ledger's net-corrected set, before any other
+      // AFLDB-ISSUE-238 S6-D2: the target (old) ledger's net-corrected set, before any other
       // ISSUE-238 work of this phase (G2/G3, the supersede artefact).
       assertCorrectedPromotionAllowed({
         environment: opts.environment, phase, freezeRecordSupplied: Boolean(freezeRecord),

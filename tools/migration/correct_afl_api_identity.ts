@@ -11,7 +11,7 @@
  *     npx tsx tools/migration/correct_afl_api_identity.ts --apply         (same arguments)
  *       --expect-fingerprint <sha256>
  *
- * Implements runbook (`issues/open/AFLDB-ISSUE-238.md`) §8.2 (the ORIGINAL transaction), §8.7
+ * Implements runbook (`issues/closed/AFLDB-ISSUE-238.md`) §8.2 (the ORIGINAL transaction), §8.7
  * (the batch contract) and §8.8 (the role model) for §12 Slice 5 only:
  *
  *   - the CLI and its three modes;
@@ -82,7 +82,6 @@ import {
   AFL_API_ADMIN_MATCH_METHOD,
   AFL_API_PLAYER_REFERENCE_MANIFEST,
   AflApiPromotionFileRefused,
-  CORRECTED_PROMOTION_REHEARSAL_REQUIRED,
   aflApiIdentityStateSha256,
   aflApiImporterStateSha256,
   aflApiLedgerStateSha256,
@@ -4473,7 +4472,8 @@ export function isPreRebuildDatabaseName(name: string): boolean {
 /**
  * §8.8's guards as a pure function of the arguments and the artefact (the connected database and
  * role are proved separately by `proveSession`, which makes them equal `expectDatabase` and
- * `afldb_owner`). Includes the temporary S6-D3 gate. An empty list means every guard passed.
+ * `afldb_owner`). The temporary S6-D3 PROD refusal was retired with the DEV rehearsal (AFLDB-ISSUE-238,
+ * 2026-10-01); a prod replay is still bound to the freeze by the promotion checker. An empty list means every guard passed.
  */
 export function replayPromotionGuardProblems(input: {
   readonly environment: 'dev' | 'prod';
@@ -4499,9 +4499,6 @@ export function replayPromotionGuardProblems(input: {
   }
   if (isPreRebuildDatabaseName(expectDatabase)) {
     problems.push(`database '${expectDatabase}' is a pre_rebuild database`);
-  }
-  if (artefact.environment === 'prod' && artefact.correctedReplays.length > 0) {
-    problems.push(`${CORRECTED_PROMOTION_REHEARSAL_REQUIRED}: a prod promotion carrying ${artefact.correctedReplays.length} corrected replay(s) is refused until Slice 11 lifts this S6-D3 gate`);
   }
   return problems;
 }
@@ -4964,7 +4961,7 @@ class ReplayForcedRollback extends Error {
 export async function runReplayPromotionCli(argv: readonly string[]): Promise<number> {
   const args = parseReplayPromotionArgs(argv);
   const file = loadReplaySupersedeFile(args.supersedeIn);
-  // Every argument/artefact guard, S6-D3 included, is evaluated before any connection is opened.
+  // Every argument/artefact guard is evaluated before any connection is opened.
   assertReplayPromotionGuards({
     environment: args.environment, expectDatabase: args.expectDatabase, expectRole: args.expectRole, artefact: file,
   });

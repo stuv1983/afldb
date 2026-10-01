@@ -2553,8 +2553,8 @@ export const AFL_API_SUPERSEDE_FORMAT = 'afldb.afl_api_supersede_expected';
  */
 export const AFL_API_SUPERSEDE_VERSION = 4;
 
-// Temporary S6-D3 gates, owned by Slice 11 / the S6-D2 freeze binding: a prod promotion carrying corrected replays is refused until they are lifted.
-export const CORRECTED_PROMOTION_REHEARSAL_REQUIRED = 'CORRECTED_PROMOTION_REHEARSAL_REQUIRED';
+// S6-D2 (permanent): a promotion carrying corrected identities REQUIRES a freeze record under BOTH environments. The temporary S6-D3
+// PROD refusal that preceded it was retired when the DEV rehearsal and Item 12 passed (AFLDB-ISSUE-238, 2026-10-01).
 export const CORRECTED_PROMOTION_REQUIRES_FREEZE = 'CORRECTED_PROMOTION_REQUIRES_FREEZE';
 
 /** AFLDB-ISSUE-238 §9.1 candidate classes 1-3 (the CPC table) and the replay each predicts. */
