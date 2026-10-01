@@ -248,6 +248,7 @@ import {
   type AflApiIdentityStateRow,
   aflApiSupersedeBindingProblems,
   buildAflApiSupersedeFile,
+  deriveAflApiPendingD15,
   classifyAflApiG3,
   parseAflApiDevRegenerationClassification,
   parseAflApiSupersedeFile,
@@ -261,6 +262,7 @@ import {
   type AflApiContinuityContradiction,
   type AflApiCandidateIdentityRow,
   type AflApiPlayerRemapResult,
+  type AflApiPendingD15Entry,
   type AflApiSupersedeFile,
 } from '../src/lib/acquisition/afl-api-adjudication';
 import type { CpcResult } from '../src/lib/acquisition/afl-api-identity-correction';
@@ -4174,7 +4176,11 @@ describe('AFLDB-ISSUE-237 L4 hardening — promotion afl_api gates (DB-free)', (
       predictedPostReplayImporterRowCount: 2, predictedPostReplayImporterSha256: 'c'.repeat(64),
       predictedPostReplayIdentitySha256: 'a'.repeat(64),
     };
-    const file = buildAflApiSupersedeFile({ ...base, expectedSupersedes: ['CD_I2', 'CD_I1', 'CD_I2'] });
+    // v4: the pending-D15 `supersede` entries are E_promotion (each bound to its net ledger row and stable identity)
+    const pendingSupersedes = ['CD_I1', 'CD_I2'].map((externalId, i) => ({
+      externalId, adjudicationId: i + 1, playerIdentity: `players/X/${externalId}.html`, d15Action: 'supersede' as const,
+    }));
+    const file = buildAflApiSupersedeFile({ ...base, pendingD15Providers: pendingSupersedes, expectedSupersedes: ['CD_I2', 'CD_I1', 'CD_I2'] });
     expect(file.expectedSupersedes).toEqual(['CD_I1', 'CD_I2']);
     const text = JSON.stringify(file);
     expect(parseAflApiSupersedeFile(text)).toEqual(file);
@@ -4199,7 +4205,7 @@ describe('AFLDB-ISSUE-237 L4 hardening — promotion afl_api gates (DB-free)', (
     const actual = { environment: 'dev', targetDatabase: 'afldb_dev', candidateDatabase: CAND,
       importer: { rowCount: 2, sha256: 'c'.repeat(64) }, ledger: { rowCount: 1, sha256: 'd'.repeat(64) } };
     expect(aflApiSupersedeBindingProblems(file, actual)).toEqual([]);
-    const empty = buildAflApiSupersedeFile({ ...base, targetLedgerRowCount: 0, targetLedgerSha256: aflApiLedgerStateSha256([]), expectedSupersedes: [] });
+    const empty = buildAflApiSupersedeFile({ ...base, pendingD15Providers: [], targetLedgerRowCount: 0, targetLedgerSha256: aflApiLedgerStateSha256([]), expectedSupersedes: [] });
     expect(empty.expectedSupersedes).toEqual([]);
     expect(aflApiSupersedeBindingProblems(empty, { ...actual, ledger: { rowCount: 0, sha256: aflApiLedgerStateSha256([]) } })).toEqual([]);
     for (const [name, over, kind] of [
@@ -4245,6 +4251,7 @@ describe('AFLDB-ISSUE-237 L4 hardening — promotion afl_api gates (DB-free)', (
         candidateImporterRowCount: importerRows.length, candidateImporterSha256: aflApiImporterStateSha256(importerRows),
         targetLedgerRowCount: 5, targetLedgerSha256: hex('d'),
         expectedSupersedes: ['CD_I4'],
+        pendingD15Providers: [{ externalId: 'CD_I4', adjudicationId: 9, playerIdentity: 'players/R/Four.html', d15Action: 'supersede' }],
         targetCorrectedLedgerRowCount: replays.length, targetCorrectedLedgerSha256: hex('9'),
         correctedReplays: replays,
         predictedPostReplayImporterRowCount: post.rowCount, predictedPostReplayImporterSha256: post.sha256,
@@ -4275,13 +4282,40 @@ describe('AFLDB-ISSUE-237 L4 hardening — promotion afl_api gates (DB-free)', (
 
     it('round-trips v3, sorts correctedReplays by externalId, and derives the resolved count', () => {
       const file = v3();
-      expect(AFL_API_SUPERSEDE_VERSION).toBe(3);
-      expect(file.version).toBe(3);
+      expect(AFL_API_SUPERSEDE_VERSION).toBe(4);
+      expect(file.version).toBe(4);
       expect(file.correctedReplays.map((e) => e.externalId)).toEqual(['CD_I1', 'CD_I2', 'CD_I3']);
       expect(file.predictedPostReplayResolvedRowCount).toBe(3);
       expect(file.predictedPostReplayImporterRowCount).toBe(1);
       expect(parseAflApiSupersedeFile(JSON.stringify(file))).toEqual(file);
       expect(v3()).toEqual(file); // deterministic
+    });
+
+    it('v4 (stage-aware pre-swap contract): pendingD15Providers is required, bound, sorted, disjoint from C_promotion, and its supersede entries are E_promotion', () => {
+      const file = v3();
+      expect(file.pendingD15Providers).toEqual([{ externalId: 'CD_I4', adjudicationId: 9, playerIdentity: 'players/R/Four.html', d15Action: 'supersede' }]);
+      // 13: a stale v3 file (no pending binding) is refused by name; a missing key at v4 is an exact-key refusal
+      expect(() => parseAflApiSupersedeFile(forged((o) => { o.version = 3; delete o.pendingD15Providers; }))).toThrow(/stale supersede file: version 3 is not 4/);
+      refusedForged((o) => { delete o.pendingD15Providers; }, /unexpected field set/);
+      // 16: a tamper of the declaration is a payload-hash refusal
+      const tampered = JSON.parse(JSON.stringify(file)) as ForgedFile;
+      (tampered.pendingD15Providers as { playerIdentity: string }[])[0].playerIdentity = 'players/X/X.html';
+      expect(() => parseAflApiSupersedeFile(JSON.stringify(tampered))).toThrow(/tampered/);
+      // re-hashed forgeries: the field rules refuse
+      const four = { externalId: 'CD_I4', adjudicationId: 9, playerIdentity: 'players/R/Four.html', d15Action: 'supersede' };
+      const seven = { externalId: 'CD_I7', adjudicationId: 10, playerIdentity: 'players/S/Seven.html', d15Action: 'insert' };
+      refusedForged((o) => { o.pendingD15Providers = 'x'; }, /must be an array/);
+      refusedForged((o) => { o.pendingD15Providers = [seven, four]; }, /sorted by externalId/);
+      refusedForged((o) => { o.pendingD15Providers = [four, four]; }, /sorted by externalId and free of duplicates/);
+      refusedForged((o) => { o.pendingD15Providers = [{ ...four, d15Action: 'delete' }]; }, /d15Action must be insert or supersede/);
+      refusedForged((o) => { o.pendingD15Providers = [{ ...four, externalId: 'X' }]; }, /afl_api provider id/);
+      refusedForged((o) => { o.pendingD15Providers = [{ ...four, extra: 1 }]; }, /unexpected field set/);
+      refusedForged((o) => { o.pendingD15Providers = [{ ...seven, externalId: 'CD_I1' }, four]; }, /also in correctedReplays/);
+      refusedForged((o) => { o.pendingD15Providers = [{ ...four, d15Action: 'insert' }]; }, /supersede must equal expectedSupersedes exactly/);
+      refusedForged((o) => { o.pendingD15Providers = [four, { ...seven, externalId: 'CD_I8', d15Action: 'supersede' }]; }, /supersede must equal expectedSupersedes exactly/);
+      // an empty declaration is a valid (zero-linked) file only when E_promotion is empty too
+      expect(v3({ expectedSupersedes: [], pendingD15Providers: [] }).pendingD15Providers).toEqual([]);
+      expect(() => v3({ pendingD15Providers: [] })).toThrow(/supersede must equal expectedSupersedes exactly/);
     });
 
     it('refuses a tamper of each new field by payload hash', () => {
@@ -4371,9 +4405,9 @@ describe('AFLDB-ISSUE-237 L4 hardening — promotion afl_api gates (DB-free)', (
       expect(() => v3({}, [entry('CD_I1', 1), entry('CD_I1', 1)])).toThrow(/free of duplicates|appears twice/);
     });
 
-    it('zero-corrected: the artefact is still v3, correctedReplays is empty and predicted == pre-replay', () => {
+    it('zero-corrected: the artefact is still written (v4), correctedReplays is empty and predicted == pre-replay', () => {
       const file = v3({ targetCorrectedLedgerRowCount: 0, targetCorrectedLedgerSha256: aflApiCorrectedLedgerStateSha256([]).sha256 }, []);
-      expect(file.version).toBe(3);
+      expect(file.version).toBe(4);
       expect(file.correctedReplays).toEqual([]);
       expect(file.predictedPostReplayResolvedRowCount).toBe(0);
       expect(file.predictedPostReplayImporterRowCount).toBe(file.candidateImporterRowCount);
@@ -4461,6 +4495,27 @@ describe('AFLDB-ISSUE-237 L4 hardening — promotion afl_api gates (DB-free)', (
       const c = candidateAfterReinstate();
       return { database: 'afldb_dev', afl: c.afl, ids: c.ids, ledger: c.ledger, writes: [], ...over };
     };
+  it('AFLDB-ISSUE-238 v4 — post-swap D15 materialises EXACTLY the declared pending set: a declaration D15 cannot satisfy aborts before any write', async () => {
+    const { overlap } = await restored(candidateAtRestored(), devTarget());
+    const good = parseAflApiSupersedeFile(JSON.stringify(aflApiSupersedeFileFor(overlap, { environment: 'dev', ...NAMES })));
+    expect(good.pendingD15Providers).toMatchObject([{ externalId: 'CD_I1', d15Action: 'supersede' }]);
+    const expected: { environment: 'prod' | 'dev'; targetDatabase: string } = { environment: 'dev', targetDatabase: 'afldb_dev' };
+    const build = (pending: AflApiPendingD15Entry[]) => JSON.stringify(buildAflApiSupersedeFile({ ...good, pendingD15Providers: pending }));
+
+    // the exact declaration replays (and is what the writer derived)
+    const ok = promoted();
+    await replayAflApiAdjudicationsFromSupersedeFile(replayTx(ok), build([...good.pendingD15Providers]), expected);
+    expect(ok.writes).toEqual(['UPDATE']);
+
+    // 17: an extra declared provider D15 will not write (omitted by the plan) -> abort, nothing written
+    const extra: AflApiPendingD15Entry = { externalId: 'CD_I9', adjudicationId: 8, playerIdentity: good.pendingD15Providers[0].playerIdentity, d15Action: 'insert' };
+    const omitted = promoted();
+    await expect(replayAflApiAdjudicationsFromSupersedeFile(replayTx(omitted), build([...good.pendingD15Providers, extra]), expected))
+      .rejects.toThrow(/pending insert for CD_I9 is neither planned nor already materialised/);
+    expect(omitted.writes).toEqual([]);
+
+  });
+
   it('F-L4-4 — post-swap D15 replay: supersedes exactly the bound set, and refuses every unbound file before any write', async () => {
     const { overlap } = await restored(candidateAtRestored(), devTarget());
     const text = JSON.stringify(aflApiSupersedeFileFor(overlap, { environment: 'dev', ...NAMES }));
@@ -4471,7 +4526,7 @@ describe('AFLDB-ISSUE-237 L4 hardening — promotion afl_api gates (DB-free)', (
     expect(counts.supersedes).toEqual([{ externalId: 'CD_I1', playerId: 10 }]);
     expect(good.writes).toEqual(['UPDATE']);
     // AFLDB-ISSUE-238: a zero-corrected v3 file replays with exactly the ISSUE-237 result shape
-    expect(JSON.parse(text)).toMatchObject({ version: 3, correctedReplays: [] });
+    expect(JSON.parse(text)).toMatchObject({ version: 4, correctedReplays: [] });
     expect(counts).toEqual({ inserted: 0, noops: 0, stops: [], supersedes: [{ externalId: 'CD_I1', playerId: 10 }] });
 
     const refusals: [string, ReplayState, string, typeof expected][] = [
@@ -4525,6 +4580,10 @@ describe('AFLDB-ISSUE-237 L4 hardening — promotion afl_api gates (DB-free)', (
         candidateImporterRowCount: preRows.length, candidateImporterSha256: aflApiImporterStateSha256(preRows),
         targetLedgerRowCount: ledger.length, targetLedgerSha256: aflApiLedgerStateSha256(ledger),
         expectedSupersedes: ['CD_I1'],
+        pendingD15Providers: deriveAflApiPendingD15({
+          ledgerRows: ledger, ePromotion: new Set(['CD_I1']), cPromotion: new Set(replays.map((r) => r.externalId)),
+          candidateExternalIds: new Set(preRows.map((r) => r.externalId)),
+        }),
         targetCorrectedLedgerRowCount: Math.max(corrected.rowCount, replays.length),
         targetCorrectedLedgerSha256: corrected.sha256,
         correctedReplays: replays,
@@ -4917,7 +4976,7 @@ describe('AFLDB-ISSUE-237 L4 hardening — promotion afl_api gates (DB-free)', (
         providerProjections: async () => [],
       };
       const report = new Report();
-      await gateAflApiCorrectedReplayVerification(reader as never, inputs!.correctedReplays, report);
+      await gateAflApiCorrectedReplayVerification(reader as never, inputs!.correctedReplays, [], report);
       expect(report.results).toHaveLength(1);
       expect(report.results[0].verdict).toBe('FAIL');
       expect(report.results[0].gate).toContain('CRV');
@@ -4961,7 +5020,7 @@ describe('AFLDB-ISSUE-237 L4 hardening — promotion afl_api gates (DB-free)', (
       expect(main).toContain('publishRestoredAflApiFiles(opts, aflApiOverlap, report, aflApiCorrected)');
 
       // candidate: per-provider CRV on the read-only Q2 reader, only for a non-empty C_promotion; G2 gets C_promotion as CPC's set
-      expect(main).toMatch(/if \(boundSupersede!\.correctedReplays\.length > 0\) \{\s*await withCorrectionSatisfactionReader\(dsn,[^;]*gateAflApiCorrectedReplayVerification\(reader, boundSupersede!\.correctedReplays, report\)/);
+      expect(main).toMatch(/if \(boundSupersede!\.correctedReplays\.length > 0\) \{\s*await withCorrectionSatisfactionReader\(dsn,[^;]*gateAflApiCorrectedReplayVerification\(reader, boundSupersede!\.correctedReplays, boundSupersede!\.pendingD15Providers, report\)/);
       const crv = between('export async function gateAflApiCorrectedReplayVerification', 'export async function runAflApiDevRegenerationCensus');
       expect(crv).toContain('checkCorrectionSatisfaction(reader, {');
       expect(crv).toContain('currentBatchId: null');

@@ -113,6 +113,7 @@ import {
   aflApiSupersedeMismatch,
   buildAflApiDevRegenerationClassification,
   buildAflApiSupersedeFile,
+  deriveAflApiPendingD15,
   censusAflApiRows,
   checkAflApiIdentityInvariant,
   classifyAflApiDevRegenerationCensus,
@@ -141,6 +142,7 @@ import {
   type AflApiG3Row,
   type AflApiLedgerNetAction,
   type AflApiPlayerRemapResult,
+  type AflApiPendingD15Entry,
   type AflApiSupersedeFile,
 } from '../../src/lib/acquisition/afl-api-adjudication';
 import {
@@ -2141,6 +2143,8 @@ export type AflApiOverlapResult = {
   candidate: AflApiImporterView;
   target: AflApiImporterView;
   ledgerState: { rowCount: number; sha256: string };
+  /** The target's durable human ledger as G2 read it (AFLDB-ISSUE-238: the pending-D15 set is derived from it). */
+  ledgerRows: readonly AflApiAdjudicationLedgerRow[];
   targetRows: readonly AflApiG3Row[];
   candidateRows: readonly AflApiG3Row[];
   g3Grades: readonly AflApiG3Grade[];
@@ -2222,7 +2226,7 @@ export async function gateAflApiOverlap(
     ...ungraded.map((u) => `STOP ${u}: importer row whose player has no single forward stable identity; G3 cannot grade it`),
   ]);
 
-  return { ePromotion: g2.ePromotion, candidate, target, ledgerState: g2.ledgerState, targetRows, candidateRows, g3Grades };
+  return { ePromotion: g2.ePromotion, candidate, target, ledgerState: g2.ledgerState, ledgerRows: g2.ledgerRows, targetRows, candidateRows, g3Grades };
 }
 
 /**
@@ -2262,6 +2266,13 @@ export function aflApiSupersedeFileFor(
   // candidate (`--phase source`'s G1 and `--phase candidate`'s G1 refuse any anomaly) the census IS
   // the importer rows and the rows equal the previous importer-derived construction exactly.
   const preReplayIdentityRows = aflApiIdentityStateRowsFromCensus(overlap.candidate.census, overlap.candidate.identityByPlayerId);
+  // AFLDB-ISSUE-238 (v4): every net-linked non-corrected provider stays without a resolved row until D15 runs after the swap.
+  // Derived from the graded state (G2 passed before any file is written); the pre-swap stages are bound to exactly this set.
+  const pendingD15Providers = deriveAflApiPendingD15({
+    ledgerRows: overlap.ledgerRows, ePromotion: overlap.ePromotion,
+    cPromotion: new Set(correctedReplays.map((r) => r.externalId)),
+    candidateExternalIds: new Set(overlap.candidate.importerRows.map((r) => r.externalId)),
+  });
   const postImporter = predictAflApiPostReplayImporterState(preReplayRows, correctedReplays);
   const postIdentity = predictAflApiPostReplayIdentityState(preReplayIdentityRows, correctedReplays);
   return buildAflApiSupersedeFile({
@@ -2274,6 +2285,7 @@ export function aflApiSupersedeFileFor(
     correctedReplays,
     predictedPostReplayImporterRowCount: postImporter.rowCount, predictedPostReplayImporterSha256: postImporter.sha256,
     predictedPostReplayIdentitySha256: postIdentity.sha256,
+    pendingD15Providers,
   });
 }
 
@@ -2315,6 +2327,29 @@ export function aflApiDevRegenerationProposal(input: {
       entries,
     }),
   };
+}
+
+/**
+ * AFLDB-ISSUE-238 (v4), pure: the bound pending-D15 set must equal, exactly, what the reinstated candidate derives it to
+ * be (every net-linked non-corrected provider; `supersede` = E_promotion, `insert` = no candidate row). Anything else, or a
+ * derivation that refuses, is a problem. `[]` = reproduced.
+ */
+export function pendingD15ReproductionProblems(
+  bound: readonly AflApiPendingD15Entry[],
+  actual: { ledgerRows: readonly AflApiAdjudicationLedgerRow[]; ePromotion: ReadonlySet<string>; cPromotion: ReadonlySet<string>; candidateExternalIds: ReadonlySet<string> },
+): { kind: 'pending_d15_not_reproduced'; missing: string[]; extra: string[]; reason?: string }[] {
+  let derived: AflApiPendingD15Entry[];
+  try {
+    derived = deriveAflApiPendingD15(actual);
+  } catch (error) {
+    return [{ kind: 'pending_d15_not_reproduced', missing: [], extra: [], reason: (error as Error).message }];
+  }
+  const key = (e: AflApiPendingD15Entry) => JSON.stringify([e.externalId, e.adjudicationId, e.playerIdentity, e.d15Action]);
+  const boundKeys = new Set(bound.map(key));
+  const derivedKeys = new Set(derived.map(key));
+  const missing = derived.filter((e) => !boundKeys.has(key(e))).map((e) => e.externalId).sort();
+  const extra = bound.filter((e) => !derivedKeys.has(key(e))).map((e) => e.externalId).sort();
+  return missing.length > 0 || extra.length > 0 ? [{ kind: 'pending_d15_not_reproduced', missing, extra }] : [];
 }
 
 /**
@@ -2387,6 +2422,10 @@ export async function gateAflApiCandidateAfterReinstate(
     }
   }
   if (g2.failed) problems.push({ kind: 'g2_refuses_after_reinstatement' });
+  problems.push(...pendingD15ReproductionProblems(bound.pendingD15Providers, {
+    ledgerRows: g2.ledgerRows, ePromotion: g2.ePromotion, cPromotion,
+    candidateExternalIds: new Set(g2.candidate.importerRows.map((r) => r.externalId)),
+  }));
   const expected = new Set(bound.expectedSupersedes);
   const mismatch = aflApiSupersedeMismatch({ expected, actual: [...g2.ePromotion].map((externalId) => ({ externalId })) });
   if (mismatch.missing.length > 0 || mismatch.extra.length > 0) {
@@ -2398,6 +2437,7 @@ export async function gateAflApiCandidateAfterReinstate(
     ...(cPromotion.size > 0
       ? [`C_promotion (replayed, must be the resolved set) = {${[...cPromotion].sort().join(', ')}}; predicted post-replay importer sha256 ${bound.predictedPostReplayImporterSha256}`]
       : []),
+    `pending D15 (net-linked, materialised only after the swap) = {${bound.pendingD15Providers.map((e) => `${e.externalId}:${e.d15Action}`).join(', ') || 'empty'}}`,
     ...g2Lines(g2),
   ];
   const gate = 'afl_api importer identity — candidate census after target-ledger reinstatement (G1)';
@@ -2667,8 +2707,11 @@ export function crvBatchProblems(
  * equality are `gateAflApiCandidateAfterReinstate`'s.
  */
 export async function gateAflApiCorrectedReplayVerification(
-  reader: CorrectionSatisfactionReader, replays: readonly AflApiCorrectedReplayEntry[], report: Report,
+  reader: CorrectionSatisfactionReader, replays: readonly AflApiCorrectedReplayEntry[],
+  /** The bound artefact's pending-D15 set: the SAME stage-aware contract the REPLAY's Q2 uses (AFLDB-ISSUE-238). */
+  pendingD15: readonly AflApiPendingD15Entry[], report: Report,
 ): Promise<void> {
+  const preSwapPromotion = { cPromotion: new Set(replays.map((r) => r.externalId)), pendingD15 };
   const lines: string[] = [];
   let failed = false;
   const sorted = [...replays].sort((a, b) => (a.externalId < b.externalId ? -1 : a.externalId > b.externalId ? 1 : 0));
@@ -2679,7 +2722,7 @@ export async function gateAflApiCorrectedReplayVerification(
     problems.push(...crvIdentityProblems(entry, row, expectedPlayerId));
     problems.push(...crvBatchProblems(entry, await reader.batchesClaimingAdjudication(entry.adjudicationId)));
     const q2 = await checkCorrectionSatisfaction(reader, {
-      providerId: entry.externalId, adjudicationId: entry.adjudicationId, currentBatchId: null,
+      providerId: entry.externalId, adjudicationId: entry.adjudicationId, currentBatchId: null, preSwapPromotion,
     });
     if (!q2.satisfied) {
       for (const stop of q2.stops) problems.push(`${entry.externalId}: Q2 STOP [${stop.step}] ${stop.code}${stop.detail ? `: ${stop.detail}` : ''}`);
@@ -3803,7 +3846,7 @@ async function main(): Promise<number> {
       // `read only` transaction; opened only when C_promotion is non-empty (zero-corrected: none).
       if (boundSupersede!.correctedReplays.length > 0) {
         await withCorrectionSatisfactionReader(dsn, `corrected-replay-verification:${opts.database}`,
-          (reader) => gateAflApiCorrectedReplayVerification(reader, boundSupersede!.correctedReplays, report));
+          (reader) => gateAflApiCorrectedReplayVerification(reader, boundSupersede!.correctedReplays, boundSupersede!.pendingD15Providers, report));
       }
       // A4.2/A4.3 again, over the target's data_overrides as the plan actually reinstated them and
       // the candidate identities as step 2c actually converged them (AFLDB-ISSUE-242): nothing is

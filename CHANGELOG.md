@@ -15,6 +15,26 @@ commit.
 
 ## [Unreleased]
 
+### Corrected-identity promotion: stage-aware pre-swap identity contract for pending D15 providers (AFLDB-ISSUE-238; issue open) - 1 October 2026
+
+- **Found by the DEV promotion rehearsal, not a harness exception.** With a corrected provider and an
+  unrelated net-`linked` provider in the same ledger, the promotion candidate could never pass: the
+  pre-swap contract leaves the linked provider without a resolved row until D15 runs after the swap, while
+  the REPLAY's (§7.4e) and CRV's SAT-1 required every ledger entry to already hold one
+  (`ledger_without_row`). The rebuild replay avoids this by ordering D15 first; the promotion replay had no
+  equivalent.
+- **Fix (Option 1).** The supersede file is now **v4** and binds `pendingD15Providers`: the exact net-linked
+  providers D15 materialises after the swap, each bound to its net ledger row and stable identity. The REPLAY
+  and CRV evaluate SAT-1 through one shared helper that tolerates the `ledger_without_row` of exactly those
+  declared providers; every other bijection problem still refuses, and `C_promotion` and CRV's resolved
+  equality are unchanged. `--phase candidate` re-derives the set and refuses unless it is reproduced. After
+  the swap D15 must materialise exactly the declared set, and the full global invariant (E3) then applies with
+  no exemption. A v3 file is refused as stale.
+- **Unchanged.** `checkAflApiIdentityInvariant`, ordinary correction, rebuild completion, post-swap
+  acceptance and E3 keep the strict whole-table invariant; `CORRECTED_PROMOTION_REHEARSAL_REQUIRED` stays.
+- `issues/open/AFLDB-ISSUE-238.md` §9.4 and `docs/production-promotion.md` §6, §7.5 and §8 document the
+  contract. The DEV rehearsal (Stage 2 Run C onward, Stage 3, R1/R0, Item 12) has not yet re-run on this code.
+
 ### Corrected-identity promotion rehearsal accepted on `code_test_db` (AFLDB-ISSUE-238 slices 10–11; issue open) - 30 September 2026
 
 - **What was proven.** The corrected-identity machinery passed a real-PostgreSQL rehearsal on

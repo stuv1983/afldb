@@ -713,7 +713,7 @@ async function candidatePhase(ctx: Ctx, file: AflApiSupersedeFile): Promise<Repo
   }, report);
   if (file.correctedReplays.length > 0) {
     await withCorrectionSatisfactionReader(ctx.targets.ownerDsn, `s11-crv:${ctx.code}`,
-      (reader) => gateAflApiCorrectedReplayVerification(reader, file.correctedReplays, report));
+      (reader) => gateAflApiCorrectedReplayVerification(reader, file.correctedReplays, file.pendingD15Providers, report));
   }
   return report;
 }

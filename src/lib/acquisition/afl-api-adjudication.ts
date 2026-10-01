@@ -1219,6 +1219,154 @@ export function checkAflApiAdjudicationBijection(input: {
 }
 
 /* ------------------------------------------------------------------ *
+ * AFLDB-ISSUE-238: the stage-aware PRE-SWAP promotion contract (pending D15)
+ *
+ * A promotion candidate legitimately holds, before the swap, exactly the `resolved` rows of
+ * `C_promotion` (the corrected providers the REPLAY wrote). Every OTHER net-`linked` provider of the
+ * reinstated ledger is materialised by D15 only AFTER the swap, so until then it has a ledger entry and
+ * no resolved row. The whole-table bijection (`checkAflApiAdjudicationBijection`, and so the extended
+ * bijection of SAT-1) reports each of those as `ledger_without_row`, which made the pre-swap candidate
+ * contract and SAT-1 impossible to satisfy together (the 2026-10-01 DEV rehearsal, Run C).
+ *
+ * The contract below tolerates EXACTLY the pending-D15 providers the bound promotion artefact declares
+ * (`AflApiSupersedeFile.pendingD15Providers`) and nothing else. It never changes the global invariant:
+ * callers that do not pass a contract (ordinary correction, rebuild, post-swap acceptance, E3) keep the
+ * strict whole-table behaviour, so the exemption cannot outlive the pre-swap stage.
+ * ------------------------------------------------------------------ */
+
+/** One net-`linked` provider the promotion's D15 replay materialises after the swap. */
+export type AflApiPendingD15Entry = {
+  externalId: string;
+  /** The NET ledger row (a `linked` row) this entry is bound to. */
+  adjudicationId: number;
+  /** That ledger row's stable player identity. */
+  playerIdentity: string;
+  /** `insert`: the candidate holds no row for the provider. `supersede`: it holds an agreeing importer row (E_promotion). */
+  d15Action: 'insert' | 'supersede';
+};
+
+/** What the pre-swap stages (REPLAY 7.4e and CRV) are allowed to see. Comes only from the bound artefact. */
+export type AflApiPreSwapPromotionContract = {
+  readonly cPromotion: ReadonlySet<string>;
+  readonly pendingD15: readonly AflApiPendingD15Entry[];
+};
+
+export type AflApiPendingD15Problem =
+  | { kind: 'pending_d15_unbound'; externalId: string; detail: string }
+  | { kind: 'pending_d15_materialised_early'; externalId: string }
+  | { kind: 'pending_d15_not_observed'; externalId: string };
+
+/**
+ * The pre-swap filter over a bijection result. Returns the mismatches that REMAIN (every
+ * `row_without_ledger`, every undeclared `ledger_without_row`, anything else) and the contract's own
+ * problems. A declared provider is tolerated only when ALL hold: it is bound to its net ledger row
+ * (action `linked`, that row id, that stable identity), it is not in `C_promotion`, it is listed once, the
+ * candidate holds no `resolved` row for it, and its `ledger_without_row` is actually observed. The
+ * observed tolerated set therefore equals the declared set exactly.
+ */
+export function applyAflApiPendingD15(input: {
+  ledgerRows: readonly AflApiAdjudicationLedgerRow[];
+  resolvedRows: readonly { externalId: string; status: string; matchMethod: string | null }[];
+  mismatches: readonly AflApiBijectionMismatch[];
+  contract: AflApiPreSwapPromotionContract;
+}): { remaining: AflApiBijectionMismatch[]; contractProblems: AflApiPendingD15Problem[] } {
+  const net = netLedgerRowsByExternalId(input.ledgerRows);
+  const anyResolved = new Set(input.resolvedRows.filter((r) => r.status === 'resolved').map((r) => r.externalId));
+  const contractProblems: AflApiPendingD15Problem[] = [];
+  const bound = new Set<string>();
+  const seen = new Set<string>();
+  for (const entry of input.contract.pendingD15) {
+    const unbound = (detail: string) => { contractProblems.push({ kind: 'pending_d15_unbound', externalId: entry.externalId, detail }); };
+    if (seen.has(entry.externalId)) { unbound('declared more than once'); continue; }
+    seen.add(entry.externalId);
+    const row = net.get(entry.externalId);
+    if (input.contract.cPromotion.has(entry.externalId)) { unbound('a C_promotion provider can never be pending D15'); continue; }
+    if (!row) { unbound('no ledger entry'); continue; }
+    if (row.action !== 'linked') { unbound(`its net ledger state is ${row.action}, not linked`); continue; }
+    if (row.id !== entry.adjudicationId) { unbound(`its net ledger row is ${row.id}, the artefact binds ${entry.adjudicationId}`); continue; }
+    if (row.playerIdentity !== entry.playerIdentity) { unbound('its net ledger stable identity differs from the artefact\'s'); continue; }
+    if (anyResolved.has(entry.externalId)) {
+      contractProblems.push({ kind: 'pending_d15_materialised_early', externalId: entry.externalId });
+      continue;
+    }
+    bound.add(entry.externalId);
+  }
+  const observed = new Set<string>();
+  const remaining: AflApiBijectionMismatch[] = [];
+  for (const m of input.mismatches) {
+    if (m.kind === 'ledger_without_row' && bound.has(m.externalId)) { observed.add(m.externalId); continue; }
+    remaining.push(m);
+  }
+  for (const id of bound) {
+    if (!observed.has(id)) contractProblems.push({ kind: 'pending_d15_not_observed', externalId: id });
+  }
+  return { remaining, contractProblems };
+}
+
+/**
+ * The pending-D15 set as the restored gate can derive it: every net-`linked` provider of the target ledger
+ * (a net-corrected one is `C_promotion`, a net-revoked one replays nothing). `supersede` for E_promotion
+ * (G2 AGREE), `insert` for the rest; the candidate must hold no row for an `insert` provider and must hold
+ * one for a `supersede` provider, or this refuses (G2 would already have refused the promotion).
+ * Sorted by code-unit order of the provider id.
+ */
+export function deriveAflApiPendingD15(input: {
+  ledgerRows: readonly AflApiAdjudicationLedgerRow[];
+  ePromotion: ReadonlySet<string>;
+  cPromotion: ReadonlySet<string>;
+  candidateExternalIds: ReadonlySet<string>;
+}): AflApiPendingD15Entry[] {
+  const out: AflApiPendingD15Entry[] = [];
+  for (const [externalId, row] of netLedgerRowsByExternalId(input.ledgerRows)) {
+    if (row.action !== 'linked') continue;
+    if (input.cPromotion.has(externalId)) {
+      throw new Error(`deriveAflApiPendingD15: net-linked provider ${externalId} is also in C_promotion.`);
+    }
+    const supersede = input.ePromotion.has(externalId);
+    if (supersede !== input.candidateExternalIds.has(externalId)) {
+      throw new Error(`deriveAflApiPendingD15: provider ${externalId} is ${supersede ? 'in E_promotion without' : 'not in E_promotion but with'} a candidate row.`);
+    }
+    out.push({ externalId, adjudicationId: row.id, playerIdentity: row.playerIdentity, d15Action: supersede ? 'supersede' : 'insert' });
+  }
+  for (const externalId of input.ePromotion) {
+    if (!out.some((e) => e.externalId === externalId)) {
+      throw new Error(`deriveAflApiPendingD15: E_promotion provider ${externalId} is not net-linked in the ledger.`);
+    }
+  }
+  return out.sort((a, b) => compareCodeUnits(a.externalId, b.externalId));
+}
+
+/**
+ * Post-swap: D15's own plan must be exactly the declared pending set. Every planned insert/supersede is a
+ * declared provider with that action; every declared provider is planned or (an idempotent re-run) already
+ * materialised identically; nothing else. `[]` = exact.
+ */
+export function aflApiPendingD15PlanProblems(input: {
+  plan: Pick<AflApiReplayPlan, 'inserts' | 'supersedes' | 'noops'>;
+  pending: readonly AflApiPendingD15Entry[];
+}): string[] {
+  const problems: string[] = [];
+  const byId = new Map(input.pending.map((e) => [e.externalId, e]));
+  if (byId.size !== input.pending.length) problems.push('the pending D15 list names a provider more than once');
+  const inserts = new Set(input.plan.inserts.map((i) => i.externalId));
+  const supersedes = new Set(input.plan.supersedes.map((s) => s.externalId));
+  const materialised = new Set(input.plan.noops.filter((n) => n.satisfied === undefined).map((n) => n.externalId));
+  for (const id of inserts) {
+    if (byId.get(id)?.d15Action !== 'insert') problems.push(`D15 would insert ${id}, which the artefact does not declare as a pending insert`);
+  }
+  for (const id of supersedes) {
+    if (byId.get(id)?.d15Action !== 'supersede') problems.push(`D15 would supersede ${id}, which the artefact does not declare as a pending supersede`);
+  }
+  for (const entry of input.pending) {
+    const done = entry.d15Action === 'insert' ? inserts.has(entry.externalId) : supersedes.has(entry.externalId);
+    if (!done && !materialised.has(entry.externalId)) {
+      problems.push(`the declared pending ${entry.d15Action} for ${entry.externalId} is neither planned nor already materialised`);
+    }
+  }
+  return problems.sort();
+}
+
+/* ------------------------------------------------------------------ *
  * 5. AFLDB-ISSUE-237 — importer identity capture, replay and promotion
  *    gates (D5, D6, D9, D13, D14; runbook §6.1, §6.2, §6.3, §7.2)
  *
@@ -2390,9 +2538,12 @@ export const AFL_API_SUPERSEDE_FORMAT = 'afldb.afl_api_supersede_expected';
 /**
  * Version 1 carried the provider list only and bound nothing; version 2 bound the importer and
  * ledger digests but not the ISSUE-238 corrected-replay prediction. Both are refused as stale.
- * Version 3 (AFLDB-ISSUE-238 §9.1) is ALWAYS written, even with zero corrected providers.
+ * Version 3 (AFLDB-ISSUE-238 §9.1) bound the corrected-replay prediction and is ALWAYS written, even with zero
+ * corrected providers. Version 4 adds `pendingD15Providers` (the exact net-linked providers D15 materialises
+ * after the swap), which the stage-aware pre-swap contract (`applyAflApiPendingD15`) and the post-swap D15
+ * replay are bound to; a v3 file carries no such binding and is refused as stale.
  */
-export const AFL_API_SUPERSEDE_VERSION = 3;
+export const AFL_API_SUPERSEDE_VERSION = 4;
 
 // Temporary S6-D3 gates, owned by Slice 11 / the S6-D2 freeze binding: a prod promotion carrying corrected replays is refused until they are lifted.
 export const CORRECTED_PROMOTION_REHEARSAL_REQUIRED = 'CORRECTED_PROMOTION_REHEARSAL_REQUIRED';
@@ -2544,16 +2695,24 @@ export type AflApiSupersedeFile = AflApiSupersedeBinding & {
   predictedPostReplayResolvedRowCount: number;
   /** `aflApiIdentityStateSha256` of the candidate's whole `afl_api` identity state after replay. */
   predictedPostReplayIdentitySha256: string;
+  /**
+   * AFLDB-ISSUE-238 (v4): the EXACT net-linked providers that stay without a resolved row until D15 runs after
+   * the swap, each bound to its net ledger row and stable identity. Sorted by externalId, disjoint from
+   * `correctedReplays`; its `supersede` entries equal `expectedSupersedes`. May be empty.
+   */
+  pendingD15Providers: readonly AflApiPendingD15Entry[];
   /** SHA-256 of the canonical JSON of every other field. */
   payloadSha256: string;
 };
+
+const PENDING_D15_ENTRY_KEYS = ['externalId', 'adjudicationId', 'playerIdentity', 'd15Action'] as const;
 
 const SUPERSEDE_FILE_KEYS = [
   'issue', 'format', 'version', 'environment', 'candidateDatabase', 'targetDatabase',
   'candidateImporterRowCount', 'candidateImporterSha256', 'targetLedgerRowCount', 'targetLedgerSha256',
   'expectedSupersedes', 'targetCorrectedLedgerRowCount', 'targetCorrectedLedgerSha256', 'correctedReplays',
   'predictedPostReplayImporterRowCount', 'predictedPostReplayImporterSha256',
-  'predictedPostReplayResolvedRowCount', 'predictedPostReplayIdentitySha256', 'payloadSha256',
+  'predictedPostReplayResolvedRowCount', 'predictedPostReplayIdentitySha256', 'pendingD15Providers', 'payloadSha256',
 ] as const;
 
 const CORRECTED_REPLAY_ENTRY_KEYS = [
@@ -2591,6 +2750,9 @@ function supersedePayloadSha256(file: Omit<AflApiSupersedeFile, 'payloadSha256'>
     predictedPostReplayImporterSha256: file.predictedPostReplayImporterSha256,
     predictedPostReplayResolvedRowCount: file.predictedPostReplayResolvedRowCount,
     predictedPostReplayIdentitySha256: file.predictedPostReplayIdentitySha256,
+    pendingD15Providers: file.pendingD15Providers.map((e) => ({
+      externalId: e.externalId, adjudicationId: e.adjudicationId, playerIdentity: e.playerIdentity, d15Action: e.d15Action,
+    })),
   }));
 }
 
@@ -2659,6 +2821,29 @@ function requireCorrectedReplays(value: unknown, label: string): AflApiCorrected
   return entries;
 }
 
+function requirePendingD15(value: unknown, label: string): AflApiPendingD15Entry[] {
+  if (!Array.isArray(value)) refuseFile(label, 'pendingD15Providers must be an array.');
+  const entries = value.map((raw, i): AflApiPendingD15Entry => {
+    const where = `${label} pendingD15Providers[${i}]`;
+    const obj = asRecord(raw, label, `pendingD15Providers[${i}]`);
+    requireExactKeys(obj, PENDING_D15_ENTRY_KEYS, where);
+    const externalId = requireString(obj, 'externalId', where);
+    if (!AFL_API_PROVIDER_ID_RE.test(externalId)) refuseFile(where, 'externalId must be an afl_api provider id (CD_I<digits>).');
+    const d15Action = obj.d15Action;
+    if (d15Action !== 'insert' && d15Action !== 'supersede') refuseFile(where, 'd15Action must be insert or supersede.');
+    return {
+      externalId, adjudicationId: requirePositiveInt(obj, 'adjudicationId', where),
+      playerIdentity: requireString(obj, 'playerIdentity', where), d15Action,
+    };
+  });
+  for (let i = 1; i < entries.length; i += 1) {
+    if (compareCodeUnits(entries[i - 1].externalId, entries[i].externalId) >= 0) {
+      refuseFile(label, 'pendingD15Providers must be sorted by externalId and free of duplicates.');
+    }
+  }
+  return entries;
+}
+
 /**
  * Cross-field contract shared by the builder (through the parser round-trip) and the reader:
  * disjointness from E_promotion, the resolved-row count, and the zero-corrected parity rule.
@@ -2669,6 +2854,16 @@ function assertSupersedeConsistency(file: AflApiSupersedeFile, label: string): v
     if (supersedes.has(entry.externalId)) {
       refuseFile(label, `correctedReplays provider ${entry.externalId} is also in expectedSupersedes; C_promotion must be disjoint from E_promotion.`);
     }
+  }
+  // AFLDB-ISSUE-238 (v4): the pending-D15 set is disjoint from C_promotion, and its `supersede` entries ARE E_promotion.
+  const pendingSupersedes = file.pendingD15Providers.filter((e) => e.d15Action === 'supersede').map((e) => e.externalId);
+  for (const entry of file.pendingD15Providers) {
+    if (file.correctedReplays.some((c) => c.externalId === entry.externalId)) {
+      refuseFile(label, `pendingD15Providers provider ${entry.externalId} is also in correctedReplays; a corrected provider can never be pending D15.`);
+    }
+  }
+  if (pendingSupersedes.length !== supersedes.size || pendingSupersedes.some((id) => !supersedes.has(id))) {
+    refuseFile(label, 'the pendingD15Providers entries with d15Action supersede must equal expectedSupersedes exactly.');
   }
   if (file.predictedPostReplayResolvedRowCount !== file.correctedReplays.length) {
     refuseFile(label, `predictedPostReplayResolvedRowCount ${file.predictedPostReplayResolvedRowCount} must equal the correctedReplays length ${file.correctedReplays.length}.`);
@@ -2709,6 +2904,8 @@ export type AflApiSupersedeBuildInput = AflApiSupersedeBinding & {
   predictedPostReplayImporterRowCount: number;
   predictedPostReplayImporterSha256: string;
   predictedPostReplayIdentitySha256: string;
+  /** AFLDB-ISSUE-238 (v4): see `deriveAflApiPendingD15`. Sorted here; duplicates are refused by the parser round-trip. */
+  pendingD15Providers: Iterable<AflApiPendingD15Entry>;
 };
 
 export function buildAflApiSupersedeFile(input: AflApiSupersedeBuildInput): AflApiSupersedeFile {
@@ -2727,6 +2924,7 @@ export function buildAflApiSupersedeFile(input: AflApiSupersedeBuildInput): AflA
     predictedPostReplayImporterSha256: input.predictedPostReplayImporterSha256,
     predictedPostReplayResolvedRowCount: correctedReplays.length,
     predictedPostReplayIdentitySha256: input.predictedPostReplayIdentitySha256,
+    pendingD15Providers: [...input.pendingD15Providers].sort((a, b) => compareCodeUnits(a.externalId, b.externalId)),
   };
   // Round-trip through the strict parser, so a writer can never emit what a reader refuses.
   const file: AflApiSupersedeFile = { ...draft, payloadSha256: supersedePayloadSha256(draft) };
@@ -2742,7 +2940,7 @@ export function parseAflApiSupersedeFile(text: string, label = 'afl_api supersed
   // Version BEFORE the key set: a v1/v2 file lacks the v3 keys, and must be refused as STALE by name.
   if (obj.version !== AFL_API_SUPERSEDE_VERSION) {
     refuseFile(label, `stale supersede file: version ${String(obj.version)} is not ${AFL_API_SUPERSEDE_VERSION}; `
-      + 'a v1 or v2 file (no corrected-replay binding) is refused — regenerate it with the current build.');
+      + 'a v1, v2 or v3 file (no corrected-replay or pending-D15 binding) is refused — regenerate it with the current build.');
   }
   requireExactKeys(obj, SUPERSEDE_FILE_KEYS, label);
   if (obj.environment !== 'prod' && obj.environment !== 'dev') refuseFile(label, 'environment must be prod or dev.');
@@ -2763,6 +2961,7 @@ export function parseAflApiSupersedeFile(text: string, label = 'afl_api supersed
     predictedPostReplayImporterSha256: requireSha256(obj, 'predictedPostReplayImporterSha256', label),
     predictedPostReplayResolvedRowCount: requireCount(obj, 'predictedPostReplayResolvedRowCount', label),
     predictedPostReplayIdentitySha256: requireSha256(obj, 'predictedPostReplayIdentitySha256', label),
+    pendingD15Providers: requirePendingD15(obj.pendingD15Providers, label),
     payloadSha256: requireSha256(obj, 'payloadSha256', label),
   };
   // Payload hash first: a tampered file is reported as tampered, not as a cross-field inconsistency.

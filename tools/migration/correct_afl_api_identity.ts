@@ -87,6 +87,7 @@ import {
   aflApiImporterStateSha256,
   aflApiLedgerStateSha256,
   aflApiNetIsHumanLive,
+  applyAflApiPendingD15,
   censusAflApiRows,
   checkAflApiIdentityInvariant,
   classifyAflApiCensusRow,
@@ -99,6 +100,7 @@ import {
   type AflApiForwardIdentityResult,
   type AflApiIdentityStateRow,
   type AflApiImporterStateRow,
+  type AflApiPreSwapPromotionContract,
   type AflApiSupersedeFile,
   type CatalogueColumn,
   type ManifestValidationProblem,
@@ -2700,16 +2702,18 @@ async function recomputeAfterClosureMutations(
 /** §8.2 step 9 / §8.4: the post-write CORRECTION SATISFACTION re-plan; a failure rolls the transaction back. */
 async function assertPostWriteSatisfaction(
   tx: TransactionSql, providerId: string, adjudicationId: number, currentBatchId: number | null,
+  preSwapPromotion?: AflApiPreSwapPromotionContract,
 ): Promise<readonly string[]> {
-  return (await assertPostWriteSatisfactionResult(tx, providerId, adjudicationId, currentBatchId)).reports;
+  return (await assertPostWriteSatisfactionResult(tx, providerId, adjudicationId, currentBatchId, preSwapPromotion)).reports;
 }
 
 /** The same re-plan, returning Q2's whole result (ORIGINAL reports its structured outcomes). */
 async function assertPostWriteSatisfactionResult(
   tx: TransactionSql, providerId: string, adjudicationId: number, currentBatchId: number | null,
+  preSwapPromotion?: AflApiPreSwapPromotionContract,
 ): Promise<CorrectionSatisfactionResult> {
   const postWrite = await checkCorrectionSatisfaction(dbCorrectionSatisfactionReader(tx), {
-    providerId, adjudicationId, currentBatchId,
+    providerId, adjudicationId, currentBatchId, ...(preSwapPromotion === undefined ? {} : { preSwapPromotion }),
   });
   if (!postWrite.satisfied) {
     throw new CorrectionRefused(
@@ -2946,6 +2950,12 @@ export type CorrectionSatisfactionEvidence = {
   readonly attributedKeysAtP: readonly string[];
   /** SAT-1: the extended-bijection facts. */
   readonly identityInvariant: IdentityInvariantFacts;
+  /**
+   * AFLDB-ISSUE-238: the stage-aware PRE-SWAP promotion contract, passed ONLY by the promotion REPLAY (7.4e)
+   * and CRV. Absent everywhere else (ordinary correction, rebuild, post-swap, E3): SAT-1 is then the strict
+   * whole-table invariant, unchanged.
+   */
+  readonly preSwapPromotion?: AflApiPreSwapPromotionContract;
   /** SAT-5: every typed projection row of CD_I, attached to a bound row or not. */
   readonly providerProjections: readonly ProviderProjectionRow[];
 };
@@ -3469,11 +3479,16 @@ export function sat1ExtendedBijectionProblems(input: {
   readonly providerId: string;
   readonly pPrimeId: number;
   readonly pPrimeIdentity: string;
+  /** The stage-aware pre-swap contract (promotion REPLAY / CRV only). Omitted = the strict whole-table invariant. */
+  readonly preSwap?: AflApiPreSwapPromotionContract;
 }): string[] {
   const { facts } = input;
-  const problems = checkAflApiIdentityInvariant({
+  const invariant = checkAflApiIdentityInvariant({
     rows: facts.censusRows, ledgerRows: facts.ledgerRows, identityByPlayerId: facts.identityByPlayerId,
-  }).map((p): string => JSON.stringify(p));
+  });
+  const problems = input.preSwap === undefined
+    ? invariant.map((p): string => JSON.stringify(p))
+    : preSwapInvariantProblems(facts, invariant, input.preSwap);
   for (const [externalId, row] of netLedgerRowsByExternalId(facts.ledgerRows)) {
     if (externalId === input.providerId || !aflApiNetIsHumanLive(row.action)) continue;
     if (row.playerIdentity === input.pPrimeIdentity || Number(row.playerId) === input.pPrimeId) {
@@ -3481,6 +3496,43 @@ export function sat1ExtendedBijectionProblems(input: {
     }
   }
   return problems;
+}
+
+/**
+ * The stage-aware form of SAT-1's whole-table invariant for the promotion's pre-swap stages. EVERY invariant problem is
+ * kept except the `ledger_without_row` mismatches of exactly the pending-D15 providers the bound artefact declares
+ * (`applyAflApiPendingD15`: each bound to its net ledger row, absent from `C_promotion`, unresolved, and observed). Every
+ * `row_without_ledger`, every undeclared `ledger_without_row` and every other problem stays a refusal.
+ */
+function preSwapInvariantProblems(
+  facts: IdentityInvariantFacts, invariant: ReturnType<typeof checkAflApiIdentityInvariant>, contract: AflApiPreSwapPromotionContract,
+): string[] {
+  const mismatches = invariant.flatMap((p) => (p.kind === 'bijection_mismatch' ? [p.mismatch] : []));
+  const others = invariant.filter((p) => p.kind !== 'bijection_mismatch');
+  const resolvedRows = censusAflApiRows(facts.censusRows).humanRows
+    .map((r) => ({ externalId: r.externalId, status: r.status, matchMethod: r.matchMethod }));
+  const { remaining, contractProblems } = applyAflApiPendingD15({ ledgerRows: facts.ledgerRows, resolvedRows, mismatches, contract });
+  return [
+    ...others.map((p): string => JSON.stringify(p)),
+    ...remaining.map((m): string => JSON.stringify({ kind: 'bijection_mismatch', mismatch: m })),
+    ...contractProblems.map((p): string => JSON.stringify(p)),
+  ];
+}
+
+/**
+ * The pending-D15 declaration's own binding to the facts in front of the caller (no bijection verdict): every declared
+ * provider is bound to its net `linked` ledger row and identity, is not in `C_promotion`, is listed once, holds no
+ * `resolved` row, and shows its expected `ledger_without_row`. `[]` = bound. Used by the REPLAY before it writes.
+ */
+export function pendingD15BindingProblems(facts: IdentityInvariantFacts, contract: AflApiPreSwapPromotionContract): string[] {
+  const invariant = checkAflApiIdentityInvariant({
+    rows: facts.censusRows, ledgerRows: facts.ledgerRows, identityByPlayerId: facts.identityByPlayerId,
+  });
+  const mismatches = invariant.flatMap((p) => (p.kind === 'bijection_mismatch' ? [p.mismatch] : []));
+  const resolvedRows = censusAflApiRows(facts.censusRows).humanRows
+    .map((r) => ({ externalId: r.externalId, status: r.status, matchMethod: r.matchMethod }));
+  return applyAflApiPendingD15({ ledgerRows: facts.ledgerRows, resolvedRows, mismatches, contract })
+    .contractProblems.map((p): string => JSON.stringify(p));
 }
 
 /**
@@ -3547,6 +3599,7 @@ export function evaluateCorrectionSatisfactionQ2(evidence: CorrectionSatisfactio
   const preStops: OutcomeStop[] = [];
   for (const problem of sat1ExtendedBijectionProblems({
     facts: evidence.identityInvariant, providerId: evidence.providerId, pPrimeId, pPrimeIdentity: adjudication.playerIdentity,
+    preSwap: evidence.preSwapPromotion,
   })) {
     preStops.push(satStop('SAT-1', 'identity_contradicts', `extended bijection: ${problem}`));
   }
@@ -3654,9 +3707,12 @@ function auditMatchIds(
 /** Gather everything `evaluateCorrectionSatisfactionQ2` needs, through the read-only reader. */
 export async function gatherCorrectionSatisfactionEvidence(
   reader: CorrectionSatisfactionReader,
-  input: { readonly providerId: string; readonly adjudicationId: number; readonly currentBatchId: number | null },
+  input: {
+    readonly providerId: string; readonly adjudicationId: number; readonly currentBatchId: number | null;
+    readonly preSwapPromotion?: AflApiPreSwapPromotionContract;
+  },
 ): Promise<CorrectionSatisfactionEvidence> {
-  const { providerId, adjudicationId, currentBatchId } = input;
+  const { providerId, adjudicationId, currentBatchId, preSwapPromotion } = input;
   const aflApiSourceId = await reader.aflApiSourceId();
   const identityRow = await reader.identityRow(providerId);
   const ledgerRows = await reader.ledgerRows(providerId);
@@ -3713,13 +3769,18 @@ export async function gatherCorrectionSatisfactionEvidence(
     providerId, adjudicationId, currentBatchId, aflApiSourceId, identityRow, ledgerRows,
     previousPlayerId, correctedPlayerId, batches, moves, deletes, attributedKeysAtP,
     identityInvariant, providerProjections,
+    ...(preSwapPromotion === undefined ? {} : { preSwapPromotion }),
   };
 }
 
 /** Gather + evaluate: the single Q2 entry point both callers use. */
 export async function checkCorrectionSatisfaction(
   reader: CorrectionSatisfactionReader,
-  input: { readonly providerId: string; readonly adjudicationId: number; readonly currentBatchId: number | null },
+  input: {
+    readonly providerId: string; readonly adjudicationId: number; readonly currentBatchId: number | null;
+    /** Promotion REPLAY / CRV only (AFLDB-ISSUE-238 stage-aware pre-swap SAT-1). Omitted = strict. */
+    readonly preSwapPromotion?: AflApiPreSwapPromotionContract;
+  },
 ): Promise<CorrectionSatisfactionResult> {
   return evaluateCorrectionSatisfactionQ2(await gatherCorrectionSatisfactionEvidence(reader, input));
 }
@@ -4639,7 +4700,9 @@ const REPLAY_IDENTITY_NOTE = 'AFLDB-ISSUE-238 promotion replay; see afl_api_iden
  * candidate_count 0) AND CORRECTION SATISFACTION (Q2) passes. A row in that shape whose Q2 fails is
  * contradictory state and refuses; any other row is a candidate to classify.
  */
-async function detectAlreadyReplayed(tx: TransactionSql, entry: CorrectedProviderEntry): Promise<boolean> {
+async function detectAlreadyReplayed(
+  tx: TransactionSql, entry: CorrectedProviderEntry, preSwapPromotion: AflApiPreSwapPromotionContract,
+): Promise<boolean> {
   const found = await readCandidateProviderRow(tx, entry.externalId);
   if (found === null) return false;
   const row = found.row;
@@ -4649,7 +4712,7 @@ async function detectAlreadyReplayed(tx: TransactionSql, entry: CorrectedProvide
   const pPrime = await resolveCandidateIdentity(tx, entry.playerIdentity);
   if (pPrime.kind !== 'unique' || pPrime.playerId !== row.playerId) return false;
   const q2 = await checkCorrectionSatisfaction(dbCorrectionSatisfactionReader(tx), {
-    providerId: entry.externalId, adjudicationId: entry.adjudicationId, currentBatchId: null,
+    providerId: entry.externalId, adjudicationId: entry.adjudicationId, currentBatchId: null, preSwapPromotion,
   });
   if (!q2.satisfied) {
     throw new CorrectionRefused(
@@ -4741,6 +4804,19 @@ export async function runReplayPromotion(
   if (ledgerProblems.length > 0) {
     throw new CorrectionRefused(`REFUSED: the reinstated ledger does not match the artefact: ${ledgerProblems.join('; ')}`);
   }
+  // AFLDB-ISSUE-238 stage-aware pre-swap contract: C_promotion fully satisfied; exactly the providers the BOUND artefact
+  // declares pending D15 may still lack a resolved row. Built only from the file; bound to the reinstated ledger here,
+  // before any write, and again inside every Q2 (SAT-1) below.
+  const preSwap: AflApiPreSwapPromotionContract = {
+    cPromotion: new Set(entries.map((e) => e.externalId)),
+    pendingD15: file.pendingD15Providers,
+  };
+  if (entries.length > 0) {
+    const bindingProblems = pendingD15BindingProblems(await dbCorrectionSatisfactionReader(tx).identityInvariantFacts(), preSwap);
+    if (bindingProblems.length > 0) {
+      throw new CorrectionRefused(`REFUSED: the artefact's pending-D15 declaration is not bound to the reinstated candidate -- STOP: ${bindingProblems.join('; ')}`);
+    }
+  }
   const targetHumanProviders = new Map<string, string>();
   for (const [externalId, row] of netLedgerRowsByExternalId(ledgerRows)) {
     if (aflApiNetIsHumanLive(row.action)) targetHumanProviders.set(externalId, row.playerIdentity);
@@ -4753,7 +4829,7 @@ export async function runReplayPromotion(
   // Phase 0.
   const already = new Set<string>();
   for (const entry of entries) {
-    if (await detectAlreadyReplayed(tx, asProviderEntry(entry))) already.add(entry.externalId);
+    if (await detectAlreadyReplayed(tx, asProviderEntry(entry), preSwap)) already.add(entry.externalId);
   }
 
   // Phase 1.
@@ -4823,7 +4899,7 @@ export async function runReplayPromotion(
   // Phase 2.
   for (const p of pending) {
     await assertPostWriteSatisfaction(
-      tx, p.entry.externalId, p.entry.adjudicationId, p.batchId === null ? null : Number(p.batchId),
+      tx, p.entry.externalId, p.entry.adjudicationId, p.batchId === null ? null : Number(p.batchId), preSwap,
     );
     if (p.batchId !== null) await finaliseCorrectionBatch(tx, p.batchId, p.moved + p.deleted, p.finalValidationResult);
   }

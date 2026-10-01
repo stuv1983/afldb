@@ -24,12 +24,16 @@ import {
   aflApiIdentityStateSha256,
   aflApiImporterStateSha256,
   aflApiLedgerStateSha256,
+  aflApiPendingD15PlanProblems,
   classifyAflApiForwardIdentityRows,
+  deriveAflApiPendingD15,
   validateManifestAgainstCatalogue,
   type AflApiAdjudicationLedgerRow,
   type AflApiCensusRow,
   type AflApiCorrectedReplayEntry,
   type AflApiForwardIdentityResult,
+  type AflApiPendingD15Entry,
+  type AflApiPreSwapPromotionContract,
   type AflApiSupersedeFile,
 } from '../src/lib/acquisition/afl-api-adjudication';
 import {
@@ -122,6 +126,7 @@ import {
   resolveAdjudicatedContradictions,
   resolveImportDsn,
   runAlreadyCorrectedRerun,
+  pendingD15BindingProblems,
   sat1ExtendedBijectionProblems,
   sat5ProjectionContradictions,
   withStopDetails,
@@ -145,6 +150,7 @@ import {
   type SeasonTotalLiveRow,
 } from '../tools/migration/correct_afl_api_identity';
 import { parseCorrectionCliOutput, type CorrectionCliExpectation } from '../tools/db/afl-api-identity-correction-rehearsal';
+import { Report, crvExactSetProblems, gateAflApiCorrectedReplayVerification, pendingD15ReproductionProblems } from '../tools/db/promotion-check';
 
 const scratchDir = mkdtempSync(join(tmpdir(), 'afldb-issue-238-s5-'));
 afterAll(() => rmSync(scratchDir, { recursive: true, force: true }));
@@ -1278,6 +1284,248 @@ describe('§5.12 SAT-1: the §8.6 extended bijection is identity authority, eval
     untracked.census.push(importer);
     untracked.forwardIdentities = identities([rule.continuingUrl, 'players/Z/Zzz_Unrelated.html']);
     expectStop(await rerun(untracked), 'SAT-1', 'identity_contradicts');
+  });
+});
+
+describe('AFLDB-ISSUE-238 stage-aware PRE-SWAP SAT-1 / CRV: exactly the declared pending-D15 providers may lack a resolved row (production contract correction found by the DEV rehearsal)', () => {
+  const J = 'CD_J';
+  const L = 'CD_L';
+  const linkedRow = (id: number, externalId: string, n: number): AflApiAdjudicationLedgerRow => ({
+    id, externalId, action: 'linked', playerId: n, playerIdentity: `id:${n}`, supersedesId: null, previousPlayerIdentity: null,
+  });
+  const pend = (externalId: string, adjudicationId: number, n: number, d15Action: 'insert' | 'supersede' = 'insert'): AflApiPendingD15Entry => (
+    { externalId, adjudicationId, playerIdentity: `id:${n}`, d15Action });
+  const contractOf = (pendingD15: AflApiPendingD15Entry[], cPromotion: string[] = [CD_I]): AflApiPreSwapPromotionContract => (
+    { cPromotion: new Set(cPromotion), pendingD15 });
+  /** The real Run-C shape: CD_I corrected (ledger rows 1,2), a LINKED bystander (J) with NO resolved row in the candidate. */
+  const withBystanders = (...bystanders: AflApiAdjudicationLedgerRow[]): World => {
+    const world = pmsWorld();
+    world.otherLedger.push(...bystanders);
+    return world;
+  };
+  const q2 = (world: World, preSwapPromotion?: AflApiPreSwapPromotionContract) => checkCorrectionSatisfaction(fakeReader(world), {
+    providerId: CD_I, adjudicationId: 2, currentBatchId: null, ...(preSwapPromotion ? { preSwapPromotion } : {}),
+  });
+  const why = (r: Awaited<ReturnType<typeof q2>>): string => r.stops.map((s) => `${s.step}:${s.code}:${s.detail ?? ''}`).join('|');
+  const refusedWith = async (world: World, contract: AflApiPreSwapPromotionContract, re: RegExp) => {
+    const r = await q2(world, contract);
+    expect(r.satisfied, why(r)).toBe(false);
+    expect(why(r)).toMatch(re);
+  };
+
+  // --- PASS -------------------------------------------------------------------------------------------------------
+  it('1. corrected provider only (C_promotion={CD_I}, nothing pending): satisfied under the pre-swap contract exactly as before', async () => {
+    const r = await q2(pmsWorld(), contractOf([]));
+    expect(r.satisfied, why(r)).toBe(true);
+  });
+
+  it('2/25/26. the REAL Run-C shape: a pending linked bystander absent from the candidate passes ONLY when declared; undeclared it is the same ledger_without_row as before', async () => {
+    const world = withBystanders(linkedRow(5, J, 30));
+    const strict = await q2(world); // the ordinary/global SAT-1: unchanged, still refuses
+    expect(strict.satisfied).toBe(false);
+    expect(why(strict)).toContain('"kind":"ledger_without_row","externalId":"CD_J"');
+    const staged = await q2(world, contractOf([pend(J, 5, 30)]));
+    expect(staged.satisfied, why(staged)).toBe(true);
+    await refusedWith(world, contractOf([]), /ledger_without_row","externalId":"CD_J"/); // 26: pendingD15={}
+  });
+
+  it('3. several legitimate pending-D15 providers (exact bound set): satisfied', async () => {
+    const world = withBystanders(linkedRow(5, J, 30), linkedRow(6, L, 31));
+    const r = await q2(world, contractOf([pend(L, 6, 31), pend(J, 5, 30, 'supersede')]));
+    expect(r.satisfied, why(r)).toBe(true);
+  });
+
+  // --- REFUSE: the ledger/identity shape ----------------------------------------------------------------------------
+  it('4/11. a ledger_without_row provider NOT in the declared set (an extra unresolved linked provider) is refused, even beside a declared one', async () => {
+    const world = withBystanders(linkedRow(5, J, 30), linkedRow(6, L, 31));
+    await refusedWith(world, contractOf([pend(J, 5, 30)]), /ledger_without_row","externalId":"CD_L"/);
+  });
+
+  it('5/10. a declared provider that is not the net-LINKED ledger entry it names (absent, revoked-away, other row id, other identity) is refused', async () => {
+    const world = withBystanders(linkedRow(5, J, 30));
+    await refusedWith(world, contractOf([pend('CD_Z', 9, 39), pend(J, 5, 30)]), /pending_d15_unbound","externalId":"CD_Z","detail":"no ledger entry"/);
+    await refusedWith(world, contractOf([pend(J, 99, 30)]), /pending_d15_unbound","externalId":"CD_J","detail":"its net ledger row is 5, the artefact binds 99"/);
+    await refusedWith(world, contractOf([{ ...pend(J, 5, 30), playerIdentity: 'id:OTHER' }]), /pending_d15_unbound","externalId":"CD_J","detail":"its net ledger stable identity differs/);
+    const corrected = withBystanders({ ...linkedRow(5, J, 30), action: 'corrected', previousPlayerIdentity: 'id:29', evidenceSha256: 'b'.repeat(64), supersedesId: null });
+    await refusedWith(corrected, contractOf([pend(J, 5, 30)]), /pending_d15_unbound","externalId":"CD_J","detail":"its net ledger state is corrected, not linked"/);
+  });
+
+  it('6. a corrected provider missing its own resolved row is refused: nothing pending can excuse a C_promotion provider', async () => {
+    const world = withBystanders(linkedRow(5, J, 30));
+    world.census = [];
+    await refusedWith(world, contractOf([pend(J, 5, 30)]), /ledger_without_row","externalId":"CD_I"/);
+  });
+
+  it('7. a C_promotion provider declared as pending D15 is refused', async () => {
+    const world = withBystanders(linkedRow(5, J, 30));
+    await refusedWith(world, contractOf([pend(CD_I, 2, 20), pend(J, 5, 30)]), /pending_d15_unbound","externalId":"CD_I","detail":"a C_promotion provider can never be pending D15"/);
+  });
+
+  it('8. row_without_ledger is ALWAYS refused, declared set or not', async () => {
+    const world = withBystanders(linkedRow(5, J, 30));
+    world.census.push({ externalId: 'CD_X', status: 'resolved', matchMethod: AFL_API_ADMIN_MATCH_METHOD, playerId: 77, candidateCount: 0, externalUrl: null });
+    await refusedWith(world, contractOf([pend(J, 5, 30)]), /row_without_ledger","externalId":"CD_X"/);
+  });
+
+  it('9/12. a declared pending provider that already holds a resolved row pre-swap (unexpected resolved identity) is refused', async () => {
+    const world = withBystanders(linkedRow(5, J, 30));
+    world.census.push({ externalId: J, status: 'resolved', matchMethod: AFL_API_ADMIN_MATCH_METHOD, playerId: 30, candidateCount: 0, externalUrl: null });
+    await refusedWith(world, contractOf([pend(J, 5, 30)]), /pending_d15_materialised_early","externalId":"CD_J"/);
+  });
+
+  it('a pending provider declared twice is refused, and the contract never excuses any other SAT-1 problem (a second provider at P′ still STOPs)', async () => {
+    const world = withBystanders(linkedRow(5, J, 30));
+    await refusedWith(world, contractOf([pend(J, 5, 30), pend(J, 5, 30)]), /pending_d15_unbound","externalId":"CD_J","detail":"declared more than once"/);
+    const collide = withBystanders(linkedRow(5, J, 30), { ...linkedRow(6, L, 20), playerIdentity: 'id:P2' });
+    await refusedWith(collide, contractOf([pend(J, 5, 30), pend(L, 6, 20)]), /CD_L is net linked to P/);
+  });
+
+  // --- the contract is pre-swap only --------------------------------------------------------------------------------
+  it('the contract is opt-in per call: the default (ordinary correction re-run, rebuild Stage 22, post-swap) stays the strict whole-table invariant', async () => {
+    const world = withBystanders(linkedRow(5, J, 30));
+    expectStop(await rerun(world), 'SAT-1', 'identity_contradicts');
+    const sat1 = sat1ExtendedBijectionProblems;
+    const facts = await fakeReader(world).identityInvariantFacts();
+    expect(sat1({ facts, providerId: CD_I, pPrimeId: P2, pPrimeIdentity: 'id:P2' }).join('|')).toContain('ledger_without_row');
+    expect(sat1({ facts, providerId: CD_I, pPrimeId: P2, pPrimeIdentity: 'id:P2', preSwap: contractOf([pend(J, 5, 30)]) })).toEqual([]);
+    const source = readFileSync(join(process.cwd(), 'tools', 'migration', 'correct_afl_api_identity.ts'), 'utf8');
+    const rebuildSat1 = source.slice(source.indexOf('export function evaluateRebuildSat1('), source.indexOf('/* REBUILD_REPLAY_SECTION_END */'));
+    expect(rebuildSat1).not.toMatch(/preSwap|pendingD15/);
+    const ordinary = source.slice(source.indexOf('async function assertPostWriteSatisfaction('), source.indexOf('async function assertPostWriteSatisfaction(') + 1800);
+    expect(ordinary).toContain('...(preSwapPromotion === undefined ? {} : { preSwapPromotion })');
+    // only the promotion REPLAY builds a contract, and only from the bound artefact
+    expect(source).toContain('pendingD15: file.pendingD15Providers');
+  });
+
+  it('27. after D15 (resolved {CD_I, CD_J}) the GLOBAL invariant holds with no exemption; with a pending provider still unresolved it does not (19)', async () => {
+    const world = withBystanders(linkedRow(5, J, 30));
+    const still = await q2(world);
+    expect(still.satisfied).toBe(false);
+    world.census.push({ externalId: J, status: 'resolved', matchMethod: AFL_API_ADMIN_MATCH_METHOD, playerId: 30, candidateCount: 0, externalUrl: null });
+    const after = await q2(world);
+    expect(after.satisfied, why(after)).toBe(true);
+    // ... and the exemption cannot outlive the pre-swap stage: once J is resolved a still-declared contract REFUSES (materialised early)
+    await refusedWith(world, contractOf([pend(J, 5, 30)]), /pending_d15_materialised_early/);
+  });
+
+  // --- post-swap D15: the exact declared set ------------------------------------------------------------------------
+  describe('post-swap D15 must materialise EXACTLY the declared pending set', () => {
+    const plan = (over: Partial<Parameters<typeof aflApiPendingD15PlanProblems>[0]['plan']> = {}) => ({
+      inserts: [{ externalId: J, playerId: 30 }], supersedes: [] as { externalId: string; playerId: number }[], noops: [] as { externalId: string; satisfied?: 'already_satisfied' }[], ...over,
+    });
+    const pending = [pend(J, 5, 30)];
+
+    it('the planned insert equals the declaration -> exact', () => {
+      expect(aflApiPendingD15PlanProblems({ plan: plan(), pending })).toEqual([]);
+    });
+    it('17. D15 omits a declared provider -> refused', () => {
+      expect(aflApiPendingD15PlanProblems({ plan: plan({ inserts: [] }), pending }).join('|')).toMatch(/pending insert for CD_J is neither planned nor already materialised/);
+    });
+    it('18. D15 inserts an undeclared provider -> refused', () => {
+      expect(aflApiPendingD15PlanProblems({ plan: plan({ inserts: [{ externalId: J, playerId: 30 }, { externalId: L, playerId: 31 }] }), pending }).join('|'))
+        .toMatch(/D15 would insert CD_L, which the artefact does not declare/);
+    });
+    it('the declared ACTION is binding: insert vs supersede cannot be swapped', () => {
+      expect(aflApiPendingD15PlanProblems({ plan: plan({ inserts: [], supersedes: [{ externalId: J, playerId: 30 }] }), pending }).join('|'))
+        .toMatch(/D15 would supersede CD_J, which the artefact does not declare as a pending supersede/);
+    });
+    it('an idempotent re-run (already materialised identically) is exact; a corrected ALREADY_SATISFIED noop never excuses a pending provider', () => {
+      expect(aflApiPendingD15PlanProblems({ plan: plan({ inserts: [], noops: [{ externalId: J }] }), pending })).toEqual([]);
+      expect(aflApiPendingD15PlanProblems({ plan: plan({ inserts: [], noops: [{ externalId: J, satisfied: 'already_satisfied' }] }), pending }).join('|')).toMatch(/neither planned nor already materialised/);
+    });
+    it('16. a tampered declaration (extra entry, or the same provider twice) is refused', () => {
+      expect(aflApiPendingD15PlanProblems({ plan: plan(), pending: [...pending, pend(L, 6, 31)] }).join('|')).toMatch(/pending insert for CD_L/);
+      expect(aflApiPendingD15PlanProblems({ plan: plan(), pending: [...pending, ...pending] }).join('|')).toMatch(/more than once/);
+    });
+    it('20. E3 (assertAflApiIdentityInvariant) and the post-swap gate never see the exemption (source pin)', () => {
+      const source = readFileSync(join(process.cwd(), 'tools', 'migration', 'replay_afl_api_adjudications.ts'), 'utf8');
+      const e3 = source.slice(source.indexOf('export async function assertAflApiIdentityInvariant('));
+      expect(e3.slice(0, 1200)).not.toMatch(/pendingD15|PendingD15|preSwap/);
+      const promoCheck = readFileSync(join(process.cwd(), 'tools', 'db', 'promotion-check.ts'), 'utf8');
+      expect(promoCheck.slice(promoCheck.indexOf('checkAflApiIdentityInvariant({ rows: view.census'), promoCheck.indexOf('checkAflApiIdentityInvariant({ rows: view.census') + 300)).not.toMatch(/pendingD15|preSwap/);
+    });
+  });
+
+  // --- the REPLAY's own pre-write binding ---------------------------------------------------------------------------
+  it('pendingD15BindingProblems (the REPLAY\'s pre-write check) names every unbound declaration and passes an exact one', async () => {
+    const world = withBystanders(linkedRow(5, J, 30));
+    const facts = await fakeReader(world).identityInvariantFacts();
+    expect(pendingD15BindingProblems(facts, contractOf([pend(J, 5, 30)]))).toEqual([]);
+    expect(pendingD15BindingProblems(facts, contractOf([pend(J, 6, 30)])).join('|')).toMatch(/pending_d15_unbound/);
+    expect(pendingD15BindingProblems(facts, contractOf([pend(J, 5, 30), pend('CD_Q', 8, 38)])).join('|')).toMatch(/CD_Q/);
+  });
+
+  // --- CRV (promotion-check) uses the SAME contract -----------------------------------------------------------------
+  describe('CRV (gateAflApiCorrectedReplayVerification) applies the shared contract, not a second rule', () => {
+    const crvEntry: AflApiCorrectedReplayEntry = {
+      externalId: CD_I, adjudicationId: 2, adjudicationEvidenceSha256: EVIDENCE_SHA,
+      previousPlayerIdentity: 'id:P', playerIdentity: 'id:P2', candidateClass: 3, predictedIdentityAction: 'insert',
+      plannerVersion: PLANNER_VERSION, predictedClosureFingerprint: 'f'.repeat(64),
+      predictedMutations: { moved: { player_match_stats: 0, brownlow_round_votes: 0 }, deleted: { player_match_stats: 0, brownlow_round_votes: 0 } },
+    };
+    /** Identity-only class-3 replay: no batch, no closure. */
+    const crvWorld = (...bystanders: AflApiAdjudicationLedgerRow[]): World => ({ ...baseWorld(), batches: [], applications: [], rows: [], projections: [], otherLedger: bystanders });
+    const crv = async (world: World, pending: AflApiPendingD15Entry[]) => {
+      const report = new Report();
+      await gateAflApiCorrectedReplayVerification(fakeReader(world), [crvEntry], pending, report);
+      return report.results[0];
+    };
+
+    it('21. resolved set == C_promotion while the exact linked set is pending D15 -> PASS', async () => {
+      const r = await crv(crvWorld(linkedRow(5, J, 30)), [pend(J, 5, 30)]);
+      expect(r.verdict, r.lines.join('\n')).toBe('PASS');
+    });
+    it('the same world with nothing declared -> FAIL (24: undeclared missing linked provider)', async () => {
+      const r = await crv(crvWorld(linkedRow(5, J, 30)), []);
+      expect(r.verdict).toBe('FAIL');
+      expect(r.lines.join('\n')).toContain('ledger_without_row');
+    });
+    it('22. a pending provider already resolved pre-swap -> FAIL', async () => {
+      const world = crvWorld(linkedRow(5, J, 30));
+      world.census.push({ externalId: J, status: 'resolved', matchMethod: AFL_API_ADMIN_MATCH_METHOD, playerId: 30, candidateCount: 0, externalUrl: null });
+      const r = await crv(world, [pend(J, 5, 30)]);
+      expect(r.verdict).toBe('FAIL');
+      expect(r.lines.join('\n')).toContain('pending_d15_materialised_early');
+    });
+    it('23. the corrected provider absent -> FAIL, whatever is declared', async () => {
+      const world = crvWorld(linkedRow(5, J, 30));
+      world.census = [];
+      world.identityRow = null;
+      const r = await crv(world, [pend(J, 5, 30)]);
+      expect(r.verdict).toBe('FAIL');
+      expect(r.lines.join('\n')).toContain('no afl_api identity row exists after the replay');
+    });
+    it('CRV exact-set equality is unchanged: resolved must equal C_promotion (a pending provider in the resolved set is an extra)', () => {
+      expect(crvExactSetProblems({ netCorrected: new Set([CD_I]), resolved: new Set([CD_I]), cPromotion: new Set([CD_I]) })).toEqual([]);
+      expect(crvExactSetProblems({ netCorrected: new Set([CD_I]), resolved: new Set([CD_I, J]), cPromotion: new Set([CD_I]) }).map((p) => p.extra)).toEqual([[J]]);
+    });
+  });
+
+  // --- the artefact binding (derive / reproduce) --------------------------------------------------------------------
+  describe('the pending set is derived from the graded state and reproduced exactly at --phase candidate', () => {
+    const ledger: AflApiAdjudicationLedgerRow[] = [
+      linkedRow(1, CD_I, 10),
+      { id: 2, externalId: CD_I, action: 'corrected', playerId: 20, playerIdentity: 'id:P2', supersedesId: 1, previousPlayerIdentity: 'id:P', evidenceSha256: EVIDENCE_SHA },
+      linkedRow(5, J, 30), linkedRow(6, L, 31),
+    ];
+    const state = { ledgerRows: ledger, ePromotion: new Set([L]), cPromotion: new Set([CD_I]), candidateExternalIds: new Set([L]) };
+
+    it('25. derive: every net-linked non-corrected provider; supersede = E_promotion (has a candidate row), insert = none', () => {
+      expect(deriveAflApiPendingD15(state)).toEqual([pend(J, 5, 30, 'insert'), pend(L, 6, 31, 'supersede')]);
+    });
+    it('a derivation that contradicts the graded state refuses (an insert provider with a candidate row, a supersede provider without one)', () => {
+      expect(() => deriveAflApiPendingD15({ ...state, candidateExternalIds: new Set([L, J]) })).toThrow(/not in E_promotion but with a candidate row/);
+      expect(() => deriveAflApiPendingD15({ ...state, candidateExternalIds: new Set() })).toThrow(/in E_promotion without a candidate row/);
+      expect(() => deriveAflApiPendingD15({ ...state, ePromotion: new Set([L, 'CD_GHOST']) })).toThrow(/not net-linked in the ledger/);
+    });
+    it('14/15. reproduction: an exact bound set is reproduced; a stale/tampered/partial set names missing and extra', () => {
+      const bound = deriveAflApiPendingD15(state);
+      expect(pendingD15ReproductionProblems(bound, state)).toEqual([]);
+      expect(pendingD15ReproductionProblems(bound.slice(1), state)).toEqual([{ kind: 'pending_d15_not_reproduced', missing: [J], extra: [] }]);
+      expect(pendingD15ReproductionProblems([...bound, pend('CD_Z', 9, 39)], state)).toEqual([{ kind: 'pending_d15_not_reproduced', missing: [], extra: ['CD_Z'] }]);
+      expect(pendingD15ReproductionProblems([{ ...bound[0], adjudicationId: 99 }, bound[1]], state)[0]).toMatchObject({ kind: 'pending_d15_not_reproduced', missing: [J], extra: [J] });
+      expect(pendingD15ReproductionProblems(bound, { ...state, ledgerRows: ledger.filter((r) => r.id !== 5) })[0]).toMatchObject({ extra: [J] });
+    });
   });
 });
 

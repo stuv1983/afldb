@@ -711,14 +711,17 @@ owns it:
 - **`--afl-api-supersede-out` (the `E_promotion` handoff).** Written **only when every gate of the
   run passes**, atomically (a temporary sibling published by `link()`, never over an existing
   file). A refused run writes no file and says so. The file (`afldb.afl_api_supersede_expected`
-  **v3** since `AFLDB-ISSUE-238` Slice 6; v1 and v2 files are refused as stale by name — generate and
+  **v4** since the `AFLDB-ISSUE-238` stage-aware pre-swap contract (v3 since Slice 6); v1, v2 and v3 files are refused as stale by name — generate and
   consume the file with the same build) names the environment, the candidate and the target, and
   binds the candidate's **pre-replay** importer state and the target's ledger state by row count and
   SHA-256 (stable fields only; never a player id), plus the sorted `expectedSupersedes`
   (`E_promotion`) and a `payloadSha256` over all of it. v3 adds the target's corrected-ledger subset
   count/digest (diagnostic), the sorted `correctedReplays` (`C_promotion`, below), and the
   **predicted post-replay** importer count/digest, resolved-row count (= |`C_promotion`|) and whole
-  `afl_api` identity-state digest. With no `corrected` ledger entry `correctedReplays` is empty and
+  `afl_api` identity-state digest. v4 adds `pendingD15Providers`: the exact net-`linked` providers that
+  stay without a `resolved` row until D15 runs after the swap (`{externalId, adjudicationId, playerIdentity,
+  d15Action: insert|supersede}`; its `supersede` entries are `E_promotion`), derived from the graded state and bound
+  by the payload hash (§7.4e, §7.5 and §8 step 1 enforce it). With no `corrected` ledger entry `correctedReplays` is empty and
   every predicted value equals the pre-replay one, so every gate outcome is ISSUE-237's. An empty set
   is bound exactly as strongly as a non-empty one. §7.5 and §8 step 1 both refuse a file that does
   not match the state in front of them.
@@ -1246,6 +1249,16 @@ exactly one (completed, `mode: 'replay'`, `context: 'promotion'`, the predicted 
 `plannerVersion` and move/delete counts) when its predicted closure is non-empty and none otherwise;
 and CORRECTION SATISFACTION (Q2) passes for every one.
 
+**Stage-aware pre-swap identity contract (pending D15; `AFLDB-ISSUE-238` §9.4).** Q2's SAT-1 is the
+whole-table invariant, so in the REPLAY (§7.4e) and in CRV it is evaluated under one shared contract:
+`C_promotion` is fully satisfied, and **exactly** the providers the bound artefact's `pendingD15Providers`
+declares may still lack a `resolved` row. Each declared provider must be bound to its net `linked` ledger row
+and stable identity, must not be in `C_promotion`, must be listed once, must hold no `resolved` row yet, and
+its `ledger_without_row` must be observed. Every `row_without_ledger`, every undeclared `ledger_without_row`
+and every other SAT-1 problem still refuses. The candidate's declared set must also equal the set re-derived
+from the reinstated ledger (`pending_d15_not_reproduced`). The resolved-set equality above is unchanged. The
+exemption exists only in these two pre-swap stages.
+
 ## 8. Swap, post-promotion state, health, admin login
 
 ```bash
@@ -1389,7 +1402,10 @@ generator, with the hyphenated `afldb_*_pre_rebuild_20260906-112500` shape pinne
    empty, so the ISSUE-237 behaviour is unchanged); every `C_promotion` provider must return
    ALREADY_SATISFIED and the ALREADY_SATISFIED corrected set must equal `C_promotion` exactly
    (missing or extra refuses before any write); a corrected provider never causes a ledger or
-   identity write; `C_promotion ∩ E_promotion = ∅`. The operator states the environment and the
+   identity write; `C_promotion ∩ E_promotion = ∅`. **v4:** D15 must materialise **exactly** the file's
+   `pendingD15Providers` (every planned insert/supersede declared with that action; every declared provider
+   planned or already materialised identically; nothing else), checked before any write; the full
+   whole-table invariant (E3) then applies with no exemption. The operator states the environment and the
    target; the connection must actually be on that target:
 
    ```bash

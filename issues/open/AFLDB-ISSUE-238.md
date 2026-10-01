@@ -2830,6 +2830,48 @@ operator authorisation (§0, §12).
   implementation must include zero-`corrected` parity tests (§12.1, case 33), even though it lands
   after L5.
 
+### 9.4 The stage-aware pre-swap identity contract (pending D15) — a production correction found by the DEV rehearsal (2026-10-01)
+
+**Defect (not a harness exception).** The DEV promotion rehearsal's Run C (FX1 corrected, FX2 net-`linked`)
+stopped at §7.4e with `ledger_without_row CD_I9992386002`. The refusal is independent of the injected
+Case-44 row (removing row 8 does not change it): the pre-swap candidate contract and SAT-1 could not both
+hold whenever a corrected provider (`C_promotion`) coexisted with an unrelated net-`linked` provider.
+
+- The promotion contract requires the candidate's `resolved` set to equal `C_promotion` until the swap
+  (§7.5 G1/CRV), because D15 materialises every other net-`linked` provider only AFTER the swap.
+- SAT-1 is the whole-table combined invariant: every net `linked` or `corrected` ledger entry must already
+  hold its `resolved` row. The REBUILD replay escapes this by running D15 before Q2 (§9.2, "C1, binding");
+  the promotion replay has no such ordering.
+
+**Contract (Option 1; Option 2 — moving D15 before the swap and widening CRV to `C_promotion` ∪ D15 — is
+NOT implemented).**
+
+- **PRE-SWAP (REPLAY 7.4e and CRV, and only these):** `C_promotion` must be fully satisfied, unchanged. The
+  EXACT net-`linked` providers the bound artefact declares may still lack a resolved row. No other
+  bijection defect is allowed: every `row_without_ledger`, every undeclared `ledger_without_row`, a wrong
+  player/identity/ledger row, a declared provider that already holds a resolved row, a declared
+  `C_promotion` provider, a duplicate declaration and every other SAT-1 check still refuse. CRV's resolved
+  equality (`resolved == C_promotion`) is unchanged.
+- **Binding.** Supersede file **v4** adds `pendingD15Providers`: per provider `{externalId,
+  adjudicationId (the net ledger row), playerIdentity, d15Action: insert | supersede}`. Derived at
+  `--phase restored` from the graded state (every net-linked non-corrected provider; `supersede` = E_promotion,
+  `insert` = no candidate row), hashed into `payloadSha256`, refused by the parser unless sorted, unique,
+  disjoint from `correctedReplays` and exactly E_promotion for its `supersede` entries. A v3 file is refused
+  as stale. `--phase candidate` re-derives the set from the reinstated ledger and refuses unless it is
+  reproduced exactly (`pending_d15_not_reproduced`); the REPLAY binds it to the reinstated candidate before
+  any write.
+- **One shared helper.** `applyAflApiPendingD15` (`src/lib/acquisition/afl-api-adjudication.ts`) is the only
+  place the exemption exists. SAT-1 (`sat1ExtendedBijectionProblems`, via an opt-in `preSwap` argument), the
+  REPLAY and CRV all call it with the contract built from the artefact. Callers that pass no contract —
+  ordinary ORIGINAL/re-run, rebuild Stage 22, post-swap acceptance, E3 — keep the strict invariant, so the
+  exemption cannot survive the pre-swap stage. `checkAflApiIdentityInvariant` itself is unchanged.
+- **POST-SWAP.** D15 must materialise exactly the declared set (`aflApiPendingD15PlanProblems`, checked
+  before any write: every planned insert/supersede declared with that action; every declared provider planned
+  or already materialised identically; nothing else). The full global invariant then applies with NO
+  exemption (E3 `assertAflApiIdentityInvariant`, the post-swap production gate).
+- `CORRECTED_PROMOTION_REHEARSAL_REQUIRED` is unchanged and stays until the DEV rehearsal (Stage 2/3, R1/R0,
+  Item 12) passes. This issue is NOT resolved by this correction.
+
 ## 10. Migration requirements (proposed, not written)
 
 The exact CHECKs were established from migrations 001, 083 and 104. Pass 4 re-checked M1 and M2

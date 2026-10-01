@@ -48,6 +48,7 @@ import {
   aflApiLedgerStateSha256,
   aflApiReverseIdentityPaths,
   aflApiSupersedeBindingProblems,
+  aflApiPendingD15PlanProblems,
   aflApiSupersedeMismatch,
   censusAflApiRows,
   checkAflApiAdjudicationBijection,
@@ -66,6 +67,7 @@ import {
   type AflApiImporterCandidateRow,
   type AflApiImporterReplayPlan,
   type AflApiLedgerNetAction,
+  type AflApiPendingD15Entry,
   type AflApiPlayerRemapResult,
   type AflApiSupersedeFile,
   type CapturedImporterRow,
@@ -431,14 +433,23 @@ export async function replayAflApiAdjudications(
    * ALREADY_SATISFIED (`C_promotion`). A missing or extra one aborts before any write. Omitted
    * (every rebuild / OD-4 / ISSUE-235-237 caller) means no such assertion, i.e. the prior behaviour.
    */
-  options: { expectedAlreadySatisfied?: ReadonlySet<string> } = {},
+  options: {
+    expectedAlreadySatisfied?: ReadonlySet<string>;
+    /**
+     * AFLDB-ISSUE-238 (supersede file v4), post-swap: the EXACT pending-D15 set the bound artefact declared. D15's plan
+     * must equal it (every planned insert/supersede declared with that action; every declared provider planned or
+     * already materialised identically; nothing else), checked before any write. The pending-D15 exemption the pre-swap
+     * stages use ends here: the caller's E3 invariant afterwards is the strict whole-table one.
+     */
+    expectedPendingD15?: readonly AflApiPendingD15Entry[];
+  } = {},
 ): Promise<AflApiReplayCounts> {
   const sourceId = await fetchAflApiSourceId(tx);
   const ledgerRows = await readLedgerRows(tx);
   // An empty ledger can supersede nothing, so it may short-circuit ONLY when nothing was expected;
   // otherwise it falls through to the exact-set check below and aborts (D13).
   if (ledgerRows.length === 0 && expectedSupersedes.size === 0
-    && (options.expectedAlreadySatisfied?.size ?? 0) === 0) {
+    && (options.expectedAlreadySatisfied?.size ?? 0) === 0 && (options.expectedPendingD15?.length ?? 0) === 0) {
     return { inserted: 0, noops: 0, stops: [], supersedes: [] };
   }
 
@@ -477,6 +488,17 @@ export async function replayAflApiAdjudications(
       throw new AflApiReplayAbort(
         'afl_api D15 ALREADY_SATISFIED set did not equal C_promotion exactly -- nothing written '
         + `(missing: ${missing.join(', ') || 'none'}; extra: ${extra.join(', ') || 'none'})`,
+      );
+    }
+  }
+
+  // AFLDB-ISSUE-238 (v4): D15 materialises EXACTLY the declared pending set. Before any statement runs.
+  if (options.expectedPendingD15 !== undefined) {
+    const pendingProblems = aflApiPendingD15PlanProblems({ plan, pending: options.expectedPendingD15 });
+    if (pendingProblems.length > 0) {
+      throw new AflApiReplayAbort(
+        'afl_api D15 plan did not equal the declared pending-D15 set exactly -- nothing written '
+        + `(${pendingProblems.join('; ')})`,
       );
     }
   }
@@ -635,7 +657,9 @@ export async function replayAflApiAdjudicationsFromSupersedeFile(
   }
   // SAT-1: every C_promotion provider must return ALREADY_SATISFIED, and only those. D15 creates
   // no correction and writes no ledger row.
-  return replayAflApiAdjudications(tx, new Set(file.expectedSupersedes), { expectedAlreadySatisfied: cPromotion });
+  return replayAflApiAdjudications(tx, new Set(file.expectedSupersedes), {
+    expectedAlreadySatisfied: cPromotion, expectedPendingD15: file.pendingD15Providers,
+  });
 }
 
 /**
