@@ -4,7 +4,7 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 9
+**Open issues:** 7
 
 | ID | Title | Severity | Area | State | Next action |
 |---|---|---|---|---|---|
@@ -15,7 +15,12 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-230 | `afldb_test` 2026 AFL Tables spine carries 2099 observation timestamps from the 2026-09-06 settle benchmark, so real-clock settles refuse on `source_records_seen_ck` | Low | Test database hygiene — `afldb_test` `staging.source_records` | Open — found 2026-09-23 (ISSUE-228 §22.13); lineage continued to 2099-01-06 on `afldb_test` only under operator authorisation (batches 2421/2422); not repaired; did not block ISSUE-228 S9 (accepted 2026-09-23) | Choose a repair (reviewed re-stamp tool on `afldb_test` only, or a real-clock rebuild of the 2026 lineage); S9 is now accepted, so it may be scheduled |
 | AFLDB-ISSUE-226 | Stale `docs/architecture.md` §5/§6: the documented application structure names `src/services/`, `src/db/schema/` (described as a Drizzle schema) and `src/types/`, none of which exist, and no Drizzle dependency is present — the project uses postgres.js directly | Low | Documentation — `docs/architecture.md` §5 "Application structure", §6 "Shared statistical definitions" | Open — found 2026-09-19 during the PhanesLight bootstrap closure review; verified three ways against the tracked tree; no code, data or runtime impact; not corrected under the bootstrap | Correct `docs/architecture.md` §5's directory tree and the Drizzle reference to the actual layout, and re-site §6's "defined once in `src/services`" claim on wherever the shared statistical definitions now live (establish that first — this issue does not assert where they are) |
 | AFLDB-ISSUE-225 | Gridley corpus: 37 pre-existing `incorrect known answer` cells on non-draft criteria (`captain` 20, `teammates-150` 14, `teammates-100` 1, `games250sameclub` 1, `games100clubs2` 1; 14 players) present on `afldb_test` since the 2026-09-13 baseline, untouched by AFLDB-ISSUE-222 | Medium | Grid Solver / canonical data — `captaincies`, `player_club_season_stats`, `tests/integration/gridley-corpus.test.ts` | Open — opened 2026-09-19 under ISSUE-222 decision D3; reproduced 2026-09-17 (pre-import) and 2026-09-19 (report `7f14ff2c…`); root cause not investigated | Investigate the five criteria with targeted read-only queries (captaincies rows for Cameron Bruce / Steven May; the board-1024 teammate counts); classify each cell from canonical evidence; never resolve by reclassification |
-| AFLDB-ISSUE-220 | Web service credential boundary contradicts the application's `afldb_import` requirement; owner-role code-test DSN and a complete `.env` copy reach the internet-facing process | High | Deployment / runtime security | Open — implemented `f5adfe39`, merged `46805c05` 2026-09-17; 2026-10-01 deny-list drift (3 ISSUE-224/251 maintenance DSNs) restored + recursive standalone `.env*` refusal on `sonnet/issue-220-credential-drift` (contract test 24/24); DEV/PROD acceptance never completed | Merge the drift branch; DEV rollout + runbook §8 + Admin Centre `afldb_import` write/revert; PROD read-only before-state, rollout only on explicit authorisation, after-state |
+**AFLDB-ISSUE-220 resolved 2026-10-01** (implementation `f5adfe39`, merged `46805c05`; drift repair
+`1111ab19`; operator-run DEV and PROD acceptance). DEV and PROD both run `1111ab19` and hold exactly
+`DATABASE_URL`, `AFLDB_AUTH_DATABASE_URL` and `AFLDB_IMPORT_DATABASE_URL`, with no `.env*` under
+`.next/standalone`; the repository and installed units are byte-identical on both hosts. Removed from
+`IssuesIndex.md` and the Open Issues table. Full record: the entry near the end of this file and
+`issues/closed/AFLDB-ISSUE-220.md` §0a.
 
 AFLDB-ISSUE-220 opened 2026-09-17 (Fable 5.1 code review outside NL search, DEV evidence
 operator-gathered on streamanator, no values printed). `deploy/afldb.service` drops
@@ -34867,10 +34872,10 @@ Stage 2.
 
 ## AFLDB-ISSUE-220 — Web service credential boundary contradicts the application's `afldb_import` requirement; owner-role code-test DSN and a complete `.env` copy reach the internet-facing process
 
-- **Status:** Open (opened 2026-09-17). Implemented 2026-09-17 in `f5adfe39` and merged to `main`
-  at `46805c05` the same day (see Implementation below). The 2026-10-01 drift is restored on
-  `sonnet/issue-220-credential-drift` (see Update 2026-10-01). DEV/PROD acceptance is still
-  pending before resolution.
+- **Status:** **Resolved 2026-10-01** (opened 2026-09-17). Implemented 2026-09-17 in `f5adfe39` and
+  merged to `main` at `46805c05` the same day (see Implementation below). The 2026-10-01 drift was
+  repaired in `1111ab193882566b7ba7e3fc8d69b2f7c62c6c40`, merged to `main`. DEV and PROD acceptance
+  passed the same day (see Resolution 2026-10-01 at the end of this entry).
 - **Severity:** High. Security posture (a documented credential isolation that does not hold, and
   an owner-role DSN live in the public web process) and, depending on the open runtime question,
   availability of the entire Admin Centre write path.
@@ -35046,21 +35051,19 @@ different file, unaffected); `.env`/`.env.example` values (no secret touched).
   `tools/build/env-in-standalone.mjs` `.mjs`-by-extension import resolves correctly under
   `moduleResolution: bundler` + `allowJs`, the one open risk noted at implementation time).
 
-**Still outstanding** (runbook §8 steps 2–6, this issue's acceptance criteria, §9): DEV unit
-reinstall + restart, the two DEV names-only checks (running process holds exactly
+**Outstanding at the time of writing** (runbook §8 steps 2–6, this issue's acceptance criteria, §9):
+DEV unit reinstall + restart, the two DEV names-only checks (running process holds exactly
 `AFLDB_AUTH_DATABASE_URL AFLDB_IMPORT_DATABASE_URL DATABASE_URL`; no `.env*` under
 `.next/standalone/`), one `afldb_import`-backed Admin Centre write + revert on DEV, `npm run build`
 on DEV with the new `prepare-standalone.mjs` assertion passing, then PROD read-only steps 2–3
-before any PROD unit change (PROD still not inspected for this issue) and steps 2–3 again after.
-Status stays **Open** until that evidence is in hand — no further implementation changes pending
-this validation.
+before any PROD unit change and steps 2–3 again after. All were completed on 2026-10-01; see
+Resolution 2026-10-01 below.
 
 ### Follow-up
 - Related closed issues: AFLDB-ISSUE-027 (migration 066 moved admin writes to `afldb_import`),
   AFLDB-ISSUE-107 (exec-time environment evidence, 2026-08-29), AFLDB-ISSUE-122 (settle unit
   precedent for keeping exactly one writing DSN), AFLDB-ISSUE-146 (introduced the code-test DSNs).
-- PROD has not been inspected; the runbook requires the same names-only checks there before any
-  unit change.
+- PROD was first inspected on 2026-10-01 (before-state recorded in Resolution 2026-10-01 below).
 
 ### Update 2026-10-01 — historical record corrected; deny-list drift restored; standalone hardening
 
@@ -35106,14 +35109,67 @@ this validation.
   - ESLint clean on the three JS/TS files. The systemd unit has no ESLint configuration, and
     ESLint ignored it with a warning.
 - No database, DEV or PROD contact; no build, unit install or restart.
-- **Remaining acceptance (after merge, each step operator-authorised):**
+- **Acceptance outstanding at that point (each step operator-authorised; all completed, see
+  Resolution 2026-10-01 below):**
   1. DEV rollout and runbook §8.
   2. One Admin Centre `afldb_import`-backed write and revert on DEV.
   3. PROD read-only before-state checks.
   4. PROD unit/build rollout, only on explicit authorisation.
   5. PROD after-state checks.
 
-  **Status: OPEN.**
+### Resolution 2026-10-01 — DEV and PROD acceptance (operator-run)
+
+**RESOLVED 2026-10-01.** No application code, migration, deployment file, package file or test
+changed in the closure. Fix: `f5adfe39` (merged `46805c05`) plus the credential-drift repair
+`1111ab193882566b7ba7e3fc8d69b2f7c62c6c40` (merged and pushed to `main`).
+`tests/deploy-web-unit.test.ts` 24/24 PASS.
+
+- **DEV, revision `1111ab19`.**
+  - Next 16.3.1 build succeeded, 1516 static pages. `prepare-standalone` confirmed no `.env*` at the
+    standalone root or anywhere under `.next/standalone`; recursive env count 0.
+  - `afldb.service` active; `/api/health` `status=ok`, `database=ok`.
+  - Live `MainPID` held exactly `AFLDB_AUTH_DATABASE_URL`, `AFLDB_IMPORT_DATABASE_URL`,
+    `DATABASE_URL`.
+  - Repository and installed unit byte-identical, SHA256
+    `a3444840e0bd5f94ea05ea4b01508e0e8209d65ae452be665c1049c6b34e149a`; the installed deny list held
+    all 12 non-web DSNs.
+  - Browser acceptance through `/admin/data-editor`: a temporary player Notes edit saved
+    (`data_edit.saved` audit), the exact original Notes were restored (second `data_edit.saved`
+    audit). This proves a real `AFLDB_IMPORT_DATABASE_URL`-backed Admin Centre mutation works after
+    the boundary change.
+- **PROD before-state, revision `8fc60404`.** Service active, health ok. The live process held only
+  `AFLDB_AUTH_DATABASE_URL` and `DATABASE_URL`; `AFLDB_IMPORT_DATABASE_URL` was absent (the old
+  installed `UnsetEnvironment=` removed it). Standalone env count already 0. Repository and installed
+  unit hashes differed. This was the stale, under-provisioned state.
+- **PROD rollout.**
+  - The checkout fast-forwarded 21 commits to `1111ab19`; 31 known nightly settle manifests were
+    preserved in a temporary stash so deploy preflight could require a clean worktree.
+  - Preflight first correctly blocked on pending migrations 106–109 (105/109 applied). The
+    operator-authorised apply ran 106, 107, 108 and 109, all ok; `privileges.sql` reconciled as
+    `afldb_owner` against `afldb_prod`; status 109/109, 0 pending. Preflight then READY, 0
+    blockers, one expected SSH-not-requested warning.
+  - `AFLDB_IMPORT_DATABASE_URL` resolved independently to database `afldb_prod`, role
+    `afldb_import`. Workers `AFLDB_WORKERS=2`, `AFLDB_POOL_MAX=10`.
+  - `npm ci` reported 7 dependency vulnerabilities (2 moderate, 4 high, 1 critical): observed only,
+    no `npm audit fix` run, remediation outside this issue.
+  - The first build exposed an execution-environment evidence gap only: `AFLDB_ENV=production` was
+    in `.env` but not exported to the separate `prepare-standalone` wrapper. No deploy or restart
+    followed. The rebuild with it exported succeeded (1516 static pages; HSTS and production CSP
+    enabled; no `.env*` under `.next/standalone`). Independent checks: standalone env count 0, and
+    `Strict-Transport-Security` present in `.next/routes-manifest.json`.
+- **PROD after-state.** The repository unit was installed and `afldb` restarted at `1111ab19`.
+  Service active, health `status=ok`, `database=ok`. Live `MainPID` held exactly
+  `AFLDB_AUTH_DATABASE_URL`, `AFLDB_IMPORT_DATABASE_URL`, `DATABASE_URL`; standalone env count 0;
+  repository and installed unit SHA256 both `a3444840…e149a`; the same 12-name deny list. PROD now
+  satisfies the exact three-DSN runtime boundary with no credential file in the standalone output.
+- **Housekeeping.** `stash@{0}` applied cleanly, restoring exactly the original 31 nightly settle
+  manifests as untracked operational artefacts; no tracked PROD checkout change; the stash was
+  dropped.
+- **Tracking.** Runbook moved to `issues/closed/AFLDB-ISSUE-220.md` (§0 final closure, §0a
+  evidence). Removed from `IssuesIndex.md` and the Open Issues table; `CHANGELOG.md` updated under
+  `Unreleased`.
+
+**Status: RESOLVED 2026-10-01.**
 
 ---
 

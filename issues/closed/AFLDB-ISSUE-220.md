@@ -1,10 +1,20 @@
 # AFLDB-ISSUE-220 — Web service credential boundary contradicts the application's `afldb_import` requirement; owner-role code-test DSN and a complete `.env` copy reach the internet-facing process
 
-Status: **Open — implemented and merged; DEV/PROD acceptance outstanding.** Opened 2026-09-17
-(Fable 5.1 code review outside NL search) as a planning runbook. §1–§11 below are that original
-plan, kept as history. The current state is §0.
+Status: **Resolved 2026-10-01.** Opened 2026-09-17 (Fable 5.1 code review outside NL search) as a
+planning runbook. §1–§11 below are that original plan, kept as history. The final state is §0; the
+DEV and PROD acceptance evidence is §0a.
 
-## 0. Current state (2026-10-01)
+## 0. Current state — final closure (2026-10-01)
+
+**Resolved 2026-10-01.** The credential boundary is implemented, merged and accepted on both DEV and
+PROD. Every item that was outstanding below is complete, with operator-run evidence recorded in §0a.
+- Implementation: `f5adfe39`, merged to `main` at `46805c05` (2026-09-17).
+- Credential-drift repair: `1111ab193882566b7ba7e3fc8d69b2f7c62c6c40`, merged and pushed to `main`.
+- `tests/deploy-web-unit.test.ts`: 24/24 PASS.
+- DEV and PROD both run `1111ab19` and hold exactly `DATABASE_URL`, `AFLDB_AUTH_DATABASE_URL` and
+  `AFLDB_IMPORT_DATABASE_URL`, with no `.env*` anywhere under `.next/standalone`.
+
+The remainder of this section is the history of how the issue reached closure.
 
 **Historical implementation.**
 - `f5adfe39` implemented the fix and was merged to `main` at `46805c05` on 2026-09-17.
@@ -45,14 +55,83 @@ So it is not §8 acceptance.
   `.env`/`.env.*` survives anywhere. A nested one is reported for inspection, never deleted.
 - The workstation `node_modules` holds no `.env*` file, so no legitimate dependency is blocked.
 
-**Remaining acceptance (after merge, each step operator-authorised).**
+**Acceptance that was outstanding at the time of the drift repair (all complete, see §0a).**
 1. DEV rollout (unit install + rebuild + restart) and the §8 checks.
 2. One Admin Centre `afldb_import`-backed write and revert on DEV.
 3. PROD read-only before-state checks (§8 step 6).
 4. PROD unit/build rollout, only after explicit operator authorisation.
 5. PROD after-state checks.
 
-The issue stays OPEN until those pass.
+## 0a. Final acceptance evidence (operator-run, 2026-10-01)
+
+No application code, migration, deployment file, package file or test changed in this closure.
+
+**DEV (revision `1111ab193882566b7ba7e3fc8d69b2f7c62c6c40`).**
+- Next 16.3.1 production build succeeded, 1516 static pages.
+- `prepare-standalone` confirmed no `.env*` at the standalone root and none anywhere under
+  `.next/standalone`; the recursive standalone env count is 0.
+- `afldb.service` active; `/api/health` returned `status=ok`, `database=ok`.
+- Live `MainPID` held exactly `AFLDB_AUTH_DATABASE_URL`, `AFLDB_IMPORT_DATABASE_URL`, `DATABASE_URL`.
+- Repository `deploy/afldb.service` and installed `/etc/systemd/system/afldb.service` were
+  byte-identical, SHA256 `a3444840e0bd5f94ea05ea4b01508e0e8209d65ae452be665c1049c6b34e149a`.
+- The installed deny list held all 12 non-web DSNs: `AFLDB_OWNER_DATABASE_URL`,
+  `AFLDB_TEST_DATABASE_URL`, `AFLDB_TEST_IMPORT_DATABASE_URL`, `AFLDB_TEST_AUTH_DATABASE_URL`,
+  `AFLDB_CODE_TEST_DATABASE_URL`, `AFLDB_CODE_TEST_IMPORT_DATABASE_URL`, `AFLDB_DEV_DATABASE_URL`,
+  `AFLDB_DEV_IMPORT_DATABASE_URL`, `AFLDB_BACKUP_DATABASE_URL`, `AFLDB_PROD_DATABASE_URL`,
+  `AFLDB_PROD_IMPORT_DATABASE_URL`, `AFLDB_PROD_AUTH_DATABASE_URL`.
+- Browser acceptance through `/admin/data-editor`: a temporary player Notes edit saved and recorded
+  `data_edit.saved`; the exact original Notes were restored and a second `data_edit.saved` audit was
+  recorded for the revert. This proves a real `AFLDB_IMPORT_DATABASE_URL`-backed Admin Centre
+  mutation works after the boundary change.
+
+**PROD before-state (revision `8fc60404d12c64d410e1f41c68bd8f0c7f5b6154`).**
+- Service active; health `status=ok`, `database=ok`.
+- The live process held only `AFLDB_AUTH_DATABASE_URL` and `DATABASE_URL`;
+  `AFLDB_IMPORT_DATABASE_URL` was absent. Standalone env count was already 0.
+- Repository and installed unit hashes differed, and the old installed `UnsetEnvironment=`
+  explicitly removed `AFLDB_IMPORT_DATABASE_URL`.
+- This established the stale, under-provisioned PROD state before rollout.
+
+**PROD rollout.**
+- The checkout fast-forwarded 21 commits to `1111ab193882566b7ba7e3fc8d69b2f7c62c6c40`. The 31
+  known nightly settle manifests were temporarily preserved in a stash so deploy preflight could
+  require a clean worktree.
+- Read-only deploy preflight first correctly blocked on pending migrations 106–109 (status
+  105/109). The operator-authorised PROD apply ran `106_afl_api_identity_corrected_action.sql`,
+  `107_canonical_applications_delete_audit.sql`, `108_import_reads_data_edits.sql` and
+  `109_import_reads_player_match_period_stats.sql`, all ok. `privileges.sql` reconciled as
+  `afldb_owner` against `afldb_prod`. Post-apply status 109/109, 0 pending.
+- Deploy preflight: READY, 0 blockers, one expected SSH-not-requested warning.
+  `AFLDB_IMPORT_DATABASE_URL` independently resolved to database `afldb_prod`, role `afldb_import`.
+  Worker settings `AFLDB_WORKERS=2`, `AFLDB_POOL_MAX=10`.
+- `npm ci` installed the locked tree and reported 7 dependency vulnerabilities (2 moderate, 4 high,
+  1 critical). Observed only: no `npm audit fix` was run, and dependency remediation is outside
+  this issue.
+- `tests/deploy-web-unit.test.ts` 24/24 PASS.
+- The first build exposed an execution-environment evidence gap only: `AFLDB_ENV=production` was in
+  `.env` but not exported to the separate `prepare-standalone` wrapper process. No deploy or
+  restart occurred from that build. The rebuild with `AFLDB_ENV=production` exported succeeded,
+  1516 static pages; `prepare-standalone` reported HSTS and production CSP enabled, no `.env*`
+  anywhere under `.next/standalone`, bundle ready. Independent checks: standalone env count 0, and
+  `Strict-Transport-Security` present in `.next/routes-manifest.json`.
+
+**PROD after-state.**
+- The repository `afldb.service` was installed and `afldb` restarted at revision
+  `1111ab193882566b7ba7e3fc8d69b2f7c62c6c40`. Service active; health `status=ok`, `database=ok`.
+- Live `MainPID` held exactly `AFLDB_AUTH_DATABASE_URL`, `AFLDB_IMPORT_DATABASE_URL`,
+  `DATABASE_URL`. Standalone env count 0.
+- Repository and installed unit SHA256 both `a3444840e0bd5f94ea05ea4b01508e0e8209d65ae452be665c1049c6b34e149a`;
+  the installed deny list held the same 12 non-web DSNs as DEV.
+- PROD therefore satisfies the intended exact three-DSN runtime boundary with no credential file in
+  the standalone output.
+
+**Post-rollout housekeeping.** `stash@{0}` applied cleanly and restored exactly the original 31
+nightly settle manifests as untracked operational artefacts. No tracked PROD checkout change was
+present, and the temporary stash was dropped.
+
+**Acceptance criteria (§9).** All met: §8 steps 1–5 on DEV; steps 2, 3 and 6 on PROD; the unit,
+`docs/deployment.md` §9 and the contract test agree on the three-DSN set; no `.env*` under
+`.next/standalone/` on either host after a fresh build.
 
 ---
 

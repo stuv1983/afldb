@@ -15,7 +15,7 @@ commit.
 
 ## [Unreleased]
 
-### Deployment security: web DSN deny-list restored, standalone env-file detection hardened (AFLDB-ISSUE-220; issue open) - 1 October 2026
+### Deployment security: web DSN deny-list restored, standalone env-file detection hardened (AFLDB-ISSUE-220; resolved) - 1 October 2026
 
 - `deploy/afldb.service` again keeps exactly `DATABASE_URL`, `AFLDB_AUTH_DATABASE_URL` and
   `AFLDB_IMPORT_DATABASE_URL`. It now also unsets the three operator maintenance DSNs added since
@@ -27,7 +27,15 @@ commit.
   of `.next/standalone/`. It now also scans the whole finished standalone tree, by name only and
   without following symlinks, and refuses to ship if any `.env`/`.env.*` survives anywhere. Nested
   files are reported, not deleted.
-- Not yet rolled out: DEV and PROD acceptance remain outstanding.
+- Rolled out and accepted on DEV and PROD at `1111ab19` (operator-run, 1 October 2026). Both hosts
+  run the web service with exactly `DATABASE_URL`, `AFLDB_AUTH_DATABASE_URL` and
+  `AFLDB_IMPORT_DATABASE_URL`, hold no `.env*` anywhere under `.next/standalone`, and have the
+  repository `deploy/afldb.service` installed byte-for-byte (the installed deny list names all 12
+  other DSNs). A real `afldb_import`-backed Admin Centre edit and revert succeeded on DEV.
+- PROD was previously under-provisioned (`AFLDB_IMPORT_DATABASE_URL` removed by a stale installed
+  unit). The rollout applied pending migrations 106–109 and reconciled `privileges.sql` first, and
+  the PROD build now exports `AFLDB_ENV=production` to `prepare-standalone` so HSTS and the
+  production CSP are confirmed.
 
 ### Season rollover: AFL API ownership census and season-scoped AFL API Brownlow artefacts (AFLDB-ISSUE-233; issue open) - 1 October 2026
 

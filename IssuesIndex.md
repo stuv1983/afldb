@@ -9,7 +9,7 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Open issues:** 8
+**Open issues:** 7
 
 ### AFLDB-ISSUE-234 — Optional AFL API feed expansion (extended statistics, umpires, play-by-play)
 - **Severity:** Low. **Area:** data acquisition, investigation only.
@@ -183,36 +183,6 @@
 - **Next action:** correct §5's directory tree and drop the Drizzle reference. Then **establish
   where the §6 shared statistical definitions actually live** before rewriting that claim — this
   issue asserts only that they are not in `src/services/`, and does not assert where they are.
-
-### AFLDB-ISSUE-220 — Web service credential boundary contradicts the application's `afldb_import` requirement; owner-role code-test DSN and a complete `.env` copy reach the internet-facing process
-- **Severity:** High. **Area:** deployment / runtime security.
-- **State:** Open (2026-09-17). Implemented in `f5adfe39`, merged to `main` at `46805c05`
-  (2026-09-17): the three-DSN web boundary, post-build standalone `.env*` stripping, the derived
-  contract test (15/15 then) and §9 docs.
-  - **Partial DEV evidence (2026-09-19, `19eb40c0`):** the running process held exactly the three
-    DSNs. This was start-environment evidence only, taken before the drift below, and did not
-    check the standalone `.env`.
-  - **2026-10-01 drift, restored on `sonnet/issue-220-credential-drift` (pushed, not merged):**
-    - `AFLDB_DEV_IMPORT_DATABASE_URL` (ISSUE-224), `AFLDB_PROD_IMPORT_DATABASE_URL` and
-      `AFLDB_PROD_AUTH_DATABASE_URL` (ISSUE-251) were in `.env.example` but missing from the deny
-      list and §9.
-    - The contract test caught it: 4 failures on `main` `d0423d92`. It is now 24/24.
-    - The build now also refuses any `.env*` surviving anywhere under `.next/standalone/` (names
-      only, symlinks not followed, nothing nested deleted).
-    - Next 16.3.1 re-verified: the standalone copy is still unconditional, and no config option
-      prevents it.
-- **Runbook:** `issues/open/AFLDB-ISSUE-220.md` (§0 is the current state).
-- **Next action:** merge the drift branch.
-  - DEV: rollout and runbook §8 checks, plus an Admin Centre `afldb_import` write and revert.
-  - PROD: read-only before-state checks first; the unit/build rollout only on explicit operator
-    authorisation; then the after-state checks.
-- **Key files:** `deploy/afldb.service`, `docs/deployment.md` §9, `tools/build/prepare-standalone.mjs`,
-  `tools/build/env-in-standalone.mjs` (new), `tests/deploy-web-unit.test.ts` (new).
-- **Local validation (2026-09-17):** `vitest run tests/deploy-web-unit.test.ts` **15/15 passed**;
-  `tsc --noEmit` **clean**. DEV/PROD not yet run.
-- **Next action:** operator runs the Git/DEV rollout (commit → `merge:ready` → push/merge → `sync-dev.ps1`
-  build → manual unit reinstall + restart → names-only checks + Admin Centre write/revert), then PROD
-  read-only checks. Resolve only once DEV steps 1–5 and PROD steps 2–3/6 (runbook §8/§9) pass.
 
 ### AFLDB-ISSUE-225 — Gridley corpus: 37 pre-existing `incorrect known answer` cells on non-draft criteria, present on `afldb_test` before AFLDB-ISSUE-222 and untouched by it
 - **Severity:** Medium. **Area:** Grid Solver / canonical data — `captaincies`,
