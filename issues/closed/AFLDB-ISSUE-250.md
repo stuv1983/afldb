@@ -318,6 +318,15 @@ procedure: while frozen, the only owner-DSN tools run against the target are the
 A write that lands on the kept database *after* the swap (only possible for an operator role, by
 its `pre_rebuild` name) also fails the gate. That is a false refusal, and it fails closed.
 
+*Amendment (AFLDB-ISSUE-238, 2026-10-01, operator-approved).* The bound above is unchanged for rebuilt
+tables in general, with one explicit exception: the LIVE `public.external_identities` is
+freeze-protected and is in F0 (`FREEZE_PROTECTED_REBUILT_TABLES`, `tools/db/promotion-freeze.ts`).
+Its promotion treatment stays `rebuilt` (the candidate's copy stands). Reason: an AFL API identity
+adjudication writes the ledger and identity rows in one transaction, and the DEV rehearsal (Run C, case 44)
+showed a late write changing both while F0 named only the ledger, so an identity-only late write would have
+reached `--phase candidate` undetected. F0 is now 37 tables; a 36-table record written before the
+amendment is refused by a current checkout ("covers a different table set") and is historical evidence only.
+
 ### 7.7 Release and service order after the swap
 
 The new live database is the candidate: it was created by `createdb` with the default ACL and
@@ -333,7 +342,8 @@ longer writes to a promoted database that has not yet been accepted.
 
 - Tables: `freezeDigestTables(environment)` = every public contract table whose treatment is not
   `rebuilt` (the `truncatedPublicTables()` set, env-independent) + every `staging_aflw` table from
-  the contract. Generated, so a new contract entry is covered automatically.
+  the contract + the explicitly freeze-protected `rebuilt` tables (`FREEZE_PROTECTED_REBUILT_TABLES`:
+  `external_identities`; see the §7.6 amendment). Generated, so a new contract entry is covered automatically.
 - Per table: `count(*)` and `md5(string_agg(md5(t::text), '' ORDER BY md5(t::text)))`, with the
   session's output settings pinned (`TimeZone=UTC`, `DateStyle=ISO, YMD`, `IntervalStyle=postgres`,
   `extra_float_digits=1`, `bytea_output=hex`) so the same rows always render the same text.

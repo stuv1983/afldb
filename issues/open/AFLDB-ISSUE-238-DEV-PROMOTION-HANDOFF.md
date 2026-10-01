@@ -36,7 +36,10 @@ the ISSUE-250 freeze:
 | post-swap gate | `--phase production --freeze-record --old-database <kept>`: the kept database (by OID) holds exactly F0, and the promoted live database is the candidate, unfrozen | "kept … holds exactly F0" FAILs, so acceptance fails |
 
 **F0 covers `afl_api_identity_adjudications` and `external_identities`** as whole-row md5 digests.
-It covers every non-`rebuilt` public contract table (S6-D2's proof).
+It covers every non-`rebuilt` public contract table (S6-D2's proof). `external_identities` is `rebuilt`
+for promotion (the candidate's copy stands); it is in F0 because it is explicitly freeze-protected
+(`FREEZE_PROTECTED_REBUILT_TABLES`, ISSUE-238 S6-D5, operator-approved 2026-10-01 after Run C found F0 had
+named only the ledger). F0 is 37 tables from that commit; Run Z's freeze used the earlier 36-table contract.
 
 **Consequence for the late writes.** From `promotion-freeze.sql` onwards, only `afldb_owner`,
 `afldb_backup` and superusers can connect.

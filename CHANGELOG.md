@@ -15,6 +15,20 @@ commit.
 
 ## [Unreleased]
 
+### Promotion freeze: live `external_identities` is freeze-protected (AFLDB-ISSUE-238; issue open) - 1 October 2026
+
+- **Found by the DEV promotion rehearsal (Run C, case 44).** A late ORIGINAL changed the ledger and
+  `external_identities` together, but the F0 freeze digest named only the ledger: F0 covered every non-`rebuilt`
+  contract table, and `external_identities` is `rebuilt`. An identity-only late write therefore reached
+  `--phase candidate` undetected.
+- **Fix (operator-approved).** `freezeDigestTables()` adds an explicit `FREEZE_PROTECTED_REBUILT_TABLES`
+  (`external_identities`), so F0 is 37 tables and the same candidate / post-swap / freeze-dump gates detect a
+  content-only change to it. Its promotion treatment is unchanged (`rebuilt`); only the LIVE frozen copy is
+  compared, never the candidate's. A freeze record from before this change (36 tables) is refused by a current
+  checkout; freeze again. No change to the pending-D15 contract, CRV, D15 or E3.
+- `docs/production-promotion.md` §4.0, the ISSUE-250 §7.6/§8 text and ISSUE-238 S6-D5 document it. The DEV
+  rehearsal (Run C onward, Stage 3, R1/R0, Item 12) has not yet re-run on this code.
+
 ### Corrected-identity promotion: stage-aware pre-swap identity contract for pending D15 providers (AFLDB-ISSUE-238; issue open) - 1 October 2026
 
 - **Found by the DEV promotion rehearsal, not a harness exception.** With a corrected provider and an

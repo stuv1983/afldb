@@ -130,10 +130,10 @@ import {
 } from '../tools/db/promotion-check';
 import {
   DIGEST_SESSION_SETTINGS, FREEZE_CONNECT_ROLES_SQL, FREEZE_DATABASE_STATE_SQL, FREEZE_PREPARED_XACTS_SQL, FREEZE_SESSIONS_SQL,
-  assertFreezeMarkerDistinct, buildFreezeDumpProof, buildFreezeRecord, describeFreezeStatus, freezeComment, freezeDigestTables,
+  FREEZE_PROTECTED_REBUILT_TABLES, assertFreezeMarkerDistinct, buildFreezeDumpProof, buildFreezeRecord, describeFreezeStatus, freezeComment, freezeDigestTables,
   freezeSql, freezeTerminateSql, frozenRollbackSql, frozenSwapSql, isFreezeMarkerComment, judgeFreezeDigest, judgeFreezeState,
   newFreezeManifest, newFreezeToken, parseFreezeComment, parseFreezeDumpProof, parseFreezeManifest, parseFreezeRecord,
-  parseRestoreTestComment, recoveryManifest, restoreTestComment, sha256File, tableDigestSql, unfreezeSql,
+  parseRestoreTestComment, readFreezeDigest, recoveryManifest, restoreTestComment, sha256File, tableDigestSql, unfreezeSql,
 } from '../tools/db/promotion-freeze';
 import { trackedExpectedIds } from '../tools/records/first-kick-goal-source';
 import {
@@ -6769,6 +6769,155 @@ describe('AFLDB-ISSUE-250 — the promotion freeze', () => {
         await gatePromotedLiveUnfrozen(live(bad), record, report);
         expect(report.failed, JSON.stringify(bad)).toBe(true);
       }
+    });
+  });
+
+  // AFLDB-ISSUE-238 (Run C, 2026-10-01): `external_identities` is `rebuilt` for promotion but its LIVE copy is freeze-protected.
+  describe('freeze-protected rebuilt tables: live external_identities is in F0 (AFLDB-ISSUE-238)', () => {
+    const LEDGER = 'public.afl_api_identity_adjudications';
+    const IDENT = 'public.external_identities';
+    type Tables = Map<string, { rows: number; digest: string }>;
+    /** The exact tables a fresh F0 read names as drifted, from the real read + judge (not from console text). */
+    async function driftedTables(record: ReturnType<typeof recordFor>, live: FakeDb): Promise<string[]> {
+      const observed = await readFreezeDigest(fakeQuery(live));
+      return judgeFreezeDigest(record.tables, observed).map((p) => p.split(':')[0]).sort();
+    }
+    /** F0 with the Case-44 baseline: 3 ledger rows, and an identity table whose CONTENT (not count) a late write changes. */
+    function baseline(): Tables {
+      const tables = frozenTables();
+      tables.set(LEDGER, { rows: 3, digest: DIGEST_A });
+      tables.set(IDENT, { rows: 19321, digest: DIGEST_A });
+      return tables;
+    }
+    const changed = (change: Record<string, { rows: number; digest: string }>): Tables => new Map([...baseline(), ...Object.entries(change)]);
+    const LATE_LEDGER = { rows: 4, digest: DIGEST_B };       // +1 corrected ledger row
+    const LATE_IDENT = { rows: 19321, digest: DIGEST_B };    // same row count, one row's player_id changed
+
+    it('classification: external_identities stays `rebuilt` for promotion and is freeze-protected only', () => {
+      expect(FREEZE_PROTECTED_REBUILT_TABLES).toEqual(['external_identities']);
+      expect(contractByName('external_identities')).toBeUndefined();            // registry-driven `rebuilt`, never a contract entry
+      expect(truncatedPublicTables()).not.toContain('external_identities');     // not truncated, reinstated or remapped
+      const keys = freezeDigestTables().map((t) => t.key);
+      expect(keys).toContain(IDENT);                                            // yet in F0
+      // every OTHER rebuilt contract table is still outside F0 (AFLDB-ISSUE-250 §7.6)
+      for (const t of PROMOTION_CONTRACT) if (t.schema === 'public' && t.treatment === 'rebuilt') expect(keys, t.name).not.toContain(`public.${t.name}`);
+      expect(keys).not.toContain('public.players');
+      expect(keys).not.toContain('public.matches');
+      expect(new Set(keys).size).toBe(keys.length);                             // no silent duplication
+    });
+
+    it('a fresh F0 holds 37 tables (36 + external_identities), with a count and a digest for external_identities', async () => {
+      expect(freezeDigestTables()).toHaveLength(37);
+      const record = recordFor(baseline());
+      expect(record.tables).toHaveLength(37);
+      expect(record.tables.find((t) => t.table === IDENT)).toEqual({ table: IDENT, rows: 19321, digest: DIGEST_A });
+      // the record is produced by the generic frozen phase from a live read, with no second digest format
+      const opts = baseOpts({ phase: 'frozen', database: 'afldb_prod', freezeManifest: join(dir, 'm.json'), freezeRecordOut: join(dir, 'r.json') });
+      writeFileSync(opts.freezeManifest!, JSON.stringify(manifest));
+      await runFrozenPhase(fakeQuery(frozenDb({ tables: baseline() })), opts, new Report());
+      const written = parseFreezeRecord(readFileSync(opts.freezeRecordOut!, 'utf8'), 'prod');
+      expect(written.tables).toHaveLength(37);
+      expect(written.tables.find((t) => t.table === IDENT)).toMatchObject({ rows: 19321, digest: DIGEST_A });
+    });
+
+    it('the matrix: neither passes; ledger-only names the ledger; identity-only names external_identities; both name both', async () => {
+      const record = recordFor(baseline());
+      expect(await driftedTables(record, frozenDb({ tables: baseline() }))).toEqual([]);
+      expect(await driftedTables(record, frozenDb({ tables: changed({ [LEDGER]: LATE_LEDGER }) }))).toEqual([LEDGER]);
+      expect(await driftedTables(record, frozenDb({ tables: changed({ [IDENT]: LATE_IDENT }) }))).toEqual([IDENT]);
+      expect(await driftedTables(record, frozenDb({ tables: changed({ [LEDGER]: LATE_LEDGER, [IDENT]: LATE_IDENT }) }))).toEqual([LEDGER, IDENT]);
+    });
+
+    it('the candidate-phase gate result agrees with the matrix (PASS / REFUSE) and names exactly the drifted tables', async () => {
+      const record = recordFor(baseline());
+      const run = async (change: Record<string, { rows: number; digest: string }>) => {
+        const report = new Report();
+        await gateFrozenTarget(fakeQuery(frozenDb({ tables: changed(change) })), 'live target afldb_prod', 'afldb_prod', record, true, report);
+        const fail = report.results.find((r) => r.verdict === 'FAIL');
+        return { failed: report.failed, tables: (fail?.lines ?? []).filter((l) => l.startsWith('public.')).map((l) => l.split(':')[0]).sort() };
+      };
+      expect(await run({})).toEqual({ failed: false, tables: [] });
+      expect(await run({ [LEDGER]: LATE_LEDGER })).toEqual({ failed: true, tables: [LEDGER] });
+      expect(await run({ [IDENT]: LATE_IDENT })).toEqual({ failed: true, tables: [IDENT] });
+      expect(await run({ [LEDGER]: LATE_LEDGER, [IDENT]: LATE_IDENT })).toEqual({ failed: true, tables: [LEDGER, IDENT] });
+    });
+
+    it('a content-only identity change (same row count) is detected', async () => {
+      const record = recordFor(baseline());
+      const report = new Report();
+      await gateFrozenTarget(fakeQuery(frozenDb({ tables: changed({ [IDENT]: LATE_IDENT }) })), 'live target afldb_prod', 'afldb_prod', record, true, report);
+      expect(report.failed).toBe(true);
+      expect(report.results.find((r) => r.verdict === 'FAIL')!.lines.join('\n'))
+        .toMatch(/public\.external_identities: 19321 row\(s\) digest bbbb.*frozen 19321 row\(s\) digest aaaa/);
+    });
+
+    it('restoring the identity to its F0 value (Case-44 cleanup) makes the gate pass again', async () => {
+      const record = recordFor(baseline());
+      const late = new Report();
+      await gateFrozenTarget(fakeQuery(frozenDb({ tables: changed({ [LEDGER]: LATE_LEDGER, [IDENT]: LATE_IDENT }) })), 'live', 'afldb_prod', record, true, late);
+      expect(late.failed).toBe(true);
+      const cleaned = new Report();
+      await gateFrozenTarget(fakeQuery(frozenDb({ tables: baseline() })), 'live', 'afldb_prod', record, true, cleaned);
+      expect(cleaned.failed).toBe(false);
+    });
+
+    it('only the LIVE target is compared: a candidate whose external_identities legitimately differs is not live drift', async () => {
+      const record = recordFor(baseline());
+      // the candidate is the REBUILT database: its identities are whatever the rebuild produced
+      const candidate = frozenDb({ name: 'afldb_prod_candidate_1', oid: '20001', tables: changed({ [IDENT]: { rows: 20000, digest: DIGEST_B } }) });
+      expect((await readFreezeDigest(fakeQuery(candidate))).find((t) => t.table === IDENT)).toMatchObject({ rows: 20000 });
+      const live = new Report();
+      await gateFrozenTarget(fakeQuery(frozenDb({ tables: baseline() })), 'live target afldb_prod', 'afldb_prod', record, true, live);
+      expect(live.failed).toBe(false);
+      // source pin: the candidate phase hands the freeze gate ONLY the live connection, never the candidate's
+      const main = readFileSync(join(process.cwd(), 'tools', 'db', 'promotion-check.ts'), 'utf8');
+      expect(main).toContain("frozenSide = await openReadOnly(withDatabase(baseDsn, names.live), 'live');");
+      expect(main).toContain('await gateFrozenTarget(frozenSide.q, `live target ${names.live}`, names.live, freezeRecord, true, report);');
+      expect(main.match(/gateFreezeDigest\(/g)).toHaveLength(3);                // the definition, gateFrozenTarget and the freeze-dump phase; never a candidate connection
+    });
+
+    it('an old 36-table freeze record fails closed under the current contract (never synthesised, never downgraded)', async () => {
+      const old36 = new Map([...baseline()].filter(([k]) => k !== IDENT));
+      expect(old36.size).toBe(36);
+      const oldRecord = recordFor(old36);
+      expect(() => parseFreezeRecord(JSON.stringify(oldRecord), 'prod')).toThrow(/different table set/);
+      // even a record object that bypassed the parser is refused by the gate: external_identities is not in it
+      const report = new Report();
+      await gateFrozenTarget(fakeQuery(frozenDb({ tables: baseline() })), 'live target afldb_prod', 'afldb_prod', oldRecord, true, report);
+      expect(report.failed).toBe(true);
+      expect(report.results.find((r) => r.verdict === 'FAIL')!.lines.join('\n')).toContain('public.external_identities: not in the freeze record');
+    });
+
+    it('the freeze-dump proof verifies external_identities: a dump whose identities differ from F0 is refused, no proof written', async () => {
+      const SHA = 'e'.repeat(64);
+      const record = recordFor(baseline());
+      const dumpOpts = () => baseOpts({ phase: 'freeze-dump', database: 'afldb_restore_test', preCutoverDump: '/home/arm/pre.dump', freezeDumpProofOut: join(dir, 'proof.json') });
+      const restore = (tables: Tables) => frozenDb({ name: 'afldb_restore_test', comment: restoreTestComment(SHA), tables });
+      const ok = new Report();
+      await runFreezeDumpPhase(fakeQuery(restore(baseline())), dumpOpts(), record, SHA, ok);
+      expect(ok.failed).toBe(false);
+      rmSync(join(dir, 'proof.json'), { force: true });
+      const bad = new Report();
+      await runFreezeDumpPhase(fakeQuery(restore(changed({ [IDENT]: LATE_IDENT }))), dumpOpts(), record, SHA, bad);
+      expect(bad.failed).toBe(true);
+      expect(existsSync(join(dir, 'proof.json'))).toBe(false);
+    });
+
+    it('post-swap: the kept database (by OID) must hold the frozen external_identities; the token and OID guards are unchanged', async () => {
+      const record = recordFor(baseline());
+      const kept = (overrides: Partial<FakeDb> = {}) => frozenDb({ name: `${PRE_REBUILD_PREFIX}1`, tables: baseline(), ...overrides });
+      const accepted = new Report();
+      await gateFrozenTarget(fakeQuery(kept()), 'kept', `${PRE_REBUILD_PREFIX}1`, record, false, accepted);
+      expect(accepted.failed).toBe(false);
+      const identOnly = new Report();
+      await gateFrozenTarget(fakeQuery(kept({ tables: changed({ [IDENT]: LATE_IDENT }) })), 'kept', `${PRE_REBUILD_PREFIX}1`, record, false, identOnly);
+      expect(identOnly.failed).toBe(true);
+      const otherToken = new Report();
+      await gateFrozenTarget(fakeQuery(kept({ comment: freezeComment(OTHER_TOKEN, 'prod', 'afldb_prod') })), 'kept', `${PRE_REBUILD_PREFIX}1`, record, false, otherToken);
+      expect(otherToken.failed).toBe(true);
+      const otherOid = new Report();
+      await gateFrozenTarget(fakeQuery(kept({ oid: '20000' })), 'kept', `${PRE_REBUILD_PREFIX}1`, record, false, otherOid);
+      expect(otherOid.failed).toBe(true);
     });
   });
 

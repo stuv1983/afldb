@@ -95,7 +95,8 @@ candidate's `afl_api` rows are exactly whatever the rebuilt `afldb_test` held, c
 candidate's own player ids by construction. There is **no** capture or replay of importer rows in
 promotion (unlike the human ledger below): production's own importer never writes there, and
 promoted rows already in production are protected by G3 (§6/§7 below), not by a capture. The
-authoritative source is `external_identities` itself, never a bridge artefact.
+authoritative source is `external_identities` itself, never a bridge artefact. (Its LIVE copy is
+nevertheless freeze-protected against writes between F0 and the swap: §4.0.)
 
 Reinstatement order is foreign-key order and is generated, not typed: `auth_users`, then
 every table that references it and `external_grid_sources`, then `data_submission_rows`,
@@ -469,7 +470,8 @@ absent from the candidate and **silently lost** at the swap. The freeze makes th
 provable: from 4.0 until the swap, PostgreSQL itself refuses every connection except
 `afldb_owner`, `afldb_backup` and superusers, and the checker proves, by a per-table content
 digest (F0) and the database OID, that the dump, the live target right up to the swap, and the
-database the swap renames aside all hold exactly the same production-owned state. The
+database the swap renames aside all hold exactly the same production-owned state (plus the
+freeze-protected live `external_identities`, below). The
 application is down from 4.0 until §8 accepts the promotion; production serves only the gated
 beta host, and the apex is a static page.
 
@@ -517,6 +519,18 @@ shell and sends the same bytes; every generated file starts with `\set ON_ERROR_
 **While frozen, the only owner-DSN tools run against `afldb_prod` are this checker and
 `restore-test.sh`.** A superuser or owner write to a production-owned table fails a later digest
 gate; a write to a rebuilt football table is replaced by the candidate anyway.
+
+**One rebuilt table is nevertheless in F0: `public.external_identities`** (`AFLDB-ISSUE-238`).
+Its promotion treatment is unchanged: it is `rebuilt`, the candidate's copy stands, and nothing is
+truncated, reinstated or carried forward. F0 additionally covers it because an AFL API identity
+adjudication (the ORIGINAL CLI, the admin link) writes the ledger row and the identity row in one
+transaction, and the promotion must detect either half of that state changing on its own while
+frozen. The set is generated, not typed at the call site: `freezeDigestTables()` = every non-`rebuilt`
+public contract table + `staging_aflw` + `FREEZE_PROTECTED_REBUILT_TABLES` (`tools/db/promotion-freeze.ts`).
+Every other `rebuilt` table is still outside F0. The comparison is always against the frozen **live**
+database (or the kept one after the swap, or the restored dump), never against the candidate. A
+freeze record written before this rule holds 36 tables and is refused by a current checkout
+("covers a different table set"); freeze again.
 
 ### 4.1 Backup, restore test, dump proof
 

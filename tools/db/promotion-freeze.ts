@@ -499,12 +499,32 @@ export function judgeFreezeState(
 // ---------------------------------------------------------------------------
 
 /**
- * Every table a promotion does NOT take from the rebuild: the non-`rebuilt` public contract
- * tables (reinstated, reset, regenerated) and every reinstated-schema table. Generated from the
- * contract, so a new entry is covered without editing this function.
+ * Public tables that are `rebuilt` for promotion (the candidate's own copy stands; nothing is truncated,
+ * reinstated or carried forward) but whose LIVE copy is nevertheless freeze-protected: a write to the frozen
+ * target between F0 and the swap is detected, exactly as for a production-owned table.
+ *
+ * `external_identities` is the first. Its promotion treatment is unchanged (`rebuilt`); the protection is
+ * freeze-only. An AFL API identity adjudication (the ORIGINAL CLI, the admin link) writes the ledger row and the
+ * identity row in one transaction, so a late write touches both state families, and the rehearsal requires either
+ * half changing on its own to be detected (AFLDB-ISSUE-238, Run C 2026-10-01). Every other `rebuilt` table is
+ * still replaced by the candidate and still outside F0 (AFLDB-ISSUE-250 §7.6).
+ */
+export const FREEZE_PROTECTED_REBUILT_TABLES: readonly string[] = ['external_identities'];
+
+/**
+ * The F0 table set: every table a promotion does NOT take from the rebuild (the non-`rebuilt` public contract
+ * tables -- reinstated, reset, regenerated -- and every reinstated-schema table), plus the explicitly
+ * freeze-protected `rebuilt` tables above. Generated from the contract, so a new contract entry is covered
+ * without editing this function.
  */
 export function freezeDigestTables(): { schema: string; table: string; key: string }[] {
   const out = truncatedPublicTables().map((table) => ({ schema: 'public', table, key: `public.${table}` }));
+  for (const table of FREEZE_PROTECTED_REBUILT_TABLES) {
+    if (out.some((t) => t.table === table)) {
+      throw new Error(`freezeDigestTables: ${table} is already an F0 table through its promotion treatment; it must not also be listed as a freeze-protected rebuilt table.`);
+    }
+    out.push({ schema: 'public', table, key: `public.${table}` });
+  }
   for (const { schema, table } of reinstatedSchemaTables()) out.push({ schema, table, key: `${schema}.${table}` });
   return out.sort((a, b) => a.key.localeCompare(b.key));
 }
