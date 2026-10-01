@@ -140,9 +140,19 @@
   - `settle-afl-api-fixtures.ts` moved to the shared F029 loader (its private loader would have
     restored stripped credentials under systemd).
   - The chain now also needs the current-season ingestion switch.
+  - **2026-10-01 (pass 3; implemented / DB-free validated, pending DEV operator acceptance, not
+    installed on any host):**
+    - Both AFL API units now keep exactly `DATABASE_URL` and `AFLDB_IMPORT_DATABASE_URL`; 7 missed
+      DSNs, the IMAP login and the Kali key are now unset. A `.env.example`-derived contract test
+      guards this.
+    - The panel shows "Not installed on this host." for `LoadState=not-found`.
+    - Docs corrected: E1 timer policy, the env-gate-first window order, `sudo systemctl start`.
+    - §7 D adds a mandatory `--dry-run` rehearsal with halt criteria, to protect ISSUE-233's census.
+    - Out of scope: `afldb-settle-afltables.service` has the same deny-list drift (separate decision).
 - **Runbook:** `issues/open/AFLDB-ISSUE-232.md`.
-- **Next action:** DEV sync, eyeball the panel (`VISUAL: UNVERIFIED`), then the runbook §7
-  installation pass with a first observed Brownlow firing.
+- **Next action:** operator commit, merge and DEV sync; then runbook §7 A (read-only), B (panel at
+  1280/390 px), C (install), D (dry-run rehearsal, then the first observed match run) and E
+  (Brownlow timer enabled, inert firing).
 
 ### AFLDB-ISSUE-229 — AFL API fixture ingestion
 - **Severity:** Medium. **Area:** acquisition / fixtures — `afl_api` season feed → `fixtures`,

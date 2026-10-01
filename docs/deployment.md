@@ -1194,30 +1194,43 @@ its own hour. Nothing is retried and nothing is rolled back.
 
 ## 7d. In-season AFL.com.au (`afl_api`) settle — S8 (`AFLDB-ISSUE-228`)
 
-**NOT ENABLED OR INSTALLED by this pass.** The files below exist so a future
-DEV/production wiring pass has an approved artefact to install; nothing here
-has been copied into `/etc/systemd/system`, enabled or started. See
-`issues/closed/AFLDB-ISSUE-228.md` §16/§17 for the frozen design this
-implements, and that runbook's S9 for the DEV validation still required
-before any of it runs against the real feed.
+**Not installed or enabled on any host yet.** Installation is
+`AFLDB-ISSUE-232`'s operator-run DEV acceptance (`issues/open/AFLDB-ISSUE-232.md`
+§7), which includes a mandatory `--dry-run` rehearsal before the match unit's
+first applying run, then production after sign-off. See
+`issues/closed/AFLDB-ISSUE-228.md` §16/§17 for the frozen design these files
+implement.
 
 **Two independent chains, deliberately not one:**
 
 | Chain | Script | Unit | Timer | Enable gate |
 |---|---|---|---|---|
 | Match/stats | `deploy/afldb-settle-afl-api.sh` | `afldb-settle-afl-api.service` | `afldb-settle-afl-api.timer` (nightly, 05:00, after the AFL Tables timer) | `site_settings.afl_api_current_season_enabled` must be enabled in the control database |
-| Brownlow live count | `deploy/afldb-settle-afl-api-brownlow.sh` | `afldb-settle-afl-api-brownlow.service` | `afldb-settle-afl-api-brownlow.timer` (every 5 min, always enabled) | `AFLDB_AFL_API_BROWNLOW_ENABLED=true` **and** `site_settings.afl_api_brownlow_enabled` in the control database |
+| Brownlow live count | `deploy/afldb-settle-afl-api-brownlow.sh` | `afldb-settle-afl-api-brownlow.service` | `afldb-settle-afl-api-brownlow.timer` (every 5 min, permanently enabled once installed) | `AFLDB_AFL_API_BROWNLOW_ENABLED=true` **and** `site_settings.afl_api_brownlow_enabled`, plus `site_settings.afl_api_current_season_enabled` for its fixture-identity steps |
 
-Both chains are two Node steps (`acquire-afl-api*.ts` → `settle-afl-api*.ts`);
-neither uses R or Python, unlike §7b's fitzRoy chain. Both acquisition tools
-write their manifest LAST and self-clean a manifest-less partial snapshot in
-process, so neither wrapper script re-implements §7b's `cleanup_partial` trap.
+The match/stats chain is two Node steps (`acquire-afl-api.ts` →
+`settle-afl-api.ts`). The Brownlow chain is four (`acquire-afl-api.ts
+--fixtures-only` → `settle-afl-api-fixtures.ts` → `acquire-afl-api-brownlow.ts`
+→ `settle-afl-api-brownlow.ts`, below). Neither uses R; the only Python is the
+wrappers' read of `data/reference/seasons.json`, unlike §7b's fitzRoy chain.
+Each acquisition tool writes its manifest LAST and self-cleans a manifest-less
+partial snapshot in process, so neither wrapper script re-implements §7b's
+`cleanup_partial` trap.
 Canonical writer CLIs fail closed unless their live `DATABASE_URL` control
 connection permits ingestion and reports the same `current_database()` value as
-the `AFLDB_IMPORT_DATABASE_URL` writer connection. The two service units retain
-only those two required DSNs (plus their non-DSN runtime settings) and continue
-to strip owner, auth, test, development and backup credentials. No DSN values
-belong in a unit file or runbook.
+the `AFLDB_IMPORT_DATABASE_URL` writer connection.
+
+**Credential boundary (`AFLDB-ISSUE-232`).** Each of the two service units keeps
+exactly two DSNs, `DATABASE_URL` and `AFLDB_IMPORT_DATABASE_URL`. Its
+`UnsetEnvironment=` drops every other `*_DATABASE_URL` that `.env.example`
+defines, commented maintenance DSNs included: owner, auth, backup, every
+test/code-test DSN and the DEV/PROD maintenance DSNs. It also drops every
+credential the chain does not use: session, SMTP user/password, e-mail intake
+secret, IMAP user/password, revalidation secret and Kali API key. Non-secret
+settings (AFL API base URLs, outbound User-Agent, the Brownlow deployment gate)
+are kept. `tests/afl-api-ingestion-safety.test.ts` derives those names from
+`.env.example` on every run, so a DSN or secret added there fails the suite
+until both units deny it. No DSN values belong in a unit file or runbook.
 
 The match/stats wrapper invokes `--apply --auto-apply --require-complete-source`.
 For that explicit mode, an incomplete source refuses the single settle
@@ -1236,10 +1249,27 @@ rows, `unknown_match` or `fixture_identity_ambiguous` rather than a guess.
 So that those observations are fresh, the wrapper refreshes them itself first
 (ordering O1): `acquire-afl-api.ts --fixtures-only`, then
 `settle-afl-api-fixtures.ts --apply`, then the Brownlow acquisition and settle.
-It relies on neither the match timer nor systemd ordering. Steps 1–2 read the
+It does not wait for or depend on `afldb-settle-afl-api.timer`, and uses no
+systemd ordering. Steps 1–2 read the
 AFL API current-season ingestion switch too, so the Brownlow chain needs that
 switch enabled as well as its own two gates; with it off the unit fails visibly
 at step 1. Automatic `revalidateSeason()` is not wired (D-232-3).
+
+**Brownlow timer policy and the count window.** The timer is permanently
+enabled once installed (AFLDB-ISSUE-232 E1). The wrapper's first check, and its
+only early no-op, is the environment gate: when `AFLDB_AFL_API_BROWNLOW_ENABLED`
+is not `true` it exits 0 before reading `seasons.json`, the network or the
+database. Outside the count window it is left unset. The database switch is
+**not** an early no-op. With the environment gate `true` and the Brownlow
+`site_settings` switch off, steps 1–2 still run and write before the Brownlow
+acquisition refuses, and the unit fails every 5 minutes. So:
+
+- **Open the window:** (a) make sure the AFL API current-season switch is on;
+  (b) turn the Brownlow `site_settings` switch on; (c) only then set
+  `AFLDB_AFL_API_BROWNLOW_ENABLED=true` in `.env`. The oneshot unit re-reads
+  `.env` at every firing.
+- **Close the window:** (a) first remove or clear `AFLDB_AFL_API_BROWNLOW_ENABLED`;
+  (b) then turn the Brownlow `site_settings` switch off if wanted.
 
 **Co-source safety.** These units may run concurrently with
 `afldb-settle-afltables.service` (§7b) without coordination: an `afltables`-
@@ -1268,13 +1298,21 @@ Admin "start now" button and its polkit rule
 (`readSettleUnitTableStatus()`), but starting either new unit from the admin
 panel is a disclosed follow-up, not implemented (see the ISSUE-228 S8 session
 report for why: it is a genuine admin-authorization-surface change, not an
-ops-wiring one). Until then, a supervised run is started the same way the
-nightly timer would, by hand:
+ops-wiring one). `/admin/current-season` shows both units' state and latest
+batch read-only (AFLDB-ISSUE-232), including "Not installed on this host." for
+a unit systemd reports as `LoadState=not-found`. Until a trigger exists, an
+operator starts a supervised run as root. The polkit rule lets `arm` start only
+`afldb-settle-afltables.service`, so `sudo -u arm systemctl start` asks for
+authentication for these two units:
 
 ```
-sudo -u arm /usr/bin/systemctl start --no-block afldb-settle-afl-api.service
-sudo -u arm /usr/bin/systemctl start --no-block afldb-settle-afl-api-brownlow.service
+sudo systemctl start afldb-settle-afl-api.service
+sudo systemctl start afldb-settle-afl-api-brownlow.service
 ```
+
+Before the match unit's first applying run on a host, follow the rehearsal in
+`issues/open/AFLDB-ISSUE-232.md` §7 D (`--dry-run --auto-apply
+--require-complete-source`, with halt criteria).
 
 **Before the Brownlow unit ever points at the live AFL endpoint**, exercise
 `settle-afl-api-brownlow.ts` directly against the local simulator

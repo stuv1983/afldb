@@ -1869,28 +1869,44 @@ touching the match-family timer:
 | Chain | Script | Service | Timer | Enable gate |
 |---|---|---|---|---|
 | Match/stats | `deploy/afldb-settle-afl-api.sh` | `afldb-settle-afl-api.service` | `afldb-settle-afl-api.timer` — nightly 05:00, staggered after the AFL Tables 04:30 timer | the DB switch alone (§14.6); no environment gate |
-| Brownlow live count | `deploy/afldb-settle-afl-api-brownlow.sh` | `afldb-settle-afl-api-brownlow.service` | `afldb-settle-afl-api-brownlow.timer` — every 5 minutes, **always enabled** | both keys of the two-key gate (§14.6); the wrapper script no-ops (exit 0) when either is off, so the timer can stay permanently installed without ever reporting a false "failed" unit for the ~11 months the count is not running |
+| Brownlow live count | `deploy/afldb-settle-afl-api-brownlow.sh` (four Node steps, ordering O1) | `afldb-settle-afl-api-brownlow.service` | `afldb-settle-afl-api-brownlow.timer` — every 5 minutes, **permanently enabled once installed** (AFLDB-ISSUE-232 E1) | both keys of the two-key gate (§14.6), plus the current-season switch for the fixture-identity steps 1–2 |
 
-**NOT installed, enabled or started on any host by this work.** The six files above exist in
-`deploy/` as approved artefacts for a future DEV/production wiring pass; nothing has been copied
-into `/etc/systemd/system`. See `docs/deployment.md` §7d for the full installation procedure,
-directory-permission requirements (`ReadWritePaths` scoped to `data/sources/afl_api/` only,
-narrower than the fitzRoy chain), and monitoring commands (`journalctl -u afldb-settle-afl-api
--f`, `AFLDB_SETTLE_SUCCESS`/`AFLDB_SETTLE_FAILURE` markers, `systemctl list-timers`).
+**Only the environment key is an early no-op.** The wrapper checks
+`AFLDB_AFL_API_BROWNLOW_ENABLED` first. When it is not `true`, the wrapper exits 0 before reading
+`seasons.json`, the network or the database, so the permanently enabled timer reports success for
+the ~11 months the count is not running. The DB switch is checked later, by the CLIs. With the
+environment key `true` and `acquisition.afl_api_brownlow_enabled` off, steps 1–2 (fixtures-only
+acquire and fixtures settle) still run and write before the Brownlow acquisition refuses, and the
+unit fails every 5 minutes. Open the count window by enabling the current-season switch, then the
+Brownlow DB switch, and only then the environment key. Close it by clearing the environment key
+first, then the DB switch if wanted (`docs/deployment.md` §7d).
+
+**Not installed or enabled on any host yet.** The six files above exist in `deploy/`. Installation
+is AFLDB-ISSUE-232's operator-run DEV acceptance (`issues/open/AFLDB-ISSUE-232.md` §7), which
+includes a mandatory `--dry-run` rehearsal before the match unit's first applying run. See
+`docs/deployment.md` §7d for directory-permission requirements (`ReadWritePaths` scoped to
+`data/sources/afl_api/` only, narrower than the fitzRoy chain), the credential boundary (each unit
+keeps only `DATABASE_URL` and `AFLDB_IMPORT_DATABASE_URL`, enforced against `.env.example` by
+`tests/afl-api-ingestion-safety.test.ts`) and monitoring commands (`journalctl -u
+afldb-settle-afl-api -f`, `AFLDB_SETTLE_SUCCESS`/`AFLDB_SETTLE_FAILURE` markers, `systemctl
+list-timers`).
 
 **Co-source safety.** Both units may run concurrently with `afldb-settle-afltables.service`
 without coordination — a corroborated row is never overwritten and never silently re-owned
-(§14.3), so no sequencing is required between the two source chains. The Brownlow chain **does**
-have a real sequencing dependency on the match-family chain within its own source, documented in
-§14.9.
+(§14.3), so no sequencing is required between the two source chains. The Brownlow settle does need
+fresh match-family fixture observations within its own source (§14.9). The scheduled wrapper
+produces them itself, in steps 1–2 of the same run (AFLDB-ISSUE-232 ordering O1). It does not wait
+for or depend on the daily `afldb-settle-afl-api.timer`.
 
 **No on-demand admin "start now" trigger for either unit.** `settle-status.ts`/
 `settle-trigger.ts` gained a read-only three-unit status table
 (`readSettleUnitTableStatus()`, covering `afltables`/`afl_api`/`afl_api_brownlow`) but the
 existing Super Admin "start now" button and its polkit rule remain `afltables`-only — extending
 it is a disclosed follow-up (a genuine admin-authorization-surface change), not an ops-wiring
-gap. Until then, a supervised run starts the same way the timer would, by hand
-(`systemctl start --no-block afldb-settle-afl-api[.brownlow].service`).
+gap. Until then, an operator starts a supervised run as root, `sudo systemctl start
+afldb-settle-afl-api.service` or `sudo systemctl start afldb-settle-afl-api-brownlow.service`. The
+polkit rule lets `arm` start only `afldb-settle-afltables.service`, so `sudo -u arm` does not work
+for these units. `/admin/current-season` shows both units' state and latest batch, read-only.
 
 **Timers do not themselves grant permission to ingest.** Installing and enabling a timer is a
 necessary but not sufficient condition — the CLI it invokes still checks the DB switch (and, for

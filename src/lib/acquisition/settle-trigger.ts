@@ -79,10 +79,16 @@ const START_ARGV: readonly string[] = ['start', '--no-block', SETTLE_UNIT] as co
  * `Key=Value` line per property, in the order requested, and prints an empty
  * value rather than failing for a unit that has never run. Parametrised over
  * one of `SETTLE_UNITS`' own values (never a caller-supplied string).
+ *
+ * `LoadState` (AFLDB-ISSUE-232): `systemctl show` on a unit file that is not
+ * installed does not fail; it exits 0 and reports `LoadState=not-found`
+ * beside `ActiveState=inactive`. Without it, an uninstalled unit reads as
+ * idle.
  */
 function showArgvFor(unit: string): readonly string[] {
   return [
     'show', unit,
+    '--property=LoadState',
     '--property=ActiveState',
     '--property=SubState',
     '--property=Result',
@@ -118,6 +124,13 @@ export const SETTLE_TRIGGER_MODE = 'systemd';
 export type SettleUnitPhase = 'running' | 'idle' | 'failed' | 'unknown';
 
 export type SettleUnitState = {
+  /**
+   * systemd's `LoadState`: `loaded`, or `not-found` for a unit file that is
+   * not installed on this host (whose `ActiveState` still reads `inactive`).
+   * Empty if systemd did not report it. `phase` deliberately ignores it, so
+   * `startSettleRun()`'s already-running check is unchanged.
+   */
+  loadState: string;
   phase: SettleUnitPhase;
   /** systemd's own words, passed through for display: `activating`, `failed`, … */
   activeState: string;
@@ -237,6 +250,7 @@ export function parseUnitShow(stdout: string): SettleUnitState {
   const exitStatus = /^-?\d+$/.test(rawExit) ? Number(rawExit) : null;
 
   return {
+    loadState: props.get('LoadState') ?? '',
     phase: unitPhaseOf(activeState),
     activeState,
     subState: props.get('SubState') ?? '',

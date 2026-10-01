@@ -82,6 +82,7 @@ import {
 import {
   AFL_API_SETTLE_UNIT_ROWS,
   AflApiSettleUnitsPanel,
+  UNIT_NOT_INSTALLED,
 } from '@/app/admin/current-season/AflApiSettleUnitsPanel';
 import { SETTING_KEYS } from '@/lib/site-settings';
 import {
@@ -101,6 +102,7 @@ import {
 const SUPER_ADMIN = { id: 7, email: 'super@example.test' };
 
 const IDLE_UNIT = {
+  loadState: 'loaded',
   phase: 'idle' as const,
   activeState: 'inactive',
   subState: 'dead',
@@ -379,6 +381,38 @@ describe('systemctl show parsing', () => {
     expect(state.phase).toBe('failed');
     expect(JSON.stringify(state)).not.toContain('hunter2');
   });
+
+  // AFLDB-ISSUE-232: LoadState is reported beside, never folded into, the phase.
+  it.each([
+    ['inactive', 'idle'],
+    ['activating', 'running'],
+    ['failed', 'failed'],
+  ] as const)('an installed unit (LoadState=loaded) in ActiveState=%s keeps phase %s', (activeState, phase) => {
+    const state = parseUnitShow(`LoadState=loaded\nActiveState=${activeState}\n`);
+    expect(state.loadState).toBe('loaded');
+    expect(state.phase).toBe(phase);
+  });
+
+  it('reports an uninstalled unit as LoadState=not-found, which systemd pairs with inactive', () => {
+    const state = parseUnitShow('LoadState=not-found\nActiveState=inactive\nSubState=dead\nResult=success\n');
+    expect(state.loadState).toBe('not-found');
+    // The phase alone would say idle; that is why the panel reads loadState.
+    expect(state.phase).toBe('idle');
+  });
+
+  it('leaves loadState empty when systemd does not report it, and never passes other properties through', () => {
+    const state = parseUnitShow('ActiveState=inactive\nEnvironment=AFLDB_IMPORT_DATABASE_URL=postgres://x\n');
+    expect(state.loadState).toBe('');
+    expect(JSON.stringify(state)).not.toMatch(/postgres:\/\/|DATABASE_URL|Environment/);
+  });
+
+  it('asks systemd for LoadState, while startSettleRun() still names only the AFL Tables unit', () => {
+    const source = readFileSync(resolve(process.cwd(), 'src/lib/acquisition/settle-trigger.ts'), 'utf8');
+    expect(source).toContain("'--property=LoadState',");
+    expect(source).toContain("const START_ARGV: readonly string[] = ['start', '--no-block', SETTLE_UNIT] as const;");
+    // The only start argv is the fixed AFL Tables one; no other unit can be started.
+    expect(source.match(/'start'/g)).toHaveLength(1);
+  });
 });
 
 describe('failure summarising', () => {
@@ -563,13 +597,55 @@ describe('AFLDB-ISSUE-232 — AFL API settle units panel', () => {
     expect(html).not.toContain('<table');
   });
 
+  it('says "Not installed on this host." for LoadState=not-found, never "Idle"', () => {
+    const notInstalled = {
+      ...IDLE_UNIT, loadState: 'not-found', result: 'success', exitStatus: null,
+      activeEnterTimestamp: '', inactiveEnterTimestamp: '',
+    };
+    const html = render({
+      units: {
+        ...UNITS,
+        afl_api: { unit: notInstalled, unitError: null, latestRun: null, latestRunError: null },
+        afl_api_brownlow: { unit: notInstalled, unitError: null, latestRun: null, latestRunError: null },
+      } as unknown as Units,
+      error: null,
+    });
+    expect(UNIT_NOT_INSTALLED).toBe('Not installed on this host.');
+    expect(html.split(UNIT_NOT_INSTALLED)).toHaveLength(3);
+    expect(html).not.toContain('Idle');
+    expect(html).not.toContain('inactive');
+    // The batch half is still reported on its own.
+    expect(html).toContain('No batch recorded yet.');
+  });
+
+  it('keeps the ordinary phase text for an installed (LoadState=loaded) unit', () => {
+    const html = render({
+      units: {
+        ...UNITS,
+        afl_api_brownlow: { unit: IDLE_UNIT, unitError: null, latestRun: null, latestRunError: null },
+      } as unknown as Units,
+      error: null,
+    });
+    expect(html).toContain('Idle');
+    expect(html).toContain('last finished Wed 2026-09-03 05:14:02 AEST');
+    expect(html).not.toContain(UNIT_NOT_INSTALLED);
+  });
+
+  it('renders no credential or environment text, whatever the unit state', () => {
+    const html = render({ units: UNITS, error: null });
+    expect(html).not.toMatch(/postgres:\/\/|DATABASE_URL|Environment|SECRET|PASSWORD/);
+  });
+
   it('is read-only: no client code, no action, no control', () => {
     const source = readFileSync(
       resolve(process.cwd(), 'src/app/admin/current-season/AflApiSettleUnitsPanel.tsx'), 'utf8',
     );
     expect(source).not.toContain("'use client'");
+    expect(source).not.toContain("'use server'");
     expect(source).not.toContain('./actions');
-    expect(source).not.toMatch(/<button|<form|onClick/);
+    expect(source).not.toMatch(/<button|<form|<input|<select|<textarea|onClick|useState|startSettleRun/);
+    const html = render({ units: UNITS, error: null });
+    expect(html).not.toMatch(/<button|<form|<input|<select|<textarea/);
   });
 
   it('is read on the page inside its own try, so a failure cannot take the page down', () => {

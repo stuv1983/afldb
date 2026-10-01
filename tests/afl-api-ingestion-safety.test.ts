@@ -71,6 +71,117 @@ describe('AFLDB-ISSUE-244 F005 — deployed AFL API service gate environment', (
   }
 });
 
+/**
+ * AFLDB-ISSUE-232 — the two AFL API units' credential boundary.
+ *
+ * Same hazard AFLDB-ISSUE-220 found on the web unit: `EnvironmentFile=` loads
+ * the whole `.env`, and `UnsetEnvironment=` is a hand-typed deny list that
+ * silently misses any name added to `.env.example` after it was last edited.
+ * These units had missed seven DSNs and the IMAP login. The name sets below
+ * are derived from `.env.example` (commented optional assignments included)
+ * on every run, never hand-typed, so a future DSN or secret added there fails
+ * here until both units deny it.
+ */
+describe('AFLDB-ISSUE-232 — AFL API unit credential boundary', () => {
+  const envExample = readSource('.env.example');
+  const definedNames = Array.from(
+    new Set(Array.from(envExample.matchAll(/^#?\s*([A-Z][A-Z0-9_]*)=/gm), (m) => m[1])),
+  );
+  const dsnNames = definedNames.filter((name) => name.endsWith('DATABASE_URL'));
+  // Credential-shaped names: secrets, passwords, tokens, (API) keys, login
+  // users. Suffix-anchored, so AFLDB_EXTERNAL_API_USER_AGENT (`_USER` mid-name)
+  // is not a secret.
+  const isSecretName = (name: string): boolean => /(_SECRET|_PASSWORD|_API_KEY|_TOKEN|_KEY|_USER)$/.test(name);
+  const secretNames = definedNames.filter(isSecretName);
+
+  const KEPT_DSNS = ['DATABASE_URL', 'AFLDB_IMPORT_DATABASE_URL'];
+  const EXPLICIT_SECRETS = [
+    'AFLDB_SESSION_SECRET',
+    'AFLDB_SMTP_USER',
+    'AFLDB_SMTP_PASSWORD',
+    'AFLDB_EMAIL_INTAKE_SECRET',
+    'AFLDB_REVALIDATE_SECRET',
+    'AFLDB_INTAKE_IMAP_USER',
+    'AFLDB_INTAKE_IMAP_PASSWORD',
+  ];
+  // Non-secret operational configuration the chains read; none may be denied.
+  const REQUIRED_SETTINGS = [
+    'AFLDB_AFL_API_BASE_URL',
+    'AFLDB_AFL_API_CFS_BASE_URL',
+    'AFLDB_AFL_API_SAPI_BASE_URL',
+    'AFLDB_EXTERNAL_API_USER_AGENT',
+  ];
+
+  /** Every name any `UnsetEnvironment=` line denies (systemd accumulates repeated lines). */
+  const deniedBy = (unit: string): Set<string> => new Set(
+    [...unit.replace(/\r\n/g, '\n').matchAll(/^UnsetEnvironment=(.*)$/gm)]
+      .flatMap((match) => match[1].trim().split(/\s+/))
+      .filter((name) => name !== ''),
+  );
+
+  it('derives a non-trivial name set from .env.example, commented assignments included', () => {
+    // Guards the derivation: if it shrank, the per-name checks would pass vacuously.
+    expect(dsnNames).toEqual(expect.arrayContaining(KEPT_DSNS));
+    expect(dsnNames.length).toBeGreaterThan(KEPT_DSNS.length + 5);
+    // Commented optional maintenance DSNs are part of the set.
+    expect(dsnNames).toEqual(expect.arrayContaining(['AFLDB_PROD_IMPORT_DATABASE_URL', 'AFLDB_CODE_TEST_DATABASE_URL']));
+    expect(secretNames).toEqual(expect.arrayContaining(EXPLICIT_SECRETS));
+    expect(secretNames).not.toContain('AFLDB_EXTERNAL_API_USER_AGENT');
+  });
+
+  it('classifies every credential suffix, and only by suffix', () => {
+    for (const name of [
+      'X_SECRET', 'X_PASSWORD', 'X_API_KEY', 'X_TOKEN', 'X_KEY', 'X_USER', 'KALI_AFL_API_KEY',
+    ]) {
+      expect(isSecretName(name)).toBe(true);
+    }
+    for (const name of [
+      'AFLDB_EXTERNAL_API_USER_AGENT', 'AFLDB_AFL_API_BASE_URL', 'AFLDB_TOKEN_BUCKET_SIZE',
+      'AFLDB_KEYS_DIR', 'AFLDB_AFL_API_BROWNLOW_ENABLED',
+    ]) {
+      expect(isSecretName(name)).toBe(false);
+    }
+  });
+
+  for (const unitPath of [
+    'deploy/afldb-settle-afl-api.service',
+    'deploy/afldb-settle-afl-api-brownlow.service',
+  ]) {
+    describe(unitPath, () => {
+      const unit = readSource(unitPath);
+      const denied = deniedBy(unit);
+
+      it('loads .env and denies through UnsetEnvironment= only', () => {
+        expect(unit).toMatch(/^EnvironmentFile=\/home\/arm\/projects\/afldb\/\.env\r?$/m);
+        expect(denied.size).toBeGreaterThan(0);
+      });
+
+      it('retains exactly DATABASE_URL and AFLDB_IMPORT_DATABASE_URL among the DSNs', () => {
+        const retained = dsnNames.filter((name) => !denied.has(name)).sort();
+        expect(retained).toEqual([...KEPT_DSNS].sort());
+      });
+
+      it.each(dsnNames.filter((name) => !KEPT_DSNS.includes(name)))('denies DSN %s', (name) => {
+        expect(denied.has(name)).toBe(true);
+      });
+
+      it.each(EXPLICIT_SECRETS)('denies credential %s', (name) => {
+        expect(denied.has(name)).toBe(true);
+      });
+
+      it('denies every credential-shaped name .env.example defines', () => {
+        expect(secretNames.filter((name) => !denied.has(name))).toEqual([]);
+      });
+
+      it('keeps the non-secret operational settings the chain reads', () => {
+        for (const name of [...REQUIRED_SETTINGS, 'AFLDB_AFL_API_BROWNLOW_ENABLED']) {
+          expect(denied.has(name)).toBe(false);
+        }
+      });
+    });
+  }
+});
+
 describe('AFLDB-ISSUE-244 F016 — live database identity invariant', () => {
   it('allows distinct roles on the same live database', () => {
     expect(() => requireSameAflApiDatabase(

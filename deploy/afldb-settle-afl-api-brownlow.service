@@ -43,12 +43,23 @@ TimeoutStartSec=180
 
 Nice=5
 
-# Same DSN-exposure reasoning as the other two settle units:
-# settle-afl-api-brownlow.ts writes through AFLDB_IMPORT_DATABASE_URL and
-# reads the mandatory ingestion gate through DATABASE_URL. Both are retained;
-# every other credential .env carries is dropped.
+# Credential boundary (AFLDB-ISSUE-232), identical to
+# afldb-settle-afl-api.service. All four steps keep exactly two DSNs:
+# DATABASE_URL (afldb_app — the ingestion switches) and
+# AFLDB_IMPORT_DATABASE_URL (afldb_import — the fixtures and Brownlow
+# settles' only writer). Every other *_DATABASE_URL .env.example defines is
+# dropped below: the schema owner, auth, backup, every test/code-test DSN and
+# the DEV/PROD operator maintenance DSNs. So are the secrets this run never
+# uses: session, SMTP, e-mail intake (route secret and IMAP login),
+# revalidation (D-232-3) and the Kali API key. Non-secret settings are kept —
+# above all AFLDB_AFL_API_BROWNLOW_ENABLED, the deployment gate the wrapper
+# reads first; stripping it would make this unit permanently inert.
+#
+# Hand-typed deny list: tests/afl-api-ingestion-safety.test.ts derives every
+# *_DATABASE_URL name and every credential-shaped name from .env.example on
+# each run and fails if one is missing here.
 EnvironmentFile=/home/arm/projects/afldb/.env
-UnsetEnvironment=AFLDB_OWNER_DATABASE_URL AFLDB_AUTH_DATABASE_URL AFLDB_TEST_DATABASE_URL AFLDB_DEV_DATABASE_URL AFLDB_BACKUP_DATABASE_URL AFLDB_PROD_DATABASE_URL AFLDB_SESSION_SECRET AFLDB_SMTP_PASSWORD AFLDB_SMTP_USER AFLDB_EMAIL_INTAKE_SECRET AFLDB_REVALIDATE_SECRET
+UnsetEnvironment=AFLDB_OWNER_DATABASE_URL AFLDB_AUTH_DATABASE_URL AFLDB_TEST_DATABASE_URL AFLDB_TEST_IMPORT_DATABASE_URL AFLDB_TEST_AUTH_DATABASE_URL AFLDB_CODE_TEST_DATABASE_URL AFLDB_CODE_TEST_IMPORT_DATABASE_URL AFLDB_DEV_DATABASE_URL AFLDB_DEV_IMPORT_DATABASE_URL AFLDB_BACKUP_DATABASE_URL AFLDB_PROD_DATABASE_URL AFLDB_PROD_IMPORT_DATABASE_URL AFLDB_PROD_AUTH_DATABASE_URL AFLDB_SESSION_SECRET AFLDB_SMTP_USER AFLDB_SMTP_PASSWORD AFLDB_EMAIL_INTAKE_SECRET AFLDB_INTAKE_IMAP_USER AFLDB_INTAKE_IMAP_PASSWORD AFLDB_REVALIDATE_SECRET KALI_AFL_API_KEY
 
 StandardOutput=journal
 StandardError=journal

@@ -29,10 +29,16 @@ const PHASE_TEXT: Record<string, string> = {
   unknown: 'Unknown',
 };
 
+/** Shown for `LoadState=not-found`, which systemd otherwise reports as an idle `inactive` unit. */
+export const UNIT_NOT_INSTALLED = 'Not installed on this host.';
+
 function ServiceState({ status }: { status: SettleUnitStatus }) {
   const unit = status.unit;
   if (unit === null) {
     return <span className="muted">{status.unitError ?? 'Service state is not available on this host.'}</span>;
+  }
+  if (unit.loadState === 'not-found') {
+    return <span className="muted">{UNIT_NOT_INSTALLED}</span>;
   }
   return (
     <>

@@ -15,6 +15,22 @@ commit.
 
 ## [Unreleased]
 
+### AFL API settle units: credential boundary tightened, "not installed" status (AFLDB-ISSUE-232; issue open, pending DEV operator acceptance) - 1 October 2026
+
+- `deploy/afldb-settle-afl-api.service` and `deploy/afldb-settle-afl-api-brownlow.service` now keep
+  exactly `DATABASE_URL` and `AFLDB_IMPORT_DATABASE_URL`. They also unset the seven test, code-test
+  and DEV/PROD maintenance DSNs they had missed, the IMAP intake login and the Kali API key. The
+  Brownlow deployment gate and other non-secret settings are kept. `tests/afl-api-ingestion-safety.test.ts`
+  derives every DSN and credential-shaped name from `.env.example`, so a future addition fails
+  until both units deny it. Neither unit is installed on any host yet.
+- `/admin/current-season`'s read-only "AFL API scheduled settles" panel now says "Not installed on
+  this host." for a unit systemd reports as `LoadState=not-found`, instead of "Idle (inactive)".
+  `startSettleRun()` still starts only the AFL Tables unit.
+- Operations docs: the Brownlow timer is permanently enabled once installed, and only its
+  environment gate is an early no-op, so the count window is opened DB switch first and closed
+  environment gate first. AFL API units are started with `sudo systemctl start`. DEV acceptance
+  now requires a `--dry-run` rehearsal with halt criteria before the match unit's first applying run.
+
 ### Deployment security: web DSN deny-list restored, standalone env-file detection hardened (AFLDB-ISSUE-220; resolved) - 1 October 2026
 
 - `deploy/afldb.service` again keeps exactly `DATABASE_URL`, `AFLDB_AUTH_DATABASE_URL` and
