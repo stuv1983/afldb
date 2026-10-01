@@ -30,6 +30,11 @@
  * stay informational in both modes, as do the two evidence-backed height
  * categories (`external source disagreement`, §23.19; `adjudicated source
  * conflict`, §23.26), while an open `source conflict` fails like a data gap.
+ * AFLDB-ISSUE-225 (D4-D6) adds `adjudicated key disagreement`, also
+ * informational: the guarded teammates semantic contract, and a tracked,
+ * re-derived known-answer adjudication (data/players/
+ * gridley-known-answer-adjudications.csv) that turns back into `incorrect known
+ * answer`, marked STALE, the moment the AFLDB fact it was decided on changes.
  */
 import './guard';
 
@@ -43,14 +48,17 @@ import { sql } from '@/db/client';
 import { compileAxis, solveCellSummary } from '@/db/queries/grid-solver';
 import {
   mapGridleyCriterion,
-  normalisePlayerName,
   type GridleyItem,
   type GridleyLookups,
   type GridleyMapping,
 } from '@/search/gridley-compat';
 import { type GridAxisState } from '@/search/grid-solver-spec';
 import { loadAnswers, loadCorpus, type CorpusBoard } from '../gridley-compat.test';
-import { buildResolver, nationalPickKeyDisagreement, playerRegisterHorizon, rookieSourceCoverageGap, triageDraftFinding, type LinkedDraftRow, type PlayerRow } from '../gridley-corpus-support';
+import {
+  buildCoachResolver, buildCriterionListingIndex, buildResolver, CLUB_COUNT_BUILDER, criterionListedElsewhere, knownAnswerAdjudication,
+  knownAnswerEvidenceStaleness, LIST_MEMBERSHIP_LACKING_BUILDER, nationalPickKeyDisagreement, playerRegisterHorizon, type CoachRow, rookieSourceCoverageGap, teammateListMembership, triageDraftFinding, type KnownAnswerRecord, type LinkedDraftRow, type PlayerRow,
+} from '../gridley-corpus-support';
+import { loadGridleyKnownAnswerAdjudications } from '../gridley-known-answer-adjudications';
 import { adjudicationStaleness, loadHeightAdjudications, type HeightAdjudication } from '../height-adjudications';
 import { loadRookieRelistingOutcomes, type RookieRelistingOutcome } from '../rookie-relisting-outcomes';
 
@@ -83,32 +91,6 @@ const FATHER_SON_BUILDERS = new Set(['father_son_selection', 'father_son_father'
 const DRAFT_BUILDERS = new Set(['national_draft_pick_between', 'draft_pick_between', 'draft_year_between', 'draft_type_is', 'drafted_by_club', 'drafted_by_club_never_played', 'recruited_via', 'traded_min_times']);
 const MATCH_EVENT_BUILDERS = new Set(['match_event_played', 'match_event_min', 'match_event_won', 'match_event_played_between']);
 
-type CoachRow = { id: number; displayName: string };
-
-/**
- * Coach resolution: by normalised full name against coaches.display_name (the AFL
- * Tables coach-page person). Exactly one hit resolves; the eight Gridley coaches are
- * unique names on the index. On a database with no coaches loaded every coach
- * criterion is a dataset gap, never a guess.
- */
-function buildCoachResolver(coaches: CoachRow[], unresolvedLog: string[], gapLog: string[]): (ref: { criterionId: string; name: string }) => number | null {
-  const byName = new Map<string, CoachRow[]>();
-  for (const c of coaches) {
-    const k = normalisePlayerName(c.displayName);
-    byName.set(k, [...(byName.get(k) ?? []), c]);
-  }
-  return (ref) => {
-    if (coaches.length === 0) {
-      gapLog.push(`${ref.criterionId}: this database holds no coaches`);
-      return null;
-    }
-    const candidates = byName.get(normalisePlayerName(ref.name)) ?? [];
-    if (candidates.length === 1) return candidates[0].id;
-    unresolvedLog.push(`${ref.criterionId}: coach "${ref.name}" matched ${candidates.length} coaches`);
-    return null;
-  };
-}
-
 // ---------------------------------------------------------------------------
 
 type CriterionRecord = {
@@ -127,7 +109,8 @@ type CellFinding = {
   cell: string;
   category: 'parse' | 'unsupported' | 'dataset gap' | 'partial dataset' | 'query failure' | 'timeout' | 'empty answer'
     | 'incorrect known answer' | 'count mismatch' | 'time of board' | 'list membership'
-    | 'external source disagreement' | 'source conflict' | 'adjudicated source conflict' | 'source coverage gap';
+    | 'external source disagreement' | 'source conflict' | 'adjudicated source conflict' | 'source coverage gap'
+    | 'adjudicated key disagreement';
   row: string;
   col: string;
   rowAxis: string;
@@ -201,12 +184,26 @@ const rookieOutcomes = new Map<number, RookieRelistingOutcome>();
  * and won the Grand Final. Built from captaincies + match facts, never from Gridley's answer.
  */
 const coCaptaincy = new Map<number, string>();
+/**
+ * AFLDB-ISSUE-225 §19.2 (D4). AFLDB player id -> the tracked known-answer adjudications
+ * (data/players/gridley-known-answer-adjudications.csv) for the AFL Tables profile the player's
+ * afltables identity holds, each with its staleness against this database: the AFLDB fact it was
+ * decided on (games per merged organization, or every trusted captaincies row) is re-derived here.
+ */
+const knownAnswerRecords = new Map<number, KnownAnswerRecord[]>();
+/** One line per tracked known-answer adjudication: resolved, stale or absent on this database (logged and reported). */
+const knownAnswerStatus: string[] = [];
+/** AFLDB-ISSUE-225 §19.1 (D5). Bridged AFLDB player id -> played teammates at career_teammates_min's own grain (same club, same season). */
+const playedTeammates = new Map<number, number>();
+/** AFLDB-ISSUE-225 D10. Gridley player id + criterion id -> cells whose frozen key LISTS the player under that criterion. */
+let criterionListing = new Map<string, Set<string>>();
 /** Documented semantic differences between Gridley and AFLDB: reported and counted, never failed. */
 const INFORMATIONAL: Record<string, string> = {
   'time of board': "Gridley's answer key is frozen at the board's date and the player was still playing then; AFLDB answers for today",
   'list membership': "Gridley's club, decade, teammate, club-count, wooden-spoon, minor-premiership and coached-by criteria include players merely listed by a club that season (a trade-period move, the suspended 2016 Essendon players, a listed player who did not play a caretaker coach's one match); AFLDB models games played",
   'external source disagreement': "a height cell where every independent source AFLDB holds (AFL API roster, Wikipedia infobox) sits on AFLDB's side of the bound and none on Gridley's (ISSUE-118 §23.19); or a premiership-captain cell where AFLDB's canonical captaincies record the player as one of several captains of the premier club that season who all played and won the Grand Final, and Gridley's key names one premiership captain per flag (ISSUE-118 §23.23); or a National Draft pick-range cell where Gridley lists a linked player whose only trusted-linked pick inside the range is a non-national selection, named in the finding (AFLDB-ISSUE-222 §11.19.12 D1). AFLDB's answer is source-backed; the definitions differ",
   'adjudicated source conflict': "a height source conflict the operator has reviewed against every source AFLDB holds and decided in a tracked record (data/players/height-adjudications.csv, ISSUE-118 §23.26): AFL Tables is retained under the §23.19 precedence policy and the competing values are named; the record applies only while the canonical height and the competing evidence are exactly those it was decided on",
+  'adjudicated key disagreement': "an operator-adjudicated difference from Gridley's answer key (AFLDB-ISSUE-225 §19, D4-D6), one of two mechanisms named in each finding: (a) the teammates semantic contract -- Gridley lists, AFLDB omits, career_teammates_min is the only lacking axis and the career reaches 2001: Gridley counts list co-members after 2000, AFLDB counts players who played for the same club in the same season, and AFLDB's played-teammate count is in the detail; or (b) a tracked known-answer adjudication (data/players/gridley-known-answer-adjudications.csv) keyed by AFL Tables profile, applying only on its criterion and direction, only while the AFLDB fact it was decided on is exactly what the database holds (otherwise the cell stays `incorrect known answer`, marked STALE), and for a self-inconsistent key only where AFLDB satisfies the other criterion and Gridley's own frozen key lists the player under that criterion elsewhere in the corpus (D10)",
 };
 /** ISSUE-118 §23.31: the cited brothers rows behind each has_brother player (player id -> evidence), for the reverse direction. */
 const brotherEvidence = new Map<number, string>();
@@ -400,6 +397,49 @@ beforeAll(async () => {
     }
   }
 
+  // AFLDB-ISSUE-225 §19 (D4/D5/D10). The D10 guard reads Gridley's own key for the bridged players;
+  // the teammate count and the adjudication evidence read this database.
+  criterionListing = buildCriterionListingIndex(boards, answers, new Set(bridge.keys()));
+  const adjudications = loadGridleyKnownAnswerAdjudications().map((adj) => ({ adj, playerId: byProfile.get(adj.afltablesProfile)?.playerId ?? null }));
+  const adjudicatedIds = [...new Set(adjudications.flatMap((a) => (a.playerId === null ? [] : [a.playerId])))];
+  const [teammateCounts, organizationGames, trustedCaptaincies] = await Promise.all([
+    sql<{ playerId: number; teammates: number }[]>`
+      SELECT pcs.player_id AS "playerId", count(DISTINCT o.player_id)::int AS teammates
+        FROM player_club_season_stats pcs
+        JOIN player_club_season_stats o ON o.season = pcs.season AND o.club_id = pcs.club_id AND o.player_id <> pcs.player_id
+       WHERE pcs.player_id = ANY(${[...new Set(bridge.values())]}::int[])
+       GROUP BY pcs.player_id`,
+    // Games per merged organization: the fold games_at_one_club_min_incl_merged and
+    // games_at_multiple_clubs_min_incl_merged apply (grid-solver.ts mergedOrgExpr).
+    sql<{ playerId: number; slug: string; games: number }[]>`
+      SELECT pc.player_id AS "playerId", o.slug, sum(pc.games)::int AS games
+        FROM player_clubs pc JOIN clubs cl ON cl.id = pc.club_id
+        JOIN club_organizations o ON o.id = COALESCE((SELECT r.to_organization_id FROM club_organization_relations r
+                                                       WHERE r.from_organization_id = cl.organization_id AND r.relation = 'merged_into'), cl.organization_id)
+       WHERE pc.player_id = ANY(${adjudicatedIds}::int[])
+       GROUP BY pc.player_id, o.slug`,
+    // Every trusted captaincies row: the rows club_captain_any reads.
+    sql<{ playerId: number; club: string; season: number }[]>`
+      SELECT cp.player_id AS "playerId", c.name AS club, cp.season::int AS season
+        FROM captaincies cp JOIN clubs c ON c.id = cp.club_id
+       WHERE cp.player_id = ANY(${adjudicatedIds}::int[]) AND cp.link_status_value IN ('unique', 'resolved')`,
+  ]);
+  for (const r of teammateCounts) playedTeammates.set(r.playerId, r.teammates);
+  for (const { adj, playerId } of adjudications) {
+    if (playerId === null) {
+      // No afltables identity for the profile on this database: the record can apply to nobody (fail closed).
+      knownAnswerStatus.push(`${adj.afltablesProfile} ${adj.gridleyCriterion}/${adj.direction}: no afltables identity on this database`);
+      continue;
+    }
+    const stale = knownAnswerEvidenceStaleness(adj, {
+      organizationGames: organizationGames.filter((r) => r.playerId === playerId),
+      trustedCaptaincies: trustedCaptaincies.filter((r) => r.playerId === playerId),
+    });
+    knownAnswerRecords.set(playerId, [...(knownAnswerRecords.get(playerId) ?? []), { ...adj, stale }]);
+    knownAnswerStatus.push(`${adj.afltablesProfile} ${adj.gridleyCriterion}/${adj.direction} -> afldb ${playerId}: ${stale === null ? 'current' : `STALE: ${stale}`}`);
+  }
+  console.log(`[gridley-corpus] known-answer adjudications (AFLDB-ISSUE-225):\n${knownAnswerStatus.join('\n')}`);
+
   // One set per distinct mapped criterion, through the production compiler.
   for (const rec of criteria.values()) {
     if (rec.mapping.status !== 'mapped') continue;
@@ -573,6 +613,23 @@ describe('Gridley corpus -- every cell through solveCellSummary', () => {
         let detail = `gridley player ${gid} = afldb ${afldbId}: Gridley ${inGridley ? 'lists' : 'omits'}, AFLDB ${inAfldb ? 'lists' : 'omits'}${lacking ? ` (missing from ${lacking})` : ''}`;
         const finalSeason = finalSeasons.get(afldbId) ?? null;
         const inductedAfterBoard = axisBuilders.includes('hall_of_fame_player') && (hallOfFameYears.get(afldbId) ?? 0) >= boardYear;
+        // AFLDB-ISSUE-225 §19 (D4/D5): both rules are pure (tests/gridley-corpus-support.ts) and
+        // read only where the chain below reaches them, after `time of board`.
+        const ti = axisBuilders.indexOf('career_teammates_min');
+        const teammateMapping = ti >= 0 ? [rowRec, colRec][ti].mapping : null;
+        const teammateRule = teammateMapping?.status === 'mapped'
+          ? teammateListMembership({
+            inGridley, inAfldb, lackingBuilders: lackingIdx.map((i) => axisBuilders[i]), finalSeason,
+            threshold: Number(teammateMapping.axis.params.x), playedTeammates: playedTeammates.get(afldbId) ?? 0,
+          })
+          : null;
+        const adjudicationRecords = knownAnswerRecords.get(afldbId);
+        const keyAdjudication = adjudicationRecords
+          ? knownAnswerAdjudication({
+            records: adjudicationRecords, axisCriteria: axisItems.map((x) => x.id), lackingCriteria: lackingIdx.map((i) => axisItems[i].id),
+            inGridley, inAfldb, gridleyListsElsewhere: (criterion) => criterionListedElsewhere(criterionListing, gid, criterion, board.board, cell),
+          })
+          : null;
         let category: CellFinding['category'] = 'incorrect known answer';
         if (partial) category = 'partial dataset';
         else if (finalSeason === null || finalSeason >= boardYear || boardYear > gaps.maxSeason || inductedAfterBoard) category = 'time of board';
@@ -581,10 +638,18 @@ describe('Gridley corpus -- every cell through solveCellSummary', () => {
         // match for it (Heppell and Daniher under Goodwin's one 2013 Essendon game, which
         // neither played in); AFLDB's coached_by is a match the player played while X was
         // that club's coach for that exact match.
-        else if (inGridley && lackingIdx.length > 0 && lackingIdx.every((i) => /^(played_(for_club|in_decade)|teammate_of|wooden_spoon_season|minor_premiership_season|coached_by)$/.test(axisBuilders[i]))) category = 'list membership';
+        else if (inGridley && lackingIdx.length > 0 && lackingIdx.every((i) => LIST_MEMBERSHIP_LACKING_BUILDER.test(axisBuilders[i]))) category = 'list membership';
+        // AFLDB-ISSUE-225 §19.1, operator decision D5: the teammates semantic contract. Gridley
+        // lists, AFLDB omits, career_teammates_min is the ONLY lacking axis, and the career reaches
+        // the list era (2001+). The played-teammate count is in the detail. Never the reverse
+        // direction, never a mixed lacking set, never a player exception.
+        else if (teammateRule !== null) {
+          findings.push({ ...base, category: 'adjudicated key disagreement', detail: `${detail}; ${teammateRule}` });
+          continue;
+        }
         // A club-count criterion in either direction: Gridley's own text counts a
         // trade-period move to a club the player never played for.
-        else if (axisBuilders.some((b) => /^(one_club_player|multi_club_player|clubs_played_min)/.test(b))) category = 'list membership';
+        else if (axisBuilders.some((b) => CLUB_COUNT_BUILDER.test(b))) category = 'list membership';
         // ISSUE-118 §23.23. A premiership-captain cell where AFLDB lists a co-captain Gridley
         // omits. Gridley's key names one premiership captain per flag (the tracked captain
         // lists carry the same single designation as a note); AFLDB's canonical captaincies
@@ -608,6 +673,17 @@ describe('Gridley corpus -- every cell through solveCellSummary', () => {
           } else {
             findings.push({ ...base, category: 'external source disagreement', detail: `${detail}; canonical brothers row: ${brotherEvidence.get(afldbId)}` });
           }
+          continue;
+        }
+        // AFLDB-ISSUE-225 §19.2, operator decisions D4/D6. A tracked known-answer adjudication
+        // for this player, criterion and direction (and, for a self-inconsistent key, the
+        // criterion-pair guard). Reported, never failed -- unless the AFLDB fact it was decided on
+        // has changed: then the record is STALE and the cell stays `incorrect known answer`.
+        else if (category === 'incorrect known answer' && keyAdjudication !== null) {
+          findings.push({
+            ...base, category: keyAdjudication.outcome === 'adjudicated' ? 'adjudicated key disagreement' : 'incorrect known answer',
+            detail: `${detail}; ${keyAdjudication.detail}`,
+          });
           continue;
         }
         // ISSUE-118 §23.19. A height cell: Gridley's height source differs from the AFL
@@ -685,6 +761,7 @@ describe('Gridley corpus -- every cell through solveCellSummary', () => {
       cells: boards.length * 9,
       solvedCells: cellStats.length,
       findingsByCategory: Object.fromEntries(byCategory),
+      knownAnswerAdjudications: knownAnswerStatus,
       slowCells: slowCells.slice(0, 50),
       criteria: [...criteria.values()].map((r) => ({
         id: r.id, occurrences: r.occurrences, status: r.mapping.status, axis: describeAxis(r.mapping),

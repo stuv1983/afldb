@@ -66,7 +66,12 @@ EXPECTED_HEADER = (
 # lacked (Geelong, Hawthorn, West Coast, Fitzroy, Brisbane Bears, University),
 # transcribed from the Wikipedia captain lists (Hawthorn 1952, Peter O'Donohue, has no
 # AFL Tables identity and is recorded in the runbook, not here).
-EXPECTED_TOTAL = 1774
+# AFLDB-ISSUE-225 §18 (S1): +7 co-captain rows the bootstrap's club-list grain
+# omitted (Gold Coast 2017-2018 Steven May, 2019-2021 Jarrod Witts; Melbourne
+# 2008 Cameron Bruce and James McDonald), each from a named Wikipedia page per
+# docs/rebuild-manifests/captaincies/issue225-co-captaincy-review-20261001-v1.md.
+# source_key = first 24 hex of SHA-1("issue225|club|season|player|period").
+EXPECTED_TOTAL = 1781
 MIN_SEASON = 1897
 MAX_SEASON = 2026
 EXPECTED_DISTINCT_SEASONS = 130

@@ -25,7 +25,12 @@ import {
   type GridleyLookups,
   type GridleyMapping,
 } from '@/search/gridley-compat';
-import { buildResolver, nationalPickKeyDisagreement, rookieSourceCoverageGap, triageDraftFinding, type LinkedDraftRow, type PlayerRow } from './gridley-corpus-support';
+import {
+  buildCriterionListingIndex, buildResolver, criterionListedElsewhere, knownAnswerAdjudication, knownAnswerEvidence, knownAnswerEvidenceStaleness, nationalPickKeyDisagreement,
+  rookieSourceCoverageGap, teammateListMembership, triageDraftFinding, type KnownAnswerFacts, type KnownAnswerRecord, type LinkedDraftRow, type PlayerRow,
+} from './gridley-corpus-support';
+import { GRIDLEY_KNOWN_ANSWER_COLUMNS, loadGridleyKnownAnswerAdjudications } from './gridley-known-answer-adjudications';
+import { CAPTAIN_CENSUS, classifyIssue225Cell, ISSUE225_GIDS, issue225Population, TEAMMATE_CENSUS } from './issue225-acceptance';
 import { loadRookieRelistingOutcomes, type RookieRelistingOutcome } from './rookie-relisting-outcomes';
 
 const FIXTURES = join(__dirname, 'fixtures', 'gridley');
@@ -507,5 +512,301 @@ describe('Gridley corpus support (AFLDB-ISSUE-222)', () => {
       expect(rookieSourceCoverageGap(noRookieRow, rookie, outcome)).toContain(outcome.reference);
       expect(rookieSourceCoverageGap(noRookieRow, rookie, outcome)).toContain(`pick ${outcome.pick}`);
     }
+  });
+});
+
+describe('Gridley compatibility adjudication (AFLDB-ISSUE-225 §19, D4-D6, D10, D11)', () => {
+  // ---- the tracked artefact ------------------------------------------------
+  const records = loadGridleyKnownAnswerAdjudications();
+  const header = GRIDLEY_KNOWN_ANSWER_COLUMNS.join(',');
+  const swallowLine = 'players/D/David_Swallow.html,David Swallow,games250sameclub,gridley_lists,gridley_key_error,organization_games:gold-coast=249,AFL Tables career total 249 games all Gold Coast and retirement reporting agree,2026-10-01,AFLDB-ISSUE-225 §19.2';
+  const reject = (line: string, pattern: RegExp) => expect(() => loadGridleyKnownAnswerAdjudications(`${header}\n${line}\n`)).toThrow(pattern);
+  const withField = (index: number, value: string) => swallowLine.split(',').map((v, i) => (i === index ? value : v)).join(',');
+
+  it('the tracked CSV holds exactly the three decided records, keyed by AFL Tables profile', () => {
+    expect(records.map((r) => [r.afltablesProfile, r.gridleyCriterion, r.direction, r.verdict, r.afldbEvidence, r.decidedOn])).toEqual([
+      ['players/C/Cameron_Bruce.html', 'captain', 'gridley_omits', 'gridley_key_inconsistent', 'trusted_captaincies:Melbourne=2008', '2026-10-01'],
+      ['players/D/David_Swallow.html', 'games250sameclub', 'gridley_lists', 'gridley_key_error', 'organization_games:gold-coast=249', '2026-10-01'],
+      ['players/D/Dylan_Shiel.html', 'games100clubs2', 'gridley_lists', 'gridley_key_error', 'organization_games:essendon=99;greater-western-sydney=135', '2026-10-01'],
+    ]);
+    for (const r of records) expect(r.reference).toMatch(/^AFLDB-ISSUE-225 /);
+  });
+
+  it('the reader accepts a well-formed row and rejects every malformed shape', () => {
+    expect(loadGridleyKnownAnswerAdjudications(`${header}\n${swallowLine}\n`)).toHaveLength(1);
+    expect(() => loadGridleyKnownAnswerAdjudications(`${header.replace('verdict', 'decision')}\n${swallowLine}\n`)).toThrow(/header/);
+    reject(`${swallowLine},extra`, /10 fields/);
+    reject(withField(0, 'David_Swallow'), /not an AFL Tables profile path/);
+    reject(withField(2, 'games200sameclub'), /no declared evidence kind/);
+    reject(withField(3, 'gridley_disagrees'), /direction/);
+    reject(withField(4, 'gridley_wrong'), /verdict/);
+    reject(withField(4, 'gridley_key_inconsistent'), /not allowed for direction gridley_lists/);
+    reject(withField(3, 'gridley_omits'), /not allowed for direction gridley_omits/);
+    reject(withField(5, 'trusted_captaincies:Gold Coast=2017'), /must be organization_games/);
+    reject(withField(5, 'organization_games:gold-coast=249;essendon=1'), /sorted, distinct/);
+    reject(withField(5, 'organization_games:gold-coast=two'), /sorted, distinct/);
+    reject(withField(6, 'AFL Tables 249'), /must state the evidence/);
+    reject(withField(7, '1 Oct 2026'), /decided_on/);
+    reject(withField(8, 'ISSUE-225'), /reference/);
+    reject(`${swallowLine}\n${swallowLine}`, /duplicate/);
+  });
+
+  // ---- the teammates semantic contract (D5) --------------------------------
+  const teammates = { inGridley: true, inAfldb: false, lackingBuilders: ['career_teammates_min'], finalSeason: 2020, threshold: 150, playedTeammates: 149 };
+
+  it('teammates: fires on Gridley lists / AFLDB omits / career_teammates_min the only lacking axis / career reaching 2001, naming the count', () => {
+    const detail = teammateListMembership(teammates);
+    expect(detail).toContain('149 played teammates against the threshold 150');
+    expect(detail).toContain('AFLDB-ISSUE-225 §19.1 D5');
+  });
+
+  it('teammates: null for the reverse direction, a pre-2001 career, a mixed lacking set, another builder or an unknown final season', () => {
+    expect(teammateListMembership({ ...teammates, inGridley: false, inAfldb: true, lackingBuilders: [] })).toBeNull();
+    expect(teammateListMembership({ ...teammates, finalSeason: 2000 })).toBeNull();
+    expect(teammateListMembership({ ...teammates, finalSeason: 2001 })).not.toBeNull();
+    expect(teammateListMembership({ ...teammates, finalSeason: null })).toBeNull();
+    expect(teammateListMembership({ ...teammates, lackingBuilders: ['career_teammates_min', 'played_for_club'] })).toBeNull();
+    expect(teammateListMembership({ ...teammates, lackingBuilders: ['teammate_of'] })).toBeNull();
+    expect(teammateListMembership({ ...teammates, lackingBuilders: [] })).toBeNull();
+  });
+
+  // ---- evidence derivation and staleness -----------------------------------
+  const facts = (organizationGames: KnownAnswerFacts['organizationGames'], trustedCaptaincies: KnownAnswerFacts['trustedCaptaincies'] = []): KnownAnswerFacts => ({ organizationGames, trustedCaptaincies });
+  const swallow = records.find((r) => r.gridleyCriterion === 'games250sameclub')!;
+  const shiel = records.find((r) => r.gridleyCriterion === 'games100clubs2')!;
+  const bruce = records.find((r) => r.gridleyCriterion === 'captain')!;
+
+  it('staleness: each record is current against exactly the AFLDB facts it was decided on', () => {
+    expect(knownAnswerEvidenceStaleness(swallow, facts([{ slug: 'gold-coast', games: 249 }]))).toBeNull();
+    expect(knownAnswerEvidenceStaleness(shiel, facts([{ slug: 'greater-western-sydney', games: 135 }, { slug: 'essendon', games: 99 }]))).toBeNull();
+    expect(knownAnswerEvidenceStaleness(bruce, facts([], [{ club: 'Melbourne', season: 2008 }]))).toBeNull();
+    expect(knownAnswerEvidence('trusted_captaincies', facts([], [{ club: 'Melbourne', season: 2009 }, { club: 'Gold Coast', season: 2017 }])))
+      .toBe('trusted_captaincies:Gold Coast=2017;Melbourne=2009');
+  });
+
+  it('staleness: a changed game count, an extra or missing organization, or an added or missing captaincy row is STALE', () => {
+    expect(knownAnswerEvidenceStaleness(swallow, facts([{ slug: 'gold-coast', games: 250 }]))).toMatch(/AFLDB now holds organization_games:gold-coast=250/);
+    expect(knownAnswerEvidenceStaleness(swallow, facts([{ slug: 'gold-coast', games: 249 }, { slug: 'essendon', games: 1 }]))).not.toBeNull();
+    expect(knownAnswerEvidenceStaleness(shiel, facts([{ slug: 'greater-western-sydney', games: 135 }, { slug: 'essendon', games: 100 }]))).not.toBeNull();
+    expect(knownAnswerEvidenceStaleness(shiel, facts([{ slug: 'greater-western-sydney', games: 135 }]))).not.toBeNull();
+    expect(knownAnswerEvidenceStaleness(bruce, facts([], []))).toMatch(/AFLDB now holds trusted_captaincies:, adjudicated on/);
+    expect(knownAnswerEvidenceStaleness(bruce, facts([], [{ club: 'Melbourne', season: 2008 }, { club: 'Hawthorn', season: 2011 }]))).not.toBeNull();
+    expect(knownAnswerEvidenceStaleness({ gridleyCriterion: 'games200sameclub', afldbEvidence: 'organization_games:x=1' }, facts([]))).toMatch(/no evidence kind/);
+  });
+
+  // ---- the classification arm (D4, D10) -----------------------------------
+  const current = (r: (typeof records)[number]): KnownAnswerRecord => ({ ...r, stale: null });
+  const never = () => false;
+  const always = () => true;
+  const swallowCell = { records: [current(swallow)], axisCriteria: ['games250sameclub', 'clubbestfairest'], lackingCriteria: ['games250sameclub'], inGridley: true, inAfldb: false, gridleyListsElsewhere: never };
+  const bruceCell = { records: [current(bruce)], axisCriteria: ['captain', '2000s'], lackingCriteria: [] as string[], inGridley: false, inAfldb: true, gridleyListsElsewhere: (c: string) => c === '2000s' };
+
+  it('adjudication: a current gridley_key_error record fires on its own lacking criterion (Swallow board 938, Shiel board 967)', () => {
+    expect(knownAnswerAdjudication(swallowCell)).toEqual({ outcome: 'adjudicated', detail: expect.stringContaining('gridley_key_error on games250sameclub (2026-10-01, AFLDB-ISSUE-225 §19.2 D4): AFLDB organization_games:gold-coast=249') });
+    expect(knownAnswerAdjudication({ ...swallowCell, records: [current(shiel)], axisCriteria: ['games100clubs2', '2010s'], lackingCriteria: ['games100clubs2'] }))
+      .toMatchObject({ outcome: 'adjudicated' });
+  });
+
+  it('adjudication: null for no record, another criterion, the other direction, a criterion that is not lacking, or a mixed lacking set', () => {
+    expect(knownAnswerAdjudication({ ...swallowCell, records: [] })).toBeNull();
+    expect(knownAnswerAdjudication({ ...swallowCell, axisCriteria: ['games200sameclub', 'clubbestfairest'], lackingCriteria: ['games200sameclub'] })).toBeNull();
+    expect(knownAnswerAdjudication({ ...swallowCell, inGridley: false, inAfldb: true, lackingCriteria: [] })).toBeNull();
+    expect(knownAnswerAdjudication({ ...swallowCell, lackingCriteria: ['clubbestfairest'] })).toBeNull();
+    expect(knownAnswerAdjudication({ ...swallowCell, lackingCriteria: ['games250sameclub', 'clubbestfairest'] })).toBeNull();
+    expect(knownAnswerAdjudication({ ...swallowCell, inGridley: true, inAfldb: true })).toBeNull();
+  });
+
+  it('adjudication: a STALE record that would otherwise apply is reported stale, never adjudicated', () => {
+    const stale = knownAnswerAdjudication({ ...swallowCell, records: [{ ...swallow, stale: 'AFLDB now holds organization_games:gold-coast=250, adjudicated on organization_games:gold-coast=249' }] });
+    expect(stale).toEqual({ outcome: 'stale', detail: expect.stringMatching(/is STALE: AFLDB now holds organization_games:gold-coast=250/) });
+    // A stale record whose guards do not hold is simply not applicable.
+    expect(knownAnswerAdjudication({ ...swallowCell, lackingCriteria: ['clubbestfairest'], records: [{ ...swallow, stale: 'x' }] })).toBeNull();
+  });
+
+  it('D10: Bruce\'s record fires only when AFLDB lists him on both axes and Gridley\'s key independently accepts him for the other criterion', () => {
+    expect(knownAnswerAdjudication(bruceCell)).toEqual({ outcome: 'adjudicated', detail: expect.stringContaining('gridley_key_inconsistent on captain (2026-10-01, AFLDB-ISSUE-225 §19.2 D4 D10) [D10 guard: AFLDB satisfies 2000s') });
+    // Gridley never accepts him for the other criterion: a genuine disagreement, not adjudicated.
+    expect(knownAnswerAdjudication({ ...bruceCell, axisCriteria: ['captain', 'finals10'] })).toBeNull();
+    expect(knownAnswerAdjudication({ ...bruceCell, gridleyListsElsewhere: never })).toBeNull();
+    // Only the record's own criterion, only its own direction.
+    expect(knownAnswerAdjudication({ ...bruceCell, axisCriteria: ['premcaptain', '2000s'] })).toBeNull();
+    expect(knownAnswerAdjudication({ ...bruceCell, inGridley: true, inAfldb: false, lackingCriteria: ['captain'] })).toBeNull();
+    // The guard asks about the OTHER criterion, never the record's own.
+    expect(knownAnswerAdjudication({ ...bruceCell, gridleyListsElsewhere: (c: string) => c === 'captain' })).toBeNull();
+  });
+
+  it('D10: stale Bruce captaincy evidence fails closed', () => {
+    const staleBruce = { ...bruce, stale: knownAnswerEvidenceStaleness(bruce, facts([], [])) };
+    expect(staleBruce.stale).not.toBeNull();
+    expect(knownAnswerAdjudication({ ...bruceCell, records: [staleBruce] })).toEqual({ outcome: 'stale', detail: expect.stringContaining('is STALE: AFLDB now holds trusted_captaincies:') });
+    expect(classifyIssue225Cell({ ...bruceClassify, records: [staleBruce] }).category).toBe('incorrect known answer');
+  });
+
+  it('D10: an unrelated player cannot use the rule -- no record, no adjudication, whatever the key says', () => {
+    expect(knownAnswerAdjudication({ ...bruceCell, records: [] })).toBeNull();
+    expect(classifyIssue225Cell({ ...bruceClassify, records: undefined, gridleyListsElsewhere: always })).toMatchObject({ category: 'incorrect known answer' });
+    // The reader binds the self-inconsistent verdict to the omits direction; a profile is a record, not a name.
+    expect(records.filter((r) => r.verdict === 'gridley_key_inconsistent').map((r) => r.afltablesProfile)).toEqual(['players/C/Cameron_Bruce.html']);
+  });
+
+  // ---- the census and the D10 rule on Gridley's own frozen key -------------
+  const corpusBoards = loadCorpus();
+  const corpusAnswers = loadAnswers();
+  const byBoard = new Map(corpusBoards.map((b) => [b.board, b]));
+  const keyLists = (board: number, cell: string, gid: number) => {
+    const [r, c] = cell.split('-').map(Number);
+    return corpusAnswers[String(board)][r][c].includes(gid);
+  };
+  const criteriaOf = (board: number, cell: string) => {
+    const b = byBoard.get(board)!;
+    const [r, c] = cell.split('-').map(Number);
+    return [b.rows[r].id, b.cols[c].id];
+  };
+  const { BRUCE, MAY, SWALLOW, SHIEL } = ISSUE225_GIDS;
+  // E2 Q2a played-teammate counts and final seasons, by Gridley id (runbook §11.3).
+  const E2_TEAMMATES: Record<number, [number, number]> = {
+    379: [88, 2023], 1359: [128, 2011], 3211: [140, 2024], 41: [143, 2009], 6173: [149, 2022], 1141: [121, 2022],
+    4287: [144, 2017], 1846: [146, 2025], 1130: [149, 2020], 1128: [143, 2024], 3507: [142, 2022],
+  };
+
+  it('census: the 20 captain cells are Gridley-listed captain cells for Bruce and May, both of whom S1 gives a trusted captaincy row', () => {
+    for (const [board, cell, gid] of CAPTAIN_CENSUS) {
+      expect(criteriaOf(board, cell)).toContain('captain');
+      expect(keyLists(board, cell, gid)).toBe(true);
+    }
+    expect(CAPTAIN_CENSUS.filter(([, , g]) => g === BRUCE)).toHaveLength(11);
+    expect(CAPTAIN_CENSUS.filter(([, , g]) => g === MAY)).toHaveLength(9);
+    // club_captain_any reads ANY trusted captaincies row: the bootstrap ids S1 adds rows for.
+    const captaincies = readFileSync(join(__dirname, '..', 'data', 'awards', 'captaincies.csv'), 'utf8');
+    expect(captaincies).toMatch(/,2008,Melbourne,Cameron Bruce,747,unique,Captain,/);
+    expect(captaincies).toMatch(/,2017,Gold Coast,Steven May,11940,unique,Captain,/);
+    expect(captaincies).toMatch(/,2018,Gold Coast,Steven May,11940,unique,Captain,/);
+  });
+
+  it('census: the 15 teammate cells are Gridley-listed teammate cells the D5 rule classifies, each with its played-teammate count', () => {
+    expect(TEAMMATE_CENSUS).toHaveLength(15);
+    for (const [board, cell, gid] of TEAMMATE_CENSUS) {
+      const [played, finalSeason] = E2_TEAMMATES[gid];
+      const crit = criteriaOf(board, cell);
+      expect(crit.some((id) => /^teammates-(100|150)$/.test(id))).toBe(true);
+      expect(keyLists(board, cell, gid)).toBe(true);
+      const threshold = crit.includes('teammates-100') ? 100 : 150;
+      expect(played).toBeLessThan(threshold);
+      expect(teammateListMembership({ inGridley: true, inAfldb: false, lackingBuilders: ['career_teammates_min'], finalSeason, threshold, playedTeammates: played }))
+        .toContain(`${played} played teammates against the threshold ${threshold}`);
+    }
+  });
+
+  it('census: Swallow (938 0-1) and Shiel (967 0-2) are Gridley-listed cells on exactly their records\' criteria', () => {
+    expect(criteriaOf(938, '0-1')).toEqual(['games250sameclub', 'clubbestfairest']);
+    expect(keyLists(938, '0-1', SWALLOW)).toBe(true);
+    expect(criteriaOf(967, '0-2')).toEqual(['games100clubs2', '2010s']);
+    expect(keyLists(967, '0-2', SHIEL)).toBe(true);
+  });
+
+  const listing = buildCriterionListingIndex(corpusBoards, corpusAnswers, new Set([BRUCE, MAY]));
+  const builderOf = (id: string) => {
+    const item = corpusBoards.flatMap((b) => [...b.rows, ...b.cols]).find((x) => x.id === id)!;
+    const m = mapGridleyCriterion(item, STUB_LOOKUPS);
+    return m.status === 'mapped' ? m.axis.builder : null;
+  };
+  const captainCells = (gid: number) => corpusBoards.flatMap((b) => b.rows.flatMap((row, r) => b.cols.map((col, c) => {
+    const other = row.id === 'captain' ? col.id : row.id;
+    const samePairElsewhere = corpusBoards.some((b2) => b2.board !== b.board && b2.rows.some((r2, i) => b2.cols.some((c2, j) =>
+      [r2.id, c2.id].sort().join('|') === [row.id, col.id].sort().join('|') && corpusAnswers[String(b2.board)][i][j].includes(gid))));
+    return {
+      board: b.board, cell: `${r}-${c}`, year: Number(b.date.slice(0, 4)), other, captain: row.id === 'captain' || col.id === 'captain',
+      listed: corpusAnswers[String(b.board)][r][c].includes(gid), samePairElsewhere,
+      otherListedElsewhere: criterionListedElsewhere(listing, gid, other, b.board, `${r}-${c}`),
+    };
+  }))).filter((x) => x.captain);
+  const bruceCells = captainCells(BRUCE);
+  const bruceOmitted = bruceCells.filter((x) => !x.listed);
+  const tally = (cells: { other: string }[]) => {
+    const t: Record<string, number> = {};
+    for (const x of cells) t[x.other] = (t[x.other] ?? 0) + 1;
+    return t;
+  };
+
+  it('frozen key: Gridley lists Bruce on 11 captain cells, all in 2026, and omits him on 166 (144 before 2026)', () => {
+    expect(bruceCells).toHaveLength(177);
+    expect(bruceCells.filter((x) => x.listed).every((x) => x.year === 2026)).toBe(true);
+    expect(bruceOmitted).toHaveLength(166);
+    expect(bruceOmitted.filter((x) => x.year < 2026)).toHaveLength(144);
+  });
+
+  it('D10 pins: the old pair guard covered 26; the D10 rule adds 11 adjudications (plus 1 club-count cell); 37 intended Bruce adjudications, all before 2026', () => {
+    const pair = bruceOmitted.filter((x) => x.samePairElsewhere);
+    expect(pair).toHaveLength(26);
+    expect(tally(pair)).toEqual({ ME: 6, disposals30: 5, '2010s': 5, HW: 4, clubbestfairest: 3, games200: 2, risingStarNomination: 1 });
+    const d10 = bruceOmitted.filter((x) => x.otherListedElsewhere);
+    // The pair guard is a strict subset of the D10 rule.
+    expect(pair.every((x) => x.otherListedElsewhere)).toBe(true);
+    const added = d10.filter((x) => !x.samePairElsewhere);
+    expect(added).toHaveLength(12);
+    // clubs2+ (multi_club_player_incl_merged) is taken by the corpus suite's club-count arm first.
+    const clubCount = added.filter((x) => /^(one_club_player|multi_club_player|clubs_played_min)/.test(builderOf(x.other) ?? ''));
+    expect(clubCount.map((x) => `#${x.board} ${x.cell} ${x.other}`)).toEqual(['#280 0-2 clubs2+']);
+    const addedAdjudications = added.filter((x) => !clubCount.includes(x));
+    expect(addedAdjudications).toHaveLength(11);
+    expect(tally(addedAdjudications)).toEqual({ '2000s': 3, goals1avgseason: 3, games150: 1, finalswins1: 1, disposalsClubLeader: 1, coachedByClarkson: 1, brownlow10votes: 1 });
+    expect(pair.length + addedAdjudications.length).toBe(37);
+    expect(d10.every((x) => x.year < 2026)).toBe(true);
+  });
+
+  it('D10 controls: a criterion the key never accepts for Bruce stays unadjudicated, grandfinals1 included', () => {
+    for (const other of ['grandfinals1', 'allAus1953', 'premier1x', 'finals10', 'finalswins5', 'tackles10match']) {
+      const cells = bruceOmitted.filter((x) => x.other === other);
+      expect(cells.length).toBeGreaterThan(0);
+      expect(cells.some((x) => x.otherListedElsewhere)).toBe(false);
+    }
+    // grandfinals1: the key lists Bruce under it nowhere (he never played a Grand Final; E4), so
+    // after S1 the five captain x grandfinals1 cells are agreements unless AFLDB lists him there.
+    expect(listing.has(`${BRUCE}|grandfinals1`)).toBe(false);
+    expect(bruceOmitted.filter((x) => x.other === 'grandfinals1').map((x) => `#${x.board}`)).toEqual(['#289', '#548', '#766', '#938', '#988']);
+  });
+
+  // ---- the DEV acceptance probe's population and classifier (D11) ---------
+  const population = issue225Population(corpusBoards, corpusAnswers, builderOf);
+  const expectedOf = (group: string) => tally(population.cells.filter((c) => c.group === group).map((c) => ({ other: c.expected })));
+
+  it('D11 population: 20 + 15 + 2 census cells and the 164 evaluable Bruce omissions, each with its one passing classification', () => {
+    expect(expectedOf('captain census')).toEqual({ agreement: 20 });
+    expect(expectedOf('teammate census')).toEqual({ 'adjudicated key disagreement': 15 });
+    expect(expectedOf('games census')).toEqual({ 'adjudicated key disagreement': 2 });
+    expect(expectedOf('bruce reverse')).toEqual({ 'adjudicated key disagreement': 37, 'list membership': 1, agreement: 126 });
+    expect(population.excluded.map((e) => e.criterion)).toEqual(['season2024player', 'season2024player']);
+  });
+
+  it('D11 population: a census cell that is no longer Gridley-listed is an expected cell missing, and refuses', () => {
+    const tampered = structuredClone(corpusAnswers);
+    tampered['938'][0][1] = tampered['938'][0][1].filter((id) => id !== SWALLOW);
+    expect(() => issue225Population(corpusBoards, tampered, builderOf)).toThrow(/expected ISSUE-225 cell missing: #938 0-1/);
+  });
+
+  const bruceClassify = {
+    inGridley: false, axisCriteria: ['captain', '2000s'] as [string, string], axisBuilders: ['club_captain_any', 'played_in_decade'] as [string, string],
+    axisHas: [true, true] as [boolean, boolean], finalSeason: 2012, boardYear: 2024, maxSeason: 2026,
+    records: [current(bruce)] as KnownAnswerRecord[] | undefined, gridleyListsElsewhere: (c: string) => c === '2000s', playedTeammates: 0, teammateThreshold: null,
+  };
+
+  it('D11 classifier: mirrors the corpus chain -- agreement, time of board, D10 adjudication, club-count, and fail-closed otherwise', () => {
+    expect(classifyIssue225Cell(bruceClassify).category).toBe('adjudicated key disagreement');
+    expect(classifyIssue225Cell({ ...bruceClassify, axisHas: [true, false] }).category).toBe('agreement');
+    expect(classifyIssue225Cell({ ...bruceClassify, gridleyListsElsewhere: never }).category).toBe('incorrect known answer');
+    expect(classifyIssue225Cell({ ...bruceClassify, finalSeason: 2026, boardYear: 2026 }).category).toBe('time of board');
+    expect(classifyIssue225Cell({ ...bruceClassify, axisCriteria: ['captain', 'clubs2+'], axisBuilders: ['club_captain_any', 'multi_club_player_incl_merged'] }).category).toBe('list membership');
+    expect(classifyIssue225Cell({ ...bruceClassify, axisCriteria: ['captain', 'HFAME'], axisBuilders: ['club_captain_any', 'hall_of_fame_player'] }).detail).toMatch(/outside the ISSUE-225 probe's mirrored arms/);
+    // Teammates: the D5 rule with AFLDB's own count in the detail.
+    const teammate = classifyIssue225Cell({
+      ...bruceClassify, inGridley: true, axisCriteria: ['teammates-150', 'KA'], axisBuilders: ['career_teammates_min', 'played_for_club'],
+      axisHas: [false, true], finalSeason: 2025, boardYear: 2026, records: undefined, playedTeammates: 146, teammateThreshold: 150,
+    });
+    expect(teammate).toMatchObject({ category: 'adjudicated key disagreement', detail: expect.stringContaining('computes 146 played teammates against the threshold 150') });
+    // Swallow: his record on his lacking criterion.
+    expect(classifyIssue225Cell({
+      ...bruceClassify, inGridley: true, axisCriteria: ['games250sameclub', 'clubbestfairest'], axisBuilders: ['games_at_one_club_min_incl_merged', 'club_best_and_fairest_min_times'],
+      axisHas: [false, true], finalSeason: 2025, boardYear: 2026, records: [current(swallow)],
+    }).category).toBe('adjudicated key disagreement');
   });
 });

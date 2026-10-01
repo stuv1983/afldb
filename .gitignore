@@ -108,6 +108,8 @@ next-env.d.ts
 !/data/players/sibling-relationships.source.json
 !/data/players/sibling-adjudications.csv
 !/data/players/sibling-supplements.csv
+# AFLDB-ISSUE-225 §19.2 (D4/D10): the tracked, re-derived Gridley known-answer adjudications.
+!/data/players/gridley-known-answer-adjudications.csv
 !/data/records/
 /data/records/*
 !/data/records/first-kick-goal-ids.csv

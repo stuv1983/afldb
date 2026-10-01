@@ -885,7 +885,7 @@ describe('AFLDB-ISSUE-160 source contract', () => {
     // a deliberate change to an honours import, not a side effect of leadership
     // administration.
     expect(captaincies).toContain('ROLES = {"Captain"}');
-    expect(captaincies).toContain('EXPECTED_TOTAL = 1774');
+    expect(captaincies).toContain('EXPECTED_TOTAL = 1781');
     // Migration 098 does not touch the legacy table at all.
     const migration = readSource('src/db/migrations/098_club_leadership.sql');
     const sqlOnly = migration.split('\n').filter((l) => !l.trim().startsWith('--')).join('\n');

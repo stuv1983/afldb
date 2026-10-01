@@ -173,13 +173,59 @@
   `7f14ff2c…`): `captain` 20 (Cameron Bruce 2489 ×11, Steven May 12093 ×9), `teammates-150` 14
   (ten players, board #1024), `teammates-100` 1 (Angus Brayshaw 669), `games250sameclub` 1
   (David Swallow 3581), `games100clubs2` 1 (Dylan Shiel 4006). ISSUE-118 closed at 0; the cells
-  arrived with the 2026-09-13 `afldb_test` baseline. Root cause not investigated; not a draft
-  matter.
-- **Key files:** `src/db/queries/grid-solver.ts` (`club_captain_any`, `career_teammates_min`,
-  `games_at_*_incl_merged`), `captaincies`, `player_club_season_stats`, the corpus suite.
-- **Next action:** targeted read-only queries on `afldb_test` (captaincies rows for 2489/12093;
-  teammate recounts for the board-1024/993 players; lineage for 3581/4006), then classify each
-  cell from canonical evidence — never by a blanket exception.
+  arrived with the 2026-09-13 `afldb_test` baseline. Not a draft matter.
+  **Pass 1 (repository) and pass 2 (2026-10-01, operator-run E1 + read-only E2 on `afldb_test`):**
+  - **Reproducibility:** today's `afldb_test` ends at 2025 (0 matches in 2026), so the 37 cells are
+    masked as `time of board`. They are not gone; the 2026-09-19 report stays the census.
+  - **Captain:** 1,774/1,774 trusted rows; no Bruce or May row. May = candidate source omission
+    (Gridley stable: 24/0 and 9/0). Bruce = candidate Gridley-key drift (0/37 before 2026, then 11/4).
+    `club_captain_any` unchanged.
+  - **Teammates:** all 11 below threshold (88–149). Identity grain equals organization grain, rosters
+    complete, population 3,580/995. A semantic-contract difference; `career_teammates_min` unchanged.
+    Tucker (career to 2025) is horizon-sensitive.
+  - **Games at club:** Swallow Gold Coast 249 = candidate Gridley-key error. Shiel Essendon 99 is
+    unresolved and horizon-dependent; Gridley listed him on 2025-12-19, before any 2026 match. Both are
+    one game short.
+  **Pass 3 (2026-10-01: E3 DEV read-only PASS, E4 operator-run), final:**
+  - May 2017–18 and Bruce 2008 are `captaincies` source omissions; Witts 2019–21 and McDonald 2008 are also
+    missing.
+  - Teammates 15 = semantic contract.
+  - Swallow and Shiel = Gridley known-answer errors.
+  - Design: S1 adds 7 captaincy rows (1,774 → 1,781). S2 is suite-only: a teammates rule plus a tracked
+    known-answer adjudication record.
+  - S1 alone would add 37 Bruce reverse failures, plus one informational club-count/list-membership cell,
+    before S2/D10 adjudication, so S1 and S2 are one slice.
+  **Pass 4 (2026-10-01): S1+S2 implemented, uncommitted (runbook §24).**
+  - D1–D9 approved. Wikipedia supports all seven rows; `captaincies.csv` is now 1,781.
+  - Adjudication CSV and reader added; new informational `adjudicated key disagreement` category.
+  **Pass 5 (2026-10-01): D10 and D11 implemented (runbook §24.7).**
+  - D10: a Bruce-record-only criterion-level guard; 26 + 11 = 37 adjudications pinned on the frozen key.
+  - D11: a read-only DEV acceptance probe.
+  **Final operator validation (2026-10-02, runbook §24.9):**
+  - `git diff --check` PASS (LF→CRLF notices only); forbidden paths untouched.
+  - DB-free focused tests: 3 files, 144/144 (`issue225-acceptance.ts` is a core module, not a suite).
+  - `npm run typecheck` PASS.
+  - Full-repo `npm run lint` FAILS on the pre-existing baseline (390 problems: 257 errors, 133 warnings).
+  - ISSUE-225 scoped lint: 3 findings, identical on base `30b36ef0`. **Lint delta 0.**
+  **V2 and V3 (operator-run): accepted PASS (runbook §24.8).**
+  - V2 `afldb_test`: captaincies 1,774 → 1,781, trusted 1,774 → 1,781, `club_captain_any` 589 → 591;
+    batch 495, 7 inserted / 1,774 existing keyed rows rewritten in place by `reload_keyed` (not changed
+    facts) / 0 deleted / 0 rejected; all seven rows linked.
+  - V3 `afldb_test` (horizon 2025, diagnostic only): 1,205/1,205; 37 Bruce adjudications, `list
+    membership` +1; teammate/Swallow/Shiel stay `time of board`; 0 `incorrect known answer`.
+- **Key files:** `issues/open/AFLDB-ISSUE-225.md` (§16 disposition, §17 provenance, §18–§22 design, §23
+  decisions, §24 implementation), `-s1-captaincies-checks.sql` (V2/V5);
+  `data/awards/captaincies.csv`, `data/players/gridley-known-answer-adjudications.csv`,
+  `tests/gridley-known-answer-adjudications.ts`, `tests/gridley-corpus-support.ts`,
+  `tests/issue225-acceptance.ts`, `tests/integration/gridley-corpus.test.ts`,
+  `tools/validation/issue225-dev-acceptance-probe.ts`,
+  `docs/rebuild-manifests/captaincies/issue225-co-captaincy-review-20261001-v1.md`.
+- **Next action:**
+  1. Commit and merge.
+  2. V5 DEV captaincies reload.
+  3. V4 read-only DEV acceptance probe (runbook §24.6; expected 0 `incorrect known answer`).
+
+  Never a blanket exception or player-id special case.
 
 **AFLDB-ISSUE-255 resolved 2026-10-01** (Sonnet 5, implementation committed `f6d189d0`, operator-run
 DEV acceptance) — the AFL API settle no longer records an unused emergency as a game played. The

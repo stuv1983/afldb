@@ -1205,8 +1205,8 @@ export const AWARDS_HONOURS_GROUPS = [
 export const AWARDS_HONOURS_EXPECTED = {
   honourTeamMembers: 113,
   hallOfFame: 343,
-  /** 1,375 bootstrap rows + 399 AFLDB-ISSUE-118 §23.21 rows for the six missing clubs. */
-  captaincies: 1774,
+  /** 1,375 bootstrap rows + 399 AFLDB-ISSUE-118 §23.21 rows for the six missing clubs + 7 AFLDB-ISSUE-225 co-captain rows. */
+  captaincies: 1781,
   risingStarNominations: 766,
   risingStarWinners: 33,
   allAustralian: 1244,

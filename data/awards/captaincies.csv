@@ -85,6 +85,7 @@ source_key,season,club,player,player_id,link_status,role,period,note,source_cita
 09d90f8126155ec3468fccd5,1970,Hawthorn,David Parkin,2055,unique,Captain,1969–1973,,wikipedia
 09e1a17c29c916b133b39e8f,1974,South Melbourne,Peter Bedford,1519,unique,Captain,1973–1976,,wikipedia
 09f494a3b62709c6b8de6dc9,1934,Essendon,Keith Forbes,1729,unique,Captain,1934–1935,,wikipedia
+0a590b03a95e13bcfac2c41c,2008,Melbourne,Cameron Bruce,747,unique,Captain,"2008 (co-captain, rounds 6–22)",co-captain with James McDonald for the remainder of 2008 after David Neitz retired (Wikipedia: 2008 Melbourne Football Club season; corroborated: Melbourne FC),wikipedia
 0a6ebd6d5032e3e6faa28b6f,2019,Collingwood,Scott Pendlebury,4182,unique,Captain,2014–2022,,wikipedia
 0a86850f30a3644e56560265,2000,Fremantle,Adrian Fletcher,101,unique,Captain,2000–2001,,wikipedia
 0ac1c0107c8033cbe8c0a633,1981,Carlton,Mike Fitzpatrick,1722,unique,Captain,1980–1983,,wikipedia
@@ -282,6 +283,7 @@ source_key,season,club,player,player_id,link_status,role,period,note,source_cita
 257be2af4bbaa5484fb054e9,2013,Sydney,Kieren Jack,11546,unique,Captain,2013–2016,,wikipedia
 258c4c8640868f2fdb2b4ff6,2002,Western Bulldogs,Chris Grant,422,unique,Captain,2001–2004,,wikipedia
 25a56e47c123622ce7515cb1,1963,Collingwood,Murray Weideman,3865,unique,Captain,1960–1963,,wikipedia
+25f8dac05c6995eb838d7bef,2017,Gold Coast,Steven May,11940,unique,Captain,2017–2018 (co-captain),co-captain with Tom Lynch (Wikipedia: List of Gold Coast Suns captains; corroborated: Gold Coast SUNS 2018 leadership announcement and captaincy history),wikipedia
 26166b3534eba48e546aacd1,1947,Fitzroy,Fred Hughson,3097,unique,Captain,1943–1947,,wikipedia
 262ddbe0966b0f09c09787cb,1938,South Melbourne,Herbie Matthews,3275,unique,Captain,1938–1945,,wikipedia
 262f0e8fd754883a61b1d971,2002,West Coast,Ben Cousins,1051,unique,Captain,2001–2005,,wikipedia
@@ -336,6 +338,7 @@ source_key,season,club,player,player_id,link_status,role,period,note,source_cita
 2c345ff1587bc1e679cbb7a5,1902,Carlton,Joe McShane,4399,unique,Captain,1902–1904,,wikipedia
 2c4b05935039c1a1e0e30dfd,2011,Sydney,Jarrad McVeigh,3950,unique,Captain,2011–2012,Jarrad McVeigh 2012 premiership captain,wikipedia
 2c4b9dea9c30a54fc16bd2be,1974,Carlton,John Nicholls,3422,unique,Captain,1974,,wikipedia
+2c4db502ad00390a4f74db74,2020,Gold Coast,Jarrod Witts,12177,unique,Captain,2019–2021 (co-captain),co-captain with David Swallow (Wikipedia: List of Gold Coast Suns captains; corroborated: Gold Coast SUNS captaincy history),wikipedia
 2c5d553c3d256dbab6c714a6,1969,North Melbourne,John Dugdale,2808,unique,Captain,1968–1970,,wikipedia
 2c635ee972c7681a6aae763b,2018,Carlton,Marc Murphy,4148,unique,Captain,2013–2018,,wikipedia
 2c72730ee3ec0dd35ab64888,1932,Footscray,Bill Cubbins,1642,unique,Captain,1931–1932,,wikipedia
@@ -385,6 +388,7 @@ source_key,season,club,player,player_id,link_status,role,period,note,source_cita
 33e80abdb89635d726871d23,1939,Fitzroy,Frank Curcio,2745,unique,Captain,1938–1941,,wikipedia
 33f47fa244829dd1265c23b3,1982,Collingwood,Peter Moore,2000,unique,Captain,1981–1982,,wikipedia
 34620662f9e9600b8f80c80e,1971,Collingwood,Terry Waters,3857,unique,Captain,1971,,wikipedia
+3469269fae62fa9aa25d705d,2018,Gold Coast,Steven May,11940,unique,Captain,2017–2018 (co-captain),co-captain with Tom Lynch (Wikipedia: List of Gold Coast Suns captains; corroborated: Gold Coast SUNS 2018 leadership announcement and captaincy history),wikipedia
 347b2c2c2602d66bc469674d,1949,Essendon,Dick Reynolds,3578,unique,Captain,1939–1950,"1942, 1946, 1949 and 1950 premiership captain",wikipedia
 347eabffd5713ae75c969282,2016,Sydney,Kieren Jack,11546,unique,Captain,2013–2016,,wikipedia
 348227ccf794daf6887be1e4,1904,Fitzroy,Gerald Brosnan,4759,unique,Captain,1903–1905,,wikipedia
@@ -1004,6 +1008,7 @@ source_key,season,club,player,player_id,link_status,role,period,note,source_cita
 8d1a26ce4cff55b6980da6b8,1976,Collingwood,Des Tuddenham,2228,unique,Captain,1976,,wikipedia
 8d2f2e4a4b9e894b208f0f3a,2019,Adelaide,Rory Sloane,11792,unique,Captain,2019,,wikipedia
 8d43c7e6dcff43be1ffbc1b2,1924,Geelong,Lloyd Hagger,2986,unique,Captain,1924,,wikipedia
+8dbd379972bbe7f8ecf68a10,2008,Melbourne,James McDonald,730,unique,Captain,"2008 (co-captain, rounds 6–22)",co-captain with Cameron Bruce for the remainder of 2008 after David Neitz retired (Wikipedia: 2008 Melbourne Football Club season; corroborated: Melbourne FC),wikipedia
 8df40d1d066e6e847551ebdd,1942,Collingwood,Phonse Kyne,3182,unique,Captain,1942,,wikipedia
 8df67d80ed8ff460332df838,1897,Melbourne,Ned Sutton,4233,unique,Captain,1897–1898,,wikipedia
 8dfddb3b74153a0e81ab1c7b,1940,Richmond,Percy Bentley,2546,resolved,Captain,1932–1940,1932 Premiership Captain1934 Premiership Captain,wikipedia
@@ -1034,6 +1039,7 @@ source_key,season,club,player,player_id,link_status,role,period,note,source_cita
 9170c87f61c818f209121441,2000,Essendon,James Hird,312,unique,Captain,1998–2005,2000 premiership captain,wikipedia
 9194c8fac92d617bb16f1629,1965,Richmond,Neville Crowe,2737,unique,Captain,1963–1966,,wikipedia
 919f97e7aef9300c1aab92bc,1979,Richmond,Kevin Bartlett,1509,unique,Captain,1979,,wikipedia
+91b499dcbe61d3386183fc8e,2019,Gold Coast,Jarrod Witts,12177,unique,Captain,2019–2021 (co-captain),co-captain with David Swallow (Wikipedia: List of Gold Coast Suns captains; corroborated: Gold Coast SUNS captaincy history),wikipedia
 91cfdb25dac34bc7c949651f,2016,Essendon,Jobe Watson,1443,resolved,Captain,2010–2016,,wikipedia
 91d19bf3995c858b0826bc38,1992,West Coast,John Worsfold,1037,unique,Captain,1991–1998,,wikipedia
 920392bb9c1a39b0725b837f,1921,Carlton,Gordon Green,6009,unique,Captain,1921,,wikipedia
@@ -1393,6 +1399,7 @@ c8eedda1ca9d72519d463673,1977,Essendon,Ken Fletcher,1724,unique,Captain,1977–1
 c928ed27b9328ac9744118b3,1996,Geelong,Gary Ablett,567,unique,Captain,1995–1996,,wikipedia
 c94749360e137de4586277f6,2006,Brisbane Lions,Michael Voss,102,unique,Captain,2001–2006,,wikipedia
 c9ba7620d8fa32c98edc80f6,1927,Melbourne,Albert Chadwick,2666,resolved,Captain,1924–1927,,wikipedia
+c9d6a0dffa2a7035f52c66e7,2021,Gold Coast,Jarrod Witts,12177,unique,Captain,2019–2021 (co-captain),co-captain with David Swallow (Wikipedia: List of Gold Coast Suns captains; corroborated: Gold Coast SUNS captaincy history),wikipedia
 c9ed89aa7fd192c61fb54625,1997,Port Adelaide,Gavin Wanganeen,303,unique,Captain,1997–2000,,wikipedia
 ca98c8407fdd0a0d69443dd5,1946,North Melbourne,Fred Fairweather,8697,unique,Captain,1946,,wikipedia
 caa09ba3ad397b8b954c69b7,1966,Geelong,Graham Farmer,2861,unique,Captain,1965–1967,,wikipedia

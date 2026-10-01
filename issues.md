@@ -13,7 +13,7 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-229 | AFL API fixture ingestion | Medium | Data acquisition / fixtures — `afl_api` season feed → `fixtures` | Open (2026-09-23); 2026-09-26 pass 2: PARTIALLY EVIDENCED, STILL BLOCKED — one authentic `SCHEDULED` record (`CD_M20260142901`, no score block, refused by today's contract) hash-bound; every other status unobserved; no writer; runbook `issues/open/AFLDB-ISSUE-229.md` | Operator decides whether D-229-1/2 may proceed on the single `SCHEDULED` citation, or waits for more captures |
 | AFLDB-ISSUE-230 | `afldb_test` 2026 AFL Tables spine carries 2099 observation timestamps from the 2026-09-06 settle benchmark, so real-clock settles refuse on `source_records_seen_ck` | Low | Test database hygiene — `afldb_test` `staging.source_records` | Open — found 2026-09-23 (ISSUE-228 §22.13); lineage continued to 2099-01-06 on `afldb_test` only under operator authorisation (batches 2421/2422); not repaired; did not block ISSUE-228 S9 (accepted 2026-09-23) | Choose a repair (reviewed re-stamp tool on `afldb_test` only, or a real-clock rebuild of the 2026 lineage); S9 is now accepted, so it may be scheduled |
 | AFLDB-ISSUE-226 | Stale `docs/architecture.md` §5/§6: the documented application structure names `src/services/`, `src/db/schema/` (described as a Drizzle schema) and `src/types/`, none of which exist, and no Drizzle dependency is present — the project uses postgres.js directly | Low | Documentation — `docs/architecture.md` §5 "Application structure", §6 "Shared statistical definitions" | Open — found 2026-09-19 during the PhanesLight bootstrap closure review; verified three ways against the tracked tree; no code, data or runtime impact; not corrected under the bootstrap | Correct `docs/architecture.md` §5's directory tree and the Drizzle reference to the actual layout, and re-site §6's "defined once in `src/services`" claim on wherever the shared statistical definitions now live (establish that first — this issue does not assert where they are) |
-| AFLDB-ISSUE-225 | Gridley corpus: 37 pre-existing `incorrect known answer` cells on non-draft criteria (`captain` 20, `teammates-150` 14, `teammates-100` 1, `games250sameclub` 1, `games100clubs2` 1; 14 players) present on `afldb_test` since the 2026-09-13 baseline, untouched by AFLDB-ISSUE-222 | Medium | Grid Solver / canonical data — `captaincies`, `player_club_season_stats`, `tests/integration/gridley-corpus.test.ts` | Open — opened 2026-09-19 under ISSUE-222 decision D3; reproduced 2026-09-17 (pre-import) and 2026-09-19 (report `7f14ff2c…`); root cause not investigated | Investigate the five criteria with targeted read-only queries (captaincies rows for Cameron Bruce / Steven May; the board-1024 teammate counts); classify each cell from canonical evidence; never resolve by reclassification |
+| AFLDB-ISSUE-225 | Gridley corpus: 37 pre-existing `incorrect known answer` cells on non-draft criteria (`captain` 20, `teammates-150` 14, `teammates-100` 1, `games250sameclub` 1, `games100clubs2` 1; 14 players) present on `afldb_test` since the 2026-09-13 baseline, untouched by AFLDB-ISSUE-222 | Medium | Grid Solver / canonical data — `captaincies`, `player_club_season_stats`, `tests/integration/gridley-corpus.test.ts` | Open — opened 2026-09-19 under ISSUE-222 decision D3; passes 1–3 recorded (2026-10-01: E1, E2, E3 DEV read-only PASS, E4 operator-run); final classification: May 2017–18 and Bruce 2008 = `captaincies` source omissions (bootstrap club-list grain; Witts 2019–21 and McDonald 2008 also missing); teammates 15 = semantic contract; Swallow and Shiel = Gridley known-answer errors; design (runbook §16–§23): S1 +7 captaincy rows (1,774 → 1,781), S2 suite-only teammates rule + tracked known-answer adjudication record; S1 alone would add 37 Bruce reverse failures, plus one informational club-count/list-membership cell, before S2/D10 adjudication, so one slice; **pass 4 (2026-10-01): D1–D9 approved, S1+S2 implemented uncommitted, captaincies checker 1,781 PASS; pass 5 (2026-10-01): D10 (Bruce-record-only criterion-level guard: 26 + 11 = 37 adjudications) and D11 (read-only DEV acceptance probe `tools/validation/issue225-dev-acceptance-probe.ts`) implemented; final operator validation (runbook §24.9): DB-free focused 144/144, typecheck PASS, full-repo lint FAIL on the pre-existing baseline (390 problems), ISSUE-225 lint delta 0; V2 `afldb_test` captaincies reload and V3 diagnostic corpus (horizon 2025, 1,205/1,205, 0 `incorrect known answer`) accepted PASS (runbook §24.8)**; runbook `issues/open/AFLDB-ISSUE-225.md` | Operator commit and merge; then V5 DEV captaincies reload + V4 read-only DEV acceptance probe (runbook §24.6); never a blanket reclassification or player exception |
 **AFLDB-ISSUE-220 resolved 2026-10-01** (implementation `f5adfe39`, merged `46805c05`; drift repair
 `1111ab19`; operator-run DEV and PROD acceptance). DEV and PROD both run `1111ab19` and hold exactly
 `DATABASE_URL`, `AFLDB_AUTH_DATABASE_URL` and `AFLDB_IMPORT_DATABASE_URL`, with no `.env*` under
@@ -37863,10 +37863,338 @@ tracked import path or an evidenced classification rule of the §23.19/§23.23 f
 must not be moved out of `incorrect known answer` by a blanket exception, and the suite's
 assertions must not be weakened.
 
-**Next action.** Targeted read-only queries on `afldb_test`: `captaincies` rows (all statuses)
+**Next action (superseded 2026-10-01, see pass 1 below).** Targeted read-only queries on `afldb_test`: `captaincies` rows (all statuses)
 for players 2489 and 12093; the `career_teammates_min` count for the fourteen board-1024 /
 board-993 players against Gridley's key; `player_clubs` / lineage for 3581 and 4006. Then
 classify each cell and record the cause here.
+
+### Investigation pass 1 — repository evidence (2026-10-01)
+
+**Runbook:** `issues/open/AFLDB-ISSUE-225.md`, with `AFLDB-ISSUE-225-evidence.sql` (E2) and
+`AFLDB-ISSUE-225-gridley-key-probe.mjs` (E1). This pass used native read and search only. No shell, Git,
+SQL, network or test command ran. No code, test, classifier, data or database change.
+
+**Census recovered exactly.** The 37 cell records were read from the 2026-09-19 D1/D2 report
+(`gridley-corpus-20260919-d1-d2.json`). They reconcile with the table above cell-for-cell. The
+per-cell player attribution, including which captain sits in each of the 20 captain cells, is in runbook
+§2. In every record the lacking axis is the ISSUE-225 criterion.
+
+**Why they surfaced with the 2026-09-13 baseline (evidenced; exposure, not cause).**
+
+- All 37 cells are on 2026 boards (908–1140, 2026-01-09 … 08-29).
+- The suite classes any disagreement on a board past `max(matches.season)` as `time of board`.
+- `afldb_test` did not carry 2026 at ISSUE-118's close. Between ISSUE-118 Z.7 and the 2026-09-19 report,
+  `dataset gap` went 357 → 48 and `time of board` 15,366 → 21,240.
+- `teammates-100/150` occur only on boards 993, 1024 and 1026, so ISSUE-118's zero never included a
+  fair `career_teammates_min` comparison.
+
+The 37 are exposed disagreements, not regressions.
+
+**Captain (20 cells): provisional, the AFLDB side is faithful to its source.**
+
+- `data/awards/captaincies.csv` names neither Cameron Bruce nor Steven May. Melbourne 2000–2026,
+  Hawthorn 2005–2010 and Gold Coast 2011–2026 carry other captains; Gold Coast 2017–2018 is Tom Lynch
+  only.
+- The source does carry co-captaincies elsewhere.
+- `club_captain_any` has no "majority of a season" test, so it can only over-include.
+
+Open question: canonical source gap or wrong Gridley key. Decided by E1 (Gridley key consistency
+across pre-2026 boards), Q1 and, if needed, independent captain lists (E3, network, operator-authorised).
+
+**Teammates (15 cells): provisional, a definitional difference.**
+
+- Gridley's criterion text counts list co-membership after 2000 ("Includes teammates they didn't play
+  in a game with"). `career_teammates_min` counts games-played co-membership through
+  `player_club_season_stats`.
+- AFLDB holds no historical lists (migration 096).
+- That difference can only produce "Gridley lists, AFLDB omits", which is all 15 cells.
+
+Pending Q2: recount below threshold, no club-identity split, no thin roster, and population counts
+consistent with ISSUE-118 §22.6.
+
+**Games-at-club (2 cells): undetermined.** Q0b (split identity), Q3a/Q3b (derived vs source rows,
+lineage grouping) and Q3c (fixture completeness) decide them, then E3 if needed.
+
+**Conclusion so far:** at least three independent families. Their only common factor is the exposure
+mechanism. The pre-registered classification rules are in runbook §8, and the recommended slices (S1
+suite teammates arm, S2 captaincy data or adjudication, S3 games-at-club) are in §10. None is approved.
+
+**Next action (superseded by pass 2 below).** The operator runs E1 (DB-free) and E2 (`afldb_test`, `BEGIN … READ ONLY`, guard on
+`current_database()`) exactly as runbook §7 gives them, and returns both outputs.
+
+### Investigation pass 2: E1/E2 evidence recorded (2026-10-01)
+
+**Scope.** The operator ran E1 and E2 on 2026-10-01. This pass records them, refines the classifications
+(runbook §11–§12), prepares a read-only DEV query (E3) and lists the minimum independent evidence (E4,
+runbook §13). It implements no fix. No code, test, canonical CSV, `CHANGELOG.md` or database change.
+Claude executed no command.
+
+**E2 safety (as printed):** target `afldb_test`, `transaction_read_only = on`, port 5432, `BEGIN … READ ONLY`,
+ended `ROLLBACK`. No mutation.
+
+**Reproducibility boundary.**
+
+- Today's `afldb_test` has `max_match_season = 2025` and 0 matches in 2026 (E2 Q0c). The suite therefore
+  classes every 2026-board disagreement `time of board` (`gridley-corpus.test.ts:578`).
+- Today's `afldb_test` cannot reproduce the ISSUE-222 37-cell report, which was produced while `afldb_test`
+  carried 2026 data. **The 37 cells have not disappeared.** The horizon masks them, and the 2026-09-19 report
+  remains the census.
+- Corollary: the suite scores `incorrect` only when the derived `final_season` is earlier than the board
+  year. On the 2026-09-19 dataset none of the 15 had a derived 2026 season.
+
+**Ruled out by E2 for all families:**
+
+- identity split (Q0b: no duplicate names);
+- stale derived table (Q0a agrees for all 15; Q0d = 0).
+
+**Captain (20 cells).**
+
+- `captaincies` holds 1,774 rows, all 1,774 trusted, through 2026. There is no Bruce or May row under any
+  link status, so a linkage defect is ruled out.
+- Every club-season they played names other captains. Gold Coast 2017–18 is Tom Lynch only.
+- The query matches the tracked source. `club_captain_any` is not to be changed.
+- E1, Gridley's key over time:
+  - Bruce: before 2026, 0 listed / 37 omitted; in 2026, 11 listed / 4 omitted. Identical `captain × X`
+    pairs change answer.
+  - May: before 2026, 24 listed / 0 omitted; in 2026, 9 listed / 0 omitted.
+- Provisional: **May = candidate captaincies source omission**, which needs independent evidence before any
+  data correction. **Bruce = candidate Gridley-key drift/inconsistency**, which needs independent evidence
+  before adjudication.
+
+**Teammates (15 cells).** Current AFLDB recounts against the threshold:
+
+| Player | Recount / threshold |
+|---|---|
+| Adam Simpson | 143 / 150 |
+| Angus Brayshaw | 88 / 100 |
+| Brandon Ellis | 143 / 150 |
+| Brandon Matera | 149 / 150 |
+| Braydon Preuss | 121 / 150 |
+| Cameron Mooney | 128 / 150 |
+| Darcy Tucker | 146 / 150 |
+| Hugh Greenwood | 140 / 150 |
+| Jack Newnes | 142 / 150 |
+| Josh Gibson | 144 / 150 |
+| Robbie Tarrant | 149 / 150 |
+
+- Identity-grain count equals organization-grain count for all 11.
+- Roster coverage looks complete; this is not thin data.
+- The whole population is 3,580 eligible at 100 and 995 at 150, exactly ISSUE-118 §22.6.
+- Provisional: a **semantic-contract difference** between Gridley's listed-teammate concept and AFLDB's
+  played co-club-season teammate contract.
+- No evidence supports changing `career_teammates_min`. Any slice is compatibility/adjudication only, never a
+  blanket player exception.
+- Darcy Tucker (career to 2025) is the one horizon-sensitive subject.
+
+**Games at club (2 cells).** For both players, lineage, derivation and a fixture hole are ruled out.
+
+- **David Swallow 3581:** Gold Coast 249 in `player_clubs` and in the `player_match_stats` recount, one
+  organization. He fails `games250sameclub` on current canonical evidence.
+  - E1: the exact `games250sameclub × clubbestfairest` pair is omitted on 2024 and 2025 boards and listed on
+    2026-02-08, before any 2026 match.
+  - Provisional: candidate Gridley-key error.
+- **Dylan Shiel 4006:** GWS 135, Essendon 99, and `player_match_stats` agrees. He fails `games100clubs2`
+  through 2025 by one Essendon game.
+  - Unresolved and horizon-dependent at the cell level.
+  - Refinement from E1: Gridley already listed him under `games100clubs2` on board 887 (2025-12-19), before
+    any 2026 match. Under the suite's frozen-key premise, that listing points to a one-game difference in the
+    ≤2025 record: a canonical gap or a Gridley error.
+- Both players are exactly one game short. E4 (AFL Tables per season) locates which side is wrong.
+
+**Families:** four independent mechanisms (source omission, key drift, semantic contract, one-game count).
+They share only the 2026-horizon exposure. Full table: runbook §12.1. Pre-registered E3 reading: runbook §12.4.
+
+**E3 (prepared, not run):** `issues/open/AFLDB-ISSUE-225-e3-dev-horizon.sql`. It is `afldb_dev` only:
+`BEGIN … READ ONLY`, a `DO` guard on `current_database()` and `transaction_read_only`, and `ROLLBACK`.
+
+- It reads the DEV horizon.
+- It reads Swallow and Shiel 2026 and career games by organization, including as-at board dates.
+- It reads Darcy Tucker's teammate count including DEV 2026, as at board 1024.
+- It checks derived against source for those rows.
+- Players are resolved by name, because DEV ids differ from the `afldb_test` bridge ids.
+- Operator transport: runbook §7.
+
+**Next action (superseded by pass 3 below).**
+
+1. The operator runs E3 (runbook §7) and returns `e3-dev-horizon.txt`.
+2. Classify Swallow, Shiel and Tucker per §12.4.
+3. E4 (network; minimum set in runbook §13) needs explicit operator authorisation.
+
+### Pass 3: E3/E4 recorded, final classification, S1/S2 implementation design (2026-10-01)
+
+**Scope.** This pass records the evidence and designs the fix only (runbook §14–§23). No code, test, CSV,
+`CHANGELOG.md` or database change. Claude executed no command.
+
+**E3 (`afldb_dev`, role `afldb_import`, read-only, ROLLBACK): PASS.**
+
+- Horizon: 2026, with 218 matches and 11 finals.
+- Swallow: 249 Gold Coast, 0 games in 2026.
+- Shiel: GWS 135 / Essendon 99, 0 games in 2026.
+- Tucker: 146 at every grain and as at board 1024; no 2026 rows.
+- Derived and source rows agree.
+- No horizon, stale-derived, identity, lineage or fixture explanation remains.
+
+**E4 (operator-run):**
+
+- **May:** a Gold Coast captaincy source omission for 2017–18. The Suns' history and AFL.com.au both record
+  him as co-captain with Lynch.
+- **Bruce:** a Melbourne 2008 captaincy source omission. Melbourne FC records McDonald and Bruce as
+  co-captains for the remainder of 2008. Gridley's Bruce key is separately self-inconsistent over time (E1),
+  and both facts are kept.
+- **Swallow:** a Gridley known-answer error. AFL Tables and the AFL 2025 Annual Report both give 249.
+- **Shiel:** a Gridley known-answer error. AFL Tables and Essendon both give Essendon 99 of 234.
+- **Teammates (15):** a semantic-contract difference.
+- URL, access date and verbatim quote are still to be captured before any tracked file is written (runbook §23
+  D3).
+
+**Final disposition (runbook §16):**
+
+- 20 captain cells become real AFLDB answers through corrected `captaincies` data (S1).
+- 15 teammate cells are horizon-dependent: at a 2026 horizon they become `adjudicated key disagreement` under
+  D6 (runbook §24.3; this supersedes the original `list membership` design); at the 2025 `afldb_test` V3
+  horizon they remain `time of board`.
+- Swallow and Shiel become a new informational `adjudicated key disagreement`, from a tracked, re-derived,
+  evidenced record (S2).
+- Census `incorrect known answer` goes 37 → 0, and no cell is suppressed silently.
+
+**Root cause, captain (runbook §17).**
+
+- The Gold Coast and Melbourne rows are ISSUE-112 bootstrap rows, transcribed from club captain lists. Those
+  lists omit co-captains sharing a period, and mid-season successors.
+- The same sources also show Gold Coast 2019–21 missing Jarrod Witts and Melbourne 2008 missing James
+  McDonald.
+- Co-captaincy (several `Captain` rows, with the co-captaincy recorded in `period`) and sustained partial-season
+  captaincy (migration 098 convention) need no schema change.
+- `SOURCE_CITATIONS = {"wikipedia"}` can be kept if each added row is supported by a specific Wikipedia
+  player or season page, named in `note` (the Fred Phillips precedent). Widening the contract is the fallback
+  and needs its own decision.
+
+**Design (runbook §18–§21):**
+
+- **S1:** +7 `captaincies.csv` rows (May 2017–18, Witts 2019–21, Bruce and McDonald 2008), 1,774 → 1,781.
+  Re-pin `captaincies.py`, `captaincies-source.test.ts`, `data-overrides-source-contract.test.ts` and
+  `rebuild-test.ts`. Add a review manifest. Minted `issue225|…` SHA-1 keys. No schema, builder or identity
+  change.
+- **S2:** test-suite only. A teammates rule, `data/players/gridley-known-answer-adjudications.csv` (Swallow,
+  Shiel, Bruce) with a staleness check, pure helpers pinned DB-free, and one new informational category.
+  `grid-solver.ts` and `gridley-compat.ts` are untouched.
+- **New constraint:** at pass 3 / D8, the original pair analysis found Gridley omitting Bruce on 26 fair
+  pre-2026 `captain × X` cells, which S1 alone would make failures, including on today's `afldb_test`. S1 and S2
+  therefore land as one slice, with Bruce's reverse cells covered by a `gridley_key_inconsistent` record.
+  D10 (pass 5) later completed the census: S1's full Bruce reverse exposure is 37 (26 original pair-guard
+  cells + 11 D10 cells), plus the separate informational `list membership` cell `#280 0-2`.
+
+**Pass 4 (2026-10-01): S1+S2 implemented as one slice (runbook §24), uncommitted.**
+
+- **Decisions:** D1–D9 approved by the operator. Both Wikipedia pages support all seven rows: W1 `List of
+  Gold Coast Suns captains`, W2 `2008 Melbourne Football Club season` (rounds 6–22), with club corroboration.
+  The manifest is `docs/rebuild-manifests/captaincies/issue225-co-captaincy-review-20261001-v1.md`.
+- **S1:**
+  - `captaincies.csv` 1,774 → 1,781, keys SHA-1(`issue225|…`);
+  - `captaincies.py`, `rebuild-test.ts`, `data-overrides-source-contract.test.ts` and
+    `captaincies-source.test.ts` re-pinned (notes 179 → 186);
+  - a new exact-row case.
+- **S2:**
+  - `data/players/gridley-known-answer-adjudications.csv` (Bruce, Swallow, Shiel) and its reader;
+  - pure helpers in `tests/gridley-corpus-support.ts`;
+  - a new informational category `adjudicated key disagreement` with two arms in the corpus suite: the
+    teammates rule and the tracked, re-derived, STALE-aware adjudication;
+  - 15 DB-free cases.
+- **Deviations from the design (runbook §24.3):**
+  - teammates go to the new category, not `list membership`, per the operator's D6 outcome;
+  - a `gridley_lists` record must be the only lacking axis;
+  - only two record shapes are allowed;
+  - the evidence kind is bound to the criterion.
+- **Validation (DB-free only; historical pass-time run, superseded by the final operator validation below):**
+  - the captaincies checker reports 1,781 rows, 1,781 linked, 186 notes;
+  - vitest: 4 files, 666/666;
+  - `tsc` clean; `eslint` 0 errors on the files linted then.
+- **Findings needing operator decisions:**
+  - **D10:** the approved pair guard admits exactly the designed 26 Bruce cells. Gridley lists Bruce on none
+    of 144 pre-2026 `captain` cells, though, so 11 further pre-2026 cells would fail V3 as `incorrect known
+    answer`: `2000s` ×3, `goals1avgseason` ×3, `games150`, `finalswins1`, `disposalsClubLeader`,
+    `coachedByClarkson`, `brownlow10votes`. Recommended: a criterion-level acceptance guard.
+  - **D11:** `tests/setup.ts` refuses any non-`_test` database, so D7's DEV corpus run cannot run as
+    specified.
+
+**Pass 5 (2026-10-01): D10 and D11 decided by the operator and implemented (runbook §23, §24.7), uncommitted.**
+
+- **D10:** Bruce's `gridley_key_inconsistent` record applies only when all of these hold:
+  - AFLDB lists him on both axes;
+  - the frozen key lists him under the other criterion elsewhere;
+  - the record is current.
+
+  DB-free pins on the frozen key:
+  - pair coverage 26, plus 11 added adjudications = 37, all pre-2026;
+  - `#280 0-2 clubs2+` stays with the club-count `list membership` arm;
+  - never-accepted criteria (`grandfinals1`, `finals10`, `finalswins5`, …) stay unadjudicated;
+  - stale evidence fails closed;
+  - a player without a record cannot use the rule.
+
+  `captain × grandfinals1`: the key never lists Bruce under it, so it is not special-cased.
+- **D11:** read-only `tools/validation/issue225-dev-acceptance-probe.ts`, with its pure core in
+  `tests/issue225-acceptance.ts`.
+  - It refuses anything but `afldb_dev`, runs under `BEGIN READ ONLY` and always ends in `ROLLBACK`.
+  - It evaluates exactly the ISSUE-225 population: the 20 + 15 + 2 census cells and Bruce's 164 evaluable
+    omitted `captain` cells.
+  - It fails non-zero on any `incorrect known answer`, stale record, unexpected or missing cell.
+  - `tests/setup.ts` is untouched.
+- **Validation (historical pass-time run, superseded by the final operator validation below):**
+  - vitest 4 files, 672/672;
+  - `tsc` clean; `eslint` 0 errors on the files linted then;
+  - probe refusal paths exit 2, with no database contacted.
+
+**V2 and V3 (operator-run): accepted PASS (runbook §24.8).**
+
+- **V2, `afldb_test` captaincies reload:**
+  - `captaincies` 1,774 → 1,781; trusted 1,774 → 1,781;
+  - `club_captain_any` 589 → 591;
+  - import batch 495: `records_read` 1,781, inserted 7, updated 1,774, rejected 0. The 1,774 are existing
+    keyed rows rewritten in place by `reload_keyed` (an UPDATE with no value-difference guard; `updated` is
+    its rowcount), i.e. reconciliation, not 1,774 changed captaincy facts. 0 old source keys deleted;
+  - all seven ISSUE-225 rows present and correctly linked.
+- **V3, `afldb_test` diagnostic corpus, horizon `maxSeason=2025`:**
+  - 1,205/1,205 passed, exit 0;
+  - all three adjudication records `current`;
+  - 37 Bruce `adjudicated key disagreement`; Bruce `list membership` +1;
+  - teammate, Swallow and Shiel cells remain `time of board`;
+  - 0 `incorrect known answer`.
+  - Diagnostic only; it is not the DEV acceptance probe. No pre-S1 report comparison was performed.
+
+**Final operator validation of the repository surface (2026-10-02, accepted; runbook §24.9).** This is the
+current DB-free evidence.
+
+- `git diff --check` PASS. LF→CRLF notices for `tests/captaincies-source.test.ts` and
+  `tools/migration/captaincies.py` were warnings only.
+- Forbidden paths untouched: `src/db/queries/grid-solver.ts`, `src/search/gridley-compat.ts`,
+  `tests/setup.ts`, migrations, `CHANGELOG.md`.
+- **DB-free focused tests: 3 files passed, 144/144.**
+  - The command named four paths: `captaincies-source`, `data-overrides-source-contract`, `gridley-compat`
+    and `tests/issue225-acceptance.ts`.
+  - Vitest collected 3, because `tests/issue225-acceptance.ts` is a support/core module, not a `*.test.ts`
+    suite.
+- `npm run typecheck`: PASS (`next typegen` and `tsc --noEmit`).
+- **`npm run lint` (full repository): FAIL on the pre-existing repository baseline** (390 problems: 257 errors,
+  133 warnings). Not clean.
+- **ISSUE-225 scoped lint** over the complete changed TypeScript surface found three findings:
+  - `tests/captaincies-source.test.ts`: `VALID_ROW_2` unused (warning);
+  - `tools/db/rebuild-test.ts:1544:57`: `no-explicit-any` (error);
+  - `tools/db/rebuild-test.ts:3341:1`: anonymous default export (warning).
+- **Baseline proof:**
+  - base HEAD proved `30b36ef0`;
+  - the same ESLint and config on those two base files give the same 1 error and 2 warnings;
+  - the captaincies warning moved from line 140 to 141 only because preceding content moved.
+- **ISSUE-225 lint delta: 0. No lint regression introduced.**
+
+**Next action.**
+
+1. Operator reviews, commits and merges.
+2. V5: DEV captaincies reload.
+3. V4: the read-only DEV acceptance probe (runbook §24.6): `captain census` agreement 20; `teammate census`
+   adjudicated 15; `games census` adjudicated 2; `bruce reverse` adjudicated 37, `list membership` 1,
+   agreement 126; 0 `incorrect known answer`; all three records current.
+
+`CHANGELOG.md` waits for validation.
 
 ---
 

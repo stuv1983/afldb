@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, it } from 'vitest';
+import { createHash } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -148,15 +149,15 @@ describe('canonical captaincies source (AFLDB-ISSUE-112 phase 3)', () => {
     expect(result.stderr).toBe('');
     expect(result.payload).toMatchObject({
       ok: true,
-      row_count: 1774,
-      linked_count: 1774,
+      row_count: 1781,
+      linked_count: 1781,
       unlinked_count: 0,
       season_min: 1897,
       season_max: 2026,
       distinct_seasons: 130,
       distinct_clubs: 24,
-      notes_present: 179,
-      roles: { Captain: 1774 },
+      notes_present: 186,
+      roles: { Captain: 1781 },
     });
   });
 
@@ -188,11 +189,41 @@ describe('canonical captaincies source (AFLDB-ISSUE-112 phase 3)', () => {
 
   it('carries the source_record_id verbatim as source_key — 24 hex chars, strictly ascending', () => {
     const keys = canonicalLines.slice(1).map((line) => parseCsvLine(line)[COL.sourceKey]);
-    expect(keys).toHaveLength(1774);
+    expect(keys).toHaveLength(1781);
     for (const key of keys) expect(key).toMatch(/^[0-9a-f]{24}$/);
-    expect(new Set(keys).size).toBe(1774);
+    expect(new Set(keys).size).toBe(1781);
     const ascending = [...keys].sort();
     expect(keys).toEqual(ascending);
+  });
+
+  it('carries the seven AFLDB-ISSUE-225 co-captain rows exactly, each citing its Wikipedia page, with re-derivable keys', () => {
+    // AFLDB-ISSUE-225 §18 (S1): club-season completeness for the two club-seasons the
+    // bootstrap's club-list grain carried with one captain only. The review manifest
+    // (docs/rebuild-manifests/captaincies/issue225-co-captaincy-review-20261001-v1.md)
+    // holds the URLs, access date and quotations; the note names the page (the Fred
+    // Phillips precedent), so source_citation stays the source-granularity 'wikipedia'.
+    const goldCoast = 'Wikipedia: List of Gold Coast Suns captains';
+    const melbourne = 'Wikipedia: 2008 Melbourne Football Club season';
+    const expected: [number, string, string, string, string, string][] = [
+      [2017, 'Gold Coast', 'Steven May', '11940', '2017–2018 (co-captain)', `co-captain with Tom Lynch (${goldCoast}; corroborated: Gold Coast SUNS 2018 leadership announcement and captaincy history)`],
+      [2018, 'Gold Coast', 'Steven May', '11940', '2017–2018 (co-captain)', `co-captain with Tom Lynch (${goldCoast}; corroborated: Gold Coast SUNS 2018 leadership announcement and captaincy history)`],
+      [2019, 'Gold Coast', 'Jarrod Witts', '12177', '2019–2021 (co-captain)', `co-captain with David Swallow (${goldCoast}; corroborated: Gold Coast SUNS captaincy history)`],
+      [2020, 'Gold Coast', 'Jarrod Witts', '12177', '2019–2021 (co-captain)', `co-captain with David Swallow (${goldCoast}; corroborated: Gold Coast SUNS captaincy history)`],
+      [2021, 'Gold Coast', 'Jarrod Witts', '12177', '2019–2021 (co-captain)', `co-captain with David Swallow (${goldCoast}; corroborated: Gold Coast SUNS captaincy history)`],
+      [2008, 'Melbourne', 'Cameron Bruce', '747', '2008 (co-captain, rounds 6–22)', `co-captain with James McDonald for the remainder of 2008 after David Neitz retired (${melbourne}; corroborated: Melbourne FC)`],
+      [2008, 'Melbourne', 'James McDonald', '730', '2008 (co-captain, rounds 6–22)', `co-captain with Cameron Bruce for the remainder of 2008 after David Neitz retired (${melbourne}; corroborated: Melbourne FC)`],
+    ];
+    const rows = canonicalLines.slice(1).map(parseCsvLine);
+    const issue225 = rows.filter((cells) => /^co-captain with .* \(Wikipedia: (List of Gold Coast Suns captains|2008 Melbourne Football Club season);/.test(cells[COL.note]));
+    expect(issue225).toHaveLength(7);
+    for (const [season, club, player, playerId, period, note] of expected) {
+      const key = createHash('sha1').update(`issue225|${club}|${season}|${player}|${period}`, 'utf8').digest('hex').slice(0, 24);
+      expect(rows).toContainEqual([key, String(season), club, player, playerId, 'unique', 'Captain', period, note, 'wikipedia']);
+    }
+    // Additive only (D9): the bootstrap rows for the same club-seasons are untouched.
+    expect(canonicalLines).toContain('bb954785512632d238620e11,2017,Gold Coast,Tom Lynch,11948,unique,Captain,2017–2018,,wikipedia');
+    expect(canonicalLines).toContain('530214662054234159580160,2019,Gold Coast,David Swallow,11919,unique,Captain,2019–2021,,wikipedia');
+    expect(canonicalLines).toContain('2cffda7ff02bc65867c4a574,2008,Melbourne,David Neitz,689,unique,Captain,2000–2008,,wikipedia');
   });
 
   it('rejects a malformed header', () => {
@@ -270,11 +301,11 @@ describe('canonical captaincies source (AFLDB-ISSUE-112 phase 3)', () => {
     expectRejected([HEADER, row], /player has leading or trailing whitespace/);
   });
 
-  it('rejects a total row count short of the declared 1774', () => {
+  it('rejects a total row count short of the declared 1781', () => {
     // Dropping only the final row keeps every remaining row's ordering
     // valid, so this reaches the completeness check rather than an earlier
     // per-row rule.
-    expectRejected(canonicalLines.slice(0, -1), /expected 1774 captaincy rows, got 1773/);
+    expectRejected(canonicalLines.slice(0, -1), /expected 1781 captaincy rows, got 1780/);
   });
 });
 
