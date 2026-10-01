@@ -1,10 +1,14 @@
 import { readFileSync } from 'node:fs';
-import { mkdtemp, mkdir, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { findEnvFiles, removeEnvFiles } from '../tools/build/env-in-standalone.mjs';
+import {
+  findEnvFiles,
+  findEnvFilesRecursive,
+  removeEnvFiles,
+} from '../tools/build/env-in-standalone.mjs';
 
 /**
  * AFLDB-ISSUE-220 — the web unit's credential boundary.
@@ -79,6 +83,84 @@ describe('AFLDB-ISSUE-220 — standalone build ships no credential file', () => 
     const wrapper = readFileSync('tools/build/prepare-standalone.mjs', 'utf8');
     expect(wrapper).toContain('removeEnvFiles(standalone)');
     expect(wrapper).toMatch(/remainingEnvFiles\.length > 0[\s\S]*?process\.exit\(1\)/);
+  });
+
+  it('detects a nested credential file that top-level cleanup leaves, and deletes nothing nested', async () => {
+    const scratch = await mkdtemp(join(tmpdir(), 'afldb-issue-220-nested-'));
+    try {
+      await writeFile(join(scratch, '.env'), 'DATABASE_URL=postgresql://example\n');
+      await mkdir(join(scratch, 'nested', 'app'), { recursive: true });
+      await writeFile(join(scratch, 'nested', 'app', '.env.production'), 'X=1\n');
+      await writeFile(join(scratch, 'nested', 'app', 'server.js'), '// ordinary\n');
+      await mkdir(join(scratch, 'node_modules', 'pkg'), { recursive: true });
+      await writeFile(join(scratch, 'node_modules', 'pkg', 'index.js'), '// ordinary\n');
+      await writeFile(join(scratch, 'node_modules', 'pkg', '.envrc-not-env'), 'ordinary\n');
+
+      expect(await removeEnvFiles(scratch)).toEqual([]);
+      expect(await findEnvFilesRecursive(scratch)).toEqual(['nested/app/.env.production']);
+
+      // Reported, never removed; ordinary nested files are untouched.
+      expect(await readFile(join(scratch, 'nested', 'app', '.env.production'), 'utf8')).toBe('X=1\n');
+      expect(await readFile(join(scratch, 'nested', 'app', 'server.js'), 'utf8')).toBe('// ordinary\n');
+      expect((await readdir(join(scratch, 'node_modules', 'pkg'))).sort()).toEqual([
+        '.envrc-not-env',
+        'index.js',
+      ]);
+    } finally {
+      await rm(scratch, { recursive: true, force: true });
+    }
+  });
+
+  it('reports sorted relative POSIX paths, deterministically', async () => {
+    const scratch = await mkdtemp(join(tmpdir(), 'afldb-issue-220-sorted-'));
+    try {
+      await mkdir(join(scratch, 'z'), { recursive: true });
+      await mkdir(join(scratch, 'a', 'b'), { recursive: true });
+      await writeFile(join(scratch, 'z', '.env'), '');
+      await writeFile(join(scratch, 'a', 'b', '.env.local'), '');
+      await writeFile(join(scratch, '.env.production'), '');
+
+      const expected = ['.env.production', 'a/b/.env.local', 'z/.env'];
+      expect(await findEnvFilesRecursive(scratch)).toEqual(expected);
+      expect(await findEnvFilesRecursive(scratch)).toEqual(expected);
+    } finally {
+      await rm(scratch, { recursive: true, force: true });
+    }
+  });
+
+  it('never follows a symlinked directory', async () => {
+    const scratch = await mkdtemp(join(tmpdir(), 'afldb-issue-220-link-'));
+    const outside = await mkdtemp(join(tmpdir(), 'afldb-issue-220-outside-'));
+    try {
+      await writeFile(join(outside, '.env'), 'DATABASE_URL=postgresql://example\n');
+      // 'junction' needs no elevation on Windows; elsewhere it is an ordinary directory symlink.
+      await symlink(outside, join(scratch, 'linked'), 'junction');
+
+      expect(await readdir(join(scratch, 'linked'))).toEqual(['.env']);
+      expect(await findEnvFilesRecursive(scratch)).toEqual([]);
+    } finally {
+      await rm(scratch, { recursive: true, force: true });
+      await rm(outside, { recursive: true, force: true });
+    }
+  });
+
+  it('works from names only: the helper never opens a file', () => {
+    const helper = readFileSync('tools/build/env-in-standalone.mjs', 'utf8');
+    expect(helper).toMatch(/import \{ readdir, rm \} from 'node:fs\/promises';/);
+    expect(helper).not.toMatch(/readFile|createReadStream|\bopen\(/);
+  });
+
+  it('prepare-standalone.mjs refuses to ship if a .env-named file survives anywhere in the tree', () => {
+    const wrapper = readFileSync('tools/build/prepare-standalone.mjs', 'utf8');
+    expect(wrapper).toMatch(
+      /const nestedEnvFiles = await findEnvFilesRecursive\(standalone\);\s*if \(nestedEnvFiles\.length > 0\) \{[\s\S]*?process\.exit\(1\);/,
+    );
+    // The scan runs after every copy into the tree, so nothing copied later escapes it.
+    const scanAt = wrapper.indexOf('findEnvFilesRecursive(standalone)');
+    for (const lastCopy of ["join(standalone, 'public')", "join(standalone, 'deploy', 'coming-soon')"]) {
+      expect(wrapper.indexOf(lastCopy)).toBeGreaterThan(-1);
+      expect(scanAt).toBeGreaterThan(wrapper.indexOf(lastCopy));
+    }
   });
 });
 

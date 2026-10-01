@@ -15,7 +15,7 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-230 | `afldb_test` 2026 AFL Tables spine carries 2099 observation timestamps from the 2026-09-06 settle benchmark, so real-clock settles refuse on `source_records_seen_ck` | Low | Test database hygiene — `afldb_test` `staging.source_records` | Open — found 2026-09-23 (ISSUE-228 §22.13); lineage continued to 2099-01-06 on `afldb_test` only under operator authorisation (batches 2421/2422); not repaired; did not block ISSUE-228 S9 (accepted 2026-09-23) | Choose a repair (reviewed re-stamp tool on `afldb_test` only, or a real-clock rebuild of the 2026 lineage); S9 is now accepted, so it may be scheduled |
 | AFLDB-ISSUE-226 | Stale `docs/architecture.md` §5/§6: the documented application structure names `src/services/`, `src/db/schema/` (described as a Drizzle schema) and `src/types/`, none of which exist, and no Drizzle dependency is present — the project uses postgres.js directly | Low | Documentation — `docs/architecture.md` §5 "Application structure", §6 "Shared statistical definitions" | Open — found 2026-09-19 during the PhanesLight bootstrap closure review; verified three ways against the tracked tree; no code, data or runtime impact; not corrected under the bootstrap | Correct `docs/architecture.md` §5's directory tree and the Drizzle reference to the actual layout, and re-site §6's "defined once in `src/services`" claim on wherever the shared statistical definitions now live (establish that first — this issue does not assert where they are) |
 | AFLDB-ISSUE-225 | Gridley corpus: 37 pre-existing `incorrect known answer` cells on non-draft criteria (`captain` 20, `teammates-150` 14, `teammates-100` 1, `games250sameclub` 1, `games100clubs2` 1; 14 players) present on `afldb_test` since the 2026-09-13 baseline, untouched by AFLDB-ISSUE-222 | Medium | Grid Solver / canonical data — `captaincies`, `player_club_season_stats`, `tests/integration/gridley-corpus.test.ts` | Open — opened 2026-09-19 under ISSUE-222 decision D3; reproduced 2026-09-17 (pre-import) and 2026-09-19 (report `7f14ff2c…`); root cause not investigated | Investigate the five criteria with targeted read-only queries (captaincies rows for Cameron Bruce / Steven May; the board-1024 teammate counts); classify each cell from canonical evidence; never resolve by reclassification |
-| AFLDB-ISSUE-220 | Web service credential boundary contradicts the application's `afldb_import` requirement; owner-role code-test DSN and a complete `.env` copy reach the internet-facing process | High | Deployment / runtime security | Open — DEV evidence complete 2026-09-17; runtime branch (a) settled from Next source: the standalone server loads `.next/standalone/.env` at start-up | Sonnet 5 implements `AFLDB-ISSUE-220.md` §6 in a fresh worktree; first establish the build copy mechanism (§4b) |
+| AFLDB-ISSUE-220 | Web service credential boundary contradicts the application's `afldb_import` requirement; owner-role code-test DSN and a complete `.env` copy reach the internet-facing process | High | Deployment / runtime security | Open — implemented `f5adfe39`, merged `46805c05` 2026-09-17; 2026-10-01 deny-list drift (3 ISSUE-224/251 maintenance DSNs) restored + recursive standalone `.env*` refusal on `sonnet/issue-220-credential-drift` (contract test 24/24); DEV/PROD acceptance never completed | Merge the drift branch; DEV rollout + runbook §8 + Admin Centre `afldb_import` write/revert; PROD read-only before-state, rollout only on explicit authorisation, after-state |
 
 AFLDB-ISSUE-220 opened 2026-09-17 (Fable 5.1 code review outside NL search, DEV evidence
 operator-gathered on streamanator, no values printed). `deploy/afldb.service` drops
@@ -34867,8 +34867,10 @@ Stage 2.
 
 ## AFLDB-ISSUE-220 — Web service credential boundary contradicts the application's `afldb_import` requirement; owner-role code-test DSN and a complete `.env` copy reach the internet-facing process
 
-- **Status:** Open (opened 2026-09-17). Implemented 2026-09-17 (Sonnet 5, worktree `afldb-issue-220`,
-  uncommitted) — see Implementation below; pending operator DEV/PROD verification before resolution.
+- **Status:** Open (opened 2026-09-17). Implemented 2026-09-17 in `f5adfe39` and merged to `main`
+  at `46805c05` the same day (see Implementation below). The 2026-10-01 drift is restored on
+  `sonnet/issue-220-credential-drift` (see Update 2026-10-01). DEV/PROD acceptance is still
+  pending before resolution.
 - **Severity:** High. Security posture (a documented credential isolation that does not hold, and
   an owner-role DSN live in the public web process) and, depending on the open runtime question,
   availability of the entire Admin Centre write path.
@@ -34984,7 +34986,7 @@ settle unit).
 2. `ssh arm@10.0.40.100 "grep -oE '^[A-Za-z_][A-Za-z0-9_]*=' ~/projects/afldb/.next/standalone/.env | sed 's/=$//' | sort"` — expect the full project variable-name set.
 3. Runtime branch: read the control flow at the reported `loadEnvConfig` / `STANDALONE_CONFIG` lines (runbook §4).
 
-### Implementation (Sonnet 5, 2026-09-17, worktree `afldb-issue-220`, uncommitted)
+### Implementation (Sonnet 5, 2026-09-17, worktree `afldb-issue-220`; committed `f5adfe39`, merged `46805c05`)
 
 **§4b established.** Read `node_modules/next/dist/build/index.js` (Next 16.3.1, via a sibling
 worktree's `node_modules` — this worktree has none) — `writeStandaloneDirectory` (lines 321–345)
@@ -35059,6 +35061,59 @@ this validation.
   precedent for keeping exactly one writing DSN), AFLDB-ISSUE-146 (introduced the code-test DSNs).
 - PROD has not been inspected; the runbook requires the same names-only checks there before any
   unit change.
+
+### Update 2026-10-01 — historical record corrected; deny-list drift restored; standalone hardening
+
+- **Record correction.** The Implementation above was committed as `f5adfe39` and merged to
+  `main` at `46805c05` on 2026-09-17. It was not left uncommitted. The `afldb-issue-220` worktree no
+  longer exists, and no work was lost.
+- **Partial DEV evidence (historical).** The ISSUE-222 DEV deploy at `19eb40c0` (2026-09-19)
+  recorded the running `MainPID` holding exactly `DATABASE_URL`, `AFLDB_AUTH_DATABASE_URL` and
+  `AFLDB_IMPORT_DATABASE_URL`. That was start-environment evidence only. It predates the three DSNs
+  below and did not check `.next/standalone/.env*`, so it is not runbook §8 acceptance.
+- **Drift (regression of the boundary).** Three operator maintenance DSNs were added to
+  `.env.example` without a matching `UnsetEnvironment=` entry or §9 row:
+  - `AFLDB_DEV_IMPORT_DATABASE_URL` (ISSUE-224, `64858c52`);
+  - `AFLDB_PROD_IMPORT_DATABASE_URL` and `AFLDB_PROD_AUTH_DATABASE_URL` (ISSUE-251, `fb12c2bc`).
+
+  The derived contract test detected it. On `main` `d0423d92`,
+  `npx vitest run tests/deploy-web-unit.test.ts` ran 19 tests with 4 failures: `unsets` for each of
+  the three, plus `lists every DSN name .env.example defines`.
+- **Fix** (branch `sonnet/issue-220-credential-drift`, from `d0423d92`):
+  - `deploy/afldb.service` adds the three names to `UnsetEnvironment=`. It keeps exactly the three
+    web DSNs and denies every other `.env.example` `*_DATABASE_URL` (12 names). The comment now
+    classifies them: owner, test/code-test, DEV/PROD operator maintenance, backup.
+  - `docs/deployment.md` §9 gains three rows, and its boundary paragraph names the maintenance
+    class.
+  - No test assertion was changed to make the baseline pass.
+- **Next.js 16.3.1 re-verified** from installed source. `writeStandaloneDirectory`
+  (`next/dist/build/index.js:325-344`) still copies the loaded `.env`/`.env.production` into
+  `.next/standalone/<relative(outputFileTracingRoot, appDir)>/` unconditionally. No `next.config`
+  option prevents it, so post-build removal stays the mitigation.
+- **Hardening (fail closed).**
+  - `tools/build/env-in-standalone.mjs` adds `findEnvFilesRecursive`. It returns sorted, relative
+    POSIX paths, uses `readdir` only and never opens a file. It never follows a symlink or
+    junction; one that is itself env-named is reported.
+  - `prepare-standalone.mjs` keeps the top-level removal. After every copy into the tree, it scans
+    the whole tree and exits 1 if any `.env`/`.env.*` survives. Nested files are reported, not
+    deleted.
+  - The workstation `node_modules` holds no `.env*` file, so no legitimate dependency is blocked.
+- **Validation (DB-free):**
+  - `tests/deploy-web-unit.test.ts` **24/24**. The 19 originals pass; the 5 new tests cover nested
+    detection with nothing nested deleted, sorted POSIX output, symlink non-traversal, names only,
+    and the fail-closed branch's placement.
+  - `tsc --noEmit` clean.
+  - ESLint clean on the three JS/TS files. The systemd unit has no ESLint configuration, and
+    ESLint ignored it with a warning.
+- No database, DEV or PROD contact; no build, unit install or restart.
+- **Remaining acceptance (after merge, each step operator-authorised):**
+  1. DEV rollout and runbook §8.
+  2. One Admin Centre `afldb_import`-backed write and revert on DEV.
+  3. PROD read-only before-state checks.
+  4. PROD unit/build rollout, only on explicit authorisation.
+  5. PROD after-state checks.
+
+  **Status: OPEN.**
 
 ---
 

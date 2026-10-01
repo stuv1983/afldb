@@ -39,21 +39,29 @@ EnvironmentFile=/home/arm/projects/afldb/.env
 # mutation has required this role since migration 066 / AFLDB-ISSUE-027; the
 # process cannot do its job without it, and hiding it here while the
 # standalone bundle supplied it anyway was the false comfort AFLDB-ISSUE-220
-# removed). Everything else .env carries — the schema owner, every
-# test/code-test DSN, the backup role and the prod DSN — is dropped below.
+# removed). Everything else .env carries is dropped below:
+#   - the schema owner (AFLDB_OWNER_DATABASE_URL, AFLDB_PROD_DATABASE_URL);
+#   - every test/code-test DSN (AFLDB_TEST_*, AFLDB_CODE_TEST_*);
+#   - the DEV/PROD operator maintenance DSNs — the read-only DEV evidence
+#     connection, the DEV and PROD import-role adoption connections and the
+#     PROD auth-role attribution check (AFLDB_DEV_*, AFLDB_PROD_IMPORT_*,
+#     AFLDB_PROD_AUTH_*; AFLDB-ISSUE-222/224/251) — which only operator-run
+#     tools read, never the web process;
+#   - the backup role (AFLDB_BACKUP_DATABASE_URL).
 #
 # This is a hand-typed deny list, which is exactly how AFLDB-ISSUE-220
 # happened: AFLDB-ISSUE-146 added the two code-test DSNs to .env.example
 # without ever adding them here, and they reached the running process
 # unnoticed. tests/deploy-web-unit.test.ts derives the full *_DATABASE_URL
 # name set from .env.example on every run and fails if a name is missing
-# from either this list or the three kept above, so that drift cannot
-# happen silently again.
+# from either this list or the three kept above. It caught exactly that when
+# AFLDB-ISSUE-224/251 added three maintenance DSNs; a failing run of that
+# test is a credential leak in waiting, never a test to adjust.
 #
 # These are removed from the environment the service is started with;
 # migrations, imports, tests and backups read .env directly and are
 # unaffected.
-UnsetEnvironment=AFLDB_OWNER_DATABASE_URL AFLDB_TEST_DATABASE_URL AFLDB_TEST_IMPORT_DATABASE_URL AFLDB_TEST_AUTH_DATABASE_URL AFLDB_CODE_TEST_DATABASE_URL AFLDB_CODE_TEST_IMPORT_DATABASE_URL AFLDB_DEV_DATABASE_URL AFLDB_BACKUP_DATABASE_URL AFLDB_PROD_DATABASE_URL
+UnsetEnvironment=AFLDB_OWNER_DATABASE_URL AFLDB_TEST_DATABASE_URL AFLDB_TEST_IMPORT_DATABASE_URL AFLDB_TEST_AUTH_DATABASE_URL AFLDB_CODE_TEST_DATABASE_URL AFLDB_CODE_TEST_IMPORT_DATABASE_URL AFLDB_DEV_DATABASE_URL AFLDB_DEV_IMPORT_DATABASE_URL AFLDB_BACKUP_DATABASE_URL AFLDB_PROD_DATABASE_URL AFLDB_PROD_IMPORT_DATABASE_URL AFLDB_PROD_AUTH_DATABASE_URL
 
 Environment=NODE_ENV=production
 Environment=HOSTNAME=127.0.0.1

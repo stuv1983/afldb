@@ -1355,6 +1355,9 @@ All configuration is in `/home/arm/projects/afldb/.env` (mode 600, owner `arm`),
 | `AFLDB_CODE_TEST_DATABASE_URL` | **optional** (AFLDB-ISSUE-146), disposable full-rebuild rehearsal, `code_test_db` only (`afldb_owner`) |
 | `AFLDB_CODE_TEST_IMPORT_DATABASE_URL` | **optional** (AFLDB-ISSUE-146), same rehearsal, `code_test_db` only (`afldb_import`) |
 | `AFLDB_DEV_DATABASE_URL` | **optional** (AFLDB-ISSUE-222), `tools/rebuild/draftguru/bridge_import_gate.py --target dev` only (`afldb_dev`, read-only enforced at the session level, not by role — never the import or owner DSN) |
+| `AFLDB_DEV_IMPORT_DATABASE_URL` | **optional** (AFLDB-ISSUE-224), DEV-only privileged import/maintenance connection for `tools/rebuild/draftguru/register_issue224_s9_players.ts --target dev --dev-import-role` only (`afldb_import`, `afldb_dev`). Never read by application code; not supplied to the web service |
+| `AFLDB_PROD_IMPORT_DATABASE_URL` | **optional** (AFLDB-ISSUE-251), PROD player-adoption import/maintenance connection for the same tool with `--target prod --prod-import-role` only (`afldb_import`, `afldb_prod`). Never read by application code; not supplied to the web service |
+| `AFLDB_PROD_AUTH_DATABASE_URL` | **optional** (AFLDB-ISSUE-251), the same PROD adoption run's brief read-only check that the attribution actor is an enabled, enrolled `super_admin` (`afldb_auth`, `afldb_prod`). Never read by application code; not supplied to the web service |
 | `AFLDB_BACKUP_DATABASE_URL` | `pg_dump` (`afldb_backup`, read-only) |
 | `AFLDB_ENV` | `development` \| `production` — **transport security**: Secure cookies, HSTS, strict CSP |
 | `AFLDB_INDEXING` | `on` enables indexing; anything else = `noindex`. Separate from `AFLDB_ENV` |
@@ -1378,8 +1381,9 @@ with `UnsetEnvironment=`: `DATABASE_URL` (read-only), `AFLDB_AUTH_DATABASE_URL`
 (the operational auth/submission tables) and `AFLDB_IMPORT_DATABASE_URL`
 (every Admin Centre statistical mutation has required this role since
 migration 066 / AFLDB-ISSUE-027, and the process cannot serve `/admin`
-without it). The schema owner, every test/code-test DSN, the backup role and
-the prod DSN are unset. `tests/deploy-web-unit.test.ts` derives the full DSN
+without it). The schema owner, every test/code-test DSN, the DEV/PROD
+operator maintenance DSNs (`AFLDB_DEV_*`, `AFLDB_PROD_*`), and the backup role
+are unset. `tests/deploy-web-unit.test.ts` derives the full DSN
 name set from `.env.example` and fails if a future one is missing from this
 table, the unit's deny list or the three kept names (AFLDB-ISSUE-220).
 Migrations, imports, tests and backups read `.env` directly and are
@@ -1389,7 +1393,10 @@ The build output itself must also carry no credential: `next build` copies
 `.env`/`.env.production` into `.next/standalone/` unconditionally for every
 `output: 'standalone'` build, with no `next.config.ts` knob to suppress it
 (AFLDB-ISSUE-220 §4b). `npm run build`'s `prepare-standalone.mjs` step
-deletes any `.env*` file it finds there and fails the build if one survives.
+deletes the `.env*` files at the top of `.next/standalone/`, where Next 16.3.1
+puts them for this repository's layout. It then scans the whole standalone tree, without following
+symlinked directories, and fails the build if any `.env`/`.env.*` survives
+anywhere. A nested one is reported by path for inspection, not deleted.
 
 `npm run db:migrate` targets `dev`. `AFLDB_MIGRATE_TARGET` accepts `dev`,
 `test` or `prod` and **refuses to run on anything else** rather than falling

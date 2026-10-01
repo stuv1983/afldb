@@ -15,6 +15,20 @@ commit.
 
 ## [Unreleased]
 
+### Deployment security: web DSN deny-list restored, standalone env-file detection hardened (AFLDB-ISSUE-220; issue open) - 1 October 2026
+
+- `deploy/afldb.service` again keeps exactly `DATABASE_URL`, `AFLDB_AUTH_DATABASE_URL` and
+  `AFLDB_IMPORT_DATABASE_URL`. It now also unsets the three operator maintenance DSNs added since
+  the original fix: `AFLDB_DEV_IMPORT_DATABASE_URL` (ISSUE-224), and `AFLDB_PROD_IMPORT_DATABASE_URL`
+  and `AFLDB_PROD_AUTH_DATABASE_URL` (ISSUE-251). `docs/deployment.md` §9 documents all three.
+  `tests/deploy-web-unit.test.ts`, which derives the DSN set from `.env.example`, had flagged the
+  gap with four failures.
+- `npm run build`'s `prepare-standalone.mjs` still deletes the `.env*` files Next copies to the top
+  of `.next/standalone/`. It now also scans the whole finished standalone tree, by name only and
+  without following symlinks, and refuses to ship if any `.env`/`.env.*` survives anywhere. Nested
+  files are reported, not deleted.
+- Not yet rolled out: DEV and PROD acceptance remain outstanding.
+
 ### Season rollover: AFL API ownership census and season-scoped AFL API Brownlow artefacts (AFLDB-ISSUE-233; issue open) - 1 October 2026
 
 - **D-233-3 — a rebuild preserves `afl_api` ownership or refuses.** `npm run db:test:rebuild` gains a read-only

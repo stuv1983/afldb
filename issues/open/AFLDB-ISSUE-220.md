@@ -1,11 +1,60 @@
 # AFLDB-ISSUE-220 — Web service credential boundary contradicts the application's `afldb_import` requirement; owner-role code-test DSN and a complete `.env` copy reach the internet-facing process
 
-Status: **Open — planning runbook, 2026-09-17 (Fable 5.1 code review outside NL search).
-F-A and F-B confirmed on DEV by operator-run, names-only host checks. The runtime branch is
-SETTLED as (a) from Next.js source read on DEV (§4): the standalone server loads
-`.next/standalone/.env` at start-up. The build mechanism that copies `.env` there is NOT
-established (§4b) and is the implementation task's first step. No product, test, deployment or
-documentation file has been changed. Implementation is a separate task.**
+Status: **Open — implemented and merged; DEV/PROD acceptance outstanding.** Opened 2026-09-17
+(Fable 5.1 code review outside NL search) as a planning runbook. §1–§11 below are that original
+plan, kept as history. The current state is §0.
+
+## 0. Current state (2026-10-01)
+
+**Historical implementation.**
+- `f5adfe39` implemented the fix and was merged to `main` at `46805c05` on 2026-09-17.
+- It shipped:
+  - the three-DSN `UnsetEnvironment=` boundary in `deploy/afldb.service`;
+  - post-build `.env*` stripping (`tools/build/env-in-standalone.mjs`, `prepare-standalone.mjs`);
+  - the derived contract test `tests/deploy-web-unit.test.ts`;
+  - the `docs/deployment.md` §9 corrections.
+- Local validation at the time: contract test 15/15, `tsc --noEmit` clean.
+- The `afldb-issue-220` worktree it was built in no longer exists. No work was lost.
+
+**Historical partial DEV evidence.** The ISSUE-222 DEV deploy at `19eb40c0` (2026-09-19) observed
+the running `MainPID` holding exactly `DATABASE_URL`, `AFLDB_AUTH_DATABASE_URL` and
+`AFLDB_IMPORT_DATABASE_URL`. Its limits:
+- it is start-environment (`/proc/<pid>/environ`) evidence only;
+- it predates the three DSNs below;
+- it did not prove `.next/standalone/.env*` absent.
+
+So it is not §8 acceptance.
+
+**Drift found 2026-10-01, restored on `sonnet/issue-220-credential-drift`.**
+- `.env.example` gained three operator maintenance DSNs without matching deny-list or §9 entries:
+  - `AFLDB_DEV_IMPORT_DATABASE_URL` (ISSUE-224, `64858c52`);
+  - `AFLDB_PROD_IMPORT_DATABASE_URL` and `AFLDB_PROD_AUTH_DATABASE_URL` (ISSUE-251, `fb12c2bc`).
+- The derived contract test caught it. On `main` `d0423d92` it ran 19 tests with 4 failures: three
+  `unsets …` cases and `lists every DSN name .env.example defines`.
+- This pass adds the three names to `UnsetEnvironment=` and to §9, and changes no test assertion.
+  The contract test is now 24/24.
+
+**Next.js 16.3.1 re-verified (installed source, 2026-10-01).**
+- `writeStandaloneDirectory` (`next/dist/build/index.js:325-344`) still copies the loaded `.env` /
+  `.env.production` into `.next/standalone/<relative(outputFileTracingRoot, appDir)>/`
+  unconditionally for `output: 'standalone'`.
+- No `next.config` option suppresses it.
+- Post-build removal stays the mitigation.
+- New hardening: `findEnvFilesRecursive` scans the whole finished standalone tree. It reads names
+  only and never follows a symlink or junction. `prepare-standalone.mjs` refuses to ship if any
+  `.env`/`.env.*` survives anywhere. A nested one is reported for inspection, never deleted.
+- The workstation `node_modules` holds no `.env*` file, so no legitimate dependency is blocked.
+
+**Remaining acceptance (after merge, each step operator-authorised).**
+1. DEV rollout (unit install + rebuild + restart) and the §8 checks.
+2. One Admin Centre `afldb_import`-backed write and revert on DEV.
+3. PROD read-only before-state checks (§8 step 6).
+4. PROD unit/build rollout, only after explicit operator authorisation.
+5. PROD after-state checks.
+
+The issue stays OPEN until those pass.
+
+---
 
 ## 1. Objective
 

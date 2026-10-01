@@ -186,22 +186,26 @@
 
 ### AFLDB-ISSUE-220 — Web service credential boundary contradicts the application's `afldb_import` requirement; owner-role code-test DSN and a complete `.env` copy reach the internet-facing process
 - **Severity:** High. **Area:** deployment / runtime security.
-- **State:** Open (2026-09-17). Implemented in worktree `afldb-issue-220` (Sonnet 5, uncommitted),
-  pending operator DEV/PROD verification. §4b established: `writeStandaloneDirectory` in the
-  installed Next 16.3.1's own `next/dist/build/index.js` copies `.env`/`.env.production` into
-  `.next/standalone/` unconditionally, in a hardcoded loop with no `next.config.ts` knob to
-  suppress it — `next.config.ts` correctly left untouched. `deploy/afldb.service` now unsets
-  `AFLDB_OWNER_DATABASE_URL AFLDB_TEST_DATABASE_URL AFLDB_TEST_IMPORT_DATABASE_URL
-  AFLDB_TEST_AUTH_DATABASE_URL AFLDB_CODE_TEST_DATABASE_URL AFLDB_CODE_TEST_IMPORT_DATABASE_URL
-  AFLDB_BACKUP_DATABASE_URL AFLDB_PROD_DATABASE_URL` and keeps exactly `DATABASE_URL`,
-  `AFLDB_AUTH_DATABASE_URL`, `AFLDB_IMPORT_DATABASE_URL`; `tools/build/prepare-standalone.mjs`
-  now deletes any `.env*` under the standalone tree and fails the build if one survives; new
-  `tests/deploy-web-unit.test.ts` derives the full DSN name set from `.env.example` (found
-  `docs/deployment.md`'s §9 table was itself missing 5 real DSN names — completed it rather than
-  deriving from the incomplete table, see `issues.md` Implementation section). PROD still not
-  inspected.
-- **Runbook:** `issues/open/AFLDB-ISSUE-220.md` (relocated from the repository root 2026-09-19;
-  the `afldb-issue-220` worktree still holds its uncommitted copy at the old root path).
+- **State:** Open (2026-09-17). Implemented in `f5adfe39`, merged to `main` at `46805c05`
+  (2026-09-17): the three-DSN web boundary, post-build standalone `.env*` stripping, the derived
+  contract test (15/15 then) and §9 docs.
+  - **Partial DEV evidence (2026-09-19, `19eb40c0`):** the running process held exactly the three
+    DSNs. This was start-environment evidence only, taken before the drift below, and did not
+    check the standalone `.env`.
+  - **2026-10-01 drift, restored on `sonnet/issue-220-credential-drift` (pushed, not merged):**
+    - `AFLDB_DEV_IMPORT_DATABASE_URL` (ISSUE-224), `AFLDB_PROD_IMPORT_DATABASE_URL` and
+      `AFLDB_PROD_AUTH_DATABASE_URL` (ISSUE-251) were in `.env.example` but missing from the deny
+      list and §9.
+    - The contract test caught it: 4 failures on `main` `d0423d92`. It is now 24/24.
+    - The build now also refuses any `.env*` surviving anywhere under `.next/standalone/` (names
+      only, symlinks not followed, nothing nested deleted).
+    - Next 16.3.1 re-verified: the standalone copy is still unconditional, and no config option
+      prevents it.
+- **Runbook:** `issues/open/AFLDB-ISSUE-220.md` (§0 is the current state).
+- **Next action:** merge the drift branch.
+  - DEV: rollout and runbook §8 checks, plus an Admin Centre `afldb_import` write and revert.
+  - PROD: read-only before-state checks first; the unit/build rollout only on explicit operator
+    authorisation; then the after-state checks.
 - **Key files:** `deploy/afldb.service`, `docs/deployment.md` §9, `tools/build/prepare-standalone.mjs`,
   `tools/build/env-in-standalone.mjs` (new), `tests/deploy-web-unit.test.ts` (new).
 - **Local validation (2026-09-17):** `vitest run tests/deploy-web-unit.test.ts` **15/15 passed**;

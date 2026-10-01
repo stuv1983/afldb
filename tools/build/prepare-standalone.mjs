@@ -12,7 +12,7 @@
  */
 import { cp, access, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import { removeEnvFiles } from './env-in-standalone.mjs';
+import { findEnvFilesRecursive, removeEnvFiles } from './env-in-standalone.mjs';
 
 const root = process.cwd();
 const standalone = join(root, '.next', 'standalone');
@@ -88,5 +88,19 @@ if (await exists(join(root, 'deploy', 'coming-soon'))) {
 // re-renders from scratch.
 await mkdir(join(standalone, '.next', 'cache'), { recursive: true });
 console.log('prepare-standalone: created .next/cache for ISR');
+
+// AFLDB-ISSUE-220 hardening: the top-level removal above covers where Next
+// puts the copied env files today. Scan the whole finished tree — including
+// everything copied in just above — and refuse to ship if a credential-named
+// file survives anywhere. A nested one is reported for inspection, never
+// deleted: it means the layout changed and somebody should look.
+const nestedEnvFiles = await findEnvFilesRecursive(standalone);
+if (nestedEnvFiles.length > 0) {
+  console.error(
+    `prepare-standalone: refusing to ship — .env-named file(s) under .next/standalone: ${nestedEnvFiles.join(', ')}. Inspect them; they are not deleted automatically.`,
+  );
+  process.exit(1);
+}
+console.log('prepare-standalone: confirmed no .env* anywhere under .next/standalone');
 
 console.log('prepare-standalone: standalone bundle ready');
