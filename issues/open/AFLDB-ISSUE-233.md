@@ -128,6 +128,11 @@ parent `f0abbb4c`)** (§4.11.15):
 - Passes 6–12 are committed together. **Status: OPEN.** Remaining: the operator merges the branch,
   and the promotion gate's first live read happens at the next promotion (§4.6 item 6).
 
+**State after merge (2026-10-01):**
+- `f0abbb4c` and `cc1a5f2d` are merged; `main` is at `cc1a5f2d`. No merge is pending.
+- **Status: OPEN.** **Next action:** the promotion gate's first live read at the next promotion
+  (§4.6 item 6). Do not run a promotion merely to close this issue.
+
 ---
 
 ## 1. The contract
@@ -476,7 +481,8 @@ builder manifest `schema_version` 2 with `source_key: afl_api`.
 
 1. Review and commit this pass. (Final review DONE in pass 5, §4.8.4; the commit is the
    operator's.) **Passes 1–5 committed as `f0abbb4c`. Passes 6–12: final review DONE in pass 12
-   (§4.11.15) and committed on `sonnet/issue-233`; merging to `main` is the operator's.**
+   (§4.11.15) and committed on `sonnet/issue-233` as `cc1a5f2d`. DONE (2026-10-01): both commits
+   merged; `main` at `cc1a5f2d`.**
 2. **DONE (pass 5):** the rollback-only census proof against `afldb_test`
    (`npx vitest run tests/integration/afl-api-ownership-census.test.ts`): 5/5, no residue (§4.8.2).
 3. **DONE (pass 5):** a read-only census of the current rebuild scope on `afldb_test` and

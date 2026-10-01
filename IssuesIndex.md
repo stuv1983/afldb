@@ -119,9 +119,11 @@
     - Manifest paths are POSIX, so a Windows-built artefact loads on a Linux rebuild.
     - DB-free: harness 115/115, builder 173/173, TS 35/35.
   - PROD is untouched.
+  - **2026-10-01 (merged):** `f0abbb4c` and `cc1a5f2d` are merged; `main` is at `cc1a5f2d`. No
+    merge is pending.
 - **Runbook:** `issues/open/AFLDB-ISSUE-233.md`.
-- **Next action (operator):** merge `sonnet/issue-233`. The promotion gate's first live read
-  happens at the next promotion (runbook §4.6 item 6). The issue stays OPEN until then.
+- **Next action:** the promotion gate's first live read at the next promotion (runbook §4.6
+  item 6). The issue stays OPEN until then; do not run a promotion merely to close it.
 
 ### AFLDB-ISSUE-232 — AFL API operational wiring: systemd timers, Brownlow scheduled settle and admin status
 - **Severity:** Medium. **Area:** deployment / operations — `deploy/afldb-settle-afl-api*`,
