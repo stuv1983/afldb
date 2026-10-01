@@ -1,13 +1,19 @@
 # AFLDB-ISSUE-232 — AFL API operational wiring: systemd timers, Brownlow scheduled settle and admin status
 
-**Status:** Open. **Severity:** Medium. **Opened:** 2026-09-23 (ISSUE-228 §22.18 E items 2–3,
+**Status:** RESOLVED (2026-10-01; DEV acceptance §7 A–E and the final `/admin/current-season` admin
+check all PASSED at `f6d189d0`, see §7 "Final acceptance result"). **Severity:** Medium. **Opened:** 2026-09-23 (ISSUE-228 §22.18 E items 2–3,
 §22.20 rows 2–3 and part B). **This runbook:** created 2026-09-26 in the bulk successor pass on
 `opus/afl-api-successors-229-234` (base `main` `2e587415`). Passes 1–2 are merged and on `main`
 (DEV and PROD ran `1111ab19`, which contains them, for ISSUE-220). Pass 3 (§3b, 2026-10-01) was
 made on `sonnet/issue-232` from `c64fade4`; it is implemented and DB-free validated, and pending
 DEV operator acceptance (§7).
 
-**Current state (2026-10-01, DEV acceptance in progress at `6661eb66`):**
+**Final state (2026-10-01): RESOLVED.** DEV acceptance §7 D1b (rerun), D2, D3, D4 and E all PASSED
+at `f6d189d0` after ISSUE-255 was deployed (§7 "Final acceptance result"). Both timers are enabled
+on DEV; PROD is untouched and has had no AFL API unit installed. The text below is the preserved
+history of the halted run.
+
+**Historical state (2026-10-01, DEV acceptance halted at `6661eb66`):**
 - §7 A PASSED. §7 B PASSED for the unconfigured-trigger state. §7 C PASSED: four units installed,
   hashes matched, both timers disabled and inactive.
 - **§7 D1 HALTED correctly** (`canonicalRowsInserted` = 56). DEV was one AFL Tables canonical match
@@ -20,8 +26,8 @@ DEV operator acceptance (§7).
   **Disposition B: an AFL API settle defect** (§7 D1b result) that must be fixed, with an operator
   decision on the non-participation rule, before D2.
 - **BLOCKED by AFLDB-ISSUE-255** (operator decision, 2026-10-01). The fix was split into its own
-  issue rather than widening this one (`issues/open/AFLDB-ISSUE-255.md`; decisions D-255-1..5;
-  implemented and DB-free validated, not yet deployed). The D1 zero-insert/zero-update gate is
+  issue rather than widening this one (`issues/closed/AFLDB-ISSUE-255.md`; decisions D-255-1..5;
+  since resolved, §7 "Final acceptance result"). The D1 zero-insert/zero-update gate is
   **unchanged**.
 - **D2–D4 and E remain BLOCKED** until ISSUE-255 is deployed and a fresh D1b passes.
 - No AFL API service has been started; no timer is enabled; neither dry-run retained anything.
@@ -719,7 +725,7 @@ genuine coverage difference, only a non-participation placeholder.
   and must show `canonicalRowsInserted` 0 and `canonicalRowsUpdated` 0, with the rest of the D1b
   criteria unchanged.
 
-**Tracked as AFLDB-ISSUE-255** (operator decision, 2026-10-01; `issues/open/AFLDB-ISSUE-255.md`).
+**Tracked as AFLDB-ISSUE-255** (operator decision, 2026-10-01; `issues/closed/AFLDB-ISSUE-255.md`).
 - **The rule (D-255-1):** roster position exactly `EMERG` AND `timeOnGroundPercentage` exactly 0 AND
   every projected statistic exactly 0. Such a row is an observation-only non-participant: the spine
   is kept, and nothing canonical, typed, ledger, candidate, rejection or data-issue is written. It
@@ -774,6 +780,68 @@ rehearsal).
 
 Once a rollover leaves `seasons.json` with no in-progress season, the match unit exits 0 with "no
 in-progress season … nothing to settle". That is not the state today (§3b item 4).
+
+#### Final acceptance result (2026-10-01): D1b rerun, D2, D3, D4 and E PASSED
+
+Operator-run on DEV at `f6d189d0` (ISSUE-255 deployed). No PROD work was authorised or performed.
+
+**D1b rerun: PASSED** (fresh snapshot `afl-api-2026-2026-10-01-104329`; dry-run rolled back fully):
+- `snapshotMatches` 218, `snapshotPlayerMatchRows` 10,029, `seasonFeedMatches` 218,
+  `seasonFeedComplete` 1, source completeness COMPLETE;
+- `corroboratedForeignOwned` 218, `unresolvedIdentityMatch` 0, `unresolvedIdentityPlayer` 0,
+  `foreignOwnedCollision` 0, `sourceDisagreement` 0;
+- `nonParticipantPlayerRows` 1;
+- **`canonicalRowsInserted` 0, `canonicalRowsUpdated` 0**, `canonicalApplicationsLogged` 0,
+  `canonicalApplyFailures` 0, `derivedRecomputeRuns` 0, `derivedRecomputePlayers` 0;
+- `canonicalApplyRefusals` 36.
+
+The 36 refusals are the known `afltables`-owned `player_match_stats` foreign-owner class (D1b result
+above): **classified and expected, not failures.** They are not a halt criterion and remain on
+record for any later reconciliation.
+
+**D2: first observed systemd run, PASSED** (fresh label `afl-api-2026-2026-10-01-104846`):
+- `sudo systemctl start` exited 0; `Result=success`, `ExecMainStatus=0`; `AFLDB_SETTLE_SUCCESS`
+  emitted;
+- import batch **95** committed: 218 matches / 10,029 player rows, `nonParticipantPlayerRows` 1,
+  `corroboratedForeignOwned` 218;
+- `canonicalRowsInserted` 0, `canonicalRowsUpdated` 0, `canonicalApplicationsLogged` 0,
+  `canonicalApplyRefusals` 36, `canonicalApplyFailures` 0, derived recompute 0/0; source completeness
+  COMPLETE.
+
+**D3: post-run verification, PASSED** (`afldb_dev`, as `afldb_app`):
+- all 218 2026 matches are owned by `afltables`; `afl_api_owned_all_seasons` = 0;
+- the Fiorini phantom `player_match_stats` row = 0;
+- the latest AFL API batch is 95, completed, and its counters agree exactly with D2;
+- the service is inactive with `Result=success` and `ExecMainStatus=0`.
+
+**D4: match timer, PASSED.** `afldb-settle-afl-api.timer` is enabled and active. The next scheduled
+run was Fri 2026-10-02 05:10:02 AEST, and no catch-up firing occurred on enable.
+
+**E: Brownlow unit outside the count window (E1), PASSED.**
+- `AFLDB_AFL_API_BROWNLOW_ENABLED` is not `true`; `afldb-settle-afl-api-brownlow.timer` is enabled and
+  active;
+- a manual service run exited success/0 through the outer no-op gate, and the scheduled timer then
+  fired at 2026-10-01 21:05:00 AEST. The journal read "AFLDB_AFL_API_BROWNLOW_ENABLED is not 'true'
+  ... Nothing to do."; `Result=success`, `ExecMainStatus=0`;
+- the fixture and Brownlow snapshot inventories stayed 0, and the `settle-afl-api-fixtures.ts` and
+  `settle-afl-api-brownlow.ts` batch counts stayed 0;
+- the next firing was scheduled for 21:10.
+
+**Admin final check (`/admin/current-season`): PASSED.** The operator manually verified the page on DEV
+after D2/D3/D4/E. Under "AFL API scheduled settles": the "Match and player statistics" row shows
+**Batch 95, status completed**; the "Brownlow votes" row shows **No batch recorded yet** (the gate is
+closed); and there is no unexpected error or alert state. This matches D3 and E above and closes the
+§7 B and item 4 visual acceptance (`VISUAL: UNVERIFIED` cleared for this final check). The
+verification was an operator eyeball check, and no screenshot is attached to this record.
+
+**Resolution.** Scope items 1–4 are done on DEV: both units are installed and both timers enabled
+(§7 C, D4, E); the Brownlow wrapper follows D-232-1 = B and O1 (§3a); the credential boundary is
+tightened (§3b); the admin panel ships (§4). Item 5 was decided as D-232-3 = keep (§6). The "start
+now" trigger remains deferred by decision (§5). PROD installation is a separate operator-authorised
+step that has not been taken. The Brownlow count window is not opened, and its first real full-chain
+firing is observed at the 2027 count or in a separately authorised rehearsal (§7 E). Out of scope,
+unchanged: `afldb-settle-afltables.service` has the same deny-list drift, a separate decision.
+ISSUE-233 is unaffected and stays OPEN for its own promotion-gate acceptance.
 
 ## 8. Files changed (this pass, for this issue)
 

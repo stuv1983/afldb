@@ -15,7 +15,7 @@ commit.
 
 ## [Unreleased]
 
-### AFL API settle no longer records an unused emergency as a game played (AFLDB-ISSUE-255; issue open, pending deployment) - 1 October 2026
+### AFL API settle no longer records an unused emergency as a game played (AFLDB-ISSUE-255; resolved) - 1 October 2026
 
 - The AFL.com.au player-stats feed lists a named emergency who never took the field as a stats row:
   roster position `EMERG`, 0% time on ground, every statistic 0. The AFL API settle used to propose
@@ -29,9 +29,26 @@ commit.
   `validation_result`. Source completeness is unchanged.
 - An emergency who came into the side (`EMERG` with real time on ground) is unaffected.
 - DB-free (416/416), typecheck, lint delta (zero new) and the focused `afldb_test` integration case
-  (1/1) validated; DEV deployment and the fresh ISSUE-232 D1b acceptance are pending.
+  (1/1) validated.
+- Deployed to DEV at `f6d189d0` (operator-run, 1 October 2026). A fresh authentic dry-run (snapshot
+  `afl-api-2026-2026-10-01-104329`) showed 218 matches / 10,029 player rows, 1 non-participant row,
+  0 canonical inserts, 0 updates and no derived recompute, with source completeness COMPLETE. The
+  first systemd run committed import batch 95 with the same counters. The 36 known `afltables`-owned
+  `player_match_stats` refusals remain and are classified and expected. Not on PROD.
 
-### AFL API settle units: credential boundary tightened, "not installed" status (AFLDB-ISSUE-232; issue open, pending DEV operator acceptance) - 1 October 2026
+### AFL API settle units installed on DEV; timers enabled; credential boundary tightened; "not installed" status (AFLDB-ISSUE-232; resolved) - 1 October 2026
+
+- DEV operator acceptance passed at `f6d189d0`. `afldb-settle-afl-api.service`/`.timer` and
+  `afldb-settle-afl-api-brownlow.service`/`.timer` are installed and both timers are enabled. The
+  first observed match run (systemd, exit 0, import batch 95) changed no canonical row; all 218 2026
+  matches remain `afltables`-owned. The match timer's next run was 2026-10-02 05:10:02 AEST.
+- The Brownlow timer is permanently enabled with `AFLDB_AFL_API_BROWNLOW_ENABLED` closed; its
+  scheduled firings are a clean no-op that acquires and settles nothing. The count window is not
+  opened. PROD is untouched, and no AFL API unit is installed there.
+- The `/admin/current-season` panel was manually verified on DEV after the runs: "Match and player
+  statistics" shows batch 95 completed, "Brownlow votes" shows no batch recorded yet, and there is no
+  error or alert state.
+- Details of the credential-boundary and "not installed" changes:
 
 - `deploy/afldb-settle-afl-api.service` and `deploy/afldb-settle-afl-api-brownlow.service` now keep
   exactly `DATABASE_URL` and `AFLDB_IMPORT_DATABASE_URL`. They also unset the seven test, code-test

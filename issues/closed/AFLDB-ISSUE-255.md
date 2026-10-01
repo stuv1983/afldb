@@ -1,11 +1,12 @@
 # AFLDB-ISSUE-255 — AFL API unused-emergency `player_match_stats` suppression
 
-**Status:** Open. **Severity:** Medium (blocks AFLDB-ISSUE-232 D2). **Opened:** 2026-10-01, split out
-of AFLDB-ISSUE-232 §7 D1b by operator decision. **Branch/worktree:** implemented in
-`D:\dev\afldb-issue-232` (`sonnet/issue-232`, base `6661eb66`) together with the ISSUE-232 blocker
-record. **State:** implementation validation COMPLETE (DB-free, typecheck, lint delta and the focused
-`afldb_test` integration case all pass). Still OPEN: pending operator commit, DEV deployment and the
-ISSUE-232 D1b rerun (§6).
+**Status:** RESOLVED (2026-10-01). **Severity:** Medium (blocked AFLDB-ISSUE-232 D2). **Opened:**
+2026-10-01, split out of AFLDB-ISSUE-232 §7 D1b by operator decision. **Branch/worktree:**
+implemented in `D:\dev\afldb-issue-232` (`sonnet/issue-232`, base `6661eb66`) together with the
+ISSUE-232 blocker record; committed as `f6d189d0`. **State:** implementation validation COMPLETE
+(DB-free, typecheck, lint delta and the focused `afldb_test` integration case all pass), deployed to
+DEV at `f6d189d0`, and accepted by a fresh authentic ISSUE-232 D1b plus the first observed systemd run
+(§7). No PROD work was authorised or performed.
 
 ## 1. Defect (authentic, DEV, 2026-10-01)
 
@@ -208,3 +209,33 @@ pass does not resolve this issue.
    The 36 known `afltables`-owned `player_match_stats` refusals may remain, with an unchanged
    classified census.
 4. Then ISSUE-255 can be resolved, and ISSUE-232 may proceed to D2.
+
+## 7. Acceptance result (2026-10-01): PASSED, RESOLVED
+
+Operator-run on DEV at `f6d189d0`. Every §6 criterion was met.
+
+**Fresh D1b** (snapshot `afl-api-2026-2026-10-01-104329`; dry-run, rolled back fully):
+- snapshot: `snapshotMatches` 218, `snapshotPlayerMatchRows` 10,029; season feed:
+  `seasonFeedMatches` 218, `seasonFeedComplete` 1; source completeness COMPLETE;
+- identity and ownership: `corroboratedForeignOwned` 218, `unresolvedIdentityMatch` 0,
+  `unresolvedIdentityPlayer` 0, `foreignOwnedCollision` 0, `sourceDisagreement` 0;
+- **`nonParticipantPlayerRows` 1** (the Fiorini row, `CD_M20260140305|CD_T50|CD_I993799`);
+- writes: **`canonicalRowsInserted` 0, `canonicalRowsUpdated` 0**, `canonicalApplicationsLogged` 0,
+  `canonicalApplyFailures` 0;
+- derived: `derivedRecomputeRuns` 0, `derivedRecomputePlayers` 0 (the halted run showed 1/1, so the
+  phantom row no longer reaches the recompute);
+- `canonicalApplyRefusals` 36: the known `afltables`-owned `player_match_stats` foreign-owner class
+  (ISSUE-232 §7 D1b result). **Classified and expected, not a failure;** the census is unchanged
+  from the halted run.
+
+**Confirmation by the first applying run** (ISSUE-232 D2, systemd, label
+`afl-api-2026-2026-10-01-104846`): import batch 95 committed, 218 matches / 10,029 player rows,
+`nonParticipantPlayerRows` 1, `canonicalRowsInserted` 0, `canonicalRowsUpdated` 0,
+`canonicalApplicationsLogged` 0, `canonicalApplyRefusals` 36, `canonicalApplyFailures` 0, derived
+recompute 0/0, source completeness COMPLETE. D3 then confirmed on `afldb_dev` that all 218 2026
+matches are `afltables`-owned, `afl_api`-owned matches in any season are 0, and the Fiorini phantom
+`player_match_stats` row count is 0.
+
+**Resolution:** the root cause (the AFL API settle turned every player-stats entry into a proposal, so
+an unused emergency's all-zero placeholder would be recorded as a game played) is fixed by the
+`non_participant` plan status (§3). No residue existed to repair (§5). No follow-up issue.

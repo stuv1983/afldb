@@ -1195,7 +1195,7 @@ its own hour. Nothing is retried and nothing is rolled back.
 ## 7d. In-season AFL.com.au (`afl_api`) settle — S8 (`AFLDB-ISSUE-228`)
 
 **Not installed or enabled on any host yet.** Installation is
-`AFLDB-ISSUE-232`'s operator-run DEV acceptance (`issues/open/AFLDB-ISSUE-232.md`
+`AFLDB-ISSUE-232`'s operator-run DEV acceptance (`issues/closed/AFLDB-ISSUE-232.md`
 §7), which includes a mandatory `--dry-run` rehearsal before the match unit's
 first applying run, then production after sign-off. See
 `issues/closed/AFLDB-ISSUE-228.md` §16/§17 for the frozen design these files
@@ -1311,7 +1311,7 @@ sudo systemctl start afldb-settle-afl-api-brownlow.service
 ```
 
 Before the match unit's first applying run on a host, follow the rehearsal in
-`issues/open/AFLDB-ISSUE-232.md` §7 D (`--dry-run --auto-apply
+`issues/closed/AFLDB-ISSUE-232.md` §7 D (`--dry-run --auto-apply
 --require-complete-source`, with halt criteria).
 
 **Before the Brownlow unit ever points at the live AFL endpoint**, exercise

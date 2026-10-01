@@ -1882,7 +1882,7 @@ Brownlow DB switch, and only then the environment key. Close it by clearing the 
 first, then the DB switch if wanted (`docs/deployment.md` §7d).
 
 **Not installed or enabled on any host yet.** The six files above exist in `deploy/`. Installation
-is AFLDB-ISSUE-232's operator-run DEV acceptance (`issues/open/AFLDB-ISSUE-232.md` §7), which
+is AFLDB-ISSUE-232's operator-run DEV acceptance (`issues/closed/AFLDB-ISSUE-232.md` §7), which
 includes a mandatory `--dry-run` rehearsal before the match unit's first applying run. See
 `docs/deployment.md` §7d for directory-permission requirements (`ReadWritePaths` scoped to
 `data/sources/afl_api/` only, narrower than the fitzRoy chain), the credential boundary (each unit
