@@ -179,6 +179,7 @@ function counterLines(counters: AflApiSettleCounters): string[] {
     'observationsSeen', 'payloadsCreated', 'versionsAppended', 'observationsUnchanged',
   ]);
   group('Deferral (§7.3, T3 — informational, never a failure)', ['recordsDeferred']);
+  group('Participation (AFLDB-ISSUE-255 — informational, never a failure)', ['nonParticipantPlayerRows']);
   group('Resolution / ownership', [
     'unresolvedIdentityMatch', 'unresolvedIdentityPlayer', 'foreignOwnedCollision',
     'corroboratedForeignOwned', 'sourceDisagreement', 'manualAuthorityRefusals',

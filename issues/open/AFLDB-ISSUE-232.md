@@ -7,9 +7,24 @@
 made on `sonnet/issue-232` from `c64fade4`; it is implemented and DB-free validated, and pending
 DEV operator acceptance (§7).
 
-**Current state (2026-10-01, pass 3):** items 2–4 are implemented and DB-free validated. Item 1
-(host installation) and item 4's visual acceptance are operator-run (§7) and not done on any host.
-The DEV acceptance in §7 includes a mandatory dry-run rehearsal before the first applying run.
+**Current state (2026-10-01, DEV acceptance in progress at `6661eb66`):**
+- §7 A PASSED. §7 B PASSED for the unconfigured-trigger state. §7 C PASSED: four units installed,
+  hashes matched, both timers disabled and inactive.
+- **§7 D1 HALTED correctly** (`canonicalRowsInserted` = 56). DEV was one AFL Tables canonical match
+  behind: the 2026 Grand Final was missing.
+- **§7 D1a PASSED.** AFL Tables batch 91 inserted the Grand Final (match 17275, `afltables`-owned).
+  DEV now has 218 matches for 2026, all `afltables`-owned, and 0 `afl_api`-owned matches.
+- **§7 D1b HALTED** (`canonicalRowsInserted` = 1). The one insert is an **unused emergency's
+  non-participation row** (Brayden Fiorini, `CD_I993799`, `EMERG`, 0% time on ground, all-zero
+  stats). AFL Tables correctly omits it. Applying it would record a game that was never played.
+  **Disposition B: an AFL API settle defect** (§7 D1b result) that must be fixed, with an operator
+  decision on the non-participation rule, before D2.
+- **BLOCKED by AFLDB-ISSUE-255** (operator decision, 2026-10-01). The fix was split into its own
+  issue rather than widening this one (`issues/open/AFLDB-ISSUE-255.md`; decisions D-255-1..5;
+  implemented and DB-free validated, not yet deployed). The D1 zero-insert/zero-update gate is
+  **unchanged**.
+- **D2–D4 and E remain BLOCKED** until ISSUE-255 is deployed and a fresh D1b passes.
+- No AFL API service has been started; no timer is enabled; neither dry-run retained anything.
 
 **State after pass 1:** **BLOCKED ON OPERATOR DECISION** (D-232-1, D-232-3). Item 4 (admin
 status) is **IMPLEMENTED / NEEDS DEV OPERATOR ACCEPTANCE** (`VISUAL: UNVERIFIED`). Item 1 (host
@@ -39,7 +54,7 @@ installation) is operator-run and has not been done on any host.
 | 1 | Install and enable both AFL API timers (DEV, then production) | Not done; operator-run | §7 on DEV (with the §7 D rehearsal), then production |
 | 2 | Brownlow wrapper `--use-fixture-identity` policy | **Implemented** (D-232-1 = B, §3a) | Nothing beyond item 1 |
 | 3 | Match chain before Brownlow chain | **Implemented** (O1, §3a) | Nothing beyond item 1 |
-| 4 | `/admin/current-season` shows the AFL API units | **Implemented** (§4; "not installed" state §3b) | DEV visual acceptance (§7 B) |
+| 4 | `/admin/current-season` shows the AFL API units | **Implemented** (§4; "not installed" state §3b) | §7 B PASSED on DEV 2026-10-01 (unconfigured-host state); "Not installed" state re-checked after §7 C |
 | 5 | Automatic `revalidateSeason()` after an AFL API settle | **Decided: keep** (D-232-3, §6); no change | None |
 | — | "Start now" trigger for the AFL API units | Deferred (§5) | Not needed for scheduled operation |
 | — | Unit credential boundary | **Fixed** (§3b) | Nothing beyond item 1 |
@@ -353,6 +368,18 @@ const s=[...document.querySelectorAll('section')].find(x=>x.querySelector('h2')?
 
 Capture both widths. Item 4 stays `VISUAL: UNVERIFIED` until then.
 
+**B result: PASSED on DEV, 2026-10-01** (revision `6661eb66`, Super Admin session, Playwright
+browser; checked at 1280 px and 390 px). Evidence: console check returned
+`['Fetch current AFL data now', 0, false]` at both widths (390 px: `scrollWidth` 375 < `innerWidth`
+390). Two rows only, in the order above. Pre-install state (no `AFLDB_SETTLE_TRIGGER=systemd`):
+both service cells "On-demand refresh is not enabled on this host."; both batch cells "No batch
+recorded yet." (zero AFL API batches). No button, form, input, select or textarea in the section.
+No page-wide horizontal scroll. Full-page screenshots (workstation, not committed):
+`.playwright-mcp/issue232-7B-desktop-1280-full.png`, `.playwright-mcp/issue232-7B-phone-390-full.png`.
+Not exercised here: the "Not installed on this host." state, which needs
+`AFLDB_SETTLE_TRIGGER=systemd` and is re-checked after C. Item 4 is therefore visually accepted for
+the unconfigured-host state only. §7 C onward is still to do; the issue remains open.
+
 ### C. Install the units (no timer enabled yet)
 
 ```bash
@@ -367,6 +394,12 @@ systemctl show afldb-settle-afl-api.service afldb-settle-afl-api-brownlow.servic
 
 Expected: repository and installed hashes pair up; both `LoadState=loaded`, `inactive`. Reload the
 panel: both rows leave "Not installed" (when `AFLDB_SETTLE_TRIGGER=systemd`).
+
+**C result: PASSED on DEV, 2026-10-01** (revision `6661eb66`, operator-run).
+- All four unit files are installed, and the repository and installed hashes match.
+- `systemd-analyze verify` passed.
+- Both services are `LoadState=loaded`, `ActiveState=inactive`.
+- Both timers remain disabled and inactive. Neither AFL API service has been started.
 
 ### D. Match unit: mandatory rehearsal, then the first observed run
 
@@ -393,6 +426,307 @@ npx tsx tools/current-season/settle-afl-api.ts --label "$L" --dry-run --auto-app
 - the `Season feed (AFLDB-ISSUE-231 …)` completeness evidence is absent from the output.
 
 The unit is not safe to start or enable until D1 passes. On a halt, return the output for review.
+
+#### D1 result (2026-10-01): HALTED correctly
+
+Operator-run on DEV at `6661eb66`.
+- **Snapshot:** fresh AFL API acquisition `afl-api-2026-2026-10-01-092238`. The season feed has
+  218 matches, all `CONCLUDED`, including `CD_M20260142901`.
+- **Dry-run counters:**
+  - snapshot and identity: `snapshotMatches` 218, `snapshotPlayerMatchRows` 10,029,
+    `buildFailures` 0, `unresolvedIdentityMatch` 0, `unresolvedIdentityPlayer` 0;
+  - season feed: `seasonFeedMatches` 218, `seasonFeedComplete` 1, source completeness COMPLETE;
+  - ownership: `corroboratedForeignOwned` 217, `foreignOwnedCollision` 0, `sourceDisagreement` 0,
+    `manualAuthorityRefusals` 0;
+  - venues: `venueProviderUnmapped` 0, `venueUnmapped` 0;
+  - writes: `candidatesCreated` 0, `dataIssuesOpened` 36, **`canonicalRowsInserted` 56**,
+    `canonicalRowsUpdated` 0, `canonicalApplicationsLogged` 49, `canonicalApplyRefusals` 36,
+    `canonicalApplyFailures` 0.
+- The dry-run rolled back; nothing was retained.
+
+**Halted under the first halt rule above (`canonicalRowsInserted` > 0).** That is the intended
+behaviour, not a defect.
+
+**Cause: DEV is one AFL Tables canonical match behind.** The missing match is the 2026 Grand Final.
+- **Read-only DEV check** (2026-10-01, `afldb_app`, `BEGIN READ ONLY … ROLLBACK`):
+  - `afldb_dev` holds 217 matches for 2026, all `afltables`-owned, the latest dated 2026-09-19;
+  - its 10 finals are WF ×2, QF ×2, EF ×2, SF ×2 and PF ×2, with no GF and no match on or after
+    2026-09-26;
+  - `afl_api` owns 0 matches across all seasons.
+- **`CD_M20260142901` is the 2026 Grand Final.** The tracked authentic season-feed sample
+  `tests/fixtures/afl_api/match/04-season-feed-scheduled.raw-slice.json` gives round
+  `CD_R202601429`, `abbreviation "GF"`, `name "Grand Final"`, provider `roundNumber` 29, Fremantle v
+  Brisbane Lions, MCG, `utcStartTime 2026-09-26T04:30:00Z`; `issues/open/AFLDB-ISSUE-229.md` §2a records the same.
+- **The arithmetic is consistent with exactly one missing fixture:** 218 in the feed, 217
+  corroborated as `afltables`-owned, so one match is planned as new.
+- **Not analysed:** the family breakdown of the 56 inserts. They are the would-be first write of
+  that one new match and its associated rows. This pass does not claim how they split across
+  tables, and does not explain the 36 refusals and 36 data issues.
+
+**Why this must not be applied.** AFL Tables is AFLDB's primary canonical source, and the AFL API is
+a guarded co-source that corroborates and never re-owns (`README.md` "AFL Tables stays AFLDB's
+primary canonical source"; `docs/acquisition/AFLDB-2026-API-ACQUISITION.md` §14.3 (Q1
+co-source corroboration) and the 2026-09-21 amendment in §5, "Any ownership transfer away from the
+row's first-writer source is an explicit rule or an explicit operator decision"). An AFL API apply now would make `afl_api` the
+permanent first writer of the Grand Final. That would end DEV's zero-`afl_api`-owned census
+(ISSUE-233), and once 2026 completes, ISSUE-233's D-233-3 would refuse the rebuild and promotion.
+The D1 rule stopped it. **The rule is not weakened.**
+
+**D2, D3, D4 and E remain BLOCKED** until D1a and then D1b pass.
+
+#### D1a. AFL Tables settles the Grand Final first (operator-run; each step separately authorised)
+
+**Route: the documented supervised ladder** (`docs/deployment.md` §7b "Supervised validation", steps
+3–7). Its flags are those of `deploy/afldb-settle-afltables.sh`, and it adds a `--dry-run` preview
+of the exact snapshot that is then applied.
+- **Not the admin "Fetch current AFL data now" control:** it is inert on DEV, because
+  `AFLDB_SETTLE_TRIGGER` is unset (§7 B), and enabling it is a `.env` change.
+- **Not `sudo systemctl start afldb-settle-afltables.service`:** it is the same chain, but it goes
+  straight from acquisition to `--apply` with no preview. It is the fallback only if the ladder
+  cannot be run.
+- **Not enabling a timer:** DEV has no AFL Tables timer by design.
+
+Run as `arm` in `~/projects/afldb`.
+
+```bash
+cd ~/projects/afldb
+export PATH="$HOME/.nvm/versions/node/v22.23.2/bin:$PATH"
+
+# --- 0. read-only pre-checks; STOP on any surprise -----------------------------
+git rev-parse HEAD                                                     # 6661eb66… (or later main)
+systemctl show afldb-settle-afltables.service -p LoadState,ActiveState # must NOT be activating/active
+systemctl is-enabled afldb-settle-afl-api.timer afldb-settle-afl-api-brownlow.timer  # disabled, disabled
+python3 -c "import json;print(json.load(open('data/reference/seasons.json'))['in_progress_seasons'])"  # [2026]
+ls -d data/sources/afltables/fitzroy_core docs/rebuild-manifests/afltables_fitzroy_core
+sh deploy/afldb-r-preflight.sh                                          # must print R PREFLIGHT: OK
+# + run the D1a verification SQL below once now, as the BEFORE record (217 / 10 / afl_api 0)
+
+# --- 1. acquire AFL Tables (network, files only; manifest LAST) ----------------
+LT=settle-2026-$(date +%Y-%m-%d-%H%M); echo "$LT"
+( set -a; . ./.env; set +a; . deploy/afldb-r-env.sh
+  "$RSCRIPT" tools/rebuild/fitzroy/acquire_core.R --acquire --in-season --label "$LT" --from 2026 --to 2026 ) \
+  2>&1 | tee ~/i232-afltables-acquire.log
+ls -l "docs/rebuild-manifests/afltables_fitzroy_core/$LT.json"   # absent => acquisition failed: STOP
+
+# --- 2. adjudicate + emit observations (offline; opens no database) ------------
+/usr/bin/python3 tools/migration/import_fitzroy_core.py --label "$LT" \
+  --require-in-season --on-record-error reject \
+  --emit-observations "data/sources/afltables/fitzroy_core/$LT/observations.json" \
+  2>&1 | tee ~/i232-afltables-emit.log
+
+# --- 3. dry-run of THIS snapshot (full write path, rolled back) ---------------
+node_modules/.bin/tsx tools/current-season/settle-afltables.ts \
+  --label "$LT" --dry-run --auto-apply --require-complete-source 2>&1 | tee ~/i232-afltables-dryrun.log
+```
+
+**HALT before step 4 if any of:**
+- `snapshotMatches` is not 218. At 217, AFL Tables has not published the Grand Final yet: stop, and
+  retry later with a new label;
+- the `SOURCE COMPLETENESS` verdict is not complete;
+- `canonicalRowsInserted` is 0 (the Grand Final is not in this snapshot);
+- `canonicalRowsUpdated` > 0. A change to an existing row must be reviewed before it is applied;
+- `canonicalApplyFailures` > 0;
+- the refusal counters (`foreignOwnedCollision`, `canonicalApplyRefusals`) differ in kind from the
+  BEFORE batch's. Return the log for review.
+
+```bash
+# --- 4. apply THE SAME snapshot (same flags as the unit) ----------------------
+node_modules/.bin/tsx tools/current-season/settle-afltables.ts \
+  --label "$LT" --apply --auto-apply --require-complete-source 2>&1 | tee ~/i232-afltables-apply.log
+echo "exit=${PIPESTATUS[0]}"
+# --require-complete-source is judged AFTER commit (AFLDB-ISSUE-128), and so is the optional season-page
+# ISR revalidation (AFLDB-ISSUE-134; inert unless AFLDB_REVALIDATE_URL/SECRET are set). A non-zero exit
+# here can therefore mean the run COMMITTED: read 'SOURCE COMPLETENESS' and the log tail, run the
+# verification SQL, and do not re-run blindly.
+
+# --- 5. exception report (read-only) -----------------------------------------
+node_modules/.bin/tsx tools/current-season/settle-afltables.ts --label "$LT" --report 2>&1 | tee ~/i232-afltables-report.log
+```
+
+As documented in §7b, the acquisition leaves an untracked manifest under
+`docs/rebuild-manifests/afltables_fitzroy_core/`. This is expected. `deploy/sync-dev.ps1` has no
+clean-tree guard.
+
+**D1a verification (read-only; run BEFORE step 1 and AFTER step 5):**
+
+```bash
+( set -a; . ./.env; set +a; psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 <<'SQL'
+BEGIN READ ONLY;
+SELECT current_database(), current_user;
+SELECT count(*) AS matches_2026, count(*) FILTER (WHERE is_final) AS finals_2026,
+       max(match_date) AS latest_2026_match
+  FROM matches WHERE season = 2026;
+SELECT m.id, m.round_code, m.match_date, hc.name AS home, ac.name AS away,
+       m.home_score, m.away_score, s.key AS owner
+  FROM matches m
+  JOIN clubs hc ON hc.id = m.home_club_id
+  JOIN clubs ac ON ac.id = m.away_club_id
+  LEFT JOIN sources s ON s.id = m.source_id
+ WHERE m.season = 2026 AND m.match_date >= DATE '2026-09-20';
+SELECT s.key AS owner, count(*) FROM matches m LEFT JOIN sources s ON s.id = m.source_id
+ WHERE m.season = 2026 GROUP BY 1 ORDER BY 1;
+SELECT count(*) AS afl_api_owned_all_seasons
+  FROM matches m JOIN sources s ON s.id = m.source_id WHERE s.key = 'afl_api';
+SELECT id, status, completed_at, notes,
+       validation_result->>'snapshotMatches'        AS snapshot_matches,
+       validation_result->>'canonicalRowsInserted'  AS inserted,
+       validation_result->>'canonicalRowsUpdated'   AS updated,
+       validation_result->>'canonicalApplyRefusals' AS refusals,
+       validation_result->>'canonicalApplyFailures' AS failures
+  FROM import_batches WHERE tool = 'settle-afltables.ts' ORDER BY id DESC LIMIT 2;
+ROLLBACK;
+SQL
+)
+```
+
+**Expected AFTER:**
+- `matches_2026` 218, `finals_2026` 11, `latest_2026_match` 2026-09-26;
+- exactly one row dated on or after 2026-09-20: `round_code` GF, 2026-09-26, owner **`afltables`**;
+- the 2026 owner breakdown is `afltables` 218 only;
+- `afl_api_owned_all_seasons` is 0;
+- the newest `settle-afltables.ts` batch carries `snapshot=$LT` and `mode=apply`, with inserted > 0,
+  updated 0 and failures 0.
+
+Any other result: stop and return the outputs.
+
+#### D1b. Completely fresh AFL API D1 rerun (only after D1a passes)
+
+Never reuse `afl-api-2026-2026-10-01-092238`. A new acquisition is required.
+
+```bash
+cd ~/projects/afldb
+export PATH="$HOME/.nvm/versions/node/v22.23.2/bin:$PATH"
+npx tsx tools/current-season/acquire-afl-api.ts --season 2026 2>&1 | tee ~/i232-acquire-2.log
+L2=$(sed -n 's/.*, label \([A-Za-z0-9_-]*\).*/\1/p' ~/i232-acquire-2.log | head -n1); echo "$L2"
+[ -n "$L2" ] && [ "$L2" != "afl-api-2026-2026-10-01-092238" ] && echo fresh-label-ok   # else STOP
+npx tsx tools/current-season/settle-afl-api.ts --label "$L2" --dry-run --auto-apply --require-complete-source \
+  2>&1 | tee ~/i232-dryrun-2.log
+```
+
+**D1b passes only if all of:**
+- `snapshotMatches` 218, **`corroboratedForeignOwned` 218**;
+- **`canonicalRowsInserted` 0** and **`canonicalRowsUpdated` 0**;
+- `unresolvedIdentityMatch` 0 and `unresolvedIdentityPlayer` 0;
+- `canonicalApplyFailures` 0;
+- source completeness COMPLETE, with the `Season feed (AFLDB-ISSUE-231 …)` evidence present
+  (`seasonFeedMatches` 218, `seasonFeedComplete` 1).
+
+The D1 halt rule applies unchanged. Also record `canonicalApplyRefusals` and `dataIssuesOpened`
+(36 and 36 in the halted run). They are not halt criteria, but D2 would retain the data issues, so
+return them for review if they are non-zero. **Only after D1b passes may §7 D2 run.**
+
+#### D1a result (2026-10-01): PASSED
+
+Operator-run on DEV at `6661eb66`, using the supervised ladder.
+- **Snapshot and batch:** AFL Tables snapshot `settle-2026-2026-10-01-1936` had 218 matches.
+  Batch 91 committed 55 inserts, 0 updates, 0 apply failures.
+- **DEV after the apply:**
+  - 218 matches for 2026 and 11 finals;
+  - Grand Final match 17275 (GF, 2026-09-26, Fremantle v Brisbane Lions), owned by `afltables`;
+  - all 218 matches for 2026 owned by `afltables`;
+  - 0 `afl_api`-owned matches in any season.
+- **Same-label closure dry-run:** `unresolvedIdentityMatch`/`Player` 0/0, inserts 0, updates 0,
+  applications 0, refusals 0, failures 0; source completeness COMPLETE.
+- **Cross-check against D1.** D1's 56 inserts are exactly these 55 Grand Final rows plus the one row
+  classified below.
+
+#### D1b result (2026-10-01): HALTED, disposition B
+
+Operator-run on DEV at `6661eb66`. Fresh AFL API snapshot **`afl-api-2026-2026-10-01-094537`**.
+- **Counters:**
+  - snapshot: `snapshotMatches` 218, `snapshotPlayerMatchRows` 10,029, `buildFailures` 0, all 218
+    matches `CONCLUDED`;
+  - season feed: `seasonFeedMatches` 218, `seasonFeedComplete` 1, source completeness COMPLETE;
+  - identity and ownership: `unresolvedIdentityMatch` 0, `unresolvedIdentityPlayer` 0,
+    `foreignOwnedCollision` 0, **`corroboratedForeignOwned` 218**, `sourceDisagreement` 0,
+    `manualAuthorityRefusals` 0;
+  - venues: `venueProviderUnmapped` 0, `venueUnmapped` 0;
+  - writes: `dataIssuesOpened` 36, **`canonicalRowsInserted` 1**, `canonicalRowsUpdated` 0,
+    `canonicalApplicationsLogged` 1, `canonicalApplyRefusals` 36, `canonicalApplyFailures` 0;
+  - derived: `derivedRecomputeRuns` 1, `derivedRecomputePlayers` 1.
+- The dry-run rolled back; nothing was retained.
+
+**Halted under the D1 rule** (`canonicalRowsInserted` > 0). The rule is unchanged.
+
+**The single insert, proven by reproduction rather than inferred from the counter.** It was
+reproduced read-only on 2026-10-01:
+- inputs: the retained snapshot files, plus `SELECT`s as `afldb_app` under
+  `default_transaction_read_only=on`;
+- method: every snapshot player row was resolved exactly as the settle does it, using
+  `resolveAflApiPlayer()`'s `external_identities` rule and the fixture `(local date, home, away)`;
+  then the settle's own automatic proposal (`aflApiPlayerStatValues()` plus `club_id` and
+  `jumper_number`, without `career_game_no`) was compared with `player_match_stats`.
+
+| | |
+|---|---|
+| Target table / family | **`player_match_stats`** (the only snapshot row with no canonical `(player_id, match_id)` row) |
+| `external_record_id` | **`CD_M20260140305\|CD_T50\|CD_I993799`** |
+| Provider match | `CD_M20260140305`: Essendon v North Melbourne, 2026-03-28 (provider "Rd 3"; canonical round 4), `CONCLUDED` |
+| Canonical match | **17214** (ISSUE-233 recorded the same fixture as 17200 on an earlier DEV state) |
+| Provider player | **`CD_I993799`**, Brayden Fiorini, jumper 8, team `CD_T50` (Essendon) |
+| Resolved `player_id` | **2121**. A single `unique`/`resolved` `afl_api` identity. Fiorini has 2 other canonical 2026 rows. **No identity mismatch.** |
+| Proposed fields | `club_id` 6 (Essendon), `jumper_number` '8'. **All 21 statistics 0.** `career_game_no` is recompute-owned, which is why `derivedRecomputePlayers` is 1. |
+| Raw source facts | `position: "EMERG"` in both `player-stats.json` and `match-roster.json`; `timeOnGroundPercentage: 0.0`; `gamesPlayed: null` |
+
+- **Arithmetic:** 10,029 = 9,992 rows identical to canonical + 36 rows that differ + 1 insert.
+- **The 10,029 / 10,028 difference is exactly this row.** It is the only match where the counts
+  differ: match 17214 has 47 AFL API rows (24 home, 23 away) against 46 canonical rows. No canonical
+  row there lacks an AFL API row.
+
+**Why AFL Tables lacks it.** Fiorini was an **unused emergency**: named in the AFL API feed in the
+`EMERG` position, 0% time on ground, every counting stat zero. AFL Tables lists only players who
+took part, so it correctly has no row.
+- This is the row `issues/open/AFLDB-ISSUE-233.md` §4.11.11 classified on an earlier snapshot:
+  "he did not play, so the canonical `player_match_stats` correctly has no row for him", and "the
+  only zero-TOG `EMERG` row in the snapshot".
+- ISSUE-233 records 4 other `EMERG` rows with real time on ground (34–85%) and canonical rows. So
+  `EMERG` alone is **not** a non-participation marker. `docs/acquisition/AFLDB-2026-API-ACQUISITION.md`
+  §7 and §13.3 also say `EMERG`/`INT` are positions, not a substitution marker.
+
+**Not a legitimately source-exclusive appearance.** The AFL API has no valid stat row here that AFL
+Tables lacks. It publishes a placeholder for a named emergency who did not play.
+- Applying it would insert a **`player_match_stats` row for a game Fiorini did not play**: one more
+  career game, his `career_game_no` sequence renumbered, and an `afl_api`-owned row in an otherwise
+  `afltables`-owned match.
+- The automatic path has no non-participation filter. The bundle emits every
+  `homeTeamPlayerStats`/`awayTeamPlayerStats` entry (`afl-api-bundle.ts` `emitAflApiPlayerMatchStats()`).
+  `position` is parsed only into the `match_roster` projection (`afl-api-bundle.ts:632`), and
+  `timeOnGroundPercentage` is not read at all. Neither filters `player_match_stats`.
+- The ISSUE-228 design check "Σ roster positions minus `EMERG` == stat-row `playerId` set"
+  (`issues/closed/AFLDB-ISSUE-228.md`, validation item 7) assumed a non-playing emergency is absent
+  from the stat rows. This feed row contradicts that assumption.
+
+**The 36 `canonicalApplyRefusals`: the established foreign-owner class, unrelated to the insert.**
+- The reproduction finds exactly 36 existing rows whose automatic proposal differs from the
+  canonical values. **All 36 are `afltables`-owned `player_match_stats` rows**, across 22 matches.
+- Differing fields, by row count: `one_percenters` 17, `rebounds` 4, `disposals` 4, `goal_assists` 4,
+  `contested` 4, `tackles` 3, `kicks` 3, `uncontested` 3, `clangers` 2, `frees_against` 2,
+  `frees_for` 2, `clearances` 2, `handballs` 1, `behinds` 1, `marks` 1.
+- A foreign-owned target is refused by `applyCanonicalUnit()`'s ownership gate, which matches
+  `foreignOwnedCollision` 0 at match grain and refusals = data issues = 36.
+- The count was also 36 in D1, before the Grand Final existed. It does not involve match 17214's
+  insert. **No deviation.**
+
+**Disposition: B, a defect that must be fixed before D2.** This is not C: no repository policy
+permits inserting this row, and ISSUE-233 §4.11.11 states the opposite. It is not A: there is no
+genuine coverage difference, only a non-participation placeholder.
+- The fix needs an **explicit operator/design decision on the non-participation rule**, because
+  `EMERG` alone is insufficient. The candidate evidence is `timeOnGroundPercentage` = 0 with all
+  counting statistics 0.
+- It then needs an implementation and tests that keep such a row out of `player_match_stats`.
+- Where it is tracked is a separate decision: a new issue, or ISSUE-232 scope.
+- **D2, D3, D4 and E remain BLOCKED.** After the fix is deployed, D1b is re-run on a new snapshot
+  and must show `canonicalRowsInserted` 0 and `canonicalRowsUpdated` 0, with the rest of the D1b
+  criteria unchanged.
+
+**Tracked as AFLDB-ISSUE-255** (operator decision, 2026-10-01; `issues/open/AFLDB-ISSUE-255.md`).
+- **The rule (D-255-1):** roster position exactly `EMERG` AND `timeOnGroundPercentage` exactly 0 AND
+  every projected statistic exactly 0. Such a row is an observation-only non-participant: the spine
+  is kept, and nothing canonical, typed, ledger, candidate, rejection or data-issue is written. It
+  is counted in the new `nonParticipantPlayerRows`.
+- **The D1b rerun target, once ISSUE-255 is deployed:** the criteria above, plus
+  `nonParticipantPlayerRows` 1. The 36 known refusals may remain, with an unchanged classified
+  census.
 
 D2. First observed run (root; the polkit rule does not cover this unit). For a `Type=oneshot`
 unit, `systemctl start` blocks until the run ends (up to `TimeoutStartSec=3600`) and exits non-zero

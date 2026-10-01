@@ -91,6 +91,7 @@ import {
   emitAflApiMatchRoster,
   emitAflApiPlayerMatchStats,
   flattenObservedColumns,
+  isAflApiNonParticipant,
   parseAflApiIdentities,
   reconcileBrownlowLeaderboard,
   semanticHash,
@@ -963,6 +964,83 @@ describe('afl-api-bundle (AFLDB-ISSUE-228 S3)', () => {
       const raw = readFixture('match/02-player-stats.raw.json');
       raw.homeTeamPlayerStats[0].playerStats.stats.kicks = 9.5;
       expect(() => emitAflApiPlayerMatchStats(raw, registry, 'CD_M20260142801')).toThrow(/non_integral_statistic|integral count/);
+    });
+
+    describe('AFLDB-ISSUE-255 — timeOnGroundPercentage and the non-participant predicate', () => {
+      /** Only the raw stats-feed members these cases touch. */
+      interface RawStatsFeed {
+        homeTeamPlayerStats: { playerStats: { stats: Record<string, unknown>; timeOnGroundPercentage?: unknown } }[];
+      }
+      const projectionOf = (mutate?: (raw: RawStatsFeed) => void) => {
+        const raw = readFixture('match/02-player-stats.raw.json');
+        mutate?.(raw);
+        const { records } = emitAflApiPlayerMatchStats(raw, registry, 'CD_M20260142801');
+        return records.find((r) => r.providerPlayerId === 'CD_I297354')!;
+      };
+      const rosterNaming = (position: string, teamId = 'CD_T80') => ({
+        homeTeamProviderId: 'CD_T80',
+        awayTeamProviderId: 'CD_T20',
+        homePositions: teamId === 'CD_T80' ? [{ providerPlayerId: 'CD_I297354', playerJumperNumber: 10, position }] : [],
+        awayPositions: teamId === 'CD_T20' ? [{ providerPlayerId: 'CD_I297354', playerJumperNumber: 10, position }] : [],
+      });
+      const zeroed = (raw: RawStatsFeed) => {
+        const ps = raw.homeTeamPlayerStats[0].playerStats;
+        const zero = (node: Record<string, unknown>): void => {
+          for (const [k, v] of Object.entries(node)) {
+            if (typeof v === 'number') node[k] = 0;
+            else if (v !== null && typeof v === 'object') zero(v as Record<string, unknown>);
+          }
+        };
+        zero(ps.stats);
+        ps.timeOnGroundPercentage = 0.0;
+      };
+
+      it('projects playerStats.timeOnGroundPercentage, fractional values included, never into a canonical column', () => {
+        expect(projectionOf().timeOnGroundPercentage).toBe(81);
+        expect(projectionOf((raw) => { raw.homeTeamPlayerStats[0].playerStats.timeOnGroundPercentage = 85.5; })
+          .timeOnGroundPercentage).toBe(85.5);
+      });
+
+      it('reads an unfamiliar scalar time-on-ground value, or its absence, as null without failing the record', () => {
+        for (const value of [null, '0', Number.NaN]) {
+          expect(projectionOf((raw) => { raw.homeTeamPlayerStats[0].playerStats.timeOnGroundPercentage = value; })
+            .timeOnGroundPercentage).toBeNull();
+        }
+        expect(projectionOf((raw) => { delete raw.homeTeamPlayerStats[0].playerStats.timeOnGroundPercentage; })
+          .timeOnGroundPercentage).toBeNull();
+      });
+
+      it('leaves a structurally new time-on-ground shape to the existing family-contract gate', () => {
+        expect(() => projectionOf((raw) => { raw.homeTeamPlayerStats[0].playerStats.timeOnGroundPercentage = { pct: 0 }; }))
+          .toThrow(/undeclared column/);
+      });
+
+      it('is true only for roster EMERG on the same team + TOG exactly 0 + every projected statistic exactly 0', () => {
+        const zeroRow = projectionOf(zeroed);
+        expect(isAflApiNonParticipant(zeroRow, rosterNaming('EMERG'))).toBe(true);
+        // Each condition alone is insufficient.
+        expect(isAflApiNonParticipant(projectionOf(), rosterNaming('EMERG'))).toBe(false);
+        expect(isAflApiNonParticipant(zeroRow, rosterNaming('INT'))).toBe(false);
+        expect(isAflApiNonParticipant(zeroRow, rosterNaming('EMERG', 'CD_T20'))).toBe(false);
+        expect(isAflApiNonParticipant({ ...zeroRow, timeOnGroundPercentage: null }, rosterNaming('EMERG'))).toBe(false);
+        expect(isAflApiNonParticipant({ ...zeroRow, timeOnGroundPercentage: 1 }, rosterNaming('EMERG'))).toBe(false);
+        expect(isAflApiNonParticipant({ ...zeroRow, goalAssists: 1 }, rosterNaming('EMERG'))).toBe(false);
+        expect(isAflApiNonParticipant({ ...zeroRow, kicks: null }, rosterNaming('EMERG'))).toBe(false);
+        // The jumper number is identity, not a statistic.
+        expect(isAflApiNonParticipant({ ...zeroRow, jumperNumber: 8 }, rosterNaming('EMERG'))).toBe(true);
+      });
+
+      it('requires every key the settle projects into player_match_stats to be 0 (the predicate tracks the projection)', () => {
+        const zeroRow = projectionOf(zeroed);
+        const statisticKeys = Object.keys(zeroRow).filter((key) => ![
+          'providerMatchId', 'providerTeamId', 'providerPlayerId', 'jumperNumber', 'timeOnGroundPercentage',
+        ].includes(key));
+        // The 21 canonical statistics settle-afl-api.ts aflApiPlayerStatValues() maps.
+        expect(statisticKeys).toHaveLength(21);
+        for (const key of statisticKeys) {
+          expect(isAflApiNonParticipant({ ...zeroRow, [key]: 1 }, rosterNaming('EMERG'))).toBe(false);
+        }
+      });
     });
 
     describe('extendedStats: null (S9, §11.3 evidence — the nullable parent is known-but-not-required)', () => {

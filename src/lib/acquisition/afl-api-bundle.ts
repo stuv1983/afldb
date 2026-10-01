@@ -429,7 +429,68 @@ export type AflApiPlayerMatchStatsProjection = {
   contestedMarks: number | null;
   marksInside50: number | null;
   onePercenters: number | null;
+  /**
+   * AFLDB-ISSUE-255: `playerStats.timeOnGroundPercentage`, read only as
+   * participation evidence (`isAflApiNonParticipant()`), never projected into
+   * a canonical column. A percentage, so it may be fractional; anything other
+   * than a finite number reads as `null`, which never satisfies the
+   * non-participant predicate, so an unfamiliar shape stays on the existing path.
+   */
+  timeOnGroundPercentage: number | null;
 };
+
+/**
+ * AFLDB-ISSUE-255: the projection keys that are NOT canonical
+ * `player_match_stats` statistics. Every OTHER key of
+ * `AflApiPlayerMatchStatsProjection` is a statistic the settle projects into
+ * the canonical row (`settle-afl-api.ts` `aflApiPlayerStatValues()`), so a
+ * statistic added to the projection later is covered by the non-participant
+ * predicate automatically, in the conservative direction (it must also be 0).
+ */
+const NON_STATISTIC_PROJECTION_KEYS: ReadonlySet<string> = new Set([
+  'providerMatchId', 'providerTeamId', 'providerPlayerId', 'jumperNumber', 'timeOnGroundPercentage',
+]);
+
+/** The roster position that alone never proves anything (§13.3: a field position, not a status). */
+export const AFL_API_EMERGENCY_POSITION = 'EMERG';
+
+/**
+ * AFLDB-ISSUE-255 D-255-1: is this player-stats row a provider placeholder for
+ * a named emergency who did not play? True ONLY when all three hold:
+ *
+ *  1. the match roster names this provider player exactly once, on the stat
+ *     row's own team, at position exactly `EMERG` (roster evidence, never the
+ *     copy of `position` inside the player-stats payload, which this family
+ *     deliberately does not source);
+ *  2. `timeOnGroundPercentage` is exactly the number 0;
+ *  3. every statistic the settle would project into `player_match_stats` is
+ *     exactly the number 0 (a `null` statistic is not 0).
+ *
+ * `EMERG` alone, zero time on ground alone and an all-zero vector alone are
+ * each insufficient: an emergency who came into the side keeps the `EMERG`
+ * label with real time on ground (ISSUE-233 §4.11.11). Anything absent,
+ * ambiguous or non-zero returns false, so the row stays on the existing path
+ * and its existing gates. Pure; no I/O.
+ */
+export function isAflApiNonParticipant(
+  stat: AflApiPlayerMatchStatsProjection,
+  roster: Pick<AflApiMatchRosterProjection,
+    'homeTeamProviderId' | 'awayTeamProviderId' | 'homePositions' | 'awayPositions'>,
+): boolean {
+  const named = [
+    ...roster.homePositions.map((entry) => ({ teamId: roster.homeTeamProviderId, entry })),
+    ...roster.awayPositions.map((entry) => ({ teamId: roster.awayTeamProviderId, entry })),
+  ].filter(({ entry }) => entry.providerPlayerId === stat.providerPlayerId);
+  if (named.length !== 1) return false;
+  if (named[0].teamId !== stat.providerTeamId) return false;
+  if (named[0].entry.position !== AFL_API_EMERGENCY_POSITION) return false;
+
+  if (stat.timeOnGroundPercentage !== 0) return false;
+
+  const statistics = Object.entries(stat).filter(([key]) => !NON_STATISTIC_PROJECTION_KEYS.has(key));
+  if (statistics.length === 0) return false;
+  return statistics.every(([, value]) => value === 0);
+}
 
 /**
  * §4.4: the player stats feed emits every count as a JSON float (MEASURED
@@ -536,6 +597,10 @@ export function emitAflApiPlayerMatchStats(
       contestedMarks: numOrNull(stats.contestedMarks, `${path}.stats.contestedMarks`),
       marksInside50: numOrNull(stats.marksInside50, `${path}.stats.marksInside50`),
       onePercenters: numOrNull(stats.onePercenters, `${path}.stats.onePercenters`),
+      timeOnGroundPercentage: typeof playerStatsBlock.timeOnGroundPercentage === 'number'
+        && Number.isFinite(playerStatsBlock.timeOnGroundPercentage)
+        ? playerStatsBlock.timeOnGroundPercentage
+        : null,
     });
   }
 

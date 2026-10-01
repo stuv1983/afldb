@@ -313,12 +313,19 @@ export type AflApiSettleCounters = SettleCounters & {
   seasonFeedComplete: number;
   /** AFLDB-ISSUE-229 evidence: each provider `status` string verbatim, with its count. */
   seasonFeedStatusCounts: Record<string, number>;
+  /** AFLDB-ISSUE-255: `player_match_stats` rows proven to be a named emergency
+   * who did not play (`isAflApiNonParticipant()`). Still counted in
+   * `snapshotPlayerMatchRows` and observed in the spine; never proposed,
+   * never a refusal, never deferred. Informational: it never moves the
+   * completeness verdict. */
+  nonParticipantPlayerRows: number;
 };
 
 function emptyAflApiCounters(): AflApiSettleCounters {
   return {
     ...emptySettleCounters(), snapshotMatches: 0, snapshotPlayerMatchRows: 0, buildFailures: 0,
     venueProviderUnmapped: 0, seasonFeedMatches: 0, seasonFeedComplete: 0, seasonFeedStatusCounts: {},
+    nonParticipantPlayerRows: 0,
   };
 }
 
@@ -1664,6 +1671,16 @@ async function settlePlayerUnit(
     return;
   }
   if (playerPlan.status === 'blocked') return;
+
+  // AFLDB-ISSUE-255 D-255-2: an unused emergency. The spine observation was
+  // written in step 1 with every other record; nothing else is. No typed
+  // projection (a promotable row there could later be replayed as a game), no
+  // proposal, no ledger row, no candidate, no rejection, no data issue, and
+  // the player is never added to the derived-recompute scope by this row.
+  if (playerPlan.status === 'non_participant') {
+    counters.nonParticipantPlayerRows += 1;
+    return;
+  }
 
   if (playerPlan.status === 'refused') {
     const contract = getSourceFamily(registry, SETTLE_SOURCE_KEY, 'player_match_stats');

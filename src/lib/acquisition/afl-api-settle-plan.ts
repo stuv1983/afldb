@@ -34,8 +34,10 @@
 import type postgres from 'postgres';
 
 import {
+  isAflApiNonParticipant,
   type AflApiDeferralReason,
   type AflApiMatchBundle,
+  type AflApiMatchRosterProjection,
   type AflApiPlayerMatchStatsProjection,
   type AflApiSettleFamily,
   type AflApiSettleRecord,
@@ -370,6 +372,15 @@ function planRosterFamily(
 export type AflApiPlayerUnitPlan =
   | { status: 'deferred'; providerPlayerId: string; reason: AflApiDeferralReason; detail: string }
   | { status: 'blocked'; providerPlayerId: string }
+  /**
+   * AFLDB-ISSUE-255 D-255-2: a named emergency who did not play
+   * (`isAflApiNonParticipant()`). Observation-only, permanently: the spine
+   * keeps the row, but it proposes nothing, is never deferred and is never a
+   * refusal. Decided before identity resolution, because a row that can never
+   * be written needs no canonical player, and an unused emergency who has not
+   * debuted has no canonical row an identity could ever be bridged from.
+   */
+  | { status: 'non_participant'; providerPlayerId: string }
   | {
     status: 'refused';
     providerPlayerId: string;
@@ -390,6 +401,7 @@ async function planPlayerUnit(
   sourceId: number,
   matchPlan: AflApiMatchFamilyPlan,
   bundleMatch: { homeTeamProviderId: string; awayTeamProviderId: string },
+  roster: AflApiMatchRosterProjection,
   statRecord: AflApiSettleRecord,
 ): Promise<AflApiPlayerUnitPlan> {
   const stat = statRecord.projection as AflApiPlayerMatchStatsProjection | null;
@@ -412,6 +424,11 @@ async function planPlayerUnit(
       : undefined;
   if (clubId === undefined) {
     return { status: 'refused', providerPlayerId: row.providerPlayerId, reason: 'provider_team_id_unknown' };
+  }
+
+  // AFLDB-ISSUE-255 D-255-1: after the structural team gate, before identity.
+  if (isAflApiNonParticipant(row, roster)) {
+    return { status: 'non_participant', providerPlayerId: row.providerPlayerId };
   }
 
   const resolution = await resolveAflApiPlayer(sql, sourceId, row.providerPlayerId);
@@ -492,6 +509,7 @@ export async function planAflApiMatchUnit(
     players.push(await planPlayerUnit(
       sql, sourceId, matchPlan,
       { homeTeamProviderId: bundle.match.homeTeamProviderId, awayTeamProviderId: bundle.match.awayTeamProviderId },
+      bundle.roster,
       statRecord,
     ));
   }

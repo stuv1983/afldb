@@ -57,6 +57,7 @@ const EXPECTED_MATCH_KEY = '2026|PF|2026-09-19|Hawthorn|Brisbane Lions';
 function loadBundleAndRecords(mutate?: {
   fixture?: (raw: any) => void;
   roster?: (raw: any) => void;
+  stats?: (raw: RawStatsFeed) => void;
 }): { bundle: AflApiMatchBundle; records: readonly AflApiSettleRecord[] } {
   const fixture = readFixture('match/01-fixture-result.json');
   const roster = readFixture('match/03-match-roster.raw.json');
@@ -73,6 +74,7 @@ function loadBundleAndRecords(mutate?: {
   roster.match.venueLocalStartTime = '2026-09-19T17:15:00';
   mutate?.fixture?.(fixture);
   mutate?.roster?.(roster);
+  mutate?.stats?.(stats);
   const bundle = buildAflApiMatchBundle(fixture, roster, stats, registry, identities);
   const records = buildAflApiSettleRecords(bundle, fixture, roster, stats, registry);
   return { bundle, records };
@@ -564,5 +566,255 @@ describe('planAflApiMatchUnit (AFLDB-ISSUE-228 S6)', () => {
     await expect(planAflApiMatchUnit(sql, registry, SOURCE_ID, bundle, records, {
       kind: 'run_enumeration', scope: NO_MATCH_REKEY_SCOPE,
     })).rejects.toThrow(AflApiSettlePlanError);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-255 — unused-emergency non-participants (D-255-1/2/4)
+// ---------------------------------------------------------------------------
+
+const PLAYED_HOME_PLAYER = 'CD_I297354'; // Karl Amon, HBFL, 81% TOG in the fixture
+const FIORINI = 'CD_I993799';
+
+type BundleMutation = Parameters<typeof loadBundleAndRecords>[0];
+
+/** Every numeric leaf of a raw `playerStats.stats` block set to 0, recursively (clearances included). */
+function zeroNumericLeaves(node: Record<string, unknown>): void {
+  for (const [key, value] of Object.entries(node)) {
+    if (typeof value === 'number') node[key] = 0;
+    else if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+      zeroNumericLeaves(value as Record<string, unknown>);
+    }
+  }
+}
+
+/** Only the raw-feed members these helpers touch; everything else stays opaque. */
+interface RawRosterEntry { position: string; player: { playerId: string } & Record<string, unknown> }
+interface RawRoster {
+  matchRoster: { homeTeam: { positions: RawRosterEntry[] }; awayTeam: { positions: RawRosterEntry[] } };
+}
+interface RawStatsEntry {
+  player: { jumperNumber: number; player: { position: string; player: Record<string, unknown> } };
+  playerStats: {
+    player: { playerId: string } & Record<string, unknown>;
+    timeOnGroundPercentage?: unknown;
+    gamesPlayed?: unknown;
+    stats: Record<string, unknown>;
+  };
+}
+interface RawStatsFeed { homeTeamPlayerStats: RawStatsEntry[]; awayTeamPlayerStats: RawStatsEntry[] }
+
+function rosterEntryOf(roster: RawRoster, playerId: string): RawRosterEntry {
+  const all = [...roster.matchRoster.homeTeam.positions, ...roster.matchRoster.awayTeam.positions];
+  const found = all.find((entry) => entry.player.playerId === playerId);
+  if (!found) throw new Error(`fixture roster has no ${playerId}`);
+  return found;
+}
+
+function statsEntryOf(stats: RawStatsFeed, playerId: string): RawStatsEntry {
+  const all = [...stats.homeTeamPlayerStats, ...stats.awayTeamPlayerStats];
+  const found = all.find((entry) => entry.playerStats.player.playerId === playerId);
+  if (!found) throw new Error(`fixture stats feed has no ${playerId}`);
+  return found;
+}
+
+/**
+ * The authentic DEV shape (`afl-api-2026-2026-10-01-094537`, `CD_M20260140305`, ISSUE-232 §7
+ * D1b): an EXTRA home row beside the played ones, named `EMERG` on the roster (and in the
+ * stats feed's own position copy), `timeOnGroundPercentage` 0.0, every counting statistic 0,
+ * `extendedStats` null, `gamesPlayed` null, jumper 8. Built from this fixture's own entries,
+ * so every other field keeps the proven-valid shape.
+ */
+function withFioriniShapedEmergency(): BundleMutation {
+  const name = { givenName: 'Brayden', surname: 'Fiorini' };
+  return {
+    roster: (raw) => {
+      const entry = structuredClone(raw.matchRoster.homeTeam.positions[0]);
+      entry.position = 'EMERG';
+      entry.player = { ...entry.player, playerId: FIORINI, playerName: name, captain: false, playerJumperNumber: 8 };
+      raw.matchRoster.homeTeam.positions.push(entry);
+    },
+    stats: (raw) => {
+      const entry = structuredClone(raw.homeTeamPlayerStats[0]);
+      entry.player.player.position = 'EMERG';
+      entry.player.player.player = {
+        ...entry.player.player.player, playerId: FIORINI, playerName: name, captain: false, playerJumperNumber: 8,
+      };
+      entry.player.jumperNumber = 8;
+      entry.playerStats.player = {
+        ...entry.playerStats.player, playerId: FIORINI, playerName: name, captain: false, playerJumperNumber: 8,
+      };
+      entry.playerStats.timeOnGroundPercentage = 0.0;
+      entry.playerStats.gamesPlayed = null;
+      zeroNumericLeaves(entry.playerStats.stats);
+      entry.playerStats.stats.extendedStats = null;
+      raw.homeTeamPlayerStats.push(entry);
+    },
+  };
+}
+
+/** Mutates the played home player in place: roster position, TOG and the stats block. */
+function homePlayerAs(options: {
+  position?: string;
+  tog?: unknown;
+  deleteTog?: boolean;
+  zeroStats?: boolean;
+  stats?: Record<string, unknown>;
+}): BundleMutation {
+  return {
+    roster: (raw) => {
+      if (options.position !== undefined) rosterEntryOf(raw, PLAYED_HOME_PLAYER).position = options.position;
+    },
+    stats: (raw) => {
+      const entry = statsEntryOf(raw, PLAYED_HOME_PLAYER);
+      if (options.deleteTog) delete entry.playerStats.timeOnGroundPercentage;
+      else if ('tog' in options) entry.playerStats.timeOnGroundPercentage = options.tog;
+      if (options.zeroStats) zeroNumericLeaves(entry.playerStats.stats);
+      Object.assign(entry.playerStats.stats, options.stats ?? {});
+    },
+  };
+}
+
+async function planOf(mutate: BundleMutation) {
+  const { bundle, records } = loadBundleAndRecords(mutate);
+  const { sql, seen } = planningSql({ matchRespond: () => [], playerRespond: () => [{ playerId: 900 }] });
+  const plan = await planAflApiMatchUnit(sql, registry, SOURCE_ID, bundle, records, {
+    kind: 'run_enumeration', scope: NO_MATCH_REKEY_SCOPE,
+  });
+  const statusOf = (providerPlayerId: string) => plan.players.find((p) => p.providerPlayerId === providerPlayerId)?.status;
+  return { plan, records, seen, statusOf };
+}
+
+describe('AFLDB-ISSUE-255 — unused-emergency player_match_stats rows are observation-only', () => {
+  it('REGRESSION (CD_M20260140305 / CD_I993799 shape): the extra EMERG, 0% TOG, all-zero row plans as a non-participant; the played rows are untouched', async () => {
+    const { plan, records, seen, statusOf } = await planOf(withFioriniShapedEmergency());
+
+    expect(plan.players).toHaveLength(3);
+    expect(plan.players.find((p) => p.providerPlayerId === FIORINI)).toEqual({
+      status: 'non_participant', providerPlayerId: FIORINI,
+    });
+    expect(statusOf(PLAYED_HOME_PLAYER)).toBe('planned');
+    expect(statusOf('CD_I500001')).toBe('planned');
+    // D-255-2: decided before identity resolution: no lookup is even issued for it...
+    expect(seen.some((text) => text.includes('FROM external_identities') && text.includes(FIORINI))).toBe(false);
+    // ...while the played players still resolve exactly as before.
+    expect(seen.some((text) => text.includes('FROM external_identities') && text.includes(PLAYED_HOME_PLAYER))).toBe(true);
+
+    // D-255-2: the row is still a real source record; the spine persists every settle record.
+    const fiorini = records.find((r) => r.externalRecordId === `CD_M20260142801|CD_T80|${FIORINI}`);
+    expect(fiorini).toBeDefined();
+    expect(fiorini?.family).toBe('player_match_stats');
+    expect(fiorini?.deferral).toBeNull();
+    expect(fiorini?.rejection).toBeNull();
+    expect(fiorini?.payload).not.toBeNull();
+    expect(records.filter((r) => r.family === 'player_match_stats')).toHaveLength(3);
+  });
+
+  it('A. EMERG + TOG 0 + every projected statistic 0 => non-participant', async () => {
+    const { statusOf } = await planOf(homePlayerAs({ position: 'EMERG', tog: 0, zeroStats: true }));
+    expect(statusOf(PLAYED_HOME_PLAYER)).toBe('non_participant');
+  });
+
+  it.each([34, 85, 0.5])('B. POSITIVE CONTROL: EMERG + TOG %s with real statistics stays a planned participant', async (tog) => {
+    const { statusOf } = await planOf(homePlayerAs({ position: 'EMERG', tog }));
+    expect(statusOf(PLAYED_HOME_PLAYER)).toBe('planned');
+  });
+
+  it('B. EMERG + TOG > 0 stays planned even when every projected statistic is 0', async () => {
+    const { statusOf } = await planOf(homePlayerAs({ position: 'EMERG', tog: 12, zeroStats: true }));
+    expect(statusOf(PLAYED_HOME_PLAYER)).toBe('planned');
+  });
+
+  it.each([
+    ['tackles', { tackles: 1 }],
+    ['onePercenters', { onePercenters: 1 }],
+    ['clearances.totalClearances', { clearances: { centreClearances: 0, stoppageClearances: 1, totalClearances: 1 } }],
+  ])('C. EMERG + TOG 0 + a non-zero %s stays on the existing path', async (_label, nonZero) => {
+    const { statusOf } = await planOf(homePlayerAs({ position: 'EMERG', tog: 0, zeroStats: true, stats: nonZero }));
+    expect(statusOf(PLAYED_HOME_PLAYER)).toBe('planned');
+  });
+
+  it.each(['HBFL', 'INT', 'emerg', 'EMERG '])('D. roster position %j + TOG 0 + all-zero statistics stays on the existing path', async (position) => {
+    const { statusOf } = await planOf(homePlayerAs({ position, tog: 0, zeroStats: true }));
+    expect(statusOf(PLAYED_HOME_PLAYER)).toBe('planned');
+  });
+
+  it.each([
+    ['null', { tog: null }],
+    ['missing', { deleteTog: true }],
+    ['a string "0"', { tog: '0' }],
+  ] as const)('E. EMERG + TOG %s + all-zero statistics stays on the existing path', async (_label, tog) => {
+    const { statusOf } = await planOf(homePlayerAs({ position: 'EMERG', zeroStats: true, ...tog }));
+    expect(statusOf(PLAYED_HOME_PLAYER)).toBe('planned');
+  });
+
+  it('a NULL projected statistic is not 0: EMERG + TOG 0 + one null statistic stays on the existing path', async () => {
+    const { statusOf } = await planOf(homePlayerAs({ position: 'EMERG', tog: 0, zeroStats: true, stats: { kicks: null } }));
+    expect(statusOf(PLAYED_HOME_PLAYER)).toBe('planned');
+  });
+
+  it("the stats feed's own position copy is never the evidence: EMERG there but not on the roster stays on the existing path", async () => {
+    const { statusOf } = await planOf({
+      stats: (raw) => {
+        const entry = statsEntryOf(raw, PLAYED_HOME_PLAYER);
+        entry.player.player.position = 'EMERG';
+        entry.playerStats.timeOnGroundPercentage = 0;
+        zeroNumericLeaves(entry.playerStats.stats);
+      },
+    });
+    expect(statusOf(PLAYED_HOME_PLAYER)).toBe('planned');
+  });
+
+  it('ambiguous roster evidence stays on the existing path: absent, named twice, or EMERG on the other team', async () => {
+    const zeroed = (raw: RawStatsFeed) => {
+      const entry = statsEntryOf(raw, PLAYED_HOME_PLAYER);
+      entry.playerStats.timeOnGroundPercentage = 0;
+      zeroNumericLeaves(entry.playerStats.stats);
+    };
+    const absent = await planOf({
+      roster: (raw) => {
+        // The roster names somebody else as the emergency; this player is not on it at all.
+        const entry = rosterEntryOf(raw, PLAYED_HOME_PLAYER);
+        entry.position = 'EMERG';
+        entry.player.playerId = 'CD_I000001';
+      },
+      stats: zeroed,
+    });
+    expect(absent.statusOf(PLAYED_HOME_PLAYER)).toBe('planned');
+
+    const twice = await planOf({
+      roster: (raw) => {
+        rosterEntryOf(raw, PLAYED_HOME_PLAYER).position = 'EMERG';
+        raw.matchRoster.homeTeam.positions.push(structuredClone(rosterEntryOf(raw, PLAYED_HOME_PLAYER)));
+      },
+      stats: zeroed,
+    });
+    expect(twice.statusOf(PLAYED_HOME_PLAYER)).toBe('planned');
+
+    const otherTeam = await planOf({
+      roster: (raw) => {
+        // Named EMERG, but on the AWAY roster while the stat row is the home side's.
+        const entry = rosterEntryOf(raw, PLAYED_HOME_PLAYER);
+        raw.matchRoster.awayTeam.positions.push({ ...structuredClone(entry), position: 'EMERG' });
+        entry.player.playerId = 'CD_I000001';
+      },
+      stats: zeroed,
+    });
+    expect(otherTeam.statusOf(PLAYED_HOME_PLAYER)).toBe('planned');
+  });
+
+  it('deferral keeps precedence: a not-yet-concluded roster defers the row rather than classifying it', async () => {
+    const deferred = await planOf({
+      roster: (raw) => {
+        rosterEntryOf(raw, PLAYED_HOME_PLAYER).position = 'EMERG';
+        raw.matchRoster.status = 'POSTGAME';
+      },
+      stats: (raw) => {
+        const entry = statsEntryOf(raw, PLAYED_HOME_PLAYER);
+        entry.playerStats.timeOnGroundPercentage = 0;
+        zeroNumericLeaves(entry.playerStats.stats);
+      },
+    });
+    expect(deferred.statusOf(PLAYED_HOME_PLAYER)).toBe('deferred');
   });
 });

@@ -15,6 +15,22 @@ commit.
 
 ## [Unreleased]
 
+### AFL API settle no longer records an unused emergency as a game played (AFLDB-ISSUE-255; issue open, pending deployment) - 1 October 2026
+
+- The AFL.com.au player-stats feed lists a named emergency who never took the field as a stats row:
+  roster position `EMERG`, 0% time on ground, every statistic 0. The AFL API settle used to propose
+  it as a `player_match_stats` row, which would add a game the player never played. It was found by
+  AFLDB-ISSUE-232's DEV dry-run, on Brayden Fiorini in Essendon v North Melbourne, 2026-03-28.
+- Such a row is now an observation-only non-participant, but only when all three conditions hold:
+  roster `EMERG` on the row's own team, time on ground exactly 0, and every projected statistic
+  exactly 0. The raw snapshot and source spine keep it. It writes no canonical, typed staging,
+  ledger, candidate, rejection or data-issue row, and does not enter the derived recompute.
+- The settle reports such rows as `nonParticipantPlayerRows`, including in the batch's
+  `validation_result`. Source completeness is unchanged.
+- An emergency who came into the side (`EMERG` with real time on ground) is unaffected.
+- DB-free (416/416), typecheck, lint delta (zero new) and the focused `afldb_test` integration case
+  (1/1) validated; DEV deployment and the fresh ISSUE-232 D1b acceptance are pending.
+
 ### AFL API settle units: credential boundary tightened, "not installed" status (AFLDB-ISSUE-232; issue open, pending DEV operator acceptance) - 1 October 2026
 
 - `deploy/afldb-settle-afl-api.service` and `deploy/afldb-settle-afl-api-brownlow.service` now keep

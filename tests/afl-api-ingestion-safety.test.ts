@@ -274,6 +274,7 @@ describe('AFLDB-ISSUE-244 F004 — full rollback counter truth', () => {
       seasonFeedMatches: 218,
       seasonFeedComplete: 1,
       seasonFeedStatusCounts: { CONCLUDED: 218 },
+      nonParticipantPlayerRows: 1,
     };
     Object.assign(counters, {
       payloadsCreated: 1,
@@ -328,6 +329,8 @@ describe('AFLDB-ISSUE-244 F004 — full rollback counter truth', () => {
       seasonFeedMatches: 218,
       seasonFeedComplete: 1,
       seasonFeedStatusCounts: { CONCLUDED: 218 },
+      // AFLDB-ISSUE-255: a classification of the source, not a durable write; retained.
+      nonParticipantPlayerRows: 1,
       observationsSeen: 19,
       payloadsReused: 20,
       observationsUnchanged: 21,
@@ -351,7 +354,7 @@ describe('AFLDB-ISSUE-244 F008 — terminal batch field mapping (pure)', () => {
   it('maps a committed run: completed, versions appended -> records_inserted, canonical counters kept in validation_result', () => {
     const counters: AflApiSettleCounters = {
       ...emptySettleCounters(), snapshotMatches: 4, snapshotPlayerMatchRows: 90, buildFailures: 0, venueProviderUnmapped: 0,
-      seasonFeedMatches: 0, seasonFeedComplete: 0, seasonFeedStatusCounts: {},
+      seasonFeedMatches: 0, seasonFeedComplete: 0, seasonFeedStatusCounts: {}, nonParticipantPlayerRows: 1,
       observationsSeen: 7, versionsAppended: 5, observationsUnchanged: 2,
       canonicalRowsInserted: 3, canonicalRowsUpdated: 1, canonicalApplicationsLogged: 4,
     };
@@ -363,6 +366,8 @@ describe('AFLDB-ISSUE-244 F008 — terminal batch field mapping (pure)', () => {
     expect(fields.validationResult).toBe(counters);
     expect(fields.validationResult).toMatchObject({
       canonicalRowsInserted: 3, canonicalRowsUpdated: 1, canonicalApplicationsLogged: 4,
+      // AFLDB-ISSUE-255: the operator-visible classification lands in the batch evidence too.
+      nonParticipantPlayerRows: 1,
     });
   });
 
@@ -371,7 +376,7 @@ describe('AFLDB-ISSUE-244 F008 — terminal batch field mapping (pure)', () => {
     // (one refusal produced a data_issues row, not an import_rejections row).
     const counters: AflApiSettleCounters = {
       ...emptySettleCounters(), snapshotMatches: 1, snapshotPlayerMatchRows: 3, buildFailures: 0, venueProviderUnmapped: 0,
-      seasonFeedMatches: 0, seasonFeedComplete: 0, seasonFeedStatusCounts: {},
+      seasonFeedMatches: 0, seasonFeedComplete: 0, seasonFeedStatusCounts: {}, nonParticipantPlayerRows: 0,
       unresolvedIdentityPlayer: 3, versionsAppended: 4,
     };
     expect(settleImportBatchTerminalFields(counters, 2).recordsRejected).toBe(2);
@@ -380,7 +385,7 @@ describe('AFLDB-ISSUE-244 F008 — terminal batch field mapping (pure)', () => {
   it('maps an idempotent replay to a terminal zero-change batch — no false inserts, updates or rejections', () => {
     const counters: AflApiSettleCounters = {
       ...emptySettleCounters(), snapshotMatches: 217, snapshotPlayerMatchRows: 9890, buildFailures: 0, venueProviderUnmapped: 0,
-      seasonFeedMatches: 0, seasonFeedComplete: 0, seasonFeedStatusCounts: {},
+      seasonFeedMatches: 0, seasonFeedComplete: 0, seasonFeedStatusCounts: {}, nonParticipantPlayerRows: 0,
       observationsSeen: 434, versionsAppended: 0, observationsUnchanged: 434,
     };
     expect(settleImportBatchTerminalFields(counters, 0)).toMatchObject({
@@ -1033,6 +1038,55 @@ describe('AFLDB-ISSUE-244 F009 — recordApplyOutcomeFindings() lifecycle', () =
     expect(stub.open()).toHaveLength(1);
   });
 });
+
+describe('AFLDB-ISSUE-255 — a non-participant row is observed and counted, and writes nothing else', () => {
+  const source = readSource('src/lib/acquisition/settle-afl-api.ts').replace(/\r\n/g, '\n');
+  const fnStart = source.indexOf('async function settlePlayerUnit(');
+  const body = source.slice(fnStart, source.indexOf('\n}\n', fnStart));
+  const branchAt = body.indexOf("if (playerPlan.status === 'non_participant') {");
+
+  it('the branch only increments nonParticipantPlayerRows and returns', () => {
+    expect(fnStart).toBeGreaterThan(-1);
+    expect(branchAt).toBeGreaterThan(-1);
+    const branch = body.slice(branchAt, body.indexOf('}', branchAt) + 1).replace(/\s+/g, ' ');
+    expect(branch).toBe("if (playerPlan.status === 'non_participant') { counters.nonParticipantPlayerRows += 1; return; }");
+  });
+
+  it.each([
+    'projectAflApiPlayerMatch(', 'applyCanonicalUnit(', 'applyUnitOutcome(', 'writePromotionCandidate(',
+    'writeImportRejection(', 'writeMatchIdentityIssue(', 'closeMootApplyFinding(', 'derived.playerIds.add(',
+  ])('it returns before the first %s in settlePlayerUnit()', (write) => {
+    const at = body.indexOf(write);
+    expect(at).toBeGreaterThan(-1);
+    expect(at).toBeGreaterThan(branchAt);
+  });
+
+  it('the spine observes every settle record BEFORE the unit is planned, so the row keeps its observation', () => {
+    const unitStart = source.indexOf('async function settleMatchUnit(');
+    const persistAt = source.indexOf('await persistSourceObservation(', unitStart);
+    const planAt = source.indexOf('await planAflApiMatchUnit(', unitStart);
+    expect(persistAt).toBeGreaterThan(unitStart);
+    expect(planAt).toBeGreaterThan(persistAt);
+    expect(source).toContain('counters.snapshotPlayerMatchRows += statRecords.length;');
+  });
+
+  it('completeness never counts a non-participant as a rejection, and a full rollback keeps the classification', () => {
+    expect(source).toContain('snapshotRejections: counters.unresolvedIdentityMatch + counters.unresolvedIdentityPlayer,');
+    expect(fullRollbackDurableCounterSource()).not.toContain('nonParticipantPlayerRows');
+  });
+
+  it('the CLI prints the counter in its own informational group', () => {
+    const cli = readSource('tools/current-season/settle-afl-api.ts');
+    expect(cli).toContain("group('Participation (AFLDB-ISSUE-255 — informational, never a failure)', ['nonParticipantPlayerRows']);");
+  });
+});
+
+/** The source text of `FULL_ROLLBACK_DURABLE_COUNTERS`, the counters a full rollback zeroes. */
+function fullRollbackDurableCounterSource(): string {
+  const source = readSource('src/lib/acquisition/settle-afl-api.ts').replace(/\r\n/g, '\n');
+  const start = source.indexOf('const FULL_ROLLBACK_DURABLE_COUNTERS');
+  return source.slice(start, source.indexOf('] as const', start));
+}
 
 describe('AFLDB-ISSUE-244 F009 — runSettleAflApi() wiring and boundaries', () => {
   it('an automatic-apply run with nothing to evaluate issues no apply-finding statement and finalises exactly as before (F008 unchanged)', async () => {

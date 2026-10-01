@@ -9,7 +9,23 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Open issues:** 7
+**Open issues:** 8
+
+### AFLDB-ISSUE-255 — AFL API unused-emergency `player_match_stats` suppression
+- **Severity:** Medium. **Area:** data acquisition — `afl-api-bundle.ts`, `afl-api-settle-plan.ts`,
+  `settle-afl-api.ts`.
+- **State:** Open (2026-10-01), split from ISSUE-232 §7 D1b. **Blocks ISSUE-232 D2.**
+  - **Defect:** an unused emergency's AFL API placeholder (`CD_I993799`, `EMERG`, 0% TOG, all
+    statistics 0) would be inserted as a game played.
+  - **Implementation validation COMPLETE** (DB-free 416/416, tsc, zero new lint, focused `afldb_test`
+    integration 1/1 PASS). Roster `EMERG` + TOG 0 + every projected
+    statistic 0 → an observation-only `non_participant`: the spine row is kept, and nothing
+    canonical, typed, ledger, candidate, rejection or data-issue is written. It is counted in
+    `nonParticipantPlayerRows`.
+  - Played `EMERG` rows stay normal. Not committed or deployed; not resolved until D1b passes.
+- **Runbook:** `issues/open/AFLDB-ISSUE-255.md`.
+- **Next action:** operator commit; DEV sync; a fresh ISSUE-232 D1b (inserted 0, updated 0,
+  `nonParticipantPlayerRows` 1, `corroboratedForeignOwned` 218, source COMPLETE).
 
 ### AFLDB-ISSUE-234 — Optional AFL API feed expansion (extended statistics, umpires, play-by-play)
 - **Severity:** Low. **Area:** data acquisition, investigation only.
@@ -128,7 +144,8 @@
 ### AFLDB-ISSUE-232 — AFL API operational wiring: systemd timers, Brownlow scheduled settle and admin status
 - **Severity:** Medium. **Area:** deployment / operations — `deploy/afldb-settle-afl-api*`,
   `src/lib/acquisition/settle-status.ts`, `settle-trigger.ts`, `/admin/current-season`.
-- **State:** Open (2026-09-23). The units ship and are not installed on any host.
+- **State:** Open (2026-09-23). **BLOCKED by AFLDB-ISSUE-255** (2026-10-01). On DEV the four unit
+  files are installed with both timers disabled; neither service has been started. Not on PROD.
   - **2026-09-26:** `/admin/current-season` now shows both AFL API units' systemd state and latest
     batch (`AflApiSettleUnitsPanel.tsx`, read-only). It is **IMPLEMENTED / NEEDS DEV OPERATOR
     ACCEPTANCE**, `VISUAL: UNVERIFIED`.
@@ -149,10 +166,15 @@
     - Docs corrected: E1 timer policy, the env-gate-first window order, `sudo systemctl start`.
     - §7 D adds a mandatory `--dry-run` rehearsal with halt criteria, to protect ISSUE-233's census.
     - Out of scope: `afldb-settle-afltables.service` has the same deny-list drift (separate decision).
+  - **2026-10-01 (DEV acceptance at `6661eb66`):**
+    - §7 A, B (unconfigured-trigger state), C and D1a PASSED. D1a: AFL Tables batch 91 inserted the
+      2026 Grand Final, `afltables`-owned.
+    - D1b HALTED on 1 insert: an unused emergency's non-participation row. Split out as ISSUE-255;
+      the zero-insert/zero-update gate is unchanged.
 - **Runbook:** `issues/open/AFLDB-ISSUE-232.md`.
-- **Next action:** operator commit, merge and DEV sync; then runbook §7 A (read-only), B (panel at
-  1280/390 px), C (install), D (dry-run rehearsal, then the first observed match run) and E
-  (Brownlow timer enabled, inert firing).
+- **Next action:** resolve ISSUE-255 (commit, deploy, then a fresh D1b with inserted 0, updated 0 and
+  `nonParticipantPlayerRows` 1). Only then §7 D2–D4 (first observed match run, then the match
+  timer) and E (Brownlow timer enabled, inert firing).
 
 ### AFLDB-ISSUE-229 — AFL API fixture ingestion
 - **Severity:** Medium. **Area:** acquisition / fixtures — `afl_api` season feed → `fixtures`,

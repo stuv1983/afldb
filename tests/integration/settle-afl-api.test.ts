@@ -320,6 +320,8 @@ const CASE_IDS = {
   // (`issue235LifecycleSource()`), so cleanup() owns its match and spine rows exactly as it owns
   // every other case's.
   issue235Lifecycle: `${NS}Z235`,
+  // AFLDB-ISSUE-255: an unused emergency's player-stats placeholder beside the played rows.
+  nonParticipant: `${NS}N255`,
 } as const;
 const ALL_PROVIDER_IDS = Object.values(CASE_IDS);
 
@@ -398,6 +400,8 @@ const CASE_DATES: Readonly<Record<string, string>> = {
   // AFLDB-ISSUE-235 S6: a June Monday (AEST, no daylight saving), used by no other case; no
   // Preliminary Final is ever played then.
   [CASE_IDS.issue235Lifecycle]: '2026-06-01',
+  // AFLDB-ISSUE-255: the June Tuesday after it (AEST), used by no other case.
+  [CASE_IDS.nonParticipant]: '2026-06-02',
   // I244-F001 H&A cases: deliberately the LATEST dates in the suite (every
   // other case is <= 2026-09-30) so seasons.last_match_date/
   // data_through_date/last_loaded_round can be proven to reflect THIS
@@ -2412,6 +2416,131 @@ describe('AFLDB-ISSUE-228 S6 — settle-afl-api.ts against afldb_test', () => {
        WHERE source_id = ${aflApiSourceId} AND external_record_id LIKE ${`${providerId}%`}
     `;
     expect(survivingLedger.count).toBe(0);
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * AFLDB-ISSUE-255 — an unused emergency's player-stats placeholder
+ *
+ * The authentic DEV shape (`CD_M20260140305`, `CD_I993799`): one EXTRA home
+ * row beside the played ones, named `EMERG` on the roster, 0.0 time on
+ * ground, every counting statistic 0, `extendedStats` null. It must stay a
+ * real source observation (spine) and nothing else: no typed projection, no
+ * canonical row, no ledger row, no candidate, no rejection, no data issue.
+ * The played players of the same unit are unaffected (positive control).
+ * `CD_I993799` has no `external_identities` row here, deliberately: the row is
+ * classified before identity resolution, so it must not surface as an
+ * unresolved identity either.
+ * ------------------------------------------------------------------ */
+
+const ISSUE255_EMERGENCY = 'CD_I993799';
+
+/** Only the raw-feed members this helper touches; everything else stays opaque. */
+interface Issue255RosterEntry { position: string; player: Record<string, unknown> }
+interface Issue255StatsEntry {
+  player: { jumperNumber: number; player: { position: string; player: Record<string, unknown> } };
+  playerStats: {
+    player: Record<string, unknown>;
+    timeOnGroundPercentage: number;
+    gamesPlayed: number | null;
+    stats: Record<string, unknown>;
+  };
+}
+
+function zeroNumericLeaves(node: Record<string, unknown>): void {
+  for (const [key, value] of Object.entries(node)) {
+    if (typeof value === 'number') node[key] = 0;
+    else if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+      zeroNumericLeaves(value as Record<string, unknown>);
+    }
+  }
+}
+
+function withUnusedEmergency(raw: { roster: unknown; stats: unknown }): void {
+  const roster = raw.roster as { matchRoster: { homeTeam: { positions: Issue255RosterEntry[] } } };
+  const stats = raw.stats as { homeTeamPlayerStats: Issue255StatsEntry[] };
+  const name = { givenName: 'Brayden', surname: 'Fiorini' };
+  const rosterEntry = clone(roster.matchRoster.homeTeam.positions[0]);
+  rosterEntry.position = 'EMERG';
+  rosterEntry.player = { ...rosterEntry.player, playerId: ISSUE255_EMERGENCY, playerName: name, captain: false, playerJumperNumber: 8 };
+  roster.matchRoster.homeTeam.positions.push(rosterEntry);
+
+  const entry = clone(stats.homeTeamPlayerStats[0]);
+  entry.player.player.position = 'EMERG';
+  entry.player.player.player = { ...entry.player.player.player, playerId: ISSUE255_EMERGENCY, playerName: name, captain: false, playerJumperNumber: 8 };
+  entry.player.jumperNumber = 8;
+  entry.playerStats.player = { ...entry.playerStats.player, playerId: ISSUE255_EMERGENCY, playerName: name, captain: false, playerJumperNumber: 8 };
+  entry.playerStats.timeOnGroundPercentage = 0.0;
+  entry.playerStats.gamesPlayed = null;
+  zeroNumericLeaves(entry.playerStats.stats);
+  entry.playerStats.stats.extendedStats = null;
+  stats.homeTeamPlayerStats.push(entry);
+}
+
+describe('AFLDB-ISSUE-255 — unused-emergency rows are observation-only (settle-afl-api.ts against afldb_test)', () => {
+  it('the spine keeps the row; nothing canonical, typed, ledger, candidate, rejection or data-issue is written for it; played rows still apply; a replay is idempotent', async () => {
+    const providerId = CASE_IDS.nonParticipant;
+    const recordId = `${providerId}|CD_T80|${ISSUE255_EMERGENCY}`;
+    const bundle = buildBundle([unitSourceFor(providerId, withUnusedEmergency)], registry, identities);
+
+    const first = await runSettleAflApi(sql, {
+      bundle, registry, apply: true, autoApply: true, inProgressSeasons: [SEASON],
+    });
+    expect(first.halt).toBeNull();
+    expect(first.applied).toBe(true);
+    expect(first.counters.snapshotPlayerMatchRows).toBe(3);
+    expect(first.counters.nonParticipantPlayerRows).toBe(1);
+    // Only the deliberately unbridged away player is unresolved, exactly as in the golden case.
+    expect(first.counters.unresolvedIdentityPlayer).toBe(1);
+    expect(first.counters.canonicalApplyFailures).toBe(0);
+    expect(first.counters.canonicalRowsInserted).toBeGreaterThan(0);
+
+    // D-255-2: still a real source observation.
+    const [spine] = await sql<{ versionSeq: number }[]>`
+      SELECT current_version_seq AS "versionSeq" FROM staging.source_records
+       WHERE source_id = ${aflApiSourceId} AND family = 'player_match_stats' AND external_record_id = ${recordId}
+    `;
+    expect(spine?.versionSeq).toBeGreaterThan(0);
+
+    // ...and nothing else.
+    const [counts] = await sql<{
+      typed: number; ledger: number; candidates: number; rejections: number; issues: number;
+    }[]>`
+      SELECT
+        (SELECT count(*)::int FROM staging.afl_api_player_match
+          WHERE provider_match_id = ${providerId} AND provider_player_id = ${ISSUE255_EMERGENCY}) AS typed,
+        (SELECT count(*)::int FROM canonical_applications WHERE external_record_id = ${recordId}) AS ledger,
+        (SELECT count(*)::int FROM promotion_candidates WHERE external_record_id = ${recordId}) AS candidates,
+        (SELECT count(*)::int FROM import_rejections WHERE source_record_id = ${recordId}) AS rejections,
+        (SELECT count(*)::int FROM data_issues WHERE issue_key LIKE ${`%${ISSUE255_EMERGENCY}%`}) AS issues
+    `;
+    expect(counts).toEqual({ typed: 0, ledger: 0, candidates: 0, rejections: 0, issues: 0 });
+
+    // Positive control: the played bridged player of the same unit still lands, and only it.
+    const [match] = await sql<{ id: number }[]>`SELECT id FROM matches WHERE match_key = ${matchKeyFor(providerId)}`;
+    expect(match).toBeDefined();
+    const rows = await sql<{ playerId: number; kicks: number }[]>`
+      SELECT player_id AS "playerId", kicks FROM player_match_stats WHERE match_id = ${match.id}
+    `;
+    expect(rows).toEqual([{ playerId: bridgedPlayerId, kicks: 9 }]);
+
+    // D-255-3: the classification is in the batch evidence.
+    const batch = await importBatchRow(first.batchId as string);
+    expect(batch.validationResult).toMatchObject({ nonParticipantPlayerRows: 1 });
+
+    // A replay of the same snapshot: still classified, still nothing written for it.
+    const second = await runSettleAflApi(sql, {
+      bundle: buildBundle([unitSourceFor(providerId, withUnusedEmergency)], registry, identities),
+      registry, apply: true, autoApply: true, inProgressSeasons: [SEASON],
+    });
+    expect(second.counters.nonParticipantPlayerRows).toBe(1);
+    expect(second.counters.canonicalRowsInserted).toBe(0);
+    expect(second.counters.canonicalRowsUpdated).toBe(0);
+    const [after] = await sql<{ ledger: number; pms: number }[]>`
+      SELECT (SELECT count(*)::int FROM canonical_applications WHERE external_record_id = ${recordId}) AS ledger,
+             (SELECT count(*)::int FROM player_match_stats WHERE match_id = ${match.id}) AS pms
+    `;
+    expect(after).toEqual({ ledger: 0, pms: 1 });
   });
 });
 
