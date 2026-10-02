@@ -15,7 +15,7 @@ commit.
 
 ## [Unreleased]
 
-### NL search refuses career rankings for statistics AFLDB does not store, instead of failing (AFLDB-ISSUE-256; issue open, uncommitted) - 2 October 2026
+### NL search refuses career rankings for statistics AFLDB does not store, instead of failing (AFLDB-ISSUE-256; resolved) - 2 October 2026
 
 - Career ranking questions about time on ground, centre bounce attendances, disposal efficiency or score
   involvements ("most career tog", "top 10 career cba", "most career de", "most si") now get "AFLDB can’t
@@ -25,6 +25,9 @@ commit.
   statistic key is not in the grid stat catalogue, and a structural test requires every NL metric's
   statistic key to come from that catalogue. Supported career metrics are unchanged, and so is
   `PARSER_VERSION` (66).
+- Implementation `3e98fb7b`. Validated DB-free: NL/query-intent suite 1,710/1,710, TypeScript exit 0.
+- Accepted on DEV (operator-run, 2 October 2026): "most career tog" returns "AFLDB can't answer this"
+  (HTTP 200), logged as `unanswerable` / `coverage_unavailable`, with no internal error.
 
 ### Architecture documentation matches the tracked source layout (AFLDB-ISSUE-226; resolved) - 2 October 2026
 

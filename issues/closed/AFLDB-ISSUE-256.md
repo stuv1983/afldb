@@ -1,12 +1,18 @@
 # AFLDB-ISSUE-256 — NL career rankings for unsupported metrics can pass validation and fail internally
 
-**Status:** Open. **Severity:** Low. **Opened:** 2026-10-02.
+**Status:** RESOLVED 2026-10-02. **Severity:** Low. **Opened:** 2026-10-02.
 **This runbook:** created 2026-10-02 on `sonnet/issue-256-nl-career-metrics` (base `main` `6a0891c1`).
-Uncommitted.
+Moved to `issues/closed/` on resolution.
 
-**State after pass 1 (2026-10-02, uncommitted): IMPLEMENTED / DB-FREE VALIDATED.** The four unsupported
-metrics are no longer admitted, the compiler fails closed on an unknown or non-GRID metric, and a
-structural test keeps every NL metric's `statKey` inside `GRID_STATS`. Not committed; not deployed.
+**Final state (2026-10-02): RESOLVED.** Implementation committed as `3e98fb7b` ("fix(nl): reject
+unsupported career metrics"), merged and pushed (`main` = `origin/main` = `3e98fb7b`), deployed to DEV,
+and DEV acceptance COMPLETE (§7).
+
+**State after pass 1 (2026-10-02, historical; at the time uncommitted): IMPLEMENTED / DB-FREE
+VALIDATED.** The four unsupported metrics are no longer admitted, the compiler fails closed on an
+unknown or non-GRID metric, and a structural test keeps every NL metric's `statKey` inside
+`GRID_STATS`. At that point it was not committed and not deployed; see §7 for the commit and DEV
+acceptance.
 
 ---
 
@@ -124,9 +130,84 @@ No migration, schema, storage, acquisition, AFL API or ISSUE-234 change. No DEV 
 `player-season.ts` was not changed. Its metrics come only from `PLAYER_STAT_METRICS`, which is
 generated from `GRID_STATS`, and the new structural test now guards it as well.
 
-## 6. Next action
+## 6. Next action (pass 1, historical — all three steps are done, see §7)
 
 1. Operator review and commit, then `merge:ready` and merge.
 2. Recommended acceptance after DEV sync: ask "most career tog" on DEV. It should return "AFLDB can’t
    answer this" with the "not a recognised statistic" reason, not an error page.
 3. Resolve, and move this runbook to `issues/closed/`.
+
+## 7. Resolution (2026-10-02)
+
+### 7.1 Implementation
+
+- Commit `3e98fb7b` ("fix(nl): reject unsupported career metrics") on
+  `sonnet/issue-256-nl-career-metrics`, merged and pushed. `main` and `origin/main` are at `3e98fb7b`.
+- The implementation is exactly the pass-1 fix in §3. No code changed after the §4 validation.
+- **`PARSER_VERSION` remained 66**, because parsing did not change. Only validation (`plan.ts`) and the
+  compiler (`player-career.ts`) changed.
+- **No new AFL API feed, statistic ingestion or storage was added.** No migration or schema change. The
+  four metrics remain unstored, and the only correct answer for them is a refusal.
+
+### 7.2 Validation evidence (DB-free, before commit; §4)
+
+- Focused plan/guard tests (`tests/nl-player-career-metric-guard.test.ts`, `tests/nl-plan.test.ts`):
+  239/239.
+- Focused parser tests (`tests/nl-parser.test.ts -t "AFLDB-ISSUE-256"`): 18/18.
+- Complete NL/query-intent suite (every `tests/nl-*.test.ts` plus `tests/query-intent.test.ts`, 23
+  files): 1,710/1,710.
+- `tests/unit/qualifying-matches-gate.test.ts`: 3/3.
+- `npx tsc --noEmit`: exit 0.
+- eslint on the touched files: 0 errors, 4 pre-existing `no-unused-vars` warnings on untouched lines.
+- `git diff --check`: clean.
+
+### 7.3 DEV deployment (operator-run)
+
+- DEV HEAD `3e98fb7b25917a22ecaeb5d9f583425bbd6facb7`.
+- DEV `BUILD_ID` `8S0nR-A0WsMo-kEtRyucb`.
+- `afldb.service` active, `MainPID=1169477`.
+- `/api/health`: `status=ok`, `database=ok`.
+
+### 7.4 DEV acceptance smoke (operator-run): COMPLETE
+
+- Query: `most career tog`.
+- Request: public `GET /search?q=most+career+tog` on DEV.
+- User-facing result, exactly:
+
+  > AFLDB can't answer this
+  > "time_on_ground" is not a recognised statistic for this kind of question.
+
+- HTTP 200; the normal "Search | AFLDB" page with the normal feedback form.
+- No application error, no `TypeError`, no `internal_error`, and no answer substituted from another
+  statistic.
+- The entity-search results rendered below the NL answer are the normal, unrelated fallback search
+  results, not a computed NL answer.
+
+### 7.5 NL audit evidence
+
+- `nl_search_log` id **7618**, timestamp `2026-10-02 17:07:05.84+10`.
+- `outcome=unanswerable`, `failure_reason=coverage_unavailable`, `grain=player_career`,
+  `metric=time_on_ground`, `parser_version=66`. No `run_tag`, no session.
+- The row was written by normal application behaviour. It is retained audit evidence and **must not be
+  deleted**.
+
+### 7.6 Service-log evidence
+
+- No `TypeError`, no "Cannot read properties of undefined", no `internal_error`, and no ISSUE-256 error
+  attributable to the smoke.
+
+### 7.7 Post-smoke state
+
+- The service remained active with `MainPID` 1169477.
+- HEAD remained `3e98fb7b`; `BUILD_ID` remained `8S0nR-A0WsMo-kEtRyucb`.
+- No tracked changes in the DEV checkout.
+- All five existing DEV settle manifests remained present, with byte content, mtime and size unchanged.
+  They are operational evidence and **must not be removed or modified**.
+
+### 7.8 Outcome
+
+- Acceptance: **COMPLETE**. Issue: **RESOLVED 2026-10-02**.
+- No DEV or PROD data was mutated by this issue. PROD deployment was not part of this issue's
+  acceptance.
+- No follow-up issue.
+- This runbook moved from `issues/open/` to `issues/closed/AFLDB-ISSUE-256.md`.
