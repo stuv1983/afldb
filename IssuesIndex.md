@@ -128,16 +128,20 @@
 ### AFLDB-ISSUE-229 — AFL API fixture ingestion
 - **Severity:** Medium. **Area:** acquisition / fixtures — `afl_api` season feed → `fixtures`,
   `canonical_applications`, `admin-fixtures.ts`.
-- **State:** Open (2026-09-23). Fixture ingestion only.
-  - **2026-09-26 (pass 2): PARTIALLY EVIDENCED, STILL BLOCKED.** One authentic `SCHEDULED`
-    record (`CD_M20260142901`, the 2026 Grand Final, captured 7 days before the match) is now
-    hash-bound (`tests/fixtures/afl_api/match/04-season-feed-scheduled.raw-slice.json`).
-  - That record has no score block at all, and today's contract refuses it. It defines only the
-    `SCHEDULED` row. Every other status, and postponement/cancellation, is unobserved.
-  - No writer was built.
+- **State:** Open (2026-09-23). Fixture ingestion only. **Not resolved.**
+  - **2026-10-02 (main `5a85226c`):** Option B decided; D-229-1 through D-229-8a decided.
+    **B1 COMPLETE.**
+  - Authentic retained pre-match evidence now covers `SCHEDULED`
+    (`tests/fixtures/afl_api/match/04-season-feed-scheduled.raw-slice.json`) and
+    `UNCONFIRMED_TEAMS`
+    (`tests/fixtures/afl_api/match/05-season-feed-unconfirmed-teams.raw-slice.json`, 1154 bytes,
+    sha256 `e39ac375cabf5f1fc2f182e4e7e28e53d072a4a8d49001320d163bb904867da7`).
+  - Under the recorded D-229 decisions, both statuses map to fixture projection with AFLDB
+    fixture status `scheduled`.
+  - No fixture writer has been built.
 - **Runbook:** `issues/open/AFLDB-ISSUE-229.md`.
-- **Next action:** operator decides whether D-229-1/D-229-2 may proceed on the single `SCHEDULED`
-  citation (runbook §2a), or waits for more captures (§3).
+- **Next action:** B2: capture and review the first authentic 2027 pre-match season feed before
+  the fixture writer is wired or applied.
 
 **AFLDB-ISSUE-255 resolved 2026-10-01** (Sonnet 5, implementation committed `f6d189d0`, operator-run
 DEV acceptance) — the AFL API settle no longer records an unused emergency as a game played. The
