@@ -4,10 +4,14 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 2
+**Open issues:** 6
 
 | ID | Title | Severity | Area | State | Next action |
 |---|---|---|---|---|---|
+| AFLDB-ISSUE-260 | NL answer explanation prints internal column markers for career conditions | Low | NL search, describe/render stage — `src/search/nl/plan.ts` (`describePlan`) | Open (2026-10-02); code review F-004 (`playbooks/issue.md`); a career column condition is labelled with the compiler's SQL marker ("Condition: c.premierships exactly 0."); results unaffected; confirmed DB-free; operator decision 2026-10-02 (after the review): approved for implementation, reader-facing labels only, no parser change intended; nothing implemented; runbook `issues/open/AFLDB-ISSUE-260.md` | Implement in the same focused NL session as AFLDB-ISSUE-259 unless evidence shows they should be separated |
+| AFLDB-ISSUE-259 | NL club-scoped career rankings accept a career condition that is evaluated across the whole career | Low | NL search, validate stage — `src/search/nl/plan.ts` (`validatePlan`), `src/db/queries/nl/player-career.ts` | Open (2026-10-02); code review F-003 (`playbooks/issue.md`); the club-scope guard tests conditions only for unranked plans, so a ranked club-scoped plan with a non-games condition validates while its unranked form is refused; confirmed DB-free through the parser and validator, SQL read not run; operator decision 2026-10-02 (after the review) D-259-1: fail closed — decline when a condition cannot be evaluated at club scope, never reinterpret it as whole-career, add no per-club compiler capability, no parser change intended; nothing implemented; runbook `issues/open/AFLDB-ISSUE-259.md` | One focused NL session with AFLDB-ISSUE-260; check the corpora there for rows of this shape that expect an answer |
+| AFLDB-ISSUE-258 | Legacy CSV intake blanks existing statistics when an optional column is absent or malformed | Low | Legacy file intake / data integrity — `src/lib/ingest/datasets.ts` (`player_match_stats`, `match_results`) | Open (2026-10-02); code review F-002 (`playbooks/issue.md`); an absent column or unparseable cell becomes NULL with verdict `ok` and promotion overwrites the stored figure; established from source, not executed; pipeline deprecated (ISSUE-186) but reachable; operator decision 2026-10-02 (after the review) D-258-1..3: fix the two datasets — absent or blank optional column preserves the existing value, malformed value is a validation error, valid value applies, no implicit clear, ISSUE-186 retirement out of scope; nothing implemented; runbook `issues/open/AFLDB-ISSUE-258.md` | Implementation session scoped to runbook §15.2–§15.3 |
+| AFLDB-ISSUE-257 | Match Sheet edits to source-owned player statistics are reverted by the next automatic settle | Medium | Admin / data integrity / current-season acquisition — `match-sheet.ts`, `manual-authority.ts`, `canonical-apply.ts`, `settle-afltables.ts` | Open (2026-10-02); code review F-001 (`playbooks/issue.md`); a Match Sheet edit leaves no durable authority record, the settle's manual-authority proof answers `clear` for `player_match_stats`, and the next settle writes the source values back over a settle-owned current-season row; confirmed DB-free on the authority, ownership and diff functions, end-to-end write not run; related ISSUE-086, ISSUE-099 A4, ISSUE-122 §8; operator decision 2026-10-02 (after the review) D-257-0: Option A, durable authority — the correction survives settles and is replayable across rebuild/reload, keyed by a rebuild-stable natural identity, written atomically, and the write fails if authority cannot be recorded; runbook §17 design direction approved 2026-10-02 (D-257-1 source keeps settling uncorrected fields, D-257-2 additions durable, D-257-3 explicit return to source, D-257-4 replay refuses unresolved identities), with a mandatory deploy-order constraint on the `data_overrides` CHECK; natural key, schema representation, transport, tombstone, addition form, replay ordering and UI not approved (runbook §17.13); historical census a separate follow-up, not run; nothing implemented; runbook `issues/open/AFLDB-ISSUE-257.md` | Fresh implementation session starting with runbook §17.12–§17.13 |
 | AFLDB-ISSUE-233 | AFL API season discovery and season rollover ownership | Medium | Data acquisition / season lifecycle — `afl-api-identities.json`, rollover runbook | Open (2026-09-23); 2026-09-26 pass 2: D-233-1/2/3 decided (proposal JSON; season-scoped AFL API Brownlow artefacts beside the master; preserve `afl_api` ownership or refuse); discovery IMPLEMENTED / DB-FREE VALIDATED against the authentic `compseasons` sample (sha256 `fe3f1641…d965`); 2026-10-01 pass 3 (uncommitted): D-233-3 rebuild/rollover `afl_api` ownership census and D-233-2 season-scoped AFL API Brownlow load IMPLEMENTED / DB-FREE VALIDATED; 2026-10-01 pass 4 (uncommitted): D-233-3 also enforced on the LIVE promotion target (`promotion-check.ts`, `dependencies`/`pre-cutover`/`restored`/`candidate`/frozen `production`, no override); damaged-schema census refuses; discovery `--fetch` retains entity bytes verbatim; ownership replay intentionally unimplemented; 2026-10-01 pass 5 (uncommitted): integration census test 5/5 on `afldb_test` (no residue), read-only censuses PASS on `afldb_test` and `afldb_dev` (zero `afl_api`-owned matches, DEV not mutated), final review no CRIT/HIGH/MED; committed `f0abbb4c`; 2026-10-01 pass 6: first real DEV discovery `--fetch` PASSED (`20261001T034039Z`, 1 fetch, HTTP 200, 1,959 decoded body bytes sha256 `2aeed4e9…b33e`, 15/15 entries 2012–2026, `no_change`, offline replay byte-identical, DEV and registry unchanged); D-233-2 `code_test_db` write-path rehearsal designed, not written or run, blocked on a stable-identity bridge and the 2026 snapshot; R4 classified fail-safe, no successor issue; 2026-10-01 passes 7–9 (uncommitted): fresh CONCLUDED 2026 Brownlow snapshot `afl-api-brownlow-2026-2026-10-01-041609`; `afldb_test` bridge 0/669 (no 2026 matches); DEV read-only bridge 669/669 (v1); builder continuity defect FIXED (exact tracked `profile_url_continuity` pair → `continuing_url`, ISSUE-237 parity), real DEV read-only build 183/183 (Jack Ross 6519 → `players/J/Jack_Ross.html`), artefact outside repo, second write `unchanged`; `code_test_db` read-only coverage 175/183 (8 presumed 2026 debutants absent), harness NOT written; 2026-10-01 pass 10 (uncommitted): D-233-R = scoped `code_test_db` fixture of exactly the eight missing 2026 player identities (no rebuild/restore), harness `tools/migration/brownlow_afl_api_season_rehearsal.py` WRITTEN, NOT RUN, DB-free 113/113; 9,982/9,983 = one unused emergency row (expected); 2026-10-01 pass 11 (uncommitted): `code_test_db` rehearsal PASSED + exact restore PASSED (evidence `D:\tmp\issue233\rehearsal-20261001-151415`; fixture 8+8 → 183/183; real loads A1 batches 27/28, A2 29/30, 183/1,242/1/14 `afl_api`, A2 content-identical; fingerprint = F0, residue 0, coverage back to 175/183; case 5 NOT RUN); 2026-10-01 pass 12 final review: 0 CRIT/HIGH, 2 MEDIUM fixed (continuity provenance validator; POSIX manifest paths), committed on `sonnet/issue-233`; 2026-10-01: `f0abbb4c` + `cc1a5f2d` merged, `main` at `cc1a5f2d`, no merge pending; PROD untouched; runbook `issues/open/AFLDB-ISSUE-233.md` | Promotion gate's first live read at the next promotion (runbook §4.6 item 6); stays OPEN until then |
 | AFLDB-ISSUE-229 | AFL API fixture ingestion | Medium | Data acquisition / fixtures — `afl_api` season feed → `fixtures` | Open (2026-09-23); 2026-10-02 (main `5a85226c`): Option B decided; D-229-1 through D-229-8a decided; **B1 COMPLETE** — authentic retained pre-match evidence covers `SCHEDULED` and `UNCONFIRMED_TEAMS`; no fixture writer built; runbook `issues/open/AFLDB-ISSUE-229.md` | B2: capture and review the first authentic 2027 pre-match season feed before the fixture writer is wired or applied |
 
@@ -46810,3 +46814,192 @@ retained behaviour under `Unreleased`.
   - `PARSER_VERSION` remained 66, because parsing did not change. No new AFL API feed, statistic
     ingestion or storage was added. No follow-up issue.
   - Removed from `IssuesIndex.md` and the Open Issues table.
+
+## AFLDB-ISSUE-257 — Match Sheet edits to source-owned player statistics are reverted by the next automatic settle
+
+- **Status:** Open (2026-10-02). **Severity:** Medium. **Area:** admin / data integrity /
+  current-season acquisition. Key files:
+  - `src/db/queries/match-sheet.ts` (`saveMatchSheet`);
+  - `src/lib/acquisition/manual-authority.ts`;
+  - `src/lib/acquisition/canonical-apply.ts`;
+  - `src/lib/acquisition/settle-afltables.ts`.
+- **Runbook:** `issues/open/AFLDB-ISSUE-257.md`.
+- **Origin.** Code review of `main` at `1c1a4805` (`playbooks/issue.md`, F-001). Nothing implemented.
+- **Defect.** An administrator's correction to a canonical fact must not be silently replaced by an
+  unattended source run (ISSUE-086; `canonical-apply.ts` rule 1). For the Data Editor Match Sheet it
+  is.
+  - `saveMatchSheet` updates or deletes `player_match_stats` rows and writes one `data_edits` row
+    (`matches` / `match_sheet`). It writes no `data_overrides` row and leaves `source_id` unchanged.
+  - The settle proposes the same columns (`PLAYER_MATCH_STATS_PROPOSED_FIELDS`). With an unchanged
+    source payload and a differing canonical row, `invitationFor` offers a `retry`.
+  - In the applier the row's owner is the promoting source (`updateable`), the baseline is the row as
+    read in the same run, and the manual-authority verdict for `player_match_stats` is `clear`. The
+    row is updated back to the source values; a removed player is re-inserted.
+  - The ledger records an ordinary update. No finding or refusal is produced and the editor gives no
+    warning.
+- **Root cause.** The manual-authority proof. ISSUE-099 required a representable manual authority
+  for the player-grain targets (A4). ISSUE-122 §8 declared that satisfied by proving a human override
+  for `player_match_stats` unrepresentable, from the `data_overrides` CHECK and the generic editor's
+  entity list. The Match Sheet is a second human writer of that table and is in neither, so the
+  proof passes while its proposition is false.
+- **Impact.** A Match Sheet correction to a current-season row owned by the settling source lasts
+  until the next settle. The path is live: `in_progress_seasons` is `[2026]` and the nightly unit
+  runs `--apply --auto-apply`. A row the Match Sheet inserts has no owner and is refused by the
+  settle, so it is unaffected. With no durable record, an edit on any season also cannot be replayed
+  by a reload or rebuild (not exercised).
+- **Evidence.** DB-free witness on the repository's functions: editor entities `draft_picks`,
+  `matches`, `players`; `overrideScopeProven` true; changed fields `["goals"]`; ownership
+  `updateable`; authority `clear`; the contrasting `matches` score override answers `conflict`. The
+  end-to-end write was not run against a database.
+- **Related history.** ISSUE-086 (resolved; same class for the generic editor, whose surface was
+  listed as `players`, `matches`, `draft_picks`), ISSUE-099 A4, ISSUE-122 §8, ISSUE-159 (proof
+  reworked), ISSUE-238 (treats a `match_sheet` audit as a legitimate later writer). None owns this.
+- **Scope.** The Match Sheet's interaction with the automatic applier for `player_match_stats`; the
+  manual-authority contract for that table; the durable record or refusal the chosen option needs.
+- **Out of scope.** `match_period_scores` and `brownlow_round_votes`; the generic editor's overrides;
+  the legacy CSV intake (ISSUE-258); the ownership predicate, retry rule and baseline check;
+  ISSUE-229 and ISSUE-233; production data repair.
+- **Operator decision (2026-10-02, after the review).** D-257-0: Option A, durable authority. A
+  Match Sheet correction is an administrative correction, not a temporary presentation-layer edit.
+  - Required invariant: a Match Sheet correction to `player_match_stats` must survive unattended
+    source settles and must be replayable and recoverable across the supported rebuild/reload
+    lifecycle until deliberately superseded or removed.
+  - Binding requirements: a rebuild-stable natural identity as the durable key, never database-local
+    ids; atomicity between the mutation and its authority record; the write fails if authority
+    cannot be recorded; no broader access than the settle and replay paths need.
+  - A design is written in the runbook §17. It was a proposal when this decision was recorded. It
+    places the authority in `data_overrides` under a new entity type, for which `afldb_import`
+    already holds the needed grants, and it records one deploy-order constraint: the current proof
+    requires the CHECK to admit none of the three settle targets, so admitting `player_match_stats`
+    before the new code is live would make the deployed settle refuse all three.
+  - The historical census of already-reverted corrections stays a separate, separately authorised
+    follow-up. Not run.
+- **Operator decisions on the design (2026-10-02, runbook §15.3).** The direction of the §17 design
+  is approved. The decision first recorded as D-257-1 (Option A) is renumbered D-257-0.
+  - D-257-1: the source continues settling uncorrected fields. Authority is field-scoped where the
+    correction is; a correction to one field does not freeze the row's other source-owned fields;
+    the implementation fails closed if it cannot tell overridden from source-controlled fields.
+  - D-257-2: additions are durable. A row the operator adds that the source does not provide is not
+    silently deleted or negated by a settle. The model covers field updates, additions and removals
+    under one consistent rebuild/replay semantics.
+  - D-257-3: explicit return to source. Once durable manual authority exists it remains
+    authoritative until an explicit administrative action removes it, including when the source
+    later matches the corrected value. Removing it fabricates no source value; normal settle and
+    replay resume.
+  - D-257-4: replay refuses missing identities. An authority record whose player or match does not
+    resolve through the rebuild-stable identity fails the replay, is never skipped, orphaned,
+    approximately bound or resolved by database-local id, and is named in the failure.
+  - Constraints approved with it: no dependence on `players.id`, `matches.id` or another
+    database-local surrogate, with the exact identity derived from existing identity contracts in
+    the implementation session; the mutation and its authority are one atomic operation; the rule
+    follows canonical ownership and settle semantics, not the provider, so it covers `afl_api`-owned
+    rows; the deploy-order constraint is mandatory and the plan must not let an existing settle
+    refuse unrelated player-statistic, period-score or Brownlow work; no privilege is broadened
+    unless implementation proves a grant is required.
+  - Not approved, left to implementation and rehearsal (runbook §17.13): the exact natural key, the
+    `data_overrides` schema representation, promotion/rebuild transport, the removal tombstone, the
+    addition form, reload/replay ordering and UI. Deactivation of authority on match deletion is
+    not decided.
+- **Next action.** A fresh implementation session that starts with the runbook §17.12–§17.13, first
+  deriving the rebuild-stable player and match identity from the existing identity contracts, and
+  plans the deployment sequence before any migration or code. Nothing implemented.
+
+## AFLDB-ISSUE-258 — Legacy CSV intake blanks existing statistics when an optional column is absent or malformed
+
+- **Status:** Open (2026-10-02). **Severity:** Low. **Area:** legacy file intake / data integrity.
+  Key file: `src/lib/ingest/datasets.ts` (`player_match_stats` and `match_results` datasets).
+- **Runbook:** `issues/open/AFLDB-ISSUE-258.md`.
+- **Origin.** Code review of `main` at `1c1a4805` (`playbooks/issue.md`, F-002). Nothing implemented.
+- **Defect.** A row the validation report marks `ok` must be applied as written, and a file that is
+  silent about a figure must leave it alone. For the two fact-table datasets neither holds.
+  - `toIntOrNull` returns NULL for a column missing from the file and for any text that is not a
+    whole number.
+  - `player_match_stats` requires only its six identifying columns. Its 21 statistics,
+    `career_game_no`, `jumper_number` and `brownlow_votes` are never checked for "present but
+    unparseable"; the row validates `ok`.
+  - The upsert overwrites every one of those columns on a matched row. `match_results` does the same
+    for goals, behinds, attendance and attendance status.
+  - `player_bio` in the same file uses `COALESCE` and states that "a partial file can never blank a
+    figure it did not mention".
+- **Root cause.** Validation conflates not supplied, blank and unparseable into one NULL, and the
+  upsert treats that NULL as a value to write.
+- **Impact.** Stored statistics on matched rows, source-owned rows included, are replaced by NULL
+  behind a clean report. Bounded by Super Admin approval and by the pipeline being the deprecated
+  "Legacy file intake" (ISSUE-186, Phase A resolved; retirement deferred).
+- **Evidence.** Established from source. Not executed: the dataset tests are DB-backed. Whether
+  migration 020's attendance constraint refuses the `match_results` case was not verified.
+- **Related history.** ISSUE-186, ISSUE-185, ISSUE-175, ISSUE-155 §27 (records this dataset's
+  `brownlow_votes` write as a compatibility path). None owns this.
+- **Scope.** Validation and promotion of optional numeric columns in the two datasets.
+- **Out of scope.** Retiring the pipeline, except as an alternative resolution; whether the dataset
+  should write `brownlow_votes`; derived data after promotion; the other datasets.
+- **Operator decision (2026-10-02, after the review).** D-258-1: fix the two reachable datasets;
+  deprecation alone is not the resolution, and ISSUE-186 retirement stays out of this
+  implementation. D-258-2: an optional column absent from the file preserves the existing value; a
+  column present but blank preserves it; a malformed or non-integer value is a validation error and
+  promotion must not proceed for that row; a valid value applies. D-258-3: no implicit "blank means
+  clear"; explicit clearing would need a separate contract.
+- **Next action.** An implementation session scoped to the runbook §15.2–§15.3. Nothing implemented.
+
+## AFLDB-ISSUE-259 — NL club-scoped career rankings accept a career condition that is evaluated across the whole career
+
+- **Status:** Open (2026-10-02). **Severity:** Low. **Area:** NL search, validate stage. Key files:
+  - `src/search/nl/plan.ts` (`validatePlan`);
+  - `src/db/queries/nl/player-career.ts` (`conditionSql`).
+- **Runbook:** `issues/open/AFLDB-ISSUE-259.md`.
+- **Origin.** Code review of `main` at `1c1a4805` (`playbooks/issue.md`, F-003). Nothing implemented.
+- **Defect.** A club-scoped career plan must have every component scoped to the club or decline.
+  - The guard tests "every condition is on games" only when the plan has no ranking metric. A plan
+    ranking a club-scopable metric is accepted whatever its conditions are.
+  - The compiler club-scopes the ranked value and a games condition, and evaluates every other
+    column or award condition on the whole career.
+  - "players with at least 200 games and no premierships for Collingwood" is refused ("This career
+    statistic cannot currently be totalled for one club."); "most games for Collingwood without a
+    premiership" and "most games for Carlton with at least 2 brownlow medals" validate.
+- **Root cause.** In `validatePlan` the condition test is attached to the unranked branch only.
+- **Impact.** A mixed-scope answer where the unranked form declines; the explanation shows the club
+  beside the condition and does not say the condition is career-wide. No data impact.
+- **Evidence.** DB-free, through `parseNlQuestion` and `validatePlan` with an in-memory club
+  directory. The compiled SQL was read, not run. `tests/nl-semantic-mapping.test.ts` pins the
+  unranked refusal; no test covers the ranked form.
+- **Related history.** ISSUE-110, ISSUE-215 (left the guard unchanged for the unranked form),
+  ISSUE-256. None owns this.
+- **Scope.** The club-scope guard for ranked `player_career` plans carrying conditions, and its
+  tests.
+- **Out of scope.** Per-club SQL for conditions other than games; career predicates; the
+  explanation labels (ISSUE-260); parser vocabulary.
+- **Operator decision (2026-10-02, after the review).** D-259-1: fail closed on mixed club/career
+  scope. A club-scoped career ranking declines when it contains a condition that cannot also be
+  evaluated at club scope; the condition is not reinterpreted as whole-career. "most games for
+  Collingwood without a premiership" must decline under the existing coverage limitation. This issue
+  must not add per-club compiler support. No parser change is intended and `PARSER_VERSION` stays
+  unchanged unless implementation shows parsing itself must change.
+- **Next action.** One focused NL session with ISSUE-260. Whether either corpus holds rows of this
+  shape that currently expect an answer was not checked and must be measured there. Nothing
+  implemented.
+
+## AFLDB-ISSUE-260 — NL answer explanation prints internal column markers for career conditions
+
+- **Status:** Open (2026-10-02). **Severity:** Low. **Area:** NL search, describe/render stage. Key
+  file: `src/search/nl/plan.ts` (`describePlan`).
+- **Runbook:** `issues/open/AFLDB-ISSUE-260.md`.
+- **Origin.** Code review of `main` at `1c1a4805` (`playbooks/issue.md`, F-004). Nothing implemented.
+- **Defect.** The explanation under an NL answer is reader-facing text. For a career column
+  condition `describePlan` prints `NL_CAREER_COLUMNS[cond.column]`, the compiler's SQL marker, so the
+  public page shows "Condition: c.premierships exactly 0." and "Condition: c.games at least 300."
+- **Root cause.** The compiler's column map is reused as a label source; its values are SQL.
+- **Impact.** A database alias in public explanation text on every career-condition answer. Results
+  are unaffected.
+- **Evidence.** DB-free, through `parseNlQuestion`, `validatePlan` and `describePlan`. The answer
+  carries the lines as `explain` (`src/db/queries/nl/answer.ts`) and `NlAnswerSection.tsx` renders
+  them. No test asserts the text.
+- **Related history.** None found. ISSUE-110 corrected a different explanation line.
+- **Scope.** The label of a column condition in `describePlan`.
+- **Out of scope.** Whether a club-scoped answer should say a condition is career-wide (ISSUE-259);
+  parser, planner and compiler behaviour.
+- **Operator decision (2026-10-02, after the review).** Approved for implementation; no further
+  decision required. The public explanation must use reader-facing labels and never expose an
+  internal SQL or compiler identifier (`c.premierships`, `c.games`, `c.clubs_played`). No parser
+  behaviour change is intended.
+- **Next action.** Implement in the same focused NL session as ISSUE-259, unless implementation
+  evidence shows they should be separated. Nothing implemented.
