@@ -53,3 +53,7 @@ docs/rebuild-manifests/draftguru/issue224-d7-registration-decision-20260922.json
 # value redacted); both hashes are in the ISSUE-231 runbook §2a.
 tests/fixtures/afl_api/seasons/*.raw.json -text -diff !eol
 tests/fixtures/afl_api/match/04-season-feed-scheduled.raw-slice.json -text -diff !eol
+# AFLDB-ISSUE-229 B1 — byte-exact slice recovered from DEV snapshot afl-api-2026-2026-09-25-235854
+# (feed sha256 ec7eb186…c390, offset 317,317); pinned by sha256 in the ISSUE-229 runbook §2c and
+# tests/afl-api-match.test.ts. Same treatment as the 04 slice.
+tests/fixtures/afl_api/match/05-season-feed-unconfirmed-teams.raw-slice.json -text -diff !eol

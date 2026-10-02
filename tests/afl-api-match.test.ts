@@ -2081,6 +2081,95 @@ describe('AFL API season enumeration (AFLDB-ISSUE-231)', () => {
     });
   });
 
+  describe('against AUTHENTIC retained bytes (AFLDB-ISSUE-229 B1, DEV snapshot afl-api-2026-2026-09-25-235854)', () => {
+    // A byte-exact slice of that snapshot's 00-season-matches.json (feed sha256
+    // ec7eb186d19a4900ceb16576e7ab30a9c85c0994fcad2da89ceb2bcb7ffac390, offset 317,317), cut and
+    // verified on DEV by the ISSUE-229 runbook §3a script. The feed itself is not tracked.
+    const UNCONFIRMED_PATH = join(fixtureDir, '05-season-feed-unconfirmed-teams.raw-slice.json');
+    const SCHEDULED_PATH = join(fixtureDir, '04-season-feed-scheduled.raw-slice.json');
+    const sha256 = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
+    type FeedRecord = {
+      providerId: string;
+      status: string;
+      utcStartTime: string;
+      compSeason: Record<string, unknown>;
+      round: Record<string, unknown>;
+      home: Record<string, unknown>;
+      away: Record<string, unknown>;
+      venue: Record<string, unknown>;
+    };
+    const teamOf = (side: Record<string, unknown>) => (side.team as { providerId: unknown }).providerId;
+
+    /** Sorted leaf paths whose values differ, including keys present on one side only. */
+    function differingPaths(a: unknown, b: unknown, path = ''): string[] {
+      const isObject = (v: unknown): v is Record<string, unknown> =>
+        v !== null && typeof v === 'object' && !Array.isArray(v);
+      if (isObject(a) && isObject(b)) {
+        return [...new Set([...Object.keys(a), ...Object.keys(b)])]
+          .flatMap((key) => differingPaths(a[key], b[key], path ? `${path}.${key}` : key))
+          .sort();
+      }
+      return JSON.stringify(a) === JSON.stringify(b) ? [] : [path];
+    }
+
+    it('the UNCONFIRMED_TEAMS record is the recorded bytes (hash-bound) and carries no score block', () => {
+      const bytes = readFileSync(UNCONFIRMED_PATH);
+      expect(bytes.length).toBe(1154);
+      expect(sha256(bytes)).toBe('e39ac375cabf5f1fc2f182e4e7e28e53d072a4a8d49001320d163bb904867da7');
+      expect(bytes.toString('utf8')).not.toMatch(/enqueuetoken/i);
+
+      const record = JSON.parse(bytes.toString('utf8')) as FeedRecord;
+      expect(record.providerId).toBe('CD_M20260142901');
+      expect(record.status).toBe('UNCONFIRMED_TEAMS');
+      expect(Object.keys(record)).toEqual([
+        'id', 'providerId', 'compSeason', 'round', 'home', 'away', 'venue', 'utcStartTime', 'status', 'metadata',
+      ]);
+      expect(Object.keys(record.home)).toEqual(['team']);
+      expect(Object.keys(record.away)).toEqual(['team']);
+      expect(record.home).not.toHaveProperty('score');
+      expect(record.away).not.toHaveProperty('score');
+      expect(record.utcStartTime).toBe('2026-09-26T04:30:00.000+0000');
+      expect(record.venue.providerId).toBe('CD_V40');
+      expect(record.venue.timezone).toBe('Australia/Melbourne');
+      expect(teamOf(record.home)).toBe('CD_T60');
+      expect(teamOf(record.away)).toBe('CD_T20');
+    });
+
+    it('compared with the tracked 09-19 SCHEDULED slice, it differs in exactly these fields', () => {
+      // B1 found that the RECOVERED 09-21 SCHEDULED record (1,146 B, sha256 e7c7aedf…, not tracked)
+      // and this 09-25 record differ only in `status`. The tracked 09-19 slice is a different,
+      // earlier capture (1,056 B), not byte-identical to the 09-21 record, so it is NOT claimed to
+      // differ from this record only in `status`. This test pins the full difference.
+      const scheduledBytes = readFileSync(SCHEDULED_PATH);
+      expect(scheduledBytes.length).toBe(1056);
+      const scheduled = JSON.parse(scheduledBytes.toString('utf8')) as FeedRecord;
+      const unconfirmed = JSON.parse(readFileSync(UNCONFIRMED_PATH, 'utf8')) as FeedRecord;
+
+      expect(differingPaths(scheduled, unconfirmed)).toEqual([
+        'compSeason.currentRoundNumber', 'round.utcEndTime', 'round.utcStartTime', 'status',
+      ]);
+      expect([scheduled.status, unconfirmed.status]).toEqual(['SCHEDULED', 'UNCONFIRMED_TEAMS']);
+      expect([scheduled.compSeason.currentRoundNumber, unconfirmed.compSeason.currentRoundNumber]).toEqual([28, 29]);
+      expect(scheduled.round).not.toHaveProperty('utcStartTime');
+      expect(scheduled.round).not.toHaveProperty('utcEndTime');
+      expect(unconfirmed.round.utcStartTime).toBe('2026-09-26T04:30:00.000+0000');
+      expect(unconfirmed.round.utcEndTime).toBe('2026-09-26T04:30:00.000+0000');
+    });
+
+    it('AFLDB-ISSUE-229: today\'s match contract refuses the real UNCONFIRMED_TEAMS record as a build failure', () => {
+      const { records, buildFailures } = buildAflApiFixtureRecords(
+        [JSON.parse(readFileSync(UNCONFIRMED_PATH, 'utf8'))], registry, identities,
+      );
+      expect(records).toEqual([]);
+      expect(buildFailures).toHaveLength(1);
+      expect(buildFailures[0].providerMatchId).toBe('CD_M20260142901');
+      expect(buildFailures[0].error).toBe(
+        'afl_api/match is missing required column(s): home.score.goals, home.score.behinds, '
+        + 'home.score.totalScore, away.score.goals, away.score.behinds, away.score.totalScore.',
+      );
+    });
+  });
+
   it('refuses completeness when meta.pagination.numEntries is absent or not an integer', () => {
     const absent = assessAflApiSeasonEnumeration(JSON.stringify({ matches: THREE }), EXPECTED);
     expect(absent.complete).toBe(false);

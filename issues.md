@@ -41826,6 +41826,116 @@ Full record: `issues/closed/AFLDB-ISSUE-228.md` §22.22.
     postponement/cancellation is unobserved, so no ingestion was implemented.
   - **Next action:** the operator decides whether D-229-1/D-229-2 may proceed on the single
     `SCHEDULED` citation, or waits for more captures.
+- **2026-10-02 (pass 3, read-only investigation; no code, DB, network or Git): still Open.**
+  Runbook §2b.
+  - The season feed does carry `UNCONFIRMED_TEAMS`: ISSUE-231 §8 DEV snapshot
+    `afl-api-2026-2026-09-25-235854` counted `CONCLUDED 217, UNCONFIRMED_TEAMS 1`. That is very
+    probably the GF, but only counts were recorded. This contradicts runbook §2 item 3.
+  - The pre-GF DEV snapshots may still hold the GF's pre-match bytes. Retention is unverified.
+  - Four omitted decisions were found: D-229-5 (date/time), D-229-6 (a human edit of an `afl_api`
+    row becomes manual on replay), D-229-7 (rebuild/promotion durability) and D-229-8 (absence-sweep
+    scope).
+  - The 2026 feed is entirely `CONCLUDED`, so a writer has no live input before the 2027 feed.
+  - **Next action:** unchanged. The operator chooses Option A or B on the pass-3 decision memo.
+- **2026-10-02 (pass 4, read-only; no code, DB, network or Git): Option B chosen; still Open.**
+  - The fixture writer is held until the authentic 2027 pre-match feed is captured (B2).
+  - D-229-1, -2, -3, -4, -5 and -6 are recorded as first-slice decisions (runbook §4a).
+  - **D-229-5:** AFLDB stores no venue timezone, so only the provider's `venue.timezone` is
+    available. Placeholder detection waits for B2.
+  - **D-229-8:** decided as policy. The ISSUE-231 sweep reads every `afl_api`/`match` row for
+    `season=<S>`, so the operator must pick sub-choice D-229-8a. Recommended: (a), no `match`-family
+    spine write in the first slice, which defers the `canonical_applications` widening.
+  - **D-229-7:** the `fixture_key` inventory is complete (§4b). Nothing has an FK to `fixtures`.
+    The only durable key references (`data_overrides`, `data_edits`) come from admin mutation,
+    which D-229-6 forbids for AFL API rows. So re-ingesting after a rebuild with a new key is safe,
+    on the four conditions in §4b. Still the operator's decision.
+  - **B1:** the snapshot layout is documented, and a read-only one-connection DEV command is in
+    runbook §3a. It has not been run.
+  - **Next action:** the operator runs the §3a B1 command and decides D-229-7 and D-229-8a.
+- **2026-10-02 (pass 5, operator decisions, documentation only): still Open.** Runbook §4a/§4b.
+  - **D-229-5 (final).** Fixture date/time is projected from `utcStartTime` only when four
+    conditions hold:
+    - the start time parses in the observed format;
+    - the provider venue id resolves to an AFLDB venue;
+    - the payload's `venue.timezone` is a valid IANA zone (the provider's value, not stored by
+      AFLDB and not canonical);
+    - the conversion is exact to `HH:MM`, so non-zero seconds refuse.
+
+    Anything else refuses projection. A known time is never written as NULL/TBC, and genuine TBC
+    awaits B2.
+  - **D-229-7 (decided).** An AFL API-owned fixture may be re-ingested after a destructive rebuild
+    with a new random `fixture_key`. The durable identity is `(source_id, source_record_id)`.
+    - Continuity is still required for manually edited rows replayed through
+      `data_overrides`/`data_edits`.
+    - Preconditions: the D-229-6 guard; importer/audit identity uses the provider id; no new
+      importer-owned dependency on `fixture_key`.
+    - Migration 097 is not edited. Migration 110 may re-issue `COMMENT ON COLUMN` if needed.
+  - **D-229-8a (decided, option a).** No pre-match row goes into the AFL API `match` observation
+    spine, because ISSUE-231's sweep consumes it without status or tool separation.
+    - Provenance is the hash-pinned snapshot plus `fixtures.source_id`/`source_record_id`/
+      `import_batch_id`.
+    - No absence sweep and no `canonical_applications` rows for fixtures until a safe audit model
+      exists.
+    - ISSUE-231 is unchanged.
+  - **Option B is unchanged.** B1 (recover the `UNCONFIRMED_TEAMS` bytes from DEV snapshots) now;
+    B2 (the first authentic 2027 pre-match feed) before the writer is wired or applied.
+  - **Next action:** the operator runs the B1 command (runbook §3a).
+- **2026-10-02 (pass 6, B1 evidence, documentation only): still Open; Option B in force.** Runbook
+  §2c.
+  - **Run.** The operator ran B1 on `streamanator` (Python 3.12.3): read-only SSH/file inspection,
+    no database, service action, remote write or AFL API fetch. `B1 RESULT present=2/4
+    violations=0`, `EXIT 0`.
+  - **Present:**
+    - `afl-api-2026-2026-09-21-011148`: manifest `dcbd0626e64a6fcf0ed9c73e910b8b83c10aae50a8552e69be172df184c33ecb`,
+      feed `a44065703717566379c4349eb8959eaf11e990df5b984dd669b7f0db4682a058` (318,465 B),
+      `CONCLUDED 217, SCHEDULED 1`.
+    - `afl-api-2026-2026-09-25-235854`: manifest `afb2a754943fba59a48eabf0bf01dbae7e64046e012318864dc84f68c96907c7`,
+      feed `ec7eb186d19a4900ceb16576e7ab30a9c85c0994fcad2da89ceb2bcb7ffac390` (318,473 B),
+      `CONCLUDED 217, UNCONFIRMED_TEAMS 1`.
+  - **Absent:** `…-09-21-031725` and `…-09-23-002226`.
+  - **Recovered record.** `CD_M20260142901` in both: `SCHEDULED` at offset 317,317, 1,146 B, slice
+    `e7c7aedf239d1028dd2f1b485ac45222248a12733d4e847d4453781e9d4c139a`, and `UNCONFIRMED_TEAMS` at
+    offset 317,317, 1,154 B, slice `e39ac375cabf5f1fc2f182e4e7e28e53d072a4a8d49001320d163bb904867da7`.
+    The two objects differ only in `status` (operator-reported). Both have no `home.score` and no
+    `away.score`, and the same start time, round, venue, timezone, clubs and key sets. No token
+    warning was emitted.
+  - **Not inferred.** The 09-21 slice is not byte-identical to the tracked 09-19 slice (1,056 B).
+    The difference lies outside the fields B1 compared and is uncharacterised.
+  - **Historical.** ISSUE-228's 2026-09-22 statement that `-011148`'s bytes were "absent from every
+    local root" stands as the observation of that time. B1 later observed the snapshot on DEV, and
+    D-9b is not reversed.
+  - **D-229-1 revised.** `UNCONFIRMED_TEAMS` is eligible for fixture projection alongside
+    `SCHEDULED`, and both project to fixture status `scheduled`. `UNCONFIRMED_TEAMS` is not added
+    to the fixture vocabulary. `CONCLUDED` is unchanged, and every other status still fails closed
+    verbatim.
+  - **D-229-2 revised.** For both observed pre-match statuses, the score blocks are entirely absent,
+    which means no score data, never zero. A score block present on either refuses. No
+    generalisation to `LIVE`/`POSTGAME`/other.
+  - D-229-3 through D-229-8a are unchanged.
+  - **Retention.** Superseded by pass 7 below: the slice is now retained byte-exact and
+    hash-verified.
+- **2026-10-02 (pass 7, B1 retention): B1 COMPLETE; still Open; Option B in force.** Runbook §2c.
+  - **Retained byte-exact:**
+    `tests/fixtures/afl_api/match/05-season-feed-unconfirmed-teams.raw-slice.json`, written by the
+    operator from the B1 `B64` output.
+    - `CD_M20260142901`, `UNCONFIRMED_TEAMS`, 1,154 bytes, sha256
+      `e39ac375cabf5f1fc2f182e4e7e28e53d072a4a8d49001320d163bb904867da7`.
+    - Source: snapshot `afl-api-2026-2026-09-25-235854`, feed sha256
+      `ec7eb186d19a4900ceb16576e7ab30a9c85c0994fcad2da89ceb2bcb7ffac390`, offset 317,317.
+    - No `home.score` or `away.score`, and no token material detected.
+    - `.gitattributes` gives it `-text -diff !eol`, the same as the `04-…` slice.
+  - **Tests.** Three DB-free tests in `tests/afl-api-match.test.ts` cover:
+    - the hash, length, absence of a token, key sets, absent score blocks, start time, venue,
+      timezone and clubs;
+    - the exact difference from the tracked 09-19 `SCHEDULED` slice:
+      `compSeason.currentRoundNumber` 28 → 29, `round.utcStartTime`/`round.utcEndTime` added (both
+      already in `known_columns`), and `status`;
+    - today's contract refusing the record on the six score columns.
+  - **Not claimed.** The 09-19 and 09-25 slices do not differ only in `status`. B1's "only
+    `status`" result covers the recovered 09-21 and 09-25 records only, and the 09-21 bytes are not
+    tracked.
+  - **Next action:** B2, the first authentic 2027 pre-match feed (TBC representation,
+    whole-season shape validation), before the writer is wired or applied.
 
 ## AFLDB-ISSUE-231 — AFL API source-integrity hardening: retired-identity rekey and match-family absence sweep
 
