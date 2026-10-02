@@ -3,7 +3,7 @@
 -- Every statement below is a SELECT inside one READ ONLY transaction that ends in
 -- ROLLBACK. The guard refuses any database other than afldb_test and any session that
 -- is not read-only, before a single evidence row is read. Run it exactly as the runbook
--- (issues/open/AFLDB-ISSUE-225.md §7) gives it: psql -v ON_ERROR_STOP=1, so a refused
+-- (issues/closed/AFLDB-ISSUE-225.md §7) gives it: psql -v ON_ERROR_STOP=1, so a refused
 -- guard ends the run.
 --
 -- Player ids are afldb_test ids, as the corpus bridge reported them

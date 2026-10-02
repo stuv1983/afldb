@@ -16,7 +16,7 @@
 --
 -- One READ ONLY transaction: the guard runs first, ROLLBACK runs last. CREATE is refused
 -- in a read-only transaction, so every section repeats its own CTE. Run it only as runbook
--- issues/open/AFLDB-ISSUE-225.md section 7 (E3) gives it, with psql -v ON_ERROR_STOP=1.
+-- issues/closed/AFLDB-ISSUE-225.md section 7 (E3) gives it, with psql -v ON_ERROR_STOP=1.
 -- ASCII only: the operator transport may pass this file through PowerShell.
 
 \pset pager off

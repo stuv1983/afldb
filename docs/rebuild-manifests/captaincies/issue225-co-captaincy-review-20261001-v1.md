@@ -1,7 +1,7 @@
 # AFLDB-ISSUE-225 — captaincies co-captain review (S1), v1
 
 **Access date for every source: 2026-10-01.** Prepared under operator decisions D1–D3, D9
-(`issues/open/AFLDB-ISSUE-225.md` §23). This manifest is the provenance for the seven rows that S1 adds
+(`issues/closed/AFLDB-ISSUE-225.md` §23). This manifest is the provenance for the seven rows that S1 adds
 to `data/awards/captaincies.csv`. It contains short supporting excerpts only, not reproductions of the
 sources.
 

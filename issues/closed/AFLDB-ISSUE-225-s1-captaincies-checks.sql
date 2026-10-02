@@ -3,7 +3,7 @@
 --
 -- Usage (psql variable expect_db names the ONLY database this may run against):
 --   PGOPTIONS='-c default_transaction_read_only=on' \
---   psql -X -v ON_ERROR_STOP=1 -v expect_db=afldb_test -f issues/open/AFLDB-ISSUE-225-s1-captaincies-checks.sql -d "$DSN"
+--   psql -X -v ON_ERROR_STOP=1 -v expect_db=afldb_test -f issues/closed/AFLDB-ISSUE-225-s1-captaincies-checks.sql -d "$DSN"
 --
 -- Expected AFTER the reload (BEFORE in brackets):
 --   T  rows 1781 [1774], trusted 1781 [1774] on afldb_test (DEV: trusted is whatever its

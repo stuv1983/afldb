@@ -4,7 +4,7 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 6
+**Open issues:** 5
 
 | ID | Title | Severity | Area | State | Next action |
 |---|---|---|---|---|---|
@@ -13,7 +13,15 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-229 | AFL API fixture ingestion | Medium | Data acquisition / fixtures — `afl_api` season feed → `fixtures` | Open (2026-09-23); 2026-09-26 pass 2: PARTIALLY EVIDENCED, STILL BLOCKED — one authentic `SCHEDULED` record (`CD_M20260142901`, no score block, refused by today's contract) hash-bound; every other status unobserved; no writer; runbook `issues/open/AFLDB-ISSUE-229.md` | Operator decides whether D-229-1/2 may proceed on the single `SCHEDULED` citation, or waits for more captures |
 | AFLDB-ISSUE-230 | `afldb_test` 2026 AFL Tables spine carries 2099 observation timestamps from the 2026-09-06 settle benchmark, so real-clock settles refuse on `source_records_seen_ck` | Low | Test database hygiene — `afldb_test` `staging.source_records` | Open — found 2026-09-23 (ISSUE-228 §22.13); lineage continued to 2099-01-06 on `afldb_test` only under operator authorisation (batches 2421/2422); not repaired; did not block ISSUE-228 S9 (accepted 2026-09-23) | Choose a repair (reviewed re-stamp tool on `afldb_test` only, or a real-clock rebuild of the 2026 lineage); S9 is now accepted, so it may be scheduled |
 | AFLDB-ISSUE-226 | Stale `docs/architecture.md` §5/§6: the documented application structure names `src/services/`, `src/db/schema/` (described as a Drizzle schema) and `src/types/`, none of which exist, and no Drizzle dependency is present — the project uses postgres.js directly | Low | Documentation — `docs/architecture.md` §5 "Application structure", §6 "Shared statistical definitions" | Open — found 2026-09-19 during the PhanesLight bootstrap closure review; verified three ways against the tracked tree; no code, data or runtime impact; not corrected under the bootstrap | Correct `docs/architecture.md` §5's directory tree and the Drizzle reference to the actual layout, and re-site §6's "defined once in `src/services`" claim on wherever the shared statistical definitions now live (establish that first — this issue does not assert where they are) |
-| AFLDB-ISSUE-225 | Gridley corpus: 37 pre-existing `incorrect known answer` cells on non-draft criteria (`captain` 20, `teammates-150` 14, `teammates-100` 1, `games250sameclub` 1, `games100clubs2` 1; 14 players) present on `afldb_test` since the 2026-09-13 baseline, untouched by AFLDB-ISSUE-222 | Medium | Grid Solver / canonical data — `captaincies`, `player_club_season_stats`, `tests/integration/gridley-corpus.test.ts` | Open — opened 2026-09-19 under ISSUE-222 decision D3; passes 1–3 recorded (2026-10-01: E1, E2, E3 DEV read-only PASS, E4 operator-run); final classification: May 2017–18 and Bruce 2008 = `captaincies` source omissions (bootstrap club-list grain; Witts 2019–21 and McDonald 2008 also missing); teammates 15 = semantic contract; Swallow and Shiel = Gridley known-answer errors; design (runbook §16–§23): S1 +7 captaincy rows (1,774 → 1,781), S2 suite-only teammates rule + tracked known-answer adjudication record; S1 alone would add 37 Bruce reverse failures, plus one informational club-count/list-membership cell, before S2/D10 adjudication, so one slice; **pass 4 (2026-10-01): D1–D9 approved, S1+S2 implemented uncommitted, captaincies checker 1,781 PASS; pass 5 (2026-10-01): D10 (Bruce-record-only criterion-level guard: 26 + 11 = 37 adjudications) and D11 (read-only DEV acceptance probe `tools/validation/issue225-dev-acceptance-probe.ts`) implemented; final operator validation (runbook §24.9): DB-free focused 144/144, typecheck PASS, full-repo lint FAIL on the pre-existing baseline (390 problems), ISSUE-225 lint delta 0; V2 `afldb_test` captaincies reload and V3 diagnostic corpus (horizon 2025, 1,205/1,205, 0 `incorrect known answer`) accepted PASS (runbook §24.8)**; runbook `issues/open/AFLDB-ISSUE-225.md` | Operator commit and merge; then V5 DEV captaincies reload + V4 read-only DEV acceptance probe (runbook §24.6); never a blanket reclassification or player exception |
+
+**AFLDB-ISSUE-225 resolved 2026-10-02** (implementation `4c0dfb39`, merged; operator-run DEV acceptance).
+Seven evidenced co-captaincy rows were missing from the `captaincies` source: May 2017–18, Witts 2019–21,
+and Bruce and McDonald 2008. They are added (1,774 → 1,781), and the remaining Gridley cells are adjudicated
+in the suite only. Grid Solver semantics are unchanged. V2–V5 PASS, including the DEV page smoke (6/6) after
+a stale-page-cache diagnosis and a narrow two-path club revalidation. PROD out of scope. Removed from
+`IssuesIndex.md` and the Open Issues table. Full record: the entry in this file and
+`issues/closed/AFLDB-ISSUE-225.md` §24.11.
+
 **AFLDB-ISSUE-220 resolved 2026-10-01** (implementation `f5adfe39`, merged `46805c05`; drift repair
 `1111ab19`; operator-run DEV and PROD acceptance). DEV and PROD both run `1111ab19` and hold exactly
 `DATABASE_URL`, `AFLDB_AUTH_DATABASE_URL` and `AFLDB_IMPORT_DATABASE_URL`, with no `.env*` under
@@ -37820,7 +37828,11 @@ distinguish the two from the ledger alone. Independent of, and unaffected by, AF
 
 ## AFLDB-ISSUE-225 — Gridley corpus: 37 pre-existing `incorrect known answer` cells on non-draft criteria, present on `afldb_test` before AFLDB-ISSUE-222 and untouched by it
 
-**Status: Open.** Opened 2026-09-19 (Fable 5.1) under AFLDB-ISSUE-222 operator decision **D3**:
+**Status: RESOLVED (2026-10-02; see *Resolution (2026-10-02)* at the end of this entry).** Implementation
+`4c0dfb39`, merged; DEV-accepted (V5, V4 and the V5 page smoke). PROD is out of scope. Runbook and
+companions: `issues/closed/AFLDB-ISSUE-225*`.
+
+Opened 2026-09-19 (Fable 5.1) under AFLDB-ISSUE-222 operator decision **D3**:
 these cells are neither accepted as a silent baseline nor claimed as resolved by ISSUE-222. No
 command was executed to open this issue; the evidence is the two corpus reports and the
 repository fixtures.
@@ -37870,7 +37882,7 @@ classify each cell and record the cause here.
 
 ### Investigation pass 1 — repository evidence (2026-10-01)
 
-**Runbook:** `issues/open/AFLDB-ISSUE-225.md`, with `AFLDB-ISSUE-225-evidence.sql` (E2) and
+**Runbook:** `issues/closed/AFLDB-ISSUE-225.md`, with `AFLDB-ISSUE-225-evidence.sql` (E2) and
 `AFLDB-ISSUE-225-gridley-key-probe.mjs` (E1). This pass used native read and search only. No shell, Git,
 SQL, network or test command ran. No code, test, classifier, data or database change.
 
@@ -38004,7 +38016,7 @@ ended `ROLLBACK`. No mutation.
 **Families:** four independent mechanisms (source omission, key drift, semantic contract, one-game count).
 They share only the 2026-horizon exposure. Full table: runbook §12.1. Pre-registered E3 reading: runbook §12.4.
 
-**E3 (prepared, not run):** `issues/open/AFLDB-ISSUE-225-e3-dev-horizon.sql`. It is `afldb_dev` only:
+**E3 (prepared, not run):** `issues/closed/AFLDB-ISSUE-225-e3-dev-horizon.sql`. It is `afldb_dev` only:
 `BEGIN … READ ONLY`, a `DO` guard on `current_database()` and `transaction_read_only`, and `ROLLBACK`.
 
 - It reads the DEV horizon.
@@ -38186,15 +38198,102 @@ current DB-free evidence.
   - the captaincies warning moved from line 140 to 141 only because preceding content moved.
 - **ISSUE-225 lint delta: 0. No lint regression introduced.**
 
-**Next action.**
+**Merged.** Implementation commit `4c0dfb39` (`fix(captaincies): add ISSUE-225 co-captains and Gridley key
+adjudication`) is on `main`.
 
-1. Operator reviews, commits and merges.
-2. V5: DEV captaincies reload.
-3. V4: the read-only DEV acceptance probe (runbook §24.6): `captain census` agreement 20; `teammate census`
-   adjudicated 15; `games census` adjudicated 2; `bruce reverse` adjudicated 37, `list membership` 1,
-   agreement 126; 0 `incorrect known answer`; all three records current.
+**DEV phase (operator-run 2026-10-02): V5 and V4 accepted PASS (runbook §24.10).**
 
-`CHANGELOG.md` waits for validation.
+- **V5, DEV captaincies reload:**
+  - before (read-only, `afldb_dev`, role `afldb_import`, rolled back): 1,774 rows, 1,774 trusted,
+    `club_captain_any` 589, zero ISSUE-225 source rows; affected seasons held only the pre-existing captains;
+  - apply: the importer printed `afldb_import@127.0.0.1:55432/afldb_dev`; group `captaincies` only;
+    `captaincies 1,781 (1781 linked)`; exit 0;
+  - after (read-only, rolled back): 1,781 rows, 1,781 trusted, `club_captain_any` 591; all seven ISSUE-225
+    rows present and uniquely linked: Bruce → 2489, McDonald → 6730, May → 12093 (2017, 2018), Witts → 6815
+    (2019–2021);
+  - captain sets: Gold Coast 2017 and 2018 May + Lynch; Gold Coast 2019–2021 Swallow + Witts; Melbourne
+    2008 Bruce + Neitz + McDonald;
+  - import batch 97 (`wikipedia`, `import_awards.py`, `captaincies`, `completed`): read 1,781, inserted 7,
+    updated 1,774, rejected 0. As in V2, the 1,774 are keyed rows rewritten in place by `reload_keyed`
+    (reconciliation, not 1,774 factual changes);
+  - procedural note: the first local DSN parsing guard saw a malformed trailing `n` and halted. No mutation
+    occurred under that malformed target. Before the mutation, an independent remote read-only check proved
+    `afldb_dev` and the importer printed it; the after-check proved it again. Not a target ambiguity.
+- **V4, read-only DEV acceptance probe (D11):**
+  - guard: HEAD `4c0dfb39`, clean tracked worktree, tunnel `127.0.0.1:55432`, target `afldb_dev`;
+  - session: `afldb_dev`, read-only on, horizon 2026, rolled back (observed 2026-10-02 07:21:01 +10);
+  - all three adjudication records `current` (Bruce 2489, Swallow 3581, Shiel 4006);
+  - `captain census` `{"agreement":20}`; `teammate census` `{"adjudicated key disagreement":15}`;
+    `games census` `{"adjudicated key disagreement":2}`; `bruce reverse`
+    `{"agreement":126,"adjudicated key disagreement":37,"list membership":1}`;
+  - expected unsupported exclusions `#241 0-1` and `#487 0-1` (`season2024player`);
+  - `PASS`, exit 0. This satisfies the designed D11/V4 DEV acceptance contract.
+
+No ISSUE-225 database validation step remains.
+
+**Closure readiness (runbook §24.10; historical, superseded below).** At that point every §21 criterion was
+met except the V5 page smoke, which the returned evidence did not record.
+
+**V5 page smoke (2026-10-02, Playwright against DEV; runbook §24.11): PASS 6/6.**
+
+- **Initial smoke.** All six pages returned HTTP 200, rendered normally and logged 0 console errors or
+  warnings. Four showed pre-V5 captaincy data: May had no captaincy line; McDonald showed 2009–2010; the Gold
+  Coast and Melbourne Captains tables held one captain per affected season.
+- **Diagnosis: stale ISR page cache, not a public query or render defect.**
+  - Player pages read `captaincies` directly (`getPlayerHonours()`).
+  - The club query `getClubCaptains()` is a `UNION ALL` that keeps same-season co-captains.
+  - Pages revalidate after 1 hour (players) and 24 hours (clubs), and the `captaincies` importer
+    invalidates no page cache.
+  - After the normal background rebuild, the May and McDonald pages showed the V5 rows.
+- **Narrow refresh (DEV page cache only).** The existing `POST /admin/awards/revalidate` route, called with
+  exactly `/clubs/gold-coast` and `/clubs/melbourne`.
+  - 24 authenticated accepted POSTs, each HTTP 200,
+    `{"ok":true,"revalidated":["/clubs/gold-coast","/clubs/melbourne"]}`.
+  - Sequential POSTs did not reliably cover DEV's multiple workers, so two concurrent waves followed.
+  - No worker was individually identified, and no claim is made that every worker was reached.
+  - No global purge, `.next/cache` deletion, service restart or database mutation.
+- **Acceptance evidence.** After the concurrent refresh, each club page was loaded 8 consecutive times, and
+  the old ETags and content were never observed again:
+  - Gold Coast (21 rows): 2017 and 2018 May + Lynch; 2019–2021 Swallow + Witts;
+  - Melbourne (135 rows): 2008 Bruce, Neitz, McDonald.
+- **Player pages.**
+  - Bruce: Captain, Melbourne — 2008.
+  - May: Captain, Gold Coast — 2017–2018.
+  - Witts: Captain, Gold Coast — 2019–2024.
+  - McDonald: Captain, Melbourne — 2008–2010.
+
+### Resolution (2026-10-02)
+
+- **Root cause.** The `captaincies` source omitted seven evidenced co-captaincy rows, because of the
+  bootstrap's club-list grain: Steven May (Gold Coast 2017–18), Jarrod Witts (Gold Coast 2019–21), Cameron
+  Bruce and James McDonald (Melbourne 2008). The other 17 cells were not data defects:
+  - 15 are a teammates semantic-contract difference;
+  - 2 are Gridley known-answer errors (Swallow, Shiel).
+- **Fix (`4c0dfb39`).**
+  - S1: the seven rows were added to `data/awards/captaincies.csv` (1,774 → 1,781) with a review manifest.
+  - S2 (suite only):
+    - a teammates semantic-contract rule;
+    - a tracked known-answer adjudication record;
+    - the D10 Bruce-record-only guard;
+    - the informational `adjudicated key disagreement` category.
+  - D11: a read-only DEV acceptance probe.
+  - No production Grid Solver semantic change: `grid-solver.ts` and `gridley-compat.ts` are untouched. No
+    assertion was weakened, and there is no blanket exception.
+- **Validation.**
+  - V1: DB-free 144/144, typecheck PASS, lint delta 0.
+  - V2: `afldb_test` reload PASS.
+  - V3: diagnostic corpus PASS, 0 `incorrect known answer`. Its "every other category unchanged" line was
+    not independently evidenced and was accepted as such.
+  - V5: DEV reload PASS, batch 97. Its 1,774 `updated` rows are `reload_keyed` reconciliation, not factual
+    changes.
+  - V4: read-only DEV acceptance probe PASS.
+  - V5 page smoke: PASS 6/6.
+- **Out of scope.** PROD was not changed; it needs its own promotion decision (runbook §18.4).
+- **Non-blocking follow-up (no issue opened).** The club page note "N recorded captaincy seasons"
+  (`src/app/clubs/[slug]/page.tsx:376`) prints `captains.length`, so it counts rows, not distinct seasons.
+  Gold Coast reads 21 for 16 seasons.
+- **Tracking.** Removed from `IssuesIndex.md` and the Open Issues table. `CHANGELOG.md` `Unreleased`
+  entry added. The runbook and its four companions moved to `issues/closed/`.
 
 ---
 

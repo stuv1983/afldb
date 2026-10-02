@@ -1,12 +1,18 @@
 # AFLDB-ISSUE-225 — investigation runbook: 37 pre-existing `incorrect known answer` Gridley cells on non-draft criteria
 
-**Status:** Open. **Pass 4 (2026-10-01): S1+S2 implemented as one slice under operator decisions D1–D9
+**Status: RESOLVED 2026-10-02.** Every §21 closure criterion is met (§24.11). Implementation `4c0dfb39`
+is merged to `main`. On DEV, V5 and V4 passed (§24.10), and the V5 page smoke passed 6/6 after a stale
+page-cache diagnosis and a narrow club-page revalidation (§24.11). PROD is out of scope; it needs its own
+promotion decision (§18.4). This runbook moved to `issues/closed/` with its four companions.
+
+**Earlier status (kept as written):** **Pass 4 (2026-10-01): S1+S2 implemented as one slice under operator decisions D1–D9
 (§24), uncommitted. Pass 5 (2026-10-01) implemented the operator's D10 and D11 decisions (§23, §24.4,
 §24.7). Final operator validation (§24.9): DB-free focused tests 144/144, typecheck PASS, ISSUE-225 lint
 delta 0 (full-repository lint FAILS on the pre-existing baseline, not on ISSUE-225). V2 (`afldb_test`
-captaincies reload) and V3 (`afldb_test` diagnostic corpus, horizon 2025) are accepted PASS (§24.8). Next:
-operator commit and merge, then the DEV phase: V5 reload, then the V4 read-only DEV acceptance probe
-(§24.6).** Pass 3 (2026-10-01): E3 and E4 recorded (§14, §15); final 37-cell
+captaincies reload) and V3 (`afldb_test` diagnostic corpus, horizon 2025) are accepted PASS (§24.8).
+Committed and merged to `main` as `4c0dfb39`. DEV phase (2026-10-02, operator-run, §24.10): V5 DEV
+captaincies reload PASS and V4 read-only DEV acceptance probe PASS. No ISSUE-225 database validation step
+remains. Next: confirm the §21 V5 page smoke, then closure (§24.10).** Pass 3 (2026-10-01): E3 and E4 recorded (§14, §15); final 37-cell
 classification (§16); implementation design for S1 (captaincies) and S2 (Gridley adjudication) (§17–§22);
 operator decisions (§23). Worktree `D:\dev\afldb-issue-225`, branch `sonnet/issue-225`, base `30b36ef0`. Pass 1
 (§1–§10) and pass 2 (§11–§13) are kept as written. Where pass 3 refines them, §16 governs classification and
@@ -205,9 +211,9 @@ The candidate causes, each with the query that tests it:
 
 | Id | What | Where | Gate |
 |---|---|---|---|
-| **E1** | Gridley key consistency over time for the 15 players | `issues/open/AFLDB-ISSUE-225-gridley-key-probe.mjs`, which reads the two tracked fixtures only | **Done 2026-10-01** (§11.1) |
-| **E2** | Canonical recounts and source rows (Q0–Q3) | `issues/open/AFLDB-ISSUE-225-evidence.sql`, one `READ ONLY` transaction, guard refuses any DB but `afldb_test`, ends `ROLLBACK` | **Done 2026-10-01** (§11.2) |
-| **E3** | Horizon-dependent facts only: DEV match horizon; Swallow and Shiel 2026 and career games by organization; Darcy Tucker teammate count including DEV 2026; derived-against-source agreement for those rows | `issues/open/AFLDB-ISSUE-225-e3-dev-horizon.sql`, one `READ ONLY` transaction, guard refuses any DB but `afldb_dev`, ends `ROLLBACK` | **Done 2026-10-01, PASS** (§14) |
+| **E1** | Gridley key consistency over time for the 15 players | `issues/closed/AFLDB-ISSUE-225-gridley-key-probe.mjs`, which reads the two tracked fixtures only | **Done 2026-10-01** (§11.1) |
+| **E2** | Canonical recounts and source rows (Q0–Q3) | `issues/closed/AFLDB-ISSUE-225-evidence.sql`, one `READ ONLY` transaction, guard refuses any DB but `afldb_test`, ends `ROLLBACK` | **Done 2026-10-01** (§11.2) |
+| **E3** | Horizon-dependent facts only: DEV match horizon; Swallow and Shiel 2026 and career games by organization; Darcy Tucker teammate count including DEV 2026; derived-against-source agreement for those rows | `issues/closed/AFLDB-ISSUE-225-e3-dev-horizon.sql`, one `READ ONLY` transaction, guard refuses any DB but `afldb_dev`, ends `ROLLBACK` | **Done 2026-10-01, PASS** (§14) |
 | **E4** | Independent public sources (minimum set in §13). Each citation needs a URL, an access date and the quoted text | Network | **Done 2026-10-01, operator-run** (§15). URL, access date and verbatim quote still to be captured in the S1/S2 evidence records (§23 D3) |
 
 ## 7. Operator commands (read-only)
@@ -219,7 +225,7 @@ From the worktree root, in PowerShell, with the `afldb_test` tunnel up. Use the 
 
 ```powershell
 New-Item -ItemType Directory -Force D:\tmp\issue225 | Out-Null
-node issues/open/AFLDB-ISSUE-225-gridley-key-probe.mjs > D:\tmp\issue225\e1-gridley-key-probe.txt
+node issues/closed/AFLDB-ISSUE-225-gridley-key-probe.mjs > D:\tmp\issue225\e1-gridley-key-probe.txt
 ```
 
 **E2, `afldb_test`, read-only:**
@@ -228,7 +234,7 @@ node issues/open/AFLDB-ISSUE-225-gridley-key-probe.mjs > D:\tmp\issue225\e1-grid
 $dsn = $env:AFLDB_TEST_DATABASE_URL.Trim()
 if ($dsn -notmatch '/afldb_test(\?|$)') { throw 'DSN does not name afldb_test' }
 $env:PGOPTIONS = '-c default_transaction_read_only=on'
-psql -X -v ON_ERROR_STOP=1 -o D:\tmp\issue225\e2-evidence.txt -f issues/open/AFLDB-ISSUE-225-evidence.sql -d $dsn
+psql -X -v ON_ERROR_STOP=1 -o D:\tmp\issue225\e2-evidence.txt -f issues/closed/AFLDB-ISSUE-225-evidence.sql -d $dsn
 Remove-Item Env:PGOPTIONS
 ```
 
@@ -250,7 +256,7 @@ app DSN because E3 reads `sources`, which the app role may not be granted) and s
 session default is read-only. It deletes both `/tmp` files on exit. From the worktree root, in PowerShell:
 
 ```powershell
-scp issues/open/AFLDB-ISSUE-225-e3-dev-horizon.sql streamanator:/tmp/afldb-issue225-e3.sql
+scp issues/closed/AFLDB-ISSUE-225-e3-dev-horizon.sql streamanator:/tmp/afldb-issue225-e3.sql
 scp D:\tmp\issue225\run-e3.sh streamanator:/tmp/afldb-issue225-run-e3.sh
 ssh streamanator 'bash /tmp/afldb-issue225-run-e3.sh' | Out-File -Encoding utf8 D:\tmp\issue225\e3-dev-horizon.txt
 ```
@@ -1194,14 +1200,14 @@ interpreter the earlier awards reloads used. `$testImport` is the importer-role 
 ```powershell
 $testImport = '<afldb_import DSN, database afldb_test>'
 $env:PGOPTIONS = '-c default_transaction_read_only=on'
-psql -X -v ON_ERROR_STOP=1 -v expect_db=afldb_test -f issues/open/AFLDB-ISSUE-225-s1-captaincies-checks.sql -d $testImport | Out-File -Encoding utf8 D:\tmp\issue225\v2-before.txt
+psql -X -v ON_ERROR_STOP=1 -v expect_db=afldb_test -f issues/closed/AFLDB-ISSUE-225-s1-captaincies-checks.sql -d $testImport | Out-File -Encoding utf8 D:\tmp\issue225\v2-before.txt
 Remove-Item Env:PGOPTIONS
 $env:AFLDB_IMPORT_DATABASE_URL = $testImport
 python tools/migration/import_awards.py --groups captaincies --dry-run
 python tools/migration/import_awards.py --groups captaincies 2>&1 | Out-File -Encoding utf8 D:\tmp\issue225\v2-reload.txt
 Remove-Item Env:AFLDB_IMPORT_DATABASE_URL
 $env:PGOPTIONS = '-c default_transaction_read_only=on'
-psql -X -v ON_ERROR_STOP=1 -v expect_db=afldb_test -f issues/open/AFLDB-ISSUE-225-s1-captaincies-checks.sql -d $testImport | Out-File -Encoding utf8 D:\tmp\issue225\v2-after.txt
+psql -X -v ON_ERROR_STOP=1 -v expect_db=afldb_test -f issues/closed/AFLDB-ISSUE-225-s1-captaincies-checks.sql -d $testImport | Out-File -Encoding utf8 D:\tmp\issue225\v2-after.txt
 Remove-Item Env:PGOPTIONS
 ```
 
@@ -1263,13 +1269,13 @@ tunnel, with the DEV importer DSN.
 ```powershell
 $devImport = '<afldb_import DSN, database afldb_dev>'
 $env:PGOPTIONS = '-c default_transaction_read_only=on'
-psql -X -v ON_ERROR_STOP=1 -v expect_db=afldb_dev -f issues/open/AFLDB-ISSUE-225-s1-captaincies-checks.sql -d $devImport | Out-File -Encoding utf8 D:\tmp\issue225\v5-before.txt
+psql -X -v ON_ERROR_STOP=1 -v expect_db=afldb_dev -f issues/closed/AFLDB-ISSUE-225-s1-captaincies-checks.sql -d $devImport | Out-File -Encoding utf8 D:\tmp\issue225\v5-before.txt
 Remove-Item Env:PGOPTIONS
 $env:AFLDB_IMPORT_DATABASE_URL = $devImport
 python tools/migration/import_awards.py --groups captaincies 2>&1 | Out-File -Encoding utf8 D:\tmp\issue225\v5-reload.txt
 Remove-Item Env:AFLDB_IMPORT_DATABASE_URL
 $env:PGOPTIONS = '-c default_transaction_read_only=on'
-psql -X -v ON_ERROR_STOP=1 -v expect_db=afldb_dev -f issues/open/AFLDB-ISSUE-225-s1-captaincies-checks.sql -d $devImport | Out-File -Encoding utf8 D:\tmp\issue225\v5-after.txt
+psql -X -v ON_ERROR_STOP=1 -v expect_db=afldb_dev -f issues/closed/AFLDB-ISSUE-225-s1-captaincies-checks.sql -d $devImport | Out-File -Encoding utf8 D:\tmp\issue225\v5-after.txt
 Remove-Item Env:PGOPTIONS
 ```
 
@@ -1473,7 +1479,231 @@ base and line 141 on ISSUE-225 only because preceding content moved; the rule an
 disagreement`, the expected `list membership` +1, 0 `incorrect known answer`; diagnostic only, not DEV
 acceptance) (§24.8).
 
+### 24.10 DEV phase: V5 and V4 evidence (operator-run 2026-10-02; accepted PASS)
+
+The implementation commit `4c0dfb39` (`fix(captaincies): add ISSUE-225 co-captains and Gridley key
+adjudication`) is merged to `main`. Both DEV steps ran from it, in the §24.6 order: V5, then V4.
+
+**V5 — DEV captaincies reload: PASS.**
+
+| Check | Before (read-only) | After (read-only) |
+|---|---|---|
+| Database / role | `afldb_dev` / `afldb_import` | `afldb_dev` / `afldb_import` |
+| Read-only | `default_transaction_read_only=on` | `read_only=on` |
+| `captaincies` rows | 1,774 | 1,781 |
+| trusted | 1,774 | 1,781 (before + 7) |
+| `club_captain_any` eligible | 589 | 591 (+2) |
+| ISSUE-225 source rows | 0 | all 7 present, each uniquely linked |
+| Transaction | rolled back | rolled back |
+
+Before the reload, the affected seasons held only the pre-existing captains.
+
+**Apply:**
+
+- the importer printed its target explicitly: `afldb_import@127.0.0.1:55432/afldb_dev`;
+- group `captaincies` only;
+- `captaincies 1,781 (1781 linked)`; exit 0.
+
+**Links (after):**
+
+- Cameron Bruce → canonical 2489;
+- James McDonald → canonical 6730;
+- Steven May → canonical 12093 (2017, 2018);
+- Jarrod Witts → canonical 6815 (2019, 2020, 2021).
+
+**Affected season captain sets (after):**
+
+- Gold Coast 2017: Steven May + Tom Lynch;
+- Gold Coast 2018: Steven May + Tom Lynch;
+- Gold Coast 2019–2021: David Swallow + Jarrod Witts;
+- Melbourne 2008: Cameron Bruce + David Neitz + James McDonald.
+
+**Latest captaincies import batch:**
+
+| Field | Value |
+|---|---|
+| id | 97 |
+| source / tool / target | `wikipedia` / `import_awards.py` / `captaincies` |
+| status | `completed` |
+| `records_read` | 1,781 |
+| `records_inserted` | 7 |
+| `records_updated` | 1,774 |
+| `records_rejected` | 0 |
+
+`records_updated` 1,774 has the same meaning as in V2 (§24.8). `reload_keyed` rewrites every matching keyed
+row in place and reports it as `updated`. The figure is reconciliation, not 1,774 factual changes.
+
+DEV linkage was checked, not assumed (§18.4). The before-proof shows 1,774 of 1,774 trusted, so the earlier
+"84 unlinked of 1,774" DEV figure (§18.4, §24.6) no longer described DEV at V5. Why it changed is outside
+this issue and was not investigated.
+
+**Procedural note (operator anomaly; no mutation, no target ambiguity).**
+
+- The first local V5 DSN parsing guard saw a malformed trailing `n` and halted.
+- The interactive PowerShell session then continued. No mutation occurred under that malformed target.
+- Before the actual mutation, the independent remote read-only check proved `afldb_dev`. The importer
+  itself printed `127.0.0.1:55432/afldb_dev`.
+- The after-check independently proved `afldb_dev`.
+
+**V4 — read-only DEV acceptance probe (D11): PASS.**
+
+Source and runtime guard:
+
+- HEAD `4c0dfb39`; clean tracked worktree;
+- `tsx` runtime present; tunnel `127.0.0.1:55432` present;
+- the base64 DSN transport decoded to `afldb_dev`;
+- final local target guard: host `127.0.0.1`, port `55432`, database `afldb_dev`.
+
+Probe session: database `afldb_dev`; read-only `on`; server port 5432; horizon 2026; transaction rolled back;
+observed 2026-10-02 07:21:01 +10.
+
+Adjudication records, all three `current`:
+
+| Profile | Criterion / verdict | AFLDB id |
+|---|---|---|
+| Cameron Bruce | `captain` / `gridley_omits` | 2489 |
+| David Swallow | `games250sameclub` / `gridley_lists` | 3581 |
+| Dylan Shiel | `games100clubs2` / `gridley_lists` | 4006 |
+
+| Group | Expected (§21, §24.6) | Observed |
+|---|---|---|
+| `captain census` | `{"agreement":20}` | `{"agreement":20}` |
+| `teammate census` | `{"adjudicated key disagreement":15}` | `{"adjudicated key disagreement":15}` |
+| `games census` | `{"adjudicated key disagreement":2}` | `{"adjudicated key disagreement":2}` |
+| `bruce reverse` | adjudicated 37, `list membership` 1, agreement 126 | `{"agreement":126,"adjudicated key disagreement":37,"list membership":1}` |
+
+- Expected unsupported exclusions: `#241 0-1 season2024player` and `#487 0-1 season2024player`.
+- Result `PASS`, exit 0. `incorrect known answer` 0: the probe exits 1 on any.
+- The probe also exits 1 on a teammate detail without AFLDB's count (§24.6), so PASS proves every teammate
+  detail carried it. The per-player values were not part of the returned evidence.
+
+No §21 stop condition fired. This satisfies the designed D11/V4 DEV acceptance contract. No ISSUE-225
+database validation step remains.
+
+**Closure readiness (assessed 2026-10-02; closure not performed). Historical; superseded by §24.11.**
+
+| Criterion | State |
+|---|---|
+| V0: D1–D9, E4b capture (§21, §23, §24.1) | Met |
+| V1: DB-free validation (§21) | Met (§24.9 current; pass-4 checker 1,781 / 1,781 / 186) |
+| V2: `afldb_test` reload (§21) | Met (§24.8) |
+| V3: `afldb_test` diagnostic corpus, 0 `incorrect known answer` (§21; also the §10 closure rerun) | Met (§24.8). Its "every other category unchanged" line was not evidenced either way (§24.8) and was accepted as such |
+| V4: read-only DEV acceptance probe (§21, D11) | Met (above) |
+| V5: DEV `captaincies` reload, count and links (§21) | Met (above) |
+| V5: "smoke the Bruce, May, Witts and McDonald player pages, plus the Gold Coast and Melbourne club pages (… the operator eyeballs it)" (§21) | **Not recorded.** The returned V5 evidence does not include it |
+| Ledger constraint: evidenced per-cell correction or rule; no blanket exception; no assertion weakened | Met (§16–§19, §24) |
+| `CHANGELOG.md` at resolution (§22) | Pending: a closure action |
+| PROD (§18.4) | Out of scope; "It needs its own promotion decision". A follow-up, not a closure criterion |
+
+### 24.11 V5 page smoke and closure (2026-10-02): RESOLVED
+
+**Method.** The smoke was run in a Playwright browser against DEV `http://10.0.40.100:8090`. The operator
+completed the beta gate, and later the super-admin sign-in, manually in that browser; Claude never handled
+credentials. No database, importer, test, service, Git or PROD action was taken. The page code was
+untouched (data-only change).
+
+**Initial smoke: stale page cache, not a defect.** All six pages returned HTTP 200, rendered every
+section and logged 0 console errors or warnings. Four showed pre-V5 captaincy data:
+
+- Steven May had no captaincy line;
+- James McDonald showed Melbourne 2009–2010 only;
+- the Gold Coast Captains table held one captain per season (Lynch 2017–18, Swallow 2019–21);
+- the Melbourne Captains table held Neitz alone for 2008.
+
+**Diagnosis (source and response headers; nothing changed).**
+
+- Player pages read `captaincies` directly, with no derived table and no cross-request data cache:
+  `getPlayerHonours()` (`src/db/queries/awards.ts:448`, captaincy branch lines 501–519), grouped by club
+  (`src/app/players/[slug]/page.tsx:210-215`). Its `unique`/`resolved` filter admits every linked row,
+  because `link_status()` (`tools/migration/import_awards.py:119-131`) gives any row with a player id one
+  of those two statuses.
+- The club query `getClubCaptains()` (`src/db/queries/awards.ts:692-730`) is a `UNION ALL` with no
+  `DISTINCT ON`, `GROUP BY` or `LIMIT`. Its rows are keyed by `id`, so same-season co-captains survive.
+- Pages are ISR: players `revalidate = 3600`, clubs `revalidate = 86400`. The `captaincies` import
+  (`import_captaincies()`) invalidates no page cache, so V5 left the cached pages in place.
+- Live evidence: the May and McDonald pages first served stale copies (which triggered the normal
+  background rebuild). Reloaded later, the same URLs showed "Captain, Gold Coast — 2017–2018 (2 seasons)"
+  and "Captain, Melbourne — 2008–2010 (3 seasons)". The two club pages were still cache `HIT` on the pre-V5
+  table within their 24-hour window.
+- Classification: **stale cache. No public query or render defect.**
+
+**Narrow refresh (DEV page cache only).** The existing awards revalidation route,
+`POST /admin/awards/revalidate` (`data.awards.edit`; allowlist `src/app/admin/awards/revalidate-paths.ts`),
+was called with exactly `{"paths":["/clubs/gold-coast","/clubs/melbourne"]}`.
+
+- 24 authenticated POSTs were accepted. Each returned HTTP 200 and
+  `{"ok":true,"revalidated":["/clubs/gold-coast","/clubs/melbourne"]}`. One earlier attempt, made before
+  the admin sign-in, was redirected by the capability check and changed nothing.
+- `revalidatePath` acts per worker process. The first 12 POSTs, sent one after another, did not reliably
+  reach every worker: later loads still mostly served the pre-V5 tables. Two concurrent waves of 6 followed.
+- There was no global purge, no `.next/cache` deletion, no service restart and no database mutation.
+- The route does not identify the worker that handled a request, so **no claim is made that every DEV
+  worker was individually reached.**
+
+**Acceptance evidence.** After the concurrent refresh, each club page was loaded 8 consecutive times. Every
+load showed the expected rows, and the old ETags and old content were never observed again.
+
+| Page | Path | Cache statuses (8 loads) | Rows | Result |
+|---|---|---|---|---|
+| Gold Coast | `/clubs/gold-coast` | MISS, MISS, HIT, MISS, HIT, HIT, HIT, HIT; two new ETags, same content | 2017 and 2018: Steven May + Tom Lynch; 2019, 2020 and 2021: David Swallow + Jarrod Witts; 21 captaincy rows | PASS |
+| Melbourne | `/clubs/melbourne` | MISS, MISS, MISS, HIT, MISS, HIT, HIT, HIT; two new ETags, same content | 2008: Cameron Bruce, David Neitz, James McDonald; 135 captaincy rows | PASS |
+
+| Player page | Path | Honours line | Result |
+|---|---|---|---|
+| Cameron Bruce | `/players/cameron-bruce-2489` | Captain, Melbourne — 2008 (1 season) | PASS |
+| Steven May | `/players/steven-may-12093` | Captain, Gold Coast — 2017–2018 (2 seasons) | PASS |
+| Jarrod Witts | `/players/jarrod-witts-6815` | Captain, Gold Coast — 2019–2024 (6 seasons) | PASS |
+| James McDonald | `/players/james-mcdonald-6730` | Captain, Melbourne — 2008–2010 (3 seasons) | PASS |
+
+**V5 page smoke: PASS, 6/6.**
+
+**Closure criteria (final; supersedes the §24.10 readiness table).**
+
+| Criterion | State |
+|---|---|
+| V0: D1–D9, E4b capture | Met |
+| V1: DB-free validation | Met (§24.9) |
+| V2: `afldb_test` reload | Met (§24.8) |
+| V3: `afldb_test` diagnostic corpus, 0 `incorrect known answer` (also the §10 closure rerun) | Met (§24.8). Its "every other category unchanged" line was **not** independently evidenced, and was accepted as such |
+| V4: read-only DEV acceptance probe (D11) | Met (§24.10) |
+| V5: DEV `captaincies` reload, count and links | Met (§24.10) |
+| V5: page smoke (Bruce, May, Witts, McDonald; Gold Coast, Melbourne) | Met (above) |
+| Ledger constraint: evidenced per-cell correction or rule; no blanket exception; no assertion weakened | Met (§16–§19, §24) |
+| `CHANGELOG.md` at resolution (§22) | Met (`Unreleased`, 2 October 2026) |
+| PROD (§18.4) | Out of scope: "It needs its own promotion decision". Not changed by this issue |
+
+**Resolution (2026-10-02).**
+
+- **Root cause.** The `captaincies` source omitted seven evidenced co-captaincy rows, because of the
+  bootstrap's club-list grain (§17.3): May 2017–18, Witts 2019–21, Bruce and McDonald 2008. The remaining
+  cells were a teammates semantic-contract difference (15) and two Gridley known-answer errors (Swallow,
+  Shiel).
+- **Fix.** S1 added the seven rows (1,774 → 1,781). S2 added a suite-only teammates rule, a tracked
+  known-answer adjudication record and the D10 Bruce guard. D11 added the read-only DEV acceptance probe.
+  Grid Solver semantics are unchanged.
+- **Validation.** V1–V5 above, including the 6/6 DEV page smoke.
+
+**Non-blocking follow-up (not an ISSUE-225 acceptance failure; no issue opened in this pass).** The club
+page note "N recorded captaincy seasons" (`src/app/clubs/[slug]/page.tsx:376`) prints `captains.length`,
+so it counts captaincy rows, not distinct seasons. Gold Coast reads 21 for 16 seasons.
+
 ## 25. Session log
+
+- **2026-10-02, V5 page smoke and closure.**
+  - Ran the V5 page smoke in Playwright; the operator signed in manually. Diagnosed the four initial
+    failures as stale ISR page cache, not a query or render defect. Refreshed only the two club pages,
+    through the existing awards revalidation route, and re-verified them (§24.11). PASS 6/6.
+  - Resolved the issue: `issues.md` entry and Open Issues table, `IssuesIndex.md`, `CHANGELOG.md`. Moved this
+    runbook and its four companions to `issues/closed/` and updated the live path references.
+  - No database, importer, test, service, Git or PROD action. Nothing staged or committed.
+
+- **2026-10-02, DEV evidence sync and closure-readiness assessment.**
+  - Recorded the operator-run V5 (DEV captaincies reload) and V4 (read-only DEV acceptance probe), both
+    accepted PASS, and the V5 procedural note (§24.10).
+  - Assessed closure readiness against §10, §21, §22 and the ledger constraint (§24.10). Remaining: the §21
+    V5 page smoke is not recorded.
+  - Documentation only. No database, Git, shell or test command. Nothing staged or committed.
+    `CHANGELOG.md` untouched. The issue was not closed or moved.
 
 - **2026-10-02, final operator-validation evidence sync.**
   - Recorded the operator's repository-surface validation (§24.9): DB-free 144/144, typecheck PASS,

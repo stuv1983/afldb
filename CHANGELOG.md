@@ -15,6 +15,33 @@ commit.
 
 ## [Unreleased]
 
+### Captaincies gain seven evidenced co-captain rows; Gridley corpus known-answer cells adjudicated (AFLDB-ISSUE-225; resolved) - 2 October 2026
+
+- `data/awards/captaincies.csv` now carries seven co-captaincy rows the bootstrap's club-list grain had
+  dropped: Steven May (Gold Coast 2017, 2018), Jarrod Witts (Gold Coast 2019–2021), and Cameron Bruce and
+  James McDonald (Melbourne 2008). Each cites its Wikipedia page, with provenance in
+  `docs/rebuild-manifests/captaincies/issue225-co-captaincy-review-20261001-v1.md`. The table goes from
+  1,774 to 1,781 rows, all trusted. Player and club pages now show these captains alongside the existing ones.
+- The Gridley corpus suite no longer reports the 37 `incorrect known answer` cells, and nothing was blanket
+  excepted:
+  - the captain cells are fixed by the data above;
+  - 15 teammate cells are classified under an evidenced semantic-contract rule;
+  - Gridley's own key errors (David Swallow, Dylan Shiel) and Cameron Bruce's inconsistent key entries are
+    held in a tracked known-answer adjudication record (`data/players/gridley-known-answer-adjudications.csv`)
+    and reported as an informational `adjudicated key disagreement`.
+  - A read-only DEV acceptance probe (`tools/validation/issue225-dev-acceptance-probe.ts`) checks the
+    2026-horizon outcome.
+- No production Grid Solver semantic change: `src/db/queries/grid-solver.ts` and
+  `src/search/gridley-compat.ts` are untouched, and no suite assertion was weakened.
+- Validated: DB-free 144/144, typecheck PASS, lint delta 0; the `afldb_test` reload and diagnostic corpus
+  (0 `incorrect known answer`) both PASS.
+- Accepted on DEV (operator-run, 2 October 2026):
+  - captaincies reload, batch 97, 7 inserted;
+  - read-only acceptance probe PASS;
+  - page smoke 6/6, after a narrow revalidation of the two cached club pages.
+
+  Not on PROD.
+
 ### AFL API settle no longer records an unused emergency as a game played (AFLDB-ISSUE-255; resolved) - 1 October 2026
 
 - The AFL.com.au player-stats feed lists a named emergency who never took the field as a stats row:

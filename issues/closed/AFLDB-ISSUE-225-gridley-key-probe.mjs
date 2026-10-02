@@ -10,7 +10,7 @@
 //
 // Reads only the two tracked fixtures; touches no database and writes nothing.
 // Run from the repository root:
-//   node issues/open/AFLDB-ISSUE-225-gridley-key-probe.mjs
+//   node issues/closed/AFLDB-ISSUE-225-gridley-key-probe.mjs
 import { readFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 import { join } from 'node:path';
