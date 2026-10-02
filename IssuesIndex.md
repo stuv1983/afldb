@@ -9,20 +9,7 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Open issues:** 3
-
-### AFLDB-ISSUE-234 — Optional AFL API feed expansion (extended statistics, umpires, play-by-play)
-- **Severity:** Low. **Area:** data acquisition, investigation only.
-- **State:** Open (2026-09-23), ISSUE-228 S10 successor. Optional; not required by the supported
-  ISSUE-228 architecture.
-- **Triage (2026-09-26): REMAINS OPEN / DEFERRED.** Nothing was built. The following are already
-  retained raw and never projected:
-  - `extendedStats`;
-  - roster `umpires`, `weather` and `milestones`;
-  - `scoreWorm` scoring events.
-
-  No play-by-play feed is acquired. There is no model, and terms-of-use (§15 Q8) is open.
-- **Next action:** none scheduled; investigate when a product need arises.
+**Open issues:** 2
 
 ### AFLDB-ISSUE-233 — AFL API season discovery and season rollover ownership
 - **Severity:** Medium. **Area:** season lifecycle — `data/reference/afl-api-identities.json`, the

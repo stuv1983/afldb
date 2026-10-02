@@ -4,13 +4,20 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 3
+**Open issues:** 2
 
 | ID | Title | Severity | Area | State | Next action |
 |---|---|---|---|---|---|
-| AFLDB-ISSUE-234 | Optional AFL API feed expansion (extended statistics, umpires, play-by-play) | Low | Data acquisition — investigation only | Open (2026-09-23); triaged 2026-09-26: REMAINS OPEN / DEFERRED — extended stats, umpires, weather, milestones and `scoreWorm` scoring events are already retained raw (host snapshots; spine payloads per ISSUE-228 §15 Q8), never projected; no product need, no model, terms-of-use (§15 Q8) open | None scheduled; investigate when a product need arises |
 | AFLDB-ISSUE-233 | AFL API season discovery and season rollover ownership | Medium | Data acquisition / season lifecycle — `afl-api-identities.json`, rollover runbook | Open (2026-09-23); 2026-09-26 pass 2: D-233-1/2/3 decided (proposal JSON; season-scoped AFL API Brownlow artefacts beside the master; preserve `afl_api` ownership or refuse); discovery IMPLEMENTED / DB-FREE VALIDATED against the authentic `compseasons` sample (sha256 `fe3f1641…d965`); 2026-10-01 pass 3 (uncommitted): D-233-3 rebuild/rollover `afl_api` ownership census and D-233-2 season-scoped AFL API Brownlow load IMPLEMENTED / DB-FREE VALIDATED; 2026-10-01 pass 4 (uncommitted): D-233-3 also enforced on the LIVE promotion target (`promotion-check.ts`, `dependencies`/`pre-cutover`/`restored`/`candidate`/frozen `production`, no override); damaged-schema census refuses; discovery `--fetch` retains entity bytes verbatim; ownership replay intentionally unimplemented; 2026-10-01 pass 5 (uncommitted): integration census test 5/5 on `afldb_test` (no residue), read-only censuses PASS on `afldb_test` and `afldb_dev` (zero `afl_api`-owned matches, DEV not mutated), final review no CRIT/HIGH/MED; committed `f0abbb4c`; 2026-10-01 pass 6: first real DEV discovery `--fetch` PASSED (`20261001T034039Z`, 1 fetch, HTTP 200, 1,959 decoded body bytes sha256 `2aeed4e9…b33e`, 15/15 entries 2012–2026, `no_change`, offline replay byte-identical, DEV and registry unchanged); D-233-2 `code_test_db` write-path rehearsal designed, not written or run, blocked on a stable-identity bridge and the 2026 snapshot; R4 classified fail-safe, no successor issue; 2026-10-01 passes 7–9 (uncommitted): fresh CONCLUDED 2026 Brownlow snapshot `afl-api-brownlow-2026-2026-10-01-041609`; `afldb_test` bridge 0/669 (no 2026 matches); DEV read-only bridge 669/669 (v1); builder continuity defect FIXED (exact tracked `profile_url_continuity` pair → `continuing_url`, ISSUE-237 parity), real DEV read-only build 183/183 (Jack Ross 6519 → `players/J/Jack_Ross.html`), artefact outside repo, second write `unchanged`; `code_test_db` read-only coverage 175/183 (8 presumed 2026 debutants absent), harness NOT written; 2026-10-01 pass 10 (uncommitted): D-233-R = scoped `code_test_db` fixture of exactly the eight missing 2026 player identities (no rebuild/restore), harness `tools/migration/brownlow_afl_api_season_rehearsal.py` WRITTEN, NOT RUN, DB-free 113/113; 9,982/9,983 = one unused emergency row (expected); 2026-10-01 pass 11 (uncommitted): `code_test_db` rehearsal PASSED + exact restore PASSED (evidence `D:\tmp\issue233\rehearsal-20261001-151415`; fixture 8+8 → 183/183; real loads A1 batches 27/28, A2 29/30, 183/1,242/1/14 `afl_api`, A2 content-identical; fingerprint = F0, residue 0, coverage back to 175/183; case 5 NOT RUN); 2026-10-01 pass 12 final review: 0 CRIT/HIGH, 2 MEDIUM fixed (continuity provenance validator; POSIX manifest paths), committed on `sonnet/issue-233`; 2026-10-01: `f0abbb4c` + `cc1a5f2d` merged, `main` at `cc1a5f2d`, no merge pending; PROD untouched; runbook `issues/open/AFLDB-ISSUE-233.md` | Promotion gate's first live read at the next promotion (runbook §4.6 item 6); stays OPEN until then |
 | AFLDB-ISSUE-229 | AFL API fixture ingestion | Medium | Data acquisition / fixtures — `afl_api` season feed → `fixtures` | Open (2026-09-23); 2026-09-26 pass 2: PARTIALLY EVIDENCED, STILL BLOCKED — one authentic `SCHEDULED` record (`CD_M20260142901`, no score block, refused by today's contract) hash-bound; every other status unobserved; no writer; runbook `issues/open/AFLDB-ISSUE-229.md` | Operator decides whether D-229-1/2 may proceed on the single `SCHEDULED` citation, or waits for more captures |
+
+**AFLDB-ISSUE-234 closed 2026-10-02 as DEFERRED / NO CURRENT PRODUCT REQUIREMENT** (documentation
+only; read-only investigation). Nothing was implemented. No product consumer, open issue or planned
+work needs the candidate feeds (extended statistics, umpires, weather, milestones, scoring events,
+play-by-play), and ISSUE-229 B2 and ISSUE-233 rollover do not depend on them. Closing does not reject
+the feeds, remove any retained raw AFL API field, or prohibit future expansion. A future feed is a new
+issue opened against a concrete product requirement. Removed from `IssuesIndex.md` and the Open Issues
+table. Full record: the entry in this file (there is no runbook).
 
 **AFLDB-ISSUE-230 resolved 2026-10-02, with no repair** (documentation only; operator-run read-only
 census). The contaminated historical 2099 observation lineage on `afldb_test` is absent. Repository
@@ -42630,7 +42637,8 @@ Full record: `issues/closed/AFLDB-ISSUE-228.md` §22.22.
 
 ## AFLDB-ISSUE-234 — Optional AFL API feed expansion (extended statistics, umpires, play-by-play)
 
-- **Status:** Open (2026-09-23). **Severity:** Low. **Area:** data acquisition — investigation
+- **Status:** **CLOSED 2026-10-02 as DEFERRED / NO CURRENT PRODUCT REQUIREMENT** (opened
+  2026-09-23). Nothing was implemented. **Severity:** Low. **Area:** data acquisition — investigation
   only.
 - **Origin.** ISSUE-228 §16 S10 ("optional extended stats / umpires / play-by-play families").
 - **Scope.** Investigate whether additional official AFL feeds are worth ingesting: further
@@ -42638,7 +42646,8 @@ Full record: `issues/closed/AFLDB-ISSUE-228.md` §22.22.
   establish availability, licensing/terms, a stable identity, and whether AFLDB has a model for it.
 - **These are optional expansion opportunities.** They are not required by the supported ISSUE-228
   architecture, and nothing in the current acquisition, settle or Brownlow path depends on them.
-- **Next action.** None scheduled. Investigate only when a product need arises.
+- **Next action.** None. Closed 2026-10-02 (see the closure section below). Before closure it read:
+  "None scheduled. Investigate only when a product need arises."
 - **Triage (2026-09-26, bulk successor pass; no code): REMAINS OPEN / DEFERRED.** What is already
   fetched and stored incidentally, never projected (ISSUE-228 §4.2, §11.5):
   - `playerStats` `extendedStats` (26 keys, §2.2);
@@ -42649,6 +42658,58 @@ Full record: `issues/closed/AFLDB-ISSUE-228.md` §22.22.
   per ISSUE-228 §15 Q8, in `staging.source_payloads`. No play-by-play endpoint is acquired. Nothing in 229/231/232/233 needs any of it. There is no AFLDB model for
   umpires or extended statistics, and the terms-of-use question (§15 Q8) is still open. Nothing
   was built.
+- **Closure (2026-10-02): DEFERRED / NO CURRENT PRODUCT REQUIREMENT.** Documentation and lifecycle
+  only. The basis was a read-only repository investigation; no code, test, database, DEV, PROD or
+  AFL API action was taken.
+  - **Why it closes.** The investigation this issue asked for has been done: ISSUE-228 §2/§4.2,
+    the 2026-09-26 triage, and the 2026-10-02 investigation.
+    - **No product consumer.** No public, admin, search or Grid Solver code reads any candidate
+      feed. No accepted requirement or TODO asks for one. `stat-definitions.json` and
+      `stat-availability.json` declare none of these statistics.
+    - **No dependency.** No open issue depends on this one. The ISSUE-229 runbook (including B2)
+      and the ISSUE-233 runbook (including rollover) never reference it.
+    - **Incomplete contract evidence.**
+      - The tracked fixtures `tests/fixtures/afl_api/match/02-player-stats.raw.json` and
+        `03-match-roster.raw.json` are trimmed or synthetic.
+      - The authentic samples are hash-bound in
+        `docs/rebuild-manifests/afl_api/backtest-20260919.json`, but their bytes are untracked.
+      - `extendedStats`, roster `umpires` and `weather` have shape evidence: they are declared
+        known columns, and the 2022 and 2026 key sets are identical. They have no accepted
+        semantics or product requirement.
+      - The populated shapes of `milestones`, `clubDebuts` and `ins`/`outs` are unmeasured (the
+        `match_roster` family stays `known_columns_status: incomplete`).
+      - `scoreWorm.scoringEvents[]` is not a declared column.
+      - No play-by-play endpoint is acquired, and no authentic play-by-play bytes exist.
+    - **Policy.** The standing acquisition policy excludes a Champion Data licensing route.
+    - **Index hygiene.** An inert "investigate someday" item in the open-work index is misleading.
+  - **What closing does NOT mean.**
+    - The feeds are not permanently rejected.
+    - The retained raw AFL API fields (host snapshots, `staging.source_payloads`, the declared
+      known columns inside the semantic hash) stay as they are and must not be removed on the
+      strength of this closure.
+    - Future official-feed expansion is not prohibited.
+    - No behaviour was implemented, so `CHANGELOG.md` is unchanged.
+  - **Decisions preserved, unchanged by this closure.**
+    - Acquisition standing policy: free/hobby sources only, no Champion Data contract, and no
+      Champion Data licensing or `player_match_period_stats` issue while no free source exists
+      (`docs/acquisition/AFLDB-2026-API-ACQUISITION.md` §0 item 1 and the §6 exclusions;
+      ISSUE-096 §2).
+    - ISSUE-228 Q1: co-source corroboration, never re-own.
+    - ISSUE-228 Q7: rollover corroborates, never re-owns.
+    - ISSUE-228 T2: no hash exclusion without evidence.
+    - ISSUE-228 §4.2: retain raw, never project, unless a product requirement appears.
+  - **Reopen / new-issue conditions.** Future expansion is a **new issue**, opened against a
+    concrete product requirement. It must carry:
+    - the exact feed or statistic required;
+    - authentic retained source bytes;
+    - stable identity and contract evidence;
+    - a storage and ownership model, including how it fits the Q1 rule for `afltables`-owned
+      rows;
+    - resolution of the open terms-of-use questions (ISSUE-228 §15 Q8; acquisition doc §6
+      item 4), where applicable. These remain a precondition.
+  - **Tracking.** Removed from `IssuesIndex.md` and the Open Issues table (open count 3 → 2).
+    `README.md`'s successor list is annotated. There is no runbook, so this entry is the closure
+    record.
 
 ## AFLDB-ISSUE-235 — `afl_api` player-link adjudication in `/admin/player-links`
 

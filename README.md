@@ -454,7 +454,9 @@ different serialisations. It runs them through the production emitters with no e
     feed for completeness and scopes the retired-identity rekey search by it; an incomplete feed
     authorises neither.
   - AFLDB-ISSUE-233: season discovery and the season-rollover runbook changes.
-  - AFLDB-ISSUE-234: optional extra feeds (extended statistics, umpires, play-by-play).
+  - AFLDB-ISSUE-234: optional extra feeds (extended statistics, umpires, play-by-play). Closed
+    2026-10-02 as deferred, with no current product requirement. Nothing was implemented, and a
+    future feed would be opened as a new issue against a concrete requirement.
   - AFLDB-ISSUE-235: `afl_api` player-link adjudication in `/admin/player-links`.
 - **TEST-only accommodation, not normal operation.** During acceptance, `afldb_test` was settled on
   an artificial observation clock. This was to continue its pre-existing future-dated benchmark
