@@ -19,7 +19,7 @@ AFLDB is a new, independent public historical AFL/VFL statistics database. It is
                   └────────┬────────┘
                            ▼
                   ┌─────────────────┐
-                  │  Query layer    │   src/db/queries, src/services
+                  │  Query layer    │   src/db/queries (postgres.js)
                   └────────┬────────┘
                            ▼
                   ┌─────────────────┐
@@ -61,7 +61,7 @@ Ports already in use on the dev server: 3000, 8080, 8081, 8082, 8085, 8086, 6881
 | Web framework | Next.js (App Router) + TypeScript | Server Components suit a read-heavy public reference site |
 | Rendering | Server Components by default | Data-dense pages need no client JS; Client Components only for search, filters, charts |
 | Database | PostgreSQL 16 | Single authoritative datastore |
-| Query layer | Drizzle + parameterised raw SQL | Type safety for CRUD; raw SQL for CTE/window/aggregation-heavy analytics |
+| Query layer | postgres.js (`postgres`) with parameterised SQL; no ORM | Hand-written SQL suits the CTE/window/aggregation-heavy analytics; tagged-template values bind as parameters |
 | Search | PostgreSQL `pg_trgm` + normalised search columns | Exact, prefix, partial and fuzzy search without a separate engine |
 | ETL | Python 3.12 + psycopg 3 (`COPY`) | Reuses existing AFL expertise; `COPY` for the 694K-row fact table |
 | Process management | systemd | Survives reboot; no tmux/manual startup |
@@ -165,26 +165,34 @@ One asymmetry is deliberate and documented at `tools/rebuild/fitzroy/validate_la
 ```text
 afldb/
 ├── src/
-│   ├── app/            # routes (Server Components by default)
-│   ├── components/
+│   ├── app/              # routes, layouts, route handlers (Server Components by default)
+│   ├── components/       # shared React UI components
 │   ├── db/
-│   │   ├── client.ts   # server-only PostgreSQL client
-│   │   ├── schema/     # Drizzle schema
-│   │   ├── migrations/
-│   │   └── queries/    # players, clubs, matches, seasons, records, search
-│   ├── services/       # shared statistical definitions
-│   ├── search/         # global + advanced search engine
-│   ├── lib/            # formatting (dates, scores, rounds, finals)
-│   ├── types/
-│   └── styles/
+│   │   ├── client.ts     # server-only postgres.js client used by the site
+│   │   ├── authClient.ts # server-only second postgres.js pool for auth/submission writes
+│   │   ├── migrations/   # ordered plain-SQL migrations (NNN_name.sql)
+│   │   └── queries/      # parameterised SQL by domain: players, clubs, matches, seasons,
+│   │                     #   records, search, admin-*, nl/ …
+│   ├── search/           # typed search specs, query builder, Grid Solver spec, NL search (nl/)
+│   ├── lib/              # auth, settings, email, SEO, ingest/acquisition, formatting, shared helpers
+│   ├── styles/
+│   └── middleware.ts
 ├── tools/              # Python ETL: migration, validation, import, maintenance
 ├── tests/              # Vitest + Playwright, fixtures incl. oracle baselines
 └── docs/
 ```
 
-**Data access boundary.** Only server-side modules import the database client; `src/db/client.ts` carries `server-only`. Credentials never reach a browser bundle.
+**Data access.** There is no ORM and no schema-definition layer. The schema is defined by the SQL files in `src/db/migrations/`, applied by `tools/db/migrate.ts` (`npm run db:migrate`). Application code issues SQL through postgres.js tagged templates on the exported `sql` client, with row types declared as TypeScript types beside each query module.
 
-**Shared statistical definitions.** Career games, finals, premierships, club count and Brownlow votes are defined once in `src/services` and reused by pages, records and search, so the three can never disagree (requirement #95).
+**Data access boundary.** Only server-side modules import a database client; `src/db/client.ts` and `src/db/authClient.ts` both carry `server-only`. Credentials never reach a browser bundle.
+
+**Shared statistical definitions (requirement #95).** No single runtime module owns these definitions. They are fixed in three places, each held by a check:
+
+- **Derived tables.** Career games, finals, premierships, clubs played and Brownlow totals are materialised into `player_career_stats`, `player_season_stats`, `player_club_season_stats`, `player_clubs` and `club_seasons` (§4.2). The full-rebuild reference implementation is the docstring and SQL in `tools/migration/rebuild_derived.py`. Targeted runtime recomputation lives in `src/db/queries/player-derived.ts` (`recomputePlayerDerivedStats`, `recomputeClubSeasons`, `recomputeSeasonMetadata`, `recomputeBrownlowCareerTotals` and siblings), run inside admin match, data-editor and Brownlow mutations and the two current-season settles. It re-spells the same rules and is held in parity with the rebuild by the integration test `tests/integration/derived-rebuild-parity.test.ts` (AFLDB-ISSUE-254), which runs the Python module's real SQL against `afldb_test` and compares every column.
+- **Finals-series membership** is the generated column `matches.is_finals_series` (migration `085`, §4.8), pinned by the source contract `tests/finals-semantics-contract.test.ts`.
+- **Brownlow totals** are summed only from `brownlow_season_votes` (§4.3), by both writers.
+
+Player and club pages, records and Advanced Search read whole-career and whole-season figures from the derived tables. Questions the derived grain cannot answer — scoped to a club, a season range, a quarter or individual matches — are aggregated at query time from the per-match fact tables (`player_match_stats`, `player_match_period_stats`) joined to `matches`, chiefly in natural-language search (`src/db/queries/nl/`) and the Grid Solver (`src/db/queries/grid-solver.ts`). Those paths read `is_finals_series` but spell their own counting and Grand Final predicates. The single-definition guarantee is therefore enforced for the derived figures and for finals-series membership, not for every query-time aggregate.
 
 ## 6. Security
 

@@ -15,6 +15,16 @@ commit.
 
 ## [Unreleased]
 
+### Architecture documentation matches the tracked source layout (AFLDB-ISSUE-226; resolved) - 2 October 2026
+
+- `docs/architecture.md` §5 no longer describes `src/services/`, `src/db/schema/` (Drizzle) or `src/types/`,
+  none of which exist. The tree now shows the tracked `src/` layout, and data access is described as it is:
+  postgres.js, no ORM, with the schema defined by the SQL migrations. §1 and §3 are corrected to match.
+- The requirement #95 "shared statistical definitions" paragraph now names where those definitions really
+  live: `tools/migration/rebuild_derived.py`, its parity-tested counterpart `src/db/queries/player-derived.ts`,
+  and the `matches.is_finals_series` generated column. It also states that query-time aggregates in NL search
+  and the Grid Solver are outside that guarantee. Documentation only; no behaviour changed.
+
 ### Captaincies gain seven evidenced co-captain rows; Gridley corpus known-answer cells adjudicated (AFLDB-ISSUE-225; resolved) - 2 October 2026
 
 - `data/awards/captaincies.csv` now carries seven co-captaincy rows the bootstrap's club-list grain had

@@ -9,7 +9,7 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Open issues:** 5
+**Open issues:** 4
 
 ### AFLDB-ISSUE-234 — Optional AFL API feed expansion (extended statistics, umpires, play-by-play)
 - **Severity:** Low. **Area:** data acquisition, investigation only.
@@ -147,23 +147,6 @@
   DEV and PROD are unaffected. It did not block ISSUE-228 S9, which was accepted 2026-09-23.
 - **Next action:** pick a reviewed `afldb_test`-only re-stamp or a real-clock rebuild of the 2026
   lineage. S9 is now accepted, so either may be scheduled.
-
-### AFLDB-ISSUE-226 — Stale `docs/architecture.md` §5/§6: documented application structure names `src/services/`, `src/db/schema/` (Drizzle) and `src/types/`, none of which exist
-- **Severity:** Low. **Area:** documentation — `docs/architecture.md` §5 "Application structure",
-  §6 "Shared statistical definitions".
-- **State:** Open (2026-09-19). Found during the closure review of PhanesLight bootstrap commit
-  `a59917a4`. Verified three ways against the tracked tree: `git ls-files src` returns exactly
-  `app`, `components`, `db`, `lib`, `search`, `styles`, `middleware.ts` (no `services`, no
-  `types`); `git ls-files src/db` returns exactly `authClient.ts`, `client.ts`, `migrations`,
-  `queries` (no `schema/`); `package.json` carries no Drizzle dependency — PostgreSQL is accessed
-  through `postgres` 3.4.9 (postgres.js) directly, and nothing imports `@/services` or `@/types`.
-  Documentation only: no application, query, data or deployment behaviour affected, and
-  `CLAUDE.md` §6's repository map (what agent routing actually reads) is correct and unaffected.
-  Deliberately not corrected under the bootstrap — out of its scope.
-- **Key files:** `docs/architecture.md` §5, §6.
-- **Next action:** correct §5's directory tree and drop the Drizzle reference. Then **establish
-  where the §6 shared statistical definitions actually live** before rewriting that claim — this
-  issue asserts only that they are not in `src/services/`, and does not assert where they are.
 
 **AFLDB-ISSUE-255 resolved 2026-10-01** (Sonnet 5, implementation committed `f6d189d0`, operator-run
 DEV acceptance) — the AFL API settle no longer records an unused emergency as a game played. The

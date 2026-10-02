@@ -4,7 +4,7 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 5
+**Open issues:** 4
 
 | ID | Title | Severity | Area | State | Next action |
 |---|---|---|---|---|---|
@@ -12,7 +12,13 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-233 | AFL API season discovery and season rollover ownership | Medium | Data acquisition / season lifecycle — `afl-api-identities.json`, rollover runbook | Open (2026-09-23); 2026-09-26 pass 2: D-233-1/2/3 decided (proposal JSON; season-scoped AFL API Brownlow artefacts beside the master; preserve `afl_api` ownership or refuse); discovery IMPLEMENTED / DB-FREE VALIDATED against the authentic `compseasons` sample (sha256 `fe3f1641…d965`); 2026-10-01 pass 3 (uncommitted): D-233-3 rebuild/rollover `afl_api` ownership census and D-233-2 season-scoped AFL API Brownlow load IMPLEMENTED / DB-FREE VALIDATED; 2026-10-01 pass 4 (uncommitted): D-233-3 also enforced on the LIVE promotion target (`promotion-check.ts`, `dependencies`/`pre-cutover`/`restored`/`candidate`/frozen `production`, no override); damaged-schema census refuses; discovery `--fetch` retains entity bytes verbatim; ownership replay intentionally unimplemented; 2026-10-01 pass 5 (uncommitted): integration census test 5/5 on `afldb_test` (no residue), read-only censuses PASS on `afldb_test` and `afldb_dev` (zero `afl_api`-owned matches, DEV not mutated), final review no CRIT/HIGH/MED; committed `f0abbb4c`; 2026-10-01 pass 6: first real DEV discovery `--fetch` PASSED (`20261001T034039Z`, 1 fetch, HTTP 200, 1,959 decoded body bytes sha256 `2aeed4e9…b33e`, 15/15 entries 2012–2026, `no_change`, offline replay byte-identical, DEV and registry unchanged); D-233-2 `code_test_db` write-path rehearsal designed, not written or run, blocked on a stable-identity bridge and the 2026 snapshot; R4 classified fail-safe, no successor issue; 2026-10-01 passes 7–9 (uncommitted): fresh CONCLUDED 2026 Brownlow snapshot `afl-api-brownlow-2026-2026-10-01-041609`; `afldb_test` bridge 0/669 (no 2026 matches); DEV read-only bridge 669/669 (v1); builder continuity defect FIXED (exact tracked `profile_url_continuity` pair → `continuing_url`, ISSUE-237 parity), real DEV read-only build 183/183 (Jack Ross 6519 → `players/J/Jack_Ross.html`), artefact outside repo, second write `unchanged`; `code_test_db` read-only coverage 175/183 (8 presumed 2026 debutants absent), harness NOT written; 2026-10-01 pass 10 (uncommitted): D-233-R = scoped `code_test_db` fixture of exactly the eight missing 2026 player identities (no rebuild/restore), harness `tools/migration/brownlow_afl_api_season_rehearsal.py` WRITTEN, NOT RUN, DB-free 113/113; 9,982/9,983 = one unused emergency row (expected); 2026-10-01 pass 11 (uncommitted): `code_test_db` rehearsal PASSED + exact restore PASSED (evidence `D:\tmp\issue233\rehearsal-20261001-151415`; fixture 8+8 → 183/183; real loads A1 batches 27/28, A2 29/30, 183/1,242/1/14 `afl_api`, A2 content-identical; fingerprint = F0, residue 0, coverage back to 175/183; case 5 NOT RUN); 2026-10-01 pass 12 final review: 0 CRIT/HIGH, 2 MEDIUM fixed (continuity provenance validator; POSIX manifest paths), committed on `sonnet/issue-233`; 2026-10-01: `f0abbb4c` + `cc1a5f2d` merged, `main` at `cc1a5f2d`, no merge pending; PROD untouched; runbook `issues/open/AFLDB-ISSUE-233.md` | Promotion gate's first live read at the next promotion (runbook §4.6 item 6); stays OPEN until then |
 | AFLDB-ISSUE-229 | AFL API fixture ingestion | Medium | Data acquisition / fixtures — `afl_api` season feed → `fixtures` | Open (2026-09-23); 2026-09-26 pass 2: PARTIALLY EVIDENCED, STILL BLOCKED — one authentic `SCHEDULED` record (`CD_M20260142901`, no score block, refused by today's contract) hash-bound; every other status unobserved; no writer; runbook `issues/open/AFLDB-ISSUE-229.md` | Operator decides whether D-229-1/2 may proceed on the single `SCHEDULED` citation, or waits for more captures |
 | AFLDB-ISSUE-230 | `afldb_test` 2026 AFL Tables spine carries 2099 observation timestamps from the 2026-09-06 settle benchmark, so real-clock settles refuse on `source_records_seen_ck` | Low | Test database hygiene — `afldb_test` `staging.source_records` | Open — found 2026-09-23 (ISSUE-228 §22.13); lineage continued to 2099-01-06 on `afldb_test` only under operator authorisation (batches 2421/2422); not repaired; did not block ISSUE-228 S9 (accepted 2026-09-23) | Choose a repair (reviewed re-stamp tool on `afldb_test` only, or a real-clock rebuild of the 2026 lineage); S9 is now accepted, so it may be scheduled |
-| AFLDB-ISSUE-226 | Stale `docs/architecture.md` §5/§6: the documented application structure names `src/services/`, `src/db/schema/` (described as a Drizzle schema) and `src/types/`, none of which exist, and no Drizzle dependency is present — the project uses postgres.js directly | Low | Documentation — `docs/architecture.md` §5 "Application structure", §6 "Shared statistical definitions" | Open — found 2026-09-19 during the PhanesLight bootstrap closure review; verified three ways against the tracked tree; no code, data or runtime impact; not corrected under the bootstrap | Correct `docs/architecture.md` §5's directory tree and the Drizzle reference to the actual layout, and re-site §6's "defined once in `src/services`" claim on wherever the shared statistical definitions now live (establish that first — this issue does not assert where they are) |
+
+**AFLDB-ISSUE-226 resolved 2026-10-02** (documentation only). `docs/architecture.md` §5 now shows the
+tracked `src/` layout and postgres.js data access with no ORM. The "defined once in `src/services`" claim is
+replaced by where the definitions actually live: `tools/migration/rebuild_derived.py`, its parity-tested
+counterpart `src/db/queries/player-derived.ts`, and `matches.is_finals_series`. It also states the limit:
+query-time aggregates in NL search and the Grid Solver are not covered. Removed from `IssuesIndex.md` and the
+Open Issues table. Full record: the entry in this file.
 
 **AFLDB-ISSUE-225 resolved 2026-10-02** (implementation `4c0dfb39`, merged; operator-run DEV acceptance).
 Seven evidenced co-captaincy rows were missing from the `captaincies` source: May 2017–18, Witts 2019–21,
@@ -38299,7 +38305,8 @@ met except the V5 page smoke, which the returned evidence did not record.
 
 ## AFLDB-ISSUE-226 — Stale `docs/architecture.md` §5/§6: documented application structure names `src/services/`, `src/db/schema/` (Drizzle) and `src/types/`, none of which exist
 
-**Status: Open (2026-09-19).** Found during the closure review of the PhanesLight bootstrap commit
+**Status: Resolved (2026-10-02).** Documentation only; see "Resolution" at the end of this entry.
+Opened 2026-09-19. Found during the closure review of the PhanesLight bootstrap commit
 `a59917a4`, while writing the generated bootstrap architecture snapshot. Recorded, deliberately
 **not** corrected under that bootstrap — editing `docs/architecture.md` was outside its scope.
 
@@ -38352,6 +38359,88 @@ location, or record that the single-definition guarantee no longer holds. Re-ver
 **Reference.** `documentation/architecture/2026-09-19_initial/overview.md` §5 records the same
 finding from the bootstrap side; `documentation/session-summaries/SS00001_phaneslight-bootstrap_2026-09-19.md`
 records it as F-001.
+
+### Resolution (2026-10-02)
+
+**Location correction.** The "Shared statistical definitions" claim is not a §6. It is a bold
+paragraph at the end of §5 "Application structure"; §6 is "Security" and was not affected. The
+title's "§5/§6" is kept for traceability.
+
+**Layout re-verified at `9e1da6b1`.** `git ls-files src` still shows exactly `app`, `components`,
+`db`, `lib`, `search`, `styles` and `middleware.ts`. `src/db` holds exactly `authClient.ts`,
+`client.ts`, `migrations/` and `queries/`. `package.json` has `postgres` `^3.4.9` and no Drizzle.
+`src/db/migrations/` contains only `.sql` files, applied by `tools/db/migrate.ts`
+(`npm run db:migrate`). Both `src/db/client.ts` and `src/db/authClient.ts` import `server-only`.
+
+**Where the #95 definitions actually live.** No single runtime module owns them; they live in three
+places:
+
+1. **Canonical: `tools/migration/rebuild_derived.py`.** Its module docstring says "Statistical
+   definitions live here and nowhere else", and it defines games, finals (`is_finals_series`),
+   premiership, clubs played (distinct `organization_id`) and Brownlow (`brownlow_season_votes`
+   only, player-season grain). Its SQL materialises `player_clubs`, `player_club_season_stats`,
+   `player_season_stats`, `player_career_stats` and `club_seasons`.
+2. **Targeted counterpart: `src/db/queries/player-derived.ts`.** Its docstring calls
+   `recomputePlayerDerivedStats` the "Targeted counterpart of tools/migration/rebuild_derived.py …
+   Keep the statistical definitions in lockstep". It also exports `recomputeClubSeasons`,
+   `recomputeSeasonMetadata`, `recomputeSeasonBrownlowStatus`, `recomputeBrownlowCareerTotals` and
+   `recomputeBrownlowCoverage`. It is imported by `match-admin.ts`, `match-sheet.ts`,
+   `data-edits.ts`, `admin-brownlow.ts`, `settle-afltables.ts` and `settle-afl-api.ts`. It
+   re-spells the same SQL in TypeScript, so there are two spellings. They are held together by
+   `tests/integration/derived-rebuild-parity.test.ts` (ISSUE-254), which runs the Python module's
+   real SQL.
+3. **Finals-series membership: `matches.is_finals_series`.** It is a generated column (migration
+   `085_matches_is_finals_series.sql`, "the ONLY definition of it") and is pinned by
+   `tests/finals-semantics-contract.test.ts`.
+
+The consumers split two ways:
+
+- **Derived tables.** `players.ts`, `records.ts`, `advanced-search.ts` and
+  `src/search/query-builder-spec.ts` read whole-career and whole-season figures from the derived
+  tables.
+- **Query-time aggregation.** `src/db/queries/nl/player-career.ts` (club and season-range scopes,
+  and quarter splits from `player_match_period_stats`) and `src/db/queries/grid-solver.ts`
+  aggregate from `player_match_stats` + `matches`. They read `is_finals_series`, but they spell
+  their own count and Grand Final predicates. For example, `grid-solver.ts` uses
+  `m.round_type = 'grand_final' AND m.winner_club_id = pms.club_id` where the rebuild uses
+  `round_type = 'grand_final' AND outcome = 'W'`.
+
+**Conclusion on requirement #95:** the guarantee holds for the derived figures and for finals-series
+membership, but only partly. It does **not** hold, as the old text claimed ("the three can never
+disagree"), for every query-time aggregate. No divergence was observed or tested here; this records
+only the scope of the mechanism. That is not a new defect, so no new issue was opened.
+
+**Fix (`docs/architecture.md` only).**
+
+- **§5 tree.** Replaced with the tracked layout: `src/db/authClient.ts` and `src/middleware.ts`
+  added; `schema/`, `services/` and `types/` removed; the `app`, `components`, `queries`, `search`
+  and `lib` comments brought up to date.
+- **New §5 "Data access" paragraph.** No ORM. The schema is the SQL migrations. Queries use
+  postgres.js tagged templates on `sql`, with row types declared beside each query module.
+- **§5 "Data access boundary".** Now names both `server-only` clients.
+- **§5 "Shared statistical definitions (requirement #95)".** Rewritten on the three real locations
+  and the query-time limit above.
+- **Two consistency fixes.** The §1 diagram's query-layer label drops `src/services`, and the §3
+  "Query layer" row replaces "Drizzle + parameterised raw SQL" with postgres.js and no ORM.
+
+**Validation (read-only, no DB, no network, no tests).**
+
+- `git ls-files` re-derived the layout.
+- `git grep` for `src/services`, `src/types`, `src/db/schema` and `Drizzle` in `docs/architecture.md`
+  returns nothing.
+- Every path the new text cites exists in `git ls-files`.
+- `git diff --check` is clean.
+- `git status` shows only `docs/architecture.md`, `issues.md`, `IssuesIndex.md` and `CHANGELOG.md`
+  changed.
+
+**Outside scope, not fixed.** `docs/project-brief.md` (the original brief) still prescribes Drizzle
+and `src/services`. It is a historical requirements document, not a description of the current
+system. The §1 diagram still names `tools/import`, which does not exist. The §5 tree comment
+`tools/ # Python ETL` understates a directory that is now about half TypeScript. And
+`.claude/workflows/snapshot-refresh.yaml` cites this defect "as at 2026-09-19".
+
+**Tracking.** Removed from `IssuesIndex.md` and the Open Issues table (5 → 4). `CHANGELOG.md`
+`Unreleased` entry added.
 
 ## AFLDB-ISSUE-228 — AFL.com.au official JSON APIs as the current-season match, stats and Brownlow source
 
