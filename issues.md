@@ -4,14 +4,25 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 4
+**Open issues:** 3
 
 | ID | Title | Severity | Area | State | Next action |
 |---|---|---|---|---|---|
 | AFLDB-ISSUE-234 | Optional AFL API feed expansion (extended statistics, umpires, play-by-play) | Low | Data acquisition — investigation only | Open (2026-09-23); triaged 2026-09-26: REMAINS OPEN / DEFERRED — extended stats, umpires, weather, milestones and `scoreWorm` scoring events are already retained raw (host snapshots; spine payloads per ISSUE-228 §15 Q8), never projected; no product need, no model, terms-of-use (§15 Q8) open | None scheduled; investigate when a product need arises |
 | AFLDB-ISSUE-233 | AFL API season discovery and season rollover ownership | Medium | Data acquisition / season lifecycle — `afl-api-identities.json`, rollover runbook | Open (2026-09-23); 2026-09-26 pass 2: D-233-1/2/3 decided (proposal JSON; season-scoped AFL API Brownlow artefacts beside the master; preserve `afl_api` ownership or refuse); discovery IMPLEMENTED / DB-FREE VALIDATED against the authentic `compseasons` sample (sha256 `fe3f1641…d965`); 2026-10-01 pass 3 (uncommitted): D-233-3 rebuild/rollover `afl_api` ownership census and D-233-2 season-scoped AFL API Brownlow load IMPLEMENTED / DB-FREE VALIDATED; 2026-10-01 pass 4 (uncommitted): D-233-3 also enforced on the LIVE promotion target (`promotion-check.ts`, `dependencies`/`pre-cutover`/`restored`/`candidate`/frozen `production`, no override); damaged-schema census refuses; discovery `--fetch` retains entity bytes verbatim; ownership replay intentionally unimplemented; 2026-10-01 pass 5 (uncommitted): integration census test 5/5 on `afldb_test` (no residue), read-only censuses PASS on `afldb_test` and `afldb_dev` (zero `afl_api`-owned matches, DEV not mutated), final review no CRIT/HIGH/MED; committed `f0abbb4c`; 2026-10-01 pass 6: first real DEV discovery `--fetch` PASSED (`20261001T034039Z`, 1 fetch, HTTP 200, 1,959 decoded body bytes sha256 `2aeed4e9…b33e`, 15/15 entries 2012–2026, `no_change`, offline replay byte-identical, DEV and registry unchanged); D-233-2 `code_test_db` write-path rehearsal designed, not written or run, blocked on a stable-identity bridge and the 2026 snapshot; R4 classified fail-safe, no successor issue; 2026-10-01 passes 7–9 (uncommitted): fresh CONCLUDED 2026 Brownlow snapshot `afl-api-brownlow-2026-2026-10-01-041609`; `afldb_test` bridge 0/669 (no 2026 matches); DEV read-only bridge 669/669 (v1); builder continuity defect FIXED (exact tracked `profile_url_continuity` pair → `continuing_url`, ISSUE-237 parity), real DEV read-only build 183/183 (Jack Ross 6519 → `players/J/Jack_Ross.html`), artefact outside repo, second write `unchanged`; `code_test_db` read-only coverage 175/183 (8 presumed 2026 debutants absent), harness NOT written; 2026-10-01 pass 10 (uncommitted): D-233-R = scoped `code_test_db` fixture of exactly the eight missing 2026 player identities (no rebuild/restore), harness `tools/migration/brownlow_afl_api_season_rehearsal.py` WRITTEN, NOT RUN, DB-free 113/113; 9,982/9,983 = one unused emergency row (expected); 2026-10-01 pass 11 (uncommitted): `code_test_db` rehearsal PASSED + exact restore PASSED (evidence `D:\tmp\issue233\rehearsal-20261001-151415`; fixture 8+8 → 183/183; real loads A1 batches 27/28, A2 29/30, 183/1,242/1/14 `afl_api`, A2 content-identical; fingerprint = F0, residue 0, coverage back to 175/183; case 5 NOT RUN); 2026-10-01 pass 12 final review: 0 CRIT/HIGH, 2 MEDIUM fixed (continuity provenance validator; POSIX manifest paths), committed on `sonnet/issue-233`; 2026-10-01: `f0abbb4c` + `cc1a5f2d` merged, `main` at `cc1a5f2d`, no merge pending; PROD untouched; runbook `issues/open/AFLDB-ISSUE-233.md` | Promotion gate's first live read at the next promotion (runbook §4.6 item 6); stays OPEN until then |
 | AFLDB-ISSUE-229 | AFL API fixture ingestion | Medium | Data acquisition / fixtures — `afl_api` season feed → `fixtures` | Open (2026-09-23); 2026-09-26 pass 2: PARTIALLY EVIDENCED, STILL BLOCKED — one authentic `SCHEDULED` record (`CD_M20260142901`, no score block, refused by today's contract) hash-bound; every other status unobserved; no writer; runbook `issues/open/AFLDB-ISSUE-229.md` | Operator decides whether D-229-1/2 may proceed on the single `SCHEDULED` citation, or waits for more captures |
-| AFLDB-ISSUE-230 | `afldb_test` 2026 AFL Tables spine carries 2099 observation timestamps from the 2026-09-06 settle benchmark, so real-clock settles refuse on `source_records_seen_ck` | Low | Test database hygiene — `afldb_test` `staging.source_records` | Open — found 2026-09-23 (ISSUE-228 §22.13); lineage continued to 2099-01-06 on `afldb_test` only under operator authorisation (batches 2421/2422); not repaired; did not block ISSUE-228 S9 (accepted 2026-09-23) | Choose a repair (reviewed re-stamp tool on `afldb_test` only, or a real-clock rebuild of the 2026 lineage); S9 is now accepted, so it may be scheduled |
+
+**AFLDB-ISSUE-230 resolved 2026-10-02, with no repair** (documentation only; operator-run read-only
+census). The contaminated historical 2099 observation lineage on `afldb_test` is absent. Repository
+history indicates that subsequent destructive `afldb_test` reset/rebuild activity removed it. A guarded census (`afldb_test`, `afldb_owner`,
+`REPEATABLE READ READ ONLY`, ended with `ROLLBACK`) found:
+- the observation tables at 0/0/0 rows;
+- C2 0 rows and C3 0 rows;
+- `matches_2026` 0.
+
+No database mutation, re-stamp, rebuild, code change or test was performed for this issue. Removed
+from `IssuesIndex.md` and the Open Issues table. Full record: the entry in this file and
+`issues/closed/AFLDB-ISSUE-230.md` §3a.
 
 **AFLDB-ISSUE-226 resolved 2026-10-02** (documentation only). `docs/architecture.md` §5 now shows the
 tracked `src/` layout and postgres.js data access with no ORM. The "defined once in `src/services`" claim is
@@ -41690,8 +41701,9 @@ Full record: `issues/closed/AFLDB-ISSUE-228.md` §22.22.
 
 ## AFLDB-ISSUE-230 — `afldb_test` 2026 AFL Tables spine carries 2099 observation timestamps from the 2026-09-06 settle benchmark, so real-clock settles refuse
 
-- **Status:** Open (2026-09-23). **Severity:** Low. **Area:** test database hygiene: `afldb_test`
-  `staging.source_records`, AFL Tables observation spine.
+- **Status:** **RESOLVED 2026-10-02, with no repair** (opened 2026-09-23). **Severity:** Low.
+  **Area:** test database hygiene: `afldb_test` `staging.source_records`, AFL Tables observation
+  spine.
 - **Evidence.** The settle-performance benchmark ("Stage 5 handoff", 2026-09-06, batches 103–105)
   ran `runSettleAfltables` on `afldb_test` with injected `observedAt` 2099-01-02..04. Every 2026
   `afltables` spine head (213 `match` + 9,798 `player_match_stats` at the time) got `first_seen_at` in
@@ -41710,6 +41722,57 @@ Full record: `issues/closed/AFLDB-ISSUE-228.md` §22.22.
   on a real clock. A rebuild disturbs the ISSUE-228 batch 2415/2418/2421/2422 state, so schedule it
   after S9 acceptance. Separately, consider making benchmarks run in a rolled-back transaction or
   against a disposable database so they cannot leave future-dated state behind.
+- **Update (2026-10-02, investigation only; no database contacted).** Runbook, now
+  `issues/closed/AFLDB-ISSUE-230.md`. This update's inference is superseded by the measured
+  resolution below.
+  - **The defect was inferred to be very probably already gone.** `db:test:rebuild`'s
+    `RESET_SQL` drops the whole `staging` schema (`tools/db/rebuild-test.ts:2058-2067`). The I18
+    (2026-09-24) and ISSUE-237 L3 (2026-09-25) resets would therefore have removed the 2099
+    lineage (inference from repository history, not measured). The next 2026 AFL Tables lineage was
+    written by the ISSUE-252 preparation (2026-09-27, batch 29), through the unmodified CLI argv
+    path, on the real clock (`settle-afltables.ts:1818`). ISSUE-233 recorded "no 2026 matches" on
+    `afldb_test` on 2026-10-01. No injected `observedAt` is recorded after ISSUE-228 §22.14.
+  - **Neither repair (re-stamp or rebuild) is recommended** unless the census finds future-dated
+    rows. Timestamps are not identity: the hash is content-only and the version key is `version_seq`.
+    A re-stamp would also have to cover `source_record_versions` (`interval_ck`) and
+    `source_payloads`, so `source_records` alone is not enough (runbook §2, §4).
+  - **Next action (as drafted then):** the operator runs the read-only census (runbook §3). At
+    closure, C1–C4 were reviewed together, not C1 alone (below).
+- **Resolution (2026-10-02, operator-run read-only census; documentation-only closure).**
+  - **Connection and guard.** The census ran through the existing `127.0.0.1:55432` SSH tunnel:
+    - database `afldb_test`, role `afldb_owner`, `transaction_read_only` = `on`;
+    - `db_now` = `2026-10-02 12:49:05.776327+10`;
+    - `BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY`;
+    - the server-side database/read-only `DO` guard passed;
+    - the transaction ended with `ROLLBACK`.
+  - **C1.** All three observation tables are empty:
+
+    | Table | `future_rows` | `all_rows` |
+    |---|---|---|
+    | `staging.source_records` | 0 | 0 |
+    | `staging.source_record_versions` | 0 | 0 |
+    | `staging.source_payloads` | 0 | 0 |
+  - **C2:** 0 rows. No source/family/scope observation lineage is present.
+  - **C3:** 0 rows. No `season=2026` AFL Tables observation lineage is present.
+  - **C4:** `matches_2026` = 0.
+  - **Disposition: resolved with no repair.** The contaminated historical test lineage is measured
+    absent. Repository history indicates that subsequent destructive `afldb_test` reset/rebuild
+    activity removed it; the census itself does not identify which reset did so.
+    - **Measured:** C1–C4, reviewed together, show the whole observation spine is empty. The
+      problematic lineage is absent.
+    - There is no 2093/2094 synthetic future-clock residue either: all three staging observation
+      tables hold zero rows.
+    - **Inferred, not measured:** the attribution to the 2026-09-24/25 `db:test:rebuild` resets
+      comes from repository history (runbook §1). The census does not identify which reset
+      removed the lineage.
+  - **Nothing was repaired.** No database mutation, re-stamp, rebuild, code change or regression
+    test was performed for this issue. The runbook's §4 contingency remains reference only.
+  - **Out of scope, no successor opened:** benchmark hardening and future-clock prevention (the
+    "Separately, consider …" note under Next action above).
+  - **Tracking.**
+    - Removed from `IssuesIndex.md` and the Open Issues table (4 → 3).
+    - Runbook moved to `issues/closed/AFLDB-ISSUE-230.md` (census result in §3a).
+    - No `CHANGELOG.md` entry: no application, data or schema behaviour changed.
 
 ## AFLDB-ISSUE-229 — AFL API fixture ingestion
 

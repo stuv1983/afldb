@@ -9,7 +9,7 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Open issues:** 4
+**Open issues:** 3
 
 ### AFLDB-ISSUE-234 — Optional AFL API feed expansion (extended statistics, umpires, play-by-play)
 - **Severity:** Low. **Area:** data acquisition, investigation only.
@@ -138,15 +138,6 @@
 - **Runbook:** `issues/open/AFLDB-ISSUE-229.md`.
 - **Next action:** operator decides whether D-229-1/D-229-2 may proceed on the single `SCHEDULED`
   citation (runbook §2a), or waits for more captures (§3).
-
-### AFLDB-ISSUE-230 — `afldb_test` 2026 AFL Tables spine carries 2099 observation timestamps from the 2026-09-06 settle benchmark
-- **Severity:** Low. **Area:** test database hygiene: `afldb_test` `staging.source_records`.
-- **State:** Open (2026-09-23). A real-clock `settle-afltables.ts` touching any 2026 key on
-  `afldb_test` refuses on `source_records_seen_ck`. Under ISSUE-228 S9 the operator authorised
-  continuing the 2099 lineage there only (batches 2421/2422, up to 2099-01-06). It is not repaired.
-  DEV and PROD are unaffected. It did not block ISSUE-228 S9, which was accepted 2026-09-23.
-- **Next action:** pick a reviewed `afldb_test`-only re-stamp or a real-clock rebuild of the 2026
-  lineage. S9 is now accepted, so either may be scheduled.
 
 **AFLDB-ISSUE-255 resolved 2026-10-01** (Sonnet 5, implementation committed `f6d189d0`, operator-run
 DEV acceptance) — the AFL API settle no longer records an unused emergency as a game played. The
