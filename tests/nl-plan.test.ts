@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
+import { GRID_STATS, isGridStatKey } from '@/search/grid-solver-spec';
 import {
   afterSirenRequiresMatchLink,
   decodePlanToken,
   describePlan,
   encodePlanToken,
+  isNlMetric,
   NL_LIMITS,
+  NL_METRICS,
   validatePlan,
+  type NlGrain,
   type NlQueryPlan,
 } from '@/search/nl/plan';
 
@@ -1302,5 +1306,52 @@ describe('validatePlan: family', () => {
     ['debutGame', { debutGame: true }],
   ] as [string, Partial<NlQueryPlan>][])('refuses a family plan carrying %s -- no club, season, player or career condition applies', (_label, shape) => {
     expect(validatePlan(familyPlan(shape))).toHaveProperty('error');
+  });
+});
+
+/**
+ * AFLDB-ISSUE-256: NL_METRICS.player_career admitted four metrics AFLDB
+ * does not store, each with an `as any` statKey. GridStatKey is
+ * `keyof Record<string, ...>`, i.e. plain `string`, so the type system
+ * never caught it: a hand-built or parsed plan validated, then threw a
+ * TypeError at GRID_STATS[def.statKey].grain in the compiler.
+ */
+describe('validatePlan: unsupported career metrics (AFLDB-ISSUE-256)', () => {
+  const UNSUPPORTED = ['time_on_ground', 'centre_bounce_attendances', 'disposal_efficiency', 'score_involvements'];
+  const RICHMOND = { organizationId: 1, slug: 'richmond', name: 'Richmond' };
+
+  it.each(UNSUPPORTED)('refuses a hand-built player_career plan ranking %s', (metric) => {
+    expect(validatePlan(basePlan({ metric }))).toHaveProperty('error');
+    expect(validatePlan(basePlan({ metric, agg: { kind: 'min' } }))).toHaveProperty('error');
+    expect(validatePlan(basePlan({ metric, agg: { kind: 'top_n', n: 10 } }))).toHaveProperty('error');
+  });
+
+  it.each(UNSUPPORTED)('refuses a club-scoped hand-built player_career plan ranking %s', (metric) => {
+    expect(validatePlan(basePlan({ metric, scope: { clubFor: RICHMOND } }))).toHaveProperty('error');
+  });
+
+  it.each(UNSUPPORTED)('%s is not admitted at any grain', (metric) => {
+    for (const grain of Object.keys(NL_METRICS) as NlGrain[]) {
+      expect(isNlMetric(grain, metric), `${grain}.${metric}`).toBe(false);
+    }
+  });
+
+  it.each([
+    'inside_50s', 'clearances', 'goal_assists', 'frees_for', 'frees_against', 'contested', 'uncontested',
+  ])('still accepts the supported live career metric %s, with and without club scope', (metric) => {
+    expect(validatePlan(basePlan({ metric }))).not.toHaveProperty('error');
+    expect(validatePlan(basePlan({ metric, scope: { clubFor: RICHMOND } }))).not.toHaveProperty('error');
+  });
+
+  it('every statKey exposed by every NL_METRICS grain is a real GRID_STATS key', () => {
+    // The structural form: a new entry can only carry a statKey the
+    // compilers can dereference. `as any` can no longer smuggle one in.
+    for (const [grain, metrics] of Object.entries(NL_METRICS)) {
+      for (const [key, def] of Object.entries(metrics)) {
+        if (def.kind !== 'column' || def.statKey === undefined) continue;
+        expect(isGridStatKey(def.statKey), `${grain}.${key} statKey "${def.statKey}"`).toBe(true);
+        expect(GRID_STATS[def.statKey].grain, `${grain}.${key}`).toBeDefined();
+      }
+    }
   });
 });

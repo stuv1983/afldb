@@ -4,10 +4,11 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 2
+**Open issues:** 3
 
 | ID | Title | Severity | Area | State | Next action |
 |---|---|---|---|---|---|
+| AFLDB-ISSUE-256 | NL career rankings for unsupported metrics can pass validation and fail internally | Low | NL search — `plan.ts` `NL_METRICS.player_career`, `db/queries/nl/player-career.ts` | Open (2026-10-02); pass 1 (uncommitted): the four unstored metrics (`time_on_ground`, `centre_bounce_attendances`, `disposal_efficiency`, `score_involvements`) removed from `NL_METRICS.player_career` with their `as any` escapes; `metricValueExpr` fails closed; structural `statKey` ∈ `GRID_STATS` test; no parser change, `PARSER_VERSION` unchanged (66); NL unit suites 1,710/1,710, tsc PASS; runbook `issues/open/AFLDB-ISSUE-256.md` | Operator review and commit; after DEV sync, smoke "most career tog" (clean refusal); then resolve |
 | AFLDB-ISSUE-233 | AFL API season discovery and season rollover ownership | Medium | Data acquisition / season lifecycle — `afl-api-identities.json`, rollover runbook | Open (2026-09-23); 2026-09-26 pass 2: D-233-1/2/3 decided (proposal JSON; season-scoped AFL API Brownlow artefacts beside the master; preserve `afl_api` ownership or refuse); discovery IMPLEMENTED / DB-FREE VALIDATED against the authentic `compseasons` sample (sha256 `fe3f1641…d965`); 2026-10-01 pass 3 (uncommitted): D-233-3 rebuild/rollover `afl_api` ownership census and D-233-2 season-scoped AFL API Brownlow load IMPLEMENTED / DB-FREE VALIDATED; 2026-10-01 pass 4 (uncommitted): D-233-3 also enforced on the LIVE promotion target (`promotion-check.ts`, `dependencies`/`pre-cutover`/`restored`/`candidate`/frozen `production`, no override); damaged-schema census refuses; discovery `--fetch` retains entity bytes verbatim; ownership replay intentionally unimplemented; 2026-10-01 pass 5 (uncommitted): integration census test 5/5 on `afldb_test` (no residue), read-only censuses PASS on `afldb_test` and `afldb_dev` (zero `afl_api`-owned matches, DEV not mutated), final review no CRIT/HIGH/MED; committed `f0abbb4c`; 2026-10-01 pass 6: first real DEV discovery `--fetch` PASSED (`20261001T034039Z`, 1 fetch, HTTP 200, 1,959 decoded body bytes sha256 `2aeed4e9…b33e`, 15/15 entries 2012–2026, `no_change`, offline replay byte-identical, DEV and registry unchanged); D-233-2 `code_test_db` write-path rehearsal designed, not written or run, blocked on a stable-identity bridge and the 2026 snapshot; R4 classified fail-safe, no successor issue; 2026-10-01 passes 7–9 (uncommitted): fresh CONCLUDED 2026 Brownlow snapshot `afl-api-brownlow-2026-2026-10-01-041609`; `afldb_test` bridge 0/669 (no 2026 matches); DEV read-only bridge 669/669 (v1); builder continuity defect FIXED (exact tracked `profile_url_continuity` pair → `continuing_url`, ISSUE-237 parity), real DEV read-only build 183/183 (Jack Ross 6519 → `players/J/Jack_Ross.html`), artefact outside repo, second write `unchanged`; `code_test_db` read-only coverage 175/183 (8 presumed 2026 debutants absent), harness NOT written; 2026-10-01 pass 10 (uncommitted): D-233-R = scoped `code_test_db` fixture of exactly the eight missing 2026 player identities (no rebuild/restore), harness `tools/migration/brownlow_afl_api_season_rehearsal.py` WRITTEN, NOT RUN, DB-free 113/113; 9,982/9,983 = one unused emergency row (expected); 2026-10-01 pass 11 (uncommitted): `code_test_db` rehearsal PASSED + exact restore PASSED (evidence `D:\tmp\issue233\rehearsal-20261001-151415`; fixture 8+8 → 183/183; real loads A1 batches 27/28, A2 29/30, 183/1,242/1/14 `afl_api`, A2 content-identical; fingerprint = F0, residue 0, coverage back to 175/183; case 5 NOT RUN); 2026-10-01 pass 12 final review: 0 CRIT/HIGH, 2 MEDIUM fixed (continuity provenance validator; POSIX manifest paths), committed on `sonnet/issue-233`; 2026-10-01: `f0abbb4c` + `cc1a5f2d` merged, `main` at `cc1a5f2d`, no merge pending; PROD untouched; runbook `issues/open/AFLDB-ISSUE-233.md` | Promotion gate's first live read at the next promotion (runbook §4.6 item 6); stays OPEN until then |
 | AFLDB-ISSUE-229 | AFL API fixture ingestion | Medium | Data acquisition / fixtures — `afl_api` season feed → `fixtures` | Open (2026-09-23); 2026-09-26 pass 2: PARTIALLY EVIDENCED, STILL BLOCKED — one authentic `SCHEDULED` record (`CD_M20260142901`, no score block, refused by today's contract) hash-bound; every other status unobserved; no writer; runbook `issues/open/AFLDB-ISSUE-229.md` | Operator decides whether D-229-1/2 may proceed on the single `SCHEDULED` citation, or waits for more captures |
 
@@ -46723,3 +46724,53 @@ retained behaviour under `Unreleased`.
     class, classified and expected, not failures.
   - No residue existed to repair; no follow-up issue. No PROD work was authorised or performed.
   - Moved to `issues/closed/AFLDB-ISSUE-255.md`.
+
+## AFLDB-ISSUE-256 — NL career rankings for unsupported metrics can pass validation and fail internally
+
+- **Status:** Open (2026-10-02). Pass 1 IMPLEMENTED / DB-FREE VALIDATED, uncommitted, not deployed.
+- **Severity:** Low. **Area:** NL search, validate/compile stages. Key files:
+  - `src/search/nl/plan.ts` (`NL_METRICS.player_career`);
+  - `src/db/queries/nl/player-career.ts` (`metricValueExpr`).
+- **Runbook:** `issues/open/AFLDB-ISSUE-256.md`.
+- **Defect.** A validated NL plan must be safe to execute. Four career metrics broke that:
+  `time_on_ground`, `centre_bounce_attendances`, `disposal_efficiency` and `score_involvements`.
+  - AFLDB stores none of them, and none is a `GRID_STATS` key.
+  - "most career time on ground", "most career centre bounce attendances", "most career disposal
+    efficiency", "most si" and "most career si" each produced a `player_career` plan that passed
+    `validatePlan`.
+  - Each then threw a `TypeError` at `GRID_STATS[def.statKey].grain`.
+  - A hand-built club-scoped plan also validated and compiled SQL against nonexistent
+    `player_match_stats` columns.
+  - The full phrase "most career score involvements" already declined through `UNANSWERABLE_TOPICS`.
+- **Root cause.**
+  - `NL_METRICS.player_career` admitted all four, each with an `as any` `statKey`.
+  - `GRID_STATS` is `Record<string, …>`, so `GridStatKey` is plain `string` and the compiler could not
+    catch a bogus key.
+  - `isNlMetric` checks only key membership, so `validatePlan` accepted them.
+- **Fix (pass 1).**
+  - The four entries and their `as any` escapes are removed. The aliases (`tog`, `cba`, `de`, `si`, full
+    phrases) still parse, and `validatePlan` refuses them as "not a recognised statistic", which
+    `answerNlQuestion` renders as "AFLDB can’t answer this".
+  - `metricValueExpr` fails closed with an explicit `Error` on an unknown metric or a non-GRID
+    `statKey` (`isGridStatKey`), before any `GRID_STATS` dereference or `sql.unsafe`.
+  - A structural test requires every `statKey` in every `NL_METRICS` grain to be a `GRID_STATS` key.
+  - No parser change; no `UNANSWERABLE_TOPICS` addition (bare `de`/`si` would collide with player names
+    such as De Goey, because topic matching runs before name recognition).
+  - Fail-closed is correct because the data does not exist and no storage is in scope (ISSUE-234 stays
+    closed).
+- **`PARSER_VERSION`:** unchanged at 66. The parser's output is identical; only validation and the
+  compiler changed.
+- **Validation (DB-free).**
+  - Guard + planner 239/239; parser `-t "AFLDB-ISSUE-256"` 18/18.
+  - All `tests/nl-*.test.ts` + `tests/query-intent.test.ts`: 23 files, 1,710/1,710.
+  - `qualifying-matches-gate` 3/3; `npx tsc --noEmit` exit 0; eslint 0 errors (4 pre-existing warnings on
+    untouched lines).
+  - Supported career metrics (inside 50s, clearances, goal assists, frees for/against, contested and
+    uncontested possessions) still parse, validate and compile.
+  - No baseline failure was observed.
+- **Scope held:** no migration, storage, acquisition, AFL API or ISSUE-234 change; no DEV/PROD mutation.
+- **Next action:**
+  1. operator review and commit, then merge;
+  2. after DEV sync, a recommended smoke: "most career tog" should return "AFLDB can’t answer this", not
+     an error;
+  3. resolve.

@@ -2,7 +2,7 @@ import 'server-only';
 
 import { sql } from '@/db/client';
 import { compileAxis } from '@/db/queries/grid-solver';
-import { GRID_STATS } from '@/search/grid-solver-spec';
+import { GRID_STATS, isGridStatKey } from '@/search/grid-solver-spec';
 import {
   careerPredicatesOwnClubFor,
   NL_AWARDS,
@@ -43,6 +43,14 @@ function metricValueExpr(plan: NlQueryPlan): SqlFragment {
   const metric = plan.metric!;
   const periodSplit = plan.periodSplit;
   const def = NL_METRICS.player_career[metric];
+  // Fail closed (AFLDB-ISSUE-256): validatePlan should already have refused
+  // either case, but an entry whose statKey is not a GRID_STATS key would
+  // otherwise reach GRID_STATS[...].grain as a TypeError, or sql.unsafe as
+  // a column that does not exist.
+  if (!def) throw new Error(`player_career metric "${metric}" is not recognised.`);
+  if (def.kind === 'column' && def.statKey !== undefined && !isGridStatKey(def.statKey)) {
+    throw new Error(`player_career metric "${metric}" has no stored statistic.`);
+  }
   if (def.kind === 'award_count') {
     // count(*) is bigint in Postgres regardless of how small the count
     // is, and postgres.js hands a bigint back as text -- ::int keeps

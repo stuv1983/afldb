@@ -1166,10 +1166,12 @@ export const NL_METRICS: Record<NlGrain, Record<string, NlMetricDef>> = {
     contested: columnMetric('contested', 'Contested possessions', 'contested', 'contested'),
     uncontested: columnMetric('uncontested', 'Uncontested possessions', 'uncontested', 'uncontested'),
     goal_assists: columnMetric('goal_assists', 'Goal assists', 'goal_assists', 'goal_assists'),
-    centre_bounce_attendances: columnMetric('centre_bounce_attendances', 'Centre bounce attendances', 'centre_bounce_attendances', 'centre_bounce_attendances' as any),
-    time_on_ground: columnMetric('time_on_ground', 'Time on ground', 'time_on_ground', 'time_on_ground' as any),
-    score_involvements: columnMetric('score_involvements', 'Score involvements', 'score_involvements', 'score_involvements' as any),
-    disposal_efficiency: columnMetric('disposal_efficiency', 'Disposal efficiency', 'disposal_efficiency', 'disposal_efficiency' as any),
+    // No time_on_ground / centre_bounce_attendances / disposal_efficiency /
+    // score_involvements here (AFLDB-ISSUE-256): AFLDB stores none of them,
+    // they are not GRID_STATS keys, and an entry admitted a plan that
+    // validated and then threw in the compiler. vocab.ts's METRIC_WORDS
+    // still maps their aliases, so such a question parses and fails
+    // validation as "not a recognised statistic", which is accurate.
     frees_for: columnMetric('frees_for', 'Frees for', 'frees_for', 'frees_for'),
     frees_against: columnMetric('frees_against', 'Frees against', 'frees_against', 'frees_against'),
     // Award-count metrics: ranking "most X selections" rather than a

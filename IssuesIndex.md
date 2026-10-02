@@ -9,7 +9,24 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Open issues:** 2
+**Open issues:** 3
+
+### AFLDB-ISSUE-256 — NL career rankings for unsupported metrics can pass validation and fail internally
+- **Severity:** Low. **Area:** NL search — `src/search/nl/plan.ts` (`NL_METRICS.player_career`),
+  `src/db/queries/nl/player-career.ts` (`metricValueExpr`).
+- **State:** Open (2026-10-02).
+  - "most career tog/cba/de/si" (and the full phrases, except "score involvements", which already
+    declines) validated as `player_career` plans for four metrics AFLDB does not store, then threw a
+    `TypeError` in the compiler.
+  - **Pass 1 (uncommitted): IMPLEMENTED / DB-FREE VALIDATED.**
+    - The four entries and their `as any` escapes are removed.
+    - `metricValueExpr` fails closed via `isGridStatKey`.
+    - A structural test requires every NL `statKey` to be a `GRID_STATS` key.
+    - No parser change; `PARSER_VERSION` unchanged (66).
+    - NL unit suites 1,710/1,710; `tsc` PASS.
+- **Runbook:** `issues/open/AFLDB-ISSUE-256.md`.
+- **Next action:** operator review and commit. After DEV sync, smoke "most career tog" (it should be a
+  clean "AFLDB can’t answer this"), then resolve.
 
 ### AFLDB-ISSUE-233 — AFL API season discovery and season rollover ownership
 - **Severity:** Medium. **Area:** season lifecycle — `data/reference/afl-api-identities.json`, the

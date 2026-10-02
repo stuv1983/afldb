@@ -15,6 +15,17 @@ commit.
 
 ## [Unreleased]
 
+### NL search refuses career rankings for statistics AFLDB does not store, instead of failing (AFLDB-ISSUE-256; issue open, uncommitted) - 2 October 2026
+
+- Career ranking questions about time on ground, centre bounce attendances, disposal efficiency or score
+  involvements ("most career tog", "top 10 career cba", "most career de", "most si") now get "AFLDB can’t
+  answer this", with the reason that the statistic is not recognised. Previously they were accepted and then
+  failed with an internal error. AFLDB stores none of these four, and no storage is added.
+- The planner no longer lists the four metrics. The career query builder also refuses any metric whose
+  statistic key is not in the grid stat catalogue, and a structural test requires every NL metric's
+  statistic key to come from that catalogue. Supported career metrics are unchanged, and so is
+  `PARSER_VERSION` (66).
+
 ### Architecture documentation matches the tracked source layout (AFLDB-ISSUE-226; resolved) - 2 October 2026
 
 - `docs/architecture.md` §5 no longer describes `src/services/`, `src/db/schema/` (Drizzle) or `src/types/`,

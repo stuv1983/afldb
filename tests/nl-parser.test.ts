@@ -2118,6 +2118,54 @@ describe('regression: bare "most <career column>" ranks every career column, not
 });
 
 /**
+ * AFLDB-ISSUE-256: METRIC_WORDS maps tog/cba/de/si (and their full
+ * phrases) to metrics AFLDB does not store. NL_METRICS.player_career used
+ * to admit all four, so the plan validated and the compiler then threw a
+ * TypeError. The aliases still parse; validation is what must refuse them.
+ */
+describe('regression: unsupported career metrics never reach an executable plan (AFLDB-ISSUE-256)', () => {
+  const UNSUPPORTED = new Set(['time_on_ground', 'centre_bounce_attendances', 'disposal_efficiency', 'score_involvements']);
+
+  it.each([
+    'most career time on ground',
+    'most career tog',
+    'most career centre bounce attendances',
+    'most career cba',
+    'most career disposal efficiency',
+    'most career de',
+    'most career si',
+    'most si',
+    'top 10 career cba',
+    'fewest career tog',
+  ])('%s has no validated plan', async (question) => {
+    const result = await parse(question);
+    if (result.status !== 'plan') return;
+    expect(UNSUPPORTED.has(result.plan.metric ?? ''), `"${question}" -> ${result.plan.grain}.${result.plan.metric}`).toBe(true);
+    expect(validatePlan(result.plan)).toHaveProperty('error');
+  });
+
+  it('"most career score involvements" still declines as an unanswerable topic', async () => {
+    const result = await parse('most career score involvements');
+    expect(result.status).toBe('unanswerable');
+  });
+
+  it.each([
+    ['most career inside 50s', 'inside_50s'],
+    ['most career clearances', 'clearances'],
+    ['most career goal assists', 'goal_assists'],
+    ['most career frees for', 'frees_for'],
+    ['most career frees against', 'frees_against'],
+    ['most career contested possessions', 'contested'],
+    ['most career uncontested possessions', 'uncontested'],
+  ])('supported: %s -> player_career %s, validated', async (question, metric) => {
+    const p = await plan(question);
+    expect(p.grain).toBe('player_career');
+    expect(p.metric).toBe(metric);
+    expect(validatePlan(p)).not.toHaveProperty('error');
+  });
+});
+
+/**
  * A NAMED player asking for a career-only column ("games", "premierships",
  * "wins", "losses", "draws", "brownlow medals", "clubs") must go to
  * player_career, never the player_game single-game-peak default that a
