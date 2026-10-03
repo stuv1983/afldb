@@ -1469,7 +1469,7 @@ npx tsx tools/db/issue257-rollback-guard.ts --target prod    # or dev
 
 It counts `data_overrides` rows with `entity_type = 'player_match_stats'`, active or not, and
 exits 0 (`PERMITTED`) only at zero; any other answer exits 2 (`REFUSED`). Zero rows: restore
-migration 102's narrow CHECK first (`issues/open/AFLDB-ISSUE-257.md` §19, the migration 110
+migration 102's narrow CHECK first (`issues/closed/AFLDB-ISSUE-257.md` §19, the migration 110
 reversal), then roll the application back. One or more rows: the older application is not a
 supported rollback target — **roll forward only**. Never delete those records to make the guard
 pass; each is an administrator's durable decision. An application older than ISSUE-257 running

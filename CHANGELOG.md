@@ -15,7 +15,7 @@ commit.
 
 ## [Unreleased]
 
-### Match Sheet corrections to player statistics survive automatic settles (AFLDB-ISSUE-257; open, DEV acceptance outstanding) - 3 October 2026
+### Match Sheet corrections to player statistics survive automatic settles (AFLDB-ISSUE-257; DEV accepted, PROD promotion outstanding) - 3 October 2026
 
 - A Match Sheet save that changes `player_match_stats` now records durable authority in `data_overrides`
   (`entity_type = 'player_match_stats'`, key `<match_key>|<player identity>`), in the same transaction as the

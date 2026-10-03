@@ -2,7 +2,15 @@
 
 ## 0. Status
 
-- **Status:** Open.
+- **Status:** Resolved / DEV accepted (2026-10-03). **PROD promotion outstanding** (separate, separately
+  authorised sequence; not run). Runbook path after the operator's move:
+  `issues/closed/AFLDB-ISSUE-257.md`.
+- **Closure summary (2026-10-03).** Implemented across §18–§19: durable `data_overrides` authority for Match
+  Sheet corrections to `player_match_stats`, field-scoped settle scoping, replay, Return to source, rekey,
+  promotion and ISSUE-238 handling, migration 110 and the rollback guard. Code `92f2bdf6`, `a27f7104`,
+  `39a9fed1`; DEV runs `39a9fed1` (BUILD_ID `IvHo-v-Lq-aKwzFe4i2nN`). Closure verdict, evidence classes,
+  retained gaps and the Low limitation: §19.5. The sections below are the historical record and are
+  preserved as written.
 - **Opened:** 2026-10-02.
 - **Severity:** Medium.
 - **Area:** Admin / data integrity / current-season acquisition — the Data Editor Match Sheet,
@@ -12,12 +20,14 @@
   (D-257-0, §15.2). The direction of the §17 design is approved (D-257-1 to D-257-4 and five
   further constraints, §15.3). Its representation details are not approved: §17.13 lists them as
   implementation and rehearsal work.
-- Nothing has been implemented. §1–§14 are the review's evidence record as written before the
-  decision; §15–§17 carry the decision and the design.
+- *(Historical, as of 2026-10-02; superseded by the Status above.)* Nothing had been implemented.
+  §1–§14 are the review's evidence record as written before the decision; §15–§17 carry the decision and
+  the design.
 - **Implementation design (2026-10-02, read-only investigation pass, §18).** The open detail of
   §17.12–§17.13 is resolved from source: identity, key, representation, writer, settle, replay,
   promotion, rekey, ISSUE-238 and deployment. §18.12 records where §17 was corrected. One operator
-  decision remains: match deletion (§18.11). Nothing implemented; no database opened.
+  decision remained: match deletion (§18.11). *(Historical: nothing implemented and no database opened at
+  that pass.)*
 
 ## 1. Summary
 
@@ -3473,3 +3483,110 @@ verbatim in `.phaneslight/returns/257-impl-20261002/`.
          The geometry matched DEV.
     - **Not done:** no commit, deploy, PROD access or DEV rollback. No DEV configuration, privilege,
       lineup or database change in this pass. The recovery copy is retained. ISSUE-257 stays open.
+
+  - **DEV deploy of `39a9fed1` and V-257-01 re-check (operator-authorised, 2026-10-03 21:2x AEST).**
+    - **Authorisation.** Deploy merged `39a9fed1` to DEV with `-SkipMigrate -RemoteRef main`; recovery copy first;
+      no correction, lineup, privilege or PROD change; no rollback below ISSUE-257.
+    - **Recovery copy.** `~arm/afldb-recovery/a27f7104-Etn3f80GrxGD2DU9Uj0q5` (copy of the `a27f7104` standalone
+      build, BUILD_ID `Etn3f80GrxGD2DU9Uj0q5`, `RECOVERY_COMMIT` marker). `diff -rq` against the live build:
+      identical (13,224 files; 13,225 with the marker). The `3e98fb7b` copy is also retained.
+    - **Preflight** (`D:\tmp\issue257-runD\preflight-39a9fed1.log`, psql on PATH and the owner DSN via 55432,
+      process-only): READY, 0 blockers, 0 warnings, migration parity 110/110, no pending-migration exception.
+    - **Deploy** (`dev-deploy-39a9fed1.log`): `sync-dev.ps1 -SkipMigrate -RemoteRef main` exit 0; health ok on
+      the 2nd probe.
+    - **Verification** (`dev-post-deploy-39a9fed1.txt`): host HEAD `39a9fed1` on `main`; BUILD_ID
+      `IvHo-v-Lq-aKwzFe4i2nN`; service active, MainPID 2596012; health `ok`/`ok`; migrations 110 applied, 0
+      pending; rollback guard State B, 1 `player_match_stats` record (active 0), **REFUSED (D-257-7), exit 2, as
+      expected**; timers `afldb-settle-afl-api` and `afldb-settle-afl-api-brownlow` present (DEV has no
+      `afltables` timer, as before); all three settle units inactive, `Result=success`. The host working tree
+      shows the same 8 untracked `docs/rebuild-manifests/.../settle-*.json` files as before the deploy.
+      INFO: systemd logged "Failed to kill control group ... Unit process (next-server) remains running after
+      unit stopped" on the restart. The post-deploy probe also listed one `next-server (v16.3.3)` process
+      (PID 3908) beside the unit's four v16.3.1 workers. *(At the time this was logged as "Not investigated;
+      not a 257 defect", an assumption. The read-only investigation in §19.5 shows PID 3908 is an unrelated
+      service, `streamanator-dashboard.service`, not an AFLDB process.)*
+    - **Visual evidence (DEV, real Match Sheet 17275, Playwright; `D:\tmp\issue257-runD\shots\dev-39a9fed1\`).**
+      State shown: S1 (record 237 is inactive, so "No durable decisions").
+
+      | Viewport | Page overflow | Section | Panel | Wide tables |
+      |---|---|---|---|---|
+      | 390×844 | none (375/375) | 311 px (was 407+ on `a27f7104`) | x 32–343, inside | scroll inside `.table-wrap` (1007 in 311) |
+      | 700×900 | none | 615 px | x 35–650 | scroll inside `.table-wrap` (1070 in 615) |
+      | 1000×800 | none | n/a | n/a | scroll inside `.table-wrap` (1070 in 613) |
+      | 1440×900 | none | 1025 px (unchanged) | x 336–1361 | none wider than the viewport |
+
+      Verdict: V-257-01 is fixed on DEV with real data; desktop layout is unchanged and usable; intermediate-width
+      scrolling stays inside the tables. Files: `match-sheet-{390x844,700x900,1000x800,1440x900}-{viewport,panel}.png`.
+    - **Coverage, kept separate.**
+      - DEV (real data): S1 at 390 and 1440 (this pass); S1–S4 at 1440 and the DEV behaviour in steps 8–13
+        (`a27f7104`).
+      - Local only (fixtures, stubbed actions; not DEV evidence): S2 addition/removal, S4 settle-running, S5a/S5b,
+        button behaviour 12/12.
+      - Not exercised anywhere: S4 provenance mismatch.
+      - The "Return to source" card/button layout at 390 was not seen on DEV (record 237 is inactive, and no
+        further correction was authorised). It is local-only evidence.
+    - **Acceptance status: COMPLETE for DEV.** Step 14 permits states not reachable on DEV to be recorded as not
+      exercised; they are. Closure tracking prepared for operator review: `issues.md` entry set to Resolved,
+      removed from `IssuesIndex.md` and the Open Issues table, `CHANGELOG.md` heading updated. The runbook
+      moves to `issues/closed/` with the operator's commit. PROD promotion is outside this pass.
+    - **Not done:** no PROD access; no correction, lineup, privilege or schema change; no rollback. Recovery
+      copies retained.
+
+### 19.5 Closure (2026-10-03)
+
+- **Verdict: Resolved / DEV accepted. PROD promotion outstanding.** PROD promotion is a separate, separately
+  authorised sequence (`docs/production-promotion.md`); it has not run and nothing in this runbook authorises it.
+- **Evidence classes, kept separate.**
+  - *DEV, real data.* At `a27f7104`: State A, migration 110, correction 17275/345 surviving settle 100, guard
+    REFUSED, Return to source, settle 101 restoring the source value (steps 8–13); S1–S4 at 1440. At `39a9fed1`
+    (BUILD_ID `IvHo-v-Lq-aKwzFe4i2nN`): real Match Sheet 17275, S1 only, at 390×844, 700×900, 1000×800 and
+    1440×900 (§19.4 "DEV deploy of `39a9fed1`").
+  - *Local fixtures, stubbed server actions (not DEV evidence).* S2 addition and removal rows, S4 settle-running,
+    S5 not-configured and read-failed, button behaviour 12/12, and the 390 Return to source card/button layout.
+  - *`afldb_test` / `code_test_db` integration suites.* Server semantics of Return to source on additions and
+    removals ("Run D resume").
+- **Retained coverage gaps.**
+  1. S2 addition and removal and S5 are local-only; they were not exercised on DEV with real data (by
+     instruction: no lineup or configuration change).
+  2. The mobile **Return to source** button was verified locally only. It was not seen on DEV (record 237 is
+     inactive; no further correction was authorised).
+  3. S4 **provenance mismatch** was exercised nowhere (its display path is identical to the other S4 alerts).
+  4. S4 settle-running is local-only.
+- **Documented limitation (LOW, accepted).** Between about 641 and 767 px (table mode), Return to source starts
+  inside `.table-wrap`'s own horizontal scroll, the same as the shared `.responsive-table` pattern on Coaches,
+  Draft and Fixtures. Not in the 390×844 requirement; unchanged by the V-257-01 fix. INFO: at 320 px the page
+  overflows by 15 px from the site-wide `body { min-width: 320px }` plus a classic scrollbar, not from the sheet.
+- **Rollback posture.** DEV is **roll-forward only**: the guard REFUSED (D-257-7) once record 237 existed.
+  Both recovery copies are retained on the DEV host: `~arm/afldb-recovery/3e98fb7b-JwX7eDNatI1eTE96fhO9y` and
+  `~arm/afldb-recovery/a27f7104-Etn3f80GrxGD2DU9Uj0q5`. Neither is to be removed.
+- **Related issues, opened separately:** ISSUE-261, ISSUE-262, ISSUE-263 (open, none blocks 257). R-01 (rekey
+  lock) and V-257-01 (phone layout) were fixed within 257.
+- **`next-server` PID 3908 (read-only investigation, 2026-10-03 21:40 AEST): not an AFLDB process; DEV serves
+  the intended build.** Operator-authorised read-only script `pid3908-readonly.sh` (LF copy `pid3908-lf.sh`, no
+  kill, restart, write or configuration change; environment filtered to `PORT`, `HOSTNAME`, `NODE_ENV`,
+  `INVOCATION_ID`; the uploaded copy was removed afterwards). Output kept at
+  `D:\tmp\issue257-runD\pid3908-output.txt`.
+  - **PID 3908 is the Streamanator dashboard.** cgroup `/system.slice/streamanator-dashboard.service` (unit
+    "Streamanator TypeScript dashboard", Main PID 3908, active since 2026-10-01 17:50:12), cwd
+    `/home/arm/projects/streamanator_dashboard/web`, `PORT=8600`, listening on `0.0.0.0:8600` only, PPID 1.
+    It started two days before this deploy, runs `next-server (v16.3.3)` from a different checkout
+    (BUILD_ID `phJCkyx1ZEqMmWWRvgKXA`, no `RECOVERY_COMMIT` marker) and is outside the `afldb.service` cgroup.
+    The earlier probe, `pgrep -af next-server`, matches the process title on the whole host, so it listed this
+    unrelated service. It was a false positive, not a leftover of the restart.
+  - **The 3100 listener is the current AFLDB unit.** `127.0.0.1:3100` is held by PID 2596012
+    (`deploy/server-cluster.mjs`, `afldb.service`, started 21:28:01, cwd `/home/arm/projects/afldb`) with four
+    v16.3.1 workers in the same cgroup. `.next/BUILD_ID` at the listener's cwd, the checkout and
+    `.next/standalone` are all `IvHo-v-Lq-aKwzFe4i2nN`; checkout HEAD is
+    `39a9fed1ab1113e9a251506d327ec213ff726373`. `/api/health` on 3100: `{"status":"ok","database":"ok"}`.
+  - **The restart's cgroup-kill messages are INFO, with no residue.** The journal shows, on both the 20:18:51 and
+    21:27:57 restarts, "Failed to kill control group ... Invalid argument" and "Unit process ... remains running
+    after unit stopped" for old-build workers (2531481; 2595793 and 2595859), each already sent SIGKILL. None of
+    them is present at 21:40, and the only `next-server` processes besides PID 3908 are the four current
+    workers. The messages are systemd teardown noise on this host. No stale AFLDB process survived, so nothing
+    serves an old build. This is not tracked as an issue: it left no residue, affected no served request and has
+    no known root cause. It would become one if a post-restart probe, filtered by cgroup rather than process
+    title, ever finds an old-build worker still alive in or outside `afldb.service`.
+  - **Closure verdict unchanged.** No blocker found. ISSUE-257 stays Resolved on DEV acceptance, with PROD
+    promotion outstanding.
+  - **Probe hygiene.** Check the serving build by listener and cgroup (`ss -ltnp 'sport = :3100'`, then
+    `/proc/<pid>/cgroup`), not by `pgrep next-server`, which also matches other Next apps on this host.
