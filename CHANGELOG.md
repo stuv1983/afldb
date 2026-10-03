@@ -15,7 +15,7 @@ commit.
 
 ## [Unreleased]
 
-### Legacy file intake no longer blanks stored statistics a file is silent on (AFLDB-ISSUE-258; implementation validated on `afldb_test` 2026-10-04, ready for operator commit, DEV acceptance outstanding) - 3 October 2026
+### Legacy file intake no longer blanks stored statistics a file is silent on (AFLDB-ISSUE-258; DEV accepted 2026-10-04, PROD promotion outstanding) - 3 October 2026
 
 - In the `player_match_stats` and `match_results` upload datasets, an optional column the file does not
   carry, or a blank cell, now keeps the stored value when the row already exists. It no longer writes NULL.
@@ -29,9 +29,15 @@ commit.
 - Validated on `afldb_test` (operator run, 2026-10-04): promotion 10/10, datasets 16/16, submission
   promotion 7/7, full build exit 0. The test database retains 2 fixture auth users and append-only
   import batches; it is not byte-identical to its pre-run baseline.
+- Deployed to DEV at `e7b57ede` and accepted (2026-10-04) on the combined evidence: the `afldb_test`
+  promotion tests above, plus DEV upload and review validation of six labelled test submissions (absent
+  and blank columns validate clean and store nothing; malformed cells are per-column errors). **No DEV
+  promotion was performed**, so promotion-time preservation is proven on `afldb_test` only. The six
+  submissions were then rejected through the review page and are retained as evidence.
 - Known limitation, tracked separately as AFLDB-ISSUE-264: this intake still ignores Match Sheet
   authority over `player_match_stats`. A legacy submission validated before deployment must be
-  re-validated before it is promoted (R-258-1).
+  re-validated before it is promoted (R-258-1), including on PROD, which has not been deployed or
+  censused.
 
 ### Match Sheet corrections to player statistics survive automatic settles (AFLDB-ISSUE-257; DEV accepted, PROD promotion outstanding) - 3 October 2026
 

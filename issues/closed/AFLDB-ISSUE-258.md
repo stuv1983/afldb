@@ -2,8 +2,10 @@
 
 ## 0. Status
 
-- **Status:** Open. **Implementation validated 2026-10-04 (operator run `run-20261004-080549`,
-  PASS); ready for operator commit. DEV acceptance outstanding** (§16, R-258-1).
+- **Status:** Resolved (2026-10-04; DEV accepted, PROD promotion outstanding). Implementation
+  validated 2026-10-04 (operator run `run-20261004-080549`, PASS), committed as `e7b57ede`, deployed
+  to DEV and accepted on the combined evidence in §18.5. The runbook moves to `issues/closed/` with
+  the operator's commit.
 - **Opened:** 2026-10-02.
 - **Severity:** Low.
 - **Area:** Legacy file intake / data integrity — `src/lib/ingest/datasets.ts`
@@ -18,9 +20,14 @@
 - **2026-10-04, `afldb_test` validation PASSED (§17.10, run 4):** `match-results-promotion` 10/10,
   `datasets` 16/16, `submission-promotion` 7/7; `npm run build` exit 0, 1,515 pages; every
   post-suite and post-build check clean. The final diff review is §17.11. Not yet committed.
+- **2026-10-04, DEV deployed and validation-path acceptance run (§18):** `e7b57ede` on DEV, R-258-1
+  census empty, submissions 54–59 behave as specified. **DEV accepted (§18.5)** on the combined
+  `afldb_test` promotion evidence and the DEV upload/review validation. **No DEV promotion was
+  performed.** The six acceptance submissions were then rejected through the application (§18.6).
 - **Still visible:** AFLDB-ISSUE-264 stays open and unimplemented; the documented limitations
   (§17.7: F-258-I1/ISSUE-264, F-258-I2 `disposals` not schema-enforced, §15.1 item 3 past-damage
-  census not run, R-258-1 re-validation of pre-deployment submissions) are unchanged.
+  census not run, R-258-1 re-validation of pre-deployment submissions) are unchanged. New LOW finding
+  F-258-D1 (§18.7). Outstanding PROD notes: §18.8.
 - §1–§14 are the review's record as written before the decision.
 
 ## 1. Summary
@@ -658,3 +665,176 @@ was changed by this review.
 - **F-258-F2 (INFO): §17.8 omitted `tests/integration/datasets.test.ts`.** Corrected above.
 - Unchanged and still outstanding: DEV acceptance (§14), R-258-1, the §15.1 item 3 past-damage
   census (not run), and AFLDB-ISSUE-264 (open, not implemented).
+
+## 18. DEV deployment and review-page acceptance (2026-10-04)
+
+### 18.1 Deployment
+
+- **Preflight:** `npm run preflight -- --mode deploy --environment dev --issue 258 --ssh-host dev
+  --dsn-env AFLDB_OWNER_DATABASE_URL --expect-database afldb_dev`, run from the primary checkout
+  `D:\dev\afldb` on `main` at `e7b57ede` (clean; `main` = `origin/main` = remote `refs/heads/main`).
+  READY, 0 blockers: database `afldb_dev` as `afldb_owner`, migration parity 110/110. The DSN's host
+  and port were overridden in process memory to the existing `127.0.0.1:55432` tunnel (nothing
+  printed, `.env` not copied). A first run from this feature worktree was BLOCKED for
+  workstation-only reasons (mode requires `main`, no `.env`, `psql` off PATH); no bypass was used.
+- **Recovery copy (before deploy):** `~/afldb-recovery/39a9fed1-IvHo-v-Lq-aKwzFe4i2nN` (copy of the
+  serving standalone build, 831M, verified identical). The two earlier copies are untouched.
+- **Deploy:** `deploy\sync-dev.ps1 -SkipMigrate -RemoteRef main`, exit 0. DEV `39a9fed1` →
+  `e7b57ede`; `npm ci`, `npm run build` (1,516 pages), BUILD_ID `X0BaEweFcLMNQWMvLluhu`; systemd
+  respawn `2596012 → 3112739` at 08:47:28 AEDT; health `ok`.
+- **Serving proof:** primary 3112739 and 4 workers all in `/system.slice/afldb.service`, cwd
+  `…/.next/standalone`, started 08:47:27 (after the build); listener `127.0.0.1:3100` owned by
+  3112739; health `ok` on 3100 and 8090; both settle timers active. `db:status`: 0 pending.
+- **ISSUE-257 rollback guard** (`issue257-rollback-guard.ts --target dev`), before and after:
+  REFUSED, exit 2 (1 `player_match_stats` record, inactive), as expected. Roll forward only.
+- **Gaps:** no `x-afldb-build` header is emitted (ISSUE-107 gate off), so the serving build is
+  proven by process start/cwd/listener, not by header. The journal shows two
+  `Failed to kill control group … Invalid argument` warnings at 08:47:23 from the kill-and-respawn
+  restart; the service recovered cleanly.
+
+### 18.2 R-258-1 census (read-only, before deploy)
+
+`data_submissions` on DEV held **no** `match_results` or `player_match_stats` submissions in any
+status (only 27 `all_australian`, `validated`, out of scope). Nothing required revalidation. PROD was
+not examined and is out of scope.
+
+### 18.3 Acceptance submissions (labelled `ISSUE258-ACCEPT-*`, retained, status `validated`)
+
+Files are in `D:\tmp\issue258\accept\`. All target 2025 round 1 Sydney v Hawthorn (match 16623) and
+player Angus Sheldrick (680). None was approved or promoted.
+
+| ID | Dataset | Case | Result |
+|---|---|---|---|
+| 54 | match_results | optional columns absent | 1 ok, 0 warnings, 0 errors |
+| 55 | match_results | optional columns present, blank | 1 ok |
+| 56 | match_results | `home_goals=1O`, `away_behinds=12.5`, `attendance=4O310` | 1 error, three column-specific reasons |
+| 57 | player_match_stats | only `kicks` | 1 ok |
+| 58 | player_match_stats | columns present, blank | 1 ok |
+| 59 | player_match_stats | `kicks=6x`, `disposals=9.5`, `brownlow_votes=4` | 1 error, three column-specific reasons |
+
+Blank/absent columns resolve to `null` in the stored payload (54, 55, 57, 58), which is the preserve
+signal. Screenshots: `.playwright-mcp/evidence-sub56-…png`, `…sub59-…png` (gitignored).
+After the run: `import_batches` since 08:45 = 0; match 16623 and the player row are unchanged
+(attendance 40310, kicks 6, handballs 3, disposals 9).
+
+**Correction: the acceptance run did write to the DEV database.** It must not be described as having
+made "no database writes". Staging (`upload.staged`) and validation (`submission.validated`) wrote
+`data_submissions` and `data_submission_rows` records, and each action wrote an `audit_log` row. What
+did not happen is **canonical promotion**: no submission was approved or promoted, no import batch was
+created, and no canonical `matches` or `player_match_stats` row changed. The six rejections in §18.6
+are further `data_submissions` and `audit_log` writes of the same kind.
+
+### 18.4 Acceptance gaps recorded at the time of the validation-path run
+
+Superseded by the decision in §18.5; kept for the record.
+
+- Promotion-time preservation was not exercised on DEV, by instruction (no approve/promote). It rests
+  on the `afldb_test` integration run (§17.10).
+- The `Approve` button is rendered on error submissions 56 and 59; the server-side refusal was not
+  clicked. Its code and coverage are examined in §18.7.
+- Submissions 54, 55, 57 and 58 remained `validated` and promotable by a super admin. Resolved by
+  §18.6.
+
+### 18.5 Acceptance decision (2026-10-04)
+
+Accepted on the combined evidence, with the limitation stated:
+
+- **`afldb_test`:** promotion-time preservation and refusal tests passed (§17.10 run 4:
+  `match-results-promotion` 10/10, `datasets` 16/16, `submission-promotion` 7/7; build exit 0).
+- **DEV `e7b57ede`:** upload and review validation passed for submissions 54–59 (§18.3): absent and
+  blank columns validate `ok` and store `null` (the preserve signal); malformed cells validate as
+  per-column errors.
+- **Limitation, retained: no DEV promotion was performed.** Promotion-time preservation is proven on
+  `afldb_test` only, not on DEV. Doing so would have meant approving a file and writing canonical
+  rows, which was not authorised.
+- Unchanged and still visible: AFLDB-ISSUE-264 (open, unimplemented), F-258-I2, the §15.1 item 3
+  past-damage census (not run), R-258-1.
+
+### 18.6 Rejection of the acceptance submissions (2026-10-04)
+
+Authorised by the operator. **Before acting**, each of 54–59 was opened in the DEV review page
+(`http://10.0.40.100:8090/admin/submissions/<id>`, signed in as the Super admin) and verified: the
+filename carried its `ISSUE258-ACCEPT-*` label, the dataset matched §18.3, and the status was
+`validated`. None was approved, promoted or otherwise changed. All six matched, so the step went ahead.
+
+Each was rejected with the page's normal **Reject** button (`decideSubmission`, decision `reject`),
+one at a time; every page then showed status `rejected` and the notice "Rejected.":
+
+| ID | Dataset | Label | Rows (clean / error) | Result |
+|---|---|---|---|---|
+| 59 | player_match_stats | `…-F-…-malformed` | 0 / 1 | `rejected` |
+| 58 | player_match_stats | `…-E-…-valid-blank-cells` | 1 / 0 | `rejected` |
+| 57 | player_match_stats | `…-D-…-valid-columns-absent` | 1 / 0 | `rejected` |
+| 56 | match_results | `…-C-…-malformed` | 0 / 1 | `rejected` |
+| 55 | match_results | `…-B-…-valid-blank-cells` | 1 / 0 | `rejected` |
+| 54 | match_results | `…-A-…-valid-columns-absent` | 1 / 0 | `rejected` |
+
+Not deleted: the submission records and their rows are retained as evidence.
+
+**Evidence that nothing canonical changed:**
+
+- *Code:* the reject branch of `decideSubmission` (`src/app/admin/submissions/[id]/actions.ts:64-76`)
+  is one `UPDATE data_submissions … WHERE status IN ('staged','validated','approved')` plus an
+  `audit()` call. It touches no `import_batches`, `matches` or `player_match_stats`. It runs on the
+  auth connection; promotion runs on a separate import-role connection (`promoteSubmission`).
+- *Application audit trail* (`/admin/audit`, read-only): exactly six new `submission.rejected` events,
+  for submission IDs 54–59, at 22:02:55–22:04:15 UTC (2026-10-03), after the `submission.validated`
+  events at 21:55 UTC. The audit action filter on DEV lists `submission.rejected`,
+  `submission.validated` and `upload.staged` and **no** `submission.approved`, `submission.promoted` or
+  `submission.promote_failed`: no approval or promotion has ever been recorded on DEV.
+- *Not re-queried this step:* a direct `import_batches` / canonical row count. Under the §9 boundary no
+  database command was run, and no admin page lists upload batches (the only readers of
+  `import_batches` are the settle reports). The last direct reading remains §18.3 (batches since 08:45
+  = 0; match 16623 and the player row unchanged), taken before the rejections. A confirming read-only
+  query is offered to the operator in the session report.
+
+### 18.7 Finding F-258-D1 (LOW): Approve is offered on submissions with error rows
+
+**Code inspection (no execution).**
+
+- *The affordance.* `ReviewControls.tsx:35` sets `canDecide = status === 'validated'`, and the Approve
+  button renders on that alone. It does not look at the error count, so submissions 56 and 59 (status
+  `validated`, 1 error row each) show Approve beside Reject. The page does print "Errors block
+  approval. Warnings do not: …" when errors exist, which mitigates it.
+- *The server gate is real and atomic.* `decideSubmission` approve (`actions.ts:47-63`) updates only
+  `WHERE status = 'validated' AND NOT EXISTS (… r.verdict = 'error' OR r.verdict IS NULL)` and returns
+  "Only a validated submission with no error rows can be approved." when nothing updates. The same
+  rows are refused again at promotion (`pipeline.ts:296-301`, "Submission contains error rows;
+  re-validate and fix the file.") and `ReviewControls`' own comment states the buttons are
+  "affordances, not authority". `requireSuperAdmin` guards both.
+- *Existing coverage.*
+  - Promotion refusal of an error row: `tests/integration/submission-promotion.test.ts:253-267` (DB,
+    `afldb_test`; also exercised in the §17.10 run 4 suite).
+  - Reject path: `tests/submission-review-actions.test.ts` (two DB-free cases).
+  - **The approve gate itself has no test.** No DB-free test pins the `NOT EXISTS` clause or the
+    refusal message, and the integration suite does not call `decideSubmission` approve. The gate was
+    read, not run, and **was not clicked on DEV** (clicking Approve on 56/59 was out of scope; a
+    refusal there would be harmless but is unproven).
+- *Verdict.* No data-integrity risk: an error submission cannot be approved or promoted. The defect is
+  a misleading control plus an untested gate. ISSUE-258 did not change `ReviewControls.tsx` or
+  `actions.ts`, so it is not introduced by this change. ISSUE-258 does turn malformed optional cells
+  into error rows, so error submissions are now more likely to reach this screen.
+- *Existing issues.* Searched `issues.md` and `IssuesIndex.md` for the Approve control, `ReviewControls`
+  and submission-review error-row gating: no issue owns it. ISSUE-186 (retirement) is the nearest
+  and covers the whole pipeline, not this control.
+- *Disposition.* **Recorded here as a LOW finding only; no new issue number allocated.** It does not
+  meet the §5 bar (not a data-integrity or security defect, not an unresolved regression), and the
+  pipeline is deprecated. If the operator wants it fixed, the smallest change is to disable Approve
+  (or show it as unavailable) when `report.errors > 0`, plus a DB-free test of the approve path. That
+  is a decision for the operator, not part of ISSUE-258.
+
+### 18.8 Outstanding PROD promotion notes
+
+PROD has not been touched and is out of scope for this step. When ISSUE-258 is promoted:
+
+- **R-258-1** applies to PROD as to any environment. Before promoting any pre-deployment
+  `match_results` / `player_match_stats` submission, re-validate it (`approved` → Reject, Validate,
+  Approve; `failed` → stage the file again; `staged`/`validated` → Validate). Census the PROD
+  `data_submissions` for such rows first; DEV's was empty (§18.2), PROD's is unknown.
+- The §15.1 item 3 past-damage census (did an earlier promotion already blank figures?) was never run
+  for DEV or PROD.
+- AFLDB-ISSUE-264 stays open; PROD will still ignore Match Sheet authority on this intake until it is
+  implemented.
+- DEV promotion-time preservation remains unexercised on DEV (§18.5); it rests on `afldb_test`.
+- Recovery builds retained on the DEV host: `~/afldb-recovery/39a9fed1-IvHo-v-Lq-aKwzFe4i2nN` plus the
+  two earlier copies (§18.1). Nothing was removed.

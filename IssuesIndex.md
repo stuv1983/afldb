@@ -9,7 +9,7 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Open issues:** 9
+**Open issues:** 8
 
 ### AFLDB-ISSUE-264 — Legacy CSV promotion overwrites Match Sheet-protected `player_match_stats` fields and re-inserts players the Match Sheet removed
 - **Severity:** Medium. **Area:** legacy file intake / manual authority — `src/lib/ingest/datasets.ts`
@@ -22,7 +22,8 @@
   - ISSUE-258 narrows it (silent columns no longer write) but does not close it. Nothing implemented.
 - **Runbook:** `issues/open/AFLDB-ISSUE-264.md`.
 - **Next action:** operator decides a refusal modelled on `all_australian` D-12, or retirement under
-  ISSUE-186. Implement after ISSUE-258 is committed, in its own session.
+  ISSUE-186. ISSUE-258 is resolved (DEV accepted 2026-10-04), so this can start in its own session.
+  Still open for PROD: R-258-1 re-validation of any pre-deployment legacy submission.
 
 ### AFLDB-ISSUE-263 — A fresh `db:test:rebuild` leaves every `brownlow_round_votes.match_id` NULL
 - **Severity:** Low. **Area:** rebuild / Brownlow data state; tests —
@@ -86,39 +87,6 @@
 - **Runbook:** `issues/open/AFLDB-ISSUE-259.md`.
 - **Next action:** one focused NL session implementing this with AFLDB-ISSUE-260. The corpora must
   be checked there for rows of this shape that currently expect an answer.
-
-### AFLDB-ISSUE-258 — Legacy CSV intake blanks existing statistics when an optional column is absent or malformed
-- **Severity:** Low. **Area:** legacy file intake / data integrity — `src/lib/ingest/datasets.ts`
-  (`player_match_stats`, `match_results`).
-- **State:** Open (2026-10-02), from the code review recorded in `playbooks/issue.md` (F-002).
-  - An absent column or an unparseable cell becomes NULL with verdict `ok`, and promotion overwrites
-    the stored figure on a matched row.
-  - Established from source; not executed (the dataset tests are DB-backed).
-  - The pipeline is deprecated (ISSUE-186) but still reachable as "Legacy file intake".
-  - **Operator decision (2026-10-02, after the review), D-258-1..3:** fix the two datasets;
-    deprecation alone is not the resolution. An optional column that is absent, or present but
-    blank, preserves the existing value; a malformed or non-integer value is a validation error; a
-    valid value applies. No implicit "blank means clear". ISSUE-186 retirement stays out of scope.
-  - **Implemented 2026-10-03, uncommitted** (branch `issue/258-legacy-csv-null-preservation`,
-    runbook §17):
-    - strict optional-count validation; `COALESCE` upserts; attendance and its status kept as a
-      pair; a kept breakdown that breaks the score is refused at validation;
-    - DB-free 26/26 passed and typecheck passed;
-    - **`afldb_test` validation PASSED 2026-10-04** (operator `run-20261004-080549`, runbook
-      §17.10): `match-results-promotion` 10/10, `datasets` 16/16, `submission-promotion` 7/7;
-      build exit 0, 1,515 pages; all checks clean. Not byte-identical to baseline: 2 retained
-      fixture auth users and append-only `import_batches` (833 → 851), recorded in the runbook;
-    - final diff review (§17.11) clean: `diff --check` passes, `next-env.d.ts` is gitignored and
-      unchanged, stray empty untracked `value` must not be staged.
-  - **F-258-I1 (MED)** is now **AFLDB-ISSUE-264**; its implementation stays outside this issue.
-  - **F-258-I2 (LOW)** reviewed: `disposals = kicks + handballs` is not schema-enforced, so a partial
-    promotion breaches no enforced invariant; documented limitation.
-  - **R-258-1:** after deployment, re-validate any pre-deployment legacy submission before promoting
-    it (`approved` → Reject, Validate, Approve; `failed` → stage the file again).
-- **Runbook:** `issues/open/AFLDB-ISSUE-258.md`.
-- **Next action:** implementation validated, ready for operator commit; then DEV acceptance under
-  R-258-1. Limitations stay visible: ISSUE-264 (F-258-I1, unimplemented), F-258-I2, past-damage
-  census not run.
 
 ### AFLDB-ISSUE-233 — AFL API season discovery and season rollover ownership
 - **Severity:** Medium. **Area:** season lifecycle — `data/reference/afl-api-identities.json`, the
