@@ -47242,7 +47242,7 @@ retained behaviour under `Unreleased`.
 - **Status:** Resolved (2026-10-04; DEV accepted, PROD promotion outstanding). Opened 2026-10-02.
   **Severity:** Low. **Area:** legacy file intake / data integrity.
   Key file: `src/lib/ingest/datasets.ts` (`player_match_stats` and `match_results` datasets).
-- **Runbook:** `issues/open/AFLDB-ISSUE-258.md`.
+- **Runbook:** `issues/closed/AFLDB-ISSUE-258.md`.
 - **Origin.** Code review of `main` at `1c1a4805` (`playbooks/issue.md`, F-002). Nothing implemented.
 - **Defect.** A row the validation report marks `ok` must be applied as written, and a file that is
   silent about a figure must leave it alone. For the two fact-table datasets neither holds.
@@ -47537,7 +47537,7 @@ retained behaviour under `Unreleased`.
   - `src/db/queries/match-sheet.ts:276-300` (the authority writes);
   - `src/lib/ingest/datasets.ts:415-445` (the `all_australian` ISSUE-165 D-12 refusal, the closest
     existing pattern).
-- **Origin.** AFLDB-ISSUE-258 finding F-258-I1 (runbook `issues/open/AFLDB-ISSUE-258.md` §17.7),
+- **Origin.** AFLDB-ISSUE-258 finding F-258-I1 (runbook `issues/closed/AFLDB-ISSUE-258.md` §17.7),
   opened by operator decision 2026-10-03. Pre-existing: the gap dates from ISSUE-257, not from the
   ISSUE-258 change.
 - **Ownership check.** No existing issue owns it. AFLDB-ISSUE-257 §12 put "the legacy CSV intake's
