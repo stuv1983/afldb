@@ -20,6 +20,17 @@
  * and `tests/integration/brownlow-fixture.ts` for the existing reservations).
  * Two REAL, existing club identities are read — never written — from
  * `clubs`, matching `wildcard-final-fixture.ts`'s own convention.
+ *
+ * AFLDB-ISSUE-258 adds the last describe block: a re-promotion over an
+ * existing `matches` or `player_match_stats` row keeps every optional figure
+ * the file is silent on, and a malformed cell is refused at validation. It
+ * runs the real validateSubmission() -> promoteSubmission() path over
+ * synthetic season-2073 rows, and over two fixture club identities (each its
+ * own organization, spanning 2073 only) and fixture players that it creates
+ * and deletes. Every pre-existing match, player_match_stats, club and
+ * club_organizations row is fingerprinted before and after. No real club
+ * resolves for 2073: real spans end at a concrete last season
+ * (tools/migration/load_reference_data.py), and none is borrowed or widened.
  */
 import './guard';
 
@@ -28,7 +39,9 @@ import {
   afterAll, beforeAll, describe, expect, it,
 } from 'vitest';
 
-import { promoteSubmission } from '@/lib/ingest/pipeline';
+import { authSql } from '@/db/authClient';
+import { resolveClub } from '@/lib/ingest/datasets';
+import { promoteSubmission, validateSubmission } from '@/lib/ingest/pipeline';
 
 const testDbUrl = process.env.AFLDB_TEST_DATABASE_URL!;
 process.env.AFLDB_IMPORT_DATABASE_URL = process.env.AFLDB_TEST_IMPORT_DATABASE_URL
@@ -252,5 +265,350 @@ describe('AFLDB-ISSUE-185 match_results promotion provenance', () => {
     // ...but provenance did not move to sports_data_lab.
     expect(row!.sourceId).toBe(afltables.id);
     expect(row!.sourceRecordId).toBe(seededSourceRecordId);
+  });
+});
+
+describe('AFLDB-ISSUE-258 optional columns keep stored figures on re-promotion', () => {
+  const TAG = 'AFLDB-ISSUE-258';
+  const STATS = [
+    'kicks', 'marks', 'handballs', 'disposals', 'goals', 'behinds', 'hitouts',
+    'tackles', 'rebounds', 'inside_50s', 'clearances', 'clangers',
+    'frees_for', 'frees_against', 'contested', 'uncontested', 'contested_marks',
+    'marks_inside_50', 'one_percenters', 'bounces', 'goal_assists',
+  ] as const;
+  type Payload = Record<string, string | null>;
+  type Fingerprint = { n: number; h: string };
+
+  const CLUB_SLUG_PREFIX = 'afldb-issue-258-fixture-';
+  const FIXTURE_CLUBS = [
+    { slug: `${CLUB_SLUG_PREFIX}home`, name: `${TAG} Home Club`, abbreviation: 'I258H' },
+    { slug: `${CLUB_SLUG_PREFIX}away`, name: `${TAG} Away Club`, abbreviation: 'I258A' },
+  ] as const;
+
+  let home: { id: number; name: string };
+  let away: { id: number; name: string };
+  const fixturePlayers = new Map<string, number>();
+  const fixtureClubIds: number[] = [];
+  const fixtureOrganizationIds: number[] = [];
+  type Fingerprints = { matches: Fingerprint; stats: Fingerprint; clubs: Fingerprint; organizations: Fingerprint };
+  let baseline: Fingerprints;
+
+  // Every pre-existing row, as a count and an order-free hash of each row's
+  // text. clubs and club_organizations are whole-table: taken before the
+  // fixture identities exist and after they are deleted, so they also prove
+  // no real identity was touched.
+  async function fingerprint(): Promise<Fingerprints> {
+    const [matches] = await owner<Fingerprint[]>`
+      SELECT count(*)::int AS n, coalesce(sum(hashtext(m::text)::bigint), 0)::text AS h
+        FROM matches m WHERE m.season <> ${FIXTURE_SEASON}
+    `;
+    const [stats] = await owner<Fingerprint[]>`
+      SELECT count(*)::int AS n, coalesce(sum(hashtext(s::text)::bigint), 0)::text AS h
+        FROM player_match_stats s JOIN matches m ON m.id = s.match_id
+       WHERE m.season <> ${FIXTURE_SEASON}
+    `;
+    const [clubs] = await owner<Fingerprint[]>`
+      SELECT count(*)::int AS n, coalesce(sum(hashtext(c::text)::bigint), 0)::text AS h
+        FROM clubs c
+    `;
+    const [organizations] = await owner<Fingerprint[]>`
+      SELECT count(*)::int AS n, coalesce(sum(hashtext(o::text)::bigint), 0)::text AS h
+        FROM club_organizations o
+    `;
+    return { matches, stats, clubs, organizations };
+  }
+
+  /** Stage rows exactly as toObjects() would (absent column = absent key), then validate. */
+  async function stageAndValidate(dataset: string, payloads: Payload[]) {
+    const sha = `${TAG}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+    const [submission] = await owner<{ id: number }[]>`
+      INSERT INTO data_submissions
+        (dataset, filename, content, content_sha256, uploaded_by, row_count, status)
+      VALUES (${dataset}, ${`${TAG}.csv`}, ${Buffer.from('synthetic\n')}, ${sha},
+              ${fixtureAdminId}, ${payloads.length}, 'staged'::submission_status)
+      RETURNING id
+    `;
+    submissionIds.add(submission.id);
+    for (const [index, payload] of payloads.entries()) {
+      await owner`
+        INSERT INTO data_submission_rows (submission_id, row_no, payload)
+        VALUES (${submission.id}, ${index + 1}, ${owner.json(payload)})
+      `;
+    }
+    const summary = await validateSubmission(submission.id);
+    const rows = await owner<{ verdict: string; reasons: { reasons: string[] } }[]>`
+      SELECT verdict, reasons FROM data_submission_rows
+       WHERE submission_id = ${submission.id} ORDER BY row_no
+    `;
+    return { id: submission.id, summary, rows };
+  }
+
+  async function approveAndPromote(id: number) {
+    await owner`UPDATE data_submissions SET status = 'approved' WHERE id = ${id}`;
+    return promoteSubmission(id);
+  }
+
+  async function promoteFile(dataset: string, payloads: Payload[]) {
+    const staged = await stageAndValidate(dataset, payloads);
+    expect(staged.summary.errors).toBe(0);
+    // toMatchObject, so a failure prints the promotion error itself.
+    expect(await approveAndPromote(staged.id)).toMatchObject({ ok: true });
+  }
+
+  function matchPayload(roundCode: string, day: string, extra: Payload = {}): Payload {
+    return {
+      season: String(FIXTURE_SEASON), round_code: roundCode, round_number: '1',
+      match_date: `${FIXTURE_SEASON}-04-${day}`, venue: `${TAG} Oval`,
+      home_club: home.name, away_club: away.name, home_score: '86', away_score: '70',
+      ...extra,
+    };
+  }
+
+  async function readMatchFigures(roundCode: string) {
+    const [row] = await owner<{
+      homeGoals: number | null; homeBehinds: number | null; homeScore: number;
+      awayGoals: number | null; awayBehinds: number | null;
+      attendance: number | null; attendanceStatus: string;
+    }[]>`
+      SELECT home_goals AS "homeGoals", home_behinds AS "homeBehinds", home_score AS "homeScore",
+             away_goals AS "awayGoals", away_behinds AS "awayBehinds",
+             attendance, attendance_status::text AS "attendanceStatus"
+        FROM matches WHERE season = ${FIXTURE_SEASON} AND round_code = ${roundCode}
+    `;
+    return row;
+  }
+
+  function statsPayload(player: string, extra: Payload = {}): Payload {
+    return {
+      season: String(FIXTURE_SEASON), round_code: 'R258P',
+      home_club: home.name, away_club: away.name, player, club: home.name,
+      ...extra,
+    };
+  }
+
+  async function readStats(player: string) {
+    const [row] = await owner<Record<string, number | string | null>[]>`
+      SELECT s.career_game_no, s.jumper_number, s.brownlow_votes, ${owner([...STATS])}
+        FROM player_match_stats s JOIN matches m ON m.id = s.match_id
+       WHERE m.season = ${FIXTURE_SEASON} AND m.round_code = 'R258P'
+         AND s.player_id = ${fixturePlayers.get(player)!}
+    `;
+    return row;
+  }
+
+  // Every optional player_match_stats column, distinct values (kicks 1 .. goal_assists 21).
+  const FULL_STATS: Payload = {
+    ...Object.fromEntries(STATS.map((key, index) => [key, String(index + 1)])),
+    career_game_no: '5', jumper_number: '23', brownlow_votes: '2',
+  };
+  const FULL_STORED = {
+    ...Object.fromEntries(STATS.map((key, index) => [key, index + 1])),
+    career_game_no: 5, jumper_number: '23', brownlow_votes: 2,
+  };
+
+  beforeAll(async () => {
+    // validateSubmission() writes verdicts through the auth pool, whose DSN
+    // tests/setup.ts does not check. Refuse unless it is this same _test
+    // database, so no submission id can reach another database.
+    const target = (db: string, addr: string | null, port: number | null) => `${db}@${addr}:${port}`;
+    const [authTarget] = await authSql<{ db: string; addr: string | null; port: number | null }[]>`
+      SELECT current_database() AS db, inet_server_addr()::text AS addr, inet_server_port() AS port
+    `;
+    const [ownerTarget] = await owner<{ db: string; addr: string | null; port: number | null }[]>`
+      SELECT current_database() AS db, inet_server_addr()::text AS addr, inet_server_port() AS port
+    `;
+    const authAt = target(authTarget.db, authTarget.addr, authTarget.port);
+    const ownerAt = target(ownerTarget.db, ownerTarget.addr, ownerTarget.port);
+    if (authAt !== ownerAt || !/_test$/.test(authTarget.db)) {
+      throw new Error(`AFLDB_AUTH_DATABASE_URL must target ${ownerAt}; it targets ${authAt}`);
+    }
+
+    baseline = await fingerprint();
+
+    // Two fixture club identities, each its own organization, spanning the
+    // fixture season only. Refuse leftovers rather than adopt or delete them.
+    const [leftover] = await owner<{ n: number }[]>`
+      SELECT ((SELECT count(*) FROM clubs WHERE slug LIKE ${`${CLUB_SLUG_PREFIX}%`})
+            + (SELECT count(*) FROM club_organizations WHERE slug LIKE ${`${CLUB_SLUG_PREFIX}%`}))::int AS n
+    `;
+    if (leftover.n !== 0) {
+      throw new Error(`fixture club identities (${CLUB_SLUG_PREFIX}*) already exist; remove that residue first`);
+    }
+    // One transaction: both identities exist or neither does. The
+    // self-referencing current_identity_id FK is deferred, then pointed at
+    // itself, as tests/integration/match-admin-create.test.ts does.
+    await owner.begin(async (tx) => {
+      await tx`SET CONSTRAINTS clubs_current_identity_id_fkey DEFERRED`;
+      for (const club of FIXTURE_CLUBS) {
+        const [organization] = await tx<{ id: number }[]>`
+          INSERT INTO club_organizations (name, slug, first_season, last_season, is_active)
+          VALUES (${club.name}, ${club.slug}, ${FIXTURE_SEASON}, ${FIXTURE_SEASON}, true)
+          RETURNING id
+        `;
+        const [created] = await tx<{ id: number }[]>`
+          INSERT INTO clubs (slug, name, short_name, abbreviation, current_identity_id,
+                             legacy_club_hist, organization_id, first_season, last_season)
+          VALUES (${club.slug}, ${club.name}, ${club.name}, ${club.abbreviation}, -1,
+                  ${club.slug}, ${organization.id}, ${FIXTURE_SEASON}, ${FIXTURE_SEASON})
+          RETURNING id
+        `;
+        await tx`UPDATE clubs SET current_identity_id = ${created.id} WHERE id = ${created.id}`;
+        fixtureOrganizationIds.push(organization.id);
+        fixtureClubIds.push(created.id);
+      }
+    });
+
+    // Each must resolve, for the fixture season, to itself through the
+    // validator's own resolver; nothing about resolution is relaxed.
+    const resolved = await Promise.all(FIXTURE_CLUBS.map((c) => resolveClub(owner, c.name, FIXTURE_SEASON)));
+    if (resolved.some((club, index) => !club || club.id !== fixtureClubIds[index])) {
+      throw new Error('fixture club identities do not resolve to themselves for the fixture season');
+    }
+    [home, away] = resolved as [{ id: number; name: string }, { id: number; name: string }];
+
+    for (const tag of ['Kept', 'Fresh']) {
+      const name = `${TAG} ${tag} Player`;
+      const [player] = await owner<{ id: number }[]>`
+        INSERT INTO players (display_name, search_name, sort_name, slug, debut_season, final_season)
+        VALUES (${name}, afldb_normalise_name(${name}), ${name},
+                ${`issue-258-${tag.toLowerCase()}-${Date.now().toString(36)}`},
+                ${FIXTURE_SEASON}, ${FIXTURE_SEASON})
+        RETURNING id
+      `;
+      fixturePlayers.set(name, player.id);
+    }
+
+    // The match every player_match_stats case attaches to.
+    await promoteFile('match_results', [matchPayload('R258P', '20')]);
+  });
+
+  afterAll(async () => {
+    const playerIdList = [...fixturePlayers.values()];
+    await owner`DELETE FROM player_match_stats WHERE player_id = ANY(${playerIdList}::int[])`;
+    await owner`DELETE FROM matches WHERE season = ${FIXTURE_SEASON} AND round_code LIKE 'R258%'`;
+    await owner`DELETE FROM players WHERE id = ANY(${playerIdList}::int[])`;
+    // Only the identities this run created; club_aliases would cascade (none are made).
+    await owner`DELETE FROM clubs WHERE id = ANY(${fixtureClubIds}::int[])`;
+    await owner`DELETE FROM club_organizations WHERE id = ANY(${fixtureOrganizationIds}::int[])`;
+
+    const [left] = await owner<{
+      matches: number; stats: number; players: number; clubs: number; organizations: number;
+    }[]>`
+      SELECT (SELECT count(*)::int FROM matches
+               WHERE season = ${FIXTURE_SEASON} AND round_code LIKE 'R258%') AS matches,
+             (SELECT count(*)::int FROM player_match_stats
+               WHERE player_id = ANY(${playerIdList}::int[])) AS stats,
+             (SELECT count(*)::int FROM players WHERE id = ANY(${playerIdList}::int[])) AS players,
+             (SELECT count(*)::int FROM clubs
+               WHERE id = ANY(${fixtureClubIds}::int[]) OR slug LIKE ${`${CLUB_SLUG_PREFIX}%`}) AS clubs,
+             (SELECT count(*)::int FROM club_organizations
+               WHERE id = ANY(${fixtureOrganizationIds}::int[])
+                  OR slug LIKE ${`${CLUB_SLUG_PREFIX}%`}) AS organizations
+    `;
+    expect(left).toEqual({ matches: 0, stats: 0, players: 0, clubs: 0, organizations: 0 });
+    // No historical row was touched: every pre-existing row is byte-for-byte as it was.
+    expect(await fingerprint()).toEqual(baseline);
+  });
+
+  it('match_results: a silent column and a blank cell keep goals, behinds and attendance together', async () => {
+    await promoteFile('match_results', [matchPayload('R258A', '01', {
+      home_goals: '13', home_behinds: '8', away_goals: '10', away_behinds: '10', attendance: '45000',
+    })]);
+    const stored = {
+      homeGoals: 13, homeBehinds: 8, homeScore: 86, awayGoals: 10, awayBehinds: 10,
+      attendance: 45000, attendanceStatus: 'complete',
+    };
+    expect(await readMatchFigures('R258A')).toEqual(stored);
+
+    // No such columns at all.
+    await promoteFile('match_results', [matchPayload('R258A', '01')]);
+    expect(await readMatchFigures('R258A')).toEqual(stored);
+
+    // The columns, every cell blank.
+    await promoteFile('match_results', [matchPayload('R258A', '01', {
+      home_goals: null, home_behinds: null, away_goals: null, away_behinds: null, attendance: null,
+    })]);
+    expect(await readMatchFigures('R258A')).toEqual(stored);
+
+    // A supplied figure still applies, and only that figure moves.
+    await promoteFile('match_results', [matchPayload('R258A', '01', { attendance: '50123' })]);
+    expect(await readMatchFigures('R258A')).toEqual({ ...stored, attendance: 50123 });
+  });
+
+  it('match_results: a malformed cell is a validation error and promotion is refused', async () => {
+    await promoteFile('match_results', [matchPayload('R258B', '02', {
+      home_goals: '13', home_behinds: '8', attendance: '30000',
+    })]);
+    const before = await readMatchFigures('R258B');
+
+    const staged = await stageAndValidate('match_results', [
+      matchPayload('R258B', '02', { home_goals: '1O', attendance: 'n/a' }),
+    ]);
+    expect(staged.summary.errors).toBe(1);
+    expect(staged.rows[0].verdict).toBe('error');
+    expect(staged.rows[0].reasons.reasons.join(' ')).toMatch(/home_goals "1O".*attendance "n\/a"/);
+
+    const result = await approveAndPromote(staged.id);
+    expect(result.ok).toBe(false);
+    expect(await readMatchFigures('R258B')).toEqual(before);
+  });
+
+  it('match_results: a new score the kept breakdown cannot reach is refused at validation', async () => {
+    await promoteFile('match_results', [matchPayload('R258D', '04', {
+      home_goals: '13', home_behinds: '8',
+    })]);
+    const staged = await stageAndValidate('match_results', [
+      matchPayload('R258D', '04', { home_score: '92' }),
+    ]);
+    expect(staged.rows[0].verdict).toBe('error');
+    expect(staged.rows[0].reasons.reasons[0]).toMatch(/stored figure.*home_score 92/);
+  });
+
+  it('match_results: a new match with silent optional columns stores them as not recorded', async () => {
+    await promoteFile('match_results', [matchPayload('R258C', '03', { attendance: null })]);
+    expect(await readMatchFigures('R258C')).toEqual({
+      homeGoals: null, homeBehinds: null, homeScore: 86, awayGoals: null, awayBehinds: null,
+      attendance: null, attendanceStatus: 'not_collected',
+    });
+  });
+
+  it('player_match_stats: a partial file changes only the figures it carries', async () => {
+    const player = `${TAG} Kept Player`;
+    await promoteFile('player_match_stats', [statsPayload(player, FULL_STATS)]);
+    expect(await readStats(player)).toEqual(FULL_STORED);
+
+    // goals only: every other statistic, brownlow_votes, career_game_no and
+    // jumper_number keep their stored values.
+    await promoteFile('player_match_stats', [statsPayload(player, { goals: '40' })]);
+    expect(await readStats(player)).toEqual({ ...FULL_STORED, goals: 40 });
+
+    // Every optional column present and blank, except a new jumper text.
+    const blanks = Object.fromEntries(Object.keys(FULL_STATS).map((key) => [key, null]));
+    await promoteFile('player_match_stats', [statsPayload(player, { ...blanks, jumper_number: '23B' })]);
+    expect(await readStats(player)).toEqual({ ...FULL_STORED, goals: 40, jumper_number: '23B' });
+  });
+
+  it('player_match_stats: a malformed cell is a validation error and the row is untouched', async () => {
+    const player = `${TAG} Kept Player`;
+    const before = await readStats(player);
+    expect(before).toBeDefined();
+
+    const staged = await stageAndValidate('player_match_stats', [
+      statsPayload(player, { kicks: '1O', marks: '12.5', goals: '7' }),
+    ]);
+    expect(staged.summary.errors).toBe(1);
+    expect(staged.rows[0].reasons.reasons.map((r) => r.split(' ')[0])).toEqual(['kicks', 'marks']);
+
+    const result = await approveAndPromote(staged.id);
+    expect(result.ok).toBe(false);
+    expect(await readStats(player)).toEqual(before);
+  });
+
+  it('player_match_stats: a new row with silent optional columns stores them as not recorded', async () => {
+    const player = `${TAG} Fresh Player`;
+    await promoteFile('player_match_stats', [statsPayload(player)]);
+    const row = await readStats(player);
+    expect(Object.values(row).every((value) => value === null)).toBe(true);
+    expect(Object.keys(row)).toHaveLength(STATS.length + 3);
   });
 });

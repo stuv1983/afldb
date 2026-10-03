@@ -15,6 +15,24 @@ commit.
 
 ## [Unreleased]
 
+### Legacy file intake no longer blanks stored statistics a file is silent on (AFLDB-ISSUE-258; implementation validated on `afldb_test` 2026-10-04, ready for operator commit, DEV acceptance outstanding) - 3 October 2026
+
+- In the `player_match_stats` and `match_results` upload datasets, an optional column the file does not
+  carry, or a blank cell, now keeps the stored value when the row already exists. It no longer writes NULL.
+  For a new row it is stored as not recorded, as before. Blank never clears a figure.
+- A malformed optional cell is now a validation error that names the column, and blocks approval. This
+  covers text, a fraction, a sign, an exponent and a value beyond the column's range. Before, such a cell
+  validated `ok` and erased the stored figure.
+- `jumper_number` stays free text. `attendance` and `attendance_status` are kept or replaced together.
+- A `match_results` row that changes a score while leaving goals or behinds blank is refused at validation
+  if the stored breakdown would no longer add up to it.
+- Validated on `afldb_test` (operator run, 2026-10-04): promotion 10/10, datasets 16/16, submission
+  promotion 7/7, full build exit 0. The test database retains 2 fixture auth users and append-only
+  import batches; it is not byte-identical to its pre-run baseline.
+- Known limitation, tracked separately as AFLDB-ISSUE-264: this intake still ignores Match Sheet
+  authority over `player_match_stats`. A legacy submission validated before deployment must be
+  re-validated before it is promoted (R-258-1).
+
 ### Match Sheet corrections to player statistics survive automatic settles (AFLDB-ISSUE-257; DEV accepted, PROD promotion outstanding) - 3 October 2026
 
 - A Match Sheet save that changes `player_match_stats` now records durable authority in `data_overrides`

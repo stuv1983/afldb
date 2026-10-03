@@ -83,6 +83,34 @@ function toIntOrNull(value: string | null): number | null {
   return Number.isInteger(n) ? n : null;
 }
 
+/** Upper bounds of the smallint and integer columns the readers below feed. */
+const SMALLINT_MAX = 32_767;
+const INTEGER_MAX = 2_147_483_647;
+
+/**
+ * AFLDB-ISSUE-258 (D-258-2): an optional count column has four states that
+ * toIntOrNull() collapses into one. A column the file does not carry
+ * (`undefined`) and a blank cell (`null`; toObjects() trims and nulls empty
+ * cells) both read as null, and promotion treats null as "keep the stored
+ * value" (D-258-3: blank never clears). Anything else must be a plain
+ * non-negative whole number within the column's range; otherwise the column
+ * is named in `reasons` and the row becomes an error, so a typing slip such
+ * as `1O` or `12.5` blocks approval instead of erasing a stored figure.
+ */
+function optionalCountReader(row: Record<string, string | null>) {
+  const reasons: string[] = [];
+  const read = (column: string, max: number = SMALLINT_MAX): number | null => {
+    const raw = row[column] as string | null | undefined;
+    if (raw === undefined || raw === null || raw.trim() === '') return null;
+    const text = raw.trim();
+    if (/^\d+$/.test(text) && Number(text) <= max) return Number(text);
+    reasons.push(`${column} "${raw}" must be a whole number from 0 to ${max}; `
+      + 'leave the cell blank to keep the stored value');
+    return null;
+  };
+  return { read, reasons };
+}
+
 export async function resolveSeason(sql: Sql, value: string | null): Promise<number | null> {
   const year = toIntOrNull(value);
   if (year === null) return null;
@@ -463,6 +491,18 @@ const FINALS_ROUND_TYPES: Record<string, string> = {
   WF: 'wildcard_final',
 };
 
+/**
+ * The natural key match_results promotes by (season|round|date|home|away,
+ * using the era-appropriate club identity's name). Shared by validation,
+ * which reads the stored match it would update, and promotion.
+ */
+type KeyPart = number | string | null | undefined;
+function matchResultsKey(
+  season: KeyPart, roundCode: KeyPart, matchDate: KeyPart, homeName: KeyPart, awayName: KeyPart,
+): string {
+  return `${season}|${roundCode}|${matchDate}|${homeName}|${awayName}`;
+}
+
 const matchResults: DatasetSpec = {
   key: 'match_results',
   title: 'Match results',
@@ -479,6 +519,16 @@ const matchResults: DatasetSpec = {
   async validateRow(row, { sql }) {
     const reasons: string[] = [];
     let verdict: RowVerdict['verdict'] = 'ok';
+
+    // AFLDB-ISSUE-258: every optional count is read before any lookup, so a
+    // malformed cell is reported (all of them at once) rather than nulled.
+    const counts = optionalCountReader(row);
+    const homeGoals = counts.read('home_goals');
+    const homeBehinds = counts.read('home_behinds');
+    const awayGoals = counts.read('away_goals');
+    const awayBehinds = counts.read('away_behinds');
+    const attendance = counts.read('attendance', INTEGER_MAX);
+    if (counts.reasons.length > 0) return { verdict: 'error', reasons: counts.reasons };
 
     const season = await resolveSeason(sql, row.season);
     if (season === null) {
@@ -541,21 +591,46 @@ const matchResults: DatasetSpec = {
       return { verdict: 'error', reasons: [`away_score "${row.away_score}" must be a non-negative whole number`] };
     }
 
-    const homeGoals = toIntOrNull(row.home_goals);
-    const homeBehinds = toIntOrNull(row.home_behinds);
     if (homeGoals !== null && homeBehinds !== null && homeGoals * 6 + homeBehinds !== homeScore) {
       return { verdict: 'error', reasons: ['home_goals and home_behinds do not add up to home_score'] };
     }
-    const awayGoals = toIntOrNull(row.away_goals);
-    const awayBehinds = toIntOrNull(row.away_behinds);
     if (awayGoals !== null && awayBehinds !== null && awayGoals * 6 + awayBehinds !== awayScore) {
       return { verdict: 'error', reasons: ['away_goals and away_behinds do not add up to away_score'] };
     }
 
-    const attendance = toIntOrNull(row.attendance);
-    if (row.attendance && (attendance === null || attendance < 0)) {
-      return { verdict: 'error', reasons: [`attendance "${row.attendance}" must be a non-negative whole number`] };
+    // AFLDB-ISSUE-258: a goals or behinds cell the file leaves empty keeps
+    // the stored figure on an existing match, so the breakdown that must add
+    // up (matches_score_components_ck, migration 022) is the stored one
+    // overlaid with the file's. Checked here so the reviewer sees it; the
+    // constraint stays the backstop at promotion.
+    if (homeGoals === null || homeBehinds === null || awayGoals === null || awayBehinds === null) {
+      const [stored] = await sql<{
+        homeGoals: number | null; homeBehinds: number | null;
+        awayGoals: number | null; awayBehinds: number | null;
+      }[]>`
+        SELECT home_goals AS "homeGoals", home_behinds AS "homeBehinds",
+               away_goals AS "awayGoals", away_behinds AS "awayBehinds"
+          FROM matches
+         WHERE match_key = ${matchResultsKey(season, row.round_code, row.match_date, home.name, away.name)}
+      `;
+      if (stored) {
+        const sides = [
+          ['home', homeScore, homeGoals ?? stored.homeGoals, homeBehinds ?? stored.homeBehinds],
+          ['away', awayScore, awayGoals ?? stored.awayGoals, awayBehinds ?? stored.awayBehinds],
+        ] as const;
+        for (const [side, score, goals, behinds] of sides) {
+          if (goals !== null && behinds !== null && goals * 6 + behinds !== score) {
+            return {
+              verdict: 'error',
+              reasons: [`${side}_goals ${goals} and ${side}_behinds ${behinds} (the stored figure `
+                + `where the file is blank) do not add up to ${side}_score ${score}; `
+                + `supply both ${side}_goals and ${side}_behinds`],
+            };
+          }
+        }
+      }
     }
+
     // matches.attendance_status (migration 020) must agree with attendance
     // in both directions, and a genuine zero crowd requires a cited
     // source this CSV format has no column for -- refuse rather than
@@ -598,8 +673,10 @@ const matchResults: DatasetSpec = {
     // instead (the file has no source_key column, unlike rising_star),
     // so it follows all_australian's convention of deriving one from the
     // resolved identifying fields rather than inventing a new format.
-    const matchKey = `${resolved.season}|${row.round_code}|${row.match_date}`
-      + `|${resolved.home_club_name}|${resolved.away_club_name}`;
+    const matchKey = matchResultsKey(
+      resolved.season, row.round_code, row.match_date,
+      resolved.home_club_name, resolved.away_club_name,
+    );
 
     await sql`
       INSERT INTO matches
@@ -624,17 +701,26 @@ const matchResults: DatasetSpec = {
          is_final     = EXCLUDED.is_final,
          venue_id     = EXCLUDED.venue_id,
          venue_raw    = EXCLUDED.venue_raw,
-         home_goals   = EXCLUDED.home_goals,
-         home_behinds = EXCLUDED.home_behinds,
+         home_goals   = COALESCE(EXCLUDED.home_goals, matches.home_goals),
+         home_behinds = COALESCE(EXCLUDED.home_behinds, matches.home_behinds),
          home_score   = EXCLUDED.home_score,
-         away_goals   = EXCLUDED.away_goals,
-         away_behinds = EXCLUDED.away_behinds,
+         away_goals   = COALESCE(EXCLUDED.away_goals, matches.away_goals),
+         away_behinds = COALESCE(EXCLUDED.away_behinds, matches.away_behinds),
          away_score   = EXCLUDED.away_score,
          result            = EXCLUDED.result,
          winner_club_id    = EXCLUDED.winner_club_id,
          margin            = EXCLUDED.margin,
-         attendance        = EXCLUDED.attendance,
-         attendance_status = EXCLUDED.attendance_status
+         -- attendance and attendance_status move together
+         -- (matches_attendance_status_ck): a file silent on attendance keeps
+         -- both, a supplied figure sets both.
+         attendance        = COALESCE(EXCLUDED.attendance, matches.attendance),
+         attendance_status = CASE WHEN EXCLUDED.attendance IS NULL
+                                  THEN matches.attendance_status
+                                  ELSE EXCLUDED.attendance_status END
+      -- AFLDB-ISSUE-258 (D-258-2/3): a NULL optional figure above means the
+      -- file was silent (no column, or a blank cell) and keeps the stored
+      -- value; a malformed cell never reaches here, validation refuses it.
+      -- On INSERT there is nothing to keep, so it stays not recorded.
       -- source_id/source_record_id/import_batch_id are deliberately absent
       -- from this SET list (AFLDB-ISSUE-185): they are creation provenance,
       -- stamped once on INSERT only. An UPDATE here means a corrected file
@@ -668,6 +754,14 @@ const playerMatchStats: DatasetSpec = {
     `${row.season}|${row.round_code}|${row.home_club}|${row.away_club}|${row.player}|${row.club}`,
 
   async validateRow(row, { sql }) {
+    // AFLDB-ISSUE-258: every optional count is read before any lookup, so a
+    // malformed cell is reported (all of them at once) rather than nulled.
+    const counts = optionalCountReader(row);
+    const careerGameNo = counts.read('career_game_no');
+    const brownlowVotes = counts.read('brownlow_votes', 3);
+    const stats = Object.fromEntries(STAT_COLUMNS.map((key) => [key, counts.read(key)]));
+    if (counts.reasons.length > 0) return { verdict: 'error', reasons: counts.reasons };
+
     const season = await resolveSeason(sql, row.season);
     if (season === null) {
       return { verdict: 'error', reasons: [`season ${row.season ?? '(empty)'} does not exist`] };
@@ -716,25 +810,22 @@ const playerMatchStats: DatasetSpec = {
       };
     }
 
-    const brownlowVotes = toIntOrNull(row.brownlow_votes);
-    if (brownlowVotes !== null && (brownlowVotes < 0 || brownlowVotes > 3)) {
-      return { verdict: 'error', reasons: [`brownlow_votes "${row.brownlow_votes}" must be 0-3`] };
-    }
-
     const resolved: Record<string, number | string | null> = {
       match_id: match.matchId,
       player_id: player.playerId,
       club_id: club.id,
-      career_game_no: toIntOrNull(row.career_game_no),
+      career_game_no: careerGameNo,
       // jumper_number is optional and pass-through text; coerced here
       // (not read from `row` directly in promoteRow) because an admin's
       // CSV is free to omit the column entirely, in which case `row.
       // jumper_number` is `undefined`, not `null` -- and postgres.js
       // refuses an undefined parameter outright rather than sending NULL.
+      // Free text has no malformed form: absent or blank keeps the stored
+      // value (AFLDB-ISSUE-258), any supplied text applies.
       jumper_number: row.jumper_number ?? null,
       brownlow_votes: brownlowVotes,
+      ...stats,
     };
-    for (const key of STAT_COLUMNS) resolved[key] = toIntOrNull(row[key]);
 
     return { verdict: 'ok', reasons: [], resolved };
   },
@@ -757,32 +848,36 @@ const playerMatchStats: DatasetSpec = {
          ${s('contested')}, ${s('uncontested')}, ${s('contested_marks')}, ${s('marks_inside_50')},
          ${s('one_percenters')}, ${s('bounces')}, ${s('goal_assists')},
          ${resolved.brownlow_votes}, ${sourceId || null}, ${batchId})
+      -- AFLDB-ISSUE-258 (D-258-2/3): a NULL optional figure means the file
+      -- was silent (no column, or a blank cell) and keeps the stored value;
+      -- a malformed cell never reaches here, validation refuses it. On
+      -- INSERT there is nothing to keep, so it stays not recorded.
       ON CONFLICT (player_id, match_id) DO UPDATE SET
          club_id          = EXCLUDED.club_id,
-         career_game_no   = EXCLUDED.career_game_no,
-         jumper_number    = EXCLUDED.jumper_number,
-         kicks            = EXCLUDED.kicks,
-         marks            = EXCLUDED.marks,
-         handballs        = EXCLUDED.handballs,
-         disposals        = EXCLUDED.disposals,
-         goals            = EXCLUDED.goals,
-         behinds          = EXCLUDED.behinds,
-         hitouts          = EXCLUDED.hitouts,
-         tackles          = EXCLUDED.tackles,
-         rebounds         = EXCLUDED.rebounds,
-         inside_50s       = EXCLUDED.inside_50s,
-         clearances       = EXCLUDED.clearances,
-         clangers         = EXCLUDED.clangers,
-         frees_for        = EXCLUDED.frees_for,
-         frees_against    = EXCLUDED.frees_against,
-         contested        = EXCLUDED.contested,
-         uncontested      = EXCLUDED.uncontested,
-         contested_marks  = EXCLUDED.contested_marks,
-         marks_inside_50  = EXCLUDED.marks_inside_50,
-         one_percenters   = EXCLUDED.one_percenters,
-         bounces          = EXCLUDED.bounces,
-         goal_assists     = EXCLUDED.goal_assists,
-         brownlow_votes   = EXCLUDED.brownlow_votes,
+         career_game_no   = COALESCE(EXCLUDED.career_game_no, player_match_stats.career_game_no),
+         jumper_number    = COALESCE(EXCLUDED.jumper_number, player_match_stats.jumper_number),
+         kicks            = COALESCE(EXCLUDED.kicks, player_match_stats.kicks),
+         marks            = COALESCE(EXCLUDED.marks, player_match_stats.marks),
+         handballs        = COALESCE(EXCLUDED.handballs, player_match_stats.handballs),
+         disposals        = COALESCE(EXCLUDED.disposals, player_match_stats.disposals),
+         goals            = COALESCE(EXCLUDED.goals, player_match_stats.goals),
+         behinds          = COALESCE(EXCLUDED.behinds, player_match_stats.behinds),
+         hitouts          = COALESCE(EXCLUDED.hitouts, player_match_stats.hitouts),
+         tackles          = COALESCE(EXCLUDED.tackles, player_match_stats.tackles),
+         rebounds         = COALESCE(EXCLUDED.rebounds, player_match_stats.rebounds),
+         inside_50s       = COALESCE(EXCLUDED.inside_50s, player_match_stats.inside_50s),
+         clearances       = COALESCE(EXCLUDED.clearances, player_match_stats.clearances),
+         clangers         = COALESCE(EXCLUDED.clangers, player_match_stats.clangers),
+         frees_for        = COALESCE(EXCLUDED.frees_for, player_match_stats.frees_for),
+         frees_against    = COALESCE(EXCLUDED.frees_against, player_match_stats.frees_against),
+         contested        = COALESCE(EXCLUDED.contested, player_match_stats.contested),
+         uncontested      = COALESCE(EXCLUDED.uncontested, player_match_stats.uncontested),
+         contested_marks  = COALESCE(EXCLUDED.contested_marks, player_match_stats.contested_marks),
+         marks_inside_50  = COALESCE(EXCLUDED.marks_inside_50, player_match_stats.marks_inside_50),
+         one_percenters   = COALESCE(EXCLUDED.one_percenters, player_match_stats.one_percenters),
+         bounces          = COALESCE(EXCLUDED.bounces, player_match_stats.bounces),
+         goal_assists     = COALESCE(EXCLUDED.goal_assists, player_match_stats.goal_assists),
+         brownlow_votes   = COALESCE(EXCLUDED.brownlow_votes, player_match_stats.brownlow_votes),
          import_batch_id  = EXCLUDED.import_batch_id
     `;
   },

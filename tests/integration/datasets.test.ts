@@ -15,6 +15,18 @@ import { DATASETS } from '@/lib/ingest/datasets';
 const matchResults = DATASETS.match_results;
 const playerMatchStats = DATASETS.player_match_stats;
 
+// AFLDB-ISSUE-258: a row silent on goals/behinds keeps an existing match's
+// stored breakdown, so validation checks the row's score against it. A row
+// about a NEW match therefore names a round code and date no stored match has
+// (1989 round 1, Carlton v Footscray, is a real match); this proves it first.
+async function expectNoStoredMatch(season: number, roundCode: string, matchDate: string) {
+  const [row] = await authSql<{ n: number }[]>`
+    SELECT count(*)::int AS n FROM matches
+     WHERE season = ${season} AND round_code = ${roundCode} AND match_date = ${matchDate}::date
+  `;
+  expect(row.n).toBe(0);
+}
+
 describe('match_results dataset', () => {
   it('is registered with the expected required columns', () => {
     expect(matchResults).toBeDefined();
@@ -81,9 +93,10 @@ describe('match_results dataset', () => {
   });
 
   it('warns rather than errors on an unrecognised venue, and still resolves clubs/result', async () => {
+    await expectNoStoredMatch(1989, 'R258V', '1989-01-01');
     const result = await matchResults.validateRow(
       {
-        season: '1989', round_code: '1', round_number: '1', match_date: '1989-04-01',
+        season: '1989', round_code: 'R258V', round_number: '1', match_date: '1989-01-01',
         venue: 'Some Ground Nobody Has Heard Of', home_club: 'Carlton', away_club: 'Footscray',
         home_score: '80', away_score: '70',
       },
@@ -96,14 +109,16 @@ describe('match_results dataset', () => {
   });
 
   it('computes result/winner/margin correctly for a draw', async () => {
+    await expectNoStoredMatch(1989, 'R258D', '1989-01-01');
     const result = await matchResults.validateRow(
       {
-        season: '1989', round_code: '1', round_number: '1', match_date: '1989-04-01',
+        season: '1989', round_code: 'R258D', round_number: '1', match_date: '1989-01-01',
         venue: 'x', home_club: 'Carlton', away_club: 'Footscray',
         home_score: '80', away_score: '80',
       },
       { sql: authSql },
     );
+    expect(result.verdict).not.toBe('error');
     expect(result.resolved?.result).toBe('draw');
     expect(result.resolved?.winner_club_id).toBeNull();
     expect(result.resolved?.margin).toBe(0);
