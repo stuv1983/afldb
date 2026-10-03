@@ -71,6 +71,7 @@ import {
   resolveStoredIdentityToPlayer,
   type ContinuityRulesLoad,
 } from './match-sheet-authority';
+import { MANUAL_ATTENDANCE_SOURCE_KEY } from './manual-source-key';
 import type {
   ManualAuthorityProvider, ManualAuthorityQuery, ManualAuthorityVerdict,
 } from './observations';
@@ -129,8 +130,8 @@ export const UNREPRESENTABLE_OVERRIDE_ENTITIES = [
   'match_period_scores', 'brownlow_round_votes',
 ] as const;
 
-/** The provenance source key an attendance figure typed by a human carries. */
-export const MANUAL_ATTENDANCE_SOURCE_KEY = 'manual_admin_edit';
+// Defined in a dependency-free module so client bundles never import this file.
+export { MANUAL_ATTENDANCE_SOURCE_KEY };
 
 /** What one `(player_id, match_id)` pair's active ISSUE-257 records protect. */
 export type PlayerMatchStatsPairAuthority = {

@@ -34,7 +34,7 @@
  * dense would be fabricating history the coverage authority says was
  * never collected.
  */
-import { MANUAL_ATTENDANCE_SOURCE_KEY } from '@/lib/acquisition/manual-authority';
+import { MANUAL_ATTENDANCE_SOURCE_KEY } from '@/lib/acquisition/manual-source-key';
 
 /* ------------------------------------------------------------------ *
  * Constants

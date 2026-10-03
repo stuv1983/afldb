@@ -794,6 +794,15 @@ describe('provenance', () => {
     expect(BROWNLOW_MANUAL_SOURCE_KEY).toBe('manual_admin_edit');
   });
 
+  it('takes the key from the client-safe module, never from manual-authority', () => {
+    // entry.ts is bundled into the Brownlow round editor (a client component).
+    // manual-authority.ts reaches Node-only modules since AFLDB-ISSUE-257, and
+    // importing it here broke `next build`, which no unit test can see.
+    const source = readFileSync(join(process.cwd(), 'src', 'lib', 'brownlow', 'entry.ts'), 'utf8');
+    expect(source).toContain("from '@/lib/acquisition/manual-source-key'");
+    expect(source).not.toMatch(/from '@\/lib\/acquisition\/(manual-authority|match-sheet-authority)'/);
+  });
+
   it('builds record ids that name the decision and its revision', () => {
     expect(entrySourceRecordId(17730, 4)).toBe('entry:17730:r4');
     expect(publishSourceRecordId(1950, 2)).toBe('publish:1950:r2');

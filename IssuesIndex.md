@@ -193,10 +193,19 @@
        - 110 reversed by the guarded script. State A R-01 and F-S9-03 pass.
        - `afldb_test` is back at B1; the F5 `import_batches` +9 are attributed.
        - Closure: no drift. **R-01 RESOLVED.**
-  7. **Next:**
-     1. The operator commits.
-     2. The operator runs the DEV acceptance procedure (§19.4 "Run C").
-     3. Resolve.
+  7. **DEV acceptance, State A stage (2026-10-03).**
+     - The deploy preflight passed apart from the accepted, expected FAIL: 110 pending.
+     - The deploy FAILED at `npm run build` (**F-DEV-01, HIGH**): the Brownlow round editor's client
+       bundle imports `manual-authority.ts`, which reaches Node built-ins.
+     - DEV was restored to `3e98fb7b`. Health is ok, the database is unchanged and the host checkout
+       is detached.
+     - The hotfix (`manual-source-key.ts`) is prepared and passes a local production build. It is
+       uncommitted.
+  8. **Next:**
+     1. The operator commits and merges the hotfix.
+     2. Rerun preflight, then `deploy\sync-dev.ps1 -SkipMigrate -RemoteRef main`.
+     3. Run the DEV State A checks (runbook "Run C" steps 3–5); stop before 110.
+     4. The rest of DEV acceptance, then resolve.
 
      PROD is a separate authorisation.
 

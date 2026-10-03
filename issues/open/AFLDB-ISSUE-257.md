@@ -3079,3 +3079,93 @@ verbatim in `.phaneslight/returns/257-impl-20261002/`.
     - **Read-hook artefacts.** None this resume. The closure found no zero-byte repo-root file.
     - **Next.** Operator commit, then the DEV acceptance procedure (§19.4 "Run C"). Then resolve
       ISSUE-257. PROD is a separate authorisation.
+- **DEV acceptance, State A stage (2026-10-03, main session).** The operator committed and merged:
+  `main` = `origin/main` = `92f2bdf6`, primary checkout clean. Scope is the "Run C" procedure steps 2–5
+  only, stopping before migration 110. No PROD.
+  - **Environment.** The primary checkout `D:\dev\afldb` had an empty `node_modules`. The operator
+    authorised `npm ci` there: 419 packages, exit 0, no tracked change, HEAD still `92f2bdf6`. For
+    the process only, `psql` was put on PATH and `AFLDB_OWNER_DATABASE_URL` was rewritten to the
+    55432 tunnel; nothing was printed and no `.env` was changed.
+  - **Step 2: preflight.** `npm run preflight -- --mode deploy --environment dev --dsn-env
+    AFLDB_OWNER_DATABASE_URL --expect-database afldb_dev --ssh-host streamanator`, from the primary
+    checkout.
+    - PASS: repository root; branch `main`; clean tree; contains local main; ahead 0 / behind 0
+      `origin/main`; migration names collision-free; `.env` present; MSYS guard; git, psql and
+      pg_restore available; SSH `streamanator` reachable; DSN present; database reachable as
+      `afldb_dev` / `afldb_owner`, read-only.
+    - The ONLY FAIL: `migration pending-migration — 110_match_sheet_player_match_stats_authority.sql
+      is pending in the target database.` Result: BLOCKED (1 blocker, 0 warnings).
+  - **Tooling gap.** Deploy-mode preflight treats ANY pending migration as an error
+    (`tools/db/migration-safety.ts:159`) and has no exact-name override. The ISSUE-257 deploy is code
+    first (D-257-7 / §18.13), so in State A migration 110 MUST be pending. The tool cannot pass in
+    State A by design, and the Run C procedure did not anticipate this.
+  - **Operator exception (2026-10-03).** Accept ONLY the pending-migration FAIL that names
+    `110_match_sheet_player_match_stats_authority.sql`, provided it is the sole pending migration and
+    every other check passes. Both conditions held. Continue with `sync-dev.ps1 -SkipMigrate` and the
+    State A checks; stop on any other failure or unexpected state, and stop before applying 110.
+    Follow-up: an exact-name `--expect-pending` option for deploy preflight, if wanted, is separate
+    work (not opened here).
+  - **Pre-deploy DEV baseline (read-only, 17:13).**
+    - Ledger 109; CHECK md5 `f163aaed…b247` (does not admit `player_match_stats`).
+    - `data_overrides`: no `player_match_stats` rows. `data_edits` 2; `player_match_stats` 695,499.
+    - Newest AFL Tables settle, batch 91 (2026-10-01): `manualAuthorityRefusals` 0,
+      `canonicalApplyRefusals` 0, `canonicalRekeyRefusals` 0, `foreignOwnedCollision` 0,
+      `unresolvedIdentityMatch` 1.
+    - Saved at `D:\tmp\issue257-runD\dev-baseline-pre-deploy.txt`.
+  - **Step 3: deploy FAILED at the build (17:14–17:15).**
+    - `deploy\sync-dev.ps1 -SkipMigrate` pulled the host from `3e98fb7b` to `92f2bdf6` and ran `npm ci`.
+      `npm run build` then failed: `UnhandledSchemeError: Reading from "node:crypto" | "node:fs" |
+      "node:path" | "node:url" is not handled by plugins`. The script stopped (`set -e`); no restart
+      ran and no migration ran.
+    - Import trace: `RoundMatches.tsx` → `MatchVoteEditor.tsx` (client component) →
+      `src/lib/brownlow/entry.ts:37` → `manual-authority.ts` → `match-sheet-authority.ts` /
+      `fitzroy-profile-continuity.ts` (Node built-ins).
+    - **F-DEV-01 (HIGH, ISSUE-257 defect).** `entry.ts` value-imports one constant,
+      `MANUAL_ATTENDANCE_SOURCE_KEY`, from `manual-authority.ts`. ISSUE-257 made that module reach Node
+      built-ins, so the Brownlow round editor's client bundle broke. No ISSUE-257 run executed
+      `npm run build`; typecheck and vitest cannot detect a client value-import of server-only code.
+    - Impact on DEV: the failed build wiped `.next/standalone` (`server.js` and `BUILD_ID` missing).
+      The pre-deploy process (MainPID 1169477, started 2026-10-02 17:02) kept serving from memory with
+      health ok/ok, but any restart would have left the service unable to start. No database change.
+  - **DEV recovery to `3e98fb7b` (operator-authorised, 19:50–19:53).**
+    - Read-only pre-checks: 110 PENDING (only), guard State A / 0 rows / PERMITTED; host tracked tree
+      clean; its 5 untracked settle manifests do not collide with paths tracked in `3e98fb7b`.
+    - `git checkout --detach 3e98fb7b`, `npm ci`, `npm run build` (compiled successfully).
+      `server.js`, `BUILD_ID` `JwX7eDNatI1eTE96fhO9y` and the static assets present. Restart via
+      `Restart=always`: MainPID 1169477 → 2506948.
+    - Verified: running checkout `3e98fb7b` (detached), service active, health
+      `{"status":"ok","database":"ok"}`. Gated pages answer 307 and `/beta` 200. `migrate --status`
+      shows 0 pending (110 does not exist at `3e98fb7b`). Timers unchanged:
+      `afldb-settle-afl-api-brownlow.timer` (5-minute) and `afldb-settle-afl-api.timer` (daily
+      05:12).
+    - Script and logs: `D:\tmp\issue257-runD\dev-restore-3e98fb7b.sh`, `dev-restore.log`,
+      `dev-deploy.log`.
+    - **Next deploy note.** The host checkout is DETACHED at `3e98fb7b`, so the default
+      `git pull --ff-only` cannot run. Redeploy with `deploy\sync-dev.ps1 -SkipMigrate -RemoteRef main`
+      (it checks out `main` before pulling).
+  - **Hotfix (prepared in this worktree, not committed).**
+    - New dependency-free module `src/lib/acquisition/manual-source-key.ts` holds
+      `MANUAL_ATTENDANCE_SOURCE_KEY`.
+    - `manual-authority.ts` imports it and re-exports it, so existing importers are unchanged.
+    - `src/lib/brownlow/entry.ts` imports it from the new module.
+    - `tests/brownlow-entry.test.ts` adds a source pin: `entry.ts` must import from
+      `manual-source-key` and never from `manual-authority` or `match-sheet-authority`.
+    - **Validation (workstation, 2026-10-03).**
+      - `npm run typecheck`: exit 0.
+      - eslint on the 4 files: exit 0.
+      - vitest `tests/brownlow-entry.test.ts tests/current-season-import.test.ts
+        tests/match-sheet.test.ts`: 481 passed, 4 skipped.
+      - `npm run build`: compiled successfully. The first attempt stopped at page-data collection
+        only because the worktree has no `.env` (`DATABASE_URL is not set`). The re-run with
+        `DATABASE_URL` / `AFLDB_AUTH_DATABASE_URL` set process-only to `afldb_test` exited 0:
+        1,515/1,515 static pages generated, the `/admin/brownlow/...` routes built,
+        `.next/standalone/server.js` present.
+      - The only compile warnings are Next.js's own Edge-runtime notices
+        (`next/dist/esm/server/app-render/dynamic-rendering.js`), unrelated to this change.
+      - `git diff --check`: exit 0.
+    - **Lesson.** A change that touches a module reachable from a client component needs a local
+      `npm run build` before deploy; typecheck and vitest cannot catch a client value-import of
+      server-only code.
+    - **DEV acceptance resumes** only after the operator commits and merges the hotfix. Then:
+      deploy preflight (same 110-pending exception), `sync-dev.ps1 -SkipMigrate -RemoteRef main`,
+      then steps 3–5 of the "Run C" procedure, stopping before migration 110.
