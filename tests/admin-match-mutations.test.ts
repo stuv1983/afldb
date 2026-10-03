@@ -204,6 +204,24 @@ describe('admin match mutation source contracts', () => {
     expect(matchSheetUi).not.toContain('addTeamChoice');
   });
 
+  it('keeps the sheet and its durable-decisions panel inside a phone viewport (AFLDB-ISSUE-257 V-257-01)', () => {
+    // The section's single grid track must not grow to its widest unwrappable child.
+    expect(matchSheetUi).toContain('<section className="section grid-shrink"');
+    // No flex row of fixed-width buttons may stay on one line.
+    const flexRows = [...matchSheetUi.matchAll(/<div style=\{\{ (display: 'flex'[^}]*)\}\}>/g)];
+    expect(flexRows.length).toBeGreaterThanOrEqual(6);
+    for (const [, style] of flexRows) expect(style).toContain("flexWrap: 'wrap'");
+    // Below 640px the panel's rows read as cards, and both layouts share one form.
+    expect(matchSheetUi).toContain('<div className="responsive-table">');
+    expect(matchSheetUi).toContain('<ul className="admin-cards">');
+    expect(matchSheetUi).toContain('<div className="admin-card-action">{returnForm(entry)}</div>');
+    expect(matchSheetUi).toContain('<td>{returnForm(entry)}</td>');
+    // Neither the table's nowrap width nor an unbroken stored key or error reason may set
+    // the panel's width.
+    expect(matchSheetUi).toContain("gridTemplateColumns: 'minmax(0, 1fr)',");
+    expect(matchSheetUi).toContain("overflowWrap: 'anywhere',");
+  });
+
   it('keeps Match Details score corrections and dependent summaries together', () => {
     expect(dataEdits).toContain('INSERT INTO match_period_scores');
     expect(dataEdits).toContain('GREATEST(COALESCE(max(period), 4), 4)');

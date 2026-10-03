@@ -3169,3 +3169,307 @@ verbatim in `.phaneslight/returns/257-impl-20261002/`.
     - **DEV acceptance resumes** only after the operator commits and merges the hotfix. Then:
       deploy preflight (same 110-pending exception), `sync-dev.ps1 -SkipMigrate -RemoteRef main`,
       then steps 3–5 of the "Run C" procedure, stopping before migration 110.
+  - **State A stage, resumed and PASSED (2026-10-03, 20:05–20:35).** The operator merged the hotfix:
+    `main` = `origin/main` = `a27f7104` (primary checkout clean).
+    - **Recovery build, made before rebuilding.** The working DEV build (checkout `3e98fb7b`, BUILD_ID
+      `JwX7eDNatI1eTE96fhO9y`) was copied with `cp -a` to
+      `/home/arm/afldb-recovery/3e98fb7b-JwX7eDNatI1eTE96fhO9y`.
+      - The copy is 825 MB, 12,943 files plus a `RECOVERY_COMMIT` marker. `diff -rq` against the live
+        `.next/standalone` showed it identical.
+      - The unit's `ExecStart` is `node deploy/server-cluster.mjs`, with
+        `WorkingDirectory=/home/arm/projects/afldb`.
+      - Restore path: `git checkout --detach 3e98fb7b`, copy the directory back to
+        `.next/standalone`, restart.
+      - **Retained until DEV acceptance passes.**
+    - **Step 2: preflight** (primary checkout, `a27f7104`). Every check PASS except the sole FAIL
+      `110_match_sheet_player_match_stats_authority.sql is pending`. That is the operator-authorised
+      exception. Log: `D:\tmp\issue257-runD\preflight-a27f7104.log`.
+    - **Step 3: deploy.** `deploy\sync-dev.ps1 -SkipMigrate -RemoteRef main` exited 0.
+      - Before `3e98fb7b` (detached), after `a27f7104 main`; compiled successfully; BUILD_ID
+        `Etn3f80GrxGD2DU9Uj0q5`.
+      - Restart via `Restart=always`: 2506948 → 2531653. Health ready after one probe.
+      - Post-deploy checks:
+        - health `{"status":"ok","database":"ok"}`;
+        - `migrate --status --target dev`: 109 applied, `PENDING 110_match_sheet_player_match_stats_authority.sql`, 1 pending;
+        - `issue257-rollback-guard --target dev`: State A, 0 rows (active 0), PERMITTED, exit 0;
+        - timers unchanged (`afldb-settle-afl-api-brownlow` 5-minute, `afldb-settle-afl-api`
+          daily 05:12);
+        - host untracked files: only the 5 settle manifests.
+    - **Step 4: normal settle (State A).** `systemctl start --no-block afldb-settle-afltables.service`
+      at 20:19:16. Unit `Result=success`, exit 0; journal "settle chain complete — label
+      settle-2026-2026-10-03-2019". This is batch 99, completed.
+      - Batch 99 against the pre-deploy batch 91: every refusal or failure counter is 0 in both, so
+        there is **no new refusal class**. That covers `manualAuthorityRefusals`,
+        `canonicalApplyRefusals`, `canonicalApplyFailures`, `canonicalRekeyRefusals`,
+        `foreignOwnedCollision`, `snapshotRejections`, `sourceDisagreement` and every
+        `unresolvedIdentity*` counter.
+      - Batch 99 also has 0 rejections and 0 canonical applications. There are 0 new `data_issues`
+        since 20:19, and 0 `player_match_stats` overrides.
+      - The only differences are batch 91's upstream changes (47 corrected observations, 55 rows
+        inserted, 46 derived recomputes, 1 unresolved match). Batch 99 saw none: 19,986 unchanged
+        = 19,938 + 47 + 1.
+      - The journal's `foreign_source_owner` warnings are the chain's report of EXISTING open AFL API
+        data issues, first detected on 2026-10-01 and at 05:09 today. Both predate the deploy.
+      - Saved: `D:\tmp\issue257-runD\dev-settle-compare.txt`.
+    - **Step 5: the Match Sheet fails closed.** M = match 17275 (`2026|GF|2026-09-26|Fremantle|Brisbane
+      Lions`, 46 rows, all `afltables`-owned). P = player 345 (`alex-pearce`, one AFL Tables path).
+      - Q1 before: row 705529, owner `afltables`, marks 0, kicks 1, handballs 1, disposals 2. M's
+        46-row md5 `08a1673ae025066f95fc4b67836fe850`. `data_edits` 2 (max 2), 0 for M;
+        `player_match_stats` overrides 0.
+      - The operator changed P's marks 0 → 1 in `/admin/data-editor?mode=match-sheet&id=17275` and
+        saved. The UI showed "Durable Match Sheet authority is not available until migration 110 is
+        applied; nothing was saved."
+      - Q1 after: identical to the before-image in every field. Same 46-row md5, `data_edits` 2 / 0
+        for M, overrides 0. **No write.**
+      - Saved: `dev-q1-before.txt`, `dev-q1-after.txt`.
+      - Panel S1: the operator viewed the page; no S1 defect was reported. A screenshot was not
+        captured, so the S1 visual remains operator-attested only.
+    - **Stopped before migration 110,** as instructed. No PROD work.
+  - **Step 6–7: migration 110 applied to `afldb_dev` (operator-authorised, 2026-10-03 20:36 AEST).**
+    - **Reconfirmed before applying.**
+      - Host checkout `a27f7104 main`, tracked tree clean, BUILD_ID `Etn3f80GrxGD2DU9Uj0q5`,
+        service active (PID 2531653), recovery copy present.
+      - Runner target `afldb_owner@127.0.0.1:5432/afldb_dev`: 109 applied, `PENDING
+        110_match_sheet_player_match_stats_authority.sql` the SOLE pending migration.
+      - Guard: State A, 0 rows, PERMITTED.
+      - The host file is the committed file: git blob `8aa78918…` is identical on host, commit and
+        workstation. The raw sha256 differs only because the Windows checkout is CRLF (64 lines);
+        LF-normalised it equals the host's `6a59d49e…`.
+    - **Applied:** `npm run db:migrate` on the host, guarded by a script that refuses unless HEAD is
+      `a27f7104` and 110 is the only pending migration. Output: `applying
+      110_match_sheet_player_match_stats_authority.sql ... ok (14 ms)`, "Applied 1 migration(s)", exit 0.
+    - **Verified after.**
+      - `migrate --status --target dev`: 110 applied, 0 pending. Ledger 110 rows, max `110_…`.
+      - `data_overrides_entity_type_check`: 14 literals, admits `player_match_stats`, def md5
+        `8485a11052b93c3eb28fbe73fdbcfe57`, comment md5 `37f2fe81eaaf0bc26511bb799dd55f2b`. These are
+        identical to the 110 form proven on `afldb_test`.
+      - Guard: **State B, 0 rows (active 0), PERMITTED**, exit 0. This is the last point at which a
+        code rollback is possible without rolling forward (D-257-7).
+      - `data_overrides` by type is unchanged from the pre-deploy baseline (no `player_match_stats`
+        row). `data_edits` 2; `player_match_stats` 695,499 (unchanged).
+      - Service active, same PID 2531653 and BUILD_ID (no restart needed). Health
+        `{"status":"ok","database":"ok"}`; `/beta` 200, `/admin/data-editor` 307 (gate).
+      - Timers unchanged: `afldb-settle-afl-api-brownlow` last ran 20:35, `Result=success`;
+        `afldb-settle-afl-api` daily 05:12. Settle units inactive.
+      - Recovery copy `~/afldb-recovery/3e98fb7b-JwX7eDNatI1eTE96fhO9y` still present (825 MB),
+        retained.
+    - **Stopped before any Match Sheet correction or authority write** (Run C step 8). No PROD work.
+  - **Steps 8–13: controlled correction, settles, Return to source (operator-authorised, 2026-10-03
+    20:39–20:50 AEST, main session).** Authorisation: one correction, M = 17275 and P = 345, marks
+    0 → 1, only if a fresh snapshot still shows 0 and an `afltables` owner; stop otherwise. The UI was
+    driven in the Playwright browser after the operator signed in as Super Admin. SQL was read-only
+    (`BEGIN TRANSACTION READ ONLY`) through the 55432 tunnel as `afldb_owner`. Host commands went
+    through scp'd scripts. Evidence is in `D:\tmp\issue257-runD\`: `dev-s8*.txt`, `dev-s9-host-guard.txt`,
+    `dev-s10*.txt`, `dev-s11*.txt`, `dev-s12*.txt`, `dev-s13-host.txt` and `shots\`.
+    - **Preconditions (20:39:37, re-checked 20:42:41 just before the save): MET.**
+      - Row 705529: marks 0, owner `afltables`, `import_batch_id` 91, one AFL Tables path
+        (`players/A/Alex_Pearce.html`, `unique`).
+      - M's 46-row md5 `08a1673a…f850` equals the State A before-image. The other 45 rows' md5 is
+        `8efe7540…a90c`, and P's row minus `marks` is `b2c5b88e…7650`.
+      - `data_edits` 2, `player_match_stats` overrides 0, `player_match_stats` 695,499.
+      - Host: `a27f7104`, BUILD_ID `Etn3f80GrxGD2DU9Uj0q5`, PID 2531653, health ok/ok, 0 pending,
+        guard State B / 0 rows / PERMITTED, recovery copy present.
+    - **Step 8: correction PASS.** Saved at 1440×900 from a fresh page load, with only P's `M` input
+      changed (the row's inputs were checked before submitting) and the note "ISSUE-257 DEV acceptance".
+      - The UI showed "✓ Match sheet saved successfully (46 players)".
+      - Q1: marks 1. P's other fields are byte-identical (minus-marks md5 unchanged). The other 45
+        rows are byte-identical (md5 unchanged). Owner `afltables`, row count unchanged.
+      - Q2: exactly one row, id 237. `entity_key` is
+        `2026|GF|2026-09-26|Fremantle|Brisbane Lions|afltables:players/A/Alex_Pearce.html`,
+        `field_group` `match_sheet`, active, `override_values` `{"marks": 1}`.
+      - `data_edits` id 3 (`matches`/17275) has the note, `players.345 = {kind: update, values:
+        {marks: 1}}` and `authorityKeys = [{action: mint, playerId: 345, entityKey: <as above>}]`.
+    - **Step 9: rollback guard PASS.** `issue257-rollback-guard.ts --target dev` printed "REFUSED
+      (D-257-7)", 1 row (active 1), exit 2. **DEV has been roll-forward only since 20:42:56.**
+    - **Step 10: first settle PASS (batch 100, 20:44, `Result=success`).**
+      - 10,246 read; 0 inserted, 0 updated, 0 refused, 0 rejections.
+      - Every `validation_result` counter equals batch 99, including `canonicalRetryApplied` 0 and
+        `manualAuthorityRefusals` 0. No new `data_issues`.
+      - Q1 still shows marks 1. Q2 is unchanged (same `updated_at`), the other 45 rows' md5 is
+        unchanged, and P's minus-marks md5 is unchanged.
+      - The protection is direct, not incidental. With an unchanged payload the settle still offers a
+        `retry` whenever the automatic proposal differs from the canonical row
+        (`settle-afltables.ts:2215-2221`, `invitationFor`). That is the path that reverted
+        corrections before the fix (§8). Without the authority scoping, batch 100 would have written
+        marks 0 (the batch 101 retry below shows exactly that write). Unprotected fields match the
+        source **by equality** (0 updates across 10,028 player rows), not by an observed change;
+        upstream did not move between batches 99 and 101.
+      - The journal lists the same 20 open AFL API `foreign_source_owner` apply failures as before
+        the deploy. They are pre-existing, not 257.
+    - **Step 11: Return to source PASS (20:46:25).** It ran from the panel at 1440×900, and the
+      confirm dialog was accepted.
+      - S3 message: "✓ Returned to source: the Match Sheet decision was withdrawn and the next source
+        update restores the source values. Reload this page before editing the match sheet further."
+        The panel returned to the S1 empty state.
+      - Q2: id 237 `is_active = f`, retained, `updated_at` 20:46:25. Q1 is still marks 1, as designed.
+      - `data_edits` id 4 (`matches`/17275): `withdrawnKeys = [<key>]`, `rowDeleted` false,
+        `old_values.withdrawn` holds the record's payload.
+      - **S4:** a second tab loaded before the withdrawal then clicked Return to source. It showed
+        "⚠ There is no durable Match Sheet authority for this player in this match. Nothing was
+        changed." No write: `data_edits` stayed 4 and 237's `updated_at` is unchanged.
+    - **Step 12: second settle PASS (batch 101, 20:48, `Result=success`).**
+      - "0 inserted, 1 updated, 1 ledger row, 1 retried after resolution; derived recompute ran (1
+        player)". Against batch 100 the only differences are `canonicalApplicationsLogged`,
+        `canonicalRetryApplied`, `canonicalRowsUpdated`, `derivedRecomputePlayers` and
+        `derivedRecomputeRuns`, each 0 → 1. Every refusal/failure counter is 0, with no new
+        `data_issues`.
+      - `canonical_applications` 40023: `update`, target `{match_id 17275, player_id 345}`,
+        `previous_values {marks: 1}` → `new_values {marks: 0}`.
+      - Q1: marks 0, the source value (the step-5 pre-value). The row equals the pre-save image except
+        `import_batch_id` 91 → 101, which the settle stamps on update. The other 45 rows' md5 is
+        unchanged.
+      - Q2: 237 is still inactive. The authority stays released, and the record is retained as the
+        D-257-7 history. A reload of the sheet shows M = 0 and the S1 panel.
+    - **Step 13: service and schedule PASS (20:49).**
+      - Health `{"status":"ok","database":"ok"}`. `afldb` active since 20:18:56, same PID 2531653,
+        same BUILD_ID.
+      - 0 pending.
+      - Guard REFUSED, 1 row (active 0), exit 2: stays REFUSED, as designed.
+      - Timers unchanged: `afldb-settle-afl-api-brownlow` every 5 minutes, `afldb-settle-afl-api`
+        daily 05:12. Settle units inactive, `Result=success`.
+      - Host tracked tree clean. The only new untracked files are the settle manifests for 2019,
+        2044 and 2047 (8 in total).
+      - Recovery copy retained (825 MB).
+    - **Step 14: visual evidence (Playwright, this repository's browser; files in
+      `D:\tmp\issue257-runD\shots\`).**
+
+      | State | 1440×900 | 390×844 |
+      |---|---|---|
+      | S1 no authority | PASS (`S1-1440x900-panel.png`) | captured, overflow below (`S1-390x844-viewport.png`) |
+      | S2 one edited row | PASS (`S2-1440x900-panel.png`) | captured, Return to source button clipped (`S2-390x844-viewport.png`) |
+      | S3 returned | PASS (`S3-1440x900-panel.png`) | captured, overflow below (`S3-390x844-viewport.png`) |
+      | S4 refusal (no authority) | PASS (`S4-1440x900-panel.png`) | captured, overflow below (`S4-390x844-viewport.png`) |
+      | S5 authority unavailable | **NOT EXERCISED** | **NOT EXERCISED** |
+
+      - **V-257-01 (LOW, visual, 390×844).** The whole match-sheet section overflows by about 32 px
+        (`scrollWidth` 439 vs `clientWidth` 375). Its grid track is 407 px because of the existing
+        match header (min-content 405 px) and the team-tab row (407 px). The 257 panel itself needs
+        only 102 px. The panel's text and S2's Return to source button therefore run past the right
+        edge, reachable only by horizontal scroll. The cause predates 257; the panel inherits it.
+        Not fixed (no code change was in scope).
+      - **V-257-02 (INFO).** After an S4 refusal, a stale page keeps listing the withdrawn row until
+        it is reloaded. The S3 message already says to reload.
+      - Not exercised on DEV: **S5** (needs an unavailable import connection or a failed authority
+        read; inducing it would mean changing DEV configuration or privileges, which was not
+        authorised), and **S2's addition and removal rows** (they need a lineup addition or removal,
+        outside the one authorised correction). The S4 provenance-mismatch and "settle running"
+        variants were not exercised either. These remain `VISUAL: UNVERIFIED`.
+      - Incidental: the Playwright browser's cookie banner was accepted by mistake. It set one
+        anonymous search-session cookie in that test browser only.
+    - **Not done:** no PROD work. The recovery build was not touched. No code or schema change.
+      `afldb_dev` now holds exactly one `player_match_stats` authority record (inactive), plus
+      `data_edits` 3 and 4, and `canonical_applications` 40023 and batches 100–101 from the settles.
+    - **Acceptance status: NOT COMPLETE.** Steps 8–13 passed. Step 14 is partial: S5 and S2's
+      addition/removal rows are not exercised, and V-257-01 is open for an operator decision. ISSUE-257
+      stays open. Keep the recovery copy.
+  - **V-257-01 fix and local panel verification (operator-authorised, 2026-10-03 20:52–21:10, main
+    session).**
+    - **Decision.** Fix V-257-01 within ISSUE-257 and keep desktop usable. Exercise S5 and S2's
+      addition/removal states locally on the real component, with controlled fixtures and simulated
+      authority unavailability. No DEV configuration, privilege or lineup change; no commit, deploy, PROD
+      or DEV rollback.
+    - **Root cause, confirmed in the harness.**
+      - The editor's `<section>` is `display: grid` with one auto track. That track grew to the widest
+        unwrappable child: the header link row (`MatchSheetEditor.tsx` header, no `flexWrap`), the view
+        tabs and the `.btn` (nowrap) helper buttons. Every block below grew with it.
+      - Separately, the panel's 4-column table would still have hidden Return to source in a sideways
+        scroll at phone width.
+      - Two further causes were found while verifying:
+        - an unbroken stored key (the indeterminate-key badge) or error reason sets the panel's
+          min-content width (S2i at 390: 150 px of overflow);
+        - wrapping `.table-wrap` in `.responsive-table` made the wrapper the panel's grid item, so the
+          table's nowrap width widened the panel at 641–767 px (700: 26 px of page overflow).
+    - **Fix (`src/app/admin/data-editor/MatchSheetEditor.tsx`).**
+      - The section gets `grid-shrink`, the ISSUE-144 opt-in (`> * { min-width: 0 }`).
+      - Every single-line flex row gets `flexWrap: 'wrap'`: the header links, the view tabs, the team
+        header and the save row. The two helper buttons get `whiteSpace: 'normal'`.
+      - The panel:
+        - uses the shared `.responsive-table` toggle, so below 640 px each decision is an `.admin-card`
+          with a `<dl>` (Club, Decision) and a full-width `.admin-card-action` button;
+        - shares one `returnForm(entry)` between the table row and the card, so behaviour is identical;
+        - gets `gridTemplateColumns: 'minmax(0, 1fr)'` and `overflowWrap: 'anywhere'`. The latter is
+          inherited, but table cells keep `white-space: nowrap` (`globals.css:486-489`), so the desktop
+          table is unaffected.
+      - No server, query or schema change. The new type import is `import type` only (the F-DEV-01
+        lesson).
+    - **Regression test.** `tests/admin-match-mutations.test.ts` adds "keeps the sheet and its
+      durable-decisions panel inside a phone viewport (AFLDB-ISSUE-257 V-257-01)". It pins:
+      - `grid-shrink` on the section;
+      - at least 6 single-line flex rows, every one wrapping;
+      - the `.responsive-table` and `.admin-cards` markup, with `returnForm` in both layouts;
+      - the panel's `minmax(0, 1fr)` track and `overflowWrap`.
+
+      Applied to the committed `a27f7104` file, every one of those checks fails. On the worktree all pass.
+    - **Validation (workstation).**
+      - `npm run typecheck`: exit 0.
+      - eslint on the 2 files: exit 0.
+      - vitest `tests/admin-match-mutations.test.ts tests/match-sheet.test.ts tests/brownlow-entry.test.ts`:
+        177/177.
+      - `npm run build`, with `DATABASE_URL` / `AFLDB_AUTH_DATABASE_URL` set process-only to `afldb_test`
+        through 55432: exit 0. Compiled successfully, 1,515/1,515 static pages, standalone bundle ready,
+        BUILD_ID `fbXkXqxJUcykWEJ0Mwhtx`. The only stderr is Next's existing `middleware`→`proxy`
+        deprecation notice.
+      - Logs: `D:\tmp\issue257-runD\v25701-*.log`.
+    - **Local verification (LOCAL, NOT DEV evidence).** The harness is in `D:\tmp\issue257-runD\local-v257\`,
+      and the images and `README.md` are in `D:\tmp\issue257-runD\shots\local\` (58 PNGs).
+      - It bundles the real `MatchSheetEditor` with esbuild. Only the 'use server' actions module,
+        `next/link` and `next/navigation` are stubbed.
+      - It uses the site CSS unmodified, DEV's `data-site-theme="editorial"` and
+        `data-site-layout="classic"`, and the admin shell classes. Its geometry matches DEV: the section
+        is 1025 px at 1440 and 311 px at 390.
+      - **S5 was simulated through the real loader:** `loadMatchSheetAuthoritySummary` with no import
+        DSN (S5a, "AFLDB_IMPORT_DATABASE_URL is not configured.") and with an unreachable DSN (S5b,
+        "connect ECONNREFUSED 127.0.0.1:1"). The settle-running text comes from
+        `matchSheetRetryableRefusal`.
+      - **Controlled S2:** an edited row (K, H, D, M), a manual addition and a manual removal (club `—`),
+        plus S2i with an unattributable key.
+      - **Fidelity:** the committed `a27f7104` build reproduces V-257-01 in the harness. At 390 it
+        overflows by 156–170 px, with the buttons at x 533–679.
+      - **Display, fixed build, 390×844 and 1440×900, S1/S2/S2i/S5a/S5b: PASS.**
+        - Page overflow 0, the panel and all its text inside the viewport.
+        - At 390, cards with 3/3 buttons in the viewport (x 67–308).
+        - At 1440, the table is identical to before: buttons at x 1099–1244, same section width and page
+          height.
+      - **Width matrix, 17 widths × 5 scenarios:** 0 overflow from 360 to 1440. 320 is in the gaps below.
+      - **Behaviour, 12/12 PASS (6 cases × 2 viewports).**
+        - Cancel posts nothing.
+        - Each accept posts exactly one call with the right `matchId`/`playerId`. While pending every
+          button shows "Returning…" and is disabled.
+        - Results: S3 row-removed (addition), S3 withdrawn (edit and removal), the S4 no-authority alert,
+          and the S4 settle-running alert.
+        - One visible button per player.
+        - The **native** confirm dialog was exercised by hand on the 390 card layout: cancel gave 0 calls;
+          accept gave one call and S3.
+    - **Coverage now.**
+
+      | State | DEV (a27f7104, real data) | Local (fixed component, fixtures) |
+      |---|---|---|
+      | S1 | PASS 1440; 390 shows V-257-01 | PASS both |
+      | S2 edited row | PASS 1440; 390 shows V-257-01 | PASS both, with button behaviour |
+      | S2 addition / removal rows | not exercised | PASS both, with button behaviour |
+      | S3 | PASS 1440; 390 shows V-257-01 | PASS both (addition and withdrawn variants) |
+      | S4 no authority | PASS 1440; 390 shows V-257-01 | PASS both |
+      | S4 settle running | not exercised | PASS both |
+      | S4 provenance mismatch | not exercised | not exercised (display path identical to the other S4 alerts) |
+      | S5 not configured / read failed | not exercised | PASS both |
+
+    - **Remaining gaps.**
+      1. **The fix is not deployed.** DEV still runs `a27f7104`. After commit, merge and deploy, re-check
+         S1 (or S2) on DEV at 390×844 with real data. Until then V-257-01 is fixed locally and
+         `VISUAL: UNVERIFIED` on DEV.
+      2. The local evidence stubs the server actions. The server semantics of Return to source on
+         additions and removals are covered by the `data-editor` integration suite on `afldb_test`
+         ("Run D resume"), not by the harness. The harness keeps the returned row after S3 because its
+         props are static; on DEV the panel re-renders without it, as seen in step 11.
+      3. S2 addition/removal and S5 remain unexercised on DEV with real data (by instruction: no lineup
+         or configuration change).
+      4. **LOW, unchanged by this fix:** from 641 to about 767 px (table mode), Return to source starts
+         inside `.table-wrap`'s own horizontal scroll, the same as before and as the shared
+         `.responsive-table` pattern on Coaches, Draft and Fixtures. Not in the 390×844 requirement.
+      5. **INFO:** at 320 px the page overflows by 15 px, caused by the site-wide
+         `body { min-width: 320px }` plus a classic desktop scrollbar, not by the sheet. It was 226 px
+         before.
+      6. The fonts are the same families loaded from Google Fonts; DEV self-hosts them with `next/font`.
+         The geometry matched DEV.
+    - **Not done:** no commit, deploy, PROD access or DEV rollback. No DEV configuration, privilege,
+      lineup or database change in this pass. The recovery copy is retained. ISSUE-257 stays open.

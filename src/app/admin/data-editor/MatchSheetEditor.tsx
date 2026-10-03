@@ -10,7 +10,10 @@ import {
   type MatchSheetActionState,
 } from '@/app/admin/data-editor/actions';
 import { PlayerPicker } from '@/components/PlayerPicker';
-import type { MatchSheetAuthoritySummaryResult } from '@/db/queries/match-sheet';
+import type {
+  MatchSheetAuthorityPanelEntry,
+  MatchSheetAuthoritySummaryResult,
+} from '@/db/queries/match-sheet';
 import type { MatchDetail, MatchPlayerRow } from '@/db/queries/matches';
 import { formatDate, formatRoundShort } from '@/lib/format';
 import { autoDisposalsFromComponents } from '@/lib/match-sheet';
@@ -75,6 +78,27 @@ function DurableDecisionsPanel({
     clubId === match.homeClubId ? match.homeName
       : clubId === match.awayClubId ? match.awayName
         : '—';
+  const returnForm = (entry: MatchSheetAuthorityPanelEntry) => (
+    <form
+      action={formAction}
+      onSubmit={(event) => {
+        if (!window.confirm(`Return ${entry.playerName} to source? This withdraws the saved Match Sheet decision.`)) {
+          event.preventDefault();
+        }
+      }}
+    >
+      <input type="hidden" name="matchId" value={match.id} />
+      <input type="hidden" name="playerId" value={entry.playerId} />
+      <button
+        type="submit"
+        className="btn btn-secondary"
+        disabled={isPending}
+        aria-label={`Return ${entry.playerName} to source`}
+      >
+        {isPending ? 'Returning…' : 'Return to source'}
+      </button>
+    </form>
+  );
 
   return (
     <div style={{
@@ -82,7 +106,13 @@ function DurableDecisionsPanel({
       borderRadius: '8px',
       padding: '1rem 1.25rem',
       display: 'grid',
+      // V-257-01: a zero-minimum track, so the table's nowrap width scrolls inside
+      // `.table-wrap` (641px and up) instead of widening the panel past the viewport.
+      gridTemplateColumns: 'minmax(0, 1fr)',
       gap: '0.75rem',
+      // V-257-01: stored keys, error reasons and refusal texts can be single unbroken
+      // strings; let them break rather than widen the panel past a phone viewport.
+      overflowWrap: 'anywhere',
     }}>
       <h3 style={{ margin: 0, fontSize: '1rem' }}>Durable Match Sheet decisions</h3>
       <p className="muted" style={{ margin: 0, fontSize: '0.85rem' }}>
@@ -122,47 +152,49 @@ function DurableDecisionsPanel({
               No durable decisions: every player row on this sheet follows its source.
             </p>
           ) : (
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th scope="col">Player</th>
-                    <th scope="col">Club</th>
-                    <th scope="col">Decision</th>
-                    <th scope="col">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {summary.entries.map((entry) => (
-                    <tr key={entry.playerId}>
-                      <td>{entry.playerName}</td>
-                      <td>{clubName(entry.clubId)}</td>
-                      <td>{describeDecision(entry)}</td>
-                      <td>
-                        <form
-                          action={formAction}
-                          onSubmit={(event) => {
-                            if (!window.confirm(`Return ${entry.playerName} to source? This withdraws the saved Match Sheet decision.`)) {
-                              event.preventDefault();
-                            }
-                          }}
-                        >
-                          <input type="hidden" name="matchId" value={match.id} />
-                          <input type="hidden" name="playerId" value={entry.playerId} />
-                          <button
-                            type="submit"
-                            className="btn btn-secondary"
-                            disabled={isPending}
-                            aria-label={`Return ${entry.playerName} to source`}
-                          >
-                            {isPending ? 'Returning…' : 'Return to source'}
-                          </button>
-                        </form>
-                      </td>
+            // V-257-01: below 640px the rows read as cards (the shared `.responsive-table`
+            // toggle), so "Return to source" never sits in a sideways-scrolling table.
+            <div className="responsive-table">
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th scope="col">Player</th>
+                      <th scope="col">Club</th>
+                      <th scope="col">Decision</th>
+                      <th scope="col">Action</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {summary.entries.map((entry) => (
+                      <tr key={entry.playerId}>
+                        <td>{entry.playerName}</td>
+                        <td>{clubName(entry.clubId)}</td>
+                        <td>{describeDecision(entry)}</td>
+                        <td>{returnForm(entry)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <ul className="admin-cards">
+                {summary.entries.map((entry) => (
+                  <li className="admin-card" key={entry.playerId}>
+                    <div className="admin-card-title">{entry.playerName}</div>
+                    <dl className="admin-card-fields">
+                      <div>
+                        <dt>Club</dt>
+                        <dd>{clubName(entry.clubId)}</dd>
+                      </div>
+                      <div>
+                        <dt>Decision</dt>
+                        <dd>{describeDecision(entry)}</dd>
+                      </div>
+                    </dl>
+                    <div className="admin-card-action">{returnForm(entry)}</div>
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
         </>
@@ -405,7 +437,7 @@ export function MatchSheetEditor({
 
     return (
       <div style={{ display: 'grid', gap: '0.5rem', marginBottom: '1.5rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline' }}>
           <h3 style={{ margin: 0 }}>
             {clubName} ({summary.count} players)
           </h3>
@@ -651,7 +683,10 @@ export function MatchSheetEditor({
   }
 
   return (
-    <section className="section" style={{ display: 'grid', gap: '1.25rem' }}>
+    // AFLDB-ISSUE-257 V-257-01: `grid-shrink` keeps the single track at the column's width.
+    // Without it the track grew to the widest unwrappable child (the header links, the tabs),
+    // so on a phone every block below, the decisions panel included, ran past the viewport.
+    <section className="section grid-shrink" style={{ display: 'grid', gap: '1.25rem' }}>
       {/* Header Context */}
       <div style={{
         border: '1px solid var(--border-subtle)',
@@ -672,7 +707,7 @@ export function MatchSheetEditor({
             </p>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
             <Link href={`/matches/${match.id}`} target="_blank" className="btn btn-secondary">
               View public match page ↗
             </Link>
@@ -733,7 +768,7 @@ export function MatchSheetEditor({
               <button
                 type="button"
                 className="btn btn-secondary"
-                style={{ fontSize: '0.8rem', padding: '0.25rem 0.6rem' }}
+                style={{ fontSize: '0.8rem', padding: '0.25rem 0.6rem', whiteSpace: 'normal' }}
                 onClick={() => handleLoadRecentLineup('home')}
                 title={`Copy previous ${homeRecentLineup.length}-player team lineup for ${match.homeName}`}
               >
@@ -744,7 +779,7 @@ export function MatchSheetEditor({
               <button
                 type="button"
                 className="btn btn-secondary"
-                style={{ fontSize: '0.8rem', padding: '0.25rem 0.6rem' }}
+                style={{ fontSize: '0.8rem', padding: '0.25rem 0.6rem', whiteSpace: 'normal' }}
                 onClick={() => handleLoadRecentLineup('away')}
                 title={`Copy previous ${awayRecentLineup.length}-player team lineup for ${match.awayName}`}
               >
@@ -756,7 +791,7 @@ export function MatchSheetEditor({
       )}
 
       {/* View Filter Tabs */}
-      <div style={{ display: 'flex', gap: '0.5rem' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
         <button
           type="button"
           className={`btn ${activeTab === 'all' ? 'btn-primary' : 'btn-secondary'}`}
@@ -815,7 +850,7 @@ export function MatchSheetEditor({
             />
           </label>
 
-          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', marginTop: '0.5rem' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center', marginTop: '0.5rem' }}>
             <button type="submit" disabled={isPending} style={{ padding: '0.6rem 1.25rem', fontSize: '0.95rem' }}>
               {isPending ? 'Saving match sheet & recalculating stats…' : 'Save match sheet & update player stats'}
             </button>

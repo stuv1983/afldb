@@ -201,13 +201,37 @@
        is detached.
      - The hotfix (`manual-source-key.ts`) is prepared and passes a local production build. It is
        uncommitted.
-  8. **Next:**
-     1. The operator commits and merges the hotfix.
-     2. Rerun preflight, then `deploy\sync-dev.ps1 -SkipMigrate -RemoteRef main`.
-     3. Run the DEV State A checks (runbook "Run C" steps 3–5); stop before 110.
-     4. The rest of DEV acceptance, then resolve.
+  8. **State A stage PASSED (2026-10-03, hotfix `a27f7104` deployed).**
+     - The recovery copy of the `3e98fb7b` build is retained at
+       `~/afldb-recovery/3e98fb7b-JwX7eDNatI1eTE96fhO9y`.
+     - The preflight's only FAIL was the authorised 110-pending exception. The deploy is OK and
+       health is ok.
+     - Only 110 is pending; the guard shows State A, 0 rows, PERMITTED.
+     - Settle batch 99 has no new refusal class against batch 91.
+     - The Match Sheet save was refused with the authority-unavailable message, with no write (Q1
+       and M's 46-row md5 are unchanged).
+  9. **Migration 110 applied to `afldb_dev` (2026-10-03 20:36).**
+     - 0 pending. The CHECK admits `player_match_stats`; md5s match the `afldb_test` 110 form.
+     - The guard shows **State B, 0 rows, PERMITTED**.
+     - Health is ok and the timers are unchanged. The recovery copy is retained.
+  10. **DEV steps 8–13 PASSED (2026-10-03 20:39–20:50).**
+     - The correction (17275 / 345, marks 0 → 1) survived settle 100.
+     - The guard is REFUSED (roll-forward only).
+     - After Return to source, settle 101 restored marks 0 (1 retry update). Record 237 is inactive
+       and retained.
+     - Health and timers OK.
+     - S1–S4 PASS at 1440×900.
+  11. **V-257-01 fixed in the worktree (uncommitted, not deployed).** `MatchSheetEditor.tsx` changes:
+     - the section gets `grid-shrink`;
+     - every single-line flex row wraps;
+     - the panel uses the card view below 640px, a `minmax(0,1fr)` track and `overflowWrap: anywhere`.
 
-     PROD is a separate authorisation.
+     The regression test is in `admin-match-mutations`. Typecheck and eslint 0, vitest 177/177, local
+     build exit 0. The local harness (real component, fixtures; S5 via the real loader) passes S1, S2
+     edited/addition/removal, S2i, S5a and S5b at 390×844 and 1440×900, and behaviour 12/12.
+  12. **Next:** operator commit, `merge:ready`, push and merge. Then DEV deploy (`sync-dev.ps1`) and a
+     390/1440 re-check, then resolve. Keep the recovery copy until then. PROD is a separate
+     authorisation.
 
 ### AFLDB-ISSUE-233 — AFL API season discovery and season rollover ownership
 - **Severity:** Medium. **Area:** season lifecycle — `data/reference/afl-api-identities.json`, the

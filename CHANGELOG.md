@@ -28,6 +28,10 @@ commit.
 - New **Return to source** action in the Data Editor Match Sheet. It withdraws the authority. On an
   addition, it deletes the row while the row is still unowned, keeps it once a source owns it, and refuses
   any other provenance. The next settle then restores the source value.
+- The Match Sheet editor fits a phone viewport (V-257-01). Its header links, view tabs and helper buttons
+  wrap, and the section no longer widens to its widest row. Below 640px the "Durable Match Sheet
+  decisions" panel lists each decision as a card with a full-width Return to source button. Long stored
+  keys and error reasons wrap. The desktop layout is unchanged.
 - A Match Sheet save is refused, with nothing saved, if the sheet changed since it was loaded. A save that
   meets a settle's lock or a deadlock gets a "try again" refusal. Both settles retry their end-of-run
   derived recompute a bounded number of times on deadlock (`40P01`). The remaining lock-order hazard is
@@ -51,7 +55,8 @@ commit.
   - all 84 ISSUE-238 rehearsal runs passed under the old CHECK, and the seven Match Sheet cases passed
     under migration 110.
 
-  Not yet deployed. DEV acceptance is operator-run.
+  DEV acceptance steps 8–13 passed on 2026-10-03. The V-257-01 layout fix is verified locally and is not
+  yet deployed.
 
 ### NL search refuses career rankings for statistics AFLDB does not store, instead of failing (AFLDB-ISSUE-256; resolved) - 2 October 2026
 
