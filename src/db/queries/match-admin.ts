@@ -12,6 +12,7 @@ import {
   recomputeSeasonBrownlowStatus,
   recomputeSeasonMetadata,
 } from '@/db/queries/player-derived';
+import { matchDeletionAuthorityRefusal } from '@/db/queries/match-sheet';
 import { validateAdminMatchNumbers } from '@/lib/admin-match';
 
 export type QuarterScoreInput = {
@@ -416,6 +417,7 @@ export async function deleteMatch(input: {
       const [match] = await tx<{
         id: number;
         season: number;
+        matchKey: string;
         roundCode: string;
         matchDate: string;
         homeClubId: number;
@@ -423,7 +425,8 @@ export async function deleteMatch(input: {
         homeScore: number;
         awayScore: number;
       }[]>`
-        SELECT id, season, round_code AS "roundCode", match_date::text AS "matchDate",
+        SELECT id, season, match_key AS "matchKey", round_code AS "roundCode",
+               match_date::text AS "matchDate",
                home_club_id AS "homeClubId", away_club_id AS "awayClubId",
                home_score AS "homeScore", away_score AS "awayScore"
           FROM matches
@@ -452,6 +455,19 @@ export async function deleteMatch(input: {
             + 'and cannot be deleted. Remove that decision in Brownlow administration '
             + `(/admin/brownlow/${match.season}/${match.roundCode}) first.`,
         };
+      }
+
+      // AFLDB-ISSUE-257 D-257-5: a match carrying ACTIVE durable Match Sheet
+      // authority (`data_overrides`, entity_type `player_match_stats`) is not
+      // deletable. Fail closed: an active record that does not decode or resolve
+      // still blocks. Nothing is deactivated, deleted or discarded here; the admin
+      // relinquishes it through "Return to source" first. Inactive records do not
+      // block; under the pre-migration CHECK none can exist.
+      const authorityRefusal = await matchDeletionAuthorityRefusal(
+        tx, input.matchId, match.matchKey,
+      );
+      if (authorityRefusal !== null) {
+        return { ok: false as const, error: authorityRefusal };
       }
 
       // AFLDB-ISSUE-167 §8.3, the THIRD destruction path. Until Stage 6 this

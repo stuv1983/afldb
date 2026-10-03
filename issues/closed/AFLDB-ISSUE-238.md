@@ -6177,3 +6177,11 @@ now passes 73/73 (72 baseline + 1 new). `npx tsc --noEmit -p .` is clean. Nothin
 no Slice-1 confirmation remains open. No accepted decision (D1–D10, O-1…O-6, D-P5-1…3) required
 amendment. **Slice 3 onward: READY FOR SEPARATE OPERATOR AUTHORISATION** — this pass authorises
 nothing beyond Slice 1/2, per its own brief.
+
+### 14.8 Post-closure compatibility note (2026-10-02, AFLDB-ISSUE-257)
+
+The rehearsal harness `tools/db/afl-api-identity-correction-rehearsal.ts` was adapted under
+AFLDB-ISSUE-257 for the new Match Sheet stale-token and authority-schema contract (cases 016, 070,
+088, 091, 100, 101). ISSUE-238's historical conclusions and acceptance stand; it is not reopened.
+The re-run of those six cases is owned by ISSUE-257, with evidence in
+`issues/open/AFLDB-ISSUE-257.md` §19.

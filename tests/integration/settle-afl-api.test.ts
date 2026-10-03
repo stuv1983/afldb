@@ -74,6 +74,8 @@ import {
   type SourceFamilyRegistry,
 } from '@/lib/acquisition/source-families';
 import { recomputeClubSeasons, recomputeSeasonMetadata } from '@/db/queries/player-derived';
+import { loadMatchSheetStaleToken, saveMatchSheet } from '@/db/queries/match-sheet';
+import { playerMatchStatsAuthorityStorable } from '@/lib/acquisition/manual-authority';
 
 import {
   archivedCaptureName,
@@ -322,6 +324,8 @@ const CASE_IDS = {
   issue235Lifecycle: `${NS}Z235`,
   // AFLDB-ISSUE-255: an unused emergency's player-stats placeholder beside the played rows.
   nonParticipant: `${NS}N255`,
+  // AFLDB-ISSUE-257 (§17.8/F-S9-03): a Match Sheet correction over an afl_api-owned stat row.
+  matchSheetAuthority: `${NS}N257`,
 } as const;
 const ALL_PROVIDER_IDS = Object.values(CASE_IDS);
 
@@ -402,6 +406,8 @@ const CASE_DATES: Readonly<Record<string, string>> = {
   [CASE_IDS.issue235Lifecycle]: '2026-06-01',
   // AFLDB-ISSUE-255: the June Tuesday after it (AEST), used by no other case.
   [CASE_IDS.nonParticipant]: '2026-06-02',
+  // AFLDB-ISSUE-257: the June Wednesday after it (AEST), used by no other case.
+  [CASE_IDS.matchSheetAuthority]: '2026-06-03',
   // I244-F001 H&A cases: deliberately the LATEST dates in the suite (every
   // other case is <= 2026-09-30) so seasons.last_match_date/
   // data_through_date/last_loaded_round can be proven to reflect THIS
@@ -2854,6 +2860,110 @@ async function matchRowByKey(matchKey: string): Promise<Record<string, any>> {
   expect(row).toBeDefined();
   return row.snapshot;
 }
+
+/* ------------------------------------------------------------------ *
+ * AFLDB-ISSUE-257 §17.8 / F-S9-03 — durable Match Sheet authority over an
+ * afl_api-OWNED player_match_stats row, through the real settle path.
+ *
+ * The row is created by the settle itself (the F009 "setup" shape), so its
+ * source_id is the afl_api source by canonical-apply provenance, never by a
+ * hand UPDATE. State A (migration 110 not applied: no authority is storable)
+ * returns early, exactly as data-editor.test.ts does.
+ * ------------------------------------------------------------------ */
+describe('AFLDB-ISSUE-257 §17.8 — Match Sheet authority over an afl_api-owned row survives a re-settle', () => {
+  const NOTE = 'issue-257 afl_api ownership test';
+
+  it('keeps the corrected field, lets an unrelated field follow the source, and never changes ownership', async () => {
+    if (!(await playerMatchStatsAuthorityStorable(sql))) return; // State A: nothing to prove
+
+    const providerId = CASE_IDS.matchSheetAuthority;
+    const matchKey = matchKeyFor(providerId);
+    const [actor] = await sql<{ id: number }[]>`SELECT id FROM auth_users ORDER BY id LIMIT 1`;
+    const adminUserId = actor?.id ?? await seedS6Actor(sql);
+    const priorImportUrl = process.env.AFLDB_IMPORT_DATABASE_URL;
+    process.env.AFLDB_IMPORT_DATABASE_URL = process.env.AFLDB_TEST_DATABASE_URL;
+
+    const mutateSource = (raw: { stats: unknown }) => {
+      const stats = (raw.stats as { homeTeamPlayerStats: { playerStats: { stats: Record<string, unknown> } }[] })
+        .homeTeamPlayerStats[0].playerStats.stats;
+      stats.goals = 5.0; // a protected field the source now disagrees about
+      stats.contestedMarks = 4.0; // an unrelated field (not on the Match Sheet)
+    };
+    const settleOptions = (label: string, mutate?: typeof mutateSource) => ({
+      bundle: {
+        ...buildBundle([unitSourceFor(providerId, mutate)], registry, identities),
+        snapshotLabel: `issue228-integration-${providerId}-i257-${label}`,
+      },
+      registry, apply: true, autoApply: true, inProgressSeasons: [SEASON],
+    });
+    const rowOf = async (matchId: number) => {
+      const [row] = await sql<{
+        sourceId: number; goals: number; contestedMarks: number; clubId: number; jumper: string | null;
+        behinds: number; kicks: number; handballs: number; disposals: number; marks: number;
+        tackles: number; hitouts: number; freesFor: number; freesAgainst: number;
+      }[]>`
+        SELECT source_id AS "sourceId", goals::int AS goals, contested_marks::int AS "contestedMarks",
+               club_id::int AS "clubId", jumper_number AS jumper, behinds::int AS behinds,
+               kicks::int AS kicks, handballs::int AS handballs, disposals::int AS disposals,
+               marks::int AS marks, tackles::int AS tackles, hitouts::int AS hitouts,
+               frees_for::int AS "freesFor", frees_against::int AS "freesAgainst"
+          FROM player_match_stats WHERE match_id = ${matchId} AND player_id = ${bridgedPlayerId}
+      `;
+      expect(row).toBeDefined();
+      return row;
+    };
+
+    try {
+      const created = await runSettleAflApi(sql, settleOptions('create'));
+      expect(created.applied).toBe(true);
+      expect(created.counters.canonicalApplyFailures).toBe(0);
+      const [match] = await sql<{ id: number }[]>`SELECT id FROM matches WHERE match_key = ${matchKey}`;
+      expect(match).toBeDefined();
+      const before = await rowOf(match.id);
+      expect(before.sourceId).toBe(aflApiSourceId);
+      expect(before.goals).toBe(0);
+      expect(before.contestedMarks).toBe(0);
+
+      // The Match Sheet correction: goals 0 -> 2 under the player's stable identity.
+      const saved = await saveMatchSheet({
+        matchId: match.id, syncMatchScores: false,
+        players: [{
+          playerId: bridgedPlayerId, clubId: before.clubId, jumperNumber: before.jumper,
+          goals: 2, behinds: before.behinds, kicks: before.kicks, handballs: before.handballs,
+          disposals: before.disposals, marks: before.marks, tackles: before.tackles,
+          hitouts: before.hitouts, freesFor: before.freesFor, freesAgainst: before.freesAgainst,
+        }],
+        adminUserId, note: NOTE, staleToken: await loadMatchSheetStaleToken(sql, match.id),
+      });
+      expect(saved).toMatchObject({ ok: true });
+      const [{ active }] = await sql<{ active: number }[]>`
+        SELECT count(*)::int AS active FROM data_overrides
+         WHERE entity_type = 'player_match_stats' AND is_active
+           AND starts_with(entity_key, ${matchKey}::text || '|')
+      `;
+      expect(active).toBeGreaterThan(0);
+      expect((await rowOf(match.id)).goals).toBe(2);
+      expect((await rowOf(match.id)).sourceId).toBe(aflApiSourceId);
+
+      // The source now says goals 5 and contested marks 4.
+      const resettled = await runSettleAflApi(sql, settleOptions('resettle', mutateSource));
+      expect(resettled.applied).toBe(true);
+      expect(resettled.counters.canonicalApplyFailures).toBe(0);
+      const after = await rowOf(match.id);
+      expect(after.goals).toBe(2); // protected: the correction is kept
+      expect(after.contestedMarks).toBe(4); // unrelated: still follows the source
+      expect(after.sourceId).toBe(aflApiSourceId); // ownership is never changed by a Match Sheet edit
+    } finally {
+      await sql`
+        DELETE FROM data_overrides
+         WHERE entity_type = 'player_match_stats' AND starts_with(entity_key, ${matchKey}::text || '|')
+      `;
+      await sql`DELETE FROM data_edits WHERE admin_user_id = ${adminUserId} AND note = ${NOTE}`;
+      if (priorImportUrl === undefined) delete process.env.AFLDB_IMPORT_DATABASE_URL;
+      else process.env.AFLDB_IMPORT_DATABASE_URL = priorImportUrl;
+    }
+  });
+});
 
 describe('AFLDB-ISSUE-244 I244-F010 — identity-bearing corrections are withheld, durable and self-healing', () => {
   it('a provider date correction is withheld while non-identity corrections still apply; the finding is replay-safe, heals when the sides agree again, and never rewrites a human resolution', async () => {

@@ -9,7 +9,38 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Open issues:** 6
+**Open issues:** 9
+
+### AFLDB-ISSUE-263 — A fresh `db:test:rebuild` leaves every `brownlow_round_votes.match_id` NULL
+- **Severity:** Low. **Area:** rebuild / Brownlow data state; tests —
+  `tools/migration/import_fitzroy_core.py:3246-3248`, `src/db/migrations/094_brownlow_admin_workflow.sql`,
+  `tests/integration/admin-brownlow.test.ts:367-379`.
+- **State:** Open (2026-10-03). Found as ISSUE-257 F-S11-02 and pre-existing. The importer COPYs
+  `brownlow_round_votes` without `match_id`, and migration 094's one-time backfill runs before the data on a
+  rebuild, so `admin-brownlow` preflight P2 finds 320,861 of 320,861 rows unresolved. Does not block ISSUE-257.
+- **Next action:** operator decides the contract (rebuild defect versus stale test assumption).
+
+### AFLDB-ISSUE-262 — `reference-data` exact post-045 import-write list omits `afl_api_identity_adjudications` (migration 104)
+- **Severity:** Low. **Area:** tests / reference-data privilege guard — `tests/reference-data.test.ts:425`,
+  `src/db/migrations/104_afl_api_identity_adjudications.sql`.
+- **State:** Open (2026-10-03). Found as ISSUE-257 F-S9-04 and pre-existing on HEAD `3ed70ab1`. DB-free and
+  platform-independent: `npx vitest run tests/reference-data.test.ts -t "never registered import write"`
+  fails, with `"afl_api_identity_adjudications"` as the extra received entry. Does not block ISSUE-257.
+- **Next action:** confirm that 104's append-only-by-grant design is intended, then add the table, with a
+  comment, to the exact list.
+
+### AFLDB-ISSUE-261 — Targeted player-derived recompute takes row locks in an order that can deadlock a settle against a Data Editor save
+- **Severity:** Low. **Area:** data integrity / concurrency — `src/db/queries/player-derived.ts`
+  (`recomputePlayerDerivedStats`), `data-edits.ts`, `match-admin.ts`, both settles.
+- **State:** Open (2026-10-02), found in ISSUE-257 Slice 4 (F-S4-01) by code reading; pre-existing.
+  - The recompute updates every `player_match_stats` row of each affected player, with no
+    changed-value guard, so a settle and an admin writer touching one player can wait on each other.
+  - ISSUE-257 mitigates the Match Sheet case: a bounded 40P01 retry around both settles' end-of-run
+    recompute, sized to outlast the Match Sheet's 5 s `lock_timeout`.
+  - Residual: `data-edits.ts` and `match-admin.ts` set no `lock_timeout`, so the retry can exhaust
+    and roll the settle back (the next run retries). Not reproduced against a database.
+- **Next action:** decide whether to fix (changed-value guard, global `players` lock order, or a
+  `lock_timeout` on the other writers).
 
 ### AFLDB-ISSUE-260 — NL answer explanation prints internal column markers for career conditions
 - **Severity:** Low. **Area:** NL search, describe/render stage — `src/search/nl/plan.ts`
@@ -92,11 +123,82 @@
     addition form, replay ordering and UI.
   - The read-only historical census of already-reverted corrections is a separate follow-up needing
     its own authorisation. Not run.
-  - Nothing implemented.
+  - **Implementation design (2026-10-02, read-only pass, runbook §18).** Key
+    `<match_key>|<player identity>`, decoded at the last `|`; the player identity is
+    `resolvePlayerIdentity` (AFL Tables path, else manual token; no `afl_api` arm). Two field groups
+    on the existing table: `match_sheet` (field delta; `kicks`/`handballs`/`disposals` one unit;
+    `club_slug`) and `lineup` (`present` true/false); `is_active = false` means returned to source.
+    Authority scoping must precede `reconcile()` and is re-enforced in the applier; replay runs
+    inside the fitzRoy stats transaction and in the promotion §8.1 tuple; promotion needs A4.4 and
+    an F2 extension; rekey carries the records; ISSUE-238 ORIGINAL STOPs on authority it would
+    strand. Deploy code first, then the CHECK; roll forward only once a record exists.
+  - **Census and decisions (2026-10-02, runbook §19.1–§19.2).** The read-only DEV identity census
+    found no unresolved current-season population, and 4 two-path players (the ISSUE-136 continuity
+    pairs). D-257-5 match deletion is M3 (refuse). D-257-6 (refined, F-PR-03): Return to source on
+    an addition withdraws the authority, deletes the row while still unowned, keeps it once a source
+    owns it, and refuses any other provenance mismatch. D-257-7: roll forward only once a record
+    exists. D-257-8: stable-key reuse across identity upgrades. D-257-9: continuity pairs fold
+    through the existing loader.
+  - Plan review: PROCEED, no CRIT/HIGH (runbook §19.3); F-PR-03 resolved by the operator.
+  - Implementation in progress, slice log in runbook §19.4.
 - **Runbook:** `issues/open/AFLDB-ISSUE-257.md`.
-- **Next action:** a fresh implementation session that starts with runbook §17.12–§17.13 (first
-  deriving the rebuild-stable player and match identity from the existing identity contracts) and
-  plans the deployment sequence before any migration or code.
+- **Next action:** Slices 1–9 are implemented and pass the DB-free suites (2026-10-03). Migration
+  110 is written and has not been applied anywhere. F-S7-01 is accepted and F-S8-01 is kept with
+  strict guards (runbook §19.3).
+  1. Done 2026-10-03 (seventh run), not run. The F-S9-03 integration cases are authored: 10 in
+     `settle-afltables`, 7 in `data-editor` and 1 in `settle-afl-api`. F-S9-04 became ISSUE-262.
+  2. **`afldb_test` window run 2026-10-03 (eighth run), STOPPED in §4.3** (runbook §19.4 "Eighth
+     run"). The data-editor suite's restore helpers could not re-insert `player_match_stats` (the
+     identity column `id` is GENERATED ALWAYS) after deleting the row, so 14 canonical rows of
+     `afldb_test` were lost (match 1, 1897 R1, 13 rows; match 14443, 2014 R9, 1 row). 110 was
+     reversed by the guarded F-PR-04 SQL; schema, ledger, CHECK and authority are back at baseline
+     B0, and `player_match_stats` is 14 rows short. §5 and the `code_test_db` window were not run.
+     Per the 2026-10-03 operator decisions on F-S10-02 and F-S10-01 (runbook §19.4 "Test-fixture
+     rewrite"), the unapproved `OVERRIDING SYSTEM VALUE` fix is gone. The data-editor ISSUE-257 and
+     pre-257 save cases now use synthetic `issue257-` fixtures on season 2079, followed by residue
+     and historical-row guards, and the three pre-257 cases are schema-state-aware. typecheck and
+     eslint pass with 0 errors; the cases have not yet run against a database.
+  3. Done 2026-10-03: `afldb_test` was rebuilt without 110 and a fresh B0 taken (runbook §19.4
+     "Rebuild run").
+  4. **Run B relaunch, 2026-10-03** (runbook §19.4 "Run B relaunch").
+     - `afldb_test`: State A and State B passed (data-editor 31/31 and 30 + the allowed skip;
+       settle-afltables 75/75; settle-afl-api 72/72), and S5.1–S5.4 passed. The window ended at
+       the fresh B0 with F5 deltas attributed.
+     - `admin-brownlow`: 42/44. F-S11-01 (LOW, pre-257 save case on a non-season-prefixed fixture)
+       and F-S11-02 (INFO, not 257).
+     - `code_test_db`: all 7 ISSUE-238 cases PASS under the old CHECK. Under 110, 016, 070, 088 and
+       101 FAIL with `invalid_match_key`. **F-S11-03 (MED, harness-only):** the rehearsal fixture
+       keys `issue238-rehearsal:…` lack the `YYYY|` prefix. SAFE-STOPPED; `code_test_db` was restored
+       exactly to C0.
+  5. **Run C, 2026-10-03** (runbook §19.4 "Run C"; decisions F-S11-01/02/03 in §19.3). The harness
+     fixture keys are now season-prefixed (2092), and the `admin-brownlow` mirror case is
+     state-aware on a test-owned fixture.
+     - `afldb_test`: `admin-brownlow` 43/44 in both states. The sole failure is AFLDB-ISSUE-263.
+       The database was restored to B1 exactly.
+     - `code_test_db`: C4 7/7, old-CHECK sweep 77/77, C6 7/7 (016 reaches the
+       `manual_authority_present` STOP). The database was restored to C0 exactly.
+     - Fresh diff review: no CRITICAL, HIGH or MEDIUM finding (5 LOW). Closure: no drift.
+       `CHANGELOG.md` entry added.
+  6. **Run D (R-01), 2026-10-03** (runbook §19.4 "Run D (R-01)").
+     - The fix: a settle rekey unit locks the retired and incoming match rows `FOR UPDATE ORDER BY
+       id` before its authority read (`canonical-apply.ts:490-506`).
+     - Tests: 3 DB-free and 1 integration (`settle-afltables.test.ts:5700`). The DB-free suites
+       pass.
+     - `afldb_test`: the R-01 scenario passed 3/3. Then **SAFE-STOPPED**: the 55432 tunnel dropped
+       during the full `settle-afltables` run (73 passed before the drop).
+     - **Resumed and completed 2026-10-03** (runbook "Run D resume").
+       - The suite's own hooks cleaned the attributed residue.
+       - State B: `settle-afltables` 76/76, `settle-afl-api` 72/72, `data-editor` 30 + the
+         allowed skip.
+       - 110 reversed by the guarded script. State A R-01 and F-S9-03 pass.
+       - `afldb_test` is back at B1; the F5 `import_batches` +9 are attributed.
+       - Closure: no drift. **R-01 RESOLVED.**
+  7. **Next:**
+     1. The operator commits.
+     2. The operator runs the DEV acceptance procedure (§19.4 "Run C").
+     3. Resolve.
+
+     PROD is a separate authorisation.
 
 ### AFLDB-ISSUE-233 — AFL API season discovery and season rollover ownership
 - **Severity:** Medium. **Area:** season lifecycle — `data/reference/afl-api-identities.json`, the

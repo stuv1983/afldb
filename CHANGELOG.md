@@ -15,6 +15,44 @@ commit.
 
 ## [Unreleased]
 
+### Match Sheet corrections to player statistics survive automatic settles (AFLDB-ISSUE-257; open, DEV acceptance outstanding) - 3 October 2026
+
+- A Match Sheet save that changes `player_match_stats` now records durable authority in `data_overrides`
+  (`entity_type = 'player_match_stats'`, key `<match_key>|<player identity>`), in the same transaction as the
+  row write. A changed field is a `match_sheet` record; kicks, handballs and disposals form one unit. An
+  added or removed player is a `lineup` record. If the authority cannot be recorded, nothing is saved.
+- The AFL Tables and AFL API settles keep a protected field and do not re-insert a removed player. They
+  still settle every uncorrected field. A manual addition survives. The fitzRoy core reload replays the
+  records and refuses, naming it, any record whose match or player no longer resolves. A settle rekey and
+  `repair-match-rekeys` carry the records to the new match key.
+- New **Return to source** action in the Data Editor Match Sheet. It withdraws the authority. On an
+  addition, it deletes the row while the row is still unowned, keeps it once a source owns it, and refuses
+  any other provenance. The next settle then restores the source value.
+- A Match Sheet save is refused, with nothing saved, if the sheet changed since it was loaded. A save that
+  meets a settle's lock or a deadlock gets a "try again" refusal. Both settles retry their end-of-run
+  derived recompute a bounded number of times on deadlock (`40P01`). The remaining lock-order hazard is
+  tracked as AFLDB-ISSUE-261.
+- A settle that rekeys a match now locks the match row under both its old and new keys, in id order,
+  before it reads Match Sheet authority. A concurrent Match Sheet save therefore either commits first
+  and is honoured, or is refused as "try again". It can no longer commit unseen inside the rekey.
+- `deleteMatch` refuses a match that carries Match Sheet authority. The AFL API identity correction tool
+  (ISSUE-238) STOPs with `manual_authority_present` rather than strand a record. The promotion check
+  carries the records (A4.4 replay prediction; F2 extension).
+- **Migration 110** widens the `data_overrides` entity CHECK to admit `player_match_stats`. Deploy the code
+  before the migration. Until 110 is applied, any Match Sheet save that changes a statistic is refused as
+  "authority unavailable", and settles behave as before.
+- **Rollback.** Once any `player_match_stats` record exists, the only path is forward. The read-only
+  `tools/db/issue257-rollback-guard.ts --target <env>` must report `PERMITTED` before any rollback below
+  this release. The rollback procedure is in `docs/deployment.md` §11 and `docs/production-promotion.md`
+  §10.
+- Validated on `afldb_test` and `code_test_db`, with both databases restored to their baselines afterwards:
+  - the State A/B integration suites passed (data-editor, settle-afltables, settle-afl-api, admin-brownlow);
+  - the deploy and rollback rehearsal passed;
+  - all 84 ISSUE-238 rehearsal runs passed under the old CHECK, and the seven Match Sheet cases passed
+    under migration 110.
+
+  Not yet deployed. DEV acceptance is operator-run.
+
 ### NL search refuses career rankings for statistics AFLDB does not store, instead of failing (AFLDB-ISSUE-256; resolved) - 2 October 2026
 
 - Career ranking questions about time on ground, centre bounce attendances, disposal efficiency or score

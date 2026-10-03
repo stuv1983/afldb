@@ -6,7 +6,9 @@ import { CreatePlayerForm } from '@/app/admin/data-editor/CreatePlayerForm';
 import { EditorForm } from '@/app/admin/data-editor/EditorForm';
 import { MatchSheetEditor } from '@/app/admin/data-editor/MatchSheetEditor';
 import { PlayerFinder } from '@/app/admin/data-editor/PlayerFinder';
+import { sql } from '@/db/client';
 import { listClubs } from '@/db/queries/clubs';
+import { loadMatchSheetAuthoritySummary, loadMatchSheetStaleToken } from '@/db/queries/match-sheet';
 import { listVenues } from '@/db/queries/venues';
 import { getMatch, getMatchPlayers, getRecentClubLineup } from '@/db/queries/matches';
 import { getEditableRow } from '@/db/queries/data-edits';
@@ -58,7 +60,13 @@ export default async function DataEditorPage(
   const matchForSheet = (mode === 'match-sheet' && Number.isInteger(id) && id > 0)
     ? await getMatch(id)
     : null;
+  // Token FIRST: if a settle lands between the two reads the token is the older
+  // one, so the save is refused as stale rather than blessing rows never shown.
+  const matchSheetToken = matchForSheet ? await loadMatchSheetStaleToken(sql, id) : '';
   const matchSheetPlayers = matchForSheet ? await getMatchPlayers(id) : [];
+  // ISSUE-257 D-257-6: the match's active durable decisions (import-role read; fails
+  // closed to "unavailable", never to "none").
+  const authoritySummary = matchForSheet ? await loadMatchSheetAuthoritySummary(id) : null;
 
   const [homeRecentLineup, awayRecentLineup] = matchForSheet
       ? await Promise.all([
@@ -162,6 +170,8 @@ export default async function DataEditorPage(
         <MatchSheetEditor
           match={matchForSheet}
           initialPlayers={matchSheetPlayers}
+          staleToken={matchSheetToken}
+          authoritySummary={authoritySummary ?? { status: 'unavailable', reason: 'Not loaded.' }}
           homeRecentLineup={homeRecentLineup}
           awayRecentLineup={awayRecentLineup}
         />

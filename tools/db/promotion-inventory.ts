@@ -23,6 +23,16 @@
  * unit tests can pin every rule without a connection.
  */
 
+import {
+  AFLTABLES_IDENTITY_PREFIX,
+  MANUAL_IDENTITY_PREFIX,
+  PLAYER_MATCH_STATS_ENTITY,
+  continuityPartnersOf,
+  decodePlayerMatchStatsKey,
+  interpretKeyAuthority,
+  resolveStoredIdentityToPlayer,
+  type ContinuityRulesLoad,
+} from '../../src/lib/acquisition/match-sheet-authority';
 import { playerOverrideValueProblems, registrationPayloadProblems } from '../migration/rebuild_manual_registrations';
 
 // ---------------------------------------------------------------------------
@@ -3641,8 +3651,12 @@ export function assertPromotionPlanCoherent(
 // ---------------------------------------------------------------------------
 //
 // The post-swap `replay_admin_overrides()` loop (docs/production-promotion.md §8 step 1) runs
-// AFTER the swap. Two of its branches can lose a target-owned human decision there without a
-// pre-swap gate having seen it:
+// AFTER the swap, once per entity type the data_overrides CHECK admits (see the acceptance
+// checklist; `data_overrides` itself is reinstated verbatim, `compare: equal`, for all of them).
+// The branches predicted pre-swap are A4.2 (players), A4.3 (matches / match_coaches) and, for
+// AFLDB-ISSUE-257, A4.4 (player_match_stats; see the section after `planPromotionMatchReplay`);
+// the other entity types are not predicted by this module. The first two lose a human decision as
+// follows:
 //
 //   players    (A4.2) a creation record binds its token onto whichever candidate player holds
 //              its AFL Tables path (the AFLDB-ISSUE-160 bind rule), even when that player
@@ -4448,6 +4462,210 @@ export function planPromotionMatchReplay(input: {
 }
 
 // ---------------------------------------------------------------------------
+// AFLDB-ISSUE-257 A4.4 — the post-swap player_match_stats authority replay, predicted pre-swap
+// ---------------------------------------------------------------------------
+//
+// `replay_admin_overrides(conn, "player_match_stats")` runs after the players and matches replays
+// and before rebuild_derived.py. Its fail-closed preflight (`pms_preflight`, tools/migration/common.py)
+// raises AFTER the swap if any active authority record cannot be resolved. This planner is its
+// pre-swap twin, over the candidate as the players replay will leave it: a manual token the
+// players replay BINDS resolves to the bound candidate player; a token (and AFL Tables path) it
+// CREATES resolves to a not-yet-existing player with a synthetic negative id, which no candidate
+// row can match, so a field record on it passes only with a durable addition
+// (`lineup {present:true}` plus a `club_slug`) -- exactly the replay's own row-existence rule.
+// Binds and creates count only while the A4.2 plan has no STOP (F-S8-01): a token whose
+// re-creation the players replay does not guarantee never resolves here.
+
+/** One candidate `matches` row a record's match_key resolves to. */
+export type PromotionPmsMatchRow = {
+  matchKey: string; id: number; homeClubId: number | null; awayClubId: number | null;
+};
+
+/** The `(match, player)` pair key `existingPairs` is made of. */
+export function promotionPmsPairKey(matchId: number, playerId: number): string {
+  return `${matchId}:${playerId}`;
+}
+
+export type PromotionPlayerMatchStatsReplayPlan = {
+  /** Active player_match_stats records read (every field group). */
+  records: number;
+  /** Distinct entity keys. */
+  keys: number;
+  /** Keys carrying authority that resolved fully. */
+  resolved: number;
+  /** Resolved keys whose lineup record is `present: true`. */
+  additions: number;
+  /** Resolved keys whose lineup record is `present: false`. */
+  removals: number;
+  /** Every STOP, by key. Empty is the only acceptable answer. */
+  problems: string[];
+};
+
+/**
+ * What a player_match_stats read needs from the candidate, derived from the records alone: the
+ * match keys, the AFL Tables paths (with every continuity partner when the contract is readable)
+ * and the club slugs they name. Undecodable keys and unreadable payloads are omitted here and
+ * refused by the planner.
+ */
+export function playerMatchStatsReadsOfOverrides(
+  overrides: readonly PromotionOverrideRow[], continuity: ContinuityRulesLoad,
+): { records: number; matchKeys: string[]; afltablesPaths: string[]; clubSlugs: string[] } {
+  const matchKeys = new Set<string>();
+  const paths = new Set<string>();
+  const slugs = new Set<string>();
+  let records = 0;
+  for (const o of overrides) {
+    if (o.entityType !== PLAYER_MATCH_STATS_ENTITY) continue;
+    records += 1;
+    const decoded = decodePlayerMatchStatsKey(o.entityKey);
+    if (decoded !== null) {
+      matchKeys.add(decoded.matchKey);
+      if (decoded.sourceKey === 'afltables') {
+        paths.add(decoded.externalId);
+        if (continuity.ok) for (const p of continuityPartnersOf(decoded.externalId, continuity.rules)) paths.add(p);
+      }
+    }
+    const payload = parseOverrideObject(o.overrideValues);
+    if (payload !== null && typeof payload.club_slug === 'string') slugs.add(payload.club_slug);
+  }
+  return {
+    records, matchKeys: [...matchKeys].sort(), afltablesPaths: [...paths].sort(), clubSlugs: [...slugs].sort(),
+  };
+}
+
+/**
+ * A4.4. Every ACTIVE player_match_stats record must resolve exactly as `pms_preflight` will after
+ * the swap: the key decodes; the payload interprets; the match is exactly one candidate match;
+ * the identity (D-257-9, continuity folded) is exactly one player; `club_slug` is that match's
+ * home or away club; no two keys land on one (match, player); and a record that is not a durable
+ * removal either has a row or is a durable addition carrying the club to create it with.
+ * A record set with no authority at all (none, or only inactive/empty) is a PASS with zero counts.
+ */
+export function planPromotionPlayerMatchStatsReplay(input: {
+  overrides: readonly PromotionOverrideRow[];
+  matches: readonly PromotionPmsMatchRow[];
+  /** The candidate identities after convergence, plus every AFL Tables row the records name. */
+  identities: readonly PromotionIdentityRow[];
+  /**
+   * The players replay's plan: its binds and creates change who holds a token. They count ONLY
+   * while that plan has no STOP (F-S8-01, operator 2026-10-03): a bind or create the A4.2
+   * contract does not guarantee never makes a token resolvable here.
+   */
+  players: Pick<PromotionPlayersReplayPlan, 'binds' | 'creates'> & { problems?: readonly string[] };
+  clubIdBySlug: ReadonlyMap<string, number>;
+  /** `promotionPmsPairKey(match id, player id)` of every candidate player_match_stats row read. */
+  existingPairs: ReadonlySet<string>;
+  continuity: ContinuityRulesLoad;
+}): PromotionPlayerMatchStatsReplayPlan {
+  const plan: PromotionPlayerMatchStatsReplayPlan = {
+    records: 0, keys: 0, resolved: 0, additions: 0, removals: 0, problems: [],
+  };
+  const byKey = new Map<string, PromotionOverrideRow[]>();
+  for (const o of input.overrides) {
+    if (o.entityType !== PLAYER_MATCH_STATS_ENTITY) continue;
+    plan.records += 1;
+    byKey.set(o.entityKey, [...(byKey.get(o.entityKey) ?? []), o]);
+  }
+  plan.keys = byKey.size;
+  if (plan.records === 0) return plan;
+
+  // identity string -> distinct accepted players, as `pms_resolve_identity` reads them: an AFL
+  // Tables path counts only through an accepted afltables_profile_url row; a token by any method.
+  const holders = new Map<string, Set<number>>();
+  const hold = (identity: string, playerId: number): void => {
+    holders.set(identity, (holders.get(identity) ?? new Set<number>()).add(playerId));
+  };
+  for (const r of input.identities) {
+    if (r.playerId === null || !ACCEPTED_IDENTITY_STATUSES.has(r.status)) continue;
+    if (r.sourceKey === 'afltables' && r.matchMethod === 'afltables_profile_url') hold(`${AFLTABLES_IDENTITY_PREFIX}${r.externalId}`, r.playerId);
+    if (r.sourceKey === PROMOTION_MANUAL_SOURCE_KEY) hold(`${MANUAL_IDENTITY_PREFIX}${r.externalId}`, r.playerId);
+  }
+  // F-S8-01: the players replay's binds/creates are guaranteed only when A4.2 has no STOP. While it
+  // has one, no token resolves through them (the record then fails as unresolved, named below).
+  const replayGuaranteed = (input.players.problems ?? []).length === 0;
+  const unguaranteedReplayIdentities = new Set<string>();
+  for (const b of input.players.binds) {
+    if (replayGuaranteed) hold(`${MANUAL_IDENTITY_PREFIX}${b.token}`, b.playerId);
+    else unguaranteedReplayIdentities.add(`${MANUAL_IDENTITY_PREFIX}${b.token}`);
+  }
+  input.players.creates.forEach((c, n) => {
+    if (!replayGuaranteed) {
+      unguaranteedReplayIdentities.add(`${MANUAL_IDENTITY_PREFIX}${c.token}`);
+      if (c.path !== null) unguaranteedReplayIdentities.add(`${AFLTABLES_IDENTITY_PREFIX}${c.path}`);
+      return;
+    }
+    hold(`${MANUAL_IDENTITY_PREFIX}${c.token}`, -(n + 1));
+    if (c.path !== null) hold(`${AFLTABLES_IDENTITY_PREFIX}${c.path}`, -(n + 1));
+  });
+  const playerIdsByIdentity = new Map<string, readonly number[]>([...holders].map(([k, v]) => [k, [...v].sort((a, b) => a - b)]));
+
+  const matchRows = new Map<string, PromotionPmsMatchRow[]>();
+  for (const m of input.matches) matchRows.set(m.matchKey, [...(matchRows.get(m.matchKey) ?? []), m]);
+
+  const ownerOfPair = new Map<string, string>();
+  for (const entityKey of [...byKey.keys()].sort()) {
+    const at = `player_match_stats override ${entityKey}`;
+    const decoded = decodePlayerMatchStatsKey(entityKey);
+    if (decoded === null) { plan.problems.push(`${at}: entity_key does not decode as <match_key>|<identity>`); continue; }
+    const stored: { fieldGroup: string; isActive: boolean; overrideValues: unknown }[] = [];
+    let unparseable: string | null = null;
+    for (const o of byKey.get(entityKey)!) {
+      try {
+        stored.push({ fieldGroup: o.fieldGroup, isActive: true, overrideValues: JSON.parse(o.overrideValues) as unknown });
+      } catch { unparseable = o.fieldGroup; }
+    }
+    if (unparseable !== null) { plan.problems.push(`${at}: the ${unparseable} payload is not valid JSON`); continue; }
+    const interpreted = interpretKeyAuthority(stored);
+    if (!interpreted.ok) { plan.problems.push(`${at}: ${interpreted.reason} (${interpreted.detail})`); continue; }
+    const { fields, presence } = interpreted;
+    if (fields === null && presence === null) continue;
+    if (!input.continuity.ok) {
+      plan.problems.push(`${at}: the fitzRoy profile-continuity contract is unreadable (${input.continuity.detail})`);
+      continue;
+    }
+    const matches = matchRows.get(decoded.matchKey) ?? [];
+    if (matches.length !== 1) {
+      plan.problems.push(`${at}: match_key ${decoded.matchKey} resolves to ${matches.length} candidate matches, not exactly one`);
+      continue;
+    }
+    const match = matches[0];
+    const who = resolveStoredIdentityToPlayer({ identity: decoded.identity, playerIdsByIdentity, continuity: input.continuity });
+    if (!who.ok) {
+      plan.problems.push(`${at}: identity ${decoded.identity} does not resolve to exactly one player (${who.reason}${who.detail ? `: ${who.detail}` : ''})`
+        + (unguaranteedReplayIdentities.has(decoded.identity)
+          ? '; the A4.2 players replay that would register it has STOPs, so its re-creation is not guaranteed' : ''));
+      continue;
+    }
+    let clubId: number | null = null;
+    if (fields !== null && 'club_slug' in fields) {
+      clubId = input.clubIdBySlug.get(String(fields.club_slug)) ?? null;
+      if (clubId === null || (clubId !== match.homeClubId && clubId !== match.awayClubId)) {
+        plan.problems.push(`${at}: club_slug ${String(fields.club_slug)} is not exactly the match's home or away club`);
+        continue;
+      }
+    }
+    const pair = promotionPmsPairKey(match.id, who.playerId);
+    const other = ownerOfPair.get(pair);
+    if (other !== undefined) { plan.problems.push(`${at}: resolves to the same (match, player) as ${other}`); continue; }
+    ownerOfPair.set(pair, entityKey);
+    if (presence !== 'removed' && !input.existingPairs.has(pair)) {
+      if (presence !== 'present') {
+        plan.problems.push(`${at}: field record has no player_match_stats row on the candidate and no durable addition behind it`);
+        continue;
+      }
+      if (fields === null || clubId === null) {
+        plan.problems.push(`${at}: durable addition has no row and its match_sheet record carries no club_slug to create one with`);
+        continue;
+      }
+    }
+    plan.resolved += 1;
+    if (presence === 'present') plan.additions += 1;
+    if (presence === 'removed') plan.removals += 1;
+  }
+  return plan;
+}
+
+// ---------------------------------------------------------------------------
 // Acceptance checklist
 // ---------------------------------------------------------------------------
 
@@ -4474,7 +4692,7 @@ export const ACCEPTANCE_CHECKLIST: readonly string[] = [
   '`--phase production --freeze-record <record> --old-database afldb_prod_pre_rebuild_<stamp>` passed on the live afldb_prod (same gates as candidate) BEFORE afldb was started: the renamed-aside database, found by OID, still holds exactly F0 and the live database is the unfrozen candidate. Only then afldb started — the freeze release. On a refusal: promotion-rollback.sql, then promotion-unfreeze.sql, then the services.',
   'Health: /api/health 200, a season page, a player page, an AFLW page, and /search all render.',
   'Real production super admin logged in with password + TOTP (a new session — the old ones were reset by design).',
-  'data_overrides replayed onto the promoted canonical rows for EVERY entity type the CHECK admits — players, matches, draft_picks, season_list_members, coaches, match_coaches, fixtures, player_achievements, after_siren_kicks — not just players and matches. The coaches replay is what re-creates every admin-created coach in the candidate (AFLDB-ISSUE-159 §7): until it runs, a manual coach does not exist there and its /coaches/<slug>-<id> URL 404s. The season_list_members replay (AFLDB-ISSUE-161 §19) is what re-creates every administered playing list, and it must run AFTER players, because a membership names its player by identity; it is also the only branch that acts on INACTIVE overrides, which are tombstones that must delete any row found for a deliberately removed membership. It must run BEFORE the data_edits row_id remap, which resolves coach edits through afltables_coach_path. The fixtures replay (AFLDB-ISSUE-162 §20) re-creates every administered fixture — cancelled and void rows included, because a fixture is never deleted and its data_edits rows must stay resolvable — and depends on no other branch, because a fixture names its clubs and venue by slug and names no player, match or selection; it too must run BEFORE the data_edits row_id remap, which resolves fixture edits through fixture_key. The club_leadership replay (AFLDB-ISSUE-163 §19) re-creates every administered captain and vice-captain appointment — ended and void rows included, because an appointment is never deleted and its data_edits rows must stay resolvable — and must run AFTER players, because an appointment names its player by identity; it depends on no other branch (it names its club by slug and deliberately does NOT re-check season-list membership, which is a precondition of making an appointment and not a property of a recorded one), and it too must run BEFORE the data_edits row_id remap, which resolves leadership edits through appointment_key. Until it runs, the promoted public club pages show no current leadership and their Captains history stops at the last pre-2027 season. The two special-record replays (AFLDB-ISSUE-167 §11, migration 102) are TWO ADAPTERS OVER THE ONE AUTHORITY and BOTH must run: after_siren_kicks replays through this same Python replay_admin_overrides, and player_achievements replays through replaySpecialRecordOverrides() in tools/records/special-records-replay.ts, because its importer is TypeScript and D-3 refused porting it to Python merely to share common.py. data_overrides is still the sole durable authority. Neither branch depends on another: a special-record override payload carries the raw name fields only — every link and derived column is reconstructed by the importer, never by an override — so both may run anywhere in the order, and both must run BEFORE the data_edits row_id remap, which resolves their audit rows through first_kick_goal_key and after_siren_key. Void rows are re-created and re-voided, never dropped, because the row must stay resolvable; and a record an administrator created does not exist in the candidate at all until its replay re-creates it. Skip either and the promoted site shows voided first-kick goals and after-siren kicks publicly again, on /records/first-kick-goal, /records/after-the-siren, the player pages, NL answers and the Grid Solver alike.',
+  'data_overrides replayed onto the promoted canonical rows for EVERY entity type the CHECK admits — players, matches, draft_picks, season_list_members, coaches, match_coaches, fixtures, player_achievements, after_siren_kicks, player_match_stats — not just players and matches. The player_match_stats replay (AFLDB-ISSUE-257) re-applies the Match Sheet authority over source-owned rows through the same Python replay_admin_overrides; it must run AFTER players and matches (a record names its player by identity and its match by match_key) and BEFORE rebuild_derived.py, and `--phase restored` and `--phase candidate` gate it as A4.4. The coaches replay is what re-creates every admin-created coach in the candidate (AFLDB-ISSUE-159 §7): until it runs, a manual coach does not exist there and its /coaches/<slug>-<id> URL 404s. The season_list_members replay (AFLDB-ISSUE-161 §19) is what re-creates every administered playing list, and it must run AFTER players, because a membership names its player by identity; it is also the only branch that acts on INACTIVE overrides, which are tombstones that must delete any row found for a deliberately removed membership. It must run BEFORE the data_edits row_id remap, which resolves coach edits through afltables_coach_path. The fixtures replay (AFLDB-ISSUE-162 §20) re-creates every administered fixture — cancelled and void rows included, because a fixture is never deleted and its data_edits rows must stay resolvable — and depends on no other branch, because a fixture names its clubs and venue by slug and names no player, match or selection; it too must run BEFORE the data_edits row_id remap, which resolves fixture edits through fixture_key. The club_leadership replay (AFLDB-ISSUE-163 §19) re-creates every administered captain and vice-captain appointment — ended and void rows included, because an appointment is never deleted and its data_edits rows must stay resolvable — and must run AFTER players, because an appointment names its player by identity; it depends on no other branch (it names its club by slug and deliberately does NOT re-check season-list membership, which is a precondition of making an appointment and not a property of a recorded one), and it too must run BEFORE the data_edits row_id remap, which resolves leadership edits through appointment_key. Until it runs, the promoted public club pages show no current leadership and their Captains history stops at the last pre-2027 season. The two special-record replays (AFLDB-ISSUE-167 §11, migration 102) are TWO ADAPTERS OVER THE ONE AUTHORITY and BOTH must run: after_siren_kicks replays through this same Python replay_admin_overrides, and player_achievements replays through replaySpecialRecordOverrides() in tools/records/special-records-replay.ts, because its importer is TypeScript and D-3 refused porting it to Python merely to share common.py. data_overrides is still the sole durable authority. Neither branch depends on another: a special-record override payload carries the raw name fields only — every link and derived column is reconstructed by the importer, never by an override — so both may run anywhere in the order, and both must run BEFORE the data_edits row_id remap, which resolves their audit rows through first_kick_goal_key and after_siren_key. Void rows are re-created and re-voided, never dropped, because the row must stay resolvable; and a record an administrator created does not exist in the candidate at all until its replay re-creates it. Skip either and the promoted site shows voided first-kick goals and after-siren kicks publicly again, on /records/first-kick-goal, /records/after-the-siren, the player pages, NL answers and the Grid Solver alike.',
   'player_link_match_candidates regenerated from /admin; derived tables recomputed if canonical rows changed.',
   'Current season re-acquired by a supervised settle (--dry-run first), then the timer left enabled.',
   'Rollback rehearsed on paper: stop service, run the freeze-bound promotion-rollback.sql (afldb_prod back to the candidate name, afldb_prod_pre_rebuild_<stamp> back to afldb_prod, still frozen), release with promotion-unfreeze.sql, start service. An abandoned promotion before the swap is released with promotion-unfreeze.sql (or `--freeze-status` then `--unfreeze-recovery`).',

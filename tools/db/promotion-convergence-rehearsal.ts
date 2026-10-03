@@ -222,7 +222,7 @@ async function preflight(sql: Sql): Promise<Preflight> {
     SELECT
       (SELECT count(*)::int FROM external_identities e JOIN sources s ON s.id = e.source_id
         WHERE s.key = 'manual_admin_edit') AS manual,
-      (SELECT count(*)::int FROM data_overrides WHERE entity_type IN ('players', 'matches', 'match_coaches')) AS replayable,
+      (SELECT count(*)::int FROM data_overrides WHERE entity_type IN ('players', 'matches', 'match_coaches', 'player_match_stats')) AS replayable,
       (SELECT count(*)::int FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid()) AS others
   `;
   if (iso.manual !== 0) problems.push(`${iso.manual} manual_admin_edit identit(ies) outside the fixture: the step-2c global assertions would not be about the fixture alone`);

@@ -216,6 +216,70 @@ export async function affectedPlayerIds(
 }
 
 /* ------------------------------------------------------------------ *
+ * End-of-run derived recompute: bounded 40P01 retry (AFLDB-ISSUE-257 F-S4-01)
+ * ------------------------------------------------------------------ */
+
+/** PostgreSQL `deadlock_detected`. The ONLY SQLSTATE the derived-recompute retry absorbs. */
+export const DEADLOCK_DETECTED_SQLSTATE = '40P01';
+
+/**
+ * Pause before each retry, in milliseconds; its length bounds the attempts
+ * (one first attempt + one per entry). The sum (6 s) deliberately exceeds the
+ * Match Sheet writer's `SET LOCAL lock_timeout = '5s'` (`match-sheet.ts`):
+ * after the settle loses a deadlock, the writer is still waiting on row locks
+ * the settle's units took BEFORE this savepoint, so by the last attempt that
+ * writer has timed out (its "settle running" refusal) and released its rows.
+ * `tests/match-sheet.test.ts` pins the relationship.
+ */
+export const DERIVED_RECOMPUTE_DEADLOCK_BACKOFF_MS: readonly number[] = [1000, 2000, 3000];
+
+export function isDeadlockDetected(error: unknown): boolean {
+  return typeof error === 'object'
+    && error !== null
+    && (error as { code?: unknown }).code === DEADLOCK_DETECTED_SQLSTATE;
+}
+
+/** The statements the retry issues; the tagged-template subset of `TransactionSql` it needs. */
+export type SavepointTx = (strings: TemplateStringsArray, ...values: never[]) => PromiseLike<unknown>;
+
+/**
+ * Runs the settle's end-of-run derived recompute inside a named savepoint and
+ * retries it, after a pause, ONLY when PostgreSQL chose it as a deadlock
+ * victim (`40P01`). Each failed attempt is rolled back to its savepoint before
+ * the next, so a retry never stacks on half-written derived rows. Any other
+ * error, or a `40P01` on the last attempt, propagates WITHOUT being absorbed:
+ * the caller's transaction aborts and the whole settle rolls back, so canonical
+ * writes are never committed without their derived recompute.
+ *
+ * Rolling back to the savepoint releases only the locks the recompute took;
+ * the canonical row locks the run's units took before it are still held.
+ */
+export async function runDerivedRecomputeWithDeadlockRetry<T>(
+  tx: SavepointTx,
+  work: () => Promise<T>,
+  options: {
+    backoffMs?: readonly number[];
+    sleep?: (ms: number) => Promise<void>;
+  } = {},
+): Promise<{ value: T; attempts: number }> {
+  const backoff = options.backoffMs ?? DERIVED_RECOMPUTE_DEADLOCK_BACKOFF_MS;
+  const sleep = options.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+  for (let attempt = 1; ; attempt += 1) {
+    await tx`SAVEPOINT afldb_derived_recompute`;
+    try {
+      const value = await work();
+      await tx`RELEASE SAVEPOINT afldb_derived_recompute`;
+      return { value, attempts: attempt };
+    } catch (error) {
+      if (!isDeadlockDetected(error) || attempt > backoff.length) throw error;
+      await tx`ROLLBACK TO SAVEPOINT afldb_derived_recompute`;
+      await tx`RELEASE SAVEPOINT afldb_derived_recompute`;
+      await sleep(backoff[attempt - 1]);
+    }
+  }
+}
+
+/* ------------------------------------------------------------------ *
  * Disagreement / data_issues drafting — parametrised by source key
  * ------------------------------------------------------------------ */
 

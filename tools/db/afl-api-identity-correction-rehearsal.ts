@@ -60,7 +60,8 @@
  * Fixture namespace (deterministic; ids come from INSERT ... RETURNING): season 2092 (must be
  * absent), players `issue238-rh-<ccc>-*`, AFL Tables paths `players/Z/Zz238_<ccc>_*.html`,
  * providers `CD_I99923800<ccc><n>`, provider matches `CD_M99923800<ccc><n>`, teams `CD_T992238H|A`,
- * match keys `issue238-rehearsal:<ccc>:<n>`, batch tool `issue238-rehearsal-fixture`, actor
+ * match keys `2092|issue238-rehearsal:<ccc>:<n>` (the `YYYY|` season prefix is required by
+ * ISSUE-257's durable Match Sheet authority key, `seasonOfMatchKeyForAuthority`), batch tool `issue238-rehearsal-fixture`, actor
  * `issue238-rehearsal-fixture@example.test` (attribution only: no credential, disabled). Two real
  * clubs are READ only. Identity sequences, once advanced, are not wound back.
  *
@@ -82,7 +83,11 @@ import type {
   finaliseBrownlowMatch as finaliseBrownlowMatchType, publishBrownlowSeason as publishBrownlowSeasonType,
   saveDraftBrownlowMatch as saveDraftBrownlowMatchType, voidBrownlowMatch as voidBrownlowMatchType,
 } from '../../src/db/queries/admin-brownlow';
-import type { saveMatchSheet as saveMatchSheetType } from '../../src/db/queries/match-sheet';
+import type {
+  loadMatchSheetStaleToken as loadMatchSheetStaleTokenType, saveMatchSheet as saveMatchSheetType,
+} from '../../src/db/queries/match-sheet';
+import { AUTHORITY_UNAVAILABLE_REFUSAL } from '../../src/lib/acquisition/match-sheet-authority';
+import { playerMatchStatsAuthorityStorable } from '../../src/lib/acquisition/manual-authority';
 import type { deleteMatch as deleteMatchType } from '../../src/db/queries/match-admin';
 import type {
   linkAflApiProvider as linkAflApiProviderType,
@@ -124,7 +129,7 @@ export const CORRECTION_REHEARSAL = {
   providerPrefix: 'CD_I99923800',
   matchProviderPrefix: 'CD_M99923800',
   teamPrefix: 'CD_T992238',
-  matchKeyPrefix: 'issue238-rehearsal:',
+  matchKeyPrefix: '2092|issue238-rehearsal:',
   fixtureTool: 'issue238-rehearsal-fixture',
   correctionTool: 'correct_afl_api_identity',
   actorEmail: 'issue238-rehearsal-fixture@example.test',
@@ -300,6 +305,8 @@ export const FIXTURE_TABLES: readonly { table: string; fixture: string }[] = [
     fixture: `admin_user_id IN (${FIXTURE_ACTOR})
       OR (table_name IN ('matches', 'brownlow_vote_entry_state') AND row_id IN (${FIXTURE_MATCHES}))` },
   { table: 'brownlow_vote_entry_state', fixture: `match_id IN (${FIXTURE_MATCHES}) OR season = ${R.season}` },
+  // AFLDB-ISSUE-257 (State B): the real Match Sheet writer's durable authority, keyed `<match_key>|<identity>`.
+  { table: 'data_overrides', fixture: `entity_type = 'player_match_stats' AND entity_key LIKE '${R.matchKeyPrefix}%'` },
   // Family D's guard/dependent state (the real Brownlow admin writers' season authority and
   // published totals; the special-record dependents). Season 2092 is fixture-only by precondition.
   { table: 'brownlow_season_authority', fixture: `season = ${R.season}` },
@@ -1895,6 +1902,7 @@ async function holdTransaction(
 }
 
 type SaveMatchSheet = typeof saveMatchSheetType;
+type LoadMatchSheetStaleToken = typeof loadMatchSheetStaleTokenType;
 type SaveDraftBrownlowMatch = typeof saveDraftBrownlowMatchType;
 type FinaliseBrownlowMatch = typeof finaliseBrownlowMatchType;
 type VoidBrownlowMatch = typeof voidBrownlowMatchType;
@@ -1902,6 +1910,8 @@ type PublishBrownlowSeason = typeof publishBrownlowSeasonType;
 type DeleteMatch = typeof deleteMatchType;
 type Writers = {
   saveMatchSheet: SaveMatchSheet; saveDraftBrownlowMatch: SaveDraftBrownlowMatch;
+  /** AFLDB-ISSUE-257: the editor's page-load freshness token and the stale-save refusal text. */
+  loadMatchSheetStaleToken: LoadMatchSheetStaleToken; staleSheetRefusal: string;
   /** Family D (cases 17, 56): the Brownlow admin finalise / void and the season publication. */
   finaliseBrownlowMatch: FinaliseBrownlowMatch; voidBrownlowMatch: VoidBrownlowMatch; publishBrownlowSeason: PublishBrownlowSeason;
   /** Corrected-state case 72: the Data Editor's match deletion (`match-admin.ts`). */
@@ -1931,6 +1941,8 @@ async function loadWriters(): Promise<Writers> {
     return {
       deleteMatch: exported<DeleteMatch>(matchAdmin, 'deleteMatch'),
       saveMatchSheet: exported<SaveMatchSheet>(sheet, 'saveMatchSheet'),
+      loadMatchSheetStaleToken: exported<LoadMatchSheetStaleToken>(sheet, 'loadMatchSheetStaleToken'),
+      staleSheetRefusal: String(sheet.STALE_SHEET_REFUSAL ?? (sheet.default as Record<string, unknown> | undefined)?.STALE_SHEET_REFUSAL),
       saveDraftBrownlowMatch: exported<SaveDraftBrownlowMatch>(brownlow, 'saveDraftBrownlowMatch'),
       finaliseBrownlowMatch: exported<FinaliseBrownlowMatch>(brownlow, 'finaliseBrownlowMatch'),
       voidBrownlowMatch: exported<VoidBrownlowMatch>(brownlow, 'voidBrownlowMatch'),
@@ -2292,6 +2304,50 @@ async function auditsAt(owner: Sql, tableName: string, rowId: number, cutoff: st
   `;
 }
 
+/**
+ * AFLDB-ISSUE-257 compatibility. The real `saveMatchSheet` now needs the editor's freshness token
+ * (taken at the emulated page load, BEFORE any gate) and writes durable `data_overrides` authority,
+ * which needs migration 110 (State B). Without it (State A) an authority-requiring save is refused.
+ */
+async function overrideRows(owner: Sql, matchId: number): Promise<{ entityKey: string; fieldGroup: string; isActive: boolean }[]> {
+  return owner<{ entityKey: string; fieldGroup: string; isActive: boolean }[]>`
+    SELECT d.entity_key AS "entityKey", d.field_group AS "fieldGroup", d.is_active AS "isActive"
+      FROM data_overrides d JOIN matches m ON m.id = ${matchId}
+     WHERE d.entity_type = 'player_match_stats' AND starts_with(d.entity_key, m.match_key::text || '|')
+     ORDER BY d.entity_key, d.field_group
+  `;
+}
+
+/** Detect the schema state on the rehearsal connection and log it (State B = migration 110 applied). */
+async function detectAuthorityState(owner: Sql): Promise<boolean> {
+  const storable = await playerMatchStatsAuthorityStorable(owner);
+  console.log(`  schema state: ${storable ? 'B (migration 110 applied: authority is storable)' : 'A (no migration 110: authority-requiring saves refuse)'}`);
+  return storable;
+}
+
+/**
+ * The schema-state-dependent outcome of one sequential `saveMatchSheet`. Returns true when the save
+ * landed (State B). State A: refused as authority-unavailable, no authority written (the caller
+ * asserts its canonical rows are unchanged). State B: saved and the authority row exists.
+ */
+async function checkSheetSaveOutcome(
+  ctx: CaseContext, storable: boolean, result: Awaited<ReturnType<SaveMatchSheet>>, matchId: number,
+  fieldGroup: 'match_sheet' | 'lineup', playerCount: number, what: string,
+): Promise<boolean> {
+  const { owner, check } = ctx;
+  const rows = await overrideRows(owner, matchId);
+  if (!storable) {
+    check(`State A: ${what} refused as authority-unavailable (nothing saved)`,
+      !result.ok && result.error === AUTHORITY_UNAVAILABLE_REFUSAL, JSON.stringify(result));
+    check('State A: no player_match_stats data_overrides row exists for M', rows.length === 0, JSON.stringify(rows));
+    return false;
+  }
+  check(`State B: ${what} saved ({ok: true, playerCount ${playerCount}})`, result.ok && result.playerCount === playerCount, JSON.stringify(result));
+  check(`State B: durable authority written: an active player_match_stats data_overrides '${fieldGroup}' row exists for M's changed player`,
+    rows.some((r) => r.isActive && r.fieldGroup === fieldGroup), JSON.stringify(rows));
+  return true;
+}
+
 /* ---- Case 91 ---- */
 
 /**
@@ -2319,54 +2375,47 @@ async function case91(ctx: CaseContext): Promise<void> {
   const { fingerprint } = await validateOnly(ctx, input, 1);
 
   const line = matchSheetLine(w.pPrime.id, { ...closure.values, goals: 3 });
+  // AFLDB-ISSUE-257: the page-load token, taken BEFORE the gate (and so before the correction's MOVE).
+  const staleToken = await writers.loadMatchSheetStaleToken(owner, closure.matchId);
   const run = await gatedWriter(ctx, w, closure, input, fingerprint, `${HARNESS_APP}case091-writer-match-sheet`,
     () => writers.saveMatchSheet({
-      matchId: closure.matchId, syncMatchScores: false, players: [line], adminUserId: w.actorId,
+      matchId: closure.matchId, syncMatchScores: false, players: [line], adminUserId: w.actorId, staleToken,
       note: 'AFLDB-ISSUE-238 Slice 10 rehearsal case 091: concurrent match-sheet edit of the closure row',
     }));
   const { r, cutoff } = await committedCorrection(ctx, input, fingerprint, run.correctionRun, closure);
   console.log(`  writer: ${JSON.stringify(run.writerResult)}`);
-  check('writer: saveMatchSheet succeeded after the correction released M ({ok: true, playerCount 1})',
-    run.writerResult.ok && run.writerResult.playerCount === 1, JSON.stringify(run.writerResult));
+  check('writer: saveMatchSheet refused as a stale save once the correction released M (the MOVE changed the sheet the token was taken from)',
+    !run.writerResult.ok && run.writerResult.error === writers.staleSheetRefusal, JSON.stringify(run.writerResult));
 
-  // ---- post-state: the MOVE, then the writer's edit on the moved row ----
+  // ---- post-state: the MOVE only; the refused writer left the closure row untouched ----
   const after = await pmsRow(owner, closure.rowId);
-  const expected = { ...contractOf(before), goals: 3 };
-  check('post: the SAME row id is at (P′, M); the writer\'s edit landed on it: goals 2 -> 3, every other contract field as settled',
+  check('post: the SAME row id is at (P′, M) with its settled contract byte-identical (goals still 2): the stale save wrote nothing',
     after !== null && after.player_id === w.pPrime.id && after.match_id === closure.matchId
-      && canonicalJson(contractOf(after)) === canonicalJson(expected as Record<string, JsonValue>), JSON.stringify(after && contractOf(after)));
-  check('post: provenance kept (the sheet\'s upsert never touches source_id, source_record_id, import_batch_id)',
+      && rowContractHash(contractOf(after)) === closure.contractSha256, JSON.stringify(after && contractOf(after)));
+  check('post: provenance kept (source_id, source_record_id, import_batch_id)',
     after !== null && after.source_id === before.source_id && after.source_record_id === before.source_record_id
       && after.import_batch_id === before.import_batch_id);
   const [atM] = await owner<{ n: number; pRows: number }[]>`
     SELECT (SELECT count(*)::int FROM player_match_stats WHERE match_id = ${closure.matchId}) AS n,
            (SELECT count(*)::int FROM player_match_stats WHERE player_id = ${w.p.id}) AS "pRows"
   `;
-  check('post: M holds exactly the one (moved, edited) row; P holds none', atM.n === 1 && atM.pRows === 0, JSON.stringify(atM));
+  check('post: M holds exactly the one (moved) row; P holds none', atM.n === 1 && atM.pRows === 0, JSON.stringify(atM));
   await checkLedgerAndIdentity(ctx, w, identityId, { r, evidenceSha256 });
 
-  const audits = await auditsAt(owner, 'matches', closure.matchId, cutoff);
-  const audit = audits[0];
-  console.log(`  c (correction application applied_at) = ${cutoff}; writer audit data_edits#${String(audit?.id)} matches/${String(audit?.fieldGroup)} `
-    + `created_at = ${String(audit?.createdAt)} (${audit?.afterCutoff ? '>= c' : '< c'})`);
-  check('post: exactly one writer audit for M: data_edits matches/match_sheet by the actor', audits.length === 1 && audit.fieldGroup === 'match_sheet',
-    JSON.stringify(audits));
+  const audits = await auditsAt(owner, 'matches', closure.matchId, BEFORE_ANY_AUDIT);
+  check('post: NO writer audit for M (the refusal precedes every write)', audits.length === 0, JSON.stringify(audits));
+  const overrides = await overrideRows(owner, closure.matchId);
+  check('post: no player_match_stats data_overrides row for M (the refusal precedes the authority writes)', overrides.length === 0, JSON.stringify(overrides));
+  console.log(`  c (correction application applied_at) = ${cutoff}`);
 
   // ---- Q2: the validate-only re-run on a CORRECTED net state is correction satisfaction only ----
   const censusBefore = await readResidue(owner);
   const q2 = runCli(input, 'validate-only', null);
   const q2Lines = q2.stdout.replace(/\r/g, '').split('\n');
-  const explained = q2Lines.filter((l) => /post_correction_edit match_sheet(?: \(PASS\))?: player_match_stats .* goals 2 -> 3 \(audit (\d+)\)/.test(l));
   console.log(`  Q2 re-run: exit ${String(q2.status)}, ${JSON.stringify(q2.result)}`);
   for (const l of q2Lines.filter((x) => /post_correction|NOOP|STOP|ALREADY_SATISFIED/.test(x))) console.log(`    | ${l.trim()}`);
-  if (audit?.afterCutoff) {
-    check('Q2 (audit >= c): ALREADY_SATISFIED, the goals divergence explained as L8-d post_correction_edit match_sheet citing the writer\'s audit',
-      q2.result.kind === 'ALREADY_SATISFIED' && explained.length > 0 && explained.every((l) => l.includes(`(audit ${audit.id})`)),
-      explained.join(' | '));
-  } else {
-    check('Q2 (audit < c): STOP post_correction_edit_unexplained',
-      q2.result.kind === 'STOP' && q2.result.stops.some((s) => s.code === 'post_correction_edit_unexplained'), JSON.stringify(q2.result));
-  }
+  check('Q2: ALREADY_SATISFIED with no post_correction_edit divergence (the refused writer left the corrected row as settled)',
+    q2.result.kind === 'ALREADY_SATISFIED' && !q2Lines.some((l) => /post_correction_edit/.test(l)), JSON.stringify(q2.result));
   check('Q2 re-run wrote nothing (fixture census unchanged)', canonicalJson(await readResidue(owner)) === canonicalJson(censusBefore));
   await owner.begin('read only', (tx) => assertAflApiIdentityInvariant(tx));
   check('post: the combined identity invariant (SAT-1 basis) holds', true);
@@ -2416,32 +2465,31 @@ async function case100(ctx: CaseContext): Promise<void> {
   if (variant === 'match-sheet') {
     const fresh = { club_id: w.clubs.home.id, jumper_number: '7', goals: 1, behinds: 0, kicks: 10, handballs: 5, disposals: 15,
       marks: 4, tackles: 3, hitouts: 0, frees_for: 0, frees_against: 2 };
+    // AFLDB-ISSUE-257: the page-load token, taken BEFORE the gate (and so before the correction's MOVE).
+    const staleToken = await writers.loadMatchSheetStaleToken(owner, closure.matchId);
     const run = await gatedWriter(ctx, w, closure, input, fingerprint, `${HARNESS_APP}case100-writer-match-sheet`,
       () => writers.saveMatchSheet({
-        matchId: closure.matchId, syncMatchScores: false, players: [matchSheetLine(w.p.id, fresh)], adminUserId: w.actorId,
+        matchId: closure.matchId, syncMatchScores: false, players: [matchSheetLine(w.p.id, fresh)], adminUserId: w.actorId, staleToken,
         note: 'AFLDB-ISSUE-238 Slice 10 rehearsal case 100: concurrent match-sheet insert at (P, M)',
       }));
     const { r, cutoff } = await committedCorrection(ctx, input, fingerprint, run.correctionRun, closure);
     console.log(`  writer: ${JSON.stringify(run.writerResult)}`);
-    check('writer: saveMatchSheet succeeded after the correction released M ({ok: true, playerCount 1})',
-      run.writerResult.ok && run.writerResult.playerCount === 1, JSON.stringify(run.writerResult));
+    check('writer: saveMatchSheet refused as a stale save once the correction released M (the MOVE changed the sheet the token was taken from)',
+      !run.writerResult.ok && run.writerResult.error === writers.staleSheetRefusal, JSON.stringify(run.writerResult));
     const rows = await owner<{ id: number; playerId: number; row: RowSnapshot }[]>`
       SELECT id::int AS id, player_id AS "playerId", to_jsonb(p.*) AS row FROM player_match_stats p WHERE match_id = ${closure.matchId} ORDER BY id
     `;
     const moved = rows.find((x) => x.id === closure.rowId);
-    const inserted = rows.find((x) => x.id !== closure.rowId);
-    check('post: the closure row (same id) is at (P′, M) with its settled contract byte-identical -- the writer never touched it',
+    check('post: the closure row (same id) is at (P′, M) with its settled contract byte-identical -- the refused writer never touched it',
       moved !== undefined && moved.playerId === w.pPrime.id && rowContractHash(contractOf(moved.row)) === closure.contractSha256);
-    check('post: the writer INSERTED a new row at the freed (P, M), carrying its line, unattributed (source_id / source_record_id / import_batch_id NULL)',
-      rows.length === 2 && inserted !== undefined && inserted.playerId === w.p.id && inserted.id > closure.rowId
-        && inserted.row.goals === 1 && inserted.row.kicks === 10 && inserted.row.jumper_number === '7'
-        && inserted.row.source_id === null && inserted.row.source_record_id === null && inserted.row.import_batch_id === null,
-      JSON.stringify(rows.map((x) => ({ id: x.id, player_id: x.playerId, source_id: x.row.source_id }))));
+    check('post: the refused writer INSERTED nothing: M holds only the moved closure row, (P, M) stays free',
+      rows.length === 1 && moved !== undefined, JSON.stringify(rows.map((x) => ({ id: x.id, player_id: x.playerId, source_id: x.row.source_id }))));
     await checkLedgerAndIdentity(ctx, w, identityId, { r, evidenceSha256 });
-    const audits = await auditsAt(owner, 'matches', closure.matchId, cutoff);
+    const audits = await auditsAt(owner, 'matches', closure.matchId, BEFORE_ANY_AUDIT);
     console.log(`  c = ${cutoff}; writer audit ${JSON.stringify(audits.map((a) => ({ id: a.id, fieldGroup: a.fieldGroup, createdAt: a.createdAt, afterCutoff: a.afterCutoff })))}`);
-    check('post: exactly one writer audit for M (data_edits matches/match_sheet), at or after c',
-      audits.length === 1 && audits[0].fieldGroup === 'match_sheet' && audits[0].afterCutoff, JSON.stringify(audits));
+    check('post: NO writer audit for M (the refusal precedes every write)', audits.length === 0, JSON.stringify(audits));
+    const overrides = await overrideRows(owner, closure.matchId);
+    check('post: no player_match_stats data_overrides row for M (the refusal precedes the authority writes)', overrides.length === 0, JSON.stringify(overrides));
     // Observed only: what Q2 makes of the reappearance at (P, M) is case 101's contract, not claimed here.
     const censusBefore = await readResidue(owner);
     const q2 = runCli(input, 'validate-only', null);
@@ -2708,12 +2756,21 @@ async function case16(ctx: CaseContext): Promise<void> {
   const writers = await loadWriters();
   const { w, closure } = await buildPms(ctx, 16, async () => {});
   const { before } = await checkPmsPreState(ctx, w, closure);
+  const storable = await detectAuthorityState(owner);
+  const staleToken = await writers.loadMatchSheetStaleToken(owner, closure.matchId);
   const result = await writerCall(ctx.importDsn, `${HARNESS_APP}case016-writer-match-sheet`, () => writers.saveMatchSheet({
     matchId: closure.matchId, syncMatchScores: false, players: [matchSheetLine(w.p.id, { ...closure.values, goals: 3 })],
-    adminUserId: w.actorId, note: 'AFLDB-ISSUE-238 Slice 10 rehearsal case 016: match-sheet edit of the closure row before correction',
+    adminUserId: w.actorId, staleToken, note: 'AFLDB-ISSUE-238 Slice 10 rehearsal case 016: match-sheet edit of the closure row before correction',
   }));
   console.log(`  writer saveMatchSheet (before any correction): ${JSON.stringify(result)}`);
-  check('writer: the real saveMatchSheet saved M\'s sheet ({ok: true, playerCount 1})', result.ok && result.playerCount === 1, JSON.stringify(result));
+  if (!(await checkSheetSaveOutcome(ctx, storable, result, closure.matchId, 'match_sheet', 1, 'the real saveMatchSheet edit of M\'s closure row'))) {
+    // State A: the edit never happened, so P7's out_of_ledger_edit has nothing to find.
+    const unchanged = await pmsRow(owner, closure.rowId);
+    check('State A: the closure row is byte-identical to its settled pre-state (nothing saved)',
+      unchanged !== null && canonicalJson(unchanged as unknown as JsonValue) === canonicalJson(before as unknown as JsonValue));
+    check('State A: no writer audit for M', (await auditsAt(owner, 'matches', closure.matchId, BEFORE_ANY_AUDIT)).length === 0);
+    return;
+  }
   const edited = await pmsRow(owner, closure.rowId);
   check('pre: the SAME closure row, still at (P, M), now goals 2 -> 3; every other contract field as settled',
     edited !== null && edited.player_id === w.p.id
@@ -2728,9 +2785,12 @@ async function case16(ctx: CaseContext): Promise<void> {
   const apps = await applicationsAt(owner, 'player_match_stats', { player_id: w.p.id, match_id: closure.matchId });
   check('pre: the key\'s application history is still only the settle\'s insert: the edit is outside the ledger',
     apps.length === 1 && apps[0].id === closure.insertApplicationId && apps[0].verb === 'insert', JSON.stringify(apps.map((a) => a.id)));
+  // State B: the edit wrote manual authority, so the ORIGINAL correction STOPs at the ISSUE-257 guard (A257), before P7.
+  const activeKeys = (await overrideRows(owner, closure.matchId)).filter((r) => r.isActive && r.fieldGroup === 'match_sheet');
+  check('pre: exactly one active match_sheet authority key exists for M', activeKeys.length === 1, JSON.stringify(activeKeys));
   await expectQ1Stop(ctx, w, {
-    table: 'player_match_stats', rowId: closure.rowId, step: 'P7', code: 'out_of_ledger_edit',
-    detail: 'field(s) differ from reconstruction: goals',
+    table: 'player_match_stats', rowId: closure.rowId, step: 'A257', code: 'manual_authority_present',
+    detail: `active Match Sheet authority ${activeKeys[0]?.entityKey ?? '<missing>'} [match_sheet]`,
   }, { protect: [{ table: 'player_match_stats', id: closure.rowId }] });
 }
 
@@ -3920,12 +3980,19 @@ async function case70(ctx: CaseContext): Promise<void> {
   const { owner, check } = ctx;
   const writers = await loadWriters();
   const { w, closure, corrected, c, cutoff } = await correctedPmsBase(ctx, 70);
+  const storable = await detectAuthorityState(owner);
+  const staleToken = await writers.loadMatchSheetStaleToken(owner, closure.matchId);
   const result = await writerCall(ctx.importDsn, `${HARNESS_APP}case070-writer-match-sheet`, () => writers.saveMatchSheet({
     matchId: closure.matchId, syncMatchScores: false, players: [matchSheetLine(w.pPrime.id, { ...closure.values, goals: 3 })],
-    adminUserId: w.actorId, note: 'AFLDB-ISSUE-238 Slice 10 rehearsal case 070: post-correction match-sheet edit of the corrected row',
+    adminUserId: w.actorId, staleToken, note: 'AFLDB-ISSUE-238 Slice 10 rehearsal case 070: post-correction match-sheet edit of the corrected row',
   }));
   console.log(`  writer saveMatchSheet (after the correction): ${JSON.stringify(result)}`);
-  check('writer: the real saveMatchSheet saved M\'s sheet ({ok: true, playerCount 1})', result.ok && result.playerCount === 1, JSON.stringify(result));
+  if (!(await checkSheetSaveOutcome(ctx, storable, result, closure.matchId, 'match_sheet', 1, 'the real saveMatchSheet edit of the corrected row'))) {
+    check('State A: the corrected row is byte-identical afterwards (nothing saved)',
+      canonicalJson(await pmsRow(owner, closure.rowId) as unknown as JsonValue) === canonicalJson(corrected as unknown as JsonValue));
+    check('State A: no writer audit for M after c', (await auditsAt(owner, 'matches', closure.matchId, cutoff)).length === 0);
+    return;
+  }
   const edited = await pmsRow(owner, closure.rowId);
   check('post-writer: the corrected row (same id, still at (P′, M)) now has goals 2 -> 3; every other contract field and its ownership/stamps unchanged',
     edited !== null && edited.player_id === w.pPrime.id
@@ -3958,13 +4025,20 @@ async function case70(ctx: CaseContext): Promise<void> {
 async function case88(ctx: CaseContext): Promise<void> {
   const { owner, check } = ctx;
   const writers = await loadWriters();
-  const { w, closure, c, cutoff } = await correctedPmsBase(ctx, 88);
+  const { w, closure, corrected, c, cutoff } = await correctedPmsBase(ctx, 88);
+  const storable = await detectAuthorityState(owner);
+  const staleToken = await writers.loadMatchSheetStaleToken(owner, closure.matchId);
   const result = await writerCall(ctx.importDsn, `${HARNESS_APP}case088-writer-match-sheet`, () => writers.saveMatchSheet({
     matchId: closure.matchId, syncMatchScores: false, players: [], removedPlayerIds: [w.pPrime.id],
-    adminUserId: w.actorId, note: 'AFLDB-ISSUE-238 Slice 10 rehearsal case 088: post-correction match-sheet removal of P′',
+    adminUserId: w.actorId, staleToken, note: 'AFLDB-ISSUE-238 Slice 10 rehearsal case 088: post-correction match-sheet removal of P′',
   }));
   console.log(`  writer saveMatchSheet (removedPlayerIds [P′]): ${JSON.stringify(result)}`);
-  check('writer: the real saveMatchSheet removed P′ from M\'s sheet ({ok: true, playerCount 0})', result.ok && result.playerCount === 0, JSON.stringify(result));
+  if (!(await checkSheetSaveOutcome(ctx, storable, result, closure.matchId, 'lineup', 0, 'the real saveMatchSheet removal of P′ from M\'s sheet'))) {
+    check('State A: the corrected row is byte-identical afterwards (nothing removed)',
+      canonicalJson(await pmsRow(owner, closure.rowId) as unknown as JsonValue) === canonicalJson(corrected as unknown as JsonValue));
+    check('State A: no writer audit for M after c', (await auditsAt(owner, 'matches', closure.matchId, cutoff)).length === 0);
+    return;
+  }
   const [post] = await owner<{ row: number; atM: number; match: number }[]>`
     SELECT (SELECT count(*)::int FROM player_match_stats WHERE id = ${closure.rowId}) AS row,
            (SELECT count(*)::int FROM player_match_stats WHERE match_id = ${closure.matchId}) AS "atM",
@@ -3997,12 +4071,22 @@ async function case101(ctx: CaseContext): Promise<void> {
   const { w, closure, corrected, c, cutoff } = await correctedPmsBase(ctx, 101);
   const fresh = { club_id: w.clubs.home.id, jumper_number: '7', goals: 1, behinds: 0, kicks: 10, handballs: 5, disposals: 15,
     marks: 4, tackles: 3, hitouts: 0, frees_for: 0, frees_against: 2 };
+  const storable = await detectAuthorityState(owner);
+  const staleToken = await writers.loadMatchSheetStaleToken(owner, closure.matchId);
   const result = await writerCall(ctx.importDsn, `${HARNESS_APP}case101-writer-match-sheet`, () => writers.saveMatchSheet({
     matchId: closure.matchId, syncMatchScores: false, players: [matchSheetLine(w.p.id, fresh)],
-    adminUserId: w.actorId, note: 'AFLDB-ISSUE-238 Slice 10 rehearsal case 101: post-correction match-sheet line for P at M',
+    adminUserId: w.actorId, staleToken, note: 'AFLDB-ISSUE-238 Slice 10 rehearsal case 101: post-correction match-sheet line for P at M',
   }));
   console.log(`  writer saveMatchSheet (a line for P at M): ${JSON.stringify(result)}`);
-  check('writer: the real saveMatchSheet saved M\'s sheet ({ok: true, playerCount 1})', result.ok && result.playerCount === 1, JSON.stringify(result));
+  if (!(await checkSheetSaveOutcome(ctx, storable, result, closure.matchId, 'match_sheet', 1, 'the real saveMatchSheet line for P at M'))) {
+    const only = await owner<{ id: number; row: RowSnapshot }[]>`
+      SELECT id::int AS id, to_jsonb(p.*) AS row FROM player_match_stats p WHERE match_id = ${closure.matchId} ORDER BY id
+    `;
+    check('State A: M still holds only the corrected row, byte-identical; nothing reappeared at (P, M)',
+      only.length === 1 && only[0].id === closure.rowId && canonicalJson(only[0].row) === canonicalJson(corrected));
+    check('State A: no writer audit for M after c', (await auditsAt(owner, 'matches', closure.matchId, cutoff)).length === 0);
+    return;
+  }
   const rows = await owner<{ id: number; playerId: number; row: RowSnapshot }[]>`
     SELECT id::int AS id, player_id AS "playerId", to_jsonb(p.*) AS row FROM player_match_stats p WHERE match_id = ${closure.matchId} ORDER BY id
   `;

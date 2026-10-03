@@ -54,6 +54,7 @@ import {
   type CanonicalApplyTargetResult,
   type CanonicalApplyUnitResult,
 } from './canonical-apply';
+import { scopePlayerMatchStatsFields } from './manual-authority';
 import {
   findRetiredMatchIdentities,
   type MatchRekeyIdentity,
@@ -91,6 +92,7 @@ import {
 } from './source-families';
 import {
   affectedPlayerIds,
+  runDerivedRecomputeWithDeadlockRetry,
   agreementRestored as coreAgreementRestored,
   canonicalApplyIssueKey as coreCanonicalApplyIssueKey,
   disagreementConflicts as coreDisagreementConflicts,
@@ -1903,12 +1905,18 @@ export async function runSettleAfltables(
       // leaving canonical facts committed beside stale derived rows.
       // `recomputePlayerDerivedStats()` is scoped to the players the run's
       // writes touched, never the season's whole player set.
+      // AFLDB-ISSUE-257 F-S4-01: the recompute runs in its own savepoint with a
+      // bounded retry on `40P01` only — a concurrent Match Sheet save's
+      // recompute can deadlock with this one. Exhaustion or any other error
+      // still propagates and takes the whole run down, as above.
       if (counters.canonicalRowsInserted + counters.canonicalRowsUpdated > 0) {
         const playerIds = await affectedPlayerIds(tx, derived);
-        await recomputeSeasonMetadata(tx, bundle.season);
-        await recomputeClubSeasons(tx, bundle.season);
-        await recomputePlayerDerivedStats(tx, playerIds, bundle.season);
-        await recomputeSeasonBrownlowStatus(tx, bundle.season);
+        await runDerivedRecomputeWithDeadlockRetry(tx, async () => {
+          await recomputeSeasonMetadata(tx, bundle.season);
+          await recomputeClubSeasons(tx, bundle.season);
+          await recomputePlayerDerivedStats(tx, playerIds, bundle.season);
+          await recomputeSeasonBrownlowStatus(tx, bundle.season);
+        });
         counters.derivedRecomputeRuns = 1;
         counters.derivedRecomputePlayers = playerIds.length;
       }
@@ -2034,9 +2042,16 @@ async function settleFamily(
       if (targetTable === 'matches' && resolvedTarget.rekeyFromMatchKey !== null) {
         rekeyedMatchId = resolvedTarget.targetId;
       }
-      const proposedValues = projected
-        ? withRekeyRendering(targetTable, projected, resolvedTarget)
-        : {};
+      // AFLDB-ISSUE-257 Slice 4: a resolved player_match_stats target is scoped to
+      // what no human decided BEFORE reconcile(), so gate 8, the candidate, the
+      // invitation and the baseline all see one field set.
+      const scopedProposal = scopeProposalToAuthority(
+        targetTable,
+        (projected ? withRekeyRendering(targetTable, projected, resolvedTarget) : {}) ?? {},
+        resolvedTarget.identity,
+        options.manualAuthority,
+      );
+      const proposedValues = scopedProposal.proposal;
 
       // Read ONCE and reused below. A `data_issues` row must explain itself
       // with exactly the evidence that classified it, so the reconciler and
@@ -2093,6 +2108,7 @@ async function settleFamily(
 
       passes.push({
         targetTable, outcome, resolvedTarget, proposedValues: proposedValues ?? {}, claims,
+        authorityRemoved: scopedProposal.removed,
       });
     }
 
@@ -2137,7 +2153,16 @@ type TargetPass = {
   resolvedTarget: ResolvedTarget;
   proposedValues: Readonly<Record<string, JsonValue>>;
   claims: readonly ProviderClaim[];
+  /** ISSUE-257: a durable Match Sheet removal — the automatic proposal is empty. */
+  authorityRemoved: boolean;
 };
+
+/** The proposal the AUTOMATIC path may act on for one pass. */
+function passAutomaticProposal(pass: TargetPass): Readonly<Record<string, JsonValue>> {
+  return automaticProposalUnderAuthority(
+    pass.targetTable, { proposal: pass.proposedValues, removed: pass.authorityRemoved },
+  );
+}
 
 /**
  * Which targets of this record are OFFERED to the applier, and why.
@@ -2166,7 +2191,7 @@ type TargetPass = {
 function invitationFor(
   pass: TargetPass, matchesInvited: boolean,
 ): CanonicalApplyInvitation | null {
-  if (Object.keys(automaticProposal(pass.targetTable, pass.proposedValues)).length === 0) {
+  if (Object.keys(passAutomaticProposal(pass)).length === 0) {
     return null;
   }
   // AFLDB-ISSUE-131 §5.10. Ambiguous rekey evidence, or a would-be merge of
@@ -2190,7 +2215,7 @@ function invitationFor(
   if (pass.outcome.kind !== 'unchanged' && pass.outcome.kind !== 'history_only') return null;
   if (pass.resolvedTarget.identity.status === 'unresolved') return null;
   return diffFields(
-    automaticProposal(pass.targetTable, pass.proposedValues), pass.resolvedTarget.targetValues,
+    passAutomaticProposal(pass), pass.resolvedTarget.targetValues,
   ).length > 0
     ? 'retry'
     : null;
@@ -2233,6 +2258,53 @@ export function automaticProposal(
   return Object.fromEntries(
     Object.entries(proposedValues).filter(([field]) => !owned.includes(field)),
   );
+}
+
+/**
+ * AFLDB-ISSUE-257 Slice 4 (§18.6 item 3) — the shared scoping helper, used by BOTH
+ * settles: the proposal minus the fields a human decided for this
+ * `player_match_stats` target, and whether the target is a durable REMOVAL.
+ *
+ *   - `removed` keeps the FULL proposal (reconcile() still needs a non-empty
+ *     new-target proposal) and the caller derives an EMPTY automatic proposal from
+ *     the flag via `automaticProposalUnderAuthority()`: no invitation, no refusal.
+ *   - A RESOLVED target loses its protected fields, so gate 8, the candidate, the
+ *     invitation and the baseline see one field set. A `new_target` is never
+ *     narrowed (a partial insert is not a row); the applier refuses it as a conflict.
+ *   - `indeterminate`, an unresolved target, another table, or no provider: the
+ *     proposal is returned UNCHANGED (same object), so gate 8 / E4 refuse it.
+ */
+export function scopeProposalToAuthority(
+  targetTable: SettleTargetTable,
+  proposedValues: Readonly<Record<string, JsonValue>>,
+  target: { status: string; targetKey?: Readonly<Record<string, unknown>> } | null,
+  authority: ManualAuthorityProvider | null,
+): { proposal: Readonly<Record<string, JsonValue>>; removed: boolean } {
+  const unchanged = { proposal: proposedValues, removed: false };
+  if (
+    targetTable !== 'player_match_stats' || authority === null || target === null
+    || (target.status !== 'resolved' && target.status !== 'new_target')
+    || target.targetKey === undefined
+  ) return unchanged;
+  const scope = scopePlayerMatchStatsFields(
+    authority, target.targetKey, Object.keys(proposedValues),
+  );
+  if (scope.kind === 'removed') return { proposal: proposedValues, removed: true };
+  if (scope.kind !== 'scoped' || target.status !== 'resolved' || scope.dropped.length === 0) {
+    return unchanged;
+  }
+  return {
+    proposal: Object.fromEntries(scope.keep.map((field) => [field, proposedValues[field]])),
+    removed: false,
+  };
+}
+
+/** The automatic path's proposal: nothing for a durable removal, else the derived-owned fields removed. */
+export function automaticProposalUnderAuthority(
+  targetTable: SettleTargetTable,
+  scoped: { proposal: Readonly<Record<string, JsonValue>>; removed: boolean },
+): Readonly<Record<string, JsonValue>> {
+  return scoped.removed ? {} : automaticProposal(targetTable, scoped.proposal);
 }
 
 /** The evidence version a ledger row must cite, or null when there is none. */
@@ -2341,7 +2413,7 @@ async function applyRecordCanonically(
     if (versionSeq === null) continue;
     // S6: the derived-owned fields are removed BEFORE the diff, the baseline
     // hash and the applier's own comparison, so all three see one field set.
-    const proposedValues = automaticProposal(pass.targetTable, pass.proposedValues);
+    const proposedValues = passAutomaticProposal(pass);
     const renderedFields = diffFields(proposedValues, pass.resolvedTarget.targetValues);
     if (renderedFields.length === 0) continue;
     invited.push({

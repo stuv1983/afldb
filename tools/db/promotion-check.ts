@@ -222,8 +222,11 @@ import {
   EMPTY_MANUAL_IDENTITY_CONVERGENCE,
   planManualIdentityConvergence,
   planPromotionMatchReplay,
+  planPromotionPlayerMatchStatsReplay,
   planPromotionPlayersReplay,
   playerIdentityKeysOfOverrides,
+  playerMatchStatsReadsOfOverrides,
+  promotionPmsPairKey,
   promotionPlayerCheckProblems,
   stableLineageTargetForFootballRef,
   promoteStagedSql,
@@ -258,9 +261,12 @@ import {
   type PromotionMatchReplayPlan,
   type PromotionOverrideRow,
   type PromotionPlayerCheckRow,
+  type PromotionPlayerMatchStatsReplayPlan,
   type PromotionPlayersReplayPlan,
+  type PromotionPmsMatchRow,
   type Snapshot,
 } from './promotion-inventory';
+import { loadContinuityRulesFailClosed } from '../../src/lib/acquisition/match-sheet-authority';
 import {
   FREEZE_CONNECT_ROLES_SQL,
   FREEZE_DATABASE_STATE_SQL,
@@ -2918,12 +2924,15 @@ async function gateFingerprint(q: Query, expected: string, report: Report): Prom
 // AFLDB-ISSUE-237 L4 A4.2 / A4.3 — the post-swap data_overrides replay, predicted pre-swap
 // ---------------------------------------------------------------------------
 
-/** The target's ACTIVE overrides of the two branches that can lose a decision after the swap. */
+/**
+ * The target's ACTIVE overrides of the branches predicted before the swap (players A4.2,
+ * matches / match_coaches A4.3, player_match_stats A4.4 -- AFLDB-ISSUE-257).
+ */
 export const PROMOTION_REPLAY_OVERRIDES_SQL = `
   SELECT entity_type AS "entityType", entity_key AS "entityKey", field_group AS "fieldGroup",
          override_values::text AS "overrideValues"
     FROM data_overrides
-   WHERE is_active AND entity_type IN ('players', 'matches', 'match_coaches')
+   WHERE is_active AND entity_type IN ('players', 'matches', 'match_coaches', 'player_match_stats')
    ORDER BY entity_type, entity_key, field_group`;
 
 /**
@@ -2958,6 +2967,32 @@ export const PROMOTION_REPLAY_MATCH_KEYS_SQL = `
   SELECT match_key AS "matchKey" FROM matches WHERE match_key = ANY($1::text[])`;
 
 export const PROMOTION_REPLAY_MAX_SEASON_SQL = `SELECT max(season)::int AS "maxSeason" FROM matches`;
+
+/**
+ * AFLDB-ISSUE-257 A4.4 reads, all on the candidate and all narrow: by match_key, by AFL Tables
+ * path, by club slug, by candidate match id. int8 never appears; ids are cast `::int`.
+ */
+export const PROMOTION_REPLAY_PMS_MATCHES_SQL = `
+  SELECT match_key AS "matchKey", id::int AS id, home_club_id::int AS "homeClubId", away_club_id::int AS "awayClubId"
+    FROM matches WHERE match_key = ANY($1::text[]) ORDER BY match_key, id`;
+
+export const PROMOTION_REPLAY_PMS_IDENTITIES_SQL = `
+  SELECT s.key AS "sourceKey", e.external_id AS "externalId", e.player_id AS "playerId",
+         e.status::text AS status, e.match_method AS "matchMethod"
+    FROM external_identities e
+    JOIN sources s ON s.id = e.source_id
+   WHERE s.key = 'afltables' AND e.external_id = ANY($1::text[])
+   ORDER BY 1, 2, 3`;
+
+export const PROMOTION_REPLAY_PMS_CLUBS_SQL = `
+  SELECT slug, id::int AS id FROM clubs WHERE slug = ANY($1::text[]) ORDER BY slug`;
+
+export const PROMOTION_REPLAY_PMS_ROWS_SQL = `
+  SELECT match_id::int AS "matchId", player_id::int AS "playerId"
+    FROM player_match_stats WHERE match_id = ANY($1::int[]) ORDER BY 1, 2`;
+
+/** The tracked fitzRoy continuity contract, by an explicit cwd-based path (the repo root is the cwd). */
+export const PROMOTION_PMS_CONTRACT_PATH = join(process.cwd(), 'tools', 'rebuild', 'fitzroy', 'fitzroy-contract.json');
 
 /**
  * AFLDB-ISSUE-242. The TARGET's identities for the AFL Tables paths a `retire` turns on: every
@@ -3000,7 +3035,10 @@ export async function gateOverrideReplayTargets(
   roles: { overrides: string; candidate: string },
   report: Report,
   convergence?: { target: Query; role: string },
-): Promise<{ players: PromotionPlayersReplayPlan; matches: PromotionMatchReplayPlan; convergence: ManualIdentityConvergencePlan }> {
+): Promise<{
+  players: PromotionPlayersReplayPlan; matches: PromotionMatchReplayPlan; convergence: ManualIdentityConvergencePlan;
+  playerMatchStats: PromotionPlayerMatchStatsReplayPlan;
+}> {
   const overrides: PromotionOverrideRow[] = (await sides.overrides(PROMOTION_REPLAY_OVERRIDES_SQL)).map((r) => ({
     entityType: String(r.entityType), entityKey: String(r.entityKey),
     fieldGroup: String(r.fieldGroup), overrideValues: String(r.overrideValues),
@@ -3073,7 +3111,60 @@ export async function gateOverrideReplayTargets(
   }
   report.add('data_overrides match-keyed replay targets exist in the candidate (AFLDB-ISSUE-237 A4.3)',
     matches.problems.length === 0 ? 'PASS' : 'FAIL', matchLines);
-  return { players, matches, convergence: converged };
+
+  // A4.4 (AFLDB-ISSUE-257): the player_match_stats authority replay. With no such record nothing
+  // below reads the candidate, and the verdict is a PASS with zero counts.
+  const continuity = loadContinuityRulesFailClosed(PROMOTION_PMS_CONTRACT_PATH);
+  const pmsReads = playerMatchStatsReadsOfOverrides(overrides, continuity);
+  let pmsMatches: PromotionPmsMatchRow[] = [];
+  let pmsIdentities = read;
+  const clubIdBySlug = new Map<string, number>();
+  const existingPairs = new Set<string>();
+  if (pmsReads.records > 0) {
+    pmsMatches = pmsReads.matchKeys.length === 0 ? []
+      : (await sides.candidate(PROMOTION_REPLAY_PMS_MATCHES_SQL, [pmsReads.matchKeys])).map((r) => ({
+        matchKey: String(r.matchKey), id: asInt(r.id),
+        homeClubId: r.homeClubId === null || r.homeClubId === undefined ? null : asInt(r.homeClubId),
+        awayClubId: r.awayClubId === null || r.awayClubId === undefined ? null : asInt(r.awayClubId),
+      }));
+    if (pmsReads.afltablesPaths.length > 0) {
+      pmsIdentities = [...read, ...identityRowsOf(await sides.candidate(PROMOTION_REPLAY_PMS_IDENTITIES_SQL, [pmsReads.afltablesPaths]))];
+    }
+    if (pmsReads.clubSlugs.length > 0) {
+      for (const r of await sides.candidate(PROMOTION_REPLAY_PMS_CLUBS_SQL, [pmsReads.clubSlugs])) {
+        clubIdBySlug.set(String(r.slug), asInt(r.id));
+      }
+    }
+    const matchIds = [...new Set(pmsMatches.map((m) => m.id))].sort((a, b) => a - b);
+    if (matchIds.length > 0) {
+      for (const r of await sides.candidate(PROMOTION_REPLAY_PMS_ROWS_SQL, [matchIds])) {
+        existingPairs.add(promotionPmsPairKey(asInt(r.matchId), asInt(r.playerId)));
+      }
+    }
+  }
+  const playerMatchStats = planPromotionPlayerMatchStatsReplay({
+    overrides,
+    matches: pmsMatches,
+    // The candidate AS THE PLAYERS REPLAY LEAVES IT: post-convergence manual rows (applied to the
+    // widened read), the AFL Tables rows the records name, and the replay's binds / creates.
+    identities: applyManualIdentityConvergence(pmsIdentities, converged.entries),
+    players,
+    clubIdBySlug, existingPairs, continuity,
+  });
+  const pmsLines = [
+    `target data_overrides read from ${roles.overrides}; matches, identities, clubs and rows from ${roles.candidate}`,
+    `active player_match_stats records: ${playerMatchStats.records} over ${playerMatchStats.keys} key(s); `
+      + `resolving with authority: ${playerMatchStats.resolved} (durable additions ${playerMatchStats.additions}, `
+      + `durable removals ${playerMatchStats.removals})`,
+    ...playerMatchStats.problems.map((p) => `STOP ${p}`),
+  ];
+  if (playerMatchStats.problems.length > 0) {
+    pmsLines.push('A4.4: the post-swap player_match_stats replay would refuse (replay_admin_overrides raises, nothing '
+      + 'commits). STOP before the swap; return the named records to source or repair them, never by name or players.id.');
+  }
+  report.add('data_overrides player_match_stats replay predicted on the candidate (AFLDB-ISSUE-257 A4.4)',
+    playerMatchStats.problems.length === 0 ? 'PASS' : 'FAIL', pmsLines);
+  return { players, matches, convergence: converged, playerMatchStats };
 }
 
 /**

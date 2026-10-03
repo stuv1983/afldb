@@ -83,11 +83,21 @@ import postgres from 'postgres';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
+  loadMatchSheetStaleToken,
+  returnMatchSheetToSource,
+  saveMatchSheet,
+  type PlayerMatchStatInput,
+} from '@/db/queries/match-sheet';
+import {
+  checkAdmittedEntities,
   overrideScopeProvenFrom,
   loadManualAuthority,
   MANUAL_ATTENDANCE_SOURCE_KEY,
+  playerMatchStatsAuthorityStorable,
+  playerMatchStatsStorableFrom,
   UNREPRESENTABLE_OVERRIDE_ENTITIES,
 } from '@/lib/acquisition/manual-authority';
+import { MATCH_SHEET_SETTLE_RUNNING_REFUSAL } from '@/lib/acquisition/match-sheet-authority';
 import { persistSourceObservation } from '@/lib/acquisition/observation-store';
 import {
   UNAVAILABLE_MANUAL_AUTHORITY,
@@ -1963,14 +1973,36 @@ describe('AFLDB-ISSUE-122 §8 — manual authority read from data_overrides', ()
     expect(overrideScopeProvenFrom([check.def])).toBe(true);
 
     // And the database refuses to store one, which is what makes it a proof.
-    await expect(sql`
-      INSERT INTO data_overrides (
-        entity_type, entity_key, field_group, override_values, admin_user_id
-      ) VALUES (
-        'player_match_stats', ${`${PREFIX}unrepresentable`}, 'stats',
-        ${sql.json({ goals: 3 })}, ${adminUserId}
-      )
-    `).rejects.toThrow();
+    // AFLDB-ISSUE-257: in BOTH schema states the two remaining unrepresentable
+    // targets are refused by the CHECK itself.
+    for (const entity of UNREPRESENTABLE_OVERRIDE_ENTITIES) {
+      await expect(sql`
+        INSERT INTO data_overrides (
+          entity_type, entity_key, field_group, override_values, admin_user_id
+        ) VALUES (
+          ${entity}, ${`${PREFIX}unrepresentable`}, 'stats',
+          ${sql.json({ goals: 3 })}, ${adminUserId}
+        )
+      `, entity).rejects.toThrow();
+    }
+    // `player_match_stats` depends on the schema state (runbook §18.13):
+    // State A (before migration 110) the CHECK refuses it, as before; State B
+    // admits it, asserted from the constraint only -- no row is written here,
+    // because any such row (D-257-7) would make the old application an
+    // unsupported rollback target.
+    if (checkAdmittedEntities([check.def])!.includes('player_match_stats')) {
+      expect(playerMatchStatsStorableFrom([check.def])).toBe(true);
+    } else {
+      expect(playerMatchStatsStorableFrom([check.def])).toBe(false);
+      await expect(sql`
+        INSERT INTO data_overrides (
+          entity_type, entity_key, field_group, override_values, admin_user_id
+        ) VALUES (
+          'player_match_stats', ${`${PREFIX}unrepresentable`}, 'stats',
+          ${sql.json({ goals: 3 })}, ${adminUserId}
+        )
+      `).rejects.toThrow();
+    }
 
     const authority = await loadManualAuthority(sql, SEASON);
     for (const entity of UNREPRESENTABLE_OVERRIDE_ENTITIES) {
@@ -2481,6 +2513,19 @@ async function issues122(): Promise<IssueRow122[]> {
  */
 async function cleanup122(client: postgres.Sql): Promise<void> {
   const like = `${PREFIX122}%`;
+  // AFLDB-ISSUE-257 F-S9-03: that suite's match keys MUST begin with the season (a
+  // durable-authority key is `<match_key>|<identity>`, season-prefixed), and its
+  // match record id is its match key, so none of these rows match `like`. `|` is
+  // not a LIKE wildcard. Every statement is a no-op when that suite never ran.
+  const keyLike = `${SEASON122}|${PREFIX122}%`;
+  await client`DELETE FROM canonical_applications WHERE external_record_id LIKE ${keyLike}`;
+  await client`DELETE FROM staging.afltables_match WHERE external_record_id LIKE ${keyLike}`;
+  await client`DELETE FROM promotion_candidates WHERE external_record_id LIKE ${keyLike}`;
+  await client`DELETE FROM import_rejections WHERE source_record_id LIKE ${keyLike}`;
+  await client`
+    DELETE FROM data_overrides
+     WHERE entity_type = 'player_match_stats' AND entity_key LIKE ${keyLike}
+  `;
   // Before import_batches and the spine it references.
   await client`DELETE FROM canonical_applications WHERE external_record_id LIKE ${like}`;
   await client`DELETE FROM staging.afltables_match WHERE external_record_id LIKE ${like}`;
@@ -2513,8 +2558,11 @@ async function cleanup122(client: postgres.Sql): Promise<void> {
     `;
   }
   await client`DELETE FROM matches WHERE match_key LIKE ${like}`;
+  await client`DELETE FROM matches WHERE match_key LIKE ${keyLike}`;
   await client`DELETE FROM staging.source_records WHERE external_record_id LIKE ${like}`;
+  await client`DELETE FROM staging.source_records WHERE external_record_id LIKE ${keyLike}`;
   await client`DELETE FROM staging.source_record_versions WHERE external_record_id LIKE ${like}`;
+  await client`DELETE FROM staging.source_record_versions WHERE external_record_id LIKE ${keyLike}`;
   await client`
     DELETE FROM staging.source_payloads WHERE raw_payload->>'issue122_fixture' IS NOT NULL
   `;
@@ -5053,6 +5101,717 @@ describe('AFLDB-ISSUE-122 S5 — the canonical applier', () => {
       expect((await matchByKey(KEY_AMB_A))?.roundCode).toBe('201');
       expect((await matchByKey(KEY_AMB_B))?.roundCode).toBe('202');
       expect(await matchByKey(KEY_AMB_LIVE)).toBeUndefined();
+    });
+  });
+
+  /* ---------------------------------------------------------------- *
+   * AFLDB-ISSUE-257 F-S9-03 — durable Match Sheet authority through the
+   * real settle. The WRITER under test is the real `saveMatchSheet` /
+   * `returnMatchSheetToSource`, the settle is the real `runSettleAfltables`,
+   * and the rekey paths are the real settle rekey and `repair-match-rekeys`.
+   *
+   * SCHEMA STATE. A durable record can only exist once migration 110 widens the
+   * `data_overrides.entity_type` CHECK (State B). Under State A every case
+   * returns early (the same probe `data-editor.test.ts` uses): there is nothing
+   * to prove through the settle, and the writer's own State A refusal is
+   * proved there.
+   *
+   * KEYS. A durable key is `<match_key>|<identity>` and a match key must start
+   * with its season (`^\d{4}\|`), so every match key here is `2093|issue122-257-…`.
+   * By the emitter's convention (and `repair-match-rekeys`'s §3.6 proof) the match
+   * record id IS its match key, so `cleanup122` also sweeps `2093|issue122-%`.
+   * Each case owns its fixture (match key, date, round, record ids) so no case
+   * observes another's state, and every case deletes the authority it created in
+   * a `finally`.
+   *
+   * WHY F-PR-03 'KEEP THE ROW' HAS NO SETTLE CASE. A manual addition is an unowned
+   * row (`source_id IS NULL`); the settle's E3 refuses an unowned row and no code
+   * path sets `source_id` on an UPDATE (§19.1(e)), so a settle can never make that
+   * row source-owned. The owned branch is reached only by the fitzRoy core reload
+   * (`SETTLING_SOURCE_KEYS`), which this suite cannot run, and is proved at the
+   * writer in `data-editor.test.ts`. What THIS suite proves is the precondition: a
+   * settle that now carries the added player neither adopts nor drops the row nor
+   * its authority, and Return to source then deletes it and the next settle
+   * restores the source's own row.
+   * ---------------------------------------------------------------- */
+
+  describe('Durable Match Sheet authority through the settle (AFLDB-ISSUE-257 F-S9-03)', () => {
+    const NOTE = 'issue122-257 settle authority test';
+    const REC = `${PREFIX122}257-`;
+    const KEY_ROOT = `${SEASON122}|${REC}`;
+    const URL_A = `${PREFIX122}players/2/Issue122_257_A.html`;
+    const URL_B = `${PREFIX122}players/2/Issue122_257_B.html`;
+    const URL_C = `${PREFIX122}players/2/Issue122_257_C.html`;
+
+    type Fx = { matchKey: string; scope: string; round: string; roundNumber: number; date: string };
+    type Stat = Record<string, JsonValue>;
+    type PmsRow = {
+      id: number; playerId: number; clubId: number; jumperNumber: string | null;
+      goals: number | null; behinds: number | null; kicks: number | null;
+      handballs: number | null; disposals: number | null; marks: number | null;
+      tackles: number | null; hitouts: number | null; freesFor: number | null;
+      freesAgainst: number | null; sourceId: number | null; sourceKey: string | null;
+    };
+    type AuthRow = {
+      entityKey: string; fieldGroup: string; isActive: boolean; overrideValues: JsonValue;
+    };
+
+    let storable = false;
+    let priorImportUrl: string | undefined;
+    let tick = 0;
+    let playerA = 0;
+    let playerB = 0;
+    let playerC = 0;
+
+    /** Strictly increasing observation times, later than every T122 value. */
+    const at = (): string => {
+      tick += 1;
+      const part = (n: number): string => String(n).padStart(2, '0');
+      return `2093-10-01T${part(Math.floor(tick / 3600))}:${part(Math.floor(tick / 60) % 60)}:${part(tick % 60)}Z`;
+    };
+
+    /**
+     * One real-world fixture. `variant` renders the SAME fixture (date, clubs) under
+     * another round and key, which is what an upstream rekey is. Distinct `n` gives
+     * a distinct date and round, so no case can be mistaken for another's rekey.
+     */
+    const fixture = (tag: string, n: number, variant = 1): Fx => ({
+      matchKey: `${KEY_ROOT}${tag}-${variant}`,
+      scope: `${REC}scope-${tag}`,
+      round: String(110 + n * 3 + variant),
+      roundNumber: 110 + n * 3 + variant,
+      date: `2093-07-${String(n).padStart(2, '0')}`,
+    });
+
+    /** Consistent: disposals = kicks + handballs, so the real writer accepts the row. */
+    const BASE: Stat = {
+      goals: 3, behinds: 2, kicks: 12, handballs: 8, disposals: 20, marks: 5,
+      tackles: 4, hitouts: 1, frees_for: 1, frees_against: 2,
+    };
+
+    /**
+     * One player record. The payload carries the stats too, so a changed stat is a
+     * new observation VERSION (the spine versions on the payload); `revision` moves
+     * the payload alone.
+     */
+    const playerSpec = (
+      f: Fx, recordId: string, url: string, jumper: string, stats: Stat = {}, revision?: number,
+    ): PlayerSpec => {
+      const seen: Stat = { ...BASE, ...stats };
+      return {
+        recordId,
+        url,
+        payloadOver: {
+          match_key: f.matchKey,
+          round_code: f.round,
+          stats_seen: seen,
+          ...(revision === undefined ? {} : { revision }),
+        },
+        projectionOver: {
+          match_key: f.matchKey,
+          round_code: f.round,
+          round_number: f.roundNumber,
+          is_final: false,
+          jumper_number: jumper,
+          stats: statsWith(seen),
+        },
+      };
+    };
+
+    const bundleOf = (f: Fx, players: readonly PlayerSpec[]): SettleBundle => bundle122({
+      matches: [{
+        recordId: f.matchKey,
+        matchKey: f.matchKey,
+        scope: f.scope,
+        payloadOver: {
+          round_code: f.round, round_number: f.roundNumber,
+          round_type: 'home_and_away', match_date: f.date,
+        },
+        projectionOver: {
+          round_code: f.round, round_number: f.roundNumber,
+          round_type: 'home_and_away', is_final: false, match_date: f.date,
+        },
+      }],
+      players,
+    });
+
+    const settle = (
+      f: Fx, players: readonly PlayerSpec[], over: Parameters<typeof apply122>[2] = {},
+    ): Promise<SettleRunResult> => apply122(bundleOf(f, players), at(), over);
+
+    const seed = async (f: Fx, players: readonly PlayerSpec[]): Promise<MatchRow> => {
+      await settle(f, players);
+      const match = await matchRow122(f.matchKey);
+      expect(match, 'the first settle inserts the match').toBeDefined();
+      return match as MatchRow;
+    };
+
+    const pmsOf = async (matchId: number, playerId: number): Promise<PmsRow | undefined> => {
+      const [row] = await sql<PmsRow[]>`
+        SELECT s.id::int AS id, s.player_id::int AS "playerId", s.club_id::int AS "clubId",
+               s.jumper_number AS "jumperNumber", s.goals::int AS goals,
+               s.behinds::int AS behinds, s.kicks::int AS kicks,
+               s.handballs::int AS handballs, s.disposals::int AS disposals,
+               s.marks::int AS marks, s.tackles::int AS tackles, s.hitouts::int AS hitouts,
+               s.frees_for::int AS "freesFor", s.frees_against::int AS "freesAgainst",
+               s.source_id::int AS "sourceId", src.key AS "sourceKey"
+          FROM player_match_stats s
+          LEFT JOIN sources src ON src.id = s.source_id
+         WHERE s.match_id = ${matchId} AND s.player_id = ${playerId}
+      `;
+      return row;
+    };
+
+    /** Every ISSUE-257 record under one match (the §18.3 prefix, never a wildcard). */
+    const authorityOf = async (matchKey: string): Promise<AuthRow[]> => {
+      const rows = await sql<AuthRow[]>`
+        SELECT entity_key AS "entityKey", field_group AS "fieldGroup",
+               is_active AS "isActive", override_values AS "overrideValues"
+          FROM data_overrides
+         WHERE entity_type = 'player_match_stats'
+           AND starts_with(entity_key, ${matchKey}::text || '|')
+         ORDER BY entity_key, field_group
+      `;
+      return [...rows];
+    };
+
+    const shape = (rows: readonly AuthRow[]) => rows.map((row) => ({
+      entityKey: row.entityKey, group: row.fieldGroup, active: row.isActive, values: row.overrideValues,
+    }));
+
+    const pmsLedger = async (recordId: string): Promise<LedgerRow[]> =>
+      (await ledger122()).filter(
+        (row) => row.externalRecordId === recordId && row.targetTable === 'player_match_stats',
+      );
+
+    /** The twelve Match Sheet values of an existing row, with the named changes. */
+    const sheetValues = (
+      row: PmsRow, over: Partial<PlayerMatchStatInput> = {},
+    ): PlayerMatchStatInput => ({
+      playerId: row.playerId, clubId: row.clubId, jumperNumber: row.jumperNumber,
+      goals: row.goals, behinds: row.behinds, kicks: row.kicks, handballs: row.handballs,
+      disposals: row.disposals, marks: row.marks, tackles: row.tackles, hitouts: row.hitouts,
+      freesFor: row.freesFor, freesAgainst: row.freesAgainst, ...over,
+    });
+
+    /** A player the source does not carry: an addition to the sheet. */
+    const added = (playerId: number): PlayerMatchStatInput => ({
+      playerId, clubId: fixtures.awayClubId, jumperNumber: '44',
+      goals: 1, behinds: 0, kicks: 10, handballs: 5, disposals: 15,
+      marks: 3, tackles: 2, hitouts: 0, freesFor: 1, freesAgainst: 0,
+    });
+
+    /** The REAL Match Sheet writer, with the stale token the editor would hold now. */
+    const saveSheet = async (
+      matchId: number, players: PlayerMatchStatInput[], removedPlayerIds: number[] = [],
+    ): Promise<void> => {
+      const result = await saveMatchSheet({
+        matchId, syncMatchScores: false, players, removedPlayerIds,
+        adminUserId: ids122.adminUserId, note: NOTE,
+        staleToken: await loadMatchSheetStaleToken(sql, matchId),
+      });
+      expect(result.ok, JSON.stringify(result)).toBe(true);
+    };
+
+    const correct = async (
+      matchId: number, playerId: number, over: Partial<PlayerMatchStatInput>,
+    ): Promise<void> => {
+      const row = await pmsOf(matchId, playerId);
+      expect(row, 'the row to correct exists').toBeDefined();
+      await saveSheet(matchId, [sheetValues(row as PmsRow, over)]);
+    };
+
+    const returnIt = (matchId: number, playerId: number) => returnMatchSheetToSource({
+      matchId, playerId, adminUserId: ids122.adminUserId, note: NOTE,
+    });
+
+    /** The addition's two records, `lineup {present:true}` then `match_sheet`. */
+    const expectAdditionRecords = async (f: Fx, active: boolean): Promise<void> => {
+      const keyC = `${f.matchKey}|afltables:${URL_C}`;
+      const records = await authorityOf(f.matchKey);
+      expect(records.map((r) => [r.entityKey, r.fieldGroup, r.isActive]))
+        .toEqual([[keyC, 'lineup', active], [keyC, 'match_sheet', active]]);
+      expect(records[0].overrideValues).toEqual({ present: true });
+    };
+
+    const repair = (argv: readonly string[]): Promise<RepairOutcome> => runRepairMatchRekeys(
+      [...argv, '--season', String(SEASON122), '--acknowledge-completed-season'],
+      { sql, log: () => {} },
+    );
+
+    /** Zero residue: the authority this suite creates, and its audit rows. */
+    const cleanupAuthority = async (): Promise<void> => {
+      await sql`
+        DELETE FROM data_overrides
+         WHERE entity_type = 'player_match_stats' AND entity_key LIKE ${`${KEY_ROOT}%`}
+      `;
+      await sql`DELETE FROM data_edits WHERE admin_user_id = ${ids122.adminUserId} AND note = ${NOTE}`;
+    };
+
+    const seedPlayer = async (name: string, url: string): Promise<number> => {
+      const [player] = await sql<{ id: number }[]>`
+        INSERT INTO players (display_name, sort_name, search_name, slug)
+        VALUES (${`Issue257 ${name}`}, ${`${name}, Issue257`}, ${`issue257 ${name.toLowerCase()}`},
+                ${`${SLUG122}257-${name.toLowerCase()}`})
+        RETURNING id::int AS id
+      `;
+      await sql`
+        INSERT INTO external_identities (source_id, external_id, player_id, status, match_method)
+        VALUES (${fixtures.sourceId}, ${url}, ${player.id}, 'unique', 'afltables_profile_url')
+      `;
+      return player.id;
+    };
+
+    beforeAll(async () => {
+      // The real writer opens its own connection from this variable.
+      priorImportUrl = process.env.AFLDB_IMPORT_DATABASE_URL;
+      process.env.AFLDB_IMPORT_DATABASE_URL = process.env.AFLDB_TEST_DATABASE_URL;
+      storable = await playerMatchStatsAuthorityStorable(sql);
+      await cleanupAuthority();
+      if (!storable) return;
+      playerA = await seedPlayer('A', URL_A);
+      playerB = await seedPlayer('B', URL_B);
+      playerC = await seedPlayer('C', URL_C);
+    });
+
+    afterAll(async () => {
+      await cleanupAuthority();
+      if (priorImportUrl === undefined) delete process.env.AFLDB_IMPORT_DATABASE_URL;
+      else process.env.AFLDB_IMPORT_DATABASE_URL = priorImportUrl;
+      // The fixture rows (matches, stats, players, identities, spine) are removed
+      // by `cleanup122`, in the enclosing afterAll.
+    });
+
+    const scenario = (name: string, body: () => Promise<void>): void => {
+      it(name, async () => {
+        // State A (migration 110 not applied): no durable authority can exist, so
+        // there is nothing to prove through the settle.
+        if (!storable) return;
+        try {
+          await body();
+        } finally {
+          await cleanupAuthority();
+        }
+      }, 300_000);
+    };
+
+    scenario('a corrected field survives the settle, on a retry and when the source moves', async () => {
+      const f = fixture('keep', 1);
+      const a = playerSpec(f, `${REC}p-keep-a`, URL_A, '9');
+      const match = await seed(f, [a]);
+      expect(await pmsOf(match.id, playerA))
+        .toMatchObject({ goals: 3, marks: 5, sourceId: fixtures.sourceId });
+
+      // The REAL writer: one field of an AFL Tables-owned row.
+      await correct(match.id, playerA, { goals: 9 });
+      expect(await pmsOf(match.id, playerA))
+        .toMatchObject({ goals: 9, sourceId: fixtures.sourceId });
+      const recorded = [{
+        entityKey: `${f.matchKey}|afltables:${URL_A}`,
+        group: 'match_sheet', active: true, values: { goals: 9 },
+      }];
+      expect(shape(await authorityOf(f.matchKey))).toEqual(recorded);
+
+      // The same observation again. The §9.3 retry re-offers a target whose
+      // canonical state differs from the source, which is exactly how this
+      // correction used to be reverted.
+      const retry = await settle(f, [a]);
+      expect(retry.counters.canonicalRowsUpdated).toBe(0);
+      expect(retry.counters.canonicalApplicationsLogged).toBe(0);
+      expect((await pmsOf(match.id, playerA))?.goals).toBe(9);
+
+      // The source moves the very field the human decided.
+      const moved = playerSpec(f, a.recordId, URL_A, '9', { goals: 4 });
+      const run = await settle(f, [moved]);
+      expect(run.counters.versionsAppended).toBeGreaterThanOrEqual(1);
+      expect(run.counters.canonicalRowsUpdated).toBe(0);
+      expect((await pmsOf(match.id, playerA))?.goals).toBe(9);
+      expect((await pmsLedger(a.recordId)).map((row) => row.verb)).toEqual(['insert']);
+      expect(shape(await authorityOf(f.matchKey))).toEqual(recorded);
+    });
+
+    scenario('an unchanged re-settle neither churns nor reverts the corrected value', async () => {
+      const f = fixture('quiet', 2);
+      const a = playerSpec(f, `${REC}p-quiet-a`, URL_A, '9');
+      const match = await seed(f, [a]);
+      await correct(match.id, playerA, { goals: 9 });
+      const moved = playerSpec(f, a.recordId, URL_A, '9', { goals: 4 });
+      await settle(f, [moved]);
+
+      const before = await pmsOf(match.id, playerA);
+      const ledgerBefore = await ledger122();
+      const authorityBefore = await authorityOf(f.matchKey);
+      const quiet = (run: SettleRunResult): void => {
+        expect(run.counters.canonicalRowsInserted).toBe(0);
+        expect(run.counters.canonicalRowsUpdated).toBe(0);
+        expect(run.counters.canonicalApplicationsLogged).toBe(0);
+      };
+
+      quiet(await settle(f, [moved]));
+      // A payload-only revision: a NEW version (so the record really is re-evaluated)
+      // that proposes the same values again.
+      const revised = await settle(f, [playerSpec(f, a.recordId, URL_A, '9', { goals: 4 }, 2)]);
+      expect(revised.counters.versionsAppended).toBeGreaterThanOrEqual(1);
+      quiet(revised);
+
+      expect(await pmsOf(match.id, playerA)).toEqual(before);
+      expect(before?.goals).toBe(9);
+      expect(await ledger122()).toEqual(ledgerBefore);
+      expect(await authorityOf(f.matchKey)).toEqual(authorityBefore);
+    });
+
+    scenario('an unprotected field on the same row still updates from the source', async () => {
+      const f = fixture('field', 3);
+      const a = playerSpec(f, `${REC}p-field-a`, URL_A, '9');
+      const match = await seed(f, [a]);
+      await correct(match.id, playerA, { goals: 9 });
+
+      const run = await settle(f, [playerSpec(f, a.recordId, URL_A, '9', { goals: 4, marks: 7 })]);
+      expect(run.counters.canonicalRowsUpdated).toBe(1);
+      expect(await pmsOf(match.id, playerA))
+        .toMatchObject({ goals: 9, marks: 7, kicks: 12, sourceId: fixtures.sourceId });
+
+      // The write is exactly the unprotected remainder: never the corrected field.
+      const ledger = await pmsLedger(a.recordId);
+      expect(ledger.map((row) => row.verb)).toEqual(['insert', 'update']);
+      const update = ledger[1];
+      expect((update.newValues as Record<string, JsonValue>).marks).toBe(7);
+      expect(Object.keys(update.newValues as Record<string, JsonValue>)).not.toContain('goals');
+      expect((update.previousValues as Record<string, JsonValue>).marks).toBe(5);
+    });
+
+    scenario('a durable removal stops the settle reinserting the row', async () => {
+      const f = fixture('gone', 4);
+      const a = playerSpec(f, `${REC}p-gone-a`, URL_A, '9');
+      const b = playerSpec(f, `${REC}p-gone-b`, URL_B, '11');
+      const match = await seed(f, [a, b]);
+      expect(await pmsOf(match.id, playerB)).toMatchObject({ sourceId: fixtures.sourceId });
+
+      await saveSheet(match.id, [], [playerB]);
+      expect(await pmsOf(match.id, playerB)).toBeUndefined();
+      expect(shape(await authorityOf(f.matchKey))).toEqual([{
+        entityKey: `${f.matchKey}|afltables:${URL_B}`,
+        group: 'lineup', active: true, values: { present: false },
+      }]);
+
+      // The same observation (the retry path) and then a moved one: the source
+      // still carries the player, and the human decision stands.
+      const retry = await settle(f, [a, b]);
+      expect(retry.counters.canonicalRowsInserted).toBe(0);
+      expect(await pmsOf(match.id, playerB)).toBeUndefined();
+
+      const moved = await settle(f, [a, playerSpec(f, b.recordId, URL_B, '11', { marks: 9 })]);
+      expect(moved.counters.versionsAppended).toBeGreaterThanOrEqual(1);
+      expect(moved.counters.canonicalRowsInserted).toBe(0);
+      expect(await pmsOf(match.id, playerB)).toBeUndefined();
+      expect((await pmsLedger(b.recordId)).map((row) => row.verb)).toEqual(['insert']);
+      expect((await authorityOf(f.matchKey)).map((row) => [row.fieldGroup, row.isActive]))
+        .toEqual([['lineup', true]]);
+      // The removal is per player: the other row is untouched.
+      expect(await pmsOf(match.id, playerA)).toMatchObject({ goals: 3 });
+    });
+
+    scenario('a manual addition survives the settle, row and authority', async () => {
+      const f = fixture('added', 5);
+      const a = playerSpec(f, `${REC}p-added-a`, URL_A, '9');
+      const match = await seed(f, [a]);
+
+      await saveSheet(match.id, [added(playerC)]);
+      const addition = await pmsOf(match.id, playerC);
+      // A human fact: unowned, never cited to a source.
+      expect(addition).toMatchObject({ goals: 1, kicks: 10, jumperNumber: '44', sourceId: null });
+      await expectAdditionRecords(f, true);
+      const authorityBefore = await authorityOf(f.matchKey);
+
+      // The source does not carry C. The settle runs for real (A's marks move).
+      const run = await settle(f, [playerSpec(f, a.recordId, URL_A, '9', { marks: 7 })]);
+      expect(run.counters.canonicalRowsUpdated).toBe(1);
+      expect((await pmsOf(match.id, playerA))?.marks).toBe(7);
+
+      expect(await pmsOf(match.id, playerC)).toEqual(addition);
+      expect(await authorityOf(f.matchKey)).toEqual(authorityBefore);
+    });
+
+    scenario('after Return to source the next settle restores the source value', async () => {
+      const f = fixture('back', 6);
+      const a = playerSpec(f, `${REC}p-back-a`, URL_A, '9');
+      const match = await seed(f, [a]);
+      await correct(match.id, playerA, { goals: 9 });
+      const moved = playerSpec(f, a.recordId, URL_A, '9', { goals: 4 });
+      await settle(f, [moved]);
+      expect((await pmsOf(match.id, playerA))?.goals).toBe(9);
+
+      const result = await returnIt(match.id, playerA);
+      expect(result).toMatchObject({ ok: true, rowDeleted: false, rowKept: false });
+      expect(shape(await authorityOf(f.matchKey))).toEqual([{
+        entityKey: `${f.matchKey}|afltables:${URL_A}`,
+        group: 'match_sheet', active: false, values: { goals: 9 },
+      }]);
+      // Return to source never invents a value: the row is exactly as it was.
+      expect((await pmsOf(match.id, playerA))?.goals).toBe(9);
+
+      // The observation is unchanged; the §9.3 retry now finds nothing protecting
+      // the field and restores the source's value.
+      const next = await settle(f, [moved]);
+      expect(next.counters.canonicalRowsUpdated).toBe(1);
+      expect(await pmsOf(match.id, playerA))
+        .toMatchObject({ goals: 4, sourceId: fixtures.sourceId });
+      const ledger = await pmsLedger(a.recordId);
+      expect(ledger.map((row) => row.verb)).toEqual(['insert', 'update']);
+      expect((ledger[1].newValues as Record<string, JsonValue>).goals).toBe(4);
+      expect((ledger[1].previousValues as Record<string, JsonValue>).goals).toBe(9);
+      // The withdrawn record stays withdrawn.
+      expect((await authorityOf(f.matchKey)).map((row) => row.isActive)).toEqual([false]);
+    });
+
+    scenario('F-PR-03: a settle that now carries a manual addition neither adopts nor drops it', async () => {
+      const f = fixture('carried', 7);
+      const a = playerSpec(f, `${REC}p-carried-a`, URL_A, '9');
+      const match = await seed(f, [a]);
+      await saveSheet(match.id, [added(playerC)]);
+      const addition = await pmsOf(match.id, playerC);
+      expect(addition).toMatchObject({ sourceId: null });
+
+      // The source now carries C, with other values. The row is unowned, so E3
+      // refuses it: no adoption, no overwrite, no deletion, and the human
+      // decision is left standing.
+      const c = playerSpec(f, `${REC}p-carried-c`, URL_C, '44', { goals: 2, marks: 6 });
+      await settle(f, [a, c]);
+      expect(await pmsOf(match.id, playerC)).toEqual(addition);
+      expect((await pmsOf(match.id, playerC))?.sourceId).toBeNull();
+      expect(await pmsLedger(c.recordId)).toEqual([]);
+      await expectAdditionRecords(f, true);
+
+      // Return to source is the only way out, and for an UNOWNED row it deletes.
+      const result = await returnIt(match.id, playerC);
+      expect(result).toMatchObject({ ok: true, rowDeleted: true, rowKept: false });
+      expect(await pmsOf(match.id, playerC)).toBeUndefined();
+      await expectAdditionRecords(f, false);
+
+      // Nothing protects the player now: the source's own row lands on the next settle.
+      await settle(f, [a, c]);
+      expect(await pmsOf(match.id, playerC))
+        .toMatchObject({ goals: 2, marks: 6, sourceId: fixtures.sourceId });
+      expect((await pmsLedger(c.recordId)).map((row) => row.verb)).toEqual(['insert']);
+      await expectAdditionRecords(f, false);
+    });
+
+    scenario('F-PR-03: an addition the source does not carry is withdrawn and its row deleted', async () => {
+      const f = fixture('unowned', 8);
+      const a = playerSpec(f, `${REC}p-unowned-a`, URL_A, '9');
+      const match = await seed(f, [a]);
+      await saveSheet(match.id, [added(playerC)]);
+      expect(await pmsOf(match.id, playerC)).toMatchObject({ sourceId: null });
+      await expectAdditionRecords(f, true);
+      const rowA = await pmsOf(match.id, playerA);
+
+      const result = await returnIt(match.id, playerC);
+      expect(result).toMatchObject({ ok: true, rowDeleted: true, rowKept: false });
+      expect(await pmsOf(match.id, playerC)).toBeUndefined();
+      await expectAdditionRecords(f, false);
+      expect(await pmsOf(match.id, playerA)).toEqual(rowA);
+    });
+
+    scenario('a settle rekey carries the Match Sheet authority to the new match key', async () => {
+      const f1 = fixture('rekey', 9, 1);
+      const f2 = fixture('rekey', 9, 2);
+      const a1 = playerSpec(f1, `${REC}p-rekey-a-1`, URL_A, '9');
+      const match = await seed(f1, [a1]);
+      await correct(match.id, playerA, { goals: 9 });
+      const keyA = (f: Fx): string => `${f.matchKey}|afltables:${URL_A}`;
+
+      // AFL Tables corrects the round: same date, same clubs, new key and record id.
+      const a2 = playerSpec(f2, `${REC}p-rekey-a-2`, URL_A, '9', { goals: 4 });
+      await settle(f2, [a2]);
+      const after = await matchRow122(f2.matchKey);
+      expect(after?.id).toBe(match.id);
+      expect(await matchRow122(f1.matchKey)).toBeUndefined();
+
+      // Moved with the match, atomically: active at the new key, retired at the old.
+      expect(shape(await authorityOf(f2.matchKey))).toEqual([{
+        entityKey: keyA(f2), group: 'match_sheet', active: true, values: { goals: 9 },
+      }]);
+      expect(shape(await authorityOf(f1.matchKey))).toEqual([{
+        entityKey: keyA(f1), group: 'match_sheet', active: false, values: { goals: 9 },
+      }]);
+      // The rekey run itself did not revert the corrected field.
+      expect((await pmsOf(match.id, playerA))?.goals).toBe(9);
+
+      // And the carried record is effective under the new key.
+      const run = await settle(f2, [playerSpec(f2, a2.recordId, URL_A, '9', { goals: 5, marks: 7 })]);
+      expect(run.counters.canonicalRowsUpdated).toBe(1);
+      expect(await pmsOf(match.id, playerA)).toMatchObject({ goals: 9, marks: 7 });
+    });
+
+    scenario('repair-match-rekeys carries the Match Sheet authority to the live match key', async () => {
+      const f1 = fixture('repair', 10, 1);
+      const f2 = fixture('repair', 10, 2);
+      const keyA = (f: Fx): string => `${f.matchKey}|afltables:${URL_A}`;
+      const a1 = playerSpec(f1, `${REC}p-repair-a-1`, URL_A, '9');
+      const match = await seed(f1, [a1]);
+      await correct(match.id, playerA, { goals: 9 });
+
+      // The state a pre-fix settle left behind: the source's live identity is
+      // observed and projected but NOT applied, and the old one is swept absent.
+      await settle(f2, [], { autoApply: false });
+      expect(await matchRow122(f2.matchKey)).toBeUndefined();
+
+      const dry = await repair([]);
+      const planned = dry.plan.filter((entry) => entry.matchKey === f2.matchKey);
+      expect(planned).toHaveLength(1);
+      expect(planned[0]?.action).toBe('rekey_in_place');
+      expect(planned[0]?.stale.map((row) => row.id)).toEqual([match.id]);
+      // Planning writes nothing.
+      expect(shape(await authorityOf(f1.matchKey)).map((row) => row.active)).toEqual([true]);
+
+      const applied = await repair(['--apply', '--plan-hash', dry.planHash]);
+      expect(applied.applied).toBe(true);
+      expect(applied.rekeyed).toBeGreaterThanOrEqual(1);
+      expect((await matchRow122(f2.matchKey))?.id).toBe(match.id);
+
+      expect(shape(await authorityOf(f2.matchKey))).toEqual([{
+        entityKey: keyA(f2), group: 'match_sheet', active: true, values: { goals: 9 },
+      }]);
+      expect(shape(await authorityOf(f1.matchKey))).toEqual([{
+        entityKey: keyA(f1), group: 'match_sheet', active: false, values: { goals: 9 },
+      }]);
+
+      // Effective at the new key: a source change cannot revert the field.
+      const a2 = playerSpec(f2, `${REC}p-repair-a-2`, URL_A, '9', { goals: 5, marks: 7 });
+      await settle(f2, [a2]);
+      expect(await pmsOf(match.id, playerA)).toMatchObject({ goals: 9, marks: 7 });
+    });
+
+    /*
+     * R-01. In a settle REKEY unit the canonical row still holds the RETIRED key, so
+     * the applier's incoming-key lock locked nothing and the authority snapshot was
+     * read BEFORE the retired match row was locked (`readFreshTarget`). A Match Sheet
+     * save could commit inside that window and its correction was then judged against
+     * a stale snapshot.
+     *
+     * Deterministic pause, no production hook: with the permissive run-level loader
+     * the applier's `loadManualAuthority` is the settle's FIRST `data_overrides`
+     * access, so an ACCESS EXCLUSIVE lock on that table (held by a side client)
+     * parks the settle exactly there. Step 5 is the pre-fix discriminator: a settle
+     * that is reading authority must already hold the match row, so a NOWAIT probe
+     * must fail with 55P03; before the fix it acquires the row and the assertion
+     * fails. The writer's own `lock_timeout = '5s'` bounds step 6.
+     */
+    scenario('R-01: a Match Sheet save cannot commit inside the settle rekey unit authority window', async () => {
+      const f1 = fixture('race', 11, 1);
+      const f2 = fixture('race', 11, 2);
+      const keyA = (f: Fx): string => `${f.matchKey}|afltables:${URL_A}`;
+      const a1 = playerSpec(f1, `${REC}p-race-a-1`, URL_A, '9');
+      const match = await seed(f1, [a1]);
+      const rowBefore = await pmsOf(match.id, playerA);
+      expect(rowBefore).toMatchObject({ goals: 3, marks: 5 });
+      // Read BEFORE the table lock (the token reads player_match_stats only).
+      const staleToken = await loadMatchSheetStaleToken(sql, match.id);
+
+      // The holder and the probe never share the settle's pool.
+      const side = postgres(process.env.AFLDB_TEST_DATABASE_URL as string, {
+        max: 3, onnotice: () => {},
+      });
+      let release: () => void = () => {};
+      const released = new Promise<void>((resolve) => { release = resolve; });
+      let signalHeld: (pid: number) => void = () => {};
+      const held = new Promise<number>((resolve) => { signalHeld = resolve; });
+      let holder: Promise<void> | undefined;
+      type Settled = { ok: true; value: SettleRunResult } | { ok: false; error: unknown };
+      let settling: Promise<Settled> | undefined;
+      const pause = (ms: number): Promise<null> => new Promise((resolve) => setTimeout(() => resolve(null), ms));
+
+      try {
+        // 2. Hold data_overrides ACCESS EXCLUSIVE until released.
+        holder = side.begin(async (tx) => {
+          await tx`LOCK TABLE data_overrides IN ACCESS EXCLUSIVE MODE`;
+          const [backend] = await tx<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`;
+          signalHeld(backend.pid);
+          await released;
+        }).then(() => undefined);
+        const holderPid = await Promise.race([
+          held,
+          holder.then((): number => { throw new Error('the holder ended before it held the lock'); }),
+        ]);
+
+        // 3. The rekey settle, started and NOT awaited; its outcome is captured.
+        const a2 = playerSpec(f2, `${REC}p-race-a-2`, URL_A, '9', { marks: 7 });
+        settling = settle(f2, [a2], { manualAuthorityLoader: async () => () => 'clear' }).then(
+          (value): Settled => ({ ok: true, value }),
+          (error: unknown): Settled => ({ ok: false, error }),
+        );
+
+        // 4. Wait (bounded) until the settle is blocked inside the authority load.
+        const deadline = Date.now() + 60_000;
+        for (;;) {
+          const blocked = await side<{ query: string }[]>`
+            SELECT query FROM pg_stat_activity
+             WHERE datname = current_database() AND ${holderPid}::int = ANY(pg_blocking_pids(pid))
+          `;
+          // `loadManualAuthority`'s first statement resolves `'public.data_overrides'::regclass`,
+          // which takes the relation lock (observed: the settle parks THERE, `Lock:relation`);
+          // its second is the `entity_type = 'matches'` read. In a settle run both are reached
+          // only through the applier (the identical regclass probe in
+          // `playerMatchStatsAuthorityStorable` is called by the Match Sheet writer alone).
+          if (blocked.some((row) => row.query.includes("'public.data_overrides'::regclass")
+            || (row.query.includes('FROM data_overrides')
+              && row.query.includes("entity_type = 'matches'")))) break;
+          if (Date.now() > deadline) {
+            const waiting = await side<{ state: string; wait: string | null; query: string }[]>`
+              SELECT state, wait_event_type || ':' || wait_event AS wait, left(query, 160) AS query
+                FROM pg_stat_activity
+               WHERE datname = current_database() AND pid <> pg_backend_pid()
+            `;
+            throw new Error(`the settle never blocked on the loadManualAuthority data_overrides read; sessions: ${
+              JSON.stringify(waiting)}`);
+          }
+          const early = await Promise.race([settling, pause(100)]);
+          if (early !== null) {
+            throw new Error(`the settle finished before it reached the authority load: ${JSON.stringify(
+              early.ok ? 'ok' : String(early.error),
+            )}`);
+          }
+        }
+
+        // 5. PRE-FIX DISCRIMINATOR: the settle already holds the match row.
+        await expect(
+          side.begin((tx) => tx`SELECT id FROM matches WHERE id = ${match.id} FOR UPDATE NOWAIT`),
+        ).rejects.toMatchObject({ code: '55P03' });
+
+        // 6. The REAL writer, while the settle is paused: refused as retryable.
+        const refused = await saveMatchSheet({
+          matchId: match.id, syncMatchScores: false,
+          players: [sheetValues(rowBefore as PmsRow, { goals: 9 })], removedPlayerIds: [],
+          adminUserId: ids122.adminUserId, note: NOTE, staleToken,
+        });
+        expect(refused.ok).toBe(false);
+        expect(refused).toMatchObject({ error: MATCH_SHEET_SETTLE_RUNNING_REFUSAL });
+
+        // 7. Release; the settle completes and rekeys in place, the refused save wrote nothing.
+        release();
+        await holder;
+        const run = await settling;
+        expect(run.ok, run.ok ? '' : String(run.error)).toBe(true);
+        expect((await matchRow122(f2.matchKey))?.id).toBe(match.id);
+        expect(await matchRow122(f1.matchKey)).toBeUndefined();
+        expect(await pmsOf(match.id, playerA)).toMatchObject({ goals: 3, marks: 7 });
+        expect(await authorityOf(f1.matchKey)).toEqual([]);
+        expect(await authorityOf(f2.matchKey)).toEqual([]);
+
+        // 8. The correction lands at the NEW key and survives the next source change.
+        await correct(match.id, playerA, { goals: 9 });
+        expect(shape(await authorityOf(f2.matchKey))).toEqual([{
+          entityKey: keyA(f2), group: 'match_sheet', active: true, values: { goals: 9 },
+        }]);
+        await settle(f2, [playerSpec(f2, a2.recordId, URL_A, '9', { goals: 5, marks: 8 })]);
+        expect(await pmsOf(match.id, playerA)).toMatchObject({ goals: 9, marks: 8 });
+      } finally {
+        // The holder MUST be released before anything waits on the settle.
+        release();
+        await holder?.catch(() => undefined);
+        await settling;
+        await side.end({ timeout: 5 });
+      }
     });
   });
 });

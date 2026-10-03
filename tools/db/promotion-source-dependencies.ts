@@ -29,6 +29,10 @@ import {
 } from '../../src/lib/acquisition/afl-api-refusal-evidence';
 import { AFL_API_SEASON_EVIDENCE_MATCH_METHOD } from '../../src/lib/acquisition/afl-api-player-evidence';
 import {
+  PLAYER_MATCH_STATS_ENTITY,
+  decodePlayerMatchStatsKey,
+} from '../../src/lib/acquisition/match-sheet-authority';
+import {
   decodeMatchCoachKey,
   environmentNames,
   historicalOnlyFor,
@@ -75,7 +79,7 @@ export const DEPENDENCY_FAMILIES: readonly DependencyFamily[] = [
   { id: 'F1', table: 'brownlow_vote_entry_state', description: 'brownlow_vote_entry_state.match_id' },
   {
     id: 'F2', table: 'data_overrides',
-    description: "active data_overrides whose entity_type is 'matches' or 'match_coaches'",
+    description: "active data_overrides whose entity_type is 'matches', 'match_coaches' or 'player_match_stats'",
   },
   { id: 'F3', table: 'data_edits', description: "data_edits.row_id where table_name = 'matches'" },
 ];
@@ -147,6 +151,8 @@ export type FamilyStatus = 'judged' | 'withheld_by_contract';
 export function overrideMatchKeyOf(entityType: string, entityKey: string): string | null {
   if (entityType === 'matches') return entityKey.length > 0 ? entityKey : null;
   if (entityType === 'match_coaches') return decodeMatchCoachKey(entityKey)?.matchKey || null;
+  // AFLDB-ISSUE-257: `<match_key>|<identity>`, decoded at the LAST `|`; an undecodable key names none.
+  if (entityType === PLAYER_MATCH_STATS_ENTITY) return decodePlayerMatchStatsKey(entityKey)?.matchKey || null;
   return null;
 }
 
@@ -262,12 +268,12 @@ export const MATCHES_BY_KEY_SQL = `
 export const F2_OVERRIDES_SQL = `
   SELECT 'data_overrides:id=' || o.id::text AS target_row, o.entity_type AS entity_type, o.entity_key AS entity_key
     FROM data_overrides o
-   WHERE o.is_active AND o.entity_type IN ('matches', 'match_coaches')
+   WHERE o.is_active AND o.entity_type IN ('matches', 'match_coaches', 'player_match_stats')
    ORDER BY o.id`;
 
 export const F2_COUNT_SQL = `
   SELECT count(*)::int AS n FROM data_overrides o
-   WHERE o.is_active AND o.entity_type IN ('matches', 'match_coaches')`;
+   WHERE o.is_active AND o.entity_type IN ('matches', 'match_coaches', 'player_match_stats')`;
 
 export type TargetFamilyReader = { family: 'F1' | 'F3'; table: string; rowsSql: string; countSql: string };
 

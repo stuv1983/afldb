@@ -38,6 +38,8 @@
  */
 import type postgres from 'postgres';
 
+import { encodePlayerMatchStatsKey, PLAYER_MATCH_STATS_ENTITY } from './match-sheet-authority';
+
 type Sql = postgres.Sql | postgres.TransactionSql;
 
 /**
@@ -275,6 +277,73 @@ export async function findPlausibleCanonicalFixtures(
  */
 export type MatchOverrideCarry = { carried: number } | { conflict: readonly string[] };
 
+/**
+ * AFLDB-ISSUE-257 §18.9 — the Match Sheet authority of the OLD match
+ * (`player_match_stats` records whose `entity_key` is `<old match_key>|<identity>`)
+ * moves to `<new match_key>|<identity>` per `field_group`, with the same three
+ * rules. Planned (read, conflicts decided) BEFORE anything is written, so a
+ * conflict in either entity leaves the savepoint untouched. The match scope is
+ * the §18.3 predicate (`entityKeyBelongsToMatch`): the prefix, and no further
+ * `|`, so a longer match key sharing the prefix is excluded; never a `LIKE`.
+ */
+type StatsAuthorityMove = {
+  id: string; newKey: string; fieldGroup: string; overrideValues: unknown;
+  adminUserId: number; retiredId: string | null;
+};
+
+async function planPlayerMatchStatsCarry(
+  sql: Sql, previousMatchKey: string, matchKey: string,
+): Promise<{ moves: StatsAuthorityMove[]; conflict: string[] }> {
+  const oldPrefix = `${previousMatchKey}|`;
+  const rows = await sql<{
+    id: string; entityKey: string; fieldGroup: string; overrideValues: unknown; adminUserId: number;
+  }[]>`
+    SELECT id::text AS id, entity_key AS "entityKey", field_group AS "fieldGroup",
+           override_values AS "overrideValues", admin_user_id::int AS "adminUserId"
+      FROM data_overrides
+     WHERE entity_type = ${PLAYER_MATCH_STATS_ENTITY} AND is_active
+       AND starts_with(entity_key, ${oldPrefix})
+       AND strpos(substr(entity_key, ${oldPrefix.length + 1}::int), '|') = 0
+     ORDER BY entity_key, field_group
+  `;
+  if (rows.length === 0) return { moves: [], conflict: [] };
+
+  const newPrefix = `${matchKey}|`;
+  const atTarget = await sql<{
+    id: string; entityKey: string; fieldGroup: string; isActive: boolean;
+  }[]>`
+    SELECT id::text AS id, entity_key AS "entityKey", field_group AS "fieldGroup",
+           is_active AS "isActive"
+      FROM data_overrides
+     WHERE entity_type = ${PLAYER_MATCH_STATS_ENTITY}
+       AND starts_with(entity_key, ${newPrefix})
+       AND strpos(substr(entity_key, ${newPrefix.length + 1}::int), '|') = 0
+  `;
+  const existing = new Map(atTarget.map((row) => [`${row.entityKey}\u0000${row.fieldGroup}`, row]));
+
+  const moves: StatsAuthorityMove[] = [];
+  const conflict: string[] = [];
+  for (const row of rows) {
+    const encoded = encodePlayerMatchStatsKey(matchKey, row.entityKey.slice(oldPrefix.length));
+    if (!encoded.ok) {
+      // An identity that cannot be re-encoded is not carried by guessing.
+      conflict.push(`${PLAYER_MATCH_STATS_ENTITY}:${row.entityKey}`);
+      continue;
+    }
+    const retired = existing.get(`${encoded.entityKey}\u0000${row.fieldGroup}`);
+    if (retired?.isActive === true) {
+      conflict.push(`${PLAYER_MATCH_STATS_ENTITY}:${encoded.entityKey}:${row.fieldGroup}`);
+      continue;
+    }
+    moves.push({
+      id: row.id, newKey: encoded.entityKey, fieldGroup: row.fieldGroup,
+      overrideValues: row.overrideValues, adminUserId: row.adminUserId,
+      retiredId: retired?.id ?? null,
+    });
+  }
+  return { moves, conflict };
+}
+
 export async function carryMatchOverrides(
   sql: Sql, previousMatchKey: string, matchKey: string,
 ): Promise<MatchOverrideCarry> {
@@ -288,19 +357,52 @@ export async function carryMatchOverrides(
      WHERE entity_type = 'matches' AND entity_key = ${previousMatchKey} AND is_active
      ORDER BY field_group
   `;
-  if (active.length === 0) return { carried: 0 };
+  const stats = await planPlayerMatchStatsCarry(sql, previousMatchKey, matchKey);
+  if (active.length === 0 && stats.moves.length === 0 && stats.conflict.length === 0) {
+    return { carried: 0 };
+  }
 
-  const existing = await sql<{ id: string; fieldGroup: string; isActive: boolean }[]>`
-    SELECT id::text AS id, field_group AS "fieldGroup", is_active AS "isActive"
-      FROM data_overrides
-     WHERE entity_type = 'matches' AND entity_key = ${matchKey}
-  `;
+  const existing = active.length === 0
+    ? []
+    : await sql<{ id: string; fieldGroup: string; isActive: boolean }[]>`
+      SELECT id::text AS id, field_group AS "fieldGroup", is_active AS "isActive"
+        FROM data_overrides
+       WHERE entity_type = 'matches' AND entity_key = ${matchKey}
+    `;
   const atTarget = new Map(existing.map((row) => [row.fieldGroup, row]));
 
-  const conflict = active
-    .filter((row) => atTarget.get(row.fieldGroup)?.isActive === true)
-    .map((row) => row.fieldGroup);
+  const conflict = [
+    ...active
+      .filter((row) => atTarget.get(row.fieldGroup)?.isActive === true)
+      .map((row) => row.fieldGroup),
+    ...stats.conflict,
+  ];
   if (conflict.length > 0) return { conflict };
+
+  for (const move of stats.moves) {
+    if (move.retiredId === null) {
+      await sql`
+        INSERT INTO data_overrides (
+          entity_type, entity_key, field_group, override_values,
+          admin_user_id, is_active, updated_at
+        ) VALUES (
+          ${PLAYER_MATCH_STATS_ENTITY}, ${move.newKey}, ${move.fieldGroup},
+          ${sql.json(move.overrideValues as never)}, ${move.adminUserId}, true, now()
+        )
+      `;
+    } else {
+      await sql`
+        UPDATE data_overrides
+           SET override_values = ${sql.json(move.overrideValues as never)},
+               admin_user_id = ${move.adminUserId}, is_active = true, updated_at = now()
+         WHERE id = ${move.retiredId}::bigint
+      `;
+    }
+    await sql`
+      UPDATE data_overrides SET is_active = false, updated_at = now()
+       WHERE id = ${move.id}::bigint
+    `;
+  }
 
   for (const row of active) {
     const retired = atTarget.get(row.fieldGroup);
@@ -327,5 +429,5 @@ export async function carryMatchOverrides(
        WHERE id = ${row.id}::bigint
     `;
   }
-  return { carried: active.length };
+  return { carried: active.length + stats.moves.length };
 }

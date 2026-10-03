@@ -1458,6 +1458,24 @@ sudo systemctl restart afldb
 
 Migrations are forward-only: the runner refuses to run if an applied migration has been edited. To reverse a schema change, add a new migration. For a data rollback, restore from backup — see [backup-restore.md](backup-restore.md).
 
+**Rolling the application back below AFLDB-ISSUE-257 (migration 110).** Before checking out any
+commit older than the ISSUE-257 release on a database where migration 110 is applied, run the
+read-only D-257-7 guard against that database (it reads the migration runner's variable for the
+target, never a DSN on the command line):
+
+```bash
+npx tsx tools/db/issue257-rollback-guard.ts --target prod    # or dev
+```
+
+It counts `data_overrides` rows with `entity_type = 'player_match_stats'`, active or not, and
+exits 0 (`PERMITTED`) only at zero; any other answer exits 2 (`REFUSED`). Zero rows: restore
+migration 102's narrow CHECK first (`issues/open/AFLDB-ISSUE-257.md` §19, the migration 110
+reversal), then roll the application back. One or more rows: the older application is not a
+supported rollback target — **roll forward only**. Never delete those records to make the guard
+pass; each is an administrator's durable decision. An application older than ISSUE-257 running
+against migration 110 makes the nightly settle refuse player statistics, period scores and
+Brownlow votes.
+
 ## 12. Troubleshooting
 
 | Symptom | Cause | Fix |

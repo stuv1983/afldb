@@ -1018,6 +1018,25 @@ const BRW_INSERT_ROW: CanonicalApplicationRow = {
   importBatchId: 51, targetKey: BRW_OLD_KEY,
 };
 
+describe('AFLDB-ISSUE-257 Slice 6 A257: the ORIGINAL-only manual-authority guard placement (source contract)', () => {
+  it('sits after the C11 ownership checks, before P7, and only under authority.mode === ORIGINAL', () => {
+    const source = toolSource().replace(/\r\n/g, '\n');
+    const c11 = source.indexOf('playerMatchStatsClosureOwnership(candidate, providerId, aflApiSourceId)');
+    const foreignNoop = source.indexOf("NOOP foreign (C11): player_match_stats#");
+    const indeterminate = source.indexOf("step: 'C11', code: 'provenance_unexplained'");
+    const guard = source.indexOf("if (authority.mode === 'ORIGINAL') {\n      const authorityBlockers = await readManualAuthorityBlockersAtMatch(");
+    const p7 = source.indexOf('evaluatePlayerMatchStatsMutationEligibility(evidence)');
+    expect([c11, foreignNoop, indeterminate, guard, p7].every((i) => i > 0)).toBe(true);
+    expect(c11).toBeLessThan(foreignNoop);
+    expect(foreignNoop).toBeLessThan(indeterminate);
+    expect(indeterminate).toBeLessThan(guard);
+    expect(guard).toBeLessThan(p7);
+    // exactly one definition and one call; the STOP is the new code at step A257, with detail attached
+    expect(source.match(/readManualAuthorityBlockersAtMatch\(/g)).toHaveLength(2);
+    expect(source).toContain("step: 'A257', code: 'manual_authority_present' });\n        detailLastStop(");
+  });
+});
+
 describe('§5.9 BG2: a Brownlow row blocks unless it is itself a PROVEN closure row at the event', () => {
   it('BG2 case 1: PMS closure row + its legitimate paired Brownlow closure row (same CD_I closure) -> no STOP', () => {
     const paired = claimed(901, brownlowRowEvidence());

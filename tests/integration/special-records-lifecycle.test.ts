@@ -270,7 +270,10 @@ describe('migration 102 allowlist widenings', () => {
     // manual-authority.ts proves from this constraint that an override for a
     // settle target is UNREPRESENTABLE. Admitting one degrades the nightly
     // settle from apply to propose-only.
-    for (const settle of ['match_period_scores', 'player_match_stats', 'brownlow_round_votes']) {
+    // AFLDB-ISSUE-257: `player_match_stats` is no longer unrepresentable (migration
+    // 110 admits it, State B); the other two settle targets stay absent in either
+    // schema state.
+    for (const settle of ['match_period_scores', 'brownlow_round_votes']) {
       expect(check.def).not.toContain(settle);
     }
   });

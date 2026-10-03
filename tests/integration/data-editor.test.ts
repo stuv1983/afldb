@@ -1,11 +1,17 @@
 import './guard';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { spawnSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import postgres from 'postgres';
 import { sql } from '@/db/client';
 import { saveEdit } from '@/db/queries/data-edits';
-import { saveMatchSheet } from '@/db/queries/match-sheet';
+import { deleteMatch } from '@/db/queries/match-admin';
+import { loadMatchSheetStaleToken, returnMatchSheetToSource, saveMatchSheet } from '@/db/queries/match-sheet';
+import { playerMatchStatsAuthorityStorable } from '@/lib/acquisition/manual-authority';
+import { AUTHORITY_UNAVAILABLE_REFUSAL } from '@/lib/acquisition/match-sheet-authority';
 import { createPlayerInTransaction } from '@/db/queries/players';
-import { recomputeClubSeasons } from '@/db/queries/player-derived';
+import { recomputeClubSeasons, recomputePlayerDerivedStats } from '@/db/queries/player-derived';
 import { BROWNLOW_MATCH_SHEET_REFUSAL } from '@/lib/match-sheet';
 import { createImportRoleParityHarness } from './import-role-parity';
 import { seedWildcardFinalSeason, type WildcardFixture } from './wildcard-final-fixture';
@@ -33,6 +39,299 @@ const TEST_NOTES = [
 let adminUserId = 0;
 let createdThrowawayAdmin = false;
 
+/** The stale-sheet token the editor would have been rendered with, right now. */
+const tokenOf = (matchId: number) => loadMatchSheetStaleToken(sql, matchId);
+
+/* ---------------------------------------------------------------------------------------
+ * AFLDB-ISSUE-257 synthetic fixtures (F-S10-02 / F-S10-01).
+ *
+ * Every Match Sheet case that saves, replays, returns or deletes a player_match_stats row
+ * owns a SYNTHETIC season/match/player/identity/row and never mutates a real historical row
+ * (the earlier real-row picks lost 14 rows when a delete-and-reinsert restore failed on
+ * GENERATED ALWAYS player_match_stats.id). Convention: COMMITTED fixtures in a reserved
+ * namespace, the one tests/integration/wildcard-final-fixture.ts and the ISSUE-122 settle
+ * suite established; the writer and the real Python replay open their own connections, so an
+ * uncommitted fixture would be invisible to them. `clubs` and `sources` are READ, never
+ * written.
+ *
+ *   season 2079 (claimed here; 2083/2088 are this file's older fixtures, 2086-2099 other suites)
+ *   match_key          2079|issue257-<token>   (a durable-authority key is season-prefixed)
+ *   absent-key control 9999|issue257-...       (never a real match)
+ *   player slug        issue257-<token>
+ *   AFL Tables path    issue257_players/<X>/<token>0.html
+ *
+ * Cleanup is idempotent, runs in beforeAll (leftovers of a crashed run), afterEach (so an
+ * assertion failure cannot leave rows behind) and afterAll, then a residue assertion proves
+ * nothing of the namespace remains. A suite-level guard proves the historical rows are
+ * unchanged. No case deletes and re-inserts a real row.
+ * ------------------------------------------------------------------------------------ */
+const SEASON_257 = 2079;
+const KEY_ROOT_257 = `${SEASON_257}|issue257-`;
+const ABSENT_ROOT_257 = '9999|issue257-';
+const SLUG_257 = 'issue257-';
+const PATH_ROOT_257 = 'issue257_players/';
+const FX_TIMEOUT = 120_000;
+
+type Row257 = Record<string, number | string | null>;
+type Fx257 = {
+  matchId: number; matchKey: string; season: number; playerId: number;
+  clubId: number; clubSlug: string; path: string | null; sourceId: number;
+  jumperNumber: string; goals: number; behinds: number; kicks: number; handballs: number;
+  disposals: number; marks: number; tackles: number; hitouts: number;
+  freesFor: number; freesAgainst: number;
+  row: Row257;
+  /** D-257-9 fixtures only: the two tracked profile_url_continuity paths the player holds. */
+  continuing?: string; renumbered?: string;
+};
+
+const STAT_257 = {
+  jumperNumber: '7', goals: 3, behinds: 1, kicks: 12, handballs: 8, disposals: 20,
+  marks: 4, tackles: 3, hitouts: 2, freesFor: 1, freesAgainst: 1,
+};
+const seededPlayerIds257: number[] = [];
+const seededMatchIds257: number[] = [];
+const idList257 = (ids: number[]) => (ids.length > 0 ? ids : [0]);
+
+/**
+ * One match (home/away from two existing clubs), one player holding one source-owned row,
+ * the player's durable identity (an accepted AFL Tables profile URL, none when
+ * `identity: false`, or both tracked continuity paths when `folded`), and the derived rows
+ * the production builder produces for that player. Committed.
+ */
+async function seedFixture257(
+  name: string,
+  opts: { identity?: boolean; folded?: { continuing: string; renumbered: string } } = {},
+): Promise<Fx257> {
+  const token = name.replace(/[^A-Za-z0-9]/g, '');
+  const fx = await sql.begin(async (tx) => {
+    const clubs = await tx<{ id: number; slug: string }[]>`
+      SELECT DISTINCT ON (organization_id) id::int AS id, slug
+        FROM clubs
+       WHERE organization_id IS NOT NULL
+       ORDER BY organization_id, id
+       LIMIT 2
+    `;
+    if (clubs.length < 2) throw new Error('ISSUE-257 fixture needs two club identities');
+    const [home, away] = clubs;
+    const [source] = await tx<{ id: number }[]>`SELECT id::int AS id FROM sources WHERE key = 'afltables'`;
+    await tx`
+      INSERT INTO seasons (year, league, status)
+      VALUES (${SEASON_257}, 'AFL', 'complete'::season_status)
+      ON CONFLICT DO NOTHING
+    `;
+    const matchKey = `${KEY_ROOT_257}${token}`;
+    const [match] = await tx<{ id: number }[]>`
+      INSERT INTO matches (
+        match_key, season, round_code, round_number, round_type, is_final,
+        match_date, venue_raw, home_club_id, away_club_id,
+        home_score, away_score, result, winner_club_id, margin,
+        attendance, attendance_status, source_id
+      ) VALUES (
+        ${matchKey}, ${SEASON_257}, '1', 1, 'home_and_away'::round_type, false,
+        ${`${SEASON_257}-03-05`}, 'ISSUE-257 Fixture Oval', ${home.id}, ${away.id},
+        100, 80, 'home_win'::match_result, ${home.id}, 20,
+        NULL, 'not_collected'::coverage_status, ${source.id}
+      )
+      RETURNING id::int AS id
+    `;
+    const [player] = await tx<{ id: number }[]>`
+      INSERT INTO players (display_name, sort_name, search_name, slug)
+      VALUES (${`Issue257 ${token}`}, ${`${token}, Issue257`}, ${`issue257 ${token.toLowerCase()}`},
+              ${`${SLUG_257}${token.toLowerCase()}`})
+      RETURNING id::int AS id
+    `;
+    const paths = opts.folded
+      ? [opts.folded.continuing, opts.folded.renumbered]
+      : opts.identity === false ? [] : [`${PATH_ROOT_257}${token.charAt(0).toUpperCase()}/${token}0.html`];
+    for (const path of paths) {
+      await tx`
+        INSERT INTO external_identities (source_id, external_id, player_id, status, match_method)
+        VALUES (${source.id}, ${path}, ${player.id}, 'unique', 'afltables_profile_url')
+      `;
+    }
+    await tx`
+      INSERT INTO player_match_stats (
+        player_id, match_id, club_id, jumper_number, kicks, marks, handballs, disposals,
+        goals, behinds, hitouts, tackles, frees_for, frees_against, source_id
+      ) VALUES (
+        ${player.id}, ${match.id}, ${home.id}, ${STAT_257.jumperNumber}, ${STAT_257.kicks},
+        ${STAT_257.marks}, ${STAT_257.handballs}, ${STAT_257.disposals}, ${STAT_257.goals},
+        ${STAT_257.behinds}, ${STAT_257.hitouts}, ${STAT_257.tackles}, ${STAT_257.freesFor},
+        ${STAT_257.freesAgainst}, ${source.id}
+      )
+    `;
+    await recomputePlayerDerivedStats(tx, [player.id], SEASON_257);
+    const [stat] = await tx<{ row: Row257 }[]>`
+      SELECT to_jsonb(s) AS row FROM player_match_stats s
+       WHERE s.match_id = ${match.id} AND s.player_id = ${player.id}
+    `;
+    return {
+      matchId: match.id, matchKey, season: SEASON_257, playerId: player.id,
+      clubId: home.id, clubSlug: home.slug, path: paths[0] ?? null, sourceId: source.id,
+      ...STAT_257, row: stat.row,
+      ...(opts.folded ? { continuing: opts.folded.continuing, renumbered: opts.folded.renumbered } : {}),
+    } satisfies Fx257;
+  });
+  seededPlayerIds257.push(fx.playerId);
+  seededMatchIds257.push(fx.matchId);
+  return fx;
+}
+
+/**
+ * Remove every row of the ISSUE-257 namespace, children first. Idempotent; every statement
+ * is a no-op when nothing was seeded. Never touches a row outside the namespace (the season
+ * row only when no match, real or not, still references it).
+ */
+async function cleanup257(): Promise<void> {
+  // Fresh fragments per use (postgres.js fragments are single-use query objects).
+  const players = () => sql`(SELECT id FROM players WHERE starts_with(slug, ${SLUG_257}::text))`;
+  const matches = () => sql`(SELECT id FROM matches WHERE starts_with(match_key, ${KEY_ROOT_257}::text))`;
+  await sql`
+    DELETE FROM data_overrides
+     WHERE entity_type = 'player_match_stats'
+       AND (starts_with(entity_key, ${KEY_ROOT_257}::text) OR starts_with(entity_key, ${ABSENT_ROOT_257}::text))
+  `;
+  await sql`
+    DELETE FROM data_edits
+     WHERE table_name = 'matches'
+       AND (row_id = ANY(${idList257(seededMatchIds257)}) OR row_id IN ${matches()})
+  `;
+  if (adminUserId > 0) {
+    await sql`
+      DELETE FROM data_edits
+       WHERE admin_user_id = ${adminUserId} AND starts_with(note, 'issue-257 ')
+    `;
+  }
+  await sql`
+    DELETE FROM player_match_stats
+     WHERE player_id IN ${players()} OR match_id IN ${matches()}
+  `;
+  for (const table of ['player_clubs', 'player_club_season_stats', 'player_season_stats', 'player_career_stats']) {
+    await sql`DELETE FROM ${sql(table)} WHERE player_id IN ${players()}`;
+  }
+  await sql`DELETE FROM club_seasons WHERE season = ${SEASON_257}`;
+  await sql`
+    DELETE FROM external_identities
+     WHERE player_id IN ${players()} OR starts_with(external_id, ${PATH_ROOT_257}::text)
+  `;
+  await sql`DELETE FROM players WHERE starts_with(slug, ${SLUG_257}::text)`;
+  await sql`DELETE FROM matches WHERE starts_with(match_key, ${KEY_ROOT_257}::text)`;
+  await sql`
+    DELETE FROM seasons
+     WHERE year = ${SEASON_257}
+       AND NOT EXISTS (SELECT 1 FROM matches WHERE season = ${SEASON_257})
+  `;
+}
+
+const NO_RESIDUE_257 = {
+  dataOverrides: 0, dataEdits: 0, playerMatchStats: 0, playerClubs: 0, playerClubSeasonStats: 0,
+  playerSeasonStats: 0, playerCareerStats: 0, clubSeasons: 0, externalIdentities: 0,
+  players: 0, matches: 0, seasons: 0,
+};
+
+/** Counts of every namespace row, by namespace prefix AND by the ids this run seeded. */
+async function residue257(): Promise<typeof NO_RESIDUE_257> {
+  const pids = idList257(seededPlayerIds257);
+  const mids = idList257(seededMatchIds257);
+  const [r] = await sql<(typeof NO_RESIDUE_257)[]>`
+    SELECT
+      (SELECT count(*) FROM data_overrides
+        WHERE entity_type = 'player_match_stats'
+          AND (starts_with(entity_key, ${KEY_ROOT_257}::text)
+               OR starts_with(entity_key, ${ABSENT_ROOT_257}::text)))::int AS "dataOverrides",
+      (SELECT count(*) FROM data_edits
+        WHERE table_name = 'matches' AND row_id = ANY(${mids}))::int AS "dataEdits",
+      (SELECT count(*) FROM player_match_stats
+        WHERE player_id = ANY(${pids}) OR match_id = ANY(${mids}))::int AS "playerMatchStats",
+      (SELECT count(*) FROM player_clubs WHERE player_id = ANY(${pids}))::int AS "playerClubs",
+      (SELECT count(*) FROM player_club_season_stats WHERE player_id = ANY(${pids}))::int AS "playerClubSeasonStats",
+      (SELECT count(*) FROM player_season_stats WHERE player_id = ANY(${pids}))::int AS "playerSeasonStats",
+      (SELECT count(*) FROM player_career_stats WHERE player_id = ANY(${pids}))::int AS "playerCareerStats",
+      (SELECT count(*) FROM club_seasons WHERE season = ${SEASON_257})::int AS "clubSeasons",
+      (SELECT count(*) FROM external_identities
+        WHERE player_id = ANY(${pids}) OR starts_with(external_id, ${PATH_ROOT_257}::text))::int AS "externalIdentities",
+      (SELECT count(*) FROM players
+        WHERE id = ANY(${pids}) OR starts_with(slug, ${SLUG_257}::text))::int AS "players",
+      (SELECT count(*) FROM matches
+        WHERE id = ANY(${mids}) OR starts_with(match_key, ${KEY_ROOT_257}::text))::int AS "matches",
+      (SELECT count(*) FROM seasons WHERE year = ${SEASON_257})::int AS "seasons"
+  `;
+  return r;
+}
+
+/**
+ * Historical-row guard. Taken after the pre-clean and compared after the final cleanup:
+ * exact counts of player_match_stats and every derived table the writer rebuilds, plus a
+ * content checksum over a deterministic 1/61 sample of player_match_stats (rows whose
+ * player_id + match_id is divisible by 61). Counts catch lost or duplicated rows (the F-S10-02
+ * failure); the sample catches in-place edits. Deliberately NOT pg_stat_user_tables deltas
+ * (asynchronous and approximate) and NOT a full-table checksum (the full scans cost
+ * ~28-41 s on afldb_test). Cost: one sequential pass per table inside a read-only
+ * transaction with a local statement timeout; expected a few seconds in total.
+ */
+type Historical257 = Record<string, number | string>;
+async function historicalSnapshot257(): Promise<Historical257> {
+  return sql.begin('read only', async (tx) => {
+    await tx`SELECT set_config('statement_timeout', '300s', true)`;
+    const [r] = await tx<Historical257[]>`
+      SELECT
+        (SELECT count(*) FROM player_match_stats)::int AS "playerMatchStats",
+        (SELECT count(*) FROM player_season_stats)::int AS "playerSeasonStats",
+        (SELECT count(*) FROM player_career_stats)::int AS "playerCareerStats",
+        (SELECT count(*) FROM player_club_season_stats)::int AS "playerClubSeasonStats",
+        (SELECT count(*) FROM player_clubs)::int AS "playerClubs",
+        (SELECT count(*) FROM club_seasons)::int AS "clubSeasons",
+        (SELECT coalesce(sum(hashtextextended(to_jsonb(s)::text, 0)::numeric), 0)::text
+           FROM player_match_stats s WHERE (s.player_id + s.match_id) % 61 = 0) AS "playerMatchStatsSample"
+    `;
+    return r;
+  });
+}
+let historicalBefore: Historical257 | undefined;
+
+/** A complete sheet row for the fixture player (a save replaces the whole row). */
+const sheetInput257 = (
+  f: Fx257,
+  over: { goals?: number | null; kicks?: number; disposals?: number } = {},
+) => ({
+  playerId: f.playerId, clubId: f.clubId, jumperNumber: f.jumperNumber,
+  goals: f.goals, behinds: f.behinds, kicks: f.kicks, handballs: f.handballs,
+  disposals: f.disposals, marks: f.marks, tackles: f.tackles, hitouts: f.hitouts,
+  freesFor: f.freesFor, freesAgainst: f.freesAgainst, ...over,
+});
+
+const rowSnapshot257 = async (f: Fx257) => {
+  const [r] = await sql<{ row: unknown }[]>`
+    SELECT to_jsonb(s) AS row FROM player_match_stats s
+     WHERE s.match_id = ${f.matchId} AND s.player_id = ${f.playerId}
+  `;
+  return r?.row ?? null;
+};
+
+const authorityOf257 = (f: Fx257) => sql<{
+  entityKey: string; fieldGroup: string; isActive: boolean; overrideValues: Record<string, unknown>;
+}[]>`
+  SELECT entity_key AS "entityKey", field_group AS "fieldGroup", is_active AS "isActive",
+         override_values AS "overrideValues"
+    FROM data_overrides
+   WHERE entity_type = 'player_match_stats' AND starts_with(entity_key, ${f.matchKey}::text || '|')
+   ORDER BY entity_key, field_group
+`;
+
+const auditCountOf257 = async (f: Fx257, note?: string) => {
+  const [r] = await sql<{ n: number }[]>`
+    SELECT count(*)::int AS n FROM data_edits
+     WHERE table_name = 'matches' AND row_id = ${f.matchId}
+       AND (${note ?? null}::text IS NULL OR note = ${note ?? null})
+  `;
+  return r.n;
+};
+
+// Runs after EVERY case, passing or failing: the namespace never outlives a case.
+afterEach(async () => {
+  await cleanup257();
+});
+
 beforeAll(async () => {
   const [existing] = await sql<{ id: number }[]>`
     SELECT id FROM auth_users ORDER BY id LIMIT 1
@@ -48,156 +347,159 @@ beforeAll(async () => {
     adminUserId = created.id;
     createdThrowawayAdmin = true;
   }
-});
+  // Pre-clean (leftovers of a crashed run), THEN the historical-row baseline.
+  await cleanup257();
+  historicalBefore = await historicalSnapshot257();
+}, 120_000);
 
 afterAll(async () => {
-  // Remove the audit rows the committing tests above legitimately wrote
-  // (the runner connects as the table owner, so append-only grants do
-  // not apply here).
-  await sql`
-    DELETE FROM data_edits
-     WHERE admin_user_id = ${adminUserId} AND note = ANY(${TEST_NOTES})
-  `;
-  if (createdThrowawayAdmin) {
-    await sql`DELETE FROM auth_users WHERE id = ${adminUserId}`;
+  try {
+    await cleanup257();
+    // Remove the audit rows the committing tests above legitimately wrote
+    // (the runner connects as the table owner, so append-only grants do
+    // not apply here).
+    await sql`
+      DELETE FROM data_edits
+       WHERE admin_user_id = ${adminUserId} AND note = ANY(${TEST_NOTES})
+    `;
+    if (createdThrowawayAdmin) {
+      await sql`DELETE FROM auth_users WHERE id = ${adminUserId}`;
+    }
+    // No fixture row remains, and no historical row was lost, duplicated or edited.
+    expect(await residue257()).toEqual(NO_RESIDUE_257);
+    expect(historicalBefore, 'the historical baseline was not taken').toBeDefined();
+    expect(await historicalSnapshot257()).toEqual(historicalBefore);
+  } finally {
+    await sql.end();
   }
-  await sql.end();
-});
+}, 120_000);
 
 describe('Data Editor - Match Sheet Delta Tests', () => {
+  // F-S10-01 / F-S10-02: a synthetic fixture, and the schema state is DETERMINED before the
+  // save (playerMatchStatsAuthorityStorable), never inferred from a failed save.
+  //   State A (migration 110 not applied): the save is refused with the authority-unavailable
+  //     refusal and nothing is written.
+  //   State B (migration 110 applied): the save commits, the values persist, and the durable
+  //     authority is recorded.
   it('propagates kicks correctly', async () => {
-    // 1. Find a match to test
-    const [match] = await sql<{ id: number; season: number; home_club_id: number; away_club_id: number }[]>`
-      SELECT id, season, home_club_id, away_club_id FROM matches LIMIT 1
-    `;
-    expect(match).toBeDefined();
+    const storable = await playerMatchStatsAuthorityStorable(sql);
+    const fx = await seedFixture257('pre257-kicks');
 
-    // 2. Find a player in this match
-    const [playerStat] = await sql<{ player_id: number; club_id: number; kicks: number; disposals: number; jumper_number: string }[]>`
-      SELECT player_id, club_id, kicks, disposals, jumper_number
-        FROM player_match_stats
-       WHERE match_id = ${match.id}
-       LIMIT 1
-    `;
-    expect(playerStat).toBeDefined();
-
-    // 3. Get baseline season/career stats
+    // Baseline season/career stats (the fixture's derived rows, built by the production builder).
     const [seasonBaseline] = await sql<{ kicks: number; disposals: number }[]>`
-      SELECT kicks, disposals FROM player_season_stats
-       WHERE player_id = ${playerStat.player_id} AND season = ${match.season}
+      SELECT kicks::int AS kicks, disposals::int AS disposals FROM player_season_stats
+       WHERE player_id = ${fx.playerId} AND season = ${fx.season}
     `;
     const [careerBaseline] = await sql<{ kicks: number; disposals: number }[]>`
-      SELECT kicks, disposals FROM player_career_stats
-       WHERE player_id = ${playerStat.player_id}
+      SELECT kicks::int AS kicks, disposals::int AS disposals FROM player_career_stats
+       WHERE player_id = ${fx.playerId}
     `;
+    expect(seasonBaseline).toMatchObject({ kicks: fx.kicks, disposals: fx.disposals });
+    expect(careerBaseline).toMatchObject({ kicks: fx.kicks, disposals: fx.disposals });
 
-    // 4. Mutate
-    const newKicks = (playerStat.kicks || 0) + 1;
+    const before = await rowSnapshot257(fx);
+    const newKicks = fx.kicks + 1;
     const result = await saveMatchSheet({
-      matchId: match.id,
+      matchId: fx.matchId,
       syncMatchScores: false,
-      players: [
-        {
-          playerId: playerStat.player_id,
-          clubId: playerStat.club_id,
-          jumperNumber: playerStat.jumper_number,
-          kicks: newKicks,
-        }
-      ],
+      players: [sheetInput257(fx, { kicks: newKicks, disposals: newKicks + fx.handballs })],
       adminUserId,
       note: 'test mutation',
+      staleToken: await tokenOf(fx.matchId),
     });
 
+    if (!storable) {
+      // State A: refused, and no write of any kind.
+      expect(result).toEqual({ ok: false, error: AUTHORITY_UNAVAILABLE_REFUSAL });
+      expect(await rowSnapshot257(fx)).toEqual(before);
+      expect(await authorityOf257(fx)).toHaveLength(0);
+      expect(await auditCountOf257(fx)).toBe(0);
+      return;
+    }
+
+    // State B: saved; the kicks persist and propagate to the derived stats.
     expect(result.ok).toBe(true);
-    
-    // Check derivation
     const [updatedStat] = await sql<{ kicks: number; disposals: number }[]>`
-      SELECT kicks, disposals FROM player_match_stats
-       WHERE match_id = ${match.id} AND player_id = ${playerStat.player_id}
+      SELECT kicks::int AS kicks, disposals::int AS disposals FROM player_match_stats
+       WHERE match_id = ${fx.matchId} AND player_id = ${fx.playerId}
     `;
-    expect(updatedStat.kicks).toBe(newKicks);
-
-    // 5. Restore original state so I don't leave db mutated for other tests.
-    await saveMatchSheet({
-      matchId: match.id,
-      syncMatchScores: false,
-      players: [
-        {
-          playerId: playerStat.player_id,
-          clubId: playerStat.club_id,
-          jumperNumber: playerStat.jumper_number,
-          kicks: playerStat.kicks,
-        }
-      ],
-      adminUserId,
-      note: 'restore',
-    });
-  });
+    expect(updatedStat).toEqual({ kicks: newKicks, disposals: newKicks + fx.handballs });
+    const [seasonAfter] = await sql<{ kicks: number }[]>`
+      SELECT kicks::int AS kicks FROM player_season_stats
+       WHERE player_id = ${fx.playerId} AND season = ${fx.season}
+    `;
+    const [careerAfter] = await sql<{ kicks: number }[]>`
+      SELECT kicks::int AS kicks FROM player_career_stats WHERE player_id = ${fx.playerId}
+    `;
+    expect(seasonAfter.kicks).toBe(seasonBaseline.kicks + 1);
+    expect(careerAfter.kicks).toBe(careerBaseline.kicks + 1);
+    // ...and the durable authority is recorded under the fixture's identity key.
+    const authority = await authorityOf257(fx);
+    expect(authority.map((r) => [r.entityKey, r.fieldGroup, r.isActive])).toEqual([
+      [`${fx.matchKey}|afltables:${fx.path}`, 'match_sheet', true],
+    ]);
+    expect(authority[0].overrideValues).toMatchObject({ kicks: newKicks, disposals: newKicks + fx.handballs });
+  }, FX_TIMEOUT);
 });
 
 describe('Atomic required audit (AFLDB-ISSUE-027)', () => {
-  async function pickMatchAndPlayer() {
-    const [playerStat] = await sql<{
-      matchId: number;
-      playerId: number;
-      clubId: number;
-      kicks: number | null;
-      jumperNumber: string | null;
-    }[]>`
-      SELECT match_id AS "matchId", player_id AS "playerId", club_id AS "clubId",
-             kicks, jumper_number AS "jumperNumber"
-        FROM player_match_stats
-       ORDER BY match_id, player_id
-       LIMIT 1
-    `;
-    expect(playerStat).toBeDefined();
-    return playerStat;
-  }
-
+  // F-S10-01 / F-S10-02: synthetic fixtures; the schema state is determined before the save.
   it('persists the match-sheet mutation and its data_edits audit together', async () => {
-    const stat = await pickMatchAndPlayer();
+    const storable = await playerMatchStatsAuthorityStorable(sql);
+    const fx = await seedFixture257('pre257-audit');
+    const before = await rowSnapshot257(fx);
+    const note = 'issue-027 atomic audit test';
 
     const result = await saveMatchSheet({
-      matchId: stat.matchId,
+      matchId: fx.matchId,
       syncMatchScores: false,
-      players: [{
-        playerId: stat.playerId,
-        clubId: stat.clubId,
-        jumperNumber: stat.jumperNumber ?? undefined,
-        kicks: (stat.kicks ?? 0) + 1,
-      }],
+      players: [sheetInput257(fx, { kicks: fx.kicks + 1, disposals: fx.disposals + 1 })],
       adminUserId,
-      note: 'issue-027 atomic audit test',
+      note,
+      staleToken: await tokenOf(fx.matchId),
     });
+
+    if (!storable) {
+      // State A: refused before any write, so neither the row nor an audit row exists.
+      expect(result).toEqual({ ok: false, error: AUTHORITY_UNAVAILABLE_REFUSAL });
+      expect(await rowSnapshot257(fx)).toEqual(before);
+      expect(await authorityOf257(fx)).toHaveLength(0);
+      expect(await auditCountOf257(fx)).toBe(0);
+      return;
+    }
+
+    // State B: the mutation, its authority and its audit commit together.
     expect(result.ok).toBe(true);
+    const [persisted] = await sql<{ kicks: number }[]>`
+      SELECT kicks::int AS kicks FROM player_match_stats
+       WHERE match_id = ${fx.matchId} AND player_id = ${fx.playerId}
+    `;
+    expect(persisted.kicks).toBe(fx.kicks + 1);
+    expect((await authorityOf257(fx)).map((r) => [r.fieldGroup, r.isActive])).toEqual([['match_sheet', true]]);
 
     const [auditRow] = await sql<{ tableName: string; adminUserId: number }[]>`
       SELECT table_name AS "tableName", admin_user_id AS "adminUserId"
         FROM data_edits
-       WHERE table_name = 'matches' AND row_id = ${stat.matchId}
-         AND field_group = 'match_sheet' AND note = 'issue-027 atomic audit test'
+       WHERE table_name = 'matches' AND row_id = ${fx.matchId}
+         AND field_group = 'match_sheet' AND note = ${note}
     `;
     expect(auditRow).toBeDefined();
     expect(auditRow.adminUserId).toBe(adminUserId);
 
-    // Restore the original statistic; this write audits under the same note.
-    const restore = await saveMatchSheet({
-      matchId: stat.matchId,
+    // A second save back to the original statistic audits under the same note.
+    const second = await saveMatchSheet({
+      matchId: fx.matchId,
       syncMatchScores: false,
-      players: [{
-        playerId: stat.playerId,
-        clubId: stat.clubId,
-        jumperNumber: stat.jumperNumber ?? undefined,
-        kicks: stat.kicks,
-      }],
+      players: [sheetInput257(fx)],
       adminUserId,
-      note: 'issue-027 atomic audit test',
+      note,
+      staleToken: await tokenOf(fx.matchId),
     });
-    expect(restore.ok).toBe(true);
-  });
+    expect(second.ok).toBe(true);
+  }, FX_TIMEOUT);
 
   it('rolls the statistical mutation back when the required audit cannot be written', async () => {
-    const stat = await pickMatchAndPlayer();
+    const fx = await seedFixture257('pre257-rollback');
     const impossibleAdminId = 2_147_483_647;
     const [collision] = await sql<{ id: number }[]>`
       SELECT id FROM auth_users WHERE id = ${impossibleAdminId}
@@ -206,33 +508,31 @@ describe('Atomic required audit (AFLDB-ISSUE-027)', () => {
 
     // The audit INSERT violates data_edits_admin_user_id_fkey inside the
     // mutation transaction, so the whole save must fail...
+    const before = await rowSnapshot257(fx);
     const result = await saveMatchSheet({
-      matchId: stat.matchId,
+      matchId: fx.matchId,
       syncMatchScores: false,
-      players: [{
-        playerId: stat.playerId,
-        clubId: stat.clubId,
-        jumperNumber: stat.jumperNumber ?? undefined,
-        kicks: (stat.kicks ?? 0) + 5,
-      }],
+      players: [sheetInput257(fx, { kicks: fx.kicks + 5, disposals: fx.disposals + 5 })],
       adminUserId: impossibleAdminId,
       note: 'issue-027 must not persist',
+      staleToken: await tokenOf(fx.matchId),
     });
     expect(result.ok).toBe(false);
 
     // ...leaving the statistical row untouched...
     const [after] = await sql<{ kicks: number | null }[]>`
-      SELECT kicks FROM player_match_stats
-       WHERE match_id = ${stat.matchId} AND player_id = ${stat.playerId}
+      SELECT kicks::int AS kicks FROM player_match_stats
+       WHERE match_id = ${fx.matchId} AND player_id = ${fx.playerId}
     `;
-    expect(after.kicks).toBe(stat.kicks);
+    expect(after.kicks).toBe(fx.kicks);
+    expect(await rowSnapshot257(fx)).toEqual(before);
 
     // ...and no audit row behind.
     const orphans = await sql<{ id: number }[]>`
       SELECT id FROM data_edits WHERE note = 'issue-027 must not persist'
     `;
     expect(orphans).toHaveLength(0);
-  });
+  }, FX_TIMEOUT);
 });
 
 describe.skipIf(!importRole.isConfigured)(
@@ -241,49 +541,53 @@ describe.skipIf(!importRole.isConfigured)(
     beforeAll(() => importRole.validate());
 
     it('commits the production match-sheet and migration-066 audit path as afldb_import', async () => {
-      const [stat] = await sql<{
-        matchId: number;
-        playerId: number;
-        clubId: number;
-        kicks: number | null;
-        jumperNumber: string | null;
-      }[]>`
-        SELECT match_id AS "matchId", player_id AS "playerId", club_id AS "clubId",
-               kicks, jumper_number AS "jumperNumber"
-          FROM player_match_stats
-         ORDER BY match_id, player_id
-         LIMIT 1
-      `;
-      expect(stat).toBeDefined();
+      // F-S10-01 / F-S10-02: a synthetic fixture and an explicit schema state. The save
+      // CHANGES kicks (an unchanged save plans no item, writes no authority and so never
+      // exercises the State A refusal or the authority upsert as afldb_import).
+      const storable = await playerMatchStatsAuthorityStorable(sql);
+      const fx = await seedFixture257('pre257-importrole');
+      const before = await rowSnapshot257(fx);
 
       const note = 'issue-083 restricted import-role audit proof';
-      const result = await importRole.withImportDsn(() => saveMatchSheet({
-        matchId: stat.matchId,
+      const result = await importRole.withImportDsn(async () => saveMatchSheet({
+        matchId: fx.matchId,
         syncMatchScores: false,
-        players: [{
-          playerId: stat.playerId,
-          clubId: stat.clubId,
-          jumperNumber: stat.jumperNumber ?? undefined,
-          kicks: stat.kicks,
-        }],
+        players: [sheetInput257(fx, { kicks: fx.kicks + 1, disposals: fx.disposals + 1 })],
         adminUserId,
         note,
+        staleToken: await tokenOf(fx.matchId),
       }));
+
+      if (!storable) {
+        // State A: refused, nothing written (no row change, no authority, no audit).
+        expect(result).toEqual({ ok: false, error: AUTHORITY_UNAVAILABLE_REFUSAL });
+        expect(await rowSnapshot257(fx)).toEqual(before);
+        expect(await authorityOf257(fx)).toHaveLength(0);
+        expect(await auditCountOf257(fx)).toBe(0);
+        return;
+      }
+
+      // State B: the production save and the migration-066 audit commit as afldb_import.
       expect(result).toMatchObject({ ok: true });
+      const [persisted] = await sql<{ kicks: number }[]>`
+        SELECT kicks::int AS kicks FROM player_match_stats
+         WHERE match_id = ${fx.matchId} AND player_id = ${fx.playerId}
+      `;
+      expect(persisted.kicks).toBe(fx.kicks + 1);
+      expect((await authorityOf257(fx)).map((r) => [r.fieldGroup, r.isActive])).toEqual([['match_sheet', true]]);
 
       const [audit] = await sql<{ id: number }[]>`
         SELECT id FROM data_edits
          WHERE admin_user_id = ${adminUserId}
            AND table_name = 'matches'
-           AND row_id = ${stat.matchId}
+           AND row_id = ${fx.matchId}
            AND field_group = 'match_sheet'
            AND note = ${note}
          ORDER BY id DESC
          LIMIT 1
       `;
       expect(audit).toBeDefined();
-      await sql`DELETE FROM data_edits WHERE id = ${audit.id}`;
-    });
+    }, FX_TIMEOUT);
 
     it('inserts and updates a durable override atomically as afldb_import', async () => {
       const [match] = await sql<{
@@ -836,6 +1140,7 @@ describe('AFLDB-ISSUE-155 §27.15: the match sheet is not a Brownlow writer', ()
       ],
       adminUserId,
       note: 'issue-132 wildcard brownlow refusal',
+      staleToken: await tokenOf(fixture.wildcardMatchId),
     });
 
     expect(result.ok).toBe(false);
@@ -860,6 +1165,7 @@ describe('AFLDB-ISSUE-155 §27.15: the match sheet is not a Brownlow writer', ()
       }],
       adminUserId,
       note: 'issue-132 wildcard brownlow refusal',
+      staleToken: await tokenOf(homeAndAwayMatchId),
     });
 
     expect(result.ok).toBe(false);
@@ -894,6 +1200,7 @@ describe('AFLDB-ISSUE-155 §27.15: the match sheet is not a Brownlow writer', ()
       }],
       adminUserId,
       note: 'issue-132 wildcard brownlow refusal',
+      staleToken: await tokenOf(fixture.wildcardMatchId),
     });
 
     expect(result.ok).toBe(false);
@@ -902,4 +1209,594 @@ describe('AFLDB-ISSUE-155 §27.15: the match sheet is not a Brownlow writer', ()
 
     await expectNothingWritten(before);
   });
+});
+
+describe('Durable Match Sheet authority (AFLDB-ISSUE-257 Slice 3)', () => {
+  type Candidate = Fx257;
+  const NOTE = 'issue-257 slice 3 test';
+
+  // F-S10-02: synthetic fixtures (cleanup is afterEach/afterAll, which runs on failure too).
+  // A player with one accepted AFL Tables path (`identity` true) or with no durable identity.
+  const pick = (name: string, identity: boolean): Promise<Candidate> => seedFixture257(name, { identity });
+
+  const asInput = (c: Candidate, over: { goals?: number | null } = {}) => sheetInput257(c, {
+    goals: over.goals !== undefined ? over.goals : c.goals,
+  });
+
+  const readGoals = async (c: Candidate) => {
+    const [row] = await sql<{ goals: number | null }[]>`
+      SELECT goals::int AS goals FROM player_match_stats
+       WHERE match_id = ${c.matchId} AND player_id = ${c.playerId}
+    `;
+    return row.goals;
+  };
+
+  const authorityRows = (c: Candidate) => sql<{ entityKey: string; fieldGroup: string; isActive: boolean }[]>`
+    SELECT entity_key AS "entityKey", field_group AS "fieldGroup", is_active AS "isActive"
+      FROM data_overrides
+     WHERE entity_type = 'player_match_stats'
+       AND starts_with(entity_key, ${c.matchKey}::text || '|')
+     ORDER BY entity_key, field_group
+  `;
+
+  it('refuses a stale sheet whole, before any write (a settle must never become authority)', async () => {
+    const c = await pick('s3-stale', true);
+    const staleToken = await tokenOf(c.matchId);
+    // A settle-like change after the editor loaded.
+    await sql`
+      UPDATE player_match_stats SET goals = COALESCE(goals, 0) + 1
+       WHERE match_id = ${c.matchId} AND player_id = ${c.playerId}
+    `;
+    const changed = await readGoals(c);
+    const result = await saveMatchSheet({
+      matchId: c.matchId, syncMatchScores: false,
+      players: [asInput(c, { goals: c.goals + 7 })],
+      adminUserId, note: NOTE, staleToken,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('unreachable');
+    expect(result.error).toContain('Reload the sheet');
+    expect(await readGoals(c)).toBe(changed);
+    expect(await authorityRows(c)).toHaveLength(0);
+  }, FX_TIMEOUT);
+
+  it('refuses a save whose token is missing', async () => {
+    const c = await pick('s3-token', true);
+    const result = await saveMatchSheet({
+      matchId: c.matchId, syncMatchScores: false, players: [asInput(c)],
+      adminUserId, note: NOTE, staleToken: '',
+    });
+    expect(result.ok).toBe(false);
+  }, FX_TIMEOUT);
+
+  it('rolls the row change back when the player has no durable identity', async () => {
+    const c = await pick('s3-noident', false);
+    const result = await saveMatchSheet({
+      matchId: c.matchId, syncMatchScores: false,
+      players: [asInput(c, { goals: c.goals + 3 })],
+      adminUserId, note: NOTE, staleToken: await tokenOf(c.matchId),
+    });
+    expect(result.ok).toBe(false);
+    expect(await readGoals(c)).toBe(c.goals);
+    expect(await authorityRows(c)).toHaveLength(0);
+  }, FX_TIMEOUT);
+
+  it('commits the row change and its authority together, reusing an existing identity key', async () => {
+    // State A (migration 110 not applied): the CHECK admits no record to reuse, and the
+    // writer's refusal is proved by the F-S10-01 cases above.
+    if (!(await playerMatchStatsAuthorityStorable(sql))) return;
+    const c = await pick('s3-reuse', true);
+    const key = `${c.matchKey}|afltables:${c.path}`;
+    await sql`
+      INSERT INTO data_overrides (entity_type, entity_key, field_group, override_values, admin_user_id, is_active)
+      VALUES ('player_match_stats', ${key}, 'lineup', '{"present": true}'::jsonb, ${adminUserId}, true)
+    `;
+    expect(await authorityRows(c)).toHaveLength(1);
+    const result = await saveMatchSheet({
+      matchId: c.matchId, syncMatchScores: false,
+      players: [asInput(c, { goals: c.goals + 2 })],
+      adminUserId, note: NOTE, staleToken: await tokenOf(c.matchId),
+    });
+    expect(result).toMatchObject({ ok: true });
+    expect(await readGoals(c)).toBe(c.goals + 2);
+    const rows = await authorityRows(c);
+    expect(new Set(rows.map((r) => r.entityKey))).toEqual(new Set([key]));
+    expect(rows.map((r) => r.fieldGroup).sort()).toEqual(['lineup', 'match_sheet']);
+  }, FX_TIMEOUT);
+});
+
+describe('Durable Match Sheet authority: delete guard and Return to source (AFLDB-ISSUE-257 Slice 7)', () => {
+  type Pick = Fx257;
+  const NOTE = 'issue-257 slice 7 test';
+
+  // F-S10-02: a synthetic source-owned row of a player holding exactly one accepted AFL Tables
+  // path. Cleanup is afterEach/afterAll (runs on failure too); no real row is ever touched.
+  const seedPlayer = (name: string): Promise<Pick> => seedFixture257(name);
+
+  const seed = async (p: Pick, group: string, payload: unknown) => {
+    await sql`
+      INSERT INTO data_overrides (entity_type, entity_key, field_group, override_values, admin_user_id, is_active)
+      VALUES ('player_match_stats', ${`${p.matchKey}|afltables:${p.path}`}, ${group},
+              ${sql.json(payload as never)}, ${adminUserId}, true)
+    `;
+  };
+
+  const records = (p: Pick) => sql<{ fieldGroup: string; isActive: boolean }[]>`
+    SELECT field_group AS "fieldGroup", is_active AS "isActive" FROM data_overrides
+     WHERE entity_type = 'player_match_stats' AND starts_with(entity_key, ${p.matchKey}::text || '|')
+     ORDER BY field_group
+  `;
+
+  const rowOf = async (p: Pick) => {
+    const [row] = await sql<{ id: number; sourceKey: string | null }[]>`
+      SELECT s.id::int AS id, src.key AS "sourceKey"
+        FROM player_match_stats s LEFT JOIN sources src ON src.id = s.source_id
+       WHERE s.match_id = ${p.matchId} AND s.player_id = ${p.playerId}
+    `;
+    return row;
+  };
+
+  const storable = () => playerMatchStatsAuthorityStorable(sql);
+
+  const returnIt = (p: Pick) => returnMatchSheetToSource({
+    matchId: p.matchId, playerId: p.playerId, adminUserId, note: NOTE,
+  });
+
+  it('deleteMatch refuses while active Match Sheet authority exists, and deletes nothing', async () => {
+    if (!(await storable())) return; // State A: no authority can exist; nothing to prove
+    const p = await seedPlayer('s7-delete');
+    await seed(p, 'match_sheet', { goals: 1 });
+    const result = await deleteMatch({ matchId: p.matchId, adminUserId });
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('unreachable');
+    expect(result.error).toContain('durable Match Sheet authority for 1 player row');
+    expect(result.error).toContain('Return to source');
+    expect(await rowOf(p)).toBeDefined();
+    expect((await records(p)).every((r) => r.isActive)).toBe(true);
+  }, FX_TIMEOUT);
+
+  it('returns ordinary field authority to source: record withdrawn, row untouched', async () => {
+    const p = await seedPlayer('s7-ordinary');
+    if (!(await storable())) {
+      const refused = await returnIt(p);
+      expect(refused.ok).toBe(false);
+      return;
+    }
+    await seed(p, 'match_sheet', { goals: 1 });
+    const before = await rowOf(p);
+    const result = await returnIt(p);
+    expect(result).toMatchObject({ ok: true, rowDeleted: false, rowKept: false });
+    expect(await records(p)).toEqual([{ fieldGroup: 'match_sheet', isActive: false }]);
+    expect(await rowOf(p)).toEqual(before);
+  }, FX_TIMEOUT);
+
+  it('a manual addition still unowned is withdrawn and its row deleted', async () => {
+    if (!(await storable())) return;
+    const p = await seedPlayer('s7-unowned');
+    await seed(p, 'lineup', { present: true });
+    await seed(p, 'match_sheet', { goals: 1 });
+    await sql`UPDATE player_match_stats SET source_id = NULL WHERE match_id = ${p.matchId} AND player_id = ${p.playerId}`;
+    const result = await returnIt(p);
+    expect(result).toMatchObject({ ok: true, rowDeleted: true, rowKept: false });
+    expect(await rowOf(p)).toBeUndefined();
+    expect((await records(p)).every((r) => !r.isActive)).toBe(true);
+  }, FX_TIMEOUT);
+
+  it('a manual addition a settling source has since owned is withdrawn and the row kept', async () => {
+    if (!(await storable())) return;
+    const p = await seedPlayer('s7-owned');
+    await seed(p, 'lineup', { present: true });
+    await sql`
+      UPDATE player_match_stats SET source_id = (SELECT id FROM sources WHERE key = 'afltables')
+       WHERE match_id = ${p.matchId} AND player_id = ${p.playerId}
+    `;
+    const result = await returnIt(p);
+    expect(result).toMatchObject({ ok: true, rowDeleted: false, rowKept: true });
+    expect((await rowOf(p))?.sourceKey).toBe('afltables');
+    expect((await records(p)).every((r) => !r.isActive)).toBe(true);
+  }, FX_TIMEOUT);
+
+  // F-S7-01 (accepted 2026-10-03): the fitzRoy core reload's owner key is an
+  // accepted owning source; any other provenance still refuses.
+  const sourceIdOf = async (key: string) => {
+    const [row] = await sql<{ id: number }[]>`SELECT id::int AS id FROM sources WHERE key = ${key}`;
+    return row?.id ?? null;
+  };
+
+  it('F-S7-01: a manual addition now owned by fitzroy_afldata is withdrawn and the row kept', async () => {
+    const fitzroy = await sourceIdOf('fitzroy_afldata');
+    if (fitzroy === null || !(await storable())) return;
+    const p = await seedPlayer('s7-fitzroy');
+    await seed(p, 'lineup', { present: true });
+    await sql`UPDATE player_match_stats SET source_id = ${fitzroy} WHERE match_id = ${p.matchId} AND player_id = ${p.playerId}`;
+    const result = await returnIt(p);
+    expect(result).toMatchObject({ ok: true, rowDeleted: false, rowKept: true });
+    expect((await rowOf(p))?.sourceKey).toBe('fitzroy_afldata');
+    expect((await records(p)).every((r) => !r.isActive)).toBe(true);
+  }, FX_TIMEOUT);
+
+  it('F-S7-01: a manual addition owned by an unsupported source refuses, writing nothing', async () => {
+    const foreign = await sourceIdOf('manual_admin_edit');
+    if (foreign === null || !(await storable())) return;
+    const p = await seedPlayer('s7-foreign');
+    await seed(p, 'lineup', { present: true });
+    await sql`UPDATE player_match_stats SET source_id = ${foreign} WHERE match_id = ${p.matchId} AND player_id = ${p.playerId}`;
+    const result = await returnIt(p);
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('unreachable');
+    expect(result.error).toContain('unexpected source (manual_admin_edit)');
+    expect((await rowOf(p))?.sourceKey).toBe('manual_admin_edit');
+    expect((await records(p)).every((r) => r.isActive)).toBe(true);
+  }, FX_TIMEOUT);
+
+  it('a manual removal is withdrawn with no canonical write; the next settle restores the row', async () => {
+    if (!(await storable())) return;
+    const p = await seedPlayer('s7-removal');
+    await seed(p, 'lineup', { present: false });
+    await sql`DELETE FROM player_match_stats WHERE match_id = ${p.matchId} AND player_id = ${p.playerId}`;
+    const result = await returnIt(p);
+    expect(result).toMatchObject({ ok: true, rowDeleted: false, rowKept: false });
+    expect(await rowOf(p)).toBeUndefined();
+    expect(await records(p)).toEqual([{ fieldGroup: 'lineup', isActive: false }]);
+  }, FX_TIMEOUT);
+});
+
+// ISSUE-257 F-S9-03. State A (migration 110 not applied) cannot hold player_match_stats
+// authority, so every case below returns early there, exactly as the Slice 3/7 suites do.
+// The replay cases spawn the REAL tools/migration/common.py (a TypeScript re-implementation
+// would only prove two pieces of test code agree) and need psycopg; without it they are
+// not registered, the convention admin-awards.test.ts follows.
+describe('Durable Match Sheet authority: rollback, replay and continuity (AFLDB-ISSUE-257 F-S9-03)', () => {
+  type Pick = Fx257;
+  const NOTE = 'issue-257 f-s9-03 test';
+  const ENTITY = 'player_match_stats';
+  const ABSENT_MATCH_KEY = '9999|issue257-f-s9-03-absent';
+  const UNKNOWN_PATH = 'players/Z/Issue257FS903Nobody0.html';
+  const TIMEOUT = 120_000;
+
+  const root = process.cwd();
+  const venvPython = process.platform === 'win32'
+    ? join(root, '.venv', 'Scripts', 'python.exe')
+    : join(root, '.venv', 'bin', 'python');
+  const python = process.env.AFLDB_PYTHON
+    ?? (existsSync(venvPython) ? venvPython : (process.platform === 'win32' ? 'python' : 'python3'));
+  const probe = spawnSync(python, ['-c', 'import psycopg'], { encoding: 'utf8' });
+  const canReplay = !probe.error && probe.status === 0;
+
+  const runPython = (body: string[]) => spawnSync(python, ['-c', [
+    'import sys, os',
+    `sys.path.insert(0, ${JSON.stringify(join(root, 'tools', 'migration'))})`,
+    'import psycopg',
+    'conn = psycopg.connect(os.environ["AFLDB_REPLAY_DSN"])',
+    ...body,
+  ].join('\n')], {
+    cwd: root,
+    encoding: 'utf8',
+    env: { ...process.env, AFLDB_REPLAY_DSN: process.env.AFLDB_TEST_DATABASE_URL },
+  });
+
+  /** The REAL replay_admin_overrides(conn, 'player_match_stats'), committed on success. */
+  const runReplay = () => runPython([
+    'from common import replay_admin_overrides',
+    'try:',
+    '    replay_admin_overrides(conn, "player_match_stats")',
+    '    conn.commit()',
+    'finally:',
+    '    conn.close()',
+    'print("REPLAY OK")',
+  ]);
+
+  /** The REAL read-only preflight the fitzRoy reload runs before it writes anything. */
+  const runPreflight = () => runPython([
+    'from common import preflight_player_match_stats_authority',
+    'try:',
+    '    preflight_player_match_stats_authority(conn)',
+    '    print("PREFLIGHT OK")',
+    'except RuntimeError as exc:',
+    '    print("PREFLIGHT REFUSED " + str(exc))',
+    'finally:',
+    '    conn.rollback()',
+    '    conn.close()',
+  ]);
+
+  const expectOk = (r: ReturnType<typeof runReplay>) => {
+    expect(r.status, `${r.stdout}\n${r.stderr}`).toBe(0);
+    expect(r.stdout).toContain('REPLAY OK');
+  };
+
+  const storable = () => playerMatchStatsAuthorityStorable(sql);
+
+  let baseline = 0;
+  const countAuthority = async () => {
+    const [r] = await sql<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM data_overrides WHERE entity_type = ${ENTITY}
+    `;
+    return r.n;
+  };
+  // The replay applies the WHOLE active set, so foreign records would be applied too.
+  const requireCleanAuthority = () => expect(
+    baseline,
+    'afldb_test must hold no player_match_stats authority before this suite (the replay would apply it)',
+  ).toBe(0);
+
+  beforeAll(async () => {
+    baseline = await countAuthority();
+  });
+
+  afterAll(async () => {
+    // The absent-match control key lives in the `9999|issue257-` namespace, which the
+    // file-level cleanup257 (afterEach) removes with every other fixture record.
+    // Zero residue: the count between suites is what it was before this one.
+    expect(await countAuthority()).toBe(baseline);
+  });
+
+  const continuityRules = () => {
+    const contract = JSON.parse(readFileSync(
+      join(root, 'tools', 'rebuild', 'fitzroy', 'fitzroy-contract.json'), 'utf8',
+    )) as { profile_url_continuity?: { rules?: { continuing_url: string; renumbered_url: string }[] } };
+    const rules = contract.profile_url_continuity?.rules ?? [];
+    return { continuing: rules.map((r) => r.continuing_url), renumbered: rules.map((r) => r.renumbered_url) };
+  };
+
+  // F-S10-02: a SYNTHETIC source-owned row of a player holding exactly one accepted path (one
+  // no tracked continuity rule names and no other player holds, so the replay resolves it
+  // alone). Committed before the Python call; removed by the file-level cleanup257.
+  const seedSingle = (name: string): Promise<Pick> => seedFixture257(name);
+
+  // D-257-9: a synthetic player holding BOTH accepted paths of exactly one tracked rule and
+  // nothing else. The rule's real paths are the only identities the replay's tracked contract
+  // recognises, so a fixture can use them only while NO external_identities row (any source,
+  // any status) holds either path; otherwise the case has no collision-free synthetic form and
+  // is skipped. Read-only probe of the real table; no real row is ever written.
+  const seedFolded = async (): Promise<Pick | undefined> => {
+    const { continuing, renumbered } = continuityRules();
+    if (continuing.length === 0) return undefined;
+    const held = new Set((await sql<{ externalId: string }[]>`
+      SELECT external_id AS "externalId" FROM external_identities
+       WHERE external_id = ANY(${[...continuing, ...renumbered]}::text[])
+    `).map((r) => r.externalId));
+    for (let i = 0; i < continuing.length; i += 1) {
+      const [c, n] = [continuing[i], renumbered[i]];
+      // Exactly one tracked rule names either path.
+      const onlyThisRule = continuing.every((cj, j) => j === i
+        || (cj !== c && cj !== n && renumbered[j] !== c && renumbered[j] !== n));
+      if (held.has(c) || held.has(n) || !onlyThisRule) continue;
+      return seedFixture257('s9-folded', { folded: { continuing: c, renumbered: n } });
+    }
+    return undefined;
+  };
+
+  const keyOf = (p: Pick, path: string | null = p.path) => `${p.matchKey}|afltables:${path}`;
+
+  const seed = (entityKey: string, group: string, payload: unknown) => sql`
+    INSERT INTO data_overrides (entity_type, entity_key, field_group, override_values, admin_user_id, is_active)
+    VALUES (${ENTITY}, ${entityKey}, ${group}, ${sql.json(payload as never)}, ${adminUserId}, true)
+  `;
+
+  const records = (p: Pick) => sql<{ entityKey: string; fieldGroup: string; isActive: boolean }[]>`
+    SELECT entity_key AS "entityKey", field_group AS "fieldGroup", is_active AS "isActive"
+      FROM data_overrides
+     WHERE entity_type = ${ENTITY} AND starts_with(entity_key, ${p.matchKey}::text || '|')
+     ORDER BY entity_key, field_group
+  `;
+
+  const statsOf = async (p: Pick) => {
+    const [row] = await sql<{
+      goals: number | null; marks: number | null; kicks: number | null; handballs: number | null;
+      disposals: number | null; sourceId: number | null; clubId: number; jumperNumber: string | null;
+    }[]>`
+      SELECT goals::int AS goals, marks::int AS marks, kicks::int AS kicks, handballs::int AS handballs,
+             disposals::int AS disposals, source_id::int AS "sourceId", club_id::int AS "clubId",
+             jumper_number AS "jumperNumber"
+        FROM player_match_stats WHERE match_id = ${p.matchId} AND player_id = ${p.playerId}
+    `;
+    return row;
+  };
+
+  const snapshot = async (p: Pick) => {
+    const [row] = await sql<{ row: unknown }[]>`
+      SELECT to_jsonb(s) AS row FROM player_match_stats s
+       WHERE s.match_id = ${p.matchId} AND s.player_id = ${p.playerId}
+    `;
+    return row?.row ?? null;
+  };
+
+  // Every row of the match: proves a refusal wrote nothing anywhere in it.
+  const matchDigest = async (matchId: number) => {
+    const [r] = await sql<{ d: string }[]>`
+      SELECT md5(coalesce(string_agg(to_jsonb(s)::text, '|' ORDER BY s.player_id), '')) AS d
+        FROM player_match_stats s WHERE s.match_id = ${matchId}
+    `;
+    return r.d;
+  };
+
+  const auditCount = async () => {
+    const [r] = await sql<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM data_edits WHERE admin_user_id = ${adminUserId} AND note = ${NOTE}
+    `;
+    return r.n;
+  };
+
+  // No restore: every row below is a synthetic fixture the file-level cleanup257 removes
+  // (derived rows and audit rows included) after the case, whether it passed or failed.
+
+  const inputOf = (p: Pick, goals: number | null) => ({
+    playerId: p.playerId, clubId: p.clubId,
+    jumperNumber: p.row.jumper_number as string | null, goals,
+    behinds: p.row.behinds as number | null, kicks: p.row.kicks as number | null,
+    handballs: p.row.handballs as number | null, disposals: p.row.disposals as number | null,
+    marks: p.row.marks as number | null, tackles: p.row.tackles as number | null,
+    hitouts: p.row.hitouts as number | null, freesFor: p.row.frees_for as number | null,
+    freesAgainst: p.row.frees_against as number | null,
+  });
+
+  it('(1) rolls the row change AND the authority back when the authority write fails (post-110)', async () => {
+    // State A: no authority is written, so there is no authority-write failure to roll back; the
+    // audit-failure rollback is proved by the Slice 027 case above.
+    if (!(await storable())) return;
+    const p = await seedSingle('s9-rollback');
+    // Realistic induction, no trigger and no production hook: a real save by an admin id that is
+    // not in auth_users. The canonical row write (step 5) succeeds inside the transaction, then
+    // the data_overrides upsert (step 6) violates data_overrides_admin_user_id_fkey.
+    const impossibleAdminId = 2_147_483_647;
+    expect(await sql`SELECT 1 FROM auth_users WHERE id = ${impossibleAdminId}`).toHaveLength(0);
+    const before = await snapshot(p);
+    const beforeCount = await countAuthority();
+    const goals = (p.goals ?? 0) + 3;
+    const failed = await saveMatchSheet({
+      matchId: p.matchId, syncMatchScores: false, players: [inputOf(p, goals)],
+      adminUserId: impossibleAdminId, note: NOTE, staleToken: await tokenOf(p.matchId),
+    });
+    expect(failed.ok).toBe(false);
+    if (failed.ok) throw new Error('unreachable');
+    expect(failed.error).toContain('Failed to save match sheet');
+    expect(failed.error).toContain('data_overrides_admin_user_id_fkey');
+    expect(await snapshot(p)).toEqual(before);
+    expect(await records(p)).toHaveLength(0);
+    expect(await countAuthority()).toBe(beforeCount);
+    expect(await auditCount()).toBe(0);
+
+    // Control: the same save by a real admin commits, so the rollback above was not vacuous.
+    const saved = await saveMatchSheet({
+      matchId: p.matchId, syncMatchScores: false, players: [inputOf(p, goals)],
+      adminUserId, note: NOTE, staleToken: await tokenOf(p.matchId),
+    });
+    expect(saved).toMatchObject({ ok: true });
+    expect((await statsOf(p)).goals).toBe(goals);
+    const written = await records(p);
+    expect(written.map((r) => r.fieldGroup)).toContain('match_sheet');
+    expect(written.every((r) => r.isActive)).toBe(true);
+  }, TIMEOUT);
+
+  it.runIf(canReplay)('(2a) replay re-applies a field correction over a reset source value', async () => {
+    if (!(await storable())) return; // State A: the CHECK refuses the record
+    requireCleanAuthority();
+    const p = await seedSingle('s9-2a');
+    const corrected = (p.goals ?? 0) + 4;
+    const sourceValue = (p.goals ?? 0) + 1;
+    // Key presence is authority: goals is corrected, marks is explicitly cleared, kicks is absent.
+    await seed(keyOf(p), 'match_sheet', { goals: corrected, marks: null });
+    // What a destructive reload leaves: source values, no correction.
+    await sql`UPDATE player_match_stats SET goals = ${sourceValue}, marks = 5
+               WHERE match_id = ${p.matchId} AND player_id = ${p.playerId}`;
+    const reloaded = await statsOf(p);
+    expect(reloaded.goals).toBe(sourceValue);
+    expectOk(runReplay());
+    expect(await statsOf(p)).toMatchObject({
+      goals: corrected, marks: null, kicks: reloaded.kicks,
+      sourceId: reloaded.sourceId, clubId: reloaded.clubId,
+    });
+    expect((await records(p)).map((r) => [r.fieldGroup, r.isActive])).toEqual([['match_sheet', true]]);
+  }, TIMEOUT);
+
+  it.runIf(canReplay)('(2b) replay recreates a durable addition the reload did not supply', async () => {
+    if (!(await storable())) return;
+    requireCleanAuthority();
+    const p = await seedSingle('s9-2b');
+    await seed(keyOf(p), 'lineup', { present: true });
+    await seed(keyOf(p), 'match_sheet', {
+      club_slug: p.clubSlug, jumper_number: '99', goals: 7, kicks: 10, handballs: 5, disposals: 15,
+    });
+    await sql`DELETE FROM player_match_stats WHERE match_id = ${p.matchId} AND player_id = ${p.playerId}`;
+    expect(await statsOf(p)).toBeUndefined();
+    expectOk(runReplay());
+    // Created unowned (source_id NULL), with only the recorded columns.
+    expect(await statsOf(p)).toMatchObject({
+      clubId: p.clubId, jumperNumber: '99', goals: 7, kicks: 10, handballs: 5, disposals: 15,
+      marks: null, sourceId: null,
+    });
+    expect((await records(p)).every((r) => r.isActive)).toBe(true);
+  }, TIMEOUT);
+
+  it.runIf(canReplay)('(2c) replay deletes a reinserted row under a durable removal', async () => {
+    if (!(await storable())) return;
+    requireCleanAuthority();
+    const p = await seedSingle('s9-2c');
+    await seed(keyOf(p), 'lineup', { present: false });
+    // The row exists: the source reload put it back.
+    expect(await statsOf(p)).toBeDefined();
+    expectOk(runReplay());
+    expect(await statsOf(p)).toBeUndefined();
+    expect((await records(p)).map((r) => [r.fieldGroup, r.isActive])).toEqual([['lineup', true]]);
+  }, TIMEOUT);
+
+  // (3) An unresolved active key refuses the preflight AND the replay before ANY write, even
+  // though a resolvable record for a real row sits beside it and would change that row.
+  const expectRefusedBeforeAnyWrite = async (p: Pick, badKey: string, why: string) => {
+    const digest = await matchDigest(p.matchId);
+    const pre = runPreflight();
+    expect(pre.status, `${pre.stdout}\n${pre.stderr}`).toBe(0);
+    expect(pre.stdout).toContain('PREFLIGHT REFUSED');
+    expect(pre.stdout).toContain('refusing to commit');
+    expect(pre.stdout).toContain(badKey);
+    expect(pre.stdout).toContain(why);
+    const replay = runReplay();
+    expect(replay.status).not.toBe(0);
+    expect(replay.stderr).toContain('refusing to commit');
+    expect(replay.stderr).toContain(badKey);
+    expect(replay.stdout).not.toContain('REPLAY OK');
+    expect(await matchDigest(p.matchId)).toBe(digest);
+    expect((await statsOf(p)).goals).toBe(p.goals);
+  };
+
+  it.runIf(canReplay)('(3a) an active key whose match_key is absent from matches refuses before any write', async () => {
+    if (!(await storable())) return;
+    requireCleanAuthority();
+    const p = await seedSingle('s9-3a');
+    // The absent-match key is in the `9999|issue257-` namespace cleanup257 removes.
+    const badKey = `${ABSENT_MATCH_KEY}|afltables:${p.path}`;
+    await seed(keyOf(p), 'match_sheet', { goals: (p.goals ?? 0) + 4 });
+    await seed(badKey, 'match_sheet', { goals: 1 });
+    await expectRefusedBeforeAnyWrite(p, badKey, 'match_key does not resolve to exactly one match');
+  }, TIMEOUT);
+
+  it.runIf(canReplay)('(3b) an active key whose identity names no accepted external identity refuses before any write', async () => {
+    if (!(await storable())) return;
+    requireCleanAuthority();
+    const p = await seedSingle('s9-3b');
+    const badKey = keyOf(p, UNKNOWN_PATH);
+    await seed(keyOf(p), 'match_sheet', { goals: (p.goals ?? 0) + 4 });
+    await seed(badKey, 'match_sheet', { goals: 1 });
+    await expectRefusedBeforeAnyWrite(p, badKey, 'identity does not resolve to exactly one player (unresolved)');
+  }, TIMEOUT);
+
+  it.runIf(canReplay)('(5) D-257-9: a save records the folded continuing_url identity and the replay resolves it back', async (ctx) => {
+    if (!(await storable())) return; // State A: the writer refuses; nothing to fold
+    const p = await seedFolded();
+    if (!p || !p.continuing || !p.renumbered) {
+      console.warn('[ISSUE-257 F-S9-03 / D-257-9] SKIPPED: no tracked profile_url_continuity rule is '
+        + 'collision-free in afldb_test (every rule has a path already held by an external_identities '
+        + 'row), so a synthetic player cannot hold a rule\'s two paths without ambiguity. No real row '
+        + 'is used or mutated.');
+      ctx.skip();
+      return;
+    }
+    requireCleanAuthority();
+    const continuingKey = keyOf(p, p.continuing);
+    const renumberedKey = keyOf(p, p.renumbered);
+    const corrected = (p.goals ?? 0) + 2;
+    const sourceValue = (p.goals ?? 0) + 1;
+    const resetSource = () => sql`UPDATE player_match_stats SET goals = ${sourceValue}
+                                   WHERE match_id = ${p.matchId} AND player_id = ${p.playerId}`;
+    const saved = await saveMatchSheet({
+      matchId: p.matchId, syncMatchScores: false, players: [inputOf(p, corrected)],
+      adminUserId, note: NOTE, staleToken: await tokenOf(p.matchId),
+    });
+    expect(saved).toMatchObject({ ok: true });
+    const written = await records(p);
+    expect(new Set(written.map((r) => r.entityKey))).toEqual(new Set([continuingKey]));
+    expect(written.map((r) => r.fieldGroup)).toContain('match_sheet');
+
+    // The replay resolves the folded identity back to the same player.
+    await resetSource();
+    expectOk(runReplay());
+    expect((await statsOf(p)).goals).toBe(corrected);
+
+    // Either side of the tracked pair resolves to that one player (both sides hold it).
+    await sql`UPDATE data_overrides SET entity_key = ${renumberedKey}
+               WHERE entity_type = ${ENTITY} AND entity_key = ${continuingKey}`;
+    await resetSource();
+    expectOk(runReplay());
+    expect((await statsOf(p)).goals).toBe(corrected);
+  }, TIMEOUT);
 });

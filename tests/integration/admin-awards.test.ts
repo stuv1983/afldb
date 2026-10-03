@@ -492,7 +492,10 @@ describe('migration 101 — the schema the lifecycle stands on', () => {
       'players', 'club_leadership']) {
       expect(check.def).toContain(entity);
     }
-    for (const settle of ['match_period_scores', 'player_match_stats', 'brownlow_round_votes']) {
+    // AFLDB-ISSUE-257: `player_match_stats` is no longer unrepresentable; migration
+    // 110 admits it (State B) and the settle answers it from rows. The other two
+    // settle targets must still be absent in either schema state.
+    for (const settle of ['match_period_scores', 'brownlow_round_votes']) {
       expect(check.def).not.toContain(settle);
     }
   });

@@ -365,7 +365,15 @@
         "fallback": "none required — a skill costs nothing until invoked"
       }
     ],
-    "failures": [],
+    "failures": [
+      {
+        "date": "2026-10-03",
+        "capability": "visual-capture (repo Playwright via npx)",
+        "task": "AFLDB-ISSUE-257 Slice 7 — Durable Match Sheet decisions panel on /admin/data-editor",
+        "reason": "The panel renders only on the super-admin-gated /admin/data-editor page with a live import-role connection. A capture needs a running Next server with an authenticated admin session against a database holding active player_match_stats authority (migration 110). No .env may exist in the worktree, DEV/PROD are out of scope for this run, and seeding an admin session plus authority on afldb_test for a screenshot is outside the authorised command set. A static renderToStaticMarkup harness would need a new file, which this run cannot create.",
+        "outcome": "VISUAL: UNVERIFIED; user eyeball requested at DEV acceptance (states S1-S5, 1440x900 and 390x844)."
+      }
+    ],
     "foreignAssets": {
       "note": "User-authored, NEVER overwritten, regenerated or rostered by any PhanesLight run. Recorded for discovery only.",
       "skillTree": ".agents/skills",

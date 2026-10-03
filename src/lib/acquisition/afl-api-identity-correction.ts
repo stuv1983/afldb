@@ -66,6 +66,8 @@ export type StopCode =
   | 'projection_disagrees'
   | 'brownlow_state_present'
   | 'out_of_ledger_edit'
+  /** AFLDB-ISSUE-257 (A257, ORIGINAL only): an active Match Sheet/lineup authority record names P or P′ at the closure row's match. */
+  | 'manual_authority_present'
   | 'reconstruction_inconsistent'
   | 'brownlow_insert_unproven'
   | 'brownlow_chain_inconsistent'

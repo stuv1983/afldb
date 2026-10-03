@@ -196,6 +196,15 @@ import {
   type StopCode,
 } from '../../src/lib/acquisition/afl-api-identity-correction';
 import {
+  PLAYER_MATCH_STATS_ENTITY,
+  continuityPartnersOf,
+  decodePlayerMatchStatsKey,
+  describeManualAuthorityBlockers,
+  loadContinuityRulesFailClosed,
+  manualAuthorityBlockersForMatch,
+  type ManualAuthorityBlocker,
+} from '../../src/lib/acquisition/match-sheet-authority';
+import {
   readAflApiCensusRows,
   readAflApiForwardIdentities,
   readLedgerRows,
@@ -642,6 +651,70 @@ async function readPlayerMatchStatsCandidatesForPlayer(
     });
   }
   return out;
+}
+
+/**
+ * AFLDB-ISSUE-257 (F-PR-06, step A257): the Match Sheet / lineup authority records at match
+ * `matchId` that block an ORIGINAL MOVE/DELETE of P's closure row there (decision:
+ * `manualAuthorityBlockersForMatch`). Records are read by the §18.3 key-prefix predicate, in the
+ * correction transaction after `readPlayerMatchStatsCandidatesForPlayer` has taken the match lock
+ * (`FOR UPDATE OF pms, m`). Under State A (old CHECK) no record can exist, the first query returns
+ * nothing and no further read happens. Identities are resolved in reverse (D-257-9) from every
+ * external identity the records' keys (and tracked continuity partners) name.
+ */
+async function readManualAuthorityBlockersAtMatch(
+  tx: TransactionSql, matchId: number, pId: number, pPrimeId: number,
+): Promise<readonly ManualAuthorityBlocker[]> {
+  const stored = await tx<{
+    matchKey: string; entityKey: string; fieldGroup: string; isActive: boolean; overrideValues: string | null;
+  }[]>`
+    SELECT m.match_key AS "matchKey", d.entity_key AS "entityKey", d.field_group AS "fieldGroup",
+           d.is_active AS "isActive", d.override_values::text AS "overrideValues"
+      FROM matches m
+      JOIN data_overrides d
+        ON d.entity_type = ${PLAYER_MATCH_STATS_ENTITY}
+       AND starts_with(d.entity_key, m.match_key::text || '|')
+       AND strpos(substr(d.entity_key, length(m.match_key::text) + 2), '|') = 0
+     WHERE m.id = ${matchId}
+  `;
+  if (stored.length === 0) return [];
+  const continuity = loadContinuityRulesFailClosed();
+  const externalIds = new Set<string>();
+  for (const record of stored) {
+    const decoded = decodePlayerMatchStatsKey(record.entityKey);
+    if (decoded === null) continue;
+    externalIds.add(decoded.externalId);
+    if (decoded.sourceKey === 'afltables' && continuity.ok) {
+      for (const partner of continuityPartnersOf(decoded.externalId, continuity.rules)) externalIds.add(partner);
+    }
+  }
+  const identities = await tx<{ sourceKey: string; externalId: string; matchMethod: string | null; playerId: number }[]>`
+    SELECT s.key AS "sourceKey", e.external_id AS "externalId",
+           e.match_method AS "matchMethod", e.player_id::int AS "playerId"
+      FROM external_identities e
+      JOIN sources s ON s.id = e.source_id
+     WHERE s.key IN ('afltables', 'manual_admin_edit')
+       AND e.external_id = ANY(${[...externalIds]}::text[])
+       AND e.status IN ('unique', 'resolved')
+       AND e.player_id IS NOT NULL
+  `;
+  const playerIdsByIdentity = new Map<string, number[]>();
+  for (const row of identities) {
+    if (row.sourceKey === 'afltables' && row.matchMethod !== 'afltables_profile_url') continue;
+    const identity = `${row.sourceKey}:${row.externalId}`;
+    const players = playerIdsByIdentity.get(identity) ?? [];
+    if (!players.includes(Number(row.playerId))) players.push(Number(row.playerId));
+    playerIdsByIdentity.set(identity, players);
+  }
+  return manualAuthorityBlockersForMatch({
+    matchKey: stored[0].matchKey,
+    records: stored.map((row) => {
+      let overrideValues: unknown = null;
+      try { overrideValues = row.overrideValues === null ? null : JSON.parse(row.overrideValues); } catch { overrideValues = null; }
+      return { entityKey: row.entityKey, fieldGroup: row.fieldGroup, isActive: row.isActive === true, overrideValues };
+    }),
+    playerIdsByIdentity, continuity, pId, pPrimeId,
+  });
 }
 
 /**
@@ -1630,6 +1703,17 @@ async function buildClosure(
     if (ownership === 'indeterminate') {
       stops.push({ table: 'player_match_stats', rowId: candidate.id, step: 'C11', code: 'provenance_unexplained' });
       continue;
+    }
+    // AFLDB-ISSUE-257 (F-PR-06, A257): ORIGINAL only. REPLAY (ADJUDICATION) and PREDICT are governed
+    // by promotion preflight (A4.4). After C11 (a foreign NOOP row is never mutated) and before P7
+    // (so a Match Sheet edit with authority STOPs here, not as out_of_ledger_edit).
+    if (authority.mode === 'ORIGINAL') {
+      const authorityBlockers = await readManualAuthorityBlockersAtMatch(tx, candidate.matchId, pId, pPrimeId);
+      if (authorityBlockers.length > 0) {
+        stops.push({ table: 'player_match_stats', rowId: candidate.id, step: 'A257', code: 'manual_authority_present' });
+        detailLastStop({ step: 'A257', code: 'manual_authority_present', detail: describeManualAuthorityBlockers(authorityBlockers) });
+        continue;
+      }
     }
     const evidence = buildPlayerMatchStatsEvidence(candidate, providerId, aflApiSourceId);
     const eligibility = evaluatePlayerMatchStatsMutationEligibility(evidence);

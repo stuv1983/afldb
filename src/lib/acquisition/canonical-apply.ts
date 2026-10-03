@@ -45,11 +45,11 @@ import type postgres from 'postgres';
 
 import type { ImportBatchId } from '@/lib/import-batch-id';
 
-import { loadManualAuthority } from './manual-authority';
+import { loadManualAuthority, scopePlayerMatchStatsFields } from './manual-authority';
 import {
   carryMatchOverrides, findPlausibleCanonicalFixtures, findRetiredMatchIdentities,
   POSSIBLE_EXISTING_MATCH,
-  type MatchRekeyIdentity, type MatchRekeyScope,
+  type MatchRekeyIdentity, type MatchRekeyScope, type MatchRetirementEvidence,
 } from './match-rekey';
 import {
   canonicalJson, ObservationContractError, type JsonValue, type ManualAuthorityProvider,
@@ -453,6 +453,58 @@ function periodSetValues(rows: readonly PeriodRow[]): Record<string, JsonValue> 
   };
 }
 
+/** The AFLDB-ISSUE-131 §5.3 retired-identity search of a rekey-capable unit. */
+function retiredSearchOf(
+  unit: CanonicalApplyUnitInput, rekey: NonNullable<CanonicalApplyUnitInput['matchRekey']>,
+): [MatchRekeyIdentity, MatchRetirementEvidence] {
+  return [
+    {
+      season: unit.season,
+      sourceId: unit.sourceId,
+      family: unit.family,
+      matchKey: unit.matchKey,
+      ...rekey.identity,
+    },
+    { kind: 'run_enumeration', scope: rekey.scope },
+  ];
+}
+
+/**
+ * AFLDB-ISSUE-257 §18.6 item 5 and R-01. Locks the match row(s) a unit may write
+ * against, BEFORE the authority snapshot is read. The Match Sheet writer takes the
+ * match row FOR UPDATE before any stats row (`match-sheet.ts`), so a lock held here
+ * means a save either committed before the snapshot (and is in it) or waits until
+ * this settle commits (and is refused after its 5 s `lock_timeout`).
+ *
+ * - A rekey in play (a retired candidate exists): the canonical row still carries
+ *   the RETIRED key, so a lock by the incoming key alone would lock nothing. Both
+ *   renderings are locked — the retired candidates by their stable ids and any row
+ *   already holding the incoming key — in ONE statement, `ORDER BY id`, `FOR UPDATE`:
+ *   the strength `findRetiredMatchIdentities(..., true)` takes on the same rows a
+ *   few statements later and the UPDATE that rekeys the row needs anyway, so no lock
+ *   is upgraded and the order is deterministic. The candidate ids come from an
+ *   unlocked search; `readFreshTarget` still re-derives the set under its own lock.
+ * - Otherwise (unchanged): a unit that writes `player_match_stats` takes its match
+ *   row FOR SHARE by the incoming key, which is the key the row carries.
+ */
+async function lockUnitMatchRows(sp: Tx, unit: CanonicalApplyUnitInput): Promise<void> {
+  if (unit.matchRekey !== null) {
+    const retired = await findRetiredMatchIdentities(sp, ...retiredSearchOf(unit, unit.matchRekey));
+    if (retired.length > 0) {
+      await sp`
+        SELECT id::int AS id FROM matches
+         WHERE id = ANY(${retired.map((row) => row.id)}) OR match_key = ${unit.matchKey}
+         ORDER BY id
+           FOR UPDATE
+      `;
+      return;
+    }
+  }
+  if (unit.targets.some((target) => target.targetTable === 'player_match_stats')) {
+    await sp`SELECT id::int AS id FROM matches WHERE match_key = ${unit.matchKey} FOR SHARE`;
+  }
+}
+
 async function readFreshTarget(
   sp: Tx, unit: CanonicalApplyUnitInput, target: CanonicalApplyTargetInput,
   matchId: number | null,
@@ -471,16 +523,7 @@ async function readFreshTarget(
     // same retired row, and a candidate that stopped being one between the
     // proposal and the write is simply not one.
     const retired = unit.matchRekey === null ? [] : await findRetiredMatchIdentities(
-      sp,
-      {
-        season: unit.season,
-        sourceId: unit.sourceId,
-        family: unit.family,
-        matchKey: unit.matchKey,
-        ...unit.matchRekey.identity,
-      },
-      { kind: 'run_enumeration', scope: unit.matchRekey.scope },
-      true,
+      sp, ...retiredSearchOf(unit, unit.matchRekey), true,
     );
     if (row) {
       // The incoming rendering already has a row AND a retired one exists:
@@ -974,6 +1017,12 @@ export async function applyCanonicalUnit(
       // Provider` is synchronous by contract, so it is loaded once per unit
       // rather than per target — the unit is atomic, so "before the
       // mutation" and "before the unit's mutations" are the same instant.
+      //
+      // AFLDB-ISSUE-257 §18.6 item 5 (the race) and R-01: the unit's match row(s)
+      // are locked BEFORE the authority is loaded (see `lockUnitMatchRows`), so the
+      // snapshot is read after any concurrent Match Sheet save commits, and no save
+      // can commit between this read and the unit's writes.
+      await lockUnitMatchRows(sp, unit);
       const authority = await loadManualAuthority(sp, unit.season);
 
       // The canonical match id this unit may write against, RE-READ here
@@ -1063,12 +1112,45 @@ export async function applyCanonicalUnit(
         }
 
         // What would actually change, against the freshly-read row.
-        const changedFields = diffFields(target.proposedValues, fresh.currentValues);
+        let changedFields = diffFields(target.proposedValues, fresh.currentValues);
         if (changedFields.length === 0) {
           // Nothing to write, so nothing to audit. An `unchanged` outcome
           // writes no canonical row and no ledger row (§6).
           results.push(refused(target.targetTable, 'nothing_to_write'));
           continue;
+        }
+
+        // AFLDB-ISSUE-257 §18.6 item 4. Match Sheet authority over this
+        // player-match row, from the snapshot loaded a moment ago under the match
+        // lock: an indeterminate match refuses, a durable removal refuses (an
+        // insertion included), a protected field is subtracted and an empty
+        // remainder is nothing to write. A source INSERT is never narrowed — a
+        // partial row is not a row — so a protected field on one refuses.
+        // No active authority leaves `changedFields` exactly as it was.
+        if (target.targetTable === 'player_match_stats') {
+          const scope = scopePlayerMatchStatsFields(
+            authority,
+            fresh.identity.status === 'unresolved'
+              ? {}
+              : { ...fresh.identity.targetKey, match_key: unit.matchKey },
+            changedFields,
+          );
+          if (scope.kind === 'indeterminate') {
+            results.push(refused(target.targetTable, 'manual_authority_indeterminate'));
+            continue;
+          }
+          if (
+            scope.kind === 'removed'
+            || (scope.dropped.length > 0 && fresh.identity.status === 'new_target')
+          ) {
+            results.push(refused(target.targetTable, 'manual_authority_conflict'));
+            continue;
+          }
+          changedFields = scope.keep;
+          if (changedFields.length === 0) {
+            results.push(refused(target.targetTable, 'nothing_to_write'));
+            continue;
+          }
         }
 
         // E4. Human authority, asked unconditionally — including for a target

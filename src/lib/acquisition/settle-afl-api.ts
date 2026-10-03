@@ -126,18 +126,20 @@ import {
   type AflApiSeasonEnumeration,
 } from './afl-api-season-enumeration';
 import { sortAflApiRefusalEvidence, type AflApiCanonicalRefusalEvidence } from './afl-api-refusal-evidence';
-import { canonicalJson, type JsonValue } from './observations';
+import { canonicalJson, type JsonValue, type ManualAuthorityProvider } from './observations';
 import { persistSourceObservation } from './observation-store';
 import { baselineCanonicalHash } from './promotion-review';
 import { diffFields } from './reconciliation';
 import {
-  automaticProposal,
+  automaticProposalUnderAuthority,
   CANONICAL_APPLY_ISSUE_OWNER,
   CANONICAL_APPLY_ISSUE_TYPE,
   PLAYER_MATCH_STAT_COLUMNS,
+  scopeProposalToAuthority,
 } from './settle-afltables';
 import {
   affectedPlayerIds,
+  runDerivedRecomputeWithDeadlockRetry,
   APPLY_FINDING_RESOLUTION,
   canonicalApplyIssueKey,
   clearMatchIdentityFinding,
@@ -1645,10 +1647,16 @@ async function settleMatchUnit(
   //    debutant never blocks any other player's row, and a player unit is
   //    reachable even when the match is `corroborated` (see module doc
   //    comment): a player-match row is owned independently of its match.
+  //    AFLDB-ISSUE-257 Slice 4: one authority snapshot per match feeds the automatic
+  //    path's scoping; the applier's E4 re-reads its own per unit and is the gate.
+  const playerAuthority: ManualAuthorityProvider | null =
+    autoApply && matchIdForPlayers !== null && plan.players.some((p) => p.status === 'planned')
+      ? await loadManualAuthority(tx, bundle.match.season)
+      : null;
   for (const playerPlan of plan.players) {
     await settlePlayerUnit(
       tx, refs, registry, batchId, bundle, playerPlan, matchIdForPlayers, matchKeyForPlayers,
-      autoApply, inProgressSeasons, counters, derived, versionSeqOf,
+      autoApply, inProgressSeasons, counters, derived, versionSeqOf, playerAuthority,
     );
   }
 
@@ -1662,6 +1670,7 @@ async function settlePlayerUnit(
   autoApply: boolean, inProgressSeasons: readonly number[],
   counters: AflApiSettleCounters, derived: DerivedScope,
   versionSeqOf: (family: string, externalRecordId: string) => number,
+  authority: ManualAuthorityProvider | null = null,
 ): Promise<void> {
   const row = bundle.playerStats.find((s) => s.providerPlayerId === playerPlan.providerPlayerId);
   const externalRecordId = `${bundle.match.sourceRecordId}|${row?.providerTeamId ?? '?'}|${playerPlan.providerPlayerId}`;
@@ -1744,7 +1753,21 @@ async function settlePlayerUnit(
   // `matches` and `match_period_scores` have no `DERIVED_OWNED_FIELDS` entry,
   // so the match path above needs no equivalent split today; if one is ever
   // added, that path must gain the same treatment.
-  const automatic = automaticProposal('player_match_stats', proposed);
+  //
+  // AFLDB-ISSUE-257 Slice 4 (§18.6 item 3): the same call also removes what a human
+  // decided (the shared `scopeProposalToAuthority`), and a durable removal leaves it
+  // EMPTY, so an empty result closes the unit exactly as today.
+  const automatic = automaticProposalUnderAuthority(
+    'player_match_stats',
+    scopeProposalToAuthority(
+      'player_match_stats', proposed,
+      {
+        status: existing === null ? 'new_target' : 'resolved',
+        targetKey: { player_id: playerPlan.playerId, match_id: matchId },
+      },
+      authority,
+    ),
+  );
   const automaticFields = diffFields(automatic, existing?.values ?? null);
 
   const contract = getSourceFamily(registry, SETTLE_SOURCE_KEY, 'player_match_stats');
@@ -1933,12 +1956,16 @@ export async function runSettleAflApi(
         // `--dry-run` rolls every recompute back with everything else, and a
         // recompute failure fails the whole settle rather than leaving
         // committed canonical rows beside stale derived ones.
+        // AFLDB-ISSUE-257 F-S4-01: same bounded `40P01`-only retry as the AFL
+        // Tables settle; exhaustion or any other error still fails the settle.
         if (counters.canonicalRowsInserted + counters.canonicalRowsUpdated > 0) {
           const playerIds = await affectedPlayerIds(tx, derived);
-          await recomputeSeasonMetadata(tx, bundle.season);
-          await recomputeClubSeasons(tx, bundle.season);
-          await recomputePlayerDerivedStats(tx, playerIds, bundle.season);
-          await recomputeSeasonBrownlowStatus(tx, bundle.season);
+          await runDerivedRecomputeWithDeadlockRetry(tx, async () => {
+            await recomputeSeasonMetadata(tx, bundle.season);
+            await recomputeClubSeasons(tx, bundle.season);
+            await recomputePlayerDerivedStats(tx, playerIds, bundle.season);
+            await recomputeSeasonBrownlowStatus(tx, bundle.season);
+          });
           counters.derivedRecomputeRuns = 1;
           counters.derivedRecomputePlayers = playerIds.length;
         }

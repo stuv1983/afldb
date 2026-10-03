@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { spawnSync } from 'node:child_process';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 
@@ -3702,11 +3702,36 @@ import {
   matchFieldGroupsFor,
   matchGroupKeys,
   refusingProvider,
+  buildPlayerMatchStatsAuthority,
+  playerMatchStatsPairKey,
+  playerMatchStatsStorableFrom,
+  scopePlayerMatchStatsFields,
+  PRESENCE_PROBE_FIELD,
   MANUAL_ATTENDANCE_SOURCE_KEY,
+  NO_PLAYER_MATCH_STATS_AUTHORITY,
   OVERRIDE_ENTITY_TYPES,
   UNREPRESENTABLE_OVERRIDE_ENTITIES,
   type ManualAuthoritySnapshot,
+  type PlayerMatchStatsAuthority,
 } from '@/lib/acquisition/manual-authority';
+
+import {
+  classifyPlayerMatchStatsIdentity,
+  decideAuthorityKey,
+  decodePlayerMatchStatsKey,
+  encodePlayerMatchStatsKey,
+  entityKeyBelongsToMatch,
+  loadContinuityRulesFailClosed,
+  resolvableIdentityForms,
+  type ContinuityRulesLoad,
+} from '@/lib/acquisition/match-sheet-authority';
+import {
+  parseRollbackGuardTarget,
+  ROLLBACK_GUARD_CHECK_SQL,
+  ROLLBACK_GUARD_COUNT_SQL,
+  ROLLBACK_GUARD_TARGETS,
+  rollbackGuardVerdict,
+} from '../tools/db/issue257-rollback-guard';
 
 const overridesMigration = readSource('src/db/migrations/073_data_overrides.sql');
 const coachAdminMigration = readSource('src/db/migrations/095_coach_admin_overrides.sql');
@@ -3716,6 +3741,9 @@ const leadershipMigration = readSource('src/db/migrations/098_club_leadership.sq
 const honoursMigration = readSource('src/db/migrations/101_awards_honours_lifecycle.sql');
 const specialRecordsMigration = readSource(
   'src/db/migrations/102_special_records_lifecycle.sql',
+);
+const matchSheetAuthorityMigration = readSource(
+  'src/db/migrations/110_match_sheet_player_match_stats_authority.sql',
 );
 
 /** A `pg_get_constraintdef()` string of the shape PostgreSQL actually prints. */
@@ -3756,11 +3784,22 @@ const CHECK_AFTER_102 = entityTypeCheck(
   'player_achievements', 'after_siren_kicks',
 );
 
+/**
+ * The CHECK as the ISSUE-257 migration will leave it: 102's literals plus
+ * `player_match_stats` (the post-ISSUE-257 database, State B).
+ */
+const CHECK_AFTER_257 = entityTypeCheck(
+  'players', 'matches', 'draft_picks', 'coaches', 'match_coaches', 'season_list_members',
+  'fixtures', 'club_leadership', 'award_winners', 'hall_of_fame', 'honour_team_members',
+  'player_achievements', 'after_siren_kicks', 'player_match_stats',
+);
+
 function authoritySnapshot(over: Partial<ManualAuthoritySnapshot> = {}): ManualAuthoritySnapshot {
   return {
     overrideScopeProven: true,
     matchOverrides: new Map(),
     manualAttendanceMatches: new Set(),
+    playerMatchStats: NO_PLAYER_MATCH_STATS_AUTHORITY,
     ...over,
   };
 }
@@ -3768,6 +3807,72 @@ function authoritySnapshot(over: Partial<ManualAuthoritySnapshot> = {}): ManualA
 function matchQuery(fields: readonly string[], matchKey = '2026|1|CARL|COLL') {
   return { entity: 'matches', targetKey: { match_key: matchKey }, fields };
 }
+
+describe('AFLDB-ISSUE-257 D-257-7 — the rollback guard is enforceable tooling (DB-free)', () => {
+  const CHECK_B = CHECK_AFTER_257;
+  const CHECK_A = CHECK_AFTER_102;
+
+  it('permits a rollback only at zero rows, and says to restore the CHECK first', () => {
+    for (const checkDef of [CHECK_A, CHECK_B]) {
+      const v = rollbackGuardVerdict({ total: 0, active: 0, checkDef });
+      expect(v).toMatchObject({ permitted: true, exitCode: 0 });
+      expect(v.lines.join('\n')).toContain('Restore the narrow CHECK FIRST');
+    }
+    expect(rollbackGuardVerdict({ total: 0, active: 0, checkDef: CHECK_B }).lines[0]).toContain('State B');
+    expect(rollbackGuardVerdict({ total: 0, active: 0, checkDef: CHECK_A }).lines[0]).toContain('State A');
+  });
+
+  it('refuses at one or more rows, active OR inactive, and never suggests deleting them', () => {
+    for (const [total, active] of [[1, 1], [1, 0], [37, 2]]) {
+      const v = rollbackGuardVerdict({ total, active, checkDef: CHECK_B });
+      expect(v).toMatchObject({ permitted: false, exitCode: 2 });
+      const text = v.lines.join('\n');
+      expect(text).toContain('REFUSED (D-257-7)');
+      expect(text).toContain('Roll forward only');
+      expect(text).toContain('do not delete records');
+    }
+  });
+
+  it('fails closed on an unreadable count', () => {
+    for (const total of [null, undefined, '0', -1, 1.5, Number.NaN]) {
+      expect(rollbackGuardVerdict({ total, active: 0, checkDef: null })).toMatchObject({ permitted: false, exitCode: 2 });
+    }
+    expect(rollbackGuardVerdict({ total: 0, active: 0, checkDef: null }).lines[0]).toContain('unreadable');
+  });
+
+  it('counts every player_match_stats row (no is_active filter) and reads only', () => {
+    expect(ROLLBACK_GUARD_COUNT_SQL).toMatch(/FROM public\.data_overrides\s+WHERE entity_type = 'player_match_stats'\s*$/);
+    expect(ROLLBACK_GUARD_COUNT_SQL).toContain('count(*)::int AS total');
+    for (const text of [ROLLBACK_GUARD_COUNT_SQL, ROLLBACK_GUARD_CHECK_SQL]) {
+      expect(text).not.toMatch(/\b(INSERT|UPDATE|DELETE|ALTER|DROP|TRUNCATE|GRANT)\b/i);
+    }
+    const src = readSource('tools/db/issue257-rollback-guard.ts');
+    expect(src).toContain("sql.begin('read only'");
+  });
+
+  it('needs an explicit known target and uses the migration runner variables', () => {
+    expect(parseRollbackGuardTarget([])).toHaveProperty('error');
+    expect(parseRollbackGuardTarget(['--target'])).toHaveProperty('error');
+    expect(parseRollbackGuardTarget(['--target', 'staging'])).toHaveProperty('error');
+    expect(parseRollbackGuardTarget(['--target', 'prod'])).toBe('prod');
+    const migrate = readSource('tools/db/migrate.ts');
+    for (const [name, variable] of Object.entries(ROLLBACK_GUARD_TARGETS)) {
+      expect(migrate, name).toContain(`${name.includes('-') ? `'${name}'` : name}: '${variable}'`);
+    }
+  });
+
+  it('is wired into both rollback procedures (F-PR-05)', () => {
+    const deployment = readSource('docs/deployment.md');
+    const rollback = deployment.slice(deployment.indexOf('## 11. Rollback'), deployment.indexOf('## 12. Troubleshooting'));
+    expect(rollback).toContain('tools/db/issue257-rollback-guard.ts');
+    expect(rollback).toContain('roll forward only');
+    const promotion = readSource('docs/production-promotion.md');
+    const section = promotion.slice(promotion.indexOf('## 10. Rollback and cleanup'),
+      promotion.indexOf('## 11. Why restore-then-reinstate'));
+    expect(section).toContain('tools/db/issue257-rollback-guard.ts');
+    expect(section).toContain("entity_type = 'player_match_stats'");
+  });
+});
 
 describe('AFLDB-ISSUE-122 §8 — the pinned contracts the provider stands on', () => {
   it('pins the entity_type CHECK as the migrations actually leave it', () => {
@@ -3824,6 +3929,34 @@ describe('AFLDB-ISSUE-122 §8 — the pinned contracts the provider stands on', 
           .not.toContain(settleTarget);
       }
     }
+    // AFLDB-ISSUE-257 Slice 9. Migration 110 widens it forward once more,
+    // retaining every literal 102 left and adding exactly `player_match_stats`
+    // (State B). The other two settle targets stay absent.
+    expect(matchSheetAuthorityMigration).toMatch(
+      /ADD CONSTRAINT data_overrides_entity_type_check CHECK \(entity_type IN \(\s*'players',\s*'matches',\s*'draft_picks',\s*'coaches',\s*'match_coaches',\s*'season_list_members',\s*'fixtures',\s*'club_leadership',\s*'award_winners',\s*'hall_of_fame',\s*'honour_team_members',\s*'player_achievements',\s*'after_siren_kicks',\s*'player_match_stats'\s*\)\)/,
+    );
+    {
+      const widening = matchSheetAuthorityMigration.slice(
+        matchSheetAuthorityMigration.indexOf('ADD CONSTRAINT data_overrides_entity_type_check'),
+      );
+      const literals = widening.slice(0, widening.indexOf('));'));
+      for (const stillUnrepresentable of UNREPRESENTABLE_OVERRIDE_ENTITIES) {
+        expect(literals, stillUnrepresentable).not.toContain(stillUnrepresentable);
+      }
+      expect(literals.match(/'[a-z_]+'/g)).toHaveLength(14);
+      // DROP + ADD in ONE statement, the migration 095-102 convention, and a
+      // rewritten constraint comment that no longer forbids player_match_stats.
+      expect(matchSheetAuthorityMigration).toMatch(
+        /ALTER TABLE data_overrides\s+DROP CONSTRAINT data_overrides_entity_type_check,\s+ADD CONSTRAINT/,
+      );
+      const comment = matchSheetAuthorityMigration.slice(
+        matchSheetAuthorityMigration.indexOf('COMMENT ON CONSTRAINT data_overrides_entity_type_check'),
+      );
+      expect(comment).toContain('match_period_scores or brownlow_round_votes is unrepresentable');
+      expect(comment).toContain('roll forward only');
+      // No privilege change: the existing column grants already cover every writer.
+      expect(matchSheetAuthorityMigration).not.toMatch(/^\s*(GRANT|REVOKE)\b/m);
+    }
     // The documented inventory names the same entities the database now admits.
     // As a SET: the inventory is written in the order §3.1/§16.1 states it, and
     // `checkAdmittedEntities()` returns ASCII order ('match_coaches' sorts before
@@ -3834,9 +3967,11 @@ describe('AFLDB-ISSUE-122 §8 — the pinned contracts the provider stands on', 
       .toEqual(['coaches', 'draft_picks', 'fixtures', 'matches', 'match_coaches', 'players',
         'season_list_members', 'club_leadership',
         'award_winners', 'hall_of_fame', 'honour_team_members',
-        'player_achievements', 'after_siren_kicks']);
+        'player_achievements', 'after_siren_kicks', 'player_match_stats']);
     expect([...OVERRIDE_ENTITY_TYPES].sort())
-      .toEqual(checkAdmittedEntities([CHECK_AFTER_102]));
+      .toEqual(checkAdmittedEntities([CHECK_AFTER_257]));
+    expect(checkAdmittedEntities([CHECK_AFTER_257]))
+      .toEqual([...checkAdmittedEntities([CHECK_AFTER_102])!, 'player_match_stats'].sort());
     // And the order-independence D-1 requires, stated as a fact rather than a
     // hope: the settle's answer is identical against the pre-096 and pre-097
     // constraints, so each migration and its code may deploy in either order.
@@ -3850,6 +3985,10 @@ describe('AFLDB-ISSUE-122 §8 — the pinned contracts the provider stands on', 
       overrideScopeProvenFrom([CHECK_AFTER_101]));
     expect(overrideScopeProvenFrom([CHECK_AFTER_101])).toBe(
       overrideScopeProvenFrom([CHECK_AFTER_102]));
+    // AFLDB-ISSUE-257: admitting `player_match_stats` (State B) is no longer a
+    // refusal of the proof that guards the other two targets, in either order.
+    expect(overrideScopeProvenFrom([CHECK_AFTER_102])).toBe(true);
+    expect(overrideScopeProvenFrom([CHECK_AFTER_257])).toBe(true);
     // ...but it is documentation, NOT the proof. AFLDB-ISSUE-159 §3.1 / D-1: an
     // exact-set proof has no safe deploy order in either direction, so the proof
     // itself must not consult this list at all.
@@ -3864,6 +4003,9 @@ describe('AFLDB-ISSUE-122 §8 — the pinned contracts the provider stands on', 
     for (const entity of UNREPRESENTABLE_OVERRIDE_ENTITIES) {
       expect(editorEntityKeys()).not.toContain(entity);
     }
+    // `player_match_stats` is no longer in the proof, but its authority is written
+    // only by the Match Sheet writer, never by the generic editor (ISSUE-257).
+    expect(editorEntityKeys()).not.toContain('player_match_stats');
     // The editor is a SUBSET of what the CHECK admits, not equal to it: 'coaches'
     // and 'match_coaches' are admitted overrides with their own admin route and
     // deliberately no spec.ts entry (AFLDB-ISSUE-159 §16.2).
@@ -3912,9 +4054,9 @@ describe('AFLDB-ISSUE-122 §8 — the pinned contracts the provider stands on', 
     expect(overrideScopeProvenFrom([entityTypeCheck('coaches', 'match_coaches')])).toBe(false);
   });
 
-  it('keeps the three settle-critical targets apply-capable under the widened CHECK', () => {
+  it('keeps the settle-critical targets apply-capable under the widened CHECK', () => {
     // The consequence the gate actually cares about (S-1): with the post-095
-    // database, these three still answer 'clear', which is what lets the nightly
+    // database, these still answer 'clear', which is what lets the nightly
     // settle APPLY them rather than merely propose.
     const snapshot = authoritySnapshot({
       overrideScopeProven: overrideScopeProvenFrom([CHECK_AFTER_095]),
@@ -3924,6 +4066,38 @@ describe('AFLDB-ISSUE-122 §8 — the pinned contracts the provider stands on', 
         entity, targetKey: { match_id: 1 }, fields: ['goals'],
       }), entity).toBe('clear');
     }
+  });
+
+  it('keeps period scores and Brownlow clear under BOTH the old and the ISSUE-257 CHECK', () => {
+    // AFLDB-ISSUE-257 §18.13. Two entities remain unrepresentable; admitting
+    // `player_match_stats` to the CHECK must not lose the proof that guards them
+    // (State A: old database; State B: widened database).
+    expect([...UNREPRESENTABLE_OVERRIDE_ENTITIES])
+      .toEqual(['match_period_scores', 'brownlow_round_votes']);
+    for (const check of [CHECK_AFTER_102, CHECK_AFTER_257]) {
+      const snapshot = authoritySnapshot({ overrideScopeProven: overrideScopeProvenFrom([check]) });
+      expect(snapshot.overrideScopeProven).toBe(true);
+      for (const entity of UNREPRESENTABLE_OVERRIDE_ENTITIES) {
+        expect(manualAuthorityVerdict(snapshot, {
+          entity, targetKey: { match_id: 1 }, fields: ['goals'],
+        }), entity).toBe('clear');
+      }
+    }
+    // The proof still refuses when one of the TWO is admitted, on either side.
+    for (const entity of UNREPRESENTABLE_OVERRIDE_ENTITIES) {
+      expect(overrideScopeProvenFrom([CHECK_AFTER_257.replace(
+        "'player_match_stats'::text", `'player_match_stats'::text, '${entity}'::text`,
+      )]), entity).toBe(false);
+    }
+  });
+
+  it('reports whether the live CHECK admits player_match_stats (State A vs B)', () => {
+    expect(playerMatchStatsStorableFrom([CHECK_AFTER_102])).toBe(false);
+    expect(playerMatchStatsStorableFrom([CHECK_AFTER_257])).toBe(true);
+    // Unreadable, ambiguous or literal-free is not admitted.
+    expect(playerMatchStatsStorableFrom([])).toBe(false);
+    expect(playerMatchStatsStorableFrom([CHECK_AFTER_257, CHECK_AFTER_257])).toBe(false);
+    expect(playerMatchStatsStorableFrom(['CHECK ((entity_type IS NOT NULL))'])).toBe(false);
   });
 
   it('pins the five matches field groups §8 maps proposals onto', () => {
@@ -4052,6 +4226,877 @@ describe('AFLDB-ISSUE-122 §8 — the manual-authority truth table', () => {
     expect(provider(matchQuery(['home_goals']))).toBe('indeterminate');
     expect(provider({ entity: 'player_match_stats', targetKey: {}, fields: ['goals'] }))
       .toBe('indeterminate');
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * AFLDB-ISSUE-257 Slice 2 — the player_match_stats authority reader, DB-free
+ * (the SQL that fills buildPlayerMatchStatsAuthority's input is integration-only)
+ * ------------------------------------------------------------------ */
+describe('ISSUE-257 player_match_stats authority reader', () => {
+  const SEASON = 2026;
+  const MK = '2026|1|2026-03-12|Carlton|Collingwood';
+  const PATH = 'afltables:players/A/Abe.html';
+  const TOKEN = 'manual_admin_edit:tok-1';
+  const match = { id: 50, homeClubId: 1, awayClubId: 2 };
+  const base = {
+    season: SEASON,
+    matchesByKey: new Map([[MK, match]]),
+    playerIdsByIdentity: new Map<string, number[]>([[PATH, [7]], [TOKEN, [7]]]),
+    clubIdBySlug: new Map([['carlton', 1], ['collingwood', 2], ['geelong', 3]]),
+  };
+  const rec = (
+    identity: string, fieldGroup: string, overrideValues: unknown, mk = MK, isActive = true,
+  ) => ({ entityKey: `${mk}|${identity}`, fieldGroup, isActive, overrideValues });
+  const build = (records: ReturnType<typeof rec>[], over: Partial<typeof base> = {}) =>
+    buildPlayerMatchStatsAuthority({ ...base, ...over, records });
+  const ask = (
+    authority: PlayerMatchStatsAuthority, fields: string[], playerId = 7, matchId = 50,
+  ) => manualAuthorityVerdict(
+    authoritySnapshot({ playerMatchStats: authority }),
+    { entity: 'player_match_stats', targetKey: { player_id: playerId, match_id: matchId }, fields },
+  );
+
+  it('answers clear with no records, regardless of the CHECK proof or the target key', () => {
+    const empty = build([]);
+    expect(ask(empty, ['goals'])).toBe('clear');
+    // State A: no records, and the answer no longer depends on the CHECK proof.
+    expect(manualAuthorityVerdict(
+      authoritySnapshot({ overrideScopeProven: false }),
+      { entity: 'player_match_stats', targetKey: {}, fields: ['goals'] },
+    )).toBe('clear');
+    // Other entities are untouched by it.
+    expect(manualAuthorityVerdict(
+      authoritySnapshot({ overrideScopeProven: false }),
+      { entity: 'match_period_scores', targetKey: { match_id: 1 }, fields: ['goals'] },
+    )).toBe('indeterminate');
+  });
+
+  it('conflicts on a protected field only, and the club protects club_id', () => {
+    const a = build([rec(PATH, 'match_sheet', { goals: 3, club_slug: 'carlton' })]);
+    expect(ask(a, ['goals'])).toBe('conflict');
+    expect(ask(a, ['kicks', 'club_id'])).toBe('conflict');
+    expect(ask(a, ['kicks', 'marks'])).toBe('clear');
+    // A different player or match is untouched.
+    expect(ask(a, ['goals'], 8)).toBe('clear');
+    expect(ask(a, ['goals'], 7, 51)).toBe('clear');
+    // An explicit null is still authority.
+    expect(ask(build([rec(PATH, 'match_sheet', { goals: null })]), ['goals'])).toBe('conflict');
+  });
+
+  it('conflicts on a durable removal and not on a durable addition', () => {
+    expect(ask(build([rec(PATH, 'lineup', { present: false })]), ['goals'])).toBe('conflict');
+    expect(ask(build([rec(PATH, 'lineup', { present: true })]), ['goals'])).toBe('clear');
+  });
+
+  it('resolves a token-keyed record to the same player, and ignores withdrawn records', () => {
+    expect(ask(build([rec(TOKEN, 'match_sheet', { goals: 1 })]), ['goals'])).toBe('conflict');
+    expect(ask(build([rec(PATH, 'match_sheet', { goals: 1 }, MK, false)]), ['goals'])).toBe('clear');
+    // Another season's record is ignored.
+    const other = '2025|1|2025-03-12|Carlton|Collingwood';
+    expect(ask(build([rec(PATH, 'match_sheet', { goals: 1 }, other)], {
+      matchesByKey: new Map([[other, { ...match, id: 99 }], [MK, match]]),
+    }), ['goals', 'marks'], 7, 99)).toBe('clear');
+  });
+
+  it('marks the match indeterminate for an unknown key, unresolved identity or club, or two records for one pair', () => {
+    const cases: [string, ReturnType<typeof rec>[], Partial<typeof base>][] = [
+      ['unknown payload key', [rec(PATH, 'match_sheet', { bogus: 1 })], {}],
+      ['unknown field group', [rec(PATH, 'stats', { goals: 1 })], {}],
+      ['unresolved identity', [rec('afltables:players/Z/Zed.html', 'match_sheet', { goals: 1 })], {}],
+      ['ambiguous identity', [rec(PATH, 'match_sheet', { goals: 1 })], {
+        playerIdsByIdentity: new Map([[PATH, [7, 8]]]),
+      }],
+      ['unknown club', [rec(PATH, 'match_sheet', { club_slug: 'nobody' })], {}],
+      ['club not in the match', [rec(PATH, 'match_sheet', { club_slug: 'geelong' })], {}],
+      ['two identity forms for one pair', [
+        rec(PATH, 'match_sheet', { goals: 1 }), rec(TOKEN, 'match_sheet', { goals: 2 }),
+      ], {}],
+    ];
+    for (const [label, records, over] of cases) {
+      const authority = build(records, over);
+      expect(ask(authority, ['goals']), label).toBe('indeterminate');
+      // The whole match refuses, even for another player in it and unrelated fields.
+      expect(ask(authority, ['marks'], 8), label).toBe('indeterminate');
+      // Another match is unaffected.
+      expect(ask(authority, ['goals'], 7, 51), label).toBe('clear');
+    }
+  });
+
+  it('refuses every answer when a key cannot be decoded', () => {
+    const authority = build([
+      rec(PATH, 'match_sheet', { goals: 1 }),
+      { entityKey: 'not-a-key', fieldGroup: 'match_sheet', isActive: true, overrideValues: { goals: 1 } },
+    ]);
+    expect(authority.allIndeterminate).toBe(true);
+    expect(ask(authority, ['goals'], 8, 51)).toBe('indeterminate');
+  });
+
+  it('refuses a question that cannot be placed once records exist', () => {
+    const authority = build([rec(PATH, 'match_sheet', { goals: 1 })]);
+    for (const targetKey of [{}, { match_id: 50 }, { player_id: 7, match_id: 'x' }, { player_id: 0, match_id: 50 }]) {
+      expect(manualAuthorityVerdict(
+        authoritySnapshot({ playerMatchStats: authority }),
+        { entity: 'player_match_stats', targetKey, fields: ['marks'] },
+      ), JSON.stringify(targetKey)).toBe('indeterminate');
+    }
+    expect(playerMatchStatsPairKey(7, 50)).toBe('7:50');
+  });
+
+  it('reads data_overrides through parameterised SQL and exposes the capability probe', () => {
+    const source = readSource('src/lib/acquisition/manual-authority.ts');
+    expect(source).toContain('export async function playerMatchStatsAuthorityStorable');
+    expect(source).toContain("entity_type = ${PLAYER_MATCH_STATS_ENTITY}");
+    expect(source).not.toMatch(/LIKE\s/);
+    // Slice 5 / D-257-9: the continuity contract is loaded fail-closed, and the PARTNER
+    // path's identity rows are fetched alongside the stored path's.
+    expect(source).toContain('loadContinuityRulesFailClosed()');
+    expect(source).toContain('continuityPartnersOf(decoded.externalId, continuity.rules)');
+    expect(source).toContain('resolveStoredIdentityToPlayer(');
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * AFLDB-ISSUE-257 Slice 5 — TypeScript / Python parity (D-257-9), DB-free.
+ *
+ * ONE corpus drives the TypeScript settle reader (`buildPlayerMatchStatsAuthority`)
+ * and the REAL Python replay decision (`pms_preflight` in tools/migration/common.py,
+ * spawned; skipped when no python with psycopg is available). Both must RESOLVE or
+ * REFUSE identically, case by case. The only deliberate asymmetry is row existence:
+ * a field record with no row and no addition is a replay refusal; the settle has no
+ * row to protect there, so that case is marked `pythonOnly`.
+ * ------------------------------------------------------------------ */
+describe('ISSUE-257 Slice 5 — replay/settle parity corpus (TypeScript vs the real Python)', () => {
+  const MK = '2026|1|2026-03-12|Carlton|Collingwood';
+  const A = 'players/A/Abe.html';
+  const B = 'players/A/Abe2.html';
+  const TOK = 'tok-1';
+  type Rec = { identity: string; group: string; values: unknown; mk?: string; active?: boolean };
+  type Case = {
+    name: string;
+    records: Rec[];
+    players?: Record<string, number[]>;
+    rules?: [string, string][] | null;
+    existing?: [number, number][] | null;
+    expect: 'resolve' | 'refuse';
+    pythonOnly?: boolean;
+  };
+  const MATCHES = { [MK]: { id: 50, home_club_id: 1, away_club_id: 2 } };
+  const CLUBS = { carlton: 1, collingwood: 2, geelong: 3 };
+  const sheet = (values: unknown, identity = `afltables:${A}`): Rec =>
+    ({ identity, group: 'match_sheet', values });
+  const lineup = (present: boolean, identity = `afltables:${A}`): Rec =>
+    ({ identity, group: 'lineup', values: { present } });
+  const ONE = { [`afltables:${A}`]: [7], [`manual_admin_edit:${TOK}`]: [7] };
+  const PAIR = { ...ONE, [`afltables:${B}`]: [7] };
+  const RULE: [string, string][] = [[A, B]];
+
+  const corpus: Case[] = [
+    { name: 'single path', records: [sheet({ goals: 3 })], players: ONE, rules: [], expect: 'resolve' },
+    { name: 'manual token', records: [sheet({ goals: 3 }, `manual_admin_edit:${TOK}`)], players: ONE, rules: [], expect: 'resolve' },
+    { name: 'fold: both sides one player (stored under the continuing side)', records: [sheet({ goals: 3 })], players: PAIR, rules: RULE, expect: 'resolve' },
+    { name: 'fold: stored under the renumbered side', records: [sheet({ goals: 3 }, `afltables:${B}`)], players: PAIR, rules: RULE, expect: 'resolve' },
+    { name: 'split pair: sides resolve to different players', records: [sheet({ goals: 3 })], players: { ...PAIR, [`afltables:${B}`]: [8] }, rules: RULE, expect: 'refuse' },
+    { name: 'missing partner side', records: [sheet({ goals: 3 })], players: ONE, rules: RULE, expect: 'refuse' },
+    { name: 'ambiguous path: two players', records: [sheet({ goals: 3 })], players: { [`afltables:${A}`]: [7, 8] }, rules: [], expect: 'refuse' },
+    { name: 'ambiguous partner side', records: [sheet({ goals: 3 })], players: { ...PAIR, [`afltables:${B}`]: [7, 8] }, rules: RULE, expect: 'refuse' },
+    { name: 'unresolved identity', records: [sheet({ goals: 3 })], players: {}, rules: [], expect: 'refuse' },
+    { name: 'malformed continuity data fails closed', records: [sheet({ goals: 3 })], players: ONE, rules: null, expect: 'refuse' },
+    { name: 'a path in no rule resolves alone beside other rules', records: [sheet({ goals: 3 })], players: ONE, rules: [['players/Z/Zed.html', 'players/Z/Zed2.html']], expect: 'resolve' },
+    { name: 'duplicate pair: two keys, one (match, player)', records: [sheet({ goals: 1 }), sheet({ goals: 2 }, `manual_admin_edit:${TOK}`)], players: ONE, rules: [], expect: 'refuse' },
+    { name: 'duplicate pair across a folded pair', records: [sheet({ goals: 1 }), sheet({ goals: 2 }, `afltables:${B}`)], players: PAIR, rules: RULE, expect: 'refuse' },
+    { name: 'unresolved match', records: [{ ...sheet({ goals: 3 }), mk: '2026|9|2026-05-01|Carlton|Geelong' }], players: ONE, rules: [], expect: 'refuse' },
+    { name: 'club is not home or away', records: [sheet({ club_slug: 'geelong' })], players: ONE, rules: [], expect: 'refuse' },
+    { name: 'unknown club slug', records: [sheet({ club_slug: 'nobody' })], players: ONE, rules: [], expect: 'refuse' },
+    { name: 'inadmissible payload key', records: [sheet({ bogus: 1 })], players: ONE, rules: [], expect: 'refuse' },
+    { name: 'partial disposal triple', records: [sheet({ kicks: 5 })], players: ONE, rules: [], expect: 'refuse' },
+    { name: 'lineup payload with an extra key', records: [{ ...lineup(true), values: { present: true, x: 1 } }], players: ONE, rules: [], expect: 'refuse' },
+    { name: 'unknown field group', records: [{ identity: `afltables:${A}`, group: 'stats', values: { goals: 1 } }], players: ONE, rules: [], expect: 'refuse' },
+    { name: 'inactive records are ignored, even unreadable ones', records: [{ ...sheet({ bogus: 1 }), active: false }, { ...lineup(true), active: false }], players: ONE, rules: [], expect: 'resolve' },
+    { name: 'explicit null and a coupled triple are readable', records: [sheet({ goals: null, kicks: 5, handballs: 4, disposals: 9 })], players: ONE, rules: [], existing: [[50, 7]], expect: 'resolve' },
+    { name: 'durable addition with its row absent resolves', records: [lineup(true), sheet({ club_slug: 'carlton', goals: 2 })], players: ONE, rules: [], existing: [], expect: 'resolve' },
+    { name: 'durable removal resolves', records: [lineup(false)], players: ONE, rules: [], existing: [[50, 7]], expect: 'resolve' },
+    { name: 'field record with no row and no addition', records: [sheet({ goals: 3 })], players: ONE, rules: [], existing: [], expect: 'refuse', pythonOnly: true },
+    { name: 'addition with no club_slug to create the row with', records: [lineup(true), sheet({ goals: 3 })], players: ONE, rules: [], existing: [], expect: 'refuse', pythonOnly: true },
+  ];
+
+  const toTs = (c: Case): 'resolve' | 'refuse' => {
+    const rules = c.rules ?? [];
+    const continuity: ContinuityRulesLoad = c.rules === null
+      ? { ok: false, detail: 'malformed' }
+      : {
+        ok: true,
+        rules: rules.map(([continuingUrl, renumberedUrl], i) => ({ id: `r${i}`, continuingUrl, renumberedUrl })) as never,
+      };
+    const authority = buildPlayerMatchStatsAuthority({
+      season: 2026,
+      records: c.records.map((r) => ({
+        entityKey: `${r.mk ?? MK}|${r.identity}`, fieldGroup: r.group,
+        isActive: r.active !== false, overrideValues: r.values,
+      })),
+      matchesByKey: new Map([[MK, { id: 50, homeClubId: 1, awayClubId: 2 }]]),
+      playerIdsByIdentity: new Map(Object.entries(c.players ?? {})),
+      clubIdBySlug: new Map(Object.entries(CLUBS)),
+      continuity,
+    });
+    return authority.allIndeterminate || authority.indeterminateMatchIds.size > 0
+      || authority.unresolvedMatchKeys.size > 0 ? 'refuse' : 'resolve';
+  };
+
+  const root = process.cwd();
+  const venvPython = process.platform === 'win32'
+    ? join(root, '.venv', 'Scripts', 'python.exe')
+    : join(root, '.venv', 'bin', 'python');
+  const python = process.env.AFLDB_PYTHON
+    ?? (existsSync(venvPython) ? venvPython : (process.platform === 'win32' ? 'python' : 'python3'));
+  const probe = spawnSync(python, ['-c', 'import psycopg'], { encoding: 'utf8' });
+  const hasPython = !probe.error && probe.status === 0;
+
+  const script = [
+    'import sys, json',
+    `sys.path.insert(0, ${JSON.stringify(join(root, 'tools', 'migration'))})`,
+    'from common import pms_preflight',
+    'out = []',
+    'for c in json.load(sys.stdin):',
+    '    existing = None if c["existing"] is None else {tuple(p) for p in c["existing"]}',
+    '    problems, plan = pms_preflight(c["records"], c["matches"], {k: set(v) for k, v in c["players"].items()},',
+    '                                   c["clubs"], None if c["pairs"] is None else [tuple(p) for p in c["pairs"]], existing)',
+    '    out.append([[k, w] for k, w in problems])',
+    'print(json.dumps(out))',
+  ].join('\n');
+
+  const runPython = (cases: Case[]): [string, string][][] => {
+    const input = cases.map((c) => ({
+      records: c.records.map((r) => ({
+        entity_key: `${r.mk ?? MK}|${r.identity}`, field_group: r.group,
+        is_active: r.active !== false, override_values: r.values,
+      })),
+      matches: MATCHES, players: c.players ?? {}, clubs: CLUBS,
+      pairs: c.rules === undefined ? [] : c.rules,
+      existing: c.existing === undefined ? null : c.existing,
+    }));
+    const run = spawnSync(python, ['-c', script], { cwd: root, encoding: 'utf8', input: JSON.stringify(input) });
+    if (run.status !== 0) throw new Error(`python parity run failed: ${run.stderr}${run.error ?? ''}`);
+    return JSON.parse(run.stdout) as [string, string][][];
+  };
+
+  it('covers every named D-257-9 and replay-preflight state', () => {
+    const names = corpus.map((c) => c.name).join('|');
+    for (const needle of ['single path', 'manual token', 'fold', 'split pair', 'missing partner',
+      'ambiguous path', 'malformed continuity', 'duplicate pair', 'unresolved match',
+      'club is not home or away', 'inadmissible payload key', 'no row and no addition']) {
+      expect(names, needle).toContain(needle);
+    }
+  });
+
+  it('the TypeScript reader resolves or refuses exactly as the corpus states', () => {
+    for (const c of corpus.filter((x) => !x.pythonOnly)) {
+      expect(toTs(c), c.name).toBe(c.expect);
+    }
+  });
+
+  it.skipIf(!hasPython)('the real Python replay decision agrees with the corpus, and with TypeScript', () => {
+    const results = runPython(corpus);
+    corpus.forEach((c, i) => {
+      const py = results[i].length === 0 ? 'resolve' : 'refuse';
+      expect(py, `python: ${c.name} ${JSON.stringify(results[i])}`).toBe(c.expect);
+      if (!c.pythonOnly) expect(py, `parity: ${c.name}`).toBe(toTs(c));
+    });
+  });
+
+  it.skipIf(!hasPython)('Python names EVERY offending key in one pass', () => {
+    const two = runPython([{
+      name: 'two offenders',
+      records: [sheet({ bogus: 1 }), sheet({ goals: 1 }, 'afltables:players/Q/Quin.html')],
+      players: ONE, rules: [], expect: 'refuse',
+    }])[0];
+    expect(two.map(([key]) => key).sort()).toEqual([
+      `${MK}|afltables:${A}`, `${MK}|afltables:players/Q/Quin.html`,
+    ].sort());
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * AFLDB-ISSUE-257 Slice 4 — settle scoping, the applier's E4, the match lock,
+ * the rekey carry and the unresolved-match fail-closed, DB-free
+ * ------------------------------------------------------------------ */
+import { applyCanonicalUnit, type CanonicalApplyUnitInput } from '@/lib/acquisition/canonical-apply';
+import { carryMatchOverrides } from '@/lib/acquisition/match-rekey';
+import {
+  automaticProposalUnderAuthority,
+  scopeProposalToAuthority,
+} from '@/lib/acquisition/settle-afltables';
+
+describe('ISSUE-257 Slice 4 — settle behaviour under durable Match Sheet authority', () => {
+  const MK = '2026|1|2026-03-12|Carlton|Collingwood';
+  const PATH = 'afltables:players/A/Abe.html';
+  const match = { id: 50, homeClubId: 1, awayClubId: 2 };
+  const base = {
+    season: 2026,
+    matchesByKey: new Map([[MK, match]]),
+    playerIdsByIdentity: new Map<string, number[]>([[PATH, [7]]]),
+    clubIdBySlug: new Map([['carlton', 1], ['collingwood', 2]]),
+  };
+  type Rec = { entityKey: string; fieldGroup: string; isActive: boolean; overrideValues: unknown };
+  const rec = (fieldGroup: string, overrideValues: unknown, mk = MK): Rec => ({
+    entityKey: `${mk}|${PATH}`, fieldGroup, isActive: true, overrideValues,
+  });
+  const authorityOf = (records: Rec[], over: Partial<typeof base> = {}) =>
+    buildPlayerMatchStatsAuthority({ ...base, ...over, records });
+  const providerOf = (authority: PlayerMatchStatsAuthority): ManualAuthorityProvider =>
+    (query) => manualAuthorityVerdict(authoritySnapshot({ playerMatchStats: authority }), query);
+  const key = { player_id: 7, match_id: 50 };
+  const resolved = { status: 'resolved', targetKey: key };
+
+  describe('the shared scoping helper', () => {
+    const proposal = { goals: 5, kicks: 9, club_id: 1, career_game_no: 3 };
+
+    it('removes a protected field and keeps an unrelated one', () => {
+      const provider = providerOf(authorityOf([rec('match_sheet', { goals: 3 })]));
+      const scoped = scopeProposalToAuthority('player_match_stats', proposal, resolved, provider);
+      expect(scoped).toEqual({ proposal: { kicks: 9, club_id: 1, career_game_no: 3 }, removed: false });
+      // The automatic path then also drops the derived-owned field.
+      expect(automaticProposalUnderAuthority('player_match_stats', scoped))
+        .toEqual({ kicks: 9, club_id: 1 });
+    });
+
+    it('treats club_slug as protecting club_id', () => {
+      const provider = providerOf(authorityOf([rec('match_sheet', { club_slug: 'carlton' })]));
+      expect(scopeProposalToAuthority('player_match_stats', proposal, resolved, provider).proposal)
+        .toEqual({ goals: 5, kicks: 9, career_game_no: 3 });
+    });
+
+    it('keeps the FULL proposal for a removal but gives the automatic path an empty one', () => {
+      const provider = providerOf(authorityOf([rec('lineup', { present: false })]));
+      const scoped = scopeProposalToAuthority('player_match_stats', proposal, resolved, provider);
+      expect(scoped.removed).toBe(true);
+      expect(scoped.proposal).toBe(proposal);
+      expect(automaticProposalUnderAuthority('player_match_stats', scoped)).toEqual({});
+      // A new target with a removal: same.
+      const added = scopeProposalToAuthority(
+        'player_match_stats', proposal, { status: 'new_target', targetKey: key }, provider,
+      );
+      expect(added.removed).toBe(true);
+      expect(automaticProposalUnderAuthority('player_match_stats', added)).toEqual({});
+    });
+
+    it('is identical to today with no authority, no provider, another table or an unplaced target', () => {
+      const none = providerOf(authorityOf([]));
+      for (const provider of [none, null]) {
+        const scoped = scopeProposalToAuthority('player_match_stats', proposal, resolved, provider);
+        expect(scoped.proposal).toBe(proposal);
+        expect(scoped.removed).toBe(false);
+        expect(automaticProposalUnderAuthority('player_match_stats', scoped))
+          .toEqual(automaticProposal('player_match_stats', proposal));
+      }
+      const protectedGoals = providerOf(authorityOf([rec('match_sheet', { goals: 3 })]));
+      expect(scopeProposalToAuthority('matches', proposal, resolved, protectedGoals).proposal)
+        .toBe(proposal);
+      expect(scopeProposalToAuthority('player_match_stats', proposal, null, protectedGoals).proposal)
+        .toBe(proposal);
+      expect(scopeProposalToAuthority('player_match_stats', proposal, { status: 'unresolved' }, protectedGoals)
+        .proposal).toBe(proposal);
+    });
+
+    it('never narrows a new target, and leaves an indeterminate match unchanged for the gates to refuse', () => {
+      const protectedGoals = providerOf(authorityOf([rec('match_sheet', { goals: 3 })]));
+      expect(scopeProposalToAuthority(
+        'player_match_stats', proposal, { status: 'new_target', targetKey: key }, protectedGoals,
+      ).proposal).toBe(proposal);
+      const poisoned = providerOf(authorityOf([rec('match_sheet', { bogus: 1 })]));
+      const scoped = scopeProposalToAuthority('player_match_stats', proposal, resolved, poisoned);
+      expect(scoped).toEqual({ proposal, removed: false });
+      expect(poisoned({ entity: 'player_match_stats', targetKey: key, fields: ['goals'] }))
+        .toBe('indeterminate');
+    });
+
+    it('classifies a proposal through the provider alone', () => {
+      expect(scopePlayerMatchStatsFields(providerOf(authorityOf([])), key, ['goals']))
+        .toEqual({ kind: 'scoped', keep: ['goals'], dropped: [] });
+      expect(scopePlayerMatchStatsFields(
+        providerOf(authorityOf([rec('match_sheet', { goals: 3 })])), key, ['goals', 'kicks'],
+      )).toEqual({ kind: 'scoped', keep: ['kicks'], dropped: ['goals'] });
+      expect(scopePlayerMatchStatsFields(
+        providerOf(authorityOf([rec('lineup', { present: false })])), key, ['goals'],
+      )).toEqual({ kind: 'removed' });
+      expect(scopePlayerMatchStatsFields(refusingProvider(), key, ['goals']))
+        .toEqual({ kind: 'indeterminate' });
+      expect(PRESENCE_PROBE_FIELD).not.toMatch(/^(goals|kicks|club_id)$/);
+    });
+  });
+
+  describe('an active record whose match resolves to no match fails closed', () => {
+    const noMatch = { matchesByKey: new Map<string, typeof match>() };
+    const ask = (authority: PlayerMatchStatsAuthority, targetKey: Record<string, unknown>) =>
+      manualAuthorityVerdict(
+        authoritySnapshot({ playerMatchStats: authority }),
+        { entity: 'player_match_stats', targetKey, fields: ['goals'] },
+      );
+
+    it('answers indeterminate for a unit that names that match_key, and only that one', () => {
+      const authority = authorityOf([rec('match_sheet', { goals: 3 })], noMatch);
+      expect([...authority.unresolvedMatchKeys]).toEqual([MK]);
+      expect(ask(authority, { ...key, match_key: MK })).toBe('indeterminate');
+      expect(ask(authority, { ...key, match_key: '2026|2|2026-03-19|Carlton|Geelong' })).toBe('clear');
+      expect(ask(authority, key)).toBe('clear');
+    });
+
+    it('ignores a withdrawn record and another season', () => {
+      const withdrawn = authorityOf([{ ...rec('match_sheet', { goals: 3 }), isActive: false }], noMatch);
+      expect(withdrawn.unresolvedMatchKeys.size).toBe(0);
+      const other = '2025|1|2025-03-12|Carlton|Collingwood';
+      expect(authorityOf([rec('match_sheet', { goals: 3 }, other)], noMatch).unresolvedMatchKeys.size)
+        .toBe(0);
+    });
+  });
+
+  /* -- the applier ---------------------------------------------------- */
+  type Fake = { tx: never; seen: string[] };
+  function fakeUnitTx(respond: (text: string) => unknown[]): Fake {
+    const seen: string[] = [];
+    const tx = ((strings: unknown, ...values: unknown[]) => {
+      if (!Array.isArray(strings)) return strings; // sql(row) / sql(patch) helper
+      const text = (strings as string[])
+        .reduce((acc, part, i) => acc + part + (i < values.length ? JSON.stringify(values[i]) : ''), '')
+        .replace(/\s+/g, ' ').trim();
+      seen.push(text);
+      return Promise.resolve(respond(text));
+    }) as unknown as Record<string, unknown>;
+    tx.json = (value: unknown) => value;
+    tx.savepoint = async (fn: (scope: unknown) => Promise<unknown>) => fn(tx);
+    return { tx: tx as never, seen };
+  }
+
+  const CURRENT = { goals: 2, kicks: 3 };
+  function respondFor(records: Rec[], row: Record<string, unknown> | null, over: {
+    loaderMatches?: unknown[];
+  } = {}) {
+    return (text: string): unknown[] => {
+      if (text.includes('FOR SHARE')) return [{ id: 50 }];
+      if (text.includes('pg_get_constraintdef')) return [{ def: CHECK_AFTER_257 }];
+      if (text.includes('entity_type = "player_match_stats" AND is_active')) {
+        return records.map((r) => ({ ...r, overrideValues: JSON.stringify(r.overrideValues) }));
+      }
+      if (text.includes('match_key = ANY')) {
+        return over.loaderMatches ?? [{ id: 50, matchKey: MK, homeClubId: 1, awayClubId: 2 }];
+      }
+      if (text.includes('FROM external_identities')) {
+        return [{ sourceKey: 'afltables', externalId: 'players/A/Abe.html', matchMethod: 'afltables_profile_url', playerId: 7 }];
+      }
+      if (text.includes('slug FROM clubs')) return [{ id: 1, slug: 'carlton' }, { id: 2, slug: 'collingwood' }];
+      if (text.includes('SELECT id::int AS id FROM matches WHERE match_key')) return [{ id: 50 }];
+      if (text.includes('SELECT * FROM player_match_stats')) return row === null ? [] : [row];
+      return [];
+    };
+  }
+  const unitOf = (
+    proposed: Record<string, number>, current: Record<string, number> | null,
+    over: Partial<CanonicalApplyUnitInput> = {},
+  ): CanonicalApplyUnitInput => {
+    const fields = Object.keys(proposed);
+    return {
+      family: 'player_match_stats', externalRecordId: 'M|T|P', season: 2026, sourceId: 1,
+      sourceKey: 'afltables', sourceKeysById: new Map([[1, 'afltables']]),
+      batchId: asImportBatchId('1'), inProgressSeasons: [2026], completionProven: true,
+      matchKey: MK, matchRekey: null, playerId: 7, brownlowRoundNumber: null,
+      targets: [{
+        targetTable: 'player_match_stats', invitation: 'candidate', proposedValues: proposed,
+        renderedFields: fields,
+        renderedBaselineCanonicalHash: current === null ? null : baselineCanonicalHash(fields, current),
+        sourceVersionSeq: 1,
+      }],
+      ...over,
+    };
+  };
+  const ROW = { id: 900, player_id: 7, match_id: 50, source_id: 1, ...CURRENT };
+  const writes = (seen: string[]) =>
+    seen.filter((t) => /^(UPDATE player_match_stats|INSERT INTO player_match_stats)/.test(t));
+
+  describe('the applier (E4 and the match lock)', () => {
+    it('takes the match row FOR SHARE before the authority is read', async () => {
+      const { tx, seen } = fakeUnitTx(respondFor([], ROW));
+      await applyCanonicalUnit(tx, unitOf({ kicks: 9 }, CURRENT));
+      const lock = seen.findIndex((t) => t.includes('FROM matches WHERE match_key') && t.endsWith('FOR SHARE'));
+      const authorityLoad = seen.findIndex((t) => t.includes('pg_get_constraintdef'));
+      expect(lock).toBeGreaterThan(-1);
+      expect(authorityLoad).toBeGreaterThan(lock);
+      expect(seen[lock]).toContain(JSON.stringify(MK));
+    });
+
+    it('takes no match lock for a unit with no player_match_stats target', async () => {
+      const { tx, seen } = fakeUnitTx(respondFor([], ROW));
+      const unit = unitOf({ kicks: 9 }, CURRENT);
+      await applyCanonicalUnit(tx, { ...unit, inProgressSeasons: [], targets: [
+        { ...unit.targets[0], targetTable: 'brownlow_round_votes' },
+      ] });
+      expect(seen.some((t) => t.includes('FOR SHARE'))).toBe(false);
+    });
+
+    /* AFLDB-ISSUE-257 Run D R-01: a rekey unit's canonical row still holds the
+       RETIRED key, so the incoming-key lock locks nothing; the retired row must
+       be locked (with the incoming one, in id order) before the authority read. */
+    const rekeyUnit = () => unitOf({ kicks: 9 }, CURRENT, {
+      family: 'match',
+      matchRekey: {
+        scope: { completeScopeKeys: ['2026'], publishedRecordIds: ['M|T|P'] },
+        identity: { roundCode: '1', matchDate: '2026-03-12', homeClubId: 1, awayClubId: 2 },
+      },
+    });
+    const rekeyResponder = (retired: unknown[]) => {
+      const base = respondFor([], ROW);
+      return (text: string): unknown[] => (text.includes('JOIN staging.source_records') ? retired : base(text));
+    };
+
+    it('R-01: a rekey unit locks the retired and incoming match rows FOR UPDATE, in id order, before the authority is read', async () => {
+      const retired = [{ id: 41, matchKey: '2026|1|2026-03-11|Carlton|Collingwood', sourceRecordId: 'OLD' }];
+      const { tx, seen } = fakeUnitTx(rekeyResponder(retired));
+      await applyCanonicalUnit(tx, rekeyUnit()).catch(() => undefined);
+      const firstSearch = seen.findIndex((t) => t.includes('JOIN staging.source_records'));
+      const lock = seen.findIndex((t) => t.includes('FROM matches WHERE id = ANY'));
+      const authorityLoad = seen.findIndex((t) => t.includes('pg_get_constraintdef'));
+      expect(firstSearch).toBeGreaterThan(-1);
+      expect(lock).toBeGreaterThan(firstSearch);
+      expect(authorityLoad).toBeGreaterThan(lock);
+      expect(seen[lock]).toContain('ORDER BY id');
+      expect(seen[lock].endsWith('FOR UPDATE')).toBe(true);
+      expect(seen[lock]).toContain(JSON.stringify([41]));
+      expect(seen[lock]).toContain(JSON.stringify(MK));
+      expect(seen.some((t) => t.endsWith('FOR SHARE'))).toBe(false);
+    });
+
+    it('R-01: a rekey unit with no retired candidate keeps the incoming-key FOR SHARE lock', async () => {
+      const { tx, seen } = fakeUnitTx(rekeyResponder([]));
+      await applyCanonicalUnit(tx, rekeyUnit()).catch(() => undefined);
+      expect(seen.some((t) => t.includes('FROM matches WHERE id = ANY'))).toBe(false);
+      const share = seen.findIndex((t) => t.includes('FROM matches WHERE match_key') && t.endsWith('FOR SHARE'));
+      const authorityLoad = seen.findIndex((t) => t.includes('pg_get_constraintdef'));
+      expect(share).toBeGreaterThan(-1);
+      expect(authorityLoad).toBeGreaterThan(share);
+      expect(seen[share]).toContain(JSON.stringify(MK));
+    });
+
+    it('R-01: a non-rekey unit runs no retired search before the authority', async () => {
+      const { tx, seen } = fakeUnitTx(respondFor([], ROW));
+      await applyCanonicalUnit(tx, unitOf({ kicks: 9 }, CURRENT, { matchRekey: null }));
+      const authorityLoad = seen.findIndex((t) => t.includes('pg_get_constraintdef'));
+      expect(authorityLoad).toBeGreaterThan(-1);
+      expect(seen.slice(0, authorityLoad).some((t) => t.includes('JOIN staging.source_records'))).toBe(false);
+    });
+
+    it('with no active authority writes exactly the proposal, as before', async () => {
+      const { tx, seen } = fakeUnitTx(respondFor([], ROW));
+      const outcome = await applyCanonicalUnit(tx, unitOf({ goals: 5, kicks: 9 }, CURRENT));
+      expect(outcome.failure).toBeNull();
+      expect(outcome.results[0]).toMatchObject({ applied: true, verb: 'update', rowsUpdated: 1 });
+      const [update] = writes(seen);
+      expect(update).toContain('"goals":5');
+      expect(update).toContain('"kicks":9');
+    });
+
+    it('subtracts a protected field and writes the rest', async () => {
+      const { tx, seen } = fakeUnitTx(respondFor([rec('match_sheet', { goals: 3 })], ROW));
+      const outcome = await applyCanonicalUnit(tx, unitOf({ goals: 5, kicks: 9 }, CURRENT));
+      expect(outcome.results[0]).toMatchObject({ applied: true, rowsUpdated: 1 });
+      const [update] = writes(seen);
+      expect(update).toContain('"kicks":9');
+      expect(update).not.toContain('"goals"');
+      const ledger = seen.find((t) => t.startsWith('INSERT INTO canonical_applications'))!;
+      expect(ledger).toContain('{"kicks":9}');
+      expect(ledger).not.toContain('"goals"');
+    });
+
+    it('is nothing_to_write when every changed field is protected', async () => {
+      const { tx, seen } = fakeUnitTx(respondFor([rec('match_sheet', { goals: 3 })], ROW));
+      const outcome = await applyCanonicalUnit(tx, unitOf({ goals: 5 }, CURRENT));
+      expect(outcome.results[0]).toMatchObject({ applied: false, refusal: 'nothing_to_write' });
+      expect(writes(seen)).toEqual([]);
+    });
+
+    it('refuses a source insertion against a durable removal, and an insertion over a protected field', async () => {
+      const removed = fakeUnitTx(respondFor([rec('lineup', { present: false })], null));
+      const a = await applyCanonicalUnit(removed.tx, unitOf({ goals: 5, kicks: 9 }, null));
+      expect(a.results[0]).toMatchObject({ applied: false, refusal: 'manual_authority_conflict' });
+      expect(writes(removed.seen)).toEqual([]);
+
+      const partial = fakeUnitTx(respondFor([rec('match_sheet', { goals: 3 })], null));
+      const b = await applyCanonicalUnit(partial.tx, unitOf({ goals: 5, kicks: 9 }, null));
+      expect(b.results[0]).toMatchObject({ applied: false, refusal: 'manual_authority_conflict' });
+      expect(writes(partial.seen)).toEqual([]);
+    });
+
+    it('refuses an update of a durably removed row', async () => {
+      const { tx, seen } = fakeUnitTx(respondFor([rec('lineup', { present: false })], ROW));
+      const outcome = await applyCanonicalUnit(tx, unitOf({ kicks: 9 }, CURRENT));
+      expect(outcome.results[0]).toMatchObject({ refusal: 'manual_authority_conflict' });
+      expect(writes(seen)).toEqual([]);
+    });
+
+    it('refuses an indeterminate match, including an unreadable record', async () => {
+      const { tx, seen } = fakeUnitTx(respondFor([rec('match_sheet', { bogus: 1 })], ROW));
+      const outcome = await applyCanonicalUnit(tx, unitOf({ kicks: 9 }, CURRENT));
+      expect(outcome.results[0]).toMatchObject({ refusal: 'manual_authority_indeterminate' });
+      expect(writes(seen)).toEqual([]);
+    });
+
+    it('refuses when an active record names this match_key but the snapshot cannot resolve it', async () => {
+      const { tx, seen } = fakeUnitTx(
+        respondFor([rec('match_sheet', { goals: 3 })], ROW, { loaderMatches: [] }),
+      );
+      const outcome = await applyCanonicalUnit(tx, unitOf({ kicks: 9 }, CURRENT));
+      expect(outcome.results[0]).toMatchObject({ refusal: 'manual_authority_indeterminate' });
+      expect(writes(seen)).toEqual([]);
+    });
+  });
+
+  describe('the rekey carry (§18.9)', () => {
+    const OLD = '2026|1|2026-03-12|Carlton|Collingwood';
+    const NEW = '2026|1|2026-03-13|Carlton|Collingwood';
+    const oldRows = [
+      { id: '11', entityKey: `${OLD}|${PATH}`, fieldGroup: 'lineup', overrideValues: { present: false }, adminUserId: 4 },
+      { id: '12', entityKey: `${OLD}|${PATH}`, fieldGroup: 'match_sheet', overrideValues: { goals: 3 }, adminUserId: 4 },
+    ];
+    function carrySql(atTarget: unknown[]) {
+      const seen: string[] = [];
+      const sql = ((strings: TemplateStringsArray, ...values: unknown[]) => {
+        const text = strings
+          .reduce((acc, part, i) => acc + part + (i < values.length ? JSON.stringify(values[i]) : ''), '')
+          .replace(/\s+/g, ' ').trim();
+        seen.push(text);
+        if (text.includes("entity_type = 'matches'")) return Promise.resolve([]);
+        if (text.includes('AND is_active AND starts_with')) return Promise.resolve(oldRows);
+        if (text.includes(`starts_with(entity_key, ${JSON.stringify(`${NEW}|`)})`)) return Promise.resolve(atTarget);
+        return Promise.resolve([]);
+      }) as unknown as Record<string, unknown>;
+      sql.json = (value: unknown) => value;
+      return { sql: sql as never, seen };
+    }
+    const mutations = (seen: string[]) => seen.filter((t) => /^(INSERT|UPDATE) data_overrides|^(INSERT INTO|UPDATE) data_overrides/.test(t));
+
+    it('moves every active record to the new key and deactivates the old rows', async () => {
+      const { sql, seen } = carrySql([]);
+      expect(await carryMatchOverrides(sql, OLD, NEW)).toEqual({ carried: 2 });
+      const inserts = mutations(seen).filter((t) => t.startsWith('INSERT'));
+      expect(inserts).toHaveLength(2);
+      for (const text of inserts) {
+        expect(text).toContain(JSON.stringify(`${NEW}|${PATH}`));
+        expect(text).toContain('"player_match_stats"');
+      }
+      const deactivated = mutations(seen).filter((t) => t.includes('SET is_active = false'));
+      expect(deactivated.map((t) => /"(\d+)"::bigint/.exec(t)![1]).sort()).toEqual(['11', '12']);
+    });
+
+    it('refuses the rekey when an active record already holds the new key, before any write', async () => {
+      const { sql, seen } = carrySql([
+        { id: '90', entityKey: `${NEW}|${PATH}`, fieldGroup: 'match_sheet', isActive: true },
+      ]);
+      const carry = await carryMatchOverrides(sql, OLD, NEW);
+      expect(carry).toHaveProperty('conflict');
+      expect(mutations(seen)).toEqual([]);
+    });
+
+    it('reactivates an inactive record at the new key instead of inserting', async () => {
+      const { sql, seen } = carrySql([
+        { id: '91', entityKey: `${NEW}|${PATH}`, fieldGroup: 'match_sheet', isActive: false },
+      ]);
+      expect(await carryMatchOverrides(sql, OLD, NEW)).toEqual({ carried: 2 });
+      const writesSeen = mutations(seen);
+      expect(writesSeen.filter((t) => t.startsWith('INSERT'))).toHaveLength(1); // the lineup record
+      const reactivated = writesSeen.find((t) => t.includes('is_active = true') && t.startsWith('UPDATE'))!;
+      expect(reactivated).toContain('"91"::bigint');
+    });
+
+    it('refuses a record whose identity cannot be re-encoded rather than guessing', async () => {
+      const seen: string[] = [];
+      const sql = ((strings: TemplateStringsArray, ...values: unknown[]) => {
+        const text = strings.reduce((a, p, i) => a + p + (i < values.length ? JSON.stringify(values[i]) : ''), '')
+          .replace(/\s+/g, ' ').trim();
+        seen.push(text);
+        if (text.includes('AND is_active AND starts_with')) {
+          return Promise.resolve([{ id: '13', entityKey: `${OLD}|bogus`, fieldGroup: 'lineup', overrideValues: { present: false }, adminUserId: 4 }]);
+        }
+        return Promise.resolve([]);
+      }) as unknown as Record<string, unknown>;
+      sql.json = (value: unknown) => value;
+      expect(await carryMatchOverrides(sql as never, OLD, NEW)).toHaveProperty('conflict');
+      expect(mutations(seen)).toEqual([]);
+    });
+
+    it('scopes the old match with the §18.3 predicate and never a LIKE', () => {
+      const source = readSource('src/lib/acquisition/match-rekey.ts');
+      expect(source).toContain('starts_with(entity_key, ${oldPrefix})');
+      expect(source).toContain("strpos(substr(entity_key, ${oldPrefix.length + 1}::int), '|') = 0");
+      expect(source).not.toMatch(/LIKE\s/);
+    });
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * AFLDB-ISSUE-257 Slice 1 — the key and identity model, DB-free
+ * ------------------------------------------------------------------ */
+describe('ISSUE-257 player_match_stats entity_key', () => {
+  const MK = '2026|1|2026-03-12|Carlton|Collingwood';
+  const PATH = 'afltables:players/J/Jack_Ross.html';
+  const TOKEN = 'manual_admin_edit:0b1c2d3e-0000-4000-8000-000000000001';
+
+  it('round-trips a path and a token identity', () => {
+    for (const identity of [PATH, TOKEN]) {
+      const encoded = encodePlayerMatchStatsKey(MK, identity);
+      expect(encoded).toEqual({ ok: true, entityKey: `${MK}|${identity}` });
+      expect(decodePlayerMatchStatsKey(`${MK}|${identity}`)).toMatchObject({
+        matchKey: MK, identity, season: 2026,
+      });
+    }
+    expect(decodePlayerMatchStatsKey(`${MK}|${PATH}`)).toMatchObject({
+      sourceKey: 'afltables', externalId: 'players/J/Jack_Ross.html',
+    });
+  });
+
+  it('decodes at the LAST separator, so a match_key with an extra "|" is exact', () => {
+    const weird = '2026|1|2026-03-12|Club|A|Club B';
+    const decoded = decodePlayerMatchStatsKey(`${weird}|${PATH}`);
+    expect(decoded).toMatchObject({ matchKey: weird, identity: PATH });
+  });
+
+  it('scopes a match by prefix without catching a longer key that shares it', () => {
+    const shorter = '2026|1|2026-03-12|A|B';
+    const longer = `${shorter}|C`;
+    expect(entityKeyBelongsToMatch(`${shorter}|${PATH}`, shorter)).toBe(true);
+    expect(entityKeyBelongsToMatch(`${longer}|${PATH}`, shorter)).toBe(false);
+    expect(entityKeyBelongsToMatch(`${longer}|${PATH}`, longer)).toBe(true);
+    // '%' and '_' in a name are inert (no LIKE).
+    expect(entityKeyBelongsToMatch(`2026|1|d|A_|B%|${PATH}`, '2026|1|d|A_|B%')).toBe(true);
+    expect(entityKeyBelongsToMatch(`2026|1|d|AX|B%|${PATH}`, '2026|1|d|A_|B%')).toBe(false);
+  });
+
+  it('refuses a "|" in an identity and every malformed key', () => {
+    expect(encodePlayerMatchStatsKey(MK, 'afltables:players/J/a|b.html'))
+      .toEqual({ ok: false, reason: 'identity_contains_separator' });
+    expect(encodePlayerMatchStatsKey(MK, 'afl_api:123'))
+      .toEqual({ ok: false, reason: 'invalid_identity' });
+    expect(encodePlayerMatchStatsKey('nonsense', PATH))
+      .toEqual({ ok: false, reason: 'invalid_match_key' });
+    for (const bad of [
+      '', 'no-separator', `|${PATH}`, `${MK}|`, `${MK}|afl_api:1`, `${MK}|afltables:`,
+      `${MK}|players/J/Jack_Ross.html`, `notaseason|1|d|A|B|${PATH}`, `2026|${PATH}`,
+    ]) {
+      expect(decodePlayerMatchStatsKey(bad), bad).toBeNull();
+    }
+  });
+});
+
+describe('ISSUE-257 player identity (D-257-9) and key reuse (D-257-8)', () => {
+  const continuity = loadContinuityRulesFailClosed();
+  const CONT = 'players/C/Charlie_Cameron.html';
+  const RENUM = 'players/C/Charlie_Cameron3.html';
+  const classify = (afltablesPaths: string[], manualTokens: string[], c: ContinuityRulesLoad = continuity) =>
+    classifyPlayerMatchStatsIdentity({ afltablesPaths, manualTokens, continuity: c });
+
+  it('reads the tracked continuity contract', () => {
+    expect(continuity.ok).toBe(true);
+    expect(loadContinuityRulesFailClosed('Z:/definitely/not/a/contract.json').ok).toBe(false);
+  });
+
+  it('uses one path, one token, and prefers the path when both exist', () => {
+    expect(classify(['players/A/Abe.html'], []))
+      .toEqual({ ok: true, identity: 'afltables:players/A/Abe.html', via: 'afltables' });
+    expect(classify([], ['tok-1']))
+      .toEqual({ ok: true, identity: 'manual_admin_edit:tok-1', via: 'manual_admin_edit' });
+    expect(classify(['players/A/Abe.html'], ['tok-1']))
+      .toMatchObject({ ok: true, identity: 'afltables:players/A/Abe.html' });
+    // The same path repeated is one path.
+    expect(classify(['players/A/Abe.html', 'players/A/Abe.html'], []))
+      .toMatchObject({ ok: true, identity: 'afltables:players/A/Abe.html' });
+  });
+
+  it('folds exactly one tracked continuity pair, in either order, onto its continuing path', () => {
+    const want = { ok: true, identity: `afltables:${CONT}`, via: 'afltables' };
+    expect(classify([CONT, RENUM], [])).toEqual(want);
+    expect(classify([RENUM, CONT], ['tok-1'])).toEqual(want);
+  });
+
+  it('refuses any other multi-path state as ambiguous', () => {
+    // Two paths no rule names; one member of a rule plus a stranger; and three paths.
+    expect(classify(['players/A/Abe.html', 'players/B/Bob.html'], []))
+      .toEqual({ ok: false, reason: 'ambiguous_identity' });
+    expect(classify([CONT, 'players/B/Bob.html'], []))
+      .toEqual({ ok: false, reason: 'ambiguous_identity' });
+    expect(classify([CONT, RENUM, 'players/B/Bob.html'], []))
+      .toEqual({ ok: false, reason: 'ambiguous_identity' });
+    // Two manual tokens and no path.
+    expect(classify([], ['t1', 't2'])).toEqual({ ok: false, reason: 'ambiguous_identity' });
+  });
+
+  it('fails closed on malformed or unreadable continuity data', () => {
+    const bad = loadContinuityRulesFailClosed('Z:/definitely/not/a/contract.json');
+    expect(bad.ok).toBe(false);
+    expect(classify([CONT, RENUM], [], bad)).toMatchObject({ ok: false, reason: 'continuity_contract_invalid' });
+    // The contract is consulted only for a two-path player; a single path needs no rule.
+    expect(classify(['players/A/Abe.html'], [], bad)).toMatchObject({ ok: true });
+  });
+
+  it('refuses no identity and any identity containing "|"', () => {
+    expect(classify([], [])).toEqual({ ok: false, reason: 'no_durable_identity' });
+    expect(classify(['players/A/a|b.html'], []))
+      .toEqual({ ok: false, reason: 'identity_contains_separator' });
+    expect(classify([], ['to|ken']))
+      .toEqual({ ok: false, reason: 'identity_contains_separator' });
+  });
+
+  describe('decideAuthorityKey', () => {
+    const MK = '2026|1|2026-03-12|Carlton|Collingwood';
+    const pathId = 'afltables:players/A/Abe.html';
+    const tokenId = 'manual_admin_edit:tok-1';
+    const forms = resolvableIdentityForms({ afltablesPaths: ['players/A/Abe.html'], manualTokens: ['tok-1'] });
+    const canonical = classify(['players/A/Abe.html'], ['tok-1']);
+    const rec = (identity: string, over: Partial<{ fieldGroup: string; isActive: boolean }> = {}) => ({
+      entityKey: `${MK}|${identity}`, fieldGroup: 'match_sheet', isActive: true, ...over,
+    });
+
+    it('lists every resolvable form, sorted and unique', () => {
+      expect(forms).toEqual([pathId, tokenId]);
+    });
+
+    it('mints under the current canonical identity when no record exists', () => {
+      expect(decideAuthorityKey({ matchKey: MK, canonical, forms, records: [] }))
+        .toEqual({ ok: true, action: 'mint', identity: pathId, entityKey: `${MK}|${pathId}` });
+      // Other players' records and other matches' records are not this player's.
+      expect(decideAuthorityKey({
+        matchKey: MK, canonical, forms,
+        records: [rec('afltables:players/Z/Other.html'), {
+          entityKey: `2026|2|d|A|B|${tokenId}`, fieldGroup: 'match_sheet', isActive: true,
+        }],
+      })).toMatchObject({ ok: true, action: 'mint' });
+    });
+
+    it('reuses the form existing records sit under, even when it is not the preferred one', () => {
+      expect(decideAuthorityKey({
+        matchKey: MK, canonical, forms,
+        records: [rec(tokenId), rec(tokenId, { fieldGroup: 'lineup' })],
+      })).toEqual({ ok: true, action: 'reuse', identity: tokenId, entityKey: `${MK}|${tokenId}` });
+    });
+
+    it('counts an inactive (returned to source) record for reuse', () => {
+      expect(decideAuthorityKey({
+        matchKey: MK, canonical, forms, records: [rec(tokenId, { isActive: false })],
+      })).toMatchObject({ ok: true, action: 'reuse', identity: tokenId });
+    });
+
+    it('refuses duplicate authority under two identity forms', () => {
+      expect(decideAuthorityKey({
+        matchKey: MK, canonical, forms, records: [rec(pathId), rec(tokenId)],
+      })).toMatchObject({ ok: false, reason: 'ambiguous_authority' });
+    });
+
+    it('refuses a malformed key in the match scope and a failed classification', () => {
+      expect(decideAuthorityKey({
+        matchKey: MK, canonical, forms, records: [{
+          entityKey: `${MK}|afl_api:1`, fieldGroup: 'match_sheet', isActive: true,
+        }],
+      })).toMatchObject({ ok: false, reason: 'malformed_authority_key' });
+      expect(decideAuthorityKey({
+        matchKey: MK, canonical: classify([], []), forms: [], records: [],
+      })).toMatchObject({ ok: false, reason: 'no_durable_identity' });
+    });
   });
 });
 

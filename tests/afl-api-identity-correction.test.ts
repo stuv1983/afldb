@@ -67,6 +67,12 @@ import {
   type MutationPlan,
   type PlayerMatchStatsRowEvidence,
 } from '@/lib/acquisition/afl-api-identity-correction';
+import {
+  describeManualAuthorityBlockers,
+  manualAuthorityBlockersForMatch,
+  type ContinuityRulesLoad,
+  type MatchAuthorityRecord,
+} from '@/lib/acquisition/match-sheet-authority';
 
 function app(partial: Partial<Application> & Pick<Application, 'id' | 'verb' | 'newValues'>): Application {
   return {
@@ -1717,5 +1723,71 @@ describe('Slice 9 case 54: the admin resolve step setting match_id on an AFL API
       stop: { step: 'B5', code: 'out_of_ledger_edit', detail: 'field(s) differ from reconstruction: match_id' },
     });
     expect(evaluateBrownlowMutationEligibility({ ...evidence, current: { ...evidence.current, matchId: null } })).toEqual({ ok: true });
+  });
+});
+
+describe('AFLDB-ISSUE-257 Slice 6 A257: manualAuthorityBlockersForMatch (ORIGINAL guard decision, F-PR-06)', () => {
+  const MK = '2025|1|carlton|essendon';
+  const ID_P = 'afltables:players/P/Pee.html';
+  const ID_Q = 'afltables:players/P/PeePrime.html';
+  const ID_OTHER = 'afltables:players/O/Other.html';
+  const okContinuity: ContinuityRulesLoad = { ok: true, rules: [] as unknown as Extract<ContinuityRulesLoad, { ok: true }>['rules'] };
+  const players = new Map<string, number[]>([[ID_P, [1]], [ID_Q, [2]], [ID_OTHER, [3]]]);
+  const rec = (identity: string, fieldGroup = 'match_sheet', isActive = true, overrideValues: unknown = { goals: 3 }, matchKey = MK): MatchAuthorityRecord => ({
+    entityKey: `${matchKey}|${identity}`, fieldGroup, isActive, overrideValues,
+  });
+  const run = (records: MatchAuthorityRecord[], over: Partial<Parameters<typeof manualAuthorityBlockersForMatch>[0]> = {}) =>
+    manualAuthorityBlockersForMatch({
+      matchKey: MK, records, playerIdsByIdentity: players, continuity: okContinuity, pId: 1, pPrimeId: 2, ...over,
+    });
+
+  it('an active record resolving to (P, M) blocks and names the key and group', () => {
+    const blockers = run([rec(ID_P)]);
+    expect(blockers).toEqual([{ entityKey: `${MK}|${ID_P}`, fieldGroups: ['match_sheet'], kind: 'authority', reason: null }]);
+    expect(describeManualAuthorityBlockers(blockers)).toBe(`active Match Sheet authority ${MK}|${ID_P} [match_sheet]`);
+  });
+
+  it('an active lineup record at (P′, M) blocks', () => {
+    const blockers = run([rec(ID_Q, 'lineup', true, { present: false })]);
+    expect(blockers).toHaveLength(1);
+    expect(blockers[0]).toMatchObject({ kind: 'authority', fieldGroups: ['lineup'] });
+  });
+
+  it('a record of another player at M does not block', () => {
+    expect(run([rec(ID_OTHER)])).toEqual([]);
+  });
+
+  it('a withdrawn-only key carries no authority, even with an unreadable continuity contract', () => {
+    expect(run([rec(ID_P, 'match_sheet', false)])).toEqual([]);
+    expect(run([rec(ID_P, 'match_sheet', false, null)], { continuity: { ok: false, detail: 'unreadable' } })).toEqual([]);
+  });
+
+  it('an undecodable key under the match prefix is indeterminate (fails closed)', () => {
+    const blockers = run([{ entityKey: `${MK}|not-an-identity`, fieldGroup: 'match_sheet', isActive: true, overrideValues: { goals: 1 } }]);
+    expect(blockers).toHaveLength(1);
+    expect(blockers[0]).toMatchObject({ kind: 'indeterminate', reason: 'key does not decode' });
+    expect(describeManualAuthorityBlockers(blockers)).toContain('indeterminate Match Sheet authority');
+  });
+
+  it('an identity resolving to no player, or to several, is indeterminate', () => {
+    expect(run([rec('afltables:players/N/Nobody.html')])[0]).toMatchObject({ kind: 'indeterminate', reason: 'identity unresolved' });
+    const shared = new Map(players).set(ID_OTHER, [1, 3]);
+    expect(run([rec(ID_OTHER)], { playerIdsByIdentity: shared })[0]).toMatchObject({ kind: 'indeterminate', reason: 'identity ambiguous' });
+  });
+
+  it('an unreadable payload is indeterminate, whoever the key names', () => {
+    expect(run([rec(ID_OTHER, 'match_sheet', true, { bogus: 1 })])[0]).toMatchObject({ kind: 'indeterminate' });
+  });
+
+  it('an unreadable continuity contract makes every active record indeterminate', () => {
+    const blockers = run([rec(ID_P), rec(ID_OTHER)], { continuity: { ok: false, detail: 'unreadable' } });
+    expect(blockers.map((b) => b.kind)).toEqual(['indeterminate', 'indeterminate']);
+  });
+
+  it('records of another match, including a longer key sharing the prefix, are not considered', () => {
+    expect(run([
+      rec(ID_P, 'match_sheet', true, { goals: 1 }, '2025|2|carlton|essendon'),
+      rec(ID_P, 'match_sheet', true, { goals: 1 }, `${MK}|extra`),
+    ])).toEqual([]);
   });
 });

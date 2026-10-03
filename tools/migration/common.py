@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sqlite3
 import sys
 from contextlib import contextmanager
@@ -1157,12 +1158,388 @@ def _special_delta_expr(column: str, cast: str, disposition: str) -> str:
             f"ELSE x.{column} END")
 
 
-def replay_admin_overrides(conn: psycopg.Connection, table: str) -> None:
+# --------------------------------------------------------------------------
+# AFLDB-ISSUE-257 Slice 5 -- durable Match Sheet authority replay
+# --------------------------------------------------------------------------
+# The Python twin of src/lib/acquisition/match-sheet-authority.ts (key, payload
+# parsers, interpretKeyAuthority) and of resolveStoredIdentityToPlayer (D-257-9).
+# The decision half (pms_preflight) is PURE -- rows in, problems and a plan out --
+# so tests/current-season-import.test.ts can pin TS/Python agreement without a
+# database. Any change to these semantics must be made in the TypeScript model
+# too, or that parity corpus fails.
+PMS_ENTITY = "player_match_stats"
+PMS_MATCH_SHEET_GROUP = "match_sheet"
+PMS_LINEUP_GROUP = "lineup"
+# Payload key -> player_match_stats column. This tuple IS the allowlist: no
+# payload text ever reaches SQL as an identifier.
+PMS_FIELD_COLUMNS = (
+    ("club_slug", "club_id"), ("jumper_number", "jumper_number"),
+    ("goals", "goals"), ("behinds", "behinds"), ("kicks", "kicks"),
+    ("handballs", "handballs"), ("disposals", "disposals"), ("marks", "marks"),
+    ("tackles", "tackles"), ("hitouts", "hitouts"),
+    ("frees_for", "frees_for"), ("frees_against", "frees_against"),
+)
+PMS_COUPLED = ("kicks", "handballs", "disposals")
+_PMS_SMALLINT_MAX = 32767
+_PMS_SOURCE_KEYS = ("afltables", "manual_admin_edit")
+_PMS_MATCH_KEY_SEASON = re.compile(r"\d{4}\|[^\n\r  ]", re.ASCII)
+
+
+def pms_parse_identity(identity: str) -> tuple[str, str] | None:
+    """`afltables:<path>` / `manual_admin_edit:<token>` -> (source key, external id)."""
+    at = identity.find(":")
+    if at <= 0:
+        return None
+    source_key, external_id = identity[:at], identity[at + 1:]
+    if external_id == "" or "|" in external_id or source_key not in _PMS_SOURCE_KEYS:
+        return None
+    return source_key, external_id
+
+
+def pms_decode_key(entity_key: str) -> dict | None:
+    """`<match_key>|<identity>` decoded at the LAST '|', or None."""
+    at = entity_key.rfind("|")
+    if at <= 0:
+        return None
+    match_key, identity = entity_key[:at], entity_key[at + 1:]
+    parts = pms_parse_identity(identity)
+    if _PMS_MATCH_KEY_SEASON.match(match_key) is None or parts is None:
+        return None
+    return {"match_key": match_key, "identity": identity,
+            "source_key": parts[0], "external_id": parts[1]}
+
+
+def _pms_is_int(value: Any) -> bool:
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, int):
+        return True
+    # JSON 3.0 parses to a float here and to the integer 3 in JavaScript.
+    return isinstance(value, float) and value.is_integer()
+
+
+def pms_parse_match_sheet(raw: Any) -> tuple[dict | None, str | None]:
+    """(delta, None) or (None, why). Strict, exactly as parseMatchSheetPayload."""
+    if not isinstance(raw, dict):
+        return None, "match_sheet payload is not an object"
+    if not raw:
+        return None, "match_sheet payload is empty"
+    known = {key for key, _ in PMS_FIELD_COLUMNS}
+    delta: dict = {}
+    for key, value in raw.items():
+        if key not in known:
+            return None, f"unknown match_sheet key {json.dumps(key)}"
+        if key == "club_slug":
+            if not isinstance(value, str) or value == "":
+                return None, "club_slug must be a non-empty string"
+        elif key == "jumper_number":
+            if value is not None and (not isinstance(value, str) or value == "" or len(value) > 4):
+                return None, "jumper_number must be null or a 1-4 character string"
+        elif value is not None and (not _pms_is_int(value) or value < 0 or value > _PMS_SMALLINT_MAX):
+            return None, f"{key} must be null or a non-negative integer"
+        delta[key] = int(value) if _pms_is_int(value) and key not in ("club_slug", "jumper_number") else value
+    present = [key for key in PMS_COUPLED if key in delta]
+    if present and len(present) != len(PMS_COUPLED):
+        return None, "kicks, handballs and disposals must be recorded together"
+    kicks, handballs, disposals = (delta.get(key) for key in PMS_COUPLED)
+    if (isinstance(kicks, int) and isinstance(handballs, int) and isinstance(disposals, int)
+            and disposals != kicks + handballs):
+        return None, "disposals does not equal kicks plus handballs"
+    return delta, None
+
+
+def pms_parse_lineup(raw: Any) -> tuple[bool | None, str | None]:
+    """(present, None) or (None, why): exactly {"present": boolean}."""
+    if not isinstance(raw, dict):
+        return None, "lineup payload is not an object"
+    if list(raw.keys()) != ["present"] or not isinstance(raw["present"], bool):
+        return None, 'lineup payload must be exactly {"present": boolean}'
+    return raw["present"], None
+
+
+def pms_interpret_key(records: Sequence[dict]) -> dict:
+    """interpretKeyAuthority: {"ok", "fields", "presence"} or {"ok": False, "detail"}.
+
+    An inactive record is no authority and is not even parsed; an ACTIVE record in an
+    unknown or duplicated field group, or with an unreadable payload, makes the key
+    unreadable."""
+    fields: dict | None = None
+    presence: str | None = None
+    seen: set[str] = set()
+    for record in records:
+        group = record["field_group"]
+        if group in seen:
+            return {"ok": False, "detail": f"duplicate_field_group: {group}"}
+        seen.add(group)
+        if not record["is_active"]:
+            continue
+        if group == PMS_MATCH_SHEET_GROUP:
+            parsed, why = pms_parse_match_sheet(record["override_values"])
+            if why is not None:
+                return {"ok": False, "detail": f"payload_unreadable: {why}"}
+            fields = parsed
+        elif group == PMS_LINEUP_GROUP:
+            present, why = pms_parse_lineup(record["override_values"])
+            if why is not None:
+                return {"ok": False, "detail": f"payload_unreadable: {why}"}
+            presence = "present" if present else "removed"
+        else:
+            return {"ok": False, "detail": f"unknown_field_group: {group}"}
+    return {"ok": True, "fields": fields, "presence": presence}
+
+
+def pms_continuity_pairs(rules: Sequence[dict] | None = None) -> list[tuple[str, str]] | None:
+    """(continuing_url, renumbered_url) per tracked rule, or None when the contract is
+    unreadable or malformed (fail closed). The ONE validator is
+    import_fitzroy_core.load_profile_continuity_rules; it is imported lazily because
+    that module imports this one. `rules` lets a caller hand in already-loaded rules."""
+    if rules is None:
+        try:
+            from import_fitzroy_core import load_profile_continuity_rules  # noqa: PLC0415
+            rules = load_profile_continuity_rules()
+        except Exception:  # noqa: BLE001 - any unreadable contract fails closed
+            return None
+    try:
+        return [(rule["continuing_url"], rule["renumbered_url"]) for rule in rules]
+    except (KeyError, TypeError):
+        return None
+
+
+def pms_partners_of(path: str, pairs: Sequence[tuple[str, str]]) -> list[str]:
+    """The other side of every tracked rule naming `path`."""
+    partners = set()
+    for continuing, renumbered in pairs:
+        if path == continuing:
+            partners.add(renumbered)
+        elif path == renumbered:
+            partners.add(continuing)
+    return sorted(partners)
+
+
+def pms_resolve_identity(identity: str, players_by_identity: dict,
+                         pairs: Sequence[tuple[str, str]] | None) -> tuple[int | None, str | None]:
+    """resolveStoredIdentityToPlayer: (player_id, None) or (None, reason).
+
+    A manual token, or an AFL Tables path in no tracked rule, resolves iff exactly one
+    distinct player holds it. A path on EITHER side of a tracked rule resolves only if
+    both sides each resolve to exactly one player and it is the SAME player."""
+    if pairs is None:
+        return None, "continuity_contract_invalid"
+    parts = pms_parse_identity(identity)
+    if parts is None:
+        return None, "invalid_identity"
+    own = set(players_by_identity.get(identity, ()))
+    if not own:
+        return None, "unresolved"
+    if len(own) > 1:
+        return None, "ambiguous"
+    player_id = next(iter(own))
+    if parts[0] == "manual_admin_edit":
+        return player_id, None
+    for partner in pms_partners_of(parts[1], pairs):
+        other = set(players_by_identity.get(f"afltables:{partner}", ()))
+        if not other:
+            return None, "partner_missing"
+        if len(other) > 1:
+            return None, "ambiguous"
+        if next(iter(other)) != player_id:
+            return None, "split"
+    return player_id, None
+
+
+def pms_preflight(records: Sequence[dict], matches_by_key: dict, players_by_identity: dict,
+                  club_id_by_slug: dict, pairs: Sequence[tuple[str, str]] | None,
+                  existing_pairs: set | None = None) -> tuple[list[tuple[str, str]], list[dict]]:
+    """The whole decision, pure. `records` are the ACTIVE data_overrides rows
+    ({entity_key, field_group, is_active, override_values}); matches_by_key maps
+    match_key -> {id, home_club_id, away_club_id}; players_by_identity maps the full
+    identity string -> distinct player ids; club_id_by_slug maps slug -> club id.
+
+    Returns (problems, plan): problems is [(entity_key, why)] naming EVERY offender
+    (D-257-4); plan is one dict per key that carries authority. `existing_pairs`
+    (a set of (match_id, player_id)) enables the row-existence check; None skips it
+    (the reload preflight runs before the rows exist, and re-checks afterwards)."""
+    problems: list[tuple[str, str]] = []
+    by_key: dict[str, list[dict]] = {}
+    for record in records:
+        by_key.setdefault(record["entity_key"], []).append(record)
+
+    plan: list[dict] = []
+    owner_of_pair: dict[tuple[int, int], str] = {}
+    for entity_key in sorted(by_key):
+        decoded = pms_decode_key(entity_key)
+        if decoded is None:
+            problems.append((entity_key, "entity_key does not decode as <match_key>|<identity>"))
+            continue
+        interpreted = pms_interpret_key(by_key[entity_key])
+        if not interpreted["ok"]:
+            problems.append((entity_key, interpreted["detail"]))
+            continue
+        fields, presence = interpreted["fields"], interpreted["presence"]
+        if fields is None and presence is None:
+            continue  # no authority
+        if pairs is None:
+            problems.append((entity_key, "the fitzRoy profile-continuity contract is unreadable"))
+            continue
+        match = matches_by_key.get(decoded["match_key"])
+        if match is None:
+            problems.append((entity_key, "match_key does not resolve to exactly one match"))
+            continue
+        player_id, why = pms_resolve_identity(decoded["identity"], players_by_identity, pairs)
+        if why is not None:
+            problems.append((entity_key, f"identity does not resolve to exactly one player ({why})"))
+            continue
+        club_id = None
+        if fields is not None and "club_slug" in fields:
+            club_id = club_id_by_slug.get(fields["club_slug"])
+            if club_id is None or club_id not in (match["home_club_id"], match["away_club_id"]):
+                problems.append((entity_key, "club_slug is not exactly the match's home or away club"))
+                continue
+        pair = (match["id"], player_id)
+        if pair in owner_of_pair:
+            problems.append((entity_key, f"resolves to the same (match, player) as {owner_of_pair[pair]}"))
+            continue
+        owner_of_pair[pair] = entity_key
+        if existing_pairs is not None and presence != "removed" and pair not in existing_pairs:
+            if presence != "present":
+                problems.append((entity_key, "field record has no player_match_stats row "
+                                             "and no durable addition behind it"))
+                continue
+            if fields is None or club_id is None:
+                problems.append((entity_key, "durable addition has no row and its match_sheet "
+                                             "record carries no club_slug to create one with"))
+                continue
+        plan.append({"entity_key": entity_key, "match_id": match["id"], "player_id": player_id,
+                     "club_id": club_id, "fields": fields, "presence": presence})
+    return problems, plan
+
+
+def _pms_plan_from_database(cur, check_rows: bool,
+                            continuity_rules: Sequence[dict] | None) -> list[dict]:
+    """Read the active set and its resolution inputs, run pms_preflight, and raise ONE
+    RuntimeError naming every offender. Read-only."""
+    cur.execute("""
+        SELECT entity_key, field_group, is_active, override_values
+          FROM data_overrides
+         WHERE entity_type = %s AND is_active
+         ORDER BY entity_key, field_group
+    """, (PMS_ENTITY,))
+    records = [{"entity_key": k, "field_group": g, "is_active": a, "override_values": v}
+               for k, g, a, v in cur.fetchall()]
+    if not records:
+        return []  # the old CHECK admits none: a clean no-op
+
+    pairs = pms_continuity_pairs(continuity_rules)
+    match_keys: set[str] = set()
+    external_ids: set[str] = set()
+    for record in records:
+        decoded = pms_decode_key(record["entity_key"])
+        if decoded is None:
+            continue
+        match_keys.add(decoded["match_key"])
+        external_ids.add(decoded["external_id"])
+        if decoded["source_key"] == "afltables" and pairs is not None:
+            external_ids.update(pms_partners_of(decoded["external_id"], pairs))
+
+    cur.execute("""
+        SELECT match_key, id, home_club_id, away_club_id FROM matches
+         WHERE match_key = ANY(%s)
+    """, (sorted(match_keys),))
+    matches_by_key = {k: {"id": i, "home_club_id": h, "away_club_id": a}
+                      for k, i, h, a in cur.fetchall()}
+    cur.execute("""
+        SELECT s.key, e.external_id, e.match_method, e.player_id
+          FROM external_identities e
+          JOIN sources s ON s.id = e.source_id
+         WHERE s.key IN ('afltables', 'manual_admin_edit')
+           AND e.external_id = ANY(%s)
+           AND e.status IN ('unique', 'resolved')
+           AND e.player_id IS NOT NULL
+    """, (sorted(external_ids),))
+    players_by_identity: dict[str, set] = {}
+    for source_key, external_id, match_method, player_id in cur.fetchall():
+        if source_key == "afltables" and match_method != "afltables_profile_url":
+            continue
+        players_by_identity.setdefault(f"{source_key}:{external_id}", set()).add(player_id)
+    cur.execute("SELECT slug, id FROM clubs")
+    club_id_by_slug = dict(cur.fetchall())
+
+    existing_pairs = None
+    if check_rows and matches_by_key:
+        cur.execute("""
+            SELECT match_id, player_id FROM player_match_stats WHERE match_id = ANY(%s)
+        """, ([m["id"] for m in matches_by_key.values()],))
+        existing_pairs = {(m, p) for m, p in cur.fetchall()}
+
+    problems, plan = pms_preflight(records, matches_by_key, players_by_identity,
+                                   club_id_by_slug, pairs, existing_pairs)
+    if problems:
+        raise RuntimeError(
+            "replay_admin_overrides(player_match_stats): refusing to commit, "
+            + str(len(problems)) + " active override key(s) do not resolve: "
+            + "; ".join(f"{key} -- {why}" for key, why in problems))
+    return plan
+
+
+def preflight_player_match_stats_authority(conn: psycopg.Connection,
+                                           continuity_rules: Sequence[dict] | None = None) -> None:
+    """Read-only. Raise, naming every unresolvable key, BEFORE a reload writes anything.
+    Row existence cannot be judged yet (the reload is about to replace the rows), so
+    the post-COPY replay re-checks it."""
+    with conn.cursor() as cur:
+        _pms_plan_from_database(cur, False, continuity_rules)
+
+
+def _pms_apply(cur, plan: Sequence[dict]) -> None:
+    # b. A durable removal deletes the row (a source-created row after a reload too).
+    for item in plan:
+        if item["presence"] == "removed":
+            cur.execute("DELETE FROM player_match_stats WHERE match_id = %s AND player_id = %s",
+                        (item["match_id"], item["player_id"]))
+    # c. A durable addition creates its row when absent: the saveMatchSheet column set,
+    #    source_id NULL (an unowned row; ownership is not changed by this slice).
+    for item in plan:
+        if item["presence"] != "present":
+            continue
+        values = item["fields"] or {}
+        cur.execute("""
+            INSERT INTO player_match_stats
+                  (player_id, match_id, club_id, jumper_number, goals, behinds, kicks,
+                   handballs, disposals, marks, tackles, hitouts, frees_for, frees_against)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (player_id, match_id) DO NOTHING
+        """, (item["player_id"], item["match_id"], item["club_id"],
+              values.get("jumper_number"), values.get("goals"), values.get("behinds"),
+              values.get("kicks"), values.get("handballs"), values.get("disposals"),
+              values.get("marks"), values.get("tackles"), values.get("hitouts"),
+              values.get("frees_for"), values.get("frees_against")))
+    # d. Key presence is authority: only the keys the payload carries are written; an
+    #    explicit JSON null clears (not recorded), an absent key leaves the source value.
+    for item in plan:
+        if item["presence"] == "removed" or not item["fields"]:
+            continue
+        sets, params = [], []
+        for key, column in PMS_FIELD_COLUMNS:
+            if key not in item["fields"]:
+                continue
+            sets.append(f"{column} = %s")
+            params.append(item["club_id"] if key == "club_slug" else item["fields"][key])
+        cur.execute("UPDATE player_match_stats SET " + ", ".join(sets)
+                    + " WHERE match_id = %s AND player_id = %s",
+                    (*params, item["match_id"], item["player_id"]))
+
+
+def replay_admin_overrides(conn: psycopg.Connection, table: str, *,
+                           continuity_rules: Sequence[dict] | None = None) -> None:
     """Replay durable admin overrides for the given table over newly imported rows.
 
     For DraftGuru integration (AFLDB-ISSUE-093), this helper can be called
     directly by the new draft importer without redesign. The canonical DraftGuru importer
     usage here is retained for historical compatibility on this branch.
+
+    ``continuity_rules`` is consulted only by ``player_match_stats`` (AFLDB-ISSUE-257
+    D-257-9): already-loaded profile-continuity rules, for a caller that has them;
+    otherwise the tracked contract is loaded and an unreadable one fails closed.
     """
     with conn.cursor() as cur:
         if table == "players":
@@ -1476,6 +1853,13 @@ def replay_admin_overrides(conn: psycopg.Connection, table: str) -> None:
                      WHERE o.entity_type = 'players' AND o.is_active = true
                  )
             """)
+
+        elif table == "player_match_stats":
+            # AFLDB-ISSUE-257 Slice 5. Preflight over the WHOLE active set first, so
+            # one raised error names every unresolvable key before anything is
+            # written; then removals, additions, field deltas. Binding order: after
+            # players (identities) and matches (match keys, clubs).
+            _pms_apply(cur, _pms_plan_from_database(cur, True, continuity_rules))
 
         elif table == "matches":
             # home_goals, away_goals are NOT NULL. attendance is nullable.

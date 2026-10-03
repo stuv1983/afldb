@@ -3111,7 +3111,8 @@ def import_player_match_stats(pg, rep, files: list[SnapshotFile],
     matches are removed, so rows owned by other import paths (e.g. the
     current-season pipeline) are never touched.
     """
-    from common import analyze, copy_rows, import_batch
+    from common import (analyze, copy_rows, import_batch,
+                        preflight_player_match_stats_authority, replay_admin_overrides)
 
     player_map = load_player_map(pg, args)
     match_map = load_match_map(pg, matches, clubs)
@@ -3123,6 +3124,10 @@ def import_player_match_stats(pg, rep, files: list[SnapshotFile],
     started = time.time()
     with import_batch(pg, SOURCE_KEY_FITZROY, "import_fitzroy_core.py",
                       "player_match_stats") as batch:
+        # AFLDB-ISSUE-257 Slice 5 (D-257-4). Preflight BEFORE the delete: a durable
+        # Match Sheet record this reload could not honour refuses here, naming every
+        # such key, with nothing yet written.
+        preflight_player_match_stats_authority(pg)
         with pg.cursor() as cur:
             cur.execute("DELETE FROM player_match_stats WHERE match_id = ANY(%s)",
                         (list(match_map.values()),))
@@ -3156,6 +3161,14 @@ def import_player_match_stats(pg, rep, files: list[SnapshotFile],
              *(target for _, target in STAT_MAP),
              "source_id", "import_batch_id"],
             build(), batch)
+        # AFLDB-ISSUE-257 Slice 5. The durable Match Sheet decisions are replayed over
+        # the freshly loaded rows INSIDE this transaction, so a refusal (a field record
+        # whose row the reload no longer produces, with no addition behind it) rolls
+        # the whole reload back via import_batch's handler rather than committing a
+        # reload that silently dropped a human decision. Same placement as the
+        # after-siren precedent (after_siren.py), pinned by
+        # tests/data-overrides-source-contract.test.ts.
+        replay_admin_overrides(pg, "player_match_stats")
         pg.commit()
     rep.result("player_match_stats", batch.records_inserted,
                f"({time.time() - started:.1f}s)")

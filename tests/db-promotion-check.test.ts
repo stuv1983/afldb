@@ -98,6 +98,9 @@ import {
   planPromotionPlayersReplay,
   playerIdentityKeysOfOverrides,
   promotionPlayerCheckProblems,
+  planPromotionPlayerMatchStatsReplay,
+  playerMatchStatsReadsOfOverrides,
+  promotionPmsPairKey,
   applyManualIdentityConvergence,
   convergencePathsToRead,
   manualIdentityConvergenceSql,
@@ -118,6 +121,7 @@ import {
   PROMOTION_REPLAY_IDENTITIES_SQL, PROMOTION_REPLAY_MATCH_KEYS_SQL, PROMOTION_REPLAY_MAX_SEASON_SQL,
   PROMOTION_REPLAY_OVERRIDES_SQL, PROMOTION_REPLAY_PLAYER_CHECKS_SQL, gateOverrideReplayTargets, publishRestoredLineageRemap,
   PROMOTION_CONVERGENCE_TARGET_IDENTITIES_SQL,
+  PROMOTION_REPLAY_PMS_CLUBS_SQL, PROMOTION_REPLAY_PMS_IDENTITIES_SQL, PROMOTION_REPLAY_PMS_MATCHES_SQL, PROMOTION_REPLAY_PMS_ROWS_SQL,
   publishRestoredAflApiFiles, readRebuildMarkerPresent, writeOperatorFileAtomically, type AflApiOverlapResult, type Query,
   DEFAULT_DSN_ENV, READ_ONLY_SQL, parseArgs, readAflApiForwardIdentities as readPromotionForwardIdentities,
   readAflApiReverseIdentities as readPromotionReverseIdentities, writePlan,
@@ -145,6 +149,7 @@ import {
   resolveAflApiPlayerIdentity,
 } from '../tools/migration/replay_afl_api_adjudications';
 import { loadFitzroyProfileContinuityRules } from '../src/lib/acquisition/fitzroy-profile-continuity';
+import type { ContinuityRulesLoad } from '../src/lib/acquisition/match-sheet-authority';
 import { readManualPlayerToken } from '../src/db/queries/player-identity';
 import { registrationsFromLive, type LiveRegistrationState } from '../tools/migration/rebuild_manual_registrations';
 import {
@@ -5548,9 +5553,11 @@ describe('AFLDB-ISSUE-237 L4 — A4.2 / A4.3 replay gates and the lineage remap 
     expect(candidate.log).not.toContain(PROMOTION_REPLAY_OVERRIDES_SQL);
     expect(out.players.problems[0]).toContain('different token, same path');
     expect(out.matches.problems[0]).toContain('season 2026');
-    expect(report.results.map((r) => r.verdict)).toEqual(['FAIL', 'FAIL']);
+    // A4.4 (AFLDB-ISSUE-257) follows, and with no player_match_stats record it PASSes
+    expect(report.results.map((r) => r.verdict)).toEqual(['FAIL', 'FAIL', 'PASS']);
     expect(report.results[0].gate).toContain('A4.2');
     expect(report.results[1].gate).toContain('A4.3');
+    expect(report.results[2].gate).toContain('A4.4');
   });
 
   it('candidate phase: the reinstated target overrides and the candidate identities are one database; a clean state PASSES', async () => {
@@ -5640,6 +5647,257 @@ describe('AFLDB-ISSUE-237 L4 — A4.2 / A4.3 replay gates and the lineage remap 
     expect(begin).toBeGreaterThan(-1);
     expect(lines.slice(begin + 1, begin + 1 + guard.length)).toEqual(guard);
     expect(lineageRemapBindingGuard("o'brien").join('\n')).toContain("'o''brien'");
+  });
+});
+
+describe('AFLDB-ISSUE-257 A4.4 — the player_match_stats authority replay predicted before the swap (DB-free)', () => {
+  const MK = '2025|1|2025-03-13|Richmond|Carlton';
+  const PATH = 'players/P/P_Player.html';
+  const IDENT = `afltables:${PATH}`;
+  const rules = loadFitzroyProfileContinuityRules();
+  const CONTINUITY: ContinuityRulesLoad = { ok: true, rules };
+  const pms = (key: string, fieldGroup: string, payload: unknown): PromotionOverrideRow => ({
+    entityType: 'player_match_stats', entityKey: key, fieldGroup,
+    overrideValues: typeof payload === 'string' ? payload : JSON.stringify(payload),
+  });
+  const fields = (key: string, payload: Record<string, unknown>) => pms(key, 'match_sheet', payload);
+  const lineup = (key: string, present: boolean) => pms(key, 'lineup', { present });
+  const match = { matchKey: MK, id: 7, homeClubId: 1, awayClubId: 2 };
+  const aft = (path: string, playerId: number | null, status = 'resolved', matchMethod = 'afltables_profile_url'): PromotionIdentityRow => ({
+    sourceKey: 'afltables', externalId: path, playerId, status, matchMethod,
+  });
+  const manual = (token: string, playerId: number | null): PromotionIdentityRow => ({
+    sourceKey: 'manual_admin_edit', externalId: token, playerId, status: 'resolved', matchMethod: 'manual_admin_edit',
+  });
+  const NO_PLAYERS = { binds: [], creates: [] };
+  const run = (overrides: PromotionOverrideRow[], over: Partial<Parameters<typeof planPromotionPlayerMatchStatsReplay>[0]> = {}) =>
+    planPromotionPlayerMatchStatsReplay({
+      overrides, matches: [match], identities: [aft(PATH, 20)], players: NO_PLAYERS,
+      clubIdBySlug: new Map([['richmond', 1], ['carlton', 2], ['geelong', 3]]),
+      existingPairs: new Set([promotionPmsPairKey(7, 20)]), continuity: CONTINUITY, ...over,
+    });
+  const KEY = `${MK}|${IDENT}`;
+
+  it('none: a PASS with zero counts and nothing read', () => {
+    const r = run([]);
+    expect(r).toEqual({ records: 0, keys: 0, resolved: 0, additions: 0, removals: 0, problems: [] });
+    expect(playerMatchStatsReadsOfOverrides([], CONTINUITY)).toEqual({ records: 0, matchKeys: [], afltablesPaths: [], clubSlugs: [] });
+    // other entity types are not this planner's
+    expect(run([{ entityType: 'players', entityKey: 'manual_admin_edit:A', fieldGroup: 'identity', overrideValues: '{}' }]).records).toBe(0);
+  });
+
+  it('resolves: a field record on an existing row, a durable removal, and a durable addition all PASS', () => {
+    const r = run([
+      fields(KEY, { goals: 3, club_slug: 'richmond' }),
+      lineup(`${MK}|afltables:players/Z/Z_Player.html`, false),
+      lineup(`${MK}|afltables:players/Y/Y_Player.html`, true),
+      fields(`${MK}|afltables:players/Y/Y_Player.html`, { club_slug: 'carlton', goals: 1 }),
+    ], { identities: [aft(PATH, 20), aft('players/Z/Z_Player.html', 21), aft('players/Y/Y_Player.html', 22)] });
+    expect(r.problems).toEqual([]);
+    expect(r).toMatchObject({ records: 4, keys: 3, resolved: 3, additions: 1, removals: 1 });
+  });
+
+  it('an undecodable key, a missing match and an unreadable payload each fail naming the key', () => {
+    expect(run([fields('no-separator', { goals: 1 })]).problems[0]).toContain('player_match_stats override no-separator');
+    expect(run([fields(`${MK}|nosource:abc`, { goals: 1 })]).problems[0]).toContain('does not decode');
+    const miss = run([fields(KEY, { goals: 1 })], { matches: [] });
+    expect(miss.problems[0]).toContain(KEY);
+    expect(miss.problems[0]).toContain('0 candidate matches');
+    expect(run([fields(KEY, { goals: 1 })], { matches: [match, { ...match, id: 8 }] }).problems[0]).toContain('2 candidate matches');
+    expect(run([fields(KEY, { surprise: 1 })]).problems[0]).toContain(`${KEY}: payload_unreadable`);
+    expect(run([pms(KEY, 'match_sheet', '{not json')]).problems[0]).toContain('not valid JSON');
+    expect(run([pms(KEY, 'other_group', { goals: 1 })]).problems[0]).toContain('unknown_field_group');
+  });
+
+  it('identity: unresolved, ambiguous, not accepted, and a token nobody holds all fail', () => {
+    expect(run([fields(KEY, { goals: 1 })], { identities: [] }).problems[0]).toContain('(unresolved)');
+    expect(run([fields(KEY, { goals: 1 })], { identities: [aft(PATH, 20), aft(PATH, 21)] }).problems[0]).toContain('(ambiguous)');
+    // not an accepted afltables_profile_url row, or not an accepted status: no identity
+    expect(run([fields(KEY, { goals: 1 })], { identities: [aft(PATH, 20, 'resolved', 'name_match')] }).problems[0]).toContain('(unresolved)');
+    expect(run([fields(KEY, { goals: 1 })], { identities: [aft(PATH, 20, 'ambiguous')] }).problems[0]).toContain('(unresolved)');
+    expect(run([fields(`${MK}|manual_admin_edit:T`, { goals: 1 })], { identities: [] }).problems[0]).toContain('(unresolved)');
+    expect(run([fields(`${MK}|manual_admin_edit:T`, { goals: 1 })], { identities: [manual('T', 20)] }).problems).toEqual([]);
+  });
+
+  it('D-257-9 continuity: a pair on two players, or with a missing side, is refused; one player folds', () => {
+    const [rule] = rules;
+    const key = `${MK}|afltables:${rule.continuingUrl}`;
+    const same = run([fields(key, { goals: 1 })], { identities: [aft(rule.continuingUrl, 20), aft(rule.renumberedUrl, 20)] });
+    expect(same.problems).toEqual([]);
+    const split = run([fields(key, { goals: 1 })], { identities: [aft(rule.continuingUrl, 20), aft(rule.renumberedUrl, 21)] });
+    expect(split.problems[0]).toContain('(split');
+    const missing = run([fields(key, { goals: 1 })], { identities: [aft(rule.continuingUrl, 20)] });
+    expect(missing.problems[0]).toContain('(partner_missing');
+    // the reads include every partner of a named path
+    expect(playerMatchStatsReadsOfOverrides([fields(key, { goals: 1 })], CONTINUITY).afltablesPaths)
+      .toEqual([rule.continuingUrl, rule.renumberedUrl].sort());
+  });
+
+  it('an unreadable continuity contract fails every authority-carrying key closed', () => {
+    const r = run([fields(KEY, { goals: 1 })], { continuity: { ok: false, detail: 'contract missing' } });
+    expect(r.problems[0]).toContain('profile-continuity contract is unreadable');
+    expect(r.problems[0]).toContain(KEY);
+  });
+
+  it('club_slug must be exactly the match home or away club', () => {
+    expect(run([fields(KEY, { club_slug: 'geelong' })]).problems[0]).toContain("not exactly the match's home or away club");
+    expect(run([fields(KEY, { club_slug: 'nowhere' })]).problems[0]).toContain("not exactly the match's home or away club");
+    expect(run([fields(KEY, { club_slug: 'carlton' })]).problems).toEqual([]);
+  });
+
+  it('two keys resolving to one (match, player) fail, naming the second', () => {
+    const second = `${MK}|manual_admin_edit:T`;
+    const r = run([fields(KEY, { goals: 1 }), fields(second, { goals: 2 })], { identities: [aft(PATH, 20), manual('T', 20)] });
+    expect(r.problems).toHaveLength(1);
+    expect(r.problems[0]).toContain(second);
+    expect(r.problems[0]).toContain(`same (match, player) as ${KEY}`);
+  });
+
+  it('a field record needs a row or a durable addition carrying a club_slug', () => {
+    const noRow = { existingPairs: new Set<string>() };
+    expect(run([fields(KEY, { goals: 1 })], noRow).problems[0]).toContain('no durable addition behind it');
+    expect(run([fields(KEY, { goals: 1 }), lineup(KEY, true)], noRow).problems[0]).toContain('carries no club_slug');
+    expect(run([fields(KEY, { goals: 1, club_slug: 'richmond' }), lineup(KEY, true)], noRow).problems).toEqual([]);
+    // a lineup-only addition has no club to create the row with
+    expect(run([lineup(KEY, true)], noRow).problems[0]).toContain('carries no club_slug');
+    // a removal needs no row; an inactive-only/empty set carries no authority and is skipped
+    expect(run([lineup(KEY, false)], noRow).problems).toEqual([]);
+  });
+
+  it('a token the players replay BINDS resolves to the bound player; one it CREATES needs a durable addition', () => {
+    const tok = `${MK}|manual_admin_edit:T`;
+    const bound = run([fields(tok, { goals: 1 })], { players: { binds: [{ token: 'T', path: PATH, playerId: 20 }], creates: [] } });
+    expect(bound.problems).toEqual([]);
+    // unbound: the same record is unresolved
+    expect(run([fields(tok, { goals: 1 })]).problems[0]).toContain('(unresolved)');
+    // created: a not-yet-existing player holds the token AND its path, so no row can exist yet
+    const created = { binds: [], creates: [{ token: 'T', path: 'players/N/N_Player.html' }] };
+    expect(run([fields(tok, { goals: 1 })], { players: created }).problems[0]).toContain('no durable addition behind it');
+    expect(run([fields(tok, { goals: 1, club_slug: 'richmond' }), lineup(tok, true)], { players: created }).problems).toEqual([]);
+    expect(run([fields(`${MK}|afltables:players/N/N_Player.html`, { goals: 1, club_slug: 'richmond' }),
+      lineup(`${MK}|afltables:players/N/N_Player.html`, true)], { players: created }).problems).toEqual([]);
+  });
+
+  describe('F-S8-01 (operator 2026-10-03): a manual token counts only when the A4.2 replay guarantees it', () => {
+    const tok = `${MK}|manual_admin_edit:T`;
+    const NEW = 'players/N/N_Player.html';
+    const bindT = { binds: [{ token: 'T', path: PATH, playerId: 20 }], creates: [], problems: [] };
+    const createT = { binds: [], creates: [{ token: 'T', path: NEW }], problems: [] };
+
+    it('(1) token absent from the candidate before replay but guaranteed by A4.2 -> accepted', () => {
+      // absent pre-replay: the candidate holds no manual_admin_edit:T identity
+      expect(run([fields(tok, { goals: 1 })], { identities: [aft(PATH, 20)], players: bindT }).problems).toEqual([]);
+    });
+
+    it('(2) the same identity without a guaranteed player replay -> refused', () => {
+      // not in the players replay plan at all
+      expect(run([fields(tok, { goals: 1 })]).problems[0]).toContain('(unresolved)');
+      // in the plan, but A4.2 has a STOP: neither a bind nor a create is guaranteed
+      for (const plan of [bindT, createT]) {
+        const r = run([fields(tok, { goals: 1, club_slug: 'richmond' }), lineup(tok, true)],
+          { players: { ...plan, problems: ['manual_admin_edit:X: some A4.2 STOP'] } });
+        expect(r.problems).toHaveLength(1);
+        expect(r.problems[0]).toContain('(unresolved)');
+        expect(r.problems[0]).toContain('A4.2 players replay that would register it has STOPs');
+      }
+      // the created player's AFL Tables path is not guaranteed either
+      const viaPath = run([fields(`${MK}|afltables:${NEW}`, { goals: 1, club_slug: 'richmond' }), lineup(`${MK}|afltables:${NEW}`, true)],
+        { players: { ...createT, problems: ['STOP'] } });
+      expect(viaPath.problems[0]).toContain('has STOPs');
+    });
+
+    it('(3) field authority whose row must be re-created but with no covering durable addition -> refused', () => {
+      const r = run([fields(tok, { goals: 1, club_slug: 'richmond' })], { players: createT });
+      expect(r.problems).toHaveLength(1);
+      expect(r.problems[0]).toContain('no durable addition behind it');
+    });
+
+    it('(4) player replay plus covering durable addition -> accepted and replayable', () => {
+      const r = run([fields(tok, { goals: 1, club_slug: 'richmond' }), lineup(tok, true)], { players: createT });
+      expect(r.problems).toEqual([]);
+      expect(r).toMatchObject({ records: 2, keys: 1, resolved: 1, additions: 1, removals: 0 });
+    });
+  });
+
+  it('every offending key is named in one run', () => {
+    const r = run([fields('bad', { goals: 1 }), fields(`${MK}|manual_admin_edit:U`, { goals: 1 }), fields(KEY, { goals: 1 })]);
+    expect(r.problems).toHaveLength(2);
+    expect(r.keys).toBe(3);
+  });
+
+  it('F2 (ISSUE-252) names the match half of an ISSUE-257 key, decoded at the last separator', () => {
+    expect(overrideMatchKeyOf('player_match_stats', KEY)).toBe(MK);
+    expect(overrideMatchKeyOf('player_match_stats', `${MK}|manual_admin_edit:T`)).toBe(MK);
+    expect(overrideMatchKeyOf('player_match_stats', 'no-separator')).toBeNull();
+    expect(overrideMatchKeyOf('player_match_stats', `${MK}|bogus:T`)).toBeNull();
+    expect(F2_OVERRIDES_SQL).toContain("'player_match_stats'");
+    expect(F2_COUNT_SQL).toContain("'player_match_stats'");
+  });
+
+  // --- the gate ---------------------------------------------------------------------------------
+
+  type Fake = { overrides: PromotionOverrideRow[]; log: string[]; rows: Set<string>; };
+  const fakeQ = (f: Fake): Query => async (text, params = []) => {
+    f.log.push(text);
+    if (text === PROMOTION_REPLAY_OVERRIDES_SQL) return f.overrides.map((o) => ({ ...o }));
+    if (text === PROMOTION_REPLAY_IDENTITIES_SQL) return [];
+    if (text === PROMOTION_REPLAY_MAX_SEASON_SQL) return [{ maxSeason: 2025 }];
+    if (text === PROMOTION_REPLAY_PMS_MATCHES_SQL) {
+      return (params[0] as string[]).includes(MK) ? [{ matchKey: MK, id: 7, homeClubId: 1, awayClubId: 2 }] : [];
+    }
+    if (text === PROMOTION_REPLAY_PMS_IDENTITIES_SQL) {
+      return (params[0] as string[]).includes(PATH)
+        ? [{ sourceKey: 'afltables', externalId: PATH, playerId: 20, status: 'resolved', matchMethod: 'afltables_profile_url' }] : [];
+    }
+    if (text === PROMOTION_REPLAY_PMS_CLUBS_SQL) return [{ slug: 'richmond', id: 1 }];
+    if (text === PROMOTION_REPLAY_PMS_ROWS_SQL) {
+      return [...f.rows].map((p) => ({ matchId: 7, playerId: Number(p) }));
+    }
+    throw new Error(`fake database: unexpected SQL ${text}`);
+  };
+
+  it('the gate with no player_match_stats record PASSes with zero counts and reads nothing new', async () => {
+    const f: Fake = { overrides: [], log: [], rows: new Set() };
+    const report = new Report();
+    const out = await gateOverrideReplayTargets({ overrides: fakeQ(f), candidate: fakeQ(f) }, { overrides: 'o', candidate: 'c' }, report);
+    expect(out.playerMatchStats.records).toBe(0);
+    const gate = report.results.find((r) => r.gate.includes('A4.4'))!;
+    expect(gate.verdict).toBe('PASS');
+    expect(f.log.filter((t) => t.includes('player_match_stats')).length).toBe(1); // the overrides read only
+    expect(f.log).not.toContain(PROMOTION_REPLAY_PMS_MATCHES_SQL);
+  });
+
+  it('the gate reads the candidate narrowly and PASSes a resolving record; a failure is a FAIL naming the key', async () => {
+    const f: Fake = { overrides: [fields(KEY, { goals: 2, club_slug: 'richmond' })], log: [], rows: new Set(['20']) };
+    const report = new Report();
+    const out = await gateOverrideReplayTargets({ overrides: fakeQ(f), candidate: fakeQ(f) }, { overrides: 'o', candidate: 'c' }, report);
+    expect(out.playerMatchStats).toMatchObject({ records: 1, resolved: 1, problems: [] });
+    for (const sql of [PROMOTION_REPLAY_PMS_MATCHES_SQL, PROMOTION_REPLAY_PMS_IDENTITIES_SQL,
+      PROMOTION_REPLAY_PMS_CLUBS_SQL, PROMOTION_REPLAY_PMS_ROWS_SQL]) {
+      expect(f.log).toContain(sql);
+      expect(sql).toMatch(/\$1::(text|int)\[\]/);
+      expect(sql).not.toMatch(/\bLIKE\b|display_name|full_name/i);
+    }
+    expect(report.results.find((r) => r.gate.includes('A4.4'))!.verdict).toBe('PASS');
+
+    const bad: Fake = { overrides: [fields(KEY, { goals: 2 })], log: [], rows: new Set() };
+    const badReport = new Report();
+    await gateOverrideReplayTargets({ overrides: fakeQ(bad), candidate: fakeQ(bad) }, { overrides: 'o', candidate: 'c' }, badReport);
+    const gate = badReport.results.find((r) => r.gate.includes('A4.4'))!;
+    expect(gate.verdict).toBe('FAIL');
+    expect(gate.lines.join('\n')).toContain(`STOP player_match_stats override ${KEY}`);
+    expect(badReport.failed).toBe(true);
+  });
+
+  it('A4.4 is wired through the shared gate (both phases) and the convergence rehearsal counts the type', () => {
+    const source = readFileSync(join(REPO, 'tools', 'db', 'promotion-check.ts'), 'utf8');
+    expect(source).toContain('gateOverrideReplayTargets({ overrides: old.q, candidate: conn.q }');
+    expect(source).toContain('gateOverrideReplayTargets({ overrides: conn.q, candidate: conn.q }');
+    expect(source).toContain('(AFLDB-ISSUE-257 A4.4)');
+    expect(PROMOTION_REPLAY_OVERRIDES_SQL).toContain("'player_match_stats'");
+    const rehearsal = readFileSync(join(REPO, 'tools', 'db', 'promotion-convergence-rehearsal.ts'), 'utf8');
+    expect(rehearsal).toContain("entity_type IN ('players', 'matches', 'match_coaches', 'player_match_stats')");
+    expect(ACCEPTANCE_CHECKLIST.join('\n')).toMatch(/player_match_stats replay \(AFLDB-ISSUE-257\)[^]*AFTER players and matches[^]*BEFORE rebuild_derived\.py/);
   });
 });
 
@@ -5970,6 +6228,7 @@ describe('AFLDB-ISSUE-242 — manual registration token convergence (DB-free)', 
       'manual player registration token convergence planned (AFLDB-ISSUE-242)',
       'data_overrides players replay predicted on the candidate (AFLDB-ISSUE-237 A4.2)',
       'data_overrides match-keyed replay targets exist in the candidate (AFLDB-ISSUE-237 A4.3)',
+      'data_overrides player_match_stats replay predicted on the candidate (AFLDB-ISSUE-257 A4.4)',
     ]);
     expect(out.convergence.entries).toEqual([{ kind: 'rebind', path: P, candidateToken: 'B', targetToken: 'A', playerId: 20 }]);
     expect(out.players.present).toEqual([{ token: 'A', path: P, playerId: 20 }]);

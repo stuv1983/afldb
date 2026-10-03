@@ -4,8 +4,13 @@ import Link from 'next/link';
 import { useActionState, useMemo, useState } from 'react';
 
 import { DeleteMatchButton } from '@/app/admin/data-editor/DeleteMatchButton';
-import { saveMatchSheetAction, type MatchSheetActionState } from '@/app/admin/data-editor/actions';
+import {
+  returnMatchSheetToSourceAction,
+  saveMatchSheetAction,
+  type MatchSheetActionState,
+} from '@/app/admin/data-editor/actions';
 import { PlayerPicker } from '@/components/PlayerPicker';
+import type { MatchSheetAuthoritySummaryResult } from '@/db/queries/match-sheet';
 import type { MatchDetail, MatchPlayerRow } from '@/db/queries/matches';
 import { formatDate, formatRoundShort } from '@/lib/format';
 import { autoDisposalsFromComponents } from '@/lib/match-sheet';
@@ -38,6 +43,134 @@ type EditablePlayerStat = {
   brownlowVotes: string;
 };
 
+/** The editor's column abbreviations for the stored payload keys. */
+const FIELD_ABBREVIATIONS: Record<string, string> = {
+  club_slug: 'Club', jumper_number: '#',
+  goals: 'G', behinds: 'B', kicks: 'K', handballs: 'H', disposals: 'D',
+  marks: 'M', tackles: 'T', hitouts: 'HO', frees_for: 'FF', frees_against: 'FA',
+};
+
+function describeDecision(
+  entry: { kind: 'fields' | 'addition' | 'removal'; fields: string[] },
+): string {
+  if (entry.kind === 'addition') return 'Manual addition';
+  if (entry.kind === 'removal') return 'Manual removal';
+  return `Edited: ${entry.fields.map((f) => FIELD_ABBREVIATIONS[f] ?? f).join(', ')}`;
+}
+
+/**
+ * AFLDB-ISSUE-257 D-257-6: lists the durable decisions this match's sheet holds over
+ * source data and lets an admin withdraw one player's ("Return to source"). Rendered
+ * outside the save form; has its own action state.
+ */
+function DurableDecisionsPanel({
+  match,
+  summary,
+}: {
+  match: MatchDetail;
+  summary: MatchSheetAuthoritySummaryResult;
+}) {
+  const [state, formAction, isPending] = useActionState(returnMatchSheetToSourceAction, INITIAL);
+  const clubName = (clubId: number | null) =>
+    clubId === match.homeClubId ? match.homeName
+      : clubId === match.awayClubId ? match.awayName
+        : '—';
+
+  return (
+    <div style={{
+      border: '1px solid var(--border-subtle)',
+      borderRadius: '8px',
+      padding: '1rem 1.25rem',
+      display: 'grid',
+      gap: '0.75rem',
+    }}>
+      <h3 style={{ margin: 0, fontSize: '1rem' }}>Durable Match Sheet decisions</h3>
+      <p className="muted" style={{ margin: 0, fontSize: '0.85rem' }}>
+        Saved edits, additions and removals override source data until they are returned to source.
+        Returning one lets the next source update restore that player&apos;s source values.
+      </p>
+
+      {state.message && (
+        <div role="status" style={{ padding: '0.75rem 1rem', background: 'var(--bg-subtle)', borderRadius: '6px', borderLeft: '4px solid var(--accent)' }}>
+          <p style={{ margin: 0, color: 'var(--accent)', fontWeight: 600, fontSize: '0.95rem' }}>✓ {state.message}</p>
+        </div>
+      )}
+      {state.warning && (
+        <div className="badge badge-warn" style={{ justifySelf: 'start' }}>{state.warning}</div>
+      )}
+      {state.error && (
+        <div role="alert" style={{ padding: '0.75rem 1rem', background: 'var(--bg-subtle)', borderRadius: '6px', borderLeft: '4px solid var(--color-warn)' }}>
+          <p style={{ margin: 0, color: 'var(--color-warn)', fontSize: '0.95rem' }}>⚠ {state.error}</p>
+        </div>
+      )}
+
+      {summary.status === 'unavailable' ? (
+        <p className="muted" style={{ margin: 0, fontSize: '0.85rem', color: 'var(--color-warn)' }}>
+          Durable decisions could not be read, so none are shown. Do not assume there are none.
+          Reload the page; if this persists, contact an administrator. ({summary.reason})
+        </p>
+      ) : (
+        <>
+          {summary.indeterminateKeys.length > 0 && (
+            <p className="badge badge-warn" style={{ margin: 0, justifySelf: 'start', whiteSpace: 'normal' }}>
+              Some stored decisions cannot be attributed to a player and need operator repair:{' '}
+              {summary.indeterminateKeys.join('; ')}
+            </p>
+          )}
+          {summary.entries.length === 0 ? (
+            <p className="muted" style={{ margin: 0, fontSize: '0.85rem' }}>
+              No durable decisions: every player row on this sheet follows its source.
+            </p>
+          ) : (
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col">Player</th>
+                    <th scope="col">Club</th>
+                    <th scope="col">Decision</th>
+                    <th scope="col">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {summary.entries.map((entry) => (
+                    <tr key={entry.playerId}>
+                      <td>{entry.playerName}</td>
+                      <td>{clubName(entry.clubId)}</td>
+                      <td>{describeDecision(entry)}</td>
+                      <td>
+                        <form
+                          action={formAction}
+                          onSubmit={(event) => {
+                            if (!window.confirm(`Return ${entry.playerName} to source? This withdraws the saved Match Sheet decision.`)) {
+                              event.preventDefault();
+                            }
+                          }}
+                        >
+                          <input type="hidden" name="matchId" value={match.id} />
+                          <input type="hidden" name="playerId" value={entry.playerId} />
+                          <button
+                            type="submit"
+                            className="btn btn-secondary"
+                            disabled={isPending}
+                            aria-label={`Return ${entry.playerName} to source`}
+                          >
+                            {isPending ? 'Returning…' : 'Return to source'}
+                          </button>
+                        </form>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 /**
  * Super Admin Match Sheet & Lineup Editor (see changeLog.md).
  * Allows viewing and editing player statistics for any match in real time,
@@ -48,9 +181,15 @@ export function MatchSheetEditor({
   initialPlayers,
   homeRecentLineup = [],
   awayRecentLineup = [],
+  staleToken,
+  authoritySummary,
 }: {
   match: MatchDetail;
   initialPlayers: MatchPlayerRow[];
+  /** AFLDB-ISSUE-257: freshness token of the rows this sheet was loaded from. */
+  staleToken: string;
+  /** AFLDB-ISSUE-257 D-257-6: the match's active durable Match Sheet decisions. */
+  authoritySummary: MatchSheetAuthoritySummaryResult;
   homeRecentLineup?: { playerId: number; slug: string; displayName: string; clubId: number; jumperNumber?: string | null }[];
   awayRecentLineup?: { playerId: number; slug: string; displayName: string; clubId: number; jumperNumber?: string | null }[];
 }) {
@@ -645,6 +784,7 @@ export function MatchSheetEditor({
       <form action={formAction} style={{ display: 'grid', gap: '1rem' }}>
         <input type="hidden" name="matchId" value={match.id} />
         <input type="hidden" name="payload" value={payloadString} />
+        <input type="hidden" name="staleToken" value={staleToken} />
         <input type="hidden" name="syncMatchScores" value="false" />
 
         {(activeTab === 'all' || activeTab === 'home') &&
@@ -685,6 +825,9 @@ export function MatchSheetEditor({
           </div>
         </div>
       </form>
+
+      {/* Outside the save form: forms cannot nest. */}
+      <DurableDecisionsPanel match={match} summary={authoritySummary} />
 
       {/* Danger Zone: Delete Match */}
       <div style={{

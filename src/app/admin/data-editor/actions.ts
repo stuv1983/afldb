@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 
 import { saveEdit } from '@/db/queries/data-edits';
 import { createMatch, deleteMatch } from '@/db/queries/match-admin';
-import { saveMatchSheet } from '@/db/queries/match-sheet';
+import { returnMatchSheetToSource, saveMatchSheet } from '@/db/queries/match-sheet';
 import { createPlayer } from '@/db/queries/players';
 import { validateAdminMatchNumbers } from '@/lib/admin-match';
 import { EDITABLE_ENTITIES } from '@/lib/edit/spec';
@@ -214,6 +214,7 @@ export async function saveMatchSheetAction(
   const syncMatchScores = formData.get('syncMatchScores') === 'true' || formData.get('syncMatchScores') === 'on';
   const payloadRaw = String(formData.get('payload') ?? '');
   const note = String(formData.get('note') ?? '').trim();
+  const staleToken = String(formData.get('staleToken') ?? '').trim();
 
   let rawPayload: unknown;
   try {
@@ -233,6 +234,7 @@ export async function saveMatchSheetAction(
     removedPlayerIds: payload.value.removedPlayerIds,
     adminUserId: admin.id,
     note,
+    staleToken,
   });
 
   if (!result.ok) {
@@ -256,6 +258,58 @@ export async function saveMatchSheetAction(
   return {
     message: `Match sheet saved successfully (${result.playerCount} players). ${result.scoreUpdated ? 'Match scores synchronized.' : ''} Career and season stats updated.`,
     playerCount: result.playerCount,
+    warning,
+  };
+}
+
+/**
+ * AFLDB-ISSUE-257 D-257-6: withdraw one player's durable Match Sheet authority.
+ * The audit is written here after the transaction (as `saveMatchSheetAction` does);
+ * the revalidation stays in the action as the sibling's does.
+ */
+export async function returnMatchSheetToSourceAction(
+  _prev: MatchSheetActionState,
+  formData: FormData,
+): Promise<MatchSheetActionState> {
+  const admin = await requireCapability('data.dataEditor');
+
+  const matchId = Number(formData.get('matchId'));
+  if (!Number.isInteger(matchId) || matchId <= 0) {
+    return { error: 'Invalid match ID.' };
+  }
+  const playerId = Number(formData.get('playerId'));
+  if (!Number.isInteger(playerId) || playerId <= 0) {
+    return { error: 'Invalid player ID.' };
+  }
+  const note = String(formData.get('note') ?? '').trim();
+  if (note.length > 2000) return { error: 'Notes are limited to 2000 characters.' };
+
+  const result = await returnMatchSheetToSource({
+    matchId, playerId, adminUserId: admin.id, note,
+  });
+  if (!result.ok) return { error: result.error };
+
+  let warning: string | undefined;
+  try {
+    await audit('match.sheet_returned_to_source', {
+      matchId,
+      playerId,
+      withdrawnKeys: result.withdrawnKeys,
+      rowDeleted: result.rowDeleted,
+      rowKept: result.rowKept,
+    }, { userId: admin.id, label: admin.email });
+  } catch (error) {
+    console.error('Failed to log administrative audit for match-sheet return to source', error);
+    warning = combineWarnings(warning, ACTIVITY_AUDIT_WARNING);
+  }
+
+  revalidatePath('/', 'layout');
+
+  return {
+    message: result.rowDeleted
+      ? 'Returned to source: the manually added player row was removed. Reload this page before editing the match sheet further.'
+      : 'Returned to source: the Match Sheet decision was withdrawn and the next source update restores the source values. '
+        + 'Reload this page before editing the match sheet further.',
     warning,
   };
 }

@@ -41,7 +41,9 @@ import {
 } from '@/db/queries/admin-brownlow';
 import { reconcileCareerTotals } from '@/db/queries/db-health';
 import { deleteMatch } from '@/db/queries/match-admin';
-import { saveMatchSheet } from '@/db/queries/match-sheet';
+import { loadMatchSheetStaleToken, saveMatchSheet } from '@/db/queries/match-sheet';
+import { playerMatchStatsAuthorityStorable } from '@/lib/acquisition/manual-authority';
+import { AUTHORITY_UNAVAILABLE_REFUSAL } from '@/lib/acquisition/match-sheet-authority';
 import { BROWNLOW_MANUAL_SOURCE_KEY } from '@/lib/brownlow/entry';
 import {
   BROWNLOW_MAIN_SEASON,
@@ -1372,34 +1374,241 @@ describe('precedence over the reload paths (§27.11)', () => {
   });
 });
 
-describe('the match sheet and match deletion (§27.15)', () => {
-  it('preserves the Brownlow mirror through a match-sheet save', async () => {
-    const match = main.matches[0];
-    const model = await getBrownlowMatchEditorModel(match.matchId);
-    const voter = model!.selection.two!;
-    const before = await mirrorFor(match.matchId);
-    expect(before.get(voter)).toBe(2);
+/* ------------------------------------------------------------------ *
+ * AFLDB-ISSUE-257 (F-S11-01): the test-owned Match Sheet fixture
+ *
+ * The shared ISSUE-155 fixture keys matches `issue155-<season>-...` and its players hold no
+ * durable identity, so ISSUE-257 refuses a Match Sheet save against it BY DESIGN. The
+ * mirror-preservation case therefore owns one synthetic match, committed (the writer opens its
+ * own connection), in a namespace no other suite or tool uses:
+ *
+ *   season 2077 (free: 2063/2068/2073 and 2079/2082-2099 are claimed elsewhere)
+ *   match_key  2077|issue257b-brownlow-mirror   (durable keys are season-prefixed)
+ *   player     slug `issue257b-brownlow-mirror`, accepted AFL Tables identity
+ *              `issue257b_players/B/Brownlowmirror0.html`
+ *   one source-owned player_match_stats row carrying brownlow_votes = 2 (the mirror column)
+ *
+ * `clubs` and `sources` are only READ. Cleanup is idempotent and FK-ordered, runs before the
+ * seed and in `finally`, and is followed by a zero-residue assertion. The prefixes are chosen
+ * not to collide with data-editor.test.ts's `issue257-` namespace.
+ * ------------------------------------------------------------------ */
+const MIRROR_SEASON_257 = 2077;
+const MIRROR_KEY_ROOT_257 = `${MIRROR_SEASON_257}|issue257b-brownlow-`;
+const MIRROR_SLUG_257 = 'issue257b-brownlow-';
+const MIRROR_PATH_ROOT_257 = 'issue257b_players/';
+const MIRROR_STAT_257 = {
+  jumperNumber: '7', goals: 3, behinds: 1, kicks: 12, handballs: 8, disposals: 20,
+  marks: 4, tackles: 3, hitouts: 2, freesFor: 1, freesAgainst: 1,
+};
+const NO_MIRROR_RESIDUE_257 = {
+  dataOverrides: 0, dataEdits: 0, playerMatchStats: 0, playerClubs: 0, playerClubSeasonStats: 0,
+  playerSeasonStats: 0, playerCareerStats: 0, clubSeasons: 0, externalIdentities: 0,
+  players: 0, matches: 0, seasons: 0,
+};
 
-    const result = await saveMatchSheet({
-      matchId: match.matchId,
-      syncMatchScores: false,
-      players: [{ playerId: voter, clubId: match.homeClubId, kicks: 25, handballs: 5, disposals: 30 }],
-      adminUserId: actorId,
-      note: 'issue-155 mirror preservation',
-    });
-    expect(result.ok).toBe(true);
+type Mirror257 = { matchId: number; matchKey: string; playerId: number; clubId: number; path: string };
 
-    const after = await mirrorFor(match.matchId);
-    // The statistics the sheet carried were written; the column it no longer
-    // writes was not touched.
-    expect(after.get(voter)).toBe(2);
-    expect(after.size).toBe(before.size);
-    const [stat] = await sql<{ kicks: number }[]>`
-      SELECT kicks FROM player_match_stats
-       WHERE match_id = ${match.matchId} AND player_id = ${voter}
+async function seedMirror257(): Promise<Mirror257> {
+  return sql.begin(async (tx) => {
+    const clubs = await tx<{ id: number }[]>`
+      SELECT DISTINCT ON (organization_id) id::int AS id
+        FROM clubs
+       WHERE organization_id IS NOT NULL
+       ORDER BY organization_id, id
+       LIMIT 2
     `;
-    expect(stat.kicks).toBe(25);
+    if (clubs.length < 2) throw new Error('ISSUE-257 mirror fixture needs two club identities');
+    const [home, away] = clubs;
+    const [source] = await tx<{ id: number }[]>`SELECT id::int AS id FROM sources WHERE key = 'afltables'`;
+    await tx`
+      INSERT INTO seasons (year, league, status)
+      VALUES (${MIRROR_SEASON_257}, 'AFL', 'complete'::season_status)
+      ON CONFLICT DO NOTHING
+    `;
+    const matchKey = `${MIRROR_KEY_ROOT_257}mirror`;
+    const [match] = await tx<{ id: number }[]>`
+      INSERT INTO matches (
+        match_key, season, round_code, round_number, round_type, is_final,
+        match_date, venue_raw, home_club_id, away_club_id,
+        home_score, away_score, result, winner_club_id, margin,
+        attendance, attendance_status, source_id
+      ) VALUES (
+        ${matchKey}, ${MIRROR_SEASON_257}, '1', 1, 'home_and_away'::round_type, false,
+        ${`${MIRROR_SEASON_257}-03-05`}, 'ISSUE-257 Mirror Oval', ${home.id}, ${away.id},
+        100, 80, 'home_win'::match_result, ${home.id}, 20,
+        NULL, 'not_collected'::coverage_status, ${source.id}
+      )
+      RETURNING id::int AS id
+    `;
+    const [player] = await tx<{ id: number }[]>`
+      INSERT INTO players (display_name, sort_name, search_name, slug)
+      VALUES ('Issue257b Mirror', 'Mirror, Issue257b', 'issue257b mirror', ${`${MIRROR_SLUG_257}mirror`})
+      RETURNING id::int AS id
+    `;
+    const path = `${MIRROR_PATH_ROOT_257}B/Brownlowmirror0.html`;
+    await tx`
+      INSERT INTO external_identities (source_id, external_id, player_id, status, match_method)
+      VALUES (${source.id}, ${path}, ${player.id}, 'unique', 'afltables_profile_url')
+    `;
+    await tx`
+      INSERT INTO player_match_stats (
+        player_id, match_id, club_id, jumper_number, kicks, marks, handballs, disposals,
+        goals, behinds, hitouts, tackles, frees_for, frees_against, brownlow_votes, source_id
+      ) VALUES (
+        ${player.id}, ${match.id}, ${home.id}, ${MIRROR_STAT_257.jumperNumber}, ${MIRROR_STAT_257.kicks},
+        ${MIRROR_STAT_257.marks}, ${MIRROR_STAT_257.handballs}, ${MIRROR_STAT_257.disposals},
+        ${MIRROR_STAT_257.goals}, ${MIRROR_STAT_257.behinds}, ${MIRROR_STAT_257.hitouts},
+        ${MIRROR_STAT_257.tackles}, ${MIRROR_STAT_257.freesFor}, ${MIRROR_STAT_257.freesAgainst},
+        2, ${source.id}
+      )
+    `;
+    return { matchId: match.id, matchKey, playerId: player.id, clubId: home.id, path };
   });
+}
+
+async function mirrorRowSnapshot257(fx: Mirror257): Promise<unknown> {
+  const [r] = await sql<{ row: unknown }[]>`
+    SELECT to_jsonb(s) AS row FROM player_match_stats s
+     WHERE s.match_id = ${fx.matchId} AND s.player_id = ${fx.playerId}
+  `;
+  return r?.row ?? null;
+}
+
+/** Idempotent, children first; never touches a row outside the `issue257b` namespace. */
+async function cleanupMirror257(): Promise<void> {
+  // Fresh fragments per use (postgres.js fragments are single-use query objects).
+  const players = () => sql`(SELECT id FROM players WHERE starts_with(slug, ${MIRROR_SLUG_257}::text))`;
+  const matches = () => sql`(SELECT id FROM matches WHERE starts_with(match_key, ${MIRROR_KEY_ROOT_257}::text))`;
+  await sql`
+    DELETE FROM data_overrides
+     WHERE entity_type = 'player_match_stats' AND starts_with(entity_key, ${MIRROR_KEY_ROOT_257}::text)
+  `;
+  await sql`DELETE FROM data_edits WHERE table_name = 'matches' AND row_id IN ${matches()}`;
+  await sql`DELETE FROM player_match_stats WHERE player_id IN ${players()} OR match_id IN ${matches()}`;
+  for (const table of ['player_clubs', 'player_club_season_stats', 'player_season_stats', 'player_career_stats']) {
+    await sql`DELETE FROM ${sql(table)} WHERE player_id IN ${players()}`;
+  }
+  await sql`DELETE FROM club_seasons WHERE season = ${MIRROR_SEASON_257}`;
+  await sql`
+    DELETE FROM external_identities
+     WHERE player_id IN ${players()} OR starts_with(external_id, ${MIRROR_PATH_ROOT_257}::text)
+  `;
+  await sql`DELETE FROM players WHERE starts_with(slug, ${MIRROR_SLUG_257}::text)`;
+  await sql`DELETE FROM matches WHERE starts_with(match_key, ${MIRROR_KEY_ROOT_257}::text)`;
+  await sql`
+    DELETE FROM seasons
+     WHERE year = ${MIRROR_SEASON_257}
+       AND NOT EXISTS (SELECT 1 FROM matches WHERE season = ${MIRROR_SEASON_257})
+  `;
+}
+
+async function residueMirror257(): Promise<typeof NO_MIRROR_RESIDUE_257> {
+  const [r] = await sql<(typeof NO_MIRROR_RESIDUE_257)[]>`
+    SELECT
+      (SELECT count(*) FROM data_overrides
+        WHERE entity_type = 'player_match_stats'
+          AND starts_with(entity_key, ${MIRROR_KEY_ROOT_257}::text))::int AS "dataOverrides",
+      (SELECT count(*) FROM data_edits
+        WHERE table_name = 'matches' AND note = 'issue-257 brownlow mirror preservation')::int AS "dataEdits",
+      (SELECT count(*) FROM player_match_stats s
+        WHERE s.player_id IN (SELECT id FROM players WHERE starts_with(slug, ${MIRROR_SLUG_257}::text))
+           OR s.match_id IN (SELECT id FROM matches WHERE starts_with(match_key, ${MIRROR_KEY_ROOT_257}::text)))::int AS "playerMatchStats",
+      (SELECT count(*) FROM player_clubs
+        WHERE player_id IN (SELECT id FROM players WHERE starts_with(slug, ${MIRROR_SLUG_257}::text)))::int AS "playerClubs",
+      (SELECT count(*) FROM player_club_season_stats
+        WHERE player_id IN (SELECT id FROM players WHERE starts_with(slug, ${MIRROR_SLUG_257}::text)))::int AS "playerClubSeasonStats",
+      (SELECT count(*) FROM player_season_stats
+        WHERE player_id IN (SELECT id FROM players WHERE starts_with(slug, ${MIRROR_SLUG_257}::text)))::int AS "playerSeasonStats",
+      (SELECT count(*) FROM player_career_stats
+        WHERE player_id IN (SELECT id FROM players WHERE starts_with(slug, ${MIRROR_SLUG_257}::text)))::int AS "playerCareerStats",
+      (SELECT count(*) FROM club_seasons WHERE season = ${MIRROR_SEASON_257})::int AS "clubSeasons",
+      (SELECT count(*) FROM external_identities
+        WHERE starts_with(external_id, ${MIRROR_PATH_ROOT_257}::text))::int AS "externalIdentities",
+      (SELECT count(*) FROM players WHERE starts_with(slug, ${MIRROR_SLUG_257}::text))::int AS "players",
+      (SELECT count(*) FROM matches WHERE starts_with(match_key, ${MIRROR_KEY_ROOT_257}::text))::int AS "matches",
+      (SELECT count(*) FROM seasons WHERE year = ${MIRROR_SEASON_257})::int AS "seasons"
+  `;
+  return r;
+}
+
+describe('the match sheet and match deletion (§27.15)', () => {
+  // AFLDB-ISSUE-257 (F-S11-01): a Match Sheet save needs a durable player identity and a
+  // season-prefixed match key, which the shared ISSUE-155 fixture deliberately lacks, so this
+  // case owns a synthetic fixture (see seedMirror257) and never touches the shared one. The
+  // schema state is DETERMINED before the save (playerMatchStatsAuthorityStorable), never
+  // inferred from a failed save.
+  //   State A (migration 110 not applied): refused with the authority-unavailable refusal and
+  //     nothing is written (row, mirror, authority, audit).
+  //   State B (migration 110 applied): saved, values persisted, durable authority recorded,
+  //     and the Brownlow mirror column (which the sheet never writes) is preserved.
+  it('preserves the Brownlow mirror through a match-sheet save', async () => {
+    const storable = await playerMatchStatsAuthorityStorable(sql);
+    await cleanupMirror257();
+    try {
+      const fx = await seedMirror257();
+      const before = await mirrorFor(fx.matchId);
+      expect(before.get(fx.playerId)).toBe(2);
+      const rowBefore = await mirrorRowSnapshot257(fx);
+
+      const result = await saveMatchSheet({
+        matchId: fx.matchId,
+        syncMatchScores: false,
+        players: [{
+          playerId: fx.playerId, clubId: fx.clubId, jumperNumber: MIRROR_STAT_257.jumperNumber,
+          goals: MIRROR_STAT_257.goals, behinds: MIRROR_STAT_257.behinds, kicks: 25, handballs: 5,
+          disposals: 30, marks: MIRROR_STAT_257.marks, tackles: MIRROR_STAT_257.tackles,
+          hitouts: MIRROR_STAT_257.hitouts, freesFor: MIRROR_STAT_257.freesFor,
+          freesAgainst: MIRROR_STAT_257.freesAgainst,
+        }],
+        adminUserId: actorId,
+        note: 'issue-257 brownlow mirror preservation',
+        staleToken: await loadMatchSheetStaleToken(sql, fx.matchId),
+      });
+
+      const authority = await sql<{ entityKey: string; fieldGroup: string; isActive: boolean }[]>`
+        SELECT entity_key AS "entityKey", field_group AS "fieldGroup", is_active AS "isActive"
+          FROM data_overrides
+         WHERE entity_type = 'player_match_stats'
+           AND starts_with(entity_key, ${fx.matchKey}::text || '|')
+         ORDER BY entity_key, field_group
+      `;
+      const [audit] = await sql<{ n: number }[]>`
+        SELECT count(*)::int AS n FROM data_edits
+         WHERE table_name = 'matches' AND row_id = ${fx.matchId}
+      `;
+
+      if (!storable) {
+        // State A: refused, and no write of any kind.
+        expect(result).toEqual({ ok: false, error: AUTHORITY_UNAVAILABLE_REFUSAL });
+        expect(await mirrorRowSnapshot257(fx)).toEqual(rowBefore);
+        expect(await mirrorFor(fx.matchId)).toEqual(before);
+        expect(authority).toHaveLength(0);
+        expect(audit.n).toBe(0);
+        return;
+      }
+
+      // State B: saved; the statistics the sheet carried were written...
+      expect(result.ok).toBe(true);
+      const [stat] = await sql<{ kicks: number; handballs: number; disposals: number }[]>`
+        SELECT kicks::int AS kicks, handballs::int AS handballs, disposals::int AS disposals
+          FROM player_match_stats
+         WHERE match_id = ${fx.matchId} AND player_id = ${fx.playerId}
+      `;
+      expect(stat).toEqual({ kicks: 25, handballs: 5, disposals: 30 });
+      // ...the column the sheet no longer writes was not touched...
+      const after = await mirrorFor(fx.matchId);
+      expect(after.get(fx.playerId)).toBe(2);
+      expect(after.size).toBe(before.size);
+      // ...and exactly one active durable match_sheet authority was recorded.
+      expect(authority.map((r) => [r.entityKey, r.fieldGroup, r.isActive])).toEqual([
+        [`${fx.matchKey}|afltables:${fx.path}`, 'match_sheet', true],
+      ]);
+      expect(audit.n).toBeGreaterThan(0);
+    } finally {
+      await cleanupMirror257();
+      expect(await residueMirror257()).toEqual(NO_MIRROR_RESIDUE_257);
+    }
+  }, 120_000);
 
   it('refuses to delete a match that carries a Brownlow decision, and changes nothing', async () => {
     const match = main.matches[0];

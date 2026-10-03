@@ -1634,3 +1634,58 @@ describe('AFLDB-ISSUE-224 §21.3.2 — one deterministic winning authority per f
     )).toBeNull();
   });
 });
+
+describe('AFLDB-ISSUE-257 Slice 5 — player_match_stats replay placement', () => {
+  const root = process.cwd();
+  const readSource = (rel: string) => fs.readFileSync(path.join(root, rel), 'utf-8')
+    .replace(/\r\n/g, '\n');
+  const pyCommon = readSource('tools/migration/common.py');
+  const fitzroy = readSource('tools/migration/import_fitzroy_core.py');
+  const promotion = readSource('docs/production-promotion.md');
+  const reload = fitzroy.slice(
+    fitzroy.indexOf('def import_player_match_stats('),
+    fitzroy.indexOf('def import_brownlow_round_votes('));
+
+  test('the fitzRoy reload preflights BEFORE the delete and replays INSIDE the transaction', () => {
+    // Same shape as the after-siren precedent: refuse before any write, replay after the
+    // load and before the commit, so any refusal rolls the reload back.
+    const batchAt = reload.indexOf('with import_batch(pg, SOURCE_KEY_FITZROY');
+    const preflightAt = reload.indexOf('preflight_player_match_stats_authority(pg)');
+    const deleteAt = reload.indexOf('DELETE FROM player_match_stats');
+    const copyAt = reload.indexOf('copy_rows(\n            pg, "player_match_stats"');
+    const replayAt = reload.indexOf('replay_admin_overrides(pg, "player_match_stats")');
+    const commitAt = reload.indexOf('pg.commit()');
+    expect(batchAt).toBeGreaterThan(-1);
+    expect(preflightAt, 'preflight inside the batch').toBeGreaterThan(batchAt);
+    expect(preflightAt, 'preflight before the scoped delete').toBeLessThan(deleteAt);
+    expect(copyAt, 'the COPY moved').toBeGreaterThan(deleteAt);
+    expect(replayAt, 'replay after the COPY').toBeGreaterThan(copyAt);
+    expect(replayAt, 'replay before the commit').toBeLessThan(commitAt);
+  });
+
+  test('the Python branch preflights the whole active set before it writes', () => {
+    const branch = replayBranch(pyCommon, 'player_match_stats');
+    // The apply step is handed the fully preflighted plan: nothing is written until
+    // `_pms_plan_from_database` has returned (it raises, naming every offender).
+    expect(branch).toContain('_pms_apply(cur, _pms_plan_from_database(cur, True, continuity_rules))');
+    const apply = pyCommon.slice(pyCommon.indexOf('def _pms_apply('), pyCommon.indexOf('def replay_admin_overrides'));
+    // b (removals) -> c (additions) -> d (field deltas), each over the preflighted plan.
+    const del = apply.indexOf('DELETE FROM player_match_stats');
+    const ins = apply.indexOf('INSERT INTO player_match_stats');
+    const upd = apply.indexOf('UPDATE player_match_stats SET');
+    expect(del).toBeGreaterThan(-1);
+    expect(ins).toBeGreaterThan(del);
+    expect(upd).toBeGreaterThan(ins);
+    // An addition is an unowned row: no source_id is written.
+    expect(apply.slice(ins, upd)).not.toContain('source_id');
+  });
+
+  test('the promotion tuple replays player_match_stats after players and matches', () => {
+    const tuple = /for table in \(([^)]*)\)/.exec(promotion);
+    expect(tuple).not.toBeNull();
+    const tables = [...tuple![1].matchAll(/'([^']+)'/g)].map((m) => m[1]);
+    const at = tables.indexOf('player_match_stats');
+    expect(at).toBeGreaterThan(tables.indexOf('players'));
+    expect(at).toBeGreaterThan(tables.indexOf('matches'));
+  });
+});

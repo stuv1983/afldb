@@ -1352,7 +1352,13 @@ generator, with the hyphenated `afldb_*_pre_rebuild_20260906-112500` shape pinne
    **slug** — tracked reference data loaded long before any replay — and names no player, no
    match and no selection, so it depends on no other branch. `club_leadership` depends on
    `players` and on nothing else — in particular **not** on `season_list_members`, so the two
-   have no ordering cycle:
+   have no ordering cycle. `player_match_stats` (AFLDB-ISSUE-257, a durable Match Sheet
+   decision keyed `<match_key>|<player identity>`) goes **after both** `players` and `matches`:
+   it resolves its player by identity and its match and club by key, and it replays before
+   `rebuild_derived.py` (run later in this section), which recomputes from the rows it writes. The checker
+   predicts that refusal before the swap as gate **A4.4** (`--phase restored` and
+   `--phase candidate`). The replay refuses, naming every unresolvable key, before it writes
+   anything:
 
    ```bash
    cd ~/projects/afldb && ./.venv/bin/python - <<'PY'
@@ -1360,7 +1366,7 @@ generator, with the hyphenated `afldb_*_pre_rebuild_20260906-112500` shape pinne
    from common import load_env, connect_pg, replay_admin_overrides
    load_env()
    with connect_pg() as pg:
-       for table in ('players', 'matches', 'draft_picks', 'season_list_members',
+       for table in ('players', 'matches', 'player_match_stats', 'draft_picks', 'season_list_members',
                      'club_leadership', 'coaches', 'match_coaches',
                      'after_siren_kicks', 'fixtures'):
            replay_admin_overrides(pg, table)
@@ -1590,6 +1596,19 @@ nothing. Anything written to the promoted database after `systemctl start afldb`
 rollback (a new audit row, an admin edit) is left in the candidate, not merged back; say so in
 the promotion record. If the cluster itself is lost, the pre-cutover dump plus
 `docs/backup-restore.md` §6 is the path.
+
+**AFLDB-ISSUE-257 (D-257-7).** A promotion rollback changes the database, not the application.
+If the application is ALSO being rolled back to a release older than ISSUE-257, first run the
+read-only guard against the database that older application will serve, after the rollback above:
+
+```bash
+npx tsx tools/db/issue257-rollback-guard.ts --target prod
+```
+
+It counts `data_overrides` rows with `entity_type = 'player_match_stats'` (active or not). Zero:
+restore migration 102's narrow CHECK first, then the older application. One or more: refused;
+that application is not a supported rollback target, so roll forward only. Never delete those
+records to make it pass.
 
 **Abandoning a promotion before the swap, or recovering after a crash (`AFLDB-ISSUE-250`).**
 The freeze fails closed: an abandoned freeze keeps `afldb_prod` refusing the application, and
