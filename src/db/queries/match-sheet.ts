@@ -59,8 +59,11 @@ export const STALE_SHEET_REFUSAL =
   'This match sheet has changed since it was loaded (for example by a source update). '
   + 'Nothing was saved. Reload the sheet and re-apply your edits.';
 
-/** The contract the continuity rules are read from, relative to the process cwd (F-PR-02). */
-const CONTINUITY_CONTRACT_SEGMENTS = ['tools', 'rebuild', 'fitzroy', 'fitzroy-contract.json'] as const;
+/**
+ * The contract the continuity rules are read from, relative to the process cwd (F-PR-02).
+ * Also read by the legacy CSV intake's authority check (AFLDB-ISSUE-264).
+ */
+export const CONTINUITY_CONTRACT_SEGMENTS = ['tools', 'rebuild', 'fitzroy', 'fitzroy-contract.json'] as const;
 
 /**
  * Reads the match's Match Sheet rows and returns their stale-sheet token. UNLOCKED:

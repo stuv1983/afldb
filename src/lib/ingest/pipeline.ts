@@ -5,7 +5,12 @@ import { createHash } from 'node:crypto';
 import postgres from 'postgres';
 
 import { authSql } from '@/db/authClient';
-import { getDataset } from '@/lib/ingest/datasets';
+import {
+  getDataset,
+  readMatchSheetAuthority,
+  type MatchSheetAuthorityRead,
+  type MatchSheetAuthorityReader,
+} from '@/lib/ingest/datasets';
 import { CsvError, parseCsv, toObjects } from '@/lib/ingest/csv';
 import { asImportBatchId, type ImportBatchId } from '@/lib/import-batch-id';
 
@@ -135,6 +140,42 @@ export type ValidationSummary = {
 };
 
 /**
+ * AFLDB-ISSUE-264: validation runs as afldb_auth, which cannot read
+ * `data_overrides` or `external_identities`, so the Match Sheet authority is
+ * read through a short-lived import-role connection, inside a READ ONLY
+ * transaction, once per season and only when a validator asks. Validators get
+ * the answer, never the connection. Advisory only: promotion re-reads it under
+ * the match lock.
+ */
+function matchSheetAuthorityReader(): { read: MatchSheetAuthorityReader; close: () => Promise<void> } {
+  let importSql: postgres.Sql | null = null;
+  const bySeason = new Map<number, Promise<MatchSheetAuthorityRead>>();
+  const load = async (season: number): Promise<MatchSheetAuthorityRead> => {
+    const importUrl = process.env.AFLDB_IMPORT_DATABASE_URL;
+    if (!importUrl) return { ok: false, reason: 'AFLDB_IMPORT_DATABASE_URL is not configured' };
+    importSql ??= postgres(importUrl, { max: 1, onnotice: () => {} });
+    try {
+      return await importSql.begin('read only', (ro) => readMatchSheetAuthority(ro, season));
+    } catch (error) {
+      return { ok: false, reason: error instanceof Error ? error.message : String(error) };
+    }
+  };
+  return {
+    read: (season) => {
+      let pending = bySeason.get(season);
+      if (pending === undefined) {
+        pending = load(season);
+        bySeason.set(season, pending);
+      }
+      return pending;
+    },
+    close: async () => {
+      if (importSql) await importSql.end({ timeout: 5 });
+    },
+  };
+}
+
+/**
  * Validate a staged submission and attach per-row verdicts.
  *
  * Row errors do not throw: the point of the report is to show every
@@ -160,46 +201,51 @@ export async function validateSubmission(submissionId: number): Promise<Validati
 
   const summary: ValidationSummary = { ok: 0, warnings: 0, errors: 0, duplicates: 0 };
   const seenKeys = new Map<string, number>();
+  const authority = matchSheetAuthorityReader();
 
-  for (const row of rows) {
-    let verdict;
-    try {
-      verdict = await spec.validateRow(row.payload, { sql: authSql });
-    } catch (error) {
-      verdict = {
-        verdict: 'error' as const,
-        reasons: [`validator failed: ${error instanceof Error ? error.message : String(error)}`],
-      };
+  try {
+    for (const row of rows) {
+      let verdict;
+      try {
+        verdict = await spec.validateRow(row.payload, { sql: authSql, matchSheetAuthority: authority.read });
+      } catch (error) {
+        verdict = {
+          verdict: 'error' as const,
+          reasons: [`validator failed: ${error instanceof Error ? error.message : String(error)}`],
+        };
+      }
+
+      // Duplicate keys are a file-level defect caught row-by-row so the
+      // report can point at both offending lines.
+      const key = spec.fileKey(row.payload);
+      const firstAt = seenKeys.get(key);
+      if (key && firstAt !== undefined) {
+        verdict = {
+          ...verdict,
+          verdict: 'error' as const,
+          reasons: [...verdict.reasons, `duplicate of row ${firstAt} (key "${key}")`],
+        };
+        summary.duplicates += 1;
+      } else if (key) {
+        seenKeys.set(key, row.rowNo);
+      }
+
+      if (verdict.verdict === 'error') summary.errors += 1;
+      else if (verdict.verdict === 'warning') summary.warnings += 1;
+      else summary.ok += 1;
+
+      await authSql`
+        UPDATE data_submission_rows
+           SET verdict = ${verdict.verdict},
+               reasons = ${authSql.json({
+                 reasons: verdict.reasons,
+                 resolved: verdict.resolved ?? null,
+               })}
+         WHERE submission_id = ${submissionId} AND row_no = ${row.rowNo}
+      `;
     }
-
-    // Duplicate keys are a file-level defect caught row-by-row so the
-    // report can point at both offending lines.
-    const key = spec.fileKey(row.payload);
-    const firstAt = seenKeys.get(key);
-    if (key && firstAt !== undefined) {
-      verdict = {
-        ...verdict,
-        verdict: 'error' as const,
-        reasons: [...verdict.reasons, `duplicate of row ${firstAt} (key "${key}")`],
-      };
-      summary.duplicates += 1;
-    } else if (key) {
-      seenKeys.set(key, row.rowNo);
-    }
-
-    if (verdict.verdict === 'error') summary.errors += 1;
-    else if (verdict.verdict === 'warning') summary.warnings += 1;
-    else summary.ok += 1;
-
-    await authSql`
-      UPDATE data_submission_rows
-         SET verdict = ${verdict.verdict},
-             reasons = ${authSql.json({
-               reasons: verdict.reasons,
-               resolved: verdict.resolved ?? null,
-             })}
-       WHERE submission_id = ${submissionId} AND row_no = ${row.rowNo}
-    `;
+  } finally {
+    await authority.close();
   }
 
   await authSql`
@@ -302,6 +348,18 @@ export async function promoteSubmission(submissionId: number): Promise<PromoteRe
 
         try {
           const runBatchId = await tx.savepoint(async (sp): Promise<ImportBatchId> => {
+            // AFLDB-ISSUE-264: the dataset's whole-submission check runs first,
+            // before any write, and any locks it takes are held to commit. A
+            // refusal throws, so the submission is rolled back and marked failed.
+            if (spec.preparePromotion) {
+              await spec.preparePromotion(
+                rows.map((row) => ({
+                  rowNo: row.rowNo, payload: row.payload, resolved: row.reasons?.resolved ?? {},
+                })),
+                { sql: sp as unknown as typeof importSql },
+              );
+            }
+
             // Award-shaped datasets (rising_star, all_australian) feed one
             // row in `awards`; match/player-stat datasets feed the fact
             // tables directly and have no award to resolve. awardId is

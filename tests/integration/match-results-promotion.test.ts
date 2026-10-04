@@ -31,6 +31,19 @@
  * club_organizations row is fingerprinted before and after. No real club
  * resolves for 2073: real spans end at a concrete last season
  * (tools/migration/load_reference_data.py), and none is borrowed or widened.
+ *
+ * AFLDB-ISSUE-264 nests inside that block and reuses its fixtures: synthetic
+ * players with synthetic AFL Tables identities and synthetic `data_overrides`
+ * Match Sheet records on two fixture-season matches (R258X, R258Y), all
+ * removed in its own afterAll. It proves the refusal end to end through
+ * validateSubmission() and promoteSubmission(), including authority recorded
+ * between the two.
+ *
+ * AFLDB-ISSUE-264 F-002 nests a last block inside that one: the lock order and
+ * bounded waits of the two legacy `preparePromotion` hooks. It forces each
+ * ordering with side transactions (never a race), through the real hooks, the
+ * real pipeline and the real Match Sheet, Return to source and deleteMatch
+ * writers; a settle is emulated at the lock-statement level.
  */
 import './guard';
 
@@ -40,7 +53,15 @@ import {
 } from 'vitest';
 
 import { authSql } from '@/db/authClient';
-import { resolveClub } from '@/lib/ingest/datasets';
+import { deleteMatch } from '@/db/queries/match-admin';
+import {
+  loadMatchSheetStaleToken, returnMatchSheetToSource, saveMatchSheet, STALE_SHEET_REFUSAL,
+} from '@/db/queries/match-sheet';
+import { playerMatchStatsAuthorityStorable } from '@/lib/acquisition/manual-authority';
+import { carryMatchOverrides } from '@/lib/acquisition/match-rekey';
+import {
+  DATASETS, LEGACY_PROMOTION_LOCK_REFUSAL, resolveClub, type PromotionRow,
+} from '@/lib/ingest/datasets';
 import { promoteSubmission, validateSubmission } from '@/lib/ingest/pipeline';
 
 const testDbUrl = process.env.AFLDB_TEST_DATABASE_URL!;
@@ -507,7 +528,9 @@ describe('AFLDB-ISSUE-258 optional columns keep stored figures on re-promotion',
     `;
     expect(left).toEqual({ matches: 0, stats: 0, players: 0, clubs: 0, organizations: 0 });
     // No historical row was touched: every pre-existing row is byte-for-byte as it was.
-    expect(await fingerprint()).toEqual(baseline);
+    // The baseline is taken before anything is created, so none means setup failed
+    // first and there is nothing to compare.
+    if (baseline) expect(await fingerprint()).toEqual(baseline);
   });
 
   it('match_results: a silent column and a blank cell keep goals, behinds and attendance together', async () => {
@@ -610,5 +633,786 @@ describe('AFLDB-ISSUE-258 optional columns keep stored figures on re-promotion',
     const row = await readStats(player);
     expect(Object.values(row).every((value) => value === null)).toBe(true);
     expect(Object.keys(row)).toHaveLength(STATS.length + 3);
+  });
+
+  describe('AFLDB-ISSUE-264 durable Match Sheet authority refuses a reverting row', () => {
+    const TAG_264 = 'AFLDB-ISSUE-264';
+    const RUN = Date.now().toString(36);
+    const TAGS = ['Guarded', 'Removed', 'Added', 'Clear', 'Late'] as const;
+    type Tag = (typeof TAGS)[number];
+    type FixtureMatch = { id: number; key: string };
+    type StatRow = {
+      clubId: number; goals: number | null; marks: number | null; disposals: number | null;
+      sourceId: number | null;
+    };
+
+    const players264 = new Map<Tag, number>();
+    // Everything the setup actually created, recorded as it is created, so the
+    // teardown touches exactly that and survives a partial or failed setup.
+    const createdMatchKeys: string[] = [];
+    const createdIdentityPlayerIds: number[] = [];
+    let matchX: FixtureMatch;
+    let matchY: FixtureMatch;
+    let matchZ: FixtureMatch;
+
+    const nameOf = (tag: Tag) => `${TAG_264} ${tag} Player`;
+    const pathOf = (tag: string) => `players/I/Issue264_${tag}_${RUN}.html`;
+    const row264 = (tag: Tag, extra: Payload = {}, roundCode = 'R258X'): Payload => ({
+      season: String(FIXTURE_SEASON), round_code: roundCode,
+      home_club: home.name, away_club: away.name, player: nameOf(tag), club: home.name,
+      ...extra,
+    });
+
+    async function matchOf(roundCode: string): Promise<FixtureMatch> {
+      const [match] = await owner<FixtureMatch[]>`
+        SELECT id::int AS id, match_key AS key FROM matches
+         WHERE season = ${FIXTURE_SEASON} AND round_code = ${roundCode}
+      `;
+      if (!match) throw new Error(`fixture match ${roundCode} was not created by the promotion`);
+      createdMatchKeys.push(match.key);
+      return match;
+    }
+
+    /** One synthetic Match Sheet record, keyed exactly as the ISSUE-257 writer keys it. */
+    async function seed(
+      tag: string, fieldGroup: string, payload: unknown,
+      opts: { match?: FixtureMatch; isActive?: boolean } = {},
+    ) {
+      await owner`
+        INSERT INTO data_overrides
+              (entity_type, entity_key, field_group, override_values, admin_user_id, is_active)
+        VALUES ('player_match_stats', ${`${(opts.match ?? matchX).key}|afltables:${pathOf(tag)}`},
+                ${fieldGroup}, ${owner.json(payload as never)}, ${fixtureAdminId}, ${opts.isActive ?? true})
+      `;
+    }
+
+    async function rowOf(tag: Tag, match: FixtureMatch = matchX): Promise<StatRow | null> {
+      const [row] = await owner<StatRow[]>`
+        SELECT club_id::int AS "clubId", goals::int AS goals, marks::int AS marks,
+               disposals::int AS disposals, source_id::int AS "sourceId"
+          FROM player_match_stats
+         WHERE match_id = ${match.id} AND player_id = ${players264.get(tag)!}
+      `;
+      return row ?? null;
+    }
+
+    /** Every record under the fixture matches this block created, timestamps included. */
+    async function authorityRecords() {
+      if (createdMatchKeys.length === 0) return [];
+      return owner<{ entityKey: string; fieldGroup: string; payload: string; isActive: boolean; updatedAt: string }[]>`
+        SELECT entity_key AS "entityKey", field_group AS "fieldGroup", override_values::text AS payload,
+               is_active AS "isActive", updated_at::text AS "updatedAt"
+          FROM data_overrides o
+         WHERE entity_type = 'player_match_stats'
+           AND EXISTS (SELECT 1 FROM unnest(${createdMatchKeys}::text[]) AS k
+                        WHERE starts_with(o.entity_key, k || '|'))
+         ORDER BY entity_key, field_group
+      `;
+    }
+
+    beforeAll(async () => {
+      // State B is required: under State A no record could be seeded and every case would be vacuous.
+      if (!(await playerMatchStatsAuthorityStorable(owner))) {
+        throw new Error('this database does not admit player_match_stats authority (migration 110)');
+      }
+      const [afltables] = await owner<{ id: number }[]>`SELECT id FROM sources WHERE key = 'afltables'`;
+      if (!afltables) throw new Error("sources.key = 'afltables' is not seeded in this database");
+
+      await promoteFile('match_results', [
+        matchPayload('R258X', '21'), matchPayload('R258Y', '22'), matchPayload('R258Z', '23'),
+      ]);
+      matchX = await matchOf('R258X');
+      matchY = await matchOf('R258Y');
+      matchZ = await matchOf('R258Z');
+
+      for (const tag of TAGS) {
+        const name = nameOf(tag);
+        const [player] = await owner<{ id: number }[]>`
+          INSERT INTO players (display_name, search_name, sort_name, slug, debut_season, final_season)
+          VALUES (${name}, afldb_normalise_name(${name}), ${name},
+                  ${`issue-264-${tag.toLowerCase()}-${RUN}`}, ${FIXTURE_SEASON}, ${FIXTURE_SEASON})
+          RETURNING id
+        `;
+        players264.set(tag, player.id);
+        // The enclosing afterAll removes these players and their rows.
+        fixturePlayers.set(name, player.id);
+        await owner`
+          INSERT INTO external_identities (source_id, external_id, player_id, status, match_method)
+          VALUES (${afltables.id}, ${pathOf(tag)}, ${player.id}, 'unique', 'afltables_profile_url')
+        `;
+        createdIdentityPlayerIds.push(player.id);
+      }
+    });
+
+    // Runs even when the setup above threw part-way. It removes only what the
+    // setup recorded as created (the enclosing afterAll removes the matches
+    // and players), so an early failure leaves nothing to clean and no second
+    // error masks the original one.
+    afterAll(async () => {
+      if (createdMatchKeys.length > 0) {
+        await owner`
+          DELETE FROM data_overrides o
+           WHERE entity_type = 'player_match_stats'
+             AND EXISTS (SELECT 1 FROM unnest(${createdMatchKeys}::text[]) AS k
+                          WHERE starts_with(o.entity_key, k || '|'))
+        `;
+      }
+      if (createdIdentityPlayerIds.length > 0) {
+        await owner`
+          DELETE FROM external_identities WHERE player_id = ANY(${createdIdentityPlayerIds}::int[])
+        `;
+      }
+      expect(await authorityRecords()).toEqual([]);
+      const [left] = await owner<{ n: number }[]>`
+        SELECT count(*)::int AS n FROM external_identities
+         WHERE player_id = ANY(${createdIdentityPlayerIds}::int[])
+      `;
+      expect(left.n).toBe(0);
+    });
+
+    it('refuses a differing protected value at validation, and admits identical or silent ones', async () => {
+      await promoteFile('player_match_stats', [row264('Guarded', {
+        goals: '3', kicks: '10', handballs: '5', disposals: '15', marks: '2',
+      })]);
+      await seed('Guarded', 'match_sheet', {
+        goals: 3, kicks: 10, handballs: 5, disposals: 15, club_slug: FIXTURE_CLUBS[0].slug,
+      });
+      const before = await rowOf('Guarded');
+
+      const staged = await stageAndValidate('player_match_stats', [row264('Guarded', { goals: '4' })]);
+      expect(staged.summary.errors).toBe(1);
+      expect(staged.rows[0].reasons.reasons[0])
+        .toMatch(/^Match Sheet authority: .*goals \(file 4, Match Sheet 3\)/);
+      expect((await approveAndPromote(staged.id)).ok).toBe(false);
+      expect(await rowOf('Guarded')).toEqual(before);
+
+      // Identical protected values with an unprotected change, then a blank cell: both pass.
+      await promoteFile('player_match_stats', [row264('Guarded', { goals: '3', disposals: '15', marks: '7' })]);
+      await promoteFile('player_match_stats', [row264('Guarded', { goals: null })]);
+      expect(await rowOf('Guarded')).toEqual({ ...before, marks: 7 });
+    });
+
+    it('refuses a protected club change and a coupled disposals change', async () => {
+      const club = await stageAndValidate('player_match_stats', [row264('Guarded', { club: away.name })]);
+      expect(club.rows[0].reasons.reasons[0]).toContain(`club_id (file ${away.id}, Match Sheet ${home.id})`);
+      const disposals = await stageAndValidate('player_match_stats', [row264('Guarded', { disposals: '16' })]);
+      expect(disposals.rows[0].reasons.reasons[0]).toContain('disposals (file 16, Match Sheet 15)');
+    });
+
+    it('refuses to re-insert a player the Match Sheet removed', async () => {
+      await seed('Removed', 'lineup', { present: false });
+      await seed('Removed', 'match_sheet', { goals: 1 }, { isActive: false });
+      const staged = await stageAndValidate('player_match_stats', [row264('Removed', { goals: '1' })]);
+      expect(staged.rows[0].reasons.reasons[0]).toContain('promoting would re-insert the row');
+      expect((await approveAndPromote(staged.id)).ok).toBe(false);
+      expect(await rowOf('Removed')).toBeNull();
+    });
+
+    it('keeps a durable addition: compatible values apply, ownership stays, a club change refuses', async () => {
+      // The Match Sheet's own shape for an addition: an unowned row plus both records.
+      await owner`
+        INSERT INTO player_match_stats (player_id, match_id, club_id, goals)
+        VALUES (${players264.get('Added')!}, ${matchX.id}, ${home.id}, 2)
+      `;
+      await seed('Added', 'lineup', { present: true });
+      await seed('Added', 'match_sheet', { club_slug: FIXTURE_CLUBS[0].slug, goals: 2 });
+
+      await promoteFile('player_match_stats', [row264('Added', { goals: '2', marks: '4' })]);
+      expect(await rowOf('Added')).toEqual({ clubId: home.id, goals: 2, marks: 4, disposals: null, sourceId: null });
+
+      const staged = await stageAndValidate('player_match_stats', [row264('Added', { club: away.name })]);
+      expect(staged.rows[0].reasons.reasons[0]).toContain(`club_id (file ${away.id}, Match Sheet ${home.id})`);
+    });
+
+    it('ignores withdrawn (inactive) records', async () => {
+      await seed('Clear', 'lineup', { present: false }, { isActive: false });
+      await seed('Clear', 'match_sheet', { goals: 9 }, { isActive: false });
+      await promoteFile('player_match_stats', [row264('Clear', { goals: '1' })]);
+      expect(await rowOf('Clear')).toMatchObject({ goals: 1 });
+    });
+
+    it('fails closed on a match carrying authority that resolves to no player', async () => {
+      await seed('Nobody', 'match_sheet', { goals: 1 }, { match: matchY });
+      const staged = await stageAndValidate('player_match_stats', [row264('Clear', { goals: '1' }, 'R258Y')]);
+      expect(staged.rows[0].reasons.reasons[0]).toContain('cannot be attributed to exactly one player');
+      expect((await approveAndPromote(staged.id)).ok).toBe(false);
+      expect(await rowOf('Clear', matchY)).toBeNull();
+    });
+
+    it('refuses authority recorded after validation, rolling the whole submission back', async () => {
+      await promoteFile('player_match_stats', [row264('Late', { goals: '5' })]);
+      const lateBefore = await rowOf('Late');
+      const clearBefore = await rowOf('Clear');
+      const staged = await stageAndValidate('player_match_stats', [
+        row264('Clear', { marks: '11' }),
+        row264('Late', { goals: '6' }),
+      ]);
+      expect(staged.summary.errors).toBe(0);
+
+      // A Match Sheet decision lands between validation and promotion.
+      await seed('Late', 'match_sheet', { goals: 5 });
+      const recordsBefore = await authorityRecords();
+
+      const result = await approveAndPromote(staged.id);
+      expect(result).toMatchObject({ ok: false });
+      expect(result.ok ? '' : result.error).toMatch(
+        /1 row\(s\) conflict with durable Match Sheet authority; nothing was promoted\. row 2 .*goals \(file 6, Match Sheet 5\)/,
+      );
+      const [submission] = await owner<{ status: string }[]>`
+        SELECT status::text AS status FROM data_submissions WHERE id = ${staged.id}
+      `;
+      expect(submission.status).toBe('failed');
+      // Neither row of the submission landed, and the authority is untouched.
+      expect(await rowOf('Clear')).toEqual(clearBefore);
+      expect(await rowOf('Late')).toEqual(lateBefore);
+      expect(await authorityRecords()).toEqual(recordsBefore);
+    });
+
+    // F-005 (pre-commit review): a supported rekey moves the authority with the match
+    // (`carryMatchOverrides`, in the same transaction as the key change, as canonical-apply and
+    // repair-match-rekeys do), so a submission validated before the rekey is still refused after it.
+    it('still refuses a stale submission after a rekey carries the authority to the new key', async () => {
+      // Validated while no authority exists: the row passes.
+      const stale = await stageAndValidate('player_match_stats', [row264('Clear', { goals: '4' }, 'R258Z')]);
+      expect(stale.summary.errors).toBe(0);
+
+      await seed('Clear', 'match_sheet', { goals: 3 }, { match: matchZ });
+      const oldKey = matchZ.key;
+      const newKey = oldKey.replace('-04-23|', '-04-24|');
+      expect(newKey).not.toBe(oldKey);
+      createdMatchKeys.push(newKey);
+      await owner.begin(async (tx) => {
+        expect(await carryMatchOverrides(tx as unknown as postgres.Sql, oldKey, newKey)).toEqual({ carried: 1 });
+        await tx`UPDATE matches SET match_key = ${newKey}, match_date = '2073-04-24' WHERE id = ${matchZ.id}`;
+      });
+
+      const records = await authorityRecords();
+      const identity = `afltables:${pathOf('Clear')}`;
+      expect(records.filter((r) => r.isActive).map((r) => r.entityKey)).toContain(`${newKey}|${identity}`);
+      expect(records.filter((r) => r.isActive && r.entityKey.startsWith(`${oldKey}|`))).toEqual([]);
+
+      const result = await approveAndPromote(stale.id);
+      expect(result).toMatchObject({ ok: false });
+      expect(result.ok ? '' : result.error).toMatch(
+        /1 row\(s\) conflict with durable Match Sheet authority; nothing was promoted\. row 1 .*goals \(file 4, Match Sheet 3\)/,
+      );
+      expect(await rowOf('Clear', matchZ)).toBeNull();
+
+      // A fresh validation agrees, so the report and the promotion do not diverge.
+      const fresh = await stageAndValidate('player_match_stats', [row264('Clear', { goals: '4' }, 'R258Z')]);
+      expect(fresh.summary.errors).toBe(1);
+      expect(fresh.rows[0].reasons.reasons[0]).toMatch(/^Match Sheet authority: .*goals \(file 4, Match Sheet 3\)/);
+    });
+
+    /**
+     * F-002 — the two legacy writers take their match locks in `preparePromotion`, ascending id, and
+     * bound the wait. Every ordering below is forced, not raced: a side transaction holds a lock and
+     * is released only after `pg_blocking_pids` shows who is queued behind it. The real hooks, the real
+     * pipeline and the real Match Sheet, Return to source and deleteMatch writers are used; the rekey
+     * is `carryMatchOverrides` plus the key UPDATE exactly as canonical-apply runs them. The SETTLE is
+     * emulated at the lock-statement level only (the statements `lockUnitMatchRows` and the unit's row
+     * writes issue); its own coverage is in settle-afltables.test.ts.
+     */
+    describe('F-002: match lock order and bounded waits of the legacy promotion hooks', () => {
+      const NOTE = `${TAG_264} F-002 lock test`;
+      type Tx = (tx: postgres.TransactionSql) => Promise<unknown>;
+      type Held = { pid: number; go: () => void; outcome: Promise<unknown> };
+      const MATCH_COUNT = 9;
+      const lockMatch: FixtureMatch[] = [];
+      const sides: postgres.Sql[] = [];
+      const pause = (ms: number) => new Promise<void>((resolve) => { setTimeout(resolve, ms); });
+      const day = (n: number) => String(n).padStart(2, '0');
+      const dateOf = (n: number) => `${FIXTURE_SEASON}-05-${day(n)}`;
+      const lockPayload = (n: number, extra: Payload = {}): Payload =>
+        matchPayload(`R258L${n}`, '01', { match_date: dateOf(n), ...extra });
+      const asSql = (tx: postgres.TransactionSql) => tx as unknown as postgres.Sql;
+      const sqlstate = (error: unknown): string | undefined => {
+        const e = error as { code?: string; cause?: { code?: string } } | null;
+        return e?.code ?? e?.cause?.code;
+      };
+
+      const side = (): postgres.Sql => {
+        const connection = postgres(testDbUrl, { max: 1, onnotice: () => {} });
+        sides.push(connection);
+        return connection;
+      };
+
+      /** Runs `body` in its own transaction; the promise carries the error, or null. */
+      const inTx = (body: Tx): Promise<unknown> => side().begin(body).then(() => null, (error: unknown) => error);
+
+      /**
+       * A transaction that runs `first`, reports its pid, waits for `go()`, runs `second`, commits.
+       * `outcome` is the error it ended with, or null; it never rejects.
+       */
+      async function stage(first: Tx, second?: Tx): Promise<Held> {
+        let go!: () => void;
+        const gate = new Promise<void>((resolve) => { go = resolve; });
+        let ready!: (pid: number) => void;
+        let failed!: (error: unknown) => void;
+        const reached = new Promise<number>((resolve, reject) => { ready = resolve; failed = reject; });
+        const outcome = side().begin(async (tx) => {
+          try {
+            const [{ pid }] = await tx<{ pid: number }[]>`SELECT pg_backend_pid()::int AS pid`;
+            await first(tx);
+            ready(pid);
+          } catch (error) {
+            failed(error);
+            throw error;
+          }
+          await gate;
+          if (second) await second(tx);
+        }).then(() => null, (error: unknown) => error);
+        return { pid: await reached, go, outcome };
+      }
+
+      /**
+       * Waits until `count` sessions are queued behind `holder`, directly or behind each other (a second
+       * row-lock waiter queues on the first waiter's tuple lock, not on the holder).
+       */
+      async function waitBlocked(holder: number, count = 1): Promise<void> {
+        const deadline = Date.now() + 20_000;
+        for (;;) {
+          const rows = await owner<{ pid: number }[]>`
+            WITH RECURSIVE waiting AS (
+              SELECT DISTINCT pid FROM pg_locks WHERE NOT granted
+            ), edge AS (
+              SELECT w.pid, blocker FROM waiting w, unnest(pg_blocking_pids(w.pid)) AS blocker
+            ), reach(pid) AS (
+              SELECT pid FROM edge WHERE blocker = ${holder}::int
+              UNION
+              SELECT e.pid FROM edge e JOIN reach r ON e.blocker = r.pid
+            )
+            SELECT pid::int AS pid FROM reach
+          `;
+          if (rows.length >= count) return;
+          if (Date.now() > deadline) {
+            throw new Error(`expected ${count} session(s) queued behind pid ${holder}; saw ${rows.length}`);
+          }
+          await pause(25);
+        }
+      }
+
+      async function waitWaiting(pid: number): Promise<void> {
+        const deadline = Date.now() + 20_000;
+        for (;;) {
+          const [row] = await owner<{ n: number }[]>`SELECT cardinality(pg_blocking_pids(${pid}::int))::int AS n`;
+          if (row.n > 0) return;
+          if (Date.now() > deadline) throw new Error(`pid ${pid} never waited for a lock`);
+          await pause(25);
+        }
+      }
+
+      const statsPairs = (...pairs: [Tag, FixtureMatch][]): PromotionRow[] => pairs.map(([tag, match], index) => ({
+        rowNo: index + 1,
+        payload: { player: nameOf(tag) },
+        resolved: { match_id: match.id, player_id: players264.get(tag)!, club_id: home.id },
+      }));
+      const runStatsHook = (tx: postgres.TransactionSql, ...pairs: [Tag, FixtureMatch][]) =>
+        DATASETS.player_match_stats.preparePromotion!(statsPairs(...pairs), { sql: asSql(tx) });
+      const runMatchResultsHook = (tx: postgres.TransactionSql, ...ns: number[]) =>
+        DATASETS.match_results.preparePromotion!(ns.map((n, index) => ({
+          rowNo: index + 1,
+          payload: { round_code: `R258L${n}`, match_date: dateOf(n) },
+          resolved: { season: FIXTURE_SEASON, home_club_name: home.name, away_club_name: away.name },
+        })), { sql: asSql(tx) });
+
+      const lockRow = (match: FixtureMatch, strength: 'FOR UPDATE' | 'FOR SHARE'): Tx => (tx) => (strength === 'FOR UPDATE'
+        ? tx`SELECT id FROM matches WHERE id = ${match.id} FOR UPDATE`
+        : tx`SELECT id FROM matches WHERE id = ${match.id} FOR SHARE`);
+
+      const scoreOf = async (match: FixtureMatch) => (await owner<{ s: number }[]>`
+        SELECT home_score::int AS s FROM matches WHERE id = ${match.id}
+      `)[0]?.s;
+
+      async function statusOf(id: number) {
+        const [row] = await owner<{ status: string; error: string | null }[]>`
+          SELECT status::text AS status, error FROM data_submissions WHERE id = ${id}
+        `;
+        return row;
+      }
+
+      const sheetPlayer = (tag: Tag, goals: number) => ({
+        playerId: players264.get(tag)!, clubId: home.id, jumperNumber: null, goals, behinds: null, kicks: null,
+        handballs: null, disposals: null, marks: null, tackles: null, hitouts: null, freesFor: null, freesAgainst: null,
+      });
+
+      /** Holds the stats hook's own locks (the real hook, in a transaction that has not committed). */
+      async function holdStatsHook(...matches: FixtureMatch[]): Promise<Held> {
+        return stage((tx) => runStatsHook(tx, ...matches.map((m): [Tag, FixtureMatch] => ['Late', m])));
+      }
+
+      /** Starts `start` while the promotion's locks are held; it must queue, then finish once they are released. */
+      async function blockedUntilReleased<R>(matches: FixtureMatch[], start: () => Promise<R>): Promise<R> {
+        const holder = await holdStatsHook(...matches);
+        let run: Promise<R> | undefined;
+        try {
+          run = start();
+          await waitBlocked(holder.pid);
+          expect(await Promise.race([run.then(() => 'finished', () => 'finished'), pause(300).then(() => 'waiting')]))
+            .toBe('waiting');
+          holder.go();
+          expect(await holder.outcome).toBeNull();
+          return await run;
+        } finally {
+          holder.go();
+          await holder.outcome;
+          if (run) await Promise.allSettled([run]);
+        }
+      }
+
+      beforeAll(async () => {
+        await promoteFile('match_results', Array.from({ length: MATCH_COUNT }, (_, i) => lockPayload(i + 1)));
+        for (let n = 1; n <= MATCH_COUNT; n += 1) lockMatch[n] = await matchOf(`R258L${n}`);
+        // Ascending id is the lock order under test, and the fixtures promote in file order.
+        for (let n = 2; n <= MATCH_COUNT; n += 1) expect(lockMatch[n].id).toBeGreaterThan(lockMatch[n - 1].id);
+      });
+
+      afterAll(async () => {
+        await Promise.all(sides.map((connection) => connection.end({ timeout: 5 })));
+        // What the real writers leave behind in the reserved fixture season: their audit rows and the
+        // club-season rows deleteMatch and the Match Sheet recompute. Players' derived rows cascade.
+        await owner`DELETE FROM data_edits WHERE admin_user_id = ${fixtureAdminId} AND note = ${NOTE}`;
+        await owner`DELETE FROM club_seasons WHERE season = ${FIXTURE_SEASON}`;
+        // player_clubs points at matches (first/last match) with no cascade; the enclosing afterAll
+        // deletes the matches before the players, so these must go first.
+        await owner`DELETE FROM player_clubs WHERE player_id = ANY(${[...players264.values()]}::int[])`;
+      });
+
+      it('characterises the cycle the shared lock order removes: an unordered match_results writer against the stats hook', async () => {
+        const [A, B] = [lockMatch[1], lockMatch[2]];
+        // Today's match_results upserts without a hook: file order B then A, each a FOR NO KEY UPDATE.
+        const touch = (match: FixtureMatch): Tx => (tx) => tx`UPDATE matches SET venue_raw = venue_raw WHERE id = ${match.id}`;
+        const unordered = await stage(touch(B), touch(A));
+        const stats = inTx((tx) => runStatsHook(tx, ['Clear', A], ['Late', B]));
+        await waitBlocked(unordered.pid); // the hook holds A and waits for B
+        unordered.go(); // the unordered writer now asks for A
+        const ended = (await Promise.all([unordered.outcome, stats])).filter((outcome) => outcome !== null);
+        expect(ended).toHaveLength(1); // exactly one participant is the deadlock victim, the other commits
+        expect(sqlstate(ended[0])).toBe('40P01');
+      });
+
+      it('match_results queues at the lowest held match without holding a later one; both legacy writers finish', async () => {
+        const [A, B] = [lockMatch[1], lockMatch[2]];
+        const stats = await stageAndValidate('player_match_stats', [
+          row264('Clear', { goals: '1' }, 'R258L1'), row264('Late', { goals: '2' }, 'R258L2'),
+        ]);
+        // File order B then A: before the hook this writer upserted B first and kept it while it waited for A.
+        const results = await stageAndValidate('match_results', [
+          lockPayload(2, { home_score: '91' }), lockPayload(1, { home_score: '92' }),
+        ]);
+        expect(stats.summary.errors + results.summary.errors).toBe(0);
+
+        const holder = await stage(lockRow(A, 'FOR UPDATE'));
+        const runs: Promise<unknown>[] = [];
+        try {
+          runs.push(approveAndPromote(stats.id));
+          await waitBlocked(holder.pid, 1);
+          runs.push(approveAndPromote(results.id));
+          await waitBlocked(holder.pid, 2);
+          // Both are queued at A. Neither holds B (the later match), so it can be locked NOWAIT.
+          const probe = side();
+          await expect(probe.begin((tx) => tx`SELECT id FROM matches WHERE id = ${B.id} FOR UPDATE NOWAIT`))
+            .resolves.toBeDefined();
+        } finally {
+          holder.go();
+          expect(await holder.outcome).toBeNull();
+        }
+        const [statsResult, resultsResult] = await Promise.all(runs);
+        expect(statsResult).toMatchObject({ ok: true });
+        expect(resultsResult).toMatchObject({ ok: true });
+        expect([await scoreOf(A), await scoreOf(B)]).toEqual([92, 91]);
+        expect(await rowOf('Clear', A)).toMatchObject({ goals: 1 });
+        expect(await rowOf('Late', B)).toMatchObject({ goals: 2 });
+      });
+
+      it('FOR SHARE leaves readers and another stats promotion unblocked', async () => {
+        const [A, B] = [lockMatch[1], lockMatch[2]];
+        const other = await stageAndValidate('player_match_stats', [row264('Added', { goals: '1' }, 'R258L1')]);
+        expect(other.summary.errors).toBe(0);
+        const holder = await stage((tx) => runStatsHook(tx, ['Clear', A], ['Late', B]));
+        try {
+          // Both finish while the first promotion's locks are still held.
+          const promoted = await Promise.race([
+            approveAndPromote(other.id), pause(8000).then(() => 'queued behind the held promotion'),
+          ]);
+          expect(promoted).toMatchObject({ ok: true });
+          expect(await Promise.race([scoreOf(A), pause(3000).then(() => 'blocked')])).not.toBe('blocked');
+          expect(await rowOf('Added', A)).toMatchObject({ goals: 1 });
+        } finally {
+          holder.go();
+          expect(await holder.outcome).toBeNull();
+        }
+      });
+
+      it('blocks the Match Sheet save and Return to source until the promotion finishes', async () => {
+        const M = lockMatch[3];
+        await promoteFile('player_match_stats', [row264('Clear', { goals: '2' }, 'R258L3')]);
+        const staleToken = await loadMatchSheetStaleToken(owner, M.id);
+
+        const saved = await blockedUntilReleased([M], () => saveMatchSheet({
+          matchId: M.id, syncMatchScores: false, players: [sheetPlayer('Clear', 3)], removedPlayerIds: [],
+          adminUserId: fixtureAdminId, note: NOTE, staleToken,
+        }));
+        expect(saved).toMatchObject({ ok: true });
+        const identity = `${M.key}|afltables:${pathOf('Clear')}`;
+        expect((await authorityRecords()).filter((r) => r.entityKey === identity && r.isActive)).toHaveLength(1);
+
+        const returned = await blockedUntilReleased([M], () => returnMatchSheetToSource({
+          matchId: M.id, playerId: players264.get('Clear')!, adminUserId: fixtureAdminId, note: NOTE,
+        }));
+        expect(returned).toMatchObject({ ok: true });
+        expect((await authorityRecords()).filter((r) => r.entityKey === identity && r.isActive)).toEqual([]);
+      });
+
+      it('blocks any other UPDATE of the match row until the promotion finishes', async () => {
+        const M = lockMatch[3];
+        const outcome = await blockedUntilReleased([M], () => inTx((tx) =>
+          tx`UPDATE matches SET venue_raw = venue_raw WHERE id = ${M.id}`));
+        expect(outcome).toBeNull();
+      });
+
+      it('blocks a rekey (carry plus key change) until the promotion finishes, then it carries the authority', async () => {
+        const M = lockMatch[4];
+        await seed('Clear', 'match_sheet', { goals: 3 }, { match: M });
+        const newKey = M.key.replace(dateOf(4), `${FIXTURE_SEASON}-06-04`);
+        expect(newKey).not.toBe(M.key);
+        createdMatchKeys.push(newKey);
+        const outcome = await blockedUntilReleased([M], () => inTx(async (tx) => {
+          // As canonical-apply and repair-match-rekeys do: the retired match row is locked FOR UPDATE
+          // BEFORE the carry writes any authority, so it is the carry itself that must wait.
+          await tx`SELECT id FROM matches WHERE id = ${M.id} ORDER BY id FOR UPDATE`;
+          expect(await carryMatchOverrides(asSql(tx), M.key, newKey)).toEqual({ carried: 1 });
+          await tx`UPDATE matches SET match_key = ${newKey}, match_date = ${`${FIXTURE_SEASON}-06-04`} WHERE id = ${M.id}`;
+        }));
+        expect(outcome).toBeNull();
+        expect((await authorityRecords()).filter((r) => r.isActive).map((r) => r.entityKey))
+          .toContain(`${newKey}|afltables:${pathOf('Clear')}`);
+      });
+
+      it('blocks deleteMatch until the promotion finishes', async () => {
+        const M = lockMatch[5];
+        const result = await blockedUntilReleased([M], () => deleteMatch({
+          matchId: M.id, adminUserId: fixtureAdminId, reason: NOTE,
+        }));
+        expect(result).toMatchObject({ ok: true, deletedId: M.id });
+        expect(await scoreOf(M)).toBeUndefined();
+      });
+
+      it('authority recorded while a promotion waits wins: the promotion then refuses and writes nothing', async () => {
+        const M = lockMatch[6];
+        await promoteFile('player_match_stats', [row264('Late', { goals: '5' }, 'R258L6')]);
+        const pending = await stageAndValidate('player_match_stats', [row264('Late', { goals: '6' }, 'R258L6')]);
+        expect(pending.summary.errors).toBe(0);
+        const staleToken = await loadMatchSheetStaleToken(owner, M.id);
+
+        const holder = await stage(lockRow(M, 'FOR UPDATE'));
+        const runs: Promise<unknown>[] = [];
+        try {
+          // The save asks first, the promotion second: the save is granted first and commits its authority.
+          runs.push(saveMatchSheet({
+            matchId: M.id, syncMatchScores: false, players: [sheetPlayer('Late', 7)], removedPlayerIds: [],
+            adminUserId: fixtureAdminId, note: NOTE, staleToken,
+          }));
+          await waitBlocked(holder.pid, 1);
+          runs.push(approveAndPromote(pending.id));
+          await waitBlocked(holder.pid, 2);
+        } finally {
+          holder.go();
+          expect(await holder.outcome).toBeNull();
+        }
+        const [saved, promoted] = await Promise.all(runs) as [{ ok: boolean }, { ok: boolean; error?: string }];
+        expect(saved).toMatchObject({ ok: true });
+        expect(promoted.ok).toBe(false);
+        expect(promoted.error).toMatch(/conflict with durable Match Sheet authority; nothing was promoted\..*goals \(file 6, Match Sheet 7\)/);
+        expect(await rowOf('Late', M)).toMatchObject({ goals: 7 });
+        expect((await statusOf(pending.id)).status).toBe('failed');
+      });
+
+      it('a promotion that holds the match first makes a queued Match Sheet save refuse as stale, recording no authority', async () => {
+        const M = lockMatch[9];
+        await promoteFile('player_match_stats', [row264('Late', { goals: '5' }, 'R258L9')]);
+        const pending = await stageAndValidate('player_match_stats', [row264('Late', { goals: '6' }, 'R258L9')]);
+        expect(pending.summary.errors).toBe(0);
+        const staleToken = await loadMatchSheetStaleToken(owner, M.id);
+
+        const holder = await stage(lockRow(M, 'FOR UPDATE'));
+        const runs: Promise<unknown>[] = [];
+        try {
+          runs.push(approveAndPromote(pending.id));
+          await waitBlocked(holder.pid, 1);
+          runs.push(saveMatchSheet({
+            matchId: M.id, syncMatchScores: false, players: [sheetPlayer('Late', 7)], removedPlayerIds: [],
+            adminUserId: fixtureAdminId, note: NOTE, staleToken,
+          }));
+          await waitBlocked(holder.pid, 2);
+        } finally {
+          holder.go();
+          expect(await holder.outcome).toBeNull();
+        }
+        const [promoted, saved] = await Promise.all(runs);
+        expect(promoted).toMatchObject({ ok: true });
+        expect(saved).toMatchObject({ ok: false, error: STALE_SHEET_REFUSAL });
+        expect(await rowOf('Late', M)).toMatchObject({ goals: 6 });
+        expect((await authorityRecords()).filter((r) => r.entityKey.startsWith(`${M.key}|`))).toEqual([]);
+      });
+
+      it('bounds the wait at 5s with the retryable refusal, writes nothing, and a retry succeeds', async () => {
+        const M = lockMatch[2];
+        const stats = await stageAndValidate('player_match_stats', [row264('Late', { goals: '9' }, 'R258L2')]);
+        const results = await stageAndValidate('match_results', [lockPayload(2, { home_score: '95' })]);
+        expect(stats.summary.errors + results.summary.errors).toBe(0);
+        const before = { score: await scoreOf(M), late: await rowOf('Late', M) };
+
+        const holder = await stage(lockRow(M, 'FOR UPDATE'));
+        let outcomes: Awaited<ReturnType<typeof promoteSubmission>>[] = [];
+        const started = Date.now();
+        try {
+          outcomes = await Promise.all([approveAndPromote(stats.id), approveAndPromote(results.id)]);
+        } finally {
+          holder.go();
+          expect(await holder.outcome).toBeNull();
+        }
+        const elapsed = Date.now() - started;
+        expect(elapsed).toBeGreaterThanOrEqual(4500);
+        expect(elapsed).toBeLessThan(20_000);
+        for (const outcome of outcomes) {
+          expect(outcome.ok).toBe(false);
+          expect(outcome.ok ? '' : outcome.error).toContain(LEGACY_PROMOTION_LOCK_REFUSAL);
+        }
+        for (const id of [stats.id, results.id]) {
+          const failed = await statusOf(id);
+          expect(failed.status).toBe('failed');
+          expect(failed.error).toContain(LEGACY_PROMOTION_LOCK_REFUSAL);
+        }
+        expect({ score: await scoreOf(M), late: await rowOf('Late', M) }).toEqual(before);
+
+        expect(await promoteSubmission(stats.id)).toMatchObject({ ok: true });
+        expect(await promoteSubmission(results.id)).toMatchObject({ ok: true });
+        expect(await scoreOf(M)).toBe(95);
+        expect(await rowOf('Late', M)).toMatchObject({ goals: 9 });
+      }, 60_000);
+
+      it('keeps the timeout transaction-local: restored after the hook, absent on the connection afterwards', async () => {
+        const connection = side();
+        const show = async (db: postgres.Sql | postgres.TransactionSql) =>
+          (await db<{ lock_timeout: string }[]>`SHOW lock_timeout`)[0].lock_timeout;
+        const original = await show(connection);
+
+        await connection.begin(async (tx) => {
+          await runMatchResultsHook(tx, 1);
+          await runStatsHook(tx, ['Clear', lockMatch[1]]);
+          expect(await show(tx)).toBe(original); // restored inside the same transaction
+        });
+        expect(await show(connection)).toBe(original);
+
+        // A hook that times out ends its transaction; the setting does not survive on the pooled connection.
+        const holder = await stage(lockRow(lockMatch[2], 'FOR UPDATE'));
+        try {
+          await expect(connection.begin((tx) => runMatchResultsHook(tx, 2))).rejects.toThrow(LEGACY_PROMOTION_LOCK_REFUSAL);
+        } finally {
+          holder.go();
+          expect(await holder.outcome).toBeNull();
+        }
+        expect(await show(connection)).toBe(original);
+      }, 60_000);
+
+      describe('a settle holding match locks for its whole run (emulated at the lock-statement level)', () => {
+        /**
+         * The settle is the first to hold the later match B, the promotion (ascending) holds A and waits for
+         * B, then the settle's next unit asks for A. The promotion began waiting first, so its deadlock check
+         * fires first and it is the victim: the retryable refusal, nothing written, the settle unharmed.
+         */
+        it.each([
+          ['match_results'],
+          ['player_match_stats'],
+        ])('%s: the promotion is the victim, gets the retryable refusal, and a retry succeeds', async (dataset) => {
+          const [A, B] = [lockMatch[1], lockMatch[2]];
+          const stats = dataset === 'player_match_stats';
+          const file = await stageAndValidate(dataset, stats
+            ? [row264('Clear', { goals: '4' }, 'R258L1'), row264('Late', { goals: '4' }, 'R258L2')]
+            : [lockPayload(1, { home_score: '96' }), lockPayload(2, { home_score: '96' })]);
+          expect(file.summary.errors).toBe(0);
+          const before = [await scoreOf(A), await scoreOf(B)];
+
+          // A stats unit takes FOR SHARE on its match by key; a unit that writes or rekeys takes FOR UPDATE.
+          const settle = await stage(
+            stats ? lockRow(B, 'FOR UPDATE') : (tx) => tx`SELECT id FROM matches WHERE match_key = ${B.key} FOR SHARE`,
+            (tx) => tx`SELECT id FROM matches WHERE id = ANY(${[A.id]}) OR match_key = ${A.key} ORDER BY id FOR UPDATE`,
+          );
+          let promotion: Promise<Awaited<ReturnType<typeof promoteSubmission>>> | undefined;
+          const started = Date.now();
+          try {
+            promotion = approveAndPromote(file.id);
+            await waitBlocked(settle.pid); // the hook holds A and waits for B
+            settle.go(); // the settle's next unit asks for A: the cycle closes
+          } finally {
+            if (!promotion) settle.go();
+          }
+          const result = await promotion!;
+          const elapsed = Date.now() - started;
+          expect(await settle.outcome).toBeNull(); // the settle survives
+          expect(result.ok).toBe(false);
+          expect(result.ok ? '' : result.error).toContain(LEGACY_PROMOTION_LOCK_REFUSAL);
+          expect(elapsed).toBeLessThan(4500); // a deadlock victim after ~1s, not the 5s lock timeout
+          expect((await statusOf(file.id)).status).toBe('failed');
+          expect([await scoreOf(A), await scoreOf(B)]).toEqual(before);
+
+          expect(await promoteSubmission(file.id)).toMatchObject({ ok: true });
+        }, 60_000);
+
+        /**
+         * The promotion holds its matches to commit while it still writes rows. If the settle began waiting for
+         * one of those matches BEFORE the promotion reached a row the settle holds, the settle's check fires
+         * first and the SETTLE is the victim. Inside canonical-apply that costs the unit it was applying: the unit
+         * rolls back to its savepoint, one `canonical_apply_failed` finding is opened, and the run continues. The
+         * shared lock order does not remove this; it only orders the promotion's own acquisitions.
+         */
+        it('characterises that the settle can still be the deadlock victim', async () => {
+          const [X, Y] = [lockMatch[7], lockMatch[8]];
+          for (const tag of ['Clear', 'Late'] as const) {
+            await owner`
+              INSERT INTO player_match_stats (player_id, match_id, club_id, goals)
+              VALUES (${players264.get(tag)!}, ${X.id}, ${home.id}, 1)
+            `;
+          }
+          const file = await stageAndValidate('player_match_stats', [
+            row264('Clear', { goals: '2' }, 'R258L7'),
+            row264('Late', { goals: '2' }, 'R258L7'),
+            row264('Added', { goals: '2' }, 'R258L8'),
+          ]);
+          expect(file.summary.errors).toBe(0);
+          const rowLock = (tag: Tag): Tx => (tx) =>
+            tx`SELECT id FROM player_match_stats WHERE match_id = ${X.id} AND player_id = ${players264.get(tag)!} FOR UPDATE`;
+
+          // Another writer keeps the promotion's first row waiting after its hook has taken its match locks.
+          const slow = await stage(rowLock('Clear'));
+          // The settle's first unit: the stats lock on X, then it writes (and so holds) Late's row.
+          const settle = await stage(
+            async (tx) => {
+              await tx`SELECT id FROM matches WHERE match_key = ${X.key} FOR SHARE`;
+              await rowLock('Late')(tx);
+            },
+            // A later unit writes or rekeys Y, which the promotion holds FOR SHARE.
+            lockRow(Y, 'FOR UPDATE'),
+          );
+          let promotion: Promise<Awaited<ReturnType<typeof promoteSubmission>>> | undefined;
+          try {
+            promotion = approveAndPromote(file.id);
+            await waitBlocked(slow.pid); // hook done; row 1 waits for the other writer
+            settle.go();
+            await waitWaiting(settle.pid); // the settle waits for Y first
+            slow.go(); // the promotion now reaches row 2, which the settle holds: the cycle closes
+          } finally {
+            if (!promotion) { settle.go(); slow.go(); }
+          }
+          const [settled, promoted, slowEnded] = await Promise.all([settle.outcome, promotion!, slow.outcome]);
+          expect(sqlstate(settled)).toBe('40P01'); // the settle's unit would roll back to its savepoint
+          expect(promoted).toMatchObject({ ok: true }); // the promotion finishes once the settle is gone
+          expect(slowEnded).toBeNull();
+          expect([await rowOf('Clear', X), await rowOf('Late', X), await rowOf('Added', Y)].map((r) => r?.goals))
+            .toEqual([2, 2, 2]);
+        }, 60_000);
+      });
+    });
   });
 });

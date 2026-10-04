@@ -1,7 +1,20 @@
 import 'server-only';
 
+import { join } from 'node:path';
+
 import type { Sql, TransactionSql } from 'postgres';
 
+import { CONTINUITY_CONTRACT_SEGMENTS } from '@/db/queries/match-sheet';
+
+import {
+  loadPlayerMatchStatsAuthority,
+  playerMatchStatsPairKey,
+  type PlayerMatchStatsAuthority,
+} from '../acquisition/manual-authority';
+import {
+  loadContinuityRulesFailClosed,
+  seasonOfMatchKeyForAuthority,
+} from '../acquisition/match-sheet-authority';
 import type { ImportBatchId } from '../import-batch-id';
 
 /**
@@ -43,6 +56,26 @@ export type RowVerdict = {
 export type ValidationContext = {
   /** Read-only queries against reference data (players, clubs, seasons). */
   sql: Sql;
+  /**
+   * AFLDB-ISSUE-264: a season's active Match Sheet authority. afldb_auth cannot
+   * read `data_overrides`, so the pipeline supplies this from a read-only
+   * import-role transaction. Only `player_match_stats` asks for it, and fails
+   * closed when it is absent.
+   */
+  matchSheetAuthority?: MatchSheetAuthorityReader;
+};
+
+export type MatchSheetAuthorityRead =
+  | { ok: true; authority: PlayerMatchStatsAuthority }
+  | { ok: false; reason: string };
+
+export type MatchSheetAuthorityReader = (season: number) => Promise<MatchSheetAuthorityRead>;
+
+/** One validated row as promotion hands it to `preparePromotion`. */
+export type PromotionRow = {
+  rowNo: number;
+  payload: Record<string, string | null>;
+  resolved: Record<string, number | string | null>;
 };
 
 export type DatasetSpec = {
@@ -67,6 +100,15 @@ export type DatasetSpec = {
     resolved: Record<string, number | string | null>,
     context: { sql: Sql; awardId: number | null; sourceId: number; batchId: ImportBatchId },
   ) => Promise<void>;
+  /**
+   * Optional whole-submission check, run inside the promotion transaction
+   * before anything is written and before the first `promoteRow`. Throwing
+   * refuses the whole submission (it is rolled back and marked failed). Locks
+   * it takes are held until the promotion commits, so a hook that takes any
+   * bounds its wait with `withLegacyLockTimeout` and takes them in ascending
+   * match id (AFLDB-ISSUE-264 F-002).
+   */
+  preparePromotion?: (rows: readonly PromotionRow[], context: { sql: Sql }) => Promise<void>;
   /**
    * The award this dataset feeds, resolved once per promotion, for
    * award-shaped datasets only. Match/player-stat datasets feed the fact
@@ -503,6 +545,51 @@ function matchResultsKey(
   return `${season}|${roundCode}|${matchDate}|${homeName}|${awayName}`;
 }
 
+/**
+ * AFLDB-ISSUE-264 F-002 — the match locks the two legacy writers take.
+ *
+ * `match_results` and `player_match_stats` both take their match locks in
+ * `preparePromotion`, in ONE statement, ascending id (the order `canonical-apply`
+ * uses for a rekey), before the first write. Two promotions, a rekey and a Match
+ * Sheet save therefore queue behind one another instead of crossing. A cycle with
+ * a settle that holds a match lock for its whole run can still form, and then
+ * either side may be the deadlock victim; this bounds the promotion's wait and
+ * turns the failure into a retryable message. It does not remove that cycle.
+ */
+const LEGACY_LOCK_TIMEOUT = '5s';
+
+export const LEGACY_PROMOTION_LOCK_REFUSAL =
+  'Another operation (a Match Sheet save, a source settle or another promotion) is holding a match '
+  + 'this file writes to. Nothing was promoted; promote this submission again in a moment.';
+
+/** 55P03 (lock timeout) or 40P01 (deadlock victim) is retryable; any other error is not. */
+export function legacyPromotionRetryableRefusal(error: unknown): string | null {
+  const code = typeof error === 'object' && error !== null ? (error as { code?: unknown }).code : undefined;
+  return code === '55P03' || code === '40P01' ? LEGACY_PROMOTION_LOCK_REFUSAL : null;
+}
+
+/**
+ * Runs a hook's lock acquisition under a 5 s `lock_timeout`. The setting is
+ * transaction-local (`set_config(..., true)`), so it cannot outlive the
+ * promotion transaction on a pooled connection. On success the previous value
+ * is restored, so the hook's bound does not apply to the row writes that follow;
+ * on failure the pipeline's savepoint rolls back and reverts it. A lock wait
+ * that times out, or a deadlock this transaction loses, becomes the retryable
+ * refusal; every other error, including a real refusal, passes through.
+ */
+async function withLegacyLockTimeout(sql: Sql, work: () => Promise<void>): Promise<void> {
+  const [{ previous }] = await sql<{ previous: string }[]>`SELECT current_setting('lock_timeout') AS previous`;
+  await sql`SELECT set_config('lock_timeout', ${LEGACY_LOCK_TIMEOUT}, true)`;
+  try {
+    await work();
+  } catch (error) {
+    const refusal = legacyPromotionRetryableRefusal(error);
+    if (refusal !== null) throw new Error(refusal, { cause: error });
+    throw error;
+  }
+  await sql`SELECT set_config('lock_timeout', ${previous}, true)`;
+}
+
 const matchResults: DatasetSpec = {
   key: 'match_results',
   title: 'Match results',
@@ -663,6 +750,34 @@ const matchResults: DatasetSpec = {
     };
   },
 
+  // AFLDB-ISSUE-264 F-002: lock the EXISTING target matches, ascending id, with the
+  // strength the upsert below takes anyway (`ON CONFLICT DO UPDATE` never changes
+  // match_key, so it is FOR NO KEY UPDATE; no lock is upgraded later). The upserts
+  // then run in file order against rows already held, so this writer takes match
+  // locks in the same order as player_match_stats' hook and as a rekey. A row that
+  // inserts a new match has nothing to lock.
+  async preparePromotion(rows, { sql }) {
+    const keys = new Set<string>();
+    for (const row of rows) {
+      const { season, home_club_name: homeName, away_club_name: awayName } = row.resolved;
+      const { round_code: roundCode, match_date: matchDate } = row.payload;
+      if (typeof season !== 'number' || typeof homeName !== 'string' || typeof awayName !== 'string'
+        || !roundCode || !matchDate) {
+        throw new Error(`Row ${row.rowNo} carries no resolved season, clubs, round or date; re-validate the submission.`);
+      }
+      keys.add(matchResultsKey(season, roundCode, matchDate, homeName, awayName));
+    }
+    await withLegacyLockTimeout(sql, async () => {
+      await sql`
+        SELECT id::int AS id
+          FROM matches
+         WHERE match_key = ANY(${[...keys]}::text[])
+         ORDER BY id
+           FOR NO KEY UPDATE
+      `;
+    });
+  },
+
   async promoteRow(row, resolved, { sql, sourceId, batchId }) {
     // Reproduces the natural key documented on the matches table itself
     // (season|round|date|home|away, using the era-appropriate club
@@ -742,6 +857,109 @@ const STAT_COLUMNS = [
   'marks_inside_50', 'one_percenters', 'bounces', 'goal_assists',
 ] as const;
 
+/**
+ * AFLDB-ISSUE-264 — the legacy file against durable Match Sheet authority.
+ *
+ * ISSUE-257 records each Match Sheet change in `data_overrides`. This writer
+ * does not replay that authority (a second, divergent implementation, as
+ * ISSUE-165 D-12 recorded for `all_australian`); it REFUSES a row that would
+ * revert it, at validation for the report and again inside promotion under
+ * the match lock. The authority is the settle's own reader
+ * (`loadPlayerMatchStatsAuthority` -> `buildPlayerMatchStatsAuthority`): the
+ * same key decoding, identity and continuity resolution, club check and
+ * fail-closed marking, with no second implementation here.
+ *
+ * Against what promotion would actually write (`promoteRow` below):
+ * - `club_id` is always written, so a protected club refuses unless equal;
+ * - any other column writes only when supplied (ISSUE-258 `COALESCE`), so an
+ *   absent or blank cell never conflicts; a supplied value refuses unless it
+ *   equals the protected one. kicks, handballs and disposals are protected as
+ *   one unit (`COUPLED_DISPOSAL_FIELDS`), so each supplied member is compared;
+ * - a durable removal refuses the row outright: it would re-insert it;
+ * - a durable addition stands: compatible values pass and the upsert leaves the
+ *   row's ownership (`source_id`) alone, but an addition with no protected club
+ *   or (at promotion) no row is an unexpected state and refuses;
+ * - anything indeterminate for the row's match refuses.
+ *
+ * Returns the reason, or null when the row may be written. Pure.
+ */
+export function legacyStatsAuthorityRefusal(input: {
+  authority: PlayerMatchStatsAuthority;
+  playerId: number;
+  matchId: number;
+  /** The resolved values promoteRow writes. */
+  write: Readonly<Record<string, number | string | null | undefined>>;
+  /** Whether the row exists now; null when unknown (validation cannot read it). */
+  rowExists: boolean | null;
+}): string | null {
+  const { authority } = input;
+  if (authority.allIndeterminate) {
+    return 'the stored Match Sheet authority cannot be read (a record does not decode, '
+      + 'or the continuity contract is unreadable)';
+  }
+  if (authority.indeterminateMatchIds.has(input.matchId)) {
+    return 'this match carries Match Sheet authority that cannot be attributed to exactly one '
+      + 'player (unreadable, unresolved or duplicated, or naming a club outside the match)';
+  }
+  const pair = authority.byPair.get(playerMatchStatsPairKey(input.playerId, input.matchId));
+  if (pair === undefined) return null;
+  if (pair.presence === 'removed') {
+    return 'the Match Sheet removed this player from this match; promoting would re-insert the row';
+  }
+  if (pair.presence === 'present') {
+    if (pair.clubId === null) {
+      return 'the Match Sheet added this player but records no club for the addition (unexpected state)';
+    }
+    if (input.rowExists === false) {
+      return 'the Match Sheet added this player but the row is missing (unexpected state)';
+    }
+  }
+
+  const conflicts: string[] = [];
+  for (const [field, kept] of Object.entries(pair.fields ?? {})) {
+    if (field === 'club_slug') {
+      const supplied = input.write.club_id ?? null;
+      if (supplied === null || Number(supplied) !== pair.clubId) {
+        conflicts.push(`club_id (file ${supplied ?? 'blank'}, Match Sheet ${pair.clubId})`);
+      }
+      continue;
+    }
+    const supplied = input.write[field];
+    if (supplied === null || supplied === undefined) continue;
+    const same = field === 'jumper_number' ? String(supplied) === kept : Number(supplied) === kept;
+    if (!same) conflicts.push(`${field} (file ${supplied}, Match Sheet ${kept ?? 'not recorded'})`);
+  }
+  if (conflicts.length === 0) return null;
+  return `the Match Sheet protects ${conflicts.join(', ')}; promoting would overwrite it`;
+}
+
+/** The continuity contract, from the process cwd as the Match Sheet reads it (F-PR-02). */
+const loadIntakeContinuity = () =>
+  loadContinuityRulesFailClosed(join(process.cwd(), ...CONTINUITY_CONTRACT_SEGMENTS));
+
+/**
+ * One season's active Match Sheet authority through the settle's reader, never
+ * throwing: an unreadable answer is a reason, never "no authority". Used by the
+ * pipeline's validation reader and by promotion.
+ */
+export async function readMatchSheetAuthority(
+  sql: Sql | TransactionSql, season: number,
+): Promise<MatchSheetAuthorityRead> {
+  try {
+    const authority = await loadPlayerMatchStatsAuthority(sql, season, loadIntakeContinuity);
+    return authority === null
+      ? { ok: false, reason: 'a stored record has a shape that cannot be read' }
+      : { ok: true, authority };
+  } catch (error) {
+    return { ok: false, reason: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+const resolveInMatchSheet = (matchId: number) => 'Resolve it in the Match Sheet editor '
+  + `(/admin/data-editor?mode=match-sheet&id=${matchId}) or correct the file, then re-validate.`;
+
+const isPositiveInt = (value: unknown): boolean => Number.isInteger(Number(value)) && Number(value) > 0;
+
 const playerMatchStats: DatasetSpec = {
   key: 'player_match_stats',
   title: 'Player match stats',
@@ -753,7 +971,7 @@ const playerMatchStats: DatasetSpec = {
   fileKey: (row) =>
     `${row.season}|${row.round_code}|${row.home_club}|${row.away_club}|${row.player}|${row.club}`,
 
-  async validateRow(row, { sql }) {
+  async validateRow(row, { sql, matchSheetAuthority }) {
     // AFLDB-ISSUE-258: every optional count is read before any lookup, so a
     // malformed cell is reported (all of them at once) rather than nulled.
     const counts = optionalCountReader(row);
@@ -827,7 +1045,105 @@ const playerMatchStats: DatasetSpec = {
       ...stats,
     };
 
+    // AFLDB-ISSUE-264: advisory here, for the report; promotion re-checks it
+    // under the match lock. Unreadable or unavailable authority is an error.
+    const read: MatchSheetAuthorityRead = matchSheetAuthority
+      ? await matchSheetAuthority(season)
+      : { ok: false, reason: 'no authority reader was supplied' };
+    const refusal = read.ok
+      ? legacyStatsAuthorityRefusal({
+        authority: read.authority,
+        playerId: player.playerId!,
+        matchId: match.matchId!,
+        write: resolved,
+        rowExists: null,
+      })
+      : `the Match Sheet authority for ${season} could not be read (${read.reason})`;
+    if (refusal !== null) {
+      return {
+        verdict: 'error',
+        reasons: [`Match Sheet authority: ${refusal}. ${resolveInMatchSheet(match.matchId!)}`],
+      };
+    }
+
     return { verdict: 'ok', reasons: [], resolved };
+  },
+
+  async preparePromotion(rows, { sql }) {
+    const bad = rows.find((row) => !isPositiveInt(row.resolved.match_id) || !isPositiveInt(row.resolved.player_id));
+    if (bad) {
+      throw new Error(`Row ${bad.rowNo} carries no resolved match or player; re-validate the submission.`);
+    }
+    const matchIds = [...new Set(rows.map((row) => Number(row.resolved.match_id)))].sort((a, b) => a - b);
+
+    await withLegacyLockTimeout(sql, async () => {
+      // Lock order (AFLDB-ISSUE-257, canonical-apply): the matches rows, ascending id,
+      // before any player_match_stats row, in the strength canonical-apply takes for a
+      // stats unit. FOR SHARE is enough to keep the authority read valid to commit: every
+      // writer of Match Sheet authority or of match_key (Match Sheet save, Return to
+      // source, a rekey's carry, deleteMatch) takes FOR UPDATE on the match first, and any
+      // other UPDATE of the row takes FOR NO KEY UPDATE; both conflict with FOR SHARE, so
+      // each waits for this promotion to commit. It does not conflict with another stats
+      // promotion or a settle's FOR SHARE, and nothing below upgrades it (the upsert's
+      // foreign key takes FOR KEY SHARE on the same row).
+      const matches = await sql<{ id: number; matchKey: string }[]>`
+        SELECT id::int AS id, match_key AS "matchKey"
+          FROM matches
+         WHERE id = ANY(${matchIds}::int[])
+         ORDER BY id
+           FOR SHARE
+      `;
+      if (matches.length !== matchIds.length) {
+        throw new Error('A match this submission names no longer exists; re-validate the submission.');
+      }
+
+      // Records are scoped by the season their key carries, so read by that.
+      const seasonByMatch = new Map<number, number>();
+      for (const match of matches) {
+        const season = seasonOfMatchKeyForAuthority(match.matchKey);
+        if (season === null) {
+          throw new Error(`Match #${match.id} has a key the Match Sheet authority cannot scope; nothing was promoted.`);
+        }
+        seasonByMatch.set(Number(match.id), season);
+      }
+      const authorityBySeason = new Map<number, PlayerMatchStatsAuthority>();
+      for (const season of new Set(seasonByMatch.values())) {
+        const read = await readMatchSheetAuthority(sql, season);
+        if (!read.ok) {
+          throw new Error(`The Match Sheet authority for ${season} could not be read (${read.reason}); `
+            + 'nothing was promoted.');
+        }
+        authorityBySeason.set(season, read.authority);
+      }
+
+      // Only to tell a durable addition whose row is missing (unexpected) from one that is present.
+      const existing = await sql<{ playerId: number; matchId: number }[]>`
+        SELECT player_id::int AS "playerId", match_id::int AS "matchId"
+          FROM player_match_stats
+         WHERE match_id = ANY(${matchIds}::int[])
+      `;
+      const present = new Set(existing.map((r) => playerMatchStatsPairKey(Number(r.playerId), Number(r.matchId))));
+
+      const refusals: string[] = [];
+      for (const row of rows) {
+        const matchId = Number(row.resolved.match_id);
+        const playerId = Number(row.resolved.player_id);
+        const refusal = legacyStatsAuthorityRefusal({
+          authority: authorityBySeason.get(seasonByMatch.get(matchId)!)!,
+          playerId,
+          matchId,
+          write: row.resolved,
+          rowExists: present.has(playerMatchStatsPairKey(playerId, matchId)),
+        });
+        if (refusal !== null) refusals.push(`row ${row.rowNo} "${row.payload.player ?? ''}" (match #${matchId}): ${refusal}`);
+      }
+      if (refusals.length > 0) {
+        const shown = refusals.slice(0, 10).join('; ');
+        const more = refusals.length > 10 ? `; and ${refusals.length - 10} more` : '';
+        throw new Error(`${refusals.length} row(s) conflict with durable Match Sheet authority; nothing was promoted. `
+          + `${shown}${more}. Resolve them in the Match Sheet editor and promote this submission again, or upload a corrected file.`);
+      }
+    });
   },
 
   async promoteRow(row, resolved, { sql, sourceId, batchId }) {
@@ -852,6 +1168,9 @@ const playerMatchStats: DatasetSpec = {
       -- was silent (no column, or a blank cell) and keeps the stored value;
       -- a malformed cell never reaches here, validation refuses it. On
       -- INSERT there is nothing to keep, so it stays not recorded.
+      -- AFLDB-ISSUE-264: preparePromotion has already refused any row that
+      -- would revert Match Sheet authority. source_id is deliberately not
+      -- updated, so a durable addition's row keeps its ownership.
       ON CONFLICT (player_id, match_id) DO UPDATE SET
          club_id          = EXCLUDED.club_id,
          career_game_no   = COALESCE(EXCLUDED.career_game_no, player_match_stats.career_game_no),

@@ -70,6 +70,7 @@ import {
   protectedColumnsOf,
   resolveStoredIdentityToPlayer,
   type ContinuityRulesLoad,
+  type MatchSheetDelta,
 } from './match-sheet-authority';
 import { MANUAL_ATTENDANCE_SOURCE_KEY } from './manual-source-key';
 import type {
@@ -139,6 +140,14 @@ export type PlayerMatchStatsPairAuthority = {
   protectedColumns: ReadonlySet<string>;
   /** `removed` = a durable removal; `present` = a durable addition; null = none. */
   presence: 'present' | 'removed' | null;
+  /**
+   * The active `match_sheet` payload itself (null when none is active), already
+   * parsed by `interpretKeyAuthority`. AFLDB-ISSUE-264: the legacy CSV promotion
+   * compares a supplied value with it, so an identical value is not a conflict.
+   */
+  fields: MatchSheetDelta | null;
+  /** The club a protected `club_slug` resolves to (always home or away); null when unprotected. */
+  clubId: number | null;
 };
 
 /**
@@ -355,11 +364,13 @@ export function buildPlayerMatchStatsAuthority(
     const playerId = resolved.playerId;
 
     const slug = interpreted.fields?.club_slug;
+    let protectedClubId: number | null = null;
     if (typeof slug === 'string') {
       const clubId = input.clubIdBySlug.get(slug);
       if (clubId === undefined || (clubId !== match.homeClubId && clubId !== match.awayClubId)) {
         mark(); continue;
       }
+      protectedClubId = clubId;
     }
 
     const pair = playerMatchStatsPairKey(playerId, match.id);
@@ -367,6 +378,8 @@ export function buildPlayerMatchStatsAuthority(
     byPair.set(pair, {
       protectedColumns: interpreted.fields === null ? new Set() : protectedColumnsOf(interpreted.fields),
       presence: interpreted.presence,
+      fields: interpreted.fields,
+      clubId: protectedClubId,
     });
   }
   return { allIndeterminate: false, indeterminateMatchIds, unresolvedMatchKeys, byPair };
@@ -525,9 +538,15 @@ export function overrideScopeProvenFrom(definitions: readonly string[]): boolean
  * is `NO_PLAYER_MATCH_STATS_AUTHORITY`, identical to today's. Returns `null` when a
  * result shape cannot be read; a thrown query error propagates to
  * `loadManualAuthority`'s catch (the whole-refusing provider).
+ *
+ * AFLDB-ISSUE-264: also read by the legacy CSV intake (`src/lib/ingest/datasets.ts`),
+ * which runs in the Next runtime and so passes `continuity` loaded from an explicit
+ * `process.cwd()`-based path (F-PR-02); the settle keeps the default. It is read
+ * only when a record exists, exactly as before.
  */
-async function loadPlayerMatchStatsAuthority(
+export async function loadPlayerMatchStatsAuthority(
   sql: postgres.Sql | postgres.TransactionSql, season: number,
+  loadContinuity: () => ContinuityRulesLoad = () => loadContinuityRulesFailClosed(),
 ): Promise<PlayerMatchStatsAuthority | null> {
   const records = await sql<{
     entityKey: string; fieldGroup: string; isActive: boolean; overrideValues: string | null;
@@ -543,7 +562,7 @@ async function loadPlayerMatchStatsAuthority(
 
   // D-257-9: an unreadable continuity contract fails closed (the builder answers
   // all-indeterminate once a record of the season exists).
-  const continuity = loadContinuityRulesFailClosed();
+  const continuity = loadContinuity();
 
   const matchKeys = new Set<string>();
   const externalIds = new Set<string>();

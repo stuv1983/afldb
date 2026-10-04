@@ -15,6 +15,50 @@ commit.
 
 ## [Unreleased]
 
+### Legacy file intake refuses rows that would revert a Match Sheet decision (AFLDB-ISSUE-264; implemented, uncommitted, `afldb_test` validated 2026-10-04, DEV acceptance outstanding) - 4 October 2026
+
+- A `player_match_stats` upload row is now refused if promoting it would revert durable Match Sheet
+  authority (ISSUE-257). That covers a supplied figure that differs from a protected one, the always-written
+  club against a protected club, and a player the Match Sheet removed, whom the row would re-insert. The
+  rule follows the `all_australian` ISSUE-165 D-12 refusal. There is no replay and no legacy dataset is
+  retired.
+- An identical protected value passes. An absent or blank cell still keeps the stored value
+  (ISSUE-258), so it never conflicts. A durable addition stands. Compatible values apply and the row's
+  ownership is left alone.
+- Authority that cannot be read, resolved or attributed for the row's match refuses the row (fail
+  closed).
+- Validation reports each refusal per row, with a link to the Match Sheet editor. Promotion checks again
+  inside its transaction, holding the matches' row locks (ascending id, before any statistics row). One
+  conflicting row refuses the whole submission, which is rolled back and marked failed. No authority is
+  written.
+- Validation now reads the authority through a short-lived import-role connection in a READ ONLY
+  transaction, because `afldb_auth` cannot read `data_overrides`. No grant, schema or authority-model
+  change.
+- Retained validation: the seven ISSUE-264 cases, the ISSUE-185 and ISSUE-258 cases and the 14 lock-order
+  cases (`match-results-promotion` 32/32), `datasets`, `submission-promotion`, the Match Sheet authority
+  block of the AFL Tables settle suite, and the complete production build all pass on `afldb_test` with
+  migration 110 applied. 110 is applied and then reversed inside the validation window, and the test
+  database ends in its original schema state (final window 2026-10-04, runbook §14.5). The AFL API settle
+  suite is no longer run in this window, because its setup rewrites real season-2026 rows; the shared
+  authority reader stays covered through the AFL Tables block and database-free tests.
+- A refused promotion tells the operator to resolve the conflict in the Match Sheet editor and promote
+  the submission again, or upload a corrected file (a failed submission cannot be re-validated).
+- Promotion lock order (decided and implemented 2026-10-04): the match-results upload and the
+  player-statistics upload now take their match locks in one ascending order, before any write
+  (`FOR NO KEY UPDATE` and `FOR SHARE`), so two uploads, a rekey, a Match Sheet save and a match deletion
+  queue instead of crossing. The wait is bounded at 5 seconds, transaction-locally; a promotion that cannot
+  get its matches (or loses a deadlock) is refused with a retryable message, ends failed and can be promoted
+  again. Every supported writer of Match Sheet authority or of a match key waits for a running promotion.
+- Known limitation: a source settle that holds match locks for its whole run is unchanged, so a deadlock
+  with an upload can still occur. The upload is normally the victim; if the settle is, it loses the one
+  unit it was applying (a `canonical_apply_failed` finding is opened) and the run continues. There is no
+  in-run retry. The provider's next in-season run re-offers the unit and closes the finding: the AFL Tables
+  target-state retry, or the AFL API re-comparison against canonical state. On DEV, AFL Tables runs only
+  when started by an operator. Accepted by the operator as a temporary limitation and tracked as
+  AFLDB-ISSUE-265; the deadlock is not eliminated. Row-lock cycles on `player_match_stats` between two
+  uploads, or between an upload and a settle, behave as before. Details in the ISSUE-264 runbook §14.3 and
+  §14.5.
+
 ### Legacy file intake no longer blanks stored statistics a file is silent on (AFLDB-ISSUE-258; DEV accepted 2026-10-04, PROD promotion outstanding) - 3 October 2026
 
 - In the `player_match_stats` and `match_results` upload datasets, an optional column the file does not
