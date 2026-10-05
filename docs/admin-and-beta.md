@@ -398,6 +398,21 @@ staged  ->  validated  ->  approved  ->  promoted
   `(award_id, source_record_id)` so re-promoting a corrected file
   updates rather than duplicates. Any failure rolls the whole thing back
   and marks the submission `failed` with the error.
+* **Promotions and the nightly settles (AFLDB-ISSUE-265)** — the datasets
+  that write match rows (`match_results`, `player_match_stats` and
+  `match_attendance`) take a transaction-level advisory lock `(717275, 4)`
+  exclusively before they lock any match, and the AFL Tables and AFL API
+  settles take the same lock shared before they write anything, so the two
+  never overlap. A promotion that starts while a settle is running, or while
+  another match-writing promotion is in flight, waits up to 5 s and is then
+  refused with "Another operation … is holding a match this file writes to.
+  Nothing was promoted; promote this submission again in a moment." The
+  submission is marked `failed`, nothing is written, and promoting it again
+  works once the other operation has finished. A settle that finds a promotion
+  in flight waits up to 300 s at its start and then fails before writing
+  anything, with a message naming the legacy promotion; run it again once
+  that promotion has finished. `player_bio` and the award datasets do not
+  take the lock.
 
 ### Registered datasets
 

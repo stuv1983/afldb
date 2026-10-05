@@ -1,8 +1,11 @@
 # AFLDB-ISSUE-265 Phase A tooling (archived, unchanged)
 
 Archived by D-265-15 (2026-10-05) so that the evidence in `issues/open/AFLDB-ISSUE-265.md` §17 keeps the
-tooling that produced it. These files are byte-for-byte copies. Do not edit them: the Phase B runner (S8) is
-written outside the repository and does not replace these. Phase A is retired (runbook §17.15).
+tooling that produced it. These files are byte-for-byte copies. Do not edit them: the Phase B runner and probe
+are separate files outside the repository (`D:\tmp\issue265\Invoke-Issue265PhaseB.ps1`,
+`issue265-db-probe-b.mjs`) and do not replace these. Phase A is retired (runbook §17.15), and after the gate
+was implemented the Phase A harness no longer exists in the working tree: it is committed at 62f2cd67. To run
+Phase A again, check out that commit on its own, with these files.
 
 ## Files
 
@@ -18,7 +21,21 @@ finds the probe and `tools\` through `$PSScriptRoot`, and the skip check finds t
 | `tools/Invoke-Issue265SkipCheck.ps1` | `D:\tmp\issue265\tools\Invoke-Issue265SkipCheck.ps1` | 5175 | `e7bc6c72f27193d5bec5b465e81d95ec52a1dfea9d9cbf54c65e24a62eb843fb` |
 
 Each copy was verified against its original by SHA-256 and a byte comparison. The files use LF line
-endings and no BOM. A checkout that converts line endings changes the working-tree hash, not the blob.
+endings and no BOM.
+
+**Checkout integrity (verified 2026-10-05, after the S0 commit 62f2cd67).** The five committed blobs, the
+working-tree files and the `D:\tmp\issue265\` originals are byte-identical (SHA-256 and `cmp`). Git had
+warned of LF-to-CRLF conversion while staging, because the installed Git sets `core.autocrlf=true`. A
+simulated `autocrlf=true` checkout of the five files then produced CRLF copies whose hashes all differed from
+the table above. `.gitattributes` therefore carries one `-text` entry for each of the five files (not this
+README), under the pattern `issues/*/AFLDB-ISSUE-265-phase-a/…` so it survives the move to `issues/closed/`.
+The same simulated checkout with the entries is byte-identical to the originals.
+
+Limits of that protection, stated plainly:
+- It protects checkouts that include the `.gitattributes` entries. A checkout of 62f2cd67 itself, or any older
+  revision, still converts line endings under `core.autocrlf=true`; the blob is right, the working copy is not.
+- It does not prove what a window executed (see the provenance section below). The hashes identify these
+  files, nothing more.
 
 ## Lint exception
 

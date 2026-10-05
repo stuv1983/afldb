@@ -1,28 +1,48 @@
 /**
- * AFLDB-ISSUE-265 Phase A — characterisation of the settle / legacy-promotion match-lock deadlock,
- * driven through the REAL settles and the REAL promotion pipeline on the base tree (before Option 3).
+ * AFLDB-ISSUE-265 Phase B — acceptance of the settle / legacy-promotion advisory gate, driven through the REAL
+ * settles (`runSettleAfltables`, `runSettleAflApi`) and the REAL promotion pipeline (`promoteSubmission`).
  *
- * CONTRACT. `issues/open/AFLDB-ISSUE-265.md` §13.2 Phase A (A1, A2, A3), as amended by the §15 review and
- * approved by D-265-7 (§14.1). Section 17 of that runbook records what this file is, what it asserts and
- * what was NOT verified when it was written (nothing was executed).
+ * CONTRACT. `issues/open/AFLDB-ISSUE-265.md` §12 (design), §18 (plan), §19 (B1–B11), §20 (timeouts, queue
+ * behaviour), decisions D-265-1..15. Phase B REPLACES Phase A (§17.15). The Phase A harness this file started
+ * from is committed at 62f2cd67 (the S0 checkpoint), together with its runner and probe under
+ * `issues/open/AFLDB-ISSUE-265-phase-a/`; window 2 (2026-10-05 16:22:35) ran it on the base tree. Phase A
+ * asserted the deadlock; each of those assertions is a lock edge the gate removes, so Phase A must not run
+ * again on this tree and this file runs Phase B only.
  *
- * PHASE GATING. Phase A asserts PRE-CHANGE behaviour: the settle loses the deadlock. Once Option 3 lands
- * those assertions invert (the gate removes the cycle), so this file runs ONLY when the dedicated runner
- * (D:\tmp\issue265\Invoke-Issue265PhaseA.ps1, runbook §17.9) arms it. All of these must hold:
+ * WHAT IS UNDER TEST. A settle takes `pg_advisory_xact_lock_shared(717275, 4)` as the first call in its
+ * transaction (`acquireSettlePromotionGate`, settle-core.ts), bounded by a 300 s `lock_timeout` and a 330 s
+ * `statement_timeout` for that statement only. The three legacy match writers (`match_results`,
+ * `player_match_stats`, `match_attendance`) take `pg_advisory_xact_lock(717275, 4)` inside
+ * `withLegacyLockTimeout` (datasets.ts), under the 5 s hook bound and before any match lock. So a settle and a
+ * promotion never hold match row locks at the same time.
  *
- *   AFLDB_ISSUE265_PHASE=A;
+ * CASES (runbook §19.2). B1 and B2 AFL Tables · match_results; B3 and B4 AFL API · player_match_stats (B4 is
+ * F-265-1, the attendance enrichment); B5 match_attendance (the third writer; it runs LAST because it changes
+ * attendance on matches the other AFL API cases settle); B6 a settle waits behind a stuck promotion; B7 the
+ * full 300 s timeout, rollback and connection reuse for both providers; B8 concurrent settles and a rolled-back
+ * settle releasing the gate; B9 promotions serialise; B10 the helper restores both previous settings; B11 both
+ * advisory-lock queue shapes.
+ *
+ * PHASE GATING. This file runs ONLY when the dedicated Phase B runner
+ * (D:\tmp\issue265\Invoke-Issue265PhaseB.ps1) arms it. All of these must hold:
+ *
+ *   AFLDB_ISSUE265_PHASE=B;
  *   AFLDB_ISSUE265_ARMED_AT = the epoch milliseconds at which the runner launched vitest, at most 15 min
- *     old: an AFLDB_ISSUE265_PHASE left set in a shell (the old §17.9 command did exactly that) cannot arm
- *     a later, unrelated vitest run on its own;
+ *     old: an AFLDB_ISSUE265_PHASE left set in a shell cannot arm a later, unrelated vitest run on its own.
+ *     B7 alone takes about 5.5 minutes, and the whole phase about 10 to 12, so a runner that starts vitest
+ *     promptly stays inside the window; the stamp is only checked at module load;
  *   AFLDB_TEST_DATABASE_URL, AFLDB_AUTH_DATABASE_URL and AFLDB_TEST_IMPORT_DATABASE_URL set.
  *
- * Otherwise every case is skipped and NOTHING is imported that opens a connection: the shared connection
- * guard (`./guard`) is imported dynamically inside the gated `beforeAll`, not at module top as the other
- * integration suites do, because a static import connects (and throws when the DSN is absent). No other
- * module this file reaches opens a connection on import (runbook §17.10 records the static scan). A
- * skipped run is not evidence of anything. Phase B (Option 3 acceptance, runbook §13.2 B1–B6) will reuse
- * the choreography helpers below (`hold`, `reachOf`, `waitUntil`, the bundle builders) with inverted
- * assertions.
+ * A stale `AFLDB_ISSUE265_PHASE=A` arms nothing: every case is skipped and the runner, which expects a
+ * non-zero count of passed tests, fails loudly. Otherwise every case is skipped and NOTHING is imported that
+ * opens a connection: the shared connection guard (`./guard`) is imported dynamically inside the gated
+ * `beforeAll`, not at module top as the other integration suites do, because a static import connects (and
+ * throws when the DSN is absent). No other module this file reaches opens a connection on import. A skipped
+ * run is not evidence of anything.
+ *
+ * REFUSES ON A TREE WITHOUT THE GATE. Before any connection, `beforeAll` checks the source text: both settles
+ * call `acquireSettlePromotionGate` as the first call of their transaction, and `withLegacyLockTimeout` takes
+ * the exclusive gate. Phase B therefore cannot run, and fail confusingly, on the base tree.
  *
  * DSNs (read from the environment by the code under test, never from .env by this file):
  *   - AFLDB_TEST_DATABASE_URL   owner connection, side transactions and both settles (as the existing
@@ -45,9 +65,10 @@
  * identities (each its own organization, spanning 2078 only), one synthetic venue and two synthetic
  * players. No real club, venue or player is referenced, so the settles' end-of-run derived recompute
  * (recomputeSeasonMetadata/recomputeClubSeasons for 2078; recomputePlayerDerivedStats over the synthetic
- * players only) can reach no historical row. A1 (AFL Tables) uses rounds 1–4; A2/A3 (AFL API) use rounds
- * 5–9 with different dates, so no AFL API insert sees an AFL Tables match as a plausible existing fixture
- * (`findPlausibleCanonicalFixtures`: same clubs and at most one of round/date differing).
+ * players only) can reach no historical row. The AFL Tables matches (MA to MD) use rounds 1–4; the AFL API
+ * matches (M1 to M5) use rounds 5–9 with different dates, so no AFL API insert sees an AFL Tables match as a
+ * plausible existing fixture (`findPlausibleCanonicalFixtures`: same clubs and at most one of round/date
+ * differing).
  *
  * SYNTHETIC AFL API PAYLOADS. Built in code (`apiFixtureRaw` / `apiRosterRaw` / `apiStatsRaw`). The real
  * season-2026 samples under tests/fixtures/afl_api are NOT read. The emitters need two pieces of reference
@@ -58,6 +79,11 @@
  *     parseSourceFamilyRegistry() validator (the file itself is untouched);
  *   - an `AflApiIdentities` object mapping synthetic team, venue and comp-season provider ids to the
  *     synthetic identities created here.
+ *
+ * ONE VALUE, TWO WRITERS. A promotion and a settle that touch the same row write the SAME value (a promotion's
+ * file row equals the line or projection the settle writes or already stored), so a promotion that succeeds
+ * never leaves a canonical row the next settle would read as drift. A promotion is refused or succeeds; it is
+ * never what changes a value.
  *
  * FAIL-CLOSED PREFLIGHT. Before any write, a census proves the reserved season and this file's namespaces
  * hold zero rows in every table the harness (or the code it drives) writes; anything else refuses the run
@@ -78,13 +104,15 @@
  *   club_seasons, the synthetic players' derived rows, canonical_applications, promotion_candidates,
  *   import_rejections, data_issues, the AFL Tables and AFL API typed projections, the spine
  *   (source_records, source_record_versions, and this file's own payloads once unreferenced), the
- *   import_batches of every settle run and of the A3 fixture, data_submissions (rows cascade),
+ *   import_batches of every settle run and of the B4 fixture, data_submissions (rows cascade),
  *   external_identities, players, clubs, club_organizations, the venue and the 2078 seasons row.
  *   Retained by convention (ISSUE-264 §14.3 "Retained test records"; submission-promotion.test.ts and
  *   match-results-promotion.test.ts): the fixture auth_users row (deleting it races a concurrent run); the
  *   `sources` 'sports_data_lab' row if this run had to seed it (migration-057 idiom, never deleted); and the
  *   `import_batches` rows with tool 'admin-upload' that the successful promotions write (notes
  *   'submission <id>'; import_batches is append-only and nothing references them after teardown).
+ *   A full pass retains exactly EXPECTED_RETAINED_BATCHES of them: one per successful promotion (B1 1, B2 1,
+ *   B3 1, B4 1, B5 1, B6 1, B7 1, B8 1, B9 4, B11 2). A REFUSED promotion rolls back and writes none.
  *
  * TEARDOWN AFTER A FAILED SETUP. Every created row is tracked as it is created. The teardown runs from the
  * gated describe's afterAll, which vitest runs even when beforeAll threw part-way (the same reliance as
@@ -102,15 +130,21 @@
  * BOUNDED WAITS. No await in this file is unbounded: every settle, promotion, side transaction and poll
  * has an explicit limit (`within`, `waitUntil`), below the case's own vitest timeout.
  *
+ * TWO SETTLES AT ONCE. B8 and B11 hold two settles open together to show their gate locks side by side.
+ * They are released one after the other, never together: two settles' end-of-run recomputes running at the
+ * same moment is the separate, pre-existing ISSUE-261 contention, not what these cases test.
+ *
  * EVIDENCE. With AFLDB_ISSUE265_EVIDENCE_FILE set, the teardown writes the retained-record accounting
  * (the admin-upload batches by id, whether the fixture user and the sports_data_lab source pre-existed),
- * the tracked ids, any teardown problem, the residue census and which fingerprints changed. The runner
- * reconciles it with its own independent census.
+ * the tracked ids, any teardown problem, the residue census and which fingerprints changed, plus each case's
+ * timings. The runner reconciles it with its own independent census.
  *
- * OPERATOR COMMAND (not run by the author; inside a guarded afldb_test window, runbook §17.9):
- *   $env:AFLDB_ISSUE265_PHASE='A'; npx vitest run tests/integration/settle-promotion-deadlock.test.ts
+ * OPERATOR COMMAND (not run by the author; inside a guarded afldb_test window, runbook §19, §21):
+ *   powershell.exe -NoProfile -ExecutionPolicy Bypass -File D:\tmp\issue265\Invoke-Issue265PhaseB.ps1 `
+ *     -Phase Preflight -TunnelHost 127.0.0.1 -TunnelPort 55432
+ *   (then -Phase Full with the same endpoint)
  *
- * @see issues/open/AFLDB-ISSUE-265.md §10.1-§10.3, §13.2, §14.1, §15, §17
+ * @see issues/open/AFLDB-ISSUE-265.md §10-§20
  * @see tests/integration/match-results-promotion.test.ts (F-002 block: side transactions, waiter walk)
  * @see tests/integration/settle-afltables.test.ts (bundle122 / apply122 / cleanup122)
  * @see tests/integration/settle-afl-api.test.ts (cleanup(): spine and ledger deletion order)
@@ -139,7 +173,14 @@ import {
   type SettleBundle,
   type SettleRunResult,
 } from '@/lib/acquisition/settle-afltables';
-import { canonicalApplyIssueKey, renderMatchKey } from '@/lib/acquisition/settle-core';
+import {
+  acquireSettlePromotionGate,
+  canonicalApplyIssueKey,
+  renderMatchKey,
+  SETTLE_PROMOTION_GATE,
+  SETTLE_PROMOTION_GATE_WAIT_MS,
+  SettlePromotionGateTimeout,
+} from '@/lib/acquisition/settle-core';
 import {
   getSourceFamily,
   parseSourceFamilyRegistry,
@@ -153,8 +194,11 @@ import { promoteSubmission, validateSubmission } from '@/lib/ingest/pipeline';
  * Gate
  * ------------------------------------------------------------------ */
 
-const PHASE_A_REQUESTED = process.env.AFLDB_ISSUE265_PHASE === 'A';
-/** How long the runner's arming stamp stays valid. A whole Phase A window takes a few minutes. */
+const PHASE_B_REQUESTED = process.env.AFLDB_ISSUE265_PHASE === 'B';
+/**
+ * How long the runner's arming stamp stays valid. It is checked once, when this module loads (the runner
+ * launches vitest straight after stamping), so the length of the run itself does not matter.
+ */
 const ARM_WINDOW_MS = 15 * 60_000;
 const armedAt = Number(process.env.AFLDB_ISSUE265_ARMED_AT ?? '');
 const ARMED = Number.isSafeInteger(armedAt) && armedAt > 0
@@ -162,18 +206,53 @@ const ARMED = Number.isSafeInteger(armedAt) && armedAt > 0
 const testDbUrl = process.env.AFLDB_TEST_DATABASE_URL ?? '';
 const importDbUrl = process.env.AFLDB_TEST_IMPORT_DATABASE_URL ?? '';
 const DSNS_PRESENT = testDbUrl !== '' && importDbUrl !== '' && Boolean(process.env.AFLDB_AUTH_DATABASE_URL);
-const RUN_PHASE_A = PHASE_A_REQUESTED && ARMED && DSNS_PRESENT;
+const RUN_PHASE_B = PHASE_B_REQUESTED && ARMED && DSNS_PRESENT;
 
-if (PHASE_A_REQUESTED && !RUN_PHASE_A) {
+if (PHASE_B_REQUESTED && !RUN_PHASE_B) {
   const why = [
     ARMED ? null : 'AFLDB_ISSUE265_ARMED_AT is missing, invalid or older than 15 minutes',
     DSNS_PRESENT ? null : 'a required DSN is not set',
   ].filter(Boolean).join('; ');
   console.warn(
-    `AFLDB-ISSUE-265 Phase A was requested but ${why}; every case is skipped. `
+    `AFLDB-ISSUE-265 Phase B was requested but ${why}; every case is skipped. `
     + 'Run it through the dedicated runner. A skipped run is not evidence.',
   );
+} else if (process.env.AFLDB_ISSUE265_PHASE === 'A') {
+  console.warn(
+    'AFLDB-ISSUE-265 Phase A is retired (runbook §17.15): it asserted the deadlock the gate removes, so it cannot run '
+    + 'on this tree. Every case is skipped. The Phase A harness is committed at 62f2cd67.',
+  );
 }
+
+/** One admin-upload batch is retained per successful promotion; see the header for the per-case count. */
+const EXPECTED_RETAINED_BATCHES = 14;
+/** The number of cases B1 to B11. */
+const EXPECTED_TESTS = 11;
+
+/** Refuses a tree without the gate, before any connection: the Phase B assertions would be meaningless on it. */
+function assertGateInSource(): void {
+  const read = (file: string) => readFileSync(file, 'utf8');
+  const problems: string[] = [];
+  for (const file of ['src/lib/acquisition/settle-afltables.ts', 'src/lib/acquisition/settle-afl-api.ts']) {
+    const text = read(file);
+    if (text.split('await sql.begin(async (tx) => {').length !== 2
+      || !/await sql\.begin\(async \(tx\) => \{\s*(\/\/[^\n]*\s*)*await acquireSettlePromotionGate\(tx\);/.test(text)) {
+      problems.push(`${file} does not call acquireSettlePromotionGate(tx) first in its transaction`);
+    }
+  }
+  const datasets = read('src/lib/ingest/datasets.ts');
+  const start = datasets.indexOf('async function withLegacyLockTimeout');
+  // The function ends at the first closing brace on its own line; a checkout may use CRLF endings.
+  const end = start < 0 ? -1 : datasets.slice(start).search(/\r?\n\}\r?\n/);
+  const body = start < 0 || end < 0 ? '' : datasets.slice(start, start + end);
+  if (!/pg_advisory_xact_lock\(\$\{SETTLE_PROMOTION_GATE\.classId\}/.test(body) || body.includes('_shared')) {
+    problems.push('src/lib/ingest/datasets.ts withLegacyLockTimeout does not take the exclusive gate');
+  }
+  if (problems.length > 0) throw new Error(`Refusing to run Phase B: ${problems.join('; ')}.`);
+}
+
+/** Counts the settle runs this file starts, so each has a unique label and a strictly increasing observation time. */
+let runCounter = 0;
 
 /* ------------------------------------------------------------------ *
  * Namespace (runbook §17.2)
@@ -217,29 +296,7 @@ const W_PROVIDER = `CD_I${API_NS}W`;
 /** p's AFL Tables identity, so the AFL API bridge row is shaped like a real importer row (ISSUE-237 D7). */
 const P_AFLTABLES_ID = `${AFLT_NS}players/P/Issue265_Pat.html`;
 
-/** Ordered observation times, strictly increasing across every run in this file. */
-const T = {
-  a1Seed: `${SEASON}-06-01T00:00:00Z`,
-  a1Run: `${SEASON}-06-02T00:00:00Z`,
-  a1Recovery: `${SEASON}-06-03T00:00:00Z`,
-  apiSeed: `${SEASON}-06-10T00:00:00Z`,
-  a2Run: `${SEASON}-06-11T00:00:00Z`,
-  a2Recovery: `${SEASON}-06-12T00:00:00Z`,
-  a3Fixture: `${SEASON}-06-12T12:00:00Z`,
-  a3Run: `${SEASON}-06-13T00:00:00Z`,
-} as const;
-
-const LABEL = {
-  a1Seed: `${AFLT_NS}a1-seed`,
-  a1Run: `${AFLT_NS}a1-run`,
-  a1Recovery: `${AFLT_NS}a1-recovery`,
-  apiSeed: `${AFLT_NS}api-seed`,
-  a2Run: `${AFLT_NS}a2-run`,
-  a2Recovery: `${AFLT_NS}a2-recovery`,
-  a3Run: `${AFLT_NS}a3-run`,
-} as const;
-
-/* -- A1: AFL Tables matches. Seeded in this order, so ids ascend MA < MB < MC < MD. -- */
+/* -- AFL Tables matches. Seeded in this order, so ids ascend MA < MB < MC < MD. -- */
 
 type A1Key = 'MA' | 'MB' | 'MC' | 'MD';
 const A1_KEYS: readonly A1Key[] = ['MA', 'MB', 'MC', 'MD'];
@@ -253,11 +310,10 @@ const A1_SCOPE = `${AFLT_NS}a1`;
 /** Mapped by no venue, as in the ISSUE-122 harness: venue_id stays NULL and no venue row is needed. */
 const A1_VENUE_RAW = 'ISSUE-265 Unmapped Ground';
 const A1_SEED_ATTENDANCE = 31000;
-const A1_RUN_ATTENDANCE = 32000;
 const a1Key = (k: A1Key): string =>
   renderMatchKey(SEASON, String(A1[k].round), A1[k].date, CLUBS.home.name, CLUBS.away.name);
 
-/* -- A2/A3: AFL API matches. May dates: Australia/Melbourne is AEST (UTC+10), so 05:10Z is 15:10. -- */
+/* -- AFL API matches. May dates: Australia/Melbourne is AEST (UTC+10), so 05:10Z is 15:10. -- */
 
 type ApiKey = 'M1' | 'M2' | 'M3' | 'M4' | 'M5';
 const API_KEYS: readonly ApiKey[] = ['M1', 'M2', 'M3', 'M4', 'M5'];
@@ -272,8 +328,6 @@ const UTC_START = 'T05:10:00.000+0000';
 const LOCAL_START = 'T15:10:00';
 const VENUE_TZ = 'Australia/Melbourne';
 const API_VENUE_SEED = VENUE.name;
-const API_VENUE_A2 = `${VENUE.name} (renamed for A2)`;
-const API_VENUE_A3 = `${VENUE.name} (renamed for A3)`;
 /** The synthetic vocabulary maps api round n to canonical home-and-away round n. */
 const apiRoundCode = (k: ApiKey): string => String(API[k].apiRound);
 const apiKey = (k: ApiKey): string =>
@@ -302,9 +356,6 @@ const SEED_LINE: StatLine = {
   hitouts: 0, onePercenters: 2, clangers: 1, freesFor: 1, freesAgainst: 0, rebound50s: 1, goalAssists: 0,
   totalClearances: 2,
 };
-/** A2: p changed on M1. A3: p changed on M4. Kicks and disposals move together. */
-const A2_LINE: StatLine = { ...SEED_LINE, kicks: 11, disposals: 16 };
-const A3_LINE: StatLine = { ...SEED_LINE, kicks: 12, disposals: 17 };
 const P_JUMPER = 7;
 
 /** Every external record id this file can create (the deletes are scoped to exactly these). */
@@ -349,13 +400,6 @@ let ownerReady = false;
 let preflightPassed = false;
 let baseline: Record<string, Fingerprint> | null = null;
 let registry!: SourceFamilyRegistry;
-let deadlockTimeoutMs = 0;
-let checkPassedPauseMs = 0;
-/**
- * A1 releases X this long after the promotion's wait-start timestamp plus deadlock_timeout, on the SERVER
- * clock (`pg_locks.waitstart`), so the promotion's one deadlock check has run before the settle can reach MA.
- */
-const A1_CHECK_MARGIN_MS = 150;
 
 const refs = { afltablesSourceId: 0, aflApiSourceId: 0, adminUserId: 0 };
 let createdSeason = false;
@@ -367,7 +411,7 @@ const identityPlayerIds: number[] = [];
 const submissionIds = new Set<number>();
 const settleBatchIds = new Set<string>();
 const fixtureBatchIds = new Set<string>();
-/** AFL Tables spine record ids the A3 fixture writes: the M4 match key (the enrichment's own identity). */
+/** AFL Tables spine record ids the B4 fixture writes: the M4 match key (the enrichment's own identity). */
 const fixtureSpineKeys = new Set<string>();
 /**
  * Backends this file started or observed waiting, with their `backend_start`. A teardown terminate names
@@ -379,14 +423,15 @@ const retainedPromotionBatches: { submissionId: number; batchId: string; targetT
 let fixtureUserPreexisted: boolean | null = null;
 let sportsDataLabSeeded: boolean | null = null;
 /**
- * Measured choreography gaps (review F-001), written to the evidence file. A1 fills its entry step by step,
- * so a window that fails part-way still records how far it got.
+ * Measured choreography gaps, written to the evidence file. Each case fills its entry step by step, so a
+ * window that fails part-way still records how far it got.
  */
 const timings: Record<string, Record<string, number>> = {};
 /**
  * What each case's settle and promotion actually did, written to the evidence file pass or fail. The
- * 2026-10-05 15:23:57 window failed A1 and the teardown then deleted the settle's batch and findings, so
- * which ordering occurred could not be recovered (runbook §17.12).
+ * 2026-10-05 15:23:57 Phase A window failed and the teardown then deleted the settle's batch and findings, so
+ * which ordering occurred could not be recovered (runbook §17.12); a case that registers a forensic capture
+ * here keeps that evidence.
  */
 const outcomes: Record<string, unknown> = {};
 /** Read-only captures a case registers; afterEach runs them after the drain and before any teardown delete. */
@@ -419,14 +464,6 @@ function likeLiteral(value: string): string {
   return value.replace(/[\\%_]/g, (c) => `\\${c}`);
 }
 
-/** `SHOW deadlock_timeout` renders as e.g. '1s', '500ms', '1min'. */
-function settingMs(setting: string): number {
-  const match = /^(\d+)\s*(ms|s|min)?$/.exec(setting.trim());
-  if (!match) throw new Error(`cannot parse the setting '${setting}' as a duration`);
-  const n = Number(match[1]);
-  return match[2] === 'min' ? n * 60_000 : match[2] === 's' ? n * 1000 : n;
-}
-
 function withTimeout<R>(promise: Promise<R>, ms: number): Promise<R | 'timed out'> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const expiry = new Promise<'timed out'>((resolve) => { timer = setTimeout(() => resolve('timed out'), ms); });
@@ -440,14 +477,21 @@ async function within<R>(label: string, promise: Promise<R>, ms: number): Promis
   return result.value;
 }
 
-/** A fresh single-connection client on the owner DSN. Ended when its work ends, and again by the teardown. */
-function client(label: string): postgres.Sql {
+/**
+ * A fresh single-connection client on the owner DSN. Ended when its work ends, and again by the teardown.
+ * `statementTimeoutMs` is the SESSION statement_timeout it opens with (default 120 s, a backstop); `null` sends
+ * none, so the session reads the server's own default (B7 uses both, and B10 and the B5 probe use `null`).
+ */
+function client(label: string, statementTimeoutMs: number | null = 120_000): postgres.Sql {
   const connection = postgres(testDbUrl, {
     max: 1,
     connect_timeout: 20,
     onnotice: () => {},
     transform: { undefined: null },
-    connection: { application_name: `afldb_i265 ${label}`.slice(0, 63), statement_timeout: 120_000 },
+    connection: {
+      application_name: `afldb_i265 ${label}`.slice(0, 63),
+      ...(statementTimeoutMs === null ? {} : { statement_timeout: statementTimeoutMs }),
+    },
   });
   clients.push(connection);
   return connection;
@@ -585,18 +629,6 @@ const lockSpineRecord = (externalRecordId: string): Tx => async (tx) => {
 };
 
 /**
- * A1's Y: an UNCOMMITTED open finding under `issueKey`. A settle writing the same open finding
- * (`writeSettleDataIssue`, settle-core.ts:425-440, `ON CONFLICT (issue_type, issue_key)`) waits on this
- * transaction at the partial unique index `uq_data_issues_open_by_key` (migration 076). The case always
- * rolls it back (`abort()`); it is never committed, so the settle then inserts its own row.
- */
-const holdOpenFinding = (issueKey: string, matchId: number): Tx => (tx) => tx`
-  INSERT INTO data_issues (entity_type, entity_id, issue_type, issue_key, severity, description)
-  VALUES ('matches', ${matchId}, ${CANONICAL_APPLY_ISSUE_TYPE}, ${issueKey}, 'error',
-          ${`${TAG} harness stall: rolled back, never committed`})
-`;
-
-/**
  * Every session queued behind `holder`, directly or behind each other (a second row-lock waiter queues on
  * the first waiter's tuple lock, not on the holder). Verbatim from the F-002 block.
  */
@@ -626,20 +658,6 @@ async function isBehind(holder: number, pid: number): Promise<true | null> {
   return (await reachOf(holder)).includes(pid) ? true : null;
 }
 
-/**
- * Review F-002: `pid` waits on `holder`'s TRANSACTION (a row its uncommitted write or lock holds), not in
- * a tuple-lock queue: exactly one ungranted lock, of type transactionid, and `holder` its only blocker.
- */
-async function expectWaitsOnTransactionOf(label: string, pid: number, holder: number): Promise<void> {
-  const [row] = await owner<{ waits: string[]; blockers: number[] }[]>`
-    SELECT coalesce((SELECT array_agg(locktype::text ORDER BY locktype) FROM pg_locks
-                      WHERE pid = ${pid} AND NOT granted), '{}') AS waits,
-           pg_blocking_pids(${pid}::int)::int[] AS blockers
-  `;
-  expect({ label, waits: row.waits, blockers: row.blockers })
-    .toEqual({ label, waits: ['transactionid'], blockers: [holder] });
-}
-
 type WaitSnapshot = { waits: string[]; blockers: number[]; waitStartMs: number | null; serverNowMs: number };
 
 /**
@@ -660,50 +678,6 @@ async function waitSnapshot(pid: number): Promise<WaitSnapshot> {
   `;
   return row;
 }
-
-type OrderingSnapshot = {
-  /** `waitstart` of `waiter`'s ungranted transactionid lock on `holder`'s transaction; null when absent. */
-  settleOnHolderMs: number | null;
-  settleOnHolderPresent: boolean;
-  promotionOnSettleMs: number | null;
-  promotionOnSettlePresent: boolean;
-  serverNowMs: number;
-};
-
-/**
- * Review 2 F-001: ONE lock-manager snapshot of two wait edges, the settle's on `holder` and the promotion's
- * on the settle. `pg_locks` is a single `pg_lock_status()` call taken under every lock-table partition lock
- * (lock.c, GetLockStatusData), so the CTE (materialised: scanned twice, evaluated once) is one consistent
- * server-side instant. transactionid locks never take the fast path, so both edges come from that one
- * consistent table. An edge is a waiter's ungranted lock on an xid whose granted holder is another backend.
- * The settle's MB row carries the xid of a unit subtransaction that was RELEASEd, and a subtransaction's
- * xid lock is dropped at subcommit. The promotion still blocks on the settle's pid: XactLockTableWait
- * takes the dead subxid lock at once, finds the xid still in progress, climbs to its parent
- * (SubTransGetParent) and waits on the settle's TOP-LEVEL xid, which the settle holds granted (review 2,
- * follow-up F-001; window 1 showed pg_blocking_pids = [settle] for this wait).
- */
-async function orderingSnapshot(settlePid: number, holder: number, promotionPid: number): Promise<OrderingSnapshot> {
-  const [row] = await owner<OrderingSnapshot[]>`
-    WITH l AS MATERIALIZED (
-      SELECT pid, transactionid::text AS xid, granted, waitstart FROM pg_locks WHERE locktype = 'transactionid'
-    ), edge AS (
-      SELECT w.pid AS waiter, h.pid AS holder, w.waitstart
-        FROM l w JOIN l h ON h.xid = w.xid AND h.granted AND h.pid <> w.pid
-       WHERE NOT w.granted
-    )
-    SELECT (SELECT (extract(epoch FROM min(waitstart)) * 1000)::float8 FROM edge
-             WHERE waiter = ${settlePid} AND holder = ${holder}) AS "settleOnHolderMs",
-           EXISTS (SELECT 1 FROM edge WHERE waiter = ${settlePid} AND holder = ${holder}) AS "settleOnHolderPresent",
-           (SELECT (extract(epoch FROM min(waitstart)) * 1000)::float8 FROM edge
-             WHERE waiter = ${promotionPid} AND holder = ${settlePid}) AS "promotionOnSettleMs",
-           EXISTS (SELECT 1 FROM edge WHERE waiter = ${promotionPid} AND holder = ${settlePid}) AS "promotionOnSettlePresent",
-           (extract(epoch FROM clock_timestamp()) * 1000)::float8 AS "serverNowMs"
-  `;
-  return row;
-}
-
-/** Two `waitstart` readings of the same wait (identical timestamptz through the identical expression). */
-const sameWaitStart = (a: number | null, b: number): boolean => a !== null && Math.abs(a - b) < 0.001;
 
 /** A `waitUntil` probe: `pid`'s snapshot once `holder` is its only blocker and its wait start is stamped. */
 async function waitingOn(pid: number, holder: number): Promise<WaitSnapshot | null> {
@@ -777,7 +751,9 @@ async function promotionBatchCount(submissionId: number): Promise<number> {
  * The legacy promotion, staged exactly as an upload leaves it (match-results-promotion.test.ts:343-370)
  * ------------------------------------------------------------------ */
 
-async function stageApprovedFile(dataset: 'match_results' | 'player_match_stats', payloads: Payload[]): Promise<number> {
+async function stageApprovedFile(
+  dataset: 'match_results' | 'player_match_stats' | 'match_attendance', payloads: Payload[],
+): Promise<number> {
   const sha = `${TAG}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
   const [submission] = await owner<{ id: number }[]>`
     INSERT INTO data_submissions (dataset, filename, content, content_sha256, uploaded_by, row_count, status)
@@ -823,7 +799,7 @@ function registryWithSyntheticVocabulary(): SourceFamilyRegistry {
     round_vocabularies: {
       ...vocabularies,
       [key]: {
-        description: `${TAG} Phase A synthetic vocabulary for the reserved test season (in memory only).`,
+        description: `${TAG} Phase B synthetic vocabulary for the reserved test season (in memory only).`,
         mapping_status: 'declared',
         season: SEASON,
         evidence: [`${TAG} test harness; never written to data/reference.`],
@@ -927,13 +903,16 @@ function a1Bundle(label: string, order: readonly A1Key[], attendance: number): S
   });
 }
 
-/** One AFL Tables settle on its own connection, automatic path on (apply122, settle-afltables.test.ts:2363). */
-function startAfltablesSettle(label: string, bundle: SettleBundle, observedAt: string): Run<SettleRunResult> {
-  const connection = client(label);
-  return track(label, runSettleAfltables(connection, {
+/**
+ * One AFL Tables settle on the given connection, automatic path on (apply122, settle-afltables.test.ts:2363).
+ * The connection is left open, so B7 can run a second settle on the SAME backend. `apply: false` is a dry run:
+ * the settle takes the gate, does its work and rolls everything back (B8).
+ */
+function runAfltables(connection: postgres.Sql, bundle: SettleBundle, observedAt: string, apply = true): Promise<SettleRunResult> {
+  return runSettleAfltables(connection, {
     bundle,
     registry,
-    apply: true,
+    apply,
     autoApply: true,
     inProgressSeasons: [SEASON],
     manualAuthority: UNAVAILABLE_MANUAL_AUTHORITY,
@@ -942,7 +921,14 @@ function startAfltablesSettle(label: string, bundle: SettleBundle, observedAt: s
   }).then((result) => {
     if (result.batchId !== null) settleBatchIds.add(String(result.batchId));
     return result;
-  }).finally(() => connection.end({ timeout: 5 }).catch(() => undefined)));
+  });
+}
+
+/** One AFL Tables settle on its own connection, ended when it finishes. */
+function startAfltablesSettle(label: string, bundle: SettleBundle, observedAt: string, apply = true): Run<SettleRunResult> {
+  const connection = client(label);
+  return track(label, runAfltables(connection, bundle, observedAt, apply)
+    .finally(() => connection.end({ timeout: 5 }).catch(() => undefined)));
 }
 
 /* ------------------------------------------------------------------ *
@@ -1031,14 +1017,19 @@ function apiBundle(label: string, units: readonly ApiUnit[]): AflApiSettleBundle
   return bundle;
 }
 
-function startAflApiSettle(label: string, bundle: AflApiSettleBundle, observedAt: string): Run<AflApiSettleRunResult> {
-  const connection = client(label);
-  return track(label, runSettleAflApi(connection, {
+function runAflApi(connection: postgres.Sql, bundle: AflApiSettleBundle, observedAt: string): Promise<AflApiSettleRunResult> {
+  return runSettleAflApi(connection, {
     bundle, registry, apply: true, autoApply: true, inProgressSeasons: [SEASON], observedAt,
   }).then((result) => {
     if (result.batchId !== null) settleBatchIds.add(result.batchId);
     return result;
-  }).finally(() => connection.end({ timeout: 5 }).catch(() => undefined)));
+  });
+}
+
+function startAflApiSettle(label: string, bundle: AflApiSettleBundle, observedAt: string): Run<AflApiSettleRunResult> {
+  const connection = client(label);
+  return track(label, runAflApi(connection, bundle, observedAt)
+    .finally(() => connection.end({ timeout: 5 }).catch(() => undefined)));
 }
 
 /** The legacy player_match_stats columns for an AFL API stat line (settle-afl-api.ts aflApiPlayerStatValues). */
@@ -1367,6 +1358,8 @@ function writeEvidence(extra: Record<string, unknown>): void {
   if (!file) return;
   writeFileSync(file, `${JSON.stringify({
     writtenAt: new Date().toISOString(),
+    phase: 'B',
+    expectedTests: EXPECTED_TESTS,
     season: SEASON,
     preflightPassed,
     poisoned,
@@ -1526,11 +1519,177 @@ async function deleteTracked(): Promise<string[]> {
 }
 
 /* ================================================================== *
- * Phase A
+ * Phase B: gate observation helpers (read through pg_locks, on the server clock)
  * ================================================================== */
 
-describe.runIf(RUN_PHASE_A)('AFLDB-ISSUE-265 Phase A: a real settle loses the match-lock deadlock to a legacy promotion', () => {
+type GateRow = { pid: number; mode: string; granted: boolean; waitStartMs: number | null; serverNowMs: number };
+
+/**
+ * Every request for the settle/promotion gate, granted or waiting, in one statement. The two-int4 advisory
+ * key shows as `classid` = 717275, `objid` = 4, `objsubid` = 2. A settle holds `ShareLock`, a promotion
+ * `ExclusiveLock` (runbook §19.1).
+ */
+async function gateRows(): Promise<GateRow[]> {
+  const rows = await owner<GateRow[]>`
+    SELECT pid::int AS pid, mode::text AS mode, granted,
+           (extract(epoch FROM waitstart) * 1000)::float8 AS "waitStartMs",
+           (extract(epoch FROM clock_timestamp()) * 1000)::float8 AS "serverNowMs"
+      FROM pg_locks
+     WHERE locktype = 'advisory'
+       AND classid = ${SETTLE_PROMOTION_GATE.classId}::oid AND objid = ${SETTLE_PROMOTION_GATE.objId}::oid
+       AND objsubid = 2
+     ORDER BY granted DESC, pid
+  `;
+  return rows.map((row) => ({ ...row }));
+}
+
+const gateRowOf = (rows: readonly GateRow[], pid: number): GateRow | undefined => rows.find((row) => row.pid === pid);
+const grantedShared = (rows: readonly GateRow[]): number[] =>
+  rows.filter((row) => row.granted && row.mode === 'ShareLock').map((row) => row.pid).sort((a, b) => a - b);
+
+/** The `matches` row-lock modes `pid` holds or awaits (FOR SHARE/FOR UPDATE take RowShareLock, UPDATE RowExclusiveLock). */
+async function matchesRowLockModes(pid: number): Promise<string[]> {
+  const rows = await owner<{ mode: string }[]>`
+    SELECT mode::text AS mode FROM pg_locks
+     WHERE pid = ${pid} AND locktype = 'relation' AND relation = 'matches'::regclass
+       AND mode IN ('RowShareLock', 'RowExclusiveLock', 'ShareRowExclusiveLock', 'ExclusiveLock')
+     ORDER BY mode
+  `;
+  return rows.map((row) => row.mode);
+}
+
+/**
+ * What a backend holds besides its own virtual transaction id: a transactionid lock means an xid has been
+ * assigned (something was written), a relation lock means a table was touched. A settle waiting at the gate
+ * holds neither (runbook §19.1, "before any write"). `backendXid` is read through the owner, which sees a
+ * same-role session's xid; the pg_locks counts need no privilege.
+ */
+async function writesAndTableLocksOf(pid: number): Promise<{ xidLocks: number; relationLocks: number; backendXid: string | null }> {
+  const [row] = await owner<{ xidLocks: number; relationLocks: number; backendXid: string | null }[]>`
+    SELECT (SELECT count(*) FROM pg_locks WHERE pid = ${pid} AND locktype = 'transactionid')::int AS "xidLocks",
+           (SELECT count(*) FROM pg_locks WHERE pid = ${pid} AND locktype = 'relation')::int AS "relationLocks",
+           (SELECT backend_xid::text FROM pg_stat_activity WHERE pid = ${pid}) AS "backendXid"
+  `;
+  return row;
+}
+
+async function serverNowMs(): Promise<number> {
+  const [row] = await owner<{ ms: number }[]>`SELECT (extract(epoch FROM clock_timestamp()) * 1000)::float8 AS ms`;
+  return row.ms;
+}
+
+/** A side transaction holding one player_match_stats row FOR UPDATE: the "stuck promotion" stall (B6, B7, B9, B11). */
+const lockStatsRow = (playerId: number, matchId: number): Tx => async (tx) => {
+  const rows = await tx`
+    SELECT 1 FROM player_match_stats WHERE player_id = ${playerId} AND match_id = ${matchId} FOR UPDATE
+  `;
+  if (rows.length !== 1) throw new Error(`expected exactly one player_match_stats row for player ${playerId} on match ${matchId}, found ${rows.length}`);
+};
+
+/**
+ * Everything the 2078 fixtures hold that a settle would write, in one comparable value: counts of batches,
+ * findings, ledger rows and spine versions, and a digest of the season's matches and player rows. B7 asserts
+ * it is equal before and after both settles give up at the gate ("nothing persists").
+ */
+async function persistedState(): Promise<Record<string, unknown>> {
+  const promotionNotes = [...submissionIds].map((id) => `submission ${id}`);
+  const [row] = await owner<Record<string, unknown>[]>`
+    SELECT
+      (SELECT count(*) FROM import_batches WHERE notes LIKE ${BATCH_NOTE_LIKE})::int AS settle_batches,
+      (SELECT count(*) FROM import_batches WHERE tool = 'admin-upload' AND notes = ANY(${promotionNotes}::text[]))::int AS promotion_batches,
+      (SELECT count(*) FROM data_issues
+        WHERE issue_key LIKE ANY(${ISSUE_LIKE}::text[]) OR issue_key LIKE ANY(${[...TRACKED_ISSUE_PATTERNS]}::text[])
+           OR issue_key = ANY(${[...SEASON_GATE_KEYS]}::text[]))::int AS findings,
+      (SELECT count(*) FROM canonical_applications WHERE external_record_id LIKE ANY(${RECORD_LIKE}::text[]))::int AS ledger,
+      (SELECT count(*) FROM staging.source_record_versions WHERE external_record_id LIKE ANY(${RECORD_LIKE}::text[]))::int AS versions,
+      (SELECT coalesce(md5(string_agg(md5(to_jsonb(t)::text), '' ORDER BY t.id)), '') FROM matches t WHERE t.season = ${SEASON}) AS matches,
+      (SELECT coalesce(md5(string_agg(md5(to_jsonb(t)::text), '' ORDER BY t.match_id, t.player_id)), '')
+         FROM player_match_stats t WHERE t.match_id IN (SELECT id FROM matches WHERE season = ${SEASON})) AS stats
+  `;
+  return { ...row };
+}
+
+/**
+ * Samples a promotion's wait every 250 ms until it ends and asserts EVERY sample: whatever it waits on is the
+ * gate (an advisory lock, never a transactionid or tuple lock on a match) and its only blocker is `blockerPid`
+ * (runbook §19.1, "never on a match"). Returns how many samples saw it waiting. Bounded.
+ */
+async function watchGateWait(label: string, run: Run<unknown>, pid: number, blockerPid: number, timeoutMs = 30_000): Promise<number> {
+  const deadline = Date.now() + timeoutMs;
+  let waiting = 0;
+  while (!run.done) {
+    const snapshot = await waitSnapshot(pid);
+    if (snapshot.waits.length > 0) {
+      waiting += 1;
+      expect({
+        label,
+        otherWaits: snapshot.waits.filter((wait) => wait !== 'advisory'),
+        otherBlockers: snapshot.blockers.filter((blocker) => blocker !== blockerPid),
+      }).toEqual({ label, otherWaits: [], otherBlockers: [] });
+    }
+    if (Date.now() > deadline) throw new Error(`${label}: still waiting after ${timeoutMs} ms`);
+    await pause(250);
+  }
+  return waiting;
+}
+
+/** Every canonical_apply_failed finding any fixture record can have, open or resolved. */
+const allFindings = () => applyFindings([...TRACKED_RECORD_IDS]);
+const openFindings = async () => (await allFindings()).filter((finding) => finding.resolvedAt === null);
+
+/* ------------------------------------------------------------------ *
+ * Phase B: per-run parameters and fixture values
+ * ------------------------------------------------------------------ */
+
+/** One settle run's unique label, strictly increasing observation time and attendance / stat values. */
+function nextRun(): { n: number; label: string; observedAt: string; attendance: number } {
+  runCounter += 1;
+  const at = new Date(Date.UTC(SEASON, 5, 1) + runCounter * 60_000).toISOString().replace('.000Z', 'Z');
+  return { n: runCounter, label: `${AFLT_NS}b${runCounter}`, observedAt: at, attendance: 33_000 + runCounter };
+}
+
+/** An AFL API stat line that differs per run; kicks and disposals move together. */
+const lineOf = (n: number): StatLine => ({ ...SEED_LINE, kicks: SEED_LINE.kicks + n, disposals: SEED_LINE.disposals + n });
+const venueOf = (n: number): string => `${VENUE.name} (b${n})`;
+
+/** The AFL Tables feed order that stalls at MA's spine record after MB and MC are written (A1's proven order). */
+const STALL_ORDER: readonly A1Key[] = ['MB', 'MC', 'MA', 'MD'];
+
+/** A match_results file row equal to what the AFL Tables settle projects for `k`, so a promotion is idempotent. */
+const mrFileRow = (k: A1Key): Payload => ({
+  season: String(SEASON), round_code: String(A1[k].round), round_number: String(A1[k].round),
+  match_date: A1[k].date, venue: A1_VENUE_RAW, home_club: CLUBS.home.name, away_club: CLUBS.away.name,
+  home_score: '100', away_score: '72', home_goals: '15', home_behinds: '10', away_goals: '10', away_behinds: '12',
+});
+
+type Settled = SettleRunResult | AflApiSettleRunResult;
+
+/** A settle that committed: applied, and no unit failed. */
+function expectCommitted(label: string, result: Settled): void {
+  expect({ label, applied: result.applied, failures: result.counters.canonicalApplyFailures })
+    .toEqual({ label, applied: true, failures: 0 });
+}
+
+function expectRefusedRetryably(label: string, outcome: Awaited<ReturnType<typeof promoteSubmission>>): void {
+  expect({ label, ok: outcome.ok }).toEqual({ label, ok: false });
+  expect(outcome.ok ? '' : outcome.error).toContain(LEGACY_PROMOTION_LOCK_REFUSAL);
+}
+
+/* ================================================================== *
+ * Phase B
+ * ================================================================== */
+
+describe.runIf(RUN_PHASE_B)('AFLDB-ISSUE-265 Phase B: the settle / legacy-promotion gate, with real settles and real promotions', () => {
+  const a1Id = {} as Record<A1Key, number>;
+  const apiId = {} as Record<ApiKey, number>;
+  /** The AFL API stat line currently stored for (p, M1); promotions that are not part of a settle rewrite exactly this. */
+  let apiLine: StatLine = SEED_LINE;
+
+  const apiUnit = (key: ApiKey, venueName: string, line: StatLine = SEED_LINE): ApiUnit => ({ key, venueName, line });
+
   beforeAll(async () => {
+    assertGateInSource();
+
     // Target guard, part 1: no connection yet. Exact database, one expected endpoint, expected roles.
     const expect265 = {
       endpoint: (process.env.AFLDB_ISSUE265_EXPECT_ENDPOINT ?? '').toLowerCase(),
@@ -1584,14 +1743,6 @@ describe.runIf(RUN_PHASE_A)('AFLDB-ISSUE-265 Phase A: a real settle loses the ma
     }
     // The code under test reads the import DSN from here (pipeline.ts:154, :303). Restored by afterAll.
     setManagedEnv('AFLDB_IMPORT_DATABASE_URL', importDbUrl);
-
-    // Timing is read, never assumed (§13.2). One deadlock check per wait fires at deadlock_timeout.
-    const [{ deadlock_timeout: deadlockSetting }] = await owner<{ deadlock_timeout: string }[]>`SHOW deadlock_timeout`;
-    deadlockTimeoutMs = settingMs(deadlockSetting);
-    // A2/A3: the promotion's single check must have run (and found no cycle) before the cycle is closed.
-    // The pause starts only once the harness has OBSERVED the promotion waiting, so the wait began earlier
-    // and its one check fires at most deadlock_timeout after the observation; 300 ms covers the poll.
-    checkPassedPauseMs = deadlockTimeoutMs + 300;
 
     // Reference rows the run needs and must not create.
     const sources = await owner<{ id: number; key: string }[]>`
@@ -1687,17 +1838,66 @@ describe.runIf(RUN_PHASE_A)('AFLDB-ISSUE-265 Phase A: a real settle loses the ma
       VALUES (${refs.aflApiSourceId}, ${P_PROVIDER}, ${p}, 'unique', 1, 'afl_api_stat_vector_bootstrap'),
              (${refs.afltablesSourceId}, ${P_AFLTABLES_ID}, ${p}, 'unique', 1, 'afltables_profile_url')
     `;
-  }, 600_000);
+
+    // ---- seed the two providers' matches with the REAL settles (no promotion runs yet, so no gate wait) ----
+    const seedTables = nextRun();
+    const tablesSeed = await within('AFL Tables seed settle',
+      startAfltablesSettle('seed afltables', a1Bundle(seedTables.label, A1_KEYS, A1_SEED_ATTENDANCE), seedTables.observedAt).promise,
+      100_000);
+    expectCommitted('AFL Tables seed', tablesSeed);
+    for (const k of A1_KEYS) {
+      const row = await matchRow(a1Key(k));
+      if (!row || row.sourceKey !== 'afltables' || row.attendance !== A1_SEED_ATTENDANCE) {
+        throw new Error(`the AFL Tables seed did not create ${k} as an afltables-owned match: ${JSON.stringify(row)}`);
+      }
+      a1Id[k] = row.id;
+    }
+    // The ascending lock order the hooks rely on needs MA < MB.
+    expect(a1Id.MA).toBeLessThan(a1Id.MB);
+
+    const seedApi = nextRun();
+    const apiSeed = await within('AFL API seed settle',
+      startAflApiSettle('seed afl api', apiBundle(seedApi.label, API_KEYS.map((k) => apiUnit(k, API_VENUE_SEED))), seedApi.observedAt).promise,
+      100_000);
+    expectCommitted('AFL API seed', apiSeed);
+    for (const k of API_KEYS) {
+      const row = await matchRow(apiKey(k));
+      if (!row || row.sourceKey !== 'afl_api' || row.venueRaw !== API_VENUE_SEED) {
+        throw new Error(`the AFL API seed did not create ${k} as an afl_api-owned match: ${JSON.stringify(row)}`);
+      }
+      apiId[k] = row.id;
+      const stats = await statsRow(p, apiKey(k));
+      if (!stats || stats.sourceKey !== 'afl_api' || stats.kicks !== SEED_LINE.kicks) {
+        throw new Error(`the AFL API seed did not write p's afl_api row on ${k}: ${JSON.stringify(stats)}`);
+      }
+    }
+    // The ascending lock order needs M1 < M2 (B5) and the stalls need the seeded ids.
+    expect(apiId.M1).toBeLessThan(apiId.M2);
+    expect(await openFindings()).toEqual([]);
+  }, 900_000);
+
+  /** Index into `inflightRuns` at the start of the current case, so its forensic record holds only its own runs. */
+  let caseRunStart = 0;
 
   beforeEach(() => {
     if (poisoned) throw new Error(`Refusing to start this case: ${poisoned}`);
+    caseRunStart = inflightRuns.length;
   });
 
   afterEach(async () => {
     await drainCase();
+    // Every case, pass or fail: what each of its settles and promotions did, and every finding. Phase A lost this
+    // when a failed window's teardown deleted the rows (runbook §17.12); the evidence file keeps it.
+    try {
+      outcomes[expect.getState().currentTestName ?? `case ${caseRunStart}`] = {
+        runs: inflightRuns.slice(caseRunStart).map((run) => ({ label: run.label, state: describeRun(run) })),
+        findings: await within('forensic findings', allFindings(), 15_000),
+      };
+    } catch (error) {
+      outcomes.forensicErrors = [...(outcomes.forensicErrors as string[] | undefined ?? []), messageOf(error)];
+    }
     // Read-only, after the drain (the case's settle has committed or rolled back) and before afterAll
     // deletes anything. A capture that fails is recorded, never thrown: it must not mask the case's result.
-    // 15 s per capture keeps the drain (30 s + 90 s) plus one capture inside this hook's 150 s.
     for (const capture of forensics.splice(0)) {
       try {
         await within('forensic capture', capture(), 15_000);
@@ -1724,8 +1924,8 @@ describe.runIf(RUN_PHASE_A)('AFLDB-ISSUE-265 Phase A: a real settle loses the ma
         expect(released).toEqual([]);
         return;
       }
-      // Review F-003: a lingering lock must fail a teardown statement fast rather than run the hook past
-      // its own bound before the evidence is written. The fingerprints are single server-side scans.
+      // A lingering lock must fail a teardown statement fast rather than run the hook past its own bound
+      // before the evidence is written. The fingerprints are single server-side scans.
       await owner`SELECT set_config('lock_timeout', '30s', false), set_config('statement_timeout', '120s', false)`;
       deleted = await deleteTracked();
       residue = nonZero(await census());
@@ -1741,7 +1941,10 @@ describe.runIf(RUN_PHASE_A)('AFLDB-ISSUE-265 Phase A: a real settle loses the ma
       expect(changedFingerprints).toEqual([]);
     } finally {
       try {
-        writeEvidence({ teardownProblems: [...released, ...deleted], residue, fingerprintsEqual, changedFingerprints });
+        writeEvidence({
+          teardownProblems: [...released, ...deleted], residue, fingerprintsEqual, changedFingerprints,
+          expectedRetainedBatches: EXPECTED_RETAINED_BATCHES,
+        });
       } finally {
         restoreManagedEnv();
         if (ownerReady) await owner.end({ timeout: 5 });
@@ -1750,441 +1953,780 @@ describe.runIf(RUN_PHASE_A)('AFLDB-ISSUE-265 Phase A: a real settle loses the ma
   }, 600_000);
 
   /* ---------------------------------------------------------------- *
-   * A1 — AFL Tables, shape C2 (hook-phase wait), runbook §13.2 A1
+   * Held settles: a real settle, stopped mid-run by a side transaction, holding the shared gate
    * ---------------------------------------------------------------- */
 
-  describe('A1: AFL Tables settle against a match_results promotion (C2)', () => {
-    const a1Id = {} as Record<A1Key, number>;
+  /**
+   * An AFL Tables settle held open by a side transaction X on a record's spine row. It has taken the shared gate
+   * (its first lock) and written the records before the stall, and waits at the stalled record's first statement.
+   * 'MA' (the default) feeds MB, MC, MA, MD, so MB and MC are written first (A1's proven stall). 'MD' feeds the
+   * natural order, so MA, MB and MC are written and only MD and the end-of-run work remain: B2 uses it, because
+   * its promotion must obtain the gate inside its own 5 s bound once the stall is released.
+   */
+  async function startHeldAfltablesSettle(label: string, stallAt: 'MA' | 'MD' = 'MA') {
+    const run = nextRun();
+    const X = await hold(`${label} X on the ${stallAt} spine record`, lockSpineRecord(A1[stallAt].record));
+    const settle = startAfltablesSettle(
+      `${label} settle`, a1Bundle(run.label, stallAt === 'MA' ? STALL_ORDER : A1_KEYS, run.attendance), run.observedAt,
+    );
+    const settlePid = await waitUntil(`${label}: the settle queues behind X at the ${stallAt} spine record`, () => newWaiterBehind(X.pid), [settle]);
+    expect(gateRowOf(await gateRows(), settlePid)).toMatchObject({ mode: 'ShareLock', granted: true });
+    return { run, X, settle, settlePid };
+  }
 
-    beforeAll(async () => {
-      // A1 is the file's one timing-bounded case (review F-001): everything from the promotion's wait at MB
-      // to the settle being observed stalled after losing MA must fit the promotion's 5 s hook bound
-      // (LEGACY_LOCK_TIMEOUT, datasets.ts:559). The fixed part is the promotion's check, the margin and the
-      // settle's own check; the rest (MA's record up to its UPDATE, three cleanup statements, the finding
-      // INSERT, one poll) is tunnel latency, measured into timings.A1. Window 2026-10-05 15:23:57 failed
-      // the old budget (§17.12). Scoped to A1 (review 2 F-004): A2/A3 have no such bound.
-      if (2 * deadlockTimeoutMs + A1_CHECK_MARGIN_MS > 3000) {
-        throw new Error(`deadlock_timeout = ${deadlockTimeoutMs} ms leaves under 2 s of the 5 s hook bound for A1's settle work`);
-      }
-      const seed = await within('A1 seed settle',
-        startAfltablesSettle('A1 seed', a1Bundle(LABEL.a1Seed, A1_KEYS, A1_SEED_ATTENDANCE), T.a1Seed).promise, 100_000);
-      expect(seed.counters.canonicalApplyFailures).toBe(0);
-      for (const k of A1_KEYS) {
-        const row = await matchRow(a1Key(k));
-        if (!row || row.sourceKey !== 'afltables' || row.attendance !== A1_SEED_ATTENDANCE) {
-          throw new Error(`A1 seed did not create ${k} as an afltables-owned match: ${JSON.stringify(row)}`);
-        }
-        a1Id[k] = row.id;
-      }
-      // The promotion's hook locks ascending id; the choreography needs MA < MB (§13.2 A1 step 1).
-      expect(a1Id.MA).toBeLessThan(a1Id.MB);
-    }, 120_000);
+  /**
+   * An AFL API settle held open by a side transaction Y on M3 (FOR SHARE, so the settle's UPDATE of a changed M3
+   * waits). It has taken the shared gate, written (p, M1) with this run's line, and waits at M3.
+   */
+  async function startHeldApiSettle(label: string) {
+    const run = nextRun();
+    const line = lineOf(run.n);
+    const venue = venueOf(run.n);
+    const Y = await hold(`${label} Y on M3`, lockMatch(apiId.M3, 'FOR SHARE'));
+    const settle = startAflApiSettle(
+      `${label} settle`, apiBundle(run.label, [apiUnit('M1', API_VENUE_SEED, line), apiUnit('M3', venue)]), run.observedAt,
+    );
+    const settlePid = await waitUntil(`${label}: the settle queues behind Y on M3`, () => newWaiterBehind(Y.pid), [settle]);
+    expect(gateRowOf(await gateRows(), settlePid)).toMatchObject({ mode: 'ShareLock', granted: true });
+    return { run, line, venue, Y, settle, settlePid };
+  }
 
-    it('the settle is the deadlock victim on MA, commits the rest, and the promotion times out retryably; a recovery run heals MA', async () => {
-      const recordMA = A1.MA.record;
-      expect(await applyFindings(A1_KEYS.map((k) => A1[k].record))).toEqual([]);
-      const fileRow = (k: A1Key): Payload => ({
-        season: String(SEASON), round_code: String(A1[k].round), round_number: String(A1[k].round),
-        match_date: A1[k].date, venue: A1_VENUE_RAW, home_club: CLUBS.home.name, away_club: CLUBS.away.name,
-        home_score: '100', away_score: '72', home_goals: '15', home_behinds: '10', away_goals: '10', away_behinds: '12',
-      });
-      const fileId = await stageApprovedFile('match_results', [fileRow('MA'), fileRow('MB')]);
-      const maFindingKey = canonicalApplyIssueKey('afltables', 'match', recordMA, 'matches');
-      const a1: Record<string, number> = { deadlockTimeoutMs, checkMarginMs: A1_CHECK_MARGIN_MS };
-      timings.A1 = a1;
-
-      // Step 2 (revised after window 2026-10-05 15:23:57, runbook §17.12). Both side transactions sit as
-      // close to MA as a lock allows, so the promotion's 5 s window holds only MA's own work:
-      //   X holds MA's spine record: the settle stops at the first statement of MA's record, with MB and MC
-      //     already written and held. (X on MC left a whole MC unit plus MA's record inside the window.)
-      //   Y holds MA's open finding key, uncommitted: after losing MA the settle's next statements are three
-      //     savepoint cleanups (the driver's `rollback to sN`, then the anchor's ROLLBACK TO and RELEASE,
-      //     canonical-apply.ts:1273-1274) and then this INSERT, so it stalls at once, inside its failure path, still
-      //     holding MB. (Y on MD left MA's failure path plus all of MD's record inside the window.)
-      // Neither touches a match row, and neither changes any lock the settle or the promotion takes.
-      const X = await hold('A1 X on the MA spine record', lockSpineRecord(recordMA));
-      const Y = await hold('A1 Y on the MA finding key', holdOpenFinding(maFindingKey, a1Id.MA));
-
-      // Step 3: feed order MB, MC, MA, MD. The settle writes MB and MC, then waits on X at MA's spine record.
-      const settle = startAfltablesSettle('A1 settle', a1Bundle(LABEL.a1Run, ['MB', 'MC', 'MA', 'MD'], A1_RUN_ATTENDANCE), T.a1Run);
-      const settlePid = await waitUntil('A1: the settle queues behind X at the MA spine record', () => newWaiterBehind(X.pid), [settle]);
-
-      // Step 4: the promotion's hook takes MA FOR NO KEY UPDATE (lower id; datasets.ts:776; nothing holds MA)
-      // and waits on MB, which the settle holds.
-      const promotionStarted = Date.now();
-      const promotion = startPromotion('A1 promotion', fileId);
-      forensics.push(async () => {
-        outcomes.A1 = {
-          settle: settle.outcome?.ok
-            ? {
-              applied: settle.outcome.value.applied,
-              batchId: settle.outcome.value.batchId,
-              canonicalApplyFailures: settle.outcome.value.counters.canonicalApplyFailures,
-              canonicalRetryApplied: settle.outcome.value.counters.canonicalRetryApplied,
-              dataIssuesOpened: settle.outcome.value.counters.dataIssuesOpened,
-            }
-            : describeRun(settle as Run<unknown>),
-          promotion: describeRun(promotion as Run<unknown>),
-          findings: await applyFindings(A1_KEYS.map((k) => A1[k].record)),
-          attendance: Object.fromEntries(await Promise.all(
-            A1_KEYS.map(async (k) => [k, (await matchRow(a1Key(k)))?.attendance ?? null] as const),
-          )),
-        };
-      });
-      const promotionPid = await waitUntil(
-        'A1: the promotion queues behind the settle on MB', () => newWaiterBehind(settlePid), [settle, promotion],
-      );
-      const promotionWait = await waitUntil(
-        'A1: the promotion\'s wait on MB is stamped', () => waitingOn(promotionPid, settlePid), [settle, promotion],
-      );
-      // Review F-002, from the same snapshot: a wait on the settle's transaction, not a tuple-lock queue place.
-      expect({ label: 'A1 promotion at MB', waits: promotionWait.waits, blockers: promotionWait.blockers })
-        .toEqual({ label: 'A1 promotion at MB', waits: ['transactionid'], blockers: [settlePid] });
-      const promotionWaitStart = promotionWait.waitStartMs as number;
-      a1.promotionStartToObservedClientMs = Date.now() - promotionStarted;
-      a1.promotionWaitToObservedMs = promotionWait.serverNowMs - promotionWaitStart;
-
-      // Step 5: release X once the promotion's one deadlock check has run (server clock). The settle then
-      // runs MA's record up to its UPDATE of MA, waits on the promotion's lock and so closes the cycle; one
-      // deadlock_timeout later its own check finds the cycle and it is the victim.
-      const releaseInMs = Math.max(0, promotionWaitStart + deadlockTimeoutMs + A1_CHECK_MARGIN_MS - promotionWait.serverNowMs);
-      await pause(releaseInMs);
-      // Planned, on the server clock; X's COMMIT lands half to one round trip later (review 2 F-005).
-      a1.promotionWaitToXReleasePlannedMs = promotionWait.serverNowMs - promotionWaitStart + releaseInMs;
-      X.go();
-
-      // The cycle, observed directly: the settle waits on the promotion's transaction, at MA. Its wait began
-      // after the promotion's check had run, so the promotion cannot be the victim; the settle's check,
-      // deadlock_timeout after this wait began, is the one that finds the cycle.
-      const cycle = await waitUntil(
-        'A1: the settle closes the cycle, queued behind the promotion at MA', () => waitingOn(settlePid, promotionPid),
-        [settle, promotion],
-      );
-      expect({ label: 'A1 settle at MA', waits: cycle.waits, blockers: cycle.blockers })
-        .toEqual({ label: 'A1 settle at MA', waits: ['transactionid'], blockers: [promotionPid] });
-      const settleCycleWaitStart = cycle.waitStartMs as number;
-      a1.promotionWaitToSettleCycleWaitMs = settleCycleWaitStart - promotionWaitStart;
-      expect(settleCycleWaitStart - promotionWaitStart).toBeGreaterThan(deadlockTimeoutMs);
-
-      // The ordering (review 2 F-001), proven on the SERVER: the settle reached its stall before the promotion
-      // finished. Shown by one lock-manager snapshot in which the settle, having lost MA, already waits on Y
-      // while the promotion is STILL in its original MB wait (same waitstart as observed above). A promotion
-      // still waiting has not finished: its hook statement, its rollback, the 'failed' write and its COMMIT
-      // all come after that wait ends. No client receive time decides this. The promotion's completion
-      // itself carries no server timestamp (the 'failed' UPDATE, pipeline.ts:427-431, writes none; now() is
-      // its transaction START), so it is bounded below by the end of that wait, bracketed further down.
-      // Fail fast, also on the server: a snapshot where the promotion's MB wait has ended (or is a different
-      // wait) before the settle is seen on Y means the ordering did not hold.
-      const both = await waitUntil(
-        'A1: the settle (MA lost) queues behind Y on MA\'s finding while the promotion still waits on MB',
-        async () => {
-          const snapshot = await orderingSnapshot(settlePid, Y.pid, promotionPid);
-          const promotionStillInItsWait = sameWaitStart(snapshot.promotionOnSettleMs, promotionWaitStart);
-          if (snapshot.settleOnHolderMs !== null && promotionStillInItsWait) return snapshot;
-          if (!promotionStillInItsWait) {
-            a1.promotionWaitEndedBeforeStallSeenServerMs = snapshot.serverNowMs - promotionWaitStart;
-            throw new Error(
-              'A1: the promotion\'s MB wait had ended (or was no longer the observed wait) before any server snapshot '
-              + `showed the settle stalled on Y: snapshot ${Math.round(snapshot.serverNowMs - promotionWaitStart)} ms `
-              + `after the promotion's wait began; promotion edge present ${snapshot.promotionOnSettlePresent}; `
-              + `settle on Y ${!snapshot.settleOnHolderPresent ? 'absent'
-                : snapshot.settleOnHolderMs === null ? 'present, waitstart not yet stamped' : 'present'}`,
-            );
-          }
-          return null;
-        },
-        [settle],
-      );
-      const settleStallWaitStart = both.settleOnHolderMs as number;
-      a1.promotionWaitToSettleStalledMs = settleStallWaitStart - promotionWaitStart;
-      a1.promotionWaitToOrderingSnapshotMs = both.serverNowMs - promotionWaitStart;
-      a1.settleCycleWaitToStalledMs = settleStallWaitStart - settleCycleWaitStart;
-      a1.stallObservedClientMs = Date.now() - promotionStarted;
-      // Recorded, not asserted (follow-up F-002): clock_timestamp() may be evaluated a moment before the CTE
-      // reads pg_locks, so this delta can be a few microseconds negative. The proof is the co-occurrence of
-      // both edges in the one snapshot, which the probe already required.
-      a1.settleStallToOrderingSnapshotMs = both.serverNowMs - settleStallWaitStart;
-
-      // Server-side bracket for the END of the promotion's MB wait (its lock_timeout expiry, armed at its
-      // waitstart): the last snapshot still showing that wait and the first one without it. Evidence of when
-      // the promotion stopped waiting, on the same clock as every other A1 reading; its completion follows.
-      // The pair should straddle 5000 ms, the empirical check that waitstart is the lock_timeout origin.
-      let lastSeenWaiting = both.serverNowMs;
-      const firstSeenEnded = await waitUntil('A1: the promotion\'s MB wait ends (server)', async () => {
-        const snapshot = await orderingSnapshot(settlePid, Y.pid, promotionPid);
-        if (sameWaitStart(snapshot.promotionOnSettleMs, promotionWaitStart)) {
-          lastSeenWaiting = snapshot.serverNowMs;
-          return null;
-        }
-        return snapshot.serverNowMs;
-      }, [settle], 20_000);
-      a1.promotionWaitToWaitLastSeenMs = lastSeenWaiting - promotionWaitStart;
-      a1.promotionWaitToWaitEndedSeenMs = firstSeenEnded - promotionWaitStart;
-      // Recorded, not asserted: implied by the snapshot proof above, and subject to the same
-      // microsecond evaluation-order window as settleStallToOrderingSnapshotMs.
-      a1.settleStallToWaitLastSeenMs = lastSeenWaiting - settleStallWaitStart;
-
-      // Step 6: Y holds the settle open past the promotion's 5 s bound (review F-003).
-      const promoted = await within('A1 promotion (5 s hook bound)', promotion.promise, 30_000);
-      const promotionElapsed = (promotion.finishedAt ?? Date.now()) - promotionStarted;
-      a1.promotionElapsedMs = promotionElapsed;
-      expect(settle.done).toBe(false);
-      Y.abort();
-      const result = await within('A1 settle after Y', settle.promise, 60_000);
-      expect(await within('A1 X', X.outcome, 30_000)).toBeNull();
-      expect(await within('A1 Y', Y.outcome, 30_000)).toBeInstanceOf(HeldAborted);
-
-      // Step 7: the settle committed with exactly one failed unit, MA's.
-      expect(result.applied).toBe(true);
-      expect(result.counters.canonicalApplyFailures).toBe(1);
-      const opened = await applyFindings(A1_KEYS.map((k) => A1[k].record));
-      const open = opened.filter((finding) => finding.resolvedAt === null);
-      expect(open.length).toBeGreaterThanOrEqual(1);
-      expect(open.every((finding) => finding.externalRecordId === recordMA)).toBe(true);
-      expect(open.map((finding) => finding.issueKey))
-        .toContain(canonicalApplyIssueKey('afltables', 'match', recordMA, 'matches'));
-      for (const finding of open) expect(finding.error ?? '').toMatch(/deadlock detected/i);
-
-      // MA unchanged; MB and MC applied (MD too, after Y).
-      expect((await matchRow(a1Key('MA')))?.attendance).toBe(A1_SEED_ATTENDANCE);
-      for (const k of ['MB', 'MC', 'MD'] as const) expect((await matchRow(a1Key(k)))?.attendance).toBe(A1_RUN_ATTENDANCE);
-
-      // The promotion: refused retryably by its 5 s hook bound (not a deadlock victim), nothing written,
-      // and only after the settle had already lost MA and moved on.
-      expect(promoted.ok).toBe(false);
-      expect(promoted.ok ? '' : promoted.error).toContain(LEGACY_PROMOTION_LOCK_REFUSAL);
-      const failed = await submissionState(fileId);
-      expect(failed.status).toBe('failed');
-      expect(failed.error ?? '').toContain(LEGACY_PROMOTION_LOCK_REFUSAL);
-      expect(await promotionBatchCount(fileId)).toBe(0);
-      expect(promotionElapsed).toBeGreaterThanOrEqual(4500);
-      expect(promotionElapsed).toBeLessThan(20_000);
-      // "The settle reached Y before the promotion resolved" is proven above on the server clock (one
-      // lock-manager snapshot); it no longer rests on when this process received either response.
-
-      // Step 8, recovery: the same bundle again. MA's payload has not moved, so the §9.3 retry applies it.
-      const recovery = await within('A1 recovery settle', startAfltablesSettle(
-        'A1 recovery', a1Bundle(LABEL.a1Recovery, ['MB', 'MC', 'MA', 'MD'], A1_RUN_ATTENDANCE), T.a1Recovery,
-      ).promise, 60_000);
-      expect(recovery.counters.canonicalApplyFailures).toBe(0);
-      expect(recovery.counters.canonicalRetryApplied).toBeGreaterThanOrEqual(1);
-      expect((await matchRow(a1Key('MA')))?.attendance).toBe(A1_RUN_ATTENDANCE);
-      const healed = await applyFindings(A1_KEYS.map((k) => A1[k].record));
-      expect(healed.filter((finding) => finding.resolvedAt === null)).toEqual([]);
-      for (const key of open.map((finding) => finding.issueKey)) {
-        expect(healed.filter((finding) => finding.issueKey === key).map((finding) => finding.resolution))
-          .toEqual(['canonical_apply_succeeded']);
-      }
-
-      // Re-promotion is then possible.
-      expect(await within('A1 re-promotion', startPromotion('A1 re-promotion', fileId).promise, 30_000))
-        .toMatchObject({ ok: true });
-      expect((await submissionState(fileId)).status).toBe('promoted');
-    }, 180_000);
-  });
+  /**
+   * A promotion over (p, M1), stuck after its hook on a side transaction's row lock. Its row carries `line`, the
+   * value already stored there unless a later settle in the same case writes the same line, so a promotion and a
+   * settle never disagree about (p, M1).
+   */
+  async function startStuckPromotion(label: string, line: StatLine = apiLine) {
+    const p = playerIds.get('p')!;
+    const fileId = await stageApprovedFile('player_match_stats', [statsFileRow('M1', 'p', legacyStats(line))]);
+    const Xrow = await hold(`${label} X on (p, M1)`, lockStatsRow(p, apiId.M1));
+    const promotion = startPromotion(`${label} promotion`, fileId);
+    // Its hook has passed (the gate is held, M1 locked FOR SHARE) and the upsert now waits on X's row.
+    const promotionPid = await waitUntil(`${label}: the promotion passes its hook and waits on (p, M1)`, () => newWaiterBehind(Xrow.pid), [promotion]);
+    expect(gateRowOf(await gateRows(), promotionPid)).toMatchObject({ mode: 'ExclusiveLock', granted: true });
+    return { fileId, Xrow, promotion, promotionPid };
+  }
 
   /* ---------------------------------------------------------------- *
-   * A2, A3 — AFL API (runbook §13.2 A2, A3)
+   * B1, B2 — AFL Tables · match_results
    * ---------------------------------------------------------------- */
 
-  describe('AFL API settle against a player_match_stats promotion', () => {
-    const apiId = {} as Record<ApiKey, number>;
-    const seedUnit = (key: ApiKey): ApiUnit => ({ key, venueName: API_VENUE_SEED, line: SEED_LINE });
+  it('B1: AFL Tables · match_results · the promotion is refused at the gate while a settle holds it, and a retry succeeds', async () => {
+    const fileId = await stageApprovedFile('match_results', [mrFileRow('MA'), mrFileRow('MB')]);
+    const findingsBefore = await allFindings();
+    const { run, X, settle, settlePid } = await startHeldAfltablesSettle('B1');
+    const b1: Record<string, number> = {};
+    timings.B1 = b1;
 
-    beforeAll(async () => {
-      const seed = await within('AFL API seed settle',
-        startAflApiSettle('AFL API seed', apiBundle(LABEL.apiSeed, API_KEYS.map(seedUnit)), T.apiSeed).promise, 100_000);
-      expect(seed.counters.canonicalApplyFailures).toBe(0);
-      const p = playerIds.get('p')!;
-      for (const k of API_KEYS) {
-        const row = await matchRow(apiKey(k));
-        if (!row || row.sourceKey !== 'afl_api' || row.venueRaw !== API_VENUE_SEED) {
-          throw new Error(`the AFL API seed did not create ${k} as an afl_api-owned match: ${JSON.stringify(row)}`);
-        }
-        apiId[k] = row.id;
-        const stats = await statsRow(p, apiKey(k));
-        if (!stats || stats.sourceKey !== 'afl_api' || stats.kicks !== SEED_LINE.kicks) {
-          throw new Error(`the AFL API seed did not write p's afl_api row on ${k}: ${JSON.stringify(stats)}`);
-        }
-      }
-    }, 120_000);
+    const promotionStarted = Date.now();
+    const promotion = startPromotion('B1 promotion', fileId);
+    const promotionPid = await waitUntil('B1: the promotion queues behind the settle', () => newWaiterBehind(settlePid), [settle, promotion]);
+    const wait = await waitUntil('B1: the promotion\'s gate wait is stamped', () => waitingOn(promotionPid, settlePid), [settle, promotion]);
+    // On the gate (an advisory lock), not on MB or MC: the settle holds both, and the promotion never reached them.
+    expect({ waits: wait.waits, blockers: wait.blockers }).toEqual({ waits: ['advisory'], blockers: [settlePid] });
+    const rows = await gateRows();
+    expect(gateRowOf(rows, promotionPid)).toMatchObject({ mode: 'ExclusiveLock', granted: false });
+    expect(gateRowOf(rows, settlePid)).toMatchObject({ mode: 'ShareLock', granted: true });
+    expect(await matchesRowLockModes(promotionPid)).toEqual([]);
 
-    it('A2 (C1): the M2 unit loses, the promotion stays blocked by the settle while M3 stalls it, then succeeds; a recovery run heals M2', async () => {
-      const p = playerIds.get('p')!;
-      const q = playerIds.get('q')!;
-      const a2Units: ApiUnit[] = [
-        { key: 'M1', venueName: API_VENUE_SEED, line: A2_LINE }, // match unchanged, p changed
-        { key: 'M2', venueName: API_VENUE_A2, line: SEED_LINE }, // match changed
-        { key: 'M3', venueName: API_VENUE_A2, line: SEED_LINE }, // match changed; stalled by Y
-      ];
-      const m2Finding = canonicalApplyIssueKey('afl_api', 'match', API.M2.id, 'matches');
-      expect(await applyFindings(TRACKED_PROVIDER_MATCH_IDS)).toEqual([]);
+    // The settle is held past the promotion's 5 s bound (X is released only after the refusal).
+    b1.gateWaitSamples = await watchGateWait('B1 promotion wait', promotion as Run<unknown>, promotionPid, settlePid);
+    expect(b1.gateWaitSamples).toBeGreaterThan(0);
+    const refused = await within('B1 promotion (5 s hook bound)', promotion.promise, 30_000);
+    const elapsed = (promotion.finishedAt ?? Date.now()) - promotionStarted;
+    b1.promotionElapsedMs = elapsed;
+    expect(settle.done).toBe(false);
+    expectRefusedRetryably('B1 promotion', refused);
+    expect(elapsed).toBeGreaterThanOrEqual(4500);
+    expect(elapsed).toBeLessThan(20_000);
+    const failed = await submissionState(fileId);
+    expect(failed.status).toBe('failed');
+    expect(failed.error ?? '').toContain(LEGACY_PROMOTION_LOCK_REFUSAL);
+    expect(await promotionBatchCount(fileId)).toBe(0);
 
-      // Step 3: (p, M1) equal to the settle's values, so recovery stays clean, and one row on M2 (q).
-      const fileId = await stageApprovedFile('player_match_stats', [
-        statsFileRow('M1', 'p', legacyStats(A2_LINE)),
-        statsFileRow('M2', 'q', { goals: '2' }),
-      ]);
+    X.go();
+    const result = await within('B1 settle after X', settle.promise, 120_000);
+    expect(await within('B1 X', X.outcome, 30_000)).toBeNull();
+    expectCommitted('B1 settle', result);
+    // MA to MD all applied, with no finding at all: no unit lost a lock.
+    for (const k of A1_KEYS) expect((await matchRow(a1Key(k)))?.attendance).toBe(run.attendance);
+    expect(await allFindings()).toEqual(findingsBefore);
 
-      // Step 2: X holds M2 FOR SHARE (compatible with the hook); Y will stall the settle at M3.
-      const X = await hold('A2 X on M2', lockMatch(apiId.M2, 'FOR SHARE'));
-      const Y = await hold('A2 Y on M3', lockMatch(apiId.M3, 'FOR SHARE'));
+    // Retry: the same file, once the settle has committed.
+    const retried = await within('B1 re-promotion', startPromotion('B1 re-promotion', fileId).promise, 30_000);
+    expect(retried).toMatchObject({ ok: true });
+    expect((await submissionState(fileId)).status).toBe('promoted');
+    expect(await promotionBatchCount(fileId)).toBe(1);
+  }, 240_000);
 
-      // Step 4: the settle writes (p, M1), then waits on X for M2.
-      const settle = startAflApiSettle('A2 settle', apiBundle(LABEL.a2Run, a2Units), T.a2Run);
-      const settlePid = await waitUntil('A2: the settle queues behind X on M2', () => newWaiterBehind(X.pid), [settle]);
+  it('B2: AFL Tables · match_results · the promotion waits at the gate, then succeeds once the settle commits', async () => {
+    const fileId = await stageApprovedFile('match_results', [mrFileRow('MA'), mrFileRow('MB')]);
+    const { run, X, settle, settlePid } = await startHeldAfltablesSettle('B2', 'MD');
+    const b2: Record<string, number> = {};
+    timings.B2 = b2;
 
-      // Step 5: the promotion's hook passes (FOR SHARE on M1, M2), then its (p, M1) row waits on the settle.
-      const promotion = startPromotion('A2 promotion', fileId);
-      const promotionPid = await waitUntil(
-        'A2: the promotion queues behind the settle at (p, M1)', () => newWaiterBehind(settlePid), [settle, promotion],
+    const promotionStarted = Date.now();
+    const promotion = startPromotion('B2 promotion', fileId);
+    const promotionPid = await waitUntil('B2: the promotion queues behind the settle', () => newWaiterBehind(settlePid), [settle, promotion]);
+    const wait = await waitUntil('B2: the promotion\'s gate wait is stamped', () => waitingOn(promotionPid, settlePid), [settle, promotion]);
+    expect({ waits: wait.waits, blockers: wait.blockers }).toEqual({ waits: ['advisory'], blockers: [settlePid] });
+    const waitStart = wait.waitStartMs as number;
+
+    // Every stall is released only now that the promotion is observed on the gate.
+    X.go();
+    let grantedAt: number | null = null;
+    const deadline = Date.now() + 20_000;
+    while (grantedAt === null && !promotion.done && Date.now() < deadline) {
+      const mine = gateRowOf(await gateRows(), promotionPid);
+      if (mine?.granted) grantedAt = mine.serverNowMs;
+      else await pause(40);
+    }
+    const result = await within('B2 settle after X', settle.promise, 120_000);
+    const promoted = await within('B2 promotion', promotion.promise, 60_000);
+    const elapsed = (promotion.finishedAt ?? Date.now()) - promotionStarted;
+    b2.promotionElapsedMs = elapsed;
+    if (grantedAt !== null) b2.gateWaitServerMs = grantedAt - waitStart;
+    expect(await within('B2 X', X.outcome, 30_000)).toBeNull();
+    expectCommitted('B2 settle', result);
+
+    // Inconclusive guard (review F-003): a gate wait that ran into the promotion's 5 s bound proves nothing
+    // about a promotion that SUCCEEDS after the settle, so it fails as INCONCLUSIVE, never as a pass.
+    const gateWaitMs = grantedAt === null ? elapsed : grantedAt - waitStart;
+    if (gateWaitMs >= 4000) {
+      throw new Error(
+        `B2 INCONCLUSIVE: the promotion's gate wait was ${Math.round(gateWaitMs)} ms, within 1 s of its 5 s bound `
+        + `(settle remainder too slow on this link); outcome ${promoted.ok ? 'ok' : promoted.error}`,
       );
-      // §17.8 item 2, directly (review F-002): the promotion's FOR SHARE on M2 did NOT queue on the M2 tuple
-      // lock the settle's waiting UPDATE holds; it waits on the settle's transaction, at (p, M1).
-      await expectWaitsOnTransactionOf('A2 promotion at (p, M1)', promotionPid, settlePid);
+    }
+    expect(promoted).toMatchObject({ ok: true });
+    expect((await submissionState(fileId)).status).toBe('promoted');
+    expect(await promotionBatchCount(fileId)).toBe(1);
+    for (const k of A1_KEYS) expect((await matchRow(a1Key(k)))?.attendance).toBe(run.attendance);
+  }, 240_000);
 
-      // Step 6: the promotion's check passes; releasing X leaves the promotion's FOR SHARE as the settle's
-      // new blocker, so the settle gets a fresh check and is the victim (review F-004).
-      await pause(checkPassedPauseMs);
-      X.go();
-      await waitUntil('A2: the settle (M2 lost) queues behind Y on M3', () => isBehind(Y.pid, settlePid), [settle, promotion]);
+  /* ---------------------------------------------------------------- *
+   * B3, B4 — AFL API · player_match_stats
+   * ---------------------------------------------------------------- */
 
-      // Step 7, in-run retry futility (§11): the M2 unit has rolled back, yet the promotion is STILL blocked
-      // by the settle, on a row an earlier, committed-to-the-run unit holds.
-      expect(promotion.done).toBe(false);
-      expect(await reachOf(settlePid)).toContain(promotionPid);
-      await pause(300);
-      expect(promotion.done).toBe(false);
-      expect(await reachOf(settlePid)).toContain(promotionPid);
+  it('B3: AFL API · player_match_stats · the promotion waits at the gate, not on (p, M1); the M2 unit applies; a retry succeeds', async () => {
+    const p = playerIds.get('p')!;
+    const q = playerIds.get('q')!;
+    const run = nextRun();
+    const line = lineOf(run.n);
+    const venue = venueOf(run.n);
+    const findingsBefore = await allFindings();
+    const fileId = await stageApprovedFile('player_match_stats', [
+      statsFileRow('M1', 'p', legacyStats(line)),
+      statsFileRow('M2', 'q', { goals: '2' }),
+    ]);
+    const b3: Record<string, number> = {};
+    timings.B3 = b3;
 
-      Y.go();
-      const result = await within('A2 settle after Y', settle.promise, 60_000);
-      const promoted = await within('A2 promotion after the settle commits', promotion.promise, 30_000);
-      expect(await within('A2 X', X.outcome, 30_000)).toBeNull();
-      expect(await within('A2 Y', Y.outcome, 30_000)).toBeNull();
+    // X holds M2 FOR SHARE (the settle's UPDATE of M2 waits); Y will stall the settle at M3.
+    const X = await hold('B3 X on M2', lockMatch(apiId.M2, 'FOR SHARE'));
+    const Y = await hold('B3 Y on M3', lockMatch(apiId.M3, 'FOR SHARE'));
+    const settle = startAflApiSettle('B3 settle', apiBundle(run.label, [
+      apiUnit('M1', API_VENUE_SEED, line), apiUnit('M2', venue), apiUnit('M3', venue),
+    ]), run.observedAt);
+    const settlePid = await waitUntil('B3: the settle queues behind X on M2', () => newWaiterBehind(X.pid), [settle]);
 
-      expect(result.applied).toBe(true);
-      expect(result.counters.canonicalApplyFailures).toBe(1);
-      const open = (await applyFindings(TRACKED_PROVIDER_MATCH_IDS)).filter((finding) => finding.resolvedAt === null);
-      expect(open.map((finding) => finding.issueKey)).toEqual([m2Finding]);
-      expect(open[0].error ?? '').toMatch(/deadlock detected/i);
-      expect((await matchRow(apiKey('M2')))?.venueRaw).toBe(API_VENUE_SEED);
-      expect((await matchRow(apiKey('M3')))?.venueRaw).toBe(API_VENUE_A2);
-      expect((await matchRow(apiKey('M1')))?.venueRaw).toBe(API_VENUE_SEED);
+    const promotionStarted = Date.now();
+    const promotion = startPromotion('B3 promotion', fileId);
+    const promotionPid = await waitUntil('B3: the promotion queues behind the settle', () => newWaiterBehind(settlePid), [settle, promotion]);
+    const wait = await waitUntil('B3: the promotion\'s gate wait is stamped', () => waitingOn(promotionPid, settlePid), [settle, promotion]);
+    // The gate, not the (p, M1) row the settle has already written and still holds.
+    expect({ waits: wait.waits, blockers: wait.blockers }).toEqual({ waits: ['advisory'], blockers: [settlePid] });
+    expect(await matchesRowLockModes(promotionPid)).toEqual([]);
 
-      // After the commit, the promotion succeeds.
-      expect(promoted).toMatchObject({ ok: true });
-      expect((await submissionState(fileId)).status).toBe('promoted');
-      expect(await statsRow(p, apiKey('M1'))).toMatchObject({ kicks: A2_LINE.kicks, disposals: A2_LINE.disposals });
-      expect(await statsRow(q, apiKey('M2'))).toMatchObject({ goals: 2 });
+    // The M2 unit now applies (no deadlock cycle is possible), and the settle stalls at M3.
+    X.go();
+    // The promotion is NOT watched here: it may legitimately be refused (its 5 s bound) before the settle reaches M3.
+    await waitUntil('B3: the settle (M2 applied) queues behind Y on M3', () => isBehind(Y.pid, settlePid), [settle]);
 
-      // Step 8, recovery: the next run applies M2 and closes the finding.
-      const recovery = await within('A2 recovery settle',
-        startAflApiSettle('A2 recovery', apiBundle(LABEL.a2Recovery, a2Units), T.a2Recovery).promise, 60_000);
-      expect(recovery.counters.canonicalApplyFailures).toBe(0);
-      expect((await matchRow(apiKey('M2')))?.venueRaw).toBe(API_VENUE_A2);
-      const healed = (await applyFindings(TRACKED_PROVIDER_MATCH_IDS)).filter((finding) => finding.issueKey === m2Finding);
-      expect(healed.map((finding) => [finding.resolvedAt !== null, finding.resolution]))
-        .toEqual([[true, 'canonical_apply_succeeded']]);
-      expect(await statsRow(p, apiKey('M1'))).toMatchObject({ kicks: A2_LINE.kicks, disposals: A2_LINE.disposals });
-    }, 180_000);
+    b3.gateWaitSamples = await watchGateWait('B3 promotion wait', promotion as Run<unknown>, promotionPid, settlePid);
+    expect(b3.gateWaitSamples).toBeGreaterThan(0);
+    const refused = await within('B3 promotion (5 s hook bound)', promotion.promise, 30_000);
+    const elapsed = (promotion.finishedAt ?? Date.now()) - promotionStarted;
+    b3.promotionElapsedMs = elapsed;
+    expect(settle.done).toBe(false);
+    expectRefusedRetryably('B3 promotion', refused);
+    expect(elapsed).toBeGreaterThanOrEqual(4500);
+    expect(await promotionBatchCount(fileId)).toBe(0);
+    expect(await statsRow(q, apiKey('M2'))).toBeNull();
 
-    it('A3 (F-265-1): the attendance enrichment loses to the promotion and the whole AFL API run rolls back', async () => {
-      const p = playerIds.get('p')!;
-      const a3Units: ApiUnit[] = [
-        { key: 'M4', venueName: API_VENUE_SEED, line: A3_LINE }, // match unchanged, p changed: the C1 row
-        { key: 'M5', venueName: API_VENUE_A3, line: SEED_LINE }, // match changed; stalled by Z
-      ];
-      const m4Key = apiKey('M4');
+    Y.go();
+    const result = await within('B3 settle after Y', settle.promise, 120_000);
+    expect(await within('B3 X', X.outcome, 30_000)).toBeNull();
+    expect(await within('B3 Y', Y.outcome, 30_000)).toBeNull();
+    expectCommitted('B3 settle', result);
+    expect(await allFindings()).toEqual(findingsBefore);
+    expect((await matchRow(apiKey('M2')))?.venueRaw).toBe(venue);
+    expect((await matchRow(apiKey('M3')))?.venueRaw).toBe(venue);
+    expect(await statsRow(p, apiKey('M1'))).toMatchObject({ kicks: line.kicks, disposals: line.disposals });
+    apiLine = line;
 
-      // The fixture: a complete AFL Tables attendance row for the afl_api-owned M4, keyed (as the AFL Tables
-      // match family is) by the match key, with the spine version its ledger row would cite.
-      fixtureSpineKeys.add(m4Key);
-      const [fixtureBatch] = await owner<{ id: string }[]>`
-        INSERT INTO import_batches (source_id, tool, target_table, notes)
-        VALUES (${refs.afltablesSourceId}, ${FIXTURE_TOOL}, 'staging.source_record_versions', ${`${TAG} A3 enrichment fixture`})
-        RETURNING id::text AS id
+    // Retry once the settle has committed.
+    expect(await within('B3 re-promotion', startPromotion('B3 re-promotion', fileId).promise, 30_000)).toMatchObject({ ok: true });
+    expect((await submissionState(fileId)).status).toBe('promoted');
+    expect(await promotionBatchCount(fileId)).toBe(1);
+    expect(await statsRow(q, apiKey('M2'))).toMatchObject({ goals: 2 });
+    expect(await statsRow(p, apiKey('M1'))).toMatchObject({ kicks: line.kicks, disposals: line.disposals });
+  }, 240_000);
+
+  it('B4: AFL API · F-265-1 · the attendance enrichment no longer loses the whole run; the promotion waits at the gate', async () => {
+    const p = playerIds.get('p')!;
+    const run = nextRun();
+    const line = lineOf(run.n);
+    const venue = venueOf(run.n);
+    const m4Key = apiKey('M4');
+    const b4: Record<string, number> = {};
+    timings.B4 = b4;
+
+    // The fixture: a complete AFL Tables attendance row for the afl_api-owned M4, keyed (as the AFL Tables
+    // match family is) by the match key, with the spine version its ledger row would cite.
+    fixtureSpineKeys.add(m4Key);
+    const [fixtureBatch] = await owner<{ id: string }[]>`
+      INSERT INTO import_batches (source_id, tool, target_table, notes)
+      VALUES (${refs.afltablesSourceId}, ${FIXTURE_TOOL}, 'staging.source_record_versions', ${`${TAG} B4 enrichment fixture`})
+      RETURNING id::text AS id
+    `;
+    fixtureBatchIds.add(fixtureBatch.id);
+    await owner.begin(async (tx) => {
+      await persistSourceObservation(tx, {
+        contract: getSourceFamily(registry, 'afltables', 'match'),
+        sourceId: refs.afltablesSourceId,
+        externalRecordId: m4Key,
+        scopeKey: `${AFLT_NS}b4-enrichment`,
+        payload: { issue265_fixture: true, season: SEASON, round_code: apiRoundCode('M4'), match_date: API.M4.date, attendance: 30123 },
+      }, asImportBatchId(fixtureBatch.id), nextRun().observedAt);
+      const [head] = await tx<{ versionSeq: number }[]>`
+        SELECT current_version_seq AS "versionSeq" FROM staging.source_records
+         WHERE source_id = ${refs.afltablesSourceId} AND family = 'match' AND external_record_id = ${m4Key}
       `;
-      fixtureBatchIds.add(fixtureBatch.id);
-      await owner.begin(async (tx) => {
-        await persistSourceObservation(tx, {
-          contract: getSourceFamily(registry, 'afltables', 'match'),
-          sourceId: refs.afltablesSourceId,
-          externalRecordId: m4Key,
-          scopeKey: `${AFLT_NS}a3-enrichment`,
-          payload: { issue265_fixture: true, season: SEASON, round_code: apiRoundCode('M4'), match_date: API.M4.date, attendance: 30123 },
-        }, asImportBatchId(fixtureBatch.id), T.a3Fixture);
-        const [head] = await tx<{ versionSeq: number }[]>`
-          SELECT current_version_seq AS "versionSeq" FROM staging.source_records
-           WHERE source_id = ${refs.afltablesSourceId} AND family = 'match' AND external_record_id = ${m4Key}
-        `;
-        await tx`
-          INSERT INTO staging.afltables_match (
-            source_id, family, external_record_id, version_seq,
-            season, round_code, round_number, round_type, is_final, match_date,
-            venue_raw, home_club_id, away_club_id, home_score, away_score,
-            result, winner_club_id, margin, attendance, attendance_status, attendance_source_id, projected_by_batch_id
-          ) VALUES (
-            ${refs.afltablesSourceId}, 'match', ${m4Key}, ${head.versionSeq},
-            ${SEASON}, ${apiRoundCode('M4')}, ${API.M4.apiRound}, 'home_and_away'::round_type, false, ${API.M4.date},
-            ${VENUE.name}, ${clubIds[0]}, ${clubIds[1]}, 80, 66,
-            'home_win'::match_result, ${clubIds[0]}, 14, 30123, 'complete'::coverage_status, ${refs.afltablesSourceId},
-            ${fixtureBatch.id}
-          )
-        `;
-      });
+      await tx`
+        INSERT INTO staging.afltables_match (
+          source_id, family, external_record_id, version_seq,
+          season, round_code, round_number, round_type, is_final, match_date,
+          venue_raw, home_club_id, away_club_id, home_score, away_score,
+          result, winner_club_id, margin, attendance, attendance_status, attendance_source_id, projected_by_batch_id
+        ) VALUES (
+          ${refs.afltablesSourceId}, 'match', ${m4Key}, ${head.versionSeq},
+          ${SEASON}, ${apiRoundCode('M4')}, ${API.M4.apiRound}, 'home_and_away'::round_type, false, ${API.M4.date},
+          ${VENUE.name}, ${clubIds[0]}, ${clubIds[1]}, 80, 66,
+          'home_win'::match_result, ${clubIds[0]}, 14, 30123, 'complete'::coverage_status, ${refs.afltablesSourceId},
+          ${fixtureBatch.id}
+        )
+      `;
+    });
 
-      const fileId = await stageApprovedFile('player_match_stats', [statsFileRow('M4', 'p', { goals: '3' })]);
+    // The promotion's (p, M4) row equals the line the settle writes, so the two never disagree.
+    const fileId = await stageApprovedFile('player_match_stats', [statsFileRow('M4', 'p', legacyStats(line))]);
+    const Z = await hold('B4 Z on M5', lockMatch(apiId.M5, 'FOR SHARE'));
+    // The settle writes (p, M4) under FOR SHARE on M4, then waits on Z at M5.
+    const settle = startAflApiSettle('B4 settle', apiBundle(run.label, [
+      apiUnit('M4', API_VENUE_SEED, line), apiUnit('M5', venue),
+    ]), run.observedAt);
+    const settlePid = await waitUntil('B4: the settle queues behind Z on M5', () => newWaiterBehind(Z.pid), [settle]);
 
-      const snapshot = async () => {
-        const [counts] = await owner<{ versions: number; ledger: number; issues: number; batches: number }[]>`
-          SELECT
-            (SELECT count(*) FROM staging.source_record_versions
-              WHERE source_id = ${refs.aflApiSourceId}
-                AND external_record_id = ANY(${[API.M4.id, API.M5.id, apiPlayerRecord('M4'), apiPlayerRecord('M5')]}::text[]))::int AS versions,
-            (SELECT count(*) FROM canonical_applications WHERE external_record_id LIKE ANY(${RECORD_LIKE}::text[]))::int AS ledger,
-            (SELECT count(*) FROM data_issues WHERE issue_key LIKE ANY(${ISSUE_LIKE}::text[]))::int AS issues,
-            (SELECT count(*) FROM import_batches WHERE notes LIKE ${`%snapshot=${LABEL.a3Run};%`})::int AS batches
-        `;
-        const m4 = await matchRow(m4Key);
-        return {
-          ...counts,
-          m4Attendance: m4?.attendance ?? null,
-          m5Venue: (await matchRow(apiKey('M5')))?.venueRaw ?? null,
-        };
-      };
-      const before = await snapshot();
-      expect(before.batches).toBe(0);
+    const promotionStarted = Date.now();
+    const promotion = startPromotion('B4 promotion', fileId);
+    const promotionPid = await waitUntil('B4: the promotion queues behind the settle', () => newWaiterBehind(settlePid), [settle, promotion]);
+    const wait = await waitUntil('B4: the promotion\'s gate wait is stamped', () => waitingOn(promotionPid, settlePid), [settle, promotion]);
+    expect({ waits: wait.waits, blockers: wait.blockers }).toEqual({ waits: ['advisory'], blockers: [settlePid] });
 
-      const Z = await hold('A3 Z on M5', lockMatch(apiId.M5, 'FOR SHARE'));
-      // The settle writes (p, M4) under FOR SHARE on M4, then waits on Z at M5.
-      const settle = startAflApiSettle('A3 settle', apiBundle(LABEL.a3Run, a3Units), T.a3Run);
-      const settlePid = await waitUntil('A3: the settle queues behind Z on M5', () => newWaiterBehind(Z.pid), [settle]);
-      // C1: the promotion holds M4 FOR SHARE (its hook) and waits on the (p, M4) row the settle wrote.
-      const promotion = startPromotion('A3 promotion', fileId);
-      const promotionPid = await waitUntil(
-        'A3: the promotion queues behind the settle at (p, M4)', () => newWaiterBehind(settlePid), [settle, promotion],
-      );
-      await expectWaitsOnTransactionOf('A3 promotion at (p, M4)', promotionPid, settlePid);
+    // The settle finishes M5 and reaches the enrichment, whose FOR UPDATE on M4 (canonical-apply.ts, before every
+    // gate) used to close the cycle and roll the whole run back. The promotion holds nothing, so it cannot.
+    Z.go();
+    const outcome = await within('B4 settle after Z', settled(settle), 120_000);
+    expect(await within('B4 Z', Z.outcome, 30_000)).toBeNull();
+    if (!outcome.ok) throw outcome.error;
+    const result = outcome.value;
+    expectCommitted('B4 settle', result);
+    expect(result.batchId).not.toBeNull();
+    const [batch] = await owner<{ n: number }[]>`SELECT count(*)::int AS n FROM import_batches WHERE id = ${result.batchId as string}::bigint`;
+    expect(batch.n).toBe(1);
+    expect((await matchRow(m4Key))?.attendance).toBe(30123);
+    expect((await matchRow(apiKey('M5')))?.venueRaw).toBe(venue);
+    expect(await statsRow(p, m4Key)).toMatchObject({ kicks: line.kicks, disposals: line.disposals });
 
-      // Its check passes; then the settle finishes M5 and reaches the enrichment, whose FOR UPDATE on M4
-      // (canonical-apply.ts:1394-1401, before every gate) closes the cycle. The 40P01 is rethrown.
-      await pause(checkPassedPauseMs);
-      Z.go();
-      const outcome = await within('A3 settle after Z', settled(settle), 60_000);
-      const promoted = await within('A3 promotion after the settle rolls back', promotion.promise, 30_000);
-      expect(await within('A3 Z', Z.outcome, 30_000)).toBeNull();
+    // The promotion waited on the gate, then either succeeded or was refused retryably; never a deadlock victim.
+    let promoted = await within('B4 promotion after the settle commits', promotion.promise, 60_000);
+    if (!promoted.ok) {
+      expectRefusedRetryably('B4 promotion', promoted);
+      // The refusal text is the same for a lock timeout (55P03) and a deadlock victim (40P01), so the text cannot
+      // tell them apart. The 5 s bound can: a victim is chosen after about 1 s (deadlock_timeout), a timeout at 5 s.
+      expect((promotion.finishedAt ?? Date.now()) - promotionStarted).toBeGreaterThanOrEqual(4500);
+      promoted = await within('B4 re-promotion', startPromotion('B4 re-promotion', fileId).promise, 30_000);
+    }
+    expect(promoted).toMatchObject({ ok: true });
+    expect((await submissionState(fileId)).status).toBe('promoted');
+    expect(await promotionBatchCount(fileId)).toBe(1);
+    expect(await statsRow(p, m4Key)).toMatchObject({ kicks: line.kicks, disposals: line.disposals });
+  }, 240_000);
 
-      expect(outcome.ok).toBe(false);
-      expect(outcome.ok ? null : sqlstate(outcome.error)).toBe('40P01');
-      expect(outcome.ok ? '' : messageOf(outcome.error)).toMatch(/deadlock detected/i);
+  /* ---------------------------------------------------------------- *
+   * B6 — a settle waits behind a promotion that is stuck after its hook
+   * ---------------------------------------------------------------- */
 
-      // Nothing from the run persists, its import_batches row included; the promotion then succeeds.
-      expect(await snapshot()).toEqual(before);
-      expect(promoted).toMatchObject({ ok: true });
-      expect((await submissionState(fileId)).status).toBe('promoted');
-      // The settle's kicks/disposals for (p, M4) were rolled back; the promotion's goals landed.
-      expect(await statsRow(p, m4Key)).toMatchObject({ kicks: SEED_LINE.kicks, disposals: SEED_LINE.disposals, goals: 3 });
-    }, 180_000);
-  });
+  it('B6: a settle waits behind a promotion that is stuck after its hook, holding nothing, and then completes', async () => {
+    const run = nextRun();
+    const b6: Record<string, number> = {};
+    timings.B6 = b6;
+    const findingsBefore = await allFindings();
+    const { fileId, Xrow, promotion, promotionPid } = await startStuckPromotion('B6');
+
+    const settleStarted = Date.now();
+    const settle = startAfltablesSettle('B6 settle', a1Bundle(run.label, A1_KEYS, run.attendance), run.observedAt);
+    const settlePid = await waitUntil('B6: the settle queues behind the promotion', () => newWaiterBehind(promotionPid), [settle]);
+    const wait = await waitUntil('B6: the settle\'s gate wait is stamped', () => waitingOn(settlePid, promotionPid), [settle]);
+    // The settle's only wait is the gate: ShareLock, blocker = the promotion.
+    expect({ waits: wait.waits, blockers: wait.blockers }).toEqual({ waits: ['advisory'], blockers: [promotionPid] });
+    expect(gateRowOf(await gateRows(), settlePid)).toMatchObject({ mode: 'ShareLock', granted: false });
+    // Before any write and any table lock: no xid, and not even loadRefs has run.
+    expect(await writesAndTableLocksOf(settlePid)).toEqual({ xidLocks: 0, relationLocks: 0, backendXid: null });
+
+    await pause(1500);
+    expect(settle.done).toBe(false);
+    expect(promotion.done).toBe(false);
+    b6.settleGateWaitObservedMs = (await serverNowMs()) - (wait.waitStartMs as number);
+
+    Xrow.go();
+    const promoted = await within('B6 promotion', promotion.promise, 60_000);
+    expect(await within('B6 X', Xrow.outcome, 30_000)).toBeNull();
+    expect(promoted).toMatchObject({ ok: true });
+    const result = await within('B6 settle', settle.promise, 120_000);
+    b6.settleElapsedMs = (settle.finishedAt ?? Date.now()) - settleStarted;
+    expectCommitted('B6 settle', result);
+    expect(await promotionBatchCount(fileId)).toBe(1);
+    expect(await allFindings()).toEqual(findingsBefore);
+    for (const k of A1_KEYS) expect((await matchRow(a1Key(k)))?.attendance).toBe(run.attendance);
+  }, 240_000);
+
+  /* ---------------------------------------------------------------- *
+   * B7 — the 300 s timeout, rollback and connection reuse, both providers
+   * ---------------------------------------------------------------- */
+
+  it('B7: both settles give up at the gate after the full wait with a named error, write nothing, and their connections are reused', async () => {
+    const wait = SETTLE_PROMOTION_GATE_WAIT_MS;
+    const p = playerIds.get('p')!;
+    const runTables = nextRun();
+    const runApi = nextRun();
+    const lineApi = lineOf(runApi.n);
+    const venueApi = venueOf(runApi.n);
+    const b7: Record<string, number> = {};
+    timings.B7 = b7;
+
+    // The promotion's (p, M1) row equals `lineApi`, so the AFL API retry below leaves the same value.
+    const { fileId, Xrow, promotion, promotionPid } = await startStuckPromotion('B7', lineApi);
+
+    // Two clients, each max 1. The AFL API client opens with a SESSION statement_timeout of 60 s, below the wait;
+    // the AFL Tables client opens with none, so it reads the server default.
+    const tablesClient = client('B7 afltables settle', null);
+    const apiClient = client('B7 afl api settle', 60_000);
+    const settingsOf = async (connection: postgres.Sql) => {
+      const [row] = await connection<{ pid: number; lockTimeout: string; statementTimeout: string }[]>`
+        SELECT pg_backend_pid()::int AS pid, current_setting('lock_timeout') AS "lockTimeout",
+               current_setting('statement_timeout') AS "statementTimeout"
+      `;
+      await observe(row.pid);
+      return { ...row };
+    };
+    const tablesBefore = await settingsOf(tablesClient);
+    const apiBefore = await settingsOf(apiClient);
+    expect(apiBefore.statementTimeout).toBe('1min');
+    const stateBefore = await persistedState();
+
+    const started = Date.now();
+    const tablesBundle = a1Bundle(runTables.label, A1_KEYS, runTables.attendance);
+    const apiBundleB7 = apiBundle(runApi.label, [apiUnit('M1', API_VENUE_SEED, lineApi), apiUnit('M3', venueApi)]);
+    const tablesRun = track('B7 afltables settle', runAfltables(tablesClient, tablesBundle, runTables.observedAt));
+    const apiRun = track('B7 afl api settle', runAflApi(apiClient, apiBundleB7, runApi.observedAt));
+
+    // Both queue at the gate behind the promotion: ShareLock requests, each blocked only by the promotion.
+    const queued = await waitUntil('B7: both settles queue at the gate behind the promotion', async () => {
+      const rows = await gateRows();
+      const waiting = rows.filter((row) => !row.granted).map((row) => row.pid);
+      return waiting.includes(tablesBefore.pid) && waiting.includes(apiBefore.pid) ? rows : null;
+    }, [tablesRun, apiRun, promotion]);
+    expect(gateRowOf(queued, promotionPid)).toMatchObject({ mode: 'ExclusiveLock', granted: true });
+    const waitStarts: Record<string, number> = {};
+    for (const [name, pid] of [['afltables', tablesBefore.pid], ['aflapi', apiBefore.pid]] as const) {
+      const snap = await waitUntil(`B7: the ${name} settle's gate wait is stamped`, () => waitingOn(pid, promotionPid), [tablesRun, apiRun, promotion]);
+      expect({ name, waits: snap.waits, blockers: snap.blockers }).toEqual({ name, waits: ['advisory'], blockers: [promotionPid] });
+      waitStarts[name] = snap.waitStartMs as number;
+    }
+
+    // Held past the full wait. The promotion stays stuck on X's row throughout: if it ended early (for example an
+    // import-role statement_timeout), the settles would be granted and this case would be meaningless.
+    const deadline = Date.now() + wait + 120_000;
+    while (!(tablesRun.done && apiRun.done)) {
+      if (promotion.done) {
+        throw new Error(`B7: the promotion finished (${describeRun(promotion as Run<unknown>)}) before both settles gave up; it cannot hold the gate for ${wait} ms here`);
+      }
+      if (Date.now() > deadline) throw new Error(`B7: the settles had not given up ${wait + 120_000} ms after they queued`);
+      await pause(1000);
+    }
+    const nowServer = await serverNowMs();
+    b7.tablesElapsedMs = (tablesRun.finishedAt ?? Date.now()) - started;
+    b7.apiElapsedMs = (apiRun.finishedAt ?? Date.now()) - started;
+    b7.serverMsSinceTablesWait = nowServer - waitStarts.afltables;
+    b7.serverMsSinceApiWait = nowServer - waitStarts.aflapi;
+    expect(promotion.done).toBe(false);
+
+    // Both reject with the named error (cause 55P03), never a 57014, and not before the full wait elapsed.
+    for (const [name, run, elapsed, serverSince] of [
+      ['afltables', tablesRun, b7.tablesElapsedMs, b7.serverMsSinceTablesWait],
+      ['aflapi', apiRun, b7.apiElapsedMs, b7.serverMsSinceApiWait],
+    ] as const) {
+      const outcome = await settled(run as Run<unknown>);
+      expect({ name, ok: outcome.ok }).toEqual({ name, ok: false });
+      const error = outcome.ok ? null : outcome.error;
+      expect(error).toBeInstanceOf(SettlePromotionGateTimeout);
+      expect({ name, code: sqlstate(error) }).toEqual({ name, code: '55P03' });
+      expect(sqlstate(error)).not.toBe('57014');
+      expect(messageOf(error)).toMatch(/legacy CSV promotion/);
+      expect({ name, elapsedAtLeastWait: elapsed >= wait }).toEqual({ name, elapsedAtLeastWait: true });
+      // Server clock, with 500 ms for the gap between the statement reaching the server and its wait being stamped.
+      expect({ name, serverAtLeastWait: serverSince >= wait - 500 }).toEqual({ name, serverAtLeastWait: true });
+    }
+
+    // Nothing persists: no batch, no finding, no ledger, spine or canonical change.
+    expect(await persistedState()).toEqual(stateBefore);
+
+    // Reuse: the same backends, no advisory lock held, and BOTH previous settings restored, not reset or left raised.
+    const rowsAfter = await gateRows();
+    for (const [name, connection, before] of [['afltables', tablesClient, tablesBefore], ['aflapi', apiClient, apiBefore]] as const) {
+      expect(await settingsOf(connection)).toEqual(before);
+      expect({ name, heldGate: gateRowOf(rowsAfter, before.pid) !== undefined }).toEqual({ name, heldGate: false });
+    }
+
+    // Retry: release the stall. The promotion commits, then both settles re-run on the SAME clients and complete
+    // (one after the other: two settles' end-of-run recomputes are not what B7 tests).
+    Xrow.go();
+    const promoted = await within('B7 promotion', promotion.promise, 60_000);
+    expect(await within('B7 X', Xrow.outcome, 30_000)).toBeNull();
+    expect(promoted).toMatchObject({ ok: true });
+    expect(await promotionBatchCount(fileId)).toBe(1);
+    const tablesResult = await within('B7 afltables retry', runAfltables(tablesClient, tablesBundle, runTables.observedAt), 120_000);
+    expectCommitted('B7 afltables retry', tablesResult);
+    const apiResult = await within('B7 afl api retry', runAflApi(apiClient, apiBundleB7, runApi.observedAt), 120_000);
+    expectCommitted('B7 afl api retry', apiResult);
+    apiLine = lineApi;
+    expect(await statsRow(p, apiKey('M1'))).toMatchObject({ kicks: lineApi.kicks, disposals: lineApi.disposals });
+    expect((await matchRow(apiKey('M3')))?.venueRaw).toBe(venueApi);
+    for (const k of A1_KEYS) expect((await matchRow(a1Key(k)))?.attendance).toBe(runTables.attendance);
+    // The same two backends served the retries.
+    expect((await settingsOf(tablesClient)).pid).toBe(tablesBefore.pid);
+    expect((await settingsOf(apiClient)).pid).toBe(apiBefore.pid);
+  }, 720_000);
+
+  /* ---------------------------------------------------------------- *
+   * B8 — concurrent settles; a rolled-back settle releases the gate
+   * ---------------------------------------------------------------- */
+
+  it('B8: two settles hold the shared gate at once, neither waits on the other, and a dry-run rollback releases it', async () => {
+    const b8: Record<string, number> = {};
+    timings.B8 = b8;
+    const findingsBefore = await allFindings();
+    const tables = await startHeldAfltablesSettle('B8 afltables');
+    const api = await startHeldApiSettle('B8 afl api');
+
+    // One snapshot with two GRANTED ShareLock entries, and nobody waiting at the gate.
+    const rows = await waitUntil('B8: both settles hold the shared gate at once', async () => {
+      const snapshot = await gateRows();
+      const shared = grantedShared(snapshot);
+      return shared.includes(tables.settlePid) && shared.includes(api.settlePid) ? snapshot : null;
+    }, [tables.settle, api.settle]);
+    expect(rows.filter((row) => !row.granted)).toEqual([]);
+    expect(rows.filter((row) => row.granted && row.mode !== 'ShareLock')).toEqual([]);
+
+    // Released one after the other: both settles' end-of-run recomputes at once is not what B8 tests.
+    tables.X.go();
+    const tablesResult = await within('B8 afltables settle', tables.settle.promise, 120_000);
+    expectCommitted('B8 afltables settle', tablesResult);
+    api.Y.go();
+    const apiResult = await within('B8 afl api settle', api.settle.promise, 120_000);
+    expectCommitted('B8 afl api settle', apiResult);
+    expect(await within('B8 X', tables.X.outcome, 30_000)).toBeNull();
+    expect(await within('B8 Y', api.Y.outcome, 30_000)).toBeNull();
+    apiLine = api.line;
+    expect(await allFindings()).toEqual(findingsBefore);
+
+    // A dry-run settle takes the gate and rolls back; the rollback releases it.
+    const dry = nextRun();
+    const dryResult = await within('B8 dry-run settle',
+      startAfltablesSettle('B8 dry-run', a1Bundle(dry.label, A1_KEYS, dry.attendance), dry.observedAt, false).promise, 120_000);
+    expect(dryResult.applied).toBe(false);
+    expect(dryResult.batchId).toBeNull();
+    expect((await matchRow(a1Key('MA')))?.attendance).toBe(tables.run.attendance);
+    expect(await gateRows()).toEqual([]);
+
+    // So a promotion takes the gate with no wait.
+    const fileId = await stageApprovedFile('player_match_stats', [statsFileRow('M2', 'q', { goals: '2' })]);
+    const started = Date.now();
+    const promoted = await within('B8 promotion', startPromotion('B8 promotion', fileId).promise, 30_000);
+    b8.promotionElapsedMs = Date.now() - started;
+    expect(promoted).toMatchObject({ ok: true });
+    expect(await promotionBatchCount(fileId)).toBe(1);
+  }, 360_000);
+
+  /* ---------------------------------------------------------------- *
+   * B9 — promotions serialise
+   * ---------------------------------------------------------------- */
+
+  it('B9: promotions serialise on the gate: the second is refused while the first holds it, and succeeds once it commits', async () => {
+    const q = playerIds.get('q')!;
+    const b9: Record<string, number> = {};
+    timings.B9 = b9;
+
+    // Run 1: P2 waits behind a stuck P1 and is refused.
+    const first = await startStuckPromotion('B9 P1');
+    const file2 = await stageApprovedFile('player_match_stats', [statsFileRow('M2', 'q', { goals: '2' })]);
+    const qBefore = await statsRow(q, apiKey('M2'));
+    const p2Started = Date.now();
+    const p2 = startPromotion('B9 P2', file2);
+    const p2Pid = await waitUntil('B9: P2 queues behind P1', () => newWaiterBehind(first.promotionPid), [p2]);
+    const wait = await waitUntil('B9: P2\'s gate wait is stamped', () => waitingOn(p2Pid, first.promotionPid), [p2]);
+    expect({ waits: wait.waits, blockers: wait.blockers }).toEqual({ waits: ['advisory'], blockers: [first.promotionPid] });
+    expect(await matchesRowLockModes(p2Pid)).toEqual([]);
+    const refused = await within('B9 P2 (5 s hook bound)', p2.promise, 30_000);
+    b9.refusedElapsedMs = (p2.finishedAt ?? Date.now()) - p2Started;
+    expectRefusedRetryably('B9 P2', refused);
+    expect(b9.refusedElapsedMs).toBeGreaterThanOrEqual(4500);
+    expect(first.promotion.done).toBe(false);
+    expect(await promotionBatchCount(file2)).toBe(0);
+    expect(await statsRow(q, apiKey('M2'))).toEqual(qBefore);
+
+    first.Xrow.go();
+    expect(await within('B9 P1', first.promotion.promise, 60_000)).toMatchObject({ ok: true });
+    expect(await within('B9 X', first.Xrow.outcome, 30_000)).toBeNull();
+    expect(await promotionBatchCount(first.fileId)).toBe(1);
+    // Retry of P2 after P1 has committed.
+    expect(await within('B9 P2 retry', startPromotion('B9 P2 retry', file2).promise, 30_000)).toMatchObject({ ok: true });
+    expect(await promotionBatchCount(file2)).toBe(1);
+
+    // Run 2: P1 is allowed to commit within P2's bound, so P2 succeeds.
+    const second = await startStuckPromotion('B9 P1b');
+    const file4 = await stageApprovedFile('player_match_stats', [statsFileRow('M2', 'q', { goals: '2' })]);
+    const p2bStarted = Date.now();
+    const p2b = startPromotion('B9 P2b', file4);
+    const p2bPid = await waitUntil('B9: P2b queues behind P1b', () => newWaiterBehind(second.promotionPid), [p2b]);
+    await waitUntil('B9: P2b\'s gate wait is stamped', () => waitingOn(p2bPid, second.promotionPid), [p2b]);
+    second.Xrow.go();
+    const promotedB = await within('B9 P2b', p2b.promise, 60_000);
+    const elapsedB = (p2b.finishedAt ?? Date.now()) - p2bStarted;
+    b9.secondRunElapsedMs = elapsedB;
+    expect(await within('B9 P1b', second.promotion.promise, 60_000)).toMatchObject({ ok: true });
+    expect(await within('B9 X2', second.Xrow.outcome, 30_000)).toBeNull();
+    // Inconclusive guard (as B2): a refusal here means P1b did not commit within the bound on this link.
+    if (!promotedB.ok) throw new Error(`B9 INCONCLUSIVE: P2b did not obtain the gate within its 5 s bound after P1b was released (${elapsedB} ms): ${promotedB.error}`);
+    expect(promotedB).toMatchObject({ ok: true });
+    expect(await promotionBatchCount(second.fileId)).toBe(1);
+    expect(await promotionBatchCount(file4)).toBe(1);
+  }, 240_000);
+
+  /* ---------------------------------------------------------------- *
+   * B10 — the helper restores both previous settings inside the transaction
+   * ---------------------------------------------------------------- */
+
+  it('B10: acquireSettlePromotionGate restores both previous settings, holds the gate to commit and releases it after', async () => {
+    const connection = client('B10 gate helper', null);
+    const inside = await connection.begin(async (tx) => {
+      await tx`SELECT set_config('lock_timeout', '7s', true), set_config('statement_timeout', '45s', true)`;
+      await acquireSettlePromotionGate(tx);
+      const [row] = await tx<{ pid: number; lockTimeout: string; statementTimeout: string; mode: string | null; granted: boolean | null }[]>`
+        SELECT pg_backend_pid()::int AS pid, current_setting('lock_timeout') AS "lockTimeout",
+               current_setting('statement_timeout') AS "statementTimeout",
+               (SELECT mode::text FROM pg_locks WHERE pid = pg_backend_pid() AND locktype = 'advisory'
+                   AND classid = ${SETTLE_PROMOTION_GATE.classId}::oid AND objid = ${SETTLE_PROMOTION_GATE.objId}::oid) AS mode,
+               (SELECT granted FROM pg_locks WHERE pid = pg_backend_pid() AND locktype = 'advisory'
+                   AND classid = ${SETTLE_PROMOTION_GATE.classId}::oid AND objid = ${SETTLE_PROMOTION_GATE.objId}::oid) AS granted
+      `;
+      return { ...row };
+    });
+    // Both previous values come back, not 0 and not the gate's own 300 s / 330 s; the gate is held, shared, to commit.
+    expect(inside).toMatchObject({ lockTimeout: '7s', statementTimeout: '45s', mode: 'ShareLock', granted: true });
+    // After commit the gate is gone, and the settings are back to the session's own.
+    expect(gateRowOf(await gateRows(), inside.pid)).toBeUndefined();
+    const [after] = await connection<{ pid: number; lockTimeout: string; statementTimeout: string }[]>`
+      SELECT pg_backend_pid()::int AS pid, current_setting('lock_timeout') AS "lockTimeout",
+             current_setting('statement_timeout') AS "statementTimeout"
+    `;
+    expect(after.pid).toBe(inside.pid);
+    expect(after.lockTimeout).not.toBe('7s');
+    expect(after.statementTimeout).not.toBe('45s');
+    expect(after.lockTimeout).not.toBe('5min');
+    expect(after.statementTimeout).not.toBe('330s');
+  }, 60_000);
+
+  /* ---------------------------------------------------------------- *
+   * B11 — queue ordering at the gate (both shapes, runbook §20.3)
+   * ---------------------------------------------------------------- */
+
+  it('B11: a waiting promotion delays a later settle, and a waiting settle delays a later promotion', async () => {
+    const q = playerIds.get('q')!;
+    const b11: Record<string, number> = {};
+    timings.B11 = b11;
+    const findingsBefore = await allFindings();
+
+    // ---- (a) a shared request queues behind a WAITING exclusive one ----
+    const mrFile = await stageApprovedFile('match_results', [mrFileRow('MA'), mrFileRow('MB')]);
+    const s1 = await startHeldAfltablesSettle('B11a S1');
+    const pStarted = Date.now();
+    const promotionA = startPromotion('B11a P', mrFile);
+    const pPid = await waitUntil('B11a: P queues behind S1', () => newWaiterBehind(s1.settlePid), [s1.settle, promotionA]);
+    await waitUntil('B11a: P\'s gate wait is stamped', () => waitingOn(pPid, s1.settlePid), [s1.settle, promotionA]);
+
+    // S2 (AFL API) arrives while P waits, and is held open by a stall once granted.
+    const s2Run = nextRun();
+    const s2Line = lineOf(s2Run.n);
+    const s2Venue = venueOf(s2Run.n);
+    const Y = await hold('B11a Y on M3', lockMatch(apiId.M3, 'FOR SHARE'));
+    const s2 = startAflApiSettle('B11a S2', apiBundle(s2Run.label, [apiUnit('M1', API_VENUE_SEED, s2Line), apiUnit('M3', s2Venue)]), s2Run.observedAt);
+    const s2Pid = await waitUntil('B11a: S2 queues behind P at the gate', () => newWaiterBehind(pPid), [s1.settle, promotionA, s2]);
+    const s2Wait = await waitUntil('B11a: S2\'s gate wait is stamped', () => waitingOn(s2Pid, pPid), [s1.settle, promotionA, s2]);
+    // A SOFT block: S2 is blocked by the waiting promotion ahead of it, NOT by S1 (shared does not conflict with shared).
+    expect({ waits: s2Wait.waits, blockers: s2Wait.blockers }).toEqual({ waits: ['advisory'], blockers: [pPid] });
+    expect(gateRowOf(await gateRows(), s2Pid)).toMatchObject({ mode: 'ShareLock', granted: false });
+
+    // P is refused at its 5 s bound; S2 is then granted while S1 still holds, so two ShareLocks are granted at once.
+    expectRefusedRetryably('B11a P', await within('B11a P (5 s hook bound)', promotionA.promise, 30_000));
+    b11.promotionAElapsedMs = (promotionA.finishedAt ?? Date.now()) - pStarted;
+    expect(b11.promotionAElapsedMs).toBeGreaterThanOrEqual(4500);
+    expect(await promotionBatchCount(mrFile)).toBe(0);
+    const both = await waitUntil('B11a: S2 is granted while S1 still holds the gate', async () => {
+      const snapshot = await gateRows();
+      const shared = grantedShared(snapshot);
+      return shared.includes(s1.settlePid) && shared.includes(s2Pid) ? snapshot : null;
+    }, [s1.settle, s2]);
+    expect(both.filter((row) => !row.granted)).toEqual([]);
+    // Released one after the other (see B8).
+    s1.X.go();
+    expectCommitted('B11a S1', await within('B11a S1', s1.settle.promise, 120_000));
+    Y.go();
+    expectCommitted('B11a S2', await within('B11a S2', s2.promise, 120_000));
+    expect(await within('B11a X', s1.X.outcome, 30_000)).toBeNull();
+    expect(await within('B11a Y', Y.outcome, 30_000)).toBeNull();
+    apiLine = s2Line;
+    expect(await allFindings()).toEqual(findingsBefore);
+
+    // ---- (b) a promotion queues behind a WAITING shared request ----
+    const stuck = await startStuckPromotion('B11b P1');
+    const sRun = nextRun();
+    // The settle, once granted, is held open by X2 on MA's spine record after it has written MB and MC.
+    const X2 = await hold('B11b X2 on the MA spine record', lockSpineRecord(A1.MA.record));
+    const s = startAfltablesSettle('B11b S', a1Bundle(sRun.label, STALL_ORDER, sRun.attendance), sRun.observedAt);
+    const sPid = await waitUntil('B11b: S queues behind P1 at the gate', () => newWaiterBehind(stuck.promotionPid), [s]);
+    await waitUntil('B11b: S\'s gate wait is stamped', () => waitingOn(sPid, stuck.promotionPid), [s]);
+    const file2 = await stageApprovedFile('player_match_stats', [statsFileRow('M2', 'q', { goals: '2' })]);
+    const qBefore = await statsRow(q, apiKey('M2'));
+    const p2Started = Date.now();
+    const p2 = startPromotion('B11b P2', file2);
+    // Both S and P2 queue behind P1 (S directly, P2 behind both), so P2 is the waiter that is not S.
+    const p2Pid = await waitUntil('B11b: P2 queues behind P1 and S', () => newWaiterBehind(stuck.promotionPid, new Set([sPid])), [p2]);
+    const p2Wait = await waitUntil('B11b: P2\'s gate wait is stamped', async () => {
+      const snapshot = await waitSnapshot(p2Pid);
+      return snapshot.waitStartMs !== null && snapshot.blockers.includes(sPid) ? snapshot : null;
+    }, [p2]);
+    // P2 is blocked by the waiting settle S (a soft block) as well as by P1, which holds the gate.
+    expect(p2Wait.waits).toEqual(['advisory']);
+    expect(p2Wait.blockers).toContain(sPid);
+    expect(p2Wait.blockers).toContain(stuck.promotionPid);
+
+    // Release P1: it commits, and S is granted FIRST, ahead of the later promotion P2.
+    stuck.Xrow.go();
+    expect(await within('B11b P1', stuck.promotion.promise, 60_000)).toMatchObject({ ok: true });
+    expect(await within('B11b X', stuck.Xrow.outcome, 30_000)).toBeNull();
+    const order = await waitUntil('B11b: S is granted while P2 still waits', async () => {
+      const snapshot = await gateRows();
+      return gateRowOf(snapshot, sPid)?.granted === true && gateRowOf(snapshot, p2Pid)?.granted === false ? snapshot : null;
+    }, [s]);
+    expect(gateRowOf(order, sPid)).toMatchObject({ mode: 'ShareLock', granted: true });
+    expect(gateRowOf(order, p2Pid)).toMatchObject({ mode: 'ExclusiveLock', granted: false });
+
+    // P2 is refused at its 5 s bound, with nothing written, while S still runs (X2 holds it).
+    const refusedB = await within('B11b P2 (5 s hook bound)', p2.promise, 30_000);
+    b11.promotionBElapsedMs = (p2.finishedAt ?? Date.now()) - p2Started;
+    expect(s.done).toBe(false);
+    expectRefusedRetryably('B11b P2', refusedB);
+    expect(b11.promotionBElapsedMs).toBeGreaterThanOrEqual(4500);
+    expect(await promotionBatchCount(file2)).toBe(0);
+    expect(await statsRow(q, apiKey('M2'))).toEqual(qBefore);
+
+    X2.go();
+    expectCommitted('B11b S', await within('B11b S', s.promise, 120_000));
+    expect(await within('B11b X2', X2.outcome, 30_000)).toBeNull();
+    for (const k of A1_KEYS) expect((await matchRow(a1Key(k)))?.attendance).toBe(sRun.attendance);
+    // Retry of P2 after S has committed.
+    expect(await within('B11b P2 retry', startPromotion('B11b P2 retry', file2).promise, 30_000)).toMatchObject({ ok: true });
+    expect(await promotionBatchCount(file2)).toBe(1);
+    expect(await promotionBatchCount(stuck.fileId)).toBe(1);
+  }, 360_000);
+
+  /* ---------------------------------------------------------------- *
+   * B5 — match_attendance, the third legacy writer (last: it changes attendance on matches the other API cases settle)
+   * ---------------------------------------------------------------- */
+
+  it('B5: match_attendance · refused at the gate with nothing written; its re-promotion locks the matches in ascending id', async () => {
+    const run = nextRun();
+    const venue = venueOf(run.n);
+    const b5: Record<string, number> = {};
+    timings.B5 = b5;
+    const findingsBefore = await allFindings();
+    const [m1, m2] = [apiId.M1, apiId.M2];
+    const attendanceBefore = [(await matchRow(apiKey('M1')))?.attendance ?? null, (await matchRow(apiKey('M2')))?.attendance ?? null];
+
+    // The attendance file is ordered M2, M1 (the opposite of ascending id).
+    const fileId = await stageApprovedFile('match_attendance', [
+      { match_id: String(m2), attendance: '41000' },
+      { match_id: String(m1), attendance: '42000' },
+    ]);
+    // The settle writes M1 (its venue changes), then waits at M2 (a changed venue; Y holds M2 FOR SHARE).
+    const Y = await hold('B5 Y on M2', lockMatch(m2, 'FOR SHARE'));
+    const settle = startAflApiSettle('B5 settle', apiBundle(run.label, [
+      apiUnit('M1', venue, apiLine), apiUnit('M2', venue),
+    ]), run.observedAt);
+    const settlePid = await waitUntil('B5: the settle queues behind Y on M2', () => newWaiterBehind(Y.pid), [settle]);
+
+    const promotionStarted = Date.now();
+    const promotion = startPromotion('B5 promotion', fileId);
+    const promotionPid = await waitUntil('B5: the promotion queues behind the settle', () => newWaiterBehind(settlePid), [settle, promotion]);
+    const wait = await waitUntil('B5: the promotion\'s gate wait is stamped', () => waitingOn(promotionPid, settlePid), [settle, promotion]);
+    expect({ waits: wait.waits, blockers: wait.blockers }).toEqual({ waits: ['advisory'], blockers: [settlePid] });
+    expect(await matchesRowLockModes(promotionPid)).toEqual([]);
+
+    b5.gateWaitSamples = await watchGateWait('B5 promotion wait', promotion as Run<unknown>, promotionPid, settlePid);
+    expect(b5.gateWaitSamples).toBeGreaterThan(0);
+    const refused = await within('B5 promotion (5 s hook bound)', promotion.promise, 30_000);
+    b5.promotionElapsedMs = (promotion.finishedAt ?? Date.now()) - promotionStarted;
+    expect(settle.done).toBe(false);
+    expectRefusedRetryably('B5 promotion', refused);
+    expect(b5.promotionElapsedMs).toBeGreaterThanOrEqual(4500);
+    expect(await promotionBatchCount(fileId)).toBe(0);
+    expect([(await matchRow(apiKey('M1')))?.attendance ?? null, (await matchRow(apiKey('M2')))?.attendance ?? null]).toEqual(attendanceBefore);
+
+    Y.go();
+    expectCommitted('B5 settle', await within('B5 settle after Y', settle.promise, 120_000));
+    expect(await within('B5 Y', Y.outcome, 30_000)).toBeNull();
+    expect(await allFindings()).toEqual(findingsBefore);
+    expect((await matchRow(apiKey('M1')))?.venueRaw).toBe(venue);
+    expect((await matchRow(apiKey('M2')))?.venueRaw).toBe(venue);
+
+    // Ascending order, in the database: a side transaction holds M2 FOR SHARE, so the re-promotion's one locking
+    // statement takes M1 (the lower id) and then waits on M2. M1 is therefore held although the file lists M2 first.
+    // The probe connects BEFORE the re-promotion starts, so its connect is not spent from the hook's 5 s bound.
+    const probe = client('B5 probe', null);
+    await probe`SELECT 1`;
+    const Z = await hold('B5 Z on M2', lockMatch(m2, 'FOR SHARE'));
+    const retry = startPromotion('B5 re-promotion', fileId);
+    const retryPid = await waitUntil('B5: the re-promotion queues behind Z at M2', () => newWaiterBehind(Z.pid), [retry]);
+    expect(await matchesRowLockModes(retryPid)).toContain('RowShareLock');
+    const probed = await probe.begin((tx) => tx`SELECT id FROM matches WHERE id = ${m1} FOR UPDATE NOWAIT`).then(() => null, (error: unknown) => error);
+    expect({ m1HeldByThePromotion: sqlstate(probed) }).toEqual({ m1HeldByThePromotion: '55P03' });
+    Z.go();
+    expect(await within('B5 Z', Z.outcome, 30_000)).toBeNull();
+    expect(await within('B5 re-promotion', retry.promise, 60_000)).toMatchObject({ ok: true });
+    expect(await promotionBatchCount(fileId)).toBe(1);
+    expect([(await matchRow(apiKey('M2')))?.attendance, (await matchRow(apiKey('M1')))?.attendance]).toEqual([41000, 42000]);
+  }, 240_000);
 });

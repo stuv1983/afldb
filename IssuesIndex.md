@@ -48,14 +48,43 @@
   - **Phase A window 2 (2026-10-05 16:22:35): PASSED 3/3, census CLEAN** (runbook §17.14). C2, C1 and
     F-265-1 are demonstrated with real settles. Retained: batches 1230, 1233 and 1237. No migration was
     applied (109).
-  - Phase A is retired, and Phase B replaces it (runbook §17.15). The final plan, the Phase B assertions
-    and the timeout decision are in runbook §18–§20. Nothing is implemented.
+  - Phase A is retired, and Phase B replaces it (runbook §17.15). The S0 checkpoint is commit 62f2cd67.
+  - **2026-10-05: mitigation IMPLEMENTED in the working tree, uncommitted** (runbook §21). Shared settle gate
+    (300 s / 330 s), exclusive gate in the three legacy hooks, ascending `match_attendance` hook, database-free
+    pins, Phase B harness B1–B11. Typecheck, lint, unit pins and the network-blocked skip check pass.
+    Pre-window verification (§22): the two failing tests are pre-existing; provenance manifests and a
+    full-`settle-afltables` regression runner are prepared.
+  - **Phase B window (2026-10-05 22:41, operator-run): PASSED 11/11 on `afldb_test`** (runbook §23). No skips,
+    census CLEAN, 14 retained `admin-upload` batches all explained, historical fingerprints unchanged, zero
+    teardown problems, provenance unchanged (58 files), no migration applied (State A). Evidence:
+    `D:\tmp\issue265\run-20261005-224117-Full\`. It does **not** show protection against writers that lack the
+    gate (Match Sheet, Data Editor, `player_bio`, direct SQL), and the regression window and DEV acceptance
+    have not run.
+  - **Regression window FAILED twice (2026-10-05 23:10 and 2026-10-06 05:28), cause confirmed** (runbook §24). Suites
+    32/32, 16/16, 7/7, 76/76 passed; the census after `settle-afltables` was DIRTY both times (3 unexplained
+    `settle-afltables.ts` batches each). Cause: the S6 block commits three batches per run and its teardown never deleted
+    them; the probe shared the blind spot. Operator diagnostic: 18 S6 batches = six from these windows (1339-1341,
+    1477-1479) plus **twelve historical** (66-68, 325-327, 543-545, 639-641). Verdicts and evidence preserved;
+    **regression acceptance outstanding**. Suite teardown and probe corrected (uncommitted).
+  - **S6 cleanup EXECUTED and VERIFIED (operator-run 2026-10-06; runbook §24.9):** six batches deleted (COMMITTED), post-commit
+    Verify PASSED, the twelve historical batches unchanged.
+  - **Historical exception APPROVED (operator, 2026-10-06 08:46) and Static PASS (runbook §24.10):** twelve pins and `rowMd5`
+    values unchanged (0 differences vs the saved Plan); `s6-selftest` 12/12 on the approved file;
+    `run-20261006-084649-Regression-Static` PASS (172 files).
+  - **Regression window PASSED (operator-run 2026-10-06 08:56; runbook §25):** 32/32, 16/16, 7/7, 76/76; all censuses clean;
+    migration 110 restored and verified against the capture; the twelve historical S6 rows unchanged, no new S6 residue; 36
+    retained `admin-upload` batches (15 + 2 + 19), all explained; 172 provenance files unchanged. Both earlier failed verdicts and
+    all evidence preserved (`D:\tmp\issue265\run-20261006-085603-Regression-Full\`). A `-Phase Build` was added to the runner
+    (runbook §25.5).
+  - **Build PASSED (operator-run 2026-10-06, `-Phase Build`, runbook §25.8):** `npm run build` exit 0 as `afldb_app` on `afldb_test`,
+    1,515/1,515 static pages, standalone bundle ready; post-build census CLEAN (no database write); twelve S6 pins unchanged;
+    172 provenance files unchanged; migration 110 not applied (State A). Two build warnings recorded as observed, **not** claimed
+    pre-existing (deprecated `middleware` convention; `process.cwd` Edge Runtime notice from `node_modules/next`). Evidence:
+    `D:\tmp\issue265\run-20261006-092204-Regression-Build\`. No new tracked change from the build. **Commit, `merge:ready`,
+    deployment and DEV acceptance are pending**; ISSUE-265 stays open.
 - **Next action:**
-  1. The operator commits exactly the twelve files in runbook §18.1 (S0), with the Phase A harness
-     unchanged. Re-hash the harness first (window 2 captured no hash). `eslint.config.mjs` carries a
-     one-file lint exception for the archived `block-network.cjs`. The 120 s `afldb_test` reading was a probe artefact (§20.1).
-  2. Implement runbook §18 S1–S10; validate database-free, then in a Phase B window, a regression window
-     and on DEV.
+  1. The operator reviews and commits the eighteen files in runbook §25.7 (explicit paths; not the stray files; nothing under `D:\tmp\`).
+  2. `npm run merge:ready -- --issue 265`, then merge/push, `deploy/sync-dev.ps1` and DEV acceptance (runbook §18.2).
 
 ### AFLDB-ISSUE-263 — A fresh `db:test:rebuild` leaves every `brownlow_round_votes.match_id` NULL
 - **Severity:** Low. **Area:** rebuild / Brownlow data state; tests —

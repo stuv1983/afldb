@@ -912,6 +912,12 @@ describe('AFLDB-ISSUE-258 optional columns keep stored figures on re-promotion',
      * is `carryMatchOverrides` plus the key UPDATE exactly as canonical-apply runs them. The SETTLE is
      * emulated at the lock-statement level only (the statements `lockUnitMatchRows` and the unit's row
      * writes issue); its own coverage is in settle-afltables.test.ts.
+     *
+     * AFLDB-ISSUE-265: the hooks also take the exclusive settle/promotion gate before those locks.
+     * Real settles take it shared, so a real settle and a real promotion never overlap. The settle
+     * emulations below issue raw lock statements and take NO gate: they emulate an UNGATED writer, kept
+     * to characterise the cycle the gate removes. The gated behaviour is proven with real settles in
+     * settle-promotion-deadlock.test.ts (Phase B).
      */
     describe('F-002: match lock order and bounded waits of the legacy promotion hooks', () => {
       const NOTE = `${TAG_264} F-002 lock test`;
@@ -1091,7 +1097,10 @@ describe('AFLDB-ISSUE-258 optional columns keep stored figures on re-promotion',
         expect(sqlstate(ended[0])).toBe('40P01');
       });
 
-      it('match_results queues at the lowest held match without holding a later one; both legacy writers finish', async () => {
+      // AFLDB-ISSUE-265 (D-265-6): the stats promotion takes the gate and queues at A; the match_results
+      // promotion now queues at the GATE behind it (so it holds no match at all). Both are within the 5 s
+      // bound and finish in turn once the holder releases A.
+      it('match_results queues behind the stats promotion at the gate, holding no match; both legacy writers finish', async () => {
         const [A, B] = [lockMatch[1], lockMatch[2]];
         const stats = await stageAndValidate('player_match_stats', [
           row264('Clear', { goals: '1' }, 'R258L1'), row264('Late', { goals: '2' }, 'R258L2'),
@@ -1109,7 +1118,8 @@ describe('AFLDB-ISSUE-258 optional columns keep stored figures on re-promotion',
           await waitBlocked(holder.pid, 1);
           runs.push(approveAndPromote(results.id));
           await waitBlocked(holder.pid, 2);
-          // Both are queued at A. Neither holds B (the later match), so it can be locked NOWAIT.
+          // The stats promotion is queued at A and the match_results one behind it at the gate. Neither
+          // holds B (the later match), so it can be locked NOWAIT.
           const probe = side();
           await expect(probe.begin((tx) => tx`SELECT id FROM matches WHERE id = ${B.id} FOR UPDATE NOWAIT`))
             .resolves.toBeDefined();
@@ -1125,24 +1135,32 @@ describe('AFLDB-ISSUE-258 optional columns keep stored figures on re-promotion',
         expect(await rowOf('Late', B)).toMatchObject({ goals: 2 });
       });
 
-      it('FOR SHARE leaves readers and another stats promotion unblocked', async () => {
+      // AFLDB-ISSUE-265 (D-265-6): this used to assert that a second stats promotion FINISHES while the
+      // first still holds its FOR SHARE locks. Promotions now serialise on the exclusive settle/promotion
+      // gate, so the second is refused retryably after the hook's 5 s bound, writes nothing, and succeeds
+      // on a retry once the first has finished. The hook's FOR SHARE still blocks no plain reader.
+      it('FOR SHARE blocks no reader; another promotion is refused at the gate meanwhile, and a retry succeeds', async () => {
         const [A, B] = [lockMatch[1], lockMatch[2]];
         const other = await stageAndValidate('player_match_stats', [row264('Added', { goals: '1' }, 'R258L1')]);
         expect(other.summary.errors).toBe(0);
+        const addedBefore = await rowOf('Added', A);
         const holder = await stage((tx) => runStatsHook(tx, ['Clear', A], ['Late', B]));
         try {
-          // Both finish while the first promotion's locks are still held.
-          const promoted = await Promise.race([
-            approveAndPromote(other.id), pause(8000).then(() => 'queued behind the held promotion'),
-          ]);
-          expect(promoted).toMatchObject({ ok: true });
+          const started = Date.now();
+          const promoted = await approveAndPromote(other.id);
+          expect(Date.now() - started).toBeGreaterThanOrEqual(4500);
+          expect(promoted.ok).toBe(false);
+          expect(promoted.ok ? '' : promoted.error).toContain(LEGACY_PROMOTION_LOCK_REFUSAL);
+          expect((await statusOf(other.id)).status).toBe('failed');
+          expect(await rowOf('Added', A)).toEqual(addedBefore);
           expect(await Promise.race([scoreOf(A), pause(3000).then(() => 'blocked')])).not.toBe('blocked');
-          expect(await rowOf('Added', A)).toMatchObject({ goals: 1 });
         } finally {
           holder.go();
           expect(await holder.outcome).toBeNull();
         }
-      });
+        expect(await promoteSubmission(other.id)).toMatchObject({ ok: true });
+        expect(await rowOf('Added', A)).toMatchObject({ goals: 1 });
+      }, 60_000);
 
       it('blocks the Match Sheet save and Return to source until the promotion finishes', async () => {
         const M = lockMatch[3];
@@ -1316,8 +1334,9 @@ describe('AFLDB-ISSUE-258 optional columns keep stored figures on re-promotion',
         expect(await show(connection)).toBe(original);
       }, 60_000);
 
-      describe('a settle holding match locks for its whole run (emulated at the lock-statement level)', () => {
+      describe('an UNGATED settle holding match locks for its whole run (emulated at the lock-statement level)', () => {
         /**
+         * (ISSUE-265: the emulated settle takes no settle/promotion gate, as a real settle now does.)
          * The settle is the first to hold the later match B, the promotion (ascending) holds A and waits for
          * B, then the settle's next unit asks for A. The promotion began waiting first, so its deadlock check
          * fires first and it is the victim: the retryable refusal, nothing written, the settle unharmed.
@@ -1366,8 +1385,10 @@ describe('AFLDB-ISSUE-258 optional columns keep stored figures on re-promotion',
          * first and the SETTLE is the victim. Inside canonical-apply that costs the unit it was applying: the unit
          * rolls back to its savepoint, one `canonical_apply_failed` finding is opened, and the run continues. The
          * shared lock order does not remove this; it only orders the promotion's own acquisitions.
+         * ISSUE-265: a real settle takes the shared gate first, so it cannot overlap a promotion at all and
+         * this cycle cannot form. The emulation here is ungated, which is the only reason the cycle still does.
          */
-        it('characterises that the settle can still be the deadlock victim', async () => {
+        it('characterises that an UNGATED settle can still be the deadlock victim', async () => {
           const [X, Y] = [lockMatch[7], lockMatch[8]];
           for (const tag of ['Clear', 'Late'] as const) {
             await owner`

@@ -15,6 +15,7 @@ import {
   loadContinuityRulesFailClosed,
   seasonOfMatchKeyForAuthority,
 } from '../acquisition/match-sheet-authority';
+import { SETTLE_PROMOTION_GATE } from '../acquisition/settle-core';
 import type { ImportBatchId } from '../import-batch-id';
 
 /**
@@ -106,7 +107,9 @@ export type DatasetSpec = {
    * refuses the whole submission (it is rolled back and marked failed). Locks
    * it takes are held until the promotion commits, so a hook that takes any
    * bounds its wait with `withLegacyLockTimeout` and takes them in ascending
-   * match id (AFLDB-ISSUE-264 F-002).
+   * match id (AFLDB-ISSUE-264 F-002). `withLegacyLockTimeout` also takes the
+   * exclusive settle/promotion gate before `work()`, so every hook that writes
+   * matches goes through it (AFLDB-ISSUE-265).
    */
   preparePromotion?: (rows: readonly PromotionRow[], context: { sql: Sql }) => Promise<void>;
   /**
@@ -546,15 +549,22 @@ function matchResultsKey(
 }
 
 /**
- * AFLDB-ISSUE-264 F-002 — the match locks the two legacy writers take.
+ * AFLDB-ISSUE-264 F-002 / AFLDB-ISSUE-265 — the locks the three legacy match writers take.
  *
- * `match_results` and `player_match_stats` both take their match locks in
- * `preparePromotion`, in ONE statement, ascending id (the order `canonical-apply`
- * uses for a rekey), before the first write. Two promotions, a rekey and a Match
- * Sheet save therefore queue behind one another instead of crossing. A cycle with
- * a settle that holds a match lock for its whole run can still form, and then
- * either side may be the deadlock victim; this bounds the promotion's wait and
- * turns the failure into a retryable message. It does not remove that cycle.
+ * `match_results`, `player_match_stats` and `match_attendance` all take their match
+ * locks in `preparePromotion`, in ONE statement, ascending id (the order
+ * `canonical-apply` uses for a rekey), before the first write. Two promotions, a
+ * rekey and a Match Sheet save therefore queue behind one another instead of
+ * crossing.
+ *
+ * ISSUE-265: before those match locks, each hook takes the settle/promotion gate
+ * EXCLUSIVELY, inside `withLegacyLockTimeout` and so under its 5 s bound. A source
+ * settle takes the same advisory lock shared before it writes anything
+ * (`acquireSettlePromotionGate`), so a settle and a promotion never hold match row
+ * locks at the same time and no settle-versus-promotion lock cycle can form. A
+ * promotion that arrives while a settle runs, or while another promotion holds the
+ * gate, waits at most 5 s and is refused retryably with nothing written. Promotions
+ * therefore also serialise with one another.
  */
 const LEGACY_LOCK_TIMEOUT = '5s';
 
@@ -576,11 +586,16 @@ export function legacyPromotionRetryableRefusal(error: unknown): string | null {
  * on failure the pipeline's savepoint rolls back and reverts it. A lock wait
  * that times out, or a deadlock this transaction loses, becomes the retryable
  * refusal; every other error, including a real refusal, passes through.
+ *
+ * ISSUE-265: the order is the two setting statements (read the previous value,
+ * set the 5 s bound), then the exclusive settle/promotion gate, then `work()`.
+ * The gate is therefore bounded by the same 5 s and precedes every match lock.
  */
 async function withLegacyLockTimeout(sql: Sql, work: () => Promise<void>): Promise<void> {
   const [{ previous }] = await sql<{ previous: string }[]>`SELECT current_setting('lock_timeout') AS previous`;
   await sql`SELECT set_config('lock_timeout', ${LEGACY_LOCK_TIMEOUT}, true)`;
   try {
+    await sql`SELECT pg_advisory_xact_lock(${SETTLE_PROMOTION_GATE.classId}, ${SETTLE_PROMOTION_GATE.objId})`;
     await work();
   } catch (error) {
     const refusal = legacyPromotionRetryableRefusal(error);
@@ -1304,6 +1319,31 @@ const matchAttendance: DatasetSpec = {
       resolved: { match_id: matchId, attendance },
     };
   },
+
+  // AFLDB-ISSUE-265 (review F-001, D-265-10): this was a third legacy match writer with no
+  // hook, so its per-row UPDATEs ran in file order, unbounded, and could cross another
+  // promotion, a rekey or a settle. It now takes the same exclusive gate as the other two
+  // writers (inside `withLegacyLockTimeout`), then locks the EXISTING target matches in ONE
+  // statement, ascending id. FOR NO KEY UPDATE is the strength the UPDATE below takes anyway
+  // (it never changes match_key), so no lock is upgraded later. A match deleted since
+  // validation has nothing to lock; the UPDATE then touches no row, as before.
+  async preparePromotion(rows, { sql }) {
+    const bad = rows.find((row) => !isPositiveInt(row.resolved.match_id));
+    if (bad) {
+      throw new Error(`Row ${bad.rowNo} carries no resolved match; re-validate the submission.`);
+    }
+    const matchIds = [...new Set(rows.map((row) => Number(row.resolved.match_id)))].sort((a, b) => a - b);
+    await withLegacyLockTimeout(sql, async () => {
+      await sql`
+        SELECT id::int AS id
+          FROM matches
+         WHERE id = ANY(${matchIds}::int[])
+         ORDER BY id
+           FOR NO KEY UPDATE
+      `;
+    });
+  },
+
   async promoteRow(_row, resolved, { sql }) {
     await sql`
       UPDATE matches

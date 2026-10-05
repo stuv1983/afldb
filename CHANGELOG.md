@@ -15,6 +15,61 @@ commit.
 
 ## [Unreleased]
 
+### Source settles and legacy file promotions no longer overlap, so a settle cannot lose a match-lock deadlock to a promotion (AFLDB-ISSUE-265; implemented, Phase B, the regression window and the build passed on `afldb_test`; commit, deployment and DEV acceptance pending) - 5 October 2026
+
+- A transaction-level advisory gate `(717275, 4)` now separates the two. The AFL Tables and AFL API settles
+  take it **shared** as the first call in their transaction, before any row lock or write. The three
+  legacy writers that change matches (`match_results`, `player_match_stats`, `match_attendance`) take it
+  **exclusively** before they lock any match, inside the existing 5 s hook bound. A settle and a
+  promotion can therefore no longer hold match row locks at the same time, which removes the cycles that
+  could roll back a settle unit (or, through the AFL API attendance enrichment, a whole run).
+- **A promotion that starts while a settle is running** (or while another match-writing promotion holds
+  the gate) waits up to 5 s, is refused with the existing retryable message, writes nothing and is marked
+  `failed`. Promoting it again succeeds once the other operation has finished. Match-writing promotions
+  now also serialise with each other.
+- **A settle that starts while a promotion is in flight** waits at its first statement for up to 300 s,
+  then fails before writing anything with a message naming the legacy promotion; run it again once that
+  promotion has finished. The wait is a `lock_timeout` of 300 s with a transaction-local
+  `statement_timeout` of 330 s for that one statement, so a server `statement_timeout` cannot cancel it early.
+  Both previous settings are restored straight afterwards. A 57014 (a manual cancellation, say) is never
+  reported as a gate timeout.
+- `match_attendance` now takes its match locks up front, ascending id, like the other two writers. It was a
+  third, unordered writer.
+- No migration, schema or privilege change. The Brownlow and fixtures settles are unchanged.
+- Validation so far: the new unit pins (statement order, key and timeout constants, error mapping, call-site
+  ordering), typecheck and lint, and the 11-case acceptance harness (`settle-promotion-deadlock.test.ts`, real
+  settles and real promotions on `afldb_test`), which passed 11/11 on 5 October 2026 with a clean census and
+  no migration applied. That shows the settle and the three legacy promotion writers are separated; it does not
+  show protection against any writer that does not take the gate (Match Sheet and Data Editor saves,
+  `player_bio`, direct SQL). The F-002 expectations in `match-results-promotion.test.ts` change accordingly and
+  were re-run in the regression window of 6 October 2026 (32/32, see below); DEV acceptance is pending.
+- **Regression window failed twice; cause confirmed; test teardown corrected (2026-10-06; runbook §24).** Both
+  regression windows (2026-10-05 23:10 and 2026-10-06 05:28) passed every suite (32, 16, 7, 76) and ended with a
+  DIRTY census: three `settle-afltables.ts` import batches left per window. Both verdicts and all evidence are
+  preserved; regression acceptance is still outstanding.
+  - **Cause:** the S6 block of `tests/integration/settle-afltables.test.ts` commits three real `import_batches`
+    rows per run, and its cleanup never matched them (nor did the census residue predicate). An operator read-only
+    diagnostic confirmed 18 such batches on `afldb_test`: six from these windows and twelve older historical ones.
+  - **Fix (uncommitted):** the suite now removes only the batch ids its own process recorded, each re-proved by
+    tool, target, status and exact notes, never by label, so the twelve historical batches are untouched.
+    `tests/match-sheet.test.ts` pins this without a database. Test infrastructure only; no application behaviour changes.
+  - **Cleanup done (operator-run 2026-10-06; runbook §24.9):** the six leftover `import_batches` rows were deleted from
+    `afldb_test` in one transaction and the post-commit verification passed (342 rows remain, the twelve historical
+    batches unchanged, the id sequence untouched). Both failed windows' verdicts and baselines are preserved.
+  - **Exception approved (2026-10-06):** the operator approved the row-pinned exception for the twelve historical S6
+    batches; the probe's self-test (12/12) and the runner's offline Static phase pass against it.
+  - **Regression window passed (operator-run 2026-10-06; runbook §25):** `match-results-promotion` 32/32, `datasets` 16/16,
+    `submission-promotion` 7/7 and the full `settle-afltables` suite 76/76 passed on `afldb_test` with migration 110 applied;
+    every census was clean, migration 110 was then reversed and verified against the capture, the twelve historical S6 batches
+    were unchanged with no new S6 residue, and 36 retained `admin-upload` batches were each explained. The two failed
+    verdicts and all evidence are preserved.
+  - **Build passed (operator-run 2026-10-06; runbook §25.8):** `npm run build` as `afldb_app` on `afldb_test` exited 0 with
+    1,515/1,515 static pages and a prepared standalone bundle; the post-build census was clean (the build wrote nothing), the twelve
+    historical S6 pins were unchanged and 172 provenance files were unchanged. Two build warnings are recorded as observed and are
+    not claimed to be pre-existing: the deprecated `middleware` file convention and a `process.cwd` Edge Runtime notice from
+    `node_modules/next`.
+  - **Not done:** the commit, `merge:ready`, DEV deployment and acceptance, and PROD. The issue stays open.
+
 ### Legacy file intake refuses rows that would revert a Match Sheet decision (AFLDB-ISSUE-264; DEV accepted 2026-10-05, PROD promotion outstanding) - 5 October 2026
 
 - A `player_match_stats` upload row is now refused if promoting it would revert durable Match Sheet

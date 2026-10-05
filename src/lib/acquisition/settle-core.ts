@@ -280,6 +280,103 @@ export async function runDerivedRecomputeWithDeadlockRetry<T>(
 }
 
 /* ------------------------------------------------------------------ *
+ * Settle / legacy-promotion gate (AFLDB-ISSUE-265)
+ * ------------------------------------------------------------------ */
+
+/**
+ * The transaction-level advisory gate between a source settle and a legacy CSV
+ * promotion. Namespace `0xAF1DB` (717275), key 4: keys 1, 2 and 3 are the honour
+ * teams, admin lifecycle and Brownlow locks, and the fixture admin's per-season
+ * keys are 1897..2100, so nothing collides. A settle takes it SHARED, so settles
+ * never wait on one another. The legacy promotions that write matches
+ * (`match_results`, `player_match_stats`, `match_attendance`) take it EXCLUSIVE
+ * in `datasets.ts`, before their match locks. A settle and a promotion therefore
+ * never hold match row locks at the same time, which removes every
+ * settle-versus-promotion lock cycle (runbook ISSUE-265 §12).
+ */
+export const SETTLE_PROMOTION_GATE = { classId: 717275, objId: 4 } as const;
+
+/**
+ * How long a settle waits at the gate for an in-flight promotion (D-265-5). A
+ * promotion that outlasts it fails the settle BEFORE any write; the next run
+ * settles normally. `STATEMENT_BOUND_MS` is the `statement_timeout` raised for
+ * that one statement, so a host or role `statement_timeout` at or below the wait
+ * cannot cancel the gate with a 57014 before the lock timeout fires.
+ */
+export const SETTLE_PROMOTION_GATE_WAIT_MS = 300_000;
+export const SETTLE_PROMOTION_GATE_STATEMENT_BOUND_MS = SETTLE_PROMOTION_GATE_WAIT_MS + 30_000;
+
+/** PostgreSQL `lock_not_available`: what an expired `lock_timeout` raises. */
+export const LOCK_NOT_AVAILABLE_SQLSTATE = '55P03';
+
+export class SettlePromotionGateTimeout extends Error {
+  constructor(options?: { cause?: unknown }) {
+    super(
+      `The settle waited ${SETTLE_PROMOTION_GATE_WAIT_MS / 1000} s for a legacy CSV promotion to finish, `
+      + 'wrote nothing, and was stopped. Re-run it once that promotion has finished.',
+      options,
+    );
+    this.name = 'SettlePromotionGateTimeout';
+  }
+}
+
+/**
+ * The tagged-template subset of a transaction handle the gate needs. `never[]`
+ * parameters let a real `TransactionSql` satisfy it (as `SavepointTx` does).
+ */
+export type SettleGateTx = (
+  strings: TemplateStringsArray,
+  ...values: never[]
+) => PromiseLike<readonly Record<string, unknown>[]>;
+
+/**
+ * Takes the shared gate, bounded by `SETTLE_PROMOTION_GATE_WAIT_MS`. It is the
+ * FIRST call in each settle's transaction, ahead of `loadRefs` and every data
+ * statement. Four statements, none of which reads a table or locks a row:
+ *
+ *   1. read the current `lock_timeout` and `statement_timeout`;
+ *   2. set `lock_timeout = WAIT` and `statement_timeout = BOUND`, transaction-local;
+ *   3. `pg_advisory_xact_lock_shared(717275, 4)`, held to commit or rollback;
+ *   4. restore BOTH to the values read in 1, so every later statement runs under
+ *      exactly the limits it had before this helper.
+ *
+ * Only a `55P03` at statement 3 becomes `SettlePromotionGateTimeout`. A `57014`
+ * is also what `pg_cancel_backend` raises, so it must never be reported as a
+ * gate timeout; it, a `40P01` and any other error pass through unchanged. On any
+ * failure the transaction aborts, so the settings revert with its rollback and
+ * statement 4 is neither reached nor needed.
+ */
+export async function acquireSettlePromotionGate(tx: SettleGateTx): Promise<void> {
+  const [previous] = await tx`
+    SELECT current_setting('lock_timeout') AS "lockTimeout",
+           current_setting('statement_timeout') AS "statementTimeout"
+  `;
+  // Fail explicitly rather than hand `set_config` the text 'undefined' (an opaque "invalid value" and an aborted transaction).
+  if (typeof previous?.lockTimeout !== 'string' || typeof previous?.statementTimeout !== 'string') {
+    throw new Error('acquireSettlePromotionGate: could not read the current lock_timeout and statement_timeout');
+  }
+  const previousLockTimeout = previous.lockTimeout;
+  const previousStatementTimeout = previous.statementTimeout;
+  await tx`
+    SELECT set_config('lock_timeout', ${String(SETTLE_PROMOTION_GATE_WAIT_MS) as never}, true),
+           set_config('statement_timeout', ${String(SETTLE_PROMOTION_GATE_STATEMENT_BOUND_MS) as never}, true)
+  `;
+  try {
+    await tx`SELECT pg_advisory_xact_lock_shared(${SETTLE_PROMOTION_GATE.classId as never}, ${SETTLE_PROMOTION_GATE.objId as never})`;
+  } catch (error) {
+    if (typeof error === 'object' && error !== null
+        && (error as { code?: unknown }).code === LOCK_NOT_AVAILABLE_SQLSTATE) {
+      throw new SettlePromotionGateTimeout({ cause: error });
+    }
+    throw error;
+  }
+  await tx`
+    SELECT set_config('lock_timeout', ${previousLockTimeout as never}, true),
+           set_config('statement_timeout', ${previousStatementTimeout as never}, true)
+  `;
+}
+
+/* ------------------------------------------------------------------ *
  * Disagreement / data_issues drafting — parametrised by source key
  * ------------------------------------------------------------------ */
 

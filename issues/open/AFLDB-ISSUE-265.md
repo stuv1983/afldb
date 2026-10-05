@@ -2,8 +2,14 @@
 
 ## 0. Status
 
-- **Status:** Open. **Mitigation approved (Option 3, 2026-10-05), not yet implemented.** No production
-  code has changed.
+- **Status:** Open. **Mitigation IMPLEMENTED in the working tree (2026-10-05, uncommitted), database
+  validation PENDING** (§21). The settle gate, the exclusive gate in the three legacy hooks, the
+  `match_attendance` hook, the database-free pins and the Phase B acceptance harness (B1–B11) are written. Only
+  database-free checks have run. **No Phase B window and no regression window has run**; nothing is
+  committed or deployed. The issue stays open until Phase B, the regression window and DEV acceptance pass.
+  - **Later state (2026-10-06, §25):** Phase B passed 11/11 (§23); the regression window **PASSED** after two earlier failed
+    verdicts (§24, kept): 32/32, 16/16, 7/7 and 76/76, all censuses clean, migration 110 restored and verified. The build
+    (a `-Phase Build` command is prepared, not run), the commit, `merge:ready` and DEV acceptance are pending.
   - **Phase A window 2 (2026-10-05 16:22:35) PASSED, census CLEAN** (§17.14). A1, A2 and A3 passed 3/3,
     none skipped. All three base-tree shapes (C2, C1, F-265-1) are now demonstrated with real settles.
   - Phase A window 1 (15:23:57) FAILED, census CLEAN (§17.12). It is kept as historical evidence.
@@ -11,8 +17,8 @@
     it expects. Phase B replaces it.
   - The final implementation plan is in §18, the Phase B assertions in §19, and the D-265-5 timeout analysis
     in §20. **D-265-5 (300 s wait, 330 s gate-statement bound), D-265-14 (Phase B case B11) and D-265-15
-    (archive the Phase A tooling) were accepted on 2026-10-05 (§20.7).** The S0 checkpoint is prepared
-    (§18.1). **The mitigation is not implemented.**
+    (archive the Phase A tooling) were accepted on 2026-10-05 (§20.7).** The S0 checkpoint is commit
+    62f2cd67 (§18.1). The implementation record, checks and the operator-run Phase B commands are in §21.
   - **2026-10-05 timeout trace (§20.1–§20.5):**
     - The `afldb_test` `statement_timeout = 120000 ms` was the probe's own transaction-local setting. It
       is withdrawn as context.
@@ -2136,4 +2142,935 @@ documented engine behaviour into a tested property of this gate. It costs two 5 
   (lint exception, §18.1). After it, the folder-form command passes with exit 0 and no "file ignored"
   warning, linting the probe, `import-graph.mjs` and the harness. The harness and the five
   originals were re-hashed afterwards and are unchanged.
-- **Not implemented.** No production code, test or runner changed in this step.
+- **Not implemented** (as of the §20.7 checkpoint). The implementation is recorded in §21.
+
+## 21. Implementation record (2026-10-05, working tree, uncommitted; database validation PENDING)
+
+Authorisation: edit files and run local, database-free commands; read-only Git. No database was contacted, no
+credential file read, nothing committed, merged, pushed or deployed. Implemented from the S0 checkpoint
+commit 62f2cd67, following §18.
+
+### 21.1 Checkpoint integrity (step 1)
+
+- For each of the five archived files, the committed blob at 62f2cd67 (and at HEAD), the working-tree file, the
+  `D:\tmp\issue265\` original and the SHA-256 in the archive `README.md` are **byte-identical** (`cmp` and
+  hash). The committed Phase A harness blob equals the pre-checkpoint hash `5842a29c…2e7c8`.
+- Git had warned of LF-to-CRLF conversion because the installed Git sets `core.autocrlf=true` (system level),
+  and the files had no attributes. A simulated checkout (`git checkout-index` into the scratchpad, read only)
+  gave CRLF copies whose hashes all differed. `.gitattributes` now carries one `-text` entry for each of the
+  five files (not the README), under `issues/*/AFLDB-ISSUE-265-phase-a/…` so it follows the folder to
+  `issues/closed/`. The same simulated checkout is then byte-identical to the originals.
+- Limits, recorded in the archive README: the entries protect checkouts that include them (a checkout of
+  62f2cd67 itself still converts); and **window 2 captured no harness hash**, so nothing here proves the bytes a
+  window executed.
+
+### 21.2 What changed (steps 2–4)
+
+| Path | Change |
+|---|---|
+| `src/lib/acquisition/settle-core.ts` | `SETTLE_PROMOTION_GATE` `{717275, 4}`, `SETTLE_PROMOTION_GATE_WAIT_MS` 300 000, `…STATEMENT_BOUND_MS` 330 000, `LOCK_NOT_AVAILABLE_SQLSTATE`, `SettlePromotionGateTimeout`, `SettleGateTx`, `acquireSettlePromotionGate(tx)` (§18 S1). It fails explicitly if either current setting cannot be read. |
+| `settle-afltables.ts`, `settle-afl-api.ts` | `await acquireSettlePromotionGate(tx);` is the first call in the only `sql.begin` of each (S2). Neither catch changed. |
+| `src/lib/ingest/datasets.ts` | `withLegacyLockTimeout` takes `pg_advisory_xact_lock(717275, 4)` inside its `try`, after its two setting statements and before `work()`; `matchAttendance.preparePromotion` (positive `match_id`, one ascending `FOR NO KEY UPDATE`); the F-002 and hook comments (S3). |
+| `src/db/queries/admin-fixtures.ts` | namespace comment gains key 4 (S4) |
+| `tests/ingest-datasets.test.ts`, `tests/match-sheet.test.ts`, `tests/afl-api-ingestion-safety.test.ts` | database-free pins (S5, §19.3); the third file's fake transaction had to learn the gate statements |
+| `tests/integration/match-results-promotion.test.ts` | the second-stats-promotion test now expects the gate refusal and a retry (D-265-6); the emulated-settle tests are re-labelled UNGATED (D-265-11); the count stays 32 (S6) |
+| `tests/integration/settle-promotion-deadlock.test.ts` | Phase B, B1–B11, replaces Phase A (S7) |
+| `.gitattributes` | the five `-text` entries (§21.1) |
+| `CHANGELOG.md`, `docs/admin-and-beta.md`, this runbook, `issues.md`, `IssuesIndex.md` | documentation (S9, S10). The comment at `canonical-apply.ts:477` is about the Match Sheet writer and is still accurate; unchanged. |
+
+**Behaviour.** A settle waits at the gate for an in-flight match-writing promotion for up to 300 s, then fails
+before writing (`SettlePromotionGateTimeout`, `cause.code = '55P03'`); a `57014` or `40P01` there passes through
+unchanged, so a manual cancellation is never reported as a gate timeout. A promotion that starts during a settle,
+or while another match-writing promotion holds the gate, is refused retryably at 5 s with nothing written.
+`match_attendance` locks its matches in ascending id.
+
+**Phase B harness.** Reuses the Phase A infrastructure (target guard, census, fingerprints, teardown, `hold`,
+`reachOf`). New: gate, row-lock and "no xid, no table lock" observation through `pg_locks` on the server clock;
+per-run unique labels and observation times; `client(label, statementTimeoutMs | null)`; the settle runners can
+keep a connection (B7) or dry-run (B8). It refuses a tree without the gate before any connection. Order of the
+cases: B1, B2, B3, B4, B6, B7, B8, B9, B10, B11, **B5 last**, because its attendance writes re-source M1 and M2
+to `manual_admin_edit`. A promotion and a settle that touch one row write the same value. Two settles are
+released one after the other, never together (the separate ISSUE-261 recompute contention). Counts: **11
+tests; 14 retained `admin-upload` batches** (B1 1, B2 1, B3 1, B4 1, B5 1, B6 1, B7 1, B8 1, B9 4, B11 2).
+
+**Tooling (outside the repository, `D:\tmp\issue265\`).** `Invoke-Issue265PhaseB.ps1`, `issue265-db-probe-b.mjs`,
+`tools\Invoke-Issue265SkipCheckB.ps1` (derived from the archived Phase A files, which are unchanged). Differences:
+arms `B`; expects 11 tests and 14 retained batches; a 45-minute watchdog around vitest that kills the tree (checked
+on every output line; returns 124; the census still runs); retained targets include `match_attendance`; the targets
+step reads each role's raw session defaults and **refuses** a window where the import role's `statement_timeout` or
+`lock_timeout`, or the owner's `idle_in_transaction_session_timeout`, is non-zero and at most 400 s (B7 holds a
+promotion stuck and a side transaction idle for the whole 300 s wait); the skip check adds a variant that arms the
+retired `PHASE=A` with a fresh stamp. **The active Phase A runner now refuses** to run once the settle sources carry
+the gate or the suite is not the Phase A harness (an edit to that file only; the committed archive copy is
+unchanged). The Phase B tooling is not yet archived in the repository; archive it at closure, as D-265-15 did
+for Phase A.
+
+### 21.3 Checks run (database-free; step 5)
+
+- `npm run typecheck`: exit 0. `eslint --max-warnings 0` on every changed source and test file and on the
+  archive folder: exit 0. `npm run lint` (`eslint .`) reports 384 problems (253 errors) in 100 files (re-measured in §22.4; this line first said 112), **none in a
+  file this change touches**; §22.4 proves the whole set is identical on checkpoint 62f2cd67.
+- Unit and importer sweep (14 files: `ingest-datasets`, `match-sheet`, `afl-api-ingestion-safety`,
+  `settle-season-revalidation`, `submission-review-actions`, `db-promotion-check`, `data-overrides-source-contract`,
+  `afl-api-match`, `afl-api-player-bridge-cli`, `catalogue-lookups`, `current-season-import`,
+  `workflow-preflight`, `honours-lifecycle-public-contract` and the harness): **1549 passed, 15 skipped, 2
+  failed**. The two failures are `honours-lifecycle-public-contract` (`awards.ts` and `grid-solver.ts` scan
+  counts). Neither file is touched by this change. §22.1 later ran the same test on checkpoint 62f2cd67: both failures reproduce identically there, so they are pre-existing. (The 1549 / 15 split came from a PowerShell launch; §22.4 explains it.) The first sweep also caught a
+  real regression of this change (the `afl-api-ingestion-safety` fake transaction; fixed, 166/166).
+- Tooling: PowerShell parse, 0 errors for all three Phase B scripts and the edited Phase A runner; probe-b self-test
+  **23/23**; the Phase B runner `-Phase SelfTest` passes, including the network-blocked skip check (clean, stale-B and
+  fresh-A variants: 11 skipped each, **0 blocked connection attempts**); the old runner refuses; the watchdog was
+  exercised in isolation (a fast command passes its exit code through and redacts; a chatty hang is killed at the
+  deadline with 124 and nothing is left running). That test caught a real bug (the deadline was checked only when the
+  output stalled), fixed.
+- The archived Phase A files still hash to the original values.
+
+### 21.4 Independent review (step 6)
+
+A fresh read-only reviewer (CLAUDE.md §15 lets only the orchestrator spawn `afldb-reviewer`; this session used one
+general-purpose agent, §1) verified: gate ordering in both settles and all three hooks; no other legacy writer can
+hold a match lock concurrently with a settle; both queue shapes; no deadlock or livelock introduced by the gate
+(a settle at the gate holds only its virtual xid); the helper's restore, rollback and error mapping; the unit pins;
+the per-case recount to 14 and 11; one-value-two-writers; teardown coverage. **No CRIT.**
+
+| ID | Grade | Finding | Disposition |
+|---|---|---|---|
+| H1 | HIGH | B3 watched the promotion while waiting for the M2 unit, so a legitimate 5 s refusal could abort the case | **Fixed:** the promotion is no longer watched there; `settle.done === false` still proves the order |
+| M1 | MED | B2's INCONCLUSIVE guard: the settle's remaining work after release may not fit 4 s over the tunnel | **Accepted, recorded (§21.6).** The stall already sits on the last record. It fails as INCONCLUSIVE, never a pass |
+| M2 | MED | B4's "never a deadlock victim" was vacuous: 55P03 and 40P01 give the same refusal text | **Fixed:** a refused promotion must have waited at least 4500 ms |
+| M3 | MED | the probe did not refuse an import-role `lock_timeout`, which also cancels the stuck promotion | **Fixed** in probe-b, with a self-test |
+| M4 | MED | B1/B3/B5 sampled the gate-only wait once | **Fixed:** `watchGateWait` samples every 250 ms and asserts every sample (advisory only, sole blocker the settle) |
+| L1 | LOW | the source pins sliced a CRLF file with `'\n}\n'` | **Fixed** (harness and `match-sheet.test.ts`) |
+| L2 | LOW | `String(undefined)` could reach `set_config` | **Fixed** (explicit error) |
+| L3 | LOW | no case registered a forensic capture | **Fixed:** every case writes its runs' outcomes and the findings to the evidence file |
+| L4 | LOW | B5's probe connected inside the hook's 5 s budget | **Fixed:** connects first |
+| L5 | LOW | B7 keeps two connections idle across the tunnel for over 5 minutes | **Recorded** (§21.6): a drop fails the case, never passes it |
+| L6 | LOW | the first retirement check in the old runner could not fire | **Fixed**; the gate-file check was already effective |
+
+### 21.5 Operator-run Phase B commands (guarded `afldb_test` window; nothing here has been run)
+
+Prerequisites: the SSH tunnel to `afldb_test` is up (as for Phase A, `127.0.0.1:55432`); no `.env` in the worktree;
+`node_modules` present. Each phase stops at the first refusal. Do not run Phase A again.
+
+```powershell
+# 0. offline, no database contact
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File D:\tmp\issue265\Invoke-Issue265PhaseB.ps1 -Phase SelfTest
+# 1. read-only: targets (also refuses a short import statement_timeout / lock_timeout or owner idle timeout), preflight, baseline
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File D:\tmp\issue265\Invoke-Issue265PhaseB.ps1 -Phase Preflight -TunnelHost 127.0.0.1 -TunnelPort 55432
+# 2. the window: B1-B11 (about 10-15 minutes; B7 alone waits 300 s), then the post-run census
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File D:\tmp\issue265\Invoke-Issue265PhaseB.ps1 -Phase Full -TunnelHost 127.0.0.1 -TunnelPort 55432
+# 3. only after an interrupted or failed window, read-only
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File D:\tmp\issue265\Invoke-Issue265PhaseB.ps1 -Phase Census -TunnelHost 127.0.0.1 -TunnelPort 55432 -BaselineFile D:\tmp\issue265\run-<stamp>-Full\baseline.json -EvidenceFile D:\tmp\issue265\run-<stamp>-Full\harness-evidence.json
+```
+
+PASS needs: 1 file and 11 tests passed, none skipped or failed, census CLEAN with exactly 14 retained
+`admin-upload` batches, no migration applied by the run. Database-free commands the operator can repeat:
+`npm run typecheck`; `npx vitest run tests/ingest-datasets.test.ts tests/match-sheet.test.ts tests/afl-api-ingestion-safety.test.ts`;
+`npx eslint --max-warnings 0 <changed files>`.
+
+### 21.6 Not validated, and known risks
+
+- **[Superseded by §23: Phase B ran on 2026-10-05 and passed 11/11.]** **Phase B has not run.** Every database property in §19 is asserted by code that has only been type-checked,
+  linted, read by an independent reviewer and skip-checked. A first-window failure for a test-bug reason is possible.
+- **B2 and B9 (second run) can end INCONCLUSIVE** if the link is too slow for the settle or P1b to finish inside the
+  promotion's 5 s bound. That means rerun on a faster link, not a defect.
+- **B7 depends on the environment:** the import role and the owner must have no short session timeouts (the probe
+  refuses), and the tunnel must keep two idle connections for over 5 minutes.
+- **Regression window not run.** The ISSUE-264 runner (`D:\tmp\issue264\Invoke-Issue264Window.ps1`) lists
+  `match-results-promotion` (expects 32 passed, unchanged by this work), `datasets`, `submission-promotion` and only
+  the Match Sheet block of `settle-afltables`. §18.2 step 4 asks for `settle-afltables` in full; widening that filter
+  is a decision for the operator; §22.6 prepares that widening in a copied runner. The F-002 expectation changes in `match-results-promotion` have not been run.
+- The two `honours-lifecycle-public-contract` failures are **pre-existing**: they reproduce identically on checkpoint 62f2cd67 (§22.1). Their cause is not investigated.
+- DEV acceptance (§18.2 step 6) and the commit, `merge:ready` and deployment are not done.
+
+## 22. Pre-window verification (2026-10-05 later, agent; database-free)
+
+Authorisation: local database-free commands and read-only Git. No database was contacted, no credential or settings
+file read, no DEV/PROD action, no Git mutation, nothing committed. Every hash and count below was measured in this
+pass. Evidence: `D:\tmp\issue265\verify-20261005\` (lint and vitest JSON, the summarising scripts, console captures).
+
+### 22.1 The two `honours-lifecycle-public-contract` failures: baseline (item 1)
+
+- **Export.** `git checkout-index -a --prefix=D:/tmp/issue265/baseline-62f2cd67/` (read-only; the index equalled HEAD,
+  tree `0cf6f3b9d42033c4c1c0d77fd80c7a562d1018dd`, 1794 files = every tracked file; the same `core.autocrlf=true`
+  conversion as the worktree). `node_modules` is a junction to the worktree's, so the dependency versions are the
+  same. `package.json`, `package-lock.json`, `vitest.config.mts`, `tsconfig.json`, `tests/setup.ts`, the test file,
+  `src/db/queries/awards.ts` and `grid-solver.ts` have identical SHA-256 in both trees. Neither tree has a `.env` and
+  no DSN variable was set. The working tree was not changed or stashed.
+- **Command, run in each tree:** `npx vitest run tests/honours-lifecycle-public-contract.test.ts` → 11 tests, 9
+  passed, **2 failed in both**.
+- **Failures, identical in both** (only the duration and the root path differ):
+  `src/db/queries/awards.ts scans 19 honours table(s) but carries fewer lifecycle filters: expected 20 to be 19`, and
+  `src/db/queries/grid-solver.ts scans 17 honours table(s) ...: expected 23 to be 17`.
+- **Classification: pre-existing at checkpoint 62f2cd67; not caused by this work** (neither source file is modified).
+  The cause is not investigated. Two observations: the counted filters exceed the scans (20 vs 19, 23 vs 17), so the
+  message's "fewer" is misleading; and the test folds CRLF itself (`source()`), so the "Windows CRLF" explanation in
+  an earlier record (`issues.md` ~37395) is not shown by this evidence. No new issue is opened here (it is
+  tracked-test debt outside ISSUE-265); say if you want one.
+
+### 22.2 `admin-fixtures.ts` and `docs/admin-and-beta.md` (item 2)
+
+- **`src/db/queries/admin-fixtures.ts` (+5/-3): a comment, nothing executable.** Its namespace note said the fixed keys
+  in `0xAF1DB` (717275) were 1, 2 and 3. The gate adds key 4 (`SETTLE_PROMOTION_GATE`, `settle-core.ts:297`), so that
+  sentence became false. §18 S4 plans exactly this. Every user of 717275 was listed by Grep: `awards-admin.ts` and
+  `admin-awards.ts` (key 1), `admin-users.ts` (2), `admin-brownlow.ts` (3), `datasets.ts` and `settle-core.ts` (4) and
+  `admin-fixtures.ts` (the season, as the second key). The fixture lock key is a season, and `createFixture`,
+  `createFixtures` and the edit path refuse a season outside `maxYear..maxYear+1` (`fixtureSeasonBounds`, an empty
+  range when there is no register) before `lockSeason`, or read the season from an existing fixture row (`:1389`).
+  So key 4 cannot be reached as a season in practice. (The comment's "1897..2100" is the database range, wider than
+  what the writer admits; harmless, unchanged.)
+- **Writer and transaction paths affected by that file: none.** Its three transactions (`createFixture` `:1061`,
+  `createFixtures` `:1205`, the edit path `:1386`, all on the import role) take only `pg_advisory_xact_lock(717275,
+  season)`. They write `fixtures` and audit rows, and touch `matches` only through a plain `SELECT` with no `FOR` clause
+  (`:1405`, to decide "played"). No other module writes `fixtures` (Grep of `INSERT INTO|UPDATE fixtures` outside the
+  file: none), so a settle never writes it. The fixtures writer is therefore not a match writer, holds no match row lock
+  and adds no lock edge with the gate: it never holds the gate, and the gate's holders never take a season lock. No
+  change needed. (Grep-based; the neighbouring `players` observation is in §22.3.)
+- **`docs/admin-and-beta.md` (+15): the §18 S9 documentation page.** It states which datasets take the exclusive gate
+  (`match_results`, `player_match_stats`, `match_attendance`), the 5 s retryable refusal and its wording, that the
+  submission is marked `failed` with nothing written, the settle's 300 s wait and its failure before any write, and
+  that `player_bio` and the award datasets do not take the lock. Each was checked against the code: the refusal text
+  equals `LEGACY_PROMOTION_LOCK_REFUSAL`, the bounds are `LEGACY_LOCK_TIMEOUT = '5s'` and
+  `SETTLE_PROMOTION_GATE_WAIT_MS = 300_000`, and only the three datasets carry a `preparePromotion`. It documents a
+  behaviour change an administrator can see (a promotion can be refused for 5 s while a settle runs), and it is the
+  admin-upload page §18 S9 names. Within the accepted scope.
+
+### 22.3 Gate-ordering invariant, timeouts and restoration (item 3)
+
+**Invariant: the gate precedes every data write and row lock.** (Not "first statement": the timeout reads and sets
+come first, §20.7.)
+
+| Entry point | Where the gate is | Evidence |
+|---|---|---|
+| `runSettleAfltables` | first call in its only `sql.begin` (`settle-afltables.ts:1835-1840`), ahead of `loadRefs`; the derived recompute (`:1919`) is inside the same transaction | one `sql.begin` in the file; pinned DB-free by `match-sheet.test.ts` ("both settles call the gate as the first statement…") |
+| `runSettleAflApi` | the same (`settle-afl-api.ts:1905-1910`; recompute `:1968` inside) | the same pin; plus the statement order `read, set, gate, set`, then only non-gate statements, in `afl-api-ingestion-safety.test.ts` |
+| `match_results` | `preparePromotion` → `withLegacyLockTimeout` → exclusive gate → `FOR NO KEY UPDATE` (`datasets.ts:774-793`) | the hook's only statement before the gate is in-memory validation |
+| `player_match_stats` | `preparePromotion` → `withLegacyLockTimeout` → gate → `FOR SHARE` (`:1087-1110`) | likewise |
+| `match_attendance` | `preparePromotion` → `withLegacyLockTimeout` → gate → ascending `FOR NO KEY UPDATE` (`:1330-1343`) | likewise |
+
+- **No other path to a match lock.** The only advisory lock in `datasets.ts` is inside `withLegacyLockTimeout`
+  (`:598`), and every `FOR NO KEY UPDATE` / `FOR SHARE` (`:791`, `:1109`, `:1342`) is inside a `withLegacyLockTimeout`
+  closure. `rising_star`, `all_australian` and `player_bio` have no hook and write no match row. The promotion
+  transaction's earlier statements (`pipeline.ts:313-337`) are the submission's own `FOR UPDATE` and plain reads, then
+  the hook runs in a savepoint (`:350-356`).
+- **Timeout errors through the existing catches.** `SettlePromotionGateTimeout` extends `Error`, not a dry-run, halt
+  or completeness class. `sql.begin` rolls back and rethrows. AFL Tables' outer catch rethrows anything but
+  `SettleDryRunRollback` (`:1960`); AFL API's handles `DryRunRollback`, `RequireCompleteSourceRollback` and
+  `AflApiSettleHalt` and rethrows the rest (`:2005` onward). So a gate timeout fails the run with nothing written (the
+  batch row is inside the transaction), and a `57014` or `40P01` passes through unchanged (unit-pinned for 57014,
+  40P01, 23505, 40001). On the promotion side, a `55P03` or `40P01` at the gate becomes the retryable refusal and any
+  other error passes through, as before (F-002).
+- **Restoration on success.** Statement 4 restores both settings to the values statement 1 read; the unit test uses
+  `5s` and `2min` and asserts those come back, not `0` and not the gate's values. The helper throws explicitly if a
+  setting cannot be read. In a promotion, `withLegacyLockTimeout` restores `lock_timeout` after `work()`.
+- **Rollback on failure.** All four `set_config` calls are transaction-local (third argument `true`; source-pinned,
+  and `false` is forbidden by a test). A failure aborts the transaction, and in a promotion rolls back its savepoint,
+  so both settings revert; the helper deliberately issues no restore after a failure (pinned: `read, set, gate`).
+- **Database confirmation is still outstanding.** B7 (the same clients re-used after a timeout show the server
+  defaults) and B10 (restoration inside a real transaction) are the cases that prove this against PostgreSQL, and
+  Phase B has not run.
+- **Observation, INFO, no work.** A `player_bio` promotion updates `players` rows without the gate, and the settles'
+  derived recompute also updates `players` (`player-derived.ts:335,352`). I did not trace whether those can cross.
+  The accepted design (§12, D-265-1..12) excludes `player_bio` because it writes no match row, and this issue is the
+  match-lock cycle. Not examined further.
+
+### 22.4 Exact commands and counts (item 4)
+
+| Command (run from the worktree unless stated) | Result |
+|---|---|
+| `npx vitest run tests/honours-lifecycle-public-contract.test.ts`, in the worktree and in the checkpoint export | 9 passed, 2 failed, **identical** in both (§22.1) |
+| `npx vitest run tests/ingest-datasets.test.ts tests/match-sheet.test.ts tests/afl-api-ingestion-safety.test.ts` | **3 files, 344 passed**, 0 failed, 0 skipped: 99 + 79 + 166. The checkpoint gives 81 + 68 + 165 = 314, so this work added **30 tests** (18, 11, 1), all passing |
+| the 14-file sweep: `npx vitest run` over `ingest-datasets`, `match-sheet`, `afl-api-ingestion-safety`, `settle-season-revalidation`, `submission-review-actions`, `db-promotion-check`, `data-overrides-source-contract`, `afl-api-match`, `afl-api-player-bridge-cli`, `catalogue-lookups`, `current-season-import`, `workflow-preflight`, `honours-lifecycle-public-contract` and `integration/settle-promotion-deadlock` | worktree: 1566 tests, **1553 passed, 2 failed, 11 skipped** (the unarmed harness). Checkpoint export: 1528 tests, 1523 passed, 2 failed, 3 skipped (the Phase A harness). The failures are the same two tests in both: **no new failure** |
+| `npm run typecheck` | exit 0 |
+| `node node_modules/eslint/bin/eslint.js --max-warnings 0` on the ten changed code files and `issues/open/AFLDB-ISSUE-265-phase-a` | exit 0, no problems |
+| `node node_modules/eslint/bin/eslint.js . -f json`, in the worktree and in the export | **exit 1 in both**: 384 problems (253 errors, 131 warnings) in 100 files |
+
+- **Baseline failures versus new ones.** Both known failures are pre-existing (§22.1). There is no failure in this
+  sweep that the checkpoint does not also have.
+- **Whole-repository lint is FAILING** (`npm run lint` exits 1). The changed files are clean, but that does not show
+  the repository's failures pre-date this work; the differential does: after normalising the absolute root that some
+  messages embed, the (file, rule, severity, line, column, message) set is **identical in all 100 files** on the
+  checkpoint and the worktree, and none of the ten changed code files has a problem. §21.3 said "112 files"; the
+  re-measured count is 100 (the 384 and 253 agree).
+- **Why §21.3's sweep read 1549 / 15 / 2:** that launch was from PowerShell, where `sh` is not on PATH, and
+  `current-season-import.test.ts` has four `it.skipIf(!haveSh)` tests. PowerShell: that file gives 321 passed, 4
+  skipped; Git Bash: 325 passed. The same 1566 tests either way.
+- **Not run:** every integration suite (they need a database), and the Phase B harness (skipped by design when not
+  armed).
+
+### 22.5 Provenance before the first database window (item 5)
+
+Window 2 of Phase A captured no hash of its harness (§18.1); Phase B and the regression window now cannot.
+
+- **New files, all under `D:\tmp\issue265\tools\`:** `Provenance.ps1` (hashing, the static import closure through the
+  archived `import-graph.mjs`, manifest writer, recheck) and `Test-Provenance.ps1` (offline test, **21 checks pass**:
+  hashes equal `Get-FileHash`; stable manifest hash; a modified file and a deleted file are both reported; an
+  incomplete manifest is written and then refused; a tool file outside the tools root is refused; CRLF and LF twins
+  share `sha256Lf`).
+- **`Invoke-Issue265PhaseB.ps1` (edited, not an archived file):** every run of every phase writes
+  `provenance-manifest.json` and `provenance-manifest.sha256.txt` into its own evidence folder **before the tunnel
+  check, the settings file, the preconditions and any database contact**, so a refused or failed run keeps it. A
+  missing listed file stops the run after the manifest is written. After the run, in `finally`, pass or fail, every
+  file is re-hashed: a change turns a passing run into a STOP. New `-Phase Manifest` (no tunnel arguments).
+  Proven offline: `-Phase SelfTest` passes (probe 23/23; skip check 11 skipped x 3 runs, 0 blocked connection
+  attempts); a `-Phase Preflight` with no tunnel arguments STOPS and its folder still holds the manifest and the
+  recheck.
+- **What the Phase B manifest covers (58 files):** the harness; its static import closure (43 repository modules including the harness, with the six gate files
+  (`settle-core`, `settle-afltables`, `settle-afl-api`, `canonical-apply`, `datasets`, `pipeline`) marked
+  `gate-implementation`); `package.json`, the lockfile, `vitest.config.mts`, `tsconfig.json`, `tests/setup.ts`, the
+  source-family registry and the installed vitest, postgres and typescript `package.json`; and the runner, the probe,
+  the skip check, `block-network.cjs`, `import-graph.mjs` and `Provenance.ps1`.
+- **Each entry has `sha256` (working-tree bytes, CRLF on this machine) and `sha256Lf`** (CRLF folded to LF, text
+  files). After the operator commits, compare a committed blob with `sha256Lf`:
+  `git show <commit>:<path>` piped to `sha256sum`. The harness is LF on disk, so its two hashes are equal.
+- **The prepared manifests** are in `D:\tmp\issue265\provenance-prepared-20261005\` (one folder per runner). Phase B:
+  manifest hash `606a5fbb39d5a4da1640f63677d79308d9ee5e605d4114b71fc5ce42b21cb5b9`; regression runner (171 files) manifest hash
+  `9a30caa63616db1a566094a50c0ed443cb0090879d2faf0f390005679119ab13`; harness
+  `tests/integration/settle-promotion-deadlock.test.ts` SHA-256
+  `20507181fd46f5a084b99224ecab5612440909c80d4313815cee079ac437ddd8` (152501 bytes). They are a point-in-time record:
+  the manifest each run writes supersedes them, and any later edit to a hashed file changes them.
+- **Phase A originals, archive and evidence are unchanged.** The five archived files match the README hashes and the
+  originals (the probe and three tools) match the README; the archive folder's only Git change is the README, as
+  before; no pre-existing evidence folder was changed. **One slip, repaired:** a tool hook wrote three zero-byte files (`${now`, `1)`, `n`) into `run-20261005-162235-Full` and one (`afldb_test`) into
+  `D:\tmp\issue265` while the working directory was there (a tool hook writes zero-byte files named after fragments of tool input). I removed exactly those four, and the folder lists its
+  original 12 files again.
+
+### 22.6 The full `settle-afltables` suite in the regression window (item 6)
+
+**Review of `tests/integration/settle-afltables.test.ts` (76 tests; unmodified since 2026-10-03).**
+- **Target guards.** `import './guard'` first (needs `AFLDB_TEST_DATABASE_URL`, opens a preflight connection); and its
+  own `beforeAll` throws unless `current_database()` matches `_test$`. The runner's targets proof and isolation checks
+  come before it.
+- **Fixtures** are committed (an own-transaction driver cannot be wrapped), namespaced and disjoint from Phase B
+  (2078): season **2094**, prefix `issue099-` (one player, one identity, one canonical `matches` row on a dedicated
+  key, spine, projection sentinels, an independent-provider claim, `data_overrides`; two real club identities are
+  read and, in the suite's own words, never written), and season **2093**, prefix
+  `issue122-` (players, matches, stats, Match Sheet authority keyed `2093|issue122-…`, the `club_seasons` and
+  other derived rows the end-of-run recompute writes for that season and those players, the repair tool's batch). It borrows the first `auth_users` row as the admin
+  for Match Sheet saves.
+- **Cleanup** runs as a pre-clean and in `afterAll` (`cleanupIssue099`, `cleanup122`). I read all 54 `DELETE`s and
+  the 6 `UPDATE`s: each is scoped by season 2093/2094, by an `issue099-`/`issue122-` key, slug, tool or note, or by an
+  id the run created; shared rows (`sources`, `auth_users`) are deleted only if the run created them; the suite
+  refuses to start if a row already sits on its dedicated key. No DDL, role or grant change, no subprocess, no
+  network; the only `2026` is in argument-parsing assertions.
+- **The gate does not disturb its statement-capture test:** the O1 "no DELETE or TRUNCATE" scan reads
+  `settle-afltables.ts`, `observation-store.ts` and the CLI source; the gate's SQL lives in `settle-core.ts`.
+- **The other AFL API integration suites stay out** (D-264-10): `settle-afl-api.test.ts`,
+  `settle-afl-api-brownlow.test.ts`, `-brownlow-backtest` and `-brownlow-reschedule` are all pinned to real season
+  2026. They call the gated `runSettleAflApi`; their coverage is Phase B only (§18.2 step 4).
+
+**The census gap, and the fix.** The ISSUE-264 probe fingerprints a fixed table list and counts ISSUE-264's own
+fixtures. This suite's fixtures also live in tables that probe does not cover (`staging.*`, `promotion_candidates`,
+`import_rejections`, `canonical_applications`, `data_issues`, `brownlow_round_votes`, `player_club_season_stats`), so
+a leak there would pass unseen.
+
+**Prepared (outside the repository; the ISSUE-264 originals are byte-unchanged):**
+- `D:\tmp\issue265\Invoke-Issue265Regression.ps1`: a copy of `Invoke-Issue264Window.ps1`, with
+  `issue265-regression-probe.mjs` and `issue265-regression-window.mjs` copied beside it (the window helper is
+  byte-identical to the original; the probe differs only by the header and 21 `settle_*` residue columns, each the
+  `count(*)` twin of a `DELETE` in the suite's own cleanup; a script confirms every table is one the suite deletes
+  from and no `LIKE` pattern contains `_`). Run: the full suite (**76**), `match-results-promotion` 32,
+  `datasets` 16, `submission-promotion` 7, each followed by a census; the build is off unless `-WithBuild`; each suite
+  runs under a watchdog (`-SuiteTimeoutMinutes`, default 90) and a skipped test is never a pass; the baseline refuses
+  any `settle_*` residue before the run. New offline phases: `-Phase Manifest` and `-Phase Static` (provenance plus
+  the preconditions, no settings file, no database). Preconditions now also prove every suite imports the guard, that
+  no suite reads the season-2026 AFL API fixtures, and that the suite still carries the namespace constants the probe
+  was written for. Three negative tests on a copy (a drifted season constant, a removed `_test` guard, a removed guard
+  import) each refused as intended, after a passing control, and the copy was restored byte for byte.
+- **An inherited defect fixed in the copy:** the original assigned `$script:Applied` only after the target proof, so an
+  early exit read an unset variable under StrictMode. It is initialised at the top.
+- `PowerShell` parse: 0 errors for the runner and the module. `node --check`: both `.mjs` files.
+- **Exact counts come from the ISSUE-264 windows:** match-results-promotion 32 (last window `211130`, unchanged shape
+  at the checkpoint), datasets 16 and submission-promotion 7 (files unmodified since before those windows), and
+  settle-afltables 11 + 65 filtered = 76. A drift STOPS that suite, with the restore still running.
+
+**Blockers: none found that stop the full suite running in that window.** Residual risks, all recorded:
+- The **new residue SQL has not run against PostgreSQL**. Its tables and columns are the suite's own; an error would
+  surface at the read-only baseline, before anything is written.
+- The suite's **duration is unmeasured** (the Match Sheet block alone took 175 s over the tunnel); the 90-minute
+  watchdog per suite is a ceiling, not an estimate. A watchdog kill can leave fixtures; the migration 110 rollback then
+  refuses if an authority row survives, and the window records the exact state.
+- **Unmeasured hygiene of the other 65 tests:** a dirty census stops the window with State B applied and the restore
+  running. That is a finding, not a safety failure on `afldb_test`.
+- Two concurrency tests (`FOR UPDATE NOWAIT`, a settle started and not awaited) are timing-sensitive over the tunnel:
+  a flaky failure there is a test failure, not residue.
+
+**Separate window.** It is already a separate launch from Phase B (§18.2 steps 3 and 4), and should stay one: Phase B
+applies and restores nothing, while this runner applies migration 110 and restores it. Order: Phase B, then this.
+
+### 22.7 Readiness (item 7)
+
+- **Phase B window: ready for the operator,** after the operator commits (so the code is identifiable by commit as
+  well as by hash). Commands are §21.5, with `-Phase Manifest` as an optional first step.
+- **Regression window: tooling ready, not run:** `Invoke-Issue265Regression.ps1 -Phase Static` (offline), then
+  `-Phase Preflight`, then `-Phase Full`, with `-TunnelHost 127.0.0.1 -TunnelPort 55432`.
+- **Remaining blockers:** the operator's commit, the tunnel, and both database windows. The two failing
+  `honours-lifecycle-public-contract` tests and the 384-problem repository lint are pre-existing and are not blockers
+  to this issue. The Phase B and regression tooling is not yet archived in the repository (do it at closure, as
+  D-265-15 did for Phase A; the regression runner needs its own `-text` entries then).
+- **Changed paths this pass.** In the repository: `issues/open/AFLDB-ISSUE-265.md`, `issues.md`, `IssuesIndex.md` (this
+  section and the corrections above). Outside it, all under `D:\tmp\issue265\`: new `tools\Provenance.ps1`,
+  `tools\Test-Provenance.ps1`, `Invoke-Issue265Regression.ps1`, `issue265-regression-probe.mjs`,
+  `issue265-regression-window.mjs`, `baseline-62f2cd67\`, `provenance-prepared-20261005\`, `verify-20261005\`; edited
+  `Invoke-Issue265PhaseB.ps1`. No source or test file in the repository was changed.
+
+## 23. Phase B window: PASSED 11/11 (2026-10-05 22:41, operator-run; recorded by agent, read-only)
+
+Authorisation for this pass: reading the saved evidence and local offline checks only. No database was contacted,
+no Git command run, nothing deployed, **no evidence file edited**. Evidence (outside Git, unchanged):
+`D:\tmp\issue265\run-20261005-224117-Full\` (15 files: `summary.txt`, `00-derive` to `06-post-census` logs,
+`baseline.json`, `preflight.json`, `harness-evidence.json`, `06-post-census.json`, `provenance-manifest.json` and
+`.sha256.txt`, `provenance-recheck.txt`).
+
+### 23.1 Result
+
+`-Phase Full -TunnelHost 127.0.0.1 -TunnelPort 55432`, `OVERALL: PASS (Full)`. Every step exited 0.
+
+| Required | Observed (file) |
+|---|---|
+| 1 file, 11 tests passed, none skipped or failed | `Test Files 1 passed (1)`, `Tests 11 passed (11)`, no skipped or failed term; 612.19 s (`05-phase-b.log`). All of B1–B11 carry a tick. |
+| Targets | 3 connections (owner, import, auth), each `afldb_test` at `127.0.0.1:55432`, db-oid 45428, one server (`01-targets.log`). Raw session defaults of all three roles: `statement_timeout=0 lock_timeout=0 idle_in_transaction_session_timeout=0`, so B7's 300 s wait was not cut short by a role setting. |
+| Window state | Zero other sessions (twice: `02`, `04`). 109 applied, 110 pending, **State A**, zero `player_match_stats` authority rows. `deadlock_timeout` 1000 ms, `lock_timeout` 0, server 16.15. |
+| Baseline | `BASELINE OK`: no residue in season 2078 or any ISSUE-265 namespace; 136 single-column foreign keys into a namespace row checked, 0 non-zero; `import_batches` max id 1237. |
+| Census after the run | `CLEAN: historical fingerprints equal the baseline; no residue; every retained row accounted for.` All 19 residue counts 0; 136 foreign keys checked, 0 non-zero; `import_batches` max id 1268. |
+| 14 retained batches, all explained | Ids 1241, 1243 (`match_results`), 1245, 1248, 1249, 1251, 1257–1261, 1264, 1266 (`player_match_stats`), 1268 (`match_attendance`): each `admin-upload`, its submission deleted, each `explained`. Count by case: B1 1, B2 1, B3 1, B4 1, B5 1, B6 1, B7 1, B8 1, B9 4, B11 2 = 14 (`harness-evidence.json`, `06-post-census.log`). |
+| Historical fingerprints unchanged | `fingerprintsEqual: true`, `changedFingerprints: []` (`harness-evidence.json`); the census verdict above. |
+| Zero teardown problems | `teardownProblems: []`, `residue: {}`; 15 submissions (330–344) created, all deleted; 15 settle batches and 1 fixture batch (1246) removed. |
+| Provenance unchanged | 58 files hashed before any database contact, manifest sha256 `606a5fbb39d5a4da1640f63677d79308d9ee5e605d4114b71fc5ce42b21cb5b9` (equal to the prepared value in §22.5); harness `tests/integration/settle-promotion-deadlock.test.ts` sha256 `20507181fd46f5a084b99224ecab5612440909c80d4313815cee079ac437ddd8`, 152501 bytes (equal to §22.5); `provenance recheck: 58 files unchanged since the manifest was written` after the run. |
+| No migration applied | `migrations applied or restored by this run: none`; 110 stayed pending (State A) for the whole run. The fixture user pre-existed and the `sports_data_lab` source was not seeded by this run. |
+
+### 23.2 What each case showed (against real settles and real promotions, from the test titles and the recorded outcomes)
+
+| Case | Outcome recorded |
+|---|---|
+| B1 AFL Tables, `match_results` | promotion refused at the gate while a settle held it with the retryable message, nothing written; re-promotion applied 2 |
+| B2 | the promotion waited at the gate, then applied 2 once the settle committed |
+| B3 AFL API, `player_match_stats` | refused at the gate, not on `(p, M1)`; the M2 unit applied; re-promotion applied 2 |
+| B4 AFL API attendance (F-265-1) | the run was not lost; the promotion applied 1 after waiting at the gate |
+| B5 `match_attendance` | refused at the gate with nothing written; the re-promotion applied 2, locking in ascending id |
+| B6 | a settle waited behind a stuck promotion holding nothing, then completed |
+| B7 | both settles gave up after the full wait with the named error (300.26 s and 300.32 s elapsed; 301.1 s server-side, inside the 330 s bound), wrote nothing, and their connections were reused |
+| B8 | two settles held the shared gate together; a dry-run rollback released it; the promotion then applied |
+| B9 | the second of two promotions was refused while the first held the gate; its retry applied |
+| B10 | `acquireSettlePromotionGate` restored both previous settings and held the gate to commit |
+| B11 | a waiting promotion delayed a later settle, and a waiting settle delayed a later promotion |
+
+### 23.3 What this does and does not show
+
+- **Shown, on `afldb_test` in State A, in one window:** with the gate in place, the settle-versus-promotion
+  shapes of §19 behaved as designed with real settles and real promotions, and the run left no residue.
+- **No protection against an ungated writer is claimed or shown.** The gate separates the two settles from the three
+  legacy hooks (`match_results`, `player_match_stats`, `match_attendance`) only. Phase B drove no writer that lacks
+  the gate: not a Match Sheet save, a Data Editor save, `player_bio`, an award dataset, nor any direct SQL. The
+  F-002 emulations in `match-results-promotion.test.ts` still emulate an **ungated** writer (D-265-11), and the
+  ISSUE-261 recompute contention is a separate open issue. Nothing here retires the original deadlock for any of
+  those paths.
+- **Not done, so the issue stays open:** the regression window (§22.6), DEV acceptance (§18.2 step 6), the
+  operator's commit, `merge:ready`, and any PROD action. The code under test was uncommitted (HEAD `62f2cd67`);
+  the manifest identifies it by hash only.
+- **Not shown:** behaviour on a faster or slower link (B2 and B9 can end INCONCLUSIVE, §21.6), State B, or real
+  settle and promotion durations on PROD (D-265-5: PROD records cannot validate the 300 s figure).
+- The harness evidence file stores truncated outcome strings; the full logs are the record.
+
+### 23.4 Correction to the active Phase B probe (wording only)
+
+`D:\tmp\issue265\issue265-db-probe-b.mjs` printed, in its migration-state check, "Phase A does not need migration
+110 ... (runbook §17.10)", a Phase A sentence inherited when the probe was derived. The two `log(...)` strings now
+read "Phase B neither applies nor requires migration 110: this check records the migration state and never changes
+it." and "The Phase B window of 2026-10-05 passed in State A (110 not applied); see runbook §23." No check,
+condition, constant or other line changed. The §17.10 reasoning was Phase A's and is not asserted for Phase B.
+
+| | SHA-256 | Bytes |
+|---|---|---:|
+| Before (equals the hash the run's manifest recorded) | `10c97a9185216267049a94d930ab2100d516cf74ba4a93640f946cf079e00a6a` | 52139 |
+| After | `6dbdca25bdd2f9014bcfcf8cd03b59e6446393c239691189c67ff4546187df7b` | 52130 |
+
+`node --check` exits 0 and the probe self-test passes 23/23 (no database contact). The 2026-10-05 run's manifest
+therefore names the **before** hash, and the file now on disk differs from it by those two strings. That manifest
+and the rest of the run folder were not touched. The archived Phase A tooling was not touched. The same sentence
+remains in the archived Phase A runner and probe (`Invoke-Issue265PhaseA.ps1`, `issue265-db-probe.mjs`), by D-265-15.
+The other Phase A mentions in the Phase B probe are comments (the derivation note in its header, the `readOnly()`
+note near line 296 and the recompute-fingerprint note near line 490) and were left alone.
+
+### 23.5 Next: the regression window (`D:\tmp\issue265\Invoke-Issue265Regression.ps1`), operator-run
+
+It runs the full `settle-afltables` suite (76) and `match-results-promotion` (32), `datasets` (16) and
+`submission-promotion` (7) in that order after **applying migration 110 to `afldb_test`** and, always, rolling it
+back. It is a separate launch from Phase B. Run from any directory, one step at a time, and stop at the first
+refusal.
+
+```powershell
+# 1. offline, no database contact, no settings file read: provenance + preconditions
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File D:\tmp\issue265\Invoke-Issue265Regression.ps1 -Phase Static
+# 2. read-only against afldb_test: targets, window preflight (writes a capture), baseline
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File D:\tmp\issue265\Invoke-Issue265Regression.ps1 -Phase Preflight -TunnelHost 127.0.0.1 -TunnelPort 55432
+# 3. the window: applies 110, four suites with a census after each, then ALWAYS the rollback of 110
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File D:\tmp\issue265\Invoke-Issue265Regression.ps1 -Phase Full -TunnelHost 127.0.0.1 -TunnelPort 55432
+```
+
+**Expected from Static** (new folder `D:\tmp\issue265\run-<stamp>-Regression-Static\`): `provenance: 171 files hashed`
+(prepared manifest sha256 `9a30caa63616db1a566094a50c0ed443cb0090879d2faf0f390005679119ab13`; it repeats exactly
+only if no hashed file changed since §22.5, and a different value is not a failure by itself but must be
+explained), four `provenance: suite ...` lines, `preconditions OK`, `provenance recheck: 171 files unchanged ...`,
+`migration 110 applied by this run: False`, `restore: not applicable (migration 110 was never applied by this run)`,
+`OVERALL: PASS`. The Phase B probe edit is not in this manifest (the runner hashes its own probe, not probe-b). No
+`.env` is in the worktree (checked).
+
+**Expected from Preflight** (folder `...-Regression-Preflight\`, with `capture.json` and `baseline.json`): the same
+provenance lines; `TARGETS OK: every connection is afldb_test, at the expected endpoint, one server, intended
+roles.`; `ISOLATION OK`; `MIGRATION STATE OK: 109
+applied (newest 109), exactly [110_match_sheet_player_match_stats_authority.sql] pending, State A, zero
+player_match_stats authority`; `captured: ledger 109 rows ...` with `data_overrides 92 rows` (as in the Phase B
+baseline); `BASELINE OK` with every `residue` line 0, including the 21 new `settle_*` counts; `import_batches max id
+1268`; `OVERALL: PASS`; `restore: not applicable`. Phase B's rows are absorbed into the baseline: its season 2078
+and namespaces are disjoint from the 2093/2094 and ISSUE-264 residue the probe counts. The `absorbed
+import_batches` lines list only `match_results`, `player_match_stats` and `player_bio`, so the `match_attendance`
+batch 1268 is not listed (informational; the probe's explained-target list omits it and it still sits inside the
+baseline ceiling). A `DIRTY`, `REFUSED` or `STOPPED` result means do not run Full.
+
+**Expected from Full:** after the preflight and baseline steps, `02-migrate-status` reports exactly one pending
+migration (110); an isolation re-check; migration 110 applied by `tools/db/migrate.ts --target test`; `STATE B OK`;
+then exactly **32, 16, 7 and 76** passed, **zero skipped, zero failed**, each followed by a clean census; no build
+(off unless `-WithBuild`); then the restore; final `restore: RESTORED and census clean`, `migration 110 applied by
+this run: True`, `OVERALL: PASS`. The duration is unmeasured (the 11-test Match Sheet block alone took 175 s over
+the tunnel); each suite has a 90-minute watchdog (`-SuiteTimeoutMinutes`, 10 to 240).
+
+**Migration 110 after a failure or interruption (read from the runner and `issue265-regression-window.mjs`).**
+- The runner records "110 applied" only after `STATE B OK`. From then, **every** stop (a failed or timed-out suite,
+  a count or skip drift, a dirty census, a build failure) runs the restore in a `finally`: pre-restore census, then
+  ONE rollback transaction (`ACCESS EXCLUSIVE` on `data_overrides`, 10 s `lock_timeout`, 60 s `statement_timeout`)
+  that first re-proves isolation, State B and **zero `player_match_stats` authority rows (active or inactive)**,
+  then restores the captured CHECK, comment and ledger, verifies the result equals the capture inside the
+  transaction, and commits; then a read-only `verify-restored` against the capture and a final census. Anything
+  short of `RESTORED and census clean` exits 1 and says so.
+- **The rollback refuses, by design, and never deletes authority.** If a failed suite left an authority row, 110
+  stays applied, the runner records the exact state (`92-state-after-failed-rollback`) and stops database work. That
+  is an operator decision, not an automatic repair.
+- **If applying 110 leaves an unverifiable state** (neither State A nor State B verifies), no automatic restore runs:
+  the runner records `UNKNOWN`, logs the state and stops.
+- **Interruption (Ctrl+C, closed console, killed process, tunnel drop):** a PowerShell `finally` normally runs on
+  Ctrl+C, but that was not tested here and nothing runs after a killed process or a lost tunnel, so treat the
+  restore as **not guaranteed**. Recover with the capture taken during the window preflight, before 110 was applied:
+  ```powershell
+  powershell.exe -NoProfile -ExecutionPolicy Bypass -File D:\tmp\issue265\Invoke-Issue265Regression.ps1 -Phase Restore -TunnelHost 127.0.0.1 -TunnelPort 55432 -CaptureFile D:\tmp\issue265\run-<stamp>-Regression-Full\capture.json -BaselineFile D:\tmp\issue265\run-<stamp>-Regression-Full\baseline.json
+  ```
+  `-Phase Restore` runs the restore steps only. If the database is in fact still State A, the rollback guard refuses,
+  nothing changes, `92-state-after-failed-rollback` shows the state, and the run reports a failed restore: that
+  outcome is harmless and means no restore was needed. Leftover sessions from a killed run must have closed first,
+  because the guard needs isolation. Without `-BaselineFile` the census proves only zero residue.
+
+### 23.6 State
+
+ISSUE-265 **stays open**. Done: mitigation implemented (uncommitted), Phase B 11/11 on `afldb_test`. Pending: the
+operator's commit, the regression window (§23.5), `merge:ready`, DEV acceptance (§18.2), PROD. No source or test
+file in the repository was changed by this pass; the changes are this section, `issues.md`, `IssuesIndex.md`,
+`CHANGELOG.md`, and the two probe strings in §23.4.
+
+## 24. Regression window: FAILED twice (dirty census); cause confirmed; correction and cleanup prepared (2026-10-06)
+
+Authorisation for this pass: reading saved evidence and local offline work only. **No database was contacted by the
+agent, no Git command mutated anything, nothing was deployed, no cleanup was run, and no evidence file or baseline was
+edited.** The diagnostic in §24.3 was operator-run and read-only. The code and tooling changes below are uncommitted.
+
+### 24.1 The two regression windows (both kept as failed; neither verdict is changed)
+
+| | Window 1 | Window 2 |
+|---|---|---|
+| Evidence (outside Git, unchanged) | `D:\tmp\issue265\run-20261005-231059-Regression-Full\` | `D:\tmp\issue265\run-20261006-052853-Regression-Full\` |
+| Time (local, +11:00) | 2026-10-05 23:10:59 to 23:22 | 2026-10-06 05:28:53 to 05:40:23 |
+| Suites | 32/32, 16/16, 7/7, 76/76 passed; the first three post-suite censuses CLEAN | identical |
+| Census after `settle-afltables` | **DIRTY** (exit 3): `settle-afltables.ts / staging.source_record_versions x3: UNEXPLAINED` | **DIRTY**, same |
+| Migration 110 | applied, rolled back, verified against the capture (`91-rollback`, `92-verify-restored`) | same |
+| Provenance | 171 files unchanged | 171 files unchanged |
+| Verdict | `STOPPED - check after tests/integration/settle-afltables.test.ts is dirty`; final census dirty | same |
+
+Window 1 was **not recorded when it happened**, and window 2's baseline silently absorbed window 1's three leftovers: the
+`absorbed import_batches` list names only admin-upload targets, and the baseline fingerprint (270 to 309 rows, +39 = 15 +
+2 + 19 + 3) took them in. `BASELINE OK` therefore did not mean "no earlier unexplained batches". ISSUE-265 stays open and
+**regression acceptance is outstanding**.
+
+### 24.2 Cause
+
+`tests/integration/settle-afltables.test.ts`, S6 block (`LABEL_S6 = 'issue122-s6-cli'`): the CLI owns its transaction, so
+each of its three `--apply --auto-apply` runs commits a real `import_batches` row (notes `AFLDB-ISSUE-099 settle;
+snapshot=issue122-s6-cli; season=2093; mode=apply`). `cleanup122` deleted only `notes LIKE '%issue122-apply-test%'`, so
+those rows were never removed although the S6 header claims it is "torn down by the same cleanup". The probe's residue
+predicate is the `SELECT count(*)` twin of the suite's DELETEs, so it had the **same blind spot**: residue was zero while the
+batches survived, and only the unexplained-batch rule caught them. The census was right. My §22.6 review read the 54
+DELETEs for scope but not for coverage of what the suite creates, and missed this.
+
+### 24.3 Operator diagnostic (read-only, 2026-10-06 07:55 +11:00)
+
+Evidence: `D:\tmp\issue265\diag-s6-batches-20261005-205549\` (`diagnostic.txt`, `diagnostic.json`, sha256 of the JSON
+`09ea147e…1619`), run with `D:\tmp\issue265\issue265-batch-ownership-diagnostic.mjs` (sha256 `6d46f5f1…0850`).
+
+- 18 `settle-afltables.ts` batches exist and **all 18 are S6-labelled**; no other settle batch exists.
+- **Six belong to the failed windows:** 1339, 1340, 1341 (window 1) and 1477, 1478, 1479 (window 2). Each triple has
+  `canonicalRowsInserted` 6, 0, 1, matches the S6 test's three applies, and sits inside its window by timestamp.
+- **Twelve are historical** (all 2026-10-03): 66, 67, 68; 325, 326, 327; 543, 544, 545; 639, 640, 641. Same signature.
+- Probe residue predicate and suite cleanup matched **0 of 18**. S6 spine remnants: 0 versions, 0 records, 0 matches in 2093.
+- **Every one of the 38 foreign keys into `import_batches`, and every batch-named column, counts 0** for the S6 batches.
+- Server: postmaster started 2026-10-01 17:49:57 +10, so **no restart** during either window.
+
+**Unexplained, recorded without a cause.** (a) The id gaps: the match-results suite consumed 35 ids in window 1 but 100 in
+window 2 for the same 34 retained rows (a 65-id gap, 1341 to 1407); the settle suite shows a 32-id gap before S6 in both. (b) The id
+sequence `last_value` is **1544** while the highest existing batch id is 1479 (another 65). Nothing was reset by anyone
+and nothing here depends on it. Candidates (a sequence skip, activity on `afldb_test` outside the window) are unverified.
+
+### 24.4 Correction (uncommitted)
+
+| Change | Where | What it does |
+|---|---|---|
+| Suite teardown | `tests/integration/settle-afltables.test.ts` | `cli()` records each batch id its call committed in `s6CommittedBatchIds`, including a batch committed by a call that then throws (id high-water mark plus exact notes; review F-002). `cleanup122` deletes `id = ANY(recorded) AND tool AND target_table AND status='completed' AND notes = <exact S6 notes> RETURNING`, after every statement that deletes a row citing a batch, and throws after the season cleanup if it removed fewer than it recorded. **No label DELETE**, so the twelve historical batches are untouched. |
+| Pin tests | `tests/match-sheet.test.ts` ("ISSUE-265 S6 batch teardown") | six database-free tests pin the above; a deliberate switch to a label DELETE makes two fail. 85/85 pass in the file. |
+| Probe | `D:\tmp\issue265\issue265-regression-probe.mjs` | an S6 census (every S6-labelled and every other `settle-*` batch, with each row's md5) at the baseline and at every check; the baseline accepts only the twelve pinned rows and **refuses** otherwise, a check refuses any new, missing or changed S6 row; ids are recorded for any new non-promotion batch. `s6-selftest` 12/12, no database. |
+| Exception (proposed) | `D:\tmp\issue265\s6-historical-exception.json` | the twelve rows pinned field by field from the diagnostic; **shipped unapproved** (`approved:false`), so the probe fails closed until the operator sets `approved`, `approvedBy`, `approvedOn`. It can never pin the six cleanup ids. `rowMd5` ships null; `--mode verify` prints the twelve values to copy in, after which the probe enforces them. |
+| Runner | `D:\tmp\issue265\Invoke-Issue265Regression.ps1` | four new suite markers (an unfixed suite is refused before any database contact), the exception file in the provenance manifest, and the probe self-test inside the Static phase. |
+| Cleanup tool | `D:\tmp\issue265\issue265-s6-cleanup.mjs` | see §24.5. Not run. |
+
+The pre-fix probe and runner are archived **unchanged** in `D:\tmp\issue265\archive-pre-s6-fix\` (probe `a97c105d…8de8`,
+runner `7676d628…1965`), equal to the hashes in both failed runs' manifests. Final hashes: suite `0a4ed9b2…7196`, probe
+`35495179…79e3`, runner `66398224…3c64`, exception `582f4664…c452`, cleanup tool `2c101821…5899`. The original baselines and
+the diagnostic are untouched.
+
+### 24.5 Cleanup tool (operator-run; default is a read-only Plan)
+
+Removes **exactly** ids 1339, 1340, 1341, 1477, 1478, 1479 and nothing else. Guards: `afldb_test`, `afldb_owner`, the
+tunnel endpoint (host, port and database rewritten from `AFLDB_TEST_DATABASE_URL`), isolation (no other open transaction,
+lock or prepared transaction), no non-internal trigger or rule on `import_batches`, the six rows equal the diagnostic's
+values field for field, the S6 census is exactly the six plus the twelve pinned, no other settle batch, and no foreign key or
+batch-named column cites any of the six. **Execute**, in one transaction: lock `FOR UPDATE`, re-run every guard, save the
+complete rows and fsync, issue the one DELETE (id, tool, target, status, exact notes; `RETURNING`), require exactly six rows
+equal to the saved ones, require (still inside) every other batch byte-identical (count and hash sum), the twelve historical
+rows unchanged, 22 core-table counts unchanged and the id sequence unchanged, then commit. Anything else rolls back. It
+never resets a sequence and issues no other write (the self-test scans its own source for that). **Verify** (read-only)
+proves the six are gone, the twelve unchanged, every other batch identical to the saved pre-state, and that the two failed
+windows' saved baselines are **explained by exactly these removals**: window 1's baseline (270 rows, ids <= 1268) is
+reproduced exactly, and window 2's (309 rows, ids <= 1341) equals the current table plus the three removed window-1 rows,
+by exact BigInt arithmetic on the stored hashes. The failed runs' baselines are read, never replaced.
+
+```powershell
+& "C:\Program Files\nodejs\node.exe" D:\tmp\issue265\issue265-s6-cleanup.mjs --selftest   # no database
+& "C:\Program Files\nodejs\node.exe" D:\tmp\issue265\issue265-s6-cleanup.mjs              # PLAN (default, read-only)
+& "C:\Program Files\nodejs\node.exe" D:\tmp\issue265\issue265-s6-cleanup.mjs --mode execute --execute-confirmed --confirm DELETE-S6-BATCHES-1339-1340-1341-1477-1478-1479
+& "C:\Program Files\nodejs\node.exe" D:\tmp\issue265\issue265-s6-cleanup.mjs --mode verify
+```
+Exit codes: 0 ok; 2 refused or error; 3 Execute outcome UNKNOWN (COMMIT sent, not answered: run Verify first); 4 committed but
+the post-commit Verify failed. Each run writes a new folder `D:\tmp\issue265\s6-cleanup-<mode>-<stamp>\`.
+
+### 24.6 Offline checks (no database)
+
+`node --check` on every `.mjs`; PowerShell parse 0 errors; cleanup tool `--selftest` **16/16** against an in-memory fake (plan
+makes no write or lock; execute deletes only the six and saves them before the delete; a delete that returns five rows, a
+moved core table and a touched other batch each roll back completely; every guard refuses before any delete; COMMIT
+unanswered is UNKNOWN; a post-commit evidence-write failure still reports COMMITTED; the 180 s delete timeout is restored;
+more than 200 batch columns refuses; the baselines are explained). Mutation checks on a copy: a widened or id-less DELETE, a
+dropped status predicate, a dropped core-table, other-batch or reference check, a late save and a dropped confirmation are
+each caught; one (dropping only the returned-row count) is not, because the exact-id-set and row-total checks still roll it
+back. Probe replay against the real diagnostic rows: refuses exactly the six at baseline now, passes the cleaned twelve,
+names three NEW rows for a window that ran the old suite. Typecheck exit 0; ESLint `--max-warnings 0` clean on both test
+files. `-Phase Static`: `run-20261006-082255-Regression-Static`, PASS, 172 files, manifest `92cb3011…9b7f`.
+
+### 24.7 Independent review (afldb-reviewer, read only, no execution)
+
+No CRIT and no HIGH. It judged deletion scope, locking and races, historical-row preservation and the baseline arithmetic
+**sound**. Findings and disposition:
+
+| ID | Grade | Finding | Disposition |
+|---|---|---|---|
+| F-001 | MED | a post-commit evidence-write or baseline-load failure would exit "error" with no COMMITTED record | **Fixed:** baselines are loaded before any connection; COMMITTED is logged first; evidence-write failures warn |
+| F-002 | MED | `cli()` recorded the id only after `runSettleCli` returned; its post-commit report can throw | **Fixed** (suite and pin test) |
+| F-003 | LOW | 30 s statement timeout vs about 222 sequential-scan foreign-key checks in the one DELETE (those columns are deliberately unindexed, migration 044) | **Fixed:** 180 s for that statement, then restored to 30 s |
+| F-004 | LOW | watchdog hard-exit mid-transaction wrote no outcome | **Fixed:** 900 s, writes `WATCHDOG_EXIT` |
+| F-005 | LOW | header's UNKNOWN definition contradicted the correct code; UNKNOWN shared exit 2 | **Fixed:** header corrected, UNKNOWN exits 3 |
+| F-006 | INFO | `LIMIT 80` truncated the batch-column list silently | **Fixed:** refuses above 200 |
+| F-007 to F-009 | INFO | transient refusal on an autovacuum worker or unobservable session; hashes depend on session TimeZone (do not alter role settings before the run); "ROLLED BACK" can precede a dead tunnel's backend aborting (a re-Execute inside 120 s refuses on `lock_timeout`) | none required; recorded for the operator |
+
+Not verified by the reviewer: the driver's typing of `$1::bigint[]` (the Plan run executes the same parameterised reads
+first, read-only) and `afldb_owner`'s `pg_read_all_stats` membership (a transient refusal either way).
+
+### 24.8 State
+
+ISSUE-265 **stays open**. Done: mitigation implemented (uncommitted), Phase B 11/11, root cause of both failed regression
+windows confirmed, suite and probe corrected, cleanup tooling prepared and independently reviewed. **Not done:** the cleanup (not
+run), the operator's commit, a clean regression window (acceptance outstanding), `merge:ready`, DEV acceptance, PROD.
+**Do not run a third Full window before the cleanup**: each leaves three more batches and the next baseline would refuse.
+
+Next, in order, operator-run: (1) review and commit the repository changes (the suite and `tests/match-sheet.test.ts`);
+(2) run the cleanup Plan and read it; (3) Execute once, then Verify, and keep the folders; (4) copy the twelve `rowMd5`
+values Verify printed into `s6-historical-exception.json` and set `approved`, `approvedBy`, `approvedOn` (the operator's
+decision); (5) `-Phase Static`, `-Phase Preflight` (its baseline must show the twelve historical ids and `BASELINE OK`),
+then `-Phase Full` (§23.5). Changed paths this pass: in the repository, `tests/integration/settle-afltables.test.ts`,
+`tests/match-sheet.test.ts`, this section, `issues.md`, `IssuesIndex.md`, `CHANGELOG.md`; outside it, the files listed in §24.4
+and §24.5 under `D:\tmp\issue265\`.
+
+### 24.9 Cleanup executed and verified (operator-run, 2026-10-06 08:28 +11:00)
+
+**Status: COMMITTED; post-commit VERIFY PASSED.** Recorded from the saved evidence only; nothing was re-run and no database was contacted.
+
+| Evidence | Path |
+|---|---|
+| Plan (read-only, before) | `D:\tmp\issue265\s6-cleanup-plan-20261005-212824\` |
+| Execute | `D:\tmp\issue265\s6-cleanup-execute-20261005-212854\` (`log.txt`, `execute-result.json`, `rows-before-delete.json`, `rows-deleted-returning.json`) |
+| Verify (read-only, after) | `D:\tmp\issue265\s6-cleanup-verify-20261005-212854-after-execute\` (`verify.json`: `problems: []`) |
+
+- **Target:** `afldb_owner@127.0.0.1:55432/afldb_test`. Isolation OK (0 other sessions, no lock). No non-internal trigger or
+  rewrite rule on `import_batches`. Postmaster unchanged (started 2026-10-01 17:49:57 +10).
+- **Deleted, one transaction:** exactly ids 1339, 1340, 1341, 1477, 1478, 1479 (six rows returned, each equal to its saved row).
+  S6 census before: 18 batches = the six + the twelve pinned (scope guard OK). 38 foreign key / batch-column checks, 0 citations.
+- **State change:** `import_batches` 348 rows (max id 1479) to **342 rows (max id 1444)**; id sequence `last_value` **1544
+  unchanged** (not reset). The 342 other rows are byte-identical before and after (hash `-167730445606291829766`); 15 core
+  tables equal window 2's saved baseline (22 compared in-transaction, all unchanged).
+- **Historical twelve present and unchanged:** 66, 67, 68, 325, 326, 327, 543, 544, 545, 639, 640, 641. Their `row_md5` values
+  are identical in the Plan and in the post-commit re-read.
+- **Failed windows explained, not replaced:** window 1's baseline (270 rows, ids <= 1268) is reproduced exactly; window 2's
+  (309 rows, ids <= 1341) = the current 306 rows + exactly the three removed window-1 batches; batches in (1341, 1479] equal
+  window 2's final census minus its three settle batches (15 + 2 + 19 admin-upload rows).
+- **Both failed regression verdicts (`run-20261005-231059-Regression-Full`, `run-20261006-052853-Regression-Full`), the diagnostic,
+  the archived pre-fix probe and runner, and every original baseline are untouched.**
+
+**Exception file prepared, still unapproved.** `D:\tmp\issue265\s6-historical-exception.json` now carries all twelve `rowMd5` values
+(copied from the Execute log's post-commit read, cross-checked against the Plan's `row_md5`; `approved: false`, `approvedBy` and
+`approvedOn` null). Its hash therefore changed from the §24.4 value `582f4664…c452`; the next manifest records the new one.
+
+| id | rowMd5 | id | rowMd5 |
+|---|---|---|---|
+| 66 | `8e7f477cd552048e34e2167a2ff9e593` | 543 | `94839d1ff5ec3c28bf989e6f3ed03da8` |
+| 67 | `27eabc8c105682a8aecde90f1265464c` | 544 | `1c2443e52104d2b4f7daf9a4e9bf625c` |
+| 68 | `461beefb08b8077baa917a5cdcf9fcb5` | 545 | `d8f6dc01d11b82ee37b98b2d6f7423cf` |
+| 325 | `95e66e634e1636ad795eabc43a0e7f3b` | 639 | `97d9b77413551d639d2c787c6d534800` |
+| 326 | `c29467ed738ab44c6877a5437b6f6e11` | 640 | `53ad6f9aca2b3cd3063a3bf210e7c039` |
+| 327 | `6bdfda15dbafd9a137bb6e210a56a879` | 641 | `5985b534342372a8f8fb05f7664fd17f` |
+
+**Probe self-test corrected (tooling, not evidence).** `s6-selftest` case 1 asserted the *shipped* file had `rowMd5` null and was
+unapproved with exactly three problems, so filling `rowMd5` (and, later, the operator's approval) would have failed the Static
+phase. It now accepts a null or md5-hex `rowMd5` and either state: unapproved with exactly the three approval problems, or approved
+with none. No enforcement logic (`s6ValidateException`, `s6Evaluate`) changed. The probe's hash changed from §24.4's `35495179…79e3`;
+**the self-test was re-run afterwards (2026-10-06, local, no database): `s6-selftest: 12/12 passed`, exit 0**, with the exception
+file as it now stands (unapproved, twelve `rowMd5` filled). A separate offline check confirmed every `rowMd5` equals both the
+Execute log's post-commit value and a value in the Plan's `plan.json` (12 of 12, 0 mismatches).
+
+**How the probe uses the exception.** At baseline it requires the live S6/settle census to equal the approved exception row for
+row: an unapproved file, a failed-window id (1339-1341, 1477-1479), a row count other than twelve, a different tool, target,
+status or notes, or a blank approver each refuse; a live row not pinned is **additional**; a pinned id absent is **missing**; any
+field or `rowMd5` that differs is **changed**. At every later check it requires the census to equal the baseline's stored census
+(ids and row md5): new, missing and changed rows are each named and each makes the check DIRTY.
+
+**State.** Cleanup **verified**. Outstanding: the operator's approval of the exception (`approved`, `approvedBy`, `approvedOn`),
+the commit, and a fresh regression window (`-Phase Static`, `-Phase Preflight` whose baseline must
+show the twelve historical ids and `BASELINE OK`, then `-Phase Full`). ISSUE-265 stays open; regression acceptance is outstanding.
+
+### 24.10 Historical exception APPROVED; Static re-run PASS (2026-10-06 08:46 +11:00)
+
+*Supersedes the "unapproved" statements in §24.4 and §24.9, which stay as the record of their time.*
+
+- **Approval (operator):** `s6-historical-exception.json` now has `approved: true`, `approvedBy: "Stu"`, `approvedOn:
+  "2026-10-06T08:46:18.9124732+11:00"`, and a `status` of `APPROVED - retain exactly the twelve pinned historical S6 rows
+  unchanged; no additional or changed rows permitted.` The operator edited the approval fields and `status` only.
+- **Pins unchanged:** the twelve ids (66, 67, 68, 325, 326, 327, 543, 544, 545, 639, 640, 641) and `pinnedIds` are as before,
+  and **all 12 rows x 14 fields (the 13 row fields plus `rowMd5`) equal the saved Plan's rows: 0 differences**. Every
+  `rowMd5` also equals the Execute log's post-commit value. `schema` 1, `label` `issue122-s6-cli`.
+- **`s6-selftest` against the approved file:** **12/12 passed**, exit 0, no database contact. Case 1 now takes its approved branch
+  (zero problems).
+- **Static phase (offline, no settings read, no database contact):** `run-20261006-084649-Regression-Static`, **OVERALL: PASS**.
+  172 provenance files hashed and unchanged on re-check; manifest sha256 `aa12433b…7714`; `preconditions OK`; the runner's
+  own `s6-selftest` passed. Evidence: `D:\tmp\issue265\run-20261006-084649-Regression-Static\`.
+
+| File | Current SHA-256 (also in that manifest) | Earlier value (historical, §24.4) |
+|---|---|---|
+| `s6-historical-exception.json` | `1878c54544362ac6061abb6e048db5e3cf2016f9efa81947a07511adfa945ff7` | `582f4664…c452` (as shipped); the unapproved, `rowMd5`-filled state was not hashed |
+| `issue265-regression-probe.mjs` | `a5ee5aa44d822b733df39eaecf0ea4b8cee5f231ba0154a6a7f6c44fde7cb698` | `35495179…79e3` (before the case-1 edit); pre-fix `a97c105d…8de8` archived |
+| `Invoke-Issue265Regression.ps1` | `66398224eba2c30d0b759f761b5f2c5eeda0d706b067cdc882505a86d3aa3c64` | `66398224…3c64` (unchanged) |
+| `issue265-s6-cleanup.mjs` (executed tool) | `2c10182199f245e7258a1ad9d275ffb9f378747e15828985f8868e09be315899` | `2c101821…5899` (unchanged; not regenerated) |
+
+**State.** Cleanup committed and verified; exception **approved**; Static **PASS**. Still pending: the operator's commit and
+**fresh regression acceptance** (`-Phase Preflight`, whose baseline must show the twelve historical ids and `BASELINE OK`, then
+`-Phase Full`). No Full window has run since the cleanup. ISSUE-265 **remains open**.
+
+## 25. Regression window PASSED (operator-run 2026-10-06 08:56 +11:00); build-only phase prepared (2026-10-06)
+
+*Supersedes "No Full window has run since the cleanup" in §24.10 and "no regression window has run" in §0; both stay as the
+record of their time.* Recorded from the saved evidence only. **No database was contacted by the agent, no Git command mutated
+anything, nothing was deployed, no integration suite was re-run, migration 110 was not applied, and no evidence file or
+baseline was edited.** The one Static run in §25.5 is offline.
+
+### 25.1 Result
+
+Evidence (outside Git, read and left unchanged): `D:\tmp\issue265\run-20261006-085603-Regression-Full\` (`summary.txt`,
+`00-derive` to `93-final-check` logs, `capture.json`, `baseline.json`, the per-suite `*-check.json`, `provenance-manifest.json`,
+`provenance-recheck.txt`). `-Phase Full`, target `afldb_owner@127.0.0.1:55432/afldb_test`. **`OVERALL: PASS`.**
+
+| Step | Result |
+|---|---|
+| Preflight (read-only) | isolation OK (0 other sessions); 109 applied, exactly `110_match_sheet_player_match_stats_authority.sql` pending; State A; zero `player_match_stats` authority; captured ledger 109 rows, CHECK 13 literals, comment 358 chars, `data_overrides` 92 rows |
+| Baseline (read-only) | `BASELINE OK` with the twelve approved S6 rows (taken 2026-10-05T21:56:07Z); `import_batches` 342 rows, max id 1444 |
+| Migration 110 | applied by the repository runner (241 ms); State B verified (ledger equals capture plus 110; CHECK equals the captured literals plus `player_match_stats`, validated; zero authority rows) |
+| `match-results-promotion` | **32/32** passed (168 s); post-suite census clean |
+| `datasets` | **16/16** passed (3.4 s); clean |
+| `submission-promotion` | **7/7** passed (9.8 s); clean |
+| `settle-afltables` (full) | **76/76** passed (455 s), none skipped; clean |
+| Restore | pre-restore census clean; guarded rollback of 110 only (isolation OK; CHECK, comment and ledger reversed); `92-verify-restored`: ledger, CHECK definition, comment and validation flag equal the capture, zero authority rows |
+| Final census (2026-10-05T22:07:07Z) | **CLEAN**: historical fingerprints equal the baseline, all 35 residue counts 0, retained `fixture_auth_users` 2 and `sports_data_lab_source` 1 (by design) |
+| Provenance | 172 files hashed before any database contact; **172 unchanged** at the end (`provenance-recheck.txt`); manifest sha256 `aa12433b89a2a008ec074870735942d4f912cc1b843292cf16f5594a7be07714` |
+
+Every post-suite census (06, 07, 08, 09), the pre-restore census and the final census read `CLEAN`. Suite files were the
+fixed ones: `settle-afltables.test.ts` sha256 `0a4ed9b2…7196`, `match-results-promotion.test.ts` `2c9cf090…7eeb`,
+`datasets.test.ts` `fa218d2c…2442`, `submission-promotion.test.ts` `fc5360b1…5a79` (all equal to the Static manifests).
+
+### 25.2 The S6 census and the retained batches (what the §24 fix was for)
+
+- **S6 census unchanged since the baseline at every check**, 12 rows: 66, 67, 68, 325, 326, 327, 543, 544, 545, 639, 640, 641.
+  The probe compares each row's `row_md5` as well as its id; the census reported no new, missing or changed S6 row. **No new
+  S6 residue**: the corrected S6 teardown (§24.4) removed the three batches it committed, and the probe saw none.
+- **36 new `import_batches` rows were retained, all `admin-upload`, all explained** as append-only promotion batches by the
+  probe: 15 `match_results`, 2 `player_bio`, 19 `player_match_stats` (15 + 2 + 19 = 36). They exist by design: the promotion
+  suites promote real submissions and the importer never deletes a batch. After the run `import_batches` max id is **1582**
+  (baseline 1444). The id values are not contiguous with the row count (1445 to 1582 is 138 values for 36 rows); this is the
+  same unexplained id-gap pattern already recorded in §24.3 (a), and **no cause is claimed**. The id sequence `last_value` was
+  not re-measured in this window.
+- The 342 baseline rows are byte-identical (the final fingerprint equals the baseline's: `n` 342, hash `-167730445606291829766`).
+
+### 25.3 What is preserved (nothing replaced)
+
+Both earlier failed verdicts stand as recorded: `D:\tmp\issue265\run-20261005-231059-Regression-Full\` and
+`D:\tmp\issue265\run-20261006-052853-Regression-Full\` (§24.1, both **DIRTY**). The diagnostic (`diag-s6-batches-20261005-205549`),
+the cleanup Plan, Execute and Verify folders (§24.9), the archived pre-fix probe and runner (`archive-pre-s6-fix\`), and every
+original baseline are untouched. This window's own `baseline.json` is a new baseline for a new window; it replaces nothing.
+
+### 25.4 What this does and does not show
+
+**Shown:** the four affected integration suites pass in full against `afldb_test` with migration 110 applied (State B), the
+corrected S6 teardown leaves no residue, the historical rows and the twelve S6 batches are unchanged, and migration 110 was
+restored and verified against the capture. The regression window the plan required (§18.2 step 4, §22.6) is **satisfied**.
+**Not shown, and not claimed:** the build; DEV behaviour; PROD; protection against writers that do not take the gate (Match
+Sheet and Data Editor saves, `player_bio`, the award datasets, direct SQL; §23); the unexplained id-gap and sequence anomalies
+(§24.3). `afldb_test` is left in State A (migration 110 not applied), as before the window.
+
+### 25.5 Build-only phase prepared (not executed)
+
+The regression runner could only build inside a Full window (apply 110, run the four suites, then `npm run build`). Rerunning
+that to obtain a build is not wanted, so the runner now has a **`-Phase Build`**. Inspection of the build path:
+
+- `npm run build` is `next build --webpack && node tools/build/prepare-standalone.mjs`. `prepare-standalone.mjs` makes **no
+  database contact** (it copies assets and refuses to ship a `.env*`).
+- The database is touched by **prerendering**: eight async `generateStaticParams` functions (`players/[slug]`, `clubs/[slug]`,
+  `seasons/[year]`, `matches/[id]`, `venues/[slug]`, `awards/[slug]`, `brownlow/[year]`, `honour-teams/[slug]`; the `records`
+  one is synchronous) and the prerendered pages themselves read through `src/db/client.ts`, which throws if `DATABASE_URL` is
+  unset. During a build it opens a pool of 2 per prerender worker (`NEXT_PHASE=phase-production-build`) with
+  `statement_timeout` 5 s. These are application read paths; the build issues no write of its own, and `afldb_app` holds
+  read-only grants. The earlier ISSUE-264 builds as `afldb_app` on `afldb_test` (e.g. `run-20261004-202018`) generated
+  1,515 pages with 19 workers in about 13 s and passed.
+- The worktree has no `.env`, so `DATABASE_URL` comes only from the runner's process environment. Build output (`.next/`,
+  `next-env.d.ts`, `*.tsbuildinfo`) is gitignored.
+
+`-Phase Build` runs the runner's existing read-only gates first (provenance manifest, preconditions including the S6 self-test,
+every `*DATABASE_URL` in the session cleared, all four roles derived to the tunnel endpoint and proved to target `afldb_test`
+under the intended role including **`afldb_app`**, isolation, State A, capture, a baseline that refuses residue and any
+unapproved S6 row), then runs **only** `npm run build` with `DATABASE_URL` set to the derived `afldb_app` URL, clears it, and
+compares a post-build census with the baseline. It applies no migration, runs no suite, writes nothing to the database, and
+needs no restore. Redaction, environment restore and the provenance re-check are unchanged.
+
+| File | SHA-256 |
+|---|---|
+| `D:\tmp\issue265\Invoke-Issue265Regression.ps1` (now, with `-Phase Build`) | `a8797920804b65e526e1875ef8731fe01692a78524d023e3b396086476379d69` |
+| `D:\tmp\issue265\archive-pre-build-phase\Invoke-Issue265Regression.ps1` (the runner as it was for the PASS in §25.1, unchanged) | `66398224eba2c30d0b759f761b5f2c5eeda0d706b067cdc882505a86d3aa3c64` (equal to the §24.10 value) |
+
+The change is three edits (the `ValidateSet`, one `$SkipBuild` line, one phase block) plus a header note. Offline checks:
+PowerShell parse **0 errors**; `-Phase Static` `D:\tmp\issue265\run-20261006-091157-Regression-Static\` **OVERALL: PASS**
+(172 files hashed and unchanged, manifest sha256 `aa11c52d…0ebc4`, which differs from §24.10's `aa12433b…7714` as expected
+because the runner is hashed into it; the four suite hashes are identical; `s6-selftest` passed). The probe, the exception file and the window helper are unchanged.
+One tool-hook artefact: writing the runner's step title text (a `DATABASE_URL` arrow followed by `afldb_test`) made the hook
+create a zero-byte file named `afldb_test` at the repository root; it was removed (it was this pass's own file). Three older
+zero-byte strays remain untracked (§25.7).
+
+**Operator-run command** (the SSH tunnel to `127.0.0.1:55432` must be up; nothing else is needed):
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File D:\tmp\issue265\Invoke-Issue265Regression.ps1 -Phase Build -TunnelHost 127.0.0.1 -TunnelPort 55432 -BuildRole app
+```
+
+Expected: a new folder `D:\tmp\issue265\run-<stamp>-Regression-Build\`; `build role: app`; `01-preflight` ISOLATION OK and `MIGRATION STATE
+OK` (State A, 110 pending); `BASELINE OK` listing the twelve S6 ids; `30-build` exit 0 with `Generating static pages ... (1515/1515)`
+(the count may differ with the data) and `prepare-standalone: standalone bundle ready`; `30-build-check` CLEAN; `npm run build: exit 0,
+check clean`; `OVERALL: PASS`; `restore: not applicable`; `provenance recheck ... unchanged`. A refusal or STOPPED before `30-build`
+means the build never ran and nothing was written. Afterwards read-only `git status` should show no new tracked change.
+
+### 25.6 State
+
+ISSUE-265 **stays open**. Done: mitigation implemented, Phase B 11/11, root cause of the two failed windows fixed and cleaned up,
+**regression window PASSED**. Pending, in order, operator-run: (1) review and commit (§25.7); (2) the build-only command above
+(**since run and PASSED, §25.8**); (3) `npm run merge:ready -- --issue 265`; (4) the operator merges and pushes; (5) DEV
+acceptance (§18.2) and smoke; (6) PROD.
+
+### 25.7 Proposed commit contents (nothing staged; Git is operator-run)
+
+Branch `issue/265-settle-deadlock` on `62f2cd67`. **Stage by explicit path, not `git add -A`.** Eighteen modified tracked files,
+no new tracked file:
+
+| Group | Files |
+|---|---|
+| Source (gate and hooks) | `src/lib/acquisition/settle-core.ts`, `src/lib/acquisition/settle-afltables.ts`, `src/lib/acquisition/settle-afl-api.ts`, `src/lib/ingest/datasets.ts`, `src/db/queries/admin-fixtures.ts` (comment only) |
+| Tests | `tests/ingest-datasets.test.ts`, `tests/match-sheet.test.ts`, `tests/afl-api-ingestion-safety.test.ts`, `tests/integration/match-results-promotion.test.ts`, `tests/integration/settle-afltables.test.ts`, `tests/integration/settle-promotion-deadlock.test.ts` |
+| Docs and tracking | `docs/admin-and-beta.md`, `CHANGELOG.md`, `IssuesIndex.md`, `issues.md`, `issues/open/AFLDB-ISSUE-265.md`, `issues/open/AFLDB-ISSUE-265-phase-a/README.md` |
+| Attributes | `.gitattributes` (five `-text` entries for the archived Phase A tooling, D-265-15) |
+
+**Do not stage:** the three zero-byte untracked strays at the repository root, named `deriveOne('owner'`, `error)` and
+`parseTarget('owner'` (tool-hook artefacts of earlier passes, safe for the operator to delete); and anything under `D:\tmp\`,
+which is outside the repository (the runner, probe, window helper, exception file, cleanup tool and all evidence stay there
+unless separately prepared and reviewed for archival). Git warns that `issues/open/AFLDB-ISSUE-265-phase-a/README.md` and
+`tests/integration/settle-promotion-deadlock.test.ts` have LF endings that Git will convert on the next touch (`core.autocrlf`);
+the provenance manifests record LF-folded hashes for the suites, so this does not affect the evidence.
+
+### 25.8 Build-only phase PASSED (operator-run 2026-10-06, run `20261006-092204`)
+
+*Supersedes "build-only phase prepared (not executed)" in §25.5 and "Not shown: the build" in §25.4 for the build only; both stay as
+the record of their time.* Recorded from the saved evidence only. **No database was contacted by the agent, nothing was staged or
+committed, nothing was deployed, no test or build was re-run, and no evidence file was edited.** The only Git commands used were
+read-only (`status`, `diff --name-only`, `diff --stat`, `ls-files --others`).
+
+Evidence (outside Git, read and left unchanged): `D:\tmp\issue265\run-20261006-092204-Regression-Build\` (`summary.txt`,
+`00-derive` to `30-build-check` logs, `30-build.log`, `capture.json`, `baseline.json`, `30-build-check.json`,
+`provenance-manifest.json` and `.sha256.txt`, `provenance-recheck.txt`). `-Phase Build`, `-BuildRole app`, target
+`afldb_app@127.0.0.1:55432/afldb_test` for the build, tunnel endpoint `127.0.0.1:55432`. **`OVERALL: PASS`.**
+
+| Step | Result |
+|---|---|
+| Preconditions | `s6-selftest` passed (no database contact); all four roles derived to `afldb_test`; target proof (`00-targets`) exit 0 |
+| Preflight (read-only) | `01-preflight` exit 0: isolation OK (no other session holds a transaction or lock); 109 applied, exactly `110_match_sheet_player_match_stats_authority.sql` pending; State A; zero `player_match_stats` authority |
+| Baseline (read-only) | `BASELINE OK`; twelve S6 rows pinned (66, 67, 68, 325-327, 543-545, 639-641), exception approved 2026-10-06 08:46, `rowMd5` pinned on 12 of 12; `import_batches` 378 rows, max id 1582 (the §25.1 post-window state: 342 + 36) |
+| `npm run build` | **exit 0**. Next.js 16.3.1 (webpack); compiled successfully in 21.0 s; TypeScript finished in 26.5 s; **1,515/1,515 static pages** with 19 workers in 13.6 s (the figure the §25.5 expectation cited) |
+| Standalone preparation | `prepare-standalone` ran and ended **`standalone bundle ready`**: no `.env*` under `.next/standalone` (checked before and after), `.next/static`, `public` and `deploy/coming-soon` copied, `.next/cache` created. It logged `AFLDB_ENV is not production; building with development headers` (a build-environment note, not a defect) |
+| Post-build census (`30-build-check`) | exit 0, **CLEAN**: historical fingerprints equal the baseline, all 35 residue counts 0, retained `fixture_auth_users` 2 and `sports_data_lab_source` 1 (by design), `import_batches` max id 1582 and `newSinceBaseline` empty (the build wrote nothing) |
+| S6 pins | **unchanged**: census 12 rows [66, 67, 68, 325, 326, 327, 543, 544, 545, 639, 640, 641], same `row_md5` values as the baseline |
+| Provenance | **172 files hashed before any database contact, 172 unchanged** at the end (`provenance-recheck.txt`); manifest sha256 `aa11c52d3dfaeadbdd2342bd012b60b76f213174483ac37371960a8140a0ebc4` (equal to the §25.5 Static value, as expected for an unchanged runner) |
+| Migration and restore | migration 110 **not applied** by this run; restore not applicable; `afldb_test` remains in State A |
+
+**Warnings in `30-build.log` (recorded as observed; none is claimed to be pre-existing, and none was compared with an earlier build
+log in this pass):**
+
+1. `⚠ The "middleware" file convention is deprecated. Please use "proxy" instead.` (Next.js `middleware-to-proxy`). The build summary
+   lists `ƒ Proxy (Middleware)`. This pass did not locate or change the middleware file.
+2. `⚠ Compiled with warnings in 1155ms`: `./node_modules/next/dist/esm/server/app-render/dynamic-rendering.js` reports "A Node.js API
+   is used (process.cwd at line: 1044) which is not supported in the Edge Runtime", with the import trace
+   `…/request/connection.js` ← `…/web/exports/index.js` ← `…/api/server.js`. It appears **twice** in the log and originates in
+   `node_modules/next`, not in repository code.
+3. The standalone note above (`AFLDB_ENV is not production`) is informational.
+
+The warnings did not fail the build (exit 0, `Compiled successfully`). Whether either predates this branch has **not** been
+established; if it matters, compare against an earlier `afldb_app` build log (for example the ISSUE-264 build
+`run-20261004-202018` named in §25.5) rather than assuming.
+
+**Working tree after the build (read-only Git, 2026-10-06):** branch `issue/265-settle-deadlock`, HEAD `62f2cd67`, nothing staged.
+Exactly the **eighteen** modified tracked files of §25.7 (`18 files changed, 2911 insertions(+), 678 deletions(-)`, before this
+§25.8 and its tracker notes are counted); **no new tracked change from the build** (`.next/`, `next-env.d.ts` and
+`tsconfig.tsbuildinfo` are ignored). Untracked: only the three zero-byte strays of §25.7.
+
+**What this shows and does not show.** Shown: the branch's source (as it stood in the 172-file provenance set) produces a clean
+production build with standalone preparation against `afldb_test` as `afldb_app`, without writing to the database and without
+disturbing the historical rows or the twelve S6 pins. **Not shown, and not claimed:** the commit; `merge:ready`; DEV deployment or
+behaviour; PROD; protection against writers that do not take the gate (§23); the unexplained id-gap and sequence anomalies (§24.3).
+
+**State.** ISSUE-265 **stays open**. Done: mitigation, Phase B 11/11, regression window PASS (§25.1), **build PASS (this
+section)**. Pending, in order, operator-run: (1) review and commit the eighteen files (§25.7, which now also carry this
+section); (2) `npm run merge:ready -- --issue 265`; (3) the operator merges and pushes; (4) `deploy/sync-dev.ps1` to DEV and
+DEV acceptance (§18.2) and smoke; (5) PROD.

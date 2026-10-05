@@ -104,9 +104,11 @@ export const FIXTURE_SOURCE_KEY = 'manual_admin_edit';
 
 /**
  * The `0xAF1DB` advisory namespace: 1 honour teams, 2 admin lifecycle,
- * 3 Brownlow. Fixtures lock per SEASON rather than on a fixed key, so the
- * second argument is the season year itself. Seasons are 1897..2100 and the
- * three fixed keys are 1, 2 and 3, so the two schemes cannot collide.
+ * 3 Brownlow, 4 the settle/legacy-promotion gate (`SETTLE_PROMOTION_GATE` in
+ * `acquisition/settle-core.ts`; AFLDB-ISSUE-265). Fixtures lock per SEASON rather
+ * than on a fixed key, so the second argument is the season year itself. Seasons
+ * are 1897..2100 and the four fixed keys are 1 to 4, so the two schemes cannot
+ * collide.
  */
 export const FIXTURE_LOCK_NAMESPACE = 717275;
 

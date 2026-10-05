@@ -2066,6 +2066,22 @@ const PREFIX122 = 'issue122-';
 const LABEL122 = 'issue122-apply-test';
 const SLUG122 = 'issue122-';
 
+/**
+ * AFLDB-ISSUE-265 §24. The S6 CLI block's snapshot label. Each `--apply` it runs COMMITS a real
+ * `import_batches` row (the CLI owns its transaction), and that row's notes name this label, not
+ * `LABEL122`, so `cleanup122`'s label DELETE never matched it.
+ *
+ * The label is NOT a safe DELETE key: `afldb_test` still holds S6 batches an earlier run left that this
+ * process did not create (ids 66-68, 325-327, 543-545, 639-641), and a label DELETE would remove them.
+ * So the S6 batches are removed by the ids this process recorded in `s6CommittedBatchIds`, each also
+ * re-proved by tool, target, status and the exact notes below.
+ */
+const LABEL_S6 = 'issue122-s6-cli';
+/** Exactly the notes `settle-afltables.ts` writes for an S6 apply (`AFLDB-ISSUE-099 settle; snapshot=...`). */
+const S6_BATCH_NOTES = `AFLDB-ISSUE-099 settle; snapshot=${LABEL_S6}; season=${SEASON122}; mode=apply`;
+/** `import_batches.id` (decimal text) of every batch an S6 `cli()` call committed in THIS process. */
+const s6CommittedBatchIds: string[] = [];
+
 const SCOPE122 = 'issue122-main';
 const SCOPE_FOREIGN = 'issue122-foreign';
 const SCOPE_SOURCELESS = 'issue122-sourceless';
@@ -2575,7 +2591,30 @@ async function cleanup122(client: postgres.Sql): Promise<void> {
     DELETE FROM import_batches
      WHERE tool = 'repair-match-rekeys.ts' AND notes LIKE ${`%season=${SEASON122}%`}
   `;
+  // AFLDB-ISSUE-265 §24: the S6 block's committed `--apply` batches, by the ids THIS process recorded, each
+  // re-proved by tool, target, status and exact notes. Never by label (see LABEL_S6). It runs after every
+  // statement above because those delete the rows that cite a batch. A pre-clean has recorded nothing, so
+  // it removes nothing; an interrupted earlier run's batches are left for the census to report.
+  let s6BatchProblem: string | null = null;
+  if (s6CommittedBatchIds.length > 0) {
+    const recorded = [...s6CommittedBatchIds];
+    const removed = await client<{ id: string }[]>`
+      DELETE FROM import_batches
+       WHERE id = ANY(${recorded}::bigint[])
+         AND tool = 'settle-afltables.ts'
+         AND target_table = 'staging.source_record_versions'
+         AND status = 'completed'
+         AND notes = ${S6_BATCH_NOTES}
+      RETURNING id::text AS id
+    `;
+    if (removed.length === recorded.length) s6CommittedBatchIds.length = 0;
+    else {
+      s6BatchProblem = `S6 teardown removed ${removed.length} of ${recorded.length} recorded batch(es) `
+        + `[${recorded.join(', ')}]; removed [${removed.map((r) => r.id).join(', ')}]`;
+    }
+  }
   await client`DELETE FROM seasons WHERE year = ${SEASON122}`;
+  if (s6BatchProblem !== null) throw new Error(s6BatchProblem);
 }
 
 describe('AFLDB-ISSUE-122 S5 — the canonical applier', () => {
@@ -3420,7 +3459,6 @@ describe('AFLDB-ISSUE-122 S5 — the canonical applier', () => {
    * ================================================================ */
 
   describe('S6 — the operational path end to end', () => {
-    const LABEL_S6 = 'issue122-s6-cli';
     const SCOPE_S6 = 'issue122-s6';
     const MATCH_S6 = 'issue122-s6-match';
     const KEY_S6 = 'issue122-s6-key';
@@ -3531,24 +3569,46 @@ describe('AFLDB-ISSUE-122 S5 — the canonical applier', () => {
     async function cli(args: string[]): Promise<{ outcome: SettleCliOutcome; lines: string[] }> {
       const lines: string[] = [];
       revalidatedS6 = [];
-      const outcome = await runSettleCli(args, {
-        projectRoot: rootS6,
-        sql,
-        log: (line) => lines.push(line),
-        env: {},
-        revalidate: async (season) => {
-          revalidatedS6.push(season);
-          return {
-            ok: true,
-            season,
-            path: `/seasons/${season}`,
-            workersReached: ['1'],
-            workerCount: 1,
-            attempts: 1,
-            failures: [],
-          };
-        },
-      });
+      // AFLDB-ISSUE-265 §24 (review F-002): `runSettleCli` commits the batch inside `runSettleAfltables` and THEN
+      // builds its report, so it can throw after the commit with no outcome to read the id from. Remember this
+      // process's own id high-water mark so a batch committed by a call that then throws is still recorded.
+      const [{ highWater }] = await sql<{ highWater: string }[]>`
+        SELECT coalesce(max(id), 0)::text AS "highWater" FROM import_batches
+      `;
+      let outcome: SettleCliOutcome;
+      try {
+        outcome = await runSettleCli(args, {
+          projectRoot: rootS6,
+          sql,
+          log: (line) => lines.push(line),
+          env: {},
+          revalidate: async (season) => {
+            revalidatedS6.push(season);
+            return {
+              ok: true,
+              season,
+              path: `/seasons/${season}`,
+              workersReached: ['1'],
+              workerCount: 1,
+              attempts: 1,
+              failures: [],
+            };
+          },
+        });
+      } catch (error) {
+        const orphans = await sql<{ id: string }[]>`
+          SELECT id::text AS id FROM import_batches
+           WHERE id > ${highWater}::bigint AND tool = 'settle-afltables.ts' AND notes = ${S6_BATCH_NOTES}
+        `;
+        for (const orphan of orphans) s6CommittedBatchIds.push(orphan.id);
+        throw error;
+      }
+      // AFLDB-ISSUE-265 §24: an applied run committed a batch row. Record its id the moment it exists, so the
+      // teardown removes exactly what this process created even if a later assertion in the test fails.
+      const committedBatchId = outcome.result?.batchId;
+      if (committedBatchId !== null && committedBatchId !== undefined) {
+        s6CommittedBatchIds.push(String(committedBatchId));
+      }
       return { outcome, lines };
     }
 

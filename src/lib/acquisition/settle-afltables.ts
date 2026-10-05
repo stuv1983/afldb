@@ -91,6 +91,7 @@ import {
   type SourceFamilyRegistry,
 } from './source-families';
 import {
+  acquireSettlePromotionGate,
   affectedPlayerIds,
   runDerivedRecomputeWithDeadlockRetry,
   agreementRestored as coreAgreementRestored,
@@ -1832,6 +1833,10 @@ export async function runSettleAfltables(
 
   try {
     await sql.begin(async (tx) => {
+      // AFLDB-ISSUE-265: the shared settle/legacy-promotion gate comes before loadRefs,
+      // every row lock and every write. A promotion in flight makes this wait (bounded);
+      // on a timeout the run fails here with nothing written.
+      await acquireSettlePromotionGate(tx);
       const refs = await loadRefs(
         tx, bundle.season, matchRekeyScopeOf(bundle, sweep.sweepable),
       );

@@ -138,6 +138,7 @@ import {
   scopeProposalToAuthority,
 } from './settle-afltables';
 import {
+  acquireSettlePromotionGate,
   affectedPlayerIds,
   runDerivedRecomputeWithDeadlockRetry,
   APPLY_FINDING_RESOLUTION,
@@ -1902,6 +1903,10 @@ export async function runSettleAflApi(
 
   try {
     await sql.begin(async (tx) => {
+      // AFLDB-ISSUE-265: the shared settle/legacy-promotion gate comes before loadRefs,
+      // every row lock and every write. A promotion in flight makes this wait (bounded);
+      // on a timeout the run fails here with nothing written.
+      await acquireSettlePromotionGate(tx);
       const refs = await loadRefs(tx, refusalEvidence);
       const [batch] = await tx<{ id: string }[]>`
         INSERT INTO import_batches (source_id, tool, target_table, records_read, notes)

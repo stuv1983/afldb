@@ -29,9 +29,15 @@ import {
   type MatchSheetStatRow,
 } from '@/lib/acquisition/match-sheet-authority';
 import {
+  acquireSettlePromotionGate,
   DERIVED_RECOMPUTE_DEADLOCK_BACKOFF_MS,
   runDerivedRecomputeWithDeadlockRetry,
+  SETTLE_PROMOTION_GATE,
+  SETTLE_PROMOTION_GATE_STATEMENT_BOUND_MS,
+  SETTLE_PROMOTION_GATE_WAIT_MS,
+  SettlePromotionGateTimeout,
   type SavepointTx,
+  type SettleGateTx,
 } from '@/lib/acquisition/settle-core';
 import type { PlayerMatchStatInput } from '@/lib/match-sheet';
 
@@ -567,6 +573,208 @@ describe('F-S4-01 deadlock handling (AFLDB-ISSUE-257)', () => {
     }
     const sheet = fs.readFileSync(path.join(process.cwd(), 'src/db/queries/match-sheet.ts'), 'utf-8');
     expect(sheet).toContain('matchSheetRetryableRefusal(err)');
+  });
+});
+
+// AFLDB-ISSUE-265: the shared settle/legacy-promotion gate (runbook §12, §20.2, D-265-5).
+describe('ISSUE-265 settle gate', () => {
+  const pgError = (code: string) => Object.assign(new Error(`pg ${code}`), { code });
+
+  /** A fake transaction that answers the gate's statements by shape and records each. */
+  function gateTx(opts: { lockTimeout?: string; statementTimeout?: string; gateFails?: string } = {}) {
+    const calls: { text: string; values: unknown[] }[] = [];
+    const tx: SettleGateTx = async (strings, ...values) => {
+      const text = strings.join('?');
+      calls.push({ text, values: [...values] });
+      if (/current_setting/.test(text)) {
+        return [{ lockTimeout: opts.lockTimeout ?? '0', statementTimeout: opts.statementTimeout ?? '0' }];
+      }
+      if (/pg_advisory_xact_lock_shared/.test(text) && opts.gateFails) throw pgError(opts.gateFails);
+      return [];
+    };
+    const kinds = () => calls.map((c) => (/current_setting/.test(c.text) ? 'read'
+      : /pg_advisory_xact_lock_shared/.test(c.text) ? 'gate'
+        : /set_config/.test(c.text) ? 'set' : '?'));
+    return { tx, calls, kinds };
+  }
+
+  it('pins the key, the accepted D-265-5 values and their relationship', () => {
+    expect(SETTLE_PROMOTION_GATE).toEqual({ classId: 717275, objId: 4 });
+    expect(SETTLE_PROMOTION_GATE_WAIT_MS).toBe(300_000);
+    expect(SETTLE_PROMOTION_GATE_STATEMENT_BOUND_MS).toBe(330_000);
+    expect(SETTLE_PROMOTION_GATE_STATEMENT_BOUND_MS).toBeGreaterThan(SETTLE_PROMOTION_GATE_WAIT_MS);
+  });
+
+  it('runs read, set both, the SHARED gate, restore both, in that order, and nothing else', async () => {
+    const { tx, calls, kinds } = gateTx({ lockTimeout: '5s', statementTimeout: '2min' });
+    await acquireSettlePromotionGate(tx);
+    expect(kinds()).toEqual(['read', 'set', 'gate', 'set']);
+    expect(calls[1].values).toEqual(['300000', '330000']);
+    expect(calls[2].values).toEqual([717275, 4]);
+    expect(calls[2].text).toContain('pg_advisory_xact_lock_shared');
+    // Both previous settings come back, to the values read, not to 0 or to the gate's own.
+    expect(calls[3].values).toEqual(['5s', '2min']);
+    for (const call of calls) expect(call.text).not.toMatch(/\b(FROM|INSERT|UPDATE|DELETE)\b/i);
+    expect(calls.some((c) => /\bSET\s+(LOCAL\s+)?(lock|statement)_timeout/i.test(c.text))).toBe(false);
+  });
+
+  // `set_config(..., false)` would set the SESSION value, which outlives the transaction on a pooled
+  // connection. The helper must only ever set transaction-local values: two sets, two restores.
+  it('sets and restores both settings transaction-locally (third argument true)', () => {
+    const src = fs.readFileSync(path.join(process.cwd(), 'src/lib/acquisition/settle-core.ts'), 'utf-8');
+    const body = src.slice(src.indexOf('export async function acquireSettlePromotionGate'));
+    expect(body.match(/set_config\('(lock|statement)_timeout', \$\{[^}]+\}, true\)/g)).toHaveLength(4);
+    expect(body).not.toMatch(/set_config\([^)]*false\)/);
+  });
+
+  it('turns ONLY a 55P03 at the gate into SettlePromotionGateTimeout, keeping the cause', async () => {
+    const { tx, kinds } = gateTx({ gateFails: '55P03' });
+    const error = await acquireSettlePromotionGate(tx).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(SettlePromotionGateTimeout);
+    expect(error).toMatchObject({ name: 'SettlePromotionGateTimeout', cause: { code: '55P03' } });
+    expect((error as Error).message).toContain(`${SETTLE_PROMOTION_GATE_WAIT_MS / 1000} s`);
+    expect((error as Error).message).toMatch(/legacy CSV promotion/);
+    expect((error as Error).message).toMatch(/wrote nothing/);
+    // Nothing is restored on failure: the aborted transaction's rollback reverts both settings.
+    expect(kinds()).toEqual(['read', 'set', 'gate']);
+  });
+
+  // 57014 is what pg_cancel_backend raises too, so it must never read as a gate timeout.
+  it.each(['57014', '40P01', '23505', '40001'])('passes SQLSTATE %s through unchanged', async (code) => {
+    const { tx } = gateTx({ gateFails: code });
+    const error = await acquireSettlePromotionGate(tx).catch((e: unknown) => e);
+    expect(error).not.toBeInstanceOf(SettlePromotionGateTimeout);
+    expect(error).toMatchObject({ code, message: `pg ${code}` });
+  });
+
+  it('passes a plain error without a SQLSTATE through unchanged', async () => {
+    const tx: SettleGateTx = async (strings) => {
+      if (/current_setting/.test(strings.join('?'))) return [{ lockTimeout: '0', statementTimeout: '0' }];
+      if (/pg_advisory_xact_lock_shared/.test(strings.join('?'))) throw new Error('boom');
+      return [];
+    };
+    await expect(acquireSettlePromotionGate(tx)).rejects.toThrow('boom');
+  });
+
+  // The gate must be the first call in each settle's transaction, ahead of loadRefs and every
+  // data statement, and the Brownlow settle (which writes no match row) must not take it.
+  it('both settles call the gate as the first statement of their sql.begin callback', () => {
+    for (const file of ['src/lib/acquisition/settle-afltables.ts', 'src/lib/acquisition/settle-afl-api.ts']) {
+      const src = fs.readFileSync(path.join(process.cwd(), file), 'utf-8');
+      const begins = src.split('await sql.begin(async (tx) => {');
+      expect(begins, file).toHaveLength(2);
+      const afterBegin = begins[1].replace(/^(\s*\/\/[^\n]*\n)+/, '\n');
+      expect(afterBegin.trimStart().startsWith('await acquireSettlePromotionGate(tx);'), file).toBe(true);
+      expect(src.indexOf('await acquireSettlePromotionGate(tx);'), file)
+        .toBeLessThan(src.indexOf('await loadRefs(', src.indexOf('await acquireSettlePromotionGate(tx);')));
+      expect(src.split('acquireSettlePromotionGate(tx)').length - 1, file).toBe(1);
+    }
+    const brownlow = fs.readFileSync(path.join(process.cwd(), 'src/lib/acquisition/afl-api-brownlow.ts'), 'utf-8');
+    expect(brownlow).not.toContain('acquireSettlePromotionGate');
+  });
+
+  it('the legacy promotion hooks take the EXCLUSIVE gate inside withLegacyLockTimeout, before work()', () => {
+    const src = fs.readFileSync(path.join(process.cwd(), 'src/lib/ingest/datasets.ts'), 'utf-8');
+    const start = src.indexOf('async function withLegacyLockTimeout');
+    // CRLF-safe: a Windows checkout ends lines with \r\n.
+    const end = src.slice(start).search(/\r?\n\}\r?\n/);
+    expect(start).toBeGreaterThan(0);
+    expect(end).toBeGreaterThan(0);
+    const body = src.slice(start, start + end);
+    expect(body).toMatch(/SELECT pg_advisory_xact_lock\(\$\{SETTLE_PROMOTION_GATE\.classId\}, \$\{SETTLE_PROMOTION_GATE\.objId\}\)/);
+    expect(body).not.toContain('_shared');
+    expect(body.indexOf("set_config('lock_timeout'")).toBeLessThan(body.indexOf('pg_advisory_xact_lock'));
+    expect(body.indexOf('pg_advisory_xact_lock')).toBeLessThan(body.indexOf('await work()'));
+    expect(body.indexOf('pg_advisory_xact_lock')).toBeGreaterThan(body.indexOf('try {'));
+  });
+});
+
+// AFLDB-ISSUE-265 §24. The settle-afltables suite's S6 block commits real import_batches rows. Its
+// teardown must remove only the ones THIS process created. afldb_test also holds twelve S6 batches an
+// earlier run left (ids 66-68, 325-327, 543-545, 639-641), so a label DELETE is forbidden. DB-free pin.
+describe('ISSUE-265 S6 batch teardown (settle-afltables suite)', () => {
+  const read = (file: string) =>
+    fs.readFileSync(path.join(process.cwd(), file), 'utf-8').replace(/\r\n/g, '\n');
+  const suite = read('tests/integration/settle-afltables.test.ts');
+  const cleanupStart = suite.indexOf('async function cleanup122(');
+  const cleanup = suite.slice(cleanupStart, suite.indexOf('\n}\n', cleanupStart));
+
+  it('finds the cleanup function and the S6 constants', () => {
+    expect(cleanupStart).toBeGreaterThan(0);
+    expect(suite).toContain("const LABEL_S6 = 'issue122-s6-cli';");
+    expect(suite).toContain('const s6CommittedBatchIds: string[] = [];');
+    expect(suite.split("const LABEL_S6 = ").length - 1).toBe(1);
+  });
+
+  it('deletes S6 batches only by the ids this process recorded, with exact ownership predicates', () => {
+    // Each statement ends at its closing template literal, so trailing comments are not part of it.
+    const statements = (text: string) => text.split('DELETE FROM import_batches').slice(1)
+      .map((d) => d.slice(0, d.indexOf('`;')));
+    const s6 = statements(cleanup).filter((d) => d.includes('recorded') || d.includes('S6_BATCH_NOTES'));
+    expect(statements(cleanup)).toHaveLength(3);
+    expect(s6).toHaveLength(1);
+    const stmt = s6[0];
+    expect(stmt).toContain('id = ANY(${recorded}::bigint[])');
+    expect(stmt).toContain("tool = 'settle-afltables.ts'");
+    expect(stmt).toContain("target_table = 'staging.source_record_versions'");
+    expect(stmt).toContain("status = 'completed'");
+    expect(stmt).toContain('notes = ${S6_BATCH_NOTES}');
+    expect(stmt).toContain('RETURNING id::text AS id');
+    // Never a LIKE on the label, anywhere in this suite's import_batches DELETEs.
+    for (const where of statements(suite)) {
+      expect(where, where).not.toMatch(/LABEL_S6|issue122-s6/);
+    }
+    expect(cleanup).toContain('const recorded = [...s6CommittedBatchIds];');
+    expect(cleanup).toContain('if (s6BatchProblem !== null) throw new Error(s6BatchProblem);');
+  });
+
+  it('runs after every statement that deletes a row citing a batch, and before nothing it depends on', () => {
+    const at = cleanup.indexOf('id = ANY(${recorded}::bigint[])');
+    for (const dependent of [
+      'DELETE FROM canonical_applications',
+      'DELETE FROM staging.source_record_versions',
+      'DELETE FROM staging.source_records',
+      'DELETE FROM promotion_candidates',
+      'DELETE FROM import_rejections',
+      'DELETE FROM matches',
+      'DELETE FROM club_seasons',
+    ]) {
+      expect(cleanup.lastIndexOf(dependent), dependent).toBeGreaterThan(0);
+      expect(cleanup.lastIndexOf(dependent), dependent).toBeLessThan(at);
+    }
+    // The season row is removed even when the batch removal came up short; the failure is thrown afterwards.
+    expect(cleanup.indexOf('DELETE FROM seasons WHERE year = ${SEASON122}')).toBeGreaterThan(at);
+    expect(cleanup.indexOf('if (s6BatchProblem !== null)')).toBeGreaterThan(cleanup.indexOf('DELETE FROM seasons'));
+  });
+
+  it('cli() records the id of every batch an S6 run committed, and only those', () => {
+    const start = suite.indexOf('async function cli(args: string[])');
+    const body = suite.slice(start, suite.indexOf('\n    }\n', start));
+    expect(body).toContain('const committedBatchId = outcome.result?.batchId;');
+    expect(body).toContain('s6CommittedBatchIds.push(String(committedBatchId));');
+    expect(body.indexOf('runSettleCli(')).toBeLessThan(body.indexOf('s6CommittedBatchIds.push'));
+  });
+
+  // Review F-002: runSettleCli commits, then builds its report. A throw after the commit has no outcome to
+  // read the id from, so cli() must find the batch by this process's own id high-water mark and exact notes.
+  it('cli() still records a batch committed by a call that then throws', () => {
+    const start = suite.indexOf('async function cli(args: string[])');
+    const body = suite.slice(start, suite.indexOf('\n    }\n', start));
+    expect(body).toContain('SELECT coalesce(max(id), 0)::text AS "highWater" FROM import_batches');
+    expect(body).toContain('} catch (error) {');
+    expect(body).toContain("WHERE id > ${highWater}::bigint AND tool = 'settle-afltables.ts' AND notes = ${S6_BATCH_NOTES}");
+    expect(body).toContain('for (const orphan of orphans) s6CommittedBatchIds.push(orphan.id);');
+    expect(body.indexOf('highWater')).toBeLessThan(body.indexOf('runSettleCli('));
+    expect(body.indexOf('throw error;')).toBeGreaterThan(body.indexOf('s6CommittedBatchIds.push(orphan.id)'));
+    // The exact-notes predicate is the whole ownership test here: never a label match.
+    expect(body).not.toMatch(/LIKE/);
+  });
+
+  it('S6_BATCH_NOTES is exactly the notes the settle writes for an apply', () => {
+    expect(suite).toContain('const S6_BATCH_NOTES = `AFLDB-ISSUE-099 settle; snapshot=${LABEL_S6}; season=${SEASON122}; mode=apply`;');
+    const settle = read('src/lib/acquisition/settle-afltables.ts');
+    expect(settle).toContain('`AFLDB-ISSUE-099 settle; snapshot=${bundle.snapshotLabel}; `');
+    expect(settle).toContain('`season=${bundle.season}; mode=${options.apply ? \'apply\' : \'dry-run\'}`');
   });
 });
 

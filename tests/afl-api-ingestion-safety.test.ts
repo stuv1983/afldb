@@ -443,6 +443,11 @@ function makeBatchLifecycleSql(options: BatchStubOptions = {}) {
     async (strings: TemplateStringsArray, ...values: unknown[]) => {
       const text = strings.join('?').replace(/\s+/g, ' ').trim();
       statements.push({ text, values });
+      // AFLDB-ISSUE-265: the shared settle/legacy-promotion gate is the run's first call
+      // (`acquireSettlePromotionGate`): read both timeouts, set both, the gate, restore both.
+      if (text.startsWith("SELECT current_setting('lock_timeout')")) return [{ lockTimeout: '0', statementTimeout: '0' }];
+      if (text.startsWith('SELECT set_config(')) return [];
+      if (text.startsWith('SELECT pg_advisory_xact_lock_shared(')) return [];
       if (text === 'SELECT id, key FROM sources') return [{ id: 1, key: 'afl_api' }];
       if (text === "SELECT id FROM sources WHERE key = 'afl_api'") return [{ id: 1 }];
       if (text.startsWith('INSERT INTO import_batches')) return [{ id: '42' }];
@@ -523,6 +528,20 @@ describe('AFLDB-ISSUE-244 F008 — runSettleAflApi() batch lifecycle', () => {
     expect(kinds().slice(-3)).toEqual(['INSERT INTO import_batches', 'SELECT count(*)::int AS', 'UPDATE import_batches SET']);
     // What the batch says is what the run returned.
     expect(statements.at(-1)?.values[3]).toEqual({ jsonValue: result.counters });
+  });
+
+  // AFLDB-ISSUE-265: before every other statement of the run, and nothing but the four gate statements ahead
+  // of `loadRefs`' first read: current_setting, set_config, the SHARED gate, set_config.
+  it('takes the shared settle/promotion gate first, ahead of every read and write', async () => {
+    const { sql, statements } = makeBatchLifecycleSql({ rejectionRows: 0 });
+    await runSettleAflApi(sql, { ...base, bundle: emptyBundle(), apply: true });
+    const kind = (text: string) => (/current_setting/.test(text) ? 'read'
+      : /pg_advisory_xact_lock_shared/.test(text) ? 'gate'
+        : /set_config/.test(text) ? 'set' : 'other');
+    expect(statements.slice(0, 4).map((s) => kind(s.text))).toEqual(['read', 'set', 'gate', 'set']);
+    expect(statements[2].values).toEqual([717275, 4]);
+    expect(statements.slice(4).some((s) => kind(s.text) !== 'other')).toBe(false);
+    expect(statements.slice(4).length).toBeGreaterThan(0);
   });
 
   it('a dry-run still exercises the real finalising UPDATE, then rolls back and presents no committed batch', async () => {

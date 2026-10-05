@@ -442,7 +442,10 @@ describe('AFLDB-ISSUE-264 player_match_stats against durable Match Sheet authori
     /** Answers preparePromotion's queries by shape and records each, with its values. */
     function promotionSql(
       records: Rec[],
-      opts: { existing?: Pair[]; badKey?: boolean; missing?: number[]; lockFails?: string; previous?: string } = {},
+      opts: {
+        existing?: Pair[]; badKey?: boolean; missing?: number[]; lockFails?: string; previous?: string;
+        gateFails?: string;
+      } = {},
     ) {
       const queries: { text: string; values: unknown[] }[] = [];
       const tag = (strings: TemplateStringsArray, ...values: unknown[]) => {
@@ -450,6 +453,12 @@ describe('AFLDB-ISSUE-264 player_match_stats against durable Match Sheet authori
         queries.push({ text, values });
         if (/current_setting\('lock_timeout'\)/.test(text)) return Promise.resolve([{ previous: opts.previous ?? '0' }]);
         if (/set_config\('lock_timeout'/.test(text)) return Promise.resolve([]);
+        // AFLDB-ISSUE-265: the exclusive settle/promotion gate.
+        if (/pg_advisory_xact_lock\(/.test(text)) {
+          return opts.gateFails
+            ? Promise.reject(Object.assign(new Error('canceling statement'), { code: opts.gateFails }))
+            : Promise.resolve([]);
+        }
         if (opts.lockFails && /FROM matches[\s\S]*FOR SHARE/.test(text)) {
           return Promise.reject(Object.assign(new Error('canceling statement'), { code: opts.lockFails }));
         }
@@ -491,10 +500,11 @@ describe('AFLDB-ISSUE-264 player_match_stats against durable Match Sheet authori
 
     const prepare = (rows: PromotionRow[], sql: Sql) => playerMatchStats.preparePromotion!(rows, { sql });
 
-    // F-002: both legacy writers take their match locks in a hook, so they share one lock order.
-    it('is registered for both legacy writers, match_results and player_match_stats', () => {
+    // F-002 / ISSUE-265: every legacy writer of matches takes its match locks in a hook, so they
+    // share one lock order and the settle/promotion gate. match_attendance joined in ISSUE-265.
+    it('is registered for all three legacy match writers', () => {
       expect(Object.values(DATASETS).filter((spec) => spec.preparePromotion).map((spec) => spec.key).sort())
-        .toEqual(['match_results', 'player_match_stats']);
+        .toEqual(['match_attendance', 'match_results', 'player_match_stats']);
     });
 
     it('locks the matches FOR SHARE, ascending, before reading authority, and writes nothing', async () => {
@@ -523,10 +533,39 @@ describe('AFLDB-ISSUE-264 player_match_stats against durable Match Sheet authori
       expect(queries.some((q) => /\bSET\s+(LOCAL\s+)?lock_timeout/i.test(q.text))).toBe(false);
     });
 
+    // ISSUE-265: the order is read setting, set 5 s, EXCLUSIVE gate, matches lock, restore. The gate
+    // is bounded by the 5 s set before it, and precedes every match lock and every read of authority.
+    it('takes the exclusive settle/promotion gate after the 5s bound and before the matches lock', async () => {
+      const { sql, queries } = promotionSql([], { previous: '30s' });
+      await prepare([row()], sql);
+      const at = (needle: RegExp) => queries.findIndex((q) => needle.test(q.text));
+      const gate = at(/pg_advisory_xact_lock\(/);
+      expect(queries.filter((q) => /pg_advisory_xact_lock/.test(q.text))).toHaveLength(1);
+      expect(queries[gate].text).not.toMatch(/_shared/);
+      expect(queries[gate].values).toEqual([717275, 4]);
+      expect(at(/current_setting\('lock_timeout'\)/)).toBeLessThan(at(/set_config\('lock_timeout'/));
+      expect(at(/set_config\('lock_timeout'/)).toBeLessThan(gate);
+      expect(gate).toBeLessThan(at(/FROM matches/));
+      expect(gate).toBeLessThan(at(/FROM data_overrides/));
+      expect(queries.slice(0, gate).every((q) => /current_setting|set_config/.test(q.text))).toBe(true);
+    });
+
     it.each(['55P03', '40P01'])('turns SQLSTATE %s into the retryable refusal', async (code) => {
       const { sql } = promotionSql([], { lockFails: code });
       await expect(prepare([row()], sql)).rejects.toThrow(LEGACY_PROMOTION_LOCK_REFUSAL);
       await expect(prepare([row()], sql)).rejects.toMatchObject({ cause: { code } });
+    });
+
+    it.each(['55P03', '40P01'])('turns SQLSTATE %s at the GATE into the retryable refusal, before any match lock', async (code) => {
+      const { sql, queries } = promotionSql([], { gateFails: code });
+      await expect(prepare([row()], sql)).rejects.toThrow(LEGACY_PROMOTION_LOCK_REFUSAL);
+      expect(queries.some((q) => /FROM matches/.test(q.text))).toBe(false);
+    });
+
+    it('leaves any other gate error untouched', async () => {
+      const error = await prepare([row()], promotionSql([], { gateFails: '57014' }).sql).catch((e: unknown) => e);
+      expect(error).toMatchObject({ code: '57014', message: 'canceling statement' });
+      expect(String(error)).not.toContain(LEGACY_PROMOTION_LOCK_REFUSAL);
     });
 
     it('leaves any other error, and a real refusal, untouched', async () => {
@@ -604,13 +643,18 @@ describe('AFLDB-ISSUE-264 player_match_stats against durable Match Sheet authori
   // ISSUE-264 F-002: match_results takes the same ascending match locks as the stats hook, in
   // the strength its own upsert takes, before it writes anything.
   describe('match_results promotion lock', () => {
-    function lockSql(opts: { lockFails?: string } = {}) {
+    function lockSql(opts: { lockFails?: string; gateFails?: string } = {}) {
       const queries: { text: string; values: unknown[] }[] = [];
       const tag = (strings: TemplateStringsArray, ...values: unknown[]) => {
         const text = strings.join('?');
         queries.push({ text, values });
         if (/current_setting\('lock_timeout'\)/.test(text)) return Promise.resolve([{ previous: '0' }]);
         if (/set_config\('lock_timeout'/.test(text)) return Promise.resolve([]);
+        if (/pg_advisory_xact_lock\(/.test(text)) {
+          return opts.gateFails
+            ? Promise.reject(Object.assign(new Error('canceling statement'), { code: opts.gateFails }))
+            : Promise.resolve([]);
+        }
         if (/FROM matches/.test(text)) {
           return opts.lockFails
             ? Promise.reject(Object.assign(new Error('canceling statement'), { code: opts.lockFails }))
@@ -652,9 +696,29 @@ describe('AFLDB-ISSUE-264 player_match_stats against durable Match Sheet authori
       expect(queries.some((q) => /\bSET\s+(LOCAL\s+)?lock_timeout/i.test(q.text))).toBe(false);
     });
 
+    // ISSUE-265: read setting, set 5 s, exclusive gate, matches lock, restore.
+    it('takes the exclusive gate after the 5s bound and before the matches lock', async () => {
+      const { sql, queries } = lockSql();
+      await prepare([mrRow(1, 'R1')], sql);
+      const kinds = queries.map((q) => (/current_setting/.test(q.text) ? 'read'
+        : /pg_advisory_xact_lock\(/.test(q.text) ? 'gate'
+          : /set_config/.test(q.text) ? 'set'
+            : /FROM matches/.test(q.text) ? 'matches' : '?'));
+      expect(kinds).toEqual(['read', 'set', 'gate', 'matches', 'set']);
+      const gate = queries.find((q) => /pg_advisory_xact_lock\(/.test(q.text))!;
+      expect(gate.text).not.toMatch(/_shared/);
+      expect(gate.values).toEqual([717275, 4]);
+    });
+
     it.each(['55P03', '40P01'])('turns SQLSTATE %s into the retryable refusal', async (code) => {
       await expect(prepare([mrRow(1, 'R1')], lockSql({ lockFails: code }).sql))
         .rejects.toThrow(LEGACY_PROMOTION_LOCK_REFUSAL);
+    });
+
+    it.each(['55P03', '40P01'])('turns SQLSTATE %s at the GATE into the retryable refusal, before any match lock', async (code) => {
+      const { sql, queries } = lockSql({ gateFails: code });
+      await expect(prepare([mrRow(1, 'R1')], sql)).rejects.toThrow(LEGACY_PROMOTION_LOCK_REFUSAL);
+      expect(queries.some((q) => /FROM matches/.test(q.text))).toBe(false);
     });
 
     it.each<[string, Record<string, number | string | null>]>([
@@ -675,6 +739,86 @@ describe('AFLDB-ISSUE-264 player_match_stats against durable Match Sheet authori
       await expect(prepare([noRound], sql)).rejects.toThrow(/Row 5 carries no resolved season, clubs, round or date/);
       await expect(prepare([noDate], sql)).rejects.toThrow(/Row 6 carries no resolved season, clubs, round or date/);
       expect(queries).toEqual([]);
+    });
+  });
+
+  // ISSUE-265 (review F-001, D-265-10): match_attendance was a third legacy match writer with no hook.
+  // It now takes the same exclusive gate, then ONE ascending FOR NO KEY UPDATE over the matches it
+  // names, before its per-row UPDATEs.
+  describe('match_attendance promotion lock', () => {
+    const matchAttendance = DATASETS.match_attendance;
+
+    function lockSql(opts: { lockFails?: string; gateFails?: string } = {}) {
+      const queries: { text: string; values: unknown[] }[] = [];
+      const tag = (strings: TemplateStringsArray, ...values: unknown[]) => {
+        const text = strings.join('?');
+        queries.push({ text, values });
+        if (/current_setting\('lock_timeout'\)/.test(text)) return Promise.resolve([{ previous: '7s' }]);
+        if (/set_config\('lock_timeout'/.test(text)) return Promise.resolve([]);
+        const failure = (code: string) => Promise.reject(Object.assign(new Error('canceling statement'), { code }));
+        if (/pg_advisory_xact_lock\(/.test(text)) return opts.gateFails ? failure(opts.gateFails) : Promise.resolve([]);
+        if (/FROM matches/.test(text)) return opts.lockFails ? failure(opts.lockFails) : Promise.resolve([]);
+        throw new Error(`unexpected query: ${text}`);
+      };
+      return { sql: tag as unknown as Sql, queries };
+    }
+
+    const attRow = (rowNo: number, matchId: number | string | null): PromotionRow => ({
+      rowNo,
+      payload: { match_id: String(matchId), attendance: '1000' },
+      resolved: { match_id: matchId, attendance: 1000 },
+    });
+    const prepare = (rows: PromotionRow[], sql: Sql) => matchAttendance.preparePromotion!(rows, { sql });
+
+    it('is registered with a hook', () => {
+      expect(matchAttendance.preparePromotion).toBeTypeOf('function');
+    });
+
+    it('locks the named matches in ONE ascending statement, FOR NO KEY UPDATE, after the exclusive gate', async () => {
+      const { sql, queries } = lockSql();
+      await prepare([attRow(1, 502), attRow(2, 500), attRow(3, 501), attRow(4, 502)], sql);
+      const kinds = queries.map((q) => (/current_setting/.test(q.text) ? 'read'
+        : /pg_advisory_xact_lock\(/.test(q.text) ? 'gate'
+          : /set_config/.test(q.text) ? 'set'
+            : /FROM matches/.test(q.text) ? 'matches' : '?'));
+      expect(kinds).toEqual(['read', 'set', 'gate', 'matches', 'set']);
+      const gate = queries.find((q) => /pg_advisory_xact_lock\(/.test(q.text))!;
+      expect(gate.text).not.toMatch(/_shared/);
+      expect(gate.values).toEqual([717275, 4]);
+      const lock = queries.find((q) => /FROM matches/.test(q.text))!;
+      expect(lock.text).toMatch(/WHERE id = ANY\([\s\S]*ORDER BY id\s+FOR NO KEY UPDATE\s*$/);
+      expect(lock.text).not.toMatch(/FOR UPDATE|FOR SHARE/);
+      expect(lock.values[0]).toEqual([500, 501, 502]);
+      expect(queries.some((q) => /\b(INSERT|DELETE)\b|\bUPDATE\s+\w/.test(q.text))).toBe(false);
+    });
+
+    it('bounds the wait with the 5s timeout and restores the previous value', async () => {
+      const { sql, queries } = lockSql();
+      await prepare([attRow(1, 500)], sql);
+      expect(queries.filter((q) => /set_config\('lock_timeout'/.test(q.text)).map((q) => q.values))
+        .toEqual([['5s'], ['7s']]);
+    });
+
+    it.each([
+      ['no match id', null], ['a zero match id', 0], ['a negative match id', -3],
+      ['a fractional match id', 1.5], ['a text match id', 'abc'],
+    ])('refuses %s before taking any lock', async (_label, matchId) => {
+      const { sql, queries } = lockSql();
+      await expect(prepare([attRow(1, 500), attRow(9, matchId)], sql)).rejects.toThrow(/Row 9 carries no resolved match/);
+      expect(queries).toEqual([]);
+    });
+
+    it.each(['55P03', '40P01'])('turns SQLSTATE %s at the gate or the lock into the retryable refusal', async (code) => {
+      const atGate = lockSql({ gateFails: code });
+      await expect(prepare([attRow(1, 500)], atGate.sql)).rejects.toThrow(LEGACY_PROMOTION_LOCK_REFUSAL);
+      expect(atGate.queries.some((q) => /FROM matches/.test(q.text))).toBe(false);
+      await expect(prepare([attRow(1, 500)], lockSql({ lockFails: code }).sql)).rejects.toThrow(LEGACY_PROMOTION_LOCK_REFUSAL);
+    });
+
+    it('leaves any other error untouched', async () => {
+      const error = await prepare([attRow(1, 500)], lockSql({ lockFails: '23505' }).sql).catch((e: unknown) => e);
+      expect(error).toMatchObject({ code: '23505' });
+      expect(String(error)).not.toContain(LEGACY_PROMOTION_LOCK_REFUSAL);
     });
   });
 
