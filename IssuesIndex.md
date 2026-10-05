@@ -12,9 +12,10 @@
 **Open issues:** 8
 
 ### AFLDB-ISSUE-265 — A settle unit can lose a match-lock deadlock to a legacy CSV promotion, with no in-run retry
-- **Severity:** Low. **Area:** data integrity / concurrency — `src/lib/acquisition/canonical-apply.ts`
-  (`lockUnitMatchRows`), `settle-afltables.ts`, `settle-afl-api.ts`, `src/lib/ingest/datasets.ts`
-  (ISSUE-264 promotion hooks).
+- **Severity:** Medium (raised from Low on 2026-10-05, D-265-12). **Area:** data integrity / concurrency —
+  `src/lib/acquisition/canonical-apply.ts` (`lockUnitMatchRows`, `applyAttendanceEnrichment`),
+  `settle-afltables.ts`, `settle-afl-api.ts`, `settle-core.ts`, `src/lib/ingest/datasets.ts` (the
+  ISSUE-264 hooks, `match_attendance`).
 - **State:** Open (2026-10-04), from ISSUE-264 F-002. The operator accepted it as a temporary ISSUE-264
   limitation (D-264-11). ISSUE-264 is resolved (2026-10-05, DEV accepted, PROD promotion outstanding;
   runbook `issues/closed/AFLDB-ISSUE-264.md`); this limitation is **still open and not eliminated**, and the
@@ -28,8 +29,33 @@
   - DEV has no AFL Tables timer, so an AFL Tables unit waits for an operator-run settle.
   - The deadlock is not eliminated.
 - **Runbook:** `issues/open/AFLDB-ISSUE-265.md`.
-- **Next action:** the operator decides whether to mitigate: an in-run `40P01` unit retry, settle-side
-  ascending match locks, or making the promotion yield. Nothing implemented.
+  - **2026-10-05 investigation (runbook §10–§15):**
+    - **F-265-1**: an AFL API attendance-enrichment deadlock loses the **whole** run.
+    - `match_attendance` is a third, unordered legacy match writer.
+    - An in-run unit retry is futile in the main shapes.
+    - Recommended: a settle/promotion advisory gate. Independently reviewed.
+  - **2026-10-05 decisions (runbook §14.1):**
+    - D-265-1..12 accepted: Option 3 gate, with settles shared and the promotions (including
+      `match_attendance`) exclusive.
+    - D-265-5 accepted (2026-10-05): a 300 s settle gate wait with a 330 s gate-statement bound. PROD
+      records cannot validate it: promotion durations are not recorded. The D-265-13 query gives
+      settle-duration context only (runbook §16.4).
+    - D-265-14 accepted (Phase B case B11). D-265-15 accepted: the Phase A tooling is archived unchanged in
+      `issues/open/AFLDB-ISSUE-265-phase-a/` (runbook §20.7).
+    - Nothing implemented yet.
+  - Phase A window 1 (2026-10-05 15:23:57): FAILED, census CLEAN (runbook §17.12). It is kept as
+    historical evidence.
+  - **Phase A window 2 (2026-10-05 16:22:35): PASSED 3/3, census CLEAN** (runbook §17.14). C2, C1 and
+    F-265-1 are demonstrated with real settles. Retained: batches 1230, 1233 and 1237. No migration was
+    applied (109).
+  - Phase A is retired, and Phase B replaces it (runbook §17.15). The final plan, the Phase B assertions
+    and the timeout decision are in runbook §18–§20. Nothing is implemented.
+- **Next action:**
+  1. The operator commits exactly the twelve files in runbook §18.1 (S0), with the Phase A harness
+     unchanged. Re-hash the harness first (window 2 captured no hash). `eslint.config.mjs` carries a
+     one-file lint exception for the archived `block-network.cjs`. The 120 s `afldb_test` reading was a probe artefact (§20.1).
+  2. Implement runbook §18 S1–S10; validate database-free, then in a Phase B window, a regression window
+     and on DEV.
 
 ### AFLDB-ISSUE-263 — A fresh `db:test:rebuild` leaves every `brownlow_round_votes.match_id` NULL
 - **Severity:** Low. **Area:** rebuild / Brownlow data state; tests —

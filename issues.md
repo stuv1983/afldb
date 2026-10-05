@@ -8,7 +8,7 @@ This table indexes currently open issues. Detailed historical entries below rema
 
 | ID | Title | Severity | Area | State | Next action |
 |---|---|---|---|---|---|
-| AFLDB-ISSUE-265 | A settle unit can lose a match-lock deadlock to a legacy CSV promotion, with no in-run retry | Low | Data integrity / concurrency — `canonical-apply.ts` (`lockUnitMatchRows`), `settle-afltables.ts`, `settle-afl-api.ts`, `src/lib/ingest/datasets.ts` (ISSUE-264 hooks) | Open (2026-10-04); from ISSUE-264 F-002; operator-accepted as a temporary ISSUE-264 limitation (D-264-11); a settle holding a later match can deadlock with a promotion holding an earlier one, and if the settle is the victim one unit rolls back with a `canonical_apply_failed` finding while the run continues; no in-run retry; recovery on the provider's next in-season run (AFL Tables §9.3 retry; AFL API re-diff), code-traced in ISSUE-264 runbook §14.5.2; DEV has no AFL Tables timer; characterised on `afldb_test` at lock-statement level only; deadlock not eliminated | Operator decides whether to mitigate (in-run `40P01` unit retry, settle-side ascending match locks, or promotion yields); nothing implemented |
+| AFLDB-ISSUE-265 | A settle unit can lose a match-lock deadlock to a legacy CSV promotion, with no in-run retry | Medium | Data integrity / concurrency — `canonical-apply.ts` (`lockUnitMatchRows`), `settle-afltables.ts`, `settle-afl-api.ts`, `src/lib/ingest/datasets.ts` (ISSUE-264 hooks) | Open (2026-10-04); from ISSUE-264 F-002; operator-accepted as a temporary ISSUE-264 limitation (D-264-11); a settle holding a later match can deadlock with a promotion holding an earlier one, and if the settle is the victim one unit rolls back with a `canonical_apply_failed` finding while the run continues; no in-run retry; recovery on the provider's next in-season run (AFL Tables §9.3 retry; AFL API re-diff), code-traced in ISSUE-264 runbook §14.5.2; DEV has no AFL Tables timer; characterised on `afldb_test` at lock-statement level only; deadlock not eliminated; 2026-10-05 investigation (runbook §10–§15): F-265-1 AFL API attendance enrichment can lose the whole run, `match_attendance` is a third unordered writer, in-run unit retry futile in the main shapes; 2026-10-05 operator: D-265-1..12 accepted (Option 3 advisory gate incl. `match_attendance`; severity Medium); 2026-10-05 operator: D-265-5 accepted (300 s settle gate wait with a 330 s gate-statement bound; an operator judgement, PROD records cannot validate it; the D-265-13 query is context only), D-265-14 (Phase B case B11) and D-265-15 (Phase A tooling archived unchanged in `issues/open/AFLDB-ISSUE-265-phase-a/`); Phase A window 2 (2026-10-05 16:22) PASSED 3/3, census CLEAN (runbook §17.14); Phase A retired, Phase B replaces it; final plan and Phase B assertions in runbook §18–§20; nothing implemented | Operator commits exactly the twelve §18.1 files with the Phase A harness unchanged (§18 S0); then implement §18 (not started) |
 | AFLDB-ISSUE-263 | A fresh `db:test:rebuild` leaves every `brownlow_round_votes.match_id` NULL | Low | Rebuild / Brownlow data state; tests — `tools/migration/import_fitzroy_core.py:3246-3248`, `094_brownlow_admin_workflow.sql`, `tests/integration/admin-brownlow.test.ts:367-379` | Open (2026-10-03). Found as ISSUE-257 F-S11-02: the importer COPYs the table without `match_id` and 094's one-time backfill runs before data on a rebuild, so `admin-brownlow` P2 finds 320,861/320,861 unresolved. Pre-existing; not blocking ISSUE-257. | Operator decides the contract (rebuild defect versus stale test assumption). |
 | AFLDB-ISSUE-262 | `reference-data` exact post-045 import-write list omits `afl_api_identity_adjudications` (migration 104) | Low | Tests / reference-data privilege guard — `tests/reference-data.test.ts:425`, `src/db/migrations/104_afl_api_identity_adjudications.sql` | Open (2026-10-03). Fails on HEAD `3ed70ab1` independent of ISSUE-257, DB-free and platform-independent; found as ISSUE-257 F-S9-04. Not blocking ISSUE-257. | Confirm 104's append-only-by-grant design is intended, then add the table, with a comment, to the exact list. |
 | AFLDB-ISSUE-261 | Targeted player-derived recompute takes row locks in an order that can deadlock a settle against a Data Editor save | Low | Data integrity / concurrency — `src/db/queries/player-derived.ts` (`recomputePlayerDerivedStats`), `data-edits.ts`, `match-admin.ts`, both settles | Open (2026-10-02); found in ISSUE-257 Slice 4 (F-S4-01) by code reading; pre-existing; the recompute updates every `player_match_stats` row of each affected player with no changed-value guard, so a settle and an admin writer can wait on each other's rows; ISSUE-257 added a bounded 40P01 retry around the settles' end-of-run recompute and a 5 s Match Sheet `lock_timeout`; residual: `data-edits.ts`/`match-admin.ts` set no `lock_timeout`, so the retry can exhaust and roll the settle back; not reproduced | Decide whether to fix (changed-value guard, global `players` lock order, or `lock_timeout` on the other writers) |
@@ -47743,7 +47743,8 @@ retained behaviour under `Unreleased`.
 
 ## AFLDB-ISSUE-265 — A settle unit can lose a match-lock deadlock to a legacy CSV promotion, with no in-run retry
 
-- **Status:** Open (2026-10-04). **Severity:** Low. **Area:** data integrity / concurrency, source
+- **Status:** Open (2026-10-04). **Severity:** Medium (raised from Low, operator, 2026-10-05,
+  D-265-12). **Area:** data integrity / concurrency, source
   settles versus legacy file intake. Key files:
   - `src/lib/acquisition/canonical-apply.ts` (`lockUnitMatchRows` :490, taken inside the unit savepoint
     :1004-1025; the rollback :1267-1291);
@@ -47796,5 +47797,132 @@ retained behaviour under `Unreleased`.
   later retry applies. If the target no longer differs, or a gate refuses the retry, the finding stays open
   with its original error text. AFL Tables has no moot-close; the I244-F009 healers are AFL API only.
   Canonical state is then correct or correctly refused, and an operator resolves the stale finding.
+- **Investigation (2026-10-05; runbook §10–§15; repository and database-free only, nothing run).**
+  - **F-265-1 (MED, new).** The AFL API end-of-run attendance enrichment
+    (`canonical-apply.ts:1394-1401`, `settle-afl-api.ts:1003-1054`) takes `FOR UPDATE` on essentially every
+    run-owned match before its gates. It rethrows a `40P01`, so a deadlock with a legacy promotion there
+    rolls back the **whole** AFL API run, not one unit. Partly pre-existing on main; widened by ISSUE-264.
+  - **`match_attendance`** (`datasets.ts:1275-1316`) is a third, unordered, unbounded legacy match writer
+    (cycle C4). Pre-existing; found by the independent review.
+  - **An in-run `40P01` unit retry is futile** in the main shapes. The promotion's post-hook wait is
+    unbounded and is on a lock an earlier unit holds until the settle commits.
+  - **Recommendation (not approved):**
+    - a transaction-scoped advisory gate `(717275, 4)`: settles take it shared before any data write or row
+      lock (only timeout-setting statements precede it); the three match-writing legacy promotions take it
+      exclusive inside the 5 s hook bound;
+    - `match_attendance` gains an ascending hook;
+    - the settle's gate wait is bounded (a 300 s value was later accepted, D-265-5).
+
+    This removes every settle–promotion cycle between these participants. Its costs: promotions are
+    refused while a settle runs, and promotions serialise with each other.
+  - Independent review: `afldb-reviewer`, no CRIT. HIGH F-001 (`match_attendance`) is folded in.
 - **Runbook.** `issues/open/AFLDB-ISSUE-265.md`.
-- **Next action.** Operator decides whether to mitigate, and which candidate. Nothing implemented.
+- **Decisions (operator, 2026-10-05; runbook §14.1).**
+  - D-265-1..12 are accepted as recommended:
+    - Option 3, an advisory gate: settles shared, the promotions exclusive, key `(717275, 4)`;
+    - `match_attendance` joins the gate;
+    - promotions serialise with each other;
+    - Options 1, 1b and 2 are not pursued;
+    - F-265-1 is recorded here;
+    - severity is raised to Medium.
+  - D-265-5 was provisional at 60 s and is **decided (2026-10-05): a 300 s settle gate wait with a 330 s
+    gate-statement bound** (runbook §20.7). The D-265-13 PROD
+    timing query cannot validate it. The limit bounds a settle's wait behind a **promotion**, and PROD
+    does not record promotion durations: `admin-upload` batches stamp `completed_at = now()`. The query's
+    settle durations and start hours are operational context only. The value stays an operator judgement
+    (runbook §16.4).
+  - D-265-13 is open: a read-only PROD settle timing query is prepared at
+    `issues/open/AFLDB-ISSUE-265-prod-settle-timing.sql` (runbook §16) and has not been run. It now exits
+    with status 3 on a refused target or schema proof, and on any failed statement; it previously used
+    `\quit`, which exits 0. The operator command keeps psql's exit status through `tee`.
+  - AFL Tables settle durations are **not recorded** in `import_batches` (`completed_at = now()`), and no
+    rolled-back run leaves a row.
+- **Phase A preparation (2026-10-05, agent; database-free; nothing executed against any database).**
+  - The harness is hardened (runbook §17.10):
+    - it is armed only by the runner, with an expiring stamp;
+    - it targets exactly `afldb_test`, with expected roles, one endpoint and one server identity;
+    - every wait is bounded, and teardown terminates backends role-aware and ends the auth pool;
+    - findings, ledgers and staging are censused; historical fingerprints include `club_seasons` with
+      ids;
+    - the retained records are written to an evidence file.
+  - A database-free skip check proved that a disarmed or stale-armed run skips all 3 cases and attempts
+    no TCP connection.
+  - Dedicated runner and probe: `D:\tmp\issue265\` (operator tooling, outside the repository).
+  - Phase A does **not** need migration 110, and the runner neither applies nor restores it.
+- **Phase A window 1 (2026-10-05 15:23:57, operator-run): FAILED, census CLEAN** (runbook §17.12).
+  - **A2 (C1) and A3 (F-265-1) passed** on the base tree.
+  - **A1 (AFL Tables, C2) failed** at its timing-bounded step. The promotion's 5 s hook bound expired before
+    the harness saw the settle stalled after MA. The retained evidence cannot say whether the deadlock
+    occurred, so A1 is **unproven**, not a pass and not a refutation.
+  - Census: fingerprints equal, zero residue, zero teardown problems. Retained: `admin-upload` batches 1222
+    and 1226, explained; one fixture user; `sports_data_lab` already existed. Migration 110 not applied.
+    The evidence is preserved at `D:\tmp\issue265\run-20261005-152357-Full\`.
+- **A1 choreography revised (2026-10-05, agent; database-free; runbook §17.13).**
+  - X now holds MA's spine record and Y holds MA's open-finding key, uncommitted.
+  - X is released on the server clock (`pg_locks.waitstart`), and the cycle itself is observed.
+  - Outcomes and timings are captured pass or fail.
+  - Production code and every substantive assertion are unchanged.
+  - Independent review: `afldb-reviewer`, no CRIT, HIGH or MED. F-002..F-006 applied.
+  - F-001 is resolved on the server clock. One `pg_locks` snapshot shows the settle stalled on Y while the
+    promotion is still in its original MB wait. The removed client assertion is replaced, the proposition
+    is unchanged, and the reviewer verified it as strictly stronger. The promotion's completion has no
+    server timestamp without a production change, so the end of its wait is bracketed as a lower bound.
+  - Typecheck, ESLint and the database-free skip check pass.
+- **Phase A window 2 (2026-10-05 16:22:35, operator-run): PASSED, census CLEAN** (runbook §17.14).
+  - **A1 (C2), A2 (C1) and A3 (F-265-1): 3/3 passed, none skipped**, on the base tree with real settles.
+  - The A1 ordering is proven on the server clock. One `pg_locks` snapshot, 3455 ms after the promotion's
+    MB wait began, showed the settle stalled on Y while the promotion was still in that wait.
+  - The timeout bracket (last seen waiting 4972.8 ms, first seen ended 5074.6 ms) straddles the 5 s bound.
+  - The A1 settle committed with one `deadlock detected` finding on MA. The recovery run resolved it
+    `canonical_apply_succeeded`.
+  - Census CLEAN: historical fingerprints equal, zero residue, zero teardown problems.
+  - Retained and explained: `admin-upload` batches 1230, 1233 and 1237. The existing fixture user and the
+    `sports_data_lab` source are retained unchanged.
+  - Migrations: 109 applied at preflight, and the runner applied none. The post-run census does not
+    re-read the ledger.
+  - Evidence: `D:\tmp\issue265\run-20261005-162235-Full\`. Window 1 stays as historical evidence.
+- **Phase A closed and retired** (runbook §17.15). It must not run once the gate lands: each A case asserts a
+  lock edge the gate removes. Phase B replaces it in the same file.
+- **Final plan prepared (2026-10-05; runbook §18–§20; nothing implemented).**
+  - Implementation steps S0–S10: the helper and constants in `settle-core.ts`; the gate as the first call in
+    both settles' transactions, ahead of every data statement; the exclusive gate inside
+    `withLegacyLockTimeout`; the `match_attendance` ascending hook.
+  - Phase B cases B1–B11 and the database-free pins.
+  - D-265-5: a **300 s** settle gate wait (accepted, below). The value is an operator judgement; no
+    PROD record can validate it.
+- **Timeout trace (2026-10-05; runbook §20.1–§20.5; repository only, no database contacted).**
+  - The `afldb_test` `statement_timeout = 120000 ms` was the probe's own transaction-local setting, not
+    the server's. It is withdrawn.
+  - In repository configuration, neither settle connection nor the promotion connection sets any
+    `statement_timeout` or `lock_timeout`. The installed hosts' values are unknown.
+  - The planned helper now also raises `statement_timeout` to WAIT + 30 s for the gate statement only,
+    and restores both settings afterwards. A host `statement_timeout` at or below the wait can therefore
+    no longer pre-empt it with a `57014`. B7 now proves this with a 60 s session client.
+  - Queue wording corrected: a settle waiting at the gate does delay later promotions (a soft block).
+    A second settle can wait behind a queued promotion for that promotion's whole run.
+  - New decisions: D-265-14 (add Phase B case B11, queue ordering) and D-265-15 (archive the Phase A
+    runner before S8 rewrites it).
+- **Decisions accepted and checkpoint prepared (2026-10-05; runbook §20.7, §18.1; docs and archive only).**
+  - **D-265-5:** a 300 s settle gate `lock_timeout`, with a transaction-local 330 s `statement_timeout` for
+    gate acquisition only; both previous settings are restored afterwards.
+  - **D-265-14:** Phase B includes B11, covering both advisory-lock queue shapes.
+  - **D-265-15:** the five Phase A tooling files are preserved byte-for-byte, with SHA-256 hashes and a
+    README, in `issues/open/AFLDB-ISSUE-265-phase-a/`. They were read in full first: no credential or
+    connection setting is embedded. The originals and the run evidence are untouched and stay out of Git.
+  - **Wording corrected:** the gate is not literally the "first statement". Timeout inspection and
+    configuration (`current_setting`, `set_config`) precede it. The invariant is that the gate precedes every
+    data write and every row lock (runbook §12, "Gate-ordering invariant").
+  - **Window 2 captured no harness hash.** Current hashes and filesystem timestamps do not independently
+    prove the bytes it tested. The harness is unchanged.
+  - **Offline checks:** PowerShell parse and `node --check` clean; the archived runner's `-Phase SelfTest`
+    passes (probe 20/20; skip check with 0 blocked connection attempts).
+  - **Lint exception (authorised and applied 2026-10-05):** ESLint flagged two `no-require-imports` errors
+    in the archived `block-network.cjs`. `eslint.config.mjs` `globalIgnores` gained one entry for that file
+    only, with a comment; the archived file is unedited. Linting the archive folder and the harness with
+    `--max-warnings 0` exits 0 with no "file ignored" warning. The archive hashes were re-checked against
+    the originals: all five match (runbook §18.1).
+  - Nothing is implemented.
+- **Next action.**
+  1. The operator commits exactly the twelve files in runbook §18.1 (S0), after re-hashing the harness.
+  2. Implement §18 S1–S10, then validate per §18.
+  3. Optional context: the D-265-13 query (runbook §16.2).
