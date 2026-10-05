@@ -10,7 +10,7 @@
   §14.5.3). The acceptance is not a claim that the deadlock is eliminated, and it is not a decision about
   mitigation.
 - **Mitigation:** the options in §6 are **undecided**. No option has been chosen, designed or approved.
-- **Origin:** `issues/open/AFLDB-ISSUE-264.md` §14.2 (F-002), §14.3, §14.4.3 and §14.5.
+- **Origin:** `issues/closed/AFLDB-ISSUE-264.md` §14.2 (F-002), §14.3, §14.4.3 and §14.5.
 - **Tracker entry:** `issues.md` (Open Issues table and the ISSUE-265 section); `IssuesIndex.md`.
 
 ## 1. Summary
@@ -159,7 +159,7 @@ for each provider it touches. The existing evidence in §5 does not cover that.
 
 ## 8. Related
 
-- AFLDB-ISSUE-264 (origin; F-002; D-264-11; runbook `issues/open/AFLDB-ISSUE-264.md` §14.2-§14.5).
+- AFLDB-ISSUE-264 (origin; F-002; D-264-11; runbook `issues/closed/AFLDB-ISSUE-264.md` §14.2-§14.5).
 - AFLDB-ISSUE-261 (distinct: end-of-run recompute order, different lock site and writers).
 - AFLDB-ISSUE-257 (the Match Sheet authority model and its 5 s `lock_timeout`).
 

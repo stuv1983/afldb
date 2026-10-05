@@ -15,7 +15,7 @@ commit.
 
 ## [Unreleased]
 
-### Legacy file intake refuses rows that would revert a Match Sheet decision (AFLDB-ISSUE-264; implemented, uncommitted, `afldb_test` validated 2026-10-04, DEV acceptance outstanding) - 4 October 2026
+### Legacy file intake refuses rows that would revert a Match Sheet decision (AFLDB-ISSUE-264; DEV accepted 2026-10-05, PROD promotion outstanding) - 5 October 2026
 
 - A `player_match_stats` upload row is now refused if promoting it would revert durable Match Sheet
   authority (ISSUE-257). That covers a supplied figure that differs from a protected one, the always-written
@@ -58,6 +58,19 @@ commit.
   AFLDB-ISSUE-265; the deadlock is not eliminated. Row-lock cycles on `player_match_stats` between two
   uploads, or between an upload and a settle, behave as before. Details in the ISSUE-264 runbook §14.3 and
   §14.5.
+- DEV acceptance (2026-10-05, build `ebbe2c00`, signed-in upload and review UI, season-2073 fixtures,
+  operator-accepted): a conflicting value, a protected club change, a removed player and indeterminate
+  authority were each refused at validation; an identical value and a file silent on protected fields
+  validated clean and promoted (import batches 104 and 105), and their stored values were verified in the
+  database. A submission validated before its late authority existed was refused at promotion with the whole
+  submission rolled back: no row written, authority unchanged, no import batch. Submissions 60–67 and batches
+  104/105 are retained as evidence. The fixture cleanup committed once; its first verification failed on a
+  defect in the verification tooling (legitimate NULL `external_identities.player_id` counted as dangling) and
+  the corrected read-only verification passed. DEV is not claimed byte-identical to its pre-acceptance state:
+  the `auth_users` fingerprint differs by an owner-accepted sign-in `totp_last_step` advance, and the audit
+  and submission evidence is retained. Not exercised: PROD, a real settle-versus-promotion deadlock, and the
+  server's handling of Approve on an errored submission. PROD is promoted together with AFLDB-ISSUE-258
+  (R-258-1 applies). The settle-victim limitation stays open as AFLDB-ISSUE-265.
 
 ### Legacy file intake no longer blanks stored statistics a file is silent on (AFLDB-ISSUE-258; DEV accepted 2026-10-04, PROD promotion outstanding) - 3 October 2026
 
@@ -78,10 +91,10 @@ commit.
   and blank columns validate clean and store nothing; malformed cells are per-column errors). **No DEV
   promotion was performed**, so promotion-time preservation is proven on `afldb_test` only. The six
   submissions were then rejected through the review page and are retained as evidence.
-- Known limitation, tracked separately as AFLDB-ISSUE-264: this intake still ignores Match Sheet
-  authority over `player_match_stats`. A legacy submission validated before deployment must be
-  re-validated before it is promoted (R-258-1), including on PROD, which has not been deployed or
-  censused.
+- Match Sheet authority over `player_match_stats` is enforced on this intake by AFLDB-ISSUE-264
+  (resolved 2026-10-05, DEV accepted; PROD promotion outstanding, so PROD still ignores it for now).
+  A legacy submission validated before deployment must be re-validated before it is promoted
+  (R-258-1), including on PROD, which has not been deployed or censused.
 
 ### Match Sheet corrections to player statistics survive automatic settles (AFLDB-ISSUE-257; DEV accepted, PROD promotion outstanding) - 3 October 2026
 

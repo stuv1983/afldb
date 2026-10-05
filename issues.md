@@ -4,12 +4,11 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 9
+**Open issues:** 8
 
 | ID | Title | Severity | Area | State | Next action |
 |---|---|---|---|---|---|
 | AFLDB-ISSUE-265 | A settle unit can lose a match-lock deadlock to a legacy CSV promotion, with no in-run retry | Low | Data integrity / concurrency — `canonical-apply.ts` (`lockUnitMatchRows`), `settle-afltables.ts`, `settle-afl-api.ts`, `src/lib/ingest/datasets.ts` (ISSUE-264 hooks) | Open (2026-10-04); from ISSUE-264 F-002; operator-accepted as a temporary ISSUE-264 limitation (D-264-11); a settle holding a later match can deadlock with a promotion holding an earlier one, and if the settle is the victim one unit rolls back with a `canonical_apply_failed` finding while the run continues; no in-run retry; recovery on the provider's next in-season run (AFL Tables §9.3 retry; AFL API re-diff), code-traced in ISSUE-264 runbook §14.5.2; DEV has no AFL Tables timer; characterised on `afldb_test` at lock-statement level only; deadlock not eliminated | Operator decides whether to mitigate (in-run `40P01` unit retry, settle-side ascending match locks, or promotion yields); nothing implemented |
-| AFLDB-ISSUE-264 | Legacy CSV promotion overwrites Match Sheet-protected `player_match_stats` fields and re-inserts players the Match Sheet removed | Medium | Legacy file intake / manual authority — `src/lib/ingest/datasets.ts`, `src/lib/ingest/pipeline.ts`, `src/lib/acquisition/manual-authority.ts` | Open (2026-10-03); ISSUE-258 F-258-I1; Option A (refusal) decided and implemented 2026-10-04, uncommitted; a supplied value differing from active Match Sheet authority, a protected club change, or a removed player's reinsertion is refused at validation and again in promotion under the match lock (whole submission rolled back); identical/absent values pass; indeterminate authority fails closed; DB-free 81/81, typecheck and lint clean; validated on `afldb_test` 2026-10-04 (runbook §14.1, §14.3; `match-results-promotion` 32/32 with the build); pre-commit review (§14.2): F-002 (match lock order, MED) decided as Option A and implemented (§14.3; a settle can still be a deadlock victim, one unit, run continues), F-005 (`unresolvedMatchKeys`) is not a bypass on any supported path; commit hold (§14.4) cleared 2026-10-04 (§14.5): D-264-9 morning-window gap accepted without repair, D-264-10 corrected test plan approved, D-264-11 settle-victim limitation accepted as temporary after both providers' next-run recovery was traced (follow-up AFLDB-ISSUE-265); final window `run-20261004-211130` PASS (32/16/7/11, build exit 0, 110 reversed, 19 fingerprints equal baseline); runbook `issues/open/AFLDB-ISSUE-264.md` | Operator reviews and commits (ten paths, no trailers); `merge:ready`; DEV deploy application-only (`-SkipMigrate`, DEV has 110) and acceptance |
 | AFLDB-ISSUE-263 | A fresh `db:test:rebuild` leaves every `brownlow_round_votes.match_id` NULL | Low | Rebuild / Brownlow data state; tests — `tools/migration/import_fitzroy_core.py:3246-3248`, `094_brownlow_admin_workflow.sql`, `tests/integration/admin-brownlow.test.ts:367-379` | Open (2026-10-03). Found as ISSUE-257 F-S11-02: the importer COPYs the table without `match_id` and 094's one-time backfill runs before data on a rebuild, so `admin-brownlow` P2 finds 320,861/320,861 unresolved. Pre-existing; not blocking ISSUE-257. | Operator decides the contract (rebuild defect versus stale test assumption). |
 | AFLDB-ISSUE-262 | `reference-data` exact post-045 import-write list omits `afl_api_identity_adjudications` (migration 104) | Low | Tests / reference-data privilege guard — `tests/reference-data.test.ts:425`, `src/db/migrations/104_afl_api_identity_adjudications.sql` | Open (2026-10-03). Fails on HEAD `3ed70ab1` independent of ISSUE-257, DB-free and platform-independent; found as ISSUE-257 F-S9-04. Not blocking ISSUE-257. | Confirm 104's append-only-by-grant design is intended, then add the table, with a comment, to the exact list. |
 | AFLDB-ISSUE-261 | Targeted player-derived recompute takes row locks in an order that can deadlock a settle against a Data Editor save | Low | Data integrity / concurrency — `src/db/queries/player-derived.ts` (`recomputePlayerDerivedStats`), `data-edits.ts`, `match-admin.ts`, both settles | Open (2026-10-02); found in ISSUE-257 Slice 4 (F-S4-01) by code reading; pre-existing; the recompute updates every `player_match_stats` row of each affected player with no changed-value guard, so a settle and an admin writer can wait on each other's rows; ISSUE-257 added a bounded 40P01 retry around the settles' end-of-run recompute and a 5 s Match Sheet `lock_timeout`; residual: `data-edits.ts`/`match-admin.ts` set no `lock_timeout`, so the retry can exhaust and roll the settle back; not reproduced | Decide whether to fix (changed-value guard, global `players` lock order, or `lock_timeout` on the other writers) |
@@ -17,6 +16,22 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-259 | NL club-scoped career rankings accept a career condition that is evaluated across the whole career | Low | NL search, validate stage — `src/search/nl/plan.ts` (`validatePlan`), `src/db/queries/nl/player-career.ts` | Open (2026-10-02); code review F-003 (`playbooks/issue.md`); the club-scope guard tests conditions only for unranked plans, so a ranked club-scoped plan with a non-games condition validates while its unranked form is refused; confirmed DB-free through the parser and validator, SQL read not run; operator decision 2026-10-02 (after the review) D-259-1: fail closed — decline when a condition cannot be evaluated at club scope, never reinterpret it as whole-career, add no per-club compiler capability, no parser change intended; nothing implemented; runbook `issues/open/AFLDB-ISSUE-259.md` | One focused NL session with AFLDB-ISSUE-260; check the corpora there for rows of this shape that expect an answer |
 | AFLDB-ISSUE-233 | AFL API season discovery and season rollover ownership | Medium | Data acquisition / season lifecycle — `afl-api-identities.json`, rollover runbook | Open (2026-09-23); 2026-09-26 pass 2: D-233-1/2/3 decided (proposal JSON; season-scoped AFL API Brownlow artefacts beside the master; preserve `afl_api` ownership or refuse); discovery IMPLEMENTED / DB-FREE VALIDATED against the authentic `compseasons` sample (sha256 `fe3f1641…d965`); 2026-10-01 pass 3 (uncommitted): D-233-3 rebuild/rollover `afl_api` ownership census and D-233-2 season-scoped AFL API Brownlow load IMPLEMENTED / DB-FREE VALIDATED; 2026-10-01 pass 4 (uncommitted): D-233-3 also enforced on the LIVE promotion target (`promotion-check.ts`, `dependencies`/`pre-cutover`/`restored`/`candidate`/frozen `production`, no override); damaged-schema census refuses; discovery `--fetch` retains entity bytes verbatim; ownership replay intentionally unimplemented; 2026-10-01 pass 5 (uncommitted): integration census test 5/5 on `afldb_test` (no residue), read-only censuses PASS on `afldb_test` and `afldb_dev` (zero `afl_api`-owned matches, DEV not mutated), final review no CRIT/HIGH/MED; committed `f0abbb4c`; 2026-10-01 pass 6: first real DEV discovery `--fetch` PASSED (`20261001T034039Z`, 1 fetch, HTTP 200, 1,959 decoded body bytes sha256 `2aeed4e9…b33e`, 15/15 entries 2012–2026, `no_change`, offline replay byte-identical, DEV and registry unchanged); D-233-2 `code_test_db` write-path rehearsal designed, not written or run, blocked on a stable-identity bridge and the 2026 snapshot; R4 classified fail-safe, no successor issue; 2026-10-01 passes 7–9 (uncommitted): fresh CONCLUDED 2026 Brownlow snapshot `afl-api-brownlow-2026-2026-10-01-041609`; `afldb_test` bridge 0/669 (no 2026 matches); DEV read-only bridge 669/669 (v1); builder continuity defect FIXED (exact tracked `profile_url_continuity` pair → `continuing_url`, ISSUE-237 parity), real DEV read-only build 183/183 (Jack Ross 6519 → `players/J/Jack_Ross.html`), artefact outside repo, second write `unchanged`; `code_test_db` read-only coverage 175/183 (8 presumed 2026 debutants absent), harness NOT written; 2026-10-01 pass 10 (uncommitted): D-233-R = scoped `code_test_db` fixture of exactly the eight missing 2026 player identities (no rebuild/restore), harness `tools/migration/brownlow_afl_api_season_rehearsal.py` WRITTEN, NOT RUN, DB-free 113/113; 9,982/9,983 = one unused emergency row (expected); 2026-10-01 pass 11 (uncommitted): `code_test_db` rehearsal PASSED + exact restore PASSED (evidence `D:\tmp\issue233\rehearsal-20261001-151415`; fixture 8+8 → 183/183; real loads A1 batches 27/28, A2 29/30, 183/1,242/1/14 `afl_api`, A2 content-identical; fingerprint = F0, residue 0, coverage back to 175/183; case 5 NOT RUN); 2026-10-01 pass 12 final review: 0 CRIT/HIGH, 2 MEDIUM fixed (continuity provenance validator; POSIX manifest paths), committed on `sonnet/issue-233`; 2026-10-01: `f0abbb4c` + `cc1a5f2d` merged, `main` at `cc1a5f2d`, no merge pending; PROD untouched; runbook `issues/open/AFLDB-ISSUE-233.md` | Promotion gate's first live read at the next promotion (runbook §4.6 item 6); stays OPEN until then |
 | AFLDB-ISSUE-229 | AFL API fixture ingestion | Medium | Data acquisition / fixtures — `afl_api` season feed → `fixtures` | Open (2026-09-23); 2026-10-02 (main `5a85226c`): Option B decided; D-229-1 through D-229-8a decided; **B1 COMPLETE** — authentic retained pre-match evidence covers `SCHEDULED` and `UNCONFIRMED_TEAMS`; no fixture writer built; runbook `issues/open/AFLDB-ISSUE-229.md` | B2: capture and review the first authentic 2027 pre-match season feed before the fixture writer is wired or applied |
+
+**AFLDB-ISSUE-264 resolved 2026-10-05, DEV accepted, PROD promotion outstanding** (implementation `ebbe2c00`;
+operator-accepted DEV UI acceptance). A legacy `player_match_stats` upload row is now refused at validation, and
+again in promotion under the match lock, if it would overwrite a field a Match Sheet record protects, change a
+protected club, or re-insert a player the Match Sheet removed; authority that cannot be attributed to exactly one
+player fails closed, and one refusal rolls back the whole submission. On DEV (build `ebbe2c00`): C1/C4/C5/C7 were
+refused at validation, C2 (identical) and C3 (silent) promoted (batches 104 and 105, values database-verified),
+C6 was a clean control, and the P-b submission (66) was refused at promotion with the Companion row absent, the
+Late row and authority unchanged and no import batch. The fixture cleanup committed once; its first
+post-commit verification failed on a check defect (it counted legitimate NULL `external_identities.player_id`
+rows, 5,052, as dangling), and the corrected read-only Verify passed. Submissions 60–67, batches 104/105 and the
+append-only audit records are retained, and the DEV database is **not claimed byte-identical**: the one accepted
+difference is the `auth_users` fingerprint (user 4's sign-in advanced `totp_last_step`; exact matching
+reconstruction supported by the login audit, not proof of every column). **AFLDB-ISSUE-265 stays open**: the
+settle-victim deadlock limitation is temporarily accepted, not eliminated. Removed from `IssuesIndex.md` and the
+Open Issues table. Full record: the entry in this file and `issues/closed/AFLDB-ISSUE-264.md` §14.6–§14.7.
 
 **AFLDB-ISSUE-256 resolved 2026-10-02** (implementation `3e98fb7b`, merged and pushed; operator-run DEV
 acceptance). NL career rankings for four statistics AFLDB does not store (`time_on_ground`,
@@ -47351,9 +47366,12 @@ retained behaviour under `Unreleased`.
     not clicked on DEV. Recorded in runbook §18.7 for an operator decision.
   - **Outstanding PROD promotion notes.** R-258-1: re-validate any pre-deployment `match_results` or
     `player_match_stats` submission before promoting it, after censusing PROD `data_submissions`
-    (unknown). The §15.1 item 3 past-damage census was never run. AFLDB-ISSUE-264 stays open.
-  - **Limitations still open:** AFLDB-ISSUE-264 (F-258-I1, unimplemented); F-258-I2 (`disposals` not
-    schema-enforced); the §15.1 item 3 census; F-258-D1.
+    (unknown). The §15.1 item 3 past-damage census was never run. AFLDB-ISSUE-264, which owns F-258-I1,
+    was open when this was written; it is now resolved (2026-10-05, DEV accepted, PROD promotion
+    outstanding), so PROD will still ignore Match Sheet authority on this intake until ISSUE-264 is
+    promoted there.
+  - **Limitations still open:** F-258-I2 (`disposals` not schema-enforced); the §15.1 item 3 census;
+    F-258-D1. F-258-I1 is closed by AFLDB-ISSUE-264 on DEV (2026-10-05); PROD promotion outstanding.
   - **Rollback.** Recovery builds retained on the DEV host (`~/afldb-recovery/39a9fed1-…` and two
     earlier copies).
   - Removed from `IssuesIndex.md`. Runbook moves to `issues/closed/` with the operator's commit.
@@ -47528,9 +47546,10 @@ retained behaviour under `Unreleased`.
 
 ## AFLDB-ISSUE-264 — Legacy CSV promotion overwrites Match Sheet-protected `player_match_stats` fields and re-inserts players the Match Sheet removed
 
-- **Status:** Open (2026-10-03). **Implemented 2026-10-04 (Option A, refusal), uncommitted**, in
-  worktree `afldb-issue-264`. DB-free tests, typecheck, lint, the `afldb_test` integration validation
-  and the full build pass. DEV acceptance is outstanding. **Severity:** Medium. **Area:** legacy file intake /
+- **Status:** **Resolved (2026-10-05; DEV accepted, PROD promotion outstanding).** Opened 2026-10-03.
+  Implemented 2026-10-04 (Option A, refusal), commit `ebbe2c00`, worktree `afldb-issue-264`. DB-free tests,
+  typecheck, lint, the `afldb_test` integration validation and the full build passed; the DEV UI acceptance then
+  passed (see **Closure** at the end of this entry). **Severity:** Medium. **Area:** legacy file intake /
   manual authority. Key files:
   - `src/lib/ingest/datasets.ts:833-882` (`playerMatchStats.promoteRow`: `INSERT … ON CONFLICT
     (player_id, match_id) DO UPDATE`, with no `data_overrides` read);
@@ -47635,7 +47654,7 @@ retained behaviour under `Unreleased`.
   `matches`); changes to the ISSUE-257 authority model.
 - **Related.** AFLDB-ISSUE-257 (resolved; authority model), AFLDB-ISSUE-258 (finding origin),
   AFLDB-ISSUE-186 (retirement), AFLDB-ISSUE-165 D-12 (refusal pattern).
-- **Runbook.** `issues/open/AFLDB-ISSUE-264.md`. The defect evidence is from code inspection, not a
+- **Runbook.** `issues/closed/AFLDB-ISSUE-264.md`. The defect evidence is from code inspection, not a
   database reproduction.
 - **F-002 validation record (2026-10-04, runbook §14.3).** DB-free `ingest-datasets` 81/81; typecheck and
   eslint clean; `afldb_test` with migration 110 applied for a window and reversed: `match-results-promotion`
@@ -47682,12 +47701,45 @@ retained behaviour under `Unreleased`.
       source.
   - DB-free: `ingest-datasets` 81/81, `afl-api-ingestion-safety` 165/165, `match-sheet` +
     `current-season-import` 389 passed with 4 skipped.
-  - **Ready for operator review and commit.**
-- **Next action.** The operator reviews and commits (no attribution trailers; list paths explicitly), runs
-  `merge:ready` and merges. DEV deploy is **application-only** (`deploy/sync-dev.ps1 -SkipMigrate`;
-  DEV already has migration 110 from ISSUE-257), followed by DEV acceptance, and PROD goes together with
-  ISSUE-258's outstanding promotion. The "application before migration 110" order applies only to an
-  environment still at schema 109.
+  - Ready for operator review and commit (done; commit `ebbe2c00`).
+- **Closure (2026-10-05; runbook §14.6–§14.7).** DEV acceptance, driven through the signed-in DEV upload and review
+  UI on build `ebbe2c00` against seeded season-2073 fixtures (operator-run seeding, inspection, cleanup and
+  verification; agent-run UI steps), accepted by the operator as complete. **Merge state (operator-reported):**
+  the operator's deployment evidence confirmed `ebbe2c00` was merged and pushed to `main` before the DEV
+  deployment; not checked with Git here.
+  - **Cases.** C1 conflicting goals (submission 60), C4 protected club (63), C5 removed player (64) and C7
+    indeterminate authority (67) were refused at validation with the expected messages. C2 identical (61) and
+    C3 silent (62) validated clean, were approved and promoted (import batches 104 and 105). C6 (65) was a clean
+    control, not promoted.
+  - **Database verification** (Inspect, `run-20261005-115644-Inspect`): the C2 row kept its protected values; the
+    C3 row took the file's marks and kept its protected fields; no authority record changed.
+  - **P-b.** Submission 66 (two clean rows validated before the Late player's authority existed) was approved and
+    its single promotion attempt was refused: status `failed`, "…the Match Sheet protects goals (file 6, Match
+    Sheet 5); promoting would overwrite it…". The database showed the whole submission rolled back: no
+    Companion row, Late row and authority unchanged, no import batch for 66. Not retried.
+  - **Cleanup.** Committed once (9 authority rows, 5 stats rows, 10 identities, 3 matches, 9 players, 2 clubs,
+    2 club organisations, season 2073). Its first post-commit verification **failed on a check defect**: it counted
+    every legitimate NULL `external_identities.player_id` (5,052) as dangling. Original evidence
+    (`run-20261005-121322-Cleanup`) and the baseline are preserved. The check was corrected (non-NULL
+    `player_id` only; nothing weakened for a genuinely broken reference) and the **corrected read-only Verify
+    passed** (`run-20261005-122213-Verify`): 0 residue, 0 surviving manifest rows, 0 references to deleted
+    fixture ids across 129 foreign-key edges, 0 non-NULL `player_id` without a player (5,052 NULL, all
+    `unmatched`). SelfTest 67/67 (operator-reported).
+  - **Retained, not deleted.** Submissions 60–67 (60, 63, 64, 65, 67 `rejected`; 61, 62 `promoted`; 66
+    `failed`), batches 104 and 105 and the append-only audit records (23 `auth_audit_log` rows, ids 1022–1044,
+    at the post-P-b Inspect; later rows were not re-counted).
+  - **Not byte-identical.** The `auth_users` fingerprint differs from the baseline (user 4's sign-in advanced
+    `totp_last_step` 59702145 → 59705086, audit #1022): an owner-accepted exact matching reconstruction
+    supported by the login audit, not proof that every other column was preserved. Every other historical
+    fingerprint equals the baseline.
+  - **Not exercised.** Whether the server refuses Approve on a submission with errors (the button is shown and
+    was never clicked), a real settle-versus-promotion deadlock, and PROD.
+  - **Follow-up kept open: AFLDB-ISSUE-265.** The settle-unit deadlock-victim limitation (D-264-11) is temporarily
+    accepted, not eliminated; there is no in-run retry; runbook `issues/open/AFLDB-ISSUE-265.md`.
+- **Next action.** PROD promotion, together with ISSUE-258's outstanding PROD promotion: application deploy, then
+  if PROD is still at schema 109 the application-before-migration-110 order applies (runbook §14.4.4); R-258-1 (re-validate any
+  pre-deployment legacy submission after censusing PROD `data_submissions`) applies. Nothing has been deployed to
+  or checked on PROD. Runbook moves to `issues/closed/` with the operator's `git mv`.
 
 ## AFLDB-ISSUE-265 — A settle unit can lose a match-lock deadlock to a legacy CSV promotion, with no in-run retry
 
@@ -47699,7 +47751,7 @@ retained behaviour under `Unreleased`.
     :2191-2222; closure :3484-3494);
   - `src/lib/acquisition/settle-afl-api.ts` (failure finding :1145-1169; moot closure :462-471);
   - `src/lib/ingest/datasets.ts` (the ISSUE-264 `preparePromotion` hooks and `withLegacyLockTimeout`).
-- **Origin.** AFLDB-ISSUE-264 F-002 (runbook `issues/open/AFLDB-ISSUE-264.md` §14.3, §14.4.3, §14.5). The
+- **Origin.** AFLDB-ISSUE-264 F-002 (runbook `issues/closed/AFLDB-ISSUE-264.md` §14.3, §14.4.3, §14.5). The
   operator accepted it as a temporary limitation of ISSUE-264 on 2026-10-04 (D-264-11) after the recovery
   trace in §14.5.2 found a supported recovery path for both providers. New relative to main: before
   ISSUE-264 neither legacy hook took match locks.

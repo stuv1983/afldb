@@ -24,10 +24,14 @@
   census empty, submissions 54–59 behave as specified. **DEV accepted (§18.5)** on the combined
   `afldb_test` promotion evidence and the DEV upload/review validation. **No DEV promotion was
   performed.** The six acceptance submissions were then rejected through the application (§18.6).
-- **Still visible:** AFLDB-ISSUE-264 stays open and unimplemented; the documented limitations
-  (§17.7: F-258-I1/ISSUE-264, F-258-I2 `disposals` not schema-enforced, §15.1 item 3 past-damage
-  census not run, R-258-1 re-validation of pre-deployment submissions) are unchanged. New LOW finding
+- **Still visible:** F-258-I2 (`disposals` not schema-enforced), the §15.1 item 3 past-damage census
+  (not run) and R-258-1 (re-validation of pre-deployment submissions) are unchanged; new LOW finding
   F-258-D1 (§18.7). Outstanding PROD notes: §18.8.
+- **2026-10-05, ISSUE-264 now resolved:** F-258-I1 (Match Sheet authority ignored by this intake) is
+  owned by AFLDB-ISSUE-264, which is **resolved 2026-10-05, DEV accepted, PROD promotion outstanding**
+  (implementation `ebbe2c00`; runbook `issues/closed/AFLDB-ISSUE-264.md`). The 2026-10-03 to 2026-10-04
+  entries above and in §17–§18 that call ISSUE-264 open and unimplemented are dated historical records
+  and are kept as written.
 - §1–§14 are the review's record as written before the decision.
 
 ## 1. Summary
@@ -833,8 +837,9 @@ PROD has not been touched and is out of scope for this step. When ISSUE-258 is p
   `data_submissions` for such rows first; DEV's was empty (§18.2), PROD's is unknown.
 - The §15.1 item 3 past-damage census (did an earlier promotion already blank figures?) was never run
   for DEV or PROD.
-- AFLDB-ISSUE-264 stays open; PROD will still ignore Match Sheet authority on this intake until it is
-  implemented.
+- AFLDB-ISSUE-264 was open when this was written (2026-10-04). **Update 2026-10-05:** it is resolved and
+  DEV accepted; PROD promotion is outstanding, so PROD will still ignore Match Sheet authority on this
+  intake until ISSUE-264 is promoted there.
 - DEV promotion-time preservation remains unexercised on DEV (§18.5); it rests on `afldb_test`.
 - Recovery builds retained on the DEV host: `~/afldb-recovery/39a9fed1-IvHo-v-Lq-aKwzFe4i2nN` plus the
   two earlier copies (§18.1). Nothing was removed.

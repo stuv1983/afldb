@@ -2,19 +2,21 @@
 
 ## 0. Status
 
-- **Status:** Open. **Implemented (Option A, refusal), uncommitted**, in worktree
-  `afldb-issue-264` (branch `issue/264-legacy-csv-authority`) from main `09feda5c`, 2026-10-04.
-  Database-free tests, typecheck, lint, the `afldb_test` integration validation (§14.1) and the full
-  build pass. **DEV acceptance is outstanding.** The pre-commit review (§14.2) found **F-005 not a
-  bypass on any supported path**. **F-002 (lock order) was decided as Option A on 2026-10-04 and is
-  implemented and validated (§14.3)**; a settle can still be a deadlock victim (one unit, §14.3).
+- **Status:** **Resolved 2026-10-05. DEV accepted. PROD promotion outstanding.** Closure record: §14.7.
+  Implemented as Option A (refusal) in worktree `afldb-issue-264` (branch
+  `issue/264-legacy-csv-authority`) from main `09feda5c`, 2026-10-04; implementation commit `ebbe2c00`, which is
+  the build DEV served during acceptance. Database-free tests, typecheck, lint, the `afldb_test` integration
+  validation (§14.1) and the full build passed before commit, and the DEV UI acceptance (§14.6) then passed
+  on 2026-10-05. The pre-commit review (§14.2) found **F-005 not a bypass on any supported path**. **F-002
+  (lock order) was decided as Option A on 2026-10-04 and is implemented and validated (§14.3)**; a settle can
+  still be a deadlock victim (one unit, §14.3). **That limitation is not eliminated** and stays open as
+  **AFLDB-ISSUE-265**.
 - ~~**Commit readiness: ON HOLD (operator, 2026-10-04)** pending §14.4.~~ **Hold cleared 2026-10-04
   (§14.5):**
   - The operator decided D-264-9 (morning-window gap accepted, no repair), D-264-10 (corrected test plan)
     and D-264-11 (the settle-victim limitation, accepted as temporary after the recovery trace; follow-up
     AFLDB-ISSUE-265).
   - The final guarded window `run-20261004-211130` passed, and `afldb_test` was restored.
-  - **Ready for operator review and commit.**
 - **Opened:** 2026-10-03 (operator decision, from ISSUE-258 finding F-258-I1).
 - **Severity:** Medium.
 - **Area:** legacy file intake / manual authority — `src/lib/ingest/datasets.ts`
@@ -140,6 +142,8 @@ Kept as the record of what was weighed. The operator chose Option A; Option B wa
    is AFLDB-ISSUE-265 and does not block the commit.
 3. `merge:ready`, merge, DEV deploy (application only, `-SkipMigrate`; §14.4.4) and DEV acceptance. Then
    decide PROD, together with ISSUE-258's outstanding PROD promotion.
+4. (Resolved 2026-10-05: DEV accepted, §14.7.) Remaining: the PROD promotion (§14.7.4) and
+   AFLDB-ISSUE-265's mitigation decision.
 
 ## 12. Operator decisions (2026-10-04)
 
@@ -1022,3 +1026,355 @@ untracked path. After the commit:
 - PROD with ISSUE-258's outstanding promotion.
 
 AFLDB-ISSUE-265 does not block the commit.
+
+### 14.6 DEV acceptance, UI phase 1: C1–C6 and P-b validation (2026-10-05, agent-run through the signed-in DEV UI, operator-authorised)
+
+**Status: COMPLETE. DEV acceptance passed 2026-10-05 and the operator accepted it (§14.7).** C7 and P-b ran
+the same day; the results and the final submission statuses are in §14.6.7, the cleanup and its corrected
+verification in §14.6.8. The table below is the C1–C6/P-b-validation state as first recorded; the rejections in
+§14.6.7 supersede its "Final status" column.
+
+**Target and fixtures.** `http://10.0.40.100:8090` (DEV), signed in as the super admin (operator login; no
+credentials were handled by the agent). Serving build expected by the runner: commit `ebbe2c00`, build id
+`NphJ7fzlvQkJ3IXmw7XtM`. The operator ran Preflight (`run-20261005-091020-Preflight`) and Seed
+(`D:\tmp\issue264\dev-acceptance\evidence\run-20261005-091520-Seed`, manifest
+`D:\tmp\issue264\dev-acceptance\state\manifest.json`, plan hash `42cc2ad7…dd72c`, `afldb_dev` as
+`afldb_owner`). Fixtures are season 2073, matches 17276 (R264A), 17277 (R264B), 17278 (R264C); the seed
+carries authority for the Guarded, Identical, Silent, ClubChg and Removed players only. No Late or Indet
+authority existed during this phase.
+
+**Method.** Dataset "Player match stats". Each file was staged with the normal file chooser, then Validate.
+The browser tool cannot read `D:\tmp`, so the operator copied the eight CSVs to the gitignored
+`.playwright-mcp\issue264-acceptance` with matching hashes; the agent uploaded from there. An earlier
+attempt to attach a file from inside the page was denied by the permission classifier and was not pursued.
+No SQL, Git, timer, PROD or real canonical-row action was taken by the agent.
+
+| Case | Submission | Expected | Actual validation | Final status |
+|---|---|---|---|---|
+| C1 conflicting (goals 7) | 60 | error: protected goals | **error**, 0 ok: "the Match Sheet protects goals (file 7, Match Sheet 3); promoting would overwrite it" (resolve link: match 17276) | validated, not approved |
+| C2 identical | 61 | pass | **1 ok**, 0 warnings, 0 errors | approved, **promoted**, import batch **104** (1 row) |
+| C3 silent (marks only) | 62 | pass | **1 ok**, 0 warnings, 0 errors | approved, **promoted**, import batch **105** (1 row) |
+| C4 club change | 63 | error: club | **error**, 0 ok: "the Match Sheet protects club_id (file 26, Match Sheet 25); promoting would overwrite it" | validated, not approved |
+| C5 removal | 64 | error: removed | **error**, 0 ok: "the Match Sheet removed this player from this match; promoting would re-insert the row" | validated, not approved |
+| C6 control | 65 | pass | **1 ok**, 0 warnings, 0 errors | validated, not approved (not authorised for promotion) |
+| P-b (Companion, Late) | 66 | pass before the late authority exists | **2 ok**, 0 warnings, 0 errors | validated, **not approved, not promoted** |
+
+Every verdict and message matched `legacyStatsAuthorityRefusal` (`src/lib/ingest/datasets.ts`) and the
+case plan. No unexpected result. Each refusal text names the Match Sheet editor for the match and asks for
+a corrected file and re-validation.
+
+**Observations, not exercised.** The Approve button is rendered on the error submissions 60, 63 and 64
+(status `validated`). The agent did not click it, because approving a refused submission was outside the
+authorised scope. Whether the server also blocks approval of a submission with errors is therefore **not
+shown by this run**.
+
+#### 14.6.1 Not yet verified in the database
+
+The promotions of 61 and 62 report 1 row applied each, but no read-back has been done. The operator's
+Inspect (§14.6.4) is the evidence for: the Identical and Silent rows' values, `source_id` ownership left
+alone, the authority records unchanged, and zero change to any historical fingerprint.
+
+#### 14.6.2 DEV timer schedule (corrected)
+
+From the Preflight remote log (`run-20261005-091020-Preflight\01-remote.log`; the host was not re-checked
+in this phase):
+- `afldb-settle-afl-api.timer`: **daily** `OnCalendar=*-*-* 05:00:00`, `RandomizedDelaySec=15min`,
+  `Persistent=yes`, enabled, no drop-ins, installed from `/etc/systemd/system`. Last run Mon 2026-10-05
+  05:13:02 AEDT; next elapse Tue 2026-10-06 05:06:07 AEDT (about 19 h after the preflight). So 05:00 plus
+  up to 15 minutes, not "nightly at a fixed minute".
+- `afldb-settle-afl-api-brownlow.timer`: every 5 minutes (`*:00/5:00`), `Persistent=no`.
+- There is **no AFL Tables timer** on DEV. The repository ships `afldb-settle-afltables.timer` (04:30), but
+  it is not installed on that host.
+- No timer was changed by this work.
+
+#### 14.6.3 Accepted limitation carried forward
+
+Under D-264-11 (§14.5.3) a settle unit can be the deadlock victim of a legacy CSV promotion's match locks.
+The cost is one unit rolled back, one finding per target, and recovery on the provider's next in-season
+run. It is **not eliminated**. Follow-up: AFLDB-ISSUE-265 (`issues/open/AFLDB-ISSUE-265.md`). This
+acceptance does not claim to have tested or removed it.
+
+#### 14.6.4 Remaining operator steps, in order
+
+1. **Inspect** (read only).
+2. **SeedIndeterminate** (write): the C7 authority on R264C, after C1–C6.
+3. Agent: upload and validate C7 (expected: refusal "this match carries Match Sheet authority that cannot
+   be attributed to exactly one player…"). Then Inspect again, compared with step 1.
+4. **SeedLate** (write): the P-b authority for the Late player on R264B. Submission 66 stays validated and
+   unapproved until this has run.
+5. Agent: approve and promote submission 66. Expected: refusal of the Late row, nothing written for the
+   Companion row (whole-submission rollback), status `failed`.
+6. Final Inspect, Cleanup decision, then closure.
+
+Nothing here closes ISSUE-264.
+
+#### 14.6.5 Post-UI Inspect: `auth_users` fingerprint drift (2026-10-05, OPEN, not acknowledged)
+
+Evidence: `D:\tmp\issue264\dev-acceptance\evidence\run-20261005-095541-Inspect` (`03-inspect.log`,
+`snapshot-post-ui.json`) against `state\baseline.json` (captured 2026-10-04T22:10:31Z).
+
+**Established.** Of 19 historical fingerprints, exactly one differs: `auth_users`, same count (4), hash
+`20613479182353352481` -> `18315593946606290086` (delta -2297885235747062395). Append-only ceilings moved as
+expected (import_batches 103 -> 105, data_submissions 59 -> 66, auth_audit_log 1021 -> 1040: 19 rows). The
+acceptance helper never writes `auth_users` (it fingerprints it and selects super-admin ids only).
+
+**Not established (evidence gap).** The baseline stores only `{n, sum(hashtextextended(row::text))}` for
+`auth_users`, so it cannot name a changed row or column, and Inspect saved no per-row state. The cause is
+therefore **not proven**. The code-supported candidate is `auth_users.totp_last_step`, which every successful
+sign-in sets (`src/app/admin/login/actions.ts`, migration 028) and which the UI phase necessarily exercised;
+other writers (password change/reset, role/status lifecycle, invite) each leave a distinct audit action. This
+is a hypothesis to be tested, not a finding. `last_login` does not exist as a column.
+
+**Next.** Operator-run read-only diagnostic `Invoke-AuthUsersDrift.ps1` (beside the runner): rebuilds each
+signed-in admin's pre-login row in the database from earlier `admin.login` audit rows and checks whether the
+exact hash delta is reproduced; prints ids, step counters, timestamps, audit action names and booleans only.
+No baseline reset, no exclusion of `auth_users`, no `-AcknowledgeDrift`, no seed until its verdict is
+recorded here. Submission 66 stays validated and unapproved.
+
+#### 14.6.6 `auth_users` drift: diagnostic result and owner acceptance (2026-10-05)
+
+Evidence: `D:\tmp\issue264\dev-acceptance\evidence\run-20261005-104347-AuthUsersDrift\diag.log` (read-only,
+nothing written; baseline, fingerprints and fixture untouched).
+
+**Established.** Exactly one before-state reproduces the exact hash delta: user 4's `totp_last_step`
+59702145 -> 59705086 (= 2026-10-04T22:23:00Z), within +/-1 step of the sign-in at `admin.login` audit #1022
+(2026-10-05 09:23:21+11); users 10, 13 and 19 unchanged. The in-database row-rebuild control reproduced the real
+row hash for all four users. **Owner accepted** this as an *exact matching reconstruction supported by the login
+audit*, **not** conclusive proof that every other column of every row was preserved.
+
+**Classification correction.** The diagnostic's "may write `auth_users` other than `totp_last_step`: submission.promoted"
+line was a defect, not evidence: the matcher was the substring `/promot/`, intended for role promotion
+(`admin.promoted`), and it matched `submission.promoted`. `runPromotion` (`src/app/admin/submissions/[id]/actions.ts`)
+calls `promoteSubmission` (`src/lib/ingest/pipeline.ts`, no `auth_users` reference) and then `audit()`, which inserts
+into `auth_audit_log`; no trigger touches `auth_users`. The real writers and their audit actions are `admin.login`
+(`totp_last_step`), `admin.promoted/demoted/deactivated/reactivated` (`admin-users.ts`), `admin.password_reset`,
+`admin.password_changed` and `admin.invite_accepted`; the matcher is now that exact set. The saved `diag.log` is
+preserved unedited, so it still carries the wrong line.
+
+**Tooling (operator-side, `D:\tmp\issue264\dev-acceptance`, not repository code).** Before: SeedIndeterminate and
+SeedLate checked no fingerprint at all; Cleanup refused any drift unless the blanket `-AcknowledgeDrift` was given;
+only Seed refused any drift. After: a `KNOWN_DRIFT` allowance matches ONE exact `auth_users` transition (baseline
+`n=4 h=20613479182353352481` -> `n=4 h=18315593946606290086`) and only while that `diag.log` is on disk and still
+reports those values with one exact solution. SeedIndeterminate/SeedLate now gate on the ORIGINAL baseline before
+and after their insert (rolled back on any unexplained drift); Cleanup refuses any further `auth_users` change even
+with `-AcknowledgeDrift`, and keeps the old acknowledge rule for every other fingerprint. No baseline reset, no
+exclusion. Self-test 61/61 (including refusal of hash +/-1, a count change, a reset baseline, the same numbers on
+another fingerprint, absent evidence, and other drift beside the known drift).
+
+**Operational note.** A further sign-in by any admin advances `totp_last_step` again and the next gate will refuse
+it; keep the existing session for C7 and P-b, and if a re-login is unavoidable, re-run the diagnostic and record a
+fresh owner decision before adding an allowance. Submission 66 stays validated and unapproved until SeedLate
+succeeds. ISSUE-264 stays open through final Inspect and Cleanup.
+
+#### 14.6.7 C7, P-b promotion and final submission statuses (2026-10-05, agent-run through the signed-in DEV UI, operator-authorised)
+
+No SQL, Git, shell or allowed-root change was made by the agent. The same signed-in session was used throughout
+(no re-login, so the §14.6.6 `totp_last_step` allowance was not disturbed by the agent). Operator evidence
+folders (as reported by the operator, not re-read by the agent): SeedIndeterminate
+`D:\tmp\issue264\dev-acceptance\evidence\run-20261005-105900-SeedIndeterminate`, SeedLate
+`...\run-20261005-113112-SeedLate`, post-P-b Inspect `...\run-20261005-115644-Inspect` (passed).
+
+**C7 (indeterminate authority), submission 67.** `ISSUE264-ACCEPT-C7-indeterminate.csv`, `player_match_stats`, 1 row,
+uploaded through the normal file chooser from the operator's hash-verified copy in
+`.playwright-mcp\issue264-acceptance`, then Validate. Result: status `validated`, **0 ok, 0 warnings, 1 error**,
+row 1 verdict `error`. Message, verbatim: "Match Sheet authority: this match carries Match Sheet authority that
+cannot be attributed to exactly one player (unreadable, unresolved or duplicated, or naming a club outside the
+match). Resolve it in the Match Sheet editor (/admin/data-editor?mode=match-sheet&id=17278) or correct the file,
+then re-validate." This is the expected indeterminate-authority refusal. Screenshot (Playwright output folder):
+`issue264-acceptance\C7-submission-67-validated.png`. The Approve button was rendered on this errored
+submission and was not clicked (same observation as §14.6, still unexercised).
+
+**P-b (late authority), submission 66.** Before: `ISSUE264-ACCEPT-Pb-late-authority.csv`, `validated`, 2 rows,
+2 clean / 0 warnings / 0 errors (row 1 Companion goals=4, row 2 Late goals=6). Not revalidated. One Approve click
+-> `approved`. One "Promote to database" click -> status **`failed`**; error, verbatim: "Promotion failed and was
+rolled back: 1 row(s) conflict with durable Match Sheet authority; nothing was promoted. row 2 "AFLDB-ISSUE-264
+Accept Late Player" (match #17277): the Match Sheet protects goals (file 6, Match Sheet 5); promoting would
+overwrite it. Resolve them in the Match Sheet editor and promote this submission again, or upload a corrected
+file." This is the expected whole-submission refusal naming the Late player's protected goals conflict. Promotion
+was not retried and authority was not changed. Screenshot: `issue264-acceptance\Pb-submission-66-promotion-failed.png`.
+Database rollback (Companion row absent, Late row unchanged, authority unchanged, no retained import batch for
+66) is established only by the operator's Inspect above; the UI text alone does not prove it.
+
+**Final submission statuses.** Labels were confirmed in the UI before each action.
+
+| Case | Submission | Label | Final status | Action this phase |
+|---|---|---|---|---|
+| C1 conflicting | 60 | `ISSUE264-ACCEPT-C1-conflicting.csv` | **rejected** | rejected, retained as evidence |
+| C2 identical | 61 | `ISSUE264-ACCEPT-C2-identical.csv` | **promoted** (batch 104) | none (status re-read only) |
+| C3 silent | 62 | `ISSUE264-ACCEPT-C3-silent.csv` | **promoted** (batch 105) | none (status re-read only) |
+| C4 club change | 63 | `ISSUE264-ACCEPT-C4-club.csv` | **rejected** | rejected, retained as evidence |
+| C5 removal | 64 | `ISSUE264-ACCEPT-C5-removal.csv` | **rejected** | rejected, retained as evidence |
+| C6 control | 65 | `ISSUE264-ACCEPT-C6-control.csv` | **rejected** | rejected, retained as evidence |
+| P-b (Companion, Late) | 66 | `ISSUE264-ACCEPT-Pb-late-authority.csv` | **failed** | approved then promotion refused (above); unchanged since |
+| C7 indeterminate | 67 | `ISSUE264-ACCEPT-C7-indeterminate.csv` | **rejected** | rejected, retained as evidence |
+
+Rejected and failed submissions were retained, not deleted. 61 and 62 were not touched. Every outcome matched
+the case plan; there was no unexpected result.
+
+**Still open.** SQL cleanup of the seeded fixtures (season 2073, matches 17276–17278) is operator-run. ISSUE-264
+stays open until cleanup verification passes. The Approve-on-errored-submission question (§14.6) remains
+unexercised.
+
+#### 14.6.8 Cleanup: COMMITTED, post-commit verification FAILED (2026-10-05), and the check defect
+
+Evidence (preserved unedited): `D:\tmp\issue264\dev-acceptance\evidence\run-20261005-121322-Cleanup`
+(`03-cleanup.log`, `cleanup-final.json`, `cleanup-removed-rows.json`, `summary.txt`). Baseline
+`state\baseline.json` untouched. The helper exited 3.
+
+**What happened, exactly.** The cleanup transaction **committed**: its own pre-commit proof passed (every residue
+check 0), no historical fingerprint changed during it, and the manifest was then retired (`state: cleaned`,
+`cleanedAt` 2026-10-05T01:13:43Z). Deleted: 9 authority rows, 5 `player_match_stats`, 10 `external_identities`,
+3 matches, 9 players, 2 clubs, 2 club organisations, season 2073. The **separate post-commit verification then
+failed** and printed `REFUSED: post-commit verification found residue or a broken reference`. The cleanup is
+therefore **committed but not verified**. Do not describe it as verified, and it was not rolled back.
+
+**What failed.** Every residue check and the other four dangling checks were 0. The single non-zero value was
+`identities_without_player: 5052`.
+
+**Defect, established from source.** `external_identities.player_id` is declared `integer REFERENCES players(id)`
+with no NOT NULL (`src/db/migrations/002_core_entities.sql:184`), and the table comment states "player_id is NULL
+unless status is unique/resolved" (`:191-192`). The helper's check was
+`NOT EXISTS (SELECT 1 FROM players p WHERE p.id = e.player_id)` over all rows; for a NULL `player_id` the
+comparison is never true, so NOT EXISTS is true and **every legitimate NULL identity was counted as dangling**.
+`player_match_stats.player_id` is NOT NULL (`:166`), so its sibling check was not affected.
+
+**Supporting evidence, and its limit.** The `external_identities` historical fingerprint (every non-fixture row,
+whole-row hash, baseline n=19319) did not differ from the baseline after the cleanup (the only drift is the
+known `auth_users` one, `03-cleanup.log` line 55), so the 5052 rows are not something this cleanup created or
+changed. That shows the count pre-existed; it does **not** by itself show that all 5052 are NULL rather than
+some non-NULL dangling. A foreign key makes the latter near-impossible, but the corrected read-only verification,
+not this argument, is what establishes it.
+
+**Fix (tooling only, operator-side `D:\tmp\issue264\dev-acceptance`, not repository code).** The check now counts
+only `player_id IS NOT NULL AND NOT EXISTS (...)`, so a genuinely broken reference still fails. It is one shared
+function (`danglingReferences`) used by Cleanup's post-commit step and by the new phase below; nothing was
+weakened, and nothing else in the verification changed. The NULL count is reported as information beside it.
+
+**New read-only phase `Verify`** (`Invoke-Issue264DevAcceptance.ps1 -Phase Verify`, helper mode `verify`). One
+repeatable-read READ ONLY transaction; no delete, reseed, repair or manifest write; refuses unless the manifest
+is `cleaned`. It reports separately: (1) fixture residue by natural key; (2) identities with `player_id IS NULL`
+(counts by status, never a failure); (3) identities with a non-NULL `player_id` and no player (FAIL if any),
+plus the other dangling checks; (4) surviving manifest rows by id and key, every single-column foreign key into
+a fixture table (no table exempt after cleanup), authority keys naming a fixture identity path, and `data_edits`
+history on a manifest match/player (all FAIL if any); (5) historical fingerprints against the preserved baseline,
+with only the exact owner-accepted `auth_users` transition explained. Evidence: `verify-verify.json`.
+
+**Syntax check (agent, parse-only, no database, nothing executed):** `node --check` passed for the helper;
+the PowerShell parser reports no errors for the runner. The helper's new selftest cases (identity census: NULL
+rows alone pass, one non-NULL dangling row fails, a non-adding census fails, NULL with a linked status is
+information) have been added but **not yet run**.
+
+**Status at the time of writing: cleanup committed; verification FAILED on a check defect; corrected verification
+NOT YET RUN.** (Superseded by the Verify result in §14.6.9. The failed evidence above is preserved unedited.)
+
+#### 14.6.9 Corrected read-only Verify: PASSED (2026-10-05)
+
+Evidence: `D:\tmp\issue264\dev-acceptance\evidence\run-20261005-122213-Verify` (`03-verify.log`,
+`verify-post-cleanup.json`, `summary.txt`). The operator reports SelfTest 67/67 (run folder not re-read by the
+agent). The Verify run was read-only: it changed nothing, and it ran after the cleanup had committed once.
+
+- **Residue by natural key:** all 0 (season 2073, matches, club seasons, clubs, organisations, players,
+  identities, authority rows, player clubs). The 8 labelled submissions remain, by design.
+- **Identity census (the corrected check):** 19,319 identities. 5,052 have `player_id IS NULL`, all of them
+  status `unmatched` (5,052 of 5,052). 14,267 have a non-NULL `player_id`: `unique` 14,078 and `resolved` 189,
+  none NULL. **Non-NULL `player_id` with no matching player: 0.** So the original 5,052 was exactly the set of
+  legitimate unlinked identities, and the defect in §14.6.8 is confirmed rather than argued.
+- **Other dangling references:** authority 0, stats without a match 0, stats without a player 0, matches
+  without a club 0.
+- **Surviving manifest rows and references to deleted fixture ids:** 0 by id and by key in every fixture table;
+  0 `data_overrides` keys naming a fixture identity path; 0 `data_edits` rows on a manifest match or player;
+  129 single-column foreign-key edges into the fixture tables checked, none referenced by any row.
+- **Historical fingerprints against the preserved baseline:** one difference, the known owner-accepted
+  `auth_users` transition (§14.6.6). The `external_identities` fingerprint (19,319 non-fixture rows) is identical
+  to the baseline.
+- **Verdict printed:** "VERIFIED: no residue, no surviving manifest row, no reference to a deleted fixture id, no
+  non-NULL player_id without a player, and no unexplained historical drift. Nothing was changed."
+- **Retained submissions at that run:** #60 rejected, #61 promoted, #62 promoted, #63 rejected, #64 rejected,
+  #65 rejected, #66 failed, #67 rejected.
+
+### 14.7 Closure record (2026-10-05)
+
+**Resolved 2026-10-05. DEV accepted by the operator. PROD promotion outstanding.** ISSUE-265 stays open.
+
+**Merge state (operator-reported).** The operator's deployment evidence confirmed that `ebbe2c00` was merged
+and pushed to `main` before the DEV deployment. This is operator-reported; it was not checked with Git in this
+session.
+
+#### 14.7.1 What was accepted
+
+Option A (refusal) works as decided on the DEV build `ebbe2c00` (build id `NphJ7fzlvQkJ3IXmw7XtM`), through the
+normal signed-in DEV upload and review UI, against seeded season-2073 fixtures (matches 17276, 17277, 17278):
+
+| Case | Sub. | Result |
+|---|---|---|
+| C1 conflicting goals | 60 | validation **error**: the Match Sheet protects goals (file 7, Match Sheet 3) |
+| C2 identical value | 61 | validated clean, approved, **promoted** (import batch **104**) |
+| C3 silent (file carries marks only) | 62 | validated clean, approved, **promoted** (import batch **105**) |
+| C4 protected club | 63 | validation **error**: the Match Sheet protects club_id (file 26, Match Sheet 25) |
+| C5 removed player | 64 | validation **error**: the Match Sheet removed this player; promoting would re-insert the row |
+| C6 control | 65 | validated clean; not promoted (not authorised) |
+| C7 indeterminate authority | 67 | validation **error**: authority that cannot be attributed to exactly one player (fails closed) |
+| P-b late authority | 66 | validated clean (2 rows) **before** the authority existed; approved; **promotion refused** |
+
+Messages are verbatim in §14.6 and §14.6.7.
+
+- **C2 and C3, database-verified** (post-P-b Inspect, `run-20261005-115644-Inspect`, before cleanup): the Identical
+  row kept goals 3, kicks 10, marks 2, disposals 15, handballs 5 with `import_batch_id` 104; the Silent row kept
+  goals 3, kicks 10, disposals 15, handballs 5 and took the file's marks (7), `import_batch_id` 105. Neither
+  promotion changed the authority records. The Silent promotion applied the compatible value and left the
+  protected fields alone.
+- **P-b, promotion-time refusal, database-verified** (same Inspect): after approval and one promotion attempt,
+  submission 66 was **`failed`** with "1 row(s) conflict with durable Match Sheet authority; nothing was
+  promoted. row 2 … Late Player (match #17277): the Match Sheet protects goals (file 6, Match Sheet 5)…". The
+  database showed the whole submission rolled back: **no Companion row** for R264B, the **Late row unchanged**
+  (goals 5, `import_batch_id` null), the Late authority record #246 unchanged (active, goals 5), and the only
+  import batches beyond the baseline ceiling were 104 and 105 (**none for submission 66**). Promotion was not
+  retried.
+- **Not exercised, stated plainly:** whether the server refuses the review page's **Approve** button on a
+  submission with errors (it is rendered on 60, 63, 64 and 67 and was never clicked); the
+  settle-versus-promotion deadlock (ISSUE-265, never run into a real settle); and PROD.
+
+#### 14.7.2 Cleanup, its verification defect and the corrected Verify
+
+The fixture cleanup **committed once** (`run-20261005-121322-Cleanup`): 9 authority rows, 5 `player_match_stats`,
+10 identities, 3 matches, 9 players, 2 clubs, 2 club organisations and season 2073 were deleted in one
+transaction, with every residue check 0 and no historical fingerprint changed by the cleanup itself. Its
+**post-commit verification then failed** on a defect in the check: it counted every `external_identities` row with
+`player_id IS NULL` (legitimate, by the table's contract) as dangling (5,052). The original evidence and baseline
+are preserved unedited (§14.6.8). The check was corrected in the operator-side tooling (non-NULL `player_id` only,
+no weakening for a genuinely broken reference) and a read-only `Verify` phase was added. **The corrected Verify
+passed** (`run-20261005-122213-Verify`, §14.6.9): 0 residue, 0 surviving manifest rows, 0 references to deleted
+fixture ids over 129 foreign-key edges, 0 non-NULL `player_id` without a player (5,052 NULL, all `unmatched`).
+SelfTest 67/67 (operator-reported).
+
+#### 14.7.3 What is retained, and what is NOT claimed
+
+- **Retained, not deleted:** submissions **60–67** (final statuses: 60, 63, 64, 65 and 67 `rejected`; 61 and 62
+  `promoted`; 66 `failed`) with their rows; import batches **104** (submission 61) and **105** (submission 62);
+  and the append-only audit records. At the post-P-b Inspect there were 23 `auth_audit_log` rows beyond the
+  baseline ceiling (ids 1022–1044; the sign-in at #1022 is the first). The five rejections and the later runs
+  added further append-only rows that were **not** re-counted. `data_issues` was 64
+  rows (whole table, informational).
+- **Not byte-identical restoration.** Cleanup deleted only manifest-owned fixture rows. It did not, and could not,
+  restore the database to its pre-acceptance bytes: the append-only evidence above remains, identity sequences
+  have advanced, and the one accepted drift below remains. What is claimed is only that every historical
+  fingerprint except `auth_users` equals the baseline.
+- **Accepted `auth_users` drift.** The `auth_users` fingerprint differs from the baseline (same count 4; hash
+  `20613479182353352481` → `18315593946606290086`). The owner accepted this (§14.6.6) as an exact matching
+  reconstruction, supported by the login audit, of user 4's sign-in advancing `totp_last_step` 59702145 →
+  59705086 (audit #1022), **not** as conclusive proof that every other column of every row was preserved. The
+  diagnostic log is `run-20261005-104347-AuthUsersDrift/diag.log`.
+- The two season-2026 `club_seasons` residue rows and the morning-window evidence gap on `afldb_test` stay as
+  accepted in D-264-9 (§14.5.3). That is a test-database matter, unrelated to DEV acceptance.
+
+#### 14.7.4 Outstanding
+
+- **PROD promotion.** Nothing has been deployed to or checked on PROD. It goes with ISSUE-258's outstanding PROD
+  promotion. R-258-1 (re-validate any pre-deployment legacy submission before promoting it, after censusing PROD
+  `data_submissions`) still applies, and so does the migration-110 ordering note in §14.4.4 if PROD is still at
+  schema 109.
+- **AFLDB-ISSUE-265 stays open.** The D-264-11 limitation is **temporarily accepted, not eliminated**: a settle
+  that holds a later match can deadlock with a legacy promotion holding an earlier one, and if the settle is the
+  victim one unit rolls back with a `canonical_apply_failed` finding; the run continues, and the provider's next
+  in-season run re-offers the unit. There is no in-run retry, and DEV has no AFL Tables timer. Runbook
+  `issues/open/AFLDB-ISSUE-265.md`. Nothing is implemented.

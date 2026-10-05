@@ -9,72 +9,27 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Open issues:** 9
+**Open issues:** 8
 
 ### AFLDB-ISSUE-265 — A settle unit can lose a match-lock deadlock to a legacy CSV promotion, with no in-run retry
 - **Severity:** Low. **Area:** data integrity / concurrency — `src/lib/acquisition/canonical-apply.ts`
   (`lockUnitMatchRows`), `settle-afltables.ts`, `settle-afl-api.ts`, `src/lib/ingest/datasets.ts`
   (ISSUE-264 promotion hooks).
 - **State:** Open (2026-10-04), from ISSUE-264 F-002. The operator accepted it as a temporary ISSUE-264
-  limitation (D-264-11).
+  limitation (D-264-11). ISSUE-264 is resolved (2026-10-05, DEV accepted, PROD promotion outstanding;
+  runbook `issues/closed/AFLDB-ISSUE-264.md`); this limitation is **still open and not eliminated**, and the
+  DEV acceptance did not exercise it.
   - A settle holding a later match can deadlock with a promotion holding an earlier one. If the settle is
     the victim, one unit rolls back with a `canonical_apply_failed` finding and the run continues. There
     is no in-run retry.
   - Recovery comes on the provider's next in-season run: the AFL Tables §9.3 retry, or the AFL API
-    re-diff. This is traced in code (ISSUE-264 runbook §14.5.2). No real settle has been run into the
+    re-diff. This is traced in code (`issues/closed/AFLDB-ISSUE-264.md` §14.5.2). No real settle has been run into the
     deadlock.
   - DEV has no AFL Tables timer, so an AFL Tables unit waits for an operator-run settle.
   - The deadlock is not eliminated.
 - **Runbook:** `issues/open/AFLDB-ISSUE-265.md`.
 - **Next action:** the operator decides whether to mitigate: an in-run `40P01` unit retry, settle-side
   ascending match locks, or making the promotion yield. Nothing implemented.
-
-### AFLDB-ISSUE-264 — Legacy CSV promotion overwrites Match Sheet-protected `player_match_stats` fields and re-inserts players the Match Sheet removed
-- **Severity:** Medium. **Area:** legacy file intake / manual authority — `src/lib/ingest/datasets.ts`,
-  `src/lib/ingest/pipeline.ts`, `src/lib/acquisition/manual-authority.ts`.
-- **State:** Open (2026-10-03), from ISSUE-258 finding F-258-I1 (ISSUE-258 resolved; runbook
-  `issues/closed/AFLDB-ISSUE-258.md`).
-  - Option A (refusal) was decided and implemented on 2026-10-04. It is uncommitted, in worktree
-    `afldb-issue-264`.
-  - A row is refused if it supplies a value that differs from active Match Sheet authority, changes a
-    protected club, or re-inserts a removed player. The check runs at validation and again in
-    promotion under the match lock; one refusal rolls back the whole submission.
-  - Identical or absent values pass. Indeterminate authority fails closed.
-  - DB-free 68/68 (typecheck and lint were clean at 56/56). Validated on `afldb_test` with migration 110
-    applied (2026-10-04, evidence `D:\tmp\issue264\run-20261004-094838`): all seven ISSUE-264 cases pass,
-    with the neighbouring suites, the settle coverage and the full build. The window reversed 110;
-    `afldb_test` is back at its original schema and ledger.
-  - Pre-commit review (§14.2): **F-002 (MED) was decided as Option A and is implemented and validated
-    (§14.3, 2026-10-04).** `match_results` and the stats hook now take match locks in one ascending order
-    (`FOR NO KEY UPDATE` / `FOR SHARE`) under a transaction-local 5 s timeout with a retryable message;
-    every supported authority or key writer waits for the hook (14 forced-order cases on `afldb_test`).
-    **A cycle with a settle can still occur and the settle can be the victim** (one unit rolls back to its
-    savepoint, one `canonical_apply_failed` finding, run continues). It is new relative to main.
-    **F-005 (INFO)** is not a bypass on any supported path.
-  - **Commit hold cleared (§14.5, 2026-10-04).**
-    - D-264-9: the morning-window `club_seasons` evidence gap is accepted without repair. The two 2026
-      residue rows stay; nothing claims preservation before 19:52.
-    - D-264-10: the corrected runner, which refuses `settle-afl-api`, is approved. The id-inclusive
-      `club_seasons` fingerprint stays.
-    - D-264-11: the settle-victim limitation is accepted as **temporary**. Both providers re-offer the
-      unit on their next in-season run (traced in code, §14.5.2). The deadlock is not eliminated. Follow-up:
-      **AFLDB-ISSUE-265**.
-  - Final window `D:\tmp\issue264\run-20261004-211130`: **PASS**.
-    - `match-results-promotion` 32/32, `datasets` 16/16, `submission-promotion` 7/7, `settle-afltables`
-      authority block 11, and the build exit 0.
-    - Every census was clean. 110 was reversed: ledger 109, original CHECK and comment.
-    - All 19 fingerprints equal the baseline.
-  - DB-free: 81/81, 165/165, and 389 passed with 4 skipped.
-- **Runbook:** `issues/open/AFLDB-ISSUE-264.md` (§12 decisions, §13 implementation, §14 validation,
-  §14.2 pre-commit review, §14.3 F-002 outcome, §14.5 final decisions and validation).
-- **Next action:**
-  - Operator review, then commit (no attribution trailers; list the eleven paths explicitly: the ten modified tracked paths and the new
-    `issues/open/AFLDB-ISSUE-265.md`) and
-    `merge:ready`.
-  - DEV deploy is application-only (`deploy/sync-dev.ps1 -SkipMigrate`; DEV already has 110), then DEV
-    acceptance.
-  - PROD goes with ISSUE-258's outstanding promotion; the application-before-110 order applies only if
-    PROD is still at 109. R-258-1 (re-validate pre-deployment legacy submissions) still applies.
 
 ### AFLDB-ISSUE-263 — A fresh `db:test:rebuild` leaves every `brownlow_round_votes.match_id` NULL
 - **Severity:** Low. **Area:** rebuild / Brownlow data state; tests —
