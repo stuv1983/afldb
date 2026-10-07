@@ -9,7 +9,7 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Open issues:** 7
+**Open issues:** 6
 
 ### AFLDB-ISSUE-265 — A settle unit can lose a match-lock deadlock to a legacy CSV promotion, with no in-run retry
 - **Severity:** Medium (raised from Low on 2026-10-05, D-265-12). **Area:** data integrity / concurrency —
@@ -85,15 +85,6 @@
 - **Next action:**
   1. The operator reviews and commits the eighteen files in runbook §25.7 (explicit paths; not the stray files; nothing under `D:\tmp\`).
   2. `npm run merge:ready -- --issue 265`, then merge/push, `deploy/sync-dev.ps1` and DEV acceptance (runbook §18.2).
-
-### AFLDB-ISSUE-262 — `reference-data` exact post-045 import-write list omits `afl_api_identity_adjudications` (migration 104)
-- **Severity:** Low. **Area:** tests / reference-data privilege guard — `tests/reference-data.test.ts:425`,
-  `src/db/migrations/104_afl_api_identity_adjudications.sql`.
-- **State:** Open (2026-10-03). Found as ISSUE-257 F-S9-04 and pre-existing on HEAD `3ed70ab1`. DB-free and
-  platform-independent: `npx vitest run tests/reference-data.test.ts -t "never registered import write"`
-  fails, with `"afl_api_identity_adjudications"` as the extra received entry. Does not block ISSUE-257.
-- **Next action:** confirm that 104's append-only-by-grant design is intended, then add the table, with a
-  comment, to the exact list.
 
 ### AFLDB-ISSUE-261 — Targeted player-derived recompute takes row locks in an order that can deadlock a settle against a Data Editor save
 - **Severity:** Low. **Area:** data integrity / concurrency — `src/db/queries/player-derived.ts`

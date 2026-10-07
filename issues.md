@@ -4,17 +4,25 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 7
+**Open issues:** 6
 
 | ID | Title | Severity | Area | State | Next action |
 |---|---|---|---|---|---|
 | AFLDB-ISSUE-265 | A settle unit can lose a match-lock deadlock to a legacy CSV promotion, with no in-run retry | Medium | Data integrity / concurrency — `canonical-apply.ts` (`lockUnitMatchRows`), `settle-afltables.ts`, `settle-afl-api.ts`, `src/lib/ingest/datasets.ts` (ISSUE-264 hooks) | Open (2026-10-04); from ISSUE-264 F-002; operator-accepted as a temporary ISSUE-264 limitation (D-264-11); a settle holding a later match can deadlock with a promotion holding an earlier one, and if the settle is the victim one unit rolls back with a `canonical_apply_failed` finding while the run continues; no in-run retry; recovery on the provider's next in-season run (AFL Tables §9.3 retry; AFL API re-diff), code-traced in ISSUE-264 runbook §14.5.2; DEV has no AFL Tables timer; characterised on `afldb_test` at lock-statement level only; deadlock not eliminated; 2026-10-05 investigation (runbook §10–§15): F-265-1 AFL API attendance enrichment can lose the whole run, `match_attendance` is a third unordered writer, in-run unit retry futile in the main shapes; 2026-10-05 operator: D-265-1..12 accepted (Option 3 advisory gate incl. `match_attendance`; severity Medium); 2026-10-05 operator: D-265-5 accepted (300 s settle gate wait with a 330 s gate-statement bound; an operator judgement, PROD records cannot validate it; the D-265-13 query is context only), D-265-14 (Phase B case B11) and D-265-15 (Phase A tooling archived unchanged in `issues/open/AFLDB-ISSUE-265-phase-a/`); Phase A window 2 (2026-10-05 16:22) PASSED 3/3, census CLEAN (runbook §17.14); Phase A retired, Phase B replaces it; final plan and Phase B assertions in runbook §18–§20; S0 checkpoint committed (62f2cd67); **2026-10-05 mitigation IMPLEMENTED in the working tree, uncommitted (runbook §21): shared settle gate (300 s / 330 s), exclusive gate in the three legacy hooks, `match_attendance` ascending hook, database-free pins, Phase B harness B1–B11; Phase B PASSED 11/11 (2026-10-05, runbook §23); regression window FAILED twice on test-teardown residue, cause fixed (§24), then PASSED (2026-10-06, §25.1); build PASSED (2026-10-06, §25.8: exit 0, 1,515 static pages, standalone ready, census CLEAN, two warnings recorded and not claimed pre-existing); commit, deployment and DEV acceptance pending** | Operator reviews and commits the eighteen files in runbook §25.7, then `npm run merge:ready -- --issue 265`, merge/push, `deploy/sync-dev.ps1` and DEV acceptance (§18.2) |
-| AFLDB-ISSUE-262 | `reference-data` exact post-045 import-write list omits `afl_api_identity_adjudications` (migration 104) | Low | Tests / reference-data privilege guard — `tests/reference-data.test.ts:425`, `src/db/migrations/104_afl_api_identity_adjudications.sql` | Open (2026-10-03). Fails on HEAD `3ed70ab1` independent of ISSUE-257, DB-free and platform-independent; found as ISSUE-257 F-S9-04. Not blocking ISSUE-257. | Confirm 104's append-only-by-grant design is intended, then add the table, with a comment, to the exact list. |
 | AFLDB-ISSUE-261 | Targeted player-derived recompute takes row locks in an order that can deadlock a settle against a Data Editor save | Low | Data integrity / concurrency — `src/db/queries/player-derived.ts` (`recomputePlayerDerivedStats`), `data-edits.ts`, `match-admin.ts`, both settles | Open (2026-10-02); found in ISSUE-257 Slice 4 (F-S4-01) by code reading; pre-existing; the recompute updates every `player_match_stats` row of each affected player with no changed-value guard, so a settle and an admin writer can wait on each other's rows; ISSUE-257 added a bounded 40P01 retry around the settles' end-of-run recompute and a 5 s Match Sheet `lock_timeout`; residual: `data-edits.ts`/`match-admin.ts` set no `lock_timeout`, so the retry can exhaust and roll the settle back; not reproduced | Decide whether to fix (changed-value guard, global `players` lock order, or `lock_timeout` on the other writers) |
 | AFLDB-ISSUE-260 | NL answer explanation prints internal column markers for career conditions | Low | NL search, describe/render stage — `src/search/nl/plan.ts` (`describePlan`) | Open (2026-10-02); code review F-004 (`playbooks/issue.md`); a career column condition is labelled with the compiler's SQL marker ("Condition: c.premierships exactly 0."); results unaffected; confirmed DB-free; operator decision 2026-10-02 (after the review): approved for implementation, reader-facing labels only, no parser change intended; nothing implemented; runbook `issues/open/AFLDB-ISSUE-260.md` | Implement in the same focused NL session as AFLDB-ISSUE-259 unless evidence shows they should be separated |
 | AFLDB-ISSUE-259 | NL club-scoped career rankings accept a career condition that is evaluated across the whole career | Low | NL search, validate stage — `src/search/nl/plan.ts` (`validatePlan`), `src/db/queries/nl/player-career.ts` | Open (2026-10-02); code review F-003 (`playbooks/issue.md`); the club-scope guard tests conditions only for unranked plans, so a ranked club-scoped plan with a non-games condition validates while its unranked form is refused; confirmed DB-free through the parser and validator, SQL read not run; operator decision 2026-10-02 (after the review) D-259-1: fail closed — decline when a condition cannot be evaluated at club scope, never reinterpret it as whole-career, add no per-club compiler capability, no parser change intended; nothing implemented; runbook `issues/open/AFLDB-ISSUE-259.md` | One focused NL session with AFLDB-ISSUE-260; check the corpora there for rows of this shape that expect an answer |
 | AFLDB-ISSUE-233 | AFL API season discovery and season rollover ownership | Medium | Data acquisition / season lifecycle — `afl-api-identities.json`, rollover runbook | Open (2026-09-23); 2026-09-26 pass 2: D-233-1/2/3 decided (proposal JSON; season-scoped AFL API Brownlow artefacts beside the master; preserve `afl_api` ownership or refuse); discovery IMPLEMENTED / DB-FREE VALIDATED against the authentic `compseasons` sample (sha256 `fe3f1641…d965`); 2026-10-01 pass 3 (uncommitted): D-233-3 rebuild/rollover `afl_api` ownership census and D-233-2 season-scoped AFL API Brownlow load IMPLEMENTED / DB-FREE VALIDATED; 2026-10-01 pass 4 (uncommitted): D-233-3 also enforced on the LIVE promotion target (`promotion-check.ts`, `dependencies`/`pre-cutover`/`restored`/`candidate`/frozen `production`, no override); damaged-schema census refuses; discovery `--fetch` retains entity bytes verbatim; ownership replay intentionally unimplemented; 2026-10-01 pass 5 (uncommitted): integration census test 5/5 on `afldb_test` (no residue), read-only censuses PASS on `afldb_test` and `afldb_dev` (zero `afl_api`-owned matches, DEV not mutated), final review no CRIT/HIGH/MED; committed `f0abbb4c`; 2026-10-01 pass 6: first real DEV discovery `--fetch` PASSED (`20261001T034039Z`, 1 fetch, HTTP 200, 1,959 decoded body bytes sha256 `2aeed4e9…b33e`, 15/15 entries 2012–2026, `no_change`, offline replay byte-identical, DEV and registry unchanged); D-233-2 `code_test_db` write-path rehearsal designed, not written or run, blocked on a stable-identity bridge and the 2026 snapshot; R4 classified fail-safe, no successor issue; 2026-10-01 passes 7–9 (uncommitted): fresh CONCLUDED 2026 Brownlow snapshot `afl-api-brownlow-2026-2026-10-01-041609`; `afldb_test` bridge 0/669 (no 2026 matches); DEV read-only bridge 669/669 (v1); builder continuity defect FIXED (exact tracked `profile_url_continuity` pair → `continuing_url`, ISSUE-237 parity), real DEV read-only build 183/183 (Jack Ross 6519 → `players/J/Jack_Ross.html`), artefact outside repo, second write `unchanged`; `code_test_db` read-only coverage 175/183 (8 presumed 2026 debutants absent), harness NOT written; 2026-10-01 pass 10 (uncommitted): D-233-R = scoped `code_test_db` fixture of exactly the eight missing 2026 player identities (no rebuild/restore), harness `tools/migration/brownlow_afl_api_season_rehearsal.py` WRITTEN, NOT RUN, DB-free 113/113; 9,982/9,983 = one unused emergency row (expected); 2026-10-01 pass 11 (uncommitted): `code_test_db` rehearsal PASSED + exact restore PASSED (evidence `D:\tmp\issue233\rehearsal-20261001-151415`; fixture 8+8 → 183/183; real loads A1 batches 27/28, A2 29/30, 183/1,242/1/14 `afl_api`, A2 content-identical; fingerprint = F0, residue 0, coverage back to 175/183; case 5 NOT RUN); 2026-10-01 pass 12 final review: 0 CRIT/HIGH, 2 MEDIUM fixed (continuity provenance validator; POSIX manifest paths), committed on `sonnet/issue-233`; 2026-10-01: `f0abbb4c` + `cc1a5f2d` merged, `main` at `cc1a5f2d`, no merge pending; PROD untouched; runbook `issues/open/AFLDB-ISSUE-233.md` | Promotion gate's first live read at the next promotion (runbook §4.6 item 6); stays OPEN until then |
 | AFLDB-ISSUE-229 | AFL API fixture ingestion | Medium | Data acquisition / fixtures — `afl_api` season feed → `fixtures` | Open (2026-09-23); 2026-10-02 (main `5a85226c`): Option B decided; D-229-1 through D-229-8a decided; **B1 COMPLETE** — authentic retained pre-match evidence covers `SCHEDULED` and `UNCONFIRMED_TEAMS`; no fixture writer built; runbook `issues/open/AFLDB-ISSUE-229.md` | B2: capture and review the first authentic 2027 pre-match season feed before the fixture writer is wired or applied |
+
+**AFLDB-ISSUE-262 resolved 2026-10-08** (test-only correction, uncommitted at resolution, worktree
+`afldb-issue-262`; operator-run DB-free validation). The `reference-data` guard's exact list of post-045
+tables that never call `grant_import_write()` had not been updated for migration 104's
+`afl_api_identity_adjudications`. That table is append-only by grant by design, so the expected list was
+stale, not the privileges. The table is now in the list with a comment, and the exact-equality assertion is
+kept. `npx vitest run tests/reference-data.test.ts -t "never registered import write"`: 1 passed, 50
+filtered skips, 0 failures. No migration or `privileges.sql` change; no `CHANGELOG.md` entry. Removed from
+`IssuesIndex.md` and the Open Issues table. Full record: the entry in this file.
 
 **AFLDB-ISSUE-263 resolved 2026-10-08** (implementation uncommitted at resolution, worktree `afldb-issue-263`;
 operator-run validation on `afldb_test`). The fitzRoy Brownlow loader now resolves `brownlow_round_votes.match_id`
@@ -47488,7 +47496,8 @@ retained behaviour under `Unreleased`.
 
 ## AFLDB-ISSUE-262 — `reference-data` exact post-045 import-write list omits `afl_api_identity_adjudications` (migration 104)
 
-- **Status:** Open (2026-10-03). **Severity:** Low. **Area:** tests / reference-data privilege
+- **Status:** **Resolved (2026-10-08).** Opened 2026-10-03. The correction is uncommitted at
+  resolution; the operator commits it. **Severity:** Low. **Area:** tests / reference-data privilege
   guard. Key files:
   - `tests/reference-data.test.ts:417-425` ("finds the tables created after 045 that never registered
     import write"), an exact-equality list;
@@ -47518,8 +47527,45 @@ retained behaviour under `Unreleased`.
   privilege design is intended and that the reference loader's FK cascade closure does not need the
   table, which is the decision the test's comment asks a human to make.
 - **Out of scope.** Changing migration 104 or `privileges.sql`.
-- **Next action.** Make that decision, then make the one-line test change and re-run the command
-  above. Nothing implemented.
+- **Decision (2026-10-08, worktree `afldb-issue-262`, base `a929dbdc`).** The design is intended, and
+  no grant contradicts the premise:
+  - migration 104 `:36-41` and `:114-120` say the table is deliberately NOT added to
+    `afldb_meta.import_writable_tables`, because the reconcile loop would hand back
+    UPDATE/DELETE/TRUNCATE. `:121-135` grants `afldb_import` SELECT, INSERT and sequence USAGE, and
+    `afldb_auth` SELECT;
+  - `tools/maintenance/privileges.sql:373-380` re-grants exactly that to `afldb_import` on every
+    reconcile, and `:510` lists `afldb_auth` SELECT;
+  - migration 106 changes CHECK constraints and comments only, with no grants, and no migration
+    calls `grant_import_write('afl_api_identity_adjudications')`.
+
+  FK cascade closure: `player_id REFERENCES players(id)` makes the table reachable from the reference
+  loader's truncate roots, the same way `player_link_match_candidates` is. Unlike that table, though,
+  `afldb_import` can SELECT it, so the populated-roots guard (§H13) counts it and is not blocked by it.
+  No privilege needs widening, and it is not a third member of the "unreadable to `afldb_import`"
+  pair. If the ledger is populated, a populated `seasons`/`clubs` truncate is refused, which is the
+  fail-closed behaviour this durable identity authority needs.
+- **Implementation (uncommitted).** `tests/reference-data.test.ts`: `'afl_api_identity_adjudications'`
+  is added first, in sorted order, to the exact-equality list in "finds the tables created after 045
+  that never registered import write", with a comment on its append-only-by-grant status and closure
+  position. The exact-equality assertion and every other test are unchanged. No migration or
+  `privileges.sql` change.
+- **Validation (2026-10-08, operator-run, DB-free).**
+  `npx vitest run tests/reference-data.test.ts -t "never registered import write"`: 1 passed,
+  50 skipped by the name filter, 0 failures.
+- **Resolution (2026-10-08).**
+  - **Root cause.** The test's expected list was stale, not the privilege design. Migration 104
+    (AFLDB-ISSUE-235) deliberately kept `afl_api_identity_adjudications` out of
+    `afldb_meta.import_writable_tables` so that it stays append-only by grant, but the test's exact
+    list of post-045 tables that never call `grant_import_write()` was not updated when 104 landed.
+    The exact-equality assertion therefore saw one extra received entry.
+  - **Fix.** The expected list in `tests/reference-data.test.ts` (`:425-433`) now includes
+    `'afl_api_identity_adjudications'`, first in sorted order, with a comment recording its
+    append-only-by-grant status, its `privileges.sql` re-grant and its FK cascade-closure position.
+    The exact-equality assertion is kept, and no other test changed.
+  - **Unchanged.** Migration 104, every other migration and `tools/maintenance/privileges.sql`. No
+    privilege was widened.
+  - **Tracking.** No `CHANGELOG.md` entry: a test-only correction with no retained behaviour change.
+    No follow-up issue. Removed from `IssuesIndex.md` and the Open Issues table (7 -> 6).
 
 ## AFLDB-ISSUE-263 — A fresh `db:test:rebuild` leaves every `brownlow_round_votes.match_id` NULL
 

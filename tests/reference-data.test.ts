@@ -423,6 +423,14 @@ describe('load_reference_data.py', () => {
       // closure BEFORE the next destructive rebuild. A subset check would let
       // one appear silently.
       expect(unregistered).toEqual([
+        // 104 (AFLDB-ISSUE-235). The afl_api human identity adjudication
+        // ledger is append-only BY GRANT, like canonical_applications:
+        // afldb_import gets SELECT, INSERT and the sequence only (re-granted
+        // in privileges.sql), afldb_auth SELECT. Registering it would restore
+        // UPDATE/DELETE/TRUNCATE on every reconcile. Its players(id) FK puts
+        // it in the cascade closure, but afldb_import can SELECT it, so the
+        // populated-roots guard counts it rather than being blocked by it.
+        'afl_api_identity_adjudications',
         'app_health_events',
         // 094 (AFLDB-ISSUE-155 Phase C1). The Brownlow administration
         // workflow: a record of who drafted, finalised, voided and
