@@ -9,7 +9,7 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Open issues:** 8
+**Open issues:** 7
 
 ### AFLDB-ISSUE-265 — A settle unit can lose a match-lock deadlock to a legacy CSV promotion, with no in-run retry
 - **Severity:** Medium (raised from Low on 2026-10-05, D-265-12). **Area:** data integrity / concurrency —
@@ -85,15 +85,6 @@
 - **Next action:**
   1. The operator reviews and commits the eighteen files in runbook §25.7 (explicit paths; not the stray files; nothing under `D:\tmp\`).
   2. `npm run merge:ready -- --issue 265`, then merge/push, `deploy/sync-dev.ps1` and DEV acceptance (runbook §18.2).
-
-### AFLDB-ISSUE-263 — A fresh `db:test:rebuild` leaves every `brownlow_round_votes.match_id` NULL
-- **Severity:** Low. **Area:** rebuild / Brownlow data state; tests —
-  `tools/migration/import_fitzroy_core.py:3246-3248`, `src/db/migrations/094_brownlow_admin_workflow.sql`,
-  `tests/integration/admin-brownlow.test.ts:367-379`.
-- **State:** Open (2026-10-03). Found as ISSUE-257 F-S11-02 and pre-existing. The importer COPYs
-  `brownlow_round_votes` without `match_id`, and migration 094's one-time backfill runs before the data on a
-  rebuild, so `admin-brownlow` preflight P2 finds 320,861 of 320,861 rows unresolved. Does not block ISSUE-257.
-- **Next action:** operator decides the contract (rebuild defect versus stale test assumption).
 
 ### AFLDB-ISSUE-262 — `reference-data` exact post-045 import-write list omits `afl_api_identity_adjudications` (migration 104)
 - **Severity:** Low. **Area:** tests / reference-data privilege guard — `tests/reference-data.test.ts:425`,

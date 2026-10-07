@@ -3175,6 +3175,56 @@ def import_player_match_stats(pg, rep, files: list[SnapshotFile],
     analyze(pg, "player_match_stats")
 
 
+# AFLDB-ISSUE-263. Migration 094's §27.5 backfill, reproduced rather than
+# re-derived, and scoped to the seasons a load has just written. 094 resolved
+# match_id ONCE, over the rows present when it was applied; a rebuild applies
+# every migration before any data exists, so without this every reloaded row
+# stayed NULL. Same evidence, same rule: the player's own canonical
+# player_match_stats row in that season's home-and-away round, assigned only
+# when exactly ONE distinct match qualifies. Zero or several candidates keep
+# NULL, which the column comment and the admin season view treat as the
+# legitimate "unresolved" state. Never guessed; no name, date or club matching.
+ROUND_VOTE_MATCH_RESOLUTION_SQL = """
+    UPDATE brownlow_round_votes rv
+       SET match_id = r.match_id
+      FROM (
+        SELECT rv2.id,
+               (array_agg(m.id))[1] AS match_id,
+               count(DISTINCT m.id)  AS candidates
+          FROM brownlow_round_votes rv2
+          JOIN matches m
+            ON m.season = rv2.season
+           AND m.round_type = 'home_and_away'
+           AND m.round_number = rv2.round_number
+          JOIN player_match_stats pms
+            ON pms.match_id = m.id AND pms.player_id = rv2.player_id
+         WHERE rv2.match_id IS NULL
+           AND rv2.season = ANY(%s)
+         GROUP BY rv2.id
+      ) r
+     WHERE r.id = rv.id AND r.candidates = 1
+"""
+
+
+def resolve_round_vote_match_ids(cur, seasons: list[int]) -> tuple[int, int]:
+    """Attach match_id to the unresolved round-vote rows of ``seasons``.
+
+    Returns ``(resolved_now, still_unresolved)``. Touches only rows whose
+    match_id is NULL, so an attributed row is never re-attributed and a
+    second call is a no-op. Does not commit: the caller's transaction decides,
+    so the partial unique indexes judge the attribution together with the load
+    that produced it, and a violation rolls the whole load back instead of
+    committing it half-attributed.
+    """
+    cur.execute(ROUND_VOTE_MATCH_RESOLUTION_SQL, (seasons,))
+    resolved = cur.rowcount
+    cur.execute(
+        """SELECT count(*) FROM brownlow_round_votes
+            WHERE season = ANY(%s) AND match_id IS NULL""",
+        (seasons,))
+    return resolved, int(cur.fetchone()[0])
+
+
 def import_brownlow_round_votes(pg, rep, files: list[SnapshotFile],
                                 matches: dict[tuple, MatchFact], args,
                                 corrections: list[dict]) -> None:
@@ -3246,8 +3296,15 @@ def import_brownlow_round_votes(pg, rep, files: list[SnapshotFile],
         copy_rows(pg, "brownlow_round_votes",
                   ["season", "player_id", "round_number", "played", "votes"],
                   rows, batch)
+        # AFLDB-ISSUE-263: inside this transaction, after the COPY and before the
+        # commit. It reads player_match_stats as committed by the `stats` group,
+        # which GROUPS orders first; a `--groups brownlow` run resolves against
+        # whatever line-ups the database already holds, by the same rule.
+        with pg.cursor() as cur:
+            resolved, unresolved = resolve_round_vote_match_ids(cur, snapshot_seasons)
         pg.commit()
-    rep.result("brownlow_round_votes", len(rows))
+    rep.result("brownlow_round_votes", len(rows),
+               f"({resolved} resolved to a match, {unresolved} unresolved)")
 
 
 # ---------------------------------------------------------------------------

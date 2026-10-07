@@ -24,6 +24,10 @@
  */
 import './guard';
 
+import { spawnSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+
 import postgres from 'postgres';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -437,6 +441,193 @@ describe('migration 094 objects and backfill', () => {
       expect(check.definition).toContain('players');
       expect(check.definition).not.toContain('brownlow');
     }
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * 1b. AFLDB-ISSUE-263: the fitzRoy loader attributes the rows it loads
+ *
+ * Migration 094 resolved match_id once, over the rows present when it was
+ * applied; a rebuild loads every round row after it, so the loader has to apply
+ * the same rule itself. This runs the REAL resolve_round_vote_match_ids out of
+ * tools/migration/import_fitzroy_core.py over the SHORT season, in ONE psycopg
+ * transaction that is always rolled back: nothing it writes, the ambiguity
+ * line-up row included, outlives the case. The source pins (094 parity, and the
+ * call sitting between the COPY and the commit) are in
+ * tests/fitzroy-core-import.test.ts.
+ * ------------------------------------------------------------------ */
+
+const root = process.cwd();
+const venvPython = process.platform === 'win32'
+  ? join(root, '.venv', 'Scripts', 'python.exe')
+  : join(root, '.venv', 'bin', 'python');
+const python = process.env.AFLDB_PYTHON
+  ?? (existsSync(venvPython) ? venvPython : (process.platform === 'win32' ? 'python' : 'python3'));
+const canRunImporter = (() => {
+  const probe = spawnSync(python, ['-c', 'import psycopg'], { encoding: 'utf8' });
+  return !probe.error && probe.status === 0;
+})();
+
+/** [season, player_id, round_number, votes] — the columns the loader COPYs. */
+type LoadedRoundRow = [number, number, number, number];
+
+const RESOLUTION_PROBE = `
+import sys, os, json
+sys.path.insert(0, ${JSON.stringify(join(root, 'tools', 'migration'))})
+import psycopg
+import import_fitzroy_core as fz
+
+case = json.loads(os.environ["AFLDB_ISSUE263_CASE"])
+season = case["season"]
+out = {}
+conn = psycopg.connect(os.environ["AFLDB_ISSUE263_DSN"])
+try:
+    cur = conn.cursor()
+
+    def load(rows):
+        for s, player_id, round_number, votes in rows:
+            cur.execute(
+                "INSERT INTO brownlow_round_votes (season, player_id, round_number, played, votes)"
+                " VALUES (%s, %s, %s, true, %s)", (s, player_id, round_number, votes))
+
+    def state():
+        cur.execute(
+            "SELECT season, player_id, round_number, votes, match_id, source_id, import_batch_id"
+            "  FROM brownlow_round_votes WHERE season = ANY(%s)"
+            " ORDER BY season, player_id, round_number", (case["seasons"],))
+        return [list(r) for r in cur.fetchall()]
+
+    # A second home-and-away line-up row for the ambiguous player, in the other
+    # match of the same round: two distinct candidates.
+    a = case["ambiguous"]
+    cur.execute(
+        "INSERT INTO player_match_stats (player_id, match_id, club_id, jumper_number, kicks, marks,"
+        "  handballs, disposals, goals, behinds, hitouts, tackles, frees_for, frees_against, source_id)"
+        " SELECT player_id, %s, %s, jumper_number, kicks, marks, handballs, disposals, goals,"
+        "        behinds, hitouts, tackles, frees_for, frees_against, source_id"
+        "   FROM player_match_stats WHERE player_id = %s AND match_id = %s",
+        (a["extra_match_id"], a["extra_club_id"], a["player_id"], a["own_match_id"]))
+
+    load(case["rows"])
+    out["first"] = list(fz.resolve_round_vote_match_ids(cur, [season]))
+    out["after_first"] = state()
+    out["second"] = list(fz.resolve_round_vote_match_ids(cur, [season]))
+    out["after_second"] = state()
+
+    # The loader's reload: delete the season's rows, COPY them again (match_id
+    # NULL), resolve again.
+    cur.execute("DELETE FROM brownlow_round_votes WHERE season = %s", (season,))
+    load([r for r in case["rows"] if r[0] == season])
+    out["reload"] = list(fz.resolve_round_vote_match_ids(cur, [season]))
+    out["after_reload"] = state()
+
+    # Two 3-vote rows resolving to one match: the partial unique index refuses
+    # the attribution, and the savepoint shows nothing was half-applied.
+    cur.execute("SAVEPOINT collision")
+    load([case["collision"]])
+    try:
+        fz.resolve_round_vote_match_ids(cur, [season])
+        out["collision"] = None
+    except psycopg.errors.UniqueViolation as exc:
+        out["collision"] = exc.diag.constraint_name
+    cur.execute("ROLLBACK TO SAVEPOINT collision")
+    out["after_collision"] = state()
+finally:
+    conn.rollback()
+    conn.close()
+print("RESULT " + json.dumps(out))
+`;
+
+describe.skipIf(!canRunImporter)('the fitzRoy loader resolves match_id by the 094 rule (AFLDB-ISSUE-263)', () => {
+  it('attributes exactly one candidate, keeps NULL for none or several, and re-resolves on reload', async () => {
+    const [match0, match1] = short.matches;
+    const exactHome = match0.homePlayerIds[0];
+    const exactAway = match1.awayPlayerIds[0];
+    const noRoundTwo = match0.homePlayerIds[1];
+    const ambiguous = match1.homePlayerIds[0];
+    // The SHORT season fields ten on one side: a seeded player with no line-up
+    // row at all in the round.
+    const benched = short.playerIds.find((id) => short.matches.every(
+      (m) => !m.homePlayerIds.includes(id) && !m.awayPlayerIds.includes(id),
+    ));
+    expect(benched).toBeDefined();
+    const otherSeason = noMedal.matches[0].homePlayerIds[0];
+
+    const rows: LoadedRoundRow[] = [
+      [short.season, exactHome, 1, 3],
+      // A published zero is a real row and resolves like any other.
+      [short.season, exactAway, 1, 0],
+      [short.season, benched!, 1, 0],
+      // No home-and-away match exists in round 2 of this season.
+      [short.season, noRoundTwo, 2, 1],
+      [short.season, ambiguous, 1, 2],
+      // Outside the seasons the resolution is asked about: never touched.
+      [noMedal.season, otherSeason, 1, 0],
+    ];
+
+    const probe = spawnSync(python, ['-c', RESOLUTION_PROBE], {
+      cwd: root,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        AFLDB_ISSUE263_DSN: testDbUrl,
+        AFLDB_ISSUE263_CASE: JSON.stringify({
+          season: short.season,
+          seasons: [noMedal.season, short.season],
+          rows,
+          ambiguous: {
+            player_id: ambiguous,
+            own_match_id: match1.matchId,
+            extra_match_id: match0.matchId,
+            extra_club_id: match0.homeClubId,
+          },
+          collision: [short.season, match0.homePlayerIds[2], 1, 3],
+        }),
+      },
+    });
+    expect(probe.stderr).not.toMatch(/Traceback/);
+    expect(probe.status, probe.stdout + probe.stderr).toBe(0);
+    const line = probe.stdout.split('\n').find((l) => l.startsWith('RESULT '));
+    expect(line, probe.stdout).toBeDefined();
+    const out = JSON.parse(line!.slice('RESULT '.length)) as Record<string, unknown>;
+
+    // [season, player, round, votes, match_id, source_id, import_batch_id]
+    const expected = [
+      [noMedal.season, otherSeason, 1, 0, null, null, null],
+      ...[
+        [short.season, exactHome, 1, 3, match0.matchId, null, null],
+        [short.season, exactAway, 1, 0, match1.matchId, null, null],
+        [short.season, benched!, 1, 0, null, null, null],
+        [short.season, noRoundTwo, 2, 1, null, null, null],
+        [short.season, ambiguous, 1, 2, null, null, null],
+      ].sort((a, b) => (a[1] as number) - (b[1] as number) || (a[2] as number) - (b[2] as number)),
+    ];
+
+    // Two resolved; three left NULL (benched, no round 2, ambiguous). The count is
+    // scoped to the season asked about, so the other season's NULL is not in it.
+    expect(out.first).toEqual([2, 3]);
+    expect(out.after_first).toEqual(expected);
+    // Idempotent: an attributed row is never re-attributed.
+    expect(out.second).toEqual([0, 3]);
+    expect(out.after_second).toEqual(expected);
+    // Reload: the rows come back NULL and the same rule gives the same answer.
+    expect(out.reload).toEqual([2, 3]);
+    expect(out.after_reload).toEqual(expected);
+    // The index is never weakened: a duplicate value in one match refuses.
+    expect(out.collision).toBe('ux_brownlow_round_votes_match_value');
+    expect(out.after_collision).toEqual(expected);
+
+    // Rolled back: none of it reached the database.
+    const [left] = await sql<{ count: number }[]>`
+      SELECT count(*)::int AS count FROM brownlow_round_votes
+       WHERE season = ANY(${[short.season, noMedal.season]})
+    `;
+    expect(left.count).toBe(0);
+    const [extra] = await sql<{ count: number }[]>`
+      SELECT count(*)::int AS count FROM player_match_stats
+       WHERE player_id = ${ambiguous} AND match_id = ${match0.matchId}
+    `;
+    expect(extra.count).toBe(0);
   });
 });
 

@@ -306,6 +306,48 @@ describe('fitzRoy core importer contracts (AFLDB-ISSUE-093 §13.4a)', () => {
     expect(body).toMatch(/b\.season = ANY\(%s\)/);
   });
 
+  // AFLDB-ISSUE-263: migration 094 backfilled match_id once, over the rows present
+  // when it was applied, and a rebuild loads every round row after it. The loader
+  // therefore attributes match_id itself, by 094's own statement. Source halves
+  // only — the executed resolution (exact, none, several, reload, index refusal)
+  // is in tests/integration/admin-brownlow.test.ts.
+  it("resolves match_id by migration 094's own statement, scoped to the loaded seasons (ISSUE-263)", () => {
+    const migration = readFileSync(
+      join(root, 'src', 'db', 'migrations', '094_brownlow_admin_workflow.sql'), 'utf8',
+    ).replace(/\r\n/g, '\n');
+    const from094 = migration.slice(
+      migration.indexOf('UPDATE brownlow_round_votes rv'),
+      migration.indexOf('r.candidates = 1;') + 'r.candidates = 1'.length,
+    );
+    const marker = 'ROUND_VOTE_MATCH_RESOLUTION_SQL = """';
+    const open = importerSource.indexOf(marker);
+    expect(open).toBeGreaterThan(-1);
+    const importerSql = importerSource.slice(
+      open + marker.length, importerSource.indexOf('"""', open + marker.length),
+    );
+    const squash = (text: string) => text.replace(/\s+/g, ' ').trim();
+    // The ONLY difference is the season scope: same evidence, same exactly-one rule.
+    expect(importerSql).toMatch(/\n\s*AND rv2\.season = ANY\(%s\)/);
+    expect(squash(importerSql.replace(/\n\s*AND rv2\.season = ANY\(%s\)/, '')))
+      .toBe(squash(from094));
+  });
+
+  it('resolves inside the reload transaction: after the COPY, before the commit (ISSUE-263)', () => {
+    const start = importerSource.indexOf('def import_brownlow_round_votes');
+    const body = importerSource.slice(start, importerSource.indexOf('\ndef ', start + 1));
+    const deleteAt = body.indexOf('DELETE FROM brownlow_round_votes');
+    const copyAt = body.indexOf('copy_rows(pg, "brownlow_round_votes"');
+    const resolveAt = body.indexOf('resolve_round_vote_match_ids(cur, snapshot_seasons)');
+    const commitAt = body.indexOf('pg.commit()');
+    expect(deleteAt).toBeGreaterThan(-1);
+    expect(copyAt).toBeGreaterThan(deleteAt);
+    expect(resolveAt).toBeGreaterThan(copyAt);
+    expect(commitAt).toBeGreaterThan(resolveAt);
+    // The evidence is the line-ups the `stats` group commits, which runs first.
+    expect(importerSource).toContain(
+      'GROUPS = ["venues", "players", "aliases", "matches", "stats", "brownlow"]');
+  });
+
   it('pins the explicit stat field mapping by name, not CSV position', () => {
     for (const [src, target] of EXPECTED_STAT_MAP) {
       expect(importerSource).toContain(`("${src}", "${target}")`);

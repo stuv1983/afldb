@@ -4,18 +4,27 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 8
+**Open issues:** 7
 
 | ID | Title | Severity | Area | State | Next action |
 |---|---|---|---|---|---|
 | AFLDB-ISSUE-265 | A settle unit can lose a match-lock deadlock to a legacy CSV promotion, with no in-run retry | Medium | Data integrity / concurrency — `canonical-apply.ts` (`lockUnitMatchRows`), `settle-afltables.ts`, `settle-afl-api.ts`, `src/lib/ingest/datasets.ts` (ISSUE-264 hooks) | Open (2026-10-04); from ISSUE-264 F-002; operator-accepted as a temporary ISSUE-264 limitation (D-264-11); a settle holding a later match can deadlock with a promotion holding an earlier one, and if the settle is the victim one unit rolls back with a `canonical_apply_failed` finding while the run continues; no in-run retry; recovery on the provider's next in-season run (AFL Tables §9.3 retry; AFL API re-diff), code-traced in ISSUE-264 runbook §14.5.2; DEV has no AFL Tables timer; characterised on `afldb_test` at lock-statement level only; deadlock not eliminated; 2026-10-05 investigation (runbook §10–§15): F-265-1 AFL API attendance enrichment can lose the whole run, `match_attendance` is a third unordered writer, in-run unit retry futile in the main shapes; 2026-10-05 operator: D-265-1..12 accepted (Option 3 advisory gate incl. `match_attendance`; severity Medium); 2026-10-05 operator: D-265-5 accepted (300 s settle gate wait with a 330 s gate-statement bound; an operator judgement, PROD records cannot validate it; the D-265-13 query is context only), D-265-14 (Phase B case B11) and D-265-15 (Phase A tooling archived unchanged in `issues/open/AFLDB-ISSUE-265-phase-a/`); Phase A window 2 (2026-10-05 16:22) PASSED 3/3, census CLEAN (runbook §17.14); Phase A retired, Phase B replaces it; final plan and Phase B assertions in runbook §18–§20; S0 checkpoint committed (62f2cd67); **2026-10-05 mitigation IMPLEMENTED in the working tree, uncommitted (runbook §21): shared settle gate (300 s / 330 s), exclusive gate in the three legacy hooks, `match_attendance` ascending hook, database-free pins, Phase B harness B1–B11; Phase B PASSED 11/11 (2026-10-05, runbook §23); regression window FAILED twice on test-teardown residue, cause fixed (§24), then PASSED (2026-10-06, §25.1); build PASSED (2026-10-06, §25.8: exit 0, 1,515 static pages, standalone ready, census CLEAN, two warnings recorded and not claimed pre-existing); commit, deployment and DEV acceptance pending** | Operator reviews and commits the eighteen files in runbook §25.7, then `npm run merge:ready -- --issue 265`, merge/push, `deploy/sync-dev.ps1` and DEV acceptance (§18.2) |
-| AFLDB-ISSUE-263 | A fresh `db:test:rebuild` leaves every `brownlow_round_votes.match_id` NULL | Low | Rebuild / Brownlow data state; tests — `tools/migration/import_fitzroy_core.py:3246-3248`, `094_brownlow_admin_workflow.sql`, `tests/integration/admin-brownlow.test.ts:367-379` | Open (2026-10-03). Found as ISSUE-257 F-S11-02: the importer COPYs the table without `match_id` and 094's one-time backfill runs before data on a rebuild, so `admin-brownlow` P2 finds 320,861/320,861 unresolved. Pre-existing; not blocking ISSUE-257. | Operator decides the contract (rebuild defect versus stale test assumption). |
 | AFLDB-ISSUE-262 | `reference-data` exact post-045 import-write list omits `afl_api_identity_adjudications` (migration 104) | Low | Tests / reference-data privilege guard — `tests/reference-data.test.ts:425`, `src/db/migrations/104_afl_api_identity_adjudications.sql` | Open (2026-10-03). Fails on HEAD `3ed70ab1` independent of ISSUE-257, DB-free and platform-independent; found as ISSUE-257 F-S9-04. Not blocking ISSUE-257. | Confirm 104's append-only-by-grant design is intended, then add the table, with a comment, to the exact list. |
 | AFLDB-ISSUE-261 | Targeted player-derived recompute takes row locks in an order that can deadlock a settle against a Data Editor save | Low | Data integrity / concurrency — `src/db/queries/player-derived.ts` (`recomputePlayerDerivedStats`), `data-edits.ts`, `match-admin.ts`, both settles | Open (2026-10-02); found in ISSUE-257 Slice 4 (F-S4-01) by code reading; pre-existing; the recompute updates every `player_match_stats` row of each affected player with no changed-value guard, so a settle and an admin writer can wait on each other's rows; ISSUE-257 added a bounded 40P01 retry around the settles' end-of-run recompute and a 5 s Match Sheet `lock_timeout`; residual: `data-edits.ts`/`match-admin.ts` set no `lock_timeout`, so the retry can exhaust and roll the settle back; not reproduced | Decide whether to fix (changed-value guard, global `players` lock order, or `lock_timeout` on the other writers) |
 | AFLDB-ISSUE-260 | NL answer explanation prints internal column markers for career conditions | Low | NL search, describe/render stage — `src/search/nl/plan.ts` (`describePlan`) | Open (2026-10-02); code review F-004 (`playbooks/issue.md`); a career column condition is labelled with the compiler's SQL marker ("Condition: c.premierships exactly 0."); results unaffected; confirmed DB-free; operator decision 2026-10-02 (after the review): approved for implementation, reader-facing labels only, no parser change intended; nothing implemented; runbook `issues/open/AFLDB-ISSUE-260.md` | Implement in the same focused NL session as AFLDB-ISSUE-259 unless evidence shows they should be separated |
 | AFLDB-ISSUE-259 | NL club-scoped career rankings accept a career condition that is evaluated across the whole career | Low | NL search, validate stage — `src/search/nl/plan.ts` (`validatePlan`), `src/db/queries/nl/player-career.ts` | Open (2026-10-02); code review F-003 (`playbooks/issue.md`); the club-scope guard tests conditions only for unranked plans, so a ranked club-scoped plan with a non-games condition validates while its unranked form is refused; confirmed DB-free through the parser and validator, SQL read not run; operator decision 2026-10-02 (after the review) D-259-1: fail closed — decline when a condition cannot be evaluated at club scope, never reinterpret it as whole-career, add no per-club compiler capability, no parser change intended; nothing implemented; runbook `issues/open/AFLDB-ISSUE-259.md` | One focused NL session with AFLDB-ISSUE-260; check the corpora there for rows of this shape that expect an answer |
 | AFLDB-ISSUE-233 | AFL API season discovery and season rollover ownership | Medium | Data acquisition / season lifecycle — `afl-api-identities.json`, rollover runbook | Open (2026-09-23); 2026-09-26 pass 2: D-233-1/2/3 decided (proposal JSON; season-scoped AFL API Brownlow artefacts beside the master; preserve `afl_api` ownership or refuse); discovery IMPLEMENTED / DB-FREE VALIDATED against the authentic `compseasons` sample (sha256 `fe3f1641…d965`); 2026-10-01 pass 3 (uncommitted): D-233-3 rebuild/rollover `afl_api` ownership census and D-233-2 season-scoped AFL API Brownlow load IMPLEMENTED / DB-FREE VALIDATED; 2026-10-01 pass 4 (uncommitted): D-233-3 also enforced on the LIVE promotion target (`promotion-check.ts`, `dependencies`/`pre-cutover`/`restored`/`candidate`/frozen `production`, no override); damaged-schema census refuses; discovery `--fetch` retains entity bytes verbatim; ownership replay intentionally unimplemented; 2026-10-01 pass 5 (uncommitted): integration census test 5/5 on `afldb_test` (no residue), read-only censuses PASS on `afldb_test` and `afldb_dev` (zero `afl_api`-owned matches, DEV not mutated), final review no CRIT/HIGH/MED; committed `f0abbb4c`; 2026-10-01 pass 6: first real DEV discovery `--fetch` PASSED (`20261001T034039Z`, 1 fetch, HTTP 200, 1,959 decoded body bytes sha256 `2aeed4e9…b33e`, 15/15 entries 2012–2026, `no_change`, offline replay byte-identical, DEV and registry unchanged); D-233-2 `code_test_db` write-path rehearsal designed, not written or run, blocked on a stable-identity bridge and the 2026 snapshot; R4 classified fail-safe, no successor issue; 2026-10-01 passes 7–9 (uncommitted): fresh CONCLUDED 2026 Brownlow snapshot `afl-api-brownlow-2026-2026-10-01-041609`; `afldb_test` bridge 0/669 (no 2026 matches); DEV read-only bridge 669/669 (v1); builder continuity defect FIXED (exact tracked `profile_url_continuity` pair → `continuing_url`, ISSUE-237 parity), real DEV read-only build 183/183 (Jack Ross 6519 → `players/J/Jack_Ross.html`), artefact outside repo, second write `unchanged`; `code_test_db` read-only coverage 175/183 (8 presumed 2026 debutants absent), harness NOT written; 2026-10-01 pass 10 (uncommitted): D-233-R = scoped `code_test_db` fixture of exactly the eight missing 2026 player identities (no rebuild/restore), harness `tools/migration/brownlow_afl_api_season_rehearsal.py` WRITTEN, NOT RUN, DB-free 113/113; 9,982/9,983 = one unused emergency row (expected); 2026-10-01 pass 11 (uncommitted): `code_test_db` rehearsal PASSED + exact restore PASSED (evidence `D:\tmp\issue233\rehearsal-20261001-151415`; fixture 8+8 → 183/183; real loads A1 batches 27/28, A2 29/30, 183/1,242/1/14 `afl_api`, A2 content-identical; fingerprint = F0, residue 0, coverage back to 175/183; case 5 NOT RUN); 2026-10-01 pass 12 final review: 0 CRIT/HIGH, 2 MEDIUM fixed (continuity provenance validator; POSIX manifest paths), committed on `sonnet/issue-233`; 2026-10-01: `f0abbb4c` + `cc1a5f2d` merged, `main` at `cc1a5f2d`, no merge pending; PROD untouched; runbook `issues/open/AFLDB-ISSUE-233.md` | Promotion gate's first live read at the next promotion (runbook §4.6 item 6); stays OPEN until then |
 | AFLDB-ISSUE-229 | AFL API fixture ingestion | Medium | Data acquisition / fixtures — `afl_api` season feed → `fixtures` | Open (2026-09-23); 2026-10-02 (main `5a85226c`): Option B decided; D-229-1 through D-229-8a decided; **B1 COMPLETE** — authentic retained pre-match evidence covers `SCHEDULED` and `UNCONFIRMED_TEAMS`; no fixture writer built; runbook `issues/open/AFLDB-ISSUE-229.md` | B2: capture and review the first authentic 2027 pre-match season feed before the fixture writer is wired or applied |
+
+**AFLDB-ISSUE-263 resolved 2026-10-08** (implementation uncommitted at resolution, worktree `afldb-issue-263`;
+operator-run validation on `afldb_test`). The fitzRoy Brownlow loader now resolves `brownlow_round_votes.match_id`
+by migration 094's rule (exactly one candidate match from the player's own line-up row, same season and H&A round;
+zero or several keep NULL), scoped to the loaded seasons, after the COPY and before the commit, so a rebuild no
+longer leaves every row NULL. Focused tests 3 passed. A Brownlow-only `afldb_test` reload exited 0 with 320,861
+resolved and 0 unresolved; the before and after fingerprints are identical; batch 1683 completed with 320,861
+inserted and 0 rejected; C0–C7 matched with no attribution or uniqueness violation; P2 1 passed (44 filtered
+skips). **Validation used a Brownlow-only reload, not a full `db:test:rebuild`.** Removed from `IssuesIndex.md` and
+the Open Issues table. Full record: the entry in this file.
 
 **AFLDB-ISSUE-264 resolved 2026-10-05, DEV accepted, PROD promotion outstanding** (implementation `ebbe2c00`;
 operator-accepted DEV UI acceptance). A legacy `player_match_stats` upload row is now refused at validation, and
@@ -47514,7 +47523,10 @@ retained behaviour under `Unreleased`.
 
 ## AFLDB-ISSUE-263 — A fresh `db:test:rebuild` leaves every `brownlow_round_votes.match_id` NULL
 
-- **Status:** Open (2026-10-03). **Severity:** Low. **Area:** rebuild / Brownlow data state; tests.
+- **Status:** **Resolved (2026-10-08).** Opened 2026-10-03. Real-data validation was a Brownlow-only
+  `afldb_test` reload, not a full rebuild (see **Resolution** at the end of this entry). The
+  implementation is uncommitted at resolution; the operator commits it. **Severity:** Low. **Area:**
+  rebuild / Brownlow data state; tests.
   Key files:
   - `tools/migration/import_fitzroy_core.py:3246-3248` (`import_brownlow_round_votes`: `copy_rows`
     names only `season, player_id, round_number, played, votes`);
@@ -47541,8 +47553,108 @@ retained behaviour under `Unreleased`.
 - **Scope.** Decide the contract, then either resolve `match_id` during the rebuild/import or
   correct the test's expectation. Read-only evidence first.
 - **Out of scope.** Changing the importer under ISSUE-257.
-- **Next action.** Operator decision on the contract (rebuild defect versus test assumption).
-  Nothing implemented.
+- **Decision (operator, 2026-10-07).** Rebuild defect. The fix belongs in
+  `tools/migration/import_fitzroy_core.py` and applies migration 094's rule: the player's own
+  canonical `player_match_stats` row for the same season and home-and-away round; assign
+  `match_id` only when exactly one distinct match qualifies; keep NULL for zero or several. 094
+  and the P2 test stay unchanged.
+- **Ordering and transactions (checked before choosing).** `GROUPS` runs `stats` before
+  `brownlow`. `import_player_match_stats` commits its own transaction, so the line-ups are
+  committed evidence when the Brownlow stage starts. `import_brownlow_round_votes` runs the
+  manual-ownership refusal, the season-scoped DELETE, the COPY (`copy_rows` does not commit) and
+  `pg.commit()` in one `import_batch` transaction. A `--groups brownlow` run resolves against
+  whatever line-ups the database already holds, by the same rule.
+- **Implementation (2026-10-07, uncommitted, worktree `afldb-issue-263`, branch `sonnet/issue-263`).**
+  - `ROUND_VOTE_MATCH_RESOLUTION_SQL` is 094's §27.5 UPDATE copied unchanged, with one added
+    predicate, `AND rv2.season = ANY(%s)`. `resolve_round_vote_match_ids(cur, seasons)` runs it and
+    returns `(resolved_now, still_unresolved)`. It touches only `match_id IS NULL` rows, so a second
+    call does nothing. It does not commit.
+  - `import_brownlow_round_votes` calls it on `snapshot_seasons` (the DELETE's own scope) after the
+    COPY and before the commit, and reports `N resolved to a match, M unresolved`.
+  - Preserved unchanged: the coverage gate (`load_round_vote_seasons`); NA votes produce no row and a
+    published zero still loads and resolves; the §27.11 manual-ownership refusal still runs before the
+    DELETE; provenance (`source_id`, `import_batch_id` and the rest are not touched by the UPDATE); the
+    partial unique indexes. The UPDATE runs inside the load's transaction, so if an index refuses an
+    attribution, `import_batch` rolls back the whole load and marks the batch failed. Nothing is
+    committed half-attributed.
+- **Tests.**
+  - `tests/fitzroy-core-import.test.ts` (DB-free): the importer's SQL equals 094's statement
+    apart from the season predicate. In the function body the order is DELETE, COPY, resolve, then
+    commit, and `stats` still precedes `brownlow` in `GROUPS`.
+  - `tests/integration/admin-brownlow.test.ts`, new `describe` "the fitzRoy loader resolves match_id
+    by the 094 rule (AFLDB-ISSUE-263)". It runs the real Python function against `afldb_test` over the
+    reserved SHORT season, in one psycopg transaction that is always rolled back. It covers: exact
+    resolution, including a published zero; a player with no line-up row (NULL); a round with no H&A
+    match (NULL); two candidate matches (NULL); a row in an unrequested season (untouched); an
+    idempotent second call; a reload (DELETE, re-insert, resolve) that gives the same answer; and a
+    duplicate 3-vote in one match, which `ux_brownlow_round_votes_match_value` refuses with nothing
+    half-applied. Skipped when psycopg is unavailable, as in the `admin-draft` gate 10 precedent.
+- **Validation.**
+  - **Focused (operator-run, reported 2026-10-07): PASSED.** `tests/fitzroy-core-import.test.ts`
+    2 passed; `tests/integration/admin-brownlow.test.ts` 1 passed (the ISSUE-263 `describe`,
+    running the real Python resolver against `afldb_test`). Combined: 3 passed, 158 skipped by the
+    name filter, 0 failed. P2 itself was not in that run: it was filtered out, and it needs the real
+    seasons reloaded.
+  - **Operator decision (2026-10-07).** Accepted: when a partial unique index refuses an
+    attribution (conflicting non-zero votes), the whole Brownlow load fails and rolls back, and its
+    batch is marked failed.
+  - **Real-data validation: prepared 2026-10-07; run and PASSED 2026-10-08 (operator-run; see
+    Resolution).** A Brownlow-only
+    reload of `afldb_test` (`--groups brownlow`, label `full-history-20260902`, the accepted bytes
+    read in place from the main checkout via `--snapshot-dir`, under `--require-accepted-baseline`),
+    not a full rebuild. Its effects: one new `import_batches` row; then one transaction that runs
+    the manual-ownership refusal, DELETEs the 1897–2025 rows, COPYs 1984–2025 (gated by
+    `stat-availability.json`; accepted fingerprint 320,861 rows), resolves `match_id`, and
+    commits. The COPY names five columns, so, as after a rebuild, `source_id`,
+    `source_record_id` and `import_batch_id` stay NULL and `imported_at` is the load
+    transaction's start. A row cannot name its batch, so the post-load check ties the rows to the
+    one batch created after the preflight's batch-id marker, by `imported_at` falling inside that
+    batch's window. 2026 rows are outside the snapshot and are not
+    touched. No other table is written. Operator pack (outside the repository):
+    `D:\tmp\issue263\realdata-20261007\` (`env.sh` target guard, revised 2026-10-07: it reads
+    the two test DSNs from the worktree `.env` only where the environment leaves them unset, and
+    refuses with a non-zero status. The worktree `.env` has no `AFLDB_TEST_IMPORT_DATABASE_URL`,
+    and no owner or `afldb_dev` DSN is substituted for it; `preflight-importer.sql` and
+    `preflight.sql`, read-only, with STOP conditions and a dry prediction of the resolver's result
+    and of any index collision; `fingerprint.sql`, diffed before and after over the round-vote
+    facts, the authoritative `brownlow_season_votes` totals and a round-vs-season cross-check;
+    `postload.sql`: P2, attribution and provenance, the batch, the 094 rule, the match-grain
+    invariants, manual state unchanged).
+- **Next action (2026-10-07, superseded by the Resolution below).**
+  1. Operator runs the read-only preflight and the "before" fingerprint, and returns the output.
+  2. If no STOP condition holds and the operator authorises it: the reload, the "after"
+     fingerprint, `postload.sql`, and the P2 case
+     (`npx vitest run tests/integration/admin-brownlow.test.ts -t "preflight P2"`).
+  3. On a pass: record the evidence, commit, and resolve. Keep the issue open until then.
+- **Real-data validation (operator-run on `afldb_test`, reported 2026-10-08): PASSED.**
+  - Brownlow-only reload (`--groups brownlow`, operator pack `D:\tmp\issue263\realdata-20261007\`):
+    exit 0; 320,861 rows resolved to a match, 0 unresolved.
+  - Fingerprints: the "before" and "after" fingerprints are identical (round-vote facts, the
+    authoritative `brownlow_season_votes` totals and the round-vs-season cross-check).
+  - Batch 1683: `completed`, 320,861 inserted, 0 rejected.
+  - `postload.sql` C0–C7: all matched expectations; no attribution or uniqueness violation.
+  - Historical preflight P2 (`tests/integration/admin-brownlow.test.ts -t "preflight P2"`): 1 passed,
+    44 skipped by the name filter.
+  - Earlier focused checks (2026-10-07, above): 3 passed.
+- **Resolution (2026-10-08).**
+  - **Root cause.** Migration 094 backfilled `brownlow_round_votes.match_id` once, over the data present
+    when it was applied. `db:test:rebuild` applies every migration before loading data, so the backfill
+    ran over an empty table, and the fitzRoy importer's COPY then loaded every row without `match_id`.
+  - **Fix.** `tools/migration/import_fitzroy_core.py`: `import_brownlow_round_votes` runs
+    `resolve_round_vote_match_ids` (094's UPDATE, scoped to the loaded seasons) after the COPY and before
+    the commit, in the load's own transaction. Exactly one candidate match assigns `match_id`; zero or
+    several keep NULL. An index refusal rolls back the whole load and fails its batch (operator-accepted).
+    Migration 094 and the P2 test are unchanged.
+  - **Validation.** Focused tests 3 passed (2026-10-07); the Brownlow-only `afldb_test` reload, both
+    fingerprints, batch 1683, C0–C7 and P2 passed (2026-10-08), as above.
+  - **Limit of the evidence.** The real-data validation used a Brownlow-only reload of `afldb_test`,
+    which resolves against the line-ups already in that database. **A full `db:test:rebuild` was not run.**
+    The `stats`-before-`brownlow` ordering a rebuild relies on is pinned DB-free in
+    `tests/fitzroy-core-import.test.ts`, not exercised end to end. DEV and PROD were not touched.
+  - **Files.** `tools/migration/import_fitzroy_core.py`, `tests/fitzroy-core-import.test.ts`,
+    `tests/integration/admin-brownlow.test.ts`; tracking in `issues.md`, `IssuesIndex.md`, `CHANGELOG.md`.
+    Uncommitted at resolution (worktree `afldb-issue-263`, branch `sonnet/issue-263`).
+  - No follow-up issue. Removed from `IssuesIndex.md` and the Open Issues table.
 
 ## AFLDB-ISSUE-264 — Legacy CSV promotion overwrites Match Sheet-protected `player_match_stats` fields and re-inserts players the Match Sheet removed
 

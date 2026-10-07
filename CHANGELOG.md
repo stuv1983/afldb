@@ -15,6 +15,24 @@ commit.
 
 ## [Unreleased]
 
+### The fitzRoy Brownlow load resolves each round-vote row to its match, so a rebuild no longer leaves `match_id` NULL (AFLDB-ISSUE-263; resolved) - 8 October 2026
+
+- `import_brownlow_round_votes` (`tools/migration/import_fitzroy_core.py`) now applies migration 094's rule
+  after its COPY and before its commit: a row gets `match_id` only when the player's own canonical
+  `player_match_stats` row for the same season and home-and-away round identifies exactly one match. Zero or
+  several candidates keep NULL. The update is scoped to the seasons the load replaced and touches only NULL
+  rows, so it is idempotent and leaves provenance alone.
+- Before this, 094's one-time backfill ran over an empty table during `db:test:rebuild`, so every row loaded
+  afterwards had `match_id` NULL and the admin preflight P2 check failed (320,861 of 320,861 unresolved).
+- If a partial unique index refuses an attribution, the whole Brownlow load rolls back and its batch is marked
+  failed; nothing is committed half-attributed (operator-accepted). Migration 094 and the P2 test are unchanged.
+- Validation: focused tests 3 passed (DB-free SQL and ordering pins; the real resolver against `afldb_test` in a
+  rolled-back transaction). Operator-run on `afldb_test` (2026-10-08): a Brownlow-only reload exited 0 with
+  320,861 rows resolved and 0 unresolved; before and after fingerprints identical; batch 1683 completed with
+  320,861 inserted and 0 rejected; post-load checks C0–C7 as expected, with no attribution or uniqueness
+  violation; P2 passed. The validation used a Brownlow-only reload, not a full `db:test:rebuild`. DEV and PROD
+  were not touched.
+
 ### Source settles and legacy file promotions no longer overlap, so a settle cannot lose a match-lock deadlock to a promotion (AFLDB-ISSUE-265; implemented, Phase B, the regression window and the build passed on `afldb_test`; commit, deployment and DEV acceptance pending) - 5 October 2026
 
 - A transaction-level advisory gate `(717275, 4)` now separates the two. The AFL Tables and AFL API settles
