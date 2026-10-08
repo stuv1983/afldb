@@ -9,7 +9,7 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Open issues:** 3
+**Open issues:** 2
 
 ### AFLDB-ISSUE-265 — A settle unit can lose a match-lock deadlock to a legacy CSV promotion, with no in-run retry
 - **Severity:** Medium (raised from Low on 2026-10-05, D-265-12). **Area:** data integrity / concurrency —
@@ -86,107 +86,6 @@
   1. The operator reviews and commits the eighteen files in runbook §25.7 (explicit paths; not the stray files; nothing under `D:\tmp\`).
   2. `npm run merge:ready -- --issue 265`, then merge/push, `deploy/sync-dev.ps1` and DEV acceptance (runbook §18.2).
 
-### AFLDB-ISSUE-233 — AFL API season discovery and season rollover ownership
-- **Severity:** Medium. **Area:** season lifecycle — `data/reference/afl-api-identities.json`, the
-  rollover runbook, `stat-availability.json`.
-- **State:** Open (2026-09-23), ISSUE-228 S10 successor. Replaces resolved ISSUE-101/F as owner of
-  the rollover runbook change.
-  - **2026-09-26 (pass 2):** decided D-233-1 = proposal JSON; D-233-2 = season-scoped AFL API
-    Brownlow artefacts loaded beside the master, gated by `stat_availability`; D-233-3 = preserve
-    `afl_api` ownership or refuse (fail closed while any `afl_api`-owned match is in a completed
-    season being rebuilt; 2026 has 0).
-  - Discovery is **IMPLEMENTED / DB-FREE VALIDATED** against the authentic `compseasons` sample
-    (`tests/fixtures/afl_api/seasons/00-compseasons.raw.json`, sha256 `fe3f1641…d965`):
-    `discover-afl-api-seasons.ts`, proposal-only; a registered mismatch is a refusing finding.
-  - **2026-10-01 (pass 3, uncommitted):** D-233-3 and D-233-2 are **IMPLEMENTED / DB-FREE
-    VALIDATED**.
-    - D-233-3: the rebuild's `afl-api-ownership-census` stage refuses, before the capture and the
-      reset, any completed season holding `afl_api`-owned matches. The rollover requires census
-      evidence (`tools/db/afl-api-ownership-census.ts`) and refuses on the same rule.
-    - D-233-2: `import_brownlow_season.py` loads `season-votes-afl_api-<season>.csv` beside the
-      master, gated by `brownlow_season_total` complete; a season in both refuses.
-    - Discovery was audited and is unchanged.
-  - **2026-10-01 (pass 4, uncommitted, DB-free validated):**
-    - D-233-3 now also protects **promotion over a live target**. `promotion-check.ts` refuses
-      completed-season `afl_api` ownership on the live target at `dependencies`, `pre-cutover`,
-      `restored`, `candidate` and (frozen) `production`. There is no override.
-    - The census refuses a damaged schema.
-    - Discovery `--fetch` keeps the response-body bytes, after content decoding, byte-for-byte.
-    - Ownership replay remains intentionally unimplemented.
-  - **2026-10-01 (pass 5, uncommitted): live-safe validation PASSED** (runbook §4.8).
-    - The DB-free suite shows no new failure.
-    - Integration census test: 5/5 on `afldb_test`, no residue.
-    - Read-only censuses: PASS on `afldb_test` and `afldb_dev`. Both hold zero `afl_api`-owned
-      matches. DEV was not mutated.
-    - Final review: no CRIT/HIGH/MED finding, no code change.
-  - **Committed** as `f0abbb4c`.
-  - **2026-10-01 (pass 6): first real DEV discovery PASSED** (runbook §3b.3).
-    - Stamp `20261001T034039Z`; one fetch, HTTP 200.
-    - Retained body: 1,959 decoded bytes, sha256 `2aeed4e9…b33e`. Proposal sha256 `6eb9c737…5974`.
-    - 15/15 entries (2012–2026); 2022–2026 confirmed. Verdict `no_change`.
-    - The offline replay is byte-identical. DEV and the registry are unchanged.
-  - **Pass 6:** the D-233-2 `code_test_db` write-path rehearsal is designed (runbook §4.9). It is
-    not written and not run.
-    - It needs no production code change.
-    - It is blocked on inputs: an ISSUE-241 stable-identity bridge and the retained 2026 snapshot.
-  - **Pass 6:** R4 is classified as an acceptable fail-safe boundary (runbook §4.10). No successor
-    issue.
-  - **2026-10-01 (passes 7–9, uncommitted; runbook §4.11):**
-    - Fresh CONCLUDED 2026 Brownlow snapshot `afl-api-brownlow-2026-2026-10-01-041609`.
-    - The `afldb_test` bridge emit was impossible: no 2026 matches, so 0/669 linked.
-    - The DEV read-only bridge linked 669/669 (v1).
-    - **Builder continuity defect fixed.** An exact tracked `profile_url_continuity` pair now
-      resolves to `continuing_url`, as in ISSUE-237. Every other multi-path state refuses.
-    - The real DEV read-only build gave **183/183**, with Jack Ross (6519) resolving to
-      `players/J/Jack_Ross.html`. The artefact is outside the repo; the second write was
-      `unchanged`.
-    - **`code_test_db` coverage: 175/183.** Eight presumed 2026 debutants are absent. **Harness not
-      written.**
-  - **2026-10-01 (pass 10, uncommitted; runbook §4.11.8–§4.11.13):**
-    - **D-233-R (operator):** a scoped `code_test_db` fixture of exactly the eight missing 2026
-      player identities, keyed by their exact artefact paths. There is no rebuild or restore, and
-      it is rehearsal-only.
-    - **Harness WRITTEN, NOT RUN:** `tools/migration/brownlow_afl_api_season_rehearsal.py`.
-      - It drives the real loader over the pinned genuine artefact.
-      - It STOPs unless the target is 183/175/8/0 with exactly the eight unresolved. After the
-        seed it needs 183/183.
-      - The exact restore removes the fixture and restores the sequences; any reference refuses,
-        with no CASCADE.
-    - DB-free tests 113/113.
-    - 9,982/9,983 is explained: one unused emergency row in `CD_M20260140305`. This is expected,
-      not a gap.
-    - The builder's Ruff import order is fixed. The `correct-afl-api-identity-cli` failure is
-      proven baseline (CRLF).
-  - **2026-10-01 (pass 11, uncommitted; runbook §4.11.14): `code_test_db` rehearsal PASSED, exact
-    restore PASSED.** Evidence: `D:\tmp\issue233\rehearsal-20261001-151415\`.
-    - The DSNs were derived process-only (owner from `AFLDB_TEST_DATABASE_URL`, import from
-      `AFLDB_IMPORT_DATABASE_URL`, database and endpoint rewritten). The roles were proven as
-      `afldb_owner` / `afldb_import` on `code_test_db`.
-    - The fixture's players 13274–13281 and identities 18335–18342 gave 183/183.
-    - The DB refusals D1 (pending) and D2 (in-progress) wrote nothing. The offline N2/N3/N4/N6
-      refused. **Case 5 NOT RUN** (no genuine pair; DB-free only).
-    - First real load: batches 27/28, 2026 = 183 rows / 1,242 votes / 1 winner / 14 ineligible,
-      all `afl_api`, and equal to the CSV. Second load: batches 29/30, content-identical, rows
-      replaced. `brownlow_round_votes` unchanged.
-    - After the restore, the fresh-session fingerprint equals F0, residue is 0 (also in a separate
-      `residue` run), and coverage is back to 175/183 with the same eight.
-    - 9,982 / 9,983 is explained by one unused emergency row (Brayden Fiorini, `CD_I993799`,
-      `CD_M20260140305`): 9,983 = 9,962 matched + 20 stat mismatches + 1 missing canonical row.
-      The provider remains linked through two other exact-vector games, and no bridge policy was
-      changed.
-  - **2026-10-01 (pass 12, final review; committed on `sonnet/issue-233`):** CRITICAL 0, HIGH 0,
-    MEDIUM 2, both fixed.
-    - The manifest's continuity provenance is now validated by `verify_continuity_provenance()`,
-      in the builder's self-check and in the rehearsal.
-    - Manifest paths are POSIX, so a Windows-built artefact loads on a Linux rebuild.
-    - DB-free: harness 115/115, builder 173/173, TS 35/35.
-  - PROD is untouched.
-  - **2026-10-01 (merged):** `f0abbb4c` and `cc1a5f2d` are merged; `main` is at `cc1a5f2d`. No
-    merge is pending.
-- **Runbook:** `issues/open/AFLDB-ISSUE-233.md`.
-- **Next action:** the promotion gate's first live read at the next promotion (runbook §4.6
-  item 6). The issue stays OPEN until then; do not run a promotion merely to close it.
-
 ### AFLDB-ISSUE-229 — AFL API fixture ingestion
 - **Severity:** Medium. **Area:** acquisition / fixtures — `afl_api` season feed → `fixtures`,
   `canonical_applications`, `admin-fixtures.ts`.
@@ -204,6 +103,16 @@
 - **Runbook:** `issues/open/AFLDB-ISSUE-229.md`.
 - **Next action:** B2: capture and review the first authentic 2027 pre-match season feed before
   the fixture writer is wired or applied.
+
+**AFLDB-ISSUE-233 resolved 2026-10-08** (implementation merged 2026-10-01 as `f0abbb4c` and `cc1a5f2d`; operator
+decision D-233-4) — AFL API season discovery (D-233-1), season-scoped AFL API Brownlow artefacts (D-233-2), and an
+`afl_api` ownership census that refuses at rebuild, rollover and promotion (D-233-3). The promotion gate's first live read
+PASSED on DEV (`afldb_dev`, HEAD `7adfb3e8`) and PROD (`afldb_prod`, HEAD `cd3cf782`): ownership gate PASS and dependencies
+phase PASS, no `afl_api`-owned match in any season; graded offline (0 CRIT/HIGH/MED, 5 INFO). **Accepted limits:** no real
+promotion ran; `pre-cutover`, `restored`, `candidate` and `production` are DB-free tested only (capture their results at
+the next real promotion); the first genuine D-233-2 load is a 2026 rollover follow-up; the unfrozen manifests must not be
+reused for a promotion. The PROD read ran at about 19:17 AEDT on 2026-10-08, inside ISSUE-265's N2 observation window. Full
+record: `issues.md`, `issues/closed/AFLDB-ISSUE-233.md` §4.12–§4.13.
 
 **AFLDB-ISSUE-259 and AFLDB-ISSUE-260 resolved 2026-10-08** (Sonnet 5; merged and pushed at `7adfb3e8`;
 operator-run local validation and DEV deployment; DEV browser acceptance via Playwright MCP) — a club-scoped career

@@ -682,7 +682,7 @@ reproduced read-only on 2026-10-01:
 **Why AFL Tables lacks it.** Fiorini was an **unused emergency**: named in the AFL API feed in the
 `EMERG` position, 0% time on ground, every counting stat zero. AFL Tables lists only players who
 took part, so it correctly has no row.
-- This is the row `issues/open/AFLDB-ISSUE-233.md` §4.11.11 classified on an earlier snapshot:
+- This is the row `issues/closed/AFLDB-ISSUE-233.md` §4.11.11 classified on an earlier snapshot:
   "he did not play, so the canonical `player_match_stats` correctly has no row for him", and "the
   only zero-TOG `EMERG` row in the snapshot".
 - ISSUE-233 records 4 other `EMERG` rows with real time on ground (34–85%) and canonical rows. So

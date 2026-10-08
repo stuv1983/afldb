@@ -1,9 +1,10 @@
 # AFLDB-ISSUE-233 — AFL API season discovery and season rollover ownership
 
-**Status:** Open. **Severity:** Medium. **Opened:** 2026-09-23 (ISSUE-228 §16 S10, §19.3(c);
-replaces resolved ISSUE-101/F as owner of the rollover change). **This runbook:** created
-2026-09-26 in the bulk successor pass on `opus/afl-api-successors-229-234` (base `main`
-`2e587415`). Uncommitted.
+**Status:** **RESOLVED 2026-10-08** (operator decision D-233-4, §4.13; moved to `issues/closed/`).
+The state blocks below are history; the closing record is §4.13. **Severity:** Medium.
+**Opened:** 2026-09-23 (ISSUE-228 §16 S10, §19.3(c); replaces resolved ISSUE-101/F as owner of the
+rollover change). **This runbook:** created 2026-09-26 in the bulk successor pass on
+`opus/afl-api-successors-229-234` (base `main` `2e587415`).
 
 **State after this pass:**
 - Discovery: **BLOCKED ON SOURCE EVIDENCE.**
@@ -132,6 +133,22 @@ parent `f0abbb4c`)** (§4.11.15):
 - `f0abbb4c` and `cc1a5f2d` are merged; `main` is at `cc1a5f2d`. No merge is pending.
 - **Status: OPEN.** **Next action:** the promotion gate's first live read at the next promotion
   (§4.6 item 6). Do not run a promotion merely to close this issue.
+
+**State after pass 13 (2026-10-08, evidence graded offline; no repository code changed)** (§4.12):
+- **The promotion gate's first live read PASSED on DEV and PROD** (operator-run, standalone
+  `--phase dependencies`, no freeze, read-only). Ownership gate PASS and dependencies phase PASS on
+  both. No `afl_api`-owned match in any season on either database.
+- Independent grading: both archives and both internal manifests verify; the five gate source files
+  match the locally inspected source byte-for-byte (git blob IDs and SHA-256, LF-normalised); both
+  `dependency_set_sha256` values recompute. No CRIT/HIGH/MED finding; five INFO notes (§4.12.5).
+- **Limits, in short:** only the `dependencies` phase ran live; one database at one moment each; the
+  manifests are unfrozen manifest A and **must not be reused for a promotion**; a PASS on databases
+  with no `afl_api` ownership does not by itself show the refusal path (that rests on the DB-free and
+  rollback-only proofs, §4.8.2).
+- The PROD read ran on 2026-10-08 at about 19:17 AEDT, inside ISSUE-265's N2 observation window.
+- **Status at pass 13: OPEN, not resolved.** A closure recommendation and the remaining requirements
+  were in §4.12.7. **Superseded: the operator approved D-233-4 and the issue was resolved on
+  2026-10-08 (§4.13).**
 
 ---
 
@@ -499,6 +516,11 @@ builder manifest `schema_version` 2 with `source_key: afl_api`.
 6. (Pass 4) The promotion gate's first live read happens on the next promotion's `--phase
    dependencies`. Expected today: PASS on `afldb_dev` and `afldb_prod`, with 2026 reported outside
    scope. Before that, the step-3 censuses predict the result.
+   **DONE for the `dependencies` phase (pass 13, 2026-10-08, §4.12):** the gate's first live read was a
+   standalone `--phase dependencies` run on each host, and it PASSED on `afldb_dev` and `afldb_prod`.
+   Correction to the forecast above: "outside scope" was reported as **none**, not 2026. Neither
+   database holds an `afl_api`-owned match in any season. The other four gate phases
+   (`pre-cutover`, `restored`, `candidate`, `production`) are **not** exercised live (§4.12.6).
 
 §4.4.5 is no longer an open decision: pass 4 closed it (§4.7).
 
@@ -1443,6 +1465,245 @@ The whole uncommitted diff (nine files) was reviewed against the operator's chec
 - **Baseline, not fixed here:** the `correct-afl-api-identity-cli` CRLF failure (§4.11.12).
 - No database, network or PROD activity in this pass.
 
+### 4.12 Pass 13 — first live promotion-gate read: DEV and PROD, graded offline (2026-10-08)
+
+Operator-run on each host (read-only), graded here from local copies only. No host, network,
+database, Git-mutation, deployment, promotion, migration or service activity in this pass. No
+repository code changed. The original evidence is untouched: `D:\tmp\issue233\gate-read-r3-evidence\`
+(read only; extracted into the new `D:\tmp\issue233\gate-read-r3-extract\`). Like the earlier
+evidence, it stays untracked; results and hashes are recorded here. The operator script is
+`D:\tmp\issue233\gate-read-r3\issue233-gate-read-r3.sh` (sha256 `21f05c04…2b42830`, equal to the value both
+hosts logged). It was read in full: preflight, one `tools/db/promotion-check.ts --phase dependencies`
+run, a before/after checkout snapshot, and packaging. It uses no psql, no freeze and no census CLI, and
+it writes only under `$HOME/issue233-gate-read/`. The earlier r1/r2 script drafts are superseded; no
+r1/r2 evidence was returned or graded.
+
+**4.12.1 What ran**
+
+| | DEV | PROD |
+|---|---|---|
+| Folder | `r3-dev-20261008-080739` | `r3-prod-20261008-081656` |
+| Start (UTC / AEDT) | 2026-10-08T08:07:57Z / 19:07:57 | 2026-10-08T08:17:13Z / 19:17:13 |
+| Host, user | `streamanator`, `arm` | `afldb-prod`, `arm` |
+| Database, role | `afldb_dev`, `afldb_owner` | `afldb_prod`, `afldb_owner` |
+| Server, version | `127.0.0.1/32`, PostgreSQL 16.15 | `::1/128`, PostgreSQL 16.15 |
+| Checkout HEAD | `7adfb3e8dd46b4e7553890f54555b5490b0dbbf6` | `cd3cf7827da15dc73968bf775c62b975c5f26587` |
+| Ref | `refs/heads/main` | `refs/heads/main` |
+| Node / tsx | `/usr/bin/node` v18.19.1 / 4.23.12 | nvm node v22.23.2 / 4.23.12 |
+| Archive sha256 | `0657abe6697a80b351dbb889ea0ba85e3093c75c02b1996cd39ccac66b269784` | `8be30cc79422532a5f927ceaef5430d465e8899d7aef093a5dde441ac58b71dc` |
+| Manifest A file sha256 | `8b51a3662f42ba07ef50789eff80222624eab569cd0024d8068215a809a3fba5` | `82e24e6c7348e33b5d06bfdf39cb49ee989a3a231652fac1680ce46903685a88` |
+| `dependency_set_sha256` | `abe4df4e73efef1ef858d485cf56a704f6e2b5b21c1f927853a8f47b3e20a785` | `f9d77a15395481ce7e91edb2e40e4e2695de7c30e0febbf3f14258a941a2066f` |
+| Manifest `captured_at`, db oid | 2026-10-08T08:08:00.794Z, 202860 | 2026-10-08T08:17:15.214Z, 66668 |
+
+- Command on each host: `tools/db/promotion-check.ts --environment <env> --phase dependencies --database
+  <db> --dsn-env AFLDB_OWNER_DATABASE_URL --dependencies-out <evidence>/22-dependencies-A.json`.
+  Standalone: no `--freeze-record`, no `--source-dependency-proof`. Exit 0 on both.
+- Result lines: `[PASS] Database identity`; `[PASS] afl_api completed-season ownership on the live
+  target (AFLDB-ISSUE-233 D-233-3)` with scope `1897..2025 excluding in-progress 2026`, **in scope none,
+  outside scope none**; `[PASS] target dependency manifest captured (AFLDB-ISSUE-252)`; `[INFO]
+  Dependency manifest written`; `PROMOTION CHECK (<env>/dependencies): PASS — 4 gate(s) evaluated, none
+  failed.`
+- Dependency families. DEV: F1 3 rows (`brownlow_vote_entry_state` match ids 16623, 16624, 16644, all
+  keys `2025|1|2025-03-07|…`, `…03-09|…`, `…03-29|…`, owned by `afltables`); F2 0; F3 **withheld by
+  contract in dev, not read, not judged**. PROD: F1 1 row (match id 17137, key
+  `2026|1|2026-03-05|Sydney|Carlton`, owned by `afltables`); F2 0; F3 judged, 0 rows. Every dependency read is `owned` by `afltables`; none is unowned or
+  indeterminate.
+- The PROD read happened on **2026-10-08 at about 19:17 AEDT, during ISSUE-265's N2 observation
+  window** (wrapper start 08:17:13Z; database read captured 08:17:15Z). ISSUE-265's records and
+  worktree were not read or edited here, and this pass makes no claim about N2.
+
+**4.12.2 Integrity and identity (graded PASS)**
+
+- Archive SHA-256, recomputed locally, equals the host-reported value and its `.sha256` sidecar, for
+  both. Each archive's internal `MANIFEST.sha256` lists seven files, and all seven verify; no file is
+  outside the manifest. The `console.txt` terminal copies (not in the archives) are
+  `c5499fa9…4520de` (DEV) and `947fabfc…a9ec9262` (PROD). Their `ΓÇö` is a terminal-encoding artefact; the
+  archived `20-gate.txt` holds a correct em dash.
+- The manifest-A file hashes equal the manifest entries and the console-reported values.
+- `dependency_set_sha256` **recomputed independently** from the canonical form in
+  `canonicalDependencyContent()` (fixed key order, F1–F3 status and rows, sorted dependencies): both
+  equal the recorded values. Each file is byte-identical to its canonical render
+  (`JSON.stringify(m, null, 2) + "\n"`), and each family's `rows` equals its dependency count.
+  `freeze_token` is `null` on both.
+- Identity: host, user, mode pairing, DSN host/port/role/database and the in-gate `current_database()`
+  are consistent for both. No `PG*` override variable was set. The evidence holds no password or DSN
+  value (searched: only `password_present=true`).
+- Checkout snapshots: `05-checkout-before.txt` and `06-checkout-after.txt` are byte-identical on both
+  (same sha256 within each host). Both have an empty tracked diff (`git diff HEAD --binary` sha256 =
+  `e3b0c442…b855`, the hash of empty input). DEV carries 9 and PROD 38 untracked
+  `docs/rebuild-manifests/afltables_fitzroy_core/settle-*.json` files, unchanged across the run; PROD's
+  last one was written 2026-10-08 04:37:53 AEDT, before the run. They are not gate inputs.
+- `21-gate.rc`: command exit 0 and tee exit 0 on both. `evidence_write_failures=0`.
+
+**4.12.3 Source identity (graded PASS)**
+
+The preflight recorded each gate file's SHA-256 and git blob ID at the host `HEAD`. Both hosts agree
+with each other on all five. I recomputed the same values from the local worktree
+(`issue/233-promotion-gate`) after normalising CRLF to LF (the Windows checkout is CRLF; git stores
+LF), computing the blob ID as `sha1("blob <bytes>\0" + content)` with no Git command. All five match
+on both hosts, by blob ID and by SHA-256.
+
+| File | Blob ID (both hosts, equal to local) | SHA-256 |
+|---|---|---|
+| `src/lib/rollover/afl-api-ownership-census.ts` | `c7b8b2b6c0c7b91b09bba25b8336d96eab0e1a76` | `5df3ce22…e0ea60f8` |
+| `tools/db/promotion-check.ts` | `4969015dd66b4f68a8fbc498889f0cbb0e27a45a` | `25255fcb…6bde7a3f` |
+| `tools/db/promotion-inventory.ts` | `3200bc444eb0b7eb5558bd5c9eabbdf23994b7e9` | `a01322e3…ac6459a1` |
+| `tools/db/promotion-source-dependencies.ts` | `6fa30fffff97a958389dbe69bab3772180c945b0` | `0bf7514d…e6a82bed` |
+| `tools/migration/correct_afl_api_identity.ts` | `7da6710e15139ca9c8c50d36ebf1c57e0ff74c38` | `b1a0b6f5…1a91c97d` |
+
+- Both HEADs have `f0abbb4c` and `cc1a5f2d` as ancestors (preflight). The preflight also confirmed the
+  working tree equals HEAD for these files, the source markers it greps for, and that the `npm` script
+  is exactly `tsx tools/db/promotion-check.ts`.
+- **Limit:** only these five files were compared locally. The rest of the tracked tree the gate imports
+  (for example `promotion-freeze`, `catalog-fingerprint`, `afl-api-adjudication`) is pinned by each
+  host's `HEAD` plus its empty tracked diff, not compared here, because Git was out of bounds. The two
+  hosts are on different HEADs (`7adfb3e8`, `cd3cf782`). Local `fee3cd23` descends from `7adfb3e8`;
+  `cd3cf782` was not inspected.
+
+**4.12.4 Behaviour checked against the source**
+
+- "Outside scope" counts every non-zero `afl_api` season that is not in the judged scope: the count
+  SQL has no season filter (`AFL_API_OWNERSHIP_COUNTS_SQL`), and `judgeCensusRows()` splits it by
+  `inScopeSeason()`. So **"in scope none, outside scope none" means zero `afl_api`-owned matches in
+  any season**, as the operator reported.
+- The scope (`1897..2025` excluding `2026`) comes from `promotionOwnershipCensusScope()` over the
+  tracked fitzRoy contract and `data/reference/seasons.json` (`in_progress_seasons: [2026]`), read
+  before any database is opened. The printed scope is what the local source derives.
+- The gate runs after `gateIdentity()` on a connection opened by `openReadOnly()`, which issues
+  `SET default_transaction_read_only = on` before any query (`READ_ONLY_SQL`). The phase's only
+  write is the manifest file, created with `--dependencies-out`, which refuses to overwrite.
+
+**4.12.5 Findings (none CRIT, HIGH or MED)**
+
+| # | Grade | Finding | Disposition |
+|---|---|---|---|
+| G1 | INFO | §4.6 item 6 forecast "2026 reported outside scope". The gate reported `none`. | Forecast corrected in §4.6 item 6. The result is consistent with §4.8.3 (DEV `afl_api` total 0) and ISSUE-232 (all 218 DEV 2026 matches `afltables`-owned). It also shows PROD holds none. |
+| G2 | INFO | A PASS on two databases with no `afl_api` ownership does not discriminate the refusal path. PROD has no AFL API match ingestion installed (ISSUE-232). | Expected. The refusal rests on the DB-free tests (`tests/db-promotion-check.test.ts`) and the rollback-only integration proof (§4.8.2, 5/5 on `afldb_test`). This read proves the gate connects, identifies, reads the schema and counts correctly on the real targets. It does not prove the FAIL branch live. |
+| G3 | INFO | DEV ran under system Node v18.19.1 and PROD under v22.23.2. `package.json` declares no `engines`. | Both PASS. The judged inputs are SQL counts and fixed JSON, so the verdict is unlikely to depend on the Node version, but that is not proven. A promotion run should record its Node version. |
+| G4 | INFO | Manifest A for each host is unfrozen (`freeze_token: null`), DEV's F3 is withheld by contract, and the target data moves (nightly settle). | **Neither manifest may be reused for a promotion** (`--phase source` needs a manifest captured for that promotion). They are evidence of this read only. |
+| G5 | INFO | Code identity beyond the five files rests on HEAD plus an empty tracked diff (§4.12.3). | Accepted. A further comparison needs a Git command, which was not authorised. |
+
+**4.12.6 What this does not show**
+
+- `source`, `frozen`, `freeze-dump`, `pre-cutover`, `restored`, `candidate` and `production` were **not**
+  exercised. The ownership gate runs at four of them (`pre-cutover`, `restored`, `candidate`,
+  `production`); none ran live, and a PASS here does not show they would pass. They share
+  `gateAflApiOwnership()`, which the `dependencies` run exercised on real targets, and they differ only in
+  which database name they read and in the freeze context.
+- One database at one moment each. DEV is not evidence about PROD, or the reverse.
+- The census CLI was not run, so this is not a cross-check against a second implementation. §4.8.3
+  already holds an independent census of `afldb_dev` (zero `afl_api`), 2026-10-01.
+- The frozen re-check branch of `--phase dependencies` (`--freeze-record` plus
+  `--source-dependency-proof`) and manifest B were not exercised.
+
+**4.12.7 Does this satisfy §4.6 item 6 and full closure?**
+
+- **§4.6 item 6: satisfied for what it states.** It names the gate's first live read at
+  `--phase dependencies`, with PASS expected on `afldb_dev` and `afldb_prod`. That phase ran, through
+  the same code path a promotion starts with, and PASSED on both. The words "on the next promotion" are
+  not met literally (no promotion ran, by design), and the 2026 forecast was inexact (G1). Neither changes
+  the outcome.
+- **Not resolved in this pass (instruction).** Against the issue's scope:
+
+| Requirement | State |
+|---|---|
+| D-233-1 discovery tool | Done: implemented; first real DEV discovery PASSED (§3b.3). |
+| D-233-2 season-scoped AFL API Brownlow load | Done to the bound agreed in §4.6 item 5: `code_test_db` rehearsal and exact restore PASSED (§4.11.14). The duplicate-season case was DB-free only. The first genuine load waits for the 2026 rollover. |
+| D-233-3 rebuild and rollover refusal | Done: DB-free, rollback-only 5/5, read-only censuses on `afldb_test` and `afldb_dev`. No live rebuild-stage run is recorded in this runbook; I did not search other issues' records for one. |
+| D-233-3 promotion gate, `dependencies` | **Done now: live PASS on DEV and PROD.** |
+| D-233-3 promotion gate, four other phases | **Open as an observation, not a defect:** DB-free proven only. |
+| R4 (identity correction over a loaded AFL API season refuses) | Classified acceptable (§4.10); no successor issue. |
+
+- **Recommendation: resolve ISSUE-233 once the operator accepts the limits below.** The tracked
+  closure condition was the first live read ("stays OPEN until then; do not run a promotion merely to
+  close it"), and it is met. Holding the issue open for the other four phases would require a real
+  promotion or a DEV promotion rehearsal, which that standing instruction rules out. The remaining items
+  are properties of future operations, not defects, so under `CLAUDE.md` §5 they are recorded as
+  follow-up and need no successor issue.
+- **Remaining before the resolution edit:**
+  1. **Operator decision (D-233-4):** accept closure with the four unexercised phases to be observed
+     at the next real promotion, plus the first genuine D-233-2 load at the 2026 rollover. If the
+     operator wants all five phases live first, the issue stays open and the next real promotion (or an
+     authorised DEV rehearsal) is the trigger.
+  2. **Operator commit** of this record, then `npm run merge:ready -- --issue 233` and merge. Once
+     the runbook is under `issues/closed/`, `merge:ready` needs `--runbook`.
+  3. **The resolution edit (not done in this pass):** set status and resolved date in `issues.md`;
+     record the actual root cause, fix and validation; remove ISSUE-233 from `IssuesIndex.md` and the
+     Open Issues table; move the runbook to `issues/closed/AFLDB-ISSUE-233.md` with its evidence
+     references; retitle the `CHANGELOG.md` section from "issue open" to resolved.
+- **Follow-up to record at resolution (no new issue):** at the next real promotion, capture the
+  `[PASS]`/`[FAIL]` ownership line at `pre-cutover`, `restored`, `candidate` and `production`, and the
+  Node version; at the 2026 rollover, run the D-233-2 load and the census with `--through-season 2026`.
+
+### 4.13 Resolution (2026-10-08) — operator decision D-233-4
+
+**4.13.1 Decision D-233-4 (operator, 2026-10-08).** The operator approved accepting the independently
+graded standalone `--phase dependencies` reads on DEV and PROD (§4.12) as satisfying the
+first-live-read requirement of §4.6 item 6, and resolving ISSUE-233 on that basis.
+
+Accepted limits, recorded as the operator stated them:
+- **No real promotion ran.** The reads were standalone, read-only and unfrozen.
+- **`pre-cutover`, `restored`, `candidate` and `production` remain DB-free tested only.** Their
+  ownership-gate results are to be captured during the next real promotion.
+- **The first genuine D-233-2 load remains a 2026 rollover follow-up.** The write path itself passed
+  its `code_test_db` rehearsal with an exact restore (§4.11.14); the duplicate-season case (case 5)
+  was DB-free only.
+- **The unfrozen manifests must not be reused for a promotion.** The DEV and PROD manifest-A files in
+  `D:\tmp\issue233\gate-read-r3-evidence\` (§4.12.1, `freeze_token: null`) are evidence of the 2026-10-08
+  reads only.
+
+**4.13.2 What the issue was, and what closed it.**
+- **Gap.** ISSUE-228's rollover runbook change had no owner once ISSUE-101/F was resolved. Season
+  discovery had no tool; the AFL API Brownlow season totals had no load path; and a rebuild or a
+  promotion over a live target could silently re-own an `afl_api`-owned canonical match as AFL Tables
+  (a path found at the design stage; no database held such a match).
+- **D-233-1 (discovery).** `discover-afl-api-seasons.ts` proposes registry additions as a
+  deterministic JSON proposal and never edits the registry or `in_progress_seasons`. First real DEV
+  `--fetch` PASSED (`20261001T034039Z`, `no_change`, offline replay byte-identical; §3b.3).
+- **D-233-2 (season-scoped Brownlow artefacts).** `import_brownlow_season.py` loads
+  `season-votes-afl_api-<season>.csv` beside the master, gated by `brownlow_season_total` complete.
+  The `code_test_db` rehearsal PASSED and restored exactly (§4.11.14).
+- **D-233-3 (preserve ownership or refuse).** One shared census (`afl-api-ownership-census.ts`)
+  refuses at the rebuild, the rollover and the promotion gate (`dependencies`, `pre-cutover`,
+  `restored`, `candidate`, frozen `production`), with no override. Ownership replay stays
+  intentionally unimplemented.
+
+**4.13.3 Validation retained.** Each item is recorded in the section cited.
+- DB-free suites and the final review (passes 5 and 12; no CRIT/HIGH; MED findings fixed).
+- Rollback-only census proof 5/5 on `afldb_test`, no residue (§4.8.2).
+- Read-only censuses of `afldb_test` and `afldb_dev`, zero `afl_api` matches (§4.8.3).
+- `code_test_db` D-233-2 rehearsal, exact restore, residue 0 (§4.11.14).
+- **The promotion gate's first live read, 2026-10-08:** `afldb_dev` (stamp `20261008-080739`, HEAD
+  `7adfb3e8`, archive sha256 `0657abe6697a80b351dbb889ea0ba85e3093c75c02b1996cd39ccac66b269784`) and
+  `afldb_prod` (stamp `20261008-081656`, HEAD `cd3cf782`, archive sha256
+  `8be30cc79422532a5f927ceaef5430d465e8899d7aef093a5dde441ac58b71dc`): ownership gate PASS and
+  dependencies phase PASS, no `afl_api`-owned match in any season, exit 0. Graded offline in §4.12
+  (0 CRIT/HIGH/MED, 5 INFO).
+- **ISSUE-265 N2-window note (retained).** The PROD read ran on 2026-10-08 at about 19:17 AEDT (wrapper
+  start 08:17:13Z, database read captured 08:17:15Z), during ISSUE-265's N2 observation window. ISSUE-265's
+  records and worktree were not read or edited by the grading or by this closure, and no claim is made
+  about N2.
+
+**4.13.4 Follow-up (recorded; no successor issue).** Each is a property of a future operation, not a
+defect, so none meets the `CLAUDE.md` §5 criteria for a new issue.
+1. **Next real promotion:** capture the `[PASS]` or `[FAIL]` `afl_api completed-season ownership on the live
+   target` line at `pre-cutover`, `restored`, `candidate` and `production`, and record the Node version
+   (DEV ran v18.19.1 and PROD v22.23.2 in §4.12; `package.json` declares no `engines`). A `FAIL` there is
+   a gate working as designed and refuses the promotion.
+2. **2026 rollover:** run the D-233-2 load for the first time on a genuine season artefact once
+   `stat-availability.json` marks the season `complete`, and take the D-233-3 census evidence with
+   `--through-season 2026` (§4.8.3).
+3. **R4 (§4.8.4, §4.10):** an identity correction touching a loaded AFL API season refuses
+   (fail-closed); revisit at the rollover.
+4. This runbook's §4.1 onboarding checklist and rollover ordering remain the reference procedure for
+   ISSUE-229 and later season rollovers.
+
+**4.13.5 Tracking at resolution.** `issues.md` (status, resolution, Open Issues table row removed),
+`IssuesIndex.md` (entry removed, open count 3 to 2), `CHANGELOG.md` (section retitled). The runbook
+moved from `issues/open/` to `issues/closed/`. No `-HANDOFF.md` companion exists for this issue, and its
+evidence stays untracked under `D:\tmp\issue233\` (recorded above with hashes), per the convention in
+§4.8.3.
+
 ## 5. Dependencies
 
 - ISSUE-229 needs the next season registered (§4.1 step 1) to acquire its pre-match feed.
@@ -1522,3 +1783,17 @@ Pass 12 (2026-10-01, final review; committed with passes 6–11):
 - **M** `tests/python/afl_api_brownlow_season_artefact_contract.py` (+16 checks),
   `tests/python/brownlow_afl_api_season_rehearsal_contract.py` (+2 checks).
 - **M** this runbook (state block, §4.6, §4.11.15), `issues.md`, `IssuesIndex.md`, `CHANGELOG.md`.
+
+Pass 13 (2026-10-08, on `fee3cd23`, uncommitted; records only, no code):
+- **M** this runbook (state block, §4.6 item 6, §4.12), `issues.md`, `IssuesIndex.md`, `CHANGELOG.md`.
+- Outside the repository, new: `D:\tmp\issue233\gate-read-r3-extract\` (extraction of the two returned
+  archives). The returned evidence in `D:\tmp\issue233\gate-read-r3-evidence\` and the script in
+  `D:\tmp\issue233\gate-read-r3\` were read, not changed.
+
+Pass 14 (2026-10-08, resolution; records only, no code):
+- **R** this runbook, moved from `issues/open/AFLDB-ISSUE-233.md` to `issues/closed/AFLDB-ISSUE-233.md`
+  (status line, §4.12 pointer, new §4.13, this entry).
+- **M** `issues.md` (entry resolved; Open Issues table row removed, count 3 to 2), `IssuesIndex.md`
+  (entry removed, count 3 to 2, resolution summary), `CHANGELOG.md` (section retitled, resolution bullet).
+- **M** `issues/closed/AFLDB-ISSUE-232.md`, `issues/closed/AFLDB-ISSUE-257.md`: the one
+  `issues/open/AFLDB-ISSUE-233.md` path in each now names the closed path.

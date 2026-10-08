@@ -383,7 +383,7 @@ commit.
   the PROD build now exports `AFLDB_ENV=production` to `prepare-standalone` so HSTS and the
   production CSP are confirmed.
 
-### Season rollover: AFL API ownership census and season-scoped AFL API Brownlow artefacts (AFLDB-ISSUE-233; issue open) - 1 October 2026
+### Season rollover: AFL API ownership census and season-scoped AFL API Brownlow artefacts (AFLDB-ISSUE-233; resolved 8 October 2026) - 1 October 2026
 
 - **D-233-3 — a rebuild preserves `afl_api` ownership or refuses.** `npm run db:test:rebuild` gains a read-only
   stage, `afl-api-ownership-census`, straight after PRECHECK and before the adjudication capture and the reset.
@@ -483,7 +483,20 @@ commit.
   - **AFL API Brownlow manifests use POSIX paths on every host.** A manifest built on Windows used to name
     `artefact.file` with backslashes, which the loader's file-name check would refuse on a Linux rebuild.
 
-  PROD is untouched.
+  PROD was untouched as of 1 October 2026.
+
+  - **8 October 2026: the promotion gate's first live read passed on DEV and PROD** (operator-run, standalone
+    `--phase dependencies`, read-only, no freeze; no code change). Both `afldb_dev` and `afldb_prod` pass the
+    `afl_api` ownership gate and the manifest-A capture with no `afl_api`-owned match in any season. The returned
+    evidence was graded offline: archives, manifests, the recomputed `dependency_set_sha256` values and the five
+    gate source files all verify. Limits: only the `dependencies` phase ran; `pre-cutover`, `restored`,
+    `candidate` and `production` remain unexercised live (DB-free proven); the manifests are unfrozen and must not
+    be reused for a promotion.
+  - **8 October 2026: AFLDB-ISSUE-233 resolved (operator decision D-233-4; records only).** The graded standalone
+    reads are accepted as the first live read of the promotion gate. Accepted limits: no real promotion ran;
+    `pre-cutover`, `restored`, `candidate` and `production` remain DB-free tested only, to be captured at the next real
+    promotion; the first genuine D-233-2 load is a 2026 rollover follow-up. The PROD read ran at about 19:17 AEDT,
+    during ISSUE-265's N2 observation window. The runbook moved to `issues/closed/AFLDB-ISSUE-233.md`.
 
 ### Corrected-identity promotion: DEV rehearsal passed, temporary PROD gate retired, AFLDB-ISSUE-238 resolved - 1 October 2026
 

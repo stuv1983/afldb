@@ -1126,7 +1126,7 @@ READ READ ONLY`, `current_database()` guard, `ROLLBACK`. The SQL mirrors `resolv
   `fitzroy-contract.json`: 2604 `Charlie_Cameron` + `Charlie_Cameron3`; 6292 `Jack_Graham` +
   `Jack_Graham2`; 6519 `Jack_Ross` + `Jack_Ross3`; 6619 `Jack_Williams` + `Jack_Williams3`. All are
   `unique` / `afltables_profile_url`. This is deliberate continuity, not a defect; ISSUE-233 already
-  folds them (`issues/open/AFLDB-ISSUE-233.md` §4.11).
+  folds them (`issues/closed/AFLDB-ISSUE-233.md` §4.11).
 - **Conclusion.** No material current-season unresolved population. The four-player ambiguous
   population is covered by D-257-9. Implementation continues.
 
