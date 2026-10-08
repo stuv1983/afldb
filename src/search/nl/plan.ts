@@ -2429,10 +2429,20 @@ export function validatePlan(raw: NlQueryPlan): NlQueryPlan | NlValidationError 
   }
   if (raw.grain === 'player_career' && raw.scope.clubFor && raw.careerPredicates.length === 0) {
     const def = raw.metric ? NL_METRICS.player_career[raw.metric] : undefined;
+    // AFLDB-ISSUE-259: the compiler club-scopes a `games` condition and
+    // nothing else (conditionSql); any other column or award condition is
+    // evaluated across the whole career. A club-scoped plan is therefore
+    // answerable only when EVERY condition is a games condition -- ranked or
+    // not -- so a ranking can never mix club-scoped values with a
+    // whole-career filter. The condition test is shared by both branches.
+    const onlyScopedGamesConditions = raw.careerConditions.every(
+      (condition) => condition.kind === 'column' && condition.column === 'games',
+    );
     const scopedGamesConditions = raw.metric === null
       && raw.careerConditions.length > 0
-      && raw.careerConditions.every((condition) => condition.kind === 'column' && condition.column === 'games');
+      && onlyScopedGamesConditions;
     const scopedRankedMetric = raw.metric !== null
+      && onlyScopedGamesConditions
       && (raw.metric === 'games' || (def?.kind === 'column' && !!def.statKey));
     if (!scopedGamesConditions && !scopedRankedMetric) {
       return { error: 'This career statistic cannot currently be totalled for one club.' };
@@ -2637,6 +2647,35 @@ const OP_WORDS: Record<NlCompareOp, string> = {
   gte: 'at least', lte: 'at most', gt: 'more than', lt: 'less than', eq: 'exactly',
 };
 
+/**
+ * AFLDB-ISSUE-260: the reader-facing name of each career condition column.
+ * NL_CAREER_COLUMNS' values are the compiler's SQL (`c.premierships`) and
+ * must never reach the explanation; keyed by NlCareerColumn so a column
+ * added to NL_CAREER_COLUMNS without a label here fails typechecking.
+ */
+const CAREER_COLUMN_LABEL: Record<NlCareerColumn, string> = {
+  games: 'games',
+  goals: 'goals',
+  finals: 'finals',
+  premierships: 'premierships',
+  wins: 'wins',
+  draws: 'draws',
+  losses: 'losses',
+  brownlow_votes: 'Brownlow votes',
+  brownlow_medals: 'Brownlow medals',
+  clubs_played: 'clubs played',
+  seasons_played: 'seasons played',
+  debut_season: 'debut season',
+  final_season: 'final season',
+  behinds: 'behinds',
+  kicks: 'kicks',
+  handballs: 'handballs',
+  disposals: 'disposals',
+  marks: 'marks',
+  tackles: 'tackles',
+  hitouts: 'hitouts',
+};
+
 const CLUB_SEASON_CONDITION_LABEL: Record<NlClubSeasonCondition['kind'], string> = {
   premier: 'Premiers that season',
   wooden_spoon: 'Wooden spoon that season',
@@ -2721,7 +2760,7 @@ export function describePlan(plan: NlQueryPlan): string[] {
     if (cond.kind === 'column') {
       const columnLabel = cond.column === 'games' && plan.scope.clubFor
         ? `games for ${plan.scope.clubFor.name}`
-        : NL_CAREER_COLUMNS[cond.column];
+        : CAREER_COLUMN_LABEL[cond.column];
       lines.push(`Condition: ${columnLabel} ${opWord} ${cond.value}.`);
     } else {
       lines.push(`Condition: ${NL_AWARDS[cond.awardKey].label} ${opWord} ${cond.value}.`);

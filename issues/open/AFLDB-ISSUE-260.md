@@ -9,7 +9,9 @@
 - **Review origin:** `playbooks/issue.md`, finding F-004.
 - **Operator decision (2026-10-02, made after the review):** approved for implementation; no further
   decision required (§15).
-- Nothing has been implemented.
+- **Implemented in the working tree on 2026-10-08, uncommitted, together with AFLDB-ISSUE-259 (§17).
+  Local validation PASSED (operator-run, 2026-10-08; §17.3). Commit, merge and DEV browser acceptance
+  pending; the issue stays open until DEV acceptance passes.**
 
 ## 1. Summary
 
@@ -117,5 +119,68 @@ intended.
 
 ## 16. Next action
 
-Implement in the same focused NL session as AFLDB-ISSUE-259, unless implementation evidence shows
-they should be separated. Not started.
+Superseded by §17: implemented with AFLDB-ISSUE-259 on 2026-10-08; operator-run local validation
+passed (§17.3). Next: the operator commits, merges and deploys to DEV, then the DEV browser acceptance
+in §17.3 runs.
+
+## 17. Implementation (2026-10-08) and validation
+
+Nothing was executed in the implementing session (no shell, Git, SQL, tests, build or deployment).
+
+### 17.1 Change
+
+- `src/search/nl/plan.ts`: new `CAREER_COLUMN_LABEL: Record<NlCareerColumn, string>` beside `OP_WORDS`;
+  `describePlan` uses it instead of `NL_CAREER_COLUMNS[cond.column]`. Typing it on `NlCareerColumn`
+  makes a column added to `NL_CAREER_COLUMNS` without a label a TypeScript error.
+- Labels (lower case to match the existing metric-condition lines, "Brownlow" capitalised as a proper
+  noun): games, goals, finals, premierships, wins, draws, losses, Brownlow votes, Brownlow medals,
+  clubs played, seasons played, debut season, final season, behinds, kicks, handballs, disposals,
+  marks, tackles, hitouts. Wording was needed only for the columns the metric registry does not label
+  (`clubs_played`, `seasons_played`, `debut_season`, `final_season`, `draws`/`wins`/`losses` as
+  lower-case words); the metric registry was not reused because its labels are capitalised metric
+  names ("Clubs") and the registry covers fewer columns.
+- Unchanged: the operator words and values, "games for <club>" for a club-scoped games condition,
+  award-condition labels, every other explanation line, the compiler's `NL_CAREER_COLUMNS` map.
+- Example lines: "Condition: premierships exactly 0.", "Condition: games at least 300.", "Condition:
+  clubs played at least 3."
+
+### 17.2 Tests added
+
+`tests/nl-plan.test.ts`, describe "career condition labels (AFLDB-ISSUE-260)":
+- every key of `NL_CAREER_COLUMNS`: the line matches `Condition: <letters and spaces> at least 7.`
+  and contains neither the SQL marker, a `c.` alias, nor an underscore;
+- exact lines for representative columns across all five operators (eq, gte, gt, lte, lt);
+- two conditions keep one line each in plan order; a ranked plan; a club-scoped games condition and an
+  award condition keep their labels.
+The existing `/premierships.*exactly 0/` assertion still holds.
+
+### 17.3 Operator validation
+
+**Local validation PASSED (operator-run, 2026-10-08).** The implementing session ran nothing; these
+results were reported back by the operator and are recorded as returned. They were run together with
+ISSUE-259's files.
+
+```text
+npx vitest run tests/nl-plan.test.ts tests/nl-semantic-mapping.test.ts
+npm run typecheck
+git diff --check
+```
+
+| Check | Result |
+|---|---|
+| `tests/nl-plan.test.ts` (holds the new "career condition labels" describe) | 219 passed |
+| `tests/nl-semantic-mapping.test.ts` | 178 passed |
+| Combined | 397 passed, zero failures |
+| `npm run typecheck` | passed, including Next route type generation |
+| `git diff --check` | passed |
+
+The `CAREER_COLUMN_LABEL` completeness check (a column added to `NL_CAREER_COLUMNS` without a label is
+a TypeScript error) held under the typecheck.
+
+**Still pending:** operator commit, merge, and DEV deploy (`deploy/sync-dev.ps1`); then DEV browser
+acceptance. After the DEV deploy, ask one §8 question (for example "players with 300 games and no
+premierships") in the browser and confirm the explanation panel shows no `c.` identifier. The issue
+stays open until that passes.
+
+Uncertainty: none beyond wording. The label wording is an implementation detail per §15; the operator
+may prefer "career premierships"-style prefixes, which would be a one-line change per label.

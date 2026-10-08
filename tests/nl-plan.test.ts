@@ -7,9 +7,11 @@ import {
   describePlan,
   encodePlanToken,
   isNlMetric,
+  NL_CAREER_COLUMNS,
   NL_LIMITS,
   NL_METRICS,
   validatePlan,
+  type NlCareerColumn,
   type NlGrain,
   type NlQueryPlan,
 } from '@/search/nl/plan';
@@ -273,6 +275,80 @@ describe('validatePlan', () => {
           ...listPlan,
           careerPredicates: [{ builder: 'grand_finals_played_min', params: { times: '3' } }],
         }))).toBe(false);
+      });
+    });
+
+    // AFLDB-ISSUE-259: the compiler club-scopes a `games` condition and no
+    // other, so a club-scoped career plan -- ranked or not -- is answerable
+    // only when every condition is a games condition. The ranked branch
+    // previously never looked at conditions and mixed a club-scoped ranking
+    // with a whole-career filter.
+    describe('club-scoped career conditions (AFLDB-ISSUE-259)', () => {
+      const CLUB_STAT_ERROR = 'This career statistic cannot currently be totalled for one club.';
+      const premierships0 = { kind: 'column', column: 'premierships', op: 'eq', value: 0 } as const;
+      const brownlow2 = { kind: 'column', column: 'brownlow_medals', op: 'gte', value: 2 } as const;
+      const games200 = { kind: 'column', column: 'games', op: 'gte', value: 200 } as const;
+      const aa1 = { kind: 'award_count', awardKey: 'all_australian', op: 'gte', value: 1 } as const;
+      const unranked = { metric: null, agg: { kind: 'list' } } as const;
+      const ranked = { metric: 'games', agg: { kind: 'max' } } as const;
+
+      it('refuses a ranked club-scoped plan carrying a non-games column condition', () => {
+        expect(validatePlan(basePlan({
+          ...ranked, scope: { clubFor: carlton }, careerConditions: [premierships0],
+        }))).toEqual({ error: CLUB_STAT_ERROR });
+        expect(validatePlan(basePlan({
+          ...ranked, scope: { clubFor: carlton }, careerConditions: [brownlow2],
+        }))).toEqual({ error: CLUB_STAT_ERROR });
+        // A club-scopable stat metric is refused the same way.
+        expect(validatePlan(basePlan({
+          metric: 'goals', agg: { kind: 'top_n', n: 5 }, scope: { clubFor: carlton }, careerConditions: [premierships0],
+        }))).toEqual({ error: CLUB_STAT_ERROR });
+      });
+
+      it('refuses a ranked club-scoped plan carrying an award condition', () => {
+        expect(validatePlan(basePlan({
+          ...ranked, scope: { clubFor: carlton }, careerConditions: [aa1],
+        }))).toEqual({ error: CLUB_STAT_ERROR });
+      });
+
+      it('refuses a ranked club-scoped plan when a games condition is mixed with another', () => {
+        expect(validatePlan(basePlan({
+          ...ranked, scope: { clubFor: carlton }, careerConditions: [games200, premierships0],
+        }))).toEqual({ error: CLUB_STAT_ERROR });
+      });
+
+      it('refuses the unranked form identically', () => {
+        expect(validatePlan(basePlan({
+          ...unranked, scope: { clubFor: carlton }, careerConditions: [premierships0],
+        }))).toEqual({ error: CLUB_STAT_ERROR });
+        expect(validatePlan(basePlan({
+          ...unranked, scope: { clubFor: carlton }, careerConditions: [aa1],
+        }))).toEqual({ error: CLUB_STAT_ERROR });
+        expect(validatePlan(basePlan({
+          ...unranked, scope: { clubFor: carlton }, careerConditions: [games200, premierships0],
+        }))).toEqual({ error: CLUB_STAT_ERROR });
+      });
+
+      it('keeps club-scoped plans whose conditions are all on games', () => {
+        expect('error' in validatePlan(basePlan({
+          ...ranked, scope: { clubFor: carlton }, careerConditions: [games200],
+        }))).toBe(false);
+        expect('error' in validatePlan(basePlan({
+          metric: 'goals', agg: { kind: 'max' }, scope: { clubFor: carlton }, careerConditions: [games200],
+        }))).toBe(false);
+        expect('error' in validatePlan(basePlan({
+          ...unranked, scope: { clubFor: carlton }, careerConditions: [games200],
+        }))).toBe(false);
+        // No condition at all on a club-scoped ranking is unchanged.
+        expect('error' in validatePlan(basePlan({
+          ...ranked, scope: { clubFor: carlton },
+        }))).toBe(false);
+      });
+
+      it('keeps whole-career plans with any condition valid when no club is set', () => {
+        expect('error' in validatePlan(basePlan({ ...ranked, careerConditions: [premierships0] }))).toBe(false);
+        expect('error' in validatePlan(basePlan({ ...ranked, careerConditions: [brownlow2, aa1] }))).toBe(false);
+        expect('error' in validatePlan(basePlan({ ...unranked, careerConditions: [games200, premierships0] }))).toBe(false);
       });
     });
   });
@@ -598,6 +674,68 @@ describe('describePlan', () => {
     const lines = describePlan(plan);
     expect(lines.some((l) => /premierships.*exactly 0/.test(l))).toBe(true);
     expect(lines.some((l) => l.includes('Played a grand final'))).toBe(true);
+  });
+
+  // AFLDB-ISSUE-260: the condition label used to be NL_CAREER_COLUMNS' value,
+  // the compiler's SQL marker ("Condition: c.premierships exactly 0.").
+  describe('career condition labels (AFLDB-ISSUE-260)', () => {
+    const careerLines = (careerConditions: NlQueryPlan['careerConditions'], overrides: Partial<NlQueryPlan> = {}) =>
+      describePlan(basePlan({ metric: null, agg: { kind: 'list' }, careerConditions, ...overrides }))
+        .filter((line) => line.startsWith('Condition:'));
+
+    it('prints no SQL alias or column identifier for any career condition column', () => {
+      for (const [column, marker] of Object.entries(NL_CAREER_COLUMNS)) {
+        const [line] = careerLines([{ kind: 'column', column: column as NlCareerColumn, op: 'gte', value: 7 }]);
+        expect(line, column).toMatch(/^Condition: [A-Za-z][A-Za-z ]* at least 7\.$/);
+        expect(line, column).not.toContain(marker);
+        expect(line, column).not.toMatch(/\bc\.|_/);
+      }
+    });
+
+    it('names each column in reader-facing words, keeping its operator and value', () => {
+      expect(careerLines([{ kind: 'column', column: 'premierships', op: 'eq', value: 0 }]))
+        .toEqual(['Condition: premierships exactly 0.']);
+      expect(careerLines([{ kind: 'column', column: 'games', op: 'gte', value: 300 }]))
+        .toEqual(['Condition: games at least 300.']);
+      expect(careerLines([{ kind: 'column', column: 'clubs_played', op: 'gte', value: 3 }]))
+        .toEqual(['Condition: clubs played at least 3.']);
+      expect(careerLines([{ kind: 'column', column: 'brownlow_medals', op: 'gt', value: 1 }]))
+        .toEqual(['Condition: Brownlow medals more than 1.']);
+      expect(careerLines([{ kind: 'column', column: 'brownlow_votes', op: 'lte', value: 10 }]))
+        .toEqual(['Condition: Brownlow votes at most 10.']);
+      expect(careerLines([{ kind: 'column', column: 'losses', op: 'lt', value: 5 }]))
+        .toEqual(['Condition: losses less than 5.']);
+      expect(careerLines([{ kind: 'column', column: 'debut_season', op: 'gte', value: 2000 }]))
+        .toEqual(['Condition: debut season at least 2000.']);
+    });
+
+    it('keeps one line per condition, in plan order, for a multi-condition plan', () => {
+      expect(careerLines([
+        { kind: 'column', column: 'premierships', op: 'eq', value: 0 },
+        { kind: 'column', column: 'games', op: 'gte', value: 300 },
+      ])).toEqual([
+        'Condition: premierships exactly 0.',
+        'Condition: games at least 300.',
+      ]);
+    });
+
+    it('labels a ranked plan\'s condition the same way', () => {
+      const lines = describePlan(basePlan({
+        metric: 'games', agg: { kind: 'max' },
+        careerConditions: [{ kind: 'column', column: 'premierships', op: 'eq', value: 0 }],
+      }));
+      expect(lines).toContain('Condition: premierships exactly 0.');
+      expect(lines.join(' ')).not.toMatch(/\bc\./);
+    });
+
+    it('still names a club-scoped games condition after the club, and an award by its label', () => {
+      expect(careerLines(
+        [{ kind: 'column', column: 'games', op: 'gte', value: 200 }],
+        { scope: { clubFor: { organizationId: 4, slug: 'collingwood', name: 'Collingwood' } } },
+      )).toEqual(['Condition: games for Collingwood at least 200.']);
+      expect(careerLines([{ kind: 'award_count', awardKey: 'all_australian', op: 'gte', value: 2 }]))
+        .toEqual(['Condition: All-Australian selections at least 2.']);
+    });
   });
 
   it('uses the answer grain in tie prose and describes grouped counts without a fake metric', () => {

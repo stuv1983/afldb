@@ -96,10 +96,16 @@
   - **Operator decision (2026-10-02, after the review):** approved for implementation. The
     explanation must use reader-facing labels and never an internal SQL or compiler identifier. No
     parser change intended.
-  - Nothing implemented.
+  - **2026-10-08: implemented in the working tree, uncommitted, with ISSUE-259** (`describePlan`
+    uses a typed `CAREER_COLUMN_LABEL` map). Explanation text changed; parser, SQL compiler and
+    `PARSER_VERSION` unchanged.
+  - **Local validation PASSED (operator-run, 2026-10-08):** `tests/nl-plan.test.ts` 219 and
+    `tests/nl-semantic-mapping.test.ts` 178 passed (397, zero failures, shared with ISSUE-259);
+    `npm run typecheck` passed (including Next route type generation); `git diff --check` passed.
+    Commit, merge and DEV browser acceptance pending.
 - **Runbook:** `issues/open/AFLDB-ISSUE-260.md`.
-- **Next action:** implement in the same focused NL session as AFLDB-ISSUE-259, unless
-  implementation evidence shows they should be separated.
+- **Next action:** operator commits, merges and deploys to DEV, then DEV acceptance of one §8 question
+  (runbook §17.3). Stays open until then.
 
 ### AFLDB-ISSUE-259 — NL club-scoped career rankings accept a career condition that is evaluated across the whole career
 - **Severity:** Low. **Area:** NL search, validate stage — `src/search/nl/plan.ts` (`validatePlan`);
@@ -113,10 +119,17 @@
     ranking declines when it carries a condition that cannot be evaluated at club scope; the
     condition is never reinterpreted as whole-career. No per-club compiler capability is added. No
     parser change intended; `PARSER_VERSION` unchanged unless implementation shows otherwise.
-  - Nothing implemented.
+  - **2026-10-08: implemented in the working tree, uncommitted, with ISSUE-260** (`validatePlan`
+    requires every condition of a club-scoped career plan to be on `games`, ranked or not). No
+    in-repo test or generator expects an answer for the ranked shape; the external V1 CSV was not
+    searched. Validation changed; parser, SQL compiler and `PARSER_VERSION` unchanged.
+  - **Local validation PASSED (operator-run, 2026-10-08):** `tests/nl-plan.test.ts` 219 and
+    `tests/nl-semantic-mapping.test.ts` 178 passed (397, zero failures); `npm run typecheck` passed
+    (including Next route type generation); `git diff --check` passed. Commit, merge and DEV browser
+    acceptance pending.
 - **Runbook:** `issues/open/AFLDB-ISSUE-259.md`.
-- **Next action:** one focused NL session implementing this with AFLDB-ISSUE-260. The corpora must
-  be checked there for rows of this shape that currently expect an answer.
+- **Next action:** operator commits, merges and deploys to DEV, then DEV acceptance of the three §8
+  questions (runbook §17.5). Stays open until then.
 
 ### AFLDB-ISSUE-233 — AFL API season discovery and season rollover ownership
 - **Severity:** Medium. **Area:** season lifecycle — `data/reference/afl-api-identities.json`, the

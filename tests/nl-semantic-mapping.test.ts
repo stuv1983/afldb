@@ -228,6 +228,31 @@ describe('AFLDB-ISSUE-094 semantic mappings', () => {
     expect(validatePlan(p)).toEqual({ error: 'This career statistic cannot currently be totalled for one club.' });
   });
 
+  // AFLDB-ISSUE-259: the ranked form of the same wording carried the same
+  // mixed scope (club appearances ranked among players filtered on a
+  // whole-career column) and used to validate. It now obeys the same refusal.
+  it.each([
+    ['most games for Collingwood without a premiership', 'collingwood', { column: 'premierships', op: 'eq', value: 0 }],
+    ['most games for Collingwood with no premierships', 'collingwood', { column: 'premierships', op: 'eq', value: 0 }],
+    ['most games for Carlton with at least 2 brownlow medals', 'carlton', { column: 'brownlow_medals', op: 'gte', value: 2 }],
+  ] as const)('refuses a club-scoped ranking with a whole-career condition: %s', async (question, slug, condition) => {
+    const p = await plan(question);
+    expect(p).toMatchObject({
+      grain: 'player_career',
+      metric: 'games',
+      scope: { clubFor: { slug } },
+      careerConditions: [{ kind: 'column', ...condition }],
+    });
+    expect(validatePlan(p)).toEqual({ error: 'This career statistic cannot currently be totalled for one club.' });
+  });
+
+  it('keeps a whole-career ranking with a whole-career condition valid', async () => {
+    const careerRanked = await plan('most games without a premiership');
+    expect(careerRanked.scope.clubFor).toBeUndefined();
+    expect(careerRanked.careerConditions).toEqual([{ kind: 'column', column: 'premierships', op: 'eq', value: 0 }]);
+    expect(validatePlan(careerRanked)).not.toHaveProperty('error');
+  });
+
   it.each([
     ['Gary Ablett Jr career goals', 101],
     ['Gary Ablett Jnr career goals', 101],

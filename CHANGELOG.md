@@ -15,6 +15,25 @@ commit.
 
 ## [Unreleased]
 
+### NL search declines club-scoped career rankings with a whole-career condition, and the explanation names career conditions in words (AFLDB-ISSUE-259 and AFLDB-ISSUE-260; implemented; local validation passed; commit, merge and DEV acceptance pending) - 8 October 2026
+
+- A career question limited to one club is now answered only when every condition is on games, the one condition the
+  compiler totals for a club. A ranked plan with any other column condition or an award condition ("most games for
+  Collingwood without a premiership", "most games for Carlton with at least 2 brownlow medals") is refused with the
+  existing "This career statistic cannot currently be totalled for one club." Before this the unranked form was refused
+  and the ranked form ranked club appearances among players filtered on a whole-career column. Club-scoped games
+  conditions, club-scoped rankings with no condition, and whole-career questions are unchanged. No per-club compiler
+  support was added (AFLDB-ISSUE-259, decision D-259-1).
+- The "How was this calculated?" lines for a career condition use reader-facing names ("Condition: premierships exactly
+  0.", "Condition: clubs played at least 3.") instead of the compiler's column markers ("c.premierships", "c.clubs_played").
+  Operators and values are unchanged (AFLDB-ISSUE-260).
+- Plan validation and the explanation text changed; the parser, the SQL compiler and `PARSER_VERSION` are unchanged. No
+  corpus expectation was changed; no in-repo test or generator expected an answer for the ranked shape (the external V1
+  stress CSV and generated corpora were not searched).
+- Local validation passed (operator-run, 2026-10-08): `tests/nl-plan.test.ts` 219 and `tests/nl-semantic-mapping.test.ts`
+  178 passed (397, zero failures); `npm run typecheck` passed, including Next route type generation; `git diff --check`
+  passed. Commit, merge and DEV browser acceptance are pending; both issues stay open.
+
 ### The Data Editor score edit and match deletion bound their lock waits, and the settles' deadlock retry now recovers (AFLDB-ISSUE-261; resolved; commit pending) - 8 October 2026
 
 - `saveEdit` (match score group only) and `deleteMatch` run under `SET LOCAL lock_timeout = '5s'`, a bound on each lock

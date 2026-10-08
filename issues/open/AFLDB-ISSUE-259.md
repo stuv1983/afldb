@@ -9,7 +9,10 @@
   `src/db/queries/nl/player-career.ts` as the consumer.
 - **Review origin:** `playbooks/issue.md`, finding F-003.
 - **Operator decision (2026-10-02, made after the review):** fail closed — decline (§15.2).
-- Nothing has been implemented. §1–§14 are the review's record as written before the decision.
+- **Implemented in the working tree on 2026-10-08, uncommitted, together with AFLDB-ISSUE-260 (§17).
+  Local validation PASSED (operator-run, 2026-10-08; §17.5). Commit, merge and DEV browser acceptance
+  pending; the issue stays open until DEV acceptance passes.** §1–§14 are the review's record as
+  written before the decision and are unchanged.
 
 ## 1. Summary
 
@@ -177,5 +180,93 @@ corpus corrections had. The corpora were not searched in this pass.
 
 ## 16. Next action
 
-One focused NL session implementing this issue together with AFLDB-ISSUE-260, unless implementation
-evidence shows they should be separated. Not started.
+Superseded by §17: implemented with AFLDB-ISSUE-260 on 2026-10-08; operator-run local validation
+passed (§17.5). Next: the operator commits, merges and deploys to DEV, then the DEV browser acceptance
+in §17.5 runs.
+
+## 17. Implementation (2026-10-08) and validation
+
+Written with the `sonnet/issue-259-260` working tree. Nothing was executed in the implementing
+session (no shell, Git, SQL, tests, build or deployment).
+
+### 17.1 Change
+
+- `src/search/nl/plan.ts`, `validatePlan`, the `player_career` + `clubFor` + no-predicate block.
+  `onlyScopedGamesConditions` (every condition is `kind: 'column'` on `games`; true for an empty
+  list) is now computed once and required by both branches:
+  - unranked: `metric === null`, at least one condition, `onlyScopedGamesConditions` (as before);
+  - ranked: `metric !== null`, `onlyScopedGamesConditions`, and the existing metric test (`games`, or
+    a column metric with a `statKey`).
+  Neither holding returns the existing error, "This career statistic cannot currently be totalled for
+  one club." The match/season-scope refusal that follows is unchanged.
+- Validation (`validatePlan`) changed. Parser, SQL compiler (`player-career.ts`) and `PARSER_VERSION`:
+  unchanged. No per-club capability added.
+
+### 17.2 Outcomes (club-scoped `player_career`, no career predicate)
+
+| Plan | Before | After |
+|---|---|---|
+| ranked, no condition | valid | valid |
+| ranked, games condition(s) only | valid | valid |
+| ranked, any non-games column condition | valid (mixed scope) | **refused** |
+| ranked, any award condition | valid (mixed scope) | **refused** |
+| ranked, games + non-games | valid (mixed scope) | **refused** |
+| unranked, games conditions only | valid | valid |
+| unranked, any non-games / award condition | refused | refused (unchanged) |
+| any plan with no club | unchanged | unchanged |
+
+An award-count ranking metric with a club was already refused (no `statKey`).
+
+### 17.3 Corpus measurement (§15.3)
+
+- Searched `tests/` (including `nl-regression-corpus`, `nl-stress-corpus`, `nl-audit-acceptance`,
+  `nl-parser`, `integration/nl-*`), `tools/nl/ui-corpus.ts`, `generate-expanded-ui-corpus.mjs`,
+  `afldb_nl_mass_generator.py` and both exploratory generators for a ranked club-scoped career plan
+  with a non-games condition expecting an answer: **none found.**
+- The exploratory generators emit club + conditions only as `career_numeric_binding` template 3
+  (unranked list), which was already refused; their ranked templates (2, 4) carry no club.
+- Integration tests that pair a club with a games condition (`tests/integration/nl-answers.test.ts`
+  and `nl-semantic-mapping.test.ts`) stay valid.
+- **Not measured:** the externally authored V1 stress CSV and the corpora the generators produce are
+  not in the repository. Rows of the refused shape there, if any, will move from answered to declined;
+  their expectations need the earlier-corpus adjudication if a run shows it. **No expectation was
+  changed in this session.**
+
+### 17.4 Tests added
+
+- `tests/nl-plan.test.ts`, describe "club-scoped career conditions (AFLDB-ISSUE-259)": ranked refusal
+  for a column condition (games metric and a statKey metric), for an award condition, and for a games
+  + non-games mix; unranked refusal for the same; retained validity for games-only ranked and unranked
+  plans, a ranked plan with no condition, and no-club plans with any condition.
+- `tests/nl-semantic-mapping.test.ts`: the three §8 questions parse to the documented ranked shape and
+  are refused with the exact message; "most games without a premiership" (no club) stays valid.
+- Existing pins unchanged and expected to hold: the unranked refusal in `nl-semantic-mapping`, the
+  `premierships` + club refusal in `nl-plan`.
+
+### 17.5 Operator validation
+
+**Local validation PASSED (operator-run, 2026-10-08).** The implementing session ran nothing; these
+results were reported back by the operator and are recorded as returned.
+
+```text
+npx vitest run tests/nl-plan.test.ts tests/nl-semantic-mapping.test.ts
+npm run typecheck
+git diff --check
+```
+
+| Check | Result |
+|---|---|
+| `tests/nl-plan.test.ts` | 219 passed |
+| `tests/nl-semantic-mapping.test.ts` | 178 passed |
+| Combined | 397 passed, zero failures |
+| `npm run typecheck` | passed, including Next route type generation |
+| `git diff --check` | passed |
+
+The three new `nl-semantic-mapping` cases, written from the §8 record, therefore hold on the parse
+shape as well as on the validation.
+
+**Still pending:** operator commit, merge, and DEV deploy (`deploy/sync-dev.ps1`); then DEV browser
+acceptance. After the DEV deploy, ask the three §8 questions in the browser and confirm each shows the
+coverage-limit message and no answer. If a V1/V2 stress run is made, report the count of rows moving
+from answered to declined (§17.3: not measured; the external V1 CSV and generated corpora are not in
+the repository). The issue stays open until DEV acceptance passes.
