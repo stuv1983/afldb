@@ -2,7 +2,8 @@
 
 ## 0. Status
 
-- **Status:** Open.
+- **Status:** **Resolved (2026-10-08)** — merged and pushed at `7adfb3e8`, deployed to DEV, DEV browser
+  acceptance PASSED (§18). This supersedes the open-state wording below, which is preserved as history.
 - **Opened:** 2026-10-02.
 - **Severity:** Low.
 - **Area:** NL search, validate stage — `src/search/nl/plan.ts` (`validatePlan`), with
@@ -265,8 +266,74 @@ git diff --check
 The three new `nl-semantic-mapping` cases, written from the §8 record, therefore hold on the parse
 shape as well as on the validation.
 
-**Still pending:** operator commit, merge, and DEV deploy (`deploy/sync-dev.ps1`); then DEV browser
-acceptance. After the DEV deploy, ask the three §8 questions in the browser and confirm each shows the
+**Was pending at the time of writing (all completed; DEV browser acceptance is recorded in §18):** operator
+commit, merge, and DEV deploy (`deploy/sync-dev.ps1`); then DEV browser acceptance. After the DEV deploy, ask the three §8 questions in the browser and confirm each shows the
 coverage-limit message and no answer. If a V1/V2 stress run is made, report the count of rows moving
 from answered to declined (§17.3: not measured; the external V1 CSV and generated corpora are not in
 the repository). The issue stays open until DEV acceptance passes.
+
+## 18. DEV browser acceptance (2026-10-08) — PASSED
+
+Run by the implementing session through the Playwright MCP interactive browser; shared with AFLDB-ISSUE-260
+(§18 there). The operator entered the beta key personally at the gate; the key was not requested, read or
+recorded. The cookie banner was declined. No SSH, deployment, configuration change, restart or database access
+was made by this session.
+
+### 18.1 Deployment evidence (operator-reported; not independently re-derived)
+
+- DEV URL: `http://10.0.40.100:8090`. Checkout updated to `7adfb3e8` (merged and pushed). Build completed;
+  standalone `BUILD_ID` `1iy-ZuCMeAIY9W77kTRMT`.
+- Service restarted 2026-10-08 12:56:50 AEDT, MainPID 3896015. A later read-only operator check confirmed the
+  same PID and start time, the correct `WorkingDirectory` and `ExecStart`, the revision and the `BUILD_ID`.
+  `/api/health` returned HTTP 200 with the healthy payload.
+- **Failed header check, preserved as reported:** `-Issue107Gate` failed with exit 21 because `x-afldb-build` was
+  missing; `AFLDB_TRACE_REQUESTS` was absent from the primary process environment. **Live header parity was NOT
+  verified.**
+
+### 18.2 Build identity observed from the browser
+
+- `/api/health` fetched from the browser: HTTP 200. The `x-afldb-build` response header was **absent** (null),
+  consistent with the operator's failed-gate finding; it could not be used.
+- The served HTML of `/` contained the string `1iy-ZuCMeAIY9W77kTRMT` (one occurrence), equal to the operator's
+  standalone `BUILD_ID`. The endpoint therefore reaches the build the operator reported; no contradiction.
+- Limit: the browser cannot read a git commit. That the build corresponds to `7adfb3e8` rests on the operator's
+  deployment evidence plus the behaviour below. This is not header parity and is not claimed as such.
+
+### 18.3 Results
+
+Each question was submitted by typing it into the `/search` box and pressing Enter, from a freshly loaded
+`/search` page each time (no carry-over of an earlier result). Run between about 13:05 and 13:06 AEDT (snapshot
+timestamps 02:05–02:06 UTC).
+
+| # | Question | Observed result | Verdict |
+|---|---|---|---|
+| 1 | most games for Collingwood without a premiership | Heading "AFLDB can't answer this"; body "This career statistic cannot currently be totalled for one club."; no ranking, table or player shown | PASS |
+| 2 | most games for Collingwood with no premierships | Identical: "AFLDB can't answer this" and the exact message; no answer | PASS |
+| 3 | most games for Carlton with at least 2 brownlow medals | "AFLDB can't answer this" and the exact message; no ranking or player shown. One extra navigation link rendered under the feedback prompt: "Brownlow winners — Carlton — Winners by season, filtered to this club." (`/brownlow?club=carlton#brownlow-winners`). It is a page suggestion for the typed question, not an answer, and not a result carried over from questions 1 or 2 (Carlton, not Collingwood) | PASS (observation recorded) |
+
+In all three the rendered `main` text was exactly: search box, "AFLDB can't answer this", the message, and the
+"Did AFLDB understand this question?" prompt (plus the Carlton link for question 3). No answer table, no stale
+Collingwood content.
+
+### 18.4 Browser errors
+
+Playwright console messages (all, warning level and above, whole session): 0 errors, 0 warnings.
+
+### 18.5 Evidence
+
+`issues/closed/AFLDB-ISSUE-259-260-evidence/`:
+
+- `q1-259-collingwood-without-a-premiership.png`
+- `q2-259-collingwood-with-no-premierships.png`
+- `q3-259-carlton-brownlow-medals.png`
+- `q4-260-300-games-no-premierships-explanation-open.png` (ISSUE-260's question)
+
+### 18.6 Resolution
+
+All three acceptance questions show the coverage-limit message and no answer, on a build observed to be the
+operator-reported one. The acceptance criteria in §8, §14 and §17.5 are met without weakening. **Resolved
+2026-10-08.**
+
+Recorded, not blocking: the external V1 stress CSV and generated corpora were not measured (§17.3), so the count
+of rows there that move from answered to declined is unknown; and the `x-afldb-build` header parity on DEV is
+unverified (§18.1), which is a deployment-tooling matter outside this issue's scope.

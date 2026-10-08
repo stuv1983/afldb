@@ -2,7 +2,8 @@
 
 ## 0. Status
 
-- **Status:** Open.
+- **Status:** **Resolved (2026-10-08)** — merged and pushed at `7adfb3e8`, deployed to DEV, DEV browser
+  acceptance PASSED (§18). This supersedes the open-state wording below, which is preserved as history.
 - **Opened:** 2026-10-02.
 - **Severity:** Low.
 - **Area:** NL search, describe/render stage — `src/search/nl/plan.ts` (`describePlan`).
@@ -177,10 +178,56 @@ git diff --check
 The `CAREER_COLUMN_LABEL` completeness check (a column added to `NL_CAREER_COLUMNS` without a label is
 a TypeScript error) held under the typecheck.
 
-**Still pending:** operator commit, merge, and DEV deploy (`deploy/sync-dev.ps1`); then DEV browser
-acceptance. After the DEV deploy, ask one §8 question (for example "players with 300 games and no
+**Was pending at the time of writing (all completed; DEV browser acceptance is recorded in §18):** operator
+commit, merge, and DEV deploy (`deploy/sync-dev.ps1`); then DEV browser acceptance. After the DEV deploy, ask one §8 question (for example "players with 300 games and no
 premierships") in the browser and confirm the explanation panel shows no `c.` identifier. The issue
 stays open until that passes.
 
 Uncertainty: none beyond wording. The label wording is an implementation detail per §15; the operator
 may prefer "career premierships"-style prefixes, which would be a one-line change per label.
+
+## 18. DEV browser acceptance (2026-10-08) — PASSED
+
+Run by the implementing session through the Playwright MCP interactive browser; shared with AFLDB-ISSUE-259
+(§18 there, which holds the full deployment narrative). The operator entered the beta key personally at the
+gate; the key was not requested, read or recorded. No SSH, deployment, configuration change, restart or
+database access was made by this session.
+
+### 18.1 Deployment evidence (operator-reported; not independently re-derived)
+
+- DEV `http://10.0.40.100:8090`; checkout `7adfb3e8`; standalone `BUILD_ID` `1iy-ZuCMeAIY9W77kTRMT`; service
+  restarted 2026-10-08 12:56:50 AEDT, MainPID 3896015; `/api/health` HTTP 200.
+- **Failed header check, preserved as reported:** `-Issue107Gate` failed with exit 21 because `x-afldb-build` was
+  missing (`AFLDB_TRACE_REQUESTS` absent from the primary process environment). **Live header parity was NOT
+  verified.** From the browser the header was also absent; the served HTML of `/` contained the `BUILD_ID`
+  string once, matching the operator's value. The browser cannot read a git commit.
+
+### 18.2 Result
+
+Question typed into the `/search` box and submitted with Enter, about 13:06 AEDT:
+**players with 300 games and no premierships**.
+
+- Returned an answer: heading "33 players match", "Players meeting every condition asked for.", a table of 33
+  players (Travis Boak, 387 games, first; Rohan Smith, Sam Newman and Marc Murphy, 300 games, last).
+- "How was this calculated?" opened (a `<details>` element, `open = true`) and listed exactly:
+  1. Searched career records for every matching player.
+  2. **Condition: premierships exactly 0.**
+  3. **Condition: games at least 300.**
+- Both required lines are present. No `c.games`, `c.premierships` or any `c.<column>` marker appears in the
+  explanation or anywhere in the page text (regular expression `\bc\.[a-z_]+` over the explanation and over the
+  whole body: no match).
+- Console (all, warning level and above, whole session): 0 errors, 0 warnings.
+
+Not part of this acceptance: the correctness of the 33 listed players was not independently checked; the
+criterion is the explanation text.
+
+### 18.3 Evidence
+
+`issues/closed/AFLDB-ISSUE-259-260-evidence/q4-260-300-games-no-premierships-explanation-open.png` (full page,
+explanation open). The ISSUE-259 screenshots are in the same folder.
+
+### 18.4 Resolution
+
+The explanation uses reader-facing names and no internal SQL marker, on a build observed to be the
+operator-reported one. §8, §14 and §17.3 are met without weakening. **Resolved 2026-10-08.** The label wording
+remains an implementation detail (§15).

@@ -9,7 +9,7 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Open issues:** 5
+**Open issues:** 3
 
 ### AFLDB-ISSUE-265 — A settle unit can lose a match-lock deadlock to a legacy CSV promotion, with no in-run retry
 - **Severity:** Medium (raised from Low on 2026-10-05, D-265-12). **Area:** data integrity / concurrency —
@@ -85,51 +85,6 @@
 - **Next action:**
   1. The operator reviews and commits the eighteen files in runbook §25.7 (explicit paths; not the stray files; nothing under `D:\tmp\`).
   2. `npm run merge:ready -- --issue 265`, then merge/push, `deploy/sync-dev.ps1` and DEV acceptance (runbook §18.2).
-
-### AFLDB-ISSUE-260 — NL answer explanation prints internal column markers for career conditions
-- **Severity:** Low. **Area:** NL search, describe/render stage — `src/search/nl/plan.ts`
-  (`describePlan`).
-- **State:** Open (2026-10-02), from the code review recorded in `playbooks/issue.md` (F-004).
-  - A career column condition is labelled with the compiler's SQL marker, so the public explanation
-    reads "Condition: c.premierships exactly 0." Results are unaffected.
-  - Confirmed DB-free through `parseNlQuestion` → `validatePlan` → `describePlan`.
-  - **Operator decision (2026-10-02, after the review):** approved for implementation. The
-    explanation must use reader-facing labels and never an internal SQL or compiler identifier. No
-    parser change intended.
-  - **2026-10-08: implemented in the working tree, uncommitted, with ISSUE-259** (`describePlan`
-    uses a typed `CAREER_COLUMN_LABEL` map). Explanation text changed; parser, SQL compiler and
-    `PARSER_VERSION` unchanged.
-  - **Local validation PASSED (operator-run, 2026-10-08):** `tests/nl-plan.test.ts` 219 and
-    `tests/nl-semantic-mapping.test.ts` 178 passed (397, zero failures, shared with ISSUE-259);
-    `npm run typecheck` passed (including Next route type generation); `git diff --check` passed.
-    Commit, merge and DEV browser acceptance pending.
-- **Runbook:** `issues/open/AFLDB-ISSUE-260.md`.
-- **Next action:** operator commits, merges and deploys to DEV, then DEV acceptance of one §8 question
-  (runbook §17.3). Stays open until then.
-
-### AFLDB-ISSUE-259 — NL club-scoped career rankings accept a career condition that is evaluated across the whole career
-- **Severity:** Low. **Area:** NL search, validate stage — `src/search/nl/plan.ts` (`validatePlan`);
-  `src/db/queries/nl/player-career.ts`.
-- **State:** Open (2026-10-02), from the code review recorded in `playbooks/issue.md` (F-003).
-  - The club-scope guard tests conditions only for unranked plans. "most games for Collingwood
-    without a premiership" validates and ranks club appearances against a whole-career condition,
-    while the unranked form of the same wording is refused.
-  - Confirmed DB-free through the parser and validator; the compiled SQL was read, not run.
-  - **Operator decision (2026-10-02, after the review), D-259-1:** fail closed. A club-scoped career
-    ranking declines when it carries a condition that cannot be evaluated at club scope; the
-    condition is never reinterpreted as whole-career. No per-club compiler capability is added. No
-    parser change intended; `PARSER_VERSION` unchanged unless implementation shows otherwise.
-  - **2026-10-08: implemented in the working tree, uncommitted, with ISSUE-260** (`validatePlan`
-    requires every condition of a club-scoped career plan to be on `games`, ranked or not). No
-    in-repo test or generator expects an answer for the ranked shape; the external V1 CSV was not
-    searched. Validation changed; parser, SQL compiler and `PARSER_VERSION` unchanged.
-  - **Local validation PASSED (operator-run, 2026-10-08):** `tests/nl-plan.test.ts` 219 and
-    `tests/nl-semantic-mapping.test.ts` 178 passed (397, zero failures); `npm run typecheck` passed
-    (including Next route type generation); `git diff --check` passed. Commit, merge and DEV browser
-    acceptance pending.
-- **Runbook:** `issues/open/AFLDB-ISSUE-259.md`.
-- **Next action:** operator commits, merges and deploys to DEV, then DEV acceptance of the three §8
-  questions (runbook §17.5). Stays open until then.
 
 ### AFLDB-ISSUE-233 — AFL API season discovery and season rollover ownership
 - **Severity:** Medium. **Area:** season lifecycle — `data/reference/afl-api-identities.json`, the
@@ -249,6 +204,18 @@
 - **Runbook:** `issues/open/AFLDB-ISSUE-229.md`.
 - **Next action:** B2: capture and review the first authentic 2027 pre-match season feed before
   the fixture writer is wired or applied.
+
+**AFLDB-ISSUE-259 and AFLDB-ISSUE-260 resolved 2026-10-08** (Sonnet 5; merged and pushed at `7adfb3e8`;
+operator-run local validation and DEV deployment; DEV browser acceptance via Playwright MCP) — a club-scoped career
+ranking with any non-`games` condition now declines with "This career statistic cannot currently be totalled for one
+club." (259, D-259-1), and the "How was this calculated?" lines name career conditions in words, not `c.` markers
+(260). DEV `http://10.0.40.100:8090`, operator-reported `BUILD_ID` `1iy-ZuCMeAIY9W77kTRMT` (seen in the served HTML):
+the three ISSUE-259 questions each showed the message and no answer; "players with 300 games and no premierships"
+returned 33 players with "Condition: premierships exactly 0." and "Condition: games at least 300." and no `c.` marker;
+console 0 errors, 0 warnings. **Limitation recorded:** the operator's `-Issue107Gate` failed with exit 21
+(`x-afldb-build` missing; `AFLDB_TRACE_REQUESTS` absent), so live header parity was NOT verified. Full record:
+`issues.md`, `issues/closed/AFLDB-ISSUE-259.md` §18, `issues/closed/AFLDB-ISSUE-260.md` §18, evidence
+`issues/closed/AFLDB-ISSUE-259-260-evidence/`.
 
 **AFLDB-ISSUE-255 resolved 2026-10-01** (Sonnet 5, implementation committed `f6d189d0`, operator-run
 DEV acceptance) — the AFL API settle no longer records an unused emergency as a game played. The

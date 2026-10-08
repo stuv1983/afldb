@@ -15,7 +15,7 @@ commit.
 
 ## [Unreleased]
 
-### NL search declines club-scoped career rankings with a whole-career condition, and the explanation names career conditions in words (AFLDB-ISSUE-259 and AFLDB-ISSUE-260; implemented; local validation passed; commit, merge and DEV acceptance pending) - 8 October 2026
+### NL search declines club-scoped career rankings with a whole-career condition, and the explanation names career conditions in words (AFLDB-ISSUE-259 and AFLDB-ISSUE-260; resolved; merged at `7adfb3e8`; DEV browser acceptance passed) - 8 October 2026
 
 - A career question limited to one club is now answered only when every condition is on games, the one condition the
   compiler totals for a club. A ranked plan with any other column condition or an award condition ("most games for
@@ -32,7 +32,13 @@ commit.
   stress CSV and generated corpora were not searched).
 - Local validation passed (operator-run, 2026-10-08): `tests/nl-plan.test.ts` 219 and `tests/nl-semantic-mapping.test.ts`
   178 passed (397, zero failures); `npm run typecheck` passed, including Next route type generation; `git diff --check`
-  passed. Commit, merge and DEV browser acceptance are pending; both issues stay open.
+  passed.
+- DEV browser acceptance passed (2026-10-08, Playwright MCP, `http://10.0.40.100:8090`, operator-reported checkout
+  `7adfb3e8` and `BUILD_ID` `1iy-ZuCMeAIY9W77kTRMT`, the `BUILD_ID` seen in the served HTML): the three club-scoped
+  questions each showed the coverage-limit message and no answer, and "players with 300 games and no premierships"
+  returned an answer whose explanation read "Condition: premierships exactly 0." and "Condition: games at least 300."
+  with no `c.` marker. Console: no errors or warnings. The operator's `-Issue107Gate` check failed with exit 21
+  (`x-afldb-build` missing), so live header parity on DEV was not verified.
 
 ### The Data Editor score edit and match deletion bound their lock waits, and the settles' deadlock retry now recovers (AFLDB-ISSUE-261; resolved; commit pending) - 8 October 2026
 
