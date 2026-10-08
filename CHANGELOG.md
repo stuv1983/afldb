@@ -15,6 +15,26 @@ commit.
 
 ## [Unreleased]
 
+### Email intake forwards a message only on a trusted DMARC pass for its one From domain (AFLDB-ISSUE-266; implemented, database-free suite passed on Windows and Linux; host configuration and deployment pending) - 9 October 2026
+
+- `tools/email_intake/fetch_and_stage.py` no longer accepts `spf=pass` with `dkim=pass` as sender verification. Those
+  results vouch for the envelope sender and the signing domain, and the sender chooses both, so a forged
+  `From: <admin>` from any domain with its own SPF and DKIM was staged and audited as that admin. The check was also a
+  substring test over the whole header, so `dmarc=pass` written into an envelope address or a comment counted as a pass.
+- The topmost `Authentication-Results` header is now parsed per RFC 8601. A message is forwarded only when that header
+  names the configured authserv-id exactly and holds exactly one `dmarc=pass`, whose single `header.from` equals the
+  domain of the message's one From mailbox. That mailbox is the `senderEmail` sent to the intake route. Malformed
+  headers, missing, duplicate or conflicting dmarc results, duplicate From headers and ambiguous addresses are refused.
+  So are RFC 2047-encoded From addresses, which the standard-library parser would otherwise decode into a different
+  spelling, and any `Authentication-Results` or dmarc version other than 1. Lower headers are never consulted
+  (decision D-266-1).
+- `AFLDB_INTAKE_AUTHSERV_ID` is required while `AFLDB_INTAKE_REQUIRE_AUTH` is on, which is the default. A missing or
+  invalid value, or an unrecognised `AFLDB_INTAKE_REQUIRE_AUTH`, exits 78 before the mailbox is opened (decision
+  D-266-2). **A host running the intake timer needs this set before the change is deployed**, after its receiving mail
+  server's behaviour has been verified (`docs/admin-and-beta.md` §5).
+- DMARC authenticates the From domain, not the individual mailbox owner. Senders whose domain publishes no DMARC record
+  are now refused; the web upload form is unchanged. The intake route is unchanged.
+
 ### NL search declines club-scoped career rankings with a whole-career condition, and the explanation names career conditions in words (AFLDB-ISSUE-259 and AFLDB-ISSUE-260; resolved; merged at `7adfb3e8`; DEV browser acceptance passed) - 8 October 2026
 
 - A career question limited to one club is now answered only when every condition is on games, the one condition the

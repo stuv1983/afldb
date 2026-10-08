@@ -9,7 +9,7 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Open issues:** 2
+**Open issues:** 3
 
 ### AFLDB-ISSUE-265 — A settle unit can lose a match-lock deadlock to a legacy CSV promotion, with no in-run retry
 - **Severity:** Medium (raised from Low on 2026-10-05, D-265-12). **Area:** data integrity / concurrency —
@@ -103,6 +103,17 @@
 - **Runbook:** `issues/open/AFLDB-ISSUE-229.md`.
 - **Next action:** B2: capture and review the first authentic 2027 pre-match season feed before
   the fixture writer is wired or applied.
+
+### AFLDB-ISSUE-266 — Email intake accepts unaligned SPF/DKIM passes, so a forged From address stages submissions as any admin
+- **Severity:** High. **Area:** Legacy intake / email ingress — `tools/email_intake/fetch_and_stage.py`.
+- **State:** Open (2026-10-08), 2026-10-08 full code review F-001. D-266-1 (trusted `dmarc=pass` only, bound to the
+  single From mailbox's domain) and D-266-2 (`AFLDB_INTAKE_AUTHSERV_ID` required; exit 78 before IMAP) were decided on
+  2026-10-09. **Implemented in the working tree, uncommitted.** Pre-commit review fixed two parser gaps (runbook §18.8);
+  the DB-free suite passed 160/160 on Windows and, on 2026-10-09, 160/160 on Linux (streamanator, CPython 3.12.3;
+  runbook §18.9). Live mail-host behaviour and host configuration are unverified; not deployed.
+- **Runbook:** `issues/open/AFLDB-ISSUE-266.md`.
+- **Next action:** Operator reviews and commits. Per host, verify the receiving server's header behaviour and
+  authserv-id, then set `AFLDB_INTAKE_AUTHSERV_ID` before deploying (runbook §18.6).
 
 **AFLDB-ISSUE-233 resolved 2026-10-08** (implementation merged 2026-10-01 as `f0abbb4c` and `cc1a5f2d`; operator
 decision D-233-4) — AFL API season discovery (D-233-1), season-scoped AFL API Brownlow artefacts (D-233-2), and an

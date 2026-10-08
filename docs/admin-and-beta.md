@@ -479,12 +479,53 @@ is the site's *public* address and would send the secret out and back.
 against `auth_users` establishes that the address belongs to someone
 allowed to submit — not that they are the one who sent it, which
 anyone can write. So before forwarding anything, the poller requires
-that the *receiving* mail server verified the sender: the topmost
-`Authentication-Results` header must record `dmarc=pass`, or
-`spf=pass` with `dkim=pass`. Only the topmost is read, because each hop
-prepends its own and a spoofer's is the one underneath. Where the mail
-server does not strip inbound copies, set `AFLDB_INTAKE_AUTHSERV_ID` to
-its authserv-id so the header must also carry that name.
+that the *receiving* mail server verified the sender (AFLDB-ISSUE-266):
+
+- The message has exactly one `From` header holding exactly one plain
+  mailbox. That parsed address is the one forwarded as `senderEmail`.
+- The **topmost** `Authentication-Results` header names the configured
+  `AFLDB_INTAKE_AUTHSERV_ID` exactly. Each hop prepends its own header,
+  so the topmost is the receiving server's and a spoofer's sits
+  underneath. If the topmost header is from another server or does not
+  parse, the message is refused; lower headers are never consulted.
+- That header holds exactly one `dmarc` result. It is `pass`, and its
+  single `header.from` equals the From mailbox's domain.
+
+The header is parsed per RFC 8601, not searched as text. A result counts
+only where the grammar puts one, so `dmarc=pass` inside a comment, a
+quoted value or an envelope address never counts. Malformed headers and
+missing, duplicate or conflicting `dmarc` results are refused. SPF and
+DKIM passes are not accepted on their own, aligned or not: they vouch
+for the envelope sender and the signing domain, and the sender picks
+both.
+
+**DMARC authenticates the domain, not the person.** A pass shows the
+message came through the From domain's own authenticated mail system.
+Whether that system stops one of its users sending as another is up to
+the domain. This is not proof of the individual sender. A sender whose
+domain publishes no DMARC record gets `dmarc=none` and is refused; a
+`p=none` record is enough for properly signed mail to pass. The web
+upload form is unaffected.
+
+`AFLDB_INTAKE_AUTHSERV_ID` is **required** while
+`AFLDB_INTAKE_REQUIRE_AUTH` is on, which is the default. If it is
+missing or invalid, or `AFLDB_INTAKE_REQUIRE_AUTH` is neither true nor
+false, the poller exits 78 (EX_CONFIG) before connecting to the
+mailbox, so nothing is read, filed or marked. Before enabling the timer
+on a host:
+
+1. Find the receiving server's real authserv-id: the name at the start
+   of the `Authentication-Results` header on a legitimate message, as
+   delivered to the intake mailbox.
+2. Check that this server **adds** its header above any existing ones,
+   and **removes** inbound headers that already carry its authserv-id
+   (RFC 8601 §5). The second check is what stops a sender forging the
+   top header.
+3. Check that the dmarc result is in that topmost header, with an
+   authserv-id. Some stacks write SPF, DKIM and DMARC into separate
+   headers. Microsoft 365 writes no authserv-id at all and is therefore
+   unsupported.
+
 `AFLDB_INTAKE_REQUIRE_AUTH=false` turns the check off, and should only
 be set where something upstream already guarantees it.
 
@@ -523,12 +564,14 @@ protection covers a double-click on `/admin/upload`.
 Exit codes: `0` all clear, `1` something was rejected and needs a
 human, `75` (`EX_TEMPFAIL`) nothing was rejected but something is being
 retried. A single 75 during a deploy is expected; a run of them means
-the app is not answering.
+the app is not answering. `78` (`EX_CONFIG`) means the authentication
+settings are missing or invalid; the mailbox was not opened.
 
 ### One-time server setup
 
 ```bash
-# .env: AFLDB_EMAIL_INTAKE_SECRET and AFLDB_INTAKE_IMAP_* (see .env.example)
+# .env: AFLDB_EMAIL_INTAKE_SECRET, AFLDB_INTAKE_IMAP_* and AFLDB_INTAKE_AUTHSERV_ID
+# (see .env.example; establish the authserv-id with the three checks above first)
 sudo cp deploy/afldb-email-intake.service deploy/afldb-email-intake.timer /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now afldb-email-intake.timer
